@@ -56,7 +56,7 @@
     "simpleReturnTooltip": "Ganho ou perda percentual total nas suas posições, calculado como (Valor de Mercado − Custo de Aquisição) ÷ Custo de Aquisição. Não considera o momento das contribuições ou levantamentos.",
     "twr": "TWR",
     "twrFull": "(Ponderado pelo Tempo)",
-    "twrTooltip": "Mede o desempenho dos seus investimentos independentemente de quando adicionou ou retirou dinheiro. Elimina o impacto do calendário dos fluxos de caixa para mostrar o desempenho puro do investimento.",
+    "twrTooltip": "Retorno ponderado pelo tempo dos seus investimentos desde a primeira transação, calculado da mesma forma que Desempenho da carteira: os depósitos, os levantamentos e o numerário não investido são excluídos, os dividendos e os juros são incluídos.",
     "cagr": "CAGR",
     "cagrTooltip": "Taxa de Crescimento Anual Composta. O seu retorno anualizado com base no Investido Líquido vs. valor atual do portefólio, como se o crescimento tivesse sido perfeitamente constante em cada ano.",
     "notAvailable": "N/D",

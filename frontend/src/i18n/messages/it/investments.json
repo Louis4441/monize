@@ -56,7 +56,7 @@
     "simpleReturnTooltip": "Percentuale di guadagno o perdita totale sulle posizioni, calcolata come (Valore di mercato − Costo di acquisto) ÷ Costo di acquisto. Non tiene conto dei tempi di contributi o prelievi.",
     "twr": "TWR",
     "twrFull": "(Ponderato nel tempo)",
-    "twrTooltip": "Misura le performance degli investimenti indipendentemente da quando hai aggiunto o prelevato denaro. Elimina l'impatto dei flussi di cassa per mostrare le performance pure degli investimenti.",
+    "twrTooltip": "Rendimento ponderato nel tempo dei tuoi investimenti dalla prima transazione, calcolato allo stesso modo di Performance del portafoglio: depositi, prelievi e liquidità non investita sono esclusi, dividendi e interessi sono inclusi.",
     "cagr": "CAGR",
     "cagrTooltip": "Tasso di crescita annuo composto. Il tuo rendimento annualizzato basato su investito netto vs. valore corrente del portafoglio, come se la crescita fosse stata perfettamente costante ogni anno.",
     "notAvailable": "N/A",

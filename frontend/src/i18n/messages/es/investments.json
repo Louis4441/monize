@@ -56,7 +56,7 @@
     "simpleReturnTooltip": "Porcentaje total de ganancia o pérdida en tus posiciones, calculado como (Valor de Mercado − Base de Costo) ÷ Base de Costo. No tiene en cuenta el momento de las aportaciones o retiros.",
     "twr": "TWR",
     "twrFull": "(Ponderado por Tiempo)",
-    "twrTooltip": "Mide el rendimiento de tus inversiones independientemente de cuándo agregaste o retiraste dinero. Elimina el impacto del flujo de efectivo para mostrar el rendimiento puro de la inversión.",
+    "twrTooltip": "Rendimiento ponderado por tiempo de tus inversiones desde la primera transacción, calculado de la misma manera que Rendimiento de la cartera: los depósitos, los retiros y el efectivo sin invertir se excluyen, los dividendos y los intereses se incluyen.",
     "cagr": "CAGR",
     "cagrTooltip": "Tasa de Crecimiento Anual Compuesto. Tu rendimiento anualizado basado en Net Invertido vs. valor actual de la cartera, como si el crecimiento hubiera sido perfectamente constante cada año.",
     "notAvailable": "N/A",

@@ -56,7 +56,7 @@
     "simpleReturnTooltip": "Całkowity procentowy zysk lub strata na pozycjach, obliczony jako (wartość rynkowa − koszt nabycia) ÷ koszt nabycia. Nie uwzględnia momentu wpłat ani wypłat.",
     "twr": "TWR",
     "twrFull": "(ważony czasem)",
-    "twrTooltip": "Mierzy, jak dobrze radziły sobie Twoje inwestycje niezależnie od tego, kiedy dodawałeś lub wycofywałeś środki. Eliminuje wpływ momentu przepływów pieniężnych, pokazując czystą efektywność inwestycji.",
+    "twrTooltip": "Ważona czasem stopa zwrotu z Twoich inwestycji od pierwszej transakcji, obliczana tak samo jak Wyniki portfela: wpłaty, wypłaty i niezainwestowana gotówka są pomijane, dywidendy i odsetki są uwzględniane.",
     "cagr": "CAGR",
     "cagrTooltip": "Skumulowana roczna stopa wzrostu. Twój zannualizowany zwrot oparty na zainwestowanym netto względem bieżącej wartości portfela, jak gdyby wzrost był idealnie równomierny w każdym roku.",
     "notAvailable": "Brak",

@@ -56,7 +56,7 @@
     "simpleReturnTooltip": "Total persentase keuntungan atau kerugian dari kepemilikan Anda, dihitung sebagai (Nilai Pasar − Dasar Biaya) ÷ Dasar Biaya. Tidak memperhitungkan waktu kontribusi atau penarikan.",
     "twr": "TWR",
     "twrFull": "(Tertimbang Waktu)",
-    "twrTooltip": "Mengukur seberapa baik kinerja investasi Anda terlepas dari kapan Anda menambah atau menarik uang. Menghilangkan dampak waktu arus kas untuk menampilkan kinerja investasi murni.",
+    "twrTooltip": "Imbal hasil tertimbang waktu dari investasi Anda sejak transaksi pertama, dihitung dengan cara yang sama seperti Kinerja portofolio: setoran, penarikan, dan tunai yang belum diinvestasikan tidak dihitung, dividen dan bunga dihitung.",
     "cagr": "CAGR",
     "cagrTooltip": "Tingkat Pertumbuhan Tahunan Majemuk. Imbal hasil tahunan Anda berdasarkan Net Diinvestasikan vs. nilai portofolio saat ini, seolah-olah pertumbuhan telah steady setiap tahun.",
     "notAvailable": "N/A",

@@ -56,7 +56,7 @@
     "simpleReturnTooltip": "Gesamtprozentualer Gewinn oder Verlust auf Ihre Bestände, berechnet als (Marktwert − Anschaffungskosten) ÷ Anschaffungskosten. Berücksichtigt nicht den Zeitpunkt von Ein- oder Auszahlungen.",
     "twr": "TWR",
     "twrFull": "(Zeitgewichtet)",
-    "twrTooltip": "Misst, wie gut Ihre Investitionen unabhängig von Ein- oder Auszahlungszeitpunkten abgeschnitten haben. Eliminiert den Einfluss des Cashflow-Timings, um die reine Investitionsperformance zu zeigen.",
+    "twrTooltip": "Zeitgewichtete Rendite Ihrer Investitionen seit der ersten Transaktion, berechnet auf die gleiche Weise wie Portfolio-Performance: Einzahlungen, Auszahlungen und nicht investierte Barmittel werden ausgeschlossen, Dividenden und Zinsen werden eingerechnet.",
     "cagr": "CAGR",
     "cagrTooltip": "Compound Annual Growth Rate. Ihre annualisierte Rendite basierend auf der Nettoinvestition gegenüber dem aktuellen Portfoliowert, als ob das Wachstum jedes Jahr gleichmäßig gewesen wäre.",
     "notAvailable": "N/A",

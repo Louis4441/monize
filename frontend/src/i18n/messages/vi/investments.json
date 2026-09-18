@@ -56,7 +56,7 @@
     "simpleReturnTooltip": "Tổng phần trăm lãi lỗ trên các khoản nắm giữ, tính bằng (Giá trị thị trường − Cơ sở chi phí) ÷ Cơ sở chi phí. Không tính đến thời điểm đóng góp hoặc rút tiền.",
     "twr": "TWR",
     "twrFull": "(Tỷ lệ có trọng số thời gian)",
-    "twrTooltip": "Đo lường hiệu quả đầu tư bất kể thời điểm bạn thêm hoặc rút tiền. Loại bỏ tác động của thời điểm dòng tiền để cho thấy hiệu suất đầu tư thuần túy.",
+    "twrTooltip": "Lợi nhuận có trọng số thời gian của khoản đầu tư của bạn kể từ giao dịch đầu tiên, được tính theo cùng cách với Hiệu suất danh mục: các khoản nạp, rút và tiền mặt chưa đầu tư không được tính, cổ tức và lãi được tính vào.",
     "cagr": "CAGR",
     "cagrTooltip": "Tỷ lệ tăng trưởng kép hàng năm. Lợi nhuận hàng năm của bạn dựa trên Đã đầu tư ròng so với giá trị danh mục hiện tại, như thể tăng trưởng hoàn toàn đều đặn mỗi năm.",
     "notAvailable": "N/A",

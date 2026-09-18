@@ -56,7 +56,7 @@
     "simpleReturnTooltip": "Pourcentage de gain ou de perte total sur vos positions, calculé comme (Valeur de marché − Prix de revient) ÷ Prix de revient. Ne tient pas compte du calendrier des apports ou des retraits.",
     "twr": "RTP",
     "twrFull": "(Pondéré par le temps)",
-    "twrTooltip": "Mesure la performance de vos investissements indépendamment des moments où vous avez ajouté ou retiré des fonds. Élimine l'impact du calendrier des flux de trésorerie pour montrer la performance pure des investissements.",
+    "twrTooltip": "Rendement pondéré par le temps de vos investissements depuis la première transaction, calculé de la même manière que Performance du portefeuille : les dépôts, les retraits et les liquidités non investies sont exclus, les dividendes et les intérêts sont inclus.",
     "cagr": "TCAC",
     "cagrTooltip": "Taux de croissance annuel composé. Votre rendement annualisé basé sur le montant net investi par rapport à la valeur actuelle du portefeuille, comme si la croissance avait été parfaitement régulière chaque année.",
     "notAvailable": "N/D",

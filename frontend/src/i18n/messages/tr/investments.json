@@ -56,7 +56,7 @@
     "simpleReturnTooltip": "Pozisyonlarınızdaki toplam yüzde kazanç veya kayıp, (Piyasa Değeri − Maliyet Esası) ÷ Maliyet Esası olarak hesaplanır. Katkı veya çekimlerin zamanlamasını dikkate almaz.",
     "twr": "ZAG",
     "twrFull": "(Zaman Ağırlıklı)",
-    "twrTooltip": "Para ekleyip çıkardığınız zamandan bağımsız olarak yatırımlarınızın ne kadar iyi performans gösterdiğini ölçer. Nakit akışı zamanlamasının etkisini ortadan kaldırarak saf yatırım performansını gösterir.",
+    "twrTooltip": "Yatırımlarınızın ilk işlemden bu yana zaman ağırlıklı getirisi, Portföy performansı ile aynı şekilde hesaplanır: para yatırma, para çekme ve yatırıma dönüştürülmemiş nakit hariç tutulur, temettü ve faiz dahil edilir.",
     "cagr": "BYOB",
     "cagrTooltip": "Bileşik Yıllık Ortalama Büyüme. Net Yatırım ile mevcut portföy değeri arasına dayalı yıllık getiriniz, büyüme her yıl mükemmel şekilde sabit olmuş gibi.",
     "notAvailable": "Yok",
