@@ -248,6 +248,12 @@ export const getPortfolioSummaryOutput = toolOutput({
   // UNDECLARED here and reach the caller through the loose object, for the
   // reason above: the tool is at its `tools/list` byte budget, which is
   // shrink-only.
+  //
+  // `returnDiagnostics` is undeclared for the same reason. It names and dates
+  // what a withheld return is waiting for -- each security with no close, each
+  // pair with no rate, each cash account with no balance, over the run of days
+  // it covers -- so an answer says which holding to price rather than "not
+  // available"; the loose object carries it whole.
   cagr: numNull,
   // securityId is the id an entity link must quote, so it is named here.
   holdings: z.array(looseObject({ securityId: str })),

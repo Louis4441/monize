@@ -14,6 +14,7 @@ import type {
   PortfolioService,
   PortfolioSummary,
 } from "@/securities/portfolio.service";
+import { EMPTY_RETURN_DIAGNOSTICS } from "@/securities/return-diagnostics.util";
 import type { ExchangeRateService } from "@/currencies/exchange-rate.service";
 import type { NotificationDispatchService } from "@/notifications/notification-dispatch.service";
 import {
@@ -144,6 +145,7 @@ describe("portfolio movement external flow (integration)", () => {
       timeWeightedReturnSince: null,
       moneyWeightedReturn: null,
       moneyWeightedReturnReasons: [],
+      returnDiagnostics: EMPTY_RETURN_DIAGNOSTICS,
       cagr: null,
       fxComplete: true,
       missingRatePairs: [],

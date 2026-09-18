@@ -8,6 +8,13 @@ import {
   resolveUserDefaultCurrency,
 } from "../common/default-currency.util";
 import { Holding } from "./entities/holding.entity";
+import { Security } from "./entities/security.entity";
+import {
+  EMPTY_RETURN_DIAGNOSTICS,
+  ReturnDiagnostics,
+  SecurityLabel,
+  buildReturnDiagnostics,
+} from "./return-diagnostics.util";
 import { Account, AccountType } from "../accounts/entities/account.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import {
@@ -23,6 +30,7 @@ import {
   PeriodResultReason,
   PortfolioPeriodResultService,
 } from "../net-worth/portfolio-period-result.service";
+import type { IncompleteDataRanges } from "../net-worth/incomplete-data-ranges.util";
 import { YahooFinanceService } from "./yahoo-finance.service";
 import { QuoteProviderRegistry } from "./providers/quote-provider.registry";
 import { roundMoney } from "../common/round.util";
@@ -186,6 +194,17 @@ export interface PortfolioSummary {
   moneyWeightedReturn: number | null;
   /** Why `moneyWeightedReturn` is withheld; empty when the figure is known. */
   moneyWeightedReturnReasons: PeriodResultReason[];
+  /**
+   * What the two withheld returns above are waiting for: each missing price,
+   * rate and cash balance NAMED and DATED, over the same since-inception window
+   * both figures are measured across.
+   *
+   * Withholding a figure is only honest if the reader learns why, and "no
+   * price" is not a repair -- "PPK, Mar 2 to May 30" is
+   * (`docs/financial-calculation-contract.md` section 1.3). Empty when the
+   * window has no gap, which is also what a known return looks like.
+   */
+  returnDiagnostics: ReturnDiagnostics;
   cagr: number | null;
   /**
    * False when a component of these totals could not be converted into the
@@ -334,6 +353,13 @@ export interface LlmPortfolioSummary {
   moneyWeightedReturn: number | null;
   /** Why it is withheld, so a model reports the cause rather than "n/a". */
   moneyWeightedReturnReasons: PeriodResultReason[];
+  /**
+   * The named, dated gaps behind a withheld return, so a model answers "PPK has
+   * no close from Mar 2 to May 30" rather than "not available". Carried in full,
+   * ids included: they are what a `monize://security/<id>` link quotes, exactly
+   * as `LlmPortfolioHolding.securityId` is.
+   */
+  returnDiagnostics: ReturnDiagnostics;
   cagr: number | null;
   holdings: LlmPortfolioHolding[];
   holdingsByAccount: LlmAccountHoldings[];
@@ -795,6 +821,17 @@ export class PortfolioService {
       investedSinceInception.investmentMoneyWeightedReturnPercent;
     const moneyWeightedReturnReasons = investedSinceInception.investedReasons;
 
+    // What a withheld return is waiting for, named: the same window's dated
+    // gaps, resolved to symbols and account names so the card can point at the
+    // price history rather than at a generic "no price" marker (#1392).
+    const returnDiagnostics = await this.resolveReturnDiagnostics(
+      userId,
+      investedSinceInception.incompleteRanges,
+      timeWeightedReturnSince,
+      holdingsResult.holdingsWithValues,
+      accounts,
+    );
+
     // CAGR divides the portfolio value by what was invested to get there, so an
     // incomplete numerator or denominator produces a growth rate for a portfolio
     // nobody owns: with one unconvertible EUR account, 100 USD of known net
@@ -846,6 +883,7 @@ export class PortfolioService {
       timeWeightedReturnSince,
       moneyWeightedReturn,
       moneyWeightedReturnReasons,
+      returnDiagnostics,
       cagr,
       fxComplete: missingRatePairs.length === 0,
       missingRatePairs,
@@ -857,6 +895,64 @@ export class PortfolioService {
       holdingsByAccount,
       allocation,
     };
+  }
+
+  /**
+   * The window's dated gaps, turned into rows a reader can act on.
+   *
+   * The names come from what the summary already loaded wherever they can: the
+   * holdings it valued and the accounts it resolved. What is left is looked up
+   * by id -- a security sold out of the portfolio, or one whose position is
+   * inactive today, is exactly the kind of holding a months-long price gap sits
+   * on, and printing its UUID instead of its symbol would be a worse dead end
+   * than the generic sentence this replaces.
+   */
+  private async resolveReturnDiagnostics(
+    userId: string,
+    ranges: IncompleteDataRanges,
+    since: string | null,
+    holdings: HoldingWithMarketValue[],
+    accounts: Account[],
+  ): Promise<ReturnDiagnostics> {
+    const securityIds = [...new Set(ranges.prices.map((r) => r.key))];
+    const accountIds = [...new Set(ranges.cash.map((r) => r.key))];
+    if (securityIds.length === 0 && accountIds.length === 0) {
+      return { ...EMPTY_RETURN_DIAGNOSTICS, since };
+    }
+
+    const securityLabels = new Map<string, SecurityLabel>(
+      holdings.map((h) => [h.securityId, { symbol: h.symbol, name: h.name }]),
+    );
+    const accountNames = new Map<string, string>(
+      accounts.map((a) => [a.id, a.name]),
+    );
+    const missingSecurities = securityIds.filter(
+      (id) => !securityLabels.has(id),
+    );
+    const missingAccounts = accountIds.filter((id) => !accountNames.has(id));
+
+    if (missingSecurities.length > 0 || missingAccounts.length > 0) {
+      await withScopedDb(this.dataSource, async (m) => {
+        if (missingSecurities.length > 0) {
+          const rows = await m.getRepository(Security).find({
+            where: { id: In(missingSecurities), userId },
+            select: ["id", "symbol", "name"],
+          });
+          for (const row of rows) {
+            securityLabels.set(row.id, { symbol: row.symbol, name: row.name });
+          }
+        }
+        if (missingAccounts.length > 0) {
+          const rows = await m.getRepository(Account).find({
+            where: { id: In(missingAccounts), userId },
+            select: ["id", "name"],
+          });
+          for (const row of rows) accountNames.set(row.id, row.name);
+        }
+      });
+    }
+
+    return buildReturnDiagnostics(ranges, since, securityLabels, accountNames);
   }
 
   /**
@@ -941,6 +1037,7 @@ export class PortfolioService {
       timeWeightedReturnSince: summary.timeWeightedReturnSince,
       moneyWeightedReturn: roundPct(summary.moneyWeightedReturn),
       moneyWeightedReturnReasons: summary.moneyWeightedReturnReasons,
+      returnDiagnostics: summary.returnDiagnostics,
       cagr: roundPct(summary.cagr),
       fxComplete: summary.fxComplete,
       missingRatePairs: summary.missingRatePairs,

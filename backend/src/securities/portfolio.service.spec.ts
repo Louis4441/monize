@@ -2,6 +2,7 @@ import { PortfolioService } from "./portfolio.service";
 import { PortfolioCalculationService } from "./portfolio-calculation.service";
 import { Holding } from "./entities/holding.entity";
 import { SecurityPrice } from "./entities/security-price.entity";
+import { Security } from "./entities/security.entity";
 import {
   InvestmentTransaction,
   InvestmentAction,
@@ -15,6 +16,11 @@ import { UserPreference } from "../users/entities/user-preference.entity";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import { PortfolioPeriodResultService } from "../net-worth/portfolio-period-result.service";
 import { NO_INVESTED_PERIOD } from "../net-worth/invested-period-result.util";
+import {
+  EMPTY_INCOMPLETE_RANGES,
+  type IncompleteDataRanges,
+} from "../net-worth/incomplete-data-ranges.util";
+import { EMPTY_RETURN_DIAGNOSTICS } from "./return-diagnostics.util";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -24,6 +30,7 @@ describe("PortfolioService", () => {
   let service: PortfolioService;
   let holdingsRepository: Record<string, jest.Mock>;
   let securityPriceRepository: Record<string, jest.Mock>;
+  let securityRepository: Record<string, jest.Mock>;
   let investmentTransactionRepository: Record<string, jest.Mock>;
   let accountsRepository: Record<string, jest.Mock>;
   let prefRepository: Record<string, jest.Mock>;
@@ -46,6 +53,7 @@ describe("PortfolioService", () => {
       investmentMoneyWeightedReturnPercent: number | null;
       investedReasons: string[];
       startDate: string;
+      incompleteRanges: IncompleteDataRanges;
     }> = {},
   ) => ({
     currency: "CAD",
@@ -64,6 +72,7 @@ describe("PortfolioService", () => {
     missingRatePairs: [],
     unpricedSecurityIds: [],
     unknownCashAccountIds: [],
+    incompleteRanges: EMPTY_INCOMPLETE_RANGES,
     ...NO_INVESTED_PERIOD,
     investedReasons: [] as string[],
     ...overrides,
@@ -188,6 +197,12 @@ describe("PortfolioService", () => {
       query: jest.fn(),
     };
 
+    // Only the return diagnostics read it, and only for a security the
+    // summary's own holdings do not name.
+    securityRepository = {
+      find: jest.fn().mockResolvedValue([]),
+    };
+
     investmentTransactionRepository = {
       find: jest.fn().mockResolvedValue([]),
     };
@@ -286,6 +301,7 @@ describe("PortfolioService", () => {
     const { manager, dataSource } = createScopedDbMocks([
       [Holding, holdingsRepository],
       [SecurityPrice, securityPriceRepository],
+      [Security, securityRepository],
       [InvestmentTransaction, investmentTransactionRepository],
       [Account, accountsRepository],
       [UserPreference, prefRepository],
@@ -1668,6 +1684,7 @@ describe("PortfolioService", () => {
         timeWeightedReturnSince: null,
         moneyWeightedReturn: null,
         moneyWeightedReturnReasons: [],
+        returnDiagnostics: EMPTY_RETURN_DIAGNOSTICS,
         cagr: null,
         holdings: [],
         holdingsByAccount: [],
@@ -1716,6 +1733,7 @@ describe("PortfolioService", () => {
           timeWeightedReturnSince: null,
           moneyWeightedReturn: null,
           moneyWeightedReturnReasons: [],
+          returnDiagnostics: EMPTY_RETURN_DIAGNOSTICS,
           cagr: null,
           holdings: [
             {
@@ -1805,6 +1823,7 @@ describe("PortfolioService", () => {
         timeWeightedReturnSince: null,
         moneyWeightedReturn: null,
         moneyWeightedReturnReasons: [],
+        returnDiagnostics: EMPTY_RETURN_DIAGNOSTICS,
         cagr: null,
         holdings: [],
         holdingsByAccount: [],
@@ -1840,6 +1859,7 @@ describe("PortfolioService", () => {
         timeWeightedReturnSince: null,
         moneyWeightedReturn: null,
         moneyWeightedReturnReasons: [],
+        returnDiagnostics: EMPTY_RETURN_DIAGNOSTICS,
         cagr: null,
         holdings: [],
         holdingsByAccount: [],
@@ -1871,6 +1891,7 @@ describe("PortfolioService", () => {
         timeWeightedReturnSince: null,
         moneyWeightedReturn: null,
         moneyWeightedReturnReasons: [],
+        returnDiagnostics: EMPTY_RETURN_DIAGNOSTICS,
         cagr: null,
         holdings: [
           {
@@ -1921,6 +1942,7 @@ describe("PortfolioService", () => {
         timeWeightedReturnSince: null,
         moneyWeightedReturn: null,
         moneyWeightedReturnReasons: [],
+        returnDiagnostics: EMPTY_RETURN_DIAGNOSTICS,
         cagr: null,
         holdings: [],
         holdingsByAccount: [
@@ -2998,6 +3020,154 @@ describe("PortfolioService", () => {
       // Rounded like every other percentage the model is handed.
       expect(summary.moneyWeightedReturn).toBe(19.42);
       expect(summary.moneyWeightedReturnReasons).toEqual([]);
+    });
+
+    /**
+     * "No price" is not a repair; "VFV.TO, Mar 2 to Mar 5" is. The summary has
+     * no series on the client, so the names are resolved here, over the same
+     * since-inception window both returns are measured across (#1392).
+     */
+    describe("returnDiagnostics", () => {
+      const withRanges = (ranges: Partial<IncompleteDataRanges>) =>
+        investedSince({
+          investmentReturnPercent: null,
+          investedReasons: ["incompletePrices"],
+          startDate: "2025-06-14",
+          incompleteRanges: { ...EMPTY_INCOMPLETE_RANGES, ...ranges },
+        });
+
+      it("is empty, but still names the window, when nothing is missing", async () => {
+        periodResultService.getInvestedResultSinceInception.mockResolvedValue(
+          investedSince({
+            investmentReturnPercent: 25.8,
+            startDate: "2025-06-14",
+          }),
+        );
+
+        const result = await service.getPortfolioSummary(userId);
+
+        expect(result.returnDiagnostics).toEqual({
+          since: "2025-06-14",
+          prices: [],
+          rates: [],
+          cash: [],
+          truncated: { prices: false, rates: false, cash: false },
+        });
+        expect(securityRepository.find).not.toHaveBeenCalled();
+      });
+
+      it("names a held security from the holdings it already valued", async () => {
+        holdingsRepository.find.mockResolvedValue([mockHoldingVFV]);
+        securityPriceRepository.query.mockResolvedValue([
+          {
+            security_id: "sec-2",
+            close_price: "100",
+            price_date: "2026-02-07",
+          },
+        ]);
+        periodResultService.getInvestedResultSinceInception.mockResolvedValue(
+          withRanges({
+            prices: [{ key: "sec-2", start: "2026-03-02", end: "2026-03-05" }],
+          }),
+        );
+
+        const result = await service.getPortfolioSummary(userId);
+
+        expect(result.returnDiagnostics.prices).toEqual([
+          {
+            securityId: "sec-2",
+            symbol: "VFV.TO",
+            name: "Vanguard S&P 500 ETF",
+            start: "2026-03-02",
+            end: "2026-03-05",
+          },
+        ]);
+        // Already loaded, so nothing is fetched a second time.
+        expect(securityRepository.find).not.toHaveBeenCalled();
+      });
+
+      it("loads the name of a security nobody holds today", async () => {
+        // The gap is most likely on exactly the position that was sold out or
+        // made inactive, which is not among today's holdings; printing its
+        // UUID would be a worse dead end than the sentence this replaces.
+        securityRepository.find.mockResolvedValue([
+          { id: "sec-9", symbol: "PPK", name: "PPK Fund" },
+        ]);
+        periodResultService.getInvestedResultSinceInception.mockResolvedValue(
+          withRanges({
+            prices: [{ key: "sec-9", start: "2026-03-02", end: "2026-05-30" }],
+            truncated: { prices: true, rates: false, cash: false },
+          }),
+        );
+
+        const result = await service.getPortfolioSummary(userId);
+
+        expect(securityRepository.find).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ userId }),
+          }),
+        );
+        expect(result.returnDiagnostics.prices).toEqual([
+          {
+            securityId: "sec-9",
+            symbol: "PPK",
+            name: "PPK Fund",
+            start: "2026-03-02",
+            end: "2026-05-30",
+          },
+        ]);
+        expect(result.returnDiagnostics.truncated.prices).toBe(true);
+      });
+
+      it("names the cash account and carries the pair as it stands", async () => {
+        periodResultService.getInvestedResultSinceInception.mockResolvedValue(
+          withRanges({
+            rates: [
+              { key: "USD->CAD", start: "2026-01-02", end: "2026-01-09" },
+            ],
+            cash: [
+              { key: "acct-cash-1", start: "2026-01-02", end: "2026-01-02" },
+            ],
+          }),
+        );
+
+        const result = await service.getPortfolioSummary(userId);
+
+        expect(result.returnDiagnostics.rates).toEqual([
+          { pair: "USD->CAD", start: "2026-01-02", end: "2026-01-09" },
+        ]);
+        expect(result.returnDiagnostics.cash).toEqual([
+          {
+            accountId: "acct-cash-1",
+            name: "TFSA - Cash",
+            start: "2026-01-02",
+            end: "2026-01-02",
+          },
+        ]);
+      });
+
+      it("carries the diagnostics to the LLM summary", async () => {
+        securityRepository.find.mockResolvedValue([
+          { id: "sec-9", symbol: "PPK", name: "PPK Fund" },
+        ]);
+        periodResultService.getInvestedResultSinceInception.mockResolvedValue(
+          withRanges({
+            prices: [{ key: "sec-9", start: "2026-03-02", end: "2026-05-30" }],
+          }),
+        );
+
+        const summary = await service.getLlmSummary(userId);
+
+        expect(summary.returnDiagnostics.prices).toEqual([
+          {
+            securityId: "sec-9",
+            symbol: "PPK",
+            name: "PPK Fund",
+            start: "2026-03-02",
+            end: "2026-05-30",
+          },
+        ]);
+      });
     });
 
     it("has no window at all when the scope never held an investment", async () => {
@@ -4320,6 +4490,7 @@ describe("PortfolioService", () => {
         timeWeightedReturnSince: null,
         moneyWeightedReturn: null,
         moneyWeightedReturnReasons: [],
+        returnDiagnostics: EMPTY_RETURN_DIAGNOSTICS,
         cagr: null,
         holdings: [],
         holdingsByAccount: [],
