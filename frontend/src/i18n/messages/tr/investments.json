@@ -306,6 +306,14 @@
       "3m": "3A",
       "ytd": "Yıl başından",
       "1y": "1Y"
+    },
+    "loading": "Dönemler ölçülüyor...",
+    "loadFailed": "Dönem sonuçları yüklenemedi. Rakamlar sıfır değil, bekletiliyor; yeniden denemek için sayfayı yeniden yükleyin.",
+    "reasons": {
+      "incompletePrices": "Bekletilen bir dönem, bir pozisyonun fiyatı olmadığı bir günde başlar. Fiyatları yenileyin veya menkul kıymetin fiyat geçmişine elle bir fiyat ekleyin.",
+      "incompleteCash": "Bekletilen bir dönem, bu görünümdeki bir nakit hesabın bakiye bildirmediği bir günde başlar, dolayısıyla içindeki tutar sıfır değil, bilinmiyor.",
+      "missingRatePairs": "Bekletilen bir dönem, kayıtlı geçmişte bulunmayan bir kur gerektirir. Bu para birimi için kur geçmişini Para Birimleri sayfasından ekleyin.",
+      "unmeasuredFlow": "Bekletilen bir dönem, para yatırma veya çekmeden ayırt edilemeyen bir hareket içerir: bu hesapların dışında sonuçlanan bir işlem veya nakit ile yatırımı karıştıran bir bölünme."
     }
   }
 }

@@ -306,6 +306,14 @@
       "3m": "3M",
       "ytd": "Depuis janvier",
       "1y": "1A"
+    },
+    "loading": "Mesure des périodes...",
+    "loadFailed": "Les résultats des périodes n'ont pas pu être chargés. Les chiffres sont retenus, pas mis à zéro ; rechargez la page pour réessayer.",
+    "reasons": {
+      "incompletePrices": "Une période retenue commence un jour où une position n'avait aucun cours. Actualisez les cours, ou saisissez-en un dans l'historique des cours du titre.",
+      "incompleteCash": "Une période retenue commence un jour où un compte de trésorerie de cette vue n'a signalé aucun solde, donc ce qu'il détenait est inconnu, et non nul.",
+      "missingRatePairs": "Une période retenue a besoin d'un taux de change que l'historique enregistré n'a pas. Ajoutez un historique des taux pour la devise sur la page Devises.",
+      "unmeasuredFlow": "Une période retenue contient un mouvement impossible à distinguer d'un dépôt ou d'un retrait : une opération réglée en dehors de ces comptes, ou une répartition mêlant liquidités et investissements."
     }
   }
 }

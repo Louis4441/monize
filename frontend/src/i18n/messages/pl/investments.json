@@ -306,6 +306,14 @@
       "3m": "3M",
       "ytd": "Od pocz. roku",
       "1y": "1R"
+    },
+    "loading": "Trwa mierzenie okresów...",
+    "loadFailed": "Nie udało się wczytać wyników okresów. Wartości są wstrzymane, a nie zerowe; odśwież stronę, aby spróbować ponownie.",
+    "reasons": {
+      "incompletePrices": "Wstrzymany okres zaczyna się w dniu, w którym pozycja nie miała ceny. Odśwież ceny lub dodaj cenę ręcznie w historii cen papieru wartościowego.",
+      "incompleteCash": "Wstrzymany okres zaczyna się w dniu, w którym konto gotówkowe w tym widoku nie podało salda, więc jego stan jest nieznany, a nie zerowy.",
+      "missingRatePairs": "Wstrzymany okres wymaga kursu wymiany, którego nie ma w zapisanej historii. Dodaj historię kursów dla tej waluty na stronie Waluty.",
+      "unmeasuredFlow": "Wstrzymany okres zawiera ruch, którego nie można odróżnić od wpłaty lub wypłaty: transakcję rozliczoną poza tymi kontami albo podział łączący gotówkę i inwestycje."
     }
   }
 }

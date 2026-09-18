@@ -306,6 +306,14 @@
       "3m": "3M",
       "ytd": "Dit jaar",
       "1y": "1J"
+    },
+    "loading": "Periodes worden gemeten...",
+    "loadFailed": "De periodresultaten konden niet worden geladen. De cijfers worden achtergehouden, niet op nul gezet; laad de pagina opnieuw om het nogmaals te proberen.",
+    "reasons": {
+      "incompletePrices": "Een achtergehouden periode begint op een dag waarop een positie geen koers had. Vernieuw de koersen, of voeg er handmatig een toe in de koershistorie van het effect.",
+      "incompleteCash": "Een achtergehouden periode begint op een dag waarop een geldrekening in deze weergave geen saldo meldde, dus wat erop stond is onbekend en niet nul.",
+      "missingRatePairs": "Een achtergehouden periode heeft een wisselkoers nodig die niet in de opgeslagen historie staat. Voeg koershistorie voor de valuta toe op de pagina Valuta's.",
+      "unmeasuredFlow": "Een achtergehouden periode bevat een beweging die niet te onderscheiden is van een storting of opname: een transactie die buiten deze rekeningen is afgewikkeld, of een splitsing waarin contanten en beleggingen zijn vermengd."
     }
   }
 }

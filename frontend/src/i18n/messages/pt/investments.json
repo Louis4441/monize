@@ -306,6 +306,14 @@
       "3m": "3M",
       "ytd": "Desde início do ano",
       "1y": "1A"
+    },
+    "loading": "A medir os períodos...",
+    "loadFailed": "Não foi possível carregar os resultados dos períodos. Os valores são retidos, não são zero; recarregue a página para tentar novamente.",
+    "reasons": {
+      "incompletePrices": "Um período retido começa num dia em que uma posição não tinha preço. Atualize os preços, ou adicione um no histórico de preços do título.",
+      "incompleteCash": "Um período retido começa num dia em que uma conta de caixa nesta vista não indicou saldo, pelo que o que continha é desconhecido, não zero.",
+      "missingRatePairs": "Um período retido precisa de uma taxa de câmbio que o histórico guardado não tem. Adicione o histórico de taxas para a moeda na página Moedas.",
+      "unmeasuredFlow": "Um período retido contém um movimento que não é possível distinguir de um depósito ou um levantamento: uma operação liquidada fora destas contas, ou um desdobramento que mistura dinheiro e investimentos."
     }
   }
 }

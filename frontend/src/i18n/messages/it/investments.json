@@ -306,6 +306,14 @@
       "3m": "3M",
       "ytd": "Da inizio anno",
       "1y": "1A"
+    },
+    "loading": "Misurazione dei periodi in corso...",
+    "loadFailed": "Non è stato possibile caricare i risultati dei periodi. I valori sono sospesi, non azzerati; ricarica la pagina per riprovare.",
+    "reasons": {
+      "incompletePrices": "Un periodo sospeso inizia in un giorno in cui una posizione non aveva prezzo. Aggiorna i prezzi, oppure inseriscine uno nello storico prezzi del titolo.",
+      "incompleteCash": "Un periodo sospeso inizia in un giorno in cui un conto di liquidità in questa vista non ha riportato alcun saldo, quindi ciò che conteneva è sconosciuto, non zero.",
+      "missingRatePairs": "Un periodo sospeso richiede un tasso di cambio che lo storico salvato non ha. Aggiungi lo storico dei tassi per la valuta nella pagina Valute.",
+      "unmeasuredFlow": "Un periodo sospeso contiene un movimento che non si può distinguere da un deposito o un prelievo: un'operazione regolata al di fuori di questi conti, oppure una suddivisione che mescola liquidità e investimenti."
     }
   }
 }

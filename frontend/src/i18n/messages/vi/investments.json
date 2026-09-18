@@ -306,6 +306,14 @@
       "3m": "3TH",
       "ytd": "Từ đầu năm",
       "1y": "1N"
+    },
+    "loading": "Đang đo các giai đoạn...",
+    "loadFailed": "Không thể tải kết quả các giai đoạn. Các số liệu đang bị giữ lại, không phải bằng không; hãy tải lại trang để thử lại.",
+    "reasons": {
+      "incompletePrices": "Một giai đoạn bị giữ lại bắt đầu vào ngày một khoản nắm giữ không có giá. Hãy làm mới giá, hoặc tự thêm một giá trong lịch sử giá của chứng khoán.",
+      "incompleteCash": "Một giai đoạn bị giữ lại bắt đầu vào ngày một tài khoản tiền mặt trong chế độ xem này không báo cáo số dư, nên số tiền nó nắm giữ là không xác định chứ không phải bằng không.",
+      "missingRatePairs": "Một giai đoạn bị giữ lại cần một tỷ giá mà lịch sử đã lưu không có. Hãy thêm lịch sử tỷ giá cho đơn vị tiền tệ đó trên trang Tiền tệ.",
+      "unmeasuredFlow": "Một giai đoạn bị giữ lại chứa một khoản biến động không thể phân biệt với khoản nạp hay rút: một giao dịch được thanh toán ngoài các tài khoản này, hoặc một khoản tách trộn lẫn tiền mặt và đầu tư."
     }
   }
 }

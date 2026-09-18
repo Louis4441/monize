@@ -306,6 +306,14 @@
       "3m": "3M",
       "ytd": "Año en curso",
       "1y": "1A"
+    },
+    "loading": "Midiendo los periodos...",
+    "loadFailed": "No se pudieron cargar los resultados de los periodos. Las cifras se retienen, no son cero; recargue la página para volver a intentarlo.",
+    "reasons": {
+      "incompletePrices": "Un periodo retenido empieza en un día en que una posición no tenía precio. Actualice los precios o añada uno en el historial de precios del valor.",
+      "incompleteCash": "Un periodo retenido empieza en un día en que una cuenta de efectivo de esta vista no informó saldo, así que lo que contenía es desconocido, no cero.",
+      "missingRatePairs": "Un periodo retenido necesita un tipo de cambio que el historial guardado no tiene. Añada historial de tipos para la moneda en la página Monedas.",
+      "unmeasuredFlow": "Un periodo retenido contiene un movimiento que no se puede distinguir de un depósito o una retirada: una operación liquidada fuera de estas cuentas, o un desglose que mezcla efectivo e inversiones."
     }
   }
 }

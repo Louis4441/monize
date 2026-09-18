@@ -306,6 +306,14 @@
       "3m": "3B",
       "ytd": "Sejak awal tahun",
       "1y": "1T"
+    },
+    "loading": "Mengukur periode...",
+    "loadFailed": "Hasil periode tidak dapat dimuat. Angka-angka ini ditahan, bukan nol; muat ulang halaman untuk mencoba lagi.",
+    "reasons": {
+      "incompletePrices": "Periode yang ditahan dimulai pada hari saat sebuah posisi tidak memiliki harga. Segarkan harga, atau tambahkan satu secara manual di riwayat harga efek tersebut.",
+      "incompleteCash": "Periode yang ditahan dimulai pada hari saat sebuah akun kas dalam tampilan ini tidak melaporkan saldo, sehingga isinya tidak diketahui, bukan nol.",
+      "missingRatePairs": "Periode yang ditahan memerlukan nilai tukar yang tidak ada dalam riwayat yang tersimpan. Tambahkan riwayat kurs untuk mata uang tersebut di halaman Mata Uang.",
+      "unmeasuredFlow": "Periode yang ditahan berisi pergerakan yang tidak dapat dibedakan dari setoran atau penarikan: transaksi yang diselesaikan di luar akun-akun ini, atau pemisahan yang mencampur kas dan investasi."
     }
   }
 }
