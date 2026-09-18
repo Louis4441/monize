@@ -35,7 +35,20 @@ export type PeriodResultReason =
    * The flow classifier drops such a parent whole, so its ordinary part sits in
    * the value change with nothing to subtract it.
    */
-  | "mixedSplit";
+  | "mixedSplit"
+  /**
+   * The money-weighted return alone: the schedule of dated flows defines no
+   * single rate -- no sign change, no root inside the reportable bracket, or
+   * several roots, which is refused rather than resolved by whichever one a
+   * search reaches first. The P&L and the time-weighted return are unaffected.
+   */
+  | "mwrUndefined"
+  /**
+   * The money-weighted return alone: the window is shorter than
+   * `MWR_MIN_ANNUALISED_WINDOW_DAYS`, so the ANNUALISED figure is withheld and
+   * the window's own total is reported. A 1% week is a 68% year.
+   */
+  | "windowTooShort";
 
 /**
  * How `returnPercent` was arrived at, named on the wire.

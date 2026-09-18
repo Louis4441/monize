@@ -15,10 +15,16 @@
  * neither the single-range route nor the batch route re-derives a row of it.
  */
 import { roundMoney, roundToDecimals } from "../common/round.util";
+import { daysBetween } from "../common/time-series/price-boundary.util";
 import {
   chainTwrPercent,
   subPeriodFactor,
 } from "../common/time-series/twr-chain.util";
+import {
+  XirrFlow,
+  totalOverDays,
+  xirrAnnualRate,
+} from "../common/time-series/xirr.util";
 import { PORTFOLIO_MOVE_PERCENT_DECIMALS } from "../notification-center/portfolio-movement.util";
 import {
   EMPTY_INVESTED_FLOW_DAY,
@@ -35,6 +41,27 @@ import {
  * same caption -- the reason `PeriodReturnMethod` names `simple`.
  */
 export type InvestedReturnMethod = "twr";
+
+/**
+ * How `investmentMoneyWeightedReturnPercent` was arrived at, named on the wire
+ * for the same reason `InvestedReturnMethod` is: a later method (a Modified
+ * Dietz approximation, say) is a new union member and a compile error at every
+ * consumer that switched on it, rather than a silent change of meaning under
+ * one caption.
+ */
+export type MoneyWeightedReturnMethod = "xirr";
+
+/**
+ * The shortest window an annualised rate is reported over.
+ *
+ * A 1% week is a 68% year (`docs/specs/portfolio-period-result.md` section
+ * 11.7, case 8): arithmetically correct, read as a claim about a year, and
+ * moving by tens of points on the next day's close. Under this bound the annual
+ * figure is withheld with `windowTooShort` and only the window's own total --
+ * the same money, weighted the same way, with no extrapolation in it -- is
+ * reported.
+ */
+export const MWR_MIN_ANNUALISED_WINDOW_DAYS = 30;
 
 /** One day of the value series, as the invested measure reads it. */
 export interface InvestedDayValue {
@@ -74,7 +101,30 @@ export interface InvestedPeriodDecision {
   /** The time-weighted return over the same days; see `investmentReturnMethod`. */
   investmentReturnPercent: number | null;
   investmentReturnMethod: InvestedReturnMethod;
-  /** True only when both figures above are known. */
+  /**
+   * The ANNUALISED money-weighted return (XIRR) over the same flows: the rate
+   * the reader's own money earned, each purchase, disposal and distribution
+   * weighted by when it happened (section 11). `null` is withheld, never zero:
+   * the window may be too short to annualise (`windowTooShort`), the schedule
+   * may define no single rate (`mwrUndefined`), or the whole decision may be
+   * withheld for the reasons the two figures above are.
+   */
+  investmentMoneyWeightedReturnPercent: number | null;
+  /**
+   * The same rate over the window rather than over a year,
+   * `(1 + r)^(days/365) - 1`. An extrapolation of the rate, NOT a realised
+   * total: a schedule whose money came back halfway compounds its rate over a
+   * remainder that held nothing, so a surface captions it as a rate over the
+   * window and never as what the reader made (section 11.3).
+   */
+  investmentMoneyWeightedTotalPercent: number | null;
+  investmentMoneyWeightedMethod: MoneyWeightedReturnMethod;
+  /**
+   * True only when `investmentPnl` and `investmentReturnPercent` are both
+   * known. It is about those two: a window whose money-weighted rate is
+   * undefined or too short to annualise still has a P&L and a time-weighted
+   * return, and says so (section 11.5).
+   */
   investedComplete: boolean;
   /** Why a figure is withheld, from the same closed set the account measure uses. */
   investedReasons: PeriodResultReason[];
@@ -89,6 +139,9 @@ const WITHHELD: Omit<
   investmentPnl: null,
   investmentReturnPercent: null,
   investmentReturnMethod: "twr",
+  investmentMoneyWeightedReturnPercent: null,
+  investmentMoneyWeightedTotalPercent: null,
+  investmentMoneyWeightedMethod: "xirr",
   investedComplete: false,
 };
 
@@ -219,6 +272,19 @@ export function investedPeriodResult(
     factors.push(factor);
   }
 
+  // The same window, the same flows, asked the reader's own question: at what
+  // rate did MY money grow, weighted by when I paid it in (section 11). It is
+  // computed only where the two figures above are reportable, because it reads
+  // the same `IV`, the same `K` and the same `I`: anything that makes a chained
+  // factor a return on a portfolio nobody owns does the same to a discounted
+  // flow.
+  const moneyWeighted = moneyWeightedFigures(start, end, days, flowDays);
+  // Its own cause, and only where the rest of the decision is reportable: a
+  // window already withholding the P&L and the TWR has causes of its own, and
+  // "the rate is undefined too" adds nothing to them (section 11.5).
+  const withMwrReason = (): PeriodResultReason[] =>
+    moneyWeighted.reason ? [...reasons, moneyWeighted.reason] : [...reasons];
+
   if (!anyBase) {
     // No day of the window had capital at risk. Nothing invested and nothing
     // earned is a KNOWN zero (the spec's case 1); a result with no invested
@@ -232,8 +298,9 @@ export function investedPeriodResult(
         investmentPnl: 0,
         investmentReturnPercent: 0,
         investmentReturnMethod: "twr",
+        ...moneyWeighted.figures,
         investedComplete: true,
-        investedReasons: [],
+        investedReasons: withMwrReason(),
       };
     }
     reasons.add("zeroStart");
@@ -275,8 +342,90 @@ export function investedPeriodResult(
       PORTFOLIO_MOVE_PERCENT_DECIMALS,
     ),
     investmentReturnMethod: "twr",
+    ...moneyWeighted.figures,
     investedComplete: true,
-    investedReasons: [],
+    investedReasons: withMwrReason(),
+  };
+}
+
+/**
+ * The money-weighted pair for a window whose invested figures are reportable.
+ *
+ * The schedule is the reader's own (section 11.2): `-IV(b)` on the baseline --
+ * what was already invested is a purchase made on day one -- then each day's
+ * capital and income with the investor's sign, and `+IV(e)` at the end, as if
+ * the position were liquidated there. Deposits, withdrawals and idle cash are
+ * in none of it, exactly as they are in neither the P&L nor the TWR.
+ *
+ * Money is folded in integer ten-thousandths and the solver divides once
+ * (AGENTS.md, Financial math). The two answers are one rate in two dresses, so
+ * a schedule with no single rate withholds both.
+ */
+function moneyWeightedFigures(
+  start: InvestedDayValue,
+  end: InvestedDayValue,
+  days: readonly InvestedDayValue[],
+  flowDays: readonly InvestedFlowDay[],
+): {
+  figures: Pick<
+    InvestedPeriodDecision,
+    | "investmentMoneyWeightedReturnPercent"
+    | "investmentMoneyWeightedTotalPercent"
+    | "investmentMoneyWeightedMethod"
+  >;
+  reason: PeriodResultReason | null;
+} {
+  const windowDays = daysBetween(start.date, end.date);
+
+  const flows: XirrFlow[] = [
+    { dayOffset: 0, amountMinor: -Math.round(start.securitiesValue * 10000) },
+    {
+      dayOffset: windowDays,
+      amountMinor: Math.round(end.securitiesValue * 10000),
+    },
+  ];
+  for (let i = 0; i < days.length; i++) {
+    const flow = flowDays[i];
+    flows.push({
+      dayOffset: daysBetween(start.date, days[i].date),
+      amountMinor:
+        Math.round(flow.capitalOut * 10000) +
+        Math.round(flow.income * 10000) -
+        Math.round(flow.capitalIn * 10000),
+    });
+  }
+
+  const rate = xirrAnnualRate(flows);
+  const method: MoneyWeightedReturnMethod = "xirr";
+  if (rate === null) {
+    return {
+      figures: {
+        investmentMoneyWeightedReturnPercent: null,
+        investmentMoneyWeightedTotalPercent: null,
+        investmentMoneyWeightedMethod: method,
+      },
+      reason: "mwrUndefined",
+    };
+  }
+
+  const total = totalOverDays(rate, windowDays);
+  // A percentage is a ratio, not money: PORTFOLIO_MOVE_PERCENT_DECIMALS, never
+  // roundMoney.
+  const asPercent = (value: number | null): number | null =>
+    value === null
+      ? null
+      : roundToDecimals(value * 100, PORTFOLIO_MOVE_PERCENT_DECIMALS);
+
+  // Too short to annualise: the rate exists and the window's own total reports
+  // it honestly, while a year's worth of it would be a claim about a year.
+  const tooShort = windowDays < MWR_MIN_ANNUALISED_WINDOW_DAYS;
+  return {
+    figures: {
+      investmentMoneyWeightedReturnPercent: tooShort ? null : asPercent(rate),
+      investmentMoneyWeightedTotalPercent: asPercent(total),
+      investmentMoneyWeightedMethod: method,
+    },
+    reason: tooShort ? "windowTooShort" : null,
   };
 }
 

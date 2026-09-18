@@ -217,6 +217,41 @@ describe("PortfolioPeriodResultsBatchService", () => {
     }
   });
 
+  it("answers every preset with the same money-weighted figures as the single route", async () => {
+    // The MWR is a second figure of one measure, sliced from the same series
+    // and the same per-day flows, so the two routes cannot disagree about it
+    // any more than they may about the TWR (spec section 11.8).
+    const results = await batch.getPeriodResults("user-1");
+
+    for (const preset of PORTFOLIO_PERIOD_PRESETS) {
+      const expected = await single.getPeriodResult(
+        "user-1",
+        singleRouteArgs(preset),
+      );
+      expect(results.periods[preset]).toMatchObject({
+        investmentMoneyWeightedReturnPercent:
+          expected.investmentMoneyWeightedReturnPercent,
+        investmentMoneyWeightedTotalPercent:
+          expected.investmentMoneyWeightedTotalPercent,
+        investmentMoneyWeightedMethod: "xirr",
+      });
+    }
+    // Not a vacuous comparison of two nulls: the year-to-date window is long
+    // enough to annualise and carries a rate.
+    expect(results.periods.ytd?.investmentMoneyWeightedReturnPercent).toEqual(
+      expect.any(Number),
+    );
+    // A week is not long enough to annualise, and says so rather than
+    // printing a week's move as a claim about a year.
+    expect(
+      results.periods["1w"]?.investmentMoneyWeightedReturnPercent,
+    ).toBeNull();
+    expect(results.periods["1w"]?.investedReasons).toContain("windowTooShort");
+    expect(results.periods["1w"]?.investmentMoneyWeightedTotalPercent).toEqual(
+      expect.any(Number),
+    );
+  });
+
   it("builds the value series once, over the widest window asked for", async () => {
     await batch.getPeriodResults("user-1");
 

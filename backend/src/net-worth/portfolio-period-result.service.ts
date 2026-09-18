@@ -42,6 +42,7 @@ import {
 import {
   InvestedPeriodDecision,
   InvestedReturnMethod,
+  MoneyWeightedReturnMethod,
   NO_INVESTED_PERIOD,
   investedPeriodResult,
 } from "./invested-period-result.util";
@@ -63,7 +64,12 @@ export interface ScopeAccount {
   account_sub_type: string | null;
 }
 
-export { PeriodResultReason, PeriodReturnMethod, InvestedReturnMethod };
+export {
+  PeriodResultReason,
+  PeriodReturnMethod,
+  InvestedReturnMethod,
+  MoneyWeightedReturnMethod,
+};
 
 /** What `GET /net-worth/investments-period-result` answers. */
 export interface PortfolioPeriodResult {
@@ -113,6 +119,16 @@ export interface PortfolioPeriodResult {
   /** The time-weighted return over the same days; see `investmentReturnMethod`. */
   investmentReturnPercent: number | null;
   investmentReturnMethod: InvestedReturnMethod;
+  /**
+   * The ANNUALISED money-weighted return (XIRR) over the same flows: what the
+   * reader's own money earned, weighted by when it was paid in
+   * (`docs/specs/portfolio-period-result.md` section 11). `null` is withheld,
+   * with `mwrUndefined` or `windowTooShort` among `investedReasons`.
+   */
+  investmentMoneyWeightedReturnPercent: number | null;
+  /** The same rate over the window rather than a year; a rate, not a realised total. */
+  investmentMoneyWeightedTotalPercent: number | null;
+  investmentMoneyWeightedMethod: MoneyWeightedReturnMethod;
   /** True only when both invested figures are known. */
   investedComplete: boolean;
   /** Why an invested figure is withheld; the same closed set as `reasons`. */

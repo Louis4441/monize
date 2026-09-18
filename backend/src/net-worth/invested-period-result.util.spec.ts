@@ -79,7 +79,11 @@ describe("investedPeriodResult (spec section 10.5)", () => {
     expect(result.investmentPnl).toBe(0);
     expect(result.investmentReturnPercent).toBe(0);
     expect(result.investedComplete).toBe(true);
-    expect(result.investedReasons).toEqual([]);
+    // A window that never held an investment has no money-weighted rate to
+    // report -- every flow of its schedule is zero -- and says so rather than
+    // printing the P&L's honest zero under a rate's caption (section 11.5).
+    expect(result.investmentMoneyWeightedReturnPercent).toBeNull();
+    expect(result.investedReasons).toEqual(["mwrUndefined"]);
   });
 
   it("case 2: a deposit invested at once is a capital flow, not a gain", () => {
@@ -313,5 +317,153 @@ describe("investedPeriodResult (spec section 10.5)", () => {
     expect(result.investedReasons).toEqual(["noValueSeries"]);
     expect(result.investmentPnl).toBeNull();
     expect(result.investmentReturnMethod).toBe("twr");
+  });
+});
+
+/**
+ * The money-weighted return of the same windows
+ * (`docs/specs/portfolio-period-result.md` section 11.7).
+ *
+ * The adversarial case is (3): two equal purchases a year apart with the rise
+ * in the second year. The TWR is 10% over the window (4.880885% a year) and the
+ * XIRR is 6.52%, because more of the reader's money was invested while the rise
+ * happened. An implementation that returned the TWR under this caption, or that
+ * solved a rate over undated flows, passes cases 1, 2, 5 and 7 and fails this
+ * one, case 4 and case 6.
+ */
+describe("investedPeriodResult, money-weighted (spec section 11.7)", () => {
+  /** A flat series of `days + 1` closes, index 0 being the baseline. */
+  const flat = (days: number, value: number): number[] =>
+    Array.from({ length: days + 1 }, () => value);
+
+  it("case 1: one purchase, +10% over a year, equals the TWR", () => {
+    const values = flat(365, 1_000);
+    values[365] = 1_100;
+    const result = run(values);
+
+    expect(result.investmentReturnPercent).toBe(10);
+    expect(result.investmentMoneyWeightedReturnPercent).toBe(10);
+    expect(result.investmentMoneyWeightedTotalPercent).toBe(10);
+    expect(result.investmentMoneyWeightedMethod).toBe("xirr");
+    expect(result.investedReasons).toEqual([]);
+  });
+
+  it("case 2: the same +10% over two years annualises to 4.88%", () => {
+    const values = flat(730, 1_000);
+    values[730] = 1_100;
+    const result = run(values);
+
+    // The TWR is not annualised, which is why the card labels the two.
+    expect(result.investmentReturnPercent).toBe(10);
+    expect(result.investmentMoneyWeightedReturnPercent).toBe(4.88);
+    expect(result.investmentMoneyWeightedTotalPercent).toBe(10);
+  });
+
+  it("case 3: a second purchase before the rise beats the time-weighted rate", () => {
+    const values = flat(730, 1_000);
+    for (let i = 365; i <= 730; i++) values[i] = 2_000;
+    values[730] = 2_200;
+    const result = run(values, { 365: { capitalIn: 1_000 } });
+
+    expect(result.investmentPnl).toBe(200);
+    expect(result.investmentReturnPercent).toBe(10);
+    expect(result.investmentMoneyWeightedReturnPercent).toBe(6.52);
+    expect(result.investmentMoneyWeightedTotalPercent).toBe(13.48);
+  });
+
+  it("case 4: a dividend halfway is credited for having arrived early", () => {
+    const result = run(flat(730, 1_000), { 365: { income: 10 } });
+
+    expect(result.investmentPnl).toBe(10);
+    expect(result.investmentReturnPercent).toBe(1);
+    expect(result.investmentMoneyWeightedReturnPercent).toBe(0.5);
+    // 1.005012% over the window against the TWR's 1%: the money-weighted
+    // measure also credits the reader for having had the distribution a year
+    // before the end.
+    expect(result.investmentMoneyWeightedTotalPercent).toBe(1.01);
+  });
+
+  it("case 5: a late cash deposit is in none of the flows it reads", () => {
+    const values = flat(730, 1_000);
+    for (let i = 365; i <= 730; i++) values[i] = 2_000;
+    values[730] = 2_200;
+    // The 50,000 deposited the day before the end is not an investment
+    // transaction: no capital, no income, and not in IV. There is no field on
+    // this input for it to arrive through, and case 3's answer is unchanged.
+    const result = run(values, { 365: { capitalIn: 1_000 }, 729: {} });
+
+    expect(result.investmentMoneyWeightedReturnPercent).toBe(6.52);
+    expect(result.investmentPnl).toBe(200);
+  });
+
+  it("case 6: a full sale is measured from the sale, not from the cash after it", () => {
+    const values = flat(730, 8_000);
+    for (let i = 365; i <= 730; i++) values[i] = 0;
+    const result = run(values, { 365: { capitalOut: 9_000 } });
+
+    expect(result.investmentPnl).toBe(1_000);
+    expect(result.investmentReturnPercent).toBe(12.5);
+    expect(result.investmentMoneyWeightedReturnPercent).toBe(12.5);
+    // The total extrapolates that rate over a second year which held nothing,
+    // which is why no surface may caption it as what the reader made.
+    expect(result.investmentMoneyWeightedTotalPercent).toBe(26.56);
+  });
+
+  it("case 7: an incomplete price inside the window withholds both figures", () => {
+    const points = series(flat(365, 1_000));
+    points[200] = day(points[200].date, 1_000, {
+      pricesComplete: false,
+      unpricedSecurityIds: ["sec-1"],
+    });
+    const result = investedPeriodResult({
+      points,
+      startIndex: 0,
+      endIndex: points.length - 1,
+      flowsByDay: new Map(),
+    });
+
+    expect(result.investmentReturnPercent).toBeNull();
+    expect(result.investmentMoneyWeightedReturnPercent).toBeNull();
+    expect(result.investmentMoneyWeightedTotalPercent).toBeNull();
+    expect(result.investedReasons).toEqual(["incompletePrices"]);
+  });
+
+  it("case 8: a seven-day window reports the total and no annual rate", () => {
+    const values = flat(7, 1_000);
+    values[7] = 1_010;
+    const result = run(values);
+
+    // The rate exists -- 68.007541% a year -- and is exactly why it is not
+    // printed: a 1% week is not a claim about a year.
+    expect(result.investmentMoneyWeightedReturnPercent).toBeNull();
+    expect(result.investmentMoneyWeightedTotalPercent).toBe(1);
+    expect(result.investedReasons).toEqual(["windowTooShort"]);
+    // The window's own figures are unaffected by the refusal.
+    expect(result.investmentPnl).toBe(10);
+    expect(result.investmentReturnPercent).toBe(1);
+    expect(result.investedComplete).toBe(true);
+  });
+
+  it("withholds both figures for a window with no invested capital at all", () => {
+    const result = run([0, 0], { 1: { income: 100 } });
+
+    expect(result.investmentMoneyWeightedReturnPercent).toBeNull();
+    expect(result.investmentMoneyWeightedTotalPercent).toBeNull();
+    expect(result.investedReasons).toContain("zeroStart");
+    // A withheld decision carries its own causes; "the rate is undefined too"
+    // adds nothing to them (section 11.5).
+    expect(result.investedReasons).not.toContain("mwrUndefined");
+  });
+
+  it("names the method even where every figure is withheld", () => {
+    const result = investedPeriodResult({
+      points: [],
+      startIndex: 0,
+      endIndex: 0,
+      flowsByDay: new Map(),
+    });
+
+    expect(result.investmentMoneyWeightedMethod).toBe("xirr");
+    expect(result.investmentMoneyWeightedReturnPercent).toBeNull();
   });
 });
