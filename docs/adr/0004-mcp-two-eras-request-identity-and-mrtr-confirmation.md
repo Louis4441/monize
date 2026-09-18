@@ -134,3 +134,44 @@ signed state has none of that: the server holds nothing.
 confirmation whose integrity silently depended on an unset variable is the
 failure mode this decision exists to avoid, so the key is derived from
 `JWT_SECRET` with its own label, as `AiActionSigningService` already does.
+
+## Addendum, 2026-09-18: a 2025-era session is pinned to its replica
+
+This ADR said the new revision gets "no sticky sessions"; it did not say what the
+old one gets. Horizontal scaling (`docs/future-plans/horizontal-scaling.md`, WP6)
+asked the question directly: persist `session_id -> user_id` and rebuild the
+transport on any replica, or document sticky routing. The instruction was to
+decide by reading the SDK.
+
+**Read, on `@modelcontextprotocol/{server,node}` 2.0.0: it cannot be rebuilt.**
+`NodeStreamableHTTPServerTransport.sessionId` is a getter with no setter, so a
+persisted id cannot be assigned. `_initialized` is private and set only by
+handling an `initialize` request, so a transport built from a row answers `400
+Bad Request: Server not initialized` to the first request that uses it. Both are
+pinned as tests in `mcp-http.controller.spec.ts`.
+
+Persisting the row would not have been enough even with a seam to put it back.
+The state a 2025-era exchange is holding is the open response stream on that
+pod's socket, the `Protocol._responseHandlers` entry carrying the promise a
+`confirmWrite` elicitation is waiting on, and the per-`McpServer` behaviour
+record in `mcp-elicitation-support.ts`. A session id addresses none of them. A
+table would have made the id resolvable and the session no more servable -- the
+worst of the two outcomes, because it looks like the problem is solved.
+
+**So: sticky routing, on the MCP path only, off by default** (`mcp.stickySessions`).
+Two things the implementation had to account for that the plan did not anticipate:
+the MCP path has to be routed straight to the backend Service, because every
+other path is served by the frontend's proxy and pinning the frontend pod leaves
+kube-proxy spreading its server-side fetch across backend replicas; and cookie
+affinity pins only clients that keep cookies, which is not all of them.
+
+The honest statement of the limit is therefore narrower than "sticky routing
+fixes it": under `CLUSTER_MODE=multi`, a deployment serving 2025-era clients
+wants one backend replica, or clients that keep the affinity cookie, or clients
+that speak 2026-07-28. What the absence of stickiness costs is specific -- a
+misrouted session id is answered `404` and the client re-initializes, so reads
+recover, but a confirmation in flight is lost and its write completes under the
+client's own approval prompt instead of the dialog's.
+
+This sharpens rather than changes the end date already recorded above. Retiring
+the 2025-era path retires the sticky-routing requirement with it.

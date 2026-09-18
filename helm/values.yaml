@@ -413,6 +413,34 @@ frontend:
   #   - configMapRef:
   #       name: my-frontend-config
 
+# -- MCP (Model Context Protocol) endpoint routing
+#
+# The endpoint serves two protocol revisions. The 2026-07-28 one is stateless per
+# request and needs nothing here. The 2025-era one -- still what Claude Desktop's
+# connector, `claude mcp add` and Codex negotiate -- opens a session that lives in
+# ONE backend process: the SDK gives a session id no way back in, and the live
+# state of an exchange is the open stream and the pending confirmation held by
+# the replica that answered `initialize`. A request that lands elsewhere is
+# answered 404 and the client has to start over.
+#
+# So with backend.replicas > 1, a deployment serving 2025-era clients needs this
+# on. It routes the MCP path straight to the backend Service (bypassing the
+# frontend proxy, which would otherwise spread each request across replicas) and
+# asks the edge for cookie-based session affinity.
+#
+# Affinity is only as good as the client's cookie jar: a client that does not
+# keep cookies is not pinned by this, and for those the working configurations
+# are one backend replica or a 2026-07-28 client. See helm/README.md.
+mcp:
+  stickySessions:
+    # -- Pin 2025-era MCP sessions to one backend replica
+    enabled: false
+    # -- Path prefix routed straight to the backend. Must match the URL clients
+    # are given; the app's own connect instructions hand out /api/v1/mcp.
+    path: /api/v1/mcp
+    # -- Name of the affinity cookie the edge sets
+    cookieName: monize-mcp-affinity
+
 # -- Ingress configuration (traditional Kubernetes Ingress)
 ingress:
   # -- Enable Ingress resource creation

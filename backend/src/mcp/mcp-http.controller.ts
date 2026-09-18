@@ -83,6 +83,36 @@ export class McpHttpController implements OnModuleDestroy {
       this.logger.warn(`MCP request could not be served: ${error.message}`),
   });
 
+  /**
+   * A 2025-era session lives in THIS process and cannot be moved to another.
+   *
+   * These four maps are process-local on purpose, not for want of a table. The
+   * SDK (`@modelcontextprotocol/{server,node}` 2.0.0) gives a session id no way
+   * back in: `NodeStreamableHTTPServerTransport.sessionId` is a getter with no
+   * setter, `_initialized` is private and set only by handling an `initialize`
+   * request, and `validateSession` answers `400 Bad Request: Server not
+   * initialized` to every non-initialize request that reaches a transport which
+   * has not seen one. So a replica cannot rebuild a transport from a persisted
+   * `session_id -> user_id` row, and persisting one would buy nothing anyway:
+   * the live state of a 2025-era exchange is the open SSE stream bound to this
+   * pod's socket (`_streamMapping`), the `Protocol._responseHandlers` entry
+   * holding the promise a `confirmWrite` elicitation is waiting on, and the
+   * per-`McpServer` behaviour record in `mcp-elicitation-support.ts`. None of
+   * those is addressable by a session id.
+   *
+   * Under `CLUSTER_MODE=multi` that makes sticky routing on the MCP path a
+   * deployment requirement for 2025-era clients, not an optimization
+   * (`helm/README.md`, `docs/backend/mcp.md`). Without it a session id lands on
+   * the wrong replica and is answered `404 Session not found`, which the spec
+   * requires a client to recover from by re-initializing -- reads recover, but
+   * an in-flight confirmation does not: its answer never reaches the pod that
+   * asked, that pod's wait expires, and `clientAnsweredForItself` reads the
+   * timeout as `"unsupported"` and lets the write proceed under the client's own
+   * approval prompt.
+   *
+   * The 2026-07-28 leg has none of this: no session, no server-side wait, and a
+   * fresh server per request, so it is replica-agnostic as it stands.
+   */
   private transports = new Map<string, NodeStreamableHTTPServerTransport>();
   private servers = new Map<string, McpServer>();
   private sessionUsers = new Map<string, McpUserContext>();

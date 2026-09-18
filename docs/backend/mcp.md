@@ -14,6 +14,40 @@ Monize exposes its financial data over the **Model Context Protocol** so MCP cli
 - **Auth** (`validatePat`): `Authorization: Bearer <token>`. `pat_*` tokens go through `PatService`; everything else is treated as an OAuth 2.1 access token (`OAuthProviderService`). A 401 returns `WWW-Authenticate` with `resource_metadata` (RFC 9728) pointing at `/.well-known/oauth-protected-resource`. A credential that cannot be identified (an OAuth grant with no id) is refused with 403 rather than served.
 - **Server factory** (`mcp-server.service.ts`): `createServer()` builds a fresh `McpServer`, sets `instructions`, capabilities, cache hints and the confirmation options, and registers every tool/resource/prompt. The modern handler calls it per request, the sessionful path once per session. It deliberately takes no era: a factory that cannot see which revision asked cannot answer them differently. The server `version` is read from `backend/package.json` -- never hardcode it.
 
+## A 2025-era session lives in one process, and cannot be moved to another
+
+Everything a 2025-era exchange needs is held by the replica that answered
+`initialize`, and none of it is addressable by the session id:
+
+- **The id cannot be put back.** `NodeStreamableHTTPServerTransport.sessionId` is
+  a getter with no setter, `_initialized` is private and set only by handling an
+  `initialize` request, and `validateSession` answers `400 Bad Request: Server
+  not initialized` to every other request that reaches a transport which has not
+  seen one. `mcp-http.controller.spec.ts` pins both, so an SDK that grows a
+  session-restore seam turns red here rather than leaving the deployment rule
+  below standing on a limitation that has lapsed.
+- **The live state is not the id.** The open response stream is bound to that
+  pod's socket, the promise a `confirmWrite` elicitation waits on is an entry in
+  that process's `Protocol._responseHandlers`, and the observed-behaviour record
+  is keyed on that `McpServer`.
+
+So an `mcp_sessions` table would make a session id resolvable and still not make
+the session servable. The four maps in `mcp-http.controller.ts` stay process-local
+and the 5-minute sweep stays a `setInterval`: both are correct for state that
+cannot outlive its process.
+
+**More than one backend replica therefore needs sticky routing on the MCP path**
+(`mcp.stickySessions` in the chart; `helm/README.md` has the mechanism and its
+three limits). Without it a session id lands on the wrong replica and is answered
+`404 Session not found`, which the spec requires a client to recover from by
+re-initializing. Reads recover; a confirmation in flight does not. Its answer
+never reaches the replica that asked, that replica's wait expires, and
+`clientAnsweredForItself` reads the timeout as `"unsupported"` -- so the write
+proceeds under the client's own approval prompt rather than the dialog's.
+
+The 2026-07-28 leg has none of this and needs none of it: no session, no
+server-side wait, a fresh server per request.
+
 ## Identity is a property of the request, not of a session
 
 A 2026-07-28 request has no session at all, and even on a 2025-era connection the bearer rides on every request. So the transport validates the credential and attaches it as the SDK's `AuthInfo` (`toAuthInfo`), and a handler reads the caller from `resolveUserContext(ctx)` -- which validates the shape rather than casting it. `userId` never comes from tool arguments, and no tool reads a session map. That is INV-MCP-001 restated per request; a 2025-era session is additionally bound to the credential that opened it.
