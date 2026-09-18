@@ -15,6 +15,11 @@ import type { PeriodResultReason } from '@/types/net-worth';
  * nothing has no percentage to report, and a scope that produced no valued day
  * has nothing to compare. Neither is a defect to repair.
  *
+ * `mwrUndefined` and `windowTooShort` are causes of the money-weighted return
+ * alone and fall through to `noBaseline` for the same reason `zeroStart` does:
+ * a window too short to annualise, or a schedule of flows with no single rate,
+ * is a boundary rather than a price, a rate or a balance anybody can repair.
+ *
  * `externallySettledTrade` and `mixedSplit` fall to the same marker for want of
  * a truer one: nothing is missing from the data, so naming a price, a rate or a
  * balance would send the reader to a screen with nothing to do on it. What they
@@ -52,8 +57,9 @@ export type WithheldPeriodCause =
  *
  * Ranked the way `periodResultUnknownReason` ranks a single figure -- a price
  * to add before a balance to explain before a rate to refresh -- and, after
- * those, the movement the flow classifier could not count. `zeroStart` and
- * `noValueSeries` are boundaries, not defects: a portfolio younger than the
+ * those, the movement the flow classifier could not count. `zeroStart`,
+ * `noValueSeries` and the money-weighted return's own `mwrUndefined` and
+ * `windowTooShort` are boundaries, not defects: a portfolio younger than the
  * window has nothing to repair, so they print nothing and the list's own "n/a"
  * (or, when every period is one, the empty message) is the whole answer.
  */

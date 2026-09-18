@@ -208,6 +208,13 @@ export function PortfolioSummaryCard({
   const twrUnknownReason = periodResultUnknownReason(
     summary.timeWeightedReturnReasons ?? [],
   );
+  // The same measure's second figure, withheld the same way: a portfolio too
+  // young to annualise, or a schedule of flows with no single rate, says so
+  // rather than borrowing the time-weighted number.
+  const mwr = summary.moneyWeightedReturn ?? null;
+  const mwrUnknownReason = periodResultUnknownReason(
+    summary.moneyWeightedReturnReasons ?? [],
+  );
   const cagrVal = summary.cagr;
 
   return (
@@ -337,6 +344,18 @@ export function PortfolioSummaryCard({
               <div className={`text-base sm:text-lg font-semibold ${returnColorClass(twr)}`}>
                 {twr != null ? formatPercent(twr) : (
                   <UnknownAmount reason={twrUnknownReason} className="text-sm font-normal" />
+                )}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 flex items-center">
+                {t('portfolioSummary.mwr')}
+                <span className="hidden sm:inline">&nbsp;{t('portfolioSummary.mwrFull')}</span>
+                <InfoTooltip placement="top" text={t('portfolioSummary.mwrTooltip')} />
+              </div>
+              <div className={`text-base sm:text-lg font-semibold ${returnColorClass(mwr)}`}>
+                {mwr != null ? formatPercent(mwr) : (
+                  <UnknownAmount reason={mwrUnknownReason} className="text-sm font-normal" />
                 )}
               </div>
             </div>

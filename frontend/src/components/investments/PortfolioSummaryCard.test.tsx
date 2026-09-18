@@ -46,6 +46,8 @@ const makeSummary = (overrides?: Record<string, any>) => ({
   timeWeightedReturn: 15.32,
   timeWeightedReturnReasons: [],
   timeWeightedReturnSince: '2025-06-14',
+  moneyWeightedReturn: 11.7,
+  moneyWeightedReturnReasons: [],
   cagr: 10.5,
   // The API always sends these; a fixture without them is a payload the server
   // cannot produce, and with them the completeness branches are actually exercised.
@@ -102,7 +104,8 @@ describe('PortfolioSummaryCard', () => {
   it('renders return metrics section', () => {
     render(<PortfolioSummaryCard summary={makeSummary()} isLoading={false} />);
     expect(screen.getByText('Simple Return')).toBeInTheDocument();
-    expect(screen.getByText(/TWR/)).toBeInTheDocument();
+    expect(screen.getByText('TWR')).toBeInTheDocument();
+    expect(screen.getByText('MWR')).toBeInTheDocument();
     expect(screen.getByText('CAGR')).toBeInTheDocument();
   });
 
@@ -132,6 +135,60 @@ describe('PortfolioSummaryCard', () => {
     expect(screen.queryByText('N/A')).not.toBeInTheDocument();
   });
 
+  it('renders the money-weighted return beside the time-weighted one', () => {
+    render(
+      <PortfolioSummaryCard
+        summary={makeSummary({ timeWeightedReturn: 15.32, moneyWeightedReturn: 11.7 })}
+        isLoading={false}
+      />,
+    );
+    expect(screen.getByText('MWR')).toBeInTheDocument();
+    expect(screen.getByText('(Money-Weighted)')).toBeInTheDocument();
+    expect(screen.getByText('+15.32%')).toBeInTheDocument();
+    expect(screen.getByText('+11.70%')).toBeInTheDocument();
+  });
+
+  // Withheld the same way the TWR is: a portfolio younger than a month has no
+  // annual rate, and the marker names that rather than printing "N/A" or,
+  // worse, the time-weighted figure under this caption.
+  it('marks a withheld MWR as unknown while the TWR is still printed', () => {
+    render(
+      <PortfolioSummaryCard
+        summary={makeSummary({
+          timeWeightedReturn: 1.4,
+          moneyWeightedReturn: null,
+          moneyWeightedReturnReasons: ['windowTooShort'],
+        })}
+        isLoading={false}
+      />,
+    );
+    expect(screen.getByText('+1.40%')).toBeInTheDocument();
+    expect(screen.getByTestId('unknown-amount')).toBeInTheDocument();
+    expect(screen.queryByText('N/A')).not.toBeInTheDocument();
+  });
+
+  it('explains what the money-weighted return weights, and what it leaves out', () => {
+    render(<PortfolioSummaryCard summary={makeSummary()} isLoading={false} />);
+    expect(
+      screen.getByText(
+        /Money-weighted return \(XIRR\) of your investments since the first transaction/,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Deposits, withdrawals and uninvested cash are left out/),
+    ).toBeInTheDocument();
+  });
+
+  it('warns in the Simple Return tooltip that a purchase moves it on its own', () => {
+    render(<PortfolioSummaryCard summary={makeSummary()} isLoading={false} />);
+    expect(
+      screen.getByText(/It ignores when money arrived, so it jumps on every purchase/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/TWR and MWR do not have this jump/),
+    ).toBeInTheDocument();
+  });
+
   it('renders N/A for CAGR when it is null, which is not a period figure', () => {
     render(<PortfolioSummaryCard summary={makeSummary({ cagr: null })} isLoading={false} />);
     const naElements = screen.getAllByText('N/A');
@@ -151,8 +208,9 @@ describe('PortfolioSummaryCard', () => {
     // is a button: a focusable span has the generic role, so screen readers
     // dropped its aria-label and announced a nameless tab stop.
     const tooltipIcons = container.querySelectorAll('button.cursor-help svg');
-    // Holdings Value, Cash Balance, Total Gain, Net Invested, Cost Basis, Gain/Loss, Simple Return, TWR, CAGR
-    expect(tooltipIcons.length).toBe(9);
+    // Holdings Value, Cash Balance, Total Gain, Net Invested, Cost Basis,
+    // Gain/Loss, Simple Return, TWR, MWR, CAGR
+    expect(tooltipIcons.length).toBe(10);
   });
 
   it('shows negative TWR with correct formatting', () => {

@@ -132,7 +132,17 @@ export type PeriodResultReason =
   /** A trade in the window settled outside the accounts whose cash is valued. */
   | 'externallySettledTrade'
   /** A split parent in the window mixes an investment line with ordinary cash. */
-  | 'mixedSplit';
+  | 'mixedSplit'
+  /**
+   * The money-weighted return alone: its schedule of dated flows defines no
+   * single rate. The P&L and the time-weighted return are unaffected.
+   */
+  | 'mwrUndefined'
+  /**
+   * The money-weighted return alone: the window is too short to annualise, so
+   * only its un-annualised total is reported.
+   */
+  | 'windowTooShort';
 
 /**
  * What GET /net-worth/investments-period-result answers: what the portfolio did
@@ -187,6 +197,16 @@ export interface PortfolioPeriodResult {
   investmentReturnPercent?: number | null;
   /** How that percentage was arrived at; `twr` neutralises capital flows. */
   investmentReturnMethod?: 'twr';
+  /**
+   * The ANNUALISED money-weighted return (XIRR) over the same flows: what the
+   * reader's own money earned, weighted by when it was paid in. Withheld with
+   * `mwrUndefined` or `windowTooShort` among `investedReasons`.
+   */
+  investmentMoneyWeightedReturnPercent?: number | null;
+  /** The same rate over the window rather than a year; a rate, not a realised total. */
+  investmentMoneyWeightedTotalPercent?: number | null;
+  /** How that rate was arrived at; `xirr` weights each flow by its own date. */
+  investmentMoneyWeightedMethod?: 'xirr';
   /** True only when both invested figures are known. */
   investedComplete?: boolean;
   /** Why an invested figure is withheld; the same closed set as `reasons`. */

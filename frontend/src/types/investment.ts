@@ -248,6 +248,19 @@ export interface PortfolioSummary {
   timeWeightedReturnReasons?: PeriodResultReason[];
   /** The baseline close it is measured from, or null when there is no window. */
   timeWeightedReturnSince?: string | null;
+  /**
+   * The same measure's second figure: the annualised money-weighted return
+   * (XIRR) of the invested part since the first transaction -- the rate the
+   * reader's own money earned, each purchase, sale and distribution weighted by
+   * when it happened. `null` is withheld, never zero.
+   */
+  moneyWeightedReturn?: number | null;
+  /**
+   * Why the money-weighted return is withheld; empty when it is known. Optional
+   * for the rolling-deploy reason the flags below give: an older backend's
+   * payload has none, and absent is no information.
+   */
+  moneyWeightedReturnReasons?: PeriodResultReason[];
   cagr: number | null;
   /**
    * Whether every currency conversion behind the `total*` fields succeeded.
