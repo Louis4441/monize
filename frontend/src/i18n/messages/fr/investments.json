@@ -53,14 +53,17 @@
     "gainLossTooltip": "Gain ou perte latent sur vos positions actuelles : valeur de marché aux prix du jour moins le prix de revient ci-dessus. N'inclut ni les gains réalisés sur des ventes passées, ni les dividendes et intérêts reçus.",
     "returns": "Rendements",
     "simpleReturn": "Rendement simple",
-    "simpleReturnTooltip": "Pourcentage de gain ou de perte total sur vos positions, calculé comme (Valeur de marché − Prix de revient) ÷ Prix de revient. Ne tient pas compte du calendrier des apports ou des retraits.",
+    "simpleReturnTooltip": "Gain ou perte par rapport à ce que vous avez payé : (Valeur de marché − Prix de revient) ÷ Prix de revient. Ne tient pas compte du moment où l'argent est arrivé, donc cela varie brusquement à chaque achat : une position de 1 000 en hausse de 20% affiche +20% ; achetez 1 000 de plus et elle affiche +10% (200 ÷ 2 000) bien que rien n'ait été perdu. Le TWR et le MWR n'ont pas ce saut.",
     "twr": "RTP",
     "twrFull": "(Pondéré par le temps)",
     "twrTooltip": "Rendement pondéré par le temps de vos investissements depuis la première transaction, calculé de la même manière que Performance du portefeuille : les dépôts, les retraits et les liquidités non investies sont exclus, les dividendes et les intérêts sont inclus.",
     "cagr": "TCAC",
     "cagrTooltip": "Taux de croissance annuel composé. Votre rendement annualisé basé sur le montant net investi par rapport à la valeur actuelle du portefeuille, comme si la croissance avait été parfaitement régulière chaque année.",
     "notAvailable": "N/D",
-    "unpricedHoldings": "Valorisation partielle : {count, plural, one {# position n'a} other {# positions n'ont}} pas de prix actuel ({symbols}) ; les valeurs ci-dessous {count, plural, one {l'excluent} other {les excluent}}."
+    "unpricedHoldings": "Valorisation partielle : {count, plural, one {# position n'a} other {# positions n'ont}} pas de prix actuel ({symbols}) ; les valeurs ci-dessous {count, plural, one {l'excluent} other {les excluent}}.",
+    "mwr": "MWR",
+    "mwrFull": "(Pondéré par l'argent)",
+    "mwrTooltip": "Rendement pondéré par l'argent (XIRR) de vos investissements depuis la première transaction : le taux annuel que votre propre argent a rapporté, en pondérant chaque achat, vente et dividende selon le moment où il a eu lieu. Les dépôts, les retraits et les liquidités non investies sont exclus. Diffère du TWR lorsque vous avez investi davantage avant une hausse ou une baisse."
   },
   "assetAllocation": {
     "title": "Répartition des actifs",

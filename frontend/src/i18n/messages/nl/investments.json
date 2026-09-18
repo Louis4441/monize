@@ -53,14 +53,17 @@
     "gainLossTooltip": "Ongerealiseerde winst of verlies op uw huidige posities: marktwaarde tegen de prijzen van vandaag minus de kostprijs hierboven. Bevat geen gerealiseerde winsten uit eerdere verkopen, noch ontvangen dividend en rente.",
     "returns": "Rendement",
     "simpleReturn": "Eenvoudig rendement",
-    "simpleReturnTooltip": "Totaal procentueel winst of verlies op jouw posities, berekend als (marktwaarde − kostprijs) ÷ kostprijs. Houdt geen rekening met de timing van stortingen of opnames.",
+    "simpleReturnTooltip": "Winst of verlies ten opzichte van wat je betaalde: (marktwaarde − kostprijs) ÷ kostprijs. Houdt geen rekening met wanneer het geld binnenkwam, dus het springt bij elke aankoop: een positie van 1.000 die 20% stijgt toont +20%; koop er nog 1.000 bij en het toont +10% (200 ÷ 2.000) hoewel er niets verloren is. TWR en MWR hebben deze sprong niet.",
     "twr": "TWR",
     "twrFull": "(tijdgewogen)",
     "twrTooltip": "Tijdgewogen rendement van uw beleggingen sinds de eerste transactie, op dezelfde manier berekend als Portefeuilleprestatie: stortingen, opnames en niet-belegd geld worden niet meegeteld, dividenden en rente worden wel meegeteld.",
     "cagr": "CAGR",
     "cagrTooltip": "Samengesteld jaarlijks groeipercentage. Jouw geannualiseerd rendement op basis van netto belegd versus huidige portefeuillewaarde, alsof de groei elk jaar precies gelijkmatig was.",
     "notAvailable": "N/A",
-    "unpricedHoldings": "Gedeeltelijke waardering: {count, plural, one {# positie heeft} other {# posities hebben}} geen actuele prijs ({symbols}); de waarden hieronder laten {count, plural, one {die} other {ze}} buiten beschouwing."
+    "unpricedHoldings": "Gedeeltelijke waardering: {count, plural, one {# positie heeft} other {# posities hebben}} geen actuele prijs ({symbols}); de waarden hieronder laten {count, plural, one {die} other {ze}} buiten beschouwing.",
+    "mwr": "MWR",
+    "mwrFull": "(geldgewogen)",
+    "mwrTooltip": "Geldgewogen rendement (XIRR) van uw beleggingen sinds de eerste transactie: het jaarlijkse rendement dat uw eigen geld heeft opgeleverd, waarbij elke aankoop, verkoop en dividend wordt gewogen naar het moment waarop het plaatsvond. Stortingen, opnames en niet-belegd geld blijven buiten beschouwing. Wijkt af van TWR wanneer u meer heeft belegd vóór een stijging of een daling."
   },
   "assetAllocation": {
     "title": "Activaspreiding",

@@ -53,14 +53,17 @@
     "gainLossTooltip": "Mevcut pozisyonlarınızdaki gerçekleşmemiş kazanç veya kayıp: bugünkü fiyatlarla piyasa değeri eksi yukarıdaki maliyet esası. Geçmiş satışlardan gerçekleşen kazançları veya alınan temettü ve faizi içermez.",
     "returns": "Getiriler",
     "simpleReturn": "Basit Getiri",
-    "simpleReturnTooltip": "Pozisyonlarınızdaki toplam yüzde kazanç veya kayıp, (Piyasa Değeri − Maliyet Esası) ÷ Maliyet Esası olarak hesaplanır. Katkı veya çekimlerin zamanlamasını dikkate almaz.",
+    "simpleReturnTooltip": "Ödediğinize karşı kazanç veya kayıp: (Piyasa Değeri − Maliyet Esası) ÷ Maliyet Esası. Paranın ne zaman geldiğini dikkate almaz, bu yüzden her alışta sıçrar: %20 artan 1.000'lik bir pozisyon +%20 gösterir; bir 1.000 daha alın ve hiçbir şey kaybedilmemiş olsa da +%10 (200 ÷ 2.000) gösterir. TWR ve MWR'de bu sıçrama yoktur.",
     "twr": "ZAG",
     "twrFull": "(Zaman Ağırlıklı)",
     "twrTooltip": "Yatırımlarınızın ilk işlemden bu yana zaman ağırlıklı getirisi, Portföy performansı ile aynı şekilde hesaplanır: para yatırma, para çekme ve yatırıma dönüştürülmemiş nakit hariç tutulur, temettü ve faiz dahil edilir.",
     "cagr": "BYOB",
     "cagrTooltip": "Bileşik Yıllık Ortalama Büyüme. Net Yatırım ile mevcut portföy değeri arasına dayalı yıllık getiriniz, büyüme her yıl mükemmel şekilde sabit olmuş gibi.",
     "notAvailable": "Yok",
-    "unpricedHoldings": "Kısmi değerleme: {count, plural, one {# pozisyonun} other {# pozisyonun}} güncel fiyatı yok ({symbols}); aşağıdaki değerler bunları içermez."
+    "unpricedHoldings": "Kısmi değerleme: {count, plural, one {# pozisyonun} other {# pozisyonun}} güncel fiyatı yok ({symbols}); aşağıdaki değerler bunları içermez.",
+    "mwr": "MWR",
+    "mwrFull": "(Para Ağırlıklı)",
+    "mwrTooltip": "Yatırımlarınızın ilk işlemden bu yana para ağırlıklı getirisi (XIRR): her alış, satış ve temettüyü gerçekleştiği zamana göre ağırlıklandırarak kendi paranızın kazandığı yıllık oran. Para yatırma, para çekme ve yatırıma dönüştürülmemiş nakit hariç tutulur. Bir yükselişten veya düşüşten önce daha fazla yatırım yaptığınızda TWR'den farklılaşır."
   },
   "assetAllocation": {
     "title": "Varlık Dağılımı",

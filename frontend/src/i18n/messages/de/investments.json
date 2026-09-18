@@ -53,14 +53,17 @@
     "gainLossTooltip": "Nicht realisierter Gewinn oder Verlust Ihrer aktuellen Bestände: Marktwert zu heutigen Preisen minus die Anschaffungskosten oben. Realisierte Gewinne aus früheren Verkäufen sowie erhaltene Dividenden und Zinsen sind nicht enthalten.",
     "returns": "Renditen",
     "simpleReturn": "Einfache Rendite",
-    "simpleReturnTooltip": "Gesamtprozentualer Gewinn oder Verlust auf Ihre Bestände, berechnet als (Marktwert − Anschaffungskosten) ÷ Anschaffungskosten. Berücksichtigt nicht den Zeitpunkt von Ein- oder Auszahlungen.",
+    "simpleReturnTooltip": "Gewinn oder Verlust gegenüber dem, was Sie bezahlt haben: (Marktwert − Anschaffungskosten) ÷ Anschaffungskosten. Berücksichtigt nicht, wann das Geld eingegangen ist, und springt daher bei jedem Kauf: Eine Position von 1.000 mit einem Plus von 20% zeigt +20%; kaufen Sie weitere 1.000 dazu, zeigt sie +10% (200 ÷ 2.000), obwohl nichts verloren wurde. TWR und MWR haben diesen Sprung nicht.",
     "twr": "TWR",
     "twrFull": "(Zeitgewichtet)",
     "twrTooltip": "Zeitgewichtete Rendite Ihrer Investitionen seit der ersten Transaktion, berechnet auf die gleiche Weise wie Portfolio-Performance: Einzahlungen, Auszahlungen und nicht investierte Barmittel werden ausgeschlossen, Dividenden und Zinsen werden eingerechnet.",
     "cagr": "CAGR",
     "cagrTooltip": "Compound Annual Growth Rate. Ihre annualisierte Rendite basierend auf der Nettoinvestition gegenüber dem aktuellen Portfoliowert, als ob das Wachstum jedes Jahr gleichmäßig gewesen wäre.",
     "notAvailable": "N/A",
-    "unpricedHoldings": "Teilbewertung: {count, plural, one {# Bestand hat} other {# Bestände haben}} keinen aktuellen Preis ({symbols}); die Werte unten schließen {count, plural, one {ihn} other {sie}} aus."
+    "unpricedHoldings": "Teilbewertung: {count, plural, one {# Bestand hat} other {# Bestände haben}} keinen aktuellen Preis ({symbols}); die Werte unten schließen {count, plural, one {ihn} other {sie}} aus.",
+    "mwr": "MWR",
+    "mwrFull": "(Geldgewichtet)",
+    "mwrTooltip": "Geldgewichtete Rendite (XIRR) Ihrer Investitionen seit der ersten Transaktion: die jährliche Rendite, die Ihr eigenes Geld erwirtschaftet hat, wobei jeder Kauf, Verkauf und jede Dividende nach ihrem Zeitpunkt gewichtet wird. Einzahlungen, Auszahlungen und nicht investierte Barmittel bleiben unberücksichtigt. Weicht von der TWR ab, wenn Sie vor einem Anstieg oder Rückgang mehr investiert haben."
   },
   "assetAllocation": {
     "title": "Vermögensaufteilung",

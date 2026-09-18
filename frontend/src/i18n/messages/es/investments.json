@@ -53,14 +53,17 @@
     "gainLossTooltip": "Ganancia o pérdida no realizada de tus posiciones actuales: valor de mercado a precios de hoy menos la base de costo de arriba. No incluye ganancias realizadas de ventas pasadas, ni dividendos e intereses recibidos.",
     "returns": "Rendimientos",
     "simpleReturn": "Rendimiento Simple",
-    "simpleReturnTooltip": "Porcentaje total de ganancia o pérdida en tus posiciones, calculado como (Valor de Mercado − Base de Costo) ÷ Base de Costo. No tiene en cuenta el momento de las aportaciones o retiros.",
+    "simpleReturnTooltip": "Ganancia o pérdida sobre lo que pagaste: (Valor de Mercado − Base de Costo) ÷ Base de Costo. No tiene en cuenta cuándo llegó el dinero, por lo que salta con cada compra: una posición de 1.000 que sube un 20% muestra +20%; compra otros 1.000 y mostrará +10% (200 ÷ 2.000) aunque no se haya perdido nada. TWR y MWR no tienen este salto.",
     "twr": "TWR",
     "twrFull": "(Ponderado por Tiempo)",
     "twrTooltip": "Rendimiento ponderado por tiempo de tus inversiones desde la primera transacción, calculado de la misma manera que Rendimiento de la cartera: los depósitos, los retiros y el efectivo sin invertir se excluyen, los dividendos y los intereses se incluyen.",
     "cagr": "CAGR",
     "cagrTooltip": "Tasa de Crecimiento Anual Compuesto. Tu rendimiento anualizado basado en Net Invertido vs. valor actual de la cartera, como si el crecimiento hubiera sido perfectamente constante cada año.",
     "notAvailable": "N/A",
-    "unpricedHoldings": "Valoración parcial: {count, plural, one {# posición no tiene} other {# posiciones no tienen}} precio actual ({symbols}), así que los valores de abajo {count, plural, one {la excluyen} other {las excluyen}}."
+    "unpricedHoldings": "Valoración parcial: {count, plural, one {# posición no tiene} other {# posiciones no tienen}} precio actual ({symbols}), así que los valores de abajo {count, plural, one {la excluyen} other {las excluyen}}.",
+    "mwr": "MWR",
+    "mwrFull": "(Ponderado por Dinero)",
+    "mwrTooltip": "Rendimiento ponderado por dinero (XIRR) de tus inversiones desde la primera transacción: la tasa anual que ganó tu propio dinero, ponderando cada compra, venta y dividendo según el momento en que ocurrió. Los depósitos, los retiros y el efectivo sin invertir quedan excluidos. Difiere del TWR cuando invertiste más antes de una subida o una bajada."
   },
   "assetAllocation": {
     "title": "Asignación de Activos",
