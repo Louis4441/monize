@@ -26,6 +26,17 @@ export type ClusterMode = (typeof CLUSTER_MODES)[number];
 /** What an unset or blank `CLUSTER_MODE` means. */
 export const DEFAULT_CLUSTER_MODE: ClusterMode = "single";
 
+/**
+ * DI token for the parsed mode.
+ *
+ * Here rather than in `cluster.module.ts` for the reason
+ * `ATTACHMENT_STORAGE_PROVIDER` sits in its interface file: a consumer that
+ * needs the token should not have to import a module file to get it, which is
+ * how a require cycle starts (`module-graph.spec.ts`). `getClusterMode()` stays
+ * the answer for code with no injector.
+ */
+export const CLUSTER_MODE = Symbol("CLUSTER_MODE");
+
 /** Shortest `JWT_SECRET` the server will start with (`JwtStrategy` agrees). */
 export const MIN_JWT_SECRET_LENGTH = 32;
 

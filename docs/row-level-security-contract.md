@@ -102,7 +102,9 @@ calls.
 - The runtime role keeps only the DML the adapter needs on this table.
 - **This exception does not authorize direct `DataSource` access to any
   user-owned table**, and a new infrastructure table does not inherit it. A
-  second such exception is a separate decision, documented here.
+  second such exception is a separate decision, documented here. There is now
+  one other, and it is a different kind: section 4's notification connection
+  reaches no table at all.
 
 ### What the safety argument actually is
 
@@ -202,7 +204,109 @@ Reconsider this decision when any of these happens:
 - another table requests the same exemption;
 - the runtime role's grants on the table are widened.
 
-## 4. Adding or exempting a table
+## 4. The notification connection (`CLUSTER_MODE=multi`)
+
+### Context
+
+In `multi`, a replica has to be told that a row it is waiting on has changed:
+the browser's SSE stream is held on one pod and the agent's answer arrives on
+another. PostgreSQL carries that itself, with `LISTEN` and `pg_notify()`.
+
+`LISTEN` is **session** state. The runtime pool may not hold session state --
+that is the rule `common/db/advisory-locks.ts` already states for the lifecycle
+lock, and a transaction-mode pooler in front of the database would drop it
+anyway. So the subscription lives on its own connection, one per replica, for
+the life of the process: `backend/src/common/cluster/pg-listener.provider.ts`,
+bound as `PG_LISTENER` and `null` in `single`.
+
+### Decision
+
+- `PgListener` opens one `pg.Client` of its own, outside the TypeORM pool and
+  outside `withScopedDb`.
+- It connects with the **runtime role**, resolved by the same
+  `resolveRlsDatabaseAuth` call that gives the pool its credentials. Neither
+  `LISTEN` nor `pg_notify()` needs a privilege that role lacks, and the owner's
+  credentials do not belong on a long-lived connection in the serving process.
+- It runs `LISTEN <channel>` and `SELECT pg_notify($1, $2)`, and **nothing
+  else**. No table, no view, no function that reads one.
+- **This exception does not authorize reading or writing any table on that
+  connection**, and it is not precedent for a second pooled-bypass path. A
+  fourth entry in `direct-connection.guard.spec.ts` is a separate decision,
+  documented here.
+
+### What the safety argument actually is
+
+Not identity context, and not an exemption. There is **no table**.
+
+RLS is a per-row decision, so it needs a row. `LISTEN` registers interest in a
+channel name; `pg_notify()` appends a string to a queue the server holds in
+memory. Neither statement can name a relation, so no policy applies, and there
+is nothing an identity GUC could change about what either one can reach.
+
+That is the whole argument, and it is stronger than section 3's rather than
+weaker: the OAuth adapter reaches a real table whose rows carry real secrets and
+relies on the table being exempt and its keys opaque. This connection cannot
+reach a row at all.
+
+What it *can* do is carry a message between replicas outside every fence. That
+is why the payload rule is a rule and not a convention: **a notification says
+which row to look at, never what the row says.** The recipient reads that row
+back under its own scope, through `withScopedDb`, where the tenant decision is
+made as usual. A payload carrying data would hand one replica a value no policy
+ever authorized it to see, and `common/events/event-bus.interface.ts` states the
+rule where the code that would break it lives.
+
+Two smaller consequences of being outside a transaction, both deliberate:
+
+- A `pg_notify()` on this connection is **not** rolled back by the transaction
+  that triggered it, which is exactly why it is issued after the commit. Sent
+  from inside, a rollback would wake a reader to a row that never existed.
+- A wake-up can be **lost** -- one sent while this connection is reconnecting
+  reaches nobody, and PostgreSQL acknowledges no delivery. Every waiter also
+  polls on a slow timer, so the notification only shortens the wait. Readiness
+  reports the connection's state so a replica that cannot hear leaves the load
+  balancer rather than holding streams that advance only on the poll.
+
+### Rejected alternatives
+
+1. **`LISTEN` on a pooled connection.** The pool hands the next statement to
+   whichever connection is free, so the subscription would land on one
+   connection and the reader on another. It also puts session state on the pool,
+   which the RLS design forbids outright, and a transaction-mode pooler would
+   lose it silently -- the failure being wake-ups that never arrive, which reads
+   as a slow application rather than a broken one.
+
+2. **Routing `pg_notify()` through `withScopedDb`.** Tempting, because it would
+   make the code look uniform. It would open a transaction to run a statement
+   that cannot touch a row, emit identity GUCs for a tenant decision nobody is
+   making, and -- worse -- put the notify inside a transaction that can roll
+   back while the reader has already been woken. Uniformity of appearance is not
+   the goal.
+
+3. **The owner's credentials for this connection.** Rejected for the reason the
+   runtime role exists: a long-lived connection in the request-serving process
+   is the last place to hold credentials that bypass every policy, and this one
+   needs none of that privilege.
+
+4. **A second stateful service for the channel.** An earlier draft of the
+   horizontal-scaling plan reserved an optional Redis for exactly this message.
+   Rejected, and recorded in the plan: another store to run, back up, secure and
+   probe, for a channel PostgreSQL already has. See
+   `docs/future-plans/horizontal-scaling.md`.
+
+### Review triggers
+
+Reconsider this decision when any of these happens:
+
+- the listener connection runs any statement other than `LISTEN`, `UNLISTEN` or
+  `pg_notify()`;
+- a notification payload begins carrying data rather than identifiers;
+- a second long-lived direct connection is proposed for anything;
+- the connection is given the owner's credentials;
+- the runtime role's privileges are narrowed to where `LISTEN` or `pg_notify()`
+  is refused.
+
+## 5. Adding or exempting a table
 
 Adding a **user-owned** table: ship its `CREATE POLICY` in the same migration,
 and -- for any migration numbered after `123` -- its own `ALTER TABLE ... ENABLE
@@ -215,7 +319,7 @@ Exempting a table is a deliberate decision, and takes four things in one change:
 3. a row in the section 2 table above, with the real rationale;
 4. a reason it is not one of the other three buckets.
 
-## 5. What is enforced, and where
+## 6. What is enforced, and where
 
 | Guard | Fails when |
 |---|---|
@@ -226,6 +330,7 @@ Exempting a table is a deliberate decision, and takes four things in one change:
 | `backend/test/integration/rls-enforcement.integration.spec.ts` | A table is in no bucket or several; a covered table lacks its policy; an exempt table has one. Live PostgreSQL. |
 | `backend/test/integration/rls-enable.integration.spec.ts` | Migration `123` enables RLS on an unpolicied table, or misses a policied one. Live PostgreSQL. |
 | `backend/src/common/db/lint-bans.spec.ts` | A banned database primitive is not documented where contributors read, or an instruction file recommends one. |
+| `backend/src/common/db/direct-connection.guard.spec.ts` | A file under `src/` builds a `pg` `Client` or `Pool` outside the allowlist (the three pre-boot scripts and the section 4 listener), or an allowlist entry has gone stale. No database needed; ESLint cannot see this, because `pg` is a legitimate import. |
 
 The two ESLint allowlists are deliberately *not* one list: they answer different
 questions, and `backend/src/oauth/oauth-provider.service.ts` is legitimately on

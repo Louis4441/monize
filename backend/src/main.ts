@@ -28,6 +28,11 @@ import { installOidcProviderLogBridge } from "./oauth/oidc-provider-log-bridge";
 import { DataSource } from "typeorm";
 import { parseRlsMode } from "./common/db/rls-config";
 import { checkClusterBoot } from "./common/cluster/cluster-mode";
+import {
+  PG_LISTENER,
+  PG_WAKEUP_CHANNEL,
+  PgListener,
+} from "./common/cluster/pg-listener.provider";
 import { assertRuntimeRoleSafe } from "./common/db/runtime-role-check";
 import { assertRequiredDbFunctions } from "./common/db/required-db-functions";
 import { ConfigService } from "@nestjs/config";
@@ -153,6 +158,45 @@ async function assertRuntimeRoleOrExit(dataSource: DataSource): Promise<void> {
 }
 
 /**
+ * Verify this replica can hear the other replicas, and exit if not.
+ *
+ * `null` in `single`, where there is nothing to hear: the check is skipped and
+ * no second connection is opened. In `multi` it is the first thing that proves
+ * `DATABASE_HOST` is a PostgreSQL session rather than a transaction-mode
+ * pooler, because a pooler accepts the connection and then loses the `LISTEN`
+ * -- a failure that would otherwise show up as wake-ups that silently never
+ * arrive, which reads as a slow application rather than a misconfigured one.
+ *
+ * Same shape as the two database checks above, and the same reason for exiting
+ * rather than throwing.
+ */
+async function assertNotificationChannelOrExit(
+  listener: PgListener | null,
+): Promise<void> {
+  if (!listener) {
+    return;
+  }
+  const logger = new Logger("ClusterMode");
+  try {
+    await listener.connect();
+    await listener.listen(PG_WAKEUP_CHANNEL);
+    logger.log(
+      `Notification channel ready: listening on "${PG_WAKEUP_CHANNEL}".`,
+    );
+  } catch (error) {
+    logger.error(
+      `CLUSTER_MODE=multi could not open its notification channel on ` +
+        `${process.env.DATABASE_HOST ?? "localhost"}: ` +
+        `${error instanceof Error ? error.message : String(error)}. ` +
+        "Every replica holds one LISTEN, so DATABASE_HOST must reach a " +
+        "PostgreSQL session; a transaction-mode pooler (pgBouncer) cannot " +
+        "carry it. Use a direct endpoint, or CLUSTER_MODE=single.",
+    );
+    process.exit(1);
+  }
+}
+
+/**
  * Verify the database has every SQL function this build calls, and exit if not.
  *
  * Same reasoning as the role check above, and the same shape: the answer comes
@@ -224,6 +268,9 @@ async function bootstrap() {
   // state -- and the request that discovers it is the one that gets a generic
   // "Database error". Refuse here instead.
   await assertRequiredDbFunctionsOrExit(app.get(DataSource));
+
+  // And, when this replica is one of several, that it can actually hear them.
+  await assertNotificationChannelOrExit(app.get(PG_LISTENER));
 
   // Trust first proxy (Docker/nginx) so req.ip reflects the real client IP
   app.getHttpAdapter().getInstance().set("trust proxy", 1);

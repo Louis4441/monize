@@ -75,7 +75,7 @@
 | ID | Task | Depends on | Deploy impact | Status |
 |----|------|-----------|---------------|--------|
 | F1 | `CLUSTER_MODE` parsing, boot-matrix check, `main.ts` wiring, `JWT_SECRET` fatal, `.env.example` | -- | none (`JWT_SECRET` refusal is the one deliberate exception) | [x] |
-| F2 | `ClusterModule`: mode provider, the `LISTEN` connection in `multi`, connect at boot, readiness probe | F1, F6 | multi-only | [ ] |
+| F2 | `ClusterModule`: mode provider, the `LISTEN` connection in `multi`, connect at boot, readiness probe | F1, F6 | multi-only | [x] |
 | F3 | Doc corrections in `concurrency-and-idempotency.md`, `external-side-effects.md`, `cron-jobs.md` | -- | none | [x] |
 | F5 | Concurrency register: retire the stale `users.failed_login_attempts` gap row | -- | none | [x] |
 | F6 | Retire `REDIS_URL` from F1's boot matrix, `main.ts` and `.env.example` | -- | none | [x] |
@@ -161,7 +161,7 @@ environment can.
 
 ### F2 -- `ClusterModule` and the `LISTEN` connection
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/common/cluster/cluster.module.ts` (new),
 `backend/src/common/cluster/cluster.module.spec.ts` (new),
@@ -228,6 +228,75 @@ the serving process. Never put a connection string with credentials in a log
 line.
 
 **Notes:**
+
+**Scope additions**, each with its reason:
+`backend/src/common/cluster/cluster-mode.ts` (the `CLUSTER_MODE` DI token went
+there, not in the module file: `ATTACHMENT_STORAGE_PROVIDER` sits in its
+interface file for the reason that a consumer needing a token should not have
+to import a module file to get it, which is how a require cycle starts);
+`backend/src/common/db/direct-connection.guard.spec.ts` (new -- see below);
+this task list.
+
+**A guard, because nothing else could see this.** ESLint's database bans are on
+imports of `@nestjs/typeorm` and the with-context module, and `pg` is a
+legitimate import (type parsers in `main.ts`, the pre-boot scripts), so a
+hand-built `new Client(...)` anywhere under `src/` was invisible to every
+existing check. `direct-connection.guard.spec.ts` scans for one and holds a
+four-entry allowlist with a reason per entry: the three pre-boot scripts and
+this listener. It has the shrink-only rule, a stale-entry check and a vacuity
+anchor, per `docs/guard-tests.md`. Without it, section 4 of the contract would
+be a paragraph asking to be believed.
+
+**The connection is the runtime role's, through the same resolution the pool
+uses.** `resolveListenerClientConfig` calls `resolveRlsDatabaseAuth`, so under
+`RLS_MODE=enforce` the listener is `monize_app` exactly as TypeORM is. Neither
+`LISTEN` nor `pg_notify()` needs a privilege that role lacks. Two connections
+to one database that disagree about which role they are is a difference nobody
+would look for, and the spec asserts they cannot drift.
+
+**The factory opens no socket.** Connecting is `main.ts`'s, after
+`assertRequiredDbFunctionsOrExit` and before `app.listen`, which is what makes
+a database host that cannot hold a `LISTEN` one line in the log instead of a
+bootstrap rejection with the cause buried -- the reasoning the two database
+checks beside it already state. The refusal names the host and says a
+transaction-mode pooler cannot carry `LISTEN`.
+
+**The error and end handlers are armed only after a successful connect.** A
+`pg.Client` whose connect fails rejects the promise; arming them first would
+make that same failure schedule a reconnect, so the boot check would
+`process.exit(1)` while a retry loop it does not know about kept running. A
+spec asserts the listener counts on a failed client are zero rather than
+emitting `error` at it -- an `EventEmitter` with no `error` listener throws on
+emit, which would fail for the right reason but report as an unhandled error
+rather than as a claim.
+
+**`PG_WAKEUP_CHANNEL` is defined here, which R6 will use.** The boot check has
+to `LISTEN` on something to prove the connection can hold one, and a throwaway
+channel left subscribed would be untidier than the real one. One fixed channel
+per deployment with the recipient named inside each payload, rather than one
+channel per subscriber: a subscribe happens on every SSE open and every agent
+long-poll, so `LISTEN`/`UNLISTEN` churn would be on the hot path. R6 does the
+routing.
+
+**A channel name is validated, not quoted.** `LISTEN` takes no bind parameter,
+so the name is interpolated; rather than quote arbitrary input the grammar is
+narrowed to `[a-z_][a-z0-9_]*` at most 63 characters. The length bound is not
+cosmetic -- PostgreSQL truncates a longer identifier, so the notifier and the
+listener would agree on a string and disagree on a channel.
+
+**Readiness has three states, not two.** `checkNotificationChannel()` returns
+`null` in `single` (nothing to check), so `checks.eventBus` is absent there
+rather than permanently `"healthy"` -- a key that is always healthy invites a
+dashboard to watch a constant. In `multi` a missing listener counts as down,
+not as absent: that combination is a wiring defect, and serving traffic on it
+is the silent-wake-up failure the mode exists to prevent. The reason is logged;
+the response body keeps the existing generic refusal, so no new user-facing
+string was added.
+
+**For G1:** `PgListener.channels` and `PgListener.handlers` are process-local by
+construction -- they describe this replica's own connection and its own
+subscribers, and there is nothing for a second replica to share. Add both to
+the allowlist with that reason.
 
 ### F3 -- Doc corrections
 
@@ -1725,8 +1794,9 @@ shrink, never grow without a reason").
 after stripping comments with `extractTsComments` from
 `backend/src/common/repo-paths.util.ts`; seed the allowlist from the design
 doc's "Per-replica state that stays" table, plus `MemoryEventBus` (R1), the
-local fan-out map in `PostgresEventBus` (R6), the T1 log throttle, and the
-four session maps in `mcp-http.controller.ts` (M1 shipped the sticky-routing
+channel and handler sets in `PgListener` (F2), the local fan-out map in
+`PostgresEventBus` (R6), the T1 log throttle, and the four session maps in
+`mcp-http.controller.ts` (M1 shipped the sticky-routing
 variant; its Notes say why they stay), each with its reason as the map value. Leave the cron-scoped guard in place (it has a
 narrower, stronger claim).
 

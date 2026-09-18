@@ -19,6 +19,7 @@ import { PatScopeGuard } from "./auth/guards/pat-scope.guard";
 import { CsrfRefreshInterceptor } from "./common/interceptors/csrf-refresh.interceptor";
 import { RequestContextInterceptor } from "./common/interceptors/request-context.interceptor";
 import { parseRlsMode, resolveRlsDatabaseAuth } from "./common/db/rls-config";
+import { ClusterModule } from "./common/cluster/cluster.module";
 import { DemoModeModule } from "./common/demo-mode.module";
 import { EventBusModule } from "./common/events/event-bus.module";
 import { JobClaimModule } from "./common/jobs/job-claim.module";
@@ -131,6 +132,9 @@ import { I18nModule } from "./i18n/i18n.module";
     // Demo mode (global — available to all modules)
     DemoModeModule,
     JobClaimModule,
+
+    // Cluster mode and, in multi, the LISTEN/NOTIFY connection (global)
+    ClusterModule,
 
     // Cross-replica wake-ups (global — a hint channel, never a data channel)
     EventBusModule,

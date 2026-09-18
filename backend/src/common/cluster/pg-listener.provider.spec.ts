@@ -1,0 +1,504 @@
+import { EventEmitter } from "events";
+import type { Client, ClientConfig } from "pg";
+
+import {
+  PG_LISTENER_CONNECT_TIMEOUT_MS,
+  PG_LISTENER_RECONNECT_MAX_MS,
+  PG_LISTENER_RECONNECT_MIN_MS,
+  PG_WAKEUP_CHANNEL,
+  PgListener,
+  assertValidChannel,
+  resolveListenerClientConfig,
+} from "./pg-listener.provider";
+
+/**
+ * A `pg.Client` double that is an `EventEmitter`, because the reconnect path is
+ * driven entirely by the `error` and `end` events a real client emits and a
+ * plain object could not deliver them.
+ */
+class FakeClient extends EventEmitter {
+  readonly queries: string[] = [];
+  readonly params: unknown[][] = [];
+  connectCalls = 0;
+  endCalls = 0;
+  connectResult: Promise<void> | null = null;
+  queryError: Error | null = null;
+
+  connect(): Promise<void> {
+    this.connectCalls += 1;
+    return this.connectResult ?? Promise.resolve();
+  }
+
+  query(sql: string, params?: unknown[]): Promise<unknown> {
+    this.queries.push(sql);
+    if (params) this.params.push(params);
+    return this.queryError
+      ? Promise.reject(this.queryError)
+      : Promise.resolve({ rows: [] });
+  }
+
+  end(): Promise<void> {
+    this.endCalls += 1;
+    return Promise.resolve();
+  }
+}
+
+const asClient = (fake: FakeClient) => fake as unknown as Client;
+
+/** A client whose connect never succeeds. */
+function unreachableClient(): FakeClient {
+  const client = new FakeClient();
+  client.connectResult = Promise.reject(new Error("still down"));
+  return client;
+}
+
+/**
+ * A listener over a sequence of doubles, one per (re)connect.
+ *
+ * `fallback` builds every client past the end of the sequence. It defaults to a
+ * healthy one, and the backoff spec passes `unreachableClient` -- without that
+ * the listener reconnects successfully partway through the window under test
+ * and the schedule being asserted stops existing.
+ */
+function buildListener(
+  clients: FakeClient[],
+  fallback: () => FakeClient = () => new FakeClient(),
+) {
+  const made: FakeClient[] = [];
+  const listener = new PgListener({} as ClientConfig, () => {
+    const next = clients[made.length] ?? fallback();
+    made.push(next);
+    return asClient(next);
+  });
+  return { listener, made };
+}
+
+describe("assertValidChannel", () => {
+  it.each(["monize_wakeups", "a", "a_1", "z9_z"])("accepts %s", (channel) => {
+    expect(() => assertValidChannel(channel)).not.toThrow();
+  });
+
+  it.each([
+    ["Uppercase", "Wakeups"],
+    ["a quote", 'a"; DROP TABLE users; --'],
+    ["a space", "two words"],
+    ["a leading digit", "1channel"],
+    ["empty", ""],
+  ])("rejects %s", (_name, channel) => {
+    expect(() => assertValidChannel(channel)).toThrow(
+      /Invalid notification channel/,
+    );
+  });
+
+  it("rejects a name past the identifier limit rather than letting it truncate", () => {
+    // A 64-character LISTEN name is truncated by PostgreSQL, so the notifier and
+    // the listener would agree on a string and disagree on a channel.
+    expect(() => assertValidChannel("a".repeat(63))).not.toThrow();
+    expect(() => assertValidChannel("a".repeat(64))).toThrow(
+      /at most 63 characters/,
+    );
+  });
+});
+
+describe("resolveListenerClientConfig", () => {
+  const env = (overrides: Record<string, string>) => {
+    const values: Record<string, string> = {
+      DATABASE_HOST: "db",
+      DATABASE_PORT: "6543",
+      DATABASE_NAME: "monize",
+      DATABASE_USER: "owner",
+      DATABASE_PASSWORD: "owner-secret",
+      ...overrides,
+    };
+    return (name: string) => values[name];
+  };
+
+  it("uses the owner credentials when RLS is not enforced", () => {
+    const config = resolveListenerClientConfig(env({ RLS_MODE: "shadow" }));
+    expect(config).toMatchObject({
+      host: "db",
+      port: 6543,
+      database: "monize",
+      user: "owner",
+      password: "owner-secret",
+      keepAlive: true,
+      connectionTimeoutMillis: PG_LISTENER_CONNECT_TIMEOUT_MS,
+      ssl: false,
+    });
+  });
+
+  it("uses the runtime role under RLS_MODE=enforce, as the pool does", () => {
+    // Two connections to one database that disagree about which role they are
+    // is a difference nobody would look for. The resolution is shared with
+    // AppModule's, so this asserts they cannot drift apart.
+    const config = resolveListenerClientConfig(
+      env({
+        RLS_MODE: "enforce",
+        DATABASE_APP_USER: "monize_app",
+        DATABASE_APP_PASSWORD: "app-secret",
+      }),
+    );
+    expect(config.user).toBe("monize_app");
+    expect(config.password).toBe("app-secret");
+  });
+
+  it("refuses enforce without the runtime role's password", () => {
+    expect(() =>
+      resolveListenerClientConfig(env({ RLS_MODE: "enforce" })),
+    ).toThrow(/DATABASE_APP_PASSWORD/);
+  });
+
+  it("carries the TLS settings the pool uses", () => {
+    expect(
+      resolveListenerClientConfig(env({ DATABASE_SSL: "true" })).ssl,
+    ).toEqual({ rejectUnauthorized: true });
+    expect(
+      resolveListenerClientConfig(
+        env({
+          DATABASE_SSL: "true",
+          DATABASE_SSL_REJECT_UNAUTHORIZED: "false",
+        }),
+      ).ssl,
+    ).toEqual({ rejectUnauthorized: false });
+  });
+});
+
+describe("PgListener", () => {
+  describe("connect", () => {
+    it("connects once and reports itself live", async () => {
+      const { listener, made } = buildListener([new FakeClient()]);
+
+      await listener.connect();
+
+      expect(made[0].connectCalls).toBe(1);
+      expect(listener.isConnected()).toBe(true);
+      await listener.close();
+    });
+
+    it("is idempotent, so a second caller does not open a second socket", async () => {
+      const { listener, made } = buildListener([new FakeClient()]);
+
+      await listener.connect();
+      await listener.connect();
+
+      expect(made).toHaveLength(1);
+      await listener.close();
+    });
+
+    it("throws and closes the socket when the connect fails", async () => {
+      const client = new FakeClient();
+      client.connectResult = Promise.reject(new Error("ECONNREFUSED"));
+      const { listener } = buildListener([client]);
+
+      await expect(listener.connect()).rejects.toThrow("ECONNREFUSED");
+      expect(listener.isConnected()).toBe(false);
+      // The half-open client must not be left behind: main.ts exits on this
+      // path, but a spec run or a retry would leak a socket per attempt.
+      expect(client.endCalls).toBe(1);
+    });
+
+    it("does not start a reconnect loop when the first connect fails", async () => {
+      // The boot check exits on a failure here. If the failed connect had armed
+      // the loss handlers, a retry loop would keep running past the refusal --
+      // and a late `error` from the dead client would be acted on. Asserted by
+      // the listener counts rather than by emitting: an EventEmitter with no
+      // `error` listener throws on emit, which would fail this test for the
+      // right reason but report it as an unhandled error rather than a claim.
+      const client = new FakeClient();
+      client.connectResult = Promise.reject(new Error("nope"));
+      const { listener, made } = buildListener([client, new FakeClient()]);
+
+      await expect(listener.connect()).rejects.toThrow("nope");
+
+      expect(client.listenerCount("error")).toBe(0);
+      expect(client.listenerCount("end")).toBe(0);
+      expect(client.listenerCount("notification")).toBe(0);
+      expect(made).toHaveLength(1);
+    });
+
+    it("refuses to reopen after close", async () => {
+      const { listener } = buildListener([new FakeClient()]);
+      await listener.connect();
+      await listener.close();
+
+      await expect(listener.connect()).rejects.toThrow(/has been closed/);
+    });
+  });
+
+  describe("listen", () => {
+    it("issues LISTEN on the live session", async () => {
+      const { listener, made } = buildListener([new FakeClient()]);
+      await listener.connect();
+
+      await listener.listen(PG_WAKEUP_CHANNEL);
+
+      expect(made[0].queries).toContain(`LISTEN ${PG_WAKEUP_CHANNEL}`);
+      await listener.close();
+    });
+
+    it("records a channel taken before the connection exists", async () => {
+      const { listener, made } = buildListener([new FakeClient()]);
+
+      await listener.listen(PG_WAKEUP_CHANNEL);
+      expect(listener.subscribedChannels()).toEqual([PG_WAKEUP_CHANNEL]);
+
+      await listener.connect();
+      expect(made[0].queries).toContain(`LISTEN ${PG_WAKEUP_CHANNEL}`);
+      await listener.close();
+    });
+
+    it("rejects a channel name that is not an identifier", async () => {
+      const { listener } = buildListener([new FakeClient()]);
+      await listener.connect();
+
+      await expect(listener.listen('x"; DROP TABLE users; --')).rejects.toThrow(
+        /Invalid notification channel/,
+      );
+      await listener.close();
+    });
+  });
+
+  describe("notify", () => {
+    it("sends through pg_notify with the payload as a bind parameter", async () => {
+      const { listener, made } = buildListener([new FakeClient()]);
+      await listener.connect();
+
+      await listener.notify(PG_WAKEUP_CHANNEL, '{"channel":"relay:1"}');
+
+      expect(made[0].queries).toContain("SELECT pg_notify($1, $2)");
+      expect(made[0].params).toContainEqual([
+        PG_WAKEUP_CHANNEL,
+        '{"channel":"relay:1"}',
+      ]);
+      await listener.close();
+    });
+
+    it("rejects while the connection is down rather than dropping silently", async () => {
+      const { listener } = buildListener([new FakeClient()]);
+
+      await expect(listener.notify(PG_WAKEUP_CHANNEL, "{}")).rejects.toThrow(
+        /notification connection is down/,
+      );
+    });
+  });
+
+  describe("onNotification", () => {
+    it("delivers channel and payload to every handler", async () => {
+      const { listener, made } = buildListener([new FakeClient()]);
+      await listener.connect();
+      const seen: string[][] = [];
+      listener.onNotification((channel, payload) =>
+        seen.push([channel, payload]),
+      );
+      listener.onNotification((channel, payload) =>
+        seen.push([`2:${channel}`, payload]),
+      );
+
+      made[0].emit("notification", {
+        channel: PG_WAKEUP_CHANNEL,
+        payload: "{}",
+      });
+
+      expect(seen).toEqual([
+        [PG_WAKEUP_CHANNEL, "{}"],
+        [`2:${PG_WAKEUP_CHANNEL}`, "{}"],
+      ]);
+      await listener.close();
+    });
+
+    it("gives a payload-less notification an empty string, not undefined", async () => {
+      const { listener, made } = buildListener([new FakeClient()]);
+      await listener.connect();
+      const seen: unknown[] = [];
+      listener.onNotification((_channel, payload) => seen.push(payload));
+
+      made[0].emit("notification", { channel: PG_WAKEUP_CHANNEL });
+
+      expect(seen).toEqual([""]);
+      await listener.close();
+    });
+
+    it("keeps delivering after a handler throws", async () => {
+      const { listener, made } = buildListener([new FakeClient()]);
+      await listener.connect();
+      const seen: string[] = [];
+      listener.onNotification(() => {
+        throw new Error("subscriber is broken");
+      });
+      listener.onNotification((channel) => seen.push(channel));
+
+      made[0].emit("notification", {
+        channel: PG_WAKEUP_CHANNEL,
+        payload: "{}",
+      });
+
+      expect(seen).toEqual([PG_WAKEUP_CHANNEL]);
+      await listener.close();
+    });
+
+    it("unsubscribes idempotently", async () => {
+      const { listener, made } = buildListener([new FakeClient()]);
+      await listener.connect();
+      const seen: string[] = [];
+      const first = listener.onNotification(() => seen.push("first"));
+      listener.onNotification(() => seen.push("second"));
+
+      first();
+      first();
+      made[0].emit("notification", {
+        channel: PG_WAKEUP_CHANNEL,
+        payload: "{}",
+      });
+
+      expect(seen).toEqual(["second"]);
+      await listener.close();
+    });
+
+    it("delivers to a handler that a earlier handler unsubscribed alongside", async () => {
+      const { listener, made } = buildListener([new FakeClient()]);
+      await listener.connect();
+      const seen: string[] = [];
+      let dropSecond = () => undefined as void;
+      listener.onNotification(() => {
+        seen.push("first");
+        dropSecond();
+      });
+      dropSecond = listener.onNotification(() => seen.push("second"));
+
+      made[0].emit("notification", {
+        channel: PG_WAKEUP_CHANNEL,
+        payload: "{}",
+      });
+
+      // The snapshot is taken before delivery, so a handler that was subscribed
+      // when the notification arrived still receives it.
+      expect(seen).toEqual(["first", "second"]);
+      await listener.close();
+    });
+  });
+
+  describe("reconnect", () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    it("replaces the client and replays every LISTEN", async () => {
+      const first = new FakeClient();
+      const second = new FakeClient();
+      const { listener, made } = buildListener([first, second]);
+      await listener.connect();
+      await listener.listen(PG_WAKEUP_CHANNEL);
+      await listener.listen("relay_extra");
+
+      first.emit("error", new Error("server closed the connection"));
+      expect(listener.isConnected()).toBe(false);
+
+      await jest.advanceTimersByTimeAsync(PG_LISTENER_RECONNECT_MIN_MS);
+
+      expect(made).toHaveLength(2);
+      expect(listener.isConnected()).toBe(true);
+      // A reconnect that forgets the channels leaves a replica connected and
+      // deaf, which readiness would call healthy.
+      expect(second.queries).toEqual([
+        `LISTEN ${PG_WAKEUP_CHANNEL}`,
+        "LISTEN relay_extra",
+      ]);
+      await listener.close();
+    });
+
+    it("reconnects on a server-side end as well as an error", async () => {
+      const first = new FakeClient();
+      const { listener, made } = buildListener([first, new FakeClient()]);
+      await listener.connect();
+
+      first.emit("end");
+      await jest.advanceTimersByTimeAsync(PG_LISTENER_RECONNECT_MIN_MS);
+
+      expect(made).toHaveLength(2);
+      expect(listener.isConnected()).toBe(true);
+      await listener.close();
+    });
+
+    it("doubles the delay up to the ceiling, and never gives up", async () => {
+      // The schedule the implementation owes: the first retry at the minimum,
+      // each next one twice the last, and no wait longer than the ceiling --
+      // so an outage that lasts hours still gets an attempt every 30 seconds
+      // rather than backing off into never trying again.
+      const delays = [0, 1, 2, 3, 4, 5, 6].map((n) =>
+        Math.min(
+          PG_LISTENER_RECONNECT_MAX_MS,
+          PG_LISTENER_RECONNECT_MIN_MS * 2 ** n,
+        ),
+      );
+      // The window under test has to reach the cap, or it asserts only doubling.
+      expect(delays[delays.length - 1]).toBe(PG_LISTENER_RECONNECT_MAX_MS);
+      expect(delays[delays.length - 2]).toBe(PG_LISTENER_RECONNECT_MAX_MS);
+
+      const first = new FakeClient();
+      const { listener, made } = buildListener([first], unreachableClient);
+      await listener.connect();
+      first.emit("error", new Error("down"));
+
+      for (const [index, delay] of delays.entries()) {
+        await jest.advanceTimersByTimeAsync(delay - 1);
+        // Not due yet: a retry one millisecond early is a retry that is not
+        // backing off at all.
+        expect(made).toHaveLength(index + 1);
+        await jest.advanceTimersByTimeAsync(1);
+        expect(made).toHaveLength(index + 2);
+      }
+
+      expect(listener.isConnected()).toBe(false);
+      await listener.close();
+    });
+
+    it("ignores an event from a client it has already replaced", async () => {
+      const first = new FakeClient();
+      const second = new FakeClient();
+      const { listener, made } = buildListener([first, second]);
+      await listener.connect();
+
+      first.emit("error", new Error("down"));
+      await jest.advanceTimersByTimeAsync(PG_LISTENER_RECONNECT_MIN_MS);
+      expect(listener.isConnected()).toBe(true);
+
+      // A dead client emitting late must not tear down the live session.
+      first.emit("end");
+      first.emit("error", new Error("still dead"));
+
+      expect(listener.isConnected()).toBe(true);
+      expect(made).toHaveLength(2);
+      await listener.close();
+    });
+
+    it("stops reconnecting once closed", async () => {
+      const first = new FakeClient();
+      const { listener, made } = buildListener([first, new FakeClient()]);
+      await listener.connect();
+
+      first.emit("error", new Error("down"));
+      await listener.close();
+      await jest.advanceTimersByTimeAsync(PG_LISTENER_RECONNECT_MAX_MS * 2);
+
+      expect(made).toHaveLength(1);
+      expect(listener.isConnected()).toBe(false);
+    });
+  });
+
+  describe("close", () => {
+    it("ends the socket and reports itself down", async () => {
+      const client = new FakeClient();
+      const { listener } = buildListener([client]);
+      await listener.connect();
+
+      await listener.close();
+
+      expect(client.endCalls).toBe(1);
+      expect(listener.isConnected()).toBe(false);
+    });
+
+    it("is safe with no connection open", async () => {
+      const { listener } = buildListener([new FakeClient()]);
+      await expect(listener.close()).resolves.toBeUndefined();
+    });
+  });
+});
