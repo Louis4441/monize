@@ -143,7 +143,8 @@ not a transaction-mode pooler, which `db-init` and `db-migrate` already require
 for the lifecycle lock. No key prefix is needed either: several Monize
 deployments on one PostgreSQL server are separate databases, and `NOTIFY` is
 scoped to the database. Task F1 shipped a `REDIS_URL` input to the boot matrix
-against the earlier draft; task F6 retires it.
+against the earlier draft; task F6 has retired it, so `checkClusterBoot` reads
+`CLUSTER_MODE` and `JWT_SECRET` and nothing else until F2 and S1 add theirs.
 
 Boot matrix in `multi`:
 
@@ -183,8 +184,8 @@ mode and, in `multi`, one dedicated `pg.Client` for `LISTEN` and `pg_notify()`
 connection but on the runtime role, `null` in `single`. `main.ts` calls the
 check before `app.listen`. Readiness probe extension. `docs/cron-jobs.md` and
 the two stale doc sections corrected. ADR `0005` written when this lands (next
-free number in `docs/adr/README.md`). The `REDIS_URL` input F1 shipped is
-retired first (task F6).
+free number in `docs/adr/README.md`). Task F6, which retired the `REDIS_URL`
+input F1 shipped, is done.
 
 Deploy impact: `none` for `single`.
 
@@ -399,10 +400,10 @@ Deploy impact: `neutral`.
   `postgres` service the file already has.
 - **CI.** Nothing to add. The two-connection and two-instance specs run
   against the PostgreSQL service the `backend-integration-tests` job already
-  has. The `redis` service and `REDIS_URL` that task D3 added against the
-  earlier draft come out again (`.github/` is an ask-first change; D3 as now
-  written is the agreement). One E2E shard runs with `CLUSTER_MODE=multi` and
-  two backend replicas behind the frontend proxy in `docker-compose.e2e.yml`.
+  has, and task D3 has taken the `redis` service and `REDIS_URL` it added
+  against the earlier draft back out. One E2E shard runs with
+  `CLUSTER_MODE=multi` and two backend replicas behind the frontend proxy in
+  `docker-compose.e2e.yml`.
 
 Deploy impact: `none` for existing deployments (defaults unchanged).
 

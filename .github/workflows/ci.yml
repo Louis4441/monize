@@ -121,22 +121,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-      redis:
-        # For the CLUSTER_MODE=multi specs (horizontal-scaling tasks R6 and T1):
-        # the Redis event bus and the Redis throttler storage are properties of
-        # Redis, so a mocked client proves neither. Nothing in the suite needs
-        # it yet, and a spec that never connects does not notice it is here.
-        #
-        # Pinned by digest for zizmor's unpinned-images audit, like postgres
-        # above. Refresh alongside the Redis version the chart ships.
-        image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     defaults:
       run:
         working-directory: backend
@@ -147,10 +131,12 @@ jobs:
       DATABASE_USER: monize_test
       DATABASE_PASSWORD: test_password
       JWT_SECRET: test-jwt-secret-for-ci-minimum-32-characters-long
-      REDIS_URL: redis://localhost:6379
       # CLUSTER_MODE is deliberately NOT set job-wide. Setting it here would put
       # every integration spec into multi, which is not the mode this suite is
-      # about; the specs that need it set it per test.
+      # about; the specs that need it set it per test. The multi-replica specs
+      # (horizontal-scaling tasks R6 and T1) need no service of their own: the
+      # event bus is LISTEN/NOTIFY and the throttler's counters are a table, so
+      # both are properties of the postgres service above.
       NODE_ENV: test
     steps:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3

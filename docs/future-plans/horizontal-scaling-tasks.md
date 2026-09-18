@@ -78,7 +78,7 @@
 | F2 | `ClusterModule`: mode provider, the `LISTEN` connection in `multi`, connect at boot, readiness probe | F1, F6 | multi-only | [ ] |
 | F3 | Doc corrections in `concurrency-and-idempotency.md`, `external-side-effects.md`, `cron-jobs.md` | -- | none | [x] |
 | F5 | Concurrency register: retire the stale `users.failed_login_attempts` gap row | -- | none | [x] |
-| F6 | Retire `REDIS_URL` from F1's boot matrix, `main.ts` and `.env.example` | -- | none | [ ] |
+| F6 | Retire `REDIS_URL` from F1's boot matrix, `main.ts` and `.env.example` | -- | none | [x] |
 | F4 | ADR 0005 and index row | F1 | none | [ ] |
 | A1 | Migration: `auth_attempt_counters`, `single_use_tokens`; RLS exemption; sweep cron | -- | none | [x] |
 | A2 | `AuthAttemptCounterService`; 2FA attempt maps replaced | A1 | neutral | [x] |
@@ -104,14 +104,14 @@
 | G2 | `INV-HA-001..005` in both contract docs | A3, K1, R3, S1 | none | [ ] |
 | D1 | Helm: Deployments, PDB, spread, autoscaling, `clusterMode` | F2 | none (defaults unchanged) | [ ] |
 | D2 | `docker-compose.ha.yml` example | F2 | none | [ ] |
-| D3 | CI: retire the `redis` service and `REDIS_URL` from the integration job | -- | none | [ ] |
+| D3 | CI: retire the `redis` service and `REDIS_URL` from the integration job | -- | none | [x] |
 | D4 | E2E: one shard on `CLUSTER_MODE=multi` with two backends | R6, T1, D1 | none | [ ] |
 
 ## Suggested order
 
 1. F1 and F3 (done), F5, A1, R1, R2 (no behaviour change, unblock
-   everything), then F6 and D3 (undo the two Redis-shaped pieces that shipped
-   against the earlier draft, before anything builds on them).
+   everything), then F6 and D3 (done: the two Redis-shaped pieces that shipped
+   against the earlier draft, undone before anything built on them).
 2. A2, A3, A4, X1, K1, C1, C2, C3, C4 (the `neutral` durability fixes; each
    improves a single-replica deployment on its own).
 3. R3, R4, R5, M1 (relay and MCP on rows).
@@ -154,9 +154,10 @@ S1; the compose files carry no explicit `CLUSTER_MODE` (unset is `single`).
 
 The `REDIS_URL` input (its `multi` refusal, its `single` warning, the spec
 rows and the `.env.example` entry) shipped against the earlier draft, which
-reserved an optional Redis. The design no longer asks for it; task F6 retires
-it, and until F6 lands the code refuses `multi` without a `REDIS_URL` nothing
-will read.
+reserved an optional Redis. The design no longer asks for it, and task F6 has
+retired it: `ClusterBootEnv` is `{ CLUSTER_MODE?, JWT_SECRET? }`, and the
+`multi` arm of the matrix now checks only what a pure function of the
+environment can.
 
 ### F2 -- `ClusterModule` and the `LISTEN` connection
 
@@ -268,7 +269,8 @@ this list; if the statement has changed shape, the row may be right.
 
 ### F6 -- Retire `REDIS_URL` from F1
 
-- [ ] Status:
+- [x] Status: done (PR
+  [#1407](https://github.com/kenlasko/monize/pull/1407)).
 
 **Scope:** `backend/src/common/cluster/cluster-mode.ts` and its spec,
 `backend/src/main.ts` (the `assertClusterBootOrExit` call), `.env.example`
@@ -298,7 +300,33 @@ only `JWT_SECRET` set reports no refusal.
 at boot that a second replica can be woken. That is acceptable only because
 nothing selects a multi-replica bus until R6; say so in the PR.
 
-**Notes:**
+**Notes:** `checkClusterBoot` now emits no warning on any input. The
+`warnings` field stays on `ClusterBootReport` rather than being removed with
+its only producer: S1 adds the first of the next ones (the `database`
+attachment provider in `multi`), and the matrix's nine rows each assert an
+empty `warnings`, so the field is pinned rather than unobserved. `main.ts` is
+unchanged apart from the dropped argument -- it already loops over whatever
+warnings it is handed.
+
+Two specs needed more than a deletion.
+
+1. **"reports every problem at once"** paired a missing `JWT_SECRET` with the
+   missing `REDIS_URL`, and `multi` no longer has a second refusal to pair
+   with. It now pairs an unparsable `CLUSTER_MODE` with the missing secret,
+   which is the same property (an operator restarting a crash-looping
+   container reads every reason at once) over the inputs that remain, and it
+   covers the more interesting path: a mode that did not parse must not stop
+   the secret being judged.
+2. **"does not warn about an unused `REDIS_URL` when the mode did not parse"**
+   was deleted rather than rewritten. Its subject was the one warning that
+   existed; with no warning to suppress there is nothing left to assert, and a
+   rewritten version would have asserted that an empty list is empty. The
+   matrix rows carry that claim already.
+
+The `multi` matrix row keeps a comment naming what `multi` does still require
+-- a database host that can hold `LISTEN`, and cluster-safe attachment and
+backup storage -- and which task adds each check, so the row does not read as
+"multi needs nothing".
 
 ### F4 -- ADR 0005
 
@@ -1800,8 +1828,10 @@ both backends green; killing one backend leaves the app usable.
 
 ### D3 -- CI: retire the `redis` service
 
-- [ ] Status: open. The task as first written ("add a `redis` service")
-  shipped against the earlier draft; this is its reversal.
+- [x] Status: done (PR
+  [#1407](https://github.com/kenlasko/monize/pull/1407)). The task as first
+  written ("add a `redis` service") shipped against the earlier draft; this is
+  its reversal.
 
 **Scope:** `.github/workflows/ci.yml` (`backend-integration-tests` job).
 `.github/` is an ask-first change under `AGENTS.md`; this task is the
@@ -1817,13 +1847,24 @@ already there.
 **Acceptance:** the job runs unchanged; `zizmor --offline .github/workflows/ci.yml`
 reports no findings; `grep -i redis .github/workflows/ci.yml` is empty.
 
-**Notes (what shipped, so the reversal removes the right lines):**
+**Notes (what shipped, so the reversal removed the right lines):**
 `redis:7-alpine` was pinned to
 `sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf`, a
 multi-arch index, with `--health-cmd "redis-cli ping"`, port `6379:6379`, and
-`REDIS_URL: redis://localhost:6379` in the job env. The `zizmor-scan` job runs
-with `|| true` and only uploads SARIF, so it could not go red on the pin and
-cannot go red on its removal.
+`REDIS_URL: redis://localhost:6379` in the job env. All four are gone.
+
+The comment that `CLUSTER_MODE` is deliberately not set job-wide stayed, and
+gained the reason the service is no longer needed: the event bus is
+`LISTEN`/`NOTIFY` and the throttler's counters are a table, so R6's and T1's
+specs are properties of the `postgres` service the job already runs. Without
+that sentence the next reader finds a comment about specs that need a mode,
+and no sign of what they connect to.
+
+`zizmor --offline .github/workflows/ci.yml` reports no findings (v1.30.1, two
+suppressed, the same two as before). As recorded when the service landed, the
+`zizmor-scan` job runs with `|| true` and only uploads SARIF, so it could
+neither go red on the pin nor go red on its removal; the scan was run by hand
+for the same reason it was then.
 
 ### D4 -- E2E shard on `CLUSTER_MODE=multi`
 

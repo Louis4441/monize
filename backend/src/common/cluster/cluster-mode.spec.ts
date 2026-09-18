@@ -71,44 +71,16 @@ describe("checkClusterBoot", () => {
       warnings: RegExp[];
     }[] = [
       {
-        name: "multi with Redis and a secret",
-        env: {
-          CLUSTER_MODE: "multi",
-          REDIS_URL: "redis://redis:6379",
-          JWT_SECRET: GOOD_SECRET,
-        },
-        mode: "multi",
-        refusals: [],
-        warnings: [],
-      },
-      {
-        name: "multi without REDIS_URL",
+        // multi asks for no setting of its own: PostgreSQL is the only shared
+        // store, so a secret is the whole of what the matrix can check here.
+        // What multi additionally needs -- a database host that can hold
+        // LISTEN, and cluster-safe attachment and backup storage -- is a
+        // connection and a module's configuration, which F2 and S1 add.
+        name: "multi with a secret",
         env: { CLUSTER_MODE: "multi", JWT_SECRET: GOOD_SECRET },
         mode: "multi",
-        refusals: [/CLUSTER_MODE=multi requires REDIS_URL/],
-        warnings: [],
-      },
-      {
-        name: "multi with a blank REDIS_URL",
-        env: {
-          CLUSTER_MODE: "multi",
-          REDIS_URL: "  ",
-          JWT_SECRET: GOOD_SECRET,
-        },
-        mode: "multi",
-        refusals: [/requires REDIS_URL/],
-        warnings: [],
-      },
-      {
-        name: "single with REDIS_URL set",
-        env: {
-          CLUSTER_MODE: "single",
-          REDIS_URL: "redis://redis:6379",
-          JWT_SECRET: GOOD_SECRET,
-        },
-        mode: "single",
         refusals: [],
-        warnings: [/REDIS_URL is set but CLUSTER_MODE is single/],
+        warnings: [],
       },
       {
         name: "JWT_SECRET missing in single",
@@ -119,7 +91,7 @@ describe("checkClusterBoot", () => {
       },
       {
         name: "JWT_SECRET missing in multi",
-        env: { CLUSTER_MODE: "multi", REDIS_URL: "redis://redis:6379" },
+        env: { CLUSTER_MODE: "multi" },
         mode: "multi",
         refusals: [/JWT_SECRET is not set/],
         warnings: [],
@@ -164,18 +136,12 @@ describe("checkClusterBoot", () => {
   });
 
   it("reports every problem at once, so one restart is enough", () => {
-    const report = checkClusterBoot({ CLUSTER_MODE: "multi" });
+    // An unreadable mode does not stop the secret being judged: an operator
+    // who fixed one and restarted to find the other waiting is the failure
+    // this asserts against.
+    const report = checkClusterBoot({ CLUSTER_MODE: "cluster" });
     expect(report.refusals).toHaveLength(2);
+    expect(report.refusals.join("\n")).toMatch(/Invalid CLUSTER_MODE/);
     expect(report.refusals.join("\n")).toMatch(/JWT_SECRET/);
-    expect(report.refusals.join("\n")).toMatch(/REDIS_URL/);
-  });
-
-  it("does not warn about an unused REDIS_URL when the mode did not parse", () => {
-    const report = checkClusterBoot({
-      CLUSTER_MODE: "sngle",
-      REDIS_URL: "redis://redis:6379",
-      JWT_SECRET: GOOD_SECRET,
-    });
-    expect(report.warnings).toEqual([]);
   });
 });

@@ -107,7 +107,6 @@ function assertClusterBootOrExit(): void {
   // where a reader of the bootstrap can see it.
   const report = checkClusterBoot({
     CLUSTER_MODE: process.env.CLUSTER_MODE,
-    REDIS_URL: process.env.REDIS_URL,
     JWT_SECRET: process.env.JWT_SECRET,
   });
   for (const warning of report.warnings) {

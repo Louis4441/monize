@@ -7,8 +7,11 @@
  *                promises) is correct because there is only one process.
  *   - `multi`  : several replicas behind a load balancer with no session
  *                affinity. Anything a second replica would get wrong must be a
- *                row or a Redis key, so the mode is a precondition the boot
- *                checks rather than a hint.
+ *                row, so the mode is a precondition the boot checks rather
+ *                than a hint. PostgreSQL is the only shared store: the
+ *                throttler's counters are a table and the cross-replica
+ *                wake-up is `LISTEN`/`NOTIFY`, so `multi` adds no dependency
+ *                and no connection setting of its own.
  *
  * The parse-and-throw shape is `parseRlsMode` in `backend/src/common/db/rls-config.ts`: an
  * unrecognized value refuses the boot instead of silently falling back to a
@@ -56,7 +59,6 @@ export function getClusterMode(): ClusterMode {
 /** The subset of the environment the boot matrix reads. */
 export interface ClusterBootEnv {
   CLUSTER_MODE?: string;
-  REDIS_URL?: string;
   JWT_SECRET?: string;
 }
 
@@ -78,10 +80,11 @@ export interface ClusterBootReport {
  * crash-looping container should need one restart, not one per missing
  * variable.
  *
- * What it deliberately does not cover: anything that needs a connection (the
- * Redis `PING`) or a module's own configuration (which attachment and backup
- * providers are selected). Those are checks the later work packages add here,
- * fed from values their modules resolve.
+ * What it deliberately does not cover: anything that needs a connection (in
+ * `multi`, that the database host can hold the `LISTEN` each replica keeps --
+ * a transaction-mode pooler cannot) or a module's own configuration (which
+ * attachment and backup providers are selected). Those are checks the later
+ * work packages add here, fed from values their modules resolve.
  */
 export function checkClusterBoot(env: ClusterBootEnv): ClusterBootReport {
   const refusals: string[] = [];
@@ -111,22 +114,6 @@ export function checkClusterBoot(env: ClusterBootEnv): ClusterBootReport {
         "It signs every session token and derives the CSRF and OAuth cookie " +
         "keys, so a server without it cannot protect a request. Generate one " +
         'with "openssl rand -base64 32" and set JWT_SECRET.',
-    );
-  }
-
-  const redisUrl = (env.REDIS_URL ?? "").trim();
-  if (mode === "multi" && redisUrl === "") {
-    refusals.push(
-      "CLUSTER_MODE=multi requires REDIS_URL. Redis carries the HTTP " +
-        "throttler's counters and the wake-up channel between replicas; " +
-        "without it every replica would enforce its own rate limits. Set " +
-        "REDIS_URL, or use CLUSTER_MODE=single.",
-    );
-  }
-  if (mode === "single" && redisUrl !== "") {
-    warnings.push(
-      "REDIS_URL is set but CLUSTER_MODE is single, so it is ignored. Set " +
-        "CLUSTER_MODE=multi to use it.",
     );
   }
 
