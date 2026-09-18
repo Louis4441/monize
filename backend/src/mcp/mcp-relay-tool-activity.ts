@@ -38,7 +38,13 @@ export function wrapToolHandlerForRelay(
     // or is a direct MCP client's own call (see mcp-session-context.ts).
     return withMcpCaller(key, async () => {
       if (userId) {
-        relayService.reportToolActivity(userId, name, "start", false, key);
+        await relayService.reportToolActivity(
+          userId,
+          name,
+          "start",
+          false,
+          key,
+        );
       }
       let isError = false;
       try {
@@ -52,7 +58,13 @@ export function wrapToolHandlerForRelay(
         throw err;
       } finally {
         if (userId) {
-          relayService.reportToolActivity(userId, name, "result", isError, key);
+          await relayService.reportToolActivity(
+            userId,
+            name,
+            "result",
+            isError,
+            key,
+          );
         }
       }
     });

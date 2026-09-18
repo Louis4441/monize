@@ -348,7 +348,7 @@ export class McpPayeesTools {
     // turn that began in between would swallow that answer.
     if (
       !ctx.mcpReq.requestState() &&
-      emitRelayCard(this.relayService, userId, pendingAction)
+      (await emitRelayCard(this.relayService, userId, pendingAction))
     ) {
       return "relay";
     }
@@ -434,7 +434,7 @@ export class McpPayeesTools {
     );
     if (
       !ctx.mcpReq.requestState() &&
-      emitRelayCard(this.relayService, userId, action)
+      (await emitRelayCard(this.relayService, userId, action))
     ) {
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
@@ -536,7 +536,7 @@ export class McpPayeesTools {
     );
     if (
       !ctx.mcpReq.requestState() &&
-      emitRelayCard(this.relayService, userId, action)
+      (await emitRelayCard(this.relayService, userId, action))
     ) {
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
@@ -627,7 +627,7 @@ export class McpPayeesTools {
     );
     if (
       !ctx.mcpReq.requestState() &&
-      emitRelayCard(this.relayService, userId, action)
+      (await emitRelayCard(this.relayService, userId, action))
     ) {
       return toolResult(RELAY_PREVIEW_SHOWN);
     }
@@ -666,10 +666,10 @@ export class McpPayeesTools {
     // the human has already answered in their own client.
     if (
       !ctx.mcpReq.requestState() &&
-      emitRelayCard(this.relayService, userId, cards[0])
+      (await emitRelayCard(this.relayService, userId, cards[0]))
     ) {
       for (let i = 1; i < cards.length; i++) {
-        emitRelayCard(this.relayService, userId, cards[i]);
+        await emitRelayCard(this.relayService, userId, cards[i]);
       }
       return toolResult(RELAY_PREVIEW_SHOWN);
     }

@@ -87,7 +87,7 @@
 | X1 | AI action anti-replay onto `single_use_tokens`, MCP path included | A1 | neutral | [x] |
 | R1 | `EVENT_BUS` token, interface, `MemoryEventBus` wired as default | -- | none | [x] |
 | R2 | Migration: `ai_relay_prompts`, `ai_relay_agents` with RLS policies | -- | none | [x] |
-| R3 | Relay queue on rows: insert, claim, answer; in-memory queue maps removed | R1, R2 | neutral | [ ] |
+| R3 | Relay queue on rows: insert, claim, answer; in-memory queue maps removed | R1, R2 | neutral | [x] |
 | R4 | Late answers, buffered actions and agent liveness on rows; remaining maps removed | R3 | neutral | [ ] |
 | R5 | Relay attachments through the attachment storage provider | R3 | neutral | [ ] |
 | R6 | `RedisEventBus`; selected in `multi`; two-instance spec | F2, R1, D3 | multi-only | [ ] |
@@ -795,13 +795,25 @@ install -- change both by hand and check both.
 
 ### R3 -- Relay queue on rows
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/ai/relay/ai-relay.service.ts` and its spec,
 `backend/src/ai/relay/ai-relay.controller.ts` and its spec,
 `backend/src/ai/relay/ai-relay.types.ts`, `backend/src/mcp/tools/relay.tool.ts`
 and its spec, `backend/src/ai/relay/ai-relay.module.ts`,
 `backend/test/integration/ai-relay-claim.integration.spec.ts` (new).
+
+Added to Scope while doing the work, each with its reason:
+`backend/src/common/events/wake-signal.ts` + spec (the park-and-re-read latch
+both waiters need), `backend/src/ai/relay/relay-stream.registry.ts` + spec (the
+open SSE sockets, which cannot become rows),
+`backend/src/ai/relay/relay-rows.harness.ts` (a table that answers the
+service's statements, so the behavioural spec stays behavioural),
+`backend/src/mcp/mcp-relay-confirm.ts` + spec and
+`backend/src/mcp/mcp-relay-tool-activity.ts` and the three tool files
+(`investments`, `transactions`, `payees`) plus `backend/src/ai/ai.service.ts`:
+the relay's answers now come from a row, so `emitPendingAction`,
+`reportToolActivity` and `getStatus` are async and every call site awaits.
 
 **Pattern:** the `FOR UPDATE SKIP LOCKED` CTE in
 `backend/src/notifications/notification-reminder-cron.service.ts` for the
@@ -843,6 +855,34 @@ also polls the row on a slow timer (the existing long-poll timeout is the
 ceiling). Do not let the bus payload carry the prompt or the answer.
 
 **Notes:**
+
+`expires_at` carries the whole deadline, so no column was added: the insert sets
+it to now + `QUEUE_WAIT_MS`, the claim resets it to now + `IDLE_TIMEOUT_MS`, and
+every liveness signal pushes it out to
+`LEAST(now + IDLE_TIMEOUT_MS, claimed_at + HARD_WAIT_MS)`. That is one statement
+per signal instead of a rescheduled `setTimeout`, and it is what makes the
+browser's deadline something a second replica can move.
+
+`buffered` and `awaitingLate` went in this task rather than in R4. The row model
+subsumes them: an answer posted after the browser gave up is the same
+`status='answered'` row, so `post_response` needs no separate late path and
+`takeBufferedResponse` is a conditional `UPDATE ... WHERE status='answered'`
+that hands it over once. What R4 still owns is the agent-liveness row, the
+action cards and the sweeper.
+
+Three deliberate behaviour changes, each visible in `single`:
+- A second `post_response` for one prompt now returns `delivered:false` (the
+  `UPDATE` matched nothing) where the in-memory version returned an idempotent
+  `true` for a buffered answer. The tool's own description already said
+  `delivered:false` means "unknown or already answered".
+- A closed browser socket ends the waiter at once (`RelayStreamClosedError`)
+  instead of leaving the promise parked for the rest of the deadline. The row is
+  untouched, so the agent may still answer it and the pickup endpoint serves it.
+- A prompt survives a backend restart mid-wait, which is the named change.
+
+The late-answer window is `expires_at + BUFFER_TTL_MS`, checked in the
+`post_response` statement, so the grace no longer depends on a sweeper having
+not yet run.
 
 ### R4 -- Late answers, buffered actions and liveness on rows
 

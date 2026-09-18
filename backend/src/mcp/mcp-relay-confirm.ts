@@ -20,7 +20,7 @@ export function emitRelayCard(
   relayService: AiRelayService,
   userId: string,
   action: PendingAiAction,
-): boolean {
+): Promise<boolean> {
   return relayService.emitPendingAction(userId, action, currentMcpCallerKey());
 }
 

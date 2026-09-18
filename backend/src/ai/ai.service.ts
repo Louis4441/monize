@@ -641,7 +641,7 @@ export class AiService {
     userId: string,
     request: AiCompletionRequest,
   ): Promise<AiCompletionResponse> {
-    const tunnel = this.relayService.getStatus(userId);
+    const tunnel = await this.relayService.getStatus(userId);
     if (tunnel.state === "offline") {
       throw new BadRequestException(
         tr(

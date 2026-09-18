@@ -117,7 +117,7 @@ export class McpRelayTools {
         if (check.error) return check.result;
 
         try {
-          const delivered = this.relayService.postResponse(
+          const delivered = await this.relayService.postResponse(
             user.userId,
             args.promptId,
             args.text,
@@ -155,7 +155,7 @@ export class McpRelayTools {
         if (check.error) return check.result;
 
         try {
-          const delivered = this.relayService.reportProgress(
+          const delivered = await this.relayService.reportProgress(
             user.userId,
             args.promptId,
             args.text,
