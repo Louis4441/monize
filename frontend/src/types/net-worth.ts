@@ -150,6 +150,35 @@ export interface PortfolioPeriodResult {
   unknownCashAccountIds: string[];
 }
 
+/** The trailing windows the Investments page reports a portfolio result over. */
+export const PORTFOLIO_PERIOD_PRESETS = [
+  '1d',
+  '1w',
+  '1m',
+  '3m',
+  'ytd',
+  '1y',
+] as const;
+
+export type PortfolioPeriodPreset = (typeof PORTFOLIO_PERIOD_PRESETS)[number];
+
+/**
+ * What GET /net-worth/investments-period-results answers: the same measure as
+ * the single-range route, for several trailing windows at once.
+ *
+ * The server builds the value series once for the widest window and slices the
+ * rest out of it, so six windows cost one valuation. A window the series does
+ * not reach back to is absent from nothing -- it is present with every figure
+ * null and `noValueSeries` among its reasons, which the card reads as "n/a".
+ */
+export interface PortfolioPeriodResults {
+  /** The currency every figure in every period is in. */
+  currency: string;
+  /** The day every period is measured to. */
+  asOf: string;
+  periods: Partial<Record<PortfolioPeriodPreset, PortfolioPeriodResult>>;
+}
+
 /**
  * Per-security intraday breakdown (1D / 1W / 1M ranges). Same band shape as
  * the daily/monthly breakdown, but points are keyed by timestamp and the

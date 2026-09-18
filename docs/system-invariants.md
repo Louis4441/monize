@@ -911,8 +911,14 @@ Enforcement         decidePeriodResult
                     cash accounts isValuationCashAccount names on both sides of
                     a transfer, and counting the two unmeasurable cases into the
                     reasons externallySettledTrade and mixedSplit.
-                    PortfolioValueReport, PortfolioValueWidget and
-                    InvestmentValueChart print it and derive nothing; the
+                    PortfolioPeriodResultsBatchService answers the same
+                    measure for six trailing windows at
+                    GET /net-worth/investments-period-results by slicing ONE
+                    valuation instead of recomputing it, and the spec's
+                    section 8 holds the two routes to identical answers.
+                    PortfolioValueReport, PortfolioValueWidget,
+                    InvestmentValueChart and the Investments page's
+                    PortfolioPerformanceCard print it and derive nothing; the
                     client-side arithmetic they used to share is deleted
                     rather than left exported.
                     docs/specs/portfolio-period-result.md has the
@@ -921,9 +927,10 @@ Status              enforced
 ```
 
 Every surface that reports what a portfolio did over a period now reads
-`GET /net-worth/investments-period-result`: the Portfolio Value Over Time
-report, the dashboard's Portfolio Value widget and the Investments page's
-chart. Each prints the investment result as its headline with a percentage
+`GET /net-worth/investments-period-result`, or its batch sibling
+`GET /net-worth/investments-period-results`: the Portfolio Value Over Time
+report, the dashboard's Portfolio Value widget, the Investments page's chart
+and the Investments page's Portfolio performance card. Each prints the investment result as its headline with a percentage
 only over that, and names the value change and the net external flows beside
 it. The dashboard's Net Worth chart is not one of these surfaces -- it reports
 what a person is worth rather than what a portfolio earned, and its own

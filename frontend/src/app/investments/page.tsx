@@ -10,6 +10,7 @@ import { UnsavedChangesDialog } from '@/components/ui/UnsavedChangesDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { PortfolioSummaryCard } from '@/components/investments/PortfolioSummaryCard';
+import { PortfolioPerformanceCard } from '@/components/investments/PortfolioPerformanceCard';
 import { GroupedHoldingsList } from '@/components/investments/GroupedHoldingsList';
 import { AssetAllocationChart } from '@/components/investments/AssetAllocationChart';
 import { InvestmentTransactionList } from '@/components/investments/InvestmentTransactionList';
@@ -266,6 +267,21 @@ function InvestmentsContent() {
               titleSuffix={accountFilterLabel}
               accountIds={data.selectedAccountIds}
               valuationComplete={data.portfolioSummary?.valuationComplete}
+            />
+          </div>
+
+          {/* What the holdings earned over each trailing period, the reader's
+              own deposits taken out. It sits between the portfolio's value and
+              its history: what it is worth, then what it made, then when. */}
+          <div className="mb-6">
+            <PortfolioPerformanceCard
+              accountIds={data.selectedAccountIds}
+              reloadKey={data.writeRefreshKey}
+              displayCurrency={
+                data.selectedAccountIds.length === 1
+                  ? data.accounts.find(a => a.id === data.selectedAccountIds[0])?.currencyCode ?? null
+                  : null
+              }
             />
           </div>
 

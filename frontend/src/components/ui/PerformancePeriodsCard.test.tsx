@@ -1,0 +1,157 @@
+import { describe, it, expect } from 'vitest';
+import { screen } from '@testing-library/react';
+import { render } from '@/test/render';
+import { PerformancePeriodsCard } from './PerformancePeriodsCard';
+
+const base = {
+  title: 'Portfolio performance',
+  subtitle: 'How your investments did.',
+  unavailableLabel: 'n/a',
+  emptyMessage: 'Not enough history yet.',
+};
+
+describe('PerformancePeriodsCard', () => {
+  it('renders each period with its figures', () => {
+    render(
+      <PerformancePeriodsCard
+        {...base}
+        entries={[
+          {
+            period: '1m',
+            label: '1M',
+            primary: '+2.12%',
+            primaryValue: 2.12,
+            secondary: '+624.00',
+            secondaryValue: 624,
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Portfolio performance')).toBeInTheDocument();
+    expect(screen.getByText('1M')).toBeInTheDocument();
+    expect(screen.getByText('+2.12%')).toBeInTheDocument();
+    expect(screen.getByText('+624.00')).toBeInTheDocument();
+  });
+
+  /** The distinction the card exists to make: unknown is not zero. */
+  it('says n/a for a period that could not be reported', () => {
+    render(
+      <PerformancePeriodsCard
+        {...base}
+        entries={[
+          {
+            period: '1m',
+            label: '1M',
+            primary: '+1.00%',
+            primaryValue: 1,
+            secondary: null,
+            secondaryValue: null,
+          },
+          { period: '1y', label: '1Y', primary: null, primaryValue: null },
+        ]}
+      />,
+    );
+
+    // The withheld period and the withheld second line both read as unknown.
+    expect(screen.getAllByText('n/a')).toHaveLength(2);
+  });
+
+  it('renders a known zero as a number', () => {
+    render(
+      <PerformancePeriodsCard
+        {...base}
+        entries={[
+          {
+            period: '1m',
+            label: '1M',
+            primary: '0.00%',
+            primaryValue: 0,
+            secondary: '+0.00',
+            secondaryValue: 0,
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('0.00%')).toBeInTheDocument();
+    expect(screen.queryByText('n/a')).not.toBeInTheDocument();
+  });
+
+  it('colours a negative figure as a loss and a positive one as a gain', () => {
+    render(
+      <PerformancePeriodsCard
+        {...base}
+        entries={[
+          {
+            period: '1m',
+            label: '1M',
+            primary: '-3.00%',
+            primaryValue: -3,
+            secondary: '-90.00',
+            secondaryValue: -90,
+          },
+          {
+            period: '3m',
+            label: '3M',
+            primary: '+3.00%',
+            primaryValue: 3,
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('-3.00%').className).toContain('red');
+    expect(screen.getByText('-90.00').className).toContain('red');
+    expect(screen.getByText('+3.00%').className).toContain('green');
+  });
+
+  it('draws no second line for an entry that has none', () => {
+    const { container } = render(
+      <PerformancePeriodsCard
+        {...base}
+        entries={[
+          { period: '1m', label: '1M', primary: '+1.00%', primaryValue: 1 },
+        ]}
+      />,
+    );
+
+    expect(container.querySelectorAll('dd > div')).toHaveLength(1);
+  });
+
+  it('says so when no period can be reported at all, and drops the footnote', () => {
+    render(
+      <PerformancePeriodsCard
+        {...base}
+        entries={[
+          { period: '1m', label: '1M', primary: null, primaryValue: null },
+        ]}
+        footnote="Deposits are not result."
+      />,
+    );
+
+    expect(screen.getByText('Not enough history yet.')).toBeInTheDocument();
+    // Nothing is shown, so a caption about the figures would caption nothing.
+    expect(screen.queryByText('Deposits are not result.')).not.toBeInTheDocument();
+    expect(screen.queryByText('n/a')).not.toBeInTheDocument();
+  });
+
+  it('carries the footnote under the figures', () => {
+    render(
+      <PerformancePeriodsCard
+        {...base}
+        entries={[
+          { period: '1m', label: '1M', primary: '+1.00%', primaryValue: 1 },
+        ]}
+        footnote="Deposits are not result."
+        footnoteTone="warning"
+        footnoteTitle="The long version."
+      />,
+    );
+
+    const footnote = screen.getByText('Deposits are not result.');
+    expect(footnote).toBeInTheDocument();
+    expect(footnote.className).toContain('amber');
+    expect(footnote).toHaveAttribute('title', 'The long version.');
+  });
+});

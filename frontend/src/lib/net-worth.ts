@@ -6,6 +6,7 @@ import {
   InvestmentBreakdown,
   InvestmentBreakdownGranularity,
   PortfolioPeriodResult,
+  PortfolioPeriodResults,
 } from '@/types/net-worth';
 
 export const netWorthApi = {
@@ -84,6 +85,26 @@ export const netWorthApi = {
   }): Promise<PortfolioPeriodResult> => {
     const response = await apiClient.get<PortfolioPeriodResult>(
       '/net-worth/investments-period-result',
+      { params },
+    );
+    return response.data;
+  },
+
+  /**
+   * The same three figures as `getInvestmentsPeriodResult`, for several
+   * trailing windows at once.
+   *
+   * The windows are the server's own arithmetic: it decides what today is and
+   * where each preset opens, so six surfaces cannot disagree about where a
+   * month begins, and one valuation answers all of them.
+   */
+  getInvestmentsPeriodResults: async (params?: {
+    periods?: string;
+    accountIds?: string;
+    displayCurrency?: string;
+  }): Promise<PortfolioPeriodResults> => {
+    const response = await apiClient.get<PortfolioPeriodResults>(
+      '/net-worth/investments-period-results',
       { params },
     );
     return response.data;

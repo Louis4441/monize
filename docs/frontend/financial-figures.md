@@ -275,12 +275,19 @@ unconvertible amount is a rate to refresh, and a boundary (`zeroStart`,
 `noValueSeries`) is nothing anybody can fix. It is the sibling of
 `movementUnknownReason`, for the same reason.
 
-**Three surfaces read it**, through one request each and no arithmetic of their
+**Four surfaces read it**, through one request each and no arithmetic of their
 own: `PortfolioValueReport` (five cards plus the PDF and CSV exports),
 `PortfolioValueWidget` (one figure and a caption -- the investment result and
-its percent, with the value change and the net flows in the card's tooltip) and
+its percent, with the value change and the net flows in the card's tooltip),
 `InvestmentValueChart` (the result and its percent as two of its four cards,
-with the value change and the net flows on the secondary lines beneath). The
+with the value change and the net flows on the secondary lines beneath) and the
+Investments page's `PortfolioPerformanceCard`, which asks the batch route
+through `hooks/usePortfolioPeriodResults.ts` -- one request for 1D, 1W, 1M, 3M,
+YTD and 1Y -- and prints each window's `returnPercent` over its
+`investmentResult`, with "n/a" wherever the server withheld one. Its table is
+`components/ui/PerformancePeriodsCard.tsx`, shared with
+`SecurityPerformanceCard`: one layout for trailing-period figures, whatever the
+subject, and one place that decides "n/a" is not a zero. The
 widget and the chart go through `hooks/usePortfolioPeriodResult.ts`, which keeps
 the payload with the key of the request that produced it, asks nothing while the
 series is empty or a prior-close range has no first point yet, and leaves every

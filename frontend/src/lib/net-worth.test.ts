@@ -32,6 +32,24 @@ describe('netWorthApi', () => {
     });
   });
 
+  it('getInvestmentsPeriodResults fetches /net-worth/investments-period-results', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: { currency: 'CAD', asOf: '2026-09-17', periods: {} },
+    });
+
+    const result = await netWorthApi.getInvestmentsPeriodResults({
+      periods: '1d,1y',
+      accountIds: 'a1',
+      displayCurrency: 'USD',
+    });
+
+    expect(apiClient.get).toHaveBeenCalledWith(
+      '/net-worth/investments-period-results',
+      { params: { periods: '1d,1y', accountIds: 'a1', displayCurrency: 'USD' } },
+    );
+    expect(result.asOf).toBe('2026-09-17');
+  });
+
   it('recalculate posts to /net-worth/recalculate', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({ data: { success: true } });
     const result = await netWorthApi.recalculate();

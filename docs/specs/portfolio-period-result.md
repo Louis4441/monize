@@ -210,7 +210,53 @@ for the same scope, range and display currency the chart asked for, plus an
 explicit `baselineDate` for the ranges measured from the prior close (1d, 1w,
 mtd). The client chooses the dates; it does no arithmetic over them.
 
-## 8. Test matrix
+## 8. The batch route: six windows, one valuation
+
+The Investments page reports the result over six trailing windows at once (1D,
+1W, 1M, 3M, YTD, 1Y). Six calls to the single-range route would rebuild the
+daily valuation six times -- `NetWorthService.getDailyInvestments` is the
+expensive part -- and the one-year series already contains every shorter
+window's points, so `GET /net-worth/investments-period-results` builds the
+series ONCE for the widest window asked for and derives each preset by slicing
+it (`backend/src/net-worth/portfolio-period-results-batch.service.ts`).
+
+The route takes `periods` (a comma-separated subset of the closed set
+`1d,1w,1m,3m,ytd,1y`; all of them when omitted), plus the same `accountIds` and
+`displayCurrency` as the single-range route, and answers
+`{ currency, asOf, periods: { [preset]: PortfolioPeriodResult } }`. An unknown
+preset is a 400: the windows are the server's own arithmetic
+(`backend/src/net-worth/portfolio-period-presets.util.ts`), which is what keeps
+the Investments page, the chart and any later surface from disagreeing about
+where a month begins.
+
+**What is sliced, and what is not.** Nothing is recomputed: the same
+`decidePeriodResult` decides every figure, from the same series, the same flow
+classifier and the same per-day conversion.
+
+| Per preset | Taken from the one wide load |
+| --- | --- |
+| MV(e) | the series' last point, shared by every preset |
+| MV(b) | the last point on or before the prior-close baseline (1d, 1w), else the first point inside the window |
+| flows | the per-day subtotals dated strictly after that preset's own lower bound, folded against one rate index (`backend/src/net-worth/period-flow-fold.util.ts`) |
+| unmeasurable movements | the per-day counts over the same days (`backend/src/net-worth/unmeasured-flows.util.ts`) |
+
+Slicing is equivalent because neither input depends on how wide a window was
+asked for: a day is valued from the latest accepted close on or before it, and
+`buildRateIndex` loads enough rows that a date resolves the same in any window
+(issue #1390 is the defect that established the second). The equivalence is
+asserted rather than assumed:
+`backend/src/net-worth/portfolio-period-results-batch.service.spec.ts` runs the
+batch route and the single-range route over one fixture and compares them
+preset by preset, giving the single route exactly the dates the client computes
+(`usesPriorCloseBaseline`, `previousCalendarDay`).
+
+**A window the series does not reach back to** -- a portfolio three days old
+asked for its year -- is every figure `null` with `noValueSeries`, and the
+surface reads it as "n/a". Measuring from the first day the scope held anything
+would put a number under a caption promising a year of it, which is the
+security performance card's "n/a rather than 0%" rule, for the same reason.
+
+## 9. Test matrix
 
 Backend unit (`portfolio-period-result.util.spec.ts`,
 `portfolio-period-result.service.spec.ts`):
@@ -230,6 +276,19 @@ Backend unit (`portfolio-period-result.util.spec.ts`,
 | a BUY settled outside `C` | result and percent `null`, reason `externallySettledTrade` |
 | a mixed split parent in the window | result `null`, reason `mixedSplit` |
 | the flow query's account set | the valued cash accounts, not the whole scope |
+
+Backend unit
+(`backend/src/net-worth/portfolio-period-results-batch.service.spec.ts`):
+equivalence with the single-range route for every preset, the series built once
+over the widest window, a flow counted in the windows that contain it and in no
+other, a window an uncountable movement withholds while its neighbours stay
+measurable, a short history, a currency override and an empty scope.
+
+Backend unit (`portfolio-period-results-batch.service.spec.ts`): equivalence
+with the single-range route for every preset, the series built once over the
+widest window, a flow counted in the windows that contain it and in no other, a
+window an uncountable movement withholds while its neighbours stay measurable,
+a short history, a currency override and an empty scope.
 
 Frontend (`PortfolioValueReport.test.tsx`): the KPI cards show value change, net
 deposits and withdrawals, and the investment result as three separate figures;

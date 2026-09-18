@@ -62,6 +62,21 @@
     "notAvailable": "N/A",
     "unpricedHoldings": "Partial valuation: {count, plural, one {# holding has} other {# holdings have}} no current price ({symbols}), so the values below exclude {count, plural, one {it} other {them}}."
   },
+  "portfolioPerformance": {
+    "title": "Portfolio performance",
+    "subtitle": "How your investments did once deposits and withdrawals are taken out.",
+    "footnote": "Deposits and withdrawals are not counted as investment result.",
+    "unavailable": "n/a",
+    "empty": "Not enough history to measure a return yet.",
+    "periods": {
+      "1d": "1D",
+      "1w": "1W",
+      "1m": "1M",
+      "3m": "3M",
+      "ytd": "YTD",
+      "1y": "1Y"
+    }
+  },
   "assetAllocation": {
     "title": "Asset Allocation",
     "noData": "No allocation data available.",

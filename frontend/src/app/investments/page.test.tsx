@@ -340,6 +340,15 @@ vi.mock('@/components/investments/InvestmentTransactionForm', () => ({
   InvestmentTransactionForm: () => <div data-testid="transaction-form">Form</div>,
 }));
 
+vi.mock('@/components/investments/PortfolioPerformanceCard', () => ({
+  PortfolioPerformanceCard: ({ accountIds, reloadKey }: any) => (
+    <div data-testid="portfolio-performance">
+      {accountIds?.length > 0 ? `Filtered: ${accountIds.join(',')}` : 'All accounts'}
+      <span data-testid="performance-reload-key">{String(reloadKey ?? '')}</span>
+    </div>
+  ),
+}));
+
 vi.mock('@/components/investments/InvestmentValueChart', () => ({
   InvestmentValueChart: ({ accountIds, refreshKey }: any) => (
     <div data-testid="value-chart">
@@ -434,6 +443,30 @@ describe('InvestmentsPage', () => {
       await waitFor(() => {
         expect(screen.getByTestId('asset-allocation-chart')).toBeInTheDocument();
       });
+    });
+
+    /**
+     * The hierarchy the page reads in: what the portfolio is worth, what it
+     * earned, then when it earned it. A results section under the history chart
+     * would be answering a question the reader has already scrolled past.
+     */
+    it('puts the portfolio performance section between the summary and the chart', async () => {
+      await renderPage();
+      await waitFor(() => {
+        expect(screen.getByTestId('portfolio-performance')).toBeInTheDocument();
+      });
+
+      const summary = screen.getByTestId('portfolio-summary');
+      const performance = screen.getByTestId('portfolio-performance');
+      const chart = screen.getByTestId('value-chart');
+      expect(
+        summary.compareDocumentPosition(performance) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        performance.compareDocumentPosition(chart) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
     });
 
     it('renders investment value chart', async () => {
