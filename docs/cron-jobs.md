@@ -2,8 +2,8 @@
 
 Cron jobs use the `@Cron()` decorator from `@nestjs/schedule`. They run in the API process (`ScheduleModule.forRoot()` in `backend/src/app.module.ts`); there is no separate scheduler process, and on k8s with more than one backend replica every replica fires every cron.
 
-`CLUSTER_MODE` does not gate any of this. It selects Redis-backed throttling and
-the cross-replica wake-up channel (`docs/future-plans/horizontal-scaling.md`),
+`CLUSTER_MODE` does not gate any of this. It selects the table-backed throttler
+storage and the cross-replica wake-up channel (`docs/future-plans/horizontal-scaling.md`),
 never the scheduler: every replica fires every cron in `single` and in `multi`
 alike, so what stops a second replica repeating an effect is always the job's
 own claim. `CLUSTER_MODE=single` states how the deployment is meant to run, not
