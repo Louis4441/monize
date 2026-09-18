@@ -35,6 +35,10 @@ import { YahooFinanceService } from "./yahoo-finance.service";
 import { QuoteProviderRegistry } from "./providers/quote-provider.registry";
 import { roundMoney } from "../common/round.util";
 import { collectTagKeys } from "../tags/tag-key-value.util";
+import {
+  buildPortfolioSummaryMemoKey,
+  portfolioSummaryMemo,
+} from "./portfolio-summary-memo";
 import { mapWithConcurrency } from "../common/concurrency.util";
 import { formatDateYMD, todayYMD } from "../common/date-utils";
 import {
@@ -665,17 +669,51 @@ export class PortfolioService {
   }
 
   /**
-   * Get portfolio summary for a user, optionally filtered by account
+   * Get portfolio summary for a user, optionally filtered by account.
+   *
+   * Memoized per user, account scope, reporting currency and ambient identity
+   * for the memo's TTL (60 s, `portfolio-summary-memo.ts`). The memo wraps the computation
+   * here, at the service boundary, so every caller shares it: the controller,
+   * the by-tag allocation, the security detail page and the AI / MCP
+   * `get_portfolio_summary` tool. Opening the Investments page used to start
+   * three of these concurrently and pay for all three.
    */
   async getPortfolioSummary(
     userId: string,
     accountIds?: string[],
   ): Promise<PortfolioSummary> {
-    // Get user's default currency for conversion
+    // Get user's default currency for conversion. Read before the memo because
+    // it is part of the key: a preference change must not be answered from an
+    // entry computed in the previous currency.
     const pref = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(UserPreference).findOne({ where: { userId } }),
     );
     const defaultCurrency = preferredCurrency(pref);
+    return portfolioSummaryMemo.run(
+      userId,
+      buildPortfolioSummaryMemoKey(userId, accountIds, defaultCurrency),
+      () => this.computePortfolioSummary(userId, defaultCurrency, accountIds),
+    );
+  }
+
+  /**
+   * The valuation itself. Phase timings are logged at debug level so an
+   * operator can see which of the three expensive phases (live FX priming,
+   * holdings valuation, since-inception result) a slow summary is spending its
+   * seconds in, without a profiler or a code change.
+   */
+  private async computePortfolioSummary(
+    userId: string,
+    defaultCurrency: string,
+    accountIds?: string[],
+  ): Promise<PortfolioSummary> {
+    const phaseStart = Date.now();
+    let mark = phaseStart;
+    const phase = (name: string): void => {
+      const now = Date.now();
+      this.logger.debug(`Portfolio summary phase ${name}: ${now - mark}ms`);
+      mark = now;
+    };
     const rateCache: FxRateCache = new Map();
 
     // Get investment accounts
@@ -695,6 +733,7 @@ export class PortfolioService {
       categorised.holdingsAccountIds,
       defaultCurrency,
     );
+    phase("liveFxPriming");
 
     // Compute effective cash balances excluding future-dated transactions
     const cashAndStandaloneIds = [
@@ -731,6 +770,7 @@ export class PortfolioService {
         rateCache,
         (ids) => this.getLatestPrices(ids),
       );
+    phase("holdingsValuation");
 
     // Group holdings by account
     const holdingsByAccount =
@@ -802,6 +842,7 @@ export class PortfolioService {
         accountIds,
         displayCurrency: defaultCurrency,
       });
+    phase("sinceInceptionResult");
     const timeWeightedReturn = investedSinceInception.investmentReturnPercent;
     const timeWeightedReturnReasons = investedSinceInception.investedReasons;
     // The window's baseline, so the caption can name what "since" means. A
@@ -870,7 +911,7 @@ export class PortfolioService {
       ]),
     ].sort();
 
-    return {
+    const summary: PortfolioSummary = {
       totalCashValue,
       totalHoldingsValue: holdingsResult.totalHoldingsValue,
       totalCostBasis: holdingsResult.totalCostBasis,
@@ -895,6 +936,10 @@ export class PortfolioService {
       holdingsByAccount,
       allocation,
     };
+    this.logger.debug(
+      `Portfolio summary computed in ${Date.now() - phaseStart}ms`,
+    );
+    return summary;
   }
 
   /**
@@ -1426,6 +1471,28 @@ export class PortfolioService {
   }
 
   /**
+   * What the chart's grouping switcher needs to know about tags, in one query:
+   * whether any held security carries a tag at all, and the distinct KEY:VALUE
+   * tag keys among them (case-folded and sorted).
+   *
+   * This used to compute the whole portfolio valuation and read the tag names
+   * off it -- a three-second request whose only output was a list of names.
+   * Which tags are in use is a question about the holdings and their tags, and
+   * nothing else: no price, no exchange rate, no cost basis. A tag key is also
+   * not withheld because a holding is unpriced or has no rate into the
+   * reporting currency, which the valuation-based path did silently (the
+   * allocation drops an unvalued slice), so a user whose feed was late lost the
+   * grouping switcher along with the number.
+   */
+  async getPortfolioTagSummary(
+    userId: string,
+    accountIds?: string[],
+  ): Promise<{ keys: string[]; hasTaggedHoldings: boolean }> {
+    const names = await this.loadHeldTagNames(userId, accountIds);
+    return { keys: collectTagKeys(names), hasTaggedHoldings: names.length > 0 };
+  }
+
+  /**
    * Distinct KEY:VALUE tag keys present on the portfolio's securities, so the
    * UI can offer "aggregate by key" choices. Case-folded and sorted.
    */
@@ -1433,12 +1500,43 @@ export class PortfolioService {
     userId: string,
     accountIds?: string[],
   ): Promise<string[]> {
-    const inputs = await this.loadTaggedAllocationInputs(userId, accountIds);
-    const names: string[] = [];
-    for (const tags of inputs.tagsBySymbol.values()) {
-      for (const tag of tags) names.push(tag.name);
-    }
-    return collectTagKeys(names);
+    return (await this.getPortfolioTagSummary(userId, accountIds)).keys;
+  }
+
+  /**
+   * The names of the tags carried by the securities currently held in the
+   * scope, distinct and sorted.
+   *
+   * "Held" is the same predicate the valuation uses -- `|quantity| >= 0.0001`,
+   * spelled here in SQL -- so a security that has been sold out of every
+   * account in the scope contributes no tag, exactly as before.
+   */
+  private async loadHeldTagNames(
+    userId: string,
+    accountIds?: string[],
+  ): Promise<string[]> {
+    const accounts = await this.resolveAccounts(userId, accountIds);
+    const { holdingsAccountIds } =
+      this.calculationService.categoriseAccounts(accounts);
+    if (holdingsAccountIds.length === 0) return [];
+
+    const rows: Array<{ name: string }> = await withScopedDb(
+      this.dataSource,
+      (m) =>
+        m.query(
+          `SELECT DISTINCT t.name AS name
+             FROM holdings h
+             JOIN securities s ON s.id = h.security_id
+             JOIN security_tags st ON st.security_id = s.id
+             JOIN tags t ON t.id = st.tag_id
+            WHERE h.account_id = ANY($1)
+              AND s.user_id = $2
+              AND ABS(h.quantity) >= 0.0001
+            ORDER BY t.name ASC`,
+          [holdingsAccountIds, userId],
+        ),
+    );
+    return rows.map((r) => r.name);
   }
 
   /**

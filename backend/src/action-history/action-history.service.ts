@@ -33,6 +33,7 @@ import {
   lockHoldingScope,
 } from "../common/db/locks";
 import { LEDGER_MOVEMENT_PREDICATE } from "../common/ledger-balance.sql";
+import { invalidatePortfolioSummary } from "../securities/portfolio-summary-memo";
 
 export interface RecordActionParams {
   entityType: string;
@@ -365,6 +366,11 @@ export class ActionHistoryService {
       });
     });
 
+    // After the commit, like every other derived-state invalidation here: a
+    // replay that rolled back must not have dropped the memo that still
+    // describes the committed state.
+    invalidatePortfolioSummary(userId);
+
     return { action, description: `Undone: ${action.description}` };
   }
 
@@ -388,6 +394,8 @@ export class ActionHistoryService {
         isUndone: false,
       });
     });
+
+    invalidatePortfolioSummary(userId);
 
     return { action, description: `Redone: ${action.description}` };
   }

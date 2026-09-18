@@ -31,6 +31,10 @@ import { getMarketSessionFromQuote } from "./providers/market-session.util";
 import { isSessionSettled } from "./providers/settled-bar.util";
 import { assertDailySeries } from "./providers/daily-spacing.util";
 import { MARKET_PRICED_TRADE_ACTIONS } from "./investment-replay.util";
+import {
+  invalidateAllPortfolioSummaries,
+  invalidatePortfolioSummary,
+} from "./portfolio-summary-memo";
 import { BackfillRange } from "./dto/backfill-prices-query.dto";
 import { CreateSecurityPriceDto } from "./dto/create-security-price.dto";
 import { UpdateSecurityPriceDto } from "./dto/update-security-price.dto";
@@ -768,7 +772,7 @@ export class SecurityPriceService {
           continue;
         }
         try {
-          await this.savePriceData(security.id, tradingDate, quote);
+          await this.savePriceData(security, tradingDate, quote);
           await this.persistMarketSession(security, quote);
           results.push({
             symbol: security.symbol,
@@ -889,7 +893,7 @@ export class SecurityPriceService {
 
       try {
         const tradingDate = formatDateYMD(getTradingDateFromQuote(quote));
-        await this.savePriceData(security.id, tradingDate, quote);
+        await this.savePriceData(security, tradingDate, quote);
         await this.persistMarketSession(security, quote);
         results.push({
           symbol: security.symbol,
@@ -923,10 +927,11 @@ export class SecurityPriceService {
    * provider tag, defaulting to yahoo_finance for back-compat.
    */
   private async savePriceData(
-    securityId: string,
+    security: Security,
     priceDate: string,
     quote: QuoteResult,
   ): Promise<SecurityPrice> {
+    const securityId = security.id;
     const source = sourceFor(quote.provider);
     // The instant the quote was struck, which `priceDate` cannot carry and
     // `createdAt` does not track: a same-day refresh updates the row in place,
@@ -1020,6 +1025,11 @@ export class SecurityPriceService {
           `Failed to persist price for security ${securityId} on ${priceDate}`,
         );
       }
+      // A stored price changes what the portfolio is worth, so the memoized
+      // valuation for this security's owner is dropped here rather than in each
+      // of the refresh entry points -- the same argument `bulkUpsertPrices`
+      // makes for holding its guard once instead of in four callers.
+      invalidatePortfolioSummary(security.userId);
       return saved;
     });
   }
@@ -1414,7 +1424,7 @@ export class SecurityPriceService {
         }
 
         try {
-          await this.bulkUpsertPrices(security.id, prices, source);
+          await this.bulkUpsertPrices(security, prices, source);
 
           this.logger.log(
             `Backfilled ${prices.length} prices for ${security.symbol} via ${winner.provider} ` +
@@ -1463,10 +1473,11 @@ export class SecurityPriceService {
    * MSN-sourced data can be stored with source='msn_finance'.
    */
   private async bulkUpsertPrices(
-    securityId: string,
+    security: Security,
     prices: HistoricalPrice[],
     source: string,
   ): Promise<void> {
+    const securityId = security.id;
     // Before anything is written, and over the whole payload rather than per
     // batch: a provider asked for a long range may answer with weekly or
     // monthly bars, and stored into a daily table those rows are
@@ -1547,6 +1558,10 @@ export class SecurityPriceService {
         ),
       );
     }
+    // Every historical write path (catalog backfill, per-security backfill,
+    // holding-period backfill, settlement) ends here, so the owner's memoized
+    // valuation is forgotten here too.
+    invalidatePortfolioSummary(security.userId);
   }
 
   // ─── Daily settlement ────────────────────────────────────────────────────
@@ -1656,7 +1671,7 @@ export class SecurityPriceService {
         if (settled.length === 0) continue;
 
         try {
-          await this.bulkUpsertPrices(security.id, settled, source);
+          await this.bulkUpsertPrices(security, settled, source);
           securitiesSettled++;
           barsSettled += settled.length;
         } catch (error) {
@@ -1793,7 +1808,7 @@ export class SecurityPriceService {
     }
 
     await this.bulkUpsertPrices(
-      security.id,
+      security,
       bundle.prices,
       sourceFor(bundle.provider),
     );
@@ -1996,7 +2011,7 @@ export class SecurityPriceService {
       }
 
       await this.bulkUpsertPrices(
-        security.id,
+        security,
         series.prices,
         sourceFor(provider.name),
       );
@@ -2151,7 +2166,7 @@ export class SecurityPriceService {
 
     const source = sourceFor(winner.provider);
     try {
-      await this.bulkUpsertPrices(security.id, prices, source);
+      await this.bulkUpsertPrices(security, prices, source);
     } catch (error) {
       this.logger.error(
         `Failed to force-backfill prices for ${security.symbol}: ${error instanceof Error ? error.message : String(error)}`,
@@ -2331,6 +2346,10 @@ export class SecurityPriceService {
       `Transaction price backfill completed: ${pairs.length} processed, ${created} created/updated, ${skipped} skipped`,
     );
 
+    // A maintenance pass over every user's transaction-derived prices; there is
+    // no single owner to invalidate, so the whole memo goes.
+    if (created > 0) invalidateAllPortfolioSummaries();
+
     return { processed: pairs.length, created, skipped };
   }
 
@@ -2413,6 +2432,10 @@ export class SecurityPriceService {
    * which the debounced timer captures.
    */
   private scheduleSnapshotRecalc(accountIds: string[], userId: string): void {
+    // Also when no account holds the security: the manual price still changed
+    // what a future valuation will say, and the per-account loop below would
+    // invalidate nothing.
+    invalidatePortfolioSummary(userId);
     for (const accountId of accountIds) {
       this.netWorthService.triggerDebouncedRecalc(accountId, userId);
     }

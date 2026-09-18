@@ -27,6 +27,7 @@ import {
   MARKET_PRICED_TRADE_ACTIONS,
 } from "../securities/investment-replay.util";
 import { Security } from "../securities/entities/security.entity";
+import { invalidatePortfolioSummary } from "../securities/portfolio-summary-memo";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import {
   RateIndex,
@@ -334,6 +335,13 @@ export class NetWorthService {
    * queue entry that the same crash would have lost.
    */
   triggerDebouncedRecalc(accountId: string, userId: string): void {
+    // INV-CACHE-001: this is the seam every balance-moving write passes through
+    // after it commits, so it is where the in-process portfolio valuation is
+    // forgotten too. Immediately, not on the debounced timer: the memoized
+    // summary is wrong the moment the write commits, and the page reloading
+    // after a trade arrives long before the two seconds are up.
+    invalidatePortfolioSummary(userId);
+
     const key = `${userId}:${accountId}`;
     const existing = this.recalcTimers.get(key);
     if (existing) clearTimeout(existing);
@@ -374,6 +382,9 @@ export class NetWorthService {
   }
 
   async recalculateAccount(userId: string, accountId: string): Promise<void> {
+    // The same invalidation as the debounced seam, for the callers that
+    // recompute an account directly instead of going through it.
+    invalidatePortfolioSummary(userId);
     await withScopedDb(this.dataSource, async (m) => {
       // The lock first, then every read the snapshots are derived from, then the
       // delete-and-reinsert -- all in this transaction.
