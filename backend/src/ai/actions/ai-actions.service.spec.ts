@@ -1,7 +1,10 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { createHash } from "crypto";
-import { AiActionsService } from "./ai-actions.service";
+import {
+  AiActionsService,
+  AI_ACTION_CLAIM_PURPOSE,
+} from "./ai-actions.service";
 import { AiActionSigningService } from "./ai-action-signing.service";
 import { AiWriteLimiter, AI_DAILY_WRITE_LIMIT } from "./ai-write-limiter";
 import {
@@ -22,6 +25,11 @@ import {
 } from "./ai-action.types";
 import { InvestmentAction } from "../../securities/entities/investment-transaction.entity";
 import { ConfirmAiActionDto } from "./dto/confirm-ai-action.dto";
+import {
+  createSingleUseTokenMock,
+  singleUseKey,
+  type SingleUseTokenMock,
+} from "../../test-helpers/single-use-token-testing";
 
 const USER = "user-1";
 const ACC = "11111111-1111-4111-8111-111111111111";
@@ -43,6 +51,7 @@ describe("AiActionsService", () => {
   let securities: Record<string, jest.Mock>;
   let attachments: Record<string, jest.Mock>;
   let attachmentStore: Record<string, jest.Mock>;
+  let singleUseTokens: SingleUseTokenMock;
 
   beforeEach(() => {
     const config = {
@@ -94,6 +103,7 @@ describe("AiActionsService", () => {
       get: jest.fn(),
       releaseForPrompt: jest.fn(),
     };
+    singleUseTokens = createSingleUseTokenMock();
     service = new AiActionsService(
       transactions as never,
       payees as never,
@@ -103,6 +113,7 @@ describe("AiActionsService", () => {
       limiter,
       attachments as never,
       attachmentStore as never,
+      singleUseTokens as never,
     );
   });
 
@@ -975,11 +986,61 @@ describe("AiActionsService", () => {
     expect(transactions.create).toHaveBeenCalledTimes(1);
   });
 
+  // The claim is the reason a second replica -- or this one after a restart --
+  // refuses a descriptor it has never seen confirmed.
+  it("refuses a descriptor another replica already claimed", async () => {
+    const descriptor = createTxDescriptor();
+    singleUseTokens.claimed.add(
+      singleUseKey(AI_ACTION_CLAIM_PURPOSE, descriptor.actionId),
+    );
+
+    await expect(
+      service.confirm(USER, dtoFor(descriptor)),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(transactions.create).not.toHaveBeenCalled();
+  });
+
+  it("claims the action id for the descriptor's remaining lifetime", async () => {
+    const descriptor = createTxDescriptor();
+
+    await service.confirm(USER, dtoFor(descriptor));
+
+    expect(singleUseTokens.claim).toHaveBeenCalledWith(
+      AI_ACTION_CLAIM_PURPOSE,
+      descriptor.actionId,
+      expect.any(Number),
+    );
+    const [, , ttl] = singleUseTokens.claim.mock.calls[0];
+    // The row dies with the descriptor, so the guard never depends on the sweep.
+    expect(ttl).toBeGreaterThan(0);
+    expect(ttl).toBeLessThanOrEqual(descriptor.expiresAt - Date.now() + 1000);
+  });
+
+  // A refused write limit must not burn the descriptor: the user may raise it
+  // tomorrow and confirm the same card.
+  it("does not claim when the write limit refuses first", async () => {
+    for (let i = 0; i < AI_DAILY_WRITE_LIMIT; i++) {
+      limiter.record(USER, "create_transaction");
+    }
+
+    await expect(
+      service.confirm(USER, dtoFor(createTxDescriptor())),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(singleUseTokens.claim).not.toHaveBeenCalled();
+  });
+
   it("allows retry after a failed write (action id released)", async () => {
     const descriptor = createTxDescriptor();
     transactions.create.mockRejectedValueOnce(new Error("db down"));
     await expect(service.confirm(USER, dtoFor(descriptor))).rejects.toThrow();
-    // Same descriptor can be retried because the id was released on failure.
+
+    // The claim is taken before the write and given back when it throws --
+    // `execute` fans out across several transactions of its own, so there is no
+    // rollback to do it.
+    expect(singleUseTokens.release).toHaveBeenCalledWith(
+      AI_ACTION_CLAIM_PURPOSE,
+      descriptor.actionId,
+    );
     const result = await service.confirm(USER, dtoFor(descriptor));
     expect(result).toEqual({ type: "create_transaction", id: "tx-new" });
   });

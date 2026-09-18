@@ -32,6 +32,8 @@ import {
   createUserPreferenceRepoMock,
   type UserPreferenceRepoMock,
 } from "../test-helpers/user-preference-testing";
+import { authAttemptCounterProvider } from "../test-helpers/auth-attempt-counter-testing";
+import { singleUseTokenProvider } from "../test-helpers/single-use-token-testing";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -198,6 +200,8 @@ describe("AuthService", () => {
         AuthService,
         TokenService,
         TwoFactorService,
+        authAttemptCounterProvider(),
+        singleUseTokenProvider(),
         AuthEmailService,
         { provide: JwtService, useValue: jwtService },
         {
@@ -3173,53 +3177,34 @@ describe("AuthService", () => {
   // ---------------------------------------------------------------
 
   describe("checkForgotPasswordEmailLimit (M7)", () => {
-    it("allows first 3 requests for an email", () => {
-      expect(service.checkForgotPasswordEmailLimit("test@example.com")).toBe(
-        true,
-      );
-      expect(service.checkForgotPasswordEmailLimit("test@example.com")).toBe(
-        true,
-      );
-      expect(service.checkForgotPasswordEmailLimit("test@example.com")).toBe(
-        true,
-      );
+    const check = (email: string) =>
+      service.checkForgotPasswordEmailLimit(email);
+
+    it("allows first 3 requests for an email", async () => {
+      await expect(check("test@example.com")).resolves.toBe(true);
+      await expect(check("test@example.com")).resolves.toBe(true);
+      await expect(check("test@example.com")).resolves.toBe(true);
     });
 
-    it("blocks the 4th request for the same email within the window", () => {
-      expect(service.checkForgotPasswordEmailLimit("block@example.com")).toBe(
-        true,
-      );
-      expect(service.checkForgotPasswordEmailLimit("block@example.com")).toBe(
-        true,
-      );
-      expect(service.checkForgotPasswordEmailLimit("block@example.com")).toBe(
-        true,
-      );
-      expect(service.checkForgotPasswordEmailLimit("block@example.com")).toBe(
-        false,
-      );
+    it("blocks the 4th request for the same email within the window", async () => {
+      await expect(check("block@example.com")).resolves.toBe(true);
+      await expect(check("block@example.com")).resolves.toBe(true);
+      await expect(check("block@example.com")).resolves.toBe(true);
+      await expect(check("block@example.com")).resolves.toBe(false);
     });
 
-    it("normalizes email case", () => {
-      expect(service.checkForgotPasswordEmailLimit("UPPER@Example.COM")).toBe(
-        true,
-      );
-      expect(service.checkForgotPasswordEmailLimit("upper@example.com")).toBe(
-        true,
-      );
-      expect(service.checkForgotPasswordEmailLimit("Upper@EXAMPLE.com")).toBe(
-        true,
-      );
-      expect(service.checkForgotPasswordEmailLimit("upper@example.com")).toBe(
-        false,
-      );
+    it("normalizes email case", async () => {
+      await expect(check("UPPER@Example.COM")).resolves.toBe(true);
+      await expect(check("upper@example.com")).resolves.toBe(true);
+      await expect(check("Upper@EXAMPLE.com")).resolves.toBe(true);
+      await expect(check("upper@example.com")).resolves.toBe(false);
     });
 
-    it("tracks different emails independently", () => {
-      expect(service.checkForgotPasswordEmailLimit("a@test.com")).toBe(true);
-      expect(service.checkForgotPasswordEmailLimit("a@test.com")).toBe(true);
-      expect(service.checkForgotPasswordEmailLimit("a@test.com")).toBe(true);
-      expect(service.checkForgotPasswordEmailLimit("b@test.com")).toBe(true); // different email
+    it("tracks different emails independently", async () => {
+      await expect(check("a@test.com")).resolves.toBe(true);
+      await expect(check("a@test.com")).resolves.toBe(true);
+      await expect(check("a@test.com")).resolves.toBe(true);
+      await expect(check("b@test.com")).resolves.toBe(true); // different email
     });
   });
 

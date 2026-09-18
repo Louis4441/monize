@@ -2,13 +2,22 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
 import { BadRequestException } from "@nestjs/common";
 import * as bcrypt from "bcryptjs";
-import { AuthEmailService } from "./auth-email.service";
+import {
+  AuthEmailService,
+  FORGOT_PASSWORD_SCOPE,
+  VERIFICATION_EMAIL_SCOPE,
+} from "./auth-email.service";
 import { User } from "../users/entities/user.entity";
 import { TrustedDevice } from "../users/entities/trusted-device.entity";
 import { PasswordBreachService } from "./password-breach.service";
 import { TokenService } from "./token.service";
 import { hashToken } from "./crypto.util";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+import {
+  authAttemptCounterProvider,
+  createAuthAttemptCounterMock,
+  type AuthAttemptCounterMock,
+} from "../test-helpers/auth-attempt-counter-testing";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -16,6 +25,7 @@ jest.mock("../common/db/scoped-db", () =>
 
 describe("AuthEmailService", () => {
   let service: AuthEmailService;
+  let attemptCounters: AuthAttemptCounterMock;
   let usersRepository: Record<string, jest.Mock>;
   let trustedDevicesRepository: Record<string, jest.Mock>;
   let passwordBreachService: { isBreached: jest.Mock };
@@ -50,6 +60,8 @@ describe("AuthEmailService", () => {
       revokeAllUserRefreshTokens: jest.fn(),
     };
 
+    attemptCounters = createAuthAttemptCounterMock();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         {
@@ -68,14 +80,11 @@ describe("AuthEmailService", () => {
           provide: TokenService,
           useValue: tokenService,
         },
+        authAttemptCounterProvider(attemptCounters),
       ],
     }).compile();
 
     service = module.get<AuthEmailService>(AuthEmailService);
-  });
-
-  afterEach(() => {
-    service.onModuleDestroy();
   });
 
   describe("generateResetToken", () => {
@@ -245,52 +254,65 @@ describe("AuthEmailService", () => {
   });
 
   describe("checkForgotPasswordEmailLimit", () => {
-    it("should allow first request and set count to 1", () => {
-      const result = service.checkForgotPasswordEmailLimit("test@example.com");
-
-      expect(result).toBe(true);
+    it("should allow first request and set count to 1", async () => {
+      await expect(
+        service.checkForgotPasswordEmailLimit("test@example.com"),
+      ).resolves.toBe(true);
     });
 
-    it("should allow subsequent requests within the limit", () => {
-      service.checkForgotPasswordEmailLimit("test@example.com");
-      const result = service.checkForgotPasswordEmailLimit("test@example.com");
+    it("should allow subsequent requests within the limit", async () => {
+      await service.checkForgotPasswordEmailLimit("test@example.com");
 
-      expect(result).toBe(true);
+      await expect(
+        service.checkForgotPasswordEmailLimit("test@example.com"),
+      ).resolves.toBe(true);
     });
 
-    it("should block at the limit (3rd request)", () => {
-      service.checkForgotPasswordEmailLimit("test@example.com");
-      service.checkForgotPasswordEmailLimit("test@example.com");
-      service.checkForgotPasswordEmailLimit("test@example.com");
+    it("should block at the limit (3rd request)", async () => {
+      for (let i = 0; i < 3; i++) {
+        await service.checkForgotPasswordEmailLimit("test@example.com");
+      }
 
-      const result = service.checkForgotPasswordEmailLimit("test@example.com");
-
-      expect(result).toBe(false);
+      await expect(
+        service.checkForgotPasswordEmailLimit("test@example.com"),
+      ).resolves.toBe(false);
     });
 
-    it("should normalize email case", () => {
-      service.checkForgotPasswordEmailLimit("Test@Example.COM");
-      service.checkForgotPasswordEmailLimit("test@example.com");
-      service.checkForgotPasswordEmailLimit("TEST@EXAMPLE.COM");
+    it("should normalize email case", async () => {
+      await service.checkForgotPasswordEmailLimit("Test@Example.COM");
+      await service.checkForgotPasswordEmailLimit("test@example.com");
+      await service.checkForgotPasswordEmailLimit("TEST@EXAMPLE.COM");
 
       // All three count as the same email, so the 4th should be blocked
-      const result = service.checkForgotPasswordEmailLimit("test@example.com");
-
-      expect(result).toBe(false);
+      await expect(
+        service.checkForgotPasswordEmailLimit("test@example.com"),
+      ).resolves.toBe(false);
     });
 
-    it("should reset and allow after window expires", () => {
-      // First, exhaust the limit
-      service.checkForgotPasswordEmailLimit("test@example.com");
-      service.checkForgotPasswordEmailLimit("test@example.com");
-      service.checkForgotPasswordEmailLimit("test@example.com");
+    // The scope and the key shape are the contract between replicas, and the
+    // key is hashed because this table has no owner column: a plaintext key
+    // would make it a list of who asked for a password reset.
+    it("counts under the documented scope, keyed by the hashed address", async () => {
+      await service.checkForgotPasswordEmailLimit("  Test@Example.COM ");
 
-      // Verify blocked
-      expect(service.checkForgotPasswordEmailLimit("test@example.com")).toBe(
-        false,
+      expect(attemptCounters.increment).toHaveBeenCalledWith(
+        FORGOT_PASSWORD_SCOPE,
+        hashToken("test@example.com"),
+        60 * 60 * 1000,
       );
+      for (const [, key] of attemptCounters.increment.mock.calls) {
+        expect(key).not.toContain("@");
+      }
+    });
 
-      // Advance time past the 1-hour window
+    it("should reset and allow after window expires", async () => {
+      for (let i = 0; i < 3; i++) {
+        await service.checkForgotPasswordEmailLimit("test@example.com");
+      }
+      await expect(
+        service.checkForgotPasswordEmailLimit("test@example.com"),
+      ).resolves.toBe(false);
+
       const realDateNow = Date.now;
       const originalNow = Date.now();
       Date.now = jest.fn().mockReturnValue(
@@ -298,35 +320,42 @@ describe("AuthEmailService", () => {
       );
 
       try {
-        // Should reset and allow (covers lines 99-103)
-        const result =
-          service.checkForgotPasswordEmailLimit("test@example.com");
-
-        expect(result).toBe(true);
-
-        // Subsequent request should also be allowed (count reset to 1, now 2)
-        const result2 =
-          service.checkForgotPasswordEmailLimit("test@example.com");
-        expect(result2).toBe(true);
+        await expect(
+          service.checkForgotPasswordEmailLimit("test@example.com"),
+        ).resolves.toBe(true);
+        // Count restarted at 1, so the next one is allowed too.
+        await expect(
+          service.checkForgotPasswordEmailLimit("test@example.com"),
+        ).resolves.toBe(true);
       } finally {
         Date.now = realDateNow;
       }
     });
 
-    it("should track different emails independently", () => {
-      service.checkForgotPasswordEmailLimit("user1@example.com");
-      service.checkForgotPasswordEmailLimit("user1@example.com");
-      service.checkForgotPasswordEmailLimit("user1@example.com");
+    it("should track different emails independently", async () => {
+      for (let i = 0; i < 3; i++) {
+        await service.checkForgotPasswordEmailLimit("user1@example.com");
+      }
 
-      // user1 is at limit
-      expect(service.checkForgotPasswordEmailLimit("user1@example.com")).toBe(
-        false,
+      await expect(
+        service.checkForgotPasswordEmailLimit("user1@example.com"),
+      ).resolves.toBe(false);
+      await expect(
+        service.checkForgotPasswordEmailLimit("user2@example.com"),
+      ).resolves.toBe(true);
+    });
+
+    // The reason the counter moved onto a row: this process never saw the
+    // first three requests.
+    it("refuses on a count another replica wrote", async () => {
+      attemptCounters.rows.set(
+        `${FORGOT_PASSWORD_SCOPE}\u0000${hashToken("elsewhere@example.com")}`,
+        { count: 3, windowExpiresAt: new Date(Date.now() + 60 * 60 * 1000) },
       );
 
-      // user2 should still be allowed
-      expect(service.checkForgotPasswordEmailLimit("user2@example.com")).toBe(
-        true,
-      );
+      await expect(
+        service.checkForgotPasswordEmailLimit("elsewhere@example.com"),
+      ).resolves.toBe(false);
     });
   });
 
@@ -433,94 +462,73 @@ describe("AuthEmailService", () => {
   });
 
   describe("checkVerificationEmailLimit", () => {
-    it("allows the first 3 requests and blocks the 4th within the window", () => {
-      expect(service.checkVerificationEmailLimit("v@example.com")).toBe(true);
-      expect(service.checkVerificationEmailLimit("v@example.com")).toBe(true);
-      expect(service.checkVerificationEmailLimit("v@example.com")).toBe(true);
-      expect(service.checkVerificationEmailLimit("v@example.com")).toBe(false);
+    it("allows the first 3 requests and blocks the 4th within the window", async () => {
+      await expect(
+        service.checkVerificationEmailLimit("v@example.com"),
+      ).resolves.toBe(true);
+      await expect(
+        service.checkVerificationEmailLimit("v@example.com"),
+      ).resolves.toBe(true);
+      await expect(
+        service.checkVerificationEmailLimit("v@example.com"),
+      ).resolves.toBe(true);
+      await expect(
+        service.checkVerificationEmailLimit("v@example.com"),
+      ).resolves.toBe(false);
     });
 
-    it("resets and allows again after the window expires", () => {
-      service.checkVerificationEmailLimit("v2@example.com");
-      service.checkVerificationEmailLimit("v2@example.com");
-      service.checkVerificationEmailLimit("v2@example.com");
-      expect(service.checkVerificationEmailLimit("v2@example.com")).toBe(false);
+    it("resets and allows again after the window expires", async () => {
+      for (let i = 0; i < 3; i++) {
+        await service.checkVerificationEmailLimit("v2@example.com");
+      }
+      await expect(
+        service.checkVerificationEmailLimit("v2@example.com"),
+      ).resolves.toBe(false);
 
       const realDateNow = Date.now;
       Date.now = jest.fn().mockReturnValue(realDateNow() + 60 * 60 * 1000 + 1);
       try {
-        expect(service.checkVerificationEmailLimit("v2@example.com")).toBe(
-          true,
-        );
+        await expect(
+          service.checkVerificationEmailLimit("v2@example.com"),
+        ).resolves.toBe(true);
       } finally {
         Date.now = realDateNow;
       }
     });
 
-    it("tracks different emails independently and normalizes case", () => {
-      service.checkVerificationEmailLimit("A@Example.com");
-      service.checkVerificationEmailLimit("a@example.com");
-      service.checkVerificationEmailLimit("A@EXAMPLE.COM");
-      expect(service.checkVerificationEmailLimit("a@example.com")).toBe(false);
-      expect(service.checkVerificationEmailLimit("other@example.com")).toBe(
-        true,
+    it("tracks different emails independently and normalizes case", async () => {
+      await service.checkVerificationEmailLimit("A@Example.com");
+      await service.checkVerificationEmailLimit("a@example.com");
+      await service.checkVerificationEmailLimit("A@EXAMPLE.COM");
+
+      await expect(
+        service.checkVerificationEmailLimit("a@example.com"),
+      ).resolves.toBe(false);
+      await expect(
+        service.checkVerificationEmailLimit("other@example.com"),
+      ).resolves.toBe(true);
+    });
+
+    // A separate scope, so exhausting one endpoint's allowance never spends
+    // the other's for the same address.
+    it("counts under its own scope", async () => {
+      await service.checkVerificationEmailLimit("v3@example.com");
+
+      expect(attemptCounters.increment).toHaveBeenCalledWith(
+        VERIFICATION_EMAIL_SCOPE,
+        hashToken("v3@example.com"),
+        60 * 60 * 1000,
       );
     });
-  });
 
-  describe("cleanup", () => {
-    it("should remove expired entries when cleanup runs", () => {
-      // Add entries
-      service.checkForgotPasswordEmailLimit("expired@example.com");
-      service.checkForgotPasswordEmailLimit("fresh@example.com");
-
-      // Advance time so the first entry expires
-      const realDateNow = Date.now;
-      const originalNow = Date.now();
-      Date.now = jest.fn().mockReturnValue(originalNow + 60 * 60 * 1000 + 1);
-
-      try {
-        // Add a fresh entry at the new time
-        service.checkForgotPasswordEmailLimit("fresh@example.com");
-
-        // Trigger cleanup via the internal method
-        (service as any).cleanupExpiredAttempts();
-
-        // expired@example.com should be cleaned up, fresh should remain
-        // Verify by checking that expired@example.com starts fresh (allowed)
-        // and reaches limit normally
-        const result = service.checkForgotPasswordEmailLimit(
-          "expired@example.com",
-        );
-        expect(result).toBe(true);
-      } finally {
-        Date.now = realDateNow;
+    it("does not share an allowance with forgot-password", async () => {
+      for (let i = 0; i < 3; i++) {
+        await service.checkVerificationEmailLimit("both@example.com");
       }
-    });
 
-    it("should clear interval on module destroy", () => {
-      const clearIntervalSpy = jest.spyOn(global, "clearInterval");
-      service.onModuleDestroy();
-      expect(clearIntervalSpy).toHaveBeenCalled();
-      clearIntervalSpy.mockRestore();
-    });
-
-    it("prunes expired verification-email attempts too", () => {
-      service.checkVerificationEmailLimit("stale@example.com");
-
-      const realDateNow = Date.now;
-      const originalNow = Date.now();
-      Date.now = jest.fn().mockReturnValue(originalNow + 60 * 60 * 1000 + 1);
-      try {
-        (service as any).cleanupExpiredAttempts();
-
-        // The stale entry was pruned, so the limiter starts fresh again.
-        expect(service.checkVerificationEmailLimit("stale@example.com")).toBe(
-          true,
-        );
-      } finally {
-        Date.now = realDateNow;
-      }
+      await expect(
+        service.checkForgotPasswordEmailLimit("both@example.com"),
+      ).resolves.toBe(true);
     });
   });
 });

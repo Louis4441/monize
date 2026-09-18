@@ -26,12 +26,16 @@ export const RLS_EXEMPT_TABLES: Readonly<Record<string, string>> = {
     "Global reference data keyed by ISO 4217 code; created_by_user_id is attribution, not ownership.",
   exchange_rates:
     "Global reference data with no owner column; written by the scheduled refresh under system context.",
+  fetch_sync:
+    "Deployment-wide leases for the three outbound market-data fetch jobs; no owner column, one FX rate serves everybody.",
   google_places_instance_usage:
     "Request counter for the operator's own Google Places key; no owner column, one key is one bill.",
   market_index_prices:
     "Global market reference data with no owner column; one index close serves every user.",
   market_index_sync:
     "Sync bookkeeping for the market-index refresh; same ownership story as market_index_prices.",
+  oauth_instance_config:
+    "Singleton deployment OIDC signing identity (one JWKS per instance); no owner column, one issuer signs for every account.",
   oauth_payloads:
     "OIDC provider artifacts keyed by opaque id/model/grant_id/uid, with no owner column to policy on.",
   provider_health:
@@ -44,6 +48,8 @@ export const RLS_EXEMPT_TABLES: Readonly<Record<string, string>> = {
     "Migration infrastructure, written only by db-migrate running as the owner.",
   single_use_tokens:
     "One-shot claims keyed by purpose and a SHA-256 hash; no owner column, and the hash is what keeps the shared table from being replayable.",
+  update_check_state:
+    "Singleton record of what this deployment last learned about the upstream release; no owner column, one instance checks one upstream.",
 };
 
 /** The exempt table names, sorted, for comparison against the schema block. */

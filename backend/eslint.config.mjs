@@ -137,12 +137,22 @@ const WITH_CONTEXT_ALLOWLIST = [
   "src/notifications/provider-outage-alert.service.ts",
   "src/oauth/oauth-interaction.controller.ts",
   "src/oauth/oauth-provider.service.ts",
+  // The deployment's OIDC signing identity: one singleton row that belongs to
+  // no user (one issuer signs for every account), minted from the provider's
+  // initialization, which has no request to inherit an identity from.
+  "src/oauth/oauth-signing-keys.service.ts",
   // Provider availability bookkeeping: a global provider_health row written
   // from whatever code path happened to call the provider, so there is no
   // caller identity that could own it -- and it is written outside the caller's
   // transaction on purpose, because an outage is not part of whatever request
   // discovered it.
   "src/provider-health/provider-health.service.ts",
+  // The upstream release check: one singleton row for the whole deployment (one
+  // instance checks one upstream), written from a cron and a bootstrap hook
+  // with no request to inherit an identity from. The READ stays on the
+  // caller's own identity -- the table is RLS-exempt, so a request transaction
+  // sees it without a bypass.
+  "src/updates/updates.service.ts",
   // Two genuinely cross-user pieces of work, and only those: generating the
   // deployment's one VAPID key pair on the bootstrap hook (no request behind
   // it), and counting the devices that key pair serves across every account.

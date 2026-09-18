@@ -79,7 +79,9 @@ export const MISSING_ENCRYPTION_KEY_WARNING_LINES: readonly string[] = [
     "FUTURE RELEASE, and the server will then refuse to start without it.",
   "Until it is set, this deployment cannot store any secret it is asked to " +
     "keep: automatic backups are written UNENCRYPTED, AI provider API keys " +
-    "cannot be saved, and emergency access cannot be enabled.",
+    "cannot be saved, emergency access cannot be enabled, and OIDC signing " +
+    "keys are per process -- so every restart and every replica serves a " +
+    "different /oauth/jwks.",
   `Fix it now: generate a key with "openssl rand -hex 32" and set ` +
     `${ENCRYPTION_KEY_ENV} (minimum ${MIN_ENCRYPTION_KEY_LENGTH} characters). ` +
     "Nothing else changes, and existing data is unaffected.",

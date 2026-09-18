@@ -25,6 +25,7 @@ import {
   DataSourceMock,
   ManagerMock,
 } from "../test-helpers/scoped-db-testing";
+import { jobClaimProvider } from "../test-helpers/job-claim-testing";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -236,6 +237,7 @@ describe("Budget Period Lifecycle Integration", () => {
       providers: [
         BudgetPeriodService,
         BudgetPeriodCronService,
+        jobClaimProvider(),
         {
           provide: getRepositoryToken(BudgetPeriod),
           useValue: periodsRepository,

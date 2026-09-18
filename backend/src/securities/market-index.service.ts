@@ -3,6 +3,10 @@ import { Cron } from "@nestjs/schedule";
 import { DataSource, EntityManager } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { withSystemContext } from "../common/db/with-context";
+import {
+  FetchSyncJob,
+  FetchSyncService,
+} from "../common/jobs/fetch-sync.service";
 import { todayYMD } from "../common/date-utils";
 import {
   PRICE_WINDOW_LEAD_DAYS,
@@ -139,7 +143,16 @@ export class MarketIndexService implements OnApplicationBootstrap {
     private dataSource: DataSource,
     private yahooFinanceService: YahooFinanceService,
     private readonly health: ProviderHealthService,
+    private readonly fetchSync: FetchSyncService,
   ) {}
+
+  /**
+   * How long one replica holds the index fetch.
+   *
+   * Longer than a refresh of 24 indexes takes and far shorter than the daily
+   * interval, so a replica killed mid-fetch never blocks the next tick.
+   */
+  private readonly FETCH_LEASE_MS = 20 * 60 * 1000;
 
   /**
    * The catalog with the stored coverage per index, so the picker can grey out
@@ -359,8 +372,16 @@ export class MarketIndexService implements OnApplicationBootstrap {
    * loop is not.
    */
   onApplicationBootstrap(): void {
+    // The lease covers the warm-up as well as the cron: a rollout of N pods is
+    // exactly the case where N identical provider bursts are least welcome, and
+    // the per-index cooldown `respectCooldown` applies is a different question
+    // (how often ONE index is worth re-asking for, not which replica asks).
     void withSystemContext(() =>
-      this.refreshAll({ respectCooldown: true }),
+      this.fetchSync.withLease(
+        FetchSyncJob.MarketIndexes,
+        this.FETCH_LEASE_MS,
+        () => this.refreshAll({ respectCooldown: true }),
+      ),
     ).catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Initial market index refresh failed: ${message}`);
@@ -377,7 +398,16 @@ export class MarketIndexService implements OnApplicationBootstrap {
    */
   @Cron("10 17 * * 1-5", { timeZone: "America/New_York" })
   async scheduledRefresh(): Promise<void> {
-    await withSystemContext(() => this.refreshAll());
+    // One replica per tick fetches (task C2). The index upserts are idempotent,
+    // so the lease is a cost control; a lost one is a debug line and never
+    // blocks the next tick.
+    await withSystemContext(() =>
+      this.fetchSync.withLease(
+        FetchSyncJob.MarketIndexes,
+        this.FETCH_LEASE_MS,
+        () => this.refreshAll(),
+      ),
+    );
   }
 
   /**

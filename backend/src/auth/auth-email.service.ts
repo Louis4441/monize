@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  BadRequestException,
-  Logger,
-  OnModuleDestroy,
-} from "@nestjs/common";
+import { Injectable, BadRequestException, Logger } from "@nestjs/common";
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import * as bcrypt from "bcryptjs";
@@ -15,43 +10,37 @@ import { hashToken } from "./crypto.util";
 import { PasswordBreachService } from "./password-breach.service";
 import { tr } from "../i18n/translate";
 import { TokenService } from "./token.service";
+import { AuthAttemptCounterService } from "./auth-attempt-counter.service";
+
+/**
+ * `auth_attempt_counters.scope` for the two per-email throttles.
+ *
+ * The key is `sha256(lowercased, trimmed email)`. The table has no owner column
+ * and is RLS-exempt, so a plaintext key would make it a directory of who has
+ * asked for a password reset -- which is precisely the enumeration these two
+ * endpoints answer generically to avoid.
+ */
+export const FORGOT_PASSWORD_SCOPE = "forgot-password";
+export const VERIFICATION_EMAIL_SCOPE = "verification-email";
 
 @Injectable()
-export class AuthEmailService implements OnModuleDestroy {
+export class AuthEmailService {
   private readonly logger = new Logger(AuthEmailService.name);
 
   // M7: Per-email rate limiting for forgot-password
-  private readonly forgotPasswordAttempts = new Map<
-    string,
-    { count: number; windowStart: number }
-  >();
   private readonly FORGOT_PASSWORD_EMAIL_LIMIT = 3;
   private readonly FORGOT_PASSWORD_EMAIL_WINDOW_MS = 60 * 60 * 1000; // 1 hour
   // Per-email rate limiting for resending the verification email. Shares the
   // same window/limit shape as forgot-password to throttle abuse.
-  private readonly verificationEmailAttempts = new Map<
-    string,
-    { count: number; windowStart: number }
-  >();
   private readonly VERIFICATION_EMAIL_LIMIT = 3;
   private readonly VERIFICATION_EMAIL_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-  private readonly cleanupInterval: ReturnType<typeof setInterval>;
 
   constructor(
     private readonly dataSource: DataSource,
     private passwordBreachService: PasswordBreachService,
     private tokenService: TokenService,
-  ) {
-    // Periodically prune expired entries to prevent unbounded memory growth.
-    // unref() ensures the timer does not prevent Node.js process shutdown.
-    this.cleanupInterval = setInterval(
-      () => this.cleanupExpiredAttempts(),
-      this.FORGOT_PASSWORD_EMAIL_WINDOW_MS,
-    );
-    if (this.cleanupInterval.unref) {
-      this.cleanupInterval.unref();
-    }
-  }
+    private readonly attemptCounters: AuthAttemptCounterService,
+  ) {}
 
   /**
    * One repository call in its own short scoped transaction -- the RLS-era
@@ -68,22 +57,27 @@ export class AuthEmailService implements OnModuleDestroy {
     );
   }
 
-  onModuleDestroy() {
-    clearInterval(this.cleanupInterval);
-  }
-
-  private cleanupExpiredAttempts(): void {
-    const now = Date.now();
-    for (const [email, record] of this.forgotPasswordAttempts) {
-      if (now - record.windowStart > this.FORGOT_PASSWORD_EMAIL_WINDOW_MS) {
-        this.forgotPasswordAttempts.delete(email);
-      }
-    }
-    for (const [email, record] of this.verificationEmailAttempts) {
-      if (now - record.windowStart > this.VERIFICATION_EMAIL_WINDOW_MS) {
-        this.verificationEmailAttempts.delete(email);
-      }
-    }
+  /**
+   * Count this address's use of one throttled endpoint and say whether it may
+   * proceed.
+   *
+   * One statement decides it, so N replicas enforce one limit and a restart no
+   * longer hands the sender a fresh three. The window is not extended by a
+   * refused attempt: `increment` keeps `window_expires_at` as the first attempt
+   * set it, which is the behaviour the `windowStart` field had.
+   */
+  private async withinEmailLimit(
+    scope: string,
+    email: string,
+    limit: number,
+    windowMs: number,
+  ): Promise<boolean> {
+    const { count } = await this.attemptCounters.increment(
+      scope,
+      hashToken(email.toLowerCase().trim()),
+      windowMs,
+    );
+    return count <= limit;
   }
 
   async generateResetToken(
@@ -161,32 +155,13 @@ export class AuthEmailService implements OnModuleDestroy {
     }
   }
 
-  checkForgotPasswordEmailLimit(email: string): boolean {
-    const normalizedEmail = email.toLowerCase().trim();
-    const now = Date.now();
-    const record = this.forgotPasswordAttempts.get(normalizedEmail);
-
-    if (record) {
-      if (now - record.windowStart > this.FORGOT_PASSWORD_EMAIL_WINDOW_MS) {
-        // Window expired, reset
-        this.forgotPasswordAttempts.set(normalizedEmail, {
-          count: 1,
-          windowStart: now,
-        });
-        return true;
-      }
-      if (record.count >= this.FORGOT_PASSWORD_EMAIL_LIMIT) {
-        return false;
-      }
-      record.count += 1;
-      return true;
-    }
-
-    this.forgotPasswordAttempts.set(normalizedEmail, {
-      count: 1,
-      windowStart: now,
-    });
-    return true;
+  checkForgotPasswordEmailLimit(email: string): Promise<boolean> {
+    return this.withinEmailLimit(
+      FORGOT_PASSWORD_SCOPE,
+      email,
+      this.FORGOT_PASSWORD_EMAIL_LIMIT,
+      this.FORGOT_PASSWORD_EMAIL_WINDOW_MS,
+    );
   }
 
   /**
@@ -250,31 +225,12 @@ export class AuthEmailService implements OnModuleDestroy {
     }
   }
 
-  checkVerificationEmailLimit(email: string): boolean {
-    const normalizedEmail = email.toLowerCase().trim();
-    const now = Date.now();
-    const record = this.verificationEmailAttempts.get(normalizedEmail);
-
-    if (record) {
-      if (now - record.windowStart > this.VERIFICATION_EMAIL_WINDOW_MS) {
-        // Window expired, reset
-        this.verificationEmailAttempts.set(normalizedEmail, {
-          count: 1,
-          windowStart: now,
-        });
-        return true;
-      }
-      if (record.count >= this.VERIFICATION_EMAIL_LIMIT) {
-        return false;
-      }
-      record.count += 1;
-      return true;
-    }
-
-    this.verificationEmailAttempts.set(normalizedEmail, {
-      count: 1,
-      windowStart: now,
-    });
-    return true;
+  checkVerificationEmailLimit(email: string): Promise<boolean> {
+    return this.withinEmailLimit(
+      VERIFICATION_EMAIL_SCOPE,
+      email,
+      this.VERIFICATION_EMAIL_LIMIT,
+      this.VERIFICATION_EMAIL_WINDOW_MS,
+    );
   }
 }

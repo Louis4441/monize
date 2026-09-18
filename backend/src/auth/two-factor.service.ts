@@ -29,6 +29,19 @@ import { encrypt, decrypt, derivePurposeKey, hashToken } from "./crypto.util";
 import { TokenService } from "./token.service";
 import { tr } from "../i18n/translate";
 import { patchUserPreferences } from "../users/user-preference-writer";
+import { AuthAttemptCounterService } from "./auth-attempt-counter.service";
+import { SingleUseTokenService } from "./single-use-token.service";
+
+/**
+ * Limiter names for `AuthAttemptCounterService`. They are part of the contract
+ * between replicas -- two processes spelling a scope differently are counting
+ * two limits -- so they are constants, exported for the specs that assert them.
+ */
+export const TWO_FACTOR_TOKEN_SCOPE = "2fa-token";
+export const TWO_FACTOR_USER_SCOPE = "2fa-user";
+
+/** `single_use_tokens.purpose` for a spent TOTP code. Shared by both TOTP paths. */
+export const TOTP_CLAIM_PURPOSE = "totp";
 
 @Injectable()
 export class TwoFactorService {
@@ -40,20 +53,16 @@ export class TwoFactorService {
   private readonly MAX_USER_2FA_ATTEMPTS = 10;
   private readonly BASE_LOCKOUT_MS = 30 * 60 * 1000; // 30 minutes
   private readonly BACKUP_CODE_COUNT = 12;
-  private readonly twoFactorAttempts = new Map<
-    string,
-    { count: number; expiresAt: number }
-  >();
-  private readonly user2FAAttempts = new Map<
-    string,
-    { count: number; expiresAt: number }
-  >();
   /**
-   * Track recently used TOTP codes per user to prevent replay within the
-   * code's validity window. Keys are "userId:code", values are expiry timestamps.
-   * TOTP codes are valid for ~30s but we track for 90s to cover clock skew.
+   * How long a run of failed 2FA attempts is remembered. Unchanged from the
+   * `Map` entries' expiry this replaced; the account lock the tenth failure
+   * sets is a separate, longer clock (`BASE_LOCKOUT_MS`) on `users.locked_until`.
    */
-  private readonly usedTotpCodes = new Map<string, number>();
+  private readonly ATTEMPT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+  /**
+   * How long a spent TOTP code stays spent. Codes are valid for ~30s; 90s covers
+   * clock skew on either side of the window.
+   */
   private readonly TOTP_CODE_REUSE_WINDOW_MS = 90 * 1000;
 
   constructor(
@@ -61,6 +70,8 @@ export class TwoFactorService {
     private configService: ConfigService,
     private dataSource: DataSource,
     private tokenService: TokenService,
+    private attemptCounters: AuthAttemptCounterService,
+    private singleUseTokens: SingleUseTokenService,
   ) {
     this.jwtSecret = this.configService.get<string>("JWT_SECRET")!;
     this.totpEncryptionKey = derivePurposeKey(
@@ -114,10 +125,15 @@ export class TwoFactorService {
     userAgent?: string,
     ipAddress?: string,
   ) {
-    // M4: Check per-token attempt tracking before processing
-    this.cleanupExpired2FAAttempts();
-    const attemptRecord = this.twoFactorAttempts.get(tempToken);
-    if (attemptRecord && attemptRecord.count >= this.MAX_2FA_ATTEMPTS) {
+    // M4: Check per-token attempt tracking before processing. The key is the
+    // temp token's hash, never the token: it is a JWT, and this table has no
+    // owner column.
+    const tokenCounterKey = hashToken(tempToken);
+    const tokenAttempts = await this.attemptCounters.peek(
+      TWO_FACTOR_TOKEN_SCOPE,
+      tokenCounterKey,
+    );
+    if (tokenAttempts >= this.MAX_2FA_ATTEMPTS) {
       throw new UnauthorizedException(
         tr(
           "errors.auth.tooManyAttemptsLoginAgain",
@@ -149,11 +165,11 @@ export class TwoFactorService {
     }
 
     // Per-user rate limiting: prevents brute-force multiplication via multiple tempTokens
-    const userAttemptRecord = this.user2FAAttempts.get(payload.sub);
-    if (
-      userAttemptRecord &&
-      userAttemptRecord.count >= this.MAX_USER_2FA_ATTEMPTS
-    ) {
+    const userAttempts = await this.attemptCounters.peek(
+      TWO_FACTOR_USER_SCOPE,
+      payload.sub,
+    );
+    if (userAttempts >= this.MAX_USER_2FA_ATTEMPTS) {
       this.logger.warn(
         `2FA verification blocked: too many attempts for user ${payload.sub}`,
       );
@@ -189,16 +205,18 @@ export class TwoFactorService {
 
     // L5: Try TOTP for 6-digit codes, backup codes for XXXX-XXXX format
     let isValid = false;
-    let isTotpCode = false;
     if (/^\d{6}$/.test(code)) {
-      isTotpCode = true;
-      // SECURITY: Reject previously used TOTP codes to prevent replay attacks.
-      const codeKey = `${user.id}:${code}`;
-      this.cleanupExpiredTotpCodes();
-      if (this.usedTotpCodes.has(codeKey)) {
-        isValid = false;
-      } else {
-        isValid = otplib.verifySync({ token: code, secret }).valid;
+      isValid = otplib.verifySync({ token: code, secret }).valid;
+      // SECURITY: burn the code, so it cannot be replayed on any replica.
+      //
+      // Claimed *after* verification, so guessing wrong codes cannot exhaust
+      // the valid ones, and *before* the session is issued, so a replay is
+      // refused rather than answered with tokens. A code that verifies but
+      // cannot be claimed has already been spent, which is the replay this
+      // exists to stop -- so it joins the invalid-code branch below and is
+      // counted, locked and reported exactly as a wrong code is.
+      if (isValid) {
+        isValid = await this.claimTotpCode(user.id, code);
       }
     } else if (user.backupCodes) {
       isValid = await this.verifyBackupCode(user, code);
@@ -206,20 +224,18 @@ export class TwoFactorService {
 
     if (!isValid) {
       // Track failed attempt per-token
-      const existing = this.twoFactorAttempts.get(tempToken);
-      const newCount = (existing?.count ?? 0) + 1;
-      this.twoFactorAttempts.set(tempToken, {
-        count: newCount,
-        expiresAt: Date.now() + 5 * 60 * 1000,
-      });
+      await this.attemptCounters.increment(
+        TWO_FACTOR_TOKEN_SCOPE,
+        tokenCounterKey,
+        this.ATTEMPT_WINDOW_MS,
+      );
 
       // Track failed attempt per-user
-      const existingUser = this.user2FAAttempts.get(payload.sub);
-      const newUserCount = (existingUser?.count ?? 0) + 1;
-      this.user2FAAttempts.set(payload.sub, {
-        count: newUserCount,
-        expiresAt: Date.now() + 5 * 60 * 1000,
-      });
+      const { count: newUserCount } = await this.attemptCounters.increment(
+        TWO_FACTOR_USER_SCOPE,
+        payload.sub,
+        this.ATTEMPT_WINDOW_MS,
+      );
 
       // Lock account after exceeding per-user threshold
       if (newUserCount >= this.MAX_USER_2FA_ATTEMPTS) {
@@ -245,17 +261,8 @@ export class TwoFactorService {
     }
 
     // M4: Clear attempt tracking on success
-    this.twoFactorAttempts.delete(tempToken);
-    this.user2FAAttempts.delete(payload.sub);
-
-    // Mark TOTP code as used to prevent replay
-    if (isTotpCode) {
-      const codeKey = `${user.id}:${code}`;
-      this.usedTotpCodes.set(
-        codeKey,
-        Date.now() + this.TOTP_CODE_REUSE_WINDOW_MS,
-      );
-    }
+    await this.attemptCounters.reset(TWO_FACTOR_TOKEN_SCOPE, tokenCounterKey);
+    await this.attemptCounters.reset(TWO_FACTOR_USER_SCOPE, payload.sub);
 
     // Re-encrypt with purpose-derived key if still using old key material
     if (needsReEncrypt) {
@@ -289,27 +296,20 @@ export class TwoFactorService {
     };
   }
 
-  private cleanupExpired2FAAttempts(): void {
-    const now = Date.now();
-    for (const [key, value] of this.twoFactorAttempts.entries()) {
-      if (value.expiresAt <= now) {
-        this.twoFactorAttempts.delete(key);
-      }
-    }
-    for (const [key, value] of this.user2FAAttempts.entries()) {
-      if (value.expiresAt <= now) {
-        this.user2FAAttempts.delete(key);
-      }
-    }
-  }
-
-  private cleanupExpiredTotpCodes(): void {
-    const now = Date.now();
-    for (const [key, expiresAt] of this.usedTotpCodes.entries()) {
-      if (expiresAt <= now) {
-        this.usedTotpCodes.delete(key);
-      }
-    }
+  /**
+   * Spend one TOTP code for one user, once across the deployment.
+   *
+   * The key is `userId:code` because a code is only a secret in the context of
+   * the user it belongs to -- two users may legitimately hold the same six
+   * digits at the same moment, and a key of the code alone would let either
+   * lock the other out. `SingleUseTokenService` hashes it.
+   */
+  private claimTotpCode(userId: string, code: string): Promise<boolean> {
+    return this.singleUseTokens.claim(
+      TOTP_CLAIM_PURPOSE,
+      `${userId}:${code}`,
+      this.TOTP_CODE_REUSE_WINDOW_MS,
+    );
   }
 
   /**
@@ -330,22 +330,16 @@ export class TwoFactorService {
       return false;
     }
 
-    const codeKey = `${user.id}:${code}`;
-    this.cleanupExpiredTotpCodes();
-    if (this.usedTotpCodes.has(codeKey)) {
-      return false;
-    }
-
     const { secret, needsReEncrypt } = this.decryptTotpSecret(
       user.twoFactorSecret,
     );
     const isValid = otplib.verifySync({ token: code, secret }).valid;
     if (!isValid) return false;
 
-    this.usedTotpCodes.set(
-      codeKey,
-      Date.now() + this.TOTP_CODE_REUSE_WINDOW_MS,
-    );
+    // Same claim, same purpose, same key as the login path -- which is what
+    // stops a code presented at login from being replayed against a step-up
+    // endpoint, and now across replicas rather than within one process.
+    if (!(await this.claimTotpCode(user.id, code))) return false;
 
     if (needsReEncrypt) {
       user.twoFactorSecret = this.reEncryptTotpSecret(secret);

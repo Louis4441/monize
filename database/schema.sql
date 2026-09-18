@@ -896,6 +896,47 @@ CREATE TABLE market_index_sync (
     last_error TEXT
 );
 
+-- The upstream release check's answer, as one row. Held on the deployment
+-- rather than in a field per process: two replicas answering /updates from two
+-- caches disagree about whether an update exists, and a restart re-asks GitHub,
+-- whose unauthenticated rate limit is per IP and shared by every replica behind
+-- one egress address. The row is also the claim -- the refresh stamps
+-- checked_at only when the stored one is older than the window, and only the
+-- statement that stamped it calls GitHub. Singleton, no owner column, so
+-- RLS-exempt (see the marker block at the foot of the RLS section).
+CREATE TABLE update_check_state (
+    id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
+    -- When GitHub was last ASKED. A failed check still holds the window, or an
+    -- unreachable provider turns every tick on every replica into a request.
+    checked_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    latest_version TEXT,
+    release_url TEXT,
+    release_name TEXT,
+    published_at TIMESTAMPTZ,
+    last_error TEXT
+);
+
+-- Deployment-wide leases for the three outbound market-data fetch jobs
+-- (exchange rates, security prices, market indexes). Each cron fires on every
+-- replica; the writes underneath are idempotent upserts, so the data converges
+-- and only the provider bill does not. A lease rather than a permanent claim,
+-- because this is a cost control and a crashed holder must never block the next
+-- tick: lease_until is shorter than the cron interval. lease_token identifies
+-- the holder, so a worker delayed past its own expiry cannot release a lease
+-- another replica has retaken.
+--
+-- Distinct from market_index_sync, which keeps its own per-index attempt
+-- cooldown: that decides how often ONE index is worth re-asking for, this
+-- decides which replica asks at all. Deployment-wide state with no owner
+-- column, so RLS-exempt -- see the marker block at the foot of the RLS section.
+CREATE TABLE fetch_sync (
+    job TEXT PRIMARY KEY,
+    lease_until TIMESTAMPTZ,
+    lease_token UUID,
+    last_success_at TIMESTAMPTZ,
+    last_error TEXT
+);
+
 -- Outbound market-data provider availability, and what has already been said
 -- about it by email. The in-process circuit breaker decides whether to call
 -- out; this row is what survives a restart (an outage that restarts the
@@ -2513,6 +2554,36 @@ CREATE TABLE push_instance_config (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ---------------------------------------------------------------------------
+-- OIDC provider signing keys (migration 186).
+--
+-- oauth_instance_config is this deployment's OIDC signing identity: the JWKS
+-- the provider signs ID tokens with, generated on first start. Without it
+-- oidc-provider mints a development key pair per process, so two replicas serve
+-- two /oauth/jwks documents and a client that fetched one cannot verify a token
+-- signed by the other -- and a single pod does the same to itself across a
+-- restart.
+--
+-- Singleton for the same reason push_instance_config is: the key admits exactly
+-- one value, so replicas racing on first start collide and the loser re-reads
+-- the winner's row. jwks_enc is AES-256-GCM ciphertext under ENCRYPTION_KEY; an
+-- instance without that variable stores nothing and keeps the per-process
+-- behaviour rather than writing private signing keys in clear. Deployment-wide
+-- state with no owner column, so RLS-exempt -- see the marker block at the foot
+-- of the RLS section.
+--
+-- Not exported by a backup (INTENTIONALLY_EXCLUDED_TABLES in
+-- backend/src/backup/export-table-queries.ts): restoring a production backup
+-- onto a test instance must not hand it the keys that sign for the real issuer.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE oauth_instance_config (
+    -- Singleton. One deployment, one signing identity.
+    id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
+    jwks_enc TEXT NOT NULL,
+    generated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE push_subscriptions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -3315,15 +3386,18 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- rls-exempt: auth_attempt_counters
 -- rls-exempt: currencies
 -- rls-exempt: exchange_rates
+-- rls-exempt: fetch_sync
 -- rls-exempt: google_places_instance_usage
 -- rls-exempt: market_index_prices
 -- rls-exempt: market_index_sync
+-- rls-exempt: oauth_instance_config
 -- rls-exempt: oauth_payloads
 -- rls-exempt: provider_health
 -- rls-exempt: push_chart_artifacts
 -- rls-exempt: push_instance_config
 -- rls-exempt: schema_migrations
 -- rls-exempt: single_use_tokens
+-- rls-exempt: update_check_state
 -- ---------------------------------------------------------------------------
 
 -- Verification helper (run manually; not part of the migration's effect):

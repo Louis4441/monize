@@ -80,11 +80,11 @@
 | F5 | Concurrency register: retire the stale `users.failed_login_attempts` gap row | -- | none | [x] |
 | F4 | ADR 0005 and index row | F1 | none | [ ] |
 | A1 | Migration: `auth_attempt_counters`, `single_use_tokens`; RLS exemption; sweep cron | -- | none | [x] |
-| A2 | `AuthAttemptCounterService`; 2FA attempt maps replaced | A1 | neutral | [ ] |
-| A3 | `usedTotpCodes` replaced by a `single_use_tokens` claim | A1 | neutral | [ ] |
-| A4 | Step-up and auth-email counters onto the service; interval prune removed | A2 | neutral | [ ] |
-| K1 | `oauth_instance_config` + `OauthSigningKeysService`; provider gets `jwks` | -- | neutral | [ ] |
-| X1 | AI action anti-replay onto `single_use_tokens`, MCP path included | A1 | neutral | [ ] |
+| A2 | `AuthAttemptCounterService`; 2FA attempt maps replaced | A1 | neutral | [x] |
+| A3 | `usedTotpCodes` replaced by a `single_use_tokens` claim | A1 | neutral | [x] |
+| A4 | Step-up and auth-email counters onto the service; interval prune removed | A2 | neutral | [x] |
+| K1 | `oauth_instance_config` + `OauthSigningKeysService`; provider gets `jwks` | -- | neutral | [x] |
+| X1 | AI action anti-replay onto `single_use_tokens`, MCP path included | A1 | neutral | [x] |
 | R1 | `EVENT_BUS` token, interface, `MemoryEventBus` wired as default | -- | none | [x] |
 | R2 | Migration: `ai_relay_prompts`, `ai_relay_agents` with RLS policies | -- | none | [x] |
 | R3 | Relay queue on rows: insert, claim, answer; in-memory queue maps removed | R1, R2 | neutral | [ ] |
@@ -95,10 +95,10 @@
 | M1 | MCP 2025-era sessions: persisted rows or documented sticky routing | F1 | neutral | [ ] |
 | S1 | Boot refusals in `multi` for per-pod attachments and backups | F1 | multi-only | [ ] |
 | S2 | S3 backup target for automatic backups | -- | none until selected | [ ] |
-| C1 | `claimOnce` per owner and month around budget period rollover | -- | neutral | [ ] |
-| C2 | Deployment-wide `fetch_sync` lease around FX, security price and market index fetches | -- | neutral | [ ] |
-| C3 | Release-check cache to a one-row table | -- | neutral | [ ] |
-| C4 | Demo seed under the lifecycle advisory lock | -- | neutral (demo only) | [ ] |
+| C1 | `claimOnce` per owner and month around budget period rollover | -- | neutral | [x] |
+| C2 | Deployment-wide `fetch_sync` lease around FX, security price and market index fetches | -- | neutral | [x] |
+| C3 | Release-check cache to a one-row table | -- | neutral | [x] |
+| C4 | Demo seed under the lifecycle advisory lock | -- | neutral (demo only) | [x] |
 | G1 | Whole-tree process-local-state guard with allowlist | A4, X1, R4 | none | [ ] |
 | G2 | `INV-HA-001..005` in both contract docs | A3, K1, R3, S1 | none | [ ] |
 | D1 | Helm: Deployments, PDB, spread, autoscaling, `clusterMode`, `redis.url` | F2 | none (defaults unchanged) | [ ] |
@@ -336,13 +336,19 @@ as the gate.
 
 ### A2 -- `AuthAttemptCounterService`; 2FA attempt maps replaced
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/auth/auth-attempt-counter.service.ts` (new),
 `backend/src/auth/auth-attempt-counter.service.spec.ts` (new),
 `backend/src/auth/two-factor.service.ts`, `backend/src/auth/two-factor.service.spec.ts`,
 `backend/src/auth/auth.module.ts`,
-`backend/test/integration/auth-attempt-counter.integration.spec.ts` (new).
+`backend/test/integration/auth-attempt-counter.integration.spec.ts` (new),
+`backend/src/test-helpers/auth-attempt-counter-testing.ts` (new, added to scope:
+the limiter thresholds are asserted by more than one spec, so the double that
+reproduces the statement's semantics belongs beside the other service doubles
+rather than copied per spec), `backend/src/auth/auth.service.spec.ts` (added to
+scope: it constructs a real `TwoFactorService`, so the new constructor argument
+has to be provided there or the module cannot compile).
 
 **Pattern:** `recordFailedAttempt` in `backend/src/auth/auth.service.ts`
 (increment and threshold decision in one statement, `RETURNING` the
@@ -381,17 +387,38 @@ after `windowExpiresAt` returns `1`.
 that is A3, leave it. Keys must not be the raw temp token (a JWT) -- hash it.
 The backup-code path already takes a row lock; do not reroute it.
 
-**Notes:**
+**Notes:** the window is **5 minutes**, not `BASE_LOCKOUT_MS`, which this task's
+step 2 named. The `Map` entries carried `Date.now() + 5 * 60 * 1000`, and the
+acceptance is "the same limits as today", so the constant moved across as
+`ATTEMPT_WINDOW_MS`. `BASE_LOCKOUT_MS` is the separate, longer clock the tenth
+per-user failure writes to `users.locked_until`; conflating the two would have
+made a lockout six times longer than it is now.
+
+`increment` always runs through `runOutsideActiveScopedManager`, not only when a
+caller happens to hold a transaction: a failure counter written inside the
+transaction that then refuses the request rolls back with the refusal, and the
+limiter counts nothing. `verify2FA` holds no ambient transaction today, so the
+call is a no-op there, but the property is the service's, not the call site's.
+`peek` and `reset` join the caller's transaction as usual.
+
+Scopes are exported from `two-factor.service.ts` as `TWO_FACTOR_TOKEN_SCOPE`
+(`2fa-token`) and `TWO_FACTOR_USER_SCOPE` (`2fa-user`) so the specs assert the
+strings rather than re-spell them.
 
 ### A3 -- `usedTotpCodes` replaced by a single-use claim
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/auth/single-use-token.service.ts` (new),
 `backend/src/auth/single-use-token.service.spec.ts` (new),
 `backend/src/auth/two-factor.service.ts`, `backend/src/auth/two-factor.service.spec.ts`,
 `backend/src/auth/auth.module.ts`,
-`backend/test/integration/single-use-token.integration.spec.ts` (new).
+`backend/test/integration/single-use-token.integration.spec.ts` (new),
+`backend/src/test-helpers/single-use-token-testing.ts` (new, added to scope: the
+double has to *lose* the second claim or the replay assertions assert nothing,
+and two specs need it), `backend/src/auth/auth.service.spec.ts` (added to scope:
+it builds a real `TwoFactorService`, so the new constructor argument is provided
+there too).
 
 **Pattern:** `claimJti` in `backend/src/auth/oidc/oidc-reauth.service.ts`
 (`INSERT ... ON CONFLICT (jti) DO NOTHING`, winner decided by row count).
@@ -421,14 +448,37 @@ claim).
 exhaust valid codes by guessing. Hash the key; never store `userId:code` in
 clear.
 
-**Notes:**
+**Notes:** the hash is taken in Node (`hashToken`, the helper the trusted-device
+path already uses) rather than as `sha256($2)` in SQL, so the code never leaves
+the process -- not as a bind parameter, not in a statement log. It also keeps the
+service off `pgcrypto`, which would otherwise need a
+`required-db-functions.ts` entry.
+
+On the login path the lost claim folds into `isValid` rather than throwing after
+it. The previous code treated a replayed code as an invalid one -- counters
+incremented, account lockable, same message -- and a separate refusal after the
+counter reset would have quietly let a replayer clear a victim's failure count.
+The claim still runs after `otplib.verifySync` and before any token is issued.
+
+`TOTP_CLAIM_PURPOSE` is exported and both TOTP paths (`verify2FA` and
+`verifyTotpForUser`) call one private `claimTotpCode`, so the login and step-up
+surfaces cannot drift into two purposes and stop protecting each other.
+
+`claim` joins the caller's transaction, which is the opposite of A2's
+`increment` and deliberate: a claim guards work, so a failed apply must give it
+back. X1 depends on that.
 
 ### A4 -- Step-up and auth-email counters; interval prune removed
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/auth/step-up/step-up.service.ts` and its spec,
-`backend/src/auth/auth-email.service.ts` and its spec.
+`backend/src/auth/auth-email.service.ts` and its spec,
+`backend/src/auth/auth.service.ts` and `backend/src/auth/auth.controller.ts`
+(added to scope: the two limit checks are asynchronous now, so the controller
+awaits them and `auth.service.ts` -- already on `WITH_CONTEXT_ALLOWLIST` --
+seeds the system context its sibling public-path methods already seed),
+`backend/src/auth/auth.service.spec.ts` (it drives both limits end to end).
 
 **Pattern:** A2's `AuthAttemptCounterService`.
 
@@ -457,19 +507,44 @@ request's ambient context on the unauthenticated route. Confirm
 it does not, wrap with `withSystemContext` and add the file to the
 allowlist).
 
-**Notes:**
+**Notes:** the forgot-password route does **not** seed a usable context. The
+`RequestContextInterceptor` runs `requestContextStorage.run` with `userId`
+undefined on an unauthenticated request, and `withScopedDb` throws on a context
+that carries neither a user nor `system`. The `withSystemContext` wrap therefore
+went on `auth.service.ts`, beside `resetPassword`, `generateVerificationToken`
+and `verifyEmail`, which each already wrap the same service for the same reason
+-- so `WITH_CONTEXT_ALLOWLIST` did not have to grow.
+
+Both checks return `Promise<boolean>` now, so the two controller call sites
+await them. The semantics are unchanged: `increment` keeps `window_expires_at`
+where the first attempt set it, which is what the old `windowStart` field did,
+and the limit is `count <= 3`.
+
+Keys are `sha256(lowercased, trimmed email)`. The plaintext address would have
+made an RLS-exempt, owner-less table a directory of who has asked for a password
+reset -- exactly the enumeration both endpoints answer generically to prevent.
+The step-up key stays plaintext `userId:purpose`: neither half is a secret.
+
+Scopes are exported (`FORGOT_PASSWORD_SCOPE`, `VERIFICATION_EMAIL_SCOPE`,
+`STEP_UP_ATTEMPT_SCOPE`) and asserted in the specs.
 
 ### K1 -- OIDC provider signing keys persisted
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** one migration + `schema.sql` (`oauth_instance_config`),
 `backend/src/oauth/entities/oauth-instance-config.entity.ts` (new),
 `backend/src/oauth/oauth-signing-keys.service.ts` (new) + spec,
 `backend/src/oauth/oauth-provider.service.ts` and its spec,
 `backend/src/oauth/oauth.module.ts`, `backend/src/common/db/rls-exempt-tables.ts`,
-`docs/row-level-security-contract.md`, `backend/src/main.ts` (warning text),
-`e2e/tests/` (the OAuth spec, restart case).
+`docs/row-level-security-contract.md`,
+`backend/src/common/encryption/encryption-key.ts` (the warning text -- it lives
+there, not in `main.ts`, which only calls `logEncryptionKeyStatus`),
+`backend/eslint.config.mjs` (`WITH_CONTEXT_ALLOWLIST`),
+`backend/src/backup/export-table-queries.ts` (the new table's backup
+classification, which the definition of done requires),
+`backend/test/integration/oauth-signing-keys.integration.spec.ts` (new, in place
+of the E2E restart case -- see the notes). **No file under `e2e/` changed.**
 
 **Pattern:** `ensureKeyPair` in `backend/src/push/push-config.service.ts`
 (generate, `INSERT ... ON CONFLICT (id) DO NOTHING`, re-read in the same
@@ -508,17 +583,51 @@ development keys must disappear from the boot log in the configured case
 (`backend/src/oauth/oidc-provider-log-bridge.ts` routes it; assert on it).
 Rotation is out of scope; leave a `// rotation: see design doc WP4` marker.
 
-**Notes:**
+**Notes:** three deviations, each deliberate.
+
+1. **`node:crypto`, not `jose`.** `generateKeyPairSync` plus
+   `KeyObject.export({ format: "jwk" })` is the whole of what this needed, and
+   the `kid` is a hand-written RFC 7638 thumbprint (nine lines). `jose` is
+   ESM-only, so reaching it from this CommonJS build means a dynamic import, and
+   pinning it directly is a dependency change -- which `AGENTS.md` puts under
+   "ask first" -- for something the platform already does synchronously.
+2. **An integration spec instead of the E2E restart case.** The property is "a
+   second process over the same row serves the same `kid`s", and a fresh service
+   over the same database is exactly that, with a real `EncryptionService` and a
+   real key. A `docker compose restart backend` inside the E2E suite would say
+   the same thing at far higher cost, and the spec that says it is where the
+   race between two starting replicas is also tested.
+3. **The warning text is in `encryption-key.ts`.** `main.ts` only calls
+   `logEncryptionKeyStatus`; the words are `MISSING_ENCRYPTION_KEY_WARNING_LINES`,
+   and that is the line that now also names the per-process JWKS. The service
+   logs its own, more specific warning at the point it declines to store keys.
+
+The provider's development-key `NOTICE` was not asserted on: it is emitted by
+`oidc-provider` itself, which the provider spec replaces with a mock (it is ESM
+and never loaded there), so an assertion would be about the mock. What the spec
+asserts instead is the input that decides it -- `jwks` present in the
+constructor config when there are stored keys, and the option absent entirely
+when there are not.
+
+An unreadable row (a database restored onto an instance with a different
+`ENCRYPTION_KEY`) logs and falls back to per-process keys rather than throwing:
+refusing to start the OAuth provider would take the whole MCP surface down over
+something an operator fixes by deleting one row.
 
 ### X1 -- AI action anti-replay onto `single_use_tokens`
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/ai/actions/ai-actions.service.ts` and its spec,
 `backend/src/ai/ai.module.ts` (import of the auth single-use service or a
 shared module), the MCP confirmation path under `backend/src/mcp/` that
 accepts the same descriptor (grep `actionId` and the descriptor verifier),
-`backend/test/integration/ai-action-replay.integration.spec.ts` (new).
+`backend/test/integration/ai-action-replay.integration.spec.ts` (new),
+`backend/src/auth/single-use-token.module.ts` (new) and
+`backend/src/auth/single-use-token.service.ts` (`release`),
+`backend/src/auth/auth.module.ts`,
+`backend/src/test-helpers/single-use-token-testing.ts` (`release` on the
+double). **No file under `backend/src/mcp/` changed** -- see the notes.
 
 **Pattern:** A3's `SingleUseTokenService`.
 
@@ -547,7 +656,36 @@ exactly one apply; unit spec for the rollback-releases-claim case.
 the service to `backend/src/common/single-use/` in this task and update A3's
 imports. Do not create a second single-use table.
 
-**Notes:**
+**Notes:** three things this task assumed turned out not to hold. Each is
+recorded here because the next task that reasons about these paths will assume
+them too.
+
+1. **There is no `withScopedDb` that applies the action.** `execute` dispatches
+   to `TransactionsService`, `PayeesService`, `SecuritiesService` and the rest,
+   and each opens its own. Wrapping `execute` in one transaction so the claim
+   could roll back with it would make every nested call join that transaction,
+   which moves the post-commit cache invalidation (INV-CACHE-001) and the
+   action-history write inside it -- both of which are documented to happen
+   after the commit, and one of which has its own guard spec. The claim is
+   therefore taken before `execute` and released in the `catch`, which is
+   exactly the `Map`'s old lifecycle, now durable and shared. The task's
+   acceptance is met either way: one apply and one refusal across two replicas,
+   and a failed apply leaves the descriptor confirmable.
+2. **The claim is taken after the write-limit check**, where the `Map`'s
+   reservation was. A refused limit must not burn a descriptor the user can
+   confirm tomorrow.
+3. **The MCP surface already shares the claim, and has no second entry point.**
+   `AiActionsService.confirm` is the only place that verifies a descriptor
+   returned by a client. The MCP write tools mint and commit their own pending
+   action in-process (`commitCard`) and never accept one back, and a relayed
+   card is committed through `/ai/actions/confirm` -- the same method, the same
+   `actionId`, the same claim. Nothing under `src/mcp/` needed changing.
+
+`AiModule` imports a new one-provider `SingleUseTokenModule` rather than
+`AuthModule`: the service's only dependency is `DataSource`, and the
+`AuthModule` edge would have pulled users, notifications and delegation into
+`AiModule` to reach it. `AuthModule` imports and re-exports the same module, so
+there is still one service and one table.
 
 ### R1 -- Event bus token, interface, memory implementation
 
@@ -945,13 +1083,18 @@ filesystem target has.
 
 ### C1 -- Budget period rollover under a per-owner `claimOnce`
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/budgets/budget-period-cron.service.ts` and spec,
 `backend/src/common/jobs/job-claim.service.ts` (a `BudgetPeriodRollover`
 member on the `JobClaimType` const), `docs/cron-jobs.md`,
-`backend/test/integration/budget-period-rollover.integration.spec.ts` (new
-or extended).
+`backend/test/integration/budget-period-rollover.integration.spec.ts` (new),
+`docs/concurrency-and-idempotency.md` (the register row, which the task's own
+steps call for), `backend/src/budgets/budget-period.service.ts` (added to
+scope: `NoOpenPeriodError` -- see the notes),
+`backend/src/budgets/budget-period-lifecycle.spec.ts` and
+`backend/src/budgets/rls-context-smoke.spec.ts` (they construct the cron
+service, so the new constructor argument is provided there too).
 
 **Pattern:** `backend/src/database/demo-reset.service.ts` (`claimOnce` per
 window; the intraday cron's `DemoIntraday` claim keyed `<date>-<hour>`).
@@ -984,21 +1127,56 @@ that creates a missing period on demand exists before relying on it for
 repair; if it does not, use `claimLease` with a short TTL instead so a failed
 run can retry next tick.
 
-**Notes:**
+**Notes:** the repair path exists --
+`BudgetPeriodService.getOrCreateCurrentPeriod`, reached by opening the Budgets
+screen, which inserts the month's period with
+`ON CONFLICT (budget_id, period_start) DO NOTHING` -- so the permanent
+`claimOnce` is the right primitive and `claimLease` was not needed.
+
+The loop is now over owners rather than over budgets: `groupByOwner` collects
+each owner's active budgets, one claim is taken for the owner, and the whole
+group is skipped when it is lost. The per-budget body inside is unchanged.
+
+The "no OPEN period" skip is carried by a **named error**, not by a message
+match. `closePeriod` threw a bare `BadRequestException` whose message goes
+through `tr`, so matching it in the cron would be matching on translated copy;
+`NoOpenPeriodError` (still a `BadRequestException`, same status and same
+message on the HTTP path) makes it a type test. That is why
+`budget-period.service.ts` joined the scope. A first attempt discriminated by
+re-reading the period's status instead -- it worked, but it cost a query per
+error and its signature ("an OPEN period exists whose end is in the future")
+was a heuristic rather than the fact.
+
+`rolloverMonthKey` is UTC and exported, so two replicas in two zones derive one
+key from one instant. `job_claims.claim_type` is a plain `VARCHAR(64)` with no
+CHECK constraint, so the new member needed no migration.
+
+The gap row in `docs/concurrency-and-idempotency.md` is retired and the job
+moved into the resolved-claims paragraphs beside the demo reset.
 
 ### C2 -- Fetch crons behind a deployment-wide sync claim
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** one migration + `schema.sql` (`fetch_sync`),
 `backend/src/common/jobs/fetch-sync.service.ts` (new) + spec,
+`backend/src/common/jobs/entities/fetch-sync.entity.ts` (new, added to scope:
+the integration harness builds its schema from entity metadata with
+`synchronize: true`, so a table with no entity does not exist there),
 `backend/src/common/jobs/job-claim.module.ts`,
 `backend/src/currencies/exchange-rate.service.ts` and spec (`onModuleInit`
 sweep and the 17:05 cron), `backend/src/securities/security-price.service.ts`
 and spec (17:00 cron), `backend/src/securities/market-index.service.ts` and
 spec (17:10 cron), `backend/src/common/db/rls-exempt-tables.ts`,
 `docs/row-level-security-contract.md`, `docs/cron-jobs.md`,
-`backend/test/integration/fetch-sync.integration.spec.ts` (new).
+`backend/test/integration/fetch-sync.integration.spec.ts` (new),
+`backend/src/backup/export-table-queries.ts` (the new table's backup
+classification, which the definition of done requires),
+`backend/src/test-helpers/job-claim-testing.ts` (the `FetchSyncService`
+double), and the four specs that construct one of the three services:
+`currencies/rls-context-smoke.spec.ts`, `securities/rls-context-smoke.spec.ts`,
+`currencies/exchange-rate.service.spec.ts`, and
+`test/integration/manual-price-snapshot-recovery.integration.spec.ts`.
 
 **Pattern:** the `market_index_sync` table in `database/schema.sql`
 (`index_code PRIMARY KEY, last_attempt_at, last_success_at, last_error`) and
@@ -1039,15 +1217,47 @@ fields in these files; do not add new `Map`s. Add the new cron-adjacent
 service to `WITH_CONTEXT_ALLOWLIST` only if it seeds its own context (it
 should not; the callers already do).
 
-**Notes:**
+**Notes:** `FetchSyncService` seeds no context of its own, so
+`WITH_CONTEXT_ALLOWLIST` was not touched -- all three callers already wrap in
+`withSystemContext`, and the lease sits inside that wrap.
+
+The service carries a fourth method the task did not name, `withLease(job,
+leaseMs, fn)`, and the three crons call that rather than `claim`/`markSuccess`
+by hand. The lease has to come back on **both** paths, and three call sites each
+spelling out the same `try`/`catch` is the shape that ends up right in two of
+the three places. `markFailure` records the reason and releases, then rethrows:
+how a failed fetch is reported is each cron's own decision, and swallowing it
+here would take that away from all three at once.
+
+The market-index warm-up (`onApplicationBootstrap`) takes the lease too, not
+just the cron -- a rollout is exactly where N identical bursts of 24 indexes are
+least welcome. Its per-index `respectCooldown` is untouched: `market_index_sync`
+answers how often ONE index is worth re-asking for, this answers which replica
+asks at all.
+
+Leases are 15/30/20 minutes for FX, prices and indexes -- longer than a run,
+far shorter than the daily interval, so a killed holder never blocks the next
+tick and the expiry alone hands the job back. Each service spec asserts that
+bound rather than the literal, so tuning one does not silently drop it.
+
+A `FetchSync` entity was needed. `backend/test/helpers/integration-setup.ts`
+builds its schema from entity metadata (`synchronize: true`) while production
+applies `schema.sql`, so without one the integration spec met a table that did
+not exist.
 
 ### C3 -- Release-check cache to a one-row table
 
-- [ ] Status:
+- [x] Status: done.
 
-**Scope:** migration + `schema.sql` (`update_check_state (id BOOLEAN PK, checked_at, latest_version, release_url, error)`),
-`backend/src/updates/updates.service.ts` and spec, an entity, `docs/cron-jobs.md`,
-`backend/src/common/db/rls-exempt-tables.ts`.
+**Scope:** migration + `schema.sql` (`update_check_state`),
+`backend/src/updates/updates.service.ts` and spec,
+`backend/src/updates/entities/update-check-state.entity.ts` (new),
+`docs/cron-jobs.md`, `backend/src/common/db/rls-exempt-tables.ts`,
+`docs/row-level-security-contract.md` (the contract entry the exemption
+requires), `backend/eslint.config.mjs` (`WITH_CONTEXT_ALLOWLIST`),
+`backend/src/backup/export-table-queries.ts` (the new table's backup
+classification), `backend/test/integration/update-check-state.integration.spec.ts`
+(new).
 
 **Pattern:** `push_instance_config` for a singleton row.
 
@@ -1061,16 +1271,45 @@ once per 12 hours per deployment.
 
 **Tests:** service spec with a clock; two instances, one fetch.
 
-**Notes:**
+**Notes:** the in-memory `cache` field is gone rather than kept as a
+read-through. Every read is the row, so the two replicas cannot disagree at all,
+and the endpoint is not hot enough for the extra query to matter.
+
+"Once per 12 hours per deployment" needed the freshness check and the claim to
+be **one statement**, not a read then a fetch: two replicas ticking together
+would both pass a read. `claimCheck` is a conditional upsert that moves
+`checked_at` only when the stored one is older than the window, and only the
+statement that moved it goes on to call GitHub.
+
+It stamps on the **attempt**, not the outcome, which is the same thing the old
+field did: a failed check still holds the window, because stamping only on
+success would turn an unreachable GitHub into a request from every replica on
+every tick -- exactly when a per-IP rate limit shared across one egress address
+is least affordable. The last known version is kept through a failure, so the
+banner says "could not check" rather than "nothing to install".
+
+The table carries `release_name` and `published_at` as well as the four columns
+this task named. `getStatus` returns both, so leaving them out would have made
+them null on any replica that had not itself fetched -- the defect being fixed,
+in two fields.
+
+`readLatestRelease` is public and reads under the **caller's** identity;
+`update_check_state` is RLS-exempt, so a request transaction sees it without a
+bypass, and seeding one on a request path would widen the fence for nothing.
+Only the refresh (a cron and a bootstrap hook, with no request behind either)
+seeds `withSystemContext`, which is the one `WITH_CONTEXT_ALLOWLIST` entry this
+task adds.
 
 ### C4 -- Demo seed under the lifecycle advisory lock
 
-- [ ] Status:
+- [x] Status: done.
 
-**Scope:** `backend/src/db-demo-check.ts`, `backend/src/database/seed.ts`,
-`backend/docker-entrypoint.sh` (only if the step order changes),
-`backend/src/startup-logging.spec.ts` (`PRE_BOOT_SCRIPTS` already lists both;
-confirm).
+**Scope:** `backend/src/db-demo-check.ts` and its spec,
+`backend/src/database/seed.ts`,
+`backend/test/integration/demo-seed-lock.integration.spec.ts` (new).
+`backend/docker-entrypoint.sh` is **unchanged** -- the step order did not need
+to move -- and `PRE_BOOT_SCRIPTS` in `backend/src/startup-logging.spec.ts`
+already lists both scripts, confirmed by running it.
 
 **Pattern:** `backend/src/db-init.ts`'s use of `DB_LIFECYCLE_LOCK_KEY` from
 `backend/src/common/db/advisory-locks.ts`: session-scoped blocking
@@ -1087,7 +1326,37 @@ keeps one shape (named `Logger`, no `console`).
 seed invocations (the `db-init` spec, if one exists, is the pattern; else a
 small harness calling the exported function twice on two connections).
 
-**Notes:**
+**Notes:** both halves are needed and neither is sufficient. The probe takes the
+lock before it reads, so two containers starting together do not both read "no
+demo user" at once -- but a session lock dies with its connection and the shell
+runs the seeder as a **separate process**, so the probe cannot hold it across
+its own exit. `seed.ts` therefore re-asks the same question after acquiring the
+lock itself, on the connection that holds it: the probe narrows the window, the
+re-check closes it.
+
+The re-check has to be on the locked connection, which is why
+`demoUserExistsOn(client)` was split out of `demoUserExists()`. Asking on a
+second connection would be answering about a moment the lock does not cover.
+
+`seed.ts` opens its own direct `pg.Client` for the lock -- never the pooled
+runtime connection, which the RLS design forbids from holding cross-transaction
+session state, and which a transaction-mode pooler could put the lock and the
+read on different server sessions of. It opens it *before* the Nest application
+context, so a follower that finds the seed done exits without paying for one,
+and holds it until the seed has finished so a waiter re-reads a completed seed
+rather than a half-written one.
+
+A follower that finds the demo user exits **0**, not 1: the data it would have
+written is already there, and a non-zero exit would crash-loop a pod over work
+that is done.
+
+The non-demo `SeedService` path takes the lock too (it is a lifecycle
+operation) but has no predicate to re-check; it is only ever run by hand.
+
+The integration spec drives `acquireDbLifecycleLock` and `demoUserExistsOn` on
+two real connections rather than invoking `seed.ts`, which calls `process.exit`
+and builds a Nest context -- neither belongs in a Jest worker, and neither is
+what this task changed.
 
 ### G1 -- Whole-tree process-local-state guard
 

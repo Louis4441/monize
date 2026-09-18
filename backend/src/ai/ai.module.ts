@@ -18,6 +18,7 @@ import { AiForecastController } from "./forecast/ai-forecast.controller";
 import { ForecastAggregatorService } from "./forecast/forecast-aggregator.service";
 import { AiActionsController } from "./actions/ai-actions.controller";
 import { AiActionsService } from "./actions/ai-actions.service";
+import { SingleUseTokenModule } from "../auth/single-use-token.module";
 import { AiActionBuilderModule } from "./actions/ai-action-builder.module";
 import { AiWriteLimiter } from "./actions/ai-write-limiter";
 import { AccountsModule } from "../accounts/accounts.module";
@@ -50,6 +51,10 @@ import { CurrenciesModule } from "../currencies/currencies.module";
     // chat-supplied files (attachments module has no dependency back on ai).
     AttachmentsModule,
     AiActionBuilderModule,
+    // The one `single_use_tokens` door, for the confirm path's anti-replay
+    // claim. A module holding only that service, so this does not pull the auth
+    // layer in to reach a class whose sole dependency is DataSource.
+    SingleUseTokenModule,
     // AiService routes non-chat completions (insights, forecast) through the
     // reverse MCP relay when the user's provider list reaches an mcp_relay
     // config.

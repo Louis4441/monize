@@ -19,6 +19,11 @@ import {
   getRequestContext,
   requestContextStorage,
 } from "../common/request-context";
+import {
+  createFetchSyncMock,
+  type FetchSyncMock,
+} from "../test-helpers/job-claim-testing";
+import { FetchSyncJob } from "../common/jobs/fetch-sync.service";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -28,6 +33,7 @@ const TEST_USER_ID = "user-1";
 
 describe("SecurityPriceService", () => {
   let service: SecurityPriceService;
+  let fetchSync: FetchSyncMock;
   let securityPriceRepository: Record<string, jest.Mock>;
   let securitiesRepository: Record<string, jest.Mock>;
   let userPreferenceRepository: Record<string, jest.Mock>;
@@ -374,10 +380,12 @@ describe("SecurityPriceService", () => {
       msnFinanceService as never,
     );
 
+    fetchSync = createFetchSyncMock();
     service = new SecurityPriceService(
       dataSource as never,
       netWorthService as never,
       providers,
+      fetchSync as never,
     );
   });
 
@@ -2317,6 +2325,33 @@ describe("SecurityPriceService", () => {
       await service.scheduledPriceRefresh();
 
       expect(securitiesRepository.find).toHaveBeenCalled();
+    });
+
+    it("takes the deployment-wide lease before calling the provider", async () => {
+      securitiesRepository.find.mockResolvedValue([]);
+
+      await service.scheduledPriceRefresh();
+
+      expect(fetchSync.withLease).toHaveBeenCalledWith(
+        FetchSyncJob.SecurityPrices,
+        expect.any(Number),
+        expect.any(Function),
+      );
+      // Shorter than the daily interval, so a crashed holder never blocks
+      // tomorrow's tick.
+      const [, leaseMs] = fetchSync.withLease.mock.calls[0];
+      expect(leaseMs).toBeLessThan(24 * 60 * 60 * 1000);
+    });
+
+    // The whole point: one replica per tick pays the provider quota. The price
+    // upserts are idempotent, so nothing about the data depends on this.
+    it("does nothing when another replica holds the lease", async () => {
+      fetchSync.withLease.mockImplementation(async () => false);
+      securitiesRepository.find.mockResolvedValue([]);
+
+      await service.scheduledPriceRefresh();
+
+      expect(securitiesRepository.find).not.toHaveBeenCalled();
     });
 
     /**

@@ -375,6 +375,23 @@ that outran its lease cannot free the one a replica now reseeding holds; the
 lease expiry is what keeps a killed replica from leaving the demo
 un-resettable.
 
+The monthly budget rollover (`budget-period-cron.service.ts`) claims
+`claimOnce(BudgetPeriodRollover, ownerUserId, "<YYYY-MM>")` inside each owner's
+`withUserContext` before touching that owner's budgets, so a losing replica
+skips the owner rather than racing it budget by budget. The claim is per owner
+because `job_claims.user_id` is a `NOT NULL` foreign key to `users` -- there is
+no deployment-wide claim through `JobClaimService` -- and per owner is also the
+unit the rollover works in. It is permanent and never released on failure: a
+failed rollover is repaired by `getOrCreateCurrentPeriod` on the request path,
+which materializes the missing period the next time the owner opens the Budgets
+screen, whereas a retried cron would re-derive the actuals from a ledger that
+has moved on. The guarded writes underneath stay exactly as they were, as the
+second wall: `closePeriod` locks the OPEN period row, and the next period is
+`ON CONFLICT (budget_id, period_start) DO NOTHING RETURNING`. What the claim
+changed for the report is that a loser no longer reaches `closePeriod` at all,
+and the residual case -- two processes on one replica during a rollout -- raises
+a named `NoOpenPeriodError` the cron counts as a skip rather than as a failure.
+
 ### Gaps
 
 Each row is a place where the rules above are not currently met. A row leaves
@@ -385,7 +402,6 @@ this table when a mechanism lands, not when someone judges the window small.
 | `accounts.current_balance` | Three postures coexist on one column: a lock-free atomic delta (`updateBalance`), an unlocked read-then-write absolute recompute (`recalculateCurrentBalance`, the hourly `applyDueTransactionBalances`, `import-post-processing`, `write-transactions`, `action-history.recalculateBalance`), and a pessimistically locked read-then-write (`update`, `close`). A delta committing between a recompute's SELECT and its UPDATE is silently discarded. | CONC-001, CONC-003 |
 | `holdings.quantity` / `average_cost` | Every mutation path is a JavaScript read-modify-write inside a transaction with no lock and no atomic delta. `UNIQUE(account_id, security_id)` prevents duplicate rows and does nothing about a lost update to the same row. | CONC-001 |
 | Emergency-access claim consumption | Check-then-act: the in-transaction re-read passes no `lock` option, and the consuming write is an entity `save` by primary key with no `WHERE claim_token_used_at IS NULL`. The code immediately beside it uses the CAS predicate correctly for voiding *sibling* tokens. The comment claims re-validation "under lock". There is no partial unique index on unused tokens to act as a backstop. | CONC-001, CONC-002, CONC-007 |
-| `budget-period-cron` monthly rollover | No claim around the tick: every replica walks every active budget. The writes beneath it are guarded -- `closePeriod` takes a pessimistic lock on the OPEN period row, and the next period is created with `ON CONFLICT (budget_id, period_start) DO NOTHING RETURNING` whose loser re-reads the winner's row -- so the data converges. What does not converge is the report: the loser of the close lock finds no OPEN period, `closePeriod` raises `BadRequestException`, and the cron's per-budget `try/catch` counts the normal outcome of a two-replica tick as a failure and logs a stack for it. | CONC-004, CONC-006 |
 | Logout vs rotation | Logout's family revoke is an unlocked bulk `UPDATE`. It happens to be safe because `isRevoked = true` is idempotent and the end state is order-independent -- but this is a property of the value, not a protocol, and it stops holding the moment logout writes anything else. | CONC-003 (tolerated; document, do not copy) |
 | MNY import retry after a committed write | `writeAll`'s transaction commits before post-processing, verification, staged-file deletion and the terminal status update. A failure in that window leaves committed rows behind a retryable job, and a retry re-parses with fresh UUIDs. No checkpoint, run id, or per-record key. See INV-IMPORT-002. | CONC-006, CONC-007 |
 

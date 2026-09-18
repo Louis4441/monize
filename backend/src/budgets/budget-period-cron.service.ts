@@ -10,7 +10,10 @@ import { Budget } from "./entities/budget.entity";
 import { BudgetPeriod, PeriodStatus } from "./entities/budget-period.entity";
 import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
-import { BudgetPeriodService } from "./budget-period.service";
+import {
+  BudgetPeriodService,
+  NoOpenPeriodError,
+} from "./budget-period.service";
 import { BudgetReportsService } from "./budget-reports.service";
 import { EmailService } from "../notifications/email.service";
 import { budgetMonthlySummaryTemplate } from "../notifications/email-templates";
@@ -18,10 +21,35 @@ import { numberFormatterFor } from "../common/number-locale.util";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
 import { NotificationCategory } from "../notification-center/entities/notification.entity";
 import { NotificationPreferenceService } from "../notification-center/notification-preference.service";
+import {
+  JobClaimService,
+  JobClaimType,
+} from "../common/jobs/job-claim.service";
 
 interface ClosedPeriodInfo {
   budget: Budget;
   period: BudgetPeriod;
+}
+
+/**
+ * The claim key: one rollover per owner per calendar month.
+ *
+ * UTC, because two replicas in two zones must derive the same key from the same
+ * instant or the claim names two different months and both of them run.
+ */
+export function rolloverMonthKey(now: Date): string {
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Budgets grouped by their owner, which is the unit the claim is taken in. */
+function groupByOwner(budgets: Budget[]): Map<string, Budget[]> {
+  const byOwner = new Map<string, Budget[]>();
+  for (const budget of budgets) {
+    const owned = byOwner.get(budget.userId);
+    if (owned) owned.push(budget);
+    else byOwner.set(budget.userId, [budget]);
+  }
+  return byOwner;
 }
 
 @Injectable()
@@ -38,6 +66,7 @@ export class BudgetPeriodCronService {
     // The monthly summary is a BUDGETS email, gated by the same channel matrix
     // as the weekly digest.
     private readonly notificationPreferences: NotificationPreferenceService,
+    private readonly jobClaims: JobClaimService,
   ) {}
 
   @Cron("0 0 1 * *")
@@ -66,47 +95,90 @@ export class BudgetPeriodCronService {
 
       let closedCount = 0;
       let errorCount = 0;
+      let skippedOwners = 0;
       const closedPeriods: ClosedPeriodInfo[] = [];
+      const monthKey = rolloverMonthKey(new Date());
 
-      for (const budget of activeBudgets) {
-        try {
-          // RLS (task C2): per-user reads/writes run under the owner's context.
-          const openPeriod = await withUserContext(budget.userId, () =>
-            withScopedDb(this.dataSource, (m) =>
-              m.getRepository(BudgetPeriod).findOne({
-                where: { budgetId: budget.id, status: PeriodStatus.OPEN },
-              }),
-            ),
+      for (const [ownerUserId, ownedBudgets] of groupByOwner(activeBudgets)) {
+        // One month rolls over once per owner, and every replica fires this
+        // cron. The claim is permanent because a month that has rolled over
+        // must never roll over again, and it is never released on failure: a
+        // failed rollover is repaired by `getOrCreateCurrentPeriod` on the
+        // request path, which materializes the missing period the next time
+        // somebody opens the Budgets screen -- not by a second cron run that
+        // would have to re-derive the same actuals from a ledger that has moved.
+        //
+        // The claim is per OWNER rather than per deployment because
+        // `job_claims.user_id` is a NOT NULL foreign key to `users`, and per
+        // owner is also the unit the rollover works in.
+        const claimed = await withUserContext(ownerUserId, () =>
+          this.jobClaims.claimOnce(
+            JobClaimType.BudgetPeriodRollover,
+            ownerUserId,
+            monthKey,
+          ),
+        );
+        if (!claimed) {
+          skippedOwners++;
+          this.logger.debug(
+            `Budget rollover for ${monthKey} already claimed for user ${ownerUserId}; skipping`,
           );
+          continue;
+        }
 
-          if (!openPeriod) {
-            continue;
-          }
-
-          const periodEnd = new Date(openPeriod.periodEnd + "T23:59:59");
-          const now = new Date();
-
-          if (now > periodEnd) {
-            const closedPeriod = await withUserContext(budget.userId, () =>
-              this.budgetPeriodService.closePeriod(budget.userId, budget.id),
+        for (const budget of ownedBudgets) {
+          try {
+            // RLS (task C2): per-user reads/writes run under the owner's context.
+            const openPeriod = await withUserContext(budget.userId, () =>
+              withScopedDb(this.dataSource, (m) =>
+                m.getRepository(BudgetPeriod).findOne({
+                  where: { budgetId: budget.id, status: PeriodStatus.OPEN },
+                }),
+              ),
             );
-            closedCount++;
-            closedPeriods.push({ budget, period: closedPeriod });
-            this.logger.log(
-              `Closed period for budget "${budget.name}" (${budget.id})`,
+
+            if (!openPeriod) {
+              continue;
+            }
+
+            const periodEnd = new Date(openPeriod.periodEnd + "T23:59:59");
+            const now = new Date();
+
+            if (now > periodEnd) {
+              const closedPeriod = await withUserContext(budget.userId, () =>
+                this.budgetPeriodService.closePeriod(budget.userId, budget.id),
+              );
+              closedCount++;
+              closedPeriods.push({ budget, period: closedPeriod });
+              this.logger.log(
+                `Closed period for budget "${budget.name}" (${budget.id})`,
+              );
+            }
+          } catch (error) {
+            // "No open period to close" is what the loser of `closePeriod`'s row
+            // lock sees, and with the claim above it should be unreachable for a
+            // claimed owner. It is still a skip rather than an error, because a
+            // rollout that briefly runs two processes on one replica reaches it
+            // without anything being wrong -- and counting a normal tick as a
+            // failure is how the gap F3 recorded reads today.
+            if (error instanceof NoOpenPeriodError) {
+              this.logger.log(
+                `Period for budget ${budget.id} was closed by another process; skipping`,
+              );
+              continue;
+            }
+            errorCount++;
+            this.logger.error(
+              `Failed to close period for budget ${budget.id}`,
+              error instanceof Error ? error.stack : error,
             );
           }
-        } catch (error) {
-          errorCount++;
-          this.logger.error(
-            `Failed to close period for budget ${budget.id}`,
-            error instanceof Error ? error.stack : error,
-          );
         }
       }
 
       this.logger.log(
-        `Budget period close complete: ${closedCount} closed, ${errorCount} errors`,
+        `Budget period close complete: ${closedCount} closed, ` +
+          `${errorCount} errors, ${skippedOwners} owner(s) claimed elsewhere`,
       );
 
       if (closedPeriods.length > 0) {

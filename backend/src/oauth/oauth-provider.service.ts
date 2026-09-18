@@ -16,6 +16,7 @@ import { checkUserAuthState } from "../auth/user-state.util";
 import { API_SCOPES, ApiScope, MCP_SCOPE_PREFIX } from "../auth/scopes";
 import { withUserContext } from "../common/db/with-context";
 import { OAuthPayload } from "./entities/oauth-payload.entity";
+import { OauthSigningKeysService } from "./oauth-signing-keys.service";
 
 /**
  * The scopes an OAuth client may request, derived from the single vocabulary in
@@ -37,6 +38,7 @@ export class OAuthProviderService implements OnModuleInit {
     private readonly configService: ConfigService,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly authService: AuthService,
+    private readonly signingKeys: OauthSigningKeysService,
   ) {}
 
   async onModuleInit() {
@@ -89,8 +91,15 @@ export class OAuthProviderService implements OnModuleInit {
 
     const adapterFactory = makeAdapterFactory(this.dataSource);
 
+    // The deployment's signing identity, or null when it has none to store.
+    // rotation: see design doc WP4. Null keeps the previous behaviour exactly:
+    // oidc-provider mints a development key pair for this process, which is
+    // fine for one replica that never restarts and wrong for anything else.
+    const jwks = await this.signingKeys.ensureJwks();
+
     const provider = new Provider(issuer, {
       adapter: adapterFactory,
+      ...(jwks ? { jwks } : {}),
       // Pin every provider endpoint under /oauth/* (see issuer comment above).
       // Discovery (`/.well-known/openid-configuration` and
       // `/.well-known/oauth-authorization-server`) is NOT in this map — it is

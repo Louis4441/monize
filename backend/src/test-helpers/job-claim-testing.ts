@@ -1,5 +1,9 @@
 import { JobClaimService } from "../common/jobs/job-claim.service";
 import { UserMaintenanceService } from "../common/jobs/user-maintenance.service";
+import {
+  FetchSyncJob,
+  FetchSyncService,
+} from "../common/jobs/fetch-sync.service";
 
 /**
  * A `JobClaimService` double that always wins the claim.
@@ -94,4 +98,56 @@ export function userMaintenanceProvider(
   useValue: UserMaintenanceMock;
 } {
   return { provide: UserMaintenanceService, useValue: mock };
+}
+
+/**
+ * A `FetchSyncService` double that always wins the lease and runs the body.
+ *
+ * Winning by default keeps every provider-fetch spec written before the lease
+ * existed behaving as it did. The assertion worth writing is the *loser* --
+ * make `withLease` resolve false without calling its body, and check that no
+ * provider call went out.
+ */
+export type FetchSyncMock = jest.Mocked<
+  Pick<
+    FetchSyncService,
+    "claim" | "release" | "markSuccess" | "markFailure" | "withLease"
+  >
+>;
+
+/** The lease token this double hands out, so specs can assert it travelled. */
+export const TEST_FETCH_LEASE_TOKEN = "8f3a5c1e-0000-4000-8000-000000000042";
+
+export function createFetchSyncMock(): FetchSyncMock {
+  return {
+    claim: jest.fn().mockResolvedValue(TEST_FETCH_LEASE_TOKEN),
+    release: jest.fn().mockResolvedValue(undefined),
+    markSuccess: jest.fn().mockResolvedValue(undefined),
+    markFailure: jest.fn().mockResolvedValue(undefined),
+    // Runs the body and reports the win, like the real one does for a winner.
+    withLease: jest.fn(
+      async (_job: FetchSyncJob, _leaseMs: number, fn: () => Promise<void>) => {
+        await fn();
+        return true;
+      },
+    ) as FetchSyncMock["withLease"],
+  };
+}
+
+/** A double that LOST the lease: the body never runs. */
+export function createLosingFetchSyncMock(): FetchSyncMock {
+  const mock = createFetchSyncMock();
+  mock.claim.mockResolvedValue(null);
+  mock.withLease.mockImplementation(async () => false);
+  return mock;
+}
+
+/** Provider entry for `Test.createTestingModule({ providers: [...] })`. */
+export function fetchSyncProvider(
+  mock: FetchSyncMock = createFetchSyncMock(),
+): {
+  provide: typeof FetchSyncService;
+  useValue: FetchSyncMock;
+} {
+  return { provide: FetchSyncService, useValue: mock };
 }

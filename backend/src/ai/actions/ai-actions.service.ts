@@ -69,6 +69,7 @@ import { CreateTransferDto } from "../../transactions/dto/create-transfer.dto";
 import { UpdateTransferDto } from "../../transactions/dto/update-transfer.dto";
 import { BulkCreateSkip } from "../../common/bulk-create.types";
 import { ConfirmAiActionDto } from "./dto/confirm-ai-action.dto";
+import { SingleUseTokenService } from "../../auth/single-use-token.service";
 
 export interface ConfirmActionResult {
   type: AiActionDescriptor["type"];
@@ -82,12 +83,16 @@ export interface ConfirmActionResult {
   skipped?: BulkCreateSkip[];
 }
 
+/**
+ * `single_use_tokens.purpose` for a confirmed action descriptor.
+ *
+ * The web chat and the MCP relay both commit through `confirm`, so one purpose
+ * and one `actionId` are all it takes for the two surfaces to share a claim.
+ */
+export const AI_ACTION_CLAIM_PURPOSE = "ai-action";
+
 @Injectable()
 export class AiActionsService {
-  // Anti-replay: action ids that have been confirmed, with their expiry so the
-  // set self-prunes. A confirmed descriptor cannot be submitted twice.
-  private readonly consumed = new Map<string, number>();
-
   constructor(
     @Inject(forwardRef(() => TransactionsService))
     private readonly transactionsService: TransactionsService,
@@ -99,6 +104,7 @@ export class AiActionsService {
     private readonly writeLimiter: AiWriteLimiter,
     private readonly attachmentsService: AttachmentsService,
     private readonly relayAttachmentStore: RelayAttachmentStore,
+    private readonly singleUseTokens: SingleUseTokenService,
   ) {}
 
   async confirm(
@@ -144,16 +150,6 @@ export class AiActionsService {
       throw new ForbiddenException(this.invalidSignatureMessage());
     }
 
-    this.pruneConsumed();
-    if (this.consumed.has(descriptor.actionId)) {
-      throw new BadRequestException(
-        tr(
-          "errors.ai.actionConfirmFailed",
-          "This action could not be confirmed.",
-        ),
-      );
-    }
-
     // A bulk action counts as one write per row it would create, so a large
     // batch cannot slip past the daily cap. The pre-check uses the proposed row
     // count; the actual recorded writes (below) reflect only rows created.
@@ -171,9 +167,32 @@ export class AiActionsService {
       );
     }
 
-    // Reserve the action id before executing so concurrent double-submits can't
-    // both pass; release it if the write fails so the user can retry.
-    this.consumed.set(descriptor.actionId, descriptor.expiresAt);
+    // Anti-replay. The claim IS the insert, so the deployment picks one winner
+    // on the primary key rather than each replica consulting its own memory --
+    // which is what the `Map` this replaces amounted to, and what a restart
+    // wiped. The row expires with the descriptor, so the sweep never has to run
+    // for the guard to be right.
+    //
+    // Reserved before executing, so concurrent double-submits cannot both pass,
+    // and released when the write throws, so a transient failure leaves the
+    // descriptor confirmable. It is not taken inside the write's transaction:
+    // `execute` fans out to services that each open their own, dispatch cache
+    // invalidation after their commit (INV-CACHE-001) and record action history
+    // outside it, and one enclosing transaction would silently move all of that
+    // inside itself.
+    const claimed = await this.singleUseTokens.claim(
+      AI_ACTION_CLAIM_PURPOSE,
+      descriptor.actionId,
+      descriptor.expiresAt - Date.now(),
+    );
+    if (!claimed) {
+      throw new BadRequestException(
+        tr(
+          "errors.ai.actionConfirmFailed",
+          "This action could not be confirmed.",
+        ),
+      );
+    }
     try {
       const result = await this.execute(
         userId,
@@ -187,7 +206,10 @@ export class AiActionsService {
       }
       return result;
     } catch (err) {
-      this.consumed.delete(descriptor.actionId);
+      await this.singleUseTokens.release(
+        AI_ACTION_CLAIM_PURPOSE,
+        descriptor.actionId,
+      );
       throw err;
     }
   }
@@ -1009,15 +1031,6 @@ export class AiActionsService {
       "errors.ai.actionSignatureInvalid",
       "This action could not be verified.",
     );
-  }
-
-  private pruneConsumed(): void {
-    const now = Date.now();
-    for (const [id, expiresAt] of this.consumed) {
-      if (expiresAt < now) {
-        this.consumed.delete(id);
-      }
-    }
   }
 }
 

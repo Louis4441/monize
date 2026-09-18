@@ -25,6 +25,10 @@ import { withScopedDb } from "../common/db/scoped-db";
 import { returnedRows } from "../common/db/query-result";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
 import {
+  FetchSyncJob,
+  FetchSyncService,
+} from "../common/jobs/fetch-sync.service";
+import {
   EmptyWindowMemory,
   monthFetchWindow,
 } from "../common/time-series/history-fill";
@@ -100,6 +104,7 @@ export class ExchangeRateService implements OnModuleInit {
     private dataSource: DataSource,
     @Inject(forwardRef(() => YahooFinanceService))
     private yahooFinanceService: YahooFinanceService,
+    private readonly fetchSync: FetchSyncService,
   ) {}
 
   /**
@@ -115,6 +120,15 @@ export class ExchangeRateService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     await withSystemContext(() => this.checkRatesOnStartup());
   }
+
+  /**
+   * How long one replica holds the FX fetch.
+   *
+   * Comfortably longer than a refresh takes and comfortably shorter than the
+   * daily cron's interval, so a replica killed mid-fetch never blocks the next
+   * day's tick: the expiry alone hands the job back.
+   */
+  private readonly FETCH_LEASE_MS = 15 * 60 * 1000;
 
   private async checkRatesOnStartup(): Promise<void> {
     try {
@@ -132,13 +146,28 @@ export class ExchangeRateService implements OnModuleInit {
       );
 
       if (!recentRate) {
-        this.logger.log(
-          "No recent exchange rates found — fetching rates on startup",
+        // A rollout of N pods all find no recent rate and all fetch. The lease
+        // is what makes that one fetch; the per-user historical backfills below
+        // stay outside it, because they are per user, cheap, and already
+        // idempotent.
+        const fetched = await this.fetchSync.withLease(
+          FetchSyncJob.ExchangeRates,
+          this.FETCH_LEASE_MS,
+          async () => {
+            this.logger.log(
+              "No recent exchange rates found — fetching rates on startup",
+            );
+            const summary = await this.refreshAllRates();
+            this.logger.log(
+              `Startup rate refresh: ${summary.updated} updated, ${summary.failed} failed`,
+            );
+          },
         );
-        const summary = await this.refreshAllRates();
-        this.logger.log(
-          `Startup rate refresh: ${summary.updated} updated, ${summary.failed} failed`,
-        );
+        if (!fetched) {
+          this.logger.log(
+            "Startup rate refresh is being done by another replica",
+          );
+        }
       } else {
         this.logger.log("Exchange rates are up to date");
       }
@@ -1183,7 +1212,20 @@ export class ExchangeRateService implements OnModuleInit {
       // RLS (task C2): the currency-detection read spans all users' accounts,
       // securities, holdings and preferences (writes only the global
       // exchange_rates table), so the refresh runs under a system context.
-      await withSystemContext(() => this.refreshAllRates());
+      //
+      // One replica per tick makes the provider calls (task C2). The upserts
+      // beneath are idempotent, so this is about cost and rate limits rather
+      // than about correctness -- which is why a lost lease is a debug line and
+      // never blocks the next tick.
+      await withSystemContext(() =>
+        this.fetchSync.withLease(
+          FetchSyncJob.ExchangeRates,
+          this.FETCH_LEASE_MS,
+          async () => {
+            await this.refreshAllRates();
+          },
+        ),
+      );
     } catch (error) {
       this.logger.error(
         `Scheduled exchange rate refresh failed: ${error.message}`,
