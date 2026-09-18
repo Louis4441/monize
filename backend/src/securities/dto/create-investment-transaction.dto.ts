@@ -58,6 +58,16 @@ export class CreateInvestmentTransactionDto {
 
   @ApiProperty({
     required: false,
+    description:
+      "Executed total in the security's currency, commission included on a buy and deducted on a sell. Supplied, it is the fact: it is stored as given and the per-share price is derived from it. Omitted, the total is derived from the price.",
+  })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 4 })
+  @Min(0)
+  totalAmount?: number;
+
+  @ApiProperty({
+    required: false,
     description: "Commission or fee",
     default: 0,
   })

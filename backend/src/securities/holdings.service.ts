@@ -204,6 +204,7 @@ export class HoldingsService {
             quantity: tx.quantity,
             price: tx.price,
             commission: tx.commission,
+            totalAmount: tx.totalAmount,
           });
           if (cost !== null) totalCost += cost;
           qty += txQty;
@@ -557,14 +558,14 @@ export class HoldingsService {
       } else if (quantityChange > 0) {
         // Includes the acquisition commission, so average cost is what a share
         // actually cost to acquire: 10 shares at 100 with 10 commission is
-        // 101.00 per share, not 100.00. The old figure understated basis and so
-        // reported the commission as gain on the eventual disposal (P5-006).
-        // Prices here are in the security's currency, as is `averageCost`, so
-        // the row's exchange rate is deliberately not applied.
+        // 101.00 per share, not 100.00: leaving it out reported the commission
+        // as gain on the disposal (P5-006). Prices here are in the security's
+        // currency, as is `averageCost`, so the row's rate is not applied.
         const cost = acquisitionCost({
           quantity: tx.quantity,
           price: tx.price,
           commission: tx.commission,
+          totalAmount: tx.totalAmount,
         });
         if (cost !== null) holding.totalCost += cost;
       } else if (holding.quantity > 0) {

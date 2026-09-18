@@ -2152,6 +2152,105 @@ describe("InvestmentTransactionsService", () => {
       );
     });
 
+    /**
+     * Invariant: a change is a value difference, not a field being present
+     * (AGENTS.md, "Financial math"), and the stored executed total is the fact.
+     * Canonical adversarial input: the transaction form's own payload, which
+     * resends quantity, price, commission and action unchanged on an edit that
+     * only touches the description.
+     * Minimal mutation: key the re-derivation on `!== undefined` again.
+     * Test that fails under it: this one -- the stored 1510.5000 comes back as
+     * 10 x 150 + 9.99 = 1509.99, because the price is a rounded quotient.
+     */
+    it("keeps the stored total when a resent edit changes only the description", async () => {
+      const existingTx = { ...mockBuyTransaction, totalAmount: 1510.5 };
+      const firstFindQB = createMockQueryBuilder(existingTx);
+      const secondFindQB = createMockQueryBuilder({ ...existingTx });
+
+      investmentTransactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(firstFindQB)
+        .mockReturnValueOnce(secondFindQB);
+
+      transactionRepository.findOne.mockResolvedValue({
+        id: cashTransactionId,
+        userId,
+        accountId: cashAccountId,
+        amount: -1510.5,
+      });
+
+      await service.update(userId, transactionId, {
+        action: InvestmentAction.BUY,
+        quantity: 10,
+        price: 150,
+        commission: 9.99,
+        description: "Updated",
+      });
+
+      expect(investmentTransactionsRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ totalAmount: 1510.5 }),
+      );
+    });
+
+    it("re-derives the total from the price when the quantity changes", async () => {
+      const existingTx = { ...mockBuyTransaction, totalAmount: 1510.5 };
+      const firstFindQB = createMockQueryBuilder(existingTx);
+      const secondFindQB = createMockQueryBuilder({ ...existingTx });
+
+      investmentTransactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(firstFindQB)
+        .mockReturnValueOnce(secondFindQB);
+
+      transactionRepository.findOne.mockResolvedValue({
+        id: cashTransactionId,
+        userId,
+        accountId: cashAccountId,
+        amount: -1510.5,
+      });
+
+      await service.update(userId, transactionId, {
+        quantity: 20,
+        price: 150,
+        commission: 9.99,
+      });
+
+      // 20 x 150 + 9.99
+      expect(investmentTransactionsRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ totalAmount: 3009.99 }),
+      );
+    });
+
+    it("takes a supplied total as the fact and derives the price from it", async () => {
+      const existingTx = { ...mockBuyTransaction };
+      const firstFindQB = createMockQueryBuilder(existingTx);
+      const secondFindQB = createMockQueryBuilder({ ...existingTx });
+
+      investmentTransactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(firstFindQB)
+        .mockReturnValueOnce(secondFindQB);
+
+      transactionRepository.findOne.mockResolvedValue({
+        id: cashTransactionId,
+        userId,
+        accountId: cashAccountId,
+        amount: -1509.99,
+      });
+
+      await service.update(userId, transactionId, {
+        quantity: 10,
+        price: 150,
+        commission: 9.99,
+        totalAmount: 1520.91,
+      });
+
+      expect(investmentTransactionsRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          totalAmount: 1520.91,
+          // (1520.91 - 9.99) / 10
+          price: 151.092,
+        }),
+      );
+    });
+
     it("does not recalculate totalAmount when only description changes", async () => {
       const existingTx = { ...mockBuyTransaction };
       const firstFindQB = createMockQueryBuilder(existingTx);
@@ -4123,6 +4222,34 @@ describe("InvestmentTransactionsService", () => {
 
       expect(investmentTransactionsRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({ totalAmount: 0 }),
+      );
+    });
+
+    /**
+     * Invariant: the executed total is the fact; the per-share price is
+     * derived from it (`docs/financial-semantics.md` section 4).
+     * Canonical adversarial input: a sale whose total does not divide into a
+     * two-decimal price -- 141 shares for 820.91.
+     * Minimal mutation: resolve the amounts from `price` alone.
+     * Test that fails under it: this one -- the row stores 141 x 5.82 =
+     * 820.62, and the realized-gains report is 0.29 light before FX.
+     */
+    it("stores a supplied total as given and derives the price from it", async () => {
+      await service.create(userId, {
+        accountId,
+        securityId,
+        action: InvestmentAction.SELL,
+        transactionDate: "2025-01-15",
+        quantity: 141,
+        price: 5.82,
+        totalAmount: 820.91,
+      });
+
+      expect(investmentTransactionsRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          totalAmount: 820.91,
+          price: 5.8220567376,
+        }),
       );
     });
 
@@ -6874,11 +7001,14 @@ describe("InvestmentTransactionsService", () => {
         transactionDate: "2026-01-15",
         securityQuery: "AAPL",
         quantity: 1.123456789,
-        price: 2.1234567,
+        price: 2.12345678901,
         commission: 0.12345,
       });
       expect(preview.quantity).toBe(1.12345679);
-      expect(preview.price).toBe(2.123457);
+      // The price column is NUMERIC(24,10). A preview that narrowed it to six
+      // showed a figure the commit would not store, and a price derived from
+      // an executed total needs all ten.
+      expect(preview.price).toBe(2.123456789);
       expect(preview.commission).toBe(0.1235);
     });
 

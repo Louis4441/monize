@@ -224,6 +224,15 @@ export function acquisitionCost(tx: {
   price?: number | string | null;
   commission?: number | string | null;
   exchangeRate?: number | string | null;
+  /**
+   * The row's executed total, when the caller reads a stored row. It is what
+   * the acquisition came to -- commission included, by the same convention
+   * `deriveInvestmentTotal` writes it with -- and the price beside it is a
+   * quotient of it, so `quantity * price + commission` reproduces it only to
+   * within the price's rounding. Given, it is used; absent, the cost is built
+   * from the price as it always was.
+   */
+  totalAmount?: number | string | null;
 }): number | null {
   const quantity = Number(tx.quantity) || 0;
   const commission = Number(tx.commission) || 0;
@@ -244,6 +253,13 @@ export function acquisitionCost(tx: {
   // bake the silent 1:1 fallback into the one door every basis goes through.
   const rate = tx.exchangeRate == null ? 1 : Number(tx.exchangeRate);
   if (!Number.isFinite(rate) || rate <= 0) return null;
+  const total =
+    tx.totalAmount === null || tx.totalAmount === undefined
+      ? null
+      : Number(tx.totalAmount);
+  if (total !== null && Number.isFinite(total) && total !== 0) {
+    return Math.abs(total) * rate;
+  }
   return (quantity * price + commission) * rate;
 }
 

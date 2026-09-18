@@ -20,6 +20,10 @@ interface SummaryRow {
   total_amount: string;
   currency_code: string | null;
   symbol: string | null;
+  /** The row's own rate: amount currency -> settlement (cash) currency. */
+  exchange_rate: string | null;
+  /** The currency that rate converts INTO, from the row's own cash leg. */
+  settlement_currency_code: string | null;
 }
 
 /**
@@ -32,6 +36,37 @@ interface ActionBucket {
   count: number;
   excluded: number;
   fx: FxAggregate;
+}
+
+/**
+ * Which rate a row is converted at, as a value the response can carry.
+ *
+ * `transaction` -- the row's own stored rate did the conversion (possibly
+ * carried onward from its settlement currency at the market rate, which the
+ * KPI-level `onwardMarketCount` states). `market` -- the row carries no usable
+ * rate of its own, so the rate that stood on its trade date was used. `null` --
+ * the row was not converted at all: it is already in the reporting currency,
+ * its amount is zero, or no rate could be found.
+ */
+export type InvestmentConversionBasis = "transaction" | "market" | null;
+
+/**
+ * The row's own rate, or `null` when it cannot be used.
+ *
+ * A stored `1` across two different currencies is the column's default rather
+ * than a rate anybody struck ("rate 1 means same currency, never no rate
+ * found"), so such a row is converted at the market rate instead.
+ */
+export function usableRowRate(
+  storedRate: string | number | null,
+  amountCurrency: string,
+  settlementCurrency: string | null,
+): number | null {
+  if (storedRate === null || storedRate === undefined) return null;
+  const rate = Number(storedRate);
+  if (!Number.isFinite(rate) || rate <= 0) return null;
+  if (rate === 1 && amountCurrency !== settlementCurrency) return null;
+  return rate;
 }
 
 function describe(
@@ -102,6 +137,10 @@ export class InvestmentTransactionSummaryService {
     const currencies = new Set<string>();
     let hasUnknownCurrency = false;
     let excludedOverall = 0;
+    // Which rate answered each row, counted so the surface can say it.
+    let transactionRateCount = 0;
+    let marketRateCount = 0;
+    let onwardMarketCount = 0;
     // One lookup per (currency, date) pair rather than per row: a year of one
     // security's trades asks for the same day's rate many times over.
     const rateCache = new Map<string, number | null>();
@@ -147,6 +186,39 @@ export class InvestmentTransactionSummaryService {
         continue;
       }
 
+      // The row's OWN rate first: a trade that settled at 3.7287 settled at
+      // 3.7287, and the realized-gains report multiplies by exactly that.
+      // Converting the same sale at the market rate that stood on its date
+      // gave the reader two different figures for one event, with nothing on
+      // either surface saying which rate it had used.
+      const settlement = row.settlement_currency_code;
+      const rowRate = usableRowRate(row.exchange_rate, from, settlement);
+      if (rowRate !== null && settlement !== null) {
+        if (settlement === currencyCode) {
+          overall.addConverted(amount * rowRate);
+          bucket.fx.addConverted(amount * rowRate);
+          transactionRateCount += 1;
+          continue;
+        }
+        // The row's rate reaches its settlement currency but not the reader's,
+        // so the cash leg is carried onward at the market rate for that pair.
+        const onward = await this.rateOn(
+          settlement,
+          currencyCode,
+          row.transaction_date,
+          rateCache,
+        );
+        if (onward !== null) {
+          overall.addConverted(amount * rowRate * onward);
+          bucket.fx.addConverted(amount * rowRate * onward);
+          transactionRateCount += 1;
+          onwardMarketCount += 1;
+          continue;
+        }
+        // No onward rate: fall through to the market rate for the whole pair
+        // rather than withholding a figure a market rate can still answer.
+      }
+
       const rate = await this.rateOn(
         from,
         currencyCode,
@@ -158,6 +230,8 @@ export class InvestmentTransactionSummaryService {
       if (converted === null) {
         excludedOverall += 1;
         bucket.excluded += 1;
+      } else {
+        marketRateCount += 1;
       }
       overall.add(converted, from, currencyCode);
       bucket.fx.add(converted, from, currencyCode);
@@ -182,6 +256,9 @@ export class InvestmentTransactionSummaryService {
       byAction,
       amountCurrencies: [...currencies].sort(),
       hasUnknownCurrency,
+      transactionRateCount,
+      marketRateCount,
+      onwardMarketCount,
       ...describe(overall, excludedOverall),
     };
   }
@@ -267,15 +344,25 @@ export class InvestmentTransactionSummaryService {
         // is in the security's currency, and a row that names no security is
         // in the investment account's, which is where
         // `resolveSettlementCurrencyPair` denominated it when it was written.
+        // `exchange_rate` is the row's own: the rate its cash leg settled at,
+        // converting the amount above into the settlement account's currency.
+        // That account is the explicit funding account when the row names one,
+        // otherwise the brokerage's linked cash sleeve, otherwise the
+        // brokerage itself -- the same order `findCashAccount` resolves.
         `SELECT it.action AS action,
                 it.status AS status,
                 TO_CHAR(it.transaction_date, 'YYYY-MM-DD') AS transaction_date,
                 it.total_amount::text AS total_amount,
                 COALESCE(s.currency_code, a.currency_code) AS currency_code,
+                it.exchange_rate::text AS exchange_rate,
+                COALESCE(f.currency_code, cash.currency_code, a.currency_code)
+                  AS settlement_currency_code,
                 s.symbol AS symbol
            FROM investment_transactions it
            LEFT JOIN securities s ON s.id = it.security_id
            LEFT JOIN accounts a ON a.id = it.account_id
+           LEFT JOIN accounts f ON f.id = it.funding_account_id
+           LEFT JOIN accounts cash ON cash.id = a.linked_account_id
           WHERE it.user_id = $1
             AND NOT (it.action = $2 AND EXISTS (
                   -- The parent is looked up as a record (includes VOID): what

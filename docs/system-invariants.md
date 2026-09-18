@@ -96,6 +96,8 @@ implied.
 | INV-REDEEM-001 | A redemption's accrued interest moves cash once and is income once | enforced |
 | INV-RECONCILE-001 | While the strict lock is on, a reconciled transaction is not altered | enforced |
 | INV-FX-001 | An unavailable rate never becomes 1:1, a rate from after the date, or an unboundedly old one | partial |
+| INV-FX-002 | A row that carries its own exchange rate is converted at that rate on every surface | enforced |
+| INV-TRADE-001 | The executed total is the fact; the per-share price is derived from it | enforced |
 | INV-PRICE-001 | A stored price is in the currency the security is recorded in | partial |
 | INV-PORTRESULT-001 | A period change is not a return: value change, external flows and investment result are three figures | enforced |
 | INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
@@ -722,6 +724,76 @@ claim to check against the scan, and read the scan for what it actually matches.
 `docs/verification-contract.md` section 6 still describes both load-bearing FX
 scans as having landed "with the fix, so no exception list"; that is now true of
 the first scan only.
+
+### INV-FX-002 -- a row's own rate converts it on every surface
+
+```text
+Statement           A transaction that carries its own exchange rate settled at
+                    that rate. Every surface that reports it in the reader's
+                    currency multiplies by that rate; the market rate that stood
+                    on the trade date is the fallback for a row carrying none,
+                    and the surface says which of the two it used. Two surfaces
+                    answering one sale with two figures is the defect, whichever
+                    figure is nearer the truth.
+Source of truth     investment_transactions.exchange_rate (amount currency ->
+                    settlement currency), then exchange_rates for anything the
+                    row's own rate does not reach.
+Enforcement         portfolio-calculation.service.ts has always multiplied
+                    total_amount by the row's exchange_rate (realized gains, the
+                    capital-gains fold, the cash-flow sums).
+                    investment-reports/investment-transaction-summary.service.ts
+                    now does the same: usableRowRate() takes the stored rate when
+                    it is positive and is not the column's default 1 across two
+                    different currencies; the row's settlement currency comes
+                    from its funding account, its brokerage's linked cash sleeve
+                    or the brokerage itself (the order findCashAccount resolves);
+                    and a settlement currency that is not the reader's is carried
+                    onward at the market rate for that pair. The response counts
+                    each basis -- transactionRateCount, marketRateCount,
+                    onwardMarketCount -- and InvestmentTransactionHistoryReport
+                    prints the line under the KPIs, so the reader is told which
+                    rate answered. A row with no usable rate of its own falls
+                    back to the rate on its own date, under INV-FX-001.
+Test                investment-transaction-summary.service.spec.ts: a sale of
+                    820.91 USD settled at 3.7287 reads 3,060.9271 PLN and asks
+                    for no market rate; a row without a rate is converted at the
+                    market rate and counted; a stored 1 across two currencies is
+                    ignored; a third settlement currency is carried onward.
+Status              enforced
+```
+
+### INV-TRADE-001 -- the executed total is the fact, the price is derived
+
+```text
+Statement           What a trade came to is what it came to. A caller that
+                    supplies the executed total has it stored as given at money
+                    precision, and the per-share price is derived from it at the
+                    price column's ten decimals; a caller that supplies only a
+                    price has the total derived from the price. A stored total is
+                    never re-derived from a stored price unless the price, the
+                    quantity, the commission or the action is what changed --
+                    compared by value, because the form resends every field.
+Source of truth     investment_transactions.total_amount NUMERIC(20,4), with
+                    price NUMERIC(24,10) beside it.
+Enforcement         securities/investment-amount.util.ts is the one door:
+                    deriveInvestmentTotal, derivePriceFromTotal and
+                    resolveInvestmentAmounts. InvestmentTransactionsService
+                    create / update / previewCreateInvestmentTransaction, the QIF
+                    importer's investment path and cash-impact.util.ts's optional
+                    totalAmount argument all go through it, and acquisitionCost()
+                    prefers a row's stored total over quantity * price +
+                    commission. The MNY importer already kept its source amount
+                    (map-investments.ts, totalAmountOf).
+                    InvestmentTransactionForm makes the total an editable field:
+                    the last edited of total and price wins, the same pattern it
+                    already uses between the converted amount and the rate.
+Test                investment-amount.util.spec.ts (both directions and the
+                    refusals); investment-transactions.service.spec.ts -- a SELL
+                    of 141 shares supplied as 820.91 stores 820.9100 and
+                    5.8220567376, a resent description-only edit keeps the stored
+                    total, a quantity change re-derives it.
+Status              enforced
+```
 
 ### INV-PRICE-001 -- a stored price is in the currency the security is recorded in
 

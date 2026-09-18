@@ -165,6 +165,7 @@ function securityCurrencyAcquisitionCost(
     quantity: tx.quantity,
     price: tx.price,
     commission: tx.commission,
+    totalAmount: tx.totalAmount,
   });
 }
 

@@ -18,6 +18,10 @@ interface RowInput {
   amount?: string;
   currency?: string | null;
   symbol?: string | null;
+  /** The row's own settlement rate, as the column stores it. */
+  rate?: string | null;
+  /** The currency that rate converts the amount into. */
+  settlement?: string | null;
 }
 
 function row(over: RowInput = {}) {
@@ -28,6 +32,9 @@ function row(over: RowInput = {}) {
     total_amount: over.amount ?? "1000.0000",
     currency_code: over.currency === undefined ? "EUR" : over.currency,
     symbol: over.symbol === undefined ? "AAA" : over.symbol,
+    exchange_rate: over.rate === undefined ? null : over.rate,
+    settlement_currency_code:
+      over.settlement === undefined ? null : over.settlement,
   };
 }
 
@@ -130,6 +137,98 @@ describe("InvestmentTransactionSummaryService", () => {
     expect(exchangeRateService.getRateForDate).not.toHaveBeenCalled();
     expect(summary.total).toBe(0);
     expect(summary.fxComplete).toBe(true);
+  });
+
+  /**
+   * Invariant: a row that carries its own exchange rate is converted at that
+   * rate on every surface (INV-FX-002).
+   * Canonical adversarial input: the sale the realized-gains report shows as
+   * 3,060.92 PLN -- 820.91 USD settled at the broker's 3.7287 -- on a day the
+   * market rate was 3.7134.
+   * Minimal mutation: drop the stored-rate branch and ask `getRateForDate`.
+   * Test that fails under it: this one -- the KPI reads 3,048.37 while the
+   * realized-gains report reads 3,060.92 for the same sale.
+   */
+  it("converts a row at its own settlement rate, not at the market rate", async () => {
+    returnRows([
+      row({
+        action: InvestmentAction.SELL,
+        currency: "USD",
+        amount: "820.9100",
+        rate: "3.7287000000",
+        settlement: "PLN",
+      }),
+    ]);
+    exchangeRateService.getRateForDate.mockResolvedValue(3.7134);
+
+    const summary = await service.summarize("u1", {});
+
+    expect(exchangeRateService.getRateForDate).not.toHaveBeenCalled();
+    // 820.91 x 3.7287, which is what the realized-gains report reports for
+    // the same row; the market rate would have made it 3,048.37.
+    expect(summary.total).toBeCloseTo(3060.9271, 4);
+    expect(summary.transactionRateCount).toBe(1);
+    expect(summary.marketRateCount).toBe(0);
+    expect(summary.onwardMarketCount).toBe(0);
+  });
+
+  it("falls back to the market rate for a row with no rate of its own, and counts it", async () => {
+    returnRows([
+      row({ currency: "USD", amount: "100.0000", rate: null }),
+      row({
+        currency: "USD",
+        amount: "100.0000",
+        rate: "3.7287000000",
+        settlement: "PLN",
+      }),
+    ]);
+    exchangeRateService.getRateForDate.mockResolvedValue(3.7134);
+
+    const summary = await service.summarize("u1", {});
+
+    expect(summary.knownSubtotal).toBeCloseTo(371.34 + 372.87, 2);
+    expect(summary.transactionRateCount).toBe(1);
+    expect(summary.marketRateCount).toBe(1);
+  });
+
+  it("carries a row settled in a third currency onward at the market rate", async () => {
+    returnRows([
+      row({
+        currency: "USD",
+        amount: "100.0000",
+        rate: "0.9000000000",
+        settlement: "EUR",
+      }),
+    ]);
+    exchangeRateService.getRateForDate.mockImplementation((from: string) =>
+      Promise.resolve(from === "EUR" ? 4.3 : null),
+    );
+
+    const summary = await service.summarize("u1", {});
+
+    expect(summary.total).toBeCloseTo(387, 4);
+    expect(summary.transactionRateCount).toBe(1);
+    expect(summary.onwardMarketCount).toBe(1);
+    expect(summary.marketRateCount).toBe(0);
+  });
+
+  it("ignores a stored 1 across two different currencies and uses the market rate", async () => {
+    // The column's default, not a rate anybody struck.
+    returnRows([
+      row({
+        currency: "USD",
+        amount: "100.0000",
+        rate: "1.0000000000",
+        settlement: "PLN",
+      }),
+    ]);
+    exchangeRateService.getRateForDate.mockResolvedValue(3.7134);
+
+    const summary = await service.summarize("u1", {});
+
+    expect(summary.total).toBeCloseTo(371.34, 4);
+    expect(summary.marketRateCount).toBe(1);
+    expect(summary.transactionRateCount).toBe(0);
   });
 
   it("reports an empty filter as a known zero, not as unknown", async () => {

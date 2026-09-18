@@ -118,6 +118,14 @@ No separate fee row is written; the Foreign Currency Fees report derives the fee
 back out of `(originalAmount, exchangeRate, amount)`. That derivation is the
 reason all three must stay mutually consistent on every write.
 
+**Whose rate.** A row that carries its own rate settled at that rate, so every
+surface converts it at that rate -- the register, the realized-gains report and
+the transaction-history KPIs alike. The market rate on the row's own date is
+the fallback for a row carrying none (`resolveFxRate`, INV-FX-001), and the
+surface says which of the two it used rather than leaving the reader with two
+figures for one sale. A stored `1` between two different currencies is the
+column's default, not a rate: it falls back like an absent one. INV-FX-002.
+
 **Validation.** `normalizeFxEntry(input, accountCurrencyCode)` is shared by
 transactions and scheduled transactions so both accept and reject exactly the
 same shapes:
@@ -169,6 +177,32 @@ whose column is wider must not be rounded to money precision on the way in.
 The MS Money importer narrows investment values to 6dp price / 8dp quantity
 before writing. That is an importer choice about source fidelity, not the
 storage precision, and it is the one place the two legitimately differ.
+
+### The executed total is the fact; the per-share price is derived
+
+A trade's `total_amount` is what it came to; `price` is a quotient of it and
+carries the division's remainder, not the trade's meaning. So:
+
+- A caller that supplies a total has it stored **as given** at 4dp, and the
+  price derived from it at the price column's 10dp:
+  `price = (total -/+ commission) / quantity`, the commission taken back out of
+  an acquisition and put back into a disposal.
+- A caller that supplies only a price has the total derived from the price, as
+  before: `quantity * price + commission` on an acquisition, `- commission` on
+  a disposal.
+- A stored total is **never** re-derived from a stored price on an update
+  unless the price, the quantity, the commission or the action is the field
+  that changed -- a value difference against the stored row, not a field being
+  present, because `InvestmentTransactionForm` resends every field.
+
+Both directions live in `backend/src/securities/investment-amount.util.ts`
+(`deriveInvestmentTotal`, `derivePriceFromTotal`, `resolveInvestmentAmounts`);
+no call site spells the arithmetic out again. A source that carries a total
+keeps it: MNY's row amount, QIF's `T`/`$`. INV-TRADE-001.
+
+A sale of 141 shares for 820.9081 stored as 141 x 5.82 reports proceeds of
+820.62 -- a third of a percent of a realised gain that never happened, on one
+trade, before FX.
 
 ## 5. Splits
 

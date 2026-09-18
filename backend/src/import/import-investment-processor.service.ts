@@ -16,6 +16,10 @@ import { resolveFxRateOrNull } from "../common/fx-entry.util";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { baseInvestmentAction } from "../securities/investment-replay.util";
 import {
+  deriveInvestmentTotal,
+  derivePriceFromTotal,
+} from "../securities/investment-amount.util";
+import {
   formatInvestmentActionLabel,
   formatInvestmentCashPayeeName,
 } from "../securities/investment-cash-payee.util";
@@ -159,18 +163,40 @@ export class ImportInvestmentProcessorService {
 
     // Calculate amounts
     const quantity = qifTx.quantity || 0;
-    const price = qifTx.price || 0;
+    let price = qifTx.price || 0;
     const commission = qifTx.commission || 0;
-    let totalAmount = qifTx.amount
-      ? roundToDecimals(qifTx.amount, 2)
-      : roundToDecimals(quantity * price + commission, 2);
+    // A QIF `T`/`$` amount is what the trade actually came to.
+    const sourceTotal = qifTx.amount
+      ? roundMoney(Math.abs(qifTx.amount))
+      : null;
+    let totalAmount =
+      sourceTotal ?? roundToDecimals(quantity * price + commission, 2);
 
     const base = baseInvestmentAction(action);
-    if (base === InvestmentAction.BUY) {
-      totalAmount = roundToDecimals(quantity * price + commission, 2);
-    } else if (base === InvestmentAction.SELL) {
+    if (base === InvestmentAction.BUY || base === InvestmentAction.SELL) {
       // REDEEM included: a redemption's proceeds are a sale's.
-      totalAmount = roundToDecimals(quantity * price - commission, 2);
+      //
+      // The file's amount is kept and the per-share price is derived from it.
+      // Recomputing the total from the file's two-decimal `I` price threw the
+      // difference away on every fill that did not divide evenly: 141 shares
+      // for 820.91 came back as 141 x 5.82 = 820.62.
+      if (sourceTotal !== null) {
+        price =
+          derivePriceFromTotal({
+            action,
+            totalAmount: sourceTotal,
+            quantity,
+            commission,
+          }) ?? price;
+        totalAmount = sourceTotal;
+      } else {
+        totalAmount = deriveInvestmentTotal({
+          action,
+          quantity,
+          price,
+          commission,
+        });
+      }
     } else if (
       base === InvestmentAction.SPLIT ||
       base === InvestmentAction.ADD_SHARES ||

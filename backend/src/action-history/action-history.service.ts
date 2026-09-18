@@ -1426,6 +1426,8 @@ export class ActionHistoryService {
           quantity: tx.quantity,
           price: tx.price,
           commission: tx.commission,
+          // Snake_case: this is the raw row, not the entity.
+          totalAmount: tx.total_amount,
         });
         if (cost !== null) current.totalCost += cost;
       } else if (current.quantity > 0) {

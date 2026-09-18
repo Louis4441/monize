@@ -81,6 +81,11 @@ import {
   isInvestmentActionAllowedInSplit,
 } from "./cash-impact.util";
 import {
+  INVESTMENT_PRICE_DECIMALS,
+  deriveInvestmentTotal,
+  resolveInvestmentAmounts,
+} from "./investment-amount.util";
+import {
   AiActionPreviewRow,
   BatchUpdateInvestmentTransactionRow,
   BatchDeleteInvestmentTransactionRow,
@@ -1049,7 +1054,12 @@ export class InvestmentTransactionsService {
       );
     }
 
-    this.assertAcquisitionPriced(createDto.action, createDto.price);
+    // The executed total is the fact and the price follows it, so the price
+    // this write stores -- and the one the acquisition guard judges -- is the
+    // resolved one, not the (possibly cent-rounded) figure the caller typed.
+    const amounts = resolveInvestmentAmounts(createDto);
+
+    this.assertAcquisitionPriced(createDto.action, amounts.price);
 
     if (
       createDto.action === InvestmentAction.SPLIT &&
@@ -1067,7 +1077,7 @@ export class InvestmentTransactionsService {
       await this.securitiesService.findOne(userId, createDto.securityId);
     }
 
-    const totalAmount = this.calculateTotalAmount(createDto);
+    const totalAmount = amounts.totalAmount;
     const accruedInterest = roundMoney(Number(createDto.accruedInterest ?? 0));
     this.assertAccruedInterestAllowed(createDto.action, accruedInterest, false);
 
@@ -1101,7 +1111,7 @@ export class InvestmentTransactionsService {
         // Null, not zero. The column is nullable so "no price was given" and
         // "it cost nothing" stay two different rows; `?? 0` made every
         // unpriced action indistinguishable from a free one downstream.
-        price: createDto.price ?? null,
+        price: amounts.price,
         commission: createDto.commission || 0,
         totalAmount,
         exchangeRate,
@@ -1275,6 +1285,8 @@ export class InvestmentTransactionsService {
       quantity?: number;
       price?: number;
       commission?: number;
+      /** The executed total, when the caller knows it; see `create()`. */
+      totalAmount?: number;
       accruedInterest?: number;
       fundingAccountId?: string;
       exchangeRate?: number;
@@ -1369,10 +1381,6 @@ export class InvestmentTransactionsService {
       input.quantity !== undefined && input.quantity !== null
         ? roundToDecimals(Number(input.quantity), 8)
         : null;
-    const price =
-      input.price !== undefined && input.price !== null
-        ? roundToDecimals(Number(input.price), 6)
-        : null;
     const commission = roundToDecimals(Number(input.commission ?? 0), 4);
     const accruedInterest = roundToDecimals(
       Number(input.accruedInterest ?? 0),
@@ -1380,11 +1388,18 @@ export class InvestmentTransactionsService {
     );
     this.assertAccruedInterestAllowed(input.action, accruedInterest, false);
 
-    const totalAmount = this.calculateTotalAmount({
+    // The same door the write goes through, so a preview of a trade entered by
+    // its executed total shows the total the commit will store and the price it
+    // will derive -- at the price column's own ten decimals, not six.
+    const { totalAmount, price } = resolveInvestmentAmounts({
       action: input.action,
       quantity,
-      price,
+      price:
+        input.price !== undefined && input.price !== null
+          ? roundToDecimals(Number(input.price), INVESTMENT_PRICE_DECIMALS)
+          : null,
       commission,
+      totalAmount: input.totalAmount,
     });
 
     const exchangeRate = await this.resolveCashExchangeRate(
@@ -1405,6 +1420,7 @@ export class InvestmentTransactionsService {
       Number(price ?? 0),
       commission,
       accruedInterest,
+      totalAmount,
     );
 
     let cashAccountName: string | null = null;
@@ -2080,40 +2096,18 @@ export class InvestmentTransactionsService {
     return { transferOut, transferIn };
   }
 
+  /**
+   * The total a price implies. Only for a caller that has no executed total of
+   * its own -- one that does goes through `resolveInvestmentAmounts`, which
+   * stores the total as the fact and derives the price from it.
+   */
   private calculateTotalAmount(dto: {
     action: InvestmentAction;
     quantity?: number | null;
     price?: number | null;
     commission?: number | null;
   }): number {
-    const { action, quantity, price, commission } = dto;
-
-    let result: number;
-    switch (baseInvestmentAction(action)) {
-      case InvestmentAction.BUY:
-        result = (quantity || 0) * (price || 0) + (commission || 0);
-        break;
-
-      case InvestmentAction.SELL:
-        result = (quantity || 0) * (price || 0) - (commission || 0);
-        break;
-
-      case InvestmentAction.DIVIDEND:
-      case InvestmentAction.INTEREST:
-      case InvestmentAction.CAPITAL_GAIN:
-        result = (quantity || 1) * (price || 0);
-        break;
-
-      case InvestmentAction.ADD_SHARES:
-      case InvestmentAction.REMOVE_SHARES:
-        return 0;
-
-      default:
-        return 0;
-    }
-
-    // M13: Round to money storage precision (4dp) to avoid floating-point drift
-    return roundMoney(result);
+    return deriveInvestmentTotal(dto);
   }
 
   private async processTransactionEffectsInTransaction(
@@ -2603,6 +2597,10 @@ export class InvestmentTransactionsService {
       Number(saved.quantity ?? 0),
       Number(saved.price ?? 0),
       Number(saved.commission ?? 0),
+      0,
+      // The stored total, not a recomputation from the stored price: the row
+      // was written from what the trade actually came to.
+      Number(saved.totalAmount ?? 0),
     );
     const newSplitAmount = roundMoney(
       cashImpactInSecurity * Number(saved.exchangeRate),
@@ -3897,6 +3895,12 @@ export class InvestmentTransactionsService {
     // the DTO happened to carry; see the guard's own comment.
     const priorAction = transaction.action;
     const priorPrice = transaction.price;
+    // Read here for the same reason: what re-derives the stored total is a
+    // value difference in the fields the total is made of, never the mere
+    // presence of a field the form resends on every save.
+    const priorQuantity = transaction.quantity;
+    const priorCommission = transaction.commission;
+    const priorTotalAmount = transaction.totalAmount;
 
     const savedId = await withScopedDb(this.dataSource, async (manager) => {
       // First statement of the transaction: advisory before row locks
@@ -4002,10 +4006,46 @@ export class InvestmentTransactionsService {
       // every other edit.
       if (updateDto.status !== undefined) transaction.status = updateDto.status;
 
-      if (
-        updateDto.quantity !== undefined ||
-        updateDto.price !== undefined ||
-        updateDto.commission !== undefined
+      // What the executed total is made of, compared by VALUE against the row
+      // as it was stored. `InvestmentTransactionForm` resends every field, so
+      // a presence-keyed re-derivation recomputed `total_amount` from the
+      // stored price on a description-only edit -- and a price is a rounded
+      // quotient, so a sale entered at its statement total of 820.9100 came
+      // back as 141 x 5.82 = 820.6200.
+      const quantityChanged =
+        updateDto.quantity !== undefined &&
+        Number(updateDto.quantity) !== Number(priorQuantity ?? 0);
+      const priceChanged =
+        updateDto.price !== undefined &&
+        Number(updateDto.price) !== Number(priorPrice ?? 0);
+      const commissionChanged =
+        updateDto.commission !== undefined &&
+        Number(updateDto.commission) !== Number(priorCommission ?? 0);
+      const totalChanged =
+        updateDto.totalAmount !== undefined &&
+        Number(updateDto.totalAmount) !== Number(priorTotalAmount ?? 0);
+
+      if (totalChanged) {
+        // The caller stated what the trade actually came to. That is the fact;
+        // the price follows it -- unless the caller changed the price in the
+        // same edit and the two already agree, in which case nothing is lost
+        // by keeping the price exactly as sent.
+        const amounts = resolveInvestmentAmounts({
+          action: transaction.action,
+          quantity: transaction.quantity,
+          price: priceChanged ? transaction.price : null,
+          commission: transaction.commission,
+          totalAmount: updateDto.totalAmount,
+        });
+        transaction.totalAmount = amounts.totalAmount;
+        if (amounts.price !== null) transaction.price = amounts.price;
+      } else if (
+        quantityChanged ||
+        priceChanged ||
+        commissionChanged ||
+        // A different action puts the commission on the other side of the
+        // total, so the row's figure is no longer the one it was stored with.
+        transaction.action !== priorAction
       ) {
         transaction.totalAmount = this.calculateTotalAmount({
           action: transaction.action,

@@ -120,4 +120,23 @@ export interface InvestmentTransactionSummary extends ConvertedAggregate {
    * currency, the same one the write path denominated it in.
    */
   hasUnknownCurrency: boolean;
+  /**
+   * Rows converted at their OWN stored rate -- the rate the trade settled at,
+   * which is the one the realized-gains report multiplies by. A row that needed
+   * no conversion is in neither count: nothing was converted.
+   */
+  transactionRateCount: number;
+  /**
+   * Rows that carry no usable rate of their own and were converted at the
+   * market rate that stood on their trade date. The surface names this count,
+   * so a reader knows which figures are the broker's and which are the
+   * market's.
+   */
+  marketRateCount: number;
+  /**
+   * Rows counted in `transactionRateCount` whose own rate only reached their
+   * settlement currency, from which the market rate on the trade date carried
+   * them to the reporting currency.
+   */
+  onwardMarketCount: number;
 }
