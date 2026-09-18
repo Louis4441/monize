@@ -134,3 +134,27 @@ What is shared, and why each one is a single writer:
 - **Whether the figure may be reported at all** is `decideDailyMovement` (`securities/daily-movement.util.ts`), a pure function table-tested against the design's truth table B. A change needs two complete values of two different observations plus a convertible flow; the client reads `complete` and `reasons` and re-derives no row of that table.
 
 Two subtleties the shapes encode. A **zero baseline** yields no percentage but a known movement, so `movement` survives with `complete: false` -- the cell stays blank, the day panel may show the figure. And the detail endpoint's **`remainder`** (the move no per-security close explains: a dividend, a position first priced that day, cash interest) is `null` whenever any component is unknown, because a remainder computed from a subtotal is a reconciliation that reconciles nothing.
+
+## The portfolio summary is computed once per user, scope and minute, and forgotten where it stops being true
+
+`PortfolioService.getPortfolioSummary` is the most expensive read in the application: live FX priming, a per-holding cost-basis replay, and a day-by-day since-inception result. Opening the Investments page issued three requests that each needed it -- `GET /portfolio/summary`, `GET /portfolio/allocation/by-tag` and `GET /portfolio/tag-keys` -- and they start together, so the server computed the same valuation three times concurrently.
+
+`backend/src/securities/portfolio-summary-memo.ts` holds it. The key is `userId | sorted accountIds (or "all") | reporting currency | ambient identity`. Every input that changes the answer is part of the key rather than a reason to bypass the memo: a display currency that is not the preference is a different key, not a fresh computation; the ambient identity is in the key because a delegate reads the owner's accounts under the delegate's RLS identity, and the answer it computes is not necessarily the answer the owner's own request would compute. The reporting currency is therefore resolved before the memo, from the same `preferredCurrency(pref)` read the computation used to do first.
+
+The entry holds the **in-flight promise**, not only the settled value: that is what makes three simultaneous requests await one computation rather than start three. A rejection is never remembered -- the entry is dropped so the next caller recomputes instead of inheriting a failure for a minute. Entries expire after 60 s (`PORTFOLIO_SUMMARY_MEMO_TTL_MS`, the same window the intraday price cache in the same service uses) and the map is bounded at 256 entries, evicting the oldest first.
+
+It is wrapped at the service boundary, so the controller, `loadTaggedAllocationInputs`, the security detail page, Monte Carlo and the AI / MCP `get_portfolio_summary` tool all share one answer without knowing the memo exists.
+
+`invalidatePortfolioSummary(userId)` is called wherever a memoized valuation stops being true:
+
+| Seam | Where |
+|---|---|
+| Any money-moving write, after it commits | `NetWorthService.triggerDebouncedRecalc` and `recalculateAccount` (INV-CACHE-001) -- immediately, not on the debounce timer |
+| A provider quote or a historical bar | `SecurityPriceService.savePriceData` and `bulkUpsertPrices`, which between them carry refresh, refresh/selected, daily settlement and every backfill |
+| A manual price create, update or delete | `SecurityPriceService.scheduleSnapshotRecalc`, which also covers a security no account holds |
+| The transaction-price maintenance pass | `backfillTransactionPrices`, whole memo: there is no single owner |
+| A backup restore, a demo reset, an undo or a redo | `BackupRestoreService.restoreData`, `DemoResetService.performDemoReset`, `ActionHistoryService.undo` / `redo` |
+
+**The memo is process memory, and that is the bargain.** With more than one replica, a write served by pod A leaves pod B able to answer from its own memo for up to 60 s afterwards, because invalidation is a local call and not a broadcast. That is the same staleness the intraday cache already accepts, and the reason the TTL is short; it is not a distributed cache and must not be relied on as one. Anything that needs a guarantee rather than a latency improvement reads the database.
+
+`getPortfolioTagSummary` is the one caller that was removed rather than memoized. Which tags the held securities carry is a question about `holdings`, `securities`, `security_tags` and `tags` -- no price, no rate, no cost basis -- so it is one scoped query under the valuation's own held predicate (`ABS(quantity) >= 0.0001`). It reports `keys` (the distinct KEY:VALUE namespaces) and `hasTaggedHoldings` separately, because a portfolio tagged only with plain labels has no keys and still has a by-tag grouping worth offering. It is also more honest than the path it replaces: the valuation-based one dropped an unpriced or unconvertible holding's slice from the allocation, so a late price feed silently removed a tag key from the switcher.

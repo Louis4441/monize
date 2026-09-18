@@ -3904,16 +3904,31 @@ Statement           A write that changes money invalidates every client cache
                     family derived from transactions.
 Enforcement         invalidateBalanceCaches (frontend lib/apiCache.ts) drops the
                     accounts:, investments: AND budgets: prefixes -- every
-                    transaction-derived family. The cache layer is frontend, which
-                    is why the function name does not appear in backend/src.
-Concurrency scope   per browser tab
+                    transaction-derived family. The cache layer is mostly
+                    frontend, which is why the function name does not appear in
+                    backend/src. The server holds one derived cache of its own,
+                    the portfolio-summary memo
+                    (backend/src/securities/portfolio-summary-memo.ts), and it
+                    joins the same rule: invalidatePortfolioSummary(userId) runs
+                    on NetWorthService.triggerDebouncedRecalc and
+                    recalculateAccount -- the post-commit seam every
+                    money-moving write already passes through, immediately
+                    rather than on the debounce timer -- and on each price write
+                    seam, a restore, a demo reset and an undo or redo. It is
+                    process memory with a 60 s TTL, so on a second replica the
+                    bound is the TTL rather than the invalidation;
+                    docs/backend/securities-and-providers.md states that.
+Concurrency scope   per browser tab; per pod for the server-side memo
 Failure response    a saved transaction drops the budget cache, so the progress
                     bar reflects the write.
 Required tests      Present: frontend cache-prefix-classification.guard.test.ts
                     requires every cache prefix to declare itself transaction-
                     derived (and be dropped) or reference-data (and be kept), so a
                     new family cannot default to stale; balance-cache.guard.test.ts
-                    requires every balance-writing API method to invalidate.
+                    requires every balance-writing API method to invalidate;
+                    backend portfolio-summary-memo.spec.ts and the memo cases in
+                    portfolio.service.spec.ts require an invalidated user to
+                    recompute while another user's entry survives.
 Status              enforced
 ```
 
