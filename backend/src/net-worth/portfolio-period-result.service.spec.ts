@@ -37,6 +37,7 @@ describe("PortfolioPeriodResultService", () => {
   let rateRows: FakeRow[];
   let settledTradeRows: FakeRow[];
   let mixedSplitRows: FakeRow[];
+  let firstTxRows: FakeRow[];
   let queries: Array<{ sql: string; params: unknown[] }>;
 
   beforeEach(async () => {
@@ -60,6 +61,7 @@ describe("PortfolioPeriodResultService", () => {
     rateRows = [];
     settledTradeRows = [{ count: "0" }];
     mixedSplitRows = [{ count: "0" }];
+    firstTxRows = [{ date: "2026-01-02" }];
 
     const preferenceRepo = {
       findOne: jest.fn(async () => ({ defaultCurrency: "CAD" })),
@@ -71,6 +73,7 @@ describe("PortfolioPeriodResultService", () => {
         // Three statements name `investment_transactions` (the flow query and
         // the mixed-split count do so inside their exclusions), so each is
         // matched on a fragment only it carries.
+        if (sql.includes("MIN(it.transaction_date)")) return firstTxRows;
         if (sql.includes("it.action AS action")) return investedRows;
         if (sql.includes("SUM(t.amount)")) return flowRows;
         if (sql.includes("it.funding_account_id")) return settledTradeRows;
@@ -530,6 +533,172 @@ describe("PortfolioPeriodResultService", () => {
 
       expect(result.netExternalFlows).toBeNull();
       expect(result.missingRatePairs).toContain("EUR->CAD");
+    });
+  });
+
+  /**
+   * The portfolio summary's "TWR (time-weighted)" is this window of this
+   * measure. It used to be a second implementation of the same caption, which
+   * valued each boundary from `security_prices` alone and dropped an unpriced
+   * position out of the value instead of withholding the figure (#1392). The
+   * cases below hold the two properties that implementation's own tests stated,
+   * plus the equivalence that makes this method a window rather than a
+   * calculation of its own.
+   */
+  describe("getInvestedResultSinceInception", () => {
+    const buyRow = {
+      date: "2026-01-02",
+      currency: "CAD",
+      action: "BUY",
+      total: "8000",
+      gross: "0",
+    };
+
+    /** 8,000 bought on the first day, worth 8,800 today; the baseline is empty. */
+    const sinceSeries = () => [
+      point("2026-01-01", 0),
+      point("2026-01-02", 8_000),
+      point("2026-09-17", 8_800),
+    ];
+
+    it("equals the single route asked for the first transaction and the day before", async () => {
+      netWorth.getDailyInvestments.mockResolvedValue(sinceSeries());
+      investedRows = [buyRow];
+
+      const since = await service.getInvestedResultSinceInception("user-1");
+      const direct = await service.getPeriodResult("user-1", {
+        startDate: "2026-01-02",
+        baselineDate: "2026-01-01",
+        endDate: "2026-09-17",
+      });
+
+      expect(since).toEqual(direct);
+      expect(since.investmentPnl).toBe(800);
+      expect(since.investmentReturnPercent).toBe(10);
+      expect(since.investedReasons).toEqual([]);
+    });
+
+    it("asks for the series from the day before the first transaction", async () => {
+      netWorth.getDailyInvestments.mockResolvedValue(sinceSeries());
+
+      await service.getInvestedResultSinceInception("user-1");
+
+      expect(netWorth.getDailyInvestments).toHaveBeenCalledWith(
+        "user-1",
+        "2026-01-01",
+        "2026-09-17",
+        undefined,
+        "CAD",
+        { fetchMissing: undefined },
+      );
+    });
+
+    it("returns the empty decision when the scope has no investment transaction", async () => {
+      firstTxRows = [{ date: null }];
+
+      const result = await service.getInvestedResultSinceInception("user-1");
+
+      expect(result.investedReasons).toEqual(["noValueSeries"]);
+      expect(result.investmentReturnPercent).toBeNull();
+      expect(netWorth.getDailyInvestments).not.toHaveBeenCalled();
+    });
+
+    it("returns the empty decision for a scope with no accounts", async () => {
+      scopeRows = [];
+
+      const result = await service.getInvestedResultSinceInception("user-1");
+
+      expect(result.investedReasons).toEqual(["noValueSeries"]);
+      expect(result.investmentReturnPercent).toBeNull();
+    });
+
+    it("reports the price return through a split, not a share-count jump", async () => {
+      // A 2-for-1 on 2026-06-01: twice the shares at half the price is the same
+      // value, and a SPLIT is neither capital nor income, so the day is a
+      // factor of 1 and the window is still the security's own 10%.
+      netWorth.getDailyInvestments.mockResolvedValue([
+        point("2026-01-01", 0),
+        point("2026-01-02", 8_000),
+        point("2026-06-01", 8_000),
+        point("2026-09-17", 8_800),
+      ]);
+      investedRows = [
+        buyRow,
+        {
+          date: "2026-06-01",
+          currency: "CAD",
+          action: "SPLIT",
+          total: "0",
+          gross: "8000",
+        },
+      ];
+
+      const result = await service.getInvestedResultSinceInception("user-1");
+
+      expect(result.investmentCapitalFlows).toBe(8_000);
+      expect(result.investmentReturnPercent).toBe(10);
+    });
+
+    it("withholds the return when a day the chain spans could not convert a position", async () => {
+      netWorth.getDailyInvestments.mockResolvedValue([
+        point("2026-01-01", 0),
+        point("2026-01-02", 8_000),
+        point("2026-09-17", 8_800, { fxComplete: false }),
+      ]);
+      investedRows = [buyRow];
+
+      const result = await service.getInvestedResultSinceInception("user-1");
+
+      expect(result.investmentReturnPercent).toBeNull();
+      expect(result.investmentPnl).toBeNull();
+      expect(result.investedReasons).toContain("missingRatePairs");
+    });
+
+    it("withholds the return when a held position has no close on a day the chain spans", async () => {
+      // The defect this replaced: the old summary TWR left an unpriced
+      // position OUT of the period value, so the position entered the chain as
+      // a gain on the first boundary that priced it.
+      netWorth.getDailyInvestments.mockResolvedValue([
+        point("2026-01-01", 0),
+        point("2026-01-02", 8_000, {
+          pricesComplete: false,
+          unpricedSecurityIds: ["sec-2"],
+        }),
+        point("2026-09-17", 20_000),
+      ]);
+      investedRows = [buyRow];
+
+      const result = await service.getInvestedResultSinceInception("user-1");
+
+      expect(result.investmentReturnPercent).toBeNull();
+      expect(result.investedReasons).toContain("incompletePrices");
+    });
+
+    it("counts a dividend as return and a cash deposit as neither", async () => {
+      netWorth.getDailyInvestments.mockResolvedValue([
+        point("2026-01-01", 0),
+        point("2026-01-02", 8_000),
+        point("2026-09-17", 8_000),
+      ]);
+      investedRows = [
+        buyRow,
+        {
+          date: "2026-09-17",
+          currency: "CAD",
+          action: "DIVIDEND",
+          total: "100",
+          gross: "0",
+        },
+      ];
+      flowRows = [{ date: "2026-09-17", currency: "CAD", total: "50000" }];
+
+      const result = await service.getInvestedResultSinceInception("user-1");
+
+      expect(result.netExternalFlows).toBe(50_000);
+      expect(result.investmentIncome).toBe(100);
+      expect(result.investmentCapitalFlows).toBe(8_000);
+      expect(result.investmentPnl).toBe(100);
+      expect(result.investmentReturnPercent).toBe(1.25);
     });
   });
 });

@@ -8,9 +8,11 @@ import {
 import { DataSource } from "typeorm";
 
 import { withScopedDb } from "../common/db/scoped-db";
-import { todayYMD } from "../common/date-utils";
+import { returnedRows } from "../common/db/query-result";
+import { addDaysYMD, todayYMD } from "../common/date-utils";
 import { preferredCurrency } from "../common/default-currency.util";
 import { loadExternalFlowSubtotals } from "../securities/external-flow.util";
+import { investmentEffectStatusSql } from "../securities/investment-row-effects.util";
 import {
   UNFILTERED_INVESTMENT_SCOPE_SQL,
   resolveInvestmentScopeAccountIds,
@@ -185,25 +187,7 @@ export class PortfolioPeriodResultService {
         ? opts.baselineDate
         : opts.startDate;
 
-    const empty: PortfolioPeriodResult = {
-      currency,
-      startDate: from,
-      endDate: end,
-      startValue: null,
-      endValue: null,
-      valueChange: null,
-      netExternalFlows: null,
-      knownFlowSubtotal: 0,
-      investmentResult: null,
-      returnPercent: null,
-      returnMethod: "simple",
-      complete: false,
-      reasons: ["noValueSeries"],
-      missingRatePairs: [],
-      unpricedSecurityIds: [],
-      unknownCashAccountIds: [],
-      ...NO_INVESTED_PERIOD,
-    };
+    const empty = this.emptyResult(currency, from, end);
 
     if (from > end) return empty;
 
@@ -301,6 +285,110 @@ export class PortfolioPeriodResultService {
       endDate: series[series.length - 1].date,
       ...decision,
       ...investedDecision,
+    };
+  }
+
+  /**
+   * The INVESTED part's result over the scope's whole life, for a surface whose
+   * caption is "since inception" rather than a window.
+   *
+   * The portfolio summary's `timeWeightedReturn` used to be a second, older
+   * implementation of this measure: it valued each sub-period from
+   * `security_prices` alone and silently OMITTED a position with no stored
+   * close on a boundary, so a position entered the chain as a gain on the first
+   * boundary that priced it, it valued its final sub-period from a different
+   * price source, and it counted no income and knew nothing of the
+   * invested/cash split. Two implementations of one caption are two answers to
+   * one question (#1392), so the window is resolved here and the figures come
+   * from `getPeriodResult` -- the same series, the same capital and income
+   * load, the same rate index and the same `investedPeriodResult` decision the
+   * six-period card reads. Nothing is recomputed; only the dates are chosen.
+   *
+   * `b` is the day BEFORE the scope's earliest non-VOID investment transaction,
+   * because `IV(b)` is a close and already holds everything dated `b`: measuring
+   * from the first transaction's own close would drop the day that bought the
+   * portfolio out of the chain. `e` is the routes' own `todayYMD()`.
+   */
+  async getInvestedResultSinceInception(
+    userId: string,
+    opts: {
+      accountIds?: string[];
+      displayCurrency?: string;
+    } & SeriesFetchOptions = {},
+  ): Promise<PortfolioPeriodResult> {
+    const currency = await this.reportingCurrency(userId, opts.displayCurrency);
+    const end = todayYMD();
+
+    const scope = await this.resolveScope(userId, opts.accountIds);
+    if (scope.length === 0) return this.emptyResult(currency, end, end);
+
+    const first = await this.firstInvestmentDate(
+      userId,
+      scope.map((row) => row.id),
+    );
+    // No transaction is no inception: there is no window to measure, which is
+    // the empty decision rather than a zero.
+    if (first === null) return this.emptyResult(currency, end, end);
+
+    return this.getPeriodResult(userId, {
+      startDate: first,
+      baselineDate: addDaysYMD(first, -1),
+      endDate: end,
+      accountIds: opts.accountIds,
+      displayCurrency: currency,
+      fetchMissing: opts.fetchMissing,
+    });
+  }
+
+  /**
+   * The scope's earliest investment transaction date, or `null` when it has
+   * none. Rows as EFFECTS: a VOID row records something that did not happen, so
+   * it cannot be the day a portfolio started (`investmentEffectStatusSql`).
+   */
+  private async firstInvestmentDate(
+    userId: string,
+    accountIds: string[],
+  ): Promise<string | null> {
+    if (accountIds.length === 0) return null;
+    const rows = returnedRows<{ date: string | null }>(
+      await withScopedDb(this.dataSource, (m) =>
+        m.query(
+          `SELECT TO_CHAR(MIN(it.transaction_date), 'YYYY-MM-DD') AS date
+             FROM investment_transactions it
+            WHERE it.user_id = $1
+              AND it.account_id = ANY($2::UUID[])
+              AND ${investmentEffectStatusSql("it")}`,
+          [userId, accountIds],
+        ),
+      ),
+    );
+    return rows[0]?.date ?? null;
+  }
+
+  /** The answer for a scope or window with no valued day in it at all. */
+  private emptyResult(
+    currency: string,
+    from: string,
+    end: string,
+  ): PortfolioPeriodResult {
+    return {
+      currency,
+      startDate: from,
+      endDate: end,
+      startValue: null,
+      endValue: null,
+      valueChange: null,
+      netExternalFlows: null,
+      knownFlowSubtotal: 0,
+      investmentResult: null,
+      returnPercent: null,
+      returnMethod: "simple",
+      complete: false,
+      reasons: ["noValueSeries"],
+      missingRatePairs: [],
+      unpricedSecurityIds: [],
+      unknownCashAccountIds: [],
+      ...NO_INVESTED_PERIOD,
     };
   }
 
