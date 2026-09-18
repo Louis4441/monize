@@ -288,6 +288,17 @@ under their own captions. Those three also PLOT the invested value --
 answer two different questions. The dashboard's Net Worth chart is net worth
 and keeps its cash.
 
+**`PortfolioValueReport` draws ONE valuation scope -- the invested value --
+across its sum line, its "By security" breakdown, its KPIs (high/low/change),
+its table and its CSV.** The breakdown response folds cash into each point's
+`total`, so the report reads `breakdownInvestedValue(point, cashKey)`
+(`lib/invested-value.ts`) for every figure the KPIs, the table total column and
+the CSV compare against, and drops `cashComplete` from the point's completeness
+exactly as the daily sum path does (the invested value holds no cash); the cash
+band still renders as its own labelled column, never folded into the total
+captioned as the invested value. Letting the drawing mode pick the quantity is
+what made "Total" and "By security" peak at different numbers for one window.
+
 **The client picks the dates; the server measures.** `usesPriorCloseBaseline`
 and `previousCalendarDay` (`components/investments/portfolio-change-baseline.ts`)
 still decide that 1d, 1w and mtd report against the previous trading day's
@@ -364,6 +375,8 @@ A cumulative series with one unpriceable occurrence is withheld whole -- but a b
 Both halves hold in the register as well as the report: `InvestmentPriceValue` (`components/investments/InvestmentTransactionListParts.tsx`) draws `UnknownAmount reason="noPrice"` for a row with no `price` and `reason="unknownCurrency"` for one whose code is `null`, because `price ?? 0` prints a measured-looking free trade and an absent code falls through to the reader's own currency. A SPLIT with no post-split price keeps its dash: a ratio was never a price.
 
 Deriving the unit from the account made a EUR trade and a USD trade in a PLN brokerage both print `1 000,00 zl`, and a single selected account was read as proof of a single currency, which skipped conversion entirely (issue #1394).
+
+**A holding row and the account/portfolio total it sits under convert from ONE FX snapshot -- the server's.** `GroupedHoldingsList`'s row reads its market value already converted into the account and reporting currencies (`HoldingWithMarketValue.marketValueAccountCurrency` / `marketValueDefaultCurrency`, from the same server valuation that produced the totals), never a client-side re-conversion of `marketValue` through `useExchangeRates().getRate`: a second rate for one snapshot made the rows disagree with the total beneath them and divided a client-rate numerator by a server-rate denominator in the share of the portfolio. Same currency is 1:1 by definition (no server field needed); an unresolved pair is `null` and renders unknown, never a wrong-denominator percent, and the security-currency figure stays its own real number.
 
 Totals over those rows are the server's, not the client's: `investmentReportsApi.getTransactionSummary` converts every matching row at the rate that stood on its own transaction date and answers with `total`, `knownSubtotal`, `missingPairs`, `excludedCount` and `fxComplete`. Two reasons, either sufficient. The client pages the register and stops at a cap, so a figure summed here describes part of the data under a caption that says "total"; and only the server can price a trade at its own date. Render the aggregate through `PartialTotal` and relabel the caption when `fxComplete === false`.
 
