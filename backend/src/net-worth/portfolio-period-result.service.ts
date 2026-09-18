@@ -26,7 +26,6 @@ import {
   foldFlowSubtotals,
 } from "./period-flow-fold.util";
 import {
-  PeriodFlow,
   PeriodResultReason,
   PeriodReturnMethod,
   UnmeasuredFlowCounts,

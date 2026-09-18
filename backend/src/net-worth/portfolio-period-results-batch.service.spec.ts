@@ -13,6 +13,7 @@ import {
 } from "./portfolio-period-presets.util";
 import { PortfolioPeriodResultService } from "./portfolio-period-result.service";
 import { PortfolioPeriodResultsBatchService } from "./portfolio-period-results-batch.service";
+import { ExchangeRateService } from "../currencies/exchange-rate.service";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -76,6 +77,7 @@ describe("PortfolioPeriodResultsBatchService", () => {
   let batch: PortfolioPeriodResultsBatchService;
   let single: PortfolioPeriodResultService;
   let netWorth: { getDailyInvestments: jest.Mock };
+  let exchangeRates: { ensureRatesForDate: jest.Mock };
   let mocks: ReturnType<typeof createScopedDbMocks>;
   let scopeRows: FakeRow[];
   let flowRows: Array<{ date: string; currency: string; total: string }>;
@@ -144,12 +146,15 @@ describe("PortfolioPeriodResultsBatchService", () => {
       ),
     };
 
+    exchangeRates = { ensureRatesForDate: jest.fn(async () => 0) };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PortfolioPeriodResultService,
         PortfolioPeriodResultsBatchService,
         { provide: DataSource, useValue: mocks.dataSource },
         { provide: NetWorthService, useValue: netWorth },
+        { provide: ExchangeRateService, useValue: exchangeRates },
       ],
     }).compile();
 
@@ -197,6 +202,7 @@ describe("PortfolioPeriodResultsBatchService", () => {
       TODAY,
       undefined,
       "CAD",
+      { fetchMissing: undefined },
     );
   });
 
@@ -210,6 +216,7 @@ describe("PortfolioPeriodResultsBatchService", () => {
       TODAY,
       undefined,
       "CAD",
+      { fetchMissing: undefined },
     );
     const flowQuery = queries.find((q) => q.sql.includes("SUM(t.amount)"))!;
     expect(flowQuery.params[1]).toBe("2026-09-09");
@@ -303,6 +310,7 @@ describe("PortfolioPeriodResultsBatchService", () => {
       TODAY,
       undefined,
       "USD",
+      { fetchMissing: undefined },
     );
   });
 
@@ -330,5 +338,72 @@ describe("PortfolioPeriodResultsBatchService", () => {
     expect(results.asOf).toBe(TODAY);
     expect(results.periods["1m"]?.endDate).toBe(TODAY);
     expect(results.periods["3m"]).toBeUndefined();
+  });
+
+  describe("read-path FX fill", () => {
+    // A EUR deposit into a CAD-reported portfolio with no stored EUR rate: the
+    // flow is the component that cannot convert, so the batch asks the
+    // provider ONCE for the whole window, not once per preset (#1390).
+    const eurFlow = () => {
+      flowRows = [{ date: "2026-06-01", currency: "EUR", total: "10000" }];
+    };
+
+    it("asks the provider once for the month the flow could not convert", async () => {
+      eurFlow();
+
+      const results = await batch.getPeriodResults("user-1");
+
+      expect(exchangeRates.ensureRatesForDate).toHaveBeenCalledTimes(1);
+      expect(exchangeRates.ensureRatesForDate).toHaveBeenCalledWith(
+        [{ from: "EUR", to: "CAD" }],
+        "2026-06-01",
+      );
+      // Nothing was stored: every window holding the flow stays withheld, and
+      // the 3M window, which does not hold it, is unaffected.
+      expect(results.periods["1y"]?.netExternalFlows).toBeNull();
+      expect(results.periods["1y"]?.missingRatePairs).toContain("EUR->CAD");
+      expect(results.periods["3m"]?.netExternalFlows).toBe(0);
+    });
+
+    it("re-reads the rates once and every preset sees the filled index", async () => {
+      eurFlow();
+      exchangeRates.ensureRatesForDate.mockImplementation(async () => {
+        rateRows = [
+          {
+            from_currency: "EUR",
+            to_currency: "CAD",
+            rate: "1.5",
+            rate_date: "2026-06-01",
+          },
+        ];
+        return 20;
+      });
+
+      const results = await batch.getPeriodResults("user-1");
+
+      expect(exchangeRates.ensureRatesForDate).toHaveBeenCalledTimes(1);
+      expect(results.periods["1y"]?.netExternalFlows).toBe(15_000);
+      expect(results.periods["ytd"]?.netExternalFlows).toBe(15_000);
+      expect(results.periods["1y"]?.missingRatePairs).toEqual([]);
+    });
+
+    it("makes no provider call, on either half, when the caller opted out", async () => {
+      eurFlow();
+
+      const results = await batch.getPeriodResults("user-1", {
+        fetchMissing: false,
+      });
+
+      expect(exchangeRates.ensureRatesForDate).not.toHaveBeenCalled();
+      expect(netWorth.getDailyInvestments).toHaveBeenCalledWith(
+        "user-1",
+        "2025-09-17",
+        TODAY,
+        undefined,
+        "CAD",
+        { fetchMissing: false },
+      );
+      expect(results.periods["1y"]?.netExternalFlows).toBeNull();
+    });
   });
 });
