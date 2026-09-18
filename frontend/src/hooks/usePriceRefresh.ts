@@ -134,7 +134,16 @@ export function usePriceRefresh({ onRefreshComplete }: UsePriceRefreshOptions = 
             toast.success(t('priceRefresh.updated', { count: result.updated }));
           }
         }
-        await onRefreshComplete?.(result.lastUpdated);
+        // Only when something actually changed. `onRefreshComplete` reloads the
+        // page's data -- on the Investments page a portfolio summary and a
+        // transaction page, seconds of server work -- and a refresh that
+        // updated nothing (market closed, every quote refused, nothing
+        // eligible) leaves every one of those answers exactly as it was. The
+        // user saw the page "reload" for no reason at t=5.6 s of a 6.8 s page
+        // open. `updated` is the server's own count of rows it wrote.
+        if (result.updated > 0) {
+          await onRefreshComplete?.(result.lastUpdated);
+        }
       } catch (error) {
         logger.error('Failed to refresh prices:', error);
         if (!silent) toast.error(getErrorMessage(error, t('priceRefresh.failed')));

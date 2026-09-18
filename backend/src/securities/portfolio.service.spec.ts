@@ -21,6 +21,10 @@ import {
   type IncompleteDataRanges,
 } from "../net-worth/incomplete-data-ranges.util";
 import { EMPTY_RETURN_DIAGNOSTICS } from "./return-diagnostics.util";
+import {
+  invalidatePortfolioSummary,
+  portfolioSummaryMemo,
+} from "./portfolio-summary-memo";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -181,6 +185,11 @@ describe("PortfolioService", () => {
   };
 
   beforeEach(async () => {
+    // The summary memo is process-wide and survives between tests, which is the
+    // point in production and a source of cross-test contamination here: two
+    // cases that ask the same user for the same scope would otherwise share the
+    // first one's fixtures for a minute.
+    portfolioSummaryMemo.clearAll();
     holdingsRepository = {
       find: jest.fn(),
       // primeLiveRates queries distinct holding currencies via the query
@@ -4537,6 +4546,152 @@ describe("PortfolioService", () => {
       );
       expect(result.allocation.find((a) => a.name === "AI")?.value).toBe(50);
       expect(result.allocation.find((a) => a.type === "cash")?.value).toBe(50);
+    });
+  });
+
+  describe("getPortfolioTagSummary", () => {
+    beforeEach(() => {
+      prefRepository.findOne.mockResolvedValue(mockPref);
+      accountsRepository.find.mockResolvedValue([
+        mockBrokerageAccount,
+        mockCashAccount,
+      ]);
+    });
+
+    it("reads the held securities' tags without valuing the portfolio", async () => {
+      const summarySpy = jest.spyOn(service, "getPortfolioSummary");
+      // Only the tags of securities the scope still holds come back: the
+      // statement's `ABS(quantity) >= 0.0001` leaves a sold-out security's tag
+      // out of the result set, exactly as the valuation-based path did by
+      // dropping its allocation slice.
+      accountsRepository.query.mockResolvedValue([
+        { name: "AI" },
+        { name: "country:canada" },
+        { name: "sector:tech" },
+      ]);
+
+      const result = await service.getPortfolioTagSummary(userId);
+
+      expect(result).toEqual({
+        keys: ["country", "sector"],
+        hasTaggedHoldings: true,
+      });
+      expect(summarySpy).not.toHaveBeenCalled();
+      expect(holdingsRepository.find).not.toHaveBeenCalled();
+      const [sql, params] = accountsRepository.query.mock.calls[0];
+      expect(sql).toContain("FROM holdings h");
+      expect(sql).toContain("JOIN security_tags st");
+      expect(sql).toContain("ABS(h.quantity) >= 0.0001");
+      expect(params).toEqual([["acct-brokerage-1"], userId]);
+    });
+
+    it("reports no tags when every holding in the scope is untagged", async () => {
+      accountsRepository.query.mockResolvedValue([]);
+
+      await expect(service.getPortfolioTagSummary(userId)).resolves.toEqual({
+        keys: [],
+        hasTaggedHoldings: false,
+      });
+    });
+
+    it("offers the by-tag grouping for plain labels, which carry no key", async () => {
+      accountsRepository.query.mockResolvedValue([
+        { name: "Core" },
+        { name: "Speculative" },
+      ]);
+
+      await expect(service.getPortfolioTagSummary(userId)).resolves.toEqual({
+        keys: [],
+        hasTaggedHoldings: true,
+      });
+    });
+
+    it("asks nothing of the database when the scope holds no securities", async () => {
+      accountsRepository.find.mockResolvedValue([mockCashAccount]);
+
+      await expect(service.getPortfolioTagSummary(userId)).resolves.toEqual({
+        keys: [],
+        hasTaggedHoldings: false,
+      });
+      expect(accountsRepository.query).not.toHaveBeenCalled();
+    });
+
+    it("getPortfolioTagKeys is the keys of that same answer", async () => {
+      accountsRepository.query.mockResolvedValue([
+        { name: "country:canada" },
+        { name: "Core" },
+      ]);
+
+      await expect(service.getPortfolioTagKeys(userId)).resolves.toEqual([
+        "country",
+      ]);
+    });
+  });
+
+  describe("the summary memo", () => {
+    beforeEach(() => {
+      prefRepository.findOne.mockResolvedValue(mockPref);
+      accountsRepository.find.mockResolvedValue([
+        mockBrokerageAccount,
+        mockCashAccount,
+      ]);
+      holdingsRepository.find.mockResolvedValue([mockHoldingAAPL]);
+      securityPriceRepository.query.mockResolvedValue([
+        {
+          security_id: "sec-1",
+          close_price: "175.50",
+          price_date: "2026-02-07",
+        },
+      ]);
+      accountsRepository.query.mockResolvedValue([]);
+    });
+
+    it("computes one valuation for concurrent summary and by-tag callers", async () => {
+      const compute = jest.spyOn(
+        service as unknown as {
+          computePortfolioSummary: (...args: unknown[]) => Promise<unknown>;
+        },
+        "computePortfolioSummary",
+      );
+
+      const [summary, byTag] = await Promise.all([
+        service.getPortfolioSummary(userId),
+        service.getAllocationByTag(userId),
+      ]);
+
+      expect(compute).toHaveBeenCalledTimes(1);
+      expect(byTag.totalValue).toBe(summary.totalPortfolioValue);
+    });
+
+    it("recomputes after the user's derived state is invalidated", async () => {
+      const compute = jest.spyOn(
+        service as unknown as {
+          computePortfolioSummary: (...args: unknown[]) => Promise<unknown>;
+        },
+        "computePortfolioSummary",
+      );
+
+      await service.getPortfolioSummary(userId);
+      await service.getPortfolioSummary(userId);
+      expect(compute).toHaveBeenCalledTimes(1);
+
+      invalidatePortfolioSummary(userId);
+
+      await service.getPortfolioSummary(userId);
+      expect(compute).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not share one scope's valuation with another", async () => {
+      const compute = jest.spyOn(
+        service as unknown as {
+          computePortfolioSummary: (...args: unknown[]) => Promise<unknown>;
+        },
+        "computePortfolioSummary",
+      );
+
+      await service.getPortfolioSummary(userId, ["acct-brokerage-1"]);
+      await service.getPortfolioSummary(userId);
+      expect(compute).toHaveBeenCalledTimes(2);
     });
   });
 

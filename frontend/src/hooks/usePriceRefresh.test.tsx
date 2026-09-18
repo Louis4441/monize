@@ -305,6 +305,52 @@ describe('usePriceRefresh', () => {
     expect(onRefreshComplete).toHaveBeenCalledWith('2026-04-15T14:06:00Z');
   });
 
+  it('does not reload the page when the refresh updated nothing', async () => {
+    // The callback reloads the portfolio summary and the register, seconds of
+    // server work. A refresh that wrote no price (market closed, every quote
+    // refused) leaves both answers exactly as they were, and the reader saw the
+    // page redraw for nothing.
+    const onRefreshComplete = vi.fn();
+    vi.mocked(investmentsApi.getSecurities).mockResolvedValue([sec('s-1')] as any);
+    vi.mocked(investmentsApi.refreshSelectedPrices).mockResolvedValue({
+      updated: 0,
+      failed: 0,
+      totalSecurities: 1,
+      skipped: 1,
+      results: [],
+      lastUpdated: '2026-04-15T14:06:00Z',
+    });
+
+    const { result } = renderHook(() => usePriceRefresh({ onRefreshComplete }));
+    await act(async () => {
+      await result.current.triggerManualRefresh();
+    });
+    expect(investmentsApi.refreshSelectedPrices).toHaveBeenCalled();
+    expect(onRefreshComplete).not.toHaveBeenCalled();
+  });
+
+  it('still reloads when only some symbols failed but one was written', async () => {
+    const onRefreshComplete = vi.fn();
+    vi.mocked(investmentsApi.getSecurities).mockResolvedValue([
+      sec('s-1'),
+      sec('s-2'),
+    ] as any);
+    vi.mocked(investmentsApi.refreshSelectedPrices).mockResolvedValue({
+      updated: 1,
+      failed: 1,
+      totalSecurities: 2,
+      skipped: 0,
+      results: [{ symbol: 'S-2', success: false, error: 'no quote' }],
+      lastUpdated: '2026-04-15T14:06:00Z',
+    });
+
+    const { result } = renderHook(() => usePriceRefresh({ onRefreshComplete }));
+    await act(async () => {
+      await result.current.triggerManualRefresh();
+    });
+    expect(onRefreshComplete).toHaveBeenCalledWith('2026-04-15T14:06:00Z');
+  });
+
   it('does nothing when refresh is already in progress', async () => {
     setRefreshInProgress(true);
     const { result } = renderHook(() => usePriceRefresh());

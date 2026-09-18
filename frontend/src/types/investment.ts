@@ -360,6 +360,21 @@ export interface AssetAllocation {
   totalValue: number;
 }
 
+/**
+ * What the portfolio's held securities are tagged with (`GET /portfolio/tag-keys`).
+ *
+ * `keys` are the distinct KEY:VALUE namespaces, case-folded and sorted, for the
+ * aggregate-by-key chart. `hasTaggedHoldings` is a separate question: a
+ * portfolio tagged only with plain labels has no keys but still has a by-tag
+ * grouping worth offering, and the chart decides whether to show that toggle
+ * from this rather than from the by-tag allocation it no longer fetches on
+ * mount.
+ */
+export interface PortfolioTagSummary {
+  keys: string[];
+  hasTaggedHoldings: boolean;
+}
+
 export interface InvestmentTransaction {
   id: string;
   accountId: string;

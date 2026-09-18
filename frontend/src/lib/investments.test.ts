@@ -313,6 +313,43 @@ describe('investmentsApi', () => {
     );
   });
 
+  it('refreshSelectedPrices drops the investments cache when a price was written', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { totalValue: 1000 } });
+    await investmentsApi.getPortfolioSummary();
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { updated: 1 } });
+
+    await investmentsApi.refreshSelectedPrices(['s-1']);
+
+    vi.mocked(apiClient.get).mockClear();
+    await investmentsApi.getPortfolioSummary();
+    expect(apiClient.get).toHaveBeenCalled();
+  });
+
+  it('refreshSelectedPrices keeps the cache when nothing was updated', async () => {
+    // Nothing was written, so every cached investments answer is still true;
+    // dropping them made the next page open pay for a valuation it already had.
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { totalValue: 1000 } });
+    await investmentsApi.getPortfolioSummary();
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { updated: 0 } });
+
+    await investmentsApi.refreshSelectedPrices(['s-1']);
+
+    vi.mocked(apiClient.get).mockClear();
+    await investmentsApi.getPortfolioSummary();
+    expect(apiClient.get).not.toHaveBeenCalled();
+  });
+
+  it('getPortfolioTagSummary fetches /portfolio/tag-keys', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: { keys: ['country'], hasTaggedHoldings: true },
+    });
+    const result = await investmentsApi.getPortfolioTagSummary(['a1']);
+    expect(apiClient.get).toHaveBeenCalledWith('/portfolio/tag-keys', {
+      params: { accountIds: 'a1' },
+    });
+    expect(result).toEqual({ keys: ['country'], hasTaggedHoldings: true });
+  });
+
   it('backfillSecurityPrices posts to the per-security backfill endpoint', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({
       data: { symbol: 'AAPL', success: true, pricesLoaded: 100 },

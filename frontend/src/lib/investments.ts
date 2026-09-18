@@ -35,6 +35,7 @@ import {
   SecurityTransactionHistory,
   SecurityDetail,
   InvestmentRegisterFilterOptions,
+  PortfolioTagSummary,
 } from '@/types/investment';
 import { IntradayBreakdown } from '@/types/net-worth';
 import {
@@ -86,13 +87,19 @@ export const investmentsApi = {
     return response.data;
   },
 
-  // List the KEY:VALUE tag keys present on the portfolio's securities (e.g.
-  // "country", "sector"), so the UI can offer an aggregate-by-key chart.
-  getPortfolioTagKeys: async (accountIds?: string[]): Promise<string[]> => {
+  // What the portfolio's held securities are tagged with: the KEY:VALUE keys
+  // (e.g. "country", "sector") for the aggregate-by-key chart, and whether any
+  // holding carries a tag at all -- a portfolio tagged only with plain labels
+  // has no keys but still has a by-tag grouping worth offering. Answered from
+  // the holdings and their tags, without valuing the portfolio, so it is cheap
+  // enough to fetch on mount.
+  getPortfolioTagSummary: async (
+    accountIds?: string[],
+  ): Promise<PortfolioTagSummary> => {
     const cacheKey = `investments:tag-keys:${accountIds?.join(',') || 'all'}`;
-    const cached = getCached<string[]>(cacheKey);
+    const cached = getCached<PortfolioTagSummary>(cacheKey);
     if (cached) return cached;
-    const response = await apiClient.get<string[]>('/portfolio/tag-keys', {
+    const response = await apiClient.get<PortfolioTagSummary>('/portfolio/tag-keys', {
       params:
         accountIds && accountIds.length > 0
           ? { accountIds: accountIds.join(',') }
@@ -714,7 +721,11 @@ export const investmentsApi = {
       { securityIds },
       { timeout: 120_000 },
     );
-    invalidateCache('investments:');
+    // Only when a price was actually written. A refresh that updated nothing
+    // (market closed, every quote refused, nothing eligible) leaves every
+    // cached investments answer true, and dropping them makes the page pay for
+    // a valuation it already had.
+    if (response.data?.updated > 0) invalidateCache('investments:');
     return response.data;
   },
 
