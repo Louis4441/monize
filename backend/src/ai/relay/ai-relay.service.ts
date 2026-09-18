@@ -220,7 +220,7 @@ export class AiRelayService {
     // Validate and persist any attachments up front so a bad upload rejects the
     // request before the prompt is ever queued (the controller maps the thrown
     // BadRequestException to an error SSE event).
-    const attachments = this.attachmentStore.store(
+    const attachments = await this.attachmentStore.store(
       userId,
       options.attachments ?? [],
     );
@@ -586,11 +586,11 @@ export class AiRelayService {
         }
         if (row.status === "answered") {
           await this.consumeAnswer(userId, promptId);
-          this.releaseAttachments(userId, attachments);
+          await this.releaseAttachments(userId, attachments);
           return { text: row.answer?.text ?? "" };
         }
         if (row.status === "expired" || row.expired) {
-          this.settleExpired(userId, promptId, row, attachments);
+          await this.settleExpired(userId, promptId, row, attachments);
         }
         await signal.wait(
           Math.min(WAKE_POLL_INTERVAL_MS, Number(row.remaining_ms)),
@@ -603,12 +603,12 @@ export class AiRelayService {
   }
 
   /** Give up on a turn whose deadline passed, with the reason the copy needs. */
-  private settleExpired(
+  private async settleExpired(
     userId: string,
     promptId: string,
     row: PromptStateRow,
     attachments: RelayAttachmentRef[],
-  ): never {
+  ): Promise<never> {
     // Distinguish "an agent took it then went quiet" from "no agent ever picked
     // it up": the controller maps the two to different user-facing copy, and a
     // claimed turn's answer is still recoverable via the pickup endpoint if the
@@ -622,7 +622,7 @@ export class AiRelayService {
     }
     // Never claimed: no agent will ever read these attachments, so release them
     // now instead of waiting for the TTL.
-    this.releaseAttachments(userId, attachments);
+    await this.releaseAttachments(userId, attachments);
     this.logger.warn(
       `Relay prompt ${promptId} for user ${userId} timed out with no agent response`,
     );
@@ -945,14 +945,14 @@ export class AiRelayService {
   }
 
   /** Eagerly drop a settled turn's attachments from the store (TTL backstop). */
-  private releaseAttachments(
+  private async releaseAttachments(
     userId: string,
     attachments: RelayAttachmentRef[],
-  ): void {
+  ): Promise<void> {
     if (attachments.length === 0) {
       return;
     }
-    this.attachmentStore.releaseForPrompt(
+    await this.attachmentStore.releaseForPrompt(
       userId,
       attachments.map((a) => a.id),
     );

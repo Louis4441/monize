@@ -546,7 +546,7 @@ export class McpTransactionsTools {
                 "Attachments cannot be added to transfers: attach files to a standard transaction instead.",
               );
             }
-            const resolved = this.resolveMcpAttachments(
+            const resolved = await this.resolveMcpAttachments(
               user.userId,
               items[0].attachments as ManageAttachmentInput[],
             );
@@ -936,10 +936,10 @@ export class McpTransactionsTools {
    * DTOs: relay URIs read the parked chat file, inline base64 is sniffed for a
    * supported type. Returns an error string the model can act on.
    */
-  private resolveMcpAttachments(
+  private async resolveMcpAttachments(
     userId: string,
     entries: ManageAttachmentInput[],
-  ): { dtos: AttachmentDto[] } | { error: string } {
+  ): Promise<{ dtos: AttachmentDto[] } | { error: string }> {
     const dtos: AttachmentDto[] = [];
     for (const entry of entries) {
       const hasUri = entry.attachmentUri !== undefined;
@@ -952,7 +952,7 @@ export class McpTransactionsTools {
       }
       if (hasUri) {
         const id = this.parseAttachmentUri(entry.attachmentUri as string);
-        const stored = this.relayAttachmentStore.get(userId, id);
+        const stored = await this.relayAttachmentStore.get(userId, id);
         if (!stored) {
           return {
             error: `Unknown or expired attachment reference "${entry.attachmentUri}". Chat attachments expire about 20 minutes after upload; ask the user to re-send the file.`,
@@ -1023,7 +1023,7 @@ export class McpTransactionsTools {
         existingTransactionId,
       ),
     );
-    const stored = this.relayAttachmentStore.store(userId, dtos);
+    const stored = await this.relayAttachmentStore.store(userId, dtos);
     return previews.map((preview, i) => ({
       attachmentRefId: stored[i].id,
       filename: preview.filename,
@@ -1055,17 +1055,17 @@ export class McpTransactionsTools {
       );
       created.push({ id: attachment.id, filename: attachment.filename });
     }
-    this.releaseAttachmentRefs(userId, refs);
+    await this.releaseAttachmentRefs(userId, refs);
     return created;
   }
 
   /** Drop parked refs a declined/committed confirmation no longer needs. */
-  private releaseAttachmentRefs(
+  private async releaseAttachmentRefs(
     userId: string,
     refs?: AttachmentRefDescriptor[],
-  ): void {
+  ): Promise<void> {
     if (refs?.length) {
-      this.relayAttachmentStore.releaseForPrompt(
+      await this.relayAttachmentStore.releaseForPrompt(
         userId,
         refs.map((r) => r.attachmentRefId),
       );
@@ -1115,12 +1115,12 @@ export class McpTransactionsTools {
       // round does not: it returns the question. Round two re-derives its own,
       // so holding these would leave a duplicate copy of every uploaded file
       // in the store until its TTL.
-      this.releaseAttachmentRefs(userId, attachmentRefs);
+      await this.releaseAttachmentRefs(userId, attachmentRefs);
       return outcome.ask;
     }
     if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
     if (outcome === "declined") {
-      this.releaseAttachmentRefs(userId, attachmentRefs);
+      await this.releaseAttachmentRefs(userId, attachmentRefs);
       return toolError(
         "Cancelled: the confirmation was declined, so no transaction was created.",
       );
@@ -1225,12 +1225,12 @@ export class McpTransactionsTools {
         );
         if (isAsk(outcome)) {
           // See manageCreateSplit: the asking round parks nothing it keeps.
-          this.releaseAttachmentRefs(userId, attachmentRefs);
+          await this.releaseAttachmentRefs(userId, attachmentRefs);
           return outcome.ask;
         }
         if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
         if (outcome === "declined") {
-          this.releaseAttachmentRefs(userId, attachmentRefs);
+          await this.releaseAttachmentRefs(userId, attachmentRefs);
           return toolError(
             "Cancelled: the confirmation was declined, so no transaction was created.",
           );
@@ -1489,12 +1489,12 @@ export class McpTransactionsTools {
       );
       if (isAsk(outcome)) {
         // See manageCreateSplit: the asking round parks nothing it keeps.
-        this.releaseAttachmentRefs(userId, attachmentRefs);
+        await this.releaseAttachmentRefs(userId, attachmentRefs);
         return outcome.ask;
       }
       if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
       if (outcome === "declined") {
-        this.releaseAttachmentRefs(userId, attachmentRefs);
+        await this.releaseAttachmentRefs(userId, attachmentRefs);
         return toolError(
           "Cancelled: the confirmation was declined, so the transaction was not changed.",
         );

@@ -66,6 +66,7 @@ describe("RLS enforcement (T2, catalog-driven)", () => {
     transaction_tags: "transactions",
     transaction_split_tags: "transaction_splits -> transactions",
     attachment_blobs: "transaction_attachments",
+    ai_relay_attachment_blobs: "ai_relay_attachments",
     scheduled_transaction_splits: "scheduled_transactions",
     scheduled_transaction_split_tags:
       "scheduled_transaction_splits -> scheduled_transactions",

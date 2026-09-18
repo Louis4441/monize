@@ -3,6 +3,8 @@ import {
   RelayPromptPayload,
   RelayPromptStatus,
 } from "./entities/ai-relay-prompt.entity";
+import { RelayAttachmentKind } from "./entities/ai-relay-attachment.entity";
+import { RelayAttachmentStore } from "./relay-attachment.store";
 import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
 
 /**
@@ -51,6 +53,19 @@ export interface RelayActionRow {
   expiresAt: number;
 }
 
+/** One `ai_relay_attachments` row: a file uploaded with a prompt. */
+export interface RelayAttachmentRow {
+  id: string;
+  userId: string;
+  filename: string;
+  kind: RelayAttachmentKind;
+  mime: string;
+  size: number;
+  expiresAt: number;
+  /** The cascading blob row, kept here because the cascade is what reclaims it. */
+  data: Buffer;
+}
+
 export interface RelayRowsHarness {
   /** The mock DataSource to hand `AiRelayService`. */
   dataSource: ReturnType<typeof createScopedDbMocks>["dataSource"];
@@ -60,6 +75,10 @@ export interface RelayRowsHarness {
   agents: RelayAgentRow[];
   /** The buffered confirmation cards, in insertion order. */
   actions: RelayActionRow[];
+  /** The attachment rows, in insertion order, bytes and all. */
+  attachments: RelayAttachmentRow[];
+  /** A store over the same rows, ready to hand to `AiRelayService`. */
+  attachmentStore: RelayAttachmentStore;
   /** Every statement the service issued, for the rare assertion about SQL itself. */
   statements: string[];
 }
@@ -79,6 +98,7 @@ export function createRelayRowsHarness(): RelayRowsHarness {
   const rows: RelayPromptRow[] = [];
   const agents: RelayAgentRow[] = [];
   const actions: RelayActionRow[] = [];
+  const attachments: RelayAttachmentRow[] = [];
   const statements: string[] = [];
   let sequence = 0;
 
@@ -101,6 +121,71 @@ export function createRelayRowsHarness(): RelayRowsHarness {
   scoped.manager.query.mockImplementation(
     async (sql: string, params: unknown[] = []) => {
       statements.push(sql);
+
+      if (sql.includes("INSERT INTO ai_relay_attachments\n")) {
+        const [id, userId, filename, kind, mime, size, ttlMs] = params as [
+          string,
+          string,
+          string,
+          RelayAttachmentKind,
+          string,
+          number,
+          number,
+        ];
+        attachments.push({
+          id,
+          userId,
+          filename,
+          kind,
+          mime,
+          size,
+          expiresAt: now() + ttlMs,
+          // Filled by the blob INSERT below, exactly as the cascade pairs them.
+          data: Buffer.alloc(0),
+        });
+        return [];
+      }
+
+      if (sql.includes("INSERT INTO ai_relay_attachment_blobs")) {
+        const [id, data] = params as [string, Buffer];
+        const row = attachments.find((a) => a.id === id);
+        if (!row) throw new Error(`blob for unknown attachment ${id}`);
+        row.data = data;
+        return [];
+      }
+
+      if (sql.includes("FROM ai_relay_attachments a")) {
+        const [id, userId] = params as [string, string];
+        const row = attachments.find(
+          (a) => a.id === id && a.userId === userId && a.expiresAt > now(),
+        );
+        return row
+          ? [
+              {
+                id: row.id,
+                filename: row.filename,
+                kind: row.kind,
+                mime: row.mime,
+                data: row.data,
+              },
+            ]
+          : [];
+      }
+
+      if (sql.includes("DELETE FROM ai_relay_attachments")) {
+        const taken = sql.includes("expires_at <= CURRENT_TIMESTAMP")
+          ? attachments.filter((a) => a.expiresAt <= now())
+          : attachments.filter(
+              (a) =>
+                a.userId === (params[0] as string) &&
+                (params[1] as string[]).includes(a.id),
+            );
+        for (const row of taken) {
+          attachments.splice(attachments.indexOf(row), 1);
+        }
+        // The blob rows go with them: that is what the cascade does.
+        return [[], taken.length];
+      }
 
       if (sql.includes("INSERT INTO ai_relay_agents")) {
         const [userId, inactivityMs] = params as [string, number | undefined];
@@ -332,6 +417,8 @@ export function createRelayRowsHarness(): RelayRowsHarness {
     rows,
     agents,
     actions,
+    attachments,
+    attachmentStore: new RelayAttachmentStore(scoped.dataSource as never),
     statements,
   };
 }

@@ -32,6 +32,7 @@ describe("AI relay claim (real PostgreSQL)", () => {
   let db: DataSource;
   let relay: AiRelayService;
   let sweeper: RelaySweeperService;
+  let attachments: RelayAttachmentStore;
   let userId: string;
 
   const asUser = <T>(fn: () => Promise<T>) => withUserContext(userId, fn);
@@ -42,13 +43,14 @@ describe("AI relay claim (real PostgreSQL)", () => {
     userId = (
       await createTestUserDirect(db, { email: "relay-claim@test.local" })
     ).id;
+    attachments = new RelayAttachmentStore(db);
     relay = new AiRelayService(
       db,
-      new RelayAttachmentStore(),
+      attachments,
       new RelayStreamRegistry(),
       new MemoryEventBus(),
     );
-    sweeper = new RelaySweeperService(db);
+    sweeper = new RelaySweeperService(db, attachments);
   });
 
   afterAll(async () => {
@@ -59,6 +61,7 @@ describe("AI relay claim (real PostgreSQL)", () => {
     await db.query("DELETE FROM ai_relay_prompts");
     await db.query("DELETE FROM ai_relay_actions");
     await db.query("DELETE FROM ai_relay_agents");
+    await db.query("DELETE FROM ai_relay_attachments");
   });
 
   /**
@@ -385,6 +388,81 @@ describe("AI relay claim (real PostgreSQL)", () => {
       await sweeper.sweepRelayState();
 
       expect(await statusOf(id)).toBe("expired");
+    });
+  });
+
+  describe("attachments", () => {
+    const PNG_BASE64 =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    const png = (filename = "img.png") => ({
+      kind: "image" as const,
+      mediaType: "image/png",
+      filename,
+      data: PNG_BASE64,
+    });
+
+    it("round-trips the bytes, which a second replica's store reads back", async () => {
+      const [ref] = await asUser(() => attachments.store(userId, [png()]));
+
+      // A store built over the same database is what a second pod has.
+      const otherReplica = new RelayAttachmentStore(db);
+      const stored = await asUser(() => otherReplica.get(userId, ref.id));
+
+      expect(stored?.filename).toBe("img.png");
+      expect(Buffer.isBuffer(stored?.data)).toBe(true);
+      expect(stored?.data.toString("base64")).toBe(PNG_BASE64);
+    });
+
+    it("does not resolve one user's attachment for another", async () => {
+      const [ref] = await asUser(() => attachments.store(userId, [png()]));
+      const other = await createTestUserDirect(db, {
+        email: "relay-attachment-other@test.local",
+      });
+
+      await expect(
+        withUserContext(other.id, () => attachments.get(other.id, ref.id)),
+      ).resolves.toBeUndefined();
+    });
+
+    it("takes the bytes with the metadata row", async () => {
+      const [ref] = await asUser(() => attachments.store(userId, [png()]));
+
+      await asUser(() => attachments.releaseForPrompt(userId, [ref.id]));
+
+      // The cascade is what reclaims them: no second delete to get wrong.
+      const [{ count }] = await db.query(
+        `SELECT COUNT(*)::int AS count FROM ai_relay_attachment_blobs`,
+      );
+      expect(count).toBe(0);
+    });
+
+    it("refuses a kind outside the resource's three branches", async () => {
+      await expect(
+        db.query(
+          `INSERT INTO ai_relay_attachments
+             (user_id, filename, kind, mime, size, expires_at)
+           VALUES ($1, 'x', 'video', 'video/mp4', 1,
+                   CURRENT_TIMESTAMP + INTERVAL '1 hour')`,
+          [userId],
+        ),
+      ).rejects.toThrow(/ck_ai_relay_attachments_kind/);
+    });
+
+    it("is reclaimed by the sweep once past its TTL", async () => {
+      const [ref] = await asUser(() => attachments.store(userId, [png()]));
+      await db.query(
+        `UPDATE ai_relay_attachments
+            SET expires_at = CURRENT_TIMESTAMP - INTERVAL '1 second'
+          WHERE id = $1`,
+        [ref.id],
+      );
+
+      await sweeper.sweepRelayState();
+
+      const [{ count }] = await db.query(
+        `SELECT COUNT(*)::int AS count FROM ai_relay_attachments`,
+      );
+      expect(count).toBe(0);
     });
   });
 });

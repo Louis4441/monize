@@ -89,7 +89,7 @@
 | R2 | Migration: `ai_relay_prompts`, `ai_relay_agents` with RLS policies | -- | none | [x] |
 | R3 | Relay queue on rows: insert, claim, answer; in-memory queue maps removed | R1, R2 | neutral | [x] |
 | R4 | Late answers, buffered actions and agent liveness on rows; remaining maps removed | R3 | neutral | [x] |
-| R5 | Relay attachments through the attachment storage provider | R3 | neutral | [ ] |
+| R5 | Relay attachments on rows (not the storage provider -- see its Notes) | R3 | neutral | [x] |
 | R6 | `RedisEventBus`; selected in `multi`; two-instance spec | F2, R1, D3 | multi-only | [ ] |
 | T1 | `RedisThrottlerStorage`; selected in `multi`; fail-open | F2, D3 | multi-only | [ ] |
 | M1 | MCP 2025-era sessions: persisted rows or documented sticky routing | F1 | neutral | [ ] |
@@ -951,13 +951,25 @@ agent row -- because the browser polls it.
 
 ### R5 -- Relay attachments through the storage provider
 
-- [ ] Status:
+- [x] Status: done, but **not through the storage provider** -- see Notes.
 
 **Scope:** `backend/src/ai/relay/relay-attachment.store.ts` and spec,
 `backend/src/ai/relay/ai-relay.module.ts` (inject `ATTACHMENT_STORAGE_PROVIDER`),
 a small migration + `schema.sql` for `ai_relay_attachments (id, user_id, storage_key, mime, size, expires_at)`,
 `backend/src/attachments/storage/storage-key.util.ts` if the key grammar
 needs a `relay/` prefix.
+
+Actually touched: the store and its spec, the migration and `schema.sql` (two
+tables, not one), two new entities, `relay-sweeper.service.ts` (it reclaims
+them), `docs/external-side-effects.md`, `docs/cron-jobs.md`,
+`backend/src/backup/export-table-queries.ts` (the coverage guard),
+`backend/test/integration/rls-enforcement.integration.spec.ts` (`INDIRECT_MAP`),
+and the consumers the store's newly async methods reach:
+`backend/src/mcp/resources/relay-attachment.resource.ts`,
+`backend/src/ai/actions/ai-actions.service.ts`,
+`backend/src/ai/query/tool-executor.service.ts`,
+`backend/src/mcp/tools/transactions.tool.ts`. `storage-key.util.ts` was not
+touched -- nothing needed a new key grammar.
 
 **Pattern:** `backend/src/attachments/storage/attachment-storage.interface.ts`
 and how `BackupService` injects the token from outside `AttachmentsModule`.
@@ -980,6 +992,44 @@ relay keys as orphans: either register them in its intent table or namespace
 them so its query excludes `relay/`.
 
 **Notes:**
+
+**The storage provider cannot hold a relay attachment.** Its `database`
+implementation writes `attachment_blobs`, whose primary key is a foreign key to
+`transaction_attachments(id)` and whose RLS policy reads the owner from that
+same row. A relay attachment has no transaction and no attachment row, so the
+insert fails the foreign key outright and the policy would hide it even if it
+did not. The remaining options were to weaken that foreign key (a guard, and
+shrink-only), or to branch on the bound provider's name inside the relay, which
+is the generic solution that looks fine in isolation and wrong in place.
+
+So the bytes are rows: `ai_relay_attachments` plus a cascading
+`ai_relay_attachment_blobs`, mirroring
+`transaction_attachments`/`attachment_blobs` so metadata lookups never touch
+BYTEA. That buys more than the provider would have. Bytes and metadata commit or
+roll back together on every deployment -- there is no bytes-before-commit window
+at all, which the `local` and `s3` attachment paths still have (EXT-004) -- and
+the cascade reclaims the bytes, so the sweep is one `DELETE` with nothing
+outside PostgreSQL to order against or leak. The trap above therefore does not
+arise: there is no relay key for the orphan sweeper to see, and it enumerates
+`attachment_blob_tombstones` rather than the store in any case.
+
+The cost, stated plainly: a deployment running `ATTACHMENT_STORAGE_PROVIDER=s3`
+or `local` to keep attachment bytes out of PostgreSQL still holds relay
+attachments there -- at most a few megabytes, for at most twenty minutes, and
+deleted as soon as the prompt settles. If that ever stops being acceptable, the
+move is a relay-owned provider whose key space is not `transaction_attachments`,
+not a branch inside this store.
+
+Two things the sketched shape needed: `filename` and `kind` columns (the MCP
+resource returns text, a PDF's extracted text or a base64 blob, and re-deriving
+that from the prompt JSONB would be a second source of truth), and `kind`
+carrying `DEFAULT 'text'` for the same reason `ai_relay_prompts.status` carries
+`DEFAULT 'pending'` -- the RLS enforcement spec's generic seeder invents a
+`t<n>` string for a NOT NULL text column with no default, which no
+CHECK-constrained column can accept.
+
+`byUser` is gone, and with it the per-user cap: it bounded process memory, and
+the TTL plus the sweep bound a table.
 
 ### R6 -- `RedisEventBus`
 

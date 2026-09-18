@@ -3,6 +3,7 @@ import { Cron } from "@nestjs/schedule";
 import { DataSource } from "typeorm";
 
 import { BUFFER_TTL_MS } from "./ai-relay.service";
+import { RelayAttachmentStore } from "./relay-attachment.store";
 import { withScopedDb } from "../../common/db/scoped-db";
 import { withSystemContext } from "../../common/db/with-context";
 import { affectedRowCount } from "../../common/db/query-result";
@@ -14,9 +15,14 @@ import { affectedRowCount } from "../../common/db/query-result";
  * already unclaimable and unanswerable -- every statement in `AiRelayService`
  * compares against `expires_at` in the database's clock -- and a card past
  * `expires_at` is already filtered out of the drain. The sweep exists because
- * three tables would otherwise be append-only: a browser that never comes back
- * for its answer, an agent that never returns for its turn and a card nobody
- * approves all leave a row with no later visitor.
+ * four tables would otherwise be append-only: a browser that never comes back
+ * for its answer, an agent that never returns for its turn, a card nobody
+ * approves and a file uploaded with a prompt that was never claimed all leave a
+ * row with no later visitor -- and the file leaves bytes behind it.
+ *
+ * Nothing here reaches outside PostgreSQL, which is why the whole sweep is one
+ * transaction: the attachment bytes are a cascading child row rather than an
+ * object somebody has to remember to delete afterwards.
  *
  * Idempotent by predicate, so every replica firing this cron
  * (`docs/cron-jobs.md`: they all do, in both cluster modes) touches the same
@@ -28,12 +34,15 @@ import { affectedRowCount } from "../../common/db/query-result";
 export class RelaySweeperService {
   private readonly logger = new Logger(RelaySweeperService.name);
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly attachments: RelayAttachmentStore,
+  ) {}
 
   @Cron("*/5 * * * *")
   async sweepRelayState(): Promise<void> {
     try {
-      const { expired, deleted, cards } = await withSystemContext(() =>
+      const { expired, deleted, cards, files } = await withSystemContext(() =>
         withScopedDb(this.dataSource, async (manager) => {
           // A turn nobody claimed, and one an agent claimed and then abandoned
           // for longer than its answer would have been accepted. The grace is
@@ -66,17 +75,23 @@ export class RelaySweeperService {
             `DELETE FROM ai_relay_actions
               WHERE expires_at <= CURRENT_TIMESTAMP`,
           );
+          // The bytes are a cascading child row, so this one DELETE takes
+          // them: there is no object store to order against and nothing
+          // outside PostgreSQL left to leak.
+          const files = await this.attachments.sweepExpired(manager);
           return {
             expired: affectedRowCount(expiredResult),
             deleted: affectedRowCount(deletedResult),
             cards: affectedRowCount(cardResult),
+            files,
           };
         }),
       );
-      if (expired > 0 || deleted > 0 || cards > 0) {
+      if (expired > 0 || deleted > 0 || cards > 0 || files > 0) {
         this.logger.log(
           `Swept relay state: ${expired} turn(s) expired, ${deleted} deleted, ` +
-            `${cards} stale confirmation card(s) dropped`,
+            `${cards} stale confirmation card(s) dropped, ` +
+            `${files} attachment(s) reclaimed`,
         );
       }
     } catch (error) {

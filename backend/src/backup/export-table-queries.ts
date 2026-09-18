@@ -190,10 +190,14 @@ export const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   // longer exists; a liveness row would tell the restored instance an agent is
   // connected when none is. Restoring any of the three makes the tunnel
   // indicator lie and could hand a stale write-confirmation card to a user who
-  // never asked for it.
+  // never asked for it. The attachments are the same handshake's scratch: the
+  // file was uploaded for a prompt whose stream is gone, it expires twenty
+  // minutes after upload, and nothing in the restored dataset refers to it.
   "ai_relay_prompts",
   "ai_relay_agents",
   "ai_relay_actions",
+  "ai_relay_attachments",
+  "ai_relay_attachment_blobs",
 ]);
 
 export function buildExportTableQueries(

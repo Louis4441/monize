@@ -2,7 +2,8 @@ import { DataSource } from "typeorm";
 import { Test, TestingModule } from "@nestjs/testing";
 
 import { RelaySweeperService } from "./relay-sweeper.service";
-import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
+import { RelayAttachmentStore } from "./relay-attachment.store";
+import { createRelayRowsHarness, RelayRowsHarness } from "./relay-rows.harness";
 
 jest.mock("../../common/db/scoped-db", () =>
   jest
@@ -16,17 +17,24 @@ jest.mock("../../common/db/with-context", () => ({
 
 describe("RelaySweeperService", () => {
   let service: RelaySweeperService;
+  let harness: RelayRowsHarness;
   let manager: Record<string, jest.Mock>;
 
   beforeEach(async () => {
-    const scoped = createScopedDbMocks();
-    manager = scoped.manager as Record<string, jest.Mock>;
-    manager.query.mockResolvedValue([]);
+    harness = createRelayRowsHarness();
+    manager = harness.dataSource.manager as Record<string, jest.Mock>;
+    // The harness models the attachment table; the prompt and card statements
+    // are the sweep's own, and their shape is what this spec asserts.
+    const rows = manager.query.getMockImplementation()!;
+    manager.query.mockImplementation(async (sql: string, params?: unknown[]) =>
+      String(sql).includes("ai_relay_attachments") ? rows(sql, params) : [],
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RelaySweeperService,
-        { provide: DataSource, useValue: scoped.dataSource },
+        { provide: DataSource, useValue: harness.dataSource },
+        { provide: RelayAttachmentStore, useValue: harness.attachmentStore },
       ],
     }).compile();
     service = module.get(RelaySweeperService);
@@ -37,13 +45,33 @@ describe("RelaySweeperService", () => {
   const statements = () =>
     manager.query.mock.calls.map(([sql]) => String(sql).replace(/\s+/g, " "));
 
-  it("expires, deletes and drops cards in one transaction", async () => {
+  it("expires, deletes and drops cards and attachments in one transaction", async () => {
     await service.sweepRelayState();
 
-    const [expire, remove, cards] = statements();
+    const [expire, remove, cards, files] = statements();
     expect(expire).toContain("UPDATE ai_relay_prompts SET status = 'expired'");
     expect(remove).toContain("DELETE FROM ai_relay_prompts");
     expect(cards).toContain("DELETE FROM ai_relay_actions");
+    expect(files).toContain("DELETE FROM ai_relay_attachments");
+  });
+
+  it("reclaims an attachment past its TTL, bytes and all", async () => {
+    await harness.attachmentStore.store("user-1", [
+      {
+        kind: "image",
+        mediaType: "image/png",
+        filename: "img.png",
+        data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      },
+    ]);
+    // Past its TTL, so the sweep takes it.
+    harness.attachments[0].expiresAt = Date.now() - 1;
+
+    await service.sweepRelayState();
+
+    // The blob is a cascading child row, so there is no second delete to get
+    // wrong and nothing outside PostgreSQL left behind.
+    expect(harness.attachments).toHaveLength(0);
   });
 
   it("compares every cutoff against the database's clock", async () => {

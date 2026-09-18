@@ -76,7 +76,7 @@ describe("AiRelayService", () => {
     // that intentionally leave a prompt unanswered.
     jest.useFakeTimers();
     harness = createRelayRowsHarness();
-    attachmentStore = new RelayAttachmentStore();
+    attachmentStore = harness.attachmentStore;
     streams = new RelayStreamRegistry();
     bus = new MemoryEventBus();
     service = new AiRelayService(
@@ -737,9 +737,9 @@ describe("AiRelayService", () => {
       const claimed = await service.waitForPrompt(USER);
       expect(claimed!.attachments).toHaveLength(1);
       expect(claimed!.attachments![0].filename).toBe("shot.png");
-      expect(
+      await expect(
         attachmentStore.get(USER, claimed!.attachments![0].id),
-      ).toBeDefined();
+      ).resolves.toBeDefined();
     });
 
     it("omits attachments from the claimed prompt when none were uploaded", async () => {
@@ -762,7 +762,7 @@ describe("AiRelayService", () => {
       await settle();
       await pending;
 
-      expect(attachmentStore.get(USER, id)).toBeUndefined();
+      await expect(attachmentStore.get(USER, id)).resolves.toBeUndefined();
     });
 
     it("releases stored attachments when no agent ever claims the prompt", async () => {
@@ -776,7 +776,7 @@ describe("AiRelayService", () => {
       await jest.advanceTimersByTimeAsync(QUEUE_WAIT_MS + 1000);
       await settled;
 
-      expect(attachmentStore.get(USER, id)).toBeUndefined();
+      await expect(attachmentStore.get(USER, id)).resolves.toBeUndefined();
     });
 
     it("rejects before the prompt is ever queued when an attachment fails validation", async () => {
@@ -871,7 +871,7 @@ describe("AiRelayService", () => {
     const secondReplica = () =>
       new AiRelayService(
         harness.dataSource as unknown as DataSource,
-        new RelayAttachmentStore(),
+        harness.attachmentStore,
         new RelayStreamRegistry(),
         bus,
       );
