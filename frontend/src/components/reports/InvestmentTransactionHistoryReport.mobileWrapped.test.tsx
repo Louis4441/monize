@@ -198,6 +198,7 @@ const EXPECTED_EXPORT_LABELS = [
   "Amount Currency",
   "Total",
   "Commission Currency",
+  "Conversion Basis",
   "Commission",
 ];
 
@@ -213,7 +214,8 @@ const EXPORT_COL = {
   amountCurrency: 7,
   total: 8,
   commissionCurrency: 9,
-  commission: 10,
+  conversionBasis: 10,
+  commission: 11,
 } as const;
 
 /** The index of each column in that order, for addressing a cell. */
