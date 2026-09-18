@@ -24,3 +24,37 @@ export function investedValue(point: {
 }): number {
   return point.securitiesValue ?? point.value;
 }
+
+/**
+ * The key of the cash band in an investment-breakdown response, or `null` when
+ * the response carries none. The band is identified by its `type`, never by a
+ * hardcoded key string, so the sentinel the server chose stays the server's.
+ */
+export function breakdownCashKey(
+  series: ReadonlyArray<{ key: string; type: 'security' | 'cash' | 'other' }>,
+): string | null {
+  return series.find((s) => s.type === 'cash')?.key ?? null;
+}
+
+/**
+ * The INVESTED value of one breakdown point: its `total` less the cash band.
+ *
+ * The breakdown response's `total` folds the scope's cash into it, but the
+ * Portfolio Value report's one measure is the securities alone -- the same
+ * INVESTED value the sum line plots (`investedValue` above). Reading `total`
+ * for the KPIs, the table's total column and the CSV made the "By security"
+ * view draw securities+cash while the "Total" view drew securities, so
+ * switching views silently changed the high, the low and the exported figure
+ * (INV-PORTRESULT-002). Deriving here, rather than adding a per-point backend
+ * field, keeps the cash band available to draw as its own labelled band.
+ *
+ * `total` and each band are whole rounded units, so this subtraction of two
+ * integers introduces no float drift.
+ */
+export function breakdownInvestedValue(
+  point: { total: number; values: Record<string, number> },
+  cashKey: string | null,
+): number {
+  if (cashKey === null) return point.total;
+  return point.total - (point.values[cashKey] ?? 0);
+}
