@@ -12,9 +12,10 @@ import { AttachmentDto } from "../query/dto/ai-query.dto";
 
 /**
  * A lightweight reference to an attachment the user uploaded with a relayed
- * prompt. The bytes themselves are held in the in-memory RelayAttachmentStore;
- * the agent fetches them by reading `uri` as an MCP resource. Carries no base64
- * data, so it stays small when passed through the prompt queue and tool result.
+ * prompt. The bytes themselves are rows (`ai_relay_attachments` and its blob),
+ * and the agent fetches them by reading `uri` as an MCP resource. The ref
+ * carries no base64 data, so it stays small riding in the queued prompt's JSONB
+ * and in the tool result.
  */
 export interface RelayAttachmentRef {
   /** Opaque per-user attachment id; the lookup key within the owning user's bucket. */
