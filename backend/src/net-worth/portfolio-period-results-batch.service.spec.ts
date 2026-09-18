@@ -33,6 +33,7 @@ interface FakeRow {
 interface SeriesPoint {
   date: string;
   value: number;
+  securitiesValue: number;
   fxComplete: boolean;
   missingRatePairs: string[];
   pricesComplete: boolean;
@@ -41,10 +42,14 @@ interface SeriesPoint {
   unknownCashAccountIds: string[];
 }
 
+/** The scope holds a flat 2,000 of uninvested cash on every day of the series. */
+const SERIES_CASH = 2_000;
+
 function point(date: string, value: number): SeriesPoint {
   return {
     date,
     value,
+    securitiesValue: value - SERIES_CASH,
     fxComplete: true,
     missingRatePairs: [],
     pricesComplete: true,
@@ -81,6 +86,13 @@ describe("PortfolioPeriodResultsBatchService", () => {
   let mocks: ReturnType<typeof createScopedDbMocks>;
   let scopeRows: FakeRow[];
   let flowRows: Array<{ date: string; currency: string; total: string }>;
+  let investedRows: Array<{
+    date: string;
+    currency: string;
+    action: string;
+    total: string;
+    gross: string;
+  }>;
   let rateRows: FakeRow[];
   let settledTradeDays: Array<{ date: string; count: string }>;
   let mixedSplitDays: Array<{ date: string; count: string }>;
@@ -103,6 +115,18 @@ describe("PortfolioPeriodResultsBatchService", () => {
     ];
     series = canonicalSeries();
     flowRows = [{ date: "2026-06-01", currency: "CAD", total: "10000" }];
+    // The deposit of 2026-06-01 is invested the same day, so the invested part
+    // grows by a capital flow rather than by a gain: the day contributes factor
+    // 1 to every preset whose window holds it.
+    investedRows = [
+      {
+        date: "2026-06-01",
+        currency: "CAD",
+        action: "BUY",
+        total: "10000",
+        gross: "10000",
+      },
+    ];
     rateRows = [];
     settledTradeDays = [];
     mixedSplitDays = [];
@@ -128,6 +152,8 @@ describe("PortfolioPeriodResultsBatchService", () => {
           const total = rows.reduce((sum, row) => sum + Number(row.count), 0);
           return [{ date: null, count: String(total) }];
         };
+        if (sql.includes("it.action AS action"))
+          return investedRows.filter((row) => inWindow(row.date));
         if (sql.includes("SUM(t.amount)"))
           return flowRows.filter((row) => inWindow(row.date));
         if (sql.includes("it.funding_account_id"))

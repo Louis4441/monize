@@ -29,14 +29,19 @@ import {
   PortfolioPeriodResult,
   PortfolioPeriodResultService,
 } from "./portfolio-period-result.service";
-import {
-  PeriodBoundaryValue,
-  decidePeriodResult,
-} from "./portfolio-period-result.util";
+import { decidePeriodResult } from "./portfolio-period-result.util";
 import {
   loadUnmeasuredFlowRows,
   unmeasuredFlowsAfter,
 } from "./unmeasured-flows.util";
+import {
+  foldInvestedFlows,
+  loadInvestedCapitalFlowRows,
+} from "./invested-capital-flow.util";
+import {
+  NO_INVESTED_PERIOD,
+  investedPeriodResult,
+} from "./invested-period-result.util";
 
 /** What `GET /net-worth/investments-period-results` answers. */
 export interface PortfolioPeriodResults {
@@ -139,6 +144,7 @@ export class PortfolioPeriodResultsBatchService {
         end: null,
         flow: { complete: true, value: 0, missingPairs: [] },
       }),
+      ...NO_INVESTED_PERIOD,
     });
 
     const allEmpty = (): PortfolioPeriodResults => ({
@@ -165,7 +171,7 @@ export class PortfolioPeriodResultsBatchService {
     const query = (sql: string, params: unknown[]) =>
       withScopedDb(this.dataSource, (m) => m.query(sql, params));
 
-    const [series, flowRows, unmeasuredRows] = await Promise.all([
+    const [series, flowRows, investedRows, unmeasuredRows] = await Promise.all([
       this.netWorth.getDailyInvestments(
         userId,
         earliest,
@@ -174,7 +180,7 @@ export class PortfolioPeriodResultsBatchService {
         currency,
         // One opt-out for the whole answer, as in the single-range route.
         { fetchMissing: opts.fetchMissing },
-      ) as Promise<PeriodBoundaryValue[]>,
+      ),
       loadExternalFlowSubtotals(query, {
         userId,
         // Exclusive, as in the single-range route: a flow dated on a preset's
@@ -185,6 +191,14 @@ export class PortfolioPeriodResultsBatchService {
         accountIds: cashScope,
         perDay: true,
       }) as Promise<FlowSubtotalRow[]>,
+      // The invested part's capital and income over the same widest window,
+      // loaded ONCE beside the flows and sliced per preset exactly as they are.
+      loadInvestedCapitalFlowRows(query, {
+        userId,
+        afterDate: earliest,
+        throughDate: end,
+        accountIds: scope.map((row) => row.id),
+      }),
       loadUnmeasuredFlowRows(query, {
         userId,
         afterDate: earliest,
@@ -202,19 +216,32 @@ export class PortfolioPeriodResultsBatchService {
     // unit, and on a successful fill the index is re-read from the database.
     // Each preset's slice below folds against that same index, so a preset
     // cannot see a rate the whole window did not.
-    const { rateIndex } = await computeWithRateFill(
+    const { rateIndex, investedByDay } = await computeWithRateFill(
       this.exchangeRates,
       async () => {
         const index = await buildFlowRateIndex(
           query,
-          flowRows,
+          [...flowRows, ...investedRows],
           currency,
           earliest,
           end,
         );
+        // Folded per DAY once, for the whole window: a day is the same day
+        // whatever preset reads it, which is what makes a preset's slice
+        // identical to what the single-range route would have folded for it.
+        const invested = foldInvestedFlows(
+          investedRows,
+          currency,
+          index,
+          this.logger,
+        );
         return {
           rateIndex: index,
-          gaps: foldFlowSubtotals(flowRows, currency, index, this.logger).gaps,
+          investedByDay: invested.byDay,
+          gaps: [
+            ...foldFlowSubtotals(flowRows, currency, index, this.logger).gaps,
+            ...invested.gaps,
+          ],
         };
       },
       (built) => built.gaps,
@@ -244,15 +271,21 @@ export class PortfolioPeriodResultsBatchService {
         rateIndex,
         this.logger,
       );
+      const unmeasuredFlows = unmeasuredFlowsAfter(unmeasuredRows, from);
       periods[preset] = {
         currency,
         startDate: start.date,
         endDate: last.date,
-        ...decidePeriodResult({
-          start,
-          end: last,
-          flow,
-          unmeasuredFlows: unmeasuredFlowsAfter(unmeasuredRows, from),
+        ...decidePeriodResult({ start, end: last, flow, unmeasuredFlows }),
+        // The same one series, sliced at this preset's own boundary: the TWR
+        // for a preset is a product over that preset's days, O(days), over the
+        // per-day flows folded once above.
+        ...investedPeriodResult({
+          points: series,
+          startIndex: series.indexOf(start),
+          endIndex: series.length - 1,
+          flowsByDay: investedByDay,
+          unmeasuredFlows,
         }),
       };
     }
@@ -270,11 +303,11 @@ export class PortfolioPeriodResultsBatchService {
    * that far, which is a period this scope cannot report rather than one that
    * did nothing.
    */
-  private startBoundary(
-    series: readonly PeriodBoundaryValue[],
+  private startBoundary<T extends { date: string }>(
+    series: readonly T[],
     preset: PortfolioPeriodPreset,
     windowStart: string,
-  ): PeriodBoundaryValue | null {
+  ): T | null {
     const firstInWindow = series.find((point) => point.date >= windowStart);
     if (!firstInWindow) return null;
     if (!usesPriorCloseBaseline(preset)) {
@@ -286,7 +319,7 @@ export class PortfolioPeriodResultsBatchService {
     }
 
     const baseline = addDaysYMD(firstInWindow.date, -1);
-    let prior: PeriodBoundaryValue | null = null;
+    let prior: T | null = null;
     for (const point of series) {
       if (point.date > baseline) break;
       prior = point;

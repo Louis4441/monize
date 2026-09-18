@@ -128,6 +128,21 @@ export interface DailyInvestmentValue {
    * false -- read them before printing it under a total's caption.
    */
   value: number;
+  /**
+   * `IV(t)`: the INVESTED part of that same close -- the securities, without the
+   * cash beside them. `value` is this plus the scope's ledger cash.
+   *
+   * A component of the value already folded here, not a second valuation: the
+   * positions are the same replay, priced from the same accepted closes and
+   * converted at the same day's rate. The invested part's P&L and time-weighted
+   * return are measured over it, because cash held in an investment account is
+   * not an investment (`docs/specs/portfolio-period-result.md` section 10,
+   * INV-PORTRESULT-002), and the investment charts plot it for the same reason.
+   *
+   * The same subtotal rule as `value`: read `pricesComplete` and `fxComplete`
+   * (never `cashComplete` -- no cash is in here) before printing it as a total.
+   */
+  securitiesValue: number;
   /** False when a component could not be converted; see missingRatePairs. */
   fxComplete: boolean;
   /** "USD->EUR" for each pair with no available rate. */
@@ -1592,6 +1607,11 @@ export class NetWorthService {
         }
       }
 
+      // Everything above is the invested part; everything below is cash. The
+      // aggregate is snapshotted here rather than accumulated twice, so the two
+      // figures are one walk over one set of positions.
+      const securitiesSubtotal = dayValue.knownSubtotal;
+
       // Add cash balances for INVESTMENT_CASH and standalone accounts. The walk
       // is over the accounts in scope, not over the maps the query returned: an
       // account with no row for this day is a missing component, and `?? 0`
@@ -1620,6 +1640,10 @@ export class NetWorthService {
       result.push({
         date: dateStr,
         value: Math.round(dayValue.knownSubtotal),
+        // The securities-only subtotal of the very same fold, rounded the same
+        // way `value` is, so `value - securitiesValue` is the cash the walk
+        // above added and the two cannot disagree about a position.
+        securitiesValue: Math.round(securitiesSubtotal),
         fxComplete: dayValue.isComplete,
         missingRatePairs: dayValue.missingPairs,
         pricesComplete: unpricedSecurityIds.size === 0,

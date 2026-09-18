@@ -37,7 +37,10 @@ export interface FlowSubtotalRow {
 /** Every rate any of these rows could need, in one query. */
 export async function buildFlowRateIndex(
   query: RateIndexQuery,
-  rows: readonly FlowSubtotalRow[],
+  // Only the currency is read, so the invested part's capital and income rows
+  // build the SAME index as the external-flow ones: one window, one set of
+  // rates, and no day that resolves differently depending on which fold asked.
+  rows: ReadonlyArray<{ currency: string }>,
   currency: string,
   start: string,
   end: string,

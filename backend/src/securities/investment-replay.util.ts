@@ -163,6 +163,60 @@ export const CASH_INCOME_ACTIONS: readonly InvestmentAction[] = [
 ];
 
 /**
+ * What an action does to the INVESTED part of a portfolio -- the securities,
+ * with the cash beside them left out.
+ *
+ * The invested part's P&L and time-weighted return
+ * (`docs/specs/portfolio-period-result.md` section 10) need exactly this
+ * classification, and it is the one list that decides it:
+ *
+ * - `capitalIn` -- value entering the invested part. Buying is not earning, so
+ *   it must cancel out of the result and enter the base of the return.
+ * - `capitalOut` -- value leaving it. Selling is not losing; the proceeds are
+ *   what the position came to, and the cash they become earns nothing after.
+ * - `income` -- cash the invested part paid out and therefore EARNED. It leaves
+ *   as cash and stays in the result.
+ * - `none` -- SPLIT moves no value (it is a ratio), and REINVEST's shares
+ *   simply appear: the distribution never landed as cash, so counting it as
+ *   capital would subtract the return the reader actually received.
+ *
+ * Keyed by BASE action, so a Money-vocabulary refinement cannot fall out of the
+ * classification by being forgotten here -- `investedFlowKind` normalizes
+ * first. `investment-replay.util.spec.ts` holds every `InvestmentAction` member
+ * to a kind, so a new action is a failing test rather than a silent zero in a
+ * capital flow.
+ */
+export type InvestedFlowKind = "capitalIn" | "capitalOut" | "income" | "none";
+
+export const INVESTED_FLOW_KIND_BY_BASE_ACTION: ReadonlyMap<
+  InvestmentAction,
+  InvestedFlowKind
+> = new Map([
+  [InvestmentAction.BUY, "capitalIn" as const],
+  [InvestmentAction.TRANSFER_IN, "capitalIn" as const],
+  [InvestmentAction.ADD_SHARES, "capitalIn" as const],
+  [InvestmentAction.SELL, "capitalOut" as const],
+  [InvestmentAction.TRANSFER_OUT, "capitalOut" as const],
+  [InvestmentAction.REMOVE_SHARES, "capitalOut" as const],
+  [InvestmentAction.DIVIDEND, "income" as const],
+  [InvestmentAction.INTEREST, "income" as const],
+  [InvestmentAction.CAPITAL_GAIN, "income" as const],
+  [InvestmentAction.SPLIT, "none" as const],
+  [InvestmentAction.REINVEST, "none" as const],
+]);
+
+/** What `action` does to the invested part; `none` for anything that moves no value. */
+export function investedFlowKind(
+  action: InvestmentAction | string,
+): InvestedFlowKind {
+  return (
+    INVESTED_FLOW_KIND_BY_BASE_ACTION.get(
+      baseInvestmentAction(action) as InvestmentAction,
+    ) ?? "none"
+  );
+}
+
+/**
  * The only actions allowed to use an explicit funding account: a BUY draws the
  * purchase cost from it, a SELL deposits the proceeds into it. Cash-bearing
  * DIVIDEND / INTEREST / CAPITAL_GAIN settle against the brokerage's linked cash

@@ -33,6 +33,7 @@ describe("PortfolioPeriodResultService", () => {
   let mocks: ReturnType<typeof createScopedDbMocks>;
   let scopeRows: FakeRow[];
   let flowRows: FakeRow[];
+  let investedRows: FakeRow[];
   let rateRows: FakeRow[];
   let settledTradeRows: FakeRow[];
   let mixedSplitRows: FakeRow[];
@@ -55,6 +56,7 @@ describe("PortfolioPeriodResultService", () => {
       },
     ];
     flowRows = [];
+    investedRows = [];
     rateRows = [];
     settledTradeRows = [{ count: "0" }];
     mixedSplitRows = [{ count: "0" }];
@@ -69,6 +71,7 @@ describe("PortfolioPeriodResultService", () => {
         // Three statements name `investment_transactions` (the flow query and
         // the mixed-split count do so inside their exclusions), so each is
         // matched on a fragment only it carries.
+        if (sql.includes("it.action AS action")) return investedRows;
         if (sql.includes("SUM(t.amount)")) return flowRows;
         if (sql.includes("it.funding_account_id")) return settledTradeRows;
         if (sql.includes("COUNT(*) AS count")) return mixedSplitRows;
@@ -104,10 +107,13 @@ describe("PortfolioPeriodResultService", () => {
       cashComplete?: boolean;
       unpricedSecurityIds?: string[];
       unknownCashAccountIds?: string[];
+      securitiesValue?: number;
     } = {},
   ) => ({
     date,
     value,
+    // Cash-free unless a case says otherwise: the invested part IS the value.
+    securitiesValue: flags.securitiesValue ?? value,
     fxComplete: flags.fxComplete ?? true,
     missingRatePairs: [],
     pricesComplete: flags.pricesComplete ?? true,

@@ -2869,6 +2869,8 @@ describe("NetWorthService", () => {
       expect(result[0]).toEqual({
         date: "2025-03-01",
         value: 1000,
+        // No cash account in scope, so the invested part IS the whole value.
+        securitiesValue: 1000,
         fxComplete: true,
         missingRatePairs: [],
         // Every held position had a close on this day, so the value is a total

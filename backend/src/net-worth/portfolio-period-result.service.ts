@@ -32,9 +32,27 @@ import {
   decidePeriodResult,
 } from "./portfolio-period-result.util";
 import {
+  FoldedInvestedFlows,
+  InvestedFlowRow,
+  foldInvestedFlows,
+  loadInvestedCapitalFlowRows,
+} from "./invested-capital-flow.util";
+import {
+  InvestedPeriodDecision,
+  InvestedReturnMethod,
+  NO_INVESTED_PERIOD,
+  investedPeriodResult,
+} from "./invested-period-result.util";
+import {
   loadUnmeasuredFlowRows,
   unmeasuredFlowsAfter,
 } from "./unmeasured-flows.util";
+
+/** Both folds of one window, over one rate index. */
+interface PeriodFolds {
+  flow: FoldedFlow;
+  invested: FoldedInvestedFlows;
+}
 
 /** One account of the scope, with what the cash boundary is decided from. */
 export interface ScopeAccount {
@@ -43,7 +61,7 @@ export interface ScopeAccount {
   account_sub_type: string | null;
 }
 
-export { PeriodResultReason, PeriodReturnMethod };
+export { PeriodResultReason, PeriodReturnMethod, InvestedReturnMethod };
 
 /** What `GET /net-worth/investments-period-result` answers. */
 export interface PortfolioPeriodResult {
@@ -74,6 +92,29 @@ export interface PortfolioPeriodResult {
   missingRatePairs: string[];
   unpricedSecurityIds: string[];
   unknownCashAccountIds: string[];
+
+  // The invested part of the same window: securities only, cash excluded
+  // entirely (INV-PORTRESULT-002, `docs/specs/portfolio-period-result.md`
+  // section 10). These are what "Portfolio performance" reports; the fields
+  // above are what the account did, which is a different question.
+
+  /** `IV(b)`: the securities at the starting close, no cash. */
+  investedValueStart: number | null;
+  /** `IV(e)`: the securities at the ending close, no cash. */
+  investedValueEnd: number | null;
+  /** Net value paid INTO the securities after `startDate`: buys less disposals. */
+  investmentCapitalFlows: number | null;
+  /** Dividends, interest and capital-gain distributions over the same days. */
+  investmentIncome: number | null;
+  /** What the investments earned: `IV(e) - IV(b) - capital + income`. */
+  investmentPnl: number | null;
+  /** The time-weighted return over the same days; see `investmentReturnMethod`. */
+  investmentReturnPercent: number | null;
+  investmentReturnMethod: InvestedReturnMethod;
+  /** True only when both invested figures are known. */
+  investedComplete: boolean;
+  /** Why an invested figure is withheld; the same closed set as `reasons`. */
+  investedReasons: PeriodResultReason[];
 }
 
 /**
@@ -161,6 +202,7 @@ export class PortfolioPeriodResultService {
       missingRatePairs: [],
       unpricedSecurityIds: [],
       unknownCashAccountIds: [],
+      ...NO_INVESTED_PERIOD,
     };
 
     if (from > end) return empty;
@@ -181,40 +223,60 @@ export class PortfolioPeriodResultService {
     // from the latest accepted close on or before it, and the price loaders
     // carry one pre-window observation, so the first point does not depend on
     // how wide a window the caller asked for.
-    const [series, flowRows, unmeasuredFlows] = await Promise.all([
-      this.netWorth.getDailyInvestments(
-        userId,
-        from,
-        end,
-        opts.accountIds,
-        currency,
-        // One opt-out for the whole answer: the value series and the flow fold
-        // read the same rates and must not disagree about whether to fetch.
-        { fetchMissing: opts.fetchMissing },
-      ),
-      loadExternalFlowSubtotals(
-        (sql, params) =>
-          withScopedDb(this.dataSource, (m) => m.query(sql, params)),
-        {
+    const [series, flowRows, investedRows, unmeasuredFlows] = await Promise.all(
+      [
+        this.netWorth.getDailyInvestments(
           userId,
-          // Exclusive: a flow dated on the baseline is already inside MV(b).
-          afterDate: from,
-          throughDate: end,
-          accountIds: cashScope,
-          perDay: true,
-        },
-      ),
-      this.countUnmeasuredFlows(userId, from, end, {
-        scope: scope.map((row) => row.id),
-        cashScope,
-      }),
-    ]);
+          from,
+          end,
+          opts.accountIds,
+          currency,
+          // One opt-out for the whole answer: the value series and the flow fold
+          // read the same rates and must not disagree about whether to fetch.
+          { fetchMissing: opts.fetchMissing },
+        ),
+        loadExternalFlowSubtotals(
+          (sql, params) =>
+            withScopedDb(this.dataSource, (m) => m.query(sql, params)),
+          {
+            userId,
+            // Exclusive: a flow dated on the baseline is already inside MV(b).
+            afterDate: from,
+            throughDate: end,
+            accountIds: cashScope,
+            perDay: true,
+          },
+        ),
+        // The invested part's own capital and income, over the same window and
+        // the whole scope: investment rows live on the brokerage sleeves, which
+        // the cash boundary above deliberately excludes.
+        loadInvestedCapitalFlowRows(
+          (sql, params) =>
+            withScopedDb(this.dataSource, (m) => m.query(sql, params)),
+          {
+            userId,
+            afterDate: from,
+            throughDate: end,
+            accountIds: scope.map((row) => row.id),
+          },
+        ),
+        this.countUnmeasuredFlows(userId, from, end, {
+          scope: scope.map((row) => row.id),
+          cashScope,
+        }),
+      ],
+    );
 
     if (series.length === 0) return empty;
 
-    const flow = await this.foldFlows(flowRows, currency, from, end, {
-      fetchMissing: opts.fetchMissing,
-    });
+    const { flow, invested } = await this.foldFlows(
+      flowRows,
+      investedRows,
+      currency,
+      from,
+      end,
+      { fetchMissing: opts.fetchMissing },
+    );
 
     const decision = decidePeriodResult({
       start: series[0],
@@ -223,11 +285,22 @@ export class PortfolioPeriodResultService {
       unmeasuredFlows,
     });
 
+    // The same series, the same window and the same uncountable-movement
+    // counts, measured over the securities alone.
+    const investedDecision: InvestedPeriodDecision = investedPeriodResult({
+      points: series,
+      startIndex: 0,
+      endIndex: series.length - 1,
+      flowsByDay: invested.byDay,
+      unmeasuredFlows,
+    });
+
     return {
       currency,
       startDate: series[0].date,
       endDate: series[series.length - 1].date,
       ...decision,
+      ...investedDecision,
     };
   }
 
@@ -246,37 +319,53 @@ export class PortfolioPeriodResultService {
    */
   private foldFlows(
     rows: FlowSubtotalRow[],
+    investedRows: InvestedFlowRow[],
     currency: string,
     start: string,
     end: string,
     options?: SeriesFetchOptions,
-  ): Promise<FoldedFlow> {
+  ): Promise<PeriodFolds> {
     return computeWithRateFill(
       this.exchangeRates,
-      () => this.foldFlowsAt(rows, currency, start, end),
-      (folded) => folded.gaps,
+      () => this.foldFlowsAt(rows, investedRows, currency, start, end),
+      (folded) => [...folded.flow.gaps, ...folded.invested.gaps],
       options,
       this.logger,
     );
   }
 
-  /** One pass of `foldFlows` over one rate index, freshly loaded. */
+  /**
+   * One pass of `foldFlows` over ONE rate index, freshly loaded.
+   *
+   * Both folds read the same index: the account's external flows and the
+   * invested part's capital and income are two questions over one window, and
+   * two indexes would be two sets of rates a day could resolve from.
+   */
   private async foldFlowsAt(
     rows: FlowSubtotalRow[],
+    investedRows: InvestedFlowRow[],
     currency: string,
     start: string,
     end: string,
-  ): Promise<FoldedFlow> {
+  ): Promise<PeriodFolds> {
     const query = (sql: string, params: unknown[]) =>
       withScopedDb(this.dataSource, (m) => m.query(sql, params));
     const rateIndex = await buildFlowRateIndex(
       query,
-      rows,
+      [...rows, ...investedRows],
       currency,
       start,
       end,
     );
-    return foldFlowSubtotals(rows, currency, rateIndex, this.logger);
+    return {
+      flow: foldFlowSubtotals(rows, currency, rateIndex, this.logger),
+      invested: foldInvestedFlows(
+        investedRows,
+        currency,
+        rateIndex,
+        this.logger,
+      ),
+    };
   }
 
   /** Public because the batch route reports in the very same currency. */

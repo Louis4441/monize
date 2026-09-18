@@ -35,6 +35,10 @@ import {
   CASH_INCOME_ACTIONS,
   INVESTMENT_REPLAY_ORDER,
 } from "./investment-replay.util";
+import {
+  chainTwrPercent,
+  subPeriodFactor,
+} from "../common/time-series/twr-chain.util";
 import { stripBrokerageSuffix } from "../accounts/account-name.util";
 
 // "As of now" portfolio valuations fetch a live spot rate per foreign
@@ -2773,9 +2777,11 @@ export class PortfolioCalculationService {
       if (previousDate !== null && previousValue > 0) {
         // Value of existing holdings at this date's prices (before applying today's transactions)
         const currentValue = await computeValueAtDate(holdings, date);
-        if (currentValue >= 0) {
-          subPeriodFactors.push(currentValue / previousValue);
-        }
+        // The factor arithmetic is shared with the period result's own chain:
+        // two spellings of "chain the factors and subtract one" would be two
+        // returns wearing one caption (twr-chain.util.ts).
+        const factor = subPeriodFactor(previousValue, currentValue);
+        if (factor !== null) subPeriodFactors.push(factor);
       }
 
       // Apply today's transactions to holdings
@@ -2802,22 +2808,13 @@ export class PortfolioCalculationService {
     // Final sub-period: from last transaction date to today
     if (previousValue > 0) {
       const todayValue = await computeValue(holdings);
-      if (todayValue >= 0) {
-        subPeriodFactors.push(todayValue / previousValue);
-      }
+      const factor = subPeriodFactor(previousValue, todayValue);
+      if (factor !== null) subPeriodFactors.push(factor);
     }
-
-    if (subPeriodFactors.length === 0) return null;
 
     // A factor chain built over an FX gap is not a return; see fxIncomplete.
     if (fxIncomplete) return null;
 
-    // Chain: TWR = product of all factors - 1
-    let product = 1;
-    for (const factor of subPeriodFactors) {
-      product *= factor;
-    }
-
-    return (product - 1) * 100;
+    return chainTwrPercent(subPeriodFactors);
   }
 }
