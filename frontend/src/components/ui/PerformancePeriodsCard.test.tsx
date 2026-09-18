@@ -136,6 +136,26 @@ describe('PerformancePeriodsCard', () => {
     expect(screen.queryByText('n/a')).not.toBeInTheDocument();
   });
 
+  it('keeps the unknown rows on screen when a notice says why', () => {
+    render(
+      <PerformancePeriodsCard
+        {...base}
+        entries={[
+          { period: '1m', label: '1M', primary: null, primaryValue: null },
+        ]}
+        notice="The request failed."
+        footnote="Deposits are not result."
+      />,
+    );
+
+    // A notice is a claim about the figures, so the figures stay listed as
+    // unknown beneath it; the empty message would claim there is nothing.
+    expect(screen.getByRole('status')).toHaveTextContent('The request failed.');
+    expect(screen.getByText('n/a')).toBeInTheDocument();
+    expect(screen.queryByText('Not enough history yet.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Deposits are not result.')).not.toBeInTheDocument();
+  });
+
   it('carries the footnote under the figures', () => {
     render(
       <PerformancePeriodsCard

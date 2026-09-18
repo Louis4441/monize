@@ -68,6 +68,14 @@
     "footnote": "Deposits and withdrawals are not counted as investment result.",
     "unavailable": "n/a",
     "empty": "Not enough history to measure a return yet.",
+    "loading": "Measuring the periods...",
+    "loadFailed": "The period results could not be loaded. The figures are withheld, not zero; reload the page to ask again.",
+    "reasons": {
+      "incompletePrices": "A withheld period starts on a day a holding had no price. Refresh prices, or add one on the security's price history.",
+      "incompleteCash": "A withheld period starts on a day a cash account in this view reported no balance, so what it held is unknown rather than zero.",
+      "missingRatePairs": "A withheld period needs an exchange rate the stored history does not have. Add rate history for the currency on the Currencies page.",
+      "unmeasuredFlow": "A withheld period holds a movement that cannot be told apart from a deposit or withdrawal: a trade settled outside these accounts, or a split mixing cash and investments."
+    },
     "periods": {
       "1d": "1D",
       "1w": "1W",

@@ -31,8 +31,21 @@ interface PerformancePeriodsCardProps {
   entries: readonly PerformancePeriodEntry[];
   /** What a `null` figure reads as; each surface supplies its own catalog's. */
   unavailableLabel: string;
-  /** Shown instead of the list when no period can be reported at all. */
+  /**
+   * Shown instead of the list when no period can be reported at all AND the
+   * caller has no `notice` saying why: a portfolio with no history has nothing
+   * to list, but a portfolio whose periods are withheld for a cause has six
+   * rows of "n/a" and the cause under them.
+   */
   emptyMessage: string;
+  /**
+   * A one-line qualification in the warning tone, shown above the footnote
+   * whenever it is given: the request has not answered, it failed, or the
+   * server withheld a period for a cause the reader can act on. Giving it
+   * keeps the list on screen even when every figure is unknown, so a failed
+   * request or a missing price never reads as "not enough history".
+   */
+  notice?: string;
   /** A caption under the list: what the figures do and do not include. */
   footnote?: ReactNode;
   /** `warning` is for a footnote that qualifies the figures rather than explaining them. */
@@ -59,12 +72,14 @@ export function PerformancePeriodsCard({
   entries,
   unavailableLabel,
   emptyMessage,
+  notice,
   footnote,
   footnoteTone = 'muted',
   footnoteTitle,
   'data-testid': testId,
 }: PerformancePeriodsCardProps) {
   const hasAny = entries.some((entry) => entry.primary !== null);
+  const showList = hasAny || notice !== undefined;
 
   const figureClass = (value: number | null | undefined, unavailable: boolean) =>
     unavailable || value === null || value === undefined
@@ -81,7 +96,7 @@ export function PerformancePeriodsCard({
           {subtitle}
         </p>
       )}
-      {hasAny ? (
+      {showList ? (
         <dl className="space-y-2">
           {entries.map((entry) => (
             <div
@@ -121,6 +136,14 @@ export function PerformancePeriodsCard({
       ) : (
         <p className="text-sm text-gray-500 dark:text-gray-400">
           {emptyMessage}
+        </p>
+      )}
+      {notice && (
+        <p
+          role="status"
+          className="mt-3 text-xs text-amber-600 dark:text-amber-500"
+        >
+          {notice}
         </p>
       )}
       {hasAny && footnote && (

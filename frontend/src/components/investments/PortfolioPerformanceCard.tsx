@@ -5,7 +5,9 @@ import { useTranslations } from 'next-intl';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { usePortfolioPeriodResults } from '@/hooks/usePortfolioPeriodResults';
 import { PerformancePeriodsCard } from '@/components/ui/PerformancePeriodsCard';
+import { withheldPeriodCause } from './portfolio-period-result';
 import { PORTFOLIO_PERIOD_PRESETS } from '@/types/net-worth';
+import type { PortfolioPeriodResult } from '@/types/net-worth';
 
 interface PortfolioPerformanceCardProps {
   /** The page's account filter, as it goes to the chart beside this card. */
@@ -40,7 +42,7 @@ export function PortfolioPerformanceCard({
   const t = useTranslations('investments');
   const { formatCurrency, formatSignedPercent, defaultCurrency } =
     useNumberFormat();
-  const { results } = usePortfolioPeriodResults({
+  const { results, status } = usePortfolioPeriodResults({
     periods: PORTFOLIO_PERIOD_PRESETS.join(','),
     accountIds:
       accountIds && accountIds.length > 0 ? accountIds.join(',') : undefined,
@@ -78,6 +80,25 @@ export function PortfolioPerformanceCard({
     });
   }, [results, t, formatCurrency, formatSignedPercent, defaultCurrency]);
 
+  // Why a figure is missing, said once under the list. A request that has
+  // not answered, or failed, is named as such; a period the server withheld
+  // for a cause the reader can repair names that cause. Only a portfolio
+  // whose scope produced no valued day at all falls to the empty message.
+  const notice = useMemo(() => {
+    if (status === 'loading') return t('portfolioPerformance.loading');
+    if (status === 'error') return t('portfolioPerformance.loadFailed');
+    const withheld = PORTFOLIO_PERIOD_PRESETS.map(
+      (preset) => results?.periods?.[preset],
+    ).filter(
+      (period): period is PortfolioPeriodResult =>
+        !!period && period.investmentResult === null,
+    );
+    const cause = withheldPeriodCause(withheld.map((period) => period.reasons));
+    return cause === null
+      ? undefined
+      : t(`portfolioPerformance.reasons.${cause}` as Parameters<typeof t>[0]);
+  }, [status, results, t]);
+
   return (
     <PerformancePeriodsCard
       title={t('portfolioPerformance.title')}
@@ -85,6 +106,7 @@ export function PortfolioPerformanceCard({
       entries={entries}
       unavailableLabel={t('portfolioPerformance.unavailable')}
       emptyMessage={t('portfolioPerformance.empty')}
+      notice={notice}
       footnote={t('portfolioPerformance.footnote')}
       data-testid="portfolio-performance"
     />

@@ -26,6 +26,12 @@ interface UsePortfolioPeriodResultsValue {
    * divides or falls back to zero.
    */
   results: PortfolioPeriodResults | null;
+  /**
+   * Whether `results` is null because the request is in flight, because it
+   * failed, or not at all. The two nulls are different things to show: a
+   * failed request is not a portfolio with nothing to report.
+   */
+  status: 'loading' | 'ready' | 'error';
 }
 
 /**
@@ -53,7 +59,7 @@ export function usePortfolioPeriodResults({
   ]);
   const [state, setState] = useState<{
     key: string;
-    results: PortfolioPeriodResults;
+    results: PortfolioPeriodResults | null;
   } | null>(null);
 
   useEffect(() => {
@@ -65,14 +71,16 @@ export function usePortfolioPeriodResults({
       })
       .catch((error) => {
         logger.error('Failed to load the period results:', error);
-        if (!cancelled) {
-          setState((prev) => (prev?.key === key ? null : prev));
-        }
+        if (!cancelled) setState({ key, results: null });
       });
     return () => {
       cancelled = true;
     };
   }, [key, periods, accountIds, displayCurrency]);
 
-  return { results: state?.key === key ? state.results : null };
+  const answered = state?.key === key;
+  return {
+    results: answered ? state.results : null,
+    status: !answered ? 'loading' : state.results === null ? 'error' : 'ready',
+  };
 }

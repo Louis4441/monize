@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   hasUnmeasuredFlow,
   periodResultUnknownReason,
+  withheldPeriodCause,
 } from './portfolio-period-result';
 
 /**
@@ -62,5 +63,30 @@ describe('hasUnmeasuredFlow', () => {
       false,
     );
     expect(hasUnmeasuredFlow([])).toBe(false);
+  });
+});
+
+describe('withheldPeriodCause', () => {
+  it('prints nothing for boundaries, which are not defects', () => {
+    expect(withheldPeriodCause([['noValueSeries'], ['zeroStart']])).toBeNull();
+    expect(withheldPeriodCause([])).toBeNull();
+  });
+
+  it('ranks a price over a balance over a rate, across periods', () => {
+    expect(
+      withheldPeriodCause([['missingRatePairs'], ['incompleteCash']]),
+    ).toBe('incompleteCash');
+    expect(
+      withheldPeriodCause([['missingRatePairs'], ['incompletePrices']]),
+    ).toBe('incompletePrices');
+    expect(withheldPeriodCause([['missingRatePairs']])).toBe('missingRatePairs');
+  });
+
+  it('names an uncountable movement only when nothing is missing', () => {
+    expect(withheldPeriodCause([['externallySettledTrade']])).toBe('unmeasuredFlow');
+    expect(withheldPeriodCause([['mixedSplit', 'noValueSeries']])).toBe('unmeasuredFlow');
+    expect(
+      withheldPeriodCause([['mixedSplit'], ['missingRatePairs']]),
+    ).toBe('missingRatePairs');
   });
 });

@@ -38,3 +38,34 @@ export function hasUnmeasuredFlow(
     reasons.includes('externallySettledTrade') || reasons.includes('mixedSplit')
   );
 }
+
+/** The cause a withheld period's notice names, ranked as the marker ranks them. */
+export type WithheldPeriodCause =
+  | 'incompletePrices'
+  | 'incompleteCash'
+  | 'missingRatePairs'
+  | 'unmeasuredFlow';
+
+/**
+ * The one cause to print under a list of periods, some of which the server
+ * withheld, or `null` when nothing was withheld for a cause worth printing.
+ *
+ * Ranked the way `periodResultUnknownReason` ranks a single figure -- a price
+ * to add before a balance to explain before a rate to refresh -- and, after
+ * those, the movement the flow classifier could not count. `zeroStart` and
+ * `noValueSeries` are boundaries, not defects: a portfolio younger than the
+ * window has nothing to repair, so they print nothing and the list's own "n/a"
+ * (or, when every period is one, the empty message) is the whole answer.
+ */
+export function withheldPeriodCause(
+  reasonLists: ReadonlyArray<readonly PeriodResultReason[]>,
+): WithheldPeriodCause | null {
+  const reasons = new Set(reasonLists.flat());
+  if (reasons.has('incompletePrices')) return 'incompletePrices';
+  if (reasons.has('incompleteCash')) return 'incompleteCash';
+  if (reasons.has('missingRatePairs')) return 'missingRatePairs';
+  if (reasons.has('externallySettledTrade') || reasons.has('mixedSplit')) {
+    return 'unmeasuredFlow';
+  }
+  return null;
+}

@@ -156,8 +156,82 @@ describe('PortfolioPerformanceCard', () => {
   });
 
   /** A request that never answered is not a portfolio that earned nothing. */
-  it('shows the empty state when the request fails, never zeros', async () => {
+  it('names a failed request under six unknown rows, never the empty state', async () => {
     api.mockRejectedValue(new Error('nope'));
+
+    render(<PortfolioPerformanceCard />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          'The period results could not be loaded. The figures are withheld, not zero; reload the page to ask again.',
+        ),
+      ).toBeInTheDocument(),
+    );
+    // The regression: a failed request used to fall to "not enough history",
+    // which is a claim about the portfolio the card had no grounds for.
+    expect(
+      screen.queryByText('Not enough history to measure a return yet.'),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByText('n/a').length).toBeGreaterThanOrEqual(6);
+    expect(screen.queryByText('+0.00%')).not.toBeInTheDocument();
+  });
+
+  it('names the cause when every period is withheld for a repairable reason', async () => {
+    // A portfolio held for months whose first day in every window carries an
+    // unpriced holding: the server withholds all six, and the reader must be
+    // sent to the price, not told the history is too short.
+    const withheld = period({
+      valueChange: null,
+      investmentResult: null,
+      returnPercent: null,
+      complete: false,
+      reasons: ['incompletePrices', 'missingRatePairs'],
+    });
+    api.mockResolvedValue(
+      results({
+        '1d': withheld,
+        '1w': withheld,
+        '1m': withheld,
+        '3m': withheld,
+        ytd: withheld,
+        '1y': withheld,
+      }),
+    );
+
+    render(<PortfolioPerformanceCard />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "A withheld period starts on a day a holding had no price. Refresh prices, or add one on the security's price history.",
+        ),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByText('Not enough history to measure a return yet.'),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByText('n/a').length).toBeGreaterThanOrEqual(6);
+  });
+
+  it('falls to the empty state only when no window has a valued day', async () => {
+    const boundary = period({
+      valueChange: null,
+      investmentResult: null,
+      returnPercent: null,
+      complete: false,
+      reasons: ['noValueSeries'],
+    });
+    api.mockResolvedValue(
+      results({
+        '1d': boundary,
+        '1w': boundary,
+        '1m': boundary,
+        '3m': boundary,
+        ytd: boundary,
+        '1y': boundary,
+      }),
+    );
 
     render(<PortfolioPerformanceCard />);
 
@@ -166,7 +240,33 @@ describe('PortfolioPerformanceCard', () => {
         screen.getByText('Not enough history to measure a return yet.'),
       ).toBeInTheDocument(),
     );
-    expect(screen.queryByText('+0.00%')).not.toBeInTheDocument();
+    expect(screen.queryByText('n/a')).not.toBeInTheDocument();
+  });
+
+  it('still names a cause when only some periods are withheld for it', async () => {
+    api.mockResolvedValue(
+      results({
+        '1m': period(),
+        '1y': period({
+          valueChange: null,
+          investmentResult: null,
+          returnPercent: null,
+          complete: false,
+          reasons: ['missingRatePairs'],
+        }),
+      }),
+    );
+
+    render(<PortfolioPerformanceCard />);
+
+    await waitFor(() =>
+      expect(screen.getByText('+2.00%')).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByText(
+        'A withheld period needs an exchange rate the stored history does not have. Add rate history for the currency on the Currencies page.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('asks again when the page reports a write', async () => {
