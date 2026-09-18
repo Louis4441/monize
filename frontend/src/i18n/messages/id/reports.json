@@ -823,7 +823,14 @@
     "csvFxComplete": "Konversi",
     "csvComplete": "Lengkap",
     "csvPartial": "Sebagian",
-    "csvMissingPairs": "Pasangan kurs yang hilang"
+    "csvMissingPairs": "Pasangan kurs yang hilang",
+    "colConversionBasis": "Dasar Konversi",
+    "basisTransaction": "Kurs transaksi",
+    "basisMarket": "Kurs pasar",
+    "convertedAtOwnRate": "Dikonversi dengan kurs tukar milik masing-masing transaksi.",
+    "convertedAtOwnRateWithMarket": "Dikonversi dengan kurs tukar milik masing-masing transaksi; {count, plural, one {# baris tanpa kurs sendiri menggunakan} other {# baris tanpa kurs sendiri menggunakan}} kurs pasar pada tanggal transaksinya.",
+    "convertedAtMarketRate": "{count, plural, one {# baris tidak memiliki} other {# baris tidak memiliki}} kurs tukar sendiri dan dikonversi dengan kurs pasar pada tanggal transaksinya.",
+    "convertedOnward": "{count, plural, one {# baris diselesaikan} other {# baris diselesaikan}} dalam mata uang ketiga dan diteruskan ke mata uang pelaporan dengan kurs pasar."
   },
   "loanAmortization": {
     "empty": "Tidak ada akun pinjaman atau hipotek ditemukan. Tambah akun pinjaman untuk melihat riwayat pembayaran.",

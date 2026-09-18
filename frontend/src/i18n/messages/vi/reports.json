@@ -823,7 +823,14 @@
     "csvFxComplete": "Quy đổi",
     "csvComplete": "Đầy đủ",
     "csvPartial": "Một phần",
-    "csvMissingPairs": "Cặp tỷ giá bị thiếu"
+    "csvMissingPairs": "Cặp tỷ giá bị thiếu",
+    "colConversionBasis": "Căn cứ quy đổi",
+    "basisTransaction": "Tỷ giá giao dịch",
+    "basisMarket": "Tỷ giá thị trường",
+    "convertedAtOwnRate": "Được quy đổi theo tỷ giá riêng của từng giao tác.",
+    "convertedAtOwnRateWithMarket": "Được quy đổi theo tỷ giá riêng của từng giao tác; {count, plural, one {# dòng không có tỷ giá riêng dùng} other {# dòng không có tỷ giá riêng dùng}} tỷ giá thị trường vào ngày giao dịch của chúng.",
+    "convertedAtMarketRate": "{count, plural, one {# dòng không có} other {# dòng không có}} tỷ giá riêng và được quy đổi theo tỷ giá thị trường vào ngày giao dịch của chúng.",
+    "convertedOnward": "{count, plural, one {# dòng được thanh toán} other {# dòng được thanh toán}} bằng một đơn vị tiền tệ thứ ba và được quy đổi tiếp sang đơn vị tiền tệ báo cáo theo tỷ giá thị trường."
   },
   "loanAmortization": {
     "empty": "Không tìm thấy tài khoản vay hoặc thế chấp. Thêm tài khoản vay để xem lịch sử thanh toán.",

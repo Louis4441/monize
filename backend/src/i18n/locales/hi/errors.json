@@ -254,7 +254,9 @@
     "cannotModifyOther": "किसी अन्य उपयोगकर्ता की मुद्रा संशोधित नहीं की जा सकती",
     "inUse": "मुद्रा \"{{ code }}\" आपके खातों, प्रतिभूतियों या अन्य अभिलेखों में उपयोग में है। इसके बजाय इसे निष्क्रिय करें।",
     "invalidRateDate": "date YYYY-MM-DD प्रारूप में होना चाहिए",
-    "alreadyInListInactive": "मुद्रा \"{{ code }}\" पहले से आपकी सूची में है, लेकिन वर्तमान में निष्क्रिय है। इसका उपयोग करने के लिए इसे पुनः सक्रिय करें।"
+    "alreadyInListInactive": "मुद्रा \"{{ code }}\" पहले से आपकी सूची में है, लेकिन वर्तमान में निष्क्रिय है। इसका उपयोग करने के लिए इसे पुनः सक्रिय करें।",
+    "sameCurrencyHistory": "{{ code }} आपकी डिफ़ॉल्ट मुद्रा है; बढ़ाने के लिए कोई विनिमय दर इतिहास नहीं है",
+    "rateProviderUnavailable": "विनिमय दर प्रदाता ने प्रतिक्रिया नहीं दी। कृपया बाद में पुनः प्रयास करें।"
   },
   "delegation": {
     "delegatedAccessInvalid": "प्रत्यायोजित एक्सेस अब मान्य नहीं है",
@@ -338,7 +340,8 @@
     "invalidEndDate": "endDate YYYY-MM-DD प्रारूप में होनी चाहिए",
     "invalidBaselineDate": "baselineDate YYYY-MM-DD प्रारूप में होनी चाहिए",
     "invalidAccountIds": "accountIds अल्पविराम-अलग UUID होने चाहिए",
-    "invalidGranularity": "granularity 'daily' या 'monthly' होना चाहिए"
+    "invalidGranularity": "granularity 'daily' या 'monthly' होना चाहिए",
+    "invalidPeriods": "periods अल्पविराम से अलग किए गए पूर्वनिर्धारित अवधि प्रीसेट होने चाहिए"
   },
   "notifications": {
     "notFound": "ID {{ id }} वाली अधिसूचना नहीं मिली",

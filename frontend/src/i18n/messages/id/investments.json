@@ -292,5 +292,20 @@
     "accountRequired": "Akun wajib diisi",
     "dateRequired": "Tanggal wajib diisi",
     "acquisitionPriceRequired": "Harga per lembar wajib diisi dan harus lebih besar dari nol. Gunakan \"Tambah Lembar\" untuk lembar yang diperoleh tanpa biaya yang diketahui."
+  },
+  "portfolioPerformance": {
+    "title": "Kinerja portofolio",
+    "subtitle": "Bagaimana investasi Anda berkinerja setelah setoran dan penarikan dikeluarkan.",
+    "footnote": "Setoran dan penarikan tidak dihitung sebagai hasil investasi.",
+    "unavailable": "t/a",
+    "empty": "Riwayat belum cukup untuk mengukur hasil.",
+    "periods": {
+      "1d": "1H",
+      "1w": "1M",
+      "1m": "1B",
+      "3m": "3B",
+      "ytd": "Sejak awal tahun",
+      "1y": "1T"
+    }
   }
 }

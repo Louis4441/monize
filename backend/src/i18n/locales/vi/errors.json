@@ -254,7 +254,9 @@
     "cannotModifyOther": "Không thể sửa đổi tiền tệ của người dùng khác",
     "inUse": "Tiền tệ \"{{ code }}\" đang được sử dụng bởi tài khoản, chứng khoán hoặc hồ sơ khác của bạn. Hãy hủy kích hoạt thay thế.",
     "invalidRateDate": "date phải theo định dạng YYYY-MM-DD",
-    "alreadyInListInactive": "Tiền tệ \"{{ code }}\" đã có trong danh sách của bạn nhưng hiện đang không hoạt động. Kích hoạt lại để sử dụng."
+    "alreadyInListInactive": "Tiền tệ \"{{ code }}\" đã có trong danh sách của bạn nhưng hiện đang không hoạt động. Kích hoạt lại để sử dụng.",
+    "sameCurrencyHistory": "{{ code }} là tiền tệ mặc định của bạn; không có lịch sử tỷ giá nào để mở rộng",
+    "rateProviderUnavailable": "Nhà cung cấp tỷ giá hối đoái không phản hồi. Vui lòng thử lại sau."
   },
   "delegation": {
     "delegatedAccessInvalid": "Quyền truy cập được ủy quyền không còn hợp lệ",
@@ -338,7 +340,8 @@
     "invalidEndDate": "endDate phải có định dạng YYYY-MM-DD",
     "invalidBaselineDate": "baselineDate phải có định dạng YYYY-MM-DD",
     "invalidAccountIds": "accountIds phải là các UUID được phân cách bằng dấu phẩy",
-    "invalidGranularity": "granularity phải là 'daily' hoặc 'monthly'"
+    "invalidGranularity": "granularity phải là 'daily' hoặc 'monthly'",
+    "invalidPeriods": "periods phải là các preset kỳ được phân cách bằng dấu phẩy"
   },
   "notifications": {
     "notFound": "Không tìm thấy thông báo với ID {{ id }}",

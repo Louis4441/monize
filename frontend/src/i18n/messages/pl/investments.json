@@ -292,5 +292,20 @@
     "accountRequired": "Konto jest wymagane",
     "dateRequired": "Data jest wymagana",
     "acquisitionPriceRequired": "Cena za jednostkę jest wymagana i musi być większa od zera. Dla jednostek nabytych bez znanego kosztu użyj „Dodaj udziały”."
+  },
+  "portfolioPerformance": {
+    "title": "Wyniki portfela",
+    "subtitle": "Jak zachowywały się Twoje inwestycje po wyłączeniu wpływu wpłat i wypłat.",
+    "footnote": "Wpłaty i wypłaty nie są liczone jako wynik inwestycyjny.",
+    "unavailable": "n/d",
+    "empty": "Za mało historii, żeby zmierzyć zwrot.",
+    "periods": {
+      "1d": "1D",
+      "1w": "1T",
+      "1m": "1M",
+      "3m": "3M",
+      "ytd": "Od pocz. roku",
+      "1y": "1R"
+    }
   }
 }

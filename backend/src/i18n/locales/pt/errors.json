@@ -254,7 +254,9 @@
     "cannotModifyOther": "Não é possível modificar a moeda de outro utilizador",
     "inUse": "A moeda \"{{ code }}\" está em uso pelas suas contas, títulos ou outros registos. Desative-a em vez disso.",
     "invalidRateDate": "date deve estar no formato AAAA-MM-DD",
-    "alreadyInListInactive": "A moeda \"{{ code }}\" já está na sua lista, mas está atualmente inativa. Reative-a para a utilizar."
+    "alreadyInListInactive": "A moeda \"{{ code }}\" já está na sua lista, mas está atualmente inativa. Reative-a para a utilizar.",
+    "sameCurrencyHistory": "{{ code }} é a sua moeda predefinida; não há histórico de taxa de câmbio a ampliar",
+    "rateProviderUnavailable": "O fornecedor de taxas de câmbio não respondeu. Tente novamente mais tarde."
   },
   "delegation": {
     "delegatedAccessInvalid": "O acesso delegado já não é válido",
@@ -338,7 +340,8 @@
     "invalidEndDate": "endDate deve estar no formato YYYY-MM-DD",
     "invalidBaselineDate": "baselineDate deve estar no formato YYYY-MM-DD",
     "invalidAccountIds": "accountIds deve ser uma lista de UUIDs separados por vírgulas",
-    "invalidGranularity": "granularity deve ser 'daily' ou 'monthly'"
+    "invalidGranularity": "granularity deve ser 'daily' ou 'monthly'",
+    "invalidPeriods": "periods deve ser uma lista de períodos predefinidos separados por vírgulas"
   },
   "notifications": {
     "notFound": "Notificação com ID {{ id }} não encontrada",

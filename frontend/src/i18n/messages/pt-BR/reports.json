@@ -823,7 +823,14 @@
     "csvFxComplete": "Conversão",
     "csvComplete": "Completa",
     "csvPartial": "Parcial",
-    "csvMissingPairs": "Pares de câmbio ausentes"
+    "csvMissingPairs": "Pares de câmbio ausentes",
+    "colConversionBasis": "Base de conversão",
+    "basisTransaction": "Taxa da transação",
+    "basisMarket": "Taxa de mercado",
+    "convertedAtOwnRate": "Convertido pela taxa de câmbio própria de cada transação.",
+    "convertedAtOwnRateWithMarket": "Convertido pela taxa de câmbio própria de cada transação; {count, plural, one {# linha sem taxa própria usa} other {# linhas sem taxa própria usam}} a taxa de mercado na {count, plural, one {sua} other {suas}} data de negociação.",
+    "convertedAtMarketRate": "{count, plural, one {# linha não tem} other {# linhas não têm}} taxa de câmbio própria e {count, plural, one {é convertida} other {são convertidas}} pela taxa de mercado na {count, plural, one {sua} other {suas}} data de negociação.",
+    "convertedOnward": "{count, plural, one {# linha foi liquidada} other {# linhas foram liquidadas}} em uma terceira moeda e {count, plural, one {foi levada} other {foram levadas}} adiante até a moeda de referência pela taxa de mercado."
   },
   "loanAmortization": {
     "empty": "Nenhuma conta de empréstimo ou hipoteca encontrada. Adicione uma conta de empréstimo para ver o histórico de pagamentos.",

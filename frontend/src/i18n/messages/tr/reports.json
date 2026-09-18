@@ -823,7 +823,14 @@
     "csvFxComplete": "Dönüştürme",
     "csvComplete": "Tam",
     "csvPartial": "Kısmi",
-    "csvMissingPairs": "Eksik kur çiftleri"
+    "csvMissingPairs": "Eksik kur çiftleri",
+    "colConversionBasis": "Dönüşüm Esası",
+    "basisTransaction": "İşlem kuru",
+    "basisMarket": "Piyasa kuru",
+    "convertedAtOwnRate": "Her işlemin kendi döviz kurundan çevrilmiştir.",
+    "convertedAtOwnRateWithMarket": "Her işlemin kendi döviz kurundan çevrilmiştir; kendi kuru olmayan {count, plural, one {# satır} other {# satır}}, işlem tarihindeki piyasa kurunu kullanır.",
+    "convertedAtMarketRate": "Kendi döviz kuru olmayan {count, plural, one {# satır} other {# satır}}, işlem tarihindeki piyasa kurundan çevrilmiştir.",
+    "convertedOnward": "Üçüncü bir para biriminde kapanan {count, plural, one {# satır} other {# satır}}, piyasa kuruyla raporlama para birimine taşınmıştır."
   },
   "loanAmortization": {
     "empty": "Kredi veya ipotek hesabı bulunamadı. Ödeme geçmişini görmek için kredi hesabı ekleyin.",

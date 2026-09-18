@@ -823,7 +823,14 @@
     "csvFxComplete": "Przeliczenie",
     "csvComplete": "Pełne",
     "csvPartial": "Częściowe",
-    "csvMissingPairs": "Brakujące pary kursowe"
+    "csvMissingPairs": "Brakujące pary kursowe",
+    "colConversionBasis": "Podstawa przeliczenia",
+    "basisTransaction": "Kurs transakcji",
+    "basisMarket": "Kurs rynkowy",
+    "convertedAtOwnRate": "Przeliczono po własnym kursie wymiany każdej transakcji.",
+    "convertedAtOwnRateWithMarket": "Przeliczono po własnym kursie wymiany każdej transakcji; {count, plural, one {# wiersz bez własnego kursu używa} few {# wiersze bez własnego kursu używają} many {# wierszy bez własnego kursu używa} other {# wiersza bez własnego kursu używa}} kursu rynkowego z {count, plural, one {jego} other {ich}} daty transakcji.",
+    "convertedAtMarketRate": "{count, plural, one {# wiersz nie ma} few {# wiersze nie mają} many {# wierszy nie ma} other {# wiersza nie ma}} własnego kursu wymiany i {count, plural, one {jest przeliczany} other {są przeliczane}} po kursie rynkowym z {count, plural, one {jego} other {ich}} daty transakcji.",
+    "convertedOnward": "{count, plural, one {# wiersz rozliczono} few {# wiersze rozliczono} many {# wierszy rozliczono} other {# wiersza rozliczono}} w trzeciej walucie i {count, plural, one {przeliczono go} other {przeliczono je}} dalej na walutę prezentacji po kursie rynkowym."
   },
   "loanAmortization": {
     "empty": "Nie znaleziono kont pożyczek ani kredytów hipotecznych. Dodaj konto pożyczki, aby zobaczyć historię spłat.",

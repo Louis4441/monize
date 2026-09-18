@@ -254,7 +254,9 @@
     "cannotModifyOther": "Tidak dapat mengubah mata uang pengguna lain",
     "inUse": "Mata uang \"{{ code }}\" sedang digunakan oleh akun, sekuritas, atau catatan lain Anda. Nonaktifkan saja.",
     "invalidRateDate": "date harus dalam format YYYY-MM-DD",
-    "alreadyInListInactive": "Mata uang \"{{ code }}\" sudah ada dalam daftar Anda, tetapi saat ini tidak aktif. Aktifkan kembali untuk menggunakannya."
+    "alreadyInListInactive": "Mata uang \"{{ code }}\" sudah ada dalam daftar Anda, tetapi saat ini tidak aktif. Aktifkan kembali untuk menggunakannya.",
+    "sameCurrencyHistory": "{{ code }} adalah mata uang bawaan Anda; tidak ada riwayat kurs untuk diperluas",
+    "rateProviderUnavailable": "Penyedia kurs tukar tidak merespons. Silakan coba lagi nanti."
   },
   "delegation": {
     "delegatedAccessInvalid": "Akses yang didelegasikan tidak lagi valid",
@@ -338,7 +340,8 @@
     "invalidEndDate": "endDate harus dalam format YYYY-MM-DD",
     "invalidBaselineDate": "baselineDate harus dalam format YYYY-MM-DD",
     "invalidAccountIds": "accountIds harus berupa UUID yang dipisahkan koma",
-    "invalidGranularity": "granularity harus 'daily' atau 'monthly'"
+    "invalidGranularity": "granularity harus 'daily' atau 'monthly'",
+    "invalidPeriods": "periods harus berupa preset periode yang dipisahkan koma"
   },
   "notifications": {
     "notFound": "Notifikasi dengan ID {{ id }} tidak ditemukan",

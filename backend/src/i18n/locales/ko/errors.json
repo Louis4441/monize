@@ -254,7 +254,9 @@
     "cannotModifyOther": "다른 사용자의 통화는 수정할 수 없습니다",
     "inUse": "통화 \"{{ code }}\"이(가) 계정, 증권 또는 기타 레코드에서 사용 중입니다. 대신 비활성화하세요.",
     "invalidRateDate": "date는 YYYY-MM-DD 형식이어야 합니다",
-    "alreadyInListInactive": "통화 \"{{ code }}\"이(가) 이미 목록에 있지만 현재 비활성 상태입니다. 사용하려면 다시 활성화하세요."
+    "alreadyInListInactive": "통화 \"{{ code }}\"이(가) 이미 목록에 있지만 현재 비활성 상태입니다. 사용하려면 다시 활성화하세요.",
+    "sameCurrencyHistory": "{{ code }}은(는) 기본 통화이므로 확장할 환율 이력이 없습니다",
+    "rateProviderUnavailable": "환율 제공처가 응답하지 않았습니다. 나중에 다시 시도해 주세요."
   },
   "delegation": {
     "delegatedAccessInvalid": "위임된 접근 권한이 더 이상 유효하지 않습니다",
@@ -338,7 +340,8 @@
     "invalidEndDate": "endDate는 YYYY-MM-DD 형식이어야 합니다",
     "invalidBaselineDate": "baselineDate는 YYYY-MM-DD 형식이어야 합니다",
     "invalidAccountIds": "accountIds는 쉼표로 구분된 UUID여야 합니다",
-    "invalidGranularity": "granularity는 'daily' 또는 'monthly'여야 합니다"
+    "invalidGranularity": "granularity는 'daily' 또는 'monthly'여야 합니다",
+    "invalidPeriods": "periods는 쉼표로 구분된 기간 프리셋이어야 합니다"
   },
   "notifications": {
     "notFound": "ID가 {{ id }}인 알림을 찾을 수 없습니다",

@@ -823,7 +823,14 @@
     "csvFxComplete": "換算",
     "csvComplete": "完整",
     "csvPartial": "部分",
-    "csvMissingPairs": "缺少的匯率組合"
+    "csvMissingPairs": "缺少的匯率組合",
+    "colConversionBasis": "換算依據",
+    "basisTransaction": "交易匯率",
+    "basisMarket": "市場匯率",
+    "convertedAtOwnRate": "依各筆交易自身的匯率換算。",
+    "convertedAtOwnRateWithMarket": "依各筆交易自身的匯率換算；{count, plural, one {其中 # 列沒有自身匯率，改用} other {其中 # 列沒有自身匯率，改用}}其交易日當天的市場匯率。",
+    "convertedAtMarketRate": "{count, plural, one {# 列} other {# 列}}沒有自身的匯率，依其交易日的市場匯率換算。",
+    "convertedOnward": "{count, plural, one {# 列}other {# 列}}以第三種幣別結算，並依市場匯率進一步換算為報告幣別。"
   },
   "loanAmortization": {
     "empty": "找不到貸款或抵押貸款科目。請新增貸款科目以查看付款記錄。",

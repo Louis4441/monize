@@ -292,5 +292,20 @@
     "accountRequired": "Tài khoản là bắt buộc",
     "dateRequired": "Ngày là bắt buộc",
     "acquisitionPriceRequired": "Giá mỗi cổ phiếu là bắt buộc và phải lớn hơn không. Dùng \"Thêm cổ phiếu\" cho cổ phiếu có được mà không biết giá gốc."
+  },
+  "portfolioPerformance": {
+    "title": "Hiệu suất danh mục",
+    "subtitle": "Khoản đầu tư của bạn đã hoạt động thế nào sau khi loại bỏ các khoản nạp và rút.",
+    "footnote": "Các khoản nạp và rút không được tính vào kết quả đầu tư.",
+    "unavailable": "k/c",
+    "empty": "Lịch sử còn quá ít để đo lợi nhuận.",
+    "periods": {
+      "1d": "1N",
+      "1w": "1T",
+      "1m": "1TH",
+      "3m": "3TH",
+      "ytd": "Từ đầu năm",
+      "1y": "1N"
+    }
   }
 }

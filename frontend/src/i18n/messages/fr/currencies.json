@@ -111,5 +111,20 @@
     "nameMax": "Le nom ne doit pas dépasser 100 caractères",
     "symbolRequired": "Le symbole est obligatoire",
     "symbolMax": "Le symbole ne doit pas dépasser 10 caractères"
+  },
+  "rateHistory": {
+    "title": "Historique des taux",
+    "stored": "Historique enregistré : {start} à {end} ({count} observations)",
+    "none": "Aucun historique enregistré pour {pair}",
+    "loading": "Vérification de l'historique des taux enregistré...",
+    "loadFailed": "Impossible de lire l'historique des taux enregistré",
+    "addYear": "Ajouter une année supplémentaire d'historique des taux",
+    "adding": "Récupération d'une année supplémentaire...",
+    "hint": "Les rapports datés d'avant le premier taux enregistré ne peuvent pas convertir {pair}.",
+    "toasts": {
+      "added": "{count} taux ajoutés ; l'historique commence désormais le {start}",
+      "noOlder": "Le fournisseur n'a pas de taux plus anciens pour {pair}",
+      "failed": "Impossible d'étendre l'historique des taux"
+    }
   }
 }

@@ -254,7 +254,9 @@
     "cannotModifyOther": "Währung eines anderen Benutzers kann nicht geändert werden",
     "inUse": "Währung \"{{ code }}\" wird von Ihren Konten, Wertpapieren oder anderen Einträgen verwendet. Deaktivieren Sie sie stattdessen.",
     "invalidRateDate": "date muss im Format JJJJ-MM-TT angegeben werden",
-    "alreadyInListInactive": "Währung \"{{ code }}\" ist bereits in Ihrer Liste, aber derzeit inaktiv. Reaktivieren Sie sie, um sie zu verwenden."
+    "alreadyInListInactive": "Währung \"{{ code }}\" ist bereits in Ihrer Liste, aber derzeit inaktiv. Reaktivieren Sie sie, um sie zu verwenden.",
+    "sameCurrencyHistory": "{{ code }} ist Ihre Standardwährung; es gibt keinen Wechselkursverlauf zu erweitern",
+    "rateProviderUnavailable": "Der Wechselkursanbieter hat nicht geantwortet. Bitte versuchen Sie es später erneut."
   },
   "delegation": {
     "delegatedAccessInvalid": "Delegierter Zugriff ist nicht mehr gültig",
@@ -338,7 +340,8 @@
     "invalidEndDate": "endDate muss im Format YYYY-MM-DD sein",
     "invalidBaselineDate": "baselineDate muss im Format YYYY-MM-DD sein",
     "invalidAccountIds": "accountIds muss kommagetrennte UUIDs sein",
-    "invalidGranularity": "granularity muss 'daily' oder 'monthly' sein"
+    "invalidGranularity": "granularity muss 'daily' oder 'monthly' sein",
+    "invalidPeriods": "periods muss aus kommagetrennten Zeitraum-Voreinstellungen bestehen"
   },
   "notifications": {
     "notFound": "Benachrichtigung mit ID {{ id }} nicht gefunden",

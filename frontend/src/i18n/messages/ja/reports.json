@@ -823,7 +823,14 @@
     "csvFxComplete": "換算",
     "csvComplete": "完全",
     "csvPartial": "一部",
-    "csvMissingPairs": "不足しているレートの組み合わせ"
+    "csvMissingPairs": "不足しているレートの組み合わせ",
+    "colConversionBasis": "換算基準",
+    "basisTransaction": "取引レート",
+    "basisMarket": "市場レート",
+    "convertedAtOwnRate": "各取引固有の為替レートで換算されています。",
+    "convertedAtOwnRateWithMarket": "各取引固有の為替レートで換算されていますが、{count, plural, one {レートを持たない#件は} other {レートを持たない#件は}}取引日の{count, plural, one {市場レート} other {市場レート}}で換算されます。",
+    "convertedAtMarketRate": "{count, plural, one {固有の為替レートを持たない#件は} other {固有の為替レートを持たない#件は}}取引日の{count, plural, one {市場レート} other {市場レート}}で{count, plural, one {換算されます} other {換算されます}}。",
+    "convertedOnward": "{count, plural, one {第三の通貨で決済された#件は} other {第三の通貨で決済された#件は}}市場レートで表示通貨へさらに{count, plural, one {換算されました} other {換算されました}}。"
   },
   "loanAmortization": {
     "empty": "ローンまたは住宅ローン口座が見つかりません。支払い履歴を確認するにはローン口座を追加してください。",

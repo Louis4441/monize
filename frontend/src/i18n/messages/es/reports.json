@@ -823,7 +823,14 @@
     "csvFxComplete": "Conversión",
     "csvComplete": "Completa",
     "csvPartial": "Parcial",
-    "csvMissingPairs": "Pares de tipo de cambio faltantes"
+    "csvMissingPairs": "Pares de tipo de cambio faltantes",
+    "colConversionBasis": "Base de conversión",
+    "basisTransaction": "Tasa de la transacción",
+    "basisMarket": "Tasa de mercado",
+    "convertedAtOwnRate": "Convertido al tipo de cambio propio de cada transacción.",
+    "convertedAtOwnRateWithMarket": "Convertido al tipo de cambio propio de cada transacción; {count, plural, one {# fila sin tipo propio usa} other {# filas sin tipo propio usan}} el tipo de mercado en {count, plural, one {su} other {su respectiva}} fecha de operación.",
+    "convertedAtMarketRate": "{count, plural, one {# fila no tiene} other {# filas no tienen}} un tipo de cambio propio y {count, plural, one {se convierte} other {se convierten}} al tipo de mercado en {count, plural, one {su} other {su respectiva}} fecha de operación.",
+    "convertedOnward": "{count, plural, one {# fila se liquidó} other {# filas se liquidaron}} en una tercera moneda y {count, plural, one {se trasladó} other {se trasladaron}} a la moneda del informe al tipo de mercado."
   },
   "loanAmortization": {
     "empty": "No se encontraron cuentas de préstamo o hipoteca. Agrega una cuenta de préstamo para ver el historial de pagos.",

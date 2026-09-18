@@ -823,7 +823,14 @@
     "csvFxComplete": "换算",
     "csvComplete": "完整",
     "csvPartial": "部分",
-    "csvMissingPairs": "缺失的汇率对"
+    "csvMissingPairs": "缺失的汇率对",
+    "colConversionBasis": "换算依据",
+    "basisTransaction": "交易汇率",
+    "basisMarket": "市场汇率",
+    "convertedAtOwnRate": "按各笔交易自身的汇率换算。",
+    "convertedAtOwnRateWithMarket": "按各笔交易自身的汇率换算；{count, plural, one {其中 # 行没有自身汇率，使用} other {其中 # 行没有自身汇率，使用}}其交易日当天的市场汇率。",
+    "convertedAtMarketRate": "{count, plural, one {# 行} other {# 行}}没有自身的汇率，按其交易日的市场汇率换算。",
+    "convertedOnward": "{count, plural, one {# 行}other {# 行}}以第三种货币结算，并按市场汇率进一步换算为报告货币。"
   },
   "loanAmortization": {
     "empty": "未找到贷款或抵押贷款账户。添加贷款账户以查看还款历史。",

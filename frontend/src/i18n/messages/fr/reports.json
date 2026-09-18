@@ -823,7 +823,14 @@
     "csvFxComplete": "Conversion",
     "csvComplete": "Complète",
     "csvPartial": "Partielle",
-    "csvMissingPairs": "Paires de taux manquantes"
+    "csvMissingPairs": "Paires de taux manquantes",
+    "colConversionBasis": "Base de conversion",
+    "basisTransaction": "Taux de la transaction",
+    "basisMarket": "Taux du marché",
+    "convertedAtOwnRate": "Converti au taux de change propre à chaque transaction.",
+    "convertedAtOwnRateWithMarket": "Converti au taux de change propre à chaque transaction ; {count, plural, one {# ligne sans taux propre utilise} other {# lignes sans taux propre utilisent}} le taux du marché à {count, plural, one {sa} other {leur}} date d'opération.",
+    "convertedAtMarketRate": "{count, plural, one {# ligne ne porte} other {# lignes ne portent}} aucun taux de change propre et {count, plural, one {est convertie} other {sont converties}} au taux du marché à {count, plural, one {sa} other {leur}} date d'opération.",
+    "convertedOnward": "{count, plural, one {# ligne a été réglée} other {# lignes ont été réglées}} dans une devise tierce et {count, plural, one {a été reportée} other {ont été reportées}} vers la devise du rapport au taux du marché."
   },
   "loanAmortization": {
     "empty": "Aucun compte de prêt ou de prêt hypothécaire trouvé. Ajoutez un compte de prêt pour voir l'historique des paiements.",

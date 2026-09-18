@@ -292,5 +292,20 @@
     "accountRequired": "Rekening is vereist",
     "dateRequired": "Datum is vereist",
     "acquisitionPriceRequired": "De prijs per aandeel is verplicht en moet groter zijn dan nul. Gebruik \"Aandelen toevoegen\" voor aandelen die zonder bekende kostprijs zijn verkregen."
+  },
+  "portfolioPerformance": {
+    "title": "Portefeuilleprestatie",
+    "subtitle": "Hoe uw beleggingen presteerden nadat stortingen en opnames zijn uitgesloten.",
+    "footnote": "Stortingen en opnames tellen niet mee als beleggingsresultaat.",
+    "unavailable": "n.v.t.",
+    "empty": "Nog niet genoeg geschiedenis om een rendement te meten.",
+    "periods": {
+      "1d": "1D",
+      "1w": "1W",
+      "1m": "1M",
+      "3m": "3M",
+      "ytd": "Dit jaar",
+      "1y": "1J"
+    }
   }
 }

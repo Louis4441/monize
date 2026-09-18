@@ -111,5 +111,20 @@
     "nameMax": "名稱不得超過 100 個字元",
     "symbolRequired": "符號為必填",
     "symbolMax": "符號不得超過 10 個字元"
+  },
+  "rateHistory": {
+    "title": "匯率歷史",
+    "stored": "已儲存歷史：{start} 至 {end}（{count} 筆觀測值）",
+    "none": "沒有 {pair} 的已儲存歷史",
+    "loading": "正在檢查已儲存的匯率歷史...",
+    "loadFailed": "無法讀取已儲存的匯率歷史",
+    "addYear": "再新增一年匯率歷史",
+    "adding": "正在取得另一年資料...",
+    "hint": "日期早於最早儲存匯率的報告，無法換算 {pair}。",
+    "toasts": {
+      "added": "已新增 {count} 筆匯率；歷史現在從 {start} 開始",
+      "noOlder": "該資料來源沒有 {pair} 更早的匯率",
+      "failed": "無法擴充匯率歷史"
+    }
   }
 }

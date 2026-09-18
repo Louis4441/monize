@@ -111,5 +111,20 @@
     "nameMax": "O nome deve ter no máximo 100 caracteres",
     "symbolRequired": "O símbolo é obrigatório",
     "symbolMax": "O símbolo deve ter no máximo 10 caracteres"
+  },
+  "rateHistory": {
+    "title": "Histórico de taxas",
+    "stored": "Histórico guardado: {start} a {end} ({count} observações)",
+    "none": "Sem histórico guardado para {pair}",
+    "loading": "A verificar o histórico de taxas guardado...",
+    "loadFailed": "Não foi possível ler o histórico de taxas guardado",
+    "addYear": "Adicionar mais um ano de histórico de taxas",
+    "adding": "A obter mais um ano...",
+    "hint": "Relatórios com data anterior à primeira taxa guardada não conseguem converter {pair}.",
+    "toasts": {
+      "added": "Foram adicionadas {count} taxas; o histórico começa agora em {start}",
+      "noOlder": "O fornecedor não tem taxas mais antigas para {pair}",
+      "failed": "Não foi possível ampliar o histórico de taxas"
+    }
   }
 }

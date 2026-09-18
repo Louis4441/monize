@@ -292,5 +292,20 @@
     "accountRequired": "La cuenta es obligatoria",
     "dateRequired": "La fecha es obligatoria",
     "acquisitionPriceRequired": "El precio por acción es obligatorio y debe ser mayor que cero. Use «Agregar Acciones» para acciones adquiridas sin un costo conocido."
+  },
+  "portfolioPerformance": {
+    "title": "Rendimiento de la cartera",
+    "subtitle": "Cómo se comportaron sus inversiones una vez descontados los depósitos y las retiradas.",
+    "footnote": "Los depósitos y las retiradas no se cuentan como resultado de inversión.",
+    "unavailable": "n/a",
+    "empty": "Aún no hay suficiente historial para medir una rentabilidad.",
+    "periods": {
+      "1d": "1D",
+      "1w": "1S",
+      "1m": "1M",
+      "3m": "3M",
+      "ytd": "Año en curso",
+      "1y": "1A"
+    }
   }
 }

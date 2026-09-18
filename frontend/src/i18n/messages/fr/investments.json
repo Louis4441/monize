@@ -292,5 +292,20 @@
     "accountRequired": "Le compte est obligatoire",
     "dateRequired": "La date est obligatoire",
     "acquisitionPriceRequired": "Le prix par part est obligatoire et doit être supérieur à zéro. Utilisez « Ajout de parts » pour des parts acquises sans coût connu."
+  },
+  "portfolioPerformance": {
+    "title": "Performance du portefeuille",
+    "subtitle": "La performance de vos investissements une fois les dépôts et retraits exclus.",
+    "footnote": "Les dépôts et retraits ne sont pas comptés comme résultat d'investissement.",
+    "unavailable": "n/d",
+    "empty": "Pas encore assez d'historique pour mesurer un rendement.",
+    "periods": {
+      "1d": "1J",
+      "1w": "1S",
+      "1m": "1M",
+      "3m": "3M",
+      "ytd": "Depuis janvier",
+      "1y": "1A"
+    }
   }
 }

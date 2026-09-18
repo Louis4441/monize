@@ -823,7 +823,14 @@
     "csvFxComplete": "Conversione",
     "csvComplete": "Completa",
     "csvPartial": "Parziale",
-    "csvMissingPairs": "Coppie di cambio mancanti"
+    "csvMissingPairs": "Coppie di cambio mancanti",
+    "colConversionBasis": "Base di conversione",
+    "basisTransaction": "Tasso della transazione",
+    "basisMarket": "Tasso di mercato",
+    "convertedAtOwnRate": "Convertito al tasso di cambio proprio di ciascuna transazione.",
+    "convertedAtOwnRateWithMarket": "Convertito al tasso di cambio proprio di ciascuna transazione; {count, plural, one {# riga priva di tasso proprio usa} other {# righe prive di tasso proprio usano}} il tasso di mercato alla {count, plural, one {sua} other {rispettiva}} data di negoziazione.",
+    "convertedAtMarketRate": "{count, plural, one {# riga non ha} other {# righe non hanno}} un tasso di cambio proprio e {count, plural, one {viene convertita} other {vengono convertite}} al tasso di mercato alla {count, plural, one {sua} other {rispettiva}} data di negoziazione.",
+    "convertedOnward": "{count, plural, one {# riga è stata regolata} other {# righe sono state regolate}} in una terza valuta e {count, plural, one {riportata} other {riportate}} nella valuta del report al tasso di mercato."
   },
   "loanAmortization": {
     "empty": "Nessun conto di prestito o mutuo trovato. Aggiungi un conto di prestito per vedere lo storico pagamenti.",

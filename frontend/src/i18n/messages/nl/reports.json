@@ -823,7 +823,14 @@
     "csvFxComplete": "Omrekening",
     "csvComplete": "Volledig",
     "csvPartial": "Gedeeltelijk",
-    "csvMissingPairs": "Ontbrekende koersparen"
+    "csvMissingPairs": "Ontbrekende koersparen",
+    "colConversionBasis": "Omrekeningsbasis",
+    "basisTransaction": "Transactiekoers",
+    "basisMarket": "Marktkoers",
+    "convertedAtOwnRate": "Omgerekend tegen de eigen wisselkoers van elke transactie.",
+    "convertedAtOwnRateWithMarket": "Omgerekend tegen de eigen wisselkoers van elke transactie; {count, plural, one {# rij zonder eigen koers gebruikt} other {# rijen zonder eigen koers gebruiken}} de marktkoers op {count, plural, one {haar} other {hun eigen}} handelsdatum.",
+    "convertedAtMarketRate": "{count, plural, one {# rij heeft} other {# rijen hebben}} geen eigen wisselkoers en {count, plural, one {wordt} other {worden}} omgerekend tegen de marktkoers op {count, plural, one {haar} other {hun eigen}} handelsdatum.",
+    "convertedOnward": "{count, plural, one {# rij is afgewikkeld} other {# rijen zijn afgewikkeld}} in een derde valuta en {count, plural, one {is} other {zijn}} tegen de marktkoers doorgevoerd naar de rapportagevaluta."
   },
   "loanAmortization": {
     "empty": "Geen lening- of hypotheekrekeningen gevonden. Voeg een leningrekening toe om de betalingsgeschiedenis te zien.",

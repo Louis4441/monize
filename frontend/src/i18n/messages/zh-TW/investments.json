@@ -292,5 +292,20 @@
     "accountRequired": "科目為必填",
     "dateRequired": "日期為必填",
     "acquisitionPriceRequired": "每股價格為必填項，且必須大於零。對於成本未知的股數，請使用「增加股數」。"
+  },
+  "portfolioPerformance": {
+    "title": "投資組合表現",
+    "subtitle": "扣除存入與提出資金後，你的投資本身的表現。",
+    "footnote": "存入與提出資金不計入投資報酬。",
+    "unavailable": "無",
+    "empty": "歷史資料還不足以計算報酬。",
+    "periods": {
+      "1d": "1天",
+      "1w": "1週",
+      "1m": "1個月",
+      "3m": "3個月",
+      "ytd": "年初至今",
+      "1y": "1年"
+    }
   }
 }

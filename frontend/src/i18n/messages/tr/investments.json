@@ -292,5 +292,20 @@
     "accountRequired": "Hesap gereklidir",
     "dateRequired": "Tarih gereklidir",
     "acquisitionPriceRequired": "Hisse başına fiyat zorunludur ve sıfırdan büyük olmalıdır. Maliyeti bilinmeyen hisseler için \"Hisse Ekle\" kullanın."
+  },
+  "portfolioPerformance": {
+    "title": "Portföy performansı",
+    "subtitle": "Yatırımlarınızın, para yatırma ve çekme etkisi çıkarıldıktan sonraki performansı.",
+    "footnote": "Para yatırma ve çekme işlemleri yatırım sonucu olarak sayılmaz.",
+    "unavailable": "yok",
+    "empty": "Getiri ölçmek için henüz yeterli geçmiş yok.",
+    "periods": {
+      "1d": "1G",
+      "1w": "1H",
+      "1m": "1A",
+      "3m": "3A",
+      "ytd": "Yıl başından",
+      "1y": "1Y"
+    }
   }
 }

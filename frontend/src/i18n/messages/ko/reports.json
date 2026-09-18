@@ -823,7 +823,14 @@
     "csvFxComplete": "환산",
     "csvComplete": "완전",
     "csvPartial": "부분",
-    "csvMissingPairs": "누락된 환율 쌍"
+    "csvMissingPairs": "누락된 환율 쌍",
+    "colConversionBasis": "환산 기준",
+    "basisTransaction": "거래 환율",
+    "basisMarket": "시장 환율",
+    "convertedAtOwnRate": "각 거래 고유의 환율로 환산되었습니다.",
+    "convertedAtOwnRateWithMarket": "각 거래 고유의 환율로 환산되었으며, 환율이 없는 {count, plural, one {#건은} other {#건은}} 거래일의 시장 환율로 환산됩니다.",
+    "convertedAtMarketRate": "{count, plural, one {#건은} other {#건은}} 고유의 환율이 없어 거래일의 시장 환율로 환산됩니다.",
+    "convertedOnward": "{count, plural, one {#건은} other {#건은}} 제3의 통화로 결제되어, 보고 통화로 시장 환율을 통해 추가 환산되었습니다."
   },
   "loanAmortization": {
     "empty": "대출 또는 주택 담보 대출 계정을 찾을 수 없습니다. 납부 이력을 보려면 대출 계정을 추가하세요.",

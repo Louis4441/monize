@@ -823,7 +823,14 @@
     "csvFxComplete": "Umrechnung",
     "csvComplete": "Vollständig",
     "csvPartial": "Teilweise",
-    "csvMissingPairs": "Fehlende Kurspaare"
+    "csvMissingPairs": "Fehlende Kurspaare",
+    "colConversionBasis": "Umrechnungsgrundlage",
+    "basisTransaction": "Transaktionskurs",
+    "basisMarket": "Marktkurs",
+    "convertedAtOwnRate": "Umgerechnet zum jeweils eigenen Wechselkurs der Transaktion.",
+    "convertedAtOwnRateWithMarket": "Umgerechnet zum jeweils eigenen Wechselkurs der Transaktion; {count, plural, one {# Zeile ohne eigenen Kurs verwendet} other {# Zeilen ohne eigenen Kurs verwenden}} den Marktkurs an {count, plural, one {ihrem} other {ihrem jeweiligen}} Handelsdatum.",
+    "convertedAtMarketRate": "{count, plural, one {# Zeile trägt} other {# Zeilen tragen}} keinen eigenen Wechselkurs und {count, plural, one {wird} other {werden}} zum Marktkurs an {count, plural, one {ihrem} other {ihrem jeweiligen}} Handelsdatum umgerechnet.",
+    "convertedOnward": "{count, plural, one {# Zeile wurde} other {# Zeilen wurden}} in einer dritten Währung abgewickelt und {count, plural, one {wurde} other {wurden}} zum Marktkurs in die Berichtswährung weitergeführt."
   },
   "loanAmortization": {
     "empty": "Keine Darlehens- oder Hypothekenkonten gefunden. Fügen Sie ein Darlehensskonto hinzu, um die Zahlungshistorie zu sehen.",

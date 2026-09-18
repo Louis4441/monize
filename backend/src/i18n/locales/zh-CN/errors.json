@@ -254,7 +254,9 @@
     "cannotModifyOther": "无法修改其他用户的货币",
     "inUse": "货币\"{{ code }}\"正在您的账户、证券或其他记录中使用。请改为停用它。",
     "invalidRateDate": "date 必须为 YYYY-MM-DD 格式",
-    "alreadyInListInactive": "货币\"{{ code }}\"已在您的列表中，但当前处于未启用状态。请重新启用后使用。"
+    "alreadyInListInactive": "货币\"{{ code }}\"已在您的列表中，但当前处于未启用状态。请重新启用后使用。",
+    "sameCurrencyHistory": "{{ code }} 是您的默认货币，因此没有可扩展的汇率历史",
+    "rateProviderUnavailable": "汇率提供方未响应，请稍后重试。"
   },
   "delegation": {
     "delegatedAccessInvalid": "委托访问权限已不再有效",
@@ -338,7 +340,8 @@
     "invalidEndDate": "endDate 必须为 YYYY-MM-DD 格式",
     "invalidBaselineDate": "baselineDate 必须为 YYYY-MM-DD 格式",
     "invalidAccountIds": "accountIds 必须是逗号分隔的 UUID",
-    "invalidGranularity": "granularity 必须为 'daily' 或 'monthly'"
+    "invalidGranularity": "granularity 必须为 'daily' 或 'monthly'",
+    "invalidPeriods": "periods 必须是以逗号分隔的期间预设值"
   },
   "notifications": {
     "notFound": "未找到 ID 为 {{ id }} 的通知",

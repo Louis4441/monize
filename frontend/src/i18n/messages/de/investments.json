@@ -292,5 +292,20 @@
     "accountRequired": "Konto ist erforderlich",
     "dateRequired": "Datum ist erforderlich",
     "acquisitionPriceRequired": "Der Preis pro Anteil ist erforderlich und muss größer als null sein. Verwenden Sie „Anteile hinzufügen“ für Anteile, die ohne bekannte Kosten erworben wurden."
+  },
+  "portfolioPerformance": {
+    "title": "Portfolio-Performance",
+    "subtitle": "Wie sich Ihre Investitionen entwickelt haben, nachdem Einzahlungen und Auszahlungen herausgerechnet wurden.",
+    "footnote": "Einzahlungen und Auszahlungen zählen nicht als Anlageergebnis.",
+    "unavailable": "n/a",
+    "empty": "Noch zu wenig Historie, um eine Rendite zu messen.",
+    "periods": {
+      "1d": "1T",
+      "1w": "1W",
+      "1m": "1M",
+      "3m": "3M",
+      "ytd": "Seit Jahresbeginn",
+      "1y": "1J"
+    }
   }
 }

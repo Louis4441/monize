@@ -111,5 +111,20 @@
     "nameMax": "Ad en fazla 100 karakter olabilir",
     "symbolRequired": "Sembol zorunludur",
     "symbolMax": "Sembol en fazla 10 karakter olabilir"
+  },
+  "rateHistory": {
+    "title": "Kur geçmişi",
+    "stored": "Saklanan geçmiş: {start} - {end} ({count} gözlem)",
+    "none": "{pair} için saklanan geçmiş yok",
+    "loading": "Saklanan kur geçmişi kontrol ediliyor...",
+    "loadFailed": "Saklanan kur geçmişi okunamadı",
+    "addYear": "Kur geçmişine bir yıl daha ekle",
+    "adding": "Bir yıl daha alınıyor...",
+    "hint": "İlk saklanan kurdan önceki tarihli raporlar {pair} çevirisi yapamaz.",
+    "toasts": {
+      "added": "{count} kur eklendi; geçmiş artık {start} tarihinden başlıyor",
+      "noOlder": "Sağlayıcının {pair} için daha eski kuru yok",
+      "failed": "Kur geçmişi genişletilemedi"
+    }
   }
 }

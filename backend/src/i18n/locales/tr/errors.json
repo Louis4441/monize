@@ -254,7 +254,9 @@
     "cannotModifyOther": "Başka bir kullanıcının para birimi değiştirilemez",
     "inUse": "\"{{ code }}\" para birimi hesaplarınız, menkul kıymetleriniz veya diğer kayıtlarınız tarafından kullanılıyor. Bunun yerine devre dışı bırakın.",
     "invalidRateDate": "date, YYYY-AA-GG biçiminde olmalıdır",
-    "alreadyInListInactive": "\"{{ code }}\" para birimi zaten listenizde mevcut ancak şu anda etkin değil. Kullanmak için yeniden etkinleştirin."
+    "alreadyInListInactive": "\"{{ code }}\" para birimi zaten listenizde mevcut ancak şu anda etkin değil. Kullanmak için yeniden etkinleştirin.",
+    "sameCurrencyHistory": "{{ code }} varsayılan para biriminizdir; genişletilecek döviz kuru geçmişi yok",
+    "rateProviderUnavailable": "Döviz kuru sağlayıcısı yanıt vermedi. Lütfen daha sonra tekrar deneyin."
   },
   "delegation": {
     "delegatedAccessInvalid": "Delege erişimi artık geçerli değil",
@@ -338,7 +340,8 @@
     "invalidEndDate": "endDate YYYY-AA-GG biçiminde olmalıdır",
     "invalidBaselineDate": "baselineDate YYYY-AA-GG biçiminde olmalıdır",
     "invalidAccountIds": "accountIds virgülle ayrılmış UUID'ler olmalıdır",
-    "invalidGranularity": "granularity 'daily' veya 'monthly' olmalıdır"
+    "invalidGranularity": "granularity 'daily' veya 'monthly' olmalıdır",
+    "invalidPeriods": "periods, virgülle ayrılmış önceden tanımlı dönemler olmalıdır"
   },
   "notifications": {
     "notFound": "{{ id }} kimliğine sahip bildirim bulunamadı",

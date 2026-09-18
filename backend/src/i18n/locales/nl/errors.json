@@ -254,7 +254,9 @@
     "cannotModifyOther": "Kan de valuta van een andere gebruiker niet wijzigen",
     "inUse": "Valuta \"{{ code }}\" is in gebruik door je rekeningen, waardepapieren of andere records. Deactiveer deze in plaats daarvan.",
     "invalidRateDate": "date moet de indeling JJJJ-MM-DD hebben",
-    "alreadyInListInactive": "Valuta \"{{ code }}\" staat al in je lijst, maar is momenteel inactief. Activeer deze opnieuw om te gebruiken."
+    "alreadyInListInactive": "Valuta \"{{ code }}\" staat al in je lijst, maar is momenteel inactief. Activeer deze opnieuw om te gebruiken.",
+    "sameCurrencyHistory": "{{ code }} is uw standaardvaluta; er is geen wisselkoersgeschiedenis om uit te breiden",
+    "rateProviderUnavailable": "De wisselkoersaanbieder heeft niet gereageerd. Probeer het later opnieuw."
   },
   "delegation": {
     "delegatedAccessInvalid": "Gedelegeerde toegang is niet meer geldig",
@@ -338,7 +340,8 @@
     "invalidEndDate": "endDate moet JJJJ-MM-DD zijn",
     "invalidBaselineDate": "baselineDate moet JJJJ-MM-DD zijn",
     "invalidAccountIds": "accountIds moeten door komma's gescheiden UUID's zijn",
-    "invalidGranularity": "granularity moet 'daily' of 'monthly' zijn"
+    "invalidGranularity": "granularity moet 'daily' of 'monthly' zijn",
+    "invalidPeriods": "periods moet bestaan uit door komma's gescheiden periodevoorinstellingen"
   },
   "notifications": {
     "notFound": "Notificatie met ID {{ id }} niet gevonden",

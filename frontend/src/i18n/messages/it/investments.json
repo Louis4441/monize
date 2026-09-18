@@ -292,5 +292,20 @@
     "accountRequired": "Il conto è obbligatorio",
     "dateRequired": "La data è obbligatoria",
     "acquisitionPriceRequired": "Il prezzo per azione è obbligatorio e deve essere maggiore di zero. Usa «Aggiungi azioni» per azioni acquisite senza un costo noto."
+  },
+  "portfolioPerformance": {
+    "title": "Performance del portafoglio",
+    "subtitle": "Come si sono comportati i tuoi investimenti al netto di depositi e prelievi.",
+    "footnote": "Depositi e prelievi non sono conteggiati come risultato d'investimento.",
+    "unavailable": "n/d",
+    "empty": "Storico ancora insufficiente per misurare un rendimento.",
+    "periods": {
+      "1d": "1G",
+      "1w": "1S",
+      "1m": "1M",
+      "3m": "3M",
+      "ytd": "Da inizio anno",
+      "1y": "1A"
+    }
   }
 }
