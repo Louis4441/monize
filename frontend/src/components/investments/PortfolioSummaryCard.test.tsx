@@ -167,6 +167,171 @@ describe('PortfolioSummaryCard', () => {
     expect(screen.queryByText('N/A')).not.toBeInTheDocument();
   });
 
+  /**
+   * A marker saying "no price" is a dead end: the reader has to guess which of
+   * their funds it is. The server names and dates each gap; the card renders
+   * them with the same list the report uses, linked to the price history where
+   * the missing close is entered (#1392).
+   */
+  describe('withheld returns name their gaps', () => {
+    const withGaps = (overrides?: Record<string, any>) =>
+      makeSummary({
+        timeWeightedReturn: null,
+        timeWeightedReturnReasons: ['incompletePrices'],
+        moneyWeightedReturn: null,
+        moneyWeightedReturnReasons: ['incompletePrices'],
+        returnDiagnostics: {
+          since: '2025-06-14',
+          prices: [
+            {
+              securityId: 'sec-9',
+              symbol: 'PPK',
+              name: 'PPK Fund',
+              start: '2026-03-02',
+              end: '2026-05-30',
+            },
+          ],
+          rates: [],
+          cash: [],
+          truncated: { prices: false, rates: false, cash: false },
+        },
+        ...overrides,
+      });
+
+    it('names the security and its dates, and links to its price history', () => {
+      render(<PortfolioSummaryCard summary={withGaps()} isLoading={false} />);
+
+      expect(
+        screen.getByText(
+          'TWR and MWR are withheld because the history has gaps:',
+        ),
+      ).toBeInTheDocument();
+      const panel = screen.getByTestId('incomplete-data-details');
+      expect(panel).toHaveTextContent('PPK');
+      expect(panel).not.toHaveTextContent('sec-9');
+      expect(screen.getByRole('link', { name: 'PPK' })).toHaveAttribute(
+        'href',
+        '/securities/sec-9?tab=prices',
+      );
+    });
+
+    it('tells the reader to price the security, and names no filter that is not there', () => {
+      render(<PortfolioSummaryCard summary={withGaps()} isLoading={false} />);
+
+      expect(
+        screen.getByText(/Add the missing prices on each security/),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/with the account filter above/),
+      ).not.toBeInTheDocument();
+    });
+
+    it('offers the account filter where the screen has one', () => {
+      render(
+        <PortfolioSummaryCard
+          summary={withGaps()}
+          isLoading={false}
+          hasAccountFilter
+        />,
+      );
+
+      expect(
+        screen.getByText(
+          /leave those accounts out of the view with the account filter above/,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('names a missing rate and a cash account with no balance', () => {
+      render(
+        <PortfolioSummaryCard
+          summary={withGaps({
+            timeWeightedReturnReasons: ['missingRatePairs', 'incompleteCash'],
+            moneyWeightedReturnReasons: ['missingRatePairs'],
+            returnDiagnostics: {
+              since: '2025-06-14',
+              prices: [],
+              rates: [
+                { pair: 'USD->PLN', start: '2026-01-02', end: '2026-01-09' },
+              ],
+              cash: [
+                {
+                  accountId: 'acct-1',
+                  name: 'IKE account',
+                  start: '2026-01-02',
+                  end: '2026-01-02',
+                },
+              ],
+              truncated: { prices: false, rates: false, cash: false },
+            },
+          })}
+          isLoading={false}
+        />,
+      );
+
+      const panel = screen.getByTestId('incomplete-data-details');
+      expect(panel).toHaveTextContent('USD->PLN');
+      expect(panel).toHaveTextContent('IKE account');
+      expect(panel).not.toHaveTextContent('acct-1');
+    });
+
+    it('shows nothing extra when the window is merely too short to annualise', () => {
+      // Nothing is missing, so there is no repair to offer; the marker beside
+      // the figure is the whole answer.
+      render(
+        <PortfolioSummaryCard
+          summary={withGaps({
+            timeWeightedReturn: 1.4,
+            timeWeightedReturnReasons: [],
+            moneyWeightedReturnReasons: ['windowTooShort'],
+            returnDiagnostics: {
+              since: '2026-09-01',
+              prices: [],
+              rates: [],
+              cash: [],
+              truncated: { prices: false, rates: false, cash: false },
+            },
+          })}
+          isLoading={false}
+        />,
+      );
+
+      expect(screen.queryByTestId('return-diagnostics')).not.toBeInTheDocument();
+    });
+
+    it('shows nothing extra when a return is withheld with no ranges at all', () => {
+      render(
+        <PortfolioSummaryCard
+          summary={withGaps({
+            returnDiagnostics: {
+              since: '2025-06-14',
+              prices: [],
+              rates: [],
+              cash: [],
+              truncated: { prices: false, rates: false, cash: false },
+            },
+          })}
+          isLoading={false}
+        />,
+      );
+
+      expect(screen.queryByTestId('return-diagnostics')).not.toBeInTheDocument();
+    });
+
+    it('shows nothing extra for a payload that carries no diagnostics', () => {
+      // A rolling deploy's older backend: absent is no information, which must
+      // not render as an empty promise of a list.
+      render(
+        <PortfolioSummaryCard
+          summary={withGaps({ returnDiagnostics: undefined })}
+          isLoading={false}
+        />,
+      );
+
+      expect(screen.queryByTestId('return-diagnostics')).not.toBeInTheDocument();
+    });
+  });
+
   it('explains what the money-weighted return weights, and what it leaves out', () => {
     render(<PortfolioSummaryCard summary={makeSummary()} isLoading={false} />);
     expect(

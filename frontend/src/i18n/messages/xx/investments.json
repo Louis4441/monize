@@ -63,6 +63,9 @@
     "cagr": "[XX-CAGR-XX]",
     "cagrTooltip": "[XX-Compound Annual Growth Rate. Your annualized return based on Net Invested vs. current portfolio value, as if growth had been perfectly steady each year.-XX]",
     "notAvailable": "[XX-N/A-XX]",
+    "returnDiagnosticsLead": "[XX-TWR and MWR are withheld because the history has gaps:-XX]",
+    "returnDiagnosticsRepair": "[XX-Add the missing prices on each security's price history; the returns are measured over the accounts shown.-XX]",
+    "returnDiagnosticsRepairFiltered": "[XX-Add the missing prices on each security's price history, or leave those accounts out of the view with the account filter above; the returns are measured over the accounts shown.-XX]",
     "unpricedHoldings": "[XX-Partial valuation: {count, plural, one {# holding has} other {# holdings have}} no current price ({symbols}), so the values below exclude {count, plural, one {it} other {them}}.-XX]"
   },
   "portfolioPerformance": {

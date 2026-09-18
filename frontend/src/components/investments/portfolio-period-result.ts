@@ -35,6 +35,25 @@ export function periodResultUnknownReason(
   return 'noBaseline';
 }
 
+/**
+ * Whether a withheld figure is waiting for DATA the reader can supply: a price,
+ * a rate or a cash balance.
+ *
+ * The other reasons are boundaries -- a window too short to annualise, a start
+ * of nothing, a schedule of flows with no single rate -- where nothing is
+ * missing and a list of gaps would be an empty promise. A surface that offers a
+ * repair checks this first.
+ */
+export function hasRepairableDataCause(
+  reasons: readonly PeriodResultReason[],
+): boolean {
+  return (
+    reasons.includes('incompletePrices') ||
+    reasons.includes('incompleteCash') ||
+    reasons.includes('missingRatePairs')
+  );
+}
+
 /** Whether the window holds a movement the server could not count as a flow. */
 export function hasUnmeasuredFlow(
   reasons: readonly PeriodResultReason[],

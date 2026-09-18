@@ -258,6 +258,9 @@ function InvestmentsContent() {
                   : null
               }
               titleSuffix={accountFilterLabel}
+              // The picker in the header above feeds this summary, so a
+              // withheld return may offer leaving an account out as a repair.
+              hasAccountFilter
             />
             {/* What the INVESTMENTS earned over each trailing period, with
                 deposits, withdrawals and idle cash taken out. */}

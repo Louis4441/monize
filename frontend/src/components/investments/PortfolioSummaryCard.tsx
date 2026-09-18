@@ -7,7 +7,15 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
-import { periodResultUnknownReason } from '@/components/investments/portfolio-period-result';
+import {
+  hasRepairableDataCause,
+  periodResultUnknownReason,
+} from '@/components/investments/portfolio-period-result';
+import { IncompleteDataDetails } from '@/components/reports/IncompleteDataDetails';
+import {
+  hasIncompleteData,
+  type IncompleteDataCauses,
+} from '@/lib/incomplete-data-ranges';
 import { gainLossColor } from '@/lib/format';
 
 interface PortfolioSummaryCardProps {
@@ -15,6 +23,13 @@ interface PortfolioSummaryCardProps {
   isLoading: boolean;
   singleAccountCurrency?: string | null;
   titleSuffix?: string;
+  /**
+   * True where the screen has an account filter feeding this summary, so the
+   * repair offered under a withheld return may name it. The account detail view
+   * has none -- its scope is the account it is about -- and telling that reader
+   * to use a filter above would be a repair they cannot make.
+   */
+  hasAccountFilter?: boolean;
 }
 
 export function PortfolioSummaryCard({
@@ -22,6 +37,7 @@ export function PortfolioSummaryCard({
   isLoading,
   singleAccountCurrency,
   titleSuffix,
+  hasAccountFilter = false,
 }: PortfolioSummaryCardProps) {
   const t = useTranslations('investments');
   const { formatCurrency, formatSignedPercent } = useNumberFormat();
@@ -123,6 +139,45 @@ export function PortfolioSummaryCard({
     };
   }, [summary, foreignCurrency]);
 
+  // What a withheld return is waiting for, as the report's own list renders it.
+  // The server folded the window's per-point gaps into runs and resolved the
+  // names, because this card has no series of its own to fold: a summary that
+  // says "no price" sends the reader guessing which of their funds it is
+  // (#1392). Ids are the keys the list is built on; the labels are what is
+  // shown.
+  const diagnostics = useMemo(() => {
+    const data = summary?.returnDiagnostics;
+    if (!data) return null;
+    const causes: IncompleteDataCauses = {
+      prices: data.prices.map((row) => ({
+        key: row.securityId,
+        start: row.start,
+        end: row.end,
+      })),
+      rates: data.rates.map((row) => ({
+        key: row.pair,
+        start: row.start,
+        end: row.end,
+      })),
+      cash: data.cash.map((row) => ({
+        key: row.accountId,
+        start: row.start,
+        end: row.end,
+      })),
+    };
+    const symbols = new Map(
+      data.prices.map((row) => [row.securityId, row.symbol]),
+    );
+    const accountNames = new Map(
+      data.cash.map((row) => [row.accountId, row.name]),
+    );
+    return {
+      causes,
+      securityLabel: (id: string) => symbols.get(id) ?? id,
+      accountLabel: (id: string) => accountNames.get(id) ?? id,
+    };
+  }, [summary]);
+
   const fmtVal = (value: number) => {
     if (foreignCurrency) return `${formatCurrency(value, foreignCurrency)} ${foreignCurrency}`;
     return formatCurrency(value);
@@ -216,6 +271,20 @@ export function PortfolioSummaryCard({
     summary.moneyWeightedReturnReasons ?? [],
   );
   const cagrVal = summary.cagr;
+  // The list is offered only where there is a repair to make. `mwrUndefined`
+  // and `windowTooShort` withhold a figure with nothing missing behind them, so
+  // the marker beside the figure stands on its own there; a return withheld
+  // with no ranges at all (a server that sent none) shows nothing extra rather
+  // than an empty box.
+  const returnsAwaitData =
+    (twr == null &&
+      hasRepairableDataCause(summary.timeWeightedReturnReasons ?? [])) ||
+    (mwr == null &&
+      hasRepairableDataCause(summary.moneyWeightedReturnReasons ?? []));
+  const showReturnDiagnostics =
+    returnsAwaitData &&
+    diagnostics !== null &&
+    hasIncompleteData(diagnostics.causes);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-6 lg:min-h-[420px]">
@@ -371,6 +440,27 @@ export function PortfolioSummaryCard({
               </div>
             </div>
           </div>
+
+          {showReturnDiagnostics && diagnostics && (
+            <div className="mt-4 space-y-2" data-testid="return-diagnostics">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                {t('portfolioSummary.returnDiagnosticsLead')}
+              </p>
+              <IncompleteDataDetails
+                causes={diagnostics.causes}
+                securityLabel={diagnostics.securityLabel}
+                accountLabel={diagnostics.accountLabel}
+              />
+              {/* The second repair, and the one a reader with a workplace fund
+                  in its own account can make today: the summary is measured
+                  over the accounts the page's filter selected. */}
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {hasAccountFilter
+                  ? t('portfolioSummary.returnDiagnosticsRepairFiltered')
+                  : t('portfolioSummary.returnDiagnosticsRepair')}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

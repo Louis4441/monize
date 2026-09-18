@@ -223,6 +223,48 @@ export interface AccountHoldings {
   valuationComplete?: boolean;
 }
 
+/** One security with no usable close over a run of days of the window. */
+export interface ReturnDiagnosticPrice {
+  securityId: string;
+  symbol: string;
+  name: string;
+  start: string;
+  end: string;
+}
+
+/** One currency pair with no rate over a run of days. */
+export interface ReturnDiagnosticRate {
+  /** `"USD->PLN"`, as the server names the pair. */
+  pair: string;
+  start: string;
+  end: string;
+}
+
+/** One cash account that produced no balance over a run of days. */
+export interface ReturnDiagnosticCash {
+  accountId: string;
+  name: string;
+  start: string;
+  end: string;
+}
+
+/**
+ * Why the portfolio's returns are withheld, in the form a reader can act on.
+ *
+ * "Withholding a figure is only honest if the reader learns why": the marker
+ * beside the figure names a kind of repair, and this names the thing to repair
+ * and the days it covers (`docs/frontend/financial-figures.md`).
+ */
+export interface ReturnDiagnostics {
+  /** The baseline close the returns are measured from; null for no window. */
+  since: string | null;
+  prices: ReturnDiagnosticPrice[];
+  rates: ReturnDiagnosticRate[];
+  cash: ReturnDiagnosticCash[];
+  /** Per cause: true when runs older than the ones listed were dropped. */
+  truncated: { prices: boolean; rates: boolean; cash: boolean };
+}
+
 export interface PortfolioSummary {
   totalCashValue: number;
   totalHoldingsValue: number;
@@ -261,6 +303,17 @@ export interface PortfolioSummary {
    * payload has none, and absent is no information.
    */
   moneyWeightedReturnReasons?: PeriodResultReason[];
+  /**
+   * What the two withheld returns are waiting for, named and dated by the
+   * server: which security has no close over which run of days, which pair has
+   * no rate, which cash account has no balance.
+   *
+   * The card has no series of its own to fold, so these arrive resolved --
+   * symbols and account names, never bare ids. Optional for the rolling-deploy
+   * reason the flags below give: absent is no information, not "nothing is
+   * missing".
+   */
+  returnDiagnostics?: ReturnDiagnostics;
   cagr: number | null;
   /**
    * Whether every currency conversion behind the `total*` fields succeeded.
