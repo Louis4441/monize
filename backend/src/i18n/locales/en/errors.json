@@ -264,7 +264,9 @@
     "cannotModifySystem": "Cannot modify system currency metadata",
     "cannotModifyOther": "Cannot modify another user's currency",
     "inUse": "Currency \"{{ code }}\" is in use by your accounts, securities, or other records. Deactivate it instead.",
-    "invalidRateDate": "date must be in YYYY-MM-DD format"
+    "invalidRateDate": "date must be in YYYY-MM-DD format",
+    "sameCurrencyHistory": "{{ code }} is your default currency; there is no exchange rate history to extend",
+    "rateProviderUnavailable": "The exchange rate provider did not answer. Please try again later."
   },
   "delegation": {
     "delegatedAccessInvalid": "Delegated access is no longer valid",

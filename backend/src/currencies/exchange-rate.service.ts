@@ -48,7 +48,7 @@ const FX_FETCH_CONCURRENCY = 6;
  * either: one provider call is persisted both ways, so USD->CAD and CAD->USD
  * are one unit of work and one negative-cache entry.
  */
-function directionlessPairKey(from: string, to: string): string {
+export function directionlessPairKey(from: string, to: string): string {
   return [from, to].sort().join("|");
 }
 
@@ -841,8 +841,13 @@ export class ExchangeRateService implements OnModuleInit {
    *   than `null` (a transport failure, or a call the breaker refused). Only an
    *   answer may be remembered as an empty window: the two produce the same
    *   zero, and the memory holds for 30 minutes.
+   *
+   * Public so `ExchangeRateHistoryService` can reach it: a user-driven history
+   * extension asks the provider exactly the question the on-demand fill asks,
+   * and a second copy of "fetch a window, try the reverse symbol, persist both
+   * directions" is how the two would drift.
    */
-  private async fillRateWindow(
+  async fillRateWindow(
     from: string,
     to: string,
     start: string,
