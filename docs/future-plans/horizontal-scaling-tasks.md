@@ -88,7 +88,7 @@
 | R1 | `EVENT_BUS` token, interface, `MemoryEventBus` wired as default | -- | none | [x] |
 | R2 | Migration: `ai_relay_prompts`, `ai_relay_agents` with RLS policies | -- | none | [x] |
 | R3 | Relay queue on rows: insert, claim, answer; in-memory queue maps removed | R1, R2 | neutral | [x] |
-| R4 | Late answers, buffered actions and agent liveness on rows; remaining maps removed | R3 | neutral | [ ] |
+| R4 | Late answers, buffered actions and agent liveness on rows; remaining maps removed | R3 | neutral | [x] |
 | R5 | Relay attachments through the attachment storage provider | R3 | neutral | [ ] |
 | R6 | `RedisEventBus`; selected in `multi`; two-instance spec | F2, R1, D3 | multi-only | [ ] |
 | T1 | `RedisThrottlerStorage`; selected in `multi`; fail-open | F2, D3 | multi-only | [ ] |
@@ -886,12 +886,20 @@ not yet run.
 
 ### R4 -- Late answers, buffered actions and liveness on rows
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/ai/relay/ai-relay.service.ts` and spec,
 `backend/src/ai/relay/ai-relay.controller.ts` and spec (`GET response/:promptId`
 and the action pickup endpoint), `backend/src/ai/relay/relay-sweeper.service.ts`
 (new cron) and spec, `docs/cron-jobs.md`.
+
+Added to Scope: `backend/src/ai/relay/ai-relay.module.ts` (declares the cron),
+`backend/eslint.config.mjs` (`WITH_CONTEXT_ALLOWLIST` -- the sweep is a
+cross-user cron with no request to inherit an identity from),
+`backend/src/mcp/tools/relay.tool.ts` (`shouldStopForIdle` reads a row now) and
+`backend/src/ai/relay/relay-rows.harness.ts` plus
+`backend/test/integration/ai-relay-claim.integration.spec.ts` (the two new
+tables).
 
 **Steps:**
 
@@ -920,6 +928,26 @@ sweeper spec with a fake clock.
 reads cheap (one query per call, indexed by `user_id`).
 
 **Notes:**
+
+Step 1 landed in R3: the row model subsumed the late-answer buffer, so
+`takeBufferedResponse` is a conditional `UPDATE ... WHERE status='answered'`
+that returns the answer and sets `expired`. `expired` is the consumed state
+rather than a `picked_up_at` column, so no migration was needed and the pickup
+endpoint stays single-use by the same rule every other transition uses.
+
+`shouldStopForIdle` is one upsert, not a read and a write: start, elapse and
+disconnect are all `ON CONFLICT DO UPDATE ... CASE`, because two replicas
+serving the same agent's polls would otherwise each start the clock and neither
+finish it.
+
+The per-user cap on buffered cards (`MAX_BUFFERED_PER_USER`) is gone. It bounded
+*memory*; a row costs nothing to hold, only an agent that already holds a
+claimed turn can write one, and `expires_at` plus the sweeper bound the table.
+The card id keeps its meaning instead: the insert is
+`ON CONFLICT (user_id, id) DO NOTHING`, so a repeat of one card is one card.
+
+`getStatus` stays one query -- a `LEFT JOIN LATERAL` over the prompts beside the
+agent row -- because the browser polls it.
 
 ### R5 -- Relay attachments through the storage provider
 

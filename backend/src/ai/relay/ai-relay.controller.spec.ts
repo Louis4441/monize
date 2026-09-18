@@ -183,7 +183,7 @@ describe("AiRelayController", () => {
     const takeBufferedResponse = jest
       .fn()
       .mockResolvedValue({ text: "the late answer" });
-    const takeBufferedActions = jest.fn().mockReturnValue([]);
+    const takeBufferedActions = jest.fn().mockResolvedValue([]);
     const controller = build({ takeBufferedResponse, takeBufferedActions });
 
     await expect(controller.pickupResponse(req, "prompt-123")).resolves.toEqual(
@@ -197,7 +197,7 @@ describe("AiRelayController", () => {
 
   it("returns null text when nothing is waiting for the prompt", async () => {
     const takeBufferedResponse = jest.fn().mockResolvedValue(null);
-    const takeBufferedActions = jest.fn().mockReturnValue([]);
+    const takeBufferedActions = jest.fn().mockResolvedValue([]);
     const controller = build({ takeBufferedResponse, takeBufferedActions });
 
     await expect(controller.pickupResponse(req, "prompt-123")).resolves.toEqual(
@@ -211,7 +211,7 @@ describe("AiRelayController", () => {
   it("drains buffered confirmation cards on pickup, even without an answer", async () => {
     const cards = [{ actionId: "act-1" }, { actionId: "act-2" }];
     const takeBufferedResponse = jest.fn().mockResolvedValue(null);
-    const takeBufferedActions = jest.fn().mockReturnValue(cards);
+    const takeBufferedActions = jest.fn().mockResolvedValue(cards);
     const controller = build({ takeBufferedResponse, takeBufferedActions });
 
     await expect(controller.pickupResponse(req, "prompt-123")).resolves.toEqual(

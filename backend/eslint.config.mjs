@@ -21,6 +21,10 @@ const WITH_CONTEXT_ALLOWLIST = [
   "src/admin/admin.service.ts",
   "src/ai/ai-usage.service.ts",
   "src/ai/insights/ai-insights.service.ts",
+  // The relay's expiry sweep: three tables keyed by user_id whose dead rows
+  // belong to every user at once, from a cron with no request to inherit an
+  // identity from -- system context by construction (task R4).
+  "src/ai/relay/relay-sweeper.service.ts",
   // Blob-tombstone sweep: a cron fan-out that reclaims orphaned attachment
   // bytes across every user, and past them -- a tombstone outlives its owner
   // and its user_id is then NULL, so no user context can see it. No request to

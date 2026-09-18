@@ -177,7 +177,9 @@ export class AiRelayController {
     // Confirmation cards composed after the stream gave up are buffered per user
     // (not per prompt), so drain them on the same pickup the client already
     // polls -- the browser renders any cards and keeps polling for the answer.
-    const pendingActions = this.relayService.takeBufferedActions(req.user.id);
+    const pendingActions = await this.relayService.takeBufferedActions(
+      req.user.id,
+    );
     return { text: buffered?.text ?? null, pendingActions };
   }
 }

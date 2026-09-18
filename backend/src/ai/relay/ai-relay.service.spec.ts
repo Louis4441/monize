@@ -448,7 +448,9 @@ describe("AiRelayService", () => {
       expect(
         await service.emitPendingAction(USER, card("a1"), "session-a"),
       ).toBe(true);
-      expect(service.takeBufferedActions(USER)).toEqual([card("a1")]);
+      await expect(service.takeBufferedActions(USER)).resolves.toEqual([
+        card("a1"),
+      ]);
     });
 
     it("buffers a card emitted after the browser gave up, for pickup", async () => {
@@ -464,7 +466,9 @@ describe("AiRelayService", () => {
       expect(
         await service.emitPendingAction(USER, card("a1"), "session-a"),
       ).toBe(true);
-      expect(service.takeBufferedActions(USER)).toEqual([card("a1")]);
+      await expect(service.takeBufferedActions(USER)).resolves.toEqual([
+        card("a1"),
+      ]);
     });
 
     it("does not let a stale turn capture a later write forever", async () => {
@@ -539,11 +543,11 @@ describe("AiRelayService", () => {
       await jest.advanceTimersByTimeAsync(10);
       await service.emitPendingAction(USER, card("a2"), "session-a");
 
-      expect(service.takeBufferedActions(USER)).toEqual([
+      await expect(service.takeBufferedActions(USER)).resolves.toEqual([
         card("a1"),
         card("a2"),
       ]);
-      expect(service.takeBufferedActions(USER)).toEqual([]);
+      await expect(service.takeBufferedActions(USER)).resolves.toEqual([]);
     });
 
     it("drops a buffered card past its TTL", async () => {
@@ -554,7 +558,7 @@ describe("AiRelayService", () => {
 
       await jest.advanceTimersByTimeAsync(BUFFER_TTL_MS + 1000);
 
-      expect(service.takeBufferedActions(USER)).toEqual([]);
+      await expect(service.takeBufferedActions(USER)).resolves.toEqual([]);
     });
   });
 
@@ -794,27 +798,27 @@ describe("AiRelayService", () => {
 
   describe("inactivity disconnect", () => {
     it("signals stop after the inactivity timeout of empty polls", async () => {
-      expect(service.shouldStopForIdle(USER)).toBe(false);
+      await expect(service.shouldStopForIdle(USER)).resolves.toBe(false);
       await jest.advanceTimersByTimeAsync(INACTIVITY_TIMEOUT_MS + 1000);
-      expect(service.shouldStopForIdle(USER)).toBe(true);
+      await expect(service.shouldStopForIdle(USER)).resolves.toBe(true);
       expect((await service.getStatus(USER)).idleDisconnected).toBe(true);
     });
 
     it("resets the idle clock when a new prompt arrives", async () => {
-      expect(service.shouldStopForIdle(USER)).toBe(false);
+      await expect(service.shouldStopForIdle(USER)).resolves.toBe(false);
       await jest.advanceTimersByTimeAsync(INACTIVITY_TIMEOUT_MS - 1000);
 
       void start(USER, "still here", []);
       await settle();
 
       await jest.advanceTimersByTimeAsync(2000);
-      expect(service.shouldStopForIdle(USER)).toBe(false);
+      await expect(service.shouldStopForIdle(USER)).resolves.toBe(false);
     });
 
     it("clears the idle-disconnect notice once the agent polls again", async () => {
-      service.shouldStopForIdle(USER);
+      await service.shouldStopForIdle(USER);
       await jest.advanceTimersByTimeAsync(INACTIVITY_TIMEOUT_MS + 1000);
-      service.shouldStopForIdle(USER);
+      await service.shouldStopForIdle(USER);
 
       void service.waitForPrompt(USER);
       await settle();
@@ -823,7 +827,7 @@ describe("AiRelayService", () => {
     });
 
     it("does not trip while a conversation is active (a claim resets the clock)", async () => {
-      expect(service.shouldStopForIdle(USER)).toBe(false);
+      await expect(service.shouldStopForIdle(USER)).resolves.toBe(false);
       await jest.advanceTimersByTimeAsync(INACTIVITY_TIMEOUT_MS - 1000);
 
       void start(USER, "q", []);
@@ -831,7 +835,7 @@ describe("AiRelayService", () => {
       await service.waitForPrompt(USER);
 
       await jest.advanceTimersByTimeAsync(2000);
-      expect(service.shouldStopForIdle(USER)).toBe(false);
+      await expect(service.shouldStopForIdle(USER)).resolves.toBe(false);
     });
   });
 
@@ -859,6 +863,86 @@ describe("AiRelayService", () => {
       await settled;
 
       expect(streams.activeCount()).toBe(0);
+    });
+  });
+
+  describe("across replicas", () => {
+    /** A second backend over the same rows and the same bus. */
+    const secondReplica = () =>
+      new AiRelayService(
+        harness.dataSource as unknown as DataSource,
+        new RelayAttachmentStore(),
+        new RelayStreamRegistry(),
+        bus,
+      );
+
+    it("lets an agent polling one replica claim a prompt queued on another", async () => {
+      const other = secondReplica();
+      const pending = start(USER, "queued over there");
+      await settle();
+
+      const claimed = await other.waitForPrompt(USER, "session-a");
+      expect(claimed?.prompt).toBe("queued over there");
+
+      await other.postResponse(USER, claimed!.promptId, "answered over here");
+      await settle();
+      await expect(pending).resolves.toEqual({ text: "answered over here" });
+    });
+
+    it("keeps the agent's liveness and the queue on rows, not in a process", async () => {
+      const poll = service.waitForPrompt(USER, "session-a");
+      await jest.advanceTimersByTimeAsync(POLL_PARK_MS + 1000);
+      await poll;
+      start(USER, "q");
+      await settle();
+
+      // Nothing about this user's tunnel lives in the process that served the
+      // poll, which is the whole point of the move.
+      const other = secondReplica();
+      expect(await other.getStatus(USER)).toEqual({
+        state: "listening",
+        queued: 1,
+      });
+    });
+
+    it("hands a card buffered on one replica to a pickup served by another", async () => {
+      start(USER, "q");
+      await settle();
+      await service.waitForPrompt(USER, "session-a");
+      await service.emitPendingAction(USER, card("a1"), "session-a");
+
+      await expect(secondReplica().takeBufferedActions(USER)).resolves.toEqual([
+        card("a1"),
+      ]);
+    });
+  });
+
+  describe("the agent row", () => {
+    it("keeps one liveness row per user however often the agent polls", async () => {
+      const first = service.waitForPrompt(USER, "session-a");
+      await jest.advanceTimersByTimeAsync(POLL_PARK_MS + 1000);
+      await first;
+      const second = service.waitForPrompt(USER, "session-a");
+      await jest.advanceTimersByTimeAsync(POLL_PARK_MS + 1000);
+      await second;
+
+      expect(harness.agents.filter((a) => a.userId === USER)).toHaveLength(1);
+      expect(harness.agents[0].lastPollAt).not.toBeNull();
+    });
+
+    it("treats a repeat of one card id as the same card", async () => {
+      start(USER, "q");
+      await settle();
+      await service.waitForPrompt(USER, "session-a");
+
+      await service.emitPendingAction(USER, card("a1"), "session-a");
+      await service.emitPendingAction(USER, card("a1"), "session-a");
+
+      // The descriptor's id is the card's identity: the browser must be offered
+      // one card to approve, not two of the same write.
+      await expect(service.takeBufferedActions(USER)).resolves.toEqual([
+        card("a1"),
+      ]);
     });
   });
 

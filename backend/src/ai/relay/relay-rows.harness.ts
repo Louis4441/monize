@@ -6,7 +6,7 @@ import {
 import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
 
 /**
- * An `ai_relay_prompts` table that answers `AiRelayService`'s statements.
+ * The three `ai_relay_*` tables, answering `AiRelayService`'s statements.
  *
  * A double that only recorded the SQL would make every behavioural assertion in
  * the relay's spec vacuous: FIFO order, one-claim-wins, a refused second answer,
@@ -34,11 +34,32 @@ export interface RelayPromptRow {
   expiresAt: number;
 }
 
+/** One `ai_relay_agents` row: the liveness of a user's polling agent. */
+export interface RelayAgentRow {
+  userId: string;
+  lastPollAt: number | null;
+  idleSince: number | null;
+  idleDisconnectedAt: number | null;
+}
+
+/** One `ai_relay_actions` row: a card whose browser stream had already gone. */
+export interface RelayActionRow {
+  userId: string;
+  id: string;
+  card: unknown;
+  createdAt: number;
+  expiresAt: number;
+}
+
 export interface RelayRowsHarness {
   /** The mock DataSource to hand `AiRelayService`. */
   dataSource: ReturnType<typeof createScopedDbMocks>["dataSource"];
-  /** The table, in insertion order. Assert on it; mutate it to set a scenario up. */
+  /** The prompts, in insertion order. Assert on it; mutate it to set a scenario up. */
   rows: RelayPromptRow[];
+  /** The agent liveness rows, at most one per user. */
+  agents: RelayAgentRow[];
+  /** The buffered confirmation cards, in insertion order. */
+  actions: RelayActionRow[];
   /** Every statement the service issued, for the rare assertion about SQL itself. */
   statements: string[];
 }
@@ -56,8 +77,23 @@ function now(): number {
 export function createRelayRowsHarness(): RelayRowsHarness {
   const scoped = createScopedDbMocks();
   const rows: RelayPromptRow[] = [];
+  const agents: RelayAgentRow[] = [];
+  const actions: RelayActionRow[] = [];
   const statements: string[] = [];
   let sequence = 0;
+
+  const agentOf = (userId: string): RelayAgentRow => {
+    const existing = agents.find((a) => a.userId === userId);
+    if (existing) return existing;
+    const created: RelayAgentRow = {
+      userId,
+      lastPollAt: null,
+      idleSince: null,
+      idleDisconnectedAt: null,
+    };
+    agents.push(created);
+    return created;
+  };
 
   const byId = (id: string, userId: string): RelayPromptRow | undefined =>
     rows.find((r) => r.id === id && r.userId === userId);
@@ -65,6 +101,61 @@ export function createRelayRowsHarness(): RelayRowsHarness {
   scoped.manager.query.mockImplementation(
     async (sql: string, params: unknown[] = []) => {
       statements.push(sql);
+
+      if (sql.includes("INSERT INTO ai_relay_agents")) {
+        const [userId, inactivityMs] = params as [string, number | undefined];
+        const agent = agentOf(userId);
+        if (sql.includes("last_poll_at = CURRENT_TIMESTAMP")) {
+          agent.lastPollAt = now();
+          agent.idleDisconnectedAt = null;
+          return [];
+        }
+        if (sql.includes("idle_since = NULL")) {
+          agent.idleSince = null;
+          agent.idleDisconnectedAt = null;
+          return [];
+        }
+        // shouldStopForIdle: start the clock, or end it and record the stop.
+        if (agent.idleSince === null) {
+          agent.idleSince = now();
+        } else if (agent.idleSince + (inactivityMs ?? 0) <= now()) {
+          agent.idleSince = null;
+          agent.idleDisconnectedAt = now();
+        }
+        return [{ stop: agent.idleDisconnectedAt !== null }];
+      }
+
+      if (sql.includes("INSERT INTO ai_relay_actions")) {
+        const [userId, id, cardJson, ttlMs] = params as [
+          string,
+          string,
+          string,
+          number,
+        ];
+        if (actions.some((a) => a.userId === userId && a.id === id)) {
+          return [];
+        }
+        actions.push({
+          userId,
+          id,
+          card: JSON.parse(cardJson),
+          createdAt: now(),
+          expiresAt: now() + ttlMs,
+        });
+        return [];
+      }
+
+      if (sql.includes("DELETE FROM ai_relay_actions")) {
+        const [userId] = params as [string];
+        const mine = actions.filter((a) => a.userId === userId);
+        for (const row of mine) {
+          actions.splice(actions.indexOf(row), 1);
+        }
+        return mine
+          .filter((a) => a.expiresAt > now())
+          .sort((a, b) => a.createdAt - b.createdAt)
+          .map((a) => ({ card: a.card }));
+      }
 
       if (sql.includes("INSERT INTO ai_relay_prompts")) {
         const [userId, payload, queueWaitMs] = params as [
@@ -178,16 +269,22 @@ export function createRelayRowsHarness(): RelayRowsHarness {
       }
 
       if (sql.includes("COUNT(*) FILTER")) {
-        const [userId] = params as [string];
+        const [userId, connectedWindowMs] = params as [string, number];
         const live = rows.filter(
           (r) => r.userId === userId && r.expiresAt > now(),
         );
+        const agent = agents.find((a) => a.userId === userId);
         return [
           {
             queued: String(live.filter((r) => r.status === "pending").length),
             in_flight: String(
               live.filter((r) => r.status === "claimed").length,
             ),
+            connected:
+              agent?.lastPollAt !== null &&
+              agent?.lastPollAt !== undefined &&
+              agent.lastPollAt > now() - connectedWindowMs,
+            idle_disconnected: (agent?.idleDisconnectedAt ?? null) !== null,
           },
         ];
       }
@@ -233,6 +330,8 @@ export function createRelayRowsHarness(): RelayRowsHarness {
   return {
     dataSource: scoped.dataSource,
     rows,
+    agents,
+    actions,
     statements,
   };
 }

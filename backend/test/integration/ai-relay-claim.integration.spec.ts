@@ -1,7 +1,11 @@
 import { DataSource } from "typeorm";
 import { TestingModule } from "@nestjs/testing";
 
-import { AiRelayService } from "@/ai/relay/ai-relay.service";
+import {
+  AiRelayService,
+  INACTIVITY_TIMEOUT_MS,
+} from "@/ai/relay/ai-relay.service";
+import { RelaySweeperService } from "@/ai/relay/relay-sweeper.service";
 import { RelayAttachmentStore } from "@/ai/relay/relay-attachment.store";
 import { RelayStreamRegistry } from "@/ai/relay/relay-stream.registry";
 import { MemoryEventBus } from "@/common/events/memory-event-bus";
@@ -27,6 +31,7 @@ describe("AI relay claim (real PostgreSQL)", () => {
   let module: TestingModule;
   let db: DataSource;
   let relay: AiRelayService;
+  let sweeper: RelaySweeperService;
   let userId: string;
 
   const asUser = <T>(fn: () => Promise<T>) => withUserContext(userId, fn);
@@ -43,6 +48,7 @@ describe("AI relay claim (real PostgreSQL)", () => {
       new RelayStreamRegistry(),
       new MemoryEventBus(),
     );
+    sweeper = new RelaySweeperService(db);
   });
 
   afterAll(async () => {
@@ -51,6 +57,8 @@ describe("AI relay claim (real PostgreSQL)", () => {
 
   beforeEach(async () => {
     await db.query("DELETE FROM ai_relay_prompts");
+    await db.query("DELETE FROM ai_relay_actions");
+    await db.query("DELETE FROM ai_relay_agents");
   });
 
   /**
@@ -197,5 +205,186 @@ describe("AI relay claim (real PostgreSQL)", () => {
 
     expect(claimed?.promptId).toBe(theirs.id);
     expect(await statusOf(mine)).toBe("pending");
+  });
+
+  describe("the agent row", () => {
+    it("keeps one liveness row per user however often the agent polls", async () => {
+      await queue("q");
+      await asUser(() => relay.waitForPrompt(userId, "session-a"));
+      await asUser(() => relay.waitForPrompt(userId, "session-a"));
+
+      const rows = await db.query(
+        `SELECT last_poll_at FROM ai_relay_agents WHERE user_id = $1`,
+        [userId],
+      );
+      // The primary key is what stops a second replica's poll adding a second
+      // liveness row for one agent.
+      expect(rows).toHaveLength(1);
+      expect(rows[0].last_poll_at).not.toBeNull();
+    });
+
+    it("starts the inactivity clock, then ends it and records the disconnect", async () => {
+      await expect(asUser(() => relay.shouldStopForIdle(userId))).resolves.toBe(
+        false,
+      );
+      await db.query(
+        `UPDATE ai_relay_agents
+            SET idle_since = CURRENT_TIMESTAMP
+                             - ($2::numeric / 1000 * INTERVAL '1 second')
+                             - INTERVAL '1 second'
+          WHERE user_id = $1`,
+        [userId, INACTIVITY_TIMEOUT_MS],
+      );
+
+      // Start, elapse and disconnect in one upsert: two replicas serving the
+      // same agent's polls must not each start a clock neither finishes.
+      await expect(asUser(() => relay.shouldStopForIdle(userId))).resolves.toBe(
+        true,
+      );
+      expect(
+        (await asUser(() => relay.getStatus(userId))).idleDisconnected,
+      ).toBe(true);
+    });
+  });
+
+  describe("buffered confirmation cards", () => {
+    const card = (id: string) =>
+      ({ actionId: id, descriptor: { kind: "create_transaction" } }) as never;
+
+    async function claimedTurn(): Promise<void> {
+      await queue("q");
+      await asUser(() => relay.waitForPrompt(userId, "session-a"));
+    }
+
+    it("drains oldest first and only once", async () => {
+      await claimedTurn();
+      await asUser(() =>
+        relay.emitPendingAction(userId, card("a1"), "session-a"),
+      );
+      await asUser(() =>
+        relay.emitPendingAction(userId, card("a2"), "session-a"),
+      );
+
+      const drained = await asUser(() => relay.takeBufferedActions(userId));
+      expect(drained.map((c) => c.actionId)).toEqual(["a1", "a2"]);
+      await expect(
+        asUser(() => relay.takeBufferedActions(userId)),
+      ).resolves.toEqual([]);
+    });
+
+    it("takes an expired card with it rather than showing it late", async () => {
+      await claimedTurn();
+      await asUser(() =>
+        relay.emitPendingAction(userId, card("a1"), "session-a"),
+      );
+      await db.query(
+        `UPDATE ai_relay_actions
+            SET expires_at = CURRENT_TIMESTAMP - INTERVAL '1 second'`,
+      );
+
+      await expect(
+        asUser(() => relay.takeBufferedActions(userId)),
+      ).resolves.toEqual([]);
+      const [{ count }] = await db.query(
+        `SELECT COUNT(*)::int AS count FROM ai_relay_actions`,
+      );
+      expect(count).toBe(0);
+    });
+  });
+
+  describe("the sweep", () => {
+    it("expires a turn nobody claimed, without deleting it yet", async () => {
+      const id = await queue("nobody came");
+      await db.query(
+        `UPDATE ai_relay_prompts
+            SET expires_at = CURRENT_TIMESTAMP - INTERVAL '1 minute'
+          WHERE id = $1`,
+        [id],
+      );
+
+      await sweeper.sweepRelayState();
+
+      // The browser is still entitled to learn "no agent" rather than "gone".
+      expect(await statusOf(id)).toBe("expired");
+    });
+
+    it("leaves a turn whose answer would still be accepted alone", async () => {
+      const id = await queue("slow agent");
+      await asUser(() => relay.waitForPrompt(userId, "session-a"));
+      await db.query(
+        `UPDATE ai_relay_prompts
+            SET expires_at = CURRENT_TIMESTAMP - INTERVAL '1 minute'
+          WHERE id = $1`,
+        [id],
+      );
+
+      await sweeper.sweepRelayState();
+
+      expect(await statusOf(id)).toBe("claimed");
+      await expect(
+        asUser(() => relay.postResponse(userId, id, "recovered")),
+      ).resolves.toBe(true);
+    });
+
+    it("deletes a turn once its grace has run out", async () => {
+      const id = await queue("long gone");
+      await db.query(
+        `UPDATE ai_relay_prompts
+            SET status = 'expired',
+                expires_at = CURRENT_TIMESTAMP - INTERVAL '1 hour'
+          WHERE id = $1`,
+        [id],
+      );
+
+      await sweeper.sweepRelayState();
+
+      const rows = await db.query(
+        `SELECT id FROM ai_relay_prompts WHERE id = $1`,
+        [id],
+      );
+      expect(rows).toHaveLength(0);
+    });
+
+    it("drops a card past its expiry and keeps a live one", async () => {
+      await queue("q");
+      await asUser(() => relay.waitForPrompt(userId, "session-a"));
+      await asUser(() =>
+        relay.emitPendingAction(
+          userId,
+          { actionId: "live", descriptor: {} } as never,
+          "session-a",
+        ),
+      );
+      await db.query(
+        `INSERT INTO ai_relay_actions (user_id, id, card, expires_at)
+         VALUES ($1, 'stale', '{}'::jsonb, CURRENT_TIMESTAMP - INTERVAL '1 minute')`,
+        [userId],
+      );
+
+      await sweeper.sweepRelayState();
+
+      const rows = await db.query(
+        `SELECT id FROM ai_relay_actions WHERE user_id = $1`,
+        [userId],
+      );
+      expect(rows.map((r: { id: string }) => r.id)).toEqual(["live"]);
+    });
+
+    it("is a no-op the second time it runs", async () => {
+      const id = await queue("nobody came");
+      await db.query(
+        `UPDATE ai_relay_prompts
+            SET expires_at = CURRENT_TIMESTAMP - INTERVAL '1 minute'
+          WHERE id = $1`,
+        [id],
+      );
+
+      // Idempotent by predicate, which is what makes every replica firing this
+      // cron safe rather than a race.
+      await sweeper.sweepRelayState();
+      await sweeper.sweepRelayState();
+
+      expect(await statusOf(id)).toBe("expired");
+    });
   });
 });

@@ -68,13 +68,6 @@ const HARD_WAIT_MS = 20 * 60 * 1000; // 20 minutes
 export const BUFFER_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 /**
- * Cap on buffered late confirmation cards retained per user. Bounds memory if
- * an agent keeps emitting cards whose browsers have all gone away. Oldest
- * entries are evicted first.
- */
-const MAX_BUFFERED_PER_USER = 20;
-
-/**
  * How long a single `get_next_prompt` long-poll parks before returning empty.
  * Kept under typical proxy idle timeouts; the agent is told to immediately poll
  * again, so this just bounds one HTTP round-trip.
@@ -183,13 +176,6 @@ interface PromptStateRow {
   remaining_ms: string | number;
 }
 
-/** A write-confirmation card emitted after the browser stream gave up. */
-interface BufferedAction {
-  action: PendingAiAction;
-  /** Epoch ms the card was emitted; used for TTL pruning and LRU eviction. */
-  at: number;
-}
-
 /**
  * Broker between the browser chat and the user's MCP agent.
  *
@@ -216,30 +202,6 @@ export class AiRelayService {
     @Inject(EVENT_BUS) private readonly bus: EventBus,
   ) {}
 
-  /** Last time each user's agent polled, for connection liveness. */
-  private readonly lastPollAt = new Map<string, number>();
-  /**
-   * When the current idle (no-prompt) streak began for a user, set on the first
-   * empty poll and reset on any prompt. Drives the inactivity disconnect.
-   */
-  private readonly idleSince = new Map<string, number>();
-  /**
-   * Users whose agent was told to stop after INACTIVITY_TIMEOUT_MS of no prompts.
-   * Surfaced in the tunnel status so the chat shows an "idle disconnected" notice
-   * until the user reconnects (the agent polls again) or sends a new prompt.
-   */
-  private readonly idleDisconnectedAt = new Map<string, number>();
-  /**
-   * Write-confirmation cards emitted after the browser stream gave up, keyed by
-   * userId then actionId. The browser drains them via the pickup endpoint so a
-   * card composed slowly (idle timeout fired) is still shown and approvable
-   * rather than being silently lost or auto-declined (#793).
-   */
-  private readonly bufferedActions = new Map<
-    string,
-    Map<string, BufferedAction>
-  >();
-
   /**
    * Enqueue a prompt from the browser and resolve when the agent answers.
    *
@@ -264,8 +226,7 @@ export class AiRelayService {
     );
     // A new prompt is activity: restart the inactivity clock and clear any
     // prior idle-disconnect notice so the chat shows the live state again.
-    this.idleSince.delete(userId);
-    this.idleDisconnectedAt.delete(userId);
+    await this.markActivity(userId);
 
     const payload: RelayPromptPayload = {
       prompt,
@@ -299,10 +260,9 @@ export class AiRelayService {
     userId: string,
     sessionId?: string,
   ): Promise<RelayClaimedPrompt | null> {
-    this.lastPollAt.set(userId, Date.now());
-    // The agent is polling, so it is connected: clear any stale idle-disconnect
-    // notice (e.g. it just reconnected after a quiet spell).
-    this.idleDisconnectedAt.delete(userId);
+    // The agent is polling, so it is connected, and any stale idle-disconnect
+    // notice goes with it (it just reconnected after a quiet spell).
+    await this.recordPoll(userId);
     // A poll proves THIS agent is alive: keep the prompt it is mid-task on from
     // tripping the idle window. Scoped to its own session -- another session's
     // traffic says nothing about whether this agent is still working.
@@ -339,23 +299,46 @@ export class AiRelayService {
    * it), telling the tool to instruct the agent to exit rather than keep
    * polling. The clock is reset by enqueuePrompt and by claiming a prompt, so an
    * active conversation never trips it.
+   *
+   * Start, elapse and disconnect are one upsert: a read followed by a write
+   * would let two replicas serving the same agent's polls each start the clock
+   * and neither finish it.
    */
-  shouldStopForIdle(userId: string): boolean {
-    const since = this.idleSince.get(userId);
-    if (since === undefined) {
-      this.idleSince.set(userId, Date.now());
-      return false;
-    }
-    if (Date.now() - since >= INACTIVITY_TIMEOUT_MS) {
-      this.idleSince.delete(userId);
-      this.idleDisconnectedAt.set(userId, Date.now());
+  async shouldStopForIdle(userId: string): Promise<boolean> {
+    const [row] = returnedRows<{ stop: boolean }>(
+      await this.relayQuery(
+        `INSERT INTO ai_relay_agents (user_id, idle_since)
+         VALUES ($1, CURRENT_TIMESTAMP)
+         ON CONFLICT (user_id) DO UPDATE
+            SET idle_since = CASE
+                  WHEN ai_relay_agents.idle_since IS NULL
+                    THEN CURRENT_TIMESTAMP
+                  WHEN ai_relay_agents.idle_since + ${msInterval("$2")}
+                       <= CURRENT_TIMESTAMP
+                    THEN NULL
+                  ELSE ai_relay_agents.idle_since
+                END,
+                idle_disconnected_at = CASE
+                  WHEN ai_relay_agents.idle_since IS NOT NULL
+                   AND ai_relay_agents.idle_since + ${msInterval("$2")}
+                       <= CURRENT_TIMESTAMP
+                    THEN CURRENT_TIMESTAMP
+                  ELSE ai_relay_agents.idle_disconnected_at
+                END
+         RETURNING (idle_disconnected_at IS NOT NULL) AS stop`,
+        [userId, INACTIVITY_TIMEOUT_MS],
+      ),
+    );
+    // Every poll clears the notice before this runs, so a non-null value here
+    // is the one this statement just wrote.
+    const stop = row?.stop === true;
+    if (stop) {
       this.logger.log(
         `Relay agent for user ${userId} idle ${INACTIVITY_TIMEOUT_MS}ms; ` +
           `signalling stop`,
       );
-      return true;
     }
-    return false;
+    return stop;
   }
 
   /**
@@ -374,7 +357,7 @@ export class AiRelayService {
     promptId: string,
     text: string,
   ): Promise<boolean> {
-    this.lastPollAt.set(userId, Date.now());
+    await this.recordPoll(userId);
     const answered = await this.writeAnswer(userId, promptId, { text });
     if (!answered) {
       return false;
@@ -409,7 +392,7 @@ export class AiRelayService {
     text: string,
     sessionId?: string,
   ): Promise<boolean> {
-    this.lastPollAt.set(userId, Date.now());
+    await this.recordPoll(userId);
     // Knowing the (unguessable) promptId is what proves this caller owns the
     // turn, so a reconnected agent's new session is adopted here rather than
     // locked out -- and the same statement counts the call as liveness.
@@ -440,7 +423,7 @@ export class AiRelayService {
     isError = false,
     sessionId?: string,
   ): Promise<void> {
-    // Deliberately does NOT stamp lastPollAt, and everything below is scoped to
+    // Deliberately does NOT record a poll, and everything below is scoped to
     // the CALLING session: every MCP data tool call lands here, including calls
     // from a direct MCP client (Claude Desktop) that has nothing to do with the
     // relay. Treating that traffic as this user's relay liveness kept an
@@ -493,62 +476,74 @@ export class AiRelayService {
     if (this.streams.emit(userId, turn, { type: "pending_action", action })) {
       return true;
     }
-    this.bufferAction(userId, action);
+    await this.bufferAction(userId, action);
     return true;
   }
 
   /**
    * Drain any buffered confirmation cards for a user, removing them. Returns an
-   * empty array when none are buffered (expired, already picked up, or never
-   * buffered). Prunes expired entries on access.
+   * empty array when none are waiting (expired, already picked up, or never
+   * buffered). The drain takes expired rows with it and returns only the live
+   * ones, so a card nobody came back for cannot be shown late.
    */
-  takeBufferedActions(userId: string): PendingAiAction[] {
-    this.pruneActionBuffer(userId);
-    const userBuffer = this.bufferedActions.get(userId);
-    if (!userBuffer || userBuffer.size === 0) {
-      return [];
-    }
-    const actions = [...userBuffer.values()]
-      .sort((a, b) => a.at - b.at)
-      .map((entry) => entry.action);
-    this.bufferedActions.delete(userId);
-    return actions;
-  }
-
-  /** Tunnel status for the chat indicator. One indexed query per call. */
-  async getStatus(userId: string): Promise<RelayTunnelStatus> {
-    const [row] = returnedRows<{ queued: string; in_flight: string }>(
+  async takeBufferedActions(userId: string): Promise<PendingAiAction[]> {
+    const rows = returnedRows<{ card: PendingAiAction }>(
       await this.relayQuery(
-        `SELECT COUNT(*) FILTER (
-                  WHERE status = 'pending' AND expires_at > CURRENT_TIMESTAMP
-                ) AS queued,
-                COUNT(*) FILTER (
-                  WHERE status = 'claimed' AND expires_at > CURRENT_TIMESTAMP
-                ) AS in_flight
-           FROM ai_relay_prompts
-          WHERE user_id = $1`,
+        `WITH drained AS (
+           DELETE FROM ai_relay_actions
+            WHERE user_id = $1
+           RETURNING card, created_at, expires_at
+         )
+         SELECT card FROM drained
+          WHERE expires_at > CURRENT_TIMESTAMP
+          ORDER BY created_at`,
         [userId],
       ),
     );
-    const queued = Number(row?.queued ?? 0);
-    const inFlight = Number(row?.in_flight ?? 0);
-    return {
-      state: this.computeState(userId, inFlight > 0),
-      queued,
-      // Present only between an inactivity stop and the user reconnecting (agent
-      // polls again) or sending a new prompt, so the chat can explain it.
-      ...(this.idleDisconnectedAt.has(userId)
-        ? { idleDisconnected: true }
-        : {}),
-    };
+    return rows.map((r) => r.card);
   }
 
-  private computeState(userId: string, inFlight: boolean): RelayTunnelState {
-    if (inFlight) {
-      return "busy";
-    }
-    const last = this.lastPollAt.get(userId) ?? 0;
-    return Date.now() - last < CONNECTED_WINDOW_MS ? "listening" : "offline";
+  /** Tunnel status for the chat indicator. One query, indexed by `user_id`. */
+  async getStatus(userId: string): Promise<RelayTunnelStatus> {
+    const [row] = returnedRows<{
+      queued: string;
+      in_flight: string;
+      connected: boolean;
+      idle_disconnected: boolean;
+    }>(
+      await this.relayQuery(
+        `SELECT COALESCE(p.queued, 0) AS queued,
+                COALESCE(p.in_flight, 0) AS in_flight,
+                COALESCE(
+                  a.last_poll_at > CURRENT_TIMESTAMP - ${msInterval("$2")},
+                  false
+                ) AS connected,
+                (a.idle_disconnected_at IS NOT NULL) AS idle_disconnected
+           FROM (SELECT $1::uuid AS user_id) u
+           LEFT JOIN LATERAL (
+             SELECT COUNT(*) FILTER (WHERE status = 'pending') AS queued,
+                    COUNT(*) FILTER (WHERE status = 'claimed') AS in_flight
+               FROM ai_relay_prompts
+              WHERE user_id = u.user_id
+                AND expires_at > CURRENT_TIMESTAMP
+           ) p ON TRUE
+           LEFT JOIN ai_relay_agents a ON a.user_id = u.user_id`,
+        [userId, CONNECTED_WINDOW_MS],
+      ),
+    );
+    const state: RelayTunnelState =
+      Number(row?.in_flight ?? 0) > 0
+        ? "busy"
+        : row?.connected
+          ? "listening"
+          : "offline";
+    return {
+      state,
+      queued: Number(row?.queued ?? 0),
+      // Present only between an inactivity stop and the user reconnecting (agent
+      // polls again) or sending a new prompt, so the chat can explain it.
+      ...(row?.idle_disconnected ? { idleDisconnected: true } : {}),
+    };
   }
 
   // ---------------------------------------------------------------- the rows
@@ -709,7 +704,7 @@ export class AiRelayService {
       return null;
     }
     // Claiming a prompt is activity: restart the inactivity clock.
-    this.idleSince.delete(userId);
+    await this.markActivity(userId);
     return {
       promptId: row.id,
       prompt: row.prompt.prompt,
@@ -886,42 +881,67 @@ export class AiRelayService {
     await this.bus.publish(relayChannel(userId), { userId, promptId });
   }
 
+  // --------------------------------------------------- the agent's liveness
+
+  /**
+   * Record that this user's agent is polling.
+   *
+   * Progress, not business data: the row says whether the tunnel indicator
+   * reads offline, listening or busy, and nothing financial reads it. A poll
+   * also clears any idle-disconnect notice -- the agent is plainly back.
+   */
+  private async recordPoll(userId: string): Promise<void> {
+    await this.relayQuery(
+      `INSERT INTO ai_relay_agents (user_id, last_poll_at)
+       VALUES ($1, CURRENT_TIMESTAMP)
+       ON CONFLICT (user_id) DO UPDATE
+          SET last_poll_at = CURRENT_TIMESTAMP,
+              idle_disconnected_at = NULL`,
+      [userId],
+    );
+  }
+
+  /**
+   * Record that the conversation is alive: a new prompt, or an agent claiming
+   * one. Restarts the inactivity clock and clears the disconnect notice, so the
+   * chat shows the live state again.
+   */
+  private async markActivity(userId: string): Promise<void> {
+    await this.relayQuery(
+      `INSERT INTO ai_relay_agents (user_id)
+       VALUES ($1)
+       ON CONFLICT (user_id) DO UPDATE
+          SET idle_since = NULL,
+              idle_disconnected_at = NULL`,
+      [userId],
+    );
+  }
+
   // ------------------------------------------------------- the action buffer
 
-  /** Store a late confirmation card for pickup, enforcing TTL and the per-user cap. */
-  private bufferAction(userId: string, action: PendingAiAction): void {
-    this.pruneActionBuffer(userId);
-    const existing =
-      this.bufferedActions.get(userId) ?? new Map<string, BufferedAction>();
-    const next = new Map(existing);
-    next.set(action.actionId, { action, at: Date.now() });
-    // Evict oldest entries (by emit time) until within the per-user cap.
-    if (next.size > MAX_BUFFERED_PER_USER) {
-      const ordered = [...next.entries()].sort((a, b) => a[1].at - b[1].at);
-      const trimmed = ordered.slice(next.size - MAX_BUFFERED_PER_USER);
-      this.bufferedActions.set(userId, new Map(trimmed));
-    } else {
-      this.bufferedActions.set(userId, next);
-    }
+  /**
+   * Keep a late confirmation card for pickup.
+   *
+   * `DO NOTHING` because the descriptor's id is the card's identity: a repeat
+   * of the same card is the same card, and the first one written is the one the
+   * browser will approve. Bounded by `expires_at` and the sweeper rather than by
+   * a per-user cap -- a row costs nothing to hold, and only an agent that holds
+   * a claimed turn can write one.
+   */
+  private async bufferAction(
+    userId: string,
+    action: PendingAiAction,
+  ): Promise<void> {
+    await this.relayQuery(
+      `INSERT INTO ai_relay_actions (user_id, id, card, expires_at)
+       VALUES ($1, $2, $3::jsonb, CURRENT_TIMESTAMP + ${msInterval("$4")})
+       ON CONFLICT (user_id, id) DO NOTHING`,
+      [userId, action.actionId, JSON.stringify(action), BUFFER_TTL_MS],
+    );
     this.logger.warn(
       `Relay confirmation card ${action.actionId} for user ${userId} emitted ` +
         `after the stream gave up; buffered for pickup`,
     );
-  }
-
-  /** Drop expired buffered cards for a user; clean up the empty bucket. */
-  private pruneActionBuffer(userId: string): void {
-    const userBuffer = this.bufferedActions.get(userId);
-    if (!userBuffer) {
-      return;
-    }
-    const cutoff = Date.now() - BUFFER_TTL_MS;
-    const live = [...userBuffer.entries()].filter(([, v]) => v.at >= cutoff);
-    if (live.length === 0) {
-      this.bufferedActions.delete(userId);
-    } else if (live.length !== userBuffer.size) {
-      this.bufferedActions.set(userId, new Map(live));
-    }
   }
 
   /** Eagerly drop a settled turn's attachments from the store (TTL backstop). */
