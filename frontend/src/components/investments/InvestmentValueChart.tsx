@@ -46,6 +46,7 @@ import {
 import { EmptyState } from '@/components/ui/EmptyState';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
 import { preferredCurrency } from '@/lib/default-currency';
+import { investedValue } from '@/lib/invested-value';
 
 const logger = createLogger('InvestmentChart');
 
@@ -193,7 +194,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
         setChartPoints(
           data.map((d) => ({
             name: formatChartDate(d.date, 'MMM d, yyyy'),
-            Value: d.value,
+            Value: investedValue(d),
             iso: d.date,
           })),
         );
@@ -203,7 +204,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
         setChartPoints(
           data.map((d) => ({
             name: formatChartDate(d.month, 'MMM yyyy'),
-            Value: d.value,
+            Value: investedValue(d),
             iso: d.month,
           })),
         );
@@ -238,7 +239,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
             setChartPoints(
               cachedPoints.map((p) => ({
                 name: formatIntradayLabel(p.timestamp, dateRange),
-                Value: p.value,
+                Value: investedValue(p),
                 iso: p.timestamp,
               })),
             );
@@ -300,7 +301,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
           setChartPoints(
             responsePoints.map((p) => ({
               name: formatIntradayLabel(p.timestamp, dateRange),
-              Value: p.value,
+              Value: investedValue(p),
               iso: p.timestamp,
             })),
           );
@@ -386,9 +387,15 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
   // at. `null` is the server's answer that it withheld the figure and said why.
   const valueChange = periodResult?.valueChange ?? null;
   const netExternalFlows = periodResult?.netExternalFlows ?? null;
-  const investmentResult = periodResult?.investmentResult ?? null;
-  const returnPercent = periodResult?.returnPercent ?? null;
-  const unknownReason = periodResultUnknownReason(periodResult?.reasons ?? []);
+  // The chart plots the INVESTED value, so its headline figures are the
+  // invested part's too: the same measure the "Portfolio performance" card
+  // reports, so the two cannot disagree on one page (INV-PORTRESULT-002,
+  // `docs/specs/portfolio-period-result.md` section 10.7).
+  const investmentResult = periodResult?.investmentPnl ?? null;
+  const returnPercent = periodResult?.investmentReturnPercent ?? null;
+  const unknownReason = periodResultUnknownReason(
+    periodResult?.investedReasons ?? [],
+  );
   /** A secondary figure's text: the amount, or the words the cards print. */
   const secondaryText = (value: number | null) =>
     value === null
@@ -584,7 +591,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
             {/* Two movements the server could not count as a flow: nothing is
                 missing from the data, so the marker alone would send the
                 reader to a screen with nothing to do on it. */}
-            {hasUnmeasuredFlow(periodResult?.reasons ?? []) && (
+            {hasUnmeasuredFlow(periodResult?.investedReasons ?? []) && (
               <InfoTooltip
                 placement="top"
                 text={t('investmentValueChart.unmeasuredFlowTooltip')}

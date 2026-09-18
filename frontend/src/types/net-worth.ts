@@ -7,7 +7,13 @@ export interface MonthlyNetWorth {
 
 export interface MonthlyInvestmentValue {
   month: string;
+  /** Securities plus the cash beside them, at the month's close. */
   value: number;
+  /**
+   * The INVESTED part of the same month -- the securities, no cash. The
+   * investment charts plot this; see `DailyInvestmentValue.securitiesValue`.
+   */
+  securitiesValue?: number;
 }
 
 /**
@@ -26,6 +32,19 @@ export interface MonthlyInvestmentValue {
 export interface DailyInvestmentValue {
   date: string;
   value: number;
+  /**
+   * `IV(t)`: the INVESTED part of that same close -- the securities, without
+   * the cash beside them. `value` is this plus the scope's ledger cash.
+   *
+   * The investment charts plot THIS: cash held in an investment account is not
+   * an investment, so a deposit must not draw as a rise in portfolio value
+   * (INV-PORTRESULT-002, `docs/specs/portfolio-period-result.md` section 10.7).
+   * The net worth chart is net worth and keeps reading `value`.
+   *
+   * Optional for the same reason the flags are: a response from an older
+   * backend mid-deploy does not carry it.
+   */
+  securitiesValue?: number;
   /** False when a component could not be converted; see missingRatePairs. */
   fxComplete?: boolean;
   /** `"USD->EUR"` for each pair with no rate on that day. */
@@ -148,6 +167,30 @@ export interface PortfolioPeriodResult {
   missingRatePairs: string[];
   unpricedSecurityIds: string[];
   unknownCashAccountIds: string[];
+
+  // The INVESTED part of the same window: securities only, cash excluded
+  // entirely. These are what "Portfolio performance" and the investment charts
+  // report; the fields above are what the ACCOUNT did, which is the question
+  // the daily movement notification and the calendar layer ask.
+
+  /** IV(b): the securities at the starting close, no cash. */
+  investedValueStart?: number | null;
+  /** IV(e): the securities at the ending close, no cash. */
+  investedValueEnd?: number | null;
+  /** Net value paid into the securities after startDate: buys less disposals. */
+  investmentCapitalFlows?: number | null;
+  /** Dividends, interest and capital-gain distributions over the same days. */
+  investmentIncome?: number | null;
+  /** What the investments earned: IV(e) - IV(b) - capital + income. */
+  investmentPnl?: number | null;
+  /** The time-weighted return over the same days. */
+  investmentReturnPercent?: number | null;
+  /** How that percentage was arrived at; `twr` neutralises capital flows. */
+  investmentReturnMethod?: 'twr';
+  /** True only when both invested figures are known. */
+  investedComplete?: boolean;
+  /** Why an invested figure is withheld; the same closed set as `reasons`. */
+  investedReasons?: PeriodResultReason[];
 }
 
 /** The trailing windows the Investments page reports a portfolio result over. */

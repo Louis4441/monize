@@ -204,7 +204,7 @@
     "refresh": "[XX-Refresh current value-XX]",
     "investmentResult": "[XX-Investment result-XX]",
     "notAvailable": "[XX-N/A-XX]",
-    "periodBreakdownTooltip": "[XX-Value change {valueChange}, of which deposits and withdrawals were {netFlows}. The investment result is what is left.-XX]",
+    "periodBreakdownTooltip": "[XX-The account's value moved {valueChange} over this window, of which deposits and withdrawals were {netFlows}. The figure above is what the investments themselves earned, with uninvested cash left out.-XX]",
     "unmeasuredFlowTooltip": "[XX-A trade settled outside these accounts, or a split mixing an investment line with ordinary spending, means the result cannot be separated from the money moved in.-XX]"
   },
   "spendingByPayee": {

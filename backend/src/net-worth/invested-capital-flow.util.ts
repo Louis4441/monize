@@ -92,6 +92,8 @@ export function investedCapitalFlowSql(): string {
              AND it.account_id = ANY($4::UUID[])
              AND it.transaction_date > $2
              AND it.transaction_date <= $3
+             -- Rows as EFFECTS: renders it.status != 'VOID', because a void
+             -- investment row moved no shares and no value.
              AND ${investmentEffectStatusSql("it")}
            GROUP BY it.transaction_date, COALESCE(s.currency_code, a.currency_code), it.action`;
 }

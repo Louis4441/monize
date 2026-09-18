@@ -243,8 +243,12 @@ function InvestmentsContent() {
             }
           />
 
-          {/* Summary and Allocation Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Summary, performance and allocation, in one row: what the
+              portfolio is worth, what the investments earned, and how it is
+              spread. The middle column is the narrow one -- six label/figure
+              rows need far less width than a holdings table or a donut -- and
+              below `lg` the three stack in that same order. */}
+          <div className="grid grid-cols-1 lg:grid-cols-[42fr_16fr_42fr] gap-6 mb-6">
             <PortfolioSummaryCard
               summary={data.portfolioSummary}
               isLoading={data.isLoading}
@@ -254,6 +258,17 @@ function InvestmentsContent() {
                   : null
               }
               titleSuffix={accountFilterLabel}
+            />
+            {/* What the INVESTMENTS earned over each trailing period, with
+                deposits, withdrawals and idle cash taken out. */}
+            <PortfolioPerformanceCard
+              accountIds={data.selectedAccountIds}
+              reloadKey={data.writeRefreshKey}
+              displayCurrency={
+                data.selectedAccountIds.length === 1
+                  ? data.accounts.find(a => a.id === data.selectedAccountIds[0])?.currencyCode ?? null
+                  : null
+              }
             />
             <AssetAllocationChart
               allocation={data.portfolioSummary ? { allocation: data.portfolioSummary.allocation, totalValue: data.portfolioSummary.totalPortfolioValue } : null}
@@ -267,21 +282,6 @@ function InvestmentsContent() {
               titleSuffix={accountFilterLabel}
               accountIds={data.selectedAccountIds}
               valuationComplete={data.portfolioSummary?.valuationComplete}
-            />
-          </div>
-
-          {/* What the holdings earned over each trailing period, the reader's
-              own deposits taken out. It sits between the portfolio's value and
-              its history: what it is worth, then what it made, then when. */}
-          <div className="mb-6">
-            <PortfolioPerformanceCard
-              accountIds={data.selectedAccountIds}
-              reloadKey={data.writeRefreshKey}
-              displayCurrency={
-                data.selectedAccountIds.length === 1
-                  ? data.accounts.find(a => a.id === data.selectedAccountIds[0])?.currencyCode ?? null
-                  : null
-              }
             />
           </div>
 

@@ -24,10 +24,16 @@ interface PortfolioPerformanceCardProps {
  * Every figure comes from `GET /net-worth/investments-period-results` and
  * nothing here subtracts or divides: a change derived from the value series
  * counts the reader's own contributions as performance, which is the defect
- * INV-PORTRESULT-001 exists to stop (issue #1392). The percentage is the
- * server's `returnPercent` -- over `investmentResult`, never over the value
- * change -- and the amount beneath it is that result in the currency the
- * server reports in.
+ * INV-PORTRESULT-001 exists to stop (issue #1392).
+ *
+ * What it reports is the INVESTED part: `investmentReturnPercent`, the
+ * server's time-weighted return over the securities alone, and
+ * `investmentPnl` beneath it. Cash held in an investment account is not an
+ * investment, so it is in neither figure and in neither the numerator nor the
+ * base of the percentage: paying it in or out moves nothing here
+ * (INV-PORTRESULT-002, `docs/specs/portfolio-period-result.md` section 10).
+ * The account-level `investmentResult` and `returnPercent` still travel on the
+ * same payload; they answer what the ACCOUNT did, which this card does not ask.
  *
  * A period the server could not report reads "n/a", the same answer the
  * security card gives for a window its history does not cover, and for the same
@@ -67,8 +73,8 @@ export function PortfolioPerformanceCard({
       // Each figure is judged on its own: a period whose money is known and
       // whose ratio is not (a portfolio that started the window at nothing)
       // still has an amount worth reading.
-      const percent = period?.returnPercent ?? null;
-      const result = period?.investmentResult ?? null;
+      const percent = period?.investmentReturnPercent ?? null;
+      const result = period?.investmentPnl ?? null;
       return {
         period: preset,
         label: t(`portfolioPerformance.periods.${preset}` as Parameters<typeof t>[0]),
@@ -91,9 +97,14 @@ export function PortfolioPerformanceCard({
       (preset) => results?.periods?.[preset],
     ).filter(
       (period): period is PortfolioPeriodResult =>
-        !!period && period.investmentResult === null,
+        !!period && (period.investmentPnl ?? null) === null,
     );
-    const cause = withheldPeriodCause(withheld.map((period) => period.reasons));
+    // The cause of a withheld INVESTED figure is `investedReasons`; a backend
+    // that does not send them yet has withheld for no reason it named, and the
+    // list's own "n/a" is then the whole answer.
+    const cause = withheldPeriodCause(
+      withheld.map((period) => period.investedReasons ?? []),
+    );
     return cause === null
       ? undefined
       : t(`portfolioPerformance.reasons.${cause}` as Parameters<typeof t>[0]);

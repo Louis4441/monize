@@ -104,6 +104,7 @@ import {
   hasUnmeasuredFlow,
   periodResultUnknownReason,
 } from '@/components/investments/portfolio-period-result';
+import { investedValue } from '@/lib/invested-value';
 import { preferredCurrency } from '@/lib/default-currency';
 
 const logger = createLogger('PortfolioValueReport');
@@ -385,16 +386,17 @@ export function PortfolioValueReport() {
         if (loadSeqRef.current !== seq) return;
         setChartPoints(
           data.map((d) => {
-            // A day short of a price, a rate or a cash balance is a subtotal;
-            // the KPIs below refuse to name it a high, a low or a change, and
-            // the chart refuses to plot it at all.
+            // A day short of a price or a rate is a subtotal; the KPIs below
+            // refuse to name it a high, a low or a change, and the chart
+            // refuses to plot it at all. `cashComplete` is NOT read here: the
+            // chart plots the INVESTED value, which holds no cash, so a cash
+            // account with no balance for a day cannot make this point wrong.
+            // It is still reported in the incomplete-data details below.
             const complete =
-              d.pricesComplete !== false &&
-              d.fxComplete !== false &&
-              d.cashComplete !== false;
+              d.pricesComplete !== false && d.fxComplete !== false;
             return {
               name: formatChartDate(d.date, 'MMM d, yyyy'),
-              Value: complete ? d.value : null,
+              Value: complete ? investedValue(d) : null,
               iso: d.date,
               complete,
             };
@@ -407,7 +409,7 @@ export function PortfolioValueReport() {
         setChartPoints(
           data.map((d) => ({
             name: formatChartDate(d.month, 'MMM yyyy'),
-            Value: d.value,
+            Value: investedValue(d),
             iso: d.month,
           })),
         );
@@ -565,7 +567,7 @@ export function PortfolioValueReport() {
             setChartPoints(
               trimIntradayPoints(cached.points, dateRange, chartWindow.start).map((p) => ({
                 name: formatIntradayLabel(p.timestamp, dateRange),
-                Value: p.value,
+                Value: investedValue(p),
                 iso: p.timestamp,
               })),
             );
@@ -617,7 +619,7 @@ export function PortfolioValueReport() {
               trimIntradayPoints(response.points, dateRange, chartWindow.start).map(
                 (p) => ({
                   name: formatIntradayLabel(p.timestamp, dateRange),
-                  Value: p.value,
+                  Value: investedValue(p),
                   iso: p.timestamp,
                 }),
               ),
@@ -746,9 +748,15 @@ export function PortfolioValueReport() {
   // figure and said why, and nothing here recomputes it from the chart.
   const valueChange = periodResult?.valueChange ?? null;
   const netExternalFlows = periodResult?.netExternalFlows ?? null;
-  const investmentResult = periodResult?.investmentResult ?? null;
-  const returnPercent = periodResult?.returnPercent ?? null;
-  const unknownReason = periodResultUnknownReason(periodResult?.reasons ?? []);
+  // The report plots the INVESTED value, so its result and return are the
+  // invested part's: the same measure the Investments page's performance card
+  // and the dashboard widget report (section 10.7). `valueChange` above is
+  // still the account's, and still captioned as such.
+  const investmentResult = periodResult?.investmentPnl ?? null;
+  const returnPercent = periodResult?.investmentReturnPercent ?? null;
+  const unknownReason = periodResultUnknownReason(
+    periodResult?.investedReasons ?? [],
+  );
 
   // Which KPI captions the window cannot stand behind, so the cards say so
   // rather than printing a partial figure under a total's caption.

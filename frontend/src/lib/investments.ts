@@ -167,7 +167,14 @@ export const investmentsApi = {
     accountIds?: string;
     displayCurrency?: string;
   }): Promise<{
-    points: Array<{ timestamp: string; value: number }>;
+    // `securitiesValue` is the INVESTED part of the bar -- the securities,
+    // without the cash beside them. The investment charts plot it; `value` is
+    // the whole scope and stays for anything that means the account.
+    points: Array<{
+      timestamp: string;
+      value: number;
+      securitiesValue?: number;
+    }>;
     interval: '1m' | '2m' | '5m' | '15m' | '30m' | '60m' | '90m';
     currency: string;
     range: '1d' | '1w' | '1m';

@@ -29,6 +29,7 @@ import {
   hasUnmeasuredFlow,
   periodResultUnknownReason,
 } from '@/components/investments/portfolio-period-result';
+import { investedValue } from '@/lib/invested-value';
 import { chartColors } from '@/lib/chart-colors';
 import { gainLossColor } from '@/lib/format';
 import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
@@ -103,10 +104,17 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
     return isDaily
       ? netWorthApi
           .getInvestmentsDaily(params)
-          .then((rows) => rows.map((r) => ({ date: r.date, value: r.value })))
+          // The INVESTED part, not the account: cash is not an investment, so
+          // a deposit must not draw as a rise in portfolio value
+          // (`docs/specs/portfolio-period-result.md` section 10.7).
+          .then((rows) =>
+            rows.map((r) => ({ date: r.date, value: investedValue(r) })),
+          )
       : netWorthApi
           .getInvestmentsMonthly(params)
-          .then((rows) => rows.map((r) => ({ date: r.month, value: r.value })));
+          .then((rows) =>
+            rows.map((r) => ({ date: r.month, value: investedValue(r) })),
+          );
   }, [start, end, accountIdsCsv, defaultCurrency, isDaily]);
 
   // Fetch the same portfolio summary the Investments page uses so the header
@@ -168,9 +176,14 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
     displayCurrency: defaultCurrency,
   });
 
-  const investmentResult = periodResult?.investmentResult ?? null;
-  const returnPercent = periodResult?.returnPercent ?? null;
-  const unknownReason = periodResultUnknownReason(periodResult?.reasons ?? []);
+  // The widget plots the invested value, so its headline reads the invested
+  // part's own figures -- the same measure the Investments page's performance
+  // card reports.
+  const investmentResult = periodResult?.investmentPnl ?? null;
+  const returnPercent = periodResult?.investmentReturnPercent ?? null;
+  const unknownReason = periodResultUnknownReason(
+    periodResult?.investedReasons ?? [],
+  );
   // The two figures the headline is made of, named where the caption has no
   // room for them. A withheld one says so in the same words the report's cards
   // and exports use -- never an empty space a reader completes as zero.
@@ -295,7 +308,7 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
               />
               {/* Two movements the server could not count as a flow; the
                   marker's generic copy would leave the reader nowhere to go. */}
-              {hasUnmeasuredFlow(periodResult.reasons) && (
+              {hasUnmeasuredFlow(periodResult.investedReasons ?? []) && (
                 <InfoTooltip
                   placement="top"
                   align="right"

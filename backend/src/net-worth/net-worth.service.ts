@@ -1050,6 +1050,7 @@ export class NetWorthService {
     {
       month: string;
       value: number;
+      securitiesValue: number;
       fxComplete: boolean;
       missingRatePairs: string[];
     }[]
@@ -1077,12 +1078,18 @@ export class NetWorthService {
     );
 
     const monthMap = new Map<string, FxAggregate>();
+    // The invested part of the same month, folded beside the whole value: the
+    // securities without the cash sleeves and without a standalone account's
+    // own cash balance. One walk, two aggregates, so the two cannot disagree
+    // about a position (`docs/specs/portfolio-period-result.md` section 10.7).
+    const securitiesMap = new Map<string, FxAggregate>();
 
     for (const s of snapshots) {
       const monthKey = this.toDateString(s.month);
 
       if (!monthMap.has(monthKey)) {
         monthMap.set(monthKey, new FxAggregate());
+        securitiesMap.set(monthKey, new FxAggregate());
       }
 
       const monthEnd = this.monthEndDate(monthKey);
@@ -1090,7 +1097,12 @@ export class NetWorthService {
       const costBasisInDefault = firstMonthCostBasisInDefault.get(adjKey);
 
       const monthAggregate = monthMap.get(monthKey)!;
+      const securitiesAggregate = securitiesMap.get(monthKey)!;
       if (costBasisInDefault !== undefined) {
+        // The seed IS the securities: it is the cost basis of the month's
+        // brokerage transactions, with the standalone account's cash added
+        // beside it below.
+        securitiesAggregate.merge(costBasisInDefault);
         // merge, not addConverted: the seed's gaps travel with its subtotal,
         // so an unconvertible first-month component marks the month incomplete.
         monthAggregate.merge(costBasisInDefault);
@@ -1111,19 +1123,26 @@ export class NetWorthService {
         }
       } else {
         let rawValue: number;
+        // What of that value is invested: a brokerage's market value, a
+        // standalone account's market value without its own cash, and nothing
+        // at all from a cash sleeve.
+        let investedValue: number;
         if (
           s.account_sub_type === "INVESTMENT_BROKERAGE" &&
           s.market_value != null
         ) {
           rawValue = Number(s.market_value);
+          investedValue = rawValue;
         } else if (
           s.account_type === "INVESTMENT" &&
           s.account_sub_type === null &&
           s.market_value != null
         ) {
           rawValue = Number(s.market_value) + Number(s.balance);
+          investedValue = Number(s.market_value);
         } else {
           rawValue = Number(s.balance);
+          investedValue = 0;
         }
 
         monthAggregate.add(
@@ -1137,6 +1156,19 @@ export class NetWorthService {
           s.currency_code,
           defaultCurrency,
         );
+        if (investedValue !== 0) {
+          securitiesAggregate.add(
+            this.convertCurrency(
+              investedValue,
+              s.currency_code,
+              defaultCurrency,
+              monthEnd,
+              rateIndex,
+            ),
+            s.currency_code,
+            defaultCurrency,
+          );
+        }
       }
     }
 
@@ -1145,6 +1177,9 @@ export class NetWorthService {
       .map(([month, aggregate]) => ({
         month,
         value: Math.round(aggregate.knownSubtotal),
+        securitiesValue: Math.round(
+          securitiesMap.get(month)?.knownSubtotal ?? 0,
+        ),
         fxComplete: aggregate.isComplete,
         missingRatePairs: aggregate.missingPairs,
       }));

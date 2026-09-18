@@ -1413,6 +1413,12 @@ export class PortfolioService {
 
     for (const ts of loaded.timestamps) {
       let totalCents = 0; // integer arithmetic to avoid float drift
+      // The INVESTED part of the same bar: the securities, with the cash
+      // beside them left out. The investment charts plot it, because cash held
+      // in an investment account is not an investment (INV-PORTRESULT-002,
+      // `docs/specs/portfolio-period-result.md` section 10.7), and the daily
+      // and monthly series expose the same component under the same name.
+      let securitiesCents = 0;
       // Cash contributions, valued at the FX rate prevailing at this bar.
       for (const [ccy, amount] of loaded.cashByCurrency) {
         totalCents += contribution(amount, ccy, ts);
@@ -1420,17 +1426,22 @@ export class PortfolioService {
       // Stale-holding contributions (last daily close * quantity), grouped by
       // currency so the per-currency rounding matches the historical total.
       for (const [ccy, amount] of loaded.staleByCurrency) {
-        totalCents += contribution(amount, ccy, ts);
+        const cents = contribution(amount, ccy, ts);
+        totalCents += cents;
+        securitiesCents += cents;
       }
       for (let i = 0; i < loaded.sources.length; i++) {
         const src = loaded.sources[i];
         cursors[i] = this.advanceIntradayCursor(src.times, cursors[i], ts);
         const price = this.intradayPriceAt(src, cursors[i], ts);
-        totalCents += contribution(src.quantity * price, src.currencyCode, ts);
+        const cents = contribution(src.quantity * price, src.currencyCode, ts);
+        totalCents += cents;
+        securitiesCents += cents;
       }
       points.push({
         timestamp: new Date(ts).toISOString(),
         value: totalCents / 10000,
+        securitiesValue: securitiesCents / 10000,
       });
     }
 

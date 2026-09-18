@@ -295,8 +295,8 @@
   },
   "portfolioPerformance": {
     "title": "Wyniki portfela",
-    "subtitle": "Jak zachowywały się Twoje inwestycje po wyłączeniu wpływu wpłat i wypłat.",
-    "footnote": "Wpłaty i wypłaty nie są liczone jako wynik inwestycyjny.",
+    "subtitle": "Wynik Twoich inwestycji bez wpływu wpłat, wypłat i niezainwestowanej gotówki.",
+    "footnote": "Wpłaty, wypłaty i niezainwestowana gotówka nie są liczone jako wynik inwestycyjny.",
     "unavailable": "n/d",
     "empty": "Za mało historii, żeby zmierzyć zwrot.",
     "periods": {

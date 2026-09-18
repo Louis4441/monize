@@ -204,7 +204,7 @@
     "refresh": "Refresh current value",
     "investmentResult": "Investment result",
     "notAvailable": "N/A",
-    "periodBreakdownTooltip": "Value change {valueChange}, of which deposits and withdrawals were {netFlows}. The investment result is what is left.",
+    "periodBreakdownTooltip": "The account's value moved {valueChange} over this window, of which deposits and withdrawals were {netFlows}. The figure above is what the investments themselves earned, with uninvested cash left out.",
     "unmeasuredFlowTooltip": "A trade settled outside these accounts, or a split mixing an investment line with ordinary spending, means the result cannot be separated from the money moved in."
   },
   "spendingByPayee": {
