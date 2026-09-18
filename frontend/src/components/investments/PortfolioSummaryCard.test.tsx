@@ -44,6 +44,8 @@ const makeSummary = (overrides?: Record<string, any>) => ({
   totalCostBasis: 40000,
   totalNetInvested: 35000,
   timeWeightedReturn: 15.32,
+  timeWeightedReturnReasons: [],
+  timeWeightedReturnSince: '2025-06-14',
   cagr: 10.5,
   // The API always sends these; a fixture without them is a payload the server
   // cannot produce, and with them the completeness branches are actually exercised.
@@ -114,10 +116,33 @@ describe('PortfolioSummaryCard', () => {
     expect(screen.getByText('+15.32%')).toBeInTheDocument();
   });
 
-  it('renders N/A when TWR is null', () => {
-    render(<PortfolioSummaryCard summary={makeSummary({ timeWeightedReturn: null, cagr: null })} isLoading={false} />);
+  // A withheld return names its cause through the same marker the chart uses;
+  // "N/A" with no cause leaves the reader nothing to do (#1392).
+  it('marks a withheld TWR as unknown and names the repair', () => {
+    render(
+      <PortfolioSummaryCard
+        summary={makeSummary({
+          timeWeightedReturn: null,
+          timeWeightedReturnReasons: ['incompletePrices'],
+        })}
+        isLoading={false}
+      />,
+    );
+    expect(screen.getByTestId('unknown-amount')).toBeInTheDocument();
+    expect(screen.queryByText('N/A')).not.toBeInTheDocument();
+  });
+
+  it('renders N/A for CAGR when it is null, which is not a period figure', () => {
+    render(<PortfolioSummaryCard summary={makeSummary({ cagr: null })} isLoading={false} />);
     const naElements = screen.getAllByText('N/A');
     expect(naElements.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('says the return is since the first transaction and excludes cash', () => {
+    render(<PortfolioSummaryCard summary={makeSummary()} isLoading={false} />);
+    expect(
+      screen.getByText(/Time-weighted return of your investments since the first transaction/),
+    ).toBeInTheDocument();
   });
 
   it('renders info tooltip icons for all metrics', () => {
@@ -386,9 +411,8 @@ describe('PortfolioSummaryCard', () => {
         isLoading={false}
       />,
     );
-    const twrN_a = screen.getAllByText('N/A')[0];
-    // The sibling N/A span should be present; the parent div uses gray class
-    const twrContainer = twrN_a.closest('div[class*="text-"]');
+    const marker = screen.getByTestId('unknown-amount');
+    const twrContainer = marker.closest('div[class*="text-"]');
     expect(twrContainer?.className).toMatch(/text-gray-400/);
   });
 

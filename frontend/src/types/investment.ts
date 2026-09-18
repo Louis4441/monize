@@ -1,5 +1,6 @@
 import { Tag } from './tag';
 import { TransactionStatus } from './transaction';
+import type { PeriodResultReason } from './net-worth';
 
 export type InvestmentAction =
   | 'BUY'
@@ -230,7 +231,23 @@ export interface PortfolioSummary {
   totalPortfolioValue: number;
   totalGainLoss: number;
   totalGainLossPercent: number;
+  /**
+   * The invested part's time-weighted return since the portfolio's first
+   * transaction, from the same server measure "Portfolio performance" reports
+   * (INV-PORTRESULT-002). `null` is withheld, never zero, and
+   * `timeWeightedReturnReasons` says which repair it points at.
+   */
   timeWeightedReturn: number | null;
+  /**
+   * Why the return is withheld; empty when it is known.
+   *
+   * Optional for the rolling-deploy reason the completeness flags below give:
+   * an older backend's payload has none, and absent is no information rather
+   * than "nothing was withheld".
+   */
+  timeWeightedReturnReasons?: PeriodResultReason[];
+  /** The baseline close it is measured from, or null when there is no window. */
+  timeWeightedReturnSince?: string | null;
   cagr: number | null;
   /**
    * Whether every currency conversion behind the `total*` fields succeeded.

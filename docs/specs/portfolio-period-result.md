@@ -413,16 +413,16 @@ currency.
   invested and nothing was earned -- a known zero, case 1), and `null` with
   reason `zeroStart` otherwise (a result over no invested capital has no ratio).
 
-The chained factors are the SAME arithmetic the portfolio summary's
-`timeWeightedReturn` uses: `subPeriodFactor` and `chainTwrPercent`
-(`backend/src/common/time-series/twr-chain.util.ts`) are one pair of pure
-functions, called from `investedPeriodResult` and from
-`PortfolioCalculationService.calculateTWR`. What is NOT shared is the
-valuation: `calculateTWR` values every sub-period boundary at the LATEST
-price, which answers "what has this portfolio returned since inception" and is
-not date-correct for a historical window. Generalising its valuation is a
-separate proposal; reusing its factor arithmetic is what keeps the two from
-drifting into two different definitions of a chained return.
+The chained factors are written once -- `subPeriodFactor` and
+`chainTwrPercent` (`backend/src/common/time-series/twr-chain.util.ts`) -- and
+`investedPeriodResult` is their only caller. The portfolio summary's
+`timeWeightedReturn` used to be a second implementation beside it
+(`PortfolioCalculationService.calculateTWR`): it valued every sub-period
+boundary from stored closes alone, OMITTED a position with no close on a
+boundary from the value rather than withholding the figure, read its final
+sub-period from a different price source, and counted no income and no
+invested/cash split. It is removed (section 10.7): the summary asks this same
+measure for the window since inception.
 
 ### 10.3 Invariants
 
@@ -575,11 +575,27 @@ days, O(days).
 | Surface | Series it plots | Headline figures |
 | --- | --- | --- |
 | "Portfolio performance" card (Investments) | -- | `investmentReturnPercent` primary, `investmentPnl` secondary |
+| Portfolio summary card's "TWR (time-weighted)" | -- | `investmentReturnPercent` since inception |
 | "Portfolio value over time" chart (Investments) | `securitiesValue` | `investmentPnl`, `investmentReturnPercent` |
 | Portfolio value widget (dashboard) | `securitiesValue` | `investmentPnl`, `investmentReturnPercent` |
 | Portfolio Value report | `securitiesValue` | `investmentPnl`, `investmentReturnPercent` |
 | Net worth chart (dashboard) | net worth, cash included | unchanged |
 | Daily movement notification, calendar day layer | `value` | `valueChange`, `netExternalFlows`, `investmentResult` |
+
+**The summary card is the fourth consumer, over a window of its own.** Its
+"TWR (time-weighted)" is this measure since INCEPTION: the baseline is the day
+before the scope's earliest non-VOID investment transaction (`IV(b)` is a close
+and already holds everything dated `b`) and the end is the routes' own
+`todayYMD()`. `PortfolioPeriodResultService.getInvestedResultSinceInception`
+resolves those two dates and then runs `getPeriodResult`, so the summary and
+the six-period card share one series, one capital and income load, one rate
+index and one decision; a spec asserts the two are the same answer for one
+fixture. The summary carries `timeWeightedReturnReasons` and
+`timeWeightedReturnSince` beside the figure, to the REST shape, the LLM summary
+and the MCP output schema, so a withheld return names its cause instead of
+reading as "n/a" or as zero. The summary's other two figures are NOT this
+measure and keep their own captions: `totalGainLossPercent` ("Simple Return")
+and `cagr` are cost-basis measures, not returns over time.
 
 The investment surfaces draw the INVESTED value, so the chart, its KPIs and the
 card answer one question rather than three. `value` (securities plus cash) stays
@@ -606,6 +622,8 @@ Backend unit:
 | `investment-replay.util.spec.ts` | `INVESTED_FLOW_KIND` covers every `InvestmentAction` member (a list that means something, checked against the enum) |
 | `portfolio-period-result.service.spec.ts` | a 50,000 deposit the day before the end changes neither new figure while it does change `valueChange` (case 4) |
 | `portfolio-period-results-batch.service.spec.ts` | batch == single per preset on the new fields too |
+| `portfolio-period-result.service.spec.ts` | `getInvestedResultSinceInception` equals `getPeriodResult` asked for the first transaction date with the day before as the baseline; a scope with no transaction, and one with no accounts, are the empty decision; a split is a factor of 1 and no capital; an FX gap or an unpriced position on a day the chain spans withholds both figures |
+| `portfolio.service.spec.ts` | the summary prints that return, its reasons and its baseline date, and withholds it with `incompletePrices` where the removed `calculateTWR` reported a gain |
 
 Backend integration (`backend/test/integration/`): the capital/income loader
 against real PostgreSQL -- a BUY, a SELL and a DIVIDEND fixture, grouped per day

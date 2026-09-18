@@ -978,9 +978,8 @@ Enforcement         investedPeriodResult
                     table-tested over the spec's twelve worked cases in
                     backend/src/net-worth/invested-period-result.util.spec.ts.
                     Its factor arithmetic is
-                    backend/src/common/time-series/twr-chain.util.ts, shared
-                    with PortfolioCalculationService.calculateTWR so the two
-                    chained returns cannot drift into two definitions.
+                    backend/src/common/time-series/twr-chain.util.ts, whose
+                    only caller it is.
                     Both period-result routes fill the fields from the same
                     arrays, and the batch route's equivalence spec compares
                     them preset by preset. A spec holds every InvestmentAction
@@ -989,13 +988,25 @@ Enforcement         investedPeriodResult
                     PortfolioPerformanceCard, InvestmentValueChart,
                     PortfolioValueWidget and PortfolioValueReport read
                     investmentPnl and investmentReturnPercent and plot
-                    securitiesValue; investedValue
+                    securitiesValue; the portfolio summary card's
+                    "TWR (time-weighted)" is the same measure asked since
+                    inception, through
+                    PortfolioPeriodResultService.getInvestedResultSinceInception,
+                    and carries timeWeightedReturnReasons and
+                    timeWeightedReturnSince to the REST shape, the LLM summary
+                    and the MCP output schema; investedValue
                     (frontend/src/lib/invested-value.ts) is the one door to the
                     invested component of a series point.
                     docs/specs/portfolio-period-result.md section 10 has the
                     definitions, the truth table, the twelve numerical cases
                     and the test matrix.
-Status              enforced
+Status              enforced. The second definition of the same caption --
+                    PortfolioCalculationService.calculateTWR, which valued its
+                    boundaries from stored closes alone and dropped an unpriced
+                    position out of the value instead of withholding the
+                    figure -- is REMOVED rather than deprecated, which is what
+                    closes the "two TWRs" gap: there is now one chained return
+                    in the codebase and one place it is computed.
 ```
 
 Cash held in an investment account earns nothing and is not what the reader

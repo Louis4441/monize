@@ -269,7 +269,12 @@ account, so a reader with 8,000 invested and 2,000 idle who gains 10% reads
 `investmentReturnPercent` (a time-weighted return over the securities alone,
 `investmentReturnMethod: "twr"`), each withheld with its cause in
 `investedReasons` (INV-PORTRESULT-002,
-`docs/specs/portfolio-period-result.md` section 10). The four investment
+`docs/specs/portfolio-period-result.md` section 10). The portfolio summary card's
+"TWR (time-weighted)" is that same `investmentReturnPercent` asked since the
+portfolio's first transaction, withheld through `UnknownAmount` with
+`periodResultUnknownReason(summary.timeWeightedReturnReasons)` rather than a
+causeless "N/A"; the card's "Simple Return" and "CAGR" beside it are
+cost-basis measures and keep their own captions. The four investment
 surfaces LEAD with those two: `PortfolioPerformanceCard` shows
 `investmentReturnPercent` over `investmentPnl`, and `InvestmentValueChart`,
 `PortfolioValueWidget` and `PortfolioValueReport` put them where their result

@@ -190,13 +190,16 @@ per-bar close) and `InvestmentReportDataService.fxRate`. The `live` doors --
 bounded by the same age rule but **not** dated: `convertToDefault` is not a
 historical lookup, and a caller holding a date must not use it as one.
 
-**Known gap: two portfolio figures convert historical amounts at today's
-rate.** `calculateTWR`'s `computeValueAtDate` and `calculateCapitalGains`'
-local `fxRate` both value past positions through the live door, so a past
-period's figure moves with today's currency market. This predates issue #1390
-and is not closed by it; closing it means handing both the dated door with the
-position's own date, and deciding what a date with no admissible rate does to
-each figure (`null` per section 2, not a silent 1:1 and not today's rate). `buildRateIndex` and
+**Known gap: a portfolio figure converts historical amounts at today's
+rate.** `calculateCapitalGains`' local `fxRate` values past positions through
+the live door, so a past period's figure moves with today's currency market.
+(`calculateTWR`'s `computeValueAtDate` was the other half of this gap and is
+gone with the function: the summary's time-weighted return is now the invested
+measure, which converts every day at its own rate through the shared rate
+index.) This predates issue #1390 and is not closed by it; closing the half
+that remains means handing that helper the dated door with the position's own
+date, and deciding what a date with no admissible rate does to the figure
+(`null` per section 2, not a silent 1:1 and not today's rate). `buildRateIndex` and
 `buildDailyRateIndex` load the reported window plus one age bound before it,
 rather than a fixed day margin, so a date's rate does not change when the chart
 around it is widened. A caller that converts at a date *later* than the window

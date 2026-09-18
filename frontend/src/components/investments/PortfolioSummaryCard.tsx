@@ -6,6 +6,8 @@ import { PortfolioSummary } from '@/types/investment';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
+import { UnknownAmount } from '@/components/ui/UnknownAmount';
+import { periodResultUnknownReason } from '@/components/investments/portfolio-period-result';
 import { gainLossColor } from '@/lib/format';
 
 interface PortfolioSummaryCardProps {
@@ -200,6 +202,12 @@ export function PortfolioSummaryCard({
   const gainLossVal = converted?.gainLoss ?? summary.totalGainLoss;
   const gainLossPercentVal = converted?.gainLossPercent ?? summary.totalGainLossPercent;
   const twr = summary.timeWeightedReturn;
+  // A withheld return names its cause, as the chart's does: "n/a" with no cause
+  // is a dead end, and the server sends the reasons precisely so the card can
+  // point at the repair (INV-PORTRESULT-002).
+  const twrUnknownReason = periodResultUnknownReason(
+    summary.timeWeightedReturnReasons ?? [],
+  );
   const cagrVal = summary.cagr;
 
   return (
@@ -328,7 +336,7 @@ export function PortfolioSummaryCard({
               </div>
               <div className={`text-base sm:text-lg font-semibold ${returnColorClass(twr)}`}>
                 {twr != null ? formatPercent(twr) : (
-                  <span className="text-gray-400 dark:text-gray-500 text-sm font-normal">{t('portfolioSummary.notAvailable')}</span>
+                  <UnknownAmount reason={twrUnknownReason} className="text-sm font-normal" />
                 )}
               </div>
             </div>
