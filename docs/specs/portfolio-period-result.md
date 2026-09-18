@@ -595,7 +595,32 @@ fixture. The summary carries `timeWeightedReturnReasons` and
 and the MCP payload, so a withheld return names its cause instead of reading as
 "n/a" or as zero. (The MCP OUTPUT SCHEMA declares neither: the loose object
 carries them to the caller either way, and `get_portfolio_summary` is at its
-`tools/list` byte budget, which a declared field would break.) The summary's other two figures are NOT this
+`tools/list` byte budget, which a declared field would break.)
+
+**A withheld return names its gaps, not only its cause.** Every period result
+carries `incompleteRanges`: the window's per-point diagnostics folded per key
+into runs of consecutive points, one list per cause (`prices`, `rates`, `cash`),
+by `foldIncompleteData`
+(`backend/src/net-worth/incomplete-data-ranges.util.ts`) -- the server-side twin
+of the client fold the chart and the report already use, with the same
+semantics, the client's own cases ported, and a bound of 50 runs per cause
+(newest kept, `truncated` saying so) because a years-long gap across many
+securities would otherwise travel on every response. The union sets
+`unpricedSecurityIds`, `missingRatePairs` and `unknownCashAccountIds` are
+unchanged: they say WHAT is missing, and the ranges say when. The single route
+folds the points it valued; the batch route folds each preset's own slice, so a
+preset does not report a gap from before its window opened. The summary turns
+that into `returnDiagnostics` -- each run resolved to a symbol and a name, a
+pair, or an account name, with the window's baseline in `since` -- resolving a
+security absent from today's holdings by id, because the gap usually sits on
+exactly the position that was sold out or made inactive. The card renders it
+with the report's own `IncompleteDataDetails`, so the reader lands on the
+security's price history (`docs/financial-calculation-contract.md` section 1.3:
+what is missing, how to obtain it, what was tried). `returnDiagnostics` is
+undeclared in the MCP output schema for the same byte-budget reason as the two
+fields above.
+
+The summary's other two figures are NOT this
 measure and keep their own captions: `totalGainLossPercent` ("Simple Return")
 and `cagr` are cost-basis measures, not returns over time.
 
@@ -626,6 +651,10 @@ Backend unit:
 | `portfolio-period-results-batch.service.spec.ts` | batch == single per preset on the new fields too |
 | `portfolio-period-result.service.spec.ts` | `getInvestedResultSinceInception` equals `getPeriodResult` asked for the first transaction date with the day before as the baseline; a scope with no transaction, and one with no accounts, are the empty decision; a split is a factor of 1 and no capital; an FX gap or an unpriced position on a day the chain spans withholds both figures |
 | `portfolio.service.spec.ts` | the summary prints that return, its reasons and its baseline date, and withholds it with `incompletePrices` where the removed `calculateTWR` reported a gain |
+| `incomplete-data-ranges.util.spec.ts` | the client fold's own cases, ported; a gap of one point splits a run; the bound keeps the newest runs and sets `truncated` |
+| `portfolio-period-result.service.spec.ts` | a security unpriced on days 3-5 and 9 folds into two runs; a window with no gap reports none; past the bound the newest 50 are kept |
+| `portfolio-period-results-batch.service.spec.ts` | each preset's `incompleteRanges` equals the single route's, and the quarter does not report a gap the year reaches back to |
+| `portfolio.service.spec.ts` | `returnDiagnostics` names a held security from the holdings already valued, loads the name of one nobody holds today, names the cash account, and is empty over a window with no gap |
 
 Backend integration (`backend/test/integration/`): the capital/income loader
 against real PostgreSQL -- a BUY, a SELL and a DIVIDEND fixture, grouped per day

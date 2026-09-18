@@ -1007,7 +1007,16 @@ Enforcement         investedPeriodResult
                     and carries timeWeightedReturnReasons and
                     timeWeightedReturnSince on the REST shape, the LLM summary
                     and the MCP payload, with moneyWeightedReturn and
-                    moneyWeightedReturnReasons beside them from the same slice; investedValue
+                    moneyWeightedReturnReasons beside them from the same slice.
+                    A withheld return also carries returnDiagnostics: the
+                    window's per-point gaps folded into dated runs by
+                    foldIncompleteData
+                    (backend/src/net-worth/incomplete-data-ranges.util.ts, the
+                    server-side twin of the client fold, bounded per cause with
+                    a truncated flag) and resolved to symbols and account names
+                    in PortfolioService, which the summary card renders through
+                    IncompleteDataDetails so the reader is sent to the security's
+                    price history rather than told "no price"; investedValue
                     (frontend/src/lib/invested-value.ts) is the one door to the
                     invested component of a series point.
                     docs/specs/portfolio-period-result.md section 10 has the
