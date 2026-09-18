@@ -16,6 +16,7 @@ import dynamic from 'next/dynamic';
 import { exchangeRatesApi, CurrencyInfo, CreateCurrencyData, CurrencyUsage } from '@/lib/exchange-rates';
 const CurrencyForm = dynamic(() => import('@/components/currencies/CurrencyForm').then(m => m.CurrencyForm), { ssr: false });
 import { CurrencyList, type CurrencySortField, type SortDirection } from '@/components/currencies/CurrencyList';
+import { RateHistoryCoverage } from '@/components/currencies/RateHistoryCoverage';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { createLogger } from '@/lib/logger';
@@ -42,6 +43,9 @@ function CurrenciesContent() {
   const [usage, setUsage] = useState<CurrencyUsage>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshingRates, setIsRefreshingRates] = useState(false);
+  // The currency whose stored rate history is open, or null. Its own dialog,
+  // because the built-in currencies have no edit dialog to host it in.
+  const [rateHistoryCurrency, setRateHistoryCurrency] = useState<CurrencyInfo | null>(null);
   const { showForm, editingItem: editingCurrency, openCreate, openEdit, close, isEditing, modalProps, setFormDirty, unsavedChangesDialog, formSubmitRef } = useFormModal<CurrencyInfo>();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('active');
@@ -297,6 +301,14 @@ function CurrenciesContent() {
         </Modal>
         <UnsavedChangesDialog {...unsavedChangesDialog} />
 
+        {/* Rate history dialog */}
+        <Modal isOpen={!!rateHistoryCurrency} onClose={() => setRateHistoryCurrency(null)} maxWidth="md" className="p-6">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+            {rateHistoryCurrency?.code}
+          </h2>
+          {rateHistoryCurrency && <RateHistoryCoverage code={rateHistoryCurrency.code} />}
+        </Modal>
+
         {/* Currencies List */}
         <div className={`${CARD_CLASS} overflow-hidden`}>
           {isLoading ? (
@@ -309,6 +321,7 @@ function CurrenciesContent() {
               getRate={getRate}
               onEdit={handleEdit}
               onToggleActive={handleToggleActive}
+              onRateHistory={setRateHistoryCurrency}
               onRefresh={loadData}
               sortField={sortField}
               sortDirection={sortDirection}
