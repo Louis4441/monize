@@ -97,7 +97,7 @@
       "noLosers": "Sem descidas hoje."
     },
     "dailyChange": "Variação diária",
-    "dailyChangeOn": "Variação diária \u00b7 {date}",
+    "dailyChangeOn": "Variação diária · {date}",
     "openPriceHistory": "Histórico de preços de {symbol}",
     "refreshPrices": "Atualizar cotações",
     "viewPortfolio": "Ver portfólio",
@@ -118,7 +118,7 @@
     "empty": "Ainda sem títulos favoritos. Visite a <securitiesLink>página de Títulos</securitiesLink> e marque os títulos que deseja acompanhar aqui.",
     "noPriceYet": "Sem cotação ainda",
     "dailyChange": "Variação diária",
-    "dailyChangeOn": "Variação diária \u00b7 {date}",
+    "dailyChangeOn": "Variação diária · {date}",
     "openPriceHistory": "Histórico de preços de {symbol}",
     "refreshPrices": "Atualizar cotações",
     "manage": "Gerenciar títulos"
@@ -202,7 +202,11 @@
   "portfolioValue": {
     "title": "Valor do Portfólio",
     "empty": "Ainda não há histórico de investimentos para mostrar.",
-    "refresh": "Atualizar valor atual"
+    "refresh": "Atualizar valor atual",
+    "investmentResult": "Resultado do Investimento",
+    "notAvailable": "N/D",
+    "periodBreakdownTooltip": "O valor da conta variou {valueChange} neste período, dos quais depósitos e retiradas foram {netFlows}. O valor acima é o que os investimentos em si renderam, com o numerário não investido excluído.",
+    "unmeasuredFlowTooltip": "Uma operação liquidada fora dessas contas, ou um desdobramento que mistura uma linha de investimento com um gasto comum, significa que o resultado não pode ser separado do dinheiro movimentado."
   },
   "spendingByPayee": {
     "title": "Despesas por Beneficiário",

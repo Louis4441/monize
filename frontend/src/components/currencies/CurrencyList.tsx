@@ -168,12 +168,14 @@ interface CurrencyActionLabels {
   activate: string;
   deactivate: string;
   delete: string;
+  rateHistory: string;
 }
 
 interface CurrencyActionHandlers {
   onEdit: (currency: CurrencyInfo) => void;
   onToggleActive: (currency: CurrencyInfo) => void;
   onDelete: (currency: CurrencyInfo) => void;
+  onRateHistory: (currency: CurrencyInfo) => void;
 }
 
 /**
@@ -198,6 +200,18 @@ function buildCurrencyActions(
       tone: 'primary',
       onClick: () => handlers.onEdit(currency),
       hidden: currency.isSystem,
+    },
+    {
+      // Its own action, not a corner of the edit dialog: the built-in
+      // currencies (the ones whose history usually needs extending) have no
+      // edit action at all, and 1 is not a stored rate, so the reporting
+      // currency itself has no pair to have history for.
+      key: 'rateHistory',
+      label: labels.rateHistory,
+      icon: 'view',
+      tone: 'view',
+      onClick: () => handlers.onRateHistory(currency),
+      hidden: isDefault,
     },
     currency.isActive
       ? {
@@ -235,6 +249,7 @@ interface CurrencyListProps {
   getRate: (fromCurrency: string, toCurrency?: string) => number | null;
   onEdit: (currency: CurrencyInfo) => void;
   onToggleActive: (currency: CurrencyInfo) => void;
+  onRateHistory: (currency: CurrencyInfo) => void;
   onRefresh: () => void;
   sortField?: CurrencySortField;
   sortDirection?: SortDirection;
@@ -251,6 +266,7 @@ interface CurrencyRowProps {
   onEdit: (currency: CurrencyInfo) => void;
   onToggleActive: (currency: CurrencyInfo) => void;
   onDelete: (currency: CurrencyInfo) => void;
+  onRateHistory: (currency: CurrencyInfo) => void;
   getRowHandlers: (currency: CurrencyInfo) => LongPressRowHandlers;
   index: number;
   /**
@@ -289,6 +305,7 @@ const CurrencyRow = memo(function CurrencyRow({
   onEdit,
   onToggleActive,
   onDelete,
+  onRateHistory,
   getRowHandlers,
   index,
   wrapped = false,
@@ -303,8 +320,8 @@ const CurrencyRow = memo(function CurrencyRow({
     currency,
     totalUsage,
     isDefault,
-    { edit: tc('actions.edit'), activate: t('list.actions.activate'), deactivate: t('list.actions.deactivate'), delete: tc('actions.delete') },
-    { onEdit, onToggleActive, onDelete },
+    { edit: tc('actions.edit'), activate: t('list.actions.activate'), deactivate: t('list.actions.deactivate'), delete: tc('actions.delete'), rateHistory: t('rateHistory.title') },
+    { onEdit, onToggleActive, onDelete, onRateHistory },
     { includeDelete: false },
   );
 
@@ -459,6 +476,7 @@ export function CurrencyList({
   getRate,
   onEdit,
   onToggleActive,
+  onRateHistory,
   onRefresh,
   sortField: propSortField,
   sortDirection: propSortDirection,
@@ -647,6 +665,7 @@ export function CurrencyList({
                 onEdit={onEdit}
                 onToggleActive={onToggleActive}
                 onDelete={setDeleteCurrency}
+                onRateHistory={onRateHistory}
                 getRowHandlers={getRowHandlers}
                 index={index}
                 wrapped={wrapped}
@@ -666,8 +685,8 @@ export function CurrencyList({
               contextCurrency,
               (usage[contextCurrency.code]?.accounts || 0) + (usage[contextCurrency.code]?.securities || 0),
               contextCurrency.code === defaultCurrency,
-              { edit: t('list.contextMenu.editCurrency'), activate: t('list.contextMenu.activate'), deactivate: t('list.contextMenu.deactivate'), delete: t('list.contextMenu.deleteCurrency') },
-              { onEdit, onToggleActive, onDelete: setDeleteCurrency },
+              { edit: t('list.contextMenu.editCurrency'), activate: t('list.contextMenu.activate'), deactivate: t('list.contextMenu.deactivate'), delete: t('list.contextMenu.deleteCurrency'), rateHistory: t('rateHistory.title') },
+              { onEdit, onToggleActive, onDelete: setDeleteCurrency, onRateHistory },
               { includeDelete: true },
             )
           : []}

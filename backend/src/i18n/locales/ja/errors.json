@@ -259,7 +259,9 @@
     "cannotModifyOther": "他のユーザーの通貨は変更できません",
     "inUse": "通貨「{{ code }}」はあなたの口座、有価証券、またはその他の記録で使用されています。代わりに非アクティブにしてください。",
     "invalidRateDate": "date は YYYY-MM-DD 形式で指定してください",
-    "alreadyInListInactive": "通貨「{{ code }}」はすでにリストに含まれていますが、現在無効になっています。使用するには再有効化してください。"
+    "alreadyInListInactive": "通貨「{{ code }}」はすでにリストに含まれていますが、現在無効になっています。使用するには再有効化してください。",
+    "sameCurrencyHistory": "{{ code }} はあなたのデフォルト通貨のため、拡張するレート履歴がありません",
+    "rateProviderUnavailable": "為替レート提供元から応答がありませんでした。しばらくしてから再度お試しください。"
   },
   "delegation": {
     "delegatedAccessInvalid": "委任アクセスが有効ではなくなりました",
@@ -341,8 +343,10 @@
   "netWorth": {
     "invalidStartDate": "startDate は YYYY-MM-DD 形式でなければなりません",
     "invalidEndDate": "endDate は YYYY-MM-DD 形式でなければなりません",
+    "invalidBaselineDate": "baselineDate は YYYY-MM-DD 形式でなければなりません",
     "invalidAccountIds": "accountIds はカンマ区切りのUUIDでなければなりません",
-    "invalidGranularity": "granularity は 'daily' または 'monthly' である必要があります"
+    "invalidGranularity": "granularity は 'daily' または 'monthly' である必要があります",
+    "invalidPeriods": "periods はカンマ区切りの期間プリセットでなければなりません"
   },
   "notifications": {
     "notFound": "ID {{ id }} の通知が見つかりません",
@@ -418,6 +422,7 @@
   "securities": {
     "exchangeRateUnavailable": "取引日における {{ from }} -> {{ to }} の為替レートを特定できませんでした。現金口座への計上が正しくなるよう、明示的な exchangeRate を指定してください。",
     "accountMustBeInvestment": "口座は INVESTMENT タイプでなければなりません",
+    "providerCurrencyMismatch": "{{ symbol }} の価格更新を拒否しました。{{ provider }} は {{ reported }} 建てで提供していますが、この有価証券は {{ configured }} で登録されています。有価証券の通貨、シンボル、取引所を修正してから再度更新してください。",
     "securityIdRequired": "{{ action }} 取引には有価証券IDが必要です",
     "splitRatioRequired": "株式分割比率（数量）はゼロより大きくなければなりません",
     "acquisitionPriceRequired": "{{ action }} 取引には 0 より大きい 1 株あたりの価格が必要です。取得原価が不明な株式には ADD_SHARES を使用してください。",

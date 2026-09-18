@@ -19,6 +19,7 @@ import { YahooFinanceService } from "./yahoo-finance.service";
 import { MsnFinanceService } from "./msn-finance.service";
 import { QuoteProviderRegistry } from "./providers/quote-provider.registry";
 import { HoldingsService } from "./holdings.service";
+import { HoldingsDriftReportService } from "./holdings-drift-report.service";
 import { InvestmentTransactionsService } from "./investment-transactions.service";
 import { PortfolioService } from "./portfolio.service";
 import { DailyMovementService } from "./daily-movement.service";
@@ -76,6 +77,7 @@ import { ProviderHealthModule } from "../provider-health/provider-health.module"
     MsnFinanceService,
     QuoteProviderRegistry,
     HoldingsService,
+    HoldingsDriftReportService,
     InvestmentTransactionsService,
     PortfolioCalculationService,
     PortfolioService,

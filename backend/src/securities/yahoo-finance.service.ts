@@ -8,6 +8,7 @@ import {
   QuoteResult,
   SecurityLookupResult,
   HistoricalPrice,
+  HistoricalSeries,
   IntradayInterval,
   IntradayPoint,
   IntradayRange,
@@ -622,17 +623,39 @@ export class YahooFinanceService implements QuoteProvider {
     return results;
   }
 
-  async fetchHistorical(
+  async fetchHistoricalSeries(
     symbol: string,
     exchange: string | null = null,
     range: string = "max",
     _opts?: QuoteProviderOptions,
-  ): Promise<HistoricalPrice[] | null> {
+  ): Promise<HistoricalSeries | null> {
     return this.fetchHistoricalQuery(
       symbol,
       exchange,
       `interval=1d&range=${encodeURIComponent(range)}`,
     );
+  }
+
+  /**
+   * The bars only, for the callers that have no security currency to verify
+   * them against: the FX pair series and the market-index series, neither of
+   * which is stored against a `securities` row. Every path that writes into
+   * `security_prices` takes the series instead, so the currency reaches the
+   * acceptance point.
+   */
+  async fetchHistorical(
+    symbol: string,
+    exchange: string | null = null,
+    range: string = "max",
+    opts?: QuoteProviderOptions,
+  ): Promise<HistoricalPrice[] | null> {
+    const series = await this.fetchHistoricalSeries(
+      symbol,
+      exchange,
+      range,
+      opts,
+    );
+    return series ? series.prices : null;
   }
 
   /**
@@ -643,12 +666,12 @@ export class YahooFinanceService implements QuoteProvider {
    * entire multi-year history, which keeps the request fast and the parsed
    * payload small (the "max" range can be thousands of bars / several MB).
    */
-  async fetchHistoricalWindow(
+  async fetchHistoricalWindowSeries(
     symbol: string,
     exchange: string | null,
     fromDate: Date,
     toDate: Date,
-  ): Promise<HistoricalPrice[] | null> {
+  ): Promise<HistoricalSeries | null> {
     const period1 = Math.floor(fromDate.getTime() / 1000);
     const period2 = Math.floor(toDate.getTime() / 1000);
     return this.fetchHistoricalQuery(
@@ -656,6 +679,22 @@ export class YahooFinanceService implements QuoteProvider {
       exchange,
       `period1=${period1}&period2=${period2}&interval=1d`,
     );
+  }
+
+  /** The windowed bars only; see {@link fetchHistorical}. */
+  async fetchHistoricalWindow(
+    symbol: string,
+    exchange: string | null,
+    fromDate: Date,
+    toDate: Date,
+  ): Promise<HistoricalPrice[] | null> {
+    const series = await this.fetchHistoricalWindowSeries(
+      symbol,
+      exchange,
+      fromDate,
+      toDate,
+    );
+    return series ? series.prices : null;
   }
 
   /**
@@ -667,10 +706,10 @@ export class YahooFinanceService implements QuoteProvider {
     symbol: string,
     exchange: string | null,
     query: string,
-  ): Promise<HistoricalPrice[] | null> {
+  ): Promise<HistoricalSeries | null> {
     const primary = this.getYahooSymbol(symbol, exchange);
-    const prices = await this.fetchHistoricalRaw(primary, query);
-    if (prices?.length) return prices;
+    const series = await this.fetchHistoricalRaw(primary, query);
+    if (series?.prices.length) return series;
 
     // Bars, not merely an answer. An empty answer used to be `null` and so fell
     // through to the alternates by accident; now that it is `[]` -- which is
@@ -680,19 +719,20 @@ export class YahooFinanceService implements QuoteProvider {
     if (primary === symbol) {
       for (const altSymbol of this.getAlternateSymbols(symbol)) {
         const alt = await this.fetchHistoricalRaw(altSymbol, query);
-        if (alt?.length) return alt;
+        if (alt?.prices.length) return alt;
       }
     }
 
     // No alternate had bars either. The primary's own answer decides what this
-    // was: `[]` if it answered with an empty window, `null` if nothing did.
-    return prices;
+    // was: an empty series if it answered with an empty window, `null` if
+    // nothing did.
+    return series;
   }
 
   private async fetchHistoricalRaw(
     yahooSymbol: string,
     query: string,
-  ): Promise<HistoricalPrice[] | null> {
+  ): Promise<HistoricalSeries | null> {
     try {
       const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?${query}`;
 
@@ -717,7 +757,9 @@ export class YahooFinanceService implements QuoteProvider {
         // a caller may remember the window as empty. Collapsing both into
         // `null` meant a symbol nobody carries was re-asked on every report
         // render, because the negative cache could never be written for it.
-        return SYMBOL_ABSENT_STATUSES.has(response.status) ? [] : null;
+        return SYMBOL_ABSENT_STATUSES.has(response.status)
+          ? { prices: [], currencyCode: null, symbol: yahooSymbol }
+          : null;
       }
 
       const data = await this.readBody<any>(response);
@@ -732,19 +774,36 @@ export class YahooFinanceService implements QuoteProvider {
       // its turn, because that turns on bars rather than on an answer.
       if (!result) {
         const code = String(data.chart?.error?.code ?? "");
-        return SYMBOL_ABSENT_ERROR_CODES.has(code) ? [] : null;
+        return SYMBOL_ABSENT_ERROR_CODES.has(code)
+          ? { prices: [], currencyCode: null, symbol: yahooSymbol }
+          : null;
       }
       // A result with no timestamps *is* an answer: the window predates the
       // instrument, or it did not trade in it. Returning `null` for that made
       // "answered with nothing" and "no usable answer" indistinguishable, and
       // the market-index chunking read every refused window as "the index did
       // not exist yet" -- storing one year as if it were the whole history.
-      if (!result.timestamp) return [];
+      const gbx = isGbxCurrency(result.meta?.currency);
+      // The currency this whole answer is in, carried on the bundle: the bars
+      // below are already in it (pence divided into pounds where the listing
+      // is quoted in GBX), and the acceptance point needs to know which
+      // listing produced them before it stores the numbers against a security.
+      const seriesMeta = {
+        currencyCode: result.meta?.currency
+          ? gbx
+            ? "GBP"
+            : String(result.meta.currency)
+          : null,
+        symbol: (result.meta?.symbol as string | undefined) ?? yahooSymbol,
+        exchange: (result.meta?.fullExchangeName ??
+          result.meta?.exchangeName ??
+          null) as string | null,
+      };
+      if (!result.timestamp) return { prices: [], ...seriesMeta };
       // Timestamps but no quote series is a malformed answer, not an empty
       // window: null, so the caller can try an alternate symbol.
       if (!result.indicators?.quote?.[0]) return null;
 
-      const gbx = isGbxCurrency(result.meta?.currency);
       const convertPrice = (v: number | null | undefined): number | null => {
         if (v == null) return null;
         return gbx ? convertGbxToGbp(v) : v;
@@ -790,7 +849,7 @@ export class YahooFinanceService implements QuoteProvider {
         });
       }
 
-      return prices;
+      return { prices, ...seriesMeta };
     } catch (error) {
       this.health.logFailure(
         this.logger,

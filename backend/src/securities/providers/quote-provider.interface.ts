@@ -78,6 +78,30 @@ export interface HistoricalPrice {
   volume: number | null;
 }
 
+/**
+ * A daily series together with what the provider said it is a series *of*.
+ *
+ * The bars themselves carry no currency, so a payload handed over as a bare
+ * array can only be stored on trust: the same ticker listed on two exchanges
+ * answers with two different sets of numbers and nothing distinguishes them.
+ * The metadata is bundle-level because it describes the answer, not a bar --
+ * a provider quotes one instrument in one currency for the whole window.
+ */
+export interface HistoricalSeries {
+  prices: HistoricalPrice[];
+  /**
+   * The instrument's trading currency as the provider reports it for this
+   * series, GBX/GBp normalized to GBP (the bars are converted to pounds with
+   * it). `null` when the provider does not report one, which is a different
+   * fact from a currency that disagrees: see `quote-currency.util.ts`.
+   */
+  currencyCode: string | null;
+  /** The provider's own symbol for the series it answered with, when it names one. */
+  symbol?: string | null;
+  /** The exchange the provider says the series belongs to, when it names one. */
+  exchange?: string | null;
+}
+
 export interface SecurityLookupResult {
   symbol: string;
   name: string;
@@ -116,12 +140,21 @@ export interface QuoteProvider {
     opts?: QuoteProviderOptions,
   ): Promise<QuoteResult | null>;
 
-  fetchHistorical(
+  /**
+   * Daily bars for a named range, with the metadata that says which listing
+   * they belong to.
+   *
+   * The series rather than a bare array because a price acceptance point has to
+   * be able to refuse a payload whose currency is not the security's, and an
+   * array cannot carry that. `null` means no answer; a series with an empty
+   * `prices` means the provider answered with no bars in the window.
+   */
+  fetchHistoricalSeries(
     symbol: string,
     exchange: string | null,
     range?: string,
     opts?: QuoteProviderOptions,
-  ): Promise<HistoricalPrice[] | null>;
+  ): Promise<HistoricalSeries | null>;
 
   /**
    * Optional: fetch daily bars for an explicit date window rather than one of
@@ -135,13 +168,13 @@ export interface QuoteProvider {
    * omit this, and callers fall back to the narrowest range that reaches the
    * date.
    */
-  fetchHistoricalWindow?(
+  fetchHistoricalWindowSeries?(
     symbol: string,
     exchange: string | null,
     fromDate: Date,
     toDate: Date,
     opts?: QuoteProviderOptions,
-  ): Promise<HistoricalPrice[] | null>;
+  ): Promise<HistoricalSeries | null>;
 
   /**
    * Optional: fetch intraday price bars for a symbol. Used by the

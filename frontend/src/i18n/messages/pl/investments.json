@@ -53,14 +53,20 @@
     "gainLossTooltip": "Niezrealizowany zysk lub strata na obecnych pozycjach: wartość rynkowa po dzisiejszych cenach minus koszt nabycia powyżej. Nie obejmuje zysków zrealizowanych na wcześniejszych sprzedażach ani otrzymanych dywidend i odsetek.",
     "returns": "Stopy zwrotu",
     "simpleReturn": "Prosta stopa zwrotu",
-    "simpleReturnTooltip": "Całkowity procentowy zysk lub strata na pozycjach, obliczony jako (wartość rynkowa − koszt nabycia) ÷ koszt nabycia. Nie uwzględnia momentu wpłat ani wypłat.",
+    "simpleReturnTooltip": "Zysk lub strata względem tego, co zapłaciłeś: (wartość rynkowa − koszt nabycia) ÷ koszt nabycia. Nie uwzględnia momentu wpływu pieniędzy, więc zmienia się skokowo przy każdym zakupie: pozycja o wartości 1 000 wzrastająca o 20% pokazuje +20%; kup kolejne 1 000 i pokaże +10% (200 ÷ 2 000), mimo że nic nie zostało stracone. TWR i MWR nie mają tego skoku.",
     "twr": "TWR",
     "twrFull": "(ważony czasem)",
-    "twrTooltip": "Mierzy, jak dobrze radziły sobie Twoje inwestycje niezależnie od tego, kiedy dodawałeś lub wycofywałeś środki. Eliminuje wpływ momentu przepływów pieniężnych, pokazując czystą efektywność inwestycji.",
+    "twrTooltip": "Ważona czasem stopa zwrotu z Twoich inwestycji od pierwszej transakcji, obliczana tak samo jak Wyniki portfela: wpłaty, wypłaty i niezainwestowana gotówka są pomijane, dywidendy i odsetki są uwzględniane.",
     "cagr": "CAGR",
     "cagrTooltip": "Skumulowana roczna stopa wzrostu. Twój zannualizowany zwrot oparty na zainwestowanym netto względem bieżącej wartości portfela, jak gdyby wzrost był idealnie równomierny w każdym roku.",
     "notAvailable": "Brak",
-    "unpricedHoldings": "Wycena częściowa: {count, plural, one {# pozycja nie ma} few {# pozycje nie mają} many {# pozycji nie ma} other {# pozycji nie ma}} bieżącej ceny ({symbols}), więc poniższe wartości ich nie obejmują."
+    "unpricedHoldings": "Wycena częściowa: {count, plural, one {# pozycja nie ma} few {# pozycje nie mają} many {# pozycji nie ma} other {# pozycji nie ma}} bieżącej ceny ({symbols}), więc poniższe wartości ich nie obejmują.",
+    "mwr": "MWR",
+    "mwrFull": "(ważony pieniądzem)",
+    "mwrTooltip": "Stopa zwrotu ważona pieniądzem (XIRR) Twoich inwestycji od pierwszej transakcji: roczna stopa zwrotu wypracowana przez Twoje własne pieniądze, ważąca każdy zakup, sprzedaż i dywidendę momentem ich wystąpienia. Wpłaty, wypłaty i niezainwestowana gotówka są pomijane. Różni się od TWR (stopy zwrotu ważonej czasem), gdy zainwestowałeś więcej przed wzrostem lub spadkiem.",
+    "returnDiagnosticsLead": "TWR i MWR nie są pokazywane, ponieważ w historii występują luki:",
+    "returnDiagnosticsRepair": "Uzupełnij brakujące ceny w historii cen każdego papieru wartościowego; stopy zwrotu są liczone dla wyświetlanych kont.",
+    "returnDiagnosticsRepairFiltered": "Uzupełnij brakujące ceny w historii cen każdego papieru wartościowego albo wyklucz te konta z widoku za pomocą filtra kont powyżej; stopy zwrotu są liczone dla wyświetlanych kont."
   },
   "assetAllocation": {
     "title": "Alokacja aktywów",
@@ -124,8 +130,12 @@
     "noDataForPeriod": "Brak danych inwestycyjnych dla tego okresu.",
     "highestValue": "Najwyższa wartość",
     "lowestValue": "Najniższa wartość",
-    "change": "Zmiana",
-    "changePercent": "Zmiana %",
+    "investmentResult": "Wynik inwestycyjny",
+    "investmentReturn": "Zwrot",
+    "investmentResultTooltip": "Ile zarobiły Twoje inwestycje w tym okresie. Wpłaty, wypłaty i niezainwestowana gotówka są pominięte, a procent obok to stopa zwrotu ważona czasem, więc kupno i sprzedaż jej nie zmieniają.",
+    "unmeasuredFlowTooltip": "Transakcja rozliczona poza tymi kontami albo podział łączący pozycję inwestycyjną ze zwykłym wydatkiem oznacza, że wyniku nie da się oddzielić od przesuniętych pieniędzy.",
+    "valueChangeLine": "Zmiana wartości {amount}",
+    "netFlowsLine": "Wpłaty i wypłaty netto {amount}",
     "priorCloseTooltip": "Mierzone od kursu zamknięcia poprzedniej sesji z dnia {date}.",
     "notAvailable": "Brak",
     "portfolioLabel": "Portfel:"
@@ -288,5 +298,28 @@
     "accountRequired": "Konto jest wymagane",
     "dateRequired": "Data jest wymagana",
     "acquisitionPriceRequired": "Cena za jednostkę jest wymagana i musi być większa od zera. Dla jednostek nabytych bez znanego kosztu użyj „Dodaj udziały”."
+  },
+  "portfolioPerformance": {
+    "title": "Wyniki portfela",
+    "subtitle": "Wynik Twoich inwestycji bez wpływu wpłat, wypłat i niezainwestowanej gotówki.",
+    "footnote": "Wpłaty, wypłaty i niezainwestowana gotówka nie są liczone jako wynik inwestycyjny.",
+    "unavailable": "n/d",
+    "empty": "Za mało historii, żeby zmierzyć zwrot.",
+    "periods": {
+      "1d": "1D",
+      "1w": "1T",
+      "1m": "1M",
+      "3m": "3M",
+      "ytd": "Od pocz. roku",
+      "1y": "1R"
+    },
+    "loading": "Trwa mierzenie okresów...",
+    "loadFailed": "Nie udało się wczytać wyników okresów. Wartości są wstrzymane, a nie zerowe; odśwież stronę, aby spróbować ponownie.",
+    "reasons": {
+      "incompletePrices": "Wstrzymany okres zaczyna się w dniu, w którym pozycja nie miała ceny. Odśwież ceny lub dodaj cenę ręcznie w historii cen papieru wartościowego.",
+      "incompleteCash": "Wstrzymany okres zaczyna się w dniu, w którym konto gotówkowe w tym widoku nie podało salda, więc jego stan jest nieznany, a nie zerowy.",
+      "missingRatePairs": "Wstrzymany okres wymaga kursu wymiany, którego nie ma w zapisanej historii. Dodaj historię kursów dla tej waluty na stronie Waluty.",
+      "unmeasuredFlow": "Wstrzymany okres zawiera ruch, którego nie można odróżnić od wpłaty lub wypłaty: transakcję rozliczoną poza tymi kontami albo podział łączący gotówkę i inwestycje."
+    }
   }
 }

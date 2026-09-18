@@ -3,6 +3,7 @@
     "noneToUpdate": "無證券需要更新",
     "updated": "{count, plural, one {# 個證券價格已更新} other {# 個證券價格已更新}}",
     "partialFailure": "價格已更新：{updated} 成功，{failed} 失敗{symbols}",
+    "partialFailureWithReasons": "價格已更新：{updated} 成功，{failed} 失敗{symbols}\n{reasons}",
     "failed": "重新整理價格失敗"
   },
   "page": {

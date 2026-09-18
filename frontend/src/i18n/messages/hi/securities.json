@@ -3,6 +3,7 @@
     "noneToUpdate": "अपडेट करने के लिए कोई प्रतिभूति नहीं",
     "updated": "{count, plural, one {# प्रतिभूति मूल्य अपडेट हुआ} other {# प्रतिभूति मूल्य अपडेट हुए}}",
     "partialFailure": "मूल्य अपडेट: {updated} सफल, {failed} विफल{symbols}",
+    "partialFailureWithReasons": "मूल्य अपडेट: {updated} सफल, {failed} विफल{symbols}\n{reasons}",
     "failed": "मूल्य ताज़ा करने में विफल"
   },
   "page": {

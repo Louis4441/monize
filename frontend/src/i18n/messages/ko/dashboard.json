@@ -97,7 +97,7 @@
       "noLosers": "오늘 하락 종목이 없습니다."
     },
     "dailyChange": "일일 변동",
-    "dailyChangeOn": "일일 변동 \u00b7 {date}",
+    "dailyChangeOn": "일일 변동 · {date}",
     "openPriceHistory": "{symbol} 가격 이력",
     "refreshPrices": "가격 새로고침",
     "viewPortfolio": "포트폴리오 보기",
@@ -118,7 +118,7 @@
     "empty": "즐겨찾기 유가증권이 없습니다. <securitiesLink>유가증권 페이지</securitiesLink>를 방문하여 여기서 추적할 유가증권에 별표를 표시하세요.",
     "noPriceYet": "아직 가격 없음",
     "dailyChange": "일일 변동",
-    "dailyChangeOn": "일일 변동 \u00b7 {date}",
+    "dailyChangeOn": "일일 변동 · {date}",
     "openPriceHistory": "{symbol} 가격 이력",
     "refreshPrices": "가격 새로고침",
     "manage": "유가증권 관리"
@@ -202,7 +202,11 @@
   "portfolioValue": {
     "title": "포트폴리오 가치",
     "empty": "아직 표시할 투자 내역이 없습니다.",
-    "refresh": "현재 가치 새로고침"
+    "refresh": "현재 가치 새로고침",
+    "investmentResult": "투자 결과",
+    "notAvailable": "해당 없음",
+    "periodBreakdownTooltip": "이 기간 동안 계좌 가치는 {valueChange}만큼 변동했으며, 그중 입출금은 {netFlows}였습니다. 위 수치는 미투자 현금을 제외하고 투자 자체가 벌어들인 금액입니다.",
+    "unmeasuredFlowTooltip": "이 계좌 밖에서 결제된 거래이거나, 투자 항목과 일반 지출이 섞인 분할 항목이 있으면 결과를 이동한 자금과 분리할 수 없습니다."
   },
   "spendingByPayee": {
     "title": "수취인별 지출",

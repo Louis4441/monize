@@ -18,7 +18,7 @@ import { chartColors, chartSeriesColor } from '@/lib/chart-colors';
 import { netWorthApi } from '@/lib/net-worth';
 import { investmentsApi } from '@/lib/investments';
 import { PortfolioSummary } from '@/types/investment';
-import { InvestmentBreakdownSeries } from '@/types/net-worth';
+import { InvestmentBreakdownSeries, PortfolioPeriodResult } from '@/types/net-worth';
 import { Account } from '@/types/account';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -28,12 +28,17 @@ import { useDateRange } from '@/hooks/useDateRange';
 import { usePortfolioRangeWindow } from '@/hooks/usePortfolioRangeWindow';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
-import { usePortfolioChangeBaseline } from '@/hooks/usePortfolioChangeBaseline';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
 import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
+import { IncompleteDataDetails } from '@/components/reports/IncompleteDataDetails';
+import {
+  foldIncompleteData,
+  hasIncompleteData,
+  type IncompleteDataCauses,
+} from '@/lib/incomplete-data-ranges';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { CAPTION_CLASS, CellLabel, PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import type {
@@ -41,9 +46,10 @@ import type {
   SortColumnsByField as TableSortColumnsByField,
 } from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
-import { exportToCsv } from '@/lib/csv-export';
+import { exportCsvSections, type CsvValue } from '@/lib/csv-export';
 import { createLogger } from '@/lib/logger';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { UnknownAmount } from '@/components/ui/UnknownAmount';
 
 type PortfolioBreakdownSortField = 'account' | 'holdings' | 'cash' | 'total' | 'gainLoss';
 type PortfolioChartSortField = 'name' | 'value';
@@ -67,8 +73,26 @@ type SecuritiesBreakdown = {
     name: string;
     /** The point's own date/timestamp, kept beside the display label. */
     iso: string;
+    /**
+     * The whole value at this point, cash folded in -- the sum of every band,
+     * so the stacked chart draws to it. NOT the report's measure.
+     */
     total: number;
+    /**
+     * The report's ONE measure: securities only, the cash band subtracted
+     * (`breakdownInvestedValue`). The KPIs, the table's total column and the
+     * CSV all read THIS, so the "By security" view and the "Total" view draw
+     * the same quantity and switching between them cannot move the high, the
+     * low or the exported figure (INV-PORTRESULT-002).
+     */
+    invested: number;
     values: Record<string, number>;
+    /**
+     * The server's completeness for this point, absent where the endpoint
+     * reports none (intraday). Absent is NO INFORMATION, so every read is
+     * `=== false`.
+     */
+    complete?: boolean;
   }>;
   kind: 'daily' | 'monthly' | 'intraday';
 };
@@ -85,13 +109,30 @@ import {
 } from '@/components/investments/portfolio-chart-utils';
 import {
   isoDatePart,
-  priorCloseChange,
+  previousCalendarDay,
+  usesPriorCloseBaseline,
 } from '@/components/investments/portfolio-change-baseline';
+import {
+  hasUnmeasuredFlow,
+  periodResultUnknownReason,
+} from '@/components/investments/portfolio-period-result';
+import {
+  investedValue,
+  breakdownCashKey,
+  breakdownInvestedValue,
+} from '@/lib/invested-value';
 import { preferredCurrency } from '@/lib/default-currency';
 
 const logger = createLogger('PortfolioValueReport');
 
 const DAILY_RANGES = new Set(['1w', '1m', '3m', 'ytd', '1y']);
+
+/** Nothing reported missing. A frozen module constant, so the identity is stable. */
+const NO_INCOMPLETE_DATA: IncompleteDataCauses = {
+  prices: [],
+  rates: [],
+  cash: [],
+};
 const RANGE_STORAGE_KEY = 'monize-reports-portfolio-value-range';
 const ACCOUNTS_STORAGE_KEY = 'monize-reports-portfolio-value-accounts';
 
@@ -172,11 +213,47 @@ export function PortfolioValueReport() {
   const chartRef = useRef<HTMLDivElement>(null);
   // `iso` is the point's own date/timestamp, kept beside the display label so
   // the prior-close baseline can be looked up for the data actually on screen.
+  // `complete` is the server's completeness for that point, absent where the
+  // endpoint reports none (intraday, by-security) -- absent is NO INFORMATION,
+  // so every read of it is `=== false`.
+  //
+  // `Value` is NULL on a point the server could not finish. The server's
+  // `value` there is the subtotal of what it could price and convert, and a
+  // subtotal plotted on a value axis is indistinguishable from a measured one
+  // -- a whole holding period of unpriced securities drew as a flat line near
+  // zero (#1389). The chart breaks instead (`connectNulls={false}`), the table
+  // and the CSV print it as unavailable, and `IncompleteDataDetails` names the
+  // cause beside the withheld KPIs.
   const [chartPoints, setChartPoints] = useState<
-    Array<{ name: string; Value: number; iso: string }>
+    Array<{ name: string; Value: number | null; iso: string; complete?: boolean }>
   >([]);
+  // What the portfolio DID over the window, as the server worked it out: the
+  // value change, the money the reader moved in or out, and what is left. Null
+  // until it answers, and never re-derived here -- deriving a change from the
+  // plotted series is exactly what reported a deposit as a gain (#1392).
+  //
+  // Kept WITH the key of the request that produced it. A range whose request is
+  // never made -- a 1D window with no intraday points, where the effect below
+  // returns before asking -- would otherwise leave the previous range's figures
+  // on the cards under the new range's caption.
+  const [periodResultState, setPeriodResultState] = useState<{
+    key: string;
+    result: PortfolioPeriodResult;
+  } | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  // What the withheld figures are waiting for, folded into ranges per cause.
+  // Set by whichever loader produced the points on screen, and empty for the
+  // endpoints that report no completeness (intraday, monthly aggregates) --
+  // which is no information, not a claim that everything is known (#1389).
+  const [incompleteCauses, setIncompleteCauses] =
+    useState<IncompleteDataCauses>(NO_INCOMPLETE_DATA);
+  // symbol / name per security id, so a missing price names the instrument
+  // rather than a UUID. Inactive ones included: a security sold out of the
+  // portfolio is exactly the one whose history the reader is missing.
+  const [securityNames, setSecurityNames] = useState<Map<string, string>>(
+    new Map(),
+  );
   // Account filter is persisted so the report opens on the same set of accounts
   // the user last looked at, matching the investments page.
   const [selectedAccountIds, setSelectedAccountIds] = usePersistedAccountFilter(
@@ -324,22 +401,37 @@ export function PortfolioValueReport() {
         const data = await netWorthApi.getInvestmentsDaily(params);
         if (loadSeqRef.current !== seq) return;
         setChartPoints(
-          data.map((d) => ({
-            name: formatChartDate(d.date, 'MMM d, yyyy'),
-            Value: d.value,
-            iso: d.date,
-          })),
+          data.map((d) => {
+            // A day short of a price or a rate is a subtotal; the KPIs below
+            // refuse to name it a high, a low or a change, and the chart
+            // refuses to plot it at all. `cashComplete` is NOT read here: the
+            // chart plots the INVESTED value, which holds no cash, so a cash
+            // account with no balance for a day cannot make this point wrong.
+            // It is still reported in the incomplete-data details below.
+            const complete =
+              d.pricesComplete !== false && d.fxComplete !== false;
+            return {
+              name: formatChartDate(d.date, 'MMM d, yyyy'),
+              Value: complete ? investedValue(d) : null,
+              iso: d.date,
+              complete,
+            };
+          }),
         );
+        setIncompleteCauses(foldIncompleteData(data));
       } else {
         const data = await netWorthApi.getInvestmentsMonthly(params);
         if (loadSeqRef.current !== seq) return;
         setChartPoints(
           data.map((d) => ({
             name: formatChartDate(d.month, 'MMM yyyy'),
-            Value: d.value,
+            Value: investedValue(d),
             iso: d.month,
           })),
         );
+        // The monthly endpoint reports no completeness, which is no
+        // information rather than a clean bill of health.
+        setIncompleteCauses(NO_INCOMPLETE_DATA);
       }
     };
 
@@ -357,6 +449,7 @@ export function PortfolioValueReport() {
         displayCurrency: foreignCurrency || undefined,
       });
       if (loadSeqRef.current !== seq) return;
+      const cashKey = breakdownCashKey(data.series);
       const points = data.points.map((p) => ({
         name:
           granularity === 'monthly'
@@ -364,11 +457,48 @@ export function PortfolioValueReport() {
             : formatChartDate(p.date, 'MMM d, yyyy'),
         iso: p.date,
         total: p.total,
+        invested: breakdownInvestedValue(p, cashKey),
         values: p.values,
+        // A point missing a price or a rate is a subtotal of the INVESTED
+        // value: the KPI cards refuse to call it a high or a low and the chart
+        // draws no band for it. Read as `=== false` -- an older backend sends
+        // neither flag (#1389).
+        //
+        // `cashComplete` is NOT read here, exactly as on the daily sum path:
+        // the report's measure is the invested value, which holds no cash, so
+        // a cash account with no balance for a point cannot make the invested
+        // figure wrong. It is still folded into the incomplete-data details
+        // below so the reader learns of the cash gap.
+        //
+        // The rate read is the POINT's own list where the response carries one,
+        // because the response-level `fxComplete` is the union over the window
+        // and would withhold every point over one unconvertible day. A response
+        // without per-point lists is an older backend, and then the union is
+        // all there is.
+        complete:
+          p.pricesComplete !== false &&
+          (p.missingRatePairs
+            ? p.missingRatePairs.length === 0
+            : data.fxComplete !== false),
       }));
       setBreakdown({ series: data.series, points, kind: granularity });
+      setIncompleteCauses(
+        foldIncompleteData(
+          data.points.map((p) => ({
+            date: p.date,
+            unpricedSecurityIds: p.unpricedSecurityIds,
+            missingRatePairs: p.missingRatePairs,
+            unknownCashAccountIds: p.unknownCashAccountIds,
+          })),
+        ),
+      );
       setChartPoints(
-        points.map((p) => ({ name: p.name, Value: p.total, iso: p.iso })),
+        points.map((p) => ({
+          name: p.name,
+          Value: p.complete ? p.invested : null,
+          iso: p.iso,
+          complete: p.complete,
+        })),
       );
     };
 
@@ -403,6 +533,7 @@ export function PortfolioValueReport() {
         return;
       }
 
+      const cashKey = breakdownCashKey(data.series);
       const points = trimIntradayPoints(
         data.points,
         dateRange,
@@ -411,11 +542,13 @@ export function PortfolioValueReport() {
         name: formatIntradayLabel(p.timestamp, dateRange),
         iso: p.timestamp,
         total: p.total,
+        invested: breakdownInvestedValue(p, cashKey),
         values: p.values,
       }));
       setBreakdown({ series: data.series, points, kind: 'intraday' });
+      setIncompleteCauses(NO_INCOMPLETE_DATA);
       setChartPoints(
-        points.map((p) => ({ name: p.name, Value: p.total, iso: p.iso })),
+        points.map((p) => ({ name: p.name, Value: p.invested, iso: p.iso })),
       );
     };
 
@@ -423,6 +556,9 @@ export function PortfolioValueReport() {
       setIsLoading(true);
       setIntradayUnavailable(null);
       setIntradayFallbackNotice(null);
+      // The previous window's causes describe the previous window. Each loader
+      // below fills this in for the points it produced.
+      setIncompleteCauses(NO_INCOMPLETE_DATA);
 
       try {
         // Portfolio summary + accounts list always load in parallel — they
@@ -456,7 +592,7 @@ export function PortfolioValueReport() {
             setChartPoints(
               trimIntradayPoints(cached.points, dateRange, chartWindow.start).map((p) => ({
                 name: formatIntradayLabel(p.timestamp, dateRange),
-                Value: p.value,
+                Value: investedValue(p),
                 iso: p.timestamp,
               })),
             );
@@ -508,7 +644,7 @@ export function PortfolioValueReport() {
               trimIntradayPoints(response.points, dateRange, chartWindow.start).map(
                 (p) => ({
                   name: formatIntradayLabel(p.timestamp, dateRange),
-                  Value: p.value,
+                  Value: investedValue(p),
                   iso: p.timestamp,
                 }),
               ),
@@ -552,51 +688,149 @@ export function PortfolioValueReport() {
     formatChartDate,
   ]);
 
-  // On 1D / 1W / MTD the change is reported against the close of the trading
-  // day before the window rather than against the first point drawn, unless the
-  // user's Settings preference says otherwise. The baseline is looked up for
-  // the first point actually on screen.
-  const { usesPriorClose, priorClose } = usePortfolioChangeBaseline({
-    range: dateRange,
-    firstPointDate: isoDatePart(chartPoints[0]?.iso),
-    accountIds:
-      selectedAccountIds.length > 0 ? selectedAccountIds.join(',') : undefined,
-    displayCurrency: foreignCurrency || undefined,
-  });
+  // On 1D / 1W / MTD the period is measured from the close of the trading day
+  // before the window rather than from the first point drawn. Which date that
+  // is, is all this layer decides: the arithmetic over it is the server's.
+  const usesPriorClose = usesPriorCloseBaseline(dateRange);
+  const firstPointDate = isoDatePart(chartPoints[0]?.iso);
+  const periodAccountIdsCsv =
+    selectedAccountIds.length > 0 ? selectedAccountIds.join(',') : undefined;
+  const periodBaselineDate =
+    usesPriorClose && firstPointDate
+      ? previousCalendarDay(firstPointDate)
+      : undefined;
+  // Everything the answer depends on. An answer is shown only under the key it
+  // was asked for; anything else is the previous window's figures.
+  const periodKey = JSON.stringify([
+    chartWindow.start,
+    chartWindow.end,
+    periodBaselineDate ?? null,
+    periodAccountIdsCsv ?? null,
+    foreignCurrency,
+    usesPriorClose,
+    reloadKey,
+  ]);
+
+  useEffect(() => {
+    if (!isValid) return;
+    // A prior-close range measures from the close before the first point ON
+    // SCREEN, so it waits for that point rather than guessing at a date.
+    if (usesPriorClose && !firstPointDate) return;
+    netWorthApi
+      .getInvestmentsPeriodResult({
+        startDate: chartWindow.start,
+        endDate: chartWindow.end,
+        baselineDate: periodBaselineDate,
+        accountIds: periodAccountIdsCsv,
+        displayCurrency: foreignCurrency || undefined,
+      })
+      .then((result) => {
+        setPeriodResultState({ key: periodKey, result });
+      })
+      .catch((error) => {
+        logger.error('Failed to load the period result:', error);
+        // A failed request is not a period that did nothing: every figure stays
+        // unknown until the server answers.
+        setPeriodResultState((prev) => (prev?.key === periodKey ? null : prev));
+      });
+  }, [
+    chartWindow,
+    isValid,
+    usesPriorClose,
+    firstPointDate,
+    foreignCurrency,
+    periodAccountIdsCsv,
+    periodBaselineDate,
+    periodKey,
+  ]);
+
+  const periodResult =
+    periodResultState?.key === periodKey ? periodResultState.result : null;
 
   const summary = useMemo(() => {
     if (chartPoints.length === 0) {
-      return {
-        change: 0 as number | null,
-        changePercent: 0 as number | null,
-        highest: 0,
-        lowest: 0,
-      };
+      return { highest: null as number | null, lowest: null as number | null };
     }
-    const values = chartPoints.map((d) => d.Value);
-    const highest = Math.max(...values);
-    const lowest = Math.min(...values);
-    const current = chartPoints[chartPoints.length - 1]?.Value || 0;
-    if (usesPriorClose) {
-      // A baseline that has not loaded (or could not be established) leaves
-      // the change unknown -- never the first point's change wearing the
-      // prior close's label.
-      return {
-        highest,
-        lowest,
-        ...priorCloseChange(current, priorClose?.value ?? null),
-      };
+    // A point the server could not finish is a subtotal, and a subtotal can sit
+    // anywhere in the ordering: the real high or low may be the day that is
+    // missing a component. One incomplete point therefore leaves BOTH extremes
+    // unknown rather than quietly ranking a partial figure against whole ones.
+    const extremesKnown = chartPoints.every((p) => p.complete !== false);
+    const values = chartPoints
+      .map((d) => d.Value)
+      .filter((v): v is number => v !== null);
+    if (!extremesKnown || values.length === 0) {
+      return { highest: null as number | null, lowest: null as number | null };
     }
-    const initial = chartPoints[0]?.Value || 0;
-    const change = current - initial;
-    const changePercent = initial !== 0 ? (change / Math.abs(initial)) * 100 : 0;
     return {
-      change: change as number | null,
-      changePercent: changePercent as number | null,
-      highest,
-      lowest,
+      highest: Math.max(...values),
+      lowest: Math.min(...values),
     };
-  }, [chartPoints, usesPriorClose, priorClose]);
+  }, [chartPoints]);
+
+  // The three figures the cards print, and the one repair a withheld one points
+  // at. Every completeness read is the server's: `null` means it withheld the
+  // figure and said why, and nothing here recomputes it from the chart.
+  const valueChange = periodResult?.valueChange ?? null;
+  const netExternalFlows = periodResult?.netExternalFlows ?? null;
+  // The report plots the INVESTED value, so its result and return are the
+  // invested part's: the same measure the Investments page's performance card
+  // and the dashboard widget report (section 10.7). `valueChange` above is
+  // still the account's, and still captioned as such.
+  const investmentResult = periodResult?.investmentPnl ?? null;
+  const returnPercent = periodResult?.investmentReturnPercent ?? null;
+  const unknownReason = periodResultUnknownReason(
+    periodResult?.investedReasons ?? [],
+  );
+
+  // Which KPI captions the window cannot stand behind, so the cards say so
+  // rather than printing a partial figure under a total's caption.
+  const valuesIncomplete = useMemo(
+    () => chartPoints.some((p) => p.complete === false),
+    [chartPoints],
+  );
+
+  // Names for the ids in the diagnostics. Loaded only once something is
+  // actually missing, and including inactive securities: a holding sold out of
+  // the portfolio is exactly the one whose price history is missing (#1389).
+  const needsSecurityNames = incompleteCauses.prices.length > 0;
+  useEffect(() => {
+    if (!needsSecurityNames) return;
+    let cancelled = false;
+    investmentsApi
+      .getSecurities(true)
+      .then((securities) => {
+        if (cancelled) return;
+        setSecurityNames(
+          new Map(securities.map((s) => [s.id, s.symbol || s.name])),
+        );
+      })
+      .catch((error) => {
+        // A failed lookup is not an empty portfolio: the list simply keeps the
+        // names it already has and the fallback label stands in.
+        logger.error('Failed to load securities for the incomplete-data list:', error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [needsSecurityNames]);
+
+  const securityLabel = useCallback(
+    (securityId: string) =>
+      securityNames.get(securityId) ??
+      t('portfolioValue.incompleteUnknownSecurity'),
+    [securityNames, t],
+  );
+  const accountLabel = useCallback(
+    (accountId: string) => {
+      const account = accounts.find((a) => a.id === accountId);
+      return account
+        ? mainAccountName(account.name)
+        : t('portfolioValue.incompleteUnknownAccount');
+    },
+    [accounts, mainAccountName, t],
+  );
+  const showIncompleteDetails = hasIncompleteData(incompleteCauses);
 
   const sortedChartTableData = useMemo(() => {
     const sorted = chartPoints.map((p, idx) => ({ ...p, index: idx }));
@@ -629,7 +863,11 @@ export function PortfolioValueReport() {
       // zooming to the total's min/max (which would clip the lower bands).
       securitiesActive
         ? ([0, 'auto'] as [number, 'auto'])
-        : computeTightYAxisDomain(chartPoints.map((d) => d.Value)),
+        : computeTightYAxisDomain(
+            chartPoints
+              .map((d) => d.Value)
+              .filter((v): v is number => v !== null),
+          ),
     [chartPoints, securitiesActive],
   );
 
@@ -656,13 +894,28 @@ export function PortfolioValueReport() {
   }, [breakdown, t]);
 
   const stackedChartData = useMemo(() => {
-    if (!breakdown) return [] as Array<Record<string, number | string>>;
+    if (!breakdown) return [] as Array<Record<string, number | string | null>>;
     // Point names are pre-formatted at load time (date or intraday time).
-    return breakdown.points.map((p) => ({
-      name: p.name,
-      total: p.total,
-      ...p.values,
-    }));
+    //
+    // An incomplete point draws no band at all. A stack whose height is short a
+    // component is the same lie as a line drawn through a subtotal, and it is
+    // worse here: the missing band is exactly the security the reader is
+    // looking for (#1389). Every band goes null together so the stack breaks
+    // rather than settling onto a shorter total.
+    return breakdown.points.map((p) => {
+      const known = p.complete !== false;
+      const bands = Object.fromEntries(
+        Object.entries(p.values).map(([key, value]) => [
+          key,
+          known ? value : null,
+        ]),
+      );
+      return {
+        name: p.name,
+        total: known ? p.total : null,
+        ...bands,
+      };
+    });
   }, [breakdown]);
 
   const sortedBreakdownRows = useMemo(() => {
@@ -670,7 +923,9 @@ export function PortfolioValueReport() {
     const rows = breakdown.points.map((p, idx) => ({
       index: idx,
       name: p.name,
-      total: p.total,
+      // The report's measure: securities, no cash. The cash band still has its
+      // own column, but the total column is the invested value.
+      total: p.invested,
       values: p.values,
     }));
     rows.sort((a, b) => {
@@ -721,7 +976,10 @@ export function PortfolioValueReport() {
         : chartPoints.findIndex((p) => p.Value === summary.lowest),
     [chartPoints, summary.lowest],
   );
-  const showFlags = summary.highest !== summary.lowest;
+  const showFlags =
+    summary.highest !== null &&
+    summary.lowest !== null &&
+    summary.highest !== summary.lowest;
 
   // The Portfolio Breakdown table's five sortable columns, keyed by field so the
   // record is exhaustive: adding a member to `PortfolioBreakdownSortField` is a
@@ -736,6 +994,16 @@ export function PortfolioValueReport() {
     gainLoss: { field: 'gainLoss', label: t('portfolioValue.colGainLoss'), align: 'right' },
   };
   const breakdownSortColumns: readonly PortfolioBreakdownSortColumn[] = Object.values(breakdownColumns);
+
+  // A withheld figure prints as unavailable and in grey wherever the export
+  // formats cannot carry the marker the cards use. Never a zero, and never the
+  // gain colour over nothing.
+  const signedMoneyText = (value: number | null) =>
+    value === null
+      ? t('portfolioValue.notAvailable')
+      : `${value >= 0 ? '+' : ''}${fmtVal(value)}`;
+  const signedColour = (value: number | null) =>
+    value === null ? '#6b7280' : value >= 0 ? '#16a34a' : '#dc2626';
 
   const handleExportPdf = async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
@@ -754,28 +1022,45 @@ export function PortfolioValueReport() {
       title: t('portfolioValue.pdfTitle'),
       subtitle: accountLabel,
       summaryCards: [
-        { label: t('portfolioValue.highestValue'), value: fmtVal(summary.highest), color: '#111827' },
-        { label: t('portfolioValue.lowestValue'), value: fmtVal(summary.lowest), color: '#111827' },
         {
-          label: t('portfolioValue.periodChange'),
+          label: t('portfolioValue.highestValue'),
           value:
-            summary.change === null
+            summary.highest === null
               ? t('portfolioValue.notAvailable')
-              : `${summary.change >= 0 ? '+' : ''}${fmtVal(summary.change)}`,
-          color: summary.change === null ? '#6b7280' : summary.change >= 0 ? '#16a34a' : '#dc2626',
+              : fmtVal(summary.highest),
+          color: summary.highest === null ? '#6b7280' : '#111827',
         },
         {
-          label: t('portfolioValue.periodReturn'),
+          label: t('portfolioValue.lowestValue'),
           value:
-            summary.changePercent === null
+            summary.lowest === null
               ? t('portfolioValue.notAvailable')
-              : formatSignedPercent(summary.changePercent, 1),
-          color:
-            summary.changePercent === null
-              ? '#6b7280'
-              : summary.changePercent >= 0
-                ? '#16a34a'
-                : '#dc2626',
+              : fmtVal(summary.lowest),
+          color: summary.lowest === null ? '#6b7280' : '#111827',
+        },
+        {
+          label: t('portfolioValue.valueChange'),
+          value: signedMoneyText(valueChange),
+          color: signedColour(valueChange),
+        },
+        {
+          label: t('portfolioValue.netExternalFlows'),
+          value: signedMoneyText(netExternalFlows),
+          // A flow is neither a gain nor a loss, so it is not painted as one.
+          color: netExternalFlows === null ? '#6b7280' : '#111827',
+        },
+        {
+          label: t('portfolioValue.investmentResult'),
+          value: signedMoneyText(investmentResult),
+          color: signedColour(investmentResult),
+        },
+        {
+          label: t('portfolioValue.investmentReturn'),
+          value:
+            returnPercent === null
+              ? t('portfolioValue.notAvailable')
+              : formatSignedPercent(returnPercent, 1),
+          color: signedColour(returnPercent),
         },
       ],
       chartContainer: chartRef.current,
@@ -786,6 +1071,44 @@ export function PortfolioValueReport() {
       }] : undefined,
       filename: 'portfolio-value',
     });
+  };
+
+  // The period's figures, as their own CSV section above the series, and the
+  // same five the PDF prints: a reader exporting the chart was previously given
+  // the dates and values and left to work the period out themselves, which is
+  // the arithmetic this change exists to stop anybody doing (#1392).
+  //
+  // The amount column holds the RAW number and the unit is its own column, so a
+  // spreadsheet adds the cells up instead of reading a formatted string as text
+  // and a foreign-currency export cannot be mistaken for the reader's own
+  // currency. A figure the server withheld is the explicit marker, never an
+  // empty cell (indistinguishable from zero once a column is totalled).
+  const periodSummarySection = () => {
+    const money = (value: number | null): CsvValue[] =>
+      value === null
+        ? [t('portfolioValue.notAvailable'), '']
+        : [value, effectiveCurrency];
+    return {
+      title: t('portfolioValue.csvSummaryTitle'),
+      headers: [
+        t('portfolioValue.csvColFigure'),
+        t('portfolioValue.csvColAmount'),
+        t('portfolioValue.csvColCurrency'),
+      ],
+      rows: [
+        [t('portfolioValue.highestValue'), ...money(summary.highest)],
+        [t('portfolioValue.lowestValue'), ...money(summary.lowest)],
+        [t('portfolioValue.valueChange'), ...money(valueChange)],
+        [t('portfolioValue.netExternalFlows'), ...money(netExternalFlows)],
+        [t('portfolioValue.investmentResult'), ...money(investmentResult)],
+        [
+          t('portfolioValue.investmentReturn'),
+          ...(returnPercent === null
+            ? [t('portfolioValue.notAvailable'), '']
+            : [returnPercent, t('portfolioValue.csvUnitPercent')]),
+        ],
+      ] as CsvValue[][],
+    };
   };
 
   const handleExportCsv = () => {
@@ -800,12 +1123,24 @@ export function PortfolioValueReport() {
         ...securitiesSeries.map((s) => row.values[s.key] ?? 0),
         row.total,
       ]);
-      exportToCsv('portfolio-value-by-security', headers, rows);
+      exportCsvSections('portfolio-value-by-security', [
+        periodSummarySection(),
+        { headers, rows },
+      ]);
       return;
     }
     const headers = [t('portfolioValue.csvColDate'), t('portfolioValue.csvColValue')];
-    const rows = sortedChartTableData.map((p) => [p.name, p.Value]);
-    exportToCsv('portfolio-value', headers, rows);
+    // A CSV cell cannot carry the grey marker the table uses, so a withheld
+    // point exports the same words the card prints -- never an empty cell a
+    // spreadsheet reads as zero.
+    const rows = sortedChartTableData.map((p) => [
+      p.name,
+      p.Value === null ? t('portfolioValue.notAvailable') : p.Value,
+    ]);
+    exportCsvSections('portfolio-value', [
+      periodSummarySection(),
+      { headers, rows },
+    ]);
   };
 
   // Only show the full-card skeleton on the very first paint. Subsequent
@@ -825,54 +1160,150 @@ export function PortfolioValueReport() {
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">{t('portfolioValue.highestValue')}</div>
-          <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {fmtVal(summary.highest)}
+          <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+            {t('portfolioValue.highestValue')}
+            {valuesIncomplete && (
+              <InfoTooltip placement="top" text={t('portfolioValue.incompleteTooltip')} />
+            )}
           </div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">{t('portfolioValue.lowestValue')}</div>
           <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {fmtVal(summary.lowest)}
+            {summary.highest === null ? (
+              <span className="text-gray-400 dark:text-gray-500 text-base font-normal">
+                {t('portfolioValue.notAvailable')}
+              </span>
+            ) : (
+              fmtVal(summary.highest)
+            )}
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
-            {t('portfolioValue.periodChange')}
-            {priorClose && (
+            {t('portfolioValue.lowestValue')}
+            {valuesIncomplete && (
+              <InfoTooltip placement="top" text={t('portfolioValue.incompleteTooltip')} />
+            )}
+          </div>
+          <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+            {summary.lowest === null ? (
+              <span className="text-gray-400 dark:text-gray-500 text-base font-normal">
+                {t('portfolioValue.notAvailable')}
+              </span>
+            ) : (
+              fmtVal(summary.lowest)
+            )}
+          </div>
+        </div>
+        {/* Value change: what the portfolio is worth now against then. It
+            INCLUDES the reader's own deposits, which is why it is captioned as
+            a value change and never as a return. */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+            {t('portfolioValue.valueChange')}
+            <InfoTooltip placement="top" text={t('portfolioValue.valueChangeTooltip')} />
+            {usesPriorClose && periodResult && (
               <InfoTooltip
                 placement="top"
                 text={t('portfolioValue.priorCloseTooltip', {
-                  date: formatChartDate(priorClose.date, 'MMM d, yyyy'),
+                  date: formatChartDate(periodResult.startDate, 'MMM d, yyyy'),
+                })}
+              />
+            )}
+            {/* An intraday chart draws live prices while these figures are
+                measured between two STORED closes, so the line can move while
+                the cards read 0.00. The dates are on the wire; naming them is
+                the difference between a wrong figure and a dated one. */}
+            {isIntraday && periodResult && (
+              <InfoTooltip
+                placement="top"
+                text={t('portfolioValue.closeBoundsTooltip', {
+                  start: formatChartDate(periodResult.startDate, 'MMM d, yyyy'),
+                  end: formatChartDate(periodResult.endDate, 'MMM d, yyyy'),
                 })}
               />
             )}
           </div>
-          <div className={`text-xl font-bold ${summary.change === null ? '' : gainLossColor(summary.change)}`}>
-            {summary.change === null ? (
-              <span className="text-gray-400 dark:text-gray-500 text-base font-normal">
-                {t('portfolioValue.notAvailable')}
-              </span>
+          <div className={`text-xl font-bold ${valueChange === null ? '' : gainLossColor(valueChange)}`}>
+            {valueChange === null ? (
+              <UnknownAmount reason={unknownReason} className="text-base font-normal" />
             ) : (
-              <>{summary.change >= 0 ? '+' : ''}{fmtVal(summary.change)}</>
+              <>{valueChange >= 0 ? '+' : ''}{fmtVal(valueChange)}</>
             )}
           </div>
         </div>
+        {/* The money the reader moved across the boundary of these accounts. It
+            is the part of the value change that is not performance. */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">{t('portfolioValue.periodReturn')}</div>
-          <div className={`text-xl font-bold ${summary.changePercent === null ? '' : gainLossColor(summary.changePercent)}`}>
-            {summary.changePercent === null ? (
-              <span className="text-gray-400 dark:text-gray-500 text-base font-normal">
-                {t('portfolioValue.notAvailable')}
-              </span>
-            ) : (
-              formatSignedPercent(summary.changePercent, 1)
+          <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+            {t('portfolioValue.netExternalFlows')}
+            <InfoTooltip placement="top" text={t('portfolioValue.netExternalFlowsTooltip')} />
+            {/* The partial sum is named only where a rate is what withheld
+                the total: naming it for any other cause offers a subtotal of
+                something that was never in doubt. */}
+            {netExternalFlows === null &&
+              periodResult?.reasons.includes('missingRatePairs') && (
+              <InfoTooltip
+                placement="top"
+                text={t('portfolioValue.flowsPartial', {
+                  amount: fmtVal(periodResult.knownFlowSubtotal),
+                })}
+              />
             )}
+          </div>
+          <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+            {netExternalFlows === null ? (
+              <UnknownAmount reason={unknownReason} className="text-base font-normal" />
+            ) : (
+              <>{netExternalFlows >= 0 ? '+' : ''}{fmtVal(netExternalFlows)}</>
+            )}
+          </div>
+        </div>
+        {/* What is left once the deposits are taken out: the only figure a
+            percentage belongs over. */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+            {t('portfolioValue.investmentResult')}
+            <InfoTooltip placement="top" text={t('portfolioValue.investmentResultTooltip')} />
+            {/* A withheld figure names its own cause: these two are movements
+                the server could not count as a flow, so the marker's generic
+                copy would leave the reader with nowhere to go. */}
+            {hasUnmeasuredFlow(periodResult?.reasons ?? []) && (
+              <InfoTooltip
+                placement="top"
+                text={t('portfolioValue.unmeasuredFlowTooltip')}
+              />
+            )}
+          </div>
+          <div className={`text-xl font-bold ${investmentResult === null ? '' : gainLossColor(investmentResult)}`}>
+            {investmentResult === null ? (
+              <UnknownAmount reason={unknownReason} className="text-base font-normal" />
+            ) : (
+              <>{investmentResult >= 0 ? '+' : ''}{fmtVal(investmentResult)}</>
+            )}
+          </div>
+          <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+            <span className={returnPercent === null ? '' : gainLossColor(returnPercent)}>
+              {returnPercent === null
+                ? t('portfolioValue.notAvailable')
+                : formatSignedPercent(returnPercent, 1)}
+            </span>
+            <InfoTooltip placement="top" text={t('portfolioValue.investmentReturnTooltip')} />
+            <span className="sr-only">{t('portfolioValue.investmentReturn')}</span>
           </div>
         </div>
       </div>
+
+      {/* What the withheld figures above are waiting for, named and dated.
+          Beside the cards rather than inside a tooltip: a repair the reader
+          cannot find is the same dead end as no explanation at all (#1389). */}
+      {showIncompleteDetails && (
+        <IncompleteDataDetails
+          causes={incompleteCauses}
+          securityLabel={securityLabel}
+          accountLabel={accountLabel}
+        />
+      )}
 
       {/* Controls */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
@@ -1079,6 +1510,7 @@ export function PortfolioValueReport() {
                       type="monotone"
                       dataKey={s.key}
                       stackId="pf"
+                      connectNulls={false}
                       stroke={s.color}
                       strokeWidth={1}
                       fill={s.color}
@@ -1122,7 +1554,13 @@ export function PortfolioValueReport() {
                   <tr key={`${row.index}-${row.name}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                     <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{row.name}</td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {fmtFull(row.Value)}
+                      {row.Value === null ? (
+                        <span className="text-gray-400 dark:text-gray-500 font-normal">
+                          {t('portfolioValue.notAvailable')}
+                        </span>
+                      ) : (
+                        fmtFull(row.Value)
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -1160,6 +1598,7 @@ export function PortfolioValueReport() {
                 <Area
                   type="monotone"
                   dataKey="Value"
+                  connectNulls={false}
                   stroke={chartColors.income}
                   strokeWidth={2}
                   fillOpacity={1}
@@ -1177,6 +1616,9 @@ export function PortfolioValueReport() {
                       return <circle key={`dot-${index}`} cx={cx} cy={cy} r={0} fill="none" />;
                     }
                     const value = isHighest ? summary.highest : summary.lowest;
+                    if (value === null) {
+                      return <circle key={`dot-${index}`} cx={cx} cy={cy} r={0} fill="none" />;
+                    }
                     // Place the bubble to the side of its dot (with a horizontal
                     // connector) instead of above/below. This puts the bubble
                     // in the chart's middle vertical band -- well clear of the

@@ -3,6 +3,7 @@
     "noneToUpdate": "Không có giấy chứng khoán nào để cập nhật",
     "updated": "{count, plural, one {Đã cập nhật giá # giấy chứng khoán} other {Đã cập nhật giá # giấy chứng khoán}}",
     "partialFailure": "Đã cập nhật giá: {updated} thành công, {failed} thất bại{symbols}",
+    "partialFailureWithReasons": "Đã cập nhật giá: {updated} thành công, {failed} thất bại{symbols}\n{reasons}",
     "failed": "Không thể làm mới giá"
   },
   "page": {

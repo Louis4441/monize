@@ -269,7 +269,9 @@
     "cannotModifySystem": "Cannot modify system currency metadata",
     "cannotModifyOther": "Cannot modify another user's currency",
     "inUse": "Currency \"{{ code }}\" is in use by your accounts, securities, or other records. Deactivate it instead.",
-    "invalidRateDate": "date must be in YYYY-MM-DD format"
+    "invalidRateDate": "date must be in YYYY-MM-DD format",
+    "sameCurrencyHistory": "{{ code }} is your default currency; there is no exchange rate history to extend",
+    "rateProviderUnavailable": "The exchange rate provider did not answer. Please try again later."
   },
   "delegation": {
     "delegatedAccessInvalid": "Delegated access is no longer valid",
@@ -351,8 +353,10 @@
   "netWorth": {
     "invalidStartDate": "startDate must be YYYY-MM-DD",
     "invalidEndDate": "endDate must be YYYY-MM-DD",
+    "invalidBaselineDate": "baselineDate must be YYYY-MM-DD",
     "invalidAccountIds": "accountIds must be comma-separated UUIDs",
-    "invalidGranularity": "granularity must be 'daily' or 'monthly'"
+    "invalidGranularity": "granularity must be 'daily' or 'monthly'",
+    "invalidPeriods": "periods must be comma-separated period presets"
   },
   "notifications": {
     "notFound": "Notification with ID {{ id }} not found",
@@ -427,6 +431,7 @@
   },
   "securities": {
     "accountMustBeInvestment": "Account must be of type INVESTMENT",
+    "providerCurrencyMismatch": "Price update refused for {{ symbol }}: {{ provider }} quotes it in {{ reported }}, but the security is recorded in {{ configured }}. Correct the security's currency, symbol or exchange, then refresh.",
     "securityIdRequired": "Security ID is required for {{ action }} transactions",
     "exchangeRateUnavailable": "Could not determine an exchange rate for {{ from }} -> {{ to }} on the transaction date. Supply an explicit exchangeRate so the cash posting is correct.",
     "splitRatioRequired": "Split ratio (quantity) must be greater than zero",

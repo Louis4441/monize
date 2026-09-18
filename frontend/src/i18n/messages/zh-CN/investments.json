@@ -53,14 +53,20 @@
     "gainLossTooltip": "当前持仓的未实现盈亏：按今日价格计算的市值减去上面的成本基础。不包括过去卖出已实现的收益，也不包括已收到的股息和利息。",
     "returns": "回报率",
     "simpleReturn": "简单回报率",
-    "simpleReturnTooltip": "持仓的总百分比盈亏，计算公式为（市值 - 成本基础）÷ 成本基础。不考虑投入或提取资金的时间。",
+    "simpleReturnTooltip": "相对于您所支付金额的盈亏：（市值 − 成本基础）÷ 成本基础。它不考虑资金到账的时间，因此每次买入都会跳动：一笔 1,000 的持仓上涨 20% 显示为 +20%；再买入 1,000，尽管没有任何损失，却会显示为 +10%（200 ÷ 2,000）。TWR 和 MWR 没有这种跳动。",
     "twr": "时间加权回报率",
     "twrFull": "（时间加权）",
-    "twrTooltip": "衡量您的投资表现，不受资金进出时间的影响。消除现金流时机的影响，以展示纯投资表现。",
+    "twrTooltip": "自首笔交易以来您投资的时间加权回报率，计算方式与投资组合表现相同：存入、取出资金和未投资现金不计入，股息和利息计入。",
     "cagr": "年复合增长率",
     "cagrTooltip": "复合年增长率。基于净投入金额与当前投资组合价值，计算每年保持稳定增长时的年化回报率。",
     "notAvailable": "不适用",
-    "unpricedHoldings": "部分估值：{count, plural, one {# 项持仓} other {# 项持仓}}没有当前价格（{symbols}），以下数值不包含这些持仓。"
+    "unpricedHoldings": "部分估值：{count, plural, one {# 项持仓} other {# 项持仓}}没有当前价格（{symbols}），以下数值不包含这些持仓。",
+    "mwr": "MWR",
+    "mwrFull": "（资金加权）",
+    "mwrTooltip": "自首笔交易以来您投资的资金加权回报率（XIRR）：按每笔买入、卖出和股息发生的时间加权计算得出的，您自己资金所赚取的年化收益率。存入、取出资金和未投资现金不计入。如果您在上涨或下跌之前投入了更多资金，其结果会与 TWR 不同。",
+    "returnDiagnosticsLead": "由于历史记录存在缺口，TWR 和 MWR 未显示：",
+    "returnDiagnosticsRepair": "请在每个证券的价格历史中补全缺失的价格；回报是按显示的账户计算的。",
+    "returnDiagnosticsRepairFiltered": "请在每个证券的价格历史中补全缺失的价格，或使用上方的账户筛选器将这些账户排除在视图之外；回报是按显示的账户计算的。"
   },
   "assetAllocation": {
     "title": "资产配置",
@@ -124,8 +130,12 @@
     "noDataForPeriod": "此时段无投资数据。",
     "highestValue": "最高价值",
     "lowestValue": "最低价值",
-    "change": "变动",
-    "changePercent": "变动 %",
+    "investmentResult": "投资结果",
+    "investmentReturn": "回报",
+    "investmentResultTooltip": "此时间段内你的投资赚取的金额。存入、取出资金和未投资现金被排除在外，旁边的百分比是按时间加权的回报率，因此买入和卖出不会影响它。",
+    "unmeasuredFlowTooltip": "如果某笔交易在这些账户之外结算，或某个拆分将投资行与普通支出混在一起，则结果无法与转移的资金分开。",
+    "valueChangeLine": "价值变化 {amount}",
+    "netFlowsLine": "净存取款 {amount}",
     "priorCloseTooltip": "以上一交易日（{date}）收盘价为基准计算。",
     "notAvailable": "不适用",
     "portfolioLabel": "投资组合："
@@ -288,5 +298,28 @@
     "accountRequired": "账户为必填项",
     "dateRequired": "日期为必填项",
     "acquisitionPriceRequired": "每股价格为必填项，且必须大于零。对于成本未知的股份，请使用“增加股份”。"
+  },
+  "portfolioPerformance": {
+    "title": "投资组合表现",
+    "subtitle": "扣除存入、取出资金和未投资现金影响后，你的投资本身的表现。",
+    "footnote": "存入、取出资金和未投资现金不计入投资结果。",
+    "unavailable": "无",
+    "empty": "历史数据还不足以计算回报。",
+    "periods": {
+      "1d": "1天",
+      "1w": "1周",
+      "1m": "1个月",
+      "3m": "3个月",
+      "ytd": "年初至今",
+      "1y": "1年"
+    },
+    "loading": "正在计算各时间段...",
+    "loadFailed": "无法加载各时间段的结果。这些数字是被搁置的，不是零；请重新加载页面再试一次。",
+    "reasons": {
+      "incompletePrices": "被搁置的时间段始于某个持仓当天没有价格的日子。请刷新价格，或在该证券的价格历史中手动添加一条。",
+      "incompleteCash": "被搁置的时间段始于此视图中某个现金账户当天未报告余额的日子，因此其持有金额是未知，而不是零。",
+      "missingRatePairs": "被搁置的时间段需要一个已存历史中没有的汇率。请在“货币”页面为该货币添加汇率历史。",
+      "unmeasuredFlow": "被搁置的时间段包含一笔无法与存入或取出区分的资金变动：一笔在这些账户之外结算的交易，或一笔将现金和投资混在一起的拆分。"
+    }
   }
 }

@@ -259,7 +259,9 @@
     "cannotModifyOther": "Impossible de modifier la devise d'un autre utilisateur",
     "inUse": "La devise « {{ code }} » est utilisée par vos comptes, titres ou autres enregistrements. Désactivez-la à la place.",
     "invalidRateDate": "date doit être au format AAAA-MM-JJ",
-    "alreadyInListInactive": "La devise « {{ code }} » est déjà dans votre liste, mais est actuellement inactive. Réactivez-la pour l'utiliser."
+    "alreadyInListInactive": "La devise « {{ code }} » est déjà dans votre liste, mais est actuellement inactive. Réactivez-la pour l'utiliser.",
+    "sameCurrencyHistory": "{{ code }} est votre devise par défaut ; il n'y a pas d'historique de taux de change à étendre",
+    "rateProviderUnavailable": "Le fournisseur de taux de change n'a pas répondu. Veuillez réessayer plus tard."
   },
   "delegation": {
     "delegatedAccessInvalid": "L'accès délégué n'est plus valide",
@@ -341,8 +343,10 @@
   "netWorth": {
     "invalidStartDate": "startDate doit être au format YYYY-MM-DD",
     "invalidEndDate": "endDate doit être au format YYYY-MM-DD",
+    "invalidBaselineDate": "baselineDate doit être au format YYYY-MM-DD",
     "invalidAccountIds": "accountIds doit être une liste d'UUID séparés par des virgules",
-    "invalidGranularity": "granularity doit être 'daily' ou 'monthly'"
+    "invalidGranularity": "granularity doit être 'daily' ou 'monthly'",
+    "invalidPeriods": "periods doit être une liste de périodes prédéfinies séparées par des virgules"
   },
   "notifications": {
     "notFound": "Notification avec l'ID {{ id }} introuvable",
@@ -418,6 +422,7 @@
   "securities": {
     "exchangeRateUnavailable": "Impossible de déterminer un taux de change pour {{ from }} -> {{ to }} à la date de la transaction. Fournissez un exchangeRate explicite afin que l'écriture sur le compte d'espèces soit correcte.",
     "accountMustBeInvestment": "Le compte doit être de type INVESTMENT",
+    "providerCurrencyMismatch": "Mise à jour du prix refusée pour {{ symbol }} : {{ provider }} le cote en {{ reported }}, mais le titre est enregistré en {{ configured }}. Corrigez la devise, le symbole ou la place boursière du titre, puis actualisez.",
     "securityIdRequired": "L'ID de titre est requis pour les transactions {{ action }}",
     "splitRatioRequired": "Le ratio de fractionnement (quantité) doit être supérieur à zéro",
     "acquisitionPriceRequired": "Un prix par part supérieur à zéro est requis pour les transactions {{ action }}. Utilisez ADD_SHARES pour les parts acquises sans coût connu.",

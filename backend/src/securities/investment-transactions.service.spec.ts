@@ -13,6 +13,7 @@ import {
   ConflictException,
 } from "@nestjs/common";
 import { InvestmentTransactionsService } from "./investment-transactions.service";
+import { INVESTMENT_REPLAY_ORDER } from "./investment-replay.util";
 import { UpdateInvestmentTransactionDto } from "./dto/update-investment-transaction.dto";
 import {
   InvestmentTransaction,
@@ -37,6 +38,7 @@ describe("InvestmentTransactionsService", () => {
   let service: InvestmentTransactionsService;
   let investmentTransactionsRepository: Record<string, jest.Mock>;
   let transactionRepository: Record<string, jest.Mock>;
+  let transactionSplitRepository: Record<string, jest.Mock>;
   let accountsService: Record<string, jest.Mock>;
   let portfolioCalculationService: Record<string, jest.Mock>;
   let transactionsService: Record<string, jest.Mock>;
@@ -249,10 +251,7 @@ describe("InvestmentTransactionsService", () => {
     transactionsService = {};
 
     holdingsService = {
-      updateHolding: jest.fn().mockResolvedValue(undefined),
-      adjustQuantity: jest.fn().mockResolvedValue(undefined),
-      applySplit: jest.fn().mockResolvedValue(undefined),
-      reverseSplit: jest.fn().mockResolvedValue(undefined),
+      rebuildScopesFromTransactions: jest.fn().mockResolvedValue(undefined),
       findByAccountAndSecurity: jest.fn().mockResolvedValue(null),
       removeAllForUser: jest.fn().mockResolvedValue(5),
       rebuildFromTransactions: jest.fn().mockResolvedValue({
@@ -348,9 +347,14 @@ describe("InvestmentTransactionsService", () => {
       calculateCapitalGainsByMonth: jest.fn().mockResolvedValue([]),
     };
 
+    // The embedded-row status pass reads the parent's splits; default "this
+    // parent has none", which is what a non-investment split parent looks like.
+    transactionSplitRepository = { find: jest.fn().mockResolvedValue([]) };
+
     const mocks = createScopedDbMocks([
       [InvestmentTransaction, investmentTransactionsRepository],
       [Transaction, transactionRepository],
+      [TransactionSplit, transactionSplitRepository],
     ]);
     dataSource = mocks.dataSource;
     // Reuse the direct-manager behaviours the spec already defines.
@@ -469,14 +473,12 @@ describe("InvestmentTransactionsService", () => {
       // 150.999 per share), so blending the raw price in here would report the
       // commission as gain on the eventual disposal until something happened to
       // trigger a recompute (FR-008).
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        10,
-        150.999,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        false,
       );
     });
 
@@ -563,14 +565,12 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, sellDto);
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -5,
-        160,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        false,
       );
     });
 
@@ -775,14 +775,12 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, reinvestDto);
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        2,
-        150,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        false,
       );
       // No cash transaction for REINVEST
       expect(transactionRepository.create).not.toHaveBeenCalled();
@@ -822,14 +820,12 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, transferInDto);
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        20,
-        100,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        false,
       );
       expect(transactionRepository.create).not.toHaveBeenCalled();
     });
@@ -867,19 +863,17 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, transferOutDto);
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -10,
-        100,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        false,
       );
       expect(transactionRepository.create).not.toHaveBeenCalled();
     });
 
-    it("creates an ADD_SHARES transaction using adjustQuantity", async () => {
+    it("creates an ADD_SHARES transaction that adds to the position", async () => {
       const addSharesDto = {
         accountId,
         securityId,
@@ -911,18 +905,17 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, addSharesDto);
 
-      expect(holdingsService.adjustQuantity).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        5,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
       );
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
       expect(transactionRepository.create).not.toHaveBeenCalled();
     });
 
-    it("creates a REMOVE_SHARES transaction using adjustQuantity with negative delta", async () => {
+    it("creates a REMOVE_SHARES transaction that reduces the position", async () => {
       const removeSharesDto = {
         accountId,
         securityId,
@@ -954,11 +947,11 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, removeSharesDto);
 
-      expect(holdingsService.adjustQuantity).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -3,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
       );
     });
@@ -1076,7 +1069,7 @@ describe("InvestmentTransactionsService", () => {
       );
     });
 
-    it("calls holdingsService.applySplit with the supplied ratio for SPLIT", async () => {
+    it("re-derives the position from the ledger for a SPLIT", async () => {
       accountsService.findOne.mockResolvedValue(mockInvestmentAccount);
       investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
         createMockQueryBuilder({ ...mockBuyTransaction, action: "SPLIT" }),
@@ -1091,14 +1084,14 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, dto);
 
-      expect(holdingsService.applySplit).toHaveBeenCalledWith(
-        accountId,
-        securityId,
-        2,
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
+        userId,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
       );
       // SPLIT must not write a cash transaction.
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
     });
 
     it("rebuilds holdings from history after creating a SPLIT", async () => {
@@ -1149,10 +1142,11 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, dto);
 
-      expect(holdingsService.applySplit).toHaveBeenCalledWith(
-        accountId,
-        securityId,
-        0.5,
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
+        userId,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
       );
     });
@@ -1980,28 +1974,21 @@ describe("InvestmentTransactionsService", () => {
       await service.update(userId, transactionId, { quantity: 20 });
 
       // Should reverse the original effects first
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -10, // Reverse: remove original 10 shares
-        // The commissioned unit cost (10 * 150 + 9.99) / 10. Inert for this
-        // negative delta; read only if the reversal recreates a deleted
-        // holding row.
-        150.999,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
 
       // Then apply new effects
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        expect.any(Number), // New quantity applied
-        expect.any(Number),
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
     });
 
@@ -2161,6 +2148,105 @@ describe("InvestmentTransactionsService", () => {
       expect(investmentTransactionsRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
           totalAmount: 1500,
+        }),
+      );
+    });
+
+    /**
+     * Invariant: a change is a value difference, not a field being present
+     * (AGENTS.md, "Financial math"), and the stored executed total is the fact.
+     * Canonical adversarial input: the transaction form's own payload, which
+     * resends quantity, price, commission and action unchanged on an edit that
+     * only touches the description.
+     * Minimal mutation: key the re-derivation on `!== undefined` again.
+     * Test that fails under it: this one -- the stored 1510.5000 comes back as
+     * 10 x 150 + 9.99 = 1509.99, because the price is a rounded quotient.
+     */
+    it("keeps the stored total when a resent edit changes only the description", async () => {
+      const existingTx = { ...mockBuyTransaction, totalAmount: 1510.5 };
+      const firstFindQB = createMockQueryBuilder(existingTx);
+      const secondFindQB = createMockQueryBuilder({ ...existingTx });
+
+      investmentTransactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(firstFindQB)
+        .mockReturnValueOnce(secondFindQB);
+
+      transactionRepository.findOne.mockResolvedValue({
+        id: cashTransactionId,
+        userId,
+        accountId: cashAccountId,
+        amount: -1510.5,
+      });
+
+      await service.update(userId, transactionId, {
+        action: InvestmentAction.BUY,
+        quantity: 10,
+        price: 150,
+        commission: 9.99,
+        description: "Updated",
+      });
+
+      expect(investmentTransactionsRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ totalAmount: 1510.5 }),
+      );
+    });
+
+    it("re-derives the total from the price when the quantity changes", async () => {
+      const existingTx = { ...mockBuyTransaction, totalAmount: 1510.5 };
+      const firstFindQB = createMockQueryBuilder(existingTx);
+      const secondFindQB = createMockQueryBuilder({ ...existingTx });
+
+      investmentTransactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(firstFindQB)
+        .mockReturnValueOnce(secondFindQB);
+
+      transactionRepository.findOne.mockResolvedValue({
+        id: cashTransactionId,
+        userId,
+        accountId: cashAccountId,
+        amount: -1510.5,
+      });
+
+      await service.update(userId, transactionId, {
+        quantity: 20,
+        price: 150,
+        commission: 9.99,
+      });
+
+      // 20 x 150 + 9.99
+      expect(investmentTransactionsRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ totalAmount: 3009.99 }),
+      );
+    });
+
+    it("takes a supplied total as the fact and derives the price from it", async () => {
+      const existingTx = { ...mockBuyTransaction };
+      const firstFindQB = createMockQueryBuilder(existingTx);
+      const secondFindQB = createMockQueryBuilder({ ...existingTx });
+
+      investmentTransactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(firstFindQB)
+        .mockReturnValueOnce(secondFindQB);
+
+      transactionRepository.findOne.mockResolvedValue({
+        id: cashTransactionId,
+        userId,
+        accountId: cashAccountId,
+        amount: -1509.99,
+      });
+
+      await service.update(userId, transactionId, {
+        quantity: 10,
+        price: 150,
+        commission: 9.99,
+        totalAmount: 1520.91,
+      });
+
+      expect(investmentTransactionsRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          totalAmount: 1520.91,
+          // (1520.91 - 9.99) / 10
+          price: 151.092,
         }),
       );
     });
@@ -2539,18 +2625,15 @@ describe("InvestmentTransactionsService", () => {
 
       await service.remove(userId, transactionId);
 
-      // Should reverse BUY holdings (remove shares). The unit cost argument
-      // is inert for a negative delta (updateHolding blends prices only for
-      // positive ones); it is read only when the reversal has to recreate a
-      // deleted holding row, where it must be the commissioned figure.
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      // The position is re-derived from the ledger the row has just left --
+      // not from the stored figure minus this row's delta, which is what made
+      // deleting a back-dated trade converge on the wrong average cost.
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -10,
-        150.999,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
 
       // Should delete cash transaction and reverse balance
@@ -2584,14 +2667,12 @@ describe("InvestmentTransactionsService", () => {
       await service.remove(userId, tx.id);
 
       // Should reverse SELL: add shares back
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        5, // Add back the sold shares
-        160,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
     });
 
@@ -2611,15 +2692,12 @@ describe("InvestmentTransactionsService", () => {
 
       await service.remove(userId, reinvestTx.id);
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -3,
-        // (3 * 150 + 9.99) / 3
-        153.33,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
     });
 
@@ -2639,15 +2717,12 @@ describe("InvestmentTransactionsService", () => {
 
       await service.remove(userId, transferInTx.id);
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -20,
-        // (20 * 100 + 9.99) / 20
-        100.4995,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
     });
 
@@ -2667,14 +2742,12 @@ describe("InvestmentTransactionsService", () => {
 
       await service.remove(userId, transferOutTx.id);
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        10,
-        100,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
     });
 
@@ -2694,11 +2767,11 @@ describe("InvestmentTransactionsService", () => {
 
       await service.remove(userId, addSharesTx.id);
 
-      expect(holdingsService.adjustQuantity).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -5,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
       );
     });
@@ -2719,16 +2792,16 @@ describe("InvestmentTransactionsService", () => {
 
       await service.remove(userId, removeSharesTx.id);
 
-      expect(holdingsService.adjustQuantity).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        3,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
       );
     });
 
-    it("reverses SPLIT by calling reverseSplit on holdings", async () => {
+    it("re-derives the position after removing an embedded SPLIT", async () => {
       const splitTx = {
         ...mockBuyTransaction,
         id: "inv-tx-split",
@@ -2744,14 +2817,14 @@ describe("InvestmentTransactionsService", () => {
 
       await service.remove(userId, splitTx.id);
 
-      expect(holdingsService.reverseSplit).toHaveBeenCalledWith(
-        accountId,
-        securityId,
-        2,
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
+        userId,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
       );
-      // Reversing a SPLIT must NOT remove cash transactions or call updateHolding.
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
+      // Reversing a SPLIT must NOT remove cash transactions.
       // Rebuild holdings from history so any incremental drift from the
       // original (possibly buggy) apply is corrected.
       expect(holdingsService.rebuildFromTransactions).toHaveBeenCalledWith(
@@ -2920,9 +2993,16 @@ describe("InvestmentTransactionsService", () => {
         userId,
       });
       expect(investmentTransactionsRepository.remove).toHaveBeenCalledWith(tx);
-      // ...but nothing is reversed, because nothing was contributed.
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
-      expect(holdingsService.adjustQuantity).not.toHaveBeenCalled();
+      // ...and the position is re-derived from what is left of the ledger.
+      // That a VOID row contributed nothing is the rebuild's filter, covered
+      // in holdings.service.spec.ts, not a delta this seam declines to apply.
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
+        userId,
+        [{ accountId, securityId }],
+        expect.anything(),
+      );
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
     });
   });
@@ -2974,6 +3054,18 @@ describe("InvestmentTransactionsService", () => {
       mockQueryRunner.manager.query.mockImplementation(
         async (sql: string, params?: unknown[]) => {
           const text = String(sql);
+          // The unlocked scope read that feeds the advisory lock: the row's
+          // own account and its linked transfer leg's.
+          if (text.includes("SELECT DISTINCT account_id")) {
+            const self = invRows.find((row) => row.id === params?.[0]);
+            const legId = self?.linked_transaction_id ?? null;
+            const rows = invRows.filter(
+              (row) => row.id === params?.[0] || row.id === legId,
+            );
+            return [...new Set(rows.map((row) => row.account_id))].map(
+              (account_id) => ({ account_id }),
+            );
+          }
           if (!text.includes("FOR UPDATE")) return [];
           const rows = text.includes("FROM investment_transactions")
             ? invRows
@@ -2995,6 +3087,58 @@ describe("InvestmentTransactionsService", () => {
       );
     });
 
+    /**
+     * Advisory locks are taken before row locks (`common/db/locks.ts`).
+     * `updateStatus` reached the holdings advisory lock only inside the
+     * rebuild at the end, by which time `applyVoidTransitionToMirrorLeg` had
+     * already row-locked `accounts` for the cash leg -- the opposite order
+     * from create/update/remove, so two concurrent writers of one account
+     * deadlock (40P01).
+     */
+    it("takes the holdings advisory lock before its first row lock", async () => {
+      stageLocks([invLockRow()], [cashLockRow()]);
+
+      await service.updateStatus(userId, transactionId, TransactionStatus.VOID);
+
+      const calls = mockQueryRunner.manager.query.mock.calls as unknown[][];
+      const advisory = calls.findIndex(([sql]) =>
+        String(sql).includes("pg_advisory_xact_lock"),
+      );
+      const firstRowLock = calls.findIndex(([sql]) =>
+        String(sql).includes("FOR UPDATE"),
+      );
+      expect(advisory).toBeGreaterThanOrEqual(0);
+      expect(firstRowLock).toBeGreaterThanOrEqual(0);
+      expect(advisory).toBeLessThan(firstRowLock);
+    });
+
+    /** The scope covers the transfer leg that crosses the boundary with it. */
+    it("locks both legs' accounts when a linked transfer leg crosses too", async () => {
+      stageLocks(
+        [
+          invLockRow({ linked_transaction_id: "inv-tx-2" }),
+          invLockRow({
+            id: "inv-tx-2",
+            account_id: "other-brokerage",
+            linked_transaction_id: transactionId,
+            transaction_id: null,
+          }),
+        ],
+        [cashLockRow()],
+      );
+
+      await service.updateStatus(userId, transactionId, TransactionStatus.VOID);
+
+      const advisoryIds = (
+        mockQueryRunner.manager.query.mock.calls as unknown[][]
+      )
+        .filter(([sql]) => String(sql).includes("pg_advisory_xact_lock"))
+        .map(([, params]) => (params as unknown[])[1]);
+      expect(advisoryIds).toEqual(
+        [accountId, "other-brokerage"].sort((a, b) => (a < b ? -1 : 1)),
+      );
+    });
+
     it("UNRECONCILED -> CLEARED updates only the column (presentational)", async () => {
       stageLocks([invLockRow({ status: TransactionStatus.UNRECONCILED })]);
 
@@ -3009,8 +3153,9 @@ describe("InvestmentTransactionsService", () => {
         { status: TransactionStatus.CLEARED },
       );
       // Only crossing the VOID boundary moves shares or money.
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
-      expect(holdingsService.adjustQuantity).not.toHaveBeenCalled();
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).not.toHaveBeenCalled();
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
       expect(
         holdingsService.validateNoNegativeHoldingsHistory,
@@ -3024,14 +3169,12 @@ describe("InvestmentTransactionsService", () => {
 
       // Holdings reversal at the row's stored quantities (unit cost is the
       // commissioned figure, as everywhere else).
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -10,
-        150.999,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
       expect(investmentTransactionsRepository.update).toHaveBeenCalledWith(
         transactionId,
@@ -3066,14 +3209,12 @@ describe("InvestmentTransactionsService", () => {
         TransactionStatus.CLEARED,
       );
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        10,
-        150.999,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
       expect(mockQueryRunner.manager.update).toHaveBeenCalledWith(
         Transaction,
@@ -3098,7 +3239,9 @@ describe("InvestmentTransactionsService", () => {
 
       expect(investmentTransactionsRepository.update).not.toHaveBeenCalled();
       expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).not.toHaveBeenCalled();
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
     });
 
@@ -3118,7 +3261,9 @@ describe("InvestmentTransactionsService", () => {
 
       expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
       expect(investmentTransactionsRepository.update).not.toHaveBeenCalled();
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).not.toHaveBeenCalled();
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
     });
 
@@ -3183,25 +3328,17 @@ describe("InvestmentTransactionsService", () => {
         linkedLegId,
         { status: TransactionStatus.VOID },
       );
-      // Reversing a TRANSFER_OUT returns the shares to the source; reversing
-      // the TRANSFER_IN removes them from the destination.
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      // Two rows describing one movement of shares cross the boundary
+      // together, so both positions are re-derived in one call.
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        10,
+        [
+          { accountId: accountId, securityId: securityId },
+          { accountId: "account-2", securityId: securityId },
+        ],
         expect.anything(),
-        expect.anything(),
-        true,
-      );
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
-        userId,
-        "account-2",
-        securityId,
-        -10,
-        expect.anything(),
-        expect.anything(),
-        true,
       );
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
     });
@@ -3218,14 +3355,12 @@ describe("InvestmentTransactionsService", () => {
 
       await service.updateStatus(userId, transactionId, TransactionStatus.VOID);
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -10,
-        150.999,
+        [{ accountId: accountId, securityId: securityId }],
         expect.anything(),
-        true,
       );
       expect(mockQueryRunner.manager.update).not.toHaveBeenCalledWith(
         Transaction,
@@ -3233,6 +3368,36 @@ describe("InvestmentTransactionsService", () => {
         expect.anything(),
       );
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("applyParentStatusToEmbeddedRows", () => {
+    /**
+     * The split parent's status change row-locks `accounts` for the parent's
+     * own balance; this pass rebuilds the embedded rows' positions under the
+     * holdings advisory lock. Taking that lock only inside the rebuild put the
+     * two in the opposite order from an investment write (40P01), so the lock
+     * is this method's own first statement as well as its callers'.
+     */
+    it("takes the holdings advisory lock before it touches a row", async () => {
+      mockQueryRunner.manager.query.mockImplementation(async (sql: string) =>
+        String(sql).includes("SELECT DISTINCT it.account_id")
+          ? [{ account_id: accountId }]
+          : [],
+      );
+
+      await service.applyParentStatusToEmbeddedRows(
+        mockQueryRunner.manager as never,
+        userId,
+        "parent-tx-1",
+        TransactionStatus.VOID,
+      );
+
+      const advisory = (
+        mockQueryRunner.manager.query.mock.calls as unknown[][]
+      ).filter(([sql]) => String(sql).includes("pg_advisory_xact_lock"));
+      expect(advisory).toHaveLength(1);
+      expect((advisory[0][1] as unknown[])[1]).toBe(accountId);
     });
   });
 
@@ -3272,7 +3437,8 @@ describe("InvestmentTransactionsService", () => {
       expect(investmentTransactionsRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({ status: TransactionStatus.VOID }),
       );
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
+      // The VOID row's exclusion is the rebuild's status filter, not a
+      // holdings write this path declines to make.
       // The cash leg is still created -- the event stays visible in the cash
       // ledger -- but carries VOID and moves nothing.
       expect(transactionRepository.create).toHaveBeenCalledWith(
@@ -4056,6 +4222,34 @@ describe("InvestmentTransactionsService", () => {
 
       expect(investmentTransactionsRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({ totalAmount: 0 }),
+      );
+    });
+
+    /**
+     * Invariant: the executed total is the fact; the per-share price is
+     * derived from it (`docs/financial-semantics.md` section 4).
+     * Canonical adversarial input: a sale whose total does not divide into a
+     * two-decimal price -- 141 shares for 820.91.
+     * Minimal mutation: resolve the amounts from `price` alone.
+     * Test that fails under it: this one -- the row stores 141 x 5.82 =
+     * 820.62, and the realized-gains report is 0.29 light before FX.
+     */
+    it("stores a supplied total as given and derives the price from it", async () => {
+      await service.create(userId, {
+        accountId,
+        securityId,
+        action: InvestmentAction.SELL,
+        transactionDate: "2025-01-15",
+        quantity: 141,
+        price: 5.82,
+        totalAmount: 820.91,
+      });
+
+      expect(investmentTransactionsRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          totalAmount: 820.91,
+          price: 5.8220567376,
+        }),
       );
     });
 
@@ -5078,7 +5272,7 @@ describe("InvestmentTransactionsService", () => {
       });
     });
 
-    it("does NOT update holdings for a future-dated BUY transaction", async () => {
+    it("re-derives the position for a future-dated BUY, which the cutoff excludes", async () => {
       const savedTx = {
         ...mockBuyTransaction,
         transactionDate: "2027-06-15",
@@ -5092,7 +5286,16 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, createBuyDto);
 
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
+      // The row is future-dated, so `transaction_date <= cutoff` leaves it out
+      // of the replay -- the exclusion is the rebuild's, and is covered in
+      // holdings.service.spec.ts. What this path owes is the request.
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
+        userId,
+        [{ accountId, securityId }],
+        expect.anything(),
+      );
     });
 
     it("does NOT create a cash transaction for a future-dated BUY", async () => {
@@ -5116,7 +5319,7 @@ describe("InvestmentTransactionsService", () => {
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
     });
 
-    it("does NOT update holdings for a future-dated SELL transaction", async () => {
+    it("re-derives the position for a future-dated SELL, which the cutoff excludes", async () => {
       const sellDto = {
         accountId,
         securityId,
@@ -5140,12 +5343,12 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, sellDto);
 
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
+      expect(holdingsService.rebuildScopesFromTransactions).toHaveBeenCalled();
       // The cash side IS created so the user sees the projected proceeds.
       expect(transactionRepository.create).toHaveBeenCalled();
     });
 
-    it("does NOT touch holdings when deleting a future-dated transaction", async () => {
+    it("re-derives the position when deleting a future-dated transaction", async () => {
       const futureTx = {
         ...mockBuyTransaction,
         transactionDate: "2027-06-15",
@@ -5158,8 +5361,7 @@ describe("InvestmentTransactionsService", () => {
 
       await service.remove(userId, transactionId);
 
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
-      expect(holdingsService.adjustQuantity).not.toHaveBeenCalled();
+      expect(holdingsService.rebuildScopesFromTransactions).toHaveBeenCalled();
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
       // The linked cash transaction (which was created with the future date)
       // is torn down with the investment row.
@@ -5354,6 +5556,162 @@ describe("InvestmentTransactionsService", () => {
       expect(dataSource.transaction).toHaveBeenCalled();
       expect(mockActionHistoryService.record).not.toHaveBeenCalled();
     });
+
+    /**
+     * Advisory locks are taken before row locks (`common/db/locks.ts`). A
+     * ledger write that took the holdings advisory lock only inside the
+     * rebuild at the end had already row-locked `accounts` for its cash
+     * effects -- the opposite order from a split status change, which takes
+     * the advisory lock first and then row-locks the legs, so two concurrent
+     * writers of one account can deadlock (40P01).
+     */
+    const lockOrder = (): number => {
+      const calls = mockQueryRunner.manager.query.mock.calls as unknown[][];
+      const index = calls.findIndex(([sql]) =>
+        String(sql).includes("pg_advisory_xact_lock"),
+      );
+      expect(index).toBeGreaterThanOrEqual(0);
+      return mockQueryRunner.manager.query.mock.invocationCallOrder[index];
+    };
+
+    /** When the transaction first touched a row lock or wrote anything. */
+    const firstRowTouchOrder = (): number =>
+      Math.min(
+        ...[
+          ...mockQueryRunner.manager.save.mock.invocationCallOrder,
+          ...accountsService.updateBalance.mock.invocationCallOrder,
+          ...mockQueryRunner.manager.remove.mock.invocationCallOrder,
+          ...(mockQueryRunner.manager.query.mock.calls as unknown[][])
+            .map(([sql], i) =>
+              String(sql).includes("FOR UPDATE")
+                ? mockQueryRunner.manager.query.mock.invocationCallOrder[i]
+                : Number.POSITIVE_INFINITY,
+            )
+            .filter((n) => Number.isFinite(n)),
+          Number.POSITIVE_INFINITY,
+        ],
+      );
+
+    it("create takes the holdings advisory lock before its first row lock or write", async () => {
+      const savedTx = {
+        id: "inv-tx-1",
+        ...createBuyDto,
+        userId,
+        totalAmount: 1500,
+        commission: 0,
+        fundingAccountId: null,
+        transactionId: "cash-tx-1",
+        account: mockInvestmentAccount,
+        security: mockSecurity,
+      };
+      investmentTransactionsRepository.save.mockResolvedValue(savedTx);
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(savedTx),
+      );
+
+      await service.create(userId, createBuyDto);
+
+      expect(lockOrder()).toBeLessThan(firstRowTouchOrder());
+    });
+
+    it("remove takes the holdings advisory lock before its first row lock or write", async () => {
+      const existingTx = {
+        id: "inv-tx-1",
+        userId,
+        accountId,
+        securityId,
+        action: InvestmentAction.BUY,
+        transactionDate: "2025-01-15",
+        quantity: 10,
+        price: 150,
+        totalAmount: 1500,
+        commission: 0,
+        fundingAccountId: null,
+        transactionId: null,
+        account: mockInvestmentAccount,
+        security: mockSecurity,
+      };
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(existingTx),
+      );
+
+      await service.remove(userId, "inv-tx-1");
+
+      expect(lockOrder()).toBeLessThan(firstRowTouchOrder());
+    });
+
+    it("update takes the holdings advisory lock before its first row lock or write", async () => {
+      const existingTx = {
+        id: "inv-tx-1",
+        userId,
+        accountId,
+        securityId,
+        action: InvestmentAction.BUY,
+        transactionDate: "2025-01-15",
+        quantity: 10,
+        price: 150,
+        totalAmount: 1500,
+        commission: 0,
+        fundingAccountId: null,
+        transactionId: null,
+        account: mockInvestmentAccount,
+        security: mockSecurity,
+      };
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(existingTx),
+      );
+      investmentTransactionsRepository.save.mockResolvedValue(existingTx);
+
+      await service.update(userId, "inv-tx-1", { quantity: 20 });
+
+      expect(lockOrder()).toBeLessThan(firstRowTouchOrder());
+    });
+
+    /**
+     * The rebuild is the ledger write's own last statement, not a follow-up:
+     * dispatched after the commit it would read a ledger another writer had
+     * already changed, and the position would be written from outside the
+     * lock the write took.
+     */
+    it("rebuilds the position on the transaction's own manager, before the transaction returns", async () => {
+      const savedTx = {
+        id: "inv-tx-1",
+        ...createBuyDto,
+        userId,
+        totalAmount: 1500,
+        commission: 0,
+        fundingAccountId: null,
+        transactionId: "cash-tx-1",
+        account: mockInvestmentAccount,
+        security: mockSecurity,
+      };
+      investmentTransactionsRepository.save.mockResolvedValue(savedTx);
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(savedTx),
+      );
+
+      let rebuiltBeforeReturn = false;
+      dataSource.transaction.mockImplementation(async (...args: unknown[]) => {
+        const fn = (typeof args[0] === "function" ? args[0] : args[1]) as (
+          m: unknown,
+        ) => Promise<unknown>;
+        const result = await fn(mockQueryRunner.manager);
+        rebuiltBeforeReturn =
+          holdingsService.rebuildScopesFromTransactions.mock.calls.length > 0;
+        return result;
+      });
+
+      await service.create(userId, createBuyDto);
+
+      expect(rebuiltBeforeReturn).toBe(true);
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
+        userId,
+        [{ accountId, securityId }],
+        mockQueryRunner.manager,
+      );
+    });
   });
 
   describe("createEmbeddedForSplit", () => {
@@ -5499,14 +5857,12 @@ describe("InvestmentTransactionsService", () => {
           entity && entity.constructor && entity.constructor.name === "Object",
       );
       expect(transactionSaves.length).toBeGreaterThan(0); // saved the InvestmentTransaction
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        75,
-        10,
-        mockQueryRunner.manager,
-        false,
+        [{ accountId: accountId, securityId: securityId }],
+        expect.anything(),
       );
       // The embedded path should never invoke the cash-side balance update
       // for a cash account (only holdings updates).
@@ -5629,8 +5985,8 @@ describe("InvestmentTransactionsService", () => {
         },
       );
 
-      // No holdings update for DIVIDEND, no cash transaction either
-      expect(holdingsService.updateHolding).not.toHaveBeenCalled();
+      // No cash transaction either. A DIVIDEND moves no shares, which is the
+      // replay reducer's answer, not something this seam decides.
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
       expect(created).toBeDefined();
       expect(mockQueryRunner.manager.create).toHaveBeenCalledWith(
@@ -5664,14 +6020,12 @@ describe("InvestmentTransactionsService", () => {
         },
       );
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -10,
-        50,
-        mockQueryRunner.manager,
-        false,
+        [{ accountId: accountId, securityId: securityId }],
+        expect.anything(),
       );
       // Cash side suppressed
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
@@ -5929,14 +6283,12 @@ describe("InvestmentTransactionsService", () => {
       );
 
       // Reverse-of-BUY decrements holdings by qty
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -5,
-        10,
-        mockQueryRunner.manager,
-        true,
+        [{ accountId: accountId, securityId: securityId }],
+        expect.anything(),
       );
       expect(mockQueryRunner.manager.remove).toHaveBeenCalledWith(embedded);
     });
@@ -5980,25 +6332,21 @@ describe("InvestmentTransactionsService", () => {
     it("creates both legs and moves holdings at the supplied cost basis", async () => {
       const result = await service.transferSecurity(userId, transferDto);
 
-      // TRANSFER_OUT draws down the source at cost basis.
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      // Both legs carry the per-share cost basis into the ledger, and both
+      // positions are then re-derived from it in one call.
+      const legPrices = mockQueryRunner.manager.create.mock.calls
+        .filter(([entity]: any[]) => entity === InvestmentTransaction)
+        .map(([, data]: any[]) => data.price);
+      expect(legPrices).toEqual([1.67, 1.67]);
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -100,
-        1.67,
-        mockQueryRunner.manager,
-        false,
-      );
-      // TRANSFER_IN adds to the destination at the same per-share cost.
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
-        userId,
-        toAccountId,
-        securityId,
-        100,
-        1.67,
-        mockQueryRunner.manager,
-        false,
+        [
+          { accountId, securityId },
+          { accountId: toAccountId, securityId },
+        ],
+        expect.anything(),
       );
       expect(dataSource.transaction).toHaveBeenCalled();
       expect(result).toHaveProperty("transferOut");
@@ -6088,23 +6436,19 @@ describe("InvestmentTransactionsService", () => {
         costPerShare: 0,
       });
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+      const zeroLegPrices = mockQueryRunner.manager.create.mock.calls
+        .filter(([entity]: any[]) => entity === InvestmentTransaction)
+        .map(([, data]: any[]) => data.price);
+      expect(zeroLegPrices).toEqual([0, 0]);
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).toHaveBeenCalledWith(
         userId,
-        accountId,
-        securityId,
-        -100,
-        0,
-        mockQueryRunner.manager,
-        false,
-      );
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
-        userId,
-        toAccountId,
-        securityId,
-        100,
-        0,
-        mockQueryRunner.manager,
-        false,
+        [
+          { accountId, securityId },
+          { accountId: toAccountId, securityId },
+        ],
+        expect.anything(),
       );
       expect(dataSource.transaction).toHaveBeenCalled();
     });
@@ -6123,24 +6467,12 @@ describe("InvestmentTransactionsService", () => {
         costPerShare: 0,
       });
 
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
-        userId,
-        accountId,
-        securityId,
-        -100,
-        4.25,
-        mockQueryRunner.manager,
-        false,
-      );
-      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
-        userId,
-        toAccountId,
-        securityId,
-        100,
-        4.25,
-        mockQueryRunner.manager,
-        false,
-      );
+      // The carried basis reaches the ledger, which is what the rebuild then
+      // reads -- a stale client value cannot poison the destination.
+      const carriedPrices = mockQueryRunner.manager.create.mock.calls
+        .filter(([entity]: any[]) => entity === InvestmentTransaction)
+        .map(([, data]: any[]) => data.price);
+      expect(carriedPrices).toEqual([4.25, 4.25]);
     });
 
     it("rejects transferring into a non-brokerage (cash sleeve) account", async () => {
@@ -6252,8 +6584,11 @@ describe("InvestmentTransactionsService", () => {
 
       await service.update(userId, "leg-out", { quantity: 50 });
 
-      // Both legs reversed (add/remove) and reapplied -> 4 holding updates.
-      expect(holdingsService.updateHolding).toHaveBeenCalled();
+      // A transfer edit re-derives both accounts from the ledger in the
+      // caller's transaction.
+      expect(
+        holdingsService.rebuildAccountsFromTransactions,
+      ).toHaveBeenCalled();
       // Both legs saved.
       const savedActions = mockQueryRunner.manager.save.mock.calls
         .map((c: any[]) => c[0]?.action)
@@ -6454,9 +6789,7 @@ describe("InvestmentTransactionsService", () => {
       await service.getSecurityTransactionHistory(userId, securityId);
 
       expect(investmentTransactionsRepository.find).toHaveBeenCalledWith(
-        expect.objectContaining({
-          order: { transactionDate: "ASC", createdAt: "ASC" },
-        }),
+        expect.objectContaining({ order: INVESTMENT_REPLAY_ORDER }),
       );
     });
 
@@ -6668,11 +7001,14 @@ describe("InvestmentTransactionsService", () => {
         transactionDate: "2026-01-15",
         securityQuery: "AAPL",
         quantity: 1.123456789,
-        price: 2.1234567,
+        price: 2.12345678901,
         commission: 0.12345,
       });
       expect(preview.quantity).toBe(1.12345679);
-      expect(preview.price).toBe(2.123457);
+      // The price column is NUMERIC(24,10). A preview that narrowed it to six
+      // showed a figure the commit would not store, and a price derived from
+      // an executed total needs all ten.
+      expect(preview.price).toBe(2.123456789);
       expect(preview.commission).toBe(0.1235);
     });
 
@@ -7599,7 +7935,9 @@ describe("InvestmentTransactionsService", () => {
         expect(investmentTransactionsRepository.remove).not.toHaveBeenCalled();
         expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
         expect(accountsService.updateBalance).not.toHaveBeenCalled();
-        expect(holdingsService.updateHolding).not.toHaveBeenCalled();
+        expect(
+          holdingsService.rebuildScopesFromTransactions,
+        ).not.toHaveBeenCalled();
         expect(mockActionHistoryService.record).not.toHaveBeenCalled();
       });
 

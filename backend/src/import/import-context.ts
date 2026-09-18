@@ -1,5 +1,7 @@
 import { EntityManager } from "typeorm";
 import { Account } from "../accounts/entities/account.entity";
+import { applyAccountBalanceDelta } from "../accounts/accounts.service";
+import { roundMoney } from "../common/round.util";
 import { ImportResultDto } from "./dto/import.dto";
 
 export interface ImportContext {
@@ -23,23 +25,29 @@ export interface ImportContext {
 }
 
 /**
- * Update account balance with proper decimal rounding.
- * Uses explicit read-modify-write to avoid TypeORM increment precision issues.
+ * Move an account's balance by `amount`, through the same atomic delta
+ * statement every balance writer uses (`applyAccountBalanceDelta` in
+ * `accounts/accounts.service.ts`; `docs/concurrency-and-idempotency.md`
+ * section 2, row 1).
+ *
+ * One statement, so the read and the write cannot be interleaved: a second
+ * delta committing in between composes instead of being overwritten, which a
+ * `findOne` followed by an absolute `update` could not promise. The `UPDATE`
+ * row-locks `accounts` exactly where the previous one did, so the import's lock
+ * order (the `lockHoldingScope` advisory lock is the transaction's first
+ * statement) is unchanged.
+ *
+ * The delta itself is rounded through `roundMoney` (4dp, the column's
+ * precision); the sum is rounded by the database. A row that does not exist is
+ * a no-op, as before.
  */
 export async function updateAccountBalance(
   manager: EntityManager,
   accountId: string,
   amount: number,
 ): Promise<void> {
-  const account = await manager.findOne(Account, {
-    where: { id: accountId },
+  const delta = roundMoney(Number(amount) || 0);
+  await applyAccountBalanceDelta(manager, accountId, delta, {
+    openOnly: false,
   });
-  if (account) {
-    const currentBalance = Number(account.currentBalance) || 0;
-    const newBalance =
-      Math.round((currentBalance + Number(amount)) * 100) / 100;
-    await manager.update(Account, accountId, {
-      currentBalance: newBalance,
-    });
-  }
 }

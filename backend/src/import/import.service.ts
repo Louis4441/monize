@@ -4,9 +4,12 @@ import {
   NotFoundException,
   ConflictException,
   Logger,
+  Inject,
+  forwardRef,
 } from "@nestjs/common";
 import { DataSource, EntityManager, In, IsNull } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
+import { lockHoldingScope } from "../common/db/locks";
 import {
   Account,
   AccountType,
@@ -54,6 +57,7 @@ import { ImportPostProcessingService } from "./import-post-processing.service";
 import { ImportInvestmentProcessorService } from "./import-investment-processor.service";
 import { ImportRegularProcessorService } from "./import-regular-processor.service";
 import { Security } from "../securities/entities/security.entity";
+import { HoldingsService } from "../securities/holdings.service";
 import { Tag } from "../tags/entities/tag.entity";
 import {
   Transaction,
@@ -73,7 +77,64 @@ export class ImportService {
     private entityCreator: ImportEntityCreatorService,
     private investmentProcessor: ImportInvestmentProcessorService,
     private regularProcessor: ImportRegularProcessorService,
+    @Inject(forwardRef(() => HoldingsService))
+    private holdingsService: HoldingsService,
   ) {}
+
+  /**
+   * Take the holdings advisory lock for every investment account this import
+   * can reach, as the first lock of the import's transaction.
+   *
+   * Advisory locks come before row locks (`common/db/locks.ts`). An import
+   * row-locks `accounts` on every balance write and only then reached
+   * `rebuildImportedHoldings`, which takes the advisory lock -- the opposite
+   * order from an investment write, so an import running beside a trade on
+   * the same account could deadlock both (40P01).
+   *
+   * The scope is every investment account the user already has rather than
+   * the set the import turns out to touch, because that set is discovered as
+   * the file is read. Accounts the import creates inside this transaction are
+   * covered by the rebuild's own re-entrant call: no other transaction can
+   * see them, so nothing can be holding their lock.
+   */
+  private async lockImportedHoldingScopes(
+    manager: EntityManager,
+    userId: string,
+  ): Promise<void> {
+    const accounts = await manager.find(Account, {
+      where: { userId, accountType: AccountType.INVESTMENT },
+      select: ["id"],
+    });
+    await lockHoldingScope(
+      manager,
+      accounts.map((account) => account.id),
+    );
+  }
+
+  /**
+   * Re-derive the imported accounts' holdings from the ledger the import has
+   * just written, inside the import's own transaction.
+   *
+   * An import arrives in file order, which is not date order. A per-row
+   * incremental average cost therefore blended a later-dated purchase into a
+   * position that, replayed, had already been sold down -- the stored figure
+   * and `POST /holdings/rebuild` disagreed (issue #1388). The rebuild filters
+   * non-investment accounts out itself, so the caller passes whatever it
+   * touched.
+   */
+  private async rebuildImportedHoldings(
+    manager: EntityManager,
+    userId: string,
+    accountIds: Iterable<string>,
+  ): Promise<void> {
+    const ids = Array.from(new Set(accountIds));
+    if (ids.length === 0) return;
+    await this.holdingsService.rebuildAccountsFromTransactions(
+      userId,
+      ids,
+      manager,
+    );
+  }
 
   // --- QIF ---
 
@@ -219,6 +280,9 @@ export class ImportService {
     // bad row roll back without discarding the rest of the file.
     try {
       await withScopedDb(this.dataSource, async (manager) => {
+        // First lock of the transaction: advisory before row locks.
+        await this.lockImportedHoldingScopes(manager, userId);
+
         // Step 1: Create categories from !Type:Cat definitions
         const categoryMap = new Map<string, string | null>();
         await this.createCategoriesFromDefs(
@@ -418,6 +482,8 @@ export class ImportService {
             }
           }
         }
+
+        await this.rebuildImportedHoldings(manager, userId, affectedAccountIds);
 
         // Post-block cleanup: detect and remove Quicken merged split transfers
         // that were imported before their split counterparts (reverse block order).
@@ -1225,6 +1291,9 @@ export class ImportService {
     // back without discarding the rest of the file.
     try {
       await withScopedDb(this.dataSource, async (manager) => {
+        // First lock of the transaction: advisory before row locks.
+        await this.lockImportedHoldingScopes(manager, userId);
+
         const ctx: ImportContext = {
           manager,
           userId,
@@ -1323,6 +1392,8 @@ export class ImportService {
             );
           }
         }
+
+        await this.rebuildImportedHoldings(manager, userId, affectedAccountIds);
       });
     } catch (error) {
       this.logger.error(

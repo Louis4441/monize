@@ -50,6 +50,37 @@ export interface CurrencyUsage {
   [code: string]: { accounts: number; securities: number };
 }
 
+/**
+ * What the server already stores for one currency pair, in days.
+ *
+ * `observations` counts calendar days rather than rows: a fetch is persisted in
+ * both directions, and the two stored directions are one pair.
+ */
+export interface RateCoverage {
+  from: string;
+  to: string;
+  earliestDate: string | null;
+  latestDate: string | null;
+  observations: number;
+}
+
+/**
+ * The outcome of one "add another year of rate history" request.
+ *
+ * `stored: 0` means the provider answered and had no rates that far back --
+ * a different thing from a provider that did not answer, which arrives as a
+ * rejected request (503), not as a zero.
+ */
+export interface RateHistoryExtension {
+  from: string;
+  to: string;
+  requestedFrom: string;
+  requestedTo: string;
+  stored: number;
+  earliestDate: string | null;
+  answered: boolean;
+}
+
 export const exchangeRatesApi = {
   // Exchange rates
   getLatestRates: async (): Promise<ExchangeRate[]> => {
@@ -89,6 +120,28 @@ export const exchangeRatesApi = {
       },
       3_600_000, // 1 hour
     );
+  },
+
+  // Stored coverage for `code` against the caller's reporting currency. Not
+  // deduped: the dialog reads it to show what is stored right now, and it
+  // re-reads it immediately after an extension wrote rows.
+  getRateCoverage: async (code: string): Promise<RateCoverage> => {
+    const response = await apiClient.get<RateCoverage>('/currencies/exchange-rates/coverage', {
+      params: { code },
+    });
+    return response.data;
+  },
+
+  // Fetch and store one more year of daily rates, immediately before whatever
+  // is stored. Invalidates the cached rate reads afterwards for the same reason
+  // `refreshRates` does: new rows change what a dated lookup answers.
+  extendRateHistory: async (code: string): Promise<RateHistoryExtension> => {
+    const response = await apiClient.post<RateHistoryExtension>(
+      '/currencies/exchange-rates/extend-history',
+      { code },
+    );
+    invalidateCache('exchange-rates:');
+    return response.data;
   },
 
   refreshRates: async () => {

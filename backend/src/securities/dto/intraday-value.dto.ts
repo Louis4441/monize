@@ -31,7 +31,15 @@ export class IntradayValueQueryDto {
 
 export interface IntradayValuePoint {
   timestamp: string;
+  /** The scope's value at that bar: securities plus the cash beside them. */
   value: number;
+  /**
+   * The INVESTED part of the same bar -- the securities, no cash. The
+   * investment charts plot this, because cash held in an investment account is
+   * not an investment (INV-PORTRESULT-002,
+   * `docs/specs/portfolio-period-result.md` section 10.7).
+   */
+  securitiesValue: number;
 }
 
 /**

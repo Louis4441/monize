@@ -85,6 +85,7 @@
       "unpricedHolding": "Uma posição não teve preço neste dia nem no anterior, então a variação é desconhecida.",
       "missingRate": "Faltava uma taxa de câmbio, então a variação não pôde ser convertida.",
       "flowIncomplete": "Um depósito ou saque deste dia não pôde ser convertido, então a variação não pode ser separada dele.",
+      "cashIncomplete": "Uma conta de caixa não reportou saldo para este dia, então o valor do dia está incompleto e a variação é desconhecida.",
       "noPriorValue": "Não há um valor anterior para comparar com este dia.",
       "zeroBaseline": "A carteira estava vazia no dia anterior, então não há percentual a calcular."
     }

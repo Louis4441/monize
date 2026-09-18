@@ -85,6 +85,7 @@
       "unpricedHolding": "[XX-A holding had no price on this day or the one before it, so the movement is unknown.-XX]",
       "missingRate": "[XX-An exchange rate was missing, so the movement could not be converted.-XX]",
       "flowIncomplete": "[XX-A deposit or withdrawal on this day could not be converted, so the movement cannot be separated from it.-XX]",
+      "cashIncomplete": "[XX-A cash account reported no balance for this day, so the day's value is incomplete and the movement is unknown.-XX]",
       "noPriorValue": "[XX-There is no earlier value to measure this day against.-XX]",
       "zeroBaseline": "[XX-The portfolio was empty the day before, so there is no percentage to work out.-XX]"
     }

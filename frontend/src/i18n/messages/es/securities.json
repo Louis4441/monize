@@ -3,6 +3,7 @@
     "noneToUpdate": "No hay valores para actualizar",
     "updated": "{count, plural, one {# precio de valor actualizado} other {# precios de valores actualizados}}",
     "partialFailure": "Precios actualizados: {updated} correctos, {failed} fallidos{symbols}",
+    "partialFailureWithReasons": "Precios actualizados: {updated} correctos, {failed} fallidos{symbols}\n{reasons}",
     "failed": "Error al actualizar los precios"
   },
   "page": {

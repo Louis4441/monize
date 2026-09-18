@@ -176,10 +176,9 @@ export class PortfolioController {
   @AllowDelegate()
   @DelegateRequiresSection("investments")
   @ApiOperation({
-    summary:
-      "List the KEY:VALUE tag keys present on the portfolio's securities",
+    summary: "Describe the tags present on the portfolio's securities",
     description:
-      "Distinct, case-folded, sorted keys (e.g. `country`, `sector`) so the UI can offer an aggregate-by-key chart.",
+      "`keys`: distinct, case-folded, sorted KEY:VALUE keys (e.g. `country`, `sector`) so the UI can offer an aggregate-by-key chart. `hasTaggedHoldings`: whether any held security carries a tag at all, which is what decides whether the plain by-tag grouping is offered, since a portfolio tagged only with plain labels has no keys. Answered from the holdings and their tags, without valuing the portfolio.",
   })
   @ApiQuery({ name: "accountIds", required: false })
   @ApiResponse({ status: 200, description: "Tag keys retrieved successfully" })
@@ -189,7 +188,7 @@ export class PortfolioController {
     @Query("accountIds") accountIds?: string,
   ) {
     const ids = this.parseUuidList(accountIds, "account");
-    return this.portfolioService.getPortfolioTagKeys(
+    return this.portfolioService.getPortfolioTagSummary(
       req.user.id,
       await this.scopeIds(req, ids),
     );

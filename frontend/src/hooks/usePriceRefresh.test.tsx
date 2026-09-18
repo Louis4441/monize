@@ -253,6 +253,39 @@ describe('usePriceRefresh', () => {
     );
   });
 
+  /**
+   * A count of failures sends the reader nowhere: a currency mismatch is
+   * repaired by correcting the security, not by refreshing again. The server
+   * already says why, translated, so the toast carries it. INV-PRICE-001.
+   */
+  it('shows the server refusal reason in the error toast, once per distinct reason', async () => {
+    const refusal =
+      'Price update refused for AAPL: yahoo quotes it in GBP, but the security is recorded in USD.';
+    vi.mocked(investmentsApi.getSecurities).mockResolvedValue([
+      sec('s-bad-1'),
+      sec('s-bad-2'),
+    ] as any);
+    vi.mocked(investmentsApi.refreshSelectedPrices).mockResolvedValue({
+      updated: 0,
+      failed: 2,
+      totalSecurities: 2,
+      skipped: 0,
+      results: [
+        { symbol: 'AAPL', success: false, error: refusal },
+        { symbol: 'AAPL', success: false, error: refusal },
+      ],
+      lastUpdated: '',
+    });
+
+    const { result } = renderHook(() => usePriceRefresh());
+    await act(async () => {
+      await result.current.triggerManualRefresh();
+    });
+    const message = vi.mocked(toast.error).mock.calls[0][0] as string;
+    expect(message).toContain(refusal);
+    expect(message.split(refusal).length - 1).toBe(1);
+  });
+
   it('calls onRefreshComplete callback with lastUpdated from the refresh result', async () => {
     const onRefreshComplete = vi.fn();
     vi.mocked(investmentsApi.getSecurities).mockResolvedValue([sec('s-1')] as any);
@@ -262,6 +295,52 @@ describe('usePriceRefresh', () => {
       totalSecurities: 1,
       skipped: 0,
       results: [],
+      lastUpdated: '2026-04-15T14:06:00Z',
+    });
+
+    const { result } = renderHook(() => usePriceRefresh({ onRefreshComplete }));
+    await act(async () => {
+      await result.current.triggerManualRefresh();
+    });
+    expect(onRefreshComplete).toHaveBeenCalledWith('2026-04-15T14:06:00Z');
+  });
+
+  it('does not reload the page when the refresh updated nothing', async () => {
+    // The callback reloads the portfolio summary and the register, seconds of
+    // server work. A refresh that wrote no price (market closed, every quote
+    // refused) leaves both answers exactly as they were, and the reader saw the
+    // page redraw for nothing.
+    const onRefreshComplete = vi.fn();
+    vi.mocked(investmentsApi.getSecurities).mockResolvedValue([sec('s-1')] as any);
+    vi.mocked(investmentsApi.refreshSelectedPrices).mockResolvedValue({
+      updated: 0,
+      failed: 0,
+      totalSecurities: 1,
+      skipped: 1,
+      results: [],
+      lastUpdated: '2026-04-15T14:06:00Z',
+    });
+
+    const { result } = renderHook(() => usePriceRefresh({ onRefreshComplete }));
+    await act(async () => {
+      await result.current.triggerManualRefresh();
+    });
+    expect(investmentsApi.refreshSelectedPrices).toHaveBeenCalled();
+    expect(onRefreshComplete).not.toHaveBeenCalled();
+  });
+
+  it('still reloads when only some symbols failed but one was written', async () => {
+    const onRefreshComplete = vi.fn();
+    vi.mocked(investmentsApi.getSecurities).mockResolvedValue([
+      sec('s-1'),
+      sec('s-2'),
+    ] as any);
+    vi.mocked(investmentsApi.refreshSelectedPrices).mockResolvedValue({
+      updated: 1,
+      failed: 1,
+      totalSecurities: 2,
+      skipped: 0,
+      results: [{ symbol: 'S-2', success: false, error: 'no quote' }],
       lastUpdated: '2026-04-15T14:06:00Z',
     });
 

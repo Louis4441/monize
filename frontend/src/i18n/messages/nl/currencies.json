@@ -111,5 +111,20 @@
     "nameMax": "Naam mag maximaal 100 tekens lang zijn",
     "symbolRequired": "Symbool is verplicht",
     "symbolMax": "Symbool mag maximaal 10 tekens lang zijn"
+  },
+  "rateHistory": {
+    "title": "Koersgeschiedenis",
+    "stored": "Opgeslagen geschiedenis: {start} tot {end} ({count} waarnemingen)",
+    "none": "Geen opgeslagen geschiedenis voor {pair}",
+    "loading": "Opgeslagen koersgeschiedenis wordt gecontroleerd...",
+    "loadFailed": "De opgeslagen koersgeschiedenis kon niet worden gelezen",
+    "addYear": "Nog een jaar koersgeschiedenis toevoegen",
+    "adding": "Nog een jaar wordt opgehaald...",
+    "hint": "Rapporten van vóór de eerste opgeslagen koers kunnen {pair} niet omrekenen.",
+    "toasts": {
+      "added": "{count} koersen toegevoegd; de geschiedenis begint nu op {start}",
+      "noOlder": "De aanbieder heeft geen oudere koersen voor {pair}",
+      "failed": "De koersgeschiedenis kon niet worden uitgebreid"
+    }
   }
 }

@@ -85,6 +85,7 @@
       "unpricedHolding": "Một vị thế không có giá vào ngày này hoặc ngày trước đó, nên không biết được biến động.",
       "missingRate": "Thiếu tỷ giá, nên không quy đổi được biến động.",
       "flowIncomplete": "Một khoản nạp hoặc rút trong ngày này không quy đổi được, nên không tách được biến động khỏi nó.",
+      "cashIncomplete": "Một tài khoản tiền mặt không báo cáo số dư cho ngày này, nên giá trị của ngày không đầy đủ và không biết được biến động.",
       "noPriorValue": "Không có giá trị trước đó để so sánh với ngày này.",
       "zeroBaseline": "Danh mục trống vào ngày hôm trước, nên không có phần trăm để tính."
     }

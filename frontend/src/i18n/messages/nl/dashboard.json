@@ -97,7 +97,7 @@
       "noLosers": "Vandaag geen dalers."
     },
     "dailyChange": "Dagelijkse wijziging",
-    "dailyChangeOn": "Dagelijkse wijziging \u00b7 {date}",
+    "dailyChangeOn": "Dagelijkse wijziging · {date}",
     "openPriceHistory": "Koersgeschiedenis van {symbol}",
     "refreshPrices": "Koersen vernieuwen",
     "viewPortfolio": "Portefeuille bekijken",
@@ -118,7 +118,7 @@
     "empty": "Nog geen favoriete waardepapieren. Ga naar de <securitiesLink>pagina Waardepapieren</securitiesLink> en markeer de waardepapieren die je hier wilt volgen.",
     "noPriceYet": "Nog geen koers",
     "dailyChange": "Dagelijkse wijziging",
-    "dailyChangeOn": "Dagelijkse wijziging \u00b7 {date}",
+    "dailyChangeOn": "Dagelijkse wijziging · {date}",
     "openPriceHistory": "Koersgeschiedenis van {symbol}",
     "refreshPrices": "Koersen vernieuwen",
     "manage": "Waardepapieren beheren"
@@ -202,7 +202,11 @@
   "portfolioValue": {
     "title": "Portefeuillewaarde",
     "empty": "Nog geen beleggingsgeschiedenis om te tonen.",
-    "refresh": "Huidige waarde vernieuwen"
+    "refresh": "Huidige waarde vernieuwen",
+    "investmentResult": "Beleggingsresultaat",
+    "notAvailable": "N/A",
+    "periodBreakdownTooltip": "De waarde van de rekening veranderde met {valueChange} in deze periode, waarvan stortingen en opnames {netFlows} bedroegen. Het cijfer hierboven is wat de beleggingen zelf hebben opgeleverd, zonder niet-belegd geld.",
+    "unmeasuredFlowTooltip": "Een transactie die buiten deze rekeningen is afgewikkeld, of een splitsing die een investeringsregel combineert met een gewone uitgave, betekent dat het resultaat niet kan worden gescheiden van het verplaatste geld."
   },
   "spendingByPayee": {
     "title": "Uitgaven per begunstigde",

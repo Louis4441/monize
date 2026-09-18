@@ -17,6 +17,7 @@ import { useTranslations } from 'next-intl';
 import { useFormSubmitRef } from '@/hooks/useFormSubmitRef';
 import { useFormDirtyNotify } from '@/hooks/useFormDirtyNotify';
 import { FormActions } from '@/components/ui/FormActions';
+import { RateHistoryCoverage } from './RateHistoryCoverage';
 
 const logger = createLogger('CurrencyForm');
 
@@ -161,6 +162,7 @@ export function CurrencyForm({ currency, onSubmit, onCancel, onDirtyChange, subm
   useFormSubmitRef(submitRef, handleSubmit, onFormSubmit);
 
   return (
+    <div className="space-y-4">
     <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
       {/* Code + Lookup / Clear buttons */}
       <div className="flex gap-2 items-end">
@@ -255,5 +257,13 @@ export function CurrencyForm({ currency, onSubmit, onCancel, onDirtyChange, subm
 
       <FormActions onCancel={onCancel} submitLabel={currency ? t('form.submitUpdate') : t('form.submitCreate')} isSubmitting={isSubmitting} />
     </form>
+    {/*
+      Outside the `<form>` on purpose: extending the stored rate history saves
+      nothing of the user's, so it must not mark the form dirty or be reachable
+      by the form's submit. Only for a currency that already exists -- a
+      currency being created has no pair to have history for yet.
+    */}
+    {currency && <RateHistoryCoverage code={currency.code} />}
+    </div>
   );
 }

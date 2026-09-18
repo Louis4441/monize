@@ -14,21 +14,23 @@ import {
   lockTransactionRow,
   lockTransactionRows,
   lockInvestmentTransactionRow,
+  lockHoldingScope,
   LockedInvestmentTransactionRow,
 } from "../common/db/locks";
 import { applyVoidTransitionToMirrorLeg } from "../transactions/void-status-transition.util";
 import { assertReconciledRowsMutable } from "../transactions/reconciled-lock.util";
 import { investmentRowHasEffect } from "./investment-row-effects.util";
 import { formatInvestmentCashPayeeName } from "./investment-cash-payee.util";
+import { attachInvestmentRowCurrencies } from "./investment-transaction-currencies.util";
 import {
   InvestmentTransaction,
   InvestmentAction,
 } from "./entities/investment-transaction.entity";
 import { Security } from "./entities/security.entity";
 import {
-  acquisitionUnitCost,
   applyActionToQuantity,
   baseInvestmentAction,
+  INVESTMENT_REPLAY_ORDER,
 } from "./investment-replay.util";
 import {
   disposalCashAmount,
@@ -40,7 +42,7 @@ import { UpdateInvestmentTransactionDto } from "./dto/update-investment-transact
 import { TransferSecurityDto } from "./dto/transfer-security.dto";
 import { AccountsService } from "../accounts/accounts.service";
 import { TransactionsService } from "../transactions/transactions.service";
-import { HoldingsService } from "./holdings.service";
+import { HoldingsService, HoldingScope } from "./holdings.service";
 import {
   PortfolioCalculationService,
   RealizedGainEntry,
@@ -78,6 +80,11 @@ import {
   investmentSplitCashAmount,
   isInvestmentActionAllowedInSplit,
 } from "./cash-impact.util";
+import {
+  INVESTMENT_PRICE_DECIMALS,
+  deriveInvestmentTotal,
+  resolveInvestmentAmounts,
+} from "./investment-amount.util";
 import {
   AiActionPreviewRow,
   BatchUpdateInvestmentTransactionRow,
@@ -1047,7 +1054,12 @@ export class InvestmentTransactionsService {
       );
     }
 
-    this.assertAcquisitionPriced(createDto.action, createDto.price);
+    // The executed total is the fact and the price follows it, so the price
+    // this write stores -- and the one the acquisition guard judges -- is the
+    // resolved one, not the (possibly cent-rounded) figure the caller typed.
+    const amounts = resolveInvestmentAmounts(createDto);
+
+    this.assertAcquisitionPriced(createDto.action, amounts.price);
 
     if (
       createDto.action === InvestmentAction.SPLIT &&
@@ -1065,7 +1077,7 @@ export class InvestmentTransactionsService {
       await this.securitiesService.findOne(userId, createDto.securityId);
     }
 
-    const totalAmount = this.calculateTotalAmount(createDto);
+    const totalAmount = amounts.totalAmount;
     const accruedInterest = roundMoney(Number(createDto.accruedInterest ?? 0));
     this.assertAccruedInterestAllowed(createDto.action, accruedInterest, false);
 
@@ -1081,6 +1093,13 @@ export class InvestmentTransactionsService {
     );
 
     const savedId = await withScopedDb(this.dataSource, async (manager) => {
+      // First statement of the transaction: advisory locks are taken before row
+      // locks (see `common/db/locks.ts`), and the cash effects below row-lock
+      // `accounts`. The rebuild at the end takes this same lock; an advisory
+      // xact lock is re-entrant, so taking it here costs nothing and is what
+      // keeps this path in the one order every holdings writer uses.
+      await lockHoldingScope(manager, [createDto.accountId]);
+
       const investmentTransaction = manager.create(InvestmentTransaction, {
         userId,
         accountId: createDto.accountId,
@@ -1092,7 +1111,7 @@ export class InvestmentTransactionsService {
         // Null, not zero. The column is nullable so "no price was given" and
         // "it cost nothing" stay two different rows; `?? 0` made every
         // unpriced action indistinguishable from a free one downstream.
-        price: createDto.price ?? null,
+        price: amounts.price,
         commission: createDto.commission || 0,
         totalAmount,
         exchangeRate,
@@ -1118,10 +1137,32 @@ export class InvestmentTransactionsService {
         manager,
         userId,
         saved,
-        false,
         true,
         accruedInterest,
       );
+
+      // The holding is re-derived from the ledger this row has just joined, in
+      // this transaction and under the holdings lock. Insertion order is not
+      // economic order: a back-dated trade entered last still has to settle
+      // into the position where its date puts it.
+      await this.holdingsService.rebuildScopesFromTransactions(
+        userId,
+        saved.securityId
+          ? [{ accountId: saved.accountId, securityId: saved.securityId }]
+          : [],
+        manager,
+      );
+
+      // Refused inside the transaction, so a create that would oversell the
+      // position at any date leaves nothing written.
+      if (saved.securityId) {
+        await this.holdingsService.validateNoNegativeHoldingsHistory(
+          userId,
+          manager,
+          [saved.accountId],
+          [saved.securityId],
+        );
+      }
 
       return saved.id;
     });
@@ -1244,6 +1285,8 @@ export class InvestmentTransactionsService {
       quantity?: number;
       price?: number;
       commission?: number;
+      /** The executed total, when the caller knows it; see `create()`. */
+      totalAmount?: number;
       accruedInterest?: number;
       fundingAccountId?: string;
       exchangeRate?: number;
@@ -1338,10 +1381,6 @@ export class InvestmentTransactionsService {
       input.quantity !== undefined && input.quantity !== null
         ? roundToDecimals(Number(input.quantity), 8)
         : null;
-    const price =
-      input.price !== undefined && input.price !== null
-        ? roundToDecimals(Number(input.price), 6)
-        : null;
     const commission = roundToDecimals(Number(input.commission ?? 0), 4);
     const accruedInterest = roundToDecimals(
       Number(input.accruedInterest ?? 0),
@@ -1349,11 +1388,18 @@ export class InvestmentTransactionsService {
     );
     this.assertAccruedInterestAllowed(input.action, accruedInterest, false);
 
-    const totalAmount = this.calculateTotalAmount({
+    // The same door the write goes through, so a preview of a trade entered by
+    // its executed total shows the total the commit will store and the price it
+    // will derive -- at the price column's own ten decimals, not six.
+    const { totalAmount, price } = resolveInvestmentAmounts({
       action: input.action,
       quantity,
-      price,
+      price:
+        input.price !== undefined && input.price !== null
+          ? roundToDecimals(Number(input.price), INVESTMENT_PRICE_DECIMALS)
+          : null,
       commission,
+      totalAmount: input.totalAmount,
     });
 
     const exchangeRate = await this.resolveCashExchangeRate(
@@ -1374,6 +1420,7 @@ export class InvestmentTransactionsService {
       Number(price ?? 0),
       commission,
       accruedInterest,
+      totalAmount,
     );
 
     let cashAccountName: string | null = null;
@@ -1933,6 +1980,10 @@ export class InvestmentTransactionsService {
     const { outId, inId } = await withScopedDb(
       this.dataSource,
       async (manager) => {
+        // First statement of the transaction: advisory before row locks
+        // (`common/db/locks.ts`), both accounts, ascending inside the helper.
+        await lockHoldingScope(manager, [dto.fromAccountId, dto.toAccountId]);
+
         const transferOut = manager.create(InvestmentTransaction, {
           userId,
           accountId: dto.fromAccountId,
@@ -1953,7 +2004,6 @@ export class InvestmentTransactionsService {
           manager,
           userId,
           savedOut,
-          false,
           false,
         );
 
@@ -1978,7 +2028,6 @@ export class InvestmentTransactionsService {
           userId,
           savedIn,
           false,
-          false,
         );
 
         // Link the two legs to each other so a later edit or delete of one
@@ -1989,6 +2038,18 @@ export class InvestmentTransactionsService {
         await manager.update(InvestmentTransaction, inId, {
           linkedTransactionId: outId,
         });
+
+        // Both legs' positions come from the ledger the two rows have just
+        // joined, so the destination's basis is the source's replayed average
+        // cost rather than a delta blended onto whatever was stored.
+        await this.holdingsService.rebuildScopesFromTransactions(
+          userId,
+          [
+            { accountId: dto.fromAccountId, securityId: dto.securityId },
+            { accountId: dto.toAccountId, securityId: dto.securityId },
+          ],
+          manager,
+        );
 
         // Guard against transferring more than the source holds. Validates the
         // full replayed history so it catches both the immediate over-draw and
@@ -2035,47 +2096,24 @@ export class InvestmentTransactionsService {
     return { transferOut, transferIn };
   }
 
+  /**
+   * The total a price implies. Only for a caller that has no executed total of
+   * its own -- one that does goes through `resolveInvestmentAmounts`, which
+   * stores the total as the fact and derives the price from it.
+   */
   private calculateTotalAmount(dto: {
     action: InvestmentAction;
     quantity?: number | null;
     price?: number | null;
     commission?: number | null;
   }): number {
-    const { action, quantity, price, commission } = dto;
-
-    let result: number;
-    switch (baseInvestmentAction(action)) {
-      case InvestmentAction.BUY:
-        result = (quantity || 0) * (price || 0) + (commission || 0);
-        break;
-
-      case InvestmentAction.SELL:
-        result = (quantity || 0) * (price || 0) - (commission || 0);
-        break;
-
-      case InvestmentAction.DIVIDEND:
-      case InvestmentAction.INTEREST:
-      case InvestmentAction.CAPITAL_GAIN:
-        result = (quantity || 1) * (price || 0);
-        break;
-
-      case InvestmentAction.ADD_SHARES:
-      case InvestmentAction.REMOVE_SHARES:
-        return 0;
-
-      default:
-        return 0;
-    }
-
-    // M13: Round to money storage precision (4dp) to avoid floating-point drift
-    return roundMoney(result);
+    return deriveInvestmentTotal(dto);
   }
 
   private async processTransactionEffectsInTransaction(
     manager: EntityManager,
     userId: string,
     transaction: InvestmentTransaction,
-    allowNegative: boolean = false,
     createCashSide: boolean = true,
     /**
      * Accrued interest riding on this row's single cash movement. Only a
@@ -2085,32 +2123,16 @@ export class InvestmentTransactionsService {
      */
     accruedInterest: number = 0,
   ): Promise<void> {
-    // Future-dated investments: still create the linked cash transaction so
-    // it shows in the cash account ledger as a projected entry (matching how
-    // every other future-dated transaction is rendered). Skip the Holdings
-    // update -- holdings are a stateful "as of now" record and shouldn't
-    // anticipate a purchase that hasn't settled yet. The applyDueTransactionBalances
-    // cron rolls the cash balance forward when the date arrives; an explicit
-    // backfill of holdings happens via update()/remove() reverse+reapply paths
-    // when the user later edits the transaction.
-    //
-    // A VOID row is the same shape on the holdings axis, permanently: it still
-    // gets its cash leg (created VOID, moving no balance, so the event stays
-    // visible in the cash ledger) but never touches holdings.
-    const isFuture = isTransactionInFuture(transaction.transactionDate);
-    const isVoid = transaction.status === TransactionStatus.VOID;
-    const movesShares = !isFuture && !isVoid;
-
-    const {
-      action,
-      accountId,
-      securityId,
-      quantity,
-      price,
-      commission,
-      totalAmount,
-      fundingAccountId,
-    } = transaction;
+    // Holdings are NOT written here. A stored holding is a projection of the
+    // ledger, rebuilt for the touched (account, security) scopes by
+    // `HoldingsService.rebuildScopesFromTransactions` once the caller has
+    // finished writing the rows -- an incremental delta applied here blended
+    // the average cost in insertion order, so a back-dated trade stored a
+    // number the replay disagrees with (issue #1388). This method now owns the
+    // linked cash leg only, which a future-dated or VOID row still gets (it
+    // shows in the cash ledger as a projected or voided entry, moving no
+    // balance).
+    const { action, accountId, totalAmount, fundingAccountId } = transaction;
 
     // Cash account is only needed when we're creating the linked cash transaction.
     // Embedded-in-split investment transactions skip cash creation because the
@@ -2130,21 +2152,6 @@ export class InvestmentTransactionsService {
 
     switch (baseInvestmentAction(action)) {
       case InvestmentAction.BUY:
-        if (movesShares) {
-          await this.holdingsService.updateHolding(
-            userId,
-            accountId,
-            securityId!,
-            Number(quantity),
-            // Commission included, so the live average cost is what a share
-            // actually cost to acquire and matches what a rebuild would compute.
-            // The raw price here made the two disagree until something unrelated
-            // triggered a rebuild (review finding FR-008).
-            acquisitionUnitCost({ quantity, price, commission }),
-            manager,
-            allowNegative,
-          );
-        }
         if (createCashSide && cashAccount) {
           cashTransactionId = await this.createCashTransactionInTransaction(
             manager,
@@ -2157,17 +2164,6 @@ export class InvestmentTransactionsService {
         break;
 
       case InvestmentAction.SELL:
-        if (movesShares) {
-          await this.holdingsService.updateHolding(
-            userId,
-            accountId,
-            securityId!,
-            -Number(quantity),
-            Number(price),
-            manager,
-            allowNegative,
-          );
-        }
         if (createCashSide && cashAccount) {
           cashTransactionId = await this.createCashTransactionInTransaction(
             manager,
@@ -2193,93 +2189,8 @@ export class InvestmentTransactionsService {
         }
         break;
 
-      case InvestmentAction.REINVEST:
-        // A reinvestment buys shares at a market price; without a price the
-        // shares would be blended in at cost 0 and poison the average cost, so
-        // keep the price guard here. Only TRANSFER_IN/OUT (whose carried cost
-        // can legitimately be 0) drop it.
-        if (movesShares && securityId && quantity && price) {
-          await this.holdingsService.updateHolding(
-            userId,
-            accountId,
-            securityId,
-            Number(quantity),
-            acquisitionUnitCost({ quantity, price, commission }),
-            manager,
-            allowNegative,
-          );
-        }
-        break;
-
-      case InvestmentAction.SPLIT:
-        // Stock split: scale quantity by the ratio and divide averageCost by
-        // the same ratio so total cost basis is preserved. The optional
-        // `price` carries the post-split per-share market price for
-        // reporting; the cost basis comes from the existing holding, not
-        // from `price`.
-        if (movesShares && securityId && quantity) {
-          await this.holdingsService.applySplit(
-            accountId,
-            securityId,
-            Number(quantity),
-            manager,
-          );
-        }
-        break;
-
-      case InvestmentAction.TRANSFER_IN:
-        if (movesShares && securityId && quantity) {
-          await this.holdingsService.updateHolding(
-            userId,
-            accountId,
-            securityId,
-            Number(quantity),
-            // An acquisition, so the same commission-inclusive unit cost the
-            // rebuild uses. An unpriced transfer still carries cost 0.
-            acquisitionUnitCost({ quantity, price, commission }),
-            manager,
-            allowNegative,
-          );
-        }
-        break;
-
-      case InvestmentAction.TRANSFER_OUT:
-        if (movesShares && securityId && quantity) {
-          await this.holdingsService.updateHolding(
-            userId,
-            accountId,
-            securityId,
-            -Number(quantity),
-            Number(price),
-            manager,
-            allowNegative,
-          );
-        }
-        break;
-
-      case InvestmentAction.ADD_SHARES:
-        if (movesShares && securityId && quantity) {
-          await this.holdingsService.adjustQuantity(
-            userId,
-            accountId,
-            securityId,
-            Number(quantity),
-            manager,
-          );
-        }
-        break;
-
-      case InvestmentAction.REMOVE_SHARES:
-        if (movesShares && securityId && quantity) {
-          await this.holdingsService.adjustQuantity(
-            userId,
-            accountId,
-            securityId,
-            -Number(quantity),
-            manager,
-          );
-        }
-        break;
+      // REINVEST / SPLIT / TRANSFER_IN / TRANSFER_OUT / ADD_SHARES /
+      // REMOVE_SHARES move shares and no cash, so they have nothing to do here.
     }
 
     if (cashTransactionId) {
@@ -2330,6 +2241,14 @@ export class InvestmentTransactionsService {
      */
     parentStatus?: TransactionStatus,
   ): Promise<InvestmentTransaction> {
+    // First database statement this method makes; the rebuild at the end takes
+    // the same re-entrant lock. It is *not* the first statement of the caller's
+    // transaction: a split rebuild has already row-locked the parent by the time
+    // it gets here, so the caller takes `lockEmbeddedInvestmentScopes` before
+    // that row lock and this call then costs nothing
+    // (`common/db/locks.ts`, 40P01).
+    await lockHoldingScope(manager, [brokerageAccountId]);
+
     if (!isInvestmentActionAllowedInSplit(dto.action)) {
       throw new BadRequestException(
         tr(
@@ -2458,16 +2377,32 @@ export class InvestmentTransactionsService {
       userId,
       saved,
       false,
-      false,
     );
+
+    if (saved.securityId) {
+      await this.holdingsService.rebuildScopesFromTransactions(
+        userId,
+        [{ accountId: saved.accountId, securityId: saved.securityId }],
+        manager,
+      );
+      // A row embedded in a split oversells exactly as a free-standing one
+      // does, and is refused inside the parent's transaction.
+      await this.holdingsService.validateNoNegativeHoldingsHistory(
+        userId,
+        manager,
+        [saved.accountId],
+        [saved.securityId],
+      );
+    }
 
     return saved;
   }
 
   /**
-   * Reverse the holdings effects of an embedded investment transaction and
-   * delete the row. The parent split's deletion would cascade-delete this row
-   * via the FK, but we need the holdings reversal to happen first.
+   * Tear down the cash side of an embedded investment transaction, delete the
+   * row, and re-derive the position it left behind. The parent split's
+   * deletion would cascade-delete this row via the FK, but the holdings
+   * projection has to be taken after the row is gone, not before.
    */
   async reverseAndRemoveEmbedded(
     manager: EntityManager,
@@ -2480,6 +2415,19 @@ export class InvestmentTransactionsService {
       investmentTransaction,
     );
     await manager.remove(investmentTransaction);
+
+    if (investmentTransaction.securityId) {
+      await this.holdingsService.rebuildScopesFromTransactions(
+        userId,
+        [
+          {
+            accountId: investmentTransaction.accountId,
+            securityId: investmentTransaction.securityId,
+          },
+        ],
+        manager,
+      );
+    }
   }
 
   /**
@@ -2496,12 +2444,57 @@ export class InvestmentTransactionsService {
    * so every route a parent's status change takes (single update, dedicated
    * status endpoint, bulk update) propagates through one place.
    */
+  /**
+   * Advisory-lock the holding scope of every brokerage account holding an
+   * embedded investment row of these split parents.
+   *
+   * Called by a split-status path as the first statement of its transaction,
+   * before it row-locks the parent and before it row-locks `accounts` for the
+   * parent's balance. `update()` reaches the same parent the other way round --
+   * `lockHoldingScope`, then `updateEmbeddedSplitParent`'s `lockTransactionRow`
+   * on that parent -- so an advisory lock taken between the two row locks is
+   * still a deadlock for both (`common/db/locks.ts`, 40P01). The read is
+   * unlocked, so it may run before the advisory lock;
+   * `pg_advisory_xact_lock` is re-entrant, so calling this twice in one
+   * transaction costs nothing.
+   */
+  async lockEmbeddedHoldingScopes(
+    manager: EntityManager,
+    userId: string,
+    parentTransactionIds: readonly string[],
+  ): Promise<void> {
+    const ids = [...new Set(parentTransactionIds)];
+    if (ids.length === 0) return;
+    const rows: { account_id: string }[] = await manager.query(
+      // includes VOID rows: records read -- a crossing in either direction
+      // re-derives the same position.
+      `SELECT DISTINCT it.account_id
+         FROM investment_transactions it
+         JOIN transaction_splits ts ON ts.id = it.transaction_split_id
+        WHERE it.user_id = $2
+          AND ts.transaction_id = ANY($1)`,
+      [ids, userId],
+    );
+    await lockHoldingScope(
+      manager,
+      rows.map((row) => row.account_id),
+    );
+  }
+
   async applyParentStatusToEmbeddedRows(
     manager: EntityManager,
     userId: string,
     parentTransactionId: string,
     newStatus: TransactionStatus,
   ): Promise<Set<string>> {
+    // Re-entrant with the call the split-status paths make before their first
+    // balance write (`lockEmbeddedHoldingScopes`): the advisory lock must
+    // precede the `accounts` row locks the parent's balance takes, and a
+    // caller that forgot still cannot reach the rebuild below without it.
+    await this.lockEmbeddedHoldingScopes(manager, userId, [
+      parentTransactionId,
+    ]);
+
     const affectedAccountIds = new Set<string>();
 
     const splits = await manager.getRepository(TransactionSplit).find({
@@ -2515,6 +2508,7 @@ export class InvestmentTransactionsService {
 
     const isVoid = newStatus === TransactionStatus.VOID;
     const securityIds = new Set<string>();
+    const scopes = new Map<string, HoldingScope>();
 
     for (const splitId of investmentSplitIds) {
       const rows = await manager.getRepository(InvestmentTransaction).find({
@@ -2533,7 +2527,6 @@ export class InvestmentTransactionsService {
             manager,
             userId,
             row,
-            undefined,
             { keepCashSide: true },
           );
         }
@@ -2546,13 +2539,29 @@ export class InvestmentTransactionsService {
             manager,
             userId,
             row,
-            true,
             false,
           );
         }
         affectedAccountIds.add(row.accountId);
-        if (row.securityId) securityIds.add(row.securityId);
+        if (row.securityId) {
+          securityIds.add(row.securityId);
+          scopes.set(`${row.accountId}:${row.securityId}`, {
+            accountId: row.accountId,
+            securityId: row.securityId,
+          });
+        }
       }
+    }
+
+    if (scopes.size > 0) {
+      // Every row that crossed the boundary changed which ledger rows count,
+      // so the positions they belong to are re-derived from the ledger before
+      // the oversell check reads it.
+      await this.holdingsService.rebuildScopesFromTransactions(
+        userId,
+        Array.from(scopes.values()),
+        manager,
+      );
     }
 
     if (affectedAccountIds.size > 0) {
@@ -2588,6 +2597,10 @@ export class InvestmentTransactionsService {
       Number(saved.quantity ?? 0),
       Number(saved.price ?? 0),
       Number(saved.commission ?? 0),
+      0,
+      // The stored total, not a recomputation from the stored price: the row
+      // was written from what the trade actually came to.
+      Number(saved.totalAmount ?? 0),
     );
     const newSplitAmount = roundMoney(
       cashImpactInSecurity * Number(saved.exchangeRate),
@@ -2831,6 +2844,11 @@ export class InvestmentTransactionsService {
         .getMany();
 
       await this.attachAccruedInterest(m, userId, data);
+      // The unit travels with the figure: price, commission and total are the
+      // security's currency, never the account's for a trade (issue #1394),
+      // and the investment account's for a row that names no security, which
+      // is where the write path denominated it.
+      attachInvestmentRowCurrencies(data);
 
       return {
         data,
@@ -2875,7 +2893,7 @@ export class InvestmentTransactionsService {
       m.getRepository(InvestmentTransaction).find({
         where: { userId, securityId },
         relations: ["account"],
-        order: { transactionDate: "ASC", createdAt: "ASC" },
+        order: INVESTMENT_REPLAY_ORDER,
       }),
     );
 
@@ -3459,14 +3477,12 @@ export class InvestmentTransactionsService {
         manager,
         userId,
         savedEdited,
-        true,
         false,
       );
       await this.processTransactionEffectsInTransaction(
         manager,
         userId,
         savedLinked,
-        true,
         false,
       );
 
@@ -3528,12 +3544,54 @@ export class InvestmentTransactionsService {
    * holdings move, the oversell validation -- runs inside one transaction under
    * a row lock, so a refusal leaves nothing written (contract section 7).
    */
+  /**
+   * The brokerage accounts a status change on this row can re-derive: the
+   * row's own and its linked transfer leg's.
+   *
+   * Read without a lock on purpose. The advisory lock has to be the
+   * transaction's first lock, so the ids it is given cannot come from a row
+   * lock; a row that moved account between this read and the lock loses only
+   * a lock it never needed, exactly as `remove()`'s pre-read does.
+   */
+  private async readStatusHoldingScopeAccountIds(
+    manager: EntityManager,
+    userId: string,
+    id: string,
+  ): Promise<string[]> {
+    const rows: { account_id: string }[] = await manager.query(
+      // includes VOID rows: records read -- the scope of a crossing is the
+      // same whichever side of the boundary the row is on.
+      `SELECT DISTINCT account_id
+         FROM investment_transactions
+        WHERE user_id = $2
+          AND (id = $1
+               OR id = (SELECT linked_transaction_id
+                          FROM investment_transactions
+                         WHERE id = $1 AND user_id = $2))`,
+      [id, userId],
+    );
+    return rows.map((row) => row.account_id);
+  }
+
   async updateStatus(
     userId: string,
     id: string,
     newStatus: TransactionStatus,
   ): Promise<InvestmentTransaction> {
     const outcome = await withScopedDb(this.dataSource, async (manager) => {
+      // First lock of the transaction: advisory before row locks
+      // (`common/db/locks.ts`). The scope ids come from an unlocked read --
+      // a plain `SELECT` takes no lock, so it may precede the advisory one --
+      // covering this row and the transfer leg that crosses the VOID boundary
+      // with it. The rebuild at the end takes the same re-entrant lock, and
+      // `applyVoidTransitionToMirrorLeg` below row-locks `accounts`; taking
+      // the advisory lock only inside the rebuild put those two in the
+      // opposite order from every other investment write (40P01).
+      await lockHoldingScope(
+        manager,
+        await this.readStatusHoldingScopeAccountIds(manager, userId, id),
+      );
+
       const locked = await lockInvestmentTransactionRow(manager, id, userId);
       if (!locked) {
         throw new NotFoundException(
@@ -3589,11 +3647,18 @@ export class InvestmentTransactionsService {
 
       const affectedAccountIds = new Set<string>();
       const securityIds = new Set<string>();
+      const scopes = new Map<string, HoldingScope>();
       let splitTouched = false;
 
       for (const leg of legs) {
         affectedAccountIds.add(leg.accountId);
-        if (leg.securityId) securityIds.add(leg.securityId);
+        if (leg.securityId) {
+          securityIds.add(leg.securityId);
+          scopes.set(`${leg.accountId}:${leg.securityId}`, {
+            accountId: leg.accountId,
+            securityId: leg.securityId,
+          });
+        }
         // No quantity is folded here -- a crossing on a SPLIT row is followed
         // by a full rebuildFromTransactions after commit, same as
         // create()/update(); this only remembers that one was touched.
@@ -3607,7 +3672,6 @@ export class InvestmentTransactionsService {
             manager,
             userId,
             leg as unknown as InvestmentTransaction,
-            undefined,
             { keepCashSide: true },
           );
         }
@@ -3627,7 +3691,6 @@ export class InvestmentTransactionsService {
             manager,
             userId,
             activeLeg,
-            true,
             false,
           );
         }
@@ -3648,6 +3711,14 @@ export class InvestmentTransactionsService {
           }
         }
       }
+
+      // The crossing changed which rows count, so each touched position is
+      // re-derived from the ledger inside this transaction.
+      await this.holdingsService.rebuildScopesFromTransactions(
+        userId,
+        Array.from(scopes.values()),
+        manager,
+      );
 
       // A crossing that would oversell is refused, rolling everything above
       // back: a rejected command must not already have written.
@@ -3824,8 +3895,22 @@ export class InvestmentTransactionsService {
     // the DTO happened to carry; see the guard's own comment.
     const priorAction = transaction.action;
     const priorPrice = transaction.price;
+    // Read here for the same reason: what re-derives the stored total is a
+    // value difference in the fields the total is made of, never the mere
+    // presence of a field the form resends on every save.
+    const priorQuantity = transaction.quantity;
+    const priorCommission = transaction.commission;
+    const priorTotalAmount = transaction.totalAmount;
 
     const savedId = await withScopedDb(this.dataSource, async (manager) => {
+      // First statement of the transaction: advisory before row locks
+      // (`common/db/locks.ts`). Both the account the row leaves and the one it
+      // joins, because the rebuild at the end covers both.
+      await lockHoldingScope(
+        manager,
+        [accountId, updateDto.accountId].filter((id): id is string => !!id),
+      );
+
       // Resolved before the reversal, while the row still carries its stored
       // action: an edit may take the action away from REDEEM, and the companion
       // still has to be found so it can be refused or removed.
@@ -3921,10 +4006,46 @@ export class InvestmentTransactionsService {
       // every other edit.
       if (updateDto.status !== undefined) transaction.status = updateDto.status;
 
-      if (
-        updateDto.quantity !== undefined ||
-        updateDto.price !== undefined ||
-        updateDto.commission !== undefined
+      // What the executed total is made of, compared by VALUE against the row
+      // as it was stored. `InvestmentTransactionForm` resends every field, so
+      // a presence-keyed re-derivation recomputed `total_amount` from the
+      // stored price on a description-only edit -- and a price is a rounded
+      // quotient, so a sale entered at its statement total of 820.9100 came
+      // back as 141 x 5.82 = 820.6200.
+      const quantityChanged =
+        updateDto.quantity !== undefined &&
+        Number(updateDto.quantity) !== Number(priorQuantity ?? 0);
+      const priceChanged =
+        updateDto.price !== undefined &&
+        Number(updateDto.price) !== Number(priorPrice ?? 0);
+      const commissionChanged =
+        updateDto.commission !== undefined &&
+        Number(updateDto.commission) !== Number(priorCommission ?? 0);
+      const totalChanged =
+        updateDto.totalAmount !== undefined &&
+        Number(updateDto.totalAmount) !== Number(priorTotalAmount ?? 0);
+
+      if (totalChanged) {
+        // The caller stated what the trade actually came to. That is the fact;
+        // the price follows it -- unless the caller changed the price in the
+        // same edit and the two already agree, in which case nothing is lost
+        // by keeping the price exactly as sent.
+        const amounts = resolveInvestmentAmounts({
+          action: transaction.action,
+          quantity: transaction.quantity,
+          price: priceChanged ? transaction.price : null,
+          commission: transaction.commission,
+          totalAmount: updateDto.totalAmount,
+        });
+        transaction.totalAmount = amounts.totalAmount;
+        if (amounts.price !== null) transaction.price = amounts.price;
+      } else if (
+        quantityChanged ||
+        priceChanged ||
+        commissionChanged ||
+        // A different action puts the commission on the other side of the
+        // total, so the row's figure is no longer the one it was stored with.
+        transaction.action !== priorAction
       ) {
         transaction.totalAmount = this.calculateTotalAmount({
           action: transaction.action,
@@ -4030,7 +4151,6 @@ export class InvestmentTransactionsService {
         manager,
         userId,
         saved,
-        true,
         !isEmbedded,
         accruedInterest,
       );
@@ -4056,6 +4176,31 @@ export class InvestmentTransactionsService {
       const affectedSecurityIds = Array.from(
         new Set([oldSecurityId, saved.securityId].filter(Boolean) as string[]),
       );
+
+      // Both the position the row left and the one it joined are re-derived
+      // from the ledger, now that the row carries its new values. An
+      // incremental reverse-then-reapply subtracted a delta from an average
+      // cost that had been blended in a different order, so editing a
+      // back-dated row left the stored figure disagreeing with the replay.
+      const editedScopes = new Map<string, HoldingScope>();
+      if (oldSecurityId) {
+        editedScopes.set(`${accountId}:${oldSecurityId}`, {
+          accountId,
+          securityId: oldSecurityId,
+        });
+      }
+      if (saved.securityId) {
+        editedScopes.set(`${saved.accountId}:${saved.securityId}`, {
+          accountId: saved.accountId,
+          securityId: saved.securityId,
+        });
+      }
+      await this.holdingsService.rebuildScopesFromTransactions(
+        userId,
+        Array.from(editedScopes.values()),
+        manager,
+      );
+
       await this.holdingsService.validateNoNegativeHoldingsHistory(
         userId,
         manager,
@@ -4136,11 +4281,23 @@ export class InvestmentTransactionsService {
     return result;
   }
 
+  /**
+   * Tear down the linked cash Transaction of an investment row that is about to
+   * change or disappear.
+   *
+   * It does NOT touch holdings, and it must not: it runs BEFORE the ledger row
+   * is re-saved (update) or removed (remove), so a rebuild here would read a
+   * ledger that still contains the old row. Holdings are re-derived by the
+   * caller once the ledger write is final, through
+   * `HoldingsService.rebuildScopesFromTransactions` over the old and new
+   * (account, security) scopes -- which is also what makes reversing a
+   * back-dated row converge, instead of subtracting a delta from an average
+   * cost that was blended in a different order (issue #1388).
+   */
   private async reverseTransactionEffectsInTransaction(
     manager: EntityManager,
     userId: string,
     transaction: InvestmentTransaction,
-    isFutureOverride?: boolean,
     options?: {
       /**
        * Leave the linked cash Transaction row in place. Used by updateStatus,
@@ -4151,26 +4308,10 @@ export class InvestmentTransactionsService {
       keepCashSide?: boolean;
     },
   ): Promise<void> {
-    // Cash transactions are now created for future-dated investments too
-    // (they show as projected entries in the cash account ledger), so always
-    // tear down the linked Transaction even when the date is still in the
-    // future. Only the Holdings reversal is skipped for future dates -- the
-    // forward path didn't update Holdings then either, so there's nothing
-    // to undo. The optional isFutureOverride lets update() pin the decision
-    // to the OLD date even when the in-memory `transaction` already reflects
-    // a new (past) date.
-    const isFuture =
-      isFutureOverride ?? isTransactionInFuture(transaction.transactionDate);
-
-    const {
-      action,
-      accountId,
-      securityId,
-      quantity,
-      price,
-      commission,
-      transactionId,
-    } = transaction;
+    // Cash transactions are created for future-dated investments too (they show
+    // as projected entries in the cash account ledger), so the linked
+    // Transaction is torn down whatever the date.
+    const { transactionId } = transaction;
 
     if (transactionId && !options?.keepCashSide) {
       // Clear the FK reference BEFORE deleting the cash transaction
@@ -4183,153 +4324,6 @@ export class InvestmentTransactionsService {
         userId,
         transactionId,
       );
-    }
-
-    if (isFuture) {
-      // Holdings were never updated for this future-dated row, so nothing
-      // to undo on that side.
-      return;
-    }
-
-    if (transaction.status === TransactionStatus.VOID) {
-      // A VOID row never touched holdings, so there is nothing to undo there
-      // either -- the cash teardown above already reversed only what the leg
-      // actually contributed (deletionBalanceEffect: a VOID leg moved nothing).
-      // A deletion reverses only what the row actually contributed.
-      return;
-    }
-
-    // Reversing a past transaction can make the running Holding balance
-    // temporarily negative (e.g. reversing a BUY when the user has since
-    // sold the position). Allow that intermediate state; the update/remove
-    // callers validate the full transaction history before commit.
-    const allowNegative = true;
-
-    switch (baseInvestmentAction(action)) {
-      case InvestmentAction.BUY:
-        if (securityId) {
-          await this.holdingsService.updateHolding(
-            userId,
-            accountId,
-            securityId,
-            -Number(quantity),
-            // A negative delta leaves averageCost untouched (updateHolding
-            // blends a price only for positive deltas), so this argument is
-            // read on exactly one path: recreating a holding row the reversal
-            // finds deleted, which then carries the same commissioned unit
-            // cost the apply path wrote rather than the bare price.
-            acquisitionUnitCost({ quantity, price, commission }),
-            manager,
-            allowNegative,
-          );
-        }
-        break;
-
-      case InvestmentAction.SELL:
-        if (securityId) {
-          await this.holdingsService.updateHolding(
-            userId,
-            accountId,
-            securityId,
-            Number(quantity),
-            Number(price),
-            manager,
-            allowNegative,
-          );
-        }
-        break;
-
-      case InvestmentAction.DIVIDEND:
-      case InvestmentAction.INTEREST:
-      case InvestmentAction.CAPITAL_GAIN:
-        break;
-
-      case InvestmentAction.REINVEST:
-        if (securityId && quantity) {
-          await this.holdingsService.updateHolding(
-            userId,
-            accountId,
-            securityId,
-            -Number(quantity),
-            // A negative delta leaves averageCost untouched (updateHolding
-            // blends a price only for positive deltas), so this argument is
-            // read on exactly one path: recreating a holding row the reversal
-            // finds deleted, which then carries the same commissioned unit
-            // cost the apply path wrote rather than the bare price.
-            acquisitionUnitCost({ quantity, price, commission }),
-            manager,
-            allowNegative,
-          );
-        }
-        break;
-
-      case InvestmentAction.TRANSFER_IN:
-        if (securityId && quantity) {
-          await this.holdingsService.updateHolding(
-            userId,
-            accountId,
-            securityId,
-            -Number(quantity),
-            // A negative delta leaves averageCost untouched (updateHolding
-            // blends a price only for positive deltas), so this argument is
-            // read on exactly one path: recreating a holding row the reversal
-            // finds deleted, which then carries the same commissioned unit
-            // cost the apply path wrote rather than the bare price.
-            acquisitionUnitCost({ quantity, price, commission }),
-            manager,
-            allowNegative,
-          );
-        }
-        break;
-
-      case InvestmentAction.TRANSFER_OUT:
-        if (securityId && quantity) {
-          await this.holdingsService.updateHolding(
-            userId,
-            accountId,
-            securityId,
-            Number(quantity),
-            Number(price),
-            manager,
-            allowNegative,
-          );
-        }
-        break;
-
-      case InvestmentAction.ADD_SHARES:
-        if (securityId && quantity) {
-          await this.holdingsService.adjustQuantity(
-            userId,
-            accountId,
-            securityId,
-            -Number(quantity),
-            manager,
-          );
-        }
-        break;
-
-      case InvestmentAction.REMOVE_SHARES:
-        if (securityId && quantity) {
-          await this.holdingsService.adjustQuantity(
-            userId,
-            accountId,
-            securityId,
-            Number(quantity),
-            manager,
-          );
-        }
-        break;
-
-      case InvestmentAction.SPLIT:
-        if (securityId && quantity) {
-          await this.holdingsService.reverseSplit(
-            accountId,
-            securityId,
-            Number(quantity),
-            manager,
-          );
-        }
-        break;
     }
   }
 
@@ -4387,6 +4381,10 @@ export class InvestmentTransactionsService {
     );
 
     await withScopedDb(this.dataSource, async (manager) => {
+      // First statement of the transaction: advisory before row locks
+      // (`common/db/locks.ts`); the reversals below row-lock `accounts`.
+      await lockHoldingScope(manager, affectedAccountIds);
+
       // Break the mutual link before deleting so neither row's FK points at a
       // row that is about to disappear.
       for (const leg of legsToRemove) {
@@ -4402,6 +4400,20 @@ export class InvestmentTransactionsService {
         await this.reverseTransactionEffectsInTransaction(manager, userId, leg);
         await manager.remove(leg);
       }
+
+      // Taken AFTER the rows are gone: the position each deleted leg belonged
+      // to is whatever the remaining ledger says, not the stored figure minus
+      // this row's delta.
+      await this.holdingsService.rebuildScopesFromTransactions(
+        userId,
+        legsToRemove
+          .filter((leg) => leg.securityId)
+          .map((leg) => ({
+            accountId: leg.accountId,
+            securityId: leg.securityId!,
+          })),
+        manager,
+      );
 
       await this.holdingsService.validateNoNegativeHoldingsHistory(
         userId,

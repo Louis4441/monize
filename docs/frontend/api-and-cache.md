@@ -40,6 +40,14 @@ Two obligations come with moving a filter server-side: the endpoint must **autho
 
 Where the write can touch anything -- undo/redo, an AI assistant action, a backup restore -- use `clearAllCache()`; no prefix is narrow enough. This matters most for `notifyUndoRedo`/`notifyAiAction`: a refetch served from a stale cache makes the whole signal a no-op.
 
+**A write that wrote nothing is not a write.** `investmentsApi.refreshSelectedPrices` drops the `investments:` prefix only when the response's `updated` is above zero, and `usePriceRefresh` calls `onRefreshComplete` under the same condition. A price refresh outside market hours, or one where every quote was refused, changes no row: dropping the cache and reloading the page then costs a fresh portfolio valuation (seconds of server work) to redraw the same numbers, which is what made the Investments page appear to reload itself a second after it finished loading. `updated` is the server's own count of rows it wrote, not a count of symbols it tried.
+
+## An expensive view is fetched when it is chosen, and a cheap question decides whether to offer it
+
+`AssetAllocationChart` offers its groupings only once it knows each is meaningful for the selected accounts, and the honest way to know that is not always the view's own data. `GET /portfolio/allocation/by-tag` costs a whole portfolio valuation on the server, so fetching it on mount to discover whether any holding is tagged paid the most expensive question in the application to answer the cheapest one. The chart now asks `investmentsApi.getPortfolioTagSummary` on mount -- one query over the holdings and their tags, no valuation -- and reads `hasTaggedHoldings` for the toggle and `keys` for the aggregate-by-key switcher; the by-tag allocation is fetched the first time the tag view is selected, and the by-key allocation the first time a key view is. The country and asset-class look-throughs stay eager because they are cheap and their own item counts are the only signal of availability.
+
+The per-account-filter caches stay as they are: a view already fetched for a selection is instant when the reader switches back, and `cancelled` still guards a late response against a newer selection.
+
 ## Proxy (`src/proxy.ts`)
 
 This is Next.js middleware (NOT the deprecated middleware pattern from this project's conventions). It handles:

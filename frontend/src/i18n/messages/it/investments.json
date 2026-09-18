@@ -53,14 +53,20 @@
     "gainLossTooltip": "Guadagno o perdita non realizzati sulle posizioni attuali: valore di mercato ai prezzi odierni meno il costo di acquisto qui sopra. Non include i guadagni realizzati da vendite passate, né dividendi e interessi ricevuti.",
     "returns": "Rendimenti",
     "simpleReturn": "Rendimento semplice",
-    "simpleReturnTooltip": "Percentuale di guadagno o perdita totale sulle posizioni, calcolata come (Valore di mercato − Costo di acquisto) ÷ Costo di acquisto. Non tiene conto dei tempi di contributi o prelievi.",
+    "simpleReturnTooltip": "Guadagno o perdita rispetto a quanto pagato: (Valore di mercato − Costo di acquisto) ÷ Costo di acquisto. Non tiene conto di quando è arrivato il denaro, quindi salta a ogni acquisto: una posizione di 1.000 in rialzo del 20% mostra +20%; acquistane un'altra da 1.000 e mostrerà +10% (200 ÷ 2.000) anche se non si è perso nulla. TWR e MWR non hanno questo salto.",
     "twr": "TWR",
     "twrFull": "(Ponderato nel tempo)",
-    "twrTooltip": "Misura le performance degli investimenti indipendentemente da quando hai aggiunto o prelevato denaro. Elimina l'impatto dei flussi di cassa per mostrare le performance pure degli investimenti.",
+    "twrTooltip": "Rendimento ponderato nel tempo dei tuoi investimenti dalla prima transazione, calcolato allo stesso modo di Performance del portafoglio: depositi, prelievi e liquidità non investita sono esclusi, dividendi e interessi sono inclusi.",
     "cagr": "CAGR",
     "cagrTooltip": "Tasso di crescita annuo composto. Il tuo rendimento annualizzato basato su investito netto vs. valore corrente del portafoglio, come se la crescita fosse stata perfettamente costante ogni anno.",
     "notAvailable": "N/A",
-    "unpricedHoldings": "Valutazione parziale: {count, plural, one {# posizione non ha} other {# posizioni non hanno}} un prezzo corrente ({symbols}), quindi i valori qui sotto {count, plural, one {la escludono} other {le escludono}}."
+    "unpricedHoldings": "Valutazione parziale: {count, plural, one {# posizione non ha} other {# posizioni non hanno}} un prezzo corrente ({symbols}), quindi i valori qui sotto {count, plural, one {la escludono} other {le escludono}}.",
+    "mwr": "MWR",
+    "mwrFull": "(Ponderato per il denaro)",
+    "mwrTooltip": "Rendimento ponderato per il denaro (XIRR) dei tuoi investimenti dalla prima transazione: il tasso annuo guadagnato dal tuo denaro, ponderando ogni acquisto, vendita e dividendo in base a quando è avvenuto. Depositi, prelievi e liquidità non investita sono esclusi. Differisce dal TWR quando hai investito di più prima di un rialzo o di un ribasso.",
+    "returnDiagnosticsLead": "TWR e MWR non vengono mostrati perché lo storico presenta delle lacune:",
+    "returnDiagnosticsRepair": "Aggiungi le quotazioni mancanti nello storico delle quotazioni di ciascun titolo; i rendimenti sono calcolati sui conti mostrati.",
+    "returnDiagnosticsRepairFiltered": "Aggiungi le quotazioni mancanti nello storico delle quotazioni di ciascun titolo, oppure escludi quei conti dalla vista con il filtro conti sopra; i rendimenti sono calcolati sui conti mostrati."
   },
   "assetAllocation": {
     "title": "Allocazione attività",
@@ -124,8 +130,12 @@
     "noDataForPeriod": "Nessun dato di investimento per questo periodo.",
     "highestValue": "Valore massimo",
     "lowestValue": "Valore minimo",
-    "change": "Variazione",
-    "changePercent": "Variazione %",
+    "investmentResult": "Risultato dell'investimento",
+    "investmentReturn": "Rendimento",
+    "investmentResultTooltip": "Quanto hanno guadagnato i tuoi investimenti in questo periodo. Depositi, prelievi e liquidità non investita sono esclusi, e la percentuale accanto è un rendimento ponderato nel tempo, quindi acquisti e vendite non la spostano.",
+    "unmeasuredFlowTooltip": "Un'operazione regolata al di fuori di questi conti, o una suddivisione che mescola una riga di investimento con una spesa ordinaria, significa che il risultato non può essere separato dal denaro spostato.",
+    "valueChangeLine": "Variazione di valore {amount}",
+    "netFlowsLine": "Depositi e prelievi netti {amount}",
     "priorCloseTooltip": "Misurato dalla chiusura della seduta precedente del {date}.",
     "notAvailable": "N/A",
     "portfolioLabel": "Portafoglio:"
@@ -288,5 +298,28 @@
     "accountRequired": "Il conto è obbligatorio",
     "dateRequired": "La data è obbligatoria",
     "acquisitionPriceRequired": "Il prezzo per azione è obbligatorio e deve essere maggiore di zero. Usa «Aggiungi azioni» per azioni acquisite senza un costo noto."
+  },
+  "portfolioPerformance": {
+    "title": "Performance del portafoglio",
+    "subtitle": "Come si sono comportati i tuoi investimenti, senza l'effetto di depositi, prelievi e liquidità non investita.",
+    "footnote": "Depositi, prelievi e liquidità non investita non sono conteggiati come risultato dell'investimento.",
+    "unavailable": "n/d",
+    "empty": "Storico ancora insufficiente per misurare un rendimento.",
+    "periods": {
+      "1d": "1G",
+      "1w": "1S",
+      "1m": "1M",
+      "3m": "3M",
+      "ytd": "Da inizio anno",
+      "1y": "1A"
+    },
+    "loading": "Misurazione dei periodi in corso...",
+    "loadFailed": "Non è stato possibile caricare i risultati dei periodi. I valori sono sospesi, non azzerati; ricarica la pagina per riprovare.",
+    "reasons": {
+      "incompletePrices": "Un periodo sospeso inizia in un giorno in cui una posizione non aveva prezzo. Aggiorna i prezzi, oppure inseriscine uno nello storico prezzi del titolo.",
+      "incompleteCash": "Un periodo sospeso inizia in un giorno in cui un conto di liquidità in questa vista non ha riportato alcun saldo, quindi ciò che conteneva è sconosciuto, non zero.",
+      "missingRatePairs": "Un periodo sospeso richiede un tasso di cambio che lo storico salvato non ha. Aggiungi lo storico dei tassi per la valuta nella pagina Valute.",
+      "unmeasuredFlow": "Un periodo sospeso contiene un movimento che non si può distinguere da un deposito o un prelievo: un'operazione regolata al di fuori di questi conti, oppure una suddivisione che mescola liquidità e investimenti."
+    }
   }
 }

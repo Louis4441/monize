@@ -19,8 +19,13 @@ import {
   QuoteProviderName,
   QuoteResult,
   HistoricalPrice,
+  HistoricalSeries,
   SecurityLookupResult,
 } from "./providers/quote-provider.interface";
+import {
+  normalizeQuoteCurrency,
+  verifyProviderCurrency,
+} from "./providers/quote-currency.util";
 import {
   DEFAULT_QUOTE_PROVIDER,
   QuoteProviderRegistry,
@@ -30,6 +35,10 @@ import { getMarketSessionFromQuote } from "./providers/market-session.util";
 import { isSessionSettled } from "./providers/settled-bar.util";
 import { assertDailySeries } from "./providers/daily-spacing.util";
 import { MARKET_PRICED_TRADE_ACTIONS } from "./investment-replay.util";
+import {
+  invalidateAllPortfolioSummaries,
+  invalidatePortfolioSummary,
+} from "./portfolio-summary-memo";
 import { BackfillRange } from "./dto/backfill-prices-query.dto";
 import { CreateSecurityPriceDto } from "./dto/create-security-price.dto";
 import { UpdateSecurityPriceDto } from "./dto/update-security-price.dto";
@@ -217,6 +226,28 @@ interface UserContext {
 interface HistoricalWithProvider {
   prices: HistoricalPrice[];
   provider: QuoteProviderName;
+  /**
+   * The currency the provider says these bars are in, normalized. Carried from
+   * the provider's own answer so every write site can refuse a series that
+   * belongs to another listing of the same ticker.
+   */
+  currencyCode: string | null;
+}
+
+/**
+ * What an acceptance point came back with: the answer, or the reason there is
+ * none to store. A refusal is a *reported* fact about the security -- the
+ * provider answered about a different currency -- so it reaches the user as
+ * that security's error rather than as "no price data available".
+ */
+interface QuoteAcceptance {
+  quote: QuoteResult | null;
+  refusal?: string;
+}
+
+interface HistoricalAcceptance {
+  bundle: HistoricalWithProvider | null;
+  refusal?: string;
 }
 
 @Injectable()
@@ -289,11 +320,18 @@ export class SecurityPriceService {
   /**
    * Try each provider in registry order. Both "throws" and "returns null"
    * trigger the fallback. Returns the first quote that has a usable price.
+   *
+   * `group` is every security the caller will write this answer to -- the
+   * symbol/exchange group the fetch is made for, defaulting to `security`
+   * alone. The fetch-time currency check passes the answer on when *any*
+   * member could store it (see `acceptedBySomeMember`); the refusal that
+   * decides what is written is still made per security at the write.
    */
   private async fetchQuoteWithFallback(
     security: Security,
     ctx: UserContext,
-  ): Promise<QuoteResult | null> {
+    group: readonly Security[] = [security],
+  ): Promise<QuoteAcceptance> {
     const ordered = this.providers.resolveForSecurity(
       security,
       ctx.defaultQuoteProvider,
@@ -303,6 +341,7 @@ export class SecurityPriceService {
       `Refresh ${security.symbol}: override=${security.quoteProvider ?? "(none)"} default=${ctx.defaultQuoteProvider} → trying [${ordered.map((p) => p.name).join(", ")}]`,
     );
 
+    let refusal: string | undefined;
     for (const provider of ordered) {
       try {
         const quote = await provider.fetchQuote(
@@ -311,10 +350,24 @@ export class SecurityPriceService {
           this.optsFor(provider, security, ctx),
         );
         if (quote && quote.regularMarketPrice !== undefined) {
+          // A price is a number in a currency, and the row it would be written
+          // to carries only the number. So the answer is checked here, before
+          // anybody can store it, and a provider quoting another listing of
+          // this ticker is passed over rather than accepted -- the next
+          // provider gets its turn and faces the same check.
+          const mismatch = this.acceptedBySomeMember(
+            group,
+            quote.currencyCode,
+            provider.name,
+          );
+          if (mismatch) {
+            refusal = mismatch;
+            continue;
+          }
           this.logger.log(
             `Refresh ${security.symbol}: ${provider.name} returned price=${quote.regularMarketPrice}`,
           );
-          return { ...quote, provider: provider.name };
+          return { quote: { ...quote, provider: provider.name } };
         }
         this.logger.log(
           `Refresh ${security.symbol}: ${provider.name} returned no usable price`,
@@ -328,29 +381,47 @@ export class SecurityPriceService {
     this.logger.warn(
       `Refresh ${security.symbol}: no provider returned a price`,
     );
-    return null;
+    return { quote: null, refusal };
   }
 
+  /** Same group semantics as `fetchQuoteWithFallback`. */
   private async fetchHistoricalWithFallback(
     security: Security,
     range: string,
     ctx: UserContext,
-  ): Promise<HistoricalWithProvider | null> {
+    group: readonly Security[] = [security],
+  ): Promise<HistoricalAcceptance> {
     const ordered = this.providers.resolveForSecurity(
       security,
       ctx.defaultQuoteProvider,
     );
 
+    let refusal: string | undefined;
     for (const provider of ordered) {
       try {
-        const prices = await provider.fetchHistorical(
+        const series = await provider.fetchHistoricalSeries(
           security.symbol,
           security.exchange,
           range,
           this.optsFor(provider, security, ctx),
         );
-        if (prices && prices.length > 0) {
-          return { prices, provider: provider.name };
+        if (series && series.prices.length > 0) {
+          const mismatch = this.acceptedBySomeMember(
+            group,
+            series.currencyCode,
+            provider.name,
+          );
+          if (mismatch) {
+            refusal = mismatch;
+            continue;
+          }
+          return {
+            bundle: {
+              prices: series.prices,
+              provider: provider.name,
+              currencyCode: series.currencyCode,
+            },
+          };
         }
       } catch (err) {
         this.logger.warn(
@@ -358,7 +429,91 @@ export class SecurityPriceService {
         );
       }
     }
-    return null;
+    return { bundle: null, refusal };
+  }
+
+  /**
+   * The one comparison every price acceptance point makes: does the currency
+   * the provider reported match the one the security is recorded in.
+   *
+   * Returns the message to report when it does not, and `null` when the answer
+   * may be stored. A provider that reports no currency at all (MSN's chart
+   * series) is accepted as unverified rather than refused, because refusing it
+   * would leave those securities with no prices; the decision is logged.
+   *
+   * At a *write* this is called per security, never per group: the refresh and
+   * backfill passes fetch once for a representative and write for every
+   * security sharing its symbol and exchange, and those securities can be
+   * recorded in different currencies. At a *fetch* the group form
+   * `acceptedBySomeMember` asks it of the whole group instead.
+   */
+  private refuseForeignCurrency(
+    security: Pick<Security, "symbol" | "currencyCode">,
+    reported: string | null | undefined,
+    provider: QuoteProviderName,
+    opts: { warnUnverified?: boolean } = {},
+  ): string | null {
+    const verdict = verifyProviderCurrency(security.currencyCode, reported);
+    if (verdict.accepted) {
+      if (!verdict.verified && opts.warnUnverified !== false) {
+        this.logger.warn(
+          `Storing ${provider} prices for ${security.symbol} unverified: ` +
+            (verdict.reason === "provider-silent"
+              ? "the provider reported no trading currency"
+              : "the security has no recorded currency"),
+        );
+      }
+      return null;
+    }
+    const message = tr(
+      "errors.securities.providerCurrencyMismatch",
+      `Price update refused for ${security.symbol}: ${provider} quotes it in ${verdict.reported}, but the security is recorded in ${verdict.configured}. Correct the security's currency, symbol or exchange, then refresh.`,
+      {
+        symbol: security.symbol,
+        provider,
+        reported: verdict.reported,
+        configured: verdict.configured,
+      },
+    );
+    // The log is the operator's, in English; `message` is the reader's, in
+    // the request's locale, and a translated line among English ones made the
+    // server log read in whichever language the last caller used.
+    this.logger.warn(
+      `Price update refused for ${security.symbol}: ${provider} quotes it in ${verdict.reported}, but the security is recorded in ${verdict.configured}`,
+    );
+    return message;
+  }
+
+  /**
+   * The fetch-time form of `refuseForeignCurrency`, asked of a whole
+   * symbol/exchange group at once.
+   *
+   * A group is keyed on symbol and exchange, never on currency, so its members
+   * can be recorded in different currencies and at most some of them are right
+   * about any one provider answer. Judging the fetch on the representative
+   * alone let one user's mis-recorded currency stop the fetch for every other
+   * holder of that ticker: the whole group was marked failed although the
+   * answer was storable for all but one of them. So the fetch passes the answer
+   * on as soon as *one* member could store it, and the per-security check at
+   * the write (the only refusal point that matters) decides who actually gets
+   * it. Returns `null` to accept, or the refusal message when no member can.
+   */
+  private acceptedBySomeMember(
+    group: readonly Security[],
+    reported: string | null | undefined,
+    provider: QuoteProviderName,
+  ): string | null {
+    const accepting = group.find(
+      (member) =>
+        verifyProviderCurrency(member.currencyCode, reported).accepted,
+    );
+    // Either way this delegates, so the unverified-storage warning and the
+    // refusal message are written in exactly one place.
+    return this.refuseForeignCurrency(
+      accepting ?? group[0],
+      reported,
+      provider,
+    );
   }
 
   private optsFor(
@@ -568,20 +723,20 @@ export class SecurityPriceService {
           defaultQuoteProvider: DEFAULT_QUOTE_PROVIDER,
           preferredExchanges: [],
         };
-        return this.fetchQuoteWithFallback(rep, ctx);
+        return this.fetchQuoteWithFallback(rep, ctx, group);
       },
     );
 
     for (let i = 0; i < groups.length; i++) {
       const group = groups[i];
-      const quote = quotes[i];
+      const { quote, refusal } = quotes[i];
 
       if (!quote || quote.regularMarketPrice === undefined) {
         for (const security of group) {
           results.push({
             symbol: security.symbol,
             success: false,
-            error: "No price data available",
+            error: refusal ?? "No price data available",
           });
           failed++;
         }
@@ -611,8 +766,27 @@ export class SecurityPriceService {
 
       const tradingDate = formatDateYMD(getTradingDateFromQuote(quote));
       for (const security of group) {
+        // Per security, although the quote was fetched once for the group: the
+        // group is keyed on symbol and exchange, not on currency, so two users
+        // holding the same ticker can have recorded it differently and only one
+        // of them may be right about this answer.
+        const mismatch = this.refuseForeignCurrency(
+          security,
+          quote.currencyCode,
+          quote.provider ?? DEFAULT_QUOTE_PROVIDER,
+          { warnUnverified: false },
+        );
+        if (mismatch) {
+          results.push({
+            symbol: security.symbol,
+            success: false,
+            error: mismatch,
+          });
+          failed++;
+          continue;
+        }
         try {
-          await this.savePriceData(security.id, tradingDate, quote);
+          await this.savePriceData(security, tradingDate, quote);
           await this.persistMarketSession(security, quote);
           results.push({
             symbol: security.symbol,
@@ -702,13 +876,13 @@ export class SecurityPriceService {
 
     for (let i = 0; i < securities.length; i++) {
       const security = securities[i];
-      const quote = quotes[i];
+      const { quote, refusal } = quotes[i];
 
       if (!quote || quote.regularMarketPrice === undefined) {
         results.push({
           symbol: security.symbol,
           success: false,
-          error: "No price data available",
+          error: refusal ?? "No price data available",
         });
         failed++;
         continue;
@@ -733,7 +907,7 @@ export class SecurityPriceService {
 
       try {
         const tradingDate = formatDateYMD(getTradingDateFromQuote(quote));
-        await this.savePriceData(security.id, tradingDate, quote);
+        await this.savePriceData(security, tradingDate, quote);
         await this.persistMarketSession(security, quote);
         results.push({
           symbol: security.symbol,
@@ -767,10 +941,11 @@ export class SecurityPriceService {
    * provider tag, defaulting to yahoo_finance for back-compat.
    */
   private async savePriceData(
-    securityId: string,
+    security: Security,
     priceDate: string,
     quote: QuoteResult,
   ): Promise<SecurityPrice> {
+    const securityId = security.id;
     const source = sourceFor(quote.provider);
     // The instant the quote was struck, which `priceDate` cannot carry and
     // `createdAt` does not track: a same-day refresh updates the row in place,
@@ -864,6 +1039,11 @@ export class SecurityPriceService {
           `Failed to persist price for security ${securityId} on ${priceDate}`,
         );
       }
+      // A stored price changes what the portfolio is worth, so the memoized
+      // valuation for this security's owner is dropped here rather than in each
+      // of the refresh entry points -- the same argument `bulkUpsertPrices`
+      // makes for holding its guard once instead of in four callers.
+      invalidatePortfolioSummary(security.userId);
       return saved;
     });
   }
@@ -1032,7 +1212,10 @@ export class SecurityPriceService {
     for (const p of ordered) {
       try {
         const quote = await p.fetchQuote(symbol, exchange);
-        const currency = quote?.currencyCode?.trim();
+        // Through the same normalization the acceptance check applies, so the
+        // currency a security is created with is comparable -- letter for
+        // letter -- with the one every later price answer is measured against.
+        const currency = normalizeQuoteCurrency(quote?.currencyCode);
         if (currency) return currency;
       } catch (err) {
         this.logger.warn(
@@ -1079,17 +1262,6 @@ export class SecurityPriceService {
     const startTime = Date.now();
     this.logger.log("Starting historical price backfill");
 
-    const allActive = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(Security).find({
-        where: { isActive: true },
-      }),
-    );
-    const securities = allActive.filter((s) => isRefreshEligible(s));
-
-    const userContexts = await this.loadUserContexts(
-      securities.map((s) => s.userId),
-    );
-
     const earliestTxRows: Array<{ security_id: string; earliest: string }> =
       await withScopedDb(this.dataSource, (m) =>
         m.query(
@@ -1102,6 +1274,28 @@ export class SecurityPriceService {
       );
     const earliestTxDate = new Map(
       earliestTxRows.map((r) => [r.security_id, r.earliest]),
+    );
+
+    // Active securities, plus every security the user has ever held.
+    //
+    // `SecuritiesService.deactivate` refuses while any holding is non-zero, so
+    // an INACTIVE security is by definition one that was bought, held, and sold
+    // out completely -- and the days it was held are days the portfolio series
+    // still has to value. Filtering this backfill by `isActive` meant the one
+    // operation whose whole purpose is price HISTORY could never fill the
+    // history of the position a reader is looking at, so its holding period
+    // read as an unpriced gap forever (#1389). The daily quote refresh is a
+    // different question and is deliberately left alone: today's quote for
+    // something nobody holds buys nothing.
+    const allSecurities = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Security).find(),
+    );
+    const securities = allSecurities.filter(
+      (s) => (s.isActive || earliestTxDate.has(s.id)) && isRefreshEligible(s),
+    );
+
+    const userContexts = await this.loadUserContexts(
+      securities.map((s) => s.userId),
     );
 
     const oneYearAgo = new Date();
@@ -1137,27 +1331,34 @@ export class SecurityPriceService {
         groupEarliestDates.length > 0 &&
         groupEarliestDates.some((d) => d < oneYearAgoStr);
 
-      const daily = await this.fetchHistoricalWithFallback(
+      const dailyAttempt = await this.fetchHistoricalWithFallback(
         representative,
         range ?? "1y",
         ctx,
+        group,
       );
+      const daily = dailyAttempt.bundle;
 
       let maxBundle: HistoricalWithProvider | null = null;
+      let maxRefusal: string | undefined;
       if (!range && needsOlderData) {
-        maxBundle = await this.fetchHistoricalWithFallback(
+        const maxAttempt = await this.fetchHistoricalWithFallback(
           representative,
           "max",
           ctx,
+          group,
         );
+        maxBundle = maxAttempt.bundle;
+        maxRefusal = maxAttempt.refusal;
       }
 
       if (!daily && !maxBundle) {
+        const refusal = dailyAttempt.refusal ?? maxRefusal;
         for (const security of group) {
           results.push({
             symbol: security.symbol,
             success: false,
-            error: "No historical data available",
+            error: refusal ?? "No historical data available",
           });
           failed++;
         }
@@ -1218,8 +1419,26 @@ export class SecurityPriceService {
           continue;
         }
 
+        // The series was fetched for the representative; this security only
+        // shares its symbol and exchange, not necessarily its currency.
+        const mismatch = this.refuseForeignCurrency(
+          security,
+          winner.currencyCode,
+          winner.provider,
+          { warnUnverified: false },
+        );
+        if (mismatch) {
+          results.push({
+            symbol: security.symbol,
+            success: false,
+            error: mismatch,
+          });
+          failed++;
+          continue;
+        }
+
         try {
-          await this.bulkUpsertPrices(security.id, prices, source);
+          await this.bulkUpsertPrices(security, prices, source);
 
           this.logger.log(
             `Backfilled ${prices.length} prices for ${security.symbol} via ${winner.provider} ` +
@@ -1268,10 +1487,11 @@ export class SecurityPriceService {
    * MSN-sourced data can be stored with source='msn_finance'.
    */
   private async bulkUpsertPrices(
-    securityId: string,
+    security: Security,
     prices: HistoricalPrice[],
     source: string,
   ): Promise<void> {
+    const securityId = security.id;
     // Before anything is written, and over the whole payload rather than per
     // batch: a provider asked for a long range may answer with weekly or
     // monthly bars, and stored into a daily table those rows are
@@ -1352,6 +1572,10 @@ export class SecurityPriceService {
         ),
       );
     }
+    // Every historical write path (catalog backfill, per-security backfill,
+    // holding-period backfill, settlement) ends here, so the owner's memoized
+    // valuation is forgotten here too.
+    invalidatePortfolioSummary(security.userId);
   }
 
   // ─── Daily settlement ────────────────────────────────────────────────────
@@ -1416,7 +1640,12 @@ export class SecurityPriceService {
           defaultQuoteProvider: DEFAULT_QUOTE_PROVIDER,
           preferredExchanges: [],
         };
-        return this.fetchHistoricalWithFallback(rep, SETTLEMENT_RANGE, ctx);
+        return this.fetchHistoricalWithFallback(
+          rep,
+          SETTLEMENT_RANGE,
+          ctx,
+          group,
+        );
       },
     );
 
@@ -1425,7 +1654,7 @@ export class SecurityPriceService {
     let failed = 0;
 
     for (const [i, group] of groups.entries()) {
-      const bundle = bundles[i];
+      const bundle = bundles[i].bundle;
       if (!bundle || bundle.prices.length === 0) {
         failed += group.length;
         continue;
@@ -1433,6 +1662,20 @@ export class SecurityPriceService {
       const source = sourceFor(bundle.provider);
 
       for (const security of group) {
+        // Settlement writes the official bars over the day's quotes, so it is
+        // a price write like any other and faces the same check -- per
+        // security, because the group shares a symbol rather than a currency.
+        if (
+          this.refuseForeignCurrency(
+            security,
+            bundle.currencyCode,
+            bundle.provider,
+            { warnUnverified: false },
+          )
+        ) {
+          failed++;
+          continue;
+        }
         // Per security rather than per group: the session lives on the row, and
         // a symbol nothing has quoted yet has none, which is a different answer
         // from a symbol whose exchange is known.
@@ -1442,7 +1685,7 @@ export class SecurityPriceService {
         if (settled.length === 0) continue;
 
         try {
-          await this.bulkUpsertPrices(security.id, settled, source);
+          await this.bulkUpsertPrices(security, settled, source);
           securitiesSettled++;
           barsSettled += settled.length;
         } catch (error) {
@@ -1570,11 +1813,16 @@ export class SecurityPriceService {
       preferredExchanges: [],
     };
 
-    const bundle = await this.fetchHistoricalWithFallback(
+    const { bundle, refusal } = await this.fetchHistoricalWithFallback(
       security,
       range,
       userCtx,
     );
+    // A refused series is a reported fault, not an absence: this method throws
+    // so the user who asked for the history is told why they got none, while
+    // `backfillSecurityRange` keeps turning it into a zero for the background
+    // callers that only want a count.
+    if (refusal) throw new Error(refusal);
     if (!bundle || bundle.prices.length === 0) {
       this.logger.warn(`No historical prices available for ${security.symbol}`);
       return 0;
@@ -1585,7 +1833,7 @@ export class SecurityPriceService {
     }
 
     await this.bulkUpsertPrices(
-      security.id,
+      security,
       bundle.prices,
       sourceFor(bundle.provider),
     );
@@ -1748,17 +1996,17 @@ export class SecurityPriceService {
       userCtx.defaultQuoteProvider,
     )) {
       const opts = this.optsFor(provider, security, userCtx);
-      let prices: HistoricalPrice[] | null = null;
+      let series: HistoricalSeries | null = null;
       try {
-        prices = provider.fetchHistoricalWindow
-          ? await provider.fetchHistoricalWindow(
+        series = provider.fetchHistoricalWindowSeries
+          ? await provider.fetchHistoricalWindowSeries(
               security.symbol,
               security.exchange,
               fromDate,
               toDate,
               opts,
             )
-          : await provider.fetchHistorical(
+          : await provider.fetchHistoricalSeries(
               security.symbol,
               security.exchange,
               rangeReaching(date),
@@ -1774,18 +2022,28 @@ export class SecurityPriceService {
       // `null` is no answer at all. The difference is what decides whether the
       // caller may remember the window as empty, so it is tracked rather than
       // collapsed into "nothing came back".
-      if (prices !== null) answered = true;
-      if (!prices || prices.length === 0) continue;
+      if (series !== null) answered = true;
+      if (!series || series.prices.length === 0) continue;
+
+      // This path reaches `bulkUpsertPrices` without going through either
+      // fallback helper, so it is an acceptance point of its own and makes the
+      // same comparison. A refused provider gives this security's next one its
+      // turn; the fill stays best-effort and stores nothing it cannot vouch for.
+      if (
+        this.refuseForeignCurrency(security, series.currencyCode, provider.name)
+      ) {
+        continue;
+      }
 
       await this.bulkUpsertPrices(
-        security.id,
-        prices,
+        security,
+        series.prices,
         sourceFor(provider.name),
       );
       this.logger.log(
-        `Filled ${prices.length} prices for ${security.symbol} around ${date} via ${provider.name}`,
+        `Filled ${series.prices.length} prices for ${security.symbol} around ${date} via ${provider.name}`,
       );
-      return { stored: prices.length, answered: true };
+      return { stored: series.prices.length, answered: true };
     }
 
     return { stored: 0, answered };
@@ -1867,16 +2125,25 @@ export class SecurityPriceService {
 
     const needsOlderData = !!earliestTx && earliestTx < oneYearAgoStr;
 
-    const daily = await this.fetchHistoricalWithFallback(security, "1y", ctx);
-    const maxBundle = needsOlderData
+    const dailyAttempt = await this.fetchHistoricalWithFallback(
+      security,
+      "1y",
+      ctx,
+    );
+    const maxAttempt = needsOlderData
       ? await this.fetchHistoricalWithFallback(security, "max", ctx)
       : null;
+    const daily = dailyAttempt.bundle;
+    const maxBundle = maxAttempt?.bundle ?? null;
 
     if (!daily && !maxBundle) {
       return {
         symbol: security.symbol,
         success: false,
-        error: "No historical data available",
+        error:
+          dailyAttempt.refusal ??
+          maxAttempt?.refusal ??
+          "No historical data available",
       };
     }
 
@@ -1924,7 +2191,7 @@ export class SecurityPriceService {
 
     const source = sourceFor(winner.provider);
     try {
-      await this.bulkUpsertPrices(security.id, prices, source);
+      await this.bulkUpsertPrices(security, prices, source);
     } catch (error) {
       this.logger.error(
         `Failed to force-backfill prices for ${security.symbol}: ${error instanceof Error ? error.message : String(error)}`,
@@ -2104,6 +2371,10 @@ export class SecurityPriceService {
       `Transaction price backfill completed: ${pairs.length} processed, ${created} created/updated, ${skipped} skipped`,
     );
 
+    // A maintenance pass over every user's transaction-derived prices; there is
+    // no single owner to invalidate, so the whole memo goes.
+    if (created > 0) invalidateAllPortfolioSummaries();
+
     return { processed: pairs.length, created, skipped };
   }
 
@@ -2186,6 +2457,10 @@ export class SecurityPriceService {
    * which the debounced timer captures.
    */
   private scheduleSnapshotRecalc(accountIds: string[], userId: string): void {
+    // Also when no account holds the security: the manual price still changed
+    // what a future valuation will say, and the per-account loop below would
+    // invalidate nothing.
+    invalidatePortfolioSummary(userId);
     for (const accountId of accountIds) {
       this.netWorthService.triggerDebouncedRecalc(accountId, userId);
     }

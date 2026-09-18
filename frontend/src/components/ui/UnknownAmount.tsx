@@ -30,8 +30,21 @@ interface UnknownAmountProps {
    * current day to have moved over. Reaching for `noPrice` here would send the
    * reader looking for a price that is already stored -- what is missing is a
    * *recent* one.
+   *
+   * `unknownCurrency` is the sixth, and the only one where the NUMBER is known
+   * and its unit is not: an investment row naming no security has no security
+   * currency, and its price and total are denominated in that currency. No rate
+   * is missing, so `displayFx` would send the reader to the Currencies page over
+   * a conversion nobody asked for; what is missing is the security on the row.
    */
-  reason?: 'scheduledFx' | 'displayFx' | 'noPrice' | 'noBaseline' | 'staleQuote';
+  reason?:
+    | 'scheduledFx'
+    | 'displayFx'
+    | 'noPrice'
+    | 'noBaseline'
+    | 'staleQuote'
+    | 'noCashBalance'
+    | 'unknownCurrency';
   /** Extra classes for the wrapper, so a table cell can keep its alignment. */
   className?: string;
 }

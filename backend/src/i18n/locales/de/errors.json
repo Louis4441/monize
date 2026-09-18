@@ -259,7 +259,9 @@
     "cannotModifyOther": "Währung eines anderen Benutzers kann nicht geändert werden",
     "inUse": "Währung \"{{ code }}\" wird von Ihren Konten, Wertpapieren oder anderen Einträgen verwendet. Deaktivieren Sie sie stattdessen.",
     "invalidRateDate": "date muss im Format JJJJ-MM-TT angegeben werden",
-    "alreadyInListInactive": "Währung \"{{ code }}\" ist bereits in Ihrer Liste, aber derzeit inaktiv. Reaktivieren Sie sie, um sie zu verwenden."
+    "alreadyInListInactive": "Währung \"{{ code }}\" ist bereits in Ihrer Liste, aber derzeit inaktiv. Reaktivieren Sie sie, um sie zu verwenden.",
+    "sameCurrencyHistory": "{{ code }} ist Ihre Standardwährung; es gibt keinen Wechselkursverlauf zu erweitern",
+    "rateProviderUnavailable": "Der Wechselkursanbieter hat nicht geantwortet. Bitte versuchen Sie es später erneut."
   },
   "delegation": {
     "delegatedAccessInvalid": "Delegierter Zugriff ist nicht mehr gültig",
@@ -341,8 +343,10 @@
   "netWorth": {
     "invalidStartDate": "startDate muss im Format YYYY-MM-DD sein",
     "invalidEndDate": "endDate muss im Format YYYY-MM-DD sein",
+    "invalidBaselineDate": "baselineDate muss im Format YYYY-MM-DD sein",
     "invalidAccountIds": "accountIds muss kommagetrennte UUIDs sein",
-    "invalidGranularity": "granularity muss 'daily' oder 'monthly' sein"
+    "invalidGranularity": "granularity muss 'daily' oder 'monthly' sein",
+    "invalidPeriods": "periods muss aus kommagetrennten Zeitraum-Voreinstellungen bestehen"
   },
   "notifications": {
     "notFound": "Benachrichtigung mit ID {{ id }} nicht gefunden",
@@ -418,6 +422,7 @@
   "securities": {
     "exchangeRateUnavailable": "Wechselkurs für {{ from }} -> {{ to }} zum Transaktionsdatum konnte nicht ermittelt werden. Geben Sie einen expliziten exchangeRate an, damit die Buchung auf dem Geldkonto korrekt ist.",
     "accountMustBeInvestment": "Konto muss vom Typ INVESTMENT sein",
+    "providerCurrencyMismatch": "Preisaktualisierung für {{ symbol }} abgelehnt: {{ provider }} notiert es in {{ reported }}, aber das Wertpapier ist in {{ configured }} erfasst. Korrigieren Sie die Währung, das Symbol oder die Börse des Wertpapiers und aktualisieren Sie dann erneut.",
     "securityIdRequired": "Wertpapier-ID ist für {{ action }}-Buchungen erforderlich",
     "splitRatioRequired": "Teilungsverhältnis (Menge) muss größer als null sein",
     "acquisitionPriceRequired": "Für {{ action }}-Transaktionen ist ein Preis pro Anteil erforderlich, der größer als null sein muss. Verwenden Sie ADD_SHARES für Anteile, deren Kosten nicht bekannt sind.",

@@ -3,8 +3,10 @@ import { MovementInputs, decideMovement } from "./portfolio-movement.util";
 const base = (over: Partial<MovementInputs>): MovementInputs => ({
   mvComplete: true,
   mvToday: 100_000,
+  pricesCurrentSinceBaseline: true,
   currency: "USD",
   baseline: { value: 100_000, currency: "USD" },
+  baselineDateKnown: true,
   flow: { complete: true, value: 0 },
   movePercent: 5,
   ...over,
@@ -45,6 +47,17 @@ describe("decideMovement", () => {
       base({ currency: "EUR", baseline: { value: 90_000, currency: "USD" } }),
     );
     expect(d).toEqual({ fire: null, rebaselineTo: 100_000 });
+  });
+
+  it("re-baselines without firing when the baseline carries no capture date", () => {
+    // An undated baseline names no period: the flow has nothing to span and no
+    // held position's close can be stale against it, so a difference computed
+    // against it is not a measured movement. Firing here would also have put
+    // the run's own date in front of the reader as the period's opening.
+    const d = decideMovement(
+      base({ baselineDateKnown: false, mvToday: 130_000 }),
+    );
+    expect(d).toEqual({ fire: null, rebaselineTo: 130_000 });
   });
 
   it("re-baselines without firing when the baseline value is 0", () => {
@@ -88,6 +101,10 @@ describe("decideMovement", () => {
       changePercent: -8,
       direction: "down",
       movementValue: -8_000,
+      // The components travel with the figure so a reader can reproduce it.
+      baselineValue: 100_000,
+      currentValue: 92_000,
+      externalFlow: 0,
     });
     expect(d.rebaselineTo).toBe(92_000);
   });
@@ -100,7 +117,33 @@ describe("decideMovement", () => {
       changePercent: 6,
       direction: "up",
       movementValue: 6_000,
+      baselineValue: 100_000,
+      currentValue: 106_000,
+      externalFlow: 0,
     });
+  });
+
+  it("withholds and does not rebaseline on a holding priced before the baseline", () => {
+    // INV-PORTMOVE-008: part of today's value is carried from before the period,
+    // so the difference is not a market move. Withholding rather than
+    // rebaselining is what stops the catch-up firing on the day the price lands.
+    const d = decideMovement(
+      base({
+        mvToday: 92_000,
+        baseline: { value: 100_000, currency: "USD" },
+        pricesCurrentSinceBaseline: false,
+      }),
+    );
+    expect(d).toEqual({ fire: null, rebaselineTo: null });
+  });
+
+  it("ignores stale prices before there is a baseline to be stale against", () => {
+    const d = decideMovement(
+      base({ baseline: null, pricesCurrentSinceBaseline: false }),
+    );
+    // The producer passes `true` here; even so, a first capture must not be
+    // blocked by a rule about a period that does not exist yet.
+    expect(d.rebaselineTo).toBe(100_000);
   });
 
   it("stays silent below the threshold but still rebaselines", () => {

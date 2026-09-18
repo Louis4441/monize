@@ -251,4 +251,24 @@ export class InvestmentTransaction {
    */
   @ApiProperty({ required: false, example: 87.5 })
   accruedInterest?: number;
+
+  /**
+   * The unit each money field above is in, stamped on the row by
+   * `attachInvestmentRowCurrencies` so no consumer has to infer it from the
+   * account it is filed under. Not columns: they are derived from the loaded
+   * `security`, `account` and `fundingAccount` relations, and are absent on a
+   * response whose path does not load them -- absent means no information.
+   * `investment-transaction-currencies.util.ts` holds the derivation.
+   */
+  @ApiProperty({ required: false, example: "EUR" })
+  amountCurrencyCode?: string | null;
+
+  @ApiProperty({ required: false, example: "EUR" })
+  priceCurrencyCode?: string | null;
+
+  @ApiProperty({ required: false, example: "EUR" })
+  commissionCurrencyCode?: string | null;
+
+  @ApiProperty({ required: false, example: "PLN" })
+  settlementCurrencyCode?: string | null;
 }

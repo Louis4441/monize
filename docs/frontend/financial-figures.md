@@ -36,7 +36,7 @@ Every number a month grid shows is one the server already decided: a row's own `
 
 **The Balances layer is one request, scoped by accounts alone.** `useDailyBalanceTotals` asks `GET /accounts/daily-balance-totals` for the grid's range and prints what comes back: `total` through `balanceColor`, `isProjected` as the italic clock marker, `null` as the unknown marker. The scope is the page's account filter and nothing else -- narrowing a balance by category or payee would total the subset of rows that moved it, which is not a balance of anything -- and whether a day is a projection is `isProjected` off the response, never the browser's clock (design I2). `knownSubtotal` appears only in the day panel under a caption that says it is partial; the cell never prints it, because a partial sum at chip size is indistinguishable from a total. A withheld day names its cause where it is withheld: the missing pair in the panel and the banner, an incomplete forecast through `BalanceForecastUnavailable`, which is the same panel the account detail screen shows for the same server decision.
 
-**On the Investments calendar a trade is one chip, and its value layer stops at today.** A purchase writes the brokerage row and the cash-sleeve row that settles it; `dedupeInvestmentLegs` (`lib/calendar-rows.ts`) drops the cash leg when its trade is on screen and keeps it when the scope holds the sleeve without the brokerage, where it is the only record of the movement the reader can see (I5). The Values layer reads `GET /net-worth/investments-daily` for the grid clamped at the financial today, because a market value has no honest forward series and projecting the cash sleeve alone would put a subtotal under a value's caption (decision 7); a day past today is blank, which is a different rendering from unknown. `pricesComplete` and `fxComplete` are read as `=== false` through `isDailyValueComplete` -- an absent flag is an older backend mid-deploy, which is no information rather than a claim of completeness -- and a withheld value names the security or the pair behind it, in the panel and in the banner, because one manual price repairs every day from its date forward. **A security is named from the scope's holdings, not from the month's rows**: `unpricedSecurityIds` carries ids, the month names only what it traded, and the position that went unpriced usually was not traded, so the page passes `heldSecurityLabels` and the id is printed only when both sets miss it. A UUID under "add a price" is a repair instruction nobody can follow.
+**On the Investments calendar a trade is one chip, and its value layer stops at today.** A purchase writes the brokerage row and the cash-sleeve row that settles it; `dedupeInvestmentLegs` (`lib/calendar-rows.ts`) drops the cash leg when its trade is on screen and keeps it when the scope holds the sleeve without the brokerage, where it is the only record of the movement the reader can see (I5). The Values layer reads `GET /net-worth/investments-daily` for the grid clamped at the financial today, because a market value has no honest forward series and projecting the cash sleeve alone would put a subtotal under a value's caption (decision 7); a day past today is blank, which is a different rendering from unknown. `pricesComplete`, `fxComplete` and `cashComplete` are read as `=== false` through `isDailyValueComplete` -- an absent flag is an older backend mid-deploy, which is no information rather than a claim of completeness -- and a withheld value names the security or the pair behind it, in the panel and in the banner, because one manual price repairs every day from its date forward. **A security is named from the scope's holdings, not from the month's rows**: `unpricedSecurityIds` carries ids, the month names only what it traded, and the position that went unpriced usually was not traded, so the page passes `heldSecurityLabels` and the id is printed only when both sets miss it. A UUID under "add a price" is a repair instruction nobody can follow.
 
 **The Daily change layer renders `complete` and `reasons`, and re-derives neither.** `useDailyMovements` reads `GET /portfolio/daily-movements`, where `DailyMovementService.decide` has already applied truth table B: a percentage needs a trading day, two complete values, a complete flow and a non-zero baseline. The cell has three renderings and they never share markup -- a percentage, the unknown marker, nothing at all -- because a weekend carries the previous close forward and its arithmetic yields exactly zero, which would otherwise read as a flat session (decision 9). Exactly zero is neutral rather than green: `gainLossColor` calls a non-negative number a gain, which is right for a return and wrong for a session that did not move. **A withheld change names its cause where the reader can act on it.** The cell carries one `UnknownAmount` glyph for six server reasons, so `movementUnknownReason` maps them rather than assuming: an `unpricedHolding` is a price to add and everything else is a rate, because sending a reader to Price history over a missing display rate is the wrong screen. The glyph is not the whole answer either -- the banner composes the server's own wording for every reason the month withheld a change for, since `DailyMovementDialog`, which lists them, opens only from the percentage a complete day draws. `notTradingDay` and `zeroBaseline` are not composed: those days are blank by decision, and there is nothing to repair. `DailyMovementDialog` is read-only and reconciles: the per-security rows arrive sorted by the money each moved, and one remainder line carries what no close explains, so the popup adds up to the number the cell shows (decision 10); a `null` remainder says a component was unknown, and nothing on the client adds the rows up to check.
 
@@ -99,9 +99,7 @@ On `1d`, `1w` and `mtd` the Change and Change % measure from the close of the la
 
 This was briefly a user preference (migration 152, dropped by 153); it was removed because the prior close is the right answer rather than a taste. `usesPriorCloseBaseline` takes the range and nothing else -- if you find yourself adding a second argument, first ask whether the alternative is actually defensible.
 
-Both halves come from **one hook**, `hooks/usePortfolioChangeBaseline.ts` (`usesPriorClose` and the `priorClose` together); the arithmetic and range set live once in `components/investments/portfolio-change-baseline.ts`. Deciding *whether* a prior close applies in one place and reading the close in another is the specific bug the single hook prevents. The baseline is looked up for the **first point on screen**, never the requested window start (on a weekend the 1D chart shows the last session). A baseline that has not loaded makes the change **unknown** -- both cards read N/A, never the first-point change.
-
-The change itself is `portfolioSeriesChange(values, { usesPriorClose, priorCloseValue })`, read by the Investments chart and the Portfolio Value widget alike, so no surface can report a different move for the same window. A **baseline of zero has no percentage**: the money change is still known, the percentage is `null`, and 0% -- which would say the portfolio held its ground -- is never shown.
+The date is all the client decides. `usesPriorCloseBaseline` and `previousCalendarDay` (`components/investments/portfolio-change-baseline.ts`) answer which day the period is measured from, and that day goes out as `baselineDate` on the period-result request; the arithmetic over it is the server's, and the client-side helpers that used to do it here are deleted rather than left exported for the next surface to reach for. The baseline is the close before the **first point on screen**, never the requested window start (on a weekend the 1D chart shows the last session), so the request waits for that point rather than guessing a date.
 
 ## The window a price chart requests is not the period its range names
 
@@ -248,6 +246,93 @@ because a lookup cannot aggregate. It also scans for a group's provenance
 derived from its members (`.every(... isProjected ...)`) and pins the Debt
 Payoff Timeline's three axes to `dataKey="axisKey"`. INV-REPORT-002.
 
+## A period's change, flows and result are three figures the server sends
+
+A chart of portfolio value has every number needed to work out `last - first`,
+and that figure is not what the portfolio earned: it counts the deposits the
+reader made inside the window. `PortfolioValueReport` derived it for years and
+printed the result under a "Period Return" caption, so two deposits with a
+price that never moved read as +100% (issue #1392).
+
+Read `GET /net-worth/investments-period-result`
+(`netWorthApi.getInvestmentsPeriodResult`) and print what it says: `valueChange`
+captioned as a value change, `netExternalFlows` beside it, `investmentResult`
+as the performance, and a percentage only over the last of the three. Nothing
+on the client subtracts, divides or falls back to the series when the request
+fails -- an unanswered request leaves every figure unknown, never zero.
+
+**Two measures travel on one payload, and the caption says which.** The three
+figures above are the ACCOUNT's: they count the cash sitting in an investment
+account, so a reader with 8,000 invested and 2,000 idle who gains 10% reads
++8%. Beside them the same payload carries the INVESTED part --
+`investmentPnl` (the securities' own P&L, capital flows out and income in) and
+`investmentReturnPercent` (a time-weighted return over the securities alone,
+`investmentReturnMethod: "twr"`), each withheld with its cause in
+`investedReasons` (INV-PORTRESULT-002,
+`docs/specs/portfolio-period-result.md` section 10). The portfolio summary card's
+"TWR (time-weighted)" is that same `investmentReturnPercent` asked since the
+portfolio's first transaction, withheld through `UnknownAmount` with
+`periodResultUnknownReason(summary.timeWeightedReturnReasons)` rather than a
+causeless "N/A", and "MWR (money-weighted)" beside it is the same measure's
+annualised XIRR over the same flows (`summary.moneyWeightedReturn`, withheld
+the same way, `mwrUndefined` or `windowTooShort` when it is the rate rather
+than the data that is unknown -- section 11); the card's "Simple Return" and
+"CAGR" beside them are cost-basis measures and keep their own captions. The four investment
+surfaces LEAD with those two: `PortfolioPerformanceCard` shows
+`investmentReturnPercent` over `investmentPnl`, and `InvestmentValueChart`,
+`PortfolioValueWidget` and `PortfolioValueReport` put them where their result
+and return used to be, keeping `valueChange` and `netExternalFlows` beside them
+under their own captions. Those three also PLOT the invested value --
+`investedValue(point)` (`lib/invested-value.ts`) over the point's
+`securitiesValue`, never `value` -- so a chart and the figures under it cannot
+answer two different questions. The dashboard's Net Worth chart is net worth
+and keeps its cash.
+
+**`PortfolioValueReport` draws ONE valuation scope -- the invested value --
+across its sum line, its "By security" breakdown, its KPIs (high/low/change),
+its table and its CSV.** The breakdown response folds cash into each point's
+`total`, so the report reads `breakdownInvestedValue(point, cashKey)`
+(`lib/invested-value.ts`) for every figure the KPIs, the table total column and
+the CSV compare against, and drops `cashComplete` from the point's completeness
+exactly as the daily sum path does (the invested value holds no cash); the cash
+band still renders as its own labelled column, never folded into the total
+captioned as the invested value. Letting the drawing mode pick the quantity is
+what made "Total" and "By security" peak at different numbers for one window.
+
+**The client picks the dates; the server measures.** `usesPriorCloseBaseline`
+and `previousCalendarDay` (`components/investments/portfolio-change-baseline.ts`)
+still decide that 1d, 1w and mtd report against the previous trading day's
+close, and that date goes out as `baselineDate`. The arithmetic over it does
+not come back to the browser.
+
+**A withheld figure names one repair.** `periodResultUnknownReason`
+(`components/investments/portfolio-period-result.ts`) maps the server's five
+reasons onto the one `UnknownAmount` cause each card can draw -- an unpriced
+holding is a price to add, a cash gap is neither a price nor a rate, an
+unconvertible amount is a rate to refresh, and a boundary (`zeroStart`,
+`noValueSeries`) is nothing anybody can fix. It is the sibling of
+`movementUnknownReason`, for the same reason.
+
+**Four surfaces read it**, through one request each and no arithmetic of their
+own: `PortfolioValueReport` (five cards plus the PDF and CSV exports),
+`PortfolioValueWidget` (one figure and a caption -- the investment result and
+its percent, with the value change and the net flows in the card's tooltip),
+`InvestmentValueChart` (the result and its percent as two of its four cards,
+with the value change and the net flows on the secondary lines beneath) and the
+Investments page's `PortfolioPerformanceCard`, which asks the batch route
+through `hooks/usePortfolioPeriodResults.ts` -- one request for 1D, 1W, 1M, 3M,
+YTD and 1Y -- and prints each window's `returnPercent` over its
+`investmentResult`, with "n/a" wherever the server withheld one. Its table is
+`components/ui/PerformancePeriodsCard.tsx`, shared with
+`SecurityPerformanceCard`: one layout for trailing-period figures, whatever the
+subject, and one place that decides "n/a" is not a zero. The
+widget and the chart go through `hooks/usePortfolioPeriodResult.ts`, which keeps
+the payload with the key of the request that produced it, asks nothing while the
+series is empty or a prior-close range has no first point yet, and leaves every
+figure unknown when the request fails. A **caption is part of the figure**: the
+widget's one line says "Investment result", never "Change", because the number
+under a change's caption is the one that counts a deposit.
+
 ## An unknown value must not render as a measured zero
 
 The server sends `null` rather than `0` for anything it could not work out (`docs/financial-calculation-contract.md`), and the last hundred pixels are where that gets thrown away:
@@ -278,3 +363,23 @@ Same currency is 1:1 *by definition* and stays a known conversion -- keep it dis
 A withheld figure owes the reader three things (`docs/financial-calculation-contract.md` section 1.3): the exact thing that is missing, by name and with its dates; the one place the reader obtains it; and the assurance that the server already asked the provider where it could. On this layer that means: resolve every id the server sends to a name before printing it; pick the copy through `UnknownAmount`'s `reason` (`noPrice` sends to the security's price history, `displayFx` to the Currencies page, `noCashBalance` to a reload, `noBaseline` says there is nothing to add) and never through a component's own sentence; and keep the six rows, the chart or the total's caption on screen under the notice, so the reader sees which figures are withheld and which are not. A request that is loading or failed is neither of these: it is named as such (`status` from the hook, a warning-tone notice), and a card must never fall to "not enough history" or an empty state because its request was rejected.
 
 A cumulative series with one unpriceable occurrence is withheld whole -- but a blank forward line is indistinguishable from "nothing scheduled". `BalanceForecastResult.gaps` names the schedule, the currency pair and the cause, and `BalanceForecastUnavailable` renders the fix (refresh rates on Currencies; check the security's and settlement account's currency). A `null` with no explanation is a dead end, not a correction.
+
+**Portfolio Value Over Time is the same shape, per date.** A point whose `pricesComplete`, `cashComplete` or own `missingRatePairs` says the server could not finish it is plotted as `null` -- its `value` is the subtotal of what could be priced and converted, and a whole holding period of unpriced securities drew as a flat line near zero (#1389). `foldIncompleteData` (`lib/incomplete-data-ranges.ts`) folds those per-point causes into runs of consecutive points, and `IncompleteDataDetails` renders them beside the withheld cards: the security's symbol linked to its price history, the currency pair, the cash account's name, each with the dates it covers. Names, never ids -- security names come from `investmentsApi.getSecurities(true)`, because the holding whose history is missing is often one the user deactivated after selling it.
+
+**The portfolio summary card says the same thing without a series of its own.** It has no points to fold, so the server folds them (`backend/src/net-worth/incomplete-data-ranges.util.ts`), resolves the names and sends `PortfolioSummary.returnDiagnostics`; the card feeds that to the same `IncompleteDataDetails`, under a lead line and the repair (price the securities, or leave those accounts out with the account filter where the screen has one -- `hasAccountFilter`). Only where a return is withheld for `incompletePrices`, `incompleteCash` or `missingRatePairs` (`hasRepairableDataCause`): `windowTooShort` and `mwrUndefined` withhold a figure with nothing missing behind them, and an absent `returnDiagnostics` is no information rather than an empty list.
+
+## An investment row's money is in the row's own currency, never the account's or the reader's
+
+`price`, `commission` and `totalAmount` on an investment transaction are stored in the **security's** currency (`docs/financial-semantics.md` section 6). The row states it: `amountCurrencyCode`, `priceCurrencyCode` and `commissionCurrencyCode` (`types/investment.ts`), with `settlementCurrencyCode` for the cash leg. Read them through `rowAmountCurrency` / `rowPriceCurrency` / `rowCommissionCurrency` (`lib/investment-row-currency.ts`), never a component's own `tx.security?.currencyCode`, and format with `formatCurrency(value, thatCode)`. A `null` code is unknown and renders `UnknownAmount reason="unknownCurrency"`, never the account's currency and never `defaultCurrency`. `security.currencyCode` is the only accepted fallback, being the same fact from the same row.
+
+**A row that names no security is not one of the unknown ones.** `resolveSettlementCurrencyPair` denominates such a row -- a cash INTEREST posting, say -- in the investment account's currency when it writes it, and `investmentRowCurrencies` stamps that same code on the row. Calling it unknown at the surface contradicted the stored figure, drew the row with the add-a-security tooltip and withheld the report's whole "Total volume" card over one cash posting.
+
+Both halves hold in the register as well as the report: `InvestmentPriceValue` (`components/investments/InvestmentTransactionListParts.tsx`) draws `UnknownAmount reason="noPrice"` for a row with no `price` and `reason="unknownCurrency"` for one whose code is `null`, because `price ?? 0` prints a measured-looking free trade and an absent code falls through to the reader's own currency. A SPLIT with no post-split price keeps its dash: a ratio was never a price.
+
+Deriving the unit from the account made a EUR trade and a USD trade in a PLN brokerage both print `1 000,00 zl`, and a single selected account was read as proof of a single currency, which skipped conversion entirely (issue #1394).
+
+**A holding row and the account/portfolio total it sits under convert from ONE FX snapshot -- the server's.** `GroupedHoldingsList`'s row reads its market value already converted into the account and reporting currencies (`HoldingWithMarketValue.marketValueAccountCurrency` / `marketValueDefaultCurrency`, from the same server valuation that produced the totals), never a client-side re-conversion of `marketValue` through `useExchangeRates().getRate`: a second rate for one snapshot made the rows disagree with the total beneath them and divided a client-rate numerator by a server-rate denominator in the share of the portfolio. Same currency is 1:1 by definition (no server field needed); an unresolved pair is `null` and renders unknown, never a wrong-denominator percent, and the security-currency figure stays its own real number.
+
+Totals over those rows are the server's, not the client's: `investmentReportsApi.getTransactionSummary` converts every matching row at the rate that stood on its own transaction date and answers with `total`, `knownSubtotal`, `missingPairs`, `excludedCount` and `fxComplete`. Two reasons, either sufficient. The client pages the register and stops at a cap, so a figure summed here describes part of the data under a caption that says "total"; and only the server can price a trade at its own date. Render the aggregate through `PartialTotal` and relabel the caption when `fxComplete === false`.
+
+Sorting a money column across currencies compares numbers that are not comparable. The table sorts by `(currency, value)` and says so under the heading; it never ranks a raw 100 EUR above a raw 90 USD.

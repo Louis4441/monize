@@ -9,6 +9,7 @@ import {
   AccountHoldings,
   CountryWeightingResult,
   AssetClassWeightingResult,
+  PortfolioTagSummary,
 } from '@/types/investment';
 import { investmentsApi } from '@/lib/investments';
 import { CHART_SERIES, chartColors } from '@/lib/chart-colors';
@@ -164,9 +165,13 @@ export function AssetAllocationChart({
   const [groupBy, setGroupBy] = useState<GroupBy>('security');
   // By-tag, by-country and by-asset-class data cached per account-filter key so
   // toggling back and forth (or re-selecting the same accounts) does not
-  // refetch. All are fetched eagerly so we know which selectors to offer before
-  // the user acts: each toggle only appears once its data confirms the selected
-  // accounts actually carry that dimension.
+  // refetch. The country and asset-class look-throughs are fetched eagerly so
+  // we know which selectors to offer before the user acts. The by-tag
+  // allocation is NOT: it costs a whole portfolio valuation on the server, and
+  // it was paid for on every page open whether or not anyone looked at the tag
+  // view. Whether to offer the tag toggle at all is answered by the cheap tag
+  // summary below instead, and the allocation is fetched the first time the tag
+  // view is actually selected.
   const [tagCache, setTagCache] = useState<Record<string, AssetAllocation>>({});
   const [countryCache, setCountryCache] = useState<
     Record<string, CountryWeightingResult>
@@ -176,7 +181,9 @@ export function AssetAllocationChart({
   >({});
   // KEY:VALUE aggregation: the available keys per account-filter, the key the
   // user picked, and the by-key allocation cached per `accountKey|key`.
-  const [tagKeysCache, setTagKeysCache] = useState<Record<string, string[]>>({});
+  const [tagSummaryCache, setTagSummaryCache] = useState<
+    Record<string, PortfolioTagSummary>
+  >({});
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [tagKeyCache, setTagKeyCache] = useState<Record<string, AssetAllocation>>(
     {},
@@ -194,27 +201,17 @@ export function AssetAllocationChart({
 
     if (enableTagGrouping) {
       investmentsApi
-        .getAllocationByTag(ids)
-        .then((res) => {
-          if (!cancelled) setTagCache((prev) => ({ ...prev, [accountKey]: res }));
+        .getPortfolioTagSummary(ids)
+        .then((summary) => {
+          if (!cancelled)
+            setTagSummaryCache((prev) => ({ ...prev, [accountKey]: summary }));
         })
         .catch(() => {
           if (!cancelled)
-            setTagCache((prev) => ({
+            setTagSummaryCache((prev) => ({
               ...prev,
-              [accountKey]: { allocation: [], totalValue: 0 },
+              [accountKey]: { keys: [], hasTaggedHoldings: false },
             }));
-        });
-
-      investmentsApi
-        .getPortfolioTagKeys(ids)
-        .then((keys) => {
-          if (!cancelled)
-            setTagKeysCache((prev) => ({ ...prev, [accountKey]: keys }));
-        })
-        .catch(() => {
-          if (!cancelled)
-            setTagKeysCache((prev) => ({ ...prev, [accountKey]: [] }));
         });
     }
 
@@ -273,21 +270,49 @@ export function AssetAllocationChart({
 
   // A selector is only offered once its data confirms it is meaningful for the
   // currently selected accounts: tags in use, or classified country exposure.
+  // For tags that confirmation comes from the tag summary, which says whether a
+  // held security carries a tag, rather than from an allocation nobody has
+  // asked for yet.
+  const tagSummary = tagSummaryCache[accountKey];
   const tagsAvailable =
-    enableTagGrouping &&
-    (tagCache[accountKey]?.allocation.some((i) => i.type === 'tag') ?? false);
+    enableTagGrouping && (tagSummary?.hasTaggedHoldings ?? false);
   const countryAvailable = (countryResult?.items.length ?? 0) > 0;
   const assetClassAvailable = (assetClassResult?.items.length ?? 0) > 0;
 
   // KEY:VALUE aggregation: keys present for this account filter and the key the
   // chart is currently aggregating by (the user's pick, or the first key).
-  const availableKeys = enableTagGrouping ? (tagKeysCache[accountKey] ?? []) : [];
+  const availableKeys = enableTagGrouping ? (tagSummary?.keys ?? []) : [];
   const keysAvailable = availableKeys.length > 0;
   const resolvedKey =
     selectedKey && availableKeys.includes(selectedKey)
       ? selectedKey
       : (availableKeys[0] ?? null);
   const tagKeyCacheKey = resolvedKey ? `${accountKey}|${resolvedKey}` : null;
+
+  // Fetch the by-tag allocation lazily, the first time the tag view is
+  // selected. It is a whole portfolio valuation on the server, so a reader who
+  // never opens the tag view never pays for one.
+  useEffect(() => {
+    if (!enableTagGrouping || groupBy !== 'tag') return;
+    if (tagCache[accountKey]) return;
+    let cancelled = false;
+    const ids = accountKey === 'all' ? undefined : accountKey.split(',');
+    investmentsApi
+      .getAllocationByTag(ids)
+      .then((res) => {
+        if (!cancelled) setTagCache((prev) => ({ ...prev, [accountKey]: res }));
+      })
+      .catch(() => {
+        if (!cancelled)
+          setTagCache((prev) => ({
+            ...prev,
+            [accountKey]: { allocation: [], totalValue: 0 },
+          }));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enableTagGrouping, groupBy, accountKey, tagCache]);
 
   // Fetch the by-key allocation lazily, only while the key view is active.
   useEffect(() => {

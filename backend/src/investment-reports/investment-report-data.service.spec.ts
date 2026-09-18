@@ -61,7 +61,7 @@ describe("InvestmentReportDataService", () => {
   let holdingsRepository: { find: jest.Mock };
   let securitiesRepository: { find: jest.Mock };
   let accountsRepository: { find: jest.Mock };
-  let exchangeRateService: { getLatestRate: jest.Mock };
+  let exchangeRateService: { getRateForDate: jest.Mock };
   let manager: ManagerMock;
 
   beforeEach(() => {
@@ -71,7 +71,9 @@ describe("InvestmentReportDataService", () => {
     accountsRepository = {
       find: jest.fn().mockResolvedValue([{ id: "acc1", name: "Brokerage" }]),
     };
-    exchangeRateService = { getLatestRate: jest.fn().mockResolvedValue(null) };
+    exchangeRateService = {
+      getRateForDate: jest.fn().mockResolvedValue(null),
+    };
     const { manager: managerMock, dataSource } = createScopedDbMocks([
       [InvestmentTransaction, txRepository as never],
       [Holding, holdingsRepository as never],
@@ -86,7 +88,12 @@ describe("InvestmentReportDataService", () => {
   });
 
   it("returns no rows when there are no accounts", async () => {
-    const rows = await service.computeHoldings("u1", [], "2024-06-10", "USD");
+    const { rows } = await service.computeHoldings(
+      "u1",
+      [],
+      "2024-06-10",
+      "USD",
+    );
     expect(rows).toEqual([]);
   });
 
@@ -154,7 +161,7 @@ describe("InvestmentReportDataService", () => {
       }),
     ]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -227,7 +234,7 @@ describe("InvestmentReportDataService", () => {
       priceRow({ price_date: "2024-02-10", close_price: "130" }),
     ]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -262,7 +269,7 @@ describe("InvestmentReportDataService", () => {
     ]);
     manager.query.mockResolvedValue([priceRow({ close_price: "120" })]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -296,7 +303,7 @@ describe("InvestmentReportDataService", () => {
     ]);
     manager.query.mockResolvedValue([priceRow({ close_price: "120" })]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -339,7 +346,7 @@ describe("InvestmentReportDataService", () => {
       priceRow({ price_date: "2024-05-01", close_price: "110" }),
     ]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -387,7 +394,7 @@ describe("InvestmentReportDataService", () => {
     ]);
     manager.query.mockResolvedValue([priceRow({ close_price: "130" })]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1", "acc2"],
       "2024-06-10",
@@ -439,7 +446,7 @@ describe("InvestmentReportDataService", () => {
     ]);
     manager.query.mockResolvedValue([priceRow({ close_price: "130" })]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1", "acc2"],
       "2024-06-10",
@@ -477,7 +484,7 @@ describe("InvestmentReportDataService", () => {
       },
     ]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -521,9 +528,9 @@ describe("InvestmentReportDataService", () => {
         volume: "1000",
       }),
     ]);
-    exchangeRateService.getLatestRate.mockResolvedValue(0.75); // CAD -> USD
+    exchangeRateService.getRateForDate.mockResolvedValue(0.75); // CAD -> USD
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -601,7 +608,7 @@ describe("InvestmentReportDataService", () => {
       }),
     ]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -616,7 +623,156 @@ describe("InvestmentReportDataService", () => {
     expect(v.totalReturn3Year).not.toBeNull();
   });
 
-  it("uses the reverse FX rate when only the inverse pair exists", async () => {
+  /**
+   * Issue #1390. One unresolvable pair blanks every row's % of portfolio --
+   * the denominator is withheld, correctly -- but the response said nothing
+   * about why, so the blanks read as zero and only a server log named the
+   * pair. The completeness now travels with the rows.
+   */
+  it("reports the pair it could not resolve instead of only logging it", async () => {
+    securitiesRepository.find.mockResolvedValue([
+      {
+        id: "sec1",
+        symbol: "AAA",
+        name: "Alpha",
+        securityType: "STOCK",
+        currencyCode: "SEK",
+      },
+    ]);
+    holdingsRepository.find.mockResolvedValue([
+      holding({ quantity: 10, averageCost: 100 }),
+    ]);
+    txRepository.find.mockResolvedValue([
+      makeTx({
+        action: InvestmentAction.BUY,
+        transactionDate: "2024-01-10",
+        quantity: 10,
+        price: 100,
+        totalAmount: 1000,
+      }),
+    ]);
+    manager.query.mockResolvedValue([priceRow({ close_price: "120" })]);
+    exchangeRateService.getRateForDate.mockResolvedValue(null);
+
+    const result = await service.computeHoldings(
+      "u1",
+      ["acc1"],
+      "2024-06-10",
+      "USD",
+    );
+
+    expect(result.fxComplete).toBe(false);
+    expect(result.missingPairs).toEqual(["SEK->USD"]);
+    // The withheld figures stay withheld: the flag explains them, it does not
+    // replace them with a number.
+    expect(result.rows[0].values.portfolioPercent).toBeNull();
+    expect(result.rows[0].exchangeRate).toBeNull();
+  });
+
+  it("reports a fully converted run as complete", async () => {
+    securitiesRepository.find.mockResolvedValue([
+      {
+        id: "sec1",
+        symbol: "AAA",
+        name: "Alpha",
+        securityType: "STOCK",
+        currencyCode: "USD",
+      },
+    ]);
+    holdingsRepository.find.mockResolvedValue([
+      holding({ quantity: 10, averageCost: 100 }),
+    ]);
+    txRepository.find.mockResolvedValue([
+      makeTx({
+        action: InvestmentAction.BUY,
+        transactionDate: "2024-01-10",
+        quantity: 10,
+        price: 100,
+        totalAmount: 1000,
+      }),
+    ]);
+    manager.query.mockResolvedValue([priceRow({ close_price: "120" })]);
+
+    const result = await service.computeHoldings(
+      "u1",
+      ["acc1"],
+      "2024-06-10",
+      "USD",
+    );
+
+    expect(result.fxComplete).toBe(true);
+    expect(result.missingPairs).toEqual([]);
+    expect(result.pricesComplete).toBe(true);
+    expect(result.unpricedSymbols).toEqual([]);
+  });
+
+  /**
+   * Issue #1390, the other cause. An unpriced holding withholds the same
+   * denominator by the same arithmetic, but `fxComplete` stayed true and
+   * `missingPairs` empty, so the blank "% of portfolio" column carried no
+   * explanation at all and the rate table was the wrong thing to go and check.
+   */
+  it("reports an unpriced holding as its own cause, not as a rate gap", async () => {
+    securitiesRepository.find.mockResolvedValue([
+      {
+        id: "sec1",
+        symbol: "AAA",
+        name: "Alpha",
+        securityType: "STOCK",
+        currencyCode: "USD",
+      },
+      {
+        id: "sec2",
+        symbol: "BBB",
+        name: "Beta",
+        securityType: "STOCK",
+        currencyCode: "USD",
+      },
+    ]);
+    holdingsRepository.find.mockResolvedValue([
+      holding({ quantity: 10, averageCost: 100 }),
+      holding({ securityId: "sec2", quantity: 5, averageCost: 40 }),
+    ]);
+    txRepository.find.mockResolvedValue([
+      makeTx({
+        action: InvestmentAction.BUY,
+        transactionDate: "2024-01-10",
+        quantity: 10,
+        price: 100,
+        totalAmount: 1000,
+      }),
+      makeTx({
+        securityId: "sec2",
+        action: InvestmentAction.BUY,
+        transactionDate: "2024-01-10",
+        quantity: 5,
+        price: 40,
+        totalAmount: 200,
+      }),
+    ]);
+    // Only the first security has a close on or before the as-of date.
+    manager.query.mockResolvedValue([priceRow({ close_price: "120" })]);
+
+    const result = await service.computeHoldings(
+      "u1",
+      ["acc1"],
+      "2024-06-10",
+      "USD",
+    );
+
+    expect(result.pricesComplete).toBe(false);
+    expect(result.unpricedSymbols).toEqual(["BBB"]);
+    // The rate table is not the thing to go and fix.
+    expect(result.fxComplete).toBe(true);
+    expect(result.missingPairs).toEqual([]);
+    // The denominator is still withheld, on every row.
+    expect(result.rows.map((r) => r.values.portfolioPercent)).toEqual([
+      null,
+      null,
+    ]);
+  });
+
+  it("leaves the direct/inverse decision to the one ladder and converts at the as-of date", async () => {
     securitiesRepository.find.mockResolvedValue([
       {
         id: "sec1",
@@ -639,18 +795,27 @@ describe("InvestmentReportDataService", () => {
       }),
     ]);
     manager.query.mockResolvedValue([priceRow({ close_price: "120" })]);
-    // EUR->USD missing, USD->EUR = 0.8 -> rate = 1/0.8 = 1.25
-    exchangeRateService.getLatestRate.mockImplementation((from: string) =>
-      from === "EUR" ? Promise.resolve(null) : Promise.resolve(0.8),
-    );
+    // Only EUR->USD is asked for: `getRateForDate` already consults both
+    // stored directions, so a caller-side reverse chase would be a second
+    // resolver (issue #1390). 1/0.8 = 1.25 is what the ladder hands back.
+    exchangeRateService.getRateForDate.mockResolvedValue(1.25);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
       "USD",
     );
     expect(rows[0].values.exchangeRate).toBe(1.25);
+    // The report's as-of date, not today; and `fetchMissing: false`, because
+    // running a report is a read: the provider fan-out it used to trigger
+    // wrote rate rows from a GET and repeated on every refresh.
+    expect(exchangeRateService.getRateForDate).toHaveBeenCalledWith(
+      "EUR",
+      "USD",
+      "2024-06-10",
+      { fetchMissing: false },
+    );
   });
 
   it("returns null valuation columns when no price is available", async () => {
@@ -677,7 +842,7 @@ describe("InvestmentReportDataService", () => {
     ]);
     manager.query.mockResolvedValue([]); // no stored prices
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -767,7 +932,7 @@ describe("InvestmentReportDataService", () => {
       }),
     ]);
 
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -797,7 +962,7 @@ describe("InvestmentReportDataService", () => {
       }),
     ]);
     manager.query.mockResolvedValue([]);
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",
@@ -849,7 +1014,7 @@ describe("InvestmentReportDataService", () => {
       priceRow({ security_id: "sec1", close_price: "100" }),
       priceRow({ security_id: "sec2", close_price: "50" }),
     ]);
-    const rows = await service.computeHoldings(
+    const { rows } = await service.computeHoldings(
       "u1",
       ["acc1"],
       "2024-06-10",

@@ -259,7 +259,9 @@
     "cannotModifyOther": "Não é possível modificar a moeda de outro usuário",
     "inUse": "A moeda \"{{ code }}\" está em uso pelas suas contas, títulos ou outros registros. Desative-a em vez disso.",
     "invalidRateDate": "date deve estar no formato AAAA-MM-DD",
-    "alreadyInListInactive": "A moeda \"{{ code }}\" já está na sua lista, mas está atualmente inativa. Reative-a para usá-la."
+    "alreadyInListInactive": "A moeda \"{{ code }}\" já está na sua lista, mas está atualmente inativa. Reative-a para usá-la.",
+    "sameCurrencyHistory": "{{ code }} é sua moeda padrão; não há histórico de taxa de câmbio para estender",
+    "rateProviderUnavailable": "O provedor de taxas de câmbio não respondeu. Tente novamente mais tarde."
   },
   "delegation": {
     "delegatedAccessInvalid": "O acesso delegado não é mais válido",
@@ -341,8 +343,10 @@
   "netWorth": {
     "invalidStartDate": "startDate deve estar no formato YYYY-MM-DD",
     "invalidEndDate": "endDate deve estar no formato YYYY-MM-DD",
+    "invalidBaselineDate": "baselineDate deve estar no formato YYYY-MM-DD",
     "invalidAccountIds": "accountIds deve ser uma lista de UUIDs separados por vírgulas",
-    "invalidGranularity": "granularity deve ser 'daily' ou 'monthly'"
+    "invalidGranularity": "granularity deve ser 'daily' ou 'monthly'",
+    "invalidPeriods": "periods deve ser uma lista de predefinições de período separadas por vírgula"
   },
   "notifications": {
     "notFound": "Notificação com ID {{ id }} não encontrada",
@@ -418,6 +422,7 @@
   "securities": {
     "exchangeRateUnavailable": "Não foi possível determinar uma taxa de câmbio para {{ from }} -> {{ to }} na data da transação. Informe um exchangeRate explícito para que o lançamento na conta de caixa fique correto.",
     "accountMustBeInvestment": "A conta deve ser do tipo INVESTMENT",
+    "providerCurrencyMismatch": "Atualização de preço recusada para {{ symbol }}: o {{ provider }} cota em {{ reported }}, mas o título está registrado em {{ configured }}. Corrija a moeda, o símbolo ou a bolsa do título e atualize novamente.",
     "securityIdRequired": "O ID do título é obrigatório para transações de {{ action }}",
     "splitRatioRequired": "O índice de desdobramento (quantidade) deve ser maior que zero",
     "acquisitionPriceRequired": "É necessário um preço por cota maior que zero para transações {{ action }}. Use ADD_SHARES para cotas adquiridas sem um custo conhecido.",

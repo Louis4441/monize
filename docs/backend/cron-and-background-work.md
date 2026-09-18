@@ -10,6 +10,29 @@ Cron jobs use `@Cron()` from `@nestjs/schedule` and run **in the API process** (
 
 Every `@Cron` handler is an out-of-request entry point, so its body must seed its own RLS context (tasks C2-C4): the cross-user fan-out under `withSystemContext`, each per-user body under `withUserContext(userId)`. A handler that reaches the DB with no ambient context throws in every `RLS_MODE`, including `off` -- the per-module `rls-context-smoke.spec.ts` specs are the pattern for proving a cron runs clean.
 
+## A boot-time diagnostic reports; it does not repair
+
+`HoldingsDriftReportService` (`securities/holdings-drift-report.service.ts`) runs
+once per process start (`OnApplicationBootstrap`) and compares every stored
+holding with a replay of its own ledger through
+`HoldingsService.findLedgerDiscrepancies`, logging each disagreement with both
+figures and the repair to run. What it compares against is `projectedHoldingRow`
+(`securities/investment-replay.util.ts`), the same projection of the fold the
+rebuild writers store, so a position it reports is one a rebuild would change --
+a short position, whose stored average cost is `0` by that projection, is not. It **writes nothing**: no migration, no delete,
+no automatic rebuild. A rebuild replaces a figure a person may have reconciled
+against a statement, and the same replay that repairs pre-rule drift would
+overwrite an incomplete imported history without asking; the owner runs `POST
+/holdings/rebuild` once they have seen what would change. INV-HOLDING-001.
+
+The shape is the ordinary out-of-request one: `withSystemContext` for the
+cross-user enumeration (`holdings` has no `user_id`, so the query joins
+`accounts`), then `withUserContext(userId)` per user so the replay it reports is
+the one that user's own rebuild would perform, and a failure for one user is
+caught and the loop continues. It is deliberately not awaited by
+`onApplicationBootstrap` and its failures are logged, never thrown: a diagnostic
+must not stop the application booting.
+
 ## Cleanup somebody is blocked on belongs on the request path
 
 Before choosing an interval, ask what the stale row *does* while it sits there. Only untidy: a schedule is the whole answer. But if it **refuses the user's next request** (a slot, a lock, a uniqueness guard), the interval is a lockout the user cannot end. Run the cleanup inside the transaction of the request about to be refused, scoped to that caller, and leave the cron as a cross-user backstop. `MnyImportJobService` is the worked example: `reapStaleJobsForUser` runs in `create` and the poll's `findOne`, so a dead import clears within one 1.5s poll, and `reapStaleJobs` dropped to hourly.

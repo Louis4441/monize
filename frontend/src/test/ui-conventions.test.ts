@@ -3288,3 +3288,84 @@ describe("a month grid is MonthGrid", () => {
     ).toBe(false);
   });
 });
+
+/**
+ * An investment transaction's `price`, `commission` and `totalAmount` are in the
+ * SECURITY's currency, and `formatCurrency(value)` with no second argument
+ * formats in the READER's. One-argument formatting of those three fields is
+ * therefore a mislabel every time, and it is a mechanical one: the call names
+ * the field it is about. Issue #1394 shipped exactly this, twice, in one file.
+ *
+ * `docs/frontend/financial-figures.md` ("An investment row's money is in the
+ * row's own currency") has the rule and what to pass instead.
+ */
+describe("an investment amount is formatted with its own currency", () => {
+  /**
+   * A `formatCurrency*` call whose single argument mentions one of the three
+   * fields. The argument list is matched up to the first top-level `)` or `,`
+   * (one level of nesting is allowed, for `Math.abs(tx.totalAmount)`), so a
+   * call that DOES pass a currency has a comma and does not match.
+   */
+  const SINGLE_ARGUMENT_FORMAT_CALL =
+    /\b(?:formatCurrency\w*|fmtValue)\(\s*((?:[^,()]|\([^()]*\))*)\)/g;
+  const INVESTMENT_MONEY_FIELD = /\b(?:totalAmount|\.price|\.commission)\b/;
+  const UNLABELLED_INVESTMENT_MONEY = {
+    test(line: string): boolean {
+      for (const match of line.matchAll(SINGLE_ARGUMENT_FORMAT_CALL)) {
+        if (INVESTMENT_MONEY_FIELD.test(match[1])) return true;
+      }
+      return false;
+    },
+  };
+
+  /**
+   * Only a file that handles investment rows is in scope: `totalAmount` is
+   * also the name of an ordinary transaction aggregate (the recurring-expense
+   * surfaces), which is in the account's currency and is not this rule's.
+   */
+  const INVESTMENT_ROW_TYPES = /\b(?:InvestmentTransaction|RealizedGain)\w*\b/;
+
+  function offendingLines(): string[] {
+    const found: string[] = [];
+    for (const [path, content] of productionSources()) {
+      if (!INVESTMENT_ROW_TYPES.test(content)) continue;
+      withoutComments(content)
+        .split("\n")
+        .forEach((line, index) => {
+          if (UNLABELLED_INVESTMENT_MONEY.test(line)) {
+            found.push(`${path}:${index + 1}`);
+          }
+        });
+    }
+    return found;
+  }
+
+  it("never formats a price, commission or total amount in the reader's currency", () => {
+    expect(
+      offendingLines(),
+      "Pass the row's own currency: formatCurrency(value, tx.amountCurrencyCode ?? tx.security?.currencyCode), and render UnknownAmount when it is null.",
+    ).toEqual([]);
+  });
+
+  it("catches the mislabel and passes a labelled call", () => {
+    expect(
+      UNLABELLED_INVESTMENT_MONEY.test("formatCurrency(Math.abs(tx.totalAmount))"),
+    ).toBe(true);
+    expect(UNLABELLED_INVESTMENT_MONEY.test("formatCurrencyFull(tx.price)")).toBe(
+      true,
+    );
+    // The wrapper shape, which is how the defect actually shipped: a local
+    // `fmtValue` that formats in one report-wide display currency.
+    expect(UNLABELLED_INVESTMENT_MONEY.test("fmtValue(entry.price)")).toBe(true);
+    expect(
+      UNLABELLED_INVESTMENT_MONEY.test(
+        "formatCurrency(tx.totalAmount, tx.amountCurrencyCode)",
+      ),
+    ).toBe(false);
+    expect(
+      UNLABELLED_INVESTMENT_MONEY.test(
+        withoutComments("// formatCurrency(tx.totalAmount) is the defect"),
+      ),
+    ).toBe(false);
+  });
+});

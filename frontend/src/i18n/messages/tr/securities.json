@@ -3,6 +3,7 @@
     "noneToUpdate": "Güncellenecek menkul kıymet yok",
     "updated": "{count, plural, one {# menkul kıymet fiyatı güncellendi} other {# menkul kıymet fiyatı güncellendi}}",
     "partialFailure": "Fiyatlar güncellendi: {updated} başarılı, {failed} başarısız{symbols}",
+    "partialFailureWithReasons": "Fiyatlar güncellendi: {updated} başarılı, {failed} başarısız{symbols}\n{reasons}",
     "failed": "Fiyatlar yenilenemedi"
   },
   "page": {

@@ -228,8 +228,8 @@
     "portfolioMovement": {
       "titleUp": "Investments up {{ percent }}%",
       "titleDown": "Investments down {{ percent }}%",
-      "messageUp": "Your investments are up {{ percent }}% today, excluding deposits and withdrawals. Open to review.",
-      "messageDown": "Your investments are down {{ percent }}% today, excluding deposits and withdrawals. Open to review."
+      "messageUp": "Your investments are up {{ percent }}% from {{ from }} to {{ to }}, excluding deposits and withdrawals. Open to review.",
+      "messageDown": "Your investments are down {{ percent }}% from {{ from }} to {{ to }}, excluding deposits and withdrawals. Open to review."
     },
     "balanceThreshold": {
       "titleLow": "{{ account }} is below your threshold",

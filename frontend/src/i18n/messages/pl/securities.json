@@ -3,6 +3,7 @@
     "noneToUpdate": "Brak papierów wartościowych do zaktualizowania",
     "updated": "{count, plural, one {Zaktualizowano # cenę papieru wartościowego} few {Zaktualizowano # ceny papierów wartościowych} many {Zaktualizowano # cen papierów wartościowych} other {Zaktualizowano # cen papierów wartościowych}}",
     "partialFailure": "Aktualizacja cen — udane: {updated}, nieudane: {failed}{symbols}",
+    "partialFailureWithReasons": "Aktualizacja cen — udane: {updated}, nieudane: {failed}{symbols}\n{reasons}",
     "failed": "Nie udało się odświeżyć cen"
   },
   "page": {

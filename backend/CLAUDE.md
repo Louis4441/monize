@@ -63,14 +63,18 @@ Each module holds `{feature}.module.ts`, controller, service, their specs, `enti
 | A numeric environment variable | `resolvePositiveInt`, declared in a table beside its documentation | a bare `Number(process.env.X)`, or `configService.get<number>(...)`, which asserts the type without coercing |
 | A log line, including pre-boot scripts | NestJS `Logger` | `console.*` |
 | A third-party `fetch` | `ProviderHealthService` gates and `describeFetchFailure` | a bare `fetch` or logging `error.stack` from a `catch` |
+| Storing a provider price | `refuseForeignCurrency` / `verifyProviderCurrency` (`src/securities/providers/quote-currency.util.ts`) before the write | writing a quote or a historical series whose currency was never compared with the security's |
 | A literal inside a regular expression | `escapeRegExp` | a hand-written character class |
 | A text filter offered to a person or a model | `ILike` or a case-insensitive comparison | `Like` |
 | A predicate that decides which row counts | one named helper called from every site | the clauses spelled out per site |
 | A folded investment action | `applyActionToQuantity` / `acquisitionCost` | a hand-rolled replay |
+| A calendar date stepped over a range | `enumerateDaysYMD` / `addDaysYMD` | a local-midnight `Date` read back with `toISOString()` |
+| Writing `holdings.quantity` / `average_cost` | `rebuildScopesFromTransactions` in the ledger write's own transaction, ordered by `INVESTMENT_REPLAY_ORDER` | an incremental delta or blended average |
 | A register or running-balance order | `applyRegisterOrder` (`src/transactions/register-order.ts`) | a hand-written `ORDER BY created_at` |
 | Excluding investment cash from a report | `investmentExclusionSql` / `applyInvestmentTransactionFilters`, `reportableTransactionAmountSql` | an account-type or sub-type predicate |
 | A SQL function called from `src/` | declared in `src/common/db/required-db-functions.ts` with its migration | a bare call the boot check does not know |
 | A number a person reads | `src/common/number-locale.util.ts` | the `en-US` helpers in `format-currency.util.ts` (machine output only) |
+| A rate for a date | `resolveFxRate` (`src/common/time-series/fx-rate-resolver.ts`), or `ExchangeRateService.resolveStoredRate` / `getRateForDate` | `getLatestRate`, or a `rate_date DESC LIMIT 1` of your own |
 
 **A cron or bootstrap body seeds its own identity** -- `withSystemContext` for the fan-out, `withUserContext(userId)` per user, `withDelegateContext` when the two ids must differ -- and a per-user loop isolates each user, pre-checks included. `docs/backend/cron-and-background-work.md`.
 

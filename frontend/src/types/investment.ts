@@ -1,5 +1,6 @@
 import { Tag } from './tag';
 import { TransactionStatus } from './transaction';
+import type { PeriodResultReason } from './net-worth';
 
 export type InvestmentAction =
   | 'BUY'
@@ -170,6 +171,28 @@ export interface HoldingWithMarketValue {
   costBasisAccountCurrency: number | null;
   currentPrice: number | null;
   marketValue: number | null;
+  /**
+   * `marketValue` converted into the holding account's currency by the SAME
+   * server valuation that produced the account and portfolio totals, so a row
+   * and the total it belongs to share one FX snapshot. Reading it, rather than
+   * re-converting `marketValue` with the client's live `getRate`, is what keeps
+   * the rows summing to the account total (a second client-side rate made the
+   * rows disagree with the summary by the FX drift between the two snapshots).
+   *
+   * `null` when the pair had no rate -- unknown, not the unconverted figure and
+   * never an implicit 1:1. Optional for the rolling-deploy reason
+   * `costBasisAccountCurrency` gives: absent is no information, so a foreign
+   * holding's account-currency line stays absent rather than reaching for a
+   * second rate.
+   */
+  marketValueAccountCurrency?: number | null;
+  /**
+   * `marketValue` converted into the user's default (reporting) currency by the
+   * same server valuation that produced `totalPortfolioValue`, so the share of
+   * the portfolio has one numerator and denominator in one currency from one
+   * snapshot. `null`/absent read as unknown, exactly as above.
+   */
+  marketValueDefaultCurrency?: number | null;
   gainLoss: number | null;
   gainLossPercent: number | null;
 }
@@ -222,6 +245,48 @@ export interface AccountHoldings {
   valuationComplete?: boolean;
 }
 
+/** One security with no usable close over a run of days of the window. */
+export interface ReturnDiagnosticPrice {
+  securityId: string;
+  symbol: string;
+  name: string;
+  start: string;
+  end: string;
+}
+
+/** One currency pair with no rate over a run of days. */
+export interface ReturnDiagnosticRate {
+  /** `"USD->PLN"`, as the server names the pair. */
+  pair: string;
+  start: string;
+  end: string;
+}
+
+/** One cash account that produced no balance over a run of days. */
+export interface ReturnDiagnosticCash {
+  accountId: string;
+  name: string;
+  start: string;
+  end: string;
+}
+
+/**
+ * Why the portfolio's returns are withheld, in the form a reader can act on.
+ *
+ * "Withholding a figure is only honest if the reader learns why": the marker
+ * beside the figure names a kind of repair, and this names the thing to repair
+ * and the days it covers (`docs/frontend/financial-figures.md`).
+ */
+export interface ReturnDiagnostics {
+  /** The baseline close the returns are measured from; null for no window. */
+  since: string | null;
+  prices: ReturnDiagnosticPrice[];
+  rates: ReturnDiagnosticRate[];
+  cash: ReturnDiagnosticCash[];
+  /** Per cause: true when runs older than the ones listed were dropped. */
+  truncated: { prices: boolean; rates: boolean; cash: boolean };
+}
+
 export interface PortfolioSummary {
   totalCashValue: number;
   totalHoldingsValue: number;
@@ -230,7 +295,47 @@ export interface PortfolioSummary {
   totalPortfolioValue: number;
   totalGainLoss: number;
   totalGainLossPercent: number;
+  /**
+   * The invested part's time-weighted return since the portfolio's first
+   * transaction, from the same server measure "Portfolio performance" reports
+   * (INV-PORTRESULT-002). `null` is withheld, never zero, and
+   * `timeWeightedReturnReasons` says which repair it points at.
+   */
   timeWeightedReturn: number | null;
+  /**
+   * Why the return is withheld; empty when it is known.
+   *
+   * Optional for the rolling-deploy reason the completeness flags below give:
+   * an older backend's payload has none, and absent is no information rather
+   * than "nothing was withheld".
+   */
+  timeWeightedReturnReasons?: PeriodResultReason[];
+  /** The baseline close it is measured from, or null when there is no window. */
+  timeWeightedReturnSince?: string | null;
+  /**
+   * The same measure's second figure: the annualised money-weighted return
+   * (XIRR) of the invested part since the first transaction -- the rate the
+   * reader's own money earned, each purchase, sale and distribution weighted by
+   * when it happened. `null` is withheld, never zero.
+   */
+  moneyWeightedReturn?: number | null;
+  /**
+   * Why the money-weighted return is withheld; empty when it is known. Optional
+   * for the rolling-deploy reason the flags below give: an older backend's
+   * payload has none, and absent is no information.
+   */
+  moneyWeightedReturnReasons?: PeriodResultReason[];
+  /**
+   * What the two withheld returns are waiting for, named and dated by the
+   * server: which security has no close over which run of days, which pair has
+   * no rate, which cash account has no balance.
+   *
+   * The card has no series of its own to fold, so these arrive resolved --
+   * symbols and account names, never bare ids. Optional for the rolling-deploy
+   * reason the flags below give: absent is no information, not "nothing is
+   * missing".
+   */
+  returnDiagnostics?: ReturnDiagnostics;
   cagr: number | null;
   /**
    * Whether every currency conversion behind the `total*` fields succeeded.
@@ -277,6 +382,21 @@ export interface AssetAllocation {
   totalValue: number;
 }
 
+/**
+ * What the portfolio's held securities are tagged with (`GET /portfolio/tag-keys`).
+ *
+ * `keys` are the distinct KEY:VALUE namespaces, case-folded and sorted, for the
+ * aggregate-by-key chart. `hasTaggedHoldings` is a separate question: a
+ * portfolio tagged only with plain labels has no keys but still has a by-tag
+ * grouping worth offering, and the chart decides whether to show that toggle
+ * from this rather than from the by-tag allocation it no longer fetches on
+ * mount.
+ */
+export interface PortfolioTagSummary {
+  keys: string[];
+  hasTaggedHoldings: boolean;
+}
+
 export interface InvestmentTransaction {
   id: string;
   accountId: string;
@@ -294,6 +414,28 @@ export interface InvestmentTransaction {
   // the field, which means no information -- not zero interest.
   accruedInterest?: number;
   exchangeRate: number;
+  /**
+   * The unit each money field above is in. `price`, `commission` and
+   * `totalAmount` are stored in the SECURITY's currency, never the account's
+   * and never the reader's: deriving the label from the account is what printed
+   * a EUR trade and a USD trade with the same symbol and summed them into one
+   * "total volume" (issue #1394).
+   *
+   * A row that names no security is not unknown: the server denominates it in
+   * the investment account's currency when it writes it and stamps that here.
+   * `null` is unknown -- neither a security nor an account was loaded -- and
+   * renders as unknown rather than falling back to anything.
+   *
+   * Optional for the rolling-deploy reason the portfolio flags are: a backend
+   * that predates the field sends nothing, and a path that does not load the
+   * relations sends nothing either. `security.currencyCode` is the same fact
+   * from the same row and is the only accepted fallback.
+   */
+  amountCurrencyCode?: string | null;
+  priceCurrencyCode?: string | null;
+  commissionCurrencyCode?: string | null;
+  /** Currency the row's cash leg settles in (funding account, else the account). */
+  settlementCurrencyCode?: string | null;
   description: string | null;
   // Same enum as regular transactions. A VOID row moves no shares and no
   // cash; the register strikes it through and excludes it from balances.
@@ -312,6 +454,70 @@ export interface InvestmentTransaction {
   createdAt: string;
   updatedAt: string;
 }
+
+/**
+ * One converted accumulation from the server: the total only when every
+ * component converted, the part that did convert beside it, and the pairs that
+ * stopped it. Read `fxComplete === false`; absent means no information.
+ */
+export interface InvestmentConvertedAggregate {
+  total: number | null;
+  knownSubtotal: number;
+  missingPairs: string[];
+  unknownCount: number;
+  /** Rows left out of `knownSubtotal` by either cause. */
+  excludedCount: number;
+  fxComplete?: boolean;
+}
+
+export interface InvestmentTransactionActionSummary extends InvestmentConvertedAggregate {
+  action: InvestmentAction;
+  count: number;
+}
+
+/**
+ * `GET /reports/investment-transactions/summary` -- the KPIs of the Investment
+ * Transaction History report, over the whole filtered set rather than the pages
+ * the client happened to fetch.
+ */
+export interface InvestmentTransactionSummary extends InvestmentConvertedAggregate {
+  /** The currency `total` and `knownSubtotal` are in. */
+  currencyCode: string;
+  transactionCount: number;
+  securitiesTraded: number;
+  byAction: InvestmentTransactionActionSummary[];
+  /**
+   * Distinct currencies the filtered rows' amounts are in. More than one means
+   * a table sorted by a raw amount compares across currencies, which the report
+   * says out loud rather than doing silently.
+   */
+  amountCurrencies: string[];
+  /** True when some row names no security, so its amount has no unit at all. */
+  hasUnknownCurrency: boolean;
+  /**
+   * Rows converted at their OWN stored rate -- the rate the trade settled at,
+   * which is the one the realized-gains report multiplies by. A row already in
+   * the reporting currency is in neither count: nothing was converted.
+   */
+  transactionRateCount: number;
+  /**
+   * Rows with no usable rate of their own, converted at the market rate that
+   * stood on their trade date. The report names this count.
+   */
+  marketRateCount: number;
+  /**
+   * Rows inside `transactionRateCount` whose own rate only reached their
+   * settlement currency, carried onward at the market rate from there.
+   */
+  onwardMarketCount: number;
+}
+
+/**
+ * Which rate converted one row: its own stored settlement rate, the market rate
+ * on its trade date, or neither (nothing to convert). Mirrors the backend's
+ * `InvestmentConversionBasis`.
+ */
+export type InvestmentConversionBasis = 'transaction' | 'market' | null;
 
 export interface SecurityHistoryAccount {
   accountId: string;
@@ -500,6 +706,13 @@ export interface CreateInvestmentTransactionData {
   transactionDate: string;
   quantity?: number;
   price?: number;
+  /**
+   * What the trade actually came to, in the security's currency: commission
+   * included on an acquisition, deducted on a disposal, accrued interest left
+   * out. Sent, it is the fact -- the server stores it as given and derives the
+   * price from it (INV-TRADE-001). Omitted, the total comes from the price.
+   */
+  totalAmount?: number;
   commission?: number;
   /** REDEEM only. Recorded as a linked INTEREST transaction, not a second cash entry. */
   accruedInterest?: number;
@@ -809,6 +1022,7 @@ export type DailyMovementReason =
   | 'unpricedHolding'
   | 'missingRate'
   | 'flowIncomplete'
+  | 'cashIncomplete'
   | 'noPriorValue'
   | 'zeroBaseline';
 

@@ -111,5 +111,20 @@
     "nameMax": "Nama harus 100 karakter atau kurang",
     "symbolRequired": "Simbol diperlukan",
     "symbolMax": "Simbol harus 10 karakter atau kurang"
+  },
+  "rateHistory": {
+    "title": "Riwayat kurs",
+    "stored": "Riwayat tersimpan: {start} hingga {end} ({count} observasi)",
+    "none": "Tidak ada riwayat tersimpan untuk {pair}",
+    "loading": "Memeriksa riwayat kurs tersimpan...",
+    "loadFailed": "Tidak dapat membaca riwayat kurs tersimpan",
+    "addYear": "Tambahkan satu tahun lagi riwayat kurs",
+    "adding": "Mengambil satu tahun lagi...",
+    "hint": "Laporan dengan tanggal sebelum kurs tersimpan pertama tidak dapat mengonversi {pair}.",
+    "toasts": {
+      "added": "Menambahkan {count} kurs; riwayat kini dimulai {start}",
+      "noOlder": "Penyedia tidak memiliki kurs yang lebih lama untuk {pair}",
+      "failed": "Tidak dapat memperluas riwayat kurs"
+    }
   }
 }

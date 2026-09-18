@@ -259,7 +259,9 @@
     "cannotModifyOther": "Неможливо змінити валюту іншого користувача",
     "inUse": "Валюта «{{ code }}» використовується вашими рахунками, цінними паперами або іншими записами. Натомість деактивуйте її.",
     "invalidRateDate": "date має бути у форматі РРРР-ММ-ДД",
-    "alreadyInListInactive": "Валюта «{{ code }}» вже є у вашому списку, але зараз неактивна. Активуйте її, щоб використовувати."
+    "alreadyInListInactive": "Валюта «{{ code }}» вже є у вашому списку, але зараз неактивна. Активуйте її, щоб використовувати.",
+    "sameCurrencyHistory": "{{ code }} — ваша валюта за замовчуванням; історії курсу обміну для розширення немає",
+    "rateProviderUnavailable": "Постачальник курсів обміну не відповів. Спробуйте пізніше."
   },
   "delegation": {
     "delegatedAccessInvalid": "Делегований доступ більше не дійсний",
@@ -341,8 +343,10 @@
   "netWorth": {
     "invalidStartDate": "startDate має бути у форматі YYYY-MM-DD",
     "invalidEndDate": "endDate має бути у форматі YYYY-MM-DD",
+    "invalidBaselineDate": "baselineDate має бути у форматі YYYY-MM-DD",
     "invalidAccountIds": "accountIds має бути UUID через кому",
-    "invalidGranularity": "granularity має бути 'daily' або 'monthly'"
+    "invalidGranularity": "granularity має бути 'daily' або 'monthly'",
+    "invalidPeriods": "periods має бути списком попередньо визначених періодів, розділених комами"
   },
   "notifications": {
     "notFound": "Сповіщення з ідентифікатором {{ id }} не знайдено",
@@ -418,6 +422,7 @@
   "securities": {
     "exchangeRateUnavailable": "Не вдалося визначити обмінний курс для {{ from }} -> {{ to }} на дату транзакції. Вкажіть явний exchangeRate, щоб проведення за грошовим рахунком було коректним.",
     "accountMustBeInvestment": "Рахунок має бути типу INVESTMENT",
+    "providerCurrencyMismatch": "Оновлення ціни для {{ symbol }} відхилено: {{ provider }} котирує його в {{ reported }}, але цінний папір зареєстровано в {{ configured }}. Виправте валюту, символ або біржу цінного папера, а потім оновіть знову.",
     "securityIdRequired": "Ідентифікатор цінного паперу обов'язковий для операцій {{ action }}",
     "splitRatioRequired": "Коефіцієнт дроблення (кількість) має бути більше нуля",
     "acquisitionPriceRequired": "Для операцій {{ action }} потрібна ціна за одиницю, більша за нуль. Для паперів, придбаних без відомої вартості, використовуйте ADD_SHARES.",

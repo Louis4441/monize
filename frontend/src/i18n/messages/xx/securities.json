@@ -3,6 +3,7 @@
     "noneToUpdate": "[XX-No securities to update-XX]",
     "updated": "[XX-{count, plural, one {# security price updated} other {# security prices updated}}-XX]",
     "partialFailure": "[XX-Prices updated: {updated} succeeded, {failed} failed{symbols}-XX]",
+    "partialFailureWithReasons": "[XX-Prices updated: {updated} succeeded, {failed} failed{symbols}\n{reasons}-XX]",
     "failed": "[XX-Failed to refresh prices-XX]"
   },
   "page": {

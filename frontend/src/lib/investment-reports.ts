@@ -5,6 +5,7 @@ import {
   UpdateInvestmentReportData,
   InvestmentReportResult,
 } from '@/types/investment-report';
+import { InvestmentTransactionSummary } from '@/types/investment';
 import { getCached, setCache, invalidateCache } from './apiCache';
 
 // The saved investment-reports list lives under one cache key; keep the key and
@@ -21,7 +22,40 @@ export interface ExecuteInvestmentReportParams {
   accountIds?: string[];
 }
 
+/** The filter the transaction-history report is showing, for its KPIs. */
+export interface InvestmentTransactionSummaryParams {
+  accountIds?: string[];
+  startDate?: string;
+  endDate?: string;
+  actions?: string[];
+}
+
 export const investmentReportsApi = {
+  /**
+   * Volume, count and by-action subtotals over the WHOLE filtered set.
+   *
+   * Asked of the server rather than added up beside the table: the rows are in
+   * each security's own currency, and the client fetches only a bounded number
+   * of pages, so a figure derived here would be an unlabelled cross-currency sum
+   * of part of the data (issue #1394).
+   */
+  getTransactionSummary: async (
+    params: InvestmentTransactionSummaryParams,
+  ): Promise<InvestmentTransactionSummary> => {
+    const response = await apiClient.get<InvestmentTransactionSummary>(
+      '/reports/investment-transactions/summary',
+      {
+        params: {
+          accountIds: params.accountIds?.length ? params.accountIds.join(',') : undefined,
+          startDate: params.startDate || undefined,
+          endDate: params.endDate || undefined,
+          actions: params.actions?.length ? params.actions.join(',') : undefined,
+        },
+      },
+    );
+    return response.data;
+  },
+
   create: async (data: CreateInvestmentReportData): Promise<InvestmentReport> => {
     const response = await apiClient.post<InvestmentReport>('/reports/investment', data);
     invalidateCache('investment-reports:');

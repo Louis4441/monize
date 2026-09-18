@@ -259,7 +259,9 @@
     "cannotModifyOther": "Kan de valuta van een andere gebruiker niet wijzigen",
     "inUse": "Valuta \"{{ code }}\" is in gebruik door je rekeningen, waardepapieren of andere records. Deactiveer deze in plaats daarvan.",
     "invalidRateDate": "date moet de indeling JJJJ-MM-DD hebben",
-    "alreadyInListInactive": "Valuta \"{{ code }}\" staat al in je lijst, maar is momenteel inactief. Activeer deze opnieuw om te gebruiken."
+    "alreadyInListInactive": "Valuta \"{{ code }}\" staat al in je lijst, maar is momenteel inactief. Activeer deze opnieuw om te gebruiken.",
+    "sameCurrencyHistory": "{{ code }} is uw standaardvaluta; er is geen wisselkoersgeschiedenis om uit te breiden",
+    "rateProviderUnavailable": "De wisselkoersaanbieder heeft niet gereageerd. Probeer het later opnieuw."
   },
   "delegation": {
     "delegatedAccessInvalid": "Gedelegeerde toegang is niet meer geldig",
@@ -341,8 +343,10 @@
   "netWorth": {
     "invalidStartDate": "startDate moet JJJJ-MM-DD zijn",
     "invalidEndDate": "endDate moet JJJJ-MM-DD zijn",
+    "invalidBaselineDate": "baselineDate moet JJJJ-MM-DD zijn",
     "invalidAccountIds": "accountIds moeten door komma's gescheiden UUID's zijn",
-    "invalidGranularity": "granularity moet 'daily' of 'monthly' zijn"
+    "invalidGranularity": "granularity moet 'daily' of 'monthly' zijn",
+    "invalidPeriods": "periods moet bestaan uit door komma's gescheiden periodevoorinstellingen"
   },
   "notifications": {
     "notFound": "Notificatie met ID {{ id }} niet gevonden",
@@ -418,6 +422,7 @@
   "securities": {
     "exchangeRateUnavailable": "Kon geen wisselkoers bepalen voor {{ from }} -> {{ to }} op de transactiedatum. Geef een expliciete exchangeRate op zodat de boeking op de geldrekening correct is.",
     "accountMustBeInvestment": "Rekening moet van het type INVESTMENT zijn",
+    "providerCurrencyMismatch": "Prijsupdate geweigerd voor {{ symbol }}: {{ provider }} noteert het in {{ reported }}, maar het waardepapier staat geregistreerd in {{ configured }}. Corrigeer de valuta, het symbool of de beurs van het waardepapier en ververs opnieuw.",
     "securityIdRequired": "Waardepapier-ID is vereist voor {{ action }}-transacties",
     "splitRatioRequired": "Splitsingsverhouding (hoeveelheid) moet groter zijn dan nul",
     "acquisitionPriceRequired": "Voor {{ action }}-transacties is een prijs per aandeel groter dan nul vereist. Gebruik ADD_SHARES voor aandelen die zonder bekende kostprijs zijn verworven.",

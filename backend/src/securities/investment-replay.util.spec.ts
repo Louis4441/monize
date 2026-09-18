@@ -6,6 +6,8 @@ import {
   baseInvestmentAction,
   CASH_INCOME_ACTIONS,
   FUNDING_ACCOUNT_ACTIONS,
+  INVESTED_FLOW_KIND_BY_BASE_ACTION,
+  investedFlowKind,
   isQuantityOnlyAction,
   MARKET_PRICED_TRADE_ACTIONS,
   SHARE_MOVING_ACTIONS,
@@ -369,5 +371,58 @@ describe("acquisitionUnitCost", () => {
     expect(
       acquisitionUnitCost({ quantity: "10", price: "100", commission: "10" }),
     ).toBe(101);
+  });
+});
+
+/**
+ * A list that means something is written once, in the place that can check it:
+ * every member of the action enum resolves to exactly one effect on the
+ * invested part, and a new action is a failing test here rather than a silent
+ * zero in a capital flow (`docs/specs/portfolio-period-result.md` section 10.2).
+ */
+describe("INVESTED_FLOW_KIND_BY_BASE_ACTION", () => {
+  it("classifies every InvestmentAction member", () => {
+    const unclassified = Object.values(InvestmentAction).filter(
+      (action) =>
+        !INVESTED_FLOW_KIND_BY_BASE_ACTION.has(
+          baseInvestmentAction(action) as InvestmentAction,
+        ),
+    );
+
+    expect(unclassified).toEqual([]);
+  });
+
+  it("puts each action on the side the measure needs it", () => {
+    const kinds = Object.fromEntries(
+      Object.values(InvestmentAction).map((action) => [
+        action,
+        investedFlowKind(action),
+      ]),
+    );
+
+    expect(kinds).toEqual({
+      // Buying is not earning: it funds the day and cancels out of the P&L.
+      BUY: "capitalIn",
+      TRANSFER_IN: "capitalIn",
+      ADD_SHARES: "capitalIn",
+      // Selling is not losing: the proceeds are what the position came to.
+      SELL: "capitalOut",
+      REDEEM: "capitalOut",
+      TRANSFER_OUT: "capitalOut",
+      REMOVE_SHARES: "capitalOut",
+      // Distributions are what the invested part EARNED, cash though they are.
+      DIVIDEND: "income",
+      INTEREST: "income",
+      CAPITAL_GAIN: "income",
+      CAPITAL_GAIN_SHORT: "income",
+      CAPITAL_GAIN_LONG: "income",
+      // A split is a ratio and a reinvestment's shares simply appear: counting
+      // either as capital would subtract a return the reader actually received.
+      SPLIT: "none",
+      REINVEST: "none",
+      REINVEST_INTEREST: "none",
+      REINVEST_CAPITAL_GAIN_SHORT: "none",
+      REINVEST_CAPITAL_GAIN_LONG: "none",
+    });
   });
 });

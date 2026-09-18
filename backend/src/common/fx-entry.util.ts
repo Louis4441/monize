@@ -157,11 +157,13 @@ export function applyFxConversion(
  * FX_RATE_DECIMALS, or `null` when no usable rate exists anywhere. Zero and
  * negative rates are absent, not applicable.
  *
- * `ExchangeRateService.getRateForDate` already falls back to the latest stored
- * rate internally (its documented step 3), so callers must not chase a `null`
+ * `ExchangeRateService.getRateForDate` already consults both stored directions
+ * and, failing those, a provider window, so callers must not chase a `null`
  * from this helper with their own `getLatestRate` -- four hand-rolled copies of
- * this sequence existed and three carried exactly that dead trailing call.
- * Copies are how resolvers drift; this is the only one.
+ * this sequence existed and three carried exactly that dead trailing call, and
+ * an unbounded latest-rate chase is what the age policy exists to stop
+ * (`docs/time-series-contract.md` section 2.2). Copies are how resolvers
+ * drift; this is the only one.
  */
 export async function resolveFxRateOrNull(
   rates: {

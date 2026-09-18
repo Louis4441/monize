@@ -259,7 +259,9 @@
     "cannotModifyOther": "Невозможно изменить валюту другого пользователя",
     "inUse": "Валюта \"{{ code }}\" используется в ваших счетах, ценных бумагах или других записях. Деактивируйте её вместо удаления.",
     "invalidRateDate": "date должна быть в формате ГГГГ-ММ-ДД",
-    "alreadyInListInactive": "Валюта \"{{ code }}\" уже в вашем списке, но сейчас неактивна. Активируйте её, чтобы использовать."
+    "alreadyInListInactive": "Валюта \"{{ code }}\" уже в вашем списке, но сейчас неактивна. Активируйте её, чтобы использовать.",
+    "sameCurrencyHistory": "{{ code }} — ваша валюта по умолчанию; истории обменного курса для расширения нет",
+    "rateProviderUnavailable": "Поставщик обменных курсов не ответил. Повторите попытку позже."
   },
   "delegation": {
     "delegatedAccessInvalid": "Делегированный доступ больше не действителен",
@@ -341,8 +343,10 @@
   "netWorth": {
     "invalidStartDate": "startDate должна быть в формате ГГГГ-ММ-ДД",
     "invalidEndDate": "endDate должна быть в формате ГГГГ-ММ-ДД",
+    "invalidBaselineDate": "baselineDate должна быть в формате ГГГГ-ММ-ДД",
     "invalidAccountIds": "accountIds должны быть UUID, разделёнными запятыми",
-    "invalidGranularity": "granularity должно быть 'daily' или 'monthly'"
+    "invalidGranularity": "granularity должно быть 'daily' или 'monthly'",
+    "invalidPeriods": "periods должен быть списком предустановленных периодов, разделённых запятыми"
   },
   "notifications": {
     "notFound": "Уведомление с ID {{ id }} не найдено",
@@ -418,6 +422,7 @@
   "securities": {
     "exchangeRateUnavailable": "Не удалось определить обменный курс для {{ from }} -> {{ to }} на дату транзакции. Укажите явный exchangeRate, чтобы проводка по денежному счёту была корректной.",
     "accountMustBeInvestment": "Счёт должен быть типа INVESTMENT",
+    "providerCurrencyMismatch": "Обновление цены для {{ symbol }} отклонено: {{ provider }} указывает котировку в {{ reported }}, но ценная бумага зарегистрирована в {{ configured }}. Исправьте валюту, символ или биржу ценной бумаги и обновите снова.",
     "securityIdRequired": "ID ценной бумаги обязателен для проводок {{ action }}",
     "splitRatioRequired": "Коэффициент дробления (количество) должен быть больше нуля",
     "acquisitionPriceRequired": "Для операций {{ action }} требуется цена за единицу больше нуля. Для бумаг, приобретённых без известной стоимости, используйте ADD_SHARES.",

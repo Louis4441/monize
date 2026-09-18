@@ -13,6 +13,7 @@ import {
   JobClaimService,
   JobClaimType,
 } from "../common/jobs/job-claim.service";
+import { invalidatePortfolioSummary } from "../securities/portfolio-summary-memo";
 
 /**
  * How long one replica may hold the demo reset before another may retake it.
@@ -108,6 +109,11 @@ export class DemoResetService {
   }
 
   private async performDemoReset(demoUserId: string): Promise<void> {
+    // The demo user's whole dataset is about to be replaced, so nothing
+    // memoized about its portfolio survives the wipe. Before and after: a
+    // request arriving mid-reset would otherwise re-memoize the half-emptied
+    // state for a minute.
+    invalidatePortfolioSummary(demoUserId);
     try {
       // The clear runs in one transaction and must COMMIT before the re-seed:
       // seedDemoData opens its own scoped transactions, and the seeded rows
@@ -228,6 +234,7 @@ export class DemoResetService {
       if (seeded) {
         this.logger.log("Demo data re-seeded successfully");
       }
+      invalidatePortfolioSummary(demoUserId);
     } catch (error) {
       // withScopedDb has already rolled its transaction back by the time we
       // land here; the reset is best-effort, so log and let the cron continue.

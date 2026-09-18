@@ -1,33 +1,31 @@
 /**
- * The one door between the stored exchange-rate history and a converted amount
- * "as of" a date.
+ * The bulk-loaded form of the exchange-rate history: every stored observation a
+ * reported window can need, indexed by pair, so a chart of 400 points resolves
+ * its rates from one query instead of 400.
  *
- * A reporting figure that spans currencies is converted at the rate that stood
- * on the day being reported, not the latest rate: a chart point for last March
- * priced at today's rate is a different number every morning. Two services now
- * need that -- `NetWorthService`, which owns every chart that spans currencies,
- * and `DailyBalanceTotalsService`, which sums a calendar day's account balances
- * -- so the query, the index it builds, the direct/inverse decision and the
- * look-ahead fallback live here rather than in one service the other copies.
+ * The *policy* -- which observation applies to a date, how old it may be, which
+ * direction wins -- is not here. It is `fx-rate-resolver.ts`, the one door every
+ * surface asks. This module's only job is to load enough rows that the door can
+ * give the same answer for a date whatever window the caller happened to
+ * request, and to hand them over in the shape the door reads.
  *
- * The rules this module holds, none of which a caller may restate:
- *
- *  - A rate is looked up **on or before** the date being priced, taking the most
- *    recent one. `findBestRate` walks the (date-ordered) array forward, which is
- *    why `buildRateIndex` must keep the query's `ORDER BY rate_date`.
- *  - A pair with no rate converts to `null`, never to the amount unchanged and
- *    never at 1:1 (audit P5-009, INV-FX-001). Callers accumulate through
- *    `FxAggregate`, which keeps "could not convert" apart from "converted to
- *    zero".
- *  - Zero converts to zero at any rate and records no gap: an emptied account in
- *    a currency with no stored rates is a settled zero, not an unknowable value.
- *  - The one look-ahead in the codebase (a date that predates the whole stored
- *    history falls back to the earliest rate) is kept, and kept visible: it is
- *    DR-02 in the audit and `docs/specs/fx-conversion-completeness.md` section 6
- *    is where changing it would be decided. It warns once per pair per
- *    computation rather than once per point.
+ * What "enough rows" means: for any date `d` inside the window, the answer is
+ * the newest observation in `[d - FX_MAX_RATE_AGE_DAYS, d]`. Those dated on or
+ * after the window's start are loaded wholesale; of those before it, only the
+ * single newest one can ever be chosen, and anything older than the age bound
+ * measured from the start is older than the bound measured from any `d` in the
+ * window too. So the in-window rows plus one preceding row per pair are exactly
+ * sufficient -- which is why a fixed day margin (this file used to load 90 days
+ * back and 31 days *ahead*) was the wrong shape: it made a point's rate depend
+ * on how wide the chart was, and the forward margin let a date be priced by an
+ * observation from its future (issue #1390).
  */
-import { convertWithRateLookup } from "../currency-conversion.util";
+import {
+  FX_MAX_RATE_AGE_DAYS,
+  FxRateResolution,
+  describeFxGap,
+  resolveFxRate,
+} from "./fx-rate-resolver";
 
 /** `"USD->CAD"` -> the stored rates for that pair, ascending by date. */
 export type RateIndex = Map<string, Array<{ date: string; rate: number }>>;
@@ -52,20 +50,27 @@ export interface RateIndexLogger {
 }
 
 /**
- * Rates are loaded with a margin either side of the reported window: a date at
- * the very start of the window is priced by a rate struck before it, and the
- * trailing margin covers a projection priced at a rate stored slightly ahead.
- */
-const RATE_LOOKBACK_DAYS = 90;
-const RATE_LOOKAHEAD_DAYS = 31;
-
-/**
- * Every stored rate between the reporting currency and each of `currencies`,
- * in either direction, indexed by pair.
+ * Every stored rate between the reporting currency and each of `currencies`, in
+ * either direction, that any date in `[startDate, endDate]` could be priced by.
  *
- * Both directions are loaded because `convertWithRateLookup` accepts an inverse
- * rate when the direct pair is absent; dropping one direction here would make
- * that fallback unreachable for half the pairs.
+ * Both directions are loaded because the resolver takes the more recent
+ * admissible observation whichever way it is stored; dropping one direction
+ * here would make half the pairs resolve from a staler row than the history
+ * actually holds.
+ *
+ * The lower anchor is `LEAST(startDate, today)` because a window that opens in
+ * the future is priced at today's rate (the resolver clamps a future date), and
+ * the preceding-observation branch has to be anchored where the lookups will
+ * actually land.
+ *
+ * `conversionHorizon` is the latest date the caller will actually *convert* at,
+ * when that is later than the window it asked for. A monthly series requested to
+ * 2024-06-15 prices its June point at the month end, 2024-06-30: loading only to
+ * the requested end left the newest admissible observation out of the index, so
+ * the June figure changed when the same chart was asked for a wider range --
+ * exactly the "a date's rate depends on the window around it" defect this module
+ * exists to prevent. Every caller states its horizon rather than the loader
+ * widening the window on a guess; omitted, the horizon is the window's end.
  */
 export async function buildRateIndex(
   query: RateIndexQuery,
@@ -73,19 +78,49 @@ export async function buildRateIndex(
   defaultCurrency: string,
   startDate: string,
   endDate: string,
+  conversionHorizon?: string,
 ): Promise<RateIndex> {
   if (currencies.size === 0) return new Map();
 
+  const loadTo =
+    conversionHorizon && conversionHorizon > endDate
+      ? conversionHorizon
+      : endDate;
   const currArr = Array.from(currencies);
   const rates = await query(
-    `SELECT from_currency, to_currency, rate, rate_date
-       FROM exchange_rates
-       WHERE ((from_currency = ANY($1::TEXT[]) AND to_currency = $2)
-           OR (from_currency = $2 AND to_currency = ANY($1::TEXT[])))
-         AND rate_date >= ($3::DATE - INTERVAL '${RATE_LOOKBACK_DAYS} days')
-         AND rate_date <= ($4::DATE + INTERVAL '${RATE_LOOKAHEAD_DAYS} days')
-       ORDER BY rate_date`,
-    [currArr, defaultCurrency, startDate, endDate],
+    `WITH pairs AS (
+         SELECT c AS from_currency, $2::TEXT AS to_currency
+           FROM unnest($1::TEXT[]) AS c
+         UNION
+         SELECT $2::TEXT AS from_currency, c AS to_currency
+           FROM unnest($1::TEXT[]) AS c
+       ),
+       anchor AS (SELECT LEAST($3::DATE, CURRENT_DATE) AS d)
+       SELECT from_currency, to_currency, rate, rate_date
+         FROM (
+           SELECT er.from_currency, er.to_currency, er.rate, er.rate_date
+             FROM exchange_rates er
+             JOIN pairs p
+               ON er.from_currency = p.from_currency
+              AND er.to_currency = p.to_currency
+            WHERE er.rate_date >= (SELECT d FROM anchor)
+              AND er.rate_date <= GREATEST($4::DATE, (SELECT d FROM anchor))
+           UNION
+           SELECT pre.from_currency, pre.to_currency, pre.rate, pre.rate_date
+             FROM pairs p
+             CROSS JOIN LATERAL (
+               SELECT er.from_currency, er.to_currency, er.rate, er.rate_date
+                 FROM exchange_rates er
+                WHERE er.from_currency = p.from_currency
+                  AND er.to_currency = p.to_currency
+                  AND er.rate_date < (SELECT d FROM anchor)
+                  AND er.rate_date >= ((SELECT d FROM anchor) - INTERVAL '${FX_MAX_RATE_AGE_DAYS} days')
+                ORDER BY er.rate_date DESC
+                LIMIT 1
+             ) pre
+         ) loaded
+        ORDER BY rate_date`,
+    [currArr, defaultCurrency, startDate, loadTo],
   );
 
   return indexRateRows(rates);
@@ -106,52 +141,54 @@ export function indexRateRows(rows: RateIndexRow[]): RateIndex {
 }
 
 /**
- * Rate arrays whose look-ahead fallback has already been logged. Keyed by the
- * per-request array object in the index, so each pair warns once per
- * computation instead of once per chart point.
+ * Pairs already warned about, keyed by the per-request index object, so each
+ * pair warns once per computation instead of once per chart point.
  */
-const lookAheadWarned = new WeakSet<Array<{ date: string; rate: number }>>();
+const gapWarned = new WeakMap<RateIndex, Set<string>>();
+
+function warnOnce(
+  rateIndex: RateIndex,
+  pair: string,
+  message: string,
+  logger?: RateIndexLogger,
+): void {
+  if (!logger) return;
+  let seen = gapWarned.get(rateIndex);
+  if (!seen) {
+    seen = new Set();
+    gapWarned.set(rateIndex, seen);
+  }
+  if (seen.has(pair)) return;
+  seen.add(pair);
+  logger.warn(message);
+}
 
 /**
- * The most recent stored rate for `pair` dated on or before `beforeOrOn`.
+ * The rate for `from -> to` on `onDate`, resolved from a loaded index.
  *
- * Falls back to the earliest stored rate when the date predates the pair's whole
- * history. That is look-ahead -- valuing a point with a rate from its future --
- * and `docs/time-series-contract.md` forbids it in general. It is kept
- * deliberately (DR-02): a chart point that predates the rate history is more
- * useful approximated than absent. What is NOT acceptable is it being invisible,
- * which is what the warning is for.
+ * The whole resolution, not just the number: `observedOn` says which day's
+ * observation was used and `reason` says why there is none, which is what a
+ * surface needs to explain a withheld figure rather than showing a bare gap.
  */
-export function findBestRate(
-  rates: Array<{ date: string; rate: number }>,
-  pair: string,
-  beforeOrOn: string,
-  logger?: RateIndexLogger,
-): number | undefined {
-  let best: number | undefined;
-  for (const r of rates) {
-    if (r.date <= beforeOrOn) best = r.rate;
-    else break;
-  }
-  if (best === undefined && rates.length > 0) {
-    if (!lookAheadWarned.has(rates)) {
-      lookAheadWarned.add(rates);
-      logger?.warn(
-        `Valuation on or before ${beforeOrOn} predates the stored ${pair} rate history; using the earliest stored rate (look-ahead, DR-02)`,
-      );
-    }
-    best = rates[0].rate;
-  }
-  return best;
+export function resolveIndexedRate(
+  rateIndex: RateIndex,
+  from: string,
+  to: string,
+  onDate: string,
+): FxRateResolution {
+  return resolveFxRate(from, to, onDate, (f, t) => rateIndex.get(`${f}->${t}`));
 }
 
 /**
  * Date-aware conversion into the reporting currency. Returns `null` when no
- * rate exists for the pair, in either direction, at or before `onOrBefore`.
+ * admissible rate exists for the pair, in either direction, for `onOrBefore`.
  *
  * `null`, not the amount unchanged: the predecessor of this function ended in
  * `result ?? amount`, which reported 1,000 USD as 1,000 EUR and left a consumer
- * unable to tell that from a genuine 1:1 pair (audit P5-009).
+ * unable to tell that from a genuine 1:1 pair (audit P5-009). And `null`, not
+ * the earliest stored rate: valuing last March at a rate first observed this
+ * June is look-ahead, which `docs/time-series-contract.md` forbids and which
+ * `docs/specs/fx-conversion-completeness.md` section 6 now settles as removed.
  */
 export function convertAtDate(
   amount: number,
@@ -167,18 +204,20 @@ export function convertAtDate(
   // that was never open as one that could not be answered.
   if (amount === 0) return 0;
 
-  const converted = convertWithRateLookup(amount, from, to, (f, t) => {
-    const rates = rateIndex.get(`${f}->${t}`);
-    return rates
-      ? findBestRate(rates, `${f}->${t}`, onOrBefore, logger)
-      : undefined;
-  });
-  if (converted === null) {
-    logger?.warn(
-      `No exchange rate available for ${from}->${to} on or around ${onOrBefore}; the affected total is reported as unknown rather than converted 1:1`,
+  // The direct/inverse decision, the age bound and the no-look-ahead rule are
+  // all the resolver's; this function only multiplies.
+  const resolution = resolveIndexedRate(rateIndex, from, to, onOrBefore);
+  if (resolution.rate === null) {
+    const pair = `${from}->${to}`;
+    warnOnce(
+      rateIndex,
+      pair,
+      describeFxGap(pair, onOrBefore, resolution.reason ?? "no_observation"),
+      logger,
     );
+    return null;
   }
-  return converted;
+  return amount * resolution.rate;
 }
 
 /**

@@ -85,6 +85,7 @@
       "unpricedHolding": "Eine Position hatte an diesem oder am vorherigen Tag keinen Kurs, daher ist die Bewegung unbekannt.",
       "missingRate": "Ein Wechselkurs fehlte, daher konnte die Bewegung nicht umgerechnet werden.",
       "flowIncomplete": "Eine Ein- oder Auszahlung an diesem Tag konnte nicht umgerechnet werden, daher lässt sich die Bewegung nicht davon trennen.",
+      "cashIncomplete": "Ein Girokonto hat für diesen Tag keinen Saldo gemeldet, daher ist der Tageswert unvollständig und die Bewegung unbekannt.",
       "noPriorValue": "Es gibt keinen früheren Wert, an dem dieser Tag gemessen werden kann.",
       "zeroBaseline": "Das Portfolio war am Vortag leer, daher lässt sich kein Prozentsatz berechnen."
     }

@@ -3,6 +3,7 @@
     "noneToUpdate": "Nessun titolo da aggiornare",
     "updated": "{count, plural, one {# quotazione titolo aggiornata} other {# quotazioni titoli aggiornate}}",
     "partialFailure": "Quotazioni aggiornate: {updated} riuscite, {failed} fallite{symbols}",
+    "partialFailureWithReasons": "Quotazioni aggiornate: {updated} riuscite, {failed} fallite{symbols}\n{reasons}",
     "failed": "Aggiornamento quotazioni non riuscito"
   },
   "page": {

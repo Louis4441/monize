@@ -259,7 +259,9 @@
     "cannotModifyOther": "無法修改其他使用者的貨幣",
     "inUse": "貨幣「{{ code }}」正在您的科目、證券或其他記錄中使用。請改為停用它。",
     "invalidRateDate": "date 必須為 YYYY-MM-DD 格式",
-    "alreadyInListInactive": "貨幣「{{ code }}」已在您的清單中，但目前處於未啟用狀態。請重新啟用後使用。"
+    "alreadyInListInactive": "貨幣「{{ code }}」已在您的清單中，但目前處於未啟用狀態。請重新啟用後使用。",
+    "sameCurrencyHistory": "{{ code }} 是您的預設貨幣，因此沒有可擴充的匯率歷史",
+    "rateProviderUnavailable": "匯率提供方未回應，請稍後再試。"
   },
   "delegation": {
     "delegatedAccessInvalid": "委派存取已失效",
@@ -341,8 +343,10 @@
   "netWorth": {
     "invalidStartDate": "startDate 必須為 YYYY-MM-DD 格式",
     "invalidEndDate": "endDate 必須為 YYYY-MM-DD 格式",
+    "invalidBaselineDate": "baselineDate 必須為 YYYY-MM-DD 格式",
     "invalidAccountIds": "accountIds 必須是以逗號分隔的 UUID",
-    "invalidGranularity": "granularity 必須為 'daily' 或 'monthly'"
+    "invalidGranularity": "granularity 必須為 'daily' 或 'monthly'",
+    "invalidPeriods": "periods 必須是以逗號分隔的期間預設值"
   },
   "notifications": {
     "notFound": "找不到 ID 為 {{ id }} 的通知",
@@ -418,6 +422,7 @@
   "securities": {
     "exchangeRateUnavailable": "無法確定交易日 {{ from }} -> {{ to }} 的匯率。請提供明確的 exchangeRate，以便現金帳戶的記帳正確。",
     "accountMustBeInvestment": "科目類型必須為 INVESTMENT",
+    "providerCurrencyMismatch": "拒絕更新 {{ symbol }} 的價格：{{ provider }} 以 {{ reported }} 報價，但該證券登記的貨幣為 {{ configured }}。請更正該證券的貨幣、代碼或交易所，然後重新整理。",
     "securityIdRequired": "{{ action }} 交易需要證券 ID",
     "splitRatioRequired": "分割比例（數量）必須大於零",
     "acquisitionPriceRequired": "{{ action }} 交易需要填寫每股價格，且必須大於零。對於成本未知的股份，請使用 ADD_SHARES。",

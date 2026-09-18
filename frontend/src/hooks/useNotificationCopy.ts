@@ -272,11 +272,18 @@ export function useNotificationCopy() {
    */
   const portfolioMovementData = (
     notification: Notification,
-  ): { direction?: string; changePercent?: number } | null => {
+  ): {
+    direction?: string;
+    changePercent?: number;
+    baselineDate?: string;
+    valuationDate?: string;
+  } | null => {
     if (notification.type !== 'PORTFOLIO_MOVEMENT') return null;
     return (notification.data ?? {}) as {
       direction?: string;
       changePercent?: number;
+      baselineDate?: string;
+      valuationDate?: string;
     };
   };
 
@@ -292,10 +299,19 @@ export function useNotificationCopy() {
   const portfolioMovementMessage = (notification: Notification): string | null => {
     const data = portfolioMovementData(notification);
     if (!data) return null;
+    // The period is part of the claim: a Monday run measures from Friday, so the
+    // copy names both boundary dates rather than saying "today". A row written
+    // before the producer carried them falls back to the server's stored copy.
+    if (!data.baselineDate || !data.valuationDate) return null;
     const percent = Math.abs(data.changePercent ?? 0);
+    const args = {
+      percent,
+      from: formatDate(data.baselineDate),
+      to: formatDate(data.valuationDate),
+    };
     return data.direction === 'down'
-      ? t('portfolioMovement.messageDown', { percent })
-      : t('portfolioMovement.messageUp', { percent });
+      ? t('portfolioMovement.messageDown', args)
+      : t('portfolioMovement.messageUp', args);
   };
 
   /**

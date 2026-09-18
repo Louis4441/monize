@@ -13,6 +13,7 @@ import { investmentsApi } from '@/lib/investments';
 import { accountsApi } from '@/lib/accounts';
 import { getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
+import { priceDecimals, TRADE_PRICE_DISPLAY_DECIMALS } from '@/lib/security-detail';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import toast from 'react-hot-toast';
@@ -228,7 +229,17 @@ export function SecurityTransactionHistory({
                     </td>
                     <td role="cell" className={`col-start-4 row-start-2 text-gray-700 dark:text-gray-300 ${MONEY_CELL}`}>
                       <CellLabel className={CAPTION_CLASS}>{t('transactionHistory.columns.price')}</CellLabel>
-                      {tx.price === null ? '-' : formatCurrencyPrecise(tx.price, security.currencyCode, 4)}
+                      {tx.price === null
+                        ? '-'
+                        : /* Four decimals, or as many as the stored price
+                             carries (capped at six): a price derived from an
+                             executed total is a quotient, and 5.8200 is not
+                             what 141 shares went at. */
+                          formatCurrencyPrecise(
+                            tx.price,
+                            security.currencyCode,
+                            Math.max(4, priceDecimals([tx.price], TRADE_PRICE_DISPLAY_DECIMALS)),
+                          )}
                     </td>
                     <td role="cell" className={`col-start-3 col-span-2 row-start-1 text-gray-700 dark:text-gray-300 ${MONEY_CELL}`}>
                       <CellLabel className={CAPTION_CLASS}>{t('transactionHistory.columns.amount')}</CellLabel>

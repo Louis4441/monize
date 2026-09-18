@@ -104,23 +104,46 @@ export function usePriceRefresh({ onRefreshComplete }: UsePriceRefreshOptions = 
         lastRefreshTimestamp = Date.now();
         if (!silent) {
           if (result.failed > 0) {
-            const failedSymbols = result.results
-              .filter((r) => !r.success)
-              .map((r) => r.symbol);
-            const symbolList = failedSymbols.join(', ');
+            const failures = result.results.filter((r) => !r.success);
+            const symbolList = failures.map((r) => r.symbol).join(', ');
+            // The server already says *why* it refused, translated, and a
+            // currency mismatch is repaired by editing the security rather
+            // than by refreshing again: a count of failures alone sends the
+            // reader nowhere. Distinct, because one refusal usually covers
+            // every symbol in a group.
+            const reasons = [
+              ...new Set(failures.map((r) => r.error).filter((e): e is string => !!e)),
+            ];
+            const symbols = symbolList ? ` (${symbolList})` : '';
             toast.error(
-              t('priceRefresh.partialFailure', {
-                updated: result.updated,
-                failed: result.failed,
-                symbols: symbolList ? ` (${symbolList})` : '',
-              }),
+              reasons.length > 0
+                ? t('priceRefresh.partialFailureWithReasons', {
+                    updated: result.updated,
+                    failed: result.failed,
+                    symbols,
+                    reasons: reasons.join('\n'),
+                  })
+                : t('priceRefresh.partialFailure', {
+                    updated: result.updated,
+                    failed: result.failed,
+                    symbols,
+                  }),
               { duration: 8000 },
             );
           } else {
             toast.success(t('priceRefresh.updated', { count: result.updated }));
           }
         }
-        await onRefreshComplete?.(result.lastUpdated);
+        // Only when something actually changed. `onRefreshComplete` reloads the
+        // page's data -- on the Investments page a portfolio summary and a
+        // transaction page, seconds of server work -- and a refresh that
+        // updated nothing (market closed, every quote refused, nothing
+        // eligible) leaves every one of those answers exactly as it was. The
+        // user saw the page "reload" for no reason at t=5.6 s of a 6.8 s page
+        // open. `updated` is the server's own count of rows it wrote.
+        if (result.updated > 0) {
+          await onRefreshComplete?.(result.lastUpdated);
+        }
       } catch (error) {
         logger.error('Failed to refresh prices:', error);
         if (!silent) toast.error(getErrorMessage(error, t('priceRefresh.failed')));

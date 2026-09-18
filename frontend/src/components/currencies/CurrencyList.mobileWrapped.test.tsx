@@ -70,6 +70,7 @@ function renderList(currencies: CurrencyInfo[], overrides: ListOverrides = {}) {
       currencies={currencies}
       usage={overrides.usage ?? {}}
       defaultCurrency={overrides.defaultCurrency ?? 'CAD'}
+      onRateHistory={vi.fn()}
       getRate={overrides.getRate ?? (() => null)}
       onEdit={vi.fn()}
       onToggleActive={vi.fn()}

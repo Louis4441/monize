@@ -176,6 +176,13 @@ const WITH_CONTEXT_ALLOWLIST = [
   "src/push/push-subscription.service.ts",
   "src/scheduled-transactions/scheduled-transactions.service.ts",
   "src/securities/holdings.service.ts",
+  // Boot-time, READ-ONLY report of holdings that disagree with a replay of
+  // their ledger (INV-HOLDING-001). The enumeration of users holding a position
+  // is cross-user by construction, so it is a system-context fan-out; each
+  // user's comparison then runs under withUserContext. It writes nothing at
+  // all, which is what makes the system context cheap to reason about here:
+  // the widest thing it can do is log.
+  "src/securities/holdings-drift-report.service.ts",
   // The market-index refresh is a deployment-wide cron with no request behind
   // it: the rows it writes are global reference data with no owner, exactly like
   // the exchange-rate refresh above.

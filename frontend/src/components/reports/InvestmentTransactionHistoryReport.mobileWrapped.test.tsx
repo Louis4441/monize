@@ -104,8 +104,18 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 const mockExportToCsv = vi.fn();
+const mockExportCsvSections = vi.fn();
 vi.mock("@/lib/csv-export", () => ({
   exportToCsv: (...args: any[]) => mockExportToCsv(...args),
+  exportCsvSections: (...args: any[]) => mockExportCsvSections(...args),
+}));
+
+// The KPI cards and the export's converted section are the server's answer.
+const mockGetTransactionSummary = vi.fn();
+vi.mock("@/lib/investment-reports", () => ({
+  investmentReportsApi: {
+    getTransactionSummary: (...args: any[]) => mockGetTransactionSummary(...args),
+  },
 }));
 
 vi.mock("@/lib/pdf-export", () => ({
@@ -132,7 +142,7 @@ const TRANSACTIONS = [
     quantity: 50,
     price: 100,
     accountId: "acc-z",
-    security: { symbol: "VWCE.DE", name: "Vanguard FTSE All-World UCITS ETF" },
+    security: { symbol: "VWCE.DE", name: "Vanguard FTSE All-World UCITS ETF", currencyCode: "CAD" },
   },
   {
     id: "tx-late",
@@ -142,7 +152,7 @@ const TRANSACTIONS = [
     quantity: -30,
     price: 100,
     accountId: "acc-a",
-    security: { symbol: "MSFT", name: "Microsoft Corp." },
+    security: { symbol: "MSFT", name: "Microsoft Corp.", currencyCode: "CAD" },
   },
   {
     id: "tx-bare",
@@ -171,6 +181,42 @@ const EXPECTED_LABELS = [
   "Price",
   "Total",
 ];
+
+/**
+ * The export's own wider column order: every figure beside the currency it is
+ * in, so a spreadsheet groups by unit instead of adding two currencies (issue
+ * #1394). The on-screen table keeps its seven.
+ */
+const EXPECTED_EXPORT_LABELS = [
+  "Date",
+  "Action",
+  "Security",
+  "Account",
+  "Quantity",
+  "Price Currency",
+  "Price",
+  "Amount Currency",
+  "Total",
+  "Commission Currency",
+  "Conversion Basis",
+  "Commission",
+];
+
+/** The index of each export column in that order. */
+const EXPORT_COL = {
+  date: 0,
+  action: 1,
+  security: 2,
+  account: 3,
+  quantity: 4,
+  priceCurrency: 5,
+  price: 6,
+  amountCurrency: 7,
+  total: 8,
+  commissionCurrency: 9,
+  conversionBasis: 10,
+  commission: 11,
+} as const;
 
 /** The index of each column in that order, for addressing a cell. */
 const COL = {
@@ -219,6 +265,20 @@ describe("InvestmentTransactionHistoryReport (phone wrapped rows)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPush.mockClear();
+    mockGetTransactionSummary.mockResolvedValue({
+      currencyCode: "CAD",
+      transactionCount: 3,
+      securitiesTraded: 2,
+      total: 8042,
+      knownSubtotal: 8042,
+      missingPairs: [],
+      unknownCount: 0,
+      excludedCount: 0,
+      fxComplete: true,
+      byAction: [],
+      amountCurrencies: ["CAD"],
+      hasUnknownCurrency: false,
+    });
     // The sort is persisted, so a tap in one test would otherwise decide the
     // starting order of the next.
     localStorage.clear();
@@ -567,8 +627,11 @@ describe("InvestmentTransactionHistoryReport (phone wrapped rows)", () => {
     // with no column header still knows which figure is missing.
     expect(cells[COL.quantity].textContent).toBe("Quantity-");
     expect(cells[COL.price].textContent).toBe("Price-");
-    // The total is present, and the account still names the ledger.
-    expect(cells[COL.total].textContent).toBe("Total$42.00");
+    // The total's NUMBER is known but its unit is not -- a row naming no
+    // security has no security currency -- so it renders as unknown rather
+    // than being labelled with the account's or the reader's money (#1394).
+    expect(cells[COL.total].querySelector('[data-testid="unknown-amount"]')).not.toBeNull();
+    expect(cells[COL.total].textContent).not.toContain("42.00");
     expect(cells[COL.account].textContent).toBe("AccountZeta Brokerage");
   });
 
@@ -587,18 +650,24 @@ describe("InvestmentTransactionHistoryReport (phone wrapped rows)", () => {
       fireEvent.click(within(container).getByText("CSV"));
     });
 
-    expect(mockExportToCsv).toHaveBeenCalledTimes(1);
-    const [filename, headers, rows] = mockExportToCsv.mock.calls[0];
+    // Two sections now: the rows, then the server's converted summary.
+    expect(mockExportCsvSections).toHaveBeenCalledTimes(1);
+    const [filename, sections] = mockExportCsvSections.mock.calls[0];
+    const { headers, rows } = sections[0];
     expect(filename).toBe("investment-transactions");
-    expect(headers).toEqual(EXPECTED_LABELS);
+    expect(headers).toEqual(EXPECTED_EXPORT_LABELS);
+    expect(sections[1].rows).toContainEqual(["Reporting currency", "CAD"]);
     // Rows follow the table's own sort (date, descending), and each cell sits
     // under the heading that names it.
     expect(rows).toHaveLength(3);
     const [first] = rows;
-    expect(first[COL.date]).toBe("2025-11-20");
-    expect(first[COL.action]).toBe("Sell");
-    expect(first[COL.security]).toBe("MSFT");
-    expect(first[COL.account]).toBe("Alpha RRSP");
+    expect(first[EXPORT_COL.date]).toBe("2025-11-20");
+    expect(first[EXPORT_COL.action]).toBe("Sell");
+    expect(first[EXPORT_COL.security]).toBe("MSFT");
+    expect(first[EXPORT_COL.account]).toBe("Alpha RRSP");
+    // Each figure names its own unit, in its own column.
+    expect(first[EXPORT_COL.priceCurrency]).toBe("CAD");
+    expect(first[EXPORT_COL.amountCurrency]).toBe("CAD");
     // Quantity and Total reach the CSV through `Math.abs`, which makes them
     // numbers whatever the payload holds. Price is passed through exactly as
     // the row holds it, as it is today -- and a `decimal(20,4)` price crosses
@@ -607,14 +676,16 @@ describe("InvestmentTransactionHistoryReport (phone wrapped rows)", () => {
     // follows the declared type. The CSV writer's numeric test accepts either
     // form, so nothing is mis-escaped; the shape gap is pre-existing and is
     // reported rather than changed inside a layout conversion.
-    expect(first[COL.quantity]).toBe(30);
-    expect(first[COL.price]).toBe(100);
-    expect(first[COL.total]).toBe(3000);
+    expect(first[EXPORT_COL.quantity]).toBe(30);
+    expect(first[EXPORT_COL.price]).toBe(100);
+    expect(first[EXPORT_COL.total]).toBe(3000);
     // The bare row's absent figures stay empty rather than becoming a dash: a
     // dash in a numeric column is text, and a missing quantity is not a value.
-    const bare = rows.find((r: unknown[]) => r[COL.security] === "-")!;
-    expect(bare[COL.quantity]).toBe("");
-    expect(bare[COL.price]).toBe("");
+    const bare = rows.find((r: unknown[]) => r[EXPORT_COL.security] === "-")!;
+    expect(bare[EXPORT_COL.quantity]).toBe("");
+    expect(bare[EXPORT_COL.price]).toBe("");
+    // No security, so no currency to claim for the amount either.
+    expect(bare[EXPORT_COL.amountCurrency]).toBe("");
   });
 
   it("formats the quantity for the PDF and leaves the CSV a number", async () => {
@@ -636,15 +707,15 @@ describe("InvestmentTransactionHistoryReport (phone wrapped rows)", () => {
       tableData?: { rows: (string | number)[][] };
     };
     const pdfFirst = call.tableData!.rows[0];
-    expect(pdfFirst[COL.quantity]).toBe("30");
-    expect(typeof pdfFirst[COL.quantity]).toBe("string");
+    expect(pdfFirst[EXPORT_COL.quantity]).toBe("30");
+    expect(typeof pdfFirst[EXPORT_COL.quantity]).toBe("string");
 
     fireEvent.click(within(container).getByTitle("Export report"));
     await act(async () => {
       fireEvent.click(within(container).getByText("CSV"));
     });
-    const [, , csvRows] = mockExportToCsv.mock.calls.at(-1)!;
-    expect(csvRows[0][COL.quantity]).toBe(30);
+    const [, csvSections] = mockExportCsvSections.mock.calls.at(-1)!;
+    expect(csvSections[0].rows[0][EXPORT_COL.quantity]).toBe(30);
   });
 
   it("renders an unnamed account as a dash rather than an empty captioned cell", async () => {
