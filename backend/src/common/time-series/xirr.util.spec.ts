@@ -122,6 +122,39 @@ describe("xirrAnnualRate", () => {
       ).toBeNull();
     });
 
+    it("solves a losing portfolio that had a dividend and a sale on the way", () => {
+      // Monthly purchases, one dividend, one sale, and a final value below what
+      // went in: the amounts change sign three times and the cumulative flow
+      // never turns positive, so neither counting condition admits it -- yet
+      // its NPV falls steadily with the rate and the (negative) rate that
+      // clears it is the only one. The regression: this schedule, the shape of
+      // any regular-contribution plan in a drawdown, read as "undefined".
+      const flows = [flow(0, -59726)];
+      for (let month = 1; month < 40; month++)
+        flows.push(flow(month * 30, -500));
+      flows.push(flow(20 * 30, 120), flow(35 * 30, 3060), flow(40 * 30, 73186));
+
+      const rate = xirrAnnualRate(flows);
+
+      expect(rate).not.toBeNull();
+      expect(rate!).toBeLessThan(0);
+      expect(rate!).toBeGreaterThan(-0.1);
+      const npv = flows.reduce(
+        (sum, f) =>
+          sum + f.amountMinor / 10000 / Math.pow(1 + rate!, f.dayOffset / 365),
+        0,
+      );
+      expect(Math.abs(npv)).toBeLessThan(1e-6);
+    });
+
+    it("still refuses two genuine rates inside the bracket", () => {
+      // -1000, +2300, -1320 clears at both 10% and 20% a year: the slope turns
+      // between them, so the monotonic licence does not apply either.
+      expect(
+        xirrAnnualRate([flow(0, -1000), flow(365, 2300), flow(730, -1320)]),
+      ).toBeNull();
+    });
+
     it("refuses a rate outside the reportable bracket", () => {
       // A hundred-thousand-fold return in a year is a data defect, not a rate.
       expect(xirrAnnualRate([flow(0, -1), flow(365, 100000)])).toBeNull();

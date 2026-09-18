@@ -457,7 +457,12 @@ export class SecurityPriceService {
         configured: verdict.configured,
       },
     );
-    this.logger.warn(message);
+    // The log is the operator's, in English; `message` is the reader's, in
+    // the request's locale, and a translated line among English ones made the
+    // server log read in whichever language the last caller used.
+    this.logger.warn(
+      `Price update refused for ${security.symbol}: ${provider} quotes it in ${verdict.reported}, but the security is recorded in ${verdict.configured}`,
+    );
     return message;
   }
 

@@ -750,16 +750,23 @@ fraction or `null`.
     is outside the range a return can be reported over;
   - **several roots.** A refusal, never the first root the search happens to
     land on: a printed "IRR" that depends on which end the bisection started
-    from is the #1387 class of defect. Uniqueness is accepted on either
-    sufficient condition, and refused otherwise:
+    from is the #1387 class of defect. Uniqueness is accepted on any of
+    three sufficient conditions, and refused otherwise:
     1. the amounts in date order change sign exactly once (every purchase
        before every disposal -- a simple investment, whose NPV is strictly
        decreasing in `r`); or
     2. the CUMULATIVE flow sequence, in date order, changes sign exactly once
-       (Norstrom's criterion).
+       (Norstrom's criterion); or
+    3. the NPV, sampled densely across the bracket (1,024 points log-spaced in
+       `1 + r`), changes sign exactly once. This is what admits a portfolio
+       that LOST money and had a dividend or a sale on the way: its amounts
+       change sign several times and its cumulative flow never turns positive,
+       so neither count applies, yet the negative rate that clears it is the
+       only one. A regular-contribution plan in a drawdown is exactly this
+       shape, and without the third condition it read as "undefined".
 
-    A schedule such as `-1000, +2500, -1600` satisfies neither and is reported
-    as undefined.
+    A schedule such as `-1000, +2300, -1320` clears at both 10% and 20% a
+    year: two crossings, and it is reported as undefined.
 
 ### 11.5 Missing data, and the window it refuses to annualise
 
@@ -889,7 +896,7 @@ to explain itself where it is printed.
 
 | Suite | Case |
 | --- | --- |
-| `xirr.util.spec.ts` | a single in/out pair equals `(out/in)^(365/days) - 1`; the eight-case schedule set of 11.7; an all-zero schedule, a one-flow schedule and a no-sign-change schedule are `null`; `-1000, +2500, -1600` is `null` (several roots) rather than either root; a Norstrom-only schedule (two raw sign changes, one cumulative) IS solved; a rate beyond the bracket is `null`; the solver is a pure function of its input (no ambient date) |
+| `xirr.util.spec.ts` | a single in/out pair equals `(out/in)^(365/days) - 1`; the eight-case schedule set of 11.7; an all-zero schedule, a one-flow schedule and a no-sign-change schedule are `null`; `-1000, +2300, -1320` is `null` (two rates in the bracket) rather than either; a Norstrom-only schedule (two raw sign changes, one cumulative) IS solved; a losing regular-contribution schedule with a dividend and a sale (neither count) IS solved at its negative rate; a rate beyond the bracket is `null`; the solver is a pure function of its input (no ambient date) |
 | `invested-period-result.util.spec.ts` | the eight cases of 11.7 with their worked numbers; an incomplete day withholds both MWR figures with the same reasons as the TWR; a 7-day window withholds the annual figure and keeps the total; `zeroStart` withholds both |
 | `portfolio-period-results-batch.service.spec.ts` | batch == single on the new fields, preset by preset |
 | `portfolio.service.spec.ts` | the summary carries `moneyWeightedReturn` and `moneyWeightedReturnReasons` from the since-inception slice, withholds with the cause, and rounds like the other percentages |

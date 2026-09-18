@@ -87,8 +87,12 @@ function signChanges(values: readonly number[]): number {
  *    criterion, which admits a schedule that dips back in (a purchase after a
  *    sale) while the money invested to date never turns positive twice.
  *
- * Neither is necessary for a unique rate; both are sufficient, and a schedule
- * meeting neither is reported as undefined rather than guessed at.
+ * 3. failing both counts, the NPV crosses zero exactly once across the
+ *    bracket (`npvCrossesOnce`): a portfolio that lost money with a dividend
+ *    or a sale along the way meets neither count and still has one rate.
+ *
+ * None is necessary for a unique rate; each is sufficient, and a schedule
+ * meeting none is reported as undefined rather than guessed at.
  */
 function hasSingleRate(flows: readonly XirrFlow[]): boolean {
   const amounts = flows.map((flow) => flow.amountMinor);
@@ -100,7 +104,42 @@ function hasSingleRate(flows: readonly XirrFlow[]): boolean {
     running += amount;
     cumulative.push(running);
   }
-  return signChanges(cumulative) === 1;
+  if (signChanges(cumulative) === 1) return true;
+
+  return npvCrossesOnce(flows);
+}
+
+/** Sampling density of the crossing count; log-spaced in `1 + rate`. */
+const NPV_SAMPLES = 1024;
+
+/**
+ * The third licence: the NPV crosses zero exactly once across the reportable
+ * bracket, read off a dense sample of it.
+ *
+ * Neither counting condition admits a portfolio that LOST money and had a
+ * dividend or a sale along the way: its cumulative flows never turn positive
+ * (zero sign changes) while its amounts change sign several times, yet the
+ * negative rate that clears it is the only one. Nor is the NPV monotonic over
+ * the whole bracket for such a schedule (it falls through zero, then rises
+ * back towards the day-zero flow), so a slope test refuses it too. What can
+ * be checked is the crossing itself: the NPV is sampled at `NPV_SAMPLES`
+ * points log-spaced in `1 + rate`, and a sign that changes exactly once is
+ * one root in the bracket. A schedule with two genuine roots inside it
+ * (-1000, +2300, -1320 clears at both 10% and 20%) shows two crossings and is
+ * refused. This is a numerical reading, so the sample is dense: two roots
+ * closer together than a sample step would read as none or as one, which is
+ * the same answer for a pair of rates a reader could not tell apart.
+ */
+function npvCrossesOnce(flows: readonly XirrFlow[]): boolean {
+  const logLow = Math.log(1 + RATE_LOW);
+  const logHigh = Math.log(1 + RATE_HIGH);
+  const values: number[] = [];
+  for (let i = 0; i <= NPV_SAMPLES; i++) {
+    const rate = Math.exp(logLow + ((logHigh - logLow) * i) / NPV_SAMPLES) - 1;
+    const value = netPresentValue(flows, rate);
+    if (Number.isFinite(value)) values.push(value);
+  }
+  return signChanges(values) === 1;
 }
 
 /**
