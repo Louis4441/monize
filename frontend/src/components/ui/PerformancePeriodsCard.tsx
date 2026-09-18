@@ -106,19 +106,13 @@ export function PerformancePeriodsCard({
               <dt className="text-sm text-gray-500 dark:text-gray-400">
                 {entry.label}
               </dt>
-              <dd className="text-right">
-                <div
-                  className={`text-sm font-medium tabular-nums ${figureClass(
-                    entry.primaryValue,
-                    entry.primary === null,
-                  )}`}
-                >
-                  {entry.primary === null ? unavailableLabel : entry.primary}
-                </div>
-                {/* A second line only where the caller has one: a period with
-                    no amount beneath it must not grow an empty row. */}
+              {/* One line per period, the same row the security card draws.
+                  The second figure, where the caller has one, sits on that
+                  line before the headline, smaller and muted, so the two
+                  cards read alike and no row grows a second line. */}
+              <dd className="flex items-baseline justify-end gap-2 text-right">
                 {entry.secondary !== undefined && (
-                  <div
+                  <span
                     className={`text-xs tabular-nums ${figureClass(
                       entry.secondaryValue,
                       entry.secondary === null,
@@ -127,8 +121,16 @@ export function PerformancePeriodsCard({
                     {entry.secondary === null
                       ? unavailableLabel
                       : entry.secondary}
-                  </div>
+                  </span>
                 )}
+                <span
+                  className={`text-sm font-medium tabular-nums ${figureClass(
+                    entry.primaryValue,
+                    entry.primary === null,
+                  )}`}
+                >
+                  {entry.primary === null ? unavailableLabel : entry.primary}
+                </span>
               </dd>
             </div>
           ))}

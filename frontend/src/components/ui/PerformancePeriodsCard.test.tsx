@@ -106,7 +106,7 @@ describe('PerformancePeriodsCard', () => {
     expect(screen.getByText('+3.00%').className).toContain('green');
   });
 
-  it('draws no second line for an entry that has none', () => {
+  it('draws no second figure for an entry that has none', () => {
     const { container } = render(
       <PerformancePeriodsCard
         {...base}
@@ -116,7 +116,35 @@ describe('PerformancePeriodsCard', () => {
       />,
     );
 
-    expect(container.querySelectorAll('dd > div')).toHaveLength(1);
+    expect(container.querySelectorAll('dd > span')).toHaveLength(1);
+  });
+
+  it('keeps the second figure on the same line as the headline', () => {
+    // The security card has one row per period; the portfolio card carries an
+    // amount too, and it joins that row rather than opening a second one, so
+    // the two cards read alike side by side.
+    const { container } = render(
+      <PerformancePeriodsCard
+        {...base}
+        entries={[
+          {
+            period: '1m',
+            label: '1M',
+            primary: '+1.41%',
+            primaryValue: 1.41,
+            secondary: '+1,016.00',
+            secondaryValue: 1016,
+          },
+        ]}
+      />,
+    );
+
+    const dd = container.querySelector('dd')!;
+    const spans = dd.querySelectorAll(':scope > span');
+    expect(spans).toHaveLength(2);
+    expect(spans[0].textContent).toBe('+1,016.00');
+    expect(spans[1].textContent).toBe('+1.41%');
+    expect(dd.className).toContain('items-baseline');
   });
 
   it('says so when no period can be reported at all, and drops the footnote', () => {
