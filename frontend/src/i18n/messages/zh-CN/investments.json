@@ -126,7 +126,7 @@
     "lowestValue": "最低价值",
     "investmentResult": "投资结果",
     "investmentReturn": "回报",
-    "investmentResultTooltip": "扣除您自己的存取款后，持仓在此期间的收益。百分比仅适用于此数值。",
+    "investmentResultTooltip": "此时间段内你的投资赚取的金额。存入、取出资金和未投资现金被排除在外，旁边的百分比是按时间加权的回报率，因此买入和卖出不会影响它。",
     "unmeasuredFlowTooltip": "如果某笔交易在这些账户之外结算，或某个拆分将投资行与普通支出混在一起，则结果无法与转移的资金分开。",
     "valueChangeLine": "价值变化 {amount}",
     "netFlowsLine": "净存取款 {amount}",
@@ -295,8 +295,8 @@
   },
   "portfolioPerformance": {
     "title": "投资组合表现",
-    "subtitle": "扣除存入和取出资金后，你的投资本身的表现。",
-    "footnote": "存入和取出资金不计入投资回报。",
+    "subtitle": "扣除存入、取出资金和未投资现金影响后，你的投资本身的表现。",
+    "footnote": "存入、取出资金和未投资现金不计入投资结果。",
     "unavailable": "无",
     "empty": "历史数据还不足以计算回报。",
     "periods": {

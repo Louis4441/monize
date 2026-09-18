@@ -96,7 +96,7 @@
       "noLosers": "Bugün kaybedenler yok."
     },
     "dailyChange": "Günlük değişim",
-    "dailyChangeOn": "Günlük değişim \u00b7 {date}",
+    "dailyChangeOn": "Günlük değişim · {date}",
     "openPriceHistory": "{symbol} fiyat geçmişi",
     "refreshPrices": "Fiyatları yenile",
     "viewPortfolio": "Portföyü görüntüle",
@@ -117,7 +117,7 @@
     "empty": "Henüz favori menkul kıymet yok. <securitiesLink>Menkul Kıymetler sayfasını</securitiesLink> ziyaret edin ve burada takip etmek istediğiniz menkul kıymetleri yıldızlayın.",
     "noPriceYet": "Henüz fiyat yok",
     "dailyChange": "Günlük değişim",
-    "dailyChangeOn": "Günlük değişim \u00b7 {date}",
+    "dailyChangeOn": "Günlük değişim · {date}",
     "openPriceHistory": "{symbol} fiyat geçmişi",
     "refreshPrices": "Fiyatları yenile",
     "manage": "Menkul kıymetleri yönet"
@@ -204,7 +204,7 @@
     "refresh": "Güncel değeri yenile",
     "investmentResult": "Yatırım Sonucu",
     "notAvailable": "Yok",
-    "periodBreakdownTooltip": "Değer değişimi {valueChange}, bunun {netFlows} kadarı yatırılan ve çekilen tutardı. Yatırım sonucu geriye kalan kısımdır.",
+    "periodBreakdownTooltip": "Hesabın değeri bu dönemde {valueChange} değişti; bunun {netFlows} kadarı yatırılan ve çekilen tutardı. Yukarıdaki rakam, yatırıma dönüştürülmemiş nakit hariç, yatırımların kendisinin kazandığı tutardır.",
     "unmeasuredFlowTooltip": "Bu hesapların dışında kapatılan bir işlem ya da bir yatırım kalemini olağan bir harcamayla karıştıran bir bölme, sonucun taşınan paradan ayrılamayacağı anlamına gelir."
   },
   "spendingByPayee": {

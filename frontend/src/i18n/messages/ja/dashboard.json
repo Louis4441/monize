@@ -96,7 +96,7 @@
       "noLosers": "今日の値下がり銘柄はありません。"
     },
     "dailyChange": "日次変動",
-    "dailyChangeOn": "日次変動 \u00b7 {date}",
+    "dailyChangeOn": "日次変動 · {date}",
     "openPriceHistory": "{symbol} の価格履歴",
     "refreshPrices": "価格を更新",
     "viewPortfolio": "ポートフォリオを見る",
@@ -117,7 +117,7 @@
     "empty": "お気に入りの有価証券がまだありません。<securitiesLink>有価証券ページ</securitiesLink>を開いて追跡したい有価証券をスターしてください。",
     "noPriceYet": "価格未登録",
     "dailyChange": "日次変動",
-    "dailyChangeOn": "日次変動 \u00b7 {date}",
+    "dailyChangeOn": "日次変動 · {date}",
     "openPriceHistory": "{symbol} の価格履歴",
     "refreshPrices": "価格を更新",
     "manage": "有価証券を管理"
@@ -204,7 +204,7 @@
     "refresh": "現在の価値を更新",
     "investmentResult": "投資成果",
     "notAvailable": "N/A",
-    "periodBreakdownTooltip": "価値の変動は{valueChange}で、そのうち入出金は{netFlows}でした。投資成果は残りの部分です。",
+    "periodBreakdownTooltip": "この期間、口座の価値は{valueChange}変動し、そのうち入出金は{netFlows}でした。上記の数値は、未投資の現金を除いた、投資自体が生み出した金額です。",
     "unmeasuredFlowTooltip": "これらの口座以外で決済された取引や、投資明細と通常の支出が混在する分割がある場合、成果を移動した資金と切り分けることができません。"
   },
   "spendingByPayee": {

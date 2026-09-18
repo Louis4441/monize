@@ -126,7 +126,7 @@
     "lowestValue": "최저 가치",
     "investmentResult": "투자 결과",
     "investmentReturn": "수익률",
-    "investmentResultTooltip": "이 기간 동안 보유 자산이 얻은 것에서 본인의 입출금을 제외한 값입니다. 백분율은 이 수치에 대해서만 의미가 있습니다.",
+    "investmentResultTooltip": "이 기간 동안 투자가 벌어들인 금액입니다. 입금, 출금, 미투자 현금은 제외되며, 옆의 백분율은 시간가중 수익률이므로 매수와 매도는 이 값을 움직이지 않습니다.",
     "unmeasuredFlowTooltip": "이 계좌 밖에서 결제된 거래이거나, 투자 항목과 일반 지출이 섞인 분할 항목이 있으면 결과를 이동한 자금과 분리할 수 없습니다.",
     "valueChangeLine": "가치 변동 {amount}",
     "netFlowsLine": "순 입출금액 {amount}",
@@ -295,8 +295,8 @@
   },
   "portfolioPerformance": {
     "title": "포트폴리오 성과",
-    "subtitle": "입출금을 제외했을 때 투자 자체가 어떻게 되었는지입니다.",
-    "footnote": "입출금은 투자 성과로 계산되지 않습니다.",
+    "subtitle": "입금, 출금, 미투자 현금의 영향을 제외한 투자 자체의 성과입니다.",
+    "footnote": "입금, 출금, 미투자 현금은 투자 결과로 계산되지 않습니다.",
     "unavailable": "해당 없음",
     "empty": "수익률을 계산하기에 이력이 아직 부족합니다.",
     "periods": {

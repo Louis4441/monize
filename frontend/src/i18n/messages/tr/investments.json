@@ -126,7 +126,7 @@
     "lowestValue": "En Düşük Değer",
     "investmentResult": "Yatırım Sonucu",
     "investmentReturn": "Getiri",
-    "investmentResultTooltip": "Bu dönemde varlıkların, kendi yatırdığınız ve çektiğiniz tutarlar düşüldükten sonra kazandığı miktar. Yüzde yalnızca bu rakam üzerinden hesaplanır.",
+    "investmentResultTooltip": "Yatırımlarınızın bu dönemde kazandığı tutar. Para yatırma, para çekme ve yatırıma dönüştürülmemiş nakit hariç tutulur; yanındaki yüzde ise zaman ağırlıklı bir getiridir, bu yüzden alım ve satım onu değiştirmez.",
     "unmeasuredFlowTooltip": "Bu hesapların dışında kapatılan bir işlem ya da bir yatırım kalemini olağan bir harcamayla karıştıran bir bölme, sonucun taşınan paradan ayrılamayacağı anlamına gelir.",
     "valueChangeLine": "Değer değişimi {amount}",
     "netFlowsLine": "Net yatırılan ve çekilen tutar {amount}",
@@ -295,8 +295,8 @@
   },
   "portfolioPerformance": {
     "title": "Portföy performansı",
-    "subtitle": "Yatırımlarınızın, para yatırma ve çekme etkisi çıkarıldıktan sonraki performansı.",
-    "footnote": "Para yatırma ve çekme işlemleri yatırım sonucu olarak sayılmaz.",
+    "subtitle": "Yatırımlarınızın, para yatırma, para çekme ve yatırıma dönüştürülmemiş nakdin etkisi çıkarıldıktan sonraki performansı.",
+    "footnote": "Para yatırma, para çekme ve yatırıma dönüştürülmemiş nakit, yatırım sonucu olarak sayılmaz.",
     "unavailable": "yok",
     "empty": "Getiri ölçmek için henüz yeterli geçmiş yok.",
     "periods": {

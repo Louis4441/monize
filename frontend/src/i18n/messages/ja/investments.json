@@ -126,7 +126,7 @@
     "lowestValue": "最低値",
     "investmentResult": "投資成果",
     "investmentReturn": "リターン",
-    "investmentResultTooltip": "この期間に保有資産が得た成果から、ご自身の入出金を差し引いたものです。パーセンテージはこの数値に対してのみ意味を持ちます。",
+    "investmentResultTooltip": "この期間に投資が生み出した金額です。入金、出金、未投資の現金は除外されており、隣のパーセンテージは時間加重リターンなので、売買してもこの値は動きません。",
     "unmeasuredFlowTooltip": "これらの口座以外で決済された取引や、投資明細と通常の支出が混在する分割がある場合、成果を移動した資金と切り分けることができません。",
     "valueChangeLine": "価値の変動 {amount}",
     "netFlowsLine": "純入出金額 {amount}",
@@ -295,8 +295,8 @@
   },
   "portfolioPerformance": {
     "title": "ポートフォリオパフォーマンス",
-    "subtitle": "入出金を除いた、投資自体の成績です。",
-    "footnote": "入出金は投資成績には含まれません。",
+    "subtitle": "入金、出金、未投資の現金の影響を除いた、投資自体の成績です。",
+    "footnote": "入金、出金、未投資の現金は投資成果として計上されません。",
     "unavailable": "該当なし",
     "empty": "リターンを測るには履歴がまだ足りません。",
     "periods": {

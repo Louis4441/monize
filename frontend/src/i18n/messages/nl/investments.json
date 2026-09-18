@@ -126,7 +126,7 @@
     "lowestValue": "Laagste waarde",
     "investmentResult": "Beleggingsresultaat",
     "investmentReturn": "Rendement",
-    "investmentResultTooltip": "Wat de posities in deze periode hebben opgeleverd, na aftrek van uw eigen stortingen en opnames. Een percentage geldt alleen voor dit cijfer.",
+    "investmentResultTooltip": "Wat uw beleggingen in deze periode hebben opgeleverd. Stortingen, opnames en niet-belegd geld zijn buiten beschouwing gelaten, en het percentage ernaast is een tijdgewogen rendement, zodat kopen en verkopen het niet beïnvloeden.",
     "unmeasuredFlowTooltip": "Een transactie die buiten deze rekeningen is afgewikkeld, of een splitsing die een investeringsregel combineert met een gewone uitgave, betekent dat het resultaat niet kan worden gescheiden van het verplaatste geld.",
     "valueChangeLine": "Waardeverandering {amount}",
     "netFlowsLine": "Netto stortingen en opnames {amount}",
@@ -295,8 +295,8 @@
   },
   "portfolioPerformance": {
     "title": "Portefeuilleprestatie",
-    "subtitle": "Hoe uw beleggingen presteerden nadat stortingen en opnames zijn uitgesloten.",
-    "footnote": "Stortingen en opnames tellen niet mee als beleggingsresultaat.",
+    "subtitle": "Hoe uw beleggingen presteerden, zonder het effect van stortingen, opnames en niet-belegd geld.",
+    "footnote": "Stortingen, opnames en niet-belegd geld tellen niet mee als beleggingsresultaat.",
     "unavailable": "n.v.t.",
     "empty": "Nog niet genoeg geschiedenis om een rendement te meten.",
     "periods": {

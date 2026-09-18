@@ -126,7 +126,7 @@
     "lowestValue": "Nilai Terendah",
     "investmentResult": "Hasil Investasi",
     "investmentReturn": "Imbal Hasil",
-    "investmentResultTooltip": "Apa yang diperoleh kepemilikan selama periode ini, setelah dikurangi setoran dan penarikan Anda sendiri. Persentase hanya berlaku untuk angka ini.",
+    "investmentResultTooltip": "Berapa yang dihasilkan investasi Anda selama periode ini. Setoran, penarikan, dan tunai yang belum diinvestasikan dikeluarkan, dan persentase di sampingnya adalah imbal hasil yang dibobot berdasarkan waktu, sehingga pembelian dan penjualan tidak mengubahnya.",
     "unmeasuredFlowTooltip": "Sebuah transaksi yang diselesaikan di luar akun-akun ini, atau pemisahan yang mencampur baris investasi dengan pengeluaran biasa, berarti hasilnya tidak dapat dipisahkan dari uang yang berpindah.",
     "valueChangeLine": "Perubahan nilai {amount}",
     "netFlowsLine": "Setoran dan penarikan bersih {amount}",
@@ -295,8 +295,8 @@
   },
   "portfolioPerformance": {
     "title": "Kinerja portofolio",
-    "subtitle": "Bagaimana investasi Anda berkinerja setelah setoran dan penarikan dikeluarkan.",
-    "footnote": "Setoran dan penarikan tidak dihitung sebagai hasil investasi.",
+    "subtitle": "Bagaimana investasi Anda berkinerja, tanpa pengaruh setoran, penarikan, dan tunai yang belum diinvestasikan.",
+    "footnote": "Setoran, penarikan, dan tunai yang belum diinvestasikan tidak dihitung sebagai hasil investasi.",
     "unavailable": "t/a",
     "empty": "Riwayat belum cukup untuk mengukur hasil.",
     "periods": {

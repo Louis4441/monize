@@ -126,7 +126,7 @@
     "lowestValue": "最低價值",
     "investmentResult": "投資結果",
     "investmentReturn": "報酬",
-    "investmentResultTooltip": "扣除您自己的存取款後，持股在此期間的收益。百分比僅適用於此數值。",
+    "investmentResultTooltip": "此期間內你的投資賺取的金額。存入、提出資金與未投資現金被排除在外，旁邊的百分比是按時間加權的報酬率，因此買進和賣出不會影響它。",
     "unmeasuredFlowTooltip": "如果某筆交易在這些帳戶以外結算，或某個拆分將投資項目與一般支出混在一起，則結果無法與轉移的資金分開。",
     "valueChangeLine": "價值變化 {amount}",
     "netFlowsLine": "淨存取款 {amount}",
@@ -295,8 +295,8 @@
   },
   "portfolioPerformance": {
     "title": "投資組合表現",
-    "subtitle": "扣除存入與提出資金後，你的投資本身的表現。",
-    "footnote": "存入與提出資金不計入投資報酬。",
+    "subtitle": "扣除存入、提出資金與未投資現金影響後，你的投資本身的表現。",
+    "footnote": "存入、提出資金與未投資現金不計入投資結果。",
     "unavailable": "無",
     "empty": "歷史資料還不足以計算報酬。",
     "periods": {

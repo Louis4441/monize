@@ -96,7 +96,7 @@
       "noLosers": "今日无下跌。"
     },
     "dailyChange": "日涨跌",
-    "dailyChangeOn": "日涨跌 \u00b7 {date}",
+    "dailyChangeOn": "日涨跌 · {date}",
     "openPriceHistory": "{symbol} 的价格历史",
     "refreshPrices": "刷新价格",
     "viewPortfolio": "查看投资组合",
@@ -117,7 +117,7 @@
     "empty": "暂无收藏证券。前往<securitiesLink>证券页面</securitiesLink>并收藏您想在此跟踪的证券。",
     "noPriceYet": "暂无价格",
     "dailyChange": "日涨跌",
-    "dailyChangeOn": "日涨跌 \u00b7 {date}",
+    "dailyChangeOn": "日涨跌 · {date}",
     "openPriceHistory": "{symbol} 的价格历史",
     "refreshPrices": "刷新价格",
     "manage": "管理证券"
@@ -204,7 +204,7 @@
     "refresh": "刷新当前价值",
     "investmentResult": "投资结果",
     "notAvailable": "不适用",
-    "periodBreakdownTooltip": "价值变化为 {valueChange}，其中存取款为 {netFlows}。投资结果是剩余的部分。",
+    "periodBreakdownTooltip": "此时间段内账户价值变化了 {valueChange}，其中存取款为 {netFlows}。上方数字是投资本身赚取的金额，不包括未投资现金。",
     "unmeasuredFlowTooltip": "如果某笔交易在这些账户之外结算，或某个拆分将投资行与普通支出混在一起，则结果无法与转移的资金分开。"
   },
   "spendingByPayee": {

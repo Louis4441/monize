@@ -126,7 +126,7 @@
     "lowestValue": "Giá trị thấp nhất",
     "investmentResult": "Kết quả đầu tư",
     "investmentReturn": "Lợi nhuận",
-    "investmentResultTooltip": "Những gì các khoản nắm giữ kiếm được trong khoảng thời gian này, sau khi trừ đi khoản nạp và rút của chính bạn. Tỷ lệ phần trăm chỉ áp dụng cho con số này.",
+    "investmentResultTooltip": "Số tiền khoản đầu tư của bạn kiếm được trong khoảng thời gian này. Các khoản nạp, rút và tiền mặt chưa đầu tư được loại trừ, và tỷ lệ phần trăm bên cạnh là lợi nhuận tính theo trọng số thời gian, nên việc mua và bán không làm thay đổi con số này.",
     "unmeasuredFlowTooltip": "Một giao dịch được thanh toán bên ngoài các tài khoản này, hoặc một khoản tách lẫn một dòng đầu tư với chi tiêu thông thường, nghĩa là kết quả không thể tách khỏi số tiền đã di chuyển.",
     "valueChangeLine": "Thay đổi giá trị {amount}",
     "netFlowsLine": "Nạp và rút ròng {amount}",
@@ -295,8 +295,8 @@
   },
   "portfolioPerformance": {
     "title": "Hiệu suất danh mục",
-    "subtitle": "Khoản đầu tư của bạn đã hoạt động thế nào sau khi loại bỏ các khoản nạp và rút.",
-    "footnote": "Các khoản nạp và rút không được tính vào kết quả đầu tư.",
+    "subtitle": "Khoản đầu tư của bạn đã hoạt động thế nào, không tính ảnh hưởng của các khoản nạp, rút và tiền mặt chưa đầu tư.",
+    "footnote": "Các khoản nạp, rút và tiền mặt chưa đầu tư không được tính là kết quả đầu tư.",
     "unavailable": "k/c",
     "empty": "Lịch sử còn quá ít để đo lợi nhuận.",
     "periods": {

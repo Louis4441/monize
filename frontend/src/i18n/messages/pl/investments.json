@@ -126,7 +126,7 @@
     "lowestValue": "Najniższa wartość",
     "investmentResult": "Wynik inwestycyjny",
     "investmentReturn": "Zwrot",
-    "investmentResultTooltip": "To, co wypracowały pozycje w tym okresie, po odjęciu Twoich własnych wpłat i wypłat. Procent odnosi się wyłącznie do tej wartości.",
+    "investmentResultTooltip": "Ile zarobiły Twoje inwestycje w tym okresie. Wpłaty, wypłaty i niezainwestowana gotówka są pominięte, a procent obok to stopa zwrotu ważona czasem, więc kupno i sprzedaż jej nie zmieniają.",
     "unmeasuredFlowTooltip": "Transakcja rozliczona poza tymi kontami albo podział łączący pozycję inwestycyjną ze zwykłym wydatkiem oznacza, że wyniku nie da się oddzielić od przesuniętych pieniędzy.",
     "valueChangeLine": "Zmiana wartości {amount}",
     "netFlowsLine": "Wpłaty i wypłaty netto {amount}",

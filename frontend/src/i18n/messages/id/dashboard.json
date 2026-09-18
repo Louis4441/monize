@@ -96,7 +96,7 @@
       "noLosers": "Tidak ada yang turun hari ini."
     },
     "dailyChange": "Perubahan harian",
-    "dailyChangeOn": "Perubahan harian \u00b7 {date}",
+    "dailyChangeOn": "Perubahan harian · {date}",
     "openPriceHistory": "Riwayat harga {symbol}",
     "refreshPrices": "Perbarui harga",
     "viewPortfolio": "Lihat portofolio",
@@ -117,7 +117,7 @@
     "empty": "Belum ada sekuritas favorit. Kunjungi <securitiesLink>halaman Sekuritas</securitiesLink> dan bintangi sekuritas yang ingin Anda lacak di sini.",
     "noPriceYet": "Belum ada harga",
     "dailyChange": "Perubahan harian",
-    "dailyChangeOn": "Perubahan harian \u00b7 {date}",
+    "dailyChangeOn": "Perubahan harian · {date}",
     "openPriceHistory": "Riwayat harga {symbol}",
     "refreshPrices": "Perbarui harga",
     "manage": "Kelola sekuritas"
@@ -204,7 +204,7 @@
     "refresh": "Segarkan nilai saat ini",
     "investmentResult": "Hasil Investasi",
     "notAvailable": "N/A",
-    "periodBreakdownTooltip": "Perubahan nilai {valueChange}, di mana setoran dan penarikan sebesar {netFlows}. Hasil investasi adalah sisanya.",
+    "periodBreakdownTooltip": "Nilai akun berubah {valueChange} selama periode ini, di mana setoran dan penarikan sebesar {netFlows}. Angka di atas adalah yang dihasilkan investasi itu sendiri, tidak termasuk tunai yang belum diinvestasikan.",
     "unmeasuredFlowTooltip": "Sebuah transaksi yang diselesaikan di luar akun-akun ini, atau pemisahan yang mencampur baris investasi dengan pengeluaran biasa, berarti hasilnya tidak dapat dipisahkan dari uang yang berpindah."
   },
   "spendingByPayee": {

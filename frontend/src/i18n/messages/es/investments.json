@@ -126,7 +126,7 @@
     "lowestValue": "Valor Más Bajo",
     "investmentResult": "Resultado de la inversión",
     "investmentReturn": "Rentabilidad",
-    "investmentResultTooltip": "Lo que ganaron las posiciones durante esta ventana, descontando sus propios depósitos y retiros. Un porcentaje solo corresponde a esta cifra.",
+    "investmentResultTooltip": "Lo que ganaron sus inversiones en este período. Se dejan fuera los depósitos, los retiros y el efectivo sin invertir, y el porcentaje junto a la cifra es una rentabilidad ponderada por tiempo, de modo que comprar y vender no lo mueve.",
     "unmeasuredFlowTooltip": "Una operación liquidada fuera de estas cuentas, o un desglose que mezcla una línea de inversión con un gasto ordinario, significa que el resultado no se puede separar del dinero movido.",
     "valueChangeLine": "Cambio de valor {amount}",
     "netFlowsLine": "Depósitos y retiros netos {amount}",
@@ -295,8 +295,8 @@
   },
   "portfolioPerformance": {
     "title": "Rendimiento de la cartera",
-    "subtitle": "Cómo se comportaron sus inversiones una vez descontados los depósitos y las retiradas.",
-    "footnote": "Los depósitos y las retiradas no se cuentan como resultado de inversión.",
+    "subtitle": "Cómo se comportaron sus inversiones, sin el efecto de los depósitos, los retiros y el efectivo sin invertir.",
+    "footnote": "Los depósitos, los retiros y el efectivo sin invertir no cuentan como resultado de la inversión.",
     "unavailable": "n/a",
     "empty": "Aún no hay suficiente historial para medir una rentabilidad.",
     "periods": {

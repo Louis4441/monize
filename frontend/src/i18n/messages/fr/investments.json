@@ -126,7 +126,7 @@
     "lowestValue": "Valeur minimale",
     "investmentResult": "Résultat de l'investissement",
     "investmentReturn": "Rendement",
-    "investmentResultTooltip": "Ce que les positions ont rapporté sur cette période, vos propres dépôts et retraits déduits. Un pourcentage ne s'applique qu'à ce chiffre.",
+    "investmentResultTooltip": "Ce que vos investissements ont rapporté sur cette période. Les dépôts, les retraits et les liquidités non investies sont exclus, et le pourcentage à côté est un rendement pondéré dans le temps, de sorte que les achats et les ventes ne le font pas bouger.",
     "unmeasuredFlowTooltip": "Une opération réglée en dehors de ces comptes, ou une répartition qui mélange une ligne d'investissement avec une dépense ordinaire, signifie que le résultat ne peut pas être séparé de l'argent déplacé.",
     "valueChangeLine": "Variation de valeur {amount}",
     "netFlowsLine": "Dépôts et retraits nets {amount}",
@@ -295,8 +295,8 @@
   },
   "portfolioPerformance": {
     "title": "Performance du portefeuille",
-    "subtitle": "La performance de vos investissements une fois les dépôts et retraits exclus.",
-    "footnote": "Les dépôts et retraits ne sont pas comptés comme résultat d'investissement.",
+    "subtitle": "La performance de vos investissements, sans l'effet des dépôts, des retraits et des liquidités non investies.",
+    "footnote": "Les dépôts, les retraits et les liquidités non investies ne comptent pas comme résultat de l'investissement.",
     "unavailable": "n/d",
     "empty": "Pas encore assez d'historique pour mesurer un rendement.",
     "periods": {

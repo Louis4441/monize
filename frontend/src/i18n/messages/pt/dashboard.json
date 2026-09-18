@@ -96,7 +96,7 @@
       "noLosers": "Sem descidas hoje."
     },
     "dailyChange": "Variação diária",
-    "dailyChangeOn": "Variação diária \u00b7 {date}",
+    "dailyChangeOn": "Variação diária · {date}",
     "openPriceHistory": "Histórico de preços de {symbol}",
     "refreshPrices": "Atualizar cotações",
     "viewPortfolio": "Ver portefólio",
@@ -117,7 +117,7 @@
     "empty": "Ainda sem títulos favoritos. Visite a <securitiesLink>página de Títulos</securitiesLink> e marque os títulos que pretende acompanhar aqui.",
     "noPriceYet": "Sem cotação ainda",
     "dailyChange": "Variação diária",
-    "dailyChangeOn": "Variação diária \u00b7 {date}",
+    "dailyChangeOn": "Variação diária · {date}",
     "openPriceHistory": "Histórico de preços de {symbol}",
     "refreshPrices": "Atualizar cotações",
     "manage": "Gerir títulos"
@@ -204,7 +204,7 @@
     "refresh": "Atualizar valor atual",
     "investmentResult": "Resultado do Investimento",
     "notAvailable": "N/D",
-    "periodBreakdownTooltip": "Variação de valor {valueChange}, dos quais depósitos e levantamentos foram {netFlows}. O resultado do investimento é o que resta.",
+    "periodBreakdownTooltip": "O valor da conta variou {valueChange} neste período, dos quais depósitos e levantamentos foram {netFlows}. O valor acima é o que os investimentos em si renderam, com o numerário não investido excluído.",
     "unmeasuredFlowTooltip": "Uma operação liquidada fora destas contas, ou uma divisão que mistura uma linha de investimento com uma despesa comum, significa que o resultado não pode ser separado do dinheiro movimentado."
   },
   "spendingByPayee": {
