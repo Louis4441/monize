@@ -114,6 +114,21 @@ without bytes. The second is the more visible failure, because a user sees the
 attachment and cannot open it, and INV-ATTACHMENT-001's "no metadata without
 bytes" half is what it breaches.
 
+**Relay attachments are deliberately not in this section.** A file uploaded
+with a reverse-relay chat prompt goes to `ai_relay_attachments` and its
+cascading `ai_relay_attachment_blobs` row, not through
+`ATTACHMENT_STORAGE_PROVIDER` -- the provider's `database` implementation writes
+`attachment_blobs`, whose primary key is a foreign key to
+`transaction_attachments` and whose policy reads the owner from that row, so a
+relay attachment (which has no transaction) cannot be stored there at all, and
+branching on the bound provider's name would put a deployment-shaped decision
+inside the relay. The consequence is that this one path has no external side
+effect: bytes and metadata commit or roll back together on every provider, and
+the five-minute relay sweep reclaims both with one `DELETE` -- none of the
+commit-failure windows above apply. The cost is that a deployment which keeps
+attachment bytes out of PostgreSQL still holds a few megabytes of chat scratch
+there for up to twenty minutes.
+
 ## 3. Backups
 
 `AutoBackupService` writes every artifact through `writeFileAtomic`

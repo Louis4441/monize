@@ -71,7 +71,7 @@ export class McpRelayTools {
           if (!claimed) {
             // No prompt this window. If the user has gone quiet long enough,
             // tell the agent to stop looping instead of polling forever.
-            if (this.relayService.shouldStopForIdle(user.userId)) {
+            if (await this.relayService.shouldStopForIdle(user.userId)) {
               return toolResult({ hasPrompt: false, stop: true });
             }
             return toolResult({ hasPrompt: false });
@@ -117,7 +117,7 @@ export class McpRelayTools {
         if (check.error) return check.result;
 
         try {
-          const delivered = this.relayService.postResponse(
+          const delivered = await this.relayService.postResponse(
             user.userId,
             args.promptId,
             args.text,
@@ -155,7 +155,7 @@ export class McpRelayTools {
         if (check.error) return check.result;
 
         try {
-          const delivered = this.relayService.reportProgress(
+          const delivered = await this.relayService.reportProgress(
             user.userId,
             args.promptId,
             args.text,

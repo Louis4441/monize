@@ -586,7 +586,7 @@ export class AiActionsService {
     userId: string,
     descriptor: UpdateTransactionDescriptor,
   ): Promise<ConfirmActionResult> {
-    const { files, refIds } = this.resolveAttachmentFiles(
+    const { files, refIds } = await this.resolveAttachmentFiles(
       userId,
       descriptor.attachments,
     );
@@ -670,15 +670,19 @@ export class AiActionsService {
    * confirmation cleanly instead of leaving a transaction without its files.
    * The sha256 in the signed descriptor is re-checked against the parked bytes.
    */
-  private resolveAttachmentFiles(
+  private async resolveAttachmentFiles(
     userId: string,
     refs: AttachmentRefDescriptor[] | undefined,
-  ): { files: UploadedAttachmentFile[]; refIds: string[] } {
+  ): Promise<{ files: UploadedAttachmentFile[]; refIds: string[] }> {
     if (!refs || refs.length === 0) {
       return { files: [], refIds: [] };
     }
-    const files = refs.map((ref) => {
-      const stored = this.relayAttachmentStore.get(userId, ref.attachmentRefId);
+    const files: UploadedAttachmentFile[] = [];
+    for (const ref of refs) {
+      const stored = await this.relayAttachmentStore.get(
+        userId,
+        ref.attachmentRefId,
+      );
       if (!stored) {
         throw new BadRequestException(
           tr(
@@ -696,12 +700,12 @@ export class AiActionsService {
       ) {
         throw new BadRequestException(this.invalidSignatureMessage());
       }
-      return {
+      files.push({
         originalname: ref.filename,
         buffer: stored.data,
         size: stored.data.length,
-      };
-    });
+      });
+    }
     return { files, refIds: refs.map((r) => r.attachmentRefId) };
   }
 
@@ -715,14 +719,14 @@ export class AiActionsService {
     for (const file of files) {
       await this.attachmentsService.create(userId, transactionId, file);
     }
-    this.relayAttachmentStore.releaseForPrompt(userId, refIds);
+    await this.relayAttachmentStore.releaseForPrompt(userId, refIds);
   }
 
   private async executeCreateTransaction(
     userId: string,
     descriptor: CreateTransactionDescriptor,
   ): Promise<ConfirmActionResult> {
-    const { files, refIds } = this.resolveAttachmentFiles(
+    const { files, refIds } = await this.resolveAttachmentFiles(
       userId,
       descriptor.attachments,
     );

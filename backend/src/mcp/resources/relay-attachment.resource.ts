@@ -5,8 +5,8 @@ import { extractPdfText } from "../../ai/relay/pdf-text.util";
 import { resolveUserContext, hasScope } from "../mcp-context";
 
 /**
- * Serves attachments a user uploaded with a relayed chat prompt. The browser
- * stores the bytes in the in-memory RelayAttachmentStore and the relayed prompt
+ * Serves attachments a user uploaded with a relayed chat prompt. The browser's
+ * upload puts the bytes through the attachment storage provider and the relayed prompt
  * (get_next_prompt) hands the agent a `monize-attachment://<id>` URI per file;
  * the agent reads that URI here before answering. Images are returned as a
  * base64 blob; text/CSV and text-extractable PDFs are returned as text. A PDF
@@ -15,8 +15,9 @@ import { resolveUserContext, hasScope } from "../mcp-context";
  * model can still read it.
  *
  * Security: the owning userId always comes from the session context, never from
- * the URI. The `{id}` is only a lookup key within that user's bucket, so a
- * forged or guessed id can never resolve another user's file.
+ * the URI. The `{id}` is only half the lookup -- every statement in the store
+ * filters on `user_id` too -- so a forged or guessed id can never resolve
+ * another user's file.
  */
 @Injectable()
 export class McpRelayAttachmentResource {
@@ -58,7 +59,7 @@ export class McpRelayAttachmentResource {
         const rawId = variables.id;
         const id = Array.isArray(rawId) ? rawId[0] : rawId;
         const attachment = id
-          ? this.attachmentStore.get(user.userId, id)
+          ? await this.attachmentStore.get(user.userId, id)
           : undefined;
         if (!attachment) {
           return {

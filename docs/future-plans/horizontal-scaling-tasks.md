@@ -87,9 +87,9 @@
 | X1 | AI action anti-replay onto `single_use_tokens`, MCP path included | A1 | neutral | [x] |
 | R1 | `EVENT_BUS` token, interface, `MemoryEventBus` wired as default | -- | none | [x] |
 | R2 | Migration: `ai_relay_prompts`, `ai_relay_agents` with RLS policies | -- | none | [x] |
-| R3 | Relay queue on rows: insert, claim, answer; in-memory queue maps removed | R1, R2 | neutral | [ ] |
-| R4 | Late answers, buffered actions and agent liveness on rows; remaining maps removed | R3 | neutral | [ ] |
-| R5 | Relay attachments through the attachment storage provider | R3 | neutral | [ ] |
+| R3 | Relay queue on rows: insert, claim, answer; in-memory queue maps removed | R1, R2 | neutral | [x] |
+| R4 | Late answers, buffered actions and agent liveness on rows; remaining maps removed | R3 | neutral | [x] |
+| R5 | Relay attachments on rows (not the storage provider -- see its Notes) | R3 | neutral | [x] |
 | R6 | `RedisEventBus`; selected in `multi`; two-instance spec | F2, R1, D3 | multi-only | [ ] |
 | T1 | `RedisThrottlerStorage`; selected in `multi`; fail-open | F2, D3 | multi-only | [ ] |
 | M1 | MCP 2025-era sessions: persisted rows or documented sticky routing | F1 | neutral | [ ] |
@@ -795,13 +795,25 @@ install -- change both by hand and check both.
 
 ### R3 -- Relay queue on rows
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/ai/relay/ai-relay.service.ts` and its spec,
 `backend/src/ai/relay/ai-relay.controller.ts` and its spec,
 `backend/src/ai/relay/ai-relay.types.ts`, `backend/src/mcp/tools/relay.tool.ts`
 and its spec, `backend/src/ai/relay/ai-relay.module.ts`,
 `backend/test/integration/ai-relay-claim.integration.spec.ts` (new).
+
+Added to Scope while doing the work, each with its reason:
+`backend/src/common/events/wake-signal.ts` + spec (the park-and-re-read latch
+both waiters need), `backend/src/ai/relay/relay-stream.registry.ts` + spec (the
+open SSE sockets, which cannot become rows),
+`backend/src/ai/relay/relay-rows.harness.ts` (a table that answers the
+service's statements, so the behavioural spec stays behavioural),
+`backend/src/mcp/mcp-relay-confirm.ts` + spec and
+`backend/src/mcp/mcp-relay-tool-activity.ts` and the three tool files
+(`investments`, `transactions`, `payees`) plus `backend/src/ai/ai.service.ts`:
+the relay's answers now come from a row, so `emitPendingAction`,
+`reportToolActivity` and `getStatus` are async and every call site awaits.
 
 **Pattern:** the `FOR UPDATE SKIP LOCKED` CTE in
 `backend/src/notifications/notification-reminder-cron.service.ts` for the
@@ -844,14 +856,50 @@ ceiling). Do not let the bus payload carry the prompt or the answer.
 
 **Notes:**
 
+`expires_at` carries the whole deadline, so no column was added: the insert sets
+it to now + `QUEUE_WAIT_MS`, the claim resets it to now + `IDLE_TIMEOUT_MS`, and
+every liveness signal pushes it out to
+`LEAST(now + IDLE_TIMEOUT_MS, claimed_at + HARD_WAIT_MS)`. That is one statement
+per signal instead of a rescheduled `setTimeout`, and it is what makes the
+browser's deadline something a second replica can move.
+
+`buffered` and `awaitingLate` went in this task rather than in R4. The row model
+subsumes them: an answer posted after the browser gave up is the same
+`status='answered'` row, so `post_response` needs no separate late path and
+`takeBufferedResponse` is a conditional `UPDATE ... WHERE status='answered'`
+that hands it over once. What R4 still owns is the agent-liveness row, the
+action cards and the sweeper.
+
+Three deliberate behaviour changes, each visible in `single`:
+- A second `post_response` for one prompt now returns `delivered:false` (the
+  `UPDATE` matched nothing) where the in-memory version returned an idempotent
+  `true` for a buffered answer. The tool's own description already said
+  `delivered:false` means "unknown or already answered".
+- A closed browser socket ends the waiter at once (`RelayStreamClosedError`)
+  instead of leaving the promise parked for the rest of the deadline. The row is
+  untouched, so the agent may still answer it and the pickup endpoint serves it.
+- A prompt survives a backend restart mid-wait, which is the named change.
+
+The late-answer window is `expires_at + BUFFER_TTL_MS`, checked in the
+`post_response` statement, so the grace no longer depends on a sweeper having
+not yet run.
+
 ### R4 -- Late answers, buffered actions and liveness on rows
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/ai/relay/ai-relay.service.ts` and spec,
 `backend/src/ai/relay/ai-relay.controller.ts` and spec (`GET response/:promptId`
 and the action pickup endpoint), `backend/src/ai/relay/relay-sweeper.service.ts`
 (new cron) and spec, `docs/cron-jobs.md`.
+
+Added to Scope: `backend/src/ai/relay/ai-relay.module.ts` (declares the cron),
+`backend/eslint.config.mjs` (`WITH_CONTEXT_ALLOWLIST` -- the sweep is a
+cross-user cron with no request to inherit an identity from),
+`backend/src/mcp/tools/relay.tool.ts` (`shouldStopForIdle` reads a row now) and
+`backend/src/ai/relay/relay-rows.harness.ts` plus
+`backend/test/integration/ai-relay-claim.integration.spec.ts` (the two new
+tables).
 
 **Steps:**
 
@@ -881,15 +929,47 @@ reads cheap (one query per call, indexed by `user_id`).
 
 **Notes:**
 
+Step 1 landed in R3: the row model subsumed the late-answer buffer, so
+`takeBufferedResponse` is a conditional `UPDATE ... WHERE status='answered'`
+that returns the answer and sets `expired`. `expired` is the consumed state
+rather than a `picked_up_at` column, so no migration was needed and the pickup
+endpoint stays single-use by the same rule every other transition uses.
+
+`shouldStopForIdle` is one upsert, not a read and a write: start, elapse and
+disconnect are all `ON CONFLICT DO UPDATE ... CASE`, because two replicas
+serving the same agent's polls would otherwise each start the clock and neither
+finish it.
+
+The per-user cap on buffered cards (`MAX_BUFFERED_PER_USER`) is gone. It bounded
+*memory*; a row costs nothing to hold, only an agent that already holds a
+claimed turn can write one, and `expires_at` plus the sweeper bound the table.
+The card id keeps its meaning instead: the insert is
+`ON CONFLICT (user_id, id) DO NOTHING`, so a repeat of one card is one card.
+
+`getStatus` stays one query -- a `LEFT JOIN LATERAL` over the prompts beside the
+agent row -- because the browser polls it.
+
 ### R5 -- Relay attachments through the storage provider
 
-- [ ] Status:
+- [x] Status: done, but **not through the storage provider** -- see Notes.
 
 **Scope:** `backend/src/ai/relay/relay-attachment.store.ts` and spec,
 `backend/src/ai/relay/ai-relay.module.ts` (inject `ATTACHMENT_STORAGE_PROVIDER`),
 a small migration + `schema.sql` for `ai_relay_attachments (id, user_id, storage_key, mime, size, expires_at)`,
 `backend/src/attachments/storage/storage-key.util.ts` if the key grammar
 needs a `relay/` prefix.
+
+Actually touched: the store and its spec, the migration and `schema.sql` (two
+tables, not one), two new entities, `relay-sweeper.service.ts` (it reclaims
+them), `docs/external-side-effects.md`, `docs/cron-jobs.md`,
+`backend/src/backup/export-table-queries.ts` (the coverage guard),
+`backend/test/integration/rls-enforcement.integration.spec.ts` (`INDIRECT_MAP`),
+and the consumers the store's newly async methods reach:
+`backend/src/mcp/resources/relay-attachment.resource.ts`,
+`backend/src/ai/actions/ai-actions.service.ts`,
+`backend/src/ai/query/tool-executor.service.ts`,
+`backend/src/mcp/tools/transactions.tool.ts`. `storage-key.util.ts` was not
+touched -- nothing needed a new key grammar.
 
 **Pattern:** `backend/src/attachments/storage/attachment-storage.interface.ts`
 and how `BackupService` injects the token from outside `AttachmentsModule`.
@@ -912,6 +992,44 @@ relay keys as orphans: either register them in its intent table or namespace
 them so its query excludes `relay/`.
 
 **Notes:**
+
+**The storage provider cannot hold a relay attachment.** Its `database`
+implementation writes `attachment_blobs`, whose primary key is a foreign key to
+`transaction_attachments(id)` and whose RLS policy reads the owner from that
+same row. A relay attachment has no transaction and no attachment row, so the
+insert fails the foreign key outright and the policy would hide it even if it
+did not. The remaining options were to weaken that foreign key (a guard, and
+shrink-only), or to branch on the bound provider's name inside the relay, which
+is the generic solution that looks fine in isolation and wrong in place.
+
+So the bytes are rows: `ai_relay_attachments` plus a cascading
+`ai_relay_attachment_blobs`, mirroring
+`transaction_attachments`/`attachment_blobs` so metadata lookups never touch
+BYTEA. That buys more than the provider would have. Bytes and metadata commit or
+roll back together on every deployment -- there is no bytes-before-commit window
+at all, which the `local` and `s3` attachment paths still have (EXT-004) -- and
+the cascade reclaims the bytes, so the sweep is one `DELETE` with nothing
+outside PostgreSQL to order against or leak. The trap above therefore does not
+arise: there is no relay key for the orphan sweeper to see, and it enumerates
+`attachment_blob_tombstones` rather than the store in any case.
+
+The cost, stated plainly: a deployment running `ATTACHMENT_STORAGE_PROVIDER=s3`
+or `local` to keep attachment bytes out of PostgreSQL still holds relay
+attachments there -- at most a few megabytes, for at most twenty minutes, and
+deleted as soon as the prompt settles. If that ever stops being acceptable, the
+move is a relay-owned provider whose key space is not `transaction_attachments`,
+not a branch inside this store.
+
+Two things the sketched shape needed: `filename` and `kind` columns (the MCP
+resource returns text, a PDF's extracted text or a base64 blob, and re-deriving
+that from the prompt JSONB would be a second source of truth), and `kind`
+carrying `DEFAULT 'text'` for the same reason `ai_relay_prompts.status` carries
+`DEFAULT 'pending'` -- the RLS enforcement spec's generic seeder invents a
+`t<n>` string for a NOT NULL text column with no default, which no
+CHECK-constrained column can accept.
+
+`byUser` is gone, and with it the per-user cap: it bounded process memory, and
+the TTL plus the sweep bound a table.
 
 ### R6 -- `RedisEventBus`
 

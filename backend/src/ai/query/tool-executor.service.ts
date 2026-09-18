@@ -631,7 +631,7 @@ export class ToolExecutorService {
     // Park the bytes under fresh ids owned by the pending action: ids minted
     // for a relayed prompt are eagerly released when the prompt settles, which
     // happens before the user approves the card.
-    const stored = this.relayAttachmentStore.store(userId, dtos);
+    const stored = await this.relayAttachmentStore.store(userId, dtos);
     return previews.map((preview, i) => ({
       attachmentRefId: stored[i].id,
       filename: preview.filename,

@@ -1,7 +1,14 @@
 import { McpRelayAttachmentResource } from "./relay-attachment.resource";
 import { RelayAttachmentStore } from "../../ai/relay/relay-attachment.store";
+import { createRelayRowsHarness } from "../../ai/relay/relay-rows.harness";
 import { extractPdfText } from "../../ai/relay/pdf-text.util";
 import { mcpTestCtx, McpTestContext } from "../testing/mcp-test-context";
+
+jest.mock("../../common/db/scoped-db", () =>
+  jest
+    .requireActual("../../test-helpers/scoped-db-testing")
+    .scopedDbMockModule(),
+);
 
 jest.mock("../../ai/relay/pdf-text.util", () => ({
   extractPdfText: jest.fn(),
@@ -27,7 +34,7 @@ describe("McpRelayAttachmentResource", () => {
   let handler: (...args: any[]) => any;
 
   beforeEach(() => {
-    store = new RelayAttachmentStore();
+    store = createRelayRowsHarness().attachmentStore;
     resource = new McpRelayAttachmentResource(store);
     server = {
       registerResource: jest.fn((_name, _template, _opts, h) => {
@@ -66,7 +73,7 @@ describe("McpRelayAttachmentResource", () => {
   });
 
   it("returns a base64 blob for an image attachment", async () => {
-    const [ref] = store.store("u1", [
+    const [ref] = await store.store("u1", [
       {
         kind: "image",
         mediaType: "image/png",
@@ -83,7 +90,7 @@ describe("McpRelayAttachmentResource", () => {
   });
 
   it("returns text for a text attachment", async () => {
-    const [ref] = store.store("u1", [
+    const [ref] = await store.store("u1", [
       {
         kind: "text",
         mediaType: "text/csv",
@@ -101,7 +108,7 @@ describe("McpRelayAttachmentResource", () => {
 
   it("returns server-extracted text (not a blob) for a PDF attachment", async () => {
     mockExtractPdfText.mockResolvedValue("Bank statement: balance $100");
-    const [ref] = store.store("u1", [
+    const [ref] = await store.store("u1", [
       {
         kind: "pdf",
         mediaType: "application/pdf",
@@ -120,7 +127,7 @@ describe("McpRelayAttachmentResource", () => {
 
   it("falls back to a base64 blob when a PDF has no extractable text", async () => {
     mockExtractPdfText.mockResolvedValue("");
-    const [ref] = store.store("u1", [
+    const [ref] = await store.store("u1", [
       {
         kind: "pdf",
         mediaType: "application/pdf",
@@ -140,7 +147,7 @@ describe("McpRelayAttachmentResource", () => {
 
   it("falls back to a base64 blob when PDF extraction fails", async () => {
     mockExtractPdfText.mockRejectedValue(new Error("corrupt pdf"));
-    const [ref] = store.store("u1", [
+    const [ref] = await store.store("u1", [
       {
         kind: "pdf",
         mediaType: "application/pdf",
@@ -158,7 +165,7 @@ describe("McpRelayAttachmentResource", () => {
   });
 
   it("does not let one user read another user's attachment", async () => {
-    const [ref] = store.store("u1", [
+    const [ref] = await store.store("u1", [
       {
         kind: "image",
         mediaType: "image/png",
