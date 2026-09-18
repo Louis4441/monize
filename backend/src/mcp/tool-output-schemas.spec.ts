@@ -532,6 +532,8 @@ const cases: Array<{ name: string; schema: OutputSchema; raw: unknown }> = [
       totalGainLoss: 20,
       totalGainLossPercent: 25,
       timeWeightedReturn: null,
+      timeWeightedReturnReasons: ["noValueSeries"],
+      timeWeightedReturnSince: null,
       cagr: null,
       holdings: [
         {

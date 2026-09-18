@@ -112,8 +112,7 @@ function pointComplete(point: InvestedDayValue): boolean {
  * 1. No window -> nothing is known.
  * 2. A day the CHAIN SPANS that is a subtotal -> no figures, carrying that
  *    day's own causes. A factor chained over a subtotal is a return on a
- *    portfolio nobody owns, which is the rule `calculateTWR` already keeps for
- *    its own FX gaps -- and unlike a value difference, a chain cannot be
+ *    portfolio nobody owns -- and unlike a value difference, a chain cannot be
  *    repaired at the two ends.
  * 3. A capital or income row that did not convert -> no figures, pairs named.
  * 4. A movement the flow classifier cannot count -> no figures, cause named.

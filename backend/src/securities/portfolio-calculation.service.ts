@@ -35,10 +35,6 @@ import {
   CASH_INCOME_ACTIONS,
   INVESTMENT_REPLAY_ORDER,
 } from "./investment-replay.util";
-import {
-  chainTwrPercent,
-  subPeriodFactor,
-} from "../common/time-series/twr-chain.util";
 import { stripBrokerageSuffix } from "../accounts/account-name.util";
 
 // "As of now" portfolio valuations fetch a live spot rate per foreign
@@ -340,7 +336,9 @@ function applyTxToState(
 
 /**
  * Service responsible for the core portfolio value calculations:
- * holdings valuation, account grouping, allocation, TWR, and CAGR.
+ * holdings valuation, account grouping, allocation, and CAGR. The summary's
+ * time-weighted return is not here: it is the invested measure over the whole
+ * life of the portfolio, answered by `PortfolioPeriodResultService`.
  *
  * Extracted from PortfolioService to keep file sizes manageable.
  */
@@ -2566,7 +2564,7 @@ export class PortfolioCalculationService {
   }
 
   // ---------------------------------------------------------------------------
-  // Time-Weighted Return (TWR)
+  // Stored price history, for the per-period valuations the reports walk
   // ---------------------------------------------------------------------------
 
   /**
@@ -2628,193 +2626,5 @@ export class PortfolioCalculationService {
       }
     }
     return best >= 0 ? prices[best].price : null;
-  }
-
-  /**
-   * Calculate Time-Weighted Return (TWR) for a set of investment accounts.
-   * Forward-simulates holdings at each transaction date boundary and chains
-   * sub-period returns to produce a cumulative TWR percentage.
-   *
-   * @param getLatestPrices - callback to fetch latest prices (injected from PortfolioService)
-   */
-  async calculateTWR(
-    userId: string,
-    holdingsAccountIds: string[],
-    defaultCurrency: string,
-    rateCache: FxRateCache,
-    getLatestPrices: (securityIds: string[]) => Promise<Map<string, number>>,
-  ): Promise<number | null> {
-    if (holdingsAccountIds.length === 0) return null;
-
-    // Fetch all investment transactions for these accounts, ordered by date
-    const transactions = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(InvestmentTransaction).find({
-        // Rows as effects: a VOID transaction moved no shares and no cost.
-        where: {
-          userId,
-          accountId: In(holdingsAccountIds),
-          status: NON_VOID_INVESTMENT_STATUS,
-        },
-        relations: ["security"],
-        order: INVESTMENT_REPLAY_ORDER,
-      }),
-    );
-
-    if (transactions.length === 0) return null;
-
-    // Gather all referenced security IDs and fetch their full price history
-    const securityIds = [
-      ...new Set(
-        transactions.filter((t) => t.securityId).map((t) => t.securityId!),
-      ),
-    ];
-    const allPrices = await this.getAllPricesForSecurities(securityIds);
-
-    // Build a map of securityId -> currencyCode from transactions
-    const currencyMap = new Map<string, string>();
-    for (const tx of transactions) {
-      if (tx.securityId && tx.security) {
-        currencyMap.set(tx.securityId, tx.security.currencyCode);
-      }
-    }
-
-    // Group transactions by date
-    const txByDate = new Map<string, InvestmentTransaction[]>();
-    for (const tx of transactions) {
-      let arr = txByDate.get(tx.transactionDate);
-      if (!arr) {
-        arr = [];
-        txByDate.set(tx.transactionDate, arr);
-      }
-      arr.push(tx);
-    }
-
-    const sortedDates = [...txByDate.keys()].sort();
-
-    // M16: Batch-fetch all latest prices once to avoid N+1 queries
-    const latestPriceCache = await getLatestPrices(securityIds);
-
-    // TWR chains period-over-period factors, so one period value missing an
-    // unconvertible position poisons every factor after it -- and unlike the
-    // summary's totals, the ratio carries no missingRatePairs field a consumer
-    // could check. When any period value had an FX gap the chained return is a
-    // return on a portfolio nobody owns: unknown, not approximated, the same
-    // treatment CAGR gets from its completeness gate.
-    let fxIncomplete = false;
-
-    // Helper: compute portfolio value from holdings state (current prices)
-    const computeValue = async (
-      holdings: Map<string, number>,
-    ): Promise<number> => {
-      const value = new FxAggregate();
-      for (const [secId, qty] of holdings) {
-        if (qty === 0) continue;
-        const price = latestPriceCache.get(secId);
-        if (price != null) {
-          const currency = currencyMap.get(secId) || defaultCurrency;
-          value.add(
-            await this.convertToDefault(
-              qty * price,
-              currency,
-              defaultCurrency,
-              rateCache,
-            ),
-            currency,
-            defaultCurrency,
-          );
-        }
-      }
-      if (!value.isComplete) {
-        this.logger.warn(
-          `Portfolio value omits positions with no exchange rate (${value.missingPairs.join(", ")})`,
-        );
-        fxIncomplete = true;
-      }
-      return value.knownSubtotal;
-    };
-
-    // Helper: compute portfolio value from holdings state at a specific date
-    const computeValueAtDate = async (
-      holdings: Map<string, number>,
-      date: string,
-    ): Promise<number> => {
-      const value = new FxAggregate();
-      for (const [secId, qty] of holdings) {
-        if (qty === 0) continue;
-        const price = this.lookupPrice(secId, date, allPrices);
-        if (price != null) {
-          const currency = currencyMap.get(secId) || defaultCurrency;
-          value.add(
-            await this.convertToDefault(
-              qty * price,
-              currency,
-              defaultCurrency,
-              rateCache,
-            ),
-            currency,
-            defaultCurrency,
-          );
-        }
-      }
-      if (!value.isComplete) {
-        this.logger.warn(
-          `Portfolio value at ${date} omits positions with no exchange rate (${value.missingPairs.join(", ")})`,
-        );
-        fxIncomplete = true;
-      }
-      return value.knownSubtotal;
-    };
-
-    // Forward-simulate holdings and chain sub-period returns
-    const holdings = new Map<string, number>(); // securityId -> quantity
-    const subPeriodFactors: number[] = [];
-    let previousValue = 0;
-    let previousDate: string | null = null;
-
-    for (const date of sortedDates) {
-      const dayTxs = txByDate.get(date)!;
-
-      if (previousDate !== null && previousValue > 0) {
-        // Value of existing holdings at this date's prices (before applying today's transactions)
-        const currentValue = await computeValueAtDate(holdings, date);
-        // The factor arithmetic is shared with the period result's own chain:
-        // two spellings of "chain the factors and subtract one" would be two
-        // returns wearing one caption (twr-chain.util.ts).
-        const factor = subPeriodFactor(previousValue, currentValue);
-        if (factor !== null) subPeriodFactors.push(factor);
-      }
-
-      // Apply today's transactions to holdings
-      for (const tx of dayTxs) {
-        if (!tx.securityId) continue;
-        const current = holdings.get(tx.securityId) || 0;
-        const qty = Number(tx.quantity || 0);
-
-        // SPLIT was in the "no quantity change" list here, so every point after
-        // a split valued the pre-split share count -- a 2-for-1 halved the
-        // reported value of the position from that day on. Fold through the
-        // shared reducer that every other holdings walk uses.
-        holdings.set(
-          tx.securityId,
-          applyActionToQuantity(current, tx.action, qty),
-        );
-      }
-
-      // Compute portfolio value after today's transactions
-      previousValue = await computeValueAtDate(holdings, date);
-      previousDate = date;
-    }
-
-    // Final sub-period: from last transaction date to today
-    if (previousValue > 0) {
-      const todayValue = await computeValue(holdings);
-      const factor = subPeriodFactor(previousValue, todayValue);
-      if (factor !== null) subPeriodFactors.push(factor);
-    }
-
-    // A factor chain built over an FX gap is not a return; see fxIncomplete.
-    if (fxIncomplete) return null;
-
-    return chainTwrPercent(subPeriodFactors);
   }
 }

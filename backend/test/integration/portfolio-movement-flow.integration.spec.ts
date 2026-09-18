@@ -140,6 +140,8 @@ describe("portfolio movement external flow (integration)", () => {
       totalGainLoss: 0,
       totalGainLossPercent: 0,
       timeWeightedReturn: null,
+      timeWeightedReturnReasons: [],
+      timeWeightedReturnSince: null,
       cagr: null,
       fxComplete: true,
       missingRatePairs: [],

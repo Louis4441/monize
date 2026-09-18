@@ -234,6 +234,11 @@ export const getPortfolioSummaryOutput = toolOutput({
   totalGainLoss: num,
   totalGainLossPercent: numNull,
   timeWeightedReturn: numNull,
+  // A withheld return names its cause and the close it would be measured from:
+  // a bare null leaves a model nothing to say, and nothing to stop it reading
+  // the absence as a zero return.
+  timeWeightedReturnReasons: z.array(str),
+  timeWeightedReturnSince: strNull,
   cagr: numNull,
   // securityId is the id an entity link must quote, so it is named here.
   holdings: z.array(looseObject({ securityId: str })),

@@ -1,16 +1,17 @@
 /**
  * The arithmetic of a chained, time-weighted return, written once.
  *
- * Two surfaces chain sub-period factors: the portfolio summary's
- * `timeWeightedReturn` (`PortfolioCalculationService.calculateTWR`, chained at
- * transaction-date boundaries over latest prices, "what has this portfolio
- * returned since inception") and the period result's
- * `investmentReturnPercent` (chained daily over a historical window, values
- * date-correct). They value their boundaries differently on purpose and that
- * difference is not reconcilable here, but the factor arithmetic beneath them
- * is one definition: two spellings of "chain the factors and subtract one"
- * would be two returns wearing one caption, which is the
- * `docs/specs/portfolio-period-result.md` section 10.2 rule.
+ * One measure chains sub-period factors: the period result's
+ * `investmentReturnPercent` (`investedPeriodResult`,
+ * `backend/src/net-worth/invested-period-result.util.ts`), chained daily over
+ * a window whose every day is valued date-correctly. The portfolio summary's
+ * `timeWeightedReturn` is that same measure asked since the portfolio's first
+ * transaction, not a second one: the older implementation that valued its
+ * boundaries from stored closes alone was removed with #1392, because two
+ * spellings of "chain the factors and subtract one" are two returns wearing
+ * one caption -- the `docs/specs/portfolio-period-result.md` section 10.2 rule.
+ * This file stays the one home of the arithmetic so a later chained figure
+ * joins it rather than restating it.
  */
 
 /**

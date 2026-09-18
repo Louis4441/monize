@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, forwardRef } from "@nestjs/common";
 import { DataSource, In } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { returnedRows } from "../common/db/query-result";
@@ -19,6 +19,10 @@ import {
   SectorWeightingService,
   LlmLookThrough,
 } from "./sector-weighting.service";
+import {
+  PeriodResultReason,
+  PortfolioPeriodResultService,
+} from "../net-worth/portfolio-period-result.service";
 import { YahooFinanceService } from "./yahoo-finance.service";
 import { QuoteProviderRegistry } from "./providers/quote-provider.registry";
 import { roundMoney } from "../common/round.util";
@@ -159,7 +163,17 @@ export interface PortfolioSummary {
   totalPortfolioValue: number;
   totalGainLoss: number;
   totalGainLossPercent: number;
+  /**
+   * The invested part's time-weighted return since the portfolio's first
+   * transaction, produced by the same path as "Portfolio performance"
+   * (INV-PORTRESULT-002). `null` is withheld, never zero, and
+   * `timeWeightedReturnReasons` says why.
+   */
   timeWeightedReturn: number | null;
+  /** Why `timeWeightedReturn` is withheld; empty when the figure is known. */
+  timeWeightedReturnReasons: PeriodResultReason[];
+  /** The baseline close the return is measured from, or `null` for no window. */
+  timeWeightedReturnSince: string | null;
   cagr: number | null;
   /**
    * False when a component of these totals could not be converted into the
@@ -298,7 +312,12 @@ export interface LlmPortfolioSummary {
   totalPortfolioValue: number;
   totalGainLoss: number;
   totalGainLossPercent: number;
+  /** The invested part's TWR since the first transaction; null is withheld. */
   timeWeightedReturn: number | null;
+  /** Why it is withheld, so a model reports the cause rather than "n/a". */
+  timeWeightedReturnReasons: PeriodResultReason[];
+  /** The baseline close it is measured from, so the answer can name the window. */
+  timeWeightedReturnSince: string | null;
   cagr: number | null;
   holdings: LlmPortfolioHolding[];
   holdingsByAccount: LlmAccountHoldings[];
@@ -452,6 +471,13 @@ export class PortfolioService {
     private yahooFinanceService: YahooFinanceService,
     private quoteProviderRegistry: QuoteProviderRegistry,
     private sectorWeightingService: SectorWeightingService,
+    // The summary's time-weighted return is the invested measure over the
+    // portfolio's whole life, answered by the service that owns that measure
+    // rather than by a second implementation here (#1392). forwardRef for the
+    // reason `DailyMovementService` gives: SecuritiesModule and NetWorthModule
+    // already close a cycle.
+    @Inject(forwardRef(() => PortfolioPeriodResultService))
+    private periodResult: PortfolioPeriodResultService,
   ) {}
 
   /**
@@ -723,14 +749,26 @@ export class PortfolioService {
       rateCache,
     );
 
-    // Calculate Time-Weighted Return
-    const timeWeightedReturn = await this.calculationService.calculateTWR(
-      userId,
-      categorised.holdingsAccountIds,
-      defaultCurrency,
-      rateCache,
-      (ids) => this.getLatestPrices(ids),
-    );
+    // The time-weighted return, over the same measure "Portfolio performance"
+    // reports and by the same code path: the invested part's TWR since the
+    // portfolio's first transaction (INV-PORTRESULT-002,
+    // `docs/specs/portfolio-period-result.md` section 10). It is withheld with
+    // its cause rather than approximated, so a position with no stored close on
+    // a day the chain spans makes the figure unknown instead of a gain.
+    const investedSinceInception =
+      await this.periodResult.getInvestedResultSinceInception(userId, {
+        accountIds,
+        displayCurrency: defaultCurrency,
+      });
+    const timeWeightedReturn = investedSinceInception.investmentReturnPercent;
+    const timeWeightedReturnReasons = investedSinceInception.investedReasons;
+    // The window's baseline, so the caption can name what "since" means. A
+    // scope with no valued day has no window at all, which is not a date.
+    const timeWeightedReturnSince = timeWeightedReturnReasons.includes(
+      "noValueSeries",
+    )
+      ? null
+      : investedSinceInception.startDate;
 
     // CAGR divides the portfolio value by what was invested to get there, so an
     // incomplete numerator or denominator produces a growth rate for a portfolio
@@ -779,6 +817,8 @@ export class PortfolioService {
       totalGainLoss,
       totalGainLossPercent,
       timeWeightedReturn,
+      timeWeightedReturnReasons,
+      timeWeightedReturnSince,
       cagr,
       fxComplete: missingRatePairs.length === 0,
       missingRatePairs,
@@ -870,6 +910,8 @@ export class PortfolioService {
       totalGainLoss: roundMoneyValue(summary.totalGainLoss),
       totalGainLossPercent: roundPct(summary.totalGainLossPercent) ?? 0,
       timeWeightedReturn: roundPct(summary.timeWeightedReturn),
+      timeWeightedReturnReasons: summary.timeWeightedReturnReasons,
+      timeWeightedReturnSince: summary.timeWeightedReturnSince,
       cagr: roundPct(summary.cagr),
       fxComplete: summary.fxComplete,
       missingRatePairs: summary.missingRatePairs,

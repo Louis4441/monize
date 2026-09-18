@@ -357,6 +357,8 @@ export class PortfolioPeriodResultService {
              FROM investment_transactions it
             WHERE it.user_id = $1
               AND it.account_id = ANY($2::UUID[])
+              -- Rows as EFFECTS: renders it.status != 'VOID', because a void
+              -- row records something that did not happen.
               AND ${investmentEffectStatusSql("it")}`,
           [userId, accountIds],
         ),
