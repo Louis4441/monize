@@ -147,7 +147,7 @@ export interface PeriodResultDecision {
  * 3. A flow that did not fully convert -> no `netExternalFlows` and therefore no
  *    result, with the pairs named. Dropping the currency that would not convert
  *    reports the reader's own deposit as a gain, which is the whole defect
- *    (INV-PORTRESULT-003).
+ *    (INV-PORTRESULT-003L).
  * 4. A movement the flow classifier cannot see (a trade settled outside the
  *    valued cash accounts, a mixed split parent) -> no result, with the cause
  *    named. `valueChange` and `netExternalFlows` are both still measured; what

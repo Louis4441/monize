@@ -8,7 +8,7 @@
  * `FxAggregate` is what keeps "could not convert" distinguishable from
  * "converted to zero": a subtotal it could not convert makes the whole flow
  * incomplete, which withholds the result rather than shrinking it
- * (INV-PORTRESULT-003).
+ * (INV-PORTRESULT-003L).
  *
  * The index is built separately from the fold so the batch route can build ONE
  * index for its widest window and fold each preset's slice against it. The

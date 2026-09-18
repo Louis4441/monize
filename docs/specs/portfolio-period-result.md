@@ -87,19 +87,19 @@ different question over a different input.
   `netExternalFlows` and `investmentResult` as three separate named figures, and
   prints a percentage only over `investmentResult`. A single "change" derived
   from the value series alone is a contribution reported as performance.
-- **INV-PORTRESULT-002 (both boundaries complete, or no change).** `valueChange`
+- **INV-PORTRESULT-002L (both boundaries complete, or no change).** `valueChange`
   is a value only when `MV(b)` and `MV(e)` are both complete
   (`fxComplete !== false && pricesComplete !== false && cashComplete !== false`).
   A subtotal minus a total is not a difference.
-- **INV-PORTRESULT-003 (an unconvertible flow withholds the result, never
+- **INV-PORTRESULT-003L (an unconvertible flow withholds the result, never
   shrinks it).** A flow subtotal with no rate for its day makes
   `netExternalFlows` `null` and `investmentResult` `null`, with the pair named.
   Dropping that currency would report the reader's own deposit as a gain, which
   is the defect this spec removes, in a second form.
-- **INV-PORTRESULT-004 (zero start has no percentage).** `MV(b) = 0` yields
+- **INV-PORTRESULT-004L (zero start has no percentage).** `MV(b) = 0` yields
   `returnPercent: null` with reason `zeroStart`; the money figures are still
   reported.
-- **INV-PORTRESULT-005 (a movement the classifier cannot count withholds the
+- **INV-PORTRESULT-005L (a movement the classifier cannot count withholds the
   result).** When the window holds an investment action settled outside `C`, or
   a split parent mixing an investment line with ordinary cash, `investmentResult`
   and `returnPercent` are `null` with the reason `externallySettledTrade` or
@@ -108,6 +108,10 @@ different question over a different input.
 
 Every completeness read is `=== false` (absent is no information), and every
 withheld figure names its cause at the surface that withholds it.
+
+The four rules above carry an `L` suffix because they are LOCAL to this
+document: the only entries of `docs/system-invariants.md` in this family are
+INV-PORTRESULT-001 (above) and INV-PORTRESULT-002 (section 10.3).
 
 ## 4. Truth table
 
@@ -298,3 +302,322 @@ withholds it, reading every flag as `=== false`.
 The adversarial case, per `docs/financial-calculation-contract.md` section 8:
 example (1). A naive `last - first` passes every other case in this matrix and
 fails exactly that one.
+
+---
+
+## 10. The invested part: P&L and time-weighted return
+
+Status: **proposed.** Scope from kenlasko/monize#1392, the second reading of the
+same caption. Sections 1-9 stay exactly as they are: the account-level measure
+(`valueChange`, `netExternalFlows`, `investmentResult`, `returnPercent`) is
+unchanged, still served by the same fields, and INV-PORTRESULT-001 still governs
+it. This section adds a SECOND measure beside it, over the same series and the
+same load, and says which surface reads which.
+
+### 10.1 The defect this exists to remove
+
+"Portfolio performance" is read as *"how much did my investments earn or lose
+in this period"*. The measure of sections 2-5 answers a different question:
+*"how much did the whole investment account move, once the cash I moved across
+its boundary is taken out"*. The two differ wherever cash sits inside the
+scope, because `MV` counts that cash:
+
+| Day | Event | MV | IV (securities only) |
+| --- | --- | --- | --- |
+| 2026-01-02 | deposit 10,000; buy 8,000 of a security | 10,000 | 8,000 |
+| 2026-02-02 | the security is up 10% | 10,800 | 8,800 |
+
+`investmentResult` is `+800` on `MV(b) = 10,000`, so `returnPercent` reports
+**+8%**. The investments returned **+10%**; the other 2,000 is uninvested cash
+that earned nothing and should not be in the denominator. Moving the cash in or
+out moves that percentage without a single share changing hands, which is the
+#1387 class of defect in its second form: a plausible number nobody can tell
+from a real one.
+
+`MV(e) - cash(e) - (MV(b) - cash(b))` is **not** the repair, and is explicitly
+rejected: it is right only when no buy, sell, dividend, share transfer or
+composition change happened inside the window, which is exactly when nobody
+needs it. A purchase moves cash into securities and reads as a gain; a sale
+reads as a loss; a fully sold position leaves the "today's holdings" view
+altogether. The invested part has to be measured the same way the account-level
+part is -- from the ledger, day by day -- or it is a different kind of wrong.
+
+### 10.2 Definitions
+
+Let `A` be the scope (both sleeves, `resolveInvestmentScopeAccountIds`), `b` the
+baseline date and `e` the end date, and let every figure be in the reporting
+currency.
+
+- **`IV(t)`** -- the scope's INVESTED market value at the close of day `t`:
+  securities only, no cash. Every position is reconstructed from the ledger as
+  of `t` by the same replay `MV(t)` uses (`applyActionToQuantity` over every
+  non-VOID investment transaction dated on or before `t`), so a security bought
+  and fully sold inside the window is held on the days it was held and gone
+  afterwards, and a security sold before today is still valued on the days it
+  was owned. Each position is priced at the latest accepted close on or before
+  `t` (`docs/time-series-contract.md`) in the security's own currency and
+  converted at `t`'s own rate (`resolveFxRate` through the bulk rate index,
+  INV-FX-001). It is the `securitiesValue` component of the very point
+  `getDailyInvestments` already produces: `value = IV(t) + cash(t)`, exposed
+  rather than recomputed. A second valuation would be a second answer to "what
+  was this worth".
+- **`K(d)`** -- net capital flow INTO the invested part on day `d`, split into
+  the two halves the return needs:
+  - `capitalIn(d)`: BUY (and REDEEM's opposite, i.e. none), TRANSFER_IN,
+    ADD_SHARES.
+  - `capitalOut(d)`: SELL / REDEEM, TRANSFER_OUT, REMOVE_SHARES.
+  - `K(d) = capitalIn(d) - capitalOut(d)`.
+
+  A row's value is its **executed total** where it carries one -- BUY and SELL
+  store `total_amount` commission-in on an acquisition and commission-out on a
+  disposal (`deriveInvestmentTotal`), which is Monize's cost-basis convention
+  (`acquisitionCost`) -- and `quantity * price` where it does not, which is the
+  share-moving legs' carried basis (the same expression
+  `computeFirstActiveMonthCostBasis` reads for a transfer). Each row is in its
+  security's currency and is converted at ITS OWN day's rate, exactly as `IV`
+  and the external flows are.
+- **`I(d)`** -- investment income received on day `d`: the `CASH_INCOME_ACTIONS`
+  set (DIVIDEND, INTEREST, CAPITAL_GAIN and the short/long refinements), at
+  `total_amount`, converted at day `d`'s rate. Income is RETURN: it leaves the
+  invested part as cash but the invested part earned it.
+- **Neither capital nor income:** SPLIT (a ratio, no value crosses anything) and
+  REINVEST (and its refinements). A reinvested distribution never lands as cash;
+  its shares simply appear in `IV`, and counting it as a capital inflow would
+  subtract the distribution the reader actually earned.
+- **`investmentPnl(b, e) = IV(e) - IV(b) - sum K(d) + sum I(d)`** over
+  `d` in `(b, e]`. The lower bound is exclusive for the same reason section 2
+  gives: `IV(b)` is a close and already holds everything dated `b`.
+- **`investmentReturnPercent(b, e)`** -- a true time-weighted return, chained
+  daily over `(b, e]`:
+
+  ```
+  base(d)   = IV(d-1) + capitalIn(d)
+  ending(d) = IV(d)   + capitalOut(d) + I(d)
+  f(d)      = base(d) > 0 ? ending(d) / base(d) : 1
+  TWR       = (prod f(d) - 1) * 100        method "twr"
+  ```
+
+  A purchase is funded at the START of the day (it enters the base, so buying
+  cannot be a gain) and a disposal or a distribution leaves at the END of it (it
+  stays in the numerator, so selling cannot be a loss). **This is a deliberate
+  departure from a pure start-of-day convention for every flow**, which the
+  first draft of this section proposed: under it a sale of everything makes
+  `base(d) = IV(d-1) - proceeds`, which is negative for a profitable sale, and
+  the day that realised the gain would drop out of the chain (case 6 below). The
+  split convention is what makes a same-day buy-and-sell, a full liquidation and
+  an internal share transfer all come out right at once.
+
+  A day with no invested capital contributes factor 1 -- it is a day nothing was
+  at risk, not a day of zero return. When NO day of the window had
+  `base(d) > 0`: the return is `0` if `investmentPnl` is also `0` (nothing was
+  invested and nothing was earned -- a known zero, case 1), and `null` with
+  reason `zeroStart` otherwise (a result over no invested capital has no ratio).
+
+The chained factors are the SAME arithmetic the portfolio summary's
+`timeWeightedReturn` uses: `subPeriodFactor` and `chainTwrPercent`
+(`backend/src/common/time-series/twr-chain.util.ts`) are one pair of pure
+functions, called from `investedPeriodResult` and from
+`PortfolioCalculationService.calculateTWR`. What is NOT shared is the
+valuation: `calculateTWR` values every sub-period boundary at the LATEST
+price, which answers "what has this portfolio returned since inception" and is
+not date-correct for a historical window. Generalising its valuation is a
+separate proposal; reusing its factor arithmetic is what keeps the two from
+drifting into two different definitions of a chained return.
+
+### 10.3 Invariants
+
+- **INV-PORTRESULT-002 (cash is not an investment).** The invested part's P&L
+  and return exclude uninvested cash, deposits and withdrawals entirely. Cash
+  is not in `IV`, so it is in neither figure and in neither the numerator nor
+  the base of the percentage; a deposit, a withdrawal or a transfer between the
+  reader's own accounts moves neither figure at all. `investmentReturnMethod` is
+  `"twr"` and is named on the wire so a later method is a new union member
+  rather than a silent change of meaning.
+- **Measured from the ledger, never from today's holdings.** Every day's `IV` is a replay of the transactions dated on or
+  before it. A security fully sold before today counts on the days it was
+  owned; a `SELECT` over current holdings priced back through time would drop
+  it and report a window that never happened.
+- **A capital flow is not a result.** A buy funded by a
+  deposit, a sale, a share transfer and a quantity change contribute factor 1 on
+  their own day and cancel out of `investmentPnl`. Only a price change, a
+  distribution and a reinvestment are result.
+- **Completeness.** Both figures are `null` when any day the chain spans has an
+  `IV` that is a subtotal (`pricesComplete === false` or `fxComplete === false`
+  on that point), when a capital or income row could not be converted
+  (`missingRatePairs`), or when the window holds a movement the flow classifier
+  cannot count (section 6.1: `externallySettledTrade`, `mixedSplit`). Never a
+  chain over a subtotal -- the rule `calculateTWR` already keeps for its own FX
+  gaps. Every read is `=== false`.
+
+`cashComplete` is deliberately NOT read: cash enters `IV` nowhere, so a cash
+account with no balance for a day cannot make the invested figures wrong. It
+still travels on the point, still withholds the account-level `valueChange`
+(INV-PORTRESULT-002L of section 3, unchanged) and is still reported by the
+incomplete-data details. `fxComplete` IS read although it covers the day's cash
+conversion too: it is a superset of the securities' own FX gaps, so reading it
+withholds conservatively and never over-claims. Splitting it into a
+securities-only bit is a field nobody needs yet.
+
+### 10.4 Truth table
+
+| IV(b) | IV(e) | any day in (b,e] | flows/income | base(d) > 0 on some day | investmentPnl | investmentReturnPercent | investedReasons |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| complete | complete | all complete | complete | yes | number | number | -- |
+| complete | complete | all complete | complete | no, and pnl = 0 | `0` | `0` | -- |
+| complete | complete | all complete | complete | no, and pnl != 0 | number | `null` | `zeroStart` |
+| subtotal | any | any | any | any | `null` | `null` | that point's causes |
+| any | subtotal | any | any | any | `null` | `null` | that point's causes |
+| complete | complete | one is a subtotal | any | any | `null` | `null` | that point's causes |
+| complete | complete | all complete | a row did not convert | any | `null` | `null` | `missingRatePairs` |
+| complete | complete | all complete | complete, but a movement is uncountable | any | `null` | `null` | `externallySettledTrade`, `mixedSplit` |
+| no series | -- | -- | -- | -- | `null` | `null` | `noValueSeries` |
+
+`investmentCapitalFlows` and `investmentIncome` are reported as numbers
+whenever the conversion of the rows behind them succeeded, even where the
+prices withhold the two headline figures: they are what the reader moved and
+what the portfolio paid out, and neither depends on a price. They are `null`
+only when a row did not convert.
+
+### 10.5 The twelve cases
+
+Flat prices unless stated; reporting currency = account currency unless stated.
+`b` is the day before the first event.
+
+1. **Cash only.** Deposit 10,000, no securities, one month. `IV` is 0 every
+   day; no capital, no income. `investmentPnl = 0`. No day has `base > 0` and
+   the P&L is zero, so `investmentReturnPercent = 0`. (The account-level
+   `valueChange` is +10,000 and `investmentResult` 0 -- unchanged.)
+2. **Deposit and buy.** Deposit 10,000 on `d1`, buy 8,000 of a security the
+   same day, 2,000 stays cash. `IV(d1) = 8,000`, `capitalIn(d1) = 8,000`,
+   `base(d1) = 0 + 8,000 = 8,000`, `ending(d1) = 8,000`, `f = 1`. Later days
+   `f = 1`. `investmentPnl = 8,000 - 0 - 8,000 = 0`; return `0%`.
+3. **The security gains 10%.** As (2), then `IV(d2) = 8,800`.
+   `investmentPnl = 8,800 - 0 - 8,000 = +800`.
+   `f(d2) = 8,800 / 8,000 = 1.1`; return **+10%**, not +8%: the 2,000 of cash
+   is in neither the numerator nor the base.
+4. **A large late deposit.** Case 3 plus a 50,000 deposit the day before `e`,
+   left uninvested. It is not an investment transaction, so it is in no `K`, no
+   `I` and no `IV`. Still `+800` and **+10%**. (`valueChange` moves by +50,000;
+   that is the account-level measure's business.)
+5. **A second purchase at an unchanged price.** Case 3, then buy another 4,000
+   on `d3`. `base(d3) = 8,800 + 4,000 = 12,800`, `ending(d3) = 12,800`,
+   `f(d3) = 1`. `investmentPnl = 12,800 - 0 - 12,000 = +800`; return still
+   **+10%**. The purchase changed neither figure.
+6. **A full sale inside the window.** Buy 8,000 on `d1`, sell the lot for
+   9,000 on `d4`. `IV(d4) = 0`, `capitalOut(d4) = 9,000`.
+   `investmentPnl = 0 - 0 - (8,000 - 9,000) = +1,000`.
+   `f(d4) = (0 + 9,000) / 8,000 = 1.125`; return **+12.5%**. Under a pure
+   start-of-day convention `base(d4)` would be `8,000 - 9,000 = -1,000` and the
+   day that realised the whole gain would contribute factor 1 -- which is why
+   the convention is split.
+7. **The proceeds sit as cash.** Every day after `d4`: `IV = 0`, so
+   `base = 0` and `f = 1`. `investmentPnl` stays `+1,000` and the return stays
+   **+12.5%**. Money that stopped being invested stops earning.
+8. **A dividend.** 100 paid into cash on `d5` while `IV(d4) = IV(d5) = 8,000`.
+   `investmentPnl = 8,000 - 8,000 - 0 + 100 = +100`;
+   `f(d5) = (8,000 + 100) / 8,000 = 1.0125`, so the return includes it
+   although the money ended up as cash.
+9. **A position closed before today.** Security X bought for 5,000, grown to
+   6,000, fully sold on `d100`; security Y bought for 6,000 on `d150` and still
+   held at `e` at 6,600. Over a 1Y window `IV` is X's value up to `d100`, zero
+   between, Y's after: `investmentPnl = 6,600 - 0 - (5,000 + 6,000 - 6,000) =
+   +1,600`, and the chain carries X's `1.2` on its gain day and Y's `1.1` on
+   its. A "today's holdings" reconstruction would have reported only Y.
+10. **An internal transfer.** Shares worth 3,000 moved from one scope account
+    to another on `d6`: `capitalIn(d6) = 3,000` and `capitalOut(d6) = 3,000`
+    from the two legs, `IV` unchanged. `f(d6) = (IV + 3,000) / (IV + 3,000) =
+    1`, `K(d6) = 0`, `investmentPnl` unchanged. A cash transfer between the same
+    two accounts is in no investment row at all and changes nothing.
+11. **A reporting currency that is not the security's.** Every component is
+    converted at its own day: `IV(t)` at `t`, each `K(d)` and `I(d)` at `d`
+    (INV-FX-001, `resolveFxRate` through the shared rate index). The economic
+    result is the same figure a single-currency reader would see, plus the
+    genuine currency effect on the value; no component is ever converted at
+    today's rate or at 1.
+12. **A missing price or rate inside the window.** A day whose `IV` is a
+    subtotal, or a capital row with no rate for its day: `investmentPnl` and
+    `investmentReturnPercent` are both `null`, with `incompletePrices` /
+    `missingRatePairs` and the ids or pairs behind them. Never a number that
+    looks like the others.
+
+### 10.6 Missing-data policy
+
+As section 6, applied to the new figures: `null` with a named reason, never a
+substituted number, never a chain over a subtotal, never a rate of 1 for a
+failed lookup, never a percentage over an incomplete P&L. A known zero -- case 1
+-- is a number and is reported as one.
+
+Two open items, both narrowing rather than corrupting:
+
+1. **A capital row with no value.** An ADD_SHARES or TRANSFER_IN with no stored
+   price contributes 0 to `K` while its shares enter `IV`, which would read as a
+   gain. Every such row whose linked leg is not inside the scope is already
+   counted by `externallySettledTrades` (section 6.1) and withholds the whole
+   window; a linked pair inside the scope values both legs the same way and
+   nets to zero. What is left uncovered is a linked pair whose legs fall on
+   different days, which shifts value between two days' factors without
+   changing `investmentPnl`.
+2. **A transfer leg carries basis, not market value.** `IV` moves by the
+   position's market value while `K` moves by the leg's carried basis. Inside
+   the scope the two legs cancel; across the boundary the window is already
+   withheld.
+
+### 10.7 Where each surface reads which measure
+
+Both measures come from the same route and the same load. `IV` is the
+`securitiesValue` component of the daily point, and the capital and income rows
+are one more grouped read beside the external-flow one, folded through the same
+`RateIndex` with the same `fetchMissing` opt-out. The batch route keeps ONE
+series, ONE flow load, ONE income/capital load and ONE rate index, and derives
+each preset by slicing; the TWR for a preset is a product over that preset's own
+days, O(days).
+
+| Surface | Series it plots | Headline figures |
+| --- | --- | --- |
+| "Portfolio performance" card (Investments) | -- | `investmentReturnPercent` primary, `investmentPnl` secondary |
+| "Portfolio value over time" chart (Investments) | `securitiesValue` | `investmentPnl`, `investmentReturnPercent` |
+| Portfolio value widget (dashboard) | `securitiesValue` | `investmentPnl`, `investmentReturnPercent` |
+| Portfolio Value report | `securitiesValue` | `investmentPnl`, `investmentReturnPercent` |
+| Net worth chart (dashboard) | net worth, cash included | unchanged |
+| Daily movement notification, calendar day layer | `value` | `valueChange`, `netExternalFlows`, `investmentResult` |
+
+The investment surfaces draw the INVESTED value, so the chart, its KPIs and the
+card answer one question rather than three. `value` (securities plus cash) stays
+on the point and the account-level fields stay on the period result: the daily
+movement notification and the calendar layer measure the account, and the net
+worth chart is net worth. Nothing that is about the account loses its cash.
+
+Because those charts plot `securitiesValue`, a point is withheld from them on
+`pricesComplete === false` or `fxComplete === false` only; `cashComplete` no
+longer withholds an investment chart's point, because cash is not on it. The
+incomplete-data details still report a cash gap -- the reader who has one wants
+to know -- and the account-level fields still withhold on it.
+
+### 10.8 Test matrix
+
+Backend unit:
+
+| Suite | Case |
+| --- | --- |
+| `invested-period-result.util.spec.ts` | the twelve cases above, table-driven, each with its worked numbers |
+| `invested-period-result.util.spec.ts` | a mid-window subtotal day withholds both figures; a flow that did not convert withholds both; an uncountable movement withholds both |
+| `twr-chain.util.spec.ts` | `subPeriodFactor` refuses a non-positive base; `chainTwrPercent` over an empty chain is `null` |
+| `invested-capital-flow.util.spec.ts` | the SQL binds every placeholder it names and no other; the fold splits capital from income by the shared constant and converts each day at its own rate |
+| `investment-replay.util.spec.ts` | `INVESTED_FLOW_KIND` covers every `InvestmentAction` member (a list that means something, checked against the enum) |
+| `portfolio-period-result.service.spec.ts` | a 50,000 deposit the day before the end changes neither new figure while it does change `valueChange` (case 4) |
+| `portfolio-period-results-batch.service.spec.ts` | batch == single per preset on the new fields too |
+
+Backend integration (`backend/test/integration/`): the capital/income loader
+against real PostgreSQL -- a BUY, a SELL and a DIVIDEND fixture, grouped per day
+and currency, parsed by the server (the `$n`-binding lesson: every placeholder a
+statement names is bound and no other).
+
+Frontend: the card reads `investmentReturnPercent` and `investmentPnl`; the
+subtitle and footnote say cash is excluded; the Investments page puts the three
+cards in one grid in the order summary, performance, allocation; the chart, the
+widget and the report plot `securitiesValue` and show 0 / 0% for a cash-only
+deposit.
+
+The adversarial case, per `docs/financial-calculation-contract.md` section 8:
+case 4. A `totalValue - cash` patch at the two ends passes cases 1-4 and fails
+5, 6, 7 and 9.
