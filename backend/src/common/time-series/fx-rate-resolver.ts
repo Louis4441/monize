@@ -34,7 +34,7 @@
  * rather than one dated on or before the reference date, under the same age
  * bound. It is still not a licence to use a year-old rate.
  */
-import { daysBetween } from "./price-boundary.util";
+import { addDays, daysBetween } from "./price-boundary.util";
 
 /** One stored observation of a pair, as stored (never pre-inverted). */
 export interface DatedRate {
@@ -113,6 +113,83 @@ interface Rejections {
   sawStale: boolean;
 }
 
+/**
+ * One direction's observations, prepared once for lookups that do not scan.
+ *
+ * The scan this replaces was O(rows) per lookup, and every row cost two
+ * `Date.parse` calls. A since-inception portfolio walk asks for a rate on each
+ * of ~9,700 days against an index holding ~9,700 rows per direction, so the
+ * pair alone cost 66 seconds of blocked event loop before a single holding was
+ * multiplied by anything (issue #1409). The policy above is unchanged: what
+ * changes is that the admissible observation is found by binary search instead
+ * of by reading every row.
+ *
+ * `dates` is ascending, ties in source order, so the tie rule ("equal dates in
+ * one direction are the same day's observation and the first is kept") is
+ * position 0 of the run rather than a scan's first sighting. Only rows the scan
+ * would have considered at all are kept -- a non-finite, zero or negative rate
+ * is absent, and so is an empty date -- so `dates.length > 0` is exactly the
+ * scan's `sawAnyObservation`.
+ *
+ * Keyed by the array the caller handed over, in a `WeakMap`: the rate index a
+ * series builds lives for one request and its arrays are never mutated, so the
+ * preparation is a per-array memo with no lifetime of its own. `sourceLength`
+ * re-prepares an array that grew or shrank since.
+ */
+interface PreparedObservations {
+  readonly sourceLength: number;
+  readonly dates: string[];
+  readonly rates: number[];
+}
+
+const preparedObservations = new WeakMap<object, PreparedObservations>();
+
+function prepareObservations(
+  rows: ReadonlyArray<DatedRate>,
+): PreparedObservations {
+  const cached = preparedObservations.get(rows);
+  if (cached && cached.sourceLength === rows.length) return cached;
+
+  const kept: Array<{ date: string; rate: number; at: number }> = [];
+  rows.forEach((row, at) => {
+    const rate = Number(row.rate);
+    // Zero and negative are absent, not applicable -- the same reading
+    // `convertWithRateLookup` gives them.
+    if (!Number.isFinite(rate) || rate <= 0) return;
+    const date = row.date?.slice(0, 10);
+    if (!date) return;
+    kept.push({ date, rate, at });
+  });
+  kept.sort((a, b) =>
+    a.date < b.date ? -1 : a.date > b.date ? 1 : a.at - b.at,
+  );
+
+  const prepared: PreparedObservations = {
+    sourceLength: rows.length,
+    dates: kept.map((k) => k.date),
+    rates: kept.map((k) => k.rate),
+  };
+  preparedObservations.set(rows, prepared);
+  return prepared;
+}
+
+/** The last index whose date is on or before `date`, or -1. */
+function lastIndexAtOrBefore(dates: string[], date: string): number {
+  let low = 0;
+  let high = dates.length - 1;
+  let found = -1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (dates[mid] <= date) {
+      found = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return found;
+}
+
 /** The newest admissible observation in one stored direction, or null. */
 function bestInDirection(
   rows: ReadonlyArray<DatedRate> | undefined,
@@ -124,40 +201,65 @@ function bestInDirection(
 ): Candidate | null {
   if (!rows || rows.length === 0) return null;
 
-  let best: Candidate | null = null;
-  for (const row of rows) {
-    const observedRate = Number(row.rate);
-    // Zero and negative are absent, not applicable -- the same reading
-    // `convertWithRateLookup` gives them.
-    if (!Number.isFinite(observedRate) || observedRate <= 0) continue;
-    const date = row.date.slice(0, 10);
-    if (!date) continue;
-    seen.sawAnyObservation = true;
+  const { dates, rates } = prepareObservations(rows);
+  if (dates.length === 0) return null;
+  seen.sawAnyObservation = true;
 
-    const ageDays = daysBetween(date, onDate);
-    if (ageDays < 0 && mode === "historical") {
-      // Look-ahead: this observation did not exist on the date being priced.
-      seen.sawAfterDate = true;
-      continue;
-    }
-    if (Math.abs(ageDays) > maxAgeDays) {
-      seen.sawStale = true;
-      continue;
-    }
+  // The age bound as calendar dates, computed once per direction rather than
+  // as a `daysBetween` per row: `[oldest, newest]` is the window the scan
+  // accepted, and a string comparison decides membership exactly as the
+  // arithmetic did. `live` may take an observation from after the reference,
+  // inside the same bound; `historical` may not take one at all.
+  const oldest = shiftYMD(onDate, -maxAgeDays, "min");
+  const newest = mode === "live" ? shiftYMD(onDate, maxAgeDays, "max") : onDate;
 
-    // Strictly newer wins; equal dates in one direction are the same day's
-    // observation and the first is kept, so the answer does not depend on row
-    // order.
-    if (best !== null && date <= best.date) continue;
-    best = {
-      date,
-      observedRate,
-      rate: direction === "direct" ? observedRate : 1 / observedRate,
-      direction,
-      ageDays,
-    };
+  // Why an unknown answer is unknown, from the ends of the sorted series: a
+  // look-ahead rejection can only be the newest observation's problem, and a
+  // staleness rejection only the oldest's.
+  if (mode === "historical") {
+    if (dates[dates.length - 1] > onDate) seen.sawAfterDate = true;
+  } else if (dates[dates.length - 1] > newest) {
+    seen.sawStale = true;
   }
-  return best;
+  if (dates[0] < oldest) seen.sawStale = true;
+
+  const at = lastIndexAtOrBefore(dates, newest);
+  if (at < 0) return null;
+  if (dates[at] < oldest) return null;
+
+  // The first row of the chosen date's run, which is the row the scan kept:
+  // equal dates in one direction are the same day's observation.
+  let first = at;
+  while (first > 0 && dates[first - 1] === dates[at]) first--;
+
+  const date = dates[first];
+  const observedRate = rates[first];
+  return {
+    date,
+    observedRate,
+    rate: direction === "direct" ? observedRate : 1 / observedRate,
+    direction,
+    ageDays: daysBetween(date, onDate),
+  };
+}
+
+/**
+ * `date` shifted by whole days, as a calendar date.
+ *
+ * A non-finite `maxAgeDays` is a caller asking for no age bound at all, and
+ * there is no date to shift to: `unbounded` says which end of the calendar the
+ * window opens onto, so that end admits every observation rather than becoming
+ * `Invalid Date` and rejecting all of them.
+ */
+function shiftYMD(
+  date: string,
+  days: number,
+  unbounded: "min" | "max",
+): string {
+  if (!Number.isFinite(days)) {
+    return unbounded === "min" ? "0000-01-01" : "9999-12-31";
+  }
+  return addDays(date, days);
 }
 
 const UNKNOWN_SHAPE = {

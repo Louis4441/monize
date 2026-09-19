@@ -1,10 +1,12 @@
 import {
+  applyPortfolioSummaryInvalidation,
   buildPortfolioSummaryMemoKey,
   invalidateAllPortfolioSummaries,
   invalidatePortfolioSummary,
   PORTFOLIO_SUMMARY_MEMO_MAX_ENTRIES,
   PORTFOLIO_SUMMARY_MEMO_TTL_MS,
   portfolioSummaryMemo,
+  setPortfolioSummaryBroadcast,
 } from "./portfolio-summary-memo";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
 
@@ -19,6 +21,7 @@ describe("portfolio summary memo", () => {
 
   afterEach(() => {
     jest.useRealTimers();
+    setPortfolioSummaryBroadcast(null);
     portfolioSummaryMemo.clearAll();
   });
 
@@ -96,6 +99,53 @@ describe("portfolio summary memo", () => {
       expect(compute).toHaveBeenCalledTimes(2);
     });
 
+    it("dates the entry from when the valuation settled, not from when it started", async () => {
+      // Issue #1409: the TTL used to be stamped at compute start, so a 48 s
+      // valuation left 12 s of a 60 s entry and the next page open paid for
+      // the whole walk again.
+      jest.useFakeTimers();
+      const compute = jest
+        .fn<Promise<number>, []>()
+        .mockImplementationOnce(
+          () => new Promise((resolve) => setTimeout(() => resolve(1), 48_000)),
+        )
+        .mockResolvedValueOnce(2);
+
+      const first = portfolioSummaryMemo.run("u1", "k", compute);
+      await jest.advanceTimersByTimeAsync(48_000);
+      await expect(first).resolves.toBe(1);
+
+      jest.advanceTimersByTime(PORTFOLIO_SUMMARY_MEMO_TTL_MS - 1);
+      await expect(portfolioSummaryMemo.run("u1", "k", compute)).resolves.toBe(
+        1,
+      );
+      jest.advanceTimersByTime(2);
+      await expect(portfolioSummaryMemo.run("u1", "k", compute)).resolves.toBe(
+        2,
+      );
+      expect(compute).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not resurrect a valuation invalidated while it was in flight", async () => {
+      // A write landed during the walk, so what the walk returns is already
+      // untrue. Dating it on settle would serve it for a minute anyway.
+      let release: (value: string) => void = () => {};
+      const compute = jest.fn(
+        () =>
+          new Promise<string>((resolve) => {
+            release = resolve;
+          }),
+      );
+
+      const inFlight = portfolioSummaryMemo.run(UUID_A, "k", compute);
+      invalidatePortfolioSummary(UUID_A);
+      release("stale");
+      await expect(inFlight).resolves.toBe("stale");
+
+      await portfolioSummaryMemo.run(UUID_A, "k", async () => "fresh");
+      expect(compute).toHaveBeenCalledTimes(1);
+    });
+
     it("does not remember a failure", async () => {
       const compute = jest
         .fn<Promise<string>, []>()
@@ -138,6 +188,64 @@ describe("portfolio summary memo", () => {
       await portfolioSummaryMemo.run(UUID_B, "kb", b);
       expect(a).toHaveBeenCalledTimes(2);
       expect(b).toHaveBeenCalledTimes(1);
+    });
+
+    it("announces what it dropped, so the other replicas drop it too", async () => {
+      // Issue #1409: a local-only invalidation left the replica that did not
+      // serve the write answering from a valuation taken before it.
+      const announced: Array<Record<string, unknown>> = [];
+      setPortfolioSummaryBroadcast((payload) => announced.push(payload));
+
+      invalidatePortfolioSummary(UUID_A);
+      invalidateAllPortfolioSummaries();
+
+      expect(announced).toEqual([{ userId: UUID_A }, {}]);
+    });
+
+    it("drops locally even when the announcement cannot be made", async () => {
+      const compute = jest.fn(async () => "v");
+      await portfolioSummaryMemo.run(UUID_A, "ka", compute);
+      setPortfolioSummaryBroadcast(() => {
+        throw new Error("bus is down");
+      });
+
+      expect(() => invalidatePortfolioSummary(UUID_A)).not.toThrow();
+
+      await portfolioSummaryMemo.run(UUID_A, "ka", compute);
+      expect(compute).toHaveBeenCalledTimes(2);
+    });
+
+    it("applies an announcement without making one", async () => {
+      const announced: Array<Record<string, unknown>> = [];
+      setPortfolioSummaryBroadcast((payload) => announced.push(payload));
+      const a = jest.fn(async () => "a");
+      const b = jest.fn(async () => "b");
+      await portfolioSummaryMemo.run(UUID_A, "ka", a);
+      await portfolioSummaryMemo.run(UUID_B, "kb", b);
+
+      applyPortfolioSummaryInvalidation({ userId: UUID_A });
+
+      await portfolioSummaryMemo.run(UUID_A, "ka", a);
+      await portfolioSummaryMemo.run(UUID_B, "kb", b);
+      expect(a).toHaveBeenCalledTimes(2);
+      expect(b).toHaveBeenCalledTimes(1);
+      expect(announced).toEqual([]);
+    });
+
+    it("reads an announcement naming no user as the whole dataset", async () => {
+      // A message this process cannot read as one user is the wide case, never
+      // a no-op: the alternative is keeping a valuation somebody invalidated.
+      const a = jest.fn(async () => "a");
+      const b = jest.fn(async () => "b");
+      await portfolioSummaryMemo.run(UUID_A, "ka", a);
+      await portfolioSummaryMemo.run(UUID_B, "kb", b);
+
+      applyPortfolioSummaryInvalidation({ userId: 42 } as never);
+
+      await portfolioSummaryMemo.run(UUID_A, "ka", a);
+      await portfolioSummaryMemo.run(UUID_B, "kb", b);
+      expect(a).toHaveBeenCalledTimes(2);
+      expect(b).toHaveBeenCalledTimes(2);
     });
 
     it("drops every user's entries on a whole-dataset write", async () => {

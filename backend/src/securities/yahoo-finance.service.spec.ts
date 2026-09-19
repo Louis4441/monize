@@ -818,6 +818,54 @@ describe("YahooFinanceService", () => {
       expect(await service.fetchHistorical("AAPL")).toBeNull();
     });
 
+    it("reads a 400 that names an absent window as an answer, and any other 400 as none", async () => {
+      // Issue #1409. Yahoo carries no USD/CAD history before December 2003 and
+      // refuses the window with a 400 -- which IS an answer about the symbol
+      // and the window, so the caller may remember it as empty. Read as a
+      // refusal, the empty-window memory could never be written and a
+      // since-inception valuation re-issued the same doomed calls on every
+      // load. A 400 about the request itself stays a refusal.
+      const respondWith = (body: unknown) => {
+        global.fetch = jest.fn().mockResolvedValue({
+          ok: false,
+          status: 400,
+          text: () => Promise.resolve(JSON.stringify(body)),
+          json: () => Promise.resolve(body),
+        });
+      };
+
+      respondWith({
+        chart: {
+          result: null,
+          error: {
+            code: "Bad Request",
+            description:
+              "Data doesn't exist for startDate = 1000684800, endDate = 1004486400",
+          },
+        },
+      });
+      expect(await service.fetchHistorical("USDCAD=X")).toEqual([]);
+
+      respondWith({
+        chart: {
+          result: null,
+          error: {
+            code: "Bad Request",
+            description: "Invalid input - interval=1z is not supported.",
+          },
+        },
+      });
+      expect(await service.fetchHistorical("AAPL")).toBeNull();
+
+      // A body that is not JSON at all says nothing about the symbol either.
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: () => Promise.resolve("<html>Bad Request</html>"),
+      });
+      expect(await service.fetchHistorical("AAPL")).toBeNull();
+    });
+
     it("should return null when indicators are missing", async () => {
       mockFetchResponse({
         chart: { result: [{ timestamp: [1700000000] }] },

@@ -248,7 +248,9 @@ const ALLOWED = new Map<string, string>([
   [
     "securities/portfolio-summary-memo.ts#entries",
     "a request-coalescing memo keyed by user, scope, currency and the acting " +
-      "identity, held for seconds; two replicas compute the same summary twice",
+      "identity, held for seconds; its invalidation is announced on the " +
+      "EVENT_BUS and applied by every replica, so what N replicas cost is N " +
+      "computations of the same summary, never a stale one past the announcement",
   ],
   [
     "budgets/budgets.service.ts#categoryActualsCache",

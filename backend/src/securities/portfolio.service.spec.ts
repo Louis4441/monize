@@ -2932,7 +2932,12 @@ describe("PortfolioService", () => {
       investmentTransactionRepository.find.mockResolvedValue([]);
     });
 
-    it("asks the invested measure for this scope and reporting currency", async () => {
+    it("asks the invested measure for this scope and reporting currency, and does not fetch rates for it", async () => {
+      // `fetchMissing: false` is the second half of the assertion, not a
+      // detail of it: the window opens at the scope's first transaction, so
+      // without the opt-out one summary card drives a provider backfill over
+      // every month of a twenty-six-year history, inline, on a request a
+      // person is waiting on (issue #1409).
       await service.getPortfolioSummary(userId, ["acct-brokerage-1"]);
 
       expect(
@@ -2940,6 +2945,7 @@ describe("PortfolioService", () => {
       ).toHaveBeenCalledWith(userId, {
         accountIds: ["acct-brokerage-1"],
         displayCurrency: "CAD",
+        fetchMissing: false,
       });
     });
 

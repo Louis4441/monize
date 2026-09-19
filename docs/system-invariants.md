@@ -4110,11 +4110,19 @@ Enforcement         invalidateBalanceCaches (frontend lib/apiCache.ts) drops the
                     recalculateAccount -- the post-commit seam every
                     money-moving write already passes through, immediately
                     rather than on the debounce timer -- and on each price write
-                    seam, a restore, a demo reset and an undo or redo. It is
-                    process memory with a 60 s TTL, so on a second replica the
-                    bound is the TTL rather than the invalidation;
-                    docs/backend/securities-and-providers.md states that.
-Concurrency scope   per browser tab; per pod for the server-side memo
+                    seam, a restore, a demo reset and an undo or redo. The
+                    entries are process memory, but the invalidation is not: it
+                    is announced on the EVENT_BUS
+                    (PORTFOLIO_SUMMARY_INVALIDATION_CHANNEL, wired by
+                    PortfolioSummaryInvalidationBridge) and every replica drops
+                    the user's entries, so a read round-robined to a replica
+                    that did not serve the write no longer answers from a
+                    valuation taken before it. NOTIFY can be lost, so the 60 s
+                    TTL remains the bound rather than the mechanism;
+                    docs/backend/securities-and-providers.md states which one
+                    covers what.
+Concurrency scope   per browser tab; per pod for the server-side memo's
+                    entries, deployment-wide for its invalidation
 Failure response    a saved transaction drops the budget cache, so the progress
                     bar reflects the write.
 Required tests      Present: frontend cache-prefix-classification.guard.test.ts
@@ -4124,7 +4132,13 @@ Required tests      Present: frontend cache-prefix-classification.guard.test.ts
                     requires every balance-writing API method to invalidate;
                     backend portfolio-summary-memo.spec.ts and the memo cases in
                     portfolio.service.spec.ts require an invalidated user to
-                    recompute while another user's entry survives.
+                    recompute while another user's entry survives;
+                    portfolio-summary-invalidation.bridge.spec.ts requires the
+                    drop to be announced, an announcement to be applied without
+                    answering it, and a refused announcement to leave the local
+                    drop standing. The cross-replica hop itself is proved by the
+                    CLUSTER_MODE=multi E2E shard, where the write and the read
+                    land on different replicas.
 Status              enforced
 ```
 
