@@ -181,8 +181,13 @@ export interface UserPreferences {
   updatedAt: string;
 }
 
+/**
+ * The deployment's automatic-backup policy, as the admin surface reads it.
+ *
+ * Not one account's row: it has no `userId`, because the thing it describes has
+ * no owner. The name is kept because every consumer of it is this one screen.
+ */
 export interface AutoBackupSettings {
-  userId: string;
   enabled: boolean;
   folderPath: string;
   /**
@@ -202,15 +207,17 @@ export interface AutoBackupSettings {
   lastBackupError: string | null;
   nextBackupAt: string | null;
   /**
-   * How many active accounts this deployment's policy governs.
+   * How many active accounts this deployment's policy governs, and how many of
+   * them currently hold an armed schedule.
    *
    * Server-computed and read-only, present only on the admin policy surface.
-   * The one thing an operator cannot tell from the schedule alone is whether
-   * it reaches anybody.
+   * Two numbers rather than one because a single one could only have been
+   * `accountCount`, which states coverage the deployment may not have: an
+   * account whose reconcile failed is still an account the policy governs.
+   * They match on a settled deployment.
    */
-  managedUserCount?: number;
-  createdAt: string;
-  updatedAt: string;
+  accountCount?: number;
+  scheduledAccountCount?: number;
 }
 
 /**

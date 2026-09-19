@@ -301,9 +301,13 @@ export function AutoBackupSection() {
           anybody. "Daily at 02:00" over a count of 1 on a twelve-account
           instance is exactly the defect this line makes visible. */}
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-        {settings?.managedUserCount === undefined
+        {settings?.accountCount === undefined ||
+        settings?.scheduledAccountCount === undefined
           ? t('coverage.unknown')
-          : t('coverage.accounts', { count: settings.managedUserCount })}
+          : t('coverage.accounts', {
+              scheduled: settings.scheduledAccountCount,
+              total: settings.accountCount,
+            })}
       </p>
 
       {isDemoMode && (

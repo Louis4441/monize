@@ -663,8 +663,8 @@
     },
     "never": "[XX-Never-XX]",
     "coverage": {
-      "accounts": "[XX-Covers {count} active {count, plural, one {account} other {accounts}} on this deployment.-XX]",
-      "unknown": "[XX-The number of accounts this policy covers is not available.-XX]"
+      "accounts": "[XX-Scheduled on {scheduled} of {total} active {total, plural, one {account} other {accounts}} on this deployment.-XX]",
+      "unknown": "[XX-How far this policy reaches is not available.-XX]"
     },
     "storage": {
       "heading": "[XX-Backup Storage-XX]",

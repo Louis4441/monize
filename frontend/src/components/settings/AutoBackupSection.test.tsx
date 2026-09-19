@@ -34,7 +34,6 @@ import { backupApi } from '@/lib/backupApi';
 import toast from 'react-hot-toast';
 
 const defaultSettings = {
-  userId: '123',
   enabled: false,
   folderPath: '',
   frequency: 'daily' as const,
@@ -47,8 +46,6 @@ const defaultSettings = {
   lastBackupStatus: null,
   lastBackupError: null,
   nextBackupAt: null,
-  createdAt: '2026-01-01',
-  updatedAt: '2026-01-01',
 };
 
 // A capability whose store has a folder to choose: the `local` default every
@@ -585,13 +582,16 @@ describe('AutoBackupSection', () => {
       // defect this line makes visible.
       (backupApi.getAutoBackupSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
         ...defaultSettings,
-        managedUserCount: 12,
+        accountCount: 12,
+        scheduledAccountCount: 12,
       });
 
       await renderAutoBackupSection();
 
       expect(
-        screen.getByText('Covers 12 active accounts on this deployment.'),
+        screen.getByText(
+          'Scheduled on 12 of 12 active accounts on this deployment.',
+        ),
       ).toBeInTheDocument();
     });
 
@@ -599,8 +599,24 @@ describe('AutoBackupSection', () => {
       await renderAutoBackupSection();
 
       expect(
+        screen.getByText('How far this policy reaches is not available.'),
+      ).toBeInTheDocument();
+    });
+
+    it('shows the gap when the policy has not reached every account', async () => {
+      // A single number could only have been the total, which states coverage
+      // the deployment does not have.
+      (backupApi.getAutoBackupSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ...defaultSettings,
+        accountCount: 12,
+        scheduledAccountCount: 11,
+      });
+
+      await renderAutoBackupSection();
+
+      expect(
         screen.getByText(
-          'The number of accounts this policy covers is not available.',
+          'Scheduled on 11 of 12 active accounts on this deployment.',
         ),
       ).toBeInTheDocument();
     });
