@@ -897,12 +897,19 @@ are that account's own. Three consequences worth stating:
   cron's **claim** (`claimDueBackup`), so a whole-entity `save` carrying a
   snapshot read before the loop could revert a claim another replica had just
   taken and have that account backed up twice — the mirror image of the reason
-  `recordBackupOutcome` was already a targeted `UPDATE`. The armed path only
-  fills in a row that has none (`COALESCE(next_backup_at, …)`); only a disabled
-  policy overrides a held claim, which is the one case where that is the point.
-  `runBackupForUser` records its outcome through `recordBackupOutcome` for the
-  same reason, and a manual run deliberately does not move the automatic
-  schedule at all.
+  `recordBackupOutcome` was already a targeted `UPDATE`. A held value is
+  overwritten in exactly two cases, both of them an operator asking for
+  something now: a disabled policy clears it, and a change to a
+  **schedule-defining** field (`frequency`, `backupTime`, `timezone`) replaces
+  it. Neither can revert a claim into the past — the claim's whole property is
+  `next_backup_at > now` and `calculateNextBackupAt` returns a future slot, so
+  one future value gives way to another. Every other drift (retention, folder)
+  only fills in a row that has none (`COALESCE(next_backup_at, …)`). Carrying
+  the old value forward unconditionally ran the next backup on the schedule the
+  operator had just replaced — up to a week late on `weekly` — with the status
+  line contradicting the form that set it. `runBackupForUser` records its
+  outcome through `recordBackupOutcome` for the same reason, and a manual run
+  deliberately does not move the automatic schedule at all.
 
 The admin surface reads back what the deployment is actually doing rather than
 one row: `accountCount` (active accounts the policy governs) beside

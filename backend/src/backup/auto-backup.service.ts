@@ -124,6 +124,19 @@ export interface AutoBackupPolicyView extends AutoBackupPolicy {
 }
 
 /**
+ * The policy fields that decide *when* the next run is.
+ *
+ * A change to one of these re-arms every account: the operator asked for a
+ * different time, and carrying the old `next_backup_at` forward would run the
+ * next backup on the schedule they just replaced -- up to a week late on
+ * `weekly`, with the status line contradicting the form that set it. A change
+ * to retention or the folder is not one of these and must leave
+ * `next_backup_at` alone, because disturbing it for no reason is how the cron's
+ * claim gets reverted.
+ */
+const SCHEDULE_FIELDS = ["frequency", "backupTime", "timezone"] as const;
+
+/**
  * The policy fields, as a list, so "which columns does the policy own" is
  * written once. `reconcileManagedUsers` compares against it to decide whether a
  * row has drifted, and `policyFrom` projects a stored row down to it.
@@ -1859,7 +1872,12 @@ export class AutoBackupService {
       try {
         await withUserContext(userId, () =>
           current
-            ? this.updatePolicyColumns(userId, policy, now)
+            ? this.updatePolicyColumns(
+                userId,
+                policy,
+                now,
+                SCHEDULE_FIELDS.some((key) => current[key] !== policy[key]),
+              )
             : this.insertManagedRow(userId, policy, now),
         );
         this.logger.log(
@@ -1907,15 +1925,20 @@ export class AutoBackupService {
    * be backed up twice. `recordBackupOutcome` already writes only its own
    * columns for the mirror image of this reason.
    *
-   * `next_backup_at` is therefore never overwritten while it holds a value: an
-   * armed policy only fills in a row that has none (`COALESCE`), and a disabled
-   * policy clears it, which is the one case where overriding a claim is the
-   * point -- an operator switching automatic backups off means now.
+   * `next_backup_at` is therefore left alone while it holds a value, with two
+   * exceptions, both of which are an operator asking for something now. A
+   * disabled policy clears it. And `rearm` -- set when a `SCHEDULE_FIELDS`
+   * value moved -- replaces it, which cannot revert a claim: the claim's whole
+   * property is `next_backup_at > now`, and `calculateNextBackupAt` returns a
+   * future slot, so one future value gives way to another and the row stays
+   * un-due. Everything else (retention, folder) only fills in a row that has
+   * none.
    */
   private async updatePolicyColumns(
     userId: string,
     policy: AutoBackupPolicy,
     now: Date,
+    rearm: boolean,
   ): Promise<void> {
     const nextBackupAt = policy.enabled
       ? this.calculateNextBackupAt(
@@ -1937,8 +1960,9 @@ export class AutoBackupService {
                 retention_weekly = $8,
                 retention_monthly = $9,
                 next_backup_at = CASE
-                  WHEN $2 THEN COALESCE(next_backup_at, $10)
-                  ELSE NULL
+                  WHEN NOT $2 THEN NULL
+                  WHEN $11 THEN $10
+                  ELSE COALESCE(next_backup_at, $10)
                 END,
                 updated_at = CURRENT_TIMESTAMP
           WHERE user_id = $1`,
@@ -1953,6 +1977,7 @@ export class AutoBackupService {
           policy.retentionWeekly,
           policy.retentionMonthly,
           nextBackupAt,
+          rearm,
         ],
       ),
     );

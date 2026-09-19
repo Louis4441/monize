@@ -3443,6 +3443,64 @@ describe("AutoBackupService", () => {
       );
     });
 
+    it("re-arms every account when the operator moves the backup time", async () => {
+      // Carrying the old next_backup_at forward runs the next backup on the
+      // schedule the operator just replaced -- up to a week late on `weekly` --
+      // and leaves the status line contradicting the form that set it.
+      const armed = createSettings({
+        enabled: true,
+        folderPath: root,
+        backupTime: "02:00",
+        nextBackupAt: new Date("2026-04-16T02:00:00Z"),
+      });
+      armed.userId = otherUserId;
+      storePolicy({ enabled: true, folderPath: root, backupTime: "23:00" });
+      mockUsersRepo.find.mockResolvedValue([{ id: otherUserId }]);
+      settingsFind({ managed: [armed] });
+
+      await service.handleAutoBackupCron();
+
+      const update = scoped.manager.query.mock.calls.find(
+        ([sql]) =>
+          typeof sql === "string" &&
+          sql.includes("UPDATE auto_backup_settings") &&
+          sql.includes("retention_daily"),
+      );
+      expect(update).toBeDefined();
+      const params = update?.[1] as unknown[];
+      // Re-armed, at the time that was actually asked for.
+      expect(params[10]).toBe(true);
+      expect((params[9] as Date).getUTCHours()).toBe(23);
+    });
+
+    it("leaves the schedule alone when only retention moved", async () => {
+      // The other half of the same rule: disturbing next_backup_at for a change
+      // that does not decide when the next run is would revert a claim for
+      // nothing.
+      const armed = createSettings({
+        enabled: true,
+        folderPath: root,
+        retentionDaily: 7,
+        nextBackupAt: new Date("2026-04-16T02:00:00Z"),
+      });
+      armed.userId = otherUserId;
+      storePolicy({ enabled: true, folderPath: root, retentionDaily: 30 });
+      mockUsersRepo.find.mockResolvedValue([{ id: otherUserId }]);
+      settingsFind({ managed: [armed] });
+
+      await service.handleAutoBackupCron();
+
+      const update = scoped.manager.query.mock.calls.find(
+        ([sql]) =>
+          typeof sql === "string" &&
+          sql.includes("UPDATE auto_backup_settings") &&
+          sql.includes("retention_daily"),
+      );
+      const params = update?.[1] as unknown[];
+      expect(params[10]).toBe(false);
+      expect(update?.[0]).toContain("COALESCE(next_backup_at,");
+    });
+
     it("never overwrites a next_backup_at another replica may have claimed", async () => {
       // `next_backup_at` is the cron's claim. A whole-entity save wrote it back
       // from a snapshot read before the loop, so a replica that had just
@@ -3528,7 +3586,9 @@ describe("AutoBackupService", () => {
           sql.includes("retention_daily"),
       );
       expect(update).toBeDefined();
-      expect(update?.[0]).toContain("ELSE NULL");
+      // The disabled branch clears the schedule outright -- the one case where
+      // overriding a claim is the point.
+      expect(update?.[0]).toContain("WHEN NOT $2 THEN NULL");
       expect((update?.[1] as unknown[])[0]).toBe(otherUserId);
       expect((update?.[1] as unknown[])[1]).toBe(false);
     });
