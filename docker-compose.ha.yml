@@ -14,11 +14,37 @@
 #   docker compose -f docker-compose.ha.yml up -d --wait
 #   docker compose -f docker-compose.ha.yml stop backend   # both replicas
 #
-# Killing ONE backend replica should leave the application usable: the proxy
-# has two frontends, each frontend proxies to the `backend` service name, and
-# Docker's DNS round-robins it across whichever replicas are healthy.
+# Killing ONE backend replica leaves the application usable, but not instantly
+# and not invisibly. Docker's embedded DNS round-robins the `backend` service
+# name across the containers that exist, and it does NOT remove one whose
+# healthcheck is failing: a stopped replica is removed when the container
+# stops, while a container that is up and unhealthy keeps receiving its share
+# of requests. Each frontend also resolves the name per request and caches
+# briefly, so expect a window of errors rather than a clean failover. That is a
+# property of this example, not of `multi`: a real deployment puts a load
+# balancer that reads readiness in front (Kubernetes Services do, which is what
+# helm/ chooses), and `/api/v1/health/ready` is what it reads.
 #
-# Requires the same .env as docker-compose.prod.yml.
+# Two more differences from docker-compose.prod.yml worth knowing before
+# copying anything out of this file:
+#
+#   * Backups are a NAMED VOLUME here, not the bind mount prod uses. Both
+#     replicas must mount the same directory, which a named volume makes
+#     explicit on one host; a bind mount would work equally well here and is
+#     what a real deployment usually wants. If you are adapting prod, the
+#     backups do not move with the file -- copy them, or point both replicas at
+#     the existing bind mount.
+#   * DEMO_MODE seeds on boot, and both replicas run the seeder at once. That
+#     is safe -- `backend/src/database/seed.ts` holds the database-lifecycle
+#     advisory lock across the whole seed, and the follower re-asks on the
+#     connection holding the lock and exits 0 on the winner's demo user -- but
+#     it is serial: the second replica waits out the first one's seed before it
+#     starts, so the first `up --wait` of a demo stack takes about twice as long
+#     as one replica would. That lock is a session lock, which is another thing
+#     a transaction-mode pooler between here and PostgreSQL would break.
+#
+# Requires the same .env as docker-compose.prod.yml, plus PROXY_PORT for the
+# proxy below (the two frontend replicas cannot both publish FRONTEND_PORT).
 
 services:
   postgres:

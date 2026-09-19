@@ -1,7 +1,13 @@
+The workloads are Deployments, so the pods have generated names
+(`monize-backend-<replicaset>-<random>`) rather than the ordinal
+`monize-backend-0` a StatefulSet gave them. `kubectl rollout restart` names the
+workload instead of a pod, which is both stable and the only form that restarts
+every replica at `cluster.mode: multi`.
+
 ```
 cd ~/monize && REGISTRY=registry.laskonet.com/monize
-docker build -t $REGISTRY/backend:latest --target production -f backend/Dockerfile . && docker push $REGISTRY/backend:latest && kubectl delete pod -n monize monize-backend-0
-docker build -t $REGISTRY/frontend:latest --target production ./frontend && docker push $REGISTRY/frontend:latest && kubectl delete pod -n monize monize-frontend-0
+docker build -t $REGISTRY/backend:latest --target production -f backend/Dockerfile . && docker push $REGISTRY/backend:latest && kubectl rollout restart deployment/monize-backend -n monize
+docker build -t $REGISTRY/frontend:latest --target production ./frontend && docker push $REGISTRY/frontend:latest && kubectl rollout restart deployment/monize-frontend -n monize
 ```
 
 # Manual code scanners

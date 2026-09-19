@@ -143,8 +143,14 @@ not a transaction-mode pooler, which `db-init` and `db-migrate` already require
 for the lifecycle lock. No key prefix is needed either: several Monize
 deployments on one PostgreSQL server are separate databases, and `NOTIFY` is
 scoped to the database. Task F1 shipped a `REDIS_URL` input to the boot matrix
-against the earlier draft; task F6 has retired it, so `checkClusterBoot` reads
-`CLUSTER_MODE` and `JWT_SECRET` and nothing else until F2 and S1 add theirs.
+against the earlier draft; task F6 retired it. As shipped, `checkClusterBoot`
+reads `CLUSTER_MODE` and `JWT_SECRET` in every mode, plus, in `multi`, the
+attachment provider and directory (`ATTACHMENT_STORAGE_PROVIDER`,
+`ATTACHMENT_CONTAINER_DIR` or its deprecated `ATTACHMENT_LOCAL_DIR` alias) and
+the two assertions `ATTACHMENT_SHARED_VOLUME` and `BACKUP_SHARED_VOLUME`, with
+`BACKUP_CONTAINER_DIR` named in the refusal it produces. The listener's own
+connection is not in the matrix: it is checked by connecting, in `main.ts`,
+because a reachable host is not a fact about the environment.
 
 Boot matrix in `multi`:
 
@@ -152,7 +158,7 @@ Boot matrix in `multi`:
 |---|---|
 | the listener connection cannot connect and `LISTEN` within 5 s at boot | refuse, naming the host (never the password) and that a transaction-mode pooler cannot carry `LISTEN` |
 | `ATTACHMENT_STORAGE_PROVIDER=local` without `ATTACHMENT_SHARED_VOLUME=true` | refuse, naming the `database` and `s3` providers as the alternatives |
-| automatic backups enabled and `BACKUP_SHARED_VOLUME` not `true` | refuse (until the S3 backup target ships, see WP7) |
+| `BACKUP_SHARED_VOLUME` not `true` | refuse, unconditionally in `multi`: automatic backups are switched on per user, so no environment variable says whether any exist, and the check cannot be conditional on "backups enabled" (until the S3 backup target ships, see WP7) |
 | `JWT_SECRET` absent | refuse (in every mode -- this is the CSRF trap above) |
 | `ENCRYPTION_KEY` absent | warn, as today; Web Push and the persisted OIDC keys stay unavailable |
 
@@ -246,12 +252,30 @@ anything, and the readiness probe already removes a replica that lost its
 database). WP1's daily sweeper deletes expired rows; the primary key bounds
 the table to the number of distinct keys in the meantime.
 
+The window is **fixed**, and the library's in-memory storage's is **sliding**:
+its `Map` holds one expiry per hit and drops them individually, so a client's
+allowance recovers a hit at a time, whereas a row here holds one
+`window_expires_at` for the whole count and the allowance returns all at once
+when it passes. This is a deliberate difference between `single` and `multi`,
+not an oversight. A sliding window in SQL means storing the hits themselves --
+one row per request, or an array read back and rewritten on every guarded call
+-- which is the opposite of the cheap upsert this table exists to be, and the
+caps it enforces (5 logins per 15 minutes, and the rest) are stated as
+"N per window" everywhere they are documented. What a caller can observe: a
+burst spent early in a window is forgiven in one step rather than gradually,
+which is marginally more lenient at the boundary and never more strict. The
+class docstring on the storage says the same thing for a reader who arrives
+from the code.
+
 Invariant: INV-HA-001 (readiness). Tests: unit spec with a mocked manager for
 the statement's shape and the fail-open path; a two-connection integration
 spec asserting the limit holds across two `ThrottlerStorage` instances over one
 database (the harness builds the table from entity metadata, which cannot say
 `UNLOGGED`; the spec asserts counting, not durability, so that changes
-nothing). Deploy impact: `multi-only`.
+nothing), and a source guard
+(`backend/src/common/db/unlogged-table-parity.spec.ts`) holding the migration
+and `database/schema.sql` to the same persistence, since no other gate compares
+them. Deploy impact: `multi-only`.
 
 ### WP3 -- AI action anti-replay
 
@@ -465,6 +489,16 @@ lacks an ID). Proposed wording:
 
 Every task lands behind `CLUSTER_MODE=single` unchanged; the task list's
 definition of done requires proving that.
+
+One deployment obligation is not conditional on the mode and is worth stating
+here because WP9 is what makes it visible: a rolling deployment runs the
+previous release against the new schema for the length of the rollout, so a
+migration that renames or drops a column, narrows a type or adds a `NOT NULL`
+breaks the pods still serving. Expand now, contract in a later release;
+`docs/database-migrations.md` has the rule and the table of what it forbids.
+This is a property of surging rollouts rather than of `multi` -- it applies at
+one replica too -- but `multi` widens the window, and the chart's default
+`maxSurge: 1` / `maxUnavailable: 0` is what creates it.
 
 ## Open questions
 
