@@ -53,8 +53,9 @@ export interface CurrencyUsage {
 /**
  * What the server already stores for one currency pair, in days.
  *
- * `observations` counts calendar days rather than rows: a fetch is persisted in
- * both directions, and the two stored directions are one pair.
+ * `observations` counts calendar days rather than rows: either stored direction
+ * of a pair is evidence about the same day, and rows written before the pair was
+ * collapsed to one orientation still hold a day twice.
  */
 export interface RateCoverage {
   from: string;

@@ -67,6 +67,7 @@ implied.
 | INV-RECONCILE-001 | While the strict lock is on, a reconciled transaction is not altered | enforced |
 | INV-FX-001 | An unavailable rate never becomes 1:1, a rate from after the date, or an unboundedly old one | partial |
 | INV-FX-002 | A row that carries its own exchange rate is converted at that rate on every surface | enforced |
+| INV-FX-003 | A currency pair is stored in one orientation | partial |
 | INV-TRADE-001 | The executed total is the fact; the per-share price is derived from it | enforced |
 | INV-PRICE-001 | A stored price is in the currency the security is recorded in | partial |
 | INV-PORTRESULT-001 | A period change is not a return: value change, external flows and investment result are three figures | enforced |
@@ -752,6 +753,63 @@ Test                investment-transaction-summary.service.spec.ts: a sale of
                     market rate and counted; a stored 1 across two currencies is
                     ignored; a third settlement currency is carried onward.
 Status              enforced
+```
+
+### INV-FX-003 -- a pair is stored in one orientation
+
+```text
+Statement           For every currency pair and rate_date there is at most one
+                    row in exchange_rates, and its from_currency sorts before its
+                    to_currency. A pair held in two rows is a pair that can
+                    contradict itself: nothing keeps the two reciprocal, and
+                    resolveFxRate answers with the more recently observed
+                    direction, so a one-sided write decides which of two
+                    different figures a date resolves to. Two totals in one
+                    report could disagree with nothing saying so.
+Source of truth     exchange_rates. The orientation rule is
+                    backend/src/currencies/canonical-rate.util.ts
+                    (canonicalRateRow, isCanonicalOrientation), and
+                    directionlessPairKey is built on the same comparison so the
+                    ordering is written once.
+Enforcement         Every writer routes through canonicalRateRow: saveRate and
+                    persistRateSeries in currencies/exchange-rate.service.ts, and
+                    resolveExchangeRates in
+                    import/mny/writers/write-prices.ts, which used to store
+                    whichever orientation the Money file recorded. The helper
+                    inverts at the rate column's ten decimal places and refuses a
+                    same-currency pair or a non-positive rate, so a refusal
+                    happens before the write rather than as a row nothing may
+                    use. currencies/exchange-rate-orientation.guard.spec.ts is
+                    the scan: an INSERT INTO exchange_rates in a third file, or
+                    in one of those two without the helper, fails it.
+                    On the read side getLatestRate now resolves either stored
+                    direction through resolveFxRate (INV-FX-001's door) rather
+                    than reading one orientation, the backfill coverage probe
+                    counts a pair held either way as covered, and
+                    GemPositionService.convert makes one lookup instead of its
+                    own direct-then-reverse pair -- which is why it left the
+                    reciprocal allowlist in common/fx-fallback.guard.spec.ts.
+Test                canonical-rate.util.spec.ts holds the truth table, including
+                    that both directions of one observation produce the same key.
+                    exchange-rate.service.spec.ts: the daily refresh issues one
+                    upsert and stores the canonical row for a quote fetched the
+                    other way; a fetched window stores one row per day and no
+                    inverse rows; getLatestRate answers from an inverse-only
+                    pair, prefers the more recently observed direction, gives a
+                    tie to the direction asked for, and applies the age bound to
+                    both. write-prices.spec.ts: a Money row recorded USD->GBP is
+                    stored as GBP->USD inverted, and one pair recorded both ways
+                    for a date collapses to one row.
+Status              partial -- the writers and the guard hold for every new row,
+                    and rows written before this release still carry both
+                    orientations. The contract release removes them and adds
+                    CHECK (from_currency < to_currency), which is the mechanism
+                    that makes this enforced; it cannot ship until the expand
+                    release is deployed everywhere, because the previous release
+                    writes the mirror row this constraint would refuse. Spec:
+                    docs/specs/exchange-rate-canonical-orientation.md; the
+                    migration is written out in
+                    docs/future-plans/exchange-rate-canonical-orientation-tasks.md.
 ```
 
 ### INV-TRADE-001 -- the executed total is the fact, the price is derived

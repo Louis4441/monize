@@ -18,9 +18,9 @@ import {
  * What the database already holds for one currency pair, in days.
  *
  * `earliestDate` and `latestDate` are `YYYY-MM-DD` or `null` when the pair has
- * no rows at all; `observations` counts calendar days, not rows, because a
- * fetch is persisted in both directions (`persistRateSeries`) and a reader
- * shown "512 observations" for 256 days would read the storage layout as
+ * no rows at all; `observations` counts calendar days, not rows. Rows written
+ * before the pair was collapsed to one orientation still hold a day twice, and a
+ * reader shown "512 observations" for 256 days would read that storage layout as
  * market data.
  */
 export interface RateCoverage {
@@ -136,9 +136,10 @@ export class ExchangeRateHistoryService {
   /**
    * What is stored for `code` against the caller's reporting currency.
    *
-   * Both stored directions count as one pair, because they are: a fetch is
-   * persisted forwards and inverted in the same statement, so a row under
-   * `PLN->EUR` is evidence about `EUR->PLN` on that date too. Dates come back
+   * Either stored direction counts as the one pair it is: a row under
+   * `PLN->EUR` is evidence about `EUR->PLN` on that date too, which is why a new
+   * row is stored in one orientation only (INV-FX-003) and why this still reads
+   * both -- rows written before that change are still there. Dates come back
    * through `TO_CHAR` rather than the entity transformer, per the backend's
    * raw-SELECT rule.
    */

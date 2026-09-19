@@ -13,7 +13,7 @@
  *
  * - **A fetch unit is a calendar month, not a day.** One
  *   `ExchangeRateService.ensureRatesForDate` call fetches the whole calendar
- *   month around the date it is given and persists both directions, so a
+ *   month around the date it is given, for the pair in either direction, so a
  *   400-point daily chart needs at most one call per (month, pair), not four
  *   hundred. Any date inside the month selects the same window; the planner
  *   picks the earliest one it saw so the unit is deterministic.
@@ -81,9 +81,9 @@ export interface SeriesRateFillLogger {
 }
 
 /**
- * A pair key that does not distinguish direction, because a fetch does not
- * either: one provider call is persisted both ways, so USD->CAD and CAD->USD
- * are one unit of work.
+ * A pair key that does not distinguish direction, because neither the fetch nor
+ * the storage does: one provider call answers USD->CAD and CAD->USD alike and
+ * the pair is stored once, so the two are one unit of work.
  */
 function directionlessPairKey(from: string, to: string): string {
   return [from, to].sort().join("|");

@@ -19,7 +19,7 @@ import { Currency } from "./entities/currency.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { YahooFinanceService } from "../securities/yahoo-finance.service";
 import { mapWithConcurrency } from "../common/concurrency.util";
-import { roundFxRate, resolveFxRateOrNull } from "../common/fx-entry.util";
+import { resolveFxRateOrNull } from "../common/fx-entry.util";
 import { roundMoney } from "../common/round.util";
 import { addDaysYMD, todayYMD } from "../common/date-utils";
 import { withScopedDb } from "../common/db/scoped-db";
@@ -42,6 +42,10 @@ import {
   resolveFxRate,
 } from "../common/time-series/fx-rate-resolver";
 import { preferredCurrency } from "../common/default-currency.util";
+import {
+  canonicalRateRow,
+  isCanonicalOrientation,
+} from "./canonical-rate.util";
 
 // Cap concurrent Yahoo FX fetches so the daily refresh does not burst every
 // currency pair at once (this cron also runs alongside the security price
@@ -49,12 +53,17 @@ import { preferredCurrency } from "../common/default-currency.util";
 const FX_FETCH_CONCURRENCY = 6;
 
 /**
- * A pair key that does not distinguish direction, because a fetch does not
- * either: one provider call is persisted both ways, so USD->CAD and CAD->USD
- * are one unit of work and one negative-cache entry.
+ * A pair key that does not distinguish direction, because neither the fetch nor
+ * the storage does: one provider call answers USD->CAD and CAD->USD alike, and
+ * the pair is stored once, so the two are one unit of work and one negative-cache
+ * entry.
+ *
+ * Built on `isCanonicalOrientation` so the ordering rule that decides which
+ * orientation is stored and the one that decides which key a pair shares are the
+ * same rule, written once.
  */
 export function directionlessPairKey(from: string, to: string): string {
-  return [from, to].sort().join("|");
+  return isCanonicalOrientation(from, to) ? `${from}|${to}` : `${to}|${from}`;
 }
 
 /**
@@ -295,8 +304,14 @@ export class ExchangeRateService implements OnModuleInit {
   }
 
   /**
-   * Save or update an exchange rate for a given date,
-   * and also save the inverse rate for the reverse pair.
+   * Save or update an exchange rate for a given date, in the one orientation the
+   * pair is stored in.
+   *
+   * One row, not two. The inverse row that used to be written beside it existed
+   * so a reverse lookup would find something, but nothing kept the pair
+   * reciprocal, and a write that touched one side only left two rows disagreeing
+   * about one date (`canonicalRateRow`, INV-FX-003). Every reader resolves either
+   * direction through `resolveFxRate`, so the reverse lookup loses nothing.
    */
   private async saveRate(
     from: string,
@@ -304,23 +319,24 @@ export class ExchangeRateService implements OnModuleInit {
     rate: number,
     date: Date,
   ): Promise<ExchangeRate> {
-    // Both directions in one transaction: a pair persisted only one way would
-    // make the reverse lookup fall through to a live fetch forever.
-    return withScopedDb(this.dataSource, async (manager) => {
-      const result = await this.saveOneDirection(manager, from, to, rate, date);
-
-      // Also save the inverse rate so both directions stay current. Rounded at
-      // the rate column's own precision, not money precision: 1/1.3652 rounded
-      // to 4dp is 0.7325, which converts USD->CAD back to 1.3661 -- an error a
-      // bank statement quoting six decimals would show up immediately.
-      const inverseRate = roundFxRate(1 / rate);
-      await this.saveOneDirection(manager, to, from, inverseRate, date);
-
-      return result;
-    });
+    const row = canonicalRateRow(from, to, rate);
+    if (row === null) {
+      // A same-currency pair or a non-positive rate: absent, not applicable.
+      // Refused before the write rather than stored as a rate nothing may use.
+      throw new Error(
+        `Refusing to store exchange rate ${from}/${to} at ${rate} for ${date.toISOString().slice(0, 10)}`,
+      );
+    }
+    return withScopedDb(this.dataSource, (manager) =>
+      this.upsertCanonicalRate(manager, row.from, row.to, row.rate, date),
+    );
   }
 
-  private async saveOneDirection(
+  /**
+   * Upsert one row whose orientation `canonicalRateRow` has already decided.
+   * The codes arrive canonical; this does not re-order them.
+   */
+  private async upsertCanonicalRate(
     manager: EntityManager,
     from: string,
     to: string,
@@ -332,8 +348,8 @@ export class ExchangeRateService implements OnModuleInit {
     // found row or an insert -- a check-then-act, and one every replica runs:
     // the exchange-rate cron fires everywhere at 5:05 PM ET, so two processes
     // routinely fetch the same pair for the same day, both find no row, and both
-    // insert. The loser got a unique violation, which inside `saveRate`'s
-    // transaction also lost the inverse direction written beside it.
+    // insert. The loser got a unique violation and the refresh reported a pair
+    // it had in fact fetched as failed.
     //
     // `persistRateSeries` a few lines below already did it this way; the two are
     // now consistent, which matters because they write the same rows.
@@ -365,7 +381,8 @@ export class ExchangeRateService implements OnModuleInit {
   }
 
   /**
-   * Bulk-upsert a daily rate series for a pair, in both directions.
+   * Bulk-upsert a daily rate series for a pair, one row per day in the pair's
+   * canonical orientation.
    *
    * A provider call returns a whole daily series for the period asked for, and
    * costs the same whether that is one day or a hundred. Persisting only the
@@ -374,9 +391,11 @@ export class ExchangeRateService implements OnModuleInit {
    * stepping a date field backwards ran into rate limits. Storing the series
    * makes one call cover the whole window.
    *
-   * Both directions are written for the reason `saveRate` gives: a pair
-   * persisted one way only leaves the reverse lookup falling through to a live
-   * fetch forever.
+   * The series may arrive in either orientation -- the reverse symbol is what
+   * answered, for the pairs a provider carries only one way -- and
+   * `canonicalRateRow` orients each point, so a window fetched as `USD->CAD` and
+   * one fetched as `CAD->USD` land on the same rows rather than on two sets that
+   * can drift apart (INV-FX-003).
    */
   private async persistRateSeries(
     from: string,
@@ -394,9 +413,13 @@ export class ExchangeRateService implements OnModuleInit {
 
     const rows: Array<[string, string, Date, number]> = [];
     for (const point of points) {
-      rows.push([from, to, point.date, point.rate]);
-      rows.push([to, from, point.date, roundFxRate(1 / point.rate)]);
+      const row = canonicalRateRow(from, to, point.rate);
+      // Unreachable for a point that survived the filter above; a guard rather
+      // than a branch, so a future filter change cannot write an unusable rate.
+      if (row === null) continue;
+      rows.push([row.from, row.to, point.date, row.rate]);
     }
+    if (rows.length === 0) return 0;
 
     const batchSize = 500;
     for (let i = 0; i < rows.length; i += batchSize) {
@@ -422,7 +445,7 @@ export class ExchangeRateService implements OnModuleInit {
       );
     }
 
-    return points.length;
+    return rows.length;
   }
 
   /**
@@ -665,11 +688,15 @@ export class ExchangeRateService implements OnModuleInit {
     for (const [pairKey, cutoffDate] of pairEarliest.entries()) {
       const [from, to] = pairKey.split("->");
 
-      // Skip if we already have historical rates for this pair
+      // Skip if we already have historical rates for this pair, in either
+      // direction: a pair is stored once, so asking only about `from->to` reads
+      // a pair held the other way as uncovered and re-fetches it from the
+      // provider on every run, forever. `readCoverage` asks the same way.
       const existingRates = await withScopedDb(this.dataSource, (manager) =>
         manager.query(
           `SELECT COUNT(*)::INT AS count FROM exchange_rates
-         WHERE from_currency = $1 AND to_currency = $2`,
+         WHERE (from_currency = $1 AND to_currency = $2)
+            OR (from_currency = $2 AND to_currency = $1)`,
           [from, to],
         ),
       );
@@ -794,8 +821,8 @@ export class ExchangeRateService implements OnModuleInit {
     pairs: ReadonlyArray<{ from: string; to: string }>,
     date: string,
   ): Promise<number> {
-    // `persistRateSeries` writes both directions from one fetch, so USD->CAD
-    // and CAD->USD are the same piece of work and must not be fetched twice.
+    // A pair is stored once, whichever way it was asked for, so USD->CAD and
+    // CAD->USD are the same piece of work and must not be fetched twice.
     const wanted = new Map<string, { from: string; to: string }>();
     for (const pair of pairs) {
       if (!pair.from || !pair.to || pair.from === pair.to) continue;
@@ -858,12 +885,12 @@ export class ExchangeRateService implements OnModuleInit {
   }
 
   /**
-   * One pair, one window, persisted in both directions.
+   * One pair, one window, persisted in the pair's canonical orientation.
    *
    * The reverse symbol is tried when the direct one returns nothing, because
-   * Yahoo carries some pairs under one orientation only and
-   * `persistRateSeries` writes the inverse row regardless -- so `CADUSD=X`
-   * answers a `USD->CAD` question just as well.
+   * Yahoo carries some pairs under one orientation only and `persistRateSeries`
+   * orients whatever answered -- so `CADUSD=X` answers a `USD->CAD` question just
+   * as well, landing on the same rows the direct symbol would have.
    */
   /**
    * @returns the number of observations persisted, and whether the provider
@@ -936,7 +963,15 @@ export class ExchangeRateService implements OnModuleInit {
   }
 
   /**
-   * Get the latest rate for a specific currency pair
+   * The latest stored rate for a pair, in whichever direction it is stored.
+   *
+   * Both directions are read and `resolveFxRate` chooses between them, so this
+   * answers the same question as every other lookup rather than a
+   * direction-specific one of its own. It used to read the stored pair one way
+   * only, returning `null` whenever the pair happened to be held the other way
+   * -- harmless while every fetch wrote a mirror row, and a silent gap once a
+   * pair is stored once (INV-FX-003). The posting fallbacks and the
+   * scheduled-estimate refresh were the callers that went unanswered.
    */
   async getLatestRate(
     from: string,
@@ -955,22 +990,61 @@ export class ExchangeRateService implements OnModuleInit {
     maxAgeDays?: number,
   ): Promise<number | null> {
     if (from === to) return 1;
-    const where: Record<string, unknown> = {
-      fromCurrency: from,
-      toCurrency: to,
-    };
-    if (maxAgeDays !== undefined) {
-      const oldest = new Date();
-      oldest.setUTCDate(oldest.getUTCDate() - maxAgeDays);
-      where.rateDate = MoreThanOrEqual(oldest.toISOString().slice(0, 10));
-    }
-    const rate = await withScopedDb(this.dataSource, (manager) =>
-      manager.getRepository(ExchangeRate).findOne({
-        where,
-        order: { rateDate: "DESC" },
-      }),
+    const today = todayYMD();
+    // The age bound on the query as well as in the resolver: the resolver
+    // decides admissibility, this just keeps the rows it reads bounded. A
+    // calendar step, not a local-midnight `Date` read back through `toISOString`.
+    const bound: { rateDate?: FindOperator<Date> } =
+      maxAgeDays === undefined
+        ? {}
+        : {
+            // `MoreThanOrEqual` stays spelled out here rather than behind a
+            // helper: `price-boundary.one-door.spec.ts` reads the lower bound of
+            // a newest-row read off the lines around the ordering, and a bound
+            // it cannot see is a bound the next reader cannot see either. The
+            // string cast is what `ymdSpan` explains -- a `Date` bound is
+            // rendered by `pg` in the process time zone and, west of UTC, names
+            // the previous calendar day.
+            rateDate: MoreThanOrEqual(
+              addDaysYMD(today, -maxAgeDays),
+            ) as unknown as FindOperator<Date>,
+          };
+    const [direct, reverse] = await withScopedDb(
+      this.dataSource,
+      async (manager) => {
+        const repo = manager.getRepository(ExchangeRate);
+        const newest = (f: string, t: string) =>
+          repo.findOne({
+            where: { fromCurrency: f, toCurrency: t, ...bound },
+            order: { rateDate: "DESC" },
+          });
+        return Promise.all([newest(from, to), newest(to, from)]);
+      },
     );
-    return rate ? Number(rate.rate) : null;
+
+    const observed = (row: ExchangeRate | null) => {
+      if (row === null) return undefined;
+      const date =
+        row.rateDate instanceof Date
+          ? row.rateDate.toISOString().slice(0, 10)
+          : String(row.rateDate).slice(0, 10);
+      return [{ date, rate: Number(row.rate) }];
+    };
+
+    // `live`: the freshest observation rather than one dated on or before today,
+    // which is what "the latest rate" has always meant here. An omitted bound is
+    // no bound at all, as before.
+    return resolveFxRate(
+      from,
+      to,
+      today,
+      (f, t) => (f === from && t === to ? observed(direct) : observed(reverse)),
+      {
+        mode: "live",
+        maxAgeDays: maxAgeDays ?? Number.POSITIVE_INFINITY,
+        today,
+      },
+    ).rate;
   }
 
   /**
@@ -1203,8 +1277,8 @@ export class ExchangeRateService implements OnModuleInit {
    *
    * Returns `null` when no usable rate exists in either direction -- never `1`,
    * and never the input amount: `docs/specs/fx-conversion-completeness.md`.
-   * The reverse pair is tried because a rate stored one way only (older data,
-   * before both directions were persisted together) is still a rate.
+   * Either stored direction answers, because the ladder resolves the pair
+   * through `resolveFxRate`; this does not chase the reverse pair itself.
    */
   async convertOnDate(
     amount: number,
@@ -1231,12 +1305,12 @@ export class ExchangeRateService implements OnModuleInit {
       };
     }
 
-    const direct = await resolveFxRateOrNull(this, from, to, effectiveDate);
-    let rate: number | null = direct;
-    if (rate === null) {
-      const reverse = await resolveFxRateOrNull(this, to, from, effectiveDate);
-      rate = reverse === null ? null : roundFxRate(1 / reverse);
-    }
+    // One lookup. The second one this used to make -- the pair reversed, the
+    // answer reciprocated -- could never add anything: the ladder it calls
+    // already consults both stored directions and inverts the reverse
+    // observation itself, so a `null` from the first call means the pair is
+    // unknown, not that it is held the other way.
+    const rate = await resolveFxRateOrNull(this, from, to, effectiveDate);
     if (rate === null) return null;
 
     return {

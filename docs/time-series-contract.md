@@ -147,9 +147,11 @@ five conditions that are not negotiable, and only these:
   convert -- the same `missingRatePairs` the response reports -- so a currency
   the window never had to convert costs no provider call.
 - **Month-granular and deduplicated.** One `ensureRatesForDate` call fetches
-  the whole calendar month around a date and persists both directions, so the
-  unit is `(month, directionless pair)`: a 400-point chart costs one call per
-  month per pair, not four hundred.
+  the whole calendar month around a date, for the pair in either direction, so
+  the unit is `(month, directionless pair)`: a 400-point chart costs one call per
+  month per pair, not four hundred. The pair is *stored* in one orientation
+  (INV-FX-003) and read in either, so the fetch unit and the storage unit are the
+  same pair.
 - **Bounded.** `MAX_FILL_MONTHS` (24) months per request, newest first. A wider
   range fills the newest two years and reports the rest as still missing; one
   HTTP request must not become an unbounded number of outbound ones.

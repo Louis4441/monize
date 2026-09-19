@@ -2,6 +2,7 @@ import { EntityManager } from "typeorm";
 import { roundToDecimals } from "../../../common/round.util";
 import { MnyExchangeRate, MnySecurityPrice } from "../model/mny-rows";
 import { chunk } from "./chunk";
+import { canonicalRateRow } from "../../../currencies/canonical-rate.util";
 
 /**
  * Bulk writers for `SP` price history and `CRNC_EXCHG` exchange rates.
@@ -16,6 +17,10 @@ import { chunk } from "./chunk";
  * file has 68,000 price rows -- so they go in as multi-row `INSERT ... ON
  * CONFLICT` statements with a smaller chunk than the transaction writer uses,
  * because each row binds more parameters.
+ *
+ * A rate row is oriented by `canonicalRateRow` before it is written, because
+ * `exchange_rates` stores each pair once and Money records whichever direction
+ * the user entered (INV-FX-003).
  */
 
 /** 500 rows x 5 columns stays well inside Postgres's 65,535-parameter ceiling. */
@@ -123,11 +128,20 @@ export interface ExchangeRateRow {
 }
 
 /**
- * Resolves `CRNC_EXCHG` handles into ISO codes, dropping what cannot be used.
+ * Resolves `CRNC_EXCHG` handles into ISO codes, dropping what cannot be used and
+ * orienting what survives.
  *
  * A rate needs both currencies, a date and a positive rate; a row missing any of
  * those describes nothing. Self-rates (`USD -> USD`) are dropped too: they are
  * always 1 and only get in the way of the rate lookup.
+ *
+ * Money records whichever orientation the user happened to enter, and
+ * `exchange_rates` stores one orientation per pair, so each row is put through
+ * `canonicalRateRow` before it is keyed (INV-FX-003). Two recordings of one pair
+ * and date -- `USD -> GBP` and `GBP -> USD` -- therefore collapse onto one key
+ * rather than becoming two rows that disagree, and the same dedupe that keeps
+ * the multi-row `INSERT` free of "cannot affect row a second time" now also
+ * keeps the pair from contradicting itself.
  */
 export function resolveExchangeRates(
   rates: readonly MnyExchangeRate[],
@@ -146,19 +160,23 @@ export function resolveExchangeRates(
     if (
       fromCurrency === undefined ||
       toCurrency === undefined ||
-      fromCurrency === toCurrency ||
-      rate.date === null ||
-      !Number.isFinite(value) ||
-      value <= 0
+      rate.date === null
     ) {
       continue;
     }
 
+    // Refuses a self-pair and a non-positive or non-finite rate, so the checks
+    // this replaces stay in one place.
+    const row = canonicalRateRow(fromCurrency, toCurrency, value);
+    if (row === null) {
+      continue;
+    }
+
     // Later rows win, matching the price rule and Money's own write order.
-    byKey.set(`${fromCurrency}|${toCurrency}|${rate.date}`, {
-      fromCurrency,
-      toCurrency,
-      rate: value,
+    byKey.set(`${row.from}|${row.to}|${rate.date}`, {
+      fromCurrency: row.from,
+      toCurrency: row.to,
+      rate: row.rate,
       rateDate: rate.date,
     });
   }

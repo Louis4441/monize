@@ -191,10 +191,10 @@ describe("currency conversion has no silent identity fallback", () => {
     const allowed = new Set([
       // The shared date-aware helper -- the single direct/inverse decision.
       "common/currency-conversion.util.ts",
-      // Persists the inverse pair alongside the direct one, at rate precision.
+      // `getLiveRate` reciprocates a reverse quote from the provider, not a
+      // stored row: a live fetch has no resolver to defer to, and the branch
+      // falls through to `resolveStoredRate` and then to null.
       "currencies/exchange-rate.service.ts",
-      // Latest-rate resolvers, each returning null when the pair is unknown.
-      "strategies/gem-position.service.ts",
     ]);
 
     const offenders: string[] = [];
@@ -212,7 +212,12 @@ describe("currency conversion has no silent identity fallback", () => {
     // The allowlist above is only meaningful if the files on it actually
     // handle the absent case. Each must mention returning null near its
     // reciprocal rather than falling through to a number.
-    const resolvers = ["strategies/gem-position.service.ts"];
+    //
+    // `gem-position.service.ts` left this list when it stopped reciprocating at
+    // all: it makes one `getLatestRate` call, which answers from either stored
+    // direction (INV-FX-003). A reciprocal reintroduced there fails the scan
+    // above, which is the point of taking it off.
+    const resolvers = ["currencies/exchange-rate.service.ts"];
 
     for (const rel of resolvers) {
       const source = readFileSync(join(SRC_ROOT, rel), "utf8");

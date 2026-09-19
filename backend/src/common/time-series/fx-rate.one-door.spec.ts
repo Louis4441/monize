@@ -128,10 +128,11 @@ const BASELINE: ReadonlyArray<{ file: string; reason: string }> = [
   {
     file: "strategies/gem-position.service.ts",
     reason:
-      "GEM position valuation converts at the latest rate, direct then " +
-      "inverse. The GEM surfaces have their own missing-data contract " +
-      "(docs/security-benchmark-comparison.md) and moving them is a separate " +
-      "change.",
+      "GEM position valuation converts at the latest rate, bounded to the " +
+      "same fortnight as its prices, in one call that resolves either stored " +
+      "direction. The GEM surfaces have their own missing-data contract " +
+      "(docs/security-benchmark-comparison.md) and moving them onto a dated " +
+      "lookup is a separate change.",
   },
 ];
 
