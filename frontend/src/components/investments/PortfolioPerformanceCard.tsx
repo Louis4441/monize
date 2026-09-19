@@ -6,8 +6,14 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { usePortfolioPeriodResults } from '@/hooks/usePortfolioPeriodResults';
 import { PerformancePeriodsCard } from '@/components/ui/PerformancePeriodsCard';
 import { withheldPeriodCause } from './portfolio-period-result';
-import { PORTFOLIO_PERIOD_PRESETS } from '@/types/net-worth';
-import type { PortfolioPeriodResult } from '@/types/net-worth';
+import {
+  BASE_PORTFOLIO_PERIOD_PRESETS,
+  PORTFOLIO_PERIOD_PRESETS,
+} from '@/types/net-worth';
+import type {
+  PortfolioPeriodPreset,
+  PortfolioPeriodResult,
+} from '@/types/net-worth';
 
 interface PortfolioPerformanceCardProps {
   /** The page's account filter, as it goes to the chart beside this card. */
@@ -39,6 +45,15 @@ interface PortfolioPerformanceCardProps {
  * security card gives for a window its history does not cover, and for the same
  * reason: a zero would be a claim that nothing happened. A request that has not
  * answered yet, or failed, leaves every period unknown rather than zero.
+ *
+ * WHICH windows there are is the server's answer too. The long ones (2Y, 5Y,
+ * 10Y) come back only where the portfolio's history reaches them, and the
+ * all-time row only where it has ever held anything, so this card lists the
+ * windows it was sent rather than a fixed six. A row nobody can ever fill in
+ * is not an "n/a" worth printing: unlike a window withheld for a missing
+ * price, there is nothing to add. Until the server answers, the base windows
+ * stand in, so the list grows into its full length instead of shrinking out of
+ * a longer one.
  */
 export function PortfolioPerformanceCard({
   accountIds,
@@ -56,6 +71,17 @@ export function PortfolioPerformanceCard({
     reloadKey,
   });
 
+  /**
+   * The windows on screen: what the server reported, in the canonical order,
+   * or the base windows while it has not answered.
+   */
+  const presets = useMemo<readonly PortfolioPeriodPreset[]>(() => {
+    if (!results) return BASE_PORTFOLIO_PERIOD_PRESETS;
+    return PORTFOLIO_PERIOD_PRESETS.filter(
+      (preset) => results.periods?.[preset] !== undefined,
+    );
+  }, [results]);
+
   const entries = useMemo(() => {
     const currency = results?.currency;
     // The chart's convention for a figure reported in a currency that is not
@@ -68,7 +94,7 @@ export function PortfolioPerformanceCard({
         : signed;
     };
 
-    return PORTFOLIO_PERIOD_PRESETS.map((preset) => {
+    return presets.map((preset) => {
       const period = results?.periods?.[preset];
       // Each figure is judged on its own: a period whose money is known and
       // whose ratio is not (a portfolio that started the window at nothing)
@@ -84,7 +110,14 @@ export function PortfolioPerformanceCard({
         secondaryValue: result,
       };
     });
-  }, [results, t, formatCurrency, formatSignedPercent, defaultCurrency]);
+  }, [
+    presets,
+    results,
+    t,
+    formatCurrency,
+    formatSignedPercent,
+    defaultCurrency,
+  ]);
 
   // Why a figure is missing, said once under the list. A request that has
   // not answered, or failed, is named as such; a period the server withheld
@@ -93,12 +126,12 @@ export function PortfolioPerformanceCard({
   const notice = useMemo(() => {
     if (status === 'loading') return t('portfolioPerformance.loading');
     if (status === 'error') return t('portfolioPerformance.loadFailed');
-    const withheld = PORTFOLIO_PERIOD_PRESETS.map(
-      (preset) => results?.periods?.[preset],
-    ).filter(
-      (period): period is PortfolioPeriodResult =>
-        !!period && (period.investmentPnl ?? null) === null,
-    );
+    const withheld = presets
+      .map((preset) => results?.periods?.[preset])
+      .filter(
+        (period): period is PortfolioPeriodResult =>
+          !!period && (period.investmentPnl ?? null) === null,
+      );
     // The cause of a withheld INVESTED figure is `investedReasons`; a backend
     // that does not send them yet has withheld for no reason it named, and the
     // list's own "n/a" is then the whole answer.
@@ -108,7 +141,7 @@ export function PortfolioPerformanceCard({
     return cause === null
       ? undefined
       : t(`portfolioPerformance.reasons.${cause}` as Parameters<typeof t>[0]);
-  }, [status, results, t]);
+  }, [presets, status, results, t]);
 
   return (
     <PerformancePeriodsCard

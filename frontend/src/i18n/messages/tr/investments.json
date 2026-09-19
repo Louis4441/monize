@@ -311,7 +311,11 @@
       "1m": "1A",
       "3m": "3A",
       "ytd": "Yıl başından",
-      "1y": "1Y"
+      "1y": "1Y",
+      "2y": "2Y",
+      "5y": "5Y",
+      "10y": "10Y",
+      "all": "Tüm zamanlar"
     },
     "loading": "Dönemler ölçülüyor...",
     "loadFailed": "Dönem sonuçları yüklenemedi. Rakamlar sıfır değil, bekletiliyor; yeniden denemek için sayfayı yeniden yükleyin.",

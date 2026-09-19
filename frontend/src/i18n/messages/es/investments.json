@@ -311,7 +311,11 @@
       "1m": "1M",
       "3m": "3M",
       "ytd": "Año en curso",
-      "1y": "1A"
+      "1y": "1A",
+      "2y": "2A",
+      "5y": "5A",
+      "10y": "10A",
+      "all": "Todo el tiempo"
     },
     "loading": "Midiendo los periodos...",
     "loadFailed": "No se pudieron cargar los resultados de los periodos. Las cifras se retienen, no son cero; recargue la página para volver a intentarlo.",

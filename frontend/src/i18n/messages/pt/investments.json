@@ -311,7 +311,11 @@
       "1m": "1M",
       "3m": "3M",
       "ytd": "Desde início do ano",
-      "1y": "1A"
+      "1y": "1A",
+      "2y": "2A",
+      "5y": "5A",
+      "10y": "10A",
+      "all": "Todo o período"
     },
     "loading": "A medir os períodos...",
     "loadFailed": "Não foi possível carregar os resultados dos períodos. Os valores são retidos, não são zero; recarregue a página para tentar novamente.",
