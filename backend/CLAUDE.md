@@ -76,6 +76,7 @@ Each module holds `{feature}.module.ts`, controller, service, their specs, `enti
 | A number a person reads | `src/common/number-locale.util.ts` | the `en-US` helpers in `format-currency.util.ts` (machine output only) |
 | A `@Query()` value before a service slices or compares it | a pipe (`ParseCurrencyCodePipe`, `ParseCalendarDatePipe`, `ParseUUIDPipe`) or `isCalendarDate`, which reject a non-string first | a bare regular expression `.test` on the raw value, which a repeated key's array passes by coercion |
 | A rate for a date | `resolveFxRate` (`src/common/time-series/fx-rate-resolver.ts`), or `ExchangeRateService.resolveStoredRate` / `getRateForDate` | `getLatestRate`, or a `rate_date DESC LIMIT 1` of your own |
+| Writing a row to `exchange_rates` | `canonicalRateRow` (`src/currencies/canonical-rate.util.ts`), which stores each pair in one orientation | a second inverted row beside it, or the orientation a provider or an imported file happened to record |
 | A read a person is waiting on, short of rate history | `fetchMissing: false` where the window is the whole history | an inline provider backfill behind a summary card |
 
 **A cron or bootstrap body seeds its own identity** -- `withSystemContext` for the fan-out, `withUserContext(userId)` per user, `withDelegateContext` when the two ids must differ -- and a per-user loop isolates each user, pre-checks included. `docs/backend/cron-and-background-work.md`.

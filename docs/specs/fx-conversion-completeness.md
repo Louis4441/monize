@@ -173,7 +173,7 @@ The policy now, in one place -- `backend/src/common/time-series/fx-rate-resolver
 | --- | --- |
 | Which observation prices a date? | The most recent one dated **on or before** it, in either stored direction. |
 | How old may it be? | At most `FX_MAX_RATE_AGE_DAYS` (45). Long weekends, public holidays on either side and a provider outage fit comfortably inside that; a market move does not. |
-| Direct or inverse? | Whichever observed the date more recently. A tie goes to direct, so the answer is deterministic. |
+| Direct or inverse? | Whichever observed the date more recently. A tie goes to direct, so the answer is deterministic. (2026-09-19: a pair is now stored in one orientation, INV-FX-003, so for rows written since then only one of the two exists and this rule decides nothing. It still decides for older rows, until the contract migration collapses them.) |
 | Nothing admissible? | `null`, with a named reason: `no_observation`, `only_after_date`, `stale_observation`, `unknown_currency`, `invalid_date`. |
 | A date that names no day? | Unknown, with reason `invalid_date`. A request parameter declared `string` may arrive as an array, and every rule above is a lexicographic comparison of `YYYY-MM-DD` strings. |
 | Equal codes? | `1`, without consulting the history. Nothing else may produce `1`. |

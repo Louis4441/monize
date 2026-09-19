@@ -97,6 +97,14 @@ Stored: originalAmount 100.00, originalCurrencyCode USD, exchangeRate 1.3500,
         amount 135.00
 ```
 
+**Storage orientation is not the same question.** The rule above is about a
+transaction's own `exchangeRate` column. A row in `exchange_rates` is stored in
+one orientation per pair -- `from_currency` sorting before `to_currency` --
+written by `canonicalRateRow`
+(`backend/src/currencies/canonical-rate.util.ts`), and every lookup resolves
+either direction through `resolveFxRate`, so nothing reads the storage layout as
+a statement about which way round the market quotes a pair (INV-FX-003).
+
 **Precision.** A rate is not money. `roundFxRate` rounds to
 `FX_RATE_DECIMALS = 10`, matching the `NUMERIC(20,10)` columns; display uses
 `FX_RATE_DISPLAY_DECIMALS = 6`. `roundMoney(1 / 1.3652)` gives `0.7325`, which
