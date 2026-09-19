@@ -100,7 +100,7 @@
 | C2 | Deployment-wide `fetch_sync` lease around FX, security price and market index fetches | -- | neutral | [x] |
 | C3 | Release-check cache to a one-row table | -- | neutral | [x] |
 | C4 | Demo seed under the lifecycle advisory lock | -- | neutral (demo only) | [x] |
-| G1 | Whole-tree process-local-state guard with allowlist | A4, X1, R4 | none | [ ] |
+| G1 | Whole-tree process-local-state guard with allowlist | A4, X1, R4 | none | [x] |
 | G2 | `INV-HA-001..005` in both contract docs | A3, K1, R3, S1 | none | [ ] |
 | D1 | Helm: Deployments, PDB, spread, autoscaling, `clusterMode` | F2 | none (defaults unchanged) | [x] |
 | D2 | `docker-compose.ha.yml` example | F2 | none | [x] |
@@ -1914,7 +1914,7 @@ what this task changed.
 
 ### G1 -- Whole-tree process-local-state guard
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/common/process-local-state.guard.spec.ts` (new).
 
@@ -1941,7 +1941,34 @@ any allowlist entry reports its file and line.
 match (the regex anchors on `private`). Blank comments while preserving line
 numbers so the report points at the right line.
 
-**Notes:**
+**Notes:** 35 allowlist entries, each with its reason. Three things the plan
+did not anticipate:
+
+- The allowlist is keyed `path#field`, not by file. Keying by file would have
+  exempted a sixth map in `provider-health.service.ts` on the strength of the
+  five already there, and keying by `path:line` would churn on every edit above
+  the declaration.
+- A field whose declared type is `ReadonlySet`/`ReadonlyMap` is skipped rather
+  than allowlisted: the type already forbids the mutation the guard is about,
+  and three constant lookup tables (`yahoo-finance.service.ts`,
+  `investment-transactions.service.ts` x2) would otherwise have been three
+  exemptions saying "this is a constant". A `static` field with a mutable type
+  IS scanned.
+- The scan also matches the declaration-only shape (`private readonly x: Map<`,
+  assigned in the constructor), which the plan's regex pair covers but the cron
+  guard's does not use; `MovementModel` in `daily-movement.service.ts` is
+  written that way.
+
+A second `it` fails an allowlist entry whose field is gone, so the list shrinks
+by being checked rather than by being remembered. Both directions were proved
+by removing an entry and by renaming one. The forward references in
+`memory-event-bus.ts` and `postgres-event-bus.ts` ("allowlisted when the
+whole-tree guard lands") are now satisfied; their wording still reads correctly
+and was left alone rather than widening this task's scope.
+
+Out of scope, reported not fixed: `docs/system-invariants.md`'s "Candidates not
+yet admitted" still lists "Bootstrap must be serialized across replicas ... no
+advisory lock", which `backend/src/common/db/advisory-locks.ts` has closed.
 
 ### G2 -- Invariants in both contract docs
 
