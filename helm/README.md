@@ -322,6 +322,46 @@ install time, so the UI went on presenting them as configured:
   failure, for receipts and documents. (The default `database` provider keeps
   bytes in Postgres and is unaffected; so is `s3`.)
 
+Changing that provider **relocates the attachments already stored**, so the
+switch is an upgrade rather than a line in the release notes:
+
+```yaml
+backend:
+  extraEnv:
+    - name: ATTACHMENT_STORAGE_PROVIDER
+      value: "s3"
+    - name: ATTACHMENT_S3_BUCKET
+      value: "my-monize-attachments"
+    # ...the other ATTACHMENT_S3_* variables from .env.example
+    # - name: ATTACHMENT_STORAGE_MIGRATE_ON_SWITCH
+    #   value: "false"          # leave them where they are instead
+  persistence:
+    attachments:
+      enabled: true             # keep this until the relocation has finished
+```
+
+The backend copies each attachment into the new backend, reads the copy back
+and checks it against the size and checksum recorded for it, then deletes the
+original -- starting a minute after boot, hourly until none are left, one
+attachment at a time. Two consequences for an operator:
+
+- **The backend being left has to stay configured and mounted until it
+  finishes**, because each attachment is read through the backend its own row
+  names. So keep `persistence.attachments.enabled: true` (or the S3
+  credentials, in the other direction) until the log stops reporting
+  `Attachment storage relocation`, and disable it after.
+- **Attachments stay readable throughout** -- before, during and after -- from
+  whichever backend currently holds each one. A backend the deployment can no
+  longer reach is the one exception, and the download says which one it is
+  rather than reporting the file as missing.
+
+`ATTACHMENT_STORAGE_MIGRATE_ON_SWITCH=false` turns the relocation off, which
+is a decision to keep the old backend indefinitely; the backend says so in its
+log once per boot. There is no chart parameter for either variable, for the
+same reason `ATTACHMENT_STORAGE_PROVIDER` has none: the attachment settings
+are passed through `backend.extraEnv`, and `.env.example` is where they are
+documented in full.
+
 Both are off by default, because enabling them creates a PersistentVolumeClaim
 and a cluster with no default StorageClass would leave the pod `Pending`. Turning
 one on without saying where the storage comes from fails at render time rather
