@@ -230,8 +230,8 @@ test on one replica.
 a race, so its unit matrix is load-bearing, and its E2E is the one
 `required (not yet met)` here. Two replicas do now serve one browser --
 `e2e/tests/cluster.spec.ts` on the cluster shard asserts that each one reports its
-wake-up channel healthy and answers `/health/ready` with 200 -- but that is the
-positive half. What is still missing is the flip: taking one live replica's
+wake-up channel healthy, and that `/health/ready` answers 200 for one of them --
+but that is the positive half. What is still missing is the flip: taking one live replica's
 channel away and watching readiness turn 503 while the other keeps serving.
 Nothing in the E2E stack can sever one replica's `LISTEN` without taking the
 database from both, so the invariant's entry says `partial` rather than claiming

@@ -1988,16 +1988,28 @@ did not anticipate:
   exempted a sixth map in `provider-health.service.ts` on the strength of the
   five already there, and keying by `path:line` would churn on every edit above
   the declaration.
-- A field whose declared type is `ReadonlySet`/`ReadonlyMap` is skipped rather
-  than allowlisted: the type already forbids the mutation the guard is about,
+- A field that is `readonly` AND typed `ReadonlySet`/`ReadonlyMap` is skipped
+  rather than allowlisted: both halves forbid the mutation the guard is about,
   and three constant lookup tables (`yahoo-finance.service.ts`,
   `investment-transactions.service.ts` x2) would otherwise have been three
-  exemptions saying "this is a constant". A `static` field with a mutable type
-  IS scanned.
+  exemptions saying "this is a constant". The `readonly` half is load-bearing --
+  `private x: ReadonlySet<string> = new Set()` forbids `add` and still allows a
+  reassignment, which is process state by another route. A `static` field with a
+  mutable type IS scanned.
 - The scan also matches the declaration-only shape (`private readonly x: Map<`,
   assigned in the constructor), which the plan's regex pair covers but the cron
   guard's does not use; `MovementModel` in `daily-movement.service.ts` is
   written that way.
+
+Comments are blanked before the scan, and locating them is the part that had to
+be got right: `extractTsComments` returns bodies without positions, and finding
+them again with a bare `indexOf` lands on code -- measurably, in
+`ai/query/tool-input-schemas.ts`, where the body `" delete"` matched inside
+`"attachments are not used for delete."` and blanked it. A landing site is now
+accepted only where a comment can begin, and a body that cannot be located is
+left in place, because an unblanked comment can only add an offender the report
+names out loud, never hide one. The vacuity test carries that collision as a
+case and fails on the original mistake.
 
 A second `it` fails an allowlist entry whose field is gone, so the list shrinks
 by being checked rather than by being remembered. Both directions were proved

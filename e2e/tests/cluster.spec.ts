@@ -110,6 +110,10 @@ test.describe('CLUSTER_MODE=multi', () => {
     }
     expect(seen.size).toBeGreaterThan(1);
 
+    // Readiness, with what it does and does not say. `/api/v1/health/ready` is
+    // the one API path the frontend does NOT proxy -- its own route handler
+    // fetches the backend itself -- so this reaches a replica through the load
+    // balancer and comes back unlabelled. It proves one replica ready, not both.
     const ready = await request.get('/api/v1/health/ready');
     expect(ready.status()).toBe(200);
   });
@@ -286,6 +290,8 @@ test.describe('CLUSTER_MODE=multi', () => {
  * (`docs/adr/0004-mcp-two-eras-request-identity-and-mrtr-confirmation.md`), so
  * a round-robin LB would answer its second request `404 Session not found`.
  */
+let nextRpcId = 1;
+
 async function mcpCall(
   agent: APIRequestContext,
   bearer: string,
@@ -302,7 +308,7 @@ async function mcpCall(
     },
     data: {
       jsonrpc: '2.0',
-      id: Date.now(),
+      id: nextRpcId++,
       method: 'tools/call',
       params: {
         name,

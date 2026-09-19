@@ -4301,12 +4301,16 @@ Required tests      Unit: backend/src/common/cluster/cluster-mode.spec.ts drives
                     grace, the missing-listener wiring defect and the ordering
                     against the database check; backend/src/common/cluster/cluster.module.spec.ts
                     covers what is bound per mode. E2E: e2e/tests/cluster.spec.ts,
-                    on the two-replica shard, asserts that every replica booted
-                    in multi reports eventBus healthy and answers
-                    /health/ready 200 -- the positive half. Still owed: the
-                    flip, an E2E that takes a live replica's channel away and
-                    watches readiness go 503. Nothing in the E2E stack can sever
-                    one replica's LISTEN without taking the database from both.
+                    on the two-replica shard, asserts that /health answers
+                    eventBus healthy from each of the two replicas in turn, and
+                    that /health/ready answers 200 -- the latter through the
+                    frontend's own route (frontend/src/app/api/v1/health/ready/route.ts
+                    serves it rather than proxying), so it proves one replica
+                    ready and names none. That is the positive half. Still owed:
+                    the flip, an E2E that takes a live replica's channel away
+                    and watches readiness go 503. Nothing in the E2E stack can
+                    sever one replica's LISTEN without taking the database from
+                    both.
 Status              partial
 ```
 

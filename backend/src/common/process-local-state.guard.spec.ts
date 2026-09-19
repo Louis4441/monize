@@ -66,8 +66,13 @@ function sourceFiles(): string[] {
   });
 }
 
-/** A field the type system has already made immutable is not state. */
-const READONLY_TYPE = /:\s*Readonly(?:Set|Map)\s*</;
+/**
+ * A field the type system has already made immutable is not state -- but only
+ * when the binding is immutable too. `private x: ReadonlySet<string> = new
+ * Set()` forbids `add` and still allows `this.x = new Set([...])`, which is
+ * process state by another route, so the skip requires `readonly` as well.
+ */
+const READONLY_FIELD = /\breadonly\s+\w+\s*:\s*Readonly(?:Set|Map)\s*</;
 
 function relative(file: string): string {
   return file.slice(SRC.length + 1).replace(/\\/g, "/");
@@ -77,16 +82,24 @@ function relative(file: string): string {
  * `source` with every comment body replaced by spaces, newlines kept, so a line
  * number in the report still points at the line the field is on.
  *
- * `extractTsComments` returns the bodies in source order and each is an exact
- * substring, so walking them with a moving cursor blanks each one exactly once
- * -- including a body that repeats verbatim further down the file.
+ * `extractTsComments` returns the bodies in source order but not their
+ * positions, so they have to be located again -- and a plain `indexOf` is
+ * unsound: a short body such as `" delete"` matches inside code before it
+ * reaches the comment it came from, and blanking there corrupts the source the
+ * scan is about to read. That is measurable rather than theoretical; it happens
+ * in `ai/query/tool-input-schemas.ts` today.
+ *
+ * So a landing site is accepted only where a comment can actually begin,
+ * immediately after `//` or the block opener. When no such site is found the
+ * comment is left in place, which is the safe direction: an unblanked comment
+ * can only add an offender the report names out loud, never hide one.
  */
 function blankComments(source: string): string {
   let out = source;
   let cursor = 0;
   for (const body of extractTsComments(source)) {
     if (body === "") continue;
-    const at = out.indexOf(body, cursor);
+    const at = commentBodyStart(out, body, cursor);
     if (at === -1) continue;
     out =
       out.slice(0, at) +
@@ -95,6 +108,16 @@ function blankComments(source: string): string {
     cursor = at + body.length;
   }
   return out;
+}
+
+/** The first occurrence of `body` at or after `from` that a `//` or `/*` opens. */
+function commentBodyStart(source: string, body: string, from: number): number {
+  for (let at = source.indexOf(body, from); at !== -1; ) {
+    const opener = source.slice(Math.max(0, at - 2), at);
+    if (opener === "//" || opener === "/*") return at;
+    at = source.indexOf(body, at + 1);
+  }
+  return -1;
 }
 
 interface Field {
@@ -112,7 +135,7 @@ function processLocalFields(): Field[] {
     const path = relative(file);
     const lines = blankComments(readFileSync(file, "utf8")).split("\n");
     lines.forEach((line, index) => {
-      if (READONLY_TYPE.test(line)) return;
+      if (READONLY_FIELD.test(line)) return;
       const assigned = ASSIGNED_FIELD.exec(line);
       const declared = assigned ? null : DECLARED_FIELD.exec(line);
       const match = assigned ?? declared;
@@ -341,6 +364,27 @@ describe("process-local state is a written decision, not a default", () => {
 
     expect(fields.some((field) => field.shape === "assigned")).toBe(true);
     expect(fields.some((field) => field.shape === "declared")).toBe(true);
+
+    // A comment body that also occurs in the code before it must not drag the
+    // blanking onto that code. Locating comments by a bare `indexOf` did, which
+    // left the scan reading a corrupted file; this is that mistake as a case.
+    // The literal below is the shape that actually collides in this tree:
+    // `ai/query/tool-input-schemas.ts` holds "...not used for delete." and a
+    // `// delete` comment after it, and a bare indexOf blanked the message.
+    const collision = [
+      'const message = "attachments are not used for delete.";',
+      "class C {",
+      "  // delete",
+      "  private readonly seen = new Map<string, number>();",
+      "}",
+    ].join("\n");
+    const blanked = blankComments(collision);
+    expect(blanked).toContain(
+      'const message = "attachments are not used for delete.";',
+    );
+    expect(blanked.split("\n").some((line) => ASSIGNED_FIELD.test(line))).toBe(
+      true,
+    );
 
     // A method-local map is not a field, and a field written out in a doc
     // comment is not code.
