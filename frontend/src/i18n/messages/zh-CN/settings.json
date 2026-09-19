@@ -594,14 +594,15 @@
   },
   "autoBackup": {
     "heading": "自动备份",
-    "description": "按计划自动将数据备份到文件夹。由于 Monize 在 Docker 中运行，您必须将主机文件夹作为卷映射到容器中（例如：-v /host/backups:/data/backups）。",
-    "adminManagedNote": "只有管理员可以更改这些设置，并且它们目前仅适用于管理员自己的自动备份。其他所有用户都会按照固定的部署默认值自动备份到各自的文件夹中。",
+    "description": "整个部署共用一份计划：服务器会把每个账户的数据备份到下方的存储中。由于 Monize 运行在 Docker 中，必须把本地文件夹以卷的方式挂载进容器（例如 -v /host/backups:/data/backups）。",
+    "adminManagedNote": "只有管理员可以修改此策略，它适用于本部署中的每个账户，各自写入独立的文件夹。",
+    "demoDisabledNote": "在演示模式下，这些控件为只读。",
     "loadingText": "加载中...",
     "enableLabel": "启用自动备份",
     "backupFolderLabel": "备份文件夹",
     "backupFolderPlaceholder": "/data/backups",
-    "perUserFolderHelp": "每位用户的备份都会存放在此文件夹内以其用户 ID 命名的专属文件夹中。",
-    "perUserFolderHelpWithPath": "每位用户的备份都会存放在此文件夹内以其用户 ID 命名的专属文件夹中。您的：{path}",
+    "perUserFolderHelp": "每个账户的备份都放在此文件夹内以其账户 ID 命名的独立子文件夹中。",
+    "perUserFolderHelpWithPath": "每个账户的备份都放在此文件夹内以其账户 ID 命名的独立子文件夹中。示例：{path}",
     "browseButton": "浏览...",
     "validateButton": "验证",
     "validatingButton": "验证中...",
@@ -623,26 +624,27 @@
       "monthlyHelp": "每月保留一份"
     },
     "status": {
-      "heading": "状态",
-      "lastBackup": "上次备份",
-      "nextBackup": "下次备份",
+      "heading": "部署状态",
+      "lastBackup": "最近一次备份",
+      "nextBackup": "下次计划备份",
       "error": "错误",
       "success": "成功",
-      "failed": "失败",
-      "partial": "不完整"
+      "partial": "不完整",
+      "failed": "失败"
     },
-    "saveButton": "保存设置",
+    "saveButton": "保存策略",
     "savingButton": "保存中...",
-    "runNowButton": "立即运行备份",
-    "runningButton": "正在运行备份...",
+    "runNowButton": "立即备份所有账户",
+    "runningButton": "正在备份...",
     "toasts": {
-      "saved": "自动备份设置已保存",
-      "backupCreated": "备份已创建：{filename}",
+      "saved": "备份策略已保存并应用到所有账户",
       "folderValid": "文件夹有效且可写",
       "loadFailed": "加载自动备份设置失败",
       "saveFailed": "保存设置失败",
       "runFailed": "运行备份失败",
-      "browseFailed": "浏览文件夹失败"
+      "browseFailed": "浏览文件夹失败",
+      "backupRunFinished": "已备份 {requested} 个账户中的 {backedUp} 个",
+      "backupRunIncomplete": "已备份 {requested} 个中的 {backedUp} 个：{partial} 个不完整，{failed} 个失败。请查看下方状态。"
     },
     "folderErrors": {
       "required": "文件夹路径为必填项",
@@ -657,10 +659,22 @@
     },
     "noStorage": {
       "title": "此部署没有备份存储",
-      "body": "自动备份将写入 {folderPath}，但此部署无法向该位置写入。管理员需要先在该位置挂载存储，计划任务才能运行。"
+      "body": "自动备份将写入 {folderPath}，但本部署无法写入该位置。需要管理员先提供该存储，计划才能运行。"
     },
     "never": "从未",
-    "demoDisabledNote": "在演示模式下，这些控件为只读。"
+    "coverage": {
+      "accounts": "覆盖本部署中的 {count} 个启用账户。",
+      "unknown": "无法获取此策略覆盖的账户数量。"
+    },
+    "storage": {
+      "heading": "备份存储",
+      "providerLocal": "本地文件夹",
+      "providerS3": "S3 兼容对象存储",
+      "providerUnknown": "存储",
+      "localHelp": "由 BACKUP_STORAGE_PROVIDER 决定。每个账户的备份都放在此文件夹内以其账户 ID 命名的独立子文件夹中。",
+      "fixedHelp": "由 BACKUP_STORAGE_PROVIDER 决定。存储桶和键前缀属于本部署，因此这里没有可选的文件夹；每个账户的备份都放在各自的键前缀下。",
+      "artifactCount": "该存储目前保存着你账户的 {count} 个备份文件。切换存储不会移动已有的备份。"
+    }
   },
   "backupRestore": {
     "heading": "备份与恢复",

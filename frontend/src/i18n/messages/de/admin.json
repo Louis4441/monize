@@ -172,14 +172,11 @@
   },
   "backupsPage": {
     "title": "Sicherungen",
-    "subtitle": "Geplante, komprimierte Sicherungsdateien pro Benutzer, die in einen Ordner auf dem Server geschrieben werden.",
+    "subtitle": "Geplante, komprimierte Sicherungsdateien der Finanzdaten jedes einzelnen Kontos.",
     "scope": {
       "heading": "Keine vollständige Datenbanksicherung",
-      "perUser": "Die automatische Sicherung schreibt nach einem Zeitplan eine komprimierte Sicherungsdatei der eigenen Finanzdaten jedes Benutzers in einen Ordner auf dem Server und bewahrt gemäß der Aufbewahrungsrichtlinie eine bestimmte Anzahl davon auf.",
-      "adminPolicyScope": "Der hier konfigurierte Zeitplan, Ordner und die Aufbewahrung gelten derzeit nur für die automatischen Sicherungen des Administrators selbst. Andere Konten werden automatisch mit festen Bereitstellungsvorgaben gesichert; eine einheitliche Richtlinie pro Bereitstellung ist hier noch nicht konfigurierbar.",
-      "notFullDatabase": "Es handelt sich nicht um einen vollständigen PostgreSQL- oder Datenbank-Dump. Er erfasst weder das Datenbankschema noch die Daten einer anderen Bereitstellung, die Anwendungskonfiguration oder irgendetwas außerhalb der eigenen Finanzdaten eines Benutzers.",
-      "notSameAsManualExport": "Er ist mit dem manuellen Export unter Einstellungen -> Sichern & Wiederherstellen verwandt, hat aber nicht dasselbe Dateiformat.",
-      "disasterRecovery": "Für die Notfallwiederherstellung der gesamten Instanz sichern Sie die PostgreSQL-Datenbank und den Anhangspeicher separat mit den eigenen Werkzeugen Ihrer Infrastruktur."
+      "perUser": "Nach dem unten eingestellten Zeitplan schreibt der Server für jedes Konto eine komprimierte Sicherungsdatei seiner eigenen Finanzdaten und löscht ältere gemäß der Aufbewahrungsrichtlinie. Alle aktiven Konten sind erfasst.",
+      "notFullDatabase": "Es ist kein PostgreSQL-Dump: Schema, Serverkonfiguration und alles außerhalb der Finanzdaten eines Kontos werden nicht erfasst. Für die Notfallwiederherstellung der gesamten Instanz sichern Sie die Datenbank und den Anhangspeicher mit Ihren eigenen Werkzeugen."
     },
     "demoRestricted": {
       "heading": "Im Demomodus eingeschränkt",

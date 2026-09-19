@@ -215,7 +215,8 @@
     "offsiteOwnBucketRequired": "Indica il bucket in cui copiare i tuoi backup.",
     "offsiteOwnCredentialsRequired": "Inserisci un access key id e una secret access key per il tuo bucket.",
     "offsiteEncryptionKeyRequired": "Questo server non può memorizzare credenziali S3 perché ENCRYPTION_KEY non è impostata. Chiedi a un amministratore di configurarla oppure usa il bucket dell'installazione.",
-    "offsiteEmailAddressRequired": "Indica l'indirizzo a cui inviare i tuoi backup."
+    "offsiteEmailAddressRequired": "Indica l'indirizzo a cui inviare i tuoi backup.",
+    "manualRunFailed": "Non è stato possibile scrivere alcun backup: {{ count }} account non sono riusciti. Primo errore: {{ reason }}"
   },
   "budgets": {
     "notFound": "Budget con ID {{ id }} non trovato",

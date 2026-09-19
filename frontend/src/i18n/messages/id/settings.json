@@ -594,14 +594,15 @@
   },
   "autoBackup": {
     "heading": "Pencadangan Otomatis",
-    "description": "Cadangkan data Anda secara otomatis ke folder sesuai jadwal. Karena Monize berjalan di Docker, Anda harus memetakan folder host ke dalam kontainer sebagai volume (misalnya, -v /host/backups:/data/backups).",
-    "adminManagedNote": "Hanya administrator yang dapat mengubah pengaturan ini, dan saat ini mengatur pencadangan otomatis milik administrator sendiri. Semua pengguna lain dicadangkan secara otomatis dengan nilai bawaan penyebaran yang tetap, masing-masing ke folder sendiri.",
+    "description": "Satu jadwal untuk seluruh deployment: server mencadangkan data setiap akun ke penyimpanan di bawah ini. Karena Monize berjalan di Docker, folder lokal harus dipetakan ke dalam kontainer sebagai volume (mis. -v /host/backups:/data/backups).",
+    "adminManagedNote": "Hanya administrator yang dapat mengubah kebijakan ini, dan kebijakan ini berlaku untuk setiap akun pada deployment ini, masing-masing ke folder tersendiri.",
+    "demoDisabledNote": "Kontrol ini hanya-baca dalam mode demo.",
     "loadingText": "Memuat...",
     "enableLabel": "Aktifkan pencadangan otomatis",
     "backupFolderLabel": "Folder Cadangan",
     "backupFolderPlaceholder": "/data/backups",
-    "perUserFolderHelp": "Cadangan setiap pengguna disimpan di folder mereka sendiri di dalam folder ini, dinamai sesuai ID pengguna.",
-    "perUserFolderHelpWithPath": "Cadangan setiap pengguna disimpan di folder mereka sendiri di dalam folder ini, dinamai sesuai ID pengguna. Milik Anda: {path}",
+    "perUserFolderHelp": "Cadangan setiap akun disimpan di folder tersendiri di dalam folder ini, dinamai menurut ID akunnya.",
+    "perUserFolderHelpWithPath": "Cadangan setiap akun disimpan di folder tersendiri di dalam folder ini, dinamai menurut ID akunnya. Contoh: {path}",
     "browseButton": "Jelajahi...",
     "validateButton": "Validasi",
     "validatingButton": "Memvalidasi...",
@@ -623,26 +624,27 @@
       "monthlyHelp": "Satu per bulan disimpan"
     },
     "status": {
-      "heading": "Status",
-      "lastBackup": "Pencadangan terakhir",
-      "nextBackup": "Pencadangan berikutnya",
+      "heading": "Status Deployment",
+      "lastBackup": "Cadangan terbaru",
+      "nextBackup": "Cadangan terjadwal berikutnya",
       "error": "Kesalahan",
       "success": "Berhasil",
-      "failed": "Gagal",
-      "partial": "Sebagian"
+      "partial": "Sebagian",
+      "failed": "Gagal"
     },
-    "saveButton": "Simpan Pengaturan",
+    "saveButton": "Simpan Kebijakan",
     "savingButton": "Menyimpan...",
-    "runNowButton": "Jalankan Pencadangan Sekarang",
-    "runningButton": "Menjalankan Pencadangan...",
+    "runNowButton": "Cadangkan Semua Akun Sekarang",
+    "runningButton": "Mencadangkan...",
     "toasts": {
-      "saved": "Pengaturan pencadangan otomatis disimpan",
-      "backupCreated": "Cadangan dibuat: {filename}",
+      "saved": "Kebijakan cadangan disimpan dan diterapkan ke semua akun",
       "folderValid": "Folder valid dan dapat ditulis",
       "loadFailed": "Gagal memuat pengaturan pencadangan otomatis",
       "saveFailed": "Gagal menyimpan pengaturan",
       "runFailed": "Gagal menjalankan pencadangan",
-      "browseFailed": "Gagal menjelajahi folder"
+      "browseFailed": "Gagal menjelajahi folder",
+      "backupRunFinished": "Mencadangkan {backedUp} dari {requested} akun",
+      "backupRunIncomplete": "Mencadangkan {backedUp} dari {requested}: {partial} sebagian, {failed} gagal. Periksa status di bawah."
     },
     "folderErrors": {
       "required": "Jalur folder diperlukan",
@@ -657,10 +659,22 @@
     },
     "noStorage": {
       "title": "Deployment ini tidak memiliki penyimpanan backup",
-      "body": "Backup otomatis akan ditulis ke {folderPath}, yang tidak dapat ditulisi oleh deployment ini. Administrator perlu memasang penyimpanan di sana sebelum jadwal dapat berjalan."
+      "body": "Cadangan otomatis akan ditulis ke {folderPath}, yang tidak dapat ditulisi oleh deployment ini. Administrator perlu menyediakan penyimpanan di sana sebelum jadwal dapat berjalan."
     },
     "never": "Tidak pernah",
-    "demoDisabledNote": "Kontrol ini hanya-baca dalam mode demo."
+    "coverage": {
+      "accounts": "Mencakup {count} akun aktif pada deployment ini.",
+      "unknown": "Jumlah akun yang dicakup kebijakan ini tidak tersedia."
+    },
+    "storage": {
+      "heading": "Penyimpanan Cadangan",
+      "providerLocal": "Folder lokal",
+      "providerS3": "Penyimpanan objek kompatibel S3",
+      "providerUnknown": "Penyimpanan",
+      "localHelp": "Ditentukan oleh BACKUP_STORAGE_PROVIDER. Cadangan setiap akun disimpan di folder tersendiri di dalam folder ini, dinamai menurut ID akunnya.",
+      "fixedHelp": "Ditentukan oleh BACKUP_STORAGE_PROVIDER. Bucket dan awalan kunci adalah milik deployment, jadi tidak ada folder untuk dipilih di sini; cadangan setiap akun berada di bawah awalan kunci tersendiri.",
+      "artifactCount": "Penyimpanan ini kini memuat {count} berkas cadangan untuk akun Anda. Mengganti penyimpanan tidak memindahkan cadangan yang sudah ada."
+    }
   },
   "backupRestore": {
     "heading": "Cadangkan & Pulihkan",

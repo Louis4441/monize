@@ -215,7 +215,8 @@
     "offsiteOwnBucketRequired": "Yedeklerinizin kopyalanacağı bucket'ı girin.",
     "offsiteOwnCredentialsRequired": "Bucket'ınız için bir erişim anahtarı kimliği ve bir gizli erişim anahtarı girin.",
     "offsiteEncryptionKeyRequired": "ENCRYPTION_KEY ayarlanmadığı için bu sunucu S3 kimlik bilgilerini saklayamıyor. Bir yöneticiden bunu yapılandırmasını isteyin veya kurulumun bucket'ını kullanın.",
-    "offsiteEmailAddressRequired": "Yedeklerinizin gönderileceği e-posta adresini girin."
+    "offsiteEmailAddressRequired": "Yedeklerinizin gönderileceği e-posta adresini girin.",
+    "manualRunFailed": "Hiçbir yedek yazılamadı: {{ count }} hesap başarısız oldu. İlk hata: {{ reason }}"
   },
   "budgets": {
     "notFound": "{{ id }} kimliğine sahip bütçe bulunamadı",

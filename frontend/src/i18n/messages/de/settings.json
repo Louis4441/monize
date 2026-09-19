@@ -594,14 +594,15 @@
   },
   "autoBackup": {
     "heading": "Automatisches Backup",
-    "description": "Sichern Sie Ihre Daten automatisch nach einem Zeitplan in einem Ordner. Da Monize in Docker läuft, müssen Sie einen Host-Ordner als Volume in den Container einbinden (z. B. -v /host/backups:/data/backups).",
-    "adminManagedNote": "Nur Administratoren können diese Einstellungen ändern, und sie gelten derzeit für die automatischen Sicherungen des Administrators selbst. Alle anderen Benutzer werden automatisch mit festen Bereitstellungsvorgaben gesichert, jeweils in einem eigenen Ordner.",
+    "description": "Ein Zeitplan für die gesamte Installation: Der Server sichert die Daten jedes Kontos in den unten angegebenen Speicher. Da Monize in Docker läuft, muss ein lokaler Ordner als Volume in den Container eingebunden werden (z. B. -v /host/backups:/data/backups).",
+    "adminManagedNote": "Nur Administratoren können diese Richtlinie ändern; sie gilt für jedes Konto dieser Installation, jeweils in einem eigenen Ordner.",
+    "demoDisabledNote": "Diese Steuerelemente sind im Demomodus schreibgeschützt.",
     "loadingText": "Wird geladen...",
     "enableLabel": "Automatische Backups aktivieren",
     "backupFolderLabel": "Backup-Ordner",
     "backupFolderPlaceholder": "/data/backups",
-    "perUserFolderHelp": "Die Sicherungen jedes Benutzers liegen in einem eigenen Unterordner dieses Ordners, benannt nach seiner Benutzer-ID.",
-    "perUserFolderHelpWithPath": "Die Sicherungen jedes Benutzers liegen in einem eigenen Unterordner dieses Ordners, benannt nach seiner Benutzer-ID. Ihrer: {path}",
+    "perUserFolderHelp": "Die Sicherungen jedes Kontos liegen in einem eigenen Unterordner, benannt nach seiner Konto-ID.",
+    "perUserFolderHelpWithPath": "Die Sicherungen jedes Kontos liegen in einem eigenen Unterordner, benannt nach seiner Konto-ID. Beispiel: {path}",
     "browseButton": "Durchsuchen...",
     "validateButton": "Validieren",
     "validatingButton": "Wird validiert...",
@@ -623,26 +624,27 @@
       "monthlyHelp": "Eines pro Monat aufbewahrt"
     },
     "status": {
-      "heading": "Status",
-      "lastBackup": "Letztes Backup",
-      "nextBackup": "Nächstes Backup",
+      "heading": "Status der Installation",
+      "lastBackup": "Letzte Sicherung",
+      "nextBackup": "Nächste geplante Sicherung",
       "error": "Fehler",
       "success": "Erfolgreich",
-      "failed": "Fehlgeschlagen",
-      "partial": "Teilweise"
+      "partial": "Teilweise",
+      "failed": "Fehlgeschlagen"
     },
-    "saveButton": "Einstellungen speichern",
+    "saveButton": "Richtlinie speichern",
     "savingButton": "Wird gespeichert...",
-    "runNowButton": "Backup jetzt ausführen",
-    "runningButton": "Backup wird ausgeführt...",
+    "runNowButton": "Jetzt alle Konten sichern",
+    "runningButton": "Sicherung läuft...",
     "toasts": {
-      "saved": "Einstellungen für automatisches Backup gespeichert",
-      "backupCreated": "Backup erstellt: {filename}",
+      "saved": "Sicherungsrichtlinie gespeichert und auf alle Konten angewendet",
       "folderValid": "Ordner ist gültig und beschreibbar",
       "loadFailed": "Einstellungen für automatisches Backup konnten nicht geladen werden",
       "saveFailed": "Einstellungen konnten nicht gespeichert werden",
       "runFailed": "Backup konnte nicht ausgeführt werden",
-      "browseFailed": "Ordner konnten nicht durchsucht werden"
+      "browseFailed": "Ordner konnten nicht durchsucht werden",
+      "backupRunFinished": "{backedUp} von {requested} {requested, plural, one {Konto} other {Konten}} gesichert",
+      "backupRunIncomplete": "{backedUp} von {requested} gesichert: {partial} unvollständig, {failed} fehlgeschlagen. Sehen Sie den Status unten ein."
     },
     "folderErrors": {
       "required": "Ordnerpfad ist erforderlich",
@@ -657,10 +659,22 @@
     },
     "noStorage": {
       "title": "Diese Installation hat keinen Backup-Speicher",
-      "body": "Automatische Backups würden nach {folderPath} geschrieben, wohin diese Installation nicht schreiben kann. Ein Administrator muss dort Speicher einbinden, bevor ein Zeitplan laufen kann."
+      "body": "Automatische Sicherungen würden nach {folderPath} geschrieben, wohin diese Installation nicht schreiben kann. Ein Administrator muss diesen Speicher bereitstellen, bevor ein Zeitplan laufen kann."
     },
     "never": "Nie",
-    "demoDisabledNote": "Diese Steuerelemente sind im Demomodus schreibgeschützt."
+    "coverage": {
+      "accounts": "Gilt für {count} aktive {count, plural, one {Konto} other {Konten}} dieser Installation.",
+      "unknown": "Die Anzahl der von dieser Richtlinie erfassten Konten ist nicht verfügbar."
+    },
+    "storage": {
+      "heading": "Sicherungsspeicher",
+      "providerLocal": "Lokaler Ordner",
+      "providerS3": "S3-kompatibler Objektspeicher",
+      "providerUnknown": "Speicher",
+      "localHelp": "Festgelegt durch BACKUP_STORAGE_PROVIDER. Die Sicherungen jedes Kontos liegen in einem eigenen Unterordner, benannt nach seiner Konto-ID.",
+      "fixedHelp": "Festgelegt durch BACKUP_STORAGE_PROVIDER. Bucket und Schlüsselpräfix gehören zur Installation, daher gibt es hier keinen Ordner zur Auswahl; die Sicherungen jedes Kontos liegen unter einem eigenen Schlüsselpräfix.",
+      "artifactCount": "Dieser Speicher enthält derzeit {count} {count, plural, one {Sicherungsdatei} other {Sicherungsdateien}} für Ihr Konto. Ein Wechsel des Speichers verschiebt vorhandene Sicherungen nicht."
+    }
   },
   "backupRestore": {
     "heading": "Backup & Wiederherstellung",

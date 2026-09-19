@@ -215,7 +215,8 @@
     "offsiteOwnBucketRequired": "Indique o bucket para onde as suas cópias de segurança devem ser copiadas.",
     "offsiteOwnCredentialsRequired": "Introduza um id de chave de acesso e uma chave de acesso secreta para o seu bucket.",
     "offsiteEncryptionKeyRequired": "Este servidor não pode guardar credenciais de S3 porque ENCRYPTION_KEY não está definida. Peça a um administrador que a configure ou utilize o bucket desta instalação.",
-    "offsiteEmailAddressRequired": "Indique o endereço para o qual as suas cópias de segurança devem ser enviadas."
+    "offsiteEmailAddressRequired": "Indique o endereço para o qual as suas cópias de segurança devem ser enviadas.",
+    "manualRunFailed": "Não foi possível escrever nenhuma cópia de segurança: {{ count }} contas falharam. Primeiro erro: {{ reason }}"
   },
   "budgets": {
     "notFound": "Orçamento com ID {{ id }} não encontrado",

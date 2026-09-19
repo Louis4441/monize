@@ -594,14 +594,15 @@
   },
   "autoBackup": {
     "heading": "자동 백업",
-    "description": "일정에 따라 데이터를 폴더에 자동으로 백업합니다. Monize는 Docker에서 실행되므로 호스트 폴더를 볼륨으로 컨테이너에 매핑해야 합니다 (예: -v /host/backups:/data/backups).",
-    "adminManagedNote": "이 설정은 관리자만 변경할 수 있으며, 현재 관리자 자신의 자동 백업에 적용됩니다. 다른 모든 사용자는 고정된 배포 기본값으로 각자의 폴더에 자동으로 백업됩니다.",
+    "description": "배포 전체에 하나의 일정이 적용됩니다. 서버는 모든 계정의 데이터를 아래 저장소에 백업합니다. Monize는 도커에서 실행되므로 로컬 폴더를 볼륨으로 컨테이너에 연결해야 합니다(예: -v /host/backups:/data/backups).",
+    "adminManagedNote": "관리자만 이 정책을 변경할 수 있으며, 정책은 이 배포의 모든 계정에 적용되어 각각 자체 폴더에 저장됩니다.",
+    "demoDisabledNote": "데모 모드에서 이 컨트롤은 읽기 전용입니다.",
     "loadingText": "로딩 중...",
     "enableLabel": "자동 백업 활성화",
     "backupFolderLabel": "백업 폴더",
     "backupFolderPlaceholder": "/data/backups",
-    "perUserFolderHelp": "각 사용자의 백업은 이 폴더 안에 사용자 ID 이름으로 만들어진 개별 폴더에 저장됩니다.",
-    "perUserFolderHelpWithPath": "각 사용자의 백업은 이 폴더 안에 사용자 ID 이름으로 만들어진 개별 폴더에 저장됩니다. 내 폴더: {path}",
+    "perUserFolderHelp": "각 계정의 백업은 이 폴더 안의 계정 ID 이름을 가진 자체 폴더에 저장됩니다.",
+    "perUserFolderHelpWithPath": "각 계정의 백업은 이 폴더 안의 계정 ID 이름을 가진 자체 폴더에 저장됩니다. 예: {path}",
     "browseButton": "찾아보기...",
     "validateButton": "유효성 검사",
     "validatingButton": "유효성 검사 중...",
@@ -623,26 +624,27 @@
       "monthlyHelp": "월당 하나 보존"
     },
     "status": {
-      "heading": "상태",
-      "lastBackup": "마지막 백업",
-      "nextBackup": "다음 백업",
+      "heading": "배포 상태",
+      "lastBackup": "가장 최근 백업",
+      "nextBackup": "다음 예약 백업",
       "error": "오류",
       "success": "성공",
-      "failed": "실패",
-      "partial": "부분"
+      "partial": "부분",
+      "failed": "실패"
     },
-    "saveButton": "설정 저장",
+    "saveButton": "정책 저장",
     "savingButton": "저장 중...",
-    "runNowButton": "지금 백업 실행",
-    "runningButton": "백업 실행 중...",
+    "runNowButton": "지금 모든 계정 백업",
+    "runningButton": "백업 중...",
     "toasts": {
-      "saved": "자동 백업 설정이 저장되었습니다",
-      "backupCreated": "백업 생성됨: {filename}",
+      "saved": "백업 정책을 저장하고 모든 계정에 적용했습니다",
       "folderValid": "폴더가 유효하고 쓰기 가능합니다",
       "loadFailed": "자동 백업 설정 로드에 실패했습니다",
       "saveFailed": "설정 저장에 실패했습니다",
       "runFailed": "백업 실행에 실패했습니다",
-      "browseFailed": "폴더 탐색에 실패했습니다"
+      "browseFailed": "폴더 탐색에 실패했습니다",
+      "backupRunFinished": "{requested}개 계정 중 {backedUp}개를 백업했습니다",
+      "backupRunIncomplete": "{requested}개 중 {backedUp}개 백업: {partial}개 부분, {failed}개 실패. 아래 상태를 확인하세요."
     },
     "folderErrors": {
       "required": "폴더 경로는 필수입니다",
@@ -657,10 +659,22 @@
     },
     "noStorage": {
       "title": "이 배포에는 백업 저장소가 없습니다",
-      "body": "자동 백업은 {folderPath}에 기록되지만 이 배포에서는 해당 위치에 쓸 수 없습니다. 일정을 실행하려면 관리자가 먼저 해당 위치에 저장소를 마운트해야 합니다."
+      "body": "자동 백업은 {folderPath}에 기록되지만 이 배포는 그곳에 쓸 수 없습니다. 일정이 실행되려면 관리자가 해당 저장소를 준비해야 합니다."
     },
     "never": "없음",
-    "demoDisabledNote": "데모 모드에서 이 컨트롤은 읽기 전용입니다."
+    "coverage": {
+      "accounts": "이 배포의 활성 계정 {count}개를 포함합니다.",
+      "unknown": "이 정책이 포함하는 계정 수를 확인할 수 없습니다."
+    },
+    "storage": {
+      "heading": "백업 저장소",
+      "providerLocal": "로컬 폴더",
+      "providerS3": "S3 호환 오브젝트 스토리지",
+      "providerUnknown": "저장소",
+      "localHelp": "BACKUP_STORAGE_PROVIDER로 설정됩니다. 각 계정의 백업은 이 폴더 안의 계정 ID 이름을 가진 자체 폴더에 저장됩니다.",
+      "fixedHelp": "BACKUP_STORAGE_PROVIDER로 설정됩니다. 버킷과 키 접두사는 배포의 것이므로 여기서 선택할 폴더가 없습니다. 각 계정의 백업은 자체 키 접두사 아래에 저장됩니다.",
+      "artifactCount": "이 저장소에는 현재 귀하 계정의 백업 파일이 {count}개 있습니다. 저장소를 바꿔도 기존 백업은 옮겨지지 않습니다."
+    }
   },
   "backupRestore": {
     "heading": "백업 및 복원",

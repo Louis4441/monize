@@ -594,14 +594,15 @@
   },
   "autoBackup": {
     "heading": "自動備份",
-    "description": "依排程自動將您的資料備份至資料夾。由於 Monize 在 Docker 中運行，您必須將主機資料夾映射至容器作為磁碟區（例如：-v /host/backups:/data/backups）。",
-    "adminManagedNote": "只有管理員可以變更這些設定，且目前僅適用於管理員自己的自動備份。其他所有使用者都會依照固定的部署預設值自動備份到各自的資料夾中。",
+    "description": "整個部署共用一份排程：伺服器會把每個帳戶的資料備份到下方的儲存區。由於 Monize 執行於 Docker，必須把本機資料夾以磁碟區方式掛載進容器（例如 -v /host/backups:/data/backups）。",
+    "adminManagedNote": "只有管理員可以變更此原則，它適用於本部署中的每個帳戶，各自寫入獨立的資料夾。",
+    "demoDisabledNote": "在示範模式下，這些控制項為唯讀。",
     "loadingText": "載入中...",
     "enableLabel": "啟用自動備份",
     "backupFolderLabel": "備份資料夾",
     "backupFolderPlaceholder": "/data/backups",
-    "perUserFolderHelp": "每位使用者的備份都會存放在此資料夾內以其使用者 ID 命名的專屬資料夾中。",
-    "perUserFolderHelpWithPath": "每位使用者的備份都會存放在此資料夾內以其使用者 ID 命名的專屬資料夾中。您的：{path}",
+    "perUserFolderHelp": "每個帳戶的備份都放在此資料夾內以其帳戶 ID 命名的獨立子資料夾中。",
+    "perUserFolderHelpWithPath": "每個帳戶的備份都放在此資料夾內以其帳戶 ID 命名的獨立子資料夾中。範例：{path}",
     "browseButton": "瀏覽...",
     "validateButton": "驗證",
     "validatingButton": "驗證中...",
@@ -623,26 +624,27 @@
       "monthlyHelp": "每月保留一份"
     },
     "status": {
-      "heading": "狀態",
-      "lastBackup": "上次備份",
-      "nextBackup": "下次備份",
+      "heading": "部署狀態",
+      "lastBackup": "最近一次備份",
+      "nextBackup": "下次排程備份",
       "error": "錯誤",
       "success": "成功",
-      "failed": "失敗",
-      "partial": "不完整"
+      "partial": "不完整",
+      "failed": "失敗"
     },
-    "saveButton": "儲存設定",
+    "saveButton": "儲存原則",
     "savingButton": "儲存中...",
-    "runNowButton": "立即執行備份",
-    "runningButton": "執行備份中...",
+    "runNowButton": "立即備份所有帳戶",
+    "runningButton": "備份中...",
     "toasts": {
-      "saved": "自動備份設定已儲存",
-      "backupCreated": "備份已建立：{filename}",
+      "saved": "備份原則已儲存並套用至所有帳戶",
       "folderValid": "資料夾有效且可寫入",
       "loadFailed": "載入自動備份設定失敗",
       "saveFailed": "儲存設定失敗",
       "runFailed": "執行備份失敗",
-      "browseFailed": "瀏覽資料夾失敗"
+      "browseFailed": "瀏覽資料夾失敗",
+      "backupRunFinished": "已備份 {requested} 個帳戶中的 {backedUp} 個",
+      "backupRunIncomplete": "已備份 {requested} 個中的 {backedUp} 個：{partial} 個不完整，{failed} 個失敗。請查看下方狀態。"
     },
     "folderErrors": {
       "required": "資料夾路徑為必填",
@@ -657,10 +659,22 @@
     },
     "noStorage": {
       "title": "此部署沒有備份儲存空間",
-      "body": "自動備份將寫入 {folderPath}，但此部署無法寫入該位置。管理員需要先在該位置掛載儲存空間，排程才能執行。"
+      "body": "自動備份會寫入 {folderPath}，但本部署無法寫入該位置。必須由管理員先提供該儲存區，排程才能執行。"
     },
     "never": "從未",
-    "demoDisabledNote": "在示範模式下，這些控制項為唯讀。"
+    "coverage": {
+      "accounts": "涵蓋本部署中的 {count} 個啟用帳戶。",
+      "unknown": "無法取得此原則涵蓋的帳戶數量。"
+    },
+    "storage": {
+      "heading": "備份儲存區",
+      "providerLocal": "本機資料夾",
+      "providerS3": "S3 相容物件儲存",
+      "providerUnknown": "儲存區",
+      "localHelp": "由 BACKUP_STORAGE_PROVIDER 決定。每個帳戶的備份都放在此資料夾內以其帳戶 ID 命名的獨立子資料夾中。",
+      "fixedHelp": "由 BACKUP_STORAGE_PROVIDER 決定。儲存貯體與金鑰前置字元屬於本部署，因此這裡沒有可選的資料夾；每個帳戶的備份都放在各自的金鑰前置字元下。",
+      "artifactCount": "此儲存區目前保存你帳戶的 {count} 個備份檔。切換儲存區不會搬移既有的備份。"
+    }
   },
   "backupRestore": {
     "heading": "備份與還原",

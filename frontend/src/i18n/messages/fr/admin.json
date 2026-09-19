@@ -172,14 +172,11 @@
   },
   "backupsPage": {
     "title": "Sauvegardes",
-    "subtitle": "Fichiers de sauvegarde par utilisateur, compressés et planifiés, écrits dans un dossier sur le serveur.",
+    "subtitle": "Fichiers de sauvegarde compressés et planifiés des données financières de chaque compte.",
     "scope": {
       "heading": "Pas une sauvegarde complète de la base de données",
-      "perUser": "La sauvegarde automatique écrit, selon une planification, un fichier de sauvegarde compressé des données financières de chaque utilisateur dans un dossier sur le serveur, et en conserve un certain nombre selon la politique de rétention.",
-      "adminPolicyScope": "La planification, le dossier et la rétention configurés ici ne régissent actuellement que les sauvegardes automatiques de l'administrateur lui-même. Les autres comptes sont sauvegardés automatiquement selon des valeurs par défaut fixes du déploiement, et une politique unique par déploiement n'est pas encore configurable ici.",
-      "notFullDatabase": "Il ne s'agit pas d'un vidage complet de PostgreSQL ni de la base de données. Il ne capture pas le schéma de la base de données, les données d'un autre déploiement, la configuration de l'application, ni quoi que ce soit en dehors des données financières de l'utilisateur.",
-      "notSameAsManualExport": "Elle est liée à l'exportation manuelle de Paramètres -> Sauvegarde et restauration, mais n'a pas le même format sur disque.",
-      "disasterRecovery": "Pour la reprise après sinistre de l'ensemble de l'instance, sauvegardez la base de données PostgreSQL et le stockage des pièces jointes séparément à l'aide des outils propres à votre infrastructure."
+      "perUser": "Selon la planification ci-dessous, le serveur écrit un fichier de sauvegarde compressé des données financières de chaque compte et supprime les plus anciens selon la politique de rétention. Tous les comptes actifs sont couverts.",
+      "notFullDatabase": "Ce n'est pas un dump PostgreSQL : ni le schéma, ni la configuration du serveur, ni rien en dehors des données financières d'un compte n'est capturé. Pour la reprise après sinistre de l'instance entière, sauvegardez la base de données et le stockage des pièces jointes avec vos propres outils."
     },
     "demoRestricted": {
       "heading": "Restreint en mode démo",
