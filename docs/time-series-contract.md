@@ -209,6 +209,17 @@ on or before the date, in either stored direction, within
 reason otherwise -- `backend/src/common/time-series/fx-rate.one-door.spec.ts`
 fails a newest-rate read that bypasses it.
 
+**The answer must not cost the size of the history.** The door prepares each
+direction's observations once -- the rows with a usable rate and a date, sorted
+ascending, memoized against the array the caller handed over -- and then finds
+the admissible one by binary search. It used to read every row on every call,
+two `Date.parse` calls apiece: a since-inception portfolio walk asks for a rate
+on each of ~9,700 days against an index holding ~9,700 rows per direction, so
+one pair alone blocked the event loop for 66 seconds -- long enough for the
+readiness probe to fail and the pod to leave the Service (issue #1409). Which
+observation is chosen is the policy above and may be argued with; reading all of
+them to find it is not part of it.
+
 The periodic capital-gains report (`calculateCapitalGains`) is bound by this:
 it values each period boundary at the FX accepted for that boundary's own date
 in historical mode -- the start at `priceLookupStart`, the end at `periodEnd` --

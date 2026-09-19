@@ -302,6 +302,172 @@ describe("resolveFxRate", () => {
     expect(at(descending)).toEqual(at(ascending));
   });
 
+  /**
+   * Issue #1409: the resolver used to read every stored observation of a pair
+   * on every lookup, and every row cost two `Date.parse` calls. The
+   * since-inception portfolio walk asks for a rate on each of ~9,700 days
+   * against an index holding ~9,700 rows per direction, so one pair alone
+   * blocked the event loop for 66 seconds -- long enough for the readiness
+   * probe to fail and the pod to leave the Service.
+   *
+   * The answer must be the one the scan gave, row for row. `scanForBest` is
+   * that scan, kept here as the reference the fast path is measured against:
+   * the same rules, written the slow way.
+   */
+  describe("the lookup that replaced the scan", () => {
+    interface Best {
+      rate: number | null;
+      observedOn: string | null;
+      reason: string | null;
+    }
+
+    function scanForBest(
+      rows: DatedRate[],
+      inverse: DatedRate[],
+      onDate: string,
+      mode: "historical" | "live",
+      today: string,
+    ): Best {
+      const maxAgeDays = FX_MAX_RATE_AGE_DAYS;
+      const requested = onDate.slice(0, 10);
+      const reference =
+        mode === "live" ? today : requested > today ? today : requested;
+      const days = (from: string, to: string) =>
+        (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) /
+        86_400_000;
+      let sawAfter = false;
+      let sawStale = false;
+      let best: { date: string; rate: number; direction: string } | null = null;
+      for (const [direction, series] of [
+        ["direct", rows],
+        ["inverse", inverse],
+      ] as const) {
+        let inDirection: { date: string; rate: number } | null = null;
+        for (const row of series) {
+          const observed = Number(row.rate);
+          if (!Number.isFinite(observed) || observed <= 0) continue;
+          const date = row.date.slice(0, 10);
+          if (!date) continue;
+          const age = days(date, reference);
+          if (age < 0 && mode === "historical") {
+            sawAfter = true;
+            continue;
+          }
+          if (Math.abs(age) > maxAgeDays) {
+            sawStale = true;
+            continue;
+          }
+          if (inDirection !== null && date <= inDirection.date) continue;
+          inDirection = {
+            date,
+            rate: direction === "direct" ? observed : 1 / observed,
+          };
+        }
+        if (inDirection === null) continue;
+        // The more recent admissible observation wins; a tie goes to direct,
+        // which is read first here.
+        if (best === null || inDirection.date > best.date) {
+          best = { ...inDirection, direction };
+        }
+      }
+      if (best === null) {
+        return {
+          rate: null,
+          observedOn: null,
+          reason: sawStale
+            ? "stale_observation"
+            : sawAfter
+              ? "only_after_date"
+              : "no_observation",
+        };
+      }
+      return { rate: best.rate, observedOn: best.date, reason: null };
+    }
+
+    /** A deterministic generator: a seeded LCG, so a failure reproduces. */
+    function randomSeries(seed: number, count: number): DatedRate[] {
+      let state = seed;
+      const next = () => (state = (state * 1103515245 + 12345) % 2147483648);
+      const rows: DatedRate[] = [];
+      for (let i = 0; i < count; i++) {
+        const day = next() % 400;
+        const date = new Date(Date.UTC(2026, 0, 1) + day * 86_400_000)
+          .toISOString()
+          .slice(0, 10);
+        // Zero, negative and duplicate dates are all part of the input space.
+        const rate = [1.1, 1.25, 0, -1, 1.3][next() % 5];
+        rows.push({ date, rate });
+      }
+      return rows;
+    }
+
+    it("answers what the scan answered, over randomized histories", () => {
+      for (let seed = 1; seed <= 60; seed++) {
+        const direct = randomSeries(seed, 12);
+        const inverse = randomSeries(seed + 5000, 12);
+        for (const mode of ["historical", "live"] as const) {
+          for (const day of [0, 60, 150, 399]) {
+            const onDate = new Date(Date.UTC(2026, 0, 1) + day * 86_400_000)
+              .toISOString()
+              .slice(0, 10);
+            const expected = scanForBest(
+              direct,
+              inverse,
+              onDate,
+              mode,
+              "2027-06-01",
+            );
+            const actual = resolveFxRate(
+              "EUR",
+              "USD",
+              onDate,
+              lookupFrom({ "EUR->USD": direct, "USD->EUR": inverse }),
+              { mode, today: "2027-06-01" },
+            );
+            expect({
+              rate: actual.rate,
+              observedOn: actual.observedOn,
+              reason: actual.reason,
+              seed,
+              mode,
+              onDate,
+            }).toEqual({ ...expected, seed, mode, onDate });
+          }
+        }
+      }
+    });
+
+    it("keeps a day-by-day walk over a 26-year history off the event loop", () => {
+      const rows: DatedRate[] = [];
+      const dates: string[] = [];
+      for (let i = 0; i < 9_700; i++) {
+        const date = new Date(Date.UTC(2000, 0, 1) + i * 86_400_000)
+          .toISOString()
+          .slice(0, 10);
+        dates.push(date);
+        rows.push({ date, rate: 1.3 + (i % 100) / 1000 });
+      }
+      const inverse = rows.map((row) => ({
+        date: row.date,
+        rate: 1 / row.rate,
+      }));
+      const lookup = lookupFrom({ "USD->CAD": rows, "CAD->USD": inverse });
+
+      const started = Date.now();
+      for (const date of dates) {
+        expect(
+          resolveFxRate("USD", "CAD", date, lookup, { today: "2026-09-16" })
+            .rate,
+        ).not.toBeNull();
+      }
+      // The scan took 66 s for exactly this shape. The budget is deliberately
+      // two orders of magnitude above what the lookup costs (~0.1 s) rather
+      // than a tight timing assertion: what it fails is a return to work that
+      // grows with the history, not a slow machine.
+      expect(Date.now() - started).toBeLessThan(10_000);
+    }, 30_000);
+  });
+
   it("resolveFxRateValue is the rate alone", () => {
     expect(
       resolveFxRateValue(
