@@ -532,6 +532,10 @@ const cases: Array<{ name: string; schema: OutputSchema; raw: unknown }> = [
       totalGainLoss: 20,
       totalGainLossPercent: 25,
       timeWeightedReturn: null,
+      // Not in the schema (see the note beside it) but on every payload, and
+      // the loose object has to keep carrying them.
+      timeWeightedReturnReasons: ["noValueSeries"],
+      timeWeightedReturnSince: null,
       cagr: null,
       holdings: [
         {

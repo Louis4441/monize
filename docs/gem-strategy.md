@@ -426,9 +426,8 @@ compared against the units actually held **in each account separately** -- a
 surplus in one account cancels a shortfall in another if the totals are
 compared, and both wrong bases then pass. A history containing an `ADD_SHARES`
 or a `REMOVE_SHARES` leaves the basis unknown outright: those rows move units
-and carry no price, and the application itself keeps two answers for what they
-cost (`HoldingsService.adjustQuantity` holds the per-share average fixed, the
-full rebuild holds the total fixed). A `SPLIT` is not in that class -- it
+and carry no price, so the rebuild carries them as quantity-only and the basis
+it computes covers fewer shares than the position holds. A `SPLIT` is not in that class -- it
 scales units and preserves total cost, which is what both paths do.
 
 **An acquisition with no price is unknown, not free.** `price` is nullable, and

@@ -1,9 +1,10 @@
+import { FX_MAX_RATE_AGE_DAYS } from "./fx-rate-resolver";
 import {
   RateIndexRow,
   buildRateIndex,
   convertAtDate,
-  findBestRate,
   indexRateRows,
+  resolveIndexedRate,
 } from "./rate-index.util";
 
 const row = (
@@ -44,16 +45,15 @@ describe("rate-index.util", () => {
       );
 
       const [sql, params] = query.mock.calls[0];
-      // Both directions: convertWithRateLookup falls back to the inverse rate,
-      // and loading one direction would make that fallback unreachable.
+      // Both directions: the resolver takes the more recent admissible
+      // observation whichever way it is stored, so loading one direction would
+      // make half the pairs resolve from a staler row than the history holds.
       expect(sql).toContain(
-        "from_currency = ANY($1::TEXT[]) AND to_currency = $2",
+        "SELECT c AS from_currency, $2::TEXT AS to_currency",
       );
       expect(sql).toContain(
-        "from_currency = $2 AND to_currency = ANY($1::TEXT[])",
+        "SELECT $2::TEXT AS from_currency, c AS to_currency",
       );
-      // findBestRate walks forward and stops at the first date past the target,
-      // so the ordering is part of the contract, not a convenience.
       expect(sql).toContain("ORDER BY rate_date");
       expect(params).toEqual([
         ["USD", "EUR"],
@@ -63,7 +63,7 @@ describe("rate-index.util", () => {
       ]);
     });
 
-    it("loads a margin either side of the reported window", async () => {
+    it("loads the window plus the one preceding observation per pair, and nothing ahead of it", async () => {
       const query = jest.fn().mockResolvedValue([]);
       await buildRateIndex(
         query,
@@ -73,8 +73,132 @@ describe("rate-index.util", () => {
         "2026-06-30",
       );
       const [sql] = query.mock.calls[0];
-      expect(sql).toContain("($3::DATE - INTERVAL '90 days')");
-      expect(sql).toContain("($4::DATE + INTERVAL '31 days')");
+      // The last row before the window, bounded by the age policy -- not a
+      // fixed day margin, which made a point's answer depend on chart width.
+      expect(sql).toContain("ORDER BY er.rate_date DESC");
+      expect(sql).toContain("LIMIT 1");
+      expect(sql).toContain(`INTERVAL '${FX_MAX_RATE_AGE_DAYS} days'`);
+      // No forward margin: a date is never priced by an observation from its
+      // future (issue #1390).
+      expect(sql).not.toContain("+ INTERVAL");
+      expect(sql).not.toContain("90 days");
+    });
+
+    /**
+     * Issue #1390: `buildRateIndex` loaded a fixed 90-day-back / 31-day-ahead
+     * margin, so the same date resolved differently depending on how wide the
+     * chart around it was. The rows a window loads are now exactly the ones
+     * any date in it can be priced by, whatever its width.
+     */
+    it("gives one date the same answer from a narrow window and a wide one", async () => {
+      const history = [
+        row("USD", "CAD", 1.3, "2026-05-28"),
+        row("USD", "CAD", 1.365, "2026-06-15"),
+        row("USD", "CAD", 1.4, "2026-07-20"),
+      ];
+      // The database is asked for [LEAST(start, today) - 45d, end]; simulate it.
+      const serve = (start: string, end: string) =>
+        jest.fn().mockImplementation(async () => {
+          const floor = new Date(Date.parse(`${start}T00:00:00Z`));
+          floor.setUTCDate(floor.getUTCDate() - FX_MAX_RATE_AGE_DAYS);
+          const from = floor.toISOString().slice(0, 10);
+          return history.filter(
+            (r) => String(r.rate_date) >= from && String(r.rate_date) <= end,
+          );
+        });
+
+      const narrow = await buildRateIndex(
+        serve("2026-06-10", "2026-06-20"),
+        new Set(["USD"]),
+        "CAD",
+        "2026-06-10",
+        "2026-06-20",
+      );
+      const wide = await buildRateIndex(
+        serve("2026-01-01", "2026-12-31"),
+        new Set(["USD"]),
+        "CAD",
+        "2026-01-01",
+        "2026-12-31",
+      );
+
+      expect(convertAtDate(1000, "USD", "CAD", "2026-06-17", narrow)).toBe(
+        1365,
+      );
+      expect(convertAtDate(1000, "USD", "CAD", "2026-06-17", wide)).toBe(1365);
+    });
+
+    /**
+     * Issue #1390. A caller that converts at a date later than the window it
+     * asked for -- a monthly series requested to mid-month prices its last
+     * point at the month end -- got an index that stopped short of that date,
+     * so the point was priced by an older observation and moved when the same
+     * chart was asked for a wider range. The horizon is stated by the caller
+     * and the loader reads to it.
+     */
+    it("loads out to a conversion horizon later than the requested end", async () => {
+      const query = jest.fn().mockResolvedValue([]);
+
+      await buildRateIndex(
+        query,
+        new Set(["EUR"]),
+        "USD",
+        "2024-06-01",
+        "2024-06-15",
+        "2024-06-30",
+      );
+
+      expect(query.mock.calls[0][1]).toEqual([
+        ["EUR"],
+        "USD",
+        "2024-06-01",
+        "2024-06-30",
+      ]);
+    });
+
+    it("never narrows the window when the horizon is earlier than the end", async () => {
+      const query = jest.fn().mockResolvedValue([]);
+
+      await buildRateIndex(
+        query,
+        new Set(["EUR"]),
+        "USD",
+        "2024-06-01",
+        "2024-07-31",
+        "2024-06-30",
+      );
+
+      expect(query.mock.calls[0][1][3]).toBe("2024-07-31");
+    });
+
+    it("prices a month end that falls after the requested end from the observation dated on it", async () => {
+      const history = [
+        row("EUR", "USD", 1.07, "2024-06-14"),
+        row("EUR", "USD", 1.09, "2024-06-28"),
+      ];
+      // The database answers the upper bound the loader actually sent, so the
+      // fixture cannot hand back a row the query did not ask for.
+      const serve = jest
+        .fn()
+        .mockImplementation(async (_sql: string, params: unknown[]) =>
+          history.filter((r) => String(r.rate_date) <= String(params[3])),
+        );
+
+      // The window stops at 2024-06-15, but June's point is converted at
+      // 2024-06-30: without the horizon the 06-28 observation is not loaded and
+      // the point is priced at 1.07.
+      const index = await buildRateIndex(
+        serve,
+        new Set(["EUR"]),
+        "USD",
+        "2024-06-01",
+        "2024-06-15",
+        "2024-06-30",
+      );
+
+      expect(convertAtDate(10000, "EUR", "USD", "2024-06-30", index)).toBe(
+        10900,
+      );
     });
   });
 
@@ -110,35 +234,49 @@ describe("rate-index.util", () => {
     });
   });
 
-  describe("findBestRate", () => {
-    const rates = [
-      { date: "2026-06-10", rate: 1.3 },
-      { date: "2026-06-15", rate: 1.365 },
-      { date: "2026-06-20", rate: 1.4 },
-    ];
+  describe("resolveIndexedRate", () => {
+    const index = indexRateRows([
+      row("USD", "CAD", 1.3, "2026-06-10"),
+      row("USD", "CAD", 1.365, "2026-06-15"),
+      row("USD", "CAD", 1.4, "2026-06-20"),
+    ]);
 
     it("takes the most recent rate on or before the date", () => {
-      expect(findBestRate(rates, "USD->CAD", "2026-06-17")).toBe(1.365);
-      expect(findBestRate(rates, "USD->CAD", "2026-06-15")).toBe(1.365);
+      expect(
+        resolveIndexedRate(index, "USD", "CAD", "2026-06-17"),
+      ).toMatchObject({ rate: 1.365, observedOn: "2026-06-15" });
+      expect(
+        resolveIndexedRate(index, "USD", "CAD", "2026-06-15"),
+      ).toMatchObject({ rate: 1.365 });
     });
 
-    it("takes the latest rate when the date is past the whole history", () => {
-      expect(findBestRate(rates, "USD->CAD", "2027-01-01")).toBe(1.4);
+    /**
+     * Was: "takes the latest rate when the date is past the whole history".
+     * A rate is a price; an arbitrarily old one does not describe a later date
+     * (`docs/time-series-contract.md` section 2.2).
+     */
+    it("is unknown once the newest rate is past the age bound", () => {
+      expect(
+        resolveIndexedRate(index, "USD", "CAD", "2027-01-01"),
+      ).toMatchObject({ rate: null, reason: "stale_observation" });
     });
 
-    it("is undefined when the pair has no rates at all", () => {
-      expect(findBestRate([], "USD->CAD", "2026-06-17")).toBeUndefined();
+    it("is unknown when the pair has no rates at all", () => {
+      expect(
+        resolveIndexedRate(new Map(), "USD", "CAD", "2026-06-17"),
+      ).toMatchObject({ rate: null, reason: "no_observation" });
     });
 
-    it("falls back to the earliest rate before the history, and says so once", () => {
-      // A fresh array per case: the once-per-computation warning is keyed by the
-      // array object, which is exactly the behaviour being pinned here.
-      const own = [...rates];
-      const logger = { warn: jest.fn() };
-      expect(findBestRate(own, "USD->CAD", "2026-01-01", logger)).toBe(1.3);
-      expect(findBestRate(own, "USD->CAD", "2026-02-01", logger)).toBe(1.3);
-      expect(logger.warn).toHaveBeenCalledTimes(1);
-      expect(logger.warn.mock.calls[0][0]).toContain("look-ahead, DR-02");
+    /**
+     * Was: "falls back to the earliest rate before the history, and says so
+     * once" -- the look-ahead DR-02 recorded. Issue #1390 settles it: a March
+     * valuation is not evidence about a June rate, and the June rate is not
+     * evidence about March.
+     */
+    it("never prices a date with an observation from its future", () => {
+      expect(
+        resolveIndexedRate(index, "USD", "CAD", "2026-01-01"),
+      ).toMatchObject({ rate: null, reason: "only_after_date" });
     });
   });
 
@@ -173,6 +311,38 @@ describe("rate-index.util", () => {
       expect(logger.warn.mock.calls[0][0]).toContain(
         "rather than converted 1:1",
       );
+    });
+
+    // A fresh index per case: the once-per-computation warning is keyed by the
+    // index object, which is the behaviour being pinned here.
+    const ownIndex = () =>
+      indexRateRows([
+        row("USD", "CAD", 1.3, "2026-06-10"),
+        row("USD", "CAD", 1.365, "2026-06-15"),
+      ]);
+
+    it("warns once per pair per computation, not once per point", () => {
+      const own = ownIndex();
+      const logger = { warn: jest.fn() };
+      convertAtDate(1000, "JPY", "CAD", "2026-06-15", own, logger);
+      convertAtDate(2000, "JPY", "CAD", "2026-06-16", own, logger);
+      expect(logger.warn).toHaveBeenCalledTimes(1);
+    });
+
+    it("is null for a date that predates the pair's whole history", () => {
+      const logger = { warn: jest.fn() };
+      expect(
+        convertAtDate(1000, "USD", "CAD", "2026-01-01", ownIndex(), logger),
+      ).toBeNull();
+      expect(logger.warn.mock.calls[0][0]).toContain("dated after 2026-01-01");
+    });
+
+    it("is null for a date the newest stored rate is too old for", () => {
+      const logger = { warn: jest.fn() };
+      expect(
+        convertAtDate(1000, "USD", "CAD", "2027-01-01", ownIndex(), logger),
+      ).toBeNull();
+      expect(logger.warn.mock.calls[0][0]).toContain("days old");
     });
 
     it("converts zero to zero with no rate and records no gap", () => {

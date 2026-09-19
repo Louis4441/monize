@@ -111,5 +111,20 @@
     "nameMax": "Name must be 100 characters or less",
     "symbolRequired": "Symbol is required",
     "symbolMax": "Symbol must be 10 characters or less"
+  },
+  "rateHistory": {
+    "title": "Rate history",
+    "stored": "Stored history: {start} to {end} ({count} observations)",
+    "none": "No stored history for {pair}",
+    "loading": "Checking stored rate history...",
+    "loadFailed": "Could not read the stored rate history",
+    "addYear": "Add another year of rate history",
+    "adding": "Fetching another year...",
+    "hint": "Reports dated before the first stored rate cannot convert {pair}.",
+    "toasts": {
+      "added": "Added {count} rates; history now starts {start}",
+      "noOlder": "The provider has no older rates for {pair}",
+      "failed": "Could not extend the rate history"
+    }
   }
 }

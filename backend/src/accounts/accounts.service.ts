@@ -88,6 +88,38 @@ export interface LlmAccountRow {
   originalPrincipal: number | null;
 }
 
+/**
+ * The one statement that moves `accounts.current_balance` by a delta
+ * (`docs/concurrency-and-idempotency.md` section 2, row 1). PostgreSQL does the
+ * arithmetic after it wins the row lock, so two concurrent deltas compose
+ * instead of one overwriting the other; a `findOne` followed by an absolute
+ * write could not promise that.
+ *
+ * `openOnly` makes `is_closed = false` a predicate of the write itself (see
+ * `AccountsService.updateBalance` for why a separate check is not enough). The
+ * import passes `false`: it already holds the account it is writing into and
+ * treats a missing row as a no-op.
+ *
+ * Returns the number of rows the statement changed, so the caller decides what
+ * zero means (a refusal to report, or nothing to do).
+ */
+export async function applyAccountBalanceDelta(
+  m: EntityManager,
+  accountId: string,
+  delta: number,
+  options: { openOnly: boolean },
+): Promise<number> {
+  const closedPredicate = options.openOnly ? " AND is_closed = false" : "";
+  const updated: unknown = await m.query(
+    `UPDATE accounts
+        SET current_balance = ROUND(CAST(current_balance AS numeric) + $1, 4)
+      WHERE id = $2${closedPredicate}
+      RETURNING id`,
+    [delta, accountId],
+  );
+  return affectedRowCount(updated);
+}
+
 @Injectable()
 export class AccountsService {
   private readonly logger = new Logger(AccountsService.name);
@@ -1110,14 +1142,11 @@ export class AccountsService {
    */
   async updateBalance(accountId: string, amount: number): Promise<Account> {
     // One statement: lock, re-check `is_closed`, apply the delta, report back.
-    const sql = `UPDATE accounts
-                    SET current_balance = ROUND(CAST(current_balance AS numeric) + $1, 4)
-                  WHERE id = $2 AND is_closed = false
-                  RETURNING id`;
-
     return withScopedDb(this.dataSource, async (m) => {
-      const updated: unknown = await m.query(sql, [amount, accountId]);
-      if (affectedRowCount(updated) === 0) {
+      const affected = await applyAccountBalanceDelta(m, accountId, amount, {
+        openOnly: true,
+      });
+      if (affected === 0) {
         // No row matched: either the account is gone or it is closed. Tell those
         // apart so the caller gets 404 vs 400 rather than one ambiguous error.
         const exists = await m.getRepository(Account).findOne({

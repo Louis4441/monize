@@ -1225,8 +1225,9 @@ describe('InvestmentTransactionForm', () => {
   });
 
   it('displays total amount rounded to avoid IEEE 754 drift', async () => {
-    // 3 * 53.245 = 159.73499... in IEEE 754, which should round to 159.73 without fix
-    // but should display as 159.74 after roundToDecimals is applied
+    // 3 * 53.245 = 159.73499999999999 in IEEE 754. The field carries the total
+    // at the money column's four decimals, so it reads 159.735 -- the figure
+    // that will be stored -- and never the drifting tail.
     const transaction = {
       id: 't1', accountId: 'a1', action: 'BUY' as const, transactionDate: '2024-01-01',
       quantity: 3, price: 53.245, commission: 0, totalAmount: 159.74, description: '',
@@ -1234,9 +1235,10 @@ describe('InvestmentTransactionForm', () => {
 
     render(<InvestmentTransactionForm accounts={accounts} transaction={transaction} />);
     await waitFor(() => {
-      // The total display uses formatCurrency which receives the rounded value
-      // formatCurrency mock: $${n.toFixed(2)} => $159.74 not $159.73
-      expect(screen.getByText(/\$159\.74/)).toBeInTheDocument();
+      // The total is an editable field now (it is the authoritative input when
+      // the user types in it), so the figure is its value rather than text.
+      const total = screen.getByLabelText(/Total Amount/) as HTMLInputElement;
+      expect(Number(total.value)).toBe(159.735);
     });
   });
 
@@ -2476,6 +2478,78 @@ describe('InvestmentTransactionForm - extra coverage', () => {
           screen.getByRole('button', { name: 'Transfer Securities & New' }),
         ).toBeInTheDocument();
       });
+    });
+  });
+  describe('total and price', () => {
+    /**
+     * Invariant: the executed total is the fact; the per-share price is derived
+     * from it (INV-TRADE-001).
+     * Canonical adversarial input: a sale of 141 shares for 820.91, which is
+     * not any two-decimal price times 141.
+     * Minimal mutation: make the Total a read-only display again.
+     * Test that fails under it: this one -- the payload carries 820.62 (or no
+     * total at all) and a price of 5.82.
+     */
+    it('derives the price from a typed total, and sends the total as entered', async () => {
+      render(<InvestmentTransactionForm accounts={accounts} />);
+      await waitFor(() => {
+        expect(screen.getByLabelText('Transaction Type')).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Transaction Type'), {
+          target: { value: 'SELL' },
+        });
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Quantity (Shares)'), {
+          target: { value: '141' },
+        });
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText(/Price per Share/), {
+          target: { value: '5.82' },
+        });
+      });
+      // What the statement says the sale came to.
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText(/Total Amount/), {
+          target: { value: '820.91' },
+        });
+      });
+
+      const priceInput = screen.getByLabelText(/Price per Share/) as HTMLInputElement;
+      expect(Number(priceInput.value)).toBeCloseTo(5.822057, 6);
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Create Transaction'));
+      });
+      await waitFor(() => {
+        expect(investmentsApi.createTransaction).toHaveBeenCalled();
+      });
+      const payload = vi.mocked(investmentsApi.createTransaction).mock
+        .calls[0][0] as { totalAmount?: number; price?: number };
+      expect(payload.totalAmount).toBeCloseTo(820.91, 4);
+      expect(payload.price).toBeCloseTo(5.8220567376, 10);
+    });
+
+    it('still derives the total from the price when the price is what changed', async () => {
+      render(<InvestmentTransactionForm accounts={accounts} />);
+      await waitFor(() => {
+        expect(screen.getByLabelText('Transaction Type')).toBeInTheDocument();
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Quantity (Shares)'), {
+          target: { value: '8' },
+        });
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText(/Price per Share/), {
+          target: { value: '5.831963' },
+        });
+      });
+
+      const totalInput = screen.getByLabelText(/Total Amount/) as HTMLInputElement;
+      expect(Number(totalInput.value)).toBeCloseTo(46.6557, 4);
     });
   });
 });

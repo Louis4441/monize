@@ -45,6 +45,7 @@ import { restoreAiProviderKey } from "./ai-provider-key-transport";
 import { keyBearingExportTables } from "./export-table-queries";
 import { BackupAttachmentTransferService } from "./backup-attachment-transfer.service";
 import { BackupRestoreDatabaseService } from "./backup-restore-database.service";
+import { invalidatePortfolioSummary } from "../securities/portfolio-summary-memo";
 
 const gunzipAsync = promisify(gunzip);
 
@@ -329,6 +330,9 @@ export class BackupRestoreService {
               displacedKeys,
               [...stagedKeys, ...sourceKeys],
             );
+            // A restore replaces the accounts, holdings and prices the memoized
+            // portfolio valuation was computed from.
+            invalidatePortfolioSummary(userId);
             return result;
           })
           .catch(async (error) => {

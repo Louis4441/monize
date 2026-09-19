@@ -894,32 +894,186 @@ describe("ExchangeRateService", () => {
     });
   });
 
+  /**
+   * A stored row, dated: the age policy means a fixture's date is part of what
+   * it asserts, not scenery.
+   */
+  const storedRow = (
+    from: string,
+    to: string,
+    rate: number,
+    date: string,
+  ): ExchangeRate => ({
+    ...mockExchangeRate,
+    fromCurrency: from,
+    toCurrency: to,
+    rate,
+    // `main.ts` sets the pg DATE parser to hand the literal back unparsed, so a
+    // row that crossed the driver carries the `YYYY-MM-DD` string. The entity
+    // declares `Date` for the SQL column type; the fixture is the shape
+    // production actually produces, because a fixture the producer could not
+    // have written is not evidence.
+    rateDate: date as unknown as Date,
+  });
+
+  /** The [floor, ceiling] the span query asked the database for. */
+  const spanBounds = (call: any): [string, string] => {
+    const operator = call.where[0].rateDate;
+    const [lower, upper] = operator.value as Array<{ value: unknown }>;
+    return [String(lower.value), String(upper.value)];
+  };
+
+  describe("resolveStoredRate", () => {
+    /**
+     * Issue #1390. The span used to be built from UTC-midnight `Date` objects.
+     * TypeORM does not normalise a select-side parameter, `pg` renders a `Date`
+     * in the process time zone and PostgreSQL's cast to `date` keeps whatever
+     * literal that rendering produced, so anywhere west of UTC the upper bound
+     * named the previous calendar day and the reference date's own row -- in
+     * `live` mode, today's rate -- was excluded from the result. The bounds are
+     * calendar-date strings, which name the same day in every time zone.
+     */
+    it("bounds the span with calendar-date strings on both sides", async () => {
+      exchangeRateRepository.find.mockResolvedValue([]);
+
+      await service.resolveStoredRate("USD", "CAD", "2026-06-08");
+
+      const call = exchangeRateRepository.find.mock.calls[0][0];
+      const [lower, upper] = (call.where[0].rateDate as any).value as Array<{
+        value: unknown;
+      }>;
+      expect(typeof lower.value).toBe("string");
+      expect(typeof upper.value).toBe("string");
+      expect(upper.value).toBe("2026-06-08");
+      expect(lower.value).toBe("2026-04-24"); // the 45-day age bound
+      // Both stored directions are read over the one span.
+      expect(call.where[1].rateDate).toBe(call.where[0].rateDate);
+    });
+
+    it("bounds a live lookup at today, so today's own row is inside the span", async () => {
+      // Today is the suite's fixture date (`todayYMD` is mocked above).
+      exchangeRateRepository.find.mockResolvedValue([
+        storedRow("USD", "CAD", 1.42, "2026-08-18"),
+      ]);
+
+      const resolution = await service.resolveStoredRate(
+        "USD",
+        "CAD",
+        "2026-06-08",
+        { mode: "live" },
+      );
+
+      const [floor, ceiling] = spanBounds(
+        exchangeRateRepository.find.mock.calls[0][0],
+      );
+      expect(ceiling).toBe("2026-08-18");
+      expect(floor).toBe("2026-07-04"); // today minus the 45-day bound
+      expect(resolution.rate).toBe(1.42);
+      expect(resolution.observedOn).toBe("2026-08-18");
+    });
+
+    /**
+     * The entity declares `rateDate: Date` and only the pg DATE parser makes it
+     * a string, so the normalisation keeps a `Date` readable for any caller
+     * that builds a row without the driver. One case, deliberately: every other
+     * fixture carries the string production produces.
+     */
+    it("normalises a Date-valued rateDate as well as the stored string", async () => {
+      exchangeRateRepository.find.mockResolvedValue([
+        {
+          ...mockExchangeRate,
+          fromCurrency: "USD",
+          toCurrency: "CAD",
+          rate: 1.31,
+          rateDate: new Date("2026-06-05T00:00:00.000Z"),
+        },
+      ]);
+
+      const resolution = await service.resolveStoredRate(
+        "USD",
+        "CAD",
+        "2026-06-08",
+      );
+
+      expect(resolution.rate).toBe(1.31);
+      expect(resolution.observedOn).toBe("2026-06-05");
+    });
+  });
+
   describe("getRateForDate", () => {
     it("returns 1 for the same currency without any lookup", async () => {
       const result = await service.getRateForDate("USD", "USD", "2026-06-08");
 
       expect(result).toBe(1);
-      expect(exchangeRateRepository.findOne).not.toHaveBeenCalled();
+      expect(exchangeRateRepository.find).not.toHaveBeenCalled();
       expect(yahooFinanceService.fetchHistoricalWindow).not.toHaveBeenCalled();
     });
 
     it("returns the closest stored rate on or before the target date", async () => {
-      exchangeRateRepository.findOne.mockResolvedValue(mockExchangeRate);
+      exchangeRateRepository.find.mockResolvedValue([
+        storedRow("USD", "CAD", 1.3, "2026-06-01"),
+        storedRow("USD", "CAD", 1.365, "2026-06-05"),
+      ]);
 
       const result = await service.getRateForDate("USD", "CAD", "2026-06-08");
 
       expect(result).toBe(1.365);
-      // Looked up the latest stored rate not after the target date.
-      const call = exchangeRateRepository.findOne.mock.calls[0][0];
-      expect(call.where.fromCurrency).toBe("USD");
-      expect(call.where.toCurrency).toBe("CAD");
-      expect(call.order).toEqual({ rateDate: "DESC" });
-      // No Yahoo fetch needed when a stored rate exists.
+      // Both stored directions are read, over a bounded span -- not a single
+      // unbounded "any earlier row" lookup.
+      const call = exchangeRateRepository.find.mock.calls[0][0];
+      expect(call.where).toHaveLength(2);
+      expect(call.where[0].fromCurrency).toBe("USD");
+      expect(call.where[1].fromCurrency).toBe("CAD");
+      // No provider fetch needed when the span covers the target.
+      expect(yahooFinanceService.fetchHistoricalWindow).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Issue #1390. The stored step used to be "the newest row on or before the
+     * target, whatever its age", so a single row from 2019 answered every later
+     * date AND short-circuited the provider fetch that would have filled the
+     * gap. A 285-day hole therefore stayed a hole, silently back-filled.
+     */
+    it("reads only the span the age policy admits, so an ancient row neither answers nor blocks the fetch", async () => {
+      exchangeRateRepository.find.mockResolvedValue([]);
+      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue([
+        {
+          date: new Date("2026-06-05"),
+          close: 1.4,
+          open: null,
+          high: null,
+          low: null,
+          volume: null,
+        },
+      ]);
+
+      const result = await service.getRateForDate("USD", "CAD", "2026-06-08");
+
+      expect(result).toBe(1.4);
+      expect(yahooFinanceService.fetchHistoricalWindow).toHaveBeenCalledTimes(
+        1,
+      );
+      const [floor, ceiling] = spanBounds(
+        exchangeRateRepository.find.mock.calls[0][0],
+      );
+      expect(floor).toBe("2026-04-24"); // 2026-06-08 minus the 45-day bound
+      expect(ceiling).toBe("2026-06-08");
+    });
+
+    it("uses a fresh inverse observation over an older direct one", async () => {
+      exchangeRateRepository.find.mockResolvedValue([
+        storedRow("USD", "CAD", 1.3, "2026-05-20"),
+        storedRow("CAD", "USD", 0.8, "2026-06-05"),
+      ]);
+
+      const result = await service.getRateForDate("USD", "CAD", "2026-06-08");
+
+      expect(result).toBe(1.25);
       expect(yahooFinanceService.fetchHistoricalWindow).not.toHaveBeenCalled();
     });
 
     it("fetches a bounded Yahoo window around the date when none is stored", async () => {
-      exchangeRateRepository.findOne.mockResolvedValue(null);
+      exchangeRateRepository.find.mockResolvedValue([]);
       exchangeRateRepository.save.mockImplementation((data) => data);
       // Daily series straddling the target 2026-06-08 (a weekend in this set):
       // the closest day on or before is 2026-06-05.
@@ -964,7 +1118,7 @@ describe("ExchangeRateService", () => {
     });
 
     it("stores every day in the fetched window, both directions, not just the day asked for", async () => {
-      exchangeRateRepository.findOne.mockResolvedValue(null);
+      exchangeRateRepository.find.mockResolvedValue([]);
       yahooFinanceService.fetchHistoricalWindow.mockResolvedValue([
         {
           date: new Date("2026-06-05"),
@@ -1022,7 +1176,7 @@ describe("ExchangeRateService", () => {
     });
 
     it("returns null when neither a stored rate nor a Yahoo window is available", async () => {
-      exchangeRateRepository.findOne.mockResolvedValue(null);
+      exchangeRateRepository.find.mockResolvedValue([]);
       yahooFinanceService.fetchHistoricalWindow.mockResolvedValue(null);
 
       const result = await service.getRateForDate("EUR", "PLN", "2026-06-08");
@@ -1030,9 +1184,23 @@ describe("ExchangeRateService", () => {
       expect(result).toBeNull();
     });
 
+    it("stays inside the database when the caller asks it to", async () => {
+      exchangeRateRepository.find.mockResolvedValue([]);
+
+      const result = await service.getRateForDate("EUR", "PLN", "2026-06-08", {
+        fetchMissing: false,
+      });
+
+      expect(result).toBeNull();
+      expect(yahooFinanceService.fetchHistoricalWindow).not.toHaveBeenCalled();
+    });
+
     it("clamps a future date to today rather than hunting for a rate that cannot exist", async () => {
-      exchangeRateRepository.findOne.mockResolvedValue(mockExchangeRate);
-      const todayYMD = new Date().toISOString().slice(0, 10);
+      // `todayYMD` is pinned to 2026-08-18 at the top of this file.
+      const today = "2026-08-18";
+      exchangeRateRepository.find.mockResolvedValue([
+        storedRow("USD", "CAD", 1.365, today),
+      ]);
 
       // A scheduled transaction posted ahead of time: there is no rate for its
       // due date and there never will be until the day arrives, so today's is
@@ -1040,32 +1208,34 @@ describe("ExchangeRateService", () => {
       const result = await service.getRateForDate("USD", "CAD", "2099-01-01");
 
       expect(result).toBe(1.365);
-      const where = exchangeRateRepository.findOne.mock.calls[0][0].where;
-      expect(where.rateDate.value.toISOString().slice(0, 10)).toBe(todayYMD);
+      const [, ceiling] = spanBounds(
+        exchangeRateRepository.find.mock.calls[0][0],
+      );
+      expect(ceiling).toBe(today);
       // No historical window: a future window contains nothing to choose from.
       expect(yahooFinanceService.fetchHistoricalWindow).not.toHaveBeenCalled();
     });
 
     it("carries the last trading day forward across a weekend", async () => {
-      // 2026-06-06 is a Saturday. The stored lookup is on-or-before, so it
-      // resolves to Friday's rate without any fetch.
-      exchangeRateRepository.findOne.mockResolvedValue(mockExchangeRate);
+      // 2026-06-06 is a Saturday; 2026-06-05 the Friday before it.
+      exchangeRateRepository.find.mockResolvedValue([
+        storedRow("USD", "CAD", 1.365, "2026-06-05"),
+      ]);
 
       const result = await service.getRateForDate("USD", "CAD", "2026-06-06");
 
       expect(result).toBe(1.365);
-      const where = exchangeRateRepository.findOne.mock.calls[0][0].where;
-      expect(where.rateDate.value.toISOString().slice(0, 10)).toBe(
-        "2026-06-06",
-      );
       expect(yahooFinanceService.fetchHistoricalWindow).not.toHaveBeenCalled();
     });
 
-    it("takes the nearest day either side when the target predates the window", async () => {
-      exchangeRateRepository.findOne.mockResolvedValue(null);
+    /**
+     * Was: "takes the nearest day either side when the target predates the
+     * window". A bar struck after the target is not evidence about the target
+     * (issue #1390); the window answers nothing and the caller learns so.
+     */
+    it("refuses a fetched window whose every bar is dated after the target", async () => {
+      exchangeRateRepository.find.mockResolvedValue([]);
       exchangeRateRepository.save.mockImplementation((data) => data);
-      // Nothing on or before the target: the nearest point is 2026-06-10, not
-      // the earliest one the series happens to start with.
       yahooFinanceService.fetchHistoricalWindow.mockResolvedValue([
         {
           date: new Date("2026-06-20"),
@@ -1087,21 +1257,28 @@ describe("ExchangeRateService", () => {
 
       const result = await service.getRateForDate("EUR", "PLN", "2026-06-08");
 
-      expect(result).toBe(4.3);
+      expect(result).toBeNull();
+      // The bars are still persisted: a neighbouring date they DO cover is
+      // then a database read rather than a second provider call.
+      const insert = dataSource.query.mock.calls.find((call: any[]) =>
+        String(call[0]).includes("INSERT INTO exchange_rates"),
+      );
+      expect(insert).toBeDefined();
     });
 
-    it("falls back to the latest stored rate of any date when the provider has nothing", async () => {
-      // The on-or-before lookup misses (the target predates every stored row),
-      // and the window comes back empty -- but the pair does have a rate.
-      exchangeRateRepository.findOne.mockImplementation((options: any) =>
-        options.where.rateDate ? null : mockExchangeRate,
-      );
+    /**
+     * Was: "falls back to the latest stored rate of any date when the provider
+     * has nothing". An arbitrarily old rate does not describe the date being
+     * asked about (`docs/time-series-contract.md` section 2.2), and reporting
+     * it as that date's rate is the second half of issue #1390.
+     */
+    it("is null, not a rate from years away, when nothing covers the date", async () => {
+      exchangeRateRepository.find.mockResolvedValue([]);
       yahooFinanceService.fetchHistoricalWindow.mockResolvedValue(null);
 
       const result = await service.getRateForDate("USD", "CAD", "2019-01-01");
 
-      // A known rate from another day beats refusing the posting outright.
-      expect(result).toBe(1.365);
+      expect(result).toBeNull();
     });
   });
 
@@ -1122,11 +1299,13 @@ describe("ExchangeRateService", () => {
         rate: 1,
         convertedAmount: 250,
       });
-      expect(exchangeRateRepository.findOne).not.toHaveBeenCalled();
+      expect(exchangeRateRepository.find).not.toHaveBeenCalled();
     });
 
     it("applies the stored rate on or before the date and reports that date", async () => {
-      exchangeRateRepository.findOne.mockResolvedValue(mockExchangeRate);
+      exchangeRateRepository.find.mockResolvedValue([
+        storedRow("USD", "CAD", 1.365, "2026-06-05"),
+      ]);
 
       const result = await service.convertOnDate(
         100,
@@ -1143,13 +1322,15 @@ describe("ExchangeRateService", () => {
         rate: 1.365,
         convertedAmount: 136.5,
       });
-      const call = exchangeRateRepository.findOne.mock.calls[0][0];
-      expect(call.where.fromCurrency).toBe("USD");
-      expect(call.where.toCurrency).toBe("CAD");
+      const call = exchangeRateRepository.find.mock.calls[0][0];
+      expect(call.where[0].fromCurrency).toBe("USD");
+      expect(call.where[0].toCurrency).toBe("CAD");
     });
 
     it("defaults the date to today and clamps a future date to today", async () => {
-      exchangeRateRepository.findOne.mockResolvedValue(mockExchangeRate);
+      exchangeRateRepository.find.mockResolvedValue([
+        storedRow("USD", "CAD", 1.365, "2026-08-18"),
+      ]);
 
       const defaulted = await service.convertOnDate(1, "USD", "CAD");
       const future = await service.convertOnDate(1, "USD", "CAD", "2099-01-01");
@@ -1160,10 +1341,9 @@ describe("ExchangeRateService", () => {
     });
 
     it("rounds the converted amount to money precision, never the rate", async () => {
-      exchangeRateRepository.findOne.mockResolvedValue({
-        ...mockExchangeRate,
-        rate: 0.7325312345,
-      });
+      exchangeRateRepository.find.mockResolvedValue([
+        storedRow("USD", "CAD", 0.7325312345, "2026-06-05"),
+      ]);
 
       const result = await service.convertOnDate(
         1234.56,
@@ -1177,9 +1357,9 @@ describe("ExchangeRateService", () => {
     });
 
     it("reciprocates a rate stored only in the reverse direction", async () => {
-      exchangeRateRepository.findOne.mockImplementation((options: any) =>
-        options.where.fromCurrency === "CAD" ? mockExchangeRate : null,
-      );
+      exchangeRateRepository.find.mockResolvedValue([
+        storedRow("CAD", "USD", 1.365, "2026-06-05"),
+      ]);
       yahooFinanceService.fetchHistoricalWindow.mockResolvedValue(null);
 
       // Only CAD->USD is stored (at 1.365); USD->CAD is derived from it.
@@ -1195,7 +1375,7 @@ describe("ExchangeRateService", () => {
     });
 
     it("returns null -- never 1, never the input -- when no rate exists either way", async () => {
-      exchangeRateRepository.findOne.mockResolvedValue(null);
+      exchangeRateRepository.find.mockResolvedValue([]);
       yahooFinanceService.fetchHistoricalWindow.mockResolvedValue(null);
 
       const result = await service.convertOnDate(
@@ -1209,10 +1389,9 @@ describe("ExchangeRateService", () => {
     });
 
     it("treats a zero or negative stored rate as absent", async () => {
-      exchangeRateRepository.findOne.mockResolvedValue({
-        ...mockExchangeRate,
-        rate: 0,
-      });
+      exchangeRateRepository.find.mockResolvedValue([
+        storedRow("USD", "CAD", 0, "2026-06-05"),
+      ]);
       yahooFinanceService.fetchHistoricalWindow.mockResolvedValue(null);
 
       const result = await service.convertOnDate(
@@ -1343,38 +1522,67 @@ describe("ExchangeRateService", () => {
       expect(exchangeRateRepository.findOne).not.toHaveBeenCalled();
     });
 
-    it("falls back to the stored daily rate when no live quote is available", async () => {
+    it("falls back to a recent stored rate when no live quote is available", async () => {
       yahooFinanceService.fetchQuote.mockResolvedValue({
         regularMarketPrice: null,
       });
-      exchangeRateRepository.findOne.mockResolvedValue(mockExchangeRate);
+      exchangeRateRepository.find.mockResolvedValue([
+        storedRow("USD", "CAD", 1.365, "2026-08-15"),
+      ]);
 
       const result = await service.getLiveRate("USD", "CAD");
 
       expect(result).toBe(1.365);
-      expect(exchangeRateRepository.findOne).toHaveBeenCalledWith({
-        where: { fromCurrency: "USD", toCurrency: "CAD" },
-        order: { rateDate: "DESC" },
-      });
+      // Through the one door, over the bounded span -- not an unbounded
+      // newest-row read.
+      expect(exchangeRateRepository.findOne).not.toHaveBeenCalled();
+      const [floor, ceiling] = spanBounds(
+        exchangeRateRepository.find.mock.calls[0][0],
+      );
+      expect(floor).toBe("2026-07-04");
+      expect(ceiling).toBe("2026-08-18");
     });
 
-    it("falls back to the stored daily rate when the live fetch throws", async () => {
+    it("falls back to a recent stored rate when the live fetch throws", async () => {
       yahooFinanceService.fetchQuote.mockRejectedValue(
         new Error("rate limited"),
       );
-      exchangeRateRepository.findOne.mockResolvedValue(mockExchangeRate);
+      exchangeRateRepository.find.mockResolvedValue([
+        storedRow("USD", "CAD", 1.365, "2026-08-15"),
+      ]);
 
       const result = await service.getLiveRate("USD", "CAD");
 
       expect(result).toBe(1.365);
-      expect(exchangeRateRepository.findOne).toHaveBeenCalled();
+      expect(exchangeRateRepository.find).toHaveBeenCalled();
+    });
+
+    /**
+     * Issue #1390. The stored fallback was `getLatestRate` with no age bound,
+     * so with the provider down a rate struck nine months ago was returned as
+     * the live one -- and cached as live by `primeLiveRates`, which is how a
+     * portfolio total was built on it and still reported itself complete. A
+     * rate quoted as "right now" is a price: past the age bound it is unknown.
+     */
+    it("refuses a stored rate older than the age bound instead of quoting it as live", async () => {
+      yahooFinanceService.fetchQuote.mockResolvedValue({
+        regularMarketPrice: null,
+      });
+      // 276 days before the fixture's today: outside FX_MAX_RATE_AGE_DAYS.
+      exchangeRateRepository.find.mockResolvedValue([
+        storedRow("USD", "CAD", 1.2, "2025-11-15"),
+      ]);
+
+      const result = await service.getLiveRate("USD", "CAD");
+
+      expect(result).toBeNull();
     });
 
     it("returns null when neither a live quote nor a stored rate exists", async () => {
       yahooFinanceService.fetchQuote.mockResolvedValue({
         regularMarketPrice: null,
       });
-      exchangeRateRepository.findOne.mockResolvedValue(null);
+      exchangeRateRepository.find.mockResolvedValue([]);
 
       const result = await service.getLiveRate("USD", "XYZ");
 

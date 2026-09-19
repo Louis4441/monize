@@ -228,8 +228,8 @@
     "portfolioMovement": {
       "titleUp": "Investimenti in rialzo del {{ percent }}%",
       "titleDown": "Investimenti in ribasso del {{ percent }}%",
-      "messageUp": "I tuoi investimenti sono in rialzo del {{ percent }}% oggi, esclusi versamenti e prelievi. Apri per rivedere.",
-      "messageDown": "I tuoi investimenti sono in ribasso del {{ percent }}% oggi, esclusi versamenti e prelievi. Apri per rivedere."
+      "messageUp": "I tuoi investimenti sono in rialzo del {{ percent }}% dal {{ from }} al {{ to }}, esclusi versamenti e prelievi. Apri per rivedere.",
+      "messageDown": "I tuoi investimenti sono in ribasso del {{ percent }}% dal {{ from }} al {{ to }}, esclusi versamenti e prelievi. Apri per rivedere."
     },
     "balanceThreshold": {
       "titleLow": "{{ account }} è sotto la tua soglia",

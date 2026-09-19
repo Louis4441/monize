@@ -111,5 +111,20 @@
     "nameMax": "Nazwa może mieć maksymalnie 100 znaków",
     "symbolRequired": "Symbol jest wymagany",
     "symbolMax": "Symbol może mieć maksymalnie 10 znaków"
+  },
+  "rateHistory": {
+    "title": "Historia kursu",
+    "stored": "Zapisana historia: {start} do {end} ({count} obserwacji)",
+    "none": "Brak zapisanej historii dla {pair}",
+    "loading": "Sprawdzanie zapisanej historii kursu...",
+    "loadFailed": "Nie udało się odczytać zapisanej historii kursu",
+    "addYear": "Dodaj kolejny rok historii kursu",
+    "adding": "Pobieranie kolejnego roku...",
+    "hint": "Raporty datowane przed pierwszym zapisanym kursem nie mogą przeliczyć {pair}.",
+    "toasts": {
+      "added": "Dodano {count} kursów; historia zaczyna się teraz od {start}",
+      "noOlder": "Dostawca nie ma starszych kursów dla {pair}",
+      "failed": "Nie udało się rozszerzyć historii kursu"
+    }
   }
 }

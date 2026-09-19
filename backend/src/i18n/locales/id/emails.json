@@ -228,8 +228,8 @@
     "portfolioMovement": {
       "titleUp": "Investasi naik {{ percent }}%",
       "titleDown": "Investasi turun {{ percent }}%",
-      "messageUp": "Investasi Anda naik {{ percent }}% hari ini, tidak termasuk setoran dan penarikan. Buka untuk meninjau.",
-      "messageDown": "Investasi Anda turun {{ percent }}% hari ini, tidak termasuk setoran dan penarikan. Buka untuk meninjau."
+      "messageUp": "Investasi Anda naik {{ percent }}% dari {{ from }} sampai {{ to }}, tidak termasuk setoran dan penarikan. Buka untuk meninjau.",
+      "messageDown": "Investasi Anda turun {{ percent }}% dari {{ from }} sampai {{ to }}, tidak termasuk setoran dan penarikan. Buka untuk meninjau."
     },
     "balanceThreshold": {
       "titleLow": "{{ account }} di bawah ambang batas Anda",

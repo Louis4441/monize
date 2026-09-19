@@ -53,14 +53,20 @@
     "gainLossTooltip": "Gain ou perte latent sur vos positions actuelles : valeur de marché aux prix du jour moins le prix de revient ci-dessus. N'inclut ni les gains réalisés sur des ventes passées, ni les dividendes et intérêts reçus.",
     "returns": "Rendements",
     "simpleReturn": "Rendement simple",
-    "simpleReturnTooltip": "Pourcentage de gain ou de perte total sur vos positions, calculé comme (Valeur de marché − Prix de revient) ÷ Prix de revient. Ne tient pas compte du calendrier des apports ou des retraits.",
+    "simpleReturnTooltip": "Gain ou perte par rapport à ce que vous avez payé : (Valeur de marché − Prix de revient) ÷ Prix de revient. Ne tient pas compte du moment où l'argent est arrivé, donc cela varie brusquement à chaque achat : une position de 1 000 en hausse de 20% affiche +20% ; achetez 1 000 de plus et elle affiche +10% (200 ÷ 2 000) bien que rien n'ait été perdu. Le TWR et le MWR n'ont pas ce saut.",
     "twr": "RTP",
     "twrFull": "(Pondéré par le temps)",
-    "twrTooltip": "Mesure la performance de vos investissements indépendamment des moments où vous avez ajouté ou retiré des fonds. Élimine l'impact du calendrier des flux de trésorerie pour montrer la performance pure des investissements.",
+    "twrTooltip": "Rendement pondéré par le temps de vos investissements depuis la première transaction, calculé de la même manière que Performance du portefeuille : les dépôts, les retraits et les liquidités non investies sont exclus, les dividendes et les intérêts sont inclus.",
     "cagr": "TCAC",
     "cagrTooltip": "Taux de croissance annuel composé. Votre rendement annualisé basé sur le montant net investi par rapport à la valeur actuelle du portefeuille, comme si la croissance avait été parfaitement régulière chaque année.",
     "notAvailable": "N/D",
-    "unpricedHoldings": "Valorisation partielle : {count, plural, one {# position n'a} other {# positions n'ont}} pas de prix actuel ({symbols}) ; les valeurs ci-dessous {count, plural, one {l'excluent} other {les excluent}}."
+    "unpricedHoldings": "Valorisation partielle : {count, plural, one {# position n'a} other {# positions n'ont}} pas de prix actuel ({symbols}) ; les valeurs ci-dessous {count, plural, one {l'excluent} other {les excluent}}.",
+    "mwr": "MWR",
+    "mwrFull": "(Pondéré par l'argent)",
+    "mwrTooltip": "Rendement pondéré par l'argent (XIRR) de vos investissements depuis la première transaction : le taux annuel que votre propre argent a rapporté, en pondérant chaque achat, vente et dividende selon le moment où il a eu lieu. Les dépôts, les retraits et les liquidités non investies sont exclus. Diffère du TWR lorsque vous avez investi davantage avant une hausse ou une baisse.",
+    "returnDiagnosticsLead": "TWR et MWR ne sont pas affichés car l'historique comporte des lacunes :",
+    "returnDiagnosticsRepair": "Ajoutez les cours manquants dans l'historique des cours de chaque titre ; les rendements sont calculés sur les comptes affichés.",
+    "returnDiagnosticsRepairFiltered": "Ajoutez les cours manquants dans l'historique des cours de chaque titre, ou excluez ces comptes de la vue avec le filtre de comptes ci-dessus ; les rendements sont calculés sur les comptes affichés."
   },
   "assetAllocation": {
     "title": "Répartition des actifs",
@@ -124,8 +130,12 @@
     "noDataForPeriod": "Aucune donnée d'investissement pour cette période.",
     "highestValue": "Valeur maximale",
     "lowestValue": "Valeur minimale",
-    "change": "Variation",
-    "changePercent": "Variation %",
+    "investmentResult": "Résultat de l'investissement",
+    "investmentReturn": "Rendement",
+    "investmentResultTooltip": "Ce que vos investissements ont rapporté sur cette période. Les dépôts, les retraits et les liquidités non investies sont exclus, et le pourcentage à côté est un rendement pondéré dans le temps, de sorte que les achats et les ventes ne le font pas bouger.",
+    "unmeasuredFlowTooltip": "Une opération réglée en dehors de ces comptes, ou une répartition qui mélange une ligne d'investissement avec une dépense ordinaire, signifie que le résultat ne peut pas être séparé de l'argent déplacé.",
+    "valueChangeLine": "Variation de valeur {amount}",
+    "netFlowsLine": "Dépôts et retraits nets {amount}",
     "priorCloseTooltip": "Mesuré à partir de la clôture de la séance précédente, le {date}.",
     "notAvailable": "N/D",
     "portfolioLabel": "Portefeuille :"
@@ -288,5 +298,28 @@
     "accountRequired": "Le compte est obligatoire",
     "dateRequired": "La date est obligatoire",
     "acquisitionPriceRequired": "Le prix par part est obligatoire et doit être supérieur à zéro. Utilisez « Ajout de parts » pour des parts acquises sans coût connu."
+  },
+  "portfolioPerformance": {
+    "title": "Performance du portefeuille",
+    "subtitle": "La performance de vos investissements, sans l'effet des dépôts, des retraits et des liquidités non investies.",
+    "footnote": "Les dépôts, les retraits et les liquidités non investies ne comptent pas comme résultat de l'investissement.",
+    "unavailable": "n/d",
+    "empty": "Pas encore assez d'historique pour mesurer un rendement.",
+    "periods": {
+      "1d": "1J",
+      "1w": "1S",
+      "1m": "1M",
+      "3m": "3M",
+      "ytd": "Depuis janvier",
+      "1y": "1A"
+    },
+    "loading": "Mesure des périodes...",
+    "loadFailed": "Les résultats des périodes n'ont pas pu être chargés. Les chiffres sont retenus, pas mis à zéro ; rechargez la page pour réessayer.",
+    "reasons": {
+      "incompletePrices": "Une période retenue commence un jour où une position n'avait aucun cours. Actualisez les cours, ou saisissez-en un dans l'historique des cours du titre.",
+      "incompleteCash": "Une période retenue commence un jour où un compte de trésorerie de cette vue n'a signalé aucun solde, donc ce qu'il détenait est inconnu, et non nul.",
+      "missingRatePairs": "Une période retenue a besoin d'un taux de change que l'historique enregistré n'a pas. Ajoutez un historique des taux pour la devise sur la page Devises.",
+      "unmeasuredFlow": "Une période retenue contient un mouvement impossible à distinguer d'un dépôt ou d'un retrait : une opération réglée en dehors de ces comptes, ou une répartition mêlant liquidités et investissements."
+    }
   }
 }

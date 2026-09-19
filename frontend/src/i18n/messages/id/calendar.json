@@ -85,6 +85,7 @@
       "unpricedHolding": "Sebuah posisi tidak berharga pada hari ini atau sehari sebelumnya, jadi pergerakannya tidak diketahui.",
       "missingRate": "Kurs tidak tersedia, jadi pergerakan tidak dapat dikonversi.",
       "flowIncomplete": "Setoran atau penarikan pada hari ini tidak dapat dikonversi, jadi pergerakan tidak bisa dipisahkan darinya.",
+      "cashIncomplete": "Sebuah akun kas tidak melaporkan saldo untuk hari ini, jadi nilai hari ini tidak lengkap dan pergerakannya tidak diketahui.",
       "noPriorValue": "Tidak ada nilai sebelumnya untuk membandingkan hari ini.",
       "zeroBaseline": "Portofolio kosong sehari sebelumnya, jadi tidak ada persentase yang bisa dihitung."
     }

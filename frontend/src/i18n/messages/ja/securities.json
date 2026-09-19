@@ -3,6 +3,7 @@
     "noneToUpdate": "更新する有価証券がありません",
     "updated": "{count, plural, one {# 件の有価証券の株価を更新しました} other {# 件の有価証券の株価を更新しました}}",
     "partialFailure": "株価の更新: {updated} 件成功、{failed} 件失敗{symbols}",
+    "partialFailureWithReasons": "株価の更新: {updated} 件成功、{failed} 件失敗{symbols}\n{reasons}",
     "failed": "株価の更新に失敗しました"
   },
   "page": {

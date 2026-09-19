@@ -340,6 +340,15 @@ vi.mock('@/components/investments/InvestmentTransactionForm', () => ({
   InvestmentTransactionForm: () => <div data-testid="transaction-form">Form</div>,
 }));
 
+vi.mock('@/components/investments/PortfolioPerformanceCard', () => ({
+  PortfolioPerformanceCard: ({ accountIds, reloadKey }: any) => (
+    <div data-testid="portfolio-performance">
+      {accountIds?.length > 0 ? `Filtered: ${accountIds.join(',')}` : 'All accounts'}
+      <span data-testid="performance-reload-key">{String(reloadKey ?? '')}</span>
+    </div>
+  ),
+}));
+
 vi.mock('@/components/investments/InvestmentValueChart', () => ({
   InvestmentValueChart: ({ accountIds, refreshKey }: any) => (
     <div data-testid="value-chart">
@@ -434,6 +443,44 @@ describe('InvestmentsPage', () => {
       await waitFor(() => {
         expect(screen.getByTestId('asset-allocation-chart')).toBeInTheDocument();
       });
+    });
+
+    /**
+     * The hierarchy the page reads in: what the portfolio is worth, what it
+     * earned, how it is spread, then when it earned it. The three top cards
+     * share ONE grid row, so the reader compares them side by side instead of
+     * scrolling past the value to reach the result.
+     */
+    it('puts summary, performance and allocation in one row, in that order', async () => {
+      await renderPage();
+      await waitFor(() => {
+        expect(screen.getByTestId('portfolio-performance')).toBeInTheDocument();
+      });
+
+      const summary = screen.getByTestId('portfolio-summary');
+      const performance = screen.getByTestId('portfolio-performance');
+      const allocation = screen.getByTestId('asset-allocation-chart');
+      const chart = screen.getByTestId('value-chart');
+      expect(
+        summary.compareDocumentPosition(performance) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        performance.compareDocumentPosition(allocation) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        allocation.compareDocumentPosition(chart) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+
+      // One grid container, not three stacked rows. jsdom computes no layout,
+      // so the shared parent and its track list are what can be asserted; the
+      // performance card is the narrow middle column.
+      const row = summary.parentElement!;
+      expect(performance.parentElement).toBe(row);
+      expect(allocation.parentElement).toBe(row);
+      expect(row.className).toContain('lg:grid-cols-[42fr_16fr_42fr]');
     });
 
     it('renders investment value chart', async () => {

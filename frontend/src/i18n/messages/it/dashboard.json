@@ -97,7 +97,7 @@
       "noLosers": "Nessuna perdita oggi."
     },
     "dailyChange": "Variazione giornaliera",
-    "dailyChangeOn": "Variazione giornaliera \u00b7 {date}",
+    "dailyChangeOn": "Variazione giornaliera · {date}",
     "openPriceHistory": "Storico prezzi di {symbol}",
     "refreshPrices": "Aggiorna quotazioni",
     "viewPortfolio": "Visualizza portafoglio",
@@ -118,7 +118,7 @@
     "empty": "Nessun titolo preferito. Visita la <securitiesLink>pagina Titoli</securitiesLink> e aggiungi ai preferiti i titoli che vuoi monitorare.",
     "noPriceYet": "Nessun prezzo disponibile",
     "dailyChange": "Variazione giornaliera",
-    "dailyChangeOn": "Variazione giornaliera \u00b7 {date}",
+    "dailyChangeOn": "Variazione giornaliera · {date}",
     "openPriceHistory": "Storico prezzi di {symbol}",
     "refreshPrices": "Aggiorna quotazioni",
     "manage": "Gestisci titoli"
@@ -202,7 +202,11 @@
   "portfolioValue": {
     "title": "Valore del portafoglio",
     "empty": "Nessuno storico investimenti da mostrare per ora.",
-    "refresh": "Aggiorna valore attuale"
+    "refresh": "Aggiorna valore attuale",
+    "investmentResult": "Risultato dell'investimento",
+    "notAvailable": "N/A",
+    "periodBreakdownTooltip": "Il valore del conto è variato di {valueChange} in questo periodo, di cui depositi e prelievi per {netFlows}. La cifra sopra è ciò che hanno guadagnato gli investimenti in sé, esclusa la liquidità non investita.",
+    "unmeasuredFlowTooltip": "Un'operazione regolata al di fuori di questi conti, o una suddivisione che mescola una riga di investimento con una spesa ordinaria, significa che il risultato non può essere separato dal denaro spostato."
   },
   "spendingByPayee": {
     "title": "Uscite per beneficiario",

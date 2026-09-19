@@ -249,9 +249,11 @@
     "srLabel": "Kwota niedostępna",
     "scheduledFx": "Nie można ustalić aktualnej kwoty: brak kursu wymiany dla pary walutowej rozliczenia tej zaplanowanej pozycji. Zapisana kwota została obliczona po starszym kursie, więc nie jest wyświetlana.",
     "displayFx": "Tej kwoty nie można tu pokazać: sama kwota jest znana, ale brakuje kursu wymiany, aby przeliczyć ją na walutę tej sumy. Odśwież kursy na stronie Waluty.",
+    "noCashBalance": "Nie można obliczyć tej wartości: konto gotówkowe w tym widoku nie podało salda na ten dzień, więc jego stan jest nieznany, a nie zerowy. Załaduj raport ponownie; jeśli problem się powtarza, salda tego dnia nie dały się obliczyć i warto to zgłosić.",
     "noPrice": "Nie można obliczyć tej wartości: liczba posiadanych udziałów jest znana, ale papier wartościowy nie ma ceny, według której można je wycenić. Odśwież ceny lub dodaj cenę ręcznie w historii cen papieru wartościowego.",
     "noBaseline": "Tej wartości nie można obliczyć: jest to porównanie, a nie ma wcześniejszej wartości, z którą można je zestawić. Niczego nie brakuje, więc nie ma czego dodawać.",
-    "staleQuote": "Nie można obliczyć zmiany dziennej: najnowsza cena papieru wartościowego jest starsza niż ostatnia sesja, więc każda zmiana liczona z niej byłaby zmianą z wcześniejszego dnia. Odśwież ceny lub sprawdź dostawcę notowań tego papieru."
+    "staleQuote": "Nie można obliczyć zmiany dziennej: najnowsza cena papieru wartościowego jest starsza niż ostatnia sesja, więc każda zmiana liczona z niej byłaby zmianą z wcześniejszego dnia. Odśwież ceny lub sprawdź dostawcę notowań tego papieru.",
+    "unknownCurrency": "Nie można pokazać tej kwoty: zapis nie wskazuje papieru wartościowego, więc waluta tej kwoty jest nieznana. Otwórz transakcję i przypisz jej papier wartościowy, aby jej kwoty mogły mieć oznaczenie waluty."
   },
   "density": {
     "title": "Przełącz gęstość wierszy",

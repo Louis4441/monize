@@ -22,6 +22,8 @@ import {
   SHARE_MOVING_ACTIONS,
   acquisitionCost,
   isQuantityOnlyAction,
+  INVESTMENT_REPLAY_ORDER,
+  projectedHoldingRow,
 } from "./investment-replay.util";
 import { Holding } from "./entities/holding.entity";
 import {
@@ -37,6 +39,34 @@ import {
 import { AccountsService } from "../accounts/accounts.service";
 import { SecuritiesService } from "./securities.service";
 
+/**
+ * One (account, security) position: the unit a holdings rebuild operates on,
+ * and the unit a ledger write declares it touched.
+ */
+export interface HoldingScope {
+  accountId: string;
+  securityId: string;
+}
+
+/**
+ * One position where the stored row and a replay of the ledger disagree.
+ *
+ * Read-only evidence: `replayedQuantity` / `replayedAverageCost` are `null`
+ * when a rebuild would store no row for this position at all -- the ledger
+ * accounts for no shares -- which is a different finding from "it accounts for
+ * a different number". They are the row a rebuild *would* write otherwise, so a
+ * short position's `replayedAverageCost` is the `0` the writers store, not an
+ * average nothing computes.
+ */
+export interface HoldingDiscrepancy {
+  accountId: string;
+  securityId: string;
+  storedQuantity: number;
+  storedAverageCost: number | null;
+  replayedQuantity: number | null;
+  replayedAverageCost: number | null;
+}
+
 @Injectable()
 export class HoldingsService {
   private readonly logger = new Logger(HoldingsService.name);
@@ -50,11 +80,11 @@ export class HoldingsService {
 
   /**
    * Run `fn` on the caller's transaction when one was handed in, otherwise in a
-   * scoped transaction of our own. The optional-manager parameters on the
-   * holdings mutators exist because the investment-transaction flows call them
-   * from inside their own write block; a nested `withScopedDb` would join that
-   * transaction anyway, but threading the manager keeps the repository
-   * instances identical to what the caller is already using.
+   * scoped transaction of our own. The optional-manager parameters exist
+   * because the investment-transaction flows call in from inside their own
+   * write block; a nested `withScopedDb` would join that transaction anyway,
+   * but threading the manager keeps the repository instances identical to what
+   * the caller is already using.
    */
   private inScope<T>(
     manager: EntityManager | undefined,
@@ -151,10 +181,7 @@ export class HoldingsService {
     const transactions = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(InvestmentTransaction).find({
         where,
-        order: {
-          transactionDate: "ASC",
-          createdAt: "ASC",
-        },
+        order: INVESTMENT_REPLAY_ORDER,
       }),
     );
 
@@ -177,6 +204,7 @@ export class HoldingsService {
             quantity: tx.quantity,
             price: tx.price,
             commission: tx.commission,
+            totalAmount: tx.totalAmount,
           });
           if (cost !== null) totalCost += cost;
           qty += txQty;
@@ -208,234 +236,6 @@ export class HoldingsService {
     }
     const averageCost = qty > 0 ? totalCost / qty : 0;
     return { quantity: qty, averageCost };
-  }
-
-  async createOrUpdate(
-    userId: string,
-    accountId: string,
-    securityId: string,
-    quantityChange: number,
-    pricePerShare: number,
-    manager?: EntityManager,
-    allowNegative: boolean = false,
-  ): Promise<Holding> {
-    // Verify account ownership
-    await this.accountsService.findOne(userId, accountId);
-
-    // Verify security exists and belongs to user
-    await this.securitiesService.findOne(userId, securityId);
-
-    return this.inScope(manager, async (m) => {
-      const repo = m.getRepository(Holding);
-
-      // Serialize against every other holdings writer for this account before
-      // reading the quantity this update is derived from.
-      //
-      // `new = old + delta` computed in application code is a read-modify-write.
-      // The unique key on (account_id, security_id) stops two *inserts*, and the
-      // row lock PostgreSQL takes during an UPDATE serializes the physical
-      // writes -- but the second request still wrote the quantity it had
-      // calculated from the value it read before waiting. 10 shares, concurrent
-      // buys of 1 and 2, and the holding ends at 12 instead of 13: one purchase
-      // and $100 of cost basis gone, with both trades committed (audit P4-006).
-      await lockHoldingScope(m, [accountId]);
-
-      // Find existing holding
-      let holding = await this.findByAccountAndSecurity(
-        accountId,
-        securityId,
-        m,
-      );
-
-      if (!holding) {
-        // Create new holding
-        holding = repo.create({
-          accountId,
-          securityId,
-          quantity: quantityChange,
-          averageCost: pricePerShare,
-        });
-      } else {
-        // Update existing holding
-        const currentQuantity = Number(holding.quantity);
-        const currentAvgCost = Number(holding.averageCost || 0);
-        const newQuantity = currentQuantity + quantityChange;
-
-        if (quantityChange > 0) {
-          if (currentQuantity <= 0 && newQuantity > 0) {
-            // Coming out of a zero-or-negative balance (e.g. reverse-apply
-            // of a past buy): treat this purchase as establishing the new
-            // cost basis rather than blending against a phantom negative
-            // cost basis.
-            holding.averageCost = pricePerShare;
-          } else if (currentQuantity > 0 && newQuantity > 0) {
-            // Blend the purchase into existing positive holdings.
-            const totalCostBefore = currentQuantity * currentAvgCost;
-            const totalCostAdded = quantityChange * pricePerShare;
-            const newAvgCost = (totalCostBefore + totalCostAdded) / newQuantity;
-            holding.averageCost = newAvgCost;
-          }
-        }
-
-        // Guard against negative holdings from overselling. Skipped when
-        // allowNegative is true, which the investment-transaction update and
-        // remove flows use to permit intermediate negative states during
-        // reverse/re-apply. The caller is responsible for running
-        // validateHoldingsHistory afterward so oversells at any historical
-        // date are still caught.
-        if (!allowNegative && newQuantity < -0.00000001) {
-          const reduceBy = Math.abs(quantityChange);
-          throw new BadRequestException(
-            tr(
-              "errors.securities.insufficientShares",
-              `Insufficient shares: cannot reduce by ${reduceBy}, only ${currentQuantity} held`,
-              { reduceBy, currentQuantity },
-            ),
-          );
-        }
-
-        // Snap to zero to avoid floating-point ghost holdings
-        holding.quantity = Math.abs(newQuantity) < 0.0001 ? 0 : newQuantity;
-      }
-
-      return repo.save(holding);
-    });
-  }
-
-  async updateHolding(
-    userId: string,
-    accountId: string,
-    securityId: string,
-    quantityDelta: number,
-    price: number,
-    manager?: EntityManager,
-    allowNegative: boolean = false,
-  ): Promise<Holding> {
-    return this.createOrUpdate(
-      userId,
-      accountId,
-      securityId,
-      quantityDelta,
-      price,
-      manager,
-      allowNegative,
-    );
-  }
-
-  /**
-   * Apply a stock split to an existing holding: multiply quantity by the
-   * ratio (new shares per old share) and divide averageCost by the same
-   * ratio so total cost basis is preserved. A 2-for-1 split (ratio = 2)
-   * doubles shares and halves the per-share cost; a 1-for-2 reverse split
-   * (ratio = 0.5) halves shares and doubles the per-share cost.
-   *
-   * No-op when no holding exists for the security in this account.
-   */
-  async applySplit(
-    accountId: string,
-    securityId: string,
-    ratio: number,
-    manager?: EntityManager,
-  ): Promise<Holding | null> {
-    if (!ratio || ratio <= 0) {
-      throw new BadRequestException(
-        tr(
-          "errors.securities.splitRatioMustBePositive",
-          "Split ratio must be greater than zero",
-        ),
-      );
-    }
-
-    return this.inScope(manager, async (m) => {
-      // Same lock namespace as createOrUpdate: a split multiplies the quantity
-      // it read, so a buy committing in between would be multiplied away.
-      await lockHoldingScope(m, [accountId]);
-
-      const holding = await this.findByAccountAndSecurity(
-        accountId,
-        securityId,
-        m,
-      );
-      if (!holding) return null;
-
-      const currentQty = Number(holding.quantity);
-      const currentAvg = Number(holding.averageCost || 0);
-      holding.quantity = currentQty * ratio;
-      holding.averageCost = currentAvg / ratio;
-      return m.getRepository(Holding).save(holding);
-    });
-  }
-
-  /**
-   * Reverse a previously applied stock split: divide quantity by the
-   * ratio and multiply averageCost by the same ratio. Used by the
-   * investment-transaction update/remove flows to undo a SPLIT before
-   * re-applying or deleting it.
-   */
-  async reverseSplit(
-    accountId: string,
-    securityId: string,
-    ratio: number,
-    manager?: EntityManager,
-  ): Promise<Holding | null> {
-    if (!ratio || ratio <= 0) {
-      throw new BadRequestException(
-        tr(
-          "errors.securities.splitRatioMustBePositive",
-          "Split ratio must be greater than zero",
-        ),
-      );
-    }
-    return this.applySplit(accountId, securityId, 1 / ratio, manager);
-  }
-
-  /**
-   * Adjust holding quantity without affecting average cost.
-   * Used for ADD_SHARES / REMOVE_SHARES to fix minor discrepancies.
-   */
-  async adjustQuantity(
-    userId: string,
-    accountId: string,
-    securityId: string,
-    quantityChange: number,
-    manager?: EntityManager,
-  ): Promise<Holding> {
-    await this.accountsService.findOne(userId, accountId);
-    await this.securitiesService.findOne(userId, securityId);
-
-    return this.inScope(manager, async (m) => {
-      const repo = m.getRepository(Holding);
-
-      // Same lock namespace as createOrUpdate.
-      await lockHoldingScope(m, [accountId]);
-
-      let holding = await this.findByAccountAndSecurity(
-        accountId,
-        securityId,
-        m,
-      );
-
-      if (!holding) {
-        if (quantityChange < 0) {
-          throw new NotFoundException(
-            tr(
-              "errors.securities.cannotRemoveSharesNoHolding",
-              "Cannot remove shares from a non-existent holding",
-            ),
-          );
-        }
-        holding = repo.create({
-          accountId,
-          securityId,
-          quantity: quantityChange,
-          averageCost: 0,
-        });
-      } else {
-        holding.quantity = Number(holding.quantity) + quantityChange;
-      }
-
-      return repo.save(holding);
-    });
   }
 
   async getHoldingsSummary(userId: string, accountId: string) {
@@ -569,10 +369,7 @@ export class HoldingsService {
       return m.getRepository(InvestmentTransaction).find({
         where,
         relations: ["security"],
-        order: {
-          transactionDate: "ASC",
-          createdAt: "ASC",
-        },
+        order: INVESTMENT_REPLAY_ORDER,
       });
     });
 
@@ -612,6 +409,99 @@ export class HoldingsService {
    */
   private serverToday(): string {
     return formatDateYMDLocal(new Date());
+  }
+
+  /**
+   * Compare one user's stored holdings against a replay of their ledger, and
+   * return only the positions that disagree.
+   *
+   * **Reads only.** Nothing here writes, deletes or locks: the answer is
+   * evidence for a human, and the repair is `POST /holdings/rebuild`, which the
+   * owner runs when they have looked at what is reported. A rebuild is the
+   * right repair for drift that predates the ledger-projection rule and the
+   * wrong response to a replay that disagrees for some other reason, which is
+   * why this refuses to make the choice.
+   *
+   * The replay is `computeHoldingsMap` over `INVESTMENT_REPLAY_ORDER` -- the
+   * same fold `rebuildScopesFromTransactions` writes from -- and the comparison
+   * is against `projectedHoldingRow`, the same projection of that fold the
+   * rebuild writers store, so a position this reports is exactly one a rebuild
+   * would change.
+   */
+  async findLedgerDiscrepancies(
+    userId: string,
+    manager: EntityManager,
+    asOfDate?: string,
+  ): Promise<HoldingDiscrepancy[]> {
+    const accounts = await manager.find(Account, {
+      where: { userId, accountType: AccountType.INVESTMENT },
+    });
+    const eligibleIds = accounts
+      .filter(
+        (a) =>
+          a.accountSubType === AccountSubType.INVESTMENT_BROKERAGE ||
+          !a.accountSubType,
+      )
+      .map((a) => a.id);
+    if (eligibleIds.length === 0) return [];
+
+    const stored = await manager.find(Holding, {
+      where: { accountId: In(eligibleIds) },
+    });
+    if (stored.length === 0) return [];
+
+    const transactions = await manager.find(InvestmentTransaction, {
+      where: {
+        userId,
+        accountId: In(eligibleIds),
+        transactionDate: LessThanOrEqual(asOfDate ?? this.serverToday()),
+        // Rows as effects: a VOID transaction moved no shares.
+        status: NON_VOID_INVESTMENT_STATUS,
+      },
+      order: INVESTMENT_REPLAY_ORDER,
+    });
+    const replayed = this.computeHoldingsMap(transactions);
+
+    const discrepancies: HoldingDiscrepancy[] = [];
+    for (const row of stored) {
+      const data = replayed.get(row.accountId)?.get(row.securityId);
+      const storedQuantity = Number(row.quantity);
+      const storedAverageCost =
+        row.averageCost === null ? null : Number(row.averageCost);
+      // What a rebuild would store for this position, through the same helper
+      // the rebuild writers use. Deriving the expected average here instead
+      // reported every short position as disagreeing -- the writers store
+      // `averageCost = 0` for a negative quantity, so `POST /holdings/rebuild`
+      // wrote back exactly what was already there and the finding came back at
+      // the next boot. `null` is a rebuild that would store no row at all.
+      const projected = projectedHoldingRow(data);
+      const replayedQuantity = projected ? projected.quantity : null;
+      const replayedAverageCost = projected ? projected.averageCost : null;
+
+      // Both figures are stored to a fixed scale (quantity 8, average cost 10),
+      // so the comparison is against the smallest difference the column can
+      // hold rather than an exact equality no float round-trip survives.
+      const quantityDiffers =
+        replayedQuantity === null ||
+        Math.abs(replayedQuantity - storedQuantity) > 0.00000001;
+      const costDiffers =
+        (storedAverageCost === null) !== (replayedAverageCost === null) ||
+        (storedAverageCost !== null &&
+          replayedAverageCost !== null &&
+          Math.abs(replayedAverageCost - storedAverageCost) > 0.0000000001);
+
+      if (quantityDiffers || costDiffers) {
+        discrepancies.push({
+          accountId: row.accountId,
+          securityId: row.securityId,
+          storedQuantity,
+          storedAverageCost,
+          replayedQuantity,
+          replayedAverageCost,
+        });
+      }
+    }
+    return discrepancies;
   }
 
   /**
@@ -668,14 +558,14 @@ export class HoldingsService {
       } else if (quantityChange > 0) {
         // Includes the acquisition commission, so average cost is what a share
         // actually cost to acquire: 10 shares at 100 with 10 commission is
-        // 101.00 per share, not 100.00. The old figure understated basis and so
-        // reported the commission as gain on the eventual disposal (P5-006).
-        // Prices here are in the security's currency, as is `averageCost`, so
-        // the row's exchange rate is deliberately not applied.
+        // 101.00 per share, not 100.00: leaving it out reported the commission
+        // as gain on the disposal (P5-006). Prices here are in the security's
+        // currency, as is `averageCost`, so the row's rate is not applied.
         const cost = acquisitionCost({
           quantity: tx.quantity,
           price: tx.price,
           commission: tx.commission,
+          totalAmount: tx.totalAmount,
         });
         if (cost !== null) holding.totalCost += cost;
       } else if (holding.quantity > 0) {
@@ -699,6 +589,141 @@ export class HoldingsService {
     }
 
     return holdingsMap;
+  }
+
+  /**
+   * Re-derive the stored holding of each (account, security) scope from the
+   * ledger, inside the caller's open transaction and under the same advisory
+   * lock every other holdings writer takes.
+   *
+   * This is the door every investment-transaction write path goes through
+   * after it has finished writing the ledger. A holding is a projection of
+   * `investment_transactions`, not an accumulator: an incremental
+   * `new = old + delta` blends a purchase into the average cost in INSERTION
+   * order, so a back-dated SELL entered after a later BUY relieved basis that
+   * the replay says it never held. The lock gives economic order no protection
+   * at all -- it serializes writers, and the defect is a single writer's
+   * arithmetic (issue #1388).
+   *
+   * A scope the ledger has no rows for projects to "no holding": the row is
+   * deleted, exactly as `POST /holdings/rebuild` has always done. The ledger is
+   * the record; a holding with no rows behind it is a residue, not an opening
+   * position, and an opening position is imported as an ADD_SHARES row.
+   *
+   * Only the named scopes are touched, so a write in one security cannot
+   * rewrite an unrelated position in the same account.
+   */
+  async rebuildScopesFromTransactions(
+    userId: string,
+    scopes: readonly HoldingScope[],
+    manager: EntityManager,
+    asOfDate?: string,
+  ): Promise<void> {
+    const requested = new Map<string, HoldingScope>();
+    for (const scope of scopes) {
+      if (!scope.accountId || !scope.securityId) continue;
+      requested.set(`${scope.accountId}:${scope.securityId}`, scope);
+    }
+    if (requested.size === 0) return;
+
+    const accountIds = Array.from(
+      new Set(Array.from(requested.values()).map((s) => s.accountId)),
+    );
+
+    // Taken before the ledger is read, same namespace as every other holdings
+    // writer: the thing a rebuild must not lose is a concurrent *trade*, which
+    // no holdings row locks (audit P4-006).
+    await lockHoldingScope(manager, accountIds);
+
+    // Only brokerage / standalone investment accounts track holdings; the cash
+    // sleeve is excluded from every other rebuild, so its rows must not be
+    // deleted here either.
+    const accounts = await manager.find(Account, {
+      where: {
+        id: In(accountIds),
+        userId,
+        accountType: AccountType.INVESTMENT,
+      },
+    });
+    const eligibleIds = new Set(
+      accounts
+        .filter(
+          (a) =>
+            a.accountSubType === AccountSubType.INVESTMENT_BROKERAGE ||
+            !a.accountSubType,
+        )
+        .map((a) => a.id),
+    );
+    const inScope = Array.from(requested.values()).filter((s) =>
+      eligibleIds.has(s.accountId),
+    );
+    if (inScope.length === 0) return;
+
+    const securityIds = Array.from(new Set(inScope.map((s) => s.securityId)));
+    const cutoff = asOfDate ?? this.serverToday();
+
+    // `In() x In()` is a cross product, so the exact pairs are filtered back
+    // out below -- a row from a scope nobody asked about must not fold into
+    // the map and get written.
+    const wanted = new Set(
+      inScope.map((s) => `${s.accountId}:${s.securityId}`),
+    );
+    const ledger = (
+      await manager.find(InvestmentTransaction, {
+        where: {
+          userId,
+          accountId: In(Array.from(eligibleIds)),
+          securityId: In(securityIds),
+          transactionDate: LessThanOrEqual(cutoff),
+          // Rows as effects: a VOID transaction moved no shares.
+          status: NON_VOID_INVESTMENT_STATUS,
+        },
+        order: INVESTMENT_REPLAY_ORDER,
+      })
+    ).filter((tx) => wanted.has(`${tx.accountId}:${tx.securityId}`));
+
+    const holdingsMap = this.computeHoldingsMap(ledger);
+
+    const repo = manager.getRepository(Holding);
+    const existing = await repo.find({
+      where: {
+        accountId: In(Array.from(eligibleIds)),
+        securityId: In(securityIds),
+      },
+    });
+    const existingByScope = new Map<string, Holding>(
+      existing
+        .filter((h) => wanted.has(`${h.accountId}:${h.securityId}`))
+        .map((h) => [`${h.accountId}:${h.securityId}`, h]),
+    );
+
+    for (const scope of inScope) {
+      const key = `${scope.accountId}:${scope.securityId}`;
+      const data = holdingsMap.get(scope.accountId)?.get(scope.securityId);
+      const row = existingByScope.get(key);
+      const projected = projectedHoldingRow(data);
+
+      if (!projected) {
+        // No shares the ledger can account for: the projection is "no holding".
+        if (row) await repo.remove(row);
+        continue;
+      }
+
+      if (row) {
+        row.quantity = projected.quantity;
+        row.averageCost = projected.averageCost;
+        await repo.save(row);
+      } else {
+        await repo.save(
+          repo.create({
+            accountId: scope.accountId,
+            securityId: scope.securityId,
+            quantity: projected.quantity,
+            averageCost: projected.averageCost,
+          }),
+        );
+      }
+    }
   }
 
   /**
@@ -757,10 +782,7 @@ export class HoldingsService {
         // Rows as effects: a VOID transaction moved no shares.
         status: NON_VOID_INVESTMENT_STATUS,
       },
-      order: {
-        transactionDate: "ASC",
-        createdAt: "ASC",
-      },
+      order: INVESTMENT_REPLAY_ORDER,
     });
 
     const holdingsMap = this.computeHoldingsMap(transactions);
@@ -777,15 +799,14 @@ export class HoldingsService {
     const holdingsToCreate: Holding[] = [];
     for (const [accountId, securities] of holdingsMap) {
       for (const [securityId, data] of securities) {
-        if (Math.abs(data.quantity) > 0.00000001) {
-          const avgCost =
-            data.quantity > 0 ? data.totalCost / data.quantity : 0;
+        const projected = projectedHoldingRow(data);
+        if (projected) {
           holdingsToCreate.push(
             holdingsRepo.create({
               accountId,
               securityId,
-              quantity: data.quantity,
-              averageCost: avgCost,
+              quantity: projected.quantity,
+              averageCost: projected.averageCost,
             }),
           );
         }
@@ -859,10 +880,7 @@ export class HoldingsService {
           // Rows as effects: a VOID transaction moved no shares.
           status: NON_VOID_INVESTMENT_STATUS,
         },
-        order: {
-          transactionDate: "ASC",
-          createdAt: "ASC",
-        },
+        order: INVESTMENT_REPLAY_ORDER,
       });
 
       // Map: accountId -> securityId -> { quantity, totalCost }
@@ -882,16 +900,15 @@ export class HoldingsService {
       const holdingsToCreate: Holding[] = [];
       for (const [accountId, securities] of holdingsMap) {
         for (const [securityId, data] of securities) {
-          // Only create holding if there's a non-zero quantity
-          if (Math.abs(data.quantity) > 0.00000001) {
-            const avgCost =
-              data.quantity > 0 ? data.totalCost / data.quantity : 0;
+          // Only create a holding the ledger accounts for shares in.
+          const projected = projectedHoldingRow(data);
+          if (projected) {
             holdingsToCreate.push(
               holdingsRepo.create({
                 accountId,
                 securityId,
-                quantity: data.quantity,
-                averageCost: avgCost,
+                quantity: projected.quantity,
+                averageCost: projected.averageCost,
               }),
             );
           }

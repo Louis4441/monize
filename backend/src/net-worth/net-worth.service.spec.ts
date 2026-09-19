@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { NetWorthService } from "./net-worth.service";
+import { enumerateDaysYMD } from "./series-dates.util";
 import { MonthlyAccountBalance } from "./entities/monthly-account-balance.entity";
 import {
   Account,
@@ -1221,7 +1222,15 @@ describe("NetWorthService", () => {
 
       await service.getLlmHistory("user-1", "2024-01-01", "2024-12-31");
 
-      expect(spy).toHaveBeenCalledWith("user-1", "2024-01-01", "2024-12-31");
+      // `fetchMissing: false`: an LLM tool reads what is stored and never
+      // sends the server to a rate provider on a model's behalf.
+      expect(spy).toHaveBeenCalledWith(
+        "user-1",
+        "2024-01-01",
+        "2024-12-31",
+        undefined,
+        { fetchMissing: false },
+      );
       spy.mockRestore();
     });
 
@@ -2126,6 +2135,34 @@ describe("NetWorthService", () => {
       expect(result[0].value).toBe(10000);
     });
 
+    it("carries a fractional month-end value at full precision, not rounded (P7)", async () => {
+      // The monthly fold Math.round-ed value and securitiesValue to whole units,
+      // so a month worth 8,000.49 shipped 8,000 into the period-result P&L and
+      // TWR. The value must carry the grosze; rounding is a presentation step.
+      mabRepository.count.mockResolvedValue(5);
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+      reportQuery
+        .mockResolvedValueOnce([
+          {
+            month: "2024-01-01",
+            balance: 0,
+            market_value: "8000.49",
+            account_id: "inv-1",
+            account_sub_type: "INVESTMENT_BROKERAGE",
+            currency_code: "USD",
+          },
+        ])
+        .mockResolvedValueOnce([
+          { account_id: "inv-1", first_month: "2023-01-01" },
+        ]);
+
+      const result = await service.getMonthlyInvestments("user-1");
+
+      expect(result).toHaveLength(1);
+      expect(result[0].value).toBe(8000.49);
+    });
+
     it("filters by specific accountIds when provided", async () => {
       mabRepository.count.mockResolvedValue(5);
       prefRepository.findOne.mockResolvedValue({
@@ -2177,6 +2214,75 @@ describe("NetWorthService", () => {
       const queryArgs = reportQuery.mock.calls[0];
       expect(queryArgs[1]).toContain("2024-01-01");
       expect(queryArgs[1]).toContain("2024-12-31");
+    });
+
+    /**
+     * Issue #1390. A month's point is converted at the month end, which for a
+     * range ending mid-month is later than the requested end. The rate index
+     * used to be loaded only to the requested end, so June's figure was priced
+     * by the 06-14 observation when the range ended 06-15 and by the 06-28 one
+     * when it ended 07-31: the same month, two numbers, decided by the width of
+     * the chart around it.
+     */
+    it("gives a month the same value whether the range ends mid-month or later", async () => {
+      const history = [
+        {
+          from_currency: "EUR",
+          to_currency: "USD",
+          rate: "1.07",
+          rate_date: "2024-06-14",
+        },
+        {
+          from_currency: "EUR",
+          to_currency: "USD",
+          rate: "1.09",
+          rate_date: "2024-06-28",
+        },
+      ];
+
+      const runTo = async (end: string) => {
+        mabRepository.count.mockResolvedValue(5);
+        prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+        reportQuery.mockReset();
+        // Served by statement, not by call order: the exchange-rate query
+        // answers exactly the span it asked for, so a row outside the loaded
+        // window cannot reach the index.
+        reportQuery.mockImplementation(
+          async (sql: string, params: unknown[]) => {
+            if (sql.includes("exchange_rates")) {
+              return history.filter(
+                (r) => r.rate_date <= String(params[3] ?? ""),
+              );
+            }
+            if (sql.includes("first_month")) {
+              return [{ account_id: "eur-inv", first_month: "2023-01-01" }];
+            }
+            if (sql.includes("monthly_account_balances")) {
+              return [
+                {
+                  month: "2024-06-01",
+                  balance: 10000,
+                  market_value: null,
+                  account_id: "eur-inv",
+                  account_sub_type: "INVESTMENT_CASH",
+                  currency_code: "EUR",
+                },
+              ];
+            }
+            return [];
+          },
+        );
+
+        return service.getMonthlyInvestments("user-1", "2024-06-01", end);
+      };
+
+      const narrow = await runTo("2024-06-15");
+      const wide = await runTo("2024-07-31");
+
+      // 10,000 EUR at the June month end: the 2024-06-28 observation, 1.09.
+      expect(narrow[0].value).toBe(10900);
+      expect(wide[0].value).toBe(10900);
+      expect(narrow[0].fxComplete).toBe(true);
     });
 
     it("converts foreign currency investment values", async () => {
@@ -2247,7 +2353,11 @@ describe("NetWorthService", () => {
       expect(result[1].month).toBe("2024-03-01");
     });
 
-    it("rounds values to whole numbers", async () => {
+    it("carries values at 4dp money precision, not whole units (P7)", async () => {
+      // The fold used to Math.round to whole units here; it now carries the
+      // money pipeline's 4dp precision so the value that feeds the period-result
+      // P&L and TWR keeps its grosze. Rounding to whole units is a presentation
+      // step at the surface, not part of the calculation.
       mabRepository.count.mockResolvedValue(5);
       prefRepository.findOne.mockResolvedValue({
         defaultCurrency: "USD",
@@ -2266,8 +2376,7 @@ describe("NetWorthService", () => {
 
       const result = await service.getMonthlyInvestments("user-1");
 
-      expect(result[0].value).toBe(1235);
-      expect(Number.isInteger(result[0].value)).toBe(true);
+      expect(result[0].value).toBe(1234.567);
     });
 
     it("defaults to filtering INVESTMENT_CASH and INVESTMENT_BROKERAGE sub types when no accountIds", async () => {
@@ -2791,12 +2900,17 @@ describe("NetWorthService", () => {
       expect(result[0]).toEqual({
         date: "2025-03-01",
         value: 1000,
+        // No cash account in scope, so the invested part IS the whole value.
+        securitiesValue: 1000,
         fxComplete: true,
         missingRatePairs: [],
         // Every held position had a close on this day, so the value is a total
         // rather than a subtotal.
         pricesComplete: true,
         unpricedSecurityIds: [],
+        // No cash account in scope, so there is no balance to be missing.
+        cashComplete: true,
+        unknownCashAccountIds: [],
       });
       expect(result[1]).toMatchObject({ date: "2025-03-02", value: 1020 });
       expect(result[2]).toMatchObject({ date: "2025-03-03", value: 1010 });
@@ -2838,6 +2952,161 @@ describe("NetWorthService", () => {
       expect(result).toHaveLength(2);
       expect(result[0]).toMatchObject({ date: "2025-03-01", value: 5000 });
       expect(result[1]).toMatchObject({ date: "2025-03-02", value: 5100 });
+    });
+
+    /**
+     * Cash held in an investment account is not an investment
+     * (INV-PORTRESULT-002). The scope above holds 5,000 of cash and takes in
+     * another 100, and owns no security at all: the INVESTED value is zero on
+     * both days, and the investment charts that plot it draw zero rather than
+     * the reader's own deposit.
+     */
+    it("reports an invested value of zero for a cash-only scope", async () => {
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "cash-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_CASH",
+          currency_code: "USD",
+          opening_balance: 5000,
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([]);
+      reportQuery.mockResolvedValueOnce([
+        { date: "2025-03-01", balance: "5000", account_id: "cash-1" },
+        { date: "2025-03-02", balance: "5100", account_id: "cash-1" },
+      ]);
+
+      const result = await service.getDailyInvestments(
+        "user-1",
+        "2025-03-01",
+        "2025-03-02",
+      );
+
+      expect(result.map((point) => point.securitiesValue)).toEqual([0, 0]);
+      // The whole value is still reported, cash included: the net worth chart
+      // and the account-level measure both read it.
+      expect(result.map((point) => point.value)).toEqual([5000, 5100]);
+    });
+
+    /**
+     * A day's cash is a property of the day, not of the window it was asked
+     * about. #1389: the series keyed its points off a local-midnight `Date`, so
+     * every key was a day early east of Greenwich and the first requested day
+     * matched no row -- `?? 0` then drew a portfolio that had suddenly lost its
+     * whole cash sleeve on exactly the first day of every range.
+     */
+    it("reports the same cash for a day whichever window asks for it", async () => {
+      // The cash sleeve holds 5000 from before either window, and moves once,
+      // on 03-03. Both queries below answer with what the SQL answers: a row
+      // per account per calendar day of the window it was given.
+      const balanceOn = (date: string): string =>
+        date >= "2025-03-03" ? "5250" : "5000";
+      const cashRowsFor = (start: string, end: string) =>
+        enumerateDaysYMD(start, end).map((date) => ({
+          date,
+          balance: balanceOn(date),
+          account_id: "cash-1",
+        }));
+
+      const runWindow = async (start: string, end: string) => {
+        prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+        reportQuery.mockResolvedValueOnce([
+          {
+            id: "cash-1",
+            account_type: "INVESTMENT",
+            account_sub_type: "INVESTMENT_CASH",
+            currency_code: "USD",
+            opening_balance: 5000,
+          },
+        ]);
+        securityRepository.findByIds.mockResolvedValue([]);
+        reportQuery.mockResolvedValueOnce(cashRowsFor(start, end));
+        return service.getDailyInvestments("user-1", start, end);
+      };
+
+      const first = await runWindow("2025-03-01", "2025-03-04");
+      const second = await runWindow("2025-03-03", "2025-03-06");
+
+      // The window's own edges are the days the caller asked for, both ends.
+      expect(first.map((p) => p.date)).toEqual([
+        "2025-03-01",
+        "2025-03-02",
+        "2025-03-03",
+        "2025-03-04",
+      ]);
+      expect(second[0].date).toBe("2025-03-03");
+      expect(second[second.length - 1].date).toBe("2025-03-06");
+
+      // The first day of a range carries the balance the account really held,
+      // not zero, and the overlap agrees point for point.
+      expect(first[0]).toMatchObject({
+        date: "2025-03-01",
+        value: 5000,
+        cashComplete: true,
+        unknownCashAccountIds: [],
+      });
+      const overlap = ["2025-03-03", "2025-03-04"];
+      for (const date of overlap) {
+        const a = first.find((p) => p.date === date);
+        const b = second.find((p) => p.date === date);
+        expect(b).toMatchObject({
+          value: a!.value,
+          cashComplete: a!.cashComplete,
+          unknownCashAccountIds: a!.unknownCashAccountIds,
+        });
+      }
+      expect(second[0].value).toBe(5250);
+    });
+
+    it("reports a cash account with no row for a day as unknown, not zero", async () => {
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "cash-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_CASH",
+          currency_code: "USD",
+          opening_balance: 5000,
+        },
+        {
+          id: "cash-2",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_CASH",
+          currency_code: "USD",
+          opening_balance: 1000,
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([]);
+
+      // The second account produced no row for 03-01. Its balance for that day
+      // is unknown; the day's `value` is a subtotal of what is known.
+      reportQuery.mockResolvedValueOnce([
+        { date: "2025-03-01", balance: "5000", account_id: "cash-1" },
+        { date: "2025-03-02", balance: "5000", account_id: "cash-1" },
+        { date: "2025-03-02", balance: "1000", account_id: "cash-2" },
+      ]);
+
+      const result = await service.getDailyInvestments(
+        "user-1",
+        "2025-03-01",
+        "2025-03-02",
+      );
+
+      expect(result[0]).toMatchObject({
+        date: "2025-03-01",
+        value: 5000,
+        cashComplete: false,
+        unknownCashAccountIds: ["cash-2"],
+      });
+      expect(result[1]).toMatchObject({
+        date: "2025-03-02",
+        value: 6000,
+        cashComplete: true,
+        unknownCashAccountIds: [],
+      });
     });
 
     it("names an unpriced holding and leaves value as it was (design 6.2)", async () => {
@@ -3481,6 +3750,123 @@ describe("NetWorthService", () => {
       expect(result[0].value).toBe(14400);
     });
 
+    // Issue #1389 follow-up: the series is the ledger's answer for each day,
+    // not a backcast of what is held today. A security bought, held, and sold
+    // out completely still carries the portfolio over its holding period, and
+    // the security bought afterwards carries it from its own purchase.
+    it("values a fully sold security over its holding period and its successor after (#1389)", async () => {
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "brok-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_BROKERAGE",
+          currency_code: "USD",
+          opening_balance: 0,
+        },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        {
+          account_id: "brok-1",
+          security_id: "sec-a",
+          action: "BUY",
+          quantity: "10",
+          transaction_date: "2026-01-05",
+        },
+        {
+          account_id: "brok-1",
+          security_id: "sec-a",
+          action: "SELL",
+          quantity: "10",
+          transaction_date: "2026-01-08",
+        },
+        {
+          account_id: "brok-1",
+          security_id: "sec-b",
+          action: "BUY",
+          quantity: "5",
+          transaction_date: "2026-01-10",
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([
+        { id: "sec-a", skipPriceUpdates: false, currencyCode: "USD" },
+        { id: "sec-b", skipPriceUpdates: false, currencyCode: "USD" },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        { security_id: "sec-a", price_date: "2026-01-05", close_price: "100" },
+        { security_id: "sec-b", price_date: "2026-01-10", close_price: "200" },
+      ]);
+
+      const result = await service.getDailyInvestments(
+        "user-1",
+        "2026-01-04",
+        "2026-01-11",
+      );
+
+      const valueOn = (date: string) =>
+        result.find((p) => p.date === date)?.value;
+      expect(valueOn("2026-01-04")).toBe(0);
+      expect(valueOn("2026-01-05")).toBe(1000);
+      expect(valueOn("2026-01-07")).toBe(1000);
+      // Sold out: zero here is measured, not a gap.
+      expect(valueOn("2026-01-08")).toBe(0);
+      expect(valueOn("2026-01-09")).toBe(0);
+      expect(valueOn("2026-01-10")).toBe(1000);
+      expect(valueOn("2026-01-11")).toBe(1000);
+      expect(result.every((p) => p.pricesComplete)).toBe(true);
+    });
+
+    // The other half of the same report: when nothing can price the sold-out
+    // security, its holding period is NOT a measured zero -- the day names it.
+    it("names the sold-out security on days nothing could price it (#1389)", async () => {
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "brok-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_BROKERAGE",
+          currency_code: "USD",
+          opening_balance: 0,
+        },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        {
+          account_id: "brok-1",
+          security_id: "sec-a",
+          action: "BUY",
+          quantity: "10",
+          transaction_date: "2026-01-05",
+        },
+        {
+          account_id: "brok-1",
+          security_id: "sec-a",
+          action: "SELL",
+          quantity: "10",
+          transaction_date: "2026-01-08",
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([
+        { id: "sec-a", skipPriceUpdates: false, currencyCode: "USD" },
+      ]);
+      // Neither a stored close nor a transaction-derived one.
+
+      const result = await service.getDailyInvestments(
+        "user-1",
+        "2026-01-04",
+        "2026-01-09",
+      );
+
+      const pointOn = (date: string) => result.find((p) => p.date === date)!;
+      expect(pointOn("2026-01-04").pricesComplete).toBe(true);
+      expect(pointOn("2026-01-06").pricesComplete).toBe(false);
+      expect(pointOn("2026-01-06").unpricedSecurityIds).toEqual(["sec-a"]);
+      // The subtotal a consumer must not draw as a measured value.
+      expect(pointOn("2026-01-06").value).toBe(0);
+      expect(pointOn("2026-01-08").pricesComplete).toBe(true);
+    });
+
     // Issue #1242, daily as-of boundary: each day is valued at the latest
     // accepted close on or before it, and a future observation never leaks
     // back to an earlier day.
@@ -3740,9 +4126,10 @@ describe("NetWorthService", () => {
       );
 
       // 100 shares * $25.675 USD = $2,567.50 USD
-      // $2,567.50 USD * 1.35 = $3,466.125 CAD -> rounded to 3466
+      // $2,567.50 USD * 1.35 = $3,466.125 CAD, carried at 4dp precision (P7);
+      // whole-unit rounding is a presentation step at the surface.
       expect(result).toHaveLength(1);
-      expect(result[0].value).toBe(3466);
+      expect(result[0].value).toBe(3466.125);
     });
 
     // Same defect as issue #1081 on the total series: omitting startDate used
@@ -3791,6 +4178,102 @@ describe("NetWorthService", () => {
         "2025-03-02",
         "2025-03-03",
       ]);
+    });
+
+    it("carries a sub-unit invested value at full precision, not rounded to 0 (P7)", async () => {
+      // A single holding worth 0.49 in the reporting currency. The fold used to
+      // Math.round(value) and Math.round(securitiesValue), so 0.49 became 0 --
+      // and a baseline of 0 against a rounded-to-0 endpoint reads as a -100%
+      // return in investedPeriodResult. The value that feeds P&L and TWR must
+      // carry the grosze; whole-unit rounding is a presentation step.
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "brok-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_BROKERAGE",
+          currency_code: "USD",
+          opening_balance: 0,
+        },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        {
+          account_id: "brok-1",
+          security_id: "sec-1",
+          action: "BUY",
+          quantity: "1",
+          transaction_date: "2025-03-01",
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([
+        { id: "sec-1", skipPriceUpdates: false, currencyCode: "USD" },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        { security_id: "sec-1", price_date: "2025-03-01", close_price: "0.49" },
+      ]);
+
+      const result = await service.getDailyInvestments(
+        "user-1",
+        "2025-03-01",
+        "2025-03-01",
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].value).toBe(0.49);
+      expect(result[0].securitiesValue).toBe(0.49);
+    });
+
+    it("preserves a few-grosze move across a period, not a rounded-away 0 (P7)", async () => {
+      // A larger position moves by 0.03 over two days: 100.00 -> 100.03. Whole-
+      // unit rounding made both ends 100, so the period's P&L read 0; the move
+      // must survive to the cent because value feeds investedPeriodResult.
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "brok-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_BROKERAGE",
+          currency_code: "USD",
+          opening_balance: 0,
+        },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        {
+          account_id: "brok-1",
+          security_id: "sec-1",
+          action: "BUY",
+          quantity: "1",
+          transaction_date: "2025-02-01",
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([
+        { id: "sec-1", skipPriceUpdates: false, currencyCode: "USD" },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        {
+          security_id: "sec-1",
+          price_date: "2025-03-01",
+          close_price: "100.00",
+        },
+        {
+          security_id: "sec-1",
+          price_date: "2025-03-02",
+          close_price: "100.03",
+        },
+      ]);
+
+      const result = await service.getDailyInvestments(
+        "user-1",
+        "2025-03-01",
+        "2025-03-02",
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result[0].value).toBe(100);
+      expect(result[1].value).toBe(100.03);
+      expect(result[1].value - result[0].value).toBeCloseTo(0.03, 4);
     });
   });
 
@@ -3888,12 +4371,145 @@ describe("NetWorthService", () => {
         date: "2024-05-01",
         total: 6000,
         values: { "sec-1": 1000, cash: 5000 },
+        cashComplete: true,
+        unknownCashAccountIds: [],
+        pricesComplete: true,
+        unpricedSecurityIds: [],
+        missingRatePairs: [],
       });
       expect(result.points[1]).toEqual({
         date: "2024-06-01",
         total: 6100,
         values: { "sec-1": 1100, cash: 5000 },
+        cashComplete: true,
+        unknownCashAccountIds: [],
+        pricesComplete: true,
+        unpricedSecurityIds: [],
+        missingRatePairs: [],
       });
+    });
+
+    it("carries fractional band and cash values at full precision (P7)", async () => {
+      // groupSecurityBreakdown Math.round-ed each band and the cash band, so a
+      // holding worth 1,004.90 and cash of 5,000.51 shipped 1,005 and 5,001. The
+      // bands stack into `total`, so rounding each one loses grosze from the
+      // stacked total the chart plots; rounding is a presentation step.
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "brok-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_BROKERAGE",
+          currency_code: "USD",
+          opening_balance: 0,
+        },
+        {
+          id: "cash-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_CASH",
+          currency_code: "USD",
+          opening_balance: 5000.51,
+        },
+      ]);
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          account_id: "brok-1",
+          security_id: "sec-1",
+          action: "BUY",
+          quantity: "10",
+          transaction_date: "2024-05-15",
+        },
+      ]);
+
+      securityRepository.findByIds.mockResolvedValue([
+        {
+          id: "sec-1",
+          symbol: "AAPL",
+          name: "Apple Inc.",
+          currencyCode: "USD",
+          skipPriceUpdates: false,
+        },
+      ]);
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          security_id: "sec-1",
+          price_date: "2024-05-31",
+          close_price: "100.49",
+        },
+      ]);
+      reportQuery.mockResolvedValueOnce([]);
+      reportQuery.mockResolvedValueOnce([
+        { account_id: "cash-1", month: "2024-05-01", balance: "5000.51" },
+      ]);
+
+      const result = await service.getInvestmentBreakdown("user-1", {
+        granularity: "monthly",
+        startDate: "2024-05-01",
+        endDate: "2024-05-31",
+      });
+
+      expect(result.points).toHaveLength(1);
+      expect(result.points[0].values["sec-1"]).toBe(1004.9);
+      expect(result.points[0].values.cash).toBe(5000.51);
+      expect(result.points[0].total).toBeCloseTo(6005.41, 4);
+    });
+
+    /**
+     * #1389, in the breakdown: the per-point cash walk read the maps the query
+     * returned and defaulted a point it had no row for to zero, so a cash
+     * account that produced no balance for a day it was asked for contributed a
+     * real-looking zero to the stacked total. The balance query carries the
+     * opening balance and everything dated before the window, so a missing row
+     * is missing data, not an empty account.
+     */
+    it("says so when a scoped cash account produced no balance for a point", async () => {
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "cash-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_CASH",
+          currency_code: "USD",
+          opening_balance: 5000,
+        },
+        {
+          id: "cash-2",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_CASH",
+          currency_code: "USD",
+          opening_balance: 1000,
+        },
+      ]);
+      // No brokerage in scope, so no investment transactions are loaded.
+      securityRepository.findByIds.mockResolvedValue([]);
+      // The daily cash query answers for cash-1 only on the second day, and
+      // never for cash-2.
+      reportQuery.mockResolvedValueOnce([
+        { account_id: "cash-1", date: "2025-03-02", balance: "5000" },
+      ]);
+
+      const result = await service.getInvestmentBreakdown("user-1", {
+        granularity: "daily",
+        startDate: "2025-03-01",
+        endDate: "2025-03-02",
+      });
+
+      expect(result.points[0]).toMatchObject({
+        date: "2025-03-01",
+        cashComplete: false,
+        unknownCashAccountIds: ["cash-1", "cash-2"],
+      });
+      expect(result.points[1]).toMatchObject({
+        date: "2025-03-02",
+        cashComplete: false,
+        unknownCashAccountIds: ["cash-2"],
+      });
+      // What did resolve is still carried; it is the flag that says it is part.
+      expect(result.points[1].values.cash).toBe(5000);
     });
 
     it("values each daily point at the latest close on or before the date", async () => {
@@ -3941,9 +4557,103 @@ describe("NetWorthService", () => {
         { key: "sec-1", type: "security", symbol: "MSFT", name: "Microsoft" },
       ]);
       expect(result.points).toEqual([
-        { date: "2025-03-01", total: 1000, values: { "sec-1": 1000 } },
-        { date: "2025-03-02", total: 1000, values: { "sec-1": 1000 } },
+        {
+          date: "2025-03-01",
+          total: 1000,
+          values: { "sec-1": 1000 },
+          cashComplete: true,
+          unknownCashAccountIds: [],
+          pricesComplete: true,
+          unpricedSecurityIds: [],
+          missingRatePairs: [],
+        },
+        {
+          date: "2025-03-02",
+          total: 1000,
+          values: { "sec-1": 1000 },
+          cashComplete: true,
+          unknownCashAccountIds: [],
+          pricesComplete: true,
+          unpricedSecurityIds: [],
+          missingRatePairs: [],
+        },
       ]);
+    });
+
+    /**
+     * #1389 follow-up, in the breakdown: the "By security" view had no
+     * per-point price completeness at all, so a security held on a day nothing
+     * could price simply had no band and `total` silently shrank. The point now
+     * names the security, and the response's own dates say which days to
+     * repair.
+     */
+    it("names the security a point could not price (#1389)", async () => {
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "brok-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_BROKERAGE",
+          currency_code: "USD",
+          opening_balance: 0,
+        },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        {
+          account_id: "brok-1",
+          security_id: "sec-priced",
+          action: "BUY",
+          quantity: "10",
+          transaction_date: "2025-02-01",
+        },
+        {
+          account_id: "brok-1",
+          security_id: "sec-dark",
+          action: "BUY",
+          quantity: "5",
+          transaction_date: "2025-02-01",
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([
+        {
+          id: "sec-priced",
+          symbol: "MSFT",
+          name: "Microsoft",
+          currencyCode: "USD",
+          skipPriceUpdates: false,
+        },
+        {
+          id: "sec-dark",
+          symbol: "DARK",
+          name: "Nothing prices this",
+          currencyCode: "USD",
+          skipPriceUpdates: false,
+        },
+      ]);
+      // Only the first security has a close; `sec-dark` has none from either
+      // source.
+      reportQuery.mockResolvedValueOnce([
+        {
+          security_id: "sec-priced",
+          price_date: "2025-03-01",
+          close_price: "100",
+        },
+      ]);
+
+      const result = await service.getInvestmentBreakdown("user-1", {
+        granularity: "daily",
+        startDate: "2025-03-01",
+        endDate: "2025-03-01",
+      });
+
+      expect(result.points).toHaveLength(1);
+      expect(result.points[0].pricesComplete).toBe(false);
+      expect(result.points[0].unpricedSecurityIds).toEqual(["sec-dark"]);
+      // The total is the subtotal of the band that could be valued, which is
+      // exactly why the flag has to travel with it.
+      expect(result.points[0].total).toBe(1000);
+      expect(result.points[0].missingRatePairs).toEqual([]);
     });
 
     // Issue #1242, by-security daily: a skipPriceUpdates security's band uses
@@ -4127,6 +4837,11 @@ describe("NetWorthService", () => {
           date: "2024-05-01",
           total: 1250,
           values: { "sec-1": 1000, other: 250 },
+          cashComplete: true,
+          unknownCashAccountIds: [],
+          pricesComplete: true,
+          unpricedSecurityIds: [],
+          missingRatePairs: [],
         },
       ]);
     });

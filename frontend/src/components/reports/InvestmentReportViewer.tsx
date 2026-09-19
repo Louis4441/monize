@@ -29,6 +29,8 @@ import { createLogger } from '@/lib/logger';
 import { getErrorMessage } from '@/lib/errors';
 import { useTranslations } from 'next-intl';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { PartialTotal } from '@/components/ui/PartialTotal';
+import type { ConvertedTotal } from '@/lib/currency-total';
 
 const logger = createLogger('InvestmentReportViewer');
 
@@ -244,6 +246,23 @@ export function InvestmentReportViewer({ reportId }: InvestmentReportViewerProps
 
   const columns = result?.columns ?? [];
 
+  // `=== false` on purpose: an absent flag is no information, not a claim that
+  // every pair resolved.
+  const fxPartial = result?.fxComplete === false;
+  const missingPairs = result?.missingPairs ?? [];
+  // The other cause of the same blanks, and a different repair: an unpriced
+  // holding withholds the denominator exactly as a missing rate does, so it is
+  // named on its own rather than under the exchange-rate caption.
+  const pricesPartial = result?.pricesComplete === false;
+  const unpricedSymbols = result?.unpricedSymbols ?? [];
+  // The pairs the server refused, in the shape PartialTotal explains: each
+  // pair's source currency is the one with no rate to the base currency.
+  const fxGap: ConvertedTotal = {
+    value: 0,
+    missingCurrencies: missingPairs.map((pair) => pair.split('->')[0]),
+    excludedCount: missingPairs.length,
+  };
+
   return (
     <div className="space-y-6">
       <ReportDetailHeader
@@ -341,6 +360,28 @@ export function InvestmentReportViewer({ reportId }: InvestmentReportViewerProps
             ? t('investmentReportViewer.baseNote', { currency: result.baseCurrency })
             : t('investmentReportViewer.nativeNote')}
         </p>
+        {/* A withheld figure is relabelled where it is read, not only logged on
+            the server: one unresolvable pair blanks every row's % of portfolio,
+            and without this the blanks read as zero. Marked through the same
+            PartialTotal the other reports use, so the marker names the pairs. */}
+        {fxPartial && result && (
+          <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+            <PartialTotal total={fxGap} displayCurrency={result.baseCurrency}>
+              {t('investmentReportViewer.partialFxNote', {
+                pairs: (result.missingPairs ?? []).join(', '),
+              })}
+            </PartialTotal>
+          </p>
+        )}
+        {/* Both causes are shown when both apply: naming one makes the reader
+            fix it and watch nothing change. */}
+        {pricesPartial && result && (
+          <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+            {t('investmentReportViewer.partialPriceNote', {
+              symbols: unpricedSymbols.join(', '),
+            })}
+          </p>
+        )}
       </div>
 
       {/* Results */}

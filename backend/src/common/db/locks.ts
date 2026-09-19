@@ -38,6 +38,16 @@ import { EntityManager } from "typeorm";
  * `lockHoldingScope` and `lockAccountsForBalanceWrite` both sort; a caller that
  * needs both takes the advisory one first.
  *
+ * **An investment write transaction therefore opens with
+ * `lockHoldingScope`**, naming every account whose position it will re-derive,
+ * before it saves a row or moves a balance. The rebuild at the end of such a
+ * transaction takes the same lock, and a `pg_advisory_xact_lock` is re-entrant,
+ * so the opening call adds a wait and never a second acquisition. Without it
+ * the ledger write takes its `accounts` row lock first and the advisory one
+ * last, the exact opposite of a status change reaching the same rows through
+ * `applyParentStatusToEmbeddedRows`, and two concurrent writers deadlock
+ * (`40P01`).
+ *
  * **For `transactions` rows there is one more rule, and it is by role rather than
  * by id: a split parent is locked before any of its legs.** Ascending-id order
  * cannot be the whole answer here, because a caller cannot know a leg id until it

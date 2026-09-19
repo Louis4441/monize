@@ -85,6 +85,15 @@ lock-free: the read and the write are one statement, so no other transaction can
 interleave between them. Prefer this whenever the update is expressible as a
 delta.
 
+The import's per-row balance write is the same statement, issued on the import
+transaction's `EntityManager`:
+`backend/src/import/import-context.ts` `updateAccountBalance`, the one door the
+QIF, OFX, CSV and investment processors move a balance through. The delta it
+passes is rounded with `roundMoney` (4dp, the column's precision) and the sum is
+rounded by the database. `backend/test/integration/import-balance-delta.integration.spec.ts`
+holds both halves: an import's amounts land at 4dp, and two deltas on two
+connections compose rather than one overwriting the other.
+
 ### 2 -- unique index as the guarantee
 
 ```sql
@@ -290,6 +299,68 @@ This ordering is a rule this document introduces rather than one the code
 currently demonstrates: no existing site locks two rows of the same kind. It
 applies from the first one that does.
 
+**Advisory locks come before row locks, and holdings are the case that proves
+it.** Every writer of a position takes `lockHoldingScope` (`common/db/locks.ts`,
+`LockScope.Holdings`, keyed by account) as the *first statement* of its
+transaction, naming every account whose position the transaction will re-derive:
+`InvestmentTransactionsService.create`, `update`, `remove`, `updateStatus`,
+`transferSecurity` and `createEmbeddedForSplit`, as well as
+`HoldingsService.rebuildScopesFromTransactions` itself. A ledger write that
+waited until the rebuild at the end of its transaction had already row-locked
+`accounts` for its cash effects, which is the opposite order from a split status
+change reaching the same rows (`applyParentStatusToEmbeddedRows` takes the
+advisory lock first, then row-locks the legs): two concurrent writers of one
+account can then hold each other's next lock, and PostgreSQL breaks the cycle
+with `40P01` on one of them. `pg_advisory_xact_lock` is re-entrant within a
+transaction, so the opening call never double-acquires and the rebuild's own call
+stays where it is -- a rebuild reached from anywhere else still takes it before
+reading the ledger.
+
+The same obligation falls on the paths that reach a position *through* something
+else, because each of them row-locks the split parent, `accounts`, or both on the
+way:
+
+- **A split parent's status change.** The reconciliation, bulk and generic
+  `TransactionsService.update` routes all
+  row-lock the parent (`lockTransactionRow` / `lockTransactionRows`) and then
+  row-lock `accounts` for its balance, while `InvestmentTransactionsService`
+  reaches the same parent the other way round -- `lockHoldingScope` first, then
+  `updateEmbeddedSplitParent`'s `lockTransactionRow` on that parent. So
+  `TransactionSplitService.lockEmbeddedInvestmentScopes` (which delegates to
+  `InvestmentTransactionsService.lockEmbeddedHoldingScopes`) is the **first
+  statement** of each split-status transaction, before the parent's row lock and
+  not merely before its balance write: an advisory lock taken between the two
+  row locks still leaves advisory-A-then-row-P racing row-P-then-advisory-A,
+  which is `40P01` for both. The helper's own `SELECT` of the brokerage accounts
+  is unlocked, so it may precede the advisory lock, and the call is
+  unconditional on the reconciliation and generic-update routes because whether
+  the row is a split parent cannot be known without locking it -- a row with no
+  embedded investment legs locks nothing. The generic route reaches the advisory
+  lock by three further ways besides the status propagation --
+  `deleteSplitSideEffects`, `createEmbeddedForSplit` and the rebuild each take
+  it -- which is the same cycle and the same first statement.
+  `applyParentStatusToEmbeddedRows` takes the same re-entrant lock itself, so a
+  caller that forgets still cannot reach the rebuild without it.
+- **A split set replaced.** `TransactionSplitService.updateSplits` is the same
+  cycle without a status change: it row-locks the parent, then tears the
+  existing embedded investment rows down (`deleteSplitSideEffects` ->
+  `reverseAndRemoveEmbedded` -> the rebuild) and builds the new ones
+  (`createEmbeddedForSplit`), each under the holdings advisory lock. It takes
+  `lockEmbeddedInvestmentScopes` as the first statement of its transaction for
+  the same reason, and `createEmbeddedForSplit`'s own call is then the re-entrant
+  one. `addSplit` refuses an investment split outright and reaches no advisory
+  lock, so it needs none. A brokerage account only the incoming splits name is
+  not locked up front: no committed embedded row of that parent sits in it, so
+  no transaction can hold that account's advisory lock while waiting for this
+  parent's row.
+- **An import.** `ImportService` takes `lockHoldingScope` over every investment
+  account the user already has as the first statement of both import
+  transactions, because the accounts the file turns out to touch are discovered
+  as it is read and the per-row balance writes row-lock `accounts` long before
+  `rebuildImportedHoldings` runs. Accounts the import creates inside its own
+  transaction are covered by the rebuild's call: no other transaction can see
+  them, so nothing can be holding their lock.
+
 ## 6. Idempotency keys
 
 When a key is genuinely needed (the effect cannot be folded into one
@@ -338,6 +409,9 @@ worth keeping: CONC-003 can only be checked against a list of all writers.
 | `accounts/accounts.service.ts` `update` | `Account` row | Concurrent balance modification |
 | `accounts/accounts.service.ts` `close` | `Account` row | Race between the balance check and the close |
 | `strategies/gem-signal.service.ts` | advisory, per `strategyId` | Materialization interleaving with a settings save |
+| `securities/investment-transactions.service.ts` `create`, `update`, `remove`, `transferSecurity`, `createEmbeddedForSplit` | advisory, per account (`lockHoldingScope`), first statement of the transaction | A ledger write and a rebuild racing on one position, and the lock order that keeps it deadlock-free |
+| `transactions/transaction-reconciliation.service.ts`, `transactions/transaction-bulk-update.service.ts`, `transactions/transactions.service.ts` `update`, `transactions/transaction-split.service.ts` `updateSplits` (split-parent writes) | advisory, per brokerage account (`lockEmbeddedInvestmentScopes`), first statement of the transaction | The embedded rows' rebuild takes the same lock, and an investment write row-locks the same parent after taking it |
+| `import/import.service.ts` | advisory, per investment account (`lockHoldingScope`), first statement of the import transaction | The import's balance writes row-lock `accounts` before `rebuildImportedHoldings` |
 
 ### Conditional claims that exist
 
@@ -401,7 +475,7 @@ this table when a mechanism lands, not when someone judges the window small.
 
 | Value or operation | Current state | Rule breached |
 | --- | --- | --- |
-| `accounts.current_balance` | Three postures coexist on one column: a lock-free atomic delta (`updateBalance`), an unlocked read-then-write absolute recompute (`recalculateCurrentBalance`, the hourly `applyDueTransactionBalances`, `import-post-processing`, `write-transactions`, `action-history.recalculateBalance`), and a pessimistically locked read-then-write (`update`, `close`). A delta committing between a recompute's SELECT and its UPDATE is silently discarded. | CONC-001, CONC-003 |
+| `accounts.current_balance` | Three postures coexist on one column: a lock-free atomic delta (`updateBalance`, `import-context.updateAccountBalance`), an unlocked read-then-write absolute recompute (`recalculateCurrentBalance`, the hourly `applyDueTransactionBalances`, `import-post-processing`, `write-transactions`, `action-history.recalculateBalance`), and a pessimistically locked read-then-write (`update`, `close`). A delta committing between a recompute's SELECT and its UPDATE is silently discarded. | CONC-001, CONC-003 |
 | `holdings.quantity` / `average_cost` | Every mutation path is a JavaScript read-modify-write inside a transaction with no lock and no atomic delta. `UNIQUE(account_id, security_id)` prevents duplicate rows and does nothing about a lost update to the same row. | CONC-001 |
 | Budget rollover after a failed owner pass | The claim is handed back, so a failure is no longer recorded as a success -- but nothing re-runs it inside the month. `budget-period-cron` is `0 0 1 * *`, so there is no later tick, and the request path has no repair: `getOrCreateCurrentPeriod` has **no production caller**, and would return a previous month's still-OPEN period unchanged if it had one. The owner's previous period therefore stays OPEN until the next month's tick, which closes it and creates the month it runs in -- skipping the month that was missed. Closing it needs either a request-path repair with a caller, or a tick frequency that gives the claim somewhere to be retried. | CONC-006 |
 | Emergency-access claim consumption | Check-then-act: the in-transaction re-read passes no `lock` option, and the consuming write is an entity `save` by primary key with no `WHERE claim_token_used_at IS NULL`. The code immediately beside it uses the CAS predicate correctly for voiding *sibling* tokens. The comment claims re-validation "under lock". There is no partial unique index on unused tokens to act as a backstop. | CONC-001, CONC-002, CONC-007 |

@@ -194,8 +194,6 @@ describe("currency conversion has no silent identity fallback", () => {
       // Persists the inverse pair alongside the direct one, at rate precision.
       "currencies/exchange-rate.service.ts",
       // Latest-rate resolvers, each returning null when the pair is unknown.
-      "securities/portfolio-calculation.service.ts",
-      "investment-reports/investment-report-data.service.ts",
       "strategies/gem-position.service.ts",
     ]);
 
@@ -214,11 +212,7 @@ describe("currency conversion has no silent identity fallback", () => {
     // The allowlist above is only meaningful if the files on it actually
     // handle the absent case. Each must mention returning null near its
     // reciprocal rather than falling through to a number.
-    const resolvers = [
-      "securities/portfolio-calculation.service.ts",
-      "investment-reports/investment-report-data.service.ts",
-      "strategies/gem-position.service.ts",
-    ];
+    const resolvers = ["strategies/gem-position.service.ts"];
 
     for (const rel of resolvers) {
       const source = readFileSync(join(SRC_ROOT, rel), "utf8");

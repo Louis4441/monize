@@ -28,9 +28,9 @@ export const NOTIFICATION_EMAIL_MESSAGES = {
   "portfolioMovement.titleUp": "Investments up {{ percent }}%",
   "portfolioMovement.titleDown": "Investments down {{ percent }}%",
   "portfolioMovement.messageUp":
-    "Your investments are up {{ percent }}% today, excluding deposits and withdrawals. Open to review.",
+    "Your investments are up {{ percent }}% from {{ from }} to {{ to }}, excluding deposits and withdrawals. Open to review.",
   "portfolioMovement.messageDown":
-    "Your investments are down {{ percent }}% today, excluding deposits and withdrawals. Open to review.",
+    "Your investments are down {{ percent }}% from {{ from }} to {{ to }}, excluding deposits and withdrawals. Open to review.",
   "balanceThreshold.titleLow": "{{ account }} is below your threshold",
   "balanceThreshold.titleHigh": "{{ account }} is above your threshold",
   "balanceThreshold.messageLow":

@@ -663,6 +663,35 @@ export class TransactionSplitService {
    * Runs inside the caller's transaction so the parent's own status change and
    * every counterpart's move commit together.
    */
+  /**
+   * Take the holdings advisory lock for every brokerage account an embedded
+   * investment row of these split parents sits in.
+   *
+   * A path that writes a split parent calls this as the first statement of its
+   * transaction, before it row-locks the parent and before the parent's balance
+   * write row-locks `accounts`. The embedded rows' rebuild takes the advisory
+   * lock afterwards, and `InvestmentTransactionsService.update()` reaches the
+   * same parent the other way round -- advisory lock first, then that parent's
+   * `FOR UPDATE` -- so an advisory lock taken after either row lock is a
+   * deadlock for both (`common/db/locks.ts`, 40P01).
+   *
+   * The read inside it is unlocked, so it may precede the advisory lock, and
+   * `pg_advisory_xact_lock` is re-entrant, so a path that cannot know in advance
+   * whether the row is a split parent calls this unconditionally: a row with no
+   * embedded investment legs locks nothing.
+   */
+  lockEmbeddedInvestmentScopes(
+    m: EntityManager,
+    userId: string,
+    parentTransactionIds: readonly string[],
+  ): Promise<void> {
+    return this.investmentTransactionsService.lockEmbeddedHoldingScopes(
+      m,
+      userId,
+      parentTransactionIds,
+    );
+  }
+
   async applyParentStatusToTransferCounterparts(
     m: EntityManager,
     transactionId: string,
@@ -843,6 +872,24 @@ export class TransactionSplitService {
     // queued (recheck RR5-002).
     const affectedAccountIds = new Set<string>();
     const newSplits = await withScopedDb(this.dataSource, async (m) => {
+      // First statement of the transaction: advisory before row locks
+      // (`common/db/locks.ts`). A replacement tears the parent's existing
+      // embedded investment rows down (`deleteSplitSideEffects` ->
+      // `reverseAndRemoveEmbedded` -> the rebuild) and builds the new ones
+      // (`createEmbeddedForSplit`), both under the holdings advisory lock, while
+      // `InvestmentTransactionsService.update()` reaches the same parent the
+      // other way round -- advisory lock first, then
+      // `updateEmbeddedSplitParent`'s `lockTransactionRow` on that parent.
+      // Taking the advisory lock after the parent's row lock below left the two
+      // paths each holding the other's next lock (40P01).
+      //
+      // Unconditional: a parent with no embedded investment legs locks nothing,
+      // and the helper's own `SELECT` is unlocked so it may precede the advisory
+      // lock. A brokerage account only the incoming splits name needs no lock
+      // here -- no committed embedded row of this parent sits in it, so nothing
+      // can hold it while waiting for this parent's row.
+      await this.lockEmbeddedInvestmentScopes(m, userId, [transaction.id]);
+
       // Same parent lock as addSplit, so full replacement and incremental
       // addition serialize against each other, and validated against the
       // parent's committed amount rather than the caller's snapshot of it.

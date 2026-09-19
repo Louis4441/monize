@@ -238,6 +238,9 @@ describe("TransactionSplitService", () => {
       // The parent's status propagation asks the investment service to carry
       // the boundary onto embedded rows; an empty set means none were touched.
       applyParentStatusToEmbeddedRows: jest.fn().mockResolvedValue(new Set()),
+      // The advisory lock a split-parent write takes before its row locks;
+      // the real method returns nothing.
+      lockEmbeddedHoldingScopes: jest.fn().mockResolvedValue(undefined),
     };
 
     netWorthService = {
@@ -1034,6 +1037,41 @@ describe("TransactionSplitService", () => {
       expect(accountsService.updateBalance).not.toHaveBeenCalledWith(
         "account-2",
         40,
+      );
+    });
+
+    /**
+     * Lock order (`common/db/locks.ts`): advisory locks come before row locks.
+     *
+     * A replacement reaches the holdings advisory lock twice on the way --
+     * `deleteSplitSideEffects` tearing the parent's embedded investment rows
+     * down, `createEmbeddedForSplit` building the new ones -- while
+     * `InvestmentTransactionsService.update()` takes that advisory lock first
+     * and then row-locks the same parent. Advisory A then row P against row P
+     * then advisory A is `40P01` for both, so the advisory lock is the first
+     * statement of this transaction.
+     */
+    it("locks the embedded investment scopes before the parent's row lock", async () => {
+      const transaction = { ...mockTransaction } as Transaction;
+      lockParent(transaction);
+      splitsRepository.find.mockResolvedValue([]);
+      const lockScopes = jest.spyOn(service, "lockEmbeddedInvestmentScopes");
+
+      await service.updateSplits(
+        transaction,
+        [
+          { amount: -60, categoryId: "cat-1" },
+          { amount: -40, categoryId: "cat-2" },
+        ],
+        "user-1",
+      );
+
+      expect(lockScopes).toHaveBeenCalledWith(expect.anything(), "user-1", [
+        "tx-1",
+      ]);
+      expect(lockTransactionRow).toHaveBeenCalled();
+      expect(lockScopes.mock.invocationCallOrder[0]).toBeLessThan(
+        (lockTransactionRow as jest.Mock).mock.invocationCallOrder[0],
       );
     });
 

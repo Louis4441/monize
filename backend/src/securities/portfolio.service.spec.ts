@@ -2,6 +2,7 @@ import { PortfolioService } from "./portfolio.service";
 import { PortfolioCalculationService } from "./portfolio-calculation.service";
 import { Holding } from "./entities/holding.entity";
 import { SecurityPrice } from "./entities/security-price.entity";
+import { Security } from "./entities/security.entity";
 import {
   InvestmentTransaction,
   InvestmentAction,
@@ -13,6 +14,17 @@ import {
 } from "../accounts/entities/account.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+import { PortfolioPeriodResultService } from "../net-worth/portfolio-period-result.service";
+import { NO_INVESTED_PERIOD } from "../net-worth/invested-period-result.util";
+import {
+  EMPTY_INCOMPLETE_RANGES,
+  type IncompleteDataRanges,
+} from "../net-worth/incomplete-data-ranges.util";
+import { EMPTY_RETURN_DIAGNOSTICS } from "./return-diagnostics.util";
+import {
+  invalidatePortfolioSummary,
+  portfolioSummaryMemo,
+} from "./portfolio-summary-memo";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -22,6 +34,7 @@ describe("PortfolioService", () => {
   let service: PortfolioService;
   let holdingsRepository: Record<string, jest.Mock>;
   let securityPriceRepository: Record<string, jest.Mock>;
+  let securityRepository: Record<string, jest.Mock>;
   let investmentTransactionRepository: Record<string, jest.Mock>;
   let accountsRepository: Record<string, jest.Mock>;
   let prefRepository: Record<string, jest.Mock>;
@@ -29,8 +42,45 @@ describe("PortfolioService", () => {
   let yahooFinanceService: Record<string, jest.Mock>;
   let quoteProviderRegistry: { resolveForSecurity: jest.Mock };
   let sectorWeightingService: { getLlmLookThrough: jest.Mock };
+  let periodResultService: { getInvestedResultSinceInception: jest.Mock };
 
   const userId = "user-1";
+
+  /**
+   * What the invested measure answers for one window, as the real service
+   * would: a mock returns what the real collaborator returns, so the summary's
+   * fields are exercised through the shape the route actually produces.
+   */
+  const investedSince = (
+    overrides: Partial<{
+      investmentReturnPercent: number | null;
+      investmentMoneyWeightedReturnPercent: number | null;
+      investedReasons: string[];
+      startDate: string;
+      incompleteRanges: IncompleteDataRanges;
+    }> = {},
+  ) => ({
+    currency: "CAD",
+    startDate: "2025-06-14",
+    endDate: "2026-02-24",
+    startValue: null,
+    endValue: null,
+    valueChange: null,
+    netExternalFlows: null,
+    knownFlowSubtotal: 0,
+    investmentResult: null,
+    returnPercent: null,
+    returnMethod: "simple" as const,
+    complete: false,
+    reasons: [] as string[],
+    missingRatePairs: [],
+    unpricedSecurityIds: [],
+    unknownCashAccountIds: [],
+    incompleteRanges: EMPTY_INCOMPLETE_RANGES,
+    ...NO_INVESTED_PERIOD,
+    investedReasons: [] as string[],
+    ...overrides,
+  });
 
   // -- Mock accounts --
   const mockBrokerageAccount: Partial<Account> = {
@@ -135,6 +185,11 @@ describe("PortfolioService", () => {
   };
 
   beforeEach(async () => {
+    // The summary memo is process-wide and survives between tests, which is the
+    // point in production and a source of cross-test contamination here: two
+    // cases that ask the same user for the same scope would otherwise share the
+    // first one's fixtures for a minute.
+    portfolioSummaryMemo.clearAll();
     holdingsRepository = {
       find: jest.fn(),
       // primeLiveRates queries distinct holding currencies via the query
@@ -149,6 +204,12 @@ describe("PortfolioService", () => {
 
     securityPriceRepository = {
       query: jest.fn(),
+    };
+
+    // Only the return diagnostics read it, and only for a security the
+    // summary's own holdings do not name.
+    securityRepository = {
+      find: jest.fn().mockResolvedValue([]),
     };
 
     investmentTransactionRepository = {
@@ -166,6 +227,40 @@ describe("PortfolioService", () => {
 
     exchangeRateService = {
       getLatestRate: jest.fn(),
+      // `resolveStoredRate` is the door `convertToDefault` asks. It answers
+      // from the same stored pairs these tests configure through
+      // `getLatestRate`, direct then inverse, in the resolution shape the real
+      // method returns -- a double that handed back a bare number could not
+      // express the "unknown, and here is why" half the callers branch on.
+      resolveStoredRate: jest.fn(async (from: string, to: string) => {
+        const direct = await exchangeRateService.getLatestRate(from, to);
+        const usableDirect = direct != null && direct > 0 ? direct : null;
+        const inverse = usableDirect
+          ? null
+          : await exchangeRateService.getLatestRate(to, from);
+        const usableInverse = inverse != null && inverse > 0 ? inverse : null;
+        const rate = usableDirect ?? (usableInverse ? 1 / usableInverse : null);
+        if (rate === null) {
+          return {
+            status: "unknown",
+            rate: null,
+            observedRate: null,
+            observedOn: null,
+            direction: null,
+            ageDays: null,
+            reason: "no_observation",
+          };
+        }
+        return {
+          status: "resolved",
+          rate,
+          observedRate: usableDirect ?? usableInverse,
+          observedOn: "2026-02-07",
+          direction: usableDirect ? "direct" : "inverse",
+          ageDays: 0,
+          reason: null,
+        };
+      }),
       // Default: no live quote available, so primeLiveRates leaves the cache
       // unset and conversions fall back to the stored getLatestRate path that
       // these tests configure. Tests for the live-rate path override this.
@@ -215,6 +310,7 @@ describe("PortfolioService", () => {
     const { manager, dataSource } = createScopedDbMocks([
       [Holding, holdingsRepository],
       [SecurityPrice, securityPriceRepository],
+      [Security, securityRepository],
       [InvestmentTransaction, investmentTransactionRepository],
       [Account, accountsRepository],
       [UserPreference, prefRepository],
@@ -232,12 +328,24 @@ describe("PortfolioService", () => {
       dataSource as never,
       exchangeRateService as never,
     );
+    // Default: a portfolio with no investment transaction at all, which is the
+    // empty decision rather than a zero return.
+    periodResultService = {
+      getInvestedResultSinceInception: jest.fn().mockResolvedValue(
+        investedSince({
+          investmentReturnPercent: null,
+          investedReasons: ["noValueSeries"],
+        }),
+      ),
+    };
+
     service = new PortfolioService(
       dataSource as never,
       calculationService,
       yahooFinanceService as never,
       quoteProviderRegistry as never,
       sectorWeightingService as never,
+      periodResultService as unknown as PortfolioPeriodResultService,
     );
   });
 
@@ -1581,6 +1689,11 @@ describe("PortfolioService", () => {
         unpricedSecurityIds: [],
         valuationComplete: true,
         timeWeightedReturn: null,
+        timeWeightedReturnReasons: [],
+        timeWeightedReturnSince: null,
+        moneyWeightedReturn: null,
+        moneyWeightedReturnReasons: [],
+        returnDiagnostics: EMPTY_RETURN_DIAGNOSTICS,
         cagr: null,
         holdings: [],
         holdingsByAccount: [],
@@ -1625,6 +1738,11 @@ describe("PortfolioService", () => {
           unpricedSecurityIds: [],
           valuationComplete: true,
           timeWeightedReturn: 8.56789,
+          timeWeightedReturnReasons: [],
+          timeWeightedReturnSince: null,
+          moneyWeightedReturn: null,
+          moneyWeightedReturnReasons: [],
+          returnDiagnostics: EMPTY_RETURN_DIAGNOSTICS,
           cagr: null,
           holdings: [
             {
@@ -1641,6 +1759,8 @@ describe("PortfolioService", () => {
               costBasisAccountCurrency: 1500.0,
               currentPrice: 180.0,
               marketValue: 1800.12345,
+              marketValueAccountCurrency: 1800.12345,
+              marketValueDefaultCurrency: 1800.12345,
               gainLoss: 300.12345,
               gainLossPercent: 20.567,
             },
@@ -1710,6 +1830,11 @@ describe("PortfolioService", () => {
         unpricedSecurityIds: [],
         valuationComplete: true,
         timeWeightedReturn: null,
+        timeWeightedReturnReasons: [],
+        timeWeightedReturnSince: null,
+        moneyWeightedReturn: null,
+        moneyWeightedReturnReasons: [],
+        returnDiagnostics: EMPTY_RETURN_DIAGNOSTICS,
         cagr: null,
         holdings: [],
         holdingsByAccount: [],
@@ -1741,6 +1866,11 @@ describe("PortfolioService", () => {
         unpricedSecurityIds: [],
         valuationComplete: false,
         timeWeightedReturn: null,
+        timeWeightedReturnReasons: [],
+        timeWeightedReturnSince: null,
+        moneyWeightedReturn: null,
+        moneyWeightedReturnReasons: [],
+        returnDiagnostics: EMPTY_RETURN_DIAGNOSTICS,
         cagr: null,
         holdings: [],
         holdingsByAccount: [],
@@ -1768,6 +1898,11 @@ describe("PortfolioService", () => {
         unpricedSecurityIds: [],
         valuationComplete: true,
         timeWeightedReturn: null,
+        timeWeightedReturnReasons: [],
+        timeWeightedReturnSince: null,
+        moneyWeightedReturn: null,
+        moneyWeightedReturnReasons: [],
+        returnDiagnostics: EMPTY_RETURN_DIAGNOSTICS,
         cagr: null,
         holdings: [
           {
@@ -1784,6 +1919,8 @@ describe("PortfolioService", () => {
             costBasisAccountCurrency: 0,
             currentPrice: 20,
             marketValue: 100,
+            marketValueAccountCurrency: 100,
+            marketValueDefaultCurrency: 100,
             gainLoss: null,
             gainLossPercent: null,
           },
@@ -1814,6 +1951,11 @@ describe("PortfolioService", () => {
         unpricedSecurityIds: [],
         valuationComplete: true,
         timeWeightedReturn: null,
+        timeWeightedReturnReasons: [],
+        timeWeightedReturnSince: null,
+        moneyWeightedReturn: null,
+        moneyWeightedReturnReasons: [],
+        returnDiagnostics: EMPTY_RETURN_DIAGNOSTICS,
         cagr: null,
         holdings: [],
         holdingsByAccount: [
@@ -1838,6 +1980,8 @@ describe("PortfolioService", () => {
                 costBasisAccountCurrency: 1500,
                 currentPrice: 180,
                 marketValue: 1800.12345,
+                marketValueAccountCurrency: 1800.12345,
+                marketValueDefaultCurrency: 1800.12345,
                 gainLoss: 300.12345,
                 gainLossPercent: 20.567,
               },
@@ -2763,209 +2907,290 @@ describe("PortfolioService", () => {
     });
   });
 
-  describe("TWR calculation (via getPortfolioSummary)", () => {
+  /**
+   * The summary's "TWR (time-weighted)" is the invested measure over the
+   * portfolio's whole life, answered by `PortfolioPeriodResultService` and
+   * printed as it comes. It used to be a second implementation
+   * (`PortfolioCalculationService.calculateTWR`) that valued each sub-period
+   * boundary from `security_prices` alone and left an unpriced position OUT of
+   * the value, so a position entered the chain as a gain on the first boundary
+   * that priced it (#1392).
+   */
+  describe("TWR (via getPortfolioSummary)", () => {
     beforeEach(() => {
       prefRepository.findOne.mockResolvedValue(mockPref);
       exchangeRateService.getLatestRate.mockResolvedValue(null);
-    });
-
-    it("returns null when no investment transactions exist", async () => {
       accountsRepository.find.mockResolvedValue([
         mockBrokerageAccount,
         mockCashAccount,
       ]);
       accountsRepository.query.mockResolvedValue([
-        { account_id: "acct-cash-1", balance: "5000" },
+        { account_id: "acct-cash-1", balance: "0" },
       ]);
       holdingsRepository.find.mockResolvedValue([]);
       securityPriceRepository.query.mockResolvedValue([]);
       investmentTransactionRepository.find.mockResolvedValue([]);
+    });
+
+    it("asks the invested measure for this scope and reporting currency", async () => {
+      await service.getPortfolioSummary(userId, ["acct-brokerage-1"]);
+
+      expect(
+        periodResultService.getInvestedResultSinceInception,
+      ).toHaveBeenCalledWith(userId, {
+        accountIds: ["acct-brokerage-1"],
+        displayCurrency: "CAD",
+      });
+    });
+
+    it("prints the invested return and the close it is measured from", async () => {
+      periodResultService.getInvestedResultSinceInception.mockResolvedValue(
+        investedSince({
+          investmentReturnPercent: 25.8,
+          startDate: "2025-06-14",
+        }),
+      );
+
+      const result = await service.getPortfolioSummary(userId);
+
+      expect(result.timeWeightedReturn).toBe(25.8);
+      expect(result.timeWeightedReturnReasons).toEqual([]);
+      expect(result.timeWeightedReturnSince).toBe("2025-06-14");
+    });
+
+    it("withholds the return, with its cause, when a position had no close on a day the chain spans", async () => {
+      // The defect fixture: two securities, one priced throughout and one
+      // whose first stored close comes after its purchase. The old walk
+      // omitted the unpriced position from the period value and reported a
+      // gain when it appeared; the invested measure withholds the figure and
+      // names the missing price.
+      periodResultService.getInvestedResultSinceInception.mockResolvedValue(
+        investedSince({
+          investmentReturnPercent: null,
+          investedReasons: ["incompletePrices"],
+          startDate: "2025-06-14",
+        }),
+      );
 
       const result = await service.getPortfolioSummary(userId);
 
       expect(result.timeWeightedReturn).toBeNull();
+      expect(result.timeWeightedReturnReasons).toEqual(["incompletePrices"]);
+      // The window is still named: what is unknown is the return, not the dates.
+      expect(result.timeWeightedReturnSince).toBe("2025-06-14");
     });
 
-    it("calculates TWR for simple buy-and-hold scenario", async () => {
-      accountsRepository.find.mockResolvedValue([
-        mockBrokerageAccount,
-        mockCashAccount,
-      ]);
-      accountsRepository.query.mockResolvedValue([
-        { account_id: "acct-cash-1", balance: "0" },
-      ]);
-      holdingsRepository.find.mockResolvedValue([mockHoldingVFV]);
-
-      // Mock transactions: bought VFV at $80
-      investmentTransactionRepository.find.mockResolvedValue([
-        {
-          id: "tx-1",
-          userId,
-          accountId: "acct-brokerage-1",
-          securityId: "sec-2",
-          action: InvestmentAction.BUY,
-          transactionDate: "2025-06-15",
-          quantity: 50,
-          price: 80,
-          totalAmount: 4000,
-          commission: 0,
-          security: mockSecurityVFV,
-          createdAt: new Date("2025-06-15"),
-        },
-      ]);
-
-      // Handle different query calls: getLatestPrices vs getAllPricesForSecurities
-      securityPriceRepository.query.mockImplementation((sql: string) => {
-        if (sql.includes("DISTINCT ON")) {
-          // getLatestPrices - current price is $100
-          return [
-            {
-              security_id: "sec-2",
-              close_price: "100",
-              price_date: "2026-02-24",
-            },
-          ];
-        }
-        // getAllPricesForSecurities - full price history
-        return [
-          { security_id: "sec-2", price_date: "2025-06-15", close_price: "80" },
-          {
-            security_id: "sec-2",
-            price_date: "2026-02-24",
-            close_price: "100",
-          },
-        ];
-      });
+    it("prints the money-weighted return from the same slice", async () => {
+      // One call, two figures: the summary asks the invested measure once and
+      // reports what it answered, rather than deriving a second rate of its own
+      // (spec section 11.8).
+      periodResultService.getInvestedResultSinceInception.mockResolvedValue(
+        investedSince({
+          investmentReturnPercent: 25.8,
+          investmentMoneyWeightedReturnPercent: 19.42,
+          startDate: "2025-06-14",
+        }),
+      );
 
       const result = await service.getPortfolioSummary(userId);
 
-      // Bought at $80, now $100 => 25% return
-      expect(result.timeWeightedReturn).not.toBeNull();
-      expect(result.timeWeightedReturn).toBeCloseTo(25, 0);
+      expect(result.moneyWeightedReturn).toBe(19.42);
+      expect(result.moneyWeightedReturnReasons).toEqual([]);
+      expect(
+        periodResultService.getInvestedResultSinceInception,
+      ).toHaveBeenCalledTimes(1);
     });
 
-    it("calculates TWR with multiple buys at different prices", async () => {
-      accountsRepository.find.mockResolvedValue([
-        mockBrokerageAccount,
-        mockCashAccount,
-      ]);
-      accountsRepository.query.mockResolvedValue([
-        { account_id: "acct-cash-1", balance: "0" },
-      ]);
-      // Current state: 20 shares of VFV
-      holdingsRepository.find.mockResolvedValue([
-        { ...mockHoldingVFV, quantity: 20 as any },
-      ]);
-
-      investmentTransactionRepository.find.mockResolvedValue([
-        {
-          id: "tx-1",
-          userId,
-          accountId: "acct-brokerage-1",
-          securityId: "sec-2",
-          action: InvestmentAction.BUY,
-          transactionDate: "2025-01-15",
-          quantity: 10,
-          price: 80,
-          totalAmount: 800,
-          commission: 0,
-          security: mockSecurityVFV,
-          createdAt: new Date("2025-01-15"),
-        },
-        {
-          id: "tx-2",
-          userId,
-          accountId: "acct-brokerage-1",
-          securityId: "sec-2",
-          action: InvestmentAction.BUY,
-          transactionDate: "2025-07-15",
-          quantity: 10,
-          price: 100,
-          totalAmount: 1000,
-          commission: 0,
-          security: mockSecurityVFV,
-          createdAt: new Date("2025-07-15"),
-        },
-      ]);
-
-      securityPriceRepository.query.mockImplementation((sql: string) => {
-        if (sql.includes("DISTINCT ON")) {
-          return [
-            {
-              security_id: "sec-2",
-              close_price: "120",
-              price_date: "2026-02-24",
-            },
-          ];
-        }
-        return [
-          { security_id: "sec-2", price_date: "2025-01-15", close_price: "80" },
-          {
-            security_id: "sec-2",
-            price_date: "2025-07-15",
-            close_price: "100",
-          },
-          {
-            security_id: "sec-2",
-            price_date: "2026-02-24",
-            close_price: "120",
-          },
-        ];
-      });
+    it("withholds the money-weighted return with its cause", async () => {
+      // A portfolio younger than a month has a time-weighted return and no
+      // annualised rate: a fortnight's move is not a claim about a year.
+      periodResultService.getInvestedResultSinceInception.mockResolvedValue(
+        investedSince({
+          investmentReturnPercent: 1.4,
+          investmentMoneyWeightedReturnPercent: null,
+          investedReasons: ["windowTooShort"],
+          startDate: "2026-02-10",
+        }),
+      );
 
       const result = await service.getPortfolioSummary(userId);
 
-      // Sub-period 1: 10 shares, $80 -> $100 = 25% (factor 1.25)
-      // Sub-period 2: 20 shares at $100 -> 20 shares at $120 = 20% (factor 1.20)
-      // TWR = 1.25 * 1.20 - 1 = 0.50 = 50%
-      expect(result.timeWeightedReturn).not.toBeNull();
-      expect(result.timeWeightedReturn).toBeCloseTo(50, 0);
+      expect(result.timeWeightedReturn).toBe(1.4);
+      expect(result.moneyWeightedReturn).toBeNull();
+      expect(result.moneyWeightedReturnReasons).toEqual(["windowTooShort"]);
     });
 
-    it("returns null when price data is missing for all securities", async () => {
-      accountsRepository.find.mockResolvedValue([
-        mockBrokerageAccount,
-        mockCashAccount,
-      ]);
-      accountsRepository.query.mockResolvedValue([
-        { account_id: "acct-cash-1", balance: "0" },
-      ]);
-      holdingsRepository.find.mockResolvedValue([mockHoldingVFV]);
+    it("carries both returns and their causes to the LLM summary", async () => {
+      periodResultService.getInvestedResultSinceInception.mockResolvedValue(
+        investedSince({
+          investmentReturnPercent: 25.8,
+          investmentMoneyWeightedReturnPercent: 19.4242,
+          investedReasons: [],
+          startDate: "2025-06-14",
+        }),
+      );
 
-      investmentTransactionRepository.find.mockResolvedValue([
-        {
-          id: "tx-1",
-          userId,
-          accountId: "acct-brokerage-1",
-          securityId: "sec-2",
-          action: InvestmentAction.BUY,
-          transactionDate: "2025-06-15",
-          quantity: 50,
-          price: 80,
-          totalAmount: 4000,
-          commission: 0,
-          security: mockSecurityVFV,
-          createdAt: new Date("2025-06-15"),
-        },
-      ]);
+      const summary = await service.getLlmSummary(userId);
 
-      // No price data at all
-      securityPriceRepository.query.mockResolvedValue([]);
+      // Rounded like every other percentage the model is handed.
+      expect(summary.moneyWeightedReturn).toBe(19.42);
+      expect(summary.moneyWeightedReturnReasons).toEqual([]);
+    });
 
+    /**
+     * "No price" is not a repair; "VFV.TO, Mar 2 to Mar 5" is. The summary has
+     * no series on the client, so the names are resolved here, over the same
+     * since-inception window both returns are measured across (#1392).
+     */
+    describe("returnDiagnostics", () => {
+      const withRanges = (ranges: Partial<IncompleteDataRanges>) =>
+        investedSince({
+          investmentReturnPercent: null,
+          investedReasons: ["incompletePrices"],
+          startDate: "2025-06-14",
+          incompleteRanges: { ...EMPTY_INCOMPLETE_RANGES, ...ranges },
+        });
+
+      it("is empty, but still names the window, when nothing is missing", async () => {
+        periodResultService.getInvestedResultSinceInception.mockResolvedValue(
+          investedSince({
+            investmentReturnPercent: 25.8,
+            startDate: "2025-06-14",
+          }),
+        );
+
+        const result = await service.getPortfolioSummary(userId);
+
+        expect(result.returnDiagnostics).toEqual({
+          since: "2025-06-14",
+          prices: [],
+          rates: [],
+          cash: [],
+          truncated: { prices: false, rates: false, cash: false },
+        });
+        expect(securityRepository.find).not.toHaveBeenCalled();
+      });
+
+      it("names a held security from the holdings it already valued", async () => {
+        holdingsRepository.find.mockResolvedValue([mockHoldingVFV]);
+        securityPriceRepository.query.mockResolvedValue([
+          {
+            security_id: "sec-2",
+            close_price: "100",
+            price_date: "2026-02-07",
+          },
+        ]);
+        periodResultService.getInvestedResultSinceInception.mockResolvedValue(
+          withRanges({
+            prices: [{ key: "sec-2", start: "2026-03-02", end: "2026-03-05" }],
+          }),
+        );
+
+        const result = await service.getPortfolioSummary(userId);
+
+        expect(result.returnDiagnostics.prices).toEqual([
+          {
+            securityId: "sec-2",
+            symbol: "VFV.TO",
+            name: "Vanguard S&P 500 ETF",
+            start: "2026-03-02",
+            end: "2026-03-05",
+          },
+        ]);
+        // Already loaded, so nothing is fetched a second time.
+        expect(securityRepository.find).not.toHaveBeenCalled();
+      });
+
+      it("loads the name of a security nobody holds today", async () => {
+        // The gap is most likely on exactly the position that was sold out or
+        // made inactive, which is not among today's holdings; printing its
+        // UUID would be a worse dead end than the sentence this replaces.
+        securityRepository.find.mockResolvedValue([
+          { id: "sec-9", symbol: "PPK", name: "PPK Fund" },
+        ]);
+        periodResultService.getInvestedResultSinceInception.mockResolvedValue(
+          withRanges({
+            prices: [{ key: "sec-9", start: "2026-03-02", end: "2026-05-30" }],
+            truncated: { prices: true, rates: false, cash: false },
+          }),
+        );
+
+        const result = await service.getPortfolioSummary(userId);
+
+        expect(securityRepository.find).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ userId }),
+          }),
+        );
+        expect(result.returnDiagnostics.prices).toEqual([
+          {
+            securityId: "sec-9",
+            symbol: "PPK",
+            name: "PPK Fund",
+            start: "2026-03-02",
+            end: "2026-05-30",
+          },
+        ]);
+        expect(result.returnDiagnostics.truncated.prices).toBe(true);
+      });
+
+      it("names the cash account and carries the pair as it stands", async () => {
+        periodResultService.getInvestedResultSinceInception.mockResolvedValue(
+          withRanges({
+            rates: [
+              { key: "USD->CAD", start: "2026-01-02", end: "2026-01-09" },
+            ],
+            cash: [
+              { key: "acct-cash-1", start: "2026-01-02", end: "2026-01-02" },
+            ],
+          }),
+        );
+
+        const result = await service.getPortfolioSummary(userId);
+
+        expect(result.returnDiagnostics.rates).toEqual([
+          { pair: "USD->CAD", start: "2026-01-02", end: "2026-01-09" },
+        ]);
+        expect(result.returnDiagnostics.cash).toEqual([
+          {
+            accountId: "acct-cash-1",
+            name: "TFSA - Cash",
+            start: "2026-01-02",
+            end: "2026-01-02",
+          },
+        ]);
+      });
+
+      it("carries the diagnostics to the LLM summary", async () => {
+        securityRepository.find.mockResolvedValue([
+          { id: "sec-9", symbol: "PPK", name: "PPK Fund" },
+        ]);
+        periodResultService.getInvestedResultSinceInception.mockResolvedValue(
+          withRanges({
+            prices: [{ key: "sec-9", start: "2026-03-02", end: "2026-05-30" }],
+          }),
+        );
+
+        const summary = await service.getLlmSummary(userId);
+
+        expect(summary.returnDiagnostics.prices).toEqual([
+          {
+            securityId: "sec-9",
+            symbol: "PPK",
+            name: "PPK Fund",
+            start: "2026-03-02",
+            end: "2026-05-30",
+          },
+        ]);
+      });
+    });
+
+    it("has no window at all when the scope never held an investment", async () => {
       const result = await service.getPortfolioSummary(userId);
 
       expect(result.timeWeightedReturn).toBeNull();
-    });
-
-    it("includes timeWeightedReturn field in response", async () => {
-      accountsRepository.find.mockResolvedValue([]);
-      holdingsRepository.find.mockResolvedValue([]);
-      securityPriceRepository.query.mockResolvedValue([]);
-      investmentTransactionRepository.find.mockResolvedValue([]);
-
-      const result = await service.getPortfolioSummary(userId);
-
-      expect(result).toHaveProperty("timeWeightedReturn");
+      expect(result.timeWeightedReturnReasons).toEqual(["noValueSeries"]);
+      expect(result.timeWeightedReturnSince).toBeNull();
     });
   });
 
@@ -4276,6 +4501,11 @@ describe("PortfolioService", () => {
         unpricedSecurityIds: [],
         valuationComplete: true,
         timeWeightedReturn: null,
+        timeWeightedReturnReasons: [],
+        timeWeightedReturnSince: null,
+        moneyWeightedReturn: null,
+        moneyWeightedReturnReasons: [],
+        returnDiagnostics: EMPTY_RETURN_DIAGNOSTICS,
         cagr: null,
         holdings: [],
         holdingsByAccount: [],
@@ -4322,6 +4552,152 @@ describe("PortfolioService", () => {
       );
       expect(result.allocation.find((a) => a.name === "AI")?.value).toBe(50);
       expect(result.allocation.find((a) => a.type === "cash")?.value).toBe(50);
+    });
+  });
+
+  describe("getPortfolioTagSummary", () => {
+    beforeEach(() => {
+      prefRepository.findOne.mockResolvedValue(mockPref);
+      accountsRepository.find.mockResolvedValue([
+        mockBrokerageAccount,
+        mockCashAccount,
+      ]);
+    });
+
+    it("reads the held securities' tags without valuing the portfolio", async () => {
+      const summarySpy = jest.spyOn(service, "getPortfolioSummary");
+      // Only the tags of securities the scope still holds come back: the
+      // statement's `ABS(quantity) >= 0.0001` leaves a sold-out security's tag
+      // out of the result set, exactly as the valuation-based path did by
+      // dropping its allocation slice.
+      accountsRepository.query.mockResolvedValue([
+        { name: "AI" },
+        { name: "country:canada" },
+        { name: "sector:tech" },
+      ]);
+
+      const result = await service.getPortfolioTagSummary(userId);
+
+      expect(result).toEqual({
+        keys: ["country", "sector"],
+        hasTaggedHoldings: true,
+      });
+      expect(summarySpy).not.toHaveBeenCalled();
+      expect(holdingsRepository.find).not.toHaveBeenCalled();
+      const [sql, params] = accountsRepository.query.mock.calls[0];
+      expect(sql).toContain("FROM holdings h");
+      expect(sql).toContain("JOIN security_tags st");
+      expect(sql).toContain("ABS(h.quantity) >= 0.0001");
+      expect(params).toEqual([["acct-brokerage-1"], userId]);
+    });
+
+    it("reports no tags when every holding in the scope is untagged", async () => {
+      accountsRepository.query.mockResolvedValue([]);
+
+      await expect(service.getPortfolioTagSummary(userId)).resolves.toEqual({
+        keys: [],
+        hasTaggedHoldings: false,
+      });
+    });
+
+    it("offers the by-tag grouping for plain labels, which carry no key", async () => {
+      accountsRepository.query.mockResolvedValue([
+        { name: "Core" },
+        { name: "Speculative" },
+      ]);
+
+      await expect(service.getPortfolioTagSummary(userId)).resolves.toEqual({
+        keys: [],
+        hasTaggedHoldings: true,
+      });
+    });
+
+    it("asks nothing of the database when the scope holds no securities", async () => {
+      accountsRepository.find.mockResolvedValue([mockCashAccount]);
+
+      await expect(service.getPortfolioTagSummary(userId)).resolves.toEqual({
+        keys: [],
+        hasTaggedHoldings: false,
+      });
+      expect(accountsRepository.query).not.toHaveBeenCalled();
+    });
+
+    it("getPortfolioTagKeys is the keys of that same answer", async () => {
+      accountsRepository.query.mockResolvedValue([
+        { name: "country:canada" },
+        { name: "Core" },
+      ]);
+
+      await expect(service.getPortfolioTagKeys(userId)).resolves.toEqual([
+        "country",
+      ]);
+    });
+  });
+
+  describe("the summary memo", () => {
+    beforeEach(() => {
+      prefRepository.findOne.mockResolvedValue(mockPref);
+      accountsRepository.find.mockResolvedValue([
+        mockBrokerageAccount,
+        mockCashAccount,
+      ]);
+      holdingsRepository.find.mockResolvedValue([mockHoldingAAPL]);
+      securityPriceRepository.query.mockResolvedValue([
+        {
+          security_id: "sec-1",
+          close_price: "175.50",
+          price_date: "2026-02-07",
+        },
+      ]);
+      accountsRepository.query.mockResolvedValue([]);
+    });
+
+    it("computes one valuation for concurrent summary and by-tag callers", async () => {
+      const compute = jest.spyOn(
+        service as unknown as {
+          computePortfolioSummary: (...args: unknown[]) => Promise<unknown>;
+        },
+        "computePortfolioSummary",
+      );
+
+      const [summary, byTag] = await Promise.all([
+        service.getPortfolioSummary(userId),
+        service.getAllocationByTag(userId),
+      ]);
+
+      expect(compute).toHaveBeenCalledTimes(1);
+      expect(byTag.totalValue).toBe(summary.totalPortfolioValue);
+    });
+
+    it("recomputes after the user's derived state is invalidated", async () => {
+      const compute = jest.spyOn(
+        service as unknown as {
+          computePortfolioSummary: (...args: unknown[]) => Promise<unknown>;
+        },
+        "computePortfolioSummary",
+      );
+
+      await service.getPortfolioSummary(userId);
+      await service.getPortfolioSummary(userId);
+      expect(compute).toHaveBeenCalledTimes(1);
+
+      invalidatePortfolioSummary(userId);
+
+      await service.getPortfolioSummary(userId);
+      expect(compute).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not share one scope's valuation with another", async () => {
+      const compute = jest.spyOn(
+        service as unknown as {
+          computePortfolioSummary: (...args: unknown[]) => Promise<unknown>;
+        },
+        "computePortfolioSummary",
+      );
+
+      await service.getPortfolioSummary(userId, ["acct-brokerage-1"]);
+      await service.getPortfolioSummary(userId);
+      expect(compute).toHaveBeenCalledTimes(2);
     });
   });
 

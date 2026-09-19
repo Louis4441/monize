@@ -49,6 +49,7 @@ vi.mock('@/components/ui/DateRangeSelector', () => ({
 
 const mockGetTransactions = vi.fn();
 const mockGetInvestmentAccounts = vi.fn();
+const mockGetTransactionSummary = vi.fn();
 
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
@@ -56,6 +57,48 @@ vi.mock('@/lib/investments', () => ({
     getInvestmentAccounts: (...args: any[]) => mockGetInvestmentAccounts(...args),
   },
 }));
+
+vi.mock('@/lib/investment-reports', () => ({
+  investmentReportsApi: {
+    getTransactionSummary: (...args: any[]) => mockGetTransactionSummary(...args),
+  },
+}));
+
+/** The server's KPI answer; every card reads this and nothing else. */
+function summaryFixture(over: Record<string, unknown> = {}) {
+  return {
+    currencyCode: 'CAD',
+    transactionCount: 0,
+    securitiesTraded: 0,
+    total: 0,
+    knownSubtotal: 0,
+    missingPairs: [],
+    unknownCount: 0,
+    excludedCount: 0,
+    fxComplete: true,
+    byAction: [],
+    amountCurrencies: [],
+    hasUnknownCurrency: false,
+    transactionRateCount: 0,
+    marketRateCount: 0,
+    onwardMarketCount: 0,
+    ...over,
+  };
+}
+
+function actionFixture(action: string, over: Record<string, unknown> = {}) {
+  return {
+    action,
+    count: 1,
+    total: 0,
+    knownSubtotal: 0,
+    missingPairs: [],
+    unknownCount: 0,
+    excludedCount: 0,
+    fxComplete: true,
+    ...over,
+  };
+}
 
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({
@@ -69,11 +112,13 @@ vi.mock('@/lib/logger', () => ({
 describe('InvestmentTransactionHistoryReport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetTransactionSummary.mockResolvedValue(summaryFixture());
   });
 
   it('shows loading state initially', () => {
     mockGetTransactions.mockReturnValue(new Promise(() => {}));
     mockGetInvestmentAccounts.mockReturnValue(new Promise(() => {}));
+    mockGetTransactionSummary.mockReturnValue(new Promise(() => {}));
     render(<InvestmentTransactionHistoryReport />);
     expect(document.querySelector('.animate-pulse')).toBeTruthy();
   });
@@ -162,6 +207,11 @@ describe('InvestmentTransactionHistoryReport', () => {
       pagination: { hasMore: false },
     });
     mockGetInvestmentAccounts.mockResolvedValue([]);
+    mockGetTransactionSummary.mockResolvedValue(
+      summaryFixture({
+        byAction: [actionFixture('BUY'), actionFixture('DIVIDEND')],
+      }),
+    );
     render(<InvestmentTransactionHistoryReport />);
     await waitFor(() => {
       expect(screen.getByText('Activity Summary')).toBeInTheDocument();
@@ -190,6 +240,11 @@ describe('InvestmentTransactionHistoryReport', () => {
     mockGetInvestmentAccounts.mockResolvedValue([
       { id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
     ]);
+    // The activity badges are the server's by-action subtotals now, so the
+    // summary has to carry the action for the badge to exist at all.
+    mockGetTransactionSummary.mockResolvedValue(
+      summaryFixture({ transactionCount: 1, byAction: [actionFixture('BUY')] }),
+    );
     render(<InvestmentTransactionHistoryReport />);
     await waitFor(() => {
       expect(screen.getByText(/Transaction History/)).toBeInTheDocument();
@@ -298,6 +353,11 @@ describe('InvestmentTransactionHistoryReport', () => {
       pagination: { hasMore: false },
     });
     mockGetInvestmentAccounts.mockResolvedValue([]);
+    // The count is the server's over the whole filtered set, not a client-side
+    // distinct over the pages that happened to be fetched.
+    mockGetTransactionSummary.mockResolvedValue(
+      summaryFixture({ securitiesTraded: 2, transactionCount: 3 }),
+    );
     render(<InvestmentTransactionHistoryReport />);
     await waitFor(() => {
       expect(screen.getByText('Securities Traded')).toBeInTheDocument();
@@ -367,6 +427,98 @@ describe('InvestmentTransactionHistoryReport', () => {
     }
   });
 
+  /**
+   * A failed KPI request is a failed report, not a report of the rows the
+   * client happens to hold.
+   *
+   * The summary answers all four cards over the WHOLE filtered set; the table's
+   * rows are capped at fifty pages and filtered again client-side. Reading the
+   * error as "no summary" put the capped row count under "Total Transactions",
+   * zero under "Securities Traded", and an exchange-rate tooltip over a 500 --
+   * an outage rendered as a plausible answer with an errand attached.
+   */
+  describe('when the summary request fails', () => {
+    beforeEach(() => {
+      mockGetTransactions.mockResolvedValue({
+        data: [
+          {
+            id: 'tx1',
+            accountId: 'acc-1',
+            security: { symbol: 'AAPL', name: 'Apple' },
+            transactionDate: '2025-06-15',
+            quantity: 10,
+            price: 100,
+            totalAmount: 1000,
+            action: 'BUY',
+          },
+        ],
+        pagination: { hasMore: false },
+      });
+      mockGetInvestmentAccounts.mockResolvedValue([
+        { id: 'acc-1', name: 'Brokerage', accountSubType: 'INVESTMENT_CASH', currencyCode: 'CAD' },
+      ]);
+      mockGetTransactionSummary.mockRejectedValue(new Error('500'));
+    });
+
+    it('shows the retryable report error, not the KPI block', async () => {
+      await act(async () => {
+        render(<InvestmentTransactionHistoryReport />);
+      });
+      await waitFor(() =>
+        expect(screen.getByText('Failed to load report data. Please try again.')).toBeInTheDocument(),
+      );
+      expect(screen.queryByText('Total Transactions')).not.toBeInTheDocument();
+      expect(screen.queryByText('Securities Traded')).not.toBeInTheDocument();
+      // The currency tooltip is the wrong story for a transport failure: it
+      // sends the reader to the Currencies page over a rate that is not the
+      // problem.
+      expect(screen.queryByTestId('unknown-amount')).not.toBeInTheDocument();
+    });
+
+    it('retries both requests from the error screen', async () => {
+      await act(async () => {
+        render(<InvestmentTransactionHistoryReport />);
+      });
+      await waitFor(() => expect(screen.getByText('Try again')).toBeInTheDocument());
+      mockGetTransactionSummary.mockResolvedValue(
+        summaryFixture({ transactionCount: 7, securitiesTraded: 3 }),
+      );
+      await act(async () => {
+        fireEvent.click(screen.getByText('Try again'));
+      });
+      await waitFor(() => expect(screen.getByText('Total Transactions')).toBeInTheDocument());
+      expect(screen.getByText('Total Transactions').parentElement?.textContent).toContain('7');
+      expect(screen.getByText('Securities Traded').parentElement?.textContent).toContain('3');
+    });
+  });
+
+  it('waits for the summary rather than captioning the capped rows as the totals', async () => {
+    mockGetTransactions.mockResolvedValue({
+      data: [
+        {
+          id: 'tx1',
+          accountId: 'acc-1',
+          security: { symbol: 'AAPL', name: 'Apple' },
+          transactionDate: '2025-06-15',
+          quantity: 10,
+          price: 100,
+          totalAmount: 1000,
+          action: 'BUY',
+        },
+      ],
+      pagination: { hasMore: false },
+    });
+    mockGetInvestmentAccounts.mockResolvedValue([
+      { id: 'acc-1', name: 'Brokerage', accountSubType: 'INVESTMENT_CASH', currencyCode: 'CAD' },
+    ]);
+    mockGetTransactionSummary.mockReturnValue(new Promise(() => {}));
+    await act(async () => {
+      render(<InvestmentTransactionHistoryReport />);
+    });
+    expect(document.querySelector('.animate-pulse')).toBeTruthy();
+    expect(screen.queryByText('Total Transactions')).not.toBeInTheDocument();
+  });
+
   it('restores the persisted account selection', async () => {
     window.localStorage.setItem(
       'monize-reports-investment-transactions-accounts',
@@ -379,6 +531,43 @@ describe('InvestmentTransactionHistoryReport', () => {
       expect(mockGetTransactions).toHaveBeenCalledWith(
         expect.objectContaining({ accountIds: 'acc-1' }),
       );
+    });
+  });
+  describe('which rate converted each row', () => {
+    /**
+     * Invariant: a row carrying its own exchange rate is converted at that rate
+     * on every surface, and the surface says which rate it used (INV-FX-002).
+     * Canonical adversarial input: a filtered set where most rows settled at
+     * their own rate and one did not.
+     * Minimal mutation: drop the line.
+     * Test that fails under it: this one -- the KPIs and the realized-gains
+     * report show two figures for one sale with nothing explaining either.
+     */
+    it('names the rows converted at the market rate for want of their own', async () => {
+      mockGetTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      mockGetTransactionSummary.mockResolvedValue(
+        summaryFixture({ transactionRateCount: 4, marketRateCount: 2 }),
+      );
+      render(<InvestmentTransactionHistoryReport />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/2 rows without one use the market rate/),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('says nothing when no row needed converting at all', async () => {
+      mockGetTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      mockGetTransactionSummary.mockResolvedValue(summaryFixture());
+      render(<InvestmentTransactionHistoryReport />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Total Transactions')).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/market rate/)).not.toBeInTheDocument();
     });
   });
 });

@@ -16,15 +16,24 @@ import {
 } from "./portfolio.service";
 import { roundMoney } from "../common/round.util";
 import { parseTag } from "../tags/tag-key-value.util";
-import { formatDateYMD, formatDateYMDLocal } from "../common/date-utils";
+import {
+  formatDateYMD,
+  formatDateYMDLocal,
+  todayYMD,
+} from "../common/date-utils";
 import { mapWithConcurrency } from "../common/concurrency.util";
-import { convertWithRateLookup } from "../common/currency-conversion.util";
 import { FxAggregate } from "../common/fx-aggregate";
+import {
+  FX_MAX_RATE_AGE_DAYS,
+  describeFxGap,
+  resolveFxRate,
+} from "../common/time-series/fx-rate-resolver";
 import {
   acquisitionCost,
   applyActionToQuantity,
   baseInvestmentAction,
   CASH_INCOME_ACTIONS,
+  INVESTMENT_REPLAY_ORDER,
 } from "./investment-replay.util";
 import { stripBrokerageSuffix } from "../accounts/account-name.util";
 
@@ -327,7 +336,9 @@ function applyTxToState(
 
 /**
  * Service responsible for the core portfolio value calculations:
- * holdings valuation, account grouping, allocation, TWR, and CAGR.
+ * holdings valuation, account grouping, allocation, and CAGR. The summary's
+ * time-weighted return is not here: it is the invested measure over the whole
+ * life of the portfolio, answered by `PortfolioPeriodResultService`.
  *
  * Extracted from PortfolioService to keep file sizes manageable.
  */
@@ -373,30 +384,33 @@ export class PortfolioCalculationService {
     const cacheKey = `${fromCurrency}->${defaultCurrency}`;
     let rate = rateCache.get(cacheKey);
     if (rate === undefined) {
-      const directRate = await this.exchangeRateService.getLatestRate(
+      // One door, `live` mode: the freshest stored observation in either
+      // direction, still inside the age bound. Two unbounded `getLatestRate`
+      // calls plus a hand-rolled reciprocal is what let this path and the
+      // report path quote different rates for one pair in one session, and let
+      // either of them quote a rate from months ago as "current".
+      const resolved = await this.exchangeRateService.resolveStoredRate(
         fromCurrency,
         defaultCurrency,
+        todayYMD(),
+        { mode: "live" },
       );
-      if (directRate !== null && directRate > 0) {
-        rate = directRate;
-      } else {
-        const reverseRate = await this.exchangeRateService.getLatestRate(
-          defaultCurrency,
-          fromCurrency,
+      if (resolved.rate === null) {
+        // The absence is cached too (`null`), so a portfolio with many
+        // holdings in one unrated currency resolves the pair once per
+        // request instead of re-running the lookup and re-warning per
+        // holding -- the warn below is therefore once per pair per cache.
+        this.logger.warn(
+          describeFxGap(
+            cacheKey,
+            todayYMD(),
+            resolved.reason ?? "no_observation",
+          ),
         );
-        if (reverseRate === null || reverseRate <= 0) {
-          // The absence is cached too (`null`), so a portfolio with many
-          // holdings in one unrated currency resolves the pair once per
-          // request instead of re-running both lookups and re-warning per
-          // holding -- the warn below is therefore once per pair per cache.
-          this.logger.warn(
-            `No exchange rate available for ${cacheKey}; the affected total is reported as unknown rather than converted 1:1`,
-          );
-          rateCache.set(cacheKey, null);
-          return null;
-        }
-        rate = 1 / reverseRate;
+        rateCache.set(cacheKey, null);
+        return null;
       }
+      rate = resolved.rate;
       rateCache.set(cacheKey, rate);
     }
     if (rate === null) return null;
@@ -408,12 +422,14 @@ export class PortfolioCalculationService {
    * currency held across the given accounts and their holdings. The portfolio
    * summary's "as of now" valuations (holdings value, cash, allocation, net
    * invested) then convert at the current rate -- matching the live Portfolio
-   * Value Over Time chart -- instead of the once-a-day stored snapshot used by
-   * getLatestRate.
+   * Value Over Time chart -- instead of the once-a-day stored snapshot.
    *
-   * Best effort: when a live quote is unavailable for a currency the cache is
-   * left unset for that pair, so the downstream convertToDefault falls back to
-   * the stored daily rate (its existing behaviour).
+   * Best effort: when no rate is available for a currency the cache is left
+   * unset for that pair and `convertToDefault` resolves it through the same
+   * door under the same age bound. What it must not do is seed a rate the door
+   * would refuse: `getLiveRate` used to fall back to an unbounded newest-row
+   * read, so a 276-day-old observation was cached as "live" and every figure
+   * built on it reported itself complete (issue #1390).
    */
   async primeLiveRates(
     rateCache: FxRateCache,
@@ -484,8 +500,16 @@ export class PortfolioCalculationService {
     const index: DailyRateIndex = new Map();
     if (needed.size === 0) return index;
 
+    // Load one age bound before the window opens, anchored at today when the
+    // window opens later than that (a future bar resolves at today's rate).
+    // Those are exactly the observations any date in [startDate, endDate] can
+    // be priced by, so widening or narrowing the chart cannot change a bar's
+    // rate -- which loading only the window itself did (issue #1390).
+    const anchor = startDate < todayYMD() ? startDate : todayYMD();
+    const floor = new Date(`${anchor}T00:00:00.000Z`);
+    floor.setUTCDate(floor.getUTCDate() - FX_MAX_RATE_AGE_DAYS);
     const rows = await this.exchangeRateService.getRateHistory(
-      startDate,
+      floor.toISOString().slice(0, 10),
       endDate,
     );
     for (const row of rows) {
@@ -528,10 +552,12 @@ export class PortfolioCalculationService {
 
   /**
    * Resolve the stored daily rate for converting 1 unit of `from` to `to` as of
-   * `dateStr` (YYYY-MM-DD) from a `DailyRateIndex`. Picks the most recent rate
-   * at or before the date; if none exists yet it uses the earliest known rate.
-   * Returns undefined when the pair is absent in either direction so callers can
-   * apply their own fallback.
+   * `dateStr` (YYYY-MM-DD) from a `DailyRateIndex`, through the one door.
+   *
+   * Returns `undefined` when no admissible observation exists in either
+   * direction, so callers report the bar as unknown. It used to end in
+   * `best ?? rates[0].rate` -- the earliest stored rate, from after the bar
+   * being valued (issue #1390).
    */
   resolveDailyRate(
     index: DailyRateIndex,
@@ -539,17 +565,10 @@ export class PortfolioCalculationService {
     to: string,
     dateStr: string,
   ): number | undefined {
-    const result = convertWithRateLookup(1, from, to, (f, t) => {
-      const rates = index.get(`${f}->${t}`);
-      if (!rates || rates.length === 0) return undefined;
-      let best: number | undefined;
-      for (const r of rates) {
-        if (r.date <= dateStr) best = r.rate;
-        else break;
-      }
-      return best ?? rates[0].rate;
-    });
-    return result == null ? undefined : result;
+    const resolved = resolveFxRate(from, to, dateStr, (f, t) =>
+      index.get(`${f}->${t}`),
+    );
+    return resolved.rate === null ? undefined : resolved.rate;
   }
 
   // ---------------------------------------------------------------------------
@@ -766,14 +785,13 @@ export class PortfolioCalculationService {
    *
    * Quantity-only actions (ADD_SHARES/REMOVE_SHARES) move units and carry no
    * price, so they leave the running cost alone and mark the lot's basis
-   * **unknown** (`basisKnown: false`). They are not a zero-cost sleeve: the
-   * application itself keeps two different answers for what those units cost.
-   * `HoldingsService.adjustQuantity` leaves `average_cost` per share untouched,
-   * so the stored basis grows with an `ADD_SHARES` and shrinks with a
-   * `REMOVE_SHARES`; `computeHoldingsMap`, the full rebuild, holds `totalCost`
-   * fixed instead, so the same history gives a different stored basis depending
-   * on whether a rebuild has run since. Neither is derivable here, and a
-   * position whose cost has two answers has none.
+   * **unknown** (`basisKnown: false`). They are not a zero-cost sleeve: what
+   * those units cost is not in the ledger at all. `computeHoldingsMap`
+   * (`HoldingsService`) is now the only writer of `quantity` and
+   * `average_cost`, and it holds `totalCost` fixed across such a row, so the
+   * per-share average moves with the count while the money behind it stays
+   * whatever the priced rows said. That is a projection of an unknown, not a
+   * measurement of one, so it is not reported as a basis here.
    *
    * SPLIT is not in that class: it scales quantity and preserves total cost,
    * which is what both live paths do, so the per-share average adjusts and the
@@ -810,7 +828,7 @@ export class PortfolioCalculationService {
           // Rows as effects: a VOID transaction moved no shares and no cost.
           status: NON_VOID_INVESTMENT_STATUS,
         },
-        order: { transactionDate: "ASC", createdAt: "ASC" },
+        order: INVESTMENT_REPLAY_ORDER,
       }),
     );
 
@@ -1243,7 +1261,7 @@ export class PortfolioCalculationService {
       m.getRepository(InvestmentTransaction).find({
         where,
         relations: ["security", "account"],
-        order: { transactionDate: "ASC", createdAt: "ASC" },
+        order: INVESTMENT_REPLAY_ORDER,
       }),
     );
 
@@ -1422,7 +1440,7 @@ export class PortfolioCalculationService {
       m.getRepository(InvestmentTransaction).find({
         where,
         relations: ["security", "account"],
-        order: { transactionDate: "ASC", createdAt: "ASC" },
+        order: INVESTMENT_REPLAY_ORDER,
       }),
     );
 
@@ -1470,27 +1488,65 @@ export class PortfolioCalculationService {
       group.txs.push(tx);
     }
 
-    // Cache FX rates: securityCurrency -> accountCurrency
-    const fxCache = new Map<string, number>();
+    // Cache FX rates: (securityCurrency -> accountCurrency, on a given date).
+    const fxCache = new Map<string, number | null>();
     // `null` when the pair has no rate. This used to end `: 1`, valuing a
     // foreign security's period start and end as though its currency were the
-    // account's (audit P5-009). Rate 1 only when the codes are equal.
+    // account's (audit P5-009). Rate 1 only when the codes are equal -- a
+    // missing code is unknown, and the lookup is the one bounded door rather
+    // than two unbounded latest-rate reads with a hand-rolled reciprocal.
+    //
+    // The rate is resolved AT THE BOUNDARY'S OWN DATE in historical mode -- the
+    // newest observation on or before that date within FX_MAX_RATE_AGE_DAYS,
+    // never a future rate and never today's (INV-FX-001, docs/time-series-
+    // contract.md sections 2 and 4). Resolving once at todayYMD() in `live` mode
+    // priced every historical boundary of every period at one rate, so the
+    // report reads a currency's move over the window as no move at all. The
+    // cache is keyed by date so a portfolio holding one pair still resolves each
+    // distinct boundary date once.
     const fxRate = async (
       from: string | null,
       to: string | null,
+      onDate: string,
     ): Promise<number | null> => {
-      if (!from || !to || from === to) return 1;
-      const cacheKey = `${from}->${to}`;
+      if (!from || !to) return null;
+      if (from === to) return 1;
+      const cacheKey = `${from}->${to}@${onDate}`;
       const cached = fxCache.get(cacheKey);
       if (cached !== undefined) return cached;
-      let rate = await this.exchangeRateService.getLatestRate(from, to);
-      if (rate === null || rate <= 0) {
-        const reverse = await this.exchangeRateService.getLatestRate(to, from);
-        if (reverse === null || reverse <= 0) return null;
-        rate = 1 / reverse;
-      }
-      fxCache.set(cacheKey, rate);
-      return rate;
+      const resolved = await this.exchangeRateService.resolveStoredRate(
+        from,
+        to,
+        onDate,
+        { mode: "historical" },
+      );
+      // The absence is cached too, so a portfolio holding many securities in
+      // one unrated currency resolves that pair once per date instead of per
+      // group.
+      fxCache.set(cacheKey, resolved.rate);
+      return resolved.rate;
+    };
+
+    // A boundary's market value in the account's currency. A zero position is
+    // worth zero on any date and needs no rate; a held position with no accepted
+    // price on or before the boundary is UNKNOWN (`null`), never zero; otherwise
+    // the security-currency value is converted at the FX accepted for the
+    // boundary's own date.
+    const boundaryValue = async (
+      quantity: number,
+      rawPrice: number | null,
+      onDate: string,
+      securityCurrencyCode: string | null,
+      accountCurrencyCode: string | null,
+    ): Promise<number | null> => {
+      if (Math.abs(quantity) < COST_BASIS_QUANTITY_TOLERANCE) return 0;
+      if (rawPrice === null) return null;
+      const fx = await fxRate(
+        securityCurrencyCode,
+        accountCurrencyCode,
+        onDate,
+      );
+      return fx === null ? null : quantity * rawPrice * fx;
     };
 
     const results: CapitalGainEntry[] = [];
@@ -1499,10 +1555,6 @@ export class PortfolioCalculationService {
       const txs = group.txs;
       const state = { quantity: 0, costBasis: 0, basisKnown: true };
       let txIdx = 0;
-      const securityToAccountFx = await fxRate(
-        group.securityCurrencyCode,
-        group.accountCurrencyCode,
-      );
 
       // Replay any transactions strictly before the first period to seed state.
       while (
@@ -1515,15 +1567,19 @@ export class PortfolioCalculationService {
 
       for (const { key: periodKey, periodEnd, priceLookupStart } of periods) {
         const startQuantity = state.quantity;
-        const startPrice =
-          this.lookupPrice(group.securityId, priceLookupStart, allPrices) ?? 0;
-        // A period whose security currency cannot be converted into the
-        // account's has no knowable start or end value; the rate is 1 only when
-        // the two currencies are the same.
-        const startValue =
-          securityToAccountFx === null
-            ? null
-            : startQuantity * startPrice * securityToAccountFx;
+        // The start value uses the FX accepted for the day BEFORE the period's
+        // start (priceLookupStart), where the position was carried into the
+        // period; the end value uses the FX accepted for periodEnd. A held
+        // position with no price on a boundary makes that boundary unknown, and
+        // an unconvertible currency does the same -- the rate is 1 only when the
+        // two currencies are the same.
+        const startValue = await boundaryValue(
+          startQuantity,
+          this.lookupPrice(group.securityId, priceLookupStart, allPrices),
+          priceLookupStart,
+          group.securityCurrencyCode,
+          group.accountCurrencyCode,
+        );
 
         let buys = 0;
         let sells = 0;
@@ -1599,12 +1655,13 @@ export class PortfolioCalculationService {
         }
 
         const endQuantity = state.quantity;
-        const endPrice =
-          this.lookupPrice(group.securityId, periodEnd, allPrices) ?? 0;
-        const endValue =
-          securityToAccountFx === null
-            ? null
-            : endQuantity * endPrice * securityToAccountFx;
+        const endValue = await boundaryValue(
+          endQuantity,
+          this.lookupPrice(group.securityId, periodEnd, allPrices),
+          periodEnd,
+          group.securityCurrencyCode,
+          group.accountCurrencyCode,
+        );
 
         // Unknown boundary values -- or an incomplete `buys` -- make the
         // capital gain unknown rather than equal to the known cash movements.
@@ -1804,6 +1861,29 @@ export class PortfolioCalculationService {
           defaultCurrency,
         );
       }
+      // The row's value in the account and reporting currencies, from the SAME
+      // rateCache the totals use, so the row and the total it joins share one
+      // FX snapshot. `null` when the pair has no rate or the value is unknown;
+      // the default-currency figure is exactly this holding's contribution to
+      // `holdingsValueTotal` below.
+      const marketValueAccountCurrency =
+        marketValue === null
+          ? null
+          : await this.convertToDefault(
+              marketValue,
+              holdingCurrency,
+              accountCurrency,
+              rateCache,
+            );
+      const marketValueDefaultCurrency =
+        marketValue === null
+          ? null
+          : await this.convertToDefault(
+              marketValue,
+              holdingCurrency,
+              defaultCurrency,
+              rateCache,
+            );
       if (marketValue !== null) {
         holdingsValueTotal.add(
           await this.convertToDefault(
@@ -1835,6 +1915,8 @@ export class PortfolioCalculationService {
         costBasisAccountCurrency,
         currentPrice,
         marketValue,
+        marketValueAccountCurrency,
+        marketValueDefaultCurrency,
         gainLoss,
         gainLossPercent,
       });
@@ -2541,7 +2623,7 @@ export class PortfolioCalculationService {
   }
 
   // ---------------------------------------------------------------------------
-  // Time-Weighted Return (TWR)
+  // Stored price history, for the per-period valuations the reports walk
   // ---------------------------------------------------------------------------
 
   /**
@@ -2603,200 +2685,5 @@ export class PortfolioCalculationService {
       }
     }
     return best >= 0 ? prices[best].price : null;
-  }
-
-  /**
-   * Calculate Time-Weighted Return (TWR) for a set of investment accounts.
-   * Forward-simulates holdings at each transaction date boundary and chains
-   * sub-period returns to produce a cumulative TWR percentage.
-   *
-   * @param getLatestPrices - callback to fetch latest prices (injected from PortfolioService)
-   */
-  async calculateTWR(
-    userId: string,
-    holdingsAccountIds: string[],
-    defaultCurrency: string,
-    rateCache: FxRateCache,
-    getLatestPrices: (securityIds: string[]) => Promise<Map<string, number>>,
-  ): Promise<number | null> {
-    if (holdingsAccountIds.length === 0) return null;
-
-    // Fetch all investment transactions for these accounts, ordered by date
-    const transactions = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(InvestmentTransaction).find({
-        // Rows as effects: a VOID transaction moved no shares and no cost.
-        where: {
-          userId,
-          accountId: In(holdingsAccountIds),
-          status: NON_VOID_INVESTMENT_STATUS,
-        },
-        relations: ["security"],
-        order: { transactionDate: "ASC", createdAt: "ASC" },
-      }),
-    );
-
-    if (transactions.length === 0) return null;
-
-    // Gather all referenced security IDs and fetch their full price history
-    const securityIds = [
-      ...new Set(
-        transactions.filter((t) => t.securityId).map((t) => t.securityId!),
-      ),
-    ];
-    const allPrices = await this.getAllPricesForSecurities(securityIds);
-
-    // Build a map of securityId -> currencyCode from transactions
-    const currencyMap = new Map<string, string>();
-    for (const tx of transactions) {
-      if (tx.securityId && tx.security) {
-        currencyMap.set(tx.securityId, tx.security.currencyCode);
-      }
-    }
-
-    // Group transactions by date
-    const txByDate = new Map<string, InvestmentTransaction[]>();
-    for (const tx of transactions) {
-      let arr = txByDate.get(tx.transactionDate);
-      if (!arr) {
-        arr = [];
-        txByDate.set(tx.transactionDate, arr);
-      }
-      arr.push(tx);
-    }
-
-    const sortedDates = [...txByDate.keys()].sort();
-
-    // M16: Batch-fetch all latest prices once to avoid N+1 queries
-    const latestPriceCache = await getLatestPrices(securityIds);
-
-    // TWR chains period-over-period factors, so one period value missing an
-    // unconvertible position poisons every factor after it -- and unlike the
-    // summary's totals, the ratio carries no missingRatePairs field a consumer
-    // could check. When any period value had an FX gap the chained return is a
-    // return on a portfolio nobody owns: unknown, not approximated, the same
-    // treatment CAGR gets from its completeness gate.
-    let fxIncomplete = false;
-
-    // Helper: compute portfolio value from holdings state (current prices)
-    const computeValue = async (
-      holdings: Map<string, number>,
-    ): Promise<number> => {
-      const value = new FxAggregate();
-      for (const [secId, qty] of holdings) {
-        if (qty === 0) continue;
-        const price = latestPriceCache.get(secId);
-        if (price != null) {
-          const currency = currencyMap.get(secId) || defaultCurrency;
-          value.add(
-            await this.convertToDefault(
-              qty * price,
-              currency,
-              defaultCurrency,
-              rateCache,
-            ),
-            currency,
-            defaultCurrency,
-          );
-        }
-      }
-      if (!value.isComplete) {
-        this.logger.warn(
-          `Portfolio value omits positions with no exchange rate (${value.missingPairs.join(", ")})`,
-        );
-        fxIncomplete = true;
-      }
-      return value.knownSubtotal;
-    };
-
-    // Helper: compute portfolio value from holdings state at a specific date
-    const computeValueAtDate = async (
-      holdings: Map<string, number>,
-      date: string,
-    ): Promise<number> => {
-      const value = new FxAggregate();
-      for (const [secId, qty] of holdings) {
-        if (qty === 0) continue;
-        const price = this.lookupPrice(secId, date, allPrices);
-        if (price != null) {
-          const currency = currencyMap.get(secId) || defaultCurrency;
-          value.add(
-            await this.convertToDefault(
-              qty * price,
-              currency,
-              defaultCurrency,
-              rateCache,
-            ),
-            currency,
-            defaultCurrency,
-          );
-        }
-      }
-      if (!value.isComplete) {
-        this.logger.warn(
-          `Portfolio value at ${date} omits positions with no exchange rate (${value.missingPairs.join(", ")})`,
-        );
-        fxIncomplete = true;
-      }
-      return value.knownSubtotal;
-    };
-
-    // Forward-simulate holdings and chain sub-period returns
-    const holdings = new Map<string, number>(); // securityId -> quantity
-    const subPeriodFactors: number[] = [];
-    let previousValue = 0;
-    let previousDate: string | null = null;
-
-    for (const date of sortedDates) {
-      const dayTxs = txByDate.get(date)!;
-
-      if (previousDate !== null && previousValue > 0) {
-        // Value of existing holdings at this date's prices (before applying today's transactions)
-        const currentValue = await computeValueAtDate(holdings, date);
-        if (currentValue >= 0) {
-          subPeriodFactors.push(currentValue / previousValue);
-        }
-      }
-
-      // Apply today's transactions to holdings
-      for (const tx of dayTxs) {
-        if (!tx.securityId) continue;
-        const current = holdings.get(tx.securityId) || 0;
-        const qty = Number(tx.quantity || 0);
-
-        // SPLIT was in the "no quantity change" list here, so every point after
-        // a split valued the pre-split share count -- a 2-for-1 halved the
-        // reported value of the position from that day on. Fold through the
-        // shared reducer that every other holdings walk uses.
-        holdings.set(
-          tx.securityId,
-          applyActionToQuantity(current, tx.action, qty),
-        );
-      }
-
-      // Compute portfolio value after today's transactions
-      previousValue = await computeValueAtDate(holdings, date);
-      previousDate = date;
-    }
-
-    // Final sub-period: from last transaction date to today
-    if (previousValue > 0) {
-      const todayValue = await computeValue(holdings);
-      if (todayValue >= 0) {
-        subPeriodFactors.push(todayValue / previousValue);
-      }
-    }
-
-    if (subPeriodFactors.length === 0) return null;
-
-    // A factor chain built over an FX gap is not a return; see fxIncomplete.
-    if (fxIncomplete) return null;
-
-    // Chain: TWR = product of all factors - 1
-    let product = 1;
-    for (const factor of subPeriodFactors) {
-      product *= factor;
-    }
-
-    return (product - 1) * 100;
   }
 }

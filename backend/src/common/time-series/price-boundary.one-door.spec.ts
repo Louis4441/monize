@@ -48,15 +48,6 @@ const BASELINE: ReadonlyArray<{ file: string; reason: string }> = [
       "valuation.",
   },
   {
-    file: "currencies/exchange-rate.service.ts",
-    reason:
-      "getLatestRate takes an optional maxAgeDays and its money call sites " +
-      "pass one; getRateForDate's carry-forward has an upper bound but no " +
-      "lower one. Pre-existing, and deliberately not built upon -- the " +
-      "Security Performance comparison converts nothing (see " +
-      "docs/security-benchmark-comparison.md section 2).",
-  },
-  {
     file: "securities/portfolio.service.ts",
     reason:
       "getLatestPrices and the ROW_NUMBER latest-close CTEs behind the " +

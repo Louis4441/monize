@@ -11,8 +11,9 @@ import type { DailyInvestmentValue } from '@/types/net-worth';
  * asked for is clamped at today and a day past it simply has no point (design
  * decision 7).
  *
- * Completeness is the response's: `pricesComplete === false` or
- * `fxComplete === false` is a value the server could not work out, and an
+ * Completeness is the response's: `pricesComplete === false`,
+ * `fxComplete === false` or `cashComplete === false` is a value the server could
+ * not work out, and an
  * ABSENT flag is no information rather than a claim of completeness, which is
  * why both reads are `=== false` (INV-HOLDING-002).
  */
@@ -26,7 +27,11 @@ export interface InvestmentDailyValuesState {
 
 /** Whether a day's value is one the server could actually work out. */
 export function isDailyValueComplete(point: DailyInvestmentValue): boolean {
-  return point.pricesComplete !== false && point.fxComplete !== false;
+  return (
+    point.pricesComplete !== false &&
+    point.fxComplete !== false &&
+    point.cashComplete !== false
+  );
 }
 
 export function investmentDailyValuesKey(

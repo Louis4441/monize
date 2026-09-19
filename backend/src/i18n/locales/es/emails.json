@@ -228,8 +228,8 @@
     "portfolioMovement": {
       "titleUp": "Inversiones al alza {{ percent }}%",
       "titleDown": "Inversiones a la baja {{ percent }}%",
-      "messageUp": "Tus inversiones han subido un {{ percent }}% hoy, sin contar depósitos ni retiros. Abre para revisar.",
-      "messageDown": "Tus inversiones han bajado un {{ percent }}% hoy, sin contar depósitos ni retiros. Abre para revisar."
+      "messageUp": "Tus inversiones han subido un {{ percent }}% del {{ from }} al {{ to }}, sin contar depósitos ni retiros. Abre para revisar.",
+      "messageDown": "Tus inversiones han bajado un {{ percent }}% del {{ from }} al {{ to }}, sin contar depósitos ni retiros. Abre para revisar."
     },
     "balanceThreshold": {
       "titleLow": "{{ account }} está por debajo de tu umbral",

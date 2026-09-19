@@ -111,5 +111,20 @@
     "nameMax": "Name darf höchstens 100 Zeichen lang sein",
     "symbolRequired": "Symbol ist erforderlich",
     "symbolMax": "Symbol darf höchstens 10 Zeichen lang sein"
+  },
+  "rateHistory": {
+    "title": "Kursverlauf",
+    "stored": "Gespeicherter Verlauf: {start} bis {end} ({count} Beobachtungen)",
+    "none": "Kein gespeicherter Verlauf für {pair}",
+    "loading": "Gespeicherter Kursverlauf wird geprüft...",
+    "loadFailed": "Der gespeicherte Kursverlauf konnte nicht gelesen werden",
+    "addYear": "Ein weiteres Jahr Kursverlauf hinzufügen",
+    "adding": "Ein weiteres Jahr wird abgerufen...",
+    "hint": "Berichte mit einem Datum vor dem ersten gespeicherten Kurs können {pair} nicht umrechnen.",
+    "toasts": {
+      "added": "{count} Kurse hinzugefügt; der Verlauf beginnt jetzt am {start}",
+      "noOlder": "Der Anbieter hat keine älteren Kurse für {pair}",
+      "failed": "Der Kursverlauf konnte nicht erweitert werden"
+    }
   }
 }

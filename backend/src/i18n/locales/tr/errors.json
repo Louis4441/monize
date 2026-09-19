@@ -259,7 +259,9 @@
     "cannotModifyOther": "Başka bir kullanıcının para birimi değiştirilemez",
     "inUse": "\"{{ code }}\" para birimi hesaplarınız, menkul kıymetleriniz veya diğer kayıtlarınız tarafından kullanılıyor. Bunun yerine devre dışı bırakın.",
     "invalidRateDate": "date, YYYY-AA-GG biçiminde olmalıdır",
-    "alreadyInListInactive": "\"{{ code }}\" para birimi zaten listenizde mevcut ancak şu anda etkin değil. Kullanmak için yeniden etkinleştirin."
+    "alreadyInListInactive": "\"{{ code }}\" para birimi zaten listenizde mevcut ancak şu anda etkin değil. Kullanmak için yeniden etkinleştirin.",
+    "sameCurrencyHistory": "{{ code }} varsayılan para biriminizdir; genişletilecek döviz kuru geçmişi yok",
+    "rateProviderUnavailable": "Döviz kuru sağlayıcısı yanıt vermedi. Lütfen daha sonra tekrar deneyin."
   },
   "delegation": {
     "delegatedAccessInvalid": "Delege erişimi artık geçerli değil",
@@ -341,8 +343,10 @@
   "netWorth": {
     "invalidStartDate": "startDate YYYY-AA-GG biçiminde olmalıdır",
     "invalidEndDate": "endDate YYYY-AA-GG biçiminde olmalıdır",
+    "invalidBaselineDate": "baselineDate YYYY-AA-GG biçiminde olmalıdır",
     "invalidAccountIds": "accountIds virgülle ayrılmış UUID'ler olmalıdır",
-    "invalidGranularity": "granularity 'daily' veya 'monthly' olmalıdır"
+    "invalidGranularity": "granularity 'daily' veya 'monthly' olmalıdır",
+    "invalidPeriods": "periods, virgülle ayrılmış önceden tanımlı dönemler olmalıdır"
   },
   "notifications": {
     "notFound": "{{ id }} kimliğine sahip bildirim bulunamadı",
@@ -418,6 +422,7 @@
   "securities": {
     "exchangeRateUnavailable": "İşlem tarihinde {{ from }} -> {{ to }} için bir döviz kuru belirlenemedi. Nakit hesabına kaydın doğru olması için açık bir exchangeRate girin.",
     "accountMustBeInvestment": "Hesap YATIRİM türünde olmalıdır",
+    "providerCurrencyMismatch": "{{ symbol }} için fiyat güncellemesi reddedildi: {{ provider }} bunu {{ reported }} cinsinden bildiriyor, ancak menkul kıymet {{ configured }} cinsinden kayıtlı. Menkul kıymetin para birimini, sembolünü veya borsasını düzeltip yeniden yenileyin.",
     "securityIdRequired": "{{ action }} işlemleri için menkul kıymet kimliği gereklidir",
     "splitRatioRequired": "Bölünme oranı (miktar) sıfırdan büyük olmalıdır",
     "acquisitionPriceRequired": "{{ action }} işlemleri için sıfırdan büyük bir birim fiyat gereklidir. Maliyeti bilinmeyen paylar için ADD_SHARES kullanın.",

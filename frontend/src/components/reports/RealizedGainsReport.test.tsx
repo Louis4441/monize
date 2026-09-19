@@ -466,6 +466,31 @@ describe('RealizedGainsReport', () => {
     });
   });
 
+  it("labels the unit price in the security's currency, not the account's", async () => {
+    // A EUR security sold from a CAD account: the price is the raw transaction
+    // value in the security's currency, while proceeds/basis/gain beside it are
+    // the server's conversion into the account's. Labelling the price with the
+    // account's (or the reader's) currency is issue #1394's mislabel, and it is
+    // what `fmtValue(entry.price)` did here.
+    mockGetInvestmentAccounts.mockResolvedValue([
+      { id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
+    ]);
+    mockGetRealizedGains.mockResolvedValue([
+      gainEntry({ securityCurrencyCode: 'EUR', price: 110, accountCurrencyCode: 'CAD' }),
+    ]);
+    render(<RealizedGainsReport />);
+    await waitFor(() => expect(screen.getByTitle('Table')).toBeInTheDocument());
+    await act(async () => { fireEvent.click(screen.getByTitle('Table')); });
+
+    await waitFor(() => {
+      expect(screen.getByText('$110.00 EUR')).toBeInTheDocument();
+    });
+    // The proceeds are the account's currency, so they carry no foreign suffix
+    // (the figure appears in the KPI card and in the row).
+    expect(screen.getAllByText('$5500.00').length).toBeGreaterThan(0);
+    expect(screen.queryByText('$5500.00 CAD')).not.toBeInTheDocument();
+  });
+
   it('uses convertToDefault when no account is selected (All Accounts)', async () => {
     mockGetInvestmentAccounts.mockResolvedValue([]);
     mockGetRealizedGains.mockResolvedValue([

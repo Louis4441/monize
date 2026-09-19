@@ -134,6 +134,40 @@ site that bypasses it, in the manner of
 `frontend/src/test/ui-conventions.test.ts`.
 `backend/src/common/time-series/price-boundary.one-door.spec.ts` is that test.
 
+### 2.2 A series read may fill its own gaps, once, before it reports them
+
+A pair missing from the stored history is usually a fact about what has been
+fetched, not about the world: the daily refresh writes today only and
+`backfillHistoricalRates` skips a pair the moment it holds any row, so a chart
+over a span nobody ever loaded names every point incomplete for rates the
+provider has had all along. A series read may therefore ask for them, under
+five conditions that are not negotiable, and only these:
+
+- **Demand-driven.** The plan comes from the points that actually failed to
+  convert -- the same `missingRatePairs` the response reports -- so a currency
+  the window never had to convert costs no provider call.
+- **Month-granular and deduplicated.** One `ensureRatesForDate` call fetches
+  the whole calendar month around a date and persists both directions, so the
+  unit is `(month, directionless pair)`: a 400-point chart costs one call per
+  month per pair, not four hundred.
+- **Bounded.** `MAX_FILL_MONTHS` (24) months per request, newest first. A wider
+  range fills the newest two years and reports the rest as still missing; one
+  HTTP request must not become an unbounded number of outbound ones.
+- **Re-read, never patched.** Only a fill that persisted something triggers a
+  rebuild of the rate index **from the database** and a recomputation through
+  the same code, so the series converts with what a second request would find.
+- **Best-effort, and it never invents a rate.** A provider that is down or has
+  no history for a pair leaves the point exactly where section 3 leaves it: the
+  pair named, the figure withheld. The read never fails because an outbound
+  fetch did, and a caller that must not reach the network at all (a cron, an
+  LLM tool) passes `fetchMissing: false`.
+
+`backend/src/net-worth/series-rate-fill.ts` is the shared planner and runner,
+used by the investment series, the investment breakdown, the monthly net-worth
+series and `PortfolioPeriodResultService`;
+`backend/src/accounts/account-balances-report.service.ts` is the same shape for
+a point-in-time report (`docs/specs/account-balances-as-of.md` section 7.1).
+
 One deliberate exception lives **inside** the door rather than beside it:
 `backend/src/common/time-series/nearest-observation.ts` answers "what is the
 closest thing anybody ever observed", unbounded, for a surface that has decided
@@ -167,6 +201,19 @@ a fresh price and a nine-month-old rate is no more knowable than one built
 from a stale price, and it fails more quietly, because no figure on the page
 is denominated in a rate. A conversion feeding a number the user acts on takes
 a bounded rate or returns unknown.
+
+The door is `resolveFxRate`
+(`backend/src/common/time-series/fx-rate-resolver.ts`): the newest observation
+on or before the date, in either stored direction, within
+`FX_MAX_RATE_AGE_DAYS`, never one from after the date, and `null` with a named
+reason otherwise -- `backend/src/common/time-series/fx-rate.one-door.spec.ts`
+fails a newest-rate read that bypasses it.
+
+The periodic capital-gains report (`calculateCapitalGains`) is bound by this:
+it values each period boundary at the FX accepted for that boundary's own date
+in historical mode -- the start at `priceLookupStart`, the end at `periodEnd` --
+never once at today's live rate for both ends, which read a currency's move over
+the window as none.
 
 ### 2.3 A boundary needs two observations, not two lookups
 
@@ -207,6 +254,29 @@ issue #1081 reported: the per-security portfolio chart opened in 1990 and
 flattened three decades of nothing against the x-axis. `net-worth.service.ts`
 carries the allowlist and the scan test that holds it.
 
+### 2.6 A sample date is a calendar date, not an instant
+
+A series keyed by calendar date enumerates `YYYY-MM-DD` strings and steps them
+with `addDaysYMD` (`backend/src/common/date-utils.ts`) or, for a whole window,
+`enumerateDaysYMD` (`backend/src/net-worth/series-dates.util.ts`). A `Date` built
+from a date string plus `T00:00:00` is LOCAL midnight, and `toISOString()` reads
+UTC components: the pair names every day one day early in any process east of
+Greenwich, and drops the last day of the window entirely. The database returns
+real calendar dates, so the keys stop matching and every lookup against them
+falls to its default.
+
+That default is the second half of the rule. A series point looks up its
+components by date; when a component the query was asked to produce has no row
+for that date, the point is missing data, not holding zero. Walk the EXPECTED
+components -- the resolved account scope, not the maps the query happened to
+return -- so a missing map is visible, and give the gap a completeness flag of
+its own (`cashComplete` and `unknownCashAccountIds` on
+`DailyInvestmentValue`) rather than a `?? 0` that reads as a measurement. Zero is
+the right answer only where the query legitimately says "no movement" and the
+opening balance is already carried; a row that was never produced says nothing
+at all. `series-dates.guard.spec.ts` scans `backend/src/net-worth/` for both
+shapes.
+
 ## 3. Missing returns are never zero
 
 - A period with no usable prices has `return: null`. Never `0`.
@@ -223,6 +293,15 @@ carries the allowlist and the scan test that holds it.
   four unobserved months is indistinguishable from measured data, and a
   tooltip admitting "unknown" under the cursor does not undo it. Whoever adds
   the `null` owns its rendering.
+- **A withheld figure names its cause where it is withheld.** The gap says
+  that something is unknown; it does not say what to repair. The surface that
+  withholds carries the causes the series already dates -- which instrument,
+  which currency pair, which account, over which dates -- close enough to the
+  withheld figure to be read with it, and resolved to names rather than ids.
+  `foldIncompleteData` and `IncompleteDataDetails`
+  (`frontend/src/lib/incomplete-data-ranges.ts`,
+  `frontend/src/components/reports/IncompleteDataDetails.tsx`) are that
+  rendering for the portfolio series.
 
 ## 4. Incomplete history: reject or disclose
 

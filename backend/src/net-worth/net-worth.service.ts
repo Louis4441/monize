@@ -27,6 +27,7 @@ import {
   MARKET_PRICED_TRADE_ACTIONS,
 } from "../securities/investment-replay.util";
 import { Security } from "../securities/entities/security.entity";
+import { invalidatePortfolioSummary } from "../securities/portfolio-summary-memo";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import {
   RateIndex,
@@ -34,12 +35,24 @@ import {
   convertAtDate,
 } from "../common/time-series/rate-index.util";
 import { FxAggregate } from "../common/fx-aggregate";
-import { applyActionToQuantity } from "../securities/investment-replay.util";
+import { roundMoney } from "../common/round.util";
+import { ExchangeRateService } from "../currencies/exchange-rate.service";
+import {
+  SeriesFetchOptions,
+  SeriesRateGap,
+  computeWithRateFill,
+} from "./series-rate-fill";
+import {
+  applyActionToQuantity,
+  INVESTMENT_REPLAY_ORDER,
+  INVESTMENT_REPLAY_ORDER_SQL,
+} from "../securities/investment-replay.util";
 import {
   UNFILTERED_INVESTMENT_SCOPE_SQL,
   resolveInvestmentScopeAccountIds,
 } from "../securities/investment-scope.util";
-import { formatDateYMDLocal } from "../common/date-utils";
+import { formatDateYMDLocal, todayYMD } from "../common/date-utils";
+import { enumerateDaysYMD } from "./series-dates.util";
 import { positionCloseAsOf, PricePoint } from "./position-price.util";
 import { preferredCurrency } from "../common/default-currency.util";
 import {
@@ -69,14 +82,38 @@ export interface JointNetWorthScope {
 }
 
 /**
+ * Whether the investment valuation walks this account's LEDGER CASH.
+ *
+ * The cash sleeve and the standalone investment account that predates the pair
+ * hold cash the series adds to market value; a brokerage row holds positions,
+ * and its own ledger rows are not valued. Written once because it is a boundary,
+ * not a filter: any figure measured against this series -- a period's external
+ * flow above all -- has to be drawn around the same accounts, or money moves
+ * across a line the valuation cannot see and the difference reads as
+ * performance (`docs/specs/portfolio-period-result.md` section 6).
+ */
+export function isValuationCashAccount(account: {
+  account_type: string;
+  account_sub_type: string | null;
+}): boolean {
+  return (
+    account.account_sub_type === "INVESTMENT_CASH" ||
+    (account.account_type === "INVESTMENT" && !account.account_sub_type)
+  );
+}
+
+/**
  * One day of `GET /net-worth/investments-daily`: the scope's market value plus
  * cash at the close of that calendar day, in the reporting currency.
  *
- * Two completeness bits, for two different repairs. `fxComplete` says every
+ * Three completeness bits, for three different repairs. `fxComplete` says every
  * component converted; `pricesComplete` says every position the scope held that
- * day had an accepted close on or before it. A day can be short of either, and
- * the reader who has to fix it needs to know which -- a missing rate is fixed in
- * Currencies, a missing price by entering one for the security.
+ * day had an accepted close on or before it; `cashComplete` says every cash
+ * account in the scope produced a balance for the day. A day can be short of any
+ * of them, and the reader who has to fix it needs to know which -- a missing rate
+ * is fixed in Currencies, a missing price by entering one for the security, and a
+ * cash account with no balance for a day it was asked for is a defect to report
+ * rather than a zero balance to draw (#1389).
  *
  * `value` is NOT withheld when `pricesComplete` is false. It is a subtotal on
  * such a day, which `docs/financial-calculation-contract.md` section 1 says a
@@ -93,6 +130,21 @@ export interface DailyInvestmentValue {
    * false -- read them before printing it under a total's caption.
    */
   value: number;
+  /**
+   * `IV(t)`: the INVESTED part of that same close -- the securities, without the
+   * cash beside them. `value` is this plus the scope's ledger cash.
+   *
+   * A component of the value already folded here, not a second valuation: the
+   * positions are the same replay, priced from the same accepted closes and
+   * converted at the same day's rate. The invested part's P&L and time-weighted
+   * return are measured over it, because cash held in an investment account is
+   * not an investment (`docs/specs/portfolio-period-result.md` section 10,
+   * INV-PORTRESULT-002), and the investment charts plot it for the same reason.
+   *
+   * The same subtotal rule as `value`: read `pricesComplete` and `fxComplete`
+   * (never `cashComplete` -- no cash is in here) before printing it as a total.
+   */
+  securitiesValue: number;
   /** False when a component could not be converted; see missingRatePairs. */
   fxComplete: boolean;
   /** "USD->EUR" for each pair with no available rate. */
@@ -104,6 +156,15 @@ export interface DailyInvestmentValue {
   pricesComplete: boolean;
   /** The securities behind `pricesComplete: false`, so a reader can price them. */
   unpricedSecurityIds: string[];
+  /**
+   * False when a cash account in the scope produced no balance for this day, so
+   * its contribution is unknown rather than zero. The per-day balance query
+   * already carries the opening balance and everything dated before the window,
+   * so a row it did not produce for a day it was asked for is missing data.
+   */
+  cashComplete: boolean;
+  /** The accounts behind `cashComplete: false`. */
+  unknownCashAccountIds: string[];
 }
 
 export type InvestmentBreakdownGranularity = "daily" | "monthly";
@@ -130,6 +191,30 @@ export interface InvestmentBreakdownPoint {
   total: number;
   /** Per-series value keyed by {@link InvestmentBreakdownSeries.key}. */
   values: Record<string, number>;
+  /**
+   * False when a cash account in the scope produced no balance for this point,
+   * so the cash band -- and therefore `total` -- is short a component whose
+   * value is unknown rather than zero. Read as `=== false`: an absent flag is
+   * an older backend saying nothing, which is no information (#1389).
+   */
+  cashComplete: boolean;
+  /** The accounts behind `cashComplete: false`. */
+  unknownCashAccountIds: string[];
+  /**
+   * False when a security held at this point had no accepted close on or before
+   * its valuation date. Its band is missing entirely -- unknown, not zero -- so
+   * `total` here is a subtotal of the bands that could be valued. Mirrors
+   * {@link DailyInvestmentValue.pricesComplete}; read as `=== false`.
+   */
+  pricesComplete: boolean;
+  /** The securities behind `pricesComplete: false`, so a reader can price them. */
+  unpricedSecurityIds: string[];
+  /**
+   * `"USD->EUR"` for each pair THIS point could not convert. The
+   * response-level `missingRatePairs` is the union over the window, which
+   * cannot say which dates to repair; this one dates each pair (#1389).
+   */
+  missingRatePairs: string[];
 }
 
 export interface InvestmentBreakdown {
@@ -195,7 +280,39 @@ export class NetWorthService {
     @Optional()
     @Inject(forwardRef(() => BalanceThresholdAlertService))
     private balanceAlerts?: BalanceThresholdAlertService,
+    // The read-path FX fill (see `computeWithRateFill`). Optional + forwardRef
+    // for the same two reasons: CurrenciesModule reaches back here through
+    // SecuritiesModule, and a harness that omits it simply reports the rates as
+    // missing, which is what the series did before the fill existed.
+    @Optional()
+    @Inject(forwardRef(() => ExchangeRateService))
+    private exchangeRates?: ExchangeRateService,
   ) {}
+
+  /**
+   * A series read that fills its own exchange-rate gaps; see
+   * `series-rate-fill.ts` for what that means and what it refuses to do.
+   *
+   * The gap it closes: the daily refresh writes today only and
+   * `backfillHistoricalRates` skips a pair that has any row at all, so a user
+   * who bought their first EUR holding in June has no EUR->PLN observation for
+   * January through May and every chart point in that span reports the pair as
+   * missing. Nothing is wrong with the data path; nobody ever asked the
+   * provider. A read may ask, once, for the months its own diagnostics name.
+   */
+  private computeWithRateFill<R>(
+    compute: () => Promise<R>,
+    gapsOf: (result: R) => ReadonlyArray<SeriesRateGap>,
+    options?: SeriesFetchOptions,
+  ): Promise<R> {
+    return computeWithRateFill(
+      this.exchangeRates,
+      compute,
+      gapsOf,
+      options,
+      this.logger,
+    );
+  }
 
   /**
    * One raw statement in its own short scoped transaction -- the RLS-compliant
@@ -219,6 +336,13 @@ export class NetWorthService {
    * queue entry that the same crash would have lost.
    */
   triggerDebouncedRecalc(accountId: string, userId: string): void {
+    // INV-CACHE-001: this is the seam every balance-moving write passes through
+    // after it commits, so it is where the in-process portfolio valuation is
+    // forgotten too. Immediately, not on the debounced timer: the memoized
+    // summary is wrong the moment the write commits, and the page reloading
+    // after a trade arrives long before the two seconds are up.
+    invalidatePortfolioSummary(userId);
+
     const key = `${userId}:${accountId}`;
     const existing = this.recalcTimers.get(key);
     if (existing) clearTimeout(existing);
@@ -259,6 +383,9 @@ export class NetWorthService {
   }
 
   async recalculateAccount(userId: string, accountId: string): Promise<void> {
+    // The same invalidation as the debounced seam, for the callers that
+    // recompute an account directly instead of going through it.
+    invalidatePortfolioSummary(userId);
     await withScopedDb(this.dataSource, async (m) => {
       // The lock first, then every read the snapshots are derived from, then the
       // delete-and-reinsert -- all in this transaction.
@@ -585,7 +712,19 @@ export class NetWorthService {
       .substring(0, 10);
     const resolvedStart = startDate || defaultStart;
     const resolvedEnd = endDate || today.toISOString().substring(0, 10);
-    return this.getMonthlyNetWorth(userId, resolvedStart, resolvedEnd);
+    // `fetchMissing: false`: a tool call is not a user waiting on a chart. The
+    // model gets what the database holds, with the same completeness flags and
+    // the same named pairs it would get for any other gap, and no HTTP request
+    // to a provider is made on an LLM's behalf.
+    return this.getMonthlyNetWorth(
+      userId,
+      resolvedStart,
+      resolvedEnd,
+      undefined,
+      {
+        fetchMissing: false,
+      },
+    );
   }
 
   async getMonthlyNetWorth(
@@ -593,6 +732,7 @@ export class NetWorthService {
     startDate?: string,
     endDate?: string,
     jointScope?: JointNetWorthScope,
+    options?: SeriesFetchOptions,
   ): Promise<
     {
       month: string;
@@ -651,13 +791,37 @@ export class NetWorthService {
       }
     }
 
-    const rateIndex = await this.buildRateIndex(
-      currencies,
-      defaultCurrency,
-      start,
-      end,
+    return this.computeWithRateFill(
+      async () =>
+        this.foldMonthlyNetWorth(
+          snapshots,
+          defaultCurrency,
+          await this.buildRateIndex(currencies, defaultCurrency, start, end),
+        ),
+      // A monthly point's `month` is its month-first date, which is the month
+      // the fill fetches; the conversion happens at that month's end.
+      (months) =>
+        months.map((m) => ({
+          date: m.month,
+          missingRatePairs: m.missingRatePairs,
+        })),
+      options,
     );
+  }
 
+  /** The month-by-month fold of `getMonthlyNetWorth`, at one rate index. */
+  private foldMonthlyNetWorth(
+    snapshots: any[],
+    defaultCurrency: string,
+    rateIndex: RateIndex,
+  ): {
+    month: string;
+    assets: number;
+    liabilities: number;
+    netWorth: number;
+    fxComplete: boolean;
+    missingRatePairs: string[];
+  }[] {
     // Aggregate by month. Assets and liabilities each accumulate through an
     // FxAggregate so a month containing a component with no available rate
     // reports an unknown total instead of a plausible wrong one (P5-009).
@@ -794,6 +958,7 @@ export class NetWorthService {
     endDate?: string,
     accountIds?: string[],
     displayCurrency?: string,
+    options?: SeriesFetchOptions,
   ): Promise<
     {
       month: string;
@@ -853,6 +1018,55 @@ export class NetWorthService {
 
     if (snapshots.length === 0) return [];
 
+    const currencies = new Set<string>();
+    for (const s of snapshots) {
+      if (s.currency_code !== defaultCurrency) {
+        currencies.add(s.currency_code);
+      }
+    }
+
+    return this.computeWithRateFill(
+      () =>
+        this.foldMonthlyInvestments(
+          userId,
+          snapshots,
+          defaultCurrency,
+          currencies,
+          start,
+          end,
+        ),
+      (months) =>
+        months.map((m) => ({
+          date: m.month,
+          missingRatePairs: m.missingRatePairs,
+        })),
+      options,
+    );
+  }
+
+  /**
+   * The month-by-month fold of `getMonthlyInvestments`, at one rate index.
+   *
+   * The first-month cost basis is recomputed here rather than hoisted out
+   * because it converts too: after a fill stored the rates it was short of, its
+   * own gaps have to close with everyone else's.
+   */
+  private async foldMonthlyInvestments(
+    userId: string,
+    snapshots: any[],
+    defaultCurrency: string,
+    currencies: Set<string>,
+    start: string,
+    end: string,
+  ): Promise<
+    {
+      month: string;
+      value: number;
+      securitiesValue: number;
+      fxComplete: boolean;
+      missingRatePairs: string[];
+    }[]
+  > {
     // For the first active month of an account, the stored market_value is the
     // month-end snapshot which silently absorbs any gains/losses on positions
     // that were established earlier the same month -- skewing the chart's
@@ -868,13 +1082,6 @@ export class NetWorthService {
         end,
       );
 
-    const currencies = new Set<string>();
-    for (const s of snapshots) {
-      if (s.currency_code !== defaultCurrency) {
-        currencies.add(s.currency_code);
-      }
-    }
-
     const rateIndex = await this.buildRateIndex(
       currencies,
       defaultCurrency,
@@ -883,12 +1090,18 @@ export class NetWorthService {
     );
 
     const monthMap = new Map<string, FxAggregate>();
+    // The invested part of the same month, folded beside the whole value: the
+    // securities without the cash sleeves and without a standalone account's
+    // own cash balance. One walk, two aggregates, so the two cannot disagree
+    // about a position (`docs/specs/portfolio-period-result.md` section 10.7).
+    const securitiesMap = new Map<string, FxAggregate>();
 
     for (const s of snapshots) {
       const monthKey = this.toDateString(s.month);
 
       if (!monthMap.has(monthKey)) {
         monthMap.set(monthKey, new FxAggregate());
+        securitiesMap.set(monthKey, new FxAggregate());
       }
 
       const monthEnd = this.monthEndDate(monthKey);
@@ -896,7 +1109,12 @@ export class NetWorthService {
       const costBasisInDefault = firstMonthCostBasisInDefault.get(adjKey);
 
       const monthAggregate = monthMap.get(monthKey)!;
+      const securitiesAggregate = securitiesMap.get(monthKey)!;
       if (costBasisInDefault !== undefined) {
+        // The seed IS the securities: it is the cost basis of the month's
+        // brokerage transactions, with the standalone account's cash added
+        // beside it below.
+        securitiesAggregate.merge(costBasisInDefault);
         // merge, not addConverted: the seed's gaps travel with its subtotal,
         // so an unconvertible first-month component marks the month incomplete.
         monthAggregate.merge(costBasisInDefault);
@@ -917,19 +1135,26 @@ export class NetWorthService {
         }
       } else {
         let rawValue: number;
+        // What of that value is invested: a brokerage's market value, a
+        // standalone account's market value without its own cash, and nothing
+        // at all from a cash sleeve.
+        let investedValue: number;
         if (
           s.account_sub_type === "INVESTMENT_BROKERAGE" &&
           s.market_value != null
         ) {
           rawValue = Number(s.market_value);
+          investedValue = rawValue;
         } else if (
           s.account_type === "INVESTMENT" &&
           s.account_sub_type === null &&
           s.market_value != null
         ) {
           rawValue = Number(s.market_value) + Number(s.balance);
+          investedValue = Number(s.market_value);
         } else {
           rawValue = Number(s.balance);
+          investedValue = 0;
         }
 
         monthAggregate.add(
@@ -943,6 +1168,19 @@ export class NetWorthService {
           s.currency_code,
           defaultCurrency,
         );
+        if (investedValue !== 0) {
+          securitiesAggregate.add(
+            this.convertCurrency(
+              investedValue,
+              s.currency_code,
+              defaultCurrency,
+              monthEnd,
+              rateIndex,
+            ),
+            s.currency_code,
+            defaultCurrency,
+          );
+        }
       }
     }
 
@@ -950,7 +1188,13 @@ export class NetWorthService {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, aggregate]) => ({
         month,
-        value: Math.round(aggregate.knownSubtotal),
+        // 4dp money precision, not whole units: the value carries into the
+        // period-result P&L and TWR, so the grosze must survive the fold and be
+        // rounded only for display at the surface.
+        value: roundMoney(aggregate.knownSubtotal),
+        securitiesValue: roundMoney(
+          securitiesMap.get(month)?.knownSubtotal ?? 0,
+        ),
         fxComplete: aggregate.isComplete,
         missingRatePairs: aggregate.missingPairs,
       }));
@@ -1137,13 +1381,16 @@ export class NetWorthService {
     endDate?: string,
     accountIds?: string[],
     displayCurrency?: string,
+    options?: SeriesFetchOptions,
   ): Promise<DailyInvestmentValue[]> {
     const pref = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(UserPreference).findOne({ where: { userId } }),
     );
     const defaultCurrency = displayCurrency || preferredCurrency(pref);
 
-    const end = endDate || new Date().toISOString().slice(0, 10);
+    // "Today" is the request's calendar day, not a UTC slice of the clock:
+    // `todayYMD()` reads the request timezone where one is set.
+    const end = endDate || todayYMD();
 
     let accountFilter = "";
     const acctParams: any[] = [userId];
@@ -1190,11 +1437,7 @@ export class NetWorthService {
       )
       .map((a) => a.id);
     const cashIds = investAccounts
-      .filter(
-        (a) =>
-          a.account_sub_type === "INVESTMENT_CASH" ||
-          (a.account_type === "INVESTMENT" && !a.account_sub_type),
-      )
+      .filter((a) => isValuationCashAccount(a))
       .map((a) => a.id);
     // Load investment transactions up to end date for holdings replay
     const invTxs: any[] =
@@ -1205,7 +1448,7 @@ export class NetWorthService {
            WHERE account_id = ANY($1::UUID[])
              AND transaction_date <= $2
              AND status != 'VOID'
-           ORDER BY transaction_date ASC, created_at ASC`,
+           ORDER BY ${INVESTMENT_REPLAY_ORDER_SQL}`,
             [brokerageIds, end],
           )
         : [];
@@ -1234,61 +1477,30 @@ export class NetWorthService {
     const { stored: pricesBySec, txFallback: txPricesBySec } =
       await this.loadValuationSeries(securityIds, start, end);
 
-    // Load daily cash balances for INVESTMENT_CASH and standalone accounts
+    // Daily cash balances for INVESTMENT_CASH and standalone accounts, through
+    // the one statement `loadDailyCashBalances` holds: this series and the
+    // by-security breakdown ask the same question, and a second spelling of it
+    // would be two answers to "what did this account hold that day" (#1389).
     const cashBalances = new Map<string, Map<string, number>>();
     if (cashIds.length > 0) {
-      const cashRows: any[] = await this.scopedQuery(
-        `WITH target_accounts AS (
-            SELECT id, opening_balance
-            FROM accounts WHERE id = ANY($1::UUID[])
-          ),
-          pre_period AS (
-            SELECT t.account_id, SUM(t.amount) as total
-            FROM transactions t
-            JOIN target_accounts ta ON ta.id = t.account_id
-            WHERE ${LEDGER_MOVEMENT_PREDICATE}
-              AND t.transaction_date < $2
-            GROUP BY t.account_id
-          ),
-          daily_tx AS (
-            SELECT t.account_id, t.transaction_date::DATE as tx_date, SUM(t.amount) as total
-            FROM transactions t
-            JOIN target_accounts ta ON ta.id = t.account_id
-            WHERE ${LEDGER_MOVEMENT_PREDICATE}
-              AND t.transaction_date >= $2
-              AND t.transaction_date <= $3
-            GROUP BY t.account_id, t.transaction_date::DATE
-          ),
-          account_daily AS (
-            SELECT d.dt::DATE as date, ta.id as account_id,
-              (ta.opening_balance + COALESCE(pp.total, 0) +
-                COALESCE(SUM(dtx.total) OVER (
-                  PARTITION BY ta.id ORDER BY d.dt ROWS UNBOUNDED PRECEDING
-                ), 0)
-              ) as balance
-            FROM target_accounts ta
-            CROSS JOIN generate_series($2::TIMESTAMP, $3::TIMESTAMP, '1 day') d(dt)
-            LEFT JOIN pre_period pp ON pp.account_id = ta.id
-            LEFT JOIN daily_tx dtx ON dtx.account_id = ta.id AND dtx.tx_date = d.dt::DATE
-          )
-          SELECT date::TEXT, balance::NUMERIC, account_id FROM account_daily ORDER BY date`,
-        [cashIds, start, end],
+      const cashRows: any[] = await this.loadDailyCashBalances(
+        cashIds,
+        start,
+        end,
       );
       for (const r of cashRows) {
         if (!cashBalances.has(r.account_id))
           cashBalances.set(r.account_id, new Map());
-        cashBalances.get(r.account_id)!.set(r.date, Number(r.balance));
+        cashBalances
+          .get(r.account_id)!
+          .set(this.toDateString(r.date), Number(r.balance));
       }
     }
 
-    // Generate daily dates
-    const dates: string[] = [];
-    const d = new Date(start + "T00:00:00");
-    const endD = new Date(end + "T00:00:00");
-    while (d <= endD) {
-      dates.push(d.toISOString().substring(0, 10));
-      d.setDate(d.getDate() + 1);
-    }
+    // The calendar days of the window, keyed exactly as the SQL above keys its
+    // rows. Iterated as strings: a local-midnight `Date` read back in UTC named
+    // every day one early east of Greenwich (#1389).
+    const dates = enumerateDaysYMD(start, end);
 
     // Currency conversion setup: include both account currencies (for cash
     // balances) and security currencies (for holdings market value). Prices in
@@ -1306,18 +1518,59 @@ export class NetWorthService {
         currencies.add(sec.currencyCode);
       }
     }
-    const rateIndex = await this.buildRateIndex(
-      currencies,
-      defaultCurrency,
-      start,
-      end,
-    );
-
     // Build account currency map (used for cash balance conversion)
     const acctCurrency = new Map<string, string>();
     for (const a of investAccounts) {
       acctCurrency.set(a.id, a.currency_code);
     }
+
+    return this.computeWithRateFill(
+      async () =>
+        this.foldDailyInvestments(
+          await this.buildRateIndex(currencies, defaultCurrency, start, end),
+          {
+            dates,
+            invTxs,
+            securityMap,
+            pricesBySec,
+            txPricesBySec,
+            cashIds,
+            cashBalances,
+            acctCurrency,
+            defaultCurrency,
+          },
+        ),
+      (points) => points,
+      options,
+    );
+  }
+
+  /** The day-by-day fold of `getDailyInvestments`, at one rate index. */
+  private foldDailyInvestments(
+    rateIndex: RateIndex,
+    input: {
+      dates: string[];
+      invTxs: any[];
+      securityMap: Map<string, Security>;
+      pricesBySec: Map<string, PricePoint[]>;
+      txPricesBySec: Map<string, PricePoint[]>;
+      cashIds: string[];
+      cashBalances: Map<string, Map<string, number>>;
+      acctCurrency: Map<string, string>;
+      defaultCurrency: string;
+    },
+  ): DailyInvestmentValue[] {
+    const {
+      dates,
+      invTxs,
+      securityMap,
+      pricesBySec,
+      txPricesBySec,
+      cashIds,
+      cashBalances,
+      acctCurrency,
+      defaultCurrency,
+    } = input;
 
     // Replay holdings per-account day by day and compute market value
     // Key: account_id -> (security_id -> quantity)
@@ -1404,9 +1657,22 @@ export class NetWorthService {
         }
       }
 
-      // Add cash balances for INVESTMENT_CASH and standalone accounts
-      for (const [acctId, dailyMap] of cashBalances) {
-        const bal = dailyMap.get(dateStr) ?? 0;
+      // Everything above is the invested part; everything below is cash. The
+      // aggregate is snapshotted here rather than accumulated twice, so the two
+      // figures are one walk over one set of positions.
+      const securitiesSubtotal = dayValue.knownSubtotal;
+
+      // Add cash balances for INVESTMENT_CASH and standalone accounts. The walk
+      // is over the accounts in scope, not over the maps the query returned: an
+      // account with no row for this day is a missing component, and `?? 0`
+      // turned exactly that into a real-looking zero balance (#1389).
+      const unknownCashAccountIds = new Set<string>();
+      for (const acctId of cashIds) {
+        const bal = cashBalances.get(acctId)?.get(dateStr);
+        if (bal === undefined) {
+          unknownCashAccountIds.add(acctId);
+          continue;
+        }
         const currency = acctCurrency.get(acctId) || defaultCurrency;
         dayValue.add(
           this.convertCurrency(
@@ -1423,11 +1689,21 @@ export class NetWorthService {
 
       result.push({
         date: dateStr,
-        value: Math.round(dayValue.knownSubtotal),
+        // Carried at the money pipeline's 4dp precision, never whole units:
+        // this value feeds investedPeriodResult's P&L, TWR and MWR, and
+        // rounding the grosze away here read a sub-unit holding as a -100%
+        // return. Whole-unit rounding is a presentation step at the surface.
+        value: roundMoney(dayValue.knownSubtotal),
+        // The securities-only subtotal of the very same fold, rounded the same
+        // way `value` is, so `value - securitiesValue` is the cash the walk
+        // above added and the two cannot disagree about a position.
+        securitiesValue: roundMoney(securitiesSubtotal),
         fxComplete: dayValue.isComplete,
         missingRatePairs: dayValue.missingPairs,
         pricesComplete: unpricedSecurityIds.size === 0,
         unpricedSecurityIds: [...unpricedSecurityIds].sort(),
+        cashComplete: unknownCashAccountIds.size === 0,
+        unknownCashAccountIds: [...unknownCashAccountIds].sort(),
       });
     }
 
@@ -1456,7 +1732,7 @@ export class NetWorthService {
       accountIds?: string[];
       displayCurrency?: string;
       limit?: number;
-    },
+    } & SeriesFetchOptions,
   ): Promise<InvestmentBreakdown> {
     const { granularity } = opts;
     const limit = opts.limit ?? 10;
@@ -1466,7 +1742,7 @@ export class NetWorthService {
     );
     const defaultCurrency = opts.displayCurrency || preferredCurrency(pref);
 
-    const end = opts.endDate || new Date().toISOString().slice(0, 10);
+    const end = opts.endDate || todayYMD();
 
     const empty: InvestmentBreakdown = {
       granularity,
@@ -1500,11 +1776,7 @@ export class NetWorthService {
       )
       .map((a) => a.id);
     const cashIds = investAccounts
-      .filter(
-        (a) =>
-          a.account_sub_type === "INVESTMENT_CASH" ||
-          (a.account_type === "INVESTMENT" && !a.account_sub_type),
-      )
+      .filter((a) => isValuationCashAccount(a))
       .map((a) => a.id);
 
     // Investment transactions from inception up to the window end, so holdings
@@ -1517,7 +1789,7 @@ export class NetWorthService {
              WHERE account_id = ANY($1::UUID[])
                AND transaction_date <= $2
                AND status != 'VOID'
-             ORDER BY transaction_date ASC, created_at ASC`,
+             ORDER BY ${INVESTMENT_REPLAY_ORDER_SQL}`,
             [brokerageIds, end],
           )
         : [];
@@ -1540,7 +1812,7 @@ export class NetWorthService {
     const sampleDates =
       granularity === "monthly"
         ? this.enumerateMonths(start, end)
-        : this.enumerateDays(start, end);
+        : enumerateDaysYMD(start, end);
     if (sampleDates.length === 0) return empty;
 
     // --- Price lookups -------------------------------------------------------
@@ -1584,15 +1856,62 @@ export class NetWorthService {
         currencies.add(sec.currencyCode);
       }
     }
-    const rateIndex = await this.buildRateIndex(
-      currencies,
-      defaultCurrency,
-      start,
-      end,
-    );
-
     const acctCurrency = new Map<string, string>();
     for (const a of investAccounts) acctCurrency.set(a.id, a.currency_code);
+
+    return this.computeWithRateFill(
+      async () =>
+        this.foldInvestmentBreakdown(
+          await this.buildRateIndex(currencies, defaultCurrency, start, end),
+          {
+            granularity,
+            limit,
+            defaultCurrency,
+            sampleDates,
+            invTxs,
+            securityMap,
+            storedSeries,
+            txSeries,
+            cashIds,
+            cashBalances,
+            acctCurrency,
+          },
+        ),
+      (breakdown) => breakdown.points,
+      opts,
+    );
+  }
+
+  /** The point-by-point fold of `getInvestmentBreakdown`, at one rate index. */
+  private foldInvestmentBreakdown(
+    rateIndex: RateIndex,
+    input: {
+      granularity: InvestmentBreakdownGranularity;
+      limit: number;
+      defaultCurrency: string;
+      sampleDates: string[];
+      invTxs: any[];
+      securityMap: Map<string, Security>;
+      storedSeries: Map<string, PricePoint[]>;
+      txSeries: Map<string, PricePoint[]>;
+      cashIds: string[];
+      cashBalances: Map<string, Map<string, number>>;
+      acctCurrency: Map<string, string>;
+    },
+  ): InvestmentBreakdown {
+    const {
+      granularity,
+      limit,
+      defaultCurrency,
+      sampleDates,
+      invTxs,
+      securityMap,
+      storedSeries,
+      txSeries,
+      cashIds,
+      cashBalances,
+      acctCurrency,
+    } = input;
 
     // --- Replay holdings, accumulating per security --------------------------
     const holdings = new Map<string, number>(); // securityId -> quantity
@@ -1602,6 +1921,12 @@ export class NetWorthService {
       date: string;
       valuesBySec: Map<string, number>;
       cash: number;
+      /** Scoped cash accounts with no balance for this point; see the point. */
+      unknownCashAccountIds: string[];
+      /** Securities held at this point that nothing could price; see the point. */
+      unpricedSecurityIds: string[];
+      /** Pairs this point alone could not convert; see the point. */
+      missingRatePairs: string[];
     }> = [];
 
     // Pairs the whole breakdown could not resolve a rate for. Collected across
@@ -1637,6 +1962,12 @@ export class NetWorthService {
       }
 
       const valuesBySec = new Map<string, number>();
+      // What this point alone is short of, so the reader learns WHICH security
+      // and WHICH pair over WHICH dates rather than that "something" was
+      // missing somewhere in the range (#1389). The whole-response
+      // `missingPairs` below stays as it is: it answers a different question.
+      const unpricedSecurityIds = new Set<string>();
+      const pointMissingPairs = new Set<string>();
       for (const [secId, qty] of holdings) {
         if (Math.abs(qty) < 0.00000001) continue;
         const security = securityMap.get(secId);
@@ -1645,7 +1976,12 @@ export class NetWorthService {
           txSeries.get(secId),
           valuationDate,
         );
-        if (price == null) continue;
+        // Held, but nothing priced it: its band is unknown, not zero, and the
+        // point's total is a subtotal of the rest.
+        if (price == null) {
+          unpricedSecurityIds.add(secId);
+          continue;
+        }
         const secCurrency = security?.currencyCode || defaultCurrency;
         const value = this.convertCurrency(
           qty * price,
@@ -1658,16 +1994,26 @@ export class NetWorthService {
         // rather than entered at 1:1, and recorded so the point can say so.
         if (value === null) {
           missingPairs.add(`${secCurrency}->${defaultCurrency}`);
+          pointMissingPairs.add(`${secCurrency}->${defaultCurrency}`);
           continue;
         }
         valuesBySec.set(secId, (valuesBySec.get(secId) ?? 0) + value);
       }
 
       // Cash maps are keyed by the sample date itself: day strings for daily,
-      // month-first strings for monthly.
+      // month-first strings for monthly. The walk is over the accounts IN
+      // SCOPE, not over the maps the query returned: an account with no row for
+      // a point it was asked for is a missing component, and `?? 0` turned
+      // exactly that into a real-looking zero balance (#1389).
       const cashAggregate = new FxAggregate();
-      for (const [acctId, dailyMap] of cashBalances) {
-        const bal = dailyMap.get(sampleDate) ?? 0;
+      const unknownCashAccountIds = new Set<string>();
+      for (const acctId of cashIds) {
+        const bal = cashBalances.get(acctId)?.get(sampleDate);
+        if (bal === undefined) {
+          unknownCashAccountIds.add(acctId);
+          continue;
+        }
+        // Zero needs no rate, and an emptied account is a settled zero.
         if (bal === 0) continue;
         const currency = acctCurrency.get(acctId) || defaultCurrency;
         cashAggregate.add(
@@ -1682,12 +2028,18 @@ export class NetWorthService {
           defaultCurrency,
         );
       }
-      for (const pair of cashAggregate.missingPairs) missingPairs.add(pair);
+      for (const pair of cashAggregate.missingPairs) {
+        missingPairs.add(pair);
+        pointMissingPairs.add(pair);
+      }
 
       ungrouped.push({
         date: sampleDate,
         valuesBySec,
         cash: cashAggregate.knownSubtotal,
+        unknownCashAccountIds: [...unknownCashAccountIds].sort(),
+        unpricedSecurityIds: [...unpricedSecurityIds].sort(),
+        missingRatePairs: [...pointMissingPairs].sort(),
       });
     }
 
@@ -1803,18 +2155,6 @@ export class NetWorthService {
     if (!earliest) return end;
     const inception = this.toDateString(earliest);
     return inception > end ? end : inception;
-  }
-
-  /** All calendar days in [start, end] inclusive, as YYYY-MM-DD strings. */
-  private enumerateDays(start: string, end: string): string[] {
-    const dates: string[] = [];
-    const d = new Date(start + "T00:00:00");
-    const endD = new Date(end + "T00:00:00");
-    while (d <= endD) {
-      dates.push(d.toISOString().substring(0, 10));
-      d.setDate(d.getDate() + 1);
-    }
-    return dates;
   }
 
   /** Month-first dates for every month spanned by [start, end], YYYY-MM-01. */
@@ -1944,6 +2284,9 @@ export class NetWorthService {
       date: string;
       valuesBySec: Map<string, number>;
       cash: number;
+      unknownCashAccountIds: string[];
+      unpricedSecurityIds: string[];
+      missingRatePairs: string[];
     }>,
     securityMap: Map<string, Security>,
     limit: number,
@@ -1993,8 +2336,11 @@ export class NetWorthService {
     const points: InvestmentBreakdownPoint[] = ungrouped.map((pt) => {
       const values: Record<string, number> = {};
       let total = 0;
+      // Each band and the cash band carry 4dp money precision, not whole units:
+      // the bands stack into `total`, so rounding each one lost grosze from the
+      // stacked total. Whole-unit rounding is a presentation step at the chart.
       for (const secId of topIds) {
-        const v = Math.round(pt.valuesBySec.get(secId) ?? 0);
+        const v = roundMoney(pt.valuesBySec.get(secId) ?? 0);
         values[secId] = v;
         total += v;
       }
@@ -2002,16 +2348,27 @@ export class NetWorthService {
         let otherSum = 0;
         for (const secId of otherIds)
           otherSum += pt.valuesBySec.get(secId) ?? 0;
-        const v = Math.round(otherSum);
+        const v = roundMoney(otherSum);
         values.other = v;
         total += v;
       }
       if (hasCash) {
-        const v = Math.round(pt.cash);
+        const v = roundMoney(pt.cash);
         values.cash = v;
         total += v;
       }
-      return { date: pt.date, total, values };
+      return {
+        date: pt.date,
+        // Rounded once after summing the 4dp bands so float drift does not leak
+        // into the stacked total.
+        total: roundMoney(total),
+        values,
+        cashComplete: pt.unknownCashAccountIds.length === 0,
+        unknownCashAccountIds: pt.unknownCashAccountIds,
+        pricesComplete: pt.unpricedSecurityIds.length === 0,
+        unpricedSecurityIds: pt.unpricedSecurityIds,
+        missingRatePairs: pt.missingRatePairs,
+      };
     });
 
     return { series, points };
@@ -2170,7 +2527,7 @@ export class NetWorthService {
           // Rows as effects: a VOID transaction moved no shares.
           status: NON_VOID_INVESTMENT_STATUS,
         },
-        order: { transactionDate: "ASC", createdAt: "ASC" },
+        order: INVESTMENT_REPLAY_ORDER,
       }),
     );
 
@@ -2494,6 +2851,17 @@ export class NetWorthService {
     return { stored, txFallback };
   }
 
+  /**
+   * The rate index for a net-worth window.
+   *
+   * Every monthly series in this service converts its points at the month end
+   * (`convertCurrency(..., monthEndDate(month), ...)`), which for a window
+   * ending mid-month is later than `endDate`. The conversion horizon is stated
+   * here, once, so the loader covers the dates the conversions actually ask
+   * about: without it the last month's rate came from whatever observation
+   * happened to fall inside the requested window, and the same month's figure
+   * differed between a range ending 2024-06-15 and one ending 2024-07-31.
+   */
   private buildRateIndex(
     currencies: Set<string>,
     defaultCurrency: string,
@@ -2506,6 +2874,7 @@ export class NetWorthService {
       defaultCurrency,
       startDate,
       endDate,
+      this.monthEndDate(endDate),
     );
   }
 

@@ -259,7 +259,9 @@
     "cannotModifyOther": "No se pueden modificar las divisas de otro usuario",
     "inUse": "La divisa \"{{ code }}\" está en uso por tus cuentas, valores u otros registros. Desactívala en su lugar.",
     "invalidRateDate": "date debe tener el formato AAAA-MM-DD",
-    "alreadyInListInactive": "La divisa \"{{ code }}\" ya está en tu lista, pero actualmente está inactiva. Reactívala para usarla."
+    "alreadyInListInactive": "La divisa \"{{ code }}\" ya está en tu lista, pero actualmente está inactiva. Reactívala para usarla.",
+    "sameCurrencyHistory": "{{ code }} es su moneda predeterminada; no hay historial de tipo de cambio que ampliar",
+    "rateProviderUnavailable": "El proveedor de tipos de cambio no respondió. Inténtelo de nuevo más tarde."
   },
   "delegation": {
     "delegatedAccessInvalid": "El acceso delegado ya no es válido",
@@ -341,8 +343,10 @@
   "netWorth": {
     "invalidStartDate": "startDate debe estar en formato YYYY-MM-DD",
     "invalidEndDate": "endDate debe estar en formato YYYY-MM-DD",
+    "invalidBaselineDate": "baselineDate debe estar en formato YYYY-MM-DD",
     "invalidAccountIds": "accountIds debe ser una lista de UUIDs separados por comas",
-    "invalidGranularity": "granularity debe ser 'daily' o 'monthly'"
+    "invalidGranularity": "granularity debe ser 'daily' o 'monthly'",
+    "invalidPeriods": "periods debe ser una lista de periodos predefinidos separados por comas"
   },
   "notifications": {
     "notFound": "Notificación con ID {{ id }} no encontrada",
@@ -418,6 +422,7 @@
   "securities": {
     "exchangeRateUnavailable": "No se pudo determinar un tipo de cambio para {{ from }} -> {{ to }} en la fecha de la transacción. Indica un exchangeRate explícito para que el asiento en la cuenta de efectivo sea correcto.",
     "accountMustBeInvestment": "La cuenta debe ser de tipo INVESTMENT",
+    "providerCurrencyMismatch": "Actualización de precio rechazada para {{ symbol }}: {{ provider }} lo cotiza en {{ reported }}, pero el valor está registrado en {{ configured }}. Corrige la moneda, el símbolo o el mercado del valor y vuelve a actualizar.",
     "securityIdRequired": "El ID del valor es obligatorio para las transacciones de {{ action }}",
     "splitRatioRequired": "El ratio de división (cantidad) debe ser mayor que cero",
     "acquisitionPriceRequired": "Se requiere un precio por acción mayor que cero para las transacciones {{ action }}. Utilice ADD_SHARES para las acciones adquiridas sin un coste conocido.",

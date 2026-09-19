@@ -71,8 +71,8 @@
   "portfolioMovement": {
     "titleUp": "Investimentos a subir {percent}%",
     "titleDown": "Investimentos a descer {percent}%",
-    "messageUp": "Os seus investimentos subiram {percent}% hoje, excluindo depósitos e levantamentos. Abra para rever.",
-    "messageDown": "Os seus investimentos desceram {percent}% hoje, excluindo depósitos e levantamentos. Abra para rever."
+    "messageUp": "Os seus investimentos subiram {percent}% de {from} a {to}, excluindo depósitos e levantamentos. Abra para rever.",
+    "messageDown": "Os seus investimentos desceram {percent}% de {from} a {to}, excluindo depósitos e levantamentos. Abra para rever."
   },
   "balanceThreshold": {
     "titleLow": "{account} está abaixo do seu limite",

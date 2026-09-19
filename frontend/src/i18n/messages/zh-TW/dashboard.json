@@ -97,7 +97,7 @@
       "noLosers": "今日無下跌標的。"
     },
     "dailyChange": "每日變動",
-    "dailyChangeOn": "每日變動 \u00b7 {date}",
+    "dailyChangeOn": "每日變動 · {date}",
     "openPriceHistory": "{symbol} 的價格歷史",
     "refreshPrices": "更新價格",
     "viewPortfolio": "查看投資組合",
@@ -118,7 +118,7 @@
     "empty": "尚無我的最愛證券。請前往<securitiesLink>證券頁面</securitiesLink>，將您想追蹤的證券加入星號。",
     "noPriceYet": "尚無價格",
     "dailyChange": "每日變動",
-    "dailyChangeOn": "每日變動 \u00b7 {date}",
+    "dailyChangeOn": "每日變動 · {date}",
     "openPriceHistory": "{symbol} 的價格歷史",
     "refreshPrices": "更新價格",
     "manage": "管理證券"
@@ -202,7 +202,11 @@
   "portfolioValue": {
     "title": "投資組合價值",
     "empty": "尚無投資歷史可顯示。",
-    "refresh": "重新整理目前價值"
+    "refresh": "重新整理目前價值",
+    "investmentResult": "投資結果",
+    "notAvailable": "不適用",
+    "periodBreakdownTooltip": "此期間帳戶價值變化了 {valueChange}，其中存取款為 {netFlows}。上方數字是投資本身賺取的金額，不包括未投資現金。",
+    "unmeasuredFlowTooltip": "如果某筆交易在這些帳戶以外結算，或某個拆分將投資項目與一般支出混在一起，則結果無法與轉移的資金分開。"
   },
   "spendingByPayee": {
     "title": "依收款人分析支出",

@@ -1,12 +1,16 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { CurrenciesController } from "./currencies.controller";
 import { ExchangeRateService } from "./exchange-rate.service";
+import { ExchangeRateHistoryService } from "./exchange-rate-history.service";
 import { CurrenciesService } from "./currencies.service";
 
 describe("CurrenciesController", () => {
   let controller: CurrenciesController;
   let mockExchangeRateService: Partial<
     Record<keyof ExchangeRateService, jest.Mock>
+  >;
+  let mockExchangeRateHistoryService: Partial<
+    Record<keyof ExchangeRateHistoryService, jest.Mock>
   >;
   let mockCurrenciesService: Partial<
     Record<keyof CurrenciesService, jest.Mock>
@@ -22,6 +26,11 @@ describe("CurrenciesController", () => {
       getLastUpdateTime: jest.fn(),
       refreshAllRates: jest.fn(),
       backfillHistoricalRates: jest.fn(),
+    };
+
+    mockExchangeRateHistoryService = {
+      getCoverage: jest.fn(),
+      extendHistory: jest.fn(),
     };
 
     mockCurrenciesService = {
@@ -43,6 +52,10 @@ describe("CurrenciesController", () => {
         {
           provide: ExchangeRateService,
           useValue: mockExchangeRateService,
+        },
+        {
+          provide: ExchangeRateHistoryService,
+          useValue: mockExchangeRateHistoryService,
         },
         {
           provide: CurrenciesService,
@@ -296,6 +309,52 @@ describe("CurrenciesController", () => {
       expect(mockExchangeRateService.getRateHistory).toHaveBeenCalledWith(
         undefined,
         undefined,
+      );
+    });
+  });
+
+  describe("getRateCoverage()", () => {
+    it("delegates to exchangeRateHistoryService.getCoverage with the caller's id", async () => {
+      const coverage = {
+        from: "EUR",
+        to: "PLN",
+        earliestDate: "2026-01-02",
+        latestDate: "2026-09-16",
+        observations: 180,
+      };
+      mockExchangeRateHistoryService.getCoverage!.mockResolvedValue(coverage);
+
+      await expect(controller.getRateCoverage(mockReq, "EUR")).resolves.toEqual(
+        coverage,
+      );
+      expect(mockExchangeRateHistoryService.getCoverage).toHaveBeenCalledWith(
+        "user-1",
+        "EUR",
+      );
+    });
+  });
+
+  describe("extendRateHistory()", () => {
+    it("delegates to exchangeRateHistoryService.extendHistory with the DTO's code", async () => {
+      const extension = {
+        from: "EUR",
+        to: "PLN",
+        requestedFrom: "2025-01-02",
+        requestedTo: "2026-01-01",
+        stored: 240,
+        earliestDate: "2025-01-02",
+        answered: true,
+      };
+      mockExchangeRateHistoryService.extendHistory!.mockResolvedValue(
+        extension,
+      );
+
+      await expect(
+        controller.extendRateHistory(mockReq, { code: "EUR" }),
+      ).resolves.toEqual(extension);
+      expect(mockExchangeRateHistoryService.extendHistory).toHaveBeenCalledWith(
+        "user-1",
+        "EUR",
       );
     });
   });

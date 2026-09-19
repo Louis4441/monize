@@ -21,6 +21,7 @@ vi.mock('@/lib/errors', () => ({
 describe('CurrencyList', () => {
   const onEdit = vi.fn();
   const onToggleActive = vi.fn();
+  const onRateHistory = vi.fn();
   const onRefresh = vi.fn();
   const getRate = vi.fn().mockReturnValue(null);
 
@@ -30,6 +31,7 @@ describe('CurrencyList', () => {
     getRate,
     onEdit,
     onToggleActive,
+    onRateHistory,
     onRefresh,
   };
 
@@ -104,6 +106,28 @@ describe('CurrencyList', () => {
     render(<CurrencyList currencies={currencies} {...defaultProps} usage={usage} />);
     expect(screen.queryByText('Deactivate')).not.toBeInTheDocument();
     expect(screen.getByText('Edit')).toBeInTheDocument();
+  });
+
+  describe('rate history action', () => {
+    // The regression: the "add another year of rate history" section lived
+    // only in the edit dialog, and the built-in currencies -- the ones whose
+    // history usually needs extending -- have no edit action, so it could not
+    // be reached for EUR, USD or any other system currency.
+    it('offers Rate history for a system currency that is not the default', () => {
+      const currencies = [makeCurrency({ code: 'USD', isSystem: true })];
+
+      render(<CurrencyList currencies={currencies} {...defaultProps} />);
+      expect(screen.queryByText('Edit')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByText('Rate history'));
+      expect(onRateHistory).toHaveBeenCalledWith(expect.objectContaining({ code: 'USD' }));
+    });
+
+    it('hides Rate history for the reporting currency itself', () => {
+      const currencies = [makeCurrency({ code: 'CAD', isSystem: true })];
+
+      render(<CurrencyList currencies={currencies} {...defaultProps} />);
+      expect(screen.queryByText('Rate history')).not.toBeInTheDocument();
+    });
   });
 
   describe('isSystem flag', () => {

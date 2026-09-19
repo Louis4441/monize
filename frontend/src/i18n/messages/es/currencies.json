@@ -111,5 +111,20 @@
     "nameMax": "El nombre no puede superar los 100 caracteres",
     "symbolRequired": "El símbolo es obligatorio",
     "symbolMax": "El símbolo no puede superar los 10 caracteres"
+  },
+  "rateHistory": {
+    "title": "Historial de tasas",
+    "stored": "Historial guardado: {start} a {end} ({count} observaciones)",
+    "none": "No hay historial guardado para {pair}",
+    "loading": "Comprobando el historial de tasas guardado...",
+    "loadFailed": "No se pudo leer el historial de tasas guardado",
+    "addYear": "Añadir otro año de historial de tasas",
+    "adding": "Obteniendo otro año...",
+    "hint": "Los informes anteriores a la primera tasa guardada no pueden convertir {pair}.",
+    "toasts": {
+      "added": "Se añadieron {count} tasas; el historial ahora comienza el {start}",
+      "noOlder": "El proveedor no tiene tasas más antiguas para {pair}",
+      "failed": "No se pudo ampliar el historial de tasas"
+    }
   }
 }

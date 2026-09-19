@@ -111,5 +111,20 @@
     "nameMax": "Tên phải từ 100 ký tự trở xuống",
     "symbolRequired": "Ký hiệu là bắt buộc",
     "symbolMax": "Ký hiệu phải từ 10 ký tự trở xuống"
+  },
+  "rateHistory": {
+    "title": "Lịch sử tỷ giá",
+    "stored": "Lịch sử đã lưu: {start} đến {end} ({count} quan sát)",
+    "none": "Không có lịch sử đã lưu cho {pair}",
+    "loading": "Đang kiểm tra lịch sử tỷ giá đã lưu...",
+    "loadFailed": "Không thể đọc lịch sử tỷ giá đã lưu",
+    "addYear": "Thêm một năm lịch sử tỷ giá nữa",
+    "adding": "Đang tải thêm một năm nữa...",
+    "hint": "Báo cáo có ngày trước tỷ giá đã lưu đầu tiên không thể quy đổi {pair}.",
+    "toasts": {
+      "added": "Đã thêm {count} tỷ giá; lịch sử giờ bắt đầu từ {start}",
+      "noOlder": "Nhà cung cấp không có tỷ giá cũ hơn cho {pair}",
+      "failed": "Không thể mở rộng lịch sử tỷ giá"
+    }
   }
 }

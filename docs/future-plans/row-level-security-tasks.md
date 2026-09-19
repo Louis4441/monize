@@ -705,7 +705,7 @@ Shared instructions for every R task — the per-task list only names the module
 
   **Boundary decisions (for R6/R7 and L1):**
   - Helpers that took an optional `QueryRunner` now take an optional `EntityManager`:
-    `HoldingsService.{findByAccountAndSecurity,createOrUpdate,updateHolding,applySplit,reverseSplit,adjustQuantity,validateNoNegativeHoldingsHistory}`
+    `HoldingsService.{findByAccountAndSecurity,validateNoNegativeHoldingsHistory}` (the incremental mutators named here were deleted by issue #1388)
     and `SecuritiesService.setSecurityTags`. A private `inScope(manager, fn)` on `HoldingsService`
     is the one-liner for "use the caller's manager, else open a scoped one".
   - **R2's `QueryRunner | EntityManager` shim is gone.**

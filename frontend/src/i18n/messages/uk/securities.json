@@ -3,6 +3,7 @@
     "noneToUpdate": "Немає цінних паперів для оновлення",
     "updated": "{count, plural, one {Ціну # цінного паперу оновлено} other {Ціни # цінних паперів оновлено}}",
     "partialFailure": "Ціни оновлено: {updated} успішно, {failed} невдало{symbols}",
+    "partialFailureWithReasons": "Ціни оновлено: {updated} успішно, {failed} невдало{symbols}\n{reasons}",
     "failed": "Не вдалося оновити ціни"
   },
   "page": {

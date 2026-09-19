@@ -32,6 +32,11 @@ import {
   HistoricalRateBackfillSummary,
 } from "./exchange-rate.service";
 import {
+  ExchangeRateHistoryService,
+  RateCoverage,
+  RateHistoryExtension,
+} from "./exchange-rate-history.service";
+import {
   CurrenciesService,
   CurrencyLookupResult,
   CurrencyUsageMap,
@@ -40,6 +45,7 @@ import {
 import { ExchangeRate } from "./entities/exchange-rate.entity";
 import { CreateCurrencyDto } from "./dto/create-currency.dto";
 import { UpdateCurrencyDto } from "./dto/update-currency.dto";
+import { ExtendRateHistoryDto } from "./dto/extend-rate-history.dto";
 import { tr } from "../i18n/translate";
 
 @ApiTags("Currencies")
@@ -49,6 +55,7 @@ import { tr } from "../i18n/translate";
 export class CurrenciesController {
   constructor(
     private readonly exchangeRateService: ExchangeRateService,
+    private readonly exchangeRateHistoryService: ExchangeRateHistoryService,
     private readonly currenciesService: CurrenciesService,
   ) {}
 
@@ -183,6 +190,58 @@ export class CurrenciesController {
     }
     const rate = await this.exchangeRateService.getRateForDate(from, to, date);
     return { rate };
+  }
+
+  @Get("exchange-rates/coverage")
+  @AllowDelegate()
+  @Throttle({ default: { ttl: 60000, limit: 10 } }) // L2: as `history`, one indexed aggregate per call
+  @ApiOperation({
+    summary: "Stored exchange rate coverage for a pair",
+    description:
+      "The first and last stored rate date, and the number of days covered, for the given currency against the caller's reporting currency. Both stored directions count as one pair.",
+  })
+  @ApiQuery({ name: "code", required: true, type: String, example: "EUR" })
+  @ApiResponse({ status: 200, description: "Stored coverage for the pair" })
+  @ApiResponse({
+    status: 400,
+    description: "The code is the caller's own reporting currency",
+  })
+  getRateCoverage(
+    @Request() req,
+    @Query("code", ParseCurrencyCodePipe) code: string,
+  ): Promise<RateCoverage> {
+    return this.exchangeRateHistoryService.getCoverage(req.user.id, code);
+  }
+
+  /**
+   * Not admin-only, unlike the backfill above.
+   *
+   * The backfill walks every pair on the deployment; this one extends exactly
+   * the pair the caller is looking at, formed with their own reporting
+   * currency, by one bounded year. The rows it writes are shared reference data
+   * with no owner, so the log line names the user id -- the same treatment the
+   * global refresh gets.
+   */
+  @Post("exchange-rates/extend-history")
+  @Throttle({ default: { ttl: 60000, limit: 6 } }) // L2: each call is one outbound provider window
+  @ApiOperation({
+    summary: "Extend a pair's stored rate history by one more year",
+  })
+  @ApiResponse({
+    status: 201,
+    description:
+      "Extension summary; `stored: 0` means the provider answered with no rates that far back",
+  })
+  @ApiResponse({
+    status: 400,
+    description: "The code is the caller's own reporting currency",
+  })
+  @ApiResponse({ status: 503, description: "The provider did not answer" })
+  extendRateHistory(
+    @Request() req,
+    @Body() dto: ExtendRateHistoryDto,
+  ): Promise<RateHistoryExtension> {
+    return this.exchangeRateHistoryService.extendHistory(req.user.id, dto.code);
   }
 
   @Get("exchange-rates/status")

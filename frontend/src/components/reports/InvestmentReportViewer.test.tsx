@@ -98,6 +98,76 @@ describe('InvestmentReportViewer', () => {
     expect(screen.getByText(/2 holdings/)).toBeInTheDocument();
   });
 
+  /**
+   * Issue #1390. An unresolvable pair blanks every row's % of portfolio, and
+   * the response now says so. Read as `=== false`, and the surface names the
+   * pair rather than leaving blanks that read as zero.
+   */
+  it('marks the figures partial and names the pair when the server reports an FX gap', async () => {
+    mockExecute.mockResolvedValue({
+      ...result,
+      fxComplete: false,
+      missingPairs: ['SEK->USD'],
+    });
+
+    await renderViewer();
+
+    expect(await screen.findByText(/no exchange rate for SEK->USD/)).toBeInTheDocument();
+    expect(screen.getByTestId('partial-total-marker')).toBeInTheDocument();
+  });
+
+  /**
+   * The other cause of the same blanks. `pricesComplete` stayed absent while
+   * an unpriced holding withheld the denominator, so the column was blank
+   * under no explanation and the exchange-rate caption would have sent the
+   * reader to the wrong screen.
+   */
+  it('names the unpriced holdings when the server reports a price gap', async () => {
+    mockExecute.mockResolvedValue({
+      ...result,
+      pricesComplete: false,
+      unpricedSymbols: ['BBB'],
+    });
+
+    await renderViewer();
+
+    expect(await screen.findByText(/no price for BBB/)).toBeInTheDocument();
+    expect(screen.queryByText(/no exchange rate for/)).not.toBeInTheDocument();
+  });
+
+  it('names both causes when both apply', async () => {
+    mockExecute.mockResolvedValue({
+      ...result,
+      fxComplete: false,
+      missingPairs: ['SEK->USD'],
+      pricesComplete: false,
+      unpricedSymbols: ['BBB'],
+    });
+
+    await renderViewer();
+
+    expect(await screen.findByText(/no exchange rate for SEK->USD/)).toBeInTheDocument();
+    expect(screen.getByText(/no price for BBB/)).toBeInTheDocument();
+  });
+
+  it('shows no partial marker when the conversion was complete', async () => {
+    mockExecute.mockResolvedValue({ ...result, fxComplete: true, missingPairs: [] });
+
+    await renderViewer();
+    await screen.findByText('AAA');
+
+    expect(screen.queryByTestId('partial-total-marker')).not.toBeInTheDocument();
+  });
+
+  it('says nothing when the server sent no completeness at all', async () => {
+    // Absent is no information, not a claim of completeness -- and not a
+    // reason to caption every figure as partial either.
+    await renderViewer();
+    await screen.findByText('AAA');
+
+    expect(screen.queryByTestId('partial-total-marker')).not.toBeInTheDocument();
+  });
+
   it('sorts rows when a column header is clicked', async () => {
     await renderViewer();
     await screen.findByText('AAA');

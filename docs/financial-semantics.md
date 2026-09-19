@@ -118,6 +118,14 @@ No separate fee row is written; the Foreign Currency Fees report derives the fee
 back out of `(originalAmount, exchangeRate, amount)`. That derivation is the
 reason all three must stay mutually consistent on every write.
 
+**Whose rate.** A row that carries its own rate settled at that rate, so every
+surface converts it at that rate -- the register, the realized-gains report and
+the transaction-history KPIs alike. The market rate on the row's own date is
+the fallback for a row carrying none (`resolveFxRate`, INV-FX-001), and the
+surface says which of the two it used rather than leaving the reader with two
+figures for one sale. A stored `1` between two different currencies is the
+column's default, not a rate: it falls back like an absent one. INV-FX-002.
+
 **Validation.** `normalizeFxEntry(input, accountCurrencyCode)` is shared by
 transactions and scheduled transactions so both accept and reject exactly the
 same shapes:
@@ -169,6 +177,32 @@ whose column is wider must not be rounded to money precision on the way in.
 The MS Money importer narrows investment values to 6dp price / 8dp quantity
 before writing. That is an importer choice about source fidelity, not the
 storage precision, and it is the one place the two legitimately differ.
+
+### The executed total is the fact; the per-share price is derived
+
+A trade's `total_amount` is what it came to; `price` is a quotient of it and
+carries the division's remainder, not the trade's meaning. So:
+
+- A caller that supplies a total has it stored **as given** at 4dp, and the
+  price derived from it at the price column's 10dp:
+  `price = (total -/+ commission) / quantity`, the commission taken back out of
+  an acquisition and put back into a disposal.
+- A caller that supplies only a price has the total derived from the price, as
+  before: `quantity * price + commission` on an acquisition, `- commission` on
+  a disposal.
+- A stored total is **never** re-derived from a stored price on an update
+  unless the price, the quantity, the commission or the action is the field
+  that changed -- a value difference against the stored row, not a field being
+  present, because `InvestmentTransactionForm` resends every field.
+
+Both directions live in `backend/src/securities/investment-amount.util.ts`
+(`deriveInvestmentTotal`, `derivePriceFromTotal`, `resolveInvestmentAmounts`);
+no call site spells the arithmetic out again. A source that carries a total
+keeps it: MNY's row amount, QIF's `T`/`$`. INV-TRADE-001.
+
+A sale of 141 shares for 820.9081 stored as 141 x 5.82 reports proceeds of
+820.62 -- a third of a percent of a realised gain that never happened, on one
+trade, before FX.
 
 ## 5. Splits
 
@@ -239,11 +273,11 @@ Additive result:    92 shares   (a difference of -88 shares)
 
 The ratio is stored in the `quantity` column of the `SPLIT` investment
 transaction, validated only as `> 0`. A reverse split is the same operation with
-a ratio below one -- `reverseSplit(ratio)` is literally
-`applySplit(1 / ratio)`, and a 1-for-2 reverse split is `ratio = 0.5`, halving
-shares and doubling per-share cost. There is no separate reverse-split action,
-so any code that special-cases "ratio greater than one" is wrong for half the
-inputs.
+a ratio below one: a 1-for-2 reverse split is `ratio = 0.5`, halving shares and
+doubling per-share cost. There is no separate reverse-split action, so any code
+that special-cases "ratio greater than one" is wrong for half the inputs, and
+nothing applies a ratio to a stored holding -- the position is re-derived from
+the ledger the SPLIT row now belongs to (INV-HOLDING-001).
 
 `holdings.service.ts` implements this correctly (`qty *= txQty`). Section 9
 records where it is implemented additively instead.
@@ -325,6 +359,73 @@ in symbol order, so each row prints its own dated change (`widgets.asOf`) and
 nothing is ranked against anything. `getMonthOverMonthMovers` is a different
 period entirely -- the last close on or before each month end, per security, by
 design -- and does not filter.
+
+### A period's value change is not what the portfolio earned
+
+Over any window a portfolio reports three different figures, and collapsing
+them into one reports a deposit as performance:
+
+| Figure | What it is | Includes the reader's own money? |
+|---|---|---|
+| `valueChange` | `MV(end) - MV(baseline)` | yes |
+| `netExternalFlows` | the cash that crossed the scope's boundary on `(baseline, end]` | it IS that money |
+| `investmentResult` | `valueChange - netExternalFlows` | no |
+
+A percentage belongs over the third and nowhere else. A security at 100 that
+never moves, bought with 10,000 in January and another 10,000 in June, has a
+value change of +10,000 and an investment result of exactly 0; the report that
+divided the first figure by the January value announced a 100 per cent return
+(issue #1392).
+
+Which rows are external flow is **not** decided here: it is
+`loadExternalFlowSubtotals` (`backend/src/securities/external-flow.util.ts`),
+the classifier the daily movement notification already shares. A deposit, a
+withdrawal and a transfer whose counterparty is outside the scope are external;
+a dividend, interest, a buy, a sell and a transfer between two scoped accounts
+are internal, and internal flows are return. Each day's subtotal converts at
+**its own day's** rate -- January's deposit is January's money -- through
+`resolveFxRate`, and a subtotal with no rate makes the whole flow unknown
+rather than smaller (`FxAggregate`).
+
+**The lower bound is exclusive.** `MV(baseline)` is the close of the baseline
+day and already holds every flow that landed on it, so counting those again
+subtracts them from a starting value that contains them.
+
+**One boundary for both figures.** The flow is measured over the accounts whose
+ledger cash `MV` values -- the cash sleeves and the standalone investment
+accounts, `isValuationCashAccount` -- on both sides of a transfer, never over the
+wider investment scope: a deposit posted straight to a brokerage row is a flow
+the series cannot see, and subtracting it is a loss nobody made. A movement that
+crosses that boundary without producing a countable flow (a trade settled
+outside it, a split parent mixing an investment line with ordinary cash) is
+counted per window and withholds `investmentResult` with the reason
+`externallySettledTrade` or `mixedSplit`; the two figures either side of the
+subtraction are still reported.
+
+**A time-weighted return and a money-weighted one are two figures, not two
+spellings.** The invested part reports both over the same flows and the same
+days: `investmentReturnPercent` (`"twr"`, chained daily, the reader's timing
+neutralised) and `investmentMoneyWeightedReturnPercent` (`"xirr"`, annualised,
+each purchase, disposal and distribution weighted by its own date). They differ
+wherever the reader invested more before a rise or a fall, and neither is a
+correction of the other. A window under 30 days gets no annualised rate
+(`windowTooShort`), a schedule with no single rate gets none at all
+(`mwrUndefined`), and anything that withholds the P&L withholds both
+(`docs/specs/portfolio-period-result.md` section 11).
+
+**The return method is named on the wire.** `returnMethod: "simple"` divides
+the period's result by the value it started with and ignores when each flow
+arrived; it is neither Modified Dietz nor a time-weighted return, both of which
+need a complete value on every flow date rather than only at the two
+boundaries. The union exists so a later time-weighted figure arrives as a new
+method rather than as the same caption meaning something else.
+
+`decidePeriodResult`
+(`backend/src/net-worth/portfolio-period-result.util.ts`) is the one place the
+policy lives, `PortfolioPeriodResultService` reads the boundaries from the very
+series the chart draws, and `docs/specs/portfolio-period-result.md` holds the
+truth table, the numerical examples and the missing-data policy.
+INV-PORTRESULT-001.
 
 ## 7. Scheduled occurrences
 

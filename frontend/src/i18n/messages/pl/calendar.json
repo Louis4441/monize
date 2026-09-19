@@ -85,6 +85,7 @@
       "unpricedHolding": "Pozycja nie miała ceny w tym dniu ani dzień wcześniej, więc zmiana jest nieznana.",
       "missingRate": "Brakowało kursu wymiany, więc zmiany nie udało się przeliczyć.",
       "flowIncomplete": "Wpłaty lub wypłaty z tego dnia nie udało się przeliczyć, więc zmiany nie można od niej oddzielić.",
+      "cashIncomplete": "Konto gotówkowe nie zgłosiło salda dla tego dnia, więc wartość dnia jest niepełna, a zmiana nieznana.",
       "noPriorValue": "Nie ma wcześniejszej wartości, do której można odnieść ten dzień.",
       "zeroBaseline": "Dzień wcześniej portfel był pusty, więc nie ma procentu do wyliczenia."
     }

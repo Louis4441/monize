@@ -53,14 +53,20 @@
     "gainLossTooltip": "目前持倉的未實現損益：按今日價格計算的市值減去上面的成本基礎。不包括過去賣出已實現的收益，也不包括已收到的股息和利息。",
     "returns": "報酬",
     "simpleReturn": "簡單報酬率",
-    "simpleReturnTooltip": "持倉的總百分比損益，計算方式為（市值 − 成本基礎）÷ 成本基礎，不考慮投入或提款的時間點。",
+    "simpleReturnTooltip": "相對於您所支付金額的損益：（市值 − 成本基礎）÷ 成本基礎。它不考慮資金到帳的時間，因此每次買入都會跳動：一筆 1,000 的持倉上漲 20% 顯示為 +20%；再買入 1,000，儘管沒有任何損失，卻會顯示為 +10%（200 ÷ 2,000）。TWR 和 MWR 沒有這種跳動。",
     "twr": "TWR",
     "twrFull": "（時間加權）",
-    "twrTooltip": "衡量您的投資表現，不受資金進出時間的影響，排除現金流時機以呈現純粹的投資績效。",
+    "twrTooltip": "自首筆交易以來您投資的時間加權報酬率，計算方式與投資組合表現相同：存入、提出資金與未投資現金不計入，股利和利息計入。",
     "cagr": "CAGR",
     "cagrTooltip": "複合年均成長率。以淨投入金額對比目前投資組合價值計算的年化報酬率，假設每年增長均勻穩定。",
     "notAvailable": "不適用",
-    "unpricedHoldings": "部分估值：{count, plural, one {# 項持倉} other {# 項持倉}}沒有目前價格（{symbols}），以下數值不包含這些持倉。"
+    "unpricedHoldings": "部分估值：{count, plural, one {# 項持倉} other {# 項持倉}}沒有目前價格（{symbols}），以下數值不包含這些持倉。",
+    "mwr": "MWR",
+    "mwrFull": "（資金加權）",
+    "mwrTooltip": "自首筆交易以來您投資的資金加權報酬率（XIRR）：按每筆買入、賣出和股利發生的時間加權計算得出的，您自己資金所賺取的年化報酬率。存入、提出資金和未投資現金不計入。如果您在上漲或下跌之前投入了更多資金，其結果會與 TWR 不同。",
+    "returnDiagnosticsLead": "由於歷史記錄中有缺口，TWR 與 MWR 未顯示：",
+    "returnDiagnosticsRepair": "請在每個證券的價格歷史中補齊缺少的價格；報酬是依顯示的科目計算。",
+    "returnDiagnosticsRepairFiltered": "請在每個證券的價格歷史中補齊缺少的價格，或使用上方的科目篩選器將這些科目排除在檢視之外；報酬是依顯示的科目計算。"
   },
   "assetAllocation": {
     "title": "資產配置",
@@ -124,8 +130,12 @@
     "noDataForPeriod": "此期間無投資資料。",
     "highestValue": "最高價值",
     "lowestValue": "最低價值",
-    "change": "變化",
-    "changePercent": "變化 %",
+    "investmentResult": "投資結果",
+    "investmentReturn": "報酬",
+    "investmentResultTooltip": "此期間內你的投資賺取的金額。存入、提出資金與未投資現金被排除在外，旁邊的百分比是按時間加權的報酬率，因此買進和賣出不會影響它。",
+    "unmeasuredFlowTooltip": "如果某筆交易在這些帳戶以外結算，或某個拆分將投資項目與一般支出混在一起，則結果無法與轉移的資金分開。",
+    "valueChangeLine": "價值變化 {amount}",
+    "netFlowsLine": "淨存取款 {amount}",
     "priorCloseTooltip": "以上一交易日（{date}）收盤價為基準計算。",
     "notAvailable": "不適用",
     "portfolioLabel": "投資組合："
@@ -288,5 +298,28 @@
     "accountRequired": "科目為必填",
     "dateRequired": "日期為必填",
     "acquisitionPriceRequired": "每股價格為必填項，且必須大於零。對於成本未知的股數，請使用「增加股數」。"
+  },
+  "portfolioPerformance": {
+    "title": "投資組合表現",
+    "subtitle": "扣除存入、提出資金與未投資現金影響後，你的投資本身的表現。",
+    "footnote": "存入、提出資金與未投資現金不計入投資結果。",
+    "unavailable": "無",
+    "empty": "歷史資料還不足以計算報酬。",
+    "periods": {
+      "1d": "1天",
+      "1w": "1週",
+      "1m": "1個月",
+      "3m": "3個月",
+      "ytd": "年初至今",
+      "1y": "1年"
+    },
+    "loading": "正在計算各時間段...",
+    "loadFailed": "無法載入各時間段的結果。這些數字是被保留的，不是零；請重新載入頁面再試一次。",
+    "reasons": {
+      "incompletePrices": "被保留的時間段始於某個持倉當天沒有價格的日子。請重新整理價格，或在該證券的價格記錄中手動新增一筆。",
+      "incompleteCash": "被保留的時間段始於此檢視中某個現金帳戶當天未回報餘額的日子，因此其持有金額是未知，而不是零。",
+      "missingRatePairs": "被保留的時間段需要一個已存記錄中沒有的匯率。請在「貨幣」頁面為該貨幣新增匯率記錄。",
+      "unmeasuredFlow": "被保留的時間段包含一筆無法與存入或提出區分的資金變動：一筆在這些帳戶之外結算的交易，或一筆將現金和投資混在一起的拆分。"
+    }
   }
 }

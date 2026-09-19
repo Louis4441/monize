@@ -85,6 +85,7 @@
       "unpricedHolding": "Een positie had geen koers op deze dag of de dag ervoor, dus de beweging is onbekend.",
       "missingRate": "Er ontbrak een wisselkoers, dus de beweging kon niet worden omgerekend.",
       "flowIncomplete": "Een storting of opname op deze dag kon niet worden omgerekend, dus de beweging kan er niet van worden gescheiden.",
+      "cashIncomplete": "Een liquide rekening heeft voor deze dag geen saldo gemeld, dus de waarde van de dag is onvolledig en de beweging is onbekend.",
       "noPriorValue": "Er is geen eerdere waarde om deze dag mee te vergelijken.",
       "zeroBaseline": "De portefeuille was de dag ervoor leeg, dus er is geen percentage te berekenen."
     }

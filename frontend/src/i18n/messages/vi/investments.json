@@ -53,14 +53,20 @@
     "gainLossTooltip": "Lãi hoặc lỗ chưa thực hiện của các vị thế hiện tại: giá trị thị trường theo giá hôm nay trừ cơ sở chi phí ở trên. Không bao gồm lãi đã thực hiện từ các lần bán trước, cũng như cổ tức và lãi suất đã nhận.",
     "returns": "Lợi nhuận",
     "simpleReturn": "Lợi nhuận đơn giản",
-    "simpleReturnTooltip": "Tổng phần trăm lãi lỗ trên các khoản nắm giữ, tính bằng (Giá trị thị trường − Cơ sở chi phí) ÷ Cơ sở chi phí. Không tính đến thời điểm đóng góp hoặc rút tiền.",
+    "simpleReturnTooltip": "Lãi hoặc lỗ so với số tiền bạn đã trả: (Giá trị thị trường − Cơ sở chi phí) ÷ Cơ sở chi phí. Nó không tính đến thời điểm tiền vào, nên sẽ nhảy vọt mỗi lần mua: một khoản nắm giữ 1.000 tăng 20% sẽ hiển thị +20%; mua thêm 1.000 nữa thì sẽ hiển thị +10% (200 ÷ 2.000) dù không mất gì cả. TWR và MWR không có bước nhảy này.",
     "twr": "TWR",
     "twrFull": "(Tỷ lệ có trọng số thời gian)",
-    "twrTooltip": "Đo lường hiệu quả đầu tư bất kể thời điểm bạn thêm hoặc rút tiền. Loại bỏ tác động của thời điểm dòng tiền để cho thấy hiệu suất đầu tư thuần túy.",
+    "twrTooltip": "Lợi nhuận có trọng số thời gian của khoản đầu tư của bạn kể từ giao dịch đầu tiên, được tính theo cùng cách với Hiệu suất danh mục: các khoản nạp, rút và tiền mặt chưa đầu tư không được tính, cổ tức và lãi được tính vào.",
     "cagr": "CAGR",
     "cagrTooltip": "Tỷ lệ tăng trưởng kép hàng năm. Lợi nhuận hàng năm của bạn dựa trên Đã đầu tư ròng so với giá trị danh mục hiện tại, như thể tăng trưởng hoàn toàn đều đặn mỗi năm.",
     "notAvailable": "N/A",
-    "unpricedHoldings": "Định giá một phần: {count, plural, one {# vị thế} other {# vị thế}} không có giá hiện tại ({symbols}), nên các giá trị bên dưới không bao gồm chúng."
+    "unpricedHoldings": "Định giá một phần: {count, plural, one {# vị thế} other {# vị thế}} không có giá hiện tại ({symbols}), nên các giá trị bên dưới không bao gồm chúng.",
+    "mwr": "MWR",
+    "mwrFull": "(Tỷ lệ có trọng số tiền)",
+    "mwrTooltip": "Lợi nhuận có trọng số tiền (XIRR) của khoản đầu tư của bạn kể từ giao dịch đầu tiên: tỷ lệ hàng năm mà tiền của chính bạn kiếm được, trong đó mỗi lần mua, bán và cổ tức được tính trọng số theo thời điểm xảy ra. Các khoản nạp, rút và tiền mặt chưa đầu tư không được tính. Khác với TWR khi bạn đầu tư nhiều hơn trước một đợt tăng hoặc giảm.",
+    "returnDiagnosticsLead": "TWR và MWR không được hiển thị vì lịch sử có khoảng trống:",
+    "returnDiagnosticsRepair": "Thêm các mức giá còn thiếu vào lịch sử giá của từng chứng khoán; lợi nhuận được tính trên các tài khoản đang hiển thị.",
+    "returnDiagnosticsRepairFiltered": "Thêm các mức giá còn thiếu vào lịch sử giá của từng chứng khoán, hoặc loại các tài khoản đó khỏi chế độ xem bằng bộ lọc tài khoản ở trên; lợi nhuận được tính trên các tài khoản đang hiển thị."
   },
   "assetAllocation": {
     "title": "Phân bổ tài sản",
@@ -124,8 +130,12 @@
     "noDataForPeriod": "Không có dữ liệu đầu tư cho kỳ này.",
     "highestValue": "Giá trị cao nhất",
     "lowestValue": "Giá trị thấp nhất",
-    "change": "Thay đổi",
-    "changePercent": "Thay đổi %",
+    "investmentResult": "Kết quả đầu tư",
+    "investmentReturn": "Lợi nhuận",
+    "investmentResultTooltip": "Số tiền khoản đầu tư của bạn kiếm được trong khoảng thời gian này. Các khoản nạp, rút và tiền mặt chưa đầu tư được loại trừ, và tỷ lệ phần trăm bên cạnh là lợi nhuận tính theo trọng số thời gian, nên việc mua và bán không làm thay đổi con số này.",
+    "unmeasuredFlowTooltip": "Một giao dịch được thanh toán bên ngoài các tài khoản này, hoặc một khoản tách lẫn một dòng đầu tư với chi tiêu thông thường, nghĩa là kết quả không thể tách khỏi số tiền đã di chuyển.",
+    "valueChangeLine": "Thay đổi giá trị {amount}",
+    "netFlowsLine": "Nạp và rút ròng {amount}",
     "priorCloseTooltip": "Được tính từ giá đóng cửa của phiên giao dịch trước đó, ngày {date}.",
     "notAvailable": "N/A",
     "portfolioLabel": "Danh mục:"
@@ -288,5 +298,28 @@
     "accountRequired": "Tài khoản là bắt buộc",
     "dateRequired": "Ngày là bắt buộc",
     "acquisitionPriceRequired": "Giá mỗi cổ phiếu là bắt buộc và phải lớn hơn không. Dùng \"Thêm cổ phiếu\" cho cổ phiếu có được mà không biết giá gốc."
+  },
+  "portfolioPerformance": {
+    "title": "Hiệu suất danh mục",
+    "subtitle": "Khoản đầu tư của bạn đã hoạt động thế nào, không tính ảnh hưởng của các khoản nạp, rút và tiền mặt chưa đầu tư.",
+    "footnote": "Các khoản nạp, rút và tiền mặt chưa đầu tư không được tính là kết quả đầu tư.",
+    "unavailable": "k/c",
+    "empty": "Lịch sử còn quá ít để đo lợi nhuận.",
+    "periods": {
+      "1d": "1N",
+      "1w": "1T",
+      "1m": "1TH",
+      "3m": "3TH",
+      "ytd": "Từ đầu năm",
+      "1y": "1N"
+    },
+    "loading": "Đang đo các giai đoạn...",
+    "loadFailed": "Không thể tải kết quả các giai đoạn. Các số liệu đang bị giữ lại, không phải bằng không; hãy tải lại trang để thử lại.",
+    "reasons": {
+      "incompletePrices": "Một giai đoạn bị giữ lại bắt đầu vào ngày một khoản nắm giữ không có giá. Hãy làm mới giá, hoặc tự thêm một giá trong lịch sử giá của chứng khoán.",
+      "incompleteCash": "Một giai đoạn bị giữ lại bắt đầu vào ngày một tài khoản tiền mặt trong chế độ xem này không báo cáo số dư, nên số tiền nó nắm giữ là không xác định chứ không phải bằng không.",
+      "missingRatePairs": "Một giai đoạn bị giữ lại cần một tỷ giá mà lịch sử đã lưu không có. Hãy thêm lịch sử tỷ giá cho đơn vị tiền tệ đó trên trang Tiền tệ.",
+      "unmeasuredFlow": "Một giai đoạn bị giữ lại chứa một khoản biến động không thể phân biệt với khoản nạp hay rút: một giao dịch được thanh toán ngoài các tài khoản này, hoặc một khoản tách trộn lẫn tiền mặt và đầu tư."
+    }
   }
 }

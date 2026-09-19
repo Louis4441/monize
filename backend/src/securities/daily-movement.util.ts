@@ -19,6 +19,8 @@ export type DailyMovementReason =
   | "missingRate"
   /** An external cash flow on the day could not be converted. */
   | "flowIncomplete"
+  /** A cash account in the scope reported no balance for the day. */
+  | "cashIncomplete"
   /** The day before precedes the scope's first valued day. */
   | "noPriorValue"
   /** The previous day's value is zero: a percentage of nothing. */
@@ -27,7 +29,10 @@ export type DailyMovementReason =
 /** One day's value, as `getDailyInvestments` reports it, reduced to what decide needs. */
 export interface DailyMovementValue {
   value: number;
-  /** Every component priced and converted: `fxComplete && pricesComplete`. */
+  /**
+   * Every component priced, converted and balanced:
+   * `fxComplete && pricesComplete && cashComplete`.
+   */
   complete: boolean;
   /** Why not, when `complete` is false. */
   reasons: DailyMovementReason[];
@@ -167,17 +172,19 @@ export function decideDailyMovement(
 
 /**
  * The reasons a day's value carries, from the completeness flags the value
- * series reports. Two flags, two causes, two repairs -- a day short of both
- * names both.
+ * series reports. Three flags, three causes, three repairs -- a day short of
+ * more than one names each of them.
  */
 export function valueReasons(point: {
   fxComplete?: boolean;
   pricesComplete?: boolean;
+  cashComplete?: boolean;
 }): DailyMovementReason[] {
   const reasons: DailyMovementReason[] = [];
   // `=== false`, never `!flag`: absent is no information, not incomplete.
   if (point.pricesComplete === false) reasons.push("unpricedHolding");
   if (point.fxComplete === false) reasons.push("missingRate");
+  if (point.cashComplete === false) reasons.push("cashIncomplete");
   return reasons;
 }
 

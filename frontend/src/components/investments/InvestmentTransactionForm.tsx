@@ -562,6 +562,47 @@ function InvestmentTransactionFormFields({
   /** True when the cash leg cannot be priced, so the trade must not be posted. */
   const conversionUnresolved = needsConversion && convertedAmount === null;
 
+  /**
+   * The total the row will STORE, which is not always the total on screen: a
+   * redemption's proceeds are shown with the accrued interest that arrives
+   * with them, and `total_amount` is proceeds (the interest is its own linked
+   * row).
+   */
+  const storedTotalAmount = useMemo(
+    () =>
+      supportsAccruedInterest(watchedAction)
+        ? roundToDecimals(totalAmount - watchedAccruedInterest, 4)
+        : totalAmount,
+    [watchedAction, totalAmount, watchedAccruedInterest],
+  );
+
+  /**
+   * The user typed the total, so the total is the fact and the price follows
+   * it -- the inverse of the `totalAmount` memo above, at the price column's
+   * own ten decimals (INV-TRADE-001).
+   *
+   * Nothing to derive without shares to divide by, and a total smaller than
+   * the commission would imply a negative price, which is not a price; both
+   * leave the fields as they are rather than writing a figure nobody meant.
+   */
+  const handleTotalAmountChange = (value: number | undefined) => {
+    if (value === undefined || value === null) return;
+    if (!watchedQuantity) return;
+    const proceeds = supportsAccruedInterest(watchedAction)
+      ? value - watchedAccruedInterest
+      : value;
+    const base = baseInvestmentAction(watchedAction);
+    const gross =
+      base === 'BUY' || base === 'REINVEST'
+        ? proceeds - watchedCommission
+        : proceeds + watchedCommission;
+    if (!(gross > 0)) return;
+    setValue('price', roundToDecimals(gross / watchedQuantity, 10), {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  };
+
   const handleConvertedAmountChange = (value: number | undefined) => {
     if (!needsConversion || totalAmount === 0) return;
     if (value === undefined || value === null) return;
@@ -986,6 +1027,14 @@ function InvestmentTransactionFormFields({
         commission: actionIn(action, quantityOnlyActions) || isSplit
           ? undefined
           : data.commission,
+        // What the trade came to, sent as the fact it is: the server stores it
+        // as given and derives the price from it, so the figure the user
+        // approved on screen is the figure in the ledger. Only the actions
+        // whose total is a quantity times a price have one.
+        totalAmount:
+          actionIn(action, quantityPriceActions) && !isSplit
+            ? storedTotalAmount
+            : undefined,
         // Always sent for a redemption, including as 0: an omitted field means
         // "unchanged" to the backend, so clearing the box has to say so.
         accruedInterest: supportsAccruedInterest(action)
@@ -1523,14 +1572,31 @@ function InvestmentTransactionFormFields({
       {/* Total Amount Display - meaningless for a transfer (no cash moves) */}
       {(needsQuantityPrice || isAmountOnly) && !isTransferLeg && (
         <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4">
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {t('transactionForm.totalAmount', { currency: transactionCurrency })}
-            </span>
-            <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {formatCurrency(totalAmount, transactionCurrency)}
-            </span>
-          </div>
+          {needsQuantityPrice ? (
+            // Editable, and authoritative when it is the field being edited:
+            // a statement states what a sale came to, and typing a price
+            // rounded to the cent instead throws the remainder away (141
+            // shares for 820.91 becomes 141 x 5.82 = 820.62). Price and total
+            // each follow the other, exactly as the exchange rate and the
+            // converted amount above do.
+            <NumericInput
+              label={t('transactionForm.totalAmount', { currency: transactionCurrency })}
+              prefix={currencySymbol}
+              value={totalAmount || undefined}
+              onChange={handleTotalAmountChange}
+              decimalPlaces={4}
+              min={0}
+            />
+          ) : (
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {t('transactionForm.totalAmount', { currency: transactionCurrency })}
+              </span>
+              <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                {formatCurrency(totalAmount, transactionCurrency)}
+              </span>
+            </div>
+          )}
           {needsQuantityPrice && (
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {t('transactionForm.sharesAtPrice', { shares: watchedQuantity, symbol: currencySymbol, price: watchedPrice.toFixed(6) })}

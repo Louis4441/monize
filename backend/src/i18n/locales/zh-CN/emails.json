@@ -228,8 +228,8 @@
     "portfolioMovement": {
       "titleUp": "投资上涨 {{ percent }}%",
       "titleDown": "投资下跌 {{ percent }}%",
-      "messageUp": "今天您的投资上涨了 {{ percent }}%（不含存入和取出）。打开以查看。",
-      "messageDown": "今天您的投资下跌了 {{ percent }}%（不含存入和取出）。打开以查看。"
+      "messageUp": "从 {{ from }} 到 {{ to }}，您的投资上涨了 {{ percent }}%（不含存入和取出）。打开以查看。",
+      "messageDown": "从 {{ from }} 到 {{ to }}，您的投资下跌了 {{ percent }}%（不含存入和取出）。打开以查看。"
     },
     "balanceThreshold": {
       "titleLow": "{{ account }} 低于您的阈值",

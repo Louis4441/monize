@@ -97,7 +97,7 @@
       "noLosers": "Heute keine Verlierer."
     },
     "dailyChange": "Tagesveränderung",
-    "dailyChangeOn": "Tagesveränderung \u00b7 {date}",
+    "dailyChangeOn": "Tagesveränderung · {date}",
     "openPriceHistory": "Kursverlauf für {symbol}",
     "refreshPrices": "Kurse aktualisieren",
     "viewPortfolio": "Portfolio anzeigen",
@@ -118,7 +118,7 @@
     "empty": "Noch keine Favoritwertpapiere. Besuchen Sie die <securitiesLink>Wertpapierseite</securitiesLink> und markieren Sie die Wertpapiere, die Sie hier verfolgen möchten.",
     "noPriceYet": "Noch kein Kurs",
     "dailyChange": "Tagesveränderung",
-    "dailyChangeOn": "Tagesveränderung \u00b7 {date}",
+    "dailyChangeOn": "Tagesveränderung · {date}",
     "openPriceHistory": "Kursverlauf für {symbol}",
     "refreshPrices": "Kurse aktualisieren",
     "manage": "Wertpapiere verwalten"
@@ -202,7 +202,11 @@
   "portfolioValue": {
     "title": "Portfolio-Wert",
     "empty": "Noch keine Anlagehistorie vorhanden.",
-    "refresh": "Aktuellen Wert aktualisieren"
+    "refresh": "Aktuellen Wert aktualisieren",
+    "investmentResult": "Anlageergebnis",
+    "notAvailable": "N/A",
+    "periodBreakdownTooltip": "Der Wert des Kontos hat sich in diesem Zeitraum um {valueChange} verändert, wovon Einzahlungen und Auszahlungen {netFlows} ausmachten. Die obige Zahl ist das, was die Investitionen selbst erwirtschaftet haben, ohne nicht investierte Barmittel.",
+    "unmeasuredFlowTooltip": "Ein Geschäft, das außerhalb dieser Konten abgewickelt wurde, oder eine Aufteilung, die eine Investitionsposition mit gewöhnlichen Ausgaben vermischt, bedeutet, dass das Ergebnis nicht vom bewegten Geld getrennt werden kann."
   },
   "spendingByPayee": {
     "title": "Ausgaben nach Zahlungsempfänger",

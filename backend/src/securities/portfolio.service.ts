@@ -1,12 +1,20 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, forwardRef } from "@nestjs/common";
 import { DataSource, In } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
+import { returnedRows } from "../common/db/query-result";
 import { FxAggregate } from "../common/fx-aggregate";
 import {
   preferredCurrency,
   resolveUserDefaultCurrency,
 } from "../common/default-currency.util";
 import { Holding } from "./entities/holding.entity";
+import { Security } from "./entities/security.entity";
+import {
+  EMPTY_RETURN_DIAGNOSTICS,
+  ReturnDiagnostics,
+  SecurityLabel,
+  buildReturnDiagnostics,
+} from "./return-diagnostics.util";
 import { Account, AccountType } from "../accounts/entities/account.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import {
@@ -18,10 +26,19 @@ import {
   SectorWeightingService,
   LlmLookThrough,
 } from "./sector-weighting.service";
+import {
+  PeriodResultReason,
+  PortfolioPeriodResultService,
+} from "../net-worth/portfolio-period-result.service";
+import type { IncompleteDataRanges } from "../net-worth/incomplete-data-ranges.util";
 import { YahooFinanceService } from "./yahoo-finance.service";
 import { QuoteProviderRegistry } from "./providers/quote-provider.registry";
 import { roundMoney } from "../common/round.util";
 import { collectTagKeys } from "../tags/tag-key-value.util";
+import {
+  buildPortfolioSummaryMemoKey,
+  portfolioSummaryMemo,
+} from "./portfolio-summary-memo";
 import { mapWithConcurrency } from "../common/concurrency.util";
 import { formatDateYMD, todayYMD } from "../common/date-utils";
 import {
@@ -101,6 +118,22 @@ export interface HoldingWithMarketValue {
   costBasisAccountCurrency: number | null;
   currentPrice: number | null;
   marketValue: number | null;
+  /**
+   * `marketValue` converted into the holding account's currency by the SAME
+   * `rateCache` snapshot that produces the account and portfolio totals, so a
+   * row and the total it belongs to share one FX snapshot rather than the row
+   * re-converting with the client's live rate (which drifted from the total).
+   * `null` when the pair has no rate (unknown, never an implicit 1:1) and when
+   * `marketValue` itself is null.
+   */
+  marketValueAccountCurrency: number | null;
+  /**
+   * `marketValue` converted into the user's default (reporting) currency from
+   * the same snapshot that produces `totalPortfolioValue`, so the share of the
+   * portfolio has one numerator and denominator in one currency. It is exactly
+   * this holding's contribution to `holdingsValueTotal`.
+   */
+  marketValueDefaultCurrency: number | null;
   gainLoss: number | null;
   gainLossPercent: number | null;
 }
@@ -158,7 +191,40 @@ export interface PortfolioSummary {
   totalPortfolioValue: number;
   totalGainLoss: number;
   totalGainLossPercent: number;
+  /**
+   * The invested part's time-weighted return since the portfolio's first
+   * transaction, produced by the same path as "Portfolio performance"
+   * (INV-PORTRESULT-002). `null` is withheld, never zero, and
+   * `timeWeightedReturnReasons` says why.
+   */
   timeWeightedReturn: number | null;
+  /** Why `timeWeightedReturn` is withheld; empty when the figure is known. */
+  timeWeightedReturnReasons: PeriodResultReason[];
+  /** The baseline close the return is measured from, or `null` for no window. */
+  timeWeightedReturnSince: string | null;
+  /**
+   * The same measure's second figure: the invested part's ANNUALISED
+   * money-weighted return (XIRR) since the portfolio's first transaction, the
+   * rate the reader's own money earned with each purchase, sale and
+   * distribution weighted by when it happened
+   * (`docs/specs/portfolio-period-result.md` section 11). `null` is withheld,
+   * never zero, and `moneyWeightedReturnReasons` says why -- a window under 30
+   * days is not annualised at all.
+   */
+  moneyWeightedReturn: number | null;
+  /** Why `moneyWeightedReturn` is withheld; empty when the figure is known. */
+  moneyWeightedReturnReasons: PeriodResultReason[];
+  /**
+   * What the two withheld returns above are waiting for: each missing price,
+   * rate and cash balance NAMED and DATED, over the same since-inception window
+   * both figures are measured across.
+   *
+   * Withholding a figure is only honest if the reader learns why, and "no
+   * price" is not a repair -- "PPK, Mar 2 to May 30" is
+   * (`docs/financial-calculation-contract.md` section 1.3). Empty when the
+   * window has no gap, which is also what a known return looks like.
+   */
+  returnDiagnostics: ReturnDiagnostics;
   cagr: number | null;
   /**
    * False when a component of these totals could not be converted into the
@@ -297,7 +363,23 @@ export interface LlmPortfolioSummary {
   totalPortfolioValue: number;
   totalGainLoss: number;
   totalGainLossPercent: number;
+  /** The invested part's TWR since the first transaction; null is withheld. */
   timeWeightedReturn: number | null;
+  /** Why it is withheld, so a model reports the cause rather than "n/a". */
+  timeWeightedReturnReasons: PeriodResultReason[];
+  /** The baseline close it is measured from, so the answer can name the window. */
+  timeWeightedReturnSince: string | null;
+  /** The invested part's annualised XIRR over the same window; null is withheld. */
+  moneyWeightedReturn: number | null;
+  /** Why it is withheld, so a model reports the cause rather than "n/a". */
+  moneyWeightedReturnReasons: PeriodResultReason[];
+  /**
+   * The named, dated gaps behind a withheld return, so a model answers "PPK has
+   * no close from Mar 2 to May 30" rather than "not available". Carried in full,
+   * ids included: they are what a `monize://security/<id>` link quotes, exactly
+   * as `LlmPortfolioHolding.securityId` is.
+   */
+  returnDiagnostics: ReturnDiagnostics;
   cagr: number | null;
   holdings: LlmPortfolioHolding[];
   holdingsByAccount: LlmAccountHoldings[];
@@ -451,6 +533,13 @@ export class PortfolioService {
     private yahooFinanceService: YahooFinanceService,
     private quoteProviderRegistry: QuoteProviderRegistry,
     private sectorWeightingService: SectorWeightingService,
+    // The summary's time-weighted return is the invested measure over the
+    // portfolio's whole life, answered by the service that owns that measure
+    // rather than by a second implementation here (#1392). forwardRef for the
+    // reason `DailyMovementService` gives: SecuritiesModule and NetWorthModule
+    // already close a cycle.
+    @Inject(forwardRef(() => PortfolioPeriodResultService))
+    private periodResult: PortfolioPeriodResultService,
   ) {}
 
   /**
@@ -458,6 +547,25 @@ export class PortfolioService {
    * Uses DISTINCT ON for efficient single-pass query instead of correlated subquery
    */
   async getLatestPrices(securityIds: string[]): Promise<Map<string, number>> {
+    const observations = await this.getLatestPriceObservations(securityIds);
+    return new Map(
+      [...observations].map(([securityId, point]) => [securityId, point.close]),
+    );
+  }
+
+  /**
+   * The same latest observations, each with the date it was actually struck on.
+   *
+   * `getLatestPrices` is this query with the date dropped, so the two cannot
+   * name different rows: a caller that has to know whether today's valuation is
+   * dated today or carried forward from a month ago is asking about the very
+   * observation that priced it, and a second query would be a second rule. The
+   * daily portfolio-movement producer reads it for exactly that
+   * (INV-PORTMOVE-008).
+   */
+  async getLatestPriceObservations(
+    securityIds: string[],
+  ): Promise<Map<string, { close: number; date: string }>> {
     if (securityIds.length === 0) {
       return new Map();
     }
@@ -473,12 +581,19 @@ export class PortfolioService {
       ),
     );
 
-    const priceMap = new Map<string, number>();
-    for (const price of latestPrices) {
-      priceMap.set(price.security_id, Number(price.close_price));
+    const observations = new Map<string, { close: number; date: string }>();
+    for (const price of returnedRows<{
+      security_id: string;
+      close_price: string;
+      price_date: string | Date;
+    }>(latestPrices)) {
+      observations.set(price.security_id, {
+        close: Number(price.close_price),
+        date: priceDateYmd(price.price_date),
+      });
     }
 
-    return priceMap;
+    return observations;
   }
 
   /**
@@ -570,17 +685,51 @@ export class PortfolioService {
   }
 
   /**
-   * Get portfolio summary for a user, optionally filtered by account
+   * Get portfolio summary for a user, optionally filtered by account.
+   *
+   * Memoized per user, account scope, reporting currency and ambient identity
+   * for the memo's TTL (60 s, `portfolio-summary-memo.ts`). The memo wraps the computation
+   * here, at the service boundary, so every caller shares it: the controller,
+   * the by-tag allocation, the security detail page and the AI / MCP
+   * `get_portfolio_summary` tool. Opening the Investments page used to start
+   * three of these concurrently and pay for all three.
    */
   async getPortfolioSummary(
     userId: string,
     accountIds?: string[],
   ): Promise<PortfolioSummary> {
-    // Get user's default currency for conversion
+    // Get user's default currency for conversion. Read before the memo because
+    // it is part of the key: a preference change must not be answered from an
+    // entry computed in the previous currency.
     const pref = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(UserPreference).findOne({ where: { userId } }),
     );
     const defaultCurrency = preferredCurrency(pref);
+    return portfolioSummaryMemo.run(
+      userId,
+      buildPortfolioSummaryMemoKey(userId, accountIds, defaultCurrency),
+      () => this.computePortfolioSummary(userId, defaultCurrency, accountIds),
+    );
+  }
+
+  /**
+   * The valuation itself. Phase timings are logged at debug level so an
+   * operator can see which of the three expensive phases (live FX priming,
+   * holdings valuation, since-inception result) a slow summary is spending its
+   * seconds in, without a profiler or a code change.
+   */
+  private async computePortfolioSummary(
+    userId: string,
+    defaultCurrency: string,
+    accountIds?: string[],
+  ): Promise<PortfolioSummary> {
+    const phaseStart = Date.now();
+    let mark = phaseStart;
+    const phase = (name: string): void => {
+      const now = Date.now();
+      this.logger.debug(`Portfolio summary phase ${name}: ${now - mark}ms`);
+      mark = now;
+    };
     const rateCache: FxRateCache = new Map();
 
     // Get investment accounts
@@ -600,6 +749,7 @@ export class PortfolioService {
       categorised.holdingsAccountIds,
       defaultCurrency,
     );
+    phase("liveFxPriming");
 
     // Compute effective cash balances excluding future-dated transactions
     const cashAndStandaloneIds = [
@@ -636,6 +786,7 @@ export class PortfolioService {
         rateCache,
         (ids) => this.getLatestPrices(ids),
       );
+    phase("holdingsValuation");
 
     // Group holdings by account
     const holdingsByAccount =
@@ -696,13 +847,46 @@ export class PortfolioService {
       rateCache,
     );
 
-    // Calculate Time-Weighted Return
-    const timeWeightedReturn = await this.calculationService.calculateTWR(
+    // The time-weighted return, over the same measure "Portfolio performance"
+    // reports and by the same code path: the invested part's TWR since the
+    // portfolio's first transaction (INV-PORTRESULT-002,
+    // `docs/specs/portfolio-period-result.md` section 10). It is withheld with
+    // its cause rather than approximated, so a position with no stored close on
+    // a day the chain spans makes the figure unknown instead of a gain.
+    const investedSinceInception =
+      await this.periodResult.getInvestedResultSinceInception(userId, {
+        accountIds,
+        displayCurrency: defaultCurrency,
+      });
+    phase("sinceInceptionResult");
+    const timeWeightedReturn = investedSinceInception.investmentReturnPercent;
+    const timeWeightedReturnReasons = investedSinceInception.investedReasons;
+    // The window's baseline, so the caption can name what "since" means. A
+    // scope with no valued day has no window at all, which is not a date.
+    const timeWeightedReturnSince = timeWeightedReturnReasons.includes(
+      "noValueSeries",
+    )
+      ? null
+      : investedSinceInception.startDate;
+
+    // The second figure of that same measure, from the same slice: what the
+    // reader's own money earned, annualised, with every purchase, sale and
+    // distribution weighted by when it happened (section 11). Withheld with
+    // its cause -- including a portfolio too young to annualise -- rather than
+    // approximated or defaulted to the time-weighted one.
+    const moneyWeightedReturn =
+      investedSinceInception.investmentMoneyWeightedReturnPercent;
+    const moneyWeightedReturnReasons = investedSinceInception.investedReasons;
+
+    // What a withheld return is waiting for, named: the same window's dated
+    // gaps, resolved to symbols and account names so the card can point at the
+    // price history rather than at a generic "no price" marker (#1392).
+    const returnDiagnostics = await this.resolveReturnDiagnostics(
       userId,
-      categorised.holdingsAccountIds,
-      defaultCurrency,
-      rateCache,
-      (ids) => this.getLatestPrices(ids),
+      investedSinceInception.incompleteRanges,
+      timeWeightedReturnSince,
+      holdingsResult.holdingsWithValues,
+      accounts,
     );
 
     // CAGR divides the portfolio value by what was invested to get there, so an
@@ -743,7 +927,7 @@ export class PortfolioService {
       ]),
     ].sort();
 
-    return {
+    const summary: PortfolioSummary = {
       totalCashValue,
       totalHoldingsValue: holdingsResult.totalHoldingsValue,
       totalCostBasis: holdingsResult.totalCostBasis,
@@ -752,6 +936,11 @@ export class PortfolioService {
       totalGainLoss,
       totalGainLossPercent,
       timeWeightedReturn,
+      timeWeightedReturnReasons,
+      timeWeightedReturnSince,
+      moneyWeightedReturn,
+      moneyWeightedReturnReasons,
+      returnDiagnostics,
       cagr,
       fxComplete: missingRatePairs.length === 0,
       missingRatePairs,
@@ -763,6 +952,68 @@ export class PortfolioService {
       holdingsByAccount,
       allocation,
     };
+    this.logger.debug(
+      `Portfolio summary computed in ${Date.now() - phaseStart}ms`,
+    );
+    return summary;
+  }
+
+  /**
+   * The window's dated gaps, turned into rows a reader can act on.
+   *
+   * The names come from what the summary already loaded wherever they can: the
+   * holdings it valued and the accounts it resolved. What is left is looked up
+   * by id -- a security sold out of the portfolio, or one whose position is
+   * inactive today, is exactly the kind of holding a months-long price gap sits
+   * on, and printing its UUID instead of its symbol would be a worse dead end
+   * than the generic sentence this replaces.
+   */
+  private async resolveReturnDiagnostics(
+    userId: string,
+    ranges: IncompleteDataRanges,
+    since: string | null,
+    holdings: HoldingWithMarketValue[],
+    accounts: Account[],
+  ): Promise<ReturnDiagnostics> {
+    const securityIds = [...new Set(ranges.prices.map((r) => r.key))];
+    const accountIds = [...new Set(ranges.cash.map((r) => r.key))];
+    if (securityIds.length === 0 && accountIds.length === 0) {
+      return { ...EMPTY_RETURN_DIAGNOSTICS, since };
+    }
+
+    const securityLabels = new Map<string, SecurityLabel>(
+      holdings.map((h) => [h.securityId, { symbol: h.symbol, name: h.name }]),
+    );
+    const accountNames = new Map<string, string>(
+      accounts.map((a) => [a.id, a.name]),
+    );
+    const missingSecurities = securityIds.filter(
+      (id) => !securityLabels.has(id),
+    );
+    const missingAccounts = accountIds.filter((id) => !accountNames.has(id));
+
+    if (missingSecurities.length > 0 || missingAccounts.length > 0) {
+      await withScopedDb(this.dataSource, async (m) => {
+        if (missingSecurities.length > 0) {
+          const rows = await m.getRepository(Security).find({
+            where: { id: In(missingSecurities), userId },
+            select: ["id", "symbol", "name"],
+          });
+          for (const row of rows) {
+            securityLabels.set(row.id, { symbol: row.symbol, name: row.name });
+          }
+        }
+        if (missingAccounts.length > 0) {
+          const rows = await m.getRepository(Account).find({
+            where: { id: In(missingAccounts), userId },
+            select: ["id", "name"],
+          });
+          for (const row of rows) accountNames.set(row.id, row.name);
+        }
+      });
+    }
+
+    return buildReturnDiagnostics(ranges, since, securityLabels, accountNames);
   }
 
   /**
@@ -843,6 +1094,11 @@ export class PortfolioService {
       totalGainLoss: roundMoneyValue(summary.totalGainLoss),
       totalGainLossPercent: roundPct(summary.totalGainLossPercent) ?? 0,
       timeWeightedReturn: roundPct(summary.timeWeightedReturn),
+      timeWeightedReturnReasons: summary.timeWeightedReturnReasons,
+      timeWeightedReturnSince: summary.timeWeightedReturnSince,
+      moneyWeightedReturn: roundPct(summary.moneyWeightedReturn),
+      moneyWeightedReturnReasons: summary.moneyWeightedReturnReasons,
+      returnDiagnostics: summary.returnDiagnostics,
       cagr: roundPct(summary.cagr),
       fxComplete: summary.fxComplete,
       missingRatePairs: summary.missingRatePairs,
@@ -1231,6 +1487,28 @@ export class PortfolioService {
   }
 
   /**
+   * What the chart's grouping switcher needs to know about tags, in one query:
+   * whether any held security carries a tag at all, and the distinct KEY:VALUE
+   * tag keys among them (case-folded and sorted).
+   *
+   * This used to compute the whole portfolio valuation and read the tag names
+   * off it -- a three-second request whose only output was a list of names.
+   * Which tags are in use is a question about the holdings and their tags, and
+   * nothing else: no price, no exchange rate, no cost basis. A tag key is also
+   * not withheld because a holding is unpriced or has no rate into the
+   * reporting currency, which the valuation-based path did silently (the
+   * allocation drops an unvalued slice), so a user whose feed was late lost the
+   * grouping switcher along with the number.
+   */
+  async getPortfolioTagSummary(
+    userId: string,
+    accountIds?: string[],
+  ): Promise<{ keys: string[]; hasTaggedHoldings: boolean }> {
+    const names = await this.loadHeldTagNames(userId, accountIds);
+    return { keys: collectTagKeys(names), hasTaggedHoldings: names.length > 0 };
+  }
+
+  /**
    * Distinct KEY:VALUE tag keys present on the portfolio's securities, so the
    * UI can offer "aggregate by key" choices. Case-folded and sorted.
    */
@@ -1238,12 +1516,43 @@ export class PortfolioService {
     userId: string,
     accountIds?: string[],
   ): Promise<string[]> {
-    const inputs = await this.loadTaggedAllocationInputs(userId, accountIds);
-    const names: string[] = [];
-    for (const tags of inputs.tagsBySymbol.values()) {
-      for (const tag of tags) names.push(tag.name);
-    }
-    return collectTagKeys(names);
+    return (await this.getPortfolioTagSummary(userId, accountIds)).keys;
+  }
+
+  /**
+   * The names of the tags carried by the securities currently held in the
+   * scope, distinct and sorted.
+   *
+   * "Held" is the same predicate the valuation uses -- `|quantity| >= 0.0001`,
+   * spelled here in SQL -- so a security that has been sold out of every
+   * account in the scope contributes no tag, exactly as before.
+   */
+  private async loadHeldTagNames(
+    userId: string,
+    accountIds?: string[],
+  ): Promise<string[]> {
+    const accounts = await this.resolveAccounts(userId, accountIds);
+    const { holdingsAccountIds } =
+      this.calculationService.categoriseAccounts(accounts);
+    if (holdingsAccountIds.length === 0) return [];
+
+    const rows: Array<{ name: string }> = await withScopedDb(
+      this.dataSource,
+      (m) =>
+        m.query(
+          `SELECT DISTINCT t.name AS name
+             FROM holdings h
+             JOIN securities s ON s.id = h.security_id
+             JOIN security_tags st ON st.security_id = s.id
+             JOIN tags t ON t.id = st.tag_id
+            WHERE h.account_id = ANY($1)
+              AND s.user_id = $2
+              AND ABS(h.quantity) >= 0.0001
+            ORDER BY t.name ASC`,
+          [holdingsAccountIds, userId],
+        ),
+    );
+    return rows.map((r) => r.name);
   }
 
   /**
@@ -1386,6 +1695,12 @@ export class PortfolioService {
 
     for (const ts of loaded.timestamps) {
       let totalCents = 0; // integer arithmetic to avoid float drift
+      // The INVESTED part of the same bar: the securities, with the cash
+      // beside them left out. The investment charts plot it, because cash held
+      // in an investment account is not an investment (INV-PORTRESULT-002,
+      // `docs/specs/portfolio-period-result.md` section 10.7), and the daily
+      // and monthly series expose the same component under the same name.
+      let securitiesCents = 0;
       // Cash contributions, valued at the FX rate prevailing at this bar.
       for (const [ccy, amount] of loaded.cashByCurrency) {
         totalCents += contribution(amount, ccy, ts);
@@ -1393,17 +1708,22 @@ export class PortfolioService {
       // Stale-holding contributions (last daily close * quantity), grouped by
       // currency so the per-currency rounding matches the historical total.
       for (const [ccy, amount] of loaded.staleByCurrency) {
-        totalCents += contribution(amount, ccy, ts);
+        const cents = contribution(amount, ccy, ts);
+        totalCents += cents;
+        securitiesCents += cents;
       }
       for (let i = 0; i < loaded.sources.length; i++) {
         const src = loaded.sources[i];
         cursors[i] = this.advanceIntradayCursor(src.times, cursors[i], ts);
         const price = this.intradayPriceAt(src, cursors[i], ts);
-        totalCents += contribution(src.quantity * price, src.currencyCode, ts);
+        const cents = contribution(src.quantity * price, src.currencyCode, ts);
+        totalCents += cents;
+        securitiesCents += cents;
       }
       points.push({
         timestamp: new Date(ts).toISOString(),
         value: totalCents / 10000,
+        securitiesValue: securitiesCents / 10000,
       });
     }
 

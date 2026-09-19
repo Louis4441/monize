@@ -24,6 +24,7 @@ import { PortfolioValueReport } from './PortfolioValueReport';
 const mockGetInvestmentsDaily = vi.fn();
 const mockGetInvestmentsMonthly = vi.fn();
 const mockGetInvestmentsBreakdown = vi.fn();
+const mockGetPeriodResult = vi.fn();
 const mockGetFirstPricedDay = vi.fn();
 const mockGetPortfolioSummary = vi.fn();
 const mockGetInvestmentAccounts = vi.fn();
@@ -95,6 +96,7 @@ vi.mock('@/lib/net-worth', () => ({
     getInvestmentsDaily: (...args: any[]) => mockGetInvestmentsDaily(...args),
     getInvestmentsMonthly: (...args: any[]) => mockGetInvestmentsMonthly(...args),
     getInvestmentsBreakdown: (...args: any[]) => mockGetInvestmentsBreakdown(...args),
+    getInvestmentsPeriodResult: (...args: any[]) => mockGetPeriodResult(...args),
     getFirstPricedDay: (...args: any[]) => mockGetFirstPricedDay(...args),
   },
 }));
@@ -144,6 +146,26 @@ const stripGlyph = (el: Element) => el.textContent?.replace(/[↑↓↕]/g, '').
 describe('PortfolioValueReport breakdown table (phone wrapped)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The KPI cards read the server's period result; this suite is about the
+    // breakdown table below them, so a complete one keeps them out of the way.
+    mockGetPeriodResult.mockResolvedValue({
+      currency: 'CAD',
+      startDate: '2024-01-01',
+      endDate: '2026-01-01',
+      startValue: 0,
+      endValue: 0,
+      valueChange: 0,
+      netExternalFlows: 0,
+      knownFlowSubtotal: 0,
+      investmentResult: 0,
+      returnPercent: 0,
+      returnMethod: 'simple',
+      complete: true,
+      reasons: [],
+      missingRatePairs: [],
+      unpricedSecurityIds: [],
+      unknownCashAccountIds: [],
+    });
   });
 
   it('keeps a table from sm up and a grid below it, with the semantics a restyle strips', async () => {

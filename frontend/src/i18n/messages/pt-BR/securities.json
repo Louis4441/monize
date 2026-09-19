@@ -3,6 +3,7 @@
     "noneToUpdate": "Sem títulos para atualizar",
     "updated": "{count, plural, one {# cotação de título atualizada} other {# cotações de títulos atualizadas}}",
     "partialFailure": "Cotações atualizadas: {updated} com sucesso, {failed} com falha{symbols}",
+    "partialFailureWithReasons": "Cotações atualizadas: {updated} com sucesso, {failed} com falha{symbols}\n{reasons}",
     "failed": "Falha ao atualizar cotações"
   },
   "page": {

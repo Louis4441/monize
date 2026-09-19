@@ -97,7 +97,7 @@
       "noLosers": "Brak spadków dzisiaj."
     },
     "dailyChange": "Zmiana dzienna",
-    "dailyChangeOn": "Zmiana dzienna \u00b7 {date}",
+    "dailyChangeOn": "Zmiana dzienna · {date}",
     "openPriceHistory": "Historia ceny: {symbol}",
     "refreshPrices": "Odśwież ceny",
     "viewPortfolio": "Zobacz portfel",
@@ -118,7 +118,7 @@
     "empty": "Brak ulubionych papierów wartościowych. Odwiedź <securitiesLink>stronę Papiery wartościowe</securitiesLink> i oznacz gwiazdką te, które chcesz tu śledzić.",
     "noPriceYet": "Brak ceny",
     "dailyChange": "Zmiana dzienna",
-    "dailyChangeOn": "Zmiana dzienna \u00b7 {date}",
+    "dailyChangeOn": "Zmiana dzienna · {date}",
     "openPriceHistory": "Historia ceny: {symbol}",
     "refreshPrices": "Odśwież ceny",
     "manage": "Zarządzaj papierami wartościowymi"
@@ -202,7 +202,11 @@
   "portfolioValue": {
     "title": "Wartość portfela",
     "empty": "Brak historii inwestycji do wyświetlenia.",
-    "refresh": "Odśwież bieżącą wartość"
+    "refresh": "Odśwież bieżącą wartość",
+    "investmentResult": "Wynik inwestycyjny",
+    "notAvailable": "Brak",
+    "periodBreakdownTooltip": "Wartość konta zmieniła się o {valueChange} w tym okresie, z czego wpłaty i wypłaty wyniosły {netFlows}. Powyższa wartość to to, co zarobiły same inwestycje, z pominięciem niezainwestowanej gotówki.",
+    "unmeasuredFlowTooltip": "Transakcja rozliczona poza tymi kontami albo podział łączący pozycję inwestycyjną ze zwykłym wydatkiem oznacza, że wyniku nie da się oddzielić od przesuniętych pieniędzy."
   },
   "spendingByPayee": {
     "title": "Wydatki według odbiorcy",

@@ -111,5 +111,20 @@
     "nameMax": "Il nome deve contenere al massimo 100 caratteri",
     "symbolRequired": "Il simbolo è obbligatorio",
     "symbolMax": "Il simbolo deve contenere al massimo 10 caratteri"
+  },
+  "rateHistory": {
+    "title": "Storico dei tassi",
+    "stored": "Storico memorizzato: da {start} a {end} ({count} osservazioni)",
+    "none": "Nessuno storico memorizzato per {pair}",
+    "loading": "Verifica dello storico dei tassi memorizzato...",
+    "loadFailed": "Impossibile leggere lo storico dei tassi memorizzato",
+    "addYear": "Aggiungi un altro anno di storico dei tassi",
+    "adding": "Recupero di un altro anno...",
+    "hint": "I report con data anteriore al primo tasso memorizzato non possono convertire {pair}.",
+    "toasts": {
+      "added": "Aggiunti {count} tassi; lo storico ora inizia il {start}",
+      "noOlder": "Il fornitore non ha tassi più vecchi per {pair}",
+      "failed": "Impossibile estendere lo storico dei tassi"
+    }
   }
 }

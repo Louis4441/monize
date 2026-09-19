@@ -53,14 +53,20 @@
     "gainLossTooltip": "Nicht realisierter Gewinn oder Verlust Ihrer aktuellen Bestände: Marktwert zu heutigen Preisen minus die Anschaffungskosten oben. Realisierte Gewinne aus früheren Verkäufen sowie erhaltene Dividenden und Zinsen sind nicht enthalten.",
     "returns": "Renditen",
     "simpleReturn": "Einfache Rendite",
-    "simpleReturnTooltip": "Gesamtprozentualer Gewinn oder Verlust auf Ihre Bestände, berechnet als (Marktwert − Anschaffungskosten) ÷ Anschaffungskosten. Berücksichtigt nicht den Zeitpunkt von Ein- oder Auszahlungen.",
+    "simpleReturnTooltip": "Gewinn oder Verlust gegenüber dem, was Sie bezahlt haben: (Marktwert − Anschaffungskosten) ÷ Anschaffungskosten. Berücksichtigt nicht, wann das Geld eingegangen ist, und springt daher bei jedem Kauf: Eine Position von 1.000 mit einem Plus von 20% zeigt +20%; kaufen Sie weitere 1.000 dazu, zeigt sie +10% (200 ÷ 2.000), obwohl nichts verloren wurde. TWR und MWR haben diesen Sprung nicht.",
     "twr": "TWR",
     "twrFull": "(Zeitgewichtet)",
-    "twrTooltip": "Misst, wie gut Ihre Investitionen unabhängig von Ein- oder Auszahlungszeitpunkten abgeschnitten haben. Eliminiert den Einfluss des Cashflow-Timings, um die reine Investitionsperformance zu zeigen.",
+    "twrTooltip": "Zeitgewichtete Rendite Ihrer Investitionen seit der ersten Transaktion, berechnet auf die gleiche Weise wie Portfolio-Performance: Einzahlungen, Auszahlungen und nicht investierte Barmittel werden ausgeschlossen, Dividenden und Zinsen werden eingerechnet.",
     "cagr": "CAGR",
     "cagrTooltip": "Compound Annual Growth Rate. Ihre annualisierte Rendite basierend auf der Nettoinvestition gegenüber dem aktuellen Portfoliowert, als ob das Wachstum jedes Jahr gleichmäßig gewesen wäre.",
     "notAvailable": "N/A",
-    "unpricedHoldings": "Teilbewertung: {count, plural, one {# Bestand hat} other {# Bestände haben}} keinen aktuellen Preis ({symbols}); die Werte unten schließen {count, plural, one {ihn} other {sie}} aus."
+    "unpricedHoldings": "Teilbewertung: {count, plural, one {# Bestand hat} other {# Bestände haben}} keinen aktuellen Preis ({symbols}); die Werte unten schließen {count, plural, one {ihn} other {sie}} aus.",
+    "mwr": "MWR",
+    "mwrFull": "(Geldgewichtet)",
+    "mwrTooltip": "Geldgewichtete Rendite (XIRR) Ihrer Investitionen seit der ersten Transaktion: die jährliche Rendite, die Ihr eigenes Geld erwirtschaftet hat, wobei jeder Kauf, Verkauf und jede Dividende nach ihrem Zeitpunkt gewichtet wird. Einzahlungen, Auszahlungen und nicht investierte Barmittel bleiben unberücksichtigt. Weicht von der TWR ab, wenn Sie vor einem Anstieg oder Rückgang mehr investiert haben.",
+    "returnDiagnosticsLead": "TWR und MWR werden zurückgehalten, weil der Verlauf Lücken aufweist:",
+    "returnDiagnosticsRepair": "Ergänzen Sie die fehlenden Kurse im Kursverlauf des jeweiligen Wertpapiers; die Renditen werden über die angezeigten Konten berechnet.",
+    "returnDiagnosticsRepairFiltered": "Ergänzen Sie die fehlenden Kurse im Kursverlauf des jeweiligen Wertpapiers, oder blenden Sie diese Konten mit dem Kontofilter oben aus der Ansicht aus; die Renditen werden über die angezeigten Konten berechnet."
   },
   "assetAllocation": {
     "title": "Vermögensaufteilung",
@@ -124,8 +130,12 @@
     "noDataForPeriod": "Keine Investitionsdaten für diesen Zeitraum.",
     "highestValue": "Höchstwert",
     "lowestValue": "Tiefstwert",
-    "change": "Änderung",
-    "changePercent": "Änderung %",
+    "investmentResult": "Anlageergebnis",
+    "investmentReturn": "Rendite",
+    "investmentResultTooltip": "Was Ihre Investitionen in diesem Zeitraum erwirtschaftet haben. Einzahlungen, Auszahlungen und nicht investierte Barmittel bleiben unberücksichtigt, und die Prozentzahl daneben ist eine zeitgewichtete Rendite, sodass Käufe und Verkäufe sie nicht bewegen.",
+    "unmeasuredFlowTooltip": "Ein Geschäft, das außerhalb dieser Konten abgewickelt wurde, oder eine Aufteilung, die eine Investitionsposition mit gewöhnlichen Ausgaben vermischt, bedeutet, dass das Ergebnis nicht vom bewegten Geld getrennt werden kann.",
+    "valueChangeLine": "Wertveränderung {amount}",
+    "netFlowsLine": "Netto-Ein- und Auszahlungen {amount}",
     "priorCloseTooltip": "Gemessen ab dem Schlusskurs des vorherigen Handelstags am {date}.",
     "notAvailable": "N/A",
     "portfolioLabel": "Portfolio:"
@@ -288,5 +298,28 @@
     "accountRequired": "Konto ist erforderlich",
     "dateRequired": "Datum ist erforderlich",
     "acquisitionPriceRequired": "Der Preis pro Anteil ist erforderlich und muss größer als null sein. Verwenden Sie „Anteile hinzufügen“ für Anteile, die ohne bekannte Kosten erworben wurden."
+  },
+  "portfolioPerformance": {
+    "title": "Portfolio-Performance",
+    "subtitle": "Wie sich Ihre Investitionen entwickelt haben, ohne den Effekt von Einzahlungen, Auszahlungen und nicht investierten Barmitteln.",
+    "footnote": "Einzahlungen, Auszahlungen und nicht investierte Barmittel zählen nicht als Anlageergebnis.",
+    "unavailable": "n/a",
+    "empty": "Noch zu wenig Historie, um eine Rendite zu messen.",
+    "periods": {
+      "1d": "1T",
+      "1w": "1W",
+      "1m": "1M",
+      "3m": "3M",
+      "ytd": "Seit Jahresbeginn",
+      "1y": "1J"
+    },
+    "loading": "Zeiträume werden gemessen...",
+    "loadFailed": "Die Ergebnisse der Zeiträume konnten nicht geladen werden. Die Werte werden zurückgehalten, nicht auf null gesetzt; laden Sie die Seite neu, um es erneut zu versuchen.",
+    "reasons": {
+      "incompletePrices": "Ein zurückgehaltener Zeitraum beginnt an einem Tag, an dem für eine Position kein Kurs vorlag. Aktualisieren Sie die Kurse oder tragen Sie einen im Kursverlauf des Wertpapiers ein.",
+      "incompleteCash": "Ein zurückgehaltener Zeitraum beginnt an einem Tag, an dem ein Geldkonto in dieser Ansicht keinen Saldo gemeldet hat, sein Bestand ist also unbekannt und nicht null.",
+      "missingRatePairs": "Für einen zurückgehaltenen Zeitraum fehlt ein Wechselkurs, den der gespeicherte Verlauf nicht enthält. Ergänzen Sie den Kursverlauf für die Währung auf der Seite Währungen.",
+      "unmeasuredFlow": "Ein zurückgehaltener Zeitraum enthält eine Bewegung, die sich nicht von einer Einzahlung oder Auszahlung unterscheiden lässt: ein außerhalb dieser Konten abgewickeltes Geschäft oder eine Aufteilung, die Bargeld und Anlagen vermischt."
+    }
   }
 }

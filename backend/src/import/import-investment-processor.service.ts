@@ -6,7 +6,6 @@ import {
   InvestmentTransaction,
   InvestmentAction,
 } from "../securities/entities/investment-transaction.entity";
-import { Holding } from "../securities/entities/holding.entity";
 import {
   Transaction,
   TransactionStatus,
@@ -15,13 +14,11 @@ import { ImportContext, updateAccountBalance } from "./import-context";
 import { roundMoney, roundToDecimals } from "../common/round.util";
 import { resolveFxRateOrNull } from "../common/fx-entry.util";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
+import { baseInvestmentAction } from "../securities/investment-replay.util";
 import {
-  applyActionToQuantity,
-  acquisitionUnitCost,
-  baseInvestmentAction,
-  isQuantityOnlyAction,
-  SHARE_MOVING_ACTIONS,
-} from "../securities/investment-replay.util";
+  deriveInvestmentTotal,
+  derivePriceFromTotal,
+} from "../securities/investment-amount.util";
 import {
   formatInvestmentActionLabel,
   formatInvestmentCashPayeeName,
@@ -166,18 +163,40 @@ export class ImportInvestmentProcessorService {
 
     // Calculate amounts
     const quantity = qifTx.quantity || 0;
-    const price = qifTx.price || 0;
+    let price = qifTx.price || 0;
     const commission = qifTx.commission || 0;
-    let totalAmount = qifTx.amount
-      ? roundToDecimals(qifTx.amount, 2)
-      : roundToDecimals(quantity * price + commission, 2);
+    // A QIF `T`/`$` amount is what the trade actually came to.
+    const sourceTotal = qifTx.amount
+      ? roundMoney(Math.abs(qifTx.amount))
+      : null;
+    let totalAmount =
+      sourceTotal ?? roundToDecimals(quantity * price + commission, 2);
 
     const base = baseInvestmentAction(action);
-    if (base === InvestmentAction.BUY) {
-      totalAmount = roundToDecimals(quantity * price + commission, 2);
-    } else if (base === InvestmentAction.SELL) {
+    if (base === InvestmentAction.BUY || base === InvestmentAction.SELL) {
       // REDEEM included: a redemption's proceeds are a sale's.
-      totalAmount = roundToDecimals(quantity * price - commission, 2);
+      //
+      // The file's amount is kept and the per-share price is derived from it.
+      // Recomputing the total from the file's two-decimal `I` price threw the
+      // difference away on every fill that did not divide evenly: 141 shares
+      // for 820.91 came back as 141 x 5.82 = 820.62.
+      if (sourceTotal !== null) {
+        price =
+          derivePriceFromTotal({
+            action,
+            totalAmount: sourceTotal,
+            quantity,
+            commission,
+          }) ?? price;
+        totalAmount = sourceTotal;
+      } else {
+        totalAmount = deriveInvestmentTotal({
+          action,
+          quantity,
+          price,
+          commission,
+        });
+      }
     } else if (
       base === InvestmentAction.SPLIT ||
       base === InvestmentAction.ADD_SHARES ||
@@ -219,19 +238,12 @@ export class ImportInvestmentProcessorService {
       securityId,
     );
 
-    // Update holdings. A VOID trade moved no shares: the row is imported so
-    // the record survives, but its effect is excluded exactly as the holdings
-    // rebuild excludes it.
-    if (status !== TransactionStatus.VOID) {
-      await this.processHoldings(
-        ctx,
-        action,
-        securityId,
-        quantity,
-        price,
-        commission,
-      );
-    }
+    // Holdings are NOT written per row. An import arrives in file order, which
+    // is not date order, and an incremental average cost blended in file order
+    // disagrees with the ledger replay (issue #1388). `ImportService` rebuilds
+    // the imported account's positions from the ledger once the block is
+    // written, in the same transaction. A VOID row is excluded there by the
+    // same filter every other rebuild uses.
 
     ctx.importResult.imported++;
   }
@@ -634,86 +646,5 @@ export class ImportInvestmentProcessorService {
     await ctx.manager.save(investmentTx);
 
     await updateAccountBalance(ctx.manager, cashAccountId, cashAmount);
-  }
-
-  private async processHoldings(
-    ctx: ImportContext,
-    action: InvestmentAction,
-    securityId: string | null,
-    quantity: number,
-    price: number,
-    commission: number,
-  ): Promise<void> {
-    // ADD_SHARES and REMOVE_SHARES were missing from this list, so importing
-    // either left holdings untouched: shares booked without a purchase never
-    // reached the position at all. Same omission the three net-worth reducers
-    // had, in a path the audit could not execute. The shared list is used so a
-    // new action cannot be dropped from one surface again.
-    if (!SHARE_MOVING_ACTIONS.includes(action) || !securityId || !quantity) {
-      return;
-    }
-
-    const holding = await ctx.manager.findOne(Holding, {
-      where: { accountId: ctx.accountId, securityId },
-    });
-
-    if (action === InvestmentAction.SPLIT) {
-      // Stock split: scale quantity by the ratio and divide averageCost by
-      // the same ratio so total cost basis is preserved. No-op when no
-      // existing position; the imported QIF should not introduce a holding
-      // out of thin air on a split.
-      if (!holding || quantity <= 0) return;
-      const currentQuantity = Number(holding.quantity);
-      const currentAvgCost = Number(holding.averageCost || 0);
-      holding.quantity = applyActionToQuantity(
-        currentQuantity,
-        action,
-        quantity,
-      );
-      holding.averageCost = currentAvgCost / quantity;
-      await ctx.manager.save(holding);
-      return;
-    }
-
-    // Direction from the shared reducer rather than a second hand-written list,
-    // which is how REMOVE_SHARES came to be treated as an acquisition here.
-    const quantityChange =
-      applyActionToQuantity(0, action, quantity) < 0 ? -quantity : quantity;
-
-    // ADD_SHARES / REMOVE_SHARES move shares without supplying a cost -- every
-    // other surface (isQuantityOnlyAction, adjustQuantity, computeHoldingsMap)
-    // treats them as basis-free, so blending an imported ShrsIn price into
-    // averageCost here wrote a basis the first rebuild silently erased.
-    // Per-unit acquisition cost comes through the shared helper so the
-    // commission lands in the basis exactly as a rebuild computes it -- the
-    // bare price here was the FR-008 live-vs-rebuild drift on the import
-    // surface.
-    const unitCost = isQuantityOnlyAction(action)
-      ? 0
-      : acquisitionUnitCost({ quantity: quantityChange, price, commission });
-
-    if (!holding) {
-      const newHolding = new Holding();
-      newHolding.accountId = ctx.accountId;
-      newHolding.securityId = securityId;
-      newHolding.quantity = quantityChange;
-      newHolding.averageCost = quantityChange > 0 ? unitCost : 0;
-      await ctx.manager.save(newHolding);
-      return;
-    }
-
-    const currentQuantity = Number(holding.quantity);
-    const currentAvgCost = Number(holding.averageCost || 0);
-    const newQuantity = currentQuantity + quantityChange;
-
-    if (quantityChange > 0 && unitCost > 0) {
-      const totalCostBefore = currentQuantity * currentAvgCost;
-      const totalCostAdded = quantityChange * unitCost;
-      holding.averageCost =
-        newQuantity > 0 ? (totalCostBefore + totalCostAdded) / newQuantity : 0;
-    }
-
-    holding.quantity = newQuantity;
-    await ctx.manager.save(holding);
   }
 }

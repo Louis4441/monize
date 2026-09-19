@@ -228,8 +228,8 @@
     "portfolioMovement": {
       "titleUp": "Đầu tư tăng {{ percent }}%",
       "titleDown": "Đầu tư giảm {{ percent }}%",
-      "messageUp": "Các khoản đầu tư của bạn hôm nay tăng {{ percent }}%, không tính nạp và rút tiền. Mở để xem lại.",
-      "messageDown": "Các khoản đầu tư của bạn hôm nay giảm {{ percent }}%, không tính nạp và rút tiền. Mở để xem lại."
+      "messageUp": "Các khoản đầu tư của bạn tăng {{ percent }}% từ {{ from }} đến {{ to }}, không tính nạp và rút tiền. Mở để xem lại.",
+      "messageDown": "Các khoản đầu tư của bạn giảm {{ percent }}% từ {{ from }} đến {{ to }}, không tính nạp và rút tiền. Mở để xem lại."
     },
     "balanceThreshold": {
       "titleLow": "{{ account }} dưới ngưỡng của bạn",

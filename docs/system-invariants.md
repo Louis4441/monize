@@ -65,7 +65,12 @@ implied.
 | INV-TRANSFER-001 | A transfer's two legs share the VOID boundary and one balance decision | enforced |
 | INV-REDEEM-001 | A redemption's accrued interest moves cash once and is income once | enforced |
 | INV-RECONCILE-001 | While the strict lock is on, a reconciled transaction is not altered | enforced |
-| INV-FX-001 | An unavailable rate never becomes 1:1 | partial |
+| INV-FX-001 | An unavailable rate never becomes 1:1, a rate from after the date, or an unboundedly old one | partial |
+| INV-FX-002 | A row that carries its own exchange rate is converted at that rate on every surface | enforced |
+| INV-TRADE-001 | The executed total is the fact; the per-share price is derived from it | enforced |
+| INV-PRICE-001 | A stored price is in the currency the security is recorded in | partial |
+| INV-PORTRESULT-001 | A period change is not a return: value change, external flows and investment result are three figures | enforced |
+| INV-PORTRESULT-002 | Cash is not an investment: the invested part's P&L and TWR exclude deposits, withdrawals and idle cash | enforced |
 | INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
 | INV-REPORT-002 | A chart's down-sampling never reaches a count, a total or an export | enforced |
 | INV-LOAN-001 | A recurring overpayment's cadence is a calendar, not a payment interval | enforced |
@@ -121,6 +126,8 @@ implied.
 | INV-DISPATCH-002 | The in-app row is written for every `notify`, whatever the matrix or the throttle says | enforced |
 | INV-DISPATCH-003 | The throttle gates only the notification-mode fan-out, never the in-app row or a report, and never an escalation | enforced |
 | INV-DISPATCH-004 | A failed push or email never rolls back, or surfaces through, the notification it is about | enforced |
+| INV-PORTMOVE-007 | A portfolio movement's external flow is converted at the date each amount crossed the boundary | enforced |
+| INV-PORTMOVE-008 | A portfolio movement is withheld while a held position's price predates the period it measures | enforced |
 | INV-RLS-001 | Enforced mode refuses to run on a role that can bypass RLS | enforced |
 | INV-CACHE-001 | A money-moving write invalidates every derived cache | enforced |
 | INV-DAYNOTE-001 | A calendar date is covered by at most one of a user's notes, and a save never reads first | enforced |
@@ -274,22 +281,97 @@ too.
 
 ```text
 Statement           holdings.quantity and average_cost equal a deterministic
-                    replay of that account's investment ledger.
+                    replay of that account's investment ledger, whatever order
+                    the rows were entered in.
 Source of truth     investment_transactions
-Enforcement         Every mutation path takes an account-scoped advisory lock.
-                    lockHoldingScope (common/db/locks.ts) is taken by
-                    createOrUpdate, updateHolding, applySplit, reverseSplit,
-                    adjustQuantity and rebuild -- advisory rather than a row lock
-                    because a rebuild must serialize against investment_transactions
-                    inserts that no holdings row-lock covers -- so two concurrent
-                    trades on one (account, security) cannot lose an update.
+Enforcement         No path writes the columns incrementally. Every ledger write
+                    -- create, update, delete, status change, account or security
+                    change, both legs of a transfer, the embedded-split rows, and
+                    a QIF/CSV/OFX import block -- finishes by re-deriving the
+                    touched (account, security) scopes from the ledger through
+                    HoldingsService.rebuildScopesFromTransactions
+                    (securities/holdings.service.ts), in the SAME withScopedDb
+                    transaction as the write, so the projection commits or rolls
+                    back with it. Undo/redo rebuilds the whole account the same
+                    way; POST /holdings/rebuild rebuilds every account.
+                    Economic order comes from INVESTMENT_REPLAY_ORDER
+                    (securities/investment-replay.util.ts): transaction_date,
+                    then created_at, then id. The id leg is what makes the replay
+                    a function of the ledger rather than of the plan -- rows
+                    written by one import or one split share created_at to the
+                    microsecond. The basis fold itself is computeHoldingsMap,
+                    over applyActionToQuantity and acquisitionCost.
+                    lockHoldingScope (common/db/locks.ts) is still taken by every
+                    writer before it reads -- advisory rather than a row lock
+                    because a rebuild must serialize against
+                    investment_transactions inserts that no holdings row-lock
+                    covers -- so a concurrent trade cannot be replaced by a
+                    projection that never saw it.
                     UNIQUE(account_id, security_id) still prevents duplicate rows.
+                    A scope the ledger has no rows for projects to "no holding":
+                    the row is deleted. Every writer takes that decision, and
+                    the average cost a short position stores, through
+                    projectedHoldingRow. An imported opening position is an
+                    ADD_SHARES row, not a holding with nothing behind it.
 Concurrency scope   per (account, security)
 Retry semantics     Serialized by the lock; a lost update cannot occur.
 Failure response    the stored holding equals a deterministic replay of the ledger.
+Repair path         a row written before this rule can still be wrong, and
+                    nothing in the database says which: an average cost is a bare
+                    number with no record of how it was arrived at.
+                    HoldingsDriftReportService
+                    (securities/holdings-drift-report.service.ts) reports them at
+                    boot, read-only, through
+                    HoldingsService.findLedgerDiscrepancies -- the same fold the
+                    rebuild writes from, compared through projectedHoldingRow
+                    (securities/investment-replay.util.ts), the same projection
+                    of that fold the rebuild writers store, so what is reported
+                    is what a rebuild would change and nothing else. Deriving
+                    the expected average in the report instead reported every
+                    short position at every boot: the writers store
+                    average_cost = 0 for a negative quantity, so the rebuild
+                    wrote back exactly the figure the report refused to expect.
+                    It names both figures and
+                    POST /holdings/rebuild. It writes nothing: no migration and
+                    no unattended rebuild, because the same replay that repairs
+                    pre-rule drift would silently overwrite an incomplete
+                    imported history, and the owner is the one who can tell the
+                    two apart.
+Known gap           an unpriced acquisition (acquisitionCost returns null) adds
+                    shares but no basis, so the average cost it produces is a
+                    partial figure with nothing marking it as one. The column has
+                    no completeness flag; the surfaces that need one derive it
+                    from the ledger (docs/financial-calculation-contract.md).
+                    Four narrower risks are open and unclosed, recorded here
+                    rather than fixed in passing: action-history.service.ts keeps
+                    a second fold over the ledger that does not filter by
+                    SHARE_MOVING_ACTIONS, so its undo/redo rebuild and
+                    computeHoldingsMap can disagree about a non-share-moving
+                    action; transferSecurity reads the source position's carried
+                    cost before the transaction it writes in, so a concurrent
+                    trade can move the basis between the read and the write;
+                    update() and remove() derive the scopes they will rebuild
+                    from a snapshot loaded before the transaction, without
+                    lockInvestmentTransactionRow, so a row that moved account or
+                    security in between is rebuilt on the old pair; and a
+                    security recorded in GBX normalizes to GBP for the provider
+                    currency check (quote-currency.util.ts) while currency_code
+                    stays GBX, so every reader of that column sees a unit the
+                    prices are not in.
 Required tests      Two-connection (concurrent trades on one holding, the stored
                     row compared against the replay):
                     backend/test/integration/holding-concurrent-trades.integration.spec.ts.
+                    Out-of-order entry through the real service, stored row
+                    compared against the replay:
+                    backend/test/integration/holding-ledger-projection.integration.spec.ts.
+                    Read-only drift report, seeded mismatch logged and nothing
+                    written: securities/holdings-drift-report.service.spec.ts and
+                    the findLedgerDiscrepancies cases in holdings.service.spec.ts.
+                    Source scan: no average-cost arithmetic outside the fold,
+                    and no hand-written replay order over the investment ledger
+                    (an ORDER BY or a TypeORM `order` naming transaction_date
+                    without the id leg), both in
+                    backend/src/securities/investment-replay.guard.spec.ts.
 Status              enforced
 ```
 
@@ -331,6 +413,28 @@ which security to price. `value` itself is unchanged -- making it `null` on such
 day is the contract's real answer and a behaviour change to four charts, reported
 as its own proposal. Every consumer reads the flag as `pricesComplete === false`:
 absent means an older backend said nothing, not that the day was complete.
+
+Cash is the same question asked of the other half of the point. The per-day
+balance query is asked for every account in the resolved scope, so an account
+with no row for a day it was asked about is missing data: the day carries
+`cashComplete: false` and `unknownCashAccountIds`, read the same way and folded
+into `DailyMovementService`'s `complete` as the `cashIncomplete` reason. Before
+#1389 that walk was over the maps the query returned, keyed by a day name a
+local `Date` had shifted, so the first day of every range reported a portfolio
+with no cash in it at all.
+
+The by-security breakdown answers the same two questions per point:
+`InvestmentBreakdownPoint` carries `pricesComplete`, `unpricedSecurityIds` and
+its own `missingRatePairs` beside `cashComplete`, because the response-level
+`fxComplete` names pairs without saying which dates need them. And the flags
+reach the pixel: `PortfolioValueReport` plots `null` for an incomplete point
+rather than the subtotal, with `connectNulls={false}`, and
+`IncompleteDataDetails` folds the per-point causes into dated ranges naming the
+security, the pair and the account. The replay itself never filtered by what is
+held today -- a security bought, held and sold out is valued over its holding
+period from the ledger -- but `backfillHistoricalPrices` used to skip inactive
+securities, so the one operation that fills price history could not fill the
+history of exactly those positions (#1389).
 
 ### INV-TRANSFER-001 -- both legs, one decision
 
@@ -462,7 +566,11 @@ Status              enforced
 ```text
 Statement           A cross-currency value must never become a valid-looking 1:1
                     value, and an unconverted amount must never be returned under
-                    the target currency's label.
+                    the target currency's label. Nor may a valuation date be
+                    priced by an observation struck AFTER it (look-ahead), nor by
+                    one older than FX_MAX_RATE_AGE_DAYS: both produce a
+                    valid-looking figure from evidence that does not describe the
+                    date, which is the same failure wearing a timestamp.
 Source of truth     exchange_rates
 Enforcement         The 1:1 half is enforced. Consumers return null on an absent
                     rate, and accumulate through FxAggregate. net-worth.service.ts
@@ -474,6 +582,54 @@ Enforcement         The 1:1 half is enforced. Consumers return null on an absent
                     conversion, `rate ... : 1` / `?? 1`, and an unreviewed
                     `1 / reverse` reciprocal, and asserts each reviewed
                     reciprocal returns null when neither direction exists.
+                    The date half is enforced by
+                    common/time-series/fx-rate-resolver.ts (resolveFxRate), the
+                    one door: historical mode takes the newest observation dated
+                    on or before the date, in either stored direction, within
+                    FX_MAX_RATE_AGE_DAYS, and answers `unknown` with a named
+                    reason otherwise; live mode takes the freshest observation
+                    under the same bound. rate-index.util.ts (convertAtDate,
+                    resolveIndexedRate), ExchangeRateService.resolveStoredRate /
+                    getRateForDate / getLiveRate,
+                    PortfolioCalculationService.resolveDailyRate and
+                    convertToDefault (the last two `live` mode) and
+                    InvestmentReportDataService.fxRate all route through it.
+                    calculateCapitalGains' local fxRate resolves the
+                    security->account pair AT EACH BOUNDARY'S OWN DATE in
+                    historical mode (start at priceLookupStart, end at periodEnd,
+                    cached per (pair, date)); it used to resolve once at
+                    todayYMD() in live mode and price every historical boundary
+                    at one rate, reading a currency's move over the window as
+                    none. A held position with no accepted price on a boundary is
+                    withheld (null) there rather than valued at zero, and a zero
+                    quantity is zero without a rate. All the above route through
+                    the door, and buildRateIndex / buildDailyRateIndex load the window plus
+                    one age bound before it so a date's answer does not depend on
+                    the window's width (issue #1390, which also closed DR-02 in
+                    docs/specs/fx-conversion-completeness.md section 6). A caller
+                    that converts past its window states buildRateIndex's
+                    conversionHorizon, which is how NetWorthService's month-end
+                    points stopped moving with the requested range.
+                    resolveStoredRate compares its span as YYYY-MM-DD strings, so
+                    the reference date's own row is inside it in every process
+                    time zone. A second scanning guard,
+                    common/time-series/fx-rate.one-door.spec.ts, fails a new
+                    newest-rate read outside the door and carries the shrink-only
+                    baseline of the dateless call sites that remain; its
+                    exemption for currencies/exchange-rate.service.ts is
+                    getLatestRate's own declaration, not the whole file, so a new
+                    unbounded read beside it fails.
+                    A read that finds no observation may ask the provider for the
+                    months it was short of before it reports the gap --
+                    accounts/account-balances-report.service.ts for a
+                    point-in-time report, net-worth/series-rate-fill.ts for the
+                    investment series, the investment breakdown, the monthly
+                    net-worth series and PortfolioPeriodResultService -- but only
+                    through ExchangeRateService.ensureRatesForDate, which
+                    persists and is then RE-READ from the database. A fetch that
+                    stored nothing, failed, or fell outside the bound leaves the
+                    pair missing and the figure withheld; it never becomes 1:1
+                    (docs/time-series-contract.md section 2.2).
                     The mislabelling half is NOT enforced on the built-in report
                     path: see Known gap below.
 Known gap           **An unconverted amount still reaches a report under the
@@ -502,6 +658,21 @@ Known gap           **An unconverted amount still reaches a report under the
                     beside a total that is null when anything was left out. The
                     report and the dashboard widget drawing each of them mark the
                     same subtotal through PartialTotal. The remaining callers of
+                    A third surface is done on the investment side: Investment
+                    Transaction History no longer labels a row's amount with the
+                    account's currency (price, commission and total_amount are
+                    the SECURITY's, which the row now states in
+                    amountCurrencyCode / priceCurrencyCode /
+                    commissionCurrencyCode) and no longer sums across currencies
+                    on the client. A row that names no security carries the
+                    investment account's currency there, the one the write path
+                    denominated it in; calling it unknown withheld the card over
+                    one cash INTEREST posting. Its KPIs come from
+                    investment-reports/investment-transaction-summary.service.ts,
+                    which converts each row at its own transaction date and
+                    accumulates through FxAggregate, answering with total,
+                    knownSubtotal, missingPairs, excludedCount and fxComplete.
+                    The remaining callers of
                     convertAmount are Income by Source, Spending by Payee,
                     Monthly Spending Trend, Monthly Category Breakdown, and the
                     anomaly, comparison, tax/recurring and data-quality families;
@@ -537,6 +708,328 @@ claim to check against the scan, and read the scan for what it actually matches.
 `docs/verification-contract.md` section 6 still describes both load-bearing FX
 scans as having landed "with the fix, so no exception list"; that is now true of
 the first scan only.
+
+### INV-FX-002 -- a row's own rate converts it on every surface
+
+```text
+Statement           A transaction that carries its own exchange rate settled at
+                    that rate. Every surface that reports it in the reader's
+                    currency multiplies by that rate; the market rate that stood
+                    on the trade date is the fallback for a row carrying none,
+                    and the surface says which of the two it used. Two surfaces
+                    answering one sale with two figures is the defect, whichever
+                    figure is nearer the truth.
+Source of truth     investment_transactions.exchange_rate (amount currency ->
+                    settlement currency), then exchange_rates for anything the
+                    row's own rate does not reach.
+Enforcement         portfolio-calculation.service.ts has always multiplied
+                    total_amount by the row's exchange_rate (realized gains, the
+                    capital-gains fold, the cash-flow sums).
+                    investment-reports/investment-transaction-summary.service.ts
+                    now does the same: usableRowRate() takes the stored rate when
+                    it is positive and is not the column's default 1 across two
+                    different currencies; the row's settlement currency comes
+                    from its funding account, its brokerage's linked cash sleeve
+                    or the brokerage itself (the order findCashAccount resolves);
+                    and a settlement currency that is not the reader's is carried
+                    onward at the market rate for that pair. The response counts
+                    each basis -- transactionRateCount, marketRateCount,
+                    onwardMarketCount -- and InvestmentTransactionHistoryReport
+                    prints the line under the KPIs, so the reader is told which
+                    rate answered. A row with no usable rate of its own falls
+                    back to the rate on its own date, under INV-FX-001.
+Test                investment-transaction-summary.service.spec.ts: a sale of
+                    820.91 USD settled at 3.7287 reads 3,060.9271 PLN and asks
+                    for no market rate; a row without a rate is converted at the
+                    market rate and counted; a stored 1 across two currencies is
+                    ignored; a third settlement currency is carried onward.
+Status              enforced
+```
+
+### INV-TRADE-001 -- the executed total is the fact, the price is derived
+
+```text
+Statement           What a trade came to is what it came to. A caller that
+                    supplies the executed total has it stored as given at money
+                    precision, and the per-share price is derived from it at the
+                    price column's ten decimals; a caller that supplies only a
+                    price has the total derived from the price. A stored total is
+                    never re-derived from a stored price unless the price, the
+                    quantity, the commission or the action is what changed --
+                    compared by value, because the form resends every field.
+Source of truth     investment_transactions.total_amount NUMERIC(20,4), with
+                    price NUMERIC(24,10) beside it.
+Enforcement         securities/investment-amount.util.ts is the one door:
+                    deriveInvestmentTotal, derivePriceFromTotal and
+                    resolveInvestmentAmounts. InvestmentTransactionsService
+                    create / update / previewCreateInvestmentTransaction, the QIF
+                    importer's investment path and cash-impact.util.ts's optional
+                    totalAmount argument all go through it, and acquisitionCost()
+                    prefers a row's stored total over quantity * price +
+                    commission. The MNY importer already kept its source amount
+                    (map-investments.ts, totalAmountOf).
+                    InvestmentTransactionForm makes the total an editable field:
+                    the last edited of total and price wins, the same pattern it
+                    already uses between the converted amount and the rate.
+Test                investment-amount.util.spec.ts (both directions and the
+                    refusals); investment-transactions.service.spec.ts -- a SELL
+                    of 141 shares supplied as 820.91 stores 820.9100 and
+                    5.8220567376, a resent description-only edit keeps the stored
+                    total, a quantity change re-derives it.
+Status              enforced
+```
+
+### INV-PRICE-001 -- a stored price is in the currency the security is recorded in
+
+```text
+Statement           A row in security_prices is a bare number, and the currency it
+                    is read in is securities.currency_code. So a provider answer
+                    may be stored against a security only when the currency the
+                    provider reports for that answer is the security's own, after
+                    one normalization of both sides (GBX/GBp is GBP).
+Source of truth     The provider's own metadata: Yahoo's chart `meta.currency`,
+                    MSN's chart `currency`. It, not the exchange, is what says
+                    which listing answered -- a USD-denominated ETF on the LSE is
+                    the case an exchange guess gets wrong.
+Enforcement         securities/providers/quote-currency.util.ts decides it once:
+                    normalizeQuoteCurrency on both sides, verifyProviderCurrency
+                    returning accepted/verified, accepted/unverified or refused.
+                    SecurityPriceService.refuseForeignCurrency is the single call
+                    site wrapper: it runs inside fetchQuoteWithFallback and
+                    fetchHistoricalWithFallback (where a refused provider is
+                    passed over and the next one faces the same check), inside
+                    fillPriceWindow, which reaches bulkUpsertPrices through
+                    neither, and again per security immediately before every
+                    savePriceData and bulkUpsertPrices on the group paths
+                    (refreshAllPricesGlobally, backfillHistoricalPrices,
+                    settleDailyBarsGlobally), because those fetch once for a
+                    representative and write for every security sharing its
+                    symbol and exchange -- and the group key holds no currency.
+                    Those three pass the whole group into the fetch helpers,
+                    which accept an answer one member could store
+                    (acceptedBySomeMember) rather than judging the group on its
+                    representative; the per-security check at the write is the
+                    refusal point.
+                    The provider contract carries the currency because
+                    fetchHistoricalSeries returns a HistoricalSeries bundle; a
+                    bare HistoricalPrice[] cannot state what its numbers are in.
+Known gap           **Unverifiable is accepted, not refused.** A provider that
+                    reports no currency (MSN's chart series routinely does not,
+                    and its Quotes endpoint only sometimes does), or a security
+                    with no recorded currency, is stored with a logged warning
+                    rather than refused: refusing would leave MSN-priced
+                    securities with no prices at all. And a stored row still does
+                    not record the currency it was written in, so a row written
+                    before this check, or written unverified, cannot be audited
+                    from the database. Closing that is a column on
+                    security_prices plus a migration, which this entry does not
+                    claim.
+Concurrency scope   security
+Retry semantics     A refusal is deterministic for a given provider answer, so a
+                    retry refuses again until the security's currency, symbol or
+                    exchange is corrected.
+Crash semantics     The check precedes the write on every path, so a crash between
+                    them leaves the row untouched rather than half-converted.
+Failure response    refuse: no price row is written, the security is reported as
+                    failed the way a failed fetch already is, with a tr() message
+                    naming both currencies. That message travels as
+                    PriceUpdateResult.error / HistoricalBackfillResult.error and
+                    is shown verbatim on both client paths: the force-update
+                    button (SecurityPriceHistory.tsx) and the refresh hook
+                    (usePriceRefresh.ts, which appends the distinct reasons to
+                    the partial-failure toast). A failure count alone would not
+                    do: this refusal is repaired by correcting the security's
+                    currency, symbol or exchange, never by refreshing again.
+Required tests      Present: providers/quote-currency.util.spec.ts (the table:
+                    match, GBX normalized once, mismatch, either side silent) and
+                    security-price.service.spec.ts, which asserts no write mock is
+                    called on a mismatched quote, on a mismatched historical
+                    series, and when the fallback provider is the mismatching one,
+                    that an unreported currency is stored with a warning, and
+                    that a group whose representative refuses still prices the
+                    members the answer fits (refresh and backfill); and
+                    frontend usePriceRefresh.test.tsx, that the refusal reason
+                    reaches the toast.
+                    Owed: an integration test that a refused refresh leaves the
+                    previous row intact.
+Status              partial
+```
+
+A GBP listing stored against a USD-configured security understates every close
+by the GBP/USD rate -- 23 to 35 per cent over the range in issue #1393 -- and
+nothing in the stored series says so, because the series is numbers and the
+currency is on another table's row.
+
+### INV-PORTRESULT-001 -- a period change is not a return
+
+```text
+Statement           A surface reporting what a portfolio did over a period
+                    reports three figures and not one: valueChange (the two
+                    boundary closes subtracted, which includes the money the
+                    reader moved in), netExternalFlows (that money), and
+                    investmentResult (the difference). A percentage is reported
+                    over investmentResult alone. Each figure is null, with its
+                    cause named, whenever a component is unknown: a boundary
+                    close that is a subtotal withholds the value change, and a
+                    flow subtotal with no rate for its day withholds the flow
+                    and the result rather than shrinking them. The flow and the
+                    value are measured over ONE set of accounts -- the accounts
+                    whose cash the series values -- and a movement the flow
+                    classifier cannot count (a trade settled outside that set, a
+                    split parent mixing an investment line with ordinary cash)
+                    withholds the result rather than letting it read as the
+                    market's.
+Source of truth     The value series from
+                    NetWorthService.getDailyInvestments with its completeness
+                    bits, and the external-flow classifier
+                    loadExternalFlowSubtotals -- the same two the daily
+                    movement notification reads, so the two measures cannot
+                    disagree about the same accounts.
+Enforcement         decidePeriodResult
+                    (backend/src/net-worth/portfolio-period-result.util.ts) is
+                    the only place the policy is written, pure and
+                    table-tested; PortfolioPeriodResultService serves it at
+                    GET /net-worth/investments-period-result over the very
+                    series the chart draws, converting each day's flow at that
+                    day's rate through resolveFxRate and FxAggregate, over the
+                    cash accounts isValuationCashAccount names on both sides of
+                    a transfer, and counting the two unmeasurable cases into the
+                    reasons externallySettledTrade and mixedSplit.
+                    PortfolioPeriodResultsBatchService answers the same
+                    measure for six trailing windows at
+                    GET /net-worth/investments-period-results by slicing ONE
+                    valuation instead of recomputing it, and the spec's
+                    section 8 holds the two routes to identical answers.
+                    PortfolioValueReport, PortfolioValueWidget and
+                    InvestmentValueChart print the account-level figures beside
+                    their own headline and derive nothing; the client-side
+                    arithmetic they used to share is deleted rather than left
+                    exported. What they lead with is the INVESTED part
+                    (INV-PORTRESULT-002), which the same payload carries.
+                    docs/specs/portfolio-period-result.md has the
+                    truth table, the numerical examples and the test matrix.
+Status              enforced
+```
+
+Every surface that reports what a portfolio did over a period now reads
+`GET /net-worth/investments-period-result`, or its batch sibling
+`GET /net-worth/investments-period-results`: the Portfolio Value Over Time
+report, the dashboard's Portfolio Value widget, the Investments page's chart
+and the Investments page's Portfolio performance card. None of them derives a
+figure of its own. Which of the payload's two measures each one leads with is
+INV-PORTRESULT-002 below and `docs/specs/portfolio-period-result.md` section
+10.7: the four investment surfaces lead with the invested part and name the
+account-level value change and net external flows beside it, while the daily
+movement notification and the calendar's day layer report the account-level
+measure, which is the question they ask. The dashboard's Net Worth chart is not
+one of these surfaces -- it reports what a person is worth rather than what a
+portfolio earned, and its own measure has not been specified.
+
+### INV-PORTRESULT-002 -- cash is not an investment
+
+```text
+Statement           A figure captioned as what a portfolio's INVESTMENTS earned,
+                    or as their return, excludes uninvested cash entirely:
+                    cash is in neither the amount, nor the numerator, nor the
+                    base of the percentage, and paying it into or out of an
+                    investment account moves neither figure. The amount is
+                    IV(e) - IV(b) - capital flows + income over the securities
+                    alone, reconstructed from the ledger as of each day rather
+                    than from today's holdings, so a position sold before today
+                    still counts on the days it was held. The percentage is a
+                    time-weighted return chained daily over the same window,
+                    which neutralises buys funded by deposits, sells, share
+                    transfers and quantity changes and keeps price change,
+                    distributions and reinvestments. A SECOND figure of the same
+                    measure answers the reader's own question over the same
+                    flows and the same days: the annualised money-weighted
+                    return (XIRR) of -IV(b), the per-day capital and income, and
+                    +IV(e), which weights each purchase, disposal and
+                    distribution by when it happened. Same inputs, same
+                    completeness: it is withheld whenever the two figures above
+                    are, and additionally when the window is too short to
+                    annualise (windowTooShort, under 30 days) or the schedule
+                    defines no single rate (mwrUndefined, which is a refusal
+                    rather than whichever root a search reaches first). Both are null, with the
+                    cause named, whenever a day the chain spans is a subtotal, a
+                    capital or income row did not convert, or the window holds a
+                    movement the flow classifier cannot count. A window in which
+                    nothing was ever invested and nothing was earned is a known
+                    zero, not unknown.
+Source of truth     The securitiesValue component of
+                    NetWorthService.getDailyInvestments -- the same replay and
+                    the same accepted closes the whole value uses, with the cash
+                    left out rather than a second valuation -- and the capital
+                    and income rows of loadInvestedCapitalFlowRows
+                    (backend/src/net-worth/invested-capital-flow.util.ts),
+                    classified by INVESTED_FLOW_KIND_BY_BASE_ACTION in
+                    backend/src/securities/investment-replay.util.ts and folded
+                    through the same RateIndex the external flows use.
+Enforcement         investedPeriodResult
+                    (backend/src/net-worth/invested-period-result.util.ts) is
+                    the only place the policy is written, pure and
+                    table-tested over the spec's twelve worked cases in
+                    backend/src/net-worth/invested-period-result.util.spec.ts.
+                    Its factor arithmetic is
+                    backend/src/common/time-series/twr-chain.util.ts, whose
+                    only caller it is, and its rate solver is
+                    backend/src/common/time-series/xirr.util.ts, bracketed and
+                    pure, with its own spec.
+                    Both period-result routes fill the fields from the same
+                    arrays, and the batch route's equivalence spec compares
+                    them preset by preset. A spec holds every InvestmentAction
+                    member to a classification, so a new action is a failing
+                    test rather than a silent zero in a capital flow.
+                    PortfolioPerformanceCard, InvestmentValueChart,
+                    PortfolioValueWidget and PortfolioValueReport read
+                    investmentPnl and investmentReturnPercent and plot
+                    securitiesValue; the portfolio summary card's
+                    "TWR (time-weighted)" is the same measure asked since
+                    inception, through
+                    PortfolioPeriodResultService.getInvestedResultSinceInception,
+                    and carries timeWeightedReturnReasons and
+                    timeWeightedReturnSince on the REST shape, the LLM summary
+                    and the MCP payload, with moneyWeightedReturn and
+                    moneyWeightedReturnReasons beside them from the same slice.
+                    A withheld return also carries returnDiagnostics: the
+                    window's per-point gaps folded into dated runs by
+                    foldIncompleteData
+                    (backend/src/net-worth/incomplete-data-ranges.util.ts, the
+                    server-side twin of the client fold, bounded per cause with
+                    a truncated flag) and resolved to symbols and account names
+                    in PortfolioService, which the summary card renders through
+                    IncompleteDataDetails so the reader is sent to the security's
+                    price history rather than told "no price"; investedValue
+                    (frontend/src/lib/invested-value.ts) is the one door to the
+                    invested component of a series point.
+                    docs/specs/portfolio-period-result.md section 10 has the
+                    definitions, the truth table, the twelve numerical cases
+                    and the test matrix; section 11 does the same for the
+                    money-weighted figure.
+                    foldDailyInvestments and foldMonthlyInvestments carry value
+                    and securitiesValue at the money pipeline's 4dp precision
+                    (roundMoney), never Math.round to whole units, and
+                    groupSecurityBreakdown does the same for each band and the
+                    stacked total: the fold rounding grosze away read a sub-unit
+                    holding against a zero baseline as a -100% return, and no
+                    downstream ten-thousandths recover the lost precision.
+                    Whole-unit rounding is a presentation step at the surface.
+Status              enforced. The second definition of the same caption --
+                    PortfolioCalculationService.calculateTWR, which valued its
+                    boundaries from stored closes alone and dropped an unpriced
+                    position out of the value instead of withholding the
+                    figure -- is REMOVED rather than deprecated, which is what
+                    closes the "two TWRs" gap: there is now one chained return
+                    in the codebase and one place it is computed.
+```
+
+Cash held in an investment account earns nothing and is not what the reader
+means by "how did my investments do". The account-level measure counts it: a
+reader with 8,000 invested and 2,000 idle who gains 10% is told +8%, and the
+figure moves when they pay cash in without buying anything. The invested
+measure is the answer to the question the caption asks, and the account-level
+measure -- which is the right answer to a different question -- keeps its own
+fields, its own caption and its own consumers.
 
 ### INV-REPORT-001 -- a report's account scope is investment linkage, not account type
 
@@ -3488,6 +3981,82 @@ Why it exists       A read-path producer (bill reminders on GET /notifications)
 Status              enforced
 ```
 
+### INV-PORTMOVE-007 -- a flow is worth its own day's rate
+
+```text
+Statement           The external cash flow subtracted from a portfolio movement
+                    is converted per (date, currency) at the rate of the date the
+                    cash crossed the boundary, never at the rate of the day the
+                    producer happens to run. A pair with no rate on its own date
+                    makes the flow unknown, which withholds the movement.
+Source of truth     transactions (the dated subtotals) and exchange_rates.
+Enforcement         loadExternalFlowSubtotals({ perDay: true }) supplies the date;
+                    foldExternalFlow takes rateFor(currency, date) and both
+                    callers -- PortfolioMovementAlertService.externalFlow and
+                    DailyMovementService.flowOn -- resolve that date's rate
+                    through the one FX door (ExchangeRateService.getRateForDate /
+                    convertAtDate, INV-FX-001). The fold accumulates integer
+                    1/10000 units, so a many-day window does not drift. There is
+                    no window to convert without a baseline date, so
+                    decideMovement's baselineDateKnown arm replaces an undated
+                    baseline instead of measuring a period against it.
+Concurrency scope   per user, per run
+Retry semantics     Read-only and idempotent: a re-run resolves the same dates.
+Crash semantics     No write precedes the decision; a crash leaves the baseline.
+Failure response    complete: false, missingPairs naming the pair AND the day;
+                    the producer withholds and does not advance the baseline.
+Required tests      notification-center/portfolio-flow.util.spec.ts (the fold),
+                    notification-center/portfolio-movement-alert.service.spec.ts
+                    (the dates the resolver is asked for),
+                    test/integration/portfolio-movement-flow.integration.spec.ts
+                    (the same rows through real SQL).
+Why it exists       The producer converted a whole window at the run day's rate,
+                    so a Monday run priced Friday's and Saturday's deposits at
+                    Monday's close and reported the weekend's FX move as a market
+                    return (kenlasko/monize#1391).
+Status              enforced
+```
+
+### INV-PORTMOVE-008 -- a movement needs evidence from its own period
+
+```text
+Statement           While a security held in a non-zero quantity has no accepted
+                    close dated on or after the baseline date, the run is
+                    incomplete for the movement: no alert, and the baseline is
+                    not advanced. The position is NOT dropped from the valuation
+                    and the two runs' position sets are not intersected -- it is
+                    the comparison that is refused, not the value.
+Source of truth     security_prices (the observation that priced the position).
+Enforcement         PortfolioService.getLatestPriceObservations returns the dated
+                    form of the query getLatestPrices already ran, so the check
+                    reads the very rows that produced today's value;
+                    stalePricedSecurityIds
+                    (notification-center/portfolio-price-freshness.util.ts) is the
+                    policy and decideMovement applies it before the arithmetic.
+                    A baseline with no capture date has no period for a close to
+                    be stale against, so decideMovement's baselineDateKnown arm
+                    replaces such a baseline rather than reaching this check.
+Concurrency scope   per user, per run
+Retry semantics     Read-only and idempotent.
+Crash semantics     No write precedes the decision.
+Failure response    No notification; baseline unchanged; the producer logs the
+                    securities it is waiting on.
+Required tests      notification-center/portfolio-price-freshness.util.spec.ts,
+                    notification-center/portfolio-movement.util.spec.ts (the
+                    guard's position in the order),
+                    notification-center/portfolio-movement-alert.service.spec.ts.
+Why it exists       A carried close contributes the same figure to both ends of
+                    the comparison only until it arrives or disappears; the run
+                    it changes on books the whole catch-up as one day's market
+                    move -- the 94% "movement" in kenlasko/monize#1391. Carrying
+                    a close forward is legitimate for VALUATION
+                    (docs/time-series-contract.md section 2.1, second exception),
+                    which is why this refuses the movement rather than the price.
+                    Consequence by design: a permanently dead feed silences this
+                    user's alert until the holding is priced or closed.
+Status              enforced
+```
+
 ### INV-RLS-001 -- enforced mode refuses a privileged role
 
 ```text
@@ -3526,16 +4095,31 @@ Statement           A write that changes money invalidates every client cache
                     family derived from transactions.
 Enforcement         invalidateBalanceCaches (frontend lib/apiCache.ts) drops the
                     accounts:, investments: AND budgets: prefixes -- every
-                    transaction-derived family. The cache layer is frontend, which
-                    is why the function name does not appear in backend/src.
-Concurrency scope   per browser tab
+                    transaction-derived family. The cache layer is mostly
+                    frontend, which is why the function name does not appear in
+                    backend/src. The server holds one derived cache of its own,
+                    the portfolio-summary memo
+                    (backend/src/securities/portfolio-summary-memo.ts), and it
+                    joins the same rule: invalidatePortfolioSummary(userId) runs
+                    on NetWorthService.triggerDebouncedRecalc and
+                    recalculateAccount -- the post-commit seam every
+                    money-moving write already passes through, immediately
+                    rather than on the debounce timer -- and on each price write
+                    seam, a restore, a demo reset and an undo or redo. It is
+                    process memory with a 60 s TTL, so on a second replica the
+                    bound is the TTL rather than the invalidation;
+                    docs/backend/securities-and-providers.md states that.
+Concurrency scope   per browser tab; per pod for the server-side memo
 Failure response    a saved transaction drops the budget cache, so the progress
                     bar reflects the write.
 Required tests      Present: frontend cache-prefix-classification.guard.test.ts
                     requires every cache prefix to declare itself transaction-
                     derived (and be dropped) or reference-data (and be kept), so a
                     new family cannot default to stale; balance-cache.guard.test.ts
-                    requires every balance-writing API method to invalidate.
+                    requires every balance-writing API method to invalidate;
+                    backend portfolio-summary-memo.spec.ts and the memo cases in
+                    portfolio.service.spec.ts require an invalidated user to
+                    recompute while another user's entry survives.
 Status              enforced
 ```
 

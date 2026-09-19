@@ -2,12 +2,15 @@
 
 import { useTranslations } from 'next-intl';
 import { CellLabel } from '@/components/ui/Table';
+import { UnknownAmount } from '@/components/ui/UnknownAmount';
 import { StatusCellButton } from '@/components/transactions/StatusCellButton';
 import { InvestmentTransaction } from '@/types/investment';
 import {
   redemptionTotalWithInterest,
   supportsAccruedInterest,
 } from '@/lib/investment-actions';
+import { rowAmountCurrency, rowPriceCurrency } from '@/lib/investment-row-currency';
+import { priceDecimals, TRADE_PRICE_DISPLAY_DECIMALS } from '@/lib/security-detail';
 import type { RowAction } from '@/components/ui/row-actions/rowAction';
 
 /**
@@ -186,6 +189,11 @@ export function InvestmentSharesValue({
  * holds the cash amount rather than a per-share price. That the header
  * overstates what the figure is for those actions is a property of the column
  * this renderer serves, not of the layout calling it.
+ *
+ * Two states are not figures. A row with no `price` has nothing measured, and
+ * `0` would read as a free trade; a row with no security has no currency for
+ * the number it does hold, and the reader's own currency is a unit nobody
+ * priced it in. Each is drawn as unknown, naming its own cause.
  */
 export function InvestmentPriceValue({
   tx,
@@ -196,18 +204,26 @@ export function InvestmentPriceValue({
   formatCurrency: FormatCurrency;
   defaultCurrency: string;
 }) {
+  if (tx.action === 'SPLIT' && !tx.price) return <>-</>;
+  if (tx.price == null) return <UnknownAmount reason="noPrice" />;
+  // The row's own stamp, never the account it is filed under and never the
+  // reader's: a security-less row is denominated in its investment account's
+  // currency by the write path, and the server states that on the row.
+  const currencyCode = rowPriceCurrency(tx);
+  if (!currencyCode) return <UnknownAmount reason="unknownCurrency" />;
   return (
     <>
-      {tx.action === 'SPLIT' && !tx.price ? (
-        '-'
-      ) : (
-        <>
-          {formatCurrency(tx.price ?? 0, tx.security?.currencyCode, 4)}
-          {tx.security?.currencyCode && tx.security.currencyCode !== defaultCurrency && (
-            <span className="ml-1">{tx.security.currencyCode}</span>
-          )}
-        </>
+      {/* Four decimals unless the stored price needs more of its own: a price
+          derived from an executed total is a quotient (141 shares for 820.91
+          went at 5.822057), and rounding it to the column's old width printed
+          a figure that does not multiply back to the total beside it. Capped
+          at six, the most a person reads. */}
+      {formatCurrency(
+        tx.price,
+        currencyCode,
+        Math.max(4, priceDecimals([tx.price], TRADE_PRICE_DISPLAY_DECIMALS)),
       )}
+      {currencyCode !== defaultCurrency && <span className="ml-1">{currencyCode}</span>}
     </>
   );
 }
@@ -221,6 +237,7 @@ export function InvestmentTotalValue({
   formatCurrency: FormatCurrency;
   defaultCurrency: string;
 }) {
+  const amountCurrency = rowAmountCurrency(tx);
   return (
     <>
       {formatCurrency(
@@ -230,10 +247,10 @@ export function InvestmentTotalValue({
         supportsAccruedInterest(tx.action)
           ? redemptionTotalWithInterest(tx.totalAmount, tx.accruedInterest)
           : tx.totalAmount,
-        tx.security?.currencyCode,
+        amountCurrency ?? undefined,
       )}
-      {tx.security?.currencyCode && tx.security.currencyCode !== defaultCurrency && (
-        <span className="ml-1 font-normal">{tx.security.currencyCode}</span>
+      {amountCurrency && amountCurrency !== defaultCurrency && (
+        <span className="ml-1 font-normal">{amountCurrency}</span>
       )}
     </>
   );

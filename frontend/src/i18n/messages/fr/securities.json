@@ -3,6 +3,7 @@
     "noneToUpdate": "Aucun titre à mettre à jour",
     "updated": "{count, plural, one {# cours de titre mis à jour} other {# cours de titres mis à jour}}",
     "partialFailure": "Cours mis à jour : {updated} réussi(s), {failed} échoué(s){symbols}",
+    "partialFailureWithReasons": "Cours mis à jour : {updated} réussi(s), {failed} échoué(s){symbols}\n{reasons}",
     "failed": "Échec de l'actualisation des cours"
   },
   "page": {

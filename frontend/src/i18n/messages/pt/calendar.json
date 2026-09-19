@@ -85,6 +85,7 @@
       "unpricedHolding": "Uma posição não teve preço neste dia nem no anterior, por isso o movimento é desconhecido.",
       "missingRate": "Faltava uma taxa de câmbio, por isso o movimento não pôde ser convertido.",
       "flowIncomplete": "Um depósito ou levantamento deste dia não pôde ser convertido, por isso o movimento não pode ser separado dele.",
+      "cashIncomplete": "Uma conta de tesouraria não reportou saldo para este dia, pelo que o valor do dia está incompleto e o movimento é desconhecido.",
       "noPriorValue": "Não há um valor anterior com que medir este dia.",
       "zeroBaseline": "A carteira estava vazia no dia anterior, por isso não há percentagem a calcular."
     }

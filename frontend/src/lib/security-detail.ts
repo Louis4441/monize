@@ -490,6 +490,14 @@ export const MAX_PRICE_DECIMALS = 10;
 /** Fewest, so a whole-number price still reads as money. */
 const MIN_PRICE_DECIMALS = 2;
 
+/**
+ * What a TRADE's per-share price is shown at: enough to see that 141 shares
+ * went at 5.8220567376 rather than at 5.82, and no more than a person reads.
+ * A price derived from an executed total is stored at ten decimals
+ * (INV-TRADE-001); six is what `formatPrice` shows and what this matches.
+ */
+export const TRADE_PRICE_DISPLAY_DECIMALS = 6;
+
 /** Decimal places a single number is written with, or null if not readable. */
 function decimalPlacesOf(value: number): number | null {
   if (!isFinite(value)) return null;
@@ -514,18 +522,26 @@ function decimalPlacesOf(value: number): number | null {
  * each to its own precision put two and six decimals side by side in one column
  * of figures that should be scannable at a glance. The widest count any value
  * needs is the one they all use, so every row lines up.
+ *
+ * `max` caps it for a column that shows fewer than the storage scale -- a
+ * trade's price column passes `TRADE_PRICE_DISPLAY_DECIMALS`, so a price
+ * derived from an executed total reads as 5.822057 rather than as all ten
+ * stored decimals.
  */
-export function priceDecimals(values: readonly (number | null)[]): number {
+export function priceDecimals(
+  values: readonly (number | null)[],
+  max: number = MAX_PRICE_DECIMALS,
+): number {
   let widest = MIN_PRICE_DECIMALS;
   for (const value of values) {
     if (value === null || value === undefined) continue;
     const places = decimalPlacesOf(value);
     // Unreadable means "at least as precise as anything we can count", so it
     // takes the column straight to the maximum.
-    if (places === null) return MAX_PRICE_DECIMALS;
+    if (places === null) return max;
     if (places > widest) widest = places;
   }
-  return Math.min(widest, MAX_PRICE_DECIMALS);
+  return Math.min(widest, max);
 }
 
 /** A month's worth of price rows, newest month first within its year. */

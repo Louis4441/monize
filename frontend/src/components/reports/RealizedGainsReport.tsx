@@ -155,6 +155,24 @@ export function RealizedGainsReport() {
     return formatCurrencyFull(value);
   }, [isForeign, displayCurrency, formatCurrencyFull]);
 
+  /**
+   * A figure that is in the SECURITY's currency, not the account's: the unit
+   * price and the commission on a realized-gain row are the raw transaction
+   * values, while proceeds, basis and gain are converted into the holding
+   * account's currency by the server.
+   *
+   * A null code renders unknown; the reader's currency is not the answer
+   * (`docs/frontend/financial-figures.md`, issue #1394).
+   */
+  const fmtSecurityMoney = useCallback(
+    (value: number, currencyCode: string | null): string => {
+      if (!currencyCode) return tCommon('unknownAmount.marker');
+      if (currencyCode === defaultCurrency) return formatCurrencyFull(value, currencyCode);
+      return `${formatCurrencyFull(value, currencyCode)} ${currencyCode}`;
+    },
+    [formatCurrencyFull, defaultCurrency, tCommon],
+  );
+
   // Fetch accounts once on mount
   useEffect(() => {
     investmentsApi.getInvestmentAccounts()
@@ -296,8 +314,12 @@ export function RealizedGainsReport() {
         case 'quantity':
           comparison = compareValues(a.quantity, b.quantity);
           break;
+        // Unit prices are in each security's own currency, so they group by
+        // currency before being compared: 100 EUR is not above 90 USD.
         case 'price':
-          comparison = compareValues(a.price, b.price);
+          comparison =
+            compareValues(a.securityCurrencyCode, b.securityCurrencyCode) ||
+            compareValues(a.price, b.price);
           break;
         case 'proceeds':
           comparison = compareValues(
@@ -675,7 +697,12 @@ export function RealizedGainsReport() {
                     </td>
                     <td role="cell" className={`col-start-2 row-start-2 text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                       <CellLabel className={CAPTION_CLASS}>{sellTransactionColumns.price.label}</CellLabel>
-                      {fmtValue(entry.price)}
+                      {/* The unit price is the SECURITY's currency, unlike the
+                          proceeds beside it (the account's, converted by the
+                          server). Formatting it through `fmtValue` printed a
+                          EUR price with the reader's symbol -- the same
+                          mislabel as the transaction history's, issue #1394. */}
+                      {fmtSecurityMoney(entry.price, entry.securityCurrencyCode)}
                     </td>
                     <td role="cell" className={`col-start-1 col-span-2 row-start-3 font-medium text-gray-900 dark:text-gray-100 ${FIGURE_CELL}`}>
                       <CellLabel className={CAPTION_CLASS}>{sellTransactionColumns.proceeds.label}</CellLabel>
