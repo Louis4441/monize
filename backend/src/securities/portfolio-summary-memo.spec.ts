@@ -96,6 +96,53 @@ describe("portfolio summary memo", () => {
       expect(compute).toHaveBeenCalledTimes(2);
     });
 
+    it("dates the entry from when the valuation settled, not from when it started", async () => {
+      // Issue #1409: the TTL used to be stamped at compute start, so a 48 s
+      // valuation left 12 s of a 60 s entry and the next page open paid for
+      // the whole walk again.
+      jest.useFakeTimers();
+      const compute = jest
+        .fn<Promise<number>, []>()
+        .mockImplementationOnce(
+          () => new Promise((resolve) => setTimeout(() => resolve(1), 48_000)),
+        )
+        .mockResolvedValueOnce(2);
+
+      const first = portfolioSummaryMemo.run("u1", "k", compute);
+      await jest.advanceTimersByTimeAsync(48_000);
+      await expect(first).resolves.toBe(1);
+
+      jest.advanceTimersByTime(PORTFOLIO_SUMMARY_MEMO_TTL_MS - 1);
+      await expect(portfolioSummaryMemo.run("u1", "k", compute)).resolves.toBe(
+        1,
+      );
+      jest.advanceTimersByTime(2);
+      await expect(portfolioSummaryMemo.run("u1", "k", compute)).resolves.toBe(
+        2,
+      );
+      expect(compute).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not resurrect a valuation invalidated while it was in flight", async () => {
+      // A write landed during the walk, so what the walk returns is already
+      // untrue. Dating it on settle would serve it for a minute anyway.
+      let release: (value: string) => void = () => {};
+      const compute = jest.fn(
+        () =>
+          new Promise<string>((resolve) => {
+            release = resolve;
+          }),
+      );
+
+      const inFlight = portfolioSummaryMemo.run(UUID_A, "k", compute);
+      invalidatePortfolioSummary(UUID_A);
+      release("stale");
+      await expect(inFlight).resolves.toBe("stale");
+
+      await portfolioSummaryMemo.run(UUID_A, "k", async () => "fresh");
+      expect(compute).toHaveBeenCalledTimes(1);
+    });
+
     it("does not remember a failure", async () => {
       const compute = jest
         .fn<Promise<string>, []>()
