@@ -1476,6 +1476,91 @@ describe("AutoBackupService", () => {
       ]);
     });
 
+    it("summarizes this user's artifacts as a count and a total", async () => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true }),
+      );
+      await seed("monize-backup-daily-2026-04-14.json.gz", userId, "older");
+      await seed("monize-backup-weekly-2026-04-15.mzbe", userId, "newer-file");
+
+      await expect(service.summarizeStoredBackups(userId)).resolves.toEqual({
+        enabled: true,
+        artifacts: 2,
+        bytes: "older".length + "newer-file".length,
+      });
+    });
+
+    it("counts nothing towards the total that the owner-facing listing would not offer", async () => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true }),
+      );
+      await seed("monize-backup-daily-2026-04-15.json.gz", userId, "mine");
+      // Another user's namespace, the pre-namespacing flat folder whose name
+      // carries no owner, and a file this module never wrote: none of the three
+      // is attributable to this user, so none of them may be billed to them.
+      await seed("monize-backup-daily-2026-04-15.json.gz", otherUserId, "hers");
+      await fs.writeFile(
+        join(root, "monize-backup-daily-2026-04-13.json.gz"),
+        "legacy",
+      );
+      await seed("notes.txt", userId, "not-an-artifact");
+
+      await expect(service.summarizeStoredBackups(userId)).resolves.toEqual({
+        enabled: true,
+        artifacts: 1,
+        bytes: "mine".length,
+      });
+    });
+
+    it("reports zero for a user whose namespace is empty", async () => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true }),
+      );
+
+      // Enrolled but not yet run: a store that enumerates fine and holds
+      // nothing is zero, which is a figure, not a missing answer.
+      await expect(service.summarizeStoredBackups(userId)).resolves.toEqual({
+        enabled: true,
+        artifacts: 0,
+        bytes: 0,
+      });
+    });
+
+    it("reports a store it cannot enumerate as unknown rather than as empty", async () => {
+      const outside = mkdtempSync(join(tmpdir(), "monize-unreadable-"));
+      try {
+        mockSettingsRepo.findOne.mockResolvedValue(
+          createSettings({ enabled: true, folderPath: outside }),
+        );
+
+        // A root outside BACKUP_ALLOWED_ROOTS refuses before anything is
+        // listed. Answering 0 here would put "stores nothing" on the admin
+        // screen for a user whose backups are simply unreachable.
+        await expect(service.summarizeStoredBackups(userId)).resolves.toEqual({
+          enabled: true,
+          artifacts: null,
+          bytes: null,
+        });
+      } finally {
+        rmSync(outside, { recursive: true, force: true });
+      }
+    });
+
+    it("keeps the schedule and the stored bytes as separate answers", async () => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: false }),
+      );
+      await seed("monize-backup-daily-2026-04-15.json.gz", userId, "kept");
+
+      // Switched off last week, still occupying what retention has not aged
+      // out: "off" is not "nothing stored".
+      await expect(service.summarizeStoredBackups(userId)).resolves.toEqual({
+        enabled: false,
+        artifacts: 1,
+        bytes: "kept".length,
+      });
+    });
+
     it("opens one artifact by name, as a stream of its bytes", async () => {
       mockSettingsRepo.findOne.mockResolvedValue(
         createSettings({ enabled: true }),

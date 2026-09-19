@@ -21,6 +21,7 @@ import {
 import {
   PORTFOLIO_PERIOD_PRESETS,
   PortfolioPeriodPreset,
+  isHistoryGatedPreset,
   presetEarliestDate,
   presetWindowStart,
   usesPriorCloseBaseline,
@@ -67,21 +68,22 @@ export interface PortfolioPeriodResultsOptions extends SeriesFetchOptions {
 }
 
 /**
- * Six trailing windows of the same portfolio, measured once.
+ * Every trailing window of the same portfolio, measured once.
  *
  * Every figure is the one `PortfolioPeriodResultService` would have answered
  * for that window: the same value series, the same flow classifier, the same
  * per-day conversion and the same `decidePeriodResult`. What differs is how
  * often the expensive parts run. `getDailyInvestments` rebuilds a portfolio's
- * whole valuation, and the year's series already contains every shorter
- * window's points, so this service builds it ONCE for the widest window asked
- * for, loads the per-day flow subtotals and the unmeasurable-movement counts
- * once beside it, and derives each preset by slicing:
+ * whole valuation, and the widest window's series already contains every
+ * shorter window's points, so this service builds it ONCE for the widest
+ * window it reports, loads the per-day flow subtotals and the
+ * unmeasurable-movement counts once beside it, and derives each preset by
+ * slicing:
  *
  *  - the end boundary is the series' last point, shared by every preset;
  *  - the start boundary is the last point on or before the preset's baseline
- *    (1d and 1w report against the previous close) or the first point on or
- *    after the window's start (every other preset);
+ *    (1d, 1w and all report against the previous close) or the first point on
+ *    or after the window's start (every other preset);
  *  - the flows and the unmeasurable counts are the days strictly after the
  *    preset's own lower bound, which is exactly what a single-range call with
  *    that bound would have loaded.
@@ -99,6 +101,15 @@ export interface PortfolioPeriodResultsOptions extends SeriesFetchOptions {
  * `noValueSeries`: a portfolio three days old has no one-year return, and
  * measuring from its first day instead would report a number that looks like
  * one.
+ *
+ * The LONG windows are not reported that way, because a permanent "n/a" is not
+ * an answer anybody can act on. `2y`, `5y` and `10y` are left out of the
+ * response entirely unless the scope's history reaches back to them
+ * (`isHistoryGatedPreset`), and `all` opens on that history's first day rather
+ * than on any arithmetic -- the same day, drawn the same way, as
+ * `getInvestedResultSinceInception`. Absence therefore says "this portfolio
+ * has no such window"; a window that IS present with null figures was withheld
+ * for a cause it names.
  */
 @Injectable()
 export class PortfolioPeriodResultsBatchService {
@@ -130,13 +141,6 @@ export class PortfolioPeriodResultsBatchService {
     );
     const end = opts.endDate || todayYMD();
 
-    // The widest window any preset can need a value for. A prior-close preset
-    // reaches one day further back than its window opens, because that close is
-    // what it is measured from.
-    const earliest = presets
-      .map((preset) => presetEarliestDate(preset, end))
-      .reduce((a, b) => (a < b ? a : b));
-
     // The empty answer is the decision itself over no boundaries, so the shape
     // and the reason are the same ones every other caller of the policy gets.
     const empty = (startDate: string): PortfolioPeriodResult => ({
@@ -152,20 +156,65 @@ export class PortfolioPeriodResultsBatchService {
       ...NO_INVESTED_PERIOD,
     });
 
+    const scope = await this.periodResult.resolveScope(userId, opts.accountIds);
+
+    // Where this scope's history begins, asked once and only when a preset
+    // needs it: `all` opens there, and a gated window is shown only when the
+    // scope reaches back to it. `null` is a scope that has never held
+    // anything, which has no all-time window and no long ones either.
+    const needsInception = presets.some(
+      (preset) => preset === "all" || isHistoryGatedPreset(preset),
+    );
+    const inception =
+      scope.length > 0 && needsInception
+        ? await this.periodResult.firstInvestmentDate(
+            userId,
+            scope.map((row) => row.id),
+          )
+        : null;
+
+    // The windows this answer actually reports, each with the day it opens on.
+    // A gated window the scope has no history for is left out of the response
+    // rather than returned as a permanent "n/a": the client shows the windows
+    // it is sent, and absence here means "this portfolio has no such window",
+    // while a window that IS sent with null figures was withheld for a cause
+    // it names.
+    const windows = new Map<PortfolioPeriodPreset, string>();
+    for (const preset of presets) {
+      if (preset === "all") {
+        if (inception !== null) windows.set(preset, inception);
+        continue;
+      }
+      const start = presetWindowStart(preset, end);
+      if (start === null) continue;
+      if (
+        isHistoryGatedPreset(preset) &&
+        (inception === null || inception > start)
+      ) {
+        continue;
+      }
+      windows.set(preset, start);
+    }
+
     const allEmpty = (): PortfolioPeriodResults => ({
       currency,
       asOf: end,
       periods: Object.fromEntries(
-        presets.map((preset) => [
-          preset,
-          empty(presetWindowStart(preset, end)),
-        ]),
+        [...windows].map(([preset, start]) => [preset, empty(start)]),
       ),
     });
 
-    if (earliest > end) return allEmpty();
+    // The widest window any reported preset can need a value for. A prior-close
+    // preset reaches one day further back than its window opens, because that
+    // close is what it is measured from.
+    const earliestDates = [...windows].flatMap(([preset, start]) => {
+      const date = presetEarliestDate(preset, end, start);
+      return date === null ? [] : [date];
+    });
+    if (earliestDates.length === 0) return allEmpty();
+    const earliest = earliestDates.reduce((a, b) => (a < b ? a : b));
 
-    const scope = await this.periodResult.resolveScope(userId, opts.accountIds);
+    if (earliest > end) return allEmpty();
     if (scope.length === 0) return allEmpty();
     // ONE boundary, the same one the single-range route draws: the accounts
     // whose ledger cash the valuation actually walks, on both sides of a
@@ -258,8 +307,7 @@ export class PortfolioPeriodResultsBatchService {
     const periods: Partial<
       Record<PortfolioPeriodPreset, PortfolioPeriodResult>
     > = {};
-    for (const preset of presets) {
-      const windowStart = presetWindowStart(preset, end);
+    for (const [preset, windowStart] of windows) {
       const start = this.startBoundary(series, preset, windowStart);
       if (!start) {
         periods[preset] = empty(windowStart);
@@ -313,6 +361,10 @@ export class PortfolioPeriodResultsBatchService {
    * of the day the window opens on. `null` when the series does not reach back
    * that far, which is a period this scope cannot report rather than one that
    * did nothing.
+   *
+   * `all` is a prior-close preset whose window opens on the scope's first
+   * holding: its baseline is the close the day before that purchase, which the
+   * series carries because `presetEarliestDate` loads from it.
    */
   private startBoundary<T extends { date: string }>(
     series: readonly T[],

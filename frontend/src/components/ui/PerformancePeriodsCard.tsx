@@ -108,12 +108,14 @@ export function PerformancePeriodsCard({
               </dt>
               {/* One line per period, the same row the security card draws.
                   The second figure, where the caller has one, sits on that
-                  line before the headline, smaller and muted, so the two
-                  cards read alike and no row grows a second line. */}
+                  line before the headline, at the headline's own size -- both
+                  are figures the reader compares, and a money amount set
+                  smaller than the ratio beside it reads as a footnote to it.
+                  Lighter weight is what keeps the headline the headline. */}
               <dd className="flex items-baseline justify-end gap-2 text-right">
                 {entry.secondary !== undefined && (
                   <span
-                    className={`text-xs tabular-nums ${figureClass(
+                    className={`text-sm tabular-nums ${figureClass(
                       entry.secondaryValue,
                       entry.secondary === null,
                     )}`}

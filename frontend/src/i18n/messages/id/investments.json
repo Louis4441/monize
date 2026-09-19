@@ -311,7 +311,11 @@
       "1m": "1B",
       "3m": "3B",
       "ytd": "Sejak awal tahun",
-      "1y": "1T"
+      "1y": "1T",
+      "2y": "2T",
+      "5y": "5T",
+      "10y": "10T",
+      "all": "Sepanjang waktu"
     },
     "loading": "Mengukur periode...",
     "loadFailed": "Hasil periode tidak dapat dimuat. Angka-angka ini ditahan, bukan nol; muat ulang halaman untuk mencoba lagi.",

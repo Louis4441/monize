@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { DataSource, EntityManager } from "typeorm";
+import { DataSource, EntityManager, FindOptionsWhere } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { withSystemContext } from "../common/db/with-context";
 import * as bcrypt from "bcryptjs";
@@ -32,6 +32,44 @@ import { EmailService } from "../notifications/email.service";
 import { accountInviteTemplate } from "../notifications/email-templates";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { toUserProfile, UserProfile } from "../users/user-profile";
+import {
+  AttachmentsService,
+  AttachmentStorageUsage,
+} from "../attachments/attachments.service";
+import {
+  AutoBackupService,
+  StoredBackupUsage,
+} from "../backup/auto-backup.service";
+
+/**
+ * Who the admin screens manage: everybody except the owner-managed delegate
+ * identities -- users that exist solely because an account owner added them via
+ * Shared Access, and are managed from that owner's page instead.
+ *
+ * One constant rather than the clause spelled out per query, because the user
+ * list and the storage figures beside it have to enumerate the same people: a
+ * user in one and not the other would render as an account storing nothing.
+ */
+const MANAGED_USERS: FindOptionsWhere<User> = { isDelegateOnly: false };
+
+/** The order both managed-user listings use, oldest account first. */
+const MANAGED_USERS_ORDER = { createdAt: "ASC" } as const;
+
+/**
+ * What one user occupies on this deployment's storage, as the admin user list
+ * shows it.
+ *
+ * Two independent figures, kept apart on purpose: attachments are counted from
+ * metadata rows and are always known, while the backups are counted by
+ * enumerating whatever store this deployment writes to and can therefore be
+ * unknown. Summing them into one number would have to answer for a component
+ * that may be missing, so no such total is offered.
+ */
+export interface AdminUserStorageUsage {
+  readonly userId: string;
+  readonly backups: StoredBackupUsage;
+  readonly attachments: AttachmentStorageUsage;
+}
 
 /**
  * The admin create-user response: the complete profile plus the fields only
@@ -57,6 +95,8 @@ export class AdminService {
     private configService: ConfigService,
     private emailService: EmailService,
     private readonly i18n: I18nService,
+    private readonly attachmentsService: AttachmentsService,
+    private readonly autoBackupService: AutoBackupService,
   ) {}
 
   async findAllUsers(): Promise<UserProfile[]> {
@@ -73,11 +113,63 @@ export class AdminService {
     // still shows up here.
     const users = await withScopedDb(this.dataSource, (manager) =>
       manager.getRepository(User).find({
-        where: { isDelegateOnly: false },
-        order: { createdAt: "ASC" },
+        where: MANAGED_USERS,
+        order: MANAGED_USERS_ORDER,
       }),
     );
     return users.map((user) => toUserProfile(user));
+  }
+
+  /**
+   * What each managed user occupies on this deployment's storage: their
+   * automatic backups and their attachments.
+   *
+   * Its own endpoint rather than extra fields on the user list, because the two
+   * cost very different things to answer. The list is one query; this
+   * enumerates the backup store once per user, which on an object store is a
+   * round trip each -- folding it in would make opening User Management wait on
+   * S3, and a store that has gone slow would look like a broken page rather
+   * than like two columns that have not filled in yet.
+   */
+  async getUserStorageUsage(): Promise<AdminUserStorageUsage[]> {
+    return withSystemContext(() => this.getUserStorageUsageWithinContext());
+  }
+
+  private async getUserStorageUsageWithinContext(): Promise<
+    AdminUserStorageUsage[]
+  > {
+    const users = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(User).find({
+        where: MANAGED_USERS,
+        order: MANAGED_USERS_ORDER,
+        select: { id: true },
+      }),
+    );
+
+    // One grouped aggregate for every user's attachments, against the metadata
+    // rows that record each file's size -- so the figure is the same whichever
+    // provider holds the bytes (database, local or S3) and no object store is
+    // enumerated for it at all.
+    const attachmentsByUser =
+      await this.attachmentsService.summarizeUsageByUser();
+
+    // The backups, by contrast, are only knowable by asking the store, and the
+    // store keeps one namespace per user. Sequentially: on the `s3` target each
+    // call is a ListObjectsV2, and fanning an unbounded user list out in
+    // parallel would put the whole deployment's users on the wire at once for a
+    // page that is not latency-critical.
+    const usage: AdminUserStorageUsage[] = [];
+    for (const user of users) {
+      usage.push({
+        userId: user.id,
+        backups: await this.autoBackupService.summarizeStoredBackups(user.id),
+        // A user with no attachments has no aggregate row; zero is the honest
+        // figure for an account that stores nothing, and is not a stand-in for
+        // an answer nobody could obtain.
+        attachments: attachmentsByUser.get(user.id) ?? { files: 0, bytes: 0 },
+      });
+    }
+    return usage;
   }
 
   async createUser(dto: CreateUserDto): Promise<CreatedAdminUserProfile> {

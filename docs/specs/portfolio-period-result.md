@@ -214,24 +214,57 @@ for the same scope, range and display currency the chart asked for, plus an
 explicit `baselineDate` for the ranges measured from the prior close (1d, 1w,
 mtd). The client chooses the dates; it does no arithmetic over them.
 
-## 8. The batch route: six windows, one valuation
+## 8. The batch route: every window, one valuation
 
-The Investments page reports the result over six trailing windows at once (1D,
-1W, 1M, 3M, YTD, 1Y). Six calls to the single-range route would rebuild the
-daily valuation six times -- `NetWorthService.getDailyInvestments` is the
-expensive part -- and the one-year series already contains every shorter
-window's points, so `GET /net-worth/investments-period-results` builds the
-series ONCE for the widest window asked for and derives each preset by slicing
-it (`backend/src/net-worth/portfolio-period-results-batch.service.ts`).
+The Investments page reports the result over every trailing window at once (1D,
+1W, 1M, 3M, YTD, 1Y, 2Y, 5Y, 10Y and all-time). One call to the single-range
+route per window would rebuild the daily valuation that many times --
+`NetWorthService.getDailyInvestments` is the expensive part -- and the widest
+window's series already contains every shorter window's points, so
+`GET /net-worth/investments-period-results` builds the series ONCE for the
+widest window it reports and derives each preset by slicing it
+(`backend/src/net-worth/portfolio-period-results-batch.service.ts`).
 
 The route takes `periods` (a comma-separated subset of the closed set
-`1d,1w,1m,3m,ytd,1y`; all of them when omitted), plus the same `accountIds` and
-`displayCurrency` as the single-range route, and answers
+`1d,1w,1m,3m,ytd,1y,2y,5y,10y,all`; all of them when omitted), plus the same
+`accountIds` and `displayCurrency` as the single-range route, and answers
 `{ currency, asOf, periods: { [preset]: PortfolioPeriodResult } }`. An unknown
 preset is a 400: the windows are the server's own arithmetic
 (`backend/src/net-worth/portfolio-period-presets.util.ts`), which is what keeps
 the Investments page, the chart and any later surface from disagreeing about
-where a month begins.
+where a month begins. The arithmetic follows the client's own range picker
+where the two offer the same caption -- `2y` is a rolling 730 days, as the
+chart's `2y` button draws it -- so one page does not open the same window on
+two days.
+
+### 8.1 Which windows a scope is shown
+
+`periods` is partial, and the two ways a window can fail to carry a figure are
+different answers:
+
+- **Present, with every figure `null` and a reason.** The window exists for
+  this scope and could not be measured: a boundary the series does not reach,
+  a missing price, a rate the history does not have. The card reads it as
+  "n/a" and names the cause, because the reader can often repair it.
+- **Absent.** This portfolio has no such window. `2y`, `5y` and `10y` are
+  reported only where the scope's history reaches back to their start
+  (`isHistoryGatedPreset`), and `all` only where the scope has ever held
+  anything. A five-year row on a two-year-old portfolio is a permanent "n/a"
+  with nothing behind it to fix, so it is not sent and not drawn. The shorter
+  windows are never gated: every portfolio is shown its day, week, month,
+  quarter, year-to-date and year, and a young one reports them from the day it
+  started holding anything.
+
+A gated window that is not reported does not widen the valuation either: the
+series is built over the widest window actually reported, so a three-year-old
+portfolio never values ten years of empty days.
+
+**Where `all` opens.** On the day the scope's first non-VOID investment
+transaction settled, measured from the close BEFORE it -- that day's own close
+already holds the purchase. This is the same boundary
+`getInvestedResultSinceInception` draws (section 10.7), from the same
+`firstInvestmentDate`, so the card's all-time row and the summary card's
+since-inception return are one answer rather than two.
 
 **What is sliced, and what is not.** Nothing is recomputed: the same
 `decidePeriodResult` decides every figure, from the same series, the same flow
@@ -283,10 +316,16 @@ Backend unit (`portfolio-period-result.util.spec.ts`,
 
 Backend unit
 (`backend/src/net-worth/portfolio-period-results-batch.service.spec.ts`):
-equivalence with the single-range route for every preset, the series built once
-over the widest window, a flow counted in the windows that contain it and in no
-other, a window an uncountable movement withholds while its neighbours stay
-measurable, a short history, a currency override and an empty scope.
+equivalence with the single-range route for every preset reported, the series
+built once over the widest window, a flow counted in the windows that contain
+it and in no other, a window an uncountable movement withholds while its
+neighbours stay measurable, a short history, a currency override and an empty
+scope. For the windows of section 8.1: a gated window left out when the history
+does not reach it and reported when it does, the boundary drawn at the window's
+own start rather than the widest one asked for, `all` opening on the close
+before the first holding, `all` equal to `getInvestedResultSinceInception`, no
+all-time window for a scope that never held anything, and the history asked for
+once, or not at all when no window needs it.
 
 Backend unit (`portfolio-period-results-batch.service.spec.ts`): equivalence
 with the single-range route for every preset, the series built once over the
@@ -588,9 +627,10 @@ before the scope's earliest non-VOID investment transaction (`IV(b)` is a close
 and already holds everything dated `b`) and the end is the routes' own
 `todayYMD()`. `PortfolioPeriodResultService.getInvestedResultSinceInception`
 resolves those two dates and then runs `getPeriodResult`, so the summary and
-the six-period card share one series, one capital and income load, one rate
+the period card share one series, one capital and income load, one rate
 index and one decision; a spec asserts the two are the same answer for one
-fixture. The summary carries `timeWeightedReturnReasons` and
+fixture, and the batch route's own `all` window is that same answer again
+(section 8.1). The summary carries `timeWeightedReturnReasons` and
 `timeWeightedReturnSince` beside the figure, on the REST shape, the LLM summary
 and the MCP payload, so a withheld return names its cause instead of reading as
 "n/a" or as zero. (The MCP OUTPUT SCHEMA declares neither: the loose object
@@ -904,7 +944,7 @@ decimal places.
 | Portfolio summary card, "MWR (Money-Weighted)" | `moneyWeightedReturn` since inception, annualised |
 | Portfolio summary (REST, LLM summary, MCP payload) | the same, with `moneyWeightedReturnReasons` |
 | `GET /net-worth/investments-period-result(s)` | both figures per window, for a future toggle |
-| "Portfolio performance" card | NOT shown: six periods times three figures does not fit its column. The payload carries the fields |
+| "Portfolio performance" card | NOT shown: a row per window times three figures does not fit its column. The payload carries the fields |
 
 The summary's window is the one section 10.7 already defines -- the day before
 the scope's earliest non-VOID investment transaction to `todayYMD()` -- through

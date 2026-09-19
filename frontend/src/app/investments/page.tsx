@@ -243,12 +243,9 @@ function InvestmentsContent() {
             }
           />
 
-          {/* Summary, performance and allocation, in one row: what the
-              portfolio is worth, what the investments earned, and how it is
-              spread. The middle column is the narrow one -- six label/figure
-              rows need far less width than a holdings table or a donut -- and
-              below `lg` the three stack in that same order. */}
-          <div className="grid grid-cols-1 lg:grid-cols-[42fr_16fr_42fr] gap-6 mb-6">
+          {/* Summary and allocation, in one row: what the portfolio is worth
+              beside how it is spread. Below `lg` the two stack in that order. */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <PortfolioSummaryCard
               summary={data.portfolioSummary}
               isLoading={data.isLoading}
@@ -261,17 +258,6 @@ function InvestmentsContent() {
               // The picker in the header above feeds this summary, so a
               // withheld return may offer leaving an account out as a repair.
               hasAccountFilter
-            />
-            {/* What the INVESTMENTS earned over each trailing period, with
-                deposits, withdrawals and idle cash taken out. */}
-            <PortfolioPerformanceCard
-              accountIds={data.selectedAccountIds}
-              reloadKey={data.writeRefreshKey}
-              displayCurrency={
-                data.selectedAccountIds.length === 1
-                  ? data.accounts.find(a => a.id === data.selectedAccountIds[0])?.currencyCode ?? null
-                  : null
-              }
             />
             <AssetAllocationChart
               allocation={data.portfolioSummary ? { allocation: data.portfolioSummary.allocation, totalValue: data.portfolioSummary.totalPortfolioValue } : null}
@@ -288,8 +274,12 @@ function InvestmentsContent() {
             />
           </div>
 
-          {/* Portfolio Value Over Time */}
-          <div className="mb-6">
+          {/* The value series and what the investments earned from it, in one
+              row: the reader sees the shape of the portfolio's value beside
+              the trailing returns that shape produced. The right column is the
+              narrow one -- six label/figure rows need far less width than a
+              chart -- and below `lg` the two stack in that same order. */}
+          <div className="grid grid-cols-1 lg:grid-cols-[3fr_1fr] gap-6 mb-6">
             <InvestmentValueChart
               accountIds={data.selectedAccountIds}
               refreshKey={data.writeRefreshKey}
@@ -299,6 +289,17 @@ function InvestmentsContent() {
                   : null
               }
               titleSuffix={accountFilterLabel}
+            />
+            {/* What the INVESTMENTS earned over each trailing period, with
+                deposits, withdrawals and idle cash taken out. */}
+            <PortfolioPerformanceCard
+              accountIds={data.selectedAccountIds}
+              reloadKey={data.writeRefreshKey}
+              displayCurrency={
+                data.selectedAccountIds.length === 1
+                  ? data.accounts.find(a => a.id === data.selectedAccountIds[0])?.currencyCode ?? null
+                  : null
+              }
             />
           </div>
 

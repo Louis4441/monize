@@ -311,7 +311,11 @@
       "1m": "1M",
       "3m": "3M",
       "ytd": "Seit Jahresbeginn",
-      "1y": "1J"
+      "1y": "1J",
+      "2y": "2J",
+      "5y": "5J",
+      "10y": "10J",
+      "all": "Gesamter Zeitraum"
     },
     "loading": "Zeiträume werden gemessen...",
     "loadFailed": "Die Ergebnisse der Zeiträume konnten nicht geladen werden. Die Werte werden zurückgehalten, nicht auf null gesetzt; laden Sie die Seite neu, um es erneut zu versuchen.",

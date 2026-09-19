@@ -3,13 +3,21 @@
  * and where each one starts.
  *
  * The dates are the client's own range arithmetic moved to the server, so the
- * batch route answers exactly what six calls to the single-range route would
- * have: `frontend/src/lib/date-range.ts` resolves `1w` as seven days back, `1m`
- * as thirty days, `3m` as ninety, `ytd` as January 1 and `1y` as the same day a
- * year earlier, and `frontend/src/components/investments/portfolio-change-baseline.ts`
+ * batch route answers exactly what one call to the single-range route per
+ * window would have: `frontend/src/lib/date-range.ts` resolves `1w` as seven
+ * days back, `1m` as thirty days, `3m` as ninety, `ytd` as January 1, `1y` as
+ * the same day a year earlier, `2y` as seven hundred and thirty days back and
+ * `5y` as the same day five years earlier, and
+ * `frontend/src/components/investments/portfolio-change-baseline.ts`
  * decides which of them measure from the previous close instead of from their
- * first point. `1d` is the one window with no client counterpart: a day's move
- * IS the prior close against the newest one, so its window is the end day alone.
+ * first point. `1d` and `10y` are the windows with no client counterpart: a
+ * day's move IS the prior close against the newest one, so its window is the
+ * end day alone, and `10y` follows `5y`'s same-day-N-years-earlier arithmetic.
+ *
+ * `all` is the one window whose start no arithmetic answers: it opens on the
+ * day the scope's own history begins, which only a query knows, so
+ * `presetWindowStart` returns `null` for it and the caller that HAS that date
+ * supplies it (`PortfolioPeriodResultService.firstInvestmentDate`).
  *
  * Every function here is pure and takes "today" as a string, because the server
  * decides what today is (`todayYMD`) and a window must not depend on the clock
@@ -24,9 +32,31 @@ export const PORTFOLIO_PERIOD_PRESETS = [
   "3m",
   "ytd",
   "1y",
+  "2y",
+  "5y",
+  "10y",
+  "all",
 ] as const;
 
 export type PortfolioPeriodPreset = (typeof PORTFOLIO_PERIOD_PRESETS)[number];
+
+/**
+ * The windows a scope is shown only when its history reaches back to them.
+ *
+ * A portfolio two years old has no five-year return, and the row would be a
+ * permanent "n/a" telling the reader nothing they can act on -- unlike a
+ * window withheld for a missing price, which names a repair. The shorter
+ * windows are NOT gated: every portfolio is shown its month and its year, and
+ * a young one reports them from the day it started holding anything, which is
+ * the behaviour the card has always had. `all` is not gated either: a scope
+ * with any history at all has an all-time result, and one with none has no
+ * windows to report in the first place.
+ */
+const HISTORY_GATED_PRESETS: ReadonlySet<string> = new Set(["2y", "5y", "10y"]);
+
+export function isHistoryGatedPreset(preset: PortfolioPeriodPreset): boolean {
+  return HISTORY_GATED_PRESETS.has(preset);
+}
 
 /**
  * The presets measured from the previous trading day's close rather than from
@@ -37,8 +67,15 @@ export type PortfolioPeriodPreset = (typeof PORTFOLIO_PERIOD_PRESETS)[number];
  * previous close and that point. Every quote source reports these against the
  * prior close, so this does too -- the same rule, and the same set, as
  * `usesPriorCloseBaseline` on the client.
+ *
+ * `all` is here for a different reason with the same arithmetic: its window
+ * opens on the day the scope's first holding was bought, and that day's close
+ * already holds the purchase, so measuring from it would drop the day that
+ * bought the portfolio out of the chain. `getInvestedResultSinceInception`
+ * draws the same boundary (`baselineDate: first - 1 day`), and the two must
+ * answer the same figure.
  */
-const PRIOR_CLOSE_PRESETS: ReadonlySet<string> = new Set(["1d", "1w"]);
+const PRIOR_CLOSE_PRESETS: ReadonlySet<string> = new Set(["1d", "1w", "all"]);
 
 export function usesPriorCloseBaseline(preset: PortfolioPeriodPreset): boolean {
   return PRIOR_CLOSE_PRESETS.has(preset);
@@ -51,23 +88,28 @@ export function isPortfolioPeriodPreset(
 }
 
 /**
- * The same calendar day one year earlier, clamped to the month's last day so
+ * The same calendar day `years` earlier, clamped to the month's last day so
  * February 29 steps back to February 28 rather than rolling into March -- the
- * behaviour of `subYears`, which is what the client's `1y` range uses.
+ * behaviour of `subYears`, which is what the client's `1y` and `5y` ranges use.
  */
-function oneYearEarlier(ymd: string): string {
+function yearsEarlier(ymd: string, years: number): string {
   const [year, month, day] = ymd.split("-").map(Number);
-  const lastDayOfMonth = new Date(Date.UTC(year - 1, month, 0)).getUTCDate();
+  const lastDayOfMonth = new Date(
+    Date.UTC(year - years, month, 0),
+  ).getUTCDate();
   const clamped = Math.min(day, lastDayOfMonth);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${year - 1}-${pad(month)}-${pad(clamped)}`;
+  return `${year - years}-${pad(month)}-${pad(clamped)}`;
 }
 
-/** The first day the preset's window covers, given the day it ends on. */
+/**
+ * The first day the preset's window covers, given the day it ends on, or
+ * `null` for `all`, whose window opens where the scope's history does.
+ */
 export function presetWindowStart(
   preset: PortfolioPeriodPreset,
   today: string,
-): string {
+): string | null {
   switch (preset) {
     case "1d":
       return today;
@@ -80,7 +122,18 @@ export function presetWindowStart(
     case "ytd":
       return `${today.slice(0, 4)}-01-01`;
     case "1y":
-      return oneYearEarlier(today);
+      return yearsEarlier(today, 1);
+    // A rolling two years is 730 days on the client, not two calendar years;
+    // the chart's own `2y` button draws that window, and two surfaces on one
+    // page must not disagree about where the same caption opens.
+    case "2y":
+      return addDaysYMD(today, -730);
+    case "5y":
+      return yearsEarlier(today, 5);
+    case "10y":
+      return yearsEarlier(today, 10);
+    case "all":
+      return null;
   }
 }
 
@@ -95,7 +148,11 @@ export function presetWindowStart(
 export function presetEarliestDate(
   preset: PortfolioPeriodPreset,
   today: string,
-): string {
-  const start = presetWindowStart(preset, today);
+  /** Where `all` opens; ignored by every other preset. */
+  inception?: string,
+): string | null {
+  const start =
+    preset === "all" ? (inception ?? null) : presetWindowStart(preset, today);
+  if (start === null) return null;
   return usesPriorCloseBaseline(preset) ? addDaysYMD(start, -1) : start;
 }

@@ -267,6 +267,29 @@ export interface StoredBackupsReport {
 }
 
 /**
+ * How much of the store one user's automatic backups occupy, for the admin user
+ * list.
+ *
+ * `artifacts` and `bytes` are `null` **together** and only when the store could
+ * not be enumerated at all -- a misconfigured backup root, an object store that
+ * refused the listing. That is genuinely unknown and is reported as unknown: a
+ * store nobody could read is not a store holding nothing, and zero is the
+ * truthful answer only for a user whose namespace is empty, which enumerates
+ * fine and answers `0`.
+ *
+ * `enabled` is this user's schedule as it stands now, which is a different
+ * question from what the store is holding: a user switched off last week still
+ * occupies whatever their retention window has not aged out yet.
+ */
+export interface StoredBackupUsage {
+  readonly enabled: boolean;
+  /** Artifacts attributable to this user, or `null` when the store is unreadable. */
+  readonly artifacts: number | null;
+  /** Their combined size in bytes; `null` exactly when `artifacts` is. */
+  readonly bytes: number | null;
+}
+
+/**
  * What one written artifact is, to anything downstream of the write.
  *
  * `digest` is the **egress digest** (`docs/specs/backup-off-machine.md` section
@@ -455,6 +478,55 @@ export class AutoBackupService {
     // one written.
     backups.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
     return { enabled, backups };
+  }
+
+  /**
+   * The same store listing as `listStoredBackups`, reduced to a count and a
+   * total -- what the admin user list shows per user.
+   *
+   * It counts exactly the artifacts that listing offers, and for the same
+   * reasons: `legacy` ones are skipped because their names carry no owner, so
+   * attributing their bytes to anybody would be a guess, and a name
+   * `classifyBackupFileName` does not recognise is not an artifact this module
+   * wrote. Both exclusions can make the column read low on a `local` store
+   * holding pre-namespacing files; a figure that under-counts a shared history
+   * is better than one that bills it to whichever user happens to be listed.
+   *
+   * Deliberately no off-site lookup: this is called once per user on an admin
+   * page, and the per-destination status is a property of an individual
+   * artifact, not of the total.
+   *
+   * An unreadable store answers `null`/`null` rather than throwing, so one
+   * user's broken backup root does not take the whole admin listing down --
+   * `listStoredBackups` swallows the same failure into an empty list, and the
+   * difference here is that an empty list and an unreadable store must not
+   * render as the same number.
+   */
+  async summarizeStoredBackups(userId: string): Promise<StoredBackupUsage> {
+    const settings = await this.scoped(AutoBackupSettings, (repo) =>
+      repo.findOne({ where: { userId } }),
+    );
+    const enabled = settings?.enabled === true;
+    let entries: StoredArtifactEntry[];
+    try {
+      const location = await this.resolveReadLocation(
+        userId,
+        settings?.folderPath,
+      );
+      entries = await this.store.list(location);
+    } catch {
+      return { enabled, artifacts: null, bytes: null };
+    }
+
+    let artifacts = 0;
+    let bytes = 0;
+    for (const entry of entries) {
+      if (entry.legacy) continue;
+      if (!classifyBackupFileName(entry.name)) continue;
+      artifacts += 1;
+      bytes += entry.sizeBytes;
+    }
+    return { enabled, artifacts, bytes };
   }
 
   /**

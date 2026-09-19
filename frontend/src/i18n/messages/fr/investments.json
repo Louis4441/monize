@@ -311,7 +311,11 @@
       "1m": "1M",
       "3m": "3M",
       "ytd": "Depuis janvier",
-      "1y": "1A"
+      "1y": "1A",
+      "2y": "2A",
+      "5y": "5A",
+      "10y": "10A",
+      "all": "Toute la période"
     },
     "loading": "Mesure des périodes...",
     "loadFailed": "Les résultats des périodes n'ont pas pu être chargés. Les chiffres sont retenus, pas mis à zéro ; rechargez la page pour réessayer.",

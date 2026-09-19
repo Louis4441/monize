@@ -311,7 +311,11 @@
       "1m": "1M",
       "3m": "3M",
       "ytd": "Da inizio anno",
-      "1y": "1A"
+      "1y": "1A",
+      "2y": "2A",
+      "5y": "5A",
+      "10y": "10A",
+      "all": "Tutto il periodo"
     },
     "loading": "Misurazione dei periodi in corso...",
     "loadFailed": "Non è stato possibile caricare i risultati dei periodi. I valori sono sospesi, non azzerati; ricarica la pagina per riprovare.",
