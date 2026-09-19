@@ -5,20 +5,38 @@ import {
   PG_LISTENER,
   PgListener,
 } from "../common/cluster/pg-listener.provider";
-import { HealthController } from "./health.controller";
+import { PostgresThrottlerStorage } from "../common/throttler/postgres-throttler-storage";
+import {
+  EVENT_BUS_READINESS_GRACE_MS,
+  HealthController,
+} from "./health.controller";
 
 describe("HealthController", () => {
   let controller: HealthController;
   let mockDataSource: Partial<DataSource>;
-  let listener: { isConnected: jest.Mock } | null;
+  let listener: { isConnected: jest.Mock; downForMs: jest.Mock } | null;
+
+  /**
+   * `downForMs` defaults to just-dropped, which is the state readiness must
+   * tolerate: a database restart takes every replica's session at the same
+   * instant, so failing on the state alone would empty the endpoint list.
+   */
+  let throttlerStorage: { degradedReason: jest.Mock };
 
   const build = async (
     mode: ClusterMode,
     connected: boolean | null,
+    downForMs = 0,
   ): Promise<void> => {
     mockDataSource = { query: jest.fn() };
+    throttlerStorage = { degradedReason: jest.fn(() => null) };
     listener =
-      connected === null ? null : { isConnected: jest.fn(() => connected) };
+      connected === null
+        ? null
+        : {
+            isConnected: jest.fn(() => connected),
+            downForMs: jest.fn(() => downForMs),
+          };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [HealthController],
@@ -28,6 +46,10 @@ describe("HealthController", () => {
         {
           provide: PG_LISTENER,
           useValue: listener as unknown as PgListener | null,
+        },
+        {
+          provide: PostgresThrottlerStorage,
+          useValue: throttlerStorage as unknown as PostgresThrottlerStorage,
         },
       ],
     }).compile();
@@ -65,6 +87,31 @@ describe("HealthController", () => {
 
         expect(result.status).toBe("degraded");
         expect(result.checks.database).toBe("unhealthy");
+      });
+
+      it("says nothing about rate limiting while it is working", async () => {
+        databaseUp();
+
+        const result = await controller.check();
+
+        // A key that is always present would be another constant to watch.
+        expect(result.checks).not.toHaveProperty("rateLimiting");
+      });
+
+      it("reports a rate limiter that has silently stopped working", async () => {
+        // The storage fails open by design, so a missing table or a missing
+        // grant leaves every HTTP limit off while every other signal stays
+        // green. This probe is the only place it surfaces.
+        databaseUp();
+        throttlerStorage.degradedReason.mockReturnValue(
+          '42P01: relation "http_throttle_counters" does not exist',
+        );
+
+        const result = await controller.check();
+
+        expect(result.status).toBe("degraded");
+        expect(result.checks.database).toBe("healthy");
+        expect(result.checks.rateLimiting).toBe("disabled");
       });
 
       it("omits the event bus, which does not exist here", async () => {
@@ -124,29 +171,46 @@ describe("HealthController", () => {
       });
     });
 
-    describe("with the notification channel down", () => {
+    describe("with the notification channel just dropped", () => {
       beforeEach(async () => {
-        await build("multi", false);
+        await build("multi", false, 0);
       });
 
-      it("leaves the load balancer even though the database is fine", async () => {
+      it("keeps serving, because the loss is correlated across the fleet", async () => {
         databaseUp();
 
-        // This replica answers requests but cannot be woken: an SSE stream it
-        // holds advances only on the slow poll, and a relay turn answered on
-        // another replica waits out that timer. One replica out is cheaper than
-        // a conversation that looks hung.
-        await expect(controller.ready()).rejects.toThrow("Service not ready");
+        // Every replica loses its session at the same instant when the database
+        // restarts. Failing readiness here would take every pod out of the
+        // Service at once -- a total outage of every feature -- to avoid one
+        // poll interval of extra latency on relay turns, which is all a missing
+        // wake-up costs.
+        await expect(controller.ready()).resolves.toEqual({ status: "ok" });
       });
 
-      it("reports degraded with the cause named", async () => {
+      it("still reports the outage for alerting, with no grace period", async () => {
         databaseUp();
 
         const result = await controller.check();
 
+        // The monitor should see it the moment it starts; only the decision to
+        // stop serving waits.
         expect(result.status).toBe("degraded");
         expect(result.checks.database).toBe("healthy");
         expect(result.checks.eventBus).toBe("unhealthy");
+      });
+    });
+
+    describe("with the notification channel down past the grace period", () => {
+      beforeEach(async () => {
+        await build("multi", false, EVENT_BUS_READINESS_GRACE_MS + 1);
+      });
+
+      it("leaves the load balancer", async () => {
+        databaseUp();
+
+        // The reconnect ladder has had several full attempts by now, so this
+        // replica is probably not coming back on its own.
+        await expect(controller.ready()).rejects.toThrow("Service not ready");
       });
 
       it("recovers when the connection returns", async () => {
@@ -154,15 +218,23 @@ describe("HealthController", () => {
         await expect(controller.ready()).rejects.toThrow("Service not ready");
 
         listener!.isConnected.mockReturnValue(true);
+        listener!.downForMs.mockReturnValue(0);
 
+        await expect(controller.ready()).resolves.toEqual({ status: "ok" });
+      });
+
+      it("is exactly a threshold, not a rounding", async () => {
+        databaseUp();
+        listener!.downForMs.mockReturnValue(EVENT_BUS_READINESS_GRACE_MS);
+
+        // At the boundary the replica is still given the benefit of the doubt.
         await expect(controller.ready()).resolves.toEqual({ status: "ok" });
       });
     });
 
-    it("treats a missing listener as down rather than as absent", async () => {
-      // multi with no listener bound is a wiring defect, not a single-replica
-      // deployment; serving traffic on it would be the silent-wake-up failure
-      // the mode exists to prevent.
+    it("treats a missing listener as down with no grace at all", async () => {
+      // multi with no listener bound is a wiring defect rather than an outage:
+      // there is nothing to wait for, so there is no grace to give.
       await build("multi", null);
       databaseUp();
 

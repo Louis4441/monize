@@ -178,6 +178,7 @@ async function assertRuntimeRoleOrExit(dataSource: DataSource): Promise<void> {
  */
 async function assertNotificationChannelOrExit(
   listener: PgListener | null,
+  dataSource: DataSource,
 ): Promise<void> {
   if (!listener) {
     return;
@@ -185,9 +186,17 @@ async function assertNotificationChannelOrExit(
   const logger = new Logger("ClusterMode");
   try {
     await listener.connect();
-    await listener.listen(PG_WAKEUP_CHANNEL);
+    // Not `listen()` alone: accepting the statement is not receiving what it
+    // subscribes to. The probe is published on the *pool*, so what is proven is
+    // that a notification from another connection reaches this one -- which is
+    // exactly what a transaction-mode pooler cannot do, and exactly what the
+    // refusal below claims to catch.
+    await listener.verifyDelivery(PG_WAKEUP_CHANNEL, (channel, payload) =>
+      dataSource.query("SELECT pg_notify($1, $2)", [channel, payload]),
+    );
     logger.log(
-      `Notification channel ready: listening on "${PG_WAKEUP_CHANNEL}".`,
+      `Notification channel ready: listening on "${PG_WAKEUP_CHANNEL}" ` +
+        "and receiving from other connections.",
     );
   } catch (error) {
     logger.error(
@@ -195,8 +204,10 @@ async function assertNotificationChannelOrExit(
         `${process.env.DATABASE_HOST ?? "localhost"}: ` +
         `${error instanceof Error ? error.message : String(error)}. ` +
         "Every replica holds one LISTEN, so DATABASE_HOST must reach a " +
-        "PostgreSQL session; a transaction-mode pooler (pgBouncer) cannot " +
-        "carry it. Use a direct endpoint, or CLUSTER_MODE=single.",
+        "PostgreSQL session; a transaction-mode pooler (pgBouncer) accepts " +
+        "the statement and then loses the subscription, which is why this " +
+        "check requires a notification to arrive rather than a statement to " +
+        "succeed. Use a direct endpoint, or CLUSTER_MODE=single.",
     );
     process.exit(1);
   }
@@ -276,7 +287,10 @@ async function bootstrap() {
   await assertRequiredDbFunctionsOrExit(app.get(DataSource));
 
   // And, when this replica is one of several, that it can actually hear them.
-  await assertNotificationChannelOrExit(app.get(PG_LISTENER));
+  await assertNotificationChannelOrExit(
+    app.get(PG_LISTENER),
+    app.get(DataSource),
+  );
 
   // Trust first proxy (Docker/nginx) so req.ip reflects the real client IP
   app.getHttpAdapter().getInstance().set("trust proxy", 1);

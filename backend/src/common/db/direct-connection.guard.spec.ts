@@ -97,6 +97,29 @@ describe("direct PostgreSQL connections", () => {
     expect([...ALLOWED.keys()].filter((file) => !actual.has(file))).toEqual([]);
   });
 
+  it("runs nothing but LISTEN and pg_notify on the notification connection", () => {
+    // An allowlist entry is a permission to hold a connection, never a
+    // permission to reach a row on it. docs/row-level-security-contract.md
+    // section 4: "It runs `LISTEN <channel>` and `SELECT pg_notify($1, $2)`,
+    // and **nothing else**. No table, no view, no function that reads one."
+    // Without this the file-scoped allowlist above would permit a future
+    // `client.query("SELECT ... FROM users")` there -- the one thing section 4
+    // forbids outright, on a connection with no identity and no policy.
+    const source = readFileSync(
+      join(SRC, "common/cluster/pg-listener.provider.ts"),
+      "utf8",
+    );
+    const statements = [
+      ...source.matchAll(/\.query\(\s*(`[^`]*`|"[^"]*")/g),
+    ].map((match) => match[1].slice(1, -1));
+
+    // The vacuity anchor: a regex that stopped matching would otherwise pass.
+    expect(statements.length).toBeGreaterThan(0);
+    for (const statement of statements) {
+      expect(statement).toMatch(/^(LISTEN |UNLISTEN |SELECT pg_notify\()/);
+    }
+  });
+
   it("finds the sites at all, so the scan cannot pass by seeing nothing", () => {
     // The vacuity anchor: a regex or a glob that silently stops matching would
     // otherwise turn this whole spec green.

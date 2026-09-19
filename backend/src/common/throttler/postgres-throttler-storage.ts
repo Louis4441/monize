@@ -58,7 +58,38 @@ export class PostgresThrottlerStorage implements ThrottlerStorage {
    */
   private lastFailureLoggedAt = 0;
 
+  /**
+   * The last structural failure seen, or `null` while the storage is working.
+   *
+   * A structural failure -- a missing relation, a privilege the runtime role
+   * never had, a statement the server will not parse -- does not heal when the
+   * connection comes back, so folding it into the once-a-minute blip line hides
+   * a rate limiter that has silently stopped existing. `/health` reads this.
+   */
+  private structuralFailure: string | null = null;
+
+  /**
+   * Keys this replica has seen the database refuse, and until when.
+   *
+   * Consulted before the statement, which is what makes a refusal cheap. Sound
+   * because a block in this schema only moves forward or lapses: nothing
+   * shortens `blocked_until`, and the sweeper deliberately spares a blocked
+   * row. So this can only refuse during a period the database would also have
+   * refused, and never allows a request the database would have blocked. It
+   * needs no cross-replica agreement: each replica learns a block from its own
+   * first refused request.
+   */
+  private readonly blockedUntilByKey = new Map<string, number>();
+
   constructor(private readonly dataSource: DataSource) {}
+
+  /**
+   * What `/health` reports: `null` while the limiter is working, otherwise the
+   * structural failure that has silently disabled it.
+   */
+  degradedReason(): string | null {
+    return this.structuralFailure;
+  }
 
   /**
    * Count one request against `key`, and say whether it is now blocked.
@@ -86,6 +117,20 @@ export class PostgresThrottlerStorage implements ThrottlerStorage {
    *  3. **window expired** -- a fresh window at one hit.
    *  4. **otherwise** -- one more hit in the live window, and the block is set
    *     if that hit passed the limit.
+   *
+   * **The window is fixed, not sliding, and that is a deliberate difference
+   * from the storage this replaces.** `@nestjs/throttler`'s in-memory storage
+   * schedules a timer per hit that decrements the count `ttl` later, so it
+   * never allows more than `limit` in any sliding window. This resets the whole
+   * count when the window passes, which admits up to `2 x limit` across a
+   * boundary: five registrations at 14:59 and five more at 15:01 against a
+   * 15-minute, 5-request cap. The trade is deliberate -- it is the same fixed
+   * window `auth_attempt_counters` uses, it needs no per-hit row, and at two or
+   * more replicas it is still strictly tighter than the `limit x replicas` the
+   * in-memory storage gives -- but it is a weakening at one replica and is
+   * named here rather than left for a reader to discover. The auth routes carry
+   * `auth_attempt_counters` and `users.locked_until` beneath them;
+   * `register`, `oauth/interaction`, `pat` and the `ai/*` spend limits do not.
    */
   async increment(
     key: string,
@@ -94,6 +139,22 @@ export class PostgresThrottlerStorage implements ThrottlerStorage {
     blockDuration: number,
     throttlerName: string,
   ): Promise<ThrottleRecord> {
+    const cached = this.cachedBlock(throttlerName, key);
+    if (cached !== null) {
+      // Already refused, and the block cannot have been shortened. Going to the
+      // database here would turn every request of a client that is hammering
+      // through its block into a transaction, a row lock and a dead tuple on
+      // one hot page -- a rate limiter that amplifies load instead of shedding
+      // it. The window figures are the block's, which is all the guard reads
+      // while `isBlocked` is true.
+      return {
+        totalHits: 0,
+        timeToExpire: cached,
+        isBlocked: true,
+        timeToBlockExpire: cached,
+      };
+    }
+
     try {
       // The guard runs before RequestContextInterceptor, so there is no ambient
       // identity to inherit -- and this table has no owner to establish one
@@ -101,11 +162,17 @@ export class PostgresThrottlerStorage implements ThrottlerStorage {
       // a count joined to a transaction that then refuses the request would
       // roll back with the refusal, and the limiter would count every attempt
       // as zero. With no ambient transaction it is a no-op.
-      const rows = await runOutsideActiveScopedManager(() =>
-        withSystemContext(() =>
-          withScopedDb(this.dataSource, (manager) =>
-            manager.query(
-              `INSERT INTO http_throttle_counters AS t
+      // Bounded, because the pool's acquire has no timeout of its own: under
+      // saturation `withScopedDb` queues rather than throwing, so without a
+      // deadline the fail-open path below is unreachable in exactly the
+      // degradation it was written for -- a slow database rather than a dead
+      // one -- and every request stalls in the guard.
+      const rows = await withDeadline(
+        runOutsideActiveScopedManager(() =>
+          withSystemContext(() =>
+            withScopedDb(this.dataSource, (manager) =>
+              manager.query(
+                `INSERT INTO http_throttle_counters AS t
                    (name, key, hits, window_expires_at, blocked_until)
                VALUES (
                  $1, $2, 1,
@@ -149,16 +216,18 @@ export class PostgresThrottlerStorage implements ThrottlerStorage {
                          window_expires_at AS window_expires_at,
                          blocked_until AS blocked_until,
                          CURRENT_TIMESTAMP AS db_now`,
-              [
-                throttlerName,
-                key,
-                Math.round(ttl),
-                limit,
-                Math.round(blockDuration),
-              ],
+                [
+                  throttlerName,
+                  key,
+                  Math.round(ttl),
+                  limit,
+                  Math.round(blockDuration),
+                ],
+              ),
             ),
           ),
         ),
+        STATEMENT_DEADLINE_MS,
       );
 
       const [row] = returnedRows<{
@@ -173,14 +242,30 @@ export class PostgresThrottlerStorage implements ThrottlerStorage {
         row.blocked_until === null ? null : toDate(row.blocked_until).getTime();
       const isBlocked = blockedUntil !== null && blockedUntil > now;
 
+      this.structuralFailure = null;
+      const timeToBlockExpire = isBlocked ? toSeconds(blockedUntil - now) : 0;
+      if (isBlocked) {
+        this.blockedUntilByKey.set(
+          cacheKey(throttlerName, key),
+          Date.now() + timeToBlockExpire * 1000,
+        );
+      }
+
       return {
         totalHits: Number(row.hits),
-        timeToExpire: toSeconds(toDate(row.window_expires_at).getTime() - now),
+        // Never negative. While a key is blocked its window is frozen, so once
+        // the window passes but the block runs on, the raw difference goes
+        // negative and the guard puts it in `X-RateLimit-Reset` -- a header
+        // telling a client to come back in the past.
+        timeToExpire: Math.max(
+          0,
+          toSeconds(toDate(row.window_expires_at).getTime() - now),
+        ),
         isBlocked,
         // Zero rather than a negative when nothing is blocked: the guard reads
         // this only while blocked, and a Retry-After of "-1763" would be the
         // kind of header that sends somebody looking for a bug that is not one.
-        timeToBlockExpire: isBlocked ? toSeconds(blockedUntil - now) : 0,
+        timeToBlockExpire,
       };
     } catch (error) {
       this.reportFailure(error);
@@ -197,8 +282,34 @@ export class PostgresThrottlerStorage implements ThrottlerStorage {
     }
   }
 
-  /** One line a minute, however many requests are failing. */
+  /**
+   * A blip gets one line a minute; a structural failure gets one every time.
+   *
+   * The difference matters because they are not the same event. A connection
+   * that comes back restores the limiter on its own; a missing table, a missing
+   * grant or a statement the server will not parse leaves every HTTP rate limit
+   * in the deployment switched off until somebody notices -- and the routes
+   * with no second control (`register`, `oauth/interaction`, `pat`, the `ai/*`
+   * spend caps) have nothing beneath them. Recorded as well as logged, so
+   * `/health` can say it rather than leaving it to whoever greps.
+   */
   private reportFailure(error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error);
+    const code =
+      typeof (error as { code?: unknown } | null)?.code === "string"
+        ? (error as { code: string }).code
+        : "";
+
+    if (STRUCTURAL_SQLSTATES.has(code)) {
+      this.structuralFailure = `${code}: ${message}`;
+      this.logger.error(
+        `Rate limiting is DISABLED: the counters table cannot be written and ` +
+          `this will not heal on its own (${code}). Every HTTP rate limit in ` +
+          `this deployment is off until it is fixed: ${message}`,
+      );
+      return;
+    }
+
     const now = Date.now();
     if (now - this.lastFailureLoggedAt < FAILURE_LOG_INTERVAL_MS) {
       return;
@@ -206,9 +317,73 @@ export class PostgresThrottlerStorage implements ThrottlerStorage {
     this.lastFailureLoggedAt = now;
     this.logger.error(
       `Rate-limit counters are unreachable; the HTTP throttler is failing ` +
-        `open until the database returns: ` +
-        `${error instanceof Error ? error.message : String(error)}`,
+        `open until the database returns: ${message}`,
     );
+  }
+
+  /** Seconds left on a block this replica already knows about, or `null`. */
+  private cachedBlock(throttlerName: string, key: string): number | null {
+    const entry = this.blockedUntilByKey.get(cacheKey(throttlerName, key));
+    if (entry === undefined) {
+      return null;
+    }
+    const remainingMs = entry - Date.now();
+    if (remainingMs <= 0) {
+      // Lapsed: drop it so the map cannot grow without bound, and let the next
+      // request go to the database, which is the only thing that can reopen the
+      // window.
+      this.blockedUntilByKey.delete(cacheKey(throttlerName, key));
+      return null;
+    }
+    return Math.ceil(remainingMs / 1000);
+  }
+}
+
+/** One map key for the table's composite primary key. */
+function cacheKey(throttlerName: string, key: string): string {
+  return `${throttlerName}\u0000${key}`;
+}
+
+/**
+ * SQLSTATEs that are not a blip.
+ *
+ * A relation that does not exist, a privilege the runtime role was never
+ * granted and a statement the server will not parse do not heal when the
+ * connection returns, so they are reported every time rather than once a
+ * minute, and they are what `/health` surfaces.
+ */
+const STRUCTURAL_SQLSTATES = new Set([
+  "42P01", // undefined_table
+  "42703", // undefined_column
+  "42501", // insufficient_privilege
+  "42601", // syntax_error
+  "42883", // undefined_function
+  "42P10", // invalid_column_reference (a bad ON CONFLICT target)
+]);
+
+/** How long the counting statement may take before the storage fails open. */
+export const STATEMENT_DEADLINE_MS = 2_000;
+
+/** Fail a promise that has not settled in time, so the guard cannot stall. */
+async function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(
+              new Error(
+                `the rate-limit statement did not answer within ${ms}ms`,
+              ),
+            ),
+          ms,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 

@@ -3,6 +3,7 @@ import { DataSource } from "typeorm";
 import {
   FAILURE_LOG_INTERVAL_MS,
   PostgresThrottlerStorage,
+  STATEMENT_DEADLINE_MS,
 } from "./postgres-throttler-storage";
 
 /**
@@ -112,14 +113,48 @@ describe("PostgresThrottlerStorage", () => {
     });
 
     it("counts a hit as blocked while the block is in the future", async () => {
+      // 12s remaining against a configured 30s block: the two must differ, or a
+      // storage that returned the configured duration instead of the remaining
+      // time would pass. That mutation used to survive the whole suite.
       query.mockResolvedValue(
-        row({ hits: 101, blocked_until: new Date(NOW.getTime() + 30_000) }),
+        row({ hits: 101, blocked_until: new Date(NOW.getTime() + 12_000) }),
       );
 
       const record = await storage.increment("k", 60_000, 100, 30_000, "x");
 
       expect(record.isBlocked).toBe(true);
-      expect(record.timeToBlockExpire).toBe(30);
+      expect(record.timeToBlockExpire).toBe(12);
+    });
+
+    it("never reports a negative window while a block runs on", async () => {
+      // A blocked key's window is frozen, so once it passes the raw difference
+      // goes negative -- and the guard puts timeToExpire in X-RateLimit-Reset,
+      // which would tell the client to come back in the past.
+      query.mockResolvedValue(
+        row({
+          hits: 6,
+          window_expires_at: new Date(NOW.getTime() - 90_000),
+          blocked_until: new Date(NOW.getTime() + 20_000),
+        }),
+      );
+
+      const record = await storage.increment("k", 60_000, 5, 60_000, "login");
+
+      expect(record.timeToExpire).toBe(0);
+      expect(record.timeToBlockExpire).toBe(20);
+    });
+
+    it("blocks the very first request when the limit is zero", async () => {
+      // The INSERT arm's own block branch, which no other case reaches: with
+      // limit 0 the first hit is already over it.
+      query.mockResolvedValue(
+        row({ hits: 1, blocked_until: new Date(NOW.getTime() + 5_000) }),
+      );
+
+      const record = await storage.increment("k", 60_000, 0, 5_000, "x");
+
+      expect(record.isBlocked).toBe(true);
+      expect(params()[3]).toBe(0);
     });
 
     it("is not blocked by a block the database has already passed", async () => {
@@ -210,6 +245,157 @@ describe("PostgresThrottlerStorage", () => {
 
       expect(error.mock.calls[0][0]).toContain("connection terminated");
       expect(error.mock.calls[0][0]).toContain("failing");
+    });
+
+    it("reports a blip as transient, with nothing for /health to show", async () => {
+      await storage.increment("k", 60_000, 100, 0, "default");
+
+      // A connection that comes back restores the limiter on its own.
+      expect(storage.degradedReason()).toBeNull();
+    });
+  });
+
+  describe("when the failure is structural", () => {
+    let error: jest.SpyInstance;
+
+    const failWith = (code: string, message: string) => {
+      const failure = Object.assign(new Error(message), { code });
+      query.mockRejectedValue(failure);
+    };
+
+    beforeEach(() => {
+      error = jest
+        .spyOn(
+          (storage as unknown as { logger: { error: (m: string) => void } })
+            .logger,
+          "error",
+        )
+        .mockImplementation(() => undefined);
+    });
+
+    afterEach(() => error.mockRestore());
+
+    it.each([
+      ["42P01", 'relation "http_throttle_counters" does not exist'],
+      ["42501", "permission denied for table http_throttle_counters"],
+      ["42601", "syntax error at or near ON"],
+    ])("records %s so /health can report it", async (code, message) => {
+      failWith(code, message);
+
+      await storage.increment("k", 60_000, 100, 0, "default");
+
+      // This does not heal when the connection comes back: every HTTP rate
+      // limit in the deployment is off until somebody fixes it, and every other
+      // signal stays green because the storage fails open.
+      expect(storage.degradedReason()).toContain(code);
+      expect(error.mock.calls[0][0]).toContain("Rate limiting is DISABLED");
+    });
+
+    it("logs every occurrence, not once a minute", async () => {
+      jest.useFakeTimers().setSystemTime(NOW);
+      failWith("42P01", "relation does not exist");
+
+      await storage.increment("k", 60_000, 100, 0, "default");
+      await storage.increment("k", 60_000, 100, 0, "default");
+      await storage.increment("k", 60_000, 100, 0, "default");
+
+      // The once-a-minute throttle is for a blip. Folding a permanently
+      // disabled limiter into it is how it stays unnoticed.
+      expect(error).toHaveBeenCalledTimes(3);
+      jest.useRealTimers();
+    });
+
+    it("clears the report once the statement works again", async () => {
+      failWith("42P01", "relation does not exist");
+      await storage.increment("k", 60_000, 100, 0, "default");
+      expect(storage.degradedReason()).not.toBeNull();
+
+      query.mockResolvedValue(row());
+      await storage.increment("k", 60_000, 100, 0, "default");
+
+      expect(storage.degradedReason()).toBeNull();
+    });
+  });
+
+  describe("a key it already knows is blocked", () => {
+    it("is refused without touching the database", async () => {
+      // A client hammering through its block would otherwise turn every refused
+      // request into a transaction and a row lock on one hot page: a rate
+      // limiter that amplifies load instead of shedding it.
+      query.mockResolvedValue(
+        row({ hits: 6, blocked_until: new Date(NOW.getTime() + 30_000) }),
+      );
+      const first = await storage.increment("k", 60_000, 5, 30_000, "login");
+      expect(first.isBlocked).toBe(true);
+      expect(query).toHaveBeenCalledTimes(1);
+
+      const second = await storage.increment("k", 60_000, 5, 30_000, "login");
+
+      expect(second.isBlocked).toBe(true);
+      expect(second.timeToBlockExpire).toBeGreaterThan(0);
+      expect(query).toHaveBeenCalledTimes(1);
+    });
+
+    it("goes back to the database once the block has lapsed", async () => {
+      // The cache can only ever refuse during a period the database would also
+      // have refused; reopening the window is the database's decision alone.
+      jest.useFakeTimers().setSystemTime(NOW);
+      query.mockResolvedValue(
+        row({ hits: 6, blocked_until: new Date(NOW.getTime() + 1_000) }),
+      );
+      await storage.increment("k", 60_000, 5, 1_000, "login");
+
+      jest.setSystemTime(new Date(NOW.getTime() + 2_000));
+      query.mockResolvedValue(row());
+      const after = await storage.increment("k", 60_000, 5, 1_000, "login");
+
+      expect(after.isBlocked).toBe(false);
+      expect(query).toHaveBeenCalledTimes(2);
+      jest.useRealTimers();
+    });
+
+    it("keeps a separate block per throttler on one key", async () => {
+      query.mockResolvedValue(
+        row({ hits: 6, blocked_until: new Date(NOW.getTime() + 30_000) }),
+      );
+      await storage.increment("k", 60_000, 5, 30_000, "login");
+
+      query.mockResolvedValue(row());
+      const other = await storage.increment("k", 60_000, 100, 0, "default");
+
+      // A stricter limiter's block must not refuse a looser limiter's traffic.
+      expect(other.isBlocked).toBe(false);
+      expect(query).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("when the database is saturated rather than down", () => {
+    it("fails open on its own deadline instead of queueing behind the pool", async () => {
+      // The pool's acquire has no timeout, so `withScopedDb` queues rather than
+      // throwing: without a deadline of its own the fail-open path is
+      // unreachable in exactly the degradation it was written for, and every
+      // request stalls inside the guard.
+      jest.useFakeTimers();
+      const error = jest
+        .spyOn(
+          (storage as unknown as { logger: { error: (m: string) => void } })
+            .logger,
+          "error",
+        )
+        .mockImplementation(() => undefined);
+      query.mockImplementation(() => new Promise(() => undefined));
+
+      const pending = storage.increment("k", 60_000, 100, 0, "default");
+      await jest.advanceTimersByTimeAsync(STATEMENT_DEADLINE_MS);
+
+      await expect(pending).resolves.toEqual({
+        totalHits: 0,
+        timeToExpire: 0,
+        isBlocked: false,
+        timeToBlockExpire: 0,
+      });
+      error.mockRestore();
+      jest.useRealTimers();
     });
   });
 });

@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { Logger } from "@nestjs/common";
 import { Client, ClientConfig, Notification } from "pg";
 
@@ -60,6 +62,22 @@ export const PG_LISTENER_RECONNECT_MIN_MS = 1_000;
 
 /** Longest a replica waits between reconnect attempts. */
 export const PG_LISTENER_RECONNECT_MAX_MS = 30_000;
+
+/**
+ * How long the socket may be idle before the kernel probes it.
+ *
+ * `keepAlive: true` on its own means `setKeepAlive(true, 0)`, which is the OS
+ * default -- 7200 seconds on Linux. This connection is idle between wake-ups by
+ * construction, and every NAT table and managed-endpoint idle timeout is far
+ * shorter than two hours, so without an explicit delay a middlebox can drop the
+ * flow without an RST and the replica holds a socket it believes is live,
+ * hears nothing, and reports itself ready the whole time. Ten seconds makes
+ * the kernel notice in tens of seconds instead of hours.
+ */
+export const PG_LISTENER_KEEPALIVE_DELAY_MS = 10_000;
+
+/** How long the boot probe waits for its own notification to come back. */
+export const PG_LISTENER_PROBE_TIMEOUT_MS = 5_000;
 
 /**
  * A channel name is an identifier, and `LISTEN` takes no bind parameter, so the
@@ -130,6 +148,7 @@ export function resolveListenerClientConfig(
     // NAT table or an idle-timeout on a managed endpoint drops silently. Without
     // this the replica keeps a socket it believes is live and hears nothing.
     keepAlive: true,
+    keepAliveInitialDelayMillis: PG_LISTENER_KEEPALIVE_DELAY_MS,
     connectionTimeoutMillis: PG_LISTENER_CONNECT_TIMEOUT_MS,
   };
 }
@@ -182,9 +201,28 @@ export class PgListener {
   /** Non-null only while a session is live; readiness reads exactly this. */
   private client: Client | null = null;
 
+  /**
+   * The `open()` in flight, if there is one.
+   *
+   * Single-flight, because `client` is null for the whole of a connect: a
+   * decision taken before that await -- a second `connect()`, or a `close()` --
+   * would otherwise be applied after it, and the session opened during a
+   * shutdown would outlive the shutdown that already returned.
+   */
+  private opening: Promise<void> | null = null;
+
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
   private closed = false;
+
+  /**
+   * When the current outage began, or `null` while the session is live.
+   *
+   * Readiness needs the duration, not the state: every replica loses its
+   * session at the same instant when the database restarts, so a probe that
+   * fails on the state alone empties the whole endpoint list at once.
+   */
+  private downSince: number | null = null;
 
   constructor(
     private readonly config: ClientConfig,
@@ -196,6 +234,16 @@ export class PgListener {
   /** Whether a session is live. False while reconnecting. */
   isConnected(): boolean {
     return this.client !== null;
+  }
+
+  /**
+   * How long the channel has been down, in milliseconds, or `0` while it is up.
+   *
+   * The reconnect ladder tops out at `PG_LISTENER_RECONNECT_MAX_MS`, so a value
+   * well above that means the reconnect is not merely in progress.
+   */
+  downForMs(now: number = Date.now()): number {
+    return this.downSince === null ? 0 : Math.max(0, now - this.downSince);
   }
 
   /** Channels this process wants to hear, live or not. For specs and logs. */
@@ -261,6 +309,58 @@ export class PgListener {
     await client.query("SELECT pg_notify($1, $2)", [channel, payload]);
   }
 
+  /**
+   * Prove this session actually receives notifications, not merely that it
+   * accepted `LISTEN`.
+   *
+   * `publish` must send on a **different** connection: that is the whole point.
+   * A transaction-mode pooler accepts the connection, forwards the `LISTEN`
+   * statement to whichever server connection is free, returns success, and then
+   * hands that server connection to somebody else -- so the subscription is on
+   * a backend this listener does not own. Accepting the statement therefore
+   * proves nothing, and publishing on this same connection would round-trip
+   * through the pooler too. Only a notification that originated elsewhere and
+   * arrived here distinguishes a session from a pooled handle.
+   *
+   * Rejects when no probe arrives inside the deadline, which is what turns a
+   * misconfigured `DATABASE_HOST` into a refused boot rather than a deployment
+   * whose replicas silently never wake each other.
+   */
+  async verifyDelivery(
+    channel: string,
+    publish: (channel: string, payload: string) => Promise<unknown>,
+    timeoutMs: number = PG_LISTENER_PROBE_TIMEOUT_MS,
+  ): Promise<void> {
+    assertValidChannel(channel);
+    await this.listen(channel);
+    const token = `probe:${randomUUID()}`;
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        off();
+        reject(
+          new Error(
+            `no notification arrived within ${timeoutMs}ms. The connection ` +
+              "accepted LISTEN but does not receive what another connection " +
+              "sends, which is what a transaction-mode pooler does.",
+          ),
+        );
+      }, timeoutMs);
+      const off = this.onNotification((received, payload) => {
+        if (received !== channel || payload !== token) {
+          return;
+        }
+        clearTimeout(timer);
+        off();
+        resolve();
+      });
+      void publish(channel, token).catch((error: unknown) => {
+        clearTimeout(timer);
+        off();
+        reject(error instanceof Error ? error : new Error(String(error)));
+      });
+    });
+  }
+
   /** Receive every notification on every channel. Returns an unsubscribe. */
   onNotification(handler: PgNotificationHandler): () => void {
     this.handlers.add(handler);
@@ -281,6 +381,13 @@ export class PgListener {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    // An open() already in flight would otherwise install its client after this
+    // returns. It ends that client itself now that `closed` is set, so all this
+    // has to do is not resolve before it has: without the wait, `close()`
+    // resolves, `isConnected()` goes back to true a moment later, and the pg
+    // socket is a ref'd handle that keeps the process alive until the
+    // container's grace period kills it.
+    await this.opening?.catch(() => undefined);
     const client = this.client;
     this.client = null;
     if (client) {
@@ -290,17 +397,40 @@ export class PgListener {
 
   /** Connect, arm the loss handlers, and replay every channel. Throws. */
   private async open(): Promise<void> {
-    const client = this.createClient(this.config);
+    if (this.opening) {
+      return this.opening;
+    }
+    this.opening = this.openOnce();
     try {
-      // The error and end handlers go on *after* the connect resolves. A
-      // connect that fails rejects the promise; arming them first would make
-      // that same failure also schedule a reconnect, so the boot check would
-      // exit while a retry loop it does not know about kept running.
+      await this.opening;
+    } finally {
+      this.opening = null;
+    }
+  }
+
+  private async openOnce(): Promise<void> {
+    const client = this.createClient(this.config);
+    // The `error` and `end` handlers go on as soon as the connect resolves and
+    // *before* the LISTEN replay, not after it. Arming them before the connect
+    // would make a failed connect schedule a reconnect the boot check does not
+    // know about; arming them after the replay left a window -- connect
+    // resolved, handlers not yet attached -- in which a dropped session emits
+    // `error` on a client with no listener, which Node throws as an uncaught
+    // exception from inside pg's socket callback. That window is exactly where
+    // a failover puts every replica at once, so it turned a self-healing
+    // reconnect into a crash loop. `handleLoss`'s identity check makes these a
+    // no-op until `this.client` is set, so the replay's own error handling is
+    // unchanged.
+    let connected = false;
+    try {
       await withDeadline(
         client.connect(),
         PG_LISTENER_CONNECT_TIMEOUT_MS,
         "Connecting the notification channel",
       );
+      connected = true;
+      client.on("error", (error: Error) => this.handleLoss(client, error));
+      client.on("end", () => this.handleLoss(client, null));
       for (const channel of this.channels) {
         await withDeadline(
           client.query(`LISTEN ${channel}`),
@@ -309,16 +439,31 @@ export class PgListener {
         );
       }
     } catch (error) {
+      if (connected) {
+        // Leave a swallowing listener behind: end() can emit a late `error`,
+        // and this client is about to be unreferenced, so nothing should act
+        // on it -- but an emit with no listener at all still throws.
+        client.removeAllListeners("error");
+        client.removeAllListeners("end");
+        client.on("error", () => undefined);
+      }
       await client.end().catch(() => undefined);
       throw error;
     }
-    client.on("error", (error: Error) => this.handleLoss(client, error));
-    client.on("end", () => this.handleLoss(client, null));
+    if (this.closed) {
+      // close() ran while this connect was in flight and has already decided
+      // there is no session. Honour that rather than installing one behind it.
+      client.removeAllListeners("error");
+      client.on("error", () => undefined);
+      await client.end().catch(() => undefined);
+      return;
+    }
     client.on("notification", (message: Notification) =>
       this.dispatch(message),
     );
     this.client = client;
     this.reconnectAttempt = 0;
+    this.downSince = null;
   }
 
   private handleLoss(client: Client, error: Error | null): void {
@@ -328,6 +473,7 @@ export class PgListener {
       return;
     }
     this.client = null;
+    this.downSince ??= Date.now();
     this.logger.warn(
       error
         ? `Notification connection lost: ${error.message}. Reconnecting.`
@@ -360,6 +506,12 @@ export class PgListener {
     }
     try {
       await this.open();
+      if (!this.isConnected()) {
+        // `open()` stood down because `close()` ran while it was in flight.
+        // Announcing a re-established connection there would be announcing a
+        // session that was deliberately discarded.
+        return;
+      }
       this.logger.log(
         `Notification connection re-established; listening on ` +
           `${this.subscribedChannels().join(", ") || "no channels"}.`,

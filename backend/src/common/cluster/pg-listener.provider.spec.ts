@@ -3,6 +3,7 @@ import type { Client, ClientConfig } from "pg";
 
 import {
   PG_LISTENER_CONNECT_TIMEOUT_MS,
+  PG_LISTENER_KEEPALIVE_DELAY_MS,
   PG_LISTENER_RECONNECT_MAX_MS,
   PG_LISTENER_RECONNECT_MIN_MS,
   PG_WAKEUP_CHANNEL,
@@ -122,6 +123,10 @@ describe("resolveListenerClientConfig", () => {
       user: "owner",
       password: "owner-secret",
       keepAlive: true,
+      // Without an explicit delay this is the OS default -- two hours on Linux
+      // -- so a NAT or endpoint idle timeout drops the flow and the replica
+      // holds a dead socket, hears nothing, and reports itself ready.
+      keepAliveInitialDelayMillis: PG_LISTENER_KEEPALIVE_DELAY_MS,
       connectionTimeoutMillis: PG_LISTENER_CONNECT_TIMEOUT_MS,
       ssl: false,
     });
@@ -214,6 +219,43 @@ describe("PgListener", () => {
       expect(client.listenerCount("end")).toBe(0);
       expect(client.listenerCount("notification")).toBe(0);
       expect(made).toHaveLength(1);
+    });
+
+    it("arms the loss handlers before replaying LISTEN, not after", async () => {
+      // The window between "connect resolved" and "handlers attached" is where
+      // a failover drops every replica's session at once. An `error` emitted
+      // on a client with no listener is an uncaught exception thrown from
+      // inside pg's socket callback, so this used to turn a self-healing
+      // reconnect into a crash loop.
+      const client = new FakeClient();
+      let listenersDuringReplay = -1;
+      client.query = (sql: string) => {
+        client.queries.push(sql);
+        listenersDuringReplay = client.listenerCount("error");
+        return Promise.resolve({ rows: [] });
+      };
+      const { listener } = buildListener([client]);
+      await listener.listen(PG_WAKEUP_CHANNEL);
+
+      await listener.connect();
+
+      expect(listenersDuringReplay).toBeGreaterThan(0);
+      await listener.close();
+    });
+
+    it("leaves a swallowing error listener on a client it gives up on", async () => {
+      // end() can emit a late `error`, and an emit with no listener at all
+      // throws even though nothing should act on this client any more.
+      const client = new FakeClient();
+      client.queryError = new Error("LISTEN refused");
+      const { listener } = buildListener([client]);
+      await listener.listen(PG_WAKEUP_CHANNEL);
+
+      await expect(listener.connect()).rejects.toThrow("LISTEN refused");
+
+      expect(() =>
+        client.emit("error", new Error("late failure after end")),
+      ).not.toThrow();
     });
 
     it("refuses to reopen after close", async () => {
@@ -470,6 +512,57 @@ describe("PgListener", () => {
       await listener.close();
     });
 
+    it("does not install a session that close() has already given up on", async () => {
+      // close() used to read `client` (null during a connect), end nothing and
+      // resolve, after which the in-flight open installed its client anyway:
+      // isConnected() went back to true, notify() worked on a closed listener,
+      // and the pg socket is a ref'd handle that keeps the process alive until
+      // the container's grace period kills it.
+      const first = new FakeClient();
+      const second = new FakeClient();
+      let release!: () => void;
+      second.connectResult = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const { listener } = buildListener([first, second]);
+      await listener.connect();
+
+      first.emit("error", new Error("down"));
+      await jest.advanceTimersByTimeAsync(PG_LISTENER_RECONNECT_MIN_MS);
+
+      const closing = listener.close();
+      release();
+      await closing;
+
+      expect(listener.isConnected()).toBe(false);
+      expect(second.endCalls).toBe(1);
+      await expect(listener.notify(PG_WAKEUP_CHANNEL, "{}")).rejects.toThrow(
+        /connection is down/,
+      );
+    });
+
+    it("resets the backoff after a successful reconnect", async () => {
+      // Without the reset a flapping link degrades to a permanent 30s ladder,
+      // which the "doubles the delay" case cannot see because it never lets a
+      // reconnect succeed.
+      const first = new FakeClient();
+      const second = new FakeClient();
+      const third = new FakeClient();
+      const { listener, made } = buildListener([first, second, third]);
+      await listener.connect();
+
+      first.emit("error", new Error("down"));
+      await jest.advanceTimersByTimeAsync(PG_LISTENER_RECONNECT_MIN_MS);
+      expect(made).toHaveLength(2);
+
+      second.emit("error", new Error("down again"));
+      await jest.advanceTimersByTimeAsync(PG_LISTENER_RECONNECT_MIN_MS);
+
+      // The minimum delay again, not double it.
+      expect(made).toHaveLength(3);
+      await listener.close();
+    });
+
     it("stops reconnecting once closed", async () => {
       const first = new FakeClient();
       const { listener, made } = buildListener([first, new FakeClient()]);
@@ -481,6 +574,89 @@ describe("PgListener", () => {
 
       expect(made).toHaveLength(1);
       expect(listener.isConnected()).toBe(false);
+    });
+  });
+
+  describe("verifyDelivery", () => {
+    it("resolves when a probe published elsewhere arrives here", async () => {
+      const client = new FakeClient();
+      const { listener } = buildListener([client]);
+      await listener.connect();
+
+      // The publisher stands in for the pool: a different connection entirely.
+      const verified = listener.verifyDelivery(
+        PG_WAKEUP_CHANNEL,
+        (channel, payload) => {
+          client.emit("notification", { channel, payload });
+          return Promise.resolve();
+        },
+      );
+
+      await expect(verified).resolves.toBeUndefined();
+      expect(client.queries).toContain(`LISTEN ${PG_WAKEUP_CHANNEL}`);
+      await listener.close();
+    });
+
+    it("rejects when LISTEN was accepted but nothing is delivered", async () => {
+      // Exactly what a transaction-mode pooler does: it takes the statement and
+      // hands the server connection holding the subscription to somebody else.
+      jest.useFakeTimers();
+      const client = new FakeClient();
+      const { listener } = buildListener([client]);
+      await listener.connect();
+
+      const verified = listener.verifyDelivery(
+        PG_WAKEUP_CHANNEL,
+        () => Promise.resolve(),
+        1_000,
+      );
+      const assertion = expect(verified).rejects.toThrow(
+        /no notification arrived/,
+      );
+      await jest.advanceTimersByTimeAsync(1_000);
+      await assertion;
+
+      await listener.close();
+      jest.useRealTimers();
+    });
+
+    it("ignores a notification that is not its own probe", async () => {
+      jest.useFakeTimers();
+      const client = new FakeClient();
+      const { listener } = buildListener([client]);
+      await listener.connect();
+
+      const verified = listener.verifyDelivery(
+        PG_WAKEUP_CHANNEL,
+        (channel) => {
+          // Ordinary traffic on the same channel, not the probe token.
+          client.emit("notification", { channel, payload: "{}" });
+          return Promise.resolve();
+        },
+        1_000,
+      );
+      const assertion = expect(verified).rejects.toThrow(
+        /no notification arrived/,
+      );
+      await jest.advanceTimersByTimeAsync(1_000);
+      await assertion;
+
+      await listener.close();
+      jest.useRealTimers();
+    });
+
+    it("surfaces a publisher failure rather than waiting out the deadline", async () => {
+      const client = new FakeClient();
+      const { listener } = buildListener([client]);
+      await listener.connect();
+
+      await expect(
+        listener.verifyDelivery(PG_WAKEUP_CHANNEL, () =>
+          Promise.reject(new Error("pool is gone")),
+        ),
+      ).rejects.toThrow("pool is gone");
+
+      await listener.close();
     });
   });
 
