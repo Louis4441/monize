@@ -601,6 +601,7 @@
   },
   "attachments": {
     "notFound": "Anhang nicht gefunden",
+    "storageUnavailable": "Die Datei dieses Anhangs liegt im Speicher-Backend \"{{ provider }}\", auf das dieser Server nicht zugreifen kann",
     "transactionNotFound": "Transaktion nicht gefunden",
     "empty": "Die hochgeladene Datei ist leer",
     "fileTooLarge": "Die Datei überschreitet die maximale Größe von {{ max }} Bytes",

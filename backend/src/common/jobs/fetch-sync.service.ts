@@ -6,28 +6,36 @@ import { withScopedDb } from "../db/scoped-db";
 import { returnedRows } from "../db/query-result";
 
 /**
- * The three outbound market-data fetches, and which of them this deployment's
- * jobs may name.
+ * Every deployment-wide job one replica should run per tick, and which of them
+ * this deployment's jobs may name.
  *
  * Spelled out so a typo is a compile error rather than a second lease nobody
  * contends for -- which would look exactly like the job working.
+ *
+ * The first three are the outbound market-data fetches this table was added for.
+ * The fourth is the attachment relocation pass, which is not a fetch but has the
+ * same shape for the same reason: its writes converge whoever runs them (per-row,
+ * under a lock, idempotent by key), so what a second replica duplicates is the
+ * cost -- reads and writes of bytes that end up identical -- and not the result.
  */
 export const FetchSyncJob = {
   ExchangeRates: "exchange-rates",
   SecurityPrices: "security-prices",
   MarketIndexes: "market-indexes",
+  AttachmentRelocation: "attachment-relocation",
 } as const;
 
 export type FetchSyncJob = (typeof FetchSyncJob)[keyof typeof FetchSyncJob];
 
 /**
- * One replica per tick calls the provider.
+ * One replica per tick does the work.
  *
  * Every replica fires the FX, security-price and market-index crons. Their
  * writes are idempotent upserts, so the *data* converges however many run --
  * what does not converge is the cost: N replicas is N times the provider calls,
  * N times the rate-limit budget, and N chances to trip the breaker on a
- * provider that is merely slow.
+ * provider that is merely slow. The attachment relocation pass joins them on the
+ * same terms, with object-store traffic in place of provider calls.
  *
  * So this is a **cost control, not a correctness mechanism**, and that decides
  * its shape at every point:
@@ -148,9 +156,9 @@ export class FetchSyncService {
    * return `false`.
    *
    * The whole point of putting it here rather than at each call site: the
-   * lease has to be given back on **both** paths, and the three crons that
-   * take one would otherwise each spell out the same `try/finally` -- which is
-   * the kind of thing that is right in two of the three places.
+   * lease has to be given back on **both** paths, and every caller that takes
+   * one would otherwise spell out the same `try/finally` -- which is the kind of
+   * thing that is right in all but one of the places.
    */
   async withLease(
     job: FetchSyncJob,

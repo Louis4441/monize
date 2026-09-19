@@ -601,6 +601,7 @@
   },
   "attachments": {
     "notFound": "Không tìm thấy tệp đính kèm",
+    "storageUnavailable": "Tệp của tệp đính kèm này nằm trong bộ lưu trữ \"{{ provider }}\", mà máy chủ này chưa được cấu hình để truy cập",
     "transactionNotFound": "Không tìm thấy giao tác",
     "empty": "Tệp đã tải lên trống",
     "fileTooLarge": "Tệp vượt quá kích thước tối đa {{ max }} byte",

@@ -98,6 +98,7 @@ implied.
 | INV-CURRENCY-001 | A shared currency is deleted only by its creator, on a global count | enforced |
 | INV-ATTACHMENT-001 | Available metadata resolves to committed bytes | enforced |
 | INV-ATTACHMENT-002 | A scanned document and its original are one attachment | enforced |
+| INV-ATTACHMENT-003 | An attachment's bytes are read from the backend that holds them, and a provider switch moves them | enforced |
 | INV-SHARE-001 | A shared file reaches the server only through an endpoint that already existed | enforced |
 | INV-SHARE-002 | Nothing is imported, attached or saved from a share without an explicit action | enforced |
 | INV-SHARE-003 | The share stash holds only files within the declared limits, and outlives neither its lifetime nor the session | enforced |
@@ -2806,6 +2807,50 @@ Retry semantics     A failed pair leaves neither row; the compensation deletes
 Crash semantics     A crash between the two writes rolls both back; the
                     intents outlive the process, so neither object is orphaned
                     undiscoverably.
+Status              enforced
+```
+
+### INV-ATTACHMENT-003 -- the row says which backend, and a switch is a move
+
+```text
+Statement           An attachment's bytes are read from the backend its own row
+                    names, whatever ATTACHMENT_STORAGE_PROVIDER now says, and a
+                    change to that setting relocates every attachment into the new
+                    backend without a window in which one is unreadable. A row is
+                    never flipped to a backend that does not yet hold a verified
+                    copy of its bytes.
+Enforcement         Reads go through AttachmentStorageRegistry (resolve/require on
+                    row.storage_provider), so the bound provider is consulted only
+                    for where NEW bytes go; an unaddressable backend is a
+                    ServiceUnavailableException naming it, never a 404, and the
+                    preview renders that state as "intact, not servable from here"
+                    rather than offering a download that fails identically
+                    (isStoreUnreachable).
+                    AttachmentStorageMigrator (onApplicationBootstrap, plus hourly
+                    at :50) does the move per attachment inside one transaction:
+                    SELECT ... FOR UPDATE, check the source bytes against the row's
+                    byte_size/sha256, save to the destination, read the copy back
+                    and check it again, flip storage_provider, retire the source
+                    (tombstone for local/s3, transactional blob DELETE for
+                    database). The destination write is preceded by an upload intent
+                    and the intent is cleared inside the flip, fenced on swept_at
+                    (the create path's protocol). The source object is deleted after
+                    the commit, through AttachmentOrphanSweeper.sweepKey, which
+                    sweeps each addressable backend and refuses any key a live
+                    transaction_attachments row still points at.
+Concurrency scope   per attachment (the row lock), with a deployment-wide lease
+                    (FetchSyncService "attachment-relocation") as a cost control
+                    only
+Retry semantics     Every refusal is before the destination write, so a failed row
+                    is unchanged and the next hourly pass retries it. A lost lease,
+                    an expired one and a duplicate pass all converge: the key is the
+                    attachment id, so a repeated copy writes identical bytes and the
+                    locked re-read lets only one flip happen.
+Crash semantics     Before the commit: bytes in the destination that nothing
+                    references, enumerable from the intent. After it: the source
+                    object survives under its tombstone until a sweep takes it.
+                    Neither state makes an attachment unreadable, because the row
+                    points at whichever copy is intact.
 Status              enforced
 ```
 

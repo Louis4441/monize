@@ -24,14 +24,13 @@ import { BackupRestoreDatabaseService } from "@/backup/backup-restore-database.s
 import { NetWorthService } from "@/net-worth/net-worth.service";
 import { OidcReauthService } from "@/auth/oidc/oidc-reauth.service";
 import { EncryptionService } from "@/common/encryption/encryption.service";
-import { DatabaseStorageProvider } from "@/attachments/storage/database-storage.provider";
-import { ATTACHMENT_STORAGE_PROVIDER } from "@/attachments/storage/attachment-storage.interface";
 import { JobClaimService } from "@/common/jobs/job-claim.service";
 import { UserMaintenanceService } from "@/common/jobs/user-maintenance.service";
 import { User } from "@/users/entities/user.entity";
 import { withUserContext } from "@/common/db/with-context";
 
 import {
+  attachmentStorageProviders,
   cleanTables,
   createEnforcedIntegrationModule,
   createTestUserDirect,
@@ -418,11 +417,7 @@ describe("Calendar day notes survive a backup round trip", () => {
         JobClaimService,
         UserMaintenanceService,
         { provide: EncryptionService, useValue: { decrypt: () => "" } },
-        DatabaseStorageProvider,
-        {
-          provide: ATTACHMENT_STORAGE_PROVIDER,
-          useExisting: DatabaseStorageProvider,
-        },
+        ...attachmentStorageProviders(),
       ],
     }).compile();
 

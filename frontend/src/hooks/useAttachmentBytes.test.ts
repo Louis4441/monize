@@ -26,6 +26,25 @@ function deferred<T>() {
 }
 
 const bytesOf = (text: string) => new TextEncoder().encode(text).buffer;
+
+/**
+ * What axios throws for the server's "I cannot reach that backend" answer: 503
+ * with the code, and the body as bytes because the request asked for an
+ * arraybuffer.
+ */
+const unreachableStoreError = () =>
+  Object.assign(new Error('unreachable'), {
+    isAxiosError: true,
+    response: {
+      status: 503,
+      data: new TextEncoder().encode(
+        JSON.stringify({
+          message: 'held in the "s3" storage backend',
+          code: 'ATTACHMENT_STORE_UNREACHABLE',
+        }),
+      ).buffer,
+    },
+  });
 const saved = (id: string): PreviewSource => ({ kind: 'saved', id });
 
 describe('useAttachmentBytes', () => {
@@ -96,7 +115,53 @@ describe('useAttachmentBytes', () => {
     await act(async () => {
       request.reject(new Error('boom'));
     });
-    expect(result.current).toEqual({ status: 'error' });
+    expect(result.current).toEqual({ status: 'error', storeUnreachable: false });
+  });
+
+  it('distinguishes a backend this deployment cannot reach', async () => {
+    // The server answers 503 naming the backend when a row's bytes are in a
+    // storage provider it is not configured for -- a provider switch whose old
+    // backend went away. Nothing is lost, and downloading fails the same way, so
+    // the reader needs a different message from a generic failure.
+    const request = deferred<{ bytes: ArrayBuffer; contentType: string }>();
+    fetchBytes.mockReturnValue(request.promise);
+    const { result } = renderHook(() => useAttachmentBytes(saved('a-1')));
+    await act(async () => {
+      request.reject(unreachableStoreError());
+    });
+    expect(result.current).toEqual({ status: 'error', storeUnreachable: true });
+  });
+
+  it('does not read a bare 503 as an unreachable backend', async () => {
+    // A reverse proxy answers 503 while the backend restarts. Nothing is wrong
+    // with this attachment's storage, so the reader must not be told there is.
+    const request = deferred<{ bytes: ArrayBuffer; contentType: string }>();
+    fetchBytes.mockReturnValue(request.promise);
+    const { result } = renderHook(() => useAttachmentBytes(saved('a-1')));
+    await act(async () => {
+      request.reject(
+        Object.assign(new Error('bad gateway'), {
+          isAxiosError: true,
+          response: { status: 503, data: '<html>503</html>' },
+        }),
+      );
+    });
+    expect(result.current).toEqual({ status: 'error', storeUnreachable: false });
+  });
+
+  it('does not read a plain 404 as an unreachable backend', async () => {
+    const request = deferred<{ bytes: ArrayBuffer; contentType: string }>();
+    fetchBytes.mockReturnValue(request.promise);
+    const { result } = renderHook(() => useAttachmentBytes(saved('a-1')));
+    await act(async () => {
+      request.reject(
+        Object.assign(new Error('gone'), {
+          isAxiosError: true,
+          response: { status: 404 },
+        }),
+      );
+    });
+    expect(result.current).toEqual({ status: 'error', storeUnreachable: false });
   });
 
   it('reads a staged file from the file itself', async () => {

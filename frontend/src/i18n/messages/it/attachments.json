@@ -70,6 +70,7 @@
   "preview": {
     "loading": "Caricamento dell'anteprima…",
     "failed": "Impossibile caricare l'anteprima. Puoi comunque scaricare il file.",
+    "storeUnavailable": "Questo file si trova in un archivio che il server non riesce a raggiungere al momento, quindi non può essere visualizzato né scaricato. Non è andato perso nulla: chiedi all'amministrazione di ripristinare le impostazioni dell'archivio allegati.",
     "unsupported": "Questo tipo di file non può essere visualizzato in anteprima. Puoi comunque scaricarlo.",
     "fit": "Adatta allo schermo",
     "actualSize": "Dimensione reale",

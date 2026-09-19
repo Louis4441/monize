@@ -51,6 +51,16 @@ export { S3_MAX_ATTEMPTS, S3_REQUEST_TIMEOUT_MS };
 export class S3StorageProvider implements AttachmentStorageProvider {
   readonly name = "s3";
 
+  /**
+   * A bucket name is the whole of it. Credentials may legitimately come from the
+   * ambient chain and the endpoint may legitimately be AWS's default, so neither
+   * is evidence; without a bucket there is nothing to address, which is what
+   * `client()` throws about on first use.
+   */
+  get addressable(): boolean {
+    return this.bucket.length > 0;
+  }
+
   private clientInstance?: S3Client;
   private readonly bucket: string;
   private readonly prefix: string;

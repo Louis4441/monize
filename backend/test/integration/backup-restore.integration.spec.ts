@@ -17,11 +17,12 @@ import { NetWorthService } from "@/net-worth/net-worth.service";
 import { User } from "@/users/entities/user.entity";
 import { OidcReauthService } from "@/auth/oidc/oidc-reauth.service";
 import { EncryptionService } from "../../src/common/encryption/encryption.service";
-import { DatabaseStorageProvider } from "@/attachments/storage/database-storage.provider";
-import { ATTACHMENT_STORAGE_PROVIDER } from "@/attachments/storage/attachment-storage.interface";
 import { JobClaimService } from "@/common/jobs/job-claim.service";
 import { UserMaintenanceService } from "@/common/jobs/user-maintenance.service";
-import { createTestUserDirect } from "../helpers/integration-setup";
+import {
+  attachmentStorageProviders,
+  createTestUserDirect,
+} from "../helpers/integration-setup";
 import { applyRlsPolicies } from "../helpers/rls-setup";
 import { withUserContext } from "@/common/db/with-context";
 
@@ -116,11 +117,7 @@ describe("Backup export/restore round-trip (integration)", () => {
         // need: their whole point is that Postgres computes the digest the
         // export judges, and a double would answer for it. It also needs no
         // extra config, unlike local/S3.
-        DatabaseStorageProvider,
-        {
-          provide: ATTACHMENT_STORAGE_PROVIDER,
-          useExisting: DatabaseStorageProvider,
-        },
+        ...attachmentStorageProviders(),
       ],
     }).compile();
 

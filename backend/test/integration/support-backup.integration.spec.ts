@@ -20,11 +20,10 @@ import {
 import { User } from "@/users/entities/user.entity";
 import { OidcReauthService } from "@/auth/oidc/oidc-reauth.service";
 import { EncryptionService } from "../../src/common/encryption/encryption.service";
-import { DatabaseStorageProvider } from "@/attachments/storage/database-storage.provider";
-import { ATTACHMENT_STORAGE_PROVIDER } from "@/attachments/storage/attachment-storage.interface";
 import { JobClaimService } from "@/common/jobs/job-claim.service";
 import { UserMaintenanceService } from "@/common/jobs/user-maintenance.service";
 import {
+  attachmentStorageProviders,
   createTestUserDirect,
   INTEGRATION_TYPEORM_OPTIONS,
 } from "../helpers/integration-setup";
@@ -73,11 +72,7 @@ describe("Support backup (integration)", () => {
         // The real database-backed provider: BackupService's constructor
         // requires the token to be resolvable regardless of whether a given
         // test seeds an attachment, and this needs no extra config.
-        DatabaseStorageProvider,
-        {
-          provide: ATTACHMENT_STORAGE_PROVIDER,
-          useExisting: DatabaseStorageProvider,
-        },
+        ...attachmentStorageProviders(),
       ],
     }).compile();
 

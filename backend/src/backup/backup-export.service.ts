@@ -11,6 +11,7 @@ import {
   ATTACHMENT_STORAGE_PROVIDER,
   AttachmentStorageProvider,
 } from "../attachments/storage/attachment-storage.interface";
+import { AttachmentStorageRegistry } from "../attachments/storage/attachment-storage.registry";
 import { resolveConfiguredBackupLimit } from "./backup-limits";
 import { attachmentBytesConsistent } from "./attachment-integrity.util";
 import { BACKUP_VERSION, BackupCompletenessReport } from "./backup-format";
@@ -85,8 +86,21 @@ export class BackupExportService {
     private readonly dataSource: DataSource,
     @Inject(ATTACHMENT_STORAGE_PROVIDER)
     private readonly attachmentStorage: AttachmentStorageProvider,
+    private readonly attachmentStores: AttachmentStorageRegistry,
     private readonly aiEncryption: EncryptionService,
   ) {}
+
+  /**
+   * Whether an attachment row's own backend is one this export can read.
+   *
+   * The export reads each object through the provider the ROW names, not the
+   * bound one: a deployment part-way through a storage switch holds some
+   * attachments in each, and both are readable. `database` is excluded because
+   * its bytes already travel in `attachment_blobs`.
+   */
+  private readonly canReadExternally = (providerName: string): boolean =>
+    providerName !== "database" &&
+    this.attachmentStores.resolve(providerName) !== null;
 
   /** Ceiling on the artifact a buffered export may accumulate. */
   get exportBufferLimitBytes(): number {
@@ -147,7 +161,7 @@ export class BackupExportService {
   private getTableQueries(audit?: AttachmentAudit): ExportTableQuery[] {
     return buildExportTableQueries(
       externalAttachmentRows(
-        this.attachmentStorage.name,
+        this.canReadExternally,
         (id, row) => this.readAttachmentObject(id, row),
         {
           only: audit?.carriedExternalIds,
@@ -467,8 +481,10 @@ export class BackupExportService {
     reader: ExportReader,
   ): Promise<AttachmentAudit> {
     const provider = this.attachmentStorage.name;
-    const audit = await auditAttachments(reader, provider, (id, row) =>
-      this.readAttachmentObject(id, row),
+    const audit = await auditAttachments(
+      reader,
+      this.canReadExternally,
+      (id, row) => this.readAttachmentObject(id, row),
     );
 
     if (audit.unreadable > 0) {
@@ -521,9 +537,16 @@ export class BackupExportService {
     id: string,
     row: Record<string, unknown>,
   ): Promise<AttachmentReadResult> {
+    // The row's backend, not the bound one. Asking the bound provider for a key
+    // it never wrote is a 404 the export would report as unreadable -- an
+    // artifact incomplete by every attachment a storage switch has not moved yet.
+    const store = this.attachmentStores.resolve(
+      String(row.storage_provider ?? "database"),
+    );
+    if (!store) return { status: "unreadable" };
     let bytes: Buffer;
     try {
-      bytes = await this.attachmentStorage.load(id);
+      bytes = await store.load(id);
     } catch {
       return { status: "unreadable" };
     }

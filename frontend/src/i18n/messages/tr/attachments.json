@@ -70,6 +70,7 @@
   "preview": {
     "loading": "Önizleme yükleniyor…",
     "failed": "Önizleme yüklenemedi. Dosyayı yine de indirebilirsiniz.",
+    "storeUnavailable": "Bu dosya, sunucunun şu anda erişemediği bir depolama alanında tutuluyor; bu yüzden ne önizlenebilir ne de indirilebilir. Hiçbir şey kaybolmadı: yöneticinizden ek depolama ayarlarını geri getirmesini isteyin.",
     "unsupported": "Bu dosya türü önizlenemiyor. Yine de indirebilirsiniz.",
     "fit": "Ekrana sığdır",
     "actualSize": "Gerçek boyut",

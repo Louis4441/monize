@@ -114,6 +114,68 @@ without bytes. The second is the more visible failure, because a user sees the
 attachment and cannot open it, and INV-ATTACHMENT-001's "no metadata without
 bytes" half is what it breaches.
 
+### Changing the provider is a migration, not a rebind
+
+`ATTACHMENT_STORAGE_PROVIDER` says where the NEXT object goes.
+`transaction_attachments.storage_provider` says where an existing one already is.
+Those two were assumed to be the same value, and the download asked the bound
+provider for the row's key -- so the boot after an operator changed the setting
+answered 404 for every attachment uploaded before it, with the row, the filename
+and the size all still listed. Nothing was lost; nothing said so either, and
+nothing moved the bytes.
+
+Two mechanisms, both in `backend/src/attachments/storage/`:
+
+- **Reads resolve per row.** `AttachmentStorageRegistry.require(row.storage_provider)`
+  answers with the backend that row names, and refuses with a
+  `ServiceUnavailableException` **naming the provider** when this deployment
+  cannot address it. That refusal is deliberately not the `NotFoundException` a
+  missing object gets: nothing is lost, one setting is absent, and the repairs
+  differ. `null` from `resolve` therefore means "unconfigured backend", never "no
+  bytes". The distinction reaches the reader: `isStoreUnreachable` in
+  `frontend/src/lib/attachments.ts` recognises the 503 and the preview says the
+  file is intact rather than offering a download that fails identically
+  (`docs/frontend/ui-conventions.md`).
+- **`AttachmentStorageMigrator` moves them**, on `onApplicationBootstrap` (not
+  awaited -- Nest runs the hook inside `app.listen()`) and hourly at :50 until
+  nothing is outside the active backend. Any pair of backends, either direction,
+  no operator action. It assumes both are configured at once, because the source
+  is read through its own provider.
+
+Per attachment, one transaction, in this order: `SELECT ... FOR UPDATE` and
+re-read what the row says (gone, or already moved, ends here -- before any byte is
+written); read the source bytes; check them against the row's own `byte_size` and
+`sha256`; `save` to the destination; **read the copy back** and check it the same
+way; flip `storage_provider`; record the source object as unreferenced; commit.
+The source object is deleted only after that commit, through
+`AttachmentOrphanSweeper.sweepKey(key, provider)`.
+
+Four things make that safe to interrupt, and each is a mechanism rather than an
+assurance:
+
+- The destination write takes an **upload intent** first, exactly as `create`
+  does, so a crash before the commit leaves bytes the sweep can enumerate and a
+  row still naming the copy that is intact. The intent is cleared inside the flip,
+  fenced on `swept_at`, so a committed row naming swept bytes stays unreachable
+  (audit RV4-002).
+- The source is retired **inside** the flip: a tombstone for `local`/`s3`, or the
+  blob `DELETE` itself for `database`, which is transactional. The post-commit
+  sweep is promptness; the tombstone is the guarantee.
+- The read-back is what the source deletion rests on. A resolved `save` is not
+  evidence the bytes are readable -- a `PutObject` 200 from a proxy, a cached
+  filesystem write -- and this is a move, so the claim has to be checked.
+- The sweeper's claim now also refuses any key a live `transaction_attachments`
+  row still points at (`NOT_REFERENCED_SQL`). Without it, an intent left behind by
+  a crashed relocation would have the sweep delete a migrated attachment's only
+  copy once the lease expired, and nothing else in the claim could tell the
+  difference -- by shape there is none.
+
+One replica per batch holds `FetchSyncService.withLease("attachment-relocation")`,
+which is a cost control only: correctness is the per-row lock, so an expired lease
+costs duplicated reads and writes of identical bytes and never a row in the wrong
+state. `ATTACHMENT_STORAGE_MIGRATE_ON_SWITCH=false` leaves everything where it
+is, and says so in the log once rather than silently.
+
 **Relay attachments are deliberately not in this section.** A file uploaded
 with a reverse-relay chat prompt goes to `ai_relay_attachments` and its
 cascading `ai_relay_attachment_blobs` row, not through

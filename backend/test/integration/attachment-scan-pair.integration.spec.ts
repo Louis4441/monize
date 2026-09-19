@@ -7,6 +7,7 @@ import {
   UploadedAttachmentFile,
 } from "@/attachments/attachments.service";
 import { AttachmentOrphanSweeper } from "@/attachments/attachment-orphan-sweeper.service";
+import { AttachmentStorageRegistry } from "@/attachments/storage/attachment-storage.registry";
 import type { AttachmentStorageProvider } from "@/attachments/storage/attachment-storage.interface";
 import { withUserContext } from "@/common/db/with-context";
 
@@ -107,6 +108,7 @@ describe("a scanned attachment and the original it came from", () => {
       // An external provider: its writes cannot join a PostgreSQL transaction,
       // which is the harder of the two shapes for the pair to get right.
       name: "s3",
+      addressable: true,
       save: async (key: string, data: Buffer) => {
         objects.set(key, data);
       },
@@ -119,8 +121,9 @@ describe("a scanned attachment and the original it came from", () => {
         objects.delete(key);
       },
     };
-    sweeper = new AttachmentOrphanSweeper(dataSource, storage);
-    service = new AttachmentsService(dataSource, storage, sweeper);
+    const registry = new AttachmentStorageRegistry(storage, [storage]);
+    sweeper = new AttachmentOrphanSweeper(dataSource, registry);
+    service = new AttachmentsService(dataSource, registry, sweeper);
 
     userId = (
       await createTestUserDirect(dataSource, { email: "scanner@example.com" })

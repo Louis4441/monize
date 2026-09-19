@@ -601,6 +601,7 @@
   },
   "attachments": {
     "notFound": "Pièce jointe introuvable",
+    "storageUnavailable": "Le fichier de cette pièce jointe se trouve dans le stockage \"{{ provider }}\", auquel ce serveur n'est pas configuré pour accéder",
     "transactionNotFound": "Transaction introuvable",
     "empty": "Le fichier téléversé est vide",
     "fileTooLarge": "Le fichier dépasse la taille maximale de {{ max }} octets",

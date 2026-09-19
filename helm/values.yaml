@@ -251,7 +251,10 @@ backend:
       accessMode: ReadWriteOnce
     # -- Storage for locally stored attachment bytes (/data/attachments). Only
     # needed with ATTACHMENT_STORAGE_PROVIDER=local; the default "database"
-    # provider keeps bytes in Postgres and s3 keeps them in a bucket.
+    # provider keeps bytes in Postgres and s3 keeps them in a bucket. Keep it
+    # enabled for as long as any attachment still lives here: after a switch
+    # away from "local" the relocation reads each remaining attachment from this
+    # claim (see backend.attachmentContainerDir).
     attachments:
       enabled: false
       existingClaim: ""
@@ -386,6 +389,19 @@ backend:
 
   # -- Where locally stored attachment bytes are written inside the container.
   # Must match ATTACHMENT_CONTAINER_DIR if you override that through extraEnv.
+  #
+  # Changing ATTACHMENT_STORAGE_PROVIDER relocates the attachments already
+  # stored: the backend copies each one into the new backend, verifies the copy
+  # and deletes the original, starting on boot and retrying hourly at :50 until
+  # none are left. Unlike the backup store above, this is not
+  # forward-only -- but it does mean **the backend being moved away from has to
+  # stay configured and mounted until it finishes**, because each attachment is
+  # read through the backend its own row names. Leaving `local` for `s3` is
+  # therefore: set the new variables, keep the claim below, watch for
+  # "Attachment storage relocation" in the backend log, and only then disable
+  # persistence.attachments. Set ATTACHMENT_STORAGE_MIGRATE_ON_SWITCH=false in
+  # extraEnv to leave everything where it is instead; attachments stay readable
+  # either way, from whichever backend holds them.
   attachmentContainerDir: /data/attachments
 
   # -- Additional volumes for the backend pod (beyond /tmp and the persistence

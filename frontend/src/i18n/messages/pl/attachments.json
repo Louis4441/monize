@@ -70,6 +70,7 @@
   "preview": {
     "loading": "Ładowanie podglądu…",
     "failed": "Nie udało się wczytać podglądu. Nadal możesz pobrać plik.",
+    "storeUnavailable": "Ten plik znajduje się w magazynie, do którego ten serwer nie ma teraz dostępu, więc nie można go ani podejrzeć, ani pobrać. Nic nie zginęło: poproś administratora o przywrócenie ustawień magazynu załączników.",
     "unsupported": "Tego typu pliku nie można podejrzeć. Nadal możesz go pobrać.",
     "fit": "Dopasuj do ekranu",
     "actualSize": "Rzeczywisty rozmiar",

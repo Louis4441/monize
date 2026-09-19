@@ -601,6 +601,7 @@
   },
   "attachments": {
     "notFound": "Adjunto no encontrado",
+    "storageUnavailable": "El archivo de este adjunto está en el almacenamiento \"{{ provider }}\", al que este servidor no está configurado para acceder",
     "transactionNotFound": "Transacción no encontrada",
     "empty": "El archivo subido está vacío",
     "fileTooLarge": "El archivo supera el tamaño máximo de {{ max }} bytes",

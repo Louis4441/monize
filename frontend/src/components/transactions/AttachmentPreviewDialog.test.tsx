@@ -162,6 +162,29 @@ describe('AttachmentPreviewDialog', () => {
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
+  it('says the bytes are unreachable, not lost, when the backend is not configured', async () => {
+    // The one failure with a different repair: the server answered 503 naming a
+    // storage backend it cannot reach, so the file is intact and the Download
+    // link would fail for the same reason. Telling the reader to download it
+    // instead -- which is what the generic message does -- would be wrong.
+    fetchBytes.mockRejectedValue(
+      Object.assign(new Error('unreachable'), {
+        isAxiosError: true,
+        response: {
+          status: 503,
+          data: new TextEncoder().encode(
+            JSON.stringify({ code: 'ATTACHMENT_STORE_UNREACHABLE' }),
+          ).buffer,
+        },
+      }),
+    );
+    await open(saved());
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('cannot currently reach');
+    expect(alert).toHaveTextContent('Nothing is lost');
+    expect(alert).not.toHaveTextContent('You can still download');
+  });
+
   it('hands a PDF to the page renderer', async () => {
     await open(saved({ id: 'pdf-1', filename: 'invoice.pdf', contentType: 'application/pdf' }));
     const pages = await screen.findByTestId('pdf-pages');

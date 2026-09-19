@@ -90,6 +90,12 @@ export class AttachmentsController {
   @ApiOperation({ summary: "Download an attachment's bytes" })
   @ApiResponse({ status: 200, description: "Attachment file bytes" })
   @ApiResponse({ status: 404, description: "Attachment not found" })
+  @ApiResponse({
+    status: 503,
+    description:
+      "The attachment's bytes are held in a storage backend this deployment is " +
+      "not configured to reach; the response names it",
+  })
   async download(
     @Request() req,
     @Param("id", ParseUUIDPipe) id: string,

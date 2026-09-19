@@ -601,6 +601,7 @@
   },
   "attachments": {
     "notFound": "未找到附件",
+    "storageUnavailable": "此附件的文件存放在 \"{{ provider }}\" 存储后端，而本服务器未配置为访问该后端",
     "transactionNotFound": "未找到交易",
     "empty": "上传的文件为空",
     "fileTooLarge": "文件超过最大大小 {{ max }} 字节",

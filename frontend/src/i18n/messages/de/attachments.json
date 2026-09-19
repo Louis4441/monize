@@ -70,6 +70,7 @@
   "preview": {
     "loading": "Vorschau wird geladen…",
     "failed": "Die Vorschau konnte nicht geladen werden. Sie können die Datei trotzdem herunterladen.",
+    "storeUnavailable": "Diese Datei liegt in einem Speicher-Backend, das dieser Server derzeit nicht erreichen kann, daher ist keine Vorschau und kein Download möglich. Es ist nichts verloren: Bitten Sie Ihre Administration, die Einstellungen für den Anhang-Speicher wiederherzustellen.",
     "unsupported": "Dieser Dateityp kann nicht als Vorschau angezeigt werden. Sie können ihn trotzdem herunterladen.",
     "fit": "An Bildschirm anpassen",
     "actualSize": "Originalgröße",

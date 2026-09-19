@@ -23,6 +23,7 @@ import { BackupAttachmentTransferService } from "./backup-attachment-transfer.se
 import { BackupRestoreDatabaseService } from "./backup-restore-database.service";
 import { buildExportTableQueries } from "./export-table-queries";
 import { ATTACHMENT_EXPORT_SQL } from "./export-attachments";
+import { AttachmentStorageRegistry } from "../attachments/storage/attachment-storage.registry";
 import { restoreProcessingGate } from "./restore-processing-gate";
 import { User } from "../users/entities/user.entity";
 import { EncryptionService } from "../common/encryption/encryption.service";
@@ -164,6 +165,8 @@ describe("BackupService", () => {
   // produce (docs/backend/testing.md, "a mock must return what the real collaborator
   // returns").
   let attachmentStorage: jest.Mocked<AttachmentStorageProvider>;
+  /** A second registered backend, for the part-way-through-a-switch case. */
+  let previousAttachmentStorage: jest.Mocked<AttachmentStorageProvider>;
   let attachmentStorageName: string;
 
   /**
@@ -669,8 +672,20 @@ describe("BackupService", () => {
       get name() {
         return attachmentStorageName;
       },
+      addressable: true,
       save: jest.fn().mockResolvedValue(undefined),
       load: jest.fn().mockRejectedValue(new Error("no such object")),
+      delete: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<AttachmentStorageProvider>;
+    // The backend a storage switch is moving away from: registered, addressable,
+    // never the active one. Its reads delegate to the same double so a test sets
+    // up objects in one place; what it proves is that the export reaches a row's
+    // OWN backend, which before this was counted as a missing object.
+    previousAttachmentStorage = {
+      name: "s3",
+      addressable: true,
+      save: jest.fn().mockResolvedValue(undefined),
+      load: jest.fn((key: string) => attachmentStorage.load(key)),
       delete: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<AttachmentStorageProvider>;
 
@@ -711,6 +726,15 @@ describe("BackupService", () => {
         {
           provide: ATTACHMENT_STORAGE_PROVIDER,
           useValue: attachmentStorage,
+        },
+        {
+          // The real registry over the same double: the export and the download
+          // both resolve a row's backend through it now.
+          provide: AttachmentStorageRegistry,
+          useValue: new AttachmentStorageRegistry(attachmentStorage, [
+            attachmentStorage,
+            previousAttachmentStorage,
+          ]),
         },
       ],
     }).compile();
@@ -858,6 +882,35 @@ describe("BackupService", () => {
       ]);
     });
 
+    it("carries an object still held in the backend a switch moved away from", async () => {
+      // `local` is where new bytes go; this row's are in `s3` because the
+      // relocation has not reached it yet. Both are configured, so both are
+      // readable -- and an export that compared each row against the BOUND
+      // provider called this attachment missing and the artifact incomplete.
+      attachmentStorageName = "local";
+      storeHoldsWithMetadata(
+        [
+          {
+            id: A_ID,
+            provider: "s3",
+            byte_size: A_BYTES.length,
+            sha256: createHash("sha256").update(A_BYTES).digest("hex"),
+          },
+        ],
+        { [A_ID]: A_BYTES },
+      );
+
+      const result = await exported();
+
+      expect(result.attachment_blobs).toEqual([
+        { attachment_id: A_ID, data: A_BYTES.toString("base64") },
+      ]);
+      expect(previousAttachmentStorage.load).toHaveBeenCalledWith(A_ID);
+      expect(result.completeness).toEqual(
+        expect.objectContaining({ complete: true, includedAttachments: 1 }),
+      );
+    });
+
     it("reads nothing from the store on a database-provider deployment", async () => {
       // Those bytes are already in `attachment_blobs`; there is no object store.
       attachmentStorageName = "database";
@@ -869,13 +922,24 @@ describe("BackupService", () => {
     });
 
     it("skips a row written by a provider this runtime cannot address", async () => {
+      // "Not the bound provider" and "not addressable" used to be the same test,
+      // because the export compared each row against the bound provider's name.
+      // They are different facts: `s3` beside a bound `local` is a switch in
+      // progress and readable (above), while a backend this deployment has no
+      // configuration for is a row whose bytes cannot travel.
       attachmentStorageName = "local";
-      storeHolds([{ id: A_ID, provider: "s3" }], { [A_ID]: A_BYTES });
+      storeHolds([{ id: A_ID, provider: "azure-blob" }], { [A_ID]: A_BYTES });
 
       const result = await exported();
 
       expect(attachmentStorage.load).not.toHaveBeenCalled();
+      expect(previousAttachmentStorage.load).not.toHaveBeenCalled();
       expect(result.attachment_blobs).toEqual([]);
+      // And the artifact says it is incomplete by that attachment rather than
+      // reporting a success it cannot honour.
+      expect(result.completeness).toEqual(
+        expect.objectContaining({ complete: false, missingAttachments: 1 }),
+      );
     });
 
     it("finishes the export when one object cannot be read", async () => {
@@ -3146,10 +3210,18 @@ describe("BackupService", () => {
           // readers -- a scan that can only see one file is a scan a refactor
           // silently disarms.
           const sources = backupModuleSources();
+          // Any `.load(` on a storage provider, however the provider was
+          // obtained. Pinned to `this.attachmentStorage.load(` it counted the
+          // spelling rather than the act: the export now resolves each row's own
+          // backend through `AttachmentStorageRegistry` and calls `store.load(`,
+          // which is the same read of the same kind of object -- and the guard
+          // went from "two readers, both accounted for" to "one" without a single
+          // reader moving.
           const reads = sources.flatMap(({ file, text }) =>
-            [...text.matchAll(/this\.attachmentStorage\.load\(/g)].map(
-              (match) => ({ file, at: match.index as number }),
-            ),
+            [...text.matchAll(/\.load\(/g)].map((match) => ({
+              file,
+              at: match.index as number,
+            })),
           );
           expect(reads).toHaveLength(2);
 

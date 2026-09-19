@@ -1,5 +1,6 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { Global, Module } from "@nestjs/common";
+import type { Provider } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ConfigModule } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
@@ -22,6 +23,9 @@ import {
   TEST_APP_ROLE_PASSWORD,
 } from "./rls-setup";
 import { settlePendingPriceWrites } from "@/securities/security-price.service";
+import { DatabaseStorageProvider } from "@/attachments/storage/database-storage.provider";
+import { ATTACHMENT_STORAGE_PROVIDER } from "@/attachments/storage/attachment-storage.interface";
+import { AttachmentStorageRegistry } from "@/attachments/storage/attachment-storage.registry";
 
 /**
  * Shared PostgreSQL connection options for integration suites. Specs that need
@@ -337,4 +341,36 @@ function restoreRlsMode(previous: string | undefined): void {
   } else {
     process.env.RLS_MODE = previous;
   }
+}
+
+/**
+ * The attachment-storage providers an integration module needs to resolve
+ * `AttachmentsService` and the backup export.
+ *
+ * Three suites spelled out the same pair (`DatabaseStorageProvider` plus the
+ * `ATTACHMENT_STORAGE_PROVIDER` token) and all three broke together the moment a
+ * third provider -- `AttachmentStorageRegistry`, which resolves a row's own
+ * backend rather than the bound one -- joined the graph. Nest resolves these at
+ * run time, so `tsc` cannot see the gap and only the database-backed job does:
+ * one helper is what keeps the next suite from finding that out in CI.
+ *
+ * `database` because it is the provider whose bytes the export actually judges,
+ * and it needs no filesystem or bucket configuration. The registry is the real
+ * class over that one provider, so a row naming any other backend resolves to
+ * `null` here exactly as it would in a deployment that has not configured it.
+ */
+export function attachmentStorageProviders(): Provider[] {
+  return [
+    DatabaseStorageProvider,
+    {
+      provide: ATTACHMENT_STORAGE_PROVIDER,
+      useExisting: DatabaseStorageProvider,
+    },
+    {
+      provide: AttachmentStorageRegistry,
+      useFactory: (database: DatabaseStorageProvider) =>
+        new AttachmentStorageRegistry(database, [database]),
+      inject: [DatabaseStorageProvider],
+    },
+  ];
 }
