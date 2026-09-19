@@ -175,6 +175,7 @@
     "folderNotExistVolume": "Map bestaat niet: {{ safePath }}. Zorg ervoor dat het pad is gekoppeld als een Docker-volume.",
     "folderAccessErrorDetail": "Kan map niet openen: {{ safePath }} - {{ message }}",
     "folderNotWritable": "Map is niet beschrijfbaar: {{ safePath }}. Controleer de containermachtigingen.",
+    "folderNotSelectable": "Deze installatie bewaart automatische back-ups in objectopslag, waarin geen map te kiezen valt. De locatie wordt bepaald door de configuratie van de installatie.",
     "userNotFoundRestore": "Gebruiker niet gevonden",
     "backupPasswordWrong": "Het ingevoerde wachtwoord kan deze back-up niet ontsleutelen. Gebruik het wachtwoord dat is ingesteld toen de back-up werd aangemaakt.",
     "backupPasswordRequired": "Deze back-up is versleuteld. Geef het wachtwoord op dat is gebruikt bij het aanmaken van de back-up.",

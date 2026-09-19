@@ -175,6 +175,7 @@
     "folderNotExistVolume": "Thư mục không tồn tại: {{ safePath }}. Đảm bảo đường dẫn được ánh xạ như một Docker volume.",
     "folderAccessErrorDetail": "Không thể truy cập thư mục: {{ safePath }} - {{ message }}",
     "folderNotWritable": "Thư mục không thể ghi: {{ safePath }}. Kiểm tra quyền truy cập của container.",
+    "folderNotSelectable": "Bản triển khai này lưu các bản sao lưu tự động trong kho lưu trữ đối tượng, nơi không có thư mục nào để chọn. Vị trí do cấu hình của bản triển khai quyết định.",
     "userNotFoundRestore": "Không tìm thấy người dùng",
     "backupPasswordWrong": "Mật khẩu bạn nhập không thể giải mã bản sao lưu này. Hãy thử mật khẩu đã thiết lập khi tạo bản sao lưu.",
     "backupPasswordRequired": "Bản sao lưu này đã được mã hóa. Cung cấp mật khẩu đã sử dụng khi tạo bản sao lưu.",

@@ -175,6 +175,7 @@
     "folderNotExistVolume": "Folder nie istnieje: {{ safePath }}. Upewnij się, że ścieżka jest zamapowana jako wolumin Dockera.",
     "folderAccessErrorDetail": "Brak dostępu do folderu: {{ safePath }} - {{ message }}",
     "folderNotWritable": "Brak uprawnień do zapisu w folderze: {{ safePath }}. Sprawdź uprawnienia kontenera.",
+    "folderNotSelectable": "Ta instalacja przechowuje automatyczne kopie zapasowe w magazynie obiektowym, w którym nie ma folderu do wyboru. Lokalizację określa konfiguracja instalacji.",
     "userNotFoundRestore": "Nie znaleziono użytkownika",
     "backupPasswordWrong": "Wprowadzone hasło nie odszyfrowuje tej kopii zapasowej. Spróbuj hasła ustawionego podczas tworzenia kopii zapasowej.",
     "backupPasswordRequired": "Ta kopia zapasowa jest zaszyfrowana. Podaj hasło użyte podczas tworzenia kopii zapasowej.",

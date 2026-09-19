@@ -125,6 +125,8 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-BACKUP-003 local copy first | **required** | -- | -- | -- | -- | optional | -- | -- |
 | INV-BACKUP-004 egress adds, never replaces | required | **required** | -- | -- | -- | -- | optional | -- |
 | INV-BACKUP-005 verified, claimed, leased | **required** | -- | required | **required** | optional | required (not yet met) | optional | -- |
+| INV-BACKUP-006 published whole or not at all | **required** | -- | -- | -- | -- | optional | **required** | -- |
+| INV-BACKUP-007 store and egress are two places | **required** | -- | -- | -- | -- | -- | -- | -- |
 | INV-PUSH-001 subscription ownership | required | -- | **required** | required (not yet met) | -- | -- | -- | optional |
 | INV-PUSH-002 private key stays server-side | supporting | **required** | -- | -- | -- | -- | -- | -- |
 | INV-PUSH-006 channel offered only while usable | **required** | -- | optional | -- | -- | -- | -- | -- |
@@ -252,6 +254,22 @@ database evaluates, both in
 `required (not yet met)` is `INV-BACKUP-005`'s failpoint: a crash between the
 verified put and the outcome write is exactly the window the claim lease exists
 for, and nothing yet throws at that boundary.
+
+`INV-BACKUP-006` divides the same way and lands on the opposite side of it. The
+`local` half is a claim about what a directory looks like after an unfinished
+write, so it is a unit test against a real `mkdtemp` and never a mocked `fs` --
+what a mock can report is the call that was made, not the state that was left.
+The `s3` half is a claim about a property of the *service*: that S3 applies an
+object to its key only on a complete, checksum-matching upload. No double can
+demonstrate that, whatever it is told to resolve, so the provider column is
+`required` rather than `optional` and
+`backend/test/integration/backup-store-s3.integration.spec.ts` is where it is
+met, against MinIO. That suite is gated on `BACKUP_STORE_S3_TEST_ENDPOINT` and
+the `backend-integration-tests` job does not yet run a MinIO service, which is
+the outstanding half of the row and is recorded as such in task S2 rather than
+left to read as met. `INV-BACKUP-007` is pure configuration arithmetic --
+endpoint, bucket and normalised prefix -- so it needs nothing but a unit test,
+and the boot-time refusal it also calls for is that task's third stage.
 
 ## 4. CI ownership
 

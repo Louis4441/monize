@@ -1,5 +1,5 @@
 import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
+import { ConfigModule, ConfigService } from "@nestjs/config";
 import { BackupController } from "./backup.controller";
 import { AutoBackupController } from "./auto-backup.controller";
 import { BackupService } from "./backup.service";
@@ -17,6 +17,8 @@ import { BackupOffsiteEmailSender } from "./offsite/backup-offsite-email.sender"
 import { BackupOffsiteDispatchService } from "./offsite/backup-offsite-dispatch.service";
 import { BackupOffsiteRetryService } from "./offsite/backup-offsite-retry.service";
 import { LocalBackupStorageTarget } from "./storage/local-backup-storage.target";
+import { S3BackupStorageTarget } from "./storage/s3-backup-storage.target";
+import { resolveBackupStoreProvider } from "./storage/backup-store-config";
 import { BACKUP_STORAGE_TARGET } from "./storage/backup-storage.interface";
 import { AuthModule } from "../auth/auth.module";
 import { EncryptionModule } from "../common/encryption/encryption.module";
@@ -46,12 +48,25 @@ import { NotificationsModule } from "../notifications/notifications.module";
     BackupOffsiteController,
   ],
   providers: [
-    // Where the automatic backup artifacts live. One target today, bound
-    // directly: the seam exists so a second one can be added without the
-    // service learning about it, and nothing is configurable until there is
-    // something to configure. `docs/specs/backup-storage-targets.md`.
+    // Where the automatic backup artifacts live, selected by
+    // BACKUP_STORAGE_PROVIDER and registered the way ATTACHMENT_STORAGE_PROVIDER
+    // is in `attachments.module.ts`: every implementation a provider, one
+    // factory choosing by configuration, so nothing downstream of the store
+    // knows which one is bound. `docs/specs/backup-storage-targets.md`.
     LocalBackupStorageTarget,
-    { provide: BACKUP_STORAGE_TARGET, useExisting: LocalBackupStorageTarget },
+    S3BackupStorageTarget,
+    {
+      provide: BACKUP_STORAGE_TARGET,
+      useFactory: (
+        config: ConfigService,
+        local: LocalBackupStorageTarget,
+        s3: S3BackupStorageTarget,
+      ) =>
+        resolveBackupStoreProvider((name) => config.get<string>(name)) === "s3"
+          ? s3
+          : local,
+      inject: [ConfigService, LocalBackupStorageTarget, S3BackupStorageTarget],
+    },
     // The four components issue #1092 split BackupService into; BackupService
     // itself is now the facade over the first two.
     BackupExportService,

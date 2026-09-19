@@ -175,6 +175,7 @@
     "folderNotExistVolume": "資料夾不存在：{{ safePath }}。請確保路徑已掛載為 Docker 磁碟區。",
     "folderAccessErrorDetail": "無法存取資料夾：{{ safePath }} - {{ message }}",
     "folderNotWritable": "資料夾無法寫入：{{ safePath }}。請檢查容器權限。",
+    "folderNotSelectable": "此部署將自動備份儲存在物件儲存空間中，沒有可供選擇的資料夾。存放位置由部署的設定決定。",
     "userNotFoundRestore": "找不到使用者",
     "backupPasswordWrong": "您輸入的密碼無法解密此備份。請試用建立備份時設定的密碼。",
     "backupPasswordRequired": "此備份已加密。請提供建立備份時使用的密碼。",

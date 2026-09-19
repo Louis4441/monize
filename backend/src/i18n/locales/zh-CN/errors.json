@@ -175,6 +175,7 @@
     "folderNotExistVolume": "文件夹不存在：{{ safePath }}。请确保该路径已作为 Docker 卷映射。",
     "folderAccessErrorDetail": "无法访问文件夹：{{ safePath }} - {{ message }}",
     "folderNotWritable": "文件夹不可写：{{ safePath }}。请检查容器权限。",
+    "folderNotSelectable": "此部署将自动备份保存在对象存储中，没有可供选择的文件夹。存放位置由部署的配置决定。",
     "userNotFoundRestore": "未找到用户",
     "backupPasswordWrong": "您输入的密码无法解密此备份。请尝试创建备份时设置的密码。",
     "backupPasswordRequired": "此备份已加密。请提供创建时使用的密码。",

@@ -175,6 +175,7 @@
     "folderNotExistVolume": "La carpeta no existe: {{ safePath }}. Asegúrate de que la ruta esté mapeada como volumen Docker.",
     "folderAccessErrorDetail": "No se puede acceder a la carpeta: {{ safePath }} - {{ message }}",
     "folderNotWritable": "La carpeta no tiene permisos de escritura: {{ safePath }}. Comprueba los permisos del contenedor.",
+    "folderNotSelectable": "Esta instalación guarda las copias de seguridad automáticas en almacenamiento de objetos, que no tiene ninguna carpeta que elegir. La ubicación la define la configuración de la instalación.",
     "userNotFoundRestore": "Usuario no encontrado",
     "backupPasswordWrong": "La contraseña introducida no puede descifrar esta copia de seguridad. Prueba la contraseña que se estableció cuando se creó la copia de seguridad.",
     "backupPasswordRequired": "Esta copia de seguridad está cifrada. Proporciona la contraseña que se usó al crearla.",
