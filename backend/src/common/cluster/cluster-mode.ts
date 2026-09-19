@@ -1,3 +1,8 @@
+import {
+  BACKUP_STORE_PROVIDERS,
+  sharesLocation,
+} from "../../backup/storage/backup-store-location";
+
 /**
  * Cluster runtime mode: how many replicas of this process are expected to serve
  * one database.
@@ -85,10 +90,24 @@ export interface ClusterBootEnv {
   ATTACHMENT_LOCAL_DIR?: string;
   /** `true` asserts `ATTACHMENT_CONTAINER_DIR` is mounted by every replica. */
   ATTACHMENT_SHARED_VOLUME?: string;
-  /** Where automatic backups are written. Named in the refusal, never parsed. */
+  /** `local` (default) or `s3`; see `backup/storage/backup-store-config.ts`. */
+  BACKUP_STORAGE_PROVIDER?: string;
+  /** Where the `local` store writes. Named in the refusal, never parsed. */
   BACKUP_CONTAINER_DIR?: string;
   /** `true` asserts `BACKUP_CONTAINER_DIR` is mounted by every replica. */
   BACKUP_SHARED_VOLUME?: string;
+  /** The `s3` store's bucket. Its presence is what makes that store usable. */
+  BACKUP_STORE_S3_BUCKET?: string;
+  /** The `s3` store's key prefix, for the collision check below. */
+  BACKUP_STORE_S3_PREFIX?: string;
+  /** The `s3` store's endpoint, for the collision check below. */
+  BACKUP_STORE_S3_ENDPOINT?: string;
+  /** The deployment-default OFF-MACHINE destination's bucket. A different thing. */
+  BACKUP_S3_BUCKET?: string;
+  /** The off-machine destination's key prefix. */
+  BACKUP_S3_PREFIX?: string;
+  /** The off-machine destination's endpoint. */
+  BACKUP_S3_ENDPOINT?: string;
 }
 
 export interface ClusterBootReport {
@@ -186,13 +205,22 @@ export function checkClusterBoot(env: ClusterBootEnv): ClusterBootReport {
       );
     }
 
-    // Backups. Unlike attachments there is no provider to choose yet -- the
-    // automatic backup always writes to the filesystem -- and whether any user
-    // has switched theirs on is a row, not an environment variable, so the
-    // check cannot be conditional on it. The refusal is therefore
-    // unconditional in `multi` until the S3 backup target ships (plan task S2).
+    // Backups. Like attachments there is now a store to choose, and unlike
+    // attachments there is no cluster-safe default: whether any user has
+    // switched their schedule on is a row rather than an environment variable,
+    // so the check can never be conditional on "is anyone using this".
+    //
+    // A `local` store writes to a container path, so it needs the same
+    // assertion the `local` attachment provider needs. An `s3` store is
+    // reachable from every replica by construction and needs none.
+    const backupStore = (env.BACKUP_STORAGE_PROVIDER ?? "local")
+      .trim()
+      .toLowerCase();
     const backupDir = env.BACKUP_CONTAINER_DIR?.trim() || "/data/backups";
-    if (env.BACKUP_SHARED_VOLUME?.trim() !== SHARED_VOLUME_ASSERTED) {
+    if (
+      backupStore === "local" &&
+      env.BACKUP_SHARED_VOLUME?.trim() !== SHARED_VOLUME_ASSERTED
+    ) {
       refusals.push(
         `CLUSTER_MODE=multi writes automatic backups to ${backupDir} on ` +
           "whichever replica runs the hourly job, and a restore served by " +
@@ -200,10 +228,73 @@ export function checkClusterBoot(env: ClusterBootEnv): ClusterBootReport {
           "per user, so no setting here says whether any exist. Mount that " +
           "directory on every replica (ReadWriteMany, or a single-host volume " +
           "under docker compose, where it is shared by definition) and set " +
-          "BACKUP_SHARED_VOLUME=true.",
+          "BACKUP_SHARED_VOLUME=true, or use BACKUP_STORAGE_PROVIDER=s3, " +
+          "which every replica reaches by construction.",
       );
     }
   }
 
+  // In every mode, not only `multi`: an `s3` store sharing a location with the
+  // off-machine destination is wrong on one replica as much as on five.
+  refusals.push(...backupStoreRefusals(env));
+
   return { mode, refusals, warnings };
+}
+
+/**
+ * What the backup store's own configuration refuses, whatever the cluster mode.
+ *
+ * Two things, and the second is INV-BACKUP-007. An unrecognised
+ * `BACKUP_STORAGE_PROVIDER` is refused rather than quietly read as `local`,
+ * because a typo would otherwise put a deployment's recovery points on a pod's
+ * disk while its operator believed they were in a bucket. And an `s3` store
+ * whose bucket and prefix are the off-machine destination's is refused here, at
+ * the boot, rather than at 02:00 by the first backup: the off-machine copy
+ * exists to survive the loss of the store, so one bucket holding both is a
+ * 3-2-1 arrangement that is actually a 1, and an operator should learn that
+ * from a container that will not start rather than from a restore.
+ *
+ * A bucket that is not set at all is not checked here. `BACKUP_STORE_S3_BUCKET`
+ * is required for an `s3` store and the store says so on its first use, with a
+ * message naming the variable; duplicating that requirement in the boot matrix
+ * would give the same misconfiguration two different wordings.
+ */
+function backupStoreRefusals(env: ClusterBootEnv): string[] {
+  const configured = env.BACKUP_STORAGE_PROVIDER?.trim().toLowerCase();
+  if (!configured) return [];
+  if (!BACKUP_STORE_PROVIDERS.includes(configured as never)) {
+    return [
+      `BACKUP_STORAGE_PROVIDER=${configured} is not a backup storage target. ` +
+        `Use one of: ${BACKUP_STORE_PROVIDERS.join(", ")}.`,
+    ];
+  }
+  if (configured !== "s3") return [];
+
+  const bucket = env.BACKUP_STORE_S3_BUCKET?.trim();
+  const offsiteBucket = env.BACKUP_S3_BUCKET?.trim();
+  if (!bucket || !offsiteBucket) return [];
+  if (
+    !sharesLocation(
+      {
+        bucket,
+        prefix: env.BACKUP_STORE_S3_PREFIX,
+        endpoint: env.BACKUP_STORE_S3_ENDPOINT,
+      },
+      {
+        bucket: offsiteBucket,
+        prefix: env.BACKUP_S3_PREFIX,
+        endpoint: env.BACKUP_S3_ENDPOINT,
+      },
+    )
+  ) {
+    return [];
+  }
+  return [
+    `BACKUP_STORE_S3_BUCKET and BACKUP_S3_BUCKET are the same location ` +
+      `(bucket "${bucket}", prefixes "${env.BACKUP_STORE_S3_PREFIX ?? ""}" ` +
+      `and "${env.BACKUP_S3_PREFIX ?? ""}"). The off-machine copy exists to ` +
+      "survive the loss of the store, so one bucket holding both is not a " +
+      "second copy (INV-BACKUP-007). Point them at different buckets, or at " +
+      "non-overlapping prefixes in different buckets.",
+  ];
 }

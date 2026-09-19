@@ -446,7 +446,13 @@ export class AutoBackupService {
     const defaults = new AutoBackupSettings();
     defaults.userId = userId;
     defaults.enabled = false;
-    defaults.folderPath = this.store.defaultBase;
+    // Only where the store has a location somebody may choose. Writing an
+    // object store's `s3://bucket/prefix` into this column would persist a
+    // value nothing reads -- and would be read as a directory, and refused, by
+    // a deployment that later switched back to a `local` store.
+    defaults.folderPath = this.store.locationSelectable
+      ? this.store.defaultBase
+      : "";
     defaults.frequency = "daily";
     defaults.backupTime = "02:00";
     defaults.timezone = "UTC";
@@ -572,10 +578,13 @@ export class AutoBackupService {
       settings.enabled = dto.enabled;
       if (dto.enabled) {
         // Persist the resolved base so the stored row always records where
-        // backups actually go, even when the user never picked one. What gets
-        // checked for writability is the per-user namespace inside it, which is
-        // where the artifact will land.
-        settings.folderPath = this.store.resolveBase(settings.folderPath);
+        // backups actually go, even when the user never picked one -- but only
+        // where the store has a location somebody may choose, for the reason
+        // `defaultSettingsFor` gives. What gets checked for writability is the
+        // per-user namespace inside it, which is where the artifact will land.
+        if (this.store.locationSelectable) {
+          settings.folderPath = this.store.resolveBase(settings.folderPath);
+        }
         // Make and check the user's own namespace now, so a store that is
         // readable but not writable is reported at save time rather than at
         // 02:00 as a failed backup.
@@ -638,7 +647,9 @@ export class AutoBackupService {
       (await this.scoped(AutoBackupSettings, (repo) =>
         repo.findOne({ where: { userId } }),
       )) ?? this.defaultSettingsFor(userId);
-    settings.folderPath = this.store.resolveBase(settings.folderPath);
+    if (this.store.locationSelectable) {
+      settings.folderPath = this.store.resolveBase(settings.folderPath);
+    }
 
     const location = await this.resolveWriteLocation(
       userId,
@@ -1064,7 +1075,9 @@ export class AutoBackupService {
       return;
     }
 
-    settings.folderPath = this.store.resolveBase(settings.folderPath);
+    if (this.store.locationSelectable) {
+      settings.folderPath = this.store.resolveBase(settings.folderPath);
+    }
     const location = await this.resolveWriteLocation(
       settings.userId,
       settings.folderPath,

@@ -24,7 +24,10 @@ import {
   WEEKLY_DAYS,
 } from "./auto-backup.service";
 import { LocalBackupStorageTarget } from "./storage/local-backup-storage.target";
-import { BACKUP_STORAGE_TARGET } from "./storage/backup-storage.interface";
+import {
+  BACKUP_STORAGE_TARGET,
+  BackupStorageTarget,
+} from "./storage/backup-storage.interface";
 import { BackupService } from "./backup.service";
 import { BackupEncryptionService } from "./backup-encryption.service";
 import { AutoBackupSettings } from "./entities/auto-backup-settings.entity";
@@ -3515,6 +3518,147 @@ describe("AutoBackupService", () => {
       // 06:00 CST = 12:00 UTC, or 06:00 CDT = 11:00 UTC
       // Slots are at 06:00 and 18:00 local, so UTC equivalents vary
       expect(nextAt.getUTCMinutes()).toBe(0);
+    });
+  });
+  /**
+   * A store with no location for anybody to choose.
+   *
+   * The `s3` target is the one that has this shape today, but what is under
+   * test is the service's half of the rule rather than that target's: a store
+   * whose `locationSelectable` is false must not have a base written into the
+   * settings column, because a value nothing reads is a value a deployment that
+   * later switched back to a `local` store would read as a directory and refuse
+   * (`docs/specs/backup-storage-targets.md` section 11, decision 1).
+   *
+   * The target here is a minimal stand-in rather than the real `s3` one: it
+   * implements the same interface -- so `tsc` rejects a shape the real method
+   * cannot produce -- and keeps the assertions about the service rather than
+   * about an object store.
+   */
+  describe("a store with no location to choose", () => {
+    const DISPLAY = "s3://monize-store/backups/";
+
+    let fixedStore: BackupStorageTarget;
+    let published: Array<{ filename: string; bytes: Buffer }>;
+
+    const buildService = async (): Promise<AutoBackupService> => {
+      published = [];
+      fixedStore = {
+        name: "fixed",
+        locationSelectable: false,
+        defaultBase: DISPLAY,
+        resolveBase: () => DISPLAY,
+        acceptBase: () => {
+          throw new BadRequestException("no folder to choose");
+        },
+        describeLocation: () => DISPLAY,
+        resolveLocation: async () => ({ target: "fixed", display: DISPLAY }),
+        describeStore: async () => ({
+          available: true,
+          location: DISPLAY,
+          locationSelectable: false,
+          artifactCount: 3,
+        }),
+        validateFolder: async () => ({
+          valid: false,
+          error: "no folder to browse",
+        }),
+        browseFolders: () => {
+          throw new BadRequestException("no folder to browse");
+        },
+        publish: async (_location, filename, bytes) => {
+          published.push({ filename, bytes });
+        },
+        promote: async () => undefined,
+        list: async () => [],
+        open: async () => null,
+        remove: async () => undefined,
+        sweepIncomplete: async () => 0,
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          { provide: DataSource, useValue: scoped.dataSource },
+          AutoBackupService,
+          { provide: BackupService, useValue: mockBackupService },
+          userMaintenanceProvider(maintenance),
+          { provide: BackupEncryptionService, useValue: mockBackupEncryption },
+          {
+            provide: DemoModeService,
+            useValue: {
+              get isDemo() {
+                return isDemo;
+              },
+            },
+          },
+          { provide: SystemAlertService, useValue: mockSystemAlerts },
+          {
+            provide: BackupOffsiteDispatchService,
+            useValue: mockOffsiteDispatch,
+          },
+          { provide: BACKUP_STORAGE_TARGET, useValue: fixedStore },
+        ],
+      }).compile();
+      return module.get<AutoBackupService>(AutoBackupService);
+    };
+
+    it("reports the store as fixed, with what it already holds", async () => {
+      const svc = await buildService();
+      mockSettingsRepo.findOne.mockResolvedValue(createSettings());
+
+      await expect(svc.describeCapability(userId)).resolves.toEqual({
+        available: true,
+        folderPath: DISPLAY,
+        // The flag the settings screen hides its folder picker on, rather than
+        // offering a control whose endpoints refuse.
+        locationSelectable: false,
+        // Switching store is forward-only, so the count is how an operator sees
+        // the gap instead of inferring it.
+        artifactCount: 3,
+      });
+    });
+
+    it("refuses a folder somebody asks to store", async () => {
+      const svc = await buildService();
+      mockSettingsRepo.findOne.mockResolvedValue(createSettings());
+
+      await expect(
+        svc.updateSettings(userId, { folderPath: "/data/backups" }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockSettingsRepo.save).not.toHaveBeenCalled();
+    });
+
+    it("answers a refusal rather than validating or browsing a folder", async () => {
+      const svc = await buildService();
+
+      await expect(svc.validateFolder("/data/backups")).resolves.toEqual({
+        valid: false,
+        error: "no folder to browse",
+      });
+      await expect(svc.browseFolders("/data/backups")).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it("writes no base into the settings column when a schedule is enabled", async () => {
+      const svc = await buildService();
+      mockSettingsRepo.findOne.mockResolvedValue(createSettings());
+
+      await svc.updateSettings(userId, { enabled: true });
+
+      // Not DISPLAY: a deployment that later switched back to a local store
+      // would read an `s3://` URL as a directory and refuse every backup.
+      expect(mockSettingsRepo.save.mock.calls[0][0].folderPath).toBe("");
+    });
+
+    it("leaves the stored column alone on a manual run", async () => {
+      const svc = await buildService();
+      mockSettingsRepo.findOne.mockResolvedValue(createSettings());
+
+      await svc.runManualBackup(userId);
+
+      expect(published).toHaveLength(1);
+      expect(mockSettingsRepo.save.mock.calls[0][0].folderPath).toBe("");
     });
   });
 });

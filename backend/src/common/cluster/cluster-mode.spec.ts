@@ -175,6 +175,116 @@ describe("checkClusterBoot", () => {
         warnings: [],
       },
       {
+        // The refusal above is the LOCAL store's. An object store is reachable
+        // from every replica by construction, so the assertion it exists to
+        // extract has nothing to assert -- which is the whole point of task S2.
+        name: "multi with an s3 backup store needs no shared volume",
+        env: {
+          CLUSTER_MODE: "multi",
+          JWT_SECRET: GOOD_SECRET,
+          ATTACHMENT_STORAGE_PROVIDER: "s3",
+          BACKUP_STORAGE_PROVIDER: "s3",
+          BACKUP_STORE_S3_BUCKET: "monize-store",
+        },
+        mode: "multi",
+        refusals: [],
+        warnings: [],
+      },
+      {
+        // local is the default in every mode, so an unset provider is still the
+        // one that needs the assertion.
+        name: "multi with the backup store left unset still needs the assertion",
+        env: {
+          CLUSTER_MODE: "multi",
+          JWT_SECRET: GOOD_SECRET,
+          ATTACHMENT_STORAGE_PROVIDER: "s3",
+          BACKUP_STORAGE_PROVIDER: "local",
+        },
+        mode: "multi",
+        refusals: [/BACKUP_SHARED_VOLUME=true/],
+        warnings: [],
+      },
+      {
+        // The refusal names the second way out now that there is one.
+        name: "the local-store refusal offers the s3 store as an answer",
+        env: {
+          CLUSTER_MODE: "multi",
+          JWT_SECRET: GOOD_SECRET,
+          ATTACHMENT_STORAGE_PROVIDER: "s3",
+        },
+        mode: "multi",
+        refusals: [/BACKUP_STORAGE_PROVIDER=s3/],
+        warnings: [],
+      },
+      {
+        // A typo would otherwise be read as `local` and put the recovery points
+        // on a pod's disk while the operator believed they were in a bucket.
+        name: "an unrecognised backup store, in single",
+        env: { JWT_SECRET: GOOD_SECRET, BACKUP_STORAGE_PROVIDER: "S3-bucket" },
+        mode: "single",
+        refusals: [/is not a backup storage target/],
+        warnings: [],
+      },
+      {
+        // INV-BACKUP-007, at the boot rather than at 02:00: the off-machine
+        // copy exists to survive the loss of the store, so one bucket holding
+        // both is a 3-2-1 arrangement that is actually a 1.
+        name: "an s3 store sharing its bucket with the off-machine destination",
+        env: {
+          JWT_SECRET: GOOD_SECRET,
+          BACKUP_STORAGE_PROVIDER: "s3",
+          BACKUP_STORE_S3_BUCKET: "one-bucket",
+          BACKUP_STORE_S3_PREFIX: "backups/",
+          BACKUP_S3_BUCKET: "one-bucket",
+          BACKUP_S3_PREFIX: "backups/offsite/",
+        },
+        mode: "single",
+        refusals: [/INV-BACKUP-007/],
+        warnings: [],
+      },
+      {
+        name: "an s3 store and an off-machine destination in two buckets",
+        env: {
+          JWT_SECRET: GOOD_SECRET,
+          BACKUP_STORAGE_PROVIDER: "s3",
+          BACKUP_STORE_S3_BUCKET: "monize-store",
+          BACKUP_S3_BUCKET: "monize-offsite",
+        },
+        mode: "single",
+        refusals: [],
+        warnings: [],
+      },
+      {
+        // The same bucket name on two services is two places; comparing the
+        // names alone would refuse a perfectly good configuration.
+        name: "the same bucket name on two different endpoints",
+        env: {
+          JWT_SECRET: GOOD_SECRET,
+          BACKUP_STORAGE_PROVIDER: "s3",
+          BACKUP_STORE_S3_BUCKET: "backups",
+          BACKUP_STORE_S3_ENDPOINT: "http://minio:9000",
+          BACKUP_S3_BUCKET: "backups",
+        },
+        mode: "single",
+        refusals: [],
+        warnings: [],
+      },
+      {
+        // A deployment with no off-machine destination has nothing to collide
+        // with, and an s3 store with no bucket is refused by the store itself
+        // with a message naming the variable -- one misconfiguration, one
+        // wording.
+        name: "an s3 store with no off-machine destination configured",
+        env: {
+          JWT_SECRET: GOOD_SECRET,
+          BACKUP_STORAGE_PROVIDER: "s3",
+          BACKUP_STORE_S3_BUCKET: "monize-store",
+        },
+        mode: "single",
+        refusals: [],
+        warnings: [],
+      },
+      {
         name: "single ignores the storage settings entirely",
         env: {
           CLUSTER_MODE: "single",

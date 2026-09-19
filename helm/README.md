@@ -313,8 +313,11 @@ rendered no volumes at all, which meant two features visible in the UI could not
 work in the canonical chart -- and both failed at the point of use rather than at
 install time, so the UI went on presenting them as configured:
 
-- **Automatic backups** write to `/data/backups`. Directory creation failed with
-  EROFS, so a user's schedule reported errors forever and produced no files.
+- **Automatic backups** write to `/data/backups` under the default `local`
+  store. Directory creation failed with EROFS, so a user's schedule reported
+  errors forever and produced no files. (`BACKUP_STORAGE_PROVIDER=s3` with the
+  `BACKUP_STORE_S3_*` variables keeps the artifacts in a bucket instead and
+  needs no claim; see "Horizontal scaling" for why `multi` cares.)
 - **`ATTACHMENT_STORAGE_PROVIDER=local`** writes to `/data/attachments`. Same
   failure, for receipts and documents. (The default `database` provider keeps
   bytes in Postgres and is unaffected; so is `s3`.)
@@ -410,7 +413,7 @@ Notes on sizing and behaviour:
 |-----------|-------------|---------|
 | `cluster.mode` | `single` (one backend replica) or `multi` | `single` |
 | `cluster.attachmentSharedVolume` | Assert every replica mounts the attachment dir | `false` |
-| `cluster.backupSharedVolume` | Assert every replica mounts the backup dir | `false` |
+| `cluster.backupSharedVolume` | Assert every replica mounts the backup dir (`local` store only) | `false` |
 
 `cluster.mode` becomes `CLUSTER_MODE` in the backend's configmap. At `single`
 the backend keeps rate-limit counters and cross-replica wake-ups in its own
@@ -434,6 +437,17 @@ Two things the chart cannot verify, and the backend refuses to boot without:
    `cluster.backupSharedVolume: true` while the claim is still `ReadWriteOnce`
    is a deployment that boots and then loses backups, which is why `NOTES.txt`
    prints the mismatch at install time.
+
+   Each assertion is only asked for by the storage that needs it. The backup one
+   applies to the default `local` store; setting
+   `BACKUP_STORAGE_PROVIDER=s3` in `backend.extraEnv`, with
+   `BACKUP_STORE_S3_BUCKET` and the rest, puts the artifacts in a bucket every
+   replica reaches by construction, and the refusal lifts. That bucket must not
+   be the off-machine destination's `BACKUP_S3_BUCKET`: the off-machine copy
+   exists to survive the loss of the store, so the backend refuses to start when
+   the two resolve to one location (INV-BACKUP-007). Switching stores is
+   forward-only -- nothing is migrated, and the previous recovery points stay on
+   the old claim -- so keep it until the new store has a full retention window.
 
 `helm/ci/multi-values.yaml` turns on every template the mode reaches --
 Deployments above one replica, both budgets, the spread constraints, the

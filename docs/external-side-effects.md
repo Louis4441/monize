@@ -131,12 +131,28 @@ there for up to twenty minutes.
 
 ## 3. Backups
 
-`AutoBackupService` writes every artifact through `writeFileAtomic`
+`AutoBackupService` performs no storage operation itself. Every one goes through
+the store selected by `BACKUP_STORAGE_PROVIDER`
+(`backend/src/backup/storage/backup-storage.interface.ts`): `local`, a container
+directory, or `s3`, an S3-compatible bucket. The seam offers `publish` and no
+`write`, because the name is the invariant -- **an artifact is published whole or
+not at all** (INV-BACKUP-006) -- and a caller cannot ask for a non-atomic write
+when no operation offers one.
+
+Each target satisfies it by its own mechanism, and both are named rather than
+asserted. `local` writes through `writeFileAtomic`
 (`backend/src/backup/atomic-file.ts`): a temp name, `fsync`, a size check, the
 `rename`, then an `fsync` of the directory. `rename` within a filesystem is
 atomic, so a process killed mid-write or an `ENOSPC` leaves a temp file that the
-next run sweeps, never a truncated file under the final name. Promotion to the
-weekly and monthly tiers goes through `copyFileAtomic` with the same size check.
+next run's `sweepIncomplete` removes, never a truncated file under the final
+name. `s3` sends one `PutObject` with a known `Content-Length` and a declared
+`ChecksumSHA256`, which S3 applies to the key only on a complete,
+checksum-matching upload -- so the destination rather than this process is what
+verifies the bytes arrived, and an interrupted upload leaves no object to sweep.
+Promotion to the weekly and monthly tiers is `copyFileAtomic` with the same size
+check, or a server-side `CopyObject`, likewise all-or-nothing at the destination
+key.
+
 `lastBackupStatus` records what the export found -- `success` or `partial` --
 and the same verdict travels inside the document (`completeness` in the
 envelope, `backup-format.ts`), so restore refuses an artifact whose
@@ -151,14 +167,33 @@ trailer and `JSON.parse` on restore, a deliberate alteration is not. That gap is
 recorded in section 8, and it is one more reason a plaintext artifact never
 leaves the machine (INV-BACKUP-002).
 
-**Per-user namespacing is already correct on `main`,** and worth recording as
-settled: `userFolderPath` uses `shardedSegments(userId)` to build
-`<base>/<ab>/<cd>/<userId>/`, because automatic backup filenames carry only a
-tier and a date. A flat folder gave every user the same name for the same day,
-so whoever's cron ran last overwrote the rest and one user's retention pass
+**Per-user namespacing is settled, and is the same tree on both targets:**
+`shardedSegments(userId)` builds `<base>/<ab>/<cd>/<userId>/` as a directory on
+`local` and as a key prefix on `s3`, because automatic backup filenames carry
+only a tier and a date. A flat folder gave every user the same name for the same
+day, so whoever's cron ran last overwrote the rest and one user's retention pass
 deleted another's files. `enforceRetention` still sweeps the old flat layout for
-files written before the fix. The folder browse and validate endpoints are
-admin-gated at the controller.
+files written before the fix -- a `local`-only concept, since the `s3` store has
+never had a layout without an owner in the key, and one the listing marks
+`legacy` so nothing downloadable is served from it. The folder browse and
+validate endpoints are admin-gated at the controller, and under an `s3` store
+they answer a typed refusal rather than walking a filesystem that has nothing to
+do with where the bytes are.
+
+**The store and the off-machine destination must be two places**
+(INV-BACKUP-007). The store's variables are `BACKUP_STORE_S3_*` and the
+off-machine destination's are `BACKUP_S3_*`; a deployment whose two resolve to
+one bucket and overlapping prefix is refused at the boot. This is the one place
+in this document where two external side effects have to be told apart rather
+than ordered: the off-machine copy exists to survive the loss of the store, so
+one bucket holding both is a 3-2-1 arrangement that is actually a 1, and every
+ordering rule below would still hold while the arrangement protected nothing.
+
+**Switching stores is forward-only.** Nothing is migrated; the previous recovery
+points stay where they were, invisible to the new store's listing. The
+capability report carries the count of artifacts the current store holds so the
+gap is visible rather than inferred, and the operator keeps the old volume or
+bucket until the new store has a full retention window.
 
 **Encryption.** A support backup is unconditionally encrypted -- the DTO's
 `password` is required, and there is no code path returning an unencrypted
@@ -168,12 +203,14 @@ stored password cannot be decrypted (a rotated key) the backup is **refused**
 rather than silently written in clear. Refusing is the right failure: it is
 visible, and it does not downgrade.
 
-**The writability probe** names its file with `randomUUID()`, so two users or two
-replicas probing the same folder in the same millisecond cannot collide on the
-name, and the `unlink` sits outside the `try` that decides the verdict: the
-write is the answer, and a probe file that could not be removed is a warning
-in the log, not a "not writable" that would contradict the write that just
-succeeded.
+**The writability probe** on the `local` store names its file with
+`randomUUID()`, so two users or two replicas probing the same folder in the same
+millisecond cannot collide on the name, and the `unlink` sits outside the `try`
+that decides the verdict: the write is the answer, and a probe file that could
+not be removed is a warning in the log, not a "not writable" that would
+contradict the write that just succeeded. The `s3` store probes with a
+`HeadBucket` instead -- it says the bucket exists and this credential reaches it
+without writing an object into somebody's recovery points to find out.
 
 **Restore** is the strongest workflow here. The whole thing -- delete existing
 data, insert backup data, fix deferred FKs -- runs inside

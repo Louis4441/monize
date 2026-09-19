@@ -95,7 +95,7 @@
 | T1 | Migration `http_throttle_counters`; `PostgresThrottlerStorage`; selected in `multi`; fail-open | F2 | multi-only | [x] |
 | M1 | MCP 2025-era sessions: persisted rows or documented sticky routing | F1 | none | [x] |
 | S1 | Boot refusals in `multi` for per-pod attachments and backups | F1 | multi-only | [x] |
-| S2 | S3 backup target for automatic backups | -- | none until selected | [ ] |
+| S2 | S3 backup target for automatic backups | -- | none until selected | [x] |
 | C1 | `claimOnce` per owner and month around budget period rollover | -- | neutral | [x] |
 | C2 | Deployment-wide `fetch_sync` lease around FX, security price and market index fetches | -- | neutral | [x] |
 | C3 | Release-check cache to a one-row table | -- | neutral | [x] |
@@ -1611,7 +1611,7 @@ documented as deprecated, beside the current name.
 
 ### S2 -- S3 backup target
 
-- [ ] Status:
+- [x] Status: done, with one step outstanding -- see Notes.
 
 **Scope:** `backend/src/backup/storage/` (new folder: interface, `local` and
 `s3` targets, token `BACKUP_STORAGE_PROVIDER`), `backend/src/backup/auto-backup.service.ts`,
@@ -1643,37 +1643,70 @@ external write, or reconstructibility; a backup object with no record is a
 storage cost, a record with no object is the failure. Keep the order the
 filesystem target has.
 
-**Notes:** Not started. `docs/specs/backup-storage-targets.md` is the spec, and
-it is **proposed, not approved**: no code lands until the maintainer answers its
-section 11. Writing it first was the maintainer's call, and the survey behind it
-turned up four things this task's Scope does not cover, each of which would have
-been discovered mid-implementation:
+**Notes:** Done in the three PRs section 10 of the spec stages, after the
+maintainer answered its section 11 (the setting becomes inert, no migration,
+`local` stays the default, the legacy flat-folder sweep stays where it is). The
+spec is now **approved** and section 11 records those answers as decisions.
 
-- **`BACKUP_S3_*` is already taken**, by the off-machine destination's
-  deployment default. An `s3` store reusing that prefix would put the primary
-  artifact and its off-machine copy in one bucket by default, silently -- the
-  exact failure the off-machine feature exists to prevent. The store's variables
-  are `BACKUP_STORE_S3_*`, and the separation is proposed as INV-BACKUP-007
-  rather than left as a naming convention.
-- **`openStoredBackup` returns a filesystem path** and `backup.controller.ts`
-  opens it with `createReadStream`. An object store has no path, so the download
-  route changes shape; `backup-offsite-dispatch.service.ts` reads artifacts the
-  same way and moves with it. Neither file is in this task's Scope.
-- **`enforceRetention` is synchronous and sweeps a legacy flat folder** that only
-  ever existed on disk. It becomes async, and the legacy sweep is local-only.
-- **The per-user folder setting and the admin folder browser have no meaning on
-  object storage.** That is the one user-visible decision in the feature and it
-  is section 11's first question, with a recommendation rather than a choice made
-  for the maintainer.
+1. **The seam and the `local` target.** `BACKUP_STORAGE_TARGET` with the twelve
+   operations of spec section 2; `LocalBackupStorageTarget` carries the previous
+   behaviour unchanged. `openStoredBackup` stops returning a filesystem path and
+   the download route pipes the store's stream; the off-site dispatcher's
+   `readArtifact` moves onto the same `open()`. The proof is
+   `auto-backup.service.spec.ts` running against the real target.
+2. **The `s3` target.** `S3BackupStorageTarget` over the shared
+   `s3-transport.ts`, `BACKUP_STORE_S3_*` configuration, `INV-BACKUP-006` and
+   `INV-BACKUP-007` in both contract documents, unit and deadline suites, the
+   MinIO integration spec, `.env.example`.
+3. **The boot matrix and the docs.** `checkClusterBoot`'s backup refusal is
+   conditional on a `local` store and names the `s3` one as the second way out;
+   it also refuses an unrecognised provider and a store that shares a location
+   with the off-machine destination. Helm's warnings and README follow it, the
+   folder setting is inert under a non-selectable store, and
+   `docs/backup-restore-contract.md` section 7 and
+   `docs/external-side-effects.md` section 3 are rewritten from the filesystem
+   to the store.
 
-The spec also stages the work as three PRs -- the seam with a `local` target that
-changes nothing, then the `s3` target, then the boot matrix and the docs -- so
-the extraction is proven by the existing 3473-line spec suite before any new
-storage behaviour is added.
+The four things the survey turned up that this task's Scope did not cover were
+all handled: the `BACKUP_S3_*` collision became `INV-BACKUP-007` and the
+`BACKUP_STORE_S3_*` prefix; `openStoredBackup` and `backup-offsite-dispatch.service.ts`
+moved onto the stream (both outside the original Scope, added in PR 1);
+`enforceRetention` became async; and the folder setting is inert rather than
+honoured under `s3`.
 
-No verification of the S3 half is possible in an agent session without Docker:
-the acceptance needs MinIO, and the `backend-integration-tests` job has only
-`postgres` today.
+**Outstanding, and the reason it is:** `backend/test/integration/backup-store-s3.integration.spec.ts`
+is gated on `BACKUP_STORE_S3_TEST_ENDPOINT`, and the `backend-integration-tests`
+job still has only `postgres`. The job needs a MinIO service pinned by digest
+(`zizmor`'s unpinned-images audit refuses a tag), and the session that wrote this
+could not resolve one: container registries are blocked by its egress policy, so
+`docker manifest inspect` and the registry API both answer `unauthorized`. The
+block to add, once a digest is resolved:
+
+```yaml
+      minio:
+        image: minio/minio@sha256:<resolve this>
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "mc ready local"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+```
+
+with `BACKUP_STORE_S3_TEST_ENDPOINT: http://localhost:9000` in the job's `env`
+and the bucket created before `npm run test:integration`. Until then the `s3`
+half of `INV-BACKUP-006`'s provider row is owed, which
+`docs/verification-contract.md` section 3 says rather than letting the row read
+as met.
+
+**A follow-up the spec listed as one:** the frontend still renders the backup
+folder picker regardless of `locationSelectable`. The endpoints refuse under an
+`s3` store, so the control fails honestly rather than misleading, but hiding it
+on that flag is its own small PR.
 
 ### C1 -- Budget period rollover under a per-owner `claimOnce`
 

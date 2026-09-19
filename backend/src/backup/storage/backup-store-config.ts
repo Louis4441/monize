@@ -1,5 +1,28 @@
 import { clampS3Deadline } from "../../attachments/storage/s3-transport";
 import { OffsiteS3Target } from "../offsite/backup-offsite.types";
+import {
+  BACKUP_STORE_PROVIDERS,
+  BackupStoreProvider,
+  BackupStoreS3Config,
+  normalizeStorePrefix,
+  sharesLocation,
+} from "./backup-store-location";
+
+/**
+ * Re-exported because this is where a caller that needs the shape also needs
+ * the reader beside it; `backup-store-location.ts` holds them so the boot
+ * matrix can reach them without the transport.
+ */
+export {
+  BACKUP_STORE_PROVIDERS,
+  normalizeStorePrefix,
+  sharesLocation,
+} from "./backup-store-location";
+export type {
+  BackupStoreProvider,
+  BackupStoreS3Config,
+  S3Location,
+} from "./backup-store-location";
 
 /**
  * Where a deployment keeps its primary automatic backups, read from the
@@ -16,23 +39,6 @@ import { OffsiteS3Target } from "../offsite/backup-offsite.types";
 
 /** How a caller supplies configuration. Returns `undefined` when unset. */
 export type BackupStoreEnvGetter = (name: string) => string | undefined;
-
-/** The targets `BACKUP_STORAGE_PROVIDER` may name. */
-export const BACKUP_STORE_PROVIDERS = ["local", "s3"] as const;
-export type BackupStoreProvider = (typeof BACKUP_STORE_PROVIDERS)[number];
-
-/** Where an `s3` store puts its objects, and how it reaches them. */
-export interface BackupStoreS3Config {
-  readonly bucket: string;
-  /** Normalised to at most one trailing slash, or `undefined` for the root. */
-  readonly prefix?: string;
-  readonly region?: string;
-  readonly endpoint?: string;
-  readonly forcePathStyle: boolean;
-  readonly credentials?: { accessKeyId: string; secretAccessKey: string };
-  /** Already clamped by `clampS3Deadline`; see `s3-transport.ts`. */
-  readonly deadlineMs: number;
-}
 
 const text = (get: BackupStoreEnvGetter, name: string): string | undefined => {
   const value = get(name)?.trim();
@@ -66,20 +72,6 @@ export function resolveBackupStoreProvider(
     );
   }
   return known;
-}
-
-/**
- * A key prefix, normalised to at most one trailing slash -- the same shape
- * `S3StorageProvider` gives `ATTACHMENT_S3_PREFIX` and
- * `normalizeOffsitePrefix` gives the off-machine destination's, so an operator
- * who has configured one bucket has configured all three the same way.
- */
-export function normalizeStorePrefix(
-  prefix: string | null | undefined,
-): string | undefined {
-  if (!prefix) return undefined;
-  const trimmed = prefix.trim().replace(/\/+$/, "");
-  return trimmed ? `${trimmed}/` : undefined;
 }
 
 /**
@@ -133,49 +125,6 @@ export function resolveBackupStoreS3Config(
     // deployment can widen the window in which a put may still land.
     deadlineMs: clampS3Deadline(get("BACKUP_STORE_S3_REQUEST_TIMEOUT_MS")),
   };
-}
-
-/**
- * One S3 location, for comparing a store against an off-machine destination.
- *
- * `endpoint` is part of the identity because the same bucket name on two
- * services is two places, and its absence (AWS) is a value of its own.
- */
-export interface S3Location {
-  readonly endpoint?: string;
-  readonly bucket: string;
-  readonly prefix?: string;
-}
-
-/**
- * Whether a store and an off-machine destination would write to the same place
- * (INV-BACKUP-007).
- *
- * "The same place" is broader than string equality on purpose. Two prefixes
- * where one contains the other are one place: `backups/` and `backups/store/`
- * are not separate failure domains, and the off-machine copy exists to survive
- * the loss of the store. A trailing-slash difference is not a difference at all,
- * which is why both sides are normalised before they are compared.
- *
- * An endpoint or bucket that differs makes them two places whatever the prefixes
- * say; comparing prefixes across buckets would refuse a perfectly good
- * configuration.
- */
-export function sharesLocation(
-  store: S3Location,
-  offsite: S3Location,
-): boolean {
-  const sameEndpoint =
-    (store.endpoint ?? "").replace(/\/+$/, "") ===
-    (offsite.endpoint ?? "").replace(/\/+$/, "");
-  if (!sameEndpoint || store.bucket !== offsite.bucket) return false;
-
-  const a = normalizeStorePrefix(store.prefix) ?? "";
-  const b = normalizeStorePrefix(offsite.prefix) ?? "";
-  // Both carry one trailing slash (or are empty, meaning the bucket root), so a
-  // containment test is a prefix test and cannot match a sibling whose name
-  // merely begins the same way: `backups/` never matches `backups-old/`.
-  return a.startsWith(b) || b.startsWith(a);
 }
 
 /**
