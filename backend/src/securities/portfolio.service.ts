@@ -853,10 +853,21 @@ export class PortfolioService {
     // `docs/specs/portfolio-period-result.md` section 10). It is withheld with
     // its cause rather than approximated, so a position with no stored close on
     // a day the chain spans makes the figure unknown instead of a gain.
+    // `fetchMissing: false`: a summary card is not a licence to drive a
+    // twenty-six-year provider backfill from inside a GET. The window opens at
+    // the scope's first transaction, so a portfolio that started in 2000 asked
+    // the rate provider for every month it had no stored rate for -- inline,
+    // on the request a person is waiting on, and again on the next request
+    // because a provider with no history for that era answers nothing there is
+    // to store (issue #1409). The summary already withholds a figure with its
+    // cause (`timeWeightedReturnReasons`, `incompleteRanges`), so it reports
+    // the gap; filling it is `ExchangeRateHistoryService` and the scheduled
+    // jobs, where a person is not waiting.
     const investedSinceInception =
       await this.periodResult.getInvestedResultSinceInception(userId, {
         accountIds,
         displayCurrency: defaultCurrency,
+        fetchMissing: false,
       });
     phase("sinceInceptionResult");
     const timeWeightedReturn = investedSinceInception.investmentReturnPercent;

@@ -75,6 +75,7 @@ Each module holds `{feature}.module.ts`, controller, service, their specs, `enti
 | A SQL function called from `src/` | declared in `src/common/db/required-db-functions.ts` with its migration | a bare call the boot check does not know |
 | A number a person reads | `src/common/number-locale.util.ts` | the `en-US` helpers in `format-currency.util.ts` (machine output only) |
 | A rate for a date | `resolveFxRate` (`src/common/time-series/fx-rate-resolver.ts`), or `ExchangeRateService.resolveStoredRate` / `getRateForDate` | `getLatestRate`, or a `rate_date DESC LIMIT 1` of your own |
+| A read a person is waiting on, short of rate history | `fetchMissing: false` where the window is the whole history | an inline provider backfill behind a summary card |
 
 **A cron or bootstrap body seeds its own identity** -- `withSystemContext` for the fan-out, `withUserContext(userId)` per user, `withDelegateContext` when the two ids must differ -- and a per-user loop isolates each user, pre-checks included. `docs/backend/cron-and-background-work.md`.
 
