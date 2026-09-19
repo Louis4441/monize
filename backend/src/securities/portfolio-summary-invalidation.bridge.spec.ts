@@ -1,3 +1,5 @@
+import { Test } from "@nestjs/testing";
+
 import { MemoryEventBus } from "../common/events/memory-event-bus";
 import { EventBus } from "../common/events/event-bus.interface";
 import { PortfolioSummaryInvalidationBridge } from "./portfolio-summary-invalidation.bridge";
@@ -113,6 +115,31 @@ describe("PortfolioSummaryInvalidationBridge", () => {
     await portfolioSummaryMemo.run(UUID_A, "ka", compute);
     expect(compute).toHaveBeenCalledTimes(2);
     isolated.onModuleDestroy();
+  });
+
+  it("compiles, and stays local, in a graph with no bus bound", async () => {
+    // The integration harness builds a testing module from the feature modules
+    // alone, and `EventBusModule` is `@Global()` rather than imported by each
+    // of them -- so a bridge that REQUIRED the bus failed every integration
+    // suite that touches securities at module compile. A graph with no bus has
+    // no other replica to tell.
+    bridge.onModuleDestroy();
+
+    const isolated = await Test.createTestingModule({
+      providers: [PortfolioSummaryInvalidationBridge],
+    }).compile();
+    await isolated.init();
+
+    const compute = jest.fn(async () => "v");
+    await portfolioSummaryMemo.run(UUID_A, "ka", compute);
+    invalidatePortfolioSummary(UUID_A);
+    await settle();
+
+    // Local drop, no announcement, no throw.
+    expect(received).toEqual([]);
+    await portfolioSummaryMemo.run(UUID_A, "ka", compute);
+    expect(compute).toHaveBeenCalledTimes(2);
+    await isolated.close();
   });
 
   it("stops announcing and listening at shutdown", async () => {

@@ -2,6 +2,7 @@ import {
   Inject,
   Injectable,
   Logger,
+  Optional,
   OnModuleDestroy,
   OnModuleInit,
 } from "@nestjs/common";
@@ -45,13 +46,33 @@ export class PortfolioSummaryInvalidationBridge
   /** The subscription's own unsubscribe; `null` while not subscribed. */
   private unsubscribe: (() => void) | null = null;
 
-  constructor(@Inject(EVENT_BUS) private readonly bus: EventBus) {}
+  /**
+   * `@Optional()` because `SecuritiesModule` is compiled without the bus in
+   * places that are not the application: the integration harness builds a
+   * testing module from the feature modules alone, and `EventBusModule` is
+   * `@Global()` rather than imported by each of them, so requiring it here made
+   * every integration suite that touches securities fail to compile. A graph
+   * with no bus has no other replica to tell, so the memo's invalidation is
+   * local and the TTL is the bound -- which is exactly where this started, and
+   * is why the absence is logged rather than thrown.
+   */
+  constructor(
+    @Optional() @Inject(EVENT_BUS) private readonly bus: EventBus | null,
+  ) {}
 
   onModuleInit(): void {
+    if (!this.bus) {
+      this.logger.warn(
+        "No event bus is bound, so a portfolio summary invalidation reaches " +
+          "this replica only; another replica keeps its entry until it expires.",
+      );
+      return;
+    }
     this.unsubscribe = this.bus.subscribe(
       PORTFOLIO_SUMMARY_INVALIDATION_CHANNEL,
       (payload) => applyPortfolioSummaryInvalidation(payload),
     );
+    const bus = this.bus;
     setPortfolioSummaryBroadcast((payload) => {
       // Not awaited, and deliberately: the seams that invalidate are
       // synchronous and have already committed, so an announcement that fails
@@ -59,7 +80,7 @@ export class PortfolioSummaryInvalidationBridge
       // rejection is logged here because `publish` rejects rather than
       // swallowing a down connection, and a silent catch would make a bus that
       // is never delivering look exactly like one that is.
-      void this.bus
+      void bus
         .publish(PORTFOLIO_SUMMARY_INVALIDATION_CHANNEL, payload)
         .catch((error: unknown) => {
           this.logger.warn(
@@ -73,6 +94,7 @@ export class PortfolioSummaryInvalidationBridge
   }
 
   onModuleDestroy(): void {
+    if (!this.bus) return;
     // The announcer first: a shutdown that stops listening while still
     // announcing would publish onto a bus this process no longer reads.
     setPortfolioSummaryBroadcast(null);
