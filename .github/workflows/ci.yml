@@ -1427,15 +1427,16 @@ jobs:
   # Gates releases: build-and-push lists this job in its needs, so a red E2E
   # run blocks the container build/push. Retries (2 in CI) absorb flakiness.
   e2e-tests:
-    name: E2E Tests (shard ${{ matrix.shard }}/4)
+    name: E2E Tests (shard ${{ matrix.shard }}/4${{ matrix.cluster == 'true' && ', cluster' || '' }})
     runs-on: ubuntu-latest
     # Depends on e2e-browsers so the Playwright cache is fully populated before
     # any shard starts; the backend/frontend unit-test gate is inherited
     # transitively through e2e-browsers.
     needs: [e2e-browsers]
     # Shard across 4 runners. Each shard brings up its OWN isolated stack
-    # (postgres + backend + frontend) below, so there is no shared database
-    # state between shards. Within a shard Playwright still runs serially
+    # (postgres + backend + frontend, plus a second backend and a load balancer
+    # on the cluster shard) below, so there is no shared database state between
+    # shards. Within a shard Playwright still runs serially
     # (workers: 1 in playwright.config.ts), preserving the existing ordering
     # guarantees (e.g. zz-danger-zone last). fail-fast: false lets every shard
     # finish so we see all failures, not just the first shard to go red.
@@ -1443,9 +1444,27 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4]
+        include:
+          # One shard runs the SAME suite against two backend replicas behind a
+          # round-robin load balancer with no affinity (docker-compose.e2e.yml,
+          # profile `cluster`). It is the only place the product is exercised as
+          # a cluster, and it also runs tests/cluster.spec.ts, which is skipped
+          # everywhere else because one backend makes it true for the wrong
+          # reason. The other three shards are byte-for-byte what they were.
+          - shard: 4
+            cluster: 'true'
     permissions:
       contents: read
       pull-requests: write # so the failure-diagnostics step can post container logs as a PR comment via the issues/comments API
+    env:
+      # Read by docker compose itself and by docker-compose.e2e.yml's
+      # interpolations. Empty COMPOSE_PROFILES is the default (one backend).
+      COMPOSE_PROFILES: ${{ matrix.cluster == 'true' && 'cluster' || '' }}
+      E2E_CLUSTER_MODE: ${{ matrix.cluster == 'true' && 'multi' || 'single' }}
+      E2E_INTERNAL_API_URL: ${{ matrix.cluster == 'true' && 'http://api-lb' || 'http://backend:3000' }}
+      # The cluster shard compiles the backend in two containers at once, so it
+      # needs longer than the single-backend shards to become healthy.
+      E2E_WAIT_TIMEOUT: ${{ matrix.cluster == 'true' && '900' || '600' }}
     steps:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
@@ -1458,7 +1477,7 @@ jobs:
         run: docker compose -f docker-compose.e2e.yml build
 
       - name: Start application stack
-        run: docker compose -f docker-compose.e2e.yml up -d --wait --wait-timeout 600
+        run: docker compose -f docker-compose.e2e.yml up -d --wait --wait-timeout "$E2E_WAIT_TIMEOUT"
 
       - name: Install E2E dependencies
         working-directory: e2e
@@ -1500,6 +1519,24 @@ jobs:
           name: chromium-push-report
           path: e2e/playwright-push-report/
           retention-days: 7
+
+      # Before the sharded run: zz-danger-zone.spec.ts deletes the shared admin
+      # account, and a cluster check that ran after it would be asserting
+      # against a stack the suite had already torn down half of.
+      #
+      # --project=chromium because every test in the file drives the API
+      # directly and never opens a page; a second browser would double the run
+      # and prove nothing.
+      - name: Run cluster tests (CLUSTER_MODE=multi)
+        if: matrix.cluster == 'true'
+        working-directory: e2e
+        timeout-minutes: 10
+        env:
+          BASE_URL: http://localhost:3001
+          E2E_CLUSTER: multi
+          E2E_LB_URL: http://localhost:3002
+          CI: 'true'
+        run: npx playwright test tests/cluster.spec.ts --project=chromium
 
       - name: Run E2E tests
         working-directory: e2e
@@ -1543,7 +1580,11 @@ jobs:
             echo '```'
             docker compose -f docker-compose.e2e.yml ps -a 2>&1 || true
             echo '```'
-            for svc in postgres backend frontend; do
+            # The services this shard actually started: the cluster shard has
+            # two backends and a load balancer, the others do not, and asking
+            # compose beats a hardcoded list that goes stale or prints empty
+            # sections for services that were never up.
+            for svc in $(docker compose -f docker-compose.e2e.yml config --services); do
               echo "<details><summary>$svc (last 150 lines)</summary>"
               echo
               echo '```'

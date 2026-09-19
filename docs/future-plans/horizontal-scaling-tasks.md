@@ -79,7 +79,7 @@
 | F3 | Doc corrections in `concurrency-and-idempotency.md`, `external-side-effects.md`, `cron-jobs.md` | -- | none | [x] |
 | F5 | Concurrency register: retire the stale `users.failed_login_attempts` gap row | -- | none | [x] |
 | F6 | Retire `REDIS_URL` from F1's boot matrix, `main.ts` and `.env.example` | -- | none | [x] |
-| F4 | ADR 0005 and index row | F1 | none | [ ] |
+| F4 | ADR 0005 and index row | F1 | none | [x] |
 | A1 | Migration: `auth_attempt_counters`, `single_use_tokens`; RLS exemption; sweep cron | -- | none | [x] |
 | A2 | `AuthAttemptCounterService`; 2FA attempt maps replaced | A1 | neutral | [x] |
 | A3 | `usedTotpCodes` replaced by a `single_use_tokens` claim | A1 | neutral | [x] |
@@ -100,12 +100,12 @@
 | C2 | Deployment-wide `fetch_sync` lease around FX, security price and market index fetches | -- | neutral | [x] |
 | C3 | Release-check cache to a one-row table | -- | neutral | [x] |
 | C4 | Demo seed under the lifecycle advisory lock | -- | neutral (demo only) | [x] |
-| G1 | Whole-tree process-local-state guard with allowlist | A4, X1, R4 | none | [ ] |
-| G2 | `INV-HA-001..005` in both contract docs | A3, K1, R3, S1 | none | [ ] |
+| G1 | Whole-tree process-local-state guard with allowlist | A4, X1, R4 | none | [x] |
+| G2 | `INV-HA-001..005` in both contract docs | A3, K1, R3, S1 | none | [x] |
 | D1 | Helm: Deployments, PDB, spread, autoscaling, `clusterMode` | F2 | none (defaults unchanged) | [x] |
 | D2 | `docker-compose.ha.yml` example | F2 | none | [x] |
 | D3 | CI: retire the `redis` service and `REDIS_URL` from the integration job | -- | none | [x] |
-| D4 | E2E: one shard on `CLUSTER_MODE=multi` with two backends | R6, T1, D1 | none | [ ] |
+| D4 | E2E: one shard on `CLUSTER_MODE=multi` with two backends | R6, T1, D1 | none | [x] |
 
 ## Suggested order
 
@@ -400,7 +400,7 @@ backup storage -- and which task adds each check, so the row does not read as
 
 ### F4 -- ADR 0005
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `docs/adr/0005-cluster-mode-on-postgresql-alone.md` (new),
 `docs/adr/README.md` (index row).
@@ -431,7 +431,17 @@ single-replica deployments need nothing new).
 
 **Acceptance:** index row present; `doc-paths` guard green.
 
-**Notes:**
+**Notes:** marked retrospective on the `Date` line, per `docs/adr/README.md`:
+the decision was taken with the plan and most of it has shipped, so a bare
+date would read as a decision taken on 2026-09-19. The README's sentence
+listing the retrospective ADRs was updated with it.
+
+Two consequences recorded that the task's outline did not name, because they
+are decisions a future reader would otherwise have to re-derive: the throttler's
+deliberate fail-open as an exception to INV-HA-001, and G1's guard as the thing
+that now makes per-replica state a written decision. One extra alternative is
+recorded for the same reason -- leader election for the duplicated provider
+fetches, rejected in favour of C2's `fetch_sync` lease.
 
 ### A1 -- Migration: `auth_attempt_counters`, `single_use_tokens`
 
@@ -1633,7 +1643,37 @@ external write, or reconstructibility; a backup object with no record is a
 storage cost, a record with no object is the failure. Keep the order the
 filesystem target has.
 
-**Notes:**
+**Notes:** Not started. `docs/specs/backup-storage-targets.md` is the spec, and
+it is **proposed, not approved**: no code lands until the maintainer answers its
+section 11. Writing it first was the maintainer's call, and the survey behind it
+turned up four things this task's Scope does not cover, each of which would have
+been discovered mid-implementation:
+
+- **`BACKUP_S3_*` is already taken**, by the off-machine destination's
+  deployment default. An `s3` store reusing that prefix would put the primary
+  artifact and its off-machine copy in one bucket by default, silently -- the
+  exact failure the off-machine feature exists to prevent. The store's variables
+  are `BACKUP_STORE_S3_*`, and the separation is proposed as INV-BACKUP-007
+  rather than left as a naming convention.
+- **`openStoredBackup` returns a filesystem path** and `backup.controller.ts`
+  opens it with `createReadStream`. An object store has no path, so the download
+  route changes shape; `backup-offsite-dispatch.service.ts` reads artifacts the
+  same way and moves with it. Neither file is in this task's Scope.
+- **`enforceRetention` is synchronous and sweeps a legacy flat folder** that only
+  ever existed on disk. It becomes async, and the legacy sweep is local-only.
+- **The per-user folder setting and the admin folder browser have no meaning on
+  object storage.** That is the one user-visible decision in the feature and it
+  is section 11's first question, with a recommendation rather than a choice made
+  for the maintainer.
+
+The spec also stages the work as three PRs -- the seam with a `local` target that
+changes nothing, then the `s3` target, then the boot matrix and the docs -- so
+the extraction is proven by the existing 3473-line spec suite before any new
+storage behaviour is added.
+
+No verification of the S3 half is possible in an agent session without Docker:
+the acceptance needs MinIO, and the `backend-integration-tests` job has only
+`postgres` today.
 
 ### C1 -- Budget period rollover under a per-owner `claimOnce`
 
@@ -1914,7 +1954,7 @@ what this task changed.
 
 ### G1 -- Whole-tree process-local-state guard
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `backend/src/common/process-local-state.guard.spec.ts` (new).
 
@@ -1941,11 +1981,50 @@ any allowlist entry reports its file and line.
 match (the regex anchors on `private`). Blank comments while preserving line
 numbers so the report points at the right line.
 
-**Notes:**
+**Notes:** 35 allowlist entries, each with its reason. Three things the plan
+did not anticipate:
+
+- The allowlist is keyed `path#field`, not by file. Keying by file would have
+  exempted a sixth map in `provider-health.service.ts` on the strength of the
+  five already there, and keying by `path:line` would churn on every edit above
+  the declaration.
+- A field that is `readonly` AND typed `ReadonlySet`/`ReadonlyMap` is skipped
+  rather than allowlisted: both halves forbid the mutation the guard is about,
+  and three constant lookup tables (`yahoo-finance.service.ts`,
+  `investment-transactions.service.ts` x2) would otherwise have been three
+  exemptions saying "this is a constant". The `readonly` half is load-bearing --
+  `private x: ReadonlySet<string> = new Set()` forbids `add` and still allows a
+  reassignment, which is process state by another route. A `static` field with a
+  mutable type IS scanned.
+- The scan also matches the declaration-only shape (`private readonly x: Map<`,
+  assigned in the constructor), which the plan's regex pair covers but the cron
+  guard's does not use; `MovementModel` in `daily-movement.service.ts` is
+  written that way.
+
+Comments are blanked before the scan, and locating them is the part that had to
+be got right: `extractTsComments` returns bodies without positions, and finding
+them again with a bare `indexOf` lands on code -- measurably, in
+`ai/query/tool-input-schemas.ts`, where the body `" delete"` matched inside
+`"attachments are not used for delete."` and blanked it. A landing site is now
+accepted only where a comment can begin, and a body that cannot be located is
+left in place, because an unblanked comment can only add an offender the report
+names out loud, never hide one. The vacuity test carries that collision as a
+case and fails on the original mistake.
+
+A second `it` fails an allowlist entry whose field is gone, so the list shrinks
+by being checked rather than by being remembered. Both directions were proved
+by removing an entry and by renaming one. The forward references in
+`memory-event-bus.ts` and `postgres-event-bus.ts` ("allowlisted when the
+whole-tree guard lands") are now satisfied; their wording still reads correctly
+and was left alone rather than widening this task's scope.
+
+Out of scope, reported not fixed: `docs/system-invariants.md`'s "Candidates not
+yet admitted" still lists "Bootstrap must be serialized across replicas ... no
+advisory lock", which `backend/src/common/db/advisory-locks.ts` has closed.
 
 ### G2 -- Invariants in both contract docs
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `docs/system-invariants.md` (five entries in the field template
 plus five index rows), `docs/verification-contract.md` (five section-3 rows
@@ -1963,7 +2042,22 @@ missing path listed.
 **Acceptance:** `npm run test:unit -- invariant-catalog-parity` and
 `doc-paths` green; every `Required tests` line names a spec that resolves.
 
-**Notes:**
+**Notes:** four `enforced`, one `partial`. INV-HA-001 is the `partial`, for two
+named reasons rather than an unfinished mechanism: no E2E flips readiness on a
+live replica yet (task D4), and `PostgresThrottlerStorage` fails **open** on a
+structural failure, so a broken rate limiter deliberately does not refuse
+readiness -- `/health` reports `rateLimiting: disabled` and every auth route
+keeps INV-HA-002's logged counter beneath the throttler. Both are written into
+the entry rather than left for a reader to notice.
+
+INV-HA-003's statement covers the OIDC step-up `jti` as the design doc worded
+it, but its enforcement names `oidc_step_up_claims` rather than
+`single_use_tokens`: that path already had the same mechanism on its own table
+and X1 did not move it.
+
+INV-HA-002 carries a source scan as a second load-bearing kind in the matrix --
+G1's guard. A budget kept in memory passes every behavioural test on one
+replica, so the scan is the only kind that can fail it.
 
 ### D1 -- Helm
 
@@ -2162,7 +2256,7 @@ for the same reason it was then.
 
 ### D4 -- E2E shard on `CLUSTER_MODE=multi`
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `docker-compose.e2e.yml`, `.github/workflows/ci.yml` (`e2e-tests`
 matrix), `e2e/tests/` (a relay round trip and a login-lockout spec that
@@ -2181,4 +2275,62 @@ show both backends served requests.
 `workers: 1`. The Lighthouse job reuses the same compose file; keep its
 default path on one backend so its budgets do not shift.
 
-**Notes:**
+**Notes:** Scope gained `e2e/cluster/api-lb.conf` (the nginx config the compose
+file mounts), `e2e/tests/cluster.spec.ts`, `e2e/helpers/api.ts` (one export),
+`e2e/CLAUDE.md`, and the two contract docs, for the reasons below.
+
+**The shape.** A compose **profile**, not a second compose file: with
+`COMPOSE_PROFILES` unset the file renders exactly what it rendered before, which
+is what keeps the Lighthouse job's budgets where they are. `backend` and
+`backend-2` share one YAML anchor for their whole environment, so the two
+replicas cannot drift into being two different applications. Both run
+`db-init`/`db-migrate` on purpose: the lifecycle advisory lock is part of what
+the shard proves.
+
+**The specs do not alternate backends by hoping.** `api-lb.conf` labels every
+answer with `X-E2E-Upstream`, so each test asserts on the set of replicas that
+served it rather than on a log grep after the fact; a test whose requests all
+landed on one replica fails as inconclusive rather than passing for the wrong
+reason. The load balancer is also published on 3002 so a failure says whether
+the fixture or the frontend proxy's header forwarding is at fault.
+
+**The relay round trip is in, and needed no new dependency.** The 2026-07-28 MCP
+revision is a plain JSON-RPC POST, so the agent half is `request.post` with two
+`_meta` envelope keys and the `Mcp-Method`/`Mcp-Name` headers. It has to be that
+leg: a 2025-era session is pinned to its replica, so a round-robin LB would
+answer its second request `404`. The wire was verified against the real SDK
+handler before the spec was written rather than guessed.
+
+**The shard also covers what the plan did not ask for**: `/oauth/jwks` agreeing
+across replicas (INV-HA-004 -- the one defect here that was user-visible before
+K1), and `/health` reporting the wake-up channel on each replica.
+
+**What is NOT covered, and the invariant says so.** INV-HA-001's readiness
+*flip* has no E2E: nothing in this stack can sever one replica's `LISTEN`
+without taking the database from both, so its matrix cell stays
+`required (not yet met)` and its entry stays `partial`. The paragraph in
+`docs/verification-contract.md` that said D4 would close it was corrected in the
+same commit rather than left to read as satisfied.
+
+**What the first CI run cost, and what it proved.** The shard failed before
+Playwright started: `api-lb` never became healthy. The image's own log named the
+cause -- `10-listen-on-ipv6-by-default.sh: info: can not modify
+/etc/nginx/conf.d/default.conf (read-only file system?)` -- and nginx had no
+access-log line at all, so no request ever reached it. The official nginx
+entrypoint turns `listen 80` into `listen [::]:80` by rewriting that file, the
+`:ro` mount stops it, and the healthcheck's `localhost` resolves to `::1` first
+in the container. The backends get away with the same URL because Node binds
+dual-stack. The healthcheck now addresses `127.0.0.1`, which depends on no
+resolution order, and the conf records why the entrypoint's message is expected.
+
+The run was not wasted. Both replicas reached `healthy` in `CLUSTER_MODE=multi`,
+which they cannot do unless the boot matrix accepted the compose environment, the
+two containers' concurrent `db-init`/`db-migrate` resolved under the lifecycle
+advisory lock, and each opened its `LISTEN` connection and round-tripped
+`verifyDelivery` -- `main.ts` exits 1 otherwise. The Lighthouse job passed on the
+same commit, which is the direct evidence that the default compose path is
+unchanged.
+
+**Still not verified here.** No Docker daemon in an agent session, so the fix is
+reasoned from the container's own log rather than reproduced locally, and the
+five cluster tests have still never run.

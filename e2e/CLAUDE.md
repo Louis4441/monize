@@ -10,6 +10,11 @@ docker compose -f docker-compose.e2e.yml up -d --wait   # from the repository ro
 npm test -- --workers=1                                  # the whole suite
 npm test -- tests/accounts.spec.ts                       # one file; safe without the flag
 npm run test:push                                        # push suite (push/*.spec.ts, playwright.push.config.ts); needs no stack
+
+# the two-replica stack, for tests/cluster.spec.ts (skipped without it)
+COMPOSE_PROFILES=cluster E2E_CLUSTER_MODE=multi E2E_INTERNAL_API_URL=http://api-lb \
+  docker compose -f docker-compose.e2e.yml up -d --wait
+E2E_CLUSTER=multi npx playwright test tests/cluster.spec.ts --project=chromium
 ```
 
 `playwright.config.ts` sets one worker only when `CI` is set, and `tests/zz-danger-zone.spec.ts` deletes the shared account, so its `zz-` ordering only means anything serially. The UI locale is pinned to `en` so label-based selectors match the base catalog. `e2e/push/README.md` has the push harness recipe.
@@ -26,3 +31,4 @@ npm run test:push                                        # push suite (push/*.sp
 - **Custom comboboxes** (the transaction payee field) swallow `fill()`; identify a row by a distinctive seeded amount and click a cell that does not stop propagation.
 - **Push tests observe only through `push/fixture.ts`.** Never call `deliverPushMessage` or `registration.getNotifications()` from a spec; `frontend/src/test/e2e-conventions.test.ts` scans for both, and for the bare alert locator above.
 - **A control renamed or removed in the app has consumers here that no unit suite loads.** Grep this directory for the accessible name in the same commit.
+- **`tests/cluster.spec.ts` runs only against the two-replica stack** and skips itself without `E2E_CLUSTER=multi`; `cluster/api-lb.conf` round-robins with no affinity and labels each answer with `X-E2E-Upstream`. One CI shard starts that stack; the other three are unchanged.

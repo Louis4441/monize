@@ -135,6 +135,11 @@ implied.
 | INV-PAYEE-002 | Google Places requests in one Pacific calendar month never exceed the cap for the key's owner | enforced |
 | INV-RELEASE-001 | The tested, imaged and tagged revisions are one revision | partial |
 | INV-MIGRATION-001 | Migrations apply in numeric prefix order, and a new migration's prefix cannot collide | enforced |
+| INV-HA-001 | A replica serves traffic only while what it shares with the others is reachable | partial |
+| INV-HA-002 | An authentication attempt budget is one number per deployment, not per process | enforced |
+| INV-HA-003 | A single-use artifact is consumed at most once across every replica | enforced |
+| INV-HA-004 | One deployment publishes one OIDC signing key set, stable across restarts | enforced |
+| INV-HA-005 | A relay prompt is claimed by exactly one agent poll and answered at most once | enforced |
 
 ## Imports
 
@@ -4255,6 +4260,245 @@ assigned at authoring time under both schemes, so a migration merged later can
 carry an earlier prefix and replay first on a fresh install. A migration must
 not depend on the ordering of another in-flight migration; nothing checks that
 beyond review.
+
+### INV-HA-001 -- a replica serves only while what it shares is reachable
+
+```text
+Statement           A process running under CLUSTER_MODE=multi serves traffic
+                    only while every replica-shared dependency it needs is
+                    reachable: it refuses to boot without them, and it leaves
+                    the load balancer when its wake-up channel is gone for good.
+Source of truth     The environment, read by checkClusterBoot, and the state of
+                    this replica's own LISTEN session.
+Enforcement         backend/src/common/cluster/cluster-mode.ts checkClusterBoot is the
+                    boot matrix as a pure function of the environment: in multi
+                    it refuses a missing or too-short JWT_SECRET (every replica
+                    derives the CSRF and OAuth cookie keys and the restore
+                    upload ticket from it), the per-pod `local` attachment
+                    provider and the automatic backup directory unless the
+                    operator asserts a shared volume, and it reports every
+                    refusal at once so one restart is enough. backend/src/main.ts logs
+                    them and exits 1 before app.listen. What needs a round trip
+                    is checked after: the listener connects and verifyDelivery
+                    sends and receives one notification, so a transaction-mode
+                    pooler that cannot hold LISTEN refuses the boot rather than
+                    running deaf. Thereafter /health/ready reads the session:
+                    down for longer than EVENT_BUS_READINESS_GRACE_MS is not
+                    ready. Below that it stays in service deliberately -- every
+                    replica's session dies at the same instant on a failover, so
+                    a zero-grace probe would empty the Service to save one poll
+                    interval on one feature.
+Concurrency scope   per replica
+Retry semantics     n/a: the matrix is a boot precondition and the probe is an
+                    idempotent read of local state.
+Crash semantics     A replica that loses the channel keeps answering every
+                    request correctly; what it loses is the wake-up shortcut,
+                    and event-bus.interface.ts makes every waiter poll as well.
+Failure response    exit(1) at boot, with every reason logged; 503 from
+                    /health/ready once the grace has run out.
+Required tests      Unit: backend/src/common/cluster/cluster-mode.spec.ts drives the matrix
+                    row by row; backend/src/health/health.controller.spec.ts covers the
+                    grace, the missing-listener wiring defect and the ordering
+                    against the database check; backend/src/common/cluster/cluster.module.spec.ts
+                    covers what is bound per mode. E2E: e2e/tests/cluster.spec.ts,
+                    on the two-replica shard, asserts that /health answers
+                    eventBus healthy from each of the two replicas in turn, and
+                    that /health/ready answers 200 -- the latter through the
+                    frontend's own route (frontend/src/app/api/v1/health/ready/route.ts
+                    serves it rather than proxying), so it proves one replica
+                    ready and names none. That is the positive half. Still owed:
+                    the flip, an E2E that takes a live replica's channel away
+                    and watches readiness go 503. Nothing in the E2E stack can
+                    sever one replica's LISTEN without taking the database from
+                    both.
+Status              partial
+```
+
+`partial` for two named reasons, not for an unfinished mechanism. The E2E above
+does not exist yet. And one shared dependency is deliberately outside the rule:
+`PostgresThrottlerStorage` fails **open** when its table or grant is missing, so
+a broken rate limiter does not refuse readiness. That is a chosen trade -- an
+outage of the limiter must not become an outage of the product -- and it is paid
+for twice: `/health` reports `rateLimiting: disabled` the moment it happens, and
+every authentication route carries INV-HA-002's logged counter beneath the
+throttler, so the budget that matters survives the limiter.
+
+### INV-HA-002 -- an attempt budget is one number per deployment
+
+```text
+Statement           An authentication attempt budget -- 2FA verification, 2FA
+                    per-user, step-up, forgot-password and verification-email
+                    sends, password lockout -- counts one number for the whole
+                    deployment, whatever the replica count.
+Source of truth     auth_attempt_counters (scope, key), and users.failed_login_attempts
+                    for the password lockout that already had a row.
+Enforcement         backend/src/auth/auth-attempt-counter.service.ts is the one door: a
+                    single INSERT ... ON CONFLICT (scope, key) DO UPDATE whose
+                    SET clause both restarts an expired window and increments a
+                    live one, RETURNING the count the caller then compares. The
+                    arithmetic is the database's, so two replicas racing cannot
+                    read the same number twice. `scope` keeps unrelated budgets
+                    off one key, and a window is fixed or sliding per scope.
+                    The statement runs on its own connection
+                    (runOutsideActiveScopedManager) so a refused request's
+                    count is durable even when the caller's transaction rolls
+                    back. The former Maps in two-factor.service.ts,
+                    step-up.service.ts and auth-email.service.ts are gone;
+                    backend/src/common/process-local-state.guard.spec.ts fails a new one.
+                    backend/src/auth/auth-state-sweeper.service.ts prunes expired rows;
+                    nothing reads a pruned row, because an expired window is
+                    reported as zero whether or not the sweep has run.
+Concurrency scope   per (scope, key) -- a user, an email address or an IP,
+                    globally across replicas
+Retry semantics     Every attempt counts exactly once: the increment is the
+                    statement, not a read-modify-write, so a retried request
+                    that reaches the database twice spends two attempts, which
+                    is the correct reading of two attempts.
+Crash semantics     The row survives a restart, so a lockout is no longer
+                    cleared by redeploying. A crash between the increment and
+                    the response leaves the attempt counted, which is the safe
+                    direction.
+Failure response    The caller's existing refusal: 429 or the locked-account
+                    error, unchanged from the in-memory era.
+Required tests      Two connections: backend/test/integration/auth-attempt-counter.integration.spec.ts
+                    (two concurrent increments serialize, a window restarts
+                    without deleting the row, a fixed window's end does not
+                    move while a sliding one does, one connection reads and
+                    clears what another wrote, an expired window reads as zero
+                    with no sweep). Unit: backend/src/auth/auth-attempt-counter.service.spec.ts
+                    and the callers' own specs.
+Status              enforced
+```
+
+### INV-HA-003 -- a single-use artifact is spent once, deployment-wide
+
+```text
+Statement           A single-use artifact -- a TOTP code inside its reuse
+                    window, a confirmed AI action descriptor, an OIDC step-up
+                    jti -- is consumed at most once across every replica.
+Source of truth     single_use_tokens (purpose, token_hash) for the first two;
+                    oidc_step_up_claims (jti) for the third.
+Enforcement         The claim IS the INSERT. backend/src/auth/single-use-token.service.ts
+                    runs INSERT ... ON CONFLICT (purpose, token_hash) DO
+                    NOTHING RETURNING token_hash, so exactly one caller sees a
+                    row and every later one sees none; the primary key is the
+                    arbiter, and only a hash is stored, so the table is not a
+                    list of live codes. `purpose` keeps two unrelated one-shots
+                    from colliding on one hash. TOTP keys on `userId:code`,
+                    because two users may hold the same six digits at the same
+                    moment and a key of the code alone would let either lock the
+                    other out. The AI action path claims the descriptor before
+                    executing and releases it when the write throws, so a
+                    transient failure leaves the action confirmable and a
+                    committed one does not; that claim is taken in
+                    backend/src/ai/actions/ai-actions.service.ts, which is the single door the
+                    HTTP and MCP confirmations both come through. The step-up
+                    jti kept its own table and the same mechanism
+                    (backend/src/auth/oidc/oidc-reauth.service.ts). An expired row is
+                    treated as spent rather than free until the sweeper removes
+                    it.
+Concurrency scope   per (purpose, artifact), globally across replicas
+Retry semantics     A retry loses. That is the invariant, not a limitation: the
+                    caller distinguishes "already spent" from "failed" by the
+                    RETURNING row, never by a preceding SELECT.
+Crash semantics     A crash after the claim and before the effect leaves the
+                    artifact spent. Deliberate for a TOTP code (the user enters
+                    the next one) and repaired for an AI action by the explicit
+                    release on the throw path.
+Failure response    The 2FA refusal, or 400 for an AI action that cannot be
+                    confirmed.
+Required tests      Two connections: backend/test/integration/single-use-token.integration.spec.ts
+                    (one winner of two concurrent claims, a spent code refused
+                    later, only the hash stored, two purposes kept apart, an
+                    expired row treated as spent) and
+                    backend/test/integration/ai-action-replay.integration.spec.ts (one of two
+                    concurrent confirmations proceeds, the loser stays refused,
+                    a released claim is confirmable again, an AI action's claim
+                    never collides with a TOTP code's).
+Status              enforced
+```
+
+### INV-HA-004 -- one deployment, one OIDC signing key set
+
+```text
+Statement           Every replica of a deployment signs ID tokens with the same
+                    key set, and that set survives a restart.
+Source of truth     oauth_instance_config, one row.
+Enforcement         backend/src/oauth/oauth-signing-keys.service.ts generates a key set,
+                    encrypts the private halves and offers the row with INSERT
+                    ... ON CONFLICT (id) DO NOTHING; the insert is the arbiter
+                    and every process then re-reads the row it lost to, so the
+                    loser adopts the winner's keys rather than keeping the pair
+                    it generated. The keys are passed to oidc-provider as
+                    `jwks`, replacing the development key it used to invent per
+                    process -- which made /oauth/jwks differ per replica and per
+                    restart. With no encryption key configured nothing is
+                    stored, and a row that does not decrypt is fallen back on
+                    rather than thrown over, so a deployment that loses its
+                    encryption key degrades to the old per-process behaviour
+                    instead of failing to start.
+Concurrency scope   global (one deployment, one row)
+Retry semantics     Safe: a second start inserts nothing and reads the winner.
+Crash semantics     A crash before the insert leaves no row and the next start
+                    offers its own set; after it, every process adopts it.
+Failure response    None visible: the loser's own key set is discarded silently,
+                    which is the correct outcome.
+Required tests      Two instances: backend/test/integration/oauth-signing-keys.integration.spec.ts
+                    (two replicas racing on first start end with one set, a
+                    later process serves the same kids, the private halves
+                    round-trip through real encryption, nothing is stored
+                    without an encryption key, a mismatched key falls back).
+                    Unit: backend/src/oauth/oauth-signing-keys.service.spec.ts.
+Status              enforced
+```
+
+### INV-HA-005 -- a relay turn has one claimant and one answer
+
+```text
+Statement           A queued AI-relay prompt is claimed by exactly one agent
+                    poll, answered at most once, and handed to the browser at
+                    most once.
+Source of truth     ai_relay_prompts.status, with claimed_by and the deadlines
+                    beside it.
+Enforcement         backend/src/ai/relay/ai-relay.service.ts. The claim is a CTE selecting
+                    the oldest pending, unexpired row FOR UPDATE SKIP LOCKED
+                    and an UPDATE that re-checks status = 'pending', so a second
+                    poll skips the locked row instead of queueing behind it and
+                    cannot take a row the first has claimed. The answer is a
+                    conditional UPDATE ... WHERE status = 'claimed' RETURNING
+                    id, so a second post_response for the same turn writes
+                    nothing and is refused. The handover is the same shape
+                    (status = 'answered' -> 'expired' RETURNING answer), so a
+                    reconnecting browser cannot be shown one answer twice. The
+                    claim and the agent's inactivity clock commit together, so a
+                    failed clock write rolls the claim back and the next poll
+                    takes it. Buffered confirmation cards use ON CONFLICT
+                    (user_id, id) DO NOTHING RETURNING to tell a duplicate from
+                    an insert. The one part that stays in memory is
+                    backend/src/ai/relay/relay-stream.registry.ts, the open SSE sockets this
+                    process holds; it decides delivery, never the turn's state.
+Concurrency scope   per prompt, and per user for the agent liveness row
+Retry semantics     An agent that re-polls after a lost response claims the next
+                    prompt, not the one it already holds; an answer replayed
+                    after the deadline is refused rather than applied late.
+Crash semantics     A claimed turn whose agent dies expires on its deadline and
+                    the sweeper deletes it after the grace; an answered turn
+                    whose browser never returns is deleted the same way, so no
+                    row leaks and no answer is shown out of time.
+Failure response    The poll returns nothing; a duplicate answer is refused.
+Required tests      Two connections and two instances:
+                    backend/test/integration/ai-relay-claim.integration.spec.ts (one queued
+                    prompt to exactly one of two concurrent polls, a locked row
+                    skipped rather than queued, a second post_response refused,
+                    an answer for an unclaimed turn refused, a late answer handed
+                    over exactly once, an expired prompt never claimed, one
+                    user's prompt never handed to another's agent, the buffered
+                    cards drained oldest-first and only once, and an idempotent
+                    sweep). backend/test/integration/postgres-event-bus.integration.spec.ts
+                    proves the wake-up crosses two instances, including after
+                    both connections are dropped.
+Status              enforced
+```
 
 ## Candidates not yet admitted
 
