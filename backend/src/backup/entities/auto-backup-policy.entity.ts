@@ -1,5 +1,6 @@
 import {
   Entity,
+  Check,
   Column,
   PrimaryColumn,
   CreateDateColumn,
@@ -21,7 +22,12 @@ import {
  * `auto_backup_settings` now carries only what is genuinely one account's --
  * the bookkeeping of its own runs.
  */
+// The primary key alone admits TRUE *and* FALSE; `CHECK (id)` is what refuses
+// the second row. It is declared here as well as in schema.sql because the
+// integration harness builds its database from entity metadata, so a constraint
+// only schema.sql carries is one no integration spec can observe.
 @Entity("auto_backup_policy")
+@Check("id")
 export class AutoBackupPolicyRow {
   /** Always `true`: the `CHECK (id)` is what makes this table one row. */
   @PrimaryColumn({ type: "boolean", default: true })

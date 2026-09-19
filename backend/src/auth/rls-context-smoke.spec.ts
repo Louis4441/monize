@@ -5,6 +5,7 @@ import { AccountDelegateGuard } from "../delegation/guards/account-delegate.guar
 import { RefreshToken } from "./entities/refresh-token.entity";
 import { User } from "../users/entities/user.entity";
 import { AutoBackupSettings } from "../backup/entities/auto-backup-settings.entity";
+import { AutoBackupPolicyRow } from "../backup/entities/auto-backup-policy.entity";
 import { EmergencyAccessSettings } from "../emergency-access/entities/emergency-access-settings.entity";
 import { getRequestContext } from "../common/request-context";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
@@ -50,16 +51,17 @@ describe("R7 modules RLS context smoke (real withScopedDb)", () => {
   it("handleAutoBackupCron reads its due-settings fan-out under the system context", async () => {
     const settingsRepo = {
       find: jest.fn().mockResolvedValue([]),
-      // The policy row, read across users to find the deployment's primary
-      // administrator's settings.
       findOne: jest.fn().mockResolvedValue(null),
     };
+    // The deployment policy singleton the reconcile reads before its fan-out.
+    const policyRepo = { findOne: jest.fn().mockResolvedValue(null) };
     const usersRepo = {
       find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn().mockResolvedValue(null),
     };
     const { dataSource } = createScopedDbMocks([
       [AutoBackupSettings, settingsRepo],
+      [AutoBackupPolicyRow, policyRepo],
       [User, usersRepo],
     ]);
 
