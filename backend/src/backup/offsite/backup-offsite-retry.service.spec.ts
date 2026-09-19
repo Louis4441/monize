@@ -1,6 +1,7 @@
 import { Logger } from "@nestjs/common";
 
 import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
+import type { BackupStoreLocation } from "../storage/backup-storage.interface";
 import type { AutoBackupService } from "../auto-backup.service";
 import type { BackupOffsiteDispatchService } from "./backup-offsite-dispatch.service";
 import { MAX_OFFSITE_ATTEMPTS } from "./backup-offsite-dispatch.service";
@@ -45,14 +46,25 @@ const dueRow = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+/**
+ * A `local` store handle, the shape `AutoBackupService.resolveStoredBackupLocation`
+ * hands back. Typed as the interface rather than the target's own narrowing, so
+ * this spec asserts on what the sweep passes along and not on how a target spells
+ * its own handle.
+ */
+const localLocation = (folder: string): BackupStoreLocation => ({
+  target: "local",
+  display: folder,
+});
+
 describe("BackupOffsiteRetryService", () => {
   let query: jest.Mock;
   let service: BackupOffsiteRetryService;
   let claimAndPerform: jest.MockedFunction<
     BackupOffsiteDispatchService["claimAndPerform"]
   >;
-  let resolveStoredBackupFolder: jest.MockedFunction<
-    AutoBackupService["resolveStoredBackupFolder"]
+  let resolveStoredBackupLocation: jest.MockedFunction<
+    AutoBackupService["resolveStoredBackupLocation"]
   >;
 
   beforeEach(() => {
@@ -60,16 +72,16 @@ describe("BackupOffsiteRetryService", () => {
     query = scoped.manager.query;
     query.mockResolvedValue([]);
     claimAndPerform = jest.fn().mockResolvedValue(true) as never;
-    resolveStoredBackupFolder = jest
+    resolveStoredBackupLocation = jest
       .fn()
-      .mockImplementation(
-        async (userId: string) => `/data/backups/${userId}`,
+      .mockImplementation(async (userId: string) =>
+        localLocation(`/data/backups/${userId}`),
       ) as never;
 
     service = new BackupOffsiteRetryService(
       scoped.dataSource as never,
       { claimAndPerform } as never,
-      { resolveStoredBackupFolder } as never,
+      { resolveStoredBackupLocation } as never,
     );
   });
 
@@ -214,7 +226,7 @@ describe("BackupOffsiteRetryService", () => {
     it("does nothing when nothing is due", async () => {
       await service.handleRetrySweep();
 
-      expect(resolveStoredBackupFolder).not.toHaveBeenCalled();
+      expect(resolveStoredBackupLocation).not.toHaveBeenCalled();
       expect(claimAndPerform).not.toHaveBeenCalled();
     });
 
@@ -241,22 +253,24 @@ describe("BackupOffsiteRetryService", () => {
         digest: DIGEST,
         // BIGINT arrives as a string and is compared numerically downstream.
         sizeBytes: 4096,
-        folder: `/data/backups/${USER_A}`,
+        location: localLocation(`/data/backups/${USER_A}`),
         // Derived from the key: the row describes a copy, not a run.
         filename: "monize-backup-daily-2026-09-14.mzbe",
         origin: "automatic",
       });
     });
 
-    it("reads the artifact from the user's current folder, not a remembered one", async () => {
+    it("reads the artifact from the user's current store location, not a remembered one", async () => {
       query.mockResolvedValue([dueRow()]);
-      resolveStoredBackupFolder.mockResolvedValue("/mnt/moved/33/33/user");
+      resolveStoredBackupLocation.mockResolvedValue(
+        localLocation("/mnt/moved/33/33/user"),
+      );
 
       await service.handleRetrySweep();
 
-      expect(resolveStoredBackupFolder).toHaveBeenCalledWith(USER_A);
-      expect(claimAndPerform.mock.calls[0][0].folder).toBe(
-        "/mnt/moved/33/33/user",
+      expect(resolveStoredBackupLocation).toHaveBeenCalledWith(USER_A);
+      expect(claimAndPerform.mock.calls[0][0].location).toEqual(
+        localLocation("/mnt/moved/33/33/user"),
       );
     });
 
@@ -280,14 +294,14 @@ describe("BackupOffsiteRetryService", () => {
   });
 
   describe("one row's failure is one row's failure", () => {
-    it("carries on after a folder that cannot be resolved", async () => {
+    it("carries on after a store location that cannot be resolved", async () => {
       query.mockResolvedValue([
         dueRow({ id: "row-1", user_id: USER_A }),
         dueRow({ id: "row-2", user_id: USER_B }),
       ]);
-      resolveStoredBackupFolder.mockImplementation(async (userId: string) => {
+      resolveStoredBackupLocation.mockImplementation(async (userId: string) => {
         if (userId === USER_A) throw new Error("folder outside allowed roots");
-        return `/data/backups/${userId}`;
+        return localLocation(`/data/backups/${userId}`);
       });
 
       await expect(service.handleRetrySweep()).resolves.toBeUndefined();

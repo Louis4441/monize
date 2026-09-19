@@ -31,21 +31,35 @@ Issue #1092 split the 2,600-line original into `BackupExportService`, `BackupRes
 Auto-backup endpoints live on `AutoBackupController`, whose class-level `@Roles("admin")` is the whole access rule -- a new endpoint there is admin-only automatically. Manual export/restore (caller's own data) stays on `BackupController` for everyone.
 
 **The files are the user's even though the schedule is not.** `listStoredBackups`
-and `openStoredBackup` live on `AutoBackupService` (it owns the folder layout and
-the naming) but are reached through `BackupController`, which has no role guard --
-a user who cannot see the settings still has to be able to take and restore the
-artifacts those settings produced for them. Only the caller's own sharded folder
-is enumerated: the flat base folder a pre-per-user version wrote into carries no
-owner in its filenames, so nothing there can be attributed to anybody and
-offering one for download would hand a user another user's ledger. A name is
-served only when `classifyBackupFileName` (`backup-file-names.ts`) recognises it,
-and the path that is opened is the directory entry's rather than the caller's
-string -- the requested name is compared against the folder's own listing and
-the matching entry is what gets joined -- with the join still
-containment-checked, because a validated name with an unvalidated join is a
-decorative check. The listing carries the caller's own
-`enabled` flag: the settings endpoint that would otherwise answer "is anything
-backing me up?" is admin-only, and the Settings section hides itself on it.
+and `openStoredBackup` live on `AutoBackupService` (it owns the naming and the
+per-user namespace) but are reached through `BackupController`, which has no role
+guard -- a user who cannot see the settings still has to be able to take and
+restore the artifacts those settings produced for them. Only the caller's own
+namespace is enumerated: the store's `legacy` artifacts (on the `local` target,
+the flat base folder a pre-per-user version wrote into) carry no owner in their
+filenames, so nothing there can be attributed to anybody and offering one for
+download would hand a user another user's ledger. A name is served only when
+`classifyBackupFileName` (`backup-file-names.ts`) recognises it, and the store
+then matches that name against what it is holding and opens its own entry rather
+than the caller's string -- on `local` that is the CWE-22 boundary, still
+containment-checked on the join, because a validated name with an unvalidated
+join is a decorative check. The listing carries the caller's own `enabled` flag:
+the settings endpoint that would otherwise answer "is anything backing me up?" is
+admin-only, and the Settings section hides itself on it.
+
+## Where the artifacts live is a target, not a directory
+
+Every storage touch in the automatic backup path goes through
+`BACKUP_STORAGE_TARGET` (`src/backup/storage/backup-storage.interface.ts`),
+selected by `BACKUP_STORAGE_PROVIDER` and registered the way
+`ATTACHMENT_STORAGE_PROVIDER` is. `AutoBackupService` holds no path, no
+`BACKUP_ALLOWED_ROOTS` and no `fs` import: the containment model, the atomic
+write and the legacy flat-folder sweep are `LocalBackupStorageTarget`'s, which is
+the default and is what ran before the seam existed. The download route and the
+off-machine reader take a stream from `open(location, filename)` rather than a
+path, because an object store has none. There is no `write` (only `publish`,
+which is INV-BACKUP-006 in the name) and no `exists` (a check that is then acted
+on is a race). `docs/specs/backup-storage-targets.md` is the specification.
 
 `AutoBackupService.enrollManagedUsers` runs at the top of the hourly cron and enrolls every other user on the deployment defaults -- without it a non-admin would silently have no backups. It reconciles rather than seeds: drifted rows are written back to the defaults, unchanged ones are not written, and `lastBackup*`/`nextBackupAt` are left alone so enrollment never re-triggers a backup.
 

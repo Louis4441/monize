@@ -15,15 +15,11 @@ import { BackupService } from "./backup.service";
 import { BackupEncryptionService } from "./backup-encryption.service";
 import { SupportBackupService } from "./support-backup/support-backup.service";
 import { AutoBackupService } from "./auto-backup.service";
-import { createReadStream } from "fs";
+import { Readable } from "stream";
 import { pipeline } from "stream/promises";
 
-// The download hands a file handle to a socket; what this suite asserts is the
-// headers it sets and the handle it hands over, not the kernel copy.
-jest.mock("fs", () => ({
-  ...jest.requireActual("fs"),
-  createReadStream: jest.fn(() => ({ handle: true })),
-}));
+// The download hands the store's stream to a socket; what this suite asserts is
+// the headers it sets and the stream it hands over, not the kernel copy.
 jest.mock("stream/promises", () => ({
   pipeline: jest.fn().mockResolvedValue(undefined),
 }));
@@ -643,9 +639,13 @@ describe("BackupController", () => {
       ["monize-backup-daily-2026-04-15.json.gz", "application/gzip"],
       ["monize-backup-daily-2026-04-15.mzbe", "application/octet-stream"],
     ])("streams %s as %s", async (filename, contentType) => {
+      // What the store hands back: a stream of the artifact's bytes and the
+      // length it measured. There is no path -- an object store has none, and
+      // the route has to serve both targets through one shape.
+      const stream = Readable.from([Buffer.from("artifact")]);
       mockAutoBackup.openStoredBackup.mockResolvedValue({
-        path: `/data/backups/${filename}`,
-        size: 1234,
+        stream,
+        sizeBytes: 1234,
         filename,
       });
       const mockRes = { setHeader: jest.fn() };
@@ -669,12 +669,11 @@ describe("BackupController", () => {
         "Content-Disposition",
         `attachment; filename="${filename}"`,
       );
-      // The server's own name for the artifact, so the copy on the user's disk
-      // still says which recovery point it is.
-      expect(createReadStream).toHaveBeenCalledWith(
-        `/data/backups/${filename}`,
-      );
-      expect(pipeline).toHaveBeenCalledWith({ handle: true }, mockRes);
+      // The store's own stream, piped straight through: no presigned-URL
+      // redirect, which would move an authenticated, demo-restricted,
+      // owner-scoped download onto a URL that carries its own authority and
+      // outlives the request.
+      expect(pipeline).toHaveBeenCalledWith(stream, mockRes);
     });
   });
 });

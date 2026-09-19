@@ -1,7 +1,10 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { createHash } from "crypto";
-import { promises as fs } from "fs";
-import { resolve, sep } from "path";
+import {
+  BACKUP_STORAGE_TARGET,
+  BackupStorageTarget,
+  BackupStoreLocation,
+} from "../storage/backup-storage.interface";
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
 
 import { tokenHashesEqual } from "../../auth/crypto.util";
@@ -49,8 +52,8 @@ const MAX_LAST_ERROR = 1024;
 /** One completed local artifact, offered to this user's off-machine destinations. */
 export interface BackupOffsiteDispatchInput {
   userId: string;
-  /** The user's own backup folder, already containment-checked by its resolver. */
-  folder: string;
+  /** The user's namespace in the backup store, from its own resolver. */
+  location: BackupStoreLocation;
   filename: string;
   tier: BackupOffsiteTier;
   /** The egress digest: SHA-256 of the exact written bytes, lowercase hex. */
@@ -77,7 +80,8 @@ export interface OffsiteUploadClaim {
   tier: BackupOffsiteTier;
   digest: string;
   sizeBytes: number;
-  folder: string;
+  /** The user's namespace in the backup store, from its own resolver. */
+  location: BackupStoreLocation;
   filename: string;
   origin: BackupRunOrigin;
 }
@@ -152,6 +156,10 @@ export class BackupOffsiteDispatchService {
     private readonly uploader: BackupOffsiteS3Uploader,
     private readonly emailSender: BackupOffsiteEmailSender,
     private readonly systemAlerts: SystemAlertService,
+    // The artifact is read back out of whatever store wrote it, never off a path
+    // this service builds for itself.
+    @Inject(BACKUP_STORAGE_TARGET)
+    private readonly store: BackupStorageTarget,
   ) {}
 
   /**
@@ -295,7 +303,7 @@ export class BackupOffsiteDispatchService {
       tier: input.tier,
       digest: input.digest,
       sizeBytes: input.sizeBytes,
-      folder: input.folder,
+      location: input.location,
       filename: input.filename,
       origin: input.origin,
     };
@@ -599,17 +607,21 @@ export class BackupOffsiteDispatchService {
   }
 
   /**
-   * The exact bytes under `<folder>/<filename>`, or `null` when there is no such
-   * file.
+   * The exact bytes of `claim.filename` in the claim's store location, or `null`
+   * when the store holds no such artifact.
    *
-   * The path opened is a directory entry's, never the claim's own string: the
-   * requested name is matched against the user's folder listing and the matching
-   * entry is what is joined and read, so the value reaching the filesystem is one
-   * this deployment wrote rather than one carried in on a row -- the same CWE-22
-   * boundary `AutoBackupService.openStoredBackup` states, and what lets a SAST
-   * tool see it. The name is classified before the listing, and the join is
-   * containment-checked all the same, because a validated name and an unchecked
-   * join is how a check becomes decorative.
+   * The name is refused here unless `classifyBackupFileName` recognises it --
+   * this module keeps its own refusal of a name the deployment does not write,
+   * because a row is durable and an artifact named by one may have been written
+   * by a version that is long gone. The store then matches that name against
+   * what it is actually holding and opens its own entry, never the string
+   * carried in on the row: on the `local` target that is the CWE-22 boundary
+   * this method used to state for itself, in one place instead of two, and on an
+   * object store there is no path to traverse at all.
+   *
+   * Buffered rather than streamed on purpose: the destination is told a checksum
+   * over these exact bytes and the caller re-derives it before anything leaves
+   * the machine (INV-BACKUP-005), which is a claim about a whole artifact.
    */
   private async readArtifact(
     claim: OffsiteUploadClaim,
@@ -620,30 +632,13 @@ export class BackupOffsiteDispatchService {
           "this deployment writes backups under",
       );
     }
-    let entries: string[];
-    try {
-      entries = await fs.readdir(claim.folder);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException)?.code === "ENOENT") return null;
-      throw error;
+    const artifact = await this.store.open(claim.location, claim.filename);
+    if (!artifact) return null;
+    const chunks: Buffer[] = [];
+    for await (const chunk of artifact.stream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
-    // Only the server's own readdir string is joined; `claim.filename` is used to
-    // match, never to build the path.
-    const entry = entries.find((name) => name === claim.filename);
-    if (entry === undefined) return null;
-    const path = resolve(claim.folder, entry);
-    if (!path.startsWith(claim.folder + sep)) {
-      throw new Error(
-        `Refusing to read ${JSON.stringify(entry)}: it resolves outside the ` +
-          "user's backup folder",
-      );
-    }
-    try {
-      return await fs.readFile(path);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException)?.code === "ENOENT") return null;
-      throw error;
-    }
+    return Buffer.concat(chunks);
   }
 
   /** The recipient's own stored language -- never the locale of whoever ran the backup. */

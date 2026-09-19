@@ -23,6 +23,8 @@ import {
   MONTHLY_DAY,
   WEEKLY_DAYS,
 } from "./auto-backup.service";
+import { LocalBackupStorageTarget } from "./storage/local-backup-storage.target";
+import { BACKUP_STORAGE_TARGET } from "./storage/backup-storage.interface";
 import { BackupService } from "./backup.service";
 import { BackupEncryptionService } from "./backup-encryption.service";
 import { AutoBackupSettings } from "./entities/auto-backup-settings.entity";
@@ -234,6 +236,15 @@ describe("AutoBackupService", () => {
               key in env ? env[key] : defaultEnv[key],
             ),
           },
+        },
+        // The real `local` target over the real temp directory this suite
+        // creates, not a stub. The extraction of the storage seam claims it
+        // changed nothing, and the only thing that can prove that is this suite
+        // exercising the same filesystem behaviour it always has.
+        LocalBackupStorageTarget,
+        {
+          provide: BACKUP_STORAGE_TARGET,
+          useExisting: LocalBackupStorageTarget,
         },
       ],
     }).compile();
@@ -825,6 +836,30 @@ describe("AutoBackupService", () => {
       await expect(service.describeCapability(userId)).resolves.toEqual({
         available: true,
         folderPath: root,
+        // A container directory is a location an operator may choose, so the
+        // settings screen keeps its folder picker.
+        locationSelectable: true,
+        // Nothing stored for this user yet. The count is what makes a store
+        // that has just been switched over visibly empty rather than silently
+        // so (`docs/specs/backup-storage-targets.md` section 11, decision 2).
+        artifactCount: 0,
+      });
+    });
+
+    it("counts the artifacts the current store already holds", async () => {
+      await fs.mkdir(folderFor(), { recursive: true });
+      await fs.writeFile(
+        join(folderFor(), "monize-backup-daily-2026-04-15.json.gz"),
+        "artifact",
+      );
+      await fs.writeFile(
+        join(folderFor(), "monize-backup-weekly-2026-04-14.mzbe"),
+        "artifact",
+      );
+
+      await expect(service.describeCapability(userId)).resolves.toMatchObject({
+        available: true,
+        artifactCount: 2,
       });
     });
 
@@ -843,7 +878,7 @@ describe("AutoBackupService", () => {
           createSettings({ folderPath: other }),
         );
 
-        await expect(svc.describeCapability(userId)).resolves.toEqual({
+        await expect(svc.describeCapability(userId)).resolves.toMatchObject({
           available: true,
           folderPath: other,
         });
@@ -1220,19 +1255,26 @@ describe("AutoBackupService", () => {
       ]);
     });
 
-    it("opens one artifact by name", async () => {
+    it("opens one artifact by name, as a stream of its bytes", async () => {
       mockSettingsRepo.findOne.mockResolvedValue(
         createSettings({ enabled: true }),
       );
       await seed("monize-backup-monthly-26-04.json.gz", userId, "bytes");
 
-      await expect(
-        service.openStoredBackup(userId, "monize-backup-monthly-26-04.json.gz"),
-      ).resolves.toEqual({
-        path: join(folderFor(), "monize-backup-monthly-26-04.json.gz"),
-        size: "bytes".length,
-        filename: "monize-backup-monthly-26-04.json.gz",
-      });
+      const artifact = await service.openStoredBackup(
+        userId,
+        "monize-backup-monthly-26-04.json.gz",
+      );
+
+      expect(artifact.filename).toBe("monize-backup-monthly-26-04.json.gz");
+      expect(artifact.sizeBytes).toBe("bytes".length);
+      // A path would be no use to a store that has none. The stream is read to
+      // the end here because that is what proves it is the artifact's bytes and
+      // not merely a handle the assertion happened to be handed -- and because
+      // a caller that opens one owes it a close.
+      const chunks: Buffer[] = [];
+      for await (const chunk of artifact.stream) chunks.push(chunk as Buffer);
+      expect(Buffer.concat(chunks).toString()).toBe("bytes");
     });
 
     it.each([
@@ -1833,7 +1875,12 @@ describe("AutoBackupService", () => {
       const onDisk = readFileSync(join(folderFor(), filename));
       expect(dispatched).toEqual({
         userId,
-        folder: folderFor(),
+        // The store handle, not a folder string: the dispatcher reads the
+        // artifact back through the same store that wrote it.
+        location: expect.objectContaining({
+          target: "local",
+          display: folderFor(),
+        }),
         filename,
         tier: "daily",
         digest: createHash("sha256").update(onDisk).digest("hex"),

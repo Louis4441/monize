@@ -16,6 +16,8 @@ import { BackupOffsiteS3Uploader } from "./offsite/backup-offsite-s3.uploader";
 import { BackupOffsiteEmailSender } from "./offsite/backup-offsite-email.sender";
 import { BackupOffsiteDispatchService } from "./offsite/backup-offsite-dispatch.service";
 import { BackupOffsiteRetryService } from "./offsite/backup-offsite-retry.service";
+import { LocalBackupStorageTarget } from "./storage/local-backup-storage.target";
+import { BACKUP_STORAGE_TARGET } from "./storage/backup-storage.interface";
 import { AuthModule } from "../auth/auth.module";
 import { EncryptionModule } from "../common/encryption/encryption.module";
 import { AttachmentsModule } from "../attachments/attachments.module";
@@ -44,6 +46,12 @@ import { NotificationsModule } from "../notifications/notifications.module";
     BackupOffsiteController,
   ],
   providers: [
+    // Where the automatic backup artifacts live. One target today, bound
+    // directly: the seam exists so a second one can be added without the
+    // service learning about it, and nothing is configurable until there is
+    // something to configure. `docs/specs/backup-storage-targets.md`.
+    LocalBackupStorageTarget,
+    { provide: BACKUP_STORAGE_TARGET, useExisting: LocalBackupStorageTarget },
     // The four components issue #1092 split BackupService into; BackupService
     // itself is now the facade over the first two.
     BackupExportService,
