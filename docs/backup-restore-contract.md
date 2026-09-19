@@ -814,15 +814,14 @@ concern, not an account preference, so its configuration surface is admin-only:
 **Admin → Backups** (`frontend/src/app/admin/backups/page.tsx`, route
 `/admin/backups`), reading and writing the admin-restricted `AutoBackupController`
 endpoints. That page states plainly what an automatic backup is — a **compressed
-per-user backup file** of a user's own financial records, written to a server
-folder on a schedule and pruned by retention — and what it is **not**: a full
-PostgreSQL/database dump. The schedule, folder and retention configured there
-currently govern the *administrator's own* automatic backups (see the Known gap
-below); other accounts run on hardcoded deployment defaults. It is related to,
-but not the same on-disk format as, the manual per-account export a person can
-download themselves. It does not capture the schema, another deployment's
-data, or server configuration; whole-instance disaster recovery is a separate
-backup of PostgreSQL and the attachment storage. A person's own manual
+per-user backup file** of a user's own financial records, written to the store on
+a schedule and pruned by retention — and what it is **not**: a full
+PostgreSQL/database dump. The schedule, folder and retention configured there are
+**one deployment policy that every active account runs on** (below). It is
+related to, but not the same on-disk format as, the manual per-account export a
+person can download themselves. It does not capture the schema, another
+deployment's data, or server configuration; whole-instance disaster recovery is a
+separate backup of PostgreSQL and the attachment storage. A person's own manual
 export/restore stays in **Settings → Backup & Restore**
 (`frontend/src/components/settings/BackupRestoreSection.tsx`), open to every user
 and touching only their own data. The two were previously stacked in one Settings
@@ -856,20 +855,62 @@ so the encryption sniff, the warning, the account-password or OIDC confirmation
 and the summary dialogue are the same ones a file picked from disk goes through;
 there is no second restore path to keep in step.
 
-**Known gap — the stored policy is per-user, not instance-level.** The admin's
-`updateSettings` writes the administrator's *own* `auto_backup_settings` row
-(keyed by `req.user.id`), so the schedule, folder and retention chosen on Admin →
-Backups govern only the administrator's own backups. Every non-admin is enrolled
-each hour by `AutoBackupService.enrollManagedUsers`, which reconciles their rows
-to `applyManagedDefaults` — and those defaults come from the **hardcoded**
-`defaultSettingsFor` (daily at 02:00 UTC, 7/4/6 retention, `BACKUP_CONTAINER_DIR`),
-not from the administrator's row. So an operator who changes the frequency or
-retention here changes nothing for anyone else. A correct instance-level model
-would store a single deployment policy (a settings singleton, or environment-
-derived defaults) that both the admin surface edits and `enrollManagedUsers`
-reads. That is a persistence/schema change and is deliberately **not** made by the
-UI-split change that added this note; it is recorded here so the next change to
-this area starts from the right question — "whose row is this policy on".
+**The policy is the deployment's, and it reaches every account.** What Admin →
+Backups edits is one `AutoBackupPolicy` — `enabled`, folder, frequency, time,
+timezone and the three retention counts. `AutoBackupService.reconcileManagedUsers`
+writes it onto every active account's `auto_backup_settings` row, at the top of
+the hourly cron and again the moment the policy is saved, so an operator does not
+wait an hour to see a change take. The per-account row stays the runtime source
+the cron claims and records against; only its **bookkeeping** columns
+(`last_backup_at`, `last_backup_status`, `last_backup_error`, `next_backup_at`)
+are that account's own. Three consequences worth stating:
+
+- **Whose row holds the policy.** The earliest-created active administrator's
+  (`resolvePolicyUserId`). Every admin endpoint reads and writes *that* row
+  whichever administrator is signed in, so two operators edit one policy instead
+  of two, the second of which used to revert on the next hourly reconcile. A
+  deployment with no active administrator runs on `defaultPolicy()`, which is
+  **enabled**: the previous `applyManagedDefaults` hardcoded `enabled: true` for
+  managed users, so a disabled default would have switched automatic backups off
+  for every deployment that had never opened the screen.
+- **Every active account, administrators included** — all but the one whose row
+  *is* the policy. A second administrator used to be excluded from enrollment
+  along with the first and enrolled by nothing, so unless they opened the
+  settings screen themselves their data was never backed up at all.
+- **Disabling the policy disarms every account**, by clearing `next_backup_at`;
+  leaving it behind would have a disabled policy keep taking backups. An account
+  a disabled policy has never reached gets no row written at all.
+
+The admin surface reads back what the deployment is actually doing rather than
+one row: `managedUserCount` (how many active accounts the policy governs) and
+deployment-wide `lastBackup*` / `nextBackupAt` aggregates — the most recent run of
+any account and the soonest next run of any armed one. A policy screen reporting
+one row's `lastBackupAt` says "Last backup: today" on an instance where eleven of
+twelve accounts have never been backed up at all.
+
+**"Back Up Every Account Now" means every account.** `runManualBackup` fans out
+over every active account through the same per-user path the cron uses, caller
+first, one at a time; one account's failure never stops the rest. It answers
+counts (`usersRequested`, `usersBackedUp`, `usersSkipped`, `usersFailed`,
+`usersPartial`) plus `filename` for the caller's *own* artifact only — one
+filename cannot describe a fan-out. A run that wrote nothing refuses rather than
+answering 200 with zeroes: the single account's own error when exactly one
+failed, so its status and reason survive; the count and the first reason when
+more did; the maintenance conflict when every account was skipped. Backing up one
+row under a deployment policy was the same defect as the policy governing one
+row — an operator pressed it to prove backups worked and proved it for
+themselves only.
+
+**Which store is in use is named, not inferred.** `describeCapability` carries
+`storageProvider` (the bound target's `name`) beside `locationSelectable`, and the
+settings screen shows a storage row on every deployment: the provider, the store's
+own display location, and how many artifacts it already holds for the reader. The
+folder input, Browse and Validate render only where `locationSelectable` is true,
+the save omits `folderPath` where it is false (an object store's `acceptBase`
+refuses one, so the form used to fail every save on `s3`), and the run button is
+no longer gated on a stored folder — an object store has none, which hid it
+entirely on every `s3` deployment. `locationSelectable` answers "may I choose a
+location"; it never answered "where do my backups live".
 
 - **The store is a target, not a directory.** Every storage operation goes
   through `BACKUP_STORAGE_TARGET`
@@ -943,10 +984,12 @@ this area starts from the right question — "whose row is this policy on".
   artifact could not be read back without the user's password. The fix stops new
   losses; it does not reclassify history it cannot inspect.
 
-  What it does *not* yet fix: `Run Backup Now` still reports a partial run through
-  the ordinary "Backup created: `<filename>`" toast, so the only thing telling the
-  user is `partial-` in the name it shows them. The service returns a message
-  saying more (`runManualBackup`) and the frontend does not use it.
+  A manual run that produced any partial artifact now says so: `runManualBackup`
+  counts `usersPartial` and spells out in its message that those artifacts were
+  written as partials, were not promoted and displaced no complete backup, and
+  the settings screen shows that as a plain toast rather than a success one. It
+  previously reported every run through "Backup created: `<filename>`", so the
+  only thing telling the user was `partial-` in the name it showed them.
 
 - **Encryption is on by default, and its key is announced before it is enforced
   (issue #1269).** An automatic backup is encrypted with the user's own password

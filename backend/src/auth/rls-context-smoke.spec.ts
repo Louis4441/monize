@@ -48,8 +48,16 @@ describe("R7 modules RLS context smoke (real withScopedDb)", () => {
   });
 
   it("handleAutoBackupCron reads its due-settings fan-out under the system context", async () => {
-    const settingsRepo = { find: jest.fn().mockResolvedValue([]) };
-    const usersRepo = { find: jest.fn().mockResolvedValue([]) };
+    const settingsRepo = {
+      find: jest.fn().mockResolvedValue([]),
+      // The policy row, read across users to find the deployment's primary
+      // administrator's settings.
+      findOne: jest.fn().mockResolvedValue(null),
+    };
+    const usersRepo = {
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
+    };
     const { dataSource } = createScopedDbMocks([
       [AutoBackupSettings, settingsRepo],
       [User, usersRepo],

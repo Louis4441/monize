@@ -130,6 +130,19 @@ describe("AutoBackupService", () => {
   const folderFor = (id: string = userId) =>
     join(root, id.slice(0, 2), id.slice(2, 4), id);
 
+  /**
+   * The artifact the account that pressed "Run Backup Now" got.
+   *
+   * A manual run is a fan-out across every account now, so `filename` is
+   * optional on its result -- present only when the caller's own backup was
+   * written. These specs drive one account, so an absent one is the failure and
+   * is asserted here rather than papered over with a non-null assertion.
+   */
+  function ownArtifact(result: { filename?: string }): string {
+    expect(result.filename).toBeDefined();
+    return result.filename as string;
+  }
+
   async function listBackups(directory: string): Promise<string[]> {
     try {
       return (await fs.readdir(directory)).sort();
@@ -160,6 +173,8 @@ describe("AutoBackupService", () => {
     }
   }
   let isDemo: boolean;
+  /** The account `resolvePolicyUserId` resolves to; `null` for none. */
+  let policyAdminId: string | null;
 
   function createSettings(
     overrides: Partial<AutoBackupSettings> = {},
@@ -300,17 +315,31 @@ describe("AutoBackupService", () => {
       execute: jest.fn().mockResolvedValue({ affected: 1 }),
     };
 
+    // Who `resolvePolicyUserId` finds: the deployment's primary administrator,
+    // whose `auto_backup_settings` row carries the policy every account runs on.
+    // These specs drive `userId` as that administrator, which is the
+    // single-admin deployment; the tests that are *about* a second operator set
+    // it themselves.
+    policyAdminId = userId;
     mockUsersRepo = {
-      findOne: jest.fn().mockImplementation(({ where }) =>
-        Promise.resolve({
+      findOne: jest.fn().mockImplementation(({ where }) => {
+        // The policy lookup selects on the role, not on an id.
+        if (where?.role !== undefined) {
+          return Promise.resolve(
+            policyAdminId === null ? null : { id: policyAdminId },
+          );
+        }
+        return Promise.resolve({
           id: where.id,
           backupEncryptionEnabled: false,
           backupPasswordEnc: null,
-        }),
-      ),
-      // Managed-user enrollment sweeps every non-admin user; no such users by
-      // default, so the cron tests below exercise only the due-backup path.
+        });
+      }),
+      // Policy reconciliation sweeps every active account; none by default, so
+      // the cron tests below exercise only the due-backup path.
       find: jest.fn().mockResolvedValue([]),
+      // The admin surface reports how many accounts the policy governs.
+      count: jest.fn().mockResolvedValue(0),
     };
 
     // The off-site ledger the stored-backups listing reads to attach each
@@ -413,11 +442,69 @@ describe("AutoBackupService", () => {
       expect(result).toStrictEqual(
         Object.assign(new AutoBackupSettings(), existing, {
           resolvedFolderPath: folderFor(),
+          // The admin surface reads a deployment policy, so it also carries
+          // how many accounts that policy governs.
+          managedUserCount: 0,
         }),
       );
       expect(mockSettingsRepo.findOne).toHaveBeenCalledWith({
         where: { userId },
       });
+    });
+
+    it("reads the primary administrator's row, not the caller's own", async () => {
+      // Two administrators must edit one policy. Reading "whoever is signed in"
+      // gave a deployment two answers to one question, the second of which
+      // reverted on the next hourly reconcile.
+      policyAdminId = userId;
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({
+          enabled: true,
+          folderPath: root,
+          frequency: "weekly",
+        }),
+      );
+
+      const result = await service.getSettings(otherUserId);
+
+      expect(result.userId).toBe(userId);
+      expect(result.frequency).toBe("weekly");
+      expect(mockSettingsRepo.findOne).toHaveBeenCalledWith({
+        where: { userId },
+      });
+    });
+
+    it("reports the deployment's own last and next run, not one account's", async () => {
+      // A policy screen reporting one row's `lastBackupAt` says "Last backup:
+      // today" on an instance where eleven of twelve accounts have never been
+      // backed up at all.
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true, folderPath: root }),
+      );
+      mockUsersRepo.count.mockResolvedValue(3);
+      const mine = createSettings({
+        enabled: true,
+        lastBackupAt: new Date("2026-04-10T02:00:00Z"),
+        lastBackupStatus: "success",
+        nextBackupAt: new Date("2026-04-16T02:00:00Z"),
+      });
+      const theirs = createSettings({
+        enabled: true,
+        lastBackupAt: new Date("2026-04-14T02:00:00Z"),
+        lastBackupStatus: "partial",
+        lastBackupError: "attachments",
+        nextBackupAt: new Date("2026-04-15T23:00:00Z"),
+      });
+      theirs.userId = otherUserId;
+      mockSettingsRepo.find.mockResolvedValue([mine, theirs]);
+
+      const result = await service.getSettings(userId);
+
+      expect(result.managedUserCount).toBe(3);
+      expect(result.lastBackupAt).toEqual(theirs.lastBackupAt);
+      expect(result.lastBackupStatus).toBe("partial");
+      expect(result.lastBackupError).toBe("attachments");
+      expect(result.nextBackupAt).toEqual(theirs.nextBackupAt);
     });
 
     it("reports the per-user folder the files actually land in", async () => {
@@ -439,7 +526,10 @@ describe("AutoBackupService", () => {
       const result = await service.getSettings(userId);
 
       expect(result.userId).toBe(userId);
-      expect(result.enabled).toBe(false);
+      // Enabled, because that is what the deployment is actually doing: an
+      // instance whose policy has never been saved still backs every account up
+      // on the default schedule, and this screen used to say otherwise.
+      expect(result.enabled).toBe(true);
       expect(result.folderPath).toBe(root);
       expect(result.frequency).toBe("daily");
       expect(result.backupTime).toBe("02:00");
@@ -503,6 +593,67 @@ describe("AutoBackupService", () => {
   });
 
   describe("updateSettings", () => {
+    it("writes the primary administrator's row whoever is signed in", async () => {
+      // One deployment policy needs one row. Writing `req.user.id` gave a
+      // second administrator a second policy that reverted on the next hourly
+      // reconcile.
+      policyAdminId = userId;
+      mockSettingsRepo.findOne.mockResolvedValue(null);
+
+      await service.updateSettings(otherUserId, { frequency: "weekly" });
+
+      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ userId, frequency: "weekly" }),
+      );
+      expect(mockSettingsRepo.save).not.toHaveBeenCalledWith(
+        expect.objectContaining({ userId: otherUserId }),
+      );
+    });
+
+    it("pushes the saved policy onto every other account before answering", async () => {
+      // The whole point of the method: a policy that only took effect at the
+      // top of the next hour leaves "Save" looking like it did nothing, and a
+      // policy that only ever governs the row it is stored on is the defect.
+      mockSettingsRepo.findOne.mockResolvedValue(null);
+      mockUsersRepo.find.mockResolvedValue([
+        { id: userId },
+        { id: otherUserId },
+      ]);
+      mockSettingsRepo.find.mockResolvedValue([]);
+
+      await service.updateSettings(userId, {
+        enabled: true,
+        folderPath: root,
+        frequency: "every12hours",
+        retentionDaily: 21,
+      });
+
+      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: otherUserId,
+          enabled: true,
+          frequency: "every12hours",
+          retentionDaily: 21,
+          nextBackupAt: expect.any(Date),
+        }),
+      );
+    });
+
+    it("still reports the policy as saved when one account fails to reconcile", async () => {
+      // A saved policy that answers 500 because somebody else's row would not
+      // write reads as "not saved", and the operator saves it again.
+      mockSettingsRepo.findOne.mockResolvedValue(null);
+      mockUsersRepo.find.mockResolvedValue([{ id: otherUserId }]);
+      mockSettingsRepo.find.mockResolvedValue([]);
+      mockSettingsRepo.save
+        .mockImplementationOnce((entity) => Promise.resolve(entity))
+        .mockImplementationOnce(() => Promise.reject(new Error("db down")));
+
+      await expect(
+        service.updateSettings(userId, { frequency: "weekly" }),
+      ).resolves.toEqual(expect.objectContaining({ frequency: "weekly" }));
+    });
+
     it("should create new settings if none exist", async () => {
       mockSettingsRepo.findOne.mockResolvedValue(null);
 
@@ -846,6 +997,9 @@ describe("AutoBackupService", () => {
         // that has just been switched over visibly empty rather than silently
         // so (`docs/specs/backup-storage-targets.md` section 11, decision 2).
         artifactCount: 0,
+        // Which store is bound, so the screen names it instead of inferring
+        // "S3" from the absence of a folder picker.
+        storageProvider: "local",
       });
     });
 
@@ -1582,11 +1736,87 @@ describe("AutoBackupService", () => {
         createSettings({ folderPath: root }),
       );
 
+      // Refused before anything is resolved against the store: a user id that
+      // is not a UUID is not a shard segment either, so the ambient-identity
+      // check now names it first. Either refusal is the containment holding --
+      // what must never happen is a write.
       await expect(service.runManualBackup("../../etc")).rejects.toThrow(
-        /Path traversal/,
+        /Path traversal|valid UUID/,
       );
       // Nothing was written anywhere under the root.
       expect(await listBackups(root)).toEqual([]);
+    });
+
+    it("backs up every account on the deployment, not the administrator alone", async () => {
+      // "Run Backup Now" sits under a deployment policy, so backing up one row
+      // was the same defect as the policy governing one row: an operator
+      // pressed it to prove backups worked and proved it for themselves only.
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true, folderPath: root }),
+      );
+      mockUsersRepo.find.mockResolvedValue([
+        { id: userId },
+        { id: otherUserId },
+      ]);
+
+      const result = await service.runManualBackup(userId);
+
+      expect(result.usersRequested).toBe(2);
+      expect(result.usersBackedUp).toBe(2);
+      expect(await listBackups(folderFor(userId))).toHaveLength(1);
+      expect(await listBackups(folderFor(otherUserId))).toHaveLength(1);
+    });
+
+    it("keeps going, and reports the count, when one account fails", async () => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true, folderPath: root }),
+      );
+      mockUsersRepo.find.mockResolvedValue([
+        { id: userId },
+        { id: otherUserId },
+      ]);
+      // The caller's own account runs first, so the second export is the other
+      // account's.
+      mockBackupService.exportToBuffer
+        .mockResolvedValueOnce({
+          buffer: Buffer.from("gzipped-export"),
+          report: {
+            complete: true,
+            expectedAttachments: 0,
+            missingAttachments: 0,
+            inconsistentAttachments: 0,
+          },
+        })
+        .mockRejectedValueOnce(new Error("export blew up"));
+
+      const result = await service.runManualBackup(userId);
+
+      expect(result.usersBackedUp).toBe(1);
+      expect(result.usersFailed).toBe(1);
+      expect(result.message).toMatch(/1 failed/);
+      // The caller's own artifact is still named, because it is the one they
+      // can go and look at.
+      expect(await listBackups(folderFor(userId))).toHaveLength(1);
+    });
+
+    it("skips an account whose data is mid-replacement without failing the run", async () => {
+      mockSettingsRepo.findOne.mockResolvedValue(
+        createSettings({ enabled: true, folderPath: root }),
+      );
+      mockUsersRepo.find.mockResolvedValue([
+        { id: userId },
+        { id: otherUserId },
+      ]);
+      maintenance.isUnderMaintenance.mockImplementation((id: string) =>
+        Promise.resolve(id === otherUserId),
+      );
+
+      const result = await service.runManualBackup(userId);
+
+      expect(result.usersBackedUp).toBe(1);
+      expect(result.usersSkipped).toBe(1);
+      expect(result.usersFailed).toBe(0);
+      expect(await listBackups(folderFor(otherUserId))).toEqual([]);
     });
 
     it("refuses rather than writing an empty file mid-maintenance", async () => {
@@ -1613,7 +1843,11 @@ describe("AutoBackupService", () => {
 
       const result = await service.runManualBackup(userId);
 
-      expect(result.message).toBe("Backup completed successfully");
+      // A run covers every account on the deployment, so the message counts
+      // accounts rather than describing the one artifact the caller got.
+      expect(result.message).toBe("Backed up 1 of 1 account(s)");
+      expect(result.usersBackedUp).toBe(1);
+      expect(result.usersFailed).toBe(0);
       expect(result.filename).toMatch(
         /^monize-backup-daily-\d{4}-\d{2}-\d{2}\.json\.gz$/,
       );
@@ -1625,7 +1859,7 @@ describe("AutoBackupService", () => {
       );
       // The bytes are on disk under the reported name, not merely written.
       expect(
-        await fs.readFile(join(folderFor(), result.filename), "utf-8"),
+        await fs.readFile(join(folderFor(), ownArtifact(result)), "utf-8"),
       ).toBe("gzipped-export");
     });
 
@@ -1780,7 +2014,7 @@ describe("AutoBackupService", () => {
       try {
         const result = await service.runManualBackup(userId);
 
-        const onDisk = readFileSync(join(folderFor(), result.filename));
+        const onDisk = readFileSync(join(folderFor(), ownArtifact(result)));
         const recomputed = createHash("sha256").update(onDisk).digest("hex");
         const identity = loggedIdentity(log);
         expect(identity.digest).toBe(recomputed);
@@ -1839,7 +2073,7 @@ describe("AutoBackupService", () => {
         expect(secondIdentity.sizeBytes).not.toBe(first.sizeBytes);
         expect(secondIdentity.digest).toBe(
           createHash("sha256")
-            .update(readFileSync(join(folderFor(), second.filename)))
+            .update(readFileSync(join(folderFor(), ownArtifact(second))))
             .digest("hex"),
         );
       } finally {
@@ -2493,7 +2727,7 @@ describe("AutoBackupService", () => {
       const result = await service.runManualBackup(userId);
 
       expect(
-        await fs.readFile(join(folderFor(), result.filename), "utf-8"),
+        await fs.readFile(join(folderFor(), ownArtifact(result)), "utf-8"),
       ).toBe("gzipped-export");
     });
 
@@ -2812,8 +3046,8 @@ describe("AutoBackupService", () => {
 
       expect(partial.filename).not.toBe(complete.filename);
       // The whole of the defect: this used to read "partial-08:00".
-      expect(await read(complete.filename)).toBe("complete-02:00");
-      expect(await read(partial.filename)).toBe("partial-08:00");
+      expect(await read(ownArtifact(complete))).toBe("complete-02:00");
+      expect(await read(ownArtifact(partial))).toBe("partial-08:00");
     });
 
     it("every6hours: an 08:00 partial cron run does not replace the 02:00 complete one", async () => {
@@ -2991,12 +3225,12 @@ describe("AutoBackupService", () => {
     });
   });
 
-  describe("managed-user enrollment", () => {
+  describe("policy reconciliation", () => {
     const otherUserId = "77777777-7777-7777-7777-777777777777";
 
     /**
-     * Enrollment reads the settings rows of the non-admin users it found;
-     * the due-backup fan-out reads the enabled rows that are due. Both go
+     * Reconciliation reads the settings rows of the accounts it found; the
+     * due-backup fan-out reads the enabled rows that are due. Both go
      * through `find`, so answer them by their `where` clause.
      */
     function settingsFind({
@@ -3034,19 +3268,132 @@ describe("AutoBackupService", () => {
       );
     });
 
-    it("only sweeps active non-admin users", async () => {
+    it("sweeps every active account, administrators included", async () => {
       mockUsersRepo.find.mockResolvedValue([]);
 
       await service.handleAutoBackupCron();
 
+      // A deactivated account is not backed up; every active one is. The role
+      // is deliberately NOT part of the filter any more: a second
+      // administrator used to be excluded here and enrolled by nothing, so
+      // unless they opened the settings screen themselves their data was never
+      // backed up at all.
       expect(mockUsersRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { isActive: true } }),
+      );
+    });
+
+    it("leaves the policy owner's own row alone -- it is the policy", async () => {
+      // `userId` is the primary administrator in this suite, so their row is
+      // where the policy lives. Reconciling it to itself would, on the tick
+      // after an operator disarmed the schedule, re-derive the very
+      // `nextBackupAt` they had just cleared.
+      mockUsersRepo.find.mockResolvedValue([{ id: userId }]);
+      settingsFind({});
+
+      await service.handleAutoBackupCron();
+
+      expect(mockSettingsRepo.save).not.toHaveBeenCalled();
+    });
+
+    it("reconciles every account onto the administrator's stored policy, not the hardcoded defaults", async () => {
+      // The defect this closes: the schedule, folder and retention an operator
+      // chose governed their own row and nothing else, while the screen said it
+      // was configuring the deployment.
+      mockSettingsRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(
+          where.userId === userId
+            ? createSettings({
+                enabled: true,
+                folderPath: root,
+                frequency: "every6hours",
+                backupTime: "23:30",
+                retentionDaily: 30,
+                retentionWeekly: 12,
+                retentionMonthly: 24,
+              })
+            : null,
+        ),
+      );
+      mockUsersRepo.find.mockResolvedValue([{ id: otherUserId }]);
+      settingsFind({});
+
+      await service.handleAutoBackupCron();
+
+      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ isActive: true }),
+          userId: otherUserId,
+          enabled: true,
+          frequency: "every6hours",
+          backupTime: "23:30",
+          retentionDaily: 30,
+          retentionWeekly: 12,
+          retentionMonthly: 24,
         }),
       );
-      // An admin configures their own; a deactivated account is not backed up.
-      const { where } = mockUsersRepo.find.mock.calls[0][0];
-      expect(where.role).toEqual(expect.objectContaining({ value: "admin" }));
+    });
+
+    it("disarms every account when the policy is disabled", async () => {
+      mockSettingsRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(
+          where.userId === userId
+            ? createSettings({ enabled: false, folderPath: root })
+            : null,
+        ),
+      );
+      mockUsersRepo.find.mockResolvedValue([{ id: otherUserId }]);
+      const armed = createSettings({
+        enabled: true,
+        folderPath: root,
+        nextBackupAt: new Date("2026-04-16T02:00:00Z"),
+      });
+      armed.userId = otherUserId;
+      settingsFind({ managed: [armed] });
+
+      await service.handleAutoBackupCron();
+
+      // Leaving the old `next_backup_at` behind would have a disabled policy
+      // keep taking backups.
+      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: otherUserId,
+          enabled: false,
+          nextBackupAt: null,
+        }),
+      );
+    });
+
+    it("writes no row at all for an account a disabled policy has never reached", async () => {
+      mockSettingsRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(
+          where.userId === userId
+            ? createSettings({ enabled: false, folderPath: root })
+            : null,
+        ),
+      );
+      mockUsersRepo.find.mockResolvedValue([{ id: otherUserId }]);
+      settingsFind({});
+
+      await service.handleAutoBackupCron();
+
+      // There is no schedule to record, and a table of disabled rows is not one.
+      expect(mockSettingsRepo.save).not.toHaveBeenCalled();
+    });
+
+    it("falls back to an ENABLED default policy when no administrator has saved one", async () => {
+      // An instance that has never had its backup policy opened still backs
+      // every account up: a disabled default would have turned automatic
+      // backups off for every such deployment the moment the policy started
+      // being honoured.
+      mockSettingsRepo.findOne.mockResolvedValue(null);
+      mockUsersRepo.find.mockResolvedValue([{ id: otherUserId }]);
+      settingsFind({});
+
+      await service.handleAutoBackupCron();
+
+      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: otherUserId, enabled: true }),
+      );
     });
 
     it("brings a drifted row back to the deployment defaults", async () => {
@@ -3615,6 +3962,10 @@ describe("AutoBackupService", () => {
         // Switching store is forward-only, so the count is how an operator sees
         // the gap instead of inferring it.
         artifactCount: 3,
+        // Named, not inferred: "not selectable" is the absence of a folder
+        // picker, which is not the same fact as "the artifacts are in a
+        // bucket".
+        storageProvider: "fixed",
       });
     });
 

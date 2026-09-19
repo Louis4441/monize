@@ -10,6 +10,7 @@ import {
   DataSource,
   EntityTarget,
   In,
+  IsNull,
   LessThanOrEqual,
   Not,
   ObjectLiteral,
@@ -60,11 +61,54 @@ import {
 import { tr } from "../i18n/translate";
 
 /**
- * Role that may see and change automatic backup settings. Everyone else is
- * enrolled on the deployment defaults by `enrollManagedUsers` and never sees
- * the feature -- see the class comment.
+ * Role that may see and change the deployment's automatic backup policy.
+ * Everyone else is reconciled onto that policy by `reconcileManagedUsers` and
+ * never sees the controls -- see the class comment.
  */
 const BACKUP_ADMIN_ROLE = "admin";
+
+/**
+ * The deployment's automatic-backup policy: how backups run, for every account
+ * on this instance.
+ *
+ * These are exactly the columns of `auto_backup_settings` that are **not** one
+ * user's bookkeeping. The split is the whole point: `lastBackupAt`,
+ * `lastBackupStatus`, `lastBackupError` and `nextBackupAt` describe how one
+ * account's own run went and belong to that account's row; everything here
+ * describes the deployment and has one value for all of them.
+ *
+ * Before this existed, the admin surface wrote the schedule, folder and
+ * retention onto the administrator's own row and every other account was
+ * reconciled to a hardcoded `defaultSettingsFor` instead -- so an operator who
+ * changed the frequency or the retention changed nothing for anybody but
+ * themselves, while the screen said it was configuring the deployment.
+ */
+export interface AutoBackupPolicy {
+  enabled: boolean;
+  folderPath: string;
+  frequency: AutoBackupFrequency;
+  backupTime: string;
+  timezone: string;
+  retentionDaily: number;
+  retentionWeekly: number;
+  retentionMonthly: number;
+}
+
+/**
+ * The policy fields, as a list, so "which columns does the policy own" is
+ * written once. `reconcileManagedUsers` compares against it to decide whether a
+ * row has drifted, and `policyFrom` projects a stored row down to it.
+ */
+const POLICY_FIELDS = [
+  "enabled",
+  "folderPath",
+  "frequency",
+  "backupTime",
+  "timezone",
+  "retentionDaily",
+  "retentionWeekly",
+  "retentionMonthly",
+] as const;
 
 /**
  * Re-exported from the `local` storage target, which is where the default lives
@@ -211,11 +255,23 @@ interface BackupFile {
  * deleted another's files. The per-user folder is what makes a backup belong to
  * somebody.
  *
- * **Who configures it.** Only an administrator sees the settings (the endpoints
- * live on `AutoBackupController`, behind `@Roles("admin")`). Every other user is
- * enrolled automatically on the deployment defaults by `enrollManagedUsers`, so
- * their data is protected without them having to ask -- and without them being
- * able to point backups at a folder the operator did not mount.
+ * **Who configures it, and whose data it covers.** Only an administrator sees
+ * the controls (the endpoints live on `AutoBackupController`, behind
+ * `@Roles("admin")`), and what they edit is one **deployment policy**
+ * (`AutoBackupPolicy`) rather than their own preference: every active account on
+ * the instance is reconciled onto it, hourly by `reconcileManagedUsers` and
+ * immediately on save. So a frequency, folder or retention chosen here is the
+ * frequency, folder and retention every account runs on -- which is what the
+ * screen has always said it was doing.
+ *
+ * **Where the policy is stored.** On the `auto_backup_settings` row of the
+ * deployment's primary administrator, the earliest-created active account
+ * holding `BACKUP_ADMIN_ROLE` (`resolvePolicyUserId`). That row is a real user's
+ * row -- it is also how *their* backups run -- and it is the single row the
+ * admin endpoints read and write, whichever administrator is signed in, so two
+ * administrators edit one policy rather than two. A deployment with no active
+ * administrator at all runs on `defaultPolicy`, which is enabled: an instance
+ * whose operator account was deactivated keeps taking backups.
  */
 @Injectable()
 export class AutoBackupService {
@@ -441,24 +497,171 @@ export class AutoBackupService {
     );
   }
 
-  /** Settings for a user with no persisted row yet (not saved by this method). */
+  /**
+   * The policy a deployment runs on until an administrator saves one.
+   *
+   * **Enabled**, unlike `defaultSettingsFor` below, and deliberately: an
+   * instance that has never had its backup policy opened still backs every
+   * account up, which is the behaviour managed users have always had (the old
+   * `applyManagedDefaults` hardcoded `enabled: true` for them). A disabled
+   * default would have turned automatic backups off for every such deployment
+   * the moment the policy started being honoured.
+   */
+  private defaultPolicy(): AutoBackupPolicy {
+    return {
+      enabled: true,
+      // Only where the store has a location somebody may choose. Writing an
+      // object store's `s3://bucket/prefix` into this column would persist a
+      // value nothing reads -- and would be read as a directory, and refused,
+      // by a deployment that later switched back to a `local` store.
+      folderPath: this.store.locationSelectable ? this.store.defaultBase : "",
+      frequency: "daily",
+      backupTime: "02:00",
+      timezone: "UTC",
+      retentionDaily: 7,
+      retentionWeekly: 4,
+      retentionMonthly: 6,
+    };
+  }
+
+  /** The policy half of a stored row, with its bookkeeping columns dropped. */
+  private policyFrom(settings: AutoBackupSettings): AutoBackupPolicy {
+    return {
+      enabled: settings.enabled,
+      folderPath: settings.folderPath,
+      frequency: settings.frequency as AutoBackupFrequency,
+      backupTime: settings.backupTime,
+      timezone: settings.timezone,
+      retentionDaily: settings.retentionDaily,
+      retentionWeekly: settings.retentionWeekly,
+      retentionMonthly: settings.retentionMonthly,
+    };
+  }
+
+  /**
+   * Whose `auto_backup_settings` row carries this deployment's policy: the
+   * earliest-created active administrator, or `null` on an instance with none.
+   *
+   * Deterministic rather than "whoever is signed in", because the admin surface
+   * has to read and write *the same row* for every administrator -- otherwise a
+   * second operator edits a second policy, sees it revert on the next hourly
+   * reconcile, and the deployment has two answers to one question. Ordered by
+   * `createdAt` with `id` as the tiebreak so two accounts created in the same
+   * transaction still resolve to one of them, always the same one.
+   */
+  private async resolvePolicyUserId(): Promise<string | null> {
+    // RLS: reading across users to find the deployment's operator.
+    const admin = await withSystemContext(() =>
+      this.scoped(User, (repo) =>
+        repo.findOne({
+          select: { id: true },
+          where: { role: BACKUP_ADMIN_ROLE, isActive: true },
+          order: { createdAt: "ASC", id: "ASC" },
+        }),
+      ),
+    );
+    return admin?.id ?? null;
+  }
+
+  /**
+   * This deployment's automatic-backup policy, and whose row it came from.
+   *
+   * `row` is absent when no administrator has saved one -- either there is no
+   * active administrator or their row does not exist yet -- in which case the
+   * policy is `defaultPolicy()` and nothing has been persisted.
+   */
+  private async loadPolicy(): Promise<{
+    ownerUserId: string | null;
+    policy: AutoBackupPolicy;
+    /** The stored row the policy came from, when there is one. */
+    row?: AutoBackupSettings;
+  }> {
+    const ownerUserId = await this.resolvePolicyUserId();
+    if (!ownerUserId) {
+      return { ownerUserId: null, policy: this.defaultPolicy() };
+    }
+    // RLS: the policy row belongs to the primary administrator, who is not
+    // necessarily the caller -- a second administrator reads the same row.
+    const row = await withSystemContext(() =>
+      this.scoped(AutoBackupSettings, (repo) =>
+        repo.findOne({ where: { userId: ownerUserId } }),
+      ),
+    );
+    return row
+      ? { ownerUserId, policy: this.policyFrom(row), row }
+      : { ownerUserId, policy: this.defaultPolicy() };
+  }
+
+  /**
+   * What the admin surface shows beside the policy: how many accounts it
+   * governs, and how the deployment's runs are actually going.
+   *
+   * The status columns are a **deployment-wide** answer -- the most recent run
+   * of any account, and the soonest next run of any armed one -- not the
+   * administrator's own. A policy screen reporting one row's `lastBackupAt` says
+   * "Last backup: today" on an instance where eleven of twelve accounts have
+   * never been backed up at all.
+   */
+  private async describeCoverage(): Promise<{
+    managedUserCount: number;
+    lastBackupAt: Date | null;
+    lastBackupStatus: string | null;
+    lastBackupError: string | null;
+    nextBackupAt: Date | null;
+  }> {
+    // RLS: a deployment-wide count and two deployment-wide aggregates.
+    return withSystemContext(async () => {
+      const managedUserCount = await this.scoped(User, (repo) =>
+        repo.count({ where: { isActive: true } }),
+      );
+      // One read of a table with one row per account, reduced here rather than
+      // two ordered `findOne`s: the aggregates are over the same rows, and a
+      // second round trip to answer the second half of one question is a round
+      // trip.
+      const rows = await this.scoped(AutoBackupSettings, (repo) =>
+        repo.find({
+          where: [{ lastBackupAt: Not(IsNull()) }, { enabled: true }],
+        }),
+      );
+      const lastRun = rows
+        .filter((row) => row.lastBackupAt)
+        .sort(
+          (a, b) =>
+            (b.lastBackupAt as Date).getTime() -
+            (a.lastBackupAt as Date).getTime(),
+        )[0];
+      const nextRun = rows
+        .filter((row) => row.enabled && row.nextBackupAt)
+        .sort(
+          (a, b) =>
+            (a.nextBackupAt as Date).getTime() -
+            (b.nextBackupAt as Date).getTime(),
+        )[0];
+      return {
+        managedUserCount,
+        lastBackupAt: lastRun?.lastBackupAt ?? null,
+        lastBackupStatus: lastRun?.lastBackupStatus ?? null,
+        lastBackupError: lastRun?.lastBackupError ?? null,
+        nextBackupAt: nextRun?.nextBackupAt ?? null,
+      };
+    });
+  }
+
+  /**
+   * Settings for a user with no persisted row yet (not saved by this method).
+   *
+   * Disabled, unlike `defaultPolicy`: this is the shape of an account that
+   * nothing has reconciled yet, and claiming it is armed would have the cron
+   * skip it while the screen said otherwise. `reconcileManagedUsers` is what
+   * turns it into a row that runs.
+   */
   private defaultSettingsFor(userId: string): AutoBackupSettings {
-    const defaults = new AutoBackupSettings();
+    const defaults = Object.assign(
+      new AutoBackupSettings(),
+      this.defaultPolicy(),
+    );
     defaults.userId = userId;
     defaults.enabled = false;
-    // Only where the store has a location somebody may choose. Writing an
-    // object store's `s3://bucket/prefix` into this column would persist a
-    // value nothing reads -- and would be read as a directory, and refused, by
-    // a deployment that later switched back to a `local` store.
-    defaults.folderPath = this.store.locationSelectable
-      ? this.store.defaultBase
-      : "";
-    defaults.frequency = "daily";
-    defaults.backupTime = "02:00";
-    defaults.timezone = "UTC";
-    defaults.retentionDaily = 7;
-    defaults.retentionWeekly = 4;
-    defaults.retentionMonthly = 6;
     defaults.lastBackupAt = null;
     defaults.lastBackupStatus = null;
     defaults.lastBackupError = null;
@@ -483,15 +686,30 @@ export class AutoBackupService {
     });
   }
 
-  async getSettings(userId: string): Promise<AutoBackupSettings> {
-    const existing = await this.scoped(AutoBackupSettings, (repo) =>
-      repo.findOne({
-        where: { userId },
-      }),
+  /**
+   * The deployment policy, as the admin surface reads it.
+   *
+   * Not the caller's own row: whichever administrator is signed in, this is the
+   * one policy the instance runs on, with deployment-wide coverage and status
+   * attached (`describeCoverage`). `userId` on the returned object is the
+   * policy's owner, which is what `resolvedFolderPath` is an example path for.
+   */
+  async getSettings(actingUserId: string): Promise<AutoBackupSettings> {
+    const { ownerUserId, policy, row } = await this.loadPolicy();
+    const owner = ownerUserId ?? actingUserId;
+    // The stored row where there is one, so `createdAt`/`updatedAt` are the
+    // row's own rather than absent; a synthesized default otherwise. Either
+    // way the policy fields are what the deployment is running on.
+    const settings = Object.assign(
+      row ?? this.defaultSettingsFor(owner),
+      policy,
     );
-    // Report the folder backups are actually written to, so a stored row that
-    // never had one chosen shows the deployment default instead of a blank.
-    return this.withResolvedFolder(existing ?? this.defaultSettingsFor(userId));
+    // Report the folder backups are actually written to, so a policy that never
+    // had one chosen shows the deployment default instead of a blank.
+    return Object.assign(
+      this.withResolvedFolder(settings),
+      await this.describeCoverage(),
+    );
   }
 
   /**
@@ -505,30 +723,38 @@ export class AutoBackupService {
    * anything they chose. A surface that can say "this deployment has no backup
    * storage" up front is telling them something true earlier.
    *
-   * The store this admin's schedule would actually write to is what gets
-   * probed -- their stored base when one is set, the deployment default
-   * otherwise. Probing only the default reported "no storage" while a configured
-   * secondary root from BACKUP_ALLOWED_ROOTS was mounted and writable, and the
-   * banner then blocked re-arming a schedule that would have worked (F3RB-003).
+   * The store the **policy** would actually write to is what gets probed -- its
+   * stored base when one is set, the deployment default otherwise. Probing only
+   * the default reported "no storage" while a configured secondary root from
+   * BACKUP_ALLOWED_ROOTS was mounted and writable, and the banner then blocked
+   * re-arming a schedule that would have worked (F3RB-003).
    */
   async describeCapability(userId: string): Promise<{
     available: boolean;
     folderPath: string;
     locationSelectable: boolean;
+    storageProvider: string;
     artifactCount?: number;
     reason?: string;
   }> {
-    const settings = await this.scoped(AutoBackupSettings, (repo) =>
-      repo.findOne({ where: { userId } }),
-    );
+    // The policy's folder, not the caller's own row: this surface reports
+    // whether the deployment can write the backups the policy asks for, and on
+    // a second administrator's session those are two different folders.
+    const { policy } = await this.loadPolicy();
     const capability = await this.store.describeStore(
       userId,
-      settings?.folderPath,
+      policy.folderPath,
     );
     return {
       available: capability.available,
       folderPath: capability.location,
       locationSelectable: capability.locationSelectable,
+      // Which store is bound, so the screen can name it rather than inferring
+      // "S3" from the absence of a folder picker. `locationSelectable` answers
+      // "may I choose a location"; it does not answer "where do my backups
+      // live", and a surface that has to guess gets it wrong the first time a
+      // third target exists.
+      storageProvider: this.store.name,
       ...(capability.artifactCount !== undefined
         ? { artifactCount: capability.artifactCount }
         : {}),
@@ -536,21 +762,26 @@ export class AutoBackupService {
     };
   }
 
+  /**
+   * Change the deployment policy, and make it true of every account now.
+   *
+   * The write lands on the primary administrator's row wherever the caller's own
+   * row is (`resolvePolicyUserId`), so two administrators edit one policy. The
+   * reconcile afterwards is the point of the whole method: a policy that only
+   * took effect at the top of the next hour would leave "Save" looking like it
+   * had done nothing, and a policy that only ever governed the row it was stored
+   * on -- which is what this used to be -- is the defect being fixed.
+   */
   async updateSettings(
-    userId: string,
+    actingUserId: string,
     dto: UpdateAutoBackupSettingsDto,
   ): Promise<AutoBackupSettings> {
-    let settings = await this.scoped(AutoBackupSettings, (repo) =>
-      repo.findOne({
-        where: { userId },
-      }),
-    );
-
-    if (!settings) {
-      // Seed the row with the same defaults getSettings reports, so an update
-      // that only touches one field still lands on a complete row.
-      settings = this.defaultSettingsFor(userId);
-    }
+    const { ownerUserId, row } = await this.loadPolicy();
+    const userId = ownerUserId ?? actingUserId;
+    // Seed the row with the same defaults getSettings reports, so an update
+    // that only touches one field still lands on a complete row.
+    const settings = row ?? this.defaultSettingsFor(userId);
+    settings.userId = userId;
 
     if (dto.folderPath !== undefined) {
       settings.folderPath = this.store.acceptBase(dto.folderPath);
@@ -600,10 +831,27 @@ export class AutoBackupService {
       }
     }
 
-    const saved = await this.scoped(AutoBackupSettings, (repo) =>
-      repo.save(settings),
+    // RLS: the policy row is the primary administrator's, which is the caller's
+    // own row on every single-administrator deployment and somebody else's on
+    // the rest. One policy needs one row, so the identity is the row's owner.
+    const saved = await withUserContext(userId, () =>
+      this.scoped(AutoBackupSettings, (repo) => repo.save(settings)),
     );
-    return this.withResolvedFolder(saved);
+
+    // The policy is now stored; make it true of every other account before
+    // answering, so the count the screen reads back is the count that is
+    // actually running on it. One account's row failing to reconcile is caught
+    // and logged per account inside, so it cannot turn a saved policy into a
+    // 500 the operator reads as "not saved".
+    await this.reconcileManagedUsers(new Date(), {
+      ownerUserId: userId,
+      policy: this.policyFrom(saved),
+    });
+
+    return Object.assign(
+      this.withResolvedFolder(saved),
+      await this.describeCoverage(),
+    );
   }
 
   /**
@@ -625,13 +873,89 @@ export class AutoBackupService {
     return this.store.browseFolders(folderPath);
   }
 
-  async runManualBackup(
-    userId: string,
-  ): Promise<{ message: string; filename: string }> {
-    // The cron defers in this state; a manual run has a user watching, so it says
-    // so instead. Writing the file anyway would produce an empty backup and then
-    // rotate the last good one out to keep the retention count.
-    if (await this.maintenance.isUnderMaintenance(userId)) {
+  /**
+   * "Run Backup Now" on the policy screen: back up **every account this
+   * deployment holds**, not the administrator pressing the button.
+   *
+   * The button sits under a deployment policy, so backing up one row was the
+   * same defect as the policy governing one row -- an operator pressed it to
+   * prove backups worked and proved it for themselves only. Accounts are run one
+   * at a time, through the same per-user path the cron uses, and one account's
+   * failure never stops the rest: the counts come back so the screen can say how
+   * many accounts were written, skipped and failed rather than showing a
+   * filename that belongs to whichever ran last.
+   *
+   * It is a fan-out inside one request, and the request waits for it. That is
+   * the honest shape for a button labelled "now" on an instance whose accounts
+   * are counted in tens; an instance where it is not should arm the schedule and
+   * let the hourly cron do the work.
+   */
+  async runManualBackup(actingUserId: string): Promise<{
+    message: string;
+    usersRequested: number;
+    usersBackedUp: number;
+    usersSkipped: number;
+    usersFailed: number;
+    usersPartial: number;
+    /**
+     * The artifact written for the account that pressed the button, when one
+     * was. Deliberately only that one: a single filename cannot describe a
+     * fan-out, and naming whichever account happened to run last would be a
+     * value the reader would take for their own.
+     */
+    filename?: string;
+  }> {
+    const { policy } = await this.loadPolicy();
+    const userIds = await this.resolveBackupTargets(actingUserId);
+
+    let usersBackedUp = 0;
+    let usersSkipped = 0;
+    let usersFailed = 0;
+    let usersPartial = 0;
+    let ownFilename: string | undefined;
+    // Kept so a run that wrote nothing can say *why* rather than "it did not
+    // work". The operator pressed this button to find out.
+    let firstError: unknown;
+
+    for (const userId of userIds) {
+      try {
+        const outcome = await this.runBackupForUser(userId, policy);
+        if (!outcome) {
+          usersSkipped++;
+          continue;
+        }
+        usersBackedUp++;
+        if (userId === actingUserId) ownFilename = outcome.filename;
+        if (!outcome.complete) usersPartial++;
+      } catch (error) {
+        usersFailed++;
+        firstError ??= error;
+        this.logger.error(
+          `Manual backup failed for user ${userId}: ${error.message}`,
+        );
+      }
+    }
+
+    // Nothing was written at all: a 200 carrying zeroes reads as "done" on a
+    // screen whose whole job is to say whether backups work.
+    if (usersBackedUp === 0 && userIds.length > 0) {
+      if (usersFailed === 1) {
+        // One account, one reason: the caller gets the actual refusal -- the
+        // undecryptable password, the missing user row, the unwritable folder
+        // -- with its own status, not a generic replacement for it.
+        throw firstError;
+      }
+      if (usersFailed > 1) {
+        const reason = String((firstError as Error)?.message ?? firstError);
+        throw new ConflictException(
+          tr(
+            "errors.backup.manualRunFailed",
+            `No backup could be written: ${usersFailed} account(s) failed. First error: ${reason}`,
+            { count: usersFailed, reason },
+          ),
+        );
+      }
+      // Skipped, not failed: every account is mid-replacement.
       throw new ConflictException(
         tr(
           "errors.maintenance.inProgress",
@@ -640,13 +964,85 @@ export class AutoBackupService {
       );
     }
 
-    // A user who has never opened the auto-backup settings still gets a working
-    // manual run: the row is seeded with defaults here and persisted by the
-    // save at the end of this method.
+    return {
+      // A count is not a result on its own: a partial artifact is the one
+      // outcome a reader would otherwise take for a complete backup, so the
+      // message says what "partial" cost them and what it did not.
+      message:
+        `Backed up ${usersBackedUp} of ${userIds.length} account(s)` +
+        (usersPartial > 0 ? `, ${usersPartial} partial` : "") +
+        (usersSkipped > 0 ? `, ${usersSkipped} skipped` : "") +
+        (usersFailed > 0 ? `, ${usersFailed} failed` : "") +
+        (usersPartial > 0
+          ? ". Some attachments could not be included: those artifacts were " +
+            "saved as partial artifacts, were not promoted, and did not " +
+            "replace or age out any complete backup."
+          : ""),
+      usersRequested: userIds.length,
+      usersBackedUp,
+      usersSkipped,
+      usersFailed,
+      usersPartial,
+      ...(ownFilename !== undefined ? { filename: ownFilename } : {}),
+    };
+  }
+
+  /**
+   * Every active account a manual run covers, the caller's own first so an
+   * operator watching the request sees their own data protected before anyone
+   * else's if it is cut short.
+   */
+  private async resolveBackupTargets(actingUserId: string): Promise<string[]> {
+    // RLS: a deployment-wide fan-out, the same read `reconcileManagedUsers`
+    // makes.
+    const ids = await withSystemContext(async () => {
+      const users = await this.scoped(User, (repo) =>
+        repo.find({ select: { id: true }, where: { isActive: true } }),
+      );
+      return users.map((u) => u.id);
+    });
+    if (ids.length === 0) return [actingUserId];
+    return [
+      ...ids.filter((id) => id === actingUserId),
+      ...ids.filter((id) => id !== actingUserId),
+    ];
+  }
+
+  /**
+   * One account's manual backup: `null` when its data is mid-replacement and the
+   * run was therefore skipped, otherwise the artifact that was written.
+   *
+   * The cron defers in the maintenance state; a manual run says so instead of
+   * writing the file anyway, which would produce an empty backup and then rotate
+   * the last good one out to keep the retention count.
+   *
+   * An account that has never been reconciled still gets a working run: the row
+   * is seeded from the **deployment policy** here -- not from a disabled
+   * `defaultSettingsFor` -- so a run cannot be what persists an "off" policy row
+   * for an instance that was running on the enabled default.
+   */
+  private async runBackupForUser(
+    userId: string,
+    policy: AutoBackupPolicy,
+  ): Promise<{ filename: string; complete: boolean } | null> {
+    // RLS: each account's own body runs under its own identity, exactly as the
+    // cron's `runDueBackup` does.
+    const underMaintenance = await withUserContext(userId, () =>
+      this.maintenance.isUnderMaintenance(userId),
+    );
+    if (underMaintenance) {
+      this.logger.log(
+        `Manual backup skipped for user ${userId}: their data is being replaced`,
+      );
+      return null;
+    }
+
     const settings =
-      (await this.scoped(AutoBackupSettings, (repo) =>
-        repo.findOne({ where: { userId } }),
-      )) ?? this.defaultSettingsFor(userId);
+      (await withUserContext(userId, () =>
+        this.scoped(AutoBackupSettings, (repo) =>
+          repo.findOne({ where: { userId } }),
+        ),
+      )) ?? Object.assign(this.defaultSettingsFor(userId), policy, { userId });
     if (this.store.locationSelectable) {
       settings.folderPath = this.store.resolveBase(settings.folderPath);
     }
@@ -656,7 +1052,9 @@ export class AutoBackupService {
       settings.folderPath,
     );
     const timezone = settings.timezone || "UTC";
-    const artifact = await this.exportToStore(userId, location, timezone);
+    const artifact = await withUserContext(userId, () =>
+      this.exportToStore(userId, location, timezone),
+    );
     const { filename, report } = artifact;
     // A partial artifact is published under its own `partial-<date>` name and
     // its own retention tier, so it cannot replace this day's complete artifact
@@ -681,18 +1079,15 @@ export class AutoBackupService {
         new Date(),
       );
     }
-    await this.scoped(AutoBackupSettings, (repo) => repo.save(settings));
+    await withUserContext(userId, () =>
+      this.scoped(AutoBackupSettings, (repo) => repo.save(settings)),
+    );
 
     // After the local artifact exists and this run's own bookkeeping is durable,
     // and outside every transaction above (INV-BACKUP-003).
     await this.dispatchOffsiteCopy(userId, location, artifact, "manual");
 
-    return {
-      message: report.complete
-        ? "Backup completed successfully"
-        : "Backup written, but some attachments could not be included; it was saved as a partial artifact, was not promoted, and did not replace or age out any complete backup",
-      filename,
-    };
+    return { filename, complete: report.complete };
   }
 
   /**
@@ -976,7 +1371,7 @@ export class AutoBackupService {
   @Cron("0 * * * *")
   async handleAutoBackupCron(): Promise<void> {
     const now = new Date();
-    await this.enrollManagedUsers(now);
+    await this.reconcileManagedUsers(now);
     // RLS (task C2): cross-user fan-out over every user's due backup settings.
     const dueSettings = await withSystemContext(() =>
       this.scoped(AutoBackupSettings, (repo) =>
@@ -1001,7 +1396,7 @@ export class AutoBackupService {
       // every user after this one, with nothing recorded as failed either. That
       // is precisely how `RETURNING id` against a table with no `id` column
       // turned one bad statement into "no automatic backups at all". The same
-      // rule is already written out in `enrollManagedUsers` below: one user's
+      // rule is already written out in `reconcileManagedUsers` below: one user's
       // row failing must not stop the others.
       try {
         await this.runDueBackup(settings, now);
@@ -1199,26 +1594,41 @@ export class AutoBackupService {
   }
 
   /**
-   * Put every non-admin user on the deployment's default backup schedule.
+   * Put every account on this deployment's backup policy.
    *
    * Automatic backups are not a per-user preference: only an administrator can
-   * see or change the settings, so anybody else would silently have no backups
-   * at all unless something enrolled them. This runs at the top of the hourly
-   * cron rather than at registration so that users who already existed -- and
-   * anyone demoted out of the admin role later -- are covered too, with no
-   * migration to write and nothing to re-run by hand.
+   * see or change the policy, so anybody else would silently have no backups at
+   * all unless something enrolled them. This runs at the top of the hourly cron
+   * rather than at registration so that accounts that already existed are
+   * covered too, with no migration to write and nothing to re-run by hand, and
+   * again the moment the policy is saved so an operator does not have to wait an
+   * hour to see it take.
    *
-   * The row is fully managed: it is written back to the defaults whenever it
-   * has drifted, which is also how a row left over from when the feature was
-   * user-configurable gets brought into line. `lastBackup*` and `nextBackupAt`
-   * are the schedule's own bookkeeping and are never reset, so an enrolled user
-   * is not re-backed-up every hour.
+   * **Every active account, administrators included** -- all but the one whose
+   * row *is* the policy. A second administrator used to be excluded along with
+   * the first and enrolled by nothing, so unless they opened the settings screen
+   * themselves their data was never backed up at all.
+   *
+   * The row is fully managed: it is written back to the policy whenever it has
+   * drifted, which is also how a row left over from when the feature was
+   * user-configurable gets brought into line. `lastBackup*` is the schedule's
+   * own bookkeeping and is never reset, and `nextBackupAt` is only filled in or
+   * cleared, so a reconciled account is not re-backed-up every hour.
    */
-  private async enrollManagedUsers(now: Date): Promise<void> {
+  private async reconcileManagedUsers(
+    now: Date,
+    known?: { ownerUserId: string | null; policy: AutoBackupPolicy },
+  ): Promise<void> {
     // Demo data is regenerated daily and every visitor is a separate user, so
     // enrolling them would write throwaway exports for accounts that are about
     // to be deleted.
     if (this.demoMode.isDemo) return;
+
+    // `known` is the policy the caller just wrote. Re-reading it would be a
+    // round trip to learn what we are holding, and would reconcile to whatever
+    // a concurrent save had left there instead of to the policy this call is
+    // applying.
+    const { ownerUserId, policy } = known ?? (await this.loadPolicy());
 
     // RLS: reading every user and writing rows that are not the caller's is
     // cross-user work by definition.
@@ -1226,10 +1636,13 @@ export class AutoBackupService {
       const users = await this.scoped(User, (repo) =>
         repo.find({
           select: { id: true },
-          where: { role: Not(BACKUP_ADMIN_ROLE), isActive: true },
+          where: { isActive: true },
         }),
       );
-      return users.map((u) => u.id);
+      // The policy owner's own row is the policy; reconciling it to itself
+      // would be a no-op at best and, on the tick after an operator disarmed
+      // the schedule, would re-derive a `nextBackupAt` they had just cleared.
+      return users.map((u) => u.id).filter((id) => id !== ownerUserId);
     });
     if (managedUserIds.length === 0) return;
 
@@ -1242,52 +1655,52 @@ export class AutoBackupService {
 
     for (const userId of managedUserIds) {
       const current = byUserId.get(userId);
-      const managed = this.applyManagedDefaults(current, userId, now);
+      const managed = this.applyPolicy(current, userId, now, policy);
       if (!managed) continue;
       try {
         await withUserContext(userId, () =>
           this.scoped(AutoBackupSettings, (repo) => repo.save(managed)),
         );
         this.logger.log(
-          `Enrolled user ${userId} in automatic backups on the deployment defaults`,
+          `Reconciled user ${userId} onto the deployment's automatic backup policy`,
         );
       } catch (error) {
-        // One user's row failing must not stop the others from being enrolled,
-        // nor the backups that are already due from running.
+        // One user's row failing must not stop the others from being
+        // reconciled, nor the backups that are already due from running.
         this.logger.error(
-          `Failed to enroll user ${userId} in automatic backups: ${error.message}`,
+          `Failed to reconcile user ${userId} onto the automatic backup policy: ${error.message}`,
         );
       }
     }
   }
 
   /**
-   * The managed form of `current` when it differs from the deployment defaults,
-   * or `null` when it is already correct -- so a settled deployment writes
-   * nothing on the hourly tick.
+   * The managed form of `current` under `policy`, or `null` when it is already
+   * correct -- so a settled deployment writes nothing on the hourly tick.
+   *
+   * A disabled policy over an account with no row writes nothing at all: there
+   * is no schedule to record, and a table of disabled rows is not one.
    */
-  private applyManagedDefaults(
+  private applyPolicy(
     current: AutoBackupSettings | undefined,
     userId: string,
     now: Date,
+    policy: AutoBackupPolicy,
   ): AutoBackupSettings | null {
-    const defaults = this.defaultSettingsFor(userId);
+    if (!current && !policy.enabled) return null;
     const managed = Object.assign(
       new AutoBackupSettings(),
-      current ?? defaults,
-      {
-        enabled: true,
-        folderPath: defaults.folderPath,
-        frequency: defaults.frequency,
-        backupTime: defaults.backupTime,
-        timezone: defaults.timezone,
-        retentionDaily: defaults.retentionDaily,
-        retentionWeekly: defaults.retentionWeekly,
-        retentionMonthly: defaults.retentionMonthly,
-      },
+      current ?? this.defaultSettingsFor(userId),
+      policy,
+      { userId },
     );
-    // A managed row with no next run would never be picked up by the cron.
-    if (!managed.nextBackupAt) {
+    if (!managed.enabled) {
+      // A cleared schedule is what stops the cron picking the row up; leaving
+      // the old `next_backup_at` behind would have a disabled policy keep
+      // taking backups.
+      managed.nextBackupAt = null;
+    } else if (!managed.nextBackupAt) {
+      // A managed row with no next run would never be picked up by the cron.
       managed.nextBackupAt = this.calculateNextBackupAt(
         managed.frequency as AutoBackupFrequency,
         managed.backupTime,
@@ -1296,19 +1709,9 @@ export class AutoBackupService {
       );
     }
     if (!current) return managed;
-    const changed = (
-      [
-        "enabled",
-        "folderPath",
-        "frequency",
-        "backupTime",
-        "timezone",
-        "retentionDaily",
-        "retentionWeekly",
-        "retentionMonthly",
-        "nextBackupAt",
-      ] as const
-    ).some((key) => current[key] !== managed[key]);
+    const changed = ([...POLICY_FIELDS, "nextBackupAt"] as const).some(
+      (key) => current[key] !== managed[key],
+    );
     return changed ? managed : null;
   }
 
