@@ -7,9 +7,9 @@ on a per-pod disk. Written before the implementation, per
 feature of any substance starts from a short approved spec"). The staged plan is
 task S2 of `docs/future-plans/horizontal-scaling-tasks.md`.
 
-**Status: proposed. No code lands until this is approved.** Section 11 is the
-list of decisions the maintainer has to make; the rest is what the implementation
-must do once they are made.
+**Status: approved.** The maintainer answered section 11 on 2026-09-19 and took
+the recommendation on all four questions; those answers are now part of the
+specification rather than open questions, and section 11 records them.
 
 This spec governs *where the primary automatic backup lives*. It does not change
 the export pipeline, the on-disk format, the retention arithmetic, restore, or
@@ -259,8 +259,11 @@ message gains the third option. `backend/src/common/cluster/cluster-mode.spec.ts
 gets the rows.
 
 **The settings surface (#11, #12).** Under `s3` there is no folder for a user to
-choose or an admin to browse. See section 11, question 1: this is the one
-user-visible decision in the feature and it is not the implementation's to make.
+choose or an admin to browse. Section 11, decision 1: the setting becomes inert
+-- `updateSettings` refuses a `folderPath`, `validateFolder` and `browseFolders`
+answer a typed refusal, and `describeCapability` reports the bucket and prefix
+with `locationSelectable: false`. Hiding the picker on that flag is a follow-up
+frontend PR.
 
 **Helm.** `backup.storageProvider` and the `backupStore.s3.*` values, with the
 existing `backup.sharedVolume` assertion becoming conditional on the provider in
@@ -368,45 +371,57 @@ default deployment unchanged.
 3. **The boot matrix and the docs.** `checkClusterBoot`'s conditional refusal,
    `docs/backup-restore-contract.md` section 7 and
    `docs/external-side-effects.md` section 3 rewritten from "the filesystem" to
-   "the store", and the settings surface decided in section 11.
+   "the store", and the inert settings surface of section 11's decision 1.
 
-## 11. Open questions for the maintainer
+## 11. Decisions (answered 2026-09-19)
 
-**1. What happens to the per-user backup folder under an `s3` store?** The
-settings UI lets a user choose a folder and an admin browse the container
-filesystem. Neither means anything on object storage.
+The four questions this section opened with are answered. Each took the
+recommendation, so the reasoning under each *Recommended* bullet is the reasoning
+for the decision; what follows is what the implementation must do, not a choice
+still to be made.
 
-- *Recommended:* the setting becomes inert. `updateSettings` refuses a
-  `folderPath` with a message naming the provider, `validateFolder` and
-  `browseFolders` answer a typed refusal, and `describeCapability` reports the
-  bucket and prefix as a non-editable location plus a new
-  `locationSelectable: false`. The frontend hides the picker on that flag -- a
-  small follow-up PR, listed as such rather than smuggled in.
-- *Alternative:* the `folderPath` becomes a user-chosen key sub-prefix. More
-  faithful to the current UI and strictly worse: it is a user-supplied string in
-  an object key, so it needs its own containment model, and the thing it would
-  let a user do -- choose where their bytes physically land -- is not something
-  an object store offers anyway.
+**1. The per-user backup folder is inert under an `s3` store.** There is no
+folder for a user to choose or an admin to browse, and the implementation says so
+rather than pretending otherwise:
 
-**2. Does an existing deployment's data move?** Switching a live deployment from
-`local` to `s3` leaves every previous recovery point on the old volume, invisible
-to the listing.
+- `updateSettings` refuses a `folderPath` with a message naming the active
+  provider. The stored column keeps whatever it held; it is simply never read for
+  a location.
+- `validateFolder` and `browseFolders` answer a typed refusal rather than walking
+  a filesystem that has nothing to do with where the bytes are.
+- `describeCapability` reports the bucket and prefix as the location and carries
+  `locationSelectable: false`.
+- The frontend hides the picker on that flag. That is a **follow-up PR**, listed
+  here as one: the backend flag is meaningful on its own (the endpoints already
+  refuse), and a frontend change does not belong in the PR that adds a storage
+  target.
 
-- *Recommended:* no migration, stated loudly. The switch is documented as
-  forward-only, the release note says to keep the old volume until the new store
-  has a full retention window, and `describeCapability` says how many artifacts
-  the current store holds so the gap is visible rather than inferred.
-- *Alternative:* a one-shot copy command. Real work, real failure modes, and the
-  operator can do it with their own tooling against a documented key layout.
+The rejected alternative -- `folderPath` as a user-chosen key sub-prefix -- stays
+rejected: it is a user-supplied string in an object key and would need its own
+containment model.
 
-**3. Should `local` remain the default forever, or should `multi` prefer `s3`?**
-Recommended: `local` stays the default in every mode. `multi` refuses a `local`
-store without the shared-volume assertion, which is a refusal an operator can
-answer two ways, and choosing for them is how a default becomes a surprise.
+**2. No migration. The switch is forward-only and said so loudly.** Moving a live
+deployment from `local` to `s3` leaves every previous recovery point on the old
+volume, invisible to the new store's listing:
 
-**4. Is the legacy flat-folder sweep retired with this?** `enforceRetention`
-sweeps a pre-sharding layout that has not been written to since per-user folders
-landed. It is `local`-only and cannot be represented on `s3`. Recommended: keep
-it in the `local` target, unchanged and commented as local-only, and retire it in
-its own PR against its own evidence -- not silently as a side effect of a
-refactor that was supposed to change nothing.
+- The documentation states the switch is forward-only, in
+  `docs/backup-restore-contract.md` and beside `BACKUP_STORAGE_PROVIDER` in
+  `.env.example`.
+- The release note says to keep the old volume until the new store holds a full
+  retention window.
+- `describeCapability` reports how many artifacts the **current** store holds, so
+  an operator sees the gap rather than inferring it.
+
+No copy command ships. An operator who wants the old artifacts in the new store
+can move them with their own tooling against the documented key layout, which is
+the same layout on both targets.
+
+**3. `local` stays the default in every mode, including `multi`.** `multi` with a
+`local` store refuses without the shared-volume assertion, which is a refusal an
+operator can answer two ways (mount `ReadWriteMany`, or select the `s3` store);
+choosing for them is how a default becomes a surprise.
+
+**4. The legacy flat-folder sweep stays, unchanged, in the `local` target.** It
+is commented as local-only, the `s3` target's listing has no legacy entries to
+return, and retiring it is its own PR against its own evidence -- not a silent
+side effect of a refactor whose whole claim is that it changed nothing.

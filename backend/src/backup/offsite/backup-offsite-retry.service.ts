@@ -117,9 +117,9 @@ export class BackupOffsiteRetryService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly dispatch: BackupOffsiteDispatchService,
-    // For the folder the artifact is read back from: the same resolver the
-    // owner-facing listing uses, so the containment checks are not spelled a
-    // second way here.
+    // For the store location the artifact is read back from: the same resolver
+    // the owner-facing listing uses, so the checks are not spelled a second way
+    // here.
     private readonly autoBackup: AutoBackupService,
   ) {}
 
@@ -278,9 +278,9 @@ export class BackupOffsiteRetryService {
    * One row: find the artifact again, then take the same claim and the same
    * perform the first dispatch takes.
    *
-   * The folder is resolved from the user's *current* settings rather than
-   * remembered, because an operator may have moved the backup root since the
-   * artifact was written -- and the row carries the copy's identity, not the
+   * The store location is resolved from the user's *current* settings rather
+   * than remembered, because an operator may have moved the backup store since
+   * the artifact was written -- and the row carries the copy's identity, not the
    * deployment's layout.
    *
    * `origin` is `automatic` whatever produced the original run. By the time a
@@ -288,7 +288,9 @@ export class BackupOffsiteRetryService {
    * only way the lost off-machine copy is learned about is the alert.
    */
   private async retryOne(row: DueUpload): Promise<void> {
-    const folder = await this.autoBackup.resolveStoredBackupFolder(row.userId);
+    const location = await this.autoBackup.resolveStoredBackupLocation(
+      row.userId,
+    );
     await this.dispatch.claimAndPerform({
       userId: row.userId,
       destination: row.destination,
@@ -296,7 +298,7 @@ export class BackupOffsiteRetryService {
       tier: row.tier,
       digest: row.digest,
       sizeBytes: row.sizeBytes,
-      folder,
+      location,
       filename: offsiteArtifactFileName(
         row.destination,
         row.objectKey,

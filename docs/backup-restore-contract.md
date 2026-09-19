@@ -807,7 +807,7 @@ line now — but the restore's shape is unchanged: its `express.raw` upload is b
 before any of our code runs, so making the restore stream is a different change from
 this one, and it is what would replace a measured multiple with a bound.
 
-## 7. Automatic backups on disk
+## 7. Automatic backups in the store
 
 **Who configures it, and where.** Automatic backup is a deployment/operator
 concern, not an account preference, so its configuration surface is admin-only:
@@ -841,11 +841,16 @@ only the caller's own server-computed folder is enumerated (never the legacy fla
 root, whose filenames carry no owner), only names `classifyBackupFileName`
 recognises are served, and the listing reports the caller's own `enabled` so the
 section is absent on a deployment that runs no automatic backups. A download
-opens the **directory entry**, never the name the request carried: the requested
-name is compared against that folder's own listing and the matching entry is
-what is joined and streamed, so the string reaching the filesystem is one this
-deployment wrote. `safePath` still containment-checks the join, because a
-validated name with an unvalidated join is a decorative check. Restoring from
+opens what the **store** holds under that name, never the caller's string: the
+requested name is matched against the store's own entry, which is what is opened
+and streamed, so the value reaching the filesystem is one this deployment wrote.
+On the `local` store the join is still containment-checked, because a validated
+name with an unvalidated join is a decorative check; on the `s3` store the name
+is composed into a key that cannot leave the user's prefix and there is no path
+to traverse at all. The route streams the store's stream rather than a file
+handle, and deliberately does **not** redirect to a presigned URL: that would
+move an authenticated, demo-restricted, owner-scoped download onto a URL
+carrying its own authority that outlives the request. Restoring from
 that list **downloads the artifact and hands it to the existing restore form**,
 so the encryption sniff, the warning, the account-password or OIDC confirmation
 and the summary dialogue are the same ones a file picked from disk goes through;
@@ -866,25 +871,55 @@ reads. That is a persistence/schema change and is deliberately **not** made by t
 UI-split change that added this note; it is recorded here so the next change to
 this area starts from the right question — "whose row is this policy on".
 
-- **Per-user directory.** Each user's artifacts go in a server-computed
-  subdirectory of the root, named by their user id. Filenames carry only
-  frequency and date, so isolation has to come from the path — and retention only
-  ever enumerates one user's directory. Files sitting directly in a root predate
-  this, carry no owner in their names, and are left exactly where they are.
-- **Crash-atomic writes.** Temp file in the same directory, `fsync`, atomic
-  rename, `fsync` the directory. A final filename never refers to a partial file,
-  and a failed write leaves the previous artifact intact. Stale temp files are
-  swept separately from retention, because a partial write is not a backup and
-  counting one would silently shorten the retention window.
+- **The store is a target, not a directory.** Every storage operation goes
+  through `BACKUP_STORAGE_TARGET`
+  (`backend/src/backup/storage/backup-storage.interface.ts`), selected by
+  `BACKUP_STORAGE_PROVIDER`: `local` (the default) writes to a container
+  directory, `s3` puts the artifacts in an S3-compatible bucket. Nothing above
+  the store knows which is bound — the naming, the tiers, the promotion and the
+  retention arithmetic are the same either way, and the key layout is the same
+  tree. `docs/specs/backup-storage-targets.md` is the specification.
+- **Switching stores is forward-only.** Nothing is migrated. The previous
+  recovery points stay where they were and the new store's listing cannot see
+  them, so an operator keeps the old volume or bucket until the new store holds
+  a full retention window. The Backup settings page reports how many artifacts
+  the **current** store holds, so the gap is visible rather than inferred.
+- **Per-user namespace.** Each user's artifacts go in a server-computed
+  namespace named by their user id — a sharded subdirectory on `local`, the same
+  sharded key prefix on `s3`. Filenames carry only frequency and date, so
+  isolation has to come from the namespace, and retention only ever enumerates
+  one user's. Artifacts sitting directly in a `local` root predate this, carry no
+  owner in their names, and are left exactly where they are; the `s3` store has
+  never had a layout without an owner in the key.
+- **Published whole or not at all (INV-BACKUP-006).** There is no `write`
+  operation on the seam, only `publish`, so a caller cannot ask for a non-atomic
+  one. `local`: temp file in the same directory, `fsync`, length check, atomic
+  rename, `fsync` the directory. `s3`: one `PutObject` with a known
+  `Content-Length` and a declared `ChecksumSHA256`, which the service applies to
+  the key only on a complete, checksum-matching upload. Either way a final name
+  never refers to a partial artifact and a failed publish leaves the previous one
+  intact. Leftovers of an interrupted write are swept separately from retention,
+  because a partial write is not a backup and counting one would silently shorten
+  the retention window; on `s3` there is nothing to sweep.
 - **Confined destinations.** `BACKUP_ALLOWED_ROOTS` (defaulting to
   `BACKUP_CONTAINER_DIR`) bounds every user-influenced path, canonically — a
-  symlink inside a permitted directory cannot lead out of one.
+  symlink inside a permitted directory cannot lead out of one. It is the `local`
+  store's own concern and appears nowhere in the seam. An `s3` store has no
+  folder for a user to choose or an admin to browse, so the setting is inert
+  there: `updateSettings` refuses a `folderPath`, `validateFolder` and
+  `browseFolders` answer a typed refusal, and the capability report carries
+  `locationSelectable: false` for the settings screen to hide its picker on.
+- **The store and the off-machine copy are two places (INV-BACKUP-007).** The
+  store's variables are `BACKUP_STORE_S3_*`; `BACKUP_S3_*` is the off-machine
+  destination's. A deployment whose two resolve to one bucket and overlapping
+  prefix refuses to start: the off-machine copy exists to survive the loss of the
+  store, so one bucket holding both is a 3-2-1 arrangement that is actually a 1.
 - **Completeness is part of an artifact's identity, not a note beside it
   (F3RB-001, issue #1069).** A run that knows its artifact is incomplete publishes
   it as `monize-backup-partial-<date>.<ext>`, in its own retention tier; nothing
   named `daily-`, `weekly-` or `monthly-` is ever written by such a run. The name
   is chosen *after* the export, from what the export found, because
-  `writeFileAtomic` replaces a final name by design: choosing it first destroyed
+  a publish replaces a final name by design: choosing it first destroyed
   that day's complete artifact and then recorded `partial` in the settings row,
   with nothing left to preserve. Retention then read the ordinary name and counted
   it as a complete daily, so `retentionDaily = 3` over three partial days could

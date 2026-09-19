@@ -175,6 +175,7 @@
     "folderNotExistVolume": "Le dossier n'existe pas : {{ safePath }}. Assurez-vous que le chemin est mappé en tant que volume Docker.",
     "folderAccessErrorDetail": "Impossible d'accéder au dossier : {{ safePath }} - {{ message }}",
     "folderNotWritable": "Le dossier n'est pas accessible en écriture : {{ safePath }}. Vérifiez les permissions du conteneur.",
+    "folderNotSelectable": "Ce déploiement enregistre les sauvegardes automatiques dans un stockage objet, qui ne comporte aucun dossier à choisir. L'emplacement est défini par la configuration du déploiement.",
     "userNotFoundRestore": "Utilisateur introuvable",
     "backupPasswordWrong": "Le mot de passe saisi ne peut pas déchiffrer cette sauvegarde. Essayez le mot de passe défini lors de la création de la sauvegarde.",
     "backupPasswordRequired": "Cette sauvegarde est chiffrée. Fournissez le mot de passe utilisé lors de sa création.",

@@ -21,6 +21,8 @@ import {
   BackupOffsiteUploadStatus,
 } from "./entities/backup-offsite-upload.entity";
 import { OffsiteS3Target } from "./backup-offsite.types";
+import { BackupStoreLocation } from "../storage/backup-storage.interface";
+import { LocalBackupStorageTarget } from "../storage/local-backup-storage.target";
 
 jest.mock("../../common/db/scoped-db", () =>
   jest
@@ -143,7 +145,10 @@ const s3Target = (): OffsiteS3Target => ({
 });
 
 describe("BackupOffsiteDispatchService", () => {
+  let root: string;
   let folder: string;
+  let store: LocalBackupStorageTarget;
+  let location: BackupStoreLocation;
   let bytes: Buffer;
   let digest: string;
   let service: BackupOffsiteDispatchService;
@@ -200,6 +205,7 @@ describe("BackupOffsiteDispatchService", () => {
       { upload } as never,
       { send } as never,
       { raiseAdminAlert } as never,
+      store,
     );
   };
 
@@ -214,7 +220,7 @@ describe("BackupOffsiteDispatchService", () => {
     overrides: Partial<BackupOffsiteDispatchInput> = {},
   ): BackupOffsiteDispatchInput => ({
     userId: USER_ID,
-    folder,
+    location,
     filename: FILENAME,
     tier: "daily",
     digest,
@@ -228,8 +234,23 @@ describe("BackupOffsiteDispatchService", () => {
 
   const key = (): string => offsiteObjectKey(USER_ID, FILENAME, digest);
 
-  beforeEach(() => {
-    folder = mkdtempSync(join(tmpdir(), "monize-offsite-spec-"));
+  beforeEach(async () => {
+    root = mkdtempSync(join(tmpdir(), "monize-offsite-spec-"));
+    // The real `local` target over a real directory, not a fake: the property
+    // under test at "records a failure rather than reading a name this
+    // deployment never wrote" is a property of the store's own name matching,
+    // and a stub that returned bytes for whatever it was asked would prove
+    // nothing about it.
+    store = new LocalBackupStorageTarget({
+      get: (key: string) =>
+        key === "BACKUP_CONTAINER_DIR" || key === "BACKUP_ALLOWED_ROOTS"
+          ? root
+          : undefined,
+    } as never);
+    location = await store.resolveLocation(USER_ID, null, { create: true });
+    // The per-user namespace the target computed, which is where an artifact
+    // this deployment wrote would actually be.
+    folder = location.display;
     bytes = Buffer.from("encrypted-monize-envelope-bytes");
     digest = createHash("sha256").update(bytes).digest("hex");
     writeFileSync(join(folder, FILENAME), bytes);
@@ -237,7 +258,7 @@ describe("BackupOffsiteDispatchService", () => {
   });
 
   afterEach(() => {
-    rmSync(folder, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
     jest.clearAllMocks();
   });
 
@@ -602,7 +623,7 @@ describe("BackupOffsiteDispatchService", () => {
       tier: "daily" as const,
       digest,
       sizeBytes: bytes.length,
-      folder,
+      location,
       filename: FILENAME,
       origin: "automatic" as const,
       ...overrides,

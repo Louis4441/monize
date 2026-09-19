@@ -175,6 +175,7 @@
     "folderNotExistVolume": "フォルダーが存在しません：{{ safePath }}。パスがDockerボリュームとしてマウントされていることを確認してください。",
     "folderAccessErrorDetail": "フォルダーにアクセスできません：{{ safePath }} - {{ message }}",
     "folderNotWritable": "フォルダーへの書き込みができません：{{ safePath }}。コンテナの権限を確認してください。",
+    "folderNotSelectable": "このデプロイメントは自動バックアップをオブジェクトストレージに保存します。選択できるフォルダーはありません。保存場所はデプロイメントの設定で決まります。",
     "userNotFoundRestore": "ユーザーが見つかりません",
     "backupPasswordWrong": "入力したパスワードではこのバックアップを復号化できません。バックアップ作成時に設定したパスワードを使用してください。",
     "backupPasswordRequired": "このバックアップは暗号化されています。バックアップ作成時に使用したパスワードを入力してください。",

@@ -108,6 +108,8 @@ implied.
 | INV-BACKUP-003 | A complete local copy exists before any off-machine copy | enforced |
 | INV-BACKUP-004 | The application can add an off-machine copy and never delete or overwrite one | partial |
 | INV-BACKUP-005 | An off-machine copy is verified before it is recorded as done, and a claim nobody finishes is reclaimed | partial |
+| INV-BACKUP-006 | An artifact is published whole or not at all, on every storage target | enforced |
+| INV-BACKUP-007 | The automatic backup store and the off-machine destination are two places | enforced |
 | INV-PUSH-001 | A push subscription belongs to the authenticated caller, and no request touches another account's device | enforced |
 | INV-PUSH-002 | The VAPID private key never leaves the server, and is never stored unencrypted | enforced |
 | INV-PUSH-006 | A push channel is offered only while its key pair can actually be used | enforced |
@@ -3377,6 +3379,101 @@ Required tests      Unit against a local fake S3 endpoint:
                     evaluates). Owed: the lease's reclamation has no
                     two-connection test of its own yet.
 Status              partial
+```
+
+### INV-BACKUP-006 -- an artifact is published whole or not at all, on every target
+
+```text
+Statement           A reader of the store sees an artifact's complete bytes under
+                    its final name, or no artifact under that name. No target
+                    ever exposes a partially written artifact, and a failed
+                    publish never destroys the artifact already under that name.
+Source of truth     The object or file under the final name.
+Enforcement         One operation, named for the property: the storage seam
+                    (backup/storage/backup-storage.interface.ts) offers publish
+                    and no write, so a caller cannot ask for a non-atomic one.
+                    local: writeFileAtomic / copyFileAtomic (atomic-file.ts) --
+                    temp name, fsync, length check against the buffer, rename,
+                    directory fsync; rename(2) within a filesystem is atomic, and
+                    no code path opens the final name for writing, so there is
+                    nothing to truncate.
+                    s3: one PutObject with a known ContentLength and a declared
+                    ChecksumSHA256, which S3 applies to the key only on a
+                    complete, checksum-matching upload -- so the destination,
+                    not this process, is what verifies the bytes arrived intact.
+                    Promotion is a server-side CopyObject, likewise
+                    all-or-nothing at the destination key. Where an
+                    S3-compatible service ignores the checksum header we learn
+                    it from a rejected put, not from a silent acceptance.
+Concurrency scope   per (user, filename)
+Retry semantics     Safe and idempotent: republishing the same filename replaces
+                    it with the bytes the export just produced. Two runs for the
+                    same user and day cannot interleave -- the run is claimed
+                    (claimDueBackup) -- so last-writer-wins is never reached.
+                    Unlike the egress path (INV-BACKUP-004) there is no
+                    IfNoneMatch: replacing a day's own artifact is intended here.
+Crash semantics     local: a crash leaves a temp file the next run's
+                    sweepIncomplete removes, and retention never counts it.
+                    s3: a crash leaves no object; an interrupted upload is not
+                    applied to the key, and there is no intermediate state to
+                    sweep.
+Failure response    The run is recorded failed and alerted; nothing is published.
+                    A promotion or retention failure is a BACKUP_PARTIAL admin
+                    alert with the run still reflecting what the export found.
+Required tests      Unit, both targets: local-backup-storage.target.spec.ts and
+                    s3-backup-storage.target.spec.ts ("leaves the previous
+                    artifact complete when a publish fails"; the declared length
+                    and checksum; the absent IfNoneMatch). Integration against
+                    MinIO: test/integration/backup-store-s3.integration.spec.ts
+                    (a checksum that does not match the bytes is refused by the
+                    destination and leaves the key absent; an aborted publish
+                    leaves the previous artifact intact). The local half runs
+                    against a real mkdtemp, never a mocked fs, because what is
+                    claimed is what the directory looks like afterwards.
+Status              enforced
+```
+
+### INV-BACKUP-007 -- the store and the off-machine copy are two places
+
+```text
+Statement           A deployment's automatic backup store and any off-machine
+                    destination are distinct locations. The same bucket and key
+                    prefix cannot serve both.
+Source of truth     The two configurations: the store's bucket and prefix
+                    (BACKUP_STORE_S3_*) and the off-machine destination's
+                    (BACKUP_S3_* for the deployment default, or the user's own
+                    row).
+Enforcement         Separate variable prefixes so the two cannot collide by
+                    default, plus an equality refusal over what they resolve to.
+                    assertStoreAndOffsiteDiffer (backup/storage/backup-store-config.ts)
+                    compares endpoint, bucket and normalised prefix and refuses
+                    when one prefix contains the other -- a trailing-slash
+                    difference is not a difference, and backups/ and
+                    backups/store/ are not separate failure domains. Not a
+                    warning: the off-machine copy exists to survive the loss of
+                    the store, and one bucket holding both is a 3-2-1
+                    arrangement that is actually a 1.
+                    The prefix split is the load-bearing half. BACKUP_S3_* was
+                    already the off-machine destination's; a store reusing it
+                    would have put the primary artifact and its off-machine copy
+                    in one bucket by default and silently.
+Concurrency scope   deployment (and per user for a user-configured destination)
+Retry semantics     n/a
+Crash semantics     n/a
+Failure response    The store refuses the first operation that needs its
+                    configuration, naming both locations, so no artifact is
+                    written to a bucket that is also the egress target.
+Required tests      Unit: backup-store-config.spec.ts (the comparison, including
+                    a prefix that is a parent of the other either way round, a
+                    trailing-slash difference that is not a real difference, a
+                    sibling whose name merely begins the same way, the bucket
+                    root against any prefix, and the same bucket name on two
+                    endpoints); s3-backup-storage.target.spec.ts (a collided
+                    deployment refuses before any command is sent; a separated
+                    one publishes). Owed: the boot-time half -- a deployment
+                    configured both ways refusing to start rather than refusing
+                    at the first backup -- is task S2's third stage.
+Status              enforced
 ```
 
 ### INV-CRON-001 -- one logical effect per tick

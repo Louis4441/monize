@@ -376,6 +376,12 @@ backend:
   # -- Where automatic backups are written inside the container. Must match
   # BACKUP_CONTAINER_DIR if you override that through extraEnv; the mount for
   # backend.persistence.backups follows this value.
+  #
+  # Read only by the "local" backup store, which is the default. Set
+  # BACKUP_STORAGE_PROVIDER=s3 in extraEnv to keep the artifacts in a bucket
+  # instead, in which case this directory and the claim below are unused.
+  # Switching is forward-only: the previous recovery points stay where they
+  # were, so keep the old claim until the new store has a full retention window.
   backupContainerDir: /data/backups
 
   # -- Where locally stored attachment bytes are written inside the container.
@@ -615,9 +621,16 @@ cluster:
   attachmentSharedVolume: false
   # -- Assert that every replica mounts backend.backupContainerDir
   #
-  # Required by mode=multi unconditionally: automatic backups are switched on
-  # per user rather than by a chart value, and the hourly job writes to
+  # Only read when mode=multi with the "local" backup store, which is the
+  # default: automatic backups are switched on per user rather than by a chart
+  # value, so no setting says whether any exist, and the hourly job writes to
   # whichever replica runs it. Same ReadWriteMany requirement as above.
+  #
+  # The other way out is BACKUP_STORAGE_PROVIDER=s3 with the BACKUP_STORE_S3_*
+  # variables in backend.extraEnv, which puts the artifacts in a bucket every
+  # replica reaches by construction. Keep that bucket separate from the
+  # off-machine destination's BACKUP_S3_BUCKET: the backend refuses to start
+  # when the two are one location (INV-BACKUP-007).
   backupSharedVolume: false
 
 # -- Ingress configuration (traditional Kubernetes Ingress)

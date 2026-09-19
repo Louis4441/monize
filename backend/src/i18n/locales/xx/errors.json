@@ -185,6 +185,7 @@
     "folderNotExistVolume": "[XX-Folder does not exist: {{ safePath }}. Ensure the path is mapped as a Docker volume.-XX]",
     "folderAccessErrorDetail": "[XX-Cannot access folder: {{ safePath }} - {{ message }}-XX]",
     "folderNotWritable": "[XX-Folder is not writable: {{ safePath }}. Check container permissions.-XX]",
+    "folderNotSelectable": "[XX-This deployment stores automatic backups in object storage, which has no folder to choose. The location is set by the deployment's configuration.-XX]",
     "userNotFoundRestore": "[XX-User not found-XX]",
     "backupPasswordWrong": "[XX-The password you entered cannot decrypt this backup. Try the password that was set when the backup was created.-XX]",
     "backupPasswordRequired": "[XX-This backup is encrypted. Provide the password that was used when the backup was created.-XX]",

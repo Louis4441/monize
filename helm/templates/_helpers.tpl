@@ -131,6 +131,23 @@ matching the backend's own default.
 {{- end -}}
 
 {{/*
+The configured backup storage target, read out of backend.extraEnv the same way
+the attachment provider is, so NOTES.txt and the shared-volume warnings can tell
+a local store (which needs a volume every replica mounts) from an s3 one (which
+every replica reaches by construction). Defaults to "local", matching the
+backend's own default in every cluster mode.
+*/}}
+{{- define "monize.backupStore" -}}
+{{- $store := "local" -}}
+{{- range .Values.backend.extraEnv -}}
+{{- if eq .name "BACKUP_STORAGE_PROVIDER" -}}
+{{- $store = .value | default "local" -}}
+{{- end -}}
+{{- end -}}
+{{- $store | lower -}}
+{{- end -}}
+
+{{/*
 Whether a value means "true", tested exactly rather than for truthiness.
 
 A plain `if` on cluster.backupSharedVolume is true for the *string* "false",

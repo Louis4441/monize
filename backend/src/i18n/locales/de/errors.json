@@ -175,6 +175,7 @@
     "folderNotExistVolume": "Ordner existiert nicht: {{ safePath }}. Stellen Sie sicher, dass der Pfad als Docker-Volume eingebunden ist.",
     "folderAccessErrorDetail": "Kein Zugriff auf Ordner: {{ safePath }} - {{ message }}",
     "folderNotWritable": "Ordner ist nicht beschreibbar: {{ safePath }}. Überprüfen Sie die Container-Berechtigungen.",
+    "folderNotSelectable": "Diese Installation speichert automatische Backups im Objektspeicher, der keinen auswählbaren Ordner hat. Der Speicherort wird durch die Konfiguration der Installation festgelegt.",
     "userNotFoundRestore": "Benutzer nicht gefunden",
     "backupPasswordWrong": "Das eingegebene Passwort kann diese Sicherung nicht entschlüsseln. Verwenden Sie das Passwort, das beim Erstellen der Sicherung festgelegt wurde.",
     "backupPasswordRequired": "Diese Sicherung ist verschlüsselt. Geben Sie das Passwort an, das beim Erstellen der Sicherung verwendet wurde.",

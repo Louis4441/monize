@@ -175,6 +175,7 @@
     "folderNotExistVolume": "La cartella non esiste: {{ safePath }}. Assicurati che il percorso sia mappato come volume Docker.",
     "folderAccessErrorDetail": "Impossibile accedere alla cartella: {{ safePath }} - {{ message }}",
     "folderNotWritable": "La cartella non è scrivibile: {{ safePath }}. Controlla i permessi del container.",
+    "folderNotSelectable": "Questa installazione conserva i backup automatici in un archivio a oggetti, che non ha alcuna cartella da scegliere. La posizione è definita dalla configurazione dell'installazione.",
     "userNotFoundRestore": "Utente non trovato",
     "backupPasswordWrong": "La password inserita non può decifrare questo backup. Usa la password impostata al momento della creazione del backup.",
     "backupPasswordRequired": "Questo backup è cifrato. Fornisci la password usata al momento della creazione del backup.",

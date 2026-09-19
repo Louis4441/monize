@@ -175,6 +175,7 @@
     "folderNotExistVolume": "A pasta não existe: {{ safePath }}. Certifique-se de que o caminho está mapeado como um volume Docker.",
     "folderAccessErrorDetail": "Não é possível aceder à pasta: {{ safePath }} - {{ message }}",
     "folderNotWritable": "A pasta não tem permissão de escrita: {{ safePath }}. Verifique as permissões do contentor.",
+    "folderNotSelectable": "Esta instalação guarda as cópias de segurança automáticas em armazenamento de objetos, que não tem qualquer pasta para escolher. A localização é definida pela configuração da instalação.",
     "userNotFoundRestore": "Utilizador não encontrado",
     "backupPasswordWrong": "A palavra-passe introduzida não consegue desencriptar esta cópia de segurança. Utilize a palavra-passe que foi definida quando a cópia foi criada.",
     "backupPasswordRequired": "Esta cópia de segurança está encriptada. Forneça a palavra-passe que foi utilizada quando a cópia foi criada.",

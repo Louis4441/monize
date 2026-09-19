@@ -21,7 +21,6 @@ import {
   ApiResponse,
 } from "@nestjs/swagger";
 import { Response } from "express";
-import { createReadStream } from "fs";
 import { pipeline } from "stream/promises";
 import { BackupService } from "./backup.service";
 import { AutoBackupService } from "./auto-backup.service";
@@ -363,15 +362,19 @@ export class BackupController {
         ? "application/octet-stream"
         : "application/gzip",
     );
-    res.setHeader("Content-Length", String(artifact.size));
+    res.setHeader("Content-Length", String(artifact.sizeBytes));
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="${artifact.filename}"`,
     );
-    // `pipeline` rather than `.pipe`: it destroys the file handle when the
-    // client hangs up mid-download, which a bare pipe leaves open until the
-    // stream drains into a socket nobody is reading.
-    await pipeline(createReadStream(artifact.path), res);
+    // `pipeline` rather than `.pipe`: it destroys the source when the client
+    // hangs up mid-download, which a bare pipe leaves open until the stream
+    // drains into a socket nobody is reading. The store hands back a stream
+    // rather than a path so that the same route serves a container directory and
+    // an object store; a presigned-URL redirect would move an authenticated,
+    // demo-restricted, owner-scoped download onto a URL carrying its own
+    // authority that outlives the request.
+    await pipeline(artifact.stream, res);
   }
 
   @Get("encryption")

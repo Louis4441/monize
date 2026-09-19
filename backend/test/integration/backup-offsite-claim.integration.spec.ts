@@ -3,7 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { DataSource } from "typeorm";
 import { createHash } from "crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -18,6 +18,11 @@ import { BackupOffsiteRetryService } from "@/backup/offsite/backup-offsite-retry
 import { BackupOffsiteS3Uploader } from "@/backup/offsite/backup-offsite-s3.uploader";
 import { BackupOffsiteSettingsService } from "@/backup/offsite/backup-offsite-settings.service";
 import { OffsiteS3Target } from "@/backup/offsite/backup-offsite.types";
+import {
+  BACKUP_STORAGE_TARGET,
+  BackupStoreLocation,
+} from "@/backup/storage/backup-storage.interface";
+import { LocalBackupStorageTarget } from "@/backup/storage/local-backup-storage.target";
 import { SystemAlertService } from "@/system-alerts/system-alert.service";
 import { withUserContext } from "@/common/db/with-context";
 
@@ -53,7 +58,10 @@ describe("off-site upload claim (integration)", () => {
   let dataSource: DataSource;
   let dispatch: BackupOffsiteDispatchService;
   let userId: string;
+  let root: string;
   let folder: string;
+  let store: LocalBackupStorageTarget;
+  let location: BackupStoreLocation;
   let bytes: Buffer;
   let digest: string;
 
@@ -80,7 +88,7 @@ describe("off-site upload claim (integration)", () => {
     tier: "daily" as const,
     digest,
     sizeBytes: bytes.length,
-    folder,
+    location,
     filename: FILENAME,
     origin: "automatic" as const,
   });
@@ -101,6 +109,16 @@ describe("off-site upload claim (integration)", () => {
   };
 
   beforeAll(async () => {
+    root = mkdtempSync(join(tmpdir(), "monize-offsite-int-"));
+    // The real `local` target over a real directory: the artifact this suite
+    // races two claims over is read back through the store that would have
+    // written it, not through a stub that always answers with bytes.
+    store = new LocalBackupStorageTarget({
+      get: (key: string) =>
+        key === "BACKUP_CONTAINER_DIR" || key === "BACKUP_ALLOWED_ROOTS"
+          ? root
+          : undefined,
+    } as never);
     module = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({ isGlobal: true }),
@@ -141,22 +159,25 @@ describe("off-site upload claim (integration)", () => {
             raiseAdminAlert: async () => ({ created: 0, emailed: 0 }),
           },
         },
+        { provide: BACKUP_STORAGE_TARGET, useValue: store },
       ],
     }).compile();
 
     dataSource = module.get(DataSource);
     dispatch = module.get(BackupOffsiteDispatchService);
     userId = (await createTestUserDirect(dataSource)).id;
+    location = await store.resolveLocation(userId, null, { create: true });
+    folder = location.display;
   });
 
   afterAll(async () => {
     await module?.close();
-    rmSync(folder, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
   });
 
   beforeEach(async () => {
     await cleanTables(dataSource, ["backup_offsite_uploads"]);
-    folder = mkdtempSync(join(tmpdir(), "monize-offsite-int-"));
+    mkdirSync(folder, { recursive: true });
     bytes = Buffer.from("encrypted-monize-envelope-bytes");
     digest = createHash("sha256").update(bytes).digest("hex");
     writeFileSync(join(folder, FILENAME), bytes);
@@ -264,7 +285,7 @@ describe("off-site upload claim (integration)", () => {
         dataSource,
         { claimAndPerform } as unknown as BackupOffsiteDispatchService,
         {
-          resolveStoredBackupFolder: async () => folder,
+          resolveStoredBackupLocation: async () => location,
         } as unknown as AutoBackupService,
       );
     });

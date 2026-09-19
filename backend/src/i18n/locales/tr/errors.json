@@ -175,6 +175,7 @@
     "folderNotExistVolume": "Klasör mevcut değil: {{ safePath }}. Yolun Docker birimi olarak eşlendiğinden emin olun.",
     "folderAccessErrorDetail": "Klasöre erişilemiyor: {{ safePath }} - {{ message }}",
     "folderNotWritable": "Klasör yazılabilir değil: {{ safePath }}. Konteyner izinlerini kontrol edin.",
+    "folderNotSelectable": "Bu kurulum otomatik yedekleri nesne depolamada tutar; seçilecek bir klasör yoktur. Konum, kurulumun yapılandırmasıyla belirlenir.",
     "userNotFoundRestore": "Kullanıcı bulunamadı",
     "backupPasswordWrong": "Girdiğiniz şifre bu yedeği çözemiyor. Yedek oluşturulurken ayarlanan şifreyi deneyin.",
     "backupPasswordRequired": "Bu yedek şifrelenmiş. Oluşturulurken kullanılan şifreyi girin.",

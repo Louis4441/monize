@@ -175,6 +175,7 @@
     "folderNotExistVolume": "Folder tidak ada: {{ safePath }}. Pastikan jalur dipetakan sebagai volume Docker.",
     "folderAccessErrorDetail": "Tidak dapat mengakses folder: {{ safePath }} - {{ message }}",
     "folderNotWritable": "Folder tidak dapat ditulis: {{ safePath }}. Periksa izin kontainer.",
+    "folderNotSelectable": "Penerapan ini menyimpan cadangan otomatis di penyimpanan objek, yang tidak memiliki folder untuk dipilih. Lokasinya ditentukan oleh konfigurasi penerapan.",
     "userNotFoundRestore": "Pengguna tidak ditemukan",
     "backupPasswordWrong": "Kata sandi yang Anda masukkan tidak dapat mendekripsi cadangan ini. Coba kata sandi yang digunakan saat cadangan dibuat.",
     "backupPasswordRequired": "Cadangan ini terenkripsi. Masukkan kata sandi yang digunakan saat cadangan dibuat.",
