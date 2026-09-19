@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
-import { UserManagementTable } from './UserManagementTable';
+import { AdminStorageState, UserManagementTable } from './UserManagementTable';
+import { AdminUserStorage } from '@/lib/admin';
 
 vi.mock('@/hooks/useDateFormat', () => ({
   useDateFormat: () => ({ dateFormat: 'browser', datePattern: 'YYYY-MM-DD', formatDate: (d: Date) => d.toISOString().slice(0, 10) }),
@@ -30,8 +31,25 @@ describe('UserManagementTable', () => {
     },
   ] as any[];
 
+  /** A loaded reading, with each user's row overridable per test. */
+  const readingOf = (...rows: AdminUserStorage[]): AdminStorageState => ({
+    status: 'ready',
+    byUser: new Map(rows.map((row) => [row.userId, row])),
+  });
+
+  const storedFor = (
+    userId: string,
+    overrides: Partial<AdminUserStorage> = {},
+  ): AdminUserStorage => ({
+    userId,
+    backups: { enabled: true, artifacts: 2, bytes: 3_145_728 },
+    attachments: { files: 4, bytes: 1_048_576 },
+    ...overrides,
+  });
+
   const defaultProps = {
     users,
+    storage: readingOf(storedFor('u1'), storedFor('u2'), storedFor('u3')),
     currentUserId: 'u1',
     onChangeRole,
     onToggleStatus,
@@ -176,6 +194,132 @@ describe('UserManagementTable', () => {
     render(<UserManagementTable {...defaultProps} users={usersNoInfo} currentUserId="other" />);
     expect(screen.getByText('Unknown')).toBeInTheDocument();
     expect(screen.getByText('No email')).toBeInTheDocument();
+  });
+
+  describe('storage columns', () => {
+    const soloUser = [users[1]] as any[];
+
+    it('shows a size and what it covers for each figure', () => {
+      render(
+        <UserManagementTable
+          {...defaultProps}
+          users={soloUser}
+          storage={readingOf(storedFor('u2'))}
+        />,
+      );
+
+      expect(screen.getByText('3.0 MB')).toBeInTheDocument();
+      expect(screen.getByText('2 backups')).toBeInTheDocument();
+      expect(screen.getByText('1.0 MB')).toBeInTheDocument();
+      expect(screen.getByText('4 files')).toBeInTheDocument();
+    });
+
+    it('renders a store it could not read as unknown, never as zero', () => {
+      render(
+        <UserManagementTable
+          {...defaultProps}
+          users={soloUser}
+          storage={readingOf(
+            storedFor('u2', {
+              backups: { enabled: true, artifacts: null, bytes: null },
+            }),
+          )}
+        />,
+      );
+
+      const unknown = screen.getByText('Unknown');
+      expect(unknown).toBeInTheDocument();
+      // The reason travels with the refusal: a bare "Unknown" is a dead end.
+      expect(unknown).toHaveAttribute(
+        'title',
+        expect.stringContaining('backup store could not be read'),
+      );
+      expect(screen.queryByText('0 byte')).not.toBeInTheDocument();
+    });
+
+    it('distinguishes a user with no backups from one whose store is unreadable', () => {
+      render(
+        <UserManagementTable
+          {...defaultProps}
+          users={soloUser}
+          storage={readingOf(
+            storedFor('u2', {
+              backups: { enabled: false, artifacts: 0, bytes: 0 },
+              attachments: { files: 0, bytes: 0 },
+            }),
+          )}
+        />,
+      );
+
+      expect(screen.getByText('Off')).toBeInTheDocument();
+      expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
+      // An account that stores no attachments genuinely stores zero.
+      expect(screen.getByText('0 byte')).toBeInTheDocument();
+      expect(screen.getByText('No files')).toBeInTheDocument();
+    });
+
+    it('still reports the bytes of a user whose schedule is switched off', () => {
+      render(
+        <UserManagementTable
+          {...defaultProps}
+          users={soloUser}
+          storage={readingOf(
+            storedFor('u2', {
+              backups: { enabled: false, artifacts: 2, bytes: 3_145_728 },
+            }),
+          )}
+        />,
+      );
+
+      expect(screen.getByText('3.0 MB')).toBeInTheDocument();
+      expect(screen.getByText('Schedule off')).toBeInTheDocument();
+    });
+
+    it('says the figures are still loading rather than showing a blank cell', () => {
+      render(
+        <UserManagementTable
+          {...defaultProps}
+          users={soloUser}
+          storage={{ status: 'loading' }}
+        />,
+      );
+
+      expect(screen.getAllByText('Loading\u2026')).toHaveLength(2);
+    });
+
+    it('says the reading failed, and what to do, when the request did', () => {
+      render(
+        <UserManagementTable
+          {...defaultProps}
+          users={soloUser}
+          storage={{ status: 'error' }}
+        />,
+      );
+
+      const cells = screen.getAllByText('Unavailable');
+      expect(cells).toHaveLength(2);
+      expect(cells[0]).toHaveAttribute(
+        'title',
+        expect.stringContaining('Reload the page'),
+      );
+    });
+
+    it('marks a user the reading did not cover instead of billing them zero', () => {
+      render(
+        <UserManagementTable
+          {...defaultProps}
+          users={soloUser}
+          storage={readingOf()}
+        />,
+      );
+
+      const unknown = screen.getAllByText('Not reported');
+      expect(unknown).toHaveLength(2);
+      expect(unknown[0]).toHaveAttribute(
+        'title',
+        expect.stringContaining('last storage reading'),
+      );
+    });
   });
 
   it('sorts users by creation date ascending', () => {

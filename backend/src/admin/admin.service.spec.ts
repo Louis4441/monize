@@ -16,6 +16,8 @@ import { PersonalAccessToken } from "../auth/entities/personal-access-token.enti
 import { OAuthProviderService } from "../oauth/oauth-provider.service";
 import { UsersService } from "../users/users.service";
 import { EmailService } from "../notifications/email.service";
+import { AttachmentsService } from "../attachments/attachments.service";
+import { AutoBackupService } from "../backup/auto-backup.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
 jest.mock("../common/db/scoped-db", () =>
@@ -32,6 +34,8 @@ describe("AdminService", () => {
   let usersService: Record<string, jest.Mock>;
   let emailService: Record<string, jest.Mock>;
   let configService: Record<string, jest.Mock>;
+  let attachmentsService: Record<string, jest.Mock>;
+  let autoBackupService: Record<string, jest.Mock>;
   let transactionManager: Record<string, jest.Mock>;
   let dataSource: Record<string, jest.Mock>;
 
@@ -124,6 +128,16 @@ describe("AdminService", () => {
       get: jest.fn().mockReturnValue("http://localhost:3000"),
     };
 
+    attachmentsService = {
+      summarizeUsageByUser: jest.fn().mockResolvedValue(new Map()),
+    };
+
+    autoBackupService = {
+      summarizeStoredBackups: jest
+        .fn()
+        .mockResolvedValue({ enabled: false, artifacts: 0, bytes: 0 }),
+    };
+
     transactionManager = {
       findOne: jest.fn(),
       create: jest.fn().mockImplementation((_entity, data) => ({ ...data })),
@@ -180,10 +194,111 @@ describe("AdminService", () => {
               opts?.defaultValue ?? key,
           },
         },
+        {
+          provide: AttachmentsService,
+          useValue: attachmentsService,
+        },
+        {
+          provide: AutoBackupService,
+          useValue: autoBackupService,
+        },
       ],
     }).compile();
 
     service = module.get<AdminService>(AdminService);
+  });
+
+  describe("getUserStorageUsage", () => {
+    it("pairs each managed user with their backup and attachment usage", async () => {
+      usersRepository.find.mockResolvedValue([
+        { id: "admin-1" },
+        { id: "user-2" },
+      ]);
+      attachmentsService.summarizeUsageByUser.mockResolvedValue(
+        new Map([
+          ["admin-1", { files: 3, bytes: 2048 }],
+          ["user-2", { files: 1, bytes: 512 }],
+        ]),
+      );
+      autoBackupService.summarizeStoredBackups.mockImplementation(
+        (userId: string) =>
+          Promise.resolve(
+            userId === "admin-1"
+              ? { enabled: true, artifacts: 7, bytes: 70_000 }
+              : { enabled: false, artifacts: 1, bytes: 900 },
+          ),
+      );
+
+      const result = await service.getUserStorageUsage();
+
+      expect(result).toEqual([
+        {
+          userId: "admin-1",
+          backups: { enabled: true, artifacts: 7, bytes: 70_000 },
+          attachments: { files: 3, bytes: 2048 },
+        },
+        {
+          userId: "user-2",
+          backups: { enabled: false, artifacts: 1, bytes: 900 },
+          attachments: { files: 1, bytes: 512 },
+        },
+      ]);
+    });
+
+    it("enumerates the same users the admin list does, so a delegate-only row has no storage line", async () => {
+      usersRepository.find.mockResolvedValue([]);
+
+      await service.getUserStorageUsage();
+
+      expect(usersRepository.find).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { isDelegateOnly: false } }),
+      );
+    });
+
+    it("reports zero -- not unknown -- for a user with no attachments", async () => {
+      usersRepository.find.mockResolvedValue([{ id: "user-2" }]);
+      attachmentsService.summarizeUsageByUser.mockResolvedValue(new Map());
+
+      const [row] = await service.getUserStorageUsage();
+
+      expect(row.attachments).toEqual({ files: 0, bytes: 0 });
+    });
+
+    it("keeps an unreadable backup store unknown rather than turning it into zero", async () => {
+      usersRepository.find.mockResolvedValue([{ id: "user-2" }]);
+      autoBackupService.summarizeStoredBackups.mockResolvedValue({
+        enabled: true,
+        artifacts: null,
+        bytes: null,
+      });
+
+      const [row] = await service.getUserStorageUsage();
+
+      expect(row.backups).toEqual({
+        enabled: true,
+        artifacts: null,
+        bytes: null,
+      });
+    });
+
+    it("asks the store once per user rather than once for the deployment", async () => {
+      usersRepository.find.mockResolvedValue([
+        { id: "admin-1" },
+        { id: "user-2" },
+      ]);
+
+      await service.getUserStorageUsage();
+
+      expect(autoBackupService.summarizeStoredBackups).toHaveBeenCalledTimes(2);
+      expect(autoBackupService.summarizeStoredBackups).toHaveBeenCalledWith(
+        "admin-1",
+      );
+      expect(autoBackupService.summarizeStoredBackups).toHaveBeenCalledWith(
+        "user-2",
+      );
+      // One grouped aggregate covers every user's attachments.
+      expect(attachmentsService.summarizeUsageByUser).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("findAllUsers", () => {

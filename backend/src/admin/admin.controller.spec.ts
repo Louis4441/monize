@@ -15,6 +15,7 @@ describe("AdminController", () => {
       updateUserStatus: jest.fn(),
       deleteUser: jest.fn(),
       resetUserPassword: jest.fn(),
+      getUserStorageUsage: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -38,6 +39,17 @@ describe("AdminController", () => {
 
       expect(result).toBe("users");
       expect(mockAdminService.findAllUsers).toHaveBeenCalledWith();
+    });
+  });
+
+  describe("storageUsage()", () => {
+    it("delegates to adminService.getUserStorageUsage with no arguments", () => {
+      mockAdminService.getUserStorageUsage!.mockReturnValue("usage");
+
+      const result = controller.storageUsage();
+
+      expect(result).toBe("usage");
+      expect(mockAdminService.getUserStorageUsage).toHaveBeenCalledWith();
     });
   });
 
