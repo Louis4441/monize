@@ -44,6 +44,16 @@ spec:
       {{- include "monize.frontend.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      {{- /*
+        The pods are rolled when the ConfigMap changes. Kubernetes does not do
+        this for envFrom: an edited ConfigMap leaves the running containers with
+        the environment they started with, so a `helm upgrade` that changes only
+        a value in it would report success and change nothing until something
+        else happened to restart the pods. The hash makes the pod template
+        differ, which is the only thing a Deployment rolls on.
+      */}}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-frontend.yaml") . | sha256sum }}
       labels:
         {{- include "monize.frontend.labels" . | nindent 8 }}
         {{- with .Values.frontend.extraLabels }}
@@ -55,7 +65,17 @@ spec:
         Without this, the scheduler is free to put every replica on one node,
         which makes the replica count look like availability while a single
         node drain still takes the whole service down.
+
+        The selector is checked against this pod template's own labels, because
+        a constraint that selects nothing is satisfied by every placement and
+        reports no error at any layer.
       */}}
+      {{- include "monize.assertSpreadSelectors" (dict
+            "constraints" .
+            "podLabels" (merge
+              (deepCopy ($.Values.frontend.extraLabels | default dict))
+              (include "monize.frontend.labels" $ | fromYaml))
+            "path" "frontend") }}
       topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}
       {{- end }}

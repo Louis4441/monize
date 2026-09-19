@@ -435,9 +435,42 @@ Two things the chart cannot verify, and the backend refuses to boot without:
    is a deployment that boots and then loses backups, which is why `NOTES.txt`
    prints the mismatch at install time.
 
-A worked `multi` configuration, including the `ReadWriteMany` claims that make
-the assertions true, is `helm/ci/multi-values.yaml` -- rendered by CI on every
-push so none of these templates can silently stop working.
+`helm/ci/multi-values.yaml` turns on every template the mode reaches --
+Deployments above one replica, both budgets, the spread constraints, the
+backend HPA, `CLUSTER_MODE` in the ConfigMap, both storage assertions -- and CI
+renders it on every push so none of them can silently stop working. Read it for
+the shape of each key, not as a recommendation: a real deployment picks among
+these rather than enabling all of them, and the file says so at the top.
+
+Three things the chart refuses to render, because Kubernetes accepts all three
+and none of them reports an error where it goes wrong:
+
+- more than one backend replica (or an autoscaler that could produce one) at
+  `cluster.mode: single`, where the second replica enforces every rate limit a
+  second time and hears none of the first one's wake-ups;
+- a `topologySpreadConstraints` entry whose `labelSelector` matches no pod --
+  which is not a weaker constraint but no constraint at all, satisfied by every
+  placement including all replicas on one node. Select `app: monize-backend` or
+  `app: monize-frontend`, the labels the pods actually carry;
+- a `podDisruptionBudget` that permits no eviction (`minAvailable` equal to the
+  replica count, or `maxUnavailable: 0`), which turns a brief interruption into
+  a node drain that blocks until somebody deletes the budget by hand.
+
+Two more things worth knowing before an upgrade:
+
+- **A `ReadWriteOnce` claim changes the rollout to `Recreate`.** Surging means
+  two pods at once and such a volume attaches to one node, so the new pod would
+  sit `Pending` on a Multi-Attach error while `maxUnavailable: 0` forbids
+  removing the old one. That is a stuck rollout ending in a manual pod delete;
+  `Recreate` takes the same seconds of downtime at the moment you chose. Set
+  `accessMode: ReadWriteMany` on every enabled `backend.persistence` store to
+  keep the surging rollout -- including when you mount your own claim with
+  `existingClaim`, since `accessMode` is how you tell the chart what that claim
+  is.
+- **Changing only a ConfigMap value still rolls the pods.** Both pod templates
+  carry a `checksum/config` annotation over their ConfigMap, because `envFrom`
+  is read once at container start: without it a `helm upgrade --set
+  cluster.mode=multi` would report success and change nothing.
 
 Raising `backend.replicas` while 2025-era MCP clients connect also needs
 `mcp.stickySessions`; see "MCP sessions and more than one backend replica"
@@ -459,9 +492,28 @@ kubectl delete statefulset monize-backend monize-frontend \
 ```
 
 `--cascade=orphan` leaves the running pods alone, so the service keeps
-answering until the new Deployment adopts them. The PersistentVolumeClaims are
-untouched by this: they are ordinary claims the chart creates, not
-`volumeClaimTemplates`, and they carry `helm.sh/resource-policy: keep`.
+answering while the upgrade runs. **They are never adopted.** A ReplicaSet
+adopts only pods matching its full selector, which includes the
+`pod-template-hash` label it generates; a StatefulSet's pods do not carry one
+and never will. So the orphans keep serving, keep their old image, and are
+counted by nothing -- the Deployment brings up its own replicas beside them,
+and `kubectl get pods` shows both generations.
+
+Delete the orphans by name once the new pods are `Ready`:
+
+```bash
+kubectl get pods --namespace monize
+kubectl delete pod monize-backend-0 monize-frontend-0 --namespace monize
+```
+
+The ordinal names are the giveaway: a Deployment's pods are
+`monize-backend-<replicaset>-<random>`, so anything still named
+`monize-backend-<n>` is an orphan. Leaving one running is not harmless at
+`cluster.mode: single` -- it is the second replica the mode is not built for.
+
+The PersistentVolumeClaims are untouched by any of this: they are ordinary
+claims the chart creates, not `volumeClaimTemplates`, and they carry
+`helm.sh/resource-policy: keep`.
 
 ### Row-Level Security (RLS)
 

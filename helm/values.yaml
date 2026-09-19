@@ -43,8 +43,16 @@ backend:
     # -- Create a PodDisruptionBudget
     enabled: false
     # -- Minimum pods that must stay available (ignored when maxUnavailable is set)
+    #
+    # Must be below the replica count (below autoscaling.minReplicas when the
+    # autoscaler owns it). A budget equal to it admits no eviction at all, so a
+    # node drain or cluster upgrade blocks indefinitely rather than interrupting
+    # the service briefly; the chart refuses to render one.
     minAvailable: 1
     # -- Maximum pods that may be unavailable; takes precedence over minAvailable
+    #
+    # Read exactly, so 0 is not mistaken for unset -- and then refused for the
+    # same reason as minAvailable above: it permits no eviction either.
     maxUnavailable: ""
 
   # -- Scheduler spread, so replicas do not all land on one node
@@ -52,19 +60,36 @@ backend:
   # Empty by default: it is only meaningful above one replica, and a constraint
   # a single-node cluster cannot satisfy is a pod that will not schedule.
   # DoNotSchedule is the strict form; use ScheduleAnyway where capacity is tight.
+  #
+  # The labelSelector must match the labels these pods actually carry --
+  # `app: monize-backend`, which is also the Deployment's own selector. A selector
+  # that matches nothing is not a weaker constraint but no constraint at all:
+  # it is satisfied by every placement, including all replicas on one node, and
+  # neither Kubernetes nor `helm template` reports anything. The chart refuses
+  # to render a matchLabels entry this pod template does not carry.
   topologySpreadConstraints: []
   #   - maxSkew: 1
   #     topologyKey: kubernetes.io/hostname
   #     whenUnsatisfiable: ScheduleAnyway
   #     labelSelector:
   #       matchLabels:
-  #         app.kubernetes.io/name: monize
-  #         app.kubernetes.io/component: backend
+  #         app: monize-backend
 
   # -- Horizontal pod autoscaling (CPU only)
   #
   # When enabled the Deployment omits its own replica count, so the chart and
   # the autoscaler do not fight on every upgrade. Needs metrics-server.
+  #
+  # targetCPUUtilizationPercentage is a percentage of the CPU *request* below,
+  # not of a core and not of the limit. With no request set the ratio is
+  # undefined, the HPA reports <unknown>/75% and never scales -- so a chart that
+  # looks autoscaled sits at minReplicas through every load it was installed to
+  # survive. Raising or lowering resources.requests.cpu silently re-tunes every
+  # threshold here; the two are one setting in two places. The request above is
+  # deliberately small so the pod schedules anywhere, which makes 75% of it a
+  # very low bar -- anything past idle scales out to maxReplicas and stays
+  # there. Enabling autoscaling means sizing resources.requests.cpu to what the
+  # process actually uses first.
   autoscaling:
     # -- Create a HorizontalPodAutoscaler
     enabled: false
@@ -399,8 +424,16 @@ frontend:
     # -- Create a PodDisruptionBudget
     enabled: false
     # -- Minimum pods that must stay available (ignored when maxUnavailable is set)
+    #
+    # Must be below the replica count (below autoscaling.minReplicas when the
+    # autoscaler owns it). A budget equal to it admits no eviction at all, so a
+    # node drain or cluster upgrade blocks indefinitely rather than interrupting
+    # the service briefly; the chart refuses to render one.
     minAvailable: 1
     # -- Maximum pods that may be unavailable; takes precedence over minAvailable
+    #
+    # Read exactly, so 0 is not mistaken for unset -- and then refused for the
+    # same reason as minAvailable above: it permits no eviction either.
     maxUnavailable: ""
 
   # -- Scheduler spread, so replicas do not all land on one node
@@ -408,19 +441,36 @@ frontend:
   # Empty by default: it is only meaningful above one replica, and a constraint
   # a single-node cluster cannot satisfy is a pod that will not schedule.
   # DoNotSchedule is the strict form; use ScheduleAnyway where capacity is tight.
+  #
+  # The labelSelector must match the labels these pods actually carry --
+  # `app: monize-frontend`, which is also the Deployment's own selector. A selector
+  # that matches nothing is not a weaker constraint but no constraint at all:
+  # it is satisfied by every placement, including all replicas on one node, and
+  # neither Kubernetes nor `helm template` reports anything. The chart refuses
+  # to render a matchLabels entry this pod template does not carry.
   topologySpreadConstraints: []
   #   - maxSkew: 1
   #     topologyKey: kubernetes.io/hostname
   #     whenUnsatisfiable: ScheduleAnyway
   #     labelSelector:
   #       matchLabels:
-  #         app.kubernetes.io/name: monize
-  #         app.kubernetes.io/component: frontend
+  #         app: monize-frontend
 
   # -- Horizontal pod autoscaling (CPU only)
   #
   # When enabled the Deployment omits its own replica count, so the chart and
   # the autoscaler do not fight on every upgrade. Needs metrics-server.
+  #
+  # targetCPUUtilizationPercentage is a percentage of the CPU *request* below,
+  # not of a core and not of the limit. With no request set the ratio is
+  # undefined, the HPA reports <unknown>/75% and never scales -- so a chart that
+  # looks autoscaled sits at minReplicas through every load it was installed to
+  # survive. Raising or lowering resources.requests.cpu silently re-tunes every
+  # threshold here; the two are one setting in two places. The request above is
+  # deliberately small so the pod schedules anywhere, which makes 75% of it a
+  # very low bar -- anything past idle scales out to maxReplicas and stays
+  # there. Enabling autoscaling means sizing resources.requests.cpu to what the
+  # process actually uses first.
   autoscaling:
     # -- Create a HorizontalPodAutoscaler
     enabled: false

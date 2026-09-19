@@ -19,13 +19,15 @@ backend:
     enabled: true
     minAvailable: 1
   topologySpreadConstraints:
+    # `app: monize-backend` is the label the pod template carries and the
+    # Deployment selects on. A selector naming anything else renders and
+    # schedules cleanly while constraining nothing, so the chart refuses one.
     - maxSkew: 1
       topologyKey: kubernetes.io/hostname
       whenUnsatisfiable: ScheduleAnyway
       labelSelector:
         matchLabels:
-          app.kubernetes.io/name: monize
-          app.kubernetes.io/component: backend
+          app: monize-backend
   autoscaling:
     enabled: true
     minReplicas: 2

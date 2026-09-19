@@ -22,7 +22,7 @@ Access via Ingress:
 
 Public URL: {{ include "monize.publicAppUrl" . }}
 
-{{- if eq .Values.cluster.mode "multi" }}
+{{- if eq (include "monize.clusterMulti" .) "true" }}
 
 CLUSTER_MODE=multi: two things this chart cannot check for you.
 
@@ -52,8 +52,10 @@ CLUSTER_MODE=multi: two things this chart cannot check for you.
      files.
 {{- end }}
 {{- end }}
-{{- if not .Values.cluster.backupSharedVolume }}
-     cluster.backupSharedVolume is false, and multi refuses to boot without it.
+{{- if ne (include "monize.isTrue" .Values.cluster.backupSharedVolume) "true" }}
+     cluster.backupSharedVolume is not true, and multi refuses to boot without
+     it. Note that the ConfigMap tests it for exactly "true", so a quoted
+     "false" is false here and there alike.
 {{- end }}
 {{- end }}
 
