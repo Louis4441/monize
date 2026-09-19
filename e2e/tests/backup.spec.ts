@@ -104,10 +104,17 @@ test.describe('Backup & restore', () => {
       adminPage.getByRole('heading', { name: 'Automatic Backup' }),
     ).toBeVisible();
 
+    // The policy governs every account, and the page says which store it
+    // writes to -- on the E2E stack, the `local` container directory.
+    await expect(
+      adminPage.getByRole('heading', { name: 'Backup Storage' }),
+    ).toBeVisible();
+    await expect(adminPage.getByText('Local folder')).toBeVisible();
+
     // The automatic-backup flow lives here now, so its controls do too.
     const folder = adminPage.getByLabel('Backup Folder');
     const validate = adminPage.getByRole('button', { name: 'Validate' });
-    const save = adminPage.getByRole('button', { name: 'Save Settings' });
+    const save = adminPage.getByRole('button', { name: 'Save Policy' });
     await expect(folder).toBeVisible();
     await expect(adminPage.getByRole('switch')).toBeVisible();
     await expect(
@@ -128,12 +135,12 @@ test.describe('Backup & restore', () => {
     await expect(validate).toBeEnabled();
 
     // Exercise Save. A disabled schedule with a folder set does not need
-    // writable storage, so the PATCH round-trips and the server then reports a
-    // folder is configured -- which is exactly what makes Run Backup Now appear.
+    // writable storage, so the PATCH round-trips. The run button is offered
+    // regardless of whether a folder is stored -- an object store has none.
     await expect(save).toBeEnabled();
     await save.click();
     await expect(
-      adminPage.getByRole('button', { name: 'Run Backup Now' }),
+      adminPage.getByRole('button', { name: 'Back Up Every Account Now' }),
     ).toBeVisible();
   });
 
@@ -159,7 +166,7 @@ test.describe('Backup & restore', () => {
       adminPage.getByRole('button', { name: 'Browse...' }),
     ).toBeDisabled();
     await expect(
-      adminPage.getByRole('button', { name: 'Save Settings' }),
+      adminPage.getByRole('button', { name: 'Save Policy' }),
     ).toBeDisabled();
   });
 });

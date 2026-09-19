@@ -201,21 +201,63 @@ export interface AutoBackupSettings {
   lastBackupStatus: 'success' | 'partial' | 'failed' | null;
   lastBackupError: string | null;
   nextBackupAt: string | null;
+  /**
+   * How many active accounts this deployment's policy governs.
+   *
+   * Server-computed and read-only, present only on the admin policy surface.
+   * The one thing an operator cannot tell from the schedule alone is whether
+   * it reaches anybody.
+   */
+  managedUserCount?: number;
   createdAt: string;
   updatedAt: string;
 }
 
 /**
- * Whether the deployment has somewhere to write automatic backups.
+ * Whether the deployment has somewhere to write automatic backups, and where.
  *
  * This is a deployment capability, not a field from the acting-context user
  * profile or the user's settings row.
  */
 export interface AutoBackupCapability {
   available: boolean;
+  /** The store in display form: a directory, or a bucket and key prefix. */
   folderPath: string;
+  /**
+   * False when the bound store has no location to choose -- an object store's
+   * bucket and prefix are the deployment's. The folder picker is hidden on it
+   * rather than offering a control whose endpoints refuse.
+   */
+  locationSelectable: boolean;
+  /**
+   * Which store is bound: `local` for a container directory, `s3` for an
+   * S3-compatible bucket. Named rather than inferred from
+   * `locationSelectable`, which answers "may I choose a location" and not
+   * "where do my backups live".
+   */
+  storageProvider: string;
+  /** How many artifacts the current store already holds for the caller. */
+  artifactCount?: number;
   /** Operator-facing detail when the capability is unavailable. */
   reason?: string;
+}
+
+/**
+ * What one "back up every account now" run did.
+ *
+ * Counts rather than a filename: the run covers every account on the
+ * deployment, and `filename` names only the artifact written for the account
+ * that pressed the button -- absent when that account's own backup was skipped
+ * or failed.
+ */
+export interface AutoBackupRunResult {
+  message: string;
+  usersRequested: number;
+  usersBackedUp: number;
+  usersSkipped: number;
+  usersFailed: number;
+  usersPartial: number;
+  filename?: string;
 }
 
 export interface UpdateAutoBackupSettingsData {

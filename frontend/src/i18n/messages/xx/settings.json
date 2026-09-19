@@ -594,15 +594,15 @@
   },
   "autoBackup": {
     "heading": "[XX-Automatic Backup-XX]",
-    "description": "[XX-Automatically back up your data to a folder on a schedule. Since Monize runs in Docker, you must map a host folder into the container as a volume (e.g., -v /host/backups:/data/backups).-XX]",
-    "adminManagedNote": "[XX-Only administrators can change these settings, and they currently govern the administrator's own automatic backups. Every other user is backed up automatically on fixed deployment defaults, into a folder of their own.-XX]",
+    "description": "[XX-One schedule for the whole deployment: the server backs up every account's data to the storage below. Since Monize runs in Docker, a local folder must be mapped into the container as a volume (e.g., -v /host/backups:/data/backups).-XX]",
+    "adminManagedNote": "[XX-Only administrators can change this policy, and it governs every account on this deployment, each into a folder of their own.-XX]",
     "demoDisabledNote": "[XX-These controls are read-only in demo mode.-XX]",
     "loadingText": "[XX-Loading...-XX]",
     "enableLabel": "[XX-Enable automatic backups-XX]",
     "backupFolderLabel": "[XX-Backup Folder-XX]",
     "backupFolderPlaceholder": "[XX-/data/backups-XX]",
-    "perUserFolderHelp": "[XX-Each user's backups go in their own folder inside this one, named for their user ID.-XX]",
-    "perUserFolderHelpWithPath": "[XX-Each user's backups go in their own folder inside this one, named for their user ID. Yours: {path}-XX]",
+    "perUserFolderHelp": "[XX-Each account's backups go in their own folder inside this one, named for their account ID.-XX]",
+    "perUserFolderHelpWithPath": "[XX-Each account's backups go in their own folder inside this one, named for their account ID. Example: {path}-XX]",
     "browseButton": "[XX-Browse...-XX]",
     "validateButton": "[XX-Validate-XX]",
     "validatingButton": "[XX-Validating...-XX]",
@@ -624,26 +624,27 @@
       "monthlyHelp": "[XX-One per month retained-XX]"
     },
     "status": {
-      "heading": "[XX-Status-XX]",
-      "lastBackup": "[XX-Last backup-XX]",
-      "nextBackup": "[XX-Next backup-XX]",
+      "heading": "[XX-Deployment Status-XX]",
+      "lastBackup": "[XX-Most recent backup-XX]",
+      "nextBackup": "[XX-Next scheduled backup-XX]",
       "error": "[XX-Error-XX]",
       "success": "[XX-Success-XX]",
       "partial": "[XX-Partial-XX]",
       "failed": "[XX-Failed-XX]"
     },
-    "saveButton": "[XX-Save Settings-XX]",
+    "saveButton": "[XX-Save Policy-XX]",
     "savingButton": "[XX-Saving...-XX]",
-    "runNowButton": "[XX-Run Backup Now-XX]",
-    "runningButton": "[XX-Running Backup...-XX]",
+    "runNowButton": "[XX-Back Up Every Account Now-XX]",
+    "runningButton": "[XX-Backing Up...-XX]",
     "toasts": {
-      "saved": "[XX-Auto-backup settings saved-XX]",
-      "backupCreated": "[XX-Backup created: {filename}-XX]",
+      "saved": "[XX-Backup policy saved and applied to every account-XX]",
       "folderValid": "[XX-Folder is valid and writable-XX]",
       "loadFailed": "[XX-Failed to load auto-backup settings-XX]",
       "saveFailed": "[XX-Failed to save settings-XX]",
       "runFailed": "[XX-Failed to run backup-XX]",
-      "browseFailed": "[XX-Failed to browse folders-XX]"
+      "browseFailed": "[XX-Failed to browse folders-XX]",
+      "backupRunFinished": "[XX-Backed up {backedUp} of {requested} {requested, plural, one {account} other {accounts}}-XX]",
+      "backupRunIncomplete": "[XX-Backed up {backedUp} of {requested}: {partial} partial, {failed} failed. Check the status below.-XX]"
     },
     "folderErrors": {
       "required": "[XX-Folder path is required-XX]",
@@ -658,9 +659,22 @@
     },
     "noStorage": {
       "title": "[XX-This deployment has no backup storage-XX]",
-      "body": "[XX-Automatic backups would be written to {folderPath}, which this deployment cannot write to. An administrator needs to mount storage there before a schedule can run.-XX]"
+      "body": "[XX-Automatic backups would be written to {folderPath}, which this deployment cannot write to. An administrator needs to make that storage available before a schedule can run.-XX]"
     },
-    "never": "[XX-Never-XX]"
+    "never": "[XX-Never-XX]",
+    "coverage": {
+      "accounts": "[XX-Covers {count} active {count, plural, one {account} other {accounts}} on this deployment.-XX]",
+      "unknown": "[XX-The number of accounts this policy covers is not available.-XX]"
+    },
+    "storage": {
+      "heading": "[XX-Backup Storage-XX]",
+      "providerLocal": "[XX-Local folder-XX]",
+      "providerS3": "[XX-S3-compatible object storage-XX]",
+      "providerUnknown": "[XX-Storage-XX]",
+      "localHelp": "[XX-Set by BACKUP_STORAGE_PROVIDER. Each account's backups go in their own folder inside this one, named for their account ID.-XX]",
+      "fixedHelp": "[XX-Set by BACKUP_STORAGE_PROVIDER. The bucket and key prefix are the deployment's, so there is no folder to choose here; each account's backups go under their own key prefix.-XX]",
+      "artifactCount": "[XX-This store currently holds {count} backup {count, plural, one {file} other {files}} for your account. Switching storage does not move existing backups.-XX]"
+    }
   },
   "backupRestore": {
     "heading": "[XX-Backup & Restore-XX]",

@@ -74,6 +74,16 @@ export function AutoBackupSection() {
   const [isCapabilityLoading, setIsCapabilityLoading] = useState(true);
   const storageUnavailable = capability?.available === false;
   const capabilityBlocksArming = isCapabilityLoading || storageUnavailable;
+  // Where the artifacts actually land. `locationSelectable === false` is an
+  // object store: its bucket and key prefix are the deployment's, the folder
+  // endpoints refuse, and offering a picker here produced a control that could
+  // only ever error -- and a save that failed, because the form posted a
+  // folderPath the server rejects.
+  const locationSelectable = capability?.locationSelectable !== false;
+  const storageProvider = capability?.storageProvider;
+  // The store's own display form when we have it, falling back to the stored
+  // base so the row is never blank while the probe is in flight.
+  const storageLocation = capability?.folderPath || folderPath;
   // Use the persisted state, not the mutable toggle. A schedule that was already
   // armed stays switchable off even when storage is unavailable; a schedule that
   // was persisted disabled must not be armed while capability is unknown or
@@ -163,7 +173,9 @@ export function AutoBackupSection() {
     try {
       const data: UpdateAutoBackupSettingsData = {
         enabled,
-        folderPath,
+        // A store with no location to choose refuses every folder, so sending
+        // the one we are displaying would fail every save on an object store.
+        ...(locationSelectable ? { folderPath } : {}),
         frequency,
         backupTime,
         timezone: userTimezone,
@@ -189,7 +201,26 @@ export function AutoBackupSection() {
     setIsRunning(true);
     try {
       const result = await backupApi.runAutoBackup();
-      toast.success(t('toasts.backupCreated', { filename: result.filename }));
+      // A run covers every account, so the toast counts accounts. A run that
+      // wrote some accounts partially, or failed on any, is not a success and
+      // is not shown as one.
+      if (result.usersFailed > 0 || result.usersPartial > 0) {
+        toast(
+          t('toasts.backupRunIncomplete', {
+            backedUp: result.usersBackedUp,
+            requested: result.usersRequested,
+            partial: result.usersPartial,
+            failed: result.usersFailed,
+          }),
+        );
+      } else {
+        toast.success(
+          t('toasts.backupRunFinished', {
+            backedUp: result.usersBackedUp,
+            requested: result.usersRequested,
+          }),
+        );
+      }
       await loadSettings();
     } catch (error) {
       toast.error(getErrorMessage(error, t('toasts.runFailed')));
@@ -263,8 +294,16 @@ export function AutoBackupSection() {
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
         {t('description')}
       </p>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
         {t('adminManagedNote')}
+      </p>
+      {/* The one thing the schedule alone cannot say: whether it reaches
+          anybody. "Daily at 02:00" over a count of 1 on a twelve-account
+          instance is exactly the defect this line makes visible. */}
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+        {settings?.managedUserCount === undefined
+          ? t('coverage.unknown')
+          : t('coverage.accounts', { count: settings.managedUserCount })}
       </p>
 
       {isDemoMode && (
@@ -303,7 +342,42 @@ export function AutoBackupSection() {
         </label>
       </div>
 
-      {/* Folder path */}
+      {/* Where the artifacts land. Shown on every deployment, because which
+          store is bound is a fact an operator needs whether or not they may
+          change it -- and on an object store this row is the only place it is
+          stated. */}
+      <div className="mb-6">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
+          {t('storage.heading')}
+        </h3>
+        <p className="text-sm text-gray-700 dark:text-gray-300">
+          <span className="font-medium">
+            {storageProvider === 's3'
+              ? t('storage.providerS3')
+              : storageProvider === 'local'
+                ? t('storage.providerLocal')
+                : t('storage.providerUnknown')}
+          </span>
+          {storageLocation && (
+            <span className="ml-2 break-all text-gray-600 dark:text-gray-400">
+              {storageLocation}
+            </span>
+          )}
+        </p>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          {locationSelectable ? t('storage.localHelp') : t('storage.fixedHelp')}
+        </p>
+        {capability?.artifactCount !== undefined && (
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {t('storage.artifactCount', { count: capability.artifactCount })}
+          </p>
+        )}
+      </div>
+
+      {/* Folder path -- only where the store has a location to choose. An
+          object store's bucket and prefix are the deployment's: its folder
+          endpoints refuse, so a picker here could only ever error. */}
+      {locationSelectable && (
       <div className="mb-6">
         <label
           htmlFor="auto-backup-folder"
@@ -418,6 +492,7 @@ export function AutoBackupSection() {
           <p className="mt-1 text-sm text-red-600 dark:text-red-400">{folderError}</p>
         )}
       </div>
+      )}
 
       {/* Frequency */}
       <div className="mb-6">
@@ -585,7 +660,10 @@ export function AutoBackupSection() {
         >
           {isSaving ? t('savingButton') : t('saveButton')}
         </Button>
-        {settings && settings.folderPath && (
+        {/* Not gated on a stored folder: an object store has none, which hid
+            this button entirely on every `s3` deployment. Whether the store can
+            be written to is the capability's answer, below. */}
+        {settings && (
           <Button
             variant="outline"
             onClick={handleRunNow}
