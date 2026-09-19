@@ -9,7 +9,7 @@ import { EventBus } from "./event-bus.interface";
  * The `Map` here is process-local **by design**, which is the one place in this
  * codebase that is the right answer rather than the defect. In `single` there
  * is no second process to reach, and in `multi` this class is not the bound
- * implementation -- `RedisEventBus` is (task R6). When the whole-tree
+ * implementation -- `PostgresEventBus` is. When the whole-tree
  * process-local-state guard lands (task G1), this file is allowlisted with that
  * reason rather than rewritten.
  */
@@ -30,9 +30,10 @@ export class MemoryEventBus implements EventBus {
    * A synchronous call would run every handler inside the publisher's stack,
    * where a handler that publishes re-enters the publisher and a handler that
    * blocks holds up the caller that was only announcing. Deferring also makes
-   * this bus behave like the Redis one, whose delivery is always a later tick:
-   * a caller that happens to work only because delivery was synchronous fails
-   * in `multi` and passes every test here.
+   * this bus behave like the PostgreSQL one, whose delivery always arrives on a
+   * later tick as a connection event: a caller that happens to work only
+   * because delivery was synchronous fails in `multi` and passes every test
+   * here.
    */
   async publish(
     channel: string,

@@ -1,9 +1,9 @@
 /**
  * A re-armable latch for a request parked on the `EventBus`.
  *
- * A bus message is a hint, never data: it can be lost entirely (a subscriber
- * that reconnects after a Redis restart missed everything sent while it was
- * away), so nothing may block on one forever. Every `wait` therefore carries its
+ * A bus message is a hint, never data: it can be lost entirely (a replica whose
+ * `LISTEN` connection reconnects missed everything sent while it was away), so
+ * nothing may block on one forever. Every `wait` therefore carries its
  * own ceiling, and the caller re-reads the database when it returns -- whichever
  * of the two woke it.
  *

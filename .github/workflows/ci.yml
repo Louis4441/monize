@@ -121,22 +121,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-      redis:
-        # For the CLUSTER_MODE=multi specs (horizontal-scaling tasks R6 and T1):
-        # the Redis event bus and the Redis throttler storage are properties of
-        # Redis, so a mocked client proves neither. Nothing in the suite needs
-        # it yet, and a spec that never connects does not notice it is here.
-        #
-        # Pinned by digest for zizmor's unpinned-images audit, like postgres
-        # above. Refresh alongside the Redis version the chart ships.
-        image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     defaults:
       run:
         working-directory: backend
@@ -147,10 +131,12 @@ jobs:
       DATABASE_USER: monize_test
       DATABASE_PASSWORD: test_password
       JWT_SECRET: test-jwt-secret-for-ci-minimum-32-characters-long
-      REDIS_URL: redis://localhost:6379
       # CLUSTER_MODE is deliberately NOT set job-wide. Setting it here would put
       # every integration spec into multi, which is not the mode this suite is
-      # about; the specs that need it set it per test.
+      # about; the specs that need it set it per test. The multi-replica specs
+      # (horizontal-scaling tasks R6 and T1) need no service of their own: the
+      # event bus is LISTEN/NOTIFY and the throttler's counters are a table, so
+      # both are properties of the postgres service above.
       NODE_ENV: test
     steps:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
@@ -443,6 +429,123 @@ jobs:
             || { echo "ingress.enabled=true rendered no Ingress -- the value flag is not turning the resource on"; exit 1; }
       - name: Render with HTTPRoute disabled
         run: helm template monize ./helm --set httpRoute.enabled=false > "$RUNNER_TEMP/rendered-minimal.yaml"
+      # CLUSTER_MODE=multi turns on templates the default render never reaches:
+      # both PodDisruptionBudgets, the backend HPA and CLUSTER_MODE in the
+      # configmap. Asserted by presence for the same reason as the Ingress
+      # above -- parsing a doc that never rendered cannot fail.
+      - name: Render with CLUSTER_MODE=multi
+        run: |
+          helm template monize ./helm -f ./helm/ci/multi-values.yaml \
+            > "$RUNNER_TEMP/rendered-multi.yaml"
+          grep -q '^kind: PodDisruptionBudget$' "$RUNNER_TEMP/rendered-multi.yaml" \
+            || { echo "multi values rendered no PodDisruptionBudget"; exit 1; }
+          grep -q '^kind: HorizontalPodAutoscaler$' "$RUNNER_TEMP/rendered-multi.yaml" \
+            || { echo "multi values rendered no HorizontalPodAutoscaler"; exit 1; }
+          grep -q 'CLUSTER_MODE: "multi"' "$RUNNER_TEMP/rendered-multi.yaml" \
+            || { echo "CLUSTER_MODE did not reach the backend configmap"; exit 1; }
+          # The workloads are Deployments now; a StatefulSet in the output means
+          # the conversion was partly reverted, which upgrades in place and then
+          # fails on the first `helm upgrade` against a real cluster.
+          ! grep -q '^kind: StatefulSet$' "$RUNNER_TEMP/rendered-multi.yaml" \
+            || { echo "a StatefulSet is still being rendered"; exit 1; }
+          grep -q '^kind: Deployment$' "$RUNNER_TEMP/rendered-multi.yaml" \
+            || { echo "no Deployment rendered"; exit 1; }
+          # The two assertions the backend refuses to boot in multi without.
+          # They are the operator's word that both replicas mount the same
+          # directories, they are tested for the exact string "true", and a
+          # template edit that stopped emitting them would turn every multi
+          # install into a pod that will not start.
+          grep -q 'BACKUP_SHARED_VOLUME: "true"' "$RUNNER_TEMP/rendered-multi.yaml" \
+            || { echo "cluster.backupSharedVolume did not reach the backend configmap"; exit 1; }
+          grep -q 'ATTACHMENT_SHARED_VOLUME: "true"' "$RUNNER_TEMP/rendered-multi.yaml" \
+            || { echo "cluster.attachmentSharedVolume did not reach the backend configmap"; exit 1; }
+          # Spread is what makes the replica count availability rather than
+          # arithmetic; a values block that stopped reaching the pod spec would
+          # leave both replicas schedulable onto one node.
+          grep -q 'topologySpreadConstraints:' "$RUNNER_TEMP/rendered-multi.yaml" \
+            || { echo "backend.topologySpreadConstraints did not reach the pod spec"; exit 1; }
+          # Both pod templates carry a hash of their ConfigMap. Without it a
+          # `helm upgrade` that changes only a ConfigMap value -- CLUSTER_MODE
+          # among them -- reports success and rolls nothing, because envFrom is
+          # read once at container start.
+          checksums=$(grep -c 'checksum/config:' "$RUNNER_TEMP/rendered-multi.yaml" || true)
+          [ "$checksums" = "2" ] \
+            || { echo "expected a checksum/config annotation on both pod templates, found $checksums"; exit 1; }
+      # Every claim here is ReadWriteMany, so the rollout still surges. The
+      # ReadWriteOnce case is the next step.
+      - name: Render with an exclusive claim
+        # A ReadWriteOnce volume attaches to one node, so maxSurge: 1 would
+        # leave the new pod Pending on a Multi-Attach error while maxUnavailable:
+        # 0 forbids removing the old one -- a rollout that never finishes and
+        # ends in a manual pod delete. The chart switches to Recreate instead,
+        # which takes the same downtime in seconds and at the moment the
+        # operator chose. Nothing else renders this branch: persistence is off
+        # by default and ReadWriteMany in the multi values.
+        run: |
+          helm template monize ./helm \
+            --set backend.persistence.backups.enabled=true \
+            > "$RUNNER_TEMP/rendered-exclusive-claim.yaml"
+          grep -q 'type: Recreate' "$RUNNER_TEMP/rendered-exclusive-claim.yaml" \
+            || { echo "a ReadWriteOnce claim did not switch the backend rollout to Recreate"; exit 1; }
+      # The refusals. Each of these renders, installs and runs while being
+      # wrong: a second replica at CLUSTER_MODE=single enforces every rate limit
+      # twice, a spread constraint that selects no pod is satisfied by every
+      # placement, and a budget of minAvailable equal to the replica count
+      # blocks a node drain forever. Kubernetes reports none of them, so the
+      # chart refuses to render -- and a refusal nothing exercises is a refusal
+      # that quietly stops working.
+      - name: Refuse the configurations that look fine and are not
+        run: |
+          set -uo pipefail
+          refuses() {
+            local why="$1"; shift
+            if helm template monize ./helm "$@" > /dev/null 2>&1; then
+              echo "chart rendered a configuration it must refuse: $why"
+              exit 1
+            fi
+          }
+          refuses "two backend replicas at cluster.mode=single" \
+            --set backend.replicas=2
+          refuses "an autoscaler above one replica at cluster.mode=single" \
+            --set backend.autoscaling.enabled=true \
+            --set backend.autoscaling.maxReplicas=4
+          refuses "a spread constraint whose selector matches no pod" \
+            -f ./helm/ci/multi-values.yaml \
+            --set backend.topologySpreadConstraints[0].maxSkew=1 \
+            --set backend.topologySpreadConstraints[0].topologyKey=kubernetes.io/hostname \
+            --set backend.topologySpreadConstraints[0].whenUnsatisfiable=ScheduleAnyway \
+            --set backend.topologySpreadConstraints[0].labelSelector.matchLabels.app=monize
+          refuses "a disruption budget that permits no disruption" \
+            -f ./helm/ci/multi-values.yaml \
+            --set backend.autoscaling.enabled=false \
+            --set backend.podDisruptionBudget.minAvailable=2
+          refuses "the same budget spelled maxUnavailable: 0" \
+            -f ./helm/ci/multi-values.yaml \
+            --set backend.podDisruptionBudget.maxUnavailable=0
+      # The other half of that: a value the chart must honour rather than
+      # refuse. `maxUnavailable` is read by kind and exact value because 0 is
+      # falsy in a template, and reading it for truthiness would fall through to
+      # `minAvailable` -- giving the operator a budget they did not write.
+      - name: Honour an explicit maxUnavailable
+        run: |
+          helm template monize ./helm -f ./helm/ci/multi-values.yaml \
+            --set backend.podDisruptionBudget.maxUnavailable=1 \
+            > "$RUNNER_TEMP/rendered-maxunavailable.yaml"
+          grep -q '^  maxUnavailable: 1$' "$RUNNER_TEMP/rendered-maxunavailable.yaml" \
+            || { echo "podDisruptionBudget.maxUnavailable did not reach the budget"; exit 1; }
+      # A quoted "false" is truthy in a template, and these two keys are
+      # assertions the backend cannot verify for itself: emitting
+      # BACKUP_SHARED_VOLUME=true because somebody quoted the value would turn a
+      # boot refusal into two replicas writing backups to two different disks.
+      - name: Refuse to assert a shared volume the operator set to a quoted false
+        run: |
+          helm template monize ./helm -f ./helm/ci/multi-values.yaml \
+            --set-string cluster.backupSharedVolume=false \
+            > "$RUNNER_TEMP/rendered-quoted-false.yaml"
+          ! grep -q 'BACKUP_SHARED_VOLUME: "true"' "$RUNNER_TEMP/rendered-quoted-false.yaml" \
+            || { echo 'a quoted "false" was emitted as BACKUP_SHARED_VOLUME=true'; exit 1; }
+          grep -q 'ATTACHMENT_SHARED_VOLUME: "true"' "$RUNNER_TEMP/rendered-quoted-false.yaml" \
+            || { echo "the other assertion stopped rendering, so this proves nothing"; exit 1; }
       # PyYAML happens to be present on the current ubuntu-latest image, which
       # is not the same as this job declaring it. An undeclared dependency that
       # disappears in a runner-image bump turns the check below into an

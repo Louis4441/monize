@@ -174,6 +174,11 @@ export const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   // artifact that can be mailed to its own destination must not carry the
   // credential for that destination.
   "backup_offsite_settings",
+  // The HTTP throttler's counters for this deployment. A cache on an UNLOGGED
+  // table that its own database truncates on crash recovery, so carrying it in
+  // an artifact would be exporting state PostgreSQL itself does not promise to
+  // keep. Same category as the auth counters below, one layer up.
+  "http_throttle_counters",
   // Authentication rate-limit and lockout counters for this deployment. A
   // restore carrying them would either resurrect a lockout the user has since
   // waited out or, worse, hand a fresh instance a spent window that lets the

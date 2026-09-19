@@ -30,6 +30,58 @@ Two consequences worth internalising:
   whole body. If the body is not idempotent, that retry fails the same way and
   the pod crash-loops.
 
+## Two versions of the code run against one database during a rollout
+
+A rolling deployment brings a new pod up before the old one goes away -- that
+is what makes it zero-downtime, and it is what the Helm chart does by default
+(`maxSurge: 1`, `maxUnavailable: 0`), at one replica as much as at four. The
+new pod runs its migrations at start. So between that moment and the moment the
+last old pod is removed, **the previous release's code is serving requests
+against the new schema**, on the same database, for as long as the rollout
+takes -- minutes, or indefinitely if the new pod fails its readiness probe and
+the rollout stalls with both generations live.
+
+At `CLUSTER_MODE=multi` the overlap is wider (several old pods, several new),
+but it is not caused by `multi` and it is not avoided by staying at one
+replica. The only rollout that has no overlap is `Recreate`, which the chart
+selects when a `ReadWriteOnce` claim is mounted and which costs downtime.
+
+This makes one rule non-negotiable for any migration that changes an existing
+column or table: **expand first, contract in a later release.**
+
+- **Expand** (this release): add the new column, table or index; make it
+  nullable or give it a default; backfill; write to both the old and the new
+  shape. The old code must still work unchanged after this migration runs,
+  because it will be running after it runs.
+- **Migrate the readers** (this release or the next): the new code reads the new
+  shape. Now both shapes are populated and both generations are correct.
+- **Contract** (a later release, after the expand release is fully rolled out
+  everywhere it will be): drop the old column, the old table, the compatibility
+  writes and the `NOT NULL` you deferred.
+
+What that forbids in a single migration, because the previous release is still
+executing its statements when the migration commits:
+
+| Do not | Because the old pod | Do instead |
+|---|---|---|
+| `ALTER TABLE ... RENAME COLUMN` | selects and inserts the old name; every statement naming it errors | add the new column, write both, drop the old one a release later |
+| `DROP COLUMN` | still names it in `SELECT` and `INSERT` | stop writing it, ship, then drop |
+| add `NOT NULL` without a default | inserts rows without the column | add with a default, backfill, tighten in a later release |
+| narrow a type or add a `CHECK` | writes values the new constraint rejects | accept both, ship the writer, tighten later |
+| `RENAME TABLE` | names the old table | a rename is a multi-release operation, and the backup format keys on the old name too: `backend/src/common/db/migration-table-renames.spec.ts` |
+
+Widening is safe in one step: a new nullable column, a new table, a new index
+(`CREATE INDEX CONCURRENTLY` is not available here -- each migration runs in a
+transaction -- so an index on a large table blocks writes for its duration,
+which is a rollout cost rather than a correctness one), a new default, a
+relaxed constraint.
+
+The guards do not catch this. `migration:lint` reads one file, and
+`verify-schema.sh` replays every migration onto `schema.sql` in an empty
+database where no previous release exists. The only thing that catches a
+contract shipped too early is somebody asking, of each changed column, whether
+the currently deployed release still runs.
+
 ## Filenames
 
 Two prefix forms live side by side in `database/migrations/`:

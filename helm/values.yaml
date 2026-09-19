@@ -26,11 +26,83 @@ backend:
     pullPolicy: IfNotPresent
 
   # -- Number of replicas
+  #
+  # More than one requires cluster.mode=multi below: at CLUSTER_MODE=single the
+  # backend keeps rate-limit counters and cross-replica wake-ups in its own
+  # process, which a second replica would neither share nor see. Attachment and backup
+  # storage must be cluster-safe too, which the backend refuses to boot
+  # without: see cluster.mode.
   replicas: 1
 
-  # -- Extra labels to add to the StatefulSet and pod template
+  # -- Voluntary-disruption budget (node drains, cluster upgrades)
+  #
+  # Off by default on purpose: at replicas: 1 a budget of minAvailable: 1 makes
+  # a node drain block indefinitely rather than interrupt the service briefly,
+  # which is the worse surprise. Turn it on with the replica count.
+  podDisruptionBudget:
+    # -- Create a PodDisruptionBudget
+    enabled: false
+    # -- Minimum pods that must stay available (ignored when maxUnavailable is set)
+    #
+    # Must be below the replica count (below autoscaling.minReplicas when the
+    # autoscaler owns it). A budget equal to it admits no eviction at all, so a
+    # node drain or cluster upgrade blocks indefinitely rather than interrupting
+    # the service briefly; the chart refuses to render one.
+    minAvailable: 1
+    # -- Maximum pods that may be unavailable; takes precedence over minAvailable
+    #
+    # Read exactly, so 0 is not mistaken for unset -- and then refused for the
+    # same reason as minAvailable above: it permits no eviction either.
+    maxUnavailable: ""
+
+  # -- Scheduler spread, so replicas do not all land on one node
+  #
+  # Empty by default: it is only meaningful above one replica, and a constraint
+  # a single-node cluster cannot satisfy is a pod that will not schedule.
+  # DoNotSchedule is the strict form; use ScheduleAnyway where capacity is tight.
+  #
+  # The labelSelector must match the labels these pods actually carry --
+  # `app: monize-backend`, which is also the Deployment's own selector. A selector
+  # that matches nothing is not a weaker constraint but no constraint at all:
+  # it is satisfied by every placement, including all replicas on one node, and
+  # neither Kubernetes nor `helm template` reports anything. The chart refuses
+  # to render a matchLabels entry this pod template does not carry.
+  topologySpreadConstraints: []
+  #   - maxSkew: 1
+  #     topologyKey: kubernetes.io/hostname
+  #     whenUnsatisfiable: ScheduleAnyway
+  #     labelSelector:
+  #       matchLabels:
+  #         app: monize-backend
+
+  # -- Horizontal pod autoscaling (CPU only)
+  #
+  # When enabled the Deployment omits its own replica count, so the chart and
+  # the autoscaler do not fight on every upgrade. Needs metrics-server.
+  #
+  # targetCPUUtilizationPercentage is a percentage of the CPU *request* below,
+  # not of a core and not of the limit. With no request set the ratio is
+  # undefined, the HPA reports <unknown>/75% and never scales -- so a chart that
+  # looks autoscaled sits at minReplicas through every load it was installed to
+  # survive. Raising or lowering resources.requests.cpu silently re-tunes every
+  # threshold here; the two are one setting in two places. The request above is
+  # deliberately small so the pod schedules anywhere, which makes 75% of it a
+  # very low bar -- anything past idle scales out to maxReplicas and stays
+  # there. Enabling autoscaling means sizing resources.requests.cpu to what the
+  # process actually uses first.
+  autoscaling:
+    # -- Create a HorizontalPodAutoscaler
+    enabled: false
+    # -- Lower bound on replicas
+    minReplicas: 2
+    # -- Upper bound on replicas
+    maxReplicas: 4
+    # -- Target average CPU utilization, as a percentage of the request
+    targetCPUUtilizationPercentage: 75
+
+  # -- Extra labels to add to the Deployment and pod template
   extraLabels: {}
-  # -- Extra annotations to add to the StatefulSet
+  # -- Extra annotations to add to the Deployment
   extraAnnotations: {}
 
   # -- Service port
@@ -143,7 +215,7 @@ backend:
   # -- Writable durable storage for the data the backend keeps outside Postgres.
   #
   # The backend container runs with readOnlyRootFilesystem: true and, until this
-  # existed, the StatefulSet rendered no volumes at all. So two features that are
+  # existed, the backend workload rendered no volumes at all. So two features that are
   # exposed in the UI could not work in the canonical chart, and both failed at
   # the point of use rather than at install time:
   #
@@ -159,8 +231,10 @@ backend:
   # without saying where the storage comes from.
   #
   # These are plain PVCs mounted as volumes, deliberately not
-  # volumeClaimTemplates: a StatefulSet's volumeClaimTemplates are immutable, so
-  # adding one to an existing release cannot be done by an upgrade.
+  # volumeClaimTemplates: those are a StatefulSet feature and are immutable, so
+  # adding one to an existing release could not be done by an upgrade. Keeping
+  # them as ordinary claims is also what made converting these workloads to
+  # Deployments a rename rather than a data migration.
   persistence:
     # -- Storage for automatic backups (/data/backups).
     backups:
@@ -330,11 +404,86 @@ frontend:
     pullPolicy: IfNotPresent
 
   # -- Number of replicas
+  #
+  # More than one requires cluster.mode=multi below: at CLUSTER_MODE=single the
+  # backend keeps rate-limit counters and cross-replica wake-ups in its own
+  # process, which a second replica would neither share nor see.
+  #
+  # The frontend is stateless, so its replica count is independent of the
+  # backend's; cluster.mode is about the backend. Note that its proxy buffers a
+  # whole request body, so each replica's memory must still cover the .mny
+  # import limit.
   replicas: 1
 
-  # -- Extra labels to add to the StatefulSet and pod template
+  # -- Voluntary-disruption budget (node drains, cluster upgrades)
+  #
+  # Off by default on purpose: at replicas: 1 a budget of minAvailable: 1 makes
+  # a node drain block indefinitely rather than interrupt the service briefly,
+  # which is the worse surprise. Turn it on with the replica count.
+  podDisruptionBudget:
+    # -- Create a PodDisruptionBudget
+    enabled: false
+    # -- Minimum pods that must stay available (ignored when maxUnavailable is set)
+    #
+    # Must be below the replica count (below autoscaling.minReplicas when the
+    # autoscaler owns it). A budget equal to it admits no eviction at all, so a
+    # node drain or cluster upgrade blocks indefinitely rather than interrupting
+    # the service briefly; the chart refuses to render one.
+    minAvailable: 1
+    # -- Maximum pods that may be unavailable; takes precedence over minAvailable
+    #
+    # Read exactly, so 0 is not mistaken for unset -- and then refused for the
+    # same reason as minAvailable above: it permits no eviction either.
+    maxUnavailable: ""
+
+  # -- Scheduler spread, so replicas do not all land on one node
+  #
+  # Empty by default: it is only meaningful above one replica, and a constraint
+  # a single-node cluster cannot satisfy is a pod that will not schedule.
+  # DoNotSchedule is the strict form; use ScheduleAnyway where capacity is tight.
+  #
+  # The labelSelector must match the labels these pods actually carry --
+  # `app: monize-frontend`, which is also the Deployment's own selector. A selector
+  # that matches nothing is not a weaker constraint but no constraint at all:
+  # it is satisfied by every placement, including all replicas on one node, and
+  # neither Kubernetes nor `helm template` reports anything. The chart refuses
+  # to render a matchLabels entry this pod template does not carry.
+  topologySpreadConstraints: []
+  #   - maxSkew: 1
+  #     topologyKey: kubernetes.io/hostname
+  #     whenUnsatisfiable: ScheduleAnyway
+  #     labelSelector:
+  #       matchLabels:
+  #         app: monize-frontend
+
+  # -- Horizontal pod autoscaling (CPU only)
+  #
+  # When enabled the Deployment omits its own replica count, so the chart and
+  # the autoscaler do not fight on every upgrade. Needs metrics-server.
+  #
+  # targetCPUUtilizationPercentage is a percentage of the CPU *request* below,
+  # not of a core and not of the limit. With no request set the ratio is
+  # undefined, the HPA reports <unknown>/75% and never scales -- so a chart that
+  # looks autoscaled sits at minReplicas through every load it was installed to
+  # survive. Raising or lowering resources.requests.cpu silently re-tunes every
+  # threshold here; the two are one setting in two places. The request above is
+  # deliberately small so the pod schedules anywhere, which makes 75% of it a
+  # very low bar -- anything past idle scales out to maxReplicas and stays
+  # there. Enabling autoscaling means sizing resources.requests.cpu to what the
+  # process actually uses first.
+  autoscaling:
+    # -- Create a HorizontalPodAutoscaler
+    enabled: false
+    # -- Lower bound on replicas
+    minReplicas: 2
+    # -- Upper bound on replicas
+    maxReplicas: 4
+    # -- Target average CPU utilization, as a percentage of the request
+    targetCPUUtilizationPercentage: 75
+
+  # -- Extra labels to add to the Deployment and pod template
   extraLabels: {}
-  # -- Extra annotations to add to the StatefulSet
+  # -- Extra annotations to add to the Deployment
   extraAnnotations: {}
 
   # -- Service port
@@ -440,6 +589,36 @@ mcp:
     path: /api/v1/mcp
     # -- Name of the affinity cookie the edge sets
     cookieName: monize-mcp-affinity
+
+# -- Horizontal scaling
+#
+# What the backend needs before a second replica of it is correct. Everything
+# shared lives in PostgreSQL, so this adds no dependency -- see
+# docs/future-plans/horizontal-scaling.md.
+cluster:
+  # -- CLUSTER_MODE: single (one backend replica) or multi (several)
+  #
+  # In multi the backend enforces rate limits and single-use claims on rows
+  # rather than in process memory, and replicas wake each other over
+  # LISTEN/NOTIFY. Two things it then requires, both refused at boot if absent:
+  # backend.database.DATABASE_HOST must reach a PostgreSQL session rather than a
+  # transaction-mode pooler (each replica holds one LISTEN), and the storage
+  # assertions below must be true.
+  mode: single
+  # -- Assert that every replica mounts backend.attachmentContainerDir
+  #
+  # Only read when mode=multi with ATTACHMENT_STORAGE_PROVIDER=local, where the
+  # boot refuses without it. The chart's own claim defaults to ReadWriteOnce,
+  # which a second pod on another node cannot attach, so this means switching
+  # backend.persistence.attachments.accessMode to ReadWriteMany as well. The
+  # database and s3 providers need nothing here.
+  attachmentSharedVolume: false
+  # -- Assert that every replica mounts backend.backupContainerDir
+  #
+  # Required by mode=multi unconditionally: automatic backups are switched on
+  # per user rather than by a chart value, and the hourly job writes to
+  # whichever replica runs it. Same ReadWriteMany requirement as above.
+  backupSharedVolume: false
 
 # -- Ingress configuration (traditional Kubernetes Ingress)
 ingress:
