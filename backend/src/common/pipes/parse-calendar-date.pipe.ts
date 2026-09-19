@@ -13,8 +13,8 @@ import { isCalendarDate } from "../validators/is-calendar-date.validator";
  * plainly a client error.
  */
 @Injectable()
-export class ParseCalendarDatePipe implements PipeTransform<string, string> {
-  transform(value: string): string {
+export class ParseCalendarDatePipe implements PipeTransform<unknown, string> {
+  transform(value: unknown): string {
     if (!isCalendarDate(value)) {
       throw new BadRequestException(
         tr(
@@ -24,5 +24,31 @@ export class ParseCalendarDatePipe implements PipeTransform<string, string> {
       );
     }
     return value;
+  }
+}
+
+/**
+ * The same check for a query parameter the route may omit.
+ *
+ * `@Query()` hands a pipe `undefined` when the key is absent, which is the one
+ * value an optional bound may take; everything else goes through
+ * `ParseCalendarDatePipe`'s check, including the array Express parses a
+ * repeated key into (`?startDate=x&startDate=y`). A regular expression `.test`
+ * on such a value coerces the array to text and passes it (CodeQL
+ * `js/type-confusion-through-parameter-tampering`), which is why the type is
+ * checked rather than the text.
+ */
+@Injectable()
+export class ParseOptionalCalendarDatePipe implements PipeTransform<
+  unknown,
+  string | undefined
+> {
+  private readonly required = new ParseCalendarDatePipe();
+
+  transform(value: unknown): string | undefined {
+    // Absent, or the empty string a client sends for a bound the user left
+    // alone: no bound, which is what the route means by an omitted one.
+    if (value === undefined || value === "") return undefined;
+    return this.required.transform(value);
   }
 }

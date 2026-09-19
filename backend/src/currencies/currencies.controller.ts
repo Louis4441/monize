@@ -23,6 +23,7 @@ import {
 import { AuthGuard } from "@nestjs/passport";
 import { Throttle } from "@nestjs/throttler";
 import { ParseCurrencyCodePipe } from "../common/pipes/parse-currency-code.pipe";
+import { ParseOptionalCalendarDatePipe } from "../common/pipes/parse-calendar-date.pipe";
 import { isCalendarDate } from "../common/validators/is-calendar-date.validator";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -138,16 +139,29 @@ export class CurrenciesController {
   @AllowDelegate()
   @Throttle({ default: { ttl: 60000, limit: 10 } }) // L2: 10 requests per minute
   @ApiOperation({ summary: "Get exchange rates for a date range" })
-  @ApiQuery({ name: "startDate", required: false, type: String })
-  @ApiQuery({ name: "endDate", required: false, type: String })
+  @ApiQuery({
+    name: "startDate",
+    required: false,
+    type: String,
+    example: "2026-07-20",
+  })
+  @ApiQuery({
+    name: "endDate",
+    required: false,
+    type: String,
+    example: "2026-07-27",
+  })
   @ApiResponse({
     status: 200,
     description: "Exchange rates within the date range",
     type: [ExchangeRate],
   })
+  // Both bounds go into a `rate_date` comparison, so each is a day or it is
+  // nothing: the pipe refuses the array Express parses a repeated key into
+  // rather than letting it reach the query as a supposed string.
   getRateHistory(
-    @Query("startDate") startDate?: string,
-    @Query("endDate") endDate?: string,
+    @Query("startDate", ParseOptionalCalendarDatePipe) startDate?: string,
+    @Query("endDate", ParseOptionalCalendarDatePipe) endDate?: string,
   ): Promise<ExchangeRate[]> {
     return this.exchangeRateService.getRateHistory(startDate, endDate);
   }

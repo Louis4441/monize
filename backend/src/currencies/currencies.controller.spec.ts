@@ -1,4 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
+import { ParseOptionalCalendarDatePipe } from "../common/pipes/parse-calendar-date.pipe";
 import { Test, TestingModule } from "@nestjs/testing";
 import { CurrenciesController } from "./currencies.controller";
 import { ExchangeRateService } from "./exchange-rate.service";
@@ -337,6 +338,33 @@ describe("CurrenciesController", () => {
         undefined,
         undefined,
       );
+    });
+
+    /**
+     * Both bounds reach a `rate_date` comparison, and Express parses a repeated
+     * key into an array, so each is validated by a pipe. Calling the method
+     * directly bypasses every pipe, so the wiring is asserted against the
+     * metadata Nest would hand it -- the pipe's own behaviour is
+     * `parse-calendar-date.pipe.spec.ts`.
+     */
+    it("declares the calendar-date pipe on both bounds", () => {
+      const routeArguments = Reflect.getMetadata(
+        "__routeArguments__",
+        CurrenciesController,
+        "getRateHistory",
+      ) as Record<string, { index: number; pipes?: unknown[] }> | undefined;
+      const boundIndexes = Object.values(routeArguments ?? {})
+        .filter((argument) =>
+          (argument.pipes ?? []).some(
+            (pipe) =>
+              pipe === ParseOptionalCalendarDatePipe ||
+              pipe instanceof ParseOptionalCalendarDatePipe,
+          ),
+        )
+        .map((argument) => argument.index)
+        .sort();
+
+      expect(boundIndexes).toEqual([0, 1]);
     });
   });
 
