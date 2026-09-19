@@ -364,12 +364,12 @@ describe("ExchangeRateService", () => {
       expect(result.updated).toBe(0);
     });
 
-    it("upserts both directions rather than reading first and then writing", async () => {
+    it("upserts one canonical row rather than reading first and then writing", async () => {
       // The rate cron fires on every replica, so two processes routinely fetch
       // the same pair for the same day. The old shape read the row and then
       // either saved it or inserted -- a check-then-act whose loser hit
-      // `UNIQUE(from_currency, to_currency, rate_date)` and, because the two
-      // directions share a transaction, lost the inverse rate with it.
+      // `UNIQUE(from_currency, to_currency, rate_date)` and reported a pair it
+      // had in fact fetched as failed.
       routeRateQueries(["USD", "CAD"]);
 
       yahooFinanceService.fetchQuote.mockResolvedValue({
@@ -385,27 +385,46 @@ describe("ExchangeRateService", () => {
           call[0].includes("INSERT INTO exchange_rates") &&
           call[0].includes("RETURNING id"),
       );
-      expect(upserts).toHaveLength(2);
+      // One row, not a pair. The inverse row that used to be written beside it
+      // was what a one-sided write could then contradict (INV-FX-003).
+      expect(upserts).toHaveLength(1);
       expect(upserts[0][0]).toContain(
         "ON CONFLICT (from_currency, to_currency, rate_date) DO UPDATE",
       );
-      // Forward, then the inverse.
+      // The fetch asked for USD->CAD; the pair is stored as CAD->USD, so the
+      // rate is inverted at the rate column's ten decimal places, not at money
+      // precision: rounding it to four (0.7143) inverts back to 1.39997, which a
+      // statement quoting six decimals reconciles against by cents.
+      expect(upsertedRates).toHaveLength(1);
       expect(upsertedRates[0]).toMatchObject({
-        fromCurrency: "USD",
-        toCurrency: "CAD",
-        rate: 1.4,
-      });
-      // The inverse is stored at the rate column's ten decimal places, not at
-      // money precision: rounding it to four (0.7143) inverts back to 1.39997,
-      // which a statement quoting six decimals reconciles against by cents.
-      expect(upsertedRates[1]).toMatchObject({
         fromCurrency: "CAD",
         toCurrency: "USD",
         rate: roundFxRate(1 / 1.4),
         source: "yahoo_finance",
       });
-      expect(upsertedRates[1].rate).not.toBe(0.7143);
-      expect(roundFxRate(1 / upsertedRates[1].rate)).toBeCloseTo(1.4, 6);
+      expect(upsertedRates[0].rate).not.toBe(0.7143);
+      expect(roundFxRate(1 / upsertedRates[0].rate)).toBeCloseTo(1.4, 6);
+    });
+
+    it("stores a fetch that is already canonical as it stands", async () => {
+      // CAD sorts before USD, so a CAD->USD quote needs no inversion and the
+      // stored rate is the fetched number itself.
+      routeRateQueries(["CAD", "USD"]);
+
+      yahooFinanceService.fetchQuote.mockResolvedValue({
+        regularMarketPrice: 0.72,
+      });
+
+      await service.refreshAllRates();
+
+      expect(upsertedRates).toEqual([
+        {
+          fromCurrency: "CAD",
+          toCurrency: "USD",
+          rate: 0.72,
+          source: "yahoo_finance",
+        },
+      ]);
     });
 
     it("handles a rate write failure gracefully", async () => {
@@ -1146,7 +1165,7 @@ describe("ExchangeRateService", () => {
       expect((toDate as Date).getTime()).toBeGreaterThanOrEqual(target);
     });
 
-    it("stores every day in the fetched window, both directions, not just the day asked for", async () => {
+    it("stores every day in the fetched window, not just the day asked for", async () => {
       exchangeRateRepository.find.mockResolvedValue([]);
       yahooFinanceService.fetchHistoricalWindow.mockResolvedValue([
         {
@@ -1169,15 +1188,15 @@ describe("ExchangeRateService", () => {
 
       await service.getRateForDate("EUR", "PLN", "2026-06-08");
 
-      // One bulk upsert carrying both days in both directions. Keeping only
-      // the chosen point sent the next lookup for a neighbouring date straight
-      // back out to the provider, which is what ran into its rate limits.
+      // One bulk upsert carrying both days. Keeping only the chosen point sent
+      // the next lookup for a neighbouring date straight back out to the
+      // provider, which is what ran into its rate limits.
       const insert = dataSource.query.mock.calls.find((call: any[]) =>
         String(call[0]).includes("INSERT INTO exchange_rates"),
       );
       expect(insert).toBeDefined();
       const params = insert[1] as unknown[];
-      expect(params).toHaveLength(2 * 2 * 4); // 2 days x 2 directions x 4 columns
+      expect(params).toHaveLength(2 * 4); // 2 days x 4 columns, one row each
 
       // Read the flat parameter list back as (from, to, date, rate) rows.
       const rows: Array<[string, string, Date, number]> = [];
@@ -1192,16 +1211,13 @@ describe("ExchangeRateService", () => {
             r[2].toISOString().slice(0, 10) === day,
         );
 
+      // EUR sorts before PLN, so the fetched orientation is the stored one.
       expect(rowFor("EUR", "PLN", "2026-06-05")?.[3]).toBe(4.25);
       expect(rowFor("EUR", "PLN", "2026-06-09")?.[3]).toBe(4.3);
-      // The inverse pair is written too, so a PLN->EUR lookup is a DB read --
-      // and at rate precision, not money precision.
-      expect(rowFor("PLN", "EUR", "2026-06-05")?.[3]).toBe(
-        roundFxRate(1 / 4.25),
-      );
-      expect(rowFor("PLN", "EUR", "2026-06-09")?.[3]).toBe(
-        roundFxRate(1 / 4.3),
-      );
+      // And the inverse rows are gone: a PLN->EUR lookup is still a database
+      // read, resolved from these rows by `resolveFxRate`.
+      expect(rowFor("PLN", "EUR", "2026-06-05")).toBeUndefined();
+      expect(rowFor("PLN", "EUR", "2026-06-09")).toBeUndefined();
     });
 
     it("returns null when neither a stored rate nor a Yahoo window is available", async () => {
@@ -1854,7 +1870,7 @@ describe("ExchangeRateService", () => {
       expect(ymd(end)).toBe("2017-08-31");
     });
 
-    it("persists both directions from the one call", async () => {
+    it("persists one canonical row from the one call", async () => {
       yahooFinanceService.fetchHistoricalWindow.mockResolvedValue([
         { date: new Date("2017-08-17T00:00:00Z"), close: 1.25 },
       ]);
@@ -1864,8 +1880,8 @@ describe("ExchangeRateService", () => {
         "2017-08-18",
       );
 
+      // Asked for USD->CAD at 1.25, stored as the canonical CAD->USD at 0.8.
       expect(inserted).toEqual([
-        { from: "USD", to: "CAD", date: "2017-08-17", rate: 1.25 },
         { from: "CAD", to: "USD", date: "2017-08-17", rate: 0.8 },
       ]);
     });
@@ -1900,8 +1916,8 @@ describe("ExchangeRateService", () => {
       expect(yahooFinanceService.fetchHistoricalWindow).not.toHaveBeenCalled();
     });
 
-    // Yahoo carries some pairs under one orientation only, and the inverse row
-    // is written either way -- so `CADUSD=X` answers a USD->CAD question.
+    // Yahoo carries some pairs under one orientation only, and either symbol
+    // lands on the same stored row -- so `CADUSD=X` answers a USD->CAD question.
     it("falls back to the reverse symbol when the direct one has nothing", async () => {
       yahooFinanceService.fetchHistoricalWindow.mockImplementation(
         async (symbol: string) =>
@@ -1916,9 +1932,10 @@ describe("ExchangeRateService", () => {
       );
 
       expect(loaded).toBe(1);
+      // The reverse symbol answered with CAD->USD, which is already the stored
+      // orientation, so it is written as it came back.
       expect(inserted).toEqual([
         { from: "CAD", to: "USD", date: "2017-08-17", rate: 0.8 },
-        { from: "USD", to: "CAD", date: "2017-08-17", rate: 1.25 },
       ]);
     });
 
@@ -2008,11 +2025,12 @@ describe("ExchangeRateService", () => {
       );
 
       expect(loaded).toBe(1);
+      // Fetched as EUR->CAD, stored as the canonical CAD->EUR.
       expect(inserted).toContainEqual({
-        from: "EUR",
-        to: "CAD",
+        from: "CAD",
+        to: "EUR",
         date: "2017-08-17",
-        rate: 1.47,
+        rate: roundFxRate(1 / 1.47),
       });
     });
 
