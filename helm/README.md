@@ -342,7 +342,7 @@ backend:
 
 The backend copies each attachment into the new backend, reads the copy back
 and checks it against the size and checksum recorded for it, then deletes the
-original -- starting a minute after boot, hourly until none are left, one
+original -- starting on boot, then hourly at :50 until none are left, one
 attachment at a time. Two consequences for an operator:
 
 - **The backend being left has to stay configured and mounted until it
@@ -352,8 +352,10 @@ attachment at a time. Two consequences for an operator:
   `Attachment storage relocation`, and disable it after.
 - **Attachments stay readable throughout** -- before, during and after -- from
   whichever backend currently holds each one. A backend the deployment can no
-  longer reach is the one exception, and the download says which one it is
-  rather than reporting the file as missing.
+  longer reach is the one exception: the API answers `503` naming it (not `404`),
+  and the in-app preview says the file is intact and cannot be served from here.
+  The browser's own download of such a file still just fails, so the preview is
+  where a user learns why.
 
 `ATTACHMENT_STORAGE_MIGRATE_ON_SWITCH=false` turns the relocation off, which
 is a decision to keep the old backend indefinitely; the backend says so in its

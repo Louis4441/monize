@@ -132,7 +132,10 @@ Two mechanisms, both in `backend/src/attachments/storage/`:
   cannot address it. That refusal is deliberately not the `NotFoundException` a
   missing object gets: nothing is lost, one setting is absent, and the repairs
   differ. `null` from `resolve` therefore means "unconfigured backend", never "no
-  bytes".
+  bytes". The distinction reaches the reader: `isStoreUnreachable` in
+  `frontend/src/lib/attachments.ts` recognises the 503 and the preview says the
+  file is intact rather than offering a download that fails identically
+  (`docs/frontend/ui-conventions.md`).
 - **`AttachmentStorageMigrator` moves them**, on `onApplicationBootstrap` (not
   awaited -- Nest runs the hook inside `app.listen()`) and hourly at :50 until
   nothing is outside the active backend. Any pair of backends, either direction,

@@ -70,6 +70,7 @@
   "preview": {
     "loading": "Chargement de l'aperçu…",
     "failed": "L'aperçu n'a pas pu être chargé. Vous pouvez tout de même télécharger le fichier.",
+    "storeUnavailable": "Ce fichier se trouve dans un stockage auquel ce serveur ne peut pas accéder actuellement, il ne peut donc être ni prévisualisé ni téléchargé. Rien n'est perdu : demandez à votre administration de rétablir la configuration du stockage des pièces jointes.",
     "unsupported": "Ce type de fichier ne peut pas être prévisualisé. Vous pouvez tout de même le télécharger.",
     "fit": "Ajuster à l'écran",
     "actualSize": "Taille réelle",

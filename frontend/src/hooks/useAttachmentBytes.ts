@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { attachmentsApi } from '@/lib/attachments';
+import { attachmentsApi, isStoreUnreachable } from '@/lib/attachments';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('AttachmentBytes');
@@ -18,7 +18,14 @@ export type PreviewSource =
 export type PreviewBytes =
   | { status: 'loading' }
   | { status: 'ready'; bytes: ArrayBuffer; contentType: string }
-  | { status: 'error' };
+  /**
+   * `storeUnreachable` is the one failure with a different repair and different
+   * advice: the bytes are intact in a storage backend this deployment is not
+   * configured to reach (a provider switch whose old backend was decommissioned
+   * before the relocation finished), so telling the reader to download instead
+   * would send them at the same 503. Everything else is the generic failure.
+   */
+  | { status: 'error'; storeUnreachable: boolean };
 
 const LOADING: PreviewBytes = { status: 'loading' };
 
@@ -52,7 +59,8 @@ export function previewSourceKey(source: PreviewSource): string {
  * A failed read is `error`, never an empty result -- there is no such thing as
  * an attachment with no bytes, and rendering one as blank would claim there
  * is. An abandoned request (source changed, preview closed) sets nothing at
- * all.
+ * all. A staged `File` cannot reach a storage backend at all, so its failures
+ * are never `storeUnreachable`.
  *
  * Returns `null` for a `null` source (the preview is closed), so the caller
  * can hold one hook whether or not anything is open.
@@ -96,7 +104,13 @@ export function useAttachmentBytes(
         if (controller.signal.aborted) return;
         if (currentKeyRef.current !== key) return;
         logger.error('Failed to load attachment bytes:', error);
-        setAnswer({ key, result: { status: 'error' } });
+        setAnswer({
+          key,
+          result: {
+            status: 'error',
+            storeUnreachable: isStoreUnreachable(error),
+          },
+        });
       });
 
     return () => {

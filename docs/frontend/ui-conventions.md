@@ -180,6 +180,13 @@ Four rules the viewer holds, each with a test:
   `useAttachmentBytes` keys the payload to its source, so switching Enhanced to
   Original and back cannot paint the slower answer over the newer one, and a
   failed read is `error`, never an empty result.
+- **One failure is told apart from the rest: a storage backend this deployment
+  cannot reach.** The server answers a 503 naming it
+  (`AttachmentStorageRegistry.require`, for a row whose bytes a provider switch
+  has not relocated yet), `isStoreUnreachable` recognises it and the viewer says
+  the file is intact and cannot be served from here. The generic message ends
+  "you can still download the file", which for this state is false: the download
+  is the same request. `attachments.preview.storeUnavailable` is that message.
 - **pdf.js is reached from one module behind a dynamic import.**
   `lib/attachment-preview/pdf-engine.ts` is the only file naming `pdfjs-dist`
   or `/vendor/pdfjs/`, and `PdfPages` is the only place it is `import()`ed, so

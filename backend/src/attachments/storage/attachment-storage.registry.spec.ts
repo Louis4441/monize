@@ -1,6 +1,9 @@
 import { ServiceUnavailableException } from "@nestjs/common";
 import { AttachmentStorageProvider } from "./attachment-storage.interface";
-import { AttachmentStorageRegistry } from "./attachment-storage.registry";
+import {
+  ATTACHMENT_STORE_UNREACHABLE_CODE,
+  AttachmentStorageRegistry,
+} from "./attachment-storage.registry";
 
 function store(name: string, addressable = true): AttachmentStorageProvider {
   return {
@@ -54,6 +57,24 @@ describe("AttachmentStorageRegistry", () => {
       // An operator reading "attachment unavailable" looks in the wrong place;
       // the provider name is what points at the setting to fix.
       expect(() => registry.require("s3")).toThrow(/s3/);
+    });
+
+    it("carries a stable code the client can match on", () => {
+      const registry = new AttachmentStorageRegistry(database, [database]);
+
+      // The status alone is not enough on the client: a reverse proxy answers 503
+      // when the backend is down, and the preview must not read that as "your
+      // file is in an unconfigured storage backend".
+      try {
+        registry.require("s3");
+        throw new Error("require should have refused");
+      } catch (error) {
+        const body = (error as ServiceUnavailableException).getResponse();
+        expect(body).toMatchObject({
+          code: ATTACHMENT_STORE_UNREACHABLE_CODE,
+          message: expect.stringContaining("s3"),
+        });
+      }
     });
 
     it("returns the provider when it is addressable", () => {

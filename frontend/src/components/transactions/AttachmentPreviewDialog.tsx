@@ -275,7 +275,16 @@ export function AttachmentPreviewDialog({
             role="alert"
             className="rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
           >
-            {t('preview.failed')}
+            {/*
+              Two different facts, so two different messages. The generic one
+              says the file can still be downloaded; when the server answered
+              that it cannot reach the backend holding these bytes, the download
+              is the same request and fails the same way -- and the file is not
+              lost, which is what the reader most needs to know.
+            */}
+            {bytes.storeUnreachable
+              ? t('preview.storeUnavailable')
+              : t('preview.failed')}
           </div>
         )}
         {ready && isImage && imageUrl && (

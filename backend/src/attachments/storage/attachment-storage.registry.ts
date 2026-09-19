@@ -25,6 +25,32 @@ import { AttachmentStorageProvider } from "./attachment-storage.interface";
  * its type in any case, so a second name for the same thing would be one more
  * thing to keep in step.
  */
+/**
+ * The refusal for a row whose backend this deployment cannot address.
+ *
+ * `503` with a **code**, following `BackupPasswordRequiredError`: the client has
+ * to tell this apart from every other failure, and a bare status cannot carry
+ * that. A reverse proxy answers 503 when the backend is down, and a preview that
+ * read the status alone would tell the reader their file is in an unconfigured
+ * storage backend during an ordinary outage. The code is what
+ * `isStoreUnreachable` (`frontend/src/lib/attachments.ts`) matches on.
+ */
+export class AttachmentStoreUnreachableError extends ServiceUnavailableException {
+  constructor(readonly providerName: string) {
+    super({
+      message: tr(
+        "errors.attachments.storageUnavailable",
+        `This attachment's file is held in the "${providerName}" storage backend, which this server is not configured to reach`,
+        { provider: providerName },
+      ),
+      code: ATTACHMENT_STORE_UNREACHABLE_CODE,
+    });
+  }
+}
+
+/** The stable code on that refusal's body, matched by the client. */
+export const ATTACHMENT_STORE_UNREACHABLE_CODE = "ATTACHMENT_STORE_UNREACHABLE";
+
 export class AttachmentStorageRegistry {
   constructor(
     /** Where new bytes go: the provider `ATTACHMENT_STORAGE_PROVIDER` selected. */
@@ -74,22 +100,15 @@ export class AttachmentStorageRegistry {
   /**
    * The provider for a row, or a refusal that says which backend is missing.
    *
-   * A `ServiceUnavailableException` rather than the `NotFoundException` a missing
-   * object gets: nothing is lost, one setting is absent, and the two have
-   * different repairs. Naming the provider is the whole value of the message --
-   * "attachment unavailable" sends an operator to the wrong place.
+   * The refusal is `AttachmentStoreUnreachableError`, deliberately not the
+   * `NotFoundException` a missing object gets: nothing is lost, one setting is
+   * absent, and the two have different repairs. Naming the provider is the whole
+   * value of the message -- "attachment unavailable" sends an operator to the
+   * wrong place.
    */
   require(providerName: string): AttachmentStorageProvider {
     const provider = this.resolve(providerName);
-    if (!provider) {
-      throw new ServiceUnavailableException(
-        tr(
-          "errors.attachments.storageUnavailable",
-          `This attachment's file is held in the "${providerName}" storage backend, which this server is not configured to reach`,
-          { provider: providerName },
-        ),
-      );
-    }
+    if (!provider) throw new AttachmentStoreUnreachableError(providerName);
     return provider;
   }
 

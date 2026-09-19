@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios';
 import apiClient from './api';
 import { Attachment } from '@/types/attachment';
 import { invalidateCache } from './apiCache';
@@ -9,6 +10,78 @@ import { invalidateCache } from './apiCache';
  */
 export function attachmentDownloadUrl(id: string): string {
   return `/api/v1/attachments/${id}/download`;
+}
+
+/**
+ * The code the server puts on that one refusal (`AttachmentStoreUnreachableError`).
+ * Mirrored here rather than imported: the client and the server share the string,
+ * not the module.
+ */
+export const ATTACHMENT_STORE_UNREACHABLE_CODE = 'ATTACHMENT_STORE_UNREACHABLE';
+
+/**
+ * Whether a failed read means "this deployment cannot reach the backend holding
+ * these bytes".
+ *
+ * It is the one attachment failure a reader can do something about: nothing is
+ * lost, a setting is missing, and downloading fails for the same reason -- so the
+ * usual "you can still download the file" advice is wrong for it. Everything
+ * else, including a 404, stays the generic failure.
+ *
+ * Matched on the **code**, not the status. A reverse proxy answers 503 when the
+ * backend is down, and reading the status alone would tell the reader their file
+ * sits in an unconfigured storage backend during an ordinary outage.
+ */
+export function isStoreUnreachable(error: unknown): boolean {
+  if (!isAxiosError(error) || error.response?.status !== 503) return false;
+  return errorCode(error.response.data) === ATTACHMENT_STORE_UNREACHABLE_CODE;
+}
+
+/**
+ * The `code` on an error body, whatever shape axios handed back.
+ *
+ * `fetchBytes` asks for an `arraybuffer`, and axios applies that to the error
+ * response too -- so the body of a refusal arrives as bytes and has to be decoded
+ * before it can be read. Duck-typed rather than `instanceof ArrayBuffer`: a buffer
+ * that crossed a realm boundary (jsdom in the tests, a worker in a browser) fails
+ * that check while decoding perfectly well, and the whole point of this function
+ * is to be right about the body it is actually given. A body that is not JSON, or
+ * carries no code, is not this failure.
+ */
+function errorCode(body: unknown): string | undefined {
+  const text = decodeBody(body);
+  if (text === null) {
+    return typeof body === 'object' && body !== null
+      ? (body as { code?: string }).code
+      : undefined;
+  }
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return typeof parsed === 'object' && parsed !== null
+      ? (parsed as { code?: string }).code
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** A response body as text, or `null` when it is not text or bytes. */
+function decodeBody(body: unknown): string | null {
+  if (typeof body === 'string') return body;
+  if (ArrayBuffer.isView(body)) return new TextDecoder().decode(body);
+  const maybeBuffer = body as { byteLength?: unknown } | null;
+  if (
+    typeof body === 'object' &&
+    body !== null &&
+    typeof maybeBuffer?.byteLength === 'number'
+  ) {
+    try {
+      return new TextDecoder().decode(body as ArrayBuffer);
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 /** An attachment's bytes, as the preview reads them. */

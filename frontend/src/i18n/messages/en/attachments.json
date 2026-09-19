@@ -70,6 +70,7 @@
   "preview": {
     "loading": "Loading preview…",
     "failed": "The preview could not be loaded. You can still download the file.",
+    "storeUnavailable": "This file is stored in a storage backend this server cannot currently reach, so it cannot be previewed or downloaded. Nothing is lost: ask your administrator to restore the attachment storage settings.",
     "unsupported": "This file type cannot be previewed. You can still download it.",
     "fit": "Fit to screen",
     "actualSize": "Actual size",

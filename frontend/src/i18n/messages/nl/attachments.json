@@ -70,6 +70,7 @@
   "preview": {
     "loading": "Voorbeeld wordt geladen…",
     "failed": "Het voorbeeld kon niet worden geladen. U kunt het bestand nog steeds downloaden.",
+    "storeUnavailable": "Dit bestand staat in een opslag die deze server nu niet kan bereiken, dus het kan niet worden bekeken of gedownload. Er is niets verloren: vraag je beheerder de instellingen voor bijlageopslag te herstellen.",
     "unsupported": "Van dit bestandstype kan geen voorbeeld worden getoond. U kunt het nog steeds downloaden.",
     "fit": "Passend op scherm",
     "actualSize": "Ware grootte",

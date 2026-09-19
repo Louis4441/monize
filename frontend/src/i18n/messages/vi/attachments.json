@@ -70,6 +70,7 @@
   "preview": {
     "loading": "Đang tải bản xem trước…",
     "failed": "Không thể tải bản xem trước. Bạn vẫn có thể tải tệp xuống.",
+    "storeUnavailable": "Tệp này nằm trong bộ lưu trữ mà máy chủ hiện không thể truy cập, nên không thể xem trước hay tải xuống. Không có gì bị mất: hãy nhờ quản trị viên khôi phục cài đặt lưu trữ tệp đính kèm.",
     "unsupported": "Không thể xem trước loại tệp này. Bạn vẫn có thể tải nó xuống.",
     "fit": "Vừa màn hình",
     "actualSize": "Kích thước thật",

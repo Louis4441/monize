@@ -70,6 +70,7 @@
   "preview": {
     "loading": "Cargando la vista previa…",
     "failed": "No se pudo cargar la vista previa. Aún puedes descargar el archivo.",
+    "storeUnavailable": "Este archivo está en un almacenamiento al que este servidor no puede acceder ahora mismo, por lo que no se puede previsualizar ni descargar. No se ha perdido nada: pide a tu administración que restaure la configuración de almacenamiento de adjuntos.",
     "unsupported": "Este tipo de archivo no se puede previsualizar. Aún puedes descargarlo.",
     "fit": "Ajustar a la pantalla",
     "actualSize": "Tamaño real",

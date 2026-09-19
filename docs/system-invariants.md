@@ -2822,7 +2822,10 @@ Statement           An attachment's bytes are read from the backend its own row
 Enforcement         Reads go through AttachmentStorageRegistry (resolve/require on
                     row.storage_provider), so the bound provider is consulted only
                     for where NEW bytes go; an unaddressable backend is a
-                    ServiceUnavailableException naming it, never a 404.
+                    ServiceUnavailableException naming it, never a 404, and the
+                    preview renders that state as "intact, not servable from here"
+                    rather than offering a download that fails identically
+                    (isStoreUnreachable).
                     AttachmentStorageMigrator (onApplicationBootstrap, plus hourly
                     at :50) does the move per attachment inside one transaction:
                     SELECT ... FOR UPDATE, check the source bytes against the row's

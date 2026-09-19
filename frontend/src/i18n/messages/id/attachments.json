@@ -70,6 +70,7 @@
   "preview": {
     "loading": "Memuat pratinjau…",
     "failed": "Pratinjau tidak dapat dimuat. Anda tetap dapat mengunduh berkasnya.",
+    "storeUnavailable": "Berkas ini berada di penyimpanan yang saat ini tidak dapat dijangkau server, jadi tidak bisa dipratinjau atau diunduh. Tidak ada yang hilang: minta administrator memulihkan pengaturan penyimpanan lampiran.",
     "unsupported": "Jenis berkas ini tidak dapat dipratinjau. Anda tetap dapat mengunduhnya.",
     "fit": "Sesuaikan dengan layar",
     "actualSize": "Ukuran sebenarnya",
