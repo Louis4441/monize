@@ -663,8 +663,8 @@
     },
     "never": "Nie",
     "coverage": {
-      "accounts": "Gilt für {count} aktive {count, plural, one {Konto} other {Konten}} dieser Installation.",
-      "unknown": "Die Anzahl der von dieser Richtlinie erfassten Konten ist nicht verfügbar."
+      "accounts": "Geplant für {scheduled} von {total} aktive {total, plural, one {Konto} other {Konten}} dieser Installation.",
+      "unknown": "Wie weit diese Richtlinie reicht, ist nicht verfügbar."
     },
     "storage": {
       "heading": "Sicherungsspeicher",

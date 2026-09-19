@@ -663,8 +663,8 @@
     },
     "never": "Nunca",
     "coverage": {
-      "accounts": "Cubre {count} {count, plural, one {cuenta activa} other {cuentas activas}} de este despliegue.",
-      "unknown": "El número de cuentas que cubre esta política no está disponible."
+      "accounts": "Programada en {scheduled} de {total} {total, plural, one {cuenta activa} other {cuentas activas}} de este despliegue.",
+      "unknown": "Hasta dónde llega esta política no está disponible."
     },
     "storage": {
       "heading": "Almacenamiento de copias",

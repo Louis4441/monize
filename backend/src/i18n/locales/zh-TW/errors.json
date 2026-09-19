@@ -216,7 +216,8 @@
     "offsiteOwnCredentialsRequired": "請輸入該儲存貯體的存取金鑰 ID 與私密存取金鑰。",
     "offsiteEncryptionKeyRequired": "由於未設定 ENCRYPTION_KEY，此伺服器無法儲存 S3 認證資訊。請要求管理員進行設定，或使用此部署的儲存貯體。",
     "offsiteEmailAddressRequired": "請輸入備份要寄送到的電子郵件地址。",
-    "manualRunFailed": "未寫入任何備份：{{ count }} 個帳戶失敗。第一個錯誤：{{ reason }}"
+    "manualRunFailed": "未寫入任何備份：{{ count }} 個帳戶失敗。第一個錯誤：{{ reason }}",
+    "manualRunInProgress": "本部署已有一個針對所有帳戶的備份正在執行。請等待完成後再試。"
   },
   "budgets": {
     "notFound": "找不到 ID 為 {{ id }} 的預算",

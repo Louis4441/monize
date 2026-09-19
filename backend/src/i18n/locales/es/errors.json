@@ -216,7 +216,8 @@
     "offsiteOwnCredentialsRequired": "Introduzca un id de clave de acceso y una clave de acceso secreta para su bucket.",
     "offsiteEncryptionKeyRequired": "Este servidor no puede almacenar credenciales de S3 porque ENCRYPTION_KEY no está configurada. Pida a un administrador que la configure o use el bucket de la instalación.",
     "offsiteEmailAddressRequired": "Indique la dirección a la que se deben enviar sus copias de seguridad.",
-    "manualRunFailed": "No se pudo escribir ninguna copia de seguridad: fallaron {{ count }} cuentas. Primer error: {{ reason }}"
+    "manualRunFailed": "No se pudo escribir ninguna copia de seguridad: fallaron {{ count }} cuentas. Primer error: {{ reason }}",
+    "manualRunInProgress": "Ya se está ejecutando una copia de seguridad de todas las cuentas en este despliegue. Espere a que termine e inténtelo de nuevo."
   },
   "budgets": {
     "notFound": "Presupuesto con ID {{ id }} no encontrado",

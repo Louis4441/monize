@@ -663,8 +663,8 @@
     },
     "never": "Mai",
     "coverage": {
-      "accounts": "Copre {count} {count, plural, one {account attivo} other {account attivi}} di questo deployment.",
-      "unknown": "Il numero di account coperti da questa politica non è disponibile."
+      "accounts": "Pianificata su {scheduled} di {total} {total, plural, one {account attivo} other {account attivi}} di questo deployment.",
+      "unknown": "Fin dove arriva questa politica non è disponibile."
     },
     "storage": {
       "heading": "Spazio dei backup",

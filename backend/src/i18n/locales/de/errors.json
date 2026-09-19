@@ -216,7 +216,8 @@
     "offsiteOwnCredentialsRequired": "Geben Sie eine Access Key ID und einen Secret Access Key für Ihren Bucket an.",
     "offsiteEncryptionKeyRequired": "Dieser Server kann keine S3-Zugangsdaten speichern, weil ENCRYPTION_KEY nicht gesetzt ist. Bitten Sie einen Administrator, ihn zu konfigurieren, oder verwenden Sie den Bucket dieser Installation.",
     "offsiteEmailAddressRequired": "Geben Sie die Adresse an, an die Ihre Backups gesendet werden sollen.",
-    "manualRunFailed": "Es konnte keine Sicherung geschrieben werden: {{ count }} Konten sind fehlgeschlagen. Erster Fehler: {{ reason }}"
+    "manualRunFailed": "Es konnte keine Sicherung geschrieben werden: {{ count }} Konten sind fehlgeschlagen. Erster Fehler: {{ reason }}",
+    "manualRunInProgress": "Auf dieser Installation läuft bereits eine Sicherung aller Konten. Warten Sie, bis sie abgeschlossen ist, und versuchen Sie es erneut."
   },
   "budgets": {
     "notFound": "Budget mit ID {{ id }} nicht gefunden",

@@ -663,8 +663,8 @@
     },
     "never": "從未",
     "coverage": {
-      "accounts": "涵蓋本部署中的 {count} 個啟用帳戶。",
-      "unknown": "無法取得此原則涵蓋的帳戶數量。"
+      "accounts": "已為本部署 {total} 個啟用帳戶中的 {scheduled} 個排定排程。",
+      "unknown": "無法取得此原則的涵蓋範圍。"
     },
     "storage": {
       "heading": "備份儲存區",

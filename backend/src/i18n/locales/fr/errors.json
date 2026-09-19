@@ -216,7 +216,8 @@
     "offsiteOwnCredentialsRequired": "Saisissez un identifiant de clé d'accès et une clé d'accès secrète pour votre bucket.",
     "offsiteEncryptionKeyRequired": "Ce serveur ne peut pas stocker d'identifiants S3 car ENCRYPTION_KEY n'est pas défini. Demandez à un administrateur de le configurer, ou utilisez le bucket de l'installation.",
     "offsiteEmailAddressRequired": "Indiquez l'adresse à laquelle vos sauvegardes doivent être envoyées.",
-    "manualRunFailed": "Aucune sauvegarde n'a pu être écrite : {{ count }} comptes ont échoué. Première erreur : {{ reason }}"
+    "manualRunFailed": "Aucune sauvegarde n'a pu être écrite : {{ count }} comptes ont échoué. Première erreur : {{ reason }}",
+    "manualRunInProgress": "Une sauvegarde de tous les comptes est déjà en cours sur ce déploiement. Attendez qu'elle se termine et réessayez."
   },
   "budgets": {
     "notFound": "Budget avec l'ID {{ id }} introuvable",

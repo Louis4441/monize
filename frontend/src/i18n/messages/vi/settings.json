@@ -663,8 +663,8 @@
     },
     "never": "Không bao giờ",
     "coverage": {
-      "accounts": "Bao gồm {count} tài khoản đang hoạt động trên bản triển khai này.",
-      "unknown": "Không có thông tin về số tài khoản mà chính sách này bao gồm."
+      "accounts": "Đã lên lịch cho {scheduled} trên {total} tài khoản đang hoạt động của bản triển khai này.",
+      "unknown": "Không có thông tin về phạm vi của chính sách này."
     },
     "storage": {
       "heading": "Kho lưu trữ bản sao lưu",

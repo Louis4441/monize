@@ -216,7 +216,8 @@
     "offsiteOwnCredentialsRequired": "Hãy nhập access key id và secret access key cho bucket của bạn.",
     "offsiteEncryptionKeyRequired": "Máy chủ này không thể lưu thông tin xác thực S3 vì ENCRYPTION_KEY chưa được đặt. Hãy đề nghị quản trị viên cấu hình nó, hoặc dùng bucket của bản triển khai này.",
     "offsiteEmailAddressRequired": "Hãy nhập địa chỉ mà các bản sao lưu của bạn sẽ được gửi tới.",
-    "manualRunFailed": "Không ghi được bản sao lưu nào: {{ count }} tài khoản thất bại. Lỗi đầu tiên: {{ reason }}"
+    "manualRunFailed": "Không ghi được bản sao lưu nào: {{ count }} tài khoản thất bại. Lỗi đầu tiên: {{ reason }}",
+    "manualRunInProgress": "Bản sao lưu mọi tài khoản đang chạy trên bản triển khai này. Hãy đợi hoàn tất rồi thử lại."
   },
   "budgets": {
     "notFound": "Không tìm thấy ngân sách với ID {{ id }}",

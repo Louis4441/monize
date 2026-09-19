@@ -663,8 +663,8 @@
     },
     "never": "Jamais",
     "coverage": {
-      "accounts": "Couvre {count} {count, plural, one {compte actif} other {comptes actifs}} de ce déploiement.",
-      "unknown": "Le nombre de comptes couverts par cette politique n'est pas disponible."
+      "accounts": "Planifiée sur {scheduled} des {total} {total, plural, one {compte actif} other {comptes actifs}} de ce déploiement.",
+      "unknown": "La portée de cette politique n'est pas disponible."
     },
     "storage": {
       "heading": "Stockage des sauvegardes",

@@ -216,7 +216,8 @@
     "offsiteOwnCredentialsRequired": "Vul een access key id en een secret access key voor je bucket in.",
     "offsiteEncryptionKeyRequired": "Deze server kan geen S3-inloggegevens opslaan omdat ENCRYPTION_KEY niet is ingesteld. Vraag een beheerder om die te configureren, of gebruik de bucket van deze installatie.",
     "offsiteEmailAddressRequired": "Vul het adres in waarnaar je back-ups gemaild moeten worden.",
-    "manualRunFailed": "Er kon geen enkele back-up worden geschreven: {{ count }} accounts zijn mislukt. Eerste fout: {{ reason }}"
+    "manualRunFailed": "Er kon geen enkele back-up worden geschreven: {{ count }} accounts zijn mislukt. Eerste fout: {{ reason }}",
+    "manualRunInProgress": "Er loopt al een back-up van elk account op deze installatie. Wacht tot die klaar is en probeer het opnieuw."
   },
   "budgets": {
     "notFound": "Budget met ID {{ id }} niet gevonden",

@@ -663,8 +663,8 @@
     },
     "never": "从未",
     "coverage": {
-      "accounts": "覆盖本部署中的 {count} 个启用账户。",
-      "unknown": "无法获取此策略覆盖的账户数量。"
+      "accounts": "已为本部署 {total} 个启用账户中的 {scheduled} 个排定计划。",
+      "unknown": "无法获取此策略的覆盖范围。"
     },
     "storage": {
       "heading": "备份存储",

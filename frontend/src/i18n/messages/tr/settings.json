@@ -663,8 +663,8 @@
     },
     "never": "Hiçbir zaman",
     "coverage": {
-      "accounts": "Bu kurulumdaki {count} etkin hesabı kapsar.",
-      "unknown": "Bu ilkenin kapsadığı hesap sayısı kullanılamıyor."
+      "accounts": "Bu kurulumdaki {total} etkin hesabın {scheduled} tanesinde zamanlandı.",
+      "unknown": "Bu ilkenin ne kadarını kapsadığı kullanılamıyor."
     },
     "storage": {
       "heading": "Yedek Depolaması",

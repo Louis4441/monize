@@ -663,8 +663,8 @@
     },
     "never": "Nigdy",
     "coverage": {
-      "accounts": "Obejmuje {count} aktywnych kont w tym wdrożeniu.",
-      "unknown": "Liczba kont objętych tą polityką jest niedostępna."
+      "accounts": "Zaplanowana dla {scheduled} z {total} aktywnych kont w tym wdrożeniu.",
+      "unknown": "Zasięg tej polityki jest niedostępny."
     },
     "storage": {
       "heading": "Magazyn kopii zapasowych",

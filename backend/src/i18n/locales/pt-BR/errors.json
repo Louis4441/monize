@@ -216,7 +216,8 @@
     "offsiteOwnCredentialsRequired": "Informe um id de chave de acesso e uma chave de acesso secreta do seu bucket.",
     "offsiteEncryptionKeyRequired": "Este servidor não pode armazenar credenciais do S3 porque ENCRYPTION_KEY não está definida. Peça a um administrador que a configure ou use o bucket desta instalação.",
     "offsiteEmailAddressRequired": "Informe o endereço para o qual os seus backups devem ser enviados.",
-    "manualRunFailed": "Não foi possível gravar nenhum backup: {{ count }} contas falharam. Primeiro erro: {{ reason }}"
+    "manualRunFailed": "Não foi possível gravar nenhum backup: {{ count }} contas falharam. Primeiro erro: {{ reason }}",
+    "manualRunInProgress": "Já está em andamento um backup de todas as contas nesta implantação. Aguarde a conclusão e tente novamente."
   },
   "budgets": {
     "notFound": "Orçamento com ID {{ id }} não encontrado",

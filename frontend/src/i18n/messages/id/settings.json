@@ -663,8 +663,8 @@
     },
     "never": "Tidak pernah",
     "coverage": {
-      "accounts": "Mencakup {count} akun aktif pada deployment ini.",
-      "unknown": "Jumlah akun yang dicakup kebijakan ini tidak tersedia."
+      "accounts": "Terjadwal pada {scheduled} dari {total} akun aktif pada deployment ini.",
+      "unknown": "Sejauh mana kebijakan ini menjangkau tidak tersedia."
     },
     "storage": {
       "heading": "Penyimpanan Cadangan",

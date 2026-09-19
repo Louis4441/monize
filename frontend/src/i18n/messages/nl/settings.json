@@ -663,8 +663,8 @@
     },
     "never": "Nooit",
     "coverage": {
-      "accounts": "Geldt voor {count} {count, plural, one {actief account} other {actieve accounts}} op deze installatie.",
-      "unknown": "Het aantal accounts dat dit beleid dekt, is niet beschikbaar."
+      "accounts": "Gepland op {scheduled} van {total} {total, plural, one {actief account} other {actieve accounts}} op deze installatie.",
+      "unknown": "Hoe ver dit beleid reikt, is niet beschikbaar."
     },
     "storage": {
       "heading": "Back-upopslag",

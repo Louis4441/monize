@@ -663,8 +663,8 @@
     },
     "never": "Nunca",
     "coverage": {
-      "accounts": "Abrange {count} {count, plural, one {conta ativa} other {contas ativas}} desta instalação.",
-      "unknown": "O número de contas abrangidas por esta política não está disponível."
+      "accounts": "Agendada em {scheduled} de {total} {total, plural, one {conta ativa} other {contas ativas}} desta instalação.",
+      "unknown": "O alcance desta política não está disponível."
     },
     "storage": {
       "heading": "Armazenamento das cópias",
