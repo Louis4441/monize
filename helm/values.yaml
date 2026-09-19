@@ -392,8 +392,8 @@ backend:
   #
   # Changing ATTACHMENT_STORAGE_PROVIDER relocates the attachments already
   # stored: the backend copies each one into the new backend, verifies the copy
-  # and deletes the original, starting a minute after boot and retrying hourly
-  # until none are left. Unlike the backup store above, this is not
+  # and deletes the original, starting on boot and retrying hourly at :50 until
+  # none are left. Unlike the backup store above, this is not
   # forward-only -- but it does mean **the backend being moved away from has to
   # stay configured and mounted until it finishes**, because each attachment is
   # read through the backend its own row names. Leaving `local` for `s3` is

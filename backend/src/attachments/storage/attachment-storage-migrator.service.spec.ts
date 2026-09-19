@@ -1,5 +1,5 @@
 import { ConfigService } from "@nestjs/config";
-import { NotFoundException } from "@nestjs/common";
+import { Logger, NotFoundException } from "@nestjs/common";
 import { DataSource, EntityManager } from "typeorm";
 import { createHash } from "crypto";
 import {
@@ -8,10 +8,12 @@ import {
 } from "../../common/db/scoped-db";
 import { FetchSyncService } from "../../common/jobs/fetch-sync.service";
 import { AttachmentOrphanSweeper } from "../attachment-orphan-sweeper.service";
+import { getRequestContext } from "../../common/request-context";
 import { AttachmentStorageProvider } from "./attachment-storage.interface";
 import { AttachmentStorageRegistry } from "./attachment-storage.registry";
 import {
   AttachmentStorageMigrator,
+  MAX_REPORTED_FAILURES,
   RELOCATION_BATCH,
 } from "./attachment-storage-migrator.service";
 
@@ -33,23 +35,41 @@ interface FakeStore extends AttachmentStorageProvider {
   save: jest.Mock;
   load: jest.Mock;
   delete: jest.Mock;
+  /**
+   * The ambient identity each call ran under.
+   *
+   * `withScopedDb` is mocked in this file, so nothing else here would notice the
+   * relocation running with no identity context -- and under RLS that is every
+   * statement in it reading zero rows. Recording it at the seam that does the I/O
+   * is what makes "each attachment moves under its owner's identity" a fact this
+   * suite can fail on.
+   */
+  contexts: Array<string | undefined>;
 }
 
 function makeStore(name: string, addressable = true): FakeStore {
   const objects = new Map<string, Buffer>();
+  const contexts: Array<string | undefined> = [];
+  const note = (): void => {
+    contexts.push(getRequestContext()?.userId);
+  };
   return {
     name,
     addressable,
     objects,
+    contexts,
     save: jest.fn(async (key: string, data: Buffer) => {
+      note();
       objects.set(key, Buffer.from(data));
     }),
     load: jest.fn(async (key: string) => {
+      note();
       const found = objects.get(key);
       if (!found) throw new NotFoundException("no such object");
       return found;
     }),
     delete: jest.fn(async (key: string) => {
+      note();
       objects.delete(key);
     }),
   };
@@ -181,10 +201,47 @@ describe("AttachmentStorageMigrator", () => {
         skipped: 0,
         failed: 0,
         unreachable: 0,
+        failedIds: [],
       });
       expect(destination.objects.get(ATTACHMENT)).toEqual(BYTES);
       const flip = sqlLike("SET storage_provider")[0];
       expect(flip).toContain("WHERE id = $2 AND storage_provider = $3");
+    });
+
+    it("moves each attachment under its owner's identity", async () => {
+      await migrator.relocateAll("test");
+
+      // Every statement in the per-row work is one the owner's own RLS policies
+      // admit; only the cross-user scan runs under system context. Asserted at
+      // the store seam because `withScopedDb` is mocked here.
+      expect(source.contexts).toEqual([OWNER]);
+      expect(destination.contexts).toEqual([OWNER, OWNER]);
+    });
+
+    it("re-reads the row under a lock before writing anything", async () => {
+      await migrator.relocateAll("test");
+
+      // The lock is what makes "two replicas cannot both flip this row" true, and
+      // what makes every check in the transaction final. Asserted, not inferred
+      // from the double's routing.
+      const locking = sqlLike("FROM transaction_attachments").find((sql) =>
+        sql.includes("FOR UPDATE"),
+      );
+      expect(locking).toContain("WHERE id = $1 AND storage_provider = $2");
+      const lockedAt = statements().indexOf(locking!);
+      const flipAt = statements().findIndex((sql) =>
+        sql.includes("SET storage_provider"),
+      );
+      expect(lockedAt).toBeLessThan(flipAt);
+      expect(lockedAt).toBeGreaterThan(-1);
+    });
+
+    it("binds the batch size rather than interpolating it", async () => {
+      await migrator.relocateAll("test");
+
+      // Parameterized SQL only: a constant today is a configurable tomorrow.
+      const scan = sqlLike("ORDER BY id")[0];
+      expect(scan).toContain("LIMIT $3");
     });
 
     it("reads the copy back before anything is deleted", async () => {
@@ -280,6 +337,7 @@ describe("AttachmentStorageMigrator", () => {
         skipped: 0,
         failed: 0,
         unreachable: 1,
+        failedIds: [],
       });
       expect(destination.save).not.toHaveBeenCalled();
       expect(statements().some((sql) => sql.includes("tombstones"))).toBe(
@@ -388,6 +446,7 @@ describe("AttachmentStorageMigrator", () => {
         skipped: 0,
         failed: 0,
         unreachable: 0,
+        failedIds: [],
       });
       expect(fetchSync.withLease).toHaveBeenCalledTimes(1);
     });
@@ -403,6 +462,65 @@ describe("AttachmentStorageMigrator", () => {
 
       expect(outcome.failed).toBe(1);
       expect(source.objects.has(ATTACHMENT)).toBe(true);
+    });
+
+    it("names what it could not move once per pass, not once per attachment", async () => {
+      // A row that can never move is re-read every hour. The pass says which
+      // attachments those are, in one line; the reason per attachment is a level
+      // down, so the log an operator reads does not fill up with it.
+      const warn = jest.spyOn(Logger.prototype, "warn");
+      const debug = jest.spyOn(Logger.prototype, "debug");
+      source.objects.delete(ATTACHMENT);
+
+      const outcome = await migrator.relocateAll("test");
+
+      expect(outcome.failed).toBe(1);
+      expect(outcome.failedIds).toEqual([ATTACHMENT]);
+      const summaries = warn.mock.calls.map((call) => String(call[0]));
+      expect(summaries).toHaveLength(1);
+      expect(summaries[0]).toContain(ATTACHMENT);
+      expect(summaries[0]).toContain("left in place after an error");
+      expect(
+        debug.mock.calls.some((call) => String(call[0]).includes(ATTACHMENT)),
+      ).toBe(true);
+    });
+
+    it("caps the named failures so the summary stays one line", async () => {
+      const ids = Array.from(
+        { length: MAX_REPORTED_FAILURES + 3 },
+        (_, i) =>
+          `${String(i + 10).padStart(8, "0")}-2222-4222-8222-222222222222`,
+      );
+      pending = ids.map((id) => row({ id, storage_key: id }));
+      // No bytes for any of them, so every row fails.
+      source.objects.clear();
+
+      const outcome = await migrator.relocateAll("test");
+
+      expect(outcome.failed).toBe(ids.length);
+      expect(outcome.failedIds).toHaveLength(MAX_REPORTED_FAILURES);
+    });
+
+    it("writes nothing when the active backend itself is not configured", async () => {
+      // `ATTACHMENT_STORAGE_PROVIDER=s3` with no bucket: the boot does not refuse
+      // it, so the relocation would otherwise walk the whole table every hour to
+      // fail on every row, paying a tombstone write each time.
+      const unconfigured = makeStore("s3", false);
+      build([unconfigured, source], unconfigured);
+
+      const outcome = await migrator.relocateAll("test");
+
+      expect(outcome).toEqual({
+        moved: 0,
+        skipped: 0,
+        failed: 0,
+        unreachable: 0,
+        failedIds: [],
+      });
+      expect(fetchSync.withLease).not.toHaveBeenCalled();
+      expect(statements().some((sql) => sql.includes("tombstones"))).toBe(
+        false,
+      );
     });
 
     it("does nothing at all when no row is outside the active backend", async () => {
@@ -426,9 +544,13 @@ describe("AttachmentStorageMigrator", () => {
     });
 
     it("starts on boot without making the boot wait for it", () => {
-      const relocate = jest
-        .spyOn(migrator, "relocateAll")
-        .mockResolvedValue({ moved: 0, skipped: 0, failed: 0, unreachable: 0 });
+      const relocate = jest.spyOn(migrator, "relocateAll").mockResolvedValue({
+        moved: 0,
+        skipped: 0,
+        failed: 0,
+        unreachable: 0,
+        failedIds: [],
+      });
 
       // Returns void, synchronously: Nest awaits bootstrap hooks inside
       // `app.listen()`, so a hook that awaited the copy would hold the port shut.

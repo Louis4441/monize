@@ -916,10 +916,13 @@ CREATE TABLE update_check_state (
     last_error TEXT
 );
 
--- Deployment-wide leases for the three outbound market-data fetch jobs
--- (exchange rates, security prices, market indexes). Each cron fires on every
--- replica; the writes underneath are idempotent upserts, so the data converges
--- and only the provider bill does not. A lease rather than a permanent claim,
+-- Deployment-wide leases for the jobs one replica should run per tick: the three
+-- outbound market-data fetches (exchange rates, security prices, market indexes)
+-- and the attachment relocation pass that follows a storage-provider switch.
+-- Each fires on every replica; the writes underneath converge whoever runs them
+-- (idempotent upserts; per-row, locked and keyed by attachment id for the
+-- relocation), so what a second replica duplicates is the cost and not the
+-- result. A lease rather than a permanent claim,
 -- because this is a cost control and a crashed holder must never block the next
 -- tick: lease_until is shorter than the cron interval. lease_token identifies
 -- the holder, so a worker delayed past its own expiry cannot release a lease

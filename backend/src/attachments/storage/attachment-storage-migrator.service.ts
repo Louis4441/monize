@@ -46,20 +46,49 @@ export const RELOCATION_LEASE_MS = 20 * 60 * 1000;
 /** Set `false` to leave attachments where they are after a provider switch. */
 const MIGRATE_ON_SWITCH_DEFAULT = true;
 
-/** What one pass did, for the log line and for the specs. */
-export interface RelocationOutcome {
-  /** Attachments whose bytes are now in the active backend. */
-  moved: number;
-  /** Rows another replica, or a concurrent edit, had already dealt with. */
-  skipped: number;
-  /** Rows left where they are, with the reason logged per row. */
-  failed: number;
-  /** Rows whose recorded backend this deployment cannot address. */
-  unreachable: number;
+/**
+ * How many attachments a pass reached each outcome, and which ones it could not
+ * move.
+ *
+ * The ids are here because the alternative was a log line per failed attachment
+ * on every pass. A row that can never move -- a file missing from the volume a
+ * database dump was restored without -- is re-read hourly forever, so per-row
+ * warnings are a flood that buries the log they are meant to inform, while a
+ * count alone cannot answer the only question an operator has: *which ones*. So
+ * the detail per attachment goes to `debug` and the pass names what it could not
+ * move, capped at `MAX_REPORTED_FAILURES`. `AttachmentOrphanSweeper` answers the
+ * same question from `attachment_blob_tombstones.attempts` / `last_error`; a
+ * relocation failure has no row of its own to record, and giving it one is a
+ * migration rather than a log line.
+ */
+export interface RelocationOutcome extends Record<RelocationTally, number> {
+  /** Attachments this pass could not move, capped for the summary line. */
+  failedIds: string[];
 }
+
+/** The four outcomes one attachment can reach, each a counter on the tally. */
+export type RelocationTally = "moved" | "skipped" | "failed" | "unreachable";
+
+/**
+ * How many failed attachment ids one summary line names.
+ *
+ * Enough to start an investigation, few enough that the line stays one line: an
+ * operator with four hundred unmovable attachments has a configuration problem,
+ * not four hundred separate problems.
+ */
+export const MAX_REPORTED_FAILURES = 10;
 
 /** One batch's tally, plus where the next batch resumes. */
 type RelocationBatch = RelocationOutcome & { cursor: string; scanned: number };
+
+/** A tally with nothing in it, which is also what a pass that does nothing returns. */
+const emptyOutcome = (): RelocationOutcome => ({
+  moved: 0,
+  skipped: 0,
+  failed: 0,
+  unreachable: 0,
+  failedIds: [],
+});
 
 /**
  * One row's worth of what the relocation needs to know.
@@ -131,6 +160,8 @@ export class AttachmentStorageMigrator implements OnApplicationBootstrap {
   private running = false;
   /** So a deployment with the relocation switched off says so once, not hourly. */
   private announcedDisabled = false;
+  /** The same, for an active backend this deployment cannot write to. */
+  private announcedUnaddressable = false;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -206,18 +237,20 @@ export class AttachmentStorageMigrator implements OnApplicationBootstrap {
    * winner that then dies.
    */
   async relocateAll(trigger: string): Promise<RelocationOutcome> {
-    const total: RelocationOutcome = {
-      moved: 0,
-      skipped: 0,
-      failed: 0,
-      unreachable: 0,
-    };
+    const total = emptyOutcome();
     if (this.running) return total;
     this.running = true;
     try {
       if (!(await this.hasPendingRows())) return total;
       if (!this.enabled) {
         this.announceDisabled();
+        return total;
+      }
+      if (!this.registry.active.addressable) {
+        // Nothing can be written to a backend this deployment cannot address, so
+        // walking the table to fail on every row would only cost a warning and
+        // two tombstone writes per attachment per hour.
+        this.announceUnaddressableDestination();
         return total;
       }
       this.logger.log(
@@ -252,6 +285,12 @@ export class AttachmentStorageMigrator implements OnApplicationBootstrap {
         total.skipped += done.skipped;
         total.failed += done.failed;
         total.unreachable += done.unreachable;
+        total.failedIds.push(
+          ...done.failedIds.slice(
+            0,
+            Math.max(0, MAX_REPORTED_FAILURES - total.failedIds.length),
+          ),
+        );
         if (done.scanned < RELOCATION_BATCH) break;
         cursor = done.cursor;
       }
@@ -279,6 +318,25 @@ export class AttachmentStorageMigrator implements OnApplicationBootstrap {
         `backend and ATTACHMENT_STORAGE_MIGRATE_ON_SWITCH=false, so they will not be ` +
         `moved. They stay readable from the backend each one names; keep it ` +
         `configured, or unset the variable to relocate them.`,
+    );
+  }
+
+  /**
+   * Say once that the backend new bytes are meant to go to cannot be reached.
+   *
+   * The boot does not refuse this configuration -- `S3StorageProvider` throws on
+   * first use, not at construction -- so a deployment naming `s3` with no bucket
+   * serves and uploads-fails happily. Attachments stay readable from wherever
+   * they are; what cannot happen is a copy into nowhere.
+   */
+  private announceUnaddressableDestination(): void {
+    if (this.announcedUnaddressable) return;
+    this.announcedUnaddressable = true;
+    this.logger.warn(
+      `Some attachments are stored outside the active "${this.registry.active.name}" ` +
+        `backend, and that backend is not configured (an s3 provider needs ` +
+        `ATTACHMENT_S3_BUCKET). They stay readable from the backend each one names; ` +
+        `nothing is moved until the active backend can be written to.`,
     );
   }
 
@@ -314,17 +372,18 @@ export class AttachmentStorageMigrator implements OnApplicationBootstrap {
             WHERE storage_provider <> $1
               AND ($2 = '' OR id > $2::uuid)
             ORDER BY id
-            LIMIT ${RELOCATION_BATCH}`,
-          [this.registry.active.name, cursor],
+            LIMIT $3`,
+          // Bound, not interpolated: the value is a constant here, and the one
+          // other raw query in this repository that takes a limit binds it too
+          // (`built-in-reports/data-quality-reports.service.ts`). A parameter
+          // cannot become an injection when somebody makes it configurable.
+          [this.registry.active.name, cursor, RELOCATION_BATCH],
         ),
       ),
     );
     const batch = returnedRows<RelocationRow>(rows);
-    const outcome = {
-      moved: 0,
-      skipped: 0,
-      failed: 0,
-      unreachable: 0,
+    const outcome: RelocationBatch = {
+      ...emptyOutcome(),
       cursor,
       scanned: batch.length,
     };
@@ -336,6 +395,12 @@ export class AttachmentStorageMigrator implements OnApplicationBootstrap {
         this.relocateRow(row),
       );
       outcome[result] += 1;
+      if (
+        result === "failed" &&
+        outcome.failedIds.length < MAX_REPORTED_FAILURES
+      ) {
+        outcome.failedIds.push(row.id);
+      }
     }
     return outcome;
   }
@@ -350,9 +415,7 @@ export class AttachmentStorageMigrator implements OnApplicationBootstrap {
    * so the one outcome that cannot happen is a committed row naming bytes that were
    * swept (audit RV4-002).
    */
-  private async relocateRow(
-    row: RelocationRow,
-  ): Promise<keyof RelocationOutcome> {
+  private async relocateRow(row: RelocationRow): Promise<RelocationTally> {
     const destination = this.registry.active;
     const source = this.registry.resolve(row.storage_provider);
     if (!source) return "unreachable";
@@ -366,7 +429,7 @@ export class AttachmentStorageMigrator implements OnApplicationBootstrap {
       RELOCATION_LEASE_MS,
     );
     let wroteObject = false;
-    let outcome: keyof RelocationOutcome = "failed";
+    let outcome: RelocationTally = "failed";
     try {
       outcome = await withScopedDb(this.dataSource, async (m) => {
         const locked = await this.lockRow(m, row.id, source.name);
@@ -376,8 +439,9 @@ export class AttachmentStorageMigrator implements OnApplicationBootstrap {
         if (!attachmentBytesConsistent(bytes, locked)) {
           // The source disagrees with its own metadata, so copying it would
           // publish a checksum the new backend cannot satisfy either. Left where
-          // it is and named in the log: the repair is a restore, not this pass.
-          this.logger.warn(
+          // it is; the repair is a restore, not this pass. At `debug` because the
+          // pass summary names the attachment and this line repeats hourly.
+          this.logger.debug(
             `Attachment ${row.id} was not relocated: the bytes in "${source.name}" ` +
               `do not match the size and checksum recorded for them`,
           );
@@ -402,7 +466,9 @@ export class AttachmentStorageMigrator implements OnApplicationBootstrap {
         return "moved";
       });
     } catch (error) {
-      this.logger.warn(
+      // At `debug` for the same reason: a row that can never move fails on every
+      // pass, and `report` is what says so once, with the ids.
+      this.logger.debug(
         `Attachment ${row.id} could not be moved from "${row.storage_provider}" to ` +
           `"${destination.name}": ${describe(error)}`,
       );
@@ -531,11 +597,23 @@ export class AttachmentStorageMigrator implements OnApplicationBootstrap {
 
   /** One line per pass, and silence when a pass had nothing to say. */
   private report(outcome: RelocationOutcome): void {
-    const { moved, skipped, failed, unreachable } = outcome;
+    const { moved, skipped, failed, unreachable, failedIds } = outcome;
     if (moved + failed + unreachable === 0) return;
     const parts = [`${moved} attachment(s) moved`];
     if (skipped > 0) parts.push(`${skipped} already moved elsewhere`);
-    if (failed > 0) parts.push(`${failed} left in place after an error`);
+    if (failed > 0) {
+      // The ids, because "40 left in place" cannot be investigated and
+      // "40 left in place: <id>, <id>, ..." can. The reason per attachment is one
+      // log level down, so a deployment that wants it can have it without every
+      // deployment carrying it hourly.
+      const named = failedIds.join(", ");
+      parts.push(
+        `${failed} left in place after an error` +
+          (named.length > 0
+            ? ` (${named}${failed > failedIds.length ? ", ..." : ""}; raise the log level to debug for the reason per attachment)`
+            : ""),
+      );
+    }
     if (unreachable > 0) {
       parts.push(
         `${unreachable} in a backend this deployment cannot address (configure it ` +

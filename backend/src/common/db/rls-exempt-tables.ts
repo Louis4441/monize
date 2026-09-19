@@ -27,7 +27,7 @@ export const RLS_EXEMPT_TABLES: Readonly<Record<string, string>> = {
   exchange_rates:
     "Global reference data with no owner column; written by the scheduled refresh under system context.",
   fetch_sync:
-    "Deployment-wide leases for the three outbound market-data fetch jobs; no owner column, one FX rate serves everybody.",
+    "Deployment-wide leases for the jobs one replica should run per tick (the three market-data fetches and the attachment relocation pass); no owner column, one FX rate serves everybody.",
   google_places_instance_usage:
     "Request counter for the operator's own Google Places key; no owner column, one key is one bill.",
   http_throttle_counters:
