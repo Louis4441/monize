@@ -1643,7 +1643,37 @@ external write, or reconstructibility; a backup object with no record is a
 storage cost, a record with no object is the failure. Keep the order the
 filesystem target has.
 
-**Notes:**
+**Notes:** Not started. `docs/specs/backup-storage-targets.md` is the spec, and
+it is **proposed, not approved**: no code lands until the maintainer answers its
+section 11. Writing it first was the maintainer's call, and the survey behind it
+turned up four things this task's Scope does not cover, each of which would have
+been discovered mid-implementation:
+
+- **`BACKUP_S3_*` is already taken**, by the off-machine destination's
+  deployment default. An `s3` store reusing that prefix would put the primary
+  artifact and its off-machine copy in one bucket by default, silently -- the
+  exact failure the off-machine feature exists to prevent. The store's variables
+  are `BACKUP_STORE_S3_*`, and the separation is proposed as INV-BACKUP-007
+  rather than left as a naming convention.
+- **`openStoredBackup` returns a filesystem path** and `backup.controller.ts`
+  opens it with `createReadStream`. An object store has no path, so the download
+  route changes shape; `backup-offsite-dispatch.service.ts` reads artifacts the
+  same way and moves with it. Neither file is in this task's Scope.
+- **`enforceRetention` is synchronous and sweeps a legacy flat folder** that only
+  ever existed on disk. It becomes async, and the legacy sweep is local-only.
+- **The per-user folder setting and the admin folder browser have no meaning on
+  object storage.** That is the one user-visible decision in the feature and it
+  is section 11's first question, with a recommendation rather than a choice made
+  for the maintainer.
+
+The spec also stages the work as three PRs -- the seam with a `local` target that
+changes nothing, then the `s3` target, then the boot matrix and the docs -- so
+the extraction is proven by the existing 3473-line spec suite before any new
+storage behaviour is added.
+
+No verification of the S3 half is possible in an agent session without Docker:
+the acceptance needs MinIO, and the `backend-integration-tests` job has only
+`postgres` today.
 
 ### C1 -- Budget period rollover under a per-owner `claimOnce`
 
