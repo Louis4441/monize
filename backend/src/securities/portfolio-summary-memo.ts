@@ -15,12 +15,14 @@ import { getRequestContext } from "../common/request-context";
  * rejection is never cached: the entry is dropped so the next caller recomputes
  * instead of inheriting a failure for a minute.
  *
- * It is process memory, deliberately, and the same bargain the intraday cache
- * next door already makes: with more than one replica, a write served by pod A
- * leaves pod B able to answer from its own memo for up to
- * {@link PORTFOLIO_SUMMARY_MEMO_TTL_MS} afterwards. Invalidation is therefore a
- * latency optimisation on the writing pod, not a distributed guarantee;
- * `docs/backend/securities-and-providers.md` states that explicitly.
+ * It is process memory, deliberately -- but its invalidation is not. A write
+ * served by pod A used to leave pod B answering from its own memo for up to
+ * {@link PORTFOLIO_SUMMARY_MEMO_TTL_MS}, which a load balancer with no affinity
+ * turns into "the trade I just entered is not there" on the very next read.
+ * Every invalidation is therefore announced on the `EventBus` and applied by
+ * every replica (see {@link PORTFOLIO_SUMMARY_INVALIDATION_CHANNEL}). The bus
+ * can drop a message, so the TTL remains the bound rather than the mechanism;
+ * `docs/backend/securities-and-providers.md` states what each one covers.
  */
 
 /** Same 60 s window the intraday price cache uses. */
@@ -168,7 +170,52 @@ class PortfolioSummaryMemo {
 export const portfolioSummaryMemo = new PortfolioSummaryMemo();
 
 /**
- * Forget a user's memoized valuations.
+ * The channel an invalidation travels on, so every replica drops the entry and
+ * not only the one that served the write.
+ *
+ * A memo invalidated locally is a valuation that survives on the replica that
+ * did not handle the POST, and a load balancer with no affinity sends the very
+ * next read there: the Investments page showed the portfolio as it was BEFORE
+ * the trade the person had just entered, for up to
+ * {@link PORTFOLIO_SUMMARY_MEMO_TTL_MS} (issue #1409, caught by the
+ * `CLUSTER_MODE=multi` E2E shard). Reading your own write is not a latency
+ * question.
+ *
+ * What travels is a user id, which is what `EventBus` exists to carry: the
+ * recipient drops a cache and recomputes from the database under its own scope,
+ * so nothing here is data and nothing is trusted. A lost `NOTIFY` leaves the
+ * TTL as the bound, exactly as before this channel existed -- the bus improves
+ * the common case and guarantees nothing, which is the contract
+ * `common/events/event-bus.interface.ts` states.
+ */
+export const PORTFOLIO_SUMMARY_INVALIDATION_CHANNEL =
+  "portfolio-summary:invalidate";
+
+/** Announces an invalidation to the other replicas; see the bridge. */
+export type PortfolioSummaryBroadcast = (
+  payload: Record<string, unknown>,
+) => void;
+
+let broadcast: PortfolioSummaryBroadcast | null = null;
+
+/**
+ * Register (or, with `null`, remove) the announcer.
+ *
+ * The memo is a module-level singleton precisely so the eight write seams can
+ * invalidate it without taking a constructor dependency, so the bus reaches it
+ * the same way round: `PortfolioSummaryInvalidationBridge` registers this at
+ * module init and removes it at shutdown. Until it does, an invalidation is
+ * local and nothing else changes -- which is what a unit test, a script and a
+ * cron-only process get.
+ */
+export function setPortfolioSummaryBroadcast(
+  announce: PortfolioSummaryBroadcast | null,
+): void {
+  broadcast = announce;
+}
+
+/**
+ * Forget a user's memoized valuations, here and on every other replica.
  *
  * Called from every seam that makes one untrue: a price write, the post-commit
  * balance invalidation (INV-CACHE-001), a restore, a demo reset, an undo or a
@@ -176,9 +223,49 @@ export const portfolioSummaryMemo = new PortfolioSummaryMemo();
  */
 export function invalidatePortfolioSummary(userId: string): void {
   portfolioSummaryMemo.invalidateUser(userId);
+  announce({ userId });
 }
 
 /** Forget every user's valuations: whole-dataset writes with no single owner. */
 export function invalidateAllPortfolioSummaries(): void {
   portfolioSummaryMemo.clearAll();
+  announce({});
+}
+
+/**
+ * Apply an invalidation that arrived from another replica.
+ *
+ * It drops entries and announces nothing: an announcement made here would be
+ * answered by every replica that received the first one, and a bus whose
+ * messages each produce another message does not converge. A payload with no
+ * `userId` is the whole-dataset case, the same one `clearAll` covers, because
+ * a message this process does not understand must not be read as "one user".
+ */
+export function applyPortfolioSummaryInvalidation(
+  payload: Record<string, unknown> | undefined,
+): void {
+  const userId = payload?.userId;
+  if (typeof userId === "string" && userId.length > 0) {
+    portfolioSummaryMemo.invalidateUser(userId);
+    return;
+  }
+  portfolioSummaryMemo.clearAll();
+}
+
+/**
+ * Tell the other replicas, best-effort.
+ *
+ * The local drop has already happened, so a bus that is down or absent costs
+ * the other replicas their TTL and costs this one nothing. The seams that call
+ * this are synchronous and post-commit; a rejection is the bridge's to log,
+ * which is why nothing is awaited here.
+ */
+function announce(payload: Record<string, unknown>): void {
+  if (!broadcast) return;
+  try {
+    broadcast(payload);
+  } catch {
+    // An announcement nobody could make is the TTL's problem, not the
+    // caller's: the write it followed has already committed.
+  }
 }

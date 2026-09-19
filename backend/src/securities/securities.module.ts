@@ -22,6 +22,7 @@ import { HoldingsService } from "./holdings.service";
 import { HoldingsDriftReportService } from "./holdings-drift-report.service";
 import { InvestmentTransactionsService } from "./investment-transactions.service";
 import { PortfolioService } from "./portfolio.service";
+import { PortfolioSummaryInvalidationBridge } from "./portfolio-summary-invalidation.bridge";
 import { DailyMovementService } from "./daily-movement.service";
 import { PortfolioCalculationService } from "./portfolio-calculation.service";
 import { SecurityDetailService } from "./security-detail.service";
@@ -81,6 +82,9 @@ import { ProviderHealthModule } from "../provider-health/provider-health.module"
     InvestmentTransactionsService,
     PortfolioCalculationService,
     PortfolioService,
+    // Subscribes this replica to memo invalidations and announces its own;
+    // `EventBusModule` is `@Global()`, so no module edge is needed for it.
+    PortfolioSummaryInvalidationBridge,
     DailyMovementService,
     SecurityDetailService,
     SecurityDocumentsService,
