@@ -14,6 +14,7 @@ import {
   runOutsideActiveScopedManager,
   withScopedDb,
 } from "../common/db/scoped-db";
+import { getRequestContext } from "../common/request-context";
 import { lockTransactionRow } from "../common/db/locks";
 import { affectedRowCount, returnedRows } from "../common/db/query-result";
 import { AttachmentOrphanSweeper } from "./attachment-orphan-sweeper.service";
@@ -106,6 +107,19 @@ interface ValidatedUpload {
  */
 export interface AttachmentListItem extends TransactionAttachment {
   originalAttachmentId: string | null;
+}
+
+/**
+ * What one user's attachments occupy: how many files, and their combined size.
+ *
+ * Both figures are complete by construction -- they are a `COUNT` and a `SUM`
+ * over metadata rows the same transaction read, not a partial enumeration of an
+ * object store -- so neither is nullable and an account with no attachments is
+ * a truthful `{ files: 0, bytes: 0 }`.
+ */
+export interface AttachmentStorageUsage {
+  readonly files: number;
+  readonly bytes: number;
 }
 
 @Injectable()
@@ -503,6 +517,60 @@ export class AttachmentsService {
             ?.orig_id ?? null,
       }));
     });
+  }
+
+  /**
+   * How much attachment storage each user is occupying, keyed by user id.
+   *
+   * The only cross-user read in this service, and the one method here that does
+   * not take a `userId`: the caller is the admin user list, which asks about
+   * everybody at once. It therefore requires an ambient **system** context --
+   * under any user's own scope RLS answers with that user's rows alone, which
+   * would read as "every other account stores nothing" rather than as an error.
+   *
+   * `byte_size` is the metadata row's record of the bytes written, so the answer
+   * is the same figure whichever storage provider holds them -- `database`,
+   * `local` or `s3` -- and needs no object store enumerated. It is also why this
+   * is one grouped aggregate rather than a query per user.
+   *
+   * Every row counts, including the unprocessed original of a scan pair, which
+   * `findAllForTransaction` deliberately hides: an original the user chose to
+   * keep occupies its bytes whether or not the register lists it beside the
+   * visible half.
+   *
+   * A user with no attachments is absent from the map rather than present with
+   * zero -- `GROUP BY` has no row to emit for them -- and the caller supplies
+   * the zero, which is the honest figure for an account that stores nothing.
+   */
+  async summarizeUsageByUser(): Promise<Map<string, AttachmentStorageUsage>> {
+    // The context is checked rather than assumed, because the failure it
+    // prevents is silent: under a user's own scope the policy answers with that
+    // user's rows and the aggregate comes back looking complete, with every
+    // other account reading as zero bytes. A throw is the only way a caller
+    // that forgot the system context finds out.
+    if (getRequestContext()?.system !== true) {
+      throw new Error(
+        "summarizeUsageByUser reads every user's rows and requires an ambient system context",
+      );
+    }
+
+    const rows: Array<{ user_id: string; files: string; bytes: string }> =
+      await withScopedDb(this.dataSource, (m) =>
+        m.query(
+          `SELECT user_id, COUNT(*) AS files, COALESCE(SUM(byte_size), 0) AS bytes
+             FROM transaction_attachments
+            GROUP BY user_id`,
+        ),
+      );
+    // COUNT and SUM over a BIGINT both come back as strings from the pg driver
+    // (numeric and bigint alike), so they are converted at the boundary rather
+    // than left to concatenate somewhere downstream.
+    return new Map(
+      rows.map((row) => [
+        row.user_id,
+        { files: Number(row.files), bytes: Number(row.bytes) },
+      ]),
+    );
   }
 
   /** Load one attachment's bytes and headers for streaming download. */

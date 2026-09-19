@@ -82,6 +82,7 @@ const mockUpdateUserRole = vi.fn();
 const mockUpdateUserStatus = vi.fn();
 const mockResetUserPassword = vi.fn();
 const mockDeleteUser = vi.fn();
+const mockGetUserStorage = vi.fn();
 
 vi.mock('@/lib/admin', () => ({
   adminApi: {
@@ -91,6 +92,7 @@ vi.mock('@/lib/admin', () => ({
     updateUserStatus: (...args: any[]) => mockUpdateUserStatus(...args),
     resetUserPassword: (...args: any[]) => mockResetUserPassword(...args),
     deleteUser: (...args: any[]) => mockDeleteUser(...args),
+    getUserStorage: (...args: any[]) => mockGetUserStorage(...args),
   },
 }));
 
@@ -170,8 +172,14 @@ vi.mock('@/components/admin/ResetPasswordModal', () => ({
 }));
 
 vi.mock('@/components/admin/UserManagementTable', () => ({
-  UserManagementTable: ({ users, currentUserId, onChangeRole, onToggleStatus, onResetPassword, onDeleteUser }: any) => (
+  UserManagementTable: ({ users, storage, currentUserId, onChangeRole, onToggleStatus, onResetPassword, onDeleteUser }: any) => (
     <div data-testid="user-table">
+      <span data-testid="storage-status">{storage.status}</span>
+      {storage.status === 'ready' && (
+        <span data-testid="storage-users">
+          {[...storage.byUser.keys()].join(',')}
+        </span>
+      )}
       {users.map((user: any) => (
         <div key={user.id} data-testid={`user-row-${user.id}`}>
           <span>{user.email || user.firstName}</span>
@@ -204,6 +212,49 @@ describe('AdminUsersPage', () => {
     vi.clearAllMocks();
     mockGetUsers.mockResolvedValue(mockUsers);
     mockGetSmtpStatus.mockResolvedValue({ configured: true });
+    mockGetUserStorage.mockResolvedValue(
+      mockUsers.map((user) => ({
+        userId: user.id,
+        backups: { enabled: true, artifacts: 3, bytes: 3000 },
+        attachments: { files: 2, bytes: 200 },
+      })),
+    );
+  });
+
+  describe('Storage usage', () => {
+    it('hands the table a reading keyed by user id', async () => {
+      render(<AdminUsersPage />);
+
+      await waitFor(() =>
+        expect(screen.getByTestId('storage-status')).toHaveTextContent('ready'),
+      );
+      expect(screen.getByTestId('storage-users')).toHaveTextContent(
+        'admin-id,user-1,user-2',
+      );
+    });
+
+    it('reports its own failure without failing the user list', async () => {
+      mockGetUserStorage.mockRejectedValue(new Error('store unreachable'));
+
+      render(<AdminUsersPage />);
+
+      await waitFor(() =>
+        expect(screen.getByTestId('storage-status')).toHaveTextContent('error'),
+      );
+      // The rows are the other request's and are unaffected by it.
+      expect(screen.getByTestId('user-row-user-1')).toBeInTheDocument();
+    });
+
+    it('re-reads the figures when an account is created, so the new row is covered', async () => {
+      mockCreateUser.mockResolvedValue({});
+      render(<AdminUsersPage />);
+      await waitFor(() => expect(mockGetUserStorage).toHaveBeenCalledTimes(1));
+
+      fireEvent.click(screen.getByText('+ New User'));
+      fireEvent.click(screen.getByText('Created With Invite'));
+
+      await waitFor(() => expect(mockGetUserStorage).toHaveBeenCalledTimes(2));
+    });
   });
 
   describe('Rendering', () => {

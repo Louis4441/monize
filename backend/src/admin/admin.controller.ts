@@ -42,6 +42,15 @@ export class AdminController {
     return this.adminService.findAllUsers();
   }
 
+  @Get("storage")
+  @ApiOperation({
+    summary: "Per-user backup and attachment storage usage (admin only)",
+  })
+  @ApiResponse({ status: 200, description: "Storage usage per user" })
+  storageUsage() {
+    return this.adminService.getUserStorageUsage();
+  }
+
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: "Create a new user account (admin only)" })
