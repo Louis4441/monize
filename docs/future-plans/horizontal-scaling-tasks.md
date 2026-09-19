@@ -2312,7 +2312,25 @@ without taking the database from both, so its matrix cell stays
 `docs/verification-contract.md` that said D4 would close it was corrected in the
 same commit rather than left to read as satisfied.
 
-**Not verified here.** This session had no Docker daemon, so the compose file
-was validated with `docker compose config` in both shapes and the specs with
-`playwright test --list`, but the shard has never been run. CI is the first
-execution.
+**What the first CI run cost, and what it proved.** The shard failed before
+Playwright started: `api-lb` never became healthy. The image's own log named the
+cause -- `10-listen-on-ipv6-by-default.sh: info: can not modify
+/etc/nginx/conf.d/default.conf (read-only file system?)` -- and nginx had no
+access-log line at all, so no request ever reached it. The official nginx
+entrypoint turns `listen 80` into `listen [::]:80` by rewriting that file, the
+`:ro` mount stops it, and the healthcheck's `localhost` resolves to `::1` first
+in the container. The backends get away with the same URL because Node binds
+dual-stack. The healthcheck now addresses `127.0.0.1`, which depends on no
+resolution order, and the conf records why the entrypoint's message is expected.
+
+The run was not wasted. Both replicas reached `healthy` in `CLUSTER_MODE=multi`,
+which they cannot do unless the boot matrix accepted the compose environment, the
+two containers' concurrent `db-init`/`db-migrate` resolved under the lifecycle
+advisory lock, and each opened its `LISTEN` connection and round-tripped
+`verifyDelivery` -- `main.ts` exits 1 otherwise. The Lighthouse job passed on the
+same commit, which is the direct evidence that the default compose path is
+unchanged.
+
+**Still not verified here.** No Docker daemon in an agent session, so the fix is
+reasoned from the container's own log rather than reproduced locally, and the
+five cluster tests have still never run.

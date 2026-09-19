@@ -147,9 +147,15 @@ services:
       - "3002:80"
     networks:
       - e2e-network
+    # 127.0.0.1, not localhost, and that is the whole of a CI cycle's lesson.
+    # The official image's entrypoint rewrites `listen 80` into `listen [::]:80`
+    # at start-up; the read-only mount above stops it, so nginx binds IPv4 only
+    # while `localhost` resolves to ::1 first in the container. The backends get
+    # away with `localhost` because Node binds dual-stack. A literal address
+    # depends on no resolution order at all.
     healthcheck:
       test:
-        ["CMD-SHELL", "wget -q -O /dev/null http://localhost/api/v1/health || exit 1"]
+        ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/api/v1/health || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 20
