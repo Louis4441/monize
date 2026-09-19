@@ -23,6 +23,8 @@ import {
 import { AuthGuard } from "@nestjs/passport";
 import { Throttle } from "@nestjs/throttler";
 import { ParseCurrencyCodePipe } from "../common/pipes/parse-currency-code.pipe";
+import { ParseOptionalCalendarDatePipe } from "../common/pipes/parse-calendar-date.pipe";
+import { isCalendarDate } from "../common/validators/is-calendar-date.validator";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { AllowDelegate } from "../delegation/decorators/delegate-access.decorator";
@@ -137,16 +139,29 @@ export class CurrenciesController {
   @AllowDelegate()
   @Throttle({ default: { ttl: 60000, limit: 10 } }) // L2: 10 requests per minute
   @ApiOperation({ summary: "Get exchange rates for a date range" })
-  @ApiQuery({ name: "startDate", required: false, type: String })
-  @ApiQuery({ name: "endDate", required: false, type: String })
+  @ApiQuery({
+    name: "startDate",
+    required: false,
+    type: String,
+    example: "2026-07-20",
+  })
+  @ApiQuery({
+    name: "endDate",
+    required: false,
+    type: String,
+    example: "2026-07-27",
+  })
   @ApiResponse({
     status: 200,
     description: "Exchange rates within the date range",
     type: [ExchangeRate],
   })
+  // Both bounds go into a `rate_date` comparison, so each is a day or it is
+  // nothing: the pipe refuses the array Express parses a repeated key into
+  // rather than letting it reach the query as a supposed string.
   getRateHistory(
-    @Query("startDate") startDate?: string,
-    @Query("endDate") endDate?: string,
+    @Query("startDate", ParseOptionalCalendarDatePipe) startDate?: string,
+    @Query("endDate", ParseOptionalCalendarDatePipe) endDate?: string,
   ): Promise<ExchangeRate[]> {
     return this.exchangeRateService.getRateHistory(startDate, endDate);
   }
@@ -180,7 +195,12 @@ export class CurrenciesController {
     @Query("to", ParseCurrencyCodePipe) to: string,
     @Query("date") date: string,
   ): Promise<{ rate: number | null }> {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date ?? "")) {
+    // `isCalendarDate`, not a bare regular expression on the raw value: Express
+    // parses a repeated key (`?date=x&date=y`) into an array, and `.test` would
+    // coerce that array to text and pass it through to the resolver as a
+    // supposed string (CodeQL `js/type-confusion-through-parameter-tampering`).
+    // It also rejects a day that does not exist, such as `2026-02-30`.
+    if (!isCalendarDate(date)) {
       throw new BadRequestException(
         tr(
           "errors.currencies.invalidRateDate",

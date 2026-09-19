@@ -484,12 +484,76 @@ describe("resolveFxRate", () => {
     const lines = (
       [
         "unknown_currency",
+        "invalid_date",
         "no_observation",
         "only_after_date",
         "stale_observation",
       ] as const
     ).map((reason) => describeFxGap("EUR->USD", "2026-03-01", reason));
-    expect(new Set(lines).size).toBe(4);
+    expect(new Set(lines).size).toBe(5);
     expect(lines.every((line) => line.includes("EUR->USD"))).toBe(true);
+  });
+
+  /**
+   * `onDate` is declared `string` and on the request path it is a query
+   * parameter: `?date=x&date=y` reaches the handler as an array. Every rule in
+   * this module is a lexicographic comparison of `YYYY-MM-DD` strings, and an
+   * array satisfies none of them while passing every one by coercion -- the
+   * resolver used to hand back a rate for a day nobody named (CodeQL
+   * `js/type-confusion-through-parameter-tampering`).
+   */
+  describe("a valuation date that does not name a day", () => {
+    const stored = { "EUR->USD": [{ date: "2026-06-18", rate: 1.2 }] };
+
+    it("refuses an array in place of the date rather than resolving it", () => {
+      const result = resolveFxRate(
+        "EUR",
+        "USD",
+        ["2026-06-22"] as unknown as string,
+        lookupFrom(stored),
+        { today: TODAY },
+      );
+      expect(result).toMatchObject({
+        status: "unknown",
+        rate: null,
+        observedOn: null,
+        reason: "invalid_date",
+      });
+    });
+
+    it("refuses a repeated parameter, which coercion would read as one date", () => {
+      const result = resolveFxRate(
+        "EUR",
+        "USD",
+        ["2026-06-22", "2026-06-23"] as unknown as string,
+        lookupFrom(stored),
+        { today: TODAY },
+      );
+      expect(result.rate).toBeNull();
+      expect(result.reason).toBe("invalid_date");
+    });
+
+    it("refuses a string that is not a calendar date, in live mode too", () => {
+      for (const mode of ["historical", "live"] as const) {
+        expect(
+          resolveFxRate("EUR", "USD", "yesterday", lookupFrom(stored), {
+            today: TODAY,
+            mode,
+          }),
+        ).toMatchObject({ rate: null, reason: "invalid_date" });
+      }
+    });
+
+    it("keeps refusing it through resolveFxRateValue", () => {
+      expect(
+        resolveFxRateValue(
+          "EUR",
+          "USD",
+          ["2026-06-22"] as unknown as string,
+          lookupFrom(stored),
+          { today: TODAY },
+        ),
+      ).toBeNull();
+    });
   });
 });

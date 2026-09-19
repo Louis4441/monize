@@ -1,3 +1,5 @@
+import { BadRequestException } from "@nestjs/common";
+import { ParseOptionalCalendarDatePipe } from "../common/pipes/parse-calendar-date.pipe";
 import { Test, TestingModule } from "@nestjs/testing";
 import { CurrenciesController } from "./currencies.controller";
 import { ExchangeRateService } from "./exchange-rate.service";
@@ -162,6 +164,32 @@ describe("CurrenciesController", () => {
       ).rejects.toThrow();
       expect(mockExchangeRateService.getRateForDate).not.toHaveBeenCalled();
     });
+
+    /**
+     * Express parses a repeated key into an array, so `date` is only a `string`
+     * by declaration. A regular expression `.test` coerces the array to text
+     * and passes it, after which the resolver sliced an array and compared it
+     * as a date (CodeQL `js/type-confusion-through-parameter-tampering`).
+     */
+    it("refuses a repeated date parameter rather than passing an array on", async () => {
+      for (const tampered of [["2026-07-20"], ["2026-07-20", "2026-07-21"]]) {
+        await expect(
+          controller.getRateForDate(
+            "EUR",
+            "USD",
+            tampered as unknown as string,
+          ),
+        ).rejects.toThrow(BadRequestException);
+      }
+      expect(mockExchangeRateService.getRateForDate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a day that does not exist", async () => {
+      await expect(
+        controller.getRateForDate("EUR", "USD", "2026-02-30"),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockExchangeRateService.getRateForDate).not.toHaveBeenCalled();
+    });
   });
 
   describe("getUsage()", () => {
@@ -310,6 +338,33 @@ describe("CurrenciesController", () => {
         undefined,
         undefined,
       );
+    });
+
+    /**
+     * Both bounds reach a `rate_date` comparison, and Express parses a repeated
+     * key into an array, so each is validated by a pipe. Calling the method
+     * directly bypasses every pipe, so the wiring is asserted against the
+     * metadata Nest would hand it -- the pipe's own behaviour is
+     * `parse-calendar-date.pipe.spec.ts`.
+     */
+    it("declares the calendar-date pipe on both bounds", () => {
+      const routeArguments = Reflect.getMetadata(
+        "__routeArguments__",
+        CurrenciesController,
+        "getRateHistory",
+      ) as Record<string, { index: number; pipes?: unknown[] }> | undefined;
+      const boundIndexes = Object.values(routeArguments ?? {})
+        .filter((argument) =>
+          (argument.pipes ?? []).some(
+            (pipe) =>
+              pipe === ParseOptionalCalendarDatePipe ||
+              pipe instanceof ParseOptionalCalendarDatePipe,
+          ),
+        )
+        .map((argument) => argument.index)
+        .sort();
+
+      expect(boundIndexes).toEqual([0, 1]);
     });
   });
 
