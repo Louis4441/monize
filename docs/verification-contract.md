@@ -152,6 +152,11 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-PAYEE-002 Google Places monthly cap | optional | supporting | **required** | -- | -- | -- | -- | -- |
 | INV-RELEASE-001 one revision | required | -- | -- | -- | -- | -- | -- | workflow self-test |
 | INV-MIGRATION-001 numeric prefix order, collision-free prefix | required | **required** | supporting | -- | -- | -- | -- | -- |
+| INV-HA-001 a replica serves only while what it shares is reachable | **required** | -- | -- | -- | optional | -- | -- | required (not yet met) |
+| INV-HA-002 one attempt budget per deployment | supporting | **required** | required | **required** | optional | -- | -- | -- |
+| INV-HA-003 a single-use artifact is spent once | supporting | -- | required | **required** | optional | required | -- | optional |
+| INV-HA-004 one OIDC signing key set | supporting | -- | required | optional | **required** | -- | -- | optional |
+| INV-HA-005 one claimant, one answer | supporting | -- | required | **required** | **required** | -- | -- | optional |
 
 Bold marks the kind that is load-bearing -- the one whose absence means the
 invariant is unverified no matter how many others pass. `INV-PROFILE-001`'s is a
@@ -206,6 +211,27 @@ counting tests will not reveal it. The failpoint that would:
 
 A test that throws *inside* the import transaction passes today and proves
 nothing about this.
+
+The `INV-HA-` rows are the horizontal-scaling set, and their load-bearing kinds
+follow the failure each one actually has. `INV-HA-002`..`-005` are all "does this
+still hold when a second process is doing the same thing", which no mocked
+manager can answer, so the load-bearing kind is two connections or two instances
+-- `INV-HA-004`'s is two *instances* rather than two connections because the race
+is between two processes deciding at startup, not between two statements.
+`INV-HA-002` carries a second load-bearing kind, a source scan, for the reason
+`INV-PROFILE-001` does: the defect arrives from a file nobody is looking at.
+Every attempt budget was a `Map` on a service until it was not, and the next one
+will be written the same way unless something fails --
+`backend/src/common/process-local-state.guard.spec.ts` is what fails it, and it is
+the only kind that can, since a budget kept in memory passes every behavioural
+test on one replica.
+
+`INV-HA-001` is the exception in the set: its mechanism is a refusal rather than
+a race, so its unit matrix is load-bearing and its E2E is the one
+`required (not yet met)` here -- nothing yet starts two replicas, takes the wake-up
+channel away and watches readiness flip. That is task D4 in
+`docs/future-plans/horizontal-scaling-tasks.md`, and until it lands the invariant's
+own entry says `partial` rather than claiming the proof.
 
 The off-machine backup rows (`INV-BACKUP-002`..`-005`) split along a line worth
 naming, because the obvious reading of their columns is wrong. The S3 semantics

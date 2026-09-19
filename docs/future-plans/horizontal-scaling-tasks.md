@@ -101,7 +101,7 @@
 | C3 | Release-check cache to a one-row table | -- | neutral | [x] |
 | C4 | Demo seed under the lifecycle advisory lock | -- | neutral (demo only) | [x] |
 | G1 | Whole-tree process-local-state guard with allowlist | A4, X1, R4 | none | [x] |
-| G2 | `INV-HA-001..005` in both contract docs | A3, K1, R3, S1 | none | [ ] |
+| G2 | `INV-HA-001..005` in both contract docs | A3, K1, R3, S1 | none | [x] |
 | D1 | Helm: Deployments, PDB, spread, autoscaling, `clusterMode` | F2 | none (defaults unchanged) | [x] |
 | D2 | `docker-compose.ha.yml` example | F2 | none | [x] |
 | D3 | CI: retire the `redis` service and `REDIS_URL` from the integration job | -- | none | [x] |
@@ -1972,7 +1972,7 @@ advisory lock", which `backend/src/common/db/advisory-locks.ts` has closed.
 
 ### G2 -- Invariants in both contract docs
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `docs/system-invariants.md` (five entries in the field template
 plus five index rows), `docs/verification-contract.md` (five section-3 rows
@@ -1990,7 +1990,22 @@ missing path listed.
 **Acceptance:** `npm run test:unit -- invariant-catalog-parity` and
 `doc-paths` green; every `Required tests` line names a spec that resolves.
 
-**Notes:**
+**Notes:** four `enforced`, one `partial`. INV-HA-001 is the `partial`, for two
+named reasons rather than an unfinished mechanism: no E2E flips readiness on a
+live replica yet (task D4), and `PostgresThrottlerStorage` fails **open** on a
+structural failure, so a broken rate limiter deliberately does not refuse
+readiness -- `/health` reports `rateLimiting: disabled` and every auth route
+keeps INV-HA-002's logged counter beneath the throttler. Both are written into
+the entry rather than left for a reader to notice.
+
+INV-HA-003's statement covers the OIDC step-up `jti` as the design doc worded
+it, but its enforcement names `oidc_step_up_claims` rather than
+`single_use_tokens`: that path already had the same mechanism on its own table
+and X1 did not move it.
+
+INV-HA-002 carries a source scan as a second load-bearing kind in the matrix --
+G1's guard. A budget kept in memory passes every behavioural test on one
+replica, so the scan is the only kind that can fail it.
 
 ### D1 -- Helm
 
