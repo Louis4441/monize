@@ -227,11 +227,15 @@ the only kind that can, since a budget kept in memory passes every behavioural
 test on one replica.
 
 `INV-HA-001` is the exception in the set: its mechanism is a refusal rather than
-a race, so its unit matrix is load-bearing and its E2E is the one
-`required (not yet met)` here -- nothing yet starts two replicas, takes the wake-up
-channel away and watches readiness flip. That is task D4 in
-`docs/future-plans/horizontal-scaling-tasks.md`, and until it lands the invariant's
-own entry says `partial` rather than claiming the proof.
+a race, so its unit matrix is load-bearing, and its E2E is the one
+`required (not yet met)` here. Two replicas do now serve one browser --
+`e2e/tests/cluster.spec.ts` on the cluster shard asserts that each one reports its
+wake-up channel healthy and answers `/health/ready` with 200 -- but that is the
+positive half. What is still missing is the flip: taking one live replica's
+channel away and watching readiness turn 503 while the other keeps serving.
+Nothing in the E2E stack can sever one replica's `LISTEN` without taking the
+database from both, so the invariant's entry says `partial` rather than claiming
+a proof the suite does not make.
 
 The off-machine backup rows (`INV-BACKUP-002`..`-005`) split along a line worth
 naming, because the obvious reading of their columns is wrong. The S3 semantics

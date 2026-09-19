@@ -105,7 +105,7 @@
 | D1 | Helm: Deployments, PDB, spread, autoscaling, `clusterMode` | F2 | none (defaults unchanged) | [x] |
 | D2 | `docker-compose.ha.yml` example | F2 | none | [x] |
 | D3 | CI: retire the `redis` service and `REDIS_URL` from the integration job | -- | none | [x] |
-| D4 | E2E: one shard on `CLUSTER_MODE=multi` with two backends | R6, T1, D1 | none | [ ] |
+| D4 | E2E: one shard on `CLUSTER_MODE=multi` with two backends | R6, T1, D1 | none | [x] |
 
 ## Suggested order
 
@@ -2214,7 +2214,7 @@ for the same reason it was then.
 
 ### D4 -- E2E shard on `CLUSTER_MODE=multi`
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `docker-compose.e2e.yml`, `.github/workflows/ci.yml` (`e2e-tests`
 matrix), `e2e/tests/` (a relay round trip and a login-lockout spec that
@@ -2233,4 +2233,44 @@ show both backends served requests.
 `workers: 1`. The Lighthouse job reuses the same compose file; keep its
 default path on one backend so its budgets do not shift.
 
-**Notes:**
+**Notes:** Scope gained `e2e/cluster/api-lb.conf` (the nginx config the compose
+file mounts), `e2e/tests/cluster.spec.ts`, `e2e/helpers/api.ts` (one export),
+`e2e/CLAUDE.md`, and the two contract docs, for the reasons below.
+
+**The shape.** A compose **profile**, not a second compose file: with
+`COMPOSE_PROFILES` unset the file renders exactly what it rendered before, which
+is what keeps the Lighthouse job's budgets where they are. `backend` and
+`backend-2` share one YAML anchor for their whole environment, so the two
+replicas cannot drift into being two different applications. Both run
+`db-init`/`db-migrate` on purpose: the lifecycle advisory lock is part of what
+the shard proves.
+
+**The specs do not alternate backends by hoping.** `api-lb.conf` labels every
+answer with `X-E2E-Upstream`, so each test asserts on the set of replicas that
+served it rather than on a log grep after the fact; a test whose requests all
+landed on one replica fails as inconclusive rather than passing for the wrong
+reason. The load balancer is also published on 3002 so a failure says whether
+the fixture or the frontend proxy's header forwarding is at fault.
+
+**The relay round trip is in, and needed no new dependency.** The 2026-07-28 MCP
+revision is a plain JSON-RPC POST, so the agent half is `request.post` with two
+`_meta` envelope keys and the `Mcp-Method`/`Mcp-Name` headers. It has to be that
+leg: a 2025-era session is pinned to its replica, so a round-robin LB would
+answer its second request `404`. The wire was verified against the real SDK
+handler before the spec was written rather than guessed.
+
+**The shard also covers what the plan did not ask for**: `/oauth/jwks` agreeing
+across replicas (INV-HA-004 -- the one defect here that was user-visible before
+K1), and `/health` reporting the wake-up channel on each replica.
+
+**What is NOT covered, and the invariant says so.** INV-HA-001's readiness
+*flip* has no E2E: nothing in this stack can sever one replica's `LISTEN`
+without taking the database from both, so its matrix cell stays
+`required (not yet met)` and its entry stays `partial`. The paragraph in
+`docs/verification-contract.md` that said D4 would close it was corrected in the
+same commit rather than left to read as satisfied.
+
+**Not verified here.** This session had no Docker daemon, so the compose file
+was validated with `docker compose config` in both shapes and the specs with
+`playwright test --list`, but the shard has never been run. CI is the first
+execution.

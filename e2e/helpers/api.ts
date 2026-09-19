@@ -34,7 +34,11 @@ function withPrefix(path: string): string {
 
 // The csrf_token cookie is intentionally JS-readable (double-submit pattern);
 // resource mutations must echo it back in the X-CSRF-Token header.
-async function csrfToken(request: APIRequestContext): Promise<string | undefined> {
+//
+// Exported for the one caller `createApiClient` cannot serve: a request that
+// must set its own timeout, because it parks on an SSE stream for as long as
+// the relay takes to answer (`tests/cluster.spec.ts`).
+export async function csrfToken(request: APIRequestContext): Promise<string | undefined> {
   const { cookies } = await request.storageState();
   const raw = cookies.find((c) => c.name === 'csrf_token')?.value;
   // Express encodes cookie values, so the token's ':' separator is stored as
