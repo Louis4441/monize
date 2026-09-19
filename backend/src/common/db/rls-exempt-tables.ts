@@ -22,6 +22,8 @@
 export const RLS_EXEMPT_TABLES: Readonly<Record<string, string>> = {
   auth_attempt_counters:
     "Rate-limit and lockout counters keyed by opaque scope/key hash; no owner column, written on the failure path before any identity is established.",
+  auto_backup_policy:
+    "Singleton deployment automatic-backup policy (one schedule, folder and retention per instance); no owner column, and putting it on an administrator's row is what let an ordinary account operation rewrite it.",
   currencies:
     "Global reference data keyed by ISO 4217 code; created_by_user_id is attribution, not ownership.",
   exchange_rates:

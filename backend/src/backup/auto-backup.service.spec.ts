@@ -31,6 +31,7 @@ import {
 import { BackupService } from "./backup.service";
 import { BackupEncryptionService } from "./backup-encryption.service";
 import { AutoBackupSettings } from "./entities/auto-backup-settings.entity";
+import { AutoBackupPolicyRow } from "./entities/auto-backup-policy.entity";
 import { User } from "../users/entities/user.entity";
 import { DemoModeService } from "../common/demo-mode.service";
 import { SystemAlertService } from "../system-alerts/system-alert.service";
@@ -41,6 +42,7 @@ import {
   BackupOffsiteUpload,
   BackupOffsiteUploadStatus,
 } from "./offsite/entities/backup-offsite-upload.entity";
+import { INTENTIONALLY_EXCLUDED_TABLES } from "./export-table-queries";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import {
   createUserMaintenanceMock,
@@ -95,6 +97,8 @@ const SUITE_CLOCK = new Date("2026-04-15T10:00:00Z");
 describe("AutoBackupService", () => {
   let service: AutoBackupService;
   let mockSettingsRepo: Record<string, jest.Mock>;
+  /** The deployment policy singleton (`auto_backup_policy`). */
+  let mockPolicyRepo: Record<string, jest.Mock>;
   let mockUsersRepo: Record<string, jest.Mock>;
   let mockOffsiteUploadRepo: Record<string, jest.Mock>;
   let mockBackupService: Record<string, jest.Mock>;
@@ -173,8 +177,6 @@ describe("AutoBackupService", () => {
     }
   }
   let isDemo: boolean;
-  /** The account `resolvePolicyUserId` resolves to; `null` for none. */
-  let policyAdminId: string | null;
 
   function createSettings(
     overrides: Partial<AutoBackupSettings> = {},
@@ -197,11 +199,104 @@ describe("AutoBackupService", () => {
     return s;
   }
 
+  /**
+   * The policy `updateSettings` upserted, read back off the raw statement it
+   * issues.
+   *
+   * The write is one `INSERT ... ON CONFLICT (id) DO UPDATE` rather than an
+   * entity save, because the row may not exist yet and two administrators
+   * pressing Save together must leave one policy rather than race a read. The
+   * parameter order is the statement's; asserting on it here is what keeps the
+   * two in step.
+   */
+  function writtenPolicy(): {
+    enabled: boolean;
+    folderPath: string;
+    frequency: string;
+    backupTime: string;
+    timezone: string;
+    retentionDaily: number;
+    retentionWeekly: number;
+    retentionMonthly: number;
+  } | null {
+    const call = [...scoped.manager.query.mock.calls]
+      .reverse()
+      .find(
+        ([sql]) =>
+          typeof sql === "string" &&
+          sql.includes("INSERT INTO auto_backup_policy") &&
+          sql.includes("DO UPDATE"),
+      );
+    if (!call) return null;
+    const [
+      enabled,
+      folderPath,
+      frequency,
+      backupTime,
+      timezone,
+      retentionDaily,
+      retentionWeekly,
+      retentionMonthly,
+    ] = call[1] as [
+      boolean,
+      string,
+      string,
+      string,
+      string,
+      number,
+      number,
+      number,
+    ];
+    return {
+      enabled,
+      folderPath,
+      frequency,
+      backupTime,
+      timezone,
+      retentionDaily,
+      retentionWeekly,
+      retentionMonthly,
+    };
+  }
+
+  /**
+   * The account row the reconcile wrote -- where `next_backup_at` is derived.
+   *
+   * The policy holds no schedule of its own, so an assertion about *when* the
+   * next backup lands is an assertion about the row the reconcile enrolled.
+   */
+  function reconciledRow(): AutoBackupSettings {
+    const calls = mockSettingsRepo.save.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    return calls[calls.length - 1][0] as AutoBackupSettings;
+  }
+
+  /**
+   * The stored deployment policy, as `auto_backup_policy` holds it. Absent by
+   * default, which is the fresh-deployment case.
+   */
+  function storePolicy(overrides: Partial<AutoBackupPolicyRow> = {}): void {
+    const row = new AutoBackupPolicyRow();
+    row.id = true;
+    row.enabled = true;
+    row.folderPath = "";
+    row.frequency = "daily";
+    row.backupTime = "02:00";
+    row.timezone = "UTC";
+    row.retentionDaily = 7;
+    row.retentionWeekly = 4;
+    row.retentionMonthly = 6;
+    row.manualRunClaimedAt = null;
+    Object.assign(row, overrides);
+    mockPolicyRepo.findOne.mockResolvedValue(row);
+  }
+
   async function createService(
     env: Record<string, string> = {},
   ): Promise<AutoBackupService> {
     scoped = createScopedDbMocks([
       [AutoBackupSettings, mockSettingsRepo as never],
+      [AutoBackupPolicyRow, mockPolicyRepo as never],
       [User, mockUsersRepo as never],
       [BackupOffsiteUpload, mockOffsiteUploadRepo as never],
     ]);
@@ -308,6 +403,14 @@ describe("AutoBackupService", () => {
       createQueryBuilder: jest.fn(() => updateBuilder),
     };
 
+    // Nothing saved by default: `loadPolicy` falls back to `defaultPolicy()`,
+    // which is enabled -- a deployment that has never opened the screen still
+    // backs every account up.
+    mockPolicyRepo = {
+      findOne: jest.fn().mockResolvedValue(null),
+      save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
+    };
+
     updateBuilder = {
       update: jest.fn(() => updateBuilder),
       set: jest.fn(() => updateBuilder),
@@ -315,26 +418,14 @@ describe("AutoBackupService", () => {
       execute: jest.fn().mockResolvedValue({ affected: 1 }),
     };
 
-    // Who `resolvePolicyUserId` finds: the deployment's primary administrator,
-    // whose `auto_backup_settings` row carries the policy every account runs on.
-    // These specs drive `userId` as that administrator, which is the
-    // single-admin deployment; the tests that are *about* a second operator set
-    // it themselves.
-    policyAdminId = userId;
     mockUsersRepo = {
-      findOne: jest.fn().mockImplementation(({ where }) => {
-        // The policy lookup selects on the role, not on an id.
-        if (where?.role !== undefined) {
-          return Promise.resolve(
-            policyAdminId === null ? null : { id: policyAdminId },
-          );
-        }
-        return Promise.resolve({
+      findOne: jest.fn().mockImplementation(({ where }) =>
+        Promise.resolve({
           id: where.id,
           backupEncryptionEnabled: false,
           backupPasswordEnc: null,
-        });
-      }),
+        }),
+      ),
       // Policy reconciliation sweeps every active account; none by default, so
       // the cron tests below exercise only the due-backup path.
       find: jest.fn().mockResolvedValue([]),
@@ -430,57 +521,54 @@ describe("AutoBackupService", () => {
   });
 
   describe("getSettings", () => {
-    it("should return existing settings when found", async () => {
-      const existing = createSettings({
-        enabled: true,
-        folderPath: root,
-      });
-      mockSettingsRepo.findOne.mockResolvedValue(existing);
+    it("returns the stored deployment policy", async () => {
+      storePolicy({ enabled: true, folderPath: root, frequency: "weekly" });
 
       const result = await service.getSettings(userId);
 
-      expect(result).toStrictEqual(
-        Object.assign(new AutoBackupSettings(), existing, {
-          resolvedFolderPath: folderFor(),
-          // The admin surface reads a deployment policy, so it also carries
-          // how many accounts that policy governs.
-          managedUserCount: 0,
-        }),
-      );
-      expect(mockSettingsRepo.findOne).toHaveBeenCalledWith({
-        where: { userId },
+      expect(result).toStrictEqual({
+        enabled: true,
+        folderPath: root,
+        frequency: "weekly",
+        backupTime: "02:00",
+        timezone: "UTC",
+        retentionDaily: 7,
+        retentionWeekly: 4,
+        retentionMonthly: 6,
+        resolvedFolderPath: folderFor(),
+        // Coverage travels with the policy: a schedule alone cannot say
+        // whether it reaches anybody.
+        accountCount: 0,
+        scheduledAccountCount: 0,
+        lastBackupAt: null,
+        lastBackupStatus: null,
+        lastBackupError: null,
+        nextBackupAt: null,
+      });
+      expect(mockPolicyRepo.findOne).toHaveBeenCalledWith({
+        where: { id: true },
       });
     });
 
-    it("reads the primary administrator's row, not the caller's own", async () => {
+    it("reads the one policy row whichever administrator is signed in", async () => {
       // Two administrators must edit one policy. Reading "whoever is signed in"
       // gave a deployment two answers to one question, the second of which
-      // reverted on the next hourly reconcile.
-      policyAdminId = userId;
-      mockSettingsRepo.findOne.mockResolvedValue(
-        createSettings({
-          enabled: true,
-          folderPath: root,
-          frequency: "weekly",
-        }),
-      );
+      // reverted on the next hourly reconcile. No account's own row is read
+      // here at all.
+      storePolicy({ enabled: true, folderPath: root, frequency: "weekly" });
+      mockSettingsRepo.findOne.mockClear();
 
       const result = await service.getSettings(otherUserId);
 
-      expect(result.userId).toBe(userId);
       expect(result.frequency).toBe("weekly");
-      expect(mockSettingsRepo.findOne).toHaveBeenCalledWith({
-        where: { userId },
-      });
+      expect(mockSettingsRepo.findOne).not.toHaveBeenCalled();
     });
 
     it("reports the deployment's own last and next run, not one account's", async () => {
       // A policy screen reporting one row's `lastBackupAt` says "Last backup:
       // today" on an instance where eleven of twelve accounts have never been
       // backed up at all.
-      mockSettingsRepo.findOne.mockResolvedValue(
-        createSettings({ enabled: true, folderPath: root }),
-      );
+      storePolicy({ enabled: true, folderPath: root });
       mockUsersRepo.count.mockResolvedValue(3);
       const mine = createSettings({
         enabled: true,
@@ -500,7 +588,10 @@ describe("AutoBackupService", () => {
 
       const result = await service.getSettings(userId);
 
-      expect(result.managedUserCount).toBe(3);
+      expect(result.accountCount).toBe(3);
+      // Two armed rows, three accounts: the gap is the point, and a single
+      // number could only have been the three.
+      expect(result.scheduledAccountCount).toBe(2);
       expect(result.lastBackupAt).toEqual(theirs.lastBackupAt);
       expect(result.lastBackupStatus).toBe("partial");
       expect(result.lastBackupError).toBe("attachments");
@@ -508,9 +599,7 @@ describe("AutoBackupService", () => {
     });
 
     it("reports the per-user folder the files actually land in", async () => {
-      mockSettingsRepo.findOne.mockResolvedValue(
-        createSettings({ enabled: true, folderPath: root }),
-      );
+      storePolicy({ enabled: true, folderPath: root });
 
       const result = await service.getSettings(userId);
 
@@ -520,12 +609,11 @@ describe("AutoBackupService", () => {
       expect(result.resolvedFolderPath).toBe(folderFor());
     });
 
-    it("should return defaults when no settings exist", async () => {
-      mockSettingsRepo.findOne.mockResolvedValue(null);
+    it("should return defaults when no policy has been saved", async () => {
+      mockPolicyRepo.findOne.mockResolvedValue(null);
 
       const result = await service.getSettings(userId);
 
-      expect(result.userId).toBe(userId);
       // Enabled, because that is what the deployment is actually doing: an
       // instance whose policy has never been saved still backs every account up
       // on the default schedule, and this screen used to say otherwise.
@@ -538,7 +626,8 @@ describe("AutoBackupService", () => {
       expect(result.retentionMonthly).toBe(6);
     });
 
-    it("should report the default folder for a stored row without one", async () => {
+    it("should report the default folder for a stored policy without one", async () => {
+      storePolicy({ enabled: true, folderPath: "" });
       mockSettingsRepo.findOne.mockResolvedValue(
         createSettings({ enabled: true, folderPath: "" }),
       );
@@ -593,21 +682,14 @@ describe("AutoBackupService", () => {
   });
 
   describe("updateSettings", () => {
-    it("writes the primary administrator's row whoever is signed in", async () => {
+    it("writes the one policy row whoever is signed in", async () => {
       // One deployment policy needs one row. Writing `req.user.id` gave a
       // second administrator a second policy that reverted on the next hourly
-      // reconcile.
-      policyAdminId = userId;
-      mockSettingsRepo.findOne.mockResolvedValue(null);
-
+      // reconcile, and put a deployment-wide setting where deactivating,
+      // demoting or restoring that account would rewrite it.
       await service.updateSettings(otherUserId, { frequency: "weekly" });
 
-      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({ userId, frequency: "weekly" }),
-      );
-      expect(mockSettingsRepo.save).not.toHaveBeenCalledWith(
-        expect.objectContaining({ userId: otherUserId }),
-      );
+      expect(writtenPolicy()).toMatchObject({ frequency: "weekly" });
     });
 
     it("pushes the saved policy onto every other account before answering", async () => {
@@ -662,15 +744,12 @@ describe("AutoBackupService", () => {
         frequency: "weekly",
       });
 
-      // The row is built by defaultSettingsFor() and saved directly; the
-      // repo.create() round-trip it used to go through was a no-op clone.
-      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId,
-          folderPath: root,
-          frequency: "weekly",
-        }),
-      );
+      // Upserted onto the singleton: a deployment that has never saved has no
+      // row, and the same statement covers both cases.
+      expect(writtenPolicy()).toMatchObject({
+        folderPath: root,
+        frequency: "weekly",
+      });
     });
 
     it("should update existing settings", async () => {
@@ -682,12 +761,10 @@ describe("AutoBackupService", () => {
         retentionDaily: 14,
       });
 
-      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          folderPath: "/new-backups",
-          retentionDaily: 14,
-        }),
-      );
+      expect(writtenPolicy()).toMatchObject({
+        folderPath: "/new-backups",
+        retentionDaily: 14,
+      });
     });
 
     it("should fall back to BACKUP_CONTAINER_DIR when enabling without a folder path", async () => {
@@ -695,12 +772,10 @@ describe("AutoBackupService", () => {
 
       await service.updateSettings(userId, { enabled: true });
 
-      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          enabled: true,
-          folderPath: root,
-        }),
-      );
+      expect(writtenPolicy()).toMatchObject({
+        enabled: true,
+        folderPath: root,
+      });
     });
 
     it("should validate folder is writable when enabling", async () => {
@@ -708,8 +783,13 @@ describe("AutoBackupService", () => {
         createSettings({ folderPath: root }),
       );
 
+      mockUsersRepo.find.mockResolvedValue([{ id: userId }]);
+      mockSettingsRepo.find.mockResolvedValue([]);
+
       await service.updateSettings(userId, { enabled: true });
 
+      expect(writtenPolicy()).toMatchObject({ enabled: true });
+      // The schedule itself lands on the account row the reconcile enrols.
       expect(mockSettingsRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
           enabled: true,
@@ -725,14 +805,13 @@ describe("AutoBackupService", () => {
     it("refuses to enable a folder outside the permitted roots", async () => {
       const outside = mkdtempSync(join(tmpdir(), "monize-elsewhere-"));
       try {
-        mockSettingsRepo.findOne.mockResolvedValue(
-          createSettings({ folderPath: outside }),
-        );
+        storePolicy({ folderPath: outside });
 
         await expect(
           service.updateSettings(userId, { enabled: true }),
         ).rejects.toThrow(/outside the permitted roots/);
-        // A rejected command must not have written: the schedule stays off.
+        // A rejected command must not have written: the policy stays off.
+        expect(writtenPolicy()).toBeNull();
         expect(mockSettingsRepo.save).not.toHaveBeenCalled();
       } finally {
         rmSync(outside, { recursive: true, force: true });
@@ -749,12 +828,9 @@ describe("AutoBackupService", () => {
 
       await service.updateSettings(userId, { enabled: false });
 
-      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          enabled: false,
-          nextBackupAt: null,
-        }),
-      );
+      // The policy carries no schedule of its own; disarming every account's
+      // own `next_backup_at` is the reconcile's job.
+      expect(writtenPolicy()).toMatchObject({ enabled: false });
     });
 
     it("should reject non-absolute paths", async () => {
@@ -783,13 +859,11 @@ describe("AutoBackupService", () => {
         retentionMonthly: 24,
       });
 
-      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          retentionDaily: 30,
-          retentionWeekly: 12,
-          retentionMonthly: 24,
-        }),
-      );
+      expect(writtenPolicy()).toMatchObject({
+        retentionDaily: 30,
+        retentionWeekly: 12,
+        retentionMonthly: 24,
+      });
     });
 
     it("should update backupTime", async () => {
@@ -798,9 +872,7 @@ describe("AutoBackupService", () => {
 
       await service.updateSettings(userId, { backupTime: "14:30" });
 
-      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({ backupTime: "14:30" }),
-      );
+      expect(writtenPolicy()).toMatchObject({ backupTime: "14:30" });
     });
   });
 
@@ -944,7 +1016,7 @@ describe("AutoBackupService", () => {
 
     it("still refuses to store an enabled schedule", async () => {
       const { service: svc } = await serviceWithUncreatableRoot();
-      mockSettingsRepo.findOne.mockResolvedValue(createSettings());
+      storePolicy();
 
       await expect(
         svc.updateSettings(userId, { enabled: true }),
@@ -957,7 +1029,7 @@ describe("AutoBackupService", () => {
     it("says the deployment has no backup storage, not that a path is missing", async () => {
       const { service: svc, root: unusable } =
         await serviceWithUncreatableRoot();
-      mockSettingsRepo.findOne.mockResolvedValue(createSettings());
+      storePolicy();
 
       const error: Error = await svc
         .updateSettings(userId, { enabled: true })
@@ -1031,9 +1103,7 @@ describe("AutoBackupService", () => {
           BACKUP_CONTAINER_DIR: join(root, "does-not-exist", "nested"),
           BACKUP_ALLOWED_ROOTS: other,
         });
-        mockSettingsRepo.findOne.mockResolvedValue(
-          createSettings({ folderPath: other }),
-        );
+        storePolicy({ folderPath: other });
 
         await expect(svc.describeCapability(userId)).resolves.toMatchObject({
           available: true,
@@ -1058,9 +1128,7 @@ describe("AutoBackupService", () => {
       // from "wrote and unlinked". The spy can.
       const writeFile = jest.spyOn(fs, "writeFile");
       try {
-        mockSettingsRepo.findOne.mockResolvedValue(
-          createSettings({ folderPath: outside }),
-        );
+        storePolicy({ folderPath: outside });
 
         const capability = await service.describeCapability(userId);
 
@@ -1083,9 +1151,7 @@ describe("AutoBackupService", () => {
       const link = join(root, "stored-escape");
       try {
         await fs.symlink(outside, link);
-        mockSettingsRepo.findOne.mockResolvedValue(
-          createSettings({ folderPath: link }),
-        );
+        storePolicy({ folderPath: link });
 
         const capability = await service.describeCapability(userId);
 
@@ -1102,9 +1168,7 @@ describe("AutoBackupService", () => {
       // off; capability answering "no" is what the banner needs, not an error.
       const outside = mkdtempSync(join(tmpdir(), "monize-capability-enabled-"));
       try {
-        mockSettingsRepo.findOne.mockResolvedValue(
-          createSettings({ enabled: true, folderPath: outside }),
-        );
+        storePolicy({ enabled: true, folderPath: outside });
 
         await expect(service.describeCapability(userId)).resolves.toMatchObject(
           { available: false },
@@ -1851,7 +1915,10 @@ describe("AutoBackupService", () => {
       expect(result.filename).toMatch(
         /^monize-backup-daily-\d{4}-\d{2}-\d{2}\.json\.gz$/,
       );
-      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
+      // Only the outcome columns: a whole-entity save wrote back a
+      // `next_backup_at` read before the export and could revert another
+      // replica's claim.
+      expect(updateBuilder.set).toHaveBeenCalledWith(
         expect.objectContaining({
           lastBackupStatus: "success",
           lastBackupError: null,
@@ -2684,9 +2751,7 @@ describe("AutoBackupService", () => {
     });
 
     it("publishes it under its own tier name, never a daily one", async () => {
-      mockSettingsRepo.findOne.mockResolvedValue(
-        createSettings({ enabled: true, folderPath: root }),
-      );
+      storePolicy({ enabled: true, folderPath: root });
 
       const result = await service.runManualBackup(userId);
 
@@ -2704,9 +2769,7 @@ describe("AutoBackupService", () => {
     }
 
     it("records `partial` status, not success, and explains why", async () => {
-      mockSettingsRepo.findOne.mockResolvedValue(
-        createSettings({ enabled: true, folderPath: root }),
-      );
+      storePolicy({ enabled: true, folderPath: root });
 
       const result = await service.runManualBackup(userId);
 
@@ -2720,9 +2783,7 @@ describe("AutoBackupService", () => {
     });
 
     it("still writes the artifact so the ledger is captured", async () => {
-      mockSettingsRepo.findOne.mockResolvedValue(
-        createSettings({ enabled: true, folderPath: root }),
-      );
+      storePolicy({ enabled: true, folderPath: root });
 
       const result = await service.runManualBackup(userId);
 
@@ -2768,9 +2829,7 @@ describe("AutoBackupService", () => {
       // backup incomplete", took that day's dedupe key (silencing the real
       // automatic failure behind it), and made the HTTP request wait on a
       // per-administrator SMTP fan-out after the backup had succeeded.
-      mockSettingsRepo.findOne.mockResolvedValue(
-        createSettings({ enabled: true, folderPath: root }),
-      );
+      storePolicy({ enabled: true, folderPath: root });
 
       const result = await service.runManualBackup(userId);
 
@@ -2780,15 +2839,13 @@ describe("AutoBackupService", () => {
     });
 
     it("does not run retention, so complete copies past the window survive", async () => {
-      mockSettingsRepo.findOne.mockResolvedValue(
-        createSettings({
-          enabled: true,
-          folderPath: root,
-          retentionDaily: 1,
-          retentionWeekly: 0,
-          retentionMonthly: 0,
-        }),
-      );
+      storePolicy({
+        enabled: true,
+        folderPath: root,
+        retentionDaily: 1,
+        retentionWeekly: 0,
+        retentionMonthly: 0,
+      });
       // Three complete dailies already on disk, retention set to keep 1.
       await seed([
         "monize-backup-daily-2026-04-01.json.gz",
@@ -2808,9 +2865,7 @@ describe("AutoBackupService", () => {
     it("does not promote a partial to weekly or monthly", async () => {
       // Day 7 would normally trigger a weekly promotion.
       await withClockAt("2026-04-07T12:00:00Z", async () => {
-        mockSettingsRepo.findOne.mockResolvedValue(
-          createSettings({ enabled: true, folderPath: root }),
-        );
+        storePolicy({ enabled: true, folderPath: root });
 
         await service.runManualBackup(userId);
 
@@ -2849,15 +2904,13 @@ describe("AutoBackupService", () => {
     });
 
     it("a later complete backup resumes normal promotion and retention", async () => {
-      mockSettingsRepo.findOne.mockResolvedValue(
-        createSettings({
-          enabled: true,
-          folderPath: root,
-          retentionDaily: 1,
-          retentionWeekly: 0,
-          retentionMonthly: 0,
-        }),
-      );
+      storePolicy({
+        enabled: true,
+        folderPath: root,
+        retentionDaily: 1,
+        retentionWeekly: 0,
+        retentionMonthly: 0,
+      });
       await seed([
         "monize-backup-daily-2026-04-01.json.gz",
         "monize-backup-daily-2026-04-02.json.gz",
@@ -3225,6 +3278,74 @@ describe("AutoBackupService", () => {
     });
   });
 
+  /**
+   * The policy is deployment state, so it must survive every account operation.
+   * It used to live on the earliest active administrator's own settings row,
+   * where deactivating or demoting that account handed the policy to whichever
+   * administrator was next -- usually one with no row, so the whole deployment
+   * silently reverted to the built-in defaults -- and restoring their personal
+   * backup replayed a months-old policy over every account.
+   */
+  describe("the policy is the deployment's, not an account's", () => {
+    it("does not read any user to decide whose policy this is", async () => {
+      storePolicy({ enabled: true, folderPath: root, frequency: "weekly" });
+      mockUsersRepo.findOne.mockClear();
+
+      const result = await service.getSettings(userId);
+
+      expect(result.frequency).toBe("weekly");
+      // No "who is the primary administrator" lookup exists to go stale.
+      expect(mockUsersRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it("is not exported with an account's backup, so a restore cannot replay it", () => {
+      // The table has no user_id to export it under, and excluding it is what
+      // stops one account's restore rewriting the deployment's schedule.
+      expect(INTENTIONALLY_EXCLUDED_TABLES.has("auto_backup_policy")).toBe(
+        true,
+      );
+    });
+  });
+
+  describe("the manual fan-out claim", () => {
+    it("refuses a second run while one is already walking every account", async () => {
+      // The claim's conditional UPDATE matched no row: somebody holds it.
+      scoped.manager.query.mockImplementation((sql: string) =>
+        Promise.resolve(
+          typeof sql === "string" && sql.includes("auto_backup_policy")
+            ? [[], 0]
+            : [[{ user_id: userId }], 1],
+        ),
+      );
+
+      await expect(service.runManualBackup(userId)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(mockBackupService.exportToBuffer).not.toHaveBeenCalled();
+    });
+
+    it("releases the claim when the run throws", async () => {
+      storePolicy({ enabled: true, folderPath: root });
+      mockBackupService.exportToBuffer.mockRejectedValue(
+        new Error("export blew up"),
+      );
+
+      await expect(service.runManualBackup(userId)).rejects.toThrow(
+        /export blew up/,
+      );
+
+      // A claim a failed run kept would block every later one until it aged
+      // out.
+      const released = scoped.manager.query.mock.calls.some(
+        ([sql]) =>
+          typeof sql === "string" &&
+          sql.includes("UPDATE auto_backup_policy") &&
+          sql.includes("manual_run_claimed_at = NULL"),
+      );
+      expect(released).toBe(true);
+    });
+  });
+
   describe("policy reconciliation", () => {
     const otherUserId = "77777777-7777-7777-7777-777777777777";
 
@@ -3283,16 +3404,73 @@ describe("AutoBackupService", () => {
       );
     });
 
-    it("leaves the policy owner's own row alone -- it is the policy", async () => {
-      // `userId` is the primary administrator in this suite, so their row is
-      // where the policy lives. Reconciling it to itself would, on the tick
-      // after an operator disarmed the schedule, re-derive the very
-      // `nextBackupAt` they had just cleared.
+    it("enrols the administrator too -- there is no excepted account", async () => {
+      // Two exceptions have been made here and both cost somebody their
+      // backups: every administrator, and then the account the policy was
+      // stored on. The second left an operator who had never pressed Save the
+      // one account the policy did not reach, while the screen counted them as
+      // covered.
       mockUsersRepo.find.mockResolvedValue([{ id: userId }]);
       settingsFind({});
 
       await service.handleAutoBackupCron();
 
+      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId,
+          enabled: true,
+          nextBackupAt: expect.any(Date),
+        }),
+      );
+    });
+
+    it("writes nothing for an account whose row already matches the policy", async () => {
+      const settled = createSettings({
+        enabled: true,
+        folderPath: root,
+        nextBackupAt: new Date("2026-04-16T02:00:00Z"),
+      });
+      settled.userId = otherUserId;
+      mockUsersRepo.find.mockResolvedValue([{ id: otherUserId }]);
+      settingsFind({ managed: [settled] });
+
+      await service.handleAutoBackupCron();
+
+      expect(mockSettingsRepo.save).not.toHaveBeenCalled();
+      expect(scoped.manager.query).not.toHaveBeenCalledWith(
+        expect.stringContaining("UPDATE auto_backup_settings\n            SET"),
+        expect.anything(),
+      );
+    });
+
+    it("never overwrites a next_backup_at another replica may have claimed", async () => {
+      // `next_backup_at` is the cron's claim. A whole-entity save wrote it back
+      // from a snapshot read before the loop, so a replica that had just
+      // claimed a window and begun exporting would have the claim reverted
+      // under it and the account backed up twice. The armed path only fills in
+      // a row that has none.
+      const drifted = createSettings({
+        enabled: true,
+        folderPath: root,
+        retentionDaily: 99,
+        nextBackupAt: new Date("2026-04-16T02:00:00Z"),
+      });
+      drifted.userId = otherUserId;
+      mockUsersRepo.find.mockResolvedValue([{ id: otherUserId }]);
+      settingsFind({ managed: [drifted] });
+
+      await service.handleAutoBackupCron();
+
+      const update = scoped.manager.query.mock.calls.find(
+        ([sql]) =>
+          typeof sql === "string" &&
+          sql.includes("UPDATE auto_backup_settings") &&
+          sql.includes("retention_daily"),
+      );
+      expect(update).toBeDefined();
+      // COALESCE, not an assignment: a held claim survives.
+      expect(update?.[0]).toContain("COALESCE(next_backup_at,");
+      // And the row is not rewritten wholesale.
       expect(mockSettingsRepo.save).not.toHaveBeenCalled();
     });
 
@@ -3300,21 +3478,15 @@ describe("AutoBackupService", () => {
       // The defect this closes: the schedule, folder and retention an operator
       // chose governed their own row and nothing else, while the screen said it
       // was configuring the deployment.
-      mockSettingsRepo.findOne.mockImplementation(({ where }) =>
-        Promise.resolve(
-          where.userId === userId
-            ? createSettings({
-                enabled: true,
-                folderPath: root,
-                frequency: "every6hours",
-                backupTime: "23:30",
-                retentionDaily: 30,
-                retentionWeekly: 12,
-                retentionMonthly: 24,
-              })
-            : null,
-        ),
-      );
+      storePolicy({
+        enabled: true,
+        folderPath: root,
+        frequency: "every6hours",
+        backupTime: "23:30",
+        retentionDaily: 30,
+        retentionWeekly: 12,
+        retentionMonthly: 24,
+      });
       mockUsersRepo.find.mockResolvedValue([{ id: otherUserId }]);
       settingsFind({});
 
@@ -3334,13 +3506,7 @@ describe("AutoBackupService", () => {
     });
 
     it("disarms every account when the policy is disabled", async () => {
-      mockSettingsRepo.findOne.mockImplementation(({ where }) =>
-        Promise.resolve(
-          where.userId === userId
-            ? createSettings({ enabled: false, folderPath: root })
-            : null,
-        ),
-      );
+      storePolicy({ enabled: false, folderPath: root });
       mockUsersRepo.find.mockResolvedValue([{ id: otherUserId }]);
       const armed = createSettings({
         enabled: true,
@@ -3353,24 +3519,22 @@ describe("AutoBackupService", () => {
       await service.handleAutoBackupCron();
 
       // Leaving the old `next_backup_at` behind would have a disabled policy
-      // keep taking backups.
-      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId: otherUserId,
-          enabled: false,
-          nextBackupAt: null,
-        }),
+      // keep taking backups, so this is the one case that overrides a claim --
+      // an operator switching automatic backups off means now.
+      const update = scoped.manager.query.mock.calls.find(
+        ([sql]) =>
+          typeof sql === "string" &&
+          sql.includes("UPDATE auto_backup_settings") &&
+          sql.includes("retention_daily"),
       );
+      expect(update).toBeDefined();
+      expect(update?.[0]).toContain("ELSE NULL");
+      expect((update?.[1] as unknown[])[0]).toBe(otherUserId);
+      expect((update?.[1] as unknown[])[1]).toBe(false);
     });
 
     it("writes no row at all for an account a disabled policy has never reached", async () => {
-      mockSettingsRepo.findOne.mockImplementation(({ where }) =>
-        Promise.resolve(
-          where.userId === userId
-            ? createSettings({ enabled: false, folderPath: root })
-            : null,
-        ),
-      );
+      storePolicy({ enabled: false, folderPath: root });
       mockUsersRepo.find.mockResolvedValue([{ id: otherUserId }]);
       settingsFind({});
 
@@ -3409,17 +3573,22 @@ describe("AutoBackupService", () => {
 
       await service.handleAutoBackupCron();
 
-      expect(mockSettingsRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId: otherUserId,
-          enabled: true,
-          folderPath: root,
-          retentionDaily: 7,
-          // The schedule's own bookkeeping is not reset, so enrollment does
-          // not re-trigger a backup every hour.
-          nextBackupAt: drifted.nextBackupAt,
-        }),
+      const update = scoped.manager.query.mock.calls.find(
+        ([sql]) =>
+          typeof sql === "string" &&
+          sql.includes("UPDATE auto_backup_settings") &&
+          sql.includes("retention_daily"),
       );
+      expect(update).toBeDefined();
+      const params = update?.[1] as unknown[];
+      expect(params[0]).toBe(otherUserId);
+      expect(params[1]).toBe(true);
+      expect(params[2]).toBe(root);
+      expect(params[6]).toBe(7);
+      // The schedule's own bookkeeping is not reset -- COALESCE keeps whatever
+      // the row already holds -- so reconciling does not re-trigger a backup
+      // every hour, and cannot revert another replica's claim.
+      expect(update?.[0]).toContain("COALESCE(next_backup_at,");
     });
 
     it("writes nothing when the managed row already matches", async () => {
@@ -3717,97 +3886,95 @@ describe("AutoBackupService", () => {
   });
 
   describe("frequency calculation with backup time", () => {
+    // The schedule is derived where an account's row is written, which is
+    // the reconcile that `updateSettings` runs -- the policy itself carries
+    // no `next_backup_at`. So these need one active account with no row yet.
+    beforeEach(() => {
+      mockUsersRepo.find.mockResolvedValue([{ id: userId }]);
+      mockSettingsRepo.find.mockResolvedValue([]);
+    });
+
     it("should schedule daily backup at configured time", async () => {
-      const existing = createSettings({
+      storePolicy({
         folderPath: root,
         backupTime: "03:30",
       });
-      mockSettingsRepo.findOne.mockResolvedValue(existing);
 
       await service.updateSettings(userId, {
         enabled: true,
         frequency: "daily",
       });
 
-      const savedCall = mockSettingsRepo.save.mock.calls[0][0];
-      const nextAt = savedCall.nextBackupAt as Date;
+      const nextAt = reconciledRow().nextBackupAt as Date;
       expect(nextAt.getUTCHours()).toBe(3);
       // Minutes are snapped to 0 since the cron fires at minute 0 each hour
       expect(nextAt.getUTCMinutes()).toBe(0);
     });
 
     it("should schedule next slot for sub-daily frequency", async () => {
-      const existing = createSettings({
+      storePolicy({
         folderPath: root,
         backupTime: "00:00",
       });
-      mockSettingsRepo.findOne.mockResolvedValue(existing);
 
       await service.updateSettings(userId, {
         enabled: true,
         frequency: "every6hours",
       });
 
-      const savedCall = mockSettingsRepo.save.mock.calls[0][0];
-      const nextAt = savedCall.nextBackupAt as Date;
+      const nextAt = reconciledRow().nextBackupAt as Date;
       // Should be at minute 0 (aligned to configured time)
       expect(nextAt.getUTCMinutes()).toBe(0);
     });
 
     it("should schedule weekly backup at configured time", async () => {
-      const existing = createSettings({
+      storePolicy({
         folderPath: root,
         backupTime: "23:00",
       });
-      mockSettingsRepo.findOne.mockResolvedValue(existing);
 
       await service.updateSettings(userId, {
         enabled: true,
         frequency: "weekly",
       });
 
-      const savedCall = mockSettingsRepo.save.mock.calls[0][0];
-      const nextAt = savedCall.nextBackupAt as Date;
+      const nextAt = reconciledRow().nextBackupAt as Date;
       expect(nextAt.getUTCHours()).toBe(23);
       expect(nextAt.getUTCMinutes()).toBe(0);
     });
 
     it("should convert local timezone backup time to UTC", async () => {
       // America/New_York is UTC-5 (EST) or UTC-4 (EDT)
-      const existing = createSettings({
+      storePolicy({
         folderPath: root,
         backupTime: "02:00",
         timezone: "America/New_York",
       });
-      mockSettingsRepo.findOne.mockResolvedValue(existing);
 
       await service.updateSettings(userId, {
         enabled: true,
         frequency: "daily",
       });
 
-      const savedCall = mockSettingsRepo.save.mock.calls[0][0];
-      const nextAt = savedCall.nextBackupAt as Date;
+      const nextAt = reconciledRow().nextBackupAt as Date;
       // 02:00 EST = 07:00 UTC, or 02:00 EDT = 06:00 UTC
       expect([6, 7]).toContain(nextAt.getUTCHours());
       expect(nextAt.getUTCMinutes()).toBe(0);
     });
 
     it("should handle UTC timezone without offset", async () => {
-      const existing = createSettings({
+      storePolicy({
         folderPath: root,
         backupTime: "14:30",
         timezone: "UTC",
       });
-      mockSettingsRepo.findOne.mockResolvedValue(existing);
 
       await service.updateSettings(userId, {
         enabled: true,
         frequency: "daily",
       });
 
-      const savedCall = mockSettingsRepo.save.mock.calls[0][0];
-      const nextAt = savedCall.nextBackupAt as Date;
+      const nextAt = reconciledRow().nextBackupAt as Date;
       expect(nextAt.getUTCHours()).toBe(14);
       // Minutes are snapped to 0 since the cron fires at minute 0 each hour
       expect(nextAt.getUTCMinutes()).toBe(0);
@@ -3815,20 +3982,18 @@ describe("AutoBackupService", () => {
 
     it("should handle positive UTC offset timezone", async () => {
       // Europe/Berlin is UTC+1 (CET) or UTC+2 (CEST)
-      const existing = createSettings({
+      storePolicy({
         folderPath: root,
         backupTime: "03:00",
         timezone: "Europe/Berlin",
       });
-      mockSettingsRepo.findOne.mockResolvedValue(existing);
 
       await service.updateSettings(userId, {
         enabled: true,
         frequency: "daily",
       });
 
-      const savedCall = mockSettingsRepo.save.mock.calls[0][0];
-      const nextAt = savedCall.nextBackupAt as Date;
+      const nextAt = reconciledRow().nextBackupAt as Date;
       // 03:00 CET = 02:00 UTC, or 03:00 CEST = 01:00 UTC
       expect([1, 2]).toContain(nextAt.getUTCHours());
       expect(nextAt.getUTCMinutes()).toBe(0);
@@ -3842,26 +4007,24 @@ describe("AutoBackupService", () => {
         timezone: "Asia/Tokyo",
       });
 
-      const savedCall = mockSettingsRepo.save.mock.calls[0][0];
+      const savedCall = reconciledRow();
       expect(savedCall.timezone).toBe("Asia/Tokyo");
     });
 
     it("should use timezone for sub-daily frequency scheduling", async () => {
       // America/Chicago is UTC-6 (CST) or UTC-5 (CDT)
-      const existing = createSettings({
+      storePolicy({
         folderPath: root,
         backupTime: "06:00",
         timezone: "America/Chicago",
       });
-      mockSettingsRepo.findOne.mockResolvedValue(existing);
 
       await service.updateSettings(userId, {
         enabled: true,
         frequency: "every12hours",
       });
 
-      const savedCall = mockSettingsRepo.save.mock.calls[0][0];
-      const nextAt = savedCall.nextBackupAt as Date;
+      const nextAt = reconciledRow().nextBackupAt as Date;
       // 06:00 CST = 12:00 UTC, or 06:00 CDT = 11:00 UTC
       // Slots are at 06:00 and 18:00 local, so UTC equivalents vary
       expect(nextAt.getUTCMinutes()).toBe(0);
@@ -3951,7 +4114,7 @@ describe("AutoBackupService", () => {
 
     it("reports the store as fixed, with what it already holds", async () => {
       const svc = await buildService();
-      mockSettingsRepo.findOne.mockResolvedValue(createSettings());
+      storePolicy();
 
       await expect(svc.describeCapability(userId)).resolves.toEqual({
         available: true,
@@ -3971,7 +4134,7 @@ describe("AutoBackupService", () => {
 
     it("refuses a folder somebody asks to store", async () => {
       const svc = await buildService();
-      mockSettingsRepo.findOne.mockResolvedValue(createSettings());
+      storePolicy();
 
       await expect(
         svc.updateSettings(userId, { folderPath: "/data/backups" }),
@@ -3993,18 +4156,18 @@ describe("AutoBackupService", () => {
 
     it("writes no base into the settings column when a schedule is enabled", async () => {
       const svc = await buildService();
-      mockSettingsRepo.findOne.mockResolvedValue(createSettings());
+      storePolicy();
 
       await svc.updateSettings(userId, { enabled: true });
 
       // Not DISPLAY: a deployment that later switched back to a local store
       // would read an `s3://` URL as a directory and refuse every backup.
-      expect(mockSettingsRepo.save.mock.calls[0][0].folderPath).toBe("");
+      expect(writtenPolicy()?.folderPath).toBe("");
     });
 
     it("leaves the stored column alone on a manual run", async () => {
       const svc = await buildService();
-      mockSettingsRepo.findOne.mockResolvedValue(createSettings());
+      storePolicy();
 
       await svc.runManualBackup(userId);
 

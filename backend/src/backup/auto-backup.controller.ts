@@ -31,9 +31,10 @@ import { DemoRestricted } from "../common/decorators/demo-restricted.decorator";
  * What these endpoints read and write is one policy for the whole instance, not
  * the caller's own preference: it decides where files are written on the
  * server's filesystem and how much disk they take, and every active account is
- * reconciled onto it by `AutoBackupService.reconcileManagedUsers`. Which row
- * holds it is the service's business (`resolvePolicyUserId`), so the handlers
- * pass the acting administrator's id only as the identity of the caller. The
+ * reconciled onto it by `AutoBackupService.reconcileManagedUsers`. It has its
+ * own singleton row (`auto_backup_policy`), so the handlers pass the acting
+ * administrator's id only as the identity of the caller -- to probe a namespace
+ * and to name an example folder, never to decide whose policy this is. The
  * guards are on the class rather than on each handler so an endpoint added here
  * is admin-only by default.
  *

@@ -71,15 +71,4 @@ export class AutoBackupSettings {
    * the configured base folder is unusable.
    */
   resolvedFolderPath?: string;
-
-  /**
-   * How many active accounts this deployment's policy governs, attached only to
-   * the admin surface's view of the policy (`AutoBackupService.getSettings`).
-   *
-   * Read-only and never stored. The screen it feeds is a deployment policy, and
-   * the one thing an operator cannot tell from the schedule alone is whether it
-   * reaches anybody: "Daily at 02:00" over a count of 1 on a twelve-account
-   * instance is the defect this field makes visible.
-   */
-  managedUserCount?: number;
 }

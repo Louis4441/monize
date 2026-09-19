@@ -865,32 +865,66 @@ the cron claims and records against; only its **bookkeeping** columns
 (`last_backup_at`, `last_backup_status`, `last_backup_error`, `next_backup_at`)
 are that account's own. Three consequences worth stating:
 
-- **Whose row holds the policy.** The earliest-created active administrator's
-  (`resolvePolicyUserId`). Every admin endpoint reads and writes *that* row
-  whichever administrator is signed in, so two operators edit one policy instead
-  of two, the second of which used to revert on the next hourly reconcile. A
-  deployment with no active administrator runs on `defaultPolicy()`, which is
-  **enabled**: the previous `applyManagedDefaults` hardcoded `enabled: true` for
-  managed users, so a disabled default would have switched automatic backups off
-  for every deployment that had never opened the screen.
-- **Every active account, administrators included** — all but the one whose row
-  *is* the policy. A second administrator used to be excluded from enrollment
-  along with the first and enrolled by nothing, so unless they opened the
-  settings screen themselves their data was never backed up at all.
+- **Where the policy lives.** Its own singleton row, `auto_backup_policy` —
+  a boolean primary key with `CHECK (id)`, the shape `update_check_state` and
+  `push_instance_config` use. It is RLS-exempt (no owner column) and excluded
+  from `INTENTIONALLY_EXCLUDED_TABLES`, so no account's archive carries it.
+  It previously lived on the earliest-created active administrator's
+  `auto_backup_settings` row, which let three ordinary operations silently
+  rewrite a deployment-wide setting: **deactivating or demoting** that
+  administrator handed the policy to the next one, whose row usually did not
+  exist, so every account reverted to the built-in defaults — and with them a
+  folder that may not be mounted, failing every backup; **deleting** them
+  cascaded the policy away; and **restoring their own backup** replayed a
+  months-old policy over the whole instance, with `withPreserveTimestamps`
+  keeping even `updated_at` from showing it had moved.
+- **A deployment that has never saved** runs on `defaultPolicy()`, which is
+  **enabled**: the enrollment it replaces hardcoded `enabled: true` for managed
+  users, so a disabled default would have switched automatic backups off for
+  every such deployment.
+- **Every active account, with no exception.** Two have been made here and both
+  cost somebody their backups: first every administrator was excluded, so a
+  second operator who never opened the screen was enrolled by nothing; then the
+  account holding the policy was excluded, which on a deployment whose
+  administrator had never pressed Save left the operator's own data the single
+  account the policy did not reach — while the screen counted it as covered. A
+  row that already matches costs one comparison and no write, so an exception
+  buys nothing.
 - **Disabling the policy disarms every account**, by clearing `next_backup_at`;
   leaving it behind would have a disabled policy keep taking backups. An account
   a disabled policy has never reached gets no row written at all.
+- **A reconcile writes only the columns it owns.** `next_backup_at` is the
+  cron's **claim** (`claimDueBackup`), so a whole-entity `save` carrying a
+  snapshot read before the loop could revert a claim another replica had just
+  taken and have that account backed up twice — the mirror image of the reason
+  `recordBackupOutcome` was already a targeted `UPDATE`. The armed path only
+  fills in a row that has none (`COALESCE(next_backup_at, …)`); only a disabled
+  policy overrides a held claim, which is the one case where that is the point.
+  `runBackupForUser` records its outcome through `recordBackupOutcome` for the
+  same reason, and a manual run deliberately does not move the automatic
+  schedule at all.
 
 The admin surface reads back what the deployment is actually doing rather than
-one row: `managedUserCount` (how many active accounts the policy governs) and
+one row: `accountCount` (active accounts the policy governs) beside
+`scheduledAccountCount` (how many of them hold an armed row right now), and
 deployment-wide `lastBackup*` / `nextBackupAt` aggregates — the most recent run of
 any account and the soonest next run of any armed one. A policy screen reporting
 one row's `lastBackupAt` says "Last backup: today" on an instance where eleven of
-twelve accounts have never been backed up at all.
+twelve accounts have never been backed up at all. The counts are **two** numbers
+because a single one could only have been `accountCount`, which states coverage
+the deployment may not have: an account whose reconcile threw is logged, skipped,
+and still governed by the policy. They match on a settled deployment.
 
 **"Back Up Every Account Now" means every account.** `runManualBackup` fans out
 over every active account through the same per-user path the cron uses, caller
-first, one at a time; one account's failure never stops the rest. It answers
+first, one at a time; one account's failure never stops the rest. The fan-out is
+**claimed deployment-wide** before it starts — a conditional `UPDATE` on
+`auto_backup_policy.manual_run_claimed_at`, released in a `finally` **by token**
+so a run that outran `MANUAL_RUN_CLAIM_TTL_HOURS` cannot free the claim a later
+one has since taken, and bounded by that TTL so a killed replica frees it — because the button
+walks every account inside one request, and a proxy timeout that leaves the run
+going plus an operator who presses again otherwise interleaves two full passes
+over the same rows. A second caller is refused, not queued. It answers
 counts (`usersRequested`, `usersBackedUp`, `usersSkipped`, `usersFailed`,
 `usersPartial`) plus `filename` for the caller's *own* artifact only — one
 filename cannot describe a fan-out. A run that wrote nothing refuses rather than
