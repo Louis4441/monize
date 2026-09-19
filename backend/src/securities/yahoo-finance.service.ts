@@ -106,6 +106,23 @@ const SYMBOL_ABSENT_ERROR_CODES: ReadonlySet<string> = new Set([
   "Bad Request",
 ]);
 
+/**
+ * The `chart.error.description` of a 400 that is an answer rather than a fault.
+ *
+ * Yahoo refuses a window it has no history for with a 400 whose body reads
+ * `Data doesn't exist for startDate = 1000684800, endDate = 1004486400` -- a
+ * statement about this symbol over this window, in the same class as a 404. A
+ * request this client built wrong is also a 400, and that one says nothing
+ * about the symbol, so the status alone cannot decide: the description does.
+ *
+ * Reading the two as one refusal is issue #1409. `USDCAD=X` has no history
+ * before December 2003, so a since-inception valuation asked for 2000-2003,
+ * got `null` ("the provider declined"), and the empty-window memory that would
+ * have stopped it asking again may only remember an answer -- so every
+ * subsequent portfolio summary re-issued the same 76 doomed calls, forever.
+ */
+const ABSENT_WINDOW_DESCRIPTION = /^data doesn['\u2019]?t exist/i;
+
 const YAHOO_SECTOR_NAMES: Record<string, string> = {
   realestate: "Real Estate",
   consumer_cyclical: "Consumer Cyclical",
@@ -729,6 +746,31 @@ export class YahooFinanceService implements QuoteProvider {
     return series;
   }
 
+  /**
+   * Whether a non-OK response is Yahoo saying the window holds no history.
+   *
+   * Only a 400 is read: the statuses that already mean "no such series" are
+   * decided by `SYMBOL_ABSENT_STATUSES` before this is called, and a 429, a
+   * 5xx or a 401 is the provider declining to answer -- reading a body for one
+   * of those cannot turn it into an answer. The body is read with `text()`
+   * rather than `readBody`, because `throttledFetch` has already recorded a
+   * non-OK response with the breaker and a second success would count one
+   * answer twice.
+   */
+  private async describesAbsentWindow(response: Response): Promise<boolean> {
+    if (response.status !== 400) return false;
+    try {
+      const body = await response.text();
+      const description = String(
+        (JSON.parse(body) as any)?.chart?.error?.description ?? "",
+      ).trim();
+      return ABSENT_WINDOW_DESCRIPTION.test(description);
+    } catch {
+      // An unparseable body is not a statement about the symbol.
+      return false;
+    }
+  }
+
   private async fetchHistoricalRaw(
     yahooSymbol: string,
     query: string,
@@ -757,9 +799,13 @@ export class YahooFinanceService implements QuoteProvider {
         // a caller may remember the window as empty. Collapsing both into
         // `null` meant a symbol nobody carries was re-asked on every report
         // render, because the negative cache could never be written for it.
-        return SYMBOL_ABSENT_STATUSES.has(response.status)
-          ? { prices: [], currencyCode: null, symbol: yahooSymbol }
-          : null;
+        if (
+          SYMBOL_ABSENT_STATUSES.has(response.status) ||
+          (await this.describesAbsentWindow(response))
+        ) {
+          return { prices: [], currencyCode: null, symbol: yahooSymbol };
+        }
+        return null;
       }
 
       const data = await this.readBody<any>(response);
