@@ -38,6 +38,7 @@ import {
   FxRateMode,
   FxRateResolution,
   describeFxGap,
+  fxReferenceDate,
   resolveFxRate,
 } from "../common/time-series/fx-rate-resolver";
 import { preferredCurrency } from "../common/default-currency.util";
@@ -1002,9 +1003,17 @@ export class ExchangeRateService implements OnModuleInit {
       });
     }
 
-    const requested = onDate.slice(0, 10);
-    const reference =
-      mode === "live" ? today : requested > today ? today : requested;
+    // The reference day, refusing a value that names none: the span below is a
+    // pair of `YYYY-MM-DD` strings and a request parameter typed `string` may
+    // arrive as an array (`fxReferenceDate`).
+    const reference = fxReferenceDate(onDate, today, mode);
+    if (reference === null) {
+      return resolveFxRate(from, to, onDate, () => undefined, {
+        mode,
+        maxAgeDays,
+        today,
+      });
+    }
     // The span is expressed as YYYY-MM-DD strings, never `Date` objects.
     // TypeORM does not normalise a select-side parameter: `pg` renders a `Date`
     // in the process time zone, and PostgreSQL's cast to `date` keeps whatever

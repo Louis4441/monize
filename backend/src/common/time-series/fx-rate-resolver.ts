@@ -58,6 +58,8 @@ export type FxRateMode = "historical" | "live";
 export type FxRateGapReason =
   /** A currency code was empty, so there is no pair to look up. */
   | "unknown_currency"
+  /** The valuation date was not a `YYYY-MM-DD` day, so it prices nothing. */
+  | "invalid_date"
   /** Neither direction has ever been observed. */
   | "no_observation"
   /** Every observation is dated after the valuation date (the removed look-ahead). */
@@ -272,6 +274,34 @@ const UNKNOWN_SHAPE = {
 } as const;
 
 /**
+ * The day a lookup prices, as `YYYY-MM-DD`, or `null` when the caller named no
+ * day.
+ *
+ * A date in the future has no rate and will not until it arrives; today's is
+ * the best available estimate, and it is what every "as of" surface shows. In
+ * `live` mode the reference is today outright.
+ *
+ * `onDate` is declared `string`, and on the request path it is a query
+ * parameter: Express parses a repeated key (`?date=x&date=y`) into an array, so
+ * the declared type is a claim about the caller rather than a fact about the
+ * value. Unchecked, `slice` on an array returns an array and every comparison
+ * downstream silently compares coerced text -- CodeQL
+ * `js/type-confusion-through-parameter-tampering`. A value that does not name a
+ * day is refused here rather than coerced into one; the comparisons below are
+ * lexicographic over `YYYY-MM-DD` and mean nothing for any other shape.
+ */
+export function fxReferenceDate(
+  onDate: string,
+  today: string,
+  mode: FxRateMode,
+): string | null {
+  if (typeof onDate !== "string") return null;
+  const requested = onDate.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(requested)) return null;
+  return mode === "live" ? today : requested > today ? today : requested;
+}
+
+/**
  * The rate that converts one unit of `from` into `to` on `onDate`.
  *
  * `lookup` is handed the pair in a stored direction and returns that
@@ -313,12 +343,10 @@ export function resolveFxRate(
   }
 
   const today = options?.today ?? new Date().toISOString().slice(0, 10);
-  // A date in the future has no rate and will not until it arrives; today's is
-  // the best available estimate, and it is what every "as of" surface shows.
-  // In `live` mode the reference is today outright.
-  const requested = onDate.slice(0, 10);
-  const reference =
-    mode === "live" ? today : requested > today ? today : requested;
+  const reference = fxReferenceDate(onDate, today, mode);
+  if (reference === null) {
+    return { ...UNKNOWN_SHAPE, reason: "invalid_date" };
+  }
 
   const seen: Rejections = {
     sawAnyObservation: false,
@@ -398,6 +426,8 @@ export function describeFxGap(
   switch (reason) {
     case "unknown_currency":
       return `No currency pair to resolve for ${pair}; the affected figure is reported as unknown rather than converted 1:1`;
+    case "invalid_date":
+      return `No calendar date to resolve ${pair} on; the affected figure is reported as unknown rather than priced on a guessed day`;
     case "only_after_date":
       return `Every stored ${pair} rate is dated after ${onDate}; the affected figure is reported as unknown rather than valued at a rate from its future`;
     case "stale_observation":

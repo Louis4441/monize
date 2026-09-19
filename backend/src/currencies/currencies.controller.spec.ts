@@ -1,3 +1,4 @@
+import { BadRequestException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { CurrenciesController } from "./currencies.controller";
 import { ExchangeRateService } from "./exchange-rate.service";
@@ -160,6 +161,32 @@ describe("CurrenciesController", () => {
       await expect(
         controller.getRateForDate("EUR", "USD", "07/20/2026"),
       ).rejects.toThrow();
+      expect(mockExchangeRateService.getRateForDate).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Express parses a repeated key into an array, so `date` is only a `string`
+     * by declaration. A regular expression `.test` coerces the array to text
+     * and passes it, after which the resolver sliced an array and compared it
+     * as a date (CodeQL `js/type-confusion-through-parameter-tampering`).
+     */
+    it("refuses a repeated date parameter rather than passing an array on", async () => {
+      for (const tampered of [["2026-07-20"], ["2026-07-20", "2026-07-21"]]) {
+        await expect(
+          controller.getRateForDate(
+            "EUR",
+            "USD",
+            tampered as unknown as string,
+          ),
+        ).rejects.toThrow(BadRequestException);
+      }
+      expect(mockExchangeRateService.getRateForDate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a day that does not exist", async () => {
+      await expect(
+        controller.getRateForDate("EUR", "USD", "2026-02-30"),
+      ).rejects.toThrow(BadRequestException);
       expect(mockExchangeRateService.getRateForDate).not.toHaveBeenCalled();
     });
   });

@@ -23,6 +23,7 @@ import {
 import { AuthGuard } from "@nestjs/passport";
 import { Throttle } from "@nestjs/throttler";
 import { ParseCurrencyCodePipe } from "../common/pipes/parse-currency-code.pipe";
+import { isCalendarDate } from "../common/validators/is-calendar-date.validator";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { AllowDelegate } from "../delegation/decorators/delegate-access.decorator";
@@ -180,7 +181,12 @@ export class CurrenciesController {
     @Query("to", ParseCurrencyCodePipe) to: string,
     @Query("date") date: string,
   ): Promise<{ rate: number | null }> {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date ?? "")) {
+    // `isCalendarDate`, not a bare regular expression on the raw value: Express
+    // parses a repeated key (`?date=x&date=y`) into an array, and `.test` would
+    // coerce that array to text and pass it through to the resolver as a
+    // supposed string (CodeQL `js/type-confusion-through-parameter-tampering`).
+    // It also rejects a day that does not exist, such as `2026-02-30`.
+    if (!isCalendarDate(date)) {
       throw new BadRequestException(
         tr(
           "errors.currencies.invalidRateDate",

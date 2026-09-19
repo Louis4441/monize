@@ -950,6 +950,35 @@ describe("ExchangeRateService", () => {
       expect(call.where[1].rateDate).toBe(call.where[0].rateDate);
     });
 
+    /**
+     * `onDate` reaches here from a query parameter, and Express parses a
+     * repeated key into an array, so a value declared `string` need not be one.
+     * The span was built by slicing it: an array sliced to an array, the
+     * comparison that clamps a future date became a text coercion, and the
+     * query ran over bounds nobody named (CodeQL
+     * `js/type-confusion-through-parameter-tampering`).
+     */
+    it("refuses a date that names no day instead of querying a coerced span", async () => {
+      for (const tampered of [
+        ["2026-06-08"] as unknown as string,
+        ["2026-06-08", "2026-06-09"] as unknown as string,
+        "08/06/2026",
+      ]) {
+        const resolution = await service.resolveStoredRate(
+          "USD",
+          "CAD",
+          tampered,
+        );
+
+        expect(resolution).toMatchObject({
+          status: "unknown",
+          rate: null,
+          reason: "invalid_date",
+        });
+      }
+      expect(exchangeRateRepository.find).not.toHaveBeenCalled();
+    });
+
     it("bounds a live lookup at today, so today's own row is inside the span", async () => {
       // Today is the suite's fixture date (`todayYMD` is mocked above).
       exchangeRateRepository.find.mockResolvedValue([
