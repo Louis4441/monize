@@ -357,26 +357,23 @@ export class GemPositionService {
     if (!from || from === to) return amount;
     const key = `${from}->${to}`;
     if (!cache.has(key)) {
+      // One lookup, which answers from either stored direction. This used to ask
+      // twice and reciprocate the second answer itself -- a second copy of a
+      // decision `resolveFxRate` owns, and copies are how resolvers drift.
+      //
       // Bounded to the same fortnight as the prices these amounts are struck
       // from. An unbounded rate fails the way the unbounded price did, only
       // more quietly: nothing on the page is denominated in the rate, so a
       // nine-month-old one simply makes every converted figure wrong by the
       // year's currency move.
-      const direct = await this.exchangeRateService.getLatestRate(
-        from,
-        to,
-        RATE_MAX_AGE_DAYS,
-      );
-      if (direct !== null) {
-        cache.set(key, direct);
-      } else {
-        const reverse = await this.exchangeRateService.getLatestRate(
-          to,
+      cache.set(
+        key,
+        await this.exchangeRateService.getLatestRate(
           from,
+          to,
           RATE_MAX_AGE_DAYS,
-        );
-        cache.set(key, reverse !== null && reverse !== 0 ? 1 / reverse : null);
-      }
+        ),
+      );
     }
     const rate = cache.get(key) ?? null;
     return rate === null ? null : amount * rate;

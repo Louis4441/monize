@@ -4,6 +4,7 @@ import { ExchangeRateService } from "./exchange-rate.service";
 import { ProviderHealthService } from "../provider-health/provider-health.service";
 import { createTestProviderHealth } from "../test-helpers/provider-health-testing";
 import { ExchangeRate } from "./entities/exchange-rate.entity";
+import { addDaysYMD, todayYMD } from "../common/date-utils";
 import { Currency } from "./entities/currency.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { YahooFinanceService } from "../securities/yahoo-finance.service";
@@ -506,6 +507,34 @@ describe("ExchangeRateService", () => {
       expect(result.successful).toBe(1);
       expect(result.results[0].pair).toBe("EUR/USD");
       expect(result.results[0].ratesLoaded).toBe(0); // skipped because existing
+    });
+
+    it("counts a pair stored in the other direction as already covered", async () => {
+      // A pair is stored once. Asking only about `EUR->USD` read a pair held as
+      // `USD->EUR` as uncovered and re-fetched it from the provider on every
+      // run, forever.
+      userPreferenceRepository.findOne.mockResolvedValue(null);
+      dataSource.query
+        .mockResolvedValueOnce([
+          { currency_code: "EUR", earliest: "2025-01-01" },
+        ]) // accountCurrencyRows
+        .mockResolvedValueOnce([]) // securityCurrencyRows
+        .mockResolvedValueOnce([{ count: 5 }]); // the coverage probe
+
+      const result = await service.backfillHistoricalRates("user-1");
+
+      const probe = dataSource.query.mock.calls.find((call: unknown[]) =>
+        String(call[0]).includes("COUNT(*)::INT AS count FROM exchange_rates"),
+      );
+      expect(probe).toBeDefined();
+      expect(String(probe[0])).toContain(
+        "(from_currency = $1 AND to_currency = $2)",
+      );
+      expect(String(probe[0])).toContain(
+        "(from_currency = $2 AND to_currency = $1)",
+      );
+      expect(result.results[0].ratesLoaded).toBe(0);
+      expect(yahooFinanceService.fetchHistorical).not.toHaveBeenCalled();
     });
 
     it("returns empty summary when no pairs need backfill", async () => {
@@ -1417,6 +1446,10 @@ describe("ExchangeRateService", () => {
 
       expect(result?.rate).toBe(roundFxRate(1 / 1.365));
       expect(result?.convertedAmount).toBe(100);
+      // One trip to the store. The second lookup this used to make -- the pair
+      // reversed, the answer reciprocated -- could never add anything, because
+      // the ladder it calls already reads both stored directions.
+      expect(exchangeRateRepository.find).toHaveBeenCalledTimes(1);
     });
 
     it("returns null -- never 1, never the input -- when no rate exists either way", async () => {
@@ -1486,6 +1519,42 @@ describe("ExchangeRateService", () => {
   });
 
   describe("getLatestRate", () => {
+    /**
+     * The truth table in `docs/specs/exchange-rate-canonical-orientation.md`
+     * section 4. A pair is stored in one orientation, so "the latest rate" has to
+     * be answered from whichever direction holds it -- this used to read
+     * `from->to` alone and returned null for a pair held the other way.
+     */
+    const row = (
+      fromCurrency: string,
+      toCurrency: string,
+      rate: number | string,
+      rateDate: Date | string,
+    ): ExchangeRate =>
+      ({
+        ...mockExchangeRate,
+        fromCurrency,
+        toCurrency,
+        rate,
+        rateDate,
+      }) as unknown as ExchangeRate;
+
+    /** Answer each direction's newest-row query from what the store holds. */
+    const store = (rows: ExchangeRate[]): void => {
+      exchangeRateRepository.findOne.mockImplementation(
+        async (options: {
+          where: { fromCurrency: string; toCurrency: string };
+        }) =>
+          rows.find(
+            (r) =>
+              r.fromCurrency === options.where.fromCurrency &&
+              r.toCurrency === options.where.toCurrency,
+          ) ?? null,
+      );
+    };
+
+    const today = todayYMD();
+
     it("returns 1 when from and to are the same currency", async () => {
       const result = await service.getLatestRate("USD", "USD");
 
@@ -1493,31 +1562,90 @@ describe("ExchangeRateService", () => {
       expect(exchangeRateRepository.findOne).not.toHaveBeenCalled();
     });
 
-    it("returns the rate value when a rate is found", async () => {
-      exchangeRateRepository.findOne.mockResolvedValue(mockExchangeRate);
+    it("returns the rate when the pair is stored in the direction asked for", async () => {
+      store([row("USD", "CAD", 1.365, new Date("2026-02-10"))]);
 
       const result = await service.getLatestRate("USD", "CAD");
 
       expect(result).toBe(1.365);
+      // Both directions are read; the resolver decides between them.
       expect(exchangeRateRepository.findOne).toHaveBeenCalledWith({
         where: { fromCurrency: "USD", toCurrency: "CAD" },
         order: { rateDate: "DESC" },
       });
-    });
-
-    it("returns null when no rate is found", async () => {
-      exchangeRateRepository.findOne.mockResolvedValue(null);
-
-      const result = await service.getLatestRate("USD", "XYZ");
-
-      expect(result).toBeNull();
-    });
-
-    it("converts decimal rate to number", async () => {
-      exchangeRateRepository.findOne.mockResolvedValue({
-        ...mockExchangeRate,
-        rate: "1.3650000000", // decimal string from DB
+      expect(exchangeRateRepository.findOne).toHaveBeenCalledWith({
+        where: { fromCurrency: "CAD", toCurrency: "USD" },
+        order: { rateDate: "DESC" },
       });
+    });
+
+    it("inverts the stored row when the pair is held the other way", async () => {
+      // The case that used to come back null. CAD sorts first, so this is the
+      // orientation the collapse stores.
+      store([row("CAD", "USD", 0.7326, new Date("2026-02-10"))]);
+
+      const result = await service.getLatestRate("USD", "CAD");
+
+      expect(result).toBeCloseTo(1 / 0.7326, 9);
+    });
+
+    it("returns null when neither direction is stored", async () => {
+      store([]);
+
+      expect(await service.getLatestRate("USD", "XYZ")).toBeNull();
+    });
+
+    it("prefers the more recently observed direction", async () => {
+      store([
+        row("USD", "CAD", 1.3, addDaysYMD(today, -10)),
+        row("CAD", "USD", 0.5, addDaysYMD(today, -1)),
+      ]);
+
+      // The fresher inverse row wins over the older direct one.
+      expect(await service.getLatestRate("USD", "CAD")).toBeCloseTo(2, 9);
+    });
+
+    it("gives a tie to the direction asked for, so the answer is deterministic", async () => {
+      store([
+        row("USD", "CAD", 1.3, addDaysYMD(today, -2)),
+        row("CAD", "USD", 0.5, addDaysYMD(today, -2)),
+      ]);
+
+      expect(await service.getLatestRate("USD", "CAD")).toBe(1.3);
+    });
+
+    it("applies an age bound to both directions", async () => {
+      store([
+        row("USD", "CAD", 1.3, addDaysYMD(today, -200)),
+        row("CAD", "USD", 0.5, addDaysYMD(today, -200)),
+      ]);
+
+      // A rate is a price: past the bound the answer is unknown, not the last
+      // one on file, whichever direction that one is stored in.
+      expect(await service.getLatestRate("USD", "CAD", 30)).toBeNull();
+      const [call] = exchangeRateRepository.findOne.mock.calls;
+      expect(call[0].where.rateDate).toBeDefined();
+    });
+
+    it("answers from an admissible direction when the other is stale", async () => {
+      store([
+        row("USD", "CAD", 1.3, addDaysYMD(today, -200)),
+        row("CAD", "USD", 0.5, addDaysYMD(today, -3)),
+      ]);
+
+      expect(await service.getLatestRate("USD", "CAD", 30)).toBeCloseTo(2, 9);
+    });
+
+    it("treats a non-positive stored rate as absent", async () => {
+      store([row("USD", "CAD", 0, new Date("2026-02-10"))]);
+
+      expect(await service.getLatestRate("USD", "CAD")).toBeNull();
+    });
+
+    it("converts a decimal string from the driver to a number", async () => {
+      // The `pg` DATE parser hands the date back as a literal string and numerics
+      // arrive as strings too, so this is the shape the real repository returns.
+      store([row("USD", "CAD", "1.3650000000", "2026-02-10")]);
 
       const result = await service.getLatestRate("USD", "CAD");
 

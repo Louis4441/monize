@@ -739,7 +739,10 @@ describe("GemPositionService", () => {
     expect(result.action?.estimatedTax).toBeCloseTo(14687.93, 1);
   });
 
-  it("falls back to the inverse rate", async () => {
+  it("converts a pair the store holds the other way, in one lookup", async () => {
+    // Only USD->EUR at 0.5 is stored. `getLatestRate` resolves either stored
+    // direction and hands back the EUR->USD rate of 2, so this service asks once
+    // and does not reciprocate anything itself (INV-FX-003).
     holdingRows = [
       {
         security_id: "sec-spy",
@@ -751,11 +754,13 @@ describe("GemPositionService", () => {
       },
     ];
     priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 100]]));
-    exchangeRates.getLatestRate
-      .mockResolvedValueOnce(null) // EUR -> USD unknown
-      .mockResolvedValueOnce(0.5); // USD -> EUR known
+    exchangeRates.getLatestRate.mockResolvedValue(2);
+
     const result = await build();
+
     expect(result.position?.current?.marketValue).toBeCloseTo(2000, 2);
+    expect(exchangeRates.getLatestRate).toHaveBeenCalledTimes(1);
+    expect(exchangeRates.getLatestRate).toHaveBeenCalledWith("EUR", "USD", 14);
   });
 
   /**

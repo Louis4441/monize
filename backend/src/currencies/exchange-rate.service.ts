@@ -19,7 +19,7 @@ import { Currency } from "./entities/currency.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { YahooFinanceService } from "../securities/yahoo-finance.service";
 import { mapWithConcurrency } from "../common/concurrency.util";
-import { roundFxRate, resolveFxRateOrNull } from "../common/fx-entry.util";
+import { resolveFxRateOrNull } from "../common/fx-entry.util";
 import { roundMoney } from "../common/round.util";
 import { addDaysYMD, todayYMD } from "../common/date-utils";
 import { withScopedDb } from "../common/db/scoped-db";
@@ -83,6 +83,15 @@ function ymdSpan(fromYmd: string, toYmd: string): FindOperator<Date> {
     MoreThanOrEqual(fromYmd),
     LessThanOrEqual(toYmd),
   ) as unknown as FindOperator<Date>;
+}
+
+/**
+ * `rate_date` on or after `fromYmd`, the bound as a `YYYY-MM-DD` string for the
+ * reason `ymdSpan` gives: a `Date` bound is rendered by `pg` in the process time
+ * zone and, west of UTC, names the previous calendar day.
+ */
+function ymdFrom(fromYmd: string): FindOperator<Date> {
+  return MoreThanOrEqual(fromYmd) as unknown as FindOperator<Date>;
 }
 
 /**
@@ -688,11 +697,15 @@ export class ExchangeRateService implements OnModuleInit {
     for (const [pairKey, cutoffDate] of pairEarliest.entries()) {
       const [from, to] = pairKey.split("->");
 
-      // Skip if we already have historical rates for this pair
+      // Skip if we already have historical rates for this pair, in either
+      // direction: a pair is stored once, so asking only about `from->to` reads
+      // a pair held the other way as uncovered and re-fetches it from the
+      // provider on every run, forever. `readCoverage` asks the same way.
       const existingRates = await withScopedDb(this.dataSource, (manager) =>
         manager.query(
           `SELECT COUNT(*)::INT AS count FROM exchange_rates
-         WHERE from_currency = $1 AND to_currency = $2`,
+         WHERE (from_currency = $1 AND to_currency = $2)
+            OR (from_currency = $2 AND to_currency = $1)`,
           [from, to],
         ),
       );
@@ -959,7 +972,15 @@ export class ExchangeRateService implements OnModuleInit {
   }
 
   /**
-   * Get the latest rate for a specific currency pair
+   * The latest stored rate for a pair, in whichever direction it is stored.
+   *
+   * Both directions are read and `resolveFxRate` chooses between them, so this
+   * answers the same question as every other lookup rather than a
+   * direction-specific one of its own. It used to read the stored pair one way
+   * only, returning `null` whenever the pair happened to be held the other way
+   * -- harmless while every fetch wrote a mirror row, and a silent gap once a
+   * pair is stored once (INV-FX-003). The posting fallbacks and the
+   * scheduled-estimate refresh were the callers that went unanswered.
    */
   async getLatestRate(
     from: string,
@@ -978,22 +999,50 @@ export class ExchangeRateService implements OnModuleInit {
     maxAgeDays?: number,
   ): Promise<number | null> {
     if (from === to) return 1;
-    const where: Record<string, unknown> = {
-      fromCurrency: from,
-      toCurrency: to,
-    };
-    if (maxAgeDays !== undefined) {
-      const oldest = new Date();
-      oldest.setUTCDate(oldest.getUTCDate() - maxAgeDays);
-      where.rateDate = MoreThanOrEqual(oldest.toISOString().slice(0, 10));
-    }
-    const rate = await withScopedDb(this.dataSource, (manager) =>
-      manager.getRepository(ExchangeRate).findOne({
-        where,
-        order: { rateDate: "DESC" },
-      }),
+    const today = todayYMD();
+    // The age bound on the query as well as in the resolver: the resolver
+    // decides admissibility, this just keeps the rows it reads bounded. A
+    // calendar step, not a local-midnight `Date` read back through `toISOString`.
+    const bound: { rateDate?: FindOperator<Date> } =
+      maxAgeDays === undefined
+        ? {}
+        : { rateDate: ymdFrom(addDaysYMD(today, -maxAgeDays)) };
+    const [direct, reverse] = await withScopedDb(
+      this.dataSource,
+      async (manager) => {
+        const repo = manager.getRepository(ExchangeRate);
+        const newest = (f: string, t: string) =>
+          repo.findOne({
+            where: { fromCurrency: f, toCurrency: t, ...bound },
+            order: { rateDate: "DESC" },
+          });
+        return Promise.all([newest(from, to), newest(to, from)]);
+      },
     );
-    return rate ? Number(rate.rate) : null;
+
+    const observed = (row: ExchangeRate | null) => {
+      if (row === null) return undefined;
+      const date =
+        row.rateDate instanceof Date
+          ? row.rateDate.toISOString().slice(0, 10)
+          : String(row.rateDate).slice(0, 10);
+      return [{ date, rate: Number(row.rate) }];
+    };
+
+    // `live`: the freshest observation rather than one dated on or before today,
+    // which is what "the latest rate" has always meant here. An omitted bound is
+    // no bound at all, as before.
+    return resolveFxRate(
+      from,
+      to,
+      today,
+      (f, t) => (f === from && t === to ? observed(direct) : observed(reverse)),
+      {
+        mode: "live",
+        maxAgeDays: maxAgeDays ?? Number.POSITIVE_INFINITY,
+        today,
+      },
+    ).rate;
   }
 
   /**
@@ -1226,8 +1275,8 @@ export class ExchangeRateService implements OnModuleInit {
    *
    * Returns `null` when no usable rate exists in either direction -- never `1`,
    * and never the input amount: `docs/specs/fx-conversion-completeness.md`.
-   * The reverse pair is tried because a rate stored one way only (older data,
-   * before both directions were persisted together) is still a rate.
+   * Either stored direction answers, because the ladder resolves the pair
+   * through `resolveFxRate`; this does not chase the reverse pair itself.
    */
   async convertOnDate(
     amount: number,
@@ -1254,12 +1303,12 @@ export class ExchangeRateService implements OnModuleInit {
       };
     }
 
-    const direct = await resolveFxRateOrNull(this, from, to, effectiveDate);
-    let rate: number | null = direct;
-    if (rate === null) {
-      const reverse = await resolveFxRateOrNull(this, to, from, effectiveDate);
-      rate = reverse === null ? null : roundFxRate(1 / reverse);
-    }
+    // One lookup. The second one this used to make -- the pair reversed, the
+    // answer reciprocated -- could never add anything: the ladder it calls
+    // already consults both stored directions and inverts the reverse
+    // observation itself, so a `null` from the first call means the pair is
+    // unknown, not that it is held the other way.
+    const rate = await resolveFxRateOrNull(this, from, to, effectiveDate);
     if (rate === null) return null;
 
     return {
