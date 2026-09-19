@@ -185,6 +185,15 @@ That makes the artifact self-sufficient, which has three consequences:
   onto a `database` deployment and vice versa; the bytes land wherever this runtime
   keeps them and `storage_provider` is rewritten to match. Both directions used to
   be an unrestorable skip.
+- **The export reads each row's own backend, not the bound one.** Those two differ
+  while a storage switch is being relocated (`AttachmentStorageMigrator`, and
+  `docs/external-side-effects.md` section 2), so comparing every row against
+  `ATTACHMENT_STORAGE_PROVIDER` counted each not-yet-moved attachment as missing and
+  made the artifact **incomplete** -- for bytes the process could read perfectly
+  well. Readability is now `AttachmentStorageRegistry.resolve`, so an artifact taken
+  mid-relocation is complete. A row naming a backend this deployment has no
+  configuration for is still counted missing, which is the honest answer: nothing
+  can read those bytes here.
 
 What it costs, stated plainly: artifacts are larger. What it no longer costs is
 memory. The export used to accumulate every carried object as base64 in one array

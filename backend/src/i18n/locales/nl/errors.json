@@ -599,6 +599,7 @@
   },
   "attachments": {
     "notFound": "Bijlage niet gevonden",
+    "storageUnavailable": "Het bestand van deze bijlage staat in de opslag \"{{ provider }}\", die deze server niet kan bereiken",
     "transactionNotFound": "Transactie niet gevonden",
     "empty": "Geüpload bestand is leeg",
     "fileTooLarge": "Bestand overschrijdt de maximale grootte van {{ max }} bytes",

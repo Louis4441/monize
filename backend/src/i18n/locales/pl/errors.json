@@ -599,6 +599,7 @@
   },
   "attachments": {
     "notFound": "Nie znaleziono załącznika",
+    "storageUnavailable": "Plik tego załącznika znajduje się w magazynie \"{{ provider }}\", do którego ten serwer nie jest skonfigurowany",
     "transactionNotFound": "Nie znaleziono transakcji",
     "empty": "Przesłany plik jest pusty",
     "fileTooLarge": "Plik przekracza maksymalny rozmiar {{ max }} bajtów",

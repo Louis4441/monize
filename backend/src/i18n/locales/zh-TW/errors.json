@@ -599,6 +599,7 @@
   },
   "attachments": {
     "notFound": "找不到附件",
+    "storageUnavailable": "此附件的檔案存放在 \"{{ provider }}\" 儲存後端，而此伺服器未設定為存取該後端",
     "transactionNotFound": "找不到交易",
     "empty": "上傳的檔案為空",
     "fileTooLarge": "檔案超過最大大小 {{ max }} 位元組",

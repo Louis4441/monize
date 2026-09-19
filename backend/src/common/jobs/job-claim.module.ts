@@ -11,7 +11,7 @@ import { FetchSyncService } from "./fetch-sync.service";
  * `FetchSyncService` lives here for that second reason: it is a different
  * mechanism (a deployment-wide lease, for work that belongs to no user) and it
  * belongs beside the per-user one, not off in the currencies module where only
- * one of its three callers would find it.
+ * one of its callers would find it.
  */
 @Global()
 @Module({

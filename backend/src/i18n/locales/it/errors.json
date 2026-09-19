@@ -599,6 +599,7 @@
   },
   "attachments": {
     "notFound": "Allegato non trovato",
+    "storageUnavailable": "Il file di questo allegato si trova nell'archivio \"{{ provider }}\", che questo server non è configurato per raggiungere",
     "transactionNotFound": "Transazione non trovata",
     "empty": "Il file caricato è vuoto",
     "fileTooLarge": "Il file supera la dimensione massima di {{ max }} byte",

@@ -599,6 +599,7 @@
   },
   "attachments": {
     "notFound": "Lampiran tidak ditemukan",
+    "storageUnavailable": "Berkas lampiran ini berada di penyimpanan \"{{ provider }}\", yang tidak dapat dijangkau oleh server ini",
     "transactionNotFound": "Transaksi tidak ditemukan",
     "empty": "File yang diunggah kosong",
     "fileTooLarge": "File melebihi ukuran maksimum {{ max }} byte",

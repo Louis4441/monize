@@ -30,6 +30,11 @@ const WITH_CONTEXT_ALLOWLIST = [
   // and its user_id is then NULL, so no user context can see it. No request to
   // inherit an identity from either; system context by construction.
   "src/attachments/attachment-orphan-sweeper.service.ts",
+  // The relocation pass that follows a storage-provider switch: a system-context
+  // scan for rows whose bytes are in a backend other than the active one (every
+  // user's, and no request behind it), then each attachment moved under its own
+  // owner's context (task R4's shape).
+  "src/attachments/storage/attachment-storage-migrator.service.ts",
   "src/auth/auth.controller.ts",
   "src/auth/auth.service.ts",
   // Daily sweep of the two auth state tables (auth_attempt_counters,

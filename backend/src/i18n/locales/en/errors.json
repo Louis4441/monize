@@ -1,6 +1,7 @@
 {
   "attachments": {
     "notFound": "Attachment not found",
+    "storageUnavailable": "This attachment's file is held in the \"{{ provider }}\" storage backend, which this server is not configured to reach",
     "transactionNotFound": "Transaction not found",
     "empty": "Uploaded file is empty",
     "fileTooLarge": "File exceeds the maximum size of {{ max }} bytes",

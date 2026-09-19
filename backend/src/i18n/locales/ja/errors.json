@@ -599,6 +599,7 @@
   },
   "attachments": {
     "notFound": "添付ファイルが見つかりません",
+    "storageUnavailable": "この添付ファイルは \"{{ provider }}\" ストレージに保存されていますが、このサーバーはそこに接続する設定になっていません",
     "transactionNotFound": "取引が見つかりません",
     "empty": "アップロードされたファイルが空です",
     "fileTooLarge": "ファイルが最大サイズの {{ max }} バイトを超えています",

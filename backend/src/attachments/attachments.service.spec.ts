@@ -2,6 +2,7 @@ import {
   BadRequestException,
   NotFoundException,
   PayloadTooLargeException,
+  ServiceUnavailableException,
   UnsupportedMediaTypeException,
 } from "@nestjs/common";
 import { DataSource, EntityManager } from "typeorm";
@@ -11,12 +12,15 @@ import {
   withScopedDb,
 } from "../common/db/scoped-db";
 import { TransactionAttachment } from "./entities/transaction-attachment.entity";
+import { AttachmentStorageRegistry } from "./storage/attachment-storage.registry";
 import {
   AttachmentObjectSweptError,
+  UPLOAD_INTENT_LEASE_MS,
+} from "./storage/object-intent";
+import {
   AttachmentsService,
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS_PER_TRANSACTION,
-  UPLOAD_INTENT_LEASE_MS,
   UploadedAttachmentFile,
   sanitizeFilename,
 } from "./attachments.service";
@@ -68,6 +72,8 @@ describe("AttachmentsService", () => {
   let service: AttachmentsService;
   let storage: jest.Mocked<AttachmentStorageProvider>;
   let orphanSweeper: jest.Mocked<Pick<AttachmentOrphanSweeper, "sweepKey">>;
+  /** Backends registered beside the active one, for the read-a-row's-own case. */
+  let otherStores: jest.Mocked<AttachmentStorageProvider>[];
   /**
    * The parent-transaction row `create` locks before counting. Present by
    * default; a spec that wants the not-found path clears it.
@@ -166,18 +172,16 @@ describe("AttachmentsService", () => {
 
     storage = {
       name: "database",
+      addressable: true,
       save: jest.fn().mockResolvedValue(undefined),
       load: jest.fn(),
       delete: jest.fn().mockResolvedValue(undefined),
     };
 
     orphanSweeper = { sweepKey: jest.fn().mockResolvedValue(undefined) };
+    otherStores = [];
 
-    service = new AttachmentsService(
-      {} as DataSource,
-      storage,
-      orphanSweeper as unknown as AttachmentOrphanSweeper,
-    );
+    service = buildService();
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -192,11 +196,40 @@ describe("AttachmentsService", () => {
       ...storage,
       name: "s3",
     } as jest.Mocked<AttachmentStorageProvider>;
-    service = new AttachmentsService(
+    service = buildService();
+  }
+
+  /**
+   * The service over the real registry, so a read resolves its provider the way
+   * production does. Only the active double is registered: a row naming anything
+   * else is the unaddressable case, which is its own test below.
+   */
+  function buildService(): AttachmentsService {
+    return new AttachmentsService(
       {} as DataSource,
-      storage,
+      new AttachmentStorageRegistry(storage, [storage, ...otherStores]),
       orphanSweeper as unknown as AttachmentOrphanSweeper,
     );
+  }
+
+  /**
+   * A second backend, the one a provider switch is moving away from. Registered
+   * but not active, which is the state every attachment uploaded before the switch
+   * is read in.
+   */
+  function previousStorage(
+    name: string,
+  ): jest.Mocked<AttachmentStorageProvider> {
+    const previous = {
+      name,
+      addressable: true,
+      save: jest.fn().mockResolvedValue(undefined),
+      load: jest.fn(),
+      delete: jest.fn().mockResolvedValue(undefined),
+    } as jest.Mocked<AttachmentStorageProvider>;
+    otherStores = [previous];
+    service = buildService();
+    return previous;
   }
 
   describe("create", () => {
@@ -709,6 +742,7 @@ describe("AttachmentsService", () => {
         contentType: "image/png",
         filename: "r.png",
         byteSize: 10,
+        storageProvider: "database",
         storageKey: "a1",
       });
       storage.load.mockResolvedValue(PNG_BYTES);
@@ -731,21 +765,65 @@ describe("AttachmentsService", () => {
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(storage.load).not.toHaveBeenCalled();
     });
+
+    it("reads from the backend the row names, not the active one", async () => {
+      // The defect this closes: after ATTACHMENT_STORAGE_PROVIDER changed, every
+      // attachment uploaded before it was asked of the NEW backend and answered
+      // 404 -- metadata listed, filename and size shown, bytes intact elsewhere.
+      const previous = previousStorage("local");
+      previous.load.mockResolvedValue(PNG_BYTES);
+      attRepo.findOne.mockResolvedValue({
+        id: "a1",
+        contentType: "image/png",
+        filename: "r.png",
+        byteSize: 10,
+        storageProvider: "local",
+        storageKey: "a1",
+      });
+
+      const result = await service.getForDownload("user-1", "a1");
+
+      expect(result.data).toBe(PNG_BYTES);
+      expect(previous.load).toHaveBeenCalledWith("a1");
+      expect(storage.load).not.toHaveBeenCalled();
+    });
+
+    it("says which backend is missing when the row names one it cannot reach", async () => {
+      attRepo.findOne.mockResolvedValue({
+        id: "a1",
+        contentType: "image/png",
+        filename: "r.png",
+        byteSize: 10,
+        storageProvider: "s3",
+        storageKey: "a1",
+      });
+
+      // Not a 404: nothing is lost, one setting is absent, and the two have
+      // different repairs -- so the refusal names the backend to configure.
+      await expect(
+        service.getForDownload("user-1", "a1"),
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      expect(storage.load).not.toHaveBeenCalled();
+    });
   });
 
   describe("remove", () => {
     it("deletes metadata, then hands the object to the sweeper", async () => {
-      managerQuery.mockResolvedValue([{ storage_key: "a1" }]);
+      managerQuery.mockResolvedValue([
+        { storage_provider: "s3", storage_key: "a1" },
+      ]);
 
       await service.remove("user-1", "a1");
 
       const [sql, params] = managerQuery.mock.calls[0];
       expect(sql).toContain("DELETE FROM transaction_attachments");
-      expect(sql).toContain("RETURNING storage_key");
+      expect(sql).toContain("RETURNING storage_provider, storage_key");
       expect(params).toEqual(["a1", "user-1"]);
       // The external delete happens AFTER the metadata delete has committed, so
       // a commit failure cannot leave metadata pointing at bytes that are gone.
-      expect(orphanSweeper.sweepKey).toHaveBeenCalledWith("a1");
+      // The row's own backend, not the active one: an attachment deleted before
+      // the relocation pass reached it still holds its bytes where it says.
+      expect(orphanSweeper.sweepKey).toHaveBeenCalledWith("a1", "s3");
     });
 
     // Deleting a scan pair deletes both rows. The database cascade would remove
@@ -753,8 +831,8 @@ describe("AttachmentsService", () => {
     // so its bytes go now instead of waiting for the hourly sweep.
     it("deletes a scan pair's original with it and sweeps both objects", async () => {
       managerQuery.mockResolvedValue([
-        { storage_key: "visible-1" },
-        { storage_key: "original-1" },
+        { storage_provider: "database", storage_key: "visible-1" },
+        { storage_provider: "database", storage_key: "original-1" },
       ]);
 
       await service.remove("user-1", "visible-1");
@@ -763,8 +841,14 @@ describe("AttachmentsService", () => {
       expect(sql).toContain("original_of_attachment_id = $1");
       expect(params).toEqual(["visible-1", "user-1"]);
       expect(orphanSweeper.sweepKey).toHaveBeenCalledTimes(2);
-      expect(orphanSweeper.sweepKey).toHaveBeenCalledWith("visible-1");
-      expect(orphanSweeper.sweepKey).toHaveBeenCalledWith("original-1");
+      expect(orphanSweeper.sweepKey).toHaveBeenCalledWith(
+        "visible-1",
+        "database",
+      );
+      expect(orphanSweeper.sweepKey).toHaveBeenCalledWith(
+        "original-1",
+        "database",
+      );
     });
 
     it("throws when the attachment is not found for the user", async () => {

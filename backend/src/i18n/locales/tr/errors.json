@@ -599,6 +599,7 @@
   },
   "attachments": {
     "notFound": "Ek bulunamadı",
+    "storageUnavailable": "Bu ekin dosyası \"{{ provider }}\" depolama arka ucunda tutuluyor ve bu sunucu ona erişecek şekilde yapılandırılmamış",
     "transactionNotFound": "İşlem bulunamadı",
     "empty": "Yüklenen dosya boş",
     "fileTooLarge": "Dosya, {{ max }} baytlık maksimum boyutu aşıyor",

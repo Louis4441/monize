@@ -1,7 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
-  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -9,65 +7,28 @@ import {
   UnsupportedMediaTypeException,
 } from "@nestjs/common";
 import { createHash, randomUUID } from "crypto";
-import { DataSource, EntityManager, IsNull } from "typeorm";
-import {
-  runOutsideActiveScopedManager,
-  withScopedDb,
-} from "../common/db/scoped-db";
+import { DataSource, EntityManager } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { lockTransactionRow } from "../common/db/locks";
-import { affectedRowCount, returnedRows } from "../common/db/query-result";
+import { returnedRows } from "../common/db/query-result";
 import { AttachmentOrphanSweeper } from "./attachment-orphan-sweeper.service";
-import { AttachmentBlobTombstone } from "./entities/attachment-blob-tombstone.entity";
 import { tr } from "../i18n/translate";
 import { TransactionAttachment } from "./entities/transaction-attachment.entity";
 import {
   ALLOWED_ATTACHMENT_MIME_TYPES,
   sniffAttachmentMime,
 } from "./attachment-mime.util";
+import { AttachmentStorageProvider } from "./storage/attachment-storage.interface";
+import { AttachmentStorageRegistry } from "./storage/attachment-storage.registry";
 import {
-  ATTACHMENT_STORAGE_PROVIDER,
-  AttachmentStorageProvider,
-} from "./storage/attachment-storage.interface";
+  clearObjectIntent,
+  dropCommittedObjectIntent,
+  recordObjectIntent,
+} from "./storage/object-intent";
 import {
   primaryAttachmentSql,
   primaryAttachmentWhere,
 } from "./primary-attachment.util";
-
-/**
- * How long an upload owns the key it is about to write.
- *
- * A *latency* mechanism, not the safety one: it keeps the orphan sweep away from
- * an upload that is probably still running, so the fence in `clearUploadIntent`
- * stays a safety net rather than a routine source of failed uploads. Correctness
- * does not depend on the value being right, which is the whole difference from the
- * age check it replaced (audit RV4-002).
- */
-export const UPLOAD_INTENT_LEASE_MS = 15 * 60 * 1000;
-
-/**
- * The sweeper claimed this upload's object before the metadata could commit.
- *
- * Thrown inside that transaction, so it rolls back -- the alternative is a
- * committed attachment row whose bytes have been deleted, which a successful 201
- * makes invisible until someone tries to download their receipt.
- *
- * A `ConflictException`, because a lost race is what happened and retrying is what
- * the client should do. As a bare `Error` this escaped `create` as a 500 carrying
- * an untranslated internal message -- neither of which is true of it. The storage
- * key stays a property rather than going in the message: it is a diagnostic, and
- * the client has no use for it.
- */
-export class AttachmentObjectSweptError extends ConflictException {
-  constructor(readonly storageKey: string) {
-    super(
-      tr(
-        "errors.attachments.swept",
-        "The upload took too long and its storage was reclaimed. Please try again.",
-      ),
-    );
-    this.name = "AttachmentObjectSweptError";
-  }
-}
 
 /** Largest single attachment we accept (also enforced by the upload interceptor). */
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -114,10 +75,19 @@ export class AttachmentsService {
 
   constructor(
     private readonly dataSource: DataSource,
-    @Inject(ATTACHMENT_STORAGE_PROVIDER)
-    private readonly storage: AttachmentStorageProvider,
+    private readonly registry: AttachmentStorageRegistry,
     private readonly orphanSweeper: AttachmentOrphanSweeper,
   ) {}
+
+  /**
+   * Where bytes this request writes go: the backend `ATTACHMENT_STORAGE_PROVIDER`
+   * selected. Read from the registry rather than injected beside it so there is
+   * one answer to "which provider is active" in this class -- and so the reads
+   * below, which resolve a provider per row instead, are visibly the other case.
+   */
+  private get storage(): AttachmentStorageProvider {
+    return this.registry.active;
+  }
 
   /**
    * Store an uploaded file against a transaction. Validates size, sniffs the
@@ -351,119 +321,43 @@ export class AttachmentsService {
   /**
    * Record that bytes are about to be written at `storageKey`, and commit it.
    *
-   * A tombstone means "these bytes may exist and nothing references them", which
-   * is exactly true of an upload in flight -- so the intent and the deletion
-   * record are the same row shape and the same sweeper handles both. What keeps
-   * the sweeper off an upload still in progress is the lease this row carries
-   * (`UPLOAD_INTENT_LEASE_MS`), not its age: nothing bounds an upload to a window,
-   * so an age check deletes the bytes of any upload that outlives the guess. The
-   * lease is a latency mechanism all the same -- correctness is the fence in
-   * `clearUploadIntent` (audit RV4-002).
-   *
-   * `runOutsideActiveScopedManager` because `create` may itself be called inside
-   * a caller's transaction: joining it would make the intent roll back with the
-   * work it exists to outlive.
-   *
-   * The conflict arm deliberately does **not** clear `swept_at`. Storage keys are
-   * per-upload UUIDs so a conflict with a swept row is not reachable today, but
-   * resurrecting one would un-fence the sweeper's claim -- and a claimed row may be
-   * inside its late-write quarantine, in which case bytes are pending deletion at
-   * that key. Refusing is the only answer that stays true if a provider ever hands
-   * out reusable keys.
+   * The protocol, its two fences and the reasoning behind them are
+   * `storage/object-intent.ts`, shared with the relocation pass that writes the
+   * same kind of not-yet-referenced object when a deployment switches providers.
+   * These three wrappers exist so this class's narrative keeps naming the step,
+   * and to bind each one to the active provider.
    */
-  private async recordUploadIntent(
+  private recordUploadIntent(
     userId: string,
     storageKey: string,
   ): Promise<void> {
-    if (this.storage.name === "database") return;
-    const claimed = await runOutsideActiveScopedManager(() =>
-      withScopedDb(this.dataSource, (m) =>
-        m.query(
-          `INSERT INTO attachment_blob_tombstones
-             (user_id, storage_provider, storage_key, upload_lease_expires_at)
-           VALUES ($1, $2, $3,
-                   CURRENT_TIMESTAMP + ($4::text || ' milliseconds')::interval)
-           ON CONFLICT (storage_provider, storage_key)
-           DO UPDATE SET upload_lease_expires_at = EXCLUDED.upload_lease_expires_at
-             WHERE attachment_blob_tombstones.swept_at IS NULL
-           RETURNING id`,
-          [
-            userId,
-            this.storage.name,
-            storageKey,
-            String(UPLOAD_INTENT_LEASE_MS),
-          ],
-        ),
-      ),
+    return recordObjectIntent(
+      this.dataSource,
+      this.storage.name,
+      storageKey,
+      userId,
     );
-    // An `INSERT` comes back as bare rows whatever the RETURNING, so this is
-    // `returnedRows` and not a length check on a shape nobody confirmed.
-    if (returnedRows<{ id: string }>(claimed).length === 0) {
-      throw new AttachmentObjectSweptError(storageKey);
-    }
   }
 
-  /**
-   * Drop the intent inside the caller's transaction, so it commits with the row --
-   * and refuse if the sweeper has already claimed the object.
-   *
-   * `swept_at IS NULL` is the fence. The sweeper sets it before deleting the
-   * bytes, and this statement contends for the same row, so PostgreSQL admits only
-   * two outcomes: this transaction clears the intent and commits metadata for
-   * bytes that are still there, or the sweeper claimed first and this throws and
-   * rolls back. A committed metadata row pointing at deleted bytes -- which the
-   * previous age-only check permitted whenever an upload outlived the grace window
-   * -- is not reachable (audit RV4-002).
-   */
-  private async clearUploadIntent(
+  /** Drop the intent inside the caller's transaction, fenced on `swept_at`. */
+  private clearUploadIntent(
     m: EntityManager,
     storageKey: string,
   ): Promise<void> {
-    if (this.storage.name === "database") return;
-    const cleared = await m.query(
-      `DELETE FROM attachment_blob_tombstones
-        WHERE storage_provider = $1 AND storage_key = $2 AND swept_at IS NULL
-        RETURNING id`,
-      [this.storage.name, storageKey],
-    );
-    if (affectedRowCount(cleared) === 0) {
-      throw new AttachmentObjectSweptError(storageKey);
-    }
+    return clearObjectIntent(m, this.storage.name, storageKey);
   }
 
-  /**
-   * Drop the intent in its own transaction, when there is no work to bind it to.
-   *
-   * Fenced on `swept_at` for the same reason `clearUploadIntent` is, and it is not
-   * the same reason. That one protects *metadata*; this one protects the *record*.
-   * A claimed row may be inside its late-write quarantine -- the sweeper deleted a
-   * key where a stalled put had not yet landed, and keeps the row so the next pass
-   * re-deletes it (audit RRV4-002). This method runs in the `catch` of `create`,
-   * including the arm where `storage.save` threw: an aborted put destroys the
-   * socket but cannot prove the endpoint discarded a body it had already received.
-   * Dropping the row there would throw away the only thing that can enumerate
-   * those bytes, which is exactly the failure the quarantine exists for.
-   *
-   * So this deletes a row the sweeper has not claimed, and leaves one it has. The
-   * database refuses a quarantined delete too (migration 148), but a backstop that
-   * every caller relies on is not a backstop.
-   */
-  private async clearCommittedUploadIntent(storageKey: string): Promise<void> {
-    if (this.storage.name === "database") return;
-    await runOutsideActiveScopedManager(() =>
-      withScopedDb(this.dataSource, (m) =>
-        m.getRepository(AttachmentBlobTombstone).delete({
-          storageProvider: this.storage.name,
-          storageKey,
-          sweptAt: IsNull(),
-        }),
-      ),
-    ).catch((error: unknown) =>
-      this.logger.warn(
-        `Could not clear the upload intent for ${storageKey}; the orphan sweep ` +
-          `will retry a no-op delete: ` +
-          `${error instanceof Error ? error.message : String(error)}`,
-      ),
+  /** Drop an intent with no work to bind it to; best effort by design. */
+  private clearCommittedUploadIntent(storageKey: string): Promise<void> {
+    return dropCommittedObjectIntent(
+      this.dataSource,
+      this.storage.name,
+      storageKey,
+      (message) =>
+        this.logger.warn(
+          `Could not clear the upload intent for ${storageKey}; the orphan sweep ` +
+            `will retry a no-op delete: ${message}`,
+        ),
     );
   }
 
@@ -519,7 +413,13 @@ export class AttachmentsService {
       );
     }
 
-    const data = await this.storage.load(attachment.storageKey);
+    // The row says where its bytes are, and that is not necessarily where new
+    // bytes go: a provider switch is relocated in the background, so until the
+    // pass reaches this row the answer is the backend it still names. Reading
+    // through the active provider instead returned 404 for every attachment
+    // uploaded before the switch -- metadata listed, bytes intact and unasked for.
+    const source = this.registry.require(attachment.storageProvider);
+    const data = await source.load(attachment.storageKey);
     return {
       data,
       contentType: attachment.contentType,
@@ -551,10 +451,13 @@ export class AttachmentsService {
       const deleted: unknown = await m.query(
         `DELETE FROM transaction_attachments
           WHERE (id = $1 OR original_of_attachment_id = $1) AND user_id = $2
-          RETURNING storage_key`,
+          RETURNING storage_provider, storage_key`,
         [id, userId],
       );
-      const rows = returnedRows<{ storage_key: string }>(deleted);
+      const rows = returnedRows<{
+        storage_provider: string;
+        storage_key: string;
+      }>(deleted);
       if (rows.length === 0) {
         // "Not found" covers both never-existed and already-deleted-by-a-
         // concurrent-request. Either way there is nothing left to sweep.
@@ -562,12 +465,19 @@ export class AttachmentsService {
           tr("errors.attachments.notFound", "Attachment not found"),
         );
       }
-      return rows.map((row) => row.storage_key);
+      // The provider comes from the row for the same reason the download does:
+      // an attachment deleted before the relocation pass reached it holds its
+      // bytes in the backend it names, and sweeping the active one would leave
+      // them behind under a tombstone the hourly pass then has to find.
+      return rows.map((row) => ({
+        provider: row.storage_provider,
+        key: row.storage_key,
+      }));
     });
 
     // Committed. Now the part PostgreSQL could not have rolled back.
-    for (const storageKey of storageKeys) {
-      await this.orphanSweeper.sweepKey(storageKey);
+    for (const { provider, key } of storageKeys) {
+      await this.orphanSweeper.sweepKey(key, provider);
     }
   }
 }
