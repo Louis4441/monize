@@ -225,7 +225,9 @@
     "offsiteOwnBucketRequired": "Enter the bucket your backups should be copied to.",
     "offsiteOwnCredentialsRequired": "Enter an access key id and a secret access key for your bucket.",
     "offsiteEncryptionKeyRequired": "This server cannot store S3 credentials because ENCRYPTION_KEY is not set. Ask an administrator to configure it, or use the deployment's bucket.",
-    "offsiteEmailAddressRequired": "Enter the address your backups should be emailed to."
+    "offsiteEmailAddressRequired": "Enter the address your backups should be emailed to.",
+    "manualRunFailed": "No backup could be written: {{ count }} account(s) failed. First error: {{ reason }}",
+    "manualRunInProgress": "A backup of every account is already running on this deployment. Wait for it to finish and try again."
   },
   "budgets": {
     "notFound": "Budget with ID {{ id }} not found",

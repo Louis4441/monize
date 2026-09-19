@@ -594,14 +594,15 @@
   },
   "autoBackup": {
     "heading": "Otomatik Yedekleme",
-    "description": "Verilerinizi bir programa göre otomatik olarak bir klasöre yedekleyin. Monize Docker'da çalıştığından, bir ana klasörü kapsayıcıya birim olarak eşlemeniz gerekir (örn., -v /host/backups:/data/backups).",
-    "adminManagedNote": "Bu ayarları yalnızca yöneticiler değiştirebilir ve bunlar şu anda yöneticinin kendi otomatik yedeklerini yönetir. Diğer tüm kullanıcılar sabit dağıtım varsayılanlarıyla, her biri kendi klasörüne otomatik olarak yedeklenir.",
+    "description": "Tüm kurulum için tek bir zamanlama: sunucu her hesabın verisini aşağıdaki depolamaya yedekler. Monize Docker'da çalıştığı için yerel bir klasörün kapsayıcıya birim olarak bağlanması gerekir (ör. -v /host/backups:/data/backups).",
+    "adminManagedNote": "Bu ilkeyi yalnızca yöneticiler değiştirebilir ve ilke bu kurulumdaki her hesap için geçerlidir; her biri kendi klasörüne yedeklenir.",
+    "demoDisabledNote": "Bu denetimler demo modunda salt okunurdur.",
     "loadingText": "Yükleniyor...",
     "enableLabel": "Otomatik yedeklemeyi etkinleştir",
     "backupFolderLabel": "Yedekleme Klasörü",
     "backupFolderPlaceholder": "/data/backups",
-    "perUserFolderHelp": "Her kullanıcının yedekleri, bu klasörün içinde kullanıcı kimliğiyle adlandırılmış kendi klasörüne kaydedilir.",
-    "perUserFolderHelpWithPath": "Her kullanıcının yedekleri, bu klasörün içinde kullanıcı kimliğiyle adlandırılmış kendi klasörüne kaydedilir. Sizinki: {path}",
+    "perUserFolderHelp": "Her hesabın yedekleri, bunun içinde hesap kimliğiyle adlandırılmış kendi klasörüne yazılır.",
+    "perUserFolderHelpWithPath": "Her hesabın yedekleri, bunun içinde hesap kimliğiyle adlandırılmış kendi klasörüne yazılır. Örnek: {path}",
     "browseButton": "Göz at...",
     "validateButton": "Doğrula",
     "validatingButton": "Doğrulanıyor...",
@@ -623,26 +624,27 @@
       "monthlyHelp": "Ayda bir tutulur"
     },
     "status": {
-      "heading": "Durum",
-      "lastBackup": "Son yedekleme",
-      "nextBackup": "Sonraki yedekleme",
+      "heading": "Kurulum Durumu",
+      "lastBackup": "En son yedek",
+      "nextBackup": "Sonraki zamanlanmış yedek",
       "error": "Hata",
       "success": "Başarılı",
-      "failed": "Başarısız",
-      "partial": "Kısmi"
+      "partial": "Kısmi",
+      "failed": "Başarısız"
     },
-    "saveButton": "Ayarları Kaydet",
+    "saveButton": "İlkeyi Kaydet",
     "savingButton": "Kaydediliyor...",
-    "runNowButton": "Şimdi Yedekle",
+    "runNowButton": "Tüm Hesapları Şimdi Yedekle",
     "runningButton": "Yedekleniyor...",
     "toasts": {
-      "saved": "Otomatik yedekleme ayarları kaydedildi",
-      "backupCreated": "Yedekleme oluşturuldu: {filename}",
+      "saved": "Yedekleme ilkesi kaydedildi ve tüm hesaplara uygulandı",
       "folderValid": "Klasör geçerli ve yazılabilir",
       "loadFailed": "Otomatik yedekleme ayarları yüklenemedi",
       "saveFailed": "Ayarlar kaydedilemedi",
       "runFailed": "Yedekleme çalıştırılamadı",
-      "browseFailed": "Klasörler incelenemedi"
+      "browseFailed": "Klasörler incelenemedi",
+      "backupRunFinished": "{requested} hesabın {backedUp} tanesi yedeklendi",
+      "backupRunIncomplete": "{requested} hesabın {backedUp} tanesi yedeklendi: {partial} kısmi, {failed} başarısız. Aşağıdaki durumu kontrol edin."
     },
     "folderErrors": {
       "required": "Klasör yolu zorunludur",
@@ -657,10 +659,22 @@
     },
     "noStorage": {
       "title": "Bu kurulumda yedek deposu yok",
-      "body": "Otomatik yedekler {folderPath} konumuna yazılacaktı, ancak bu kurulum oraya yazamıyor. Bir zamanlamanın çalışabilmesi için yöneticinin oraya depolama bağlaması gerekir."
+      "body": "Otomatik yedekler {folderPath} konumuna yazılacaktı, ancak bu kurulum oraya yazamıyor. Bir zamanlamanın çalışabilmesi için bir yöneticinin o depolamayı kullanılabilir kılması gerekir."
     },
     "never": "Hiçbir zaman",
-    "demoDisabledNote": "Bu denetimler demo modunda salt okunurdur."
+    "coverage": {
+      "accounts": "Bu kurulumdaki {total} etkin hesabın {scheduled} tanesinde zamanlandı.",
+      "unknown": "Bu ilkenin ne kadarını kapsadığı kullanılamıyor."
+    },
+    "storage": {
+      "heading": "Yedek Depolaması",
+      "providerLocal": "Yerel klasör",
+      "providerS3": "S3 uyumlu nesne depolaması",
+      "providerUnknown": "Depolama",
+      "localHelp": "BACKUP_STORAGE_PROVIDER ile belirlenir. Her hesabın yedekleri, bunun içinde hesap kimliğiyle adlandırılmış kendi klasörüne yazılır.",
+      "fixedHelp": "BACKUP_STORAGE_PROVIDER ile belirlenir. Paket ve anahtar öneki kuruluma aittir, bu yüzden burada seçilecek bir klasör yoktur; her hesabın yedekleri kendi anahtar önekinin altına yazılır.",
+      "artifactCount": "Bu depolamada şu anda hesabınıza ait {count} yedek dosyası var. Depolamayı değiştirmek mevcut yedekleri taşımaz."
+    }
   },
   "backupRestore": {
     "heading": "Yedekleme ve Geri Yükleme",

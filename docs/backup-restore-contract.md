@@ -814,15 +814,14 @@ concern, not an account preference, so its configuration surface is admin-only:
 **Admin → Backups** (`frontend/src/app/admin/backups/page.tsx`, route
 `/admin/backups`), reading and writing the admin-restricted `AutoBackupController`
 endpoints. That page states plainly what an automatic backup is — a **compressed
-per-user backup file** of a user's own financial records, written to a server
-folder on a schedule and pruned by retention — and what it is **not**: a full
-PostgreSQL/database dump. The schedule, folder and retention configured there
-currently govern the *administrator's own* automatic backups (see the Known gap
-below); other accounts run on hardcoded deployment defaults. It is related to,
-but not the same on-disk format as, the manual per-account export a person can
-download themselves. It does not capture the schema, another deployment's
-data, or server configuration; whole-instance disaster recovery is a separate
-backup of PostgreSQL and the attachment storage. A person's own manual
+per-user backup file** of a user's own financial records, written to the store on
+a schedule and pruned by retention — and what it is **not**: a full
+PostgreSQL/database dump. The schedule, folder and retention configured there are
+**one deployment policy that every active account runs on** (below). It is
+related to, but not the same on-disk format as, the manual per-account export a
+person can download themselves. It does not capture the schema, another
+deployment's data, or server configuration; whole-instance disaster recovery is a
+separate backup of PostgreSQL and the attachment storage. A person's own manual
 export/restore stays in **Settings → Backup & Restore**
 (`frontend/src/components/settings/BackupRestoreSection.tsx`), open to every user
 and touching only their own data. The two were previously stacked in one Settings
@@ -856,20 +855,103 @@ so the encryption sniff, the warning, the account-password or OIDC confirmation
 and the summary dialogue are the same ones a file picked from disk goes through;
 there is no second restore path to keep in step.
 
-**Known gap — the stored policy is per-user, not instance-level.** The admin's
-`updateSettings` writes the administrator's *own* `auto_backup_settings` row
-(keyed by `req.user.id`), so the schedule, folder and retention chosen on Admin →
-Backups govern only the administrator's own backups. Every non-admin is enrolled
-each hour by `AutoBackupService.enrollManagedUsers`, which reconciles their rows
-to `applyManagedDefaults` — and those defaults come from the **hardcoded**
-`defaultSettingsFor` (daily at 02:00 UTC, 7/4/6 retention, `BACKUP_CONTAINER_DIR`),
-not from the administrator's row. So an operator who changes the frequency or
-retention here changes nothing for anyone else. A correct instance-level model
-would store a single deployment policy (a settings singleton, or environment-
-derived defaults) that both the admin surface edits and `enrollManagedUsers`
-reads. That is a persistence/schema change and is deliberately **not** made by the
-UI-split change that added this note; it is recorded here so the next change to
-this area starts from the right question — "whose row is this policy on".
+**The policy is the deployment's, and it reaches every account.** What Admin →
+Backups edits is one `AutoBackupPolicy` — `enabled`, folder, frequency, time,
+timezone and the three retention counts. `AutoBackupService.reconcileManagedUsers`
+writes it onto every active account's `auto_backup_settings` row, at the top of
+the hourly cron and again the moment the policy is saved, so an operator does not
+wait an hour to see a change take. The per-account row stays the runtime source
+the cron claims and records against; only its **bookkeeping** columns
+(`last_backup_at`, `last_backup_status`, `last_backup_error`, `next_backup_at`)
+are that account's own. Three consequences worth stating:
+
+- **Where the policy lives.** Its own singleton row, `auto_backup_policy` —
+  a boolean primary key with `CHECK (id)`, the shape `update_check_state` and
+  `push_instance_config` use. It is RLS-exempt (no owner column) and excluded
+  from `INTENTIONALLY_EXCLUDED_TABLES`, so no account's archive carries it.
+  It previously lived on the earliest-created active administrator's
+  `auto_backup_settings` row, which let three ordinary operations silently
+  rewrite a deployment-wide setting: **deactivating or demoting** that
+  administrator handed the policy to the next one, whose row usually did not
+  exist, so every account reverted to the built-in defaults — and with them a
+  folder that may not be mounted, failing every backup; **deleting** them
+  cascaded the policy away; and **restoring their own backup** replayed a
+  months-old policy over the whole instance, with `withPreserveTimestamps`
+  keeping even `updated_at` from showing it had moved.
+- **A deployment that has never saved** runs on `defaultPolicy()`, which is
+  **enabled**: the enrollment it replaces hardcoded `enabled: true` for managed
+  users, so a disabled default would have switched automatic backups off for
+  every such deployment.
+- **Every active account, with no exception.** Two have been made here and both
+  cost somebody their backups: first every administrator was excluded, so a
+  second operator who never opened the screen was enrolled by nothing; then the
+  account holding the policy was excluded, which on a deployment whose
+  administrator had never pressed Save left the operator's own data the single
+  account the policy did not reach — while the screen counted it as covered. A
+  row that already matches costs one comparison and no write, so an exception
+  buys nothing.
+- **Disabling the policy disarms every account**, by clearing `next_backup_at`;
+  leaving it behind would have a disabled policy keep taking backups. An account
+  a disabled policy has never reached gets no row written at all.
+- **A reconcile writes only the columns it owns.** `next_backup_at` is the
+  cron's **claim** (`claimDueBackup`), so a whole-entity `save` carrying a
+  snapshot read before the loop could revert a claim another replica had just
+  taken and have that account backed up twice — the mirror image of the reason
+  `recordBackupOutcome` was already a targeted `UPDATE`. A held value is
+  overwritten in exactly two cases, both of them an operator asking for
+  something now: a disabled policy clears it, and a change to a
+  **schedule-defining** field (`frequency`, `backupTime`, `timezone`) replaces
+  it. Neither can revert a claim into the past — the claim's whole property is
+  `next_backup_at > now` and `calculateNextBackupAt` returns a future slot, so
+  one future value gives way to another. Every other drift (retention, folder)
+  only fills in a row that has none (`COALESCE(next_backup_at, …)`). Carrying
+  the old value forward unconditionally ran the next backup on the schedule the
+  operator had just replaced — up to a week late on `weekly` — with the status
+  line contradicting the form that set it. `runBackupForUser` records its
+  outcome through `recordBackupOutcome` for the same reason, and a manual run
+  deliberately does not move the automatic schedule at all.
+
+The admin surface reads back what the deployment is actually doing rather than
+one row: `accountCount` (active accounts the policy governs) beside
+`scheduledAccountCount` (how many of them hold an armed row right now), and
+deployment-wide `lastBackup*` / `nextBackupAt` aggregates — the most recent run of
+any account and the soonest next run of any armed one. A policy screen reporting
+one row's `lastBackupAt` says "Last backup: today" on an instance where eleven of
+twelve accounts have never been backed up at all. The counts are **two** numbers
+because a single one could only have been `accountCount`, which states coverage
+the deployment may not have: an account whose reconcile threw is logged, skipped,
+and still governed by the policy. They match on a settled deployment.
+
+**"Back Up Every Account Now" means every account.** `runManualBackup` fans out
+over every active account through the same per-user path the cron uses, caller
+first, one at a time; one account's failure never stops the rest. The fan-out is
+**claimed deployment-wide** before it starts — a conditional `UPDATE` on
+`auto_backup_policy.manual_run_claimed_at`, released in a `finally` **by token**
+so a run that outran `MANUAL_RUN_CLAIM_TTL_HOURS` cannot free the claim a later
+one has since taken, and bounded by that TTL so a killed replica frees it — because the button
+walks every account inside one request, and a proxy timeout that leaves the run
+going plus an operator who presses again otherwise interleaves two full passes
+over the same rows. A second caller is refused, not queued. It answers
+counts (`usersRequested`, `usersBackedUp`, `usersSkipped`, `usersFailed`,
+`usersPartial`) plus `filename` for the caller's *own* artifact only — one
+filename cannot describe a fan-out. A run that wrote nothing refuses rather than
+answering 200 with zeroes: the single account's own error when exactly one
+failed, so its status and reason survive; the count and the first reason when
+more did; the maintenance conflict when every account was skipped. Backing up one
+row under a deployment policy was the same defect as the policy governing one
+row — an operator pressed it to prove backups worked and proved it for
+themselves only.
+
+**Which store is in use is named, not inferred.** `describeCapability` carries
+`storageProvider` (the bound target's `name`) beside `locationSelectable`, and the
+settings screen shows a storage row on every deployment: the provider, the store's
+own display location, and how many artifacts it already holds for the reader. The
+folder input, Browse and Validate render only where `locationSelectable` is true,
+the save omits `folderPath` where it is false (an object store's `acceptBase`
+refuses one, so the form used to fail every save on `s3`), and the run button is
+no longer gated on a stored folder — an object store has none, which hid it
+entirely on every `s3` deployment. `locationSelectable` answers "may I choose a
+location"; it never answered "where do my backups live".
 
 - **The store is a target, not a directory.** Every storage operation goes
   through `BACKUP_STORAGE_TARGET`
@@ -943,10 +1025,12 @@ this area starts from the right question — "whose row is this policy on".
   artifact could not be read back without the user's password. The fix stops new
   losses; it does not reclassify history it cannot inspect.
 
-  What it does *not* yet fix: `Run Backup Now` still reports a partial run through
-  the ordinary "Backup created: `<filename>`" toast, so the only thing telling the
-  user is `partial-` in the name it shows them. The service returns a message
-  saying more (`runManualBackup`) and the frontend does not use it.
+  A manual run that produced any partial artifact now says so: `runManualBackup`
+  counts `usersPartial` and spells out in its message that those artifacts were
+  written as partials, were not promoted and displaced no complete backup, and
+  the settings screen shows that as a plain toast rather than a success one. It
+  previously reported every run through "Backup created: `<filename>`", so the
+  only thing telling the user was `partial-` in the name it showed them.
 
 - **Encryption is on by default, and its key is announced before it is enforced
   (issue #1269).** An automatic backup is encrypted with the user's own password

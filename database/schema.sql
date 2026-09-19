@@ -1090,6 +1090,31 @@ CREATE TABLE auto_backup_settings (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- The deployment's automatic-backup policy, as one row: the schedule, folder
+-- and retention every account is reconciled onto. It lived on the earliest
+-- active administrator's auto_backup_settings row, where deactivating,
+-- demoting or restoring that administrator silently rewrote a deployment-wide
+-- setting. auto_backup_settings above keeps only what is one account's -- the
+-- bookkeeping of its own runs, next_backup_at among it, which is also the
+-- cron's claim. manual_run_claimed_at is the fan-out claim for "Back Up Every
+-- Account Now", not a setting. Deployment-wide state with no owner column, so
+-- RLS-exempt.
+CREATE TABLE auto_backup_policy (
+    id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
+    enabled BOOLEAN NOT NULL DEFAULT true,
+    folder_path VARCHAR(1024) NOT NULL DEFAULT '',
+    frequency VARCHAR(20) NOT NULL DEFAULT 'daily',
+    backup_time VARCHAR(5) NOT NULL DEFAULT '02:00',
+    timezone VARCHAR(100) NOT NULL DEFAULT 'UTC',
+    retention_daily SMALLINT NOT NULL DEFAULT 7,
+    retention_weekly SMALLINT NOT NULL DEFAULT 4,
+    retention_monthly SMALLINT NOT NULL DEFAULT 6,
+    manual_run_claimed_at TIMESTAMP,
+    manual_run_claim_token UUID,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Trusted Devices (for 2FA "remember this device" feature)
 CREATE TABLE trusted_devices (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -3462,6 +3487,7 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- backend/test/integration/rls-enforcement.integration.spec.ts.
 --
 -- rls-exempt: auth_attempt_counters
+-- rls-exempt: auto_backup_policy
 -- rls-exempt: currencies
 -- rls-exempt: exchange_rates
 -- rls-exempt: fetch_sync

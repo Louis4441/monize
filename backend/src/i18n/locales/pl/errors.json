@@ -215,7 +215,9 @@
     "offsiteOwnBucketRequired": "Podaj bucket, do którego mają być kopiowane Twoje kopie zapasowe.",
     "offsiteOwnCredentialsRequired": "Podaj access key id i secret access key do swojego bucketu.",
     "offsiteEncryptionKeyRequired": "Ten serwer nie może przechowywać poświadczeń S3, ponieważ nie ustawiono ENCRYPTION_KEY. Poproś administratora o jego skonfigurowanie albo użyj bucketu tej instalacji.",
-    "offsiteEmailAddressRequired": "Podaj adres, na który mają być wysyłane Twoje kopie zapasowe."
+    "offsiteEmailAddressRequired": "Podaj adres, na który mają być wysyłane Twoje kopie zapasowe.",
+    "manualRunFailed": "Nie udało się zapisać żadnej kopii zapasowej: {{ count }} kont zakończyło się błędem. Pierwszy błąd: {{ reason }}",
+    "manualRunInProgress": "Na tym wdrożeniu trwa już tworzenie kopii zapasowej wszystkich kont. Poczekaj na jej zakończenie i spróbuj ponownie."
   },
   "budgets": {
     "notFound": "Nie znaleziono budżetu o ID {{ id }}",

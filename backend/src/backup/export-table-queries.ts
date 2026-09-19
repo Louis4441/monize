@@ -104,6 +104,11 @@ export const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   // per-user archive writing it would let one user's restore overwrite a
   // counter another user's lookups are still spending.
   "google_places_instance_usage",
+  // The DEPLOYMENT's backup policy: one schedule, folder and retention for the
+  // whole instance, with no user_id to export it under. Excluding it is also
+  // what stops a restore replaying a months-old policy over every account --
+  // the defect that moved this off an administrator's own settings row.
+  "auto_backup_policy",
   "exchange_rates", // global shared reference data, not per-user
   "market_index_prices", // global market reference data, refetched from the provider
   "market_index_sync", // provider fetch bookkeeping for the above

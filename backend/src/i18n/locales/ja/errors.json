@@ -215,7 +215,9 @@
     "offsiteOwnBucketRequired": "バックアップのコピー先となるバケットを入力してください。",
     "offsiteOwnCredentialsRequired": "バケットのアクセスキー ID とシークレットアクセスキーを入力してください。",
     "offsiteEncryptionKeyRequired": "ENCRYPTION_KEY が設定されていないため、このサーバーは S3 の認証情報を保存できません。管理者に設定を依頼するか、このデプロイのバケットを使用してください。",
-    "offsiteEmailAddressRequired": "バックアップの送信先となるメールアドレスを入力してください。"
+    "offsiteEmailAddressRequired": "バックアップの送信先となるメールアドレスを入力してください。",
+    "manualRunFailed": "バックアップを 1 件も書き込めませんでした。{{ count }} 件のアカウントが失敗しました。最初のエラー: {{ reason }}",
+    "manualRunInProgress": "このデプロイでは全アカウントのバックアップがすでに実行中です。完了を待ってからもう一度お試しください。"
   },
   "budgets": {
     "notFound": "ID {{ id }} の予算が見つかりません",

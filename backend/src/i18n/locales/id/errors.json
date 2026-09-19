@@ -215,7 +215,9 @@
     "offsiteOwnBucketRequired": "Masukkan bucket tujuan penyalinan cadangan Anda.",
     "offsiteOwnCredentialsRequired": "Masukkan access key id dan secret access key untuk bucket Anda.",
     "offsiteEncryptionKeyRequired": "Server ini tidak dapat menyimpan kredensial S3 karena ENCRYPTION_KEY belum disetel. Minta administrator mengonfigurasinya, atau gunakan bucket milik deployment ini.",
-    "offsiteEmailAddressRequired": "Masukkan alamat tujuan pengiriman cadangan Anda."
+    "offsiteEmailAddressRequired": "Masukkan alamat tujuan pengiriman cadangan Anda.",
+    "manualRunFailed": "Tidak ada cadangan yang dapat ditulis: {{ count }} akun gagal. Kesalahan pertama: {{ reason }}",
+    "manualRunInProgress": "Pencadangan semua akun sudah berjalan pada deployment ini. Tunggu hingga selesai lalu coba lagi."
   },
   "budgets": {
     "notFound": "Anggaran dengan ID {{ id }} tidak ditemukan",

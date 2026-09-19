@@ -594,14 +594,15 @@
   },
   "autoBackup": {
     "heading": "Automatyczna kopia zapasowa",
-    "description": "Automatycznie twórz kopie zapasowe danych do folderu według harmonogramu. Ponieważ Monize działa w Dockerze, musisz zamapować folder hosta do kontenera jako wolumin (np. -v /host/backups:/data/backups).",
-    "adminManagedNote": "Tylko administratorzy mogą zmieniać te ustawienia i regulują one obecnie automatyczne kopie zapasowe samego administratora. Wszyscy pozostali użytkownicy są archiwizowani automatycznie według stałych wartości domyślnych wdrożenia, każdy do własnego folderu.",
+    "description": "Jeden harmonogram dla całego wdrożenia: serwer tworzy kopie danych każdego konta w magazynie wskazanym poniżej. Ponieważ Monize działa w Dockerze, lokalny folder trzeba podpiąć do kontenera jako wolumin (np. -v /host/backups:/data/backups).",
+    "adminManagedNote": "Tylko administratorzy mogą zmieniać tę politykę, a obowiązuje ona dla każdego konta w tym wdrożeniu, każde we własnym folderze.",
+    "demoDisabledNote": "W trybie demonstracyjnym te elementy sterujące są tylko do odczytu.",
     "loadingText": "Wczytywanie...",
     "enableLabel": "Włącz automatyczne kopie zapasowe",
     "backupFolderLabel": "Folder kopii zapasowych",
     "backupFolderPlaceholder": "/data/backups",
-    "perUserFolderHelp": "Kopie zapasowe każdego użytkownika trafiają do własnego folderu wewnątrz tego, nazwanego jego identyfikatorem użytkownika.",
-    "perUserFolderHelpWithPath": "Kopie zapasowe każdego użytkownika trafiają do własnego folderu wewnątrz tego, nazwanego jego identyfikatorem użytkownika. Twój: {path}",
+    "perUserFolderHelp": "Kopie każdego konta trafiają do własnego folderu wewnątrz tego, nazwanego identyfikatorem konta.",
+    "perUserFolderHelpWithPath": "Kopie każdego konta trafiają do własnego folderu wewnątrz tego, nazwanego identyfikatorem konta. Przykład: {path}",
     "browseButton": "Przeglądaj...",
     "validateButton": "Sprawdź",
     "validatingButton": "Sprawdzanie...",
@@ -623,26 +624,27 @@
       "monthlyHelp": "Jedna na miesiąc zachowana"
     },
     "status": {
-      "heading": "Status",
-      "lastBackup": "Ostatnia kopia zapasowa",
-      "nextBackup": "Następna kopia zapasowa",
+      "heading": "Stan wdrożenia",
+      "lastBackup": "Najnowsza kopia",
+      "nextBackup": "Następna zaplanowana kopia",
       "error": "Błąd",
       "success": "Sukces",
-      "failed": "Niepowodzenie",
-      "partial": "Częściowa"
+      "partial": "Częściowa",
+      "failed": "Niepowodzenie"
     },
-    "saveButton": "Zapisz ustawienia",
+    "saveButton": "Zapisz politykę",
     "savingButton": "Zapisywanie...",
-    "runNowButton": "Utwórz kopię teraz",
-    "runningButton": "Tworzenie kopii zapasowej...",
+    "runNowButton": "Utwórz teraz kopie wszystkich kont",
+    "runningButton": "Tworzenie kopii...",
     "toasts": {
-      "saved": "Zapisano ustawienia automatycznej kopii zapasowej",
-      "backupCreated": "Utworzono kopię zapasową: {filename}",
+      "saved": "Polityka kopii zapasowych zapisana i zastosowana do wszystkich kont",
       "folderValid": "Folder jest prawidłowy i zapisywalny",
       "loadFailed": "Nie udało się wczytać ustawień automatycznej kopii zapasowej",
       "saveFailed": "Nie udało się zapisać ustawień",
       "runFailed": "Nie udało się wykonać kopii zapasowej",
-      "browseFailed": "Nie udało się przeglądać folderów"
+      "browseFailed": "Nie udało się przeglądać folderów",
+      "backupRunFinished": "Utworzono kopie {backedUp} z {requested} kont",
+      "backupRunIncomplete": "Utworzono kopie {backedUp} z {requested}: {partial} częściowych, {failed} nieudanych. Sprawdź stan poniżej."
     },
     "folderErrors": {
       "required": "Ścieżka folderu jest wymagana",
@@ -657,10 +659,22 @@
     },
     "noStorage": {
       "title": "Ta instalacja nie ma magazynu kopii zapasowych",
-      "body": "Automatyczne kopie zapasowe byłyby zapisywane w {folderPath}, gdzie ta instalacja nie może pisać. Administrator musi zamontować tam magazyn, zanim harmonogram będzie mógł działać."
+      "body": "Kopie automatyczne byłyby zapisywane w {folderPath}, gdzie to wdrożenie nie może pisać. Administrator musi udostępnić ten magazyn, zanim harmonogram będzie mógł działać."
     },
     "never": "Nigdy",
-    "demoDisabledNote": "W trybie demonstracyjnym te elementy sterujące są tylko do odczytu."
+    "coverage": {
+      "accounts": "Zaplanowana dla {scheduled} z {total} aktywnych kont w tym wdrożeniu.",
+      "unknown": "Zasięg tej polityki jest niedostępny."
+    },
+    "storage": {
+      "heading": "Magazyn kopii zapasowych",
+      "providerLocal": "Folder lokalny",
+      "providerS3": "Magazyn obiektowy zgodny z S3",
+      "providerUnknown": "Magazyn",
+      "localHelp": "Ustawiane przez BACKUP_STORAGE_PROVIDER. Kopie każdego konta trafiają do własnego folderu wewnątrz tego, nazwanego identyfikatorem konta.",
+      "fixedHelp": "Ustawiane przez BACKUP_STORAGE_PROVIDER. Zasobnik i prefiks klucza należą do wdrożenia, więc nie ma tu folderu do wyboru; kopie każdego konta trafiają pod własny prefiks klucza.",
+      "artifactCount": "Ten magazyn zawiera obecnie {count} plików kopii zapasowej Twojego konta. Zmiana magazynu nie przenosi istniejących kopii."
+    }
   },
   "backupRestore": {
     "heading": "Kopia zapasowa i przywracanie",

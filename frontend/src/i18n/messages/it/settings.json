@@ -594,14 +594,15 @@
   },
   "autoBackup": {
     "heading": "Backup automatico",
-    "description": "Esegui automaticamente il backup dei tuoi dati in una cartella secondo una pianificazione. Poiché Monize gira in Docker, devi mappare una cartella dell'host nel container come volume (es. -v /host/backups:/data/backups).",
-    "adminManagedNote": "Solo gli amministratori possono modificare queste impostazioni, che attualmente regolano i backup automatici dell'amministratore stesso. Tutti gli altri utenti vengono salvati automaticamente con valori predefiniti fissi del deployment, ciascuno in una cartella propria.",
+    "description": "Una sola pianificazione per l'intero deployment: il server esegue il backup dei dati di ogni account nello spazio indicato qui sotto. Poiché Monize gira in Docker, una cartella locale va montata nel contenitore come volume (es. -v /host/backups:/data/backups).",
+    "adminManagedNote": "Solo gli amministratori possono modificare questa politica, che vale per ogni account di questo deployment, ciascuno in una cartella propria.",
+    "demoDisabledNote": "Questi controlli sono di sola lettura in modalità demo.",
     "loadingText": "Caricamento...",
     "enableLabel": "Attiva backup automatici",
     "backupFolderLabel": "Cartella di backup",
     "backupFolderPlaceholder": "/data/backups",
-    "perUserFolderHelp": "I backup di ogni utente vengono salvati in una cartella dedicata all'interno di questa, denominata con il suo ID utente.",
-    "perUserFolderHelpWithPath": "I backup di ogni utente vengono salvati in una cartella dedicata all'interno di questa, denominata con il suo ID utente. La tua: {path}",
+    "perUserFolderHelp": "I backup di ogni account vanno in una cartella propria all'interno di questa, con il nome del suo ID account.",
+    "perUserFolderHelpWithPath": "I backup di ogni account vanno in una cartella propria all'interno di questa, con il nome del suo ID account. Esempio: {path}",
     "browseButton": "Sfoglia...",
     "validateButton": "Convalida",
     "validatingButton": "Convalida in corso...",
@@ -623,26 +624,27 @@
       "monthlyHelp": "Uno per mese conservato"
     },
     "status": {
-      "heading": "Stato",
-      "lastBackup": "Ultimo backup",
-      "nextBackup": "Prossimo backup",
+      "heading": "Stato del deployment",
+      "lastBackup": "Backup più recente",
+      "nextBackup": "Prossimo backup pianificato",
       "error": "Errore",
       "success": "Riuscito",
-      "failed": "Fallito",
-      "partial": "Parziale"
+      "partial": "Parziale",
+      "failed": "Fallito"
     },
-    "saveButton": "Salva impostazioni",
+    "saveButton": "Salva politica",
     "savingButton": "Salvataggio...",
-    "runNowButton": "Esegui backup ora",
+    "runNowButton": "Esegui il backup di ogni account",
     "runningButton": "Backup in corso...",
     "toasts": {
-      "saved": "Impostazioni backup automatico salvate",
-      "backupCreated": "Backup creato: {filename}",
+      "saved": "Politica di backup salvata e applicata a ogni account",
       "folderValid": "La cartella è valida e scrivibile",
       "loadFailed": "Impossibile caricare le impostazioni del backup automatico",
       "saveFailed": "Impossibile salvare le impostazioni",
       "runFailed": "Impossibile eseguire il backup",
-      "browseFailed": "Impossibile sfogliare le cartelle"
+      "browseFailed": "Impossibile sfogliare le cartelle",
+      "backupRunFinished": "Eseguito il backup di {backedUp} account su {requested}",
+      "backupRunIncomplete": "Eseguito il backup di {backedUp} su {requested}: {partial} parziali, {failed} non riusciti. Controlla lo stato qui sotto."
     },
     "folderErrors": {
       "required": "Il percorso della cartella è obbligatorio",
@@ -657,10 +659,22 @@
     },
     "noStorage": {
       "title": "Questa installazione non ha spazio di archiviazione per i backup",
-      "body": "I backup automatici verrebbero scritti in {folderPath}, dove questa installazione non può scrivere. Un amministratore deve montare uno spazio di archiviazione lì prima che una pianificazione possa essere eseguita."
+      "body": "I backup automatici verrebbero scritti in {folderPath}, dove questo deployment non può scrivere. Un amministratore deve rendere disponibile quello spazio prima che una pianificazione possa essere eseguita."
     },
     "never": "Mai",
-    "demoDisabledNote": "Questi controlli sono di sola lettura in modalità demo."
+    "coverage": {
+      "accounts": "Pianificata su {scheduled} di {total} {total, plural, one {account attivo} other {account attivi}} di questo deployment.",
+      "unknown": "Fin dove arriva questa politica non è disponibile."
+    },
+    "storage": {
+      "heading": "Spazio dei backup",
+      "providerLocal": "Cartella locale",
+      "providerS3": "Object storage compatibile S3",
+      "providerUnknown": "Spazio di archiviazione",
+      "localHelp": "Impostato da BACKUP_STORAGE_PROVIDER. I backup di ogni account vanno in una cartella propria all'interno di questa, con il nome del suo ID account.",
+      "fixedHelp": "Impostato da BACKUP_STORAGE_PROVIDER. Bucket e prefisso di chiave appartengono al deployment, quindi qui non c'è una cartella da scegliere; i backup di ogni account vanno sotto un prefisso di chiave proprio.",
+      "artifactCount": "Questo spazio contiene attualmente {count} {count, plural, one {file di backup} other {file di backup}} per il tuo account. Cambiare spazio non sposta i backup esistenti."
+    }
   },
   "backupRestore": {
     "heading": "Backup e ripristino",

@@ -594,14 +594,15 @@
   },
   "autoBackup": {
     "heading": "Automatische back-up",
-    "description": "Maak automatisch een back-up van jouw gegevens naar een map op een schema. Omdat Monize in Docker draait, moet je een hostmap als volume in de container koppelen (bijv. -v /host/backups:/data/backups).",
-    "adminManagedNote": "Alleen beheerders kunnen deze instellingen wijzigen en ze gelden momenteel voor de automatische back-ups van de beheerder zelf. Alle andere gebruikers worden automatisch geback-upt met vaste implementatiestandaarden, elk in een eigen map.",
+    "description": "Eén schema voor de hele installatie: de server maakt een back-up van de gegevens van elk account naar de opslag hieronder. Omdat Monize in Docker draait, moet een lokale map als volume in de container worden gekoppeld (bijv. -v /host/backups:/data/backups).",
+    "adminManagedNote": "Alleen beheerders kunnen dit beleid wijzigen, en het geldt voor elk account op deze installatie, elk in een eigen map.",
+    "demoDisabledNote": "Deze bedieningselementen zijn alleen-lezen in de demomodus.",
     "loadingText": "Laden...",
     "enableLabel": "Automatische back-ups inschakelen",
     "backupFolderLabel": "Back-upmap",
     "backupFolderPlaceholder": "/data/backups",
-    "perUserFolderHelp": "De back-ups van elke gebruiker komen in een eigen map binnen deze map, genoemd naar hun gebruikers-ID.",
-    "perUserFolderHelpWithPath": "De back-ups van elke gebruiker komen in een eigen map binnen deze map, genoemd naar hun gebruikers-ID. De jouwe: {path}",
+    "perUserFolderHelp": "De back-ups van elk account komen in een eigen map hierbinnen, genoemd naar hun account-ID.",
+    "perUserFolderHelpWithPath": "De back-ups van elk account komen in een eigen map hierbinnen, genoemd naar hun account-ID. Voorbeeld: {path}",
     "browseButton": "Bladeren...",
     "validateButton": "Valideren",
     "validatingButton": "Valideren...",
@@ -623,26 +624,27 @@
       "monthlyHelp": "Één per maand bewaard"
     },
     "status": {
-      "heading": "Status",
-      "lastBackup": "Laatste back-up",
-      "nextBackup": "Volgende back-up",
+      "heading": "Status van de installatie",
+      "lastBackup": "Meest recente back-up",
+      "nextBackup": "Volgende geplande back-up",
       "error": "Fout",
       "success": "Geslaagd",
-      "failed": "Mislukt",
-      "partial": "Gedeeltelijk"
+      "partial": "Gedeeltelijk",
+      "failed": "Mislukt"
     },
-    "saveButton": "Instellingen opslaan",
+    "saveButton": "Beleid opslaan",
     "savingButton": "Opslaan...",
-    "runNowButton": "Nu back-up uitvoeren",
-    "runningButton": "Back-up uitvoeren...",
+    "runNowButton": "Nu elk account back-uppen",
+    "runningButton": "Back-up bezig...",
     "toasts": {
-      "saved": "Instellingen voor automatische back-up opgeslagen",
-      "backupCreated": "Back-up aangemaakt: {filename}",
+      "saved": "Back-upbeleid opgeslagen en toegepast op elk account",
       "folderValid": "Map is geldig en beschrijfbaar",
       "loadFailed": "Laden van instellingen voor automatische back-up mislukt",
       "saveFailed": "Opslaan van instellingen mislukt",
       "runFailed": "Uitvoeren van back-up mislukt",
-      "browseFailed": "Bladeren door mappen mislukt"
+      "browseFailed": "Bladeren door mappen mislukt",
+      "backupRunFinished": "{backedUp} van {requested} {requested, plural, one {account} other {accounts}} geback-upt",
+      "backupRunIncomplete": "{backedUp} van {requested} geback-upt: {partial} gedeeltelijk, {failed} mislukt. Bekijk de status hieronder."
     },
     "folderErrors": {
       "required": "Mappad is vereist",
@@ -657,10 +659,22 @@
     },
     "noStorage": {
       "title": "Deze installatie heeft geen back-upopslag",
-      "body": "Automatische back-ups zouden naar {folderPath} worden geschreven, waar deze installatie niet kan schrijven. Een beheerder moet daar opslag aankoppelen voordat een schema kan worden uitgevoerd."
+      "body": "Automatische back-ups zouden naar {folderPath} worden geschreven, waar deze installatie niet naar kan schrijven. Een beheerder moet die opslag beschikbaar maken voordat een schema kan draaien."
     },
     "never": "Nooit",
-    "demoDisabledNote": "Deze bedieningselementen zijn alleen-lezen in de demomodus."
+    "coverage": {
+      "accounts": "Gepland op {scheduled} van {total} {total, plural, one {actief account} other {actieve accounts}} op deze installatie.",
+      "unknown": "Hoe ver dit beleid reikt, is niet beschikbaar."
+    },
+    "storage": {
+      "heading": "Back-upopslag",
+      "providerLocal": "Lokale map",
+      "providerS3": "S3-compatibele objectopslag",
+      "providerUnknown": "Opslag",
+      "localHelp": "Ingesteld via BACKUP_STORAGE_PROVIDER. De back-ups van elk account komen in een eigen map hierbinnen, genoemd naar hun account-ID.",
+      "fixedHelp": "Ingesteld via BACKUP_STORAGE_PROVIDER. De bucket en het sleutelvoorvoegsel zijn van de installatie, dus hier valt geen map te kiezen; de back-ups van elk account komen onder een eigen sleutelvoorvoegsel.",
+      "artifactCount": "Deze opslag bevat op dit moment {count} {count, plural, one {back-upbestand} other {back-upbestanden}} voor uw account. Van opslag wisselen verplaatst bestaande back-ups niet."
+    }
   },
   "backupRestore": {
     "heading": "Back-up en herstel",

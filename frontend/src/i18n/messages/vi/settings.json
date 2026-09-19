@@ -594,14 +594,15 @@
   },
   "autoBackup": {
     "heading": "Sao lưu tự động",
-    "description": "Tự động sao lưu dữ liệu của bạn vào một thư mục theo lịch. Vì Monize chạy trong Docker, bạn phải ánh xạ một thư mục máy chủ vào container dưới dạng volume (VD: -v /host/backups:/data/backups).",
-    "adminManagedNote": "Chỉ quản trị viên mới có thể thay đổi các cài đặt này, và chúng hiện điều chỉnh các bản sao lưu tự động của chính quản trị viên. Tất cả người dùng khác được sao lưu tự động theo các giá trị mặc định cố định của lần triển khai, mỗi người vào một thư mục riêng.",
+    "description": "Một lịch duy nhất cho toàn bộ bản triển khai: máy chủ sao lưu dữ liệu của mọi tài khoản vào kho lưu trữ bên dưới. Vì Monize chạy trong Docker, cần gắn một thư mục cục bộ vào vùng chứa dưới dạng volume (ví dụ: -v /host/backups:/data/backups).",
+    "adminManagedNote": "Chỉ quản trị viên mới thay đổi được chính sách này, và nó áp dụng cho mọi tài khoản trên bản triển khai này, mỗi tài khoản vào một thư mục riêng.",
+    "demoDisabledNote": "Các điều khiển này ở chế độ chỉ đọc trong chế độ demo.",
     "loadingText": "Đang tải...",
     "enableLabel": "Bật sao lưu tự động",
     "backupFolderLabel": "Thư mục sao lưu",
     "backupFolderPlaceholder": "/data/backups",
-    "perUserFolderHelp": "Bản sao lưu của mỗi người dùng nằm trong thư mục riêng bên trong thư mục này, được đặt tên theo ID người dùng.",
-    "perUserFolderHelpWithPath": "Bản sao lưu của mỗi người dùng nằm trong thư mục riêng bên trong thư mục này, được đặt tên theo ID người dùng. Của bạn: {path}",
+    "perUserFolderHelp": "Bản sao lưu của mỗi tài khoản nằm trong thư mục riêng bên trong thư mục này, đặt tên theo ID tài khoản.",
+    "perUserFolderHelpWithPath": "Bản sao lưu của mỗi tài khoản nằm trong thư mục riêng bên trong thư mục này, đặt tên theo ID tài khoản. Ví dụ: {path}",
     "browseButton": "Duyệt...",
     "validateButton": "Xác thực",
     "validatingButton": "Đang xác thực...",
@@ -623,26 +624,27 @@
       "monthlyHelp": "Giữ một bản mỗi tháng"
     },
     "status": {
-      "heading": "Trạng thái",
-      "lastBackup": "Sao lưu lần cuối",
-      "nextBackup": "Sao lưu tiếp theo",
+      "heading": "Trạng thái bản triển khai",
+      "lastBackup": "Bản sao lưu gần nhất",
+      "nextBackup": "Bản sao lưu theo lịch kế tiếp",
       "error": "Lỗi",
       "success": "Thành công",
-      "failed": "Thất bại",
-      "partial": "Một phần"
+      "partial": "Một phần",
+      "failed": "Thất bại"
     },
-    "saveButton": "Lưu cài đặt",
+    "saveButton": "Lưu chính sách",
     "savingButton": "Đang lưu...",
-    "runNowButton": "Chạy sao lưu ngay",
-    "runningButton": "Đang chạy sao lưu...",
+    "runNowButton": "Sao lưu mọi tài khoản ngay",
+    "runningButton": "Đang sao lưu...",
     "toasts": {
-      "saved": "Cài đặt sao lưu tự động đã được lưu",
-      "backupCreated": "Sao lưu đã được tạo: {filename}",
+      "saved": "Đã lưu chính sách sao lưu và áp dụng cho mọi tài khoản",
       "folderValid": "Thư mục hợp lệ và có thể ghi",
       "loadFailed": "Không thể tải cài đặt sao lưu tự động",
       "saveFailed": "Không thể lưu cài đặt",
       "runFailed": "Không thể chạy sao lưu",
-      "browseFailed": "Không thể duyệt thư mục"
+      "browseFailed": "Không thể duyệt thư mục",
+      "backupRunFinished": "Đã sao lưu {backedUp} trên {requested} tài khoản",
+      "backupRunIncomplete": "Đã sao lưu {backedUp} trên {requested}: {partial} một phần, {failed} thất bại. Xem trạng thái bên dưới."
     },
     "folderErrors": {
       "required": "Cần có đường dẫn thư mục",
@@ -657,10 +659,22 @@
     },
     "noStorage": {
       "title": "Bản triển khai này không có bộ lưu trữ sao lưu",
-      "body": "Bản sao lưu tự động sẽ được ghi vào {folderPath}, nơi bản triển khai này không thể ghi. Quản trị viên cần gắn bộ lưu trữ ở đó trước khi lịch trình có thể chạy."
+      "body": "Bản sao lưu tự động sẽ được ghi vào {folderPath}, nơi bản triển khai này không ghi được. Quản trị viên cần cung cấp kho lưu trữ đó trước khi lịch có thể chạy."
     },
     "never": "Không bao giờ",
-    "demoDisabledNote": "Các điều khiển này ở chế độ chỉ đọc trong chế độ demo."
+    "coverage": {
+      "accounts": "Đã lên lịch cho {scheduled} trên {total} tài khoản đang hoạt động của bản triển khai này.",
+      "unknown": "Không có thông tin về phạm vi của chính sách này."
+    },
+    "storage": {
+      "heading": "Kho lưu trữ bản sao lưu",
+      "providerLocal": "Thư mục cục bộ",
+      "providerS3": "Kho đối tượng tương thích S3",
+      "providerUnknown": "Kho lưu trữ",
+      "localHelp": "Được đặt bởi BACKUP_STORAGE_PROVIDER. Bản sao lưu của mỗi tài khoản nằm trong thư mục riêng bên trong thư mục này, đặt tên theo ID tài khoản.",
+      "fixedHelp": "Được đặt bởi BACKUP_STORAGE_PROVIDER. Bucket và tiền tố khoá thuộc về bản triển khai nên ở đây không có thư mục để chọn; bản sao lưu của mỗi tài khoản nằm dưới tiền tố khoá riêng.",
+      "artifactCount": "Kho này hiện giữ {count} tệp sao lưu của tài khoản bạn. Chuyển kho lưu trữ không di chuyển các bản sao lưu hiện có."
+    }
   },
   "backupRestore": {
     "heading": "Sao lưu & Khôi phục",

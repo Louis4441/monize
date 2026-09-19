@@ -3,6 +3,7 @@ import { clearAllCache } from './apiCache';
 import { filenameFromContentDisposition } from './download';
 import {
   AutoBackupCapability,
+  AutoBackupRunResult,
   AutoBackupSettings,
   UpdateAutoBackupSettingsData,
 } from '@/types/auth';
@@ -616,8 +617,15 @@ export const backupApi = {
     return response.data;
   },
 
-  runAutoBackup: async (): Promise<{ message: string; filename: string }> => {
-    const response = await apiClient.post<{ message: string; filename: string }>(
+  /**
+   * Back up every account on the deployment now.
+   *
+   * A fan-out, so the result counts accounts. `filename` is present only for
+   * the artifact written for the account that pressed the button -- one
+   * filename cannot describe a run over twelve accounts.
+   */
+  runAutoBackup: async (): Promise<AutoBackupRunResult> => {
+    const response = await apiClient.post<AutoBackupRunResult>(
       '/backup/run-auto-backup',
     );
     return response.data;

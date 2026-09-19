@@ -25,12 +25,10 @@ export default function AdminBackupsPage() {
  *
  * This is an operator surface, not an account preference. The endpoints behind
  * it live on `AutoBackupController` under a class-level `@Roles("admin")`, and
- * every non-admin account is enrolled on the deployment defaults by the backend
- * cron -- so the schedule and retention here are a deployment policy that
- * happens to be stored against the administrator's own row today (see the note
- * in `docs/backup-restore-contract.md` section 7). A person's own manual
- * export/restore lives in Settings -> Backup & Restore instead, and touches only
- * their own data.
+ * what they read and write is one deployment policy that every active account
+ * is reconciled onto (`docs/backup-restore-contract.md` section 7). A person's
+ * own manual export/restore lives in Settings -> Backup & Restore instead, and
+ * touches only their own data.
  *
  * The admin gate mirrors `admin/notifications`: an admin-only endpoint answers a
  * non-admin with a 403, so the page redirects rather than fetching, and renders
@@ -70,7 +68,9 @@ function AdminBackupsContent() {
         )}
 
         {/* The one thing this page must make unambiguous: what an automatic
-            backup is and, more importantly, what it is not. */}
+            backup is and, more importantly, what it is not. Two paragraphs, not
+            five -- an operator who stops reading after the first has still been
+            told the thing that matters. */}
         <Card as="section" padding="md" className="mb-6" aria-labelledby="admin-backups-scope-heading">
           <h2
             id="admin-backups-scope-heading"
@@ -81,17 +81,8 @@ function AdminBackupsContent() {
           <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
             {t('scope.perUser')}
           </p>
-          <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-            {t('scope.adminPolicyScope')}
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-            {t('scope.notFullDatabase')}
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-            {t('scope.notSameAsManualExport')}
-          </p>
           <p className="text-sm text-gray-600 dark:text-gray-300">
-            {t('scope.disasterRecovery')}
+            {t('scope.notFullDatabase')}
           </p>
         </Card>
 

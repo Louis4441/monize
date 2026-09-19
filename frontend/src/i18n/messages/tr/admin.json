@@ -187,14 +187,11 @@
   },
   "backupsPage": {
     "title": "Yedekler",
-    "subtitle": "Sunucudaki bir klasöre yazılan, zamanlanmış ve sıkıştırılmış, kullanıcı başına yedek dosyaları.",
+    "subtitle": "Her hesabın kendi finansal kayıtlarının zamanlanmış, sıkıştırılmış yedek dosyaları.",
     "scope": {
-      "heading": "Tam bir veritabanı yedeği değildir",
-      "perUser": "Otomatik yedekleme, bir zamanlamaya göre, her kullanıcının kendi finansal kayıtlarının sıkıştırılmış bir yedek dosyasını sunucudaki bir klasöre yazar ve saklama ilkesine göre bunlardan belirli bir sayıda tutar.",
-      "adminPolicyScope": "Burada yapılandırılan zamanlama, klasör ve saklama şu anda yalnızca yöneticinin kendi otomatik yedeklerini yönetir. Diğer hesaplar sabit dağıtım varsayılanlarıyla otomatik olarak yedeklenir ve dağıtım başına tek bir ilke henüz burada yapılandırılamaz.",
-      "notFullDatabase": "Tam bir PostgreSQL veya veritabanı dökümü değildir. Veritabanı şemasını, başka bir dağıtımın verilerini, uygulama yapılandırmasını veya kullanıcının kendi finansal kayıtları dışındaki hiçbir şeyi içermez.",
-      "notSameAsManualExport": "Ayarlar -> Yedekleme ve Geri Yükleme bölümündeki manuel dışa aktarmayla ilişkilidir, ancak diskteki biçimi aynı değildir.",
-      "disasterRecovery": "Tüm örneğin olağanüstü durum kurtarması için PostgreSQL veritabanını ve ek depolamasını altyapınızın kendi araçlarını kullanarak ayrı ayrı yedekleyin."
+      "heading": "Tam veritabanı yedeği değildir",
+      "perUser": "Aşağıdaki zamanlamaya göre sunucu, her hesabın kendi finansal kayıtlarının sıkıştırılmış bir yedek dosyasını yazar ve saklama ilkesine göre eskileri siler. Tüm etkin hesaplar kapsanır.",
+      "notFullDatabase": "Bu bir PostgreSQL dökümü değildir: şemayı, sunucu yapılandırmasını ve bir hesabın finansal kayıtları dışındaki hiçbir şeyi içermez. Tüm örneğin felaket kurtarması için veritabanını ve ek depolamasını kendi araçlarınızla yedekleyin."
     },
     "demoRestricted": {
       "heading": "Demo Modunda Kısıtlı",

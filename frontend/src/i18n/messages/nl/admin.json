@@ -187,14 +187,11 @@
   },
   "backupsPage": {
     "title": "Back-ups",
-    "subtitle": "Geplande, gecomprimeerde back-upbestanden per gebruiker, geschreven naar een map op de server.",
+    "subtitle": "Geplande, gecomprimeerde back-upbestanden van de financiële gegevens van elk account.",
     "scope": {
       "heading": "Geen volledige databaseback-up",
-      "perUser": "De automatische back-up schrijft volgens een schema een gecomprimeerd back-upbestand van de eigen financiële gegevens van elke gebruiker naar een map op de server en bewaart er een aantal volgens het bewaarbeleid.",
-      "adminPolicyScope": "Het hier geconfigureerde schema, de map en de bewaring gelden momenteel alleen voor de automatische back-ups van de beheerder zelf. Andere accounts worden automatisch geback-upt met vaste implementatiestandaarden, en één beleid per implementatie is hier nog niet configureerbaar.",
-      "notFullDatabase": "Het is geen volledige PostgreSQL- of databasedump. Het legt niet het databaseschema, de gegevens van een andere implementatie, de applicatieconfiguratie of iets buiten de eigen financiële gegevens van een gebruiker vast.",
-      "notSameAsManualExport": "Het is gerelateerd aan de handmatige export in Instellingen -> Back-up & herstel, maar heeft niet hetzelfde bestandsformaat.",
-      "disasterRecovery": "Voor noodherstel van de hele instantie maakt u de PostgreSQL-database en de bijlageopslag afzonderlijk een back-up met de eigen hulpmiddelen van uw infrastructuur."
+      "perUser": "Volgens het schema hieronder schrijft de server een gecomprimeerd back-upbestand van de financiële gegevens van elk account en ruimt oudere op volgens het bewaarbeleid. Alle actieve accounts vallen eronder.",
+      "notFullDatabase": "Het is geen PostgreSQL-dump: het schema, de serverconfiguratie en alles buiten de financiële gegevens van een account worden niet vastgelegd. Maak voor noodherstel van de hele instantie met uw eigen hulpmiddelen een back-up van de database en de bijlageopslag."
     },
     "demoRestricted": {
       "heading": "Beperkt in demomodus",

@@ -594,14 +594,15 @@
   },
   "autoBackup": {
     "heading": "Sauvegarde automatique",
-    "description": "Sauvegardez automatiquement vos données dans un dossier selon un calendrier. Comme Monize fonctionne dans Docker, vous devez mapper un dossier hôte dans le conteneur en tant que volume (ex. : -v /host/backups:/data/backups).",
-    "adminManagedNote": "Seuls les administrateurs peuvent modifier ces paramètres, et ils régissent actuellement les sauvegardes automatiques de l'administrateur lui-même. Tous les autres utilisateurs sont sauvegardés automatiquement selon des valeurs par défaut fixes du déploiement, chacun dans son propre dossier.",
+    "description": "Une seule planification pour tout le déploiement : le serveur sauvegarde les données de chaque compte vers le stockage indiqué ci-dessous. Comme Monize s'exécute dans Docker, un dossier local doit être monté dans le conteneur en tant que volume (par ex. -v /host/backups:/data/backups).",
+    "adminManagedNote": "Seuls les administrateurs peuvent modifier cette politique, et elle régit tous les comptes de ce déploiement, chacun dans son propre dossier.",
+    "demoDisabledNote": "Ces commandes sont en lecture seule en mode démo.",
     "loadingText": "Chargement...",
     "enableLabel": "Activer les sauvegardes automatiques",
     "backupFolderLabel": "Dossier de sauvegarde",
     "backupFolderPlaceholder": "/data/backups",
-    "perUserFolderHelp": "Les sauvegardes de chaque utilisateur sont placées dans leur propre dossier à l'intérieur de celui-ci, nommé d'après leur identifiant utilisateur.",
-    "perUserFolderHelpWithPath": "Les sauvegardes de chaque utilisateur sont placées dans leur propre dossier à l'intérieur de celui-ci, nommé d'après leur identifiant utilisateur. Le vôtre : {path}",
+    "perUserFolderHelp": "Les sauvegardes de chaque compte vont dans leur propre dossier à l'intérieur de celui-ci, nommé d'après son identifiant de compte.",
+    "perUserFolderHelpWithPath": "Les sauvegardes de chaque compte vont dans leur propre dossier à l'intérieur de celui-ci, nommé d'après son identifiant de compte. Exemple : {path}",
     "browseButton": "Parcourir...",
     "validateButton": "Valider",
     "validatingButton": "Validation...",
@@ -623,26 +624,27 @@
       "monthlyHelp": "Une par mois conservée"
     },
     "status": {
-      "heading": "État",
-      "lastBackup": "Dernière sauvegarde",
-      "nextBackup": "Prochaine sauvegarde",
+      "heading": "État du déploiement",
+      "lastBackup": "Sauvegarde la plus récente",
+      "nextBackup": "Prochaine sauvegarde planifiée",
       "error": "Erreur",
       "success": "Succès",
-      "failed": "Échec",
-      "partial": "Partielle"
+      "partial": "Partielle",
+      "failed": "Échec"
     },
-    "saveButton": "Enregistrer les paramètres",
+    "saveButton": "Enregistrer la politique",
     "savingButton": "Enregistrement...",
-    "runNowButton": "Lancer la sauvegarde maintenant",
+    "runNowButton": "Sauvegarder tous les comptes",
     "runningButton": "Sauvegarde en cours...",
     "toasts": {
-      "saved": "Paramètres de sauvegarde automatique enregistrés",
-      "backupCreated": "Sauvegarde créée : {filename}",
+      "saved": "Politique de sauvegarde enregistrée et appliquée à tous les comptes",
       "folderValid": "Le dossier est valide et accessible en écriture",
       "loadFailed": "Échec du chargement des paramètres de sauvegarde automatique",
       "saveFailed": "Échec de l'enregistrement des paramètres",
       "runFailed": "Échec de l'exécution de la sauvegarde",
-      "browseFailed": "Échec de la navigation dans les dossiers"
+      "browseFailed": "Échec de la navigation dans les dossiers",
+      "backupRunFinished": "{backedUp} {requested, plural, one {compte} other {comptes}} sur {requested} sauvegardés",
+      "backupRunIncomplete": "{backedUp} sur {requested} sauvegardés : {partial} partiels, {failed} en échec. Consultez l'état ci-dessous."
     },
     "folderErrors": {
       "required": "Le chemin du dossier est requis",
@@ -657,10 +659,22 @@
     },
     "noStorage": {
       "title": "Cette installation n'a aucun stockage de sauvegarde",
-      "body": "Les sauvegardes automatiques seraient écrites dans {folderPath}, où cette installation ne peut pas écrire. Un administrateur doit y monter un stockage avant qu'une planification puisse s'exécuter."
+      "body": "Les sauvegardes automatiques seraient écrites dans {folderPath}, où ce déploiement ne peut pas écrire. Un administrateur doit rendre ce stockage disponible avant qu'une planification puisse s'exécuter."
     },
     "never": "Jamais",
-    "demoDisabledNote": "Ces commandes sont en lecture seule en mode démo."
+    "coverage": {
+      "accounts": "Planifiée sur {scheduled} des {total} {total, plural, one {compte actif} other {comptes actifs}} de ce déploiement.",
+      "unknown": "La portée de cette politique n'est pas disponible."
+    },
+    "storage": {
+      "heading": "Stockage des sauvegardes",
+      "providerLocal": "Dossier local",
+      "providerS3": "Stockage objet compatible S3",
+      "providerUnknown": "Stockage",
+      "localHelp": "Défini par BACKUP_STORAGE_PROVIDER. Les sauvegardes de chaque compte vont dans leur propre dossier à l'intérieur de celui-ci, nommé d'après son identifiant de compte.",
+      "fixedHelp": "Défini par BACKUP_STORAGE_PROVIDER. Le bucket et le préfixe de clé appartiennent au déploiement : il n'y a donc pas de dossier à choisir ici ; les sauvegardes de chaque compte vont sous leur propre préfixe de clé.",
+      "artifactCount": "Ce stockage contient actuellement {count} {count, plural, one {fichier de sauvegarde} other {fichiers de sauvegarde}} pour votre compte. Changer de stockage ne déplace pas les sauvegardes existantes."
+    }
   },
   "backupRestore": {
     "heading": "Sauvegarde et restauration",

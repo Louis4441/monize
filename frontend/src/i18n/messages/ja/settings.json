@@ -594,14 +594,15 @@
   },
   "autoBackup": {
     "heading": "自動バックアップ",
-    "description": "スケジュールに従ってフォルダーにデータを自動でバックアップします。MonizeはDockerで動作しているため、ホストフォルダーをボリュームとしてコンテナにマップする必要があります（例: -v /host/backups:/data/backups）。",
-    "adminManagedNote": "これらの設定を変更できるのは管理者のみで、現在のところ管理者自身の自動バックアップを制御します。他のすべてのユーザーは固定のデプロイメント既定値で、それぞれ専用のフォルダーに自動的にバックアップされます。",
+    "description": "デプロイ全体で 1 つのスケジュールです。サーバーはすべてのアカウントのデータを下記のストレージにバックアップします。Monize は Docker で動作するため、ローカルフォルダーをボリュームとしてコンテナーにマウントする必要があります (例: -v /host/backups:/data/backups)。",
+    "adminManagedNote": "このポリシーを変更できるのは管理者のみで、このデプロイのすべてのアカウントに適用されます。各アカウントはそれぞれ専用のフォルダーに保存されます。",
+    "demoDisabledNote": "デモモードではこれらのコントロールは読み取り専用です。",
     "loadingText": "読み込み中...",
     "enableLabel": "自動バックアップを有効化",
     "backupFolderLabel": "バックアップフォルダー",
     "backupFolderPlaceholder": "/data/backups",
-    "perUserFolderHelp": "各ユーザーのバックアップは、このフォルダー内にあるユーザーIDを名前とする専用フォルダーに保存されます。",
-    "perUserFolderHelpWithPath": "各ユーザーのバックアップは、このフォルダー内にあるユーザーIDを名前とする専用フォルダーに保存されます。あなたのフォルダー: {path}",
+    "perUserFolderHelp": "各アカウントのバックアップは、このフォルダー内のアカウント ID 名の専用フォルダーに保存されます。",
+    "perUserFolderHelpWithPath": "各アカウントのバックアップは、このフォルダー内のアカウント ID 名の専用フォルダーに保存されます。例: {path}",
     "browseButton": "参照...",
     "validateButton": "検証",
     "validatingButton": "検証中...",
@@ -623,26 +624,27 @@
       "monthlyHelp": "月1回保持"
     },
     "status": {
-      "heading": "状態",
-      "lastBackup": "前回のバックアップ",
-      "nextBackup": "次回のバックアップ",
+      "heading": "デプロイの状態",
+      "lastBackup": "直近のバックアップ",
+      "nextBackup": "次回の予定バックアップ",
       "error": "エラー",
       "success": "成功",
-      "failed": "失敗",
-      "partial": "不完全"
+      "partial": "不完全",
+      "failed": "失敗"
     },
-    "saveButton": "設定を保存",
+    "saveButton": "ポリシーを保存",
     "savingButton": "保存中...",
-    "runNowButton": "今すぐバックアップを実行",
-    "runningButton": "バックアップを実行中...",
+    "runNowButton": "今すぐ全アカウントをバックアップ",
+    "runningButton": "バックアップ中...",
     "toasts": {
-      "saved": "自動バックアップ設定を保存しました",
-      "backupCreated": "バックアップを作成しました: {filename}",
+      "saved": "バックアップポリシーを保存し、すべてのアカウントに適用しました",
       "folderValid": "フォルダーは有効で書き込み可能です",
       "loadFailed": "自動バックアップ設定の読み込みに失敗しました",
       "saveFailed": "設定の保存に失敗しました",
       "runFailed": "バックアップの実行に失敗しました",
-      "browseFailed": "フォルダーの参照に失敗しました"
+      "browseFailed": "フォルダーの参照に失敗しました",
+      "backupRunFinished": "{requested} 件中 {backedUp} 件のアカウントをバックアップしました",
+      "backupRunIncomplete": "{requested} 件中 {backedUp} 件をバックアップ: {partial} 件が不完全、{failed} 件が失敗。下の状態を確認してください。"
     },
     "folderErrors": {
       "required": "フォルダーパスは必須です",
@@ -657,10 +659,22 @@
     },
     "noStorage": {
       "title": "このデプロイにはバックアップ用ストレージがありません",
-      "body": "自動バックアップは {folderPath} に書き込まれますが、このデプロイからは書き込めません。スケジュールを実行する前に、管理者がそこにストレージをマウントする必要があります。"
+      "body": "自動バックアップは {folderPath} に書き込まれますが、このデプロイはそこに書き込めません。スケジュールを実行する前に、管理者がそのストレージを利用可能にする必要があります。"
     },
     "never": "なし",
-    "demoDisabledNote": "デモモードではこれらのコントロールは読み取り専用です。"
+    "coverage": {
+      "accounts": "このデプロイの有効なアカウント {total} 件のうち {scheduled} 件で予定されています。",
+      "unknown": "このポリシーがどこまで届いているかは取得できません。"
+    },
+    "storage": {
+      "heading": "バックアップの保存先",
+      "providerLocal": "ローカルフォルダー",
+      "providerS3": "S3 互換オブジェクトストレージ",
+      "providerUnknown": "保存先",
+      "localHelp": "BACKUP_STORAGE_PROVIDER で設定されます。各アカウントのバックアップは、このフォルダー内のアカウント ID 名の専用フォルダーに保存されます。",
+      "fixedHelp": "BACKUP_STORAGE_PROVIDER で設定されます。バケットとキープレフィックスはデプロイのものなので、ここで選べるフォルダーはありません。各アカウントのバックアップは専用のキープレフィックスの下に保存されます。",
+      "artifactCount": "このストレージには現在、あなたのアカウントのバックアップファイルが {count} 件あります。ストレージを切り替えても既存のバックアップは移動しません。"
+    }
   },
   "backupRestore": {
     "heading": "バックアップと復元",

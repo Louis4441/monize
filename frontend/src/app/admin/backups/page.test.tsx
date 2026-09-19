@@ -110,9 +110,11 @@ describe('AdminBackupsPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Not a full database backup')).toBeInTheDocument();
     });
-    // The scope copy must explicitly say what it is not.
+    // The scope copy must explicitly say what it is not, and -- since the
+    // policy now governs the whole instance -- whose data it covers.
+    expect(screen.getByText(/not a PostgreSQL dump/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/not a full PostgreSQL or database dump/i),
+      screen.getByText(/Every active account is covered/i),
     ).toBeInTheDocument();
     // And it renders the automatic-backup configuration below the explanation.
     expect(

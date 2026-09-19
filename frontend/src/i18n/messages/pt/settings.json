@@ -594,14 +594,15 @@
   },
   "autoBackup": {
     "heading": "Cópia de Segurança Automática",
-    "description": "Faça cópias de segurança automáticas dos seus dados para uma pasta, de acordo com um agendamento. Como o Monize corre em Docker, tem de mapear uma pasta do anfitrião para o contentor como volume (ex.: -v /host/backups:/data/backups).",
-    "adminManagedNote": "Apenas administradores podem alterar estas definições, e estas regem atualmente as cópias de segurança automáticas do próprio administrador. Todos os outros utilizadores são copiados automaticamente com predefinições fixas da implementação, cada um para a sua própria pasta.",
+    "description": "Um único agendamento para toda a instalação: o servidor faz cópia dos dados de cada conta para o armazenamento abaixo. Como o Monize corre em Docker, uma pasta local tem de ser montada no contentor como volume (por ex., -v /host/backups:/data/backups).",
+    "adminManagedNote": "Apenas administradores podem alterar esta política, que rege todas as contas desta instalação, cada uma numa pasta própria.",
+    "demoDisabledNote": "Estes controlos são só de leitura no modo de demonstração.",
     "loadingText": "A carregar...",
     "enableLabel": "Ativar cópias de segurança automáticas",
     "backupFolderLabel": "Pasta de Cópias de Segurança",
     "backupFolderPlaceholder": "/data/backups",
-    "perUserFolderHelp": "As cópias de segurança de cada utilizador ficam numa pasta própria dentro desta, com o nome do respetivo ID de utilizador.",
-    "perUserFolderHelpWithPath": "As cópias de segurança de cada utilizador ficam numa pasta própria dentro desta, com o nome do respetivo ID de utilizador. A sua: {path}",
+    "perUserFolderHelp": "As cópias de cada conta ficam numa pasta própria dentro desta, com o nome do respetivo ID de conta.",
+    "perUserFolderHelpWithPath": "As cópias de cada conta ficam numa pasta própria dentro desta, com o nome do respetivo ID de conta. Exemplo: {path}",
     "browseButton": "Procurar...",
     "validateButton": "Validar",
     "validatingButton": "A validar...",
@@ -623,26 +624,27 @@
       "monthlyHelp": "Uma por mês retida"
     },
     "status": {
-      "heading": "Estado",
-      "lastBackup": "Última cópia de segurança",
-      "nextBackup": "Próxima cópia de segurança",
+      "heading": "Estado da instalação",
+      "lastBackup": "Cópia mais recente",
+      "nextBackup": "Próxima cópia agendada",
       "error": "Erro",
       "success": "Sucesso",
-      "failed": "Falhou",
-      "partial": "Parcial"
+      "partial": "Parcial",
+      "failed": "Falhou"
     },
-    "saveButton": "Guardar Definições",
+    "saveButton": "Guardar política",
     "savingButton": "A guardar...",
-    "runNowButton": "Executar Cópia de Segurança Agora",
-    "runningButton": "A executar cópia de segurança...",
+    "runNowButton": "Copiar todas as contas agora",
+    "runningButton": "A copiar...",
     "toasts": {
-      "saved": "Definições de cópia de segurança automática guardadas",
-      "backupCreated": "Cópia de segurança criada: {filename}",
+      "saved": "Política de cópias guardada e aplicada a todas as contas",
       "folderValid": "A pasta é válida e tem permissão de escrita",
       "loadFailed": "Falha ao carregar as definições de cópia de segurança automática",
       "saveFailed": "Falha ao guardar as definições",
       "runFailed": "Falha ao executar a cópia de segurança",
-      "browseFailed": "Falha ao navegar nas pastas"
+      "browseFailed": "Falha ao navegar nas pastas",
+      "backupRunFinished": "Copiadas {backedUp} de {requested} {requested, plural, one {conta} other {contas}}",
+      "backupRunIncomplete": "Copiadas {backedUp} de {requested}: {partial} parciais, {failed} com falha. Consulte o estado abaixo."
     },
     "folderErrors": {
       "required": "O caminho da pasta é obrigatório",
@@ -657,10 +659,22 @@
     },
     "noStorage": {
       "title": "Esta instalação não tem armazenamento para backups",
-      "body": "As cópias automáticas seriam escritas em {folderPath}, onde esta instalação não consegue escrever. Um administrador tem de montar armazenamento nesse local antes de um agendamento poder ser executado."
+      "body": "As cópias automáticas seriam escritas em {folderPath}, onde esta instalação não consegue escrever. Um administrador tem de disponibilizar esse armazenamento antes de um agendamento poder correr."
     },
     "never": "Nunca",
-    "demoDisabledNote": "Estes controlos são só de leitura no modo de demonstração."
+    "coverage": {
+      "accounts": "Agendada em {scheduled} de {total} {total, plural, one {conta ativa} other {contas ativas}} desta instalação.",
+      "unknown": "O alcance desta política não está disponível."
+    },
+    "storage": {
+      "heading": "Armazenamento das cópias",
+      "providerLocal": "Pasta local",
+      "providerS3": "Armazenamento de objetos compatível com S3",
+      "providerUnknown": "Armazenamento",
+      "localHelp": "Definido por BACKUP_STORAGE_PROVIDER. As cópias de cada conta ficam numa pasta própria dentro desta, com o nome do respetivo ID de conta.",
+      "fixedHelp": "Definido por BACKUP_STORAGE_PROVIDER. O bucket e o prefixo de chave pertencem à instalação, por isso não há pasta a escolher aqui; as cópias de cada conta ficam sob um prefixo de chave próprio.",
+      "artifactCount": "Este armazenamento contém atualmente {count} {count, plural, one {ficheiro de cópia} other {ficheiros de cópia}} da sua conta. Mudar de armazenamento não move as cópias existentes."
+    }
   },
   "backupRestore": {
     "heading": "Cópia de Segurança e Restauro",

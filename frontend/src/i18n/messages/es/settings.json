@@ -594,14 +594,15 @@
   },
   "autoBackup": {
     "heading": "Copia de seguridad automática",
-    "description": "Realiza copias de seguridad automáticas de tus datos en una carpeta según un horario. Dado que Monize se ejecuta en Docker, debes mapear una carpeta del host al contenedor como volumen (p. ej., -v /host/backups:/data/backups).",
-    "adminManagedNote": "Solo los administradores pueden cambiar esta configuración, que actualmente rige las copias de seguridad automáticas del propio administrador. El resto de los usuarios se respaldan automáticamente con valores predeterminados fijos de la implementación, cada uno en su propia carpeta.",
+    "description": "Una sola programación para todo el despliegue: el servidor copia los datos de cada cuenta al almacenamiento indicado abajo. Como Monize se ejecuta en Docker, hay que montar una carpeta local en el contenedor como volumen (p. ej., -v /host/backups:/data/backups).",
+    "adminManagedNote": "Solo los administradores pueden cambiar esta política, y rige para todas las cuentas de este despliegue, cada una en su propia carpeta.",
+    "demoDisabledNote": "Estos controles son de solo lectura en el modo de demostración.",
     "loadingText": "Cargando...",
     "enableLabel": "Habilitar copias de seguridad automáticas",
     "backupFolderLabel": "Carpeta de copia de seguridad",
     "backupFolderPlaceholder": "/data/backups",
-    "perUserFolderHelp": "Las copias de seguridad de cada usuario se guardan en su propia carpeta dentro de esta, con el nombre de su ID de usuario.",
-    "perUserFolderHelpWithPath": "Las copias de seguridad de cada usuario se guardan en su propia carpeta dentro de esta, con el nombre de su ID de usuario. La tuya: {path}",
+    "perUserFolderHelp": "Las copias de cada cuenta van en su propia carpeta dentro de esta, con el nombre de su ID de cuenta.",
+    "perUserFolderHelpWithPath": "Las copias de cada cuenta van en su propia carpeta dentro de esta, con el nombre de su ID de cuenta. Ejemplo: {path}",
     "browseButton": "Examinar...",
     "validateButton": "Validar",
     "validatingButton": "Validando...",
@@ -623,26 +624,27 @@
       "monthlyHelp": "Una por mes conservada"
     },
     "status": {
-      "heading": "Estado",
-      "lastBackup": "Última copia de seguridad",
-      "nextBackup": "Próxima copia de seguridad",
+      "heading": "Estado del despliegue",
+      "lastBackup": "Copia más reciente",
+      "nextBackup": "Próxima copia programada",
       "error": "Error",
       "success": "Exitoso",
-      "failed": "Fallido",
-      "partial": "Parcial"
+      "partial": "Parcial",
+      "failed": "Fallido"
     },
-    "saveButton": "Guardar configuración",
+    "saveButton": "Guardar política",
     "savingButton": "Guardando...",
-    "runNowButton": "Ejecutar copia ahora",
-    "runningButton": "Ejecutando copia...",
+    "runNowButton": "Copiar todas las cuentas ahora",
+    "runningButton": "Copiando...",
     "toasts": {
-      "saved": "Configuración de copia automática guardada",
-      "backupCreated": "Copia de seguridad creada: {filename}",
+      "saved": "Política de copias guardada y aplicada a todas las cuentas",
       "folderValid": "La carpeta es válida y tiene permisos de escritura",
       "loadFailed": "Error al cargar la configuración de copia automática",
       "saveFailed": "Error al guardar la configuración",
       "runFailed": "Error al ejecutar la copia de seguridad",
-      "browseFailed": "Error al explorar las carpetas"
+      "browseFailed": "Error al explorar las carpetas",
+      "backupRunFinished": "Se copiaron {backedUp} de {requested} {requested, plural, one {cuenta} other {cuentas}}",
+      "backupRunIncomplete": "Se copiaron {backedUp} de {requested}: {partial} parciales, {failed} con error. Consulte el estado más abajo."
     },
     "folderErrors": {
       "required": "La ruta de la carpeta es obligatoria",
@@ -657,10 +659,22 @@
     },
     "noStorage": {
       "title": "Esta instalación no tiene almacenamiento para copias de seguridad",
-      "body": "Las copias automáticas se escribirían en {folderPath}, donde esta instalación no puede escribir. Un administrador debe montar almacenamiento allí antes de que se pueda ejecutar una programación."
+      "body": "Las copias automáticas se escribirían en {folderPath}, donde este despliegue no puede escribir. Un administrador debe poner ese almacenamiento a disposición antes de que pueda ejecutarse una programación."
     },
     "never": "Nunca",
-    "demoDisabledNote": "Estos controles son de solo lectura en el modo de demostración."
+    "coverage": {
+      "accounts": "Programada en {scheduled} de {total} {total, plural, one {cuenta activa} other {cuentas activas}} de este despliegue.",
+      "unknown": "Hasta dónde llega esta política no está disponible."
+    },
+    "storage": {
+      "heading": "Almacenamiento de copias",
+      "providerLocal": "Carpeta local",
+      "providerS3": "Almacenamiento de objetos compatible con S3",
+      "providerUnknown": "Almacenamiento",
+      "localHelp": "Definido por BACKUP_STORAGE_PROVIDER. Las copias de cada cuenta van en su propia carpeta dentro de esta, con el nombre de su ID de cuenta.",
+      "fixedHelp": "Definido por BACKUP_STORAGE_PROVIDER. El bucket y el prefijo de clave son del despliegue, así que aquí no hay carpeta que elegir; las copias de cada cuenta van bajo su propio prefijo de clave.",
+      "artifactCount": "Este almacenamiento contiene ahora {count} {count, plural, one {archivo de copia} other {archivos de copia}} de su cuenta. Cambiar de almacenamiento no mueve las copias existentes."
+    }
   },
   "backupRestore": {
     "heading": "Copia de seguridad y restauración",

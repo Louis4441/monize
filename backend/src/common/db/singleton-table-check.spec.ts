@@ -97,9 +97,10 @@ describe("singleton tables declare their CHECK on the entity", () => {
   const entities = entitySourcesByTable();
 
   it("finds the singleton declarations in schema.sql", () => {
-    // Names the three that exist today, so deleting one is a decision somebody
+    // Names the four that exist today, so deleting one is a decision somebody
     // makes rather than a guard quietly covering less.
     expect(singletons).toEqual([
+      "auto_backup_policy",
       "oauth_instance_config",
       "push_instance_config",
       "update_check_state",

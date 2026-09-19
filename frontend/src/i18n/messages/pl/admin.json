@@ -187,14 +187,11 @@
   },
   "backupsPage": {
     "title": "Kopie zapasowe",
-    "subtitle": "Zaplanowane, skompresowane pliki kopii zapasowych dla poszczególnych użytkowników, zapisywane do folderu na serwerze.",
+    "subtitle": "Zaplanowane, skompresowane pliki kopii zapasowych danych finansowych każdego konta.",
     "scope": {
       "heading": "To nie jest pełna kopia zapasowa bazy danych",
-      "perUser": "Automatyczna kopia zapasowa zapisuje według harmonogramu skompresowany plik kopii z własnymi danymi finansowymi każdego użytkownika do folderu na serwerze i przechowuje pewną ich liczbę zgodnie z zasadami przechowywania.",
-      "adminPolicyScope": "Skonfigurowane tutaj harmonogram, folder i przechowywanie regulują obecnie tylko automatyczne kopie zapasowe samego administratora. Pozostałe konta są archiwizowane automatycznie według stałych wartości domyślnych wdrożenia, a pojedynczych zasad dla całego wdrożenia nie można jeszcze skonfigurować w tym miejscu.",
-      "notFullDatabase": "To nie jest pełny zrzut bazy PostgreSQL ani bazy danych. Nie obejmuje schematu bazy danych, danych innego wdrożenia, konfiguracji aplikacji ani niczego poza własnymi danymi finansowymi użytkownika.",
-      "notSameAsManualExport": "Jest powiązany z ręcznym eksportem w Ustawienia -> Kopia zapasowa i przywracanie, ale ma inny format na dysku.",
-      "disasterRecovery": "Na potrzeby odtwarzania awaryjnego całej instancji wykonaj osobną kopię zapasową bazy danych PostgreSQL i magazynu załączników za pomocą własnych narzędzi swojej infrastruktury."
+      "perUser": "Zgodnie z harmonogramem poniżej serwer zapisuje skompresowany plik kopii zapasowej danych finansowych każdego konta i usuwa starsze zgodnie z polityką przechowywania. Obejmuje to wszystkie aktywne konta.",
+      "notFullDatabase": "To nie jest zrzut PostgreSQL: nie obejmuje schematu, konfiguracji serwera ani niczego poza danymi finansowymi konta. Aby przywrócić całą instancję po awarii, wykonaj kopię bazy danych i magazynu załączników własnymi narzędziami."
     },
     "demoRestricted": {
       "heading": "Ograniczone w trybie demonstracyjnym",
