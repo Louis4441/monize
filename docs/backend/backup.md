@@ -47,6 +47,22 @@ join is a decorative check. The listing carries the caller's own `enabled` flag:
 the settings endpoint that would otherwise answer "is anything backing me up?" is
 admin-only, and the Settings section hides itself on it.
 
+**How much a user's backups occupy is the same question, asked for the admin
+screen.** `summarizeStoredBackups` reduces that listing to a count and a total
+for the `Backups` column on Admin > Users (`AdminService.getUserStorageUsage`,
+`GET /admin/users/storage`), and counts exactly the artifacts the owner-facing
+listing offers: `legacy` names carry no owner, so billing their bytes to
+whichever user happens to be listed would be a guess, and a name
+`classifyBackupFileName` does not recognise is not an artifact this module
+wrote. On a `local` store still holding pre-namespacing files the column
+therefore reads low, which is the honest reading of a shared history nothing can
+attribute. A store that cannot be enumerated at all answers `null` for both
+figures rather than `0`: "nobody could read it" and "this user has nothing
+stored" are different facts with different repairs, and the column renders them
+differently. The attachment column beside it needs no store at all -- it is a
+`SUM(byte_size)` over `transaction_attachments`, the same figure whichever
+provider holds the bytes.
+
 ## Where the artifacts live is a target, not a directory
 
 Every storage touch in the automatic backup path goes through
