@@ -86,15 +86,6 @@ function ymdSpan(fromYmd: string, toYmd: string): FindOperator<Date> {
 }
 
 /**
- * `rate_date` on or after `fromYmd`, the bound as a `YYYY-MM-DD` string for the
- * reason `ymdSpan` gives: a `Date` bound is rendered by `pg` in the process time
- * zone and, west of UTC, names the previous calendar day.
- */
-function ymdFrom(fromYmd: string): FindOperator<Date> {
-  return MoreThanOrEqual(fromYmd) as unknown as FindOperator<Date>;
-}
-
-/**
  * One amount converted at the rate that applied on `date`. `rate` is
  * `fromCurrency -> toCurrency` at FX precision (10dp); `convertedAmount` is
  * money (4dp). `date` is the day whose rate was asked for, after clamping a
@@ -1006,7 +997,18 @@ export class ExchangeRateService implements OnModuleInit {
     const bound: { rateDate?: FindOperator<Date> } =
       maxAgeDays === undefined
         ? {}
-        : { rateDate: ymdFrom(addDaysYMD(today, -maxAgeDays)) };
+        : {
+            // `MoreThanOrEqual` stays spelled out here rather than behind a
+            // helper: `price-boundary.one-door.spec.ts` reads the lower bound of
+            // a newest-row read off the lines around the ordering, and a bound
+            // it cannot see is a bound the next reader cannot see either. The
+            // string cast is what `ymdSpan` explains -- a `Date` bound is
+            // rendered by `pg` in the process time zone and, west of UTC, names
+            // the previous calendar day.
+            rateDate: MoreThanOrEqual(
+              addDaysYMD(today, -maxAgeDays),
+            ) as unknown as FindOperator<Date>,
+          };
     const [direct, reverse] = await withScopedDb(
       this.dataSource,
       async (manager) => {
