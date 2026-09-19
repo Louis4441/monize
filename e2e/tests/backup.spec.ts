@@ -109,7 +109,13 @@ test.describe('Backup & restore', () => {
     await expect(
       adminPage.getByRole('heading', { name: 'Backup Storage' }),
     ).toBeVisible();
-    await expect(adminPage.getByText('Local folder')).toBeVisible();
+    // `exact`: the section's own description says "a local folder must be
+    // mapped into the container as a volume", and getByText is a
+    // case-insensitive substring match, so a loose matcher resolves to two
+    // elements and fails strict mode.
+    await expect(
+      adminPage.getByText('Local folder', { exact: true }),
+    ).toBeVisible();
 
     // The automatic-backup flow lives here now, so its controls do too.
     const folder = adminPage.getByLabel('Backup Folder');
