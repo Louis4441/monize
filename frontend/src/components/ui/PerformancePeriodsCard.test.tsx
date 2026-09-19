@@ -145,6 +145,12 @@ describe('PerformancePeriodsCard', () => {
     expect(spans[0].textContent).toBe('+1,016.00');
     expect(spans[1].textContent).toBe('+1.41%');
     expect(dd.className).toContain('items-baseline');
+    // Both are figures the reader compares, so they are set at one size; the
+    // headline is distinguished by weight, not by making the money smaller.
+    expect(spans[0].className).toContain('text-sm');
+    expect(spans[1].className).toContain('text-sm');
+    expect(spans[0].className).not.toContain('font-medium');
+    expect(spans[1].className).toContain('font-medium');
   });
 
   it('says so when no period can be reported at all, and drops the footnote', () => {

@@ -311,7 +311,11 @@
       "1m": "1M",
       "3m": "3M",
       "ytd": "Od pocz. roku",
-      "1y": "1R"
+      "1y": "1R",
+      "2y": "2R",
+      "5y": "5R",
+      "10y": "10R",
+      "all": "Cały czas"
     },
     "loading": "Trwa mierzenie okresów...",
     "loadFailed": "Nie udało się wczytać wyników okresów. Wartości są wstrzymane, a nie zerowe; odśwież stronę, aby spróbować ponownie.",

@@ -27,6 +27,7 @@ import {
 import { AttachmentStorageProvider } from "./storage/attachment-storage.interface";
 import { AttachmentOrphanSweeper } from "./attachment-orphan-sweeper.service";
 import { lockTransactionRow } from "../common/db/locks";
+import { requestContextStorage } from "../common/request-context";
 import {
   lockedTransactionRow,
   stubLockedTransactions,
@@ -732,6 +733,87 @@ describe("AttachmentsService", () => {
       // Not spelled out here: the shared predicate is the only place it is
       // written, and `primary-attachment.guard.spec.ts` fails a second copy.
       expect(qbConditions).toContain("ta.original_of_attachment_id IS NULL");
+    });
+  });
+
+  describe("summarizeUsageByUser", () => {
+    /**
+     * The cross-user read's required ambient identity. Seeded here rather than
+     * mocked away, so the fence below is exercised by every case that is not
+     * about it.
+     */
+    const asSystem = <T>(fn: () => Promise<T>): Promise<T> =>
+      requestContextStorage.run({ system: true }, fn);
+
+    /** Answer the aggregate with `rows`, leaving the other statements alone. */
+    const aggregateReturns = (
+      rows: Array<{ user_id: string; files: string; bytes: string }>,
+    ): void => {
+      const previous = managerQuery.getMockImplementation();
+      managerQuery.mockImplementation(async (sql: string, ...rest: never[]) =>
+        String(sql).includes("FROM transaction_attachments")
+          ? rows
+          : previous?.(sql, ...rest),
+      );
+    };
+
+    it("totals each user's bytes and file count from the metadata rows", async () => {
+      aggregateReturns([
+        { user_id: "user-1", files: "3", bytes: "2048" },
+        { user_id: "user-2", files: "1", bytes: "512" },
+      ]);
+
+      const usage = await asSystem(() => service.summarizeUsageByUser());
+
+      expect(usage.get("user-1")).toEqual({ files: 3, bytes: 2048 });
+      expect(usage.get("user-2")).toEqual({ files: 1, bytes: 512 });
+    });
+
+    // COUNT and SUM over a BIGINT both arrive as strings from the pg driver, so
+    // a figure left unconverted concatenates instead of adding -- and the
+    // difference only shows on a deployment with real attachments in it.
+    it("converts the driver's strings to numbers at the boundary", async () => {
+      aggregateReturns([{ user_id: "user-1", files: "2", bytes: "9007199" }]);
+
+      const usage = await asSystem(() => service.summarizeUsageByUser());
+
+      expect(typeof usage.get("user-1")?.bytes).toBe("number");
+      expect(typeof usage.get("user-1")?.files).toBe("number");
+      expect((usage.get("user-1")?.bytes ?? 0) + 1).toBe(9007200);
+    });
+
+    it("groups every user in one statement rather than querying per user", async () => {
+      aggregateReturns([]);
+
+      await asSystem(() => service.summarizeUsageByUser());
+
+      const aggregates = managerQuery.mock.calls.filter((call) =>
+        String(call[0]).includes("FROM transaction_attachments"),
+      );
+      expect(aggregates).toHaveLength(1);
+      expect(String(aggregates[0][0])).toContain("GROUP BY user_id");
+    });
+
+    // The figure is the bytes each file occupies, so both halves of a scan pair
+    // count -- unlike `findAllForTransaction`, which shows the pair as one row.
+    it("counts every stored row, not only the ones a register lists", async () => {
+      aggregateReturns([]);
+
+      await asSystem(() => service.summarizeUsageByUser());
+
+      const [sql] = managerQuery.mock.calls.find((call) =>
+        String(call[0]).includes("FROM transaction_attachments"),
+      ) as [string];
+      expect(sql).not.toContain("original_of_attachment_id");
+    });
+
+    // The failure this prevents is silent: under one user's own scope RLS
+    // answers with that user's rows, the aggregate looks complete, and every
+    // other account reads as storing nothing.
+    it("refuses to answer without the system context its rows need", async () => {
+      await expect(service.summarizeUsageByUser()).rejects.toThrow(
+        /system context/,
+      );
     });
   });
 

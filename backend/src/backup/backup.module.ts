@@ -87,6 +87,10 @@ import { NotificationsModule } from "../notifications/notifications.module";
     BackupOffsiteDispatchService,
     BackupOffsiteRetryService,
   ],
-  exports: [BackupEncryptionService],
+  // AutoBackupService is exported for the admin user list's storage column: it
+  // owns the per-user namespace inside the store, so how much a user's backups
+  // occupy is its question to answer and not one an admin screen may compute
+  // from a path of its own.
+  exports: [BackupEncryptionService, AutoBackupService],
 })
 export class BackupModule {}

@@ -9,7 +9,10 @@ import { PageLayout } from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/Button';
-import { UserManagementTable } from '@/components/admin/UserManagementTable';
+import {
+  AdminStorageState,
+  UserManagementTable,
+} from '@/components/admin/UserManagementTable';
 import { ResetPasswordModal } from '@/components/admin/ResetPasswordModal';
 import { CreateUserModal } from '@/components/admin/CreateUserModal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -29,6 +32,10 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [smtpConfigured, setSmtpConfigured] = useState(false);
+  // Its own request and its own state: it enumerates the backup store once per
+  // user, so the rows must not wait on it, and a store that is slow or refusing
+  // has to read as two unfilled columns rather than as a page that failed.
+  const [storage, setStorage] = useState<AdminStorageState>({ status: 'loading' });
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
   // Reset password modal state. Reused to surface a generated temporary
@@ -77,9 +84,28 @@ export default function AdminUsersPage() {
     }
   }, [t]);
 
+  const loadStorage = useCallback(async () => {
+    try {
+      const rows = await adminApi.getUserStorage();
+      setStorage({
+        status: 'ready',
+        byUser: new Map(rows.map((row) => [row.userId, row])),
+      });
+    } catch (error) {
+      // No toast: the two columns say what is missing and what to do about it,
+      // where the reader is already looking, and the rest of the page works.
+      logger.error('Failed to load storage usage:', error);
+      setStorage({ status: 'error' });
+    }
+  }, []);
+
   useEffect(() => {
     loadUsers();
   }, [loadUsers]);
+
+  useEffect(() => {
+    loadStorage();
+  }, [loadStorage]);
 
   useEffect(() => {
     userSettingsApi
@@ -90,6 +116,9 @@ export default function AdminUsersPage() {
 
   const handleUserCreated = (result: CreateUserResponse) => {
     loadUsers();
+    // The new account is not in the reading the columns are holding, so it
+    // would render as "not reported" until something else refreshed them.
+    loadStorage();
     const userName =
       [result.firstName, result.lastName].filter(Boolean).join(' ') ||
       result.email ||
@@ -255,6 +284,7 @@ export default function AdminUsersPage() {
           ) : (
             <UserManagementTable
               users={users}
+              storage={storage}
               currentUserId={currentUser.id}
               onChangeRole={handleChangeRole}
               onToggleStatus={handleToggleStatus}
