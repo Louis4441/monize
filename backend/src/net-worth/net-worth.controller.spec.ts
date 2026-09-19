@@ -298,8 +298,11 @@ describe("NetWorthController", () => {
     });
 
     it("rejects a period that is not a preset", async () => {
+      // `6m` is a range the client's own date picker offers and this route
+      // does not: a window the server has no arithmetic for is a 400, never a
+      // silently dropped member of a list whose other windows still answer.
       await expect(
-        controller.getPeriodResults(mockReq, "1d,10y"),
+        controller.getPeriodResults(mockReq, "1d,6m"),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(mockPeriodResults.getPeriodResults).not.toHaveBeenCalled();
     });

@@ -88,7 +88,11 @@
       "1m": "1M",
       "3m": "3M",
       "ytd": "YTD",
-      "1y": "1Y"
+      "1y": "1Y",
+      "2y": "2Y",
+      "5y": "5Y",
+      "10y": "10Y",
+      "all": "All time"
     }
   },
   "assetAllocation": {

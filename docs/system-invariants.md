@@ -903,7 +903,7 @@ Enforcement         decidePeriodResult
                     a transfer, and counting the two unmeasurable cases into the
                     reasons externallySettledTrade and mixedSplit.
                     PortfolioPeriodResultsBatchService answers the same
-                    measure for six trailing windows at
+                    measure for every trailing window at
                     GET /net-worth/investments-period-results by slicing ONE
                     valuation instead of recomputing it, and the spec's
                     section 8 holds the two routes to identical answers.

@@ -43,7 +43,7 @@ interface UsePortfolioPeriodResultsValue {
  * scope's caption, and a failed request leaves the figures unknown rather than
  * stale. The dates are not among the inputs because this route does not take
  * any: the server decides what today is and where each window opens, which is
- * what keeps six windows to one valuation.
+ * what keeps every window to one valuation.
  */
 export function usePortfolioPeriodResults({
   periods,

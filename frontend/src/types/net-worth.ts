@@ -221,18 +221,45 @@ export const PORTFOLIO_PERIOD_PRESETS = [
   '3m',
   'ytd',
   '1y',
+  '2y',
+  '5y',
+  '10y',
+  'all',
 ] as const;
 
 export type PortfolioPeriodPreset = (typeof PORTFOLIO_PERIOD_PRESETS)[number];
+
+/**
+ * The windows every scope is answered for, whatever its history.
+ *
+ * The server reports the longer ones only where the portfolio reaches back to
+ * them, and `all` only where it has ever held anything, so which windows exist
+ * is not knowable until it answers. These are what a card shows in the
+ * meantime: the rows that are always coming, so the list does not grow a
+ * skeleton it then has to take away.
+ */
+export const BASE_PORTFOLIO_PERIOD_PRESETS = [
+  '1d',
+  '1w',
+  '1m',
+  '3m',
+  'ytd',
+  '1y',
+] as const satisfies readonly PortfolioPeriodPreset[];
 
 /**
  * What GET /net-worth/investments-period-results answers: the same measure as
  * the single-range route, for several trailing windows at once.
  *
  * The server builds the value series once for the widest window and slices the
- * rest out of it, so six windows cost one valuation. A window the series does
- * not reach back to is absent from nothing -- it is present with every figure
- * null and `noValueSeries` among its reasons, which the card reads as "n/a".
+ * rest out of it, so every window costs one valuation.
+ *
+ * `periods` is partial for a reason a consumer must not confuse with a
+ * withheld figure. A window that is PRESENT with every figure null and
+ * `noValueSeries` among its reasons is one the scope cannot measure, which the
+ * card reads as "n/a". A window that is ABSENT is one this portfolio does not
+ * have at all -- a five-year return on a two-year-old portfolio -- and a
+ * surface shows the windows it was sent rather than a row nobody can fill in.
  */
 export interface PortfolioPeriodResults {
   /** The currency every figure in every period is in. */

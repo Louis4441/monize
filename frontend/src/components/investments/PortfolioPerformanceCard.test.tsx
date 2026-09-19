@@ -99,7 +99,7 @@ describe('PortfolioPerformanceCard', () => {
     api.mockResolvedValue(everyPreset());
   });
 
-  it('reports the six trailing periods the server answered', async () => {
+  it('reports the trailing periods the server answered', async () => {
     render(<PortfolioPerformanceCard />);
 
     await waitFor(() =>
@@ -108,6 +108,8 @@ describe('PortfolioPerformanceCard', () => {
     for (const label of ['1D', '1W', '1M', '3M', 'YTD', '1Y']) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+    // The long windows are not in this fixture's answer, so they are not rows.
+    expect(screen.queryByText('All time')).not.toBeInTheDocument();
     // The percentage is the server's return over the investment result, and the
     // amount beneath it is that result -- never the value change.
     expect(screen.getByText('+2.00%')).toBeInTheDocument();
@@ -202,9 +204,69 @@ describe('PortfolioPerformanceCard', () => {
     await waitFor(() =>
       expect(screen.getByText('+2.00%')).toBeInTheDocument(),
     );
-    // 1Y is withheld and the four presets the server did not answer are unknown
-    // too: five rows of "n/a", two lines each for the ones the card asked for.
-    expect(screen.getAllByText('n/a').length).toBeGreaterThanOrEqual(5);
+    // The window is REPORTED and withheld, so it keeps its row and reads
+    // "n/a" on both figures: unlike a window the server did not send, there is
+    // something here the reader may be able to repair.
+    expect(screen.getByText('1Y')).toBeInTheDocument();
+    expect(screen.getAllByText('n/a')).toHaveLength(2);
+  });
+
+  /**
+   * WHICH windows exist is the server's answer. A five-year return on a
+   * two-year-old portfolio is not an "n/a" the reader can act on -- there is
+   * nothing to add -- so the server leaves the window out and the card shows
+   * the windows it was sent.
+   */
+  it('shows only the windows the server reported', async () => {
+    api.mockResolvedValue(
+      results({
+        '1d': period(),
+        '1w': period(),
+        '1m': period(),
+        '3m': period(),
+        ytd: period(),
+        '1y': period(),
+        '2y': period(),
+        all: period(),
+      }),
+    );
+
+    render(<PortfolioPerformanceCard />);
+
+    await waitFor(() => expect(screen.getByText('2Y')).toBeInTheDocument());
+    expect(screen.getByText('All time')).toBeInTheDocument();
+    // The history does not reach five or ten years back, so the server sent
+    // neither window and neither has a row -- not even one saying "n/a".
+    expect(screen.queryByText('5Y')).not.toBeInTheDocument();
+    expect(screen.queryByText('10Y')).not.toBeInTheDocument();
+  });
+
+  it('reports every long window a portfolio with the history for it has', async () => {
+    api.mockResolvedValue(
+      results({
+        '1d': period(),
+        '1w': period(),
+        '1m': period(),
+        '3m': period(),
+        ytd: period(),
+        '1y': period(),
+        '2y': period({ returnPercent: 20, investmentResult: 2000 }),
+        '5y': period({ returnPercent: 50, investmentResult: 5000 }),
+        '10y': period({ returnPercent: 90, investmentResult: 9000 }),
+        all: period({ returnPercent: 120, investmentResult: 12000 }),
+      }),
+    );
+
+    render(<PortfolioPerformanceCard />);
+
+    await waitFor(() => expect(screen.getByText('10Y')).toBeInTheDocument());
+    for (const label of ['1D', '1W', '1M', '3M', 'YTD', '1Y', '2Y', '5Y', '10Y', 'All time']) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    // Each long window carries its own figures, in the order the server's
+    // preset list gives them.
+    expect(screen.getByText('+90.00%')).toBeInTheDocument();
+    expect(screen.getByText('+$12,000.00')).toBeInTheDocument();
   });
 
   it('renders a period that earned nothing as a zero, not as n/a', async () => {
@@ -380,7 +442,7 @@ describe('PortfolioPerformanceCard', () => {
 
     await waitFor(() =>
       expect(api).toHaveBeenCalledWith({
-        periods: '1d,1w,1m,3m,ytd,1y',
+        periods: '1d,1w,1m,3m,ytd,1y,2y,5y,10y,all',
         accountIds: 'acc-1,acc-2',
         displayCurrency: 'CAD',
       }),

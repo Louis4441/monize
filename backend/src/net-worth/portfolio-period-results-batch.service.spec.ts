@@ -11,6 +11,7 @@ import {
   presetWindowStart,
   usesPriorCloseBaseline,
 } from "./portfolio-period-presets.util";
+import { PortfolioPeriodResults } from "./portfolio-period-results-batch.service";
 import { PortfolioPeriodResultService } from "./portfolio-period-result.service";
 import { PortfolioPeriodResultsBatchService } from "./portfolio-period-results-batch.service";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
@@ -97,6 +98,7 @@ describe("PortfolioPeriodResultsBatchService", () => {
   let settledTradeDays: Array<{ date: string; count: string }>;
   let mixedSplitDays: Array<{ date: string; count: string }>;
   let series: SeriesPoint[];
+  let inception: string | null;
   let queries: Array<{ sql: string; params: unknown[] }>;
 
   beforeEach(async () => {
@@ -114,6 +116,9 @@ describe("PortfolioPeriodResultsBatchService", () => {
       },
     ];
     series = canonicalSeries();
+    // The day the scope's first holding was bought: one day into the series,
+    // so the all-time window has the close before it to measure from.
+    inception = "2025-09-18";
     flowRows = [{ date: "2026-06-01", currency: "CAD", total: "10000" }];
     // The deposit of 2026-06-01 is invested the same day, so the invested part
     // grows by a capital flow rather than by a gain: the day contributes factor
@@ -152,6 +157,8 @@ describe("PortfolioPeriodResultsBatchService", () => {
           const total = rows.reduce((sum, row) => sum + Number(row.count), 0);
           return [{ date: null, count: String(total) }];
         };
+        if (sql.includes("MIN(it.transaction_date)"))
+          return [{ date: inception }];
         if (sql.includes("it.action AS action"))
           return investedRows.filter((row) => inWindow(row.date));
         if (sql.includes("SUM(t.amount)"))
@@ -195,8 +202,19 @@ describe("PortfolioPeriodResultsBatchService", () => {
    * close before the window's first point where the preset reports against the
    * prior close (`usesPriorCloseBaseline`, `previousCalendarDay`).
    */
+  /**
+   * The windows the answer actually reports. A long window the fixture's
+   * history does not reach back to is absent rather than "n/a", so the
+   * equivalence loops below compare what was reported, and the cases further
+   * down assert WHICH windows those are.
+   */
+  const reported = (results: PortfolioPeriodResults): PortfolioPeriodPreset[] =>
+    Object.keys(results.periods) as PortfolioPeriodPreset[];
+
   const singleRouteArgs = (preset: PortfolioPeriodPreset) => {
-    const startDate = presetWindowStart(preset, TODAY);
+    // `all` has no arithmetic of its own: it opens where the scope's history
+    // does, which is the date the batch route asked the database for.
+    const startDate = presetWindowStart(preset, TODAY) ?? inception ?? TODAY;
     const firstPoint = series.find((p) => p.date >= startDate);
     const baselineDate =
       usesPriorCloseBaseline(preset) && firstPoint
@@ -208,7 +226,8 @@ describe("PortfolioPeriodResultsBatchService", () => {
   it("answers every preset with what the single-range route answers", async () => {
     const results = await batch.getPeriodResults("user-1");
 
-    for (const preset of PORTFOLIO_PERIOD_PRESETS) {
+    expect(reported(results).length).toBeGreaterThan(0);
+    for (const preset of reported(results)) {
       const expected = await single.getPeriodResult(
         "user-1",
         singleRouteArgs(preset),
@@ -223,7 +242,7 @@ describe("PortfolioPeriodResultsBatchService", () => {
     // any more than they may about the TWR (spec section 11.8).
     const results = await batch.getPeriodResults("user-1");
 
-    for (const preset of PORTFOLIO_PERIOD_PRESETS) {
+    for (const preset of reported(results)) {
       const expected = await single.getPeriodResult(
         "user-1",
         singleRouteArgs(preset),
@@ -268,7 +287,7 @@ describe("PortfolioPeriodResultsBatchService", () => {
 
     const results = await batch.getPeriodResults("user-1");
 
-    for (const preset of PORTFOLIO_PERIOD_PRESETS) {
+    for (const preset of reported(results)) {
       const expected = await single.getPeriodResult(
         "user-1",
         singleRouteArgs(preset),
@@ -423,6 +442,7 @@ describe("PortfolioPeriodResultsBatchService", () => {
 
   it("says nothing for a period the history does not reach back to", async () => {
     series = canonicalSeries("2026-09-15");
+    inception = "2026-09-16";
 
     const results = await batch.getPeriodResults("user-1");
 
@@ -435,6 +455,121 @@ describe("PortfolioPeriodResultsBatchService", () => {
       investmentResult: null,
       returnPercent: null,
       reasons: ["noValueSeries"],
+    });
+  });
+
+  /**
+   * The long windows, and the rule that decides whether a reader sees them.
+   *
+   * A window a portfolio cannot have is not an "n/a" worth a row: unlike a
+   * window withheld for a missing price, there is nothing the reader could add
+   * to fill it in, and six of them under a card the width of a chart's margin
+   * is noise. So the answer reports the long windows the scope's history
+   * reaches back to, and leaves the rest out.
+   */
+  describe("the long windows", () => {
+    /** A scope whose first holding was bought on `first`, valued from the day before. */
+    const historyFrom = (first: string) => {
+      inception = first;
+      series = canonicalSeries(addDaysYMD(first, -1));
+    };
+
+    it("leaves out a window the scope's history does not reach back to", async () => {
+      // One year of history: 2Y opens 730 days ago, 5Y and 10Y earlier still.
+      const results = await batch.getPeriodResults("user-1");
+
+      expect(results.periods["2y"]).toBeUndefined();
+      expect(results.periods["5y"]).toBeUndefined();
+      expect(results.periods["10y"]).toBeUndefined();
+      // And nothing wider than the year was valued for them.
+      expect(netWorth.getDailyInvestments).toHaveBeenCalledWith(
+        "user-1",
+        "2025-09-17",
+        TODAY,
+        undefined,
+        "CAD",
+        { fetchMissing: undefined },
+      );
+    });
+
+    it("reports a window the history does reach back to", async () => {
+      historyFrom("2015-01-02");
+
+      const results = await batch.getPeriodResults("user-1");
+
+      // A portfolio older than the widest window has every window there is.
+      expect(reported(results).sort()).toEqual(
+        [...PORTFOLIO_PERIOD_PRESETS].sort(),
+      );
+      for (const preset of ["2y", "5y", "10y"] as const) {
+        expect(results.periods[preset]).toMatchObject({
+          startDate: presetWindowStart(preset, TODAY),
+          endDate: TODAY,
+          investmentPnl: expect.any(Number),
+        });
+      }
+    });
+
+    it("keeps a window whose history reaches it and drops the one it does not", async () => {
+      // Three years: 2Y is inside the history, 5Y and 10Y are not. The
+      // boundary is the window's own start, not the widest window asked for.
+      historyFrom("2023-09-16");
+
+      const results = await batch.getPeriodResults("user-1");
+
+      expect(results.periods["2y"]).toBeDefined();
+      expect(results.periods["5y"]).toBeUndefined();
+      expect(results.periods["10y"]).toBeUndefined();
+    });
+
+    it("opens the all-time window on the scope's first holding", async () => {
+      const results = await batch.getPeriodResults("user-1");
+
+      // Measured from the close BEFORE the first purchase: that day's own
+      // close already holds it, so opening there would drop the day that
+      // bought the portfolio out of the chain.
+      expect(results.periods.all).toMatchObject({
+        startDate: addDaysYMD(inception as string, -1),
+        endDate: TODAY,
+      });
+    });
+
+    it("answers the all-time window with the since-inception figures", async () => {
+      // Two surfaces, one question: the card's all-time row and the portfolio
+      // summary's since-inception return must not open on different days or
+      // divide by different bases.
+      const results = await batch.getPeriodResults("user-1");
+      const sinceInception =
+        await single.getInvestedResultSinceInception("user-1");
+
+      expect(results.periods.all).toEqual(sinceInception);
+    });
+
+    it("leaves out the all-time window for a scope that has never held anything", async () => {
+      inception = null;
+
+      const results = await batch.getPeriodResults("user-1");
+
+      expect(results.periods.all).toBeUndefined();
+      // The short windows are still answered: they are what a portfolio with
+      // no holdings is shown, and they report the nothing it did.
+      expect(results.periods["1m"]).toBeDefined();
+    });
+
+    it("asks the database where the history starts exactly once", async () => {
+      await batch.getPeriodResults("user-1");
+
+      expect(
+        queries.filter((q) => q.sql.includes("MIN(it.transaction_date)")),
+      ).toHaveLength(1);
+    });
+
+    it("asks nothing about history when no window needs it", async () => {
+      await batch.getPeriodResults("user-1", { periods: ["1m", "ytd"] });
+
+      expect(
+        queries.filter((q) => q.sql.includes("MIN(it.transaction_date)")),
+      ).toHaveLength(0);
     });
   });
 
@@ -456,15 +591,23 @@ describe("PortfolioPeriodResultsBatchService", () => {
     );
   });
 
-  it("answers every preset for a scope with no accounts, and values none", async () => {
+  it("answers every ungated preset for a scope with no accounts, and values none", async () => {
     scopeRows = [];
 
     const results = await batch.getPeriodResults("user-1");
 
-    expect(Object.keys(results.periods).sort()).toEqual(
-      [...PORTFOLIO_PERIOD_PRESETS].sort(),
-    );
-    for (const preset of PORTFOLIO_PERIOD_PRESETS) {
+    // A scope with no accounts has no history, so the windows that exist only
+    // where history does are not reported at all -- including all-time, which
+    // has no first holding to open on.
+    expect(reported(results).sort()).toEqual([
+      "1d",
+      "1m",
+      "1w",
+      "1y",
+      "3m",
+      "ytd",
+    ]);
+    for (const preset of reported(results)) {
       expect(results.periods[preset]).toMatchObject({
         valueChange: null,
         investmentResult: null,

@@ -311,7 +311,11 @@
       "1m": "1TH",
       "3m": "3TH",
       "ytd": "Từ đầu năm",
-      "1y": "1N"
+      "1y": "1N",
+      "2y": "2N",
+      "5y": "5N",
+      "10y": "10N",
+      "all": "Tất cả thời gian"
     },
     "loading": "Đang đo các giai đoạn...",
     "loadFailed": "Không thể tải kết quả các giai đoạn. Các số liệu đang bị giữ lại, không phải bằng không; hãy tải lại trang để thử lại.",

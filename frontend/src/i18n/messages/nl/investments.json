@@ -311,7 +311,11 @@
       "1m": "1M",
       "3m": "3M",
       "ytd": "Dit jaar",
-      "1y": "1J"
+      "1y": "1J",
+      "2y": "2J",
+      "5y": "5J",
+      "10y": "10J",
+      "all": "Alle tijd"
     },
     "loading": "Periodes worden gemeten...",
     "loadFailed": "De periodresultaten konden niet worden geladen. De cijfers worden achtergehouden, niet op nul gezet; laad de pagina opnieuw om het nogmaals te proberen.",

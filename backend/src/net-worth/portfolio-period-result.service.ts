@@ -336,7 +336,9 @@ export class PortfolioPeriodResultService {
    * one question (#1392), so the window is resolved here and the figures come
    * from `getPeriodResult` -- the same series, the same capital and income
    * load, the same rate index and the same `investedPeriodResult` decision the
-   * six-period card reads. Nothing is recomputed; only the dates are chosen.
+   * period card reads. Nothing is recomputed; only the dates are chosen. The
+   * batch route's own `all` window draws these same two dates, so the card's
+   * all-time row and this figure are one answer.
    *
    * `b` is the day BEFORE the scope's earliest non-VOID investment transaction,
    * because `IV(b)` is a close and already holds everything dated `b`: measuring
@@ -378,8 +380,14 @@ export class PortfolioPeriodResultService {
    * The scope's earliest investment transaction date, or `null` when it has
    * none. Rows as EFFECTS: a VOID row records something that did not happen, so
    * it cannot be the day a portfolio started (`investmentEffectStatusSql`).
+   *
+   * Public because the batch route asks the same question of the same scope:
+   * where `all` opens, and which of the long windows the scope has history for
+   * (`portfolio-period-results-batch.service.ts`). One spelling of "when did
+   * this portfolio start", or the card's all-time row and the summary's
+   * since-inception figure would open on different days.
    */
-  private async firstInvestmentDate(
+  async firstInvestmentDate(
     userId: string,
     accountIds: string[],
   ): Promise<string | null> {
