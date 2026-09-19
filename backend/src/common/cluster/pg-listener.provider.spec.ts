@@ -645,6 +645,44 @@ describe("PgListener", () => {
       jest.useRealTimers();
     });
 
+    it("ignores a probe-shaped payload that is not the token", async () => {
+      // The case the length check cannot decide: same shape, same length, one
+      // character different. A second replica booting at the same instant
+      // publishes exactly this, and accepting it would pass a check whose own
+      // delivery had failed.
+      //
+      // This asserts the outcome, not the timing. A constant-time compare and
+      // a short-circuiting one agree on every result, so no unit test
+      // distinguishes them; what holds that property is the Bearer scan
+      // (javascript_lang_observable_timing) in CI.
+      jest.useFakeTimers();
+      const client = new FakeClient();
+      const { listener } = buildListener([client]);
+      await listener.connect();
+
+      const verified = listener.verifyDelivery(
+        PG_WAKEUP_CHANNEL,
+        (channel, token) => {
+          const lastIndex = token.length - 1;
+          const decoy =
+            token.slice(0, lastIndex) + (token[lastIndex] === "a" ? "b" : "a");
+          expect(decoy).toHaveLength(token.length);
+          expect(decoy).not.toBe(token);
+          client.emit("notification", { channel, payload: decoy });
+          return Promise.resolve();
+        },
+        1_000,
+      );
+      const assertion = expect(verified).rejects.toThrow(
+        /no notification arrived/,
+      );
+      await jest.advanceTimersByTimeAsync(1_000);
+      await assertion;
+
+      await listener.close();
+      jest.useRealTimers();
+    });
+
     it("surfaces a publisher failure rather than waiting out the deadline", async () => {
       const client = new FakeClient();
       const { listener } = buildListener([client]);

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 
 import { Logger } from "@nestjs/common";
 import { Client, ClientConfig, Notification } from "pg";
@@ -103,6 +103,29 @@ export function assertValidChannel(channel: string): void {
         "a truncated name is a channel nobody hears.",
     );
   }
+}
+
+/**
+ * Whether a delivered payload is the probe token `verifyDelivery` published.
+ *
+ * Compared in constant time. The token this guards is not a secret today -- it
+ * is minted, published and consumed inside one boot, and it is on the wire in
+ * plaintext either way -- so nothing is currently exploitable by timing this.
+ * It is written this way because the property should not depend on that
+ * remaining true: a later caller handing `verifyDelivery` a value that *is*
+ * sensitive gets a safe comparison rather than a defect nobody re-derives. The
+ * cost at one comparison per boot is nothing.
+ *
+ * `timingSafeEqual` throws on a length mismatch, so the length is checked
+ * first. That leaks the length, which is public: every probe token is the same
+ * shape.
+ */
+function isProbeToken(payload: string, token: string): boolean {
+  const delivered = Buffer.from(payload, "utf8");
+  const expected = Buffer.from(token, "utf8");
+  return (
+    delivered.length === expected.length && timingSafeEqual(delivered, expected)
+  );
 }
 
 /**
@@ -333,6 +356,11 @@ export class PgListener {
   ): Promise<void> {
     assertValidChannel(channel);
     await this.listen(channel);
+    // Random rather than a counter because the collision to avoid is across
+    // replicas, not within this process: every backend container's node
+    // process is pid 1 in its own namespace, so two replicas booting together
+    // would mint the same counter-based token and each could accept the
+    // other's probe -- passing a check its own delivery had failed.
     const token = `probe:${randomUUID()}`;
     await new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -346,7 +374,7 @@ export class PgListener {
         );
       }, timeoutMs);
       const off = this.onNotification((received, payload) => {
-        if (received !== channel || payload !== token) {
+        if (received !== channel || !isProbeToken(payload, token)) {
           return;
         }
         clearTimeout(timer);
