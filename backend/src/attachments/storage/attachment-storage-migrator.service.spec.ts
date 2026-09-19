@@ -375,6 +375,36 @@ describe("AttachmentStorageMigrator", () => {
       );
     });
 
+    it("ends the drain when a whole batch throws, rather than spinning on it", async () => {
+      // The lease helper rethrows what the batch threw. Nothing here is broken by
+      // stopping: every row it did not move still names its own backend, and :50
+      // comes round again.
+      fetchSync.withLease.mockRejectedValue(new Error("database down"));
+
+      const outcome = await migrator.relocateAll("test");
+
+      expect(outcome).toEqual({
+        moved: 0,
+        skipped: 0,
+        failed: 0,
+        unreachable: 0,
+      });
+      expect(fetchSync.withLease).toHaveBeenCalledTimes(1);
+    });
+
+    it("warns rather than throwing when a staged copy cannot be removed", async () => {
+      // The flip rolled back and the compensating delete failed too. The intent
+      // recorded before the copy is what makes this promptness rather than the
+      // only chance, so it is a warning and an object the sweeper knows about.
+      intentStillOurs = false;
+      destination.delete.mockRejectedValue(new Error("bucket unreachable"));
+
+      const outcome = await migrator.relocateAll("test");
+
+      expect(outcome.failed).toBe(1);
+      expect(source.objects.has(ATTACHMENT)).toBe(true);
+    });
+
     it("does nothing at all when no row is outside the active backend", async () => {
       pending = [];
 
