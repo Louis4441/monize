@@ -79,7 +79,7 @@
 | F3 | Doc corrections in `concurrency-and-idempotency.md`, `external-side-effects.md`, `cron-jobs.md` | -- | none | [x] |
 | F5 | Concurrency register: retire the stale `users.failed_login_attempts` gap row | -- | none | [x] |
 | F6 | Retire `REDIS_URL` from F1's boot matrix, `main.ts` and `.env.example` | -- | none | [x] |
-| F4 | ADR 0005 and index row | F1 | none | [ ] |
+| F4 | ADR 0005 and index row | F1 | none | [x] |
 | A1 | Migration: `auth_attempt_counters`, `single_use_tokens`; RLS exemption; sweep cron | -- | none | [x] |
 | A2 | `AuthAttemptCounterService`; 2FA attempt maps replaced | A1 | neutral | [x] |
 | A3 | `usedTotpCodes` replaced by a `single_use_tokens` claim | A1 | neutral | [x] |
@@ -400,7 +400,7 @@ backup storage -- and which task adds each check, so the row does not read as
 
 ### F4 -- ADR 0005
 
-- [ ] Status:
+- [x] Status: done.
 
 **Scope:** `docs/adr/0005-cluster-mode-on-postgresql-alone.md` (new),
 `docs/adr/README.md` (index row).
@@ -431,7 +431,17 @@ single-replica deployments need nothing new).
 
 **Acceptance:** index row present; `doc-paths` guard green.
 
-**Notes:**
+**Notes:** marked retrospective on the `Date` line, per `docs/adr/README.md`:
+the decision was taken with the plan and most of it has shipped, so a bare
+date would read as a decision taken on 2026-09-19. The README's sentence
+listing the retrospective ADRs was updated with it.
+
+Two consequences recorded that the task's outline did not name, because they
+are decisions a future reader would otherwise have to re-derive: the throttler's
+deliberate fail-open as an exception to INV-HA-001, and G1's guard as the thing
+that now makes per-replica state a written decision. One extra alternative is
+recorded for the same reason -- leader election for the duplicated provider
+fetches, rejected in favour of C2's `fetch_sync` lease.
 
 ### A1 -- Migration: `auth_attempt_counters`, `single_use_tokens`
 
