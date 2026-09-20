@@ -263,7 +263,7 @@
     "inUse": "La divisa \"{{ code }}\" está en uso por tus cuentas, valores u otros registros. Desactívala en su lugar.",
     "invalidRateDate": "date debe tener el formato AAAA-MM-DD",
     "alreadyInListInactive": "La divisa \"{{ code }}\" ya está en tu lista, pero actualmente está inactiva. Reactívala para usarla.",
-    "sameCurrencyHistory": "{{ code }} es su moneda predeterminada; no hay historial de tipo de cambio que ampliar",
+    "sameCurrencyHistory": "{{ code }} es su moneda predeterminada; no tiene historial de tipo de cambio",
     "rateProviderUnavailable": "El proveedor de tipos de cambio no respondió. Inténtelo de nuevo más tarde."
   },
   "delegation": {

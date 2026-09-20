@@ -118,13 +118,39 @@
     "none": "Geen opgeslagen geschiedenis voor {pair}",
     "loading": "Opgeslagen koersgeschiedenis wordt gecontroleerd...",
     "loadFailed": "De opgeslagen koersgeschiedenis kon niet worden gelezen",
-    "addYear": "Nog een jaar koersgeschiedenis toevoegen",
-    "adding": "Nog een jaar wordt opgehaald...",
+    "fillGaps": "Gaten in koershistorie vullen",
+    "filling": "Ontbrekende koersen ophalen...",
+    "fillGapsTitle": "Haalt de dagkoersen op die uw rapporten missen, vanaf de eerste datum waarop uw gegevens {code} gebruiken tot vandaag.",
     "hint": "Rapporten van vóór de eerste opgeslagen koers kunnen {pair} niet omrekenen.",
+    "list": {
+      "heading": "Opgeslagen koersen",
+      "direction": "Weergegeven als {to} per 1 {from}.",
+      "loading": "Opgeslagen koersen laden...",
+      "loadFailed": "Kon de opgeslagen koersen niet lezen",
+      "empty": "Geen opgeslagen koersen om te tonen",
+      "truncated": "De {count} meest recente opgeslagen koersen worden getoond; oudere staan er niet bij.",
+      "inverted": "omgekeerd",
+      "unknownRate": "Onbekend",
+      "columns": {
+        "date": "Datum",
+        "rate": "Koers",
+        "source": "Bron"
+      },
+      "sources": {
+        "yahooFinance": "Yahoo Finance",
+        "mnyImport": "Money-import",
+        "unknown": "Onbekend"
+      }
+    },
     "toasts": {
-      "added": "{count} koersen toegevoegd; de geschiedenis begint nu op {start}",
-      "noOlder": "De aanbieder heeft geen oudere koersen voor {pair}",
-      "failed": "De koersgeschiedenis kon niet worden uitgebreid"
+      "filled": "{count} koersen toegevoegd; de geschiedenis begint nu op {start}",
+      "partial": "{count} koersen opgeslagen; de historie begint nu op {start}. Nog {windows} gaten te halen, druk nogmaals om door te gaan.",
+      "moreToFetch": "Er zijn deze keer geen koersen opgeslagen; nog {windows} gaten te halen, druk nogmaals om door te gaan.",
+      "noGaps": "Elke datum die uw rapporten nodig hebben, kan al worden omgerekend voor {pair}",
+      "noNewRates": "Er zijn geen nieuwe koersen opgeslagen voor {pair}",
+      "unused": "Geen van uw rekeningen, posities of transacties gebruikt {code}, dus er zijn geen koersen op te halen",
+      "providerFloor": "De aanbieder heeft geen koersen voor {pair} van vóór {date}",
+      "failed": "Kon de koershistorie niet vullen"
     }
   }
 }

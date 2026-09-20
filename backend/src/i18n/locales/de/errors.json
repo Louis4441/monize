@@ -263,7 +263,7 @@
     "inUse": "Währung \"{{ code }}\" wird von Ihren Konten, Wertpapieren oder anderen Einträgen verwendet. Deaktivieren Sie sie stattdessen.",
     "invalidRateDate": "date muss im Format JJJJ-MM-TT angegeben werden",
     "alreadyInListInactive": "Währung \"{{ code }}\" ist bereits in Ihrer Liste, aber derzeit inaktiv. Reaktivieren Sie sie, um sie zu verwenden.",
-    "sameCurrencyHistory": "{{ code }} ist Ihre Standardwährung; es gibt keinen Wechselkursverlauf zu erweitern",
+    "sameCurrencyHistory": "{{ code }} ist Ihre Standardwährung; sie hat keinen Wechselkursverlauf",
     "rateProviderUnavailable": "Der Wechselkursanbieter hat nicht geantwortet. Bitte versuchen Sie es später erneut."
   },
   "delegation": {

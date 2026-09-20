@@ -118,13 +118,39 @@
     "none": "{pair} için saklanan geçmiş yok",
     "loading": "Saklanan kur geçmişi kontrol ediliyor...",
     "loadFailed": "Saklanan kur geçmişi okunamadı",
-    "addYear": "Kur geçmişine bir yıl daha ekle",
-    "adding": "Bir yıl daha alınıyor...",
+    "fillGaps": "Kur geçmişindeki boşlukları doldur",
+    "filling": "Eksik kurlar getiriliyor...",
+    "fillGapsTitle": "Raporlarınızda eksik olan günlük kurları, verilerinizin {code} kullandığı ilk tarihten bugüne kadar getirir.",
     "hint": "İlk saklanan kurdan önceki tarihli raporlar {pair} çevirisi yapamaz.",
+    "list": {
+      "heading": "Kayıtlı kurlar",
+      "direction": "1 {from} için {to} olarak gösterilir.",
+      "loading": "Kayıtlı kurlar yükleniyor...",
+      "loadFailed": "Kayıtlı kurlar okunamadı",
+      "empty": "Listelenecek kayıtlı kur yok",
+      "truncated": "En yeni {count} kayıtlı kur gösteriliyor; daha eskileri listelenmiyor.",
+      "inverted": "ters çevrilmiş",
+      "unknownRate": "Bilinmiyor",
+      "columns": {
+        "date": "Tarih",
+        "rate": "Kur",
+        "source": "Kaynak"
+      },
+      "sources": {
+        "yahooFinance": "Yahoo Finance",
+        "mnyImport": "Money içe aktarımı",
+        "unknown": "Bilinmiyor"
+      }
+    },
     "toasts": {
-      "added": "{count} kur eklendi; geçmiş artık {start} tarihinden başlıyor",
-      "noOlder": "Sağlayıcının {pair} için daha eski kuru yok",
-      "failed": "Kur geçmişi genişletilemedi"
+      "filled": "{count} kur eklendi; geçmiş artık {start} tarihinden başlıyor",
+      "partial": "{count} kur kaydedildi; geçmiş artık {start} tarihinde başlıyor. Getirilecek {windows} boşluk kaldı, devam etmek için tekrar basın.",
+      "moreToFetch": "Bu sefer kur kaydedilmedi; getirilecek {windows} boşluk kaldı, devam etmek için tekrar basın.",
+      "noGaps": "Raporlarınızın ihtiyaç duyduğu her tarih {pair} için zaten çevrilebiliyor",
+      "noNewRates": "{pair} için yeni kur kaydedilmedi",
+      "unused": "Hesaplarınızın, varlıklarınızın veya işlemlerinizin hiçbiri {code} kullanmıyor, bu yüzden getirilecek kur yok",
+      "providerFloor": "Sağlayıcıda {pair} için {date} tarihinden önceye ait kur yok",
+      "failed": "Kur geçmişi doldurulamadı"
     }
   }
 }

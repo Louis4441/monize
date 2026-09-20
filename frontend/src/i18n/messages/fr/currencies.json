@@ -118,13 +118,39 @@
     "none": "Aucun historique enregistré pour {pair}",
     "loading": "Vérification de l'historique des taux enregistré...",
     "loadFailed": "Impossible de lire l'historique des taux enregistré",
-    "addYear": "Ajouter une année supplémentaire d'historique des taux",
-    "adding": "Récupération d'une année supplémentaire...",
+    "fillGaps": "Combler les lacunes de l'historique",
+    "filling": "Récupération des taux manquants...",
+    "fillGapsTitle": "Récupère les taux quotidiens qui manquent à vos rapports, depuis la première date où vos données utilisent {code} jusqu'à aujourd'hui.",
     "hint": "Les rapports datés d'avant le premier taux enregistré ne peuvent pas convertir {pair}.",
+    "list": {
+      "heading": "Taux enregistrés",
+      "direction": "Affiché en {to} pour 1 {from}.",
+      "loading": "Chargement des taux enregistrés...",
+      "loadFailed": "Impossible de lire les taux enregistrés",
+      "empty": "Aucun taux enregistré à afficher",
+      "truncated": "Affichage des {count} taux enregistrés les plus récents ; les plus anciens ne sont pas listés.",
+      "inverted": "inversé",
+      "unknownRate": "Inconnu",
+      "columns": {
+        "date": "Date",
+        "rate": "Taux",
+        "source": "Source"
+      },
+      "sources": {
+        "yahooFinance": "Yahoo Finance",
+        "mnyImport": "Import Money",
+        "unknown": "Inconnu"
+      }
+    },
     "toasts": {
-      "added": "{count} taux ajoutés ; l'historique commence désormais le {start}",
-      "noOlder": "Le fournisseur n'a pas de taux plus anciens pour {pair}",
-      "failed": "Impossible d'étendre l'historique des taux"
+      "filled": "{count} taux ajoutés ; l'historique commence désormais le {start}",
+      "partial": "{count} taux enregistrés ; l'historique commence maintenant le {start}. Il reste {windows} lacunes à récupérer, appuyez à nouveau pour continuer.",
+      "moreToFetch": "Aucun taux n'a été enregistré cette fois ; il reste {windows} lacunes à récupérer, appuyez à nouveau pour continuer.",
+      "noGaps": "Toutes les dates dont vos rapports ont besoin peuvent déjà être converties pour {pair}",
+      "noNewRates": "Aucun nouveau taux n'a été enregistré pour {pair}",
+      "unused": "Aucun de vos comptes, titres ou mouvements n'utilise {code}, il n'y a donc aucun taux à récupérer",
+      "providerFloor": "Le fournisseur n'a aucun taux pour {pair} avant le {date}",
+      "failed": "Impossible de combler l'historique des taux"
     }
   }
 }

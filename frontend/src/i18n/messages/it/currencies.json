@@ -118,13 +118,39 @@
     "none": "Nessuno storico memorizzato per {pair}",
     "loading": "Verifica dello storico dei tassi memorizzato...",
     "loadFailed": "Impossibile leggere lo storico dei tassi memorizzato",
-    "addYear": "Aggiungi un altro anno di storico dei tassi",
-    "adding": "Recupero di un altro anno...",
+    "fillGaps": "Colma le lacune dello storico",
+    "filling": "Recupero dei tassi mancanti...",
+    "fillGapsTitle": "Recupera i tassi giornalieri che mancano ai tuoi report, dalla prima data in cui i tuoi dati usano {code} fino a oggi.",
     "hint": "I report con data anteriore al primo tasso memorizzato non possono convertire {pair}.",
+    "list": {
+      "heading": "Tassi memorizzati",
+      "direction": "Mostrato come {to} per 1 {from}.",
+      "loading": "Caricamento dei tassi memorizzati...",
+      "loadFailed": "Impossibile leggere i tassi memorizzati",
+      "empty": "Nessun tasso memorizzato da elencare",
+      "truncated": "Sono mostrati i {count} tassi memorizzati più recenti; i più vecchi non sono elencati.",
+      "inverted": "invertito",
+      "unknownRate": "Sconosciuto",
+      "columns": {
+        "date": "Data",
+        "rate": "Tasso",
+        "source": "Origine"
+      },
+      "sources": {
+        "yahooFinance": "Yahoo Finance",
+        "mnyImport": "Importazione Money",
+        "unknown": "Sconosciuto"
+      }
+    },
     "toasts": {
-      "added": "Aggiunti {count} tassi; lo storico ora inizia il {start}",
-      "noOlder": "Il fornitore non ha tassi più vecchi per {pair}",
-      "failed": "Impossibile estendere lo storico dei tassi"
+      "filled": "Aggiunti {count} tassi; lo storico ora inizia il {start}",
+      "partial": "{count} tassi memorizzati; lo storico ora inizia il {start}. Restano {windows} lacune da recuperare, premi di nuovo per continuare.",
+      "moreToFetch": "Questa volta non è stato memorizzato alcun tasso; restano {windows} lacune da recuperare, premi di nuovo per continuare.",
+      "noGaps": "Tutte le date di cui i tuoi report hanno bisogno sono già convertibili per {pair}",
+      "noNewRates": "Nessun nuovo tasso è stato memorizzato per {pair}",
+      "unused": "Nessuno dei tuoi conti, titoli o movimenti usa {code}, quindi non ci sono tassi da recuperare",
+      "providerFloor": "Il fornitore non ha tassi per {pair} prima del {date}",
+      "failed": "Impossibile colmare lo storico dei tassi"
     }
   }
 }

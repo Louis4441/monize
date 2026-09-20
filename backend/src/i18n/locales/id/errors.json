@@ -263,7 +263,7 @@
     "inUse": "Mata uang \"{{ code }}\" sedang digunakan oleh akun, sekuritas, atau catatan lain Anda. Nonaktifkan saja.",
     "invalidRateDate": "date harus dalam format YYYY-MM-DD",
     "alreadyInListInactive": "Mata uang \"{{ code }}\" sudah ada dalam daftar Anda, tetapi saat ini tidak aktif. Aktifkan kembali untuk menggunakannya.",
-    "sameCurrencyHistory": "{{ code }} adalah mata uang bawaan Anda; tidak ada riwayat kurs untuk diperluas",
+    "sameCurrencyHistory": "{{ code }} adalah mata uang bawaan Anda; tidak ada riwayat kurs untuknya",
     "rateProviderUnavailable": "Penyedia kurs tukar tidak merespons. Silakan coba lagi nanti."
   },
   "delegation": {

@@ -118,13 +118,39 @@
     "none": "Brak zapisanej historii dla {pair}",
     "loading": "Sprawdzanie zapisanej historii kursu...",
     "loadFailed": "Nie udało się odczytać zapisanej historii kursu",
-    "addYear": "Dodaj kolejny rok historii kursu",
-    "adding": "Pobieranie kolejnego roku...",
+    "fillGaps": "Uzupełnij luki w historii kursu",
+    "filling": "Pobieranie brakujących kursów...",
+    "fillGapsTitle": "Pobiera dzienne kursy, których brakuje Twoim raportom, od pierwszej daty, w której Twoje dane używają {code}, po dziś.",
     "hint": "Raporty datowane przed pierwszym zapisanym kursem nie mogą przeliczyć {pair}.",
+    "list": {
+      "heading": "Zapisane kursy",
+      "direction": "Pokazane jako {to} za 1 {from}.",
+      "loading": "Wczytywanie zapisanych kursów...",
+      "loadFailed": "Nie udało się odczytać zapisanych kursów",
+      "empty": "Brak zapisanych kursów do wyświetlenia",
+      "truncated": "Pokazano {count} najnowszych zapisanych kursów; starsze nie są wymienione.",
+      "inverted": "odwrócony",
+      "unknownRate": "Nieznany",
+      "columns": {
+        "date": "Data",
+        "rate": "Kurs",
+        "source": "Źródło"
+      },
+      "sources": {
+        "yahooFinance": "Yahoo Finance",
+        "mnyImport": "Import z Money",
+        "unknown": "Nieznane"
+      }
+    },
     "toasts": {
-      "added": "Dodano {count} kursów; historia zaczyna się teraz od {start}",
-      "noOlder": "Dostawca nie ma starszych kursów dla {pair}",
-      "failed": "Nie udało się rozszerzyć historii kursu"
+      "filled": "Dodano {count} kursów; historia zaczyna się teraz od {start}",
+      "partial": "Zapisano {count} kursów; historia zaczyna się teraz {start}. Pozostało {windows} luk do pobrania, naciśnij ponownie, aby kontynuować.",
+      "moreToFetch": "Tym razem nie zapisano żadnych kursów; pozostało {windows} luk do pobrania, naciśnij ponownie, aby kontynuować.",
+      "noGaps": "Każdą datę potrzebną Twoim raportom można już przeliczyć dla {pair}",
+      "noNewRates": "Nie zapisano nowych kursów dla {pair}",
+      "unused": "Żadne z Twoich kont, walorów ani transakcji nie używa {code}, więc nie ma kursów do pobrania",
+      "providerFloor": "Dostawca nie ma kursów dla {pair} sprzed {date}",
+      "failed": "Nie udało się uzupełnić historii kursu"
     }
   }
 }

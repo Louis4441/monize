@@ -263,7 +263,7 @@
     "inUse": "Tiền tệ \"{{ code }}\" đang được sử dụng bởi tài khoản, chứng khoán hoặc hồ sơ khác của bạn. Hãy hủy kích hoạt thay thế.",
     "invalidRateDate": "date phải theo định dạng YYYY-MM-DD",
     "alreadyInListInactive": "Tiền tệ \"{{ code }}\" đã có trong danh sách của bạn nhưng hiện đang không hoạt động. Kích hoạt lại để sử dụng.",
-    "sameCurrencyHistory": "{{ code }} là tiền tệ mặc định của bạn; không có lịch sử tỷ giá nào để mở rộng",
+    "sameCurrencyHistory": "{{ code }} là tiền tệ mặc định của bạn; không có lịch sử tỷ giá cho nó",
     "rateProviderUnavailable": "Nhà cung cấp tỷ giá hối đoái không phản hồi. Vui lòng thử lại sau."
   },
   "delegation": {

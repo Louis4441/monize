@@ -118,13 +118,39 @@
     "none": "沒有 {pair} 的已儲存歷史",
     "loading": "正在檢查已儲存的匯率歷史...",
     "loadFailed": "無法讀取已儲存的匯率歷史",
-    "addYear": "再新增一年匯率歷史",
-    "adding": "正在取得另一年資料...",
+    "fillGaps": "補齊匯率歷史的缺口",
+    "filling": "正在取得缺少的匯率...",
+    "fillGapsTitle": "取得報表中缺少的每日匯率，從您的資料首次使用 {code} 的日期起至今天。",
     "hint": "日期早於最早儲存匯率的報告，無法換算 {pair}。",
+    "list": {
+      "heading": "已儲存匯率",
+      "direction": "以每 1 {from} 兌 {to} 顯示。",
+      "loading": "正在載入已儲存匯率...",
+      "loadFailed": "無法讀取已儲存匯率",
+      "empty": "沒有可列出的已儲存匯率",
+      "truncated": "僅顯示最近 {count} 筆已儲存匯率；更早的未列出。",
+      "inverted": "反向換算",
+      "unknownRate": "未知",
+      "columns": {
+        "date": "日期",
+        "rate": "匯率",
+        "source": "來源"
+      },
+      "sources": {
+        "yahooFinance": "Yahoo Finance",
+        "mnyImport": "Money 匯入",
+        "unknown": "未知"
+      }
+    },
     "toasts": {
-      "added": "已新增 {count} 筆匯率；歷史現在從 {start} 開始",
-      "noOlder": "該資料來源沒有 {pair} 更早的匯率",
-      "failed": "無法擴充匯率歷史"
+      "filled": "已新增 {count} 筆匯率；歷史現在從 {start} 開始",
+      "partial": "已儲存 {count} 筆匯率；歷史現在從 {start} 開始。還有 {windows} 個缺口待取得，再按一次以繼續。",
+      "moreToFetch": "本次未儲存任何匯率；還有 {windows} 個缺口待取得，再按一次以繼續。",
+      "noGaps": "{pair} 已能換算您的報表所需的每一個日期",
+      "noNewRates": "未為 {pair} 儲存任何新匯率",
+      "unused": "您的帳戶、持股與交易都沒有使用 {code}，因此沒有可取得的匯率",
+      "providerFloor": "資料提供者沒有 {date} 之前的 {pair} 匯率",
+      "failed": "無法補齊匯率歷史"
     }
   }
 }
