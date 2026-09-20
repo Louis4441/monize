@@ -1,5 +1,6 @@
 import {
   GAP_WINDOW_MAX_DAYS,
+  MAX_GAP_WINDOWS,
   planRateGapWindows,
   type RateGapWindow,
 } from "./rate-gap-plan";
@@ -113,11 +114,7 @@ describe("planRateGapWindows", () => {
     it("plans nothing for a span that ends before it starts", () => {
       const plan = planRateGapWindows([], "2026-02-01", "2026-01-01");
 
-      expect(plan).toEqual({
-        windows: [],
-        unresolvableDays: 0,
-        remainingWindows: 0,
-      });
+      expect(plan).toEqual({ windows: [], unresolvableDays: 0 });
     });
   });
 
@@ -139,7 +136,7 @@ describe("planRateGapWindows", () => {
     });
 
     it("splits a multi-year gap into windows the provider still answers daily", () => {
-      const plan = planRateGapWindows([], "2020-01-01", "2022-06-30", 45, 99);
+      const plan = planRateGapWindows([], "2020-01-01", "2022-06-30");
 
       expect(plan.windows).toHaveLength(3);
       for (const window of plan.windows) {
@@ -163,30 +160,17 @@ describe("planRateGapWindows", () => {
     });
   });
 
-  describe("the bound on one request", () => {
-    it("keeps the oldest windows and reports the rest as remaining", () => {
-      const uncapped = planRateGapWindows(
-        [],
-        "2010-01-01",
-        "2020-01-01",
-        45,
-        999,
-      );
-      const capped = planRateGapWindows([], "2010-01-01", "2020-01-01", 45, 3);
+  describe("what it leaves to the caller", () => {
+    it("plans every window the span needs, so the caller can budget them", () => {
+      // The cap is not applied here on purpose: a pair whose provider history
+      // starts years after the reader's data does plans a run of windows that
+      // can never be filled, and capping the plan would let those consume the
+      // budget while the fillable ones are never reached.
+      const plan = planRateGapWindows([], "2010-01-01", "2020-01-01");
 
-      expect(uncapped.windows.length).toBeGreaterThan(3);
-      expect(capped.windows).toEqual(uncapped.windows.slice(0, 3));
-      expect(capped.remainingWindows).toBe(uncapped.windows.length - 3);
-      // The count of what is missing describes the history, not the cap, so it
-      // does not shrink when fewer windows are fetched.
-      expect(capped.unresolvableDays).toBe(uncapped.unresolvableDays);
-    });
-
-    it("plans no window at all when the cap is zero", () => {
-      const plan = planRateGapWindows([], "2026-01-01", "2026-01-31", 45, 0);
-
-      expect(plan.windows).toEqual([]);
-      expect(plan.remainingWindows).toBe(1);
+      expect(plan.windows.length).toBeGreaterThan(MAX_GAP_WINDOWS);
+      expect(plan.windows[0].start).toBe("2009-12-18");
+      expect(plan.windows[plan.windows.length - 1].end).toBe("2020-01-01");
     });
   });
 });

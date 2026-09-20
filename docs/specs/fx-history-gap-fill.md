@@ -48,11 +48,17 @@ Never a date merely lacking a row of its own.
 
 **Gap.** A maximal run of consecutive unresolvable dates.
 
-**Span.** `[firstUse, today]`, where `firstUse` is the earliest date the
-currency appears in the caller's data (section 4).
+**Span.** `[spanStart, today]`, where `spanStart` is the day after the provider
+floor when one is recorded for this pair, and otherwise `firstUse`, the
+earliest date the currency appears in the caller's data (section 4).
 
 **Window.** One provider request: a contiguous date range of at most
 `GAP_WINDOW_MAX_DAYS` (365).
+
+**Provider floor.** The latest date the provider has been found to have no
+rate for a pair. Recorded on `currencies` as `provider_missing_through`, with
+`provider_missing_against` naming the other side of the pair it was
+established against.
 
 ## 3. Invariants
 
@@ -116,6 +122,26 @@ A non-positive stored rate is not an observation. `resolveFxRate` discards it,
 so the gap planner must discard it too: counting it would leave the 45 days
 after it looking answerable while every report over them still refuses to
 convert.
+
+### The provider's floor bounds the span from below
+
+A provider's history starts where it starts and nothing the reader does moves
+it: Yahoo carries no `USDCAD=X` before December 2003, against a ledger that may
+open in 1996. Those seven years are not a gap anybody can fill, so the span
+opens the day after the recorded floor rather than at `firstUse`.
+
+The floor is **a property of the pair, not of the currency**: Yahoo's history
+for USD/CAD and for USD/PLN begins on different days. It is stored on
+`currencies` alongside the counter-currency it was established against, and is
+honoured only when that matches the reader's own reporting currency. A
+deployment whose readers report in different currencies therefore gives the
+hint to the first pair that wrote it and no hint at all to the others, which
+costs a re-discovery rather than hiding anybody's history. Moving the floor to
+its own per-pair table is the cleaner shape and is deliberately left for the
+day a second reporting currency makes it matter.
+
+The floor only ever moves forward, and a write never overwrites one another
+pair established.
 
 The query runs under the caller's identity through `withScopedDb`: accounts,
 transactions, securities and investment transactions are per-user tables, while
@@ -225,12 +251,20 @@ route keeps the 6-per-minute throttle its predecessor had.
 |---|---|---|
 | `GAP_WINDOW_MAX_DAYS` | 365 | a wider request returns monthly bars, and `persistRateSeries` has no daily-spacing guard |
 | `MAX_GAP_WINDOWS` | 8 | one press is a bounded number of provider calls |
+| | | applied **after** dropping windows already known empty, never by the planner |
 | `GAP_FILL_BUDGET_MS` | 20000 | a person is waiting on the request |
 | `STORED_RATE_ROW_CAP` | 2000 | the listing is a scrollable dialog, not an export |
 
 What a bound leaves out is reported (`windowsRemaining`, `truncated`), never
 silently dropped. Pressing the button again continues from where the last press
 stopped, because the plan is recomputed from what is stored.
+
+**A window the provider has already answered with nothing must not consume the
+budget.** It cannot be filled by asking again, so counting it against the cap
+lets a pair whose history starts long after the reader's data does spend every
+press skipping the same dead years, fetching nothing and never reaching the
+windows that would answer. The planner therefore plans the whole span and the
+service drops the known-empty windows before taking its `MAX_GAP_WINDOWS`.
 
 A twenty-six-year gap is therefore roughly twenty-six windows, or four presses.
 That is the accepted cost of daily bars.
@@ -261,6 +295,10 @@ saving is not worth the rows.
 | an account with no postings still dates a use, from its creation date | `exchange-rate-history.service.spec.ts` | unit |
 | an unanswered window is reported as still to do | `exchange-rate-history.service.spec.ts` | unit |
 | two callers sharing a reporting currency get their own summaries | `exchange-rate-history.service.spec.ts` | unit |
+| a known-empty window costs no place in the budget, so the next press reaches new ones | `exchange-rate-history.service.spec.ts` | unit |
+| the floor names the end of the dead run, not of its first window | `exchange-rate-history.service.spec.ts` | unit |
+| the span opens at a recorded floor rather than at first use | `exchange-rate-history.service.spec.ts` | unit |
+| the floor is read and written per pair, and only ever moves forward | `exchange-rate-history.service.spec.ts` | unit |
 | an unused currency makes no provider call | `exchange-rate-history.service.spec.ts` | unit |
 | the same-currency case refuses before any query | `exchange-rate-history.service.spec.ts` | unit |
 | no answer and nothing stored is a 503 | `exchange-rate-history.service.spec.ts` | unit |
@@ -286,3 +324,5 @@ saving is not worth the rows.
 | 5 | Is the whole span filled in one press? | No. A bounded number of windows, with the remainder reported. |
 | 6 | Where does the list render? | The dedicated rate history dialog only, not the currency edit form. |
 | 7 | Which row wins when a date is held in both orientations? | The canonical one, matching the pending contract migration. |
+| 8 | Where is the provider's floor remembered? | On `currencies`, with the counter-currency it was established against. Process memory alone lost it on every restart. |
+| 9 | Does a known-empty window count against the budget? | No. It cannot be filled, so it would starve the windows that can. |

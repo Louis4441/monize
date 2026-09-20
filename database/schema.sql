@@ -61,7 +61,15 @@ CREATE TABLE currencies (
     decimal_places SMALLINT DEFAULT 2,
     is_active BOOLEAN DEFAULT true,
     created_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL, -- NULL = system currency
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- The latest date a rate provider was found to have no rate for, and the
+    -- other side of the pair that was checked. A provider's history starts
+    -- where it starts (Yahoo carries no USD/CAD before December 2003), and the
+    -- gap fill would otherwise re-discover that one call per dead year after
+    -- every restart. Honoured only when `provider_missing_against` matches the
+    -- reader's own reporting currency: the floor belongs to the pair.
+    provider_missing_through DATE,
+    provider_missing_against VARCHAR(3)
 );
 
 -- Per-user currency preferences (visibility + is_active)

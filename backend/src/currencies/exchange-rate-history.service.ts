@@ -19,9 +19,15 @@ import {
 } from "./exchange-rate.service";
 import {
   GAP_FILL_BUDGET_MS,
+  MAX_GAP_WINDOWS,
   planRateGapWindows,
   type RateGapWindow,
 } from "./rate-gap-plan";
+
+/** How a window is named in the empty-window memory. */
+function windowKey(window: RateGapWindow): string {
+  return `${window.start}..${window.end}`;
+}
 
 /**
  * What the database already holds for one currency pair, in days.
@@ -82,10 +88,14 @@ export interface StoredRateList {
  *
  * `usedFrom` is the first date the currency appears in the caller's own data
  * and `null` when it appears nowhere, which is the one case that fetches
- * nothing at all. The window counts add up: `windowsPlanned` is
- * `windowsFetched` plus `windowsSkipped` plus `windowsRemaining`, where skipped
- * means the provider already answered that window with nothing and remaining
- * means the per-request bound stopped before it.
+ * nothing at all.
+ *
+ * `windowsPlanned` is every window the span needs, not just the ones this
+ * request could reach. `windowsSkipped` are those the provider has already
+ * answered with nothing, which cost no call and are not work left to do.
+ * `windowsFetched` were asked for, and the `windowsUnanswered` among them are
+ * counted again in `windowsRemaining`, together with the windows a bound never
+ * reached.
  */
 export interface RateGapFill {
   from: string;
@@ -106,9 +116,12 @@ export interface RateGapFill {
   /** The pair's new coverage lower bound. */
   earliestDate: string | null;
   /**
-   * The provider answered the oldest window with no rates, so it carries
-   * nothing before this date. A statement about the provider's history, not
-   * about a failure: asking again will not change it.
+   * The earliest date the provider could carry a rate for this pair: the day
+   * after the latest date it has been found to have none for, whether this
+   * request established that or a previous one did. A statement about the
+   * provider's history, not about a failure: asking again will not change it,
+   * which is why it is written to `currencies` rather than learned again on
+   * every press.
    */
   providerHasNothingBefore: string | null;
 }
@@ -400,6 +413,60 @@ export class ExchangeRateHistoryService {
   }
 
   /**
+   * The latest date the provider has been found to have no rate for this pair,
+   * or `null` while nothing has established one.
+   *
+   * Read only for the pair it was established against. The floor belongs to
+   * the pair -- Yahoo's history for USD/CAD and for USD/PLN begins on
+   * different days -- so a reader whose reporting currency differs from the
+   * one that wrote it gets no hint rather than somebody else's.
+   */
+  private async readProviderFloor(
+    from: string,
+    to: string,
+  ): Promise<string | null> {
+    const rows: Array<{ missing_through: string | null }> = await withScopedDb(
+      this.dataSource,
+      (manager) =>
+        manager.query(
+          `SELECT TO_CHAR(provider_missing_through, 'YYYY-MM-DD') AS missing_through
+             FROM currencies
+            WHERE code = $1
+              AND provider_missing_against = $2`,
+          [from, to],
+        ),
+    );
+    return rows[0]?.missing_through ?? null;
+  }
+
+  /**
+   * Record that the provider carries nothing for this pair through `through`.
+   *
+   * Only ever moves forward, and only where the column is free or already
+   * describes this same pair: a deployment whose readers report in different
+   * currencies must not have one reader's floor overwrite another's, and a
+   * floor that moved backwards would re-plan years already refused.
+   */
+  private async rememberProviderFloor(
+    from: string,
+    to: string,
+    through: string,
+  ): Promise<void> {
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        `UPDATE currencies
+            SET provider_missing_through = $3::DATE,
+                provider_missing_against = $2
+          WHERE code = $1
+            AND (provider_missing_against IS NULL OR provider_missing_against = $2)
+            AND (provider_missing_through IS NULL
+                 OR provider_missing_through < $3::DATE)`,
+        [from, to, through],
+      ),
+    );
+  }
+
+  /**
    * Fetch and store the rates the caller's reports are short of, for one pair.
    *
    * The span is the first date the currency is used through today, and the work
@@ -456,28 +523,55 @@ export class ExchangeRateHistoryService {
     if (!usedFrom) return nothingToDo();
     if (usedFrom > spanEnd) return nothingToDo();
 
+    // The span opens where the provider's history could start, not where the
+    // reader's data does. A pair the provider carries nothing for before 2003
+    // would otherwise re-plan every year back to 1996 on every press, and pay
+    // a call per dead year to learn again what is already written down.
+    const floor = await this.readProviderFloor(from, to);
+    const spanStart =
+      floor && floor >= usedFrom ? addDaysYMD(floor, 1) : usedFrom;
+    if (spanStart > spanEnd) {
+      return nothingToDo({
+        providerHasNothingBefore: this.floorReport(floor, spanEnd),
+      });
+    }
+
     const stored = await this.storedDatesFrom(
       from,
       to,
-      addDaysYMD(usedFrom, -FX_MAX_RATE_AGE_DAYS),
+      addDaysYMD(spanStart, -FX_MAX_RATE_AGE_DAYS),
       spanEnd,
     );
-    const plan = planRateGapWindows(stored, usedFrom, spanEnd);
+    const plan = planRateGapWindows(stored, spanStart, spanEnd);
     if (plan.windows.length === 0) {
       return nothingToDo({
         unresolvableDays: plan.unresolvableDays,
-        windowsRemaining: plan.remainingWindows,
+        providerHasNothingBefore: this.floorReport(floor, spanEnd),
       });
     }
+
+    // The budget is spent on windows that might actually answer. A window the
+    // provider has already said it has nothing for cannot be filled by asking
+    // again, so counting it against the cap would let a pair whose history
+    // starts long after the reader's data does consume every press on the same
+    // dead years and fetch nothing at all.
+    const key = directionlessPairKey(from, to);
+    const live = plan.windows.filter(
+      (window) => !this.emptyWindows.has(key, windowKey(window)),
+    );
+    const skipped = plan.windows.length - live.length;
+    const due = live.slice(0, MAX_GAP_WINDOWS);
 
     // `exchange_rates` is shared reference data (it is RLS-exempt for that
     // reason), so the user id goes in the log line rather than in the row.
     this.logger.log(
-      `User ${userId} filling ${plan.windows.length} ${from}->${to} rate gap window(s) ` +
-        `over ${usedFrom} to ${spanEnd} (${plan.unresolvableDays} unanswerable days)`,
+      `User ${userId} filling ${due.length} of ${plan.windows.length} ${from}->${to} ` +
+        `rate gap window(s) over ${spanStart} to ${spanEnd} ` +
+        `(${plan.unresolvableDays} unanswerable days, ${skipped} known empty` +
+        `${floor ? `, provider carries nothing through ${floor}` : ""})`,
     );
 
-    const outcome = await this.fetchWindows(from, to, plan.windows);
+    const outcome = await this.fetchWindows(from, to, due);
 
     if (
       outcome.fetched > 0 &&
@@ -502,31 +596,79 @@ export class ExchangeRateHistoryService {
     const after =
       outcome.stored > 0 ? await this.readCoverage(from, to) : before;
 
+    // What this request established about where the provider's history starts,
+    // read after the fetch so the windows it just found empty count alongside
+    // the ones it skipped. Written down, so the next press opens its span here
+    // instead of paying a call per dead year to learn it again.
+    const runEnd = this.knownEmptyRunEnd(key, plan.windows);
+    const missingThrough =
+      runEnd && (!floor || runEnd > floor) ? runEnd : floor;
+    if (missingThrough && missingThrough !== floor) {
+      await this.rememberProviderFloor(from, to, missingThrough);
+    }
+
     return {
       from,
       to,
       usedFrom,
       spanEnd,
       unresolvableDays: plan.unresolvableDays,
-      windowsPlanned: plan.windows.length + plan.remainingWindows,
+      windowsPlanned: plan.windows.length,
       windowsFetched: outcome.fetched,
-      windowsSkipped: outcome.skipped,
+      windowsSkipped: skipped,
       windowsUnanswered: outcome.unanswered,
       // A window the provider did not answer is still to do, exactly like one
       // the bound never reached: the reader is told to press again rather than
-      // being shown a total that silently dropped it.
-      windowsRemaining:
-        plan.remainingWindows +
-        (plan.windows.length - outcome.attempted) +
-        outcome.unanswered,
+      // being shown a total that silently dropped it. A skipped window is not
+      // work left over -- asking again cannot fill it.
+      windowsRemaining: live.length - outcome.attempted + outcome.unanswered,
       stored: outcome.stored,
       earliestDate: after.earliestDate,
-      providerHasNothingBefore: outcome.providerHasNothingBefore,
+      providerHasNothingBefore: this.floorReport(missingThrough, spanEnd),
     };
   }
 
   /**
+   * The reported form of a floor: the day after the latest date the provider
+   * has no rate for, never past the end of the span, so a pair with nothing at
+   * all names a date the market has reached.
+   */
+  private floorReport(
+    missingThrough: string | null,
+    spanEnd: string,
+  ): string | null {
+    if (!missingThrough) return null;
+    const before = addDaysYMD(missingThrough, 1);
+    return before > spanEnd ? spanEnd : before;
+  }
+
+  /**
+   * The end of the leading run of windows the provider has answered with
+   * nothing, or `null` when the oldest window is not one of them.
+   *
+   * Taken from the empty-window memory rather than from one request's own
+   * results, so a press that skipped those windows establishes the same date
+   * as the press that discovered them, and so a run of seven dead years names
+   * the end of the seventh rather than of the first.
+   */
+  private knownEmptyRunEnd(
+    key: string,
+    windows: readonly RateGapWindow[],
+  ): string | null {
+    let lastEmptyEnd: string | null = null;
+    for (const window of windows) {
+      if (!this.emptyWindows.has(key, windowKey(window))) break;
+      lastEmptyEnd = window.end;
+    }
+    return lastEmptyEnd;
+  }
+
+  /**
    * Ask the provider for each window in turn, stopping at the time budget.
+   *
+   * Every window handed here is one the provider has not already answered with
+   * nothing: the caller drops those before the budget is applied, so a dead
+   * stretch of history costs no call and no place in the cap.
    *
    * Sequential on purpose, for two recorded reasons. A burst of windows fired
    * from inside one HTTP request is what rate-limits everybody
@@ -541,37 +683,20 @@ export class ExchangeRateHistoryService {
   ): Promise<{
     attempted: number;
     fetched: number;
-    skipped: number;
     unanswered: number;
     stored: number;
-    providerHasNothingBefore: string | null;
   }> {
     const key = directionlessPairKey(from, to);
     const deadline = Date.now() + GAP_FILL_BUDGET_MS;
 
     let attempted = 0;
     let fetched = 0;
-    let skipped = 0;
     let unanswered = 0;
     let stored = 0;
-    let providerHasNothingBefore: string | null = null;
 
-    for (const [index, window] of windows.entries()) {
+    for (const window of windows) {
       if (Date.now() >= deadline) break;
       attempted++;
-
-      const subject = `${window.start}..${window.end}`;
-      if (this.emptyWindows.has(key, subject)) {
-        skipped++;
-        // Known empty because the provider said so, so the reader is told the
-        // same thing this run as last run: a second press that reported
-        // nothing would read as a failure rather than as a history that
-        // starts where it starts.
-        if (index === 0) {
-          providerHasNothingBefore = addDaysYMD(window.end, 1);
-        }
-        continue;
-      }
 
       const result = await this.exchangeRateService.fillRateWindow(
         from,
@@ -587,26 +712,17 @@ export class ExchangeRateHistoryService {
         continue;
       }
       if (result.stored === 0) {
-        // The provider answered and had nothing here. Remember it so pressing
-        // the button again does not re-ask, and where this is the oldest
-        // window, say so: a pair's history starts where it starts.
-        this.emptyWindows.remember(key, subject);
+        // The provider answered and had nothing here. Remember it, so neither
+        // this pair's next press nor its own plan spends a call on the window
+        // again; `knownEmptyFloor` reads the same memory to say where the
+        // history starts.
+        this.emptyWindows.remember(key, windowKey(window));
         this.logger.warn(
           `No rates available for ${from}/${to} over ${window.start} to ${window.end}`,
         );
-        if (index === 0) {
-          providerHasNothingBefore = addDaysYMD(window.end, 1);
-        }
       }
     }
 
-    return {
-      attempted,
-      fetched,
-      skipped,
-      unanswered,
-      stored,
-      providerHasNothingBefore,
-    };
+    return { attempted, fetched, unanswered, stored };
   }
 }

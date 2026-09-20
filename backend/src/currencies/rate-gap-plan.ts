@@ -24,13 +24,21 @@ import { FX_MAX_RATE_AGE_DAYS } from "../common/time-series/fx-rate-resolver";
  */
 
 /**
- * Windows fetched in one request.
+ * Windows *fetched* in one request.
  *
  * Each is one outbound provider call (two, when the direct symbol answers
  * nothing and the reverse is tried), so the cap is what keeps a press of a
  * button bounded. What it leaves out is reported rather than dropped: the plan
  * is recomputed from what is stored, so pressing again continues where this
  * one stopped.
+ *
+ * The planner does not apply it, and must not. A pair whose provider history
+ * starts years after the reader's own data does -- `USDCAD=X` carries nothing
+ * before December 2003, against a ledger opening in 1996 -- plans a run of
+ * windows that can never be filled. Capping the plan puts those inside the
+ * budget, so the second press spends itself skipping the same dead years and
+ * fetches nothing at all. The caller drops what it already knows is empty and
+ * then takes this many.
  */
 export const MAX_GAP_WINDOWS = 8;
 
@@ -62,12 +70,14 @@ export interface RateGapWindow {
 }
 
 export interface RateGapPlan {
-  /** Oldest first, each at most `GAP_WINDOW_MAX_DAYS` long, capped. */
+  /**
+   * Every window the span needs, oldest first, each at most
+   * `GAP_WINDOW_MAX_DAYS` long. Budgeting belongs to the caller, which knows
+   * which of these the provider has already answered with nothing.
+   */
   readonly windows: RateGapWindow[];
   /** Calendar days in the span no stored observation can answer. */
   readonly unresolvableDays: number;
-  /** Windows the cap left out. Pressing again plans them. */
-  readonly remainingWindows: number;
 }
 
 /** Inclusive day count, so a single-day range is 1. */
@@ -153,10 +163,9 @@ export function planRateGapWindows(
   spanStart: string,
   spanEnd: string,
   maxAgeDays: number = FX_MAX_RATE_AGE_DAYS,
-  maxWindows: number = MAX_GAP_WINDOWS,
 ): RateGapPlan {
   if (spanStart > spanEnd) {
-    return { windows: [], unresolvableDays: 0, remainingWindows: 0 };
+    return { windows: [], unresolvableDays: 0 };
   }
 
   const runs = unresolvableRuns(storedDates, spanStart, spanEnd, maxAgeDays);
@@ -165,7 +174,7 @@ export function planRateGapWindows(
     0,
   );
 
-  const planned = runs.flatMap((run) =>
+  const windows = runs.flatMap((run) =>
     // Lead so the run's first day has an observation to carry forward from
     // even where the provider's first bar of the window lands late. The end is
     // never extended: a window running past `spanEnd` would ask for dates the
@@ -176,10 +185,5 @@ export function planRateGapWindows(
     }),
   );
 
-  const kept = maxWindows > 0 ? planned.slice(0, maxWindows) : [];
-  return {
-    windows: kept,
-    unresolvableDays,
-    remainingWindows: planned.length - kept.length,
-  };
+  return { windows, unresolvableDays };
 }

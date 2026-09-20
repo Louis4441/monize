@@ -31,6 +31,8 @@ describe("CurrenciesService", () => {
     decimalPlaces: 2,
     isActive: true,
     createdByUserId: null,
+    providerMissingThrough: null,
+    providerMissingAgainst: null,
     createdAt: new Date(),
   };
 

@@ -8,6 +8,7 @@ import {
   ExchangeRateHistoryService,
   STORED_RATE_ROW_CAP,
 } from "./exchange-rate-history.service";
+import { MAX_GAP_WINDOWS } from "./rate-gap-plan";
 import { ExchangeRateService } from "./exchange-rate.service";
 import { roundFxRate } from "../common/fx-entry.util";
 import { UserPreference } from "../users/entities/user-preference.entity";
@@ -55,6 +56,8 @@ describe("ExchangeRateHistoryService", () => {
     coverage?: CoverageRow | CoverageRow[];
     storedDates?: string[];
     listing?: StoredRow[];
+    /** What `currencies` already records for this pair, if anything. */
+    providerFloor?: string | null;
   }) => {
     let coverageCall = 0;
     manager.query.mockImplementation((sql: string) => {
@@ -80,6 +83,14 @@ describe("ExchangeRateHistoryService", () => {
       if (sql.includes("ARRAY_AGG")) {
         return Promise.resolve(answers.listing ?? []);
       }
+      if (sql.includes("provider_missing_through")) {
+        // The read returns the stored floor; the write returns nothing.
+        return Promise.resolve(
+          sql.includes("UPDATE currencies")
+            ? []
+            : [{ missing_through: answers.providerFloor ?? null }],
+        );
+      }
       throw new Error(`unexpected query: ${sql}`);
     });
   };
@@ -95,6 +106,12 @@ describe("ExchangeRateHistoryService", () => {
       return Promise.resolve(outcome);
     });
   };
+
+  /** Every `UPDATE currencies` the fill issued, as `[sql, params]`. */
+  const floorWrites = () =>
+    manager.query.mock.calls.filter(([sql]: [string]) =>
+      sql.includes("UPDATE currencies"),
+    );
 
   /** The `[from, to, start, end]` of every provider window asked for. */
   const windowsAsked = () =>
@@ -393,8 +410,10 @@ describe("ExchangeRateHistoryService", () => {
 
       expect(result.stored).toBe(0);
       // The oldest window came back empty, so the pair's history starts after
-      // it. Not a failure, and asking again will not change it.
-      expect(result.providerHasNothingBefore).toBe("2026-09-18");
+      // it. Not a failure, and asking again will not change it. The whole span
+      // being empty names its end rather than a date the market has not
+      // reached.
+      expect(result.providerHasNothingBefore).toBe("2026-09-17");
     });
 
     it("does not re-ask for a window the provider already answered with nothing", async () => {
@@ -407,9 +426,61 @@ describe("ExchangeRateHistoryService", () => {
       expect(exchangeRateService.fillRateWindow).toHaveBeenCalledTimes(1);
       expect(second.windowsSkipped).toBe(1);
       expect(second.windowsFetched).toBe(0);
+      // A window nothing can fill is not work left over, so pressing again is
+      // not offered as though it would help.
+      expect(second.windowsRemaining).toBe(0);
       // Still says where the provider's history starts: the second press knows
-      // exactly what the first one learned.
-      expect(second.providerHasNothingBefore).toBe("2026-09-18");
+      // exactly what the first one learned. Every window being empty names the
+      // end of the span rather than a date the market has not reached.
+      expect(second.providerHasNothingBefore).toBe("2026-09-17");
+    });
+
+    it("does not let a window it already knows is empty consume the budget", async () => {
+      // The defect this covers: a pair whose provider history starts long
+      // after the reader's data does plans a run of windows that can never be
+      // filled. With the cap applied before those were dropped, the second
+      // press spent itself skipping them and fetched nothing at all, so the
+      // fill could never get past the dead years.
+      providerAnswers({ stored: 0, answered: true });
+      rowsFor({ firstUse: "2010-01-01" });
+
+      const first = await service.fillRateGaps("user-1", "EUR");
+      const second = await service.fillRateGaps("user-1", "EUR");
+
+      expect(first.windowsFetched).toBe(MAX_GAP_WINDOWS);
+      expect(first.windowsSkipped).toBe(0);
+      // The second press skips every window the first one found empty, for
+      // free, and spends its whole budget on windows never tried.
+      expect(second.windowsSkipped).toBe(MAX_GAP_WINDOWS);
+      expect(second.windowsFetched).toBe(MAX_GAP_WINDOWS);
+      expect(windowsAsked().slice(MAX_GAP_WINDOWS)).not.toEqual(
+        windowsAsked().slice(0, MAX_GAP_WINDOWS),
+      );
+      expect(exchangeRateService.fillRateWindow).toHaveBeenCalledTimes(
+        MAX_GAP_WINDOWS * 2,
+      );
+    });
+
+    it("names the end of the dead run as the provider's floor, not the first window", async () => {
+      // Seven empty years followed by data is the real shape of USD/CAD, whose
+      // Yahoo history starts in December 2003. Reporting the first window's end
+      // would name a date six years too early.
+      providerAnswers(
+        { stored: 0, answered: true },
+        { stored: 0, answered: true },
+        { stored: 120, answered: true },
+      );
+      rowsFor({ firstUse: "2023-01-01" });
+
+      const result = await service.fillRateGaps("user-1", "EUR");
+
+      const asked = windowsAsked();
+      expect(result.providerHasNothingBefore).toBe(
+        // The day after the second window, which is the last empty one.
+        "2024-12-17",
+      );
+      expect(asked[1][1]).toBe("2024-12-16");
+      expect(result.stored).toBeGreaterThan(0);
     });
 
     it("raises a 503 when the provider did not answer at all", async () => {
@@ -508,6 +579,70 @@ describe("ExchangeRateHistoryService", () => {
 
       expect(exchangeRateService.fillRateWindow).toHaveBeenCalledTimes(1);
       expect(a).toBe(b);
+    });
+
+    it("opens the span where the provider's history starts, not where the data does", async () => {
+      // The whole point of writing the floor down: a ledger opening in 1996
+      // against a pair the provider carries nothing for before 2003 must not
+      // re-plan those seven years, nor pay a call per dead year to re-learn
+      // what is already recorded.
+      rowsFor({ firstUse: "1996-09-16", providerFloor: "2003-08-31" });
+
+      await service.fillRateGaps("user-1", "EUR");
+
+      const asked = windowsAsked();
+      expect(asked[0][0]).toBe("2003-08-18");
+      for (const [start] of asked) {
+        expect(start >= "2003-08-18").toBe(true);
+      }
+    });
+
+    it("reads the floor only for the pair it was established against", async () => {
+      rowsFor({ firstUse: "2026-01-01", providerFloor: "2003-08-31" });
+
+      await service.fillRateGaps("user-1", "EUR");
+
+      const read = manager.query.mock.calls.find(
+        ([sql]: [string]) =>
+          sql.includes("provider_missing_through") &&
+          !sql.includes("UPDATE currencies"),
+      );
+      // The floor belongs to the pair: Yahoo's history for USD/CAD and for
+      // USD/PLN begins on different days.
+      expect(read[0]).toContain("provider_missing_against = $2");
+      expect(read[1]).toEqual(["EUR", "PLN"]);
+    });
+
+    it("writes down the floor it establishes, and only moves it forward", async () => {
+      providerAnswers(
+        { stored: 0, answered: true },
+        { stored: 0, answered: true },
+        { stored: 120, answered: true },
+      );
+      rowsFor({ firstUse: "2023-01-01" });
+
+      await service.fillRateGaps("user-1", "EUR");
+
+      const writes = floorWrites();
+      expect(writes).toHaveLength(1);
+      // The end of the dead run, not of its first window.
+      expect(writes[0][1]).toEqual(["EUR", "PLN", "2024-12-16"]);
+      // Never backwards, and never over a floor another pair established.
+      expect(writes[0][0]).toContain("provider_missing_through < $3::DATE");
+      expect(writes[0][0]).toContain(
+        "provider_missing_against IS NULL OR provider_missing_against = $2",
+      );
+    });
+
+    it("does not rewrite a floor it already agrees with", async () => {
+      providerAnswers({ stored: 240, answered: true });
+      rowsFor({ firstUse: "1996-09-16", providerFloor: "2003-08-31" });
+
+      const result = await service.fillRateGaps("user-1", "EUR");
+
+      expect(floorWrites()).toHaveLength(0);
+      // Still told, so the reader learns why the history starts where it does.
+      expect(result.providerHasNothingBefore).toBe("2003-09-01");
     });
 
     it("does not hand one caller's summary to another", async () => {

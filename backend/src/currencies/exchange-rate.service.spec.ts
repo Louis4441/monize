@@ -70,6 +70,8 @@ describe("ExchangeRateService", () => {
     decimalPlaces: 2,
     isActive: true,
     createdByUserId: null,
+    providerMissingThrough: null,
+    providerMissingAgainst: null,
     createdAt: new Date("2025-01-01"),
   };
 
