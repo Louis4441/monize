@@ -10,6 +10,14 @@ Cron jobs use `@Cron()` from `@nestjs/schedule` and run **in the API process** (
 
 Every `@Cron` handler is an out-of-request entry point, so its body must seed its own RLS context (tasks C2-C4): the cross-user fan-out under `withSystemContext`, each per-user body under `withUserContext(userId)`. A handler that reaches the DB with no ambient context throws in every `RLS_MODE`, including `off` -- the per-module `rls-context-smoke.spec.ts` specs are the pattern for proving a cron runs clean.
 
+## The wrapper goes around the lease, not only around its body
+
+`FetchSyncService.withLease` (`src/common/jobs/fetch-sync.service.ts`) is database access in its own right: `claim`, `markSuccess`, `markFailure` and `release` each open a `withScopedDb` transaction against `fetch_sync`, and that table belongs to no user, so the identity they need is the system one. A call site that seeds `withSystemContext` around only the *leased body* therefore leaves the claim with no ambient context at all, and `withScopedDb` refuses it before the body ever runs -- "DB access outside request/user/system context", every pass, with nothing done.
+
+`AttachmentStorageMigrator.relocateAll` (`src/attachments/storage/attachment-storage-migrator.service.ts`) had exactly that shape. Its per-batch scan seeded `withSystemContext` and its per-row work seeded `withUserContext`, both correctly, but the `withLease` call around them did not -- so the first boot after an operator set `ATTACHMENT_STORAGE_PROVIDER=s3` logged the relocation starting and then the refusal, and no attachment moved. The three fetch crons wrap the whole `withLease` call (`securities/security-price.service.ts`, `securities/market-index.service.ts`, `currencies/exchange-rate.service.ts`), which is the shape to copy; `ExchangeRateService.checkRatesOnStartup` is wrapped one level up, at its `onModuleInit` caller, which is the same rule and not a second one.
+
+A unit spec that substitutes a `FetchSyncService` double cannot see this -- the double never touches the database -- which is why the per-module `rls-context-smoke.spec.ts` runs the *real* `withScopedDb` over a mock `DataSource`. `src/attachments/rls-context-smoke.spec.ts` is the one that holds this path: a missing wrapper anywhere on it surfaces there as the same message the boot log carried.
+
 ## A boot-time diagnostic reports; it does not repair
 
 `HoldingsDriftReportService` (`securities/holdings-drift-report.service.ts`) runs

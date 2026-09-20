@@ -55,8 +55,9 @@ export type FetchSyncJob = (typeof FetchSyncJob)[keyof typeof FetchSyncJob];
  * attempt cooldown: that decides how often ONE index is worth re-asking for,
  * this decides which replica asks at all.
  *
- * Every call needs an ambient identity, like any other database access; the
- * callers are crons that already seed `withSystemContext`.
+ * Every call needs an ambient identity, like any other database access -- the
+ * claim and the release included, so the caller's `withSystemContext` goes around
+ * the whole `withLease` call and not around only the body it runs.
  */
 @Injectable()
 export class FetchSyncService {
