@@ -302,11 +302,15 @@ function CurrenciesContent() {
         <UnsavedChangesDialog {...unsavedChangesDialog} />
 
         {/* Rate history dialog */}
-        <Modal isOpen={!!rateHistoryCurrency} onClose={() => setRateHistoryCurrency(null)} maxWidth="md" className="p-6">
+        <Modal isOpen={!!rateHistoryCurrency} onClose={() => setRateHistoryCurrency(null)} maxWidth="lg" className="p-6">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
             {rateHistoryCurrency?.code}
           </h2>
-          {rateHistoryCurrency && <RateHistoryCoverage code={rateHistoryCurrency.code} />}
+          {/* The dialog a reader opened to see the rates is where they are
+              listed; the currency form keeps the summary alone. */}
+          {rateHistoryCurrency && (
+            <RateHistoryCoverage code={rateHistoryCurrency.code} showStoredRates />
+          )}
         </Modal>
 
         {/* Currencies List */}

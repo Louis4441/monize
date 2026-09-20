@@ -789,6 +789,20 @@ Enforcement         Every writer routes through canonicalRateRow: saveRate and
                     GemPositionService.convert makes one lookup instead of its
                     own direct-then-reverse pair -- which is why it left the
                     reciprocal allowlist in common/fx-fallback.guard.spec.ts.
+                    ExchangeRateHistoryService.getStoredRates lists a pair the
+                    same way: it reads both orientations, groups on rate_date so
+                    a pre-collapse date held twice is listed once, and keeps the
+                    canonical row of each group -- the row the contract
+                    migration below also keeps where the two disagree. A
+                    reverse-orientation row is listed as its reciprocal at the
+                    rate column's ten decimals, flagged inverted.
+                    exchange_rate_coverage, which records what a rate provider
+                    holds for a pair, keys on the same comparison and is the one
+                    place it is a database constraint rather than a code path:
+                    ck_exchange_rate_coverage_canonical refuses a row whose
+                    from_currency does not sort before its to_currency, so that
+                    table cannot hold a pair twice even through a hand-written
+                    INSERT.
 Test                canonical-rate.util.spec.ts holds the truth table, including
                     that both directions of one observation produce the same key.
                     exchange-rate.service.spec.ts: the daily refresh issues one

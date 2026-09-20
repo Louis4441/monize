@@ -66,20 +66,63 @@ export interface RateCoverage {
 }
 
 /**
- * The outcome of one "add another year of rate history" request.
+ * One stored observation, stated in the direction the panel shows.
  *
- * `stored: 0` means the provider answered and had no rates that far back --
- * a different thing from a provider that did not answer, which arrives as a
- * rejected request (503), not as a zero.
+ * `rate` is units of `to` per 1 unit of `from`, and `null` where the stored row
+ * cannot be stated that way at all -- it renders as unknown, never as 0 or 1.
+ * `inverted` says the row is stored the other way round and this figure is its
+ * reciprocal (INV-FX-003), which is why the same date can read differently from
+ * a raw look at the table.
  */
-export interface RateHistoryExtension {
+export interface StoredRate {
+  rateDate: string;
+  rate: number | null;
+  source: string | null;
+  inverted: boolean;
+}
+
+/** Newest date first, one entry per date, bounded by the server's `limit`. */
+export interface StoredRateList {
   from: string;
   to: string;
-  requestedFrom: string;
-  requestedTo: string;
+  rates: StoredRate[];
+  truncated: boolean;
+  limit: number;
+}
+
+/**
+ * The outcome of one "fill the gaps in rate history" request.
+ *
+ * `usedFrom` is the first date the reader's own data uses the currency, and
+ * `null` when nothing does, which is the one case that fetches nothing at all.
+ * `windowsRemaining` above zero means a bound stopped the fill early and
+ * pressing again has work to do. `providerHasNothingBefore` is a statement
+ * about the provider's history rather than a failure: asking again will not
+ * change it. A provider that did not answer arrives as a rejected request
+ * (503), never as a zero.
+ */
+export interface RateGapFill {
+  from: string;
+  to: string;
+  usedFrom: string | null;
+  spanEnd: string;
+  /**
+   * Days in the span no stored rate can convert at all, on the server's
+   * 45-day carry-forward bound. Often zero while `sparseDays` is large: a
+   * history holding one observation a month converts every date and prices
+   * almost none of them on their own day.
+   */
+  unresolvableDays: number;
+  /** Days in the span with no observation within ten days -- what the fill is for. */
+  sparseDays: number;
+  windowsPlanned: number;
+  windowsFetched: number;
+  windowsSkipped: number;
+  windowsUnanswered: number;
+  windowsRemaining: number;
   stored: number;
   earliestDate: string | null;
-  answered: boolean;
+  providerHasNothingBefore: string | null;
 }
 
 export const exchangeRatesApi = {
@@ -133,12 +176,26 @@ export const exchangeRatesApi = {
     return response.data;
   },
 
-  // Fetch and store one more year of daily rates, immediately before whatever
-  // is stored. Invalidates the cached rate reads afterwards for the same reason
-  // `refreshRates` does: new rows change what a dated lookup answers.
-  extendRateHistory: async (code: string): Promise<RateHistoryExtension> => {
-    const response = await apiClient.post<RateHistoryExtension>(
-      '/currencies/exchange-rates/extend-history',
+  // Every stored rate for `code` against the caller's reporting currency,
+  // newest date first. Not deduped, for the same reason `getRateCoverage` is
+  // not: the dialog re-reads it straight after a fill wrote rows, and a cached
+  // answer would describe the history it just replaced. If it is ever cached,
+  // its key must start with `exchange-rates:` so the invalidation below keeps
+  // covering it.
+  getStoredRates: async (code: string): Promise<StoredRateList> => {
+    const response = await apiClient.get<StoredRateList>('/currencies/exchange-rates/stored', {
+      params: { code },
+    });
+    return response.data;
+  },
+
+  // Fetch and store the rates this pair is missing between the first date the
+  // reader's data uses the currency and today. Invalidates the cached rate
+  // reads afterwards for the same reason `refreshRates` does: new rows change
+  // what a dated lookup answers.
+  fillRateGaps: async (code: string): Promise<RateGapFill> => {
+    const response = await apiClient.post<RateGapFill>(
+      '/currencies/exchange-rates/fill-gaps',
       { code },
     );
     invalidateCache('exchange-rates:');

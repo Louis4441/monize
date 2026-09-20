@@ -118,13 +118,39 @@
     "none": "Sem histórico guardado para {pair}",
     "loading": "A verificar o histórico de taxas guardado...",
     "loadFailed": "Não foi possível ler o histórico de taxas guardado",
-    "addYear": "Adicionar mais um ano de histórico de taxas",
-    "adding": "A obter mais um ano...",
+    "fillGaps": "Preencher lacunas do histórico",
+    "filling": "A obter as taxas em falta...",
+    "fillGapsTitle": "Obtém as taxas diárias que faltam aos seus relatórios, desde a primeira data em que os seus dados usam {code} até hoje.",
     "hint": "Relatórios com data anterior à primeira taxa guardada não conseguem converter {pair}.",
+    "list": {
+      "heading": "Taxas guardadas",
+      "direction": "Apresentado como {to} por 1 {from}.",
+      "loading": "A carregar as taxas guardadas...",
+      "loadFailed": "Não foi possível ler as taxas guardadas",
+      "empty": "Sem taxas guardadas para listar",
+      "truncated": "A mostrar as {count} taxas guardadas mais recentes; as mais antigas não são listadas.",
+      "inverted": "invertida",
+      "unknownRate": "Desconhecida",
+      "columns": {
+        "date": "Data",
+        "rate": "Taxa",
+        "source": "Origem"
+      },
+      "sources": {
+        "yahooFinance": "Yahoo Finance",
+        "mnyImport": "Importação do Money",
+        "unknown": "Desconhecida"
+      }
+    },
     "toasts": {
-      "added": "Foram adicionadas {count} taxas; o histórico começa agora em {start}",
-      "noOlder": "O fornecedor não tem taxas mais antigas para {pair}",
-      "failed": "Não foi possível ampliar o histórico de taxas"
+      "filled": "Foram adicionadas {count} taxas; o histórico começa agora em {start}",
+      "partial": "{count} taxas guardadas; o histórico começa agora a {start}. Faltam {windows} lacunas por obter, prima novamente para continuar.",
+      "moreToFetch": "Desta vez não foram guardadas taxas; faltam {windows} lacunas por obter, prima novamente para continuar.",
+      "noGaps": "{pair} já tem uma taxa diária para todas as datas de que os seus relatórios precisam",
+      "noNewRates": "Não foram guardadas taxas novas para {pair}",
+      "unused": "Nenhuma das suas contas, posições ou transações usa {code}, por isso não há taxas a obter",
+      "providerFloor": "O fornecedor não tem taxas para {pair} anteriores a {date}",
+      "failed": "Não foi possível preencher o histórico de taxas"
     }
   }
 }

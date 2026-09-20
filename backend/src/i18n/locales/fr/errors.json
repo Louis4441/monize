@@ -263,7 +263,7 @@
     "inUse": "La devise « {{ code }} » est utilisée par vos comptes, titres ou autres enregistrements. Désactivez-la à la place.",
     "invalidRateDate": "date doit être au format AAAA-MM-JJ",
     "alreadyInListInactive": "La devise « {{ code }} » est déjà dans votre liste, mais est actuellement inactive. Réactivez-la pour l'utiliser.",
-    "sameCurrencyHistory": "{{ code }} est votre devise par défaut ; il n'y a pas d'historique de taux de change à étendre",
+    "sameCurrencyHistory": "{{ code }} est votre devise par défaut ; elle n'a pas d'historique de taux de change",
     "rateProviderUnavailable": "Le fournisseur de taux de change n'a pas répondu. Veuillez réessayer plus tard."
   },
   "delegation": {

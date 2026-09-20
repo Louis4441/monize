@@ -18,7 +18,8 @@ vi.mock('@/lib/exchange-rates', () => ({
     // The edit dialog carries the rate-history section, which reads coverage on
     // mount and the rate table through `useExchangeRates`.
     getRateCoverage: (...args: any[]) => mockGetRateCoverage(...args),
-    extendRateHistory: vi.fn(),
+    getStoredRates: vi.fn(),
+    fillRateGaps: vi.fn(),
     getLatestRates: () => Promise.resolve([]),
   },
 }));

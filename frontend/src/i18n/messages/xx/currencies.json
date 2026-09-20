@@ -118,13 +118,39 @@
     "none": "[XX-No stored history for {pair}-XX]",
     "loading": "[XX-Checking stored rate history...-XX]",
     "loadFailed": "[XX-Could not read the stored rate history-XX]",
-    "addYear": "[XX-Add another year of rate history-XX]",
-    "adding": "[XX-Fetching another year...-XX]",
+    "fillGaps": "[XX-Fill gaps in rate history-XX]",
+    "filling": "[XX-Fetching missing rates...-XX]",
+    "fillGapsTitle": "[XX-Fetches the daily rates your reports are missing, from the first date your data uses {code} up to today.-XX]",
     "hint": "[XX-Reports dated before the first stored rate cannot convert {pair}.-XX]",
+    "list": {
+      "heading": "[XX-Stored rates-XX]",
+      "direction": "[XX-Shown as {to} per 1 {from}.-XX]",
+      "loading": "[XX-Loading stored rates...-XX]",
+      "loadFailed": "[XX-Could not read the stored rates-XX]",
+      "empty": "[XX-No stored rates to list-XX]",
+      "truncated": "[XX-Showing the {count} most recent stored rates; older ones are not listed.-XX]",
+      "inverted": "[XX-inverted-XX]",
+      "unknownRate": "[XX-Unknown-XX]",
+      "columns": {
+        "date": "[XX-Date-XX]",
+        "rate": "[XX-Rate-XX]",
+        "source": "[XX-Source-XX]"
+      },
+      "sources": {
+        "yahooFinance": "[XX-Yahoo Finance-XX]",
+        "mnyImport": "[XX-Money import-XX]",
+        "unknown": "[XX-Unknown-XX]"
+      }
+    },
     "toasts": {
-      "added": "[XX-Added {count} rates; history now starts {start}-XX]",
-      "noOlder": "[XX-The provider has no older rates for {pair}-XX]",
-      "failed": "[XX-Could not extend the rate history-XX]"
+      "filled": "[XX-Stored {count} rates; history now starts {start}-XX]",
+      "partial": "[XX-Stored {count} rates; history now starts {start}. {windows} more gaps to fetch, press again to continue.-XX]",
+      "moreToFetch": "[XX-No rates were stored this time; {windows} gaps are still to fetch, press again to continue.-XX]",
+      "noGaps": "[XX-{pair} already has a daily rate for every date your reports need-XX]",
+      "noNewRates": "[XX-No new rates were stored for {pair}-XX]",
+      "unused": "[XX-No account, holding or transaction of yours uses {code}, so there are no rates to fetch-XX]",
+      "providerFloor": "[XX-The provider has no rates for {pair} before {date}-XX]",
+      "failed": "[XX-Could not fill the rate history-XX]"
     }
   }
 }

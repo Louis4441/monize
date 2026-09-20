@@ -36,7 +36,8 @@ import {
 import {
   ExchangeRateHistoryService,
   RateCoverage,
-  RateHistoryExtension,
+  RateGapFill,
+  StoredRateList,
 } from "./exchange-rate-history.service";
 import {
   CurrenciesService,
@@ -47,7 +48,7 @@ import {
 import { ExchangeRate } from "./entities/exchange-rate.entity";
 import { CreateCurrencyDto } from "./dto/create-currency.dto";
 import { UpdateCurrencyDto } from "./dto/update-currency.dto";
-import { ExtendRateHistoryDto } from "./dto/extend-rate-history.dto";
+import { FillRateGapsDto } from "./dto/fill-rate-gaps.dto";
 import { tr } from "../i18n/translate";
 
 @ApiTags("Currencies")
@@ -233,35 +234,58 @@ export class CurrenciesController {
     return this.exchangeRateHistoryService.getCoverage(req.user.id, code);
   }
 
+  @Get("exchange-rates/stored")
+  @AllowDelegate()
+  @Throttle({ default: { ttl: 60000, limit: 10 } }) // L2: as `coverage`, one indexed read per call
+  @ApiOperation({
+    summary: "Stored exchange rates for a pair",
+    description:
+      "Every stored rate for the given currency against the caller's reporting currency, newest date first, one entry per date. A rate is stated as reporting-currency units per 1 unit of the code; a row stored in the other orientation is returned as its reciprocal with `inverted: true`. Bounded to the newest 2000 dates, and `truncated` says the pair holds more.",
+  })
+  @ApiQuery({ name: "code", required: true, type: String, example: "EUR" })
+  @ApiResponse({ status: 200, description: "Stored rates for the pair" })
+  @ApiResponse({
+    status: 400,
+    description: "The code is the caller's own reporting currency",
+  })
+  getStoredRates(
+    @Request() req,
+    @Query("code", ParseCurrencyCodePipe) code: string,
+  ): Promise<StoredRateList> {
+    return this.exchangeRateHistoryService.getStoredRates(req.user.id, code);
+  }
+
   /**
    * Not admin-only, unlike the backfill above.
    *
-   * The backfill walks every pair on the deployment; this one extends exactly
-   * the pair the caller is looking at, formed with their own reporting
-   * currency, by one bounded year. The rows it writes are shared reference data
-   * with no owner, so the log line names the user id -- the same treatment the
-   * global refresh gets.
+   * The backfill walks every pair on the deployment; this one fetches only the
+   * windows one pair -- the caller's own reporting currency against the code
+   * they are looking at -- cannot answer, over the span their own data uses it.
+   * The rows it writes are shared reference data with no owner, so the log line
+   * names the user id, the same treatment the global refresh gets.
    */
-  @Post("exchange-rates/extend-history")
-  @Throttle({ default: { ttl: 60000, limit: 6 } }) // L2: each call is one outbound provider window
+  @Post("exchange-rates/fill-gaps")
+  @Throttle({ default: { ttl: 60000, limit: 6 } }) // L2: each call is a bounded run of provider windows
   @ApiOperation({
-    summary: "Extend a pair's stored rate history by one more year",
+    summary: "Fill the gaps in a pair's stored rate history",
+    description:
+      "Fetches the windows between the first date the caller's data uses the currency and today that no stored observation can answer. Bounded per request: `windowsRemaining` says another press has work to do.",
   })
   @ApiResponse({
     status: 201,
     description:
-      "Extension summary; `stored: 0` means the provider answered with no rates that far back",
+      "Fill summary; `usedFrom: null` means the currency is unused and nothing was fetched, and `providerHasNothingBefore` means the provider's history starts later than the data does",
   })
   @ApiResponse({
     status: 400,
     description: "The code is the caller's own reporting currency",
   })
   @ApiResponse({ status: 503, description: "The provider did not answer" })
-  extendRateHistory(
+  fillRateGaps(
     @Request() req,
-    @Body() dto: ExtendRateHistoryDto,
-  ): Promise<RateHistoryExtension> {
-    return this.exchangeRateHistoryService.extendHistory(req.user.id, dto.code);
+    @Body() dto: FillRateGapsDto,
+  ): Promise<RateGapFill> {
+    return this.exchangeRateHistoryService.fillRateGaps(req.user.id, dto.code);
   }
 
   @Get("exchange-rates/status")

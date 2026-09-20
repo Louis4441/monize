@@ -274,7 +274,7 @@
     "cannotModifyOther": "Cannot modify another user's currency",
     "inUse": "Currency \"{{ code }}\" is in use by your accounts, securities, or other records. Deactivate it instead.",
     "invalidRateDate": "date must be in YYYY-MM-DD format",
-    "sameCurrencyHistory": "{{ code }} is your default currency; there is no exchange rate history to extend",
+    "sameCurrencyHistory": "{{ code }} is your default currency; it has no exchange rate history",
     "rateProviderUnavailable": "The exchange rate provider did not answer. Please try again later."
   },
   "delegation": {

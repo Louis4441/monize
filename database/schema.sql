@@ -91,6 +91,30 @@ CREATE TABLE exchange_rates (
 CREATE INDEX idx_exchange_rates_date ON exchange_rates(rate_date DESC);
 CREATE INDEX idx_exchange_rates_currencies ON exchange_rates(from_currency, to_currency);
 
+-- What a rate provider is known to hold for one pair, and where the next
+-- history fill resumes. One row per pair in the canonical orientation only
+-- (from_currency < to_currency, INV-FX-003), held by the CHECK rather than by
+-- a convention in the writer: a rate window answers a pair, not a direction.
+-- Global reference data like exchange_rates itself, so no owner column.
+CREATE TABLE exchange_rate_coverage (
+    id BIGSERIAL PRIMARY KEY,
+    from_currency VARCHAR(3) NOT NULL REFERENCES currencies(code),
+    to_currency VARCHAR(3) NOT NULL REFERENCES currencies(code),
+    -- Earliest date the provider is known to carry a rate for the pair; NULL
+    -- while nothing has established one. Nothing before it is asked for again.
+    earliest_available_date DATE,
+    -- Where the next fill resumes: the earliest date whose gap has not yet
+    -- been put to the provider. NULL means never probed. Moves forward only.
+    first_gap_date DATE,
+    -- The earliest date any fill has planned over, which is what makes the
+    -- pointer above safe when a reader imports older data. Moves back only.
+    probed_from DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_exchange_rate_coverage_pair UNIQUE (from_currency, to_currency),
+    CONSTRAINT ck_exchange_rate_coverage_canonical CHECK (from_currency < to_currency)
+);
+
 -- Account Types
 CREATE TYPE account_type AS ENUM (
     'CHEQUING',
@@ -3492,6 +3516,7 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- rls-exempt: auth_attempt_counters
 -- rls-exempt: auto_backup_policy
 -- rls-exempt: currencies
+-- rls-exempt: exchange_rate_coverage
 -- rls-exempt: exchange_rates
 -- rls-exempt: fetch_sync
 -- rls-exempt: google_places_instance_usage
@@ -3601,6 +3626,8 @@ AS $$
   SELECT EXISTS (
     SELECT 1 FROM user_currency_preferences WHERE currency_code = p_code
     UNION ALL SELECT 1 FROM exchange_rates
+      WHERE from_currency = p_code OR to_currency = p_code
+    UNION ALL SELECT 1 FROM exchange_rate_coverage
       WHERE from_currency = p_code OR to_currency = p_code
     UNION ALL SELECT 1 FROM accounts WHERE currency_code = p_code
     UNION ALL SELECT 1 FROM transactions

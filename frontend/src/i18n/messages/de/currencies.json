@@ -118,13 +118,39 @@
     "none": "Kein gespeicherter Verlauf für {pair}",
     "loading": "Gespeicherter Kursverlauf wird geprüft...",
     "loadFailed": "Der gespeicherte Kursverlauf konnte nicht gelesen werden",
-    "addYear": "Ein weiteres Jahr Kursverlauf hinzufügen",
-    "adding": "Ein weiteres Jahr wird abgerufen...",
+    "fillGaps": "Lücken im Kursverlauf füllen",
+    "filling": "Fehlende Kurse werden abgerufen...",
+    "fillGapsTitle": "Ruft die täglichen Kurse ab, die Ihren Berichten fehlen: vom ersten Datum, an dem Ihre Daten {code} verwenden, bis heute.",
     "hint": "Berichte mit einem Datum vor dem ersten gespeicherten Kurs können {pair} nicht umrechnen.",
+    "list": {
+      "heading": "Gespeicherte Kurse",
+      "direction": "Angezeigt als {to} pro 1 {from}.",
+      "loading": "Gespeicherte Kurse werden geladen...",
+      "loadFailed": "Die gespeicherten Kurse konnten nicht gelesen werden",
+      "empty": "Keine gespeicherten Kurse vorhanden",
+      "truncated": "Es werden die {count} neuesten gespeicherten Kurse angezeigt; ältere werden nicht aufgeführt.",
+      "inverted": "invertiert",
+      "unknownRate": "Unbekannt",
+      "columns": {
+        "date": "Datum",
+        "rate": "Kurs",
+        "source": "Quelle"
+      },
+      "sources": {
+        "yahooFinance": "Yahoo Finance",
+        "mnyImport": "Money-Import",
+        "unknown": "Unbekannt"
+      }
+    },
     "toasts": {
-      "added": "{count} Kurse hinzugefügt; der Verlauf beginnt jetzt am {start}",
-      "noOlder": "Der Anbieter hat keine älteren Kurse für {pair}",
-      "failed": "Der Kursverlauf konnte nicht erweitert werden"
+      "filled": "{count} Kurse hinzugefügt; der Verlauf beginnt jetzt am {start}",
+      "partial": "{count} Kurse gespeichert; der Verlauf beginnt jetzt am {start}. Es fehlen noch {windows} Lücken, erneut drücken, um fortzufahren.",
+      "moreToFetch": "Diesmal wurden keine Kurse gespeichert; {windows} Lücken sind noch offen, erneut drücken, um fortzufahren.",
+      "noGaps": "{pair} hat bereits für jedes von Ihren Berichten benötigte Datum einen Tageskurs",
+      "noNewRates": "Für {pair} wurden keine neuen Kurse gespeichert",
+      "unused": "Keines Ihrer Konten, Bestände oder Buchungen verwendet {code}, daher gibt es keine Kurse abzurufen",
+      "providerFloor": "Der Anbieter hat keine Kurse für {pair} vor dem {date}",
+      "failed": "Der Kursverlauf konnte nicht gefüllt werden"
     }
   }
 }

@@ -163,7 +163,11 @@ vi.mock('@/components/currencies/CurrencyList', () => ({
 }));
 
 vi.mock('@/components/currencies/RateHistoryCoverage', () => ({
-  RateHistoryCoverage: ({ code }: { code: string }) => <div data-testid="rate-history-coverage">{code}</div>,
+  RateHistoryCoverage: ({ code, showStoredRates }: { code: string; showStoredRates?: boolean }) => (
+    <div data-testid="rate-history-coverage" data-shows-rates={String(!!showStoredRates)}>
+      {code}
+    </div>
+  ),
 }));
 
 vi.mock('@/components/ui/Modal', () => ({
@@ -652,6 +656,12 @@ describe('CurrenciesPage', () => {
       expect(screen.getByTestId('modal')).toBeInTheDocument();
       expect(screen.getByTestId('rate-history-coverage')).toHaveTextContent('CAD');
     });
+    // The dialog a reader opened to see the rates lists them; the currency
+    // form embeds the same panel without the list.
+    expect(screen.getByTestId('rate-history-coverage')).toHaveAttribute(
+      'data-shows-rates',
+      'true',
+    );
   });
 
   it('opens edit modal when edit button is clicked', async () => {

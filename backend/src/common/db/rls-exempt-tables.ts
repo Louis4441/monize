@@ -26,6 +26,8 @@ export const RLS_EXEMPT_TABLES: Readonly<Record<string, string>> = {
     "Singleton deployment automatic-backup policy (one schedule, folder and retention per instance); no owner column, and putting it on an administrator's row is what let an ordinary account operation rewrite it.",
   currencies:
     "Global reference data keyed by ISO 4217 code; created_by_user_id is attribution, not ownership.",
+  exchange_rate_coverage:
+    "Global record of what a rate provider carries per currency pair and where the next history fill resumes; no owner column, one provider's history serves everybody.",
   exchange_rates:
     "Global reference data with no owner column; written by the scheduled refresh under system context.",
   fetch_sync:

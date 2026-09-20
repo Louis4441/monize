@@ -118,13 +118,39 @@
     "none": "Tidak ada riwayat tersimpan untuk {pair}",
     "loading": "Memeriksa riwayat kurs tersimpan...",
     "loadFailed": "Tidak dapat membaca riwayat kurs tersimpan",
-    "addYear": "Tambahkan satu tahun lagi riwayat kurs",
-    "adding": "Mengambil satu tahun lagi...",
+    "fillGaps": "Isi celah riwayat kurs",
+    "filling": "Mengambil kurs yang hilang...",
+    "fillGapsTitle": "Mengambil kurs harian yang hilang dari laporan Anda, dari tanggal pertama data Anda memakai {code} hingga hari ini.",
     "hint": "Laporan dengan tanggal sebelum kurs tersimpan pertama tidak dapat mengonversi {pair}.",
+    "list": {
+      "heading": "Kurs tersimpan",
+      "direction": "Ditampilkan sebagai {to} per 1 {from}.",
+      "loading": "Memuat kurs tersimpan...",
+      "loadFailed": "Tidak dapat membaca kurs tersimpan",
+      "empty": "Tidak ada kurs tersimpan untuk ditampilkan",
+      "truncated": "Menampilkan {count} kurs tersimpan terbaru; yang lebih lama tidak ditampilkan.",
+      "inverted": "dibalik",
+      "unknownRate": "Tidak diketahui",
+      "columns": {
+        "date": "Tanggal",
+        "rate": "Kurs",
+        "source": "Sumber"
+      },
+      "sources": {
+        "yahooFinance": "Yahoo Finance",
+        "mnyImport": "Impor Money",
+        "unknown": "Tidak diketahui"
+      }
+    },
     "toasts": {
-      "added": "Menambahkan {count} kurs; riwayat kini dimulai {start}",
-      "noOlder": "Penyedia tidak memiliki kurs yang lebih lama untuk {pair}",
-      "failed": "Tidak dapat memperluas riwayat kurs"
+      "filled": "Menambahkan {count} kurs; riwayat kini dimulai {start}",
+      "partial": "{count} kurs tersimpan; riwayat kini dimulai {start}. Masih ada {windows} celah untuk diambil, tekan lagi untuk melanjutkan.",
+      "moreToFetch": "Kali ini tidak ada kurs yang tersimpan; masih ada {windows} celah untuk diambil, tekan lagi untuk melanjutkan.",
+      "noGaps": "{pair} sudah memiliki kurs harian untuk setiap tanggal yang dibutuhkan laporan Anda",
+      "noNewRates": "Tidak ada kurs baru yang tersimpan untuk {pair}",
+      "unused": "Tidak ada akun, kepemilikan, atau transaksi Anda yang memakai {code}, jadi tidak ada kurs untuk diambil",
+      "providerFloor": "Penyedia tidak memiliki kurs untuk {pair} sebelum {date}",
+      "failed": "Tidak dapat mengisi riwayat kurs"
     }
   }
 }

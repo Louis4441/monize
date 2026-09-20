@@ -118,13 +118,39 @@
     "none": "No hay historial guardado para {pair}",
     "loading": "Comprobando el historial de tasas guardado...",
     "loadFailed": "No se pudo leer el historial de tasas guardado",
-    "addYear": "Añadir otro año de historial de tasas",
-    "adding": "Obteniendo otro año...",
+    "fillGaps": "Rellenar huecos del historial",
+    "filling": "Obteniendo los tipos que faltan...",
+    "fillGapsTitle": "Obtiene los tipos diarios que faltan en sus informes, desde la primera fecha en que sus datos usan {code} hasta hoy.",
     "hint": "Los informes anteriores a la primera tasa guardada no pueden convertir {pair}.",
+    "list": {
+      "heading": "Tipos guardados",
+      "direction": "Mostrado como {to} por 1 {from}.",
+      "loading": "Cargando los tipos guardados...",
+      "loadFailed": "No se pudieron leer los tipos guardados",
+      "empty": "No hay tipos guardados que mostrar",
+      "truncated": "Se muestran los {count} tipos guardados más recientes; los más antiguos no aparecen.",
+      "inverted": "invertido",
+      "unknownRate": "Desconocido",
+      "columns": {
+        "date": "Fecha",
+        "rate": "Tipo",
+        "source": "Origen"
+      },
+      "sources": {
+        "yahooFinance": "Yahoo Finance",
+        "mnyImport": "Importación de Money",
+        "unknown": "Desconocido"
+      }
+    },
     "toasts": {
-      "added": "Se añadieron {count} tasas; el historial ahora comienza el {start}",
-      "noOlder": "El proveedor no tiene tasas más antiguas para {pair}",
-      "failed": "No se pudo ampliar el historial de tasas"
+      "filled": "Se añadieron {count} tasas; el historial ahora comienza el {start}",
+      "partial": "{count} tipos guardados; el historial empieza ahora el {start}. Quedan {windows} huecos por obtener, pulse de nuevo para continuar.",
+      "moreToFetch": "Esta vez no se guardó ningún tipo; quedan {windows} huecos por obtener, pulse de nuevo para continuar.",
+      "noGaps": "{pair} ya tiene un tipo de cambio diario para cada fecha que necesitan sus informes",
+      "noNewRates": "No se guardó ningún tipo nuevo para {pair}",
+      "unused": "Ninguna de sus cuentas, posiciones o transacciones usa {code}, así que no hay tipos que obtener",
+      "providerFloor": "El proveedor no tiene tipos para {pair} anteriores al {date}",
+      "failed": "No se pudo rellenar el historial de tipos"
     }
   }
 }

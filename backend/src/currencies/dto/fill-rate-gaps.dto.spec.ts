@@ -1,11 +1,10 @@
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
-import { ExtendRateHistoryDto } from "./extend-rate-history.dto";
+import { FillRateGapsDto } from "./fill-rate-gaps.dto";
 
-const build = (payload: unknown) =>
-  plainToInstance(ExtendRateHistoryDto, payload);
+const build = (payload: unknown) => plainToInstance(FillRateGapsDto, payload);
 
-describe("ExtendRateHistoryDto", () => {
+describe("FillRateGapsDto", () => {
   it("accepts a three-letter code", async () => {
     const dto = build({ code: "EUR" });
     expect(await validate(dto)).toHaveLength(0);

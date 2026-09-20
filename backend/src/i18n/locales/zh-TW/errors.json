@@ -263,7 +263,7 @@
     "inUse": "貨幣「{{ code }}」正在您的科目、證券或其他記錄中使用。請改為停用它。",
     "invalidRateDate": "date 必須為 YYYY-MM-DD 格式",
     "alreadyInListInactive": "貨幣「{{ code }}」已在您的清單中，但目前處於未啟用狀態。請重新啟用後使用。",
-    "sameCurrencyHistory": "{{ code }} 是您的預設貨幣，因此沒有可擴充的匯率歷史",
+    "sameCurrencyHistory": "{{ code }} 是您的預設貨幣，因此沒有匯率歷史",
     "rateProviderUnavailable": "匯率提供方未回應，請稍後再試。"
   },
   "delegation": {

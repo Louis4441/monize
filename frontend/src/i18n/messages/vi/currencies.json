@@ -118,13 +118,39 @@
     "none": "Không có lịch sử đã lưu cho {pair}",
     "loading": "Đang kiểm tra lịch sử tỷ giá đã lưu...",
     "loadFailed": "Không thể đọc lịch sử tỷ giá đã lưu",
-    "addYear": "Thêm một năm lịch sử tỷ giá nữa",
-    "adding": "Đang tải thêm một năm nữa...",
+    "fillGaps": "Lấp chỗ trống trong lịch sử tỷ giá",
+    "filling": "Đang tải các tỷ giá còn thiếu...",
+    "fillGapsTitle": "Tải các tỷ giá hằng ngày mà báo cáo của bạn còn thiếu, từ ngày đầu tiên dữ liệu của bạn dùng {code} đến hôm nay.",
     "hint": "Báo cáo có ngày trước tỷ giá đã lưu đầu tiên không thể quy đổi {pair}.",
+    "list": {
+      "heading": "Tỷ giá đã lưu",
+      "direction": "Hiển thị theo {to} cho 1 {from}.",
+      "loading": "Đang tải các tỷ giá đã lưu...",
+      "loadFailed": "Không đọc được các tỷ giá đã lưu",
+      "empty": "Không có tỷ giá đã lưu để liệt kê",
+      "truncated": "Đang hiển thị {count} tỷ giá đã lưu mới nhất; các tỷ giá cũ hơn không được liệt kê.",
+      "inverted": "nghịch đảo",
+      "unknownRate": "Không rõ",
+      "columns": {
+        "date": "Ngày",
+        "rate": "Tỷ giá",
+        "source": "Nguồn"
+      },
+      "sources": {
+        "yahooFinance": "Yahoo Finance",
+        "mnyImport": "Nhập từ Money",
+        "unknown": "Không rõ"
+      }
+    },
     "toasts": {
-      "added": "Đã thêm {count} tỷ giá; lịch sử giờ bắt đầu từ {start}",
-      "noOlder": "Nhà cung cấp không có tỷ giá cũ hơn cho {pair}",
-      "failed": "Không thể mở rộng lịch sử tỷ giá"
+      "filled": "Đã thêm {count} tỷ giá; lịch sử giờ bắt đầu từ {start}",
+      "partial": "Đã lưu {count} tỷ giá; lịch sử nay bắt đầu từ {start}. Còn {windows} chỗ trống cần tải, nhấn lại để tiếp tục.",
+      "moreToFetch": "Lần này không có tỷ giá nào được lưu; còn {windows} chỗ trống cần tải, nhấn lại để tiếp tục.",
+      "noGaps": "{pair} đã có tỷ giá hằng ngày cho mọi ngày mà báo cáo của bạn cần",
+      "noNewRates": "Không có tỷ giá mới nào được lưu cho {pair}",
+      "unused": "Không tài khoản, khoản nắm giữ hay giao dịch nào của bạn dùng {code}, nên không có tỷ giá để tải",
+      "providerFloor": "Nhà cung cấp không có tỷ giá {pair} trước ngày {date}",
+      "failed": "Không lấp được lịch sử tỷ giá"
     }
   }
 }

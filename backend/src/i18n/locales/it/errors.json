@@ -263,7 +263,7 @@
     "inUse": "La valuta \"{{ code }}\" è in uso dai tuoi conti, titoli o altri record. Disattivala invece.",
     "invalidRateDate": "date deve essere nel formato AAAA-MM-GG",
     "alreadyInListInactive": "La valuta \"{{ code }}\" è già nella tua lista, ma attualmente non è attiva. Riattivala per usarla.",
-    "sameCurrencyHistory": "{{ code }} è la tua valuta predefinita; non c'è uno storico del tasso di cambio da estendere",
+    "sameCurrencyHistory": "{{ code }} è la tua valuta predefinita; non ha uno storico del tasso di cambio",
     "rateProviderUnavailable": "Il fornitore di tassi di cambio non ha risposto. Riprova più tardi."
   },
   "delegation": {

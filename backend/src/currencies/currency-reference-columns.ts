@@ -18,6 +18,7 @@ export const CURRENCY_REFERENCE_COLUMNS: Readonly<
   // Global reference data with no owner. Present for completeness (the guard
   // test compares against every FK in the schema) but never in a user's export.
   exchange_rates: ["from_currency", "to_currency"],
+  exchange_rate_coverage: ["from_currency", "to_currency"],
   accounts: ["currency_code"],
   transactions: ["currency_code", "original_currency_code"],
   securities: ["currency_code"],
