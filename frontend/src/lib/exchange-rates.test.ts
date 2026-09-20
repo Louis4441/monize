@@ -111,8 +111,8 @@ describe('exchangeRatesApi', () => {
       expect(result).toEqual(coverage);
     });
 
-    // Not deduped: the dialog re-reads it immediately after an extension wrote
-    // rows, and a cached answer would report the history it just replaced.
+    // Not deduped: the dialog re-reads it immediately after a fill wrote rows,
+    // and a cached answer would report the history it just replaced.
     it('asks the server again on a second call', async () => {
       vi.mocked(apiClient.get).mockResolvedValue({ data: { observations: 0 } });
 
@@ -123,26 +123,69 @@ describe('exchangeRatesApi', () => {
     });
   });
 
-  describe('extendRateHistory', () => {
-    it('posts the code and returns the extension summary', async () => {
-      const extension = {
+  describe('getStoredRates', () => {
+    it('fetches the stored rates for a code', async () => {
+      const listing = {
         from: 'EUR',
         to: 'PLN',
-        requestedFrom: '2025-01-02',
-        requestedTo: '2026-01-01',
-        stored: 240,
-        earliestDate: '2025-01-02',
-        answered: true,
+        rates: [
+          {
+            rateDate: '2026-09-16',
+            rate: 4.3,
+            source: 'yahoo_finance',
+            inverted: false,
+          },
+        ],
+        truncated: false,
+        limit: 2000,
       };
-      vi.mocked(apiClient.post).mockResolvedValue({ data: extension });
+      vi.mocked(apiClient.get).mockResolvedValue({ data: listing });
 
-      const result = await exchangeRatesApi.extendRateHistory('EUR');
+      const result = await exchangeRatesApi.getStoredRates('EUR');
+
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/currencies/exchange-rates/stored',
+        { params: { code: 'EUR' } },
+      );
+      expect(result).toEqual(listing);
+    });
+
+    it('asks the server again on a second call', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: { rates: [] } });
+
+      await exchangeRatesApi.getStoredRates('EUR');
+      await exchangeRatesApi.getStoredRates('EUR');
+
+      expect(apiClient.get).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('fillRateGaps', () => {
+    it('posts the code and returns the fill summary', async () => {
+      const fill = {
+        from: 'EUR',
+        to: 'PLN',
+        usedFrom: '2026-01-01',
+        spanEnd: '2026-09-17',
+        unresolvableDays: 260,
+        windowsPlanned: 1,
+        windowsFetched: 1,
+        windowsSkipped: 0,
+        windowsUnanswered: 0,
+        windowsRemaining: 0,
+        stored: 240,
+        earliestDate: '2025-12-18',
+        providerHasNothingBefore: null,
+      };
+      vi.mocked(apiClient.post).mockResolvedValue({ data: fill });
+
+      const result = await exchangeRatesApi.fillRateGaps('EUR');
 
       expect(apiClient.post).toHaveBeenCalledWith(
-        '/currencies/exchange-rates/extend-history',
+        '/currencies/exchange-rates/fill-gaps',
         { code: 'EUR' },
       );
-      expect(result).toEqual(extension);
+      expect(result).toEqual(fill);
     });
 
     it('drops the cached rate reads so a dated lookup sees the new rows', async () => {
@@ -151,7 +194,7 @@ describe('exchangeRatesApi', () => {
       expect(apiClient.get).toHaveBeenCalledTimes(1);
 
       vi.mocked(apiClient.post).mockResolvedValue({ data: { stored: 240 } });
-      await exchangeRatesApi.extendRateHistory('EUR');
+      await exchangeRatesApi.fillRateGaps('EUR');
 
       await exchangeRatesApi.getLatestRates();
       expect(apiClient.get).toHaveBeenCalledTimes(2);
@@ -162,7 +205,7 @@ describe('exchangeRatesApi', () => {
       await exchangeRatesApi.getLatestRates();
       vi.mocked(apiClient.post).mockRejectedValue(new Error('503'));
 
-      await expect(exchangeRatesApi.extendRateHistory('EUR')).rejects.toThrow();
+      await expect(exchangeRatesApi.fillRateGaps('EUR')).rejects.toThrow();
 
       await exchangeRatesApi.getLatestRates();
       expect(apiClient.get).toHaveBeenCalledTimes(1);

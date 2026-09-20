@@ -118,13 +118,39 @@
     "none": "No stored history for {pair}",
     "loading": "Checking stored rate history...",
     "loadFailed": "Could not read the stored rate history",
-    "addYear": "Add another year of rate history",
-    "adding": "Fetching another year...",
+    "fillGaps": "Fill gaps in rate history",
+    "filling": "Fetching missing rates...",
+    "fillGapsTitle": "Fetches the daily rates your reports are missing, from the first date your data uses {code} up to today.",
     "hint": "Reports dated before the first stored rate cannot convert {pair}.",
+    "list": {
+      "heading": "Stored rates",
+      "direction": "Shown as {to} per 1 {from}.",
+      "loading": "Loading stored rates...",
+      "loadFailed": "Could not read the stored rates",
+      "empty": "No stored rates to list",
+      "truncated": "Showing the {count} most recent stored rates; older ones are not listed.",
+      "inverted": "inverted",
+      "unknownRate": "Unknown",
+      "columns": {
+        "date": "Date",
+        "rate": "Rate",
+        "source": "Source"
+      },
+      "sources": {
+        "yahooFinance": "Yahoo Finance",
+        "mnyImport": "Money import",
+        "unknown": "Unknown"
+      }
+    },
     "toasts": {
-      "added": "Added {count} rates; history now starts {start}",
-      "noOlder": "The provider has no older rates for {pair}",
-      "failed": "Could not extend the rate history"
+      "filled": "Stored {count} rates; history now starts {start}",
+      "partial": "Stored {count} rates; history now starts {start}. {windows} more gaps to fetch, press again to continue.",
+      "moreToFetch": "No rates were stored this time; {windows} gaps are still to fetch, press again to continue.",
+      "noGaps": "Every date your reports need can already be converted for {pair}",
+      "noNewRates": "No new rates were stored for {pair}",
+      "unused": "No account, holding or transaction of yours uses {code}, so there are no rates to fetch",
+      "providerFloor": "The provider has no rates for {pair} before {date}",
+      "failed": "Could not fill the rate history"
     }
   }
 }

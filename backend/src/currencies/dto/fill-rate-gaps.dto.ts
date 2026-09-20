@@ -4,13 +4,13 @@ import { IsString, Length, Matches } from "class-validator";
 
 /**
  * The currency whose rate history against the caller's reporting currency is
- * to be extended by one more year.
+ * to have its gaps filled.
  *
  * Only the code: the other side of the pair is the caller's own default
  * currency, read on the server, so a request cannot name a pair that is nobody's
- * to extend.
+ * to fetch.
  */
-export class ExtendRateHistoryDto {
+export class FillRateGapsDto {
   @ApiProperty({ example: "EUR", description: "ISO 4217 currency code" })
   @Transform(({ value }) =>
     typeof value === "string" ? value.toUpperCase() : value,

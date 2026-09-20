@@ -223,6 +223,12 @@ const ALLOWED = new Map<string, string>([
     "the same negative cache for security prices, with the same upsert behind it",
   ],
   [
+    "currencies/exchange-rate-history.service.ts#emptyWindows",
+    "the empty-window negative cache for the user-driven gap fill; a window " +
+      "the provider answered with nothing cannot be filled by asking again, " +
+      "and a cold replica costs one extra fetch behind the same upsert",
+  ],
+  [
     "currencies/exchange-rate-history.service.ts#inFlight",
     "a coalescer, not a guard: a double-clicked button costs one provider " +
       "call instead of two, and a replica that has not seen the first click " +
