@@ -146,7 +146,7 @@
       "filled": "已新增 {count} 筆匯率；歷史現在從 {start} 開始",
       "partial": "已儲存 {count} 筆匯率；歷史現在從 {start} 開始。還有 {windows} 個缺口待取得，再按一次以繼續。",
       "moreToFetch": "本次未儲存任何匯率；還有 {windows} 個缺口待取得，再按一次以繼續。",
-      "noGaps": "{pair} 已能換算您的報表所需的每一個日期",
+      "noGaps": "{pair} 已有報表所需每個日期的每日匯率",
       "noNewRates": "未為 {pair} 儲存任何新匯率",
       "unused": "您的帳戶、持股與交易都沒有使用 {code}，因此沒有可取得的匯率",
       "providerFloor": "資料提供者沒有 {date} 之前的 {pair} 匯率",

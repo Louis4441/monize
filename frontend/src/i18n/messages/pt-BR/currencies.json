@@ -146,7 +146,7 @@
       "filled": "Foram adicionadas {count} taxas; o histórico agora começa em {start}",
       "partial": "{count} taxas armazenadas; o histórico agora começa em {start}. Faltam {windows} lacunas para buscar, pressione novamente para continuar.",
       "moreToFetch": "Desta vez nenhuma taxa foi armazenada; faltam {windows} lacunas para buscar, pressione novamente para continuar.",
-      "noGaps": "Todas as datas de que seus relatórios precisam já podem ser convertidas para {pair}",
+      "noGaps": "{pair} já tem uma taxa diária para todas as datas de que seus relatórios precisam",
       "noNewRates": "Nenhuma taxa nova foi armazenada para {pair}",
       "unused": "Nenhuma das suas contas, posições ou transações usa {code}, então não há taxas a buscar",
       "providerFloor": "O provedor não tem taxas para {pair} anteriores a {date}",

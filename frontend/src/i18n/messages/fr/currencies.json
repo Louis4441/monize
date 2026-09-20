@@ -146,7 +146,7 @@
       "filled": "{count} taux ajoutés ; l'historique commence désormais le {start}",
       "partial": "{count} taux enregistrés ; l'historique commence maintenant le {start}. Il reste {windows} lacunes à récupérer, appuyez à nouveau pour continuer.",
       "moreToFetch": "Aucun taux n'a été enregistré cette fois ; il reste {windows} lacunes à récupérer, appuyez à nouveau pour continuer.",
-      "noGaps": "Toutes les dates dont vos rapports ont besoin peuvent déjà être converties pour {pair}",
+      "noGaps": "{pair} a déjà un taux quotidien pour chaque date dont vos rapports ont besoin",
       "noNewRates": "Aucun nouveau taux n'a été enregistré pour {pair}",
       "unused": "Aucun de vos comptes, titres ou mouvements n'utilise {code}, il n'y a donc aucun taux à récupérer",
       "providerFloor": "Le fournisseur n'a aucun taux pour {pair} avant le {date}",

@@ -146,7 +146,7 @@
       "filled": "Aggiunti {count} tassi; lo storico ora inizia il {start}",
       "partial": "{count} tassi memorizzati; lo storico ora inizia il {start}. Restano {windows} lacune da recuperare, premi di nuovo per continuare.",
       "moreToFetch": "Questa volta non è stato memorizzato alcun tasso; restano {windows} lacune da recuperare, premi di nuovo per continuare.",
-      "noGaps": "Tutte le date di cui i tuoi report hanno bisogno sono già convertibili per {pair}",
+      "noGaps": "{pair} ha già un tasso giornaliero per ogni data richiesta dai suoi report",
       "noNewRates": "Nessun nuovo tasso è stato memorizzato per {pair}",
       "unused": "Nessuno dei tuoi conti, titoli o movimenti usa {code}, quindi non ci sono tassi da recuperare",
       "providerFloor": "Il fornitore non ha tassi per {pair} prima del {date}",

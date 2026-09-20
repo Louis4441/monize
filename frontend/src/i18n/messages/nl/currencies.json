@@ -146,7 +146,7 @@
       "filled": "{count} koersen toegevoegd; de geschiedenis begint nu op {start}",
       "partial": "{count} koersen opgeslagen; de historie begint nu op {start}. Nog {windows} gaten te halen, druk nogmaals om door te gaan.",
       "moreToFetch": "Er zijn deze keer geen koersen opgeslagen; nog {windows} gaten te halen, druk nogmaals om door te gaan.",
-      "noGaps": "Elke datum die uw rapporten nodig hebben, kan al worden omgerekend voor {pair}",
+      "noGaps": "{pair} heeft al een dagkoers voor elke datum die uw rapporten nodig hebben",
       "noNewRates": "Er zijn geen nieuwe koersen opgeslagen voor {pair}",
       "unused": "Geen van uw rekeningen, posities of transacties gebruikt {code}, dus er zijn geen koersen op te halen",
       "providerFloor": "De aanbieder heeft geen koersen voor {pair} van vóór {date}",

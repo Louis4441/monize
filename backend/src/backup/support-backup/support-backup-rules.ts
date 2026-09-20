@@ -61,11 +61,6 @@ export const RULES: Record<string, TableRules> = {
     is_active: keep,
     created_by_user_id: keep,
     created_at: keep,
-    // Where a provider's history starts is a fact about the provider, not
-    // about anybody's finances, and a support copy that carries it explains
-    // why a fill stopped where it did.
-    provider_missing_through: keep,
-    provider_missing_against: keep,
   },
   // A note is the user's own writing about their own day: whatever they put in
   // it, a support copy has no use for the text and every reason not to carry

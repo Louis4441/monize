@@ -146,7 +146,7 @@
       "filled": "{count} Kurse hinzugefügt; der Verlauf beginnt jetzt am {start}",
       "partial": "{count} Kurse gespeichert; der Verlauf beginnt jetzt am {start}. Es fehlen noch {windows} Lücken, erneut drücken, um fortzufahren.",
       "moreToFetch": "Diesmal wurden keine Kurse gespeichert; {windows} Lücken sind noch offen, erneut drücken, um fortzufahren.",
-      "noGaps": "Alle Daten, die Ihre Berichte benötigen, lassen sich für {pair} bereits umrechnen",
+      "noGaps": "{pair} hat bereits für jedes von Ihren Berichten benötigte Datum einen Tageskurs",
       "noNewRates": "Für {pair} wurden keine neuen Kurse gespeichert",
       "unused": "Keines Ihrer Konten, Bestände oder Buchungen verwendet {code}, daher gibt es keine Kurse abzurufen",
       "providerFloor": "Der Anbieter hat keine Kurse für {pair} vor dem {date}",

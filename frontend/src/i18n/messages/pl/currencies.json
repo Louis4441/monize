@@ -146,7 +146,7 @@
       "filled": "Dodano {count} kursów; historia zaczyna się teraz od {start}",
       "partial": "Zapisano {count} kursów; historia zaczyna się teraz {start}. Pozostało {windows} luk do pobrania, naciśnij ponownie, aby kontynuować.",
       "moreToFetch": "Tym razem nie zapisano żadnych kursów; pozostało {windows} luk do pobrania, naciśnij ponownie, aby kontynuować.",
-      "noGaps": "Każdą datę potrzebną Twoim raportom można już przeliczyć dla {pair}",
+      "noGaps": "{pair} ma już dzienny kurs dla każdej daty potrzebnej Twoim raportom",
       "noNewRates": "Nie zapisano nowych kursów dla {pair}",
       "unused": "Żadne z Twoich kont, walorów ani transakcji nie używa {code}, więc nie ma kursów do pobrania",
       "providerFloor": "Dostawca nie ma kursów dla {pair} sprzed {date}",

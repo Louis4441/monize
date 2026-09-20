@@ -56,8 +56,12 @@ describe("ExchangeRateHistoryService", () => {
     coverage?: CoverageRow | CoverageRow[];
     storedDates?: string[];
     listing?: StoredRow[];
-    /** What `currencies` already records for this pair, if anything. */
-    providerFloor?: string | null;
+    /** What `exchange_rate_coverage` already records for this pair. */
+    pairCoverage?: {
+      earliestAvailable?: string | null;
+      firstGap?: string | null;
+      probedFrom?: string | null;
+    };
   }) => {
     let coverageCall = 0;
     manager.query.mockImplementation((sql: string) => {
@@ -83,13 +87,18 @@ describe("ExchangeRateHistoryService", () => {
       if (sql.includes("ARRAY_AGG")) {
         return Promise.resolve(answers.listing ?? []);
       }
-      if (sql.includes("provider_missing_through")) {
-        // The read returns the stored floor; the write returns nothing.
-        return Promise.resolve(
-          sql.includes("UPDATE currencies")
-            ? []
-            : [{ missing_through: answers.providerFloor ?? null }],
-        );
+      if (sql.includes("exchange_rate_coverage")) {
+        // The read returns what is on record; the upsert returns nothing.
+        if (sql.includes("INSERT INTO exchange_rate_coverage")) {
+          return Promise.resolve([]);
+        }
+        return Promise.resolve([
+          {
+            earliest_available: answers.pairCoverage?.earliestAvailable ?? null,
+            first_gap: answers.pairCoverage?.firstGap ?? null,
+            probed_from: answers.pairCoverage?.probedFrom ?? null,
+          },
+        ]);
       }
       throw new Error(`unexpected query: ${sql}`);
     });
@@ -107,11 +116,25 @@ describe("ExchangeRateHistoryService", () => {
     });
   };
 
-  /** Every `UPDATE currencies` the fill issued, as `[sql, params]`. */
-  const floorWrites = () =>
+  /** Every coverage upsert the fill issued, as `[sql, params]`. */
+  const coverageWrites = () =>
     manager.query.mock.calls.filter(([sql]: [string]) =>
-      sql.includes("UPDATE currencies"),
+      sql.includes("INSERT INTO exchange_rate_coverage"),
     );
+
+  /** The `{ earliestAvailable, firstGap }` of the last coverage upsert. */
+  const lastCoverageWrite = () => {
+    const writes = coverageWrites();
+    const params = writes[writes.length - 1]?.[1] as string[] | undefined;
+    return params
+      ? {
+          pair: [params[0], params[1]],
+          earliestAvailable: params[2],
+          firstGap: params[3],
+          probedFrom: params[4],
+        }
+      : null;
+  };
 
   /** The `[from, to, start, end]` of every provider window asked for. */
   const windowsAsked = () =>
@@ -334,9 +357,28 @@ describe("ExchangeRateHistoryService", () => {
       expect(params).toEqual(["user-1", "EUR"]);
     });
 
-    it("fetches nothing when every date in the span is already answerable", async () => {
-      // One observation a fortnight before the span and one inside it: the
-      // carry-forward bound covers everything between them.
+    it("fetches nothing when the span is already densely covered", async () => {
+      // One observation before the span to answer its first days, then one
+      // every week or so: no stretch of ten days goes unobserved, which is
+      // what a weekday feed with its weekends and holidays looks like.
+      rowsFor({
+        firstUse: "2026-09-01",
+        storedDates: ["2026-08-28", "2026-09-05", "2026-09-12"],
+      });
+
+      const result = await service.fillRateGaps("user-1", "EUR");
+
+      expect(result.windowsPlanned).toBe(0);
+      expect(result.sparseDays).toBe(0);
+      expect(result.unresolvableDays).toBe(0);
+      expect(exchangeRateService.fillRateWindow).not.toHaveBeenCalled();
+    });
+
+    it("plans a stretch the carry-forward bound would call answerable", async () => {
+      // Three weeks between two observations: every date still converts, and
+      // every date but two is priced at a rate struck up to three weeks
+      // earlier. The first is what `unresolvableDays` reports; the second is
+      // what the fill is for.
       rowsFor({
         firstUse: "2026-09-01",
         storedDates: ["2026-08-20", "2026-09-10"],
@@ -344,9 +386,9 @@ describe("ExchangeRateHistoryService", () => {
 
       const result = await service.fillRateGaps("user-1", "EUR");
 
-      expect(result.windowsPlanned).toBe(0);
       expect(result.unresolvableDays).toBe(0);
-      expect(exchangeRateService.fillRateWindow).not.toHaveBeenCalled();
+      expect(result.sparseDays).toBeGreaterThan(0);
+      expect(result.windowsPlanned).toBe(1);
     });
 
     it("asks the provider for the span when the pair has nothing stored", async () => {
@@ -582,11 +624,14 @@ describe("ExchangeRateHistoryService", () => {
     });
 
     it("opens the span where the provider's history starts, not where the data does", async () => {
-      // The whole point of writing the floor down: a ledger opening in 1996
-      // against a pair the provider carries nothing for before 2003 must not
-      // re-plan those seven years, nor pay a call per dead year to re-learn
-      // what is already recorded.
-      rowsFor({ firstUse: "1996-09-16", providerFloor: "2003-08-31" });
+      // The whole point of recording the provider's floor: a ledger opening in
+      // 1996 against a pair the provider carries nothing for before 2003 must
+      // not re-plan those seven years, nor pay a call per dead year to re-learn
+      // what is already on record.
+      rowsFor({
+        firstUse: "1996-09-16",
+        pairCoverage: { earliestAvailable: "2003-09-01" },
+      });
 
       await service.fillRateGaps("user-1", "EUR");
 
@@ -597,23 +642,83 @@ describe("ExchangeRateHistoryService", () => {
       }
     });
 
-    it("reads the floor only for the pair it was established against", async () => {
-      rowsFor({ firstUse: "2026-01-01", providerFloor: "2003-08-31" });
+    it("resumes where the last press stopped instead of re-asking for it", async () => {
+      // The second pointer, and the reason a press after a press makes
+      // progress: a stretch already put to the provider is behind
+      // `first_gap_date`, whether it came back dense or came back as sparse as
+      // it was. Without this the same years are re-fetched every press and the
+      // ones past them are never reached.
+      rowsFor({
+        firstUse: "1996-09-16",
+        pairCoverage: {
+          earliestAvailable: "2003-09-01",
+          firstGap: "2015-06-01",
+          probedFrom: "1996-09-16",
+        },
+      });
+
+      await service.fillRateGaps("user-1", "EUR");
+
+      const asked = windowsAsked();
+      expect(asked[0][0]).toBe("2015-05-18");
+    });
+
+    it("stands the resume pointer down when the reader's data reaches back further than anything probed", async () => {
+      // Importing older transactions moves `firstUse` behind everything a fill
+      // has ever planned over. The pointer would otherwise sit in front of
+      // years nothing has examined and hide them for good, which is a worse
+      // failure than the re-fetching it exists to prevent.
+      rowsFor({
+        firstUse: "1996-09-16",
+        pairCoverage: { firstGap: "2015-06-01", probedFrom: "2010-01-01" },
+      });
+
+      await service.fillRateGaps("user-1", "EUR");
+
+      // Back at the newly reachable years, not at the pointer.
+      expect(windowsAsked()[0][0]).toBe("1996-09-02");
+      // And the probe mark follows the span back, so the next press resumes
+      // normally rather than standing down again.
+      expect(lastCoverageWrite()?.probedFrom).toBe("1996-09-16");
+    });
+
+    it("keeps honouring the provider floor even while the pointer stands down", async () => {
+      // The two are different kinds of fact. Older data of the reader's says
+      // nothing about where the provider's history starts, so the floor holds.
+      rowsFor({
+        firstUse: "1996-09-16",
+        pairCoverage: {
+          earliestAvailable: "2003-09-01",
+          firstGap: "2015-06-01",
+          probedFrom: "2010-01-01",
+        },
+      });
+
+      await service.fillRateGaps("user-1", "EUR");
+
+      expect(windowsAsked()[0][0]).toBe("2003-08-18");
+    });
+
+    it("reads and writes one row per pair, in the canonical orientation", async () => {
+      rowsFor({
+        firstUse: "2026-01-01",
+        pairCoverage: { earliestAvailable: "2003-09-01" },
+      });
 
       await service.fillRateGaps("user-1", "EUR");
 
       const read = manager.query.mock.calls.find(
         ([sql]: [string]) =>
-          sql.includes("provider_missing_through") &&
-          !sql.includes("UPDATE currencies"),
+          sql.includes("FROM exchange_rate_coverage") &&
+          !sql.includes("INSERT INTO"),
       );
-      // The floor belongs to the pair: Yahoo's history for USD/CAD and for
-      // USD/PLN begins on different days.
-      expect(read[0]).toContain("provider_missing_against = $2");
+      // A rate window answers a pair, not a direction: one row, keyed the way
+      // `canonicalRateRow` keys the rates themselves (INV-FX-003).
       expect(read[1]).toEqual(["EUR", "PLN"]);
+      expect(lastCoverageWrite()?.pair).toEqual(["EUR", "PLN"]);
     });
 
-    it("writes down the floor it establishes, and only moves it forward", async () => {
+    it("records the provider's floor as the day after the dead run ends", async () => {
       providerAnswers(
         { stored: 0, answered: true },
         { stored: 0, answered: true },
@@ -623,26 +728,70 @@ describe("ExchangeRateHistoryService", () => {
 
       await service.fillRateGaps("user-1", "EUR");
 
-      const writes = floorWrites();
-      expect(writes).toHaveLength(1);
-      // The end of the dead run, not of its first window.
-      expect(writes[0][1]).toEqual(["EUR", "PLN", "2024-12-16"]);
-      // Never backwards, and never over a floor another pair established.
-      expect(writes[0][0]).toContain("provider_missing_through < $3::DATE");
-      expect(writes[0][0]).toContain(
-        "provider_missing_against IS NULL OR provider_missing_against = $2",
-      );
+      const write = lastCoverageWrite();
+      // The day after the end of the dead RUN, not of its first window.
+      expect(write?.earliestAvailable).toBe("2024-12-17");
+      // Everything asked for was answered, so the resume pointer reaches the
+      // end of the span.
+      expect(write?.firstGap).toBe("2026-09-17");
     });
 
-    it("does not rewrite a floor it already agrees with", async () => {
+    it("never moves either pointer backwards", async () => {
       providerAnswers({ stored: 240, answered: true });
-      rowsFor({ firstUse: "1996-09-16", providerFloor: "2003-08-31" });
+      rowsFor({
+        firstUse: "1996-09-16",
+        pairCoverage: { earliestAvailable: "2003-09-01" },
+      });
 
       const result = await service.fillRateGaps("user-1", "EUR");
 
-      expect(floorWrites()).toHaveLength(0);
-      // Still told, so the reader learns why the history starts where it does.
+      // The database decides, not the caller: GREATEST ignores nulls in
+      // PostgreSQL, so an unset column takes the new date, a set one keeps the
+      // later of the two, and a concurrent fill cannot rewind either.
+      const [sql] = coverageWrites()[coverageWrites().length - 1];
+      expect(sql).toContain("GREATEST");
+      expect(sql).toContain("ON CONFLICT (from_currency, to_currency)");
+      // This request established no floor of its own, so the reader is still
+      // told the one on record.
       expect(result.providerHasNothingBefore).toBe("2003-09-01");
+    });
+
+    it("keeps working on a history that holds only month ends", async () => {
+      // The defect a reader sees: earlier fetches asked for decades at a time
+      // and Yahoo answered with monthly bars, so the pair holds one
+      // observation a month. Every date resolves under the 45-day
+      // carry-forward, so a fill that plans on resolvability alone reports
+      // "no gaps" and never adds another row.
+      const monthEnds: string[] = [];
+      for (let year = 2024; year <= 2026; year++) {
+        for (let month = 1; month <= 12; month++) {
+          const last = new Date(Date.UTC(year, month, 0));
+          const ymd = last.toISOString().slice(0, 10);
+          if (ymd >= "2024-01-31" && ymd <= "2026-09-17") monthEnds.push(ymd);
+        }
+      }
+      rowsFor({ firstUse: "2024-01-31", storedDates: monthEnds });
+
+      const result = await service.fillRateGaps("user-1", "EUR");
+
+      expect(result.unresolvableDays).toBe(0);
+      expect(result.sparseDays).toBeGreaterThan(400);
+      expect(result.windowsPlanned).toBeGreaterThan(0);
+      expect(result.windowsFetched).toBeGreaterThan(0);
+    });
+
+    it("does not advance the resume pointer over a window the provider never answered", async () => {
+      // An unanswered window proved nothing about its dates. Advancing past it
+      // would lose them: the next press would open its span after a stretch
+      // that was never fetched.
+      providerAnswers({ stored: 0, answered: false });
+      rowsFor({ firstUse: "2023-01-01" });
+
+      await expect(service.fillRateGaps("user-1", "EUR")).rejects.toThrow(
+        ServiceUnavailableException,
+      );
+
+      expect(coverageWrites()).toHaveLength(0);
     });
 
     it("does not hand one caller's summary to another", async () => {

@@ -146,7 +146,7 @@
       "filled": "Menambahkan {count} kurs; riwayat kini dimulai {start}",
       "partial": "{count} kurs tersimpan; riwayat kini dimulai {start}. Masih ada {windows} celah untuk diambil, tekan lagi untuk melanjutkan.",
       "moreToFetch": "Kali ini tidak ada kurs yang tersimpan; masih ada {windows} celah untuk diambil, tekan lagi untuk melanjutkan.",
-      "noGaps": "Setiap tanggal yang dibutuhkan laporan Anda sudah dapat dikonversi untuk {pair}",
+      "noGaps": "{pair} sudah memiliki kurs harian untuk setiap tanggal yang dibutuhkan laporan Anda",
       "noNewRates": "Tidak ada kurs baru yang tersimpan untuk {pair}",
       "unused": "Tidak ada akun, kepemilikan, atau transaksi Anda yang memakai {code}, jadi tidak ada kurs untuk diambil",
       "providerFloor": "Penyedia tidak memiliki kurs untuk {pair} sebelum {date}",

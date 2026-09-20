@@ -146,7 +146,7 @@
       "filled": "Se añadieron {count} tasas; el historial ahora comienza el {start}",
       "partial": "{count} tipos guardados; el historial empieza ahora el {start}. Quedan {windows} huecos por obtener, pulse de nuevo para continuar.",
       "moreToFetch": "Esta vez no se guardó ningún tipo; quedan {windows} huecos por obtener, pulse de nuevo para continuar.",
-      "noGaps": "Todas las fechas que necesitan sus informes ya se pueden convertir para {pair}",
+      "noGaps": "{pair} ya tiene un tipo de cambio diario para cada fecha que necesitan sus informes",
       "noNewRates": "No se guardó ningún tipo nuevo para {pair}",
       "unused": "Ninguna de sus cuentas, posiciones o transacciones usa {code}, así que no hay tipos que obtener",
       "providerFloor": "El proveedor no tiene tipos para {pair} anteriores al {date}",

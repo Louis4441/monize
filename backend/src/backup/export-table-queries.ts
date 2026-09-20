@@ -110,6 +110,7 @@ export const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   // the defect that moved this off an administrator's own settings row.
   "auto_backup_policy",
   "exchange_rates", // global shared reference data, not per-user
+  "exchange_rate_coverage", // provider coverage bookkeeping for the above
   "market_index_prices", // global market reference data, refetched from the provider
   "market_index_sync", // provider fetch bookkeeping for the above
   "provider_health", // deployment-wide provider availability + alert bookkeeping

@@ -146,7 +146,7 @@
       "filled": "{count} kur eklendi; geçmiş artık {start} tarihinden başlıyor",
       "partial": "{count} kur kaydedildi; geçmiş artık {start} tarihinde başlıyor. Getirilecek {windows} boşluk kaldı, devam etmek için tekrar basın.",
       "moreToFetch": "Bu sefer kur kaydedilmedi; getirilecek {windows} boşluk kaldı, devam etmek için tekrar basın.",
-      "noGaps": "Raporlarınızın ihtiyaç duyduğu her tarih {pair} için zaten çevrilebiliyor",
+      "noGaps": "{pair} için raporlarınızın ihtiyaç duyduğu her tarihe ait günlük kur zaten mevcut",
       "noNewRates": "{pair} için yeni kur kaydedilmedi",
       "unused": "Hesaplarınızın, varlıklarınızın veya işlemlerinizin hiçbiri {code} kullanmıyor, bu yüzden getirilecek kur yok",
       "providerFloor": "Sağlayıcıda {pair} için {date} tarihinden önceye ait kur yok",

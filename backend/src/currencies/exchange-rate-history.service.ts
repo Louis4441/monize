@@ -13,6 +13,7 @@ import { EmptyWindowMemory } from "../common/time-series/history-fill";
 import { FX_MAX_RATE_AGE_DAYS } from "../common/time-series/fx-rate-resolver";
 import { investmentEffectStatusSql } from "../securities/investment-row-effects.util";
 import { tr } from "../i18n/translate";
+import { isCanonicalOrientation } from "./canonical-rate.util";
 import {
   ExchangeRateService,
   directionlessPairKey,
@@ -23,6 +24,27 @@ import {
   planRateGapWindows,
   type RateGapWindow,
 } from "./rate-gap-plan";
+
+/**
+ * One pair's row in `exchange_rate_coverage`, with `null` for "not established".
+ *
+ * `earliestAvailableDate` is a fact about the provider: the earliest date it is
+ * known to carry a rate for the pair, which no retry moves.
+ * `firstGapDate` is a fact about this deployment's own progress: the earliest
+ * date whose gap has not yet been put to the provider. Keeping them apart is
+ * what lets a fill skip both the years that cannot be filled and the years that
+ * already have been, without confusing one for the other.
+ */
+interface PairCoverage {
+  earliestAvailableDate: string | null;
+  firstGapDate: string | null;
+  /**
+   * The earliest date any fill has planned over. `firstGapDate` may only be
+   * trusted as far back as this: a reader whose own data now reaches further
+   * back has years in front of the pointer that nothing has ever examined.
+   */
+  probedFrom: string | null;
+}
 
 /** How a window is named in the empty-window memory. */
 function windowKey(window: RateGapWindow): string {
@@ -103,8 +125,19 @@ export interface RateGapFill {
   usedFrom: string | null;
   /** Today; the span the fill considers is `[usedFrom, spanEnd]`. */
   spanEnd: string;
-  /** Calendar days in the span no stored observation could answer. */
+  /**
+   * Calendar days in the span no stored observation could answer at all, on
+   * the 45-day carry-forward bound. Often zero while `sparseDays` is large: a
+   * month-end-only history converts every date and prices almost none of them
+   * on their own day.
+   */
   unresolvableDays: number;
+  /**
+   * Calendar days in the span with no observation within ten days -- the
+   * honest measure of how much of this history is missing, and the one the
+   * windows are planned from.
+   */
+  sparseDays: number;
   windowsPlanned: number;
   windowsFetched: number;
   windowsSkipped: number;
@@ -116,12 +149,11 @@ export interface RateGapFill {
   /** The pair's new coverage lower bound. */
   earliestDate: string | null;
   /**
-   * The earliest date the provider could carry a rate for this pair: the day
-   * after the latest date it has been found to have none for, whether this
-   * request established that or a previous one did. A statement about the
-   * provider's history, not about a failure: asking again will not change it,
-   * which is why it is written to `currencies` rather than learned again on
-   * every press.
+   * The earliest date the provider is known to carry a rate for this pair,
+   * whether this request established it or a previous one did. A statement
+   * about the provider's history, not about a failure: asking again will not
+   * change it, which is why it is kept in `exchange_rate_coverage` rather than
+   * learned again on every press.
    */
   providerHasNothingBefore: string | null;
 }
@@ -413,55 +445,99 @@ export class ExchangeRateHistoryService {
   }
 
   /**
-   * The latest date the provider has been found to have no rate for this pair,
-   * or `null` while nothing has established one.
+   * The pair as `exchange_rate_coverage` keys it: the canonical orientation.
    *
-   * Read only for the pair it was established against. The floor belongs to
-   * the pair -- Yahoo's history for USD/CAD and for USD/PLN begins on
-   * different days -- so a reader whose reporting currency differs from the
-   * one that wrote it gets no hint rather than somebody else's.
+   * A rate window answers a pair rather than a direction, so the row is the
+   * same row whichever way round the reader's own question is put. The table's
+   * CHECK constraint refuses anything else.
    */
-  private async readProviderFloor(
-    from: string,
-    to: string,
-  ): Promise<string | null> {
-    const rows: Array<{ missing_through: string | null }> = await withScopedDb(
-      this.dataSource,
-      (manager) =>
-        manager.query(
-          `SELECT TO_CHAR(provider_missing_through, 'YYYY-MM-DD') AS missing_through
-             FROM currencies
-            WHERE code = $1
-              AND provider_missing_against = $2`,
-          [from, to],
-        ),
-    );
-    return rows[0]?.missing_through ?? null;
+  private static coverageKey(from: string, to: string): [string, string] {
+    return isCanonicalOrientation(from, to) ? [from, to] : [to, from];
   }
 
   /**
-   * Record that the provider carries nothing for this pair through `through`.
+   * What is on record about the provider's history for this pair.
    *
-   * Only ever moves forward, and only where the column is free or already
-   * describes this same pair: a deployment whose readers report in different
-   * currencies must not have one reader's floor overwrite another's, and a
-   * floor that moved backwards would re-plan years already refused.
+   * All three dates are `null` until a fill has probed the pair. Read before
+   * planning, because between them they say which part of the span is worth
+   * planning at all: nothing before `earliestAvailableDate` exists to be
+   * fetched, nothing between there and `firstGapDate` has been left unasked,
+   * and `probedFrom` says how far back that second claim may be trusted.
    */
-  private async rememberProviderFloor(
+  private async readPairCoverage(
     from: string,
     to: string,
-    through: string,
+  ): Promise<PairCoverage> {
+    const [first, second] = ExchangeRateHistoryService.coverageKey(from, to);
+    const rows: Array<{
+      earliest_available: string | null;
+      first_gap: string | null;
+      probed_from: string | null;
+    }> = await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        `SELECT TO_CHAR(earliest_available_date, 'YYYY-MM-DD') AS earliest_available,
+                TO_CHAR(first_gap_date, 'YYYY-MM-DD') AS first_gap,
+                TO_CHAR(probed_from, 'YYYY-MM-DD') AS probed_from
+           FROM exchange_rate_coverage
+          WHERE from_currency = $1
+            AND to_currency = $2`,
+        [first, second],
+      ),
+    );
+    return {
+      earliestAvailableDate: rows[0]?.earliest_available ?? null,
+      firstGapDate: rows[0]?.first_gap ?? null,
+      probedFrom: rows[0]?.probed_from ?? null,
+    };
+  }
+
+  /**
+   * Record what this fill learned about the pair, forwards only.
+   *
+   * An idempotent upsert on the natural key -- mechanism 4 of
+   * `docs/concurrency-and-idempotency.md` -- so two concurrent fills converge.
+   * `GREATEST` ignores nulls in PostgreSQL, which is exactly the rule wanted
+   * here: a column already set keeps its value against a `null`, an unset one
+   * takes the new date, and neither ever moves backwards. A pointer that went
+   * backwards would re-plan the years the press before it had just answered.
+   */
+  private async recordPairCoverage(
+    from: string,
+    to: string,
+    coverage: PairCoverage,
   ): Promise<void> {
+    if (
+      !coverage.earliestAvailableDate &&
+      !coverage.firstGapDate &&
+      !coverage.probedFrom
+    ) {
+      return;
+    }
+    const [first, second] = ExchangeRateHistoryService.coverageKey(from, to);
     await withScopedDb(this.dataSource, (manager) =>
       manager.query(
-        `UPDATE currencies
-            SET provider_missing_through = $3::DATE,
-                provider_missing_against = $2
-          WHERE code = $1
-            AND (provider_missing_against IS NULL OR provider_missing_against = $2)
-            AND (provider_missing_through IS NULL
-                 OR provider_missing_through < $3::DATE)`,
-        [from, to, through],
+        `INSERT INTO exchange_rate_coverage
+                (from_currency, to_currency, earliest_available_date,
+                 first_gap_date, probed_from)
+         VALUES ($1, $2, $3::DATE, $4::DATE, $5::DATE)
+         ON CONFLICT (from_currency, to_currency) DO UPDATE SET
+           earliest_available_date = GREATEST(
+             exchange_rate_coverage.earliest_available_date,
+             EXCLUDED.earliest_available_date),
+           first_gap_date = GREATEST(
+             exchange_rate_coverage.first_gap_date,
+             EXCLUDED.first_gap_date),
+           probed_from = LEAST(
+             exchange_rate_coverage.probed_from,
+             EXCLUDED.probed_from),
+           updated_at = CURRENT_TIMESTAMP`,
+        [
+          first,
+          second,
+          coverage.earliestAvailableDate,
+          coverage.firstGapDate,
+          coverage.probedFrom,
+        ],
       ),
     );
   }
@@ -506,6 +582,7 @@ export class ExchangeRateHistoryService {
       usedFrom,
       spanEnd,
       unresolvableDays: 0,
+      sparseDays: 0,
       windowsPlanned: 0,
       windowsFetched: 0,
       windowsSkipped: 0,
@@ -523,16 +600,32 @@ export class ExchangeRateHistoryService {
     if (!usedFrom) return nothingToDo();
     if (usedFrom > spanEnd) return nothingToDo();
 
-    // The span opens where the provider's history could start, not where the
-    // reader's data does. A pair the provider carries nothing for before 2003
-    // would otherwise re-plan every year back to 1996 on every press, and pay
-    // a call per dead year to learn again what is already written down.
-    const floor = await this.readProviderFloor(from, to);
-    const spanStart =
-      floor && floor >= usedFrom ? addDaysYMD(floor, 1) : usedFrom;
+    // The span opens at the latest of three dates, none of which is worth
+    // planning before: the reader's own first use of the currency, the day the
+    // provider's history starts, and the point the last fill got to. Without
+    // the second, a pair carrying nothing before 2003 re-plans every year back
+    // to 1996 on every press; without the third, a stretch the provider has
+    // already answered as well as it can is re-asked for forever, which is what
+    // a history it can only answer sparsely would otherwise cost.
+    const coverage = await this.readPairCoverage(from, to);
+    // The resume pointer is stood down for one press when the reader's own data
+    // now reaches back behind everything that has ever been planned over --
+    // importing older transactions is how that happens. Without this the
+    // pointer would sit in front of years nothing has examined and hide them
+    // for good, which is a worse failure than the re-fetching it prevents.
+    const resumeApplies =
+      !!coverage.probedFrom && usedFrom >= coverage.probedFrom;
+    const spanStart = [
+      coverage.earliestAvailableDate,
+      resumeApplies ? coverage.firstGapDate : null,
+    ].reduce<string>(
+      (latest, candidate) =>
+        candidate && candidate > latest ? candidate : latest,
+      usedFrom,
+    );
     if (spanStart > spanEnd) {
       return nothingToDo({
-        providerHasNothingBefore: this.floorReport(floor, spanEnd),
+        providerHasNothingBefore: coverage.earliestAvailableDate,
       });
     }
 
@@ -544,9 +637,18 @@ export class ExchangeRateHistoryService {
     );
     const plan = planRateGapWindows(stored, spanStart, spanEnd);
     if (plan.windows.length === 0) {
+      // Everything from here to today is either dense enough already or has
+      // been asked for. Record that, so tomorrow's press plans the one new day
+      // rather than the whole span again.
+      await this.recordPairCoverage(from, to, {
+        earliestAvailableDate: null,
+        firstGapDate: spanEnd,
+        probedFrom: spanStart,
+      });
       return nothingToDo({
         unresolvableDays: plan.unresolvableDays,
-        providerHasNothingBefore: this.floorReport(floor, spanEnd),
+        sparseDays: plan.sparseDays,
+        providerHasNothingBefore: coverage.earliestAvailableDate,
       });
     }
 
@@ -567,8 +669,13 @@ export class ExchangeRateHistoryService {
     this.logger.log(
       `User ${userId} filling ${due.length} of ${plan.windows.length} ${from}->${to} ` +
         `rate gap window(s) over ${spanStart} to ${spanEnd} ` +
-        `(${plan.unresolvableDays} unanswerable days, ${skipped} known empty` +
-        `${floor ? `, provider carries nothing through ${floor}` : ""})`,
+        `(${plan.sparseDays} days without a nearby rate, ` +
+        `${plan.unresolvableDays} unanswerable, ${skipped} known empty` +
+        `${
+          coverage.earliestAvailableDate
+            ? `, provider history starts ${coverage.earliestAvailableDate}`
+            : ""
+        })`,
     );
 
     const outcome = await this.fetchWindows(from, to, due);
@@ -596,16 +703,21 @@ export class ExchangeRateHistoryService {
     const after =
       outcome.stored > 0 ? await this.readCoverage(from, to) : before;
 
-    // What this request established about where the provider's history starts,
-    // read after the fetch so the windows it just found empty count alongside
-    // the ones it skipped. Written down, so the next press opens its span here
-    // instead of paying a call per dead year to learn it again.
-    const runEnd = this.knownEmptyRunEnd(key, plan.windows);
-    const missingThrough =
-      runEnd && (!floor || runEnd > floor) ? runEnd : floor;
-    if (missingThrough && missingThrough !== floor) {
-      await this.rememberProviderFloor(from, to, missingThrough);
-    }
+    // What this request established, read after the fetch so the windows it
+    // just found empty count alongside the ones it skipped. Both dates are
+    // written down so the next press opens its span past them: the first
+    // because no retry can fill what the provider does not have, the second
+    // because re-asking for a window already answered buys nothing.
+    const emptyRunEnd = this.knownEmptyRunEnd(key, plan.windows);
+    const earliestAvailableDate = emptyRunEnd
+      ? this.dayAfter(emptyRunEnd, spanEnd)
+      : null;
+    const frontier = this.coveredThrough(key, plan.windows, outcome.answered);
+    await this.recordPairCoverage(from, to, {
+      earliestAvailableDate,
+      firstGapDate: frontier ? this.dayAfter(frontier, spanEnd) : null,
+      probedFrom: spanStart,
+    });
 
     return {
       from,
@@ -613,6 +725,7 @@ export class ExchangeRateHistoryService {
       usedFrom,
       spanEnd,
       unresolvableDays: plan.unresolvableDays,
+      sparseDays: plan.sparseDays,
       windowsPlanned: plan.windows.length,
       windowsFetched: outcome.fetched,
       windowsSkipped: skipped,
@@ -624,22 +737,43 @@ export class ExchangeRateHistoryService {
       windowsRemaining: live.length - outcome.attempted + outcome.unanswered,
       stored: outcome.stored,
       earliestDate: after.earliestDate,
-      providerHasNothingBefore: this.floorReport(missingThrough, spanEnd),
+      providerHasNothingBefore:
+        earliestAvailableDate ?? coverage.earliestAvailableDate,
     };
   }
 
   /**
-   * The reported form of a floor: the day after the latest date the provider
-   * has no rate for, never past the end of the span, so a pair with nothing at
-   * all names a date the market has reached.
+   * The day after `date`, never past the end of the span, so a pair the
+   * provider has nothing at all for still names a date the market has reached.
    */
-  private floorReport(
-    missingThrough: string | null,
-    spanEnd: string,
+  private dayAfter(date: string, spanEnd: string): string {
+    const next = addDaysYMD(date, 1);
+    return next > spanEnd ? spanEnd : next;
+  }
+
+  /**
+   * The end of the leading run of windows this deployment is done with, or
+   * `null` when the oldest window is not one of them.
+   *
+   * Done with means one of two things, and they are deliberately treated
+   * alike: the provider has answered the window with nothing, or this request
+   * asked for it. A window that was asked for and came back sparse anyway is
+   * the provider's best, and asking a third time would only spend the next
+   * press's budget on it. A window neither skipped nor reached stops the run,
+   * because everything past it is still owed.
+   */
+  private coveredThrough(
+    key: string,
+    planned: readonly RateGapWindow[],
+    answered: ReadonlySet<string>,
   ): string | null {
-    if (!missingThrough) return null;
-    const before = addDaysYMD(missingThrough, 1);
-    return before > spanEnd ? spanEnd : before;
+    let covered: string | null = null;
+    for (const window of planned) {
+      const name = windowKey(window);
+      if (!answered.has(name) && !this.emptyWindows.has(key, name)) break;
+      covered = window.end;
+    }
+    return covered;
   }
 
   /**
@@ -685,6 +819,13 @@ export class ExchangeRateHistoryService {
     fetched: number;
     unanswered: number;
     stored: number;
+    /**
+     * The windows the provider answered, empty or not. Named rather than
+     * counted, because the resume pointer may only advance over the ones that
+     * actually got an answer -- a window that timed out proved nothing and has
+     * to stay in front of it.
+     */
+    answered: Set<string>;
   }> {
     const key = directionlessPairKey(from, to);
     const deadline = Date.now() + GAP_FILL_BUDGET_MS;
@@ -693,6 +834,7 @@ export class ExchangeRateHistoryService {
     let fetched = 0;
     let unanswered = 0;
     let stored = 0;
+    const answered = new Set<string>();
 
     for (const window of windows) {
       if (Date.now() >= deadline) break;
@@ -711,6 +853,7 @@ export class ExchangeRateHistoryService {
         unanswered++;
         continue;
       }
+      answered.add(windowKey(window));
       if (result.stored === 0) {
         // The provider answered and had nothing here. Remember it, so neither
         // this pair's next press nor its own plan spends a call on the window
@@ -723,6 +866,6 @@ export class ExchangeRateHistoryService {
       }
     }
 
-    return { attempted, fetched, unanswered, stored };
+    return { attempted, fetched, unanswered, stored, answered };
   }
 }

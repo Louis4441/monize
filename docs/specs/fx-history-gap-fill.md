@@ -44,21 +44,65 @@ flagged `inverted`.
 **Unresolvable date.** A date for which `resolveFxRate` in `historical` mode
 can find no admissible observation: no stored observation for the pair, in
 either stored direction, dated within `FX_MAX_RATE_AGE_DAYS` (45) before it.
-Never a date merely lacking a row of its own.
+Never a date merely lacking a row of its own. This is what a reader is *told*
+about, and it is deliberately not what is *fetched*.
 
-**Gap.** A maximal run of consecutive unresolvable dates.
+**Sparse date.** A date with no stored observation for the pair within
+`MAX_OBSERVATION_GAP_DAYS` (10) before it. Ten days clears every ordinary
+market closure -- a weekend is three, Easter's Thursday-to-Tuesday five,
+Christmas Eve to the 2nd of January nine -- and does not clear a month.
 
-**Span.** `[spanStart, today]`, where `spanStart` is the day after the provider
-floor when one is recorded for this pair, and otherwise `firstUse`, the
-earliest date the currency appears in the caller's data (section 4).
+**Why two bounds.** A history holding one observation per month is resolvable
+on every date and wrong on 29 days in 30, each priced at a rate struck weeks
+earlier. Planning on the 45-day bound reports such a pair as complete and
+fetches nothing, which is exactly what a history assembled by earlier
+decade-wide requests looks like: Yahoo answers those with monthly bars, and
+`persistRateSeries` stores them as daily observations. The density bound
+decides what to fetch; the carry-forward bound decides what to report.
+
+**Gap.** A maximal run of consecutive sparse dates.
+
+**Span.** `[spanStart, today]`, where `spanStart` is the latest of `firstUse`
+(the earliest date the currency appears in the caller's data, section 4), the
+pair's `earliest_available_date`, and its `first_gap_date`.
 
 **Window.** One provider request: a contiguous date range of at most
-`GAP_WINDOW_MAX_DAYS` (365).
+`GAP_WINDOW_MAX_DAYS` (365). Gaps close enough to share one are packed into
+one: a request covering a year costs what a request covering a fortnight costs
+and overwrites every date it spans, so covering two nearby holes and the rows
+between them in one call is strictly cheaper than two calls that skip those
+rows. Month-end-only history is what makes this necessary rather than tidy --
+its holes recur monthly, and one window each would turn a decade into 120
+requests at eight a press.
 
-**Provider floor.** The latest date the provider has been found to have no
-rate for a pair. Recorded on `currencies` as `provider_missing_through`, with
-`provider_missing_against` naming the other side of the pair it was
-established against.
+**Provider floor.** `exchange_rate_coverage.earliest_available_date`: the
+earliest date the provider is known to carry a rate for the pair. Nothing
+before it is asked for again.
+
+**Resume pointer.** `exchange_rate_coverage.first_gap_date`: the earliest date
+whose gap has not yet been put to the provider. It only ever moves forward, and
+a window that was asked for is behind it whether the provider filled it densely
+or gave all it had -- otherwise a stretch the provider can only answer sparsely
+is re-fetched every press and the ground past it is never reached. Gaps *after*
+it are still planned, because the span always runs to today.
+
+**Probe mark.** `exchange_rate_coverage.probed_from`: the earliest date any
+fill has planned over for this pair, moving backwards only. It is what makes
+the resume pointer safe rather than merely fast. A reader who imports older
+transactions moves `firstUse` behind everything probed so far; the pointer
+would then sit in front of years nothing has ever examined and hide them for
+good. When `firstUse` reaches back further than the probe mark, the pointer is
+stood down for one press and the newly reachable years are planned. The
+provider floor is unaffected -- older data of the reader's says nothing about
+where the provider's history starts.
+
+**Why a table and not two columns on `currencies`.** Both facts belong to a
+pair: Yahoo's history for USD/CAD and for USD/PLN begins on different days. A
+column on `currencies` can hold one pair per currency, so a deployment whose
+readers report in different currencies has them overwrite each other.
+`exchange_rate_coverage` holds one row per pair, in the canonical orientation
+only (`from_currency < to_currency`), held by a CHECK constraint rather than by
+a convention in the writer -- a rate window answers a pair, not a direction.
 
 ## 3. Invariants
 
@@ -123,25 +167,46 @@ so the gap planner must discard it too: counting it would leave the 45 days
 after it looking answerable while every report over them still refuses to
 convert.
 
-### The provider's floor bounds the span from below
+### `exchange_rate_coverage` bounds the span from below
 
-A provider's history starts where it starts and nothing the reader does moves
-it: Yahoo carries no `USDCAD=X` before December 2003, against a ledger that may
-open in 1996. Those seven years are not a gap anybody can fill, so the span
-opens the day after the recorded floor rather than at `firstUse`.
+Two facts about a pair, both of which the fill would otherwise re-derive on
+every press and keep neither.
 
-The floor is **a property of the pair, not of the currency**: Yahoo's history
-for USD/CAD and for USD/PLN begins on different days. It is stored on
-`currencies` alongside the counter-currency it was established against, and is
-honoured only when that matches the reader's own reporting currency. A
-deployment whose readers report in different currencies therefore gives the
-hint to the first pair that wrote it and no hint at all to the others, which
-costs a re-discovery rather than hiding anybody's history. Moving the floor to
-its own per-pair table is the cleaner shape and is deliberately left for the
-day a second reporting currency makes it matter.
+**The provider's floor** (`earliest_available_date`). A provider's history
+starts where it starts and nothing the reader does moves it: Yahoo carries no
+`USDCAD=X` before December 2003, against a ledger that may open in 1996. Those
+seven years are not a gap anybody can fill, so the span opens there rather than
+at `firstUse`. Established when the leading run of planned windows comes back
+empty; recorded as the day after that run ends.
 
-The floor only ever moves forward, and a write never overwrites one another
-pair established.
+**The resume pointer** (`first_gap_date`). The earliest date whose gap has not
+yet been put to the provider. A window is behind the pointer once the provider
+has *answered* it, whether it came back dense or came back as sparse as it
+started -- that answer is the provider's best, and asking a third time only
+spends the next press's budget on it. A window the provider did not answer at
+all stays in front of the pointer: the fetch proved nothing about its dates.
+
+**The probe mark** (`probed_from`). The earliest date any fill has planned
+over, moving backwards only. Without it the pointer is unsafe: a reader who
+imports older transactions moves `firstUse` behind everything probed, and the
+pointer would hide those years permanently. When `firstUse` is earlier than the
+probe mark the pointer is stood down for one press, and the probe mark follows
+the span back so the press after that resumes normally.
+
+The first two only ever move forward and the third only ever moves back, and
+the database enforces that rather than the caller: the upsert is
+`GREATEST(existing, proposed)` and `LEAST(existing, proposed)`, both of which
+ignore nulls in PostgreSQL, so an unset column takes the new date, a set one
+keeps the better of the two, and a concurrent fill cannot rewind any of them. A
+pointer that moved backwards would re-plan the years the press before it had
+just answered.
+
+Both are **properties of the pair, not of a currency**: Yahoo's history for
+USD/CAD and for USD/PLN begins on different days. One row per pair, in the
+canonical orientation only, with a CHECK constraint holding it. The earlier
+shape -- two columns on `currencies` naming a counter-currency -- could hold
+only one pair per currency, so a deployment whose readers report in different
+currencies had them overwrite each other.
 
 The query runs under the caller's identity through `withScopedDb`: accounts,
 transactions, securities and investment transactions are per-user tables, while
@@ -154,10 +219,13 @@ transactions, securities and investment transactions are per-user tables, while
 | Stored observations in the span | Windows planned |
 |---|---|
 | none | one gap covering the whole span, chunked |
-| daily, no run of 46+ unresolvable days | none |
-| daily except a 10-day hole | none; carry-forward answers those days |
-| daily except a 60-day hole | one window over the hole, padded back |
-| two 60-day holes, whatever separates them | two windows |
+| daily, no stretch of 11+ days unobserved | none |
+| daily except a 9-day hole | none; inside the density bound |
+| daily except a 21-day hole | one window over the hole, padded back |
+| one observation per month, one year | one window; `unresolvableDays` is 0 |
+| one observation per month, ten years | about ten windows, one per year |
+| two holes less than a year apart | one window covering both and what is between |
+| two holes more than a year apart | two windows; the bound refuses to join them |
 | one hole spanning 900 days | three windows of at most 365 days |
 
 ### One window's provider outcome
@@ -276,18 +344,26 @@ That is the accepted cost of daily bars.
 so every stored row inside a fetched window is replaced by the provider's value,
 including a rate imported from Money.
 
-This is why the fill targets gap windows rather than re-fetching the span, and
-why nothing joins two gaps into one request. Two gaps are always separated by
-an observation and the 45 days it reaches over, so joining them would re-fetch
-and overwrite at least 47 days of stored rows to save one provider call. The
-saving is not worth the rows.
+This is why the fill targets gap windows rather than re-fetching the span. It
+is also the cost of packing nearby gaps into one request: the rows between two
+packed holes are re-fetched and overwritten with the provider's own value for
+those dates. That is accepted because the alternative does not work -- a
+month-end-only decade has a hole every month, and planning one window each
+makes a decade 120 requests at eight a press, which no reader will sit through.
+`GAP_WINDOW_MAX_DAYS` bounds the damage: two holes more than a year apart
+cannot share a window, so a dense stretch between distant holes is never swept
+up.
 
 ## 11. Test matrix
 
 | Claim | Where | Kind |
 |---|---|---|
-| a weekend is not a gap; a 46-day hole is | `rate-gap-plan.spec.ts` | unit |
-| two holes stay two windows, never one re-fetching what is between them | `rate-gap-plan.spec.ts` | unit |
+| a weekend is not a gap; a 21-day hole is | `rate-gap-plan.spec.ts` | unit |
+| a market's longest ordinary closure is not a gap | `rate-gap-plan.spec.ts` | unit |
+| a month-end-only history plans windows with `unresolvableDays` at 0 | `rate-gap-plan.spec.ts` | unit |
+| the two bounds are separate, and a caller cannot conflate them | `rate-gap-plan.spec.ts` | unit |
+| a year of monthly holes packs into one request, a decade into about ten | `rate-gap-plan.spec.ts` | unit |
+| holes more than a window apart stay separate requests | `rate-gap-plan.spec.ts` | unit |
 | a window is padded by the boundary lead | `rate-gap-plan.spec.ts` | unit |
 | a multi-year gap splits into 365-day chunks | `rate-gap-plan.spec.ts` | unit |
 | the cap keeps the oldest windows and reports the remainder | `rate-gap-plan.spec.ts` | unit |
@@ -296,9 +372,15 @@ saving is not worth the rows.
 | an unanswered window is reported as still to do | `exchange-rate-history.service.spec.ts` | unit |
 | two callers sharing a reporting currency get their own summaries | `exchange-rate-history.service.spec.ts` | unit |
 | a known-empty window costs no place in the budget, so the next press reaches new ones | `exchange-rate-history.service.spec.ts` | unit |
-| the floor names the end of the dead run, not of its first window | `exchange-rate-history.service.spec.ts` | unit |
+| the floor names the day after the dead run ends, not after its first window | `exchange-rate-history.service.spec.ts` | unit |
 | the span opens at a recorded floor rather than at first use | `exchange-rate-history.service.spec.ts` | unit |
-| the floor is read and written per pair, and only ever moves forward | `exchange-rate-history.service.spec.ts` | unit |
+| the span resumes at `first_gap_date` rather than re-asking for what is behind it | `exchange-rate-history.service.spec.ts` | unit |
+| coverage is read and written as one row per pair, canonically oriented | `exchange-rate-history.service.spec.ts` | unit |
+| neither pointer ever moves backwards | `exchange-rate-history.service.spec.ts` | unit |
+| the resume pointer does not advance over a window the provider never answered | `exchange-rate-history.service.spec.ts` | unit |
+| the pointer stands down when the reader's data reaches back behind the probe mark | `exchange-rate-history.service.spec.ts` | unit |
+| the provider floor still holds while the pointer stands down | `exchange-rate-history.service.spec.ts` | unit |
+| a month-end-only history still plans and fetches work | `exchange-rate-history.service.spec.ts` | unit |
 | an unused currency makes no provider call | `exchange-rate-history.service.spec.ts` | unit |
 | the same-currency case refuses before any query | `exchange-rate-history.service.spec.ts` | unit |
 | no answer and nothing stored is a 503 | `exchange-rate-history.service.spec.ts` | unit |
@@ -318,11 +400,14 @@ saving is not worth the rows.
 | # | Question | Answer |
 |---|---|---|
 | 1 | Does the button still mean "one more year"? | No. It fills the gaps over the span the currency is used. |
-| 2 | What defines a gap? | Unresolvable under the 45-day carry-forward bound, not "a day with no row". |
+| 2 | What defines a gap? | A stretch of 11+ days with no observation (the density bound), not "a day with no row" and not the 45-day carry-forward bound, which calls a month-end-only history complete. |
 | 3 | Do closed accounts count towards first use? | Yes. Historical reports cover the years they were open. |
 | 4 | How deep may one provider request go? | 365 days, or the bars stop being daily. |
 | 5 | Is the whole span filled in one press? | No. A bounded number of windows, with the remainder reported. |
 | 6 | Where does the list render? | The dedicated rate history dialog only, not the currency edit form. |
 | 7 | Which row wins when a date is held in both orientations? | The canonical one, matching the pending contract migration. |
-| 8 | Where is the provider's floor remembered? | On `currencies`, with the counter-currency it was established against. Process memory alone lost it on every restart. |
+| 8 | Where is the provider's floor remembered? | `exchange_rate_coverage`, one row per pair, beside the resume pointer. Process memory alone lost it on every restart; two columns on `currencies` could hold only one pair per currency. |
 | 9 | Does a known-empty window count against the budget? | No. It cannot be filled, so it would starve the windows that can. |
+| 10 | Why does a fetched-but-still-sparse window not get re-planned? | The provider answered it; that answer is its best. Re-asking spends the next press's budget on ground already covered and never reaches what is past it. |
+| 11 | May packing re-fetch rows that are already stored? | Yes, within one window. One call covers a year at the price of a fortnight, and the alternative -- a window per monthly hole -- cannot finish a decade. |
+| 12 | What stops the resume pointer hiding newly imported older years? | `probed_from`. When the reader's first use of the currency reaches back behind it, the pointer stands down for one press. |

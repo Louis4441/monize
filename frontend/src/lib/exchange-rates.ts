@@ -106,7 +106,15 @@ export interface RateGapFill {
   to: string;
   usedFrom: string | null;
   spanEnd: string;
+  /**
+   * Days in the span no stored rate can convert at all, on the server's
+   * 45-day carry-forward bound. Often zero while `sparseDays` is large: a
+   * history holding one observation a month converts every date and prices
+   * almost none of them on their own day.
+   */
   unresolvableDays: number;
+  /** Days in the span with no observation within ten days -- what the fill is for. */
+  sparseDays: number;
   windowsPlanned: number;
   windowsFetched: number;
   windowsSkipped: number;

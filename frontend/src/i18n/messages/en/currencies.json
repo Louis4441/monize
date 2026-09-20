@@ -146,7 +146,7 @@
       "filled": "Stored {count} rates; history now starts {start}",
       "partial": "Stored {count} rates; history now starts {start}. {windows} more gaps to fetch, press again to continue.",
       "moreToFetch": "No rates were stored this time; {windows} gaps are still to fetch, press again to continue.",
-      "noGaps": "Every date your reports need can already be converted for {pair}",
+      "noGaps": "{pair} already has a daily rate for every date your reports need",
       "noNewRates": "No new rates were stored for {pair}",
       "unused": "No account, holding or transaction of yours uses {code}, so there are no rates to fetch",
       "providerFloor": "The provider has no rates for {pair} before {date}",

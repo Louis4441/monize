@@ -146,7 +146,7 @@
       "filled": "Đã thêm {count} tỷ giá; lịch sử giờ bắt đầu từ {start}",
       "partial": "Đã lưu {count} tỷ giá; lịch sử nay bắt đầu từ {start}. Còn {windows} chỗ trống cần tải, nhấn lại để tiếp tục.",
       "moreToFetch": "Lần này không có tỷ giá nào được lưu; còn {windows} chỗ trống cần tải, nhấn lại để tiếp tục.",
-      "noGaps": "Mọi ngày mà báo cáo của bạn cần đều đã có thể quy đổi cho {pair}",
+      "noGaps": "{pair} đã có tỷ giá hằng ngày cho mọi ngày mà báo cáo của bạn cần",
       "noNewRates": "Không có tỷ giá mới nào được lưu cho {pair}",
       "unused": "Không tài khoản, khoản nắm giữ hay giao dịch nào của bạn dùng {code}, nên không có tỷ giá để tải",
       "providerFloor": "Nhà cung cấp không có tỷ giá {pair} trước ngày {date}",

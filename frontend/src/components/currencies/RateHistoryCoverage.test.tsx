@@ -62,6 +62,7 @@ const filled = {
   usedFrom: '2026-01-01',
   spanEnd: '2026-09-17',
   unresolvableDays: 260,
+  sparseDays: 260,
   windowsPlanned: 1,
   windowsFetched: 1,
   windowsSkipped: 0,
@@ -336,14 +337,17 @@ describe('RateHistoryCoverage', () => {
         windowsPlanned: 0,
         windowsFetched: 0,
         unresolvableDays: 0,
+        sparseDays: 0,
       });
       await renderSection();
 
       await userEvent.click(screen.getByRole('button', { name: FILL_BUTTON }));
 
+      // The claim is density, not mere convertibility: a month-end-only
+      // history converts every date too, and this branch must not fire for it.
       await waitFor(() =>
         expect(toast.success).toHaveBeenCalledWith(
-          'Every date your reports need can already be converted for EUR->PLN',
+          'EUR->PLN already has a daily rate for every date your reports need',
         ),
       );
     });

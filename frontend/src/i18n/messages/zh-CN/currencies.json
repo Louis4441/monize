@@ -146,7 +146,7 @@
       "filled": "已添加 {count} 条汇率；历史现在从 {start} 开始",
       "partial": "已存储 {count} 条汇率；历史现从 {start} 开始。还有 {windows} 个缺口待获取，再次点击以继续。",
       "moreToFetch": "本次未存储任何汇率；还有 {windows} 个缺口待获取，再次点击以继续。",
-      "noGaps": "{pair} 已能换算您的报表所需的每一个日期",
+      "noGaps": "{pair} 已有报表所需每个日期的每日汇率",
       "noNewRates": "未为 {pair} 存储任何新汇率",
       "unused": "您的账户、持仓和交易都没有使用 {code}，因此没有可获取的汇率",
       "providerFloor": "数据提供方没有 {date} 之前的 {pair} 汇率",
