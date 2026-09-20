@@ -263,20 +263,25 @@ export class AttachmentStorageMigrator implements OnApplicationBootstrap {
         // assigns is read after it returns and the compiler cannot see that the
         // lease ran it.
         const batch: { value: RelocationBatch | null } = { value: null };
-        const held = await this.fetchSync
-          .withLease(
+        // The lease itself is database access, and `fetch_sync` belongs to no
+        // user, so the claim and its release need the ambient system identity
+        // the same way every other `withLease` call site seeds one. Wrapping
+        // only the batch -- as this did -- left `claim()` outside any context,
+        // and `withScopedDb` refused it before a single row was read.
+        const held = await withSystemContext(() =>
+          this.fetchSync.withLease(
             FetchSyncJob.AttachmentRelocation,
             RELOCATION_LEASE_MS,
             async () => {
               batch.value = await this.relocateBatch(cursor);
             },
-          )
-          .catch((error: unknown) => {
-            this.logger.warn(
-              `Attachment storage relocation batch failed: ${describe(error)}`,
-            );
-            return false;
-          });
+          ),
+        ).catch((error: unknown) => {
+          this.logger.warn(
+            `Attachment storage relocation batch failed: ${describe(error)}`,
+          );
+          return false;
+        });
         const done = batch.value;
         // Nothing to add when this replica lost the lease (another is draining) or
         // the batch threw: the rows it did not move still name their own backend.
