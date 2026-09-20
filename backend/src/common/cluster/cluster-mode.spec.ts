@@ -1,3 +1,5 @@
+import { readFileSync } from "fs";
+import { join } from "path";
 import {
   CLUSTER_MODES,
   MIN_JWT_SECRET_LENGTH,
@@ -398,5 +400,60 @@ describe("checkClusterBoot", () => {
     expect(report.refusals).toHaveLength(2);
     expect(report.refusals.join("\n")).toMatch(/Invalid CLUSTER_MODE/);
     expect(report.refusals.join("\n")).toMatch(/JWT_SECRET/);
+  });
+});
+
+/**
+ * The boot matrix is only as good as what the bootstrap hands it.
+ *
+ * `assertClusterBootOrExit` in `main.ts` names each variable one by one instead
+ * of passing `process.env`, so a field added to `ClusterBootEnv` and read by
+ * `checkClusterBoot` arrives as `undefined` until that list is extended too --
+ * and an `undefined` field reads as its default, which is the servable answer
+ * for the attachment provider and the unservable one for the backup store.
+ * That is how `BACKUP_STORAGE_PROVIDER=s3` spent a release refusing to boot
+ * under `multi` with a message telling the operator to set
+ * `BACKUP_STORAGE_PROVIDER=s3`. Every unit test passed: the pure function was
+ * right and nothing tested the call site.
+ *
+ * So both sides are read from source. The spec cannot import the interface's
+ * keys -- a TypeScript type is gone by runtime -- and a hand-kept list here
+ * would be a third place to forget.
+ */
+describe("the main.ts call site", () => {
+  const read = (...parts: string[]) =>
+    readFileSync(join(__dirname, ...parts), "utf8");
+
+  /** The `KEY?: string;` members of `interface ClusterBootEnv`. */
+  const declaredFields = (): string[] => {
+    const source = read("cluster-mode.ts");
+    const body = /export interface ClusterBootEnv \{([\s\S]*?)\n\}/.exec(
+      source,
+    )?.[1];
+    if (!body) throw new Error("ClusterBootEnv not found in cluster-mode.ts");
+    return [...body.matchAll(/^\s{2}(\w+)\?:/gm)].map((match) => match[1]);
+  };
+
+  /** The object literal `assertClusterBootOrExit` builds. */
+  const forwardedFields = (): string[] => {
+    const source = read("..", "..", "main.ts");
+    const literal = /checkClusterBoot\(\{([\s\S]*?)\n\s*\}\)/.exec(source)?.[1];
+    if (!literal) throw new Error("checkClusterBoot call not found in main.ts");
+    return [...literal.matchAll(/(\w+):\s*process\.env\.(\w+)/g)]
+      .filter(([, key, variable]) => key === variable)
+      .map(([, key]) => key);
+  };
+
+  it("parses both sides, so a silent zero match cannot pass this spec", () => {
+    expect(declaredFields()).toContain("BACKUP_STORAGE_PROVIDER");
+    expect(forwardedFields()).toContain("CLUSTER_MODE");
+  });
+
+  it("forwards every variable the boot matrix reads", () => {
+    const forwarded = new Set(forwardedFields());
+    const missing = declaredFields().filter((field) => !forwarded.has(field));
+
+    // Naming them: the fix is to add these lines to the literal in main.ts.
+    expect(missing).toEqual([]);
   });
 });
