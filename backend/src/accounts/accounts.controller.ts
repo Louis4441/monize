@@ -87,7 +87,9 @@ function sanitizeDateFormat(input: string | undefined): string | undefined {
   if (input === undefined) return undefined;
   if (input.length > 20) {
     throw new BadRequestException(
-      tr("errors.accounts.dateFormatTooLong", "dateFormat is too long"),
+      tr("errors.params.isTooLong", 'The value of "dateFormat" is too long', {
+        param: "dateFormat",
+      }),
     );
   }
   if (NAMED_DATE_FORMATS.has(input)) {
@@ -408,11 +410,19 @@ export class AccountsController {
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (sd && !dateRegex.test(sd))
       throw new BadRequestException(
-        tr("errors.accounts.startDateFormat", "startDate must be YYYY-MM-DD"),
+        tr(
+          "errors.params.mustBeCalendarDate",
+          'The value of "startDate" must be a date in YYYY-MM-DD format',
+          { param: "startDate" },
+        ),
       );
     if (ed && !dateRegex.test(ed))
       throw new BadRequestException(
-        tr("errors.accounts.endDateFormat", "endDate must be YYYY-MM-DD"),
+        tr(
+          "errors.params.mustBeCalendarDate",
+          'The value of "endDate" must be a date in YYYY-MM-DD format',
+          { param: "endDate" },
+        ),
       );
     let ids = aIds ? aIds.split(",").filter(Boolean) : undefined;
     let jointIds: string[] = [];
@@ -473,7 +483,11 @@ export class AccountsController {
     const requested = assertStringParam(asOfDate, "asOfDate");
     if (requested && !/^\d{4}-\d{2}-\d{2}$/.test(requested)) {
       throw new BadRequestException(
-        tr("errors.accounts.asOfDateFormat", "asOfDate must be YYYY-MM-DD"),
+        tr(
+          "errors.params.mustBeCalendarDate",
+          'The value of "asOfDate" must be a date in YYYY-MM-DD format',
+          { param: "asOfDate" },
+        ),
       );
     }
     const date = requested || todayYMD();
@@ -875,12 +889,20 @@ export class AccountsController {
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!sd || !dateRegex.test(sd)) {
       throw new BadRequestException(
-        tr("errors.accounts.startDateFormat", "startDate must be YYYY-MM-DD"),
+        tr(
+          "errors.params.mustBeCalendarDate",
+          'The value of "startDate" must be a date in YYYY-MM-DD format',
+          { param: "startDate" },
+        ),
       );
     }
     if (!ed || !dateRegex.test(ed)) {
       throw new BadRequestException(
-        tr("errors.accounts.endDateFormat", "endDate must be YYYY-MM-DD"),
+        tr(
+          "errors.params.mustBeCalendarDate",
+          'The value of "endDate" must be a date in YYYY-MM-DD format',
+          { param: "endDate" },
+        ),
       );
     }
     return this.statementCycleService.getInterestPaid(req.user.id, id, sd, ed);

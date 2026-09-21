@@ -37,8 +37,9 @@ export function resolveDayNoteSpan(
   if (endDate < startDate) {
     throw new BadRequestException(
       tr(
-        "errors.calendar.noteSpanBackwards",
-        "endDate must be on or after startDate",
+        "errors.params.onOrBefore",
+        'The value of "endDate" must be on or before "startDate"',
+        { param: "endDate", other: "startDate" },
       ),
     );
   }

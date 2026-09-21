@@ -86,8 +86,9 @@ export class NetWorthController {
       if (!uuidRegex.test(id))
         throw new BadRequestException(
           tr(
-            "errors.netWorth.invalidAccountIds",
-            "accountIds must be comma-separated UUIDs",
+            "errors.params.mustBeCsvUuids",
+            'The value of "accountIds" must be a comma-separated list of UUIDs',
+            { param: "accountIds" },
           ),
         );
     }
@@ -129,11 +130,19 @@ export class NetWorthController {
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (startDate && !dateRegex.test(startDate))
       throw new BadRequestException(
-        tr("errors.netWorth.invalidStartDate", "startDate must be YYYY-MM-DD"),
+        tr(
+          "errors.params.mustBeCalendarDate",
+          'The value of "startDate" must be a date in YYYY-MM-DD format',
+          { param: "startDate" },
+        ),
       );
     if (endDate && !dateRegex.test(endDate))
       throw new BadRequestException(
-        tr("errors.netWorth.invalidEndDate", "endDate must be YYYY-MM-DD"),
+        tr(
+          "errors.params.mustBeCalendarDate",
+          'The value of "endDate" must be a date in YYYY-MM-DD format',
+          { param: "endDate" },
+        ),
       );
     return this.netWorthService.getMonthlyNetWorth(
       req.user.id,
@@ -177,11 +186,19 @@ export class NetWorthController {
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (sd && !dateRegex.test(sd))
       throw new BadRequestException(
-        tr("errors.netWorth.invalidStartDate", "startDate must be YYYY-MM-DD"),
+        tr(
+          "errors.params.mustBeCalendarDate",
+          'The value of "startDate" must be a date in YYYY-MM-DD format',
+          { param: "startDate" },
+        ),
       );
     if (ed && !dateRegex.test(ed))
       throw new BadRequestException(
-        tr("errors.netWorth.invalidEndDate", "endDate must be YYYY-MM-DD"),
+        tr(
+          "errors.params.mustBeCalendarDate",
+          'The value of "endDate" must be a date in YYYY-MM-DD format',
+          { param: "endDate" },
+        ),
       );
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -191,8 +208,9 @@ export class NetWorthController {
         if (!uuidRegex.test(id))
           throw new BadRequestException(
             tr(
-              "errors.netWorth.invalidAccountIds",
-              "accountIds must be comma-separated UUIDs",
+              "errors.params.mustBeCsvUuids",
+              'The value of "accountIds" must be a comma-separated list of UUIDs',
+              { param: "accountIds" },
             ),
           );
       }
@@ -241,11 +259,19 @@ export class NetWorthController {
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (sd && !dateRegex.test(sd))
       throw new BadRequestException(
-        tr("errors.netWorth.invalidStartDate", "startDate must be YYYY-MM-DD"),
+        tr(
+          "errors.params.mustBeCalendarDate",
+          'The value of "startDate" must be a date in YYYY-MM-DD format',
+          { param: "startDate" },
+        ),
       );
     if (ed && !dateRegex.test(ed))
       throw new BadRequestException(
-        tr("errors.netWorth.invalidEndDate", "endDate must be YYYY-MM-DD"),
+        tr(
+          "errors.params.mustBeCalendarDate",
+          'The value of "endDate" must be a date in YYYY-MM-DD format',
+          { param: "endDate" },
+        ),
       );
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -255,8 +281,9 @@ export class NetWorthController {
         if (!uuidRegex.test(id))
           throw new BadRequestException(
             tr(
-              "errors.netWorth.invalidAccountIds",
-              "accountIds must be comma-separated UUIDs",
+              "errors.params.mustBeCsvUuids",
+              'The value of "accountIds" must be a comma-separated list of UUIDs',
+              { param: "accountIds" },
             ),
           );
       }
@@ -329,24 +356,34 @@ export class NetWorthController {
     if (preset && !isPortfolioPeriodPreset(preset))
       throw new BadRequestException(
         tr(
-          "errors.netWorth.invalidPeriod",
-          "period must be one of the period presets",
+          "errors.params.mustBeOneOf",
+          `The value of "period" must be one of: ${PORTFOLIO_PERIOD_PRESETS.join(", ")}`,
+          { param: "period", options: PORTFOLIO_PERIOD_PRESETS.join(", ") },
         ),
       );
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!preset && (!sd || !dateRegex.test(sd)))
       throw new BadRequestException(
-        tr("errors.netWorth.invalidStartDate", "startDate must be YYYY-MM-DD"),
+        tr(
+          "errors.params.mustBeCalendarDate",
+          'The value of "startDate" must be a date in YYYY-MM-DD format',
+          { param: "startDate" },
+        ),
       );
     if (ed && !dateRegex.test(ed))
       throw new BadRequestException(
-        tr("errors.netWorth.invalidEndDate", "endDate must be YYYY-MM-DD"),
+        tr(
+          "errors.params.mustBeCalendarDate",
+          'The value of "endDate" must be a date in YYYY-MM-DD format',
+          { param: "endDate" },
+        ),
       );
     if (bd && !dateRegex.test(bd))
       throw new BadRequestException(
         tr(
-          "errors.netWorth.invalidBaselineDate",
-          "baselineDate must be YYYY-MM-DD",
+          "errors.params.mustBeCalendarDate",
+          'The value of "baselineDate" must be a date in YYYY-MM-DD format',
+          { param: "baselineDate" },
         ),
       );
     const uuidRegex =
@@ -357,8 +394,9 @@ export class NetWorthController {
         if (!uuidRegex.test(id))
           throw new BadRequestException(
             tr(
-              "errors.netWorth.invalidAccountIds",
-              "accountIds must be comma-separated UUIDs",
+              "errors.params.mustBeCsvUuids",
+              'The value of "accountIds" must be a comma-separated list of UUIDs',
+              { param: "accountIds" },
             ),
           );
       }
@@ -429,8 +467,9 @@ export class NetWorthController {
       if (!isPortfolioPeriodPreset(name))
         throw new BadRequestException(
           tr(
-            "errors.netWorth.invalidPeriods",
-            "periods must be comma-separated period presets",
+            "errors.params.mustBeCsvOneOf",
+            `The value of "periods" must be a comma-separated list, each one of: ${PORTFOLIO_PERIOD_PRESETS.join(", ")}`,
+            { param: "periods", options: PORTFOLIO_PERIOD_PRESETS.join(", ") },
           ),
         );
       presets.push(name);
@@ -470,7 +509,11 @@ export class NetWorthController {
     const aIds = assertStringParam(accountIds, "accountIds");
     if (!from || !/^\d{4}-\d{2}-\d{2}$/.test(from)) {
       throw new BadRequestException(
-        tr("errors.netWorth.invalidStartDate", "onOrAfter must be YYYY-MM-DD"),
+        tr(
+          "errors.params.mustBeCalendarDate",
+          'The value of "startDate" must be a date in YYYY-MM-DD format',
+          { param: "startDate" },
+        ),
       );
     }
     const uuidRegex =
@@ -481,8 +524,9 @@ export class NetWorthController {
         if (!uuidRegex.test(id))
           throw new BadRequestException(
             tr(
-              "errors.netWorth.invalidAccountIds",
-              "accountIds must be comma-separated UUIDs",
+              "errors.params.mustBeCsvUuids",
+              'The value of "accountIds" must be a comma-separated list of UUIDs',
+              { param: "accountIds" },
             ),
           );
       }
@@ -536,8 +580,9 @@ export class NetWorthController {
     if (gran !== "daily" && gran !== "monthly") {
       throw new BadRequestException(
         tr(
-          "errors.netWorth.invalidGranularity",
-          "granularity must be 'daily' or 'monthly'",
+          "errors.params.mustBeOneOf",
+          'The value of "granularity" must be one of: daily, monthly',
+          { param: "granularity", options: "daily, monthly" },
         ),
       );
     }
@@ -548,11 +593,19 @@ export class NetWorthController {
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (sd && !dateRegex.test(sd))
       throw new BadRequestException(
-        tr("errors.netWorth.invalidStartDate", "startDate must be YYYY-MM-DD"),
+        tr(
+          "errors.params.mustBeCalendarDate",
+          'The value of "startDate" must be a date in YYYY-MM-DD format',
+          { param: "startDate" },
+        ),
       );
     if (ed && !dateRegex.test(ed))
       throw new BadRequestException(
-        tr("errors.netWorth.invalidEndDate", "endDate must be YYYY-MM-DD"),
+        tr(
+          "errors.params.mustBeCalendarDate",
+          'The value of "endDate" must be a date in YYYY-MM-DD format',
+          { param: "endDate" },
+        ),
       );
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -562,8 +615,9 @@ export class NetWorthController {
         if (!uuidRegex.test(id))
           throw new BadRequestException(
             tr(
-              "errors.netWorth.invalidAccountIds",
-              "accountIds must be comma-separated UUIDs",
+              "errors.params.mustBeCsvUuids",
+              'The value of "accountIds" must be a comma-separated list of UUIDs',
+              { param: "accountIds" },
             ),
           );
       }

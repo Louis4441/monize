@@ -552,7 +552,10 @@ describe("NetWorthController", () => {
           undefined,
           undefined,
         ),
-      ).rejects.toThrow("startDate must be YYYY-MM-DD");
+        // The parameter the caller has to fix is what the message must name;
+        // the sentence around it is copy, and pinning that made a wording
+        // change break a validation test.
+      ).rejects.toThrow(/"startDate".*YYYY-MM-DD/);
     });
 
     it("throws BadRequestException for invalid accountIds", async () => {
@@ -564,7 +567,7 @@ describe("NetWorthController", () => {
           "not-a-uuid",
           undefined,
         ),
-      ).rejects.toThrow("accountIds must be comma-separated UUIDs");
+      ).rejects.toThrow(/"accountIds".*UUID/);
     });
   });
 

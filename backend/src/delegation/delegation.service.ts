@@ -463,8 +463,9 @@ export class DelegationService {
     if (!Array.isArray(accountIds)) {
       throw new BadRequestException(
         tr(
-          "errors.delegation.accountIdsMustBeArray",
-          "accountIds must be an array",
+          "errors.params.mustBeArray",
+          'The value of "accountIds" must be an array',
+          { param: "accountIds" },
         ),
       );
     }

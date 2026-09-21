@@ -88,8 +88,9 @@ function parseTagKeyFilter(
   if (key.length > 100) {
     throw new BadRequestException(
       tr(
-        "errors.transactions.tagKeyTooLong",
-        "tagKey must not exceed 100 characters",
+        "errors.params.maxLength",
+        'The value of "tagKey" must not exceed 100 characters',
+        { param: "tagKey", max: "100" },
       ),
     );
   }
@@ -109,8 +110,9 @@ function parseTagKeyFilter(
     if (value === "") {
       throw new BadRequestException(
         tr(
-          "errors.transactions.tagKeyValueRequired",
-          "tagKeyValue is required for contains / notContains",
+          "errors.params.isRequired",
+          'A value for "tagKeyValue" is required',
+          { param: "tagKeyValue" },
         ),
       );
     }
@@ -426,8 +428,9 @@ export class TransactionsController {
     if (targetTransactionId && !UUID_REGEX.test(targetTransactionId)) {
       throw new BadRequestException(
         tr(
-          "errors.transactions.targetTransactionIdInvalidUuid",
-          "targetTransactionId must be a valid UUID",
+          "errors.params.mustBeUuid",
+          'The value of "targetTransactionId" must be a valid UUID',
+          { param: "targetTransactionId" },
         ),
       );
     }
@@ -441,8 +444,9 @@ export class TransactionsController {
     if (parsedAmountFrom !== undefined && isNaN(parsedAmountFrom)) {
       throw new BadRequestException(
         tr(
-          "errors.transactions.amountFromMustBeNumber",
-          "amountFrom must be a number",
+          "errors.params.mustBeNumber",
+          'The value of "amountFrom" must be a number',
+          { param: "amountFrom" },
         ),
       );
     }
@@ -452,8 +456,9 @@ export class TransactionsController {
     if (parsedAmountTo !== undefined && isNaN(parsedAmountTo)) {
       throw new BadRequestException(
         tr(
-          "errors.transactions.amountToMustBeNumber",
-          "amountTo must be a number",
+          "errors.params.mustBeNumber",
+          'The value of "amountTo" must be a number',
+          { param: "amountTo" },
         ),
       );
     }
@@ -611,8 +616,9 @@ export class TransactionsController {
     if (parsedAmountFrom !== undefined && isNaN(parsedAmountFrom)) {
       throw new BadRequestException(
         tr(
-          "errors.transactions.amountFromMustBeNumber",
-          "amountFrom must be a number",
+          "errors.params.mustBeNumber",
+          'The value of "amountFrom" must be a number',
+          { param: "amountFrom" },
         ),
       );
     }
@@ -622,8 +628,9 @@ export class TransactionsController {
     if (parsedAmountTo !== undefined && isNaN(parsedAmountTo)) {
       throw new BadRequestException(
         tr(
-          "errors.transactions.amountToMustBeNumber",
-          "amountTo must be a number",
+          "errors.params.mustBeNumber",
+          'The value of "amountTo" must be a number',
+          { param: "amountTo" },
         ),
       );
     }
@@ -743,8 +750,9 @@ export class TransactionsController {
     if (groupBy !== "category" && groupBy !== "payee") {
       throw new BadRequestException(
         tr(
-          "errors.transactions.invalidGroupBy",
-          "groupBy must be 'category' or 'payee'",
+          "errors.params.mustBeOneOf",
+          'The value of "groupBy" must be one of: category, payee',
+          { param: "groupBy", options: "category, payee" },
         ),
       );
     }
@@ -757,8 +765,9 @@ export class TransactionsController {
     if (parsedAmountFrom !== undefined && isNaN(parsedAmountFrom)) {
       throw new BadRequestException(
         tr(
-          "errors.transactions.amountFromMustBeNumber",
-          "amountFrom must be a number",
+          "errors.params.mustBeNumber",
+          'The value of "amountFrom" must be a number',
+          { param: "amountFrom" },
         ),
       );
     }
@@ -768,8 +777,9 @@ export class TransactionsController {
     if (parsedAmountTo !== undefined && isNaN(parsedAmountTo)) {
       throw new BadRequestException(
         tr(
-          "errors.transactions.amountToMustBeNumber",
-          "amountTo must be a number",
+          "errors.params.mustBeNumber",
+          'The value of "amountTo" must be a number',
+          { param: "amountTo" },
         ),
       );
     }
@@ -865,8 +875,9 @@ export class TransactionsController {
     if (parsedAmountFrom !== undefined && isNaN(parsedAmountFrom)) {
       throw new BadRequestException(
         tr(
-          "errors.transactions.amountFromMustBeNumber",
-          "amountFrom must be a number",
+          "errors.params.mustBeNumber",
+          'The value of "amountFrom" must be a number',
+          { param: "amountFrom" },
         ),
       );
     }
@@ -876,8 +887,9 @@ export class TransactionsController {
     if (parsedAmountTo !== undefined && isNaN(parsedAmountTo)) {
       throw new BadRequestException(
         tr(
-          "errors.transactions.amountToMustBeNumber",
-          "amountTo must be a number",
+          "errors.params.mustBeNumber",
+          'The value of "amountTo" must be a number',
+          { param: "amountTo" },
         ),
       );
     }
@@ -964,16 +976,18 @@ export class TransactionsController {
     if (!hasPayeeIds && !accountId) {
       throw new BadRequestException(
         tr(
-          "errors.transactions.recurringFilterRequired",
-          "accountId or payeeIds is required",
+          "errors.params.eitherRequired",
+          'A value for either "accountId" or "payeeIds" is required',
+          { param: "accountId", other: "payeeIds" },
         ),
       );
     }
     if (!startDate || !endDate) {
       throw new BadRequestException(
         tr(
-          "errors.transactions.recurringDatesRequired",
-          "startDate and endDate are required",
+          "errors.params.bothRequired",
+          'Values for both "startDate" and "endDate" are required',
+          { param: "startDate", other: "endDate" },
         ),
       );
     }
@@ -1068,8 +1082,9 @@ export class TransactionsController {
     if (parsedAmountFrom !== undefined && isNaN(parsedAmountFrom)) {
       throw new BadRequestException(
         tr(
-          "errors.transactions.amountFromMustBeNumber",
-          "amountFrom must be a number",
+          "errors.params.mustBeNumber",
+          'The value of "amountFrom" must be a number',
+          { param: "amountFrom" },
         ),
       );
     }
@@ -1079,8 +1094,9 @@ export class TransactionsController {
     if (parsedAmountTo !== undefined && isNaN(parsedAmountTo)) {
       throw new BadRequestException(
         tr(
-          "errors.transactions.amountToMustBeNumber",
-          "amountTo must be a number",
+          "errors.params.mustBeNumber",
+          'The value of "amountTo" must be a number',
+          { param: "amountTo" },
         ),
       );
     }
@@ -1275,8 +1291,9 @@ export class TransactionsController {
     if (!statementDate || !DATE_REGEX.test(statementDate)) {
       throw new BadRequestException(
         tr(
-          "errors.transactions.statementDateFormat",
-          "statementDate must be YYYY-MM-DD",
+          "errors.params.mustBeCalendarDate",
+          'The value of "statementDate" must be a date in YYYY-MM-DD format',
+          { param: "statementDate" },
         ),
       );
     }
@@ -1284,8 +1301,9 @@ export class TransactionsController {
     if (isNaN(balance)) {
       throw new BadRequestException(
         tr(
-          "errors.transactions.statementBalanceMustBeNumber",
-          "statementBalance must be a number",
+          "errors.params.mustBeNumber",
+          'The value of "statementBalance" must be a number',
+          { param: "statementBalance" },
         ),
       );
     }
