@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate harus dalam format YYYY-MM-DD",
     "invalidAccountIds": "accountIds harus berupa UUID yang dipisahkan koma",
     "invalidGranularity": "granularity harus 'daily' atau 'monthly'",
-    "invalidPeriods": "periods harus berupa preset periode yang dipisahkan koma"
+    "invalidPeriods": "periods harus berupa preset periode yang dipisahkan koma",
+    "invalidPeriod": "period harus salah satu dari preset periode"
   },
   "notifications": {
     "notFound": "Notifikasi dengan ID {{ id }} tidak ditemukan",

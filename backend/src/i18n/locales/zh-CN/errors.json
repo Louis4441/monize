@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate 必须为 YYYY-MM-DD 格式",
     "invalidAccountIds": "accountIds 必须是逗号分隔的 UUID",
     "invalidGranularity": "granularity 必须为 'daily' 或 'monthly'",
-    "invalidPeriods": "periods 必须是以逗号分隔的期间预设值"
+    "invalidPeriods": "periods 必须是以逗号分隔的期间预设值",
+    "invalidPeriod": "period 必须是期间预设值之一"
   },
   "notifications": {
     "notFound": "未找到 ID 为 {{ id }} 的通知",

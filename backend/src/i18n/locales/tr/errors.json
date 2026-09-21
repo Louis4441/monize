@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate YYYY-AA-GG biçiminde olmalıdır",
     "invalidAccountIds": "accountIds virgülle ayrılmış UUID'ler olmalıdır",
     "invalidGranularity": "granularity 'daily' veya 'monthly' olmalıdır",
-    "invalidPeriods": "periods, virgülle ayrılmış önceden tanımlı dönemler olmalıdır"
+    "invalidPeriods": "periods, virgülle ayrılmış önceden tanımlı dönemler olmalıdır",
+    "invalidPeriod": "period, önceden tanımlı dönemlerden biri olmalıdır"
   },
   "notifications": {
     "notFound": "{{ id }} kimliğine sahip bildirim bulunamadı",

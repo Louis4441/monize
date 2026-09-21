@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate は YYYY-MM-DD 形式でなければなりません",
     "invalidAccountIds": "accountIds はカンマ区切りのUUIDでなければなりません",
     "invalidGranularity": "granularity は 'daily' または 'monthly' である必要があります",
-    "invalidPeriods": "periods はカンマ区切りの期間プリセットでなければなりません"
+    "invalidPeriods": "periods はカンマ区切りの期間プリセットでなければなりません",
+    "invalidPeriod": "period は期間プリセットのいずれかでなければなりません"
   },
   "notifications": {
     "notFound": "ID {{ id }} の通知が見つかりません",

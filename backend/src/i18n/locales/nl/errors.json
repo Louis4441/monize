@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate moet JJJJ-MM-DD zijn",
     "invalidAccountIds": "accountIds moeten door komma's gescheiden UUID's zijn",
     "invalidGranularity": "granularity moet 'daily' of 'monthly' zijn",
-    "invalidPeriods": "periods moet bestaan uit door komma's gescheiden periodevoorinstellingen"
+    "invalidPeriods": "periods moet bestaan uit door komma's gescheiden periodevoorinstellingen",
+    "invalidPeriod": "period moet een van de periodevoorinstellingen zijn"
   },
   "notifications": {
     "notFound": "Notificatie met ID {{ id }} niet gevonden",

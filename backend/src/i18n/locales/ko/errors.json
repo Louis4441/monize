@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate는 YYYY-MM-DD 형식이어야 합니다",
     "invalidAccountIds": "accountIds는 쉼표로 구분된 UUID여야 합니다",
     "invalidGranularity": "granularity는 'daily' 또는 'monthly'여야 합니다",
-    "invalidPeriods": "periods는 쉼표로 구분된 기간 프리셋이어야 합니다"
+    "invalidPeriods": "periods는 쉼표로 구분된 기간 프리셋이어야 합니다",
+    "invalidPeriod": "period는 기간 프리셋 중 하나여야 합니다"
   },
   "notifications": {
     "notFound": "ID가 {{ id }}인 알림을 찾을 수 없습니다",

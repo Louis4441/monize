@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate має бути у форматі YYYY-MM-DD",
     "invalidAccountIds": "accountIds має бути UUID через кому",
     "invalidGranularity": "granularity має бути 'daily' або 'monthly'",
-    "invalidPeriods": "periods має бути списком попередньо визначених періодів, розділених комами"
+    "invalidPeriods": "periods має бути списком попередньо визначених періодів, розділених комами",
+    "invalidPeriod": "period має бути одним із попередньо визначених періодів"
   },
   "notifications": {
     "notFound": "Сповіщення з ідентифікатором {{ id }} не знайдено",

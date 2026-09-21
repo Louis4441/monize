@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate muss im Format YYYY-MM-DD sein",
     "invalidAccountIds": "accountIds muss kommagetrennte UUIDs sein",
     "invalidGranularity": "granularity muss 'daily' oder 'monthly' sein",
-    "invalidPeriods": "periods muss aus kommagetrennten Zeitraum-Voreinstellungen bestehen"
+    "invalidPeriods": "periods muss aus kommagetrennten Zeitraum-Voreinstellungen bestehen",
+    "invalidPeriod": "period muss eine der Zeitraum-Voreinstellungen sein"
   },
   "notifications": {
     "notFound": "Benachrichtigung mit ID {{ id }} nicht gefunden",

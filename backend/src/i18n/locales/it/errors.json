@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate deve essere nel formato YYYY-MM-DD",
     "invalidAccountIds": "accountIds deve essere un elenco di UUID separati da virgole",
     "invalidGranularity": "granularity deve essere 'daily' o 'monthly'",
-    "invalidPeriods": "periods deve essere un elenco di periodi predefiniti separati da virgole"
+    "invalidPeriods": "periods deve essere un elenco di periodi predefiniti separati da virgole",
+    "invalidPeriod": "period deve essere uno dei periodi predefiniti"
   },
   "notifications": {
     "notFound": "Notifica con ID {{ id }} non trovata",

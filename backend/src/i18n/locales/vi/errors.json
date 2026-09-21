@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate phải có định dạng YYYY-MM-DD",
     "invalidAccountIds": "accountIds phải là các UUID được phân cách bằng dấu phẩy",
     "invalidGranularity": "granularity phải là 'daily' hoặc 'monthly'",
-    "invalidPeriods": "periods phải là các preset kỳ được phân cách bằng dấu phẩy"
+    "invalidPeriods": "periods phải là các preset kỳ được phân cách bằng dấu phẩy",
+    "invalidPeriod": "period phải là một trong các preset kỳ"
   },
   "notifications": {
     "notFound": "Không tìm thấy thông báo với ID {{ id }}",

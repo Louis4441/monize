@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate должна быть в формате ГГГГ-ММ-ДД",
     "invalidAccountIds": "accountIds должны быть UUID, разделёнными запятыми",
     "invalidGranularity": "granularity должно быть 'daily' или 'monthly'",
-    "invalidPeriods": "periods должен быть списком предустановленных периодов, разделённых запятыми"
+    "invalidPeriods": "periods должен быть списком предустановленных периодов, разделённых запятыми",
+    "invalidPeriod": "period должен быть одним из предустановленных периодов"
   },
   "notifications": {
     "notFound": "Уведомление с ID {{ id }} не найдено",

@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate YYYY-MM-DD प्रारूप में होनी चाहिए",
     "invalidAccountIds": "accountIds अल्पविराम-अलग UUID होने चाहिए",
     "invalidGranularity": "granularity 'daily' या 'monthly' होना चाहिए",
-    "invalidPeriods": "periods अल्पविराम से अलग किए गए पूर्वनिर्धारित अवधि प्रीसेट होने चाहिए"
+    "invalidPeriods": "periods अल्पविराम से अलग किए गए पूर्वनिर्धारित अवधि प्रीसेट होने चाहिए",
+    "invalidPeriod": "period पूर्वनिर्धारित अवधि प्रीसेट में से एक होना चाहिए"
   },
   "notifications": {
     "notFound": "ID {{ id }} वाली अधिसूचना नहीं मिली",
