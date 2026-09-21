@@ -3,11 +3,13 @@ import { BadRequestException } from "@nestjs/common";
 import { InvestmentTransactionsController } from "./investment-transactions.controller";
 import { InvestmentTransactionsService } from "./investment-transactions.service";
 import { DelegationService } from "../delegation/delegation.service";
+import { TransferPairLinkService } from "./transfer-pair-link.service";
 
 describe("InvestmentTransactionsController", () => {
   let controller: InvestmentTransactionsController;
   let service: Record<string, jest.Mock>;
   let delegationMock: Record<string, jest.Mock>;
+  let transferPairLinks: Record<string, jest.Mock>;
 
   const req = { user: { id: "user-1" } };
   const UUID1 = "00000000-0000-0000-0000-000000000001";
@@ -54,6 +56,18 @@ describe("InvestmentTransactionsController", () => {
           provide: DelegationService,
           useValue: (delegationMock = {
             readableAccountIds: jest.fn().mockResolvedValue([]),
+          }),
+        },
+        {
+          provide: TransferPairLinkService,
+          useValue: (transferPairLinks = {
+            findCandidates: jest.fn().mockResolvedValue([]),
+            linkPair: jest.fn().mockResolvedValue({
+              outTransactionId: "tx-out",
+              inTransactionId: "tx-in",
+              securityId: "sec-1",
+              rebuiltAccountIds: [],
+            }),
           }),
         },
       ],

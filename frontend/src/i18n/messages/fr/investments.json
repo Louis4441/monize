@@ -299,6 +299,14 @@
     "dateRequired": "La date est obligatoire",
     "acquisitionPriceRequired": "Le prix par part est obligatoire et doit être supérieur à zéro. Utilisez « Ajout de parts » pour des parts acquises sans coût connu."
   },
+  "unlinkedTransfers": {
+    "title": "Transferts saisis en deux lignes distinctes",
+    "subtitle": "Chacun ressemble à un transfert saisi deux fois, une fois par compte. Tant que les deux lignes ne sont pas liées, le compte destinataire ne peut pas reprendre le coût cédé par le compte source : son prix de revient et sa plus-value restent inconnus.",
+    "pair": "{quantity} {security} le {date}, de {from} vers {to}",
+    "link": "Lier",
+    "linking": "Liaison...",
+    "linkFailed": "Ces deux lignes n'ont pas pu être liées. Rechargez la page et réessayez."
+  },
   "portfolioPerformance": {
     "title": "Performance du portefeuille",
     "subtitle": "La performance de vos investissements, sans l'effet des dépôts, des retraits et des liquidités non investies.",

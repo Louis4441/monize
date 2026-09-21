@@ -299,6 +299,14 @@
     "dateRequired": "La data è obbligatoria",
     "acquisitionPriceRequired": "Il prezzo per azione è obbligatorio e deve essere maggiore di zero. Usa «Aggiungi azioni» per azioni acquisite senza un costo noto."
   },
+  "unlinkedTransfers": {
+    "title": "Trasferimenti registrati come due righe separate",
+    "subtitle": "Ognuno sembra un trasferimento inserito due volte, una per conto. Finché le due righe non sono collegate, il conto ricevente non può prendere il costo ceduto da quello di partenza, quindi il suo costo di carico e la plusvalenza risultano sconosciuti.",
+    "pair": "{quantity} {security} il {date}, da {from} a {to}",
+    "link": "Collega",
+    "linking": "Collegamento...",
+    "linkFailed": "Non è stato possibile collegare queste due righe. Ricarica la pagina e riprova."
+  },
   "portfolioPerformance": {
     "title": "Performance del portafoglio",
     "subtitle": "Come si sono comportati i tuoi investimenti, senza l'effetto di depositi, prelievi e liquidità non investita.",

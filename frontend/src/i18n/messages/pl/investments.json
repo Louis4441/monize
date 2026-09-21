@@ -299,6 +299,14 @@
     "dateRequired": "Data jest wymagana",
     "acquisitionPriceRequired": "Cena za jednostkę jest wymagana i musi być większa od zera. Dla jednostek nabytych bez znanego kosztu użyj „Dodaj udziały”."
   },
+  "unlinkedTransfers": {
+    "title": "Transfery zapisane jako dwa osobne wiersze",
+    "subtitle": "Każdy z nich wygląda jak jeden transfer wprowadzony dwa razy, po razie na każdym rachunku. Dopóki wiersze nie są powiązane, rachunek odbierający nie może przejąć kosztu oddanego przez wysyłający, więc jego koszt nabycia i zysk są nieznane.",
+    "pair": "{quantity} {security} dnia {date}, z {from} do {to}",
+    "link": "Powiąż",
+    "linking": "Wiązanie...",
+    "linkFailed": "Nie udało się powiązać tych dwóch wierszy. Odśwież stronę i spróbuj ponownie."
+  },
   "portfolioPerformance": {
     "title": "Wyniki portfela",
     "subtitle": "Wynik Twoich inwestycji bez wpływu wpłat, wypłat i niezainwestowanej gotówki.",

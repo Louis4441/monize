@@ -299,6 +299,14 @@
     "dateRequired": "日期為必填",
     "acquisitionPriceRequired": "每股價格為必填項，且必須大於零。對於成本未知的股數，請使用「增加股數」。"
   },
+  "unlinkedTransfers": {
+    "title": "記為兩筆獨立記錄的轉移",
+    "subtitle": "每一項看起來都像同一筆轉移被輸入了兩次，每個帳戶各一次。在兩筆記錄關聯之前，接收帳戶無法承接轉出帳戶放棄的成本，因此其成本基礎與收益顯示為未知。",
+    "pair": "{date} 的 {quantity} {security}，從 {from} 到 {to}",
+    "link": "關聯",
+    "linking": "正在關聯...",
+    "linkFailed": "無法關聯這兩筆記錄。請重新載入頁面後再試。"
+  },
   "portfolioPerformance": {
     "title": "投資組合表現",
     "subtitle": "扣除存入、提出資金與未投資現金影響後，你的投資本身的表現。",

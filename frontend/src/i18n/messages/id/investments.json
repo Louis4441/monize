@@ -299,6 +299,14 @@
     "dateRequired": "Tanggal wajib diisi",
     "acquisitionPriceRequired": "Harga per lembar wajib diisi dan harus lebih besar dari nol. Gunakan \"Tambah Lembar\" untuk lembar yang diperoleh tanpa biaya yang diketahui."
   },
+  "unlinkedTransfers": {
+    "title": "Transfer yang tercatat sebagai dua baris terpisah",
+    "subtitle": "Masing-masing tampak seperti satu transfer yang dimasukkan dua kali, sekali di tiap akun. Selama kedua baris belum ditautkan, akun penerima tidak dapat mengambil biaya yang dilepas akun pengirim, sehingga basis biaya dan keuntungannya terbaca tidak diketahui.",
+    "pair": "{quantity} {security} pada {date}, {from} ke {to}",
+    "link": "Tautkan",
+    "linking": "Menautkan...",
+    "linkFailed": "Kedua baris ini tidak dapat ditautkan. Muat ulang halaman dan coba lagi."
+  },
   "portfolioPerformance": {
     "title": "Kinerja portofolio",
     "subtitle": "Bagaimana investasi Anda berkinerja, tanpa pengaruh setoran, penarikan, dan tunai yang belum diinvestasikan.",

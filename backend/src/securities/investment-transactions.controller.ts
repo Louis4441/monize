@@ -26,6 +26,8 @@ import { CreateInvestmentTransactionDto } from "./dto/create-investment-transact
 import { UpdateInvestmentTransactionDto } from "./dto/update-investment-transaction.dto";
 import { UpdateTransactionStatusDto } from "../transactions/dto/update-transaction-status.dto";
 import { TransferSecurityDto } from "./dto/transfer-security.dto";
+import { LinkTransferPairDto } from "./dto/link-transfer-pair.dto";
+import { TransferPairLinkService } from "./transfer-pair-link.service";
 import {
   InvestmentTransaction,
   InvestmentAction,
@@ -49,7 +51,79 @@ export class InvestmentTransactionsController {
   constructor(
     private readonly investmentTransactionsService: InvestmentTransactionsService,
     private readonly delegationService: DelegationService,
+    private readonly transferPairLinks: TransferPairLinkService,
   ) {}
+
+  /**
+   * The share transfers whose two legs the ledger never paired.
+   *
+   * A suggestion, not a finding: an unpaired `TRANSFER_IN` cannot take the
+   * basis its source released, so the destination reports its cost -- and the
+   * gain over it -- as unknown, and pairing the legs is the repair. Which two
+   * rows are one transfer is still a person's call, so nothing is linked here
+   * and no measure reads this.
+   */
+  @Get("unlinked-transfer-pairs")
+  @AllowDelegate()
+  @DelegateRequiresSection("investments")
+  @ApiOperation({
+    summary: "Share transfers whose two legs were never linked to each other",
+  })
+  @ApiQuery({
+    name: "accountIds",
+    required: false,
+    description:
+      "Comma-separated account IDs to look within (linked pairs included); the whole portfolio when omitted",
+  })
+  @ApiResponse({ status: 200, description: "The candidate pairs" })
+  async getUnlinkedTransferPairs(
+    @Request() req,
+    @Query("accountIds") accountIds?: string,
+  ) {
+    const ids =
+      typeof accountIds === "string" && accountIds.length > 0
+        ? accountIds.split(",").filter(Boolean)
+        : undefined;
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    for (const id of ids ?? []) {
+      if (!uuidRegex.test(id))
+        throw new BadRequestException(
+          tr(
+            "errors.netWorth.invalidAccountIds",
+            "accountIds must be comma-separated UUIDs",
+          ),
+        );
+    }
+    return this.transferPairLinks.findCandidates(
+      req.user.id,
+      await this.scopeIds(req, ids),
+    );
+  }
+
+  /**
+   * Pair two legs a person confirmed are one transfer, and rebuild the basis
+   * the pairing lets the destination carry.
+   *
+   * Not `@AllowDelegate`: this writes, and a delegate's investment grant is a
+   * read of the section.
+   */
+  @Post("link-transfer-pair")
+  @ApiOperation({
+    summary: "Link the two legs of one share transfer to each other",
+  })
+  @ApiResponse({ status: 200, description: "The legs are linked" })
+  @ApiResponse({
+    status: 400,
+    description: "The two rows are not the legs of one transfer",
+  })
+  async linkTransferPair(@Request() req, @Body() dto: LinkTransferPairDto) {
+    return this.transferPairLinks.linkPair(
+      req.user.id,
+      dto.outTransactionId,
+      dto.inTransactionId,
+    );
+  }
 
   /**
    * For an acting delegate, restrict the account-id filter to the accounts

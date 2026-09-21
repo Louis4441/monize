@@ -299,6 +299,14 @@
     "dateRequired": "Tarih gereklidir",
     "acquisitionPriceRequired": "Hisse başına fiyat zorunludur ve sıfırdan büyük olmalıdır. Maliyeti bilinmeyen hisseler için \"Hisse Ekle\" kullanın."
   },
+  "unlinkedTransfers": {
+    "title": "İki ayrı satır olarak kaydedilmiş transferler",
+    "subtitle": "Her biri, her hesapta bir kez olmak üzere iki kez girilmiş tek bir transfer gibi görünüyor. İki satır bağlanana kadar alan hesap, veren hesabın bıraktığı maliyeti devralamaz; bu yüzden maliyet esası ve kazancı bilinmiyor olarak görünür.",
+    "pair": "{date} tarihinde {quantity} {security}, {from} hesabından {to} hesabına",
+    "link": "Bağla",
+    "linking": "Bağlanıyor...",
+    "linkFailed": "Bu iki satır bağlanamadı. Sayfayı yenileyip tekrar deneyin."
+  },
   "portfolioPerformance": {
     "title": "Portföy performansı",
     "subtitle": "Yatırımlarınızın, para yatırma, para çekme ve yatırıma dönüştürülmemiş nakdin etkisi çıkarıldıktan sonraki performansı.",

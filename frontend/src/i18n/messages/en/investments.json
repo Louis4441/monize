@@ -68,6 +68,14 @@
     "returnDiagnosticsRepairFiltered": "Add the missing prices on each security's price history, or leave those accounts out of the view with the account filter above; the returns are measured over the accounts shown.",
     "unpricedHoldings": "Partial valuation: {count, plural, one {# holding has} other {# holdings have}} no current price ({symbols}), so the values below exclude {count, plural, one {it} other {them}}."
   },
+  "unlinkedTransfers": {
+    "title": "Transfers recorded as two separate rows",
+    "subtitle": "Each of these looks like one transfer entered twice, once in each account. Until the two rows are linked, the receiving account cannot take the cost the sending one gave up, so its cost basis and gain read as unknown.",
+    "pair": "{quantity} {security} on {date}, {from} to {to}",
+    "link": "Link",
+    "linking": "Linking...",
+    "linkFailed": "These two rows could not be linked. Reload the page and try again."
+  },
   "portfolioPerformance": {
     "title": "Portfolio performance",
     "subtitle": "How your investments did, without the effect of deposits, withdrawals and uninvested cash.",

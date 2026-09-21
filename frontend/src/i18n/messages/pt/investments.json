@@ -299,6 +299,14 @@
     "dateRequired": "A data é obrigatória",
     "acquisitionPriceRequired": "O preço por ação é obrigatório e deve ser maior que zero. Use «Adicionar Ações» para ações adquiridas sem um custo conhecido."
   },
+  "unlinkedTransfers": {
+    "title": "Transferências registadas como duas linhas separadas",
+    "subtitle": "Cada uma parece uma transferência introduzida duas vezes, uma por conta. Enquanto as duas linhas não estiverem ligadas, a conta que recebe não pode assumir o custo que a de origem cedeu, pelo que o seu custo de aquisição e a mais-valia ficam desconhecidos.",
+    "pair": "{quantity} {security} em {date}, de {from} para {to}",
+    "link": "Ligar",
+    "linking": "A ligar...",
+    "linkFailed": "Não foi possível ligar estas duas linhas. Recarregue a página e tente novamente."
+  },
   "portfolioPerformance": {
     "title": "Desempenho da carteira",
     "subtitle": "Como os seus investimentos se comportaram, sem o efeito dos depósitos, dos levantamentos e do numerário não investido.",

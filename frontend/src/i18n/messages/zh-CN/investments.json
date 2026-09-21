@@ -299,6 +299,14 @@
     "dateRequired": "日期为必填项",
     "acquisitionPriceRequired": "每股价格为必填项，且必须大于零。对于成本未知的股份，请使用“增加股份”。"
   },
+  "unlinkedTransfers": {
+    "title": "记为两条独立记录的转移",
+    "subtitle": "每一项看起来都像同一笔转移被录入了两次，每个账户各一次。在两条记录关联之前，接收账户无法承接转出账户放弃的成本，因此其成本基础和收益显示为未知。",
+    "pair": "{date} 的 {quantity} {security}，从 {from} 到 {to}",
+    "link": "关联",
+    "linking": "正在关联...",
+    "linkFailed": "无法关联这两条记录。请重新加载页面后再试。"
+  },
   "portfolioPerformance": {
     "title": "投资组合表现",
     "subtitle": "扣除存入、取出资金和未投资现金影响后，你的投资本身的表现。",

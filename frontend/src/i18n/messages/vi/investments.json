@@ -299,6 +299,14 @@
     "dateRequired": "Ngày là bắt buộc",
     "acquisitionPriceRequired": "Giá mỗi cổ phiếu là bắt buộc và phải lớn hơn không. Dùng \"Thêm cổ phiếu\" cho cổ phiếu có được mà không biết giá gốc."
   },
+  "unlinkedTransfers": {
+    "title": "Giao dịch chuyển được ghi thành hai dòng riêng",
+    "subtitle": "Mỗi mục trông như một giao dịch chuyển được nhập hai lần, mỗi tài khoản một lần. Chừng nào hai dòng chưa được liên kết, tài khoản nhận không thể tiếp nhận giá vốn mà tài khoản gửi đã nhường, nên giá vốn và lãi của nó hiển thị là không xác định.",
+    "pair": "{quantity} {security} ngày {date}, từ {from} đến {to}",
+    "link": "Liên kết",
+    "linking": "Đang liên kết...",
+    "linkFailed": "Không thể liên kết hai dòng này. Hãy tải lại trang và thử lại."
+  },
   "portfolioPerformance": {
     "title": "Hiệu suất danh mục",
     "subtitle": "Khoản đầu tư của bạn đã hoạt động thế nào, không tính ảnh hưởng của các khoản nạp, rút và tiền mặt chưa đầu tư.",
