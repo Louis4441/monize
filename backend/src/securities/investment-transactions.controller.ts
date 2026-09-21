@@ -90,8 +90,9 @@ export class InvestmentTransactionsController {
       if (!uuidRegex.test(id))
         throw new BadRequestException(
           tr(
-            "errors.netWorth.invalidAccountIds",
-            "accountIds must be comma-separated UUIDs",
+            "errors.params.mustBeCsvUuids",
+            'The value of "accountIds" must be a comma-separated list of UUIDs',
+            { param: "accountIds" },
           ),
         );
     }
@@ -258,16 +259,18 @@ export class InvestmentTransactionsController {
     if (startDate !== undefined && !dateRegex.test(startDate)) {
       throw new BadRequestException(
         tr(
-          "errors.securities.startDateFormat",
-          "startDate must be in YYYY-MM-DD format",
+          "errors.params.mustBeCalendarDate",
+          'The value of "startDate" must be a date in YYYY-MM-DD format',
+          { param: "startDate" },
         ),
       );
     }
     if (endDate !== undefined && !dateRegex.test(endDate)) {
       throw new BadRequestException(
         tr(
-          "errors.securities.endDateFormat",
-          "endDate must be in YYYY-MM-DD format",
+          "errors.params.mustBeCalendarDate",
+          'The value of "endDate" must be a date in YYYY-MM-DD format',
+          { param: "endDate" },
         ),
       );
     }
@@ -421,16 +424,18 @@ export class InvestmentTransactionsController {
     if (startDate !== undefined && !dateRegex.test(startDate)) {
       throw new BadRequestException(
         tr(
-          "errors.securities.startDateFormat",
-          "startDate must be in YYYY-MM-DD format",
+          "errors.params.mustBeCalendarDate",
+          'The value of "startDate" must be a date in YYYY-MM-DD format',
+          { param: "startDate" },
         ),
       );
     }
     if (endDate !== undefined && !dateRegex.test(endDate)) {
       throw new BadRequestException(
         tr(
-          "errors.securities.endDateFormat",
-          "endDate must be in YYYY-MM-DD format",
+          "errors.params.mustBeCalendarDate",
+          'The value of "endDate" must be a date in YYYY-MM-DD format',
+          { param: "endDate" },
         ),
       );
     }
@@ -473,32 +478,36 @@ export class InvestmentTransactionsController {
     if (!startDate || !dateRegex.test(startDate)) {
       throw new BadRequestException(
         tr(
-          "errors.securities.startDateRequired",
-          "startDate is required and must be in YYYY-MM-DD format",
+          "errors.params.requiredCalendarDate",
+          'A value for "startDate" is required, as a date in YYYY-MM-DD format',
+          { param: "startDate" },
         ),
       );
     }
     if (!endDate || !dateRegex.test(endDate)) {
       throw new BadRequestException(
         tr(
-          "errors.securities.endDateRequired",
-          "endDate is required and must be in YYYY-MM-DD format",
+          "errors.params.requiredCalendarDate",
+          'A value for "endDate" is required, as a date in YYYY-MM-DD format',
+          { param: "endDate" },
         ),
       );
     }
     if (startDate > endDate) {
       throw new BadRequestException(
         tr(
-          "errors.securities.startDateBeforeEndDate",
-          "startDate must be on or before endDate",
+          "errors.params.onOrBefore",
+          'The value of "startDate" must be on or before "endDate"',
+          { param: "startDate", other: "endDate" },
         ),
       );
     }
     if (granularity && granularity !== "month" && granularity !== "day") {
       throw new BadRequestException(
         tr(
-          "errors.securities.invalidGranularity",
-          "granularity must be 'month' or 'day' if provided",
+          "errors.params.mustBeOneOf",
+          'The value of "granularity" must be one of: month, day',
+          { param: "granularity", options: "month, day" },
         ),
       );
     }

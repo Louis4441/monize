@@ -1966,8 +1966,9 @@ export class AccountsService {
     if (!Array.isArray(accountIds)) {
       throw new BadRequestException(
         tr(
-          "errors.accounts.accountIdsMustBeArray",
-          "accountIds must be an array",
+          "errors.params.mustBeArray",
+          'The value of "accountIds" must be an array',
+          { param: "accountIds" },
         ),
       );
     }

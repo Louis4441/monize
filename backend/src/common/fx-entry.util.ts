@@ -61,8 +61,9 @@ export function normalizeFxEntry(
   if (hasAmount !== hasCode) {
     throw new BadRequestException(
       tr(
-        "errors.transactions.fxFieldsIncomplete",
-        "originalAmount and originalCurrencyCode must be provided together",
+        "errors.params.requiresOther",
+        'A value for "originalAmount" requires one for "originalCurrencyCode" as well',
+        { param: "originalAmount", other: "originalCurrencyCode" },
       ),
     );
   }
@@ -90,8 +91,9 @@ export function normalizeFxEntry(
   if (original > 0 !== amount > 0 && original !== 0 && amount !== 0) {
     throw new BadRequestException(
       tr(
-        "errors.transactions.fxSignMismatch",
-        "originalAmount and amount must have the same sign",
+        "errors.params.sameSign",
+        'The values of "originalAmount" and "amount" must have the same sign',
+        { param: "originalAmount", other: "amount" },
       ),
     );
   }

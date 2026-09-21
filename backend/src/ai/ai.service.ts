@@ -855,8 +855,9 @@ export class AiService {
       if (!validateUrlBasicSafety(baseUrl)) {
         throw new BadRequestException(
           tr(
-            "errors.ai.baseUrlInvalidBasic",
-            "baseUrl must be a valid HTTP or HTTPS URL",
+            "errors.params.mustBeUrl",
+            'The value of "baseUrl" must be a valid HTTP or HTTPS URL',
+            { param: "baseUrl" },
           ),
         );
       }
@@ -865,8 +866,9 @@ export class AiService {
       if (!isSafe) {
         throw new BadRequestException(
           tr(
-            "errors.ai.baseUrlInvalidExternal",
-            "baseUrl must be a valid HTTP/HTTPS URL pointing to an external host",
+            "errors.params.mustBeExternalUrl",
+            'The value of "baseUrl" must be a valid HTTP or HTTPS URL pointing to a host outside this server',
+            { param: "baseUrl" },
           ),
         );
       }

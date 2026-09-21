@@ -267,8 +267,9 @@ export class MonteCarloService {
     if (!Array.isArray(scenarioIds)) {
       throw new BadRequestException(
         tr(
-          "errors.monteCarlo.scenarioIdsMustBeArray",
-          "scenarioIds must be an array",
+          "errors.params.mustBeArray",
+          'The value of "scenarioIds" must be an array',
+          { param: "scenarioIds" },
         ),
       );
     }

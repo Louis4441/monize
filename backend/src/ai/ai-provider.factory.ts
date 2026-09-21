@@ -39,8 +39,9 @@ export class AiProviderFactory {
         if (!apiKey) {
           throw new BadRequestException(
             tr(
-              "errors.ai.ollamaCloudApiKeyRequired",
-              "apiKey is required for ollama-cloud provider",
+              "errors.params.requiredForProvider",
+              'A value for "apiKey" is required for the ollama-cloud provider',
+              { param: "apiKey", provider: "ollama-cloud" },
             ),
           );
         }
@@ -56,8 +57,9 @@ export class AiProviderFactory {
         if (!config.baseUrl) {
           throw new BadRequestException(
             tr(
-              "errors.ai.openaiCompatibleBaseUrlRequired",
-              "baseUrl is required for openai-compatible provider",
+              "errors.params.requiredForProvider",
+              'A value for "baseUrl" is required for the openai-compatible provider',
+              { param: "baseUrl", provider: "openai-compatible" },
             ),
           );
         }
