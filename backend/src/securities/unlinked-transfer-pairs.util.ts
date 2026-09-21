@@ -84,8 +84,9 @@ export function unlinkedTransferPairsSql(): string {
              AND i.account_id = ANY($2::UUID[])
              AND o.security_id IS NOT NULL
              AND COALESCE(o.quantity, 0) <> 0
-             -- Rows as EFFECTS on both legs: a void row recorded something
-             -- that did not happen, and cannot be half of a transfer.
+             -- Rows as EFFECTS on both legs: renders o.status != 'VOID' and
+             -- i.status != 'VOID', because a void row recorded something that
+             -- did not happen and cannot be half of a transfer.
              AND ${investmentEffectStatusSql("o")}
              AND ${investmentEffectStatusSql("i")}
              -- Neither leg is already paired. A row pointing at a leg outside

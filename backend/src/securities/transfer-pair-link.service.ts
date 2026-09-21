@@ -97,6 +97,11 @@ export class TransferPairLinkService {
     }
 
     return withScopedDb(this.dataSource, async (manager) => {
+      // Rows as RECORDS, includes VOID: a void leg has to be READ in order to
+      // be refused. `assertPairable` names it as the reason the pairing was
+      // rejected, which a query that filtered it out could not do -- the two
+      // rows would simply be "not found", and a reader would go looking for a
+      // deletion that never happened.
       const repo = manager.getRepository(InvestmentTransaction);
       // Locked in id order, so two requests over one pair cannot deadlock.
       const [first, second] = [outTransactionId, inTransactionId].sort();
