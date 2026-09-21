@@ -28,7 +28,23 @@ interface FakeRow {
  */
 describe("PortfolioPeriodResultService", () => {
   let service: PortfolioPeriodResultService;
-  let netWorth: { getDailyInvestments: jest.Mock };
+  let netWorth: {
+    getDailyInvestments: jest.Mock;
+    getLastPricedDays: jest.Mock;
+    loadValuationSeries: jest.Mock;
+  };
+  /**
+   * The accepted closes the share-moving legs are valued from, keyed by
+   * security. Empty unless a case puts a transfer in the window: the service
+   * asks for no prices where no leg needs one.
+   */
+  let storedCloses: Map<string, Array<{ date: string; close: number }>>;
+  /**
+   * The trading session behind each boundary the service asks about. The
+   * fixture series runs over calendar days, so a session is its own day unless
+   * a test says otherwise -- which is what a weekend boundary does.
+   */
+  let pricedSessions: Map<string, string | null>;
   let exchangeRates: { ensureRatesForDate: jest.Mock };
   let mocks: ReturnType<typeof createScopedDbMocks>;
   let scopeRows: FakeRow[];
@@ -36,6 +52,7 @@ describe("PortfolioPeriodResultService", () => {
   let investedRows: FakeRow[];
   let rateRows: FakeRow[];
   let settledTradeRows: FakeRow[];
+  let shareTransferRows: FakeRow[];
   let mixedSplitRows: FakeRow[];
   let firstTxRows: FakeRow[];
   let queries: Array<{ sql: string; params: unknown[] }>;
@@ -60,6 +77,7 @@ describe("PortfolioPeriodResultService", () => {
     investedRows = [];
     rateRows = [];
     settledTradeRows = [{ count: "0" }];
+    shareTransferRows = [{ count: "0" }];
     mixedSplitRows = [{ count: "0" }];
     firstTxRows = [{ date: "2026-01-02" }];
 
@@ -77,6 +95,7 @@ describe("PortfolioPeriodResultService", () => {
         if (sql.includes("it.action AS action")) return investedRows;
         if (sql.includes("SUM(t.amount)")) return flowRows;
         if (sql.includes("it.funding_account_id")) return settledTradeRows;
+        if (sql.includes("it.linked_transaction_id")) return shareTransferRows;
         if (sql.includes("COUNT(*) AS count")) return mixedSplitRows;
         if (sql.includes("FROM exchange_rates")) return rateRows;
         if (sql.includes("FROM accounts")) return scopeRows;
@@ -84,7 +103,24 @@ describe("PortfolioPeriodResultService", () => {
       },
     );
 
-    netWorth = { getDailyInvestments: jest.fn().mockResolvedValue([]) };
+    pricedSessions = new Map();
+    storedCloses = new Map();
+    netWorth = {
+      getDailyInvestments: jest.fn().mockResolvedValue([]),
+      loadValuationSeries: jest.fn(async () => ({
+        stored: storedCloses,
+        txFallback: new Map(),
+      })),
+      getLastPricedDays: jest.fn(
+        async (_userId: string, boundaries: readonly string[]) =>
+          new Map(
+            boundaries.map((day) => [
+              day,
+              pricedSessions.has(day) ? pricedSessions.get(day) : day,
+            ]),
+          ),
+      ),
+    };
     exchangeRates = { ensureRatesForDate: jest.fn().mockResolvedValue(0) };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -661,8 +697,9 @@ describe("PortfolioPeriodResultService", () => {
       date: "2026-01-02",
       currency: "CAD",
       action: "BUY",
+      security_id: "sec-1",
       total: "8000",
-      gross: "0",
+      quantity: "80",
     };
 
     /** 8,000 bought on the first day, worth 8,800 today; the baseline is empty. */
@@ -810,6 +847,248 @@ describe("PortfolioPeriodResultService", () => {
       expect(result.investmentCapitalFlows).toBe(8_000);
       expect(result.investmentPnl).toBe(100);
       expect(result.investmentReturnPercent).toBe(1.25);
+    });
+  });
+  /**
+   * A caller that NAMES its window instead of dating it.
+   *
+   * The window a portfolio chart draws is deliberately not the period its
+   * button names: `resolveRangePreset` widens 1D to a week so a daily fallback
+   * has more than one point, `portfolio-range-window.ts` opens 3M a day early
+   * so the first plotted close precedes the quarter, and `all` resolves to no
+   * start date at all. Sending the drawn window measured those days, so the
+   * chart's card and the performance card beside it -- which resolves its
+   * windows from `portfolio-period-presets.util.ts` -- reported different
+   * figures under the same caption. A preset is resolved HERE, from that same
+   * file, so there is one window per name.
+   */
+  describe("a named window", () => {
+    it("measures 1D over the day, not over whatever dates the caller holds", async () => {
+      netWorth.getDailyInvestments.mockResolvedValue([
+        point("2026-09-16", 20_000),
+        point("2026-09-17", 20_400),
+      ]);
+
+      await service.getPeriodResult("user-1", { period: "1d" });
+
+      // Today, measured from the close before it -- not the week
+      // `resolveRangePreset('1d')` hands a chart to draw.
+      expect(netWorth.getDailyInvestments).toHaveBeenCalledWith(
+        "user-1",
+        "2026-09-16",
+        "2026-09-17",
+        undefined,
+        "CAD",
+        { fetchMissing: undefined },
+      );
+    });
+
+    it("opens each preset where the presets file says, not a day early", async () => {
+      netWorth.getDailyInvestments.mockResolvedValue(flatSeries());
+
+      for (const [preset, start] of [
+        ["3m", "2026-06-19"],
+        ["1y", "2025-09-17"],
+        ["5y", "2021-09-17"],
+      ] as const) {
+        netWorth.getDailyInvestments.mockClear();
+        await service.getPeriodResult("user-1", { period: preset });
+        expect(netWorth.getDailyInvestments).toHaveBeenCalledWith(
+          "user-1",
+          start,
+          "2026-09-17",
+          undefined,
+          "CAD",
+          { fetchMissing: undefined },
+        );
+      }
+    });
+
+    it("opens the all-time window on the close before the scope's first holding", async () => {
+      // The range with no arithmetic: the client cannot date it, so it sent
+      // nothing and both figures read n/a for every account.
+      netWorth.getDailyInvestments.mockResolvedValue([
+        point("2026-01-01", 0),
+        point("2026-09-17", 20_000),
+      ]);
+
+      const result = await service.getPeriodResult("user-1", { period: "all" });
+
+      expect(netWorth.getDailyInvestments).toHaveBeenCalledWith(
+        "user-1",
+        "2026-01-01",
+        "2026-09-17",
+        undefined,
+        "CAD",
+        { fetchMissing: undefined },
+      );
+      expect(result.startDate).toBe("2026-01-01");
+      expect(result.investmentPnl).not.toBeNull();
+    });
+
+    it("answers the all-time preset exactly as the since-inception figure", async () => {
+      // Two spellings of one window would be two answers to one question.
+      netWorth.getDailyInvestments.mockResolvedValue([
+        point("2026-01-01", 0),
+        point("2026-09-17", 20_000),
+      ]);
+
+      expect(
+        await service.getPeriodResult("user-1", { period: "all" }),
+      ).toEqual(await service.getInvestedResultSinceInception("user-1"));
+    });
+
+    it("has no window to measure for a scope that never held anything", async () => {
+      firstTxRows = [{ date: null }];
+
+      const result = await service.getPeriodResult("user-1", { period: "all" });
+
+      expect(result.investmentPnl).toBeNull();
+      expect(result.reasons).toContain("noValueSeries");
+      expect(netWorth.getDailyInvestments).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * Which SESSION a window is measured from, as opposed to which calendar day
+   * it is dated.
+   *
+   * `getDailyInvestments` values every calendar day from the latest close at or
+   * before it, so a Monday 1D window opens on Sunday and carries Friday's
+   * close. A surface printing the boundary told the reader the figure was
+   * measured from a day the market was shut.
+   */
+  describe("the session behind the boundary", () => {
+    it("names the trading day the opening value came from", async () => {
+      // Monday 2026-09-21 measured from Sunday the 20th, priced on Friday.
+      pricedSessions.set("2026-09-20", "2026-09-18");
+      netWorth.getDailyInvestments.mockResolvedValue([
+        point("2026-09-20", 20_000),
+        point("2026-09-21", 20_400),
+      ]);
+
+      const result = await service.getPeriodResult("user-1", {
+        startDate: "2026-09-21",
+        baselineDate: "2026-09-20",
+        endDate: "2026-09-21",
+      });
+
+      expect(result.startDate).toBe("2026-09-20");
+      expect(result.startPriceDate).toBe("2026-09-18");
+      expect(netWorth.getLastPricedDays).toHaveBeenCalledWith(
+        "user-1",
+        ["2026-09-20"],
+        ["brok-1", "cash-1"],
+      );
+    });
+
+    it("leaves the session unknown rather than substituting the calendar day", async () => {
+      pricedSessions.set("2026-01-02", null);
+      netWorth.getDailyInvestments.mockResolvedValue(flatSeries());
+
+      const result = await run();
+
+      expect(result.startDate).toBe("2026-01-02");
+      expect(result.startPriceDate).toBeNull();
+    });
+  });
+  /**
+   * A share-moving leg is valued at the day's accepted CLOSE, not at the basis
+   * the row carries.
+   *
+   * `IV` moves by the position's market value, so a leg valued at anything
+   * else leaves the difference in the P&L as a gain nobody made. Valuing it at
+   * the same close `positionCloseAsOf` gave the valuation makes the two cancel
+   * exactly, which is what lets the invested figures report over a window a
+   * transfer falls in -- a portfolio built by transferring holdings in reported
+   * "n/a" for every window that reached them (`docs/specs/portfolio-period-result.md`
+   * section 10.6).
+   */
+  describe("a share transfer from outside the portfolio", () => {
+    /** A transfer leg recorded at a historical cost, far from the day's close. */
+    const transferRow = {
+      date: "2026-06-01",
+      currency: "CAD",
+      action: "TRANSFER_IN",
+      security_id: "sec-1",
+      total: "0",
+      quantity: "100",
+    };
+
+    beforeEach(() => {
+      shareTransferRows = [{ count: "1" }];
+      investedRows = [transferRow];
+      // 100 shares arrive at 100 on the day: IV rises by 10,000 and nothing
+      // was earned.
+      netWorth.getDailyInvestments.mockResolvedValue([
+        point("2026-01-02", 10_000),
+        point("2026-06-01", 20_000),
+        point("2026-09-17", 20_000),
+      ]);
+      storedCloses = new Map([["sec-1", [{ date: "2026-06-01", close: 100 }]]]);
+    });
+
+    it("reports the invested result, with the transfer counted as capital", async () => {
+      const result = await run();
+
+      // 20,000 - 10,000 - 10,000 of arriving shares = nothing earned.
+      expect(result.investmentPnl).toBe(0);
+      expect(result.investmentCapitalFlows).toBe(10_000);
+      expect(result.investedReasons).not.toContain("externallySettledTrade");
+    });
+
+    it("asks for the close of the security whose leg it is, over the window", async () => {
+      await run();
+
+      expect(netWorth.loadValuationSeries).toHaveBeenCalledWith(
+        ["sec-1"],
+        "2026-01-02",
+        "2026-09-17",
+      );
+    });
+
+    it("still withholds the ACCOUNT's result, which has no flow to net it", async () => {
+      // The shares are value that entered `MV` with no cash crossing the
+      // boundary: that subtraction is not the market's, and never was.
+      const result = await run();
+
+      expect(result.investmentResult).toBeNull();
+      expect(result.reasons).toContain("externallySettledTrade");
+    });
+
+    it("withholds the invested figures, naming the price to add, when nothing priced the leg", async () => {
+      storedCloses = new Map();
+
+      const result = await run();
+
+      expect(result.investmentPnl).toBeNull();
+      // A price for a named security on a named day, not a movement nobody
+      // can act on.
+      expect(result.investedReasons).toContain("incompletePrices");
+      expect(result.investedReasons).not.toContain("externallySettledTrade");
+    });
+
+    it("dates the unvaluable leg, so the reader is sent to one price history", async () => {
+      storedCloses = new Map();
+
+      const result = await run();
+
+      expect(result.incompleteRanges.prices).toEqual([
+        { key: "sec-1", start: "2026-06-01", end: "2026-06-01" },
+      ]);
+    });
+
+    it("asks for no close at all when no leg moves shares", async () => {
+      investedRows = [];
+      shareTransferRows = [{ count: "0" }];
+
+      await run();
+
+      expect(netWorth.loadValuationSeries).toHaveBeenCalledWith(
+        [],
+        "2026-01-02",
+        "2026-09-17",
+      );
     });
   });
 });

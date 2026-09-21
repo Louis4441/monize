@@ -82,7 +82,13 @@ function canonicalSeries(from = "2025-09-17", to = TODAY): SeriesPoint[] {
 describe("PortfolioPeriodResultsBatchService", () => {
   let batch: PortfolioPeriodResultsBatchService;
   let single: PortfolioPeriodResultService;
-  let netWorth: { getDailyInvestments: jest.Mock };
+  let netWorth: {
+    getDailyInvestments: jest.Mock;
+    getLastPricedDays: jest.Mock;
+    loadValuationSeries: jest.Mock;
+  };
+  /** The accepted closes a share-moving leg is valued from; see the single-range spec. */
+  let storedCloses: Map<string, Array<{ date: string; close: number }>>;
   let exchangeRates: { ensureRatesForDate: jest.Mock };
   let mocks: ReturnType<typeof createScopedDbMocks>;
   let scopeRows: FakeRow[];
@@ -96,6 +102,7 @@ describe("PortfolioPeriodResultsBatchService", () => {
   }>;
   let rateRows: FakeRow[];
   let settledTradeDays: Array<{ date: string; count: string }>;
+  let shareTransferDays: Array<{ date: string; count: string }>;
   let mixedSplitDays: Array<{ date: string; count: string }>;
   let series: SeriesPoint[];
   let inception: string | null;
@@ -134,6 +141,7 @@ describe("PortfolioPeriodResultsBatchService", () => {
     ];
     rateRows = [];
     settledTradeDays = [];
+    shareTransferDays = [];
     mixedSplitDays = [];
 
     const preferenceRepo = {
@@ -165,6 +173,8 @@ describe("PortfolioPeriodResultsBatchService", () => {
           return flowRows.filter((row) => inWindow(row.date));
         if (sql.includes("it.funding_account_id"))
           return counts(settledTradeDays);
+        if (sql.includes("it.linked_transaction_id"))
+          return counts(shareTransferDays);
         if (sql.includes("COUNT(*) AS count")) return counts(mixedSplitDays);
         if (sql.includes("FROM exchange_rates")) return rateRows;
         if (sql.includes("FROM accounts")) return scopeRows;
@@ -172,10 +182,21 @@ describe("PortfolioPeriodResultsBatchService", () => {
       },
     );
 
+    storedCloses = new Map();
     netWorth = {
+      loadValuationSeries: jest.fn(async () => ({
+        stored: storedCloses,
+        txFallback: new Map(),
+      })),
       getDailyInvestments: jest.fn(
         async (_userId: string, from: string, to: string) =>
           series.filter((p) => p.date >= from && p.date <= to),
+      ),
+      // The fixture series runs over calendar days and every one of them
+      // carries a close, so each boundary's session is its own day.
+      getLastPricedDays: jest.fn(
+        async (_userId: string, boundaries: readonly string[]) =>
+          new Map(boundaries.map((day) => [day, day])),
       ),
     };
 

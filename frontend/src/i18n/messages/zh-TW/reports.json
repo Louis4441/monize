@@ -1187,7 +1187,7 @@
     "investmentReturnTooltip": "僅針對證券的按時間加權報酬率。某一天存入或提出的資金不會影響它，未投資現金既不計入結果，也不計入用於衡量它的基準。",
     "flowsPartial": "只有部分經過這些帳戶的資金可以換算：{amount}。",
     "incompleteTooltip": "此期間內有些天缺少價格、匯率或現金餘額，因此依賴每一天資料的數字不會顯示。",
-    "priorCloseTooltip": "以上一交易日（{date}）收盤價為基準計算。",
+    "measuredFromClose": "自 {date} 收盤起",
     "unmeasuredFlowTooltip": "資金以此處無法計算的方式轉入或轉出這些帳戶：例如某筆交易透過這些帳戶以外的帳戶結算，或某個拆分將投資項目與一般支出混在一起。投資結果不會顯示，因為其中一部分將是您自己的資金。",
     "closeBoundsTooltip": "這些數據是根據已儲存的 {start} 和 {end} 收盤價計算得出。上方圖表顯示的是當天的即時價格，因此圖表可能會變動，而這些數據保持不變。",
     "notAvailable": "不適用",

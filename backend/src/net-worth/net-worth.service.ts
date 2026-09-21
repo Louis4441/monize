@@ -1375,6 +1375,66 @@ export class NetWorthService {
     return { date: rows[0]?.date ?? null };
   }
 
+  /**
+   * The newest day on or before each boundary on which any security the scope
+   * held by then actually has a close -- the trading session a boundary's value
+   * came from, as opposed to the calendar day it is dated.
+   *
+   * The mirror of {@link getFirstPricedDay}, and it exists for the same reason:
+   * `getDailyInvestments` values EVERY calendar day at the latest close at or
+   * before it, so a Sunday boundary carries Friday's close and a reader told
+   * the figure is measured "from Sunday" is being told the wrong day. Only
+   * `security_prices` knows which days a price was struck.
+   *
+   * Several boundaries in one round trip because the batch route asks for one
+   * per preset, and the two routes must answer the same question the same way.
+   * A boundary with nothing priced on or before it maps to **null**: the
+   * session is unknown, never substituted with the calendar day.
+   */
+  async getLastPricedDays(
+    userId: string,
+    boundaries: readonly string[],
+    accountIds?: string[],
+  ): Promise<Map<string, string | null>> {
+    const unique = [...new Set(boundaries)];
+    const result = new Map<string, string | null>(
+      unique.map((day) => [day, null]),
+    );
+    if (unique.length === 0) return result;
+
+    const params: any[] = [userId, unique];
+    let accountFilter = "";
+    if (accountIds && accountIds.length > 0) {
+      const placeholders = accountIds.map((_, i) => `$${i + 3}`).join(", ");
+      accountFilter = `AND a.id IN (${placeholders})`;
+      params.push(...accountIds);
+    }
+
+    const rows: Array<{ boundary: string; date: string | null }> =
+      await this.scopedQuery(
+        `SELECT TO_CHAR(b.day, 'YYYY-MM-DD') AS boundary, p.date
+           FROM UNNEST($2::DATE[]) AS b(day)
+           LEFT JOIN LATERAL (
+             SELECT MAX(sp.price_date)::TEXT AS date
+               FROM security_prices sp
+              WHERE sp.price_date <= b.day
+                AND sp.security_id IN (
+                      SELECT DISTINCT it.security_id
+                        FROM investment_transactions it
+                        JOIN accounts a ON a.id = it.account_id
+                       WHERE a.user_id = $1
+                         AND it.security_id IS NOT NULL
+                         AND it.status != 'VOID'
+                         AND it.transaction_date <= b.day
+                         ${accountFilter}
+                    )
+           ) p ON TRUE`,
+        params,
+      );
+    for (const row of rows) result.set(row.boundary, row.date ?? null);
+    return result;
+  }
+
   async getDailyInvestments(
     userId: string,
     startDate?: string,

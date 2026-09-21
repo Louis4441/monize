@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate musi mieć format YYYY-MM-DD",
     "invalidAccountIds": "accountIds musi być listą UUID rozdzielonych przecinkami",
     "invalidGranularity": "granularity musi być 'daily' lub 'monthly'",
-    "invalidPeriods": "periods musi być listą wstępnie zdefiniowanych okresów rozdzielonych przecinkami"
+    "invalidPeriods": "periods musi być listą wstępnie zdefiniowanych okresów rozdzielonych przecinkami",
+    "invalidPeriod": "period musi być jednym ze wstępnie zdefiniowanych okresów"
   },
   "notifications": {
     "notFound": "Nie znaleziono powiadomienia o ID {{ id }}",
@@ -425,6 +426,16 @@
   "securities": {
     "exchangeRateUnavailable": "Nie można ustalić kursu wymiany dla {{ from }} -> {{ to }} na dzień transakcji. Podaj jawny exchangeRate, aby księgowanie na koncie gotówkowym było poprawne.",
     "accountMustBeInvestment": "Konto musi być typu INVESTMENT",
+    "transferPairSameRow": "Dwie strony jednego transferu nie mogą być tą samą transakcją",
+    "transferPairNotFound": "Jedna z dwóch transakcji już nie istnieje",
+    "transferPairAlreadyLinked": "Jedna z tych stron jest już powiązana z inną transakcją",
+    "transferPairVoid": "Anulowana transakcja niczego nie zapisała, więc nie może być połową transferu",
+    "transferPairActions": "Te dwie operacje nie są stroną wychodzącą i przychodzącą jednego transferu",
+    "transferPairSecurity": "Obie strony muszą dotyczyć tego samego papieru wartościowego",
+    "transferPairDate": "Obie strony muszą mieć tę samą datę",
+    "transferPairSameAccount": "Transfer przenosi jednostki między dwoma różnymi rachunkami",
+    "transferPairQuantity": "Obie strony muszą przenosić tę samą liczbę jednostek",
+    "transferPairOutsidePortfolio": "Obie strony muszą znajdować się na rachunkach inwestycyjnych tego portfela",
     "providerCurrencyMismatch": "Odrzucono aktualizację ceny dla {{ symbol }}: {{ provider }} notuje ją w {{ reported }}, ale papier wartościowy jest zapisany w {{ configured }}. Popraw walutę, symbol lub giełdę papieru wartościowego, a następnie odśwież ponownie.",
     "securityIdRequired": "Identyfikator papieru wartościowego jest wymagany dla transakcji {{ action }}",
     "splitRatioRequired": "Współczynnik splitu (ilość) musi być większy od zera",

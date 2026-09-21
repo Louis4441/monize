@@ -360,7 +360,8 @@
     "invalidBaselineDate": "[XX-baselineDate must be YYYY-MM-DD-XX]",
     "invalidAccountIds": "[XX-accountIds must be comma-separated UUIDs-XX]",
     "invalidGranularity": "[XX-granularity must be 'daily' or 'monthly'-XX]",
-    "invalidPeriods": "[XX-periods must be comma-separated period presets-XX]"
+    "invalidPeriods": "[XX-periods must be comma-separated period presets-XX]",
+    "invalidPeriod": "[XX-period must be one of the period presets-XX]"
   },
   "notifications": {
     "notFound": "[XX-Notification with ID {{ id }} not found-XX]",
@@ -435,6 +436,16 @@
   },
   "securities": {
     "accountMustBeInvestment": "[XX-Account must be of type INVESTMENT-XX]",
+    "transferPairSameRow": "[XX-A transfer's two legs cannot be the same transaction-XX]",
+    "transferPairNotFound": "[XX-One of the two transactions no longer exists-XX]",
+    "transferPairAlreadyLinked": "[XX-One of these legs is already linked to another transaction-XX]",
+    "transferPairVoid": "[XX-A void transaction recorded nothing, so it cannot be half of a transfer-XX]",
+    "transferPairActions": "[XX-These two actions are not the outgoing and incoming legs of one transfer-XX]",
+    "transferPairSecurity": "[XX-Both legs must move the same security-XX]",
+    "transferPairDate": "[XX-Both legs must be dated the same day-XX]",
+    "transferPairSameAccount": "[XX-A transfer moves shares between two different accounts-XX]",
+    "transferPairQuantity": "[XX-Both legs must move the same number of shares-XX]",
+    "transferPairOutsidePortfolio": "[XX-Both legs must be on investment accounts of this portfolio-XX]",
     "providerCurrencyMismatch": "[XX-Price update refused for {{ symbol }}: {{ provider }} quotes it in {{ reported }}, but the security is recorded in {{ configured }}. Correct the security's currency, symbol or exchange, then refresh.-XX]",
     "securityIdRequired": "[XX-Security ID is required for {{ action }} transactions-XX]",
     "exchangeRateUnavailable": "[XX-Could not determine an exchange rate for {{ from }} -> {{ to }} on the transaction date. Supply an explicit exchangeRate so the cash posting is correct.-XX]",

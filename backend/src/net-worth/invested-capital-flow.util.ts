@@ -35,16 +35,19 @@ import { actionCarriesTotal } from "../securities/investment-amount.util";
 import { investedFlowKind } from "../securities/investment-replay.util";
 import { investmentEffectStatusSql } from "../securities/investment-row-effects.util";
 import { SeriesRateGap } from "./series-rate-fill";
+import { PricePoint, positionCloseAsOf } from "./position-price.util";
 
-/** One day's subtotal for one currency and one action, as the loader returns it. */
+/** One day's subtotal for one currency, action and security, as the loader returns it. */
 export interface InvestedFlowRow {
   date: string;
   currency: string;
   action: string;
+  /** The security the rows moved; null only for a row that names none. */
+  securityId: string | null;
   /** Sum of the executed totals, for the actions that carry one. */
   total: number;
-  /** Sum of `quantity * price`, for the share-moving legs that do not. */
-  gross: number;
+  /** Shares moved, unsigned. What a share-moving leg is VALUED from. */
+  quantity: number;
 }
 
 export interface InvestedFlowQueryOptions {
@@ -69,12 +72,15 @@ export type InvestedFlowQuery = (
  *
  * `total_amount` is stored in the security's currency, commission in on an
  * acquisition and out on a disposal (`deriveInvestmentTotal`), which is the
- * cost-basis convention the invested part measures in. The share-moving legs
- * carry no total at all, so their value is `quantity * price` -- the carried
- * basis, the same expression the first-active-month cost basis reads. Both
- * sums come back per action and the fold picks which one the action means, so
- * the action vocabulary stays in TypeScript where the constant that defines it
- * lives.
+ * cost-basis convention the invested part measures in.
+ *
+ * The share-moving legs carry no total, and what they are valued at is not
+ * their carried basis: `IV` moves by the position's MARKET value at the day's
+ * accepted close, so a leg valued at anything else leaves the difference in
+ * the P&L as a gain nobody made (`docs/specs/portfolio-period-result.md`
+ * section 10.6). The shares are therefore returned unsummed-of-price, per
+ * SECURITY, and `foldInvestedFlows` values them through `positionCloseAsOf` --
+ * the same close, resolved by the same helper, that valued the position.
  */
 export function investedCapitalFlowSql(): string {
   // $1 userId, $2 afterDate, $3 throughDate, $4 accountIds. Every placeholder
@@ -83,8 +89,9 @@ export function investedCapitalFlowSql(): string {
   return `SELECT TO_CHAR(it.transaction_date, 'YYYY-MM-DD') AS date,
                  COALESCE(s.currency_code, a.currency_code) AS currency,
                  it.action AS action,
+                 it.security_id AS security_id,
                  SUM(ABS(COALESCE(it.total_amount, 0))) AS total,
-                 SUM(ABS(COALESCE(it.quantity, 0) * COALESCE(it.price, 0))) AS gross
+                 SUM(ABS(COALESCE(it.quantity, 0))) AS quantity
             FROM investment_transactions it
             JOIN accounts a ON a.id = it.account_id
             LEFT JOIN securities s ON s.id = it.security_id
@@ -95,7 +102,7 @@ export function investedCapitalFlowSql(): string {
              -- Rows as EFFECTS: renders it.status != 'VOID', because a void
              -- investment row moved no shares and no value.
              AND ${investmentEffectStatusSql("it")}
-           GROUP BY it.transaction_date, COALESCE(s.currency_code, a.currency_code), it.action`;
+           GROUP BY it.transaction_date, COALESCE(s.currency_code, a.currency_code), it.action, it.security_id`;
 }
 
 /**
@@ -113,8 +120,9 @@ export async function loadInvestedCapitalFlowRows(
     date: string;
     currency: string;
     action: string;
+    security_id: string | null;
     total: string;
-    gross: string;
+    quantity: string;
   }>(
     await query(investedCapitalFlowSql(), [
       options.userId,
@@ -128,8 +136,9 @@ export async function loadInvestedCapitalFlowRows(
     date: row.date,
     currency: row.currency,
     action: row.action,
+    securityId: row.security_id ?? null,
     total: Number(row.total) || 0,
-    gross: Number(row.gross) || 0,
+    quantity: Number(row.quantity) || 0,
   }));
 }
 
@@ -141,10 +150,75 @@ export interface InvestedFlowDay {
   capitalOut: number;
   /** Cash the invested part paid out, and therefore earned. */
   income: number;
-  /** False when a component of this day could not be converted. */
+  /** False when a component of this day could not be converted OR valued. */
   complete: boolean;
   /** `"EUR->USD"` for each pair with no rate on this day. */
   missingPairs: string[];
+  /**
+   * The securities whose share-moving leg this day could not be valued at,
+   * because nothing priced them on or before it. Their shares are in `IV` with
+   * no capital flow to net them, so the day is a subtotal and the period is
+   * withheld -- naming a price to add, which is a repair, rather than a
+   * movement nobody can act on.
+   */
+  unpricedSecurityIds: string[];
+}
+
+/**
+ * The accepted close valuing one security on one day, or `null` when nothing
+ * priced it by then.
+ *
+ * Supplied by the caller rather than resolved here, and it MUST be
+ * `positionCloseAsOf` over the very series the value chart was built from: a
+ * second price-resolution rule would let `IV` and `K` move by different amounts
+ * for the same shares, which is the whole defect this values legs at market to
+ * avoid.
+ */
+export type ShareLegClose = (
+  securityId: string | null,
+  date: string,
+) => number | null;
+
+/**
+ * The securities whose legs this window has to price, and no others.
+ *
+ * Only a share-moving leg is valued from a close; a BUY or a DIVIDEND carries
+ * its own executed total. A window with none of the former loads no prices at
+ * all, which is the common case.
+ */
+export function shareLegSecurityIds(
+  rows: readonly InvestedFlowRow[],
+): string[] {
+  const ids = new Set<string>();
+  for (const row of rows) {
+    if (actionCarriesTotal(row.action)) continue;
+    if (investedFlowKind(row.action) === "none") continue;
+    if (row.quantity === 0 || !row.securityId) continue;
+    ids.add(row.securityId);
+  }
+  return [...ids];
+}
+
+/**
+ * The one resolver every caller passes to {@link foldInvestedFlows}, over the
+ * valuation series `NetWorthService.loadValuationSeries` returns.
+ *
+ * Written once here because both period routes need it and `positionCloseAsOf`
+ * is the merge rule the value series itself resolves a close by: two spellings
+ * would let `IV` and `K` disagree about what a share was worth on a day.
+ */
+export function shareLegCloseFrom(series: {
+  stored: Map<string, PricePoint[]>;
+  txFallback: Map<string, PricePoint[]>;
+}): ShareLegClose {
+  return (securityId, date) =>
+    securityId === null
+      ? null
+      : positionCloseAsOf(
+          series.stored.get(securityId),
+          series.txFallback.get(securityId),
+          date,
+        );
 }
 
 export interface FoldedInvestedFlows {
@@ -161,6 +235,7 @@ export const EMPTY_INVESTED_FLOW_DAY: InvestedFlowDay = {
   income: 0,
   complete: true,
   missingPairs: [],
+  unpricedSecurityIds: [],
 };
 
 /**
@@ -176,33 +251,58 @@ export function foldInvestedFlows(
   currency: string,
   rateIndex: RateIndex,
   logger: RateIndexLogger,
+  shareLegClose: ShareLegClose,
 ): FoldedInvestedFlows {
   const aggregates = new Map<
     string,
-    { in: FxAggregate; out: FxAggregate; income: FxAggregate }
+    {
+      in: FxAggregate;
+      out: FxAggregate;
+      income: FxAggregate;
+      unpriced: Set<string>;
+    }
   >();
   const gaps: SeriesRateGap[] = [];
 
-  for (const row of rows) {
-    const kind = investedFlowKind(row.action);
-    if (kind === "none") continue;
-    // The executed total is the fact where the action carries one; the
-    // share-moving legs have none, so their value is what the row priced them
-    // at. Neither is ever defaulted to something else: a zero total on a
-    // priceless leg contributes zero and the window's uncountable-movement
-    // count is what withholds it (section 10.6, open item 1).
-    const amount = actionCarriesTotal(row.action) ? row.total : row.gross;
-    if (amount === 0) continue;
-
-    let entry = aggregates.get(row.date);
+  const dayEntry = (date: string) => {
+    let entry = aggregates.get(date);
     if (!entry) {
       entry = {
         in: new FxAggregate(),
         out: new FxAggregate(),
         income: new FxAggregate(),
+        unpriced: new Set<string>(),
       };
-      aggregates.set(row.date, entry);
+      aggregates.set(date, entry);
     }
+    return entry;
+  };
+
+  for (const row of rows) {
+    const kind = investedFlowKind(row.action);
+    if (kind === "none") continue;
+    // The executed total is the fact where the action carries one. A
+    // share-moving leg has none, and is valued at the close that valued the
+    // position -- NOT at the basis the row carries. `IV` moves by market
+    // value, so the two cancel exactly and a transfer is neither a gain nor a
+    // loss, whatever cost the leg was recorded at (section 10.6).
+    let amount: number;
+    if (actionCarriesTotal(row.action)) {
+      amount = row.total;
+    } else {
+      if (row.quantity === 0) continue;
+      const close = shareLegClose(row.securityId, row.date);
+      if (close === null) {
+        // Unknown, never zero: the shares are in `IV` and free capital would
+        // read as a gain. The day becomes a subtotal and names the price to add.
+        if (row.securityId) dayEntry(row.date).unpriced.add(row.securityId);
+        continue;
+      }
+      amount = row.quantity * close;
+    }
+    if (amount === 0) continue;
+
+    const entry = dayEntry(row.date);
     const target =
       kind === "capitalIn"
         ? entry.in
@@ -243,8 +343,12 @@ export function foldInvestedFlows(
       capitalOut: entry.out.knownSubtotal,
       income: entry.income.knownSubtotal,
       complete:
-        entry.in.isComplete && entry.out.isComplete && entry.income.isComplete,
+        entry.in.isComplete &&
+        entry.out.isComplete &&
+        entry.income.isComplete &&
+        entry.unpriced.size === 0,
       missingPairs: [...missing].sort(),
+      unpricedSecurityIds: [...entry.unpriced].sort(),
     });
   }
 

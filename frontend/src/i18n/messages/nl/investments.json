@@ -136,7 +136,7 @@
     "unmeasuredFlowTooltip": "Een transactie die buiten deze rekeningen is afgewikkeld, of een splitsing die een investeringsregel combineert met een gewone uitgave, betekent dat het resultaat niet kan worden gescheiden van het verplaatste geld.",
     "valueChangeLine": "Waardeverandering {amount}",
     "netFlowsLine": "Netto stortingen en opnames {amount}",
-    "priorCloseTooltip": "Gemeten vanaf de slotkoers van de vorige handelsdag op {date}.",
+    "measuredFromClose": "Sinds de slotkoers van {date}",
     "notAvailable": "N/A",
     "portfolioLabel": "Portefeuille:"
   },
@@ -299,10 +299,17 @@
     "dateRequired": "Datum is vereist",
     "acquisitionPriceRequired": "De prijs per aandeel is verplicht en moet groter zijn dan nul. Gebruik \"Aandelen toevoegen\" voor aandelen die zonder bekende kostprijs zijn verkregen."
   },
+  "unlinkedTransfers": {
+    "title": "Overboekingen die als twee losse regels zijn vastgelegd",
+    "subtitle": "Elk hiervan lijkt op één overboeking die twee keer is ingevoerd, één keer per rekening. Zolang de twee regels niet gekoppeld zijn, kan de ontvangende rekening de kostprijs van de verzendende niet overnemen, waardoor kostprijs en winst als onbekend gelden.",
+    "pair": "{quantity} {security} op {date}, {from} naar {to}",
+    "link": "Koppelen",
+    "linking": "Koppelen...",
+    "linkFailed": "Deze twee regels konden niet worden gekoppeld. Herlaad de pagina en probeer het opnieuw."
+  },
   "portfolioPerformance": {
     "title": "Portefeuilleprestatie",
     "subtitle": "Hoe uw beleggingen presteerden, zonder het effect van stortingen, opnames en niet-belegd geld.",
-    "footnote": "Stortingen, opnames en niet-belegd geld tellen niet mee als beleggingsresultaat.",
     "unavailable": "n.v.t.",
     "empty": "Nog niet genoeg geschiedenis om een rendement te meten.",
     "periods": {

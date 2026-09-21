@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate debe estar en formato YYYY-MM-DD",
     "invalidAccountIds": "accountIds debe ser una lista de UUIDs separados por comas",
     "invalidGranularity": "granularity debe ser 'daily' o 'monthly'",
-    "invalidPeriods": "periods debe ser una lista de periodos predefinidos separados por comas"
+    "invalidPeriods": "periods debe ser una lista de periodos predefinidos separados por comas",
+    "invalidPeriod": "period debe ser uno de los periodos predefinidos"
   },
   "notifications": {
     "notFound": "Notificación con ID {{ id }} no encontrada",
@@ -425,6 +426,16 @@
   "securities": {
     "exchangeRateUnavailable": "No se pudo determinar un tipo de cambio para {{ from }} -> {{ to }} en la fecha de la transacción. Indica un exchangeRate explícito para que el asiento en la cuenta de efectivo sea correcto.",
     "accountMustBeInvestment": "La cuenta debe ser de tipo INVESTMENT",
+    "transferPairSameRow": "Las dos partes de una transferencia no pueden ser la misma transacción",
+    "transferPairNotFound": "Una de las dos transacciones ya no existe",
+    "transferPairAlreadyLinked": "Una de estas partes ya está vinculada a otra transacción",
+    "transferPairVoid": "Una transacción anulada no registró nada, así que no puede ser la mitad de una transferencia",
+    "transferPairActions": "Estas dos acciones no son las partes de salida y entrada de una transferencia",
+    "transferPairSecurity": "Ambas partes deben mover el mismo valor",
+    "transferPairDate": "Ambas partes deben tener la misma fecha",
+    "transferPairSameAccount": "Una transferencia mueve participaciones entre dos cuentas distintas",
+    "transferPairQuantity": "Ambas partes deben mover el mismo número de participaciones",
+    "transferPairOutsidePortfolio": "Ambas partes deben estar en cuentas de inversión de esta cartera",
     "providerCurrencyMismatch": "Actualización de precio rechazada para {{ symbol }}: {{ provider }} lo cotiza en {{ reported }}, pero el valor está registrado en {{ configured }}. Corrige la moneda, el símbolo o el mercado del valor y vuelve a actualizar.",
     "securityIdRequired": "El ID del valor es obligatorio para las transacciones de {{ action }}",
     "splitRatioRequired": "El ratio de división (cantidad) debe ser mayor que cero",

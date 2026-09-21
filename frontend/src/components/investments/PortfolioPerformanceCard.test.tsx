@@ -116,21 +116,21 @@ describe('PortfolioPerformanceCard', () => {
     expect(screen.getByText('+$200.00')).toBeInTheDocument();
   });
 
-  it('names the footnote that says what is not in these figures', async () => {
+  it('says what is not in these figures once, under the heading', async () => {
     render(<PortfolioPerformanceCard />);
 
     await waitFor(() =>
       expect(
         screen.getByText(
-          'Deposits, withdrawals and uninvested cash are not counted as investment result.',
+          'How your investments did, without the effect of deposits, withdrawals and uninvested cash.',
         ),
       ).toBeInTheDocument(),
     );
+    // And not a second time beneath the rows: the footnote said the same
+    // thing the subtitle already says.
     expect(
-      screen.getByText(
-        'How your investments did, without the effect of deposits, withdrawals and uninvested cash.',
-      ),
-    ).toBeInTheDocument();
+      screen.queryByText(/not counted as investment result/),
+    ).not.toBeInTheDocument();
   });
 
   /**

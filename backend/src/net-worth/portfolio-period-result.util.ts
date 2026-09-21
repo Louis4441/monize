@@ -99,8 +99,17 @@ export interface PeriodFlow {
  * does (`docs/specs/portfolio-period-result.md` section 6).
  */
 export interface UnmeasuredFlowCounts {
-  /** Investment actions settled outside the cash accounts the valuation walks. */
+  /** Investment actions whose CASH settled outside the accounts the valuation walks. */
   externallySettledTrades: number;
+  /**
+   * Legs that moved shares across the portfolio's edge with no cash leg at all.
+   *
+   * Withholds the ACCOUNT-level result and not the invested one: the shares
+   * enter `MV` with no flow to subtract, but the invested measure values the
+   * leg at the same close `IV` valued the position at, so those two cancel
+   * (`docs/specs/portfolio-period-result.md` section 10.6).
+   */
+  externalShareTransfers: number;
   /** Split parents mixing an embedded investment line with ordinary cash. */
   mixedSplitParents: number;
 }
@@ -259,12 +268,19 @@ export function decidePeriodResult(
   // it as performance -- the same defect as a dropped flow currency, reached by
   // a different route. The two figures either side of it are still measured.
   const unmeasured = input.unmeasuredFlows;
-  if ((unmeasured?.externallySettledTrades ?? 0) > 0) {
+  // Both share the one reason: to a reader of the ACCOUNT's result, cash that
+  // settled elsewhere and shares that arrived from elsewhere are the same
+  // thing -- value across the boundary with no flow to net it.
+  if (
+    (unmeasured?.externallySettledTrades ?? 0) > 0 ||
+    (unmeasured?.externalShareTransfers ?? 0) > 0
+  ) {
     reasons.add("externallySettledTrade");
   }
   if ((unmeasured?.mixedSplitParents ?? 0) > 0) reasons.add("mixedSplit");
   const flowsFullyMeasured =
     (unmeasured?.externallySettledTrades ?? 0) === 0 &&
+    (unmeasured?.externalShareTransfers ?? 0) === 0 &&
     (unmeasured?.mixedSplitParents ?? 0) === 0;
 
   const investmentResult =

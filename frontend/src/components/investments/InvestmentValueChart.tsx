@@ -369,10 +369,10 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
   // What the portfolio DID over this window, as the server worked it out: the
   // value change, the money the reader moved in or out, and what is left. A
   // change read off the plotted series counts a deposit as performance
-  // (INV-PORTRESULT-001), so nothing here subtracts two points. On 1D / 1W /
-  // MTD the period is measured from the close of the trading day before the
-  // first point on screen; which date that is, is all this layer decides.
-  const { periodResult, usesPriorClose } = usePortfolioPeriodResult({
+  // (INV-PORTRESULT-001), so nothing here subtracts two points. The window is
+  // NAMED, not dated: the one this chart draws opens earlier than the period
+  // its button names, and measuring over it reported a week under "1D".
+  const { periodResult } = usePortfolioPeriodResult({
     range: dateRange,
     startDate: chartWindow.start,
     endDate: chartWindow.end,
@@ -396,6 +396,16 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
   const unknownReason = periodResultUnknownReason(
     periodResult?.investedReasons ?? [],
   );
+  // The session these figures are measured from, under the title rather than
+  // behind a marker: it is a fact about every window on this chart, not a
+  // caveat about three of them. `startPriceDate` is the trading day the
+  // opening value came from, which on a Monday is the Friday before -- the
+  // calendar boundary beside it names a day the market was shut.
+  const measuredFromLabel = periodResult?.startPriceDate
+    ? t('investmentValueChart.measuredFromClose', {
+        date: formatChartDate(periodResult.startPriceDate, 'MMM d, yyyy'),
+      })
+    : null;
   /** A secondary figure's text: the amount, or the words the cards print. */
   const secondaryText = (value: number | null) =>
     value === null
@@ -483,6 +493,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-6">
       {/* Header with title and date range buttons */}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mb-4">
+        <div>
         <div className="flex items-center gap-x-3 gap-y-1 flex-wrap">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
           {t('investmentValueChart.title')}{titleSuffix ? ` (${titleSuffix})` : ''}
@@ -546,6 +557,15 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
           </svg>
         </Link>
         </div>
+        {measuredFromLabel && (
+          <p
+            className="mt-0.5 text-xs text-gray-500 dark:text-gray-400"
+            data-testid="measured-from-close"
+          >
+            {measuredFromLabel}
+          </p>
+        )}
+        </div>
         <DateRangeSelector
           ranges={['1d', '1w', 'mtd', '1m', '3m', 'ytd', '1y', '2y', '5y', 'all']}
           value={dateRange}
@@ -580,14 +600,6 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
               placement="top"
               text={t('investmentValueChart.investmentResultTooltip')}
             />
-            {usesPriorClose && periodResult && (
-              <InfoTooltip
-                placement="top"
-                text={t('investmentValueChart.priorCloseTooltip', {
-                  date: formatChartDate(periodResult.startDate, 'MMM d, yyyy'),
-                })}
-              />
-            )}
             {/* Two movements the server could not count as a flow: nothing is
                 missing from the data, so the marker alone would send the
                 reader to a screen with nothing to do on it. */}

@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate harus dalam format YYYY-MM-DD",
     "invalidAccountIds": "accountIds harus berupa UUID yang dipisahkan koma",
     "invalidGranularity": "granularity harus 'daily' atau 'monthly'",
-    "invalidPeriods": "periods harus berupa preset periode yang dipisahkan koma"
+    "invalidPeriods": "periods harus berupa preset periode yang dipisahkan koma",
+    "invalidPeriod": "period harus salah satu dari preset periode"
   },
   "notifications": {
     "notFound": "Notifikasi dengan ID {{ id }} tidak ditemukan",
@@ -425,6 +426,16 @@
   "securities": {
     "exchangeRateUnavailable": "Tidak dapat menentukan nilai tukar untuk {{ from }} -> {{ to }} pada tanggal transaksi. Berikan exchangeRate eksplisit agar pencatatan ke akun kas benar.",
     "accountMustBeInvestment": "Akun harus bertipe INVESTMENT",
+    "transferPairSameRow": "Dua sisi satu transfer tidak boleh merupakan transaksi yang sama",
+    "transferPairNotFound": "Salah satu dari kedua transaksi itu sudah tidak ada",
+    "transferPairAlreadyLinked": "Salah satu sisi ini sudah tertaut ke transaksi lain",
+    "transferPairVoid": "Transaksi yang dibatalkan tidak mencatat apa pun, jadi tidak bisa menjadi separuh transfer",
+    "transferPairActions": "Kedua aksi ini bukan sisi keluar dan masuk dari satu transfer",
+    "transferPairSecurity": "Kedua sisi harus memindahkan efek yang sama",
+    "transferPairDate": "Kedua sisi harus bertanggal sama",
+    "transferPairSameAccount": "Transfer memindahkan unit antara dua akun berbeda",
+    "transferPairQuantity": "Kedua sisi harus memindahkan jumlah unit yang sama",
+    "transferPairOutsidePortfolio": "Kedua sisi harus berada pada akun investasi portofolio ini",
     "providerCurrencyMismatch": "Pembaruan harga ditolak untuk {{ symbol }}: {{ provider }} mengutipnya dalam {{ reported }}, tetapi sekuritas ini tercatat dalam {{ configured }}. Perbaiki mata uang, simbol, atau bursa sekuritas ini, lalu segarkan kembali.",
     "securityIdRequired": "ID sekuritas diperlukan untuk transaksi {{ action }}",
     "splitRatioRequired": "Rasio pemecahan (kuantitas) harus lebih dari nol",

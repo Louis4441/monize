@@ -21,6 +21,7 @@ import { QuoteProviderRegistry } from "./providers/quote-provider.registry";
 import { HoldingsService } from "./holdings.service";
 import { HoldingsDriftReportService } from "./holdings-drift-report.service";
 import { InvestmentTransactionsService } from "./investment-transactions.service";
+import { TransferPairLinkService } from "./transfer-pair-link.service";
 import { PortfolioService } from "./portfolio.service";
 import { PortfolioSummaryInvalidationBridge } from "./portfolio-summary-invalidation.bridge";
 import { DailyMovementService } from "./daily-movement.service";
@@ -72,6 +73,7 @@ import { ProviderHealthModule } from "../provider-health/provider-health.module"
   ],
   providers: [
     SecuritiesService,
+    TransferPairLinkService,
     SecurityToolPrepService,
     SecurityPriceService,
     YahooFinanceService,

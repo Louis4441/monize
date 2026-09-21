@@ -279,7 +279,17 @@ export class NetWorthController {
     description:
       "Three separate figures over the same series the chart draws: valueChange (last close minus first), netExternalFlows (cash that crossed the scope's boundary after the baseline, each day converted at its own date) and investmentResult (the difference). returnPercent is the result over the starting value, method 'simple'. Each is null with a named reason when a component is unknown; see docs/specs/portfolio-period-result.md.",
   })
-  @ApiQuery({ name: "startDate", required: true, example: "2026-01-02" })
+  @ApiQuery({
+    name: "period",
+    required: false,
+    description: `A preset the server resolves the window for (${PORTFOLIO_PERIOD_PRESETS.join(", ")}), from the same arithmetic the batch route uses. Supplying it replaces startDate and baselineDate, which are then ignored.`,
+  })
+  @ApiQuery({
+    name: "startDate",
+    required: false,
+    description: "Required unless period is given.",
+    example: "2026-01-02",
+  })
   @ApiQuery({ name: "endDate", required: false, example: "2026-09-17" })
   @ApiQuery({
     name: "baselineDate",
@@ -308,14 +318,23 @@ export class NetWorthController {
     @Query("baselineDate") baselineDate?: string,
     @Query("accountIds") accountIds?: string,
     @Query("displayCurrency") displayCurrency?: string,
+    @Query("period") period?: string,
   ) {
     const sd = assertStringParam(startDate, "startDate");
     const ed = assertStringParam(endDate, "endDate");
     const bd = assertStringParam(baselineDate, "baselineDate");
     const aIds = assertStringParam(accountIds, "accountIds");
     const curr = assertStringParam(displayCurrency, "displayCurrency");
+    const preset = assertStringParam(period, "period");
+    if (preset && !isPortfolioPeriodPreset(preset))
+      throw new BadRequestException(
+        tr(
+          "errors.netWorth.invalidPeriod",
+          "period must be one of the period presets",
+        ),
+      );
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!sd || !dateRegex.test(sd))
+    if (!preset && (!sd || !dateRegex.test(sd)))
       throw new BadRequestException(
         tr("errors.netWorth.invalidStartDate", "startDate must be YYYY-MM-DD"),
       );
@@ -345,13 +364,26 @@ export class NetWorthController {
       }
     }
     const safeCurrency = curr ? curr.slice(0, 3).toUpperCase() : undefined;
-    return this.periodResult.getPeriodResult(req.user.id, {
-      startDate: sd,
-      endDate: ed,
-      baselineDate: bd,
-      accountIds: await this.scopeIds(req, ids),
-      displayCurrency: safeCurrency,
-    });
+    const scopeIds = await this.scopeIds(req, ids);
+    // A preset names the whole window, so the dates beside it are not a second
+    // opinion to reconcile: the server draws it from the preset alone.
+    return this.periodResult.getPeriodResult(
+      req.user.id,
+      isPortfolioPeriodPreset(preset ?? "")
+        ? {
+            period: preset as PortfolioPeriodPreset,
+            endDate: ed,
+            accountIds: scopeIds,
+            displayCurrency: safeCurrency,
+          }
+        : {
+            startDate: sd as string,
+            endDate: ed,
+            baselineDate: bd,
+            accountIds: scopeIds,
+            displayCurrency: safeCurrency,
+          },
+    );
   }
 
   @Get("investments-period-results")

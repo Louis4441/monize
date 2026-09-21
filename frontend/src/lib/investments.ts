@@ -39,6 +39,7 @@ import {
 } from '@/types/investment';
 import { IntradayBreakdown } from '@/types/net-worth';
 import {
+  clearAllCache,
   dedupe,
   getCached,
   setCache,
@@ -48,7 +49,57 @@ import {
 } from './apiCache';
 import { API_MAX_PAGE_LIMIT } from './api-page-limits';
 
+/**
+ * Two legs of one share transfer that the ledger never paired.
+ *
+ * A suggestion, never a conclusion: an unpaired TRANSFER_IN cannot take the
+ * cost basis its source released, so that position reports its basis -- and the
+ * gain over it -- as unknown. Which two rows are one transfer is a person's
+ * call, so nothing links them until one is confirmed.
+ */
+export interface UnlinkedTransferPair {
+  securityId: string;
+  symbol: string | null;
+  securityName: string | null;
+  transactionDate: string;
+  quantity: number;
+  out: { transactionId: string; accountId: string; accountName: string };
+  in: { transactionId: string; accountId: string; accountName: string };
+}
+
 export const investmentsApi = {
+  /** The transfers whose legs were never linked, over the given scope. */
+  getUnlinkedTransferPairs: async (
+    accountIds?: string[],
+  ): Promise<UnlinkedTransferPair[]> => {
+    const response = await apiClient.get<UnlinkedTransferPair[]>(
+      '/investment-transactions/unlinked-transfer-pairs',
+      {
+        params: accountIds?.length
+          ? { accountIds: accountIds.join(',') }
+          : undefined,
+      },
+    );
+    return response.data;
+  },
+
+  /**
+   * Pair two legs the reader confirmed. The server re-checks every condition
+   * before it writes, so a pair that has changed under the reader is refused
+   * rather than forced.
+   */
+  linkTransferPair: async (params: {
+    outTransactionId: string;
+    inTransactionId: string;
+  }): Promise<void> => {
+    await apiClient.post(
+      '/investment-transactions/link-transfer-pair',
+      params,
+    );
+    // The pairing rewrote both holdings' stored basis.
+    clearAllCache();
+  },
+
   // Get portfolio summary
   getPortfolioSummary: async (accountIds?: string[]): Promise<PortfolioSummary> => {
     const cacheKey = `investments:summary:${accountIds?.join(',') || 'all'}`;

@@ -18,7 +18,7 @@ import { chartColors, chartSeriesColor } from '@/lib/chart-colors';
 import { netWorthApi } from '@/lib/net-worth';
 import { investmentsApi } from '@/lib/investments';
 import { PortfolioSummary } from '@/types/investment';
-import { InvestmentBreakdownSeries, PortfolioPeriodResult } from '@/types/net-worth';
+import { InvestmentBreakdownSeries } from '@/types/net-worth';
 import { Account } from '@/types/account';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -26,6 +26,7 @@ import { gainLossColor } from '@/lib/format';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useDateRange } from '@/hooks/useDateRange';
 import { usePortfolioRangeWindow } from '@/hooks/usePortfolioRangeWindow';
+import { usePortfolioPeriodResult } from '@/hooks/usePortfolioPeriodResult';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
@@ -107,11 +108,6 @@ import {
   renderChartFlagDot,
   ChartFlagShadowFilter,
 } from '@/components/investments/portfolio-chart-utils';
-import {
-  isoDatePart,
-  previousCalendarDay,
-  usesPriorCloseBaseline,
-} from '@/components/investments/portfolio-change-baseline';
 import {
   hasUnmeasuredFlow,
   periodResultUnknownReason,
@@ -227,19 +223,6 @@ export function PortfolioValueReport() {
   const [chartPoints, setChartPoints] = useState<
     Array<{ name: string; Value: number | null; iso: string; complete?: boolean }>
   >([]);
-  // What the portfolio DID over the window, as the server worked it out: the
-  // value change, the money the reader moved in or out, and what is left. Null
-  // until it answers, and never re-derived here -- deriving a change from the
-  // plotted series is exactly what reported a deposit as a gain (#1392).
-  //
-  // Kept WITH the key of the request that produced it. A range whose request is
-  // never made -- a 1D window with no intraday points, where the effect below
-  // returns before asking -- would otherwise leave the previous range's figures
-  // on the cards under the new range's caption.
-  const [periodResultState, setPeriodResultState] = useState<{
-    key: string;
-    result: PortfolioPeriodResult;
-  } | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   // What the withheld figures are waiting for, folded into ranges per cause.
@@ -688,64 +671,28 @@ export function PortfolioValueReport() {
     formatChartDate,
   ]);
 
-  // On 1D / 1W / MTD the period is measured from the close of the trading day
-  // before the window rather than from the first point drawn. Which date that
-  // is, is all this layer decides: the arithmetic over it is the server's.
-  const usesPriorClose = usesPriorCloseBaseline(dateRange);
-  const firstPointDate = isoDatePart(chartPoints[0]?.iso);
+  // What the portfolio DID over the window, as the server worked it out: the
+  // value change, the money the reader moved in or out, and what is left. Null
+  // until it answers, and never re-derived here -- deriving a change from the
+  // plotted series is exactly what reported a deposit as a gain (#1392).
+  //
+  // Through the same hook the Investments page's chart reads, and the window
+  // is NAMED rather than dated, so this report, that chart and the performance
+  // card beside it resolve one window from one file. The window this report
+  // DRAWS opens earlier than the period its button names, and measuring over
+  // it reported a week under "1D" and nothing at all under "All".
   const periodAccountIdsCsv =
     selectedAccountIds.length > 0 ? selectedAccountIds.join(',') : undefined;
-  const periodBaselineDate =
-    usesPriorClose && firstPointDate
-      ? previousCalendarDay(firstPointDate)
-      : undefined;
-  // Everything the answer depends on. An answer is shown only under the key it
-  // was asked for; anything else is the previous window's figures.
-  const periodKey = JSON.stringify([
-    chartWindow.start,
-    chartWindow.end,
-    periodBaselineDate ?? null,
-    periodAccountIdsCsv ?? null,
-    foreignCurrency,
-    usesPriorClose,
+  const { periodResult } = usePortfolioPeriodResult({
+    range: dateRange,
+    startDate: isValid ? chartWindow.start : '',
+    endDate: chartWindow.end,
+    firstPointIso: chartPoints[0]?.iso,
+    hasSeries: chartPoints.length > 0,
+    accountIds: periodAccountIdsCsv,
+    displayCurrency: foreignCurrency || undefined,
     reloadKey,
-  ]);
-
-  useEffect(() => {
-    if (!isValid) return;
-    // A prior-close range measures from the close before the first point ON
-    // SCREEN, so it waits for that point rather than guessing at a date.
-    if (usesPriorClose && !firstPointDate) return;
-    netWorthApi
-      .getInvestmentsPeriodResult({
-        startDate: chartWindow.start,
-        endDate: chartWindow.end,
-        baselineDate: periodBaselineDate,
-        accountIds: periodAccountIdsCsv,
-        displayCurrency: foreignCurrency || undefined,
-      })
-      .then((result) => {
-        setPeriodResultState({ key: periodKey, result });
-      })
-      .catch((error) => {
-        logger.error('Failed to load the period result:', error);
-        // A failed request is not a period that did nothing: every figure stays
-        // unknown until the server answers.
-        setPeriodResultState((prev) => (prev?.key === periodKey ? null : prev));
-      });
-  }, [
-    chartWindow,
-    isValid,
-    usesPriorClose,
-    firstPointDate,
-    foreignCurrency,
-    periodAccountIdsCsv,
-    periodBaselineDate,
-    periodKey,
-  ]);
-
-  const periodResult =
-    periodResultState?.key === periodKey ? periodResultState.result : null;
+  });
 
   const summary = useMemo(() => {
     if (chartPoints.length === 0) {
@@ -782,6 +729,16 @@ export function PortfolioValueReport() {
   const unknownReason = periodResultUnknownReason(
     periodResult?.investedReasons ?? [],
   );
+  // The session these figures are measured from, under the chart's title
+  // rather than behind a marker: it is a fact about every window here, not a
+  // caveat about three of them. `startPriceDate` is the trading day the
+  // opening value came from -- on a Monday, the Friday before, where the
+  // calendar boundary beside it names a day the market was shut.
+  const measuredFromLabel = periodResult?.startPriceDate
+    ? t('portfolioValue.measuredFromClose', {
+        date: formatChartDate(periodResult.startPriceDate, 'MMM d, yyyy'),
+      })
+    : null;
 
   // Which KPI captions the window cannot stand behind, so the cards say so
   // rather than printing a partial figure under a total's caption.
@@ -1202,14 +1159,6 @@ export function PortfolioValueReport() {
           <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
             {t('portfolioValue.valueChange')}
             <InfoTooltip placement="top" text={t('portfolioValue.valueChangeTooltip')} />
-            {usesPriorClose && periodResult && (
-              <InfoTooltip
-                placement="top"
-                text={t('portfolioValue.priorCloseTooltip', {
-                  date: formatChartDate(periodResult.startDate, 'MMM d, yyyy'),
-                })}
-              />
-            )}
             {/* An intraday chart draws live prices while these figures are
                 measured between two STORED closes, so the line can move while
                 the cards read 0.00. The dates are on the wire; naming them is
@@ -1417,6 +1366,14 @@ export function PortfolioValueReport() {
             </span>
           )}
         </h3>
+        {measuredFromLabel && (
+          <p
+            className="-mt-3 mb-4 text-xs text-gray-500 dark:text-gray-400"
+            data-testid="report-measured-from-close"
+          >
+            {measuredFromLabel}
+          </p>
+        )}
         {intradayUnavailable ? (
           <EmptyState
             className="px-4"

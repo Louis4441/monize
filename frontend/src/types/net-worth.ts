@@ -161,6 +161,16 @@ export interface PortfolioPeriodResult {
   currency: string;
   /** The close the period is measured from (the baseline, where one applied). */
   startDate: string;
+  /**
+   * The trading session `startDate`'s value came from: the newest day on or
+   * before it carrying a close for anything the scope held.
+   *
+   * `startDate` is a CALENDAR day and the value series prices every calendar
+   * day from the latest close at or before it, so a window opening on a Sunday
+   * is measured from Friday's close. This is the day a surface prints. `null`
+   * is unknown -- never the calendar day in its place.
+   */
+  startPriceDate?: string | null;
   endDate: string;
   startValue: number | null;
   endValue: number | null;
@@ -228,6 +238,21 @@ export const PORTFOLIO_PERIOD_PRESETS = [
 ] as const;
 
 export type PortfolioPeriodPreset = (typeof PORTFOLIO_PERIOD_PRESETS)[number];
+
+/**
+ * Whether the server resolves this window itself, from its own preset
+ * arithmetic, rather than being sent a pair of dates.
+ *
+ * A chart names its range here instead of dating it: the window a price chart
+ * DRAWS is deliberately not the period its button names, and sending the drawn
+ * one measures the wrong days (`usePortfolioPeriodResult`). A range with no
+ * preset -- `mtd`, a custom window -- still sends its dates.
+ */
+export function isPortfolioPeriodPreset(
+  value: string,
+): value is PortfolioPeriodPreset {
+  return (PORTFOLIO_PERIOD_PRESETS as readonly string[]).includes(value);
+}
 
 /**
  * The windows every scope is answered for, whatever its history.

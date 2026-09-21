@@ -1187,7 +1187,7 @@
     "investmentReturnTooltip": "Stopa zwrotu ważona czasem liczona tylko dla papierów wartościowych. Pieniądze wpłacone lub wypłacone danego dnia jej nie zmieniają, a niezainwestowana gotówka nie wchodzi ani w skład wyniku, ani w skład wartości, do której się go odnosi.",
     "flowsPartial": "Udało się przeliczyć tylko część kwot przechodzących przez te konta: {amount}.",
     "incompleteTooltip": "W niektórych dniach tego okresu brakuje ceny, kursu wymiany lub salda gotówkowego, dlatego wartości zależne od każdego dnia nie są wyświetlane.",
-    "priorCloseTooltip": "Mierzone od kursu zamknięcia poprzedniej sesji z dnia {date}.",
+    "measuredFromClose": "Od zamknięcia notowań {date}",
     "unmeasuredFlowTooltip": "Pieniądze wpłynęły na te konta lub z nich wypłynęły w sposób, którego nie da się tu policzyć: transakcja rozliczona z konta spoza tej grupy albo podział łączący pozycję inwestycyjną ze zwykłym wydatkiem. Wynik inwestycyjny nie jest pokazywany, ponieważ część z niego byłaby Twoimi własnymi pieniędzmi.",
     "closeBoundsTooltip": "Te wartości są mierzone między zapisanymi kursami zamknięcia z dnia {start} i {end}. Wykres powyżej pokazuje ceny na żywo w ciągu dnia, więc może się poruszać, podczas gdy te wartości pozostają bez zmian.",
     "notAvailable": "Brak",

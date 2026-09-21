@@ -1,5 +1,5 @@
 /**
- * The two movements inside a window that the external-flow classifier cannot
+ * The movements inside a window that the external-flow classifier cannot
  * count, loaded once and read per window.
  *
  * The predicates themselves are documented in
@@ -32,9 +32,10 @@ export interface UnmeasuredFlowDayCount {
   count: number;
 }
 
-/** The two causes, each as the rows the loader was asked for. */
+/** The three causes, each as the rows the loader was asked for. */
 export interface UnmeasuredFlowRows {
   externallySettledTrades: UnmeasuredFlowDayCount[];
+  externalShareTransfers: UnmeasuredFlowDayCount[];
   mixedSplitParents: UnmeasuredFlowDayCount[];
 }
 
@@ -67,9 +68,14 @@ function groupBy(perDay: boolean, alias: string): string {
 }
 
 /**
- * Investment actions in the window whose settlement cash is outside the set the
- * valuation walks -- including one that moved shares with no cash leg at all and
- * no linked leg inside the scope.
+ * Investment actions in the window whose settlement CASH is outside the set the
+ * valuation walks.
+ *
+ * Cash only. A leg that moved shares with no cash at all is
+ * {@link externalShareTransfersSql}, counted separately because the two
+ * withhold different figures: this one puts value into `MV` with no flow to
+ * subtract, and nothing can measure it; that one is valued at the day's close
+ * on both sides of the invested measure, which can.
  */
 export function externallySettledTradesSql(perDay: boolean): string {
   // $1 userId, $2 afterDate, $3 throughDate, $4 scope, $5 cashScope.
@@ -96,20 +102,45 @@ export function externallySettledTradesSql(perDay: boolean): string {
                  WHERE s.id = it.transaction_split_id
                    AND NOT (pt.account_id = ANY($5::UUID[]))
               )
-              OR (
-                it.transaction_id IS NULL
-                AND it.transaction_split_id IS NULL
-                AND it.action IN (
-                  'TRANSFER_IN', 'TRANSFER_OUT', 'ADD_SHARES', 'REMOVE_SHARES'
-                )
-                AND NOT EXISTS (
-                  -- The linked leg is looked up as a record (includes VOID):
-                  -- the effect is decided by the row above.
-                  SELECT 1 FROM investment_transactions li
-                   WHERE li.id = it.linked_transaction_id
-                     AND li.account_id = ANY($4::UUID[])
-                )
-              )
+            )
+          ${groupBy(perDay, "it")}`;
+}
+
+/**
+ * Legs in the window that moved SHARES across the portfolio's edge: no cash leg
+ * of any kind, and no linked leg on an account of the scope (which would make
+ * it a move inside the portfolio rather than across its boundary).
+ *
+ * Counted apart from the cash-settled trades because it withholds less. The
+ * ACCOUNT-level result still cannot be measured -- the shares are value
+ * entering `MV` with no cash to net them against -- but the INVESTED measure
+ * values such a leg at the day's accepted close, the same close `IV` valued
+ * the position at, so the two cancel and the P&L is exact. Where that close
+ * does not exist the fold says so per day and names the security
+ * (`InvestedFlowDay.unpricedSecurityIds`), which is a price to add rather than
+ * a movement nobody can act on.
+ */
+export function externalShareTransfersSql(perDay: boolean): string {
+  // $1 userId, $2 afterDate, $3 throughDate, $4 scope. No cash scope: a leg
+  // with a cash leg of any kind is the statement above's, not this one's.
+  return `SELECT ${dayColumn(perDay, "it")}COUNT(*) AS count
+           FROM investment_transactions it
+          WHERE it.user_id = $1
+            AND it.account_id = ANY($4::UUID[])
+            AND it.transaction_date > $2
+            AND it.transaction_date <= $3
+            AND it.status != 'VOID'
+            AND it.transaction_id IS NULL
+            AND it.transaction_split_id IS NULL
+            AND it.action IN (
+              'TRANSFER_IN', 'TRANSFER_OUT', 'ADD_SHARES', 'REMOVE_SHARES'
+            )
+            AND NOT EXISTS (
+              -- The linked leg is looked up as a record (includes VOID): the
+              -- effect is decided by the row above.
+              SELECT 1 FROM investment_transactions li
+               WHERE li.id = it.linked_transaction_id
+                 AND li.account_id = ANY($4::UUID[])
             )
           ${groupBy(perDay, "it")}`;
 }
@@ -178,13 +209,20 @@ export async function loadUnmeasuredFlowRows(
       count: Number(row.count ?? 0),
     }));
 
-  const [settled, mixed] = await Promise.all([
+  // The share statement names $1..$4 and no cash scope, so it is bound to the
+  // settled list without its last member: every placeholder a statement
+  // carries is bound, and nothing more.
+  const shareParams: unknown[] = settledParams.slice(0, 4);
+
+  const [settled, shares, mixed] = await Promise.all([
     query(externallySettledTradesSql(perDay), settledParams),
+    query(externalShareTransfersSql(perDay), shareParams),
     query(mixedSplitParentsSql(perDay), mixedParams),
   ]);
 
   return {
     externallySettledTrades: toRows(settled),
+    externalShareTransfers: toRows(shares),
     mixedSplitParents: toRows(mixed),
   };
 }
@@ -213,6 +251,7 @@ export function unmeasuredFlowsAfter(
 
   return {
     externallySettledTrades: sum(rows.externallySettledTrades),
+    externalShareTransfers: sum(rows.externalShareTransfers),
     mixedSplitParents: sum(rows.mixedSplitParents),
   };
 }

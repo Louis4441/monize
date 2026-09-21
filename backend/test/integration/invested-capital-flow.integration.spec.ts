@@ -273,6 +273,8 @@ describe("invested capital flow loader (integration)", () => {
       "USD",
       new Map([["EUR->USD", [{ date: "2026-02-02", rate: 1.1 }]]]),
       { warn: () => undefined },
+      // Neither row is a share-moving leg, so no close is ever asked for.
+      () => null,
     );
 
     expect(byDay.get("2026-02-02")).toEqual({
@@ -281,6 +283,56 @@ describe("invested capital flow loader (integration)", () => {
       income: 110,
       complete: true,
       missingPairs: [],
+      unpricedSecurityIds: [],
+    });
+  });
+
+  it("values a transfer leg at the day's close, whatever basis it carries", async () => {
+    // The row is recorded at a historical cost of 10 a share; the day's close
+    // is 100. `IV` moves by 30 x 100, so the capital flow must too, or the
+    // difference reads as a gain nobody made.
+    await addInvestmentRow({
+      securityId: usdSecurityId,
+      action: InvestmentAction.TRANSFER_IN,
+      date: "2026-02-02",
+      quantity: 30,
+      price: 10,
+      totalAmount: 0,
+    });
+
+    const { byDay } = foldInvestedFlows(
+      await load(),
+      "USD",
+      new Map(),
+      { warn: () => undefined },
+      () => 100,
+    );
+
+    expect(byDay.get("2026-02-02")?.capitalIn).toBe(3000);
+  });
+
+  it("withholds the day and names the security when nothing priced the leg", async () => {
+    await addInvestmentRow({
+      securityId: usdSecurityId,
+      action: InvestmentAction.TRANSFER_IN,
+      date: "2026-02-02",
+      quantity: 30,
+      price: 0,
+      totalAmount: 0,
+    });
+
+    const { byDay } = foldInvestedFlows(
+      await load(),
+      "USD",
+      new Map(),
+      { warn: () => undefined },
+      () => null,
+    );
+
+    expect(byDay.get("2026-02-02")).toMatchObject({
+      capitalIn: 0,
+      complete: false,
+      unpricedSecurityIds: [usdSecurityId],
     });
   });
 });

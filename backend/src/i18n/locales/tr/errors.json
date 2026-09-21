@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate YYYY-AA-GG biçiminde olmalıdır",
     "invalidAccountIds": "accountIds virgülle ayrılmış UUID'ler olmalıdır",
     "invalidGranularity": "granularity 'daily' veya 'monthly' olmalıdır",
-    "invalidPeriods": "periods, virgülle ayrılmış önceden tanımlı dönemler olmalıdır"
+    "invalidPeriods": "periods, virgülle ayrılmış önceden tanımlı dönemler olmalıdır",
+    "invalidPeriod": "period, önceden tanımlı dönemlerden biri olmalıdır"
   },
   "notifications": {
     "notFound": "{{ id }} kimliğine sahip bildirim bulunamadı",
@@ -425,6 +426,16 @@
   "securities": {
     "exchangeRateUnavailable": "İşlem tarihinde {{ from }} -> {{ to }} için bir döviz kuru belirlenemedi. Nakit hesabına kaydın doğru olması için açık bir exchangeRate girin.",
     "accountMustBeInvestment": "Hesap YATIRİM türünde olmalıdır",
+    "transferPairSameRow": "Bir transferin iki bacağı aynı işlem olamaz",
+    "transferPairNotFound": "İki işlemden biri artık mevcut değil",
+    "transferPairAlreadyLinked": "Bu bacaklardan biri zaten başka bir işleme bağlı",
+    "transferPairVoid": "İptal edilmiş bir işlem hiçbir şey kaydetmemiştir, bu nedenle bir transferin yarısı olamaz",
+    "transferPairActions": "Bu iki eylem bir transferin çıkış ve giriş bacakları değil",
+    "transferPairSecurity": "Her iki bacak da aynı menkul kıymeti hareket ettirmelidir",
+    "transferPairDate": "Her iki bacak da aynı tarihli olmalıdır",
+    "transferPairSameAccount": "Transfer, payları iki farklı hesap arasında taşır",
+    "transferPairQuantity": "Her iki bacak da aynı sayıda payı hareket ettirmelidir",
+    "transferPairOutsidePortfolio": "Her iki bacak da bu portföyün yatırım hesaplarında olmalıdır",
     "providerCurrencyMismatch": "{{ symbol }} için fiyat güncellemesi reddedildi: {{ provider }} bunu {{ reported }} cinsinden bildiriyor, ancak menkul kıymet {{ configured }} cinsinden kayıtlı. Menkul kıymetin para birimini, sembolünü veya borsasını düzeltip yeniden yenileyin.",
     "securityIdRequired": "{{ action }} işlemleri için menkul kıymet kimliği gereklidir",
     "splitRatioRequired": "Bölünme oranı (miktar) sıfırdan büyük olmalıdır",

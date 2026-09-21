@@ -2813,6 +2813,99 @@ describe("NetWorthService", () => {
     });
   });
 
+  /**
+   * The mirror of `getFirstPricedDay`, and it exists for the mirrored reason:
+   * a period's boundary is a CALENDAR day, and `getDailyInvestments` prices
+   * every calendar day from the latest close at or before it. A Monday window
+   * measured from Sunday carries Friday's close, so a surface printing the
+   * boundary tells the reader the figure is measured from a day the market was
+   * shut.
+   */
+  describe("getLastPricedDays", () => {
+    it("answers the session behind each boundary in one round trip", async () => {
+      reportQuery.mockResolvedValueOnce([
+        { boundary: "2026-09-20", date: "2026-09-18" },
+        { boundary: "2026-06-19", date: "2026-06-19" },
+      ]);
+
+      const result = await service.getLastPricedDays("user-1", [
+        "2026-09-20",
+        "2026-06-19",
+      ]);
+
+      expect(result.get("2026-09-20")).toBe("2026-09-18");
+      expect(result.get("2026-06-19")).toBe("2026-06-19");
+      const [sql, params] = reportQuery.mock.calls[0];
+      expect(sql).toContain("MAX(sp.price_date)");
+      expect(sql).toContain("FROM security_prices sp");
+      expect(sql).toContain("sp.price_date <= b.day");
+      expect(params).toEqual(["user-1", ["2026-09-20", "2026-06-19"]]);
+    });
+
+    it("leaves a boundary with nothing priced before it unknown", async () => {
+      // Never the calendar day in its place: the session is not known, and a
+      // substituted date would be a claim about a market nobody observed.
+      reportQuery.mockResolvedValueOnce([
+        { boundary: "2019-01-02", date: null },
+      ]);
+
+      const result = await service.getLastPricedDays("user-1", ["2019-01-02"]);
+
+      expect(result.get("2019-01-02")).toBeNull();
+    });
+
+    it("leaves a boundary the query answered nothing for unknown", async () => {
+      reportQuery.mockResolvedValueOnce([]);
+
+      const result = await service.getLastPricedDays("user-1", ["2026-09-20"]);
+
+      expect(result.get("2026-09-20")).toBeNull();
+    });
+
+    it("asks nothing when there are no boundaries", async () => {
+      expect(await service.getLastPricedDays("user-1", [])).toEqual(new Map());
+      expect(reportQuery).not.toHaveBeenCalled();
+    });
+
+    it("asks once for a boundary named twice", async () => {
+      reportQuery.mockResolvedValueOnce([
+        { boundary: "2026-09-20", date: "2026-09-18" },
+      ]);
+
+      await service.getLastPricedDays("user-1", ["2026-09-20", "2026-09-20"]);
+
+      expect(reportQuery.mock.calls[0][1]).toEqual(["user-1", ["2026-09-20"]]);
+    });
+
+    it("restricts to the requested accounts, parameterized", async () => {
+      reportQuery.mockResolvedValueOnce([
+        { boundary: "2026-09-20", date: "2026-09-18" },
+      ]);
+
+      await service.getLastPricedDays(
+        "user-1",
+        ["2026-09-20"],
+        ["acct-1", "acct-2"],
+      );
+
+      const [sql, params] = reportQuery.mock.calls[0];
+      expect(sql).toContain("AND a.id IN ($3, $4)");
+      expect(params).toEqual(["user-1", ["2026-09-20"], "acct-1", "acct-2"]);
+    });
+
+    it("only considers securities transacted on or before the boundary", async () => {
+      reportQuery.mockResolvedValueOnce([
+        { boundary: "2026-09-20", date: "2026-09-18" },
+      ]);
+
+      await service.getLastPricedDays("user-1", ["2026-09-20"]);
+
+      expect(reportQuery.mock.calls[0][0]).toContain(
+        "it.transaction_date <= b.day",
+      );
+    });
+  });
+
   describe("getDailyInvestments", () => {
     it("returns empty array when no accounts match", async () => {
       prefRepository.findOne.mockResolvedValue({

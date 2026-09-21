@@ -1187,7 +1187,7 @@
     "investmentReturnTooltip": "Un rendimento ponderato nel tempo riferito solo ai titoli. Il denaro versato o prelevato in un giorno non lo sposta, e la liquidità non investita non rientra né nel risultato né in ciò rispetto a cui viene misurato.",
     "flowsPartial": "È stato possibile convertire solo una parte di quanto transitato su questi conti: {amount}.",
     "incompleteTooltip": "Alcuni giorni di questo periodo non hanno un prezzo, un tasso di cambio o un saldo di liquidità, quindi i dati che dipendono da ogni giorno non vengono mostrati.",
-    "priorCloseTooltip": "Misurato dalla chiusura della seduta precedente del {date}.",
+    "measuredFromClose": "Dalla chiusura delle contrattazioni del {date}",
     "unmeasuredFlowTooltip": "Del denaro è entrato o uscito da questi conti in un modo che non può essere conteggiato qui: un'operazione regolata da un conto esterno a questi, oppure una suddivisione che mescola una riga di investimento con una spesa ordinaria. Il risultato dell'investimento non viene mostrato, perché parte di esso sarebbe denaro proprio.",
     "closeBoundsTooltip": "Questi dati sono misurati tra i valori di chiusura memorizzati del {start} e del {end}. Il grafico sopra mostra i prezzi in tempo reale durante la giornata, quindi può variare mentre questi dati restano fermi.",
     "notAvailable": "N/D",

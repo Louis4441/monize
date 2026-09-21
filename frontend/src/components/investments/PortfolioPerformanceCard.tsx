@@ -151,7 +151,6 @@ export function PortfolioPerformanceCard({
       unavailableLabel={t('portfolioPerformance.unavailable')}
       emptyMessage={t('portfolioPerformance.empty')}
       notice={notice}
-      footnote={t('portfolioPerformance.footnote')}
       data-testid="portfolio-performance"
     />
   );

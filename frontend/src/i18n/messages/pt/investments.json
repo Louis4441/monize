@@ -136,7 +136,7 @@
     "unmeasuredFlowTooltip": "Uma operação liquidada fora destas contas, ou uma divisão que mistura uma linha de investimento com uma despesa comum, significa que o resultado não pode ser separado do dinheiro movimentado.",
     "valueChangeLine": "Variação de valor {amount}",
     "netFlowsLine": "Depósitos e levantamentos líquidos {amount}",
-    "priorCloseTooltip": "Medido a partir do fecho da sessão anterior, em {date}.",
+    "measuredFromClose": "Desde o fecho da sessão de {date}",
     "notAvailable": "N/D",
     "portfolioLabel": "Portefólio:"
   },
@@ -299,10 +299,17 @@
     "dateRequired": "A data é obrigatória",
     "acquisitionPriceRequired": "O preço por ação é obrigatório e deve ser maior que zero. Use «Adicionar Ações» para ações adquiridas sem um custo conhecido."
   },
+  "unlinkedTransfers": {
+    "title": "Transferências registadas como duas linhas separadas",
+    "subtitle": "Cada uma parece uma transferência introduzida duas vezes, uma por conta. Enquanto as duas linhas não estiverem ligadas, a conta que recebe não pode assumir o custo que a de origem cedeu, pelo que o seu custo de aquisição e a mais-valia ficam desconhecidos.",
+    "pair": "{quantity} {security} em {date}, de {from} para {to}",
+    "link": "Ligar",
+    "linking": "A ligar...",
+    "linkFailed": "Não foi possível ligar estas duas linhas. Recarregue a página e tente novamente."
+  },
   "portfolioPerformance": {
     "title": "Desempenho da carteira",
     "subtitle": "Como os seus investimentos se comportaram, sem o efeito dos depósitos, dos levantamentos e do numerário não investido.",
-    "footnote": "Depósitos, levantamentos e numerário não investido não contam como resultado do investimento.",
     "unavailable": "n/d",
     "empty": "Ainda não há histórico suficiente para medir uma rentabilidade.",
     "periods": {

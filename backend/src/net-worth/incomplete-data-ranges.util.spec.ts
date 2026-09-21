@@ -3,6 +3,7 @@ import {
   MAX_INCOMPLETE_RANGES_PER_CAUSE,
   foldIncompleteData,
   hasIncompleteData,
+  withFlowUnpricedSecurities,
 } from "./incomplete-data-ranges.util";
 
 /**
@@ -126,5 +127,61 @@ describe("foldIncompleteData", () => {
     const ranges = foldIncompleteData(points);
     expect(ranges.rates).toHaveLength(MAX_INCOMPLETE_RANGES_PER_CAUSE);
     expect(ranges.truncated.rates).toBe(true);
+  });
+});
+/**
+ * A share-moving leg is valued at the day's accepted close, so a leg nothing
+ * priced is a missing price -- and the reader repairs it on the same screen, by
+ * the same means, as a held position nothing could price. It therefore folds
+ * into the same runs rather than into a list of its own.
+ */
+describe("withFlowUnpricedSecurities", () => {
+  const day = (date: string, unpricedSecurityIds: string[] = []) => ({
+    date,
+    unpricedSecurityIds,
+  });
+
+  it("folds a day's unvaluable leg into that point's own missing prices", () => {
+    const points = [day("2026-06-01"), day("2026-06-02"), day("2026-06-03")];
+    const flows = new Map([["2026-06-02", { unpricedSecurityIds: ["sec-a"] }]]);
+
+    const ranges = foldIncompleteData(
+      withFlowUnpricedSecurities(points, flows),
+    );
+
+    expect(ranges.prices).toEqual([
+      { key: "sec-a", start: "2026-06-02", end: "2026-06-02" },
+    ]);
+  });
+
+  it("keeps what the point already reported, without duplicating it", () => {
+    const points = [day("2026-06-01", ["sec-a"])];
+    const flows = new Map([
+      ["2026-06-01", { unpricedSecurityIds: ["sec-a", "sec-b"] }],
+    ]);
+
+    const [merged] = withFlowUnpricedSecurities(points, flows);
+
+    expect(merged.unpricedSecurityIds).toEqual(["sec-a", "sec-b"]);
+  });
+
+  it("joins a run the point's own gap already opened", () => {
+    // One outage, not two: the reader has one price history to fix.
+    const points = [day("2026-06-01", ["sec-a"]), day("2026-06-02")];
+    const flows = new Map([["2026-06-02", { unpricedSecurityIds: ["sec-a"] }]]);
+
+    const ranges = foldIncompleteData(
+      withFlowUnpricedSecurities(points, flows),
+    );
+
+    expect(ranges.prices).toEqual([
+      { key: "sec-a", start: "2026-06-01", end: "2026-06-02" },
+    ]);
+  });
+
+  it("returns the very same points when no day has one", () => {
+    const points = [day("2026-06-01")];
+
+    expect(withFlowUnpricedSecurities(points, new Map())).toBe(points);
   });
 });

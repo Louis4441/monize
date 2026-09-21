@@ -136,7 +136,7 @@
     "unmeasuredFlowTooltip": "Một giao dịch được thanh toán bên ngoài các tài khoản này, hoặc một khoản tách lẫn một dòng đầu tư với chi tiêu thông thường, nghĩa là kết quả không thể tách khỏi số tiền đã di chuyển.",
     "valueChangeLine": "Thay đổi giá trị {amount}",
     "netFlowsLine": "Nạp và rút ròng {amount}",
-    "priorCloseTooltip": "Được tính từ giá đóng cửa của phiên giao dịch trước đó, ngày {date}.",
+    "measuredFromClose": "Kể từ khi đóng cửa phiên giao dịch ngày {date}",
     "notAvailable": "N/A",
     "portfolioLabel": "Danh mục:"
   },
@@ -299,10 +299,17 @@
     "dateRequired": "Ngày là bắt buộc",
     "acquisitionPriceRequired": "Giá mỗi cổ phiếu là bắt buộc và phải lớn hơn không. Dùng \"Thêm cổ phiếu\" cho cổ phiếu có được mà không biết giá gốc."
   },
+  "unlinkedTransfers": {
+    "title": "Giao dịch chuyển được ghi thành hai dòng riêng",
+    "subtitle": "Mỗi mục trông như một giao dịch chuyển được nhập hai lần, mỗi tài khoản một lần. Chừng nào hai dòng chưa được liên kết, tài khoản nhận không thể tiếp nhận giá vốn mà tài khoản gửi đã nhường, nên giá vốn và lãi của nó hiển thị là không xác định.",
+    "pair": "{quantity} {security} ngày {date}, từ {from} đến {to}",
+    "link": "Liên kết",
+    "linking": "Đang liên kết...",
+    "linkFailed": "Không thể liên kết hai dòng này. Hãy tải lại trang và thử lại."
+  },
   "portfolioPerformance": {
     "title": "Hiệu suất danh mục",
     "subtitle": "Khoản đầu tư của bạn đã hoạt động thế nào, không tính ảnh hưởng của các khoản nạp, rút và tiền mặt chưa đầu tư.",
-    "footnote": "Các khoản nạp, rút và tiền mặt chưa đầu tư không được tính là kết quả đầu tư.",
     "unavailable": "k/c",
     "empty": "Lịch sử còn quá ít để đo lợi nhuận.",
     "periods": {

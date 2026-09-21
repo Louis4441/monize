@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate 必須為 YYYY-MM-DD 格式",
     "invalidAccountIds": "accountIds 必須是以逗號分隔的 UUID",
     "invalidGranularity": "granularity 必須為 'daily' 或 'monthly'",
-    "invalidPeriods": "periods 必須是以逗號分隔的期間預設值"
+    "invalidPeriods": "periods 必須是以逗號分隔的期間預設值",
+    "invalidPeriod": "period 必須是期間預設值之一"
   },
   "notifications": {
     "notFound": "找不到 ID 為 {{ id }} 的通知",
@@ -425,6 +426,16 @@
   "securities": {
     "exchangeRateUnavailable": "無法確定交易日 {{ from }} -> {{ to }} 的匯率。請提供明確的 exchangeRate，以便現金帳戶的記帳正確。",
     "accountMustBeInvestment": "科目類型必須為 INVESTMENT",
+    "transferPairSameRow": "一筆轉移的兩筆記錄不能是同一筆交易",
+    "transferPairNotFound": "兩筆交易其中之一已不存在",
+    "transferPairAlreadyLinked": "其中一筆記錄已與另一筆交易關聯",
+    "transferPairVoid": "已作廢的交易未記錄任何內容，因此不能作為轉移的一半",
+    "transferPairActions": "這兩個動作不是同一筆轉移的轉出與轉入記錄",
+    "transferPairSecurity": "兩筆記錄必須涉及同一證券",
+    "transferPairDate": "兩筆記錄的日期必須相同",
+    "transferPairSameAccount": "轉移是在兩個不同帳戶之間移動單位數",
+    "transferPairQuantity": "兩筆記錄移動的單位數必須相同",
+    "transferPairOutsidePortfolio": "兩筆記錄都必須位於本投資組合的投資帳戶中",
     "providerCurrencyMismatch": "拒絕更新 {{ symbol }} 的價格：{{ provider }} 以 {{ reported }} 報價，但該證券登記的貨幣為 {{ configured }}。請更正該證券的貨幣、代碼或交易所，然後重新整理。",
     "securityIdRequired": "{{ action }} 交易需要證券 ID",
     "splitRatioRequired": "分割比例（數量）必須大於零",

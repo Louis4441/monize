@@ -1187,7 +1187,7 @@
     "investmentReturnTooltip": "Lợi nhuận tính theo trọng số thời gian chỉ tính trên chứng khoán. Tiền nạp vào hoặc rút ra trong một ngày không làm thay đổi con số này, và tiền mặt chưa đầu tư không nằm trong kết quả cũng như trong giá trị dùng để đo lường nó.",
     "flowsPartial": "Chỉ một phần số tiền đi qua các tài khoản này có thể quy đổi được: {amount}.",
     "incompleteTooltip": "Một số ngày trong khoảng thời gian này thiếu giá, tỷ giá hối đoái hoặc số dư tiền mặt, nên các số liệu phụ thuộc vào từng ngày sẽ không được hiển thị.",
-    "priorCloseTooltip": "Được tính từ giá đóng cửa của phiên giao dịch trước đó, ngày {date}.",
+    "measuredFromClose": "Kể từ khi đóng cửa phiên giao dịch ngày {date}",
     "unmeasuredFlowTooltip": "Tiền đã chuyển vào hoặc ra khỏi các tài khoản này theo cách không thể tính được ở đây: một giao dịch được thanh toán từ một tài khoản bên ngoài nhóm này, hoặc một khoản tách lẫn một dòng đầu tư với chi tiêu thông thường. Kết quả đầu tư không được hiển thị, vì một phần của nó sẽ là tiền của chính bạn.",
     "closeBoundsTooltip": "Các số liệu này được đo giữa các giá đóng cửa đã lưu của {start} và {end}. Biểu đồ ở trên hiển thị giá theo thời gian thực trong ngày, vì vậy nó có thể thay đổi trong khi các số liệu này không đổi.",
     "notAvailable": "N/A",

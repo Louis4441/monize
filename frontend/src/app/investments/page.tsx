@@ -11,6 +11,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { PortfolioSummaryCard } from '@/components/investments/PortfolioSummaryCard';
 import { PortfolioPerformanceCard } from '@/components/investments/PortfolioPerformanceCard';
+import { UnlinkedTransfersCard } from '@/components/investments/UnlinkedTransfersCard';
 import { GroupedHoldingsList } from '@/components/investments/GroupedHoldingsList';
 import { AssetAllocationChart } from '@/components/investments/AssetAllocationChart';
 import { InvestmentTransactionList } from '@/components/investments/InvestmentTransactionList';
@@ -300,6 +301,19 @@ function InvestmentsContent() {
                   ? data.accounts.find(a => a.id === data.selectedAccountIds[0])?.currencyCode ?? null
                   : null
               }
+            />
+          </div>
+
+          {/* A transfer entered twice, once per account, and never paired: the
+              receiving position cannot take the cost the sending one gave up,
+              so its basis reads unknown. Above the holdings because that is
+              the list the unknown shows up in. Renders nothing when there is
+              nothing to suggest. */}
+          <div className="mb-6 empty:mb-0">
+            <UnlinkedTransfersCard
+              accountIds={data.selectedAccountIds}
+              reloadKey={data.writeRefreshKey}
+              onLinked={data.refreshAfterWrite}
             />
           </div>
 

@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import type { ReactNode } from 'react';
-import { Card } from '@/components/ui/Card';
-import { gainLossColor } from '@/lib/format';
+import type { ReactNode } from "react";
+import { Card } from "@/components/ui/Card";
+import { gainLossColor } from "@/lib/format";
 
 /** One period's row: a label, a figure, and optionally a figure beneath it. */
 export interface PerformancePeriodEntry {
@@ -49,10 +49,10 @@ interface PerformancePeriodsCardProps {
   /** A caption under the list: what the figures do and do not include. */
   footnote?: ReactNode;
   /** `warning` is for a footnote that qualifies the figures rather than explaining them. */
-  footnoteTone?: 'muted' | 'warning';
+  footnoteTone?: "muted" | "warning";
   /** Title attribute for the footnote, where it has more to say. */
   footnoteTitle?: string;
-  'data-testid'?: string;
+  "data-testid"?: string;
 }
 
 /**
@@ -74,16 +74,23 @@ export function PerformancePeriodsCard({
   emptyMessage,
   notice,
   footnote,
-  footnoteTone = 'muted',
+  footnoteTone = "muted",
   footnoteTitle,
-  'data-testid': testId,
+  "data-testid": testId,
 }: PerformancePeriodsCardProps) {
   const hasAny = entries.some((entry) => entry.primary !== null);
   const showList = hasAny || notice !== undefined;
+  // Whether this caller reports a second figure at all. The security card does
+  // not, and an empty column would leave its percentages hanging off a gutter
+  // nothing sits in.
+  const hasSecondary = entries.some((entry) => entry.secondary !== undefined);
 
-  const figureClass = (value: number | null | undefined, unavailable: boolean) =>
+  const figureClass = (
+    value: number | null | undefined,
+    unavailable: boolean,
+  ) =>
     unavailable || value === null || value === undefined
-      ? 'text-gray-400 dark:text-gray-500'
+      ? "text-gray-400 dark:text-gray-500"
       : gainLossColor(value);
 
   return (
@@ -97,42 +104,50 @@ export function PerformancePeriodsCard({
         </p>
       )}
       {showList ? (
-        <dl className="space-y-2">
+        /* One line per period, the same row the security card draws, laid out
+           as a GRID rather than a row of flex lines: a column is what makes
+           every period's figure start at the same x, so the reader compares
+           them down the card instead of re-finding each one. `contents` on the
+           group keeps the `dt`/`dd` pairing while letting the grid own the
+           columns.
+
+           The second figure, where the caller has one, sits before the
+           headline at the headline's own size -- both are figures the reader
+           compares, and a money amount set smaller than the ratio beside it
+           reads as a footnote to it. Lighter weight is what keeps the headline
+           the headline. */
+        <dl
+          className={`grid items-baseline gap-x-4 gap-y-2 ${
+            hasSecondary ? "grid-cols-[1fr_auto_auto]" : "grid-cols-[1fr_auto]"
+          }`}
+        >
           {entries.map((entry) => (
-            <div
-              key={entry.period}
-              className="flex items-baseline justify-between gap-4"
-            >
+            <div key={entry.period} className="contents">
               <dt className="text-sm text-gray-500 dark:text-gray-400">
                 {entry.label}
               </dt>
-              {/* One line per period, the same row the security card draws.
-                  The second figure, where the caller has one, sits on that
-                  line before the headline, at the headline's own size -- both
-                  are figures the reader compares, and a money amount set
-                  smaller than the ratio beside it reads as a footnote to it.
-                  Lighter weight is what keeps the headline the headline. */}
-              <dd className="flex items-baseline justify-end gap-2 text-right">
-                {entry.secondary !== undefined && (
-                  <span
-                    className={`text-sm tabular-nums ${figureClass(
-                      entry.secondaryValue,
-                      entry.secondary === null,
-                    )}`}
-                  >
-                    {entry.secondary === null
-                      ? unavailableLabel
-                      : entry.secondary}
-                  </span>
-                )}
-                <span
-                  className={`text-sm font-medium tabular-nums ${figureClass(
-                    entry.primaryValue,
-                    entry.primary === null,
+              {hasSecondary && (
+                <dd
+                  className={`text-right text-sm tabular-nums ${figureClass(
+                    entry.secondaryValue,
+                    entry.secondary === null,
                   )}`}
                 >
-                  {entry.primary === null ? unavailableLabel : entry.primary}
-                </span>
+                  {/* `undefined` is a row this caller has no second figure
+                      for, which is not the same as one it could not report:
+                      the cell holds the column open and says nothing. */}
+                  {entry.secondary === undefined
+                    ? null
+                    : (entry.secondary ?? unavailableLabel)}
+                </dd>
+              )}
+              <dd
+                className={`text-right text-sm font-medium tabular-nums ${figureClass(
+                  entry.primaryValue,
+                  entry.primary === null,
+                )}`}
+              >
+                {entry.primary === null ? unavailableLabel : entry.primary}
               </dd>
             </div>
           ))}
@@ -153,9 +168,9 @@ export function PerformancePeriodsCard({
       {hasAny && footnote && (
         <p
           className={`mt-3 text-xs ${
-            footnoteTone === 'warning'
-              ? 'text-amber-600 dark:text-amber-500'
-              : 'text-gray-500 dark:text-gray-400'
+            footnoteTone === "warning"
+              ? "text-amber-600 dark:text-amber-500"
+              : "text-gray-500 dark:text-gray-400"
           }`}
           title={footnoteTitle}
         >

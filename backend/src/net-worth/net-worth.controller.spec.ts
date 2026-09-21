@@ -260,6 +260,76 @@ describe("NetWorthController", () => {
     });
   });
 
+  describe("getPeriodResult()", () => {
+    it("lets the server resolve a named window, ignoring the dates beside it", async () => {
+      // A chart names its range because the window it DRAWS is not the period
+      // the range names. A preset plus a pair of dates is one question,
+      // not two, so the dates are not passed on to be reconciled.
+      mockPeriodResult.getPeriodResult!.mockReturnValue("period");
+
+      const result = await controller.getPeriodResult(
+        mockReq,
+        "2026-01-02",
+        undefined,
+        "2026-01-01",
+        undefined,
+        "cad",
+        "3m",
+      );
+
+      expect(result).toBe("period");
+      expect(mockPeriodResult.getPeriodResult).toHaveBeenCalledWith("user-1", {
+        period: "3m",
+        endDate: undefined,
+        accountIds: undefined,
+        displayCurrency: "CAD",
+      });
+    });
+
+    it("needs no startDate when the window is named", async () => {
+      // `all` is the window no client arithmetic answers: it has no start date
+      // to send, and requiring one left both its figures unreported.
+      mockPeriodResult.getPeriodResult!.mockReturnValue("period");
+
+      await controller.getPeriodResult(
+        mockReq,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        "all",
+      );
+
+      expect(mockPeriodResult.getPeriodResult).toHaveBeenCalledWith(
+        "user-1",
+        expect.objectContaining({ period: "all" }),
+      );
+    });
+
+    it("still requires a startDate when no window is named", async () => {
+      await expect(controller.getPeriodResult(mockReq)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(mockPeriodResult.getPeriodResult).not.toHaveBeenCalled();
+    });
+
+    it("rejects a window name the presets have no arithmetic for", async () => {
+      await expect(
+        controller.getPeriodResult(
+          mockReq,
+          "2026-01-02",
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          "6m",
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(mockPeriodResult.getPeriodResult).not.toHaveBeenCalled();
+    });
+  });
+
   describe("getPeriodResults()", () => {
     it("passes the presets and the scope through", async () => {
       mockPeriodResults.getPeriodResults!.mockReturnValue("results");

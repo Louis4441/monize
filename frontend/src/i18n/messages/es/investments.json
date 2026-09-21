@@ -136,7 +136,7 @@
     "unmeasuredFlowTooltip": "Una operación liquidada fuera de estas cuentas, o un desglose que mezcla una línea de inversión con un gasto ordinario, significa que el resultado no se puede separar del dinero movido.",
     "valueChangeLine": "Cambio de valor {amount}",
     "netFlowsLine": "Depósitos y retiros netos {amount}",
-    "priorCloseTooltip": "Medido desde el cierre de la sesión bursátil anterior, el {date}.",
+    "measuredFromClose": "Desde el cierre de la sesión del {date}",
     "notAvailable": "N/A",
     "portfolioLabel": "Cartera:"
   },
@@ -299,10 +299,17 @@
     "dateRequired": "La fecha es obligatoria",
     "acquisitionPriceRequired": "El precio por acción es obligatorio y debe ser mayor que cero. Use «Agregar Acciones» para acciones adquiridas sin un costo conocido."
   },
+  "unlinkedTransfers": {
+    "title": "Transferencias registradas como dos filas separadas",
+    "subtitle": "Cada una parece una transferencia introducida dos veces, una en cada cuenta. Mientras las dos filas no estén vinculadas, la cuenta receptora no puede tomar el coste que cedió la emisora, así que su coste base y su ganancia figuran como desconocidos.",
+    "pair": "{quantity} {security} el {date}, de {from} a {to}",
+    "link": "Vincular",
+    "linking": "Vinculando...",
+    "linkFailed": "No se han podido vincular estas dos filas. Recargue la página e inténtelo de nuevo."
+  },
   "portfolioPerformance": {
     "title": "Rendimiento de la cartera",
     "subtitle": "Cómo se comportaron sus inversiones, sin el efecto de los depósitos, los retiros y el efectivo sin invertir.",
-    "footnote": "Los depósitos, los retiros y el efectivo sin invertir no cuentan como resultado de la inversión.",
     "unavailable": "n/a",
     "empty": "Aún no hay suficiente historial para medir una rentabilidad.",
     "periods": {

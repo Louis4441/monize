@@ -1187,7 +1187,7 @@
     "investmentReturnTooltip": "Eine zeitgewichtete Rendite allein für die Wertpapiere. Geld, das an einem Tag ein- oder ausgezahlt wird, bewegt sie nicht, und nicht investierte Barmittel gehören weder zum Ergebnis noch zu der Grundlage, an der es gemessen wird.",
     "flowsPartial": "Nur ein Teil der Bewegungen auf diesen Konten konnte umgerechnet werden: {amount}.",
     "incompleteTooltip": "Für einige Tage in diesem Zeitraum fehlt ein Kurs, ein Wechselkurs oder ein Kassenbestand, daher werden die davon abhängigen Zahlen nicht angezeigt.",
-    "priorCloseTooltip": "Gemessen ab dem Schlusskurs des vorherigen Handelstags am {date}.",
+    "measuredFromClose": "Seit dem Handelsschluss am {date}",
     "unmeasuredFlowTooltip": "Geld wurde auf eine Weise auf diese Konten ein- oder ausgezahlt, die hier nicht erfasst werden kann: ein Geschäft, das über ein Konto außerhalb dieser Gruppe abgewickelt wurde, oder eine Aufteilung, die eine Investitionsposition mit gewöhnlichen Ausgaben vermischt. Das Anlageergebnis wird nicht angezeigt, da ein Teil davon Ihr eigenes Geld wäre.",
     "closeBoundsTooltip": "Diese Werte werden zwischen den gespeicherten Schlusskursen vom {start} und {end} gemessen. Das Diagramm oben zeigt Kurse in Echtzeit während des Tages, sodass es sich bewegen kann, während diese Werte es nicht tun.",
     "notAvailable": "k. A.",

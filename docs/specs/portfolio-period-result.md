@@ -185,11 +185,15 @@ a count is all that withholding needs.
    raises `MV` by 10,000 and leaves no cash leg in `C` at all, so the flow query
    reports zero and the naive subtraction calls the reader's own money a hundred
    per cent gain -- the defect of section 1, reached by a second route.
-   The same reason covers an action that moved SHARES with no cash leg of any
-   kind -- `TRANSFER_IN`, `TRANSFER_OUT`, `ADD_SHARES`, `REMOVE_SHARES` -- unless
-   its linked leg is on an account of `A`, which makes it a move inside the
-   portfolio rather than across its boundary. Shares arriving from outside are
-   value entering with no cash to net it against.
+   An action that moved SHARES with no cash leg of any kind -- `TRANSFER_IN`,
+   `TRANSFER_OUT`, `ADD_SHARES`, `REMOVE_SHARES`, and no linked leg on an
+   account of `A` -- is counted SEPARATELY, as `externalShareTransfers`
+   (`externalShareTransfersSql`). It withholds this figure for the same reason:
+   shares arriving from outside are value entering `MV` with no cash to net it
+   against. It does **not** withhold the invested figures, which value such a
+   leg at the day's close; section 10.6 is the derivation. The two counts are
+   apart because they withhold different things, and they share one `reason`
+   because to a reader of the ACCOUNT's result they are one fact.
    A brokerage account with no linked cash sleeve settles its own trades on
    itself, which is outside `C` by construction; such a scope reports
    `valueChange` and withholds the result, which is the honest answer while its
@@ -210,9 +214,34 @@ One answer, on the server:
 `backend/src/net-worth/portfolio-period-result.util.ts` holds the pure decision
 (`decidePeriodResult`), table-tested without a database exactly as
 `decideDailyMovement` is. `GET /net-worth/investments-period-result` serves it
-for the same scope, range and display currency the chart asked for, plus an
-explicit `baselineDate` for the ranges measured from the prior close (1d, 1w,
-mtd). The client chooses the dates; it does no arithmetic over them.
+for the same scope and display currency the chart asked for.
+
+**A caller names its window rather than dating it.** `period` is one of the
+presets in `backend/src/net-worth/portfolio-period-presets.util.ts`, and the
+route draws the window -- and the prior-close baseline where the preset has one
+-- from that file, which is the same file the batch route in section 8 resolves
+its windows from. `startDate`/`baselineDate` name an explicit window instead,
+for the ranges no preset covers (`mtd`, a custom window); a caller sends one
+form or the other, never both. The client does no arithmetic over the figures
+either way.
+
+The window a price chart DRAWS is deliberately not the period its range names
+(`frontend/src/components/investments/portfolio-range-window.ts`): it opens 3M,
+1Y, 2Y and 5Y a day early so the first plotted close precedes the period,
+widens 1D to a week so a daily fallback has more than one point, and resolves
+`all` to no start date at all. Sending that window to this route is what made
+the chart's card measure a week under "1D", disagree with the performance card
+under "3M" and report nothing under "All time". A chart therefore names
+its range; it never sends the window it drew.
+
+**`startPriceDate`** answers which trading SESSION `startDate`'s value came
+from: the newest day on or before it carrying a close for anything the scope
+held (`NetWorthService.getLastPricedDays`). `startDate` is a calendar day and
+the value series prices every calendar day from the latest close at or before
+it, so a Monday 1D window opens on Sunday and is measured from Friday's close.
+A surface printing `startDate` as the close it reports against names a day the
+market was shut, so the surfaces print `startPriceDate`. `null` is unknown --
+never the calendar day in its place.
 
 ## 8. The batch route: every window, one valuation
 
@@ -284,8 +313,8 @@ asked for: a day is valued from the latest accepted close on or before it, and
 asserted rather than assumed:
 `backend/src/net-worth/portfolio-period-results-batch.service.spec.ts` runs the
 batch route and the single-range route over one fixture and compares them
-preset by preset, giving the single route exactly the dates the client computes
-(`usesPriorCloseBaseline`, `previousCalendarDay`).
+preset by preset, giving the single route exactly the dates the preset file
+resolves for that window (`presetWindowStart`, `usesPriorCloseBaseline`).
 
 **A window the series does not reach back to** -- a portfolio three days old
 asked for its year -- is every figure `null` with `noValueSeries`, and the
@@ -310,6 +339,14 @@ Backend unit (`portfolio-period-result.util.spec.ts`,
 | `MV(b) = 0` | percent `null`, reason `zeroStart`, money reported |
 | empty series | every figure `null`, reason `noValueSeries` |
 | an explicit `baselineDate` | the baseline's close is the start, flows after it |
+| `period: '1d'` | the window is the day and the close before it, never the week the chart draws |
+| `period: '3m'`, `'1y'`, `'5y'` | the day `presetWindowStart` names, not the day before it |
+| `period: 'all'` | opens on the close before the scope's first holding, and equals `getInvestedResultSinceInception` |
+| `period: 'all'` on a scope that never held anything | every figure `null`, reason `noValueSeries`, no series valued |
+| a boundary on a day with no close | `startPriceDate` is the session before it; `null` where nothing was priced |
+| a TRANSFER_IN carrying a basis far from the day's close | valued at `quantity x close`, so the P&L is the market move alone |
+| a share-moving leg nothing priced | day incomplete, reason `incompletePrices`, the security dated in `incompleteRanges` |
+| a share transfer and the ACCOUNT's result | still `null` with `externallySettledTrade`; only the invested figures report |
 | a BUY settled outside `C` | result and percent `null`, reason `externallySettledTrade` |
 | a mixed split parent in the window | result `null`, reason `mixedSplit` |
 | the flow query's account set | the valued cash accounts, not the whole scope |
@@ -586,20 +623,32 @@ substituted number, never a chain over a subtotal, never a rate of 1 for a
 failed lookup, never a percentage over an incomplete P&L. A known zero -- case 1
 -- is a number and is reported as one.
 
-Two open items, both narrowing rather than corrupting:
+**A share-moving leg is valued at the day's accepted close.** `IV` moves by the
+position's MARKET value, so a leg valued at anything else -- the basis the row
+carries, or nothing at all -- leaves the difference in `investmentPnl` as a gain
+nobody made. `foldInvestedFlows` therefore values `TRANSFER_IN`,
+`TRANSFER_OUT`, `ADD_SHARES` and `REMOVE_SHARES` at `quantity x close`, where
+`close` is `positionCloseAsOf` over the very series the valuation was built
+from (`shareLegCloseFrom`). `IV` and `K` then move by one number for one day's
+shares and cancel exactly, whatever cost the row was recorded at.
 
-1. **A capital row with no value.** An ADD_SHARES or TRANSFER_IN with no stored
-   price contributes 0 to `K` while its shares enter `IV`, which would read as a
-   gain. Every such row whose linked leg is not inside the scope is already
-   counted by `externallySettledTrades` (section 6.1) and withholds the whole
-   window; a linked pair inside the scope values both legs the same way and
-   nets to zero. What is left uncovered is a linked pair whose legs fall on
-   different days, which shifts value between two days' factors without
-   changing `investmentPnl`.
-2. **A transfer leg carries basis, not market value.** `IV` moves by the
-   position's market value while `K` moves by the leg's carried basis. Inside
-   the scope the two legs cancel; across the boundary the window is already
-   withheld.
+This closes what were two open items, and it is why `externalShareTransfers` is
+counted apart from `externallySettledTrades` in section 6.1: a portfolio built
+by transferring holdings in used to report "n/a" for every window those
+transfers fell in, which is every long window and always `all`.
+
+What remains is narrowing rather than corrupting:
+
+1. **A leg nothing priced.** Where no accepted close exists on or before the
+   leg's date, the shares are in `IV` with no capital flow to net them. The
+   fold names the security on that day (`InvestedFlowDay.unpricedSecurityIds`),
+   which makes the day a subtotal, withholds the window with `incompletePrices`
+   rather than `externallySettledTrade`, and dates the security in
+   `incompleteRanges` (`withFlowUnpricedSecurities`). A price to add, on one
+   security's price history, rather than a movement nobody can act on.
+2. **A linked pair whose legs fall on different days** shifts value between two
+   days' factors without changing `investmentPnl`; both legs are valued at their
+   own day's close, so neither is a gain.
 
 ### 10.7 Where each surface reads which measure
 

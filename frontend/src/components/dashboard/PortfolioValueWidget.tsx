@@ -164,8 +164,9 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
   // change read off the plotted series counts the reader's own deposits as
   // performance (INV-PORTRESULT-001), so nothing here subtracts two points: the
   // widget asks the same endpoint the Portfolio Value report reads, for the
-  // same scope and window, and prints what comes back. 1W and MTD still report
-  // against the previous close -- that date is all this layer decides.
+  // same scope, and prints what comes back. The window it DRAWS opens earlier
+  // than the period its range names, so the range is named rather than dated
+  // and the server resolves it.
   const { periodResult } = usePortfolioPeriodResult({
     range: config.range,
     startDate: start,

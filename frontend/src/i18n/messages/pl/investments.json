@@ -136,7 +136,7 @@
     "unmeasuredFlowTooltip": "Transakcja rozliczona poza tymi kontami albo podział łączący pozycję inwestycyjną ze zwykłym wydatkiem oznacza, że wyniku nie da się oddzielić od przesuniętych pieniędzy.",
     "valueChangeLine": "Zmiana wartości {amount}",
     "netFlowsLine": "Wpłaty i wypłaty netto {amount}",
-    "priorCloseTooltip": "Mierzone od kursu zamknięcia poprzedniej sesji z dnia {date}.",
+    "measuredFromClose": "Od zamknięcia notowań {date}",
     "notAvailable": "Brak",
     "portfolioLabel": "Portfel:"
   },
@@ -299,10 +299,17 @@
     "dateRequired": "Data jest wymagana",
     "acquisitionPriceRequired": "Cena za jednostkę jest wymagana i musi być większa od zera. Dla jednostek nabytych bez znanego kosztu użyj „Dodaj udziały”."
   },
+  "unlinkedTransfers": {
+    "title": "Transfery zapisane jako dwa osobne wiersze",
+    "subtitle": "Każdy z nich wygląda jak jeden transfer wprowadzony dwa razy, po razie na każdym rachunku. Dopóki wiersze nie są powiązane, rachunek odbierający nie może przejąć kosztu oddanego przez wysyłający, więc jego koszt nabycia i zysk są nieznane.",
+    "pair": "{quantity} {security} dnia {date}, z {from} do {to}",
+    "link": "Powiąż",
+    "linking": "Wiązanie...",
+    "linkFailed": "Nie udało się powiązać tych dwóch wierszy. Odśwież stronę i spróbuj ponownie."
+  },
   "portfolioPerformance": {
     "title": "Wyniki portfela",
     "subtitle": "Wynik Twoich inwestycji bez wpływu wpłat, wypłat i niezainwestowanej gotówki.",
-    "footnote": "Wpłaty, wypłaty i niezainwestowana gotówka nie są liczone jako wynik inwestycyjny.",
     "unavailable": "n/d",
     "empty": "Za mało historii, żeby zmierzyć zwrot.",
     "periods": {

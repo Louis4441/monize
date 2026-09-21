@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate має бути у форматі YYYY-MM-DD",
     "invalidAccountIds": "accountIds має бути UUID через кому",
     "invalidGranularity": "granularity має бути 'daily' або 'monthly'",
-    "invalidPeriods": "periods має бути списком попередньо визначених періодів, розділених комами"
+    "invalidPeriods": "periods має бути списком попередньо визначених періодів, розділених комами",
+    "invalidPeriod": "period має бути одним із попередньо визначених періодів"
   },
   "notifications": {
     "notFound": "Сповіщення з ідентифікатором {{ id }} не знайдено",
@@ -425,6 +426,16 @@
   "securities": {
     "exchangeRateUnavailable": "Не вдалося визначити обмінний курс для {{ from }} -> {{ to }} на дату транзакції. Вкажіть явний exchangeRate, щоб проведення за грошовим рахунком було коректним.",
     "accountMustBeInvestment": "Рахунок має бути типу INVESTMENT",
+    "transferPairSameRow": "Дві частини одного переказу не можуть бути однією операцією",
+    "transferPairNotFound": "Однієї з двох операцій більше не існує",
+    "transferPairAlreadyLinked": "Одна з цих частин уже пов'язана з іншою операцією",
+    "transferPairVoid": "Анульована операція нічого не зафіксувала, тож не може бути половиною переказу",
+    "transferPairActions": "Ці дві дії не є вихідною та вхідною частинами одного переказу",
+    "transferPairSecurity": "Обидві частини мають переміщувати той самий цінний папір",
+    "transferPairDate": "Обидві частини мають бути датовані одним днем",
+    "transferPairSameAccount": "Переказ переміщує паї між двома різними рахунками",
+    "transferPairQuantity": "Обидві частини мають переміщувати однакову кількість паїв",
+    "transferPairOutsidePortfolio": "Обидві частини мають бути на інвестиційних рахунках цього портфеля",
     "providerCurrencyMismatch": "Оновлення ціни для {{ symbol }} відхилено: {{ provider }} котирує його в {{ reported }}, але цінний папір зареєстровано в {{ configured }}. Виправте валюту, символ або біржу цінного папера, а потім оновіть знову.",
     "securityIdRequired": "Ідентифікатор цінного паперу обов'язковий для операцій {{ action }}",
     "splitRatioRequired": "Коефіцієнт дроблення (кількість) має бути більше нуля",

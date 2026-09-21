@@ -136,7 +136,7 @@
     "unmeasuredFlowTooltip": "Ein Geschäft, das außerhalb dieser Konten abgewickelt wurde, oder eine Aufteilung, die eine Investitionsposition mit gewöhnlichen Ausgaben vermischt, bedeutet, dass das Ergebnis nicht vom bewegten Geld getrennt werden kann.",
     "valueChangeLine": "Wertveränderung {amount}",
     "netFlowsLine": "Netto-Ein- und Auszahlungen {amount}",
-    "priorCloseTooltip": "Gemessen ab dem Schlusskurs des vorherigen Handelstags am {date}.",
+    "measuredFromClose": "Seit dem Handelsschluss am {date}",
     "notAvailable": "N/A",
     "portfolioLabel": "Portfolio:"
   },
@@ -299,10 +299,17 @@
     "dateRequired": "Datum ist erforderlich",
     "acquisitionPriceRequired": "Der Preis pro Anteil ist erforderlich und muss größer als null sein. Verwenden Sie „Anteile hinzufügen“ für Anteile, die ohne bekannte Kosten erworben wurden."
   },
+  "unlinkedTransfers": {
+    "title": "Als zwei getrennte Zeilen erfasste Übertragungen",
+    "subtitle": "Jede dieser Buchungen sieht nach einer Übertragung aus, die zweimal erfasst wurde -- einmal je Konto. Solange die beiden Zeilen nicht verknüpft sind, kann das empfangende Konto die Kosten des abgebenden nicht übernehmen, sodass Einstandswert und Gewinn als unbekannt gelten.",
+    "pair": "{quantity} {security} am {date}, {from} nach {to}",
+    "link": "Verknüpfen",
+    "linking": "Wird verknüpft...",
+    "linkFailed": "Diese beiden Zeilen konnten nicht verknüpft werden. Laden Sie die Seite neu und versuchen Sie es erneut."
+  },
   "portfolioPerformance": {
     "title": "Portfolio-Performance",
     "subtitle": "Wie sich Ihre Investitionen entwickelt haben, ohne den Effekt von Einzahlungen, Auszahlungen und nicht investierten Barmitteln.",
-    "footnote": "Einzahlungen, Auszahlungen und nicht investierte Barmittel zählen nicht als Anlageergebnis.",
     "unavailable": "n/a",
     "empty": "Noch zu wenig Historie, um eine Rendite zu messen.",
     "periods": {

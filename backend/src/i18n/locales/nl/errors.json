@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate moet JJJJ-MM-DD zijn",
     "invalidAccountIds": "accountIds moeten door komma's gescheiden UUID's zijn",
     "invalidGranularity": "granularity moet 'daily' of 'monthly' zijn",
-    "invalidPeriods": "periods moet bestaan uit door komma's gescheiden periodevoorinstellingen"
+    "invalidPeriods": "periods moet bestaan uit door komma's gescheiden periodevoorinstellingen",
+    "invalidPeriod": "period moet een van de periodevoorinstellingen zijn"
   },
   "notifications": {
     "notFound": "Notificatie met ID {{ id }} niet gevonden",
@@ -425,6 +426,16 @@
   "securities": {
     "exchangeRateUnavailable": "Kon geen wisselkoers bepalen voor {{ from }} -> {{ to }} op de transactiedatum. Geef een expliciete exchangeRate op zodat de boeking op de geldrekening correct is.",
     "accountMustBeInvestment": "Rekening moet van het type INVESTMENT zijn",
+    "transferPairSameRow": "De twee zijden van een overboeking kunnen niet dezelfde transactie zijn",
+    "transferPairNotFound": "Een van de twee transacties bestaat niet meer",
+    "transferPairAlreadyLinked": "Een van deze zijden is al gekoppeld aan een andere transactie",
+    "transferPairVoid": "Een vervallen transactie heeft niets vastgelegd en kan dus geen helft van een overboeking zijn",
+    "transferPairActions": "Deze twee acties zijn niet de uitgaande en inkomende zijde van één overboeking",
+    "transferPairSecurity": "Beide zijden moeten hetzelfde effect verplaatsen",
+    "transferPairDate": "Beide zijden moeten dezelfde datum hebben",
+    "transferPairSameAccount": "Een overboeking verplaatst stukken tussen twee verschillende rekeningen",
+    "transferPairQuantity": "Beide zijden moeten hetzelfde aantal stukken verplaatsen",
+    "transferPairOutsidePortfolio": "Beide zijden moeten op beleggingsrekeningen van deze portefeuille staan",
     "providerCurrencyMismatch": "Prijsupdate geweigerd voor {{ symbol }}: {{ provider }} noteert het in {{ reported }}, maar het waardepapier staat geregistreerd in {{ configured }}. Corrigeer de valuta, het symbool of de beurs van het waardepapier en ververs opnieuw.",
     "securityIdRequired": "Waardepapier-ID is vereist voor {{ action }}-transacties",
     "splitRatioRequired": "Splitsingsverhouding (hoeveelheid) moet groter zijn dan nul",

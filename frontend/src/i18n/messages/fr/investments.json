@@ -136,7 +136,7 @@
     "unmeasuredFlowTooltip": "Une opération réglée en dehors de ces comptes, ou une répartition qui mélange une ligne d'investissement avec une dépense ordinaire, signifie que le résultat ne peut pas être séparé de l'argent déplacé.",
     "valueChangeLine": "Variation de valeur {amount}",
     "netFlowsLine": "Dépôts et retraits nets {amount}",
-    "priorCloseTooltip": "Mesuré à partir de la clôture de la séance précédente, le {date}.",
+    "measuredFromClose": "Depuis la clôture de la séance du {date}",
     "notAvailable": "N/D",
     "portfolioLabel": "Portefeuille :"
   },
@@ -299,10 +299,17 @@
     "dateRequired": "La date est obligatoire",
     "acquisitionPriceRequired": "Le prix par part est obligatoire et doit être supérieur à zéro. Utilisez « Ajout de parts » pour des parts acquises sans coût connu."
   },
+  "unlinkedTransfers": {
+    "title": "Transferts saisis en deux lignes distinctes",
+    "subtitle": "Chacun ressemble à un transfert saisi deux fois, une fois par compte. Tant que les deux lignes ne sont pas liées, le compte destinataire ne peut pas reprendre le coût cédé par le compte source : son prix de revient et sa plus-value restent inconnus.",
+    "pair": "{quantity} {security} le {date}, de {from} vers {to}",
+    "link": "Lier",
+    "linking": "Liaison...",
+    "linkFailed": "Ces deux lignes n'ont pas pu être liées. Rechargez la page et réessayez."
+  },
   "portfolioPerformance": {
     "title": "Performance du portefeuille",
     "subtitle": "La performance de vos investissements, sans l'effet des dépôts, des retraits et des liquidités non investies.",
-    "footnote": "Les dépôts, les retraits et les liquidités non investies ne comptent pas comme résultat de l'investissement.",
     "unavailable": "n/d",
     "empty": "Pas encore assez d'historique pour mesurer un rendement.",
     "periods": {

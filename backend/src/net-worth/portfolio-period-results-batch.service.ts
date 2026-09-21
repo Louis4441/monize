@@ -34,6 +34,7 @@ import { decidePeriodResult } from "./portfolio-period-result.util";
 import {
   EMPTY_INCOMPLETE_RANGES,
   foldIncompleteData,
+  withFlowUnpricedSecurities,
 } from "./incomplete-data-ranges.util";
 import {
   loadUnmeasuredFlowRows,
@@ -42,6 +43,8 @@ import {
 import {
   foldInvestedFlows,
   loadInvestedCapitalFlowRows,
+  shareLegCloseFrom,
+  shareLegSecurityIds,
 } from "./invested-capital-flow.util";
 import {
   NO_INVESTED_PERIOD,
@@ -146,6 +149,9 @@ export class PortfolioPeriodResultsBatchService {
     const empty = (startDate: string): PortfolioPeriodResult => ({
       currency,
       startDate,
+      // No valued day is no session to name; the single-range route's own
+      // empty answer says the same.
+      startPriceDate: null,
       endDate: end,
       ...decidePeriodResult({
         start: null,
@@ -265,6 +271,18 @@ export class PortfolioPeriodResultsBatchService {
 
     if (series.length === 0) return allEmpty();
 
+    // The closes a share-moving leg is valued at, over the widest window and
+    // therefore shared by every preset's slice: the same series the value
+    // chart was built from, so `IV` and `K` move by one number for one day's
+    // shares (`docs/specs/portfolio-period-result.md` section 10.6).
+    const shareLegClose = shareLegCloseFrom(
+      await this.netWorth.loadValuationSeries(
+        shareLegSecurityIds(investedRows),
+        earliest,
+        end,
+      ),
+    );
+
     // ONE index for the widest window, filled once: the fold over every row
     // names the months and pairs it is short of, the provider is asked once per
     // unit, and on a successful fill the index is re-read from the database.
@@ -288,6 +306,7 @@ export class PortfolioPeriodResultsBatchService {
           currency,
           index,
           this.logger,
+          shareLegClose,
         );
         return {
           rateIndex: index,
@@ -304,11 +323,25 @@ export class PortfolioPeriodResultsBatchService {
     );
 
     const last = series[series.length - 1];
+    // Where each reported preset is measured from, resolved before anything is
+    // built: the trading session behind each of those boundaries is one query
+    // for all of them rather than one per preset.
+    const boundaries = new Map(
+      [...windows].map(([preset, windowStart]) => [
+        preset,
+        this.startBoundary(series, preset, windowStart),
+      ]),
+    );
+    const pricedDays = await this.netWorth.getLastPricedDays(
+      userId,
+      [...boundaries.values()].flatMap((point) => (point ? [point.date] : [])),
+      scope.map((row) => row.id),
+    );
     const periods: Partial<
       Record<PortfolioPeriodPreset, PortfolioPeriodResult>
     > = {};
     for (const [preset, windowStart] of windows) {
-      const start = this.startBoundary(series, preset, windowStart);
+      const start = boundaries.get(preset) ?? null;
       if (!start) {
         periods[preset] = empty(windowStart);
         continue;
@@ -329,13 +362,16 @@ export class PortfolioPeriodResultsBatchService {
       periods[preset] = {
         currency,
         startDate: start.date,
+        startPriceDate: pricedDays.get(start.date) ?? null,
         endDate: last.date,
         ...decidePeriodResult({ start, end: last, flow, unmeasuredFlows }),
         // This preset's OWN slice of the one series, so a preset reports the
         // gaps inside its window and not the wider window's: the single-range
         // route folds exactly the points it valued, and these two must answer
         // the same thing for the same window.
-        incompleteRanges: foldIncompleteData(series.slice(startIndex)),
+        incompleteRanges: foldIncompleteData(
+          withFlowUnpricedSecurities(series.slice(startIndex), investedByDay),
+        ),
         // The same one series, sliced at this preset's own boundary: the TWR
         // for a preset is a product over that preset's days, O(days), over the
         // per-day flows folded once above.

@@ -70,14 +70,20 @@ export const netWorthApi = {
    * in or out: `valueChange`, `netExternalFlows` and `investmentResult` as
    * three separate figures, with a percentage only over the last of them.
    *
-   * `baselineDate` is the close the period is measured from where that is
-   * earlier than `startDate` -- the 1d / 1w / mtd ranges report against the
-   * previous trading day's close. The client picks the date; the server does
-   * the arithmetic, so no surface can disagree with another about what the
-   * portfolio earned.
+   * `period` names the window and the SERVER resolves it, from the same
+   * arithmetic the batch route uses -- so a chart's card and the performance
+   * card beside it report one figure under one caption. It is what every
+   * portfolio chart sends: the window a price chart DRAWS is deliberately not
+   * the period it names (`portfolio-range-window.ts`), and sending the drawn
+   * one measured 1D over a week and All over nothing at all.
+   *
+   * `startDate`/`baselineDate` name an explicit window instead, for a caller
+   * with no preset to name. `baselineDate` is the close the period is measured
+   * from where that is earlier than `startDate`.
    */
   getInvestmentsPeriodResult: async (params: {
-    startDate: string;
+    period?: string;
+    startDate?: string;
     endDate?: string;
     baselineDate?: string;
     accountIds?: string;

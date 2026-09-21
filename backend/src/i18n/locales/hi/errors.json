@@ -349,7 +349,8 @@
     "invalidBaselineDate": "baselineDate YYYY-MM-DD प्रारूप में होनी चाहिए",
     "invalidAccountIds": "accountIds अल्पविराम-अलग UUID होने चाहिए",
     "invalidGranularity": "granularity 'daily' या 'monthly' होना चाहिए",
-    "invalidPeriods": "periods अल्पविराम से अलग किए गए पूर्वनिर्धारित अवधि प्रीसेट होने चाहिए"
+    "invalidPeriods": "periods अल्पविराम से अलग किए गए पूर्वनिर्धारित अवधि प्रीसेट होने चाहिए",
+    "invalidPeriod": "period पूर्वनिर्धारित अवधि प्रीसेट में से एक होना चाहिए"
   },
   "notifications": {
     "notFound": "ID {{ id }} वाली अधिसूचना नहीं मिली",
@@ -425,6 +426,16 @@
   "securities": {
     "exchangeRateUnavailable": "लेन-देन की तारीख पर {{ from }} -> {{ to }} के लिए विनिमय दर निर्धारित नहीं की जा सकी। नकद खाते में सही प्रविष्टि के लिए स्पष्ट exchangeRate दें।",
     "accountMustBeInvestment": "खाता INVESTMENT प्रकार का होना चाहिए",
+    "transferPairSameRow": "एक ट्रांसफ़र के दोनों हिस्से एक ही लेनदेन नहीं हो सकते",
+    "transferPairNotFound": "दोनों में से एक लेनदेन अब मौजूद नहीं है",
+    "transferPairAlreadyLinked": "इनमें से एक हिस्सा पहले से किसी अन्य लेनदेन से जुड़ा है",
+    "transferPairVoid": "रद्द किया गया लेनदेन कुछ दर्ज नहीं करता, इसलिए वह ट्रांसफ़र का आधा हिस्सा नहीं हो सकता",
+    "transferPairActions": "ये दोनों क्रियाएँ एक ट्रांसफ़र के बाहर जाने और आने वाले हिस्से नहीं हैं",
+    "transferPairSecurity": "दोनों हिस्सों में एक ही प्रतिभूति होनी चाहिए",
+    "transferPairDate": "दोनों हिस्सों की तारीख एक ही होनी चाहिए",
+    "transferPairSameAccount": "ट्रांसफ़र दो अलग-अलग खातों के बीच शेयर ले जाता है",
+    "transferPairQuantity": "दोनों हिस्सों में शेयरों की संख्या समान होनी चाहिए",
+    "transferPairOutsidePortfolio": "दोनों हिस्से इस पोर्टफ़ोलियो के निवेश खातों पर होने चाहिए",
     "providerCurrencyMismatch": "{{ symbol }} के लिए मूल्य अद्यतन अस्वीकृत: {{ provider }} इसे {{ reported }} में दर्शाता है, लेकिन प्रतिभूति {{ configured }} में दर्ज है। प्रतिभूति की मुद्रा, प्रतीक या एक्सचेंज ठीक करें, फिर पुनः ताज़ा करें।",
     "securityIdRequired": "{{ action }} लेनदेन के लिए प्रतिभूति ID आवश्यक है",
     "splitRatioRequired": "विभाजन अनुपात (मात्रा) शून्य से अधिक होना चाहिए",

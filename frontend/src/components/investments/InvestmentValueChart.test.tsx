@@ -103,6 +103,7 @@ function periodResult(
   const base = {
     currency: 'CAD',
     startDate: '2023-06-01',
+    startPriceDate: '2023-06-01',
     endDate: '2024-01-01',
     startValue: 10000,
     endValue: 15000,
@@ -214,6 +215,53 @@ describe('InvestmentValueChart', () => {
     render(<InvestmentValueChart />);
     const title = await screen.findByText('Portfolio Value Over Time');
     expect(title).toBeInTheDocument();
+  });
+
+  describe('the session the figures are measured from', () => {
+    it('names it under the title, for every range', async () => {
+      // Under the heading rather than behind a marker: it is a fact about
+      // every window this chart draws, not a caveat about three of them.
+      vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockResolvedValue(
+        periodResult({ startDate: '2026-09-20', startPriceDate: '2026-09-18' }),
+      );
+      render(<InvestmentValueChart />);
+      await screen.findByText('Portfolio Value Over Time');
+
+      await waitFor(() =>
+        expect(screen.getByTestId('measured-from-close')).toHaveTextContent(
+          'Since the close of trading on Sep 18, 2026',
+        ),
+      );
+    });
+
+    it('dates the session, never the calendar day beside it', async () => {
+      // A Monday 1D window opens on Sunday and carries Friday's close. The
+      // boundary's own date names a day the market was shut.
+      vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockResolvedValue(
+        periodResult({ startDate: '2026-09-20', startPriceDate: '2026-09-18' }),
+      );
+      render(<InvestmentValueChart />);
+      await screen.findByText('Portfolio Value Over Time');
+
+      await waitFor(() =>
+        expect(screen.getByTestId('measured-from-close')).toBeInTheDocument(),
+      );
+      expect(screen.getByTestId('measured-from-close')).not.toHaveTextContent(
+        'Sep 20',
+      );
+      // And no marker to hover: the line replaced it.
+      expect(screen.queryByText(/Measured from the previous trading day/)).toBeNull();
+    });
+
+    it('says nothing when the server could not name a session', async () => {
+      vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockResolvedValue(
+        periodResult({ startPriceDate: null }),
+      );
+      render(<InvestmentValueChart />);
+      await screen.findByText('Portfolio Value Over Time');
+
+      expect(screen.queryByTestId('measured-from-close')).toBeNull();
+    });
   });
 
   it('links to the full Portfolio Value report', async () => {
@@ -486,12 +534,16 @@ describe('InvestmentValueChart', () => {
       // Highest/lowest are exactly the series' own extremes -- no extra point.
       expect(screen.getByText('$12000.00')).toBeInTheDocument();
       expect(screen.getByText('$10000.00')).toBeInTheDocument();
-      // 3M is not a prior-close range, so the period is measured from the
-      // window itself and no baseline date is sent.
+      // The window this chart DRAWS opens a day before the quarter so the
+      // first plotted close precedes it. The period is NAMED, so the figures
+      // are measured over the quarter the button says and agree with the
+      // performance card beside them.
       await waitFor(() =>
-        expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith(
-          expect.objectContaining({ baselineDate: undefined }),
-        ),
+        expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith({
+          period: '3m',
+          accountIds: undefined,
+          displayCurrency: undefined,
+        }),
       );
       // Only the chart's own daily request -- the period is the server's.
       await waitFor(() =>
@@ -499,7 +551,7 @@ describe('InvestmentValueChart', () => {
       );
     });
 
-    it('1W plots the intraday series and reads the prior close only as a baseline', async () => {
+    it('1W plots the intraday series and names its period to the server', async () => {
       dateRangeState.dateRange = '1w';
       dateRangeState.resolvedRange = { start: '2024-09-02', end: '2024-09-09' };
       vi.mocked(investmentsApi.getIntradayValue).mockResolvedValue({
@@ -531,7 +583,7 @@ describe('InvestmentValueChart', () => {
       );
       await waitFor(() =>
         expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith(
-          expect.objectContaining({ baselineDate: '2024-09-01' }),
+          expect.objectContaining({ period: '1w' }),
         ),
       );
       // The daily endpoint is never reached: the chart draws intraday points
@@ -602,11 +654,12 @@ describe('InvestmentValueChart', () => {
         expect.objectContaining({ range: '1d' }),
       )
     );
-    // As above: the period is measured against the previous session's close,
+    // As above: the period is NAMED, so the server measures the day rather
+    // than the week `resolveRangePreset('1d')` widened the drawn window to,
     // and the daily endpoint is not reached for it.
     await waitFor(() =>
       expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith(
-        expect.objectContaining({ baselineDate: '2024-01-01' }),
+        expect.objectContaining({ period: '1d' }),
       )
     );
     expect(netWorthApi.getInvestmentsDaily).not.toHaveBeenCalled();
@@ -685,8 +738,12 @@ describe('InvestmentValueChart', () => {
 
       await waitFor(() =>
         expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith(
-          expect.objectContaining({ baselineDate: '2024-01-07' }),
+          expect.objectContaining({ period: '1w' }),
         ),
+      );
+      // Never the drawn window's dates: the server resolves the week.
+      expect(netWorthApi.getInvestmentsPeriodResult).not.toHaveBeenCalledWith(
+        expect.objectContaining({ startDate: '2024-01-08' }),
       );
       await waitFor(() =>
         expect(card('Investment Result')).toContain('+$2000.00'),
@@ -737,10 +794,17 @@ describe('InvestmentValueChart', () => {
 
       // Up 200 since the open, down 200 against the previous close: the two
       // answers have opposite signs, so only one of them can be on screen.
+      // And never a week: `resolveRangePreset('1d')` hands the chart a
+      // seven-day window to DRAW, which is not the period to measure.
       await waitFor(() =>
-        expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith(
-          expect.objectContaining({ baselineDate: '2024-01-14' }),
-        ),
+        expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith({
+          period: '1d',
+          accountIds: undefined,
+          displayCurrency: undefined,
+        }),
+      );
+      expect(netWorthApi.getInvestmentsPeriodResult).not.toHaveBeenCalledWith(
+        expect.objectContaining({ startDate: '2024-01-08' }),
       );
       await waitFor(() =>
         expect(card('Investment Result')).toContain('-200.00'),
@@ -802,17 +866,20 @@ describe('InvestmentValueChart', () => {
       expect(card('Investment Result')).not.toContain('+$5000.00');
     });
 
-    it('still measures a long range from the window it drew', async () => {
-      // 1y: its first point already is a close, so no baseline date is sent.
+    it('names a long range rather than sending the window it drew', async () => {
+      // 1Y draws from the day BEFORE the anniversary so the first plotted
+      // close precedes the year. That is the line's window, not the figure's.
       render(<InvestmentValueChart />);
       await screen.findByText('Portfolio Value Over Time');
       await waitFor(() =>
         expect(card('Investment Result')).toContain('+$5000.00'),
       );
       await waitFor(() =>
-        expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith(
-          expect.objectContaining({ baselineDate: undefined }),
-        ),
+        expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith({
+          period: '1y',
+          accountIds: undefined,
+          displayCurrency: undefined,
+        }),
       );
       // One call, for the chart itself.
       await waitFor(() =>
