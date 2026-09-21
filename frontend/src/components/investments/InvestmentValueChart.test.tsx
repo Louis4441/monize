@@ -236,7 +236,7 @@ describe('InvestmentValueChart', () => {
 
     it('dates the session, never the calendar day beside it', async () => {
       // A Monday 1D window opens on Sunday and carries Friday's close. The
-      // boundary's own date names a day the market was shut (#1424).
+      // boundary's own date names a day the market was shut.
       vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockResolvedValue(
         periodResult({ startDate: '2026-09-20', startPriceDate: '2026-09-18' }),
       );
@@ -537,7 +537,7 @@ describe('InvestmentValueChart', () => {
       // The window this chart DRAWS opens a day before the quarter so the
       // first plotted close precedes it. The period is NAMED, so the figures
       // are measured over the quarter the button says and agree with the
-      // performance card beside them (#1424).
+      // performance card beside them.
       await waitFor(() =>
         expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith({
           period: '3m',
@@ -795,7 +795,7 @@ describe('InvestmentValueChart', () => {
       // Up 200 since the open, down 200 against the previous close: the two
       // answers have opposite signs, so only one of them can be on screen.
       // And never a week: `resolveRangePreset('1d')` hands the chart a
-      // seven-day window to DRAW, which is not the period to measure (#1424).
+      // seven-day window to DRAW, which is not the period to measure.
       await waitFor(() =>
         expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith({
           period: '1d',

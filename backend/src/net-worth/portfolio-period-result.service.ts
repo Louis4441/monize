@@ -229,7 +229,7 @@ export class PortfolioPeriodResultService {
    * draws its window from `portfolio-period-presets.util.ts` -- the same
    * arithmetic, from the same file, that the batch route uses, so a chart's
    * card and the performance card beside it cannot report different figures
-   * under the same caption (issue #1424: the chart sent the window it DREW,
+   * under the same caption. The chart sent the window it DREW,
    * which opens a day early on 3M/1Y/5Y, a week early on 1D and nowhere at all
    * on All). `startDate`/`baselineDate` name an explicit window instead, for a
    * caller with no preset to name.

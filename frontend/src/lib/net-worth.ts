@@ -75,7 +75,7 @@ export const netWorthApi = {
    * card beside it report one figure under one caption. It is what every
    * portfolio chart sends: the window a price chart DRAWS is deliberately not
    * the period it names (`portfolio-range-window.ts`), and sending the drawn
-   * one measured 1D over a week and All over nothing at all (#1424).
+   * one measured 1D over a week and All over nothing at all.
    *
    * `startDate`/`baselineDate` name an explicit window instead, for a caller
    * with no preset to name. `baselineDate` is the close the period is measured

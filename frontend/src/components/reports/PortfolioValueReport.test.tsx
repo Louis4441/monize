@@ -1393,7 +1393,7 @@ describe('PortfolioValueReport', () => {
 
   /**
    * Which SESSION the figures are measured from, named under the chart's
-   * title rather than behind a marker on one card (#1424).
+   * title rather than behind a marker on one card.
    *
    * `startDate` is a calendar boundary and the value series prices every
    * calendar day from the latest close at or before it, so a window opening on
@@ -1481,7 +1481,7 @@ describe('PortfolioValueReport', () => {
       });
 
       // The week is NAMED, not dated: the server resolves it from the same
-      // arithmetic the performance card's 1W row uses (#1424).
+      // arithmetic the performance card's 1W row uses.
       await waitFor(() =>
         expect(mockGetPeriodResult).toHaveBeenCalledWith(
           expect.objectContaining({ period: '1w' }),

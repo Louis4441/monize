@@ -383,7 +383,7 @@ describe('PortfolioValueWidget', () => {
   it('names the window to the server rather than sending the one it drew', async () => {
     // The widget's 1Y window opens a day before the anniversary so the first
     // plotted close precedes the year. That is the line's window, not the
-    // figure's: the server resolves 1Y from its own preset (#1424).
+    // figure's: the server resolves 1Y from its own preset.
     configState.current = { range: '1y', accountIds: [] };
     getInvestmentsMonthly.mockResolvedValue([{ month: '2026-06', value: 10000 }]);
     await renderWidget();

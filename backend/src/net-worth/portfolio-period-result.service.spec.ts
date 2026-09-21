@@ -850,7 +850,7 @@ describe("PortfolioPeriodResultService", () => {
     });
   });
   /**
-   * A caller that NAMES its window instead of dating it (#1424).
+   * A caller that NAMES its window instead of dating it.
    *
    * The window a portfolio chart draws is deliberately not the period its
    * button names: `resolveRangePreset` widens 1D to a week so a daily fallback
@@ -951,7 +951,7 @@ describe("PortfolioPeriodResultService", () => {
 
   /**
    * Which SESSION a window is measured from, as opposed to which calendar day
-   * it is dated (#1424).
+   * it is dated.
    *
    * `getDailyInvestments` values every calendar day from the latest close at or
    * before it, so a Monday 1D window opens on Sunday and carries Friday's
@@ -994,7 +994,7 @@ describe("PortfolioPeriodResultService", () => {
   });
   /**
    * A share-moving leg is valued at the day's accepted CLOSE, not at the basis
-   * the row carries (#1424).
+   * the row carries.
    *
    * `IV` moves by the position's market value, so a leg valued at anything
    * else leaves the difference in the P&L as a gain nobody made. Valuing it at

@@ -166,7 +166,7 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
   // widget asks the same endpoint the Portfolio Value report reads, for the
   // same scope, and prints what comes back. The window it DRAWS opens earlier
   // than the period its range names, so the range is named rather than dated
-  // and the server resolves it (#1424).
+  // and the server resolves it.
   const { periodResult } = usePortfolioPeriodResult({
     range: config.range,
     startDate: start,

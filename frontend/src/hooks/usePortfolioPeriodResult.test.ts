@@ -75,7 +75,7 @@ describe('usePortfolioPeriodResult', () => {
   it('measures 1D over a day, whatever window the chart drew for it', async () => {
     // `resolveRangePreset` widens 1D to a week so a daily fallback has more
     // than one point to plot. Sending that window measured a week's move under
-    // a "1D" caption and dated it seven days back (#1424).
+    // a "1D" caption and dated it seven days back.
     renderHook(() =>
       usePortfolioPeriodResult({
         ...base,
@@ -96,7 +96,7 @@ describe('usePortfolioPeriodResult', () => {
   it('asks for the all-time window, which has no start date to send', async () => {
     // `resolveRangePreset('all')` resolves to an empty start, so a dated
     // request was never made at all and both figures read n/a for every
-    // account (#1424). The server opens the window on the scope's own history.
+    // account. The server opens the window on the scope's own history.
     renderHook(() =>
       usePortfolioPeriodResult({
         ...base,

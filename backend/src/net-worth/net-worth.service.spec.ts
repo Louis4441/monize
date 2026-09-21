@@ -2819,7 +2819,7 @@ describe("NetWorthService", () => {
    * every calendar day from the latest close at or before it. A Monday window
    * measured from Sunday carries Friday's close, so a surface printing the
    * boundary tells the reader the figure is measured from a day the market was
-   * shut (#1424).
+   * shut.
    */
   describe("getLastPricedDays", () => {
     it("answers the session behind each boundary in one round trip", async () => {

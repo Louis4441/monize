@@ -263,7 +263,7 @@ describe("NetWorthController", () => {
   describe("getPeriodResult()", () => {
     it("lets the server resolve a named window, ignoring the dates beside it", async () => {
       // A chart names its range because the window it DRAWS is not the period
-      // the range names (#1424). A preset plus a pair of dates is one question,
+      // the range names. A preset plus a pair of dates is one question,
       // not two, so the dates are not passed on to be reconciled.
       mockPeriodResult.getPeriodResult!.mockReturnValue("period");
 

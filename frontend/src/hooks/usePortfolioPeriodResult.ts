@@ -55,7 +55,7 @@ interface UsePortfolioPeriodResultValue {
  * one point, and leaves All with no start date at all. Those rules are right
  * for a line and wrong for a figure, and sending the drawn window to the
  * measurement endpoint is what made 1D report a week, 3M disagree with the
- * performance card beside it and All report nothing (issue #1424).
+ * performance card beside it and All report nothing.
  *
  * So the window is NAMED rather than dated: the range goes out as `period` and
  * the server resolves it from `portfolio-period-presets.util.ts`, the same file

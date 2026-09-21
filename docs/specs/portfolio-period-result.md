@@ -231,7 +231,7 @@ The window a price chart DRAWS is deliberately not the period its range names
 widens 1D to a week so a daily fallback has more than one point, and resolves
 `all` to no start date at all. Sending that window to this route is what made
 the chart's card measure a week under "1D", disagree with the performance card
-under "3M" and report nothing under "All time" (#1424). A chart therefore names
+under "3M" and report nothing under "All time". A chart therefore names
 its range; it never sends the window it drew.
 
 **`startPriceDate`** answers which trading SESSION `startDate`'s value came
@@ -635,7 +635,7 @@ shares and cancel exactly, whatever cost the row was recorded at.
 This closes what were two open items, and it is why `externalShareTransfers` is
 counted apart from `externallySettledTrades` in section 6.1: a portfolio built
 by transferring holdings in used to report "n/a" for every window those
-transfers fell in, which is every long window and always `all` (#1424).
+transfers fell in, which is every long window and always `all`.
 
 What remains is narrowing rather than corrupting:
 

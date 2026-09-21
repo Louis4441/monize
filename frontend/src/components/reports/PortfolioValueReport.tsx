@@ -680,7 +680,7 @@ export function PortfolioValueReport() {
   // is NAMED rather than dated, so this report, that chart and the performance
   // card beside it resolve one window from one file. The window this report
   // DRAWS opens earlier than the period its button names, and measuring over
-  // it reported a week under "1D" and nothing at all under "All" (#1424).
+  // it reported a week under "1D" and nothing at all under "All".
   const periodAccountIdsCsv =
     selectedAccountIds.length > 0 ? selectedAccountIds.join(',') : undefined;
   const { periodResult } = usePortfolioPeriodResult({
