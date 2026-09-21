@@ -211,7 +211,12 @@ export function investedPeriodResult(
     incomeMinor += Math.round(day.income * 10000);
     if (!day.complete) {
       flowsComplete = false;
-      reasons.add("missingRatePairs");
+      // Two different repairs, so two different reasons: a rate to add on the
+      // Currencies page, or a close for a named security on the day its shares
+      // moved. A leg nothing priced leaves its shares in `IV` with no capital
+      // flow to net them, which would read as a gain.
+      if (day.missingPairs.length > 0) reasons.add("missingRatePairs");
+      if (day.unpricedSecurityIds.length > 0) reasons.add("incompletePrices");
     }
   }
   const investmentCapitalFlows = flowsComplete
@@ -231,6 +236,12 @@ export function investedPeriodResult(
   if ((unmeasured?.externallySettledTrades ?? 0) > 0) {
     reasons.add("externallySettledTrade");
   }
+  // `externalShareTransfers` is deliberately NOT read here. Such a leg is
+  // valued at the day's accepted close, the same one `IV` valued the position
+  // at, so the shares and the capital flow cancel and the P&L is exact
+  // whatever basis the row carried. A leg nothing priced is withheld above,
+  // by the day it made incomplete, naming the security rather than the
+  // movement (section 10.6).
   if ((unmeasured?.mixedSplitParents ?? 0) > 0) reasons.add("mixedSplit");
 
   const withheld = (): InvestedPeriodDecision => ({

@@ -1,5 +1,6 @@
 import { RateIndex } from "../common/time-series/rate-index.util";
 import {
+  ShareLegClose,
   foldInvestedFlows,
   investedCapitalFlowSql,
   loadInvestedCapitalFlowRows,
@@ -86,8 +87,9 @@ describe("loadInvestedCapitalFlowRows", () => {
         date: "2026-02-02",
         currency: "USD",
         action: "BUY",
+        security_id: "sec-1",
         total: "8000.0000",
-        gross: "7990.0000",
+        quantity: "80.00000000",
       },
     ]);
 
@@ -103,8 +105,9 @@ describe("loadInvestedCapitalFlowRows", () => {
         date: "2026-02-02",
         currency: "USD",
         action: "BUY",
+        securityId: "sec-1",
         total: 8000,
-        gross: 7990,
+        quantity: 80,
       },
     ]);
   });
@@ -116,8 +119,9 @@ describe("foldInvestedFlows", () => {
       date: "2026-02-02",
       currency: "CAD",
       action: "BUY",
+      securityId: "sec-1",
       total: 8000,
-      gross: 8000,
+      quantity: 80,
       ...partial,
     });
 
@@ -125,11 +129,18 @@ describe("foldInvestedFlows", () => {
     date: string;
     currency: string;
     action: string;
+    securityId: string | null;
     total: number;
-    gross: number;
+    quantity: number;
   }) {
     return r;
   }
+
+  /** Every security priced at `close` on every day, unless a case says otherwise. */
+  const closeAt =
+    (close: number | null): ShareLegClose =>
+    () =>
+      close;
 
   it("splits capital from income by the shared action constant", () => {
     const { byDay } = foldInvestedFlows(
@@ -141,6 +152,7 @@ describe("foldInvestedFlows", () => {
       "CAD",
       new Map(),
       logger,
+      closeAt(100),
     );
 
     expect(byDay.get("2026-02-02")).toEqual({
@@ -149,6 +161,7 @@ describe("foldInvestedFlows", () => {
       income: 100,
       complete: true,
       missingPairs: [],
+      unpricedSecurityIds: [],
     });
   });
 
@@ -157,26 +170,56 @@ describe("foldInvestedFlows", () => {
     // in IV, and counting it as capital would subtract the return it was.
     const { byDay } = foldInvestedFlows(
       [
-        row({ action: "SPLIT", total: 0, gross: 200 }),
-        row({ action: "REINVEST", total: 0, gross: 500 }),
+        row({ action: "SPLIT", total: 0, quantity: 200 }),
+        row({ action: "REINVEST", total: 0, quantity: 500 }),
       ],
       "CAD",
       new Map(),
       logger,
+      closeAt(100),
     );
 
     expect(byDay.size).toBe(0);
   });
 
-  it("values a share-moving leg from quantity x price, which carries no total", () => {
+  it("values a share-moving leg at the day's close, not at the basis it carries", () => {
+    // `IV` moves by market value, so a leg valued at anything else leaves the
+    // difference in the P&L as a gain nobody made. 30 shares at the day's 100
+    // is 3,000, whatever cost the transfer was recorded at.
     const { byDay } = foldInvestedFlows(
-      [row({ action: "TRANSFER_IN", total: 0, gross: 3000 })],
+      [row({ action: "TRANSFER_IN", total: 999_999, quantity: 30 })],
       "CAD",
       new Map(),
       logger,
+      closeAt(100),
     );
 
     expect(byDay.get("2026-02-02")?.capitalIn).toBe(3000);
+  });
+
+  it("withholds the day, naming the security, when nothing priced the leg", () => {
+    // Never zero: the shares are in `IV`, and free capital reads as a gain.
+    const { byDay } = foldInvestedFlows(
+      [row({ action: "TRANSFER_IN", total: 0, quantity: 30 })],
+      "CAD",
+      new Map(),
+      logger,
+      closeAt(null),
+    );
+
+    expect(byDay.get("2026-02-02")).toMatchObject({
+      capitalIn: 0,
+      complete: false,
+      unpricedSecurityIds: ["sec-1"],
+    });
+  });
+
+  it("asks for no close where the action carries its own total", () => {
+    const close = jest.fn(() => 100);
+
+    foldInvestedFlows([row()], "CAD", new Map(), logger, close);
+
+    expect(close).not.toHaveBeenCalled();
   });
 
   it("converts each day at the rate of its own day", () => {
@@ -198,6 +241,7 @@ describe("foldInvestedFlows", () => {
       "CAD",
       rates,
       logger,
+      closeAt(100),
     );
 
     expect(byDay.get("2026-02-02")?.capitalIn).toBe(1250);
@@ -212,6 +256,7 @@ describe("foldInvestedFlows", () => {
       "CAD",
       index("USD->CAD", "2026-02-02", 1.25),
       logger,
+      closeAt(100),
     );
 
     expect(byDay.get("2026-02-02")).toMatchObject({

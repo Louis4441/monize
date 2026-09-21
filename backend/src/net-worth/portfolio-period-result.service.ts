@@ -31,6 +31,7 @@ import {
   EMPTY_INCOMPLETE_RANGES,
   IncompleteDataRanges,
   foldIncompleteData,
+  withFlowUnpricedSecurities,
 } from "./incomplete-data-ranges.util";
 import {
   PeriodResultReason,
@@ -41,8 +42,11 @@ import {
 import {
   FoldedInvestedFlows,
   InvestedFlowRow,
+  ShareLegClose,
   foldInvestedFlows,
   loadInvestedCapitalFlowRows,
+  shareLegCloseFrom,
+  shareLegSecurityIds,
 } from "./invested-capital-flow.util";
 import {
   InvestedPeriodDecision,
@@ -335,12 +339,24 @@ export class PortfolioPeriodResultService {
 
     if (series.length === 0) return empty;
 
+    // The closes a share-moving leg is valued at: the SAME series the value
+    // chart was built from, so `IV` and `K` move by one number for one day's
+    // shares. Asked only where such a leg exists, which is the uncommon case.
+    const shareLegClose = shareLegCloseFrom(
+      await this.netWorth.loadValuationSeries(
+        shareLegSecurityIds(investedRows),
+        from,
+        end,
+      ),
+    );
+
     const { flow, invested } = await this.foldFlows(
       flowRows,
       investedRows,
       currency,
       from,
       end,
+      shareLegClose,
       { fetchMissing: opts.fetchMissing },
     );
 
@@ -371,7 +387,9 @@ export class PortfolioPeriodResultService {
       // middle is what withholds the time-weighted chain, and the reader is
       // told which security on which days rather than that "a price" is
       // missing (#1392).
-      incompleteRanges: foldIncompleteData(series),
+      incompleteRanges: foldIncompleteData(
+        withFlowUnpricedSecurities(series, invested.byDay),
+      ),
       ...investedDecision,
     };
   }
@@ -537,11 +555,20 @@ export class PortfolioPeriodResultService {
     currency: string,
     start: string,
     end: string,
+    shareLegClose: ShareLegClose,
     options?: SeriesFetchOptions,
   ): Promise<PeriodFolds> {
     return computeWithRateFill(
       this.exchangeRates,
-      () => this.foldFlowsAt(rows, investedRows, currency, start, end),
+      () =>
+        this.foldFlowsAt(
+          rows,
+          investedRows,
+          currency,
+          start,
+          end,
+          shareLegClose,
+        ),
       (folded) => [...folded.flow.gaps, ...folded.invested.gaps],
       options,
       this.logger,
@@ -561,6 +588,7 @@ export class PortfolioPeriodResultService {
     currency: string,
     start: string,
     end: string,
+    shareLegClose: ShareLegClose,
   ): Promise<PeriodFolds> {
     const query = (sql: string, params: unknown[]) =>
       withScopedDb(this.dataSource, (m) => m.query(sql, params));
@@ -578,6 +606,7 @@ export class PortfolioPeriodResultService {
         currency,
         rateIndex,
         this.logger,
+        shareLegClose,
       ),
     };
   }

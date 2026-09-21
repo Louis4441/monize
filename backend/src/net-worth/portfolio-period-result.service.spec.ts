@@ -31,7 +31,14 @@ describe("PortfolioPeriodResultService", () => {
   let netWorth: {
     getDailyInvestments: jest.Mock;
     getLastPricedDays: jest.Mock;
+    loadValuationSeries: jest.Mock;
   };
+  /**
+   * The accepted closes the share-moving legs are valued from, keyed by
+   * security. Empty unless a case puts a transfer in the window: the service
+   * asks for no prices where no leg needs one.
+   */
+  let storedCloses: Map<string, Array<{ date: string; close: number }>>;
   /**
    * The trading session behind each boundary the service asks about. The
    * fixture series runs over calendar days, so a session is its own day unless
@@ -45,6 +52,7 @@ describe("PortfolioPeriodResultService", () => {
   let investedRows: FakeRow[];
   let rateRows: FakeRow[];
   let settledTradeRows: FakeRow[];
+  let shareTransferRows: FakeRow[];
   let mixedSplitRows: FakeRow[];
   let firstTxRows: FakeRow[];
   let queries: Array<{ sql: string; params: unknown[] }>;
@@ -69,6 +77,7 @@ describe("PortfolioPeriodResultService", () => {
     investedRows = [];
     rateRows = [];
     settledTradeRows = [{ count: "0" }];
+    shareTransferRows = [{ count: "0" }];
     mixedSplitRows = [{ count: "0" }];
     firstTxRows = [{ date: "2026-01-02" }];
 
@@ -86,6 +95,7 @@ describe("PortfolioPeriodResultService", () => {
         if (sql.includes("it.action AS action")) return investedRows;
         if (sql.includes("SUM(t.amount)")) return flowRows;
         if (sql.includes("it.funding_account_id")) return settledTradeRows;
+        if (sql.includes("it.linked_transaction_id")) return shareTransferRows;
         if (sql.includes("COUNT(*) AS count")) return mixedSplitRows;
         if (sql.includes("FROM exchange_rates")) return rateRows;
         if (sql.includes("FROM accounts")) return scopeRows;
@@ -94,8 +104,13 @@ describe("PortfolioPeriodResultService", () => {
     );
 
     pricedSessions = new Map();
+    storedCloses = new Map();
     netWorth = {
       getDailyInvestments: jest.fn().mockResolvedValue([]),
+      loadValuationSeries: jest.fn(async () => ({
+        stored: storedCloses,
+        txFallback: new Map(),
+      })),
       getLastPricedDays: jest.fn(
         async (_userId: string, boundaries: readonly string[]) =>
           new Map(
@@ -682,8 +697,9 @@ describe("PortfolioPeriodResultService", () => {
       date: "2026-01-02",
       currency: "CAD",
       action: "BUY",
+      security_id: "sec-1",
       total: "8000",
-      gross: "0",
+      quantity: "80",
     };
 
     /** 8,000 bought on the first day, worth 8,800 today; the baseline is empty. */
@@ -974,6 +990,105 @@ describe("PortfolioPeriodResultService", () => {
 
       expect(result.startDate).toBe("2026-01-02");
       expect(result.startPriceDate).toBeNull();
+    });
+  });
+  /**
+   * A share-moving leg is valued at the day's accepted CLOSE, not at the basis
+   * the row carries (#1424).
+   *
+   * `IV` moves by the position's market value, so a leg valued at anything
+   * else leaves the difference in the P&L as a gain nobody made. Valuing it at
+   * the same close `positionCloseAsOf` gave the valuation makes the two cancel
+   * exactly, which is what lets the invested figures report over a window a
+   * transfer falls in -- a portfolio built by transferring holdings in reported
+   * "n/a" for every window that reached them (`docs/specs/portfolio-period-result.md`
+   * section 10.6).
+   */
+  describe("a share transfer from outside the portfolio", () => {
+    /** A transfer leg recorded at a historical cost, far from the day's close. */
+    const transferRow = {
+      date: "2026-06-01",
+      currency: "CAD",
+      action: "TRANSFER_IN",
+      security_id: "sec-1",
+      total: "0",
+      quantity: "100",
+    };
+
+    beforeEach(() => {
+      shareTransferRows = [{ count: "1" }];
+      investedRows = [transferRow];
+      // 100 shares arrive at 100 on the day: IV rises by 10,000 and nothing
+      // was earned.
+      netWorth.getDailyInvestments.mockResolvedValue([
+        point("2026-01-02", 10_000),
+        point("2026-06-01", 20_000),
+        point("2026-09-17", 20_000),
+      ]);
+      storedCloses = new Map([["sec-1", [{ date: "2026-06-01", close: 100 }]]]);
+    });
+
+    it("reports the invested result, with the transfer counted as capital", async () => {
+      const result = await run();
+
+      // 20,000 - 10,000 - 10,000 of arriving shares = nothing earned.
+      expect(result.investmentPnl).toBe(0);
+      expect(result.investmentCapitalFlows).toBe(10_000);
+      expect(result.investedReasons).not.toContain("externallySettledTrade");
+    });
+
+    it("asks for the close of the security whose leg it is, over the window", async () => {
+      await run();
+
+      expect(netWorth.loadValuationSeries).toHaveBeenCalledWith(
+        ["sec-1"],
+        "2026-01-02",
+        "2026-09-17",
+      );
+    });
+
+    it("still withholds the ACCOUNT's result, which has no flow to net it", async () => {
+      // The shares are value that entered `MV` with no cash crossing the
+      // boundary: that subtraction is not the market's, and never was.
+      const result = await run();
+
+      expect(result.investmentResult).toBeNull();
+      expect(result.reasons).toContain("externallySettledTrade");
+    });
+
+    it("withholds the invested figures, naming the price to add, when nothing priced the leg", async () => {
+      storedCloses = new Map();
+
+      const result = await run();
+
+      expect(result.investmentPnl).toBeNull();
+      // A price for a named security on a named day, not a movement nobody
+      // can act on.
+      expect(result.investedReasons).toContain("incompletePrices");
+      expect(result.investedReasons).not.toContain("externallySettledTrade");
+    });
+
+    it("dates the unvaluable leg, so the reader is sent to one price history", async () => {
+      storedCloses = new Map();
+
+      const result = await run();
+
+      expect(result.incompleteRanges.prices).toEqual([
+        { key: "sec-1", start: "2026-06-01", end: "2026-06-01" },
+      ]);
+    });
+
+    it("asks for no close at all when no leg moves shares", async () => {
+      investedRows = [];
+      shareTransferRows = [{ count: "0" }];
+
+      await run();
+
+      expect(netWorth.loadValuationSeries).toHaveBeenCalledWith(
+        [],
+        "2026-01-02",
+        "2026-09-17",
+      );
     });
   });
 });

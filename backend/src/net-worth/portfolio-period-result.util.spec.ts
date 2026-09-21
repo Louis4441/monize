@@ -213,7 +213,11 @@ describe("decidePeriodResult", () => {
       start: day("2026-01-02", 10_000),
       end: day("2026-06-30", 20_000),
       flow: complete(0),
-      unmeasuredFlows: { externallySettledTrades: 1, mixedSplitParents: 0 },
+      unmeasuredFlows: {
+        externallySettledTrades: 1,
+        externalShareTransfers: 0,
+        mixedSplitParents: 0,
+      },
     });
 
     expect(decision.valueChange).toBe(10_000);
@@ -229,7 +233,11 @@ describe("decidePeriodResult", () => {
       start: day("2026-01-02", 10_000),
       end: day("2026-06-30", 20_000),
       flow: complete(0),
-      unmeasuredFlows: { externallySettledTrades: 0, mixedSplitParents: 3 },
+      unmeasuredFlows: {
+        externallySettledTrades: 0,
+        externalShareTransfers: 0,
+        mixedSplitParents: 3,
+      },
     });
 
     expect(decision.investmentResult).toBeNull();
@@ -241,7 +249,11 @@ describe("decidePeriodResult", () => {
       start: day("2026-01-02", 10_000),
       end: day("2026-06-30", 11_000),
       flow: complete(0),
-      unmeasuredFlows: { externallySettledTrades: 0, mixedSplitParents: 0 },
+      unmeasuredFlows: {
+        externallySettledTrades: 0,
+        externalShareTransfers: 0,
+        mixedSplitParents: 0,
+      },
     });
 
     expect(decision.investmentResult).toBe(1_000);

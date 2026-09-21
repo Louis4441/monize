@@ -156,6 +156,39 @@ export function foldIncompleteData(
   };
 }
 
+/**
+ * The same points, with the securities a DAY'S FLOW could not be valued at
+ * folded into each point's own unpriced list.
+ *
+ * A share-moving leg is valued at the day's accepted close, so a leg nothing
+ * priced is a missing price exactly as a held position's is -- and it is the
+ * same repair, on the same screen. Merging it here rather than teaching
+ * `foldIncompleteData` about flows keeps one fold over one shape: the ranges a
+ * reader is shown, and the reasons the figures were withheld for, cannot then
+ * name different securities.
+ *
+ * Returns the points unchanged, by identity, when no day has one -- which is
+ * every window with no external share transfer in it.
+ */
+export function withFlowUnpricedSecurities<T extends IncompleteDataPoint>(
+  points: readonly T[],
+  flowsByDay: ReadonlyMap<string, { unpricedSecurityIds?: string[] }>,
+): readonly IncompleteDataPoint[] {
+  let touched = false;
+  const merged = points.map((point) => {
+    const extra = flowsByDay.get(point.date)?.unpricedSecurityIds ?? [];
+    if (extra.length === 0) return point;
+    touched = true;
+    return {
+      ...point,
+      unpricedSecurityIds: [
+        ...new Set([...(point.unpricedSecurityIds ?? []), ...extra]),
+      ].sort(),
+    };
+  });
+  return touched ? merged : points;
+}
+
 /** True when nothing at all was reported missing. */
 export function hasIncompleteData(ranges: IncompleteDataRanges): boolean {
   return (

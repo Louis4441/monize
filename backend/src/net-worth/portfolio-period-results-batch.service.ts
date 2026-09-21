@@ -34,6 +34,7 @@ import { decidePeriodResult } from "./portfolio-period-result.util";
 import {
   EMPTY_INCOMPLETE_RANGES,
   foldIncompleteData,
+  withFlowUnpricedSecurities,
 } from "./incomplete-data-ranges.util";
 import {
   loadUnmeasuredFlowRows,
@@ -42,6 +43,8 @@ import {
 import {
   foldInvestedFlows,
   loadInvestedCapitalFlowRows,
+  shareLegCloseFrom,
+  shareLegSecurityIds,
 } from "./invested-capital-flow.util";
 import {
   NO_INVESTED_PERIOD,
@@ -268,6 +271,18 @@ export class PortfolioPeriodResultsBatchService {
 
     if (series.length === 0) return allEmpty();
 
+    // The closes a share-moving leg is valued at, over the widest window and
+    // therefore shared by every preset's slice: the same series the value
+    // chart was built from, so `IV` and `K` move by one number for one day's
+    // shares (`docs/specs/portfolio-period-result.md` section 10.6).
+    const shareLegClose = shareLegCloseFrom(
+      await this.netWorth.loadValuationSeries(
+        shareLegSecurityIds(investedRows),
+        earliest,
+        end,
+      ),
+    );
+
     // ONE index for the widest window, filled once: the fold over every row
     // names the months and pairs it is short of, the provider is asked once per
     // unit, and on a successful fill the index is re-read from the database.
@@ -291,6 +306,7 @@ export class PortfolioPeriodResultsBatchService {
           currency,
           index,
           this.logger,
+          shareLegClose,
         );
         return {
           rateIndex: index,
@@ -353,7 +369,9 @@ export class PortfolioPeriodResultsBatchService {
         // gaps inside its window and not the wider window's: the single-range
         // route folds exactly the points it valued, and these two must answer
         // the same thing for the same window.
-        incompleteRanges: foldIncompleteData(series.slice(startIndex)),
+        incompleteRanges: foldIncompleteData(
+          withFlowUnpricedSecurities(series.slice(startIndex), investedByDay),
+        ),
         // The same one series, sliced at this preset's own boundary: the TWR
         // for a preset is a product over that preset's days, O(days), over the
         // per-day flows folded once above.

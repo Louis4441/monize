@@ -252,7 +252,11 @@ describe("investedPeriodResult (spec section 10.5)", () => {
       [0, 8_000, 8_800],
       { 1: { capitalIn: 8_000 } },
       {
-        unmeasuredFlows: { externallySettledTrades: 1, mixedSplitParents: 0 },
+        unmeasuredFlows: {
+          externallySettledTrades: 1,
+          externalShareTransfers: 0,
+          mixedSplitParents: 0,
+        },
       },
     );
 
