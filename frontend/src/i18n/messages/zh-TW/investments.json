@@ -136,7 +136,7 @@
     "unmeasuredFlowTooltip": "如果某筆交易在這些帳戶以外結算，或某個拆分將投資項目與一般支出混在一起，則結果無法與轉移的資金分開。",
     "valueChangeLine": "價值變化 {amount}",
     "netFlowsLine": "淨存取款 {amount}",
-    "priorCloseTooltip": "以上一交易日（{date}）收盤價為基準計算。",
+    "measuredFromClose": "自 {date} 收盤起",
     "notAvailable": "不適用",
     "portfolioLabel": "投資組合："
   },
@@ -302,7 +302,6 @@
   "portfolioPerformance": {
     "title": "投資組合表現",
     "subtitle": "扣除存入、提出資金與未投資現金影響後，你的投資本身的表現。",
-    "footnote": "存入、提出資金與未投資現金不計入投資結果。",
     "unavailable": "無",
     "empty": "歷史資料還不足以計算報酬。",
     "periods": {

@@ -136,7 +136,7 @@
     "unmeasuredFlowTooltip": "Một giao dịch được thanh toán bên ngoài các tài khoản này, hoặc một khoản tách lẫn một dòng đầu tư với chi tiêu thông thường, nghĩa là kết quả không thể tách khỏi số tiền đã di chuyển.",
     "valueChangeLine": "Thay đổi giá trị {amount}",
     "netFlowsLine": "Nạp và rút ròng {amount}",
-    "priorCloseTooltip": "Được tính từ giá đóng cửa của phiên giao dịch trước đó, ngày {date}.",
+    "measuredFromClose": "Kể từ khi đóng cửa phiên giao dịch ngày {date}",
     "notAvailable": "N/A",
     "portfolioLabel": "Danh mục:"
   },
@@ -302,7 +302,6 @@
   "portfolioPerformance": {
     "title": "Hiệu suất danh mục",
     "subtitle": "Khoản đầu tư của bạn đã hoạt động thế nào, không tính ảnh hưởng của các khoản nạp, rút và tiền mặt chưa đầu tư.",
-    "footnote": "Các khoản nạp, rút và tiền mặt chưa đầu tư không được tính là kết quả đầu tư.",
     "unavailable": "k/c",
     "empty": "Lịch sử còn quá ít để đo lợi nhuận.",
     "periods": {

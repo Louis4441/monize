@@ -136,7 +136,7 @@
     "unmeasuredFlowTooltip": "Sebuah transaksi yang diselesaikan di luar akun-akun ini, atau pemisahan yang mencampur baris investasi dengan pengeluaran biasa, berarti hasilnya tidak dapat dipisahkan dari uang yang berpindah.",
     "valueChangeLine": "Perubahan nilai {amount}",
     "netFlowsLine": "Setoran dan penarikan bersih {amount}",
-    "priorCloseTooltip": "Diukur dari harga penutupan hari bursa sebelumnya pada {date}.",
+    "measuredFromClose": "Sejak penutupan perdagangan pada {date}",
     "notAvailable": "N/A",
     "portfolioLabel": "Portofolio:"
   },
@@ -302,7 +302,6 @@
   "portfolioPerformance": {
     "title": "Kinerja portofolio",
     "subtitle": "Bagaimana investasi Anda berkinerja, tanpa pengaruh setoran, penarikan, dan tunai yang belum diinvestasikan.",
-    "footnote": "Setoran, penarikan, dan tunai yang belum diinvestasikan tidak dihitung sebagai hasil investasi.",
     "unavailable": "t/a",
     "empty": "Riwayat belum cukup untuk mengukur hasil.",
     "periods": {

@@ -28,7 +28,16 @@ interface FakeRow {
  */
 describe("PortfolioPeriodResultService", () => {
   let service: PortfolioPeriodResultService;
-  let netWorth: { getDailyInvestments: jest.Mock };
+  let netWorth: {
+    getDailyInvestments: jest.Mock;
+    getLastPricedDays: jest.Mock;
+  };
+  /**
+   * The trading session behind each boundary the service asks about. The
+   * fixture series runs over calendar days, so a session is its own day unless
+   * a test says otherwise -- which is what a weekend boundary does.
+   */
+  let pricedSessions: Map<string, string | null>;
   let exchangeRates: { ensureRatesForDate: jest.Mock };
   let mocks: ReturnType<typeof createScopedDbMocks>;
   let scopeRows: FakeRow[];
@@ -84,7 +93,19 @@ describe("PortfolioPeriodResultService", () => {
       },
     );
 
-    netWorth = { getDailyInvestments: jest.fn().mockResolvedValue([]) };
+    pricedSessions = new Map();
+    netWorth = {
+      getDailyInvestments: jest.fn().mockResolvedValue([]),
+      getLastPricedDays: jest.fn(
+        async (_userId: string, boundaries: readonly string[]) =>
+          new Map(
+            boundaries.map((day) => [
+              day,
+              pricedSessions.has(day) ? pricedSessions.get(day) : day,
+            ]),
+          ),
+      ),
+    };
     exchangeRates = { ensureRatesForDate: jest.fn().mockResolvedValue(0) };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -810,6 +831,149 @@ describe("PortfolioPeriodResultService", () => {
       expect(result.investmentCapitalFlows).toBe(8_000);
       expect(result.investmentPnl).toBe(100);
       expect(result.investmentReturnPercent).toBe(1.25);
+    });
+  });
+  /**
+   * A caller that NAMES its window instead of dating it (#1424).
+   *
+   * The window a portfolio chart draws is deliberately not the period its
+   * button names: `resolveRangePreset` widens 1D to a week so a daily fallback
+   * has more than one point, `portfolio-range-window.ts` opens 3M a day early
+   * so the first plotted close precedes the quarter, and `all` resolves to no
+   * start date at all. Sending the drawn window measured those days, so the
+   * chart's card and the performance card beside it -- which resolves its
+   * windows from `portfolio-period-presets.util.ts` -- reported different
+   * figures under the same caption. A preset is resolved HERE, from that same
+   * file, so there is one window per name.
+   */
+  describe("a named window", () => {
+    it("measures 1D over the day, not over whatever dates the caller holds", async () => {
+      netWorth.getDailyInvestments.mockResolvedValue([
+        point("2026-09-16", 20_000),
+        point("2026-09-17", 20_400),
+      ]);
+
+      await service.getPeriodResult("user-1", { period: "1d" });
+
+      // Today, measured from the close before it -- not the week
+      // `resolveRangePreset('1d')` hands a chart to draw.
+      expect(netWorth.getDailyInvestments).toHaveBeenCalledWith(
+        "user-1",
+        "2026-09-16",
+        "2026-09-17",
+        undefined,
+        "CAD",
+        { fetchMissing: undefined },
+      );
+    });
+
+    it("opens each preset where the presets file says, not a day early", async () => {
+      netWorth.getDailyInvestments.mockResolvedValue(flatSeries());
+
+      for (const [preset, start] of [
+        ["3m", "2026-06-19"],
+        ["1y", "2025-09-17"],
+        ["5y", "2021-09-17"],
+      ] as const) {
+        netWorth.getDailyInvestments.mockClear();
+        await service.getPeriodResult("user-1", { period: preset });
+        expect(netWorth.getDailyInvestments).toHaveBeenCalledWith(
+          "user-1",
+          start,
+          "2026-09-17",
+          undefined,
+          "CAD",
+          { fetchMissing: undefined },
+        );
+      }
+    });
+
+    it("opens the all-time window on the close before the scope's first holding", async () => {
+      // The range with no arithmetic: the client cannot date it, so it sent
+      // nothing and both figures read n/a for every account.
+      netWorth.getDailyInvestments.mockResolvedValue([
+        point("2026-01-01", 0),
+        point("2026-09-17", 20_000),
+      ]);
+
+      const result = await service.getPeriodResult("user-1", { period: "all" });
+
+      expect(netWorth.getDailyInvestments).toHaveBeenCalledWith(
+        "user-1",
+        "2026-01-01",
+        "2026-09-17",
+        undefined,
+        "CAD",
+        { fetchMissing: undefined },
+      );
+      expect(result.startDate).toBe("2026-01-01");
+      expect(result.investmentPnl).not.toBeNull();
+    });
+
+    it("answers the all-time preset exactly as the since-inception figure", async () => {
+      // Two spellings of one window would be two answers to one question.
+      netWorth.getDailyInvestments.mockResolvedValue([
+        point("2026-01-01", 0),
+        point("2026-09-17", 20_000),
+      ]);
+
+      expect(
+        await service.getPeriodResult("user-1", { period: "all" }),
+      ).toEqual(await service.getInvestedResultSinceInception("user-1"));
+    });
+
+    it("has no window to measure for a scope that never held anything", async () => {
+      firstTxRows = [{ date: null }];
+
+      const result = await service.getPeriodResult("user-1", { period: "all" });
+
+      expect(result.investmentPnl).toBeNull();
+      expect(result.reasons).toContain("noValueSeries");
+      expect(netWorth.getDailyInvestments).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * Which SESSION a window is measured from, as opposed to which calendar day
+   * it is dated (#1424).
+   *
+   * `getDailyInvestments` values every calendar day from the latest close at or
+   * before it, so a Monday 1D window opens on Sunday and carries Friday's
+   * close. A surface printing the boundary told the reader the figure was
+   * measured from a day the market was shut.
+   */
+  describe("the session behind the boundary", () => {
+    it("names the trading day the opening value came from", async () => {
+      // Monday 2026-09-21 measured from Sunday the 20th, priced on Friday.
+      pricedSessions.set("2026-09-20", "2026-09-18");
+      netWorth.getDailyInvestments.mockResolvedValue([
+        point("2026-09-20", 20_000),
+        point("2026-09-21", 20_400),
+      ]);
+
+      const result = await service.getPeriodResult("user-1", {
+        startDate: "2026-09-21",
+        baselineDate: "2026-09-20",
+        endDate: "2026-09-21",
+      });
+
+      expect(result.startDate).toBe("2026-09-20");
+      expect(result.startPriceDate).toBe("2026-09-18");
+      expect(netWorth.getLastPricedDays).toHaveBeenCalledWith(
+        "user-1",
+        ["2026-09-20"],
+        ["brok-1", "cash-1"],
+      );
+    });
+
+    it("leaves the session unknown rather than substituting the calendar day", async () => {
+      pricedSessions.set("2026-01-02", null);
+      netWorth.getDailyInvestments.mockResolvedValue(flatSeries());
+
+      const result = await run();
+
+      expect(result.startDate).toBe("2026-01-02");
+      expect(result.startPriceDate).toBeNull();
     });
   });
 });

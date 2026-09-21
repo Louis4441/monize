@@ -82,7 +82,10 @@ function canonicalSeries(from = "2025-09-17", to = TODAY): SeriesPoint[] {
 describe("PortfolioPeriodResultsBatchService", () => {
   let batch: PortfolioPeriodResultsBatchService;
   let single: PortfolioPeriodResultService;
-  let netWorth: { getDailyInvestments: jest.Mock };
+  let netWorth: {
+    getDailyInvestments: jest.Mock;
+    getLastPricedDays: jest.Mock;
+  };
   let exchangeRates: { ensureRatesForDate: jest.Mock };
   let mocks: ReturnType<typeof createScopedDbMocks>;
   let scopeRows: FakeRow[];
@@ -176,6 +179,12 @@ describe("PortfolioPeriodResultsBatchService", () => {
       getDailyInvestments: jest.fn(
         async (_userId: string, from: string, to: string) =>
           series.filter((p) => p.date >= from && p.date <= to),
+      ),
+      // The fixture series runs over calendar days and every one of them
+      // carries a close, so each boundary's session is its own day.
+      getLastPricedDays: jest.fn(
+        async (_userId: string, boundaries: readonly string[]) =>
+          new Map(boundaries.map((day) => [day, day])),
       ),
     };
 

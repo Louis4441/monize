@@ -71,7 +71,6 @@
   "portfolioPerformance": {
     "title": "[XX-Portfolio performance-XX]",
     "subtitle": "[XX-How your investments did, without the effect of deposits, withdrawals and uninvested cash.-XX]",
-    "footnote": "[XX-Deposits, withdrawals and uninvested cash are not counted as investment result.-XX]",
     "unavailable": "[XX-n/a-XX]",
     "empty": "[XX-Not enough history to measure a return yet.-XX]",
     "loading": "[XX-Measuring the periods...-XX]",
@@ -163,7 +162,7 @@
     "unmeasuredFlowTooltip": "[XX-A trade settled outside these accounts, or a split mixing an investment line with ordinary spending, means the result cannot be separated from the money moved in.-XX]",
     "valueChangeLine": "[XX-Value change {amount}-XX]",
     "netFlowsLine": "[XX-Net deposits and withdrawals {amount}-XX]",
-    "priorCloseTooltip": "[XX-Measured from the previous trading day's close on {date}.-XX]",
+    "measuredFromClose": "[XX-Since the close of trading on {date}-XX]",
     "notAvailable": "[XX-N/A-XX]",
     "portfolioLabel": "[XX-Portfolio:-XX]"
   },

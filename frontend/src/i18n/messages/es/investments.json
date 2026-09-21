@@ -136,7 +136,7 @@
     "unmeasuredFlowTooltip": "Una operación liquidada fuera de estas cuentas, o un desglose que mezcla una línea de inversión con un gasto ordinario, significa que el resultado no se puede separar del dinero movido.",
     "valueChangeLine": "Cambio de valor {amount}",
     "netFlowsLine": "Depósitos y retiros netos {amount}",
-    "priorCloseTooltip": "Medido desde el cierre de la sesión bursátil anterior, el {date}.",
+    "measuredFromClose": "Desde el cierre de la sesión del {date}",
     "notAvailable": "N/A",
     "portfolioLabel": "Cartera:"
   },
@@ -302,7 +302,6 @@
   "portfolioPerformance": {
     "title": "Rendimiento de la cartera",
     "subtitle": "Cómo se comportaron sus inversiones, sin el efecto de los depósitos, los retiros y el efectivo sin invertir.",
-    "footnote": "Los depósitos, los retiros y el efectivo sin invertir no cuentan como resultado de la inversión.",
     "unavailable": "n/a",
     "empty": "Aún no hay suficiente historial para medir una rentabilidad.",
     "periods": {

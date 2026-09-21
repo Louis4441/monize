@@ -136,7 +136,7 @@
     "unmeasuredFlowTooltip": "Ein Geschäft, das außerhalb dieser Konten abgewickelt wurde, oder eine Aufteilung, die eine Investitionsposition mit gewöhnlichen Ausgaben vermischt, bedeutet, dass das Ergebnis nicht vom bewegten Geld getrennt werden kann.",
     "valueChangeLine": "Wertveränderung {amount}",
     "netFlowsLine": "Netto-Ein- und Auszahlungen {amount}",
-    "priorCloseTooltip": "Gemessen ab dem Schlusskurs des vorherigen Handelstags am {date}.",
+    "measuredFromClose": "Seit dem Handelsschluss am {date}",
     "notAvailable": "N/A",
     "portfolioLabel": "Portfolio:"
   },
@@ -302,7 +302,6 @@
   "portfolioPerformance": {
     "title": "Portfolio-Performance",
     "subtitle": "Wie sich Ihre Investitionen entwickelt haben, ohne den Effekt von Einzahlungen, Auszahlungen und nicht investierten Barmitteln.",
-    "footnote": "Einzahlungen, Auszahlungen und nicht investierte Barmittel zählen nicht als Anlageergebnis.",
     "unavailable": "n/a",
     "empty": "Noch zu wenig Historie, um eine Rendite zu messen.",
     "periods": {

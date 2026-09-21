@@ -136,7 +136,7 @@
     "unmeasuredFlowTooltip": "これらの口座以外で決済された取引や、投資明細と通常の支出が混在する分割がある場合、成果を移動した資金と切り分けることができません。",
     "valueChangeLine": "価値の変動 {amount}",
     "netFlowsLine": "純入出金額 {amount}",
-    "priorCloseTooltip": "前営業日（{date}）の終値を基準に算出しています。",
+    "measuredFromClose": "{date} の取引終了時点から",
     "notAvailable": "N/A",
     "portfolioLabel": "ポートフォリオ："
   },
@@ -302,7 +302,6 @@
   "portfolioPerformance": {
     "title": "ポートフォリオパフォーマンス",
     "subtitle": "入金、出金、未投資の現金の影響を除いた、投資自体の成績です。",
-    "footnote": "入金、出金、未投資の現金は投資成果として計上されません。",
     "unavailable": "該当なし",
     "empty": "リターンを測るには履歴がまだ足りません。",
     "periods": {

@@ -210,9 +210,34 @@ One answer, on the server:
 `backend/src/net-worth/portfolio-period-result.util.ts` holds the pure decision
 (`decidePeriodResult`), table-tested without a database exactly as
 `decideDailyMovement` is. `GET /net-worth/investments-period-result` serves it
-for the same scope, range and display currency the chart asked for, plus an
-explicit `baselineDate` for the ranges measured from the prior close (1d, 1w,
-mtd). The client chooses the dates; it does no arithmetic over them.
+for the same scope and display currency the chart asked for.
+
+**A caller names its window rather than dating it.** `period` is one of the
+presets in `backend/src/net-worth/portfolio-period-presets.util.ts`, and the
+route draws the window -- and the prior-close baseline where the preset has one
+-- from that file, which is the same file the batch route in section 8 resolves
+its windows from. `startDate`/`baselineDate` name an explicit window instead,
+for the ranges no preset covers (`mtd`, a custom window); a caller sends one
+form or the other, never both. The client does no arithmetic over the figures
+either way.
+
+The window a price chart DRAWS is deliberately not the period its range names
+(`frontend/src/components/investments/portfolio-range-window.ts`): it opens 3M,
+1Y, 2Y and 5Y a day early so the first plotted close precedes the period,
+widens 1D to a week so a daily fallback has more than one point, and resolves
+`all` to no start date at all. Sending that window to this route is what made
+the chart's card measure a week under "1D", disagree with the performance card
+under "3M" and report nothing under "All time" (#1424). A chart therefore names
+its range; it never sends the window it drew.
+
+**`startPriceDate`** answers which trading SESSION `startDate`'s value came
+from: the newest day on or before it carrying a close for anything the scope
+held (`NetWorthService.getLastPricedDays`). `startDate` is a calendar day and
+the value series prices every calendar day from the latest close at or before
+it, so a Monday 1D window opens on Sunday and is measured from Friday's close.
+A surface printing `startDate` as the close it reports against names a day the
+market was shut, so the surfaces print `startPriceDate`. `null` is unknown --
+never the calendar day in its place.
 
 ## 8. The batch route: every window, one valuation
 
@@ -284,8 +309,8 @@ asked for: a day is valued from the latest accepted close on or before it, and
 asserted rather than assumed:
 `backend/src/net-worth/portfolio-period-results-batch.service.spec.ts` runs the
 batch route and the single-range route over one fixture and compares them
-preset by preset, giving the single route exactly the dates the client computes
-(`usesPriorCloseBaseline`, `previousCalendarDay`).
+preset by preset, giving the single route exactly the dates the preset file
+resolves for that window (`presetWindowStart`, `usesPriorCloseBaseline`).
 
 **A window the series does not reach back to** -- a portfolio three days old
 asked for its year -- is every figure `null` with `noValueSeries`, and the
@@ -310,6 +335,11 @@ Backend unit (`portfolio-period-result.util.spec.ts`,
 | `MV(b) = 0` | percent `null`, reason `zeroStart`, money reported |
 | empty series | every figure `null`, reason `noValueSeries` |
 | an explicit `baselineDate` | the baseline's close is the start, flows after it |
+| `period: '1d'` | the window is the day and the close before it, never the week the chart draws |
+| `period: '3m'`, `'1y'`, `'5y'` | the day `presetWindowStart` names, not the day before it |
+| `period: 'all'` | opens on the close before the scope's first holding, and equals `getInvestedResultSinceInception` |
+| `period: 'all'` on a scope that never held anything | every figure `null`, reason `noValueSeries`, no series valued |
+| a boundary on a day with no close | `startPriceDate` is the session before it; `null` where nothing was priced |
 | a BUY settled outside `C` | result and percent `null`, reason `externallySettledTrade` |
 | a mixed split parent in the window | result `null`, reason `mixedSplit` |
 | the flow query's account set | the valued cash accounts, not the whole scope |

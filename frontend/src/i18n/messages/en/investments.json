@@ -71,7 +71,6 @@
   "portfolioPerformance": {
     "title": "Portfolio performance",
     "subtitle": "How your investments did, without the effect of deposits, withdrawals and uninvested cash.",
-    "footnote": "Deposits, withdrawals and uninvested cash are not counted as investment result.",
     "unavailable": "n/a",
     "empty": "Not enough history to measure a return yet.",
     "loading": "Measuring the periods...",
@@ -163,7 +162,7 @@
     "unmeasuredFlowTooltip": "A trade settled outside these accounts, or a split mixing an investment line with ordinary spending, means the result cannot be separated from the money moved in.",
     "valueChangeLine": "Value change {amount}",
     "netFlowsLine": "Net deposits and withdrawals {amount}",
-    "priorCloseTooltip": "Measured from the previous trading day's close on {date}.",
+    "measuredFromClose": "Since the close of trading on {date}",
     "notAvailable": "N/A",
     "portfolioLabel": "Portfolio:"
   },

@@ -18,6 +18,7 @@ function result(
   return {
     currency: 'CAD',
     startDate: '2026-01-02',
+    startPriceDate: '2026-01-02',
     endDate: '2026-06-30',
     startValue: 10000,
     endValue: 20000,
@@ -48,7 +49,11 @@ describe('usePortfolioPeriodResult', () => {
     vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockResolvedValue(result());
   });
 
-  it('asks for the window it was given and returns what the server says', async () => {
+  it('names the window rather than dating it, so the drawn window cannot widen it', async () => {
+    // The chart DRAWS 1Y from a day before the anniversary so the first
+    // plotted close precedes the year. Measuring over that window reports a
+    // day the range does not name, and disagrees with the performance card
+    // beside it, which resolves 1Y from the server's own preset.
     const { result: hook } = renderHook(() =>
       usePortfolioPeriodResult({
         ...base,
@@ -60,17 +65,54 @@ describe('usePortfolioPeriodResult', () => {
     );
     await waitFor(() => expect(hook.current.periodResult).not.toBeNull());
     expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith({
-      startDate: '2026-01-02',
-      endDate: '2026-06-30',
-      baselineDate: undefined,
+      period: '1y',
       accountIds: 'a1,a2',
       displayCurrency: 'USD',
     });
     expect(hook.current.periodResult?.investmentResult).toBe(0);
-    expect(hook.current.usesPriorClose).toBe(false);
   });
 
-  it('sends the day before the first point on screen for a prior-close range', async () => {
+  it('measures 1D over a day, whatever window the chart drew for it', async () => {
+    // `resolveRangePreset` widens 1D to a week so a daily fallback has more
+    // than one point to plot. Sending that window measured a week's move under
+    // a "1D" caption and dated it seven days back (#1424).
+    renderHook(() =>
+      usePortfolioPeriodResult({
+        ...base,
+        startDate: '2026-06-23',
+        range: '1d',
+        firstPointIso: '2026-06-30T13:30:00.000Z',
+      }),
+    );
+    await waitFor(() =>
+      expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith({
+        period: '1d',
+        accountIds: undefined,
+        displayCurrency: undefined,
+      }),
+    );
+  });
+
+  it('asks for the all-time window, which has no start date to send', async () => {
+    // `resolveRangePreset('all')` resolves to an empty start, so a dated
+    // request was never made at all and both figures read n/a for every
+    // account (#1424). The server opens the window on the scope's own history.
+    renderHook(() =>
+      usePortfolioPeriodResult({
+        ...base,
+        startDate: '',
+        range: 'all',
+        firstPointIso: '2019-04-01',
+      }),
+    );
+    await waitFor(() =>
+      expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith(
+        expect.objectContaining({ period: 'all' }),
+      ),
+    );
+  });
+
+  it('sends the day before the first point on screen for a range with no preset', async () => {
     const { result: hook } = renderHook(() =>
       usePortfolioPeriodResult({
         ...base,
@@ -79,25 +121,29 @@ describe('usePortfolioPeriodResult', () => {
       }),
     );
     await waitFor(() =>
-      expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith(
-        expect.objectContaining({ baselineDate: '2026-06-30' }),
-      ),
+      expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith({
+        startDate: '2026-01-02',
+        endDate: '2026-06-30',
+        baselineDate: '2026-06-30',
+        accountIds: undefined,
+        displayCurrency: undefined,
+      }),
     );
-    expect(hook.current.usesPriorClose).toBe(true);
+    expect(hook.current.periodResult).not.toBeNull();
   });
 
   it('waits for the first point rather than guessing a prior close', async () => {
     renderHook(() =>
-      usePortfolioPeriodResult({ ...base, range: '1w', firstPointIso: undefined }),
+      usePortfolioPeriodResult({ ...base, range: 'mtd', firstPointIso: undefined }),
     );
     await waitFor(() =>
       expect(netWorthApi.getInvestmentsPeriodResult).not.toHaveBeenCalled(),
     );
   });
 
-  it('asks nothing while the series is empty', async () => {
+  it('asks nothing for a dated window while the series is empty', async () => {
     renderHook(() =>
-      usePortfolioPeriodResult({ ...base, range: '1y', hasSeries: false }),
+      usePortfolioPeriodResult({ ...base, range: 'mtd', hasSeries: false }),
     );
     await waitFor(() =>
       expect(netWorthApi.getInvestmentsPeriodResult).not.toHaveBeenCalled(),
@@ -118,12 +164,12 @@ describe('usePortfolioPeriodResult', () => {
   });
 
   it('does not show one window\'s answer under another window\'s key', async () => {
-    let window = { startDate: '2026-01-02', endDate: '2026-06-30' };
+    let range = '1y';
     const { result: hook, rerender } = renderHook(() =>
       usePortfolioPeriodResult({
-        ...window,
+        ...base,
         hasSeries: true,
-        range: '1y',
+        range,
         firstPointIso: '2026-01-02',
       }),
     );
@@ -134,7 +180,7 @@ describe('usePortfolioPeriodResult', () => {
     vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockImplementation(
       () => new Promise(() => {}),
     );
-    window = { startDate: '2025-01-02', endDate: '2025-06-30' };
+    range = '3m';
     rerender();
     expect(hook.current.periodResult).toBeNull();
   });

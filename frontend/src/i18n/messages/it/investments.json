@@ -136,7 +136,7 @@
     "unmeasuredFlowTooltip": "Un'operazione regolata al di fuori di questi conti, o una suddivisione che mescola una riga di investimento con una spesa ordinaria, significa che il risultato non può essere separato dal denaro spostato.",
     "valueChangeLine": "Variazione di valore {amount}",
     "netFlowsLine": "Depositi e prelievi netti {amount}",
-    "priorCloseTooltip": "Misurato dalla chiusura della seduta precedente del {date}.",
+    "measuredFromClose": "Dalla chiusura delle contrattazioni del {date}",
     "notAvailable": "N/A",
     "portfolioLabel": "Portafoglio:"
   },
@@ -302,7 +302,6 @@
   "portfolioPerformance": {
     "title": "Performance del portafoglio",
     "subtitle": "Come si sono comportati i tuoi investimenti, senza l'effetto di depositi, prelievi e liquidità non investita.",
-    "footnote": "Depositi, prelievi e liquidità non investita non sono conteggiati come risultato dell'investimento.",
     "unavailable": "n/d",
     "empty": "Storico ancora insufficiente per misurare un rendimento.",
     "periods": {

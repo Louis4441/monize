@@ -348,10 +348,12 @@ describe('PortfolioValueWidget', () => {
     expect(refresh.compareDocumentPosition(value)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
-  it('shows no period figure while the series is empty', async () => {
-    // With nothing on screen there is no window to measure, so no request is
-    // made and nothing is printed -- never a change of zero.
-    getInvestmentsMonthly.mockResolvedValue([]);
+  it('shows no period figure while a dated window has no series', async () => {
+    // MTD names no server preset, so the client dates it -- and with nothing
+    // on screen there is no first point to measure from. No request is made
+    // and nothing is printed: never a change of zero.
+    configState.current = { range: 'mtd', accountIds: [] };
+    getInvestmentsDaily.mockResolvedValue([]);
     await renderWidget();
     expect(screen.queryByTestId('portfolio-period-change')).toBeNull();
     expect(getInvestmentsPeriodResult).not.toHaveBeenCalled();
@@ -378,12 +380,15 @@ describe('PortfolioValueWidget', () => {
     );
   });
 
-  it('sends no baseline date on a range measured from its own first point', async () => {
+  it('names the window to the server rather than sending the one it drew', async () => {
+    // The widget's 1Y window opens a day before the anniversary so the first
+    // plotted close precedes the year. That is the line's window, not the
+    // figure's: the server resolves 1Y from its own preset (#1424).
     configState.current = { range: '1y', accountIds: [] };
     getInvestmentsMonthly.mockResolvedValue([{ month: '2026-06', value: 10000 }]);
     await renderWidget();
     expect(getInvestmentsPeriodResult).toHaveBeenCalledWith(
-      expect.objectContaining({ baselineDate: undefined }),
+      expect.objectContaining({ period: '1y' }),
     );
   });
 

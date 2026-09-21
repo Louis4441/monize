@@ -226,6 +226,7 @@ const periodResult = (overrides: Record<string, unknown> = {}) => {
   const base = {
   currency: 'CAD',
   startDate: '2024-01-01',
+  startPriceDate: '2024-01-01',
   endDate: '2026-01-01',
   startValue: 50000,
   endValue: 55000,
@@ -720,12 +721,11 @@ describe('PortfolioValueReport', () => {
 
   /**
    * The period result belongs to the request that produced it (#1392 follow-up).
-   * Switching from a populated 3M to a 1D window whose intraday data is
-   * unavailable leaves the effect with no first point to measure from, so it
-   * never asks -- and the cards must not go on printing the 3M figures under the
-   * 1D caption.
+   * Switching from a populated 3M to a 1D window leaves the new window's
+   * request in flight, and the cards must not go on printing the 3M figures
+   * under the 1D caption while it is.
    */
-  it('drops the previous range figures when the new range never asks', async () => {
+  it('drops the previous range figures while the new range is still being asked', async () => {
     const kpi = (label: string) =>
       screen.getByText(label).parentElement!.parentElement!.textContent;
     mockDateRangeValue = '3m';
@@ -748,6 +748,9 @@ describe('PortfolioValueReport', () => {
       skippedSymbols: [],
       fallbackToDaily: true,
     });
+    // The 1D window's own request hangs: the answer on screen belongs to the
+    // quarter, and a quarter's figures under a day's caption is the defect.
+    mockGetPeriodResult.mockImplementation(() => new Promise(() => {}));
     await act(async () => {
       rerender(<PortfolioValueReport />);
     });
@@ -1388,7 +1391,61 @@ describe('PortfolioValueReport', () => {
     });
   });
 
-  describe('prior-close baseline', () => {
+  /**
+   * Which SESSION the figures are measured from, named under the chart's
+   * title rather than behind a marker on one card (#1424).
+   *
+   * `startDate` is a calendar boundary and the value series prices every
+   * calendar day from the latest close at or before it, so a window opening on
+   * a Sunday is measured from Friday's close. The date the reader is shown is
+   * the session, never the boundary beside it.
+   */
+  describe('the session the figures are measured from', () => {
+    it('names it under the chart title, for every range', async () => {
+      mockGetInvestmentsMonthly.mockResolvedValue([
+        { month: '2024-06-01', value: 50000 },
+        { month: '2024-07-01', value: 55000 },
+      ]);
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      mockGetPeriodResult.mockResolvedValue(
+        periodResult({ startDate: '2026-09-20', startPriceDate: '2026-09-18' }),
+      );
+      render(<PortfolioValueReport />);
+
+      await waitFor(() =>
+        expect(
+          screen.getByTestId('report-measured-from-close'),
+        ).toHaveTextContent('Since the close of trading on Sep 18, 2026'),
+      );
+      // The Sunday boundary is not what the reader is told.
+      expect(
+        screen.getByTestId('report-measured-from-close'),
+      ).not.toHaveTextContent('Sep 20');
+      expect(
+        screen.queryByText(/Measured from the previous trading day/),
+      ).toBeNull();
+    });
+
+    it('says nothing when the server could not name a session', async () => {
+      mockGetInvestmentsMonthly.mockResolvedValue([
+        { month: '2024-06-01', value: 50000 },
+      ]);
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      mockGetPeriodResult.mockResolvedValue(
+        periodResult({ startPriceDate: null }),
+      );
+      render(<PortfolioValueReport />);
+
+      await waitFor(() =>
+        expect(screen.getByText('Value Change')).toBeInTheDocument(),
+      );
+      expect(screen.queryByTestId('report-measured-from-close')).toBeNull();
+    });
+  });
+
+  describe('the window the figures are measured over', () => {
     /** Text of the summary card carrying `label`. */
     const card = (label: string) => screen.getByText(label).parentElement!.textContent;
 
@@ -1405,7 +1462,7 @@ describe('PortfolioValueReport', () => {
       fallbackToDaily: false,
     });
 
-    it('sends the close before the week shown as the baseline', async () => {
+    it('names the week to the server rather than dating it', async () => {
       mockDateRangeValue = '1w';
       mockGetIntradayValue.mockResolvedValue(intradayWeek());
       mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
@@ -1423,9 +1480,11 @@ describe('PortfolioValueReport', () => {
         expect(screen.getByText('Value Change')).toBeInTheDocument();
       });
 
+      // The week is NAMED, not dated: the server resolves it from the same
+      // arithmetic the performance card's 1W row uses (#1424).
       await waitFor(() =>
         expect(mockGetPeriodResult).toHaveBeenCalledWith(
-          expect.objectContaining({ baselineDate: '2024-06-02' }),
+          expect.objectContaining({ period: '1w' }),
         ),
       );
       await waitFor(() => expect(card('Value Change')).toContain('+$2000'));
@@ -1453,7 +1512,7 @@ describe('PortfolioValueReport', () => {
       expect(screen.getAllByTestId('unknown-amount').length).toBeGreaterThan(0);
     });
 
-    it('sends no baseline on a long range, which measures from its first point', async () => {
+    it('names a long range too, rather than sending the window it drew', async () => {
       mockGetInvestmentsMonthly.mockResolvedValue([
         { month: '2024-06-01', value: 50000 },
         { month: '2024-07-01', value: 55000 },
@@ -1466,8 +1525,10 @@ describe('PortfolioValueReport', () => {
       });
 
       await waitFor(() => expect(card('Value Change')).toContain('+$5000'));
+      // 2Y draws from the day before the anniversary; the figure is measured
+      // over the two years the button names.
       expect(mockGetPeriodResult).toHaveBeenCalledWith(
-        expect.objectContaining({ baselineDate: undefined }),
+        expect.objectContaining({ period: '2y' }),
       );
     });
   });

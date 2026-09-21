@@ -1187,7 +1187,7 @@
     "investmentReturnTooltip": "Imbal hasil yang dibobot berdasarkan waktu hanya untuk sekuritas. Uang yang disetorkan atau ditarik pada suatu hari tidak mengubahnya, dan tunai yang belum diinvestasikan tidak termasuk dalam hasil maupun dalam nilai yang dijadikan pembandingnya.",
     "flowsPartial": "Hanya sebagian dari yang melewati akun-akun ini yang dapat dikonversi: {amount}.",
     "incompleteTooltip": "Beberapa hari dalam periode ini tidak memiliki harga, kurs, atau saldo kas, sehingga angka yang bergantung pada setiap hari tidak ditampilkan.",
-    "priorCloseTooltip": "Diukur dari harga penutupan hari bursa sebelumnya pada {date}.",
+    "measuredFromClose": "Sejak penutupan perdagangan pada {date}",
     "unmeasuredFlowTooltip": "Uang berpindah masuk atau keluar dari akun-akun ini dengan cara yang tidak dapat dihitung di sini: sebuah transaksi yang diselesaikan dari akun di luar kelompok ini, atau pemisahan yang mencampur baris investasi dengan pengeluaran biasa. Hasil investasi tidak ditampilkan, karena sebagian darinya adalah uang Anda sendiri.",
     "closeBoundsTooltip": "Angka-angka ini diukur antara nilai penutupan tersimpan pada {start} dan {end}. Grafik di atas menampilkan harga langsung sepanjang hari, sehingga bisa berubah meskipun angka-angka ini tidak.",
     "notAvailable": "T/A",

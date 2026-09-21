@@ -146,6 +146,9 @@ export class PortfolioPeriodResultsBatchService {
     const empty = (startDate: string): PortfolioPeriodResult => ({
       currency,
       startDate,
+      // No valued day is no session to name; the single-range route's own
+      // empty answer says the same.
+      startPriceDate: null,
       endDate: end,
       ...decidePeriodResult({
         start: null,
@@ -304,11 +307,25 @@ export class PortfolioPeriodResultsBatchService {
     );
 
     const last = series[series.length - 1];
+    // Where each reported preset is measured from, resolved before anything is
+    // built: the trading session behind each of those boundaries is one query
+    // for all of them rather than one per preset.
+    const boundaries = new Map(
+      [...windows].map(([preset, windowStart]) => [
+        preset,
+        this.startBoundary(series, preset, windowStart),
+      ]),
+    );
+    const pricedDays = await this.netWorth.getLastPricedDays(
+      userId,
+      [...boundaries.values()].flatMap((point) => (point ? [point.date] : [])),
+      scope.map((row) => row.id),
+    );
     const periods: Partial<
       Record<PortfolioPeriodPreset, PortfolioPeriodResult>
     > = {};
     for (const [preset, windowStart] of windows) {
-      const start = this.startBoundary(series, preset, windowStart);
+      const start = boundaries.get(preset) ?? null;
       if (!start) {
         periods[preset] = empty(windowStart);
         continue;
@@ -329,6 +346,7 @@ export class PortfolioPeriodResultsBatchService {
       periods[preset] = {
         currency,
         startDate: start.date,
+        startPriceDate: pricedDays.get(start.date) ?? null,
         endDate: last.date,
         ...decidePeriodResult({ start, end: last, flow, unmeasuredFlows }),
         // This preset's OWN slice of the one series, so a preset reports the

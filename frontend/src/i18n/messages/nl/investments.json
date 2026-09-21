@@ -136,7 +136,7 @@
     "unmeasuredFlowTooltip": "Een transactie die buiten deze rekeningen is afgewikkeld, of een splitsing die een investeringsregel combineert met een gewone uitgave, betekent dat het resultaat niet kan worden gescheiden van het verplaatste geld.",
     "valueChangeLine": "Waardeverandering {amount}",
     "netFlowsLine": "Netto stortingen en opnames {amount}",
-    "priorCloseTooltip": "Gemeten vanaf de slotkoers van de vorige handelsdag op {date}.",
+    "measuredFromClose": "Sinds de slotkoers van {date}",
     "notAvailable": "N/A",
     "portfolioLabel": "Portefeuille:"
   },
@@ -302,7 +302,6 @@
   "portfolioPerformance": {
     "title": "Portefeuilleprestatie",
     "subtitle": "Hoe uw beleggingen presteerden, zonder het effect van stortingen, opnames en niet-belegd geld.",
-    "footnote": "Stortingen, opnames en niet-belegd geld tellen niet mee als beleggingsresultaat.",
     "unavailable": "n.v.t.",
     "empty": "Nog niet genoeg geschiedenis om een rendement te meten.",
     "periods": {

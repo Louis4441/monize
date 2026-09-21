@@ -93,13 +93,21 @@ zero, which is a bar of height zero rather than a gap the chart closes up. Each
 bucket carries `periodStart` and `periodEnd`, so a drill-down uses the dates the
 server bucketed by rather than re-deriving them.
 
-## A short-range portfolio change is measured from the prior close
+## A portfolio chart NAMES the period it measures; it does not date it
 
-On `1d`, `1w` and `mtd` the Change and Change % measure from the close of the last trading day *before* the window -- the convention every quote source reports against. The longer ranges measure from their first point (their window opens on a day whose first point already is that day's close). Which ranges are which lives in `PRIOR_CLOSE_BASELINE_RANGES`.
+`usePortfolioPeriodResult` sends the range as `period` and the server resolves the window from `backend/src/net-worth/portfolio-period-presets.util.ts` -- the same file the batch route behind "Portfolio performance" resolves its windows from. Two surfaces on one page cannot then disagree about where a quarter opens. `isPortfolioPeriodPreset` (`types/net-worth.ts`) says which ranges the server knows; `mtd` and a custom window are the ones it does not, and they still send `startDate`/`baselineDate`.
+
+**Never send the drawn window to the measurement endpoint.** The window a price chart draws is deliberately wider than the period its button names (the section below), so sending it measured a week under "1D", a day more than a quarter under "3M", and -- because `resolveRangePreset('all')` resolves to an empty start -- nothing at all under "All time".
+
+On `1d`, `1w` and `mtd` the period measures from the close of the last trading day *before* the window, the convention every quote source reports against; the longer ranges measure from their first point, whose window opens on a day that already is that day's close. The server's `PRIOR_CLOSE_PRESETS` decides that for a named window and `PRIOR_CLOSE_BASELINE_RANGES` for a dated one; the two sets say the same thing.
 
 This was briefly a user preference (migration 152, dropped by 153); it was removed because the prior close is the right answer rather than a taste. `usesPriorCloseBaseline` takes the range and nothing else -- if you find yourself adding a second argument, first ask whether the alternative is actually defensible.
 
-The date is all the client decides. `usesPriorCloseBaseline` and `previousCalendarDay` (`components/investments/portfolio-change-baseline.ts`) answer which day the period is measured from, and that day goes out as `baselineDate` on the period-result request; the arithmetic over it is the server's, and the client-side helpers that used to do it here are deleted rather than left exported for the next surface to reach for. The baseline is the close before the **first point on screen**, never the requested window start (on a weekend the 1D chart shows the last session), so the request waits for that point rather than guessing a date.
+For a dated range the baseline is the close before the **first point on screen**, never the requested window start, so the request waits for that point rather than guessing a date. The arithmetic over it is the server's either way, and the client-side helpers that used to do it here are deleted rather than left exported for the next surface to reach for.
+
+## A boundary is a calendar day; the session behind it is `startPriceDate`
+
+`getDailyInvestments` prices every calendar day from the latest close at or before it, so a period opening on a Sunday carries Friday's close and a period's `startDate` can name a day the market was shut. `startPriceDate` on the period result is the trading session that value actually came from, and it is what a surface prints: the Investments chart and the Portfolio Value report both carry "Since the close of trading on ..." under the chart title, for every range. `null` is unknown -- the line is omitted rather than falling back to the boundary's own date.
 
 ## The window a price chart requests is not the period its range names
 
@@ -299,11 +307,11 @@ band still renders as its own labelled column, never folded into the total
 captioned as the invested value. Letting the drawing mode pick the quantity is
 what made "Total" and "By security" peak at different numbers for one window.
 
-**The client picks the dates; the server measures.** `usesPriorCloseBaseline`
-and `previousCalendarDay` (`components/investments/portfolio-change-baseline.ts`)
-still decide that 1d, 1w and mtd report against the previous trading day's
-close, and that date goes out as `baselineDate`. The arithmetic over it does
-not come back to the browser.
+**The client names the window; the server measures.** Every portfolio surface
+reads `usePortfolioPeriodResult`, which sends the range as `period` for the
+windows the server has presets for and `startDate`/`baselineDate` for the ones
+it does not (`mtd`, a custom window). No arithmetic over the figures comes back
+to the browser, and nothing here subtracts two plotted points.
 
 **A withheld figure names one repair.** `periodResultUnknownReason`
 (`components/investments/portfolio-period-result.ts`) maps the server's five

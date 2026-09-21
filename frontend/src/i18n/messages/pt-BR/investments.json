@@ -136,7 +136,7 @@
     "unmeasuredFlowTooltip": "Uma operação liquidada fora dessas contas, ou um desdobramento que mistura uma linha de investimento com um gasto comum, significa que o resultado não pode ser separado do dinheiro movimentado.",
     "valueChangeLine": "Variação de valor {amount}",
     "netFlowsLine": "Depósitos e retiradas líquidos {amount}",
-    "priorCloseTooltip": "Medido a partir do fechamento do pregão anterior, em {date}.",
+    "measuredFromClose": "Desde o fechamento do pregão de {date}",
     "notAvailable": "N/D",
     "portfolioLabel": "Portfólio:"
   },
@@ -302,7 +302,6 @@
   "portfolioPerformance": {
     "title": "Desempenho da carteira",
     "subtitle": "Como seus investimentos se saíram, sem o efeito dos depósitos, das retiradas e do numerário não investido.",
-    "footnote": "Depósitos, retiradas e numerário não investido não contam como resultado do investimento.",
     "unavailable": "N/D",
     "empty": "Ainda não há histórico suficiente para medir um retorno.",
     "periods": {

@@ -360,7 +360,8 @@
     "invalidBaselineDate": "baselineDate must be YYYY-MM-DD",
     "invalidAccountIds": "accountIds must be comma-separated UUIDs",
     "invalidGranularity": "granularity must be 'daily' or 'monthly'",
-    "invalidPeriods": "periods must be comma-separated period presets"
+    "invalidPeriods": "periods must be comma-separated period presets",
+    "invalidPeriod": "period must be one of the period presets"
   },
   "notifications": {
     "notFound": "Notification with ID {{ id }} not found",

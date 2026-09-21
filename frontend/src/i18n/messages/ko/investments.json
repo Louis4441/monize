@@ -136,7 +136,7 @@
     "unmeasuredFlowTooltip": "이 계좌 밖에서 결제된 거래이거나, 투자 항목과 일반 지출이 섞인 분할 항목이 있으면 결과를 이동한 자금과 분리할 수 없습니다.",
     "valueChangeLine": "가치 변동 {amount}",
     "netFlowsLine": "순 입출금액 {amount}",
-    "priorCloseTooltip": "직전 거래일({date}) 종가를 기준으로 계산한 값입니다.",
+    "measuredFromClose": "{date} 거래 마감 시점부터",
     "notAvailable": "해당 없음",
     "portfolioLabel": "포트폴리오:"
   },
@@ -302,7 +302,6 @@
   "portfolioPerformance": {
     "title": "포트폴리오 성과",
     "subtitle": "입금, 출금, 미투자 현금의 영향을 제외한 투자 자체의 성과입니다.",
-    "footnote": "입금, 출금, 미투자 현금은 투자 결과로 계산되지 않습니다.",
     "unavailable": "해당 없음",
     "empty": "수익률을 계산하기에 이력이 아직 부족합니다.",
     "periods": {

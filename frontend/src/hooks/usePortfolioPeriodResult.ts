@@ -8,6 +8,7 @@ import {
   previousCalendarDay,
   usesPriorCloseBaseline,
 } from '@/components/investments/portfolio-change-baseline';
+import { isPortfolioPeriodPreset } from '@/types/net-worth';
 import type { PortfolioPeriodResult } from '@/types/net-worth';
 
 const logger = createLogger('usePortfolioPeriodResult');
@@ -20,8 +21,9 @@ interface UsePortfolioPeriodResultOptions {
   endDate: string;
   /**
    * The point's own date/timestamp of the FIRST point on screen, or undefined
-   * while the series is empty. A prior-close range measures from the close
-   * before the session actually drawn, not before the window asked for.
+   * while the series is empty. Only a range the server has no preset for needs
+   * it: there the client names the window, and a prior-close range measures
+   * from the close before the session actually drawn.
    */
   firstPointIso?: string;
   /** Whether the series has any points at all. */
@@ -42,24 +44,30 @@ interface UsePortfolioPeriodResultValue {
    * nothing: nothing here subtracts, divides or falls back to the series.
    */
   periodResult: PortfolioPeriodResult | null;
-  /** Whether this range reports against the previous trading day's close. */
-  usesPriorClose: boolean;
 }
 
 /**
  * The period result for the window a portfolio series draws.
  *
- * The client picks the dates and the server measures: a change derived from the
- * plotted series counts the reader's own deposits as performance, which is the
- * defect INV-PORTRESULT-001 exists to stop. `usesPriorCloseBaseline` and
- * `previousCalendarDay` still decide that 1d, 1w and mtd report against the
- * previous close, and that date goes out as `baselineDate`.
+ * **The window a price chart DRAWS is not the period its button names.**
+ * `portfolio-range-window.ts` opens 3M a day early so the first plotted close
+ * precedes the quarter, widens 1D to a week so a daily fallback has more than
+ * one point, and leaves All with no start date at all. Those rules are right
+ * for a line and wrong for a figure, and sending the drawn window to the
+ * measurement endpoint is what made 1D report a week, 3M disagree with the
+ * performance card beside it and All report nothing (issue #1424).
+ *
+ * So the window is NAMED rather than dated: the range goes out as `period` and
+ * the server resolves it from `portfolio-period-presets.util.ts`, the same file
+ * the batch route behind "Portfolio performance" resolves its windows from. Two
+ * cards on one page cannot then disagree about where a quarter opens. A range
+ * the server has no preset for (`mtd`, a custom window) still sends its own
+ * dates, and `usesPriorCloseBaseline` still decides that it measures from the
+ * close before the first point actually on screen.
  *
  * The payload is kept WITH the key of the request that produced it, so a range,
  * account or currency switch cannot leave the previous window's figures under
- * the new window's caption, and a request that is never made (a prior-close
- * range with nothing on screen yet) leaves the figures unknown rather than
- * stale.
+ * the new window's caption.
  */
 export function usePortfolioPeriodResult({
   range,
@@ -71,6 +79,7 @@ export function usePortfolioPeriodResult({
   displayCurrency,
   reloadKey = 0,
 }: UsePortfolioPeriodResultOptions): UsePortfolioPeriodResultValue {
+  const period = isPortfolioPeriodPreset(range) ? range : undefined;
   const usesPriorClose = usesPriorCloseBaseline(range);
   const firstPointDate = isoDatePart(firstPointIso);
   const baselineDate =
@@ -80,6 +89,7 @@ export function usePortfolioPeriodResult({
   // Everything the answer depends on. An answer is shown only under the key it
   // was asked for; anything else describes a different window.
   const key = JSON.stringify([
+    period ?? null,
     startDate,
     endDate,
     baselineDate ?? null,
@@ -94,19 +104,21 @@ export function usePortfolioPeriodResult({
   } | null>(null);
 
   useEffect(() => {
-    if (!hasSeries || !startDate) return;
-    // A prior-close range measures from the close before the first point ON
-    // SCREEN, so it waits for that point rather than guessing at a date.
-    if (usesPriorClose && !baselineDate) return;
+    // A named window needs nothing from the chart: the server knows where it
+    // opens and what today is. A dated one waits for both.
+    if (!period) {
+      if (!hasSeries || !startDate) return;
+      // A prior-close range measures from the close before the first point ON
+      // SCREEN, so it waits for that point rather than guessing at a date.
+      if (usesPriorClose && !baselineDate) return;
+    }
     let cancelled = false;
     netWorthApi
-      .getInvestmentsPeriodResult({
-        startDate,
-        endDate,
-        baselineDate,
-        accountIds,
-        displayCurrency,
-      })
+      .getInvestmentsPeriodResult(
+        period
+          ? { period, accountIds, displayCurrency }
+          : { startDate, endDate, baselineDate, accountIds, displayCurrency },
+      )
       .then((result) => {
         if (!cancelled) setState({ key, result });
       })
@@ -123,6 +135,7 @@ export function usePortfolioPeriodResult({
     };
   }, [
     key,
+    period,
     hasSeries,
     startDate,
     endDate,
@@ -132,8 +145,5 @@ export function usePortfolioPeriodResult({
     usesPriorClose,
   ]);
 
-  return {
-    periodResult: state?.key === key ? state.result : null,
-    usesPriorClose,
-  };
+  return { periodResult: state?.key === key ? state.result : null };
 }

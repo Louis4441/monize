@@ -55,6 +55,11 @@ import {
   loadUnmeasuredFlowRows,
   unmeasuredFlowsAfter,
 } from "./unmeasured-flows.util";
+import {
+  PortfolioPeriodPreset,
+  presetWindowStart,
+  usesPriorCloseBaseline,
+} from "./portfolio-period-presets.util";
 
 /** Both folds of one window, over one rate index. */
 interface PeriodFolds {
@@ -76,12 +81,39 @@ export {
   MoneyWeightedReturnMethod,
 };
 
+/**
+ * How a caller names the window it wants measured.
+ *
+ * Either a preset the server resolves (`period`) or an explicit pair of dates,
+ * never a mix: a caller that sends both would be asking two questions, and the
+ * answer would silently be one of them.
+ */
+export type PeriodResultWindow =
+  | {
+      period: PortfolioPeriodPreset;
+      startDate?: undefined;
+      baselineDate?: undefined;
+    }
+  | { period?: undefined; startDate: string; baselineDate?: string };
+
 /** What `GET /net-worth/investments-period-result` answers. */
 export interface PortfolioPeriodResult {
   /** The currency every figure below is in. */
   currency: string;
   /** The close the period is measured FROM (the baseline, where one was given). */
   startDate: string;
+  /**
+   * The trading session `startDate`'s value came from: the newest day on or
+   * before it carrying a close for anything the scope held by then.
+   *
+   * `startDate` is a CALENDAR day, and the value series prices every calendar
+   * day from the latest close at or before it -- so a Monday window measured
+   * from Sunday is measured from Friday's close, and a surface that prints
+   * `startDate` as the close it reports against names a day the market was
+   * shut. This is the day to print. `null` when nothing in the scope was
+   * priced by then: unknown, never substituted with the calendar day.
+   */
+  startPriceDate: string | null;
   /** The close the period is measured TO. */
   endDate: string;
   /** MV(b); null when that day is a subtotal. */
@@ -189,32 +221,46 @@ export class PortfolioPeriodResultService {
   /**
    * The period's result for one scope and window.
    *
+   * The window is named ONE of two ways. `period` names a preset and the server
+   * draws its window from `portfolio-period-presets.util.ts` -- the same
+   * arithmetic, from the same file, that the batch route uses, so a chart's
+   * card and the performance card beside it cannot report different figures
+   * under the same caption (issue #1424: the chart sent the window it DREW,
+   * which opens a day early on 3M/1Y/5Y, a week early on 1D and nowhere at all
+   * on All). `startDate`/`baselineDate` name an explicit window instead, for a
+   * caller with no preset to name.
+   *
    * `baselineDate` is the close the period is measured from where that is NOT
    * the first day of the window: the 1d / 1w / mtd ranges report against the
-   * previous trading day's close, and the client sends that date rather than
-   * doing the arithmetic on the numbers. The lower bound for flows is exclusive
-   * of it -- the baseline's own close already contains every flow that landed
-   * that day, and counting those again would subtract them from a starting value
+   * previous trading day's close. The lower bound for flows is exclusive of it
+   * -- the baseline's own close already contains every flow that landed that
+   * day, and counting those again would subtract them from a starting value
    * that holds them.
    */
   async getPeriodResult(
     userId: string,
-    opts: {
-      startDate: string;
+    opts: PeriodResultWindow & {
       endDate?: string;
-      baselineDate?: string;
       accountIds?: string[];
       displayCurrency?: string;
     } & SeriesFetchOptions,
   ): Promise<PortfolioPeriodResult> {
     const currency = await this.reportingCurrency(userId, opts.displayCurrency);
     const end = opts.endDate || todayYMD();
+
+    const window = opts.period
+      ? await this.presetWindow(userId, opts.period, end, opts.accountIds)
+      : { startDate: opts.startDate, baselineDate: opts.baselineDate };
+    // A preset whose window this scope has no history for is a period that
+    // cannot be measured, not one that did nothing.
+    if (window === null) return this.emptyResult(currency, end, end);
+
     // The baseline is the earlier of the two when both are given, so a client
     // that sends a prior close cannot narrow the window it asked to chart.
     const from =
-      opts.baselineDate && opts.baselineDate < opts.startDate
-        ? opts.baselineDate
-        : opts.startDate;
+      window.baselineDate && window.baselineDate < window.startDate
+        ? window.baselineDate
+        : window.startDate;
 
     const empty = this.emptyResult(currency, from, end);
 
@@ -236,8 +282,8 @@ export class PortfolioPeriodResultService {
     // from the latest accepted close on or before it, and the price loaders
     // carry one pre-window observation, so the first point does not depend on
     // how wide a window the caller asked for.
-    const [series, flowRows, investedRows, unmeasuredFlows] = await Promise.all(
-      [
+    const [series, flowRows, investedRows, unmeasuredFlows, pricedDays] =
+      await Promise.all([
         this.netWorth.getDailyInvestments(
           userId,
           from,
@@ -277,8 +323,15 @@ export class PortfolioPeriodResultService {
           scope: scope.map((row) => row.id),
           cashScope,
         }),
-      ],
-    );
+        // Which SESSION the opening value came from. `from` is the series' first
+        // point (`enumerateDaysYMD` opens on it), so this is asked beside the
+        // series rather than after it.
+        this.netWorth.getLastPricedDays(
+          userId,
+          [from],
+          scope.map((row) => row.id),
+        ),
+      ]);
 
     if (series.length === 0) return empty;
 
@@ -311,6 +364,7 @@ export class PortfolioPeriodResultService {
     return {
       currency,
       startDate: series[0].date,
+      startPriceDate: pricedDays.get(series[0].date) ?? null,
       endDate: series[series.length - 1].date,
       ...decision,
       // The whole window's points, not only its two boundaries: a gap in the
@@ -352,28 +406,52 @@ export class PortfolioPeriodResultService {
       displayCurrency?: string;
     } & SeriesFetchOptions = {},
   ): Promise<PortfolioPeriodResult> {
-    const currency = await this.reportingCurrency(userId, opts.displayCurrency);
-    const end = todayYMD();
+    return this.getPeriodResult(userId, {
+      period: "all",
+      endDate: todayYMD(),
+      accountIds: opts.accountIds,
+      displayCurrency: await this.reportingCurrency(
+        userId,
+        opts.displayCurrency,
+      ),
+      fetchMissing: opts.fetchMissing,
+    });
+  }
 
-    const scope = await this.resolveScope(userId, opts.accountIds);
-    if (scope.length === 0) return this.emptyResult(currency, end, end);
-
+  /**
+   * The window a preset names, for this scope and this end day.
+   *
+   * Every arithmetic answer comes from `portfolio-period-presets.util.ts`, the
+   * one file that owns where each window opens; `all` is the exception with no
+   * arithmetic, and opens on the day before the scope's first holding, because
+   * that purchase's own close already holds it. `null` is a scope with no
+   * history at all: there is no window to measure, which is the empty decision
+   * rather than a zero.
+   */
+  private async presetWindow(
+    userId: string,
+    preset: PortfolioPeriodPreset,
+    end: string,
+    accountIds?: string[],
+  ): Promise<{ startDate: string; baselineDate?: string } | null> {
+    if (preset !== "all") {
+      const start = presetWindowStart(preset, end);
+      if (start === null) return null;
+      return {
+        startDate: start,
+        baselineDate: usesPriorCloseBaseline(preset)
+          ? addDaysYMD(start, -1)
+          : undefined,
+      };
+    }
+    const scope = await this.resolveScope(userId, accountIds);
+    if (scope.length === 0) return null;
     const first = await this.firstInvestmentDate(
       userId,
       scope.map((row) => row.id),
     );
-    // No transaction is no inception: there is no window to measure, which is
-    // the empty decision rather than a zero.
-    if (first === null) return this.emptyResult(currency, end, end);
-
-    return this.getPeriodResult(userId, {
-      startDate: first,
-      baselineDate: addDaysYMD(first, -1),
-      endDate: end,
-      accountIds: opts.accountIds,
-      displayCurrency: currency,
-      fetchMissing: opts.fetchMissing,
-    });
+    if (first === null) return null;
+    return { startDate: first, baselineDate: addDaysYMD(first, -1) };
   }
 
   /**
@@ -418,6 +496,9 @@ export class PortfolioPeriodResultService {
     return {
       currency,
       startDate: from,
+      // No valued day is no session to name: a date here would claim the
+      // window was measured from a close it never read.
+      startPriceDate: null,
       endDate: end,
       startValue: null,
       endValue: null,
