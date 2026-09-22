@@ -329,7 +329,7 @@ npm run dev
 | `POSTGRES_DB` | Database name | `monize` |
 | `POSTGRES_USER` | Database user | `monize_user` |
 | `POSTGRES_PASSWORD` | Database password | `secure-password` |
-| `JWT_SECRET` | JWT signing key (min 32 chars) | `openssl rand -base64 32` |
+| `JWT_SECRET` | JWT signing key (min 32 random chars; the `.env.example` placeholder is refused at startup) | `openssl rand -base64 32` |
 | `PUBLIC_APP_URL` | Public frontend URL | `https://money.example.com` |
 
 ### Optional Variables

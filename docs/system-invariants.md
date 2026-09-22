@@ -4642,7 +4642,8 @@ Source of truth     The environment, read by checkClusterBoot, and the state of
                     this replica's own LISTEN session.
 Enforcement         backend/src/common/cluster/cluster-mode.ts checkClusterBoot is the
                     boot matrix as a pure function of the environment: in multi
-                    it refuses a missing or too-short JWT_SECRET (every replica
+                    it refuses a JWT_SECRET that jwtSecretProblem refuses
+                    (missing, too short, a published placeholder; every replica
                     derives the CSRF and OAuth cookie keys and the restore
                     upload ticket from it), the per-pod `local` attachment
                     provider and the automatic backup directory unless the

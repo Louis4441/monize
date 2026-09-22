@@ -8,7 +8,8 @@ import {
   parseClusterMode,
 } from "./cluster-mode";
 
-const GOOD_SECRET = "x".repeat(MIN_JWT_SECRET_LENGTH);
+/** The shape "openssl rand -base64 32" prints; a fixture, never a real key. */
+const GOOD_SECRET = "FkVtZprB4sKbrwNIl6YiZarB8gB9RrKoO0rt7sFg4YM=";
 
 /**
  * What a `multi` deployment must assert about its storage before it can boot.
@@ -322,9 +323,27 @@ describe("checkClusterBoot", () => {
         // Measured the way JwtStrategy measures it: this one boots there, so it
         // must boot here. A trimmed length would refuse a running deployment.
         name: "JWT_SECRET long enough only with its whitespace",
-        env: { JWT_SECRET: `  ${"y".repeat(MIN_JWT_SECRET_LENGTH - 2)}  ` },
+        env: {
+          JWT_SECRET: `  ${GOOD_SECRET.slice(0, MIN_JWT_SECRET_LENGTH - 4)}  `,
+        },
         mode: "single",
         refusals: [],
+        warnings: [],
+      },
+      {
+        // The value `.env.example` ships. It is 46 characters, so a length
+        // floor alone admitted it, and it is public.
+        name: "JWT_SECRET left at the .env.example placeholder",
+        env: { JWT_SECRET: "your-super-secret-jwt-key-change-in-production" },
+        mode: "single",
+        refusals: [/JWT_SECRET is still the example placeholder/],
+        warnings: [],
+      },
+      {
+        name: "JWT_SECRET that is one character repeated",
+        env: { JWT_SECRET: "x".repeat(MIN_JWT_SECRET_LENGTH) },
+        mode: "single",
+        refusals: [/JWT_SECRET is too predictable/],
         warnings: [],
       },
       {

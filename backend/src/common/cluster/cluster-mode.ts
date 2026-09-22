@@ -2,6 +2,9 @@ import {
   BACKUP_STORE_PROVIDERS,
   sharesLocation,
 } from "../../backup/storage/backup-store-location";
+import { jwtSecretProblem } from "../jwt-secret-policy";
+
+export { MIN_JWT_SECRET_LENGTH } from "../jwt-secret-policy";
 
 /**
  * Cluster runtime mode: how many replicas of this process are expected to serve
@@ -41,9 +44,6 @@ export const DEFAULT_CLUSTER_MODE: ClusterMode = "single";
  * the answer for code with no injector.
  */
 export const CLUSTER_MODE = Symbol("CLUSTER_MODE");
-
-/** Shortest `JWT_SECRET` the server will start with (`JwtStrategy` agrees). */
-export const MIN_JWT_SECRET_LENGTH = 32;
 
 /**
  * Parse and validate a raw `CLUSTER_MODE` value. Unset or blank is `single`;
@@ -155,19 +155,18 @@ export function checkClusterBoot(env: ClusterBootEnv): ClusterBootReport {
   // to a per-process random key and `csrf.guard.ts` skips verification
   // entirely, which is a deployment that looks like it has CSRF protection and
   // has none -- and which would fail open differently on every replica. The
-  // length floor is the one `JwtStrategy` already enforces; checking it here
-  // too turns a dependency-injection stack trace into a first-line log message.
-  // Measured untrimmed, exactly as `JwtStrategy` measures it, so this check can
-  // only ever refuse a deployment that was already refused further in -- a
-  // secret whose length depends on its surrounding whitespace must not boot on
-  // one check and die on the other.
-  const jwtSecret = env.JWT_SECRET ?? "";
-  if (jwtSecret.length < MIN_JWT_SECRET_LENGTH) {
+  // rule is `jwtSecretProblem`, the one `JwtStrategy` also enforces; checking
+  // it here too turns a dependency-injection stack trace into a first-line log
+  // message. One shared function rather than two copies, so this check can only
+  // ever refuse a deployment that was already refused further in -- a secret
+  // that boots on one check and dies on the other is the drift it prevents.
+  const jwtProblem = jwtSecretProblem(env.JWT_SECRET);
+  if (jwtProblem !== null) {
     refusals.push(
-      `JWT_SECRET is ${jwtSecret.length === 0 ? "not set" : "shorter than " + MIN_JWT_SECRET_LENGTH + " characters"}. ` +
+      `${jwtProblem} ` +
         "It signs every session token and derives the CSRF and OAuth cookie " +
-        "keys, so a server without it cannot protect a request. Generate one " +
-        'with "openssl rand -base64 32" and set JWT_SECRET.',
+        "keys, so a server without a secret of its own cannot protect a " +
+        'request. Generate one with "openssl rand -base64 32" and set JWT_SECRET.',
     );
   }
 
