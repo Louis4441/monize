@@ -30,17 +30,45 @@ function stripComments(source: string): string {
 
 /**
  * The identifiers a file binds to the raw Express response with `@Res()`.
+ *
  * Derived per file rather than assumed to be `res`, because the ban has to
  * follow the parameter's real name and must not catch an unrelated `response`
  * (a `fetch` result, a provider reply) in a file that never touches `@Res()`.
+ * Comments are stripped first: prose explaining this rule says "a @Res()
+ * handler", and reading that as a declaration would ban `return handler` in
+ * every file that documents the rule.
  */
 function resParameterNames(source: string): string[] {
-  const names = new Set<string>();
+  const code = stripComments(source);
   const decl = /@Res\(\s*\)\s*([A-Za-z_$][\w$]*)/g;
-  for (let m = decl.exec(source); m; m = decl.exec(source)) {
-    names.add(m[1]);
-  }
-  return [...names];
+  return [...new Set([...code.matchAll(decl)].map((m) => m[1]))];
+}
+
+/**
+ * `return <resName>`, terminated so an identifier that merely starts with the
+ * same letters (`resolveFxRate`) cannot match. The whole file is scanned at
+ * once rather than line by line: prettier wraps a long chain onto the next
+ * line (`return res` / `  .status(400)` / `  .json(body)`), and a per-line
+ * scan sees `return res` with nothing after it and passes the offender.
+ */
+function bannedReturn(names: string[]): RegExp {
+  const alternatives = names.map((name) => name.replace(/\$/g, "\\$"));
+  return new RegExp(
+    `\\breturn\\s+(?:${alternatives.join("|")})\\b\\s*(?:[.;)}]|$)`,
+    "g",
+  );
+}
+
+/** 1-based line of a character offset. */
+function lineOf(source: string, index: number): number {
+  return source.slice(0, index).split("\n").length;
+}
+
+function offendingLines(source: string, names: string[]): number[] {
+  const stripped = stripComments(source);
+  return [...stripped.matchAll(bannedReturn(names))].map((m) =>
+    lineOf(stripped, m.index ?? 0),
+  );
 }
 
 /**
@@ -62,7 +90,7 @@ function resParameterNames(source: string): string[] {
  * sites that had this shape were on the unauthenticated auth surface.
  *
  * `Promise<void>` on a handler is the stronger form of the same rule and is
- * preferred where a handler is being touched; this scan is what covers the 30-odd
+ * preferred where a handler is being touched; this scan is what covers the
  * `@Res()` handlers that carry no explicit return type.
  */
 describe("a @Res() handler returns nothing", () => {
@@ -83,12 +111,8 @@ describe("a @Res() handler returns nothing", () => {
       const source = readFileSync(file, "utf8");
       const names = resParameterNames(source);
       if (names.length === 0) continue;
-      const banned = bannedReturn(names);
-      const lines = stripComments(source).split("\n");
-      for (const [index, line] of lines.entries()) {
-        if (banned.test(line)) {
-          offenders.push(`${relative(SRC_ROOT, file)}:${index + 1}`);
-        }
+      for (const line of offendingLines(source, names)) {
+        offenders.push(`${relative(SRC_ROOT, file)}:${line}`);
       }
     }
 
@@ -96,35 +120,34 @@ describe("a @Res() handler returns nothing", () => {
   });
 
   it("the scan recognises the shape it was written for", () => {
-    const banned = bannedReturn(["res"]);
+    const scan = (code: string) => offendingLines(code, ["res"]);
 
-    expect(banned.test("    return res.json({ requires2FA: true });")).toBe(
-      true,
-    );
-    expect(banned.test("    return res.status(405).end();")).toBe(true);
-    expect(banned.test("    return res;")).toBe(true);
-    // The fixed shape, and a return of something that merely reads from the
-    // response, are both fine.
-    expect(banned.test("    res.json({ requires2FA: true });")).toBe(false);
-    expect(banned.test("    return;")).toBe(false);
-    expect(banned.test("    return resolveFxRate(date);")).toBe(false);
-    expect(banned.test("    return response.ok;")).toBe(false);
+    expect(scan("    return res.json({ requires2FA: true });")).toEqual([1]);
+    expect(scan("    return res.status(405).end();")).toEqual([1]);
+    expect(scan("    return res;")).toEqual([1]);
+    // The wrap prettier produces for a long chain: the offender is on the line
+    // carrying `return`, and a per-line scan would miss it entirely.
+    expect(
+      scan("    return res\n      .status(400)\n      .json(body);"),
+    ).toEqual([1]);
+    // The fixed shape, and a return of something whose name merely starts the
+    // same way, are both fine.
+    expect(scan("    res.json({ requires2FA: true });")).toEqual([]);
+    expect(scan("    return;")).toEqual([]);
+    expect(scan("    return resolveFxRate(date);")).toEqual([]);
+    expect(scan("    return response.ok;")).toEqual([]);
   });
 
   it("the scan reads code, not prose", () => {
-    const banned = bannedReturn(["res"]);
     const prose = "/**\n * Never `return res.json(...)` from a handler.\n */\n";
-    const code = "    return res.json({ ok: true });\n";
+    const code = "\n\n    return res.json({ ok: true });\n";
 
-    expect(banned.test(stripComments(prose))).toBe(false);
-    expect(banned.test(stripComments(code))).toBe(true);
-    // Blanking keeps the line count, so reported line numbers stay true.
-    expect(stripComments(prose).split("\n")).toHaveLength(
-      prose.split("\n").length,
-    );
+    expect(offendingLines(prose, ["res"])).toEqual([]);
+    // Blanking keeps the line count, so the reported line stays true.
+    expect(offendingLines(code, ["res"])).toEqual([3]);
   });
 
-  it("the parameter scan follows the declared name", () => {
+  it("the parameter scan follows the declared name and ignores prose", () => {
     expect(resParameterNames("async get(@Res() res: Response) {}")).toEqual([
       "res",
     ]);
@@ -134,15 +157,20 @@ describe("a @Res() handler returns nothing", () => {
     expect(resParameterNames("const r = await fetch(u); return r.ok;")).toEqual(
       [],
     );
+    // The comment this rule is documented with, which reads as a declaration
+    // of a parameter named `handler` until comments are stripped. The real
+    // declaration follows it, so a scan that strips only for the first match
+    // still reports `handler` here.
+    expect(
+      resParameterNames(
+        "// the value a @Res() handler returns\nasync get(@Res() res: Response) {}",
+      ),
+    ).toEqual(["res"]);
+    // Prose after the declaration is the same mistake in the other order.
+    expect(
+      resParameterNames(
+        "async get(@Res() res: Response) {}\n// a @Res() handler returns nothing",
+      ),
+    ).toEqual(["res"]);
   });
 });
-
-/**
- * `return <resName>` on its own or followed by a member access. Anything else
- * that happens to start with the same letters (`resolveFxRate`) is excluded by
- * requiring the identifier to end there.
- */
-function bannedReturn(names: string[]): RegExp {
-  const alternatives = names.map((name) => name.replace(/\$/g, "\\$"));
-  return new RegExp(`\\breturn\\s+(?:${alternatives.join("|")})\\s*[.;)]`);
-}
