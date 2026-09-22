@@ -12,7 +12,7 @@ A transfer's label is `csvTransferLabel` in the same file, and it names the dire
 
 ## A blank transfer payee is stored blank and resolved at read time
 
-A transfer created without a payee persists `payee_name` as NULL (issue #1214); the display label is resolved per read from the linked leg's account -- its CURRENT name, in the reader's language. The English form for machine-facing surfaces (CSV/QIF export, AI/MCP rows, custom reports) lives only in `src/transactions/transfer-payee-label.util.ts`, and `transfer-payee-stamp.guard.spec.ts` fails on a `Transfer to/from ${...}` template anywhere else in `src/`. Migration 161 blanked the legacy-stamped rows; `updateTransfer` heals a surviving stamp to NULL and never regenerates it. A read surface joining `linkedTransaction.account` for this must mask or restrict cross-owner counterparts the reader cannot read (the account export masks; the custom report query restricts the join to same-owner legs).
+A transfer created without a payee persists `payee_name` as NULL (issue #1214); the display label is resolved per read from the linked leg's account -- its CURRENT name, in the reader's language. The English form for machine-facing surfaces (CSV/QIF export, AI/MCP rows, custom reports) lives only in `src/transactions/transfer-payee-label.util.ts`, and `transfer-payee-stamp.guard.spec.ts` fails on a `Transfer to/from ${...}` template anywhere else in `src/`. Migration 161 blanked the legacy-stamped rows; `updateTransfer` heals a surviving stamp to NULL and never regenerates it. That NULL is why the register's Payee sort sinks every transfer to the end in both directions: the column displays a label resolved per read, and an ORDER BY key on the DISTINCT-ids pagination path has to be a stored `alias.property`, never a computed expression. A read surface joining `linkedTransaction.account` for this must mask or restrict cross-owner counterparts the reader cannot read (the account export masks; the custom report query restricts the join to same-owner legs).
 
 The guard also asks what a value *is* rather than what it starts with, matching its twin in `frontend/src/lib/csv-export.ts`: a value a spreadsheet reads as a number is data, and prefixing one stops the column adding up (issue #1134) -- amounts bypass `escapeCsv`, so the rule covers text columns that can still hold a number (a cheque number written `-123`).
 
@@ -69,6 +69,71 @@ Four rules make the two halves one honest series, and each one exists because it
 - **An account that cannot be answered is an unknown component, never a smaller total.** `FxAggregate.addUnknown()` carries an account whose forecast was withheld whole (`BalanceForecastService`'s rule, issue #1247) or that this caller cannot project at all -- today, a joint account, whose forecast belongs to its owner's identity and which the response names in `forecast.unforecastableAccountIds`. The day's `total` is then `null` with `knownSubtotal` holding what WAS known, which may only be printed under a caption that says it is partial.
 
 The date range is bounded by `CALENDAR_RANGE_MAX_DAYS` (`common/validators/calendar-range.validator.ts`), which every calendar DTO reads so the cap cannot drift apart per endpoint: an unbounded range walks a per-day series over every account in scope and asks the forecast to expand every schedule to the horizon.
+
+## The register's sort field is a list, not a string, and only one query may order by a joined column
+
+`GET /transactions` takes `sortBy` and `sortDirection`. The fields it accepts
+are `TRANSACTION_SORT_FIELDS` in `backend/src/transactions/register-order.ts`,
+which is also what the browser's column headers and the AI and MCP tools'
+enums derive from, so a column a reader can click is a column every caller can
+ask for, with a contract spec holding the browser's copy equal to it.
+`parseTransactionSort` (`backend/src/transactions/register-sort-param.ts`) is
+the boundary: `assertStringParam` first, because Express hands a repeated key
+over as an array whose `includes` compares whole elements, then a
+case-insensitive match that returns the list's own spelling -- lowercasing the
+input and testing that against the list silently rejects `refNumber`, the one
+field whose name is not all lower case.
+
+`registerPrimaryOrder` maps a field to its ORDER BY term, and it **throws**
+for `account` or `category` unless the caller passes that table's join alias.
+Only the register query joins those tables; the three queries that sum the
+rows newer than a page select from `transactions` alone and pass no aliases,
+so none of them can be ordered by a column its statement does not have. Two
+shapes the map may never take, both forced by how TypeORM pages a query with
+joins (it selects DISTINCT ids plus the order columns from a subquery and
+rewrites each order key by splitting on the dot): the term is always
+`alias.property`, never a computed expression -- which is why status orders by
+its stored value rather than by a lifecycle rank -- and never a one-to-many
+alias such as `tags`, which would emit an id per joined row and repeat
+transactions on a page. Nullable text columns take `NULLS LAST` in both
+directions, because a blank payee is the absence of a value rather than the
+smallest one. Under any field but the date, the transaction date becomes the
+second key, so one payee's rows still read chronologically instead of in the
+order an import happened to write them.
+
+## A running balance is summed over the rows the register shows, and a deep link is counted over them too
+
+`RegisterRowFilters` (`backend/src/transactions/transactions.service.ts`) is
+the one shape naming everything that narrows the register, and
+`buildFilteredIdsSubquery` is the one query that applies it. Both the running
+balance's zero-based total and the page a `targetTransactionId` lands on are
+computed over that set, because both are answers *about the rows on screen*:
+a balance summed over a wider set counts rows the reader cannot see, and a
+page counted over a wider set does not hold the row it was following.
+
+Four filters used to narrow the listing without reaching either -- status,
+entry currency, attachment presence and the KEY:VALUE tag filter -- along with
+the brokerage exclusion, and a register narrowed by any of them fell through
+to the unfiltered regime: the account's whole projected balance, walked down
+past rows that are not the ones being shown. A filter added to the listing is
+added to `RegisterRowFilters` in the same change: every member of that shape
+is required rather than optional, so a new field is a compile error where the
+shape is built until it is named -- and that is the moment to apply it in
+`buildFilteredIdsSubquery` too, which the type cannot check for you. The
+uncategorised pseudo-category is the example of getting the second half
+wrong: the listing matches a split parent through its children, and an arm
+that matched only the plain rows gave one row two different balances
+depending on which way the register ran.
+
+The page count also has to ask the register's ORDER, not an approximation of
+it: all four keys, with the amount leg running opposite to the list (the same
+credits-before-debits rule `applyRegisterOrder` applies), and the target's
+keys read out as text. `created_at` is stored to the microsecond and the
+entity reads it into a millisecond `Date`, so binding that value back compared
+a row with a truncated copy of itself and counted it as being above itself.
+The one predicate that still differs is the `uncategorized` pseudo-category,
+which the subquery reads more narrowly than the listing does; its own comment
+says why.
 
 ## A stored holding is a projection of the ledger, never an accumulator
 

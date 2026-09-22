@@ -63,6 +63,7 @@ implied.
 | INV-HOLDING-001 | A holding equals a deterministic replay of the investment ledger | enforced |
 | INV-HOLDING-002 | Every view replays the ledger the same way | enforced |
 | INV-TRANSFER-001 | A transfer's two legs share the VOID boundary and one balance decision | enforced |
+| INV-REGISTER-001 | A row's running balance is the same figure whichever way the date register runs, and no balance is shown under any other order | enforced |
 | INV-REDEEM-001 | A redemption's accrued interest moves cash once and is income once | enforced |
 | INV-RECONCILE-001 | While the strict lock is on, a reconciled transaction is not altered | enforced |
 | INV-FX-001 | An unavailable rate never becomes 1:1, a rate from after the date, or an unboundedly old one | partial |
@@ -285,6 +286,71 @@ Status              enforced
 See `docs/concurrency-and-idempotency.md` CONC-003. The former secondary breach --
 transfers created as `VOID` moving both balances -- is closed on the create path
 too.
+
+### INV-REGISTER-001 -- one balance per row, whichever way the register runs
+
+```text
+Statement           A transaction's running balance is the same figure whether
+                    the register lists newest first or oldest first, on every
+                    page. Under any order but the date, no running balance is
+                    shown at all, and the response says why.
+Source of truth     the account's ledger rows in applyRegisterOrder's total
+                    order, plus AccountsService.getProjectedBalance (or the
+                    matched total, where a content filter makes the balance
+                    zero-based). The rows summed are the rows the register
+                    LISTS: one filter shape (RegisterRowFilters) and one
+                    query (buildFilteredIdsSubquery) decide that set, and the
+                    page a deep link lands on is counted over it too.
+Enforcement         The server sends one number per page -- startingBalance,
+                    the balance AFTER that page's newest row -- and the client
+                    walks it down the page newest-first. Four things are
+                    direction-aware, and each is written once: the ORDER BY
+                    (applyRegisterOrder, whose amount tiebreak runs opposite
+                    through creditsBeforeDebitsDirection), the page window,
+                    the deep link's comparison operators, and the client's
+                    walk.
+                    restrictToRowsNewerThanPage (transactions/register-order.ts)
+                    is the window whose sum turns the listing's balance into
+                    the page's: the pages above under DESC, everything from
+                    skip + limit under ASC. Because the ASC order is the exact
+                    reverse of the DESC one (every key flips, the credits-
+                    before-debits amount tiebreak included), the two windows
+                    name the same rows. isNewestPage decides which page needs
+                    no window at all, and takes the total because the newest
+                    page is the last one when the register runs oldest-first.
+                    walkRunningBalances (frontend lib/running-balance.ts) is
+                    the one walk, and reverses an oldest-first page before
+                    walking it. Under a non-date sort findAll computes no
+                    balance and sets startingBalanceWithheld: "sort", which the
+                    register reads (=== 'sort') to hide the column and name the
+                    fix; absent means there was no balance to withhold.
+                    Guards: register-order.spec.ts holds the service to one
+                    applyRegisterOrder call and three restrictToRowsNewerThanPage
+                    calls, with no hand-written order or page window beside a
+                    select("t.id"); ui-conventions.test.ts holds the column to
+                    the balance AND the date order; register-sort.contract.spec.ts
+                    holds the two layers' sortable-field lists equal.
+Concurrency scope   per page of one listing (a read)
+Retry semantics     idempotent; a re-read of the same page yields the same
+                    figures.
+Failure response    no seed and no column, never a zero: a balance that cannot
+                    be stated is withheld with its reason, not defaulted.
+Required tests      PG integration (required): backend/test/integration/register-sort.integration.spec.ts
+                    walks every page in both directions over a ledger holding a
+                    VOID row, a partially filtered split, a future-dated row
+                    and a same-created_at credit and debit, and asserts every
+                    row's balance agrees and the oldest row anchors to the
+                    opening balance. Unit: register-order.spec.ts (the window
+                    and the order), frontend running-balance.test.ts (the walk,
+                    on the same numbers).
+Status              enforced
+```
+
+The register's ordering is a display order, not an economic one: `applyRegisterOrder`
+answers "what does the reader see first", while `INVESTMENT_REPLAY_ORDER` answers
+"what happened first". The running balance is the one figure that depends on the
+first of those, which is why the sort and the balance are one invariant rather
+than two.
 
 ### INV-HOLDING-001 -- a holding is a deterministic ledger replay
 

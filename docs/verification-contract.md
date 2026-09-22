@@ -80,6 +80,7 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-HOLDING-001 holding replay | supporting | -- | required | **required** | optional | required | -- | optional |
 | INV-HOLDING-002 one reducer | required | **required** | supporting | -- | -- | -- | -- | required |
 | INV-TRANSFER-001 both legs | required | -- | required | optional | -- | -- | -- | required |
+| INV-REGISTER-001 one balance per row | required | required | **required** | -- | -- | -- | -- | supporting |
 | INV-REDEEM-001 accrued interest | required | **required** | required | -- | -- | -- | -- | optional |
 | INV-RECONCILE-001 reconciled lock | supporting | **required** | required | required | -- | -- | -- | optional |
 | INV-FX-001 no 1:1 fallback | **required** | **required** | required | -- | -- | required | optional | required |

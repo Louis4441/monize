@@ -1,11 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import React from 'react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@/test/render';
 import TransactionsPage from './page';
+import { TRANSACTION_SORT_STORAGE_KEY } from '@/lib/transaction-sort';
 
 // The global setup mock builds a fresh router per call, so pushes cannot be
-// observed. This one keeps a stable `push` for the navigation assertions; the
-// rest matches the global mock (this file never reads search params).
+// observed. This one keeps a stable `push` for the navigation assertions.
 const mockPush = vi.fn();
+// The query string the page starts from. Empty for every test but the ones
+// that need a single account's register; reset in the top-level `beforeEach`.
+const mockSearchParams = { value: '' };
 vi.mock('next/navigation', () => {
   // One stable object, as the real hook returns. A fresh router per call makes
   // every `useCallback([router])` change identity each render, and this page's
@@ -25,7 +29,10 @@ vi.mock('next/navigation', () => {
   return {
     useRouter: () => (router ??= buildRouter()),
     usePathname: () => '/transactions',
-    useSearchParams: () => new URLSearchParams(),
+    // Empty unless a test sets it. The page reads the account filter from the
+    // URL, so this is the only way to render it as a single account's
+    // register, which is the state that draws the Balance column.
+    useSearchParams: () => new URLSearchParams(mockSearchParams.value),
   };
 });
 
@@ -283,6 +290,30 @@ vi.mock('@/components/transactions/TransactionList', () => ({
       <span data-testid="density">{props.density}</span>
       <span data-testid="single-account">{props.isSingleAccountView ? 'single' : 'multi'}</span>
       <span data-testid="starting-balance">{props.startingBalance ?? 'none'}</span>
+      <span data-testid="sort">
+        {props.sort ? `${props.sort.field}:${props.sort.direction}` : 'none'}
+      </span>
+      {/* The order the rows on screen were fetched in, which the register uses
+          for every figure derived from them. It trails `sort` by a request. */}
+      <span data-testid="rows-sort">
+        {props.rowsSort ? `${props.rowsSort.field}:${props.rowsSort.direction}` : 'none'}
+      </span>
+      <span data-testid="balance-withheld">{props.startingBalanceWithheld ?? 'none'}</span>
+      {props.onSortChange && (
+        <button data-testid="sort-amount" onClick={() => props.onSortChange('amount')}>
+          Sort by amount
+        </button>
+      )}
+      {props.onSortChange && (
+        <button data-testid="sort-date" onClick={() => props.onSortChange('date')}>
+          Sort by date
+        </button>
+      )}
+      {props.onSortChange && (
+        <button data-testid="sort-payee" onClick={() => props.onSortChange('payee')}>
+          Sort by payee
+        </button>
+      )}
       <span data-testid="selection-mode">{props.selectionMode ? 'on' : 'off'}</span>
       {props.onToggleSelection && (
         <button data-testid="select-tx-1" onClick={() => props.onToggleSelection('tx-1')}>
@@ -450,8 +481,12 @@ vi.mock('@/hooks/useFormModal', () => ({
   }),
 }));
 
+// Stateless by default, which is what almost every test here wants. The sort
+// tests swap in a stateful implementation, because a click that cannot change
+// the remembered value proves nothing about what the click does.
+const mockUseLocalStorage = vi.fn((_key: string, defaultValue: any) => [defaultValue, vi.fn()]);
 vi.mock('@/hooks/useLocalStorage', () => ({
-  useLocalStorage: (_key: string, defaultValue: any) => [defaultValue, vi.fn()],
+  useLocalStorage: (...args: any[]) => (mockUseLocalStorage as any)(...args),
 }));
 
 vi.mock('@/hooks/useDateFormat', () => ({
@@ -2540,5 +2575,361 @@ describe('TransactionsPage', () => {
       // Category should show all split categories
       expect(rows[0][3]).toBe('Groceries; Dining');
     });
+  });
+});
+
+describe('TransactionsPage register sorting', () => {
+  /** The params of the most recent register request. */
+  const lastGetAllParams = () => {
+    const calls = mockGetAll.mock.calls;
+    return calls[calls.length - 1][0];
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSearchParams.value = '';
+    // Rows, because an empty register draws an empty state and no headers.
+    mockGetAll.mockResolvedValue({
+      data: mockTransactions,
+      pagination: { page: 3, totalPages: 3, total: 120 },
+    });
+    mockGetSummary.mockResolvedValue({ totalIncome: 0, totalExpenses: 0, netCashFlow: 0, transactionCount: 0 });
+    mockGetAllAccounts.mockResolvedValue([]);
+    mockGetAllCategories.mockResolvedValue([]);
+    mockGetAllPayees.mockResolvedValue([]);
+    mockGetDailyBalances.mockResolvedValue([]);
+    mockGetMonthlyTotals.mockResolvedValue([]);
+    // A real remembered value, so a header click can actually change it.
+    mockUseLocalStorage.mockImplementation((_key: string, defaultValue: any) => {
+      const [value, setValue] = React.useState(defaultValue);
+      return [value, setValue];
+    });
+  });
+
+  afterEach(() => {
+    mockUseLocalStorage.mockImplementation((_key: string, defaultValue: any) => [
+      defaultValue,
+      vi.fn(),
+    ]);
+  });
+
+  it('asks for the register in date order, newest first, by default', async () => {
+    render(<TransactionsPage />);
+    await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+    expect(lastGetAllParams()).toMatchObject({ sortBy: 'date', sortDirection: 'desc' });
+  });
+
+  it('re-asks the server when a column header is used, from page 1', async () => {
+    render(<TransactionsPage />);
+    await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('sort-amount'));
+    });
+
+    await waitFor(() => {
+      expect(lastGetAllParams()).toMatchObject({ sortBy: 'amount', sortDirection: 'asc' });
+    });
+    // Page 3 of one order is a different set of rows from page 3 of another,
+    // so the register goes back to the first page.
+    expect(lastGetAllParams().page).toBe(1);
+  });
+
+  it('reverses the column that is already sorted', async () => {
+    render(<TransactionsPage />);
+    await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('sort-date'));
+    });
+
+    await waitFor(() => {
+      expect(lastGetAllParams()).toMatchObject({ sortBy: 'date', sortDirection: 'asc' });
+    });
+  });
+
+  it('carries the withheld reason from the response to the register', async () => {
+    mockGetAll.mockResolvedValue({
+      data: mockTransactions,
+      pagination: { page: 1, totalPages: 1, total: 3 },
+      startingBalanceWithheld: 'sort',
+    });
+    render(<TransactionsPage />);
+    await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+    // The reason travels with the rows: the register turns it into the line
+    // that tells a reader how to get the Balance column back.
+    await waitFor(() => {
+      expect(screen.getByTestId('balance-withheld')).toHaveTextContent('sort');
+    });
+  });
+
+  it('keeps the sort out of the requests that are not the register', async () => {
+    // The charts, the calendar and the export read the same filters. A sort is
+    // not a filter: it reorders one list, and sending it anywhere else is a
+    // parameter those endpoints have to ignore.
+    render(<TransactionsPage />);
+    await waitFor(() => expect(mockGetDailyBalances).toHaveBeenCalled());
+    expect(lastGetAllParams()).toHaveProperty('sortBy');
+    for (const call of mockGetDailyBalances.mock.calls) {
+      expect(JSON.stringify(call)).not.toContain('sortBy');
+    }
+  });
+
+  it('drops back to the date order to reach a deep-linked row', async () => {
+    render(<TransactionsPage />);
+    await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('sort-amount'));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('sort')).toHaveTextContent('amount:asc');
+    });
+
+    // Following a transfer to its other leg asks the server for the page that
+    // row is on. A page number can only be counted in date order -- the server
+    // refuses the pair outright -- so arriving at a row returns to the date
+    // order, keeping the direction, exactly as it already drops the filters
+    // that would have hidden the row.
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('transfer-click-btn'));
+    });
+
+    await waitFor(() => {
+      expect(lastGetAllParams()).toMatchObject({
+        targetTransactionId: 'tx-linked',
+        sortBy: 'date',
+        sortDirection: 'asc',
+      });
+    });
+    expect(screen.getByTestId('sort')).toHaveTextContent('date:asc');
+  });
+
+  it('describes the rows on screen by the order they were fetched in', async () => {
+    // The header answers the press at once; the rows cannot. Between the two
+    // the register holds a page fetched newest-first and a header saying
+    // oldest-first, and the running balance is walked from a seed that is the
+    // balance after the page's newest row. Reading the direction from the
+    // header there reverses the page before walking it, so every figure in the
+    // Balance column comes out inverted -- a column of numbers that was never
+    // true of any state of the ledger, drawn at full opacity with no spinner
+    // over it (`docs/frontend/api-and-cache.md`: the payload plus the complete
+    // request key that produced it).
+    render(<TransactionsPage />);
+    await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+    expect(screen.getByTestId('rows-sort')).toHaveTextContent('date:desc');
+
+    // The reload never answers, so the rows stay exactly as they are.
+    const before = mockGetAll.mock.calls.length;
+    mockGetAll.mockImplementation(() => new Promise(() => {}));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('sort-date'));
+    });
+
+    // Waited for, not assumed: the request has to be in flight for this to be
+    // the in-flight state rather than a click nothing has acted on yet.
+    await waitFor(() => {
+      expect(mockGetAll.mock.calls.length).toBeGreaterThan(before);
+    });
+    expect(screen.getByTestId('sort')).toHaveTextContent('date:asc');
+    expect(screen.getByTestId('rows-sort')).toHaveTextContent('date:desc');
+  });
+
+  it('keeps describing the rows it has when the reload fails', async () => {
+    // A failed reload changes no rows and no seed, so it must change no order
+    // either: the three are one payload. Leaving the header's order behind
+    // would make the inverted column above permanent rather than momentary.
+    render(<TransactionsPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId('rows-sort')).toHaveTextContent('date:desc');
+    });
+
+    mockGetAll.mockRejectedValueOnce(new Error('register unavailable'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('sort-date'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sort')).toHaveTextContent('date:asc');
+    });
+    expect(screen.getByTestId('rows-sort')).toHaveTextContent('date:desc');
+  });
+
+  it('adopts the new order once the rows that belong to it arrive', async () => {
+    render(<TransactionsPage />);
+    await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('sort-amount'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('rows-sort')).toHaveTextContent('amount:asc');
+    });
+  });
+
+  it('reverses the date column from the order the header is showing', async () => {
+    // A remembered account sort is resolved away on a single account's page,
+    // because that page draws no Account column to click back. The Date header
+    // therefore shows the default, newest-first -- and toggling from the
+    // REMEMBERED sort returns the default too, so the first press moves no
+    // arrow, reverses nothing, and still drops the reader back to page 1.
+    mockSearchParams.value = 'accountIds=acc-1';
+    mockUseLocalStorage.mockImplementation((key: string, defaultValue: any) => {
+      const [value, setValue] = React.useState(
+        key === TRANSACTION_SORT_STORAGE_KEY
+          ? { field: 'account', direction: 'asc' }
+          : defaultValue,
+      );
+      return [value, setValue];
+    });
+
+    render(<TransactionsPage />);
+    await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+    await waitFor(() => {
+      expect(screen.getByTestId('single-account')).toHaveTextContent('single');
+    });
+    expect(screen.getByTestId('sort')).toHaveTextContent('date:desc');
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('sort-date'));
+    });
+
+    await waitFor(() => {
+      expect(lastGetAllParams()).toMatchObject({ sortBy: 'date', sortDirection: 'asc' });
+    });
+    expect(screen.getByTestId('sort')).toHaveTextContent('date:asc');
+  });
+
+  it('reads the register once for a deep link that arrives in the URL', async () => {
+    // A `targetTransactionId` in the mount URL is not a filter change, so it
+    // takes the loader's undebounced branch: nothing coalesces a second read
+    // there. Remembering the date fallback from inside the loader used to
+    // change the loader's own identity and fire one -- with the target already
+    // consumed, for whatever page the register was on, racing the page the
+    // first read resolved. Whichever answered last won, so the reader could
+    // land on page 1 with the row they followed nowhere on it.
+    mockSearchParams.value =
+      'targetTransactionId=11111111-1111-4111-8111-111111111111';
+    mockUseLocalStorage.mockImplementation((key: string, defaultValue: any) => {
+      const [value, setValue] = React.useState(
+        key === TRANSACTION_SORT_STORAGE_KEY
+          ? { field: 'amount', direction: 'asc' }
+          : defaultValue,
+      );
+      return [value, setValue];
+    });
+
+    render(<TransactionsPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId('rows-sort')).toHaveTextContent('date:asc');
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    });
+
+    const reads = mockGetAll.mock.calls.map(([params]: any[]) => ({
+      page: params.page,
+      target: params.targetTransactionId,
+      sortBy: params.sortBy,
+    }));
+    expect(reads).toEqual([
+      {
+        page: 1,
+        target: '11111111-1111-4111-8111-111111111111',
+        sortBy: 'date',
+      },
+      { page: 3, target: undefined, sortBy: 'date' },
+    ]);
+  });
+
+  it('reads the register once to follow a transfer to its other leg', async () => {
+    // The same shape on the path that goes through a filter change, where the
+    // debounce would coalesce a duplicate rather than let it race.
+    render(<TransactionsPage />);
+    await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('sort-amount'));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('rows-sort')).toHaveTextContent('amount:asc');
+    });
+
+    const before = mockGetAll.mock.calls.length;
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('transfer-click-btn'));
+    });
+    await waitFor(() => {
+      expect(lastGetAllParams()).toMatchObject({ targetTransactionId: 'tx-linked' });
+    });
+    // Settle anything the response itself scheduled before counting.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    });
+
+    // The read that follows carries the page the first one resolved, which is
+    // the pager catching up. A read for the page the register was already on,
+    // with the target gone, is the duplicate: it answers a question nobody
+    // asked and can overwrite the row's page with the one it replaced.
+    const reads = mockGetAll.mock.calls
+      .slice(before)
+      .map(([params]: any[]) => ({
+        page: params.page,
+        target: params.targetTransactionId,
+      }));
+    expect(reads).toEqual([
+      { page: 1, target: 'tx-linked' },
+      { page: 3, target: undefined },
+    ]);
+  });
+
+  it('discards a reply a newer request has already superseded', async () => {
+    // Two header clicks further apart than the debounce put two reads in
+    // flight. Without a sequence the display is whichever answered last, so a
+    // slow amount-ordered page can land under a Payee-active header.
+    render(<TransactionsPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId('rows-sort')).toHaveTextContent('date:desc');
+    });
+
+    const before = mockGetAll.mock.calls.length;
+    let releaseSlow: (value: unknown) => void = () => {};
+    mockGetAll.mockImplementationOnce(
+      () => new Promise((resolve) => { releaseSlow = resolve; }),
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('sort-amount'));
+    });
+    // The slow read has to be in flight before the second click, or the
+    // debounce cancels it and there is nothing to arrive late.
+    await waitFor(() => {
+      expect(mockGetAll.mock.calls.length).toBeGreaterThan(before);
+    });
+
+    mockGetAll.mockResolvedValue({
+      data: mockTransactions,
+      pagination: { page: 1, totalPages: 1, total: 3 },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('sort-payee'));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('rows-sort')).toHaveTextContent('payee:asc');
+    });
+
+    // The abandoned amount request answers now, and must change nothing.
+    await act(async () => {
+      releaseSlow({
+        data: [],
+        pagination: { page: 9, totalPages: 9, total: 400 },
+        startingBalanceWithheld: 'sort',
+      });
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('rows-sort')).toHaveTextContent('payee:asc');
+    expect(screen.getByTestId('tx-count')).toHaveTextContent(
+      `${mockTransactions.length} transactions`,
+    );
+    expect(screen.getByTestId('balance-withheld')).toHaveTextContent('none');
   });
 });

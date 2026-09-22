@@ -266,8 +266,8 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
-        undefined,
-        undefined,
+        "date",
+        "DESC",
         undefined,
         undefined,
         undefined,
@@ -302,8 +302,8 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
-        undefined,
-        undefined,
+        "date",
+        "DESC",
         undefined,
         undefined,
         undefined,
@@ -332,8 +332,8 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
-        undefined,
-        undefined,
+        "date",
+        "DESC",
         undefined,
         undefined,
         undefined,
@@ -374,8 +374,8 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
-        undefined,
-        undefined,
+        "date",
+        "DESC",
         undefined,
         undefined,
         undefined,
@@ -417,8 +417,8 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
-        undefined,
-        undefined,
+        "date",
+        "DESC",
         undefined,
         undefined,
         undefined,
@@ -462,8 +462,8 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
-        undefined,
-        undefined,
+        "date",
+        "DESC",
         undefined,
         undefined,
         undefined,
@@ -665,8 +665,8 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         ["UNRECONCILED", "CLEARED"],
-        undefined,
-        undefined,
+        "date",
+        "DESC",
         undefined,
         undefined,
         undefined,
@@ -1672,6 +1672,68 @@ describe("TransactionsController", () => {
     });
   });
 
+  describe("findAll() sorting", () => {
+    /**
+     * The controller takes 25 positional parameters and the two sort ones are
+     * last, so the call is built rather than spelled out. Nest fills them from
+     * `@Query`, which is why a test may hand an array: Express does exactly
+     * that for a repeated key.
+     */
+    const callWithSort = (sortBy?: unknown, sortDirection?: unknown) =>
+      (
+        controller.findAll as unknown as (
+          ...args: unknown[]
+        ) => Promise<unknown>
+      )(mockReq, ...new Array(22).fill(undefined), sortBy, sortDirection);
+
+    /** The `sortBy` and `sortDirection` the service was called with. */
+    const sortReceived = () => {
+      const calls = mockService.findAll.mock.calls;
+      const call = calls[calls.length - 1];
+      return { sortBy: call[15], sortDirection: call[16] };
+    };
+
+    beforeEach(() => {
+      mockService.findAll.mockResolvedValue({ data: [], total: 0 });
+    });
+
+    it("passes the register's own order when the caller asks for none", async () => {
+      await callWithSort(undefined, undefined);
+      expect(sortReceived()).toEqual({ sortBy: "date", sortDirection: "DESC" });
+    });
+
+    it("passes a joined-column sort through to the service", async () => {
+      await callWithSort("category", "asc");
+      expect(sortReceived()).toEqual({
+        sortBy: "category",
+        sortDirection: "ASC",
+      });
+    });
+
+    it("rejects a column the register does not sort by", async () => {
+      // Tags is the one to guard: it is a column on screen, and ordering by it
+      // would duplicate rows on the paginated-join path.
+      await expect(callWithSort("tags", undefined)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockService.findAll).not.toHaveBeenCalled();
+    });
+
+    it("rejects a direction that is not asc or desc", async () => {
+      await expect(callWithSort("date", "newest")).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockService.findAll).not.toHaveBeenCalled();
+    });
+
+    it("rejects a repeated query key instead of coercing it", async () => {
+      await expect(callWithSort(["date", "amount"], undefined)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockService.findAll).not.toHaveBeenCalled();
+    });
+  });
+
   describe("findAll() amount filters", () => {
     it("parses amountFrom and amountTo as floats", async () => {
       mockService.findAll.mockResolvedValue({ data: [], total: 0 });
@@ -1711,8 +1773,8 @@ describe("TransactionsController", () => {
         500.25,
         undefined,
         undefined,
-        undefined,
-        undefined,
+        "date",
+        "DESC",
         undefined,
         undefined,
         undefined,

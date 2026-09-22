@@ -9,7 +9,6 @@ describe("InvestmentTransactionsController", () => {
   let controller: InvestmentTransactionsController;
   let service: Record<string, jest.Mock>;
   let delegationMock: Record<string, jest.Mock>;
-  let transferPairLinks: Record<string, jest.Mock>;
 
   const req = { user: { id: "user-1" } };
   const UUID1 = "00000000-0000-0000-0000-000000000001";
@@ -60,7 +59,10 @@ describe("InvestmentTransactionsController", () => {
         },
         {
           provide: TransferPairLinkService,
-          useValue: (transferPairLinks = {
+          // Only here so the container can construct the controller: no case
+          // in this file drives the two endpoints that reach it, so nothing
+          // needs to hold on to the mock.
+          useValue: {
             findCandidates: jest.fn().mockResolvedValue([]),
             linkPair: jest.fn().mockResolvedValue({
               outTransactionId: "tx-out",
@@ -68,7 +70,7 @@ describe("InvestmentTransactionsController", () => {
               securityId: "sec-1",
               rebuiltAccountIds: [],
             }),
-          }),
+          },
         },
       ],
     }).compile();

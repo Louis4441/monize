@@ -123,6 +123,10 @@
       "status": "Status",
       "actions": "Akcje"
     },
+    "sort": {
+      "balanceHiddenHint": "Posortuj według daty, aby zobaczyć saldo bieżące",
+      "stripLabel": "Sortuj według"
+    },
     "dateDisplay": {
       "toggleLabel": "Ukryj rok",
       "toggleTitle": "Usuń rok z dat, aby zmieściło się więcej nazwy odbiorcy"

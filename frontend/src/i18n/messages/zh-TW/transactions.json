@@ -123,6 +123,10 @@
       "status": "狀態",
       "actions": "動作"
     },
+    "sort": {
+      "balanceHiddenHint": "依日期排序即可查看餘額",
+      "stripLabel": "排序方式"
+    },
     "dateDisplay": {
       "toggleLabel": "隱藏年份",
       "toggleTitle": "日期中不顯示年份，為收款人留出更多空間"

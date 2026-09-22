@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@/test/render';
+import React from 'react';
+import { render, screen, waitFor, fireEvent } from '@/test/render';
 import { TransactionList } from './TransactionList';
 import { Transaction, TransactionStatus } from '@/types/transaction';
 import { useDensityStore } from '@/store/densityStore';
@@ -334,5 +335,105 @@ describe('the register on a phone', () => {
 
     const head = container.querySelector('thead');
     expect(head!.querySelector('input[type="checkbox"]')).toBeTruthy();
+  });
+});
+
+describe('the sort strip on a phone', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+  });
+
+  const renderPhone = (
+    props: Partial<React.ComponentProps<typeof TransactionList>> = {},
+  ) => {
+    setPhoneViewport(true);
+    useDensityStore.setState({ densities: { transactions: 'normal' } });
+    const onSortChange = vi.fn();
+    const utils = render(
+      <TransactionList
+        transactions={[createTransaction()]}
+        onEdit={vi.fn()}
+        onRefresh={vi.fn()}
+        sort={{ field: 'date', direction: 'desc' }}
+        onSortChange={onSortChange}
+        {...props}
+      />,
+    );
+    return { ...utils, onSortChange };
+  };
+
+  it('brings every sort control back as a chip, since the card has no headers', async () => {
+    const { container } = renderPhone();
+
+    await waitFor(() => {
+      expect(screen.getByText('Grocery Store')).toBeInTheDocument();
+    });
+
+    const strip = container.querySelector('thead tr[aria-label="Sort by"]');
+    expect(strip).toBeTruthy();
+    // A field with no chip would strand a remembered sort: the register would
+    // stay in that order with no control on this screen to change it.
+    for (const label of ['Date', 'Account', 'Payee', 'Category', 'Description', 'Ref #', 'Amount', 'Status']) {
+      expect(strip!.textContent).toContain(label);
+    }
+  });
+
+  it('keeps the slim control header beside it', async () => {
+    const { container } = renderPhone({ selectionMode: true, onToggleAllOnPage: vi.fn() });
+
+    await waitFor(() => {
+      expect(screen.getByText('Grocery Store')).toBeInTheDocument();
+    });
+
+    const head = container.querySelector('thead')!;
+    expect(head.querySelector('input[type="checkbox"]')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /hide the year/i })).toBeInTheDocument();
+  });
+
+  it('sorts from a chip', async () => {
+    const { container, onSortChange } = renderPhone();
+
+    await waitFor(() => {
+      expect(screen.getByText('Grocery Store')).toBeInTheDocument();
+    });
+
+    const strip = container.querySelector('thead tr[aria-label="Sort by"]')!;
+    const amountChip = Array.from(strip.querySelectorAll('[role="columnheader"]')).find(
+      (chip) => chip.textContent?.includes('Amount'),
+    )!;
+    fireEvent.click(amountChip);
+    expect(onSortChange).toHaveBeenCalledWith('amount');
+  });
+
+  it('offers no Account chip where there is no Account column', async () => {
+    const { container } = renderPhone({ isSingleAccountView: true, startingBalance: 10 });
+
+    await waitFor(() => {
+      expect(screen.getByText('Grocery Store')).toBeInTheDocument();
+    });
+
+    const strip = container.querySelector('thead tr[aria-label="Sort by"]')!;
+    expect(strip.textContent).not.toContain('Account');
+  });
+
+  it('draws no strip where the surface offers no sorting', async () => {
+    setPhoneViewport(true);
+    useDensityStore.setState({ densities: { transactions: 'normal' } });
+    const { container } = render(
+      <TransactionList
+        transactions={[createTransaction()]}
+        onEdit={vi.fn()}
+        onRefresh={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Grocery Store')).toBeInTheDocument();
+    });
+    expect(container.querySelector('thead tr[aria-label="Sort by"]')).toBeNull();
   });
 });

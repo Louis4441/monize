@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { AccountsService } from "../../accounts/accounts.service";
 import { TransactionsService } from "../../transactions/transactions.service";
+import { type TransactionSortField } from "../../transactions/register-order";
 import { PayeesService } from "../../payees/payees.service";
 import type { LlmPayeeQuery } from "../../payees/llm-payee-query";
 import { formatPhoneForDisplay } from "../../common/phone-number.util";
@@ -389,8 +390,7 @@ export class ToolExecutorService {
     const includeTransactions =
       (input.includeTransactions as boolean | undefined) ?? false;
     const limit = Math.min((input.limit as number | undefined) ?? 50, 100);
-    const sortBy =
-      (input.sortBy as "date" | "amount" | "payee" | undefined) ?? "date";
+    const sortBy = (input.sortBy as TransactionSortField | undefined) ?? "date";
     const sortDirection =
       (input.sortDirection as "asc" | "desc" | undefined) ?? "desc";
 

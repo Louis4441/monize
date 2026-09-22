@@ -237,13 +237,72 @@ const ALLOWED_COLUMNS: Record<string, Set<string>> = {
 };
 const MAX_HISTORY_AGE_DAYS = 30;
 
+/**
+ * History writes that were started without anybody waiting for them.
+ *
+ * Every one of the ~20 `actionHistoryService.record(...)` call sites invokes it
+ * without `await` -- deliberately, because a missing undo entry must never fail
+ * the operation the user actually asked for. The write that lands afterwards is
+ * still a write, and it arrives with no relationship to the request that caused
+ * it.
+ *
+ * Harmless in a running server. Not harmless against a database being torn
+ * down: an integration suite that truncates `users ... CASCADE` while one of
+ * these is inserting into `action_history` gets a foreign key violation against
+ * a user that no longer exists, and a suite whose fixture writes several rows
+ * per test starts the next test body while those chains still hold pooled
+ * connections. Both read as a bug in the code under test.
+ *
+ * Module scope rather than instance state, for the same reason
+ * `pendingPriceWrites` is (`securities/security-price.service.ts`): the thing
+ * that needs to wait is a test helper holding a `DataSource`, not a consumer of
+ * this service. Nothing in `src/` waits on this; production keeps exactly the
+ * fire-and-forget behaviour it had.
+ */
+const pendingHistoryWrites = new Set<Promise<unknown>>();
+
+/**
+ * Resolves once every history write started so far has finished, in either
+ * direction. Call this before truncating or dropping the tables one references.
+ *
+ * Settled, not successful: a failed write has also stopped touching the
+ * database, which is the only property a teardown needs.
+ */
+export async function settlePendingHistoryWrites(): Promise<void> {
+  // Snapshotted because a settling promise removes itself from the set, and a
+  // write may start another before it finishes.
+  while (pendingHistoryWrites.size > 0) {
+    await Promise.allSettled([...pendingHistoryWrites]);
+  }
+}
+
+/** Register a background history write so `settlePendingHistoryWrites` sees it. */
+function trackHistoryWrite<T>(work: Promise<T>): Promise<T> {
+  pendingHistoryWrites.add(work);
+  // `finally` keeps the returned promise's own settlement untouched, so a
+  // caller that does await this still sees the original result or rejection.
+  return work.finally(() => pendingHistoryWrites.delete(work));
+}
+
 @Injectable()
 export class ActionHistoryService {
   private readonly logger = new Logger(ActionHistoryService.name);
 
   constructor(private dataSource: DataSource) {}
 
-  async record(
+  /**
+   * Record an undo entry. Callers do not await this -- see `pendingHistoryWrites`
+   * above -- so the promise is registered before it is handed back, which is the
+   * only way a teardown can tell the write is still running.
+   */
+  record(
+    userId: string,
+    params: RecordActionParams,
+  ): Promise<ActionHistory | null> {
+    return trackHistoryWrite(this.recordNow(userId, params));
+  }
+
+  private async recordNow(
     userId: string,
     params: RecordActionParams,
   ): Promise<ActionHistory | null> {

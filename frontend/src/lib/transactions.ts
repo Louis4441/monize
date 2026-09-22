@@ -1,4 +1,5 @@
 import apiClient from './api';
+import type { TransactionSortField } from './transaction-sort';
 import {
   Transaction,
   TransactionSplit,
@@ -95,6 +96,13 @@ export interface TransactionsGetAllParams {
   tagKeyValue?: string;
   /** Filter by attachment presence: true = only with, false = only without. */
   hasAttachments?: boolean;
+  /**
+   * Which column the register is sorted by, and which way. Sent only by a
+   * surface that offers sorting; omitting both takes the server's own order
+   * (by date, newest first), which is what every other caller wants.
+   */
+  sortBy?: TransactionSortField;
+  sortDirection?: 'asc' | 'desc';
 }
 
 export const transactionsApi = {
@@ -122,6 +130,8 @@ export const transactionsApi = {
       tagKeyOp: params?.tagKey ? params?.tagKeyOp : undefined,
       tagKeyValue: params?.tagKey ? params?.tagKeyValue || undefined : undefined,
       hasAttachments: params?.hasAttachments,
+      sortBy: params?.sortBy,
+      sortDirection: params?.sortDirection,
     };
 
     const response = await apiClient.get<PaginatedTransactions>('/transactions', {

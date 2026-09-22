@@ -25,7 +25,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DensityLevel, useTableDensity } from '@/hooks/useTableDensity';
 import { useDensityPreference, type DensityView } from '@/store/densityStore';
 import { Account } from '@/types/account';
-import { getLocalDateString } from '@/lib/utils';
+import { useFinancialToday } from '@/hooks/useFinancialToday';
 import { useLongPress, type LongPressRowHandlers } from '@/hooks/useLongPress';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { RowActions } from '@/components/ui/row-actions/RowActions';
@@ -370,17 +370,19 @@ export function InvestmentTransactionList({
 
   // Find the index where future investments end and today/past begin.
   // Mirrors TransactionList: rows are sorted DESC by transactionDate so the
-  // future block leads. "Today" is the user's local date so users west of
-  // UTC don't see a tomorrow-local row classified as past.
+  // future block leads. "Today" is the user's own calendar, not the browser's
+  // -- this list and the cash register are drawn on one screen, so a
+  // traveller whose laptop is a day ahead of their configured timezone would
+  // otherwise read two TODAY dividers falling on different rows.
+  const today = useFinancialToday();
   const futureBoundaryIndex = useMemo(() => {
-    const today = getLocalDateString();
     for (let i = 0; i < transactions.length; i++) {
       if (transactions[i].transactionDate <= today) {
         return i;
       }
     }
     return transactions.length;
-  }, [transactions]);
+  }, [transactions, today]);
   const { density } = useDensityPreference(densityView);
   const [showFilters, setShowFilters] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; transaction: InvestmentTransaction | null }>({ isOpen: false, transaction: null });

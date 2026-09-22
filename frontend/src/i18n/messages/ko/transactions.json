@@ -123,6 +123,10 @@
       "status": "상태",
       "actions": "작업"
     },
+    "sort": {
+      "balanceHiddenHint": "잔액을 보려면 날짜순으로 정렬하세요",
+      "stripLabel": "정렬 기준"
+    },
     "dateDisplay": {
       "toggleLabel": "연도 숨기기",
       "toggleTitle": "날짜에서 연도를 빼서 수취인 이름이 더 많이 보이도록 합니다"

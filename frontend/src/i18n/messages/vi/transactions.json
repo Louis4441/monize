@@ -123,6 +123,10 @@
       "status": "Trạng thái",
       "actions": "Hành động"
     },
+    "sort": {
+      "balanceHiddenHint": "Sắp xếp theo ngày để xem số dư luỹ kế",
+      "stripLabel": "Sắp xếp theo"
+    },
     "dateDisplay": {
       "toggleLabel": "Ẩn năm",
       "toggleTitle": "Bỏ năm khỏi ngày để hiện được nhiều tên người nhận hơn"

@@ -223,6 +223,11 @@ export interface PaginatedTransactions {
   pagination: PaginationInfo;
   /** Starting balance for running balance calculation (only set when filtering by single account) */
   startingBalance?: number;
+  /**
+   * Why no starting balance came back, where one otherwise would have. Read as
+   * `=== 'sort'`: absent is "nothing to say", not "a balance is coming".
+   */
+  startingBalanceWithheld?: 'sort';
 }
 
 // Transfer types

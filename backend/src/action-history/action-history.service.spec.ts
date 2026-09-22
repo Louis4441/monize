@@ -2,7 +2,10 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { NotFoundException, ConflictException, Logger } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
-import { ActionHistoryService } from "./action-history.service";
+import {
+  ActionHistoryService,
+  settlePendingHistoryWrites,
+} from "./action-history.service";
 import { ActionHistory } from "./entities/action-history.entity";
 
 jest.mock("../common/db/scoped-db", () =>
@@ -70,6 +73,46 @@ describe("ActionHistoryService", () => {
   });
 
   describe("record", () => {
+    it("stays visible to settlePendingHistoryWrites until it has finished", async () => {
+      // Every call site invokes `record` without `await`, so the write outlives
+      // the request that caused it. A teardown that truncates `users` while one
+      // is in flight gets a foreign key violation against a user that no longer
+      // exists, and a fixture that writes several rows per test starts the next
+      // test body with those chains still holding pooled connections -- which,
+      // on a pool that waits forever for a free one, is a 30-second stall with
+      // nothing naming the cause. Registering the promise is what lets a
+      // teardown wait for it.
+      let releaseSave: (value: unknown) => void = () => {};
+      mockRepository.delete.mockResolvedValue({});
+      mockRepository.create.mockReturnValue(mockAction);
+      mockRepository.count.mockResolvedValue(0);
+      mockRepository.save.mockReturnValue(
+        new Promise((resolve) => {
+          releaseSave = resolve;
+        }),
+      );
+
+      void service.record(userId, {
+        entityType: "tag",
+        entityId: "entity-1",
+        action: "create",
+        description: 'Created tag "Test Tag"',
+      });
+
+      let settled = false;
+      const settling = settlePendingHistoryWrites().then(() => {
+        settled = true;
+      });
+      // Several microtask turns: enough for a settle that was going to resolve
+      // immediately to have done so.
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(settled).toBe(false);
+
+      releaseSave(mockAction);
+      await settling;
+      expect(settled).toBe(true);
+    });
+
     it("reports a failed recording as an error naming what cannot be undone", async () => {
       // Recording is best-effort so it cannot fail the user's operation, but the
       // operation succeeded and its undo entry did not -- the user will look for

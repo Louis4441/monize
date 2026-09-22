@@ -123,6 +123,10 @@
       "status": "Status",
       "actions": "Acties"
     },
+    "sort": {
+      "balanceHiddenHint": "Sorteer op datum om het lopende saldo te zien",
+      "stripLabel": "Sorteren op"
+    },
     "dateDisplay": {
       "toggleLabel": "Jaar verbergen",
       "toggleTitle": "Het jaar uit de datums weglaten zodat er meer van de begunstigde past"

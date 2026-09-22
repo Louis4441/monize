@@ -123,6 +123,10 @@
       "status": "Status",
       "actions": "Aksi"
     },
+    "sort": {
+      "balanceHiddenHint": "Urutkan berdasarkan tanggal untuk melihat saldo berjalan",
+      "stripLabel": "Urutkan menurut"
+    },
     "dateDisplay": {
       "toggleLabel": "Sembunyikan tahun",
       "toggleTitle": "Hilangkan tahun dari tanggal agar nama penerima lebih terlihat"

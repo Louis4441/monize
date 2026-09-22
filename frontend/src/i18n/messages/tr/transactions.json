@@ -123,6 +123,10 @@
       "status": "Durum",
       "actions": "İşlemler"
     },
+    "sort": {
+      "balanceHiddenHint": "Yürüyen bakiyeyi görmek için tarihe göre sıralayın",
+      "stripLabel": "Sıralama ölçütü"
+    },
     "dateDisplay": {
       "toggleLabel": "Yılı gizle",
       "toggleTitle": "Alacaklının adının daha fazlası sığması için tarihlerden yılı çıkar"

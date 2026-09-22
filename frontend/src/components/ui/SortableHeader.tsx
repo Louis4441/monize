@@ -13,6 +13,15 @@ interface SortableHeaderProps<F extends string> {
   align?: 'left' | 'right' | 'center';
   className?: string;
   children: ReactNode;
+  /**
+   * A control that lives in this header and does something other than sort --
+   * the register's year toggle is the one. Activating it must not also sort
+   * the column, so it renders inside a wrapper that stops the event before it
+   * reaches the header. Moving the control out of the header instead would
+   * separate it from the column it belongs to; leaving it in without the
+   * wrapper makes every press on it sort as well.
+   */
+  controls?: ReactNode;
 }
 
 /**
@@ -27,6 +36,7 @@ export function SortableHeader<F extends string>({
   align = 'left',
   className = '',
   children,
+  controls,
 }: SortableHeaderProps<F>) {
   const justify =
     align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : '';
@@ -48,6 +58,16 @@ export function SortableHeader<F extends string>({
       <div className={`flex items-center ${justify}`}>
         {children}
         <SortIcon field={field} sortField={sortField} sortDirection={sortDirection} />
+        {controls && (
+          <span
+            role="presentation"
+            className="inline-flex items-center"
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => event.stopPropagation()}
+          >
+            {controls}
+          </span>
+        )}
       </div>
     </th>
   );

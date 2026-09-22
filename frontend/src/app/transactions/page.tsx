@@ -43,6 +43,15 @@ import { Transaction, PaginationInfo, BulkUpdateData, BulkUpdateFilters, Monthly
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useTransactionSelection } from '@/hooks/useTransactionSelection';
 import { useTransactionFilters } from '@/hooks/useTransactionFilters';
+import { useSortableTable } from '@/hooks/useSortableTable';
+import {
+  DEFAULT_TRANSACTION_SORT,
+  TRANSACTION_SORT_STORAGE_KEY,
+  nextTransactionSort,
+  resolveRegisterSort,
+  type TransactionSort,
+  type TransactionSortField,
+} from '@/lib/transaction-sort';
 import { useStaleReconciliation } from '@/hooks/useStaleReconciliation';
 import { BulkSelectionBanner } from '@/components/transactions/BulkSelectionBanner';
 import { Account, isLiabilityAccountType } from '@/types/account';
@@ -229,6 +238,59 @@ function TransactionsContent() {
 
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [startingBalance, setStartingBalance] = useState<number | undefined>();
+  const [startingBalanceWithheld, setStartingBalanceWithheld] = useState<'sort' | undefined>();
+  // The order the rows currently on screen came back in. Held beside them
+  // rather than read from the live sort, so a click that has not been answered
+  // yet cannot make the register reinterpret the page it is still showing.
+  const [rowsSort, setRowsSort] = useState<TransactionSort>(DEFAULT_TRANSACTION_SORT);
+
+  // Which column the register is sorted by, remembered in this browser the way
+  // the row density and the table/calendar view are. It is part of the request
+  // key, not a filter: changing it re-asks the server (through the same
+  // debounced reload a filter change takes) and returns to page 1, because
+  // page 3 of one order is a different set of rows from page 3 of another.
+  const { sortField, sortDirection, setSort } = useSortableTable<TransactionSortField>(
+    TRANSACTION_SORT_STORAGE_KEY,
+    DEFAULT_TRANSACTION_SORT,
+  );
+  const isSingleAccountView = filters.filterAccountIds.length === 1;
+  const storedSort = useMemo<TransactionSort>(
+    () => ({ field: sortField, direction: sortDirection }),
+    [sortField, sortDirection],
+  );
+  // The Account column is not drawn on a single account's page, so a
+  // remembered account sort would order the register by a header nobody can
+  // reach. Storage is left alone: widening the filter brings it back.
+  const registerSort = useMemo(
+    () => resolveRegisterSort(storedSort, isSingleAccountView),
+    [storedSort, isSingleAccountView],
+  );
+  // The loader reads the sort from here rather than closing over it, so
+  // remembering a deep link's fallback order does not re-run the reload effect
+  // and fire a second read for the same click. Every other thing the effect
+  // watches is a filter it already depends on, so a sort change needs its own
+  // trigger: the register is already on page 1 half the time, and nothing else
+  // in the dependency list moves.
+  const registerSortRef = useRef(registerSort);
+  registerSortRef.current = registerSort;
+  const [sortRequestTick, setSortRequestTick] = useState(0);
+  // Which register read is the newest; only that one may write state.
+  const requestSeqRef = useRef(0);
+
+  const handleSortChange = useCallback(
+    (field: TransactionSortField) => {
+      filters.isFilterChange.current = true;
+      // Toggled from the sort the header is DISPLAYING, not the one in
+      // storage. They differ where a remembered account sort has been resolved
+      // away on a single account's page, and toggling from the stored one
+      // there returns exactly what is already on screen: a click that moves no
+      // arrow, reverses nothing, and still drops the reader back to page 1.
+      setSort(nextTransactionSort(registerSort, field));
+      setSortRequestTick((tick) => tick + 1);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [registerSort, setSort],
+  );
 
   // A horizontal finger swipe on the register turns its page in place, so a
   // long list can be paged without scrolling to the pager. The zone owns the
@@ -280,9 +342,33 @@ function TransactionsContent() {
   // Load transaction data and chart data in parallel
   const loadTransactions = useCallback(async (page: number) => {
     const safePage = (!page || page < 1) ? 1 : page;
+    // Which request this is. Two header clicks further apart than the debounce
+    // put two register reads in flight, and without a sequence the display is
+    // whichever one answered last rather than the one the reader asked for
+    // last: amount-ordered rows under a Payee header, or page 1 over the page
+    // a deep link had just resolved. Only the newest request may write state.
+    const seq = ++requestSeqRef.current;
+    const isCurrentRequest = () => seq === requestSeqRef.current;
     try {
       const targetTransactionId = filters.targetTransactionIdRef.current;
       filters.targetTransactionIdRef.current = null;
+
+      // A row's page is counted by comparing it with the register's order, and
+      // only the date order has a comparison to make -- the server refuses the
+      // pair outright. Arriving at a row therefore drops back to the date
+      // order, keeping the direction, exactly as it already drops the filters
+      // that would have hidden the row. Remembering it too keeps the headers
+      // agreeing with the rows.
+      //
+      // Read from a ref rather than closed over, so that `setSort` below does
+      // not change this callback's identity: it would re-run the reload effect
+      // and fire a second register read for the same click, this time with the
+      // target already consumed, racing the page the first one resolved.
+      let effectiveSort = registerSortRef.current;
+      if (targetTransactionId && effectiveSort.field !== 'date') {
+        effectiveSort = { field: 'date', direction: effectiveSort.direction };
+        setSort(effectiveSort);
+      }
 
       const hasCategoryOrPayeeFilter = filters.filterCategoryIds.length > 0 || filters.filterPayeeIds.length > 0 || filters.filterTagIds.length > 0 || filters.filterSearch.length > 0;
 
@@ -329,6 +415,8 @@ function TransactionsContent() {
           page: safePage,
           limit: PAGE_SIZE,
           targetTransactionId: targetTransactionId || undefined,
+          sortBy: effectiveSort.field,
+          sortDirection: effectiveSort.direction,
           amountFrom: parsedAmountFrom,
           amountTo: parsedAmountTo,
           statuses: filters.filterStatuses.length > 0 ? filters.filterStatuses : undefined,
@@ -344,9 +432,22 @@ function TransactionsContent() {
         chartPromise,
       ]);
 
+      // A reply that a newer request has already superseded is discarded whole
+      // -- rows, pagination, balance, order and charts together -- rather than
+      // written over half of the newer one's state.
+      if (!isCurrentRequest()) return;
+
       setTransactions(transactionsResponse.data);
       setPagination(transactionsResponse.pagination);
       setStartingBalance(transactionsResponse.startingBalance);
+      // Adopted with the rows and the balance it belongs to: a reload that
+      // keeps the rows has to keep the reason the balance is missing too.
+      setStartingBalanceWithheld(transactionsResponse.startingBalanceWithheld);
+      // The order these rows were fetched in, adopted with them. The headers
+      // moved the moment the reader clicked; the running balance, the today
+      // divider and the Balance column itself must not, because they are
+      // statements about rows that still belong to the previous request.
+      setRowsSort(effectiveSort);
 
       if (hasCategoryOrPayeeFilter) {
         setMonthlyTotals(chartResult as MonthlyTotal[]);
@@ -372,13 +473,19 @@ function TransactionsContent() {
         budgetsApi.getCategoryBudgetStatus(categoryIds).then(setBudgetStatusMap).catch(() => {});
       }
     } catch (error) {
+      // A superseded request's failure is not this register's failure: the
+      // reader is waiting on a newer one, and a toast for the one they
+      // abandoned only tells them something is broken that is not.
+      if (!isCurrentRequest()) return;
       showErrorToast(error, t('toasts.loadFailed'));
       logger.error(error);
     } finally {
-      setIsLoading(false);
-      // Signal the entity info widgets to refetch their summaries in lockstep
-      // with the freshly loaded chart/list data.
-      setReloadKey((k) => k + 1);
+      if (isCurrentRequest()) {
+        setIsLoading(false);
+        // Signal the entity info widgets to refetch their summaries in lockstep
+        // with the freshly loaded chart/list data.
+        setReloadKey((k) => k + 1);
+      }
     }
   }, [accountIdsForQuery, filters.filterAccountStatus, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo, filters.filterStatuses, filters.filterOriginalCurrencyCodes, filters.filterTagKey, filters.filterTagKeyOp, filters.filterTagKeyValue, filters.filterHasAttachments, t]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -453,7 +560,7 @@ function TransactionsContent() {
     } else {
       loadTransactions(page);
     }
-  }, [filters.currentPage, filters.filterAccountIds, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo, filters.filterStatuses, filters.filterOriginalCurrencyCodes, filters.filterTagKey, filters.filterTagKeyOp, filters.filterTagKeyValue, filters.filterHasAttachments, filters.updateUrl, loadTransactions, filters.filtersInitialized, undoRedoTick]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filters.currentPage, filters.filterAccountIds, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo, filters.filterStatuses, filters.filterOriginalCurrencyCodes, filters.filterTagKey, filters.filterTagKeyOp, filters.filterTagKeyValue, filters.filterHasAttachments, filters.updateUrl, loadTransactions, filters.filtersInitialized, undoRedoTick, sortRequestTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Once the deep-linked transaction is actually on the page, let the flash
   // linger briefly then clear it, so the highlight does not stick around on
@@ -1488,6 +1595,10 @@ function TransactionsContent() {
               onToggleAllOnPage={selection.toggleAllOnPage}
               isAllOnPageSelected={selection.isAllOnPageSelected}
               startingBalance={startingBalance}
+              startingBalanceWithheld={startingBalanceWithheld}
+              sort={registerSort}
+              rowsSort={rowsSort}
+              onSortChange={handleSortChange}
               currentPage={filters.currentPage}
               totalPages={pagination?.totalPages ?? 1}
               totalItems={pagination?.total ?? 0}
