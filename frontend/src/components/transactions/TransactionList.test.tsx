@@ -3574,3 +3574,67 @@ describe('TransactionList sorting', () => {
     );
   });
 });
+
+describe('TransactionList today divider', () => {
+  const mockOnEdit = vi.fn();
+  const mockOnRefresh = vi.fn();
+
+  // getLocalDateString is not mocked here, so the fixture is dated relative to
+  // the real today: one row plainly in the past, one plainly ahead of it.
+  const past = createTransaction({ id: 'past', transactionDate: '2020-01-01' });
+  const future = createTransaction({ id: 'future', transactionDate: '2099-01-01' });
+
+  const renderWith = (
+    transactions: Transaction[],
+    sort?: { field: 'date' | 'payee'; direction: 'asc' | 'desc' },
+  ) =>
+    render(
+      <TransactionList
+        transactions={transactions}
+        onEdit={mockOnEdit}
+        onRefresh={mockOnRefresh}
+        sort={sort as never}
+        onSortChange={sort ? vi.fn() : undefined}
+      />,
+    );
+
+  afterEach(() => cleanup());
+
+  it('marks where a newest-first page crosses today', async () => {
+    renderWith([future, past], { field: 'date', direction: 'desc' });
+    await waitFor(() => {
+      expect(screen.getByText('Today')).toBeInTheDocument();
+    });
+  });
+
+  it('marks where an oldest-first page crosses it, which is the other end', async () => {
+    // The future rows are at the BOTTOM here, so a divider placed by index
+    // rather than by date would sit above the past rows instead.
+    renderWith([past, future], { field: 'date', direction: 'asc' });
+    await waitFor(() => {
+      expect(screen.getByText('Today')).toBeInTheDocument();
+    });
+    // And it sits between the two rows rather than above both: the divider
+    // row comes after the past row in DOM order.
+    const body = screen.getByText('Today').closest('tbody');
+    const rows = Array.from(body!.children);
+    const dividerIndex = rows.findIndex((row) => row.textContent?.includes('Today'));
+    expect(dividerIndex).toBeGreaterThan(0);
+  });
+
+  it('draws none on a page that does not cross today', async () => {
+    renderWith([past, past], { field: 'date', direction: 'asc' });
+    await waitFor(() => {
+      expect(screen.getByText('Date')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Today')).not.toBeInTheDocument();
+  });
+
+  it('draws none under an order where "future" is not a place on the page', async () => {
+    renderWith([future, past], { field: 'payee', direction: 'asc' });
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: /payee/i })).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Today')).not.toBeInTheDocument();
+  });
+});

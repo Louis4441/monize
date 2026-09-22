@@ -60,6 +60,23 @@ The preference is browser-local rather than a `user_preferences` column on purpo
 
 `<TransactionList isSingleAccountView>` draws the Balance column, and the number in it is the backend's `startingBalance` run down the page -- the list derives nothing, so the column arrives empty without it (issue #1188). Take both from the same response and adopt them in the same block: a starting balance is computed for one page of one account, and a failed reload that keeps the rows has to keep the balance too. `ui-conventions.test.ts` fails any `<TransactionList>` setting `isSingleAccountView` without `startingBalance`.
 
+**And the register has to be in date order.** Any data column of the
+Transactions page register sorts (`lib/transaction-sort.ts` holds the field
+list, mirrored from the server's and pinned equal to it by
+`register-sort.contract.spec.ts`), and a running balance is a figure about the
+row above, so beside rows ordered by payee or amount it is arithmetic nobody
+can read. The server withholds the seed under any other order and says so with
+`startingBalanceWithheld: "sort"`; the register reads that flag -- `=== 'sort'`,
+absent being "nothing to say" rather than "a balance is coming" -- and prints
+one line naming the fix, because withholding a figure is only honest if the
+reader learns why and what to do. The two directions of the date order print
+the SAME figure beside a row: the seed is the balance after the page's newest
+row either way, so `walkRunningBalances` (`lib/running-balance.ts`, the one
+walk) reverses an oldest-first page before walking it. The "today" divider
+follows the same rule -- a row is future by its own date, never by its
+position, and the divider marks where the page crosses today, which is the
+other end of the page when the register runs oldest-first.
+
 ## An overdue-reconciliation window is the server's number, never the client's
 
 Whether an unreconciled row is *overdue* is decided by `classifyStaleRow` (`lib/stale-reconciliation.ts`), and it takes the boundary date as an argument because the server owns it: every response that asks for a classification carries `overdueBefore` (and `staleAfterDays` for the copy that names it), from `STALE_UNRECONCILED_DAYS` in `backend/src/transactions/stale-reconciliation.ts`. A hardcoded number goes on saying 45 after the constant moves, and the row highlight then disagrees with the header badge.

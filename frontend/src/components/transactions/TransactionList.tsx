@@ -519,16 +519,22 @@ export function TransactionList({
   // "Today" is the user's local date -- using toISOString() would return
   // the UTC date and mis-classify a tomorrow-local-dated transaction as
   // past for users west of UTC in the late evening.
-  const futureBoundaryIndex = useMemo(() => {
-    const today = getLocalDateString();
-    for (let i = 0; i < transactions.length; i++) {
-      if (transactions[i].transactionDate <= today) {
-        return i;
-      }
-    }
-    // All transactions are future-dated
-    return transactions.length;
-  }, [transactions]);
+  // A row is future by its own date, never by where it sits: running
+  // oldest-first the future rows are at the BOTTOM of the page, so an index
+  // threshold marks exactly the wrong half of it.
+  const today = getLocalDateString();
+  // Where the page crosses today, which is before the first non-future row
+  // running newest-first and before the first future row running oldest-first.
+  // A page that does not cross it -- and a register ordered by anything but
+  // the date, where "future" is not a place on the page at all -- draws none.
+  const todayDividerIndex = useMemo(() => {
+    if (!isSortedByDate(sort)) return -1;
+    const ascending = (sort?.direction ?? 'desc') === 'asc';
+    const boundary = transactions.findIndex((tx) =>
+      ascending ? tx.transactionDate > today : tx.transactionDate <= today,
+    );
+    return boundary > 0 ? boundary : -1;
+  }, [transactions, sort, today]);
 
   // Two halves of one decision: the column is drawn where a balance was asked
   // for and supplied, AND where the register is in date order -- a running
@@ -843,10 +849,10 @@ export function TransactionList({
           </thead>
           <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
             {transactions.map((transaction, index) => {
-              const isFuture = index < futureBoundaryIndex;
+              const isFuture = transaction.transactionDate > today;
               return (
                 <React.Fragment key={transaction.id}>
-                  {index === futureBoundaryIndex && futureBoundaryIndex > 0 && (
+                  {index === todayDividerIndex && (
                     <tr>
                       {/* In the wrapped phone layout every header and body row
                           spans one column, so the divider does too; the tier

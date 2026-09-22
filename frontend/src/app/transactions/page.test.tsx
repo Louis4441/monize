@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import React from 'react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@/test/render';
 import TransactionsPage from './page';
 
@@ -283,6 +284,20 @@ vi.mock('@/components/transactions/TransactionList', () => ({
       <span data-testid="density">{props.density}</span>
       <span data-testid="single-account">{props.isSingleAccountView ? 'single' : 'multi'}</span>
       <span data-testid="starting-balance">{props.startingBalance ?? 'none'}</span>
+      <span data-testid="sort">
+        {props.sort ? `${props.sort.field}:${props.sort.direction}` : 'none'}
+      </span>
+      <span data-testid="balance-withheld">{props.startingBalanceWithheld ?? 'none'}</span>
+      {props.onSortChange && (
+        <button data-testid="sort-amount" onClick={() => props.onSortChange('amount')}>
+          Sort by amount
+        </button>
+      )}
+      {props.onSortChange && (
+        <button data-testid="sort-date" onClick={() => props.onSortChange('date')}>
+          Sort by date
+        </button>
+      )}
       <span data-testid="selection-mode">{props.selectionMode ? 'on' : 'off'}</span>
       {props.onToggleSelection && (
         <button data-testid="select-tx-1" onClick={() => props.onToggleSelection('tx-1')}>
@@ -450,8 +465,12 @@ vi.mock('@/hooks/useFormModal', () => ({
   }),
 }));
 
+// Stateless by default, which is what almost every test here wants. The sort
+// tests swap in a stateful implementation, because a click that cannot change
+// the remembered value proves nothing about what the click does.
+const mockUseLocalStorage = vi.fn((_key: string, defaultValue: any) => [defaultValue, vi.fn()]);
 vi.mock('@/hooks/useLocalStorage', () => ({
-  useLocalStorage: (_key: string, defaultValue: any) => [defaultValue, vi.fn()],
+  useLocalStorage: (...args: any[]) => (mockUseLocalStorage as any)(...args),
 }));
 
 vi.mock('@/hooks/useDateFormat', () => ({
@@ -2540,5 +2559,131 @@ describe('TransactionsPage', () => {
       // Category should show all split categories
       expect(rows[0][3]).toBe('Groceries; Dining');
     });
+  });
+});
+
+describe('TransactionsPage register sorting', () => {
+  /** The params of the most recent register request. */
+  const lastGetAllParams = () => {
+    const calls = mockGetAll.mock.calls;
+    return calls[calls.length - 1][0];
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Rows, because an empty register draws an empty state and no headers.
+    mockGetAll.mockResolvedValue({
+      data: mockTransactions,
+      pagination: { page: 3, totalPages: 3, total: 120 },
+    });
+    mockGetSummary.mockResolvedValue({ totalIncome: 0, totalExpenses: 0, netCashFlow: 0, transactionCount: 0 });
+    mockGetAllAccounts.mockResolvedValue([]);
+    mockGetAllCategories.mockResolvedValue([]);
+    mockGetAllPayees.mockResolvedValue([]);
+    mockGetDailyBalances.mockResolvedValue([]);
+    mockGetMonthlyTotals.mockResolvedValue([]);
+    // A real remembered value, so a header click can actually change it.
+    mockUseLocalStorage.mockImplementation((_key: string, defaultValue: any) => {
+      const [value, setValue] = React.useState(defaultValue);
+      return [value, setValue];
+    });
+  });
+
+  afterEach(() => {
+    mockUseLocalStorage.mockImplementation((_key: string, defaultValue: any) => [
+      defaultValue,
+      vi.fn(),
+    ]);
+  });
+
+  it('asks for the register in date order, newest first, by default', async () => {
+    render(<TransactionsPage />);
+    await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+    expect(lastGetAllParams()).toMatchObject({ sortBy: 'date', sortDirection: 'desc' });
+  });
+
+  it('re-asks the server when a column header is used, from page 1', async () => {
+    render(<TransactionsPage />);
+    await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('sort-amount'));
+    });
+
+    await waitFor(() => {
+      expect(lastGetAllParams()).toMatchObject({ sortBy: 'amount', sortDirection: 'asc' });
+    });
+    // Page 3 of one order is a different set of rows from page 3 of another,
+    // so the register goes back to the first page.
+    expect(lastGetAllParams().page).toBe(1);
+  });
+
+  it('reverses the column that is already sorted', async () => {
+    render(<TransactionsPage />);
+    await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('sort-date'));
+    });
+
+    await waitFor(() => {
+      expect(lastGetAllParams()).toMatchObject({ sortBy: 'date', sortDirection: 'asc' });
+    });
+  });
+
+  it('carries the withheld reason from the response to the register', async () => {
+    mockGetAll.mockResolvedValue({
+      data: mockTransactions,
+      pagination: { page: 1, totalPages: 1, total: 3 },
+      startingBalanceWithheld: 'sort',
+    });
+    render(<TransactionsPage />);
+    await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+    // The reason travels with the rows: the register turns it into the line
+    // that tells a reader how to get the Balance column back.
+    await waitFor(() => {
+      expect(screen.getByTestId('balance-withheld')).toHaveTextContent('sort');
+    });
+  });
+
+  it('keeps the sort out of the requests that are not the register', async () => {
+    // The charts, the calendar and the export read the same filters. A sort is
+    // not a filter: it reorders one list, and sending it anywhere else is a
+    // parameter those endpoints have to ignore.
+    render(<TransactionsPage />);
+    await waitFor(() => expect(mockGetDailyBalances).toHaveBeenCalled());
+    expect(lastGetAllParams()).toHaveProperty('sortBy');
+    for (const call of mockGetDailyBalances.mock.calls) {
+      expect(JSON.stringify(call)).not.toContain('sortBy');
+    }
+  });
+
+  it('drops back to the date order to reach a deep-linked row', async () => {
+    render(<TransactionsPage />);
+    await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('sort-amount'));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('sort')).toHaveTextContent('amount:asc');
+    });
+
+    // Following a transfer to its other leg asks the server for the page that
+    // row is on. A page number can only be counted in date order -- the server
+    // refuses the pair outright -- so arriving at a row returns to the date
+    // order, keeping the direction, exactly as it already drops the filters
+    // that would have hidden the row.
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('transfer-click-btn'));
+    });
+
+    await waitFor(() => {
+      expect(lastGetAllParams()).toMatchObject({
+        targetTransactionId: 'tx-linked',
+        sortBy: 'date',
+        sortDirection: 'asc',
+      });
+    });
+    expect(screen.getByTestId('sort')).toHaveTextContent('date:asc');
   });
 });

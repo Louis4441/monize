@@ -43,6 +43,15 @@ import { Transaction, PaginationInfo, BulkUpdateData, BulkUpdateFilters, Monthly
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useTransactionSelection } from '@/hooks/useTransactionSelection';
 import { useTransactionFilters } from '@/hooks/useTransactionFilters';
+import { useSortableTable } from '@/hooks/useSortableTable';
+import {
+  DEFAULT_TRANSACTION_SORT,
+  TRANSACTION_SORT_STORAGE_KEY,
+  nextTransactionSort,
+  resolveRegisterSort,
+  type TransactionSort,
+  type TransactionSortField,
+} from '@/lib/transaction-sort';
 import { useStaleReconciliation } from '@/hooks/useStaleReconciliation';
 import { BulkSelectionBanner } from '@/components/transactions/BulkSelectionBanner';
 import { Account, isLiabilityAccountType } from '@/types/account';
@@ -229,6 +238,38 @@ function TransactionsContent() {
 
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [startingBalance, setStartingBalance] = useState<number | undefined>();
+  const [startingBalanceWithheld, setStartingBalanceWithheld] = useState<'sort' | undefined>();
+
+  // Which column the register is sorted by, remembered in this browser the way
+  // the row density and the table/calendar view are. It is part of the request
+  // key, not a filter: changing it re-asks the server (through the same
+  // debounced reload a filter change takes) and returns to page 1, because
+  // page 3 of one order is a different set of rows from page 3 of another.
+  const { sortField, sortDirection, setSort } = useSortableTable<TransactionSortField>(
+    TRANSACTION_SORT_STORAGE_KEY,
+    DEFAULT_TRANSACTION_SORT,
+  );
+  const isSingleAccountView = filters.filterAccountIds.length === 1;
+  const storedSort = useMemo<TransactionSort>(
+    () => ({ field: sortField, direction: sortDirection }),
+    [sortField, sortDirection],
+  );
+  // The Account column is not drawn on a single account's page, so a
+  // remembered account sort would order the register by a header nobody can
+  // reach. Storage is left alone: widening the filter brings it back.
+  const registerSort = useMemo(
+    () => resolveRegisterSort(storedSort, isSingleAccountView),
+    [storedSort, isSingleAccountView],
+  );
+
+  const handleSortChange = useCallback(
+    (field: TransactionSortField) => {
+      filters.isFilterChange.current = true;
+      setSort(nextTransactionSort(storedSort, field));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [storedSort, setSort],
+  );
 
   // A horizontal finger swipe on the register turns its page in place, so a
   // long list can be paged without scrolling to the pager. The zone owns the
@@ -284,6 +325,18 @@ function TransactionsContent() {
       const targetTransactionId = filters.targetTransactionIdRef.current;
       filters.targetTransactionIdRef.current = null;
 
+      // A row's page is counted by comparing it with the register's order, and
+      // only the date order has a comparison to make -- the server refuses the
+      // pair outright. Arriving at a row therefore drops back to the date
+      // order, keeping the direction, exactly as it already drops the filters
+      // that would have hidden the row. Remembering it too keeps the headers
+      // agreeing with the rows.
+      let effectiveSort = registerSort;
+      if (targetTransactionId && effectiveSort.field !== 'date') {
+        effectiveSort = { field: 'date', direction: effectiveSort.direction };
+        setSort(effectiveSort);
+      }
+
       const hasCategoryOrPayeeFilter = filters.filterCategoryIds.length > 0 || filters.filterPayeeIds.length > 0 || filters.filterTagIds.length > 0 || filters.filterSearch.length > 0;
 
       const chartParams: { startDate?: string; endDate?: string; accountIds?: string; allTime?: boolean } = {};
@@ -329,6 +382,8 @@ function TransactionsContent() {
           page: safePage,
           limit: PAGE_SIZE,
           targetTransactionId: targetTransactionId || undefined,
+          sortBy: effectiveSort.field,
+          sortDirection: effectiveSort.direction,
           amountFrom: parsedAmountFrom,
           amountTo: parsedAmountTo,
           statuses: filters.filterStatuses.length > 0 ? filters.filterStatuses : undefined,
@@ -347,6 +402,9 @@ function TransactionsContent() {
       setTransactions(transactionsResponse.data);
       setPagination(transactionsResponse.pagination);
       setStartingBalance(transactionsResponse.startingBalance);
+      // Adopted with the rows and the balance it belongs to: a reload that
+      // keeps the rows has to keep the reason the balance is missing too.
+      setStartingBalanceWithheld(transactionsResponse.startingBalanceWithheld);
 
       if (hasCategoryOrPayeeFilter) {
         setMonthlyTotals(chartResult as MonthlyTotal[]);
@@ -380,7 +438,7 @@ function TransactionsContent() {
       // with the freshly loaded chart/list data.
       setReloadKey((k) => k + 1);
     }
-  }, [accountIdsForQuery, filters.filterAccountStatus, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo, filters.filterStatuses, filters.filterOriginalCurrencyCodes, filters.filterTagKey, filters.filterTagKeyOp, filters.filterTagKeyValue, filters.filterHasAttachments, t]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [accountIdsForQuery, filters.filterAccountStatus, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo, filters.filterStatuses, filters.filterOriginalCurrencyCodes, filters.filterTagKey, filters.filterTagKeyOp, filters.filterTagKeyValue, filters.filterHasAttachments, registerSort, t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadData = useCallback(async (page: number = filters.currentPage) => {
     await loadTransactions(page);
@@ -1488,6 +1546,9 @@ function TransactionsContent() {
               onToggleAllOnPage={selection.toggleAllOnPage}
               isAllOnPageSelected={selection.isAllOnPageSelected}
               startingBalance={startingBalance}
+              startingBalanceWithheld={startingBalanceWithheld}
+              sort={registerSort}
+              onSortChange={handleSortChange}
               currentPage={filters.currentPage}
               totalPages={pagination?.totalPages ?? 1}
               totalItems={pagination?.total ?? 0}
