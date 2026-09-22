@@ -69,7 +69,7 @@ implied.
 | INV-FX-001 | An unavailable rate never becomes 1:1, a rate from after the date, or an unboundedly old one | partial |
 | INV-FX-002 | A row that carries its own exchange rate is converted at that rate on every surface | enforced |
 | INV-FX-003 | A currency pair is stored in one orientation | partial |
-| INV-FX-004 | A user-supplied rate never replaces a global exchange-rate observation | partial |
+| INV-FX-004 | A user-supplied rate never replaces a global exchange-rate observation | enforced |
 | INV-TRADE-001 | The executed total is the fact; the per-share price is derived from it | enforced |
 | INV-PRICE-001 | A stored price is in the currency the security is recorded in | partial |
 | INV-PORTRESULT-001 | A period change is not a return: value change, external flows and investment result are three figures | enforced |
@@ -902,10 +902,14 @@ Statement           exchange_rates is reference data every user on the
                     what that user's bank charged rather than the market --
                     never replaces a row already there, so another user's
                     valuation, net worth and returns cannot change because
-                    someone else imported a file. What a user actually
-                    exchanged at belongs on their own transactions (INV-FX-002),
-                    so a provider refresh that later replaces a date the import
-                    filled loses nothing of theirs.
+                    someone else imported a file. A user-supplied rate may fill
+                    a date the table holds nothing for: a Money file can carry
+                    history from before any provider covers the pair, and a
+                    missing rate is worse than a user's own. What a user
+                    actually exchanged at belongs on their own transactions
+                    (INV-FX-002), so a provider refresh that later replaces a
+                    date the import filled loses nothing of theirs, and no
+                    user-owned rate store is needed.
 Source of truth     exchange_rates, UNIQUE (from_currency, to_currency,
                     rate_date).
 Enforcement         writeExchangeRates in import/mny/writers/write-prices.ts
@@ -919,16 +923,12 @@ Enforcement         writeExchangeRates in import/mny/writers/write-prices.ts
 Test                write-prices.spec.ts: the rate insert carries DO NOTHING
                     and no DO UPDATE, and a conflict-skipped row is not counted
                     as imported.
-Status              partial -- a Money rate still fills a date the table holds
-                    nothing for, and until a provider covers that date every
-                    user resolves through it. No user-owned rate store is
-                    planned: what a user exchanged at is already on the
-                    imported rows (each leg of a cross-currency transfer in
-                    its own account's currency, a trade's cash leg with its
-                    own exchange_rate), and import post-processing backfills
-                    market history from the provider. The remaining step is
-                    for the importer to stop writing CRNC_EXCHG to the shared
-                    table at all.
+Status              enforced -- the conflict action is the mechanism, and the
+                    unit test fails on the DO UPDATE it replaced. Filling a
+                    date nothing else holds is intended, not a gap: Money's
+                    CRNC_EXCHG history can predate what Yahoo or any other
+                    provider carries, and until a provider supplies the date
+                    every user resolves through the Money rate.
 ```
 
 ### INV-TRADE-001 -- the executed total is the fact, the price is derived

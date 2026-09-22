@@ -200,10 +200,12 @@ export function resolveExchangeRates(
  * user, so a rate already there -- a provider's observation, or another user's
  * earlier import -- is left as it is. What a Money file records may be what one
  * user's bank charged rather than the market, and overwriting would revalue
- * every other user's history at it. The reverse holds too: a provider refresh
- * that later replaces a gap this import filled loses nothing of the user's,
- * because what their own transactions actually exchanged at is carried on the
- * transactions themselves (INV-FX-002), not in this table.
+ * every other user's history at it. Filling a gap is the point of importing
+ * rates at all: a Money file can hold history from before any provider covers
+ * the pair. The reverse holds too: a provider refresh that later replaces a
+ * gap this import filled loses nothing of the user's, because what their own
+ * transactions actually exchanged at is carried on the transactions themselves
+ * (INV-FX-002), not in this table.
  */
 export async function writeExchangeRates(
   manager: EntityManager,
