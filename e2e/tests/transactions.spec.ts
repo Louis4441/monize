@@ -119,3 +119,106 @@ test.describe('Transactions', () => {
     await expect(dialog.getByText(/amount is required/i)).toBeVisible();
   });
 });
+
+// Sorting the register (issue #521). The account filter is what makes the
+// Balance column appear at all, so these seed one account and reach it through
+// the URL the account page links to, rather than driving the filter panel.
+test.describe('Register sorting', () => {
+  test('sorts by a column, and hides the balance while it is not by date', async ({
+    authedPage: page,
+    api,
+  }) => {
+    const account = await createAccount(api, { name: `Sort Account ${uniqueId()}` });
+    const alpha = `AAA Payee ${uniqueId()}`;
+    const zulu = `ZZZ Payee ${uniqueId()}`;
+    await createTransaction(api, {
+      accountId: account.id,
+      amount: -10,
+      payeeName: zulu,
+      transactionDate: '2026-01-01',
+    });
+    await createTransaction(api, {
+      accountId: account.id,
+      amount: -20,
+      payeeName: alpha,
+      transactionDate: '2026-01-02',
+    });
+
+    await page.goto(`/transactions?accountIds=${account.id}`);
+
+    // Date order is the default, and it is what a balance means anything in.
+    const balanceHeader = page.getByRole('columnheader', { name: /^balance$/i });
+    await expect(balanceHeader).toBeVisible();
+    const dateHeader = page.getByRole('columnheader', { name: /^date/i });
+    await expect(dateHeader).toHaveAttribute('aria-sort', 'descending');
+
+    // Sorting by payee puts AAA first and takes the balance away, naming the
+    // way back rather than leaving the column silently missing.
+    await page.getByRole('columnheader', { name: /^payee$/i }).click();
+    await expect(page.getByRole('columnheader', { name: /^payee$/i })).toHaveAttribute(
+      'aria-sort',
+      'ascending',
+    );
+    await expect(balanceHeader).toBeHidden();
+    await expect(page.getByText(/sort by date to see the running balance/i)).toBeVisible();
+    const firstPayee = page.locator('tbody tr').first();
+    await expect(firstPayee).toContainText(alpha);
+
+    // The choice survives a reload, like the row density does.
+    await page.reload();
+    await expect(page.getByRole('columnheader', { name: /^payee$/i })).toHaveAttribute(
+      'aria-sort',
+      'ascending',
+    );
+  });
+
+  test('shows a row the same balance in either date direction', async ({
+    authedPage: page,
+    api,
+  }) => {
+    const account = await createAccount(api, {
+      name: `Balance Order ${uniqueId()}`,
+      openingBalance: 1000,
+    });
+    const older = `Older ${uniqueId()}`;
+    const newer = `Newer ${uniqueId()}`;
+    await createTransaction(api, {
+      accountId: account.id,
+      amount: -10,
+      payeeName: older,
+      transactionDate: '2026-01-01',
+    });
+    await createTransaction(api, {
+      accountId: account.id,
+      amount: -20,
+      payeeName: newer,
+      transactionDate: '2026-01-02',
+    });
+
+    await page.goto(`/transactions?accountIds=${account.id}`);
+
+    // The whole row, which is the balance plus the date, payee and amount that
+    // reversing the register cannot change. Comparing it whole is what makes
+    // this an assertion about the BALANCE: everything else in it is already
+    // known to be identical, so a difference can only be the balance.
+    const rowText = async (payee: string) => {
+      const row = page.locator('tr', { hasText: payee });
+      await expect(row).toBeVisible();
+      return row.innerText();
+    };
+
+    const olderDescending = await rowText(older);
+    const newerDescending = await rowText(newer);
+
+    // Reverse the register: the same rows, the same figures beside them.
+    await page.getByRole('columnheader', { name: /^date/i }).click();
+    await expect(page.getByRole('columnheader', { name: /^date/i })).toHaveAttribute(
+      'aria-sort',
+      'ascending',
+    );
+    await expect(page.locator('tbody tr').first()).toContainText(older);
+
+    expect(await rowText(older)).toBe(olderDescending);
+    expect(await rowText(newer)).toBe(newerDescending);
+  });
+});
