@@ -108,6 +108,10 @@ export class OAuthInteractionController {
         uid,
         clientName: clientInfo.name,
         clientUri: clientInfo.uri,
+        // Where THIS request's code goes: the provider matched it against the
+        // client's registered redirect_uris before creating the interaction.
+        redirectUri:
+          typeof params.redirect_uri === "string" ? params.redirect_uri : null,
         userEmail: user.email ?? user.id,
         scopes: validScopes,
         resource:

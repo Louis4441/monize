@@ -237,6 +237,34 @@ describe("OAuthInteractionController", () => {
       );
     });
 
+    it("shows the redirect_uri origin of THIS authorization request, not the client's metadata", async () => {
+      // Dynamic Client Registration is open, so the client's name is chosen by
+      // whoever registered it. The destination shown must be the request's own
+      // redirect_uri, which the provider validated before the interaction.
+      const { controller } = makeController({
+        interactionDetails: jest.fn().mockResolvedValue({
+          uid: "u",
+          prompt: { name: "consent" },
+          params: {
+            client_id: "claude-desktop",
+            scope: "monize:read",
+            redirect_uri: "https://attacker.example:8443/callback?x=1",
+          },
+        }),
+      });
+      const req = { cookies: { auth_token: "valid" } } as any;
+      const res = makeRes();
+
+      await controller.render(req, res);
+
+      const html = res.send.mock.calls[0][0] as string;
+      expect(html).toContain("Claude Desktop");
+      expect(html).toContain(
+        '<p class="origin">https://attacker.example:8443</p>',
+      );
+      expect(html).not.toContain("/callback");
+    });
+
     it("renders an honest closed-window page when the interaction is stale (consumed/expired)", async () => {
       const { controller } = makeController({
         interactionDetails: jest.fn().mockRejectedValue(
