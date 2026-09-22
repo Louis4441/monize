@@ -2281,6 +2281,9 @@ describe("TransactionsService", () => {
         getParameters: jest.fn().mockReturnValue({}),
         limit: jest.fn().mockReturnValue(mockQb),
         offset: jest.fn().mockReturnValue(mockQb),
+        // Embedding one query in another (the register's filtered id set) is
+        // now an ordinary shape here, not a per-test override.
+        setParameters: jest.fn().mockReturnValue(mockQb),
         update: jest.fn().mockReturnValue(mockQb),
         set: jest.fn().mockReturnValue(mockQb),
         execute: jest.fn().mockResolvedValue({ affected: 0 }),
@@ -3188,20 +3191,28 @@ describe("TransactionsService", () => {
       const mockQb = createMockQueryBuilder();
       mockQb.getManyAndCount.mockResolvedValue([[], 0]);
 
-      // The count query for target transaction page calculation
+      // The filtered-ids subquery the count is taken over, then the count.
+      const filteredIdsQb = createMockQueryBuilder();
       const countQb = createMockQueryBuilder();
       countQb.getCount.mockResolvedValue(75); // 75 transactions come before
 
       transactionsRepository.createQueryBuilder
         .mockReturnValueOnce(mockQb) // main query
+        .mockReturnValueOnce(filteredIdsQb) // the rows the register lists
         .mockReturnValueOnce(countQb); // count query
 
       transactionsRepository.findOne.mockResolvedValue({
         id: "target-tx",
         userId: "user-1",
-        transactionDate: "2026-01-15",
-        createdAt: new Date("2026-01-15T10:00:00Z"),
       });
+      // The ordering keys come back as text, at the database's own precision.
+      mockQueryRunner.manager.query.mockResolvedValue([
+        {
+          date: "2026-01-15",
+          created_at: "2026-01-15 10:00:00.123456",
+          amount: "-50.0000",
+        },
+      ]);
 
       investmentTxRepository.find.mockResolvedValue([]);
 
@@ -3247,23 +3258,30 @@ describe("TransactionsService", () => {
       expect(result.pagination.page).toBe(3);
     });
 
-    it("applies account + date + payee + search filters in count query for targetTransactionId", async () => {
+    it("counts the target's page over the rows the register lists, filters and all", async () => {
       const mockQb = createMockQueryBuilder();
       mockQb.getManyAndCount.mockResolvedValue([[], 0]);
 
+      const filteredIdsQb = createMockQueryBuilder();
       const countQb = createMockQueryBuilder();
       countQb.getCount.mockResolvedValue(0);
 
       transactionsRepository.createQueryBuilder
         .mockReturnValueOnce(mockQb)
+        .mockReturnValueOnce(filteredIdsQb)
         .mockReturnValueOnce(countQb);
 
       transactionsRepository.findOne.mockResolvedValue({
         id: "target-tx",
         userId: "user-1",
-        transactionDate: "2026-01-15",
-        createdAt: new Date("2026-01-15T10:00:00Z"),
       });
+      mockQueryRunner.manager.query.mockResolvedValue([
+        {
+          date: "2026-01-15",
+          created_at: "2026-01-15 10:00:00.123456",
+          amount: "-50.0000",
+        },
+      ]);
 
       investmentTxRepository.find.mockResolvedValue([]);
 
@@ -3279,24 +3297,44 @@ describe("TransactionsService", () => {
         false,
         "term",
         "target-tx",
+        undefined,
+        undefined,
+        undefined,
+        [TransactionStatus.CLEARED],
       );
 
-      // Count query should have the same filters
-      expect(countQb.andWhere).toHaveBeenCalledWith(
-        "t.accountId IN (:...accountIds)",
-        { accountIds: ["acc-1"] },
+      // The filters live in the subquery that decides which rows the register
+      // lists, which is the same one the running balance sums over -- so the
+      // page a deep link lands on and the balance beside it cannot be computed
+      // over two different sets of rows.
+      expect(filteredIdsQb.andWhere).toHaveBeenCalledWith(
+        "bf.accountIds IN (:...bfAccountIds)".replace(
+          "accountIds",
+          "accountId",
+        ),
+        { bfAccountIds: ["acc-1"] },
       );
-      expect(countQb.andWhere).toHaveBeenCalledWith(
-        "t.transactionDate >= :startDate",
-        { startDate: "2026-01-01" },
+      expect(filteredIdsQb.andWhere).toHaveBeenCalledWith(
+        "bf.transactionDate >= :bfStartDate",
+        { bfStartDate: "2026-01-01" },
       );
-      expect(countQb.andWhere).toHaveBeenCalledWith(
-        "t.transactionDate <= :endDate",
-        { endDate: "2026-12-31" },
+      expect(filteredIdsQb.andWhere).toHaveBeenCalledWith(
+        "bf.transactionDate <= :bfEndDate",
+        { bfEndDate: "2026-12-31" },
       );
-      expect(countQb.andWhere).toHaveBeenCalledWith(
-        "t.payeeId IN (:...payeeIds)",
-        { payeeIds: ["payee-1"] },
+      expect(filteredIdsQb.andWhere).toHaveBeenCalledWith(
+        "bf.payeeId IN (:...bfPayeeIds)",
+        { bfPayeeIds: ["payee-1"] },
+      );
+      // The status filter is one of the four that used to narrow the listing
+      // and reach neither the page count nor the balance.
+      expect(filteredIdsQb.andWhere).toHaveBeenCalledWith(
+        "bf.status IN (:...bfStatuses)",
+        { bfStatuses: [TransactionStatus.CLEARED] },
+      );
+      // And the count is taken over exactly that set.
+      expect(countQb.where).toHaveBeenCalledWith(
+        expect.stringContaining("t.id IN ("),
       );
     });
 

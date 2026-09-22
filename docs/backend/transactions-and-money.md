@@ -101,6 +101,34 @@ smallest one. Under any field but the date, the transaction date becomes the
 second key, so one payee's rows still read chronologically instead of in the
 order an import happened to write them.
 
+## A running balance is summed over the rows the register shows, and a deep link is counted over them too
+
+`RegisterRowFilters` (`backend/src/transactions/transactions.service.ts`) is
+the one shape naming everything that narrows the register, and
+`buildFilteredIdsSubquery` is the one query that applies it. Both the running
+balance's zero-based total and the page a `targetTransactionId` lands on are
+computed over that set, because both are answers *about the rows on screen*:
+a balance summed over a wider set counts rows the reader cannot see, and a
+page counted over a wider set does not hold the row it was following.
+
+Four filters used to narrow the listing without reaching either -- status,
+entry currency, attachment presence and the KEY:VALUE tag filter -- along with
+the brokerage exclusion, and a register narrowed by any of them fell through
+to the unfiltered regime: the account's whole projected balance, walked down
+past rows that are not the ones being shown. A filter added to the listing is
+added to `RegisterRowFilters` in the same change, which is a compile error at
+every call site that builds one until it is.
+
+The page count also has to ask the register's ORDER, not an approximation of
+it: all four keys, with the amount leg running opposite to the list (the same
+credits-before-debits rule `applyRegisterOrder` applies), and the target's
+keys read out as text. `created_at` is stored to the microsecond and the
+entity reads it into a millisecond `Date`, so binding that value back compared
+a row with a truncated copy of itself and counted it as being above itself.
+The one predicate that still differs is the `uncategorized` pseudo-category,
+which the subquery reads more narrowly than the listing does; its own comment
+says why.
+
 ## A stored holding is a projection of the ledger, never an accumulator
 
 `holdings.quantity` and `holdings.average_cost` are derived, and the ledger they are derived from is `investment_transactions`. They used to be maintained incrementally -- each acquisition blended into the stored average as it arrived -- which makes the stored figure a function of **insertion** order. Insertion order is not economic order: BUY 100 at 10 dated January, BUY 100 at 20 dated March, then a SELL 50 dated February entered third, and the blend gives 15.0000 while the replay gives 16.6667 (issue #1388). `lockHoldingScope` could not have caught it; it serializes writers, and this is one writer's arithmetic.

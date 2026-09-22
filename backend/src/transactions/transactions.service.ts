@@ -26,6 +26,7 @@ import { NetWorthService } from "../net-worth/net-worth.service";
 import { TransactionSplitService } from "./transaction-split.service";
 import {
   applyRegisterOrder,
+  creditsBeforeDebitsDirection,
   isNewestPage,
   restrictToRowsNewerThanPage,
   type RegisterPageWindow,
@@ -103,6 +104,37 @@ import {
 export interface TransactionWithInvestmentLink extends Transaction {
   linkedInvestmentTransactionId?: string | null;
   attachmentCount?: number;
+}
+
+/**
+ * Everything that decides which rows the register lists, as the running
+ * balance needs it.
+ *
+ * The balance is a figure ABOUT the rows on screen, so it has to be summed
+ * over exactly the rows on screen. Four filters were missing from this shape
+ * -- status, entry currency, attachment presence and the KEY:VALUE tag filter
+ * -- along with the brokerage exclusion, so a register narrowed by any of them
+ * drew a balance that counted rows the page does not show. Naming the set once
+ * is what makes the next filter's omission visible: a new field here is a
+ * compile error at every call site that builds one.
+ */
+export interface RegisterRowFilters {
+  startDate?: string;
+  endDate?: string;
+  categoryIds?: string[];
+  payeeIds?: string[];
+  tagIds?: string[];
+  search?: string;
+  searchAmount?: number | null;
+  searchDate?: string | null;
+  amountFrom?: number;
+  amountTo?: number;
+  statuses?: TransactionStatus[];
+  originalCurrencyCodes?: string[];
+  hasAttachments?: boolean;
+  tagKeyFilter?: TagKeyFilter;
+  /** False -- the register's default -- hides investment brokerage accounts. */
+  includeInvestmentBrokerage?: boolean;
 }
 
 export interface PaginatedTransactions extends PaginatedResult<TransactionWithInvestmentLink> {
@@ -936,6 +968,27 @@ export class TransactionsService {
     // balance so all three match the same rows.
     const parsedSearch = await this.resolveSearchTerm(userId, search);
 
+    // What the register is showing, in one object, so neither the page a deep
+    // link lands on nor any of the three balance regimes can be handed a
+    // narrower set of rows than the listing itself used.
+    const rowFilters: RegisterRowFilters = {
+      startDate,
+      endDate,
+      categoryIds,
+      payeeIds,
+      tagIds,
+      search,
+      searchAmount: parsedSearch.amount,
+      searchDate: parsedSearch.date,
+      amountFrom,
+      amountTo,
+      statuses,
+      originalCurrencyCodes,
+      hasAttachments,
+      tagKeyFilter,
+      includeInvestmentBrokerage,
+    };
+
     // The whole listing -- main query, target-page lookup, running-balance
     // math, and investment/attachment enrichment -- is one read block on a
     // single withScopedDb manager.
@@ -1090,13 +1143,8 @@ export class TransactionsService {
           targetTransactionId,
           safeLimit,
           accountIds,
-          startDate,
-          endDate,
-          payeeIds,
-          search,
-          includeInvestmentBrokerage,
+          rowFilters,
           safePage,
-          parsedSearch,
           jointAccountIds,
           sortDirection,
         );
@@ -1113,14 +1161,26 @@ export class TransactionsService {
       let startingBalanceWithheld: "sort" | undefined;
       const singleAccountId =
         accountIds?.length === 1 ? accountIds[0] : undefined;
+      // Every filter that narrows the register except the date range, which
+      // keeps its own regime (a balance AT a date rather than a zero-based
+      // total). Status, entry currency, attachment presence and the KEY:VALUE
+      // tag filter were missing here, so a register narrowed by one of them
+      // fell through to the unfiltered balance -- the account's whole
+      // projected balance, walked down past rows that are not the ones the
+      // page is showing.
       const hasContentFilters = !!(
         (categoryIds && categoryIds.length > 0) ||
         (payeeIds && payeeIds.length > 0) ||
         (tagIds && tagIds.length > 0) ||
         search ||
         amountFrom !== undefined ||
-        amountTo !== undefined
+        amountTo !== undefined ||
+        (statuses && statuses.length > 0) ||
+        (originalCurrencyCodes && originalCurrencyCodes.length > 0) ||
+        hasAttachments !== undefined ||
+        tagKeyFilter
       );
+
       // Which page of which listing, and which way it runs. `total` is part of
       // it because the newest page -- the one whose seed needs no window
       // summed out of it -- is page 1 only while the register runs newest
@@ -1162,18 +1222,7 @@ export class TransactionsService {
           userId,
           singleAccountId!,
           balanceWindow,
-          {
-            startDate,
-            endDate,
-            categoryIds,
-            payeeIds,
-            tagIds,
-            search,
-            searchAmount: parsedSearch.amount,
-            searchDate: parsedSearch.date,
-            amountFrom,
-            amountTo,
-          },
+          rowFilters,
         );
       } else if (multiAccountSeed) {
         startingBalance =
@@ -1182,18 +1231,7 @@ export class TransactionsService {
             userId,
             accountIds,
             balanceWindow,
-            {
-              startDate,
-              endDate,
-              categoryIds,
-              payeeIds,
-              tagIds,
-              search,
-              searchAmount: parsedSearch.amount,
-              searchDate: parsedSearch.date,
-              amountFrom,
-              amountTo,
-            },
+            rowFilters,
             jointAccountIds,
           );
       } else if (allAccountsSeed) {
@@ -1203,18 +1241,7 @@ export class TransactionsService {
             userId,
             undefined,
             balanceWindow,
-            {
-              startDate,
-              endDate,
-              categoryIds,
-              payeeIds,
-              tagIds,
-              search,
-              searchAmount: parsedSearch.amount,
-              searchDate: parsedSearch.date,
-              amountFrom,
-              amountTo,
-            },
+            rowFilters,
             jointAccountIds,
           );
       }
@@ -1311,19 +1338,25 @@ export class TransactionsService {
     }
   }
 
+  /**
+   * Which page of the current listing holds one row.
+   *
+   * The count is "how many rows does the register list above this one", so it
+   * is only right while it asks the register's own two questions: which rows
+   * are listed, and in what order. It used to ask neither exactly -- it
+   * rebuilt a subset of the filters (no category, tag, amount, status,
+   * currency, attachment or tag-key filter) and compared on three of the four
+   * ordering keys -- so a deep link could land on a page that does not hold
+   * the row it was following.
+   */
   private async calculateTargetPage(
     m: EntityManager,
     userId: string,
     targetTransactionId: string,
     safeLimit: number,
-    accountIds?: string[],
-    startDate?: string,
-    endDate?: string,
-    payeeIds?: string[],
-    search?: string,
-    includeInvestmentBrokerage?: boolean,
+    accountIds: string[] | undefined,
+    filters: RegisterRowFilters,
     fallbackPage: number = 1,
-    parsedSearch: ParsedSearchTerm = { amount: null, date: null },
     jointAccountIds: string[] = [],
     sortDirection: RegisterSortDirection = "DESC",
   ): Promise<number> {
@@ -1337,68 +1370,69 @@ export class TransactionsService {
             ? [{ id: targetTransactionId, accountId: In(jointAccountIds) }]
             : []),
         ],
-        select: ["id", "transactionDate", "createdAt"],
+        select: ["id"],
       });
 
       if (!targetTx) return fallbackPage;
 
+      // The ordering keys as TEXT, straight from the database. `created_at` is
+      // stored to the microsecond and the entity reads it into a millisecond
+      // JavaScript Date, so binding that value back compares the row with a
+      // TRUNCATED copy of itself: the row came out strictly newer than its own
+      // timestamp, counted itself as above itself, and moved the answer up by
+      // one row (`docs/backend/entities-and-dtos.md`: read a DATE or a numeric
+      // out as text rather than trusting the transformer).
+      const targetKeys = (await m.query(
+        `SELECT TO_CHAR(transaction_date, 'YYYY-MM-DD') AS date,
+                created_at::text AS created_at,
+                amount::text AS amount
+           FROM transactions
+          WHERE id = $1`,
+        [targetTransactionId],
+      )) as { date: string; created_at: string; amount: string }[];
+      const target = targetKeys[0];
+      if (!target) return fallbackPage;
+
+      // The rows the register lists, by the register's own predicate. The one
+      // known divergence is the `uncategorized` pseudo-category, which this
+      // subquery reads more narrowly than the listing does (its own comment
+      // says why); every other filter now agrees.
+      const idsSubquery = await this.buildFilteredIdsSubquery(
+        m,
+        userId,
+        accountIds,
+        filters,
+        jointAccountIds,
+      );
+
       const countQuery = m
         .getRepository(Transaction)
         .createQueryBuilder("t")
-        .leftJoin("t.account", "a")
-        .leftJoin("t.splits", "s")
-        .where(this.registerScope("t", userId, jointAccountIds));
-
-      if (!includeInvestmentBrokerage) {
-        countQuery.andWhere(brokerageExclusionForEntity("a"));
-      }
-      if (accountIds && accountIds.length > 0) {
-        countQuery.andWhere("t.accountId IN (:...accountIds)", { accountIds });
-      }
-      if (startDate) {
-        countQuery.andWhere("t.transactionDate >= :startDate", { startDate });
-      }
-      if (endDate) {
-        countQuery.andWhere("t.transactionDate <= :endDate", { endDate });
-      }
-      if (payeeIds && payeeIds.length > 0) {
-        countQuery.andWhere("t.payeeId IN (:...payeeIds)", { payeeIds });
-      }
-      if (search && search.trim()) {
-        const searchPattern = `%${escapeLikePattern(search.trim())}%`;
-        countQuery.andWhere(
-          buildTransactionSearchClause({ transaction: "t", splits: "s" }),
-          {
-            search: searchPattern,
-            searchAmount: parsedSearch.amount,
-            searchDate: parsedSearch.date,
-          },
-        );
-      }
+        .where(`t.id IN (${idsSubquery.getQuery()})`)
+        .setParameters(idsSubquery.getParameters());
 
       // The rows the register lists ABOVE the target, which is what its page
       // number counts. "Above" is newer in a newest-first register and older
-      // in an oldest-first one, so the comparison runs the way the list does.
-      //
-      // A row is never above itself, and saying so is not belt-and-braces:
-      // `created_at` is stored to the microsecond and read back into a
-      // millisecond JavaScript Date, so the value bound here is the row's own
-      // timestamp TRUNCATED. The second clause below then finds the target
-      // strictly newer than that truncated copy of itself and counts it,
-      // which moved the answer up by one row and landed a deep link on the
-      // wrong page whenever that one row crossed a page boundary.
-      countQuery.andWhere("t.id != :targetSelfId", {
-        targetSelfId: targetTx.id,
-      });
+      // in an oldest-first one, so the comparison runs the way the list does
+      // -- and the amount leg runs OPPOSITE to it, because a credit and a
+      // debit the clock cannot separate are ordered credit-first
+      // chronologically whichever way the list runs.
       const above = sortDirection === "DESC" ? ">" : "<";
+      const amountAbove =
+        creditsBeforeDebitsDirection(sortDirection) === "ASC" ? "<" : ">";
+      const sameDate = "t.transactionDate = :targetDate";
+      const sameMoment = `${sameDate} AND t.createdAt = CAST(:targetCreatedAt AS timestamp)`;
+      const sameAmount = `${sameMoment} AND t.amount = CAST(:targetAmount AS numeric)`;
       countQuery.andWhere(
         `(t.transactionDate ${above} :targetDate
-          OR (t.transactionDate = :targetDate AND t.createdAt ${above} :targetCreatedAt)
-          OR (t.transactionDate = :targetDate AND t.createdAt = :targetCreatedAt AND t.id ${above} :targetId))`,
+          OR (${sameDate} AND t.createdAt ${above} CAST(:targetCreatedAt AS timestamp))
+          OR (${sameMoment} AND t.amount ${amountAbove} CAST(:targetAmount AS numeric))
+          OR (${sameAmount} AND t.id ${above} :targetId))`,
         {
-          targetDate: targetTx.transactionDate,
-          targetCreatedAt: targetTx.createdAt,
-          targetId: targetTx.id,
+          targetDate: target.date,
+          targetCreatedAt: target.created_at,
+          targetAmount: target.amount,
+          targetId: targetTransactionId,
         },
       );
 
@@ -1418,26 +1452,23 @@ export class TransactionsService {
     userId: string,
     singleAccountId: string,
     window: RegisterPageWindow,
-    filters?: {
-      startDate?: string;
-      endDate?: string;
-      categoryIds?: string[];
-      payeeIds?: string[];
-      tagIds?: string[];
-      search?: string;
-      searchAmount?: number | null;
-      searchDate?: string | null;
-      amountFrom?: number;
-      amountTo?: number;
-    },
+    filters?: RegisterRowFilters,
   ): Promise<number> {
+    // The same set findAll used to pick this regime; the two must agree or a
+    // register falls between them and gets a balance computed for a different
+    // set of rows than the one on screen.
     const hasContentFilters = !!(
       (filters?.categoryIds && filters.categoryIds.length > 0) ||
       (filters?.payeeIds && filters.payeeIds.length > 0) ||
       (filters?.tagIds && filters.tagIds.length > 0) ||
       filters?.search ||
       filters?.amountFrom !== undefined ||
-      filters?.amountTo !== undefined
+      filters?.amountTo !== undefined ||
+      (filters?.statuses && filters.statuses.length > 0) ||
+      (filters?.originalCurrencyCodes &&
+        filters.originalCurrencyCodes.length > 0) ||
+      filters?.hasAttachments !== undefined ||
+      filters?.tagKeyFilter
     );
     const hasDateFilter = !!(filters?.startDate || filters?.endDate);
 
@@ -1523,16 +1554,7 @@ export class TransactionsService {
     userId: string,
     accountId: string,
     window: RegisterPageWindow,
-    filters: {
-      startDate?: string;
-      endDate?: string;
-      categoryIds?: string[];
-      payeeIds?: string[];
-      tagIds?: string[];
-      search?: string;
-      amountFrom?: number;
-      amountTo?: number;
-    },
+    filters: RegisterRowFilters,
   ): Promise<number> {
     const idsSubquery = await this.buildFilteredIdsSubquery(
       m,
@@ -1565,18 +1587,7 @@ export class TransactionsService {
     userId: string,
     accountIds: string[] | undefined,
     window: RegisterPageWindow,
-    filters: {
-      startDate?: string;
-      endDate?: string;
-      categoryIds?: string[];
-      payeeIds?: string[];
-      tagIds?: string[];
-      search?: string;
-      searchAmount?: number | null;
-      searchDate?: string | null;
-      amountFrom?: number;
-      amountTo?: number;
-    },
+    filters: RegisterRowFilters,
     jointAccountIds: string[] = [],
   ): Promise<number> {
     const idsSubquery = await this.buildFilteredIdsSubquery(
@@ -1620,10 +1631,7 @@ export class TransactionsService {
     userId: string,
     accountId: string,
     window: RegisterPageWindow,
-    filters: {
-      startDate?: string;
-      endDate?: string;
-    },
+    filters: RegisterRowFilters,
   ): Promise<number> {
     let baseBalance: number;
 
@@ -1713,16 +1721,7 @@ export class TransactionsService {
     userId: string,
     accountId: string | string[] | undefined,
     window: RegisterPageWindow,
-    filters: {
-      startDate?: string;
-      endDate?: string;
-      categoryIds?: string[];
-      payeeIds?: string[];
-      tagIds?: string[];
-      search?: string;
-      amountFrom?: number;
-      amountTo?: number;
-    },
+    filters: RegisterRowFilters,
     jointAccountIds: string[] = [],
   ): Promise<number> {
     const idsSubquery = await this.buildFilteredIdsSubquery(
@@ -1764,10 +1763,7 @@ export class TransactionsService {
       getParameters: () => Record<string, any>;
     },
     userId: string,
-    filters: {
-      categoryIds?: string[];
-      tagIds?: string[];
-    },
+    filters: RegisterRowFilters,
   ): Promise<number> {
     const regularCategoryIds = (filters.categoryIds ?? []).filter(
       (id) => id !== "uncategorized" && id !== "transfer",
@@ -1844,18 +1840,7 @@ export class TransactionsService {
     m: EntityManager,
     userId: string,
     accountId: string | string[] | undefined,
-    filters: {
-      startDate?: string;
-      endDate?: string;
-      categoryIds?: string[];
-      payeeIds?: string[];
-      tagIds?: string[];
-      search?: string;
-      searchAmount?: number | null;
-      searchDate?: string | null;
-      amountFrom?: number;
-      amountTo?: number;
-    },
+    filters: RegisterRowFilters,
     jointAccountIds: string[] = [],
   ) {
     const qb = m
@@ -1905,6 +1890,53 @@ export class TransactionsService {
       qb.andWhere("bf.amount <= :bfAmountTo", {
         bfAmountTo: filters.amountTo,
       });
+    }
+
+    // The register hides investment brokerage accounts unless asked, so a
+    // balance summed across "every account" must hide them too.
+    if (!filters.includeInvestmentBrokerage) {
+      qb.leftJoin("bf.account", "bfAccount");
+      qb.andWhere(brokerageExclusionForEntity("bfAccount"));
+    }
+
+    if (filters.statuses && filters.statuses.length > 0) {
+      qb.andWhere("bf.status IN (:...bfStatuses)", {
+        bfStatuses: filters.statuses,
+      });
+    }
+
+    if (
+      filters.originalCurrencyCodes &&
+      filters.originalCurrencyCodes.length > 0
+    ) {
+      qb.andWhere("bf.original_currency_code IN (:...bfOriginalCurrencies)", {
+        bfOriginalCurrencies: filters.originalCurrencyCodes,
+      });
+    }
+
+    if (filters.hasAttachments !== undefined) {
+      // Primaries only, as the listing counts them: a scan pair's hidden
+      // original is not an attachment the user has.
+      const attachmentExists =
+        `SELECT 1 FROM transaction_attachments bfTa WHERE bfTa.transaction_id = bf.id ` +
+        `AND ${primaryAttachmentSql("bfTa")}`;
+      qb.andWhere(
+        filters.hasAttachments
+          ? `EXISTS (${attachmentExists})`
+          : `NOT EXISTS (${attachmentExists})`,
+      );
+    }
+
+    if (filters.tagKeyFilter) {
+      // Its own parameter prefix: this subquery's parameters are copied onto
+      // the query that embeds it, so a name shared with the listing's clause
+      // would be bound twice with different values.
+      const { clause, params } = buildTagKeyFilterClause(
+        "bf",
+        filters.tagKeyFilter,
+        "bfTkf",
+      );
+      qb.andWhere(clause, params);
     }
 
     // Determine if we need a splits join (shared across search/category/tag)

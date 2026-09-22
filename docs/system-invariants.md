@@ -297,7 +297,10 @@ Statement           A transaction's running balance is the same figure whether
 Source of truth     the account's ledger rows in applyRegisterOrder's total
                     order, plus AccountsService.getProjectedBalance (or the
                     matched total, where a content filter makes the balance
-                    zero-based)
+                    zero-based). The rows summed are the rows the register
+                    LISTS: one filter shape (RegisterRowFilters) and one
+                    query (buildFilteredIdsSubquery) decide that set, and the
+                    page a deep link lands on is counted over it too.
 Enforcement         The server sends one number per page -- startingBalance,
                     the balance AFTER that page's newest row -- and the client
                     walks it down the page newest-first. Only two things are

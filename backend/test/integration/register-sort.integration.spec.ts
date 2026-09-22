@@ -10,6 +10,7 @@ import {
   TRANSACTION_SORT_FIELDS,
   type TransactionSortField,
 } from "@/transactions/register-order";
+import type { TagKeyFilter } from "@/transactions/tag-key-filter.util";
 import {
   createIntegrationModule,
   cleanTables,
@@ -84,6 +85,10 @@ describe("register sorting (integration)", () => {
     page?: number;
     limit?: number;
     targetTransactionId?: string;
+    statuses?: TransactionStatus[];
+    originalCurrencyCodes?: string[];
+    hasAttachments?: boolean;
+    tagKeyFilter?: TagKeyFilter;
     sortBy?: TransactionSortField;
     sortDirection?: "ASC" | "DESC";
   };
@@ -105,9 +110,12 @@ describe("register sorting (integration)", () => {
         undefined,
         undefined,
         undefined,
-        undefined,
+        options.statuses,
         options.sortBy ?? "date",
         options.sortDirection ?? "DESC",
+        options.tagKeyFilter,
+        options.originalCurrencyCodes,
+        options.hasAttachments,
       ),
     );
 
@@ -297,6 +305,41 @@ describe("register sorting (integration)", () => {
       } as never);
     });
 
+    // A foreign-currency entry and a brokerage row: the first is what an
+    // entry-currency filter narrows to, and the second is a row the register
+    // hides from an all-accounts listing, so neither may reach a balance that
+    // is supposed to describe what is on screen.
+    const brokerage = await createTestAccount(dataSource, userId, {
+      name: "Brokerage",
+      accountType: "INVESTMENT",
+      accountSubType: "INVESTMENT_BROKERAGE",
+      openingBalance: 0,
+      currentBalance: 0,
+    } as never);
+    await dataSource.manager.save(Transaction, [
+      dataSource.manager.create(Transaction, {
+        userId,
+        accountId,
+        transactionDate: "2026-03-01",
+        amount: -12.5,
+        currencyCode: "USD",
+        originalAmount: -10,
+        originalCurrencyCode: "EUR",
+        exchangeRate: 1.25,
+        payeeName: "Paris",
+        status: TransactionStatus.UNRECONCILED,
+      } as never),
+      dataSource.manager.create(Transaction, {
+        userId,
+        accountId: brokerage.id,
+        transactionDate: "2026-03-02",
+        amount: -999,
+        currencyCode: "USD",
+        payeeName: "Brokerage cash",
+        status: TransactionStatus.UNRECONCILED,
+      } as never),
+    ]);
+
     // The pair the clock cannot separate: one save, so PostgreSQL's
     // CURRENT_TIMESTAMP (transaction start time) gives both rows the same
     // created_at, which is what an import does. Credits order before debits
@@ -408,6 +451,76 @@ describe("register sorting (integration)", () => {
     });
   });
 
+  describe("the balance counts exactly the rows the register shows", () => {
+    /**
+     * A running balance is a figure ABOUT the rows on screen, so its total has
+     * to be summed over the rows on screen. Four filters narrowed the listing
+     * without reaching the balance, which fell through to the unfiltered
+     * regime: the account's whole projected balance, walked down past rows
+     * that are not the ones being shown.
+     */
+    async function expectSeedMatchesShownRows(options: ListOptions) {
+      const { rows } = await rowsInOrder({ ...options, limit: 50 });
+      expect(rows.length).toBeGreaterThan(0);
+      const shown =
+        (rows as Transaction[]).reduce(
+          (total, row) => total + (movesBalance(row) ? rowAmountCents(row) : 0),
+          0,
+        ) / CENTS;
+      const page = await list({ ...options, page: 1, limit: 50 });
+      expect(page.startingBalance).toBeDefined();
+      expect(page.startingBalance).toBeCloseTo(shown, 4);
+    }
+
+    it("under a status filter, which the register narrows by", async () => {
+      // The account also holds a VOID row and rows of other statuses, so the
+      // unfiltered balance is a different number from this one.
+      await expectSeedMatchesShownRows({
+        accountIds: [accountId],
+        statuses: [TransactionStatus.UNRECONCILED],
+      });
+    });
+
+    it("under an entry-currency filter", async () => {
+      await expectSeedMatchesShownRows({
+        accountIds: [accountId],
+        originalCurrencyCodes: ["EUR"],
+      });
+    });
+
+    it("across every account, where the register hides brokerage rows", async () => {
+      // The brokerage row is not on screen, so it is not in the total either.
+      // Without the exclusion the balance counts a row the reader cannot see.
+      await expectSeedMatchesShownRows({
+        statuses: [TransactionStatus.UNRECONCILED],
+      });
+    });
+
+    it("under the attachment and tag-key filters, whose SQL runs nowhere else", async () => {
+      // Neither narrows this fixture -- no row carries an attachment or a
+      // KEY:VALUE tag -- so the figures are the unfiltered ones. What is being
+      // proved is that the clauses RUN: they are raw SQL naming their own
+      // aliases inside a subquery, and a mistake there is a PostgreSQL error
+      // at the far end of a user's filter, invisible to every mock.
+      await expectSeedMatchesShownRows({
+        accountIds: [accountId],
+        hasAttachments: false,
+      });
+      await expectSeedMatchesShownRows({
+        accountIds: [accountId],
+        tagKeyFilter: { key: "country", op: "noValue" },
+      });
+    });
+
+    it("and the parity across directions survives those filters", async () => {
+      await expectBalanceParity({
+        accountIds: [accountId],
+        statuses: [TransactionStatus.UNRECONCILED],
+        limit: 2,
+      });
+    });
+  });
+
   describe("every sortable column can be paged by", () => {
     it.each(TRANSACTION_SORT_FIELDS)(
       "pages %s without losing, repeating or reordering a row",
@@ -509,34 +622,41 @@ describe("register sorting (integration)", () => {
   });
 
   describe("a deep-linked row", () => {
-    it("is found on mirrored pages in the two directions", async () => {
-      const { rows, total } = await rowsInOrder({
-        accountIds: [accountId],
-        limit: 50,
-      });
-      const target = rows[3] as Transaction;
+    it("lands on the page it is actually on, every row, both ways", async () => {
+      // The page number is counted by comparing the target with the
+      // register's order, so it is only right while that comparison IS the
+      // register's order -- all four keys, including the amount leg that
+      // separates a credit from a debit the clock cannot. Checking every row
+      // rather than one is what catches the pair that shares a created_at.
       const limit = 2;
+      for (const sortDirection of ["DESC", "ASC"] as const) {
+        const { rows } = await rowsInOrder({
+          accountIds: [accountId],
+          limit: 50,
+          sortDirection,
+        });
 
-      const descending = await list({
-        accountIds: [accountId],
-        limit,
-        targetTransactionId: target.id,
-      });
-      const ascending = await list({
-        accountIds: [accountId],
-        limit,
-        sortDirection: "ASC",
-        targetTransactionId: target.id,
-      });
-
-      expect(descending.data.some((row) => row.id === target.id)).toBe(true);
-      expect(ascending.data.some((row) => row.id === target.id)).toBe(true);
-      // The page holding a row counting from one end is its mirror counting
-      // from the other.
-      const lastPage = Math.ceil(total / limit);
-      expect(ascending.pagination.page).toBe(
-        lastPage + 1 - descending.pagination.page,
-      );
+        for (const [index, row] of (rows as Transaction[]).entries()) {
+          const page = await list({
+            accountIds: [accountId],
+            limit,
+            sortDirection,
+            targetTransactionId: row.id,
+          });
+          const expected = Math.floor(index / limit) + 1;
+          expect({
+            id: row.id,
+            direction: sortDirection,
+            page: page.pagination.page,
+            holdsTheRow: page.data.some((listed) => listed.id === row.id),
+          }).toEqual({
+            id: row.id,
+            direction: sortDirection,
+            page: expected,
+            holdsTheRow: true,
+          });
+        }
+      }
     });
 
     it("is refused under a sort that cannot place it", async () => {
