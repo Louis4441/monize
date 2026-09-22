@@ -163,9 +163,11 @@ describe("applyRegisterOrder", () => {
       expect(
         orderFor(direction, "category", { category: "category" })[0][2],
       ).toBe("NULLS LAST");
+      // `status` is defaulted in the schema, not NOT NULL, so it sinks too.
+      expect(orderFor(direction, "status")[0][2]).toBe("NULLS LAST");
+      // The two columns the schema declares NOT NULL take no clause at all.
       expect(orderFor(direction, "date")[0][2]).toBeUndefined();
       expect(orderFor(direction, "amount")[0][2]).toBeUndefined();
-      expect(orderFor(direction, "status")[0][2]).toBeUndefined();
     }
   });
 
@@ -392,12 +394,14 @@ describe("the register ordering is written once", () => {
       3,
     );
     expect(source).not.toMatch(/addOrderBy\(\s*["'`][^"'`]*\.createdAt/);
-    // A page window written by hand beside a `select("t.id")` is the same
-    // drift by another door: it is the pairing of an order with a
-    // limit/offset that has to stay in one place.
-    expect(source).not.toMatch(
-      /select\("t\.id"\)[\s\S]{0,400}?\.(limit|offset)\(/,
-    );
+    // A page window written by hand is the same drift by another door: it is
+    // the pairing of an order with a limit/offset that has to stay in one
+    // place. Scanned over the whole file rather than within a character
+    // budget of the `select("t.id")` above it -- the first of the three
+    // windows already sits 412 characters past its select, so a budget that
+    // unmodified code exceeds is not a guard. `skip`/`take` are the
+    // register's own paging and are not this rule's business.
+    expect(source).not.toMatch(/\.(limit|offset)\(/);
   });
   it("gives every running balance in this layer the register's order", () => {
     // The transactions service was not the only place that walks a balance
@@ -409,6 +413,17 @@ describe("the register ordering is written once", () => {
     //
     // The rule is narrow on purpose: if a file carries a running balance, the
     // order those rows arrived in is load-bearing, so it must come from here.
+    //
+    // What it does NOT cover, so nothing reads it as more: it keys on this
+    // exact identifier, so a walker whose accumulator is spelled some other
+    // way escapes it, and the exemption proves only that the file mentions
+    // `applyRegisterOrder`, not that the query feeding the walk is the one it
+    // ordered. It currently matches the account CSV export and nothing else --
+    // `transactions.service.ts` carries the token nowhere, and the assertions
+    // above are what hold that file. Matching case-insensitively also names
+    // `buildRunningBalanceMap` in the loan payment detector, which walks a
+    // balance over an array it does not order itself; that is a separate
+    // question from this PR's and is reported rather than widened into here.
     const offenders = backendSources()
       .filter(([, content]) => /\brunningBalance\b/.test(content))
       .filter(([, content]) => !/applyRegisterOrder\(/.test(content))

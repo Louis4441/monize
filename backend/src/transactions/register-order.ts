@@ -3,12 +3,16 @@ import { ObjectLiteral, SelectQueryBuilder } from "typeorm";
 /**
  * The order the register lists transactions in, written once.
  *
- * Four queries have to agree on it, and only one of them is the register: the
- * other three sum the rows on *previous pages* so page N's running balance can
- * start from the right number. A tiebreak added to the register alone silently
- * re-splits the pages under those sums, and every balance from page 2 down is
- * wrong by whichever rows crossed the boundary. That is the "a predicate that
- * decides which row counts is written once" rule applied to an ORDER BY.
+ * More than one query has to agree on it, and only one of them is the
+ * register: the others sum the rows the register lists NEWER than the page
+ * being shown, so that page's running balance can start from the right
+ * number. Those are the pages above it when the register runs newest-first
+ * and the pages below it when it runs oldest-first, which is why the window
+ * is written once too (`restrictToRowsNewerThanPage` below). A tiebreak added
+ * to the register alone silently re-splits the pages under those sums, and
+ * every balance away from the newest page is wrong by whichever rows crossed
+ * the boundary. That is the "a predicate that decides which row counts is
+ * written once" rule applied to an ORDER BY.
  *
  * ## Why `amount` is in here
  *
@@ -154,7 +158,13 @@ export function registerPrimaryOrder(
     case "amount":
       return { expression: `${transactionAlias}.amount` };
     case "status":
-      return { expression: `${transactionAlias}.status` };
+      // `status` is defaulted in the schema, not NOT NULL, so it sinks with
+      // every other nullable column rather than riding one direction of the
+      // sort to the top.
+      return {
+        expression: `${transactionAlias}.status`,
+        nulls: "NULLS LAST",
+      };
     case "payee":
       return {
         expression: `${transactionAlias}.payeeName`,

@@ -3089,6 +3089,101 @@ describe("TransactionsService", () => {
       expect(result.startingBalance).toBe(1000);
     });
 
+    it("rounds the starting balance, because a delta is money too", async () => {
+      // The projected balance comes back rounded; subtracting a raw SUM from
+      // it un-rounds the result, so the response carried
+      // 0.08999999999999986 where the account holds 0.09. Every consumer of
+      // startingBalance inherits that -- the register absorbs it only because
+      // its own walk rescales to integer cents.
+      const mockTx = {
+        id: "tx-2",
+        userId: "user-1",
+        accountId: "account-1",
+        amount: 0.09,
+        status: TransactionStatus.UNRECONCILED,
+        isCleared: false,
+        isReconciled: false,
+        isVoid: false,
+        splits: [],
+      };
+      const mockQb = createMockQueryBuilder();
+      mockQb.getManyAndCount.mockResolvedValue([[mockTx], 51]);
+      const sumQb = createMockQueryBuilder({
+        setParameters: jest.fn().mockReturnThis(),
+      });
+      sumQb.getRawOne.mockResolvedValue({ sum: 8.2 });
+      const newerRowsQb = createMockQueryBuilder();
+      newerRowsQb.getQuery.mockReturnValue("SELECT t.id FROM ...");
+      newerRowsQb.getParameters.mockReturnValue({ userId: "user-1" });
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(mockQb)
+        .mockReturnValueOnce(newerRowsQb)
+        .mockReturnValueOnce(sumQb);
+      investmentTxRepository.find.mockResolvedValue([]);
+      accountsService.findOne.mockResolvedValue({
+        ...mockAccount,
+        currentBalance: 8.29,
+      });
+      accountsService.getProjectedBalance.mockResolvedValue(8.29);
+
+      const result = await service.findAll(
+        "user-1",
+        ["account-1"],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        2,
+        50,
+      );
+
+      expect(result.startingBalance).toBe(0.09);
+    });
+
+    it("treats a whitespace-only search as no search, as the listing does", async () => {
+      // The listing guards on a trimmed value, so a search of a single space
+      // filters nothing and the register shows every row. Treating it as a
+      // content filter here flips the balance to the zero-based regime, and
+      // the account's opening balance silently disappears from the column.
+      const mockTx = {
+        id: "tx-1",
+        userId: "user-1",
+        accountId: "account-1",
+        amount: -10,
+        status: TransactionStatus.UNRECONCILED,
+        isCleared: false,
+        isReconciled: false,
+        isVoid: false,
+        splits: [],
+      };
+      const mockQb = createMockQueryBuilder();
+      mockQb.getManyAndCount.mockResolvedValue([[mockTx], 1]);
+      transactionsRepository.createQueryBuilder.mockReturnValue(mockQb);
+      investmentTxRepository.find.mockResolvedValue([]);
+      accountsService.findOne.mockResolvedValue({
+        ...mockAccount,
+        currentBalance: 990,
+      });
+      accountsService.getProjectedBalance.mockResolvedValue(990);
+
+      const result = await service.findAll(
+        "user-1",
+        ["account-1"],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        1,
+        50,
+        false,
+        "   ",
+      );
+
+      // The unfiltered regime, newest page: the account's own balance, not a
+      // zero-based total over the rows that happen to be on screen.
+      expect(result.startingBalance).toBe(990);
+    });
+
     it("does not compute starting balance for multiple accounts without filters", async () => {
       const mockQb = createMockQueryBuilder();
       mockQb.getManyAndCount.mockResolvedValue([[], 0]);

@@ -512,6 +512,56 @@ describe("register sorting (integration)", () => {
       });
     });
 
+    it("under the uncategorised pseudo-category, which matches through splits", async () => {
+      // The listing matches a split parent whose child has no category; the
+      // balance's own row set did not, so it summed fewer rows than the
+      // register listed. That was a short total while the register only ever
+      // ran newest-first. It is worse now: the same set is what the
+      // oldest-first page window offsets into, while the page boundaries come
+      // from the listing's total -- so the two directions stop naming
+      // complementary halves and one row reads two different balances.
+      await withUserContext(userId, async () => {
+        await service.create(userId, {
+          accountId,
+          transactionDate: "2026-01-07",
+          amount: -50,
+          currencyCode: "USD",
+          payeeName: "Frank",
+          isSplit: true,
+          splits: [
+            { categoryId: alphaCategoryId, amount: -20 },
+            { categoryId: null, amount: -30 },
+          ],
+        } as never);
+      });
+
+      // The register shows that parent with only its uncategorised line
+      // hydrated, so the balance beside it counts -30, not the whole -50.
+      await expectSeedMatchesShownRows({
+        accountIds: [accountId],
+        categoryIds: ["uncategorized"],
+      });
+      // Page size 2 puts the parent and the boundary in different places in
+      // the two directions, which is what the defect needed to show itself.
+      await expectBalanceParity({
+        accountIds: [accountId],
+        categoryIds: ["uncategorized"],
+        limit: 2,
+      });
+      // The pseudo-categories are alternatives to each other, so combining
+      // them must widen the set rather than intersect it.
+      await expectBalanceParity({
+        accountIds: [accountId],
+        categoryIds: ["uncategorized", "transfer"],
+        limit: 2,
+      });
+      await expectBalanceParity({
+        accountIds: [accountId],
+        categoryIds: ["uncategorized", alphaCategoryId],
+        limit: 2,
+      });
+    });
+
     it("and the parity across directions survives those filters", async () => {
       await expectBalanceParity({
         accountIds: [accountId],
