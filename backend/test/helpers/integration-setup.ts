@@ -23,6 +23,7 @@ import {
   TEST_APP_ROLE_PASSWORD,
 } from "./rls-setup";
 import { settlePendingPriceWrites } from "@/securities/security-price.service";
+import { settlePendingHistoryWrites } from "@/action-history/action-history.service";
 import { DatabaseStorageProvider } from "@/attachments/storage/database-storage.provider";
 import { ATTACHMENT_STORAGE_PROVIDER } from "@/attachments/storage/attachment-storage.interface";
 import { AttachmentStorageRegistry } from "@/attachments/storage/attachment-storage.registry";
@@ -50,6 +51,15 @@ export const INTEGRATION_TYPEORM_OPTIONS: TypeOrmModuleOptions = {
   entities: [__dirname + "/../../src/**/*.entity{.ts,.js}"],
   synchronize: true,
   dropSchema: true,
+  // Derived-state writes are fire-and-forget by design (undo entries, net-worth
+  // recalcs, price backfills), so a fixture that writes a handful of rows per
+  // test leaves several transactions still draining when the test body starts.
+  // The node-postgres default pool of 10 is too small to absorb that, and its
+  // default `connectionTimeoutMillis` of 0 means a caller that cannot get a
+  // connection waits FOREVER -- which surfaces as jest's 30s per-test timeout
+  // with nothing naming the pool. A finite acquire timeout turns that into
+  // "timeout exceeded when trying to connect", which says what happened.
+  extra: { max: 20, connectionTimeoutMillis: 10000 },
 };
 
 /**
@@ -227,6 +237,10 @@ export async function cleanTables(
   // work that has started, not on a duration, so it costs nothing when there
   // is none.
   await settlePendingPriceWrites();
+  // The same problem for undo entries: `record` is never awaited by its
+  // callers, so a history INSERT can be in flight against the `users` row
+  // this truncate is about to remove.
+  await settlePendingHistoryWrites();
   const tables = tableNames.join(", ");
   await dataSource.query(`TRUNCATE ${tables} CASCADE`);
 }

@@ -17,6 +17,7 @@ import {
   createTestUserDirect,
 } from "../helpers/integration-setup";
 import { withUserContext } from "@/common/db/with-context";
+import { settlePendingHistoryWrites } from "@/action-history/action-history.service";
 import {
   createTestAccount,
   createTestCategory,
@@ -364,6 +365,11 @@ describe("register sorting (integration)", () => {
         status: TransactionStatus.UNRECONCILED,
       } as never),
     ]);
+
+    // The fixture above writes through the service, and every write fires an
+    // undo entry nobody awaits. Draining them here is what stops a test body
+    // starting while those chains still hold pooled connections.
+    await settlePendingHistoryWrites();
   });
 
   describe("a row's balance is the same figure whichever way the register runs", () => {
