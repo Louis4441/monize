@@ -309,6 +309,11 @@ vi.mock('@/components/transactions/TransactionList', () => ({
           Sort by date
         </button>
       )}
+      {props.onSortChange && (
+        <button data-testid="sort-payee" onClick={() => props.onSortChange('payee')}>
+          Sort by payee
+        </button>
+      )}
       <span data-testid="selection-mode">{props.selectionMode ? 'on' : 'off'}</span>
       {props.onToggleSelection && (
         <button data-testid="select-tx-1" onClick={() => props.onToggleSelection('tx-1')}>
@@ -2793,5 +2798,138 @@ describe('TransactionsPage register sorting', () => {
       expect(lastGetAllParams()).toMatchObject({ sortBy: 'date', sortDirection: 'asc' });
     });
     expect(screen.getByTestId('sort')).toHaveTextContent('date:asc');
+  });
+
+  it('reads the register once for a deep link that arrives in the URL', async () => {
+    // A `targetTransactionId` in the mount URL is not a filter change, so it
+    // takes the loader's undebounced branch: nothing coalesces a second read
+    // there. Remembering the date fallback from inside the loader used to
+    // change the loader's own identity and fire one -- with the target already
+    // consumed, for whatever page the register was on, racing the page the
+    // first read resolved. Whichever answered last won, so the reader could
+    // land on page 1 with the row they followed nowhere on it.
+    mockSearchParams.value =
+      'targetTransactionId=11111111-1111-4111-8111-111111111111';
+    mockUseLocalStorage.mockImplementation((key: string, defaultValue: any) => {
+      const [value, setValue] = React.useState(
+        key === TRANSACTION_SORT_STORAGE_KEY
+          ? { field: 'amount', direction: 'asc' }
+          : defaultValue,
+      );
+      return [value, setValue];
+    });
+
+    render(<TransactionsPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId('rows-sort')).toHaveTextContent('date:asc');
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    });
+
+    const reads = mockGetAll.mock.calls.map(([params]: any[]) => ({
+      page: params.page,
+      target: params.targetTransactionId,
+      sortBy: params.sortBy,
+    }));
+    expect(reads).toEqual([
+      {
+        page: 1,
+        target: '11111111-1111-4111-8111-111111111111',
+        sortBy: 'date',
+      },
+      { page: 3, target: undefined, sortBy: 'date' },
+    ]);
+  });
+
+  it('reads the register once to follow a transfer to its other leg', async () => {
+    // The same shape on the path that goes through a filter change, where the
+    // debounce would coalesce a duplicate rather than let it race.
+    render(<TransactionsPage />);
+    await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('sort-amount'));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('rows-sort')).toHaveTextContent('amount:asc');
+    });
+
+    const before = mockGetAll.mock.calls.length;
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('transfer-click-btn'));
+    });
+    await waitFor(() => {
+      expect(lastGetAllParams()).toMatchObject({ targetTransactionId: 'tx-linked' });
+    });
+    // Settle anything the response itself scheduled before counting.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    });
+
+    // The read that follows carries the page the first one resolved, which is
+    // the pager catching up. A read for the page the register was already on,
+    // with the target gone, is the duplicate: it answers a question nobody
+    // asked and can overwrite the row's page with the one it replaced.
+    const reads = mockGetAll.mock.calls
+      .slice(before)
+      .map(([params]: any[]) => ({
+        page: params.page,
+        target: params.targetTransactionId,
+      }));
+    expect(reads).toEqual([
+      { page: 1, target: 'tx-linked' },
+      { page: 3, target: undefined },
+    ]);
+  });
+
+  it('discards a reply a newer request has already superseded', async () => {
+    // Two header clicks further apart than the debounce put two reads in
+    // flight. Without a sequence the display is whichever answered last, so a
+    // slow amount-ordered page can land under a Payee-active header.
+    render(<TransactionsPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId('rows-sort')).toHaveTextContent('date:desc');
+    });
+
+    const before = mockGetAll.mock.calls.length;
+    let releaseSlow: (value: unknown) => void = () => {};
+    mockGetAll.mockImplementationOnce(
+      () => new Promise((resolve) => { releaseSlow = resolve; }),
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('sort-amount'));
+    });
+    // The slow read has to be in flight before the second click, or the
+    // debounce cancels it and there is nothing to arrive late.
+    await waitFor(() => {
+      expect(mockGetAll.mock.calls.length).toBeGreaterThan(before);
+    });
+
+    mockGetAll.mockResolvedValue({
+      data: mockTransactions,
+      pagination: { page: 1, totalPages: 1, total: 3 },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('sort-payee'));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('rows-sort')).toHaveTextContent('payee:asc');
+    });
+
+    // The abandoned amount request answers now, and must change nothing.
+    await act(async () => {
+      releaseSlow({
+        data: [],
+        pagination: { page: 9, totalPages: 9, total: 400 },
+        startingBalanceWithheld: 'sort',
+      });
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('rows-sort')).toHaveTextContent('payee:asc');
+    expect(screen.getByTestId('tx-count')).toHaveTextContent(
+      `${mockTransactions.length} transactions`,
+    );
+    expect(screen.getByTestId('balance-withheld')).toHaveTextContent('none');
   });
 });

@@ -265,6 +265,17 @@ function TransactionsContent() {
     () => resolveRegisterSort(storedSort, isSingleAccountView),
     [storedSort, isSingleAccountView],
   );
+  // The loader reads the sort from here rather than closing over it, so
+  // remembering a deep link's fallback order does not re-run the reload effect
+  // and fire a second read for the same click. Every other thing the effect
+  // watches is a filter it already depends on, so a sort change needs its own
+  // trigger: the register is already on page 1 half the time, and nothing else
+  // in the dependency list moves.
+  const registerSortRef = useRef(registerSort);
+  registerSortRef.current = registerSort;
+  const [sortRequestTick, setSortRequestTick] = useState(0);
+  // Which register read is the newest; only that one may write state.
+  const requestSeqRef = useRef(0);
 
   const handleSortChange = useCallback(
     (field: TransactionSortField) => {
@@ -275,6 +286,7 @@ function TransactionsContent() {
       // there returns exactly what is already on screen: a click that moves no
       // arrow, reverses nothing, and still drops the reader back to page 1.
       setSort(nextTransactionSort(registerSort, field));
+      setSortRequestTick((tick) => tick + 1);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [registerSort, setSort],
@@ -330,6 +342,13 @@ function TransactionsContent() {
   // Load transaction data and chart data in parallel
   const loadTransactions = useCallback(async (page: number) => {
     const safePage = (!page || page < 1) ? 1 : page;
+    // Which request this is. Two header clicks further apart than the debounce
+    // put two register reads in flight, and without a sequence the display is
+    // whichever one answered last rather than the one the reader asked for
+    // last: amount-ordered rows under a Payee header, or page 1 over the page
+    // a deep link had just resolved. Only the newest request may write state.
+    const seq = ++requestSeqRef.current;
+    const isCurrentRequest = () => seq === requestSeqRef.current;
     try {
       const targetTransactionId = filters.targetTransactionIdRef.current;
       filters.targetTransactionIdRef.current = null;
@@ -340,7 +359,12 @@ function TransactionsContent() {
       // order, keeping the direction, exactly as it already drops the filters
       // that would have hidden the row. Remembering it too keeps the headers
       // agreeing with the rows.
-      let effectiveSort = registerSort;
+      //
+      // Read from a ref rather than closed over, so that `setSort` below does
+      // not change this callback's identity: it would re-run the reload effect
+      // and fire a second register read for the same click, this time with the
+      // target already consumed, racing the page the first one resolved.
+      let effectiveSort = registerSortRef.current;
       if (targetTransactionId && effectiveSort.field !== 'date') {
         effectiveSort = { field: 'date', direction: effectiveSort.direction };
         setSort(effectiveSort);
@@ -408,6 +432,11 @@ function TransactionsContent() {
         chartPromise,
       ]);
 
+      // A reply that a newer request has already superseded is discarded whole
+      // -- rows, pagination, balance, order and charts together -- rather than
+      // written over half of the newer one's state.
+      if (!isCurrentRequest()) return;
+
       setTransactions(transactionsResponse.data);
       setPagination(transactionsResponse.pagination);
       setStartingBalance(transactionsResponse.startingBalance);
@@ -444,15 +473,21 @@ function TransactionsContent() {
         budgetsApi.getCategoryBudgetStatus(categoryIds).then(setBudgetStatusMap).catch(() => {});
       }
     } catch (error) {
+      // A superseded request's failure is not this register's failure: the
+      // reader is waiting on a newer one, and a toast for the one they
+      // abandoned only tells them something is broken that is not.
+      if (!isCurrentRequest()) return;
       showErrorToast(error, t('toasts.loadFailed'));
       logger.error(error);
     } finally {
-      setIsLoading(false);
-      // Signal the entity info widgets to refetch their summaries in lockstep
-      // with the freshly loaded chart/list data.
-      setReloadKey((k) => k + 1);
+      if (isCurrentRequest()) {
+        setIsLoading(false);
+        // Signal the entity info widgets to refetch their summaries in lockstep
+        // with the freshly loaded chart/list data.
+        setReloadKey((k) => k + 1);
+      }
     }
-  }, [accountIdsForQuery, filters.filterAccountStatus, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo, filters.filterStatuses, filters.filterOriginalCurrencyCodes, filters.filterTagKey, filters.filterTagKeyOp, filters.filterTagKeyValue, filters.filterHasAttachments, registerSort, t]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [accountIdsForQuery, filters.filterAccountStatus, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo, filters.filterStatuses, filters.filterOriginalCurrencyCodes, filters.filterTagKey, filters.filterTagKeyOp, filters.filterTagKeyValue, filters.filterHasAttachments, t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadData = useCallback(async (page: number = filters.currentPage) => {
     await loadTransactions(page);
@@ -525,7 +560,7 @@ function TransactionsContent() {
     } else {
       loadTransactions(page);
     }
-  }, [filters.currentPage, filters.filterAccountIds, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo, filters.filterStatuses, filters.filterOriginalCurrencyCodes, filters.filterTagKey, filters.filterTagKeyOp, filters.filterTagKeyValue, filters.filterHasAttachments, filters.updateUrl, loadTransactions, filters.filtersInitialized, undoRedoTick]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filters.currentPage, filters.filterAccountIds, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo, filters.filterStatuses, filters.filterOriginalCurrencyCodes, filters.filterTagKey, filters.filterTagKeyOp, filters.filterTagKeyValue, filters.filterHasAttachments, filters.updateUrl, loadTransactions, filters.filtersInitialized, undoRedoTick, sortRequestTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Once the deep-linked transaction is actually on the page, let the flash
   // linger briefly then clear it, so the highlight does not stick around on
