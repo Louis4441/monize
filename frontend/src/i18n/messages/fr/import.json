@@ -395,7 +395,7 @@
       "importPrices": "Importer l'historique du cours",
       "importPricesHint": "Le relevé que Money conserve de la valeur de chaque titre, jour par jour. Désactivez cette option si vous préférez partir des cours actuels.",
       "importExchangeRates": "Importer les taux de change",
-      "importExchangeRatesHint": "Taux historiques entre les devises de votre fichier, pour que les anciennes opérations en devise étrangère soient converties comme Money les convertissait.",
+      "importExchangeRatesHint": "Taux historiques entre les devises de votre fichier, utilisés uniquement aux dates pour lesquelles Monize n'a aucun taux. Les taux déjà enregistrés ne sont jamais remplacés.",
       "wipeExistingData": "Repartir de zéro : supprimer d'abord mes données Monize existantes",
       "wipeExistingDataHint": "Exécute la même opération Supprimer mes données que dans les Paramètres avant l'import. Une confirmation vous sera demandée. Laissez cette option désactivée pour ajouter le fichier Money à vos données existantes."
     },

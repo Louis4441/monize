@@ -530,7 +530,7 @@ real mappers and, in the integration spec, the real INSERT path.
 |---|---|---|
 | `DHD` (file defaults) | base currency context | Spike-confirmed field for the file's default currency handle; fallback = user's `default_currency` preference. Never a hardcoded literal |
 | `CRNC` | `currencies` via `ensureSystemCurrency` | Only currencies actually referenced by imported accounts/securities/rates |
-| `CRNC_EXCHG` | `exchange_rates` | Additive upsert on `(from, to, rate_date)`; toggle-controlled |
+| `CRNC_EXCHG` | `exchange_rates` | Additive insert on `(from, to, rate_date)` that never replaces an existing row, because the table is shared by every user (INV-FX-004); toggle-controlled |
 | `PAY` | `payees` | Referenced-only (default), degenerate-name filter, existing-payee find-or-create by name |
 | `CAT` | `categories` | Parents before children (`nLevel`); flatten deeper than two levels into `Parent:Child` names; `is_income` derived per spike (root-ancestor classification, transaction-sign heuristic as fallback); referenced-only default |
 | `SEC` (`sct != 4`) | `securities` | Per-user unique symbol; collision suffixing (`VOO-2`) + warning; empty symbols get unique placeholders with `skip_price_updates`; currency via `CRNC` map |

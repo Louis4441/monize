@@ -395,7 +395,7 @@
       "importPrices": "Koersgeschiedenis importeren",
       "importPricesHint": "De eigen registratie van Money van wat elk effect dag na dag waard was. Zet dit uit als u liever met actuele koersen begint.",
       "importExchangeRates": "Wisselkoersen importeren",
-      "importExchangeRatesHint": "Historische koersen tussen de valuta's in uw bestand, zodat oude transacties in vreemde valuta net zo worden omgerekend als Money ze omrekende.",
+      "importExchangeRatesHint": "Historische koersen tussen de valuta's in uw bestand, alleen gebruikt voor datums waarvoor Monize geen koers heeft. Reeds opgeslagen koersen worden nooit vervangen.",
       "wipeExistingData": "Opnieuw beginnen: verwijder eerst mijn bestaande Monize-gegevens",
       "wipeExistingDataHint": "Voert vóór het importeren dezelfde bewerking Mijn gegevens verwijderen uit als in Instellingen. Er wordt om bevestiging gevraagd. Laat dit uit om het Money-bestand toe te voegen aan wat u al hebt."
     },

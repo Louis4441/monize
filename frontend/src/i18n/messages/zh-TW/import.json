@@ -395,7 +395,7 @@
       "importPrices": "匯入價格歷史",
       "importPricesHint": "Money 自己記錄的每檔證券逐日價值。若您想從目前報價開始，請關閉此項。",
       "importExchangeRates": "匯入匯率",
-      "importExchangeRatesHint": "檔案中各幣別之間的歷史匯率，讓過去的外幣交易依 Money 當時的方式換算。",
+      "importExchangeRatesHint": "檔案中各幣別之間的歷史匯率，僅用於 Monize 尚無匯率的日期。已儲存的匯率絕不會被取代。",
       "wipeExistingData": "從零開始：先刪除我現有的 Monize 資料",
       "wipeExistingDataHint": "匯入前執行與設定中相同的「刪除我的資料」操作。系統會要求確認。保持關閉可將 Money 檔案加入現有資料中。"
     },

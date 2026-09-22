@@ -395,7 +395,7 @@
       "importPrices": "Importuj historię cen",
       "importPricesHint": "Zapis Money o tym, ile każdy papier był wart dzień po dniu. Wyłącz, jeśli wolisz zacząć od bieżących notowań.",
       "importExchangeRates": "Importuj kursy walut",
-      "importExchangeRatesHint": "Historyczne kursy między walutami z Twojego pliku, aby dawne operacje walutowe przeliczały się tak, jak przeliczał je Money.",
+      "importExchangeRatesHint": "Historyczne kursy między walutami z Twojego pliku, używane tylko w dniach, dla których Monize nie ma kursu. Już zapisane kursy nigdy nie są zastępowane.",
       "wipeExistingData": "Zacznij od nowa: najpierw usuń moje istniejące dane Monize",
       "wipeExistingDataHint": "Przed importem wykonuje tę samą operację Usuń moje dane co w Ustawieniach. Zostaniesz poproszony o potwierdzenie. Zostaw wyłączone, aby dodać plik Money do tego, co już masz."
     },

@@ -313,8 +313,9 @@ describe("resolveExchangeRates", () => {
 });
 
 describe("writeExchangeRates", () => {
-  it("upserts additively on the pair and date", async () => {
+  it("inserts additively on the pair and date", async () => {
     const { manager, query } = doubles();
+    query.mockResolvedValueOnce([{ id: 1 }]);
 
     const written = await writeExchangeRates(
       manager,
@@ -343,6 +344,68 @@ describe("writeExchangeRates", () => {
       "2026-01-05",
       MNY_PRICE_SOURCE,
     ]);
+  });
+
+  // INV-FX-004. `exchange_rates` is shared by every user on the deployment, so a
+  // Money file -- which may record what one user's bank charged rather than the
+  // market -- must not replace a rate already there. The writer used to
+  // `DO UPDATE`, which let one user's import revalue every other user's history.
+  it("never overwrites a rate the global table already holds", async () => {
+    const { manager, query } = doubles();
+
+    await writeExchangeRates(
+      manager,
+      [
+        mnyExchangeRate({
+          fromCurrency: 1,
+          toCurrency: 2,
+          rate: 4.17,
+          date: "2026-01-05",
+        }),
+      ],
+      new Map([
+        [1, "EUR"],
+        [2, "PLN"],
+      ]),
+    );
+
+    const sql = query.mock.calls[0][0] as string;
+    expect(sql).toMatch(
+      /ON CONFLICT \(from_currency, to_currency, rate_date\) DO NOTHING/,
+    );
+    expect(sql).not.toMatch(/DO\s+UPDATE/i);
+  });
+
+  it("counts only the rows that landed, not the ones a conflict skipped", async () => {
+    const { manager, query } = doubles();
+    // Two usable rates offered; the database already held one of them, so the
+    // insert returns a single row.
+    query.mockResolvedValueOnce([{ id: 7 }]);
+
+    const written = await writeExchangeRates(
+      manager,
+      [
+        mnyExchangeRate({
+          fromCurrency: 1,
+          toCurrency: 2,
+          rate: 4.17,
+          date: "2026-01-05",
+        }),
+        mnyExchangeRate({
+          fromCurrency: 1,
+          toCurrency: 2,
+          rate: 4.18,
+          date: "2026-01-06",
+        }),
+      ],
+      new Map([
+        [1, "EUR"],
+        [2, "PLN"],
+      ]),
+    );
+
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(written).toBe(1);
   });
 
   it("issues no statement when the file has no usable rates", async () => {
