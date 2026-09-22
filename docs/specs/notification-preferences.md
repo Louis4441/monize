@@ -926,10 +926,12 @@ the backend through the Next.js proxy (`frontend/src/proxy.ts`), so the
 backend's socket peer is always that proxy; what `req.ip` resolves to is
 whatever `X-Forwarded-For` the proxy set. Next.js middleware cannot see the
 connecting socket either (`NextRequest.ip` was Vercel-only and was removed in
-Next 15), so the proxy forwards the address the operator's reverse proxy put in
-`X-Real-IP` or at the head of `X-Forwarded-For` (`assertedClientAddress`,
-`frontend/src/lib/client-address.ts`) -- and forwards NOTHING when neither is
-present, so a browser's own `X-Forwarded-For` can never pass through unaltered.
+Next 15), so the proxy forwards the address the operator's reverse proxy
+appended to `X-Forwarded-For`, read `TRUSTED_PROXY_HOPS` entries from the right
+(or a dedicated header only when `CLIENT_IP_HEADER` names it;
+`assertedClientAddress`, `frontend/src/lib/client-address.ts`) -- and forwards
+NOTHING when there is none, so a browser's own `X-Forwarded-For` can never pass
+through unaltered.
 The predecessor fell back to the literal `127.0.0.1`, which every deployment
 behind an edge that sets only `X-Forwarded-For` (Traefik, most cloud load
 balancers) then recorded against every registration and every trusted device --

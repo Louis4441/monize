@@ -6,6 +6,8 @@ import {
   BadRequestException,
   ForbiddenException,
   NotFoundException,
+  HttpException,
+  HttpStatus,
 } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import bcrypt from "bcryptjs";
@@ -1120,6 +1122,79 @@ describe("TwoFactorService", () => {
         "Too many verification attempts. Your account has been temporarily locked.",
       );
       expect(otplib.verifySync).not.toHaveBeenCalled();
+    });
+
+    /**
+     * The authenticated management endpoints check a code against the same
+     * secret, so they draw from the same per-user budget. Before, they verified
+     * a TOTP code with no attempt limit at all: a stolen session could guess
+     * its way to disabling 2FA bounded only by the per-IP throttle, which a
+     * forwarded header could reset.
+     */
+    describe.each([
+      ["disable2FA", (code: string) => service.disable2FA("user-1", code)],
+      [
+        "generateBackupCodes",
+        (code: string) => service.generateBackupCodes("user-1", code),
+      ],
+    ] as const)("%s", (_name, call) => {
+      it("counts a wrong code against the per-user 2FA budget", async () => {
+        (otplib.verifySync as jest.Mock).mockReturnValue({ valid: false });
+
+        await expect(call("000000")).rejects.toThrow(BadRequestException);
+
+        expect(attemptCounters.increment).toHaveBeenCalledWith(
+          TWO_FACTOR_USER_SCOPE,
+          "user-1",
+          5 * 60 * 1000,
+          "sliding",
+        );
+      });
+
+      it("refuses with 429 once the budget is spent, before checking the code", async () => {
+        attemptCounters.rows.set(`${TWO_FACTOR_USER_SCOPE}\u0000user-1`, {
+          count: 10,
+          windowExpiresAt: new Date(Date.now() + 60_000),
+        });
+        (otplib.verifySync as jest.Mock).mockReturnValue({ valid: true });
+
+        const refusal = await call("123456").catch((error: unknown) => error);
+
+        expect(refusal).toBeInstanceOf(HttpException);
+        expect((refusal as HttpException).getStatus()).toBe(
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+        expect(otplib.verifySync).not.toHaveBeenCalled();
+        expect(usersRepository.save).not.toHaveBeenCalled();
+      });
+
+      it("locks the account on the failure that reaches the threshold", async () => {
+        attemptCounters.rows.set(`${TWO_FACTOR_USER_SCOPE}\u0000user-1`, {
+          count: 9,
+          windowExpiresAt: new Date(Date.now() + 60_000),
+        });
+        (otplib.verifySync as jest.Mock).mockReturnValue({ valid: false });
+
+        await expect(call("000000")).rejects.toThrow(BadRequestException);
+
+        const builder = usersRepository.createQueryBuilder.mock.results[0]
+          ?.value as { set: jest.Mock };
+        expect(builder.set).toHaveBeenCalledWith({
+          lockedUntil: expect.any(Date),
+        });
+      });
+
+      it("clears the per-user count on success", async () => {
+        (otplib.verifySync as jest.Mock).mockReturnValue({ valid: true });
+        preferencesRow.seed({ userId: "user-1", twoFactorEnabled: true });
+
+        await call("123456");
+
+        expect(attemptCounters.reset).toHaveBeenCalledWith(
+          TWO_FACTOR_USER_SCOPE,
+          "user-1",
+        );
+      });
     });
   });
 

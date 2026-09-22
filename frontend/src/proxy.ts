@@ -187,11 +187,11 @@ export async function proxy(request: NextRequest) {
     const headers = new Headers(request.headers);
     headers.delete('host');
     // X-Forwarded-For is REPLACED, never passed through, so a browser's own
-    // cannot reach the backend: either the edge asserted an address and that is
-    // what travels, or nothing does. The literal `127.0.0.1` this used to fall
-    // back to was worse than nothing -- every deployment whose edge sets
-    // X-Forwarded-For rather than X-Real-IP (Traefik, most load balancers)
-    // recorded loopback against every push registration and trusted device,
+    // cannot reach the backend: the one address the trusted edge vouches for
+    // travels (read from the right of the chain, `assertedClientAddress`), or
+    // nothing does. The backend keys every per-IP rate limit on it. The literal
+    // `127.0.0.1` this used to fall back to was worse than nothing -- it was
+    // recorded against every push registration and trusted device,
     // indistinguishable from a real connection from the server itself.
     const clientIp = assertedClientAddress(request.headers);
     if (clientIp) headers.set('x-forwarded-for', clientIp);

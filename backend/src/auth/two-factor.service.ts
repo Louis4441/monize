@@ -4,6 +4,8 @@ import {
   BadRequestException,
   ForbiddenException,
   NotFoundException,
+  HttpException,
+  HttpStatus,
   Logger,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
@@ -165,11 +167,7 @@ export class TwoFactorService {
     }
 
     // Per-user rate limiting: prevents brute-force multiplication via multiple tempTokens
-    const userAttempts = await this.attemptCounters.peek(
-      TWO_FACTOR_USER_SCOPE,
-      payload.sub,
-    );
-    if (userAttempts >= this.MAX_USER_2FA_ATTEMPTS) {
+    if (await this.userTotpBudgetSpent(payload.sub)) {
       this.logger.warn(
         `2FA verification blocked: too many attempts for user ${payload.sub}`,
       );
@@ -236,28 +234,8 @@ export class TwoFactorService {
         "sliding",
       );
 
-      // Track failed attempt per-user
-      const { count: newUserCount } = await this.attemptCounters.increment(
-        TWO_FACTOR_USER_SCOPE,
-        payload.sub,
-        this.ATTEMPT_WINDOW_MS,
-        "sliding",
-      );
-
-      // Lock account after exceeding per-user threshold
-      if (newUserCount >= this.MAX_USER_2FA_ATTEMPTS) {
-        await this.scoped(User, (repo) =>
-          repo
-            .createQueryBuilder()
-            .update(User)
-            .set({ lockedUntil: new Date(Date.now() + this.BASE_LOCKOUT_MS) })
-            .where("id = :id", { id: user.id })
-            .execute(),
-        );
-        this.logger.warn(
-          `Account locked after ${newUserCount} failed 2FA attempts for user ${user.id}`,
-        );
-      }
+      // Track failed attempt per-user, locking the account at the threshold
+      await this.recordUserTotpFailure(user.id);
 
       this.logger.warn(
         `2FA verification failed: invalid code for user ${user.id}`,
@@ -301,6 +279,73 @@ export class TwoFactorService {
       trustedDeviceRef,
       rememberMe,
     };
+  }
+
+  /**
+   * Whether `userId`'s per-user TOTP budget is spent.
+   *
+   * One budget per secret, shared by every path that checks a code against it:
+   * the login verification and the two authenticated management endpoints
+   * (`disable2FA`, `generateBackupCodes`). Guessing through a stolen session is
+   * guessing the same six digits, so it draws from the same allowance -- a
+   * separate counter per endpoint would multiply what an attacker gets. Keyed
+   * by user rather than by client address, so no forwarded header moves it.
+   */
+  private async userTotpBudgetSpent(userId: string): Promise<boolean> {
+    const attempts = await this.attemptCounters.peek(
+      TWO_FACTOR_USER_SCOPE,
+      userId,
+    );
+    return attempts >= this.MAX_USER_2FA_ATTEMPTS;
+  }
+
+  /**
+   * Count one wrong code against `userId` and lock the account when the count
+   * reaches the threshold. "sliding", because that is what the `Map` entries
+   * this replaced did: each failure pushed the expiry out, so a run of failures
+   * only lapses after a full quiet window. Under a fixed window an attacker
+   * spacing attempts one per window never accumulates (see `AttemptWindow`).
+   */
+  private async recordUserTotpFailure(userId: string): Promise<void> {
+    const { count } = await this.attemptCounters.increment(
+      TWO_FACTOR_USER_SCOPE,
+      userId,
+      this.ATTEMPT_WINDOW_MS,
+      "sliding",
+    );
+    if (count >= this.MAX_USER_2FA_ATTEMPTS) {
+      await this.scoped(User, (repo) =>
+        repo
+          .createQueryBuilder()
+          .update(User)
+          .set({ lockedUntil: new Date(Date.now() + this.BASE_LOCKOUT_MS) })
+          .where("id = :id", { id: userId })
+          .execute(),
+      );
+      this.logger.warn(
+        `Account locked after ${count} failed 2FA attempts for user ${userId}`,
+      );
+    }
+  }
+
+  /**
+   * Refuse an authenticated 2FA-management request whose user has spent the
+   * TOTP budget. 429 rather than 401: the session is valid, and a 401 would
+   * send the client into its refresh-and-sign-out path.
+   */
+  private async assertManagementTotpBudget(userId: string): Promise<void> {
+    if (await this.userTotpBudgetSpent(userId)) {
+      this.logger.warn(
+        `2FA management blocked: too many attempts for user ${userId}`,
+      );
+      throw new HttpException(
+        tr(
+          "errors.http.tooManyRequests",
+          "Too many requests. Please wait a few minutes and try again.",
+        ),
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
   }
 
   /**
@@ -483,14 +528,18 @@ export class TwoFactorService {
       );
     }
 
+    await this.assertManagementTotpBudget(user.id);
+
     const { secret } = this.decryptTotpSecret(user.twoFactorSecret);
     const isValid = otplib.verifySync({ token: code, secret }).valid;
 
     if (!isValid) {
+      await this.recordUserTotpFailure(user.id);
       throw new BadRequestException(
         tr("errors.auth.invalidVerificationCode", "Invalid verification code"),
       );
     }
+    await this.attemptCounters.reset(TWO_FACTOR_USER_SCOPE, user.id);
 
     // Clear secret and disable
     user.twoFactorSecret = null;
@@ -532,14 +581,18 @@ export class TwoFactorService {
       );
     }
 
+    await this.assertManagementTotpBudget(user.id);
+
     const { secret } = this.decryptTotpSecret(user.twoFactorSecret);
     const isValid = otplib.verifySync({ token: code, secret }).valid;
 
     if (!isValid) {
+      await this.recordUserTotpFailure(user.id);
       throw new BadRequestException(
         tr("errors.auth.invalidVerificationCode", "Invalid verification code"),
       );
     }
+    await this.attemptCounters.reset(TWO_FACTOR_USER_SCOPE, user.id);
 
     const codes: string[] = [];
     for (let i = 0; i < this.BACKUP_CODE_COUNT; i++) {
