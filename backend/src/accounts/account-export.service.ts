@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { Transaction } from "../transactions/entities/transaction.entity";
+import { applyRegisterOrder } from "../transactions/register-order";
 import { Category } from "../categories/entities/category.entity";
 import { AccountType } from "./entities/account.entity";
 import { AccountsService } from "./accounts.service";
@@ -116,10 +117,13 @@ export class AccountExportService {
     let runningBalance = Number(account.openingBalance) || 0;
 
     for (const tx of transactions) {
+      // A VOID row records something that did not happen, so it moves nothing
+      // and simply carries the balance above it down its own line -- which is
+      // what the register shows too.
       if (tx.status !== "VOID") {
         runningBalance = roundMoney(runningBalance + tx.amount);
       }
-      const balance = tx.status === "VOID" ? runningBalance : runningBalance;
+      const balance = runningBalance;
 
       if (tx.isSplit && expandSplits) {
         rows.push(
@@ -243,8 +247,8 @@ export class AccountExportService {
     accountId: string,
     realUserId = userId,
   ): Promise<ExportTransaction[]> {
-    const rawTransactions = await withScopedDb(this.dataSource, (m) =>
-      m
+    const rawTransactions = await withScopedDb(this.dataSource, (m) => {
+      const query = m
         .getRepository(Transaction)
         .createQueryBuilder("transaction")
         .leftJoinAndSelect("transaction.payee", "payee")
@@ -255,12 +259,15 @@ export class AccountExportService {
         .leftJoinAndSelect("transaction.linkedTransaction", "linkedTransaction")
         .leftJoinAndSelect("linkedTransaction.account", "linkedAccount")
         .where("transaction.userId = :userId", { userId })
-        .andWhere("transaction.accountId = :accountId", { accountId })
-        .orderBy("transaction.transactionDate", "ASC")
-        .addOrderBy("transaction.createdAt", "ASC")
-        .addOrderBy("transaction.id", "ASC")
-        .getMany(),
-    );
+        .andWhere("transaction.accountId = :accountId", { accountId });
+      // The register's own order, oldest first, because the column beside
+      // these rows is a running balance. This file used to spell the order out
+      // and left off the amount leg: when `created_at` cannot separate two
+      // rows -- a whole import shares one value -- their signs do, and an
+      // export that ordered a purchase before the transfer funding it showed
+      // the account overdrawn on a day it was never short.
+      return applyRegisterOrder(query, "transaction", "ASC").getMany();
+    });
 
     // The linkedTransaction.account join is unfiltered, so after unshare the
     // export would leak the counterpart's live account name; the response

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { SelectQueryBuilder } from "typeorm";
 import { Transaction } from "./entities/transaction.entity";
@@ -349,6 +349,24 @@ describe("the running balance a tied credit and debit produce", () => {
   });
 });
 
+/** Every non-spec TypeScript file in this layer, as [path, contents]. */
+function backendSources(): Array<[string, string]> {
+  const root = join(__dirname, "..");
+  const found: Array<[string, string]> = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) {
+        walk(full);
+      } else if (entry.endsWith(".ts") && !entry.endsWith(".spec.ts")) {
+        found.push([full.slice(root.length + 1), readFileSync(full, "utf8")]);
+      }
+    }
+  };
+  walk(root);
+  return found;
+}
+
 describe("the register ordering is written once", () => {
   it("has no hand-rolled copy left in the transactions service", () => {
     // One site is the register. The other three sum the rows the register
@@ -380,5 +398,22 @@ describe("the register ordering is written once", () => {
     expect(source).not.toMatch(
       /select\("t\.id"\)[\s\S]{0,400}?\.(limit|offset)\(/,
     );
+  });
+  it("gives every running balance in this layer the register's order", () => {
+    // The transactions service was not the only place that walks a balance
+    // down a list of rows: the account CSV export does it too, and it spelled
+    // the order out for itself without the amount leg -- so an exported
+    // balance could show the account overdrawn on a day a transfer had funded
+    // the purchase, which is the very defect `applyRegisterOrder` exists to
+    // prevent. A scan of one file could never have found it.
+    //
+    // The rule is narrow on purpose: if a file carries a running balance, the
+    // order those rows arrived in is load-bearing, so it must come from here.
+    const offenders = backendSources()
+      .filter(([, content]) => /\brunningBalance\b/.test(content))
+      .filter(([, content]) => !/applyRegisterOrder\(/.test(content))
+      .map(([path]) => path);
+
+    expect(offenders).toEqual([]);
   });
 });
