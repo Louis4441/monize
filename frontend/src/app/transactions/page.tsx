@@ -239,6 +239,10 @@ function TransactionsContent() {
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [startingBalance, setStartingBalance] = useState<number | undefined>();
   const [startingBalanceWithheld, setStartingBalanceWithheld] = useState<'sort' | undefined>();
+  // The order the rows currently on screen came back in. Held beside them
+  // rather than read from the live sort, so a click that has not been answered
+  // yet cannot make the register reinterpret the page it is still showing.
+  const [rowsSort, setRowsSort] = useState<TransactionSort>(DEFAULT_TRANSACTION_SORT);
 
   // Which column the register is sorted by, remembered in this browser the way
   // the row density and the table/calendar view are. It is part of the request
@@ -265,10 +269,15 @@ function TransactionsContent() {
   const handleSortChange = useCallback(
     (field: TransactionSortField) => {
       filters.isFilterChange.current = true;
-      setSort(nextTransactionSort(storedSort, field));
+      // Toggled from the sort the header is DISPLAYING, not the one in
+      // storage. They differ where a remembered account sort has been resolved
+      // away on a single account's page, and toggling from the stored one
+      // there returns exactly what is already on screen: a click that moves no
+      // arrow, reverses nothing, and still drops the reader back to page 1.
+      setSort(nextTransactionSort(registerSort, field));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [storedSort, setSort],
+    [registerSort, setSort],
   );
 
   // A horizontal finger swipe on the register turns its page in place, so a
@@ -405,6 +414,11 @@ function TransactionsContent() {
       // Adopted with the rows and the balance it belongs to: a reload that
       // keeps the rows has to keep the reason the balance is missing too.
       setStartingBalanceWithheld(transactionsResponse.startingBalanceWithheld);
+      // The order these rows were fetched in, adopted with them. The headers
+      // moved the moment the reader clicked; the running balance, the today
+      // divider and the Balance column itself must not, because they are
+      // statements about rows that still belong to the previous request.
+      setRowsSort(effectiveSort);
 
       if (hasCategoryOrPayeeFilter) {
         setMonthlyTotals(chartResult as MonthlyTotal[]);
@@ -1548,6 +1562,7 @@ function TransactionsContent() {
               startingBalance={startingBalance}
               startingBalanceWithheld={startingBalanceWithheld}
               sort={registerSort}
+              rowsSort={rowsSort}
               onSortChange={handleSortChange}
               currentPage={filters.currentPage}
               totalPages={pagination?.totalPages ?? 1}

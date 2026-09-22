@@ -83,6 +83,16 @@ interface TransactionListProps {
    * which is what every surface but the Transactions page does.
    */
   sort?: TransactionSort;
+  /**
+   * The order the rows on screen were actually fetched in, which is not the
+   * order the headers show while a reload is in flight. A click changes `sort`
+   * at once -- the header has to answer the press -- but `transactions` and
+   * `startingBalance` still belong to the previous request for a debounce plus
+   * a round trip. Every figure derived from the rows reads this one instead,
+   * because a walk that reverses the old page under the new direction prints a
+   * balance column that was never true of any state of the ledger.
+   */
+  rowsSort?: TransactionSort;
   onSortChange?: (field: TransactionSortField) => void;
   isSingleAccountView?: boolean;
   currentPage?: number;
@@ -299,6 +309,7 @@ export function TransactionList({
   startingBalance,
   startingBalanceWithheld,
   sort,
+  rowsSort,
   onSortChange,
   isSingleAccountView = false,
   currentPage,
@@ -532,18 +543,24 @@ export function TransactionList({
   // is a financial decision, and a traveller's laptop is on the wrong day for
   // it. `useFinancialToday` is the one answer every other such decision reads.
   const today = useFinancialToday();
+  // Everything below is a statement about the rows on screen, so it reads the
+  // order those rows were fetched in, not the order the headers are showing.
+  // The two differ for a debounce plus a round trip after every header click,
+  // and for good after a reload that failed. A register with no sorting at all
+  // passes neither and takes the server's own order.
+  const dataSort = rowsSort ?? sort;
   // Where the page crosses today, which is before the first non-future row
   // running newest-first and before the first future row running oldest-first.
   // A page that does not cross it -- and a register ordered by anything but
   // the date, where "future" is not a place on the page at all -- draws none.
   const todayDividerIndex = useMemo(() => {
-    if (!isSortedByDate(sort)) return -1;
-    const ascending = (sort?.direction ?? 'desc') === 'asc';
+    if (!isSortedByDate(dataSort)) return -1;
+    const ascending = (dataSort?.direction ?? 'desc') === 'asc';
     const boundary = transactions.findIndex((tx) =>
       ascending ? tx.transactionDate > today : tx.transactionDate <= today,
     );
     return boundary > 0 ? boundary : -1;
-  }, [transactions, sort, today]);
+  }, [transactions, dataSort, today]);
 
   // Two halves of one decision: the column is drawn where a balance was asked
   // for and supplied, AND where the register is in date order -- a running
@@ -570,7 +587,10 @@ export function TransactionList({
     (field) => field !== 'account' || !isSingleAccountView,
   );
 
-  const sortedByDate = isSortedByDate(sort);
+  // The rows' own order, not the headers': turning the column back on the
+  // instant a reader clicks Date would draw it over rows that still carry no
+  // balance, a strip of dashes under the line promising one.
+  const sortedByDate = isSortedByDate(dataSort);
   const showRunningBalance =
     (isSingleAccountView || startingBalance !== undefined) && sortedByDate;
   // Row-invariant, so computed once rather than per row: ten unconditional
@@ -614,8 +634,8 @@ export function TransactionList({
   // both directions: the seed is the balance after the page's NEWEST row, so
   // an oldest-first page is reversed before it is walked.
   const runningBalances = useMemo(
-    () => walkRunningBalances(transactions, startingBalance, sort?.direction ?? 'desc', displayAmounts),
-    [transactions, startingBalance, sort?.direction, displayAmounts],
+    () => walkRunningBalances(transactions, startingBalance, dataSort?.direction ?? 'desc', displayAmounts),
+    [transactions, startingBalance, dataSort?.direction, displayAmounts],
   );
 
   const formatAmount = useCallback((amount: number, currencyCode?: string) => {

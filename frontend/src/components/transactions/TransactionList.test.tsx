@@ -3565,6 +3565,52 @@ describe('TransactionList sorting', () => {
     expect(screen.getByText('$140.00')).toBeInTheDocument();
   });
 
+  it('walks the page in the order the rows were fetched, not the order clicked', async () => {
+    // The moment a reader clicks Date the header says oldest-first, but the
+    // rows and the seed on screen are still the newest-first page from the
+    // previous request. Reading the direction from the header there reverses
+    // that page before walking it, and every figure in the Balance column
+    // comes out inverted -- numbers that were never true of any state of the
+    // ledger, drawn at full opacity with no spinner over them.
+    const older = createTransaction({ id: 'older', transactionDate: '2024-01-14', amount: -10 });
+    const newer = createTransaction({ id: 'newer', transactionDate: '2024-01-15', amount: -40 });
+    renderSortable({
+      isSingleAccountView: true,
+      startingBalance: 100,
+      sort: { field: 'date', direction: 'asc' },
+      rowsSort: { field: 'date', direction: 'desc' },
+      transactions: [newer, older],
+    });
+
+    // Walked newest-first as the rows arrived: newer 100, older 140. Walked
+    // under the header's ascending direction the page is reversed first, and
+    // the same two rows read 110 and 100.
+    await waitFor(() => {
+      expect(screen.getByText('$140.00')).toBeInTheDocument();
+    });
+    expect(screen.getByText('$100.00')).toBeInTheDocument();
+    expect(screen.queryByText('$110.00')).not.toBeInTheDocument();
+  });
+
+  it('keeps the Balance column hidden until the date-ordered rows arrive', async () => {
+    // Clicking Date while sorted by payee must not turn the column on over
+    // rows that carry no balance: the seed was withheld with them, so every
+    // cell would render as a dash under the line promising a balance.
+    renderSortable({
+      isSingleAccountView: true,
+      sort: { field: 'date', direction: 'desc' },
+      rowsSort: { field: 'payee', direction: 'asc' },
+      startingBalanceWithheld: 'sort',
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Sort by date to see the running balance'),
+      ).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Balance')).not.toBeInTheDocument();
+  });
+
   it('draws the plain header a surface that does not sort has always had', async () => {
     render(
       <TransactionList
