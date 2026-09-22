@@ -24,7 +24,7 @@ import {
 import { TransactionActionSheet } from './TransactionActionSheet';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { getLocalDateString } from '@/lib/utils';
+import { useFinancialToday } from '@/hooks/useFinancialToday';
 import { useTableDensity } from '@/hooks/useTableDensity';
 import { useDensityPreference, type DensityView } from '@/store/densityStore';
 import { useCompactMobileDates } from '@/store/dateDisplayStore';
@@ -528,7 +528,10 @@ export function TransactionList({
   // A row is future by its own date, never by where it sits: running
   // oldest-first the future rows are at the BOTTOM of the page, so an index
   // threshold marks exactly the wrong half of it.
-  const today = getLocalDateString();
+  // The user's own calendar, not the browser's: whether a row is still to come
+  // is a financial decision, and a traveller's laptop is on the wrong day for
+  // it. `useFinancialToday` is the one answer every other such decision reads.
+  const today = useFinancialToday();
   // Where the page crosses today, which is before the first non-future row
   // running newest-first and before the first future row running oldest-first.
   // A page that does not cross it -- and a register ordered by anything but

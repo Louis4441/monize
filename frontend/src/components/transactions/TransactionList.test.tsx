@@ -34,6 +34,14 @@ vi.mock('@/hooks/useNumberFormat', async () => {
     }),
   };
 });
+// Whether a row is still to come is a financial decision, so the register asks
+// the user's own calendar rather than the browser's. Pinned here so these tests
+// do not drift with the machine's clock; one test drives it directly.
+const mockFinancialToday = vi.fn(() => '2026-01-01');
+vi.mock('@/hooks/useFinancialToday', () => ({
+  useFinancialToday: () => mockFinancialToday(),
+}));
+
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({
     error: vi.fn(),
@@ -3628,6 +3636,30 @@ describe('TransactionList today divider', () => {
       expect(screen.getByText('Date')).toBeInTheDocument();
     });
     expect(screen.queryByText('Today')).not.toBeInTheDocument();
+  });
+
+  it("reads the user's calendar for 'today', not the browser's", async () => {
+    // A traveller's laptop is on the wrong day for this. The register takes
+    // the answer from the shared financial-today helper, which reads the
+    // user's configured timezone, so moving that answer moves the divider.
+    mockFinancialToday.mockReturnValue('2024-01-15');
+    const onThatDay = createTransaction({ id: 'today', transactionDate: '2024-01-15' });
+    const theDayAfter = createTransaction({ id: 'tomorrow', transactionDate: '2024-01-16' });
+
+    renderWith([theDayAfter, onThatDay], { field: 'date', direction: 'desc' });
+    await waitFor(() => {
+      expect(screen.getByText('Today')).toBeInTheDocument();
+    });
+
+    // Move the user's day past both rows and the crossing disappears.
+    cleanup();
+    mockFinancialToday.mockReturnValue('2024-02-01');
+    renderWith([theDayAfter, onThatDay], { field: 'date', direction: 'desc' });
+    await waitFor(() => {
+      expect(screen.getByText('Date')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Today')).not.toBeInTheDocument();
+    mockFinancialToday.mockReturnValue('2026-01-01');
   });
 
   it('draws none under an order where "future" is not a place on the page', async () => {
