@@ -395,7 +395,7 @@
       "importPrices": "Impor riwayat harga",
       "importPricesHint": "Catatan Money sendiri tentang nilai setiap efek dari hari ke hari. Matikan jika Anda lebih suka mulai dari kuotasi terkini.",
       "importExchangeRates": "Impor kurs tukar",
-      "importExchangeRatesHint": "Kurs historis antar mata uang di berkas Anda, agar transaksi valuta asing lama dikonversi seperti yang dilakukan Money.",
+      "importExchangeRatesHint": "Kurs historis antar mata uang di berkas Anda, hanya dipakai untuk tanggal yang belum memiliki kurs di Monize. Kurs yang sudah tersimpan tidak pernah diganti.",
       "wipeExistingData": "Mulai dari awal: hapus dulu data Monize saya yang ada",
       "wipeExistingDataHint": "Menjalankan operasi Hapus Data Saya yang sama seperti di Pengaturan sebelum mengimpor. Anda akan diminta konfirmasi. Biarkan mati untuk menambahkan berkas Money ke data yang sudah ada."
     },

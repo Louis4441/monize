@@ -395,7 +395,7 @@
       "importPrices": "価格履歴を取り込む",
       "importPricesHint": "各銘柄が日々いくらだったかという Money 自身の記録です。現在の相場から始めたい場合はオフにしてください。",
       "importExchangeRates": "為替レートを取り込む",
-      "importExchangeRatesHint": "ファイル内の通貨間の過去レートです。これにより過去の外貨取引が Money と同じように換算されます。",
+      "importExchangeRatesHint": "ファイル内の通貨間の過去レートです。Monize にレートがない日付にのみ使われます。保存済みのレートが置き換えられることはありません。",
       "wipeExistingData": "最初からやり直す: 既存の Monize データを先に削除する",
       "wipeExistingDataHint": "インポート前に、設定と同じ「データを削除」操作を実行します。確認を求められます。Money ファイルを既存のデータに追加する場合はオフのままにしてください。"
     },

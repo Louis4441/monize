@@ -395,7 +395,7 @@
       "importPrices": "가격 이력 가져오기",
       "importPricesHint": "각 증권이 날마다 얼마였는지에 대한 Money 자체의 기록입니다. 현재 시세부터 시작하려면 끄세요.",
       "importExchangeRates": "환율 가져오기",
-      "importExchangeRatesHint": "파일에 있는 통화 간의 과거 환율입니다. 과거 외화 거래가 Money가 환산하던 대로 환산됩니다.",
+      "importExchangeRatesHint": "파일에 있는 통화 간의 과거 환율입니다. Monize에 환율이 없는 날짜에만 사용됩니다. 이미 저장된 환율은 절대 대체되지 않습니다.",
       "wipeExistingData": "새로 시작: 기존 Monize 데이터를 먼저 삭제",
       "wipeExistingDataHint": "가져오기 전에 설정의 내 데이터 삭제와 동일한 작업을 실행합니다. 확인을 요청합니다. 기존 데이터에 Money 파일을 추가하려면 꺼 두세요."
     },

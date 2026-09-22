@@ -395,7 +395,7 @@
       "importPrices": "Fiyat geçmişini içe aktar",
       "importPricesHint": "Money'nin her menkul kıymetin gün gün ne ettiğine dair kendi kaydı. Güncel kotasyonlarla başlamayı tercih ediyorsanız bunu kapatın.",
       "importExchangeRates": "Döviz kurlarını içe aktar",
-      "importExchangeRatesHint": "Dosyanızdaki para birimleri arasındaki geçmiş kurlar; böylece eski yabancı para işlemleri Money'nin çevirdiği gibi çevrilir.",
+      "importExchangeRatesHint": "Dosyanızdaki para birimleri arasındaki geçmiş kurlar; yalnızca Monize'de kuru olmayan tarihler için kullanılır. Kayıtlı kurlar asla değiştirilmez.",
       "wipeExistingData": "Sıfırdan başla: önce mevcut Monize verilerimi kaldır",
       "wipeExistingDataHint": "İçe aktarmadan önce Ayarlar'daki Verilerimi Sil işleminin aynısını çalıştırır. Onaylamanız istenir. Money dosyasını mevcut verilerinize eklemek için kapalı bırakın."
     },

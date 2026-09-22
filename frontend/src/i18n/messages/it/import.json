@@ -395,7 +395,7 @@
       "importPrices": "Importa lo storico prezzi",
       "importPricesHint": "Il registro che Money tiene del valore di ogni titolo, giorno per giorno. Disattivalo se preferisci partire dalle quotazioni attuali.",
       "importExchangeRates": "Importa i tassi di cambio",
-      "importExchangeRatesHint": "Tassi storici fra le valute presenti nel file, così le vecchie operazioni in valuta estera vengono convertite come le convertiva Money.",
+      "importExchangeRatesHint": "Tassi storici fra le valute presenti nel file, usati solo per le date in cui Monize non ha alcun tasso. I tassi già salvati non vengono mai sostituiti.",
       "wipeExistingData": "Ricomincia da zero: rimuovi prima i miei dati Monize esistenti",
       "wipeExistingDataHint": "Esegue la stessa operazione Elimina i miei dati delle Impostazioni prima dell'importazione. Ti verrà chiesta conferma. Lascialo disattivato per aggiungere il file Money a quello che hai già."
     },

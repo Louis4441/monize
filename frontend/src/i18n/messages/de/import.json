@@ -395,7 +395,7 @@
       "importPrices": "Kursverlauf importieren",
       "importPricesHint": "Moneys eigene Aufzeichnung, was jedes Wertpapier Tag für Tag wert war. Deaktivieren Sie dies, wenn Sie lieber mit aktuellen Kursen beginnen möchten.",
       "importExchangeRates": "Wechselkurse importieren",
-      "importExchangeRatesHint": "Historische Kurse zwischen den Währungen in Ihrer Datei, damit frühere Fremdwährungsbuchungen so umgerechnet werden wie in Money.",
+      "importExchangeRatesHint": "Historische Kurse zwischen den Währungen in Ihrer Datei, die nur für Tage verwendet werden, für die Monize keinen Kurs hat. Bereits gespeicherte Kurse werden nie ersetzt.",
       "wipeExistingData": "Neu beginnen: meine vorhandenen Monize-Daten zuerst entfernen",
       "wipeExistingDataHint": "Führt vor dem Import denselben Vorgang \"Meine Daten löschen\" aus wie in den Einstellungen. Sie werden um Bestätigung gebeten. Lassen Sie dies aus, um die Money-Datei zu Ihren vorhandenen Daten hinzuzufügen."
     },
