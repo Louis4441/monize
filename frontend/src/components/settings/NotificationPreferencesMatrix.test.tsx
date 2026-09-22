@@ -141,8 +141,8 @@ describe('NotificationPreferencesMatrix', () => {
 
   // The two column explanations moved out of the footnote list and onto the
   // columns they explain: a tooltip beside the heading from `md` up, the same
-  // sentence inside each of that column's cells below it (where `InfoTooltip`
-  // renders nothing at all, having no touch trigger).
+  // sentence inside each of that column's cells below it (where the grid has
+  // no column headings to hang a tooltip on).
   it('explains UnifiedPush and the cooldown on the columns themselves', async () => {
     await renderMatrix();
     // Deliberately does NOT open with "UnifiedPush": on a phone the bold column

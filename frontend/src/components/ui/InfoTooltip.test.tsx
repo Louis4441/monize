@@ -47,11 +47,15 @@ describe('InfoTooltip', () => {
     expect(container.querySelector('.h-6.w-6')).toBeInTheDocument();
   });
 
-  it('is reachable by keyboard and reveals the popover on focus', () => {
+  it('is reachable by keyboard and reveals the popover on hover and keyboard focus', () => {
     render(<InfoTooltip text="Keyboard help" />);
     const trigger = screen.getByLabelText('Keyboard help');
     expect(trigger.tagName).toBe('BUTTON');
-    expect(screen.getByRole('tooltip').className).toContain('group-focus/tip:block');
+    const popover = screen.getByRole('tooltip');
+    expect(popover.className).toContain('group-hover/tip:block');
+    // focus-visible, not focus: a tap focuses the button on Android, and the
+    // tap's own click already opens the popover.
+    expect(popover.className).toContain('group-focus-visible/tip:block');
   });
 
   it('is a button, not a focusable span', () => {
@@ -70,12 +74,12 @@ describe('InfoTooltip', () => {
 
     fireEvent.keyDown(trigger, { key: 'Escape' });
     expect(screen.getByRole('tooltip').className).not.toContain(
-      'group-focus/tip:block',
+      'group-focus-visible/tip:block',
     );
 
     fireEvent.focus(trigger);
     expect(screen.getByRole('tooltip').className).toContain(
-      'group-focus/tip:block',
+      'group-focus-visible/tip:block',
     );
   });
 
