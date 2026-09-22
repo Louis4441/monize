@@ -34,6 +34,14 @@ vi.mock('@/hooks/useExchangeRates', () => ({
   }),
 }));
 
+// The user's own calendar, which is what decides whether a row is still to
+// come. Mocked per test so the divider can be driven without touching the
+// machine's clock.
+const mockFinancialToday = vi.fn(() => '2024-01-15');
+vi.mock('@/hooks/useFinancialToday', () => ({
+  useFinancialToday: () => mockFinancialToday(),
+}));
+
 describe('InvestmentTransactionList', () => {
   const makeTx = (overrides: any = {}) => ({
     id: 't1', action: 'BUY', transactionDate: '2024-01-15',
@@ -1173,6 +1181,40 @@ describe('InvestmentTransactionList', () => {
       expect(row.className).not.toContain('opacity-50');
       const dateCell = screen.getByText('2024-01-15').closest('td')!;
       expect(dateCell.className).not.toContain('line-through');
+    });
+  });
+
+  describe('the TODAY divider', () => {
+    // This list and the cash register are drawn on one screen, so they have to
+    // read one calendar: the user's configured timezone, not the browser's. A
+    // traveller whose laptop is a day ahead otherwise reads two TODAY dividers
+    // falling on different rows of the same account.
+    const rows = [
+      makeTx({ id: 'future', transactionDate: '2024-01-16' }),
+      makeTx({ id: 'today', transactionDate: '2024-01-15' }),
+    ];
+
+    it('puts the boundary where the user\'s own calendar puts it', () => {
+      mockFinancialToday.mockReturnValue('2024-01-15');
+      render(
+        <InvestmentTransactionList transactions={rows as any[]} isLoading={false} />,
+      );
+      // The 16th is still to come, so the divider sits above the 15th.
+      const divider = screen.getByText('Today').closest('tr')!;
+      const rowsRendered = Array.from(
+        divider.parentElement!.querySelectorAll('tr'),
+      );
+      expect(rowsRendered.indexOf(divider)).toBe(1);
+    });
+
+    it('moves with the user\'s timezone, not the browser\'s', () => {
+      // A day ahead in the reader's own timezone: nothing on the page is in
+      // the future any more, so there is no boundary to draw.
+      mockFinancialToday.mockReturnValue('2024-01-17');
+      render(
+        <InvestmentTransactionList transactions={rows as any[]} isLoading={false} />,
+      );
+      expect(screen.queryByText('Today')).not.toBeInTheDocument();
     });
   });
 });

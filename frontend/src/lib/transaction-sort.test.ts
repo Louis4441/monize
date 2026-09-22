@@ -80,6 +80,27 @@ describe('resolveRegisterSort', () => {
       expect(resolveRegisterSort(sort, false)).toBe(sort);
     }
   });
+
+  it('refuses a remembered value the server would refuse', () => {
+    // Browser storage outlives the code that wrote it. Sent verbatim, each of
+    // these is a 400 on every register read, and the headers that could change
+    // it never render -- so the page has no way out but clearing site data.
+    const cases = [
+      { field: 'runningBalance', direction: 'asc' },
+      { field: 'date', direction: 'descending' },
+      { field: '', direction: 'asc' },
+      undefined,
+      null,
+    ];
+    for (const stored of cases) {
+      expect(resolveRegisterSort(stored as never, false)).toEqual(
+        DEFAULT_TRANSACTION_SORT,
+      );
+      expect(resolveRegisterSort(stored as never, true)).toEqual(
+        DEFAULT_TRANSACTION_SORT,
+      );
+    }
+  });
 });
 
 describe('isSortedByDate', () => {

@@ -1,4 +1,4 @@
-import type { SortDirection, SortState } from '@/hooks/useSortableTable';
+import type { SortState } from '@/hooks/useSortableTable';
 
 /**
  * Which column the transaction register is sorted by.
@@ -60,11 +60,24 @@ export function nextTransactionSort(
  * header to click and no way back. It falls back to the default for this
  * request and this header row only -- storage is left alone, so widening the
  * filter to several accounts brings the account sort back.
+ *
+ * A remembered value the server would refuse falls back the same way. Browser
+ * storage outlives the code that wrote it: a field this build dropped, a
+ * hand-edited entry or one from a future build all come back verbatim, and
+ * sent as-is each is a 400 on every register read -- with no way out but
+ * clearing site data, because the headers that could change it never render.
  */
 export function resolveRegisterSort(
   sort: TransactionSort,
   isSingleAccountView: boolean,
 ): TransactionSort {
+  const usable =
+    !!sort &&
+    (TRANSACTION_SORT_FIELDS as readonly string[]).includes(sort.field) &&
+    (sort.direction === 'asc' || sort.direction === 'desc');
+  if (!usable) {
+    return DEFAULT_TRANSACTION_SORT;
+  }
   if (sort.field === 'account' && isSingleAccountView) {
     return DEFAULT_TRANSACTION_SORT;
   }
@@ -80,9 +93,4 @@ export function resolveRegisterSort(
  */
 export function isSortedByDate(sort: TransactionSort | undefined): boolean {
   return sort === undefined || sort.field === 'date';
-}
-
-/** The wire spelling of a direction; the server takes either case. */
-export function sortDirectionParam(direction: SortDirection): 'asc' | 'desc' {
-  return direction;
 }
