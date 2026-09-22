@@ -404,38 +404,49 @@ describe("AuthService", () => {
       ).rejects.toThrow(ConflictException);
     });
 
-    it("claims an invited (passwordless) delegate instead of duplicating", async () => {
+    it("refuses to claim an invited (passwordless) delegate through /register", async () => {
+      // An invited row carries only an emailed invite token. Letting
+      // /register set its password would hand the row -- verified email and
+      // a session included -- to anyone who knows the address, without ever
+      // proving control of the mailbox. The invite link is the only way in.
+      const expiry = new Date(Date.now() + 60_000);
       const invitedDelegate = {
         id: "deleg-1",
         email: "shared@example.com",
         authProvider: "local",
         passwordHash: null,
+        emailVerified: true,
+        isDelegateOnly: true,
         resetToken: "tok",
-        resetTokenExpiry: new Date(),
+        resetTokenExpiry: expiry,
       };
       usersRepository.findOne.mockResolvedValue(invitedDelegate);
       delegationService.isDelegateUser.mockResolvedValue(true);
+      delegationService.isFullAccount.mockResolvedValue(false);
       passwordBreachService.isBreached.mockResolvedValue(false);
       usersRepository.save.mockImplementation(async (u: any) => u);
 
-      const result = await service.register({
+      const attempt = service.register({
         email: "shared@example.com",
         password: "StrongPass123!",
-        firstName: "Real",
+        firstName: "Attacker",
       });
 
-      expect(delegationService.isDelegateUser).toHaveBeenCalledWith("deleg-1");
-      expect(invitedDelegate.passwordHash).toBeTruthy();
-      expect(usersRepository.save).toHaveBeenCalledWith(invitedDelegate);
-      // The claim path reuses the existing row: no SERIALIZABLE create
-      // transaction is opened (every other scoped read is transaction(cb)).
+      // The same generic refusal a non-claimable row gets, so the response
+      // discloses nothing more than it did before.
+      await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+      await expect(attempt).rejects.toThrow("Unable to complete registration");
+      expect(usersRepository.save).not.toHaveBeenCalled();
+      expect(invitedDelegate.passwordHash).toBeNull();
+      expect(invitedDelegate.resetToken).toBe("tok");
+      expect(invitedDelegate.resetTokenExpiry).toBe(expiry);
+      expect(invitedDelegate.isDelegateOnly).toBe(true);
+      // Nor does it fall through to creating a duplicate account.
       expect(
         dataSource.transaction.mock.calls.some(
           (call) => call[0] === "SERIALIZABLE",
         ),
       ).toBe(false);
-      expect(result.accessToken).toBeDefined();
-      expect(result.user).not.toHaveProperty("passwordHash");
     });
 
     it("claims a delegate with a temp password when the correct currentPassword is supplied", async () => {
@@ -631,25 +642,28 @@ describe("AuthService", () => {
     });
 
     it("marks a claimed delegate as email-verified", async () => {
-      const invitedDelegate = {
+      const tempPwHash = await bcrypt.hash("Temp-Pw-9!aB", 4);
+      const tempDelegate = {
         id: "deleg-verify",
         email: "shared-verify@example.com",
         authProvider: "local",
-        passwordHash: null,
+        passwordHash: tempPwHash,
         emailVerified: false,
-        resetToken: "tok",
-        resetTokenExpiry: new Date(),
+        resetToken: null,
+        resetTokenExpiry: null,
       };
-      usersRepository.findOne.mockResolvedValue(invitedDelegate);
+      usersRepository.findOne.mockResolvedValue(tempDelegate);
       delegationService.isDelegateUser.mockResolvedValue(true);
+      delegationService.isFullAccount.mockResolvedValue(false);
       usersRepository.save.mockImplementation(async (u: any) => u);
 
       await service.register({
         email: "shared-verify@example.com",
         password: "StrongPass123!",
+        currentPassword: "Temp-Pw-9!aB",
       });
 
-      expect(invitedDelegate.emailVerified).toBe(true);
+      expect(tempDelegate.emailVerified).toBe(true);
     });
   });
 

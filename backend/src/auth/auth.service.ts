@@ -240,18 +240,23 @@ export class AuthService {
       //  - authProvider === 'local' (an OIDC user can't be claimed via a
       //    password registration),
       //  - it appears in account_delegates.delegate_user_id, and
-      //  - it owns no data (no accounts, no delegations as owner, not admin).
+      //  - it owns no data (no accounts, no delegations as owner, not admin),
+      //  - it already has a password (the owner provisioned it with a temp
+      //    password and shared it out-of-band).
       //
-      // If the delegate row already has a password (the owner provisioned
-      // it with a temp password and shared it out-of-band), the registrant
-      // must prove they hold that temp password via `currentPassword`.
-      // Without that proof anyone who knows the email could take over the
-      // delegate row.
+      // The registrant must prove they hold that password via
+      // `currentPassword`. Without that proof anyone who knows the email
+      // could take over the delegate row. An invited row has no password at
+      // all -- only an emailed invite (reset) token -- so there is nothing
+      // to prove here: it is activated through the invite link, which is the
+      // proof of mailbox control, and never through /register.
+      const delegatePasswordHash = existingUser.passwordHash;
       const isPureDelegate =
+        !!delegatePasswordHash &&
         existingUser.authProvider === "local" &&
         (await this.delegationService.isDelegateUser(existingUser.id)) &&
         !(await this.delegationService.isFullAccount(existingUser.id));
-      if (!isPureDelegate) {
+      if (!delegatePasswordHash || !isPureDelegate) {
         throw new ConflictException(
           tr(
             "errors.auth.unableToCompleteRegistration",
@@ -260,33 +265,31 @@ export class AuthService {
         );
       }
 
-      if (existingUser.passwordHash) {
-        // The registrant proves they hold the delegate password in one of
-        // two ways: either they typed it into the dedicated "Delegate
-        // password" prompt (currentPassword), or the new-account password
-        // they typed up front happens to be the same value -- in which
-        // case the front end doesn't need to ask for it a second time.
-        const newPasswordMatches = await bcrypt.compare(
-          password,
-          existingUser.passwordHash,
+      // The registrant proves they hold the delegate password in one of
+      // two ways: either they typed it into the dedicated "Delegate
+      // password" prompt (currentPassword), or the new-account password
+      // they typed up front happens to be the same value -- in which
+      // case the front end doesn't need to ask for it a second time.
+      const newPasswordMatches = await bcrypt.compare(
+        password,
+        delegatePasswordHash,
+      );
+      let claimOk = newPasswordMatches;
+      if (!claimOk) {
+        const supplied = (currentPassword ?? "").trim();
+        claimOk =
+          supplied.length > 0 &&
+          (await bcrypt.compare(supplied, delegatePasswordHash));
+      }
+      if (!claimOk) {
+        throw new UnauthorizedException(
+          tr(
+            "errors.auth.delegateClaimPasswordRequired",
+            "An account with this email already exists as a shared user. " +
+              "Provide the temporary password your administrator gave you " +
+              "to claim it.",
+          ),
         );
-        let claimOk = newPasswordMatches;
-        if (!claimOk) {
-          const supplied = (currentPassword ?? "").trim();
-          claimOk =
-            supplied.length > 0 &&
-            (await bcrypt.compare(supplied, existingUser.passwordHash));
-        }
-        if (!claimOk) {
-          throw new UnauthorizedException(
-            tr(
-              "errors.auth.delegateClaimPasswordRequired",
-              "An account with this email already exists as a shared user. " +
-                "Provide the temporary password your administrator gave you " +
-                "to claim it.",
-            ),
-          );
-        }
       }
 
       const breached = await this.passwordBreachService.isBreached(password);
@@ -307,9 +310,10 @@ export class AuthService {
       existingUser.resetTokenExpiry = null;
       existingUser.failedLoginAttempts = 0;
       existingUser.lockedUntil = null;
-      // The row being claimed was provisioned by an account owner who invited
-      // this email as a delegate, so the address is already trusted -- the
-      // claimant can sign in immediately without an email-verification step.
+      // The row being claimed was provisioned by an account owner for this
+      // email and the claimant proved they hold the password the owner gave
+      // them, so the address is already trusted -- the claimant can sign in
+      // immediately without an email-verification step.
       existingUser.emailVerified = true;
       // Promote out of the owner-managed delegate state -- the user is
       // claiming the row as their own account from here on, so they
