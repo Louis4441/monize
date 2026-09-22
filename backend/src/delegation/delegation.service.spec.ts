@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import * as bcrypt from "bcryptjs";
+import { FindOperator } from "typeorm";
 import { I18nService } from "nestjs-i18n";
 import { DelegationService, DELEGATE_2FA_REQUIRED } from "./delegation.service";
 import { DelegateAccountFavourite } from "./entities/delegate-account-favourite.entity";
@@ -1435,6 +1436,29 @@ describe("DelegationService", () => {
       return manager;
     };
 
+    // `manager.count` over a fixed set of delegation rows, honouring the
+    // `delegateUserId` / `ownerUserId` equality and `Not(...)` filters the
+    // service passes. Accounts are always 0 (no data of their own).
+    const countDelegationsOf =
+      (rows: Array<{ ownerUserId: string; delegateUserId: string }>) =>
+      (entity: unknown, opts: { where?: Record<string, unknown> }) => {
+        if (entity !== AccountDelegate) return Promise.resolve(0);
+        const where = opts?.where ?? {};
+        const matches = (value: string, filter: unknown) => {
+          if (filter === undefined) return true;
+          if (filter instanceof FindOperator && filter.type === "not")
+            return value !== filter.value;
+          return value === filter;
+        };
+        return Promise.resolve(
+          rows.filter(
+            (r) =>
+              matches(r.ownerUserId, where.ownerUserId) &&
+              matches(r.delegateUserId, where.delegateUserId),
+          ).length,
+        );
+      };
+
     it("throws when the owner is not found", async () => {
       usersRepo.findOne.mockResolvedValue(null);
       await expect(
@@ -1475,15 +1499,15 @@ describe("DelegationService", () => {
       const manager = makeManager();
       manager.findOne
         .mockResolvedValueOnce(lockedUser) // User by email
-        .mockResolvedValueOnce(null); // no existing delegation
-      // Mark as a pure delegate (already someone else's delegate row,
-      // owns no data) so credential management is allowed -- a fresh
-      // self-registered user with no delegate role would not be.
-      manager.count.mockImplementation((entity: any, opts: any) => {
-        if (opts?.where?.delegateUserId === DELEGATE_ID)
-          return Promise.resolve(1);
-        return Promise.resolve(0);
-      });
+        .mockResolvedValueOnce({ id: "g1", status: "pending" }); // own delegation
+      // A pure delegate row of THIS owner only (owns no data, its one
+      // delegation is the caller's), so credential management is allowed --
+      // a fresh self-registered user with no delegate role would not be.
+      manager.count.mockImplementation(
+        countDelegationsOf([
+          { ownerUserId: OWNER_ID, delegateUserId: DELEGATE_ID },
+        ]),
+      );
       installTransactionMock(manager);
       await service.createDelegate(OWNER_ID, {
         email: "new@x.y",
@@ -1492,6 +1516,104 @@ describe("DelegationService", () => {
       expect(lockedUser.failedLoginAttempts).toBe(0);
       expect(lockedUser.lockedUntil).toBeNull();
       expect(lockedUser.passwordHash).not.toBe("old-hash");
+    });
+
+    describe("an existing delegate row of another owner (account takeover)", () => {
+      // The row exists solely as OTHER_OWNER_ID's delegate. Were the caller
+      // allowed to set its password, mint an invite token or clear its
+      // lockout, they could sign in as that delegate and switch into
+      // OTHER_OWNER_ID's data. Only the delegation may be linked.
+      const makeForeignDelegate = () => ({
+        id: DELEGATE_ID,
+        email: "shared@x.y",
+        oidcSubject: null,
+        role: "user",
+        isDelegateOnly: true,
+        passwordHash: "OTHER-OWNER-SET" as string | null,
+        mustChangePassword: false,
+        resetToken: null as string | null,
+        resetTokenExpiry: null as Date | null,
+        failedLoginAttempts: 5,
+        lockedUntil: new Date(Date.now() + 60000) as Date | null,
+      });
+
+      const arrange = (existing: ReturnType<typeof makeForeignDelegate>) => {
+        usersRepo.findOne.mockResolvedValue({ id: OWNER_ID, email: "own@x.y" });
+        const manager = makeManager();
+        manager.findOne
+          .mockResolvedValueOnce(existing) // User by email
+          .mockResolvedValueOnce(null); // no delegation from the caller yet
+        manager.count.mockImplementation(
+          countDelegationsOf([
+            { ownerUserId: OTHER_OWNER_ID, delegateUserId: DELEGATE_ID },
+          ]),
+        );
+        installTransactionMock(manager);
+        return manager;
+      };
+
+      const expectCredentialsUntouched = (
+        existing: ReturnType<typeof makeForeignDelegate>,
+      ) => {
+        expect(existing.passwordHash).toBe("OTHER-OWNER-SET");
+        expect(existing.resetToken).toBeNull();
+        expect(existing.resetTokenExpiry).toBeNull();
+        expect(existing.failedLoginAttempts).toBe(5);
+        expect(existing.lockedUntil).not.toBeNull();
+      };
+
+      it("does not set an owner-supplied password", async () => {
+        const existing = makeForeignDelegate();
+        const manager = arrange(existing);
+
+        const res = await service.createDelegate(OWNER_ID, {
+          email: "shared@x.y",
+          password: "StrongPass1!xyz",
+        } as any);
+
+        expectCredentialsUntouched(existing);
+        expect(res.temporaryPassword).toBeUndefined();
+        expect(res.invited).toBe(false);
+        // The delegation itself is still linked.
+        expect(manager.create).toHaveBeenCalledWith(
+          AccountDelegate,
+          expect.objectContaining({
+            ownerUserId: OWNER_ID,
+            delegateUserId: DELEGATE_ID,
+          }),
+        );
+      });
+
+      it("does not mint an invite token or send the invite", async () => {
+        emailService.getStatus.mockReturnValue({ configured: true });
+        emailService.sendMail.mockResolvedValue(undefined);
+        configService.get.mockReturnValue("http://app");
+        const existing = makeForeignDelegate();
+        arrange(existing);
+
+        const res = await service.createDelegate(OWNER_ID, {
+          email: "shared@x.y",
+          sendInvite: true,
+        } as any);
+
+        expectCredentialsUntouched(existing);
+        expect(res.invited).toBe(false);
+        expect(emailService.sendMail).not.toHaveBeenCalled();
+      });
+
+      it("does not issue a temporary password for a passwordless row", async () => {
+        const existing = makeForeignDelegate();
+        existing.passwordHash = null;
+        arrange(existing);
+
+        const res = await service.createDelegate(OWNER_ID, {
+          email: "shared@x.y",
+        } as any);
+
+        expect(existing.passwordHash).toBeNull();
+        expect(existing.failedLoginAttempts).toBe(5);
+        expect(res.temporaryPassword).toBeUndefined();
+      });
     });
 
     it("sends an invite when sendInvite is set and SMTP is configured", async () => {

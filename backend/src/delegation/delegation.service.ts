@@ -1084,27 +1084,46 @@ export class DelegationService {
       // this check the front end's email-lookup race (Add clicked before
       // the 400ms debounced lookup finishes) lets a stray dto.password
       // overwrite a real user's password.
+      //
+      // A pure delegate row is owner-managed only by the owner whose
+      // delegation it is. Once ANY other owner has a delegation to it, its
+      // login also opens that owner's data: setting its password, minting an
+      // invite token or clearing its lockout here would let this owner sign
+      // in as the delegate and switch into the other owner's context. The
+      // reset path holds the same rule (`canOwnerResetDelegatePassword`);
+      // here the caller only links the delegation.
       let mayManageCredentials = true;
       if (delegateUser) {
         if (delegateUser.oidcSubject || delegateUser.role === "admin") {
           mayManageCredentials = false;
         } else {
-          const [ownsAccounts, ownsDelegations, alreadyDelegate] =
-            await Promise.all([
-              manager.count(Account, {
-                where: { userId: delegateUser.id },
-              }),
-              manager.count(AccountDelegate, {
-                where: { ownerUserId: delegateUser.id },
-              }),
-              manager.count(AccountDelegate, {
-                where: { delegateUserId: delegateUser.id },
-              }),
-            ]);
+          const [
+            ownsAccounts,
+            ownsDelegations,
+            alreadyDelegate,
+            delegateOfAnotherOwner,
+          ] = await Promise.all([
+            manager.count(Account, {
+              where: { userId: delegateUser.id },
+            }),
+            manager.count(AccountDelegate, {
+              where: { ownerUserId: delegateUser.id },
+            }),
+            manager.count(AccountDelegate, {
+              where: { delegateUserId: delegateUser.id },
+            }),
+            manager.count(AccountDelegate, {
+              where: {
+                delegateUserId: delegateUser.id,
+                ownerUserId: Not(ownerUserId),
+              },
+            }),
+          ]);
           const isPureDelegateRow = alreadyDelegate > 0;
           if (
             ownsAccounts > 0 ||
             ownsDelegations > 0 ||
+            delegateOfAnotherOwner > 0 ||
             (!isPureDelegateRow && !!delegateUser.passwordHash)
           ) {
             mayManageCredentials = false;
