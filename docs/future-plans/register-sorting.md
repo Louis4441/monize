@@ -564,25 +564,37 @@ row: a register's running balance is `walkRunningBalances`).
 
 Pre-existing, found while designing; each is its own proposal.
 
-- **R1** `calculateTargetPage` compares on (date, `createdAt`, `id`) with no
-  amount leg, so it disagrees with `applyRegisterOrder` on a same-timestamp
-  credit and debit, and it applies only the account, date, payee and search
-  filters, not category, tag, amount, status or attachment filters. A
-  `ROW_NUMBER()` over a raw rendering of the register order, with its own
-  agreement guard like `INVESTMENT_REPLAY_ORDER_SQL`, is the fix, and would
-  also allow a deep link under any sort.
-- **R2** `backend/src/accounts/account-export.service.ts` hand-writes
-  `transactionDate ASC, createdAt ASC, id ASC` without the amount leg; the
-  register-order guard scans only the transactions service.
-- **R3** `hasAttachments`, `statuses`, `originalCurrencyCodes` and the tag-key
-  filter narrow the register but are not threaded into
-  `buildFilteredIdsSubquery` or the balance windows, so a balance under one of
-  those filters counts rows the page does not show.
-- **R4** The register's "today" divider reads `getLocalDateString()` rather
-  than `useFinancialToday()`.
-- **R5** `getLlmTransactionRows` reads page 1 only and discards
-  `startingBalance`; the model can now sort by any field but never sees a
-  balance. Acceptable for a search tool; noted.
+- **R1 (fixed).** `calculateTargetPage` compared on three of the four
+  ordering keys and rebuilt a subset of the filters, so a deep link could land
+  on a page that does not hold the row it was following. It counts over
+  `buildFilteredIdsSubquery` now -- the same row set the balance sums -- and
+  compares on all four keys, with the amount leg running opposite to the list.
+  It also read the target's `created_at` through the entity, which truncates
+  microseconds to milliseconds, so the row came out newer than its own
+  timestamp and counted itself; the keys are read out as text now. A deep link
+  under a non-date sort is still refused rather than placed (decision 11):
+  placing one needs `ROW_NUMBER()` over a raw rendering of the register order,
+  which is a second spelling of the order this plan exists to keep single.
+- **R2 (fixed).** `backend/src/accounts/account-export.service.ts` walked its
+  exported running balance over a hand-written order without the amount leg,
+  so an export could show the account overdrawn on a day a transfer had funded
+  the purchase. It calls `applyRegisterOrder` now, and the guard widened from
+  one file to a scan of the layer: a file carrying a `runningBalance` takes its
+  order from there.
+- **R3 (fixed).** Those four filters, and the brokerage exclusion, narrowed
+  the listing without reaching the balance, which fell through to the
+  unfiltered regime -- the account's whole projected balance, walked down past
+  rows that are not on screen. `RegisterRowFilters` names the set once now and
+  `buildFilteredIdsSubquery` applies all of it; an integration test asserts the
+  seed equals the sum of the rows the listing returns, per filter.
+- **R4 (fixed).** The register's "today" divider read the browser's clock; it
+  reads `useFinancialToday()` now, so a traveller's laptop no longer decides
+  which rows are still to come.
+- **R5 (assessed, no change).** `getLlmTransactionRows` reads page 1 only and
+  discards `startingBalance`. That is the design rather than a defect: the
+  bound is what keeps a tool result inside its token budget, and a seed is
+  meaningless without the walk that turns it into a column. The model gets the
+  sort it asked for and no balance, which is the honest answer.
 
 ## 15. Companion task list
 
