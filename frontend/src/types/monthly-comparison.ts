@@ -1,3 +1,5 @@
+import type { PeriodResultReason } from './net-worth';
+
 export interface CategorySpendingComparisonItem {
   categoryId: string | null;
   categoryName: string;
@@ -66,9 +68,21 @@ export interface MonthlyComparisonNetWorth {
 export interface InvestmentAccountPerformance {
   accountId: string;
   accountName: string;
-  currentValue: number;
-  startValue: number;
-  annualizedReturn: number;
+  /** The securities' value at `periodEnd`, cash excluded; null when unknown. */
+  currentValue: number | null;
+  /** The securities' value at `periodStart`, cash excluded; null when unknown. */
+  startValue: number | null;
+  /** What the investments earned over the window, net of buys and sales. */
+  investmentPnl: number | null;
+  /**
+   * The invested part's time-weighted return over the trailing year, in
+   * percent. Deposits, purchases and idle cash move nothing. Null when the
+   * server withheld it; `returnReasons` says why.
+   */
+  returnPercent: number | null;
+  returnReasons: PeriodResultReason[];
+  periodStart: string;
+  periodEnd: string;
 }
 
 export interface InvestmentTopMover {

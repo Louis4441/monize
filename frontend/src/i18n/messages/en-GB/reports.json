@@ -61,9 +61,7 @@
   "monteCarloPerformance": {
     "rowAnnualizedVolatilityLabel": "Annualised Volatility"
   },
-  "monthlyComparison": {
-    "pdfAnnualizedReturn": "Annualised Return"
-  },
+  "monthlyComparison": {},
   "securityPerformance": {
     "annualizedReturn": "Annualised Return",
     "pdfAnnualizedReturn": "Annualised Return"

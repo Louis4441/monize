@@ -142,7 +142,11 @@ const mockResponse = {
         accountName: 'My Brokerage',
         currentValue: 12000,
         startValue: 10000,
-        annualizedReturn: 20,
+        investmentPnl: 1500,
+        returnPercent: 12.5,
+        returnReasons: [],
+        periodStart: '2025-01-31',
+        periodEnd: '2026-01-31',
       },
     ],
     topMovers: [
@@ -298,6 +302,57 @@ describe('MonthlyComparisonReport', () => {
     expect(screen.getByText('Top Movers')).toBeInTheDocument();
     expect(screen.getByText('AAPL')).toBeInTheDocument();
     expect(screen.getByText('Apple Inc.')).toBeInTheDocument();
+  });
+
+  it('captions the account returns as the trailing year, net of deposits and cash', async () => {
+    mockGetMonthlyComparison.mockResolvedValue(mockResponse);
+    render(<MonthlyComparisonReport />);
+    await waitFor(() => {
+      expect(screen.getByText(/over the 12 months to Jan 31, 2026/)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Deposits, purchases and uninvested cash are not counted as gains/)).toBeInTheDocument();
+    expect(screen.queryByTestId('withheld-returns')).not.toBeInTheDocument();
+  });
+
+  it('lists a withheld return as unknown with its cause instead of drawing a bar', async () => {
+    const withheld = {
+      ...mockResponse,
+      investments: {
+        accountPerformance: [
+          {
+            accountId: 'w',
+            accountName: 'Unpriced RRSP',
+            currentValue: null,
+            startValue: 1000,
+            investmentPnl: null,
+            returnPercent: null,
+            returnReasons: ['incompletePrices'],
+            periodStart: '2025-01-31',
+            periodEnd: '2026-01-31',
+          },
+        ],
+        topMovers: [],
+      },
+    };
+    // The same report with a known return draws one more bar chart than this
+    // one: a withheld return must not become a zero-length bar.
+    mockGetMonthlyComparison.mockResolvedValue(mockResponse);
+    const known = render(<MonthlyComparisonReport />);
+    await waitFor(() => {
+      expect(screen.getByText('Investment Performance')).toBeInTheDocument();
+    });
+    const chartsWithKnownReturn = screen.getAllByTestId('bar-chart').length;
+    known.unmount();
+
+    mockGetMonthlyComparison.mockResolvedValue(withheld);
+    render(<MonthlyComparisonReport />);
+    await waitFor(() => {
+      expect(screen.getByTestId('withheld-returns')).toBeInTheDocument();
+    });
+    const list = screen.getByTestId('withheld-returns');
+    expect(within(list).getByText('Unpriced RRSP: return not available')).toBeInTheDocument();
+    expect(within(list).getByTestId('unknown-amount')).toBeInTheDocument();
+    expect(screen.getAllByTestId('bar-chart')).toHaveLength(chartsWithKnownReturn - 1);
   });
 
   it('hides investment section when no data', async () => {
@@ -500,7 +555,17 @@ describe('MonthlyComparisonReport', () => {
       ...mockResponse,
       investments: {
         accountPerformance: [
-          { accountId: 'a', accountName: 'A', currentValue: 100, startValue: 90, annualizedReturn: -5 },
+          {
+            accountId: 'a',
+            accountName: 'A',
+            currentValue: 100,
+            startValue: 90,
+            investmentPnl: -5,
+            returnPercent: -5,
+            returnReasons: [],
+            periodStart: '2025-01-31',
+            periodEnd: '2026-01-31',
+          },
         ],
         topMovers: [],
       },

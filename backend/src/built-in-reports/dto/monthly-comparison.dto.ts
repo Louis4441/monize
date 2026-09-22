@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import type { PeriodResultReason } from "../../net-worth/portfolio-period-result.util";
 
 export class CategorySpendingComparisonItem {
   @ApiPropertyOptional()
@@ -146,14 +147,34 @@ export class InvestmentAccountPerformance {
   @ApiProperty()
   accountName: string;
 
-  @ApiProperty()
-  currentValue: number;
+  /** The securities' value at the end of the window, cash excluded; null when unknown. */
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  currentValue: number | null;
+
+  /** The securities' value at the start of the window, cash excluded; null when unknown. */
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  startValue: number | null;
+
+  /** What the investments earned over the window, net of buys and sales. */
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  investmentPnl: number | null;
+
+  /**
+   * The invested part's time-weighted return over the trailing year to
+   * `periodEnd`, in percent. Deposits, purchases and idle cash move nothing.
+   * Null when withheld; `returnReasons` says why.
+   */
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  returnPercent: number | null;
+
+  @ApiProperty({ type: [String] })
+  returnReasons: PeriodResultReason[];
 
   @ApiProperty()
-  startValue: number;
+  periodStart: string;
 
   @ApiProperty()
-  annualizedReturn: number;
+  periodEnd: string;
 }
 
 export class InvestmentTopMover {

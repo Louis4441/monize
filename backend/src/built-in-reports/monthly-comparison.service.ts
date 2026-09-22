@@ -13,6 +13,8 @@ import {
 } from "../common/number-locale.util";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { PortfolioService, TopMover } from "../securities/portfolio.service";
+import { PortfolioPeriodResultService } from "../net-worth/portfolio-period-result.service";
+import { todayYMD } from "../common/date-utils";
 import {
   Account,
   AccountType,
@@ -40,6 +42,7 @@ export class MonthlyComparisonService {
     private currencyService: ReportCurrencyService,
     private netWorthService: NetWorthService,
     private portfolioService: PortfolioService,
+    private periodResult: PortfolioPeriodResultService,
     private dataSource: DataSource,
   ) {}
 
@@ -187,9 +190,8 @@ export class MonthlyComparisonService {
     // Build investment performance
     const investments = await this.buildInvestmentPerformance(
       userId,
-      month,
-      historyStart,
       currentEnd,
+      defaultCurrency,
       topMovers,
     );
 
@@ -362,9 +364,8 @@ export class MonthlyComparisonService {
 
   private async buildInvestmentPerformance(
     userId: string,
-    currentMonth: string,
-    historyStart: string,
     currentEnd: string,
+    currency: string,
     topMovers: TopMover[],
   ): Promise<MonthlyComparisonInvestments> {
     // Get investment accounts
@@ -374,82 +375,71 @@ export class MonthlyComparisonService {
       }),
     );
 
-    // Get per-account monthly data from monthly_account_balances
-    const brokerageIds = investmentAccounts
-      .filter(
-        (a) =>
-          a.accountSubType === AccountSubType.INVESTMENT_BROKERAGE ||
-          (!a.accountSubType && a.accountType === AccountType.INVESTMENT),
-      )
-      .map((a) => a.id);
+    const brokerages = investmentAccounts.filter(
+      (a) =>
+        a.accountSubType === AccountSubType.INVESTMENT_BROKERAGE ||
+        (!a.accountSubType && a.accountType === AccountType.INVESTMENT),
+    );
+
+    // The trailing year to the report month's last day, never past today: a
+    // window ending in the future would value days no close exists for yet.
+    const today = todayYMD();
+    const endDate = currentEnd < today ? currentEnd : today;
+
+    // Each account's figure is the invested part's time-weighted return over
+    // the same `1y` window the Investments page's performance card reports,
+    // from the same service (INV-PORTRESULT-001/002). The ratio of two
+    // month-end balances this used to annualise counted every deposit and
+    // every purchase from the linked cash account as a gain, and compounded a
+    // one-month jump twelve times.
+    const results = await Promise.all(
+      brokerages.map(async (account) => ({
+        account,
+        result: await this.periodResult.getPeriodResult(userId, {
+          period: "1y",
+          endDate,
+          accountIds: [account.id],
+          displayCurrency: currency,
+        }),
+      })),
+    );
 
     const accountPerformance: InvestmentAccountPerformance[] = [];
-
-    if (brokerageIds.length > 0) {
-      // Get monthly snapshots for investment accounts
-      const snapshots: any[] = await withScopedDb(this.dataSource, (m) =>
-        m.query(
-          `SELECT mab.account_id, mab.month, mab.balance, mab.market_value,
-                a.name, a.account_sub_type
-         FROM monthly_account_balances mab
-         JOIN accounts a ON a.id = mab.account_id
-         WHERE mab.user_id = $1
-           AND mab.account_id = ANY($2)
-           AND mab.month >= DATE_TRUNC('month', $3::DATE)
-           AND mab.month <= DATE_TRUNC('month', $4::DATE)
-         ORDER BY mab.account_id, mab.month`,
-          [userId, brokerageIds, historyStart, currentEnd],
-        ),
-      );
-
-      // Group by account
-      const byAccount = new Map<string, any[]>();
-      for (const s of snapshots) {
-        const list = byAccount.get(s.account_id) || [];
-        list.push(s);
-        byAccount.set(s.account_id, list);
+    for (const { account, result } of results) {
+      // No valued day in the window, or nothing held on any of them: there is
+      // no performance to report, which is not the same as a withheld one.
+      if (result.investedReasons.includes("noValueSeries")) continue;
+      if (
+        result.investedValueStart === 0 &&
+        result.investedValueEnd === 0 &&
+        result.investmentPnl === 0
+      ) {
+        continue;
       }
 
-      for (const [accountId, monthlyData] of byAccount) {
-        if (monthlyData.length < 2) continue;
-
-        const first = monthlyData[0];
-        const last = monthlyData[monthlyData.length - 1];
-
-        const getValue = (s: any): number => {
-          if (
-            s.account_sub_type === "INVESTMENT_BROKERAGE" &&
-            s.market_value != null
-          ) {
-            return Number(s.market_value);
-          }
-          if (s.market_value != null) {
-            return Number(s.market_value) + Number(s.balance);
-          }
-          return Number(s.balance);
-        };
-
-        const startValue = getValue(first);
-        const currentValue = getValue(last);
-
-        // Annualized return: ((endValue / startValue) ^ (12/months) - 1) * 100
-        const months = monthlyData.length - 1;
-        let annualizedReturn = 0;
-        if (startValue > 0 && months > 0) {
-          annualizedReturn =
-            (Math.pow(currentValue / startValue, 12 / months) - 1) * 100;
-        }
-
-        const accountName = (first.name || "").replace(" - Brokerage", "");
-
-        accountPerformance.push({
-          accountId,
-          accountName,
-          currentValue: Math.round(currentValue),
-          startValue: Math.round(startValue),
-          annualizedReturn: Math.round(annualizedReturn * 100) / 100,
-        });
-      }
+      accountPerformance.push({
+        accountId: account.id,
+        accountName: (account.name || "").replace(" - Brokerage", ""),
+        currentValue:
+          result.investedValueEnd === null
+            ? null
+            : roundMoney(result.investedValueEnd),
+        startValue:
+          result.investedValueStart === null
+            ? null
+            : roundMoney(result.investedValueStart),
+        investmentPnl:
+          result.investmentPnl === null
+            ? null
+            : roundMoney(result.investmentPnl),
+        returnPercent:
+          result.investmentReturnPercent === null
+            ? null
+            : Math.round(result.investmentReturnPercent * 100) / 100,
+        returnReasons: result.investedReasons,
+        periodStart: result.startDate,
+        periodEnd: result.endDate,
+      });
     }
 
     // Map top movers to DTO
@@ -465,8 +455,12 @@ export class MonthlyComparisonService {
     }));
 
     return {
+      // Largest first; an account whose value is unknown sorts last rather
+      // than as if it held nothing.
       accountPerformance: accountPerformance.sort(
-        (a, b) => b.currentValue - a.currentValue,
+        (a, b) =>
+          (b.currentValue ?? Number.NEGATIVE_INFINITY) -
+          (a.currentValue ?? Number.NEGATIVE_INFINITY),
       ),
       topMovers: mappedMovers,
     };
