@@ -217,12 +217,16 @@ test.describe('Register sorting', () => {
     const olderDescending = await rowText(older);
     const newerDescending = await rowText(newer);
 
-    // Reverse the register by the header's own label, not the cell's centre:
-    // the Date header also holds the year toggle, whose wrapper stops the
-    // event before it reaches the header, and where the centre of the cell
-    // falls depends on how wide the rendered dates are.
+    // Reverse the register from the keyboard, not with a click. The Date
+    // header holds the year toggle, and that control's wrapper stops the event
+    // before it reaches the header -- deliberately, so pressing it does not
+    // also sort -- and the toggle is what Playwright's click lands on, because
+    // a click with no position goes to the centre of the cell. Enter reaches
+    // the header's own handler with no hit-testing at all: the `<th>` carries
+    // tabIndex and an activateOnKey handler for exactly this. The mouse path
+    // is covered by the Payee header above, which holds no control.
     const dateHeader = page.getByRole('columnheader', { name: /^date/i });
-    await dateHeader.getByText('Date', { exact: true }).click();
+    await dateHeader.press('Enter');
     await expect(dateHeader).toHaveAttribute('aria-sort', 'ascending');
     await expect(page.locator('table tbody tr').first()).toContainText(older);
 

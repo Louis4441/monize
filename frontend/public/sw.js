@@ -661,7 +661,7 @@ function stopReminderFromAction(reminderId) {
 function focusQuietly(client) {
   try {
     return Promise.resolve(client.focus()).catch(function () {});
-  } catch (error) {
+  } catch (_error) {
     return Promise.resolve();
   }
 }
