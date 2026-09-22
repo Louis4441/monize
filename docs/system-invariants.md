@@ -1061,8 +1061,10 @@ Every surface that reports what a portfolio did over a period now reads
 `GET /net-worth/investments-period-result`, or its batch sibling
 `GET /net-worth/investments-period-results`: the Portfolio Value Over Time
 report, the dashboard's Portfolio Value widget, the Investments page's chart
-and the Investments page's Portfolio performance card. None of them derives a
-figure of its own. Which of the payload's two measures each one leads with is
+and the Investments page's Portfolio performance card. The Monthly Comparison
+report's per-account investment performance reads the same measure through
+`PortfolioPeriodResultService.getPeriodResult` (the `1y` window to the report
+month's end, one account per call). None of them derives a figure of its own. Which of the payload's two measures each one leads with is
 INV-PORTRESULT-002 below and `docs/specs/portfolio-period-result.md` section
 10.7: the four investment surfaces lead with the invested part and name the
 account-level value change and net external flows beside it, while the daily

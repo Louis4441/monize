@@ -667,6 +667,7 @@ days, O(days).
 | "Portfolio value over time" chart (Investments) | `securitiesValue` | `investmentPnl`, `investmentReturnPercent` |
 | Portfolio value widget (dashboard) | `securitiesValue` | `investmentPnl`, `investmentReturnPercent` |
 | Portfolio Value report | `securitiesValue` | `investmentPnl`, `investmentReturnPercent` |
+| Monthly Comparison report, per-account performance | -- | `investmentReturnPercent` over `1y` to the report month's end, per brokerage account |
 | Net worth chart (dashboard) | net worth, cash included | unchanged |
 | Daily movement notification, calendar day layer | `value` | `valueChange`, `netExternalFlows`, `investmentResult` |
 

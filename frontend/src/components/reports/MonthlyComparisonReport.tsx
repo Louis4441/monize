@@ -35,6 +35,10 @@ import type {
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
+import { UnknownAmount } from '@/components/ui/UnknownAmount';
+import { periodResultUnknownReason } from '@/components/investments/portfolio-period-result';
+import { parseLocalDate } from '@/lib/utils';
+import type { InvestmentAccountPerformance } from '@/types/monthly-comparison';
 
 type ComparisonSortField = 'category' | 'current' | 'previous' | 'change' | 'changePercent';
 type TopMoversSortField = 'symbol' | 'name' | 'price' | 'change' | 'changePercent';
@@ -237,6 +241,13 @@ export function MonthlyComparisonReport() {
 
   const { incomeExpenses: ie, expenses, topCategories, netWorth: nw, investments } = data;
   const currency = data.currency;
+
+  // A bar is drawn only for a return the server reported; a withheld one is
+  // listed with its cause instead, because a zero-length bar reads as 0%.
+  const knownReturns = investments.accountPerformance.filter(
+    (a): a is InvestmentAccountPerformance & { returnPercent: number } => a.returnPercent !== null,
+  );
+  const withheldReturns = investments.accountPerformance.filter((a) => a.returnPercent === null);
 
   // The backend's currentMonthLabel/previousMonthLabel are English, formatted
   // for the AI/MCP tool payloads that share this DTO -- the UI renders its own
@@ -674,36 +685,55 @@ export function MonthlyComparisonReport() {
 
           {investments.accountPerformance.length > 0 && (
             <>
-              <div className="h-72 mb-6">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                  <BarChart
-                    data={investments.accountPerformance.map(a => ({
-                      name: a.accountName,
-                      return: Number(a.annualizedReturn.toFixed(2)),
-                    }))}
-                    margin={{ top: 10, right: 10, left: 0, bottom: 5 }}
-                    layout="vertical"
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
-                    {/* Fractional ticks keep a decimal: forcing 0 would print a
-                        narrow range (0.4%, 0.9%, 1.2%) as "0%", "1%", "1%". */}
-                    <XAxis type="number" tickFormatter={(v: number) => formatPercent(v, Number.isInteger(v) ? 0 : 1)} tick={{ fontSize: 12 }} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={90} />
-                    <Tooltip formatter={(value) => [formatPercent(Number(value), 2), t('monthlyComparison.pdfAnnualizedReturn')]} />
-                    <Bar
-                      dataKey="return"
-                      radius={[0, 4, 4, 0]}
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                {t('monthlyComparison.investmentPerformanceCaption', {
+                  date: formatChartDate(parseLocalDate(investments.accountPerformance[0].periodEnd), 'MMM d, yyyy'),
+                })}
+              </p>
+              {knownReturns.length > 0 && (
+                <div className="h-72 mb-6">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                    <BarChart
+                      data={knownReturns.map(a => ({
+                        name: a.accountName,
+                        return: a.returnPercent,
+                      }))}
+                      margin={{ top: 10, right: 10, left: 0, bottom: 5 }}
+                      layout="vertical"
                     >
-                      {investments.accountPerformance.map((_, i) => (
-                        <Cell
-                          key={i}
-                          fill={investments.accountPerformance[i].annualizedReturn >= 0 ? chartColors.income : chartColors.expense}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+                      <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                      {/* Fractional ticks keep a decimal: forcing 0 would print a
+                          narrow range (0.4%, 0.9%, 1.2%) as "0%", "1%", "1%". */}
+                      <XAxis type="number" tickFormatter={(v: number) => formatPercent(v, Number.isInteger(v) ? 0 : 1)} tick={{ fontSize: 12 }} />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={90} />
+                      <Tooltip formatter={(value) => [formatPercent(Number(value), 2), t('monthlyComparison.trailingYearReturn')]} />
+                      <Bar
+                        dataKey="return"
+                        radius={[0, 4, 4, 0]}
+                      >
+                        {knownReturns.map((a) => (
+                          <Cell
+                            key={a.accountId}
+                            fill={a.returnPercent >= 0 ? chartColors.income : chartColors.expense}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              {/* A withheld return is listed as unknown with its cause, never
+                  drawn as a zero-length bar. */}
+              {withheldReturns.length > 0 && (
+                <ul className="mb-6 space-y-1 text-sm text-gray-700 dark:text-gray-300" data-testid="withheld-returns">
+                  {withheldReturns.map((a) => (
+                    <li key={a.accountId} className="flex items-baseline gap-2">
+                      <span>{t('monthlyComparison.returnUnavailable', { account: a.accountName })}</span>
+                      <UnknownAmount reason={periodResultUnknownReason(a.returnReasons)} />
+                    </li>
+                  ))}
+                </ul>
+              )}
             </>
           )}
 
