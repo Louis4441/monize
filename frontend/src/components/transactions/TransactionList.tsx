@@ -32,7 +32,13 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SortableHeader } from '@/components/ui/SortableHeader';
-import { isSortedByDate, type TransactionSort, type TransactionSortField } from '@/lib/transaction-sort';
+import {
+  isSortedByDate,
+  TRANSACTION_SORT_FIELDS,
+  type TransactionSort,
+  type TransactionSortField,
+} from '@/lib/transaction-sort';
+import { PHONE_HEADER_CLASS } from '@/components/ui/Table';
 import { walkRunningBalances } from '@/lib/running-balance';
 
 interface TransactionListProps {
@@ -542,6 +548,25 @@ export function TransactionList({
   // payee or amount it is arithmetic nobody can read. The server withholds
   // the seed under any other order, so this only ever hides a column it has
   // no number for anyway.
+  // Exhaustive over the sort fields, so a field added to the union is a
+  // compile error here rather than a column with no control on a phone -- and
+  // a remembered sort with no control is one a reader cannot get back out of.
+  const sortLabels: Record<TransactionSortField, string> = {
+    date: t('list.header.date'),
+    account: t('list.header.account'),
+    payee: t('list.header.payee'),
+    category: t('list.header.category'),
+    description: t('list.header.description'),
+    refNumber: t('list.header.refNumber'),
+    amount: t('list.header.amount'),
+    status: t('list.header.status'),
+  };
+  // The Account column is not drawn on a single account's page, so it gets no
+  // chip there either (the page resolves a remembered account sort away).
+  const sortChipFields = TRANSACTION_SORT_FIELDS.filter(
+    (field) => field !== 'account' || !isSingleAccountView,
+  );
+
   const sortedByDate = isSortedByDate(sort);
   const showRunningBalance =
     (isSingleAccountView || startingBalance !== undefined) && sortedByDate;
@@ -698,6 +723,7 @@ export function TransactionList({
               exactly those. */}
           <thead className="bg-gray-50 dark:bg-gray-800">
             {wrapped ? (
+              <>
               <tr>
                 {/* Controls only, no column label: the single card cell below
                     carries payee, amount, status and the rest, so naming this
@@ -722,6 +748,27 @@ export function TransactionList({
                   </div>
                 </th>
               </tr>
+              {/* A header that holds controls is replaced, never hidden: the
+                  card labels its own values, but the sort controls have to
+                  come back or a phone can be left in an order it cannot
+                  change. Same component as the column headers, at chip size. */}
+              {sort && onSortChange && (
+                <tr role="row" aria-label={t('list.sort.stripLabel')} className="flex flex-wrap gap-x-2 gap-y-1 px-4 py-2">
+                  {sortChipFields.map((field) => (
+                    <SortableHeader<TransactionSortField>
+                      key={field}
+                      field={field}
+                      sortField={sort.field}
+                      sortDirection={sort.direction}
+                      onSort={onSortChange}
+                      className={PHONE_HEADER_CLASS}
+                    >
+                      {sortLabels[field]}
+                    </SortableHeader>
+                  ))}
+                </tr>
+              )}
+              </>
             ) : (
             <tr>
               {selectionMode && (
