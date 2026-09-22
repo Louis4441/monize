@@ -61,6 +61,7 @@ npm run i18n:check         # Verify the pseudo-locale is up to date (CI gate)
 | Report refresh / export buttons | `ReportToolbarActions`, last child of the toolbar row | rendering `ExportDropdown` or `RefreshPricesButton` in a report |
 | A dashboard card filling its grid row | the grid's own `stretch` plus the card's min-height | `h-full` on a widget's outermost element |
 | Toolbar row on a phone | `flex-wrap`, `w-full sm:w-auto`, `sm:ml-auto`, a button's height from `items-stretch` + `LabelSpacer` | an unwrapped row, a bare `ml-auto`, a hand-matched padding |
+| A register's running balance | `walkRunningBalances` (`lib/running-balance.ts`) over the response's `startingBalance` | a second walk in a component, or a balance drawn under a sort other than date |
 | Category filter pseudo-ids (`uncategorized`, `transfer`, `income`, `expense`) | `SPECIAL_CATEGORY_FILTER_IDS`, `canonicalizeCategoryFilter`, `useCategoryFilterLabels` (`lib/categoryUtils.ts`) | a literal pseudo-id check, or a type sent as its enumerated ids |
 
 **A write that moves money calls `invalidateBalanceCaches()`** (or `clearAllCache()` where the write can touch anything). `src/lib/balance-cache.guard.test.ts` scans for the omission.

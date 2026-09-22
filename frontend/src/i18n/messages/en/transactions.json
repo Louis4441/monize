@@ -123,6 +123,10 @@
       "status": "Status",
       "actions": "Actions"
     },
+    "sort": {
+      "balanceHiddenHint": "Sort by date to see the running balance",
+      "stripLabel": "Sort by"
+    },
     "dateDisplay": {
       "toggleLabel": "Hide the year",
       "toggleTitle": "Drop the year from dates so more of the payee fits"

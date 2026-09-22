@@ -3412,3 +3412,165 @@ describe('the Table / Calendar switch in the register toolbar', () => {
     expect(screen.queryByTitle('First page')).not.toBeInTheDocument();
   });
 });
+
+describe('TransactionList sorting', () => {
+  const mockOnEdit = vi.fn();
+  const mockOnRefresh = vi.fn();
+
+  const renderSortable = (
+    props: Partial<React.ComponentProps<typeof TransactionList>> = {},
+  ) => {
+    const onSortChange = vi.fn();
+    const utils = render(
+      <TransactionList
+        transactions={[createTransaction()]}
+        onEdit={mockOnEdit}
+        onRefresh={mockOnRefresh}
+        sort={{ field: 'date', direction: 'desc' }}
+        onSortChange={onSortChange}
+        {...props}
+      />,
+    );
+    return { ...utils, onSortChange };
+  };
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('offers a sort control for every column the server can sort by', async () => {
+    renderSortable();
+
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: /date/i })).toBeInTheDocument();
+    });
+    // A field with no control anywhere would strand a remembered sort: the
+    // register would stay ordered by it with no way to change it back.
+    for (const name of [/date/i, /account/i, /payee/i, /category/i, /description/i, /ref #/i, /amount/i, /status/i]) {
+      expect(screen.getByRole('columnheader', { name })).toHaveAttribute('aria-sort');
+    }
+  });
+
+  it('marks only the sorted column, and says which way it runs', async () => {
+    renderSortable({ sort: { field: 'payee', direction: 'asc' } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: /payee/i })).toHaveAttribute(
+        'aria-sort',
+        'ascending',
+      );
+    });
+    expect(screen.getByRole('columnheader', { name: /date/i })).toHaveAttribute(
+      'aria-sort',
+      'none',
+    );
+  });
+
+  it('asks the page to re-sort when a header is used', async () => {
+    const { onSortChange } = renderSortable();
+
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: /amount/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('columnheader', { name: /amount/i }));
+    expect(onSortChange).toHaveBeenCalledWith('amount');
+  });
+
+  it('keeps the year toggle in the Date header without sorting on it', async () => {
+    const { onSortChange } = renderSortable();
+
+    const toggle = await screen.findByRole('button', { name: /hide the year/i });
+    fireEvent.click(toggle);
+    expect(onSortChange).not.toHaveBeenCalled();
+  });
+
+  it('draws no Balance column while the register is sorted by something else', async () => {
+    renderSortable({
+      isSingleAccountView: true,
+      startingBalance: 1000,
+      sort: { field: 'amount', direction: 'desc' },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: /amount/i })).toBeInTheDocument();
+    });
+    // A running balance is a figure about the row above it, so beside rows in
+    // amount order it would be arithmetic nobody can read.
+    expect(screen.queryByText('Balance')).not.toBeInTheDocument();
+  });
+
+  it('draws the Balance column in either date direction', async () => {
+    for (const direction of ['asc', 'desc'] as const) {
+      cleanup();
+      renderSortable({
+        isSingleAccountView: true,
+        startingBalance: 1000,
+        sort: { field: 'date', direction },
+      });
+      await waitFor(() => {
+        expect(screen.getByText('Balance')).toBeInTheDocument();
+      });
+    }
+  });
+
+  it('says why the balance is missing, but only where there was one to miss', async () => {
+    renderSortable({
+      isSingleAccountView: true,
+      sort: { field: 'payee', direction: 'asc' },
+      startingBalanceWithheld: 'sort',
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByText('Sort by date to see the running balance'),
+      ).toBeInTheDocument();
+    });
+
+    cleanup();
+    // No flag: this register never had a Balance column, so promising one
+    // back would be a lie the reader cannot act on.
+    renderSortable({ sort: { field: 'payee', direction: 'asc' } });
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: /payee/i })).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText('Sort by date to see the running balance'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('walks an oldest-first page from the same seed', async () => {
+    // The seed is the balance after the page's NEWEST row whichever way the
+    // page arrived, so the oldest row on an ascending page is not the one
+    // carrying it.
+    const older = createTransaction({ id: 'older', transactionDate: '2024-01-14', amount: -10 });
+    const newer = createTransaction({ id: 'newer', transactionDate: '2024-01-15', amount: -40 });
+    renderSortable({
+      isSingleAccountView: true,
+      startingBalance: 100,
+      sort: { field: 'date', direction: 'asc' },
+      transactions: [older, newer],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('$100.00')).toBeInTheDocument();
+    });
+    // newer: 100; older: 100 - (-40) = 140.
+    expect(screen.getByText('$140.00')).toBeInTheDocument();
+  });
+
+  it('draws the plain header a surface that does not sort has always had', async () => {
+    render(
+      <TransactionList
+        transactions={[createTransaction()]}
+        onEdit={mockOnEdit}
+        onRefresh={mockOnRefresh}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Date')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('columnheader', { name: /payee/i })).not.toHaveAttribute(
+      'aria-sort',
+    );
+  });
+});

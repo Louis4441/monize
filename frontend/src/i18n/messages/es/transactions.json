@@ -123,6 +123,10 @@
       "status": "Estado",
       "actions": "Acciones"
     },
+    "sort": {
+      "balanceHiddenHint": "Ordena por fecha para ver el saldo acumulado",
+      "stripLabel": "Ordenar por"
+    },
     "dateDisplay": {
       "toggleLabel": "Ocultar el año",
       "toggleTitle": "Quitar el año de las fechas para que se vea más del beneficiario"

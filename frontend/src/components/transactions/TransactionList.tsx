@@ -31,6 +31,9 @@ import { useCompactMobileDates } from '@/store/dateDisplayStore';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { isSortedByDate, type TransactionSort, type TransactionSortField } from '@/lib/transaction-sort';
+import { walkRunningBalances } from '@/lib/running-balance';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -60,6 +63,21 @@ interface TransactionListProps {
   onExport?: () => void;
   isExporting?: boolean;
   startingBalance?: number;
+  /**
+   * Why there is no running balance, where there would otherwise have been
+   * one. The server sets it; the register turns it into one line of copy, so
+   * a reader who has just sorted by payee is told how to get the column back
+   * rather than left wondering where it went. Absent means there is nothing
+   * to say -- an all-accounts register never had a balance to withhold.
+   */
+  startingBalanceWithheld?: 'sort';
+  /**
+   * The column the register is sorted by, where the surface offers sorting.
+   * Undefined draws today's plain headers and takes the server's own order,
+   * which is what every surface but the Transactions page does.
+   */
+  sort?: TransactionSort;
+  onSortChange?: (field: TransactionSortField) => void;
   isSingleAccountView?: boolean;
   currentPage?: number;
   totalPages?: number;
@@ -158,6 +176,67 @@ function registerStaleReason(
 }
 
 /**
+ * A register column header: a sort control where the surface offers sorting,
+ * and exactly today's cell where it does not.
+ *
+ * Seven surfaces draw this register and only the Transactions page passes a
+ * sort, so the plain branch has to stay byte-identical -- the `inline-flex`
+ * wrapper the Date column's year toggle sits in included.
+ *
+ * `className` is passed through whole rather than composed here: it carries
+ * each column's `registerColumnClass(...)` call, and the register's column
+ * guard reads those literals out of this file in source order to check them
+ * against the column contract. Moving them into a lookup table would leave
+ * that guard with nothing to read.
+ */
+function RegisterHeader({
+  field,
+  sort,
+  onSortChange,
+  align = 'left',
+  className,
+  controls,
+  children,
+}: {
+  field: TransactionSortField;
+  sort?: TransactionSort;
+  onSortChange?: (field: TransactionSortField) => void;
+  align?: 'left' | 'right' | 'center';
+  className: string;
+  controls?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  if (!sort || !onSortChange) {
+    return (
+      <th className={className}>
+        {controls ? (
+          <span className="inline-flex items-center gap-1">
+            {children}
+            {controls}
+          </span>
+        ) : (
+          children
+        )}
+      </th>
+    );
+  }
+
+  return (
+    <SortableHeader<TransactionSortField>
+      field={field}
+      sortField={sort.field}
+      sortDirection={sort.direction}
+      onSort={onSortChange}
+      align={align}
+      className={className}
+      controls={controls}
+    >
+      {children}
+    </SortableHeader>
+  );
+}
+
+/**
  * The day/month date-view toggle that drops the year from the Date column. It
  * lives in the register's column header and, on a phone at Normal density, in
  * the wrapped card's slim control header -- one button, so the two cannot
@@ -212,6 +291,9 @@ export function TransactionList({
   onExport,
   isExporting,
   startingBalance,
+  startingBalanceWithheld,
+  sort,
+  onSortChange,
   isSingleAccountView = false,
   currentPage,
   totalPages,
@@ -448,7 +530,15 @@ export function TransactionList({
     return transactions.length;
   }, [transactions]);
 
-  const showRunningBalance = isSingleAccountView || startingBalance !== undefined;
+  // Two halves of one decision: the column is drawn where a balance was asked
+  // for and supplied, AND where the register is in date order -- a running
+  // balance is a figure about the row above it, so beside rows ordered by
+  // payee or amount it is arithmetic nobody can read. The server withholds
+  // the seed under any other order, so this only ever hides a column it has
+  // no number for anyway.
+  const sortedByDate = isSortedByDate(sort);
+  const showRunningBalance =
+    (isSingleAccountView || startingBalance !== undefined) && sortedByDate;
   // Row-invariant, so computed once rather than per row: ten unconditional
   // columns (register-columns.ts order, minus Account/FX/Balance, which are
   // conditional) plus the ones this render actually drew. Used by the "today"
@@ -481,34 +571,18 @@ export function TransactionList({
     return map;
   }, [transactions]);
 
-  // Calculate running balances using the backend-provided starting balance
-  // and display amounts (which may be filtered split totals). The row for
-  // each transaction still displays a running balance, but VOID transactions
-  // and split children (parentTransactionId != null) contribute 0 to the
-  // cumulative sum so the math matches the backend's balance calculations
-  // (which exclude both from currentBalance and futureTransactionsSum).
-  const runningBalances = useMemo(() => {
-    const safeStart = Number(startingBalance);
-    if (isNaN(safeStart) || transactions.length === 0) {
-      return new Map<string, number>();
-    }
-
-    const balances = new Map<string, number>();
-    let cumulativeCents = 0;
-
-    for (const tx of transactions) {
-      balances.set(tx.id, Math.round((safeStart * 10000) - cumulativeCents) / 10000);
-      const affectsBalance =
-        tx.status !== TransactionStatus.VOID && !tx.parentTransactionId;
-      if (affectsBalance) {
-        const raw = displayAmounts.get(tx.id) ?? Number(tx.amount);
-        const amount = isNaN(raw) ? 0 : raw;
-        cumulativeCents += Math.round(amount * 10000);
-      }
-    }
-
-    return balances;
-  }, [transactions, startingBalance, displayAmounts]);
+  // The running balance beside each row: the backend's starting balance run
+  // down the page, with a filtered split's visible total standing in where it
+  // differs. A VOID row and a split child take a balance but move none, which
+  // is what the backend's own sums exclude.
+  //
+  // The walk lives in `lib/running-balance.ts` because it has to answer for
+  // both directions: the seed is the balance after the page's NEWEST row, so
+  // an oldest-first page is reversed before it is walked.
+  const runningBalances = useMemo(
+    () => walkRunningBalances(transactions, startingBalance, sort?.direction ?? 'desc', displayAmounts),
+    [transactions, startingBalance, sort?.direction, displayAmounts],
+  );
 
   const formatAmount = useCallback((amount: number, currencyCode?: string) => {
     const isNegative = amount < 0;
@@ -570,26 +644,38 @@ export function TransactionList({
           onPageChange={onPageChange}
           itemName={t('list.itemNamePlural')}
           actions={
-            onExport && (
-              <button
-                onClick={onExport}
-                disabled={isExporting}
-                className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                title={t('list.export.title')}
-              >
-                {isExporting ? (
-                  <svg className="w-4 h-4 sm:mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                ) : (
-                  <svg className="w-4 h-4 sm:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                )}
-                <span className="hidden sm:inline">{isExporting ? t('list.export.exporting') : t('list.export.button')}</span>
-              </button>
-            )
+            <>
+              {/* Withholding a figure is only honest if the reader learns why
+                  and what to do: the Balance column is gone because the
+                  register is not in date order, and sorting by date brings it
+                  back. Drawn from the server's own flag, so it appears only
+                  where a balance would otherwise have been shown. */}
+              {startingBalanceWithheld === 'sort' && (
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {t('list.sort.balanceHiddenHint')}
+                </span>
+              )}
+              {onExport && (
+                <button
+                  onClick={onExport}
+                  disabled={isExporting}
+                  className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={t('list.export.title')}
+                >
+                  {isExporting ? (
+                    <svg className="w-4 h-4 sm:mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4 sm:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  )}
+                    <span className="hidden sm:inline">{isExporting ? t('list.export.exporting') : t('list.export.button')}</span>
+                  </button>
+              )}
+            </>
           }
         />
       )}
@@ -642,36 +728,77 @@ export function TransactionList({
                   />
                 </th>
               )}
-              <th className={`${headerPadding} ${compactPadding.date} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>
-                <span className="inline-flex items-center gap-1">
-                  {t('list.header.date')}
-                  {/* Drops the year from the Date column. Born on phones --
-                      where the payee is what runs out of room and the year is
-                      the part a register row can spare -- and now offered at
-                      every width, so the day/month view is a choice rather
-                      than something only phones get. */}
+              <RegisterHeader
+                field="date"
+                sort={sort}
+                onSortChange={onSortChange}
+                className={`${headerPadding} ${compactPadding.date} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}
+                controls={
+                  /* Drops the year from the Date column. Born on phones -- where the
+                     payee is what runs out of room and the year is the part a register
+                     row can spare -- and now offered at every width, so the day/month
+                     view is a choice rather than something only phones get. It sits in
+                     the header's controls slot, which is what stops a press on it also
+                     sorting the column. */
                   <CompactDatesToggle
                     active={compactMobileDates}
                     onToggle={toggleCompactMobileDates}
                     label={t('list.dateDisplay.toggleLabel')}
                     title={t('list.dateDisplay.toggleTitle')}
                   />
-                </span>
-              </th>
+                }
+              >
+                {t('list.header.date')}
+              </RegisterHeader>
               {/* Structural, not responsive: on a single account's page every
                   row would repeat the page's own title, so the column is
                   omitted from the DOM entirely (see register-columns.ts). */}
               {!isSingleAccountView && (
-                <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('account')}`}>{t('list.header.account')}</th>
+                <RegisterHeader
+                  field="account"
+                  sort={sort}
+                  onSortChange={onSortChange}
+                  className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('account')}`}
+                >
+                  {t('list.header.account')}
+                </RegisterHeader>
               )}
               {/* The floor travels with the header: a column's minimum is the
                   largest of its cells', so a `<th>` that does not carry it
                   would leave the label and the values it labels disagreeing
                   about where the column starts. */}
-              <th className={`${headerPadding} ${compactPadding.payee} ${REGISTER_PAYEE_CELL_FLOOR} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>{t('list.header.payee')}</th>
-              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('category')}`}>{t('list.header.category')}</th>
-              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('description')}`}>{t('list.header.description')}</th>
-              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('refNumber')}`}>{t('list.header.refNumber')}</th>
+              <RegisterHeader
+                field="payee"
+                sort={sort}
+                onSortChange={onSortChange}
+                className={`${headerPadding} ${compactPadding.payee} ${REGISTER_PAYEE_CELL_FLOOR} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}
+              >
+                {t('list.header.payee')}
+              </RegisterHeader>
+              <RegisterHeader
+                field="category"
+                sort={sort}
+                onSortChange={onSortChange}
+                className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('category')}`}
+              >
+                {t('list.header.category')}
+              </RegisterHeader>
+              <RegisterHeader
+                field="description"
+                sort={sort}
+                onSortChange={onSortChange}
+                className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('description')}`}
+              >
+                {t('list.header.description')}
+              </RegisterHeader>
+              <RegisterHeader
+                field="refNumber"
+                sort={sort}
+                onSortChange={onSortChange}
+                className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('refNumber')}`}
+              >
+                {t('list.header.refNumber')}
+              </RegisterHeader>
               <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('tags')}`}>{t('list.header.tags')}</th>
               <th
                 className={`${headerPadding} text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('attachments')}`}
@@ -682,7 +809,15 @@ export function TransactionList({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                 </svg>
               </th>
-              <th className={`${headerPadding} text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>{t('list.header.amount')}</th>
+              <RegisterHeader
+                field="amount"
+                sort={sort}
+                onSortChange={onSortChange}
+                align="right"
+                className={`${headerPadding} text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}
+              >
+                {t('list.header.amount')}
+              </RegisterHeader>
               {showFxColumns && (
                 <>
                   <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>{t('list.header.currency')}</th>
@@ -693,7 +828,15 @@ export function TransactionList({
               {showRunningBalance && (
                 <th className={`${headerPadding} text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>{t('list.header.balance')}</th>
               )}
-              <th className={`${headerPadding} text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('status')}`}>{t('list.header.status')}</th>
+              <RegisterHeader
+                field="status"
+                sort={sort}
+                onSortChange={onSortChange}
+                align="center"
+                className={`${headerPadding} text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('status')}`}
+              >
+                {t('list.header.status')}
+              </RegisterHeader>
               <th className={`${headerPadding} text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${registerColumnClass('actions')} sticky right-0 bg-gray-50 dark:bg-gray-800`}>{t('list.header.actions')}</th>
             </tr>
             )}

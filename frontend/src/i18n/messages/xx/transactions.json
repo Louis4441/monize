@@ -123,6 +123,10 @@
       "status": "[XX-Status-XX]",
       "actions": "[XX-Actions-XX]"
     },
+    "sort": {
+      "balanceHiddenHint": "[XX-Sort by date to see the running balance-XX]",
+      "stripLabel": "[XX-Sort by-XX]"
+    },
     "dateDisplay": {
       "toggleLabel": "[XX-Hide the year-XX]",
       "toggleTitle": "[XX-Drop the year from dates so more of the payee fits-XX]"

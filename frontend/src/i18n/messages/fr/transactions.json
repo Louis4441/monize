@@ -123,6 +123,10 @@
       "status": "Statut",
       "actions": "Actions"
     },
+    "sort": {
+      "balanceHiddenHint": "Triez par date pour voir le solde courant",
+      "stripLabel": "Trier par"
+    },
     "dateDisplay": {
       "toggleLabel": "Masquer l’année",
       "toggleTitle": "Retirer l’année des dates pour laisser plus de place au bénéficiaire"

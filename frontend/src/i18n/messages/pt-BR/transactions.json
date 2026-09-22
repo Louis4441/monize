@@ -123,6 +123,10 @@
       "status": "Status",
       "actions": "Ações"
     },
+    "sort": {
+      "balanceHiddenHint": "Ordene por data para ver o saldo corrente",
+      "stripLabel": "Ordenar por"
+    },
     "dateDisplay": {
       "toggleLabel": "Ocultar o ano",
       "toggleTitle": "Retirar o ano das datas para caber mais do beneficiário"

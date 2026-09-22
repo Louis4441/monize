@@ -123,6 +123,10 @@
       "status": "Status",
       "actions": "Aktionen"
     },
+    "sort": {
+      "balanceHiddenHint": "Nach Datum sortieren, um den laufenden Saldo zu sehen",
+      "stripLabel": "Sortieren nach"
+    },
     "dateDisplay": {
       "toggleLabel": "Jahr ausblenden",
       "toggleTitle": "Das Jahr aus den Datumsangaben entfernen, damit mehr vom Zahlungsempfänger sichtbar ist"

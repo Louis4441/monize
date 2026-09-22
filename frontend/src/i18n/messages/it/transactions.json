@@ -123,6 +123,10 @@
       "status": "Stato",
       "actions": "Azioni"
     },
+    "sort": {
+      "balanceHiddenHint": "Ordina per data per vedere il saldo progressivo",
+      "stripLabel": "Ordina per"
+    },
     "dateDisplay": {
       "toggleLabel": "Nascondi l’anno",
       "toggleTitle": "Togli l’anno dalle date per lasciare più spazio al beneficiario"

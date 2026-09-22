@@ -93,3 +93,46 @@ describe('SortableHeader', () => {
     expect(onSort).not.toHaveBeenCalled();
   });
 });
+
+describe('SortableHeader controls slot', () => {
+  it('does not sort when the control inside the header is used', () => {
+    // The register's Date header hosts the year toggle. Before the slot
+    // existed, every use of that toggle also re-sorted the column.
+    const onSort = vi.fn();
+    const onToggle = vi.fn();
+    render(
+      <table>
+        <thead>
+          <tr>
+            <SortableHeader
+              field="date"
+              sortField="date"
+              sortDirection="desc"
+              onSort={onSort}
+              controls={
+                <button type="button" onClick={onToggle}>
+                  Hide the year
+                </button>
+              }
+            >
+              Date
+            </SortableHeader>
+          </tr>
+        </thead>
+      </table>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide the year' }));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(onSort).not.toHaveBeenCalled();
+    expect(screen.getByRole('columnheader')).toHaveAttribute('aria-sort', 'descending');
+
+    // Keyboard activation of the control is the same decision.
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Hide the year' }), { key: 'Enter' });
+    expect(onSort).not.toHaveBeenCalled();
+
+    // The header itself still sorts.
+    fireEvent.click(screen.getByRole('columnheader'));
+    expect(onSort).toHaveBeenCalledWith('date');
+  });
+});
