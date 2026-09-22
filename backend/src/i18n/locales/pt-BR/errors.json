@@ -512,6 +512,7 @@
     "limitMax200": "limit não deve exceder 200",
     "invalidSortBy": "sortBy inválido: {{ sortBy }}. Deve ser um de: {{ allowed }}",
     "invalidSortDirection": "sortDirection inválido: {{ sortDirection }}. Deve ser asc ou desc",
+    "targetRequiresDateSort": "targetTransactionId só pode ser usado enquanto o registro estiver ordenado por data",
     "invalidTagKeyOp": "tagKeyOp inválido: {{ op }}",
     "tagKeyRequired": "É necessária uma chave de tag (1-100 caracteres)",
     "limitMustBePositive": "limit deve ser um número positivo",

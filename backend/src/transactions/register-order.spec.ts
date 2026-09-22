@@ -5,9 +5,12 @@ import { Transaction } from "./entities/transaction.entity";
 import {
   applyRegisterOrder,
   creditsBeforeDebitsDirection,
+  isNewestPage,
   isTransactionSortField,
   registerPrimaryOrder,
+  restrictToRowsNewerThanPage,
   TRANSACTION_SORT_FIELDS,
+  type RegisterPageWindow,
   type RegisterSortAliases,
   type TransactionSortField,
 } from "./register-order";
@@ -210,6 +213,109 @@ describe("applyRegisterOrder", () => {
   });
 });
 
+/**
+ * The window whose sum turns the listing's balance into this page's.
+ *
+ * The property is not "DESC limits and ASC offsets" -- it is that both name
+ * the same set of rows: the ones the register lists nearer the newest end
+ * than this page. A window that named the wrong set would put a plausible,
+ * wrong balance beside every row, which is the failure mode this whole
+ * mechanism exists to prevent.
+ */
+describe("the rows newer than a page", () => {
+  function windowCalls(window: RegisterPageWindow): {
+    order: Array<[string, string]>;
+    limit?: number;
+    offset?: number;
+  } {
+    const order: Array<[string, string]> = [];
+    let limit: number | undefined;
+    let offset: number | undefined;
+    const builder = {
+      orderBy: (column: string, direction: string) => {
+        order.push([column, direction]);
+        return builder;
+      },
+      addOrderBy: (column: string, direction: string) => {
+        order.push([column, direction]);
+        return builder;
+      },
+      limit: (value: number) => {
+        limit = value;
+        return builder;
+      },
+      offset: (value: number) => {
+        offset = value;
+        return builder;
+      },
+    } as unknown as SelectQueryBuilder<Transaction>;
+    restrictToRowsNewerThanPage(builder, "t", window);
+    return { order, limit, offset };
+  }
+
+  const page = (
+    skip: number,
+    limit: number,
+    total: number,
+    direction: "ASC" | "DESC",
+  ): RegisterPageWindow => ({ skip, limit, total, direction });
+
+  it("knows which page holds the newest row, which is not always the first", () => {
+    // Newest-first: the newest row is at the top of page 1.
+    expect(isNewestPage(page(0, 2, 5, "DESC"))).toBe(true);
+    expect(isNewestPage(page(2, 2, 5, "DESC"))).toBe(false);
+    expect(isNewestPage(page(4, 2, 5, "DESC"))).toBe(false);
+    // Oldest-first: it is at the bottom of the LAST page. Reading this as
+    // "page 1" is what would seed the oldest page with the whole account's
+    // balance and every figure on it would be wrong.
+    expect(isNewestPage(page(0, 2, 5, "ASC"))).toBe(false);
+    expect(isNewestPage(page(2, 2, 5, "ASC"))).toBe(false);
+    expect(isNewestPage(page(4, 2, 5, "ASC"))).toBe(true);
+    // A single page is the newest page whichever way it runs.
+    expect(isNewestPage(page(0, 50, 5, "ASC"))).toBe(true);
+    expect(isNewestPage(page(0, 50, 5, "DESC"))).toBe(true);
+    // An empty listing has no rows above anything.
+    expect(isNewestPage(page(0, 50, 0, "ASC"))).toBe(true);
+  });
+
+  it("takes the pages above a newest-first page", () => {
+    const { limit, offset, order } = windowCalls(page(4, 2, 9, "DESC"));
+    expect(limit).toBe(4);
+    expect(offset).toBeUndefined();
+    expect(order[0]).toEqual(["t.transactionDate", "DESC"]);
+  });
+
+  it("takes the pages below an oldest-first page", () => {
+    // Skipping 4 with a page of 2 means rows 5 and 6 are on screen; the newer
+    // ones are everything from row 7, which is an OFFSET and no limit.
+    const { limit, offset, order } = windowCalls(page(4, 2, 9, "ASC"));
+    expect(offset).toBe(6);
+    expect(limit).toBeUndefined();
+    expect(order[0]).toEqual(["t.transactionDate", "ASC"]);
+  });
+
+  it("never offsets by zero, which a builder may drop", () => {
+    // `skip + limit` is at least 1 whenever the window is applied at all, so
+    // an offset that a query builder ignores for being falsy cannot silently
+    // widen the window to the whole account.
+    for (const skip of [0, 1, 7]) {
+      const { offset } = windowCalls(page(skip, 3, 100, "ASC"));
+      expect(offset).toBeGreaterThan(0);
+    }
+  });
+
+  it("orders the window by the date, never by the reader's chosen column", () => {
+    // The window is only ever used for a date-ordered register (nothing else
+    // shows a balance), and it passes no join aliases, so it cannot be
+    // ordered by a table its own statement does not select.
+    for (const direction of ["ASC", "DESC"] as const) {
+      expect(
+        windowCalls(page(2, 2, 9, direction)).order.map(([c]) => c),
+      ).toEqual(["t.transactionDate", "t.createdAt", "t.amount", "t.id"]);
+    }
+  });
+});
+
 describe("the running balance a tied credit and debit produce", () => {
   // The reported case: an investment purchase funded by a transfer on the same
   // day. Both rows are written by one import, so `created_at` -- which defaults
@@ -245,9 +351,14 @@ describe("the running balance a tied credit and debit produce", () => {
 
 describe("the register ordering is written once", () => {
   it("has no hand-rolled copy left in the transactions service", () => {
-    // Three of the four sites sum the rows on *previous* pages so page N's
-    // running balance starts from the right number. A tiebreak added to the
-    // register alone re-splits the pages under those sums.
+    // One site is the register. The other three sum the rows the register
+    // lists NEWER than the page being shown, so its running balance starts
+    // from the right number -- and they reach that window through
+    // `restrictToRowsNewerThanPage`, which owns both the order and the
+    // limit/offset. Spelling either out again is how the register and the
+    // sums drift apart: a tiebreak added to one re-splits the pages under the
+    // others, and every balance below the first page is wrong by whichever
+    // rows crossed the boundary.
     //
     // Deliberately out of scope, and why the scan is written against
     // `addOrderBy` rather than against the column name: the payee-autofill
@@ -258,8 +369,16 @@ describe("the register ordering is written once", () => {
       "utf8",
     );
 
-    const applications = source.match(/applyRegisterOrder\(/g) ?? [];
-    expect(applications).toHaveLength(4);
+    expect(source.match(/applyRegisterOrder\(/g) ?? []).toHaveLength(1);
+    expect(source.match(/restrictToRowsNewerThanPage\(/g) ?? []).toHaveLength(
+      3,
+    );
     expect(source).not.toMatch(/addOrderBy\(\s*["'`][^"'`]*\.createdAt/);
+    // A page window written by hand beside a `select("t.id")` is the same
+    // drift by another door: it is the pairing of an order with a
+    // limit/offset that has to stay in one place.
+    expect(source).not.toMatch(
+      /select\("t\.id"\)[\s\S]{0,400}?\.(limit|offset)\(/,
+    );
   });
 });

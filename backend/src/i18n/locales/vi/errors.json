@@ -512,6 +512,7 @@
     "limitMax200": "limit không được vượt quá 200",
     "invalidSortBy": "sortBy không hợp lệ: {{ sortBy }}. Phải là một trong: {{ allowed }}",
     "invalidSortDirection": "sortDirection không hợp lệ: {{ sortDirection }}. Phải là asc hoặc desc",
+    "targetRequiresDateSort": "targetTransactionId chỉ có thể dùng khi sổ giao dịch được sắp xếp theo ngày",
     "invalidTagKeyOp": "tagKeyOp không hợp lệ: {{ op }}",
     "tagKeyRequired": "Cần có khóa thẻ (1-100 ký tự)",
     "limitMustBePositive": "limit phải là số dương",

@@ -512,6 +512,7 @@
     "limitMax200": "limit 200'ü geçemez",
     "invalidSortBy": "Geçersiz sortBy: {{ sortBy }}. Şunlardan biri olmalı: {{ allowed }}",
     "invalidSortDirection": "Geçersiz sortDirection: {{ sortDirection }}. asc veya desc olmalı",
+    "targetRequiresDateSort": "targetTransactionId yalnızca kayıt tarihe göre sıralıyken kullanılabilir",
     "invalidTagKeyOp": "Geçersiz tagKeyOp: {{ op }}",
     "tagKeyRequired": "Bir etiket anahtarı (1-100 karakter) gereklidir",
     "limitMustBePositive": "limit pozitif bir sayı olmalıdır",

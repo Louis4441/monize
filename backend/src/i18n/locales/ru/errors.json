@@ -512,6 +512,7 @@
     "limitMax200": "limit не должен превышать 200",
     "invalidSortBy": "Недопустимое значение sortBy: {{ sortBy }}. Допустимые значения: {{ allowed }}",
     "invalidSortDirection": "Недопустимое значение sortDirection: {{ sortDirection }}. Допустимые значения: asc или desc",
+    "targetRequiresDateSort": "targetTransactionId можно использовать, только когда реестр отсортирован по дате",
     "invalidTagKeyOp": "Недопустимый tagKeyOp: {{ op }}",
     "tagKeyRequired": "Требуется ключ тега (1–100 символов)",
     "limitMustBePositive": "limit должен быть положительным числом",

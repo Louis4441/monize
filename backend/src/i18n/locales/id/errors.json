@@ -512,6 +512,7 @@
     "limitMax200": "limit tidak boleh melebihi 200",
     "invalidSortBy": "sortBy tidak valid: {{ sortBy }}. Harus salah satu dari: {{ allowed }}",
     "invalidSortDirection": "sortDirection tidak valid: {{ sortDirection }}. Harus asc atau desc",
+    "targetRequiresDateSort": "targetTransactionId hanya dapat digunakan saat register diurutkan berdasarkan tanggal",
     "invalidTagKeyOp": "tagKeyOp tidak valid: {{ op }}",
     "tagKeyRequired": "Kunci tag (1-100 karakter) diperlukan",
     "limitMustBePositive": "limit harus berupa angka positif",

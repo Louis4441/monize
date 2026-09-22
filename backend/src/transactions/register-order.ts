@@ -221,3 +221,62 @@ export function applyRegisterOrder<T extends ObjectLiteral>(
     .addOrderBy(`${alias}.amount`, creditsBeforeDebitsDirection(direction))
     .addOrderBy(`${alias}.id`, direction);
 }
+
+/**
+ * Which page of the register is being listed, and which way it runs.
+ *
+ * `total` is here because the newest page is not always page 1: a
+ * newest-first register puts it there, an oldest-first one puts it last. Both
+ * `findAll` and the balance helpers have the total in hand before any balance
+ * query runs, so asking is free.
+ */
+export interface RegisterPageWindow {
+  skip: number;
+  limit: number;
+  total: number;
+  direction: RegisterSortDirection;
+}
+
+/**
+ * Whether this page holds the newest row of the whole listing.
+ *
+ * The page's running balance is seeded with the balance after its newest row,
+ * so on the newest page that seed IS the listing's own balance and nothing
+ * needs summing. Every other page subtracts the rows above it in time.
+ */
+export function isNewestPage(window: RegisterPageWindow): boolean {
+  return window.direction === "DESC"
+    ? window.skip === 0
+    : window.skip + window.limit >= window.total;
+}
+
+/**
+ * Restricts a query to the rows the register lists NEWER than this page, in
+ * the register's own order.
+ *
+ * This is the window whose sum turns the listing's balance into the page's.
+ * Under a newest-first register those rows are the pages above, so the first
+ * `skip` rows of the DESC order. Under an oldest-first register they are the
+ * pages BELOW, so everything from `skip + limit` of the ASC order -- and the
+ * ASC order is the exact reverse of the DESC one (every key flips, the amount
+ * tiebreak included), so the two windows describe the same set of rows and
+ * the same balance lands beside the same row either way.
+ *
+ * The offset is never zero when it is applied (`skip + limit >= 1`), so a
+ * builder that drops a falsy offset cannot silently widen the window to the
+ * whole table; the `isNewestPage` caller has already returned by then.
+ *
+ * Date order only. It takes no sort field and no aliases because a register
+ * sorted by anything else shows no balance at all: the rows "newer" than a
+ * page sorted by payee are not the rows whose amounts a balance moves by.
+ */
+export function restrictToRowsNewerThanPage<T extends ObjectLiteral>(
+  queryBuilder: SelectQueryBuilder<T>,
+  alias: string,
+  window: RegisterPageWindow,
+): SelectQueryBuilder<T> {
+  applyRegisterOrder(queryBuilder, alias, window.direction);
+  return window.direction === "DESC"
+    ? queryBuilder.limit(window.skip)
+    : queryBuilder.offset(window.skip + window.limit);
+}

@@ -512,6 +512,7 @@
     "limitMax200": "limit не повинен перевищувати 200",
     "invalidSortBy": "Недопустиме значення sortBy: {{ sortBy }}. Допустимі значення: {{ allowed }}",
     "invalidSortDirection": "Недопустиме значення sortDirection: {{ sortDirection }}. Допустимі значення: asc або desc",
+    "targetRequiresDateSort": "targetTransactionId можна використовувати, лише коли реєстр відсортовано за датою",
     "invalidTagKeyOp": "Недійсний tagKeyOp: {{ op }}",
     "tagKeyRequired": "Потрібен ключ тегу (1–100 символів)",
     "limitMustBePositive": "limit має бути додатним числом",

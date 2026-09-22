@@ -26,6 +26,10 @@ import { NetWorthService } from "../net-worth/net-worth.service";
 import { TransactionSplitService } from "./transaction-split.service";
 import {
   applyRegisterOrder,
+  isNewestPage,
+  restrictToRowsNewerThanPage,
+  type RegisterPageWindow,
+  type RegisterSortDirection,
   type TransactionSortField,
 } from "./register-order";
 import {
@@ -103,6 +107,14 @@ export interface TransactionWithInvestmentLink extends Transaction {
 
 export interface PaginatedTransactions extends PaginatedResult<TransactionWithInvestmentLink> {
   startingBalance?: number;
+  /**
+   * Set when a running balance WOULD have been computed for this request but
+   * the register is not in date order, so the client can say why the Balance
+   * column is missing instead of leaving a reader to guess. Absent means
+   * there was nothing to say: an all-accounts unfiltered register never had a
+   * balance to withhold.
+   */
+  startingBalanceWithheld?: "sort";
 }
 
 export interface LlmTransactionRow {
@@ -901,6 +913,20 @@ export class TransactionsService {
     hasAttachments?: boolean,
     jointAccountIds: string[] = [],
   ): Promise<PaginatedTransactions> {
+    // A page number for one row is counted by comparing that row against the
+    // register's order, and only the date order has a comparison to make here
+    // (see calculateTargetPage). Refusing is what stops a deep link silently
+    // landing on the wrong page; the client drops back to the date order
+    // instead. Raised before any query so every caller meets the same rule.
+    if (targetTransactionId && sortBy !== "date") {
+      throw new BadRequestException(
+        tr(
+          "errors.transactions.targetRequiresDateSort",
+          "targetTransactionId can only be used while the register is sorted by date",
+        ),
+      );
+    }
+
     const clamped = clampPagination(page, limit);
     const safeLimit = clamped.limit;
     let safePage = clamped.page;
@@ -1072,6 +1098,7 @@ export class TransactionsService {
           safePage,
           parsedSearch,
           jointAccountIds,
+          sortDirection,
         );
       }
 
@@ -1083,6 +1110,7 @@ export class TransactionsService {
         .getManyAndCount();
 
       let startingBalance: number | undefined;
+      let startingBalanceWithheld: "sort" | undefined;
       const singleAccountId =
         accountIds?.length === 1 ? accountIds[0] : undefined;
       const hasContentFilters = !!(
@@ -1093,13 +1121,47 @@ export class TransactionsService {
         amountFrom !== undefined ||
         amountTo !== undefined
       );
-      if (singleAccountId && data.length > 0) {
+      // Which page of which listing, and which way it runs. `total` is part of
+      // it because the newest page -- the one whose seed needs no window
+      // summed out of it -- is page 1 only while the register runs newest
+      // first; oldest first it is the last page.
+      const balanceWindow: RegisterPageWindow = {
+        skip,
+        limit: safeLimit,
+        total,
+        direction: sortDirection,
+      };
+      // The three regimes that produce a seed, named once so the withheld flag
+      // below cannot drift from the branches that compute one.
+      const singleAccountSeed = !!singleAccountId && data.length > 0;
+      const multiAccountSeed = !!(
+        accountIds &&
+        accountIds.length > 1 &&
+        hasContentFilters &&
+        data.length > 0
+      );
+      const allAccountsSeed = !!(
+        (!accountIds || accountIds.length === 0) &&
+        hasContentFilters &&
+        data.length > 0
+      );
+
+      if (sortBy !== "date") {
+        // A running balance is a figure about the row above, so it means
+        // nothing beside a register ordered by payee or amount. It is withheld
+        // rather than computed-and-ignored (three queries saved), and the flag
+        // is set only where a balance would otherwise have been returned, so
+        // the client promises the reader a balance only where sorting by date
+        // would actually produce one.
+        if (singleAccountSeed || multiAccountSeed || allAccountsSeed) {
+          startingBalanceWithheld = "sort";
+        }
+      } else if (singleAccountSeed) {
         startingBalance = await this.calculateStartingBalance(
           m,
           userId,
-          singleAccountId,
-          safePage,
-          skip,
+          singleAccountId!,
+          balanceWindow,
           {
             startDate,
             endDate,
@@ -1113,19 +1175,13 @@ export class TransactionsService {
             amountTo,
           },
         );
-      } else if (
-        accountIds &&
-        accountIds.length > 1 &&
-        hasContentFilters &&
-        data.length > 0
-      ) {
+      } else if (multiAccountSeed) {
         startingBalance =
           await this.calculateMultiAccountContentFilteredBalance(
             m,
             userId,
             accountIds,
-            safePage,
-            skip,
+            balanceWindow,
             {
               startDate,
               endDate,
@@ -1140,18 +1196,13 @@ export class TransactionsService {
             },
             jointAccountIds,
           );
-      } else if (
-        (!accountIds || accountIds.length === 0) &&
-        hasContentFilters &&
-        data.length > 0
-      ) {
+      } else if (allAccountsSeed) {
         startingBalance =
           await this.calculateMultiAccountContentFilteredBalance(
             m,
             userId,
             undefined,
-            safePage,
-            skip,
+            balanceWindow,
             {
               startDate,
               endDate,
@@ -1174,6 +1225,7 @@ export class TransactionsService {
         data: enrichedData,
         pagination: buildPaginationMeta(safePage, safeLimit, total),
         startingBalance,
+        startingBalanceWithheld,
       };
     });
   }
@@ -1273,6 +1325,7 @@ export class TransactionsService {
     fallbackPage: number = 1,
     parsedSearch: ParsedSearchTerm = { amount: null, date: null },
     jointAccountIds: string[] = [],
+    sortDirection: RegisterSortDirection = "DESC",
   ): Promise<number> {
     try {
       const targetTx = await m.getRepository(Transaction).findOne({
@@ -1323,10 +1376,14 @@ export class TransactionsService {
         );
       }
 
+      // The rows the register lists ABOVE the target, which is what its page
+      // number counts. "Above" is newer in a newest-first register and older
+      // in an oldest-first one, so the comparison runs the way the list does.
+      const above = sortDirection === "DESC" ? ">" : "<";
       countQuery.andWhere(
-        `(t.transactionDate > :targetDate
-          OR (t.transactionDate = :targetDate AND t.createdAt > :targetCreatedAt)
-          OR (t.transactionDate = :targetDate AND t.createdAt = :targetCreatedAt AND t.id > :targetId))`,
+        `(t.transactionDate ${above} :targetDate
+          OR (t.transactionDate = :targetDate AND t.createdAt ${above} :targetCreatedAt)
+          OR (t.transactionDate = :targetDate AND t.createdAt = :targetCreatedAt AND t.id ${above} :targetId))`,
         {
           targetDate: targetTx.transactionDate,
           targetCreatedAt: targetTx.createdAt,
@@ -1349,8 +1406,7 @@ export class TransactionsService {
     m: EntityManager,
     userId: string,
     singleAccountId: string,
-    safePage: number,
-    skip: number,
+    window: RegisterPageWindow,
     filters?: {
       startDate?: string;
       endDate?: string;
@@ -1379,8 +1435,7 @@ export class TransactionsService {
         m,
         userId,
         singleAccountId,
-        safePage,
-        skip,
+        window,
         filters!,
       );
     }
@@ -1390,20 +1445,13 @@ export class TransactionsService {
         m,
         userId,
         singleAccountId,
-        safePage,
-        skip,
+        window,
         filters!,
       );
     }
 
     // No filters: original behavior
-    return this.calculateUnfilteredBalance(
-      m,
-      userId,
-      singleAccountId,
-      safePage,
-      skip,
-    );
+    return this.calculateUnfilteredBalance(m, userId, singleAccountId, window);
   }
 
   /**
@@ -1414,30 +1462,30 @@ export class TransactionsService {
     m: EntityManager,
     userId: string,
     singleAccountId: string,
-    safePage: number,
-    skip: number,
+    window: RegisterPageWindow,
   ): Promise<number> {
     const projectedBalance = await this.computeProjectedBalance(
       userId,
       singleAccountId,
     );
 
-    if (safePage === 1) {
+    if (isNewestPage(window)) {
       return projectedBalance;
     }
 
-    const previousPagesQuery = m
+    const newerRowsQuery = m
       .getRepository(Transaction)
       .createQueryBuilder("t")
       .select("t.id")
       .where("t.userId = :userId", { userId })
-      .andWhere("t.accountId = :singleAccountId", { singleAccountId })
-      .limit(skip);
-    // Must stay the register's own order: these rows are the pages above the
-    // one being shown, and their sum is where its running balance starts.
-    applyRegisterOrder(previousPagesQuery, "t", "DESC");
+      .andWhere("t.accountId = :singleAccountId", { singleAccountId });
+    // Must stay the register's own order and its own window: these are the
+    // rows the register lists NEWER than this page -- the pages above it
+    // running newest-first, the pages below it running oldest-first -- and
+    // their sum is where this page's running balance starts.
+    restrictToRowsNewerThanPage(newerRowsQuery, "t", window);
 
-    // The window is every row the register lists above this page -- voids
+    // The window is every row the register lists newer than this page -- voids
     // included, because they occupy a line each. What is summed out of that
     // window is only what the projected balance counted in.
     const sumResult = await onlyBalanceAffecting(
@@ -1445,13 +1493,13 @@ export class TransactionsService {
         .getRepository(Transaction)
         .createQueryBuilder("transaction")
         .select("SUM(transaction.amount)", "sum")
-        .where(`transaction.id IN (${previousPagesQuery.getQuery()})`)
-        .setParameters(previousPagesQuery.getParameters()),
+        .where(`transaction.id IN (${newerRowsQuery.getQuery()})`)
+        .setParameters(newerRowsQuery.getParameters()),
       "transaction",
     ).getRawOne();
 
-    const sumBefore = Number(sumResult?.sum) || 0;
-    return projectedBalance - sumBefore;
+    const sumNewer = Number(sumResult?.sum) || 0;
+    return projectedBalance - sumNewer;
   }
 
   /**
@@ -1463,8 +1511,7 @@ export class TransactionsService {
     m: EntityManager,
     userId: string,
     accountId: string,
-    safePage: number,
-    skip: number,
+    window: RegisterPageWindow,
     filters: {
       startDate?: string;
       endDate?: string;
@@ -1490,17 +1537,11 @@ export class TransactionsService {
       filters,
     );
 
-    if (safePage === 1) return totalSum;
+    if (isNewestPage(window)) return totalSum;
 
     return (
       totalSum -
-      (await this.computeFilteredPrevPagesSum(
-        m,
-        userId,
-        accountId,
-        skip,
-        filters,
-      ))
+      (await this.computeNewerRowsSum(m, userId, accountId, window, filters))
     );
   }
 
@@ -1512,8 +1553,7 @@ export class TransactionsService {
     m: EntityManager,
     userId: string,
     accountIds: string[] | undefined,
-    safePage: number,
-    skip: number,
+    window: RegisterPageWindow,
     filters: {
       startDate?: string;
       endDate?: string;
@@ -1543,15 +1583,15 @@ export class TransactionsService {
       filters,
     );
 
-    if (safePage === 1) return totalSum;
+    if (isNewestPage(window)) return totalSum;
 
     return (
       totalSum -
-      (await this.computeFilteredPrevPagesSum(
+      (await this.computeNewerRowsSum(
         m,
         userId,
         accountIds,
-        skip,
+        window,
         filters,
         jointAccountIds,
       ))
@@ -1568,8 +1608,7 @@ export class TransactionsService {
     m: EntityManager,
     userId: string,
     accountId: string,
-    safePage: number,
-    skip: number,
+    window: RegisterPageWindow,
     filters: {
       startDate?: string;
       endDate?: string;
@@ -1603,27 +1642,28 @@ export class TransactionsService {
       baseBalance = await this.computeProjectedBalance(userId, accountId);
     }
 
-    if (safePage === 1) return baseBalance;
+    if (isNewestPage(window)) return baseBalance;
 
-    // For page > 1, subtract sum of previous pages (within filtered set)
-    const previousPagesQuery = m
+    // Off the newest page, subtract the rows the register lists newer than it
+    // (within the filtered set).
+    const newerRowsQuery = m
       .getRepository(Transaction)
       .createQueryBuilder("t")
       .select("t.id")
       .where("t.userId = :userId", { userId })
-      .andWhere("t.accountId = :accountId", { accountId })
-      .limit(skip);
-    // Must stay the register's own order: these rows are the pages above the
-    // one being shown, and their sum is where its running balance starts.
-    applyRegisterOrder(previousPagesQuery, "t", "DESC");
+      .andWhere("t.accountId = :accountId", { accountId });
+    // Must stay the register's own order and its own window: these rows are
+    // the ones listed newer than this page, and their sum is where its
+    // running balance starts.
+    restrictToRowsNewerThanPage(newerRowsQuery, "t", window);
 
     if (filters.startDate) {
-      previousPagesQuery.andWhere("t.transactionDate >= :startDate", {
+      newerRowsQuery.andWhere("t.transactionDate >= :startDate", {
         startDate: filters.startDate,
       });
     }
     if (filters.endDate) {
-      previousPagesQuery.andWhere("t.transactionDate <= :endDate", {
+      newerRowsQuery.andWhere("t.transactionDate <= :endDate", {
         endDate: filters.endDate,
       });
     }
@@ -1633,8 +1673,8 @@ export class TransactionsService {
         .getRepository(Transaction)
         .createQueryBuilder("transaction")
         .select("SUM(transaction.amount)", "sum")
-        .where(`transaction.id IN (${previousPagesQuery.getQuery()})`)
-        .setParameters(previousPagesQuery.getParameters()),
+        .where(`transaction.id IN (${newerRowsQuery.getQuery()})`)
+        .setParameters(newerRowsQuery.getParameters()),
       "transaction",
     ).getRawOne();
 
@@ -1654,13 +1694,14 @@ export class TransactionsService {
   }
 
   /**
-   * Sum of filtered transactions on previous pages (for content-filtered pagination).
+   * Sum of the filtered transactions the register lists NEWER than this page,
+   * which is what a zero-based running balance starts from.
    */
-  private async computeFilteredPrevPagesSum(
+  private async computeNewerRowsSum(
     m: EntityManager,
     userId: string,
     accountId: string | string[] | undefined,
-    skip: number,
+    window: RegisterPageWindow,
     filters: {
       startDate?: string;
       endDate?: string;
@@ -1681,19 +1722,19 @@ export class TransactionsService {
       jointAccountIds,
     );
 
-    // Get ordered matching transactions, limited to previous pages
-    const prevIdsQuery = m
+    // The matching rows the register lists newer than this page, in its order.
+    const newerIdsQuery = m
       .getRepository(Transaction)
       .createQueryBuilder("t")
       .select("t.id")
       .where(`t.id IN (${idsSubquery.getQuery()})`)
-      .setParameters(idsSubquery.getParameters())
-      .limit(skip);
-    // Must stay the register's own order: these rows are the pages above the
-    // one being shown, and their sum is where its running balance starts.
-    applyRegisterOrder(prevIdsQuery, "t", "DESC");
+      .setParameters(idsSubquery.getParameters());
+    // Must stay the register's own order and its own window: these rows are
+    // the ones listed newer than this page, and their sum is where its
+    // running balance starts.
+    restrictToRowsNewerThanPage(newerIdsQuery, "t", window);
 
-    return this.computeSplitAwareSum(m, prevIdsQuery, userId, filters);
+    return this.computeSplitAwareSum(m, newerIdsQuery, userId, filters);
   }
 
   /**

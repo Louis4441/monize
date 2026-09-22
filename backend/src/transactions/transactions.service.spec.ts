@@ -2280,6 +2280,7 @@ describe("TransactionsService", () => {
         getQuery: jest.fn().mockReturnValue("SELECT 1"),
         getParameters: jest.fn().mockReturnValue({}),
         limit: jest.fn().mockReturnValue(mockQb),
+        offset: jest.fn().mockReturnValue(mockQb),
         update: jest.fn().mockReturnValue(mockQb),
         set: jest.fn().mockReturnValue(mockQb),
         execute: jest.fn().mockResolvedValue({ affected: 0 }),
@@ -4139,6 +4140,227 @@ describe("TransactionsService", () => {
           "t.transactionDate >= :startDate",
           { startDate: "2026-01-01" },
         );
+      });
+    });
+
+    describe("starting balance in an oldest-first register", () => {
+      /**
+       * The seed means the same thing whichever way the register runs: the
+       * balance after the NEWEST row on the page, walked down from there. So
+       * only the window changes -- the rows the register lists newer than
+       * this page are the pages ABOVE it running newest-first and the pages
+       * BELOW it running oldest-first.
+       */
+      const mockTx = {
+        id: "tx-1",
+        userId: "user-1",
+        accountId: "account-1",
+        amount: -50,
+        status: TransactionStatus.UNRECONCILED,
+        isCleared: false,
+        isReconciled: false,
+        isVoid: false,
+        splits: [],
+      };
+
+      const arrangeAccount = () => {
+        investmentTxRepository.find.mockResolvedValue([]);
+        accountsService.findOne.mockResolvedValue({
+          ...mockAccount,
+          currentBalance: 2000,
+        });
+        accountsService.getProjectedBalance.mockResolvedValue(2000);
+      };
+
+      it("sums the pages BELOW an oldest-first page, by offset and no limit", async () => {
+        const mockQb = createMockQueryBuilder();
+        mockQb.getManyAndCount.mockResolvedValue([[mockTx], 5]);
+        const newerRowsQb = createMockQueryBuilder();
+        const sumQb = createMockQueryBuilder({
+          setParameters: jest.fn().mockReturnThis(),
+        });
+        sumQb.getRawOne.mockResolvedValue({ sum: -500 });
+        transactionsRepository.createQueryBuilder
+          .mockReturnValueOnce(mockQb)
+          .mockReturnValueOnce(newerRowsQb)
+          .mockReturnValueOnce(sumQb);
+        arrangeAccount();
+
+        // Page 2 of 5 rows at 2 per page: rows 3 and 4 are on screen, so the
+        // newer ones are everything from row 5 -- an offset of skip + limit.
+        const result = await service.findAll(
+          "user-1",
+          ["account-1"],
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          2,
+          2,
+          false,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          "date",
+          "ASC",
+        );
+
+        expect(newerRowsQb.offset).toHaveBeenCalledWith(4);
+        expect(newerRowsQb.limit).not.toHaveBeenCalled();
+        expect(newerRowsQb.orderBy).toHaveBeenCalledWith(
+          "t.transactionDate",
+          "ASC",
+          undefined,
+        );
+        // projected 2000 less the -500 the newer rows hold.
+        expect(result.startingBalance).toBe(2500);
+      });
+
+      it("sums nothing on the LAST page, which is the newest one running oldest-first", async () => {
+        const mockQb = createMockQueryBuilder();
+        mockQb.getManyAndCount.mockResolvedValue([[mockTx], 5]);
+        const newerRowsQb = createMockQueryBuilder();
+        transactionsRepository.createQueryBuilder
+          .mockReturnValueOnce(mockQb)
+          .mockReturnValueOnce(newerRowsQb);
+        arrangeAccount();
+
+        // Page 3 of 5 at 2 per page holds row 5, the newest in the account.
+        // Reading "newest page" as page 1 here would seed the OLDEST page with
+        // the account's whole balance.
+        const result = await service.findAll(
+          "user-1",
+          ["account-1"],
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          3,
+          2,
+          false,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          "date",
+          "ASC",
+        );
+
+        expect(result.startingBalance).toBe(2000);
+        expect(newerRowsQb.offset).not.toHaveBeenCalled();
+        expect(newerRowsQb.limit).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("the balance under a sort other than date", () => {
+      const mockTx = {
+        id: "tx-1",
+        userId: "user-1",
+        accountId: "account-1",
+        amount: -50,
+        status: TransactionStatus.UNRECONCILED,
+        isCleared: false,
+        isReconciled: false,
+        isVoid: false,
+        splits: [],
+      };
+
+      it("is withheld, and says so, where one would otherwise be returned", async () => {
+        const mockQb = createMockQueryBuilder();
+        mockQb.getManyAndCount.mockResolvedValue([[mockTx], 5]);
+        transactionsRepository.createQueryBuilder.mockReturnValue(mockQb);
+        investmentTxRepository.find.mockResolvedValue([]);
+        accountsService.getProjectedBalance.mockResolvedValue(2000);
+
+        const result = await service.findAll(
+          "user-1",
+          ["account-1"],
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          1,
+          50,
+          false,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          "amount",
+          "DESC",
+        );
+
+        // A running balance is a figure about the row above it, so beside a
+        // register ordered by amount it would be arithmetic nobody can read.
+        expect(result.startingBalance).toBeUndefined();
+        expect(result.startingBalanceWithheld).toBe("sort");
+        // And it is not merely dropped after the fact: the queries that would
+        // have produced it never ran.
+        expect(accountsService.getProjectedBalance).not.toHaveBeenCalled();
+      });
+
+      it("says nothing where no balance was on offer anyway", async () => {
+        const mockQb = createMockQueryBuilder();
+        mockQb.getManyAndCount.mockResolvedValue([[mockTx], 5]);
+        transactionsRepository.createQueryBuilder.mockReturnValue(mockQb);
+        investmentTxRepository.find.mockResolvedValue([]);
+
+        // Every account, no content filters: this register never had a
+        // balance column, so promising one back by sorting on date would be a
+        // lie the client would then tell the reader.
+        const result = await service.findAll(
+          "user-1",
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          1,
+          50,
+          false,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          "payee",
+          "ASC",
+        );
+
+        expect(result.startingBalance).toBeUndefined();
+        expect(result.startingBalanceWithheld).toBeUndefined();
+      });
+
+      it("refuses to place a deep-linked row, rather than placing it wrongly", async () => {
+        await expect(
+          service.findAll(
+            "user-1",
+            ["account-1"],
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            1,
+            50,
+            false,
+            undefined,
+            "11111111-1111-4111-8111-111111111111",
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            "payee",
+            "ASC",
+          ),
+        ).rejects.toThrow(BadRequestException);
       });
     });
 

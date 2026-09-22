@@ -512,6 +512,7 @@
     "limitMax200": "limit は200を超えてはなりません",
     "invalidSortBy": "無効な sortBy：{{ sortBy }}。次のいずれかである必要があります：{{ allowed }}",
     "invalidSortDirection": "無効な sortDirection：{{ sortDirection }}。asc または desc である必要があります",
+    "targetRequiresDateSort": "targetTransactionId は取引明細が日付順に並んでいるときにのみ使用できます",
     "invalidTagKeyOp": "無効な tagKeyOp: {{ op }}",
     "tagKeyRequired": "タグキー（1〜100文字）が必要です",
     "limitMustBePositive": "limit は正の数でなければなりません",
