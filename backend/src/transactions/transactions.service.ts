@@ -1379,6 +1379,17 @@ export class TransactionsService {
       // The rows the register lists ABOVE the target, which is what its page
       // number counts. "Above" is newer in a newest-first register and older
       // in an oldest-first one, so the comparison runs the way the list does.
+      //
+      // A row is never above itself, and saying so is not belt-and-braces:
+      // `created_at` is stored to the microsecond and read back into a
+      // millisecond JavaScript Date, so the value bound here is the row's own
+      // timestamp TRUNCATED. The second clause below then finds the target
+      // strictly newer than that truncated copy of itself and counts it,
+      // which moved the answer up by one row and landed a deep link on the
+      // wrong page whenever that one row crossed a page boundary.
+      countQuery.andWhere("t.id != :targetSelfId", {
+        targetSelfId: targetTx.id,
+      });
       const above = sortDirection === "DESC" ? ">" : "<";
       countQuery.andWhere(
         `(t.transactionDate ${above} :targetDate
