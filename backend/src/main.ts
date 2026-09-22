@@ -74,26 +74,13 @@ pgUtils.prepareValue = function (val: unknown, seen?: unknown[]): unknown {
   return origPrepareValue(val, seen);
 };
 
-// Suppress Node.js 20 ERR_INTERNAL_ASSERTION in HTTP detachSocket.
-// This fires asynchronously when NestJS @Res() handlers throw exceptions,
-// causing a race between the exception filter's response and internal socket
-// cleanup. The response is already sent to the client; only the socket
-// bookkeeping assertion fails. Safe to suppress in dev; does not fire in prod.
-if (process.env.NODE_ENV !== "production") {
-  process.on("uncaughtException", (err: any) => {
-    if (
-      err?.code === "ERR_INTERNAL_ASSERTION" &&
-      err?.stack?.includes("detachSocket")
-    ) {
-      return;
-    }
-    logger.error(
-      "Uncaught exception",
-      err instanceof Error ? err.stack : String(err),
-    );
-    process.exit(1);
-  });
-}
+// There is deliberately no `uncaughtException` handler here. A dev-only one used
+// to swallow ERR_INTERNAL_ASSERTION from `detachSocket` as harmless socket
+// bookkeeping; it was a real defect in this code, not a Node bug, and gating the
+// suppression on NODE_ENV hid it from dev and from the E2E stack (both run with
+// NODE_ENV=development) while it killed the process in production. A crash of
+// that class is meant to be loud: `src/common/res-handler-return.guard.spec.ts`
+// and `docs/backend/modules-and-runtime.md` carry the rule it came from.
 
 /**
  * Check the cluster boot matrix and exit if this configuration cannot serve.

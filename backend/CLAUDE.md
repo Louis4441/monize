@@ -63,6 +63,7 @@ Each module holds `{feature}.module.ts`, controller, service, their specs, `enti
 | A numeric environment variable | `resolvePositiveInt`, declared in a table beside its documentation | a bare `Number(process.env.X)`, or `configService.get<number>(...)`, which asserts the type without coercing |
 | Reading an existing attachment's bytes | the row's own backend, `AttachmentStorageRegistry.require(row.storageProvider)` | the bound `ATTACHMENT_STORAGE_PROVIDER`, which says only where the NEXT object goes |
 | A log line, including pre-boot scripts | NestJS `Logger` | `console.*` |
+| A reply from a handler that took `@Res()` | `res.json(payload); return;`, the handler typed `Promise<void>` | `return res.json(payload)`, which hands the live response to the global `ClassSerializerInterceptor` |
 | A third-party `fetch` | `ProviderHealthService` gates and `describeFetchFailure` | a bare `fetch` or logging `error.stack` from a `catch` |
 | Storing a provider price | `refuseForeignCurrency` / `verifyProviderCurrency` (`src/securities/providers/quote-currency.util.ts`) before the write | writing a quote or a historical series whose currency was never compared with the security's |
 | A literal inside a regular expression | `escapeRegExp` | a hand-written character class |

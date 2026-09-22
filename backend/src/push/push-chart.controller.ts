@@ -23,14 +23,21 @@ export class PushChartController {
     @Param("token") token: string,
     @Request() req: { method: string },
     @Res() res: Response,
-  ) {
+  ): Promise<void> {
     res.setHeader("Cache-Control", "no-store, private");
     res.setHeader("X-Content-Type-Options", "nosniff");
     // Express routes HEAD through GET: probes must not consume the one-use image.
-    if (req.method === "HEAD") return res.status(405).end();
+    if (req.method === "HEAD") {
+      res.status(405).end();
+      return;
+    }
     const png = await this.artifacts.consume(token);
     if (!png) throw new NotFoundException();
     res.type("image/png");
-    return res.send(png);
+    // Nothing is returned on purpose: a @Res() handler's return value still
+    // travels through the global ClassSerializerInterceptor, and the live
+    // Express Response is not a serializable payload. See
+    // `res-handler-return.guard.spec.ts`.
+    res.send(png);
   }
 }

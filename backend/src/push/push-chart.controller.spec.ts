@@ -15,7 +15,14 @@ describe("push chart endpoint", () => {
     const png = Buffer.from("png"),
       res = response();
     consume.mockResolvedValue(png);
-    await controller.get("token", { method: "GET" }, res as any);
+    const returned = await controller.get(
+      "token",
+      { method: "GET" },
+      res as any,
+    );
+    // A @Res() handler returns nothing: the value would reach the global
+    // ClassSerializerInterceptor, which cannot be handed a live response.
+    expect(returned).toBeUndefined();
     expect(res.setHeader).toHaveBeenCalledWith(
       "Cache-Control",
       "no-store, private",
@@ -25,7 +32,12 @@ describe("push chart endpoint", () => {
   });
   it("does not consume a token on HEAD", async () => {
     const res = response();
-    await controller.get("token", { method: "HEAD" }, res as any);
+    const returned = await controller.get(
+      "token",
+      { method: "HEAD" },
+      res as any,
+    );
+    expect(returned).toBeUndefined();
     expect(consume).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(405);
   });
