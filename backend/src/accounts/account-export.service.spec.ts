@@ -131,15 +131,27 @@ describe("AccountExportService", () => {
     };
   }
 
-  // Mock query builder chain
+  // Mock query builder chain. `getMany` hands back a fixed array, so the order
+  // the export asked for is never observable in its output -- it is recorded
+  // here instead, and asserted on its own below.
   function createMockQueryBuilder(transactions: any[]) {
+    const orderCalls: [string, string, string | undefined][] = [];
     const qb = {
       leftJoinAndSelect: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      addOrderBy: jest.fn().mockReturnThis(),
+      orderBy: jest.fn((column: string, direction: string, nulls?: string) => {
+        orderCalls.push([column, direction, nulls]);
+        return qb;
+      }),
+      addOrderBy: jest.fn(
+        (column: string, direction: string, nulls?: string) => {
+          orderCalls.push([column, direction, nulls]);
+          return qb;
+        },
+      ),
       getMany: jest.fn().mockResolvedValue(transactions),
+      orderCalls,
     };
     return qb;
   }
@@ -208,6 +220,33 @@ describe("AccountExportService", () => {
       expect(lines[2]).toContain("Loblaws");
       // Running balance: 1500 - 75.5 = 1424.5
       expect(lines[2]).toContain("1424.5");
+    });
+
+    it("reads the rows in the register's own order, oldest first", async () => {
+      // The export walks a balance FORWARD from the opening balance, so the
+      // order it reads in is the order the Running Balance column is computed
+      // in -- and it used to spell that order out for itself, without the
+      // amount leg. `created_at` is transaction start time, so an import
+      // writes a day's rows with one value; within such a tie the order fell
+      // through to a random UUID, and a purchase funded by a same-day
+      // transfer came out before the transfer about half the time. The
+      // exported column then showed the account overdrawn on a day it was
+      // never short.
+      //
+      // The amount leg runs opposite to the list, which is what puts the
+      // credit first in an oldest-first read: money has to arrive before it
+      // can be spent, and no file we import carries a time of day.
+      const qb = createMockQueryBuilder(buildMockTransactions());
+      mockTransactionRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await service.exportCsv(userId, accountId);
+
+      expect(qb.orderCalls).toEqual([
+        ["transaction.transactionDate", "ASC", undefined],
+        ["transaction.createdAt", "ASC", undefined],
+        ["transaction.amount", "DESC", undefined],
+        ["transaction.id", "ASC", undefined],
+      ]);
     });
 
     it("handles transfer transactions with account name", async () => {

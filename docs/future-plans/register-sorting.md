@@ -43,9 +43,9 @@ direction-aware, and reuses the sortable-header kit every report table uses.
 
 | Need | Existing piece | Notes |
 |---|---|---|
-| Sorted, paged register rows | `TransactionsService.findAll` (`backend/src/transactions/transactions.service.ts`) already takes `sortBy` and `sortDirection` | Reached today only by the AI assistant and MCP tools, always on page 1. The HTTP controller passes `undefined, undefined`. |
+| Sorted, paged register rows | `TransactionsService.findAll` (`backend/src/transactions/transactions.service.ts`) already takes `sortBy` and `sortDirection` | Before this work, reached only by the AI assistant and MCP tools, always on page 1: the HTTP controller passed `undefined, undefined`. |
 | One register order | `applyRegisterOrder` (`backend/src/transactions/register-order.ts`): primary column, `createdAt`, `amount` (credits before debits, opposite to the list), `id` | The ASC order is the exact reverse of the DESC order, a total order, so "the rows newer than a page" is well defined either way. |
-| The running-balance seed | `startingBalance` on the list response: the balance after the newest row on the page, computed by `calculateUnfilteredBalance`, `calculateDateFilteredBalance`, `calculateContentFilteredBalance` / `calculateMultiAccountContentFilteredBalance` (through `computeFilteredPrevPagesSum`) | Each sums "the rows on previous pages" with `applyRegisterOrder(q, "t", "DESC")` **hardcoded** and `.limit(skip)`, and each has a `safePage === 1` shortcut. Both are descending-only truths; this is why a non-default sort corrupts every page-2+ balance today. |
+| The running-balance seed | `startingBalance` on the list response: the balance after the newest row on the page, computed by `calculateUnfilteredBalance`, `calculateDateFilteredBalance`, `calculateContentFilteredBalance` / `calculateMultiAccountContentFilteredBalance` (through `computeNewerRowsSum`) | Each sums "the rows on previous pages" with `applyRegisterOrder(q, "t", "DESC")` **hardcoded** and `.limit(skip)`, and each has a `safePage === 1` shortcut. Both are descending-only truths; this is why a non-default sort corrupts every page-2+ balance today. |
 | Which rows move a balance | `onlyBalanceAffecting` (`backend/src/transactions/balance-affecting.util.ts`): not VOID, not a split child | Unchanged. INV-TRANSFER-001. |
 | The balance the newest row leaves | `AccountsService.getProjectedBalance` (`backend/src/accounts/accounts.service.ts`): opening balance plus every ledger-movement row, future-dated included | Unchanged. INV-BALANCE-001. |
 | The client walk | `TransactionList.tsx`'s `runningBalances` memo: newest-first, `balance = seed - cumulative`, VOID and split children contribute 0, filtered split parents use `displayAmounts` | Moves to `lib/running-balance.ts` and gains a direction. |
@@ -511,7 +511,7 @@ Backend: `backend/src/transactions/register-order.ts`,
 `backend/src/transactions/transactions.service.ts` (`findAll`,
 `calculateStartingBalance`, `calculateUnfilteredBalance`,
 `calculateDateFilteredBalance`, `calculateContentFilteredBalance`,
-`calculateMultiAccountContentFilteredBalance`, `computeFilteredPrevPagesSum`,
+`calculateMultiAccountContentFilteredBalance`, `computeNewerRowsSum`,
 `calculateTargetPage`, `getLlmTransactionRows`),
 `backend/src/transactions/transactions.service.spec.ts`,
 `backend/src/transactions/transactions.controller.ts`,

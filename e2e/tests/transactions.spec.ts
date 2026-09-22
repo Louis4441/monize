@@ -146,6 +146,11 @@ test.describe('Register sorting', () => {
 
     await page.goto(`/transactions?accountIds=${account.id}`);
 
+    // Scoped to the register: the page also draws a chart and a filter panel
+    // above it, and a future table mounted between them would silently
+    // redirect a bare `tbody tr`.
+    const registerRows = page.locator('table tbody tr').first();
+
     // Date order is the default, and it is what a balance means anything in.
     const balanceHeader = page.getByRole('columnheader', { name: /^balance$/i });
     await expect(balanceHeader).toBeVisible();
@@ -161,15 +166,17 @@ test.describe('Register sorting', () => {
     );
     await expect(balanceHeader).toBeHidden();
     await expect(page.getByText(/sort by date to see the running balance/i)).toBeVisible();
-    const firstPayee = page.locator('tbody tr').first();
-    await expect(firstPayee).toContainText(alpha);
+    await expect(registerRows).toContainText(alpha);
 
-    // The choice survives a reload, like the row density does.
+    // The choice survives a reload, like the row density does -- and it is
+    // re-sent to the server, which the rows are what prove.
     await page.reload();
     await expect(page.getByRole('columnheader', { name: /^payee$/i })).toHaveAttribute(
       'aria-sort',
       'ascending',
     );
+    await expect(registerRows).toContainText(alpha);
+    await expect(balanceHeader).toBeHidden();
   });
 
   test('shows a row the same balance in either date direction', async ({
@@ -210,13 +217,14 @@ test.describe('Register sorting', () => {
     const olderDescending = await rowText(older);
     const newerDescending = await rowText(newer);
 
-    // Reverse the register: the same rows, the same figures beside them.
-    await page.getByRole('columnheader', { name: /^date/i }).click();
-    await expect(page.getByRole('columnheader', { name: /^date/i })).toHaveAttribute(
-      'aria-sort',
-      'ascending',
-    );
-    await expect(page.locator('tbody tr').first()).toContainText(older);
+    // Reverse the register by the header's own label, not the cell's centre:
+    // the Date header also holds the year toggle, whose wrapper stops the
+    // event before it reaches the header, and where the centre of the cell
+    // falls depends on how wide the rendered dates are.
+    const dateHeader = page.getByRole('columnheader', { name: /^date/i });
+    await dateHeader.getByText('Date', { exact: true }).click();
+    await expect(dateHeader).toHaveAttribute('aria-sort', 'ascending');
+    await expect(page.locator('table tbody tr').first()).toContainText(older);
 
     expect(await rowText(older)).toBe(olderDescending);
     expect(await rowText(newer)).toBe(newerDescending);

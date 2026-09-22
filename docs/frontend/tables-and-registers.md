@@ -58,14 +58,15 @@ The preference is browser-local rather than a `user_preferences` column on purpo
 
 ## Asking for the Balance column and supplying the balance are one decision
 
-`<TransactionList isSingleAccountView>` draws the Balance column, and the number in it is the backend's `startingBalance` run down the page -- the list derives nothing, so the column arrives empty without it (issue #1188). Take both from the same response and adopt them in the same block: a starting balance is computed for one page of one account, and a failed reload that keeps the rows has to keep the balance too. `ui-conventions.test.ts` fails any `<TransactionList>` setting `isSingleAccountView` without `startingBalance`.
+`<TransactionList isSingleAccountView>` draws the Balance column, and the number in it is the backend's `startingBalance` run down the page -- the list derives nothing, so the column arrives empty without it (issue #1188). Take both from the same response and adopt them in the same block: a starting balance is computed for one page of one account, and a failed reload that keeps the rows has to keep the balance too -- and the ORDER those rows arrived in, which is what the walk, the today divider and the column's own gate read (`rowsSort`), never the order the headers are showing while a reload is in flight. `ui-conventions.test.ts` fails any `<TransactionList>` setting `isSingleAccountView` without `startingBalance`.
 
-**And the register has to be in date order.** Any data column of the
-Transactions page register sorts (`lib/transaction-sort.ts` holds the field
-list, mirrored from the server's and pinned equal to it by
-`register-sort.contract.spec.ts`), and a running balance is a figure about the
-row above, so beside rows ordered by payee or amount it is arithmetic nobody
-can read. The server withholds the seed under any other order and says so with
+**And the register has to be in date order.** Eight of the Transactions page
+register's columns sort (`lib/transaction-sort.ts` holds the field list,
+mirrored from the server's and pinned equal to it by
+`register-sort.contract.spec.ts`); tags, attachments and balance deliberately
+do not, and `backend/src/transactions/register-order.ts` says why. A running
+balance is a figure about the row above, so beside rows ordered by payee or
+amount it is arithmetic nobody can read. The server withholds the seed under any other order and says so with
 `startingBalanceWithheld: "sort"`; the register reads that flag -- `=== 'sort'`,
 absent being "nothing to say" rather than "a balance is coming" -- and prints
 one line naming the fix, because withholding a figure is only honest if the

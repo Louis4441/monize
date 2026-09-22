@@ -12,7 +12,7 @@ A transfer's label is `csvTransferLabel` in the same file, and it names the dire
 
 ## A blank transfer payee is stored blank and resolved at read time
 
-A transfer created without a payee persists `payee_name` as NULL (issue #1214); the display label is resolved per read from the linked leg's account -- its CURRENT name, in the reader's language. The English form for machine-facing surfaces (CSV/QIF export, AI/MCP rows, custom reports) lives only in `src/transactions/transfer-payee-label.util.ts`, and `transfer-payee-stamp.guard.spec.ts` fails on a `Transfer to/from ${...}` template anywhere else in `src/`. Migration 161 blanked the legacy-stamped rows; `updateTransfer` heals a surviving stamp to NULL and never regenerates it. A read surface joining `linkedTransaction.account` for this must mask or restrict cross-owner counterparts the reader cannot read (the account export masks; the custom report query restricts the join to same-owner legs).
+A transfer created without a payee persists `payee_name` as NULL (issue #1214); the display label is resolved per read from the linked leg's account -- its CURRENT name, in the reader's language. The English form for machine-facing surfaces (CSV/QIF export, AI/MCP rows, custom reports) lives only in `src/transactions/transfer-payee-label.util.ts`, and `transfer-payee-stamp.guard.spec.ts` fails on a `Transfer to/from ${...}` template anywhere else in `src/`. Migration 161 blanked the legacy-stamped rows; `updateTransfer` heals a surviving stamp to NULL and never regenerates it. That NULL is why the register's Payee sort sinks every transfer to the end in both directions: the column displays a label resolved per read, and an ORDER BY key on the DISTINCT-ids pagination path has to be a stored `alias.property`, never a computed expression. A read surface joining `linkedTransaction.account` for this must mask or restrict cross-owner counterparts the reader cannot read (the account export masks; the custom report query restricts the join to same-owner legs).
 
 The guard also asks what a value *is* rather than what it starts with, matching its twin in `frontend/src/lib/csv-export.ts`: a value a spreadsheet reads as a number is data, and prefixing one stops the column adding up (issue #1134) -- amounts bypass `escapeCsv`, so the rule covers text columns that can still hold a number (a cheque number written `-123`).
 
@@ -116,8 +116,14 @@ entry currency, attachment presence and the KEY:VALUE tag filter -- along with
 the brokerage exclusion, and a register narrowed by any of them fell through
 to the unfiltered regime: the account's whole projected balance, walked down
 past rows that are not the ones being shown. A filter added to the listing is
-added to `RegisterRowFilters` in the same change, which is a compile error at
-every call site that builds one until it is.
+added to `RegisterRowFilters` in the same change: every member of that shape
+is required rather than optional, so a new field is a compile error where the
+shape is built until it is named -- and that is the moment to apply it in
+`buildFilteredIdsSubquery` too, which the type cannot check for you. The
+uncategorised pseudo-category is the example of getting the second half
+wrong: the listing matches a split parent through its children, and an arm
+that matched only the plain rows gave one row two different balances
+depending on which way the register ran.
 
 The page count also has to ask the register's ORDER, not an approximation of
 it: all four keys, with the amount leg running opposite to the list (the same

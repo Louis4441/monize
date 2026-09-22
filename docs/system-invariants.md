@@ -303,8 +303,12 @@ Source of truth     the account's ledger rows in applyRegisterOrder's total
                     page a deep link lands on is counted over it too.
 Enforcement         The server sends one number per page -- startingBalance,
                     the balance AFTER that page's newest row -- and the client
-                    walks it down the page newest-first. Only two things are
-                    direction-aware, and each is written once.
+                    walks it down the page newest-first. Four things are
+                    direction-aware, and each is written once: the ORDER BY
+                    (applyRegisterOrder, whose amount tiebreak runs opposite
+                    through creditsBeforeDebitsDirection), the page window,
+                    the deep link's comparison operators, and the client's
+                    walk.
                     restrictToRowsNewerThanPage (transactions/register-order.ts)
                     is the window whose sum turns the listing's balance into
                     the page's: the pages above under DESC, everything from

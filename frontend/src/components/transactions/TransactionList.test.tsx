@@ -3633,8 +3633,9 @@ describe('TransactionList today divider', () => {
   const mockOnEdit = vi.fn();
   const mockOnRefresh = vi.fn();
 
-  // getLocalDateString is not mocked here, so the fixture is dated relative to
-  // the real today: one row plainly in the past, one plainly ahead of it.
+  // `useFinancialToday` is mocked for this file, so the fixture is dated
+  // either side of that fixed day: one row plainly in the past, one plainly
+  // ahead of it.
   const past = createTransaction({ id: 'past', transactionDate: '2020-01-01' });
   const future = createTransaction({ id: 'future', transactionDate: '2099-01-01' });
 

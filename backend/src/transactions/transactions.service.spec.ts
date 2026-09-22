@@ -3040,7 +3040,7 @@ describe("TransactionsService", () => {
       expect(result.startingBalance).toBe(3000);
     });
 
-    it("calculates starting balance for page > 1 using sum of previous pages", async () => {
+    it("calculates starting balance for page > 1 using sum of rows newer than the page", async () => {
       const mockTx = {
         id: "tx-2",
         userId: "user-1",
@@ -3054,7 +3054,7 @@ describe("TransactionsService", () => {
       };
       const mockQb = createMockQueryBuilder();
       mockQb.getManyAndCount.mockResolvedValue([[mockTx], 51]);
-      // For the sum of previous pages queries:
+      // For the sum of rows newer than the page queries:
       // 1st = main query, 2nd = previousPagesQuery, 3rd = sumResult query
       const sumQb = createMockQueryBuilder({
         setParameters: jest.fn().mockReturnThis(),
@@ -3616,7 +3616,7 @@ describe("TransactionsService", () => {
         expect(result.startingBalance).toBe(-400);
       });
 
-      it("subtracts previous pages sum for page > 1 with content filter", async () => {
+      it("subtracts rows newer than the page sum for page > 1 with content filter", async () => {
         const mockQb = createMockQueryBuilder();
         mockQb.getManyAndCount.mockResolvedValue([[mockTx], 100]);
 
@@ -4141,7 +4141,7 @@ describe("TransactionsService", () => {
         expect(result.startingBalance).toBe(1300);
       });
 
-      it("subtracts date-filtered previous pages sum for page > 1 with endDate", async () => {
+      it("subtracts date-filtered rows newer than the page sum for page > 1 with endDate", async () => {
         const mockQb = createMockQueryBuilder();
         mockQb.getManyAndCount.mockResolvedValue([[mockTx], 100]);
 
@@ -4185,7 +4185,7 @@ describe("TransactionsService", () => {
         expect(result.startingBalance).toBe(1400);
       });
 
-      it("applies date constraints to previous pages query", async () => {
+      it("applies date constraints to rows newer than the page query", async () => {
         const mockQb = createMockQueryBuilder();
         mockQb.getManyAndCount.mockResolvedValue([[mockTx], 100]);
 
@@ -4233,7 +4233,7 @@ describe("TransactionsService", () => {
         );
       });
 
-      it("subtracts date-filtered previous pages sum for page > 1 with startDate only", async () => {
+      it("subtracts date-filtered rows newer than the page sum for page > 1 with startDate only", async () => {
         const mockQb = createMockQueryBuilder();
         mockQb.getManyAndCount.mockResolvedValue([[mockTx], 100]);
 
@@ -4557,7 +4557,7 @@ describe("TransactionsService", () => {
         expect(result.startingBalance).toBe(3000);
       });
 
-      it("subtracts unfiltered previous pages sum for page > 1 with no filters", async () => {
+      it("subtracts unfiltered rows newer than the page sum for page > 1 with no filters", async () => {
         const mockQb = createMockQueryBuilder();
         mockQb.getManyAndCount.mockResolvedValue([[mockTx], 100]);
 
