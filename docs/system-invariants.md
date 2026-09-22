@@ -921,10 +921,14 @@ Test                write-prices.spec.ts: the rate insert carries DO NOTHING
                     as imported.
 Status              partial -- a Money rate still fills a date the table holds
                     nothing for, and until a provider covers that date every
-                    user resolves through it. Keeping user-supplied rates out
-                    of the shared table altogether needs a user-owned rate
-                    store that resolveFxRate consults for its owner only; that
-                    is a schema change and waits on its own spec.
+                    user resolves through it. No user-owned rate store is
+                    planned: what a user exchanged at is already on the
+                    imported rows (each leg of a cross-currency transfer in
+                    its own account's currency, a trade's cash leg with its
+                    own exchange_rate), and import post-processing backfills
+                    market history from the provider. The remaining step is
+                    for the importer to stop writing CRNC_EXCHG to the shared
+                    table at all.
 ```
 
 ### INV-TRADE-001 -- the executed total is the fact, the price is derived
