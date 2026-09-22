@@ -370,7 +370,7 @@ describe("AuthController", () => {
         firstName: "Vee",
       };
 
-      await controller.register(dto as any, res as any);
+      const returned = await controller.register(dto as any, res as any);
 
       expect(emailService.sendMail).toHaveBeenCalledWith(
         "verify@example.com",
@@ -379,6 +379,7 @@ describe("AuthController", () => {
       );
       expect(res.cookie).not.toHaveBeenCalled();
       expect(res.json).toHaveBeenCalledWith({ verificationRequired: true });
+      expect(returned).toBeUndefined();
     });
   });
 
@@ -460,12 +461,20 @@ describe("AuthController", () => {
       } as any;
       const dto = { email: "test@example.com", password: "password" };
 
-      await controller.login(dto as any, expressReq, res as any);
+      const returned = await controller.login(
+        dto as any,
+        expressReq,
+        res as any,
+      );
 
       expect(res.json).toHaveBeenCalledWith({
         requires2FA: true,
         tempToken: "temp-2fa-token",
       });
+      // A @Res() handler's return value still travels through the global
+      // ClassSerializerInterceptor; returning the live Express response killed
+      // the process with ERR_INTERNAL_ASSERTION once the reply had been sent.
+      expect(returned).toBeUndefined();
       expect(res.cookie).not.toHaveBeenCalledWith(
         "auth_token",
         expect.anything(),
@@ -539,9 +548,14 @@ describe("AuthController", () => {
       } as any;
       const dto = { email: "test@example.com", password: "password" };
 
-      await controller.login(dto as any, expressReq, res as any);
+      const returned = await controller.login(
+        dto as any,
+        expressReq,
+        res as any,
+      );
 
       expect(res.json).toHaveBeenCalledWith({ emailNotVerified: true });
+      expect(returned).toBeUndefined();
       expect(res.cookie).not.toHaveBeenCalled();
     });
   });

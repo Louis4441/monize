@@ -257,7 +257,10 @@ export class AuthController {
   @ApiOperation({ summary: "Register a new user with local credentials" })
   @ApiResponse({ status: 403, description: "Local authentication is disabled" })
   @ApiResponse({ status: 429, description: "Too many requests" })
-  async register(@Body() registerDto: RegisterDto, @Res() res: Response) {
+  async register(
+    @Body() registerDto: RegisterDto,
+    @Res() res: Response,
+  ): Promise<void> {
     if (!this.localAuthEnabled) {
       throw new ForbiddenException(
         tr(
@@ -286,7 +289,11 @@ export class AuthController {
         result.user.firstName ?? "",
         result.verificationToken,
       );
-      return res.json({ verificationRequired: true });
+      // Not `return res.json(...)`: the value a @Res() handler returns still
+      // travels through the global ClassSerializerInterceptor, which would then
+      // walk the live response object. See the note on the login handler.
+      res.json({ verificationRequired: true });
+      return;
     }
 
     this.setAuthCookies(
@@ -350,7 +357,7 @@ export class AuthController {
     @Body() loginDto: LoginDto,
     @Request() req: ExpressRequest,
     @Res() res: Response,
-  ) {
+  ): Promise<void> {
     if (!this.localAuthEnabled) {
       throw new ForbiddenException(
         tr(
@@ -369,14 +376,24 @@ export class AuthController {
       userAgent,
     );
 
-    // If 2FA is required, return temp token without setting cookie
+    // If 2FA is required, return temp token without setting cookie.
+    //
+    // The response is sent and the handler returns nothing. Returning the value
+    // of `res.json(...)` -- the Express Response itself -- hands the live
+    // response to the global ClassSerializerInterceptor, which walks the object
+    // graph (`res` -> `socket` -> `_events`) and invokes the internal HTTP
+    // listeners it finds there, clearing Node's socket bookkeeping and killing
+    // the process with ERR_INTERNAL_ASSERTION in `detachSocket` after the reply
+    // is already on the wire. `res-handler-return.guard.spec.ts` holds this.
     if (result.requires2FA) {
-      return res.json({ requires2FA: true, tempToken: result.tempToken });
+      res.json({ requires2FA: true, tempToken: result.tempToken });
+      return;
     }
 
     // Email not verified yet: no cookies, tell the client to prompt a resend.
     if (result.emailNotVerified) {
-      return res.json({ emailNotVerified: true });
+      res.json({ emailNotVerified: true });
+      return;
     }
 
     this.setAuthCookies(

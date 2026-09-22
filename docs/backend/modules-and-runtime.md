@@ -55,6 +55,49 @@ Registered globally via `APP_FILTER`, `APP_GUARD`, `APP_INTERCEPTOR`:
 
 Also configured: `ConfigModule` (global), `TypeOrmModule` (async, PostgreSQL), `ThrottlerModule`, `ScheduleModule`.
 
+## A `@Res()` handler sends the response and returns nothing
+
+`ClassSerializerInterceptor` is registered app-wide, so it is handed whatever
+every handler returns -- including a handler that took the raw response with
+`@Res()` and whose return value Nest itself ignores. `return res.json(payload)`
+evaluates to the Express `Response`, and `isObject` is true of it, so the
+interceptor calls `classToPlain` on the live HTTP response.
+
+class-transformer walks own enumerable properties and *invokes* the function
+values it meets. The reachable graph from a response is `res` -> `socket` ->
+`socket._events` -> Node's own HTTP listeners (`socketOnError`, and the rest of
+the set `_http_server` installs per connection), which it then calls with a plain
+object as the receiver. The first one throws (`this.removeListener is not a
+function`), and by then the walk has already cleared the socket's `_httpMessage`
+back-reference. When the response -- long since flushed -- emits `finish`,
+`ServerResponse.detachSocket` fails its internal assertion and the process exits
+with `ERR_INTERNAL_ASSERTION`, which no filter or `try`/`catch` can reach.
+
+The symptom is therefore a correct reply followed by a dead backend: the client
+sees the payload, then the container restarts. Five sites had the shape, three of
+them on the unauthenticated auth surface, and the one on the 2FA branch of
+`POST /auth/login` locked every account with 2FA enabled out of the product.
+
+The rule:
+
+- Send, then return nothing: `res.json(payload); return;`, never
+  `return res.json(payload)`, and never `return res`.
+- Declare the handler `Promise<void>` where you are touching one, so `tsc`
+  refuses the shape instead of a scan reporting it.
+- `backend/src/common/res-handler-return.guard.spec.ts` scans every file that
+  binds `@Res()` and fails on a `return` of that parameter. It derives the
+  parameter's name per file rather than assuming `res`, so a `fetch` result named
+  `response` elsewhere is untouched.
+
+A related trap this does not cover: the interceptor runs on a handler's return
+value *after* the handler has replied, so any exception raised there reaches
+`GlobalExceptionFilter` with the response already sent. An
+`uncaughtException` handler that swallows `ERR_INTERNAL_ASSERTION` treats that as
+noise; `main.ts` had one, gated to non-production, and the E2E stack runs with
+`NODE_ENV=development`, so the crash was invisible everywhere it could have been
+caught cheaply and fatal only for users. It is gone, and a crash of this class is
+meant to be loud.
+
 ## main.ts Setup
 
 - **API prefix:** `api/v1`
