@@ -11,6 +11,7 @@ import { tr } from "../../i18n/translate";
 import {
   ALLOW_DELEGATE_KEY,
   DELEGATED_ACCOUNT_PARAM_KEY,
+  DELEGATED_BODY_ACCOUNTS_KEY,
   DELEGATED_TRANSACTION_PARAM_KEY,
   DELEGATED_TRANSFER_BODY_KEY,
   DELEGATED_TRANSFER_PARAM_KEY,
@@ -39,6 +40,31 @@ const RESOURCE_LABELS: Record<DelegateCapabilityReq["resource"], string> = {
   categories: "categories",
   tags: "tags",
 };
+
+/**
+ * Every string a body path names. A segment ending in `[]` walks an array; a
+ * value of any other shape is skipped here and rejected by the route's DTO
+ * validation (which runs after this guard) before the handler sees it.
+ */
+function collectBodyStrings(body: unknown, path: string): string[] {
+  let nodes: unknown[] = [body];
+  for (const segment of path.split(".")) {
+    const walksArray = segment.endsWith("[]");
+    const key = walksArray ? segment.slice(0, -2) : segment;
+    const next: unknown[] = [];
+    for (const node of nodes) {
+      if (!node || typeof node !== "object" || Array.isArray(node)) continue;
+      const value = (node as Record<string, unknown>)[key];
+      if (!walksArray) {
+        next.push(value);
+      } else if (Array.isArray(value)) {
+        for (const item of value) next.push(item);
+      }
+    }
+    nodes = next;
+  }
+  return nodes.filter((value): value is string => typeof value === "string");
+}
 
 /**
  * Fail-closed enforcement for delegate ("acting as owner") requests.
@@ -162,6 +188,24 @@ export class AccountDelegateGuard implements CanActivate {
         if (accountId) {
           await this.assertTransferPermission(payload, accountId, operation);
         }
+      }
+    }
+
+    const bodyAccountPaths = this.reflector.getAllAndOverride<string[]>(
+      DELEGATED_BODY_ACCOUNTS_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    if (bodyAccountPaths) {
+      // Every other account the body names (a split's transfer target, a
+      // re-pointed account on an edit): the write lands there too, as the
+      // owner, so it needs the grant exactly like the primary account. An id
+      // that is not granted throws, so the distinct ids checked are bounded
+      // by the delegation's grants however long a request's arrays are.
+      const accountIds = new Set(
+        bodyAccountPaths.flatMap((path) => collectBodyStrings(req.body, path)),
+      );
+      for (const accountId of accountIds) {
+        await this.assertPermission(payload.delegationId, accountId, operation);
       }
     }
 

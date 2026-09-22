@@ -40,6 +40,12 @@ Reaching for `withSystemContext` when the middle row applies is the easy wrong a
 
 Own-context reads resolve their scope through `TransactionsController.resolveOwnContextJointScope` (the accounts controller's equivalents are `jointAccountIdSetFor` for list reads and a `NotFoundException` fallback through `jointAccessFor` for `:id` reads, as on `getBalance` and `getBalanceForecast`). Filtered to exactly one joint account, the query runs as the owner so every derived value is byte-identical to the owner's own view; anything else keeps the caller's scope and widens it by the already-authorized joint ids, never by raw request input. The widened predicate is written once per service (`registerScope`, `analyticsScope`). An endpoint that deliberately stays owner-only says so where it is skipped (`tag-key-breakdown` does: tags are personal).
 
+## An acting delegate's limits live only in application code
+
+While a delegate acts, `req.user.id` is the owner and every query runs with the owner's identity (under `RLS_MODE=enforce` too), so nothing in the database knows which accounts or sections the delegation granted. `AccountDelegateGuard` and the controllers are the whole of it.
+
+- **A write needs the grant on every account its body names**, not only on the row it edits. The route declares each extra body path with `@DelegatedBodyAccounts(...)` (a `[]` suffix walks an array, as in `splits[].transferAccountId`), and a transfer pair with `@DelegatedTransferBody(...)`, which carries the cross-owner relaxation; the guard refuses with 403 before the handler runs. A new DTO field that names an account on a delegate-reachable route is added to that route's decorator in the same commit; `account-delegate.guard.body-accounts.spec.ts` reads the real route metadata for every such field.
+
 ## `withScopedDb` in detail
 
 The `AGENTS.md` states the door and the four identity contexts in a few lines. These are the details behind them.

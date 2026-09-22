@@ -35,6 +35,7 @@ import {
 } from "./dto/scheduled-transaction-override.dto";
 import {
   AllowDelegate,
+  DelegatedBodyAccounts,
   DelegatedTransferBody,
   DelegatedScheduledParam,
   DelegateRequires,
@@ -98,6 +99,10 @@ export class ScheduledTransactionsController {
   @AllowDelegate()
   @DelegateRequiresSection("bills")
   @DelegatedTransferBody("accountId", "transferAccountId")
+  @DelegatedBodyAccounts(
+    "investmentFundingAccountId",
+    "splits[].transferAccountId",
+  )
   @DelegateRequires("create")
   create(@Request() req, @Body() createDto: CreateScheduledTransactionDto) {
     return this.scheduledTransactionsService.create(req.user.id, createDto);
@@ -281,6 +286,11 @@ export class ScheduledTransactionsController {
   @AllowDelegate()
   @DelegateRequiresSection("bills")
   @DelegatedScheduledParam("id")
+  @DelegatedTransferBody("accountId", "transferAccountId")
+  @DelegatedBodyAccounts(
+    "investmentFundingAccountId",
+    "splits[].transferAccountId",
+  )
   @DelegateRequires("edit")
   update(
     @Request() req,
@@ -322,6 +332,7 @@ export class ScheduledTransactionsController {
   @AllowDelegate()
   @DelegateRequiresSection("bills")
   @DelegatedScheduledParam("id")
+  @DelegatedBodyAccounts("splits[].transferAccountId")
   @DelegateRequires("edit")
   post(
     @Request() req,
@@ -426,6 +437,7 @@ export class ScheduledTransactionsController {
   @AllowDelegate()
   @DelegateRequiresSection("bills")
   @DelegatedScheduledParam("id")
+  @DelegatedBodyAccounts("splits[].transferAccountId")
   @DelegateRequires("edit")
   createOverride(
     @Request() req,
@@ -471,6 +483,7 @@ export class ScheduledTransactionsController {
   @AllowDelegate()
   @DelegateRequiresSection("bills")
   @DelegatedScheduledParam("id")
+  @DelegatedBodyAccounts("splits[].transferAccountId")
   @DelegateRequires("edit")
   updateOverride(
     @Request() req,

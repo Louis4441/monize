@@ -51,6 +51,18 @@ export const DelegatedTransferBody = (
 ) => SetMetadata(DELEGATED_TRANSFER_BODY_KEY, [fromKey, toKey]);
 
 /**
+ * Every further account a write names in its BODY, beyond the one the route's
+ * other decorators resolve: the delegate needs the route's operation on each
+ * (strictly -- no cross-owner relaxation, because these rows are written as
+ * the owner). A path is a dot-separated body key and a `[]` suffix walks an
+ * array, so "splits[].transferAccountId" checks every split line. Only the
+ * body is read: it is what the route's DTO binds.
+ */
+export const DELEGATED_BODY_ACCOUNTS_KEY = "delegatedBodyAccounts";
+export const DelegatedBodyAccounts = (...paths: string[]) =>
+  SetMetadata(DELEGATED_BODY_ACCOUNTS_KEY, paths);
+
+/**
  * A transfer edit/delete-by-id route: BOTH legs' accounts (resolved from the
  * transaction id) must satisfy the required operation.
  */
