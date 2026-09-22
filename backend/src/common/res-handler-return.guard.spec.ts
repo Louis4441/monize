@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync, statSync } from "fs";
 import { join, relative } from "path";
 
+import { escapeRegExp } from "./escape-regexp.util";
+
 const SRC_ROOT = join(__dirname, "..");
 
 function sourceFiles(dir: string): string[] {
@@ -50,9 +52,13 @@ function resParameterNames(source: string): string[] {
  * once rather than line by line: prettier wraps a long chain onto the next
  * line (`return res` / `  .status(400)` / `  .json(body)`), and a per-line
  * scan sees `return res` with nothing after it and passes the offender.
+ *
+ * The names come out of the source, so they go through `escapeRegExp` before
+ * they are interpolated -- escaping the one metacharacter an identifier can
+ * contain is the incomplete form that helper exists to prevent.
  */
 function bannedReturn(names: string[]): RegExp {
-  const alternatives = names.map((name) => name.replace(/\$/g, "\\$"));
+  const alternatives = names.map(escapeRegExp);
   return new RegExp(
     `\\breturn\\s+(?:${alternatives.join("|")})\\b\\s*(?:[.;)}]|$)`,
     "g",
@@ -136,6 +142,17 @@ describe("a @Res() handler returns nothing", () => {
     expect(scan("    return;")).toEqual([]);
     expect(scan("    return resolveFxRate(date);")).toEqual([]);
     expect(scan("    return response.ok;")).toEqual([]);
+  });
+
+  it("escapes the one metacharacter an identifier can carry", () => {
+    // `$` is legal in an identifier and means end-of-input in a pattern, so an
+    // unescaped name would match nothing. `escapeRegExp` neutralises it.
+    expect(offendingLines("    return $res.json(body);", ["$res"])).toEqual([
+      1,
+    ]);
+    expect(offendingLines("    return other.json(body);", ["$res"])).toEqual(
+      [],
+    );
   });
 
   it("the scan reads code, not prose", () => {
