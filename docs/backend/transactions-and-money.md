@@ -70,6 +70,37 @@ Four rules make the two halves one honest series, and each one exists because it
 
 The date range is bounded by `CALENDAR_RANGE_MAX_DAYS` (`common/validators/calendar-range.validator.ts`), which every calendar DTO reads so the cap cannot drift apart per endpoint: an unbounded range walks a per-day series over every account in scope and asks the forecast to expand every schedule to the horizon.
 
+## The register's sort field is a list, not a string, and only one query may order by a joined column
+
+`GET /transactions` takes `sortBy` and `sortDirection`. The fields it accepts
+are `TRANSACTION_SORT_FIELDS` in `backend/src/transactions/register-order.ts`,
+which is also what the browser's column headers and the AI and MCP tools'
+enums derive from, so a column a reader can click is a column every caller can
+ask for, with a contract spec holding the browser's copy equal to it.
+`parseTransactionSort` (`backend/src/transactions/register-sort-param.ts`) is
+the boundary: `assertStringParam` first, because Express hands a repeated key
+over as an array whose `includes` compares whole elements, then a
+case-insensitive match that returns the list's own spelling -- lowercasing the
+input and testing that against the list silently rejects `refNumber`, the one
+field whose name is not all lower case.
+
+`registerPrimaryOrder` maps a field to its ORDER BY term, and it **throws**
+for `account` or `category` unless the caller passes that table's join alias.
+Only the register query joins those tables; the three queries that sum the
+rows newer than a page select from `transactions` alone and pass no aliases,
+so none of them can be ordered by a column its statement does not have. Two
+shapes the map may never take, both forced by how TypeORM pages a query with
+joins (it selects DISTINCT ids plus the order columns from a subquery and
+rewrites each order key by splitting on the dot): the term is always
+`alias.property`, never a computed expression -- which is why status orders by
+its stored value rather than by a lifecycle rank -- and never a one-to-many
+alias such as `tags`, which would emit an id per joined row and repeat
+transactions on a page. Nullable text columns take `NULLS LAST` in both
+directions, because a blank payee is the absence of a value rather than the
+smallest one. Under any field but the date, the transaction date becomes the
+second key, so one payee's rows still read chronologically instead of in the
+order an import happened to write them.
+
 ## A stored holding is a projection of the ledger, never an accumulator
 
 `holdings.quantity` and `holdings.average_cost` are derived, and the ledger they are derived from is `investment_transactions`. They used to be maintained incrementally -- each acquisition blended into the stored average as it arrived -- which makes the stored figure a function of **insertion** order. Insertion order is not economic order: BUY 100 at 10 dated January, BUY 100 at 20 dated March, then a SELL 50 dated February entered third, and the blend gives 15.0000 while the replay gives 16.6667 (issue #1388). `lockHoldingScope` could not have caught it; it serializes writers, and this is one writer's arithmetic.

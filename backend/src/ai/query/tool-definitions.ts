@@ -4,6 +4,7 @@ import {
   SECURITY_TYPES,
   COUNTRY_OPTIONS,
 } from "../../securities/security-enums";
+import { TRANSACTION_SORT_FIELDS } from "../../transactions/register-order";
 
 export const FINANCIAL_TOOLS: AiToolDefinition[] = [
   {
@@ -84,9 +85,9 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
         },
         sortBy: {
           type: "string",
-          enum: ["date", "amount", "payee"],
+          enum: [...TRANSACTION_SORT_FIELDS],
           description:
-            "Which field to sort the raw transaction rows by (when includeTransactions is true): 'date' (default), 'amount', or 'payee'.",
+            "Which field to sort the raw transaction rows by (when includeTransactions is true). Defaults to 'date'.",
         },
         sortDirection: {
           type: "string",

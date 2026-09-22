@@ -24,7 +24,10 @@ import { AccountsService } from "../accounts/accounts.service";
 import { PayeesService } from "../payees/payees.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { TransactionSplitService } from "./transaction-split.service";
-import { applyRegisterOrder } from "./register-order";
+import {
+  applyRegisterOrder,
+  type TransactionSortField,
+} from "./register-order";
 import {
   brokerageExclusionForEntity,
   investmentLinkedSplitExclusion,
@@ -891,7 +894,7 @@ export class TransactionsService {
     amountTo?: number,
     tagIds?: string[],
     statuses?: TransactionStatus[],
-    sortBy: "date" | "amount" | "payee" = "date",
+    sortBy: TransactionSortField = "date",
     sortDirection: "ASC" | "DESC" = "DESC",
     tagKeyFilter?: TagKeyFilter,
     originalCurrencyCodes?: string[],
@@ -936,16 +939,14 @@ export class TransactionsService {
           "linkedSplitTransferAccount",
         )
         .where(this.registerScope("transaction", userId, jointAccountIds));
-      applyRegisterOrder(
-        queryBuilder,
-        "transaction",
-        sortDirection,
-        sortBy === "amount"
-          ? "amount"
-          : sortBy === "payee"
-            ? "payeeName"
-            : "transactionDate",
-      );
+      // The joined aliases are handed over so a sort by account or category
+      // orders by the name the reader sees. Only this query joins them; the
+      // three that sum the rows newer than a page pass none, which is what
+      // stops one of them being ordered by a table it does not select.
+      applyRegisterOrder(queryBuilder, "transaction", sortDirection, sortBy, {
+        account: "account",
+        category: "category",
+      });
 
       if (!includeInvestmentBrokerage) {
         queryBuilder.andWhere(brokerageExclusionForEntity("account"));
@@ -3264,7 +3265,7 @@ export class TransactionsService {
       minAmount?: number;
       maxAmount?: number;
       limit?: number;
-      sortBy?: "date" | "amount" | "payee";
+      sortBy?: TransactionSortField;
       sortDirection?: "asc" | "desc";
     },
   ): Promise<LlmTransactionSearch> {

@@ -510,6 +510,8 @@
     "pagePositiveInteger": "page 必須是正整數",
     "limitPositiveInteger": "limit 必須是正整數",
     "limitMax200": "limit 不得超過 200",
+    "invalidSortBy": "無效的 sortBy：{{ sortBy }}。必須是下列其中之一：{{ allowed }}",
+    "invalidSortDirection": "無效的 sortDirection：{{ sortDirection }}。必須是 asc 或 desc",
     "invalidTagKeyOp": "無效的 tagKeyOp：{{ op }}",
     "tagKeyRequired": "需要標籤鍵（1-100 個字元）",
     "limitMustBePositive": "limit 必須為正數",

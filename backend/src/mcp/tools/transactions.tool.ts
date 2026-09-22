@@ -7,6 +7,7 @@ import type {
   ServerContext,
 } from "@modelcontextprotocol/server";
 import { TransactionsService } from "../../transactions/transactions.service";
+import { TRANSACTION_SORT_FIELDS } from "../../transactions/register-order";
 import { PayeesService } from "../../payees/payees.service";
 import { AccountsService } from "../../accounts/accounts.service";
 import { TransactionAnalyticsService } from "../../transactions/transaction-analytics.service";
@@ -211,16 +212,16 @@ export class McpTransactionsTools {
             .optional()
             .default(50)
             .describe("Max raw rows, up to 100."),
-          sortBy: z
-            .enum(["date", "amount", "payee"])
-            .optional()
-            .default("date")
-            .describe("Sorts the raw rows. Default 'date'."),
+          // No `.describe` on either: the enum carries the values and
+          // `.default` carries the default, so prose restating them is the
+          // redundancy `tools-list-budget.spec.ts` exists to keep out of every
+          // request's context. Only "which end desc is" needs saying.
+          sortBy: z.enum(TRANSACTION_SORT_FIELDS).optional().default("date"),
           sortDirection: z
             .enum(["asc", "desc"])
             .optional()
             .default("desc")
-            .describe("Default 'desc', newest first."),
+            .describe("desc is newest first."),
         }),
         outputSchema: listTransactionsOutput,
       },

@@ -13,6 +13,7 @@ import {
   SECURITY_TYPES,
 } from "../../securities/security-enums";
 import { TRANSACTION_NOTE_MAX_LENGTH } from "../../common/transaction-note";
+import { TRANSACTION_SORT_FIELDS } from "../../transactions/register-order";
 
 /**
  * LLM07-F1: Zod schemas for validating AI tool inputs server-side.
@@ -45,7 +46,7 @@ export const listTransactionsSchema = z.object({
   transfersOnly: booleanArg().optional(),
   includeTransactions: booleanArg().optional(),
   limit: positiveIntSchema(1, 100).optional(),
-  sortBy: z.enum(["date", "amount", "payee"]).optional(),
+  sortBy: z.enum(TRANSACTION_SORT_FIELDS).optional(),
   sortDirection: z.enum(["asc", "desc"]).optional(),
 });
 

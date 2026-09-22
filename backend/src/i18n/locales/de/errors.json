@@ -510,6 +510,8 @@
     "pagePositiveInteger": "page muss eine positive ganze Zahl sein",
     "limitPositiveInteger": "limit muss eine positive ganze Zahl sein",
     "limitMax200": "limit darf 200 nicht überschreiten",
+    "invalidSortBy": "Ungültiger sortBy-Wert: {{ sortBy }}. Muss einer der folgenden sein: {{ allowed }}",
+    "invalidSortDirection": "Ungültiger sortDirection-Wert: {{ sortDirection }}. Muss asc oder desc sein",
     "invalidTagKeyOp": "Ungültiger tagKeyOp: {{ op }}",
     "tagKeyRequired": "Ein Tag-Schlüssel (1–100 Zeichen) ist erforderlich",
     "limitMustBePositive": "limit muss eine positive Zahl sein",

@@ -521,6 +521,8 @@
     "pagePositiveInteger": "page must be a positive integer",
     "limitPositiveInteger": "limit must be a positive integer",
     "limitMax200": "limit must not exceed 200",
+    "invalidSortBy": "Invalid sortBy: {{ sortBy }}. Must be one of: {{ allowed }}",
+    "invalidSortDirection": "Invalid sortDirection: {{ sortDirection }}. Must be one of: asc, desc",
     "invalidTagKeyOp": "Invalid tagKeyOp: {{ op }}",
     "tagKeyRequired": "A tag key (1-100 characters) is required",
     "limitMustBePositive": "limit must be a positive number",

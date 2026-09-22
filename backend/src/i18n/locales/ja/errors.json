@@ -510,6 +510,8 @@
     "pagePositiveInteger": "page は正の整数でなければなりません",
     "limitPositiveInteger": "limit は正の整数でなければなりません",
     "limitMax200": "limit は200を超えてはなりません",
+    "invalidSortBy": "無効な sortBy：{{ sortBy }}。次のいずれかである必要があります：{{ allowed }}",
+    "invalidSortDirection": "無効な sortDirection：{{ sortDirection }}。asc または desc である必要があります",
     "invalidTagKeyOp": "無効な tagKeyOp: {{ op }}",
     "tagKeyRequired": "タグキー（1〜100文字）が必要です",
     "limitMustBePositive": "limit は正の数でなければなりません",

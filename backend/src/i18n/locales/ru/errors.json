@@ -510,6 +510,8 @@
     "pagePositiveInteger": "page должен быть положительным целым числом",
     "limitPositiveInteger": "limit должен быть положительным целым числом",
     "limitMax200": "limit не должен превышать 200",
+    "invalidSortBy": "Недопустимое значение sortBy: {{ sortBy }}. Допустимые значения: {{ allowed }}",
+    "invalidSortDirection": "Недопустимое значение sortDirection: {{ sortDirection }}. Допустимые значения: asc или desc",
     "invalidTagKeyOp": "Недопустимый tagKeyOp: {{ op }}",
     "tagKeyRequired": "Требуется ключ тега (1–100 символов)",
     "limitMustBePositive": "limit должен быть положительным числом",

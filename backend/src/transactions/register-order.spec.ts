@@ -5,6 +5,11 @@ import { Transaction } from "./entities/transaction.entity";
 import {
   applyRegisterOrder,
   creditsBeforeDebitsDirection,
+  isTransactionSortField,
+  registerPrimaryOrder,
+  TRANSACTION_SORT_FIELDS,
+  type RegisterSortAliases,
+  type TransactionSortField,
 } from "./register-order";
 
 /**
@@ -17,18 +22,20 @@ import {
  * here.
  */
 
+type RecordedOrder = [string, string, string | undefined];
+
 function recordingBuilder(): {
   builder: SelectQueryBuilder<Transaction>;
-  calls: Array<[string, string]>;
+  calls: RecordedOrder[];
 } {
-  const calls: Array<[string, string]> = [];
+  const calls: RecordedOrder[] = [];
   const builder = {
-    orderBy: (column: string, direction: string) => {
-      calls.push([column, direction]);
+    orderBy: (column: string, direction: string, nulls?: string) => {
+      calls.push([column, direction, nulls]);
       return builder;
     },
-    addOrderBy: (column: string, direction: string) => {
-      calls.push([column, direction]);
+    addOrderBy: (column: string, direction: string, nulls?: string) => {
+      calls.push([column, direction, nulls]);
       return builder;
     },
   } as unknown as SelectQueryBuilder<Transaction>;
@@ -37,11 +44,24 @@ function recordingBuilder(): {
 
 function orderFor(
   direction: "ASC" | "DESC",
-  sortColumn?: string,
-): Array<[string, string]> {
+  field?: TransactionSortField,
+  aliases?: RegisterSortAliases,
+): RecordedOrder[] {
   const { builder, calls } = recordingBuilder();
-  applyRegisterOrder(builder, "t", direction, sortColumn);
+  applyRegisterOrder(builder, "t", direction, field, aliases);
   return calls;
+}
+
+/** The order keys alone, for a case that is about the columns and not the nulls. */
+function columnsFor(
+  direction: "ASC" | "DESC",
+  field?: TransactionSortField,
+  aliases?: RegisterSortAliases,
+): Array<[string, string]> {
+  return orderFor(direction, field, aliases).map(([column, order]) => [
+    column,
+    order,
+  ]);
 }
 
 /**
@@ -77,7 +97,7 @@ function sortByRegisterOrder<T extends { id: string; amount: number }>(
 
 describe("applyRegisterOrder", () => {
   it("orders by date, then created_at, then amount, then id", () => {
-    expect(orderFor("DESC")).toEqual([
+    expect(columnsFor("DESC")).toEqual([
       ["t.transactionDate", "DESC"],
       ["t.createdAt", "DESC"],
       ["t.amount", "ASC"],
@@ -90,7 +110,7 @@ describe("applyRegisterOrder", () => {
     // them last. Hardcoding ASC would silently invert the ascending register.
     expect(creditsBeforeDebitsDirection("DESC")).toBe("ASC");
     expect(creditsBeforeDebitsDirection("ASC")).toBe("DESC");
-    expect(orderFor("ASC")).toEqual([
+    expect(columnsFor("ASC")).toEqual([
       ["t.transactionDate", "ASC"],
       ["t.createdAt", "ASC"],
       ["t.amount", "DESC"],
@@ -98,13 +118,95 @@ describe("applyRegisterOrder", () => {
     ]);
   });
 
-  it("keeps the tiebreaks when the user sorts by amount or payee", () => {
-    expect(orderFor("DESC", "payeeName")[0]).toEqual(["t.payeeName", "DESC"]);
-    expect(orderFor("DESC", "payeeName").slice(1)).toEqual([
+  it("makes the date the second key under any other field", () => {
+    // Without this leg a payee's rows come out in the order they were
+    // imported in, because `created_at` is the next key and a whole import
+    // shares one value. The register is a ledger even when it is grouped.
+    expect(columnsFor("DESC", "payee")).toEqual([
+      ["t.payeeName", "DESC"],
+      ["t.transactionDate", "DESC"],
       ["t.createdAt", "DESC"],
       ["t.amount", "ASC"],
       ["t.id", "DESC"],
     ]);
+    // The date sort does not repeat itself as its own tiebreak.
+    expect(
+      columnsFor("DESC").filter(([c]) => c === "t.transactionDate"),
+    ).toHaveLength(1);
+  });
+
+  it("keeps the tiebreaks below every field", () => {
+    for (const field of TRANSACTION_SORT_FIELDS) {
+      const tail = columnsFor("DESC", field, {
+        account: "account",
+        category: "category",
+      }).slice(-3);
+      expect(tail).toEqual([
+        ["t.createdAt", "DESC"],
+        ["t.amount", "ASC"],
+        ["t.id", "DESC"],
+      ]);
+    }
+  });
+
+  it("sinks nulls in both directions, on the nullable fields only", () => {
+    // A blank payee is the absence of a payee, not the smallest one:
+    // reversing the sort must not fill the top of the register with rows that
+    // have nothing in the column being sorted by.
+    for (const direction of ["ASC", "DESC"] as const) {
+      expect(orderFor(direction, "payee")[0][2]).toBe("NULLS LAST");
+      expect(orderFor(direction, "description")[0][2]).toBe("NULLS LAST");
+      expect(orderFor(direction, "refNumber")[0][2]).toBe("NULLS LAST");
+      expect(
+        orderFor(direction, "category", { category: "category" })[0][2],
+      ).toBe("NULLS LAST");
+      expect(orderFor(direction, "date")[0][2]).toBeUndefined();
+      expect(orderFor(direction, "amount")[0][2]).toBeUndefined();
+      expect(orderFor(direction, "status")[0][2]).toBeUndefined();
+    }
+  });
+
+  it("orders a joined field by the alias it was given", () => {
+    expect(columnsFor("ASC", "account", { account: "account" })[0]).toEqual([
+      "account.name",
+      "ASC",
+    ]);
+    expect(columnsFor("ASC", "category", { category: "category" })[0]).toEqual([
+      "category.name",
+      "ASC",
+    ]);
+  });
+
+  it("refuses a joined field on a query that does not join the table", () => {
+    // The three queries that sum the rows newer than a page select from
+    // `transactions` alone. Emitting `account.name` there would be SQL naming
+    // an alias the statement does not have -- a runtime error on a balance
+    // query, found in production rather than here.
+    expect(() => registerPrimaryOrder("account", "t")).toThrow(/join alias/i);
+    expect(() => registerPrimaryOrder("category", "t")).toThrow(/join alias/i);
+    expect(() => orderFor("DESC", "account")).toThrow(/join alias/i);
+  });
+
+  it("names a real column for every field it offers", () => {
+    // A field added to the list with no case in `registerPrimaryOrder` would
+    // return undefined and order by "undefined", which PostgreSQL rejects at
+    // the far end of a user's click.
+    for (const field of TRANSACTION_SORT_FIELDS) {
+      const { expression } = registerPrimaryOrder(field, "t", {
+        account: "account",
+        category: "category",
+      });
+      expect(expression).toMatch(/^[a-z]+\.[A-Za-z]+$/);
+    }
+  });
+
+  it("recognises exactly the fields it lists", () => {
+    for (const field of TRANSACTION_SORT_FIELDS) {
+      expect(isTransactionSortField(field)).toBe(true);
+    }
+    for (const value of ["tags", "balance", "DATE", "", null, 3, ["date"]]) {
+      expect(isTransactionSortField(value)).toBe(false);
+    }
   });
 });
 

@@ -68,6 +68,8 @@ import {
   TAG_KEY_FILTER_OPS,
   tagKeyOpNeedsValue,
 } from "./tag-key-filter.util";
+import { parseTransactionSort } from "./register-sort-param";
+import { TRANSACTION_SORT_FIELDS } from "./register-order";
 
 const ALL_TRANSACTION_STATUSES = new Set<string>(
   Object.values(TransactionStatus),
@@ -359,6 +361,16 @@ export class TransactionsController {
     description:
       "Filter by attachment presence (true = only with attachments, false = only without)",
   })
+  @ApiQuery({
+    name: "sortBy",
+    required: false,
+    description: `Column to sort the register by (default: date). One of: ${TRANSACTION_SORT_FIELDS.join(", ")}`,
+  })
+  @ApiQuery({
+    name: "sortDirection",
+    required: false,
+    description: "Sort direction: asc or desc (default: desc)",
+  })
   @ApiResponse({
     status: 200,
     description: "List of transactions retrieved successfully",
@@ -391,6 +403,8 @@ export class TransactionsController {
     @Query("originalCurrencyCodes") originalCurrencyCodes?: string,
     @Query("hasAttachments", new ParseBoolPipe({ optional: true }))
     hasAttachments?: boolean,
+    @Query("sortBy") sortBy?: string,
+    @Query("sortDirection") sortDirection?: string,
   ) {
     // Validate pagination parameters
     if (page !== undefined) {
@@ -464,6 +478,7 @@ export class TransactionsController {
     }
 
     const tagKeyFilter = parseTagKeyFilter(tagKey, tagKeyOp, tagKeyValue);
+    const sort = parseTransactionSort(sortBy, sortDirection);
 
     let effectiveAccountIds = parseIds(accountIds, accountId);
     let registerUserId = req.user.id;
@@ -521,8 +536,8 @@ export class TransactionsController {
       parsedAmountTo,
       parseUuids(tagIdsParam),
       parseTransactionStatuses(statusesParam),
-      undefined,
-      undefined,
+      sort.sortBy,
+      sort.sortDirection,
       tagKeyFilter,
       parseCurrencyCodes(originalCurrencyCodes),
       hasAttachments,
