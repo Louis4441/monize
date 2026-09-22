@@ -79,7 +79,7 @@ and import the resulting `.mny`.
 | Only import categories that are used | on | Money seeds a full category tree whether you use it or not |
 | Import closed accounts | on | Closed accounts keep their history and are created closed |
 | Import price history | on | Money's own record of what each security was worth, day by day |
-| Import exchange rates | on | Historical rates, so past foreign-currency transactions convert the way Money had them |
+| Import exchange rates | on | Historical rates, used only for dates Monize has no rate for |
 | Start fresh | off | Removes your existing Monize data before importing. Typed confirmation and password required |
 
 ## What is imported
@@ -107,7 +107,9 @@ and import the resulting `.mny`.
   that transaction's splits.
 - **Price history and exchange rates**, both additive -- importing twice, or
   importing on top of prices a quote provider already fetched, converges rather
-  than duplicating.
+  than duplicating. Exchange rates are shared by everyone on your Monize server,
+  so a rate from your file only fills a date Monize has no rate for; it never
+  replaces one already stored, and the import reports how many it added.
 - **Scheduled bills** you ticked, created active and set not to post
   automatically, so nothing lands in your accounts without you.
 

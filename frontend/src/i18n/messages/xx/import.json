@@ -395,7 +395,7 @@
       "importPrices": "[XX-Import price history-XX]",
       "importPricesHint": "[XX-Money's own record of what each security was worth, day by day. Turn this off if you would rather start from live quotes.-XX]",
       "importExchangeRates": "[XX-Import exchange rates-XX]",
-      "importExchangeRatesHint": "[XX-Historical rates between the currencies in your file, so past foreign-currency transactions convert the way Money converted them.-XX]",
+      "importExchangeRatesHint": "[XX-Historical rates between the currencies in your file, used only for dates Monize has no rate for. Rates already stored are never replaced.-XX]",
       "wipeExistingData": "[XX-Start fresh: remove my existing Monize data first-XX]",
       "wipeExistingDataHint": "[XX-Runs the same Delete My Data operation as Settings before importing. You will be asked to confirm. Leave this off to add the Money file to what you already have.-XX]"
     },

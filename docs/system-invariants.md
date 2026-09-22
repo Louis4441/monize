@@ -69,6 +69,7 @@ implied.
 | INV-FX-001 | An unavailable rate never becomes 1:1, a rate from after the date, or an unboundedly old one | partial |
 | INV-FX-002 | A row that carries its own exchange rate is converted at that rate on every surface | enforced |
 | INV-FX-003 | A currency pair is stored in one orientation | partial |
+| INV-FX-004 | A user-supplied rate never replaces a global exchange-rate observation | partial |
 | INV-TRADE-001 | The executed total is the fact; the per-share price is derived from it | enforced |
 | INV-PRICE-001 | A stored price is in the currency the security is recorded in | partial |
 | INV-PORTRESULT-001 | A period change is not a return: value change, external flows and investment result are three figures | enforced |
@@ -890,6 +891,40 @@ Status              partial -- the writers and the guard hold for every new row,
                     docs/specs/exchange-rate-canonical-orientation.md; the
                     migration is written out in
                     docs/future-plans/exchange-rate-canonical-orientation-tasks.md.
+```
+
+### INV-FX-004 -- a user's rate never rewrites the global history
+
+```text
+Statement           exchange_rates is reference data every user on the
+                    deployment converts through. A rate one user supplies -- a
+                    Microsoft Money file's CRNC_EXCHG history, which may record
+                    what that user's bank charged rather than the market --
+                    never replaces a row already there, so another user's
+                    valuation, net worth and returns cannot change because
+                    someone else imported a file. What a user actually
+                    exchanged at belongs on their own transactions (INV-FX-002),
+                    so a provider refresh that later replaces a date the import
+                    filled loses nothing of theirs.
+Source of truth     exchange_rates, UNIQUE (from_currency, to_currency,
+                    rate_date).
+Enforcement         writeExchangeRates in import/mny/writers/write-prices.ts
+                    inserts with ON CONFLICT ... DO NOTHING rather than DO
+                    UPDATE, so an existing observation -- a provider's or an
+                    earlier import's -- wins, and the count it reports is the
+                    rows RETURNING gave back, not the rows the file offered.
+                    currencies/exchange-rate-orientation.guard.spec.ts
+                    allowlists the two files that write the table, so a third
+                    user-supplied writer is noticed.
+Test                write-prices.spec.ts: the rate insert carries DO NOTHING
+                    and no DO UPDATE, and a conflict-skipped row is not counted
+                    as imported.
+Status              partial -- a Money rate still fills a date the table holds
+                    nothing for, and until a provider covers that date every
+                    user resolves through it. Keeping user-supplied rates out
+                    of the shared table altogether needs a user-owned rate
+                    store that resolveFxRate consults for its owner only; that
+                    is a schema change and waits on its own spec.
 ```
 
 ### INV-TRADE-001 -- the executed total is the fact, the price is derived

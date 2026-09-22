@@ -86,6 +86,7 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-FX-001 no 1:1 fallback | **required** | **required** | required | -- | -- | required | optional | required |
 | INV-FX-002 a row's own rate on every surface | **required** | -- | required | -- | -- | -- | -- | optional |
 | INV-FX-003 one stored orientation per pair | **required** | **required** | required (owed by the contract release) | -- | -- | -- | -- | -- |
+| INV-FX-004 a user's rate never rewrites the global history | **required** | supporting | optional | -- | -- | -- | -- | -- |
 | INV-PRICE-001 price in the security's currency | **required** | supporting | required (not yet met) | -- | -- | -- | **required** | optional |
 | INV-TRADE-001 executed total is the fact | **required** | -- | required | -- | -- | -- | -- | optional |
 | INV-PORTRESULT-001 period change is not a return | **required** | -- | optional | -- | -- | -- | -- | optional |

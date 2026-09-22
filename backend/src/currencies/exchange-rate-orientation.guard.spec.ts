@@ -35,7 +35,8 @@ const WRITE_ALLOWLIST: Readonly<Record<string, string>> = {
     "canonicalRateRow before the upsert",
   "import/mny/writers/write-prices.ts":
     "the Money importer, which records whichever orientation the user entered " +
-    "and canonicalises it in resolveExchangeRates before the bulk upsert",
+    "and canonicalises it in resolveExchangeRates before a bulk insert that " +
+    "only fills dates the table holds nothing for (INV-FX-004)",
 };
 
 /** The helper every writer must reach for. */
