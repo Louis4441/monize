@@ -42,6 +42,7 @@ npm run i18n:check         # Verify the pseudo-locale is up to date (CI gate)
 | Money entry / other numbers | `CurrencyInput` / `NumericInput` | any `type="number"` input; `parseFloat` on typed text |
 | Number a person reads | `useNumberFormat()` (`formatCurrency`, `formatNumber`, `formatPercent`, `formatShareQuantity`, `formatBytes`) | `toFixed`, `toLocaleString()`, the raw `@/lib/format` helpers, a literal `%` |
 | Today, for a financial decision | `useFinancialToday()` / `financialTodayYmd` | `new Date().toISOString().slice(0, 10)` |
+| Help that explains a figure or setting | `InfoTooltip` (opens on hover, focus and tap) | a hand-rolled `role="tooltip"`, or a help icon hidden below a breakpoint |
 | Clickable table row | `useLongPress({ onClick })` spread on the `<tr>` | a button around the name |
 | Category colour and icon | `CategoryGlyph`, `CategoryPill`, `buildCategoryIconMap` / `buildCategoryColorMap` | reading `category.icon` or interpolating it into text |
 | Brand favicon | `InstitutionLogo` / `PayeeLogo` over `BrandLogo` | a third-party favicon URL |

@@ -383,9 +383,9 @@ export function NotificationPreferencesMatrix({
  * A column heading, and the help that belongs to that column rather than to a
  * footnote under the grid.
  *
- * The heading exists only from `md` up, and so does `InfoTooltip` -- a hover
- * popover has no touch trigger. Below that the same sentence is a footnote under
- * the grid, once, rather than repeated inside each of that column's cells.
+ * The heading exists only from `md` up, where the grid has column headings at
+ * all. Below that the same sentence is a footnote under the grid, once, rather
+ * than repeated inside each of that column's cells.
  */
 function ColumnHeader({
   label,

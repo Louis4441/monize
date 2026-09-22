@@ -237,6 +237,19 @@ when they widened it. The media query lives in that one helper -- `DateInput`
 held the only other copy -- and `ui-conventions.test.ts` fails a `capture` in a
 file that imports `useIsMobile`, and a second hand-rolled `pointer: coarse`.
 
+## Contextual help is `InfoTooltip`, and a touch reader can open it
+
+If a figure or a setting carries an explanation on a desktop, the same explanation opens on a phone. `InfoTooltip` (`components/ui/InfoTooltip.tsx`) is the one help popover: a mouse hovers it, a keyboard focuses it, and a click, a tap or Enter pins it open until the reader presses outside it, taps it again, moves focus to another control, or presses Escape. It takes one `text`, which is the popover body and the trigger's `aria-label` at once, so desktop, phone and screen reader read one translated string and there is no second copy to drift.
+
+The trigger used to be `hidden md:inline-flex`, because its popover opened only on `:hover`, and so every metric explanation on the investments screens (TWR, MWR, CAGR, simple return, investment result, net flows, cost basis, incomplete valuation) was missing on a phone. What the fix rests on:
+
+- **Never hide the trigger at a breakpoint.** Its hit area is extended with a `before:` inset so a finger finds the 16px icon.
+- **Hover belongs to a mouse.** A phone emulates `mouseenter` on a tap, and a hover state that opened then would be toggled shut by the tap's own click; the handlers read `pointerType`. For the same reason the inline popover shows on `group-focus-visible`, never `group-focus` (Android focuses a tapped button).
+- **A tap opens the portal.** A tap-opened popover goes through the fixed, viewport-clamped portal whatever the call site chose: the inline `absolute w-64` box is placed for a desktop column and runs off a phone's edge. `placePopover` (tested pure) clamps both axes and flips to the side that fits, and the popover re-measures on scroll and resize rather than closing, the rule for a portalled menu above.
+- **A pinned popover takes its own tap.** It drops `pointer-events-none` so a tap on it closes it instead of landing on the row beneath, and the trigger stops `click`, `mousedown`, `touchstart` and `contextmenu`, the events `useLongPress` listens to, so a tap on the icon neither opens its row nor arms the long press.
+
+`ui-conventions.test.ts` fails a `role="tooltip"` outside `InfoTooltip` (two hover-only exceptions, listed with their reasons); `InfoTooltip.touch.test.tsx` holds the tap, the outside press, the keyboard path and the one-text rule.
+
 ## A random value is `crypto.randomUUID()`, never `Math.random()`
 
 Every client-side use so far has been an id -- a list key, a removal handle, a temporary split row -- and those want uniqueness, which `crypto.randomUUID()` gives (`lib/ai-attachments.ts` is the pattern). `Math.random()` is not a security primitive, and Bearer flags it as CWE-330; `SplitEditor` carried that as a dated exception rather than a fix until issue #1323. `ui-conventions.test.ts` fails on `Math.random` in any production source.

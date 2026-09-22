@@ -419,8 +419,9 @@ Phase 1 (this slice):
   `NotificationsSection.tsx` in place of the single email toggle. One DOM at
   every width: below `md` each category is a card of labelled control rows, from
   `md` up the row wrapper becomes `contents` and its cells fall into the grid.
-  `md` rather than `sm` because `InfoTooltip` is itself desktop-only, so the
-  per-column help has to be inline prose wherever the tooltip is not rendered.
+  `md` rather than `sm` because `InfoTooltip` was then desktop-only, so the
+  per-column help had to be inline prose wherever the tooltip was not rendered
+  (it has since gained a tap trigger; the layout stands on its own merits).
 - `frontend/src/lib/notification-preferences.ts` (new) -- api client + the
   category list + default table mirrored from the backend (contract test).
 - i18n: `settings.notifications.preferences.*` (category labels, channel

@@ -280,6 +280,47 @@ describe("a platform capability is not decided by the window's width", () => {
   });
 });
 
+describe("contextual help opens on a touch device", () => {
+  /**
+   * `InfoTooltip` is the one help popover: hover and keyboard focus on a
+   * desktop, a tap on a phone, the same `text` either way. A help popover
+   * written anywhere else was, every time, hover-only -- so the explanation
+   * of TWR, MWR or an incomplete valuation existed on a desktop and not on a
+   * phone. `InfoTooltip.touch.test.tsx` holds the tap behaviour; this holds
+   * that nothing routes around it.
+   */
+  const SHARED = "/src/components/ui/InfoTooltip.tsx";
+  const TOOLTIP_ROLE = /role=\{?["']tooltip["']\}?/;
+  /**
+   * Shrink-only. Each is hover-only on purpose and loses nothing on a phone:
+   * the date shortcuts are keystrokes, which a touch screen has no keyboard
+   * for; the page-header icon is a link that opens the help page on a tap,
+   * and its popover only names that link.
+   */
+  const HOVER_ONLY = new Set([
+    "/src/components/ui/DateInput.tsx",
+    "/src/components/layout/PageHeader.tsx",
+  ]);
+
+  it("has no hand-rolled help popover outside InfoTooltip", () => {
+    const offenders = productionSources()
+      .filter(([path]) => path !== SHARED && !HOVER_ONLY.has(path))
+      .filter(([, raw]) => TOOLTIP_ROLE.test(withoutComments(raw)))
+      .map(([path]) => `${path}: use InfoTooltip, which opens on a tap as well as a hover`);
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("still finds the shared component, so the rule cannot pass by accident", () => {
+    const shared = sources[SHARED];
+    expect(shared, `${SHARED} not found -- update SHARED in this test`).toBeTruthy();
+    expect(TOOLTIP_ROLE.test(shared)).toBe(true);
+    for (const path of HOVER_ONLY) {
+      expect(sources[path], `${path} is gone -- remove it from HOVER_ONLY`).toBeTruthy();
+    }
+  });
+});
+
 describe("a scrollbar you need is not hidden", () => {
   /**
    * `scrollbar-hide` is for a horizontal strip of chips, where the content being
