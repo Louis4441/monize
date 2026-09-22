@@ -1187,6 +1187,26 @@ describe("a register that draws a Balance column is given the balance", () => {
       true,
     );
   });
+
+  it("draws the column only while the register is in date order", () => {
+    // A running balance is a figure about the row above it, so beside rows
+    // ordered by payee or amount it is arithmetic nobody can read -- and the
+    // server withholds the seed there, so the column would render "-" on every
+    // row. The two conditions are one expression rather than two branches
+    // because dropping either one silently brings the column back.
+    // INV-REGISTER-001.
+    const list = sources[LIST];
+    expect(
+      /\(isSingleAccountView \|\| startingBalance !== undefined\) && sortedByDate/.test(
+        list,
+      ),
+      `${LIST} must gate the Balance column on the register being date-sorted`,
+    ).toBe(true);
+    // And the walk it feeds is the shared one, not a second copy in the
+    // component: the two directions have to agree on one arithmetic.
+    expect(/walkRunningBalances\(/.test(list)).toBe(true);
+    expect(/let cumulativeCents/.test(list)).toBe(false);
+  });
 });
 
 describe("TransactionList performs its own delete", () => {
