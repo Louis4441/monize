@@ -584,7 +584,11 @@
       "copyUrlFailed": "[XX-Failed to copy URL-XX]",
       "loadFailed": "[XX-Failed to load API tokens-XX]",
       "createFailed": "[XX-Failed to create token-XX]",
-      "revokeFailed": "[XX-Failed to revoke token-XX]"
+      "revokeFailed": "[XX-Failed to revoke token-XX]",
+      "reauthFailed": "[XX-Failed to confirm re-authentication-XX]"
+    },
+    "stepUp": {
+      "reason": "[XX-A token can reach your account without signing in, so confirm it is you before creating one.-XX]"
     },
     "relative": {
       "never": "[XX-Never-XX]",

@@ -23,9 +23,12 @@ import {
   ensureUserPreferencesRow,
   type UserPreferencePatch,
 } from "./user-preference-writer";
-import { TrustedDevice } from "./entities/trusted-device.entity";
 import { RefreshToken } from "../auth/entities/refresh-token.entity";
 import { PersonalAccessToken } from "../auth/entities/personal-access-token.entity";
+import {
+  revokeOAuthGrantsAfterCommit,
+  revokeStandingCredentials,
+} from "../auth/credential-revocation";
 import { UpdateProfileDto } from "./dto/update-profile.dto";
 import { UpdatePreferencesDto } from "./dto/update-preferences.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
@@ -413,11 +416,20 @@ export class UsersService {
       );
     }
 
-    // Hash and save new password
+    // Hash and save new password. Every credential the old password stood
+    // behind goes in the same transaction: web sessions, API tokens (PATs) and
+    // trusted devices (a stolen trusted-device cookie must not bypass 2FA after
+    // the user rotates their password). `credential-revocation.ts`.
     const saltRounds = 12;
     user.passwordHash = await bcrypt.hash(dto.newPassword, saltRounds);
     user.mustChangePassword = false;
-    await this.scoped(User, (repo) => repo.save(user));
+    await withScopedDb(this.dataSource, async (manager) => {
+      await manager.getRepository(User).save(user);
+      await manager
+        .getRepository(RefreshToken)
+        .update({ userId, isRevoked: false }, { isRevoked: true });
+      await revokeStandingCredentials(manager, userId);
+    });
 
     // Re-wrap the backup key under the new login password so automatic
     // backups written from now on open with it (earlier ones keep opening with
@@ -438,19 +450,8 @@ export class UsersService {
       );
     }
 
-    // SECURITY: Revoke all refresh tokens to force re-login on all devices
-    await this.scoped(RefreshToken, (repo) =>
-      repo.update({ userId, isRevoked: false }, { isRevoked: true }),
-    );
-
-    // SECURITY: Revoke all PATs — credential change invalidates API access
-    await this.scoped(PersonalAccessToken, (repo) =>
-      repo.update({ userId, isRevoked: false }, { isRevoked: true }),
-    );
-
-    // SECURITY: Revoke trusted devices so a stolen trusted-device cookie
-    // cannot bypass 2FA after the user rotates their password.
-    await this.scoped(TrustedDevice, (repo) => repo.delete({ userId }));
+    // SECURITY: and the OAuth grants an MCP client holds, after the commit.
+    await revokeOAuthGrantsAfterCommit(this.moduleRef, userId, this.logger);
   }
 
   /**

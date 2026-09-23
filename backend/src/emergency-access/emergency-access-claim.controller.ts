@@ -11,6 +11,7 @@ import { tr } from "../i18n/translate";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { ConfigService } from "@nestjs/config";
+import { ModuleRef } from "@nestjs/core";
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { returnedRows } from "../common/db/query-result";
@@ -23,11 +24,14 @@ import { EmergencyAccessContact } from "./entities/emergency-access-contact.enti
 import { EmergencyAccessSettings } from "./entities/emergency-access-settings.entity";
 import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
-import { TrustedDevice } from "../users/entities/trusted-device.entity";
 import { hashToken } from "../auth/crypto.util";
 import { TokenService } from "../auth/token.service";
 import { PasswordBreachService } from "../auth/password-breach.service";
 import { AuthService } from "../auth/auth.service";
+import {
+  revokeOAuthGrantsAfterCommit,
+  revokeStandingCredentials,
+} from "../auth/credential-revocation";
 import { EncryptionService } from "../common/encryption/encryption.service";
 import { generateCsrfToken, getCsrfCookieOptions } from "../common/csrf.util";
 import { withSystemContext } from "../common/db/with-context";
@@ -46,6 +50,7 @@ export class EmergencyAccessClaimController {
     private readonly passwordBreachService: PasswordBreachService,
     private readonly encryption: EncryptionService,
     private readonly configService: ConfigService,
+    private readonly moduleRef: ModuleRef,
   ) {
     const disableHttpsHeaders =
       this.configService
@@ -279,8 +284,10 @@ export class EmergencyAccessClaimController {
         .where("user_id = :id", { id: ownerId })
         .execute();
 
-      // Trusted devices belonged to the previous holder.
-      await manager.delete(TrustedDevice, { userId: ownerId });
+      // Trusted devices and personal access tokens belonged to the previous
+      // holder: a claim that left a PAT live would share the account with
+      // whoever the owner handed one to (`credential-revocation.ts`).
+      await revokeStandingCredentials(manager, ownerId);
 
       // The claiming token was already consumed above; void the siblings
       // (single-claim wins).
@@ -339,6 +346,8 @@ export class EmergencyAccessClaimController {
       );
       throw error;
     }
+    // And the OAuth grants the previous holder's MCP clients were given.
+    await revokeOAuthGrantsAfterCommit(this.moduleRef, ownerId, this.logger);
 
     const freshOwner = await this.scoped(User, (repo) =>
       repo.findOne({ where: { id: ownerId } }),

@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, Logger } from "@nestjs/common";
+import { ModuleRef } from "@nestjs/core";
 import {
   DataSource,
   EntityTarget,
@@ -11,7 +12,6 @@ import * as bcrypt from "bcryptjs";
 import * as crypto from "crypto";
 
 import { User } from "../users/entities/user.entity";
-import { TrustedDevice } from "../users/entities/trusted-device.entity";
 import { hashToken } from "./crypto.util";
 import { PasswordBreachService } from "./password-breach.service";
 import { tr } from "../i18n/translate";
@@ -21,6 +21,10 @@ import {
   emailInUseConflict,
   isUniqueViolation,
 } from "../users/email-change.util";
+import {
+  revokeOAuthGrantsAfterCommit,
+  revokeStandingCredentials,
+} from "./credential-revocation";
 
 /**
  * `auth_attempt_counters.scope` for the two per-email throttles.
@@ -50,6 +54,7 @@ export class AuthEmailService {
     private passwordBreachService: PasswordBreachService,
     private tokenService: TokenService,
     private readonly attemptCounters: AuthAttemptCounterService,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   /**
@@ -134,9 +139,13 @@ export class AuthEmailService {
     const saltRounds = 12;
     const passwordHash = await bcrypt.hash(newPassword, saltRounds);
 
-    // M11: Atomic UPDATE...WHERE to prevent TOCTOU race condition.
-    const result = await this.scoped(User, (repo) =>
-      repo
+    // M11: Atomic UPDATE...WHERE to prevent TOCTOU race condition. The
+    // standing credentials go in the same transaction, so an invalid token
+    // revokes nothing and a committed reset cannot leave a PAT or a trusted
+    // device behind it (`credential-revocation.ts`).
+    const userId = await withScopedDb(this.dataSource, async (manager) => {
+      const result = await manager
+        .getRepository(User)
         .createQueryBuilder()
         .update(User)
         .set({
@@ -152,25 +161,30 @@ export class AuthEmailService {
         .where("resetToken = :hashedToken", { hashedToken })
         .andWhere("resetTokenExpiry > :now", { now: new Date() })
         .returning("id")
-        .execute(),
-    );
+        .execute();
 
-    if (!result.affected || result.affected === 0) {
-      throw new BadRequestException(
-        tr(
-          "errors.auth.invalidOrExpiredResetToken",
-          "Invalid or expired reset token",
-        ),
-      );
-    }
+      if (!result.affected || result.affected === 0) {
+        throw new BadRequestException(
+          tr(
+            "errors.auth.invalidOrExpiredResetToken",
+            "Invalid or expired reset token",
+          ),
+        );
+      }
 
-    // Revoke all refresh tokens to force re-login on all devices
-    const userId = result.raw?.[0]?.id;
+      const id: string | undefined = result.raw?.[0]?.id;
+      if (id) {
+        await revokeStandingCredentials(manager, id);
+      }
+      return id;
+    });
+
+    // After the commit: every session on every device, then the OAuth grants
+    // an MCP client holds -- a reset that left either live would hand the
+    // account straight back to whoever the owner was locking out.
     if (userId) {
       await this.tokenService.revokeAllUserRefreshTokens(userId);
-      // SECURITY: Revoke trusted devices so a stolen trusted-device cookie
-      // cannot bypass 2FA after a password reset.
-      await this.scoped(TrustedDevice, (repo) => repo.delete({ userId }));
+      await revokeOAuthGrantsAfterCommit(this.moduleRef, userId, this.logger);
     }
   }
 

@@ -23,6 +23,7 @@ import { PersonalAccessToken } from "../auth/entities/personal-access-token.enti
 import { generateReadablePassword } from "./utils/password-generator";
 import { hashToken } from "../auth/crypto.util";
 import { OAuthProviderService } from "../oauth/oauth-provider.service";
+import { revokeStandingCredentials } from "../auth/credential-revocation";
 import { UsersService } from "../users/users.service";
 import {
   lockAdminsForUpdate,
@@ -610,8 +611,8 @@ export class AdminService {
 
   /**
    * Revoke every authenticated surface for a user: web sessions (refresh
-   * tokens), CLI/API access (PATs) and MCP/OAuth clients. The two token
-   * revocations share one transaction so a user can never be left half
+   * tokens), CLI/API access (PATs), trusted devices and MCP/OAuth clients. The
+   * row revocations share one transaction so a user can never be left half
    * revoked; the OIDC sweep runs after, as it always did.
    */
   private async revokeSessionsAndTokens(targetUserId: string): Promise<void> {
@@ -622,12 +623,7 @@ export class AdminService {
           { userId: targetUserId, isRevoked: false },
           { isRevoked: true },
         );
-      await manager
-        .getRepository(PersonalAccessToken)
-        .update(
-          { userId: targetUserId, isRevoked: false },
-          { isRevoked: true },
-        );
+      await revokeStandingCredentials(manager, targetUserId);
     });
     await this.oauthProviderService.revokeAllForUser(targetUserId);
   }

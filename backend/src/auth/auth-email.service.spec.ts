@@ -9,6 +9,8 @@ import {
 } from "./auth-email.service";
 import { User } from "../users/entities/user.entity";
 import { TrustedDevice } from "../users/entities/trusted-device.entity";
+import { PersonalAccessToken } from "./entities/personal-access-token.entity";
+import { OAUTH_GRANT_REVOKER } from "./credential-revocation";
 import { PasswordBreachService } from "./password-breach.service";
 import { TokenService } from "./token.service";
 import { hashToken } from "./crypto.util";
@@ -28,6 +30,8 @@ describe("AuthEmailService", () => {
   let attemptCounters: AuthAttemptCounterMock;
   let usersRepository: Record<string, jest.Mock>;
   let trustedDevicesRepository: Record<string, jest.Mock>;
+  let patRepository: Record<string, jest.Mock>;
+  let oauthProviderService: { revokeAllForUser: jest.Mock };
   let passwordBreachService: { isBreached: jest.Mock };
   let tokenService: { revokeAllUserRefreshTokens: jest.Mock };
 
@@ -52,6 +56,9 @@ describe("AuthEmailService", () => {
       delete: jest.fn(),
     };
 
+    patRepository = { update: jest.fn() };
+    oauthProviderService = { revokeAllForUser: jest.fn().mockResolvedValue(0) };
+
     passwordBreachService = {
       isBreached: jest.fn(),
     };
@@ -69,6 +76,7 @@ describe("AuthEmailService", () => {
           useValue: createScopedDbMocks([
             [User, usersRepository as never],
             [TrustedDevice, trustedDevicesRepository as never],
+            [PersonalAccessToken, patRepository as never],
           ]).dataSource,
         },
         AuthEmailService,
@@ -81,6 +89,7 @@ describe("AuthEmailService", () => {
           useValue: tokenService,
         },
         authAttemptCounterProvider(attemptCounters),
+        { provide: OAUTH_GRANT_REVOKER, useValue: oauthProviderService },
       ],
     }).compile();
 
@@ -205,6 +214,54 @@ describe("AuthEmailService", () => {
       expect(tokenService.revokeAllUserRefreshTokens).toHaveBeenCalledWith(
         userId,
       );
+    });
+
+    it("revokes PATs, trusted devices, sessions and OAuth grants on success", async () => {
+      // A reset revoked the web sessions only: a personal access token or an
+      // MCP client's OAuth grant kept working for whoever held it.
+      mockExecute.mockResolvedValue({ affected: 1, raw: [{ id: "user-1" }] });
+      passwordBreachService.isBreached.mockResolvedValue(false);
+
+      await service.resetPassword("valid-token", "NewSecurePassword123!");
+
+      expect(patRepository.update).toHaveBeenCalledWith(
+        { userId: "user-1", isRevoked: false },
+        { isRevoked: true },
+      );
+      expect(trustedDevicesRepository.delete).toHaveBeenCalledWith({
+        userId: "user-1",
+      });
+      expect(tokenService.revokeAllUserRefreshTokens).toHaveBeenCalledWith(
+        "user-1",
+      );
+      expect(oauthProviderService.revokeAllForUser).toHaveBeenCalledWith(
+        "user-1",
+      );
+    });
+
+    it("revokes nothing when the token is invalid", async () => {
+      mockExecute.mockResolvedValue({ affected: 0, raw: [] });
+      passwordBreachService.isBreached.mockResolvedValue(false);
+
+      await expect(
+        service.resetPassword("invalid-token", "NewPassword123!"),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(patRepository.update).not.toHaveBeenCalled();
+      expect(trustedDevicesRepository.delete).not.toHaveBeenCalled();
+      expect(oauthProviderService.revokeAllForUser).not.toHaveBeenCalled();
+    });
+
+    it("reports a failed OAuth sweep instead of a clean reset", async () => {
+      mockExecute.mockResolvedValue({ affected: 1, raw: [{ id: "user-1" }] });
+      passwordBreachService.isBreached.mockResolvedValue(false);
+      oauthProviderService.revokeAllForUser.mockRejectedValue(
+        new Error("db down"),
+      );
+
+      await expect(
+        service.resetPassword("valid-token", "NewPassword123!"),
+      ).rejects.toThrow("db down");
     });
 
     it("clears the login lockout in the same statement that sets the password", async () => {

@@ -91,6 +91,7 @@ implied.
 | INV-AUTH-002 | A failed-login counter records every failure | enforced |
 | INV-AUTH-003 | A destructive OIDC action requires a provider round trip | enforced |
 | INV-AUTH-004 | A logout reports only what it achieved | enforced |
+| INV-AUTH-005 | A replaced password ends every credential issued on the old one | enforced |
 | INV-ACTIVITY-001 | Activity is attributed to whoever acted, not to whoever was acted for | enforced |
 | INV-PROFILE-001 | A user-profile response is an allowlist | enforced |
 | INV-DISPLAY-001 | A figure addressed to a person is rendered in that person's number locale | enforced |
@@ -2541,6 +2542,43 @@ Required tests      Two connections: test/integration/login-lockout.integration.
                     auth.service.spec.ts asserts the login emits the single
                     incrementing statement; auth-email.service.spec.ts asserts a
                     reset clears the lock.
+Status              enforced
+```
+
+### INV-AUTH-005 -- a replaced password ends every credential issued on the old one
+
+```text
+Statement           When a password is set because the old one may be known to
+                    someone else (emailed reset, change from settings, admin reset,
+                    an owner's reset of a delegate, emergency-access claim) or an
+                    account is linked to an identity provider, no personal access
+                    token, trusted device, refresh token or OAuth grant issued
+                    before it keeps working. Minting a new PAT needs a step-up.
+Source of truth     personal_access_tokens.is_revoked, trusted_devices,
+                    refresh_tokens.is_revoked, the OAuth provider's payload store
+Enforcement         backend/src/auth/credential-revocation.ts.
+                    revokeStandingCredentials revokes PATs and deletes trusted
+                    devices inside the password write's own withScopedDb
+                    transaction, so a refused reset revokes nothing and a committed
+                    one leaves neither live. After the commit, refresh tokens go
+                    through each path's existing revocation and
+                    revokeOAuthGrantsAfterCommit calls
+                    OAuthProviderService.revokeAllForUser; a failure there is logged
+                    at error with the account id and rethrown, never reported as a
+                    clean reset. POST /auth/tokens carries
+                    @RequireStepUp("personal-access-token") under StepUpGuard.
+Concurrency scope   per account
+Failure response    a failed OAuth sweep after the commit surfaces as an error; the
+                    password has changed and the log line names the account whose
+                    grants need revoking by hand.
+Required tests      Unit: auth-email.service.spec.ts, users.service.spec.ts,
+                    admin.service.spec.ts, delegation.service.spec.ts,
+                    emergency-access-claim.controller.spec.ts and auth.service.spec.ts
+                    (confirmOidcLink) assert each path revokes PATs, trusted devices
+                    and OAuth grants; credential-revocation.spec.ts covers the
+                    helper's error path; pat.controller.spec.ts asserts the step-up
+                    metadata. Still owed: a real-database test that a PAT minted
+                    before a reset is refused by the bearer guard after it.
 Status              enforced
 ```
 

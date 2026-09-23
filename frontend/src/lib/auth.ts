@@ -138,8 +138,20 @@ export const authApi = {
     return response.data;
   },
 
-  createToken: async (data: CreatePatData): Promise<CreatePatResponse> => {
-    const response = await apiClient.post<CreatePatResponse>('/auth/tokens', data);
+  /**
+   * Minting a PAT is step-up protected (purpose `personal-access-token`): pass
+   * the token from `useStepUpTokenStore`. Without one the server answers
+   * `STEP_UP_REQUIRED`, which the caller maps with `rethrowStepUpError`.
+   */
+  createToken: async (
+    data: CreatePatData,
+    stepUpToken?: string | null,
+  ): Promise<CreatePatResponse> => {
+    const response = stepUpToken
+      ? await apiClient.post<CreatePatResponse>('/auth/tokens', data, {
+          headers: { 'X-Step-Up-Token': stepUpToken },
+        })
+      : await apiClient.post<CreatePatResponse>('/auth/tokens', data);
     return response.data;
   },
 

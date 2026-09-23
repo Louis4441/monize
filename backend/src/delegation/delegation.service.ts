@@ -32,6 +32,10 @@ import { DelegateAccountFavourite } from "./entities/delegate-account-favourite.
 import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { RefreshToken } from "../auth/entities/refresh-token.entity";
+import {
+  revokeOAuthGrantsAfterCommit,
+  revokeStandingCredentials,
+} from "../auth/credential-revocation";
 import { Account, AccountType } from "../accounts/entities/account.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
@@ -45,6 +49,7 @@ import { resolveUserEmailLocale } from "../i18n/resolve-user-email-locale";
 import { EmailService } from "../notifications/email.service";
 import { delegateInviteTemplate } from "../notifications/email-templates";
 import { ConfigService } from "@nestjs/config";
+import { ModuleRef } from "@nestjs/core";
 import { CreateDelegateDto } from "./dto/create-delegate.dto";
 import { AccountGrantDto } from "./dto/set-grants.dto";
 import {
@@ -124,6 +129,7 @@ export class DelegationService {
     private configService: ConfigService,
     private dataSource: DataSource,
     private readonly i18n: I18nService,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   /**
@@ -1529,11 +1535,20 @@ export class DelegationService {
     // `refresh_tokens` is keyed to them. A scoped UPDATE matched nothing, so
     // the old password's sessions survived a reset that reported success --
     // the one outcome a credential rotation must never have.
-    await this.systemScoped(RefreshToken, (repo) =>
-      repo.update(
+    // PATs and trusted devices go with them, in the same transaction, and the
+    // OAuth grants after it: a reset that left either live would keep the old
+    // password's access working (`credential-revocation.ts`).
+    await this.systemScoped(RefreshToken, async (repo) => {
+      await repo.update(
         { userId: delegate.id, isRevoked: false },
         { isRevoked: true },
-      ),
+      );
+      await revokeStandingCredentials(repo.manager, delegate.id);
+    });
+    await revokeOAuthGrantsAfterCommit(
+      this.moduleRef,
+      delegate.id,
+      this.logger,
     );
 
     return { temporaryPassword };

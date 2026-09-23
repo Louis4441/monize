@@ -15,6 +15,7 @@ import { RefreshToken } from "../auth/entities/refresh-token.entity";
 import { PersonalAccessToken } from "../auth/entities/personal-access-token.entity";
 import { PasswordBreachService } from "../auth/password-breach.service";
 import { ModuleRef } from "@nestjs/core";
+import { OAUTH_GRANT_REVOKER } from "../auth/credential-revocation";
 import { I18nContext } from "nestjs-i18n";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { CurrenciesService } from "../currencies/currencies.service";
@@ -61,6 +62,7 @@ describe("UsersService", () => {
   let backupEncryptionService: { rewrapBackupKey: jest.Mock };
   let moduleRef: { get: jest.Mock };
   let emailService: { getStatus: jest.Mock; sendMail: jest.Mock };
+  let oauthProviderService: { revokeAllForUser: jest.Mock };
   let mockQueryRunner: Record<string, jest.Mock>;
   let mockDataSource: Record<string, jest.Mock>;
 
@@ -152,6 +154,7 @@ describe("UsersService", () => {
       getStatus: jest.fn().mockReturnValue({ configured: false }),
       sendMail: jest.fn().mockResolvedValue(undefined),
     };
+    oauthProviderService = { revokeAllForUser: jest.fn().mockResolvedValue(0) };
 
     moduleRef = {
       get: jest.fn((token) => {
@@ -159,6 +162,7 @@ describe("UsersService", () => {
         if (token === ExchangeRateService) return exchangeRateService;
         if (token === BackupEncryptionService) return backupEncryptionService;
         if (token === CurrenciesService) return currenciesService;
+        if (token === OAUTH_GRANT_REVOKER) return oauthProviderService;
         return undefined;
       }),
     };
@@ -981,6 +985,72 @@ describe("UsersService", () => {
         { userId: "user-1", isRevoked: false },
         { isRevoked: true },
       );
+    });
+
+    it("revokes trusted devices and every OAuth grant on password change", async () => {
+      // A connected MCP client's OAuth grant outlived a password change, so
+      // whoever the user was rotating the password against kept API access.
+      const hashedPassword = await bcrypt.hash("OldPass123!", 10);
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        passwordHash: hashedPassword,
+      });
+
+      await service.changePassword("user-1", {
+        currentPassword: "OldPass123!",
+        newPassword: "NewPass456!",
+      });
+
+      expect(trustedDevicesRepository.delete).toHaveBeenCalledWith({
+        userId: "user-1",
+      });
+      expect(oauthProviderService.revokeAllForUser).toHaveBeenCalledWith(
+        "user-1",
+      );
+    });
+
+    it("writes the password and the row revocations in one transaction", async () => {
+      const hashedPassword = await bcrypt.hash("OldPass123!", 10);
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        passwordHash: hashedPassword,
+      });
+      const order: string[] = [];
+      const runTransaction =
+        mockDataSource.transaction.getMockImplementation()!;
+      mockDataSource.transaction.mockImplementation(async (...args: any[]) => {
+        order.push("begin");
+        const result = await runTransaction(...args);
+        order.push("commit");
+        return result;
+      });
+      usersRepository.save.mockImplementation(async (u: unknown) => {
+        order.push("save");
+        return u;
+      });
+      patRepository.update.mockImplementation(async () => {
+        order.push("pats");
+      });
+      oauthProviderService.revokeAllForUser.mockImplementation(async () => {
+        order.push("oauth");
+        return 0;
+      });
+
+      await service.changePassword("user-1", {
+        currentPassword: "OldPass123!",
+        newPassword: "NewPass456!",
+      });
+
+      // The read of the user is its own short transaction; the write and the
+      // PAT revocation share the next one, and the OAuth sweep follows commit.
+      const write = order.lastIndexOf("save");
+      expect(order.slice(write - 1, write + 3)).toEqual([
+        "begin",
+        "save",
+        "pats",
+        "commit",
+      ]);
+      expect(order[order.length - 1]).toBe("oauth");
     });
 
     it("throws when current password is incorrect", async () => {

@@ -22,6 +22,8 @@ import { BackupEncryptionService } from "../backup/backup-encryption.service";
 import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { TrustedDevice } from "../users/entities/trusted-device.entity";
+import { PersonalAccessToken } from "./entities/personal-access-token.entity";
+import { OAUTH_GRANT_REVOKER } from "./credential-revocation";
 import { RefreshToken } from "./entities/refresh-token.entity";
 import { encrypt, derivePurposeKey } from "./crypto.util";
 import { PasswordBreachService } from "./password-breach.service";
@@ -65,6 +67,8 @@ describe("AuthService", () => {
   let preferencesRow: UserPreferenceRepoMock;
   let trustedDevicesRepository: Record<string, jest.Mock>;
   let refreshTokensRepository: Record<string, jest.Mock>;
+  let patRepository: Record<string, jest.Mock>;
+  let oauthProviderService: { revokeAllForUser: jest.Mock };
   let jwtService: Partial<JwtService>;
   let configService: { get: jest.Mock };
   let delegationService: {
@@ -139,6 +143,9 @@ describe("AuthService", () => {
       delete: jest.fn(),
     };
 
+    patRepository = { update: jest.fn() };
+    oauthProviderService = { revokeAllForUser: jest.fn().mockResolvedValue(0) };
+
     jwtService = {
       sign: jest.fn().mockReturnValue("mock-jwt-token"),
       verify: jest.fn(),
@@ -154,6 +161,7 @@ describe("AuthService", () => {
       // The spec provides a real TokenService, whose refresh-token writes now
       // go through the same scoped manager.
       [RefreshToken, refreshTokensRepository as never],
+      [PersonalAccessToken, patRepository as never],
     ]);
     scopedManager = scoped.manager;
     // Two statements now reach the manager directly on ordinary paths: the SQL
@@ -218,6 +226,7 @@ describe("AuthService", () => {
           },
         },
         { provide: DataSource, useValue: dataSource },
+        { provide: OAUTH_GRANT_REVOKER, useValue: oauthProviderService },
         { provide: PasswordBreachService, useValue: passwordBreachService },
         { provide: EmailService, useValue: emailService },
         {
@@ -3295,6 +3304,53 @@ describe("AuthService", () => {
       expect(result.oidcLinkPending).toBe(false);
       expect(result.oidcLinkToken).toBeNull();
       expect(result.pendingOidcSubject).toBeNull();
+    });
+
+    it("confirmOidcLink ends every credential the local password stood behind", async () => {
+      // The account now signs in through the identity provider; a PAT, a
+      // trusted device, a session or an MCP client's OAuth grant issued on the
+      // strength of the local password must not survive the switch.
+      stageOneTokenFamily();
+      const pendingUser = {
+        ...mockUser,
+        oidcLinkPending: true,
+        oidcLinkExpiresAt: new Date(Date.now() + 3600000),
+        pendingOidcSubject: "oidc-sub-confirmed",
+      };
+      usersRepository.findOne.mockResolvedValue(pendingUser);
+      usersRepository.save.mockImplementation((u) => u);
+
+      await service.confirmOidcLink("some-token");
+
+      expect(patRepository.update).toHaveBeenCalledWith(
+        { userId: mockUser.id, isRevoked: false },
+        { isRevoked: true },
+      );
+      expect(trustedDevicesRepository.delete).toHaveBeenCalledWith({
+        userId: mockUser.id,
+      });
+      expect(refreshTokensRepository.update).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: mockUser.id, isRevoked: false }),
+        { isRevoked: true },
+      );
+      expect(oauthProviderService.revokeAllForUser).toHaveBeenCalledWith(
+        mockUser.id,
+      );
+    });
+
+    it("confirmOidcLink revokes nothing for an expired link", async () => {
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        oidcLinkPending: true,
+        oidcLinkExpiresAt: new Date(Date.now() - 3600000),
+        pendingOidcSubject: "oidc-sub-expired",
+      });
+      usersRepository.save.mockImplementation((u) => u);
+
+      await expect(service.confirmOidcLink("expired-token")).rejects.toThrow();
+
+      expect(patRepository.update).not.toHaveBeenCalled();
+      expect(oauthProviderService.revokeAllForUser).not.toHaveBeenCalled();
     });
 
     it("confirmOidcLink throws for expired token", async () => {

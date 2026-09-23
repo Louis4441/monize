@@ -41,6 +41,10 @@ import { BackupEncryptionService } from "../backup/backup-encryption.service";
 import { withSystemContext } from "../common/db/with-context";
 import { withScopedDb } from "../common/db/scoped-db";
 import { recordFailedLogin } from "./login-lockout";
+import {
+  revokeOAuthGrantsAfterCommit,
+  revokeStandingCredentials,
+} from "./credential-revocation";
 import { tr } from "../i18n/translate";
 import { currentRequestLocale } from "../i18n/request-locale";
 import { I18nService } from "nestjs-i18n";
@@ -898,14 +902,22 @@ export class AuthService {
       );
     }
 
-    // Complete the link
+    // Complete the link. The account now signs in through the identity
+    // provider, so every credential issued on the strength of the local
+    // password ends with it: PATs and trusted devices in the same transaction,
+    // sessions and OAuth grants after it (`credential-revocation.ts`).
     user.oidcSubject = user.pendingOidcSubject;
     user.authProvider = "oidc";
     user.oidcLinkPending = false;
     user.oidcLinkToken = null;
     user.oidcLinkExpiresAt = null;
     user.pendingOidcSubject = null;
-    await this.scoped(User, (repo) => repo.save(user));
+    await withScopedDb(this.dataSource, async (manager) => {
+      await manager.getRepository(User).save(user);
+      await revokeStandingCredentials(manager, user.id);
+    });
+    await this.tokenService.revokeAllUserRefreshTokens(user.id);
+    await revokeOAuthGrantsAfterCommit(this.moduleRef, user.id, this.logger);
 
     return user;
   }

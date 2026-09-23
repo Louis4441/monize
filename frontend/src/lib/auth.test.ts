@@ -147,6 +147,16 @@ describe('authApi', () => {
     });
   });
 
+  it('createToken sends the step-up token as a header', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { id: 'pat-1', token: 'abc' } });
+    await authApi.createToken({ name: 'CI', expiresAt: null } as any, 'step-up-jwt');
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/auth/tokens',
+      { name: 'CI', expiresAt: null },
+      { headers: { 'X-Step-Up-Token': 'step-up-jwt' } },
+    );
+  });
+
   it('revokeToken deletes a PAT', async () => {
     vi.mocked(apiClient.delete).mockResolvedValue({ data: { message: 'revoked' } });
     await authApi.revokeToken('pat-1');

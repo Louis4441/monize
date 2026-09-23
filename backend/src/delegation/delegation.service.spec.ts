@@ -18,6 +18,9 @@ import { Transaction } from "../transactions/entities/transaction.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
 import { ScheduledTransactionOverride } from "../scheduled-transactions/entities/scheduled-transaction-override.entity";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+import { PersonalAccessToken } from "../auth/entities/personal-access-token.entity";
+import { TrustedDevice } from "../users/entities/trusted-device.entity";
+import { OAUTH_GRANT_REVOKER } from "../auth/credential-revocation";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -38,6 +41,9 @@ describe("DelegationService", () => {
   let usersRepo: Record<string, jest.Mock>;
   let prefsRepo: Record<string, jest.Mock>;
   let refreshRepo: Record<string, jest.Mock>;
+  let patRepo: Record<string, jest.Mock>;
+  let trustedDevicesRepo: Record<string, jest.Mock>;
+  let oauthProviderService: { revokeAllForUser: jest.Mock };
   let accountsRepo: Record<string, jest.Mock>;
   let transactionsRepo: Record<string, jest.Mock>;
   let scheduledTxRepo: Record<string, jest.Mock>;
@@ -58,6 +64,9 @@ describe("DelegationService", () => {
     usersRepo = { findOne: jest.fn(), find: jest.fn(), save: jest.fn() };
     prefsRepo = { findOne: jest.fn() };
     refreshRepo = { update: jest.fn() };
+    patRepo = { update: jest.fn() };
+    trustedDevicesRepo = { delete: jest.fn() };
+    oauthProviderService = { revokeAllForUser: jest.fn().mockResolvedValue(0) };
     accountsRepo = { find: jest.fn(), exists: jest.fn(), count: jest.fn() };
     transactionsRepo = { findOne: jest.fn() };
     scheduledTxRepo = { findOne: jest.fn() };
@@ -85,7 +94,11 @@ describe("DelegationService", () => {
       [ScheduledTransaction, scheduledTxRepo as never],
       [ScheduledTransactionOverride, scheduledOverrideRepo as never],
       [DelegateAccountFavourite, delegateFavouritesRepo as never],
+      [PersonalAccessToken, patRepo as never],
+      [TrustedDevice, trustedDevicesRepo as never],
     ]);
+    // `repo.manager` is the transaction's manager, as on a real repository.
+    (refreshRepo as Record<string, unknown>).manager = scoped.manager;
     dataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
 
     const i18nStub = {
@@ -98,6 +111,11 @@ describe("DelegationService", () => {
       configService as any,
       dataSource as any,
       i18nStub,
+      {
+        get: jest.fn((token: unknown) =>
+          token === OAUTH_GRANT_REVOKER ? oauthProviderService : undefined,
+        ),
+      } as any,
     );
   });
 
@@ -1416,6 +1434,35 @@ describe("DelegationService", () => {
       expect(refreshRepo.update).toHaveBeenCalledWith(
         { userId: DELEGATE_ID, isRevoked: false },
         { isRevoked: true },
+      );
+    });
+
+    it("revokes the delegate's PATs, trusted devices and OAuth grants", async () => {
+      // An owner reset cut the delegate's web sessions only; any other
+      // credential issued on the old password kept working.
+      delegatesRepo.findOne.mockResolvedValue({
+        id: "g1",
+        delegateUserId: DELEGATE_ID,
+      });
+      const delegate = {
+        id: DELEGATE_ID,
+        oidcSubject: null,
+        isDelegateOnly: true,
+      };
+      usersRepo.findOne.mockResolvedValue(delegate);
+      usersRepo.save.mockResolvedValue(delegate);
+
+      await service.resetDelegatePassword(OWNER_ID, "g1");
+
+      expect(patRepo.update).toHaveBeenCalledWith(
+        { userId: DELEGATE_ID, isRevoked: false },
+        { isRevoked: true },
+      );
+      expect(trustedDevicesRepo.delete).toHaveBeenCalledWith({
+        userId: DELEGATE_ID,
+      });
+      expect(oauthProviderService.revokeAllForUser).toHaveBeenCalledWith(
+        DELEGATE_ID,
       );
     });
 

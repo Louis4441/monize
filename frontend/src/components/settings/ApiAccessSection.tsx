@@ -12,12 +12,27 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { StepUpAuthModal } from '@/components/auth/StepUpAuthModal';
 import { authApi } from '@/lib/auth';
-import { PersonalAccessToken } from '@/types/auth';
+import apiClient from '@/lib/api';
+import {
+  StepUpRequiredError,
+  consumeOidcReauthArtifact,
+  consumeOidcStepUpPending,
+  rethrowStepUpError,
+  useStepUpTokenStore,
+} from '@/lib/stepUpToken';
+import { PersonalAccessToken, SelfUserProfile } from '@/types/auth';
 import { getErrorMessage } from '@/lib/errors';
 import { useDateFormat } from '@/hooks/useDateFormat';
 
 const MCP_PATH = '/api/v1/mcp';
+
+/**
+ * Creating a token is step-up protected: a PAT outlives the session that mints
+ * it, so the server asks for the account's strongest factor again first.
+ */
+const STEP_UP_PURPOSE = 'personal-access-token';
 
 const SCOPE_OPTIONS = [
   { value: 'read', labelKey: 'createModal.scopes.read.label', descriptionKey: 'createModal.scopes.read.description' },
@@ -37,6 +52,24 @@ const buildCreateTokenSchema = (t: (key: string) => string) => z.object({
 });
 
 type CreateTokenFormData = z.infer<ReturnType<typeof buildCreateTokenSchema>>;
+
+/** The create form as it was, carried across a step-up or an OIDC round trip. */
+interface PendingCreate {
+  name: string;
+  expiryDays: string;
+  scopes: string[];
+}
+
+function isPendingCreate(value: unknown): value is PendingCreate {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.name === 'string' &&
+    typeof v.expiryDays === 'string' &&
+    Array.isArray(v.scopes) &&
+    v.scopes.every((scope) => typeof scope === 'string')
+  );
+}
 
 function relativeOrFormatted(
   dateStr: string | null,
@@ -78,6 +111,13 @@ export function ApiAccessSection() {
   const [mcpUrlCopied, setMcpUrlCopied] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
+  // Step-up: the modal needs the account's factor (authProvider + hasPassword),
+  // which only the full self profile carries.
+  const [selfUser, setSelfUser] = useState<SelfUserProfile | null>(null);
+  const [stepUpOpen, setStepUpOpen] = useState(false);
+  const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(null);
+  const clearStepUp = useStepUpTokenStore((s) => s.clear);
+
   const {
     register,
     handleSubmit,
@@ -110,36 +150,110 @@ export function ApiAccessSection() {
     loadTokens();
   }, [loadTokens]);
 
-  const handleCreate = async (formData: CreateTokenFormData) => {
-    if (selectedScopes.length === 0) {
-      toast.error(t('toasts.selectScope'));
+  useEffect(() => {
+    authApi
+      .getSelfProfile()
+      .then((user) => setSelfUser(user))
+      .catch(() => {
+        // Without it the step-up modal cannot pick a factor and stays closed;
+        // creating a token then fails with the server's own message.
+      });
+  }, []);
+
+  /** Ask for the step-up, remembering the form so it can be submitted after. */
+  const requestStepUp = (pending: PendingCreate) => {
+    clearStepUp(STEP_UP_PURPOSE);
+    setPendingCreate(pending);
+    setStepUpOpen(true);
+  };
+
+  const submitCreate = async (pending: PendingCreate) => {
+    const stepUpToken = useStepUpTokenStore.getState().getValid(STEP_UP_PURPOSE);
+    if (!stepUpToken) {
+      requestStepUp(pending);
       return;
     }
 
     setIsCreating(true);
     try {
       let expiresAt: string | undefined;
-      if (formData.expiryDays) {
+      if (pending.expiryDays) {
         const date = new Date();
-        date.setDate(date.getDate() + parseInt(formData.expiryDays));
+        date.setDate(date.getDate() + parseInt(pending.expiryDays));
         expiresAt = date.toISOString();
       }
 
-      const result = await authApi.createToken({
-        name: formData.name.trim(),
-        scopes: selectedScopes.join(','),
-        expiresAt,
-      });
+      const result = await authApi
+        .createToken(
+          {
+            name: pending.name.trim(),
+            scopes: pending.scopes.join(','),
+            expiresAt,
+          },
+          stepUpToken,
+        )
+        .catch((error: unknown) => rethrowStepUpError(error));
 
       setCreatedToken(result.token);
       setTokens((prev) => [result, ...prev]);
       setCopied(false);
     } catch (error) {
+      if (error instanceof StepUpRequiredError) {
+        // Expired or rejected between verifying and submitting: ask again.
+        requestStepUp(pending);
+        return;
+      }
       toast.error(getErrorMessage(error, t('toasts.createFailed')));
     } finally {
       setIsCreating(false);
     }
   };
+
+  const handleCreate = async (formData: CreateTokenFormData) => {
+    if (selectedScopes.length === 0) {
+      toast.error(t('toasts.selectScope'));
+      return;
+    }
+    await submitCreate({
+      name: formData.name,
+      expiryDays: formData.expiryDays,
+      scopes: selectedScopes,
+    });
+  };
+
+  // Finish a step-up that went through the identity provider. The modal
+  // stashed the form and sent the user away; the auth callback brought them
+  // back here with a one-time artifact, which is exchanged for a step-up token
+  // before the form is reopened as it was.
+  useEffect(() => {
+    const pending = consumeOidcStepUpPending(STEP_UP_PURPOSE);
+    if (!pending) return;
+    const resumed = isPendingCreate(pending.payload) ? pending.payload : null;
+    (async () => {
+      try {
+        const artifact = consumeOidcReauthArtifact();
+        const res = await apiClient.post<{
+          stepUpToken: string;
+          expiresAt: string;
+        }>('/auth/step-up', {
+          purpose: STEP_UP_PURPOSE,
+          oidcReauthToken: artifact ?? undefined,
+        });
+        useStepUpTokenStore
+          .getState()
+          .set(STEP_UP_PURPOSE, res.data.stepUpToken, res.data.expiresAt);
+        if (resumed) {
+          resetForm({ name: resumed.name, expiryDays: resumed.expiryDays });
+          setSelectedScopes(resumed.scopes);
+          setShowCreateModal(true);
+        }
+      } catch (error) {
+        toast.error(getErrorMessage(error, t('toasts.reauthFailed')));
+      }
+    })();
+    // Once per mount: the sentinel is consumed on the first call.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCloseCreateModal = () => {
     setShowCreateModal(false);
@@ -412,6 +526,26 @@ export function ApiAccessSection() {
           )}
         </div>
       </Modal>
+
+      <StepUpAuthModal
+        isOpen={stepUpOpen && !!selfUser}
+        purpose={STEP_UP_PURPOSE}
+        authProvider={selfUser?.authProvider ?? 'local'}
+        hasPassword={selfUser?.hasPassword ?? false}
+        reason={t('stepUp.reason')}
+        oidcReturnTo="/settings"
+        oidcResumePayload={pendingCreate ? { ...pendingCreate } : undefined}
+        onClose={() => {
+          setStepUpOpen(false);
+          setPendingCreate(null);
+        }}
+        onVerified={() => {
+          const pending = pendingCreate;
+          setStepUpOpen(false);
+          setPendingCreate(null);
+          if (pending) void submitCreate(pending);
+        }}
+      />
 
       {/* Revoke Confirmation */}
       <ConfirmDialog
