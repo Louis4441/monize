@@ -45,6 +45,38 @@ export const TWO_FACTOR_USER_SCOPE = "2fa-user";
 /** `single_use_tokens.purpose` for a spent TOTP code. Shared by both TOTP paths. */
 export const TOTP_CLAIM_PURPOSE = "totp";
 
+/** Which proof a self-service 2FA reset was refused on. */
+type ResetRefusal = "credential" | "second-factor";
+
+/**
+ * What each refusal logs and answers. Both are 400, not 401: the session is
+ * valid, and a 401 would send the client into its refresh-and-sign-out path.
+ * A lookup rather than a comparison of the reason, so no equality test sits
+ * next to the credential it describes.
+ */
+const RESET_REFUSALS: Record<
+  ResetRefusal,
+  { subject: string; error: () => BadRequestException }
+> = {
+  credential: {
+    subject: "account password",
+    error: () =>
+      new BadRequestException(
+        tr(
+          "errors.auth.currentPasswordIncorrect",
+          "Current password is incorrect",
+        ),
+      ),
+  },
+  "second-factor": {
+    subject: "authenticator or backup code",
+    error: () =>
+      new BadRequestException(
+        tr("errors.auth.invalidVerificationCode", "Invalid verification code"),
+      ),
+  },
+};
+
 @Injectable()
 export class TwoFactorService {
   private readonly logger = new Logger(TwoFactorService.name);
@@ -666,7 +698,7 @@ export class TwoFactorService {
 
     const refusal = await withScopedDb(
       this.dataSource,
-      async (manager): Promise<"password" | "code" | null> => {
+      async (manager): Promise<ResetRefusal | null> => {
         const users = manager.getRepository(User);
         const user = await users.findOne({
           where: { id: userId },
@@ -700,7 +732,7 @@ export class TwoFactorService {
         }
 
         if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
-          return "password";
+          return "credential";
         }
 
         // Only the TOTP branch decrypts the secret; an undecryptable one is a
@@ -711,7 +743,7 @@ export class TwoFactorService {
           ? this.checkTotpCode(user, code).valid &&
             (await this.claimTotpCode(user.id, code))
           : await this.verifyBackupCode(user, code);
-        if (!codeValid) return "code";
+        if (!codeValid) return "second-factor";
 
         await users.update(
           { id: userId },
@@ -730,26 +762,13 @@ export class TwoFactorService {
       },
     );
 
-    if (refusal !== null) {
+    if (refusal) {
+      const { subject, error } = RESET_REFUSALS[refusal];
       await this.recordUserTotpFailure(userId);
       this.logger.warn(
-        `2FA reset refused: invalid ${refusal === "password" ? "password" : "code"} for user ${userId}`,
+        `2FA reset refused: wrong ${subject} for user ${userId}`,
       );
-      throw refusal === "password"
-        ? // 400, not 401: the session is valid, and a 401 would send the
-          // client into its refresh-and-sign-out path.
-          new BadRequestException(
-            tr(
-              "errors.auth.currentPasswordIncorrect",
-              "Current password is incorrect",
-            ),
-          )
-        : new BadRequestException(
-            tr(
-              "errors.auth.invalidVerificationCode",
-              "Invalid verification code",
-            ),
-          );
+      throw error();
     }
 
     await this.attemptCounters.reset(TWO_FACTOR_USER_SCOPE, userId);
