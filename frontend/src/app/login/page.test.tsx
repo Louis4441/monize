@@ -582,4 +582,65 @@ describe('LoginPage', () => {
       expect(mockPush).not.toHaveBeenCalledWith('/dashboard');
     });
   });
+
+  describe('returnTo that leaves the origin', () => {
+    // `?returnTo=%2F%09%2Fevil.example` decodes to "/<tab>/evil.example": it
+    // passes a prefix check, and the URL parser reads it as //evil.example.
+    it.each([
+      ['tab', '/\t/evil.example'],
+      ['CR', '/\r/evil.example'],
+      ['LF', '/\n/evil.example'],
+      ['backslash', '/\\evil.example'],
+      ['protocol-relative', '//evil.example'],
+      ['absolute URL', 'https://evil.example/'],
+    ])('is ignored after a password sign-in (%s)', async (_label, value) => {
+      mockReturnTo = value;
+      (authApi.login as ReturnType<typeof vi.fn>).mockResolvedValue({
+        user: { id: 'u1', email: 'test@example.com', firstName: 'Test', lastName: 'User', role: 'user', hasPassword: true, mustChangePassword: false },
+      });
+      render(<LoginPage />);
+      await waitFor(() => expect(screen.getByLabelText(/email/i)).toBeInTheDocument());
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'test@example.com' } });
+        fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+      });
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/dashboard');
+      });
+    });
+
+    it('is not stashed for the OIDC callback', async () => {
+      mockReturnTo = '/\t/evil.example';
+      sessionStorage.removeItem('postLoginReturnTo');
+      (authApi.getAuthMethods as ReturnType<typeof vi.fn>).mockResolvedValue({
+        local: false, oidc: true, registration: false, smtp: false, force2fa: false, demo: false,
+      });
+      render(<LoginPage />);
+      const sso = await screen.findByRole('button', { name: /sign in with sso/i });
+      await act(async () => {
+        fireEvent.click(sso);
+      });
+      expect(authApi.initiateOidc).toHaveBeenCalled();
+      expect(sessionStorage.getItem('postLoginReturnTo')).toBeNull();
+    });
+
+    it('stashes a same-origin returnTo with its query string for the OIDC callback', async () => {
+      mockReturnTo = '/api/v1/oauth-consent/abc?x=1';
+      (authApi.getAuthMethods as ReturnType<typeof vi.fn>).mockResolvedValue({
+        local: false, oidc: true, registration: false, smtp: false, force2fa: false, demo: false,
+      });
+      render(<LoginPage />);
+      const sso = await screen.findByRole('button', { name: /sign in with sso/i });
+      await act(async () => {
+        fireEvent.click(sso);
+      });
+      expect(sessionStorage.getItem('postLoginReturnTo')).toBe(
+        '/api/v1/oauth-consent/abc?x=1',
+      );
+      sessionStorage.removeItem('postLoginReturnTo');
+    });
+  });
 });

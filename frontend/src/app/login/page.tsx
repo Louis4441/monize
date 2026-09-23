@@ -22,6 +22,7 @@ import { DEMO_USER_EMAIL, DEMO_USER_PASSWORD } from '@/lib/demo-credentials';
 import { User } from '@/types/auth';
 import { createLogger } from '@/lib/logger';
 import { buildEmailSchema } from '@/lib/zod-helpers';
+import { safeReturnTo } from '@/lib/return-to';
 
 const logger = createLogger('Login');
 
@@ -32,19 +33,6 @@ const buildLoginSchema = (t: (key: string) => string, tc: (key: string) => strin
 });
 
 type LoginFormData = z.infer<ReturnType<typeof buildLoginSchema>>;
-
-/**
- * Validate a `returnTo` query parameter so we can safely redirect after login.
- * Restricts to same-origin path-only values to prevent open-redirect abuse via
- * absolute URLs, protocol-relative URLs, or backslash tricks.
- */
-function safeReturnTo(value: string | null): string | null {
-  if (!value) return null;
-  if (!value.startsWith('/') || value.startsWith('//') || value.startsWith('/\\')) {
-    return null;
-  }
-  return value;
-}
 
 export default function LoginPage() {
   const t = useTranslations('auth');
