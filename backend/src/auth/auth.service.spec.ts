@@ -1640,6 +1640,25 @@ describe("AuthService", () => {
   // disable2FA
   // ---------------------------------------------------------------
 
+  describe("reset2FA", () => {
+    it("hands the whole request to TwoFactorService, the session to keep included", async () => {
+      const twoFactor = (service as any).twoFactorService as TwoFactorService;
+      const reset = jest
+        .spyOn(twoFactor, "reset2FA")
+        .mockResolvedValue({ message: "ok" });
+
+      await expect(
+        service.reset2FA("user-1", "pw", "abcd-ef01", "current-refresh"),
+      ).resolves.toEqual({ message: "ok" });
+      expect(reset).toHaveBeenCalledWith(
+        "user-1",
+        "pw",
+        "abcd-ef01",
+        "current-refresh",
+      );
+    });
+  });
+
   describe("disable2FA", () => {
     it("validates code, clears secret, disables preferences, revokes trusted devices", async () => {
       const encryptedSecret = encrypt("TESTSECRET", TEST_TOTP_KEY);

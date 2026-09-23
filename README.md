@@ -426,6 +426,7 @@ Swagger UI is available at `/api/docs` in **development mode only** (disabled in
 - `POST /api/v1/auth/login` - Login with local credentials
 - `POST /api/v1/auth/2fa/verify` - Verify TOTP 2FA code
 - `POST /api/v1/auth/2fa/setup` - Set up 2FA
+- `POST /api/v1/auth/2fa/reset` - Reset (replace) your own 2FA with your password and an authenticator or backup code, also under `FORCE_2FA`
 - `GET /api/v1/auth/2fa/trusted-devices` - List trusted devices
 - `GET /api/v1/auth/oidc` - Initiate OIDC authentication
 - `GET /api/v1/accounts` - List accounts

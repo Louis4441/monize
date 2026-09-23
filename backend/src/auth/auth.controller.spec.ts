@@ -23,6 +23,9 @@ import { SELF_ONLY_PROFILE_FIELDS } from "../users/user-profile";
 import { fullyPopulatedUser } from "../users/user-profile.test-util";
 import { UsersController } from "../users/users.controller";
 import { UsersService } from "../users/users.service";
+import { DEMO_RESTRICTED_KEY } from "../common/guards/demo-mode.guard";
+import { SKIP_CSRF_KEY } from "../common/decorators/skip-csrf.decorator";
+import { ALLOW_DELEGATE_KEY } from "../delegation/decorators/delegate-access.decorator";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -95,6 +98,7 @@ describe("AuthController", () => {
       setup2FA: jest.fn(),
       confirmSetup2FA: jest.fn(),
       disable2FA: jest.fn(),
+      reset2FA: jest.fn(),
       verify2FA: jest.fn(),
       generateTokenPair: jest.fn(),
       findOrCreateOidcUser: jest.fn(),
@@ -1582,6 +1586,93 @@ describe("AuthController", () => {
         "delegate-1",
         "123456",
       );
+    });
+  });
+
+  describe("reset2FA", () => {
+    const body = { currentPassword: "pw", code: "abcd-ef01" };
+
+    it("resets the caller's 2FA, keeping the session that asked", async () => {
+      authService.reset2FA.mockResolvedValue({ message: "reset" });
+      const res = mockRes();
+      const req = {
+        user: { id: "user-1", realUserId: "user-1", isActing: false },
+        cookies: { refresh_token: "current-refresh" },
+      };
+
+      await controller.reset2FA(req as any, body as any, res as any);
+
+      expect(authService.reset2FA).toHaveBeenCalledWith(
+        "user-1",
+        "pw",
+        "abcd-ef01",
+        "current-refresh",
+      );
+      // The trusted devices are gone, this browser's included.
+      expect(res.clearCookie).toHaveBeenCalledWith("trusted_device");
+      expect(res.json).toHaveBeenCalledWith({ message: "reset" });
+    });
+
+    it("never resets the owner's 2FA for an acting delegate: the target is the delegate's own account", async () => {
+      authService.reset2FA.mockResolvedValue({ message: "reset" });
+      const actingReq = {
+        user: { id: "owner-1", realUserId: "delegate-1", isActing: true },
+        cookies: {},
+      };
+
+      await controller.reset2FA(
+        actingReq as any,
+        body as any,
+        mockRes() as any,
+      );
+
+      expect(authService.reset2FA).toHaveBeenCalledWith(
+        "delegate-1",
+        "pw",
+        "abcd-ef01",
+        undefined,
+      );
+      expect(authService.reset2FA).not.toHaveBeenCalledWith(
+        "owner-1",
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it("sends no reply and clears no cookie when the reset is refused", async () => {
+      authService.reset2FA.mockRejectedValue(
+        new BadRequestException("Invalid verification code"),
+      );
+      const res = mockRes();
+
+      await expect(
+        controller.reset2FA(
+          { user: { id: "user-1", realUserId: "user-1" }, cookies: {} } as any,
+          body as any,
+          res as any,
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(res.clearCookie).not.toHaveBeenCalled();
+      expect(res.json).not.toHaveBeenCalled();
+    });
+
+    it("carries the guards and limits of the neighbouring 2FA management routes", () => {
+      const handler = AuthController.prototype.reset2FA;
+      const disable = AuthController.prototype.disable2FA;
+      const meta = (key: string, fn: object) => Reflect.getMetadata(key, fn);
+
+      // Authenticated, CSRF-checked (no SkipCsrf), demo-restricted, throttled
+      // like disable2FA, and reachable by a delegate only for their own account.
+      expect(meta("__guards__", handler)).toEqual(meta("__guards__", disable));
+      expect(meta(DEMO_RESTRICTED_KEY, handler)).toBe(true);
+      expect(meta(ALLOW_DELEGATE_KEY, handler)).toBe(true);
+      expect(meta(SKIP_CSRF_KEY, handler)).toBeUndefined();
+      expect(meta("THROTTLER:LIMITdefault", handler)).toBe(
+        meta("THROTTLER:LIMITdefault", disable),
+      );
+      expect(meta("THROTTLER:TTLdefault", handler)).toBe(900000);
+      expect(meta("path", handler)).toBe("2fa/reset");
     });
   });
 

@@ -984,6 +984,20 @@ export class AuthService {
     return this.twoFactorService.disable2FA(userId, code);
   }
 
+  async reset2FA(
+    userId: string,
+    currentPassword: string,
+    code: string,
+    currentRefreshToken?: string,
+  ) {
+    return this.twoFactorService.reset2FA(
+      userId,
+      currentPassword,
+      code,
+      currentRefreshToken,
+    );
+  }
+
   async generateBackupCodes(userId: string, code: string) {
     return this.twoFactorService.generateBackupCodes(userId, code);
   }

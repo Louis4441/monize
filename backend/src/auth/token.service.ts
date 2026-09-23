@@ -303,15 +303,29 @@ export class TokenService {
    * captured families and re-revoking until a pass changes nothing converges: a
    * rotation can only add a replacement inside a family it has just revoked, and
    * the next pass, holding that family's lock, covers it.
+   *
+   * `keepSessionOf` is the raw refresh token of the session making the request,
+   * when that session is to survive: its family is left out of the captured set
+   * (resolved by the token's hash, and only among `userId`'s own rows), so "sign
+   * out everywhere else" does not sign the caller out too. An unknown or absent
+   * token keeps nothing, which is the safe direction.
    */
-  async revokeAllUserRefreshTokens(userId: string): Promise<void> {
+  async revokeAllUserRefreshTokens(
+    userId: string,
+    keepSessionOf?: string,
+  ): Promise<void> {
+    const keepHash = keepSessionOf ? hashToken(keepSessionOf) : null;
     // First round: the families this user has a live session in, captured before
     // any revocation. This is the whole set the operation is allowed to touch.
     const families = await withScopedDb(this.dataSource, async (manager) => {
       const rows: { family_id: string }[] = await manager.query(
         `SELECT DISTINCT family_id FROM refresh_tokens
-          WHERE user_id = $1 AND is_revoked = false`,
-        [userId],
+          WHERE user_id = $1 AND is_revoked = false
+            AND family_id IS DISTINCT FROM (
+              SELECT kept.family_id FROM refresh_tokens kept
+               WHERE kept.user_id = $1 AND kept.token_hash = $2
+               LIMIT 1)`,
+        [userId, keepHash],
       );
       // Ascending, the same fixed order every other multi-lock path uses, so a
       // pass cannot deadlock against a rotation holding one family.

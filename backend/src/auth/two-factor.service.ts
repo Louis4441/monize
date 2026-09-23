@@ -140,8 +140,9 @@ export class TwoFactorService {
       this.logger.warn(
         `TOTP secret for user ${user.id} cannot be decrypted (JWT_SECRET has ` +
           "probably changed since it was enrolled). Authenticator codes are " +
-          "refused until the user re-enrolls; a backup code still signs in, " +
-          "and an administrator can reset their 2FA.",
+          "refused until the user re-enrolls; a backup code still signs in " +
+          "and resets 2FA from Settings, and an administrator can reset it " +
+          "for a user without one.",
       );
       return null;
     }
@@ -617,6 +618,148 @@ export class TwoFactorService {
     await this.scoped(TrustedDevice, (repo) => repo.delete({ userId }));
 
     return { message: "Two-factor authentication disabled successfully" };
+  }
+
+  /**
+   * Self-service reset of an exposed or unusable authenticator: clear the TOTP
+   * secret (active and pending), the backup codes and the enabled flag, and
+   * every trusted device, so the user can enroll a new authenticator at once.
+   *
+   * Allowed under `FORCE_2FA`, which is the point: disabling is refused there,
+   * so without this a user whose authenticator leaked, or whose secret the
+   * server can no longer decrypt (a changed `JWT_SECRET`), needed an
+   * administrator. The forced-enrolment redirect then sends them straight back
+   * into setup.
+   *
+   * It takes both proofs -- the account password and a second factor -- and
+   * never one alone: a 6-digit authenticator code or one backup code, as sign-in
+   * accepts. There is deliberately no password-only path, not even when the
+   * TOTP secret is undecryptable: a stolen session plus a phished or reused
+   * password must not be enough to strip the second factor. With an
+   * undecryptable secret a 6-digit code is simply an invalid code (counted), and
+   * a backup code -- bcrypt-hashed, independent of `JWT_SECRET` -- still works.
+   * A user with neither needs the administrator reset.
+   *
+   * Every failure, password or code, draws on the same per-user TOTP budget as
+   * sign-in and the other management endpoints (`assertManagementTotpBudget`),
+   * so a stolen session cannot guess either through this route. The checks run
+   * inside the transaction that clears the secret, against the row locked for
+   * update, so a refused request has written nothing and a concurrent enrolment
+   * cannot interleave; the failure is counted after that transaction, because a
+   * counter joined to it would roll back with the refusal.
+   *
+   * Only the refresh-token families other than `currentRefreshToken`'s are
+   * revoked, after the commit (`TokenService.revokeAllUserRefreshTokens`
+   * converges over several transactions of its own): a session the exposed
+   * factor may have admitted ends, while the one asking stays signed in to
+   * enroll. Personal access tokens and OAuth grants are left alone; they never
+   * passed a second factor, so replacing it does not bear on them, and the
+   * password is unchanged.
+   */
+  async reset2FA(
+    userId: string,
+    currentPassword: string,
+    code: string,
+    currentRefreshToken?: string,
+  ): Promise<{ message: string }> {
+    await this.assertManagementTotpBudget(userId);
+
+    const refusal = await withScopedDb(
+      this.dataSource,
+      async (manager): Promise<"password" | "code" | null> => {
+        const users = manager.getRepository(User);
+        const user = await users.findOne({
+          where: { id: userId },
+          lock: { mode: "pessimistic_write" },
+        });
+        if (!user) {
+          throw new NotFoundException(
+            tr("errors.auth.userNotFound", "User not found"),
+          );
+        }
+        if (user.authProvider === "oidc") {
+          throw new BadRequestException(
+            tr(
+              "errors.auth.twoFactorNotAvailableForSso",
+              "Two-factor authentication is not available for SSO accounts",
+            ),
+          );
+        }
+        if (!user.passwordHash) {
+          throw new BadRequestException(
+            tr(
+              "errors.auth.twoFactorRequiresPassword",
+              "Two-factor authentication requires an account password",
+            ),
+          );
+        }
+        if (!user.twoFactorSecret) {
+          throw new BadRequestException(
+            tr("errors.auth.twoFactorNotEnabled", "2FA is not enabled"),
+          );
+        }
+
+        if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+          return "password";
+        }
+
+        // Only the TOTP branch decrypts the secret; an undecryptable one is a
+        // wrong code. The claim burns a valid code so it cannot be replayed on
+        // any replica, and joins this transaction. The backup-code branch
+        // consumes the code under the lock this transaction already holds.
+        const codeValid = /^\d{6}$/.test(code)
+          ? this.checkTotpCode(user, code).valid &&
+            (await this.claimTotpCode(user.id, code))
+          : await this.verifyBackupCode(user, code);
+        if (!codeValid) return "code";
+
+        await users.update(
+          { id: userId },
+          {
+            twoFactorSecret: null,
+            pendingTwoFactorSecret: null,
+            backupCodes: null,
+          },
+        );
+        await patchUserPreferences(manager, userId, {
+          twoFactorEnabled: false,
+        });
+        // A trusted-device cookie skips the second factor being replaced.
+        await manager.getRepository(TrustedDevice).delete({ userId });
+        return null;
+      },
+    );
+
+    if (refusal !== null) {
+      await this.recordUserTotpFailure(userId);
+      this.logger.warn(
+        `2FA reset refused: invalid ${refusal === "password" ? "password" : "code"} for user ${userId}`,
+      );
+      throw refusal === "password"
+        ? // 400, not 401: the session is valid, and a 401 would send the
+          // client into its refresh-and-sign-out path.
+          new BadRequestException(
+            tr(
+              "errors.auth.currentPasswordIncorrect",
+              "Current password is incorrect",
+            ),
+          )
+        : new BadRequestException(
+            tr(
+              "errors.auth.invalidVerificationCode",
+              "Invalid verification code",
+            ),
+          );
+    }
+
+    await this.attemptCounters.reset(TWO_FACTOR_USER_SCOPE, userId);
+    await this.tokenService.revokeAllUserRefreshTokens(
+      userId,
+      currentRefreshToken,
+    );
+    this.logger.log(`Two-factor authentication reset by user ${userId}`);
+
+    return { message: "Two-factor authentication reset successfully" };
   }
 
   // L5: Backup code methods

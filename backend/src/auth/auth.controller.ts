@@ -47,6 +47,7 @@ import { ConfirmEmailChangeDto } from "./dto/confirm-email-change.dto";
 import { ResendVerificationDto } from "./dto/resend-verification.dto";
 import { VerifyTotpDto } from "./dto/verify-totp.dto";
 import { Disable2faDto } from "./dto/disable-2fa.dto";
+import { Reset2faDto } from "./dto/reset-2fa.dto";
 import { Setup2faDto } from "./dto/setup-2fa.dto";
 import { Setup2faInitDto } from "./dto/setup-2fa-init.dto";
 import {
@@ -1130,6 +1131,37 @@ export class AuthController {
   })
   async disable2FA(@Request() req, @Body() dto: Disable2faDto) {
     return this.authService.disable2FA(req.user.realUserId, dto.code);
+  }
+
+  @Post("2fa/reset")
+  @UseGuards(AuthGuard("jwt"))
+  @AllowDelegate()
+  @DemoRestricted()
+  @Throttle({ default: { ttl: 900000, limit: rateLimit(5) } })
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      "Reset (replace) 2FA with the current password and an authenticator " +
+      "or backup code; allowed under FORCE_2FA",
+  })
+  async reset2FA(
+    @Request() req: ExpressRequest & { user: any },
+    @Body() dto: Reset2faDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    // realUserId, as on every 2FA route: a delegate acting as an owner resets
+    // their OWN second factor, never the owner's. The session making the
+    // request is kept so the user can enroll again at once; every other
+    // session of theirs is revoked.
+    const result = await this.authService.reset2FA(
+      req.user.realUserId,
+      dto.currentPassword,
+      dto.code,
+      req.cookies?.["refresh_token"],
+    );
+    // The reset deleted every trusted device, this browser's included.
+    res.clearCookie("trusted_device");
+    res.json(result);
   }
 
   @Get("2fa/status")
