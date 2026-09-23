@@ -438,7 +438,7 @@ describe('SecuritySection', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Disable Two-Factor Authentication')).toBeInTheDocument();
-      expect(screen.getByText('Enter your current 6-digit code to confirm disabling 2FA.')).toBeInTheDocument();
+      expect(screen.getByText('Enter the 6-digit code from your authenticator app, or one of your backup codes (xxxx-xxxx), to confirm disabling 2FA.')).toBeInTheDocument();
       expect(screen.getByLabelText('Verification Code')).toBeInTheDocument();
     });
   });
@@ -502,6 +502,35 @@ describe('SecuritySection', () => {
 
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith('Two-factor authentication disabled');
+    });
+  });
+
+  it('accepts a backup code to disable 2FA, for a user whose authenticator codes no longer work', async () => {
+    const prefsWith2fa = { ...mockPreferences, twoFactorEnabled: true };
+    (authApi.disable2FA as any).mockResolvedValueOnce({});
+
+    render(
+      <SecuritySection
+        user={mockUser}
+        preferences={prefsWith2fa}
+        force2fa={false}
+        onPreferencesUpdated={mockOnPreferencesUpdated}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Disable 2FA' }));
+    await waitFor(() => {
+      expect(screen.getByLabelText('Verification Code')).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText('Verification Code'), { target: { value: 'ABCD-EF01' } });
+    const disableButtons = screen.getAllByRole('button', { name: /Disable 2FA/ });
+    const modalDisableBtn = disableButtons[disableButtons.length - 1];
+    expect(modalDisableBtn).not.toBeDisabled();
+    fireEvent.click(modalDisableBtn);
+
+    await waitFor(() => {
+      expect(authApi.disable2FA).toHaveBeenCalledWith('abcd-ef01');
     });
   });
 
@@ -1191,8 +1220,8 @@ describe('SecuritySection', () => {
     });
   });
 
-  // --- Verification code only allows digits ---
-  it('strips non-digit characters from the verification code input', async () => {
+  // --- Verification code keeps only what a TOTP or backup code can hold ---
+  it('strips characters no authenticator or backup code contains', async () => {
     const prefsWith2fa = { ...mockPreferences, twoFactorEnabled: true };
 
     render(
@@ -1210,7 +1239,7 @@ describe('SecuritySection', () => {
       expect(screen.getByLabelText('Verification Code')).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText('Verification Code'), { target: { value: 'abc123' } });
+    fireEvent.change(screen.getByLabelText('Verification Code'), { target: { value: 'xyz 12!3#' } });
 
     expect((screen.getByLabelText('Verification Code') as HTMLInputElement).value).toBe('123');
   });

@@ -62,7 +62,7 @@
       "disableButton": "[XX-Disable 2FA-XX]",
       "disableModal": {
         "title": "[XX-Disable Two-Factor Authentication-XX]",
-        "description": "[XX-Enter your current 6-digit code to confirm disabling 2FA.-XX]",
+        "description": "[XX-Enter the 6-digit code from your authenticator app, or one of your backup codes (xxxx-xxxx), to confirm disabling 2FA.-XX]",
         "verificationCodeLabel": "[XX-Verification Code-XX]",
         "disablingButton": "[XX-Disabling...-XX]",
         "toasts": {

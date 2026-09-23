@@ -46,6 +46,7 @@ import { VerifyEmailDto } from "./dto/verify-email.dto";
 import { ConfirmEmailChangeDto } from "./dto/confirm-email-change.dto";
 import { ResendVerificationDto } from "./dto/resend-verification.dto";
 import { VerifyTotpDto } from "./dto/verify-totp.dto";
+import { Disable2faDto } from "./dto/disable-2fa.dto";
 import { Setup2faDto } from "./dto/setup-2fa.dto";
 import { Setup2faInitDto } from "./dto/setup-2fa-init.dto";
 import {
@@ -1124,8 +1125,10 @@ export class AuthController {
   @DemoRestricted()
   @Throttle({ default: { ttl: 900000, limit: rateLimit(5) } })
   @ApiBearerAuth()
-  @ApiOperation({ summary: "Disable 2FA with verification code" })
-  async disable2FA(@Request() req, @Body() dto: Setup2faDto) {
+  @ApiOperation({
+    summary: "Disable 2FA with an authenticator code or a backup code",
+  })
+  async disable2FA(@Request() req, @Body() dto: Disable2faDto) {
     return this.authService.disable2FA(req.user.realUserId, dto.code);
   }
 

@@ -1362,4 +1362,147 @@ describe("TwoFactorService", () => {
       expect(replay).toBe(false);
     });
   });
+
+  /**
+   * The TOTP secret is encrypted under a key derived from JWT_SECRET, so after
+   * JWT_SECRET changes every enrolled secret is undecryptable. Backup codes are
+   * bcrypt-hashed and independent of it -- and they are the user's way back in,
+   * so nothing on the backup-code path may touch the TOTP secret.
+   */
+  describe("after JWT_SECRET changed (TOTP secret undecryptable)", () => {
+    const BACKUP_CODE = "abcd-ef01";
+    const OLD_KEY = derivePurposeKey(
+      "the-jwt-secret-this-deployment-used-to-have",
+      "totp-encryption",
+    );
+    let storedCodes: string | null;
+    let userRow: Partial<User>;
+    let warn: jest.SpyInstance;
+
+    beforeEach(async () => {
+      storedCodes = JSON.stringify([
+        await bcrypt.hash("1111-2222", 4),
+        await bcrypt.hash(BACKUP_CODE, 4),
+      ]);
+      userRow = {
+        ...mockUser,
+        twoFactorSecret: encrypt("TOTP_SECRET", OLD_KEY),
+      };
+      // Behaves like the row: the locked re-read sees what the consuming
+      // UPDATE wrote, so single use is observed rather than assumed.
+      usersRepository.findOne.mockImplementation(async () => ({
+        ...userRow,
+        backupCodes: storedCodes,
+      }));
+      mockQueryRunner.manager.findOne.mockImplementation(async () => ({
+        ...userRow,
+        backupCodes: storedCodes,
+      }));
+      mockQueryRunner.manager.createQueryBuilder.mockImplementation(() => {
+        const builder = {
+          update: jest.fn().mockReturnThis(),
+          set: jest.fn((values: { backupCodes: string | null }) => {
+            storedCodes = values.backupCodes;
+            return builder;
+          }),
+          where: jest.fn().mockReturnThis(),
+          execute: jest.fn().mockResolvedValue({}),
+        };
+        return builder;
+      });
+      jwtService.verify.mockReturnValue({ sub: "user-1", type: "2fa_pending" });
+      (otplib.verifySync as jest.Mock).mockReturnValue({ valid: true });
+      warn = jest
+        .spyOn(
+          (service as unknown as { logger: { warn: () => void } }).logger,
+          "warn",
+        )
+        .mockImplementation(() => undefined);
+    });
+
+    it("signs in with a backup code without decrypting the TOTP secret", async () => {
+      const result = await service.verify2FA("temp", BACKUP_CODE);
+
+      expect(result.accessToken).toBe("mock-access-token");
+      expect(otplib.verifySync).not.toHaveBeenCalled();
+      // Consumed: one of the two codes is left.
+      expect(JSON.parse(storedCodes!)).toHaveLength(1);
+    });
+
+    it("keeps a backup code single-use", async () => {
+      await service.verify2FA("temp", BACKUP_CODE);
+
+      await expect(service.verify2FA("temp-2", BACKUP_CODE)).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it("answers a 6-digit code with the ordinary invalid-code error and counts it", async () => {
+      await expect(service.verify2FA("temp", "123456")).rejects.toThrow(
+        "Invalid verification code",
+      );
+
+      expect(otplib.verifySync).not.toHaveBeenCalled();
+      expect(attemptCounters.increment).toHaveBeenCalledWith(
+        TWO_FACTOR_USER_SCOPE,
+        "user-1",
+        expect.any(Number),
+        "sliding",
+      );
+      expect(tokenService.generateTokenPair).not.toHaveBeenCalled();
+      // The operator learns why; the log line never carries the secret.
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringMatching(/cannot be decrypted.*JWT_SECRET/),
+      );
+      expect(JSON.stringify(warn.mock.calls)).not.toContain(
+        userRow.twoFactorSecret,
+      );
+    });
+
+    it("lets the user switch 2FA off with a backup code, so they can enroll again", async () => {
+      preferencesRow.seed({ userId: "user-1", twoFactorEnabled: true });
+
+      const result = await service.disable2FA("user-1", BACKUP_CODE);
+
+      expect(result.message).toContain("disabled successfully");
+      expect(otplib.verifySync).not.toHaveBeenCalled();
+      expect(usersRepository.save.mock.calls[0][0].twoFactorSecret).toBeNull();
+      expect(preferencesRow.row()!.twoFactorEnabled).toBe(false);
+      expect(trustedDevicesRepository.delete).toHaveBeenCalledWith({
+        userId: "user-1",
+      });
+      expect(JSON.parse(storedCodes!)).toHaveLength(1);
+    });
+
+    it("refuses to disable with a wrong backup code, and counts it", async () => {
+      await expect(service.disable2FA("user-1", "0000-0000")).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(attemptCounters.increment).toHaveBeenCalledWith(
+        TWO_FACTOR_USER_SCOPE,
+        "user-1",
+        expect.any(Number),
+        "sliding",
+      );
+    });
+
+    it("refuses a 6-digit code on disable as invalid, not as a server error", async () => {
+      await expect(service.disable2FA("user-1", "123456")).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(otplib.verifySync).not.toHaveBeenCalled();
+    });
+
+    it("refuses to regenerate backup codes as an invalid code, not a server error", async () => {
+      await expect(
+        service.generateBackupCodes("user-1", "123456"),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("answers step-up verification with false rather than throwing", async () => {
+      await expect(service.verifyTotpForUser("user-1", "123456")).resolves.toBe(
+        false,
+      );
+    });
+  });
 });

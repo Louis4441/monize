@@ -120,6 +120,58 @@ export class TwoFactorService {
     return encrypt(plainSecret, this.totpEncryptionKey);
   }
 
+  /**
+   * The user's TOTP secret, or `null` when it cannot be decrypted.
+   *
+   * The key is derived from `JWT_SECRET`, so a changed `JWT_SECRET` leaves
+   * every enrolled secret undecryptable. That is an unanswerable TOTP check,
+   * not a server error: the caller treats it as a wrong code (counted like
+   * one), and a backup code -- bcrypt-hashed, independent of `JWT_SECRET` --
+   * still works, because only the TOTP branch ever calls this. The warning
+   * names the likely cause and never the secret.
+   */
+  private readableTotpSecret(
+    user: User,
+  ): { secret: string; needsReEncrypt: boolean } | null {
+    if (!user.twoFactorSecret) return null;
+    try {
+      return this.decryptTotpSecret(user.twoFactorSecret);
+    } catch {
+      this.logger.warn(
+        `TOTP secret for user ${user.id} cannot be decrypted (JWT_SECRET has ` +
+          "probably changed since it was enrolled). Authenticator codes are " +
+          "refused until the user re-enrolls; a backup code still signs in, " +
+          "and an administrator can reset their 2FA.",
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Check a 6-digit code against the user's TOTP secret. `valid: false` for a
+   * wrong code and for a secret that cannot be decrypted alike; `reEncrypted`
+   * is the secret under the current key when it was still under the legacy
+   * one, for the caller to persist after its own success path.
+   */
+  private checkTotpCode(
+    user: User,
+    code: string,
+  ): { valid: boolean; reEncrypted: string | null } {
+    const readable = this.readableTotpSecret(user);
+    if (readable === null) return { valid: false, reEncrypted: null };
+    const valid = otplib.verifySync({
+      token: code,
+      secret: readable.secret,
+    }).valid;
+    return {
+      valid,
+      reEncrypted:
+        valid && readable.needsReEncrypt
+          ? this.reEncryptTotpSecret(readable.secret)
+          : null,
+    };
+  }
+
   async verify2FA(
     tempToken: string,
     code: string,
@@ -197,14 +249,16 @@ export class TwoFactorService {
       );
     }
 
-    const { secret, needsReEncrypt } = this.decryptTotpSecret(
-      user.twoFactorSecret,
-    );
-
-    // L5: Try TOTP for 6-digit codes, backup codes for XXXX-XXXX format
+    // L5: Try TOTP for 6-digit codes, backup codes for XXXX-XXXX format. The
+    // TOTP secret is decrypted on the TOTP branch only: a backup code is
+    // bcrypt-hashed and must keep working when the secret cannot be decrypted
+    // (a changed JWT_SECRET), which is exactly when a user needs it.
     let isValid = false;
+    let reEncryptedSecret: string | null = null;
     if (/^\d{6}$/.test(code)) {
-      isValid = otplib.verifySync({ token: code, secret }).valid;
+      const totp = this.checkTotpCode(user, code);
+      isValid = totp.valid;
+      reEncryptedSecret = totp.reEncrypted;
       // SECURITY: burn the code, so it cannot be replayed on any replica.
       //
       // Claimed *after* verification, so guessing wrong codes cannot exhaust
@@ -250,8 +304,9 @@ export class TwoFactorService {
     await this.attemptCounters.reset(TWO_FACTOR_USER_SCOPE, payload.sub);
 
     // Re-encrypt with purpose-derived key if still using old key material
-    if (needsReEncrypt) {
-      user.twoFactorSecret = this.reEncryptTotpSecret(secret);
+    // (only ever set on the TOTP branch).
+    if (reEncryptedSecret !== null) {
+      user.twoFactorSecret = reEncryptedSecret;
     }
 
     // Update last login
@@ -382,19 +437,17 @@ export class TwoFactorService {
       return false;
     }
 
-    const { secret, needsReEncrypt } = this.decryptTotpSecret(
-      user.twoFactorSecret,
-    );
-    const isValid = otplib.verifySync({ token: code, secret }).valid;
-    if (!isValid) return false;
+    // An undecryptable secret is a code that cannot verify, not a 500.
+    const { valid, reEncrypted } = this.checkTotpCode(user, code);
+    if (!valid) return false;
 
     // Same claim, same purpose, same key as the login path -- which is what
     // stops a code presented at login from being replayed against a step-up
     // endpoint, and now across replicas rather than within one process.
     if (!(await this.claimTotpCode(user.id, code))) return false;
 
-    if (needsReEncrypt) {
-      user.twoFactorSecret = this.reEncryptTotpSecret(secret);
+    if (reEncrypted !== null) {
+      user.twoFactorSecret = reEncrypted;
       await this.scoped(User, (repo) => repo.save(user));
     }
 
@@ -530,8 +583,14 @@ export class TwoFactorService {
 
     await this.assertManagementTotpBudget(user.id);
 
-    const { secret } = this.decryptTotpSecret(user.twoFactorSecret);
-    const isValid = otplib.verifySync({ token: code, secret }).valid;
+    // A 6-digit authenticator code, or a backup code (consumed): the same two
+    // proofs sign-in accepts. The backup code is what lets a user whose TOTP
+    // secret can no longer be decrypted (a changed JWT_SECRET) switch 2FA off
+    // and enroll again, without an administrator. Only the TOTP branch
+    // decrypts the secret.
+    const isValid = /^\d{6}$/.test(code)
+      ? this.checkTotpCode(user, code).valid
+      : await this.verifyBackupCode(user, code);
 
     if (!isValid) {
       await this.recordUserTotpFailure(user.id);
@@ -583,8 +642,8 @@ export class TwoFactorService {
 
     await this.assertManagementTotpBudget(user.id);
 
-    const { secret } = this.decryptTotpSecret(user.twoFactorSecret);
-    const isValid = otplib.verifySync({ token: code, secret }).valid;
+    // TOTP only, as before; an undecryptable secret is a wrong code, not a 500.
+    const isValid = this.checkTotpCode(user, code).valid;
 
     if (!isValid) {
       await this.recordUserTotpFailure(user.id);

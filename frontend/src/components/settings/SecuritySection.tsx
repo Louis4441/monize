@@ -39,6 +39,20 @@ interface SecuritySectionProps {
   onPreferencesUpdated: (prefs: UserPreferences) => void;
 }
 
+/**
+ * Disabling 2FA takes the two proofs sign-in takes: a 6-digit authenticator
+ * code, or one backup code (xxxx-xxxx, consumed). The backup code is how a
+ * user whose authenticator codes stopped working -- the server's JWT_SECRET
+ * changed under their enrollment -- switches 2FA off and enrolls again.
+ */
+function normalizeDisableCode(raw: string): string {
+  return raw.replace(/[^A-Fa-f0-9-]/g, '').toLowerCase();
+}
+
+function isDisableCodeComplete(code: string): boolean {
+  return /^(\d{6}|[a-f0-9]{4}-[a-f0-9]{4})$/.test(code);
+}
+
 export function SecuritySection({ user, preferences, force2fa, onPreferencesUpdated }: SecuritySectionProps) {
   const t = useTranslations('settings.security');
   const tc = useTranslations('common');
@@ -89,7 +103,7 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
   };
 
   const handleDisable2FA = async () => {
-    if (disableCode.length !== 6) return;
+    if (!isDisableCodeComplete(disableCode)) return;
     setIsDisabling2FA(true);
     try {
       await authApi.disable2FA(disableCode);
@@ -299,11 +313,10 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
           <Input
             label={t('twoFactor.disableModal.verificationCodeLabel')}
             type="text"
-            inputMode="numeric"
             autoComplete="one-time-code"
-            maxLength={6}
+            maxLength={9}
             value={disableCode}
-            onChange={(e) => setDisableCode(e.target.value.replace(/\D/g, ''))}
+            onChange={(e) => setDisableCode(normalizeDisableCode(e.target.value))}
             placeholder="000000"
           />
           <div className="flex gap-2 justify-end">
@@ -316,7 +329,7 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
             <Button
               variant="danger"
               onClick={handleDisable2FA}
-              disabled={disableCode.length !== 6 || isDisabling2FA}
+              disabled={!isDisableCodeComplete(disableCode) || isDisabling2FA}
             >
               {isDisabling2FA ? t('twoFactor.disableModal.disablingButton') : t('twoFactor.disableButton')}
             </Button>
