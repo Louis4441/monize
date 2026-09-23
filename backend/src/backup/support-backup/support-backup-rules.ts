@@ -612,6 +612,10 @@ export const RULES: Record<string, TableRules> = {
     baseline_value: scale, // a money figure -- scaled like every other amount
     baseline_currency: keep, // an ISO currency code
     baseline_captured_on: keep, // a date
+    // Derived per-security quantities and closes; dropped rather than scaled
+    // one by one. The producer replaces a baseline without them on its next
+    // run, so a restored support copy loses one day's comparison, nothing more.
+    baseline_positions: drop,
     created_at: keep,
     updated_at: keep,
   },

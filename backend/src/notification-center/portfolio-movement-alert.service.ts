@@ -19,8 +19,12 @@ import {
 import { CreateNotificationInput } from "./notification.service";
 import { FlowSubtotal, foldExternalFlow } from "./portfolio-flow.util";
 import {
-  HeldPosition,
-  stalePricedSecurityIds,
+  BaselinePosition,
+  LatePrice,
+  PriceObservation,
+  latePriceAdjustment,
+  parseBaselinePositions,
+  snapshotPositions,
 } from "./portfolio-price-freshness.util";
 import {
   NumberT,
@@ -39,6 +43,7 @@ interface PortfolioStateRow {
   baseline_value: string | null;
   baseline_currency: string | null;
   baseline_captured_on: string | null;
+  baseline_positions: unknown;
 }
 
 /**
@@ -55,14 +60,17 @@ interface PortfolioStateRow {
  *
  * Two things make the figure evidence rather than arithmetic. The flow is
  * converted at the date each amount crossed the boundary, never at the run's
- * date (INV-PORTMOVE-007), and a run in which a held position's latest close
- * predates the baseline is withheld, because that position's value is carried
- * from before the period and the day its price arrives would book the catch-up
- * as a market move (INV-PORTMOVE-008).
+ * date (INV-PORTMOVE-007). A position carried at an old close would book its
+ * whole catch-up as a market move on the day its new close arrives, so the
+ * baseline stores the close and date that valued each held security, and a run
+ * in which a close that was already old at the baseline has been replaced
+ * restates the baseline at the new close: the catch-up is removed from the
+ * movement and named in the alert, and the baseline still advances, so a
+ * holding priced by hand never silences the alert (INV-PORTMOVE-008).
  *
  * The withhold policy and the arithmetic live in `decideMovement`
  * (`portfolio-movement.util.ts`), the flow conversion in `foldExternalFlow`
- * (`portfolio-flow.util.ts`) and the freshness rule in `stalePricedSecurityIds`
+ * (`portfolio-flow.util.ts`) and the late-price rule in `latePriceAdjustment`
  * (`portfolio-price-freshness.util.ts`); all three are pure and unit-tested.
  * This service is the cron plumbing, the flow query and the baseline
  * read-modify-write.
@@ -146,14 +154,32 @@ export class PortfolioMovementAlertService {
         : null;
 
     const capturedOn = state?.baseline_captured_on ?? null;
+    const baselinePositions = parseBaselinePositions(
+      state?.baseline_positions ?? null,
+    );
 
-    // The flow and the price evidence only matter when there is a same-currency,
-    // dated baseline to measure a period against; otherwise the decision
-    // rebaselines or withholds before reading either.
+    // One dated read covers today's holdings (the snapshot the next run will
+    // restate) and the baseline's (a position sold since still needs its latest
+    // close). It is the very query that priced today's value, so the snapshot
+    // cannot name a close the valuation did not use.
+    const observations = await this.portfolio.getLatestPriceObservations([
+      ...new Set([
+        ...summary.holdings.map((holding) => holding.securityId),
+        ...(baselinePositions ?? []).map((position) => position.securityId),
+      ]),
+    ]);
+    const observationFor = (securityId: string): PriceObservation | null =>
+      observations.get(securityId) ?? null;
+
+    // The flow and the late-price evidence only matter when there is a
+    // same-currency, dated baseline with its closes to measure a period
+    // against; otherwise the decision rebaselines or withholds before reading
+    // either.
     const comparable =
       baseline != null &&
       baseline.currency === currency &&
       capturedOn != null &&
+      baselinePositions != null &&
       summary.valuationComplete === true;
     const baselineDate = comparable ? capturedOn : null;
 
@@ -162,32 +188,62 @@ export class PortfolioMovementAlertService {
         ? { complete: true, value: 0 }
         : await this.externalFlow(userId, baselineDate, today, currency);
 
-    const stale =
-      baselineDate === null
-        ? []
-        : await this.stalePricedHoldings(summary.holdings, baselineDate);
-    if (stale.length > 0) {
+    const late =
+      baselineDate === null || baselinePositions === null
+        ? { complete: true, total: 0, items: [], missing: [] }
+        : latePriceAdjustment(
+            baselinePositions,
+            baselineDate,
+            observationFor,
+            await this.ratesInto(
+              currency,
+              baselinePositions,
+              summary.holdings,
+              today,
+            ),
+          );
+    if (!late.complete) {
       this.logger.warn(
-        `Portfolio movement withheld for user ${userId}: ${stale.length} held ` +
-          `position(s) priced before the ${baselineDate} baseline ` +
-          `(${stale.join(", ")})`,
+        `Portfolio movement for user ${userId} not measured: a late close ` +
+          `since the ${baselineDate} baseline could not be valued ` +
+          `(${late.missing.join(", ")}); rebaselining`,
+      );
+    } else if (late.items.length > 0) {
+      this.logger.log(
+        `Portfolio movement for user ${userId}: ${late.items.length} late ` +
+          `close(s) since the ${baselineDate} baseline restated it by ` +
+          `${late.total} ${currency}`,
       );
     }
 
     const inputs: MovementInputs = {
       mvComplete: summary.valuationComplete === true,
       mvToday: summary.totalPortfolioValue,
-      pricesCurrentSinceBaseline: stale.length === 0,
+      latePrice: { complete: late.complete, value: late.total },
       currency,
       baseline,
       baselineDateKnown: capturedOn != null,
+      baselinePositionsKnown: baselinePositions != null,
       flow,
       movePercent,
     };
     const decision = decideMovement(inputs);
 
     if (decision.rebaselineTo != null) {
-      await this.storeBaseline(userId, decision.rebaselineTo, currency, today);
+      const snapshot = snapshotPositions(summary.holdings, observationFor);
+      if (snapshot === null) {
+        this.logger.warn(
+          `Portfolio movement baseline for user ${userId} stored without its ` +
+            `closes: a held position has no dated observation`,
+        );
+      }
+      await this.storeBaseline(
+        userId,
+        decision.rebaselineTo,
+        currency,
+        today,
+        snapshot,
+      );
     }
     // `decideMovement` replaces an undated baseline instead of comparing
     // against it, so a fired decision always has a real opening date; the
@@ -206,35 +262,68 @@ export class PortfolioMovementAlertService {
         baselineDate,
         today,
         numberFormatterFor(prefs?.numberFormat, prefs?.language),
+        late.items.map((item) => ({
+          ...item,
+          symbol:
+            summary.holdings.find(
+              (holding) => holding.securityId === item.securityId,
+            )?.symbol ?? null,
+        })),
       ),
     );
     return written != null;
   }
 
   /**
-   * The held securities whose latest accepted close predates `baselineDate`.
+   * Today's rate from each baseline position's currency into the reporting
+   * currency, for valuing a late close.
    *
-   * The dates come from the very observations that priced today's value
-   * (`PortfolioService.getLatestPriceObservations`, the dated form of the query
-   * `getPortfolioSummary` values from), so this cannot disagree with the figure
-   * it is vouching for. The policy is `stalePricedSecurityIds`
-   * (INV-PORTMOVE-008).
+   * Read off the holdings first -- `marketValueDefaultCurrency / marketValue` is
+   * the very rate that put today's value into the reporting currency, so the
+   * restatement and the valuation share one FX snapshot and the period's FX
+   * move on the old close stays in the movement exactly. Only a currency no
+   * priced holding carries any more (a position sold since the baseline) asks
+   * the resolver, for today's date.
    */
-  private async stalePricedHoldings(
-    holdings: readonly HeldPosition[],
-    baselineDate: string,
-  ): Promise<string[]> {
-    const securityIds = [
-      ...new Set(holdings.map((holding) => holding.securityId)),
-    ];
-    if (securityIds.length === 0) return [];
-    const observations =
-      await this.portfolio.getLatestPriceObservations(securityIds);
-    return stalePricedSecurityIds(
-      holdings,
-      (securityId) => observations.get(securityId)?.date ?? null,
-      baselineDate,
-    );
+  private async ratesInto(
+    reportingCurrency: string,
+    positions: readonly BaselinePosition[],
+    holdings: readonly {
+      currencyCode: string;
+      marketValue: number | null;
+      marketValueDefaultCurrency: number | null;
+    }[],
+    today: string,
+  ): Promise<(currency: string) => number | null> {
+    const rates = new Map<string, number | null>();
+    for (const holding of holdings) {
+      if (rates.has(holding.currencyCode)) continue;
+      if (
+        holding.marketValue != null &&
+        holding.marketValue !== 0 &&
+        holding.marketValueDefaultCurrency != null
+      ) {
+        rates.set(
+          holding.currencyCode,
+          holding.marketValueDefaultCurrency / holding.marketValue,
+        );
+      }
+    }
+    for (const { currency } of positions) {
+      if (rates.has(currency)) continue;
+      rates.set(
+        currency,
+        currency === reportingCurrency
+          ? 1
+          : await this.exchangeRates.getRateForDate(
+              currency,
+              reportingCurrency,
+              today,
+            ),
+      );
+    }
+    return (currency) =>
+      currency === reportingCurrency ? 1 : (rates.get(currency) ?? null);
   }
 
   /** The user's reporting currency, resolved through the one shared reader. */
@@ -255,7 +344,8 @@ export class PortfolioMovementAlertService {
       const rows = returnedRows<PortfolioStateRow>(
         await manager.query(
           `SELECT move_alert_percent, baseline_value, baseline_currency,
-                  TO_CHAR(baseline_captured_on, 'YYYY-MM-DD') AS baseline_captured_on
+                  TO_CHAR(baseline_captured_on, 'YYYY-MM-DD') AS baseline_captured_on,
+                  baseline_positions
              FROM notification_portfolio_state WHERE user_id = $1`,
           [userId],
         ),
@@ -269,17 +359,26 @@ export class PortfolioMovementAlertService {
     value: number,
     currency: string,
     capturedOn: string,
+    positions: BaselinePosition[] | null,
   ): Promise<void> {
     await withScopedDb(this.dataSource, (manager) =>
       manager.query(
         `INSERT INTO notification_portfolio_state
-           (user_id, baseline_value, baseline_currency, baseline_captured_on)
-         VALUES ($1, $2, $3, $4)
+           (user_id, baseline_value, baseline_currency, baseline_captured_on,
+            baseline_positions)
+         VALUES ($1, $2, $3, $4, $5::jsonb)
          ON CONFLICT (user_id) DO UPDATE
            SET baseline_value = $2,
                baseline_currency = $3,
-               baseline_captured_on = $4`,
-        [userId, value, currency, capturedOn],
+               baseline_captured_on = $4,
+               baseline_positions = $5::jsonb`,
+        [
+          userId,
+          value,
+          currency,
+          capturedOn,
+          positions === null ? null : JSON.stringify(positions),
+        ],
       ),
     );
   }
@@ -363,8 +462,9 @@ export class PortfolioMovementAlertService {
  *
  * The payload names what was measured and over which period, because a figure a
  * reader cannot reproduce is a figure they have to trust: both boundary dates
- * and all three components (`baselineValue`, `currentValue`, `externalFlow`) in
- * the one currency. "Today" alone was wrong as often as it was right -- a Monday
+ * and all four components (`baselineValue`, `currentValue`, `externalFlow`,
+ * `latePriceAdjustment`) in the one currency, with each late close named in
+ * `latePrices` (security, the two close dates, and what it added). "Today" alone was wrong as often as it was right -- a Monday
  * run measures from Friday -- so the copy names the period rather than the day.
  */
 export function buildPortfolioNotification(
@@ -373,6 +473,7 @@ export function buildPortfolioNotification(
   baselineDate: string,
   today: string,
   n: NumberT = defaultNumberT,
+  latePrices: ReadonlyArray<LatePrice & { symbol: string | null }> = [],
 ): CreateNotificationInput {
   const percent = n.formatPercentTrimmed(Math.abs(fire.changePercent));
   const moved = fire.direction === "up" ? "up" : "down";
@@ -390,6 +491,14 @@ export function buildPortfolioNotification(
       baselineValue: fire.baselineValue,
       currentValue: fire.currentValue,
       externalFlow: fire.externalFlow,
+      latePriceAdjustment: fire.latePriceAdjustment,
+      latePrices: latePrices.map((item) => ({
+        securityId: item.securityId,
+        symbol: item.symbol,
+        fromDate: item.fromDate,
+        toDate: item.toDate,
+        value: item.value,
+      })),
       baselineDate,
       valuationDate: today,
       currencyCode: currency,

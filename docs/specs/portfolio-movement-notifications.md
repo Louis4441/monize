@@ -144,32 +144,45 @@ negative one is a loss the market produced; a deposit-only day is `movement ~= 0
   Held by `portfolio-flow.util.spec.ts` (the fold), the producer's spec (the
   dates it asks the resolver for) and `test/integration/portfolio-movement-flow.integration.spec.ts`
   (the same rows through real SQL).
-- **INV-PORTMOVE-008 (a movement needs evidence from its own period).** Status:
-  **enforced**. When a security held in a non-zero quantity has no accepted close
-  dated on or after `baseline_captured_on`, the run is incomplete for the
-  movement: no alert, and the baseline is not advanced. Valuation legitimately
-  carries a close forward (`docs/time-series-contract.md` section 2.1, second
-  exception) and this does **not** change that -- the position keeps its carried
-  value, is not dropped, and the two runs' position sets are not intersected.
-  What it stops is the comparison: a carried position contributes the same figure
-  to both ends only until its price arrives or its row disappears, and that run
-  books the whole catch-up as one day's market move (the 94% "movement" in
-  kenlasko/monize#1391). The dates come from the very observations that priced
-  today's value (`PortfolioService.getLatestPriceObservations`, the dated form of
-  the query `getLatestPrices` runs), so the check cannot disagree with the figure
-  it is vouching for; the policy is `stalePricedSecurityIds`
-  (`notification-center/portfolio-price-freshness.util.ts`). **Consequence, by
-  design:** a holding whose feed dies permanently silences this user's alert
-  until it is priced (manually or otherwise) or the position is closed. That is
-  the "complete, or withhold" trade, and the producer logs the securities it is
-  waiting on (by security id, at `warn`, with the baseline date it is waiting
-  against). A manual price entry re-arms it the same way a feed would: the run
-  whose `baseline_captured_on` is on or before that price's date sees a current
-  close and fires or rebaselines normally. It re-arms *that* run, not the
-  feature -- a position priced less often than the run's daily cadence (a
-  quarterly-NAV fund) is stale again against the baseline the next run records,
-  so it keeps withholding between entries. Closing the gap for such a holding
-  is a pricing-cadence change, not a change to this rule.
+- **INV-PORTMOVE-008 (a late close restates the baseline; it is not the
+  period's move).** Status: **enforced**. Valuation legitimately carries a close
+  forward (`docs/time-series-contract.md` section 2.1, second exception) and a
+  position carried at an old close contributes the same figure to both ends of
+  the comparison -- until the run in which its new close arrives, which would
+  book the whole catch-up since the old close as one period's market move (the
+  94% "movement" in kenlasko/monize#1391). So every stored baseline records, per
+  security held in a non-zero quantity, the close that valued it and the date
+  that close was struck on (`baseline_positions`, Section 4). A baseline position
+  is **late** when its close was struck more than `LATE_PRICE_TOLERANCE_DAYS` (4)
+  calendar days before `baseline_captured_on` and the security's latest
+  observation is now a different one (a new date, or a corrected close); the
+  tolerance keeps a feed that routinely runs a session behind (a fund's NAV
+  published next morning, a Monday run over Friday's close) inside the period.
+  Each late position adds `baselineQuantity x (newClose - oldClose)` at today's
+  rate to the baseline -- the baseline restated at the close that arrived -- and
+  the movement is measured against the restated baseline. The period's FX move
+  on the old close stays in the movement, because the rate is the period's own
+  evidence. A position sold since the baseline is restated too, from its latest
+  observation, since its proceeds are in today's cash at the new price. The
+  restatement travels in the alert (`latePriceAdjustment`, and `latePrices`
+  naming each security, the two close dates and what it added). The dates come
+  from the very observations that priced today's value
+  (`PortfolioService.getLatestPriceObservations`, the dated form of the query
+  `getLatestPrices` runs); the policy is `latePriceAdjustment` and the snapshot
+  `snapshotPositions` (`notification-center/portfolio-price-freshness.util.ts`).
+
+  **Nothing is withheld on account of a carried close.** The rule this replaces
+  withheld the run and kept the baseline while any held close predated the
+  baseline date; since the baseline never advanced, one holding priced by hand
+  (or whose feed had died) silenced the alert for good (kenlasko/monize#1435). A
+  carried close that is still the latest contributes nothing, and the baseline
+  advances on every complete run. Two arms keep the rule from ever stalling: a
+  late close that cannot be valued (no rate for a sold position's currency, or
+  no observation left) makes the movement unknown, so nothing fires, but the
+  baseline still moves to today's complete value rather than keeping the closes
+  that made it unknown; and a baseline stored without its closes (every row
+  written before the column existed) is replaced, not compared, exactly as an
+  undated one is.
 
 ---
 
@@ -186,6 +199,8 @@ move_alert_percent     NUMERIC(9,4)  NULL   -- threshold; NULL = off (default, o
 baseline_value         NUMERIC(20,4) NULL   -- last COMPLETE MV (INV-PORTMOVE-001)
 baseline_currency      CHAR(3)       NULL   -- reporting currency baseline_value is in
 baseline_captured_on   DATE          NULL   -- the day the baseline MV was measured
+baseline_positions     JSONB         NULL   -- per held security: quantity, close,
+                                            -- close date, currency (INV-PORTMOVE-008)
 ```
 
 - RLS: user-owned; policy + `ENABLE ROW LEVEL SECURITY` in the same migration, in
@@ -195,6 +210,9 @@ baseline_captured_on   DATE          NULL   -- the day the baseline MV was measu
   after `users` (or to `INTENTIONALLY_EXCLUDED_TABLES` with a reason -- it is a
   per-user setting plus a derived baseline, so **exported**). `entity` declares any
   index it arbitrates on (there is none here beyond the PK).
+- `baseline_positions` is written with the baseline it belongs to, in the same
+  statement, and is `drop` in the support backup: it is derived quantities and
+  closes, and a baseline without it is simply replaced on the next run.
 - `NULL move_alert_percent` = off. The default is off; the feature is opt-in.
 
 ---
@@ -237,15 +255,19 @@ for each user with move_alert_percent set:            // withSystemContext fan-o
     if (s.valuationComplete !== true) return           // INV-PORTMOVE-001/002 no-op
     const mvToday = s.totalPortfolioValue              // holdings + cash, in ccy
     if (baseline == null || baselineCurrency !== ccy
-        || baseline_captured_on == null):             // no period to measure
-        record baseline = { mvToday, ccy, today }; return           // 003/004/005
+        || baseline_captured_on == null
+        || baseline_positions == null):               // no period / no closes
+        record baseline = { mvToday, ccy, today, closes }; return   // 003/004/005
     const flow = externalFlow(A, baseline_captured_on, today)       // Section 2
     if (!flow.complete) return                          // INV-PORTMOVE-001/002 no-op
-    if (anyHeldCloseOlderThan(baseline_captured_on)) return         // INV-PORTMOVE-008
-    if (baseline_value == 0):
-        record baseline = { mvToday, ccy, today }; return           // INV-PORTMOVE-004
-    const movement = mvToday - baseline_value - flow.value
-    const pct = movement / baseline_value * 100
+    const late = latePriceAdjustment(baseline_positions, ...)       // INV-PORTMOVE-008
+    if (!late.complete):
+        record baseline = { mvToday, ccy, today, closes }; return   // unknown, never stall
+    const restated = baseline_value + late.total
+    if (restated == 0):
+        record baseline = { mvToday, ccy, today, closes }; return   // INV-PORTMOVE-004
+    const movement = mvToday - restated - flow.value
+    const pct = movement / restated * 100
     if (Math.abs(pct) >= move_alert_percent):
         dispatch.notify(userId, {
           type: PORTFOLIO_MOVEMENT,
@@ -255,12 +277,13 @@ for each user with move_alert_percent set:            // withSystemContext fan-o
                   direction: pct >= 0 ? "up" : "down",
                   movementValue: movement, baselineValue: baseline_value,
                   currentValue: mvToday, externalFlow: flow.value,
+                  latePriceAdjustment: late.total, latePrices: late.items,
                   baselineDate: baseline_captured_on, valuationDate: today,
                   currencyCode: ccy },
           target: "/investments",
           dedupeKey: `portmove:${ccy}:${today}`,        // one per day, per user
         })
-    record baseline = { mvToday, ccy, today }            // rebaseline each complete run
+    record baseline = { mvToday, ccy, today, closes }    // rebaseline each complete run
 ```
 
 **What makes a re-run safe is the dedupe key, not one long transaction.** The
@@ -281,16 +304,18 @@ so the next day measures from today.
 
 **An undated baseline is replaced, never compared against.** A stored value and
 currency with no `baseline_captured_on` names no period: the external flow has no
-window to span (INV-PORTMOVE-007) and no held position's close can be stale
+window to span (INV-PORTMOVE-007) and no held position's close can be late
 against it (INV-PORTMOVE-008), so the run records a fresh baseline instead of
 computing a difference whose opening date would have to be invented.
 `decideMovement` takes `baselineDateKnown` and refuses on that arm, which is why
 the producer needs no fallback date when it stamps `baselineDate`.
 
 **The alert names what it measured.** The period is both boundary dates
-(`baselineDate`, `valuationDate`) and the figure is its three components
-(`baselineValue`, `currentValue`, `externalFlow`) in the one currency, so a
-reader can reproduce it instead of trusting it. The copy says the period -- a
+(`baselineValue`, `currentValue`, `externalFlow`, `latePriceAdjustment`) in the
+one currency, with each late close named in `latePrices`, so a reader can
+reproduce it instead of trusting it: `movementValue = currentValue -
+baselineValue - latePriceAdjustment - externalFlow`, over `baselineValue +
+latePriceAdjustment`. The copy says the period -- a
 Monday run measures from Friday, and "today" was wrong as often as it was right.
 No new column: `notification_portfolio_state.baseline_captured_on` already is the
 period's opening date, and `valuationDate` is the run's own day. A row written
@@ -336,9 +361,13 @@ completeness sources.
 - `externalFlow` incomplete (any included `(date, currency)` subtotal
   unconvertible **at its own date**, INV-PORTMOVE-007) -> no alert, no
   rebaseline.
-- A held position whose latest accepted close predates `baseline_captured_on`
-  (INV-PORTMOVE-008) -> no alert, no rebaseline. The position keeps its carried
-  value in the valuation; it is the comparison that is refused.
+- A held position still carried at an old close (INV-PORTMOVE-008) -> nothing
+  special: it contributes the same close to both ends, and the run fires or
+  rebaselines normally. When its new close arrives, the jump restates the
+  baseline and is named in the alert; it is never the period's move.
+- A late close that cannot be valued -> no alert, but rebaseline (keeping the
+  closes that made it unknown would make every later run unknown).
+- A baseline without its per-security closes -> no alert, rebaseline.
 - A stored baseline is only ever a complete `MV`.
 - `baseline_value == 0` -> undefined percentage -> no alert, rebaseline only.
 - No value is defaulted, no flow is defaulted to zero, no percentage is computed
@@ -416,9 +445,13 @@ completeness sources.
 13. **Flow rate date** (INV-PORTMOVE-007): a deposit on a Saturday folds at
     Saturday's rate on a Monday run, and the resolver is never asked for the run
     day's rate for it; one day's missing rate withholds and names that day.
-14. **Stale price withholds** (INV-PORTMOVE-008): a held position last priced
-    before the baseline date raises nothing and leaves the baseline where it was,
-    while a position priced ON the baseline date is current.
+14. **Late close restates, carried close never blocks** (INV-PORTMOVE-008): a
+    close older than the tolerance at the baseline that has since been replaced
+    restates the baseline by `quantity x (new - old)` at today's rate and is named
+    in the alert; a close inside the tolerance (a feed a session behind) is the
+    period's own move; a carried close that is still the latest neither restates
+    nor withholds, and the baseline advances (#1435); an unvaluable late close
+    rebaselines without firing; a baseline without closes is replaced.
 
 Integration additionally owns the classification itself
 (`test/integration/portfolio-movement-flow.integration.spec.ts`): the internal

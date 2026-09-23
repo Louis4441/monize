@@ -2089,6 +2089,7 @@ CREATE TABLE notification_portfolio_state (
     baseline_value NUMERIC(20,4),
     baseline_currency VARCHAR(3),
     baseline_captured_on DATE,
+    baseline_positions JSONB,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id)

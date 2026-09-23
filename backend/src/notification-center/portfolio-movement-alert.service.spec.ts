@@ -1,4 +1,5 @@
 import { Logger } from "@nestjs/common";
+import type { BaselinePosition } from "./portfolio-price-freshness.util";
 import { PortfolioMovementAlertService } from "./portfolio-movement-alert.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import { UserPreference } from "../users/entities/user-preference.entity";
@@ -91,13 +92,27 @@ interface StateRow {
   baseline_value: string | null;
   baseline_currency: string | null;
   baseline_captured_on: string | null;
+  baseline_positions: BaselinePosition[] | null;
 }
+
+/** The held position as Friday's baseline recorded it: 100 x 250, struck Friday. */
+const positionOf = (
+  over: Partial<BaselinePosition> = {},
+): BaselinePosition => ({
+  securityId: SECURITY,
+  quantity: 100,
+  close: 250,
+  priceDate: FRIDAY,
+  currency: "USD",
+  ...over,
+});
 
 const stateOf = (over: Partial<StateRow> = {}): StateRow => ({
   move_alert_percent: "5",
   baseline_value: "100000",
   baseline_currency: "USD",
   baseline_captured_on: FRIDAY,
+  baseline_positions: [positionOf()],
   ...over,
 });
 
@@ -114,8 +129,8 @@ interface Scenario {
   flows?: FlowRow[];
   /** `currency@date` -> rate into the reporting currency, or null for none. */
   rates?: Record<string, number | null>;
-  /** securityId -> the date of the observation that priced it. */
-  priceDates?: Record<string, string>;
+  /** securityId -> the latest observation (close and date) for it. */
+  prices?: Record<string, { close: number; date: string }>;
   currency?: string;
 }
 
@@ -127,6 +142,7 @@ function setup(scenario: Scenario = {}) {
 
   const baselineWrites: Array<{ value: number; currency: string; on: string }> =
     [];
+  const snapshotWrites: Array<BaselinePosition[] | null> = [];
   const flowStatements: string[] = [];
 
   manager.query.mockImplementation(async (sql: string, params?: unknown[]) => {
@@ -145,8 +161,19 @@ function setup(scenario: Scenario = {}) {
       return scenario.flows ?? [];
     }
     if (sql.includes("INSERT INTO notification_portfolio_state")) {
-      const [, value, ccy, on] = params as [string, number, string, string];
+      const [, value, ccy, on, positions] = params as [
+        string,
+        number,
+        string,
+        string,
+        string | null,
+      ];
       baselineWrites.push({ value, currency: ccy, on });
+      snapshotWrites.push(
+        positions === null
+          ? null
+          : (JSON.parse(positions) as BaselinePosition[]),
+      );
       return [];
     }
     throw new Error(`unexpected statement: ${sql}`);
@@ -158,11 +185,13 @@ function setup(scenario: Scenario = {}) {
   const getLatestPriceObservations = jest
     .fn<Promise<Map<string, { close: number; date: string }>>, [string[]]>()
     .mockImplementation(async (ids) => {
-      const dates = scenario.priceDates ?? { [SECURITY]: TODAY };
+      const prices = scenario.prices ?? {
+        [SECURITY]: { close: 250, date: TODAY },
+      };
       return new Map(
         ids
-          .filter((id) => dates[id] !== undefined)
-          .map((id) => [id, { close: 250, date: dates[id] }]),
+          .filter((id) => prices[id] !== undefined)
+          .map((id) => [id, prices[id]]),
       );
     });
   const getRateForDate = jest
@@ -194,6 +223,7 @@ function setup(scenario: Scenario = {}) {
     service,
     notify,
     baselineWrites,
+    snapshotWrites,
     flowStatements,
     getRateForDate,
     getLatestPriceObservations,
@@ -250,33 +280,147 @@ describe("PortfolioMovementAlertService", () => {
     expect(baselineWrites).toEqual([]);
   });
 
-  it("withholds when a held position's latest close predates the baseline", async () => {
-    // INV-PORTMOVE-008, the 94% component of the issue: the position's value is
-    // carried from June, so today's total is not evidence about this period, and
-    // the run in which its price lands would book the catch-up as a market move.
-    const { service, notify, baselineWrites, getLatestPriceObservations } =
-      setup({
-        summary: summaryOf({ totalPortfolioValue: 194_000 }),
-        priceDates: { [SECURITY]: "2026-06-30" },
-      });
+  it("does not let a hand-priced holding silence the alert (#1435)", async () => {
+    // The holding was last priced in June and still is. Before, the run was
+    // withheld and the baseline never advanced, so no alert ever fired again.
+    // The carried close contributes the same figure to both ends; the rest of
+    // the portfolio fell 8%, and that is what the alert reports.
+    const june = "2026-06-30";
+    const { service, notify, baselineWrites, snapshotWrites } = setup({
+      state: stateOf({
+        baseline_positions: [positionOf({ priceDate: june })],
+      }),
+      summary: summaryOf({ totalPortfolioValue: 92_000 }),
+      prices: { [SECURITY]: { close: 250, date: june } },
+    });
 
     await service.run();
 
-    expect(getLatestPriceObservations).toHaveBeenCalledWith([SECURITY]);
-    expect(notify).not.toHaveBeenCalled();
-    expect(baselineWrites).toEqual([]);
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify.mock.calls[0][1].data).toMatchObject({
+      changePercent: -8,
+      latePriceAdjustment: 0,
+      latePrices: [],
+    });
+    expect(baselineWrites).toEqual([
+      { value: 92_000, currency: "USD", on: TODAY },
+    ]);
+    expect(snapshotWrites).toEqual([
+      [positionOf({ priceDate: june, close: 250 })],
+    ]);
   });
 
-  /**
-   * The documented consequence of INV-PORTMOVE-008 is that the reader repairs
-   * it by pricing the holding, so the two halves of that promise are held
-   * here: the withheld run names the securities it is waiting on, and a price
-   * dated on the baseline date itself re-arms the very next run.
-   */
-  it("names the securities it is waiting on when it withholds", async () => {
-    const { service } = setup({
-      summary: summaryOf({ totalPortfolioValue: 194_000 }),
-      priceDates: { [SECURITY]: "2026-06-30" },
+  it("restates the baseline at a late close instead of reporting the catch-up (#1391)", async () => {
+    // The holding was valued at June's 200 at the baseline; today's close is
+    // 250. Booked as a move, 100 x 50 = 5,000 reads as +5.5% and fires. It is
+    // a late price, so the baseline is restated to 105,000 and the period's
+    // own move is +500 (+0.48%): silent, and the baseline still advances.
+    const { service, notify, baselineWrites } = setup({
+      state: stateOf({
+        baseline_positions: [
+          positionOf({ priceDate: "2026-06-30", close: 200 }),
+        ],
+      }),
+      summary: summaryOf({ totalPortfolioValue: 105_500 }),
+    });
+
+    await service.run();
+
+    expect(notify).not.toHaveBeenCalled();
+    expect(baselineWrites).toEqual([
+      { value: 105_500, currency: "USD", on: TODAY },
+    ]);
+  });
+
+  it("names the late close it removed when the period's own move fires", async () => {
+    const { service, notify } = setup({
+      state: stateOf({
+        baseline_positions: [
+          positionOf({ priceDate: "2026-06-30", close: 200 }),
+        ],
+      }),
+      // Restated baseline 105,000; 94,500 is -10,500 / 105,000 = -10%.
+      summary: summaryOf({ totalPortfolioValue: 94_500 }),
+    });
+
+    await service.run();
+
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify.mock.calls[0][1].data).toMatchObject({
+      changePercent: -10,
+      movementValue: -10_500,
+      baselineValue: 100_000,
+      latePriceAdjustment: 5_000,
+      latePrices: [
+        {
+          securityId: SECURITY,
+          symbol: "VTI",
+          fromDate: "2026-06-30",
+          toDate: TODAY,
+          value: 5_000,
+        },
+      ],
+    });
+  });
+
+  it("values a late close on a position sold since at the resolver's rate for today", async () => {
+    // The CAD position is no longer held, so no holding carries its rate; its
+    // proceeds are in today's cash at the new close, so it is restated too:
+    // 10 x (60 - 50) x 0.75 = 75.
+    const sold = "33333333-3333-4333-8333-333333333333";
+    const { service, notify, getRateForDate } = setup({
+      state: stateOf({
+        baseline_positions: [
+          positionOf(),
+          positionOf({
+            securityId: sold,
+            quantity: 10,
+            close: 50,
+            priceDate: "2026-06-30",
+            currency: "CAD",
+          }),
+        ],
+      }),
+      summary: summaryOf({ totalPortfolioValue: 91_567.5 }),
+      prices: {
+        [SECURITY]: { close: 250, date: TODAY },
+        [sold]: { close: 60, date: TODAY },
+      },
+      rates: { [`CAD@${TODAY}`]: 0.75 },
+    });
+
+    await service.run();
+
+    expect(getRateForDate).toHaveBeenCalledWith("CAD", "USD", TODAY);
+    // (91,567.5 - 100,075) / 100,075 = -8.5%
+    expect(notify.mock.calls[0][1].data).toMatchObject({
+      latePriceAdjustment: 75,
+      changePercent: -8.5,
+    });
+  });
+
+  it("rebaselines without firing when a late close cannot be valued", async () => {
+    // No rate for the sold position's currency: the movement is unknown, so
+    // nothing fires, and the baseline moves on rather than keeping the closes
+    // that would make every later run unknown too.
+    const sold = "33333333-3333-4333-8333-333333333333";
+    const { service, notify, baselineWrites } = setup({
+      state: stateOf({
+        baseline_positions: [
+          positionOf({
+            securityId: sold,
+            quantity: 10,
+            close: 50,
+            priceDate: "2026-06-30",
+            currency: "CAD",
+          }),
+        ],
+      }),
+      summary: summaryOf({ totalPortfolioValue: 80_000 }),
+      prices: {
+        [SECURITY]: { close: 250, date: TODAY },
+        [sold]: { close: 60, date: TODAY },
+      },
     });
     const warn = jest
       .spyOn(Logger.prototype, "warn")
@@ -286,25 +430,31 @@ describe("PortfolioMovementAlertService", () => {
 
     const lines = warn.mock.calls.map(([message]) => String(message));
     warn.mockRestore();
-    // The security it is waiting on, and the date it is waiting against.
-    expect(lines.some((line) => line.includes(SECURITY))).toBe(true);
-    expect(lines.some((line) => line.includes(FRIDAY))).toBe(true);
+    expect(notify).not.toHaveBeenCalled();
+    expect(baselineWrites).toEqual([
+      { value: 80_000, currency: "USD", on: TODAY },
+    ]);
+    expect(lines.some((line) => line.includes(sold))).toBe(true);
   });
 
-  it("re-arms on a price entered on the baseline date", async () => {
-    // A manual entry is a price like any other: the run whose baseline date is
-    // on or before it sees a current close and proceeds.
-    const { service, notify, baselineWrites } = setup({
-      summary: summaryOf({ totalPortfolioValue: 92_000 }),
-      priceDates: { [SECURITY]: FRIDAY },
-    });
+  it("replaces a baseline stored without its closes instead of comparing against it", async () => {
+    // Every baseline written before the closes were recorded. It cannot tell a
+    // late price from a market move, so the first run after the upgrade records
+    // a fresh baseline with its closes, and the next one compares.
+    const { service, notify, baselineWrites, snapshotWrites, flowStatements } =
+      setup({
+        state: stateOf({ baseline_positions: null }),
+        summary: summaryOf({ totalPortfolioValue: 80_000 }),
+      });
 
     await service.run();
 
-    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify).not.toHaveBeenCalled();
+    expect(flowStatements).toEqual([]);
     expect(baselineWrites).toEqual([
-      { value: 92_000, currency: "USD", on: TODAY },
+      { value: 80_000, currency: "USD", on: TODAY },
     ]);
+    expect(snapshotWrites).toEqual([[positionOf({ priceDate: TODAY })]]);
   });
 
   it("fires once and re-baselines on a complete run over the threshold", async () => {
@@ -331,6 +481,8 @@ describe("PortfolioMovementAlertService", () => {
       baselineValue: 100_000,
       currentValue: 92_000,
       externalFlow: 0,
+      latePriceAdjustment: 0,
+      latePrices: [],
       baselineDate: FRIDAY,
       valuationDate: TODAY,
       currencyCode: "USD",
@@ -358,10 +510,15 @@ describe("PortfolioMovementAlertService", () => {
     ]);
   });
 
-  it("captures a first baseline without asking for a flow or a price date", async () => {
-    const { service, notify, baselineWrites, flowStatements } = setup({
-      state: stateOf({ baseline_value: null, baseline_captured_on: null }),
-    });
+  it("captures a first baseline, with its closes, without asking for a flow", async () => {
+    const { service, notify, baselineWrites, snapshotWrites, flowStatements } =
+      setup({
+        state: stateOf({
+          baseline_value: null,
+          baseline_captured_on: null,
+          baseline_positions: null,
+        }),
+      });
 
     await service.run();
 
@@ -370,6 +527,7 @@ describe("PortfolioMovementAlertService", () => {
     expect(baselineWrites).toEqual([
       { value: 100_000, currency: "USD", on: TODAY },
     ]);
+    expect(snapshotWrites).toEqual([[positionOf({ priceDate: TODAY })]]);
   });
 
   it("replaces a baseline stored without a capture date instead of comparing against it", async () => {
