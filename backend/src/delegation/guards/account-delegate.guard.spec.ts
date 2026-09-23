@@ -11,6 +11,7 @@ import {
   DELEGATE_OPERATION_KEY,
   DELEGATE_CAPABILITY_KEY,
   DELEGATE_SECTION_KEY,
+  DELEGATE_FULL_SCOPE_KEY,
 } from "../decorators/delegate-access.decorator";
 
 describe("AccountDelegateGuard", () => {
@@ -38,6 +39,7 @@ describe("AccountDelegateGuard", () => {
       accountIdsForScheduled: jest.fn(),
       hasCapability: jest.fn(),
       hasSection: jest.fn(),
+      grantsWholeLedger: jest.fn(),
     };
     crossOwnerAccess = {
       isAccountOwnedBy: jest.fn().mockResolvedValue(false),
@@ -845,6 +847,47 @@ describe("AccountDelegateGuard", () => {
       });
       await expect(guard.canActivate(ctx)).resolves.toBe(true);
       expect(delegationService.hasAccountPermission).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("@DelegateRequiresFullScope", () => {
+    const actingOnFullScopeRoute = () => {
+      jwtService.verify.mockReturnValue({
+        sub: "d1111111-1111-4111-8111-111111111111",
+        actingAsUserId: "01111111-1111-4111-8111-111111111111",
+        delegationId: "g1",
+      });
+      reflector.getAllAndOverride.mockImplementation((key: string) => {
+        if (key === ALLOW_DELEGATE_KEY) return true;
+        if (key === DELEGATE_FULL_SCOPE_KEY) return true;
+        return undefined;
+      });
+    };
+
+    it("refuses a delegate whose grants do not cover the whole ledger", async () => {
+      actingOnFullScopeRoute();
+      delegationService.grantsWholeLedger.mockResolvedValue(false);
+      const ctx = makeContext({ headers: { authorization: "Bearer x" } });
+      await expect(guard.canActivate(ctx)).rejects.toThrow(
+        /reads across all of the account owner's accounts and sections/,
+      );
+      expect(delegationService.grantsWholeLedger).toHaveBeenCalledWith("g1");
+    });
+
+    it("allows a delegate who can read every account and section", async () => {
+      actingOnFullScopeRoute();
+      delegationService.grantsWholeLedger.mockResolvedValue(true);
+      const ctx = makeContext({ headers: { authorization: "Bearer x" } });
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    });
+
+    it("leaves the owner's own request untouched", async () => {
+      jwtService.verify.mockReturnValue({
+        sub: "01111111-1111-4111-8111-111111111111",
+      });
+      const ctx = makeContext({ headers: { authorization: "Bearer x" } });
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
+      expect(delegationService.grantsWholeLedger).not.toHaveBeenCalled();
     });
   });
 });

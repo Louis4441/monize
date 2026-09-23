@@ -304,6 +304,7 @@
     "actionNotAvailableAsDelegate": "[XX-This action isn't available while you're acting on behalf of another user. Only the account owner can do this.-XX]",
     "capabilityNotGranted": "[XX-The account owner has not granted you permission to {{ operation }} {{ resource }}. Ask them to enable this in your delegated-access settings.-XX]",
     "sectionNotGranted": "[XX-The account owner has not shared the {{ sectionLabel }} section with you.-XX]",
+    "fullScopeRequired": "[XX-The AI Assistant reads across all of the account owner's accounts and sections, so it is only available to a delegate who can read every account and every section. Ask the owner to share the rest with you, or use the pages you already have access to.-XX]",
     "accountNotShared": "[XX-The account owner has not shared this account with you.-XX]",
     "accountOperationNotGranted": "[XX-The account owner has not granted you permission to {{ operation }} transactions in this account.-XX]",
     "jointOwnAccount": "[XX-This is your own account; joint-account access does not apply to it.-XX]",

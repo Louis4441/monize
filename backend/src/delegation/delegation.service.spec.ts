@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import * as bcrypt from "bcryptjs";
-import { FindOperator } from "typeorm";
+import { FindOperator, In, Not } from "typeorm";
 import { I18nService } from "nestjs-i18n";
 import { DelegationService, DELEGATE_2FA_REQUIRED } from "./delegation.service";
 import { DelegateAccountFavourite } from "./entities/delegate-account-favourite.entity";
@@ -1029,6 +1029,61 @@ describe("DelegationService", () => {
       );
       await expect(service.hasSection("g1", "budgets")).resolves.toBe(true);
       await expect(service.hasSection("g1", "ai")).resolves.toBe(false);
+    });
+  });
+
+  describe("grantsWholeLedger", () => {
+    const allSections = {
+      ownerUserId: "owner-1",
+      billsCanRead: true,
+      investmentsCanRead: true,
+      budgetsCanRead: true,
+      reportsCanRead: true,
+      aiCanRead: true,
+    };
+
+    it("is false when there is no active delegation", async () => {
+      delegatesRepo.findOne.mockResolvedValue(null);
+      await expect(service.grantsWholeLedger("g1")).resolves.toBe(false);
+    });
+
+    it("is false when any section is withheld, without counting accounts", async () => {
+      delegatesRepo.findOne.mockResolvedValue({
+        ...allSections,
+        budgetsCanRead: false,
+      });
+      await expect(service.grantsWholeLedger("g1")).resolves.toBe(false);
+      expect(accountsRepo.count).not.toHaveBeenCalled();
+    });
+
+    it("is false while any owner account is not READ-granted", async () => {
+      delegatesRepo.findOne.mockResolvedValue(allSections);
+      grantsRepo.find.mockResolvedValue([{ accountId: "a1" }]);
+      accountsRepo.count.mockResolvedValue(1);
+      await expect(service.grantsWholeLedger("g1")).resolves.toBe(false);
+      expect(accountsRepo.count).toHaveBeenCalledWith({
+        where: { userId: "owner-1", id: Not(In(["a1"])) },
+      });
+    });
+
+    it("counts every owner account as ungranted when nothing is granted", async () => {
+      delegatesRepo.findOne.mockResolvedValue(allSections);
+      grantsRepo.find.mockResolvedValue([]);
+      accountsRepo.count.mockResolvedValue(2);
+      await expect(service.grantsWholeLedger("g1")).resolves.toBe(false);
+      expect(accountsRepo.count).toHaveBeenCalledWith({
+        where: { userId: "owner-1" },
+      });
+    });
+
+    it("is true when every section and every owner account is granted", async () => {
+      delegatesRepo.findOne.mockResolvedValue(allSections);
+      grantsRepo.find.mockResolvedValue([
+        { accountId: "a1" },
+        { accountId: "a2" },
+      ]);
+      accountsRepo.count.mockResolvedValue(0);
+      await expect(service.grantsWholeLedger("g1")).resolves.toBe(true);
     });
   });
 

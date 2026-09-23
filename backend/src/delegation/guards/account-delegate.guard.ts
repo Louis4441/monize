@@ -19,6 +19,7 @@ import {
   DELEGATE_OPERATION_KEY,
   DELEGATE_CAPABILITY_KEY,
   DELEGATE_SECTION_KEY,
+  DELEGATE_FULL_SCOPE_KEY,
   DelegateOperation,
   DelegateCapabilityReq,
   DelegateSection,
@@ -296,6 +297,24 @@ export class AccountDelegateGuard implements CanActivate {
             "errors.delegation.sectionNotGranted",
             `The account owner has not shared the ${sectionLabel} section with you.`,
             { sectionLabel },
+          ),
+        );
+      }
+    }
+
+    const fullScope = this.reflector.getAllAndOverride<boolean>(
+      DELEGATE_FULL_SCOPE_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    if (fullScope) {
+      const ok = await this.delegationService.grantsWholeLedger(
+        payload.delegationId,
+      );
+      if (!ok) {
+        throw new ForbiddenException(
+          tr(
+            "errors.delegation.fullScopeRequired",
+            "The AI Assistant reads across all of the account owner's accounts and sections, so it is only available to a delegate who can read every account and every section. Ask the owner to share the rest with you, or use the pages you already have access to.",
           ),
         );
       }

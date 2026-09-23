@@ -3,6 +3,7 @@ import { Brackets, DataSource, EntityManager } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { roundMoney } from "../common/round.util";
 import { getAllCategoryIdsWithChildren } from "../common/category-tree.util";
+import { restrictToAccountScope } from "../delegation/delegate-account-scope.util";
 import { Account } from "../accounts/entities/account.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { Payee } from "../payees/entities/payee.entity";
@@ -66,6 +67,10 @@ function dateText(expression: string): string {
  * never reach this service: the controller's ParseUUIDPipe rejects them. And
  * `Account.assetCategoryId` points at an ordinary user category, so no special
  * exclusion exists or is needed here.
+ *
+ * `accountScope` narrows every transaction figure to those accounts (an acting
+ * delegate's READ grants, from `delegateReadableAccountScope`); `undefined`
+ * means the whole ledger, and an empty scope yields no transactions.
  */
 @Injectable()
 export class CategoryDetailService {
@@ -77,6 +82,7 @@ export class CategoryDetailService {
   async getDetail(
     userId: string,
     categoryId: string,
+    accountScope?: readonly string[],
   ): Promise<CategoryDetailDto> {
     // Validates ownership and existence (localized 404), loads children and
     // the effective (possibly inherited) colour.
@@ -91,9 +97,9 @@ export class CategoryDetailService {
 
       const [stats, accounts, largestTransaction, defaultCategoryForPayees] =
         await Promise.all([
-          this.getStats(m, userId, subtreeIds, category),
-          this.getAccountBreakdown(m, userId, subtreeIds),
-          this.getLargestTransaction(m, userId, subtreeIds),
+          this.getStats(m, userId, subtreeIds, category, accountScope),
+          this.getAccountBreakdown(m, userId, subtreeIds, accountScope),
+          this.getLargestTransaction(m, userId, subtreeIds, accountScope),
           this.getDefaultCategoryPayees(m, userId, categoryId),
         ]);
 
@@ -124,8 +130,9 @@ export class CategoryDetailService {
     m: EntityManager,
     userId: string,
     subtreeIds: string[],
+    accountScope: readonly string[] | undefined,
   ) {
-    return realTransactionScope(
+    const scoped = realTransactionScope(
       m
         .createQueryBuilder(Transaction, "t")
         .leftJoin("t.splits", "split")
@@ -141,6 +148,7 @@ export class CategoryDetailService {
           }),
         ),
     );
+    return restrictToAccountScope(scoped, "t.account_id", accountScope);
   }
 
   private async getStats(
@@ -148,8 +156,14 @@ export class CategoryDetailService {
     userId: string,
     subtreeIds: string[],
     category: Category & { children?: Category[] },
+    accountScope: readonly string[] | undefined,
   ): Promise<CategoryDetailStats> {
-    const row = await this.subtreeTransactionQuery(m, userId, subtreeIds)
+    const row = await this.subtreeTransactionQuery(
+      m,
+      userId,
+      subtreeIds,
+      accountScope,
+    )
       .select("COUNT(DISTINCT t.id)", "count")
       .addSelect(dateText("MIN(t.transaction_date)"), "first")
       .addSelect(dateText("MAX(t.transaction_date)"), "last")
@@ -174,8 +188,14 @@ export class CategoryDetailService {
     m: EntityManager,
     userId: string,
     subtreeIds: string[],
+    accountScope: readonly string[] | undefined,
   ): Promise<CategoryAccountBreakdownRow[]> {
-    const rows = await this.subtreeTransactionQuery(m, userId, subtreeIds)
+    const rows = await this.subtreeTransactionQuery(
+      m,
+      userId,
+      subtreeIds,
+      accountScope,
+    )
       .innerJoin(Account, "account", "account.id = t.account_id")
       .select("account.id", "accountId")
       .addSelect("account.name", "accountName")
@@ -214,8 +234,14 @@ export class CategoryDetailService {
     m: EntityManager,
     userId: string,
     subtreeIds: string[],
+    accountScope: readonly string[] | undefined,
   ): Promise<CategoryLargestTransaction | null> {
-    const row = await this.subtreeTransactionQuery(m, userId, subtreeIds)
+    const row = await this.subtreeTransactionQuery(
+      m,
+      userId,
+      subtreeIds,
+      accountScope,
+    )
       .innerJoin(Account, "account", "account.id = t.account_id")
       .leftJoin(Payee, "payee", "payee.id = t.payee_id")
       .select("t.id", "id")

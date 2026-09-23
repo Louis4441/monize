@@ -34,6 +34,8 @@ import {
   AllowDelegate,
   DelegateRequiresCapability,
 } from "../delegation/decorators/delegate-access.decorator";
+import { DelegationService } from "../delegation/delegation.service";
+import { delegateReadableAccountScope } from "../delegation/delegate-account-scope.util";
 
 @ApiTags("Categories")
 @Controller("categories")
@@ -44,6 +46,7 @@ export class CategoriesController {
     private readonly categoriesService: CategoriesService,
     private readonly categoryDetailService: CategoryDetailService,
     private readonly jointCategories: JointCategoriesService,
+    private readonly delegationService: DelegationService,
   ) {}
 
   @Post()
@@ -203,11 +206,17 @@ export class CategoriesController {
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
   @ApiResponse({ status: 404, description: "Category not found" })
-  getDetail(
+  async getDetail(
     @Request() req,
     @Param("id", ParseUUIDPipe) id: string,
   ): Promise<CategoryDetailDto> {
-    return this.categoryDetailService.getDetail(req.user.id, id);
+    // An acting delegate sees only the accounts they were granted READ on,
+    // exactly as the register and the analytics endpoints scope them.
+    const accountScope = await delegateReadableAccountScope(
+      req,
+      this.delegationService,
+    );
+    return this.categoryDetailService.getDetail(req.user.id, id, accountScope);
   }
 
   @Get(":id")

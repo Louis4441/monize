@@ -5,6 +5,7 @@ import { PayeeDetailService } from "./payee-detail.service";
 import { PayeeAutoMergeService } from "./payee-auto-merge.service";
 import { PayeeContactLookupService } from "./lookup/payee-contact-lookup.service";
 import { PayeeContactEnrichmentService } from "./lookup/payee-contact-enrichment.service";
+import { DelegationService } from "../delegation/delegation.service";
 
 describe("PayeesController", () => {
   let controller: PayeesController;
@@ -13,6 +14,7 @@ describe("PayeesController", () => {
   let mockAutoMergeService: Record<string, jest.Mock>;
   let mockContactLookupService: Record<string, jest.Mock>;
   let mockContactEnrichmentService: Record<string, jest.Mock>;
+  let mockDelegationService: { readableAccountIds: jest.Mock };
   const mockReq = { user: { id: "user-1" } };
 
   beforeEach(async () => {
@@ -25,6 +27,7 @@ describe("PayeesController", () => {
     mockPayeeDetailService = {
       getDetail: jest.fn(),
     };
+    mockDelegationService = { readableAccountIds: jest.fn() };
     mockPayeesService = {
       create: jest.fn(),
       findAll: jest.fn(),
@@ -75,6 +78,7 @@ describe("PayeesController", () => {
           provide: PayeeContactEnrichmentService,
           useValue: mockContactEnrichmentService,
         },
+        { provide: DelegationService, useValue: mockDelegationService },
       ],
     }).compile();
 
@@ -271,6 +275,27 @@ describe("PayeesController", () => {
       expect(mockPayeeDetailService.getDetail).toHaveBeenCalledWith(
         "user-1",
         "payee-1",
+        undefined,
+      );
+      expect(mockDelegationService.readableAccountIds).not.toHaveBeenCalled();
+    });
+
+    it("scopes an acting delegate to their READ-granted accounts", async () => {
+      mockPayeeDetailService.getDetail.mockResolvedValue({});
+      mockDelegationService.readableAccountIds.mockResolvedValue(["acc-a"]);
+
+      await controller.getDetail(
+        { user: { id: "owner-1", isActing: true, delegationId: "g1" } },
+        "payee-1",
+      );
+
+      expect(mockDelegationService.readableAccountIds).toHaveBeenCalledWith(
+        "g1",
+      );
+      expect(mockPayeeDetailService.getDetail).toHaveBeenCalledWith(
+        "owner-1",
+        "payee-1",
+        ["acc-a"],
       );
     });
   });

@@ -52,6 +52,8 @@ import {
   AllowDelegate,
   DelegateRequiresCapability,
 } from "../delegation/decorators/delegate-access.decorator";
+import { DelegationService } from "../delegation/delegation.service";
+import { delegateReadableAccountScope } from "../delegation/delegate-account-scope.util";
 
 @ApiTags("Payees")
 @ApiBearerAuth()
@@ -64,6 +66,7 @@ export class PayeesController {
     private readonly payeeAutoMergeService: PayeeAutoMergeService,
     private readonly contactLookupService: PayeeContactLookupService,
     private readonly contactEnrichmentService: PayeeContactEnrichmentService,
+    private readonly delegationService: DelegationService,
   ) {}
 
   @Post()
@@ -520,11 +523,17 @@ export class PayeesController {
     description: "Payee detail for the payee detail page",
   })
   @ApiResponse({ status: 404, description: "Payee not found" })
-  getDetail(
+  async getDetail(
     @Request() req,
     @Param("id", ParseUUIDPipe) id: string,
   ): Promise<PayeeDetailDto> {
-    return this.payeeDetailService.getDetail(req.user.id, id);
+    // An acting delegate sees only the accounts they were granted READ on,
+    // exactly as the register and the analytics endpoints scope them.
+    const accountScope = await delegateReadableAccountScope(
+      req,
+      this.delegationService,
+    );
+    return this.payeeDetailService.getDetail(req.user.id, id, accountScope);
   }
 
   @Get(":id/logo")

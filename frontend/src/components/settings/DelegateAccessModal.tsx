@@ -391,6 +391,11 @@ export function DelegateAccessModal({
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     {s.description}
                   </p>
+                  {s.key === 'ai' && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {t('sections.aiRequiresFullAccess')}
+                    </p>
+                  )}
                 </div>
                 <ToggleSwitch
                   checked={draft.sections[s.key]}

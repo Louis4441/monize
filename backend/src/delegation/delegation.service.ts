@@ -373,6 +373,33 @@ export class DelegationService {
   }
 
   /**
+   * Whether the active delegation can read everything the owner has: every
+   * section, and a READ grant on every account the owner owns (closed ones
+   * included). A route that cannot narrow its answer to a delegate's grants
+   * (@DelegateRequiresFullScope) is reachable only then. Reads the owner's
+   * account ids, so it runs under the guard's delegate context.
+   */
+  async grantsWholeLedger(delegationId: string): Promise<boolean> {
+    const delegation = await this.scoped(AccountDelegate, (repo) =>
+      repo.findOne({
+        where: { id: delegationId, status: "active" },
+      }),
+    );
+    if (!delegation) return false;
+    if (!SECTION_FIELDS.every((field) => !!delegation[field])) return false;
+    const readable = await this.readableAccountIds(delegationId);
+    const ungranted = await this.scoped(Account, (repo) =>
+      repo.count({
+        where: {
+          userId: delegation.ownerUserId,
+          ...(readable.length > 0 ? { id: Not(In(readable)) } : {}),
+        },
+      }),
+    );
+    return ungranted === 0;
+  }
+
+  /**
    * Whether the delegate can READ at least one account whose activity shows
    * in the Transactions section (i.e. any non-investment account they were
    * granted). Drives the delegate Transactions nav/route visibility.

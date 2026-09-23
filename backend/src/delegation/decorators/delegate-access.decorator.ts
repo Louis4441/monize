@@ -113,3 +113,15 @@ export type DelegateSection =
 export const DELEGATE_SECTION_KEY = "delegateSection";
 export const DelegateRequiresSection = (section: DelegateSection) =>
   SetMetadata(DELEGATE_SECTION_KEY, section);
+
+/**
+ * A route whose answer draws on the owner's WHOLE ledger and cannot be
+ * narrowed to a delegate's grants (the AI assistant reads every account and
+ * section through its tools). A delegate may reach it only when the
+ * delegation grants READ on every one of the owner's accounts and every
+ * section, so the route reveals nothing the delegate could not already open
+ * elsewhere.
+ */
+export const DELEGATE_FULL_SCOPE_KEY = "delegateFullScope";
+export const DelegateRequiresFullScope = () =>
+  SetMetadata(DELEGATE_FULL_SCOPE_KEY, true);

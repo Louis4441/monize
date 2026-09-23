@@ -905,7 +905,8 @@
       "shared": "[XX-Shared data-XX]"
     },
     "sections": {
-      "description": "[XX-Grant read-only access to whole app sections. Account-scoped data still also needs per-account access.-XX]"
+      "description": "[XX-Grant read-only access to whole app sections. Account-scoped data still also needs per-account access.-XX]",
+      "aiRequiresFullAccess": "[XX-The AI Assistant reads across every account and section, so it only answers for this delegate once they can read all of your accounts and every other section.-XX]"
     },
     "accounts": {
       "noAccounts": "[XX-No accounts to grant.-XX]",
