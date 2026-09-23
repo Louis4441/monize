@@ -1,28 +1,24 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { assertedClientAddress } from '@/lib/client-address';
 import { SHARE_PAGE_PATH, SHARE_TARGET_PATH } from '@/lib/share-target';
+import { LOCALE_COOKIE, LOCALE_HEADER } from '@/i18n/config';
 import {
-  DEFAULT_LOCALE,
-  LOCALE_COOKIE,
-  LOCALE_HEADER,
-  isSupportedLocale,
-  matchAcceptLanguage,
-} from '@/i18n/config';
+  backendBaseUrl,
+  backendRequestHeaders,
+  payloadTooLarge,
+  resolveRequestLocale,
+  responseFromBackend,
+} from '@/lib/backend-forward';
+import {
+  DEFAULT_PROXY_BODY_LIMIT_BYTES,
+  declaresBodyOver,
+  readBoundedBody,
+} from '@/lib/proxy-body-limit';
 
 const logger = createLogger('Proxy');
 const publicPaths = ['/login', '/register', '/auth/callback', '/forgot-password', '/reset-password', '/verify-email', '/confirm-email-change', '/emergency-access/claim'];
 let backendConnected = false;
-
-function resolveRequestLocale(request: NextRequest): { locale: string; fromCookie: boolean } {
-  const cookieValue = request.cookies.get(LOCALE_COOKIE)?.value;
-  if (cookieValue && isSupportedLocale(cookieValue)) {
-    return { locale: cookieValue, fromCookie: true };
-  }
-  const fromAccept = matchAcceptLanguage(request.headers.get('accept-language'));
-  return { locale: fromAccept || DEFAULT_LOCALE, fromCookie: false };
-}
 
 // Security headers that mirror next.config.js. Next's `headers()` config is
 // only applied to responses Next renders (via NextResponse.next()); responses
@@ -179,36 +175,35 @@ export async function proxy(request: NextRequest) {
   // Handle API proxying to backend
   const rootMcp = isRootMcpRequest(request, pathname);
   if (pathname.startsWith('/api/') || isOAuthPath(pathname) || rootMcp) {
-    const apiUrl = process.env.INTERNAL_API_URL || 'http://localhost:3001';
+    const apiUrl = backendBaseUrl();
     const backendPath = rootMcp ? '/api/v1/mcp' : pathname;
     const url = new URL(backendPath + request.nextUrl.search, apiUrl);
     logger.debug(`${request.method} ${pathname} -> ${apiUrl}`);
 
-    const headers = new Headers(request.headers);
-    headers.delete('host');
-    // X-Forwarded-For is REPLACED, never passed through, so a browser's own
-    // cannot reach the backend: the one address the trusted edge vouches for
-    // travels (read from the right of the chain, `assertedClientAddress`), or
-    // nothing does. The backend keys every per-IP rate limit on it. The literal
-    // `127.0.0.1` this used to fall back to was worse than nothing -- it was
-    // recorded against every push registration and trusted device,
-    // indistinguishable from a real connection from the server itself.
-    const clientIp = assertedClientAddress(request.headers);
-    if (clientIp) headers.set('x-forwarded-for', clientIp);
-    else headers.delete('x-forwarded-for');
-    // Forward resolved locale so the backend nestjs-i18n HeaderResolver picks
-    // it up and renders error messages / email content in the right language.
-    headers.set(LOCALE_HEADER, resolveRequestLocale(request).locale);
+    // X-Forwarded-For replaced with the one vouched-for address, the locale
+    // forwarded: `backendRequestHeaders`.
+    const headers = backendRequestHeaders(request);
+
+    // No body this path can legitimately need is larger than the backend's own
+    // default limit; the routes that need more are not matched by this proxy
+    // at all (`LARGE_UPLOAD_ROUTES`). Refused before it is read when the
+    // length is declared, and cut off while reading when it is not.
+    const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
+    if (hasBody && declaresBodyOver(request.headers, DEFAULT_PROXY_BODY_LIMIT_BYTES)) {
+      return applySecurityHeaders(payloadTooLarge());
+    }
 
     try {
       // Buffer the body to avoid ReadableStream locking issues in Next.js middleware.
       // Passing request.body (a ReadableStream) directly to undici can intermittently
       // fail with "expected non-null body source" if the stream has already been
       // transferred or locked by the Next.js runtime before the proxy reads it.
-      const body =
-        request.method !== 'GET' && request.method !== 'HEAD'
-          ? await request.arrayBuffer()
-          : undefined;
+      const body = hasBody
+        ? await readBoundedBody(request.body, DEFAULT_PROXY_BODY_LIMIT_BYTES)
+        : undefined;
+      if (body === null) {
+        return applySecurityHeaders(payloadTooLarge());
+      }
 
       const response = await fetch(url.toString(), {
         method: request.method,
@@ -222,14 +217,7 @@ export async function proxy(request: NextRequest) {
         logger.info(`Backend connected at ${apiUrl}`);
       }
 
-      const responseHeaders = new Headers(response.headers);
-      responseHeaders.delete('transfer-encoding');
-
-      return new NextResponse(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: responseHeaders,
-      });
+      return responseFromBackend(response);
     } catch (error) {
       logger.error('API proxy error:', error);
       return applySecurityHeaders(
@@ -271,8 +259,13 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match API routes for proxying
-    '/api/:path*',
+    // Match API routes for proxying -- except the large uploads, which have
+    // streaming route handlers of their own. Next copies the body of every
+    // request matched here into memory before the proxy runs, so a path left
+    // in this list is a path whose body the frontend buffers. Must stay in
+    // step with LARGE_UPLOAD_ROUTES (`src/lib/proxy-body-limit.ts`); the
+    // catch-all below repeats the exclusion. `proxy-matcher.test.ts` checks both.
+    '/api/((?!v1/(?:import/mny/parse|backup/restore|ai/query(?:/stream)?|transactions/[^/]+/attachments)/?$).*)',
     // Match OAuth endpoints for proxying. These have to be enumerated
     // explicitly because the catch-all matcher below excludes any path
     // containing a dot (intended for static files), which would otherwise
@@ -284,6 +277,6 @@ export const config = {
     '/.well-known/oauth-authorization-server/:path*',
     '/.well-known/openid-configuration',
     // Match all other paths except static files
-    '/((?!_next/static|_next/image|favicon.ico|.*\\..*|public).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\..*|public|api/v1/(?:import/mny/parse|backup/restore|ai/query(?:/stream)?|transactions/[^/]+/attachments)/?$).*)',
   ],
 };

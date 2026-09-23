@@ -230,6 +230,73 @@ describe('proxy client address forwarding', () => {
   });
 });
 
+/**
+ * Next copies every matched request's body into memory, up to
+ * `proxyClientMaxBodySize`, before this proxy runs. So the proxy's own limit is
+ * the backend's default (10 MB), and the routes that need more are kept out of
+ * the matcher altogether and streamed by route handlers.
+ */
+describe('proxy request body limit', () => {
+  const fetchMock = vi.fn();
+  const MIB = 1024 * 1024;
+
+  beforeEach(() => {
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    fetchMock.mockReset();
+  });
+
+  function bodyOf(size: number): ReadableStream<Uint8Array> {
+    let sent = 0;
+    return new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent >= size) return controller.close();
+        const chunk = Math.min(MIB, size - sent);
+        sent += chunk;
+        controller.enqueue(new Uint8Array(chunk));
+      },
+    });
+  }
+
+  function post(path: string, body: ReadableStream<Uint8Array>, headers: Record<string, string> = {}) {
+    return new NextRequest(`${BASE}${path}`, {
+      method: 'POST',
+      headers,
+      body,
+      duplex: 'half',
+    } as ConstructorParameters<typeof NextRequest>[1]);
+  }
+
+  it('refuses a declared body over 10 MB with 413, before forwarding', async () => {
+    const response = await proxy(
+      post('/api/v1/auth/login', bodyOf(1), { 'content-length': String(300 * MIB) }),
+    );
+
+    expect(response.status).toBe(413);
+    expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses an undeclared body once it passes 10 MB', async () => {
+    const response = await proxy(post('/api/v1/auth/login', bodyOf(11 * MIB)));
+
+    expect(response.status).toBe(413);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('forwards a body within the limit whole', async () => {
+    const response = await proxy(post('/api/v1/transactions', bodyOf(2 * MIB)));
+
+    expect(response.status).toBe(200);
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect((init.body as Uint8Array).byteLength).toBe(2 * MIB);
+  });
+});
+
 describe('proxy security headers', () => {
   const originalDisable = process.env.DISABLE_HTTPS_HEADERS;
 

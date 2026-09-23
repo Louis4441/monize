@@ -3,19 +3,20 @@ const packageJson = require('./package.json');
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
-// Every /api/* call is forwarded by proxy.ts, and Next caps a proxied request
-// body at 10MB by default -- silently: it truncates the body, forwards the
-// stump, and the backend sees an aborted upload. That is far below what a
-// Microsoft Money (.mny) file needs (a Money Plus profile with decades of
-// history runs to hundreds of MB), so the ceiling has to match the backend's
-// own MNY_IMPORT_LIMIT_MB rather than sit under it. Same variable and default,
-// so lowering it lowers both ends together.
-//
-// The proxy buffers the body it forwards, so the frontend container needs
-// roughly this much memory available on top of its baseline. See helm/README.md.
-const IMPORT_LIMIT_MB = Number(process.env.MNY_IMPORT_LIMIT_MB) || 300;
-// Multipart framing (boundaries, part headers) rides along with the file.
-const PROXY_BODY_LIMIT_MB = IMPORT_LIMIT_MB + 8;
+// Next copies the body of EVERY request proxy.ts matches into memory before the
+// proxy runs, up to this size, whatever the path and before any authentication
+// -- so this is the most one unauthenticated request can make the frontend
+// hold (twice: one copy for the proxy, one kept to replace the request body).
+// It used to be the .mny import ceiling (308MB) for every path. It is now one
+// MB above the backend's own 10MB default body limit, and the uploads that
+// genuinely need more (the .mny import, the backup restore, the assistant's
+// attachments, transaction attachments) are excluded from the proxy's matcher
+// and streamed to the backend by route handlers instead, with their own
+// per-route ceilings. Past this size Next truncates silently; the proxy refuses
+// anything over 10MB with 413, so a truncated body is never forwarded.
+// `NEXT_PROXY_CLIENT_MAX_BODY_MB` in src/lib/proxy-body-limit.ts names this
+// value and `src/test/proxy-body-limit.test.ts` holds the two together.
+const PROXY_BODY_LIMIT_MB = 11;
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
