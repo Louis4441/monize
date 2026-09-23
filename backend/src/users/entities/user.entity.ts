@@ -84,6 +84,24 @@ export class User {
   @Exclude()
   emailVerificationTokenExpiry: Date | null;
 
+  // A self-service email change waiting for its confirmation link to be
+  // followed. `email` stays the live address until then; the token column holds
+  // only the sha256 hash of what was emailed to `pendingEmail`.
+  @Column({ name: "pending_email", type: "varchar", nullable: true })
+  pendingEmail: string | null;
+
+  @Column({ name: "email_change_token", type: "varchar", nullable: true })
+  @Exclude()
+  emailChangeToken: string | null;
+
+  @Column({
+    name: "email_change_token_expiry",
+    type: "timestamp",
+    nullable: true,
+  })
+  @Exclude()
+  emailChangeTokenExpiry: Date | null;
+
   @Column({ type: "varchar", default: "user" })
   role: string;
 

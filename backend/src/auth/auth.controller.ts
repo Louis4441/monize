@@ -43,6 +43,7 @@ import { LoginDto } from "./dto/login.dto";
 import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { VerifyEmailDto } from "./dto/verify-email.dto";
+import { ConfirmEmailChangeDto } from "./dto/confirm-email-change.dto";
 import { ResendVerificationDto } from "./dto/resend-verification.dto";
 import { VerifyTotpDto } from "./dto/verify-totp.dto";
 import { Setup2faDto } from "./dto/setup-2fa.dto";
@@ -980,6 +981,20 @@ export class AuthController {
   async verifyEmail(@Body() dto: VerifyEmailDto) {
     await this.authService.verifyEmail(dto.token);
     return { message: "Email verified successfully. You can now log in." };
+  }
+
+  @Post("confirm-email-change")
+  @AllowDelegate()
+  @SkipCsrf()
+  @DemoRestricted()
+  @Throttle({ default: { ttl: 900000, limit: rateLimit(5) } })
+  @ApiOperation({ summary: "Confirm a requested account email change" })
+  async confirmEmailChange(@Body() dto: ConfirmEmailChangeDto) {
+    await this.authService.confirmEmailChange(dto.token);
+    return {
+      message:
+        "Email address changed. Sign in again with your new email address.",
+    };
   }
 
   @Post("resend-verification")

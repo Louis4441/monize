@@ -32,6 +32,9 @@ CREATE TABLE users (
     email_verified BOOLEAN NOT NULL DEFAULT false, -- gates local login; new self-service registrants must verify their email when SMTP is enabled (bootstrap/admin/delegate/OIDC accounts are created verified)
     email_verification_token VARCHAR(255), -- hashed token emailed for email verification
     email_verification_token_expiry TIMESTAMP,
+    pending_email VARCHAR(255), -- requested new address, applied only when the emailed confirmation link is followed
+    email_change_token VARCHAR(255), -- hashed single-use token emailed to pending_email
+    email_change_token_expiry TIMESTAMP,
     role VARCHAR(20) NOT NULL DEFAULT 'user', -- 'admin', 'user'
     must_change_password BOOLEAN NOT NULL DEFAULT false,
     two_factor_secret VARCHAR(255), -- encrypted TOTP secret for 2FA
@@ -53,6 +56,7 @@ CREATE TABLE users (
 
 CREATE INDEX IF NOT EXISTS idx_users_reset_token ON users(reset_token) WHERE reset_token IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_email_verification_token ON users(email_verification_token) WHERE email_verification_token IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_users_email_change_token ON users(email_change_token) WHERE email_change_token IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_oidc_link_token ON users(oidc_link_token) WHERE oidc_link_token IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_last_activity_at ON users(last_activity_at) WHERE last_activity_at IS NOT NULL;
 

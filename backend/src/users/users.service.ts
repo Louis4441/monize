@@ -3,7 +3,6 @@ import {
   BadRequestException,
   Logger,
   NotFoundException,
-  ConflictException,
   ForbiddenException,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -43,6 +42,15 @@ import {
 } from "../auth/oidc/oidc-reauth.service";
 import { toUserProfile } from "./user-profile";
 import { UserMaintenanceService } from "../common/jobs/user-maintenance.service";
+import {
+  EmailChangeService,
+  type StagedEmailChange,
+} from "./email-change.service";
+import {
+  emailInUseConflict,
+  isUniqueViolation,
+  normalizeEmail,
+} from "./email-change.util";
 
 @Injectable()
 export class UsersService {
@@ -55,6 +63,7 @@ export class UsersService {
     private demoModeService: DemoModeService,
     private oidcReauth: OidcReauthService,
     private maintenance: UserMaintenanceService,
+    private emailChange: EmailChangeService,
   ) {}
 
   /**
@@ -95,8 +104,13 @@ export class UsersService {
     }
 
     // SECURITY: Require password confirmation when changing email to prevent
-    // account takeover via compromised session
-    if (dto.email && dto.email !== user.email) {
+    // account takeover via compromised session. The address is normalized the
+    // way registration normalizes it, and with SMTP configured the change is
+    // only staged here: `users.email` moves when the link sent to the new
+    // address is followed (`AuthEmailService.confirmEmailChange`).
+    let stagedChange: StagedEmailChange | null = null;
+    const newEmail = dto.email !== undefined ? normalizeEmail(dto.email) : null;
+    if (newEmail && newEmail !== user.email) {
       if (!dto.currentPassword) {
         throw new BadRequestException(
           tr(
@@ -125,17 +139,22 @@ export class UsersService {
           ),
         );
       }
+      // Advisory only: under RLS enforcement this scope sees no other user's
+      // row. The unique index is the guard, at confirmation (or at the save
+      // below when the change applies immediately).
       const existingUser = await this.scoped(User, (repo) =>
         repo.findOne({
-          where: { email: dto.email },
+          where: { email: newEmail },
         }),
       );
       if (existingUser) {
-        throw new ConflictException(
-          tr("errors.users.emailInUse", "Email already in use"),
-        );
+        throw emailInUseConflict();
       }
-      user.email = dto.email;
+      if (this.emailChange.requiresConfirmation()) {
+        stagedChange = this.emailChange.stage(user, newEmail);
+      } else {
+        this.emailChange.applyImmediately(user, newEmail);
+      }
     }
 
     if (dto.firstName !== undefined) {
@@ -145,7 +164,16 @@ export class UsersService {
       user.lastName = dto.lastName;
     }
 
-    const saved = await this.scoped(User, (repo) => repo.save(user));
+    let saved: User;
+    try {
+      saved = await this.scoped(User, (repo) => repo.save(user));
+    } catch (error) {
+      if (isUniqueViolation(error)) throw emailInUseConflict();
+      throw error;
+    }
+    if (stagedChange) {
+      await this.emailChange.sendMessages(saved, stagedChange);
+    }
     return toUserProfile(saved);
   }
 

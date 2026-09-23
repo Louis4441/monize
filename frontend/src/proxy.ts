@@ -12,7 +12,7 @@ import {
 } from '@/i18n/config';
 
 const logger = createLogger('Proxy');
-const publicPaths = ['/login', '/register', '/auth/callback', '/forgot-password', '/reset-password', '/verify-email', '/emergency-access/claim'];
+const publicPaths = ['/login', '/register', '/auth/callback', '/forgot-password', '/reset-password', '/verify-email', '/confirm-email-change', '/emergency-access/claim'];
 let backendConnected = false;
 
 function resolveRequestLocale(request: NextRequest): { locale: string; fromCookie: boolean } {

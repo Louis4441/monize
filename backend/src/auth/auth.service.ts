@@ -1133,6 +1133,14 @@ export class AuthService {
     return withSystemContext(() => this.authEmailService.verifyEmail(token));
   }
 
+  async confirmEmailChange(token: string) {
+    // RLS: public confirm-email-change path (token in the emailed link, no
+    // req.user) -- the same shape as verifyEmail above.
+    return withSystemContext(() =>
+      this.authEmailService.confirmEmailChange(token),
+    );
+  }
+
   async checkVerificationEmailLimit(email: string) {
     // RLS: public resend-verification path (no req.user); see above.
     return withSystemContext(() =>

@@ -117,6 +117,21 @@
     "button": "[XX-Verify Email-XX]",
     "disclaimer": "[XX-This link will expire in 24 hours. If you did not create a Monize account, you can safely ignore this email.-XX]"
   },
+  "emailChangeConfirm": {
+    "subject": "[XX-Confirm your new Monize email-XX]",
+    "heading": "[XX-Confirm your new email address-XX]",
+    "greeting": "[XX-Hi {{ name }},-XX]",
+    "intro": "[XX-A request was made to use this address for a Monize account. Your email will not change until you confirm it by clicking the button below:-XX]",
+    "button": "[XX-Confirm Email Change-XX]",
+    "disclaimer": "[XX-This link will expire in 24 hours. If you did not request this change, you can safely ignore this email.-XX]"
+  },
+  "emailChangeNotice": {
+    "subject": "[XX-Monize email change requested-XX]",
+    "heading": "[XX-Email change requested-XX]",
+    "greeting": "[XX-Hi {{ name }},-XX]",
+    "body1": "[XX-A request was made to change the email address of your Monize account to {{ email }}. The change takes effect only once it is confirmed from that address.-XX]",
+    "body2": "[XX-If you did not make this request, change your password immediately and review the devices signed in to your account.-XX]"
+  },
   "accountInvite": {
     "subject": "[XX-Your Monize account is ready-XX]",
     "heading": "[XX-Your Monize account is ready-XX]",

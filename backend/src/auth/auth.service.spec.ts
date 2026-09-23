@@ -3924,4 +3924,21 @@ describe("AuthService", () => {
       expect(dataSource.transaction).toHaveBeenCalled();
     });
   });
+
+  describe("confirmEmailChange", () => {
+    // The link is followed signed out, so the service seeds its own identity
+    // around the token lookup, the same way verifyEmail does.
+    it("hands the token to AuthEmailService", async () => {
+      const authEmail = (
+        service as unknown as { authEmailService: AuthEmailService }
+      ).authEmailService;
+      const confirm = jest
+        .spyOn(authEmail, "confirmEmailChange")
+        .mockResolvedValue(undefined);
+
+      await service.confirmEmailChange("change-token");
+
+      expect(confirm).toHaveBeenCalledWith("change-token");
+    });
+  });
 });

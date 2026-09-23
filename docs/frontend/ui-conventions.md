@@ -56,7 +56,7 @@ Tailwind v4 trap: the bare `shadow` utility is a legacy alias with the stock val
 
 ## An auth screen renders inside `AuthShell`
 
-`components/auth/AuthShell.tsx` is the single shell for login, register, forgot/reset/change-password, verify-email and setup-2fa: transparent brand mark, title/subtitle, notices slot, shared `Card` around the body (`plain` for a bare status line). Language picker and version line are opt-in props. Use `/icons/monize-logo-transparent.svg` everywhere in the UI -- the boxed `monize-logo.svg` bakes in a white background and renders as a white square in dark mode. Guarded in `ui-conventions.test.ts`.
+`components/auth/AuthShell.tsx` is the single shell for login, register, forgot/reset/change-password, verify-email, confirm-email-change and setup-2fa: transparent brand mark, title/subtitle, notices slot, shared `Card` around the body (`plain` for a bare status line). Language picker and version line are opt-in props. Use `/icons/monize-logo-transparent.svg` everywhere in the UI -- the boxed `monize-logo.svg` bakes in a white background and renders as a white square in dark mode. Guarded in `ui-conventions.test.ts`.
 
 ## Navigation links and their icons live in `lib/nav-links.ts`
 

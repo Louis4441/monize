@@ -23,6 +23,9 @@ export interface User {
   isDelegateOnly?: boolean;
   backupEncryptionEnabled?: boolean;
   emailVerified?: boolean;
+  // An email change waiting for the link sent to this address; the account's
+  // email stays `email` until it is followed. Returned to the account holder only.
+  pendingEmail?: string | null;
   createdAt: string;
   updatedAt: string;
   lastLogin?: string;

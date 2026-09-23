@@ -1822,6 +1822,7 @@ describe("an auth page renders inside AuthShell", () => {
     "/src/app/reset-password/page.tsx",
     "/src/app/change-password/page.tsx",
     "/src/app/verify-email/page.tsx",
+    "/src/app/confirm-email-change/page.tsx",
     "/src/app/setup-2fa/page.tsx",
   ];
   const HAND_ROLLED_SHELL = "min-h-screen flex items-center justify-center";

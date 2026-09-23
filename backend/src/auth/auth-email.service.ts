@@ -1,5 +1,11 @@
 import { Injectable, BadRequestException, Logger } from "@nestjs/common";
-import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
+import {
+  DataSource,
+  EntityTarget,
+  MoreThan,
+  ObjectLiteral,
+  Repository,
+} from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import * as bcrypt from "bcryptjs";
 import * as crypto from "crypto";
@@ -11,6 +17,10 @@ import { PasswordBreachService } from "./password-breach.service";
 import { tr } from "../i18n/translate";
 import { TokenService } from "./token.service";
 import { AuthAttemptCounterService } from "./auth-attempt-counter.service";
+import {
+  emailInUseConflict,
+  isUniqueViolation,
+} from "../users/email-change.util";
 
 /**
  * `auth_attempt_counters.scope` for the two per-email throttles.
@@ -227,6 +237,71 @@ export class AuthEmailService {
         ),
       );
     }
+  }
+
+  /**
+   * Apply the self-service email change owning `token` (staged by
+   * `EmailChangeService` when the change was requested).
+   *
+   * One transaction: find the live pending change, refuse when another account
+   * already holds the address, then the conditional UPDATE, which is what makes
+   * the link single-use -- it matches only while the stored hash and expiry are
+   * still those the lookup saw, so a second click, a newer request that
+   * replaced the token, or an expired link all update nothing. The unique index
+   * on `users.email` decides a race the in-transaction check cannot see, and is
+   * answered as the same 409, never a 500. Other sessions are signed out after
+   * the commit, as a password reset does.
+   */
+  async confirmEmailChange(token: string): Promise<void> {
+    const hashedToken = hashToken(token);
+    const invalid = () =>
+      new BadRequestException(
+        tr(
+          "errors.auth.invalidOrExpiredEmailChangeToken",
+          "Invalid or expired email change link",
+        ),
+      );
+
+    let userId: string;
+    try {
+      userId = await withScopedDb(this.dataSource, async (manager) => {
+        const repo = manager.getRepository(User);
+        const now = new Date();
+        const pending = await repo.findOne({
+          where: {
+            emailChangeToken: hashedToken,
+            emailChangeTokenExpiry: MoreThan(now),
+          },
+        });
+        if (!pending || !pending.pendingEmail) throw invalid();
+        const newEmail = pending.pendingEmail;
+
+        const holder = await repo.findOne({ where: { email: newEmail } });
+        if (holder && holder.id !== pending.id) throw emailInUseConflict();
+
+        const result = await repo
+          .createQueryBuilder()
+          .update(User)
+          .set({
+            email: newEmail,
+            emailVerified: true,
+            pendingEmail: null,
+            emailChangeToken: null,
+            emailChangeTokenExpiry: null,
+          })
+          .where("id = :id", { id: pending.id })
+          .andWhere("emailChangeToken = :hashedToken", { hashedToken })
+          .andWhere("emailChangeTokenExpiry > :now", { now })
+          .execute();
+        if (!result.affected) throw invalid();
+        return pending.id;
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) throw emailInUseConflict();
+      throw error;
+    }
+
+    await this.tokenService.revokeAllUserRefreshTokens(userId);
   }
 
   checkVerificationEmailLimit(email: string): Promise<boolean> {

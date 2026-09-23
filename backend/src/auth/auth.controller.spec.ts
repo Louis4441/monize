@@ -87,6 +87,7 @@ describe("AuthController", () => {
       generateResetToken: jest.fn(),
       resetPassword: jest.fn(),
       verifyEmail: jest.fn(),
+      confirmEmailChange: jest.fn(),
       generateVerificationToken: jest.fn(),
       checkVerificationEmailLimit: jest.fn().mockReturnValue(true),
       revokeRefreshToken: jest.fn(),
@@ -879,6 +880,31 @@ describe("AuthController", () => {
 
       await expect(
         controller.verifyEmail({ token: "bad" } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe("confirmEmailChange", () => {
+    it("delegates to authService.confirmEmailChange and asks for a new sign-in", async () => {
+      authService.confirmEmailChange.mockResolvedValue(undefined);
+
+      const result = await controller.confirmEmailChange({
+        token: "change-token",
+      });
+
+      expect(authService.confirmEmailChange).toHaveBeenCalledWith(
+        "change-token",
+      );
+      expect(result.message).toContain("Email address changed");
+    });
+
+    it("propagates the refusal of an invalid or expired link", async () => {
+      authService.confirmEmailChange.mockRejectedValue(
+        new BadRequestException("Invalid or expired email change link"),
+      );
+
+      await expect(
+        controller.confirmEmailChange({ token: "bad" }),
       ).rejects.toThrow(BadRequestException);
     });
   });

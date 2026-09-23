@@ -21,6 +21,12 @@ import { CurrenciesService } from "../currencies/currencies.service";
 import { BackupEncryptionService } from "../backup/backup-encryption.service";
 import { DemoModeService } from "../common/demo-mode.service";
 import { OidcReauthService } from "../auth/oidc/oidc-reauth.service";
+import { ConfigService } from "@nestjs/config";
+import { I18nService } from "nestjs-i18n";
+import { QueryFailedError } from "typeorm";
+import { EmailService } from "../notifications/email.service";
+import { EmailChangeService } from "./email-change.service";
+import { hashToken } from "../auth/crypto.util";
 import {
   createUserMaintenanceMock,
   userMaintenanceProvider,
@@ -54,6 +60,7 @@ describe("UsersService", () => {
   let currenciesService: { ensureSystemCurrency: jest.Mock };
   let backupEncryptionService: { rewrapBackupKey: jest.Mock };
   let moduleRef: { get: jest.Mock };
+  let emailService: { getStatus: jest.Mock; sendMail: jest.Mock };
   let mockQueryRunner: Record<string, jest.Mock>;
   let mockDataSource: Record<string, jest.Mock>;
 
@@ -139,8 +146,16 @@ describe("UsersService", () => {
       ensureSystemCurrency: jest.fn().mockResolvedValue(undefined),
     };
 
+    // SMTP off by default: the email-change tests that need a confirmation
+    // link switch it on.
+    emailService = {
+      getStatus: jest.fn().mockReturnValue({ configured: false }),
+      sendMail: jest.fn().mockResolvedValue(undefined),
+    };
+
     moduleRef = {
       get: jest.fn((token) => {
+        if (token === EmailService) return emailService;
         if (token === ExchangeRateService) return exchangeRateService;
         if (token === BackupEncryptionService) return backupEncryptionService;
         if (token === CurrenciesService) return currenciesService;
@@ -192,6 +207,24 @@ describe("UsersService", () => {
         // sentinel survived (P2-005).
         OidcReauthService,
         userMaintenanceProvider(maintenance),
+        // Real instance: the staging, the token hashing and the two sends are
+        // what the email-change tests below assert.
+        EmailChangeService,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((_key: string, fallback?: string) => fallback),
+          },
+        },
+        {
+          provide: I18nService,
+          useValue: {
+            translate: jest.fn(
+              (_key: string, opts: { defaultValue: string }) =>
+                opts.defaultValue,
+            ),
+          },
+        },
       ],
     }).compile();
 
@@ -293,7 +326,7 @@ describe("UsersService", () => {
       expect(result.lastName).toBe("Name");
     });
 
-    it("updates email when not taken and password is correct", async () => {
+    it("without SMTP, applies the change on the password check alone", async () => {
       const hashedPassword = await bcrypt.hash("CorrectPass123!", 10);
       usersRepository.findOne
         .mockResolvedValueOnce({ ...mockUser, passwordHash: hashedPassword }) // find user
@@ -396,6 +429,131 @@ describe("UsersService", () => {
       ).rejects.toThrow(
         "Cannot change email for accounts without a local password",
       );
+    });
+
+    describe("email change with SMTP configured", () => {
+      let hashedPassword: string;
+
+      beforeAll(async () => {
+        hashedPassword = await bcrypt.hash("CorrectPass123!", 10);
+      });
+
+      beforeEach(() => {
+        emailService.getStatus.mockReturnValue({ configured: true });
+        usersRepository.findOne
+          .mockResolvedValueOnce({ ...mockUser, passwordHash: hashedPassword })
+          .mockResolvedValueOnce(null);
+        usersRepository.save.mockImplementation((user) => user);
+      });
+
+      const request = () =>
+        service.updateProfile("user-1", {
+          email: "  New.Person@Example.COM ",
+          currentPassword: "CorrectPass123!",
+        });
+
+      it("does not change the live email until the link is followed", async () => {
+        const result = await request();
+
+        expect(result.email).toBe("test@example.com");
+        expect(result.pendingEmail).toBe("new.person@example.com");
+        const saved = usersRepository.save.mock.calls[0][0];
+        expect(saved.email).toBe("test@example.com");
+      });
+
+      it("normalizes the new address the way registration does", async () => {
+        await request();
+
+        expect(usersRepository.findOne).toHaveBeenNthCalledWith(2, {
+          where: { email: "new.person@example.com" },
+        });
+        const saved = usersRepository.save.mock.calls[0][0];
+        expect(saved.pendingEmail).toBe("new.person@example.com");
+      });
+
+      it("stores only the hash of an expiring token and emails the raw one", async () => {
+        await request();
+
+        const saved = usersRepository.save.mock.calls[0][0];
+        const [to, , html] = emailService.sendMail.mock.calls[0];
+        expect(to).toBe("new.person@example.com");
+        const token = /confirm-email-change\?token=([0-9a-f]{64})/.exec(
+          html,
+        )?.[1];
+        expect(token).toBeDefined();
+        expect(saved.emailChangeToken).toBe(hashToken(token!));
+        expect(saved.emailChangeToken).not.toBe(token);
+        const ttl = saved.emailChangeTokenExpiry.getTime() - Date.now();
+        expect(ttl).toBeGreaterThan(23 * 60 * 60 * 1000);
+        expect(ttl).toBeLessThanOrEqual(24 * 60 * 60 * 1000);
+      });
+
+      it("notifies the current address, naming the requested one", async () => {
+        await request();
+
+        expect(emailService.sendMail).toHaveBeenCalledTimes(2);
+        const [to, subject, html] = emailService.sendMail.mock.calls[1];
+        expect(to).toBe("test@example.com");
+        expect(subject).toBe("Monize email change requested");
+        expect(html).toContain("new.person@example.com");
+        expect(html).not.toContain("confirm-email-change");
+      });
+
+      it("sends nothing when the request is refused", async () => {
+        usersRepository.findOne.mockReset();
+        usersRepository.findOne.mockResolvedValueOnce({
+          ...mockUser,
+          passwordHash: hashedPassword,
+        });
+
+        await expect(
+          service.updateProfile("user-1", {
+            email: "new@example.com",
+            currentPassword: "WrongPassword!",
+          }),
+        ).rejects.toThrow("Current password is incorrect");
+        expect(usersRepository.save).not.toHaveBeenCalled();
+        expect(emailService.sendMail).not.toHaveBeenCalled();
+      });
+
+      it("still answers the request when a send fails", async () => {
+        emailService.sendMail.mockRejectedValue(new Error("smtp down"));
+
+        const result = await request();
+
+        expect(result.pendingEmail).toBe("new.person@example.com");
+      });
+    });
+
+    it("answers a unique-index race on an immediate change with 409", async () => {
+      const hashedPassword = await bcrypt.hash("CorrectPass123!", 10);
+      usersRepository.findOne
+        .mockResolvedValueOnce({ ...mockUser, passwordHash: hashedPassword })
+        .mockResolvedValueOnce(null);
+      usersRepository.save.mockRejectedValue(
+        new QueryFailedError("UPDATE users", [], {
+          code: "23505",
+        } as unknown as Error),
+      );
+
+      await expect(
+        service.updateProfile("user-1", {
+          email: "new@example.com",
+          currentPassword: "CorrectPass123!",
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it("treats a case-only difference from the current email as unchanged", async () => {
+      usersRepository.findOne.mockResolvedValue({ ...mockUser });
+      usersRepository.save.mockImplementation((user) => user);
+
+      const result = await service.updateProfile("user-1", {
+        email: "TEST@example.com",
+      });
+
+      expect(result.email).toBe("test@example.com");
+      expect(emailService.sendMail).not.toHaveBeenCalled();
     });
 
     it("does not require password when email is unchanged", async () => {

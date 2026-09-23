@@ -150,6 +150,7 @@
     "accountDeactivated": "[XX-Account is deactivated-XX]",
     "emailNotVerified": "[XX-Please verify your email address before signing in. Check your inbox for the verification link.-XX]",
     "invalidOrExpiredEmailVerificationToken": "[XX-Invalid or expired verification link-XX]",
+    "invalidOrExpiredEmailChangeToken": "[XX-Invalid or expired email change link-XX]",
     "oidcNoSubject": "[XX-OIDC provider did not return a subject identifier-XX]",
     "registrationDisabled": "[XX-New account registration is disabled.-XX]",
     "invalidOrExpiredLinkToken": "[XX-Invalid or expired link token-XX]",

@@ -19,10 +19,12 @@
     "passwordRequired": "Current password is required to change email",
     "noChanges": "No changes to save",
     "passwordConfirmNote": "Password confirmation is required when changing your email address.",
+    "pendingEmailNotice": "A confirmation link was sent to {email}. Your email address changes once you follow it.",
     "saveButton": "Save Profile",
     "savingButton": "Saving...",
     "toasts": {
       "success": "Profile updated successfully",
+      "confirmationSent": "Check {email} for a link to confirm your new email address",
       "updateFailed": "Failed to update profile"
     },
     "validation": {

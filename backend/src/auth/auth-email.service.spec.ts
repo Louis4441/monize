@@ -1,6 +1,6 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { DataSource } from "typeorm";
-import { BadRequestException } from "@nestjs/common";
+import { DataSource, FindOperator, QueryFailedError } from "typeorm";
+import { BadRequestException, ConflictException } from "@nestjs/common";
 import * as bcrypt from "bcryptjs";
 import {
   AuthEmailService,
@@ -533,6 +533,177 @@ describe("AuthEmailService", () => {
       await expect(
         service.checkForgotPasswordEmailLimit("both@example.com"),
       ).resolves.toBe(true);
+    });
+  });
+
+  /**
+   * An in-memory `users` table for the confirm path: `findOne` honours the
+   * token, expiry and email predicates the service passes, and the UPDATE only
+   * applies while the id, token hash and expiry still match -- the conditional
+   * write that makes the link single-use. A call-recording mock could not tell
+   * a second click from the first.
+   */
+  describe("confirmEmailChange", () => {
+    type Row = {
+      id: string;
+      email: string | null;
+      emailVerified: boolean;
+      pendingEmail: string | null;
+      emailChangeToken: string | null;
+      emailChangeTokenExpiry: Date | null;
+    };
+    let rows: Row[];
+    let failUpdateWith: unknown;
+
+    const pendingRow = (overrides: Partial<Row> = {}): Row => ({
+      id: "user-1",
+      email: "old@example.com",
+      emailVerified: false,
+      pendingEmail: "new@example.com",
+      emailChangeToken: hashToken("change-token"),
+      emailChangeTokenExpiry: new Date(Date.now() + 60_000),
+      ...overrides,
+    });
+
+    const matches = (row: Row, where: Record<string, unknown>) =>
+      Object.entries(where).every(([key, value]) => {
+        const actual = row[key as keyof Row];
+        if (value instanceof FindOperator) {
+          // MoreThan(now) is the only operator the service uses.
+          return (
+            actual instanceof Date && actual > (value.value as unknown as Date)
+          );
+        }
+        return actual === value;
+      });
+
+    beforeEach(() => {
+      rows = [pendingRow()];
+      failUpdateWith = undefined;
+      usersRepository.findOne.mockImplementation(
+        async ({ where }: { where: Record<string, unknown> }) =>
+          rows.find((row) => matches(row, where)) ?? null,
+      );
+      usersRepository.createQueryBuilder.mockImplementation(() => {
+        let patch: Partial<Row> = {};
+        const params: Record<string, unknown> = {};
+        const chain = {
+          update: () => chain,
+          set: (values: Partial<Row>) => {
+            patch = values;
+            return chain;
+          },
+          where: (_sql: string, p: Record<string, unknown>) => {
+            Object.assign(params, p);
+            return chain;
+          },
+          andWhere: (_sql: string, p: Record<string, unknown>) => {
+            Object.assign(params, p);
+            return chain;
+          },
+          execute: async () => {
+            if (failUpdateWith) throw failUpdateWith;
+            const target = rows.find(
+              (row) =>
+                row.id === params.id &&
+                row.emailChangeToken === params.hashedToken &&
+                row.emailChangeTokenExpiry !== null &&
+                row.emailChangeTokenExpiry > (params.now as Date),
+            );
+            if (!target) return { affected: 0 };
+            Object.assign(target, patch);
+            return { affected: 1 };
+          },
+        };
+        return chain;
+      });
+    });
+
+    it("moves the pending address into email, verifies it and clears the token", async () => {
+      await service.confirmEmailChange("change-token");
+
+      expect(rows[0]).toEqual({
+        id: "user-1",
+        email: "new@example.com",
+        emailVerified: true,
+        pendingEmail: null,
+        emailChangeToken: null,
+        emailChangeTokenExpiry: null,
+      });
+      // Other sessions must sign in again with the new address.
+      expect(tokenService.revokeAllUserRefreshTokens).toHaveBeenCalledWith(
+        "user-1",
+      );
+    });
+
+    it("is single-use: a second click changes nothing and is refused", async () => {
+      await service.confirmEmailChange("change-token");
+      tokenService.revokeAllUserRefreshTokens.mockClear();
+
+      await expect(service.confirmEmailChange("change-token")).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(tokenService.revokeAllUserRefreshTokens).not.toHaveBeenCalled();
+    });
+
+    it("refuses an expired link and leaves the live email alone", async () => {
+      rows = [pendingRow({ emailChangeTokenExpiry: new Date(Date.now() - 1) })];
+
+      await expect(service.confirmEmailChange("change-token")).rejects.toThrow(
+        "Invalid or expired email change link",
+      );
+      expect(rows[0].email).toBe("old@example.com");
+      expect(tokenService.revokeAllUserRefreshTokens).not.toHaveBeenCalled();
+    });
+
+    it("refuses a token that was replaced by a newer request", async () => {
+      rows = [pendingRow({ emailChangeToken: hashToken("newer-token") })];
+
+      await expect(service.confirmEmailChange("change-token")).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(rows[0].email).toBe("old@example.com");
+    });
+
+    it("re-checks uniqueness at confirmation time", async () => {
+      rows = [
+        pendingRow(),
+        pendingRow({
+          id: "user-2",
+          email: "new@example.com",
+          pendingEmail: null,
+          emailChangeToken: null,
+          emailChangeTokenExpiry: null,
+        }),
+      ];
+
+      await expect(service.confirmEmailChange("change-token")).rejects.toThrow(
+        ConflictException,
+      );
+      expect(rows[0].email).toBe("old@example.com");
+      expect(rows[0].pendingEmail).toBe("new@example.com");
+      expect(tokenService.revokeAllUserRefreshTokens).not.toHaveBeenCalled();
+    });
+
+    it("answers a lost race on the unique index with 409, not a 500", async () => {
+      failUpdateWith = new QueryFailedError("UPDATE users", [], {
+        code: "23505",
+      } as unknown as Error);
+
+      await expect(service.confirmEmailChange("change-token")).rejects.toThrow(
+        ConflictException,
+      );
+      expect(tokenService.revokeAllUserRefreshTokens).not.toHaveBeenCalled();
+    });
+
+    it("does not swallow an unrelated database error", async () => {
+      failUpdateWith = new QueryFailedError("UPDATE users", [], {
+        code: "57014",
+      } as unknown as Error);
+
+      await expect(
+        service.confirmEmailChange("change-token"),
+      ).rejects.toBeInstanceOf(QueryFailedError);
     });
   });
 });
