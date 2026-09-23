@@ -35,6 +35,7 @@ import { RefreshToken } from "../auth/entities/refresh-token.entity";
 import { Account, AccountType } from "../accounts/entities/account.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
+import { ScheduledTransactionOverride } from "../scheduled-transactions/entities/scheduled-transaction-override.entity";
 import { hashToken } from "../auth/crypto.util";
 import { generateReadablePassword } from "../admin/utils/password-generator";
 import { I18nService } from "nestjs-i18n";
@@ -347,17 +348,37 @@ export class DelegationService {
    * transfer counterpart when it is a transfer. Empty if the row does not
    * exist (the owner-scoped service then returns 404).
    */
+  /**
+   * Every account a scheduled transaction moves money in, primary account
+   * first. Posting (manually or by the auto-post cron) writes into all of
+   * them -- the transfer counterpart, the investment funding account, each
+   * split's transfer account and any per-occurrence override split's -- so a
+   * delegate write gated on only the primary account could move money
+   * through an account it was never granted.
+   */
   async accountIdsForScheduled(scheduledId: string): Promise<string[]> {
     const st = await this.scoped(ScheduledTransaction, (repo) =>
       repo.findOne({
         where: { id: scheduledId },
-        select: ["accountId", "transferAccountId", "isTransfer"],
+        relations: { splits: true },
       }),
     );
     if (!st) return [];
+    const overrides = await this.scoped(ScheduledTransactionOverride, (repo) =>
+      repo.find({
+        where: { scheduledTransactionId: scheduledId },
+        select: ["id", "splits"],
+      }),
+    );
     const ids = new Set<string>([st.accountId]);
-    if (st.isTransfer && st.transferAccountId) {
-      ids.add(st.transferAccountId);
+    const add = (id: string | null | undefined) => {
+      if (id) ids.add(id);
+    };
+    if (st.isTransfer) add(st.transferAccountId);
+    add(st.investmentFundingAccountId);
+    for (const split of st.splits ?? []) add(split.transferAccountId);
+    for (const override of overrides) {
+      for (const split of override.splits ?? []) add(split.transferAccountId);
     }
     return [...ids];
   }

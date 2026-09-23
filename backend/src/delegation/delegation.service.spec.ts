@@ -16,6 +16,7 @@ import { RefreshToken } from "../auth/entities/refresh-token.entity";
 import { Account } from "../accounts/entities/account.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
+import { ScheduledTransactionOverride } from "../scheduled-transactions/entities/scheduled-transaction-override.entity";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
 jest.mock("../common/db/scoped-db", () =>
@@ -40,6 +41,7 @@ describe("DelegationService", () => {
   let accountsRepo: Record<string, jest.Mock>;
   let transactionsRepo: Record<string, jest.Mock>;
   let scheduledTxRepo: Record<string, jest.Mock>;
+  let scheduledOverrideRepo: Record<string, jest.Mock>;
   let delegateFavouritesRepo: Record<string, jest.Mock>;
   let emailService: Record<string, jest.Mock>;
   let configService: Record<string, jest.Mock>;
@@ -59,6 +61,7 @@ describe("DelegationService", () => {
     accountsRepo = { find: jest.fn(), exists: jest.fn(), count: jest.fn() };
     transactionsRepo = { findOne: jest.fn() };
     scheduledTxRepo = { findOne: jest.fn() };
+    scheduledOverrideRepo = { find: jest.fn().mockResolvedValue([]) };
     delegateFavouritesRepo = {
       find: jest.fn(),
       findOne: jest.fn(),
@@ -80,6 +83,7 @@ describe("DelegationService", () => {
       [Account, accountsRepo as never],
       [Transaction, transactionsRepo as never],
       [ScheduledTransaction, scheduledTxRepo as never],
+      [ScheduledTransactionOverride, scheduledOverrideRepo as never],
       [DelegateAccountFavourite, delegateFavouritesRepo as never],
     ]);
     dataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
@@ -113,6 +117,7 @@ describe("DelegationService", () => {
       if (entity === Account) return accountsRepo;
       if (entity === Transaction) return transactionsRepo;
       if (entity === ScheduledTransaction) return scheduledTxRepo;
+      if (entity === ScheduledTransactionOverride) return scheduledOverrideRepo;
       if (entity === DelegateAccountFavourite) return delegateFavouritesRepo;
       throw new Error(`unregistered entity in transaction: ${String(entity)}`);
     });
@@ -282,6 +287,49 @@ describe("DelegationService", () => {
         "a1",
         "a2",
       ]);
+    });
+
+    it("ignores a stale transferAccountId on a non-transfer", async () => {
+      scheduledTxRepo.findOne.mockResolvedValue({
+        accountId: "a1",
+        isTransfer: false,
+        transferAccountId: "a2",
+      });
+      await expect(service.accountIdsForScheduled("s1")).resolves.toEqual([
+        "a1",
+      ]);
+    });
+
+    // A delegate write on a schedule posts into every account it names; gating
+    // only the primary account let a delegate post an owner-created split or
+    // funded schedule through an account they were never granted.
+    it("includes the funding, split and override-split transfer accounts", async () => {
+      scheduledTxRepo.findOne.mockResolvedValue({
+        accountId: "a1",
+        isTransfer: false,
+        transferAccountId: null,
+        investmentFundingAccountId: "fund",
+        splits: [
+          { transferAccountId: "split-b" },
+          { transferAccountId: null },
+          { transferAccountId: "a1" },
+        ],
+      });
+      scheduledOverrideRepo.find.mockResolvedValue([
+        { splits: [{ transferAccountId: "ovr-c" }, { categoryId: "cat" }] },
+        { splits: null },
+      ]);
+      await expect(service.accountIdsForScheduled("s1")).resolves.toEqual([
+        "a1",
+        "fund",
+        "split-b",
+        "ovr-c",
+      ]);
+      expect(scheduledOverrideRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { scheduledTransactionId: "s1" },
+        }),
+      );
     });
   });
 

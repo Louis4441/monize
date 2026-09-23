@@ -238,7 +238,9 @@ export class AccountDelegateGuard implements CanActivate {
         // Unknown scheduled txn: let the owner-scoped service return 404.
         // READ only needs the primary account (accountIds[0]); the transfer
         // counterpart is masked by the interceptor, not blocked. WRITES must
-        // hold the op on BOTH legs (no moving money via a hidden account).
+        // hold the op on EVERY account the schedule posts into -- transfer
+        // leg, funding account, split and override-split transfer accounts
+        // (no moving money via a hidden account).
         const gated =
           operation === "read" ? accountIds.slice(0, 1) : accountIds;
         for (const accountId of gated) {
