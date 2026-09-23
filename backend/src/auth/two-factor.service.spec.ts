@@ -501,6 +501,23 @@ describe("TwoFactorService", () => {
       expect(preferencesRow.row()!.twoFactorEnabled).toBe(true);
     });
 
+    // Codes from an earlier enrolment must not sign in against the new
+    // authenticator; they used to survive disable and re-enable.
+    it("drops backup codes left from an earlier enrolment", async () => {
+      const pendingSecret = encrypt("TESTSECRET", TEST_TOTP_KEY);
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        pendingTwoFactorSecret: pendingSecret,
+        backupCodes: JSON.stringify(["old-hash"]),
+      });
+      (otplib.verifySync as jest.Mock).mockReturnValue({ valid: true });
+      preferencesRow.seed(null);
+
+      await service.confirmSetup2FA("user-1", "123456");
+
+      expect(usersRepository.save.mock.calls[0][0].backupCodes).toBeNull();
+    });
+
     it("should update existing preferences", async () => {
       const pendingSecret = encrypt("TESTSECRET", TEST_TOTP_KEY);
       usersRepository.findOne.mockResolvedValue({
@@ -562,6 +579,9 @@ describe("TwoFactorService", () => {
       expect(result.message).toContain("disabled successfully");
       const savedUser = usersRepository.save.mock.calls[0][0];
       expect(savedUser.twoFactorSecret).toBeNull();
+      // The backup codes go with the secret, or they would still sign in after
+      // a later re-enrolment.
+      expect(savedUser.backupCodes).toBeNull();
       expect(preferencesRow.row()!.twoFactorEnabled).toBe(false);
       expect(trustedDevicesRepository.delete).toHaveBeenCalledWith({
         userId: "user-1",

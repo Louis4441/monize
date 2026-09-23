@@ -586,9 +586,13 @@ export class TwoFactorService {
       );
     }
 
-    // H5: Promote pending secret to active secret on successful confirmation
+    // H5: Promote pending secret to active secret on successful confirmation.
+    // Backup codes belong to the enrolment they were issued with: a fresh
+    // enrolment starts with none, so codes left from an earlier one can never
+    // stand in for the new authenticator (the setup flow issues new ones next).
     user.twoFactorSecret = user.pendingTwoFactorSecret;
     user.pendingTwoFactorSecret = null;
+    user.backupCodes = null;
     await this.scoped(User, (repo) => repo.save(user));
 
     // Enable 2FA in preferences. One column, materializing the row when absent:
@@ -646,8 +650,10 @@ export class TwoFactorService {
     }
     await this.attemptCounters.reset(TWO_FACTOR_USER_SCOPE, user.id);
 
-    // Clear secret and disable
+    // Clear secret and disable. The backup codes go with it: left in place they
+    // would still sign in after a later re-enrolment.
     user.twoFactorSecret = null;
+    user.backupCodes = null;
     await this.scoped(User, (repo) => repo.save(user));
 
     // Same as the enable path: write the one column, and do it unconditionally.
