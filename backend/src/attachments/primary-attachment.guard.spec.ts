@@ -27,6 +27,11 @@ const REVIEWED: Record<string, string> = {
   "backup/restore-plan.ts":
     "defers the self-referential foreign key and repairs it in Phase 3 -- a " +
     "restore ordering concern, and it must name the column to defer it",
+  "backup/restore-references.ts":
+    "maps every uuid foreign key of every restorable table to its target so " +
+    "a restore can refuse a reference outside the file -- a referential " +
+    "check, not a read that decides which attachments a user sees, and " +
+    "restore-references.spec.ts requires every real FK to appear",
   "backup/support-backup/support-backup-integrity.ts":
     "declares what the support export's referential scrub does with the link " +
     "when its target row was trimmed away -- a dangling-reference rule, not a " +
