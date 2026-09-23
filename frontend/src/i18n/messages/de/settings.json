@@ -60,6 +60,7 @@
       "addLayerDescription": "Fügen Sie Ihrem Konto eine zusätzliche Sicherheitsebene hinzu.",
       "enableButton": "2FA aktivieren",
       "disableButton": "2FA deaktivieren",
+      "resetButton": "2FA zurücksetzen",
       "disableModal": {
         "title": "Zwei-Faktor-Authentifizierung deaktivieren",
         "description": "Geben Sie den 6-stelligen Code aus Ihrer Authentifizierungs-App oder einen Ihrer Backup-Codes (xxxx-xxxx) ein, um die Deaktivierung der 2FA zu bestätigen.",
@@ -68,6 +69,19 @@
         "toasts": {
           "disabled": "Zwei-Faktor-Authentifizierung deaktiviert",
           "disableFailed": "Zwei-Faktor-Authentifizierung konnte nicht deaktiviert werden"
+        }
+      },
+      "resetModal": {
+        "title": "Zwei-Faktor-Authentifizierung zurücksetzen",
+        "description": "Verwenden Sie dies, wenn Ihre Authentifizierungs-App oder Ihre Backup-Codes offengelegt worden sein könnten oder wenn Ihre Authentifizierungscodes nicht mehr funktionieren (zum Beispiel nach einer Änderung des Server-Secrets).",
+        "effect": "Ihr bisheriger Authentifikator, Ihre Backup-Codes und Ihre vertrauenswürdigen Geräte funktionieren danach nicht mehr, und Sie werden auf allen anderen Geräten abgemeldet. Anschließend richten Sie sofort einen neuen Authentifikator ein.",
+        "passwordLabel": "Kontopasswort",
+        "codeLabel": "Authentifizierungs- oder Backup-Code",
+        "codeHint": "Geben Sie den 6-stelligen Code aus Ihrer Authentifizierungs-App ein. Wenn Ihr Authentifikator nicht mehr funktioniert, geben Sie stattdessen einen Ihrer Backup-Codes (xxxx-xxxx) ein.",
+        "resettingButton": "Wird zurückgesetzt...",
+        "toasts": {
+          "reset": "Zwei-Faktor-Authentifizierung zurückgesetzt. Richten Sie jetzt Ihren neuen Authentifikator ein.",
+          "resetFailed": "2FA konnte nicht zurückgesetzt werden"
         }
       }
     },

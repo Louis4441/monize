@@ -60,6 +60,7 @@
       "addLayerDescription": "Agrega una capa adicional de seguridad a tu cuenta.",
       "enableButton": "Habilitar 2FA",
       "disableButton": "Deshabilitar 2FA",
+      "resetButton": "Restablecer 2FA",
       "disableModal": {
         "title": "Deshabilitar autenticación de dos factores",
         "description": "Ingresa el código de 6 dígitos de tu aplicación de autenticación, o uno de tus códigos de respaldo (xxxx-xxxx), para confirmar la desactivación de 2FA.",
@@ -68,6 +69,19 @@
         "toasts": {
           "disabled": "Autenticación de dos factores deshabilitada",
           "disableFailed": "Error al deshabilitar la autenticación de dos factores"
+        }
+      },
+      "resetModal": {
+        "title": "Restablecer autenticación de dos factores",
+        "description": "Úsalo si tu aplicación de autenticación o tus códigos de respaldo pueden haber quedado expuestos, o si tus códigos de autenticación dejaron de funcionar (por ejemplo, tras un cambio del secreto del servidor).",
+        "effect": "Tu autenticador actual, tus códigos de respaldo y tus dispositivos de confianza dejarán de funcionar, y se cerrará tu sesión en todos los demás dispositivos. Después configurarás un nuevo autenticador de inmediato.",
+        "passwordLabel": "Contraseña de la cuenta",
+        "codeLabel": "Código de autenticación o de respaldo",
+        "codeHint": "Ingresa el código de 6 dígitos de tu aplicación de autenticación. Si tu autenticador ya no funciona, ingresa en su lugar uno de tus códigos de respaldo (xxxx-xxxx).",
+        "resettingButton": "Restableciendo...",
+        "toasts": {
+          "reset": "Autenticación de dos factores restablecida. Configura tu nuevo autenticador ahora.",
+          "resetFailed": "Error al restablecer 2FA"
         }
       }
     },

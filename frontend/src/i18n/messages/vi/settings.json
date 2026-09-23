@@ -60,6 +60,7 @@
       "addLayerDescription": "Thêm một lớp bảo mật cho tài khoản của bạn.",
       "enableButton": "Bật 2FA",
       "disableButton": "Tắt 2FA",
+      "resetButton": "Đặt lại 2FA",
       "disableModal": {
         "title": "Tắt xác thực hai yếu tố",
         "description": "Nhập mã 6 chữ số từ ứng dụng xác thực của bạn, hoặc một trong các mã dự phòng (xxxx-xxxx), để xác nhận tắt 2FA.",
@@ -68,6 +69,19 @@
         "toasts": {
           "disabled": "Xác thực hai yếu tố đã bị tắt",
           "disableFailed": "Không thể tắt 2FA"
+        }
+      },
+      "resetModal": {
+        "title": "Đặt lại xác thực hai yếu tố",
+        "description": "Dùng tùy chọn này nếu ứng dụng xác thực hoặc mã dự phòng của bạn có thể đã bị lộ, hoặc nếu mã xác thực của bạn không còn hoạt động (ví dụ sau khi thay đổi bí mật máy chủ).",
+        "effect": "Trình xác thực hiện tại, mã dự phòng và thiết bị tin cậy của bạn sẽ ngừng hoạt động, và bạn sẽ bị đăng xuất khỏi mọi thiết bị khác. Sau đó bạn thiết lập ngay một trình xác thực mới.",
+        "passwordLabel": "Mật khẩu tài khoản",
+        "codeLabel": "Mã xác thực hoặc mã dự phòng",
+        "codeHint": "Nhập mã 6 chữ số từ ứng dụng xác thực của bạn. Nếu trình xác thực không còn hoạt động, hãy nhập một trong các mã dự phòng (xxxx-xxxx) thay thế.",
+        "resettingButton": "Đang đặt lại...",
+        "toasts": {
+          "reset": "Đã đặt lại xác thực hai yếu tố. Hãy thiết lập trình xác thực mới ngay bây giờ.",
+          "resetFailed": "Không thể đặt lại 2FA"
         }
       }
     },

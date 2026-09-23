@@ -60,6 +60,7 @@
       "addLayerDescription": "Ajoutez une couche de sécurité supplémentaire à votre compte.",
       "enableButton": "Activer la 2FA",
       "disableButton": "Désactiver la 2FA",
+      "resetButton": "Réinitialiser la 2FA",
       "disableModal": {
         "title": "Désactiver l'authentification à deux facteurs",
         "description": "Saisissez le code à 6 chiffres de votre application d'authentification, ou l'un de vos codes de secours (xxxx-xxxx), pour confirmer la désactivation de la 2FA.",
@@ -68,6 +69,19 @@
         "toasts": {
           "disabled": "Authentification à deux facteurs désactivée",
           "disableFailed": "Échec de la désactivation de l'authentification à deux facteurs"
+        }
+      },
+      "resetModal": {
+        "title": "Réinitialiser l'authentification à deux facteurs",
+        "description": "Utilisez cette option si votre application d'authentification ou vos codes de secours ont pu être exposés, ou si vos codes d'authentification ne fonctionnent plus (par exemple après un changement du secret du serveur).",
+        "effect": "Votre authentificateur actuel, vos codes de secours et vos appareils de confiance cesseront de fonctionner, et vous serez déconnecté de tous vos autres appareils. Vous configurerez ensuite immédiatement un nouvel authentificateur.",
+        "passwordLabel": "Mot de passe du compte",
+        "codeLabel": "Code d'authentification ou de secours",
+        "codeHint": "Saisissez le code à 6 chiffres de votre application d'authentification. Si votre authentificateur ne fonctionne plus, saisissez plutôt l'un de vos codes de secours (xxxx-xxxx).",
+        "resettingButton": "Réinitialisation...",
+        "toasts": {
+          "reset": "Authentification à deux facteurs réinitialisée. Configurez votre nouvel authentificateur maintenant.",
+          "resetFailed": "Échec de la réinitialisation de la 2FA"
         }
       }
     },

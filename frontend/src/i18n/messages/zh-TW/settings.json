@@ -60,6 +60,7 @@
       "addLayerDescription": "為您的帳戶新增額外的安全層。",
       "enableButton": "啟用 2FA",
       "disableButton": "停用 2FA",
+      "resetButton": "重設 2FA",
       "disableModal": {
         "title": "停用雙重驗證",
         "description": "輸入驗證器 App 中的 6 位數驗證碼，或您的任一備份驗證碼（xxxx-xxxx），以確認停用 2FA。",
@@ -68,6 +69,19 @@
         "toasts": {
           "disabled": "雙重驗證已停用",
           "disableFailed": "停用 2FA 失敗"
+        }
+      },
+      "resetModal": {
+        "title": "重設雙重驗證",
+        "description": "如果您的驗證器 App 或備份驗證碼可能已外洩，或驗證碼已無法使用（例如伺服器金鑰變更後），請使用此功能。",
+        "effect": "您目前的驗證器、備份驗證碼和受信任裝置將失效，並且您會在所有其他裝置上登出。接著您將立即設定新的驗證器。",
+        "passwordLabel": "帳戶密碼",
+        "codeLabel": "驗證碼或備份驗證碼",
+        "codeHint": "輸入驗證器 App 中的 6 位數驗證碼。如果驗證器已無法使用，請改為輸入您的任一備份驗證碼（xxxx-xxxx）。",
+        "resettingButton": "重設中...",
+        "toasts": {
+          "reset": "雙重驗證已重設。請立即設定新的驗證器。",
+          "resetFailed": "重設 2FA 失敗"
         }
       }
     },

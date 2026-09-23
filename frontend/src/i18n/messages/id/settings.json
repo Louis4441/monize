@@ -60,6 +60,7 @@
       "addLayerDescription": "Tambahkan lapisan keamanan ekstra ke akun Anda.",
       "enableButton": "Aktifkan 2FA",
       "disableButton": "Nonaktifkan 2FA",
+      "resetButton": "Setel Ulang 2FA",
       "disableModal": {
         "title": "Nonaktifkan Autentikasi Dua Faktor",
         "description": "Masukkan kode 6 digit dari aplikasi autentikator Anda, atau salah satu kode cadangan Anda (xxxx-xxxx), untuk mengonfirmasi menonaktifkan 2FA.",
@@ -68,6 +69,19 @@
         "toasts": {
           "disabled": "Autentikasi dua faktor dinonaktifkan",
           "disableFailed": "Gagal menonaktifkan 2FA"
+        }
+      },
+      "resetModal": {
+        "title": "Setel Ulang Autentikasi Dua Faktor",
+        "description": "Gunakan ini jika aplikasi autentikator atau kode cadangan Anda mungkin telah terekspos, atau jika kode autentikator Anda berhenti berfungsi (misalnya setelah rahasia server diubah).",
+        "effect": "Autentikator, kode cadangan, dan perangkat tepercaya Anda saat ini akan berhenti berfungsi, dan Anda akan keluar dari semua perangkat lain. Setelah itu Anda langsung menyiapkan autentikator baru.",
+        "passwordLabel": "Kata Sandi Akun",
+        "codeLabel": "Kode Autentikator atau Cadangan",
+        "codeHint": "Masukkan kode 6 digit dari aplikasi autentikator Anda. Jika autentikator Anda tidak lagi berfungsi, masukkan salah satu kode cadangan Anda (xxxx-xxxx) sebagai gantinya.",
+        "resettingButton": "Menyetel ulang...",
+        "toasts": {
+          "reset": "Autentikasi dua faktor disetel ulang. Siapkan autentikator baru Anda sekarang.",
+          "resetFailed": "Gagal menyetel ulang 2FA"
         }
       }
     },

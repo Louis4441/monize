@@ -60,6 +60,7 @@
       "addLayerDescription": "Hesabınıza ekstra bir güvenlik katmanı ekleyin.",
       "enableButton": "2FA'yı Etkinleştir",
       "disableButton": "2FA'yı Devre Dışı Bırak",
+      "resetButton": "2FA'yı Sıfırla",
       "disableModal": {
         "title": "İki Faktörlü Kimlik Doğrulamayı Devre Dışı Bırak",
         "description": "2FA'yı devre dışı bırakmayı onaylamak için kimlik doğrulama uygulamanızdaki 6 haneli kodu veya yedek kodlarınızdan birini (xxxx-xxxx) girin.",
@@ -68,6 +69,19 @@
         "toasts": {
           "disabled": "İki faktörlü kimlik doğrulama devre dışı bırakıldı",
           "disableFailed": "2FA devre dışı bırakılamadı"
+        }
+      },
+      "resetModal": {
+        "title": "İki Faktörlü Kimlik Doğrulamayı Sıfırla",
+        "description": "Kimlik doğrulama uygulamanız veya yedek kodlarınız açığa çıkmış olabilirse ya da kimlik doğrulama kodlarınız çalışmayı durdurduysa (örneğin sunucu sırrı değiştirildikten sonra) bunu kullanın.",
+        "effect": "Mevcut kimlik doğrulayıcınız, yedek kodlarınız ve güvenilir cihazlarınız çalışmayı durdurur ve diğer tüm cihazlarda oturumunuz kapatılır. Ardından hemen yeni bir kimlik doğrulayıcı kurarsınız.",
+        "passwordLabel": "Hesap Şifresi",
+        "codeLabel": "Kimlik Doğrulama veya Yedek Kod",
+        "codeHint": "Kimlik doğrulama uygulamanızdaki 6 haneli kodu girin. Kimlik doğrulayıcınız artık çalışmıyorsa bunun yerine yedek kodlarınızdan birini (xxxx-xxxx) girin.",
+        "resettingButton": "Sıfırlanıyor...",
+        "toasts": {
+          "reset": "İki faktörlü kimlik doğrulama sıfırlandı. Şimdi yeni kimlik doğrulayıcınızı kurun.",
+          "resetFailed": "2FA sıfırlanamadı"
         }
       }
     },

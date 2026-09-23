@@ -60,6 +60,7 @@
       "addLayerDescription": "为您的账户添加额外安全层。",
       "enableButton": "启用 2FA",
       "disableButton": "禁用 2FA",
+      "resetButton": "重置 2FA",
       "disableModal": {
         "title": "禁用双因素认证",
         "description": "输入身份验证器应用中的 6 位验证码，或您的任一备用码（xxxx-xxxx），以确认禁用 2FA。",
@@ -68,6 +69,19 @@
         "toasts": {
           "disabled": "双因素认证已禁用",
           "disableFailed": "禁用 2FA 失败"
+        }
+      },
+      "resetModal": {
+        "title": "重置双因素认证",
+        "description": "如果您的身份验证器应用或备用码可能已泄露，或者验证码已无法使用（例如服务器密钥更改后），请使用此功能。",
+        "effect": "您当前的身份验证器、备用码和受信任设备将失效，并且您将在所有其他设备上退出登录。随后您将立即设置新的身份验证器。",
+        "passwordLabel": "账户密码",
+        "codeLabel": "验证码或备用码",
+        "codeHint": "输入身份验证器应用中的 6 位验证码。如果身份验证器已无法使用，请改为输入您的任一备用码（xxxx-xxxx）。",
+        "resettingButton": "重置中...",
+        "toasts": {
+          "reset": "双因素认证已重置。请立即设置新的身份验证器。",
+          "resetFailed": "重置 2FA 失败"
         }
       }
     },

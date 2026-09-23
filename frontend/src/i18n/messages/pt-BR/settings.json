@@ -60,6 +60,7 @@
       "addLayerDescription": "Adicione uma camada extra de segurança à sua conta.",
       "enableButton": "Ativar 2FA",
       "disableButton": "Desativar 2FA",
+      "resetButton": "Redefinir 2FA",
       "disableModal": {
         "title": "Desativar Autenticação de Dois Fatores",
         "description": "Digite o código de 6 dígitos do seu aplicativo autenticador, ou um dos seus códigos de recuperação (xxxx-xxxx), para confirmar a desativação do 2FA.",
@@ -68,6 +69,19 @@
         "toasts": {
           "disabled": "Autenticação de dois fatores desativada",
           "disableFailed": "Falha ao desativar a autenticação de dois fatores"
+        }
+      },
+      "resetModal": {
+        "title": "Redefinir Autenticação de Dois Fatores",
+        "description": "Use esta opção se o seu aplicativo autenticador ou seus códigos de recuperação podem ter sido expostos, ou se seus códigos de autenticação pararam de funcionar (por exemplo, após uma alteração do segredo do servidor).",
+        "effect": "Seu autenticador atual, seus códigos de recuperação e seus dispositivos confiáveis deixarão de funcionar, e você será desconectado de todos os outros dispositivos. Em seguida, você configura um novo autenticador imediatamente.",
+        "passwordLabel": "Senha da conta",
+        "codeLabel": "Código do autenticador ou de recuperação",
+        "codeHint": "Digite o código de 6 dígitos do seu aplicativo autenticador. Se o seu autenticador não funcionar mais, digite um dos seus códigos de recuperação (xxxx-xxxx).",
+        "resettingButton": "Redefinindo...",
+        "toasts": {
+          "reset": "Autenticação de dois fatores redefinida. Configure seu novo autenticador agora.",
+          "resetFailed": "Falha ao redefinir o 2FA"
         }
       }
     },

@@ -60,6 +60,7 @@
       "addLayerDescription": "Dodaj dodatkową warstwę zabezpieczeń do swojego konta.",
       "enableButton": "Włącz 2FA",
       "disableButton": "Wyłącz 2FA",
+      "resetButton": "Zresetuj 2FA",
       "disableModal": {
         "title": "Wyłącz uwierzytelnianie dwuskładnikowe",
         "description": "Wpisz 6-cyfrowy kod z aplikacji uwierzytelniającej lub jeden z kodów zapasowych (xxxx-xxxx), aby potwierdzić wyłączenie 2FA.",
@@ -68,6 +69,19 @@
         "toasts": {
           "disabled": "Wyłączono uwierzytelnianie dwuskładnikowe",
           "disableFailed": "Nie udało się wyłączyć uwierzytelniania dwuskładnikowego"
+        }
+      },
+      "resetModal": {
+        "title": "Zresetuj uwierzytelnianie dwuskładnikowe",
+        "description": "Użyj tej opcji, jeśli aplikacja uwierzytelniająca lub kody zapasowe mogły zostać ujawnione albo jeśli kody uwierzytelniające przestały działać (na przykład po zmianie sekretu serwera).",
+        "effect": "Obecny uwierzytelniacz, kody zapasowe i zaufane urządzenia przestaną działać, a Ty zostaniesz wylogowany na wszystkich innych urządzeniach. Następnie od razu skonfigurujesz nowy uwierzytelniacz.",
+        "passwordLabel": "Hasło konta",
+        "codeLabel": "Kod uwierzytelniający lub zapasowy",
+        "codeHint": "Wpisz 6-cyfrowy kod z aplikacji uwierzytelniającej. Jeśli uwierzytelniacz już nie działa, wpisz zamiast tego jeden z kodów zapasowych (xxxx-xxxx).",
+        "resettingButton": "Resetowanie...",
+        "toasts": {
+          "reset": "Uwierzytelnianie dwuskładnikowe zostało zresetowane. Skonfiguruj teraz nowy uwierzytelniacz.",
+          "resetFailed": "Nie udało się zresetować 2FA"
         }
       }
     },
