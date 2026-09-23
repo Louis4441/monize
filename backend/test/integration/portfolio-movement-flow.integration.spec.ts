@@ -100,8 +100,8 @@ describe("portfolio movement external flow (integration)", () => {
     await dataSource.query(
       `INSERT INTO notification_portfolio_state
          (user_id, move_alert_percent, baseline_value, baseline_currency,
-          baseline_captured_on)
-       VALUES ($1, 5, 100000, 'USD', $2)`,
+          baseline_captured_on, baseline_positions)
+       VALUES ($1, 5, 100000, 'USD', $2, '[]'::jsonb)`,
       [userId, baselineOn],
     );
   });
@@ -152,7 +152,7 @@ describe("portfolio movement external flow (integration)", () => {
       pricesComplete: true,
       unpricedSecurityIds: [],
       valuationComplete: true,
-      // No holdings: the price-freshness rule has its own unit coverage, and
+      // No holdings: the late-price rule has its own unit coverage, and
       // leaving it out keeps this suite about the flow SQL.
       holdings: [],
       holdingsByAccount: [],
@@ -308,6 +308,17 @@ describe("portfolio movement external flow (integration)", () => {
     expect(getRateForDate).toHaveBeenCalledWith("CAD", "USD", dayOne);
     expect(getRateForDate).toHaveBeenCalledWith("CAD", "USD", dayTwo);
     expect(getRateForDate).not.toHaveBeenCalledWith("CAD", "USD", today);
+
+    // The advanced baseline carries its per-security closes as a JSON array
+    // (none here: no holdings), which the next run reads back and compares
+    // against rather than replacing (INV-PORTMOVE-008).
+    const [state] = await dataSource.query(
+      `SELECT jsonb_typeof(baseline_positions) AS kind,
+              jsonb_array_length(baseline_positions) AS count
+         FROM notification_portfolio_state WHERE user_id = $1`,
+      [userId],
+    );
+    expect(state).toEqual({ kind: "array", count: 0 });
   });
 
   it("withholds the alert and the baseline when one day's rate is missing", async () => {

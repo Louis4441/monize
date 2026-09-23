@@ -19,15 +19,15 @@ export interface MovementInputs {
   /** Today's portfolio value (holdings + cash) in the reporting currency. */
   mvToday: number;
   /**
-   * False when a held position's latest accepted close predates the baseline
-   * date, so part of today's value is carried from before the period being
-   * measured (INV-PORTMOVE-008). Such a position contributes an identical
-   * carried figure to both ends only for as long as its price stays missing:
-   * the run in which the price arrives (or the row disappears) books the whole
-   * catch-up as a market move that never happened. The producer passes `true`
-   * when there is no baseline date to be stale against.
+   * The late closes since the baseline (INV-PORTMOVE-008): a position valued at
+   * the baseline on a close older than the tolerance, whose new close has since
+   * arrived. `value` is what they add to the baseline -- the baseline restated at
+   * the closes that arrived -- so the catch-up is not booked as this period's
+   * market move. `complete: false` means a late close could not be valued in the
+   * reporting currency. The producer passes `{ complete: true, value: 0 }` when
+   * there is no baseline to restate.
    */
-  pricesCurrentSinceBaseline: boolean;
+  latePrice: { complete: boolean; value: number };
   /** The reporting currency today's value is in. */
   currency: string;
   /** The stored baseline, or null when none has been captured. */
@@ -41,6 +41,13 @@ export interface MovementInputs {
    * front of the reader. Such a baseline is replaced, not compared.
    */
   baselineDateKnown: boolean;
+  /**
+   * Whether the stored baseline carries the per-security closes it was valued
+   * at. Without them a late close cannot be told from a market move, so such a
+   * baseline (one written before the snapshot existed) is replaced, not
+   * compared.
+   */
+  baselinePositionsKnown: boolean;
   /** The day's external cash flow into the investment accounts. */
   flow: { complete: boolean; value: number };
   /** The user's threshold in percent; <= 0 or null means the alert is off. */
@@ -63,6 +70,13 @@ export interface FiredMovement {
   baselineValue: number;
   currentValue: number;
   externalFlow: number;
+  /**
+   * What late closes added to the baseline (INV-PORTMOVE-008), removed from the
+   * movement: `movementValue = currentValue - baselineValue - latePriceAdjustment
+   * - externalFlow`, and the percentage is over `baselineValue +
+   * latePriceAdjustment`, the baseline restated at the closes that arrived.
+   */
+  latePriceAdjustment: number;
 }
 
 export interface MovementDecision {
@@ -86,19 +100,21 @@ const roundPercent = (value: number): number => {
  *
  * 1. Value incomplete -> no-op (no alert, no rebaseline): a subtotal is unknown.
  * 2. Off (no threshold) -> no-op: nothing to maintain a baseline for.
- * 3. No baseline, a reporting-currency change, or a baseline with no capture
- *    date -> rebaseline, no alert: an undated baseline names no period, so the
- *    flow and the price-freshness evidence below have nothing to span.
+ * 3. No baseline, a reporting-currency change, a baseline with no capture date,
+ *    or one with no per-security closes -> rebaseline, no alert: an undated
+ *    baseline names no period, and one without its closes cannot tell a late
+ *    price from a market move.
  * 4. Flow incomplete -> no-op: an unconvertible contribution makes the movement
  *    unknown; do not rebaseline on an unknown run either.
- * 5. A held position priced before the baseline date -> no-op: today's value is
- *    partly carried evidence, so the difference is not a market move
- *    (INV-PORTMOVE-008). Checked after the baseline exists, because "older than
- *    the baseline" has no meaning before there is one.
- * 6. Baseline value 0 -> undefined percentage -> rebaseline, no alert.
- * 7. Otherwise compute movement = mvToday - baseline - flow, compare
- *    |movement / baseline| against the threshold (at full precision), and
- *    rebaseline to today whether or not it fired.
+ * 5. A late close that cannot be valued -> rebaseline, no alert
+ *    (INV-PORTMOVE-008). The movement is unknown, so nothing fires; but the
+ *    stored closes are what make it unknown, and keeping them would make every
+ *    later run unknown too, so the baseline moves to today's complete value.
+ * 6. Restated baseline value 0 -> undefined percentage -> rebaseline, no alert.
+ * 7. Otherwise restate the baseline at the late closes, compute movement =
+ *    mvToday - restatedBaseline - flow, compare |movement / restatedBaseline|
+ *    against the threshold (at full precision), and rebaseline to today whether
+ *    or not it fired.
  */
 export function decideMovement(input: MovementInputs): MovementDecision {
   if (!input.mvComplete) return { fire: null, rebaselineTo: null };
@@ -108,23 +124,25 @@ export function decideMovement(input: MovementInputs): MovementDecision {
   if (
     input.baseline == null ||
     input.baseline.currency !== input.currency ||
-    !input.baselineDateKnown
+    !input.baselineDateKnown ||
+    !input.baselinePositionsKnown
   ) {
     return { fire: null, rebaselineTo: input.mvToday };
   }
   if (!input.flow.complete) return { fire: null, rebaselineTo: null };
-  if (!input.pricesCurrentSinceBaseline) {
-    return { fire: null, rebaselineTo: null };
+  if (!input.latePrice.complete) {
+    return { fire: null, rebaselineTo: input.mvToday };
   }
-  if (input.baseline.value === 0) {
+  const restated = input.baseline.value + input.latePrice.value;
+  if (restated === 0) {
     return { fire: null, rebaselineTo: input.mvToday };
   }
 
   // The threshold compares at full precision, but the STORED movement is the
-  // difference of three decimal(20,4) values, and the difference of two 4dp
+  // difference of four decimal(20,4) values, and the difference of two 4dp
   // decimals is not a 4dp decimal -- round the delta before it is persisted.
-  const movement = input.mvToday - input.baseline.value - input.flow.value;
-  const rawPercent = (movement / input.baseline.value) * 100;
+  const movement = input.mvToday - restated - input.flow.value;
+  const rawPercent = (movement / restated) * 100;
   const fires = Math.abs(rawPercent) >= input.movePercent;
   return {
     fire: fires
@@ -135,6 +153,7 @@ export function decideMovement(input: MovementInputs): MovementDecision {
           baselineValue: roundMoney(input.baseline.value),
           currentValue: roundMoney(input.mvToday),
           externalFlow: roundMoney(input.flow.value),
+          latePriceAdjustment: roundMoney(input.latePrice.value),
         }
       : null,
     rebaselineTo: input.mvToday,

@@ -3,10 +3,11 @@ import { MovementInputs, decideMovement } from "./portfolio-movement.util";
 const base = (over: Partial<MovementInputs>): MovementInputs => ({
   mvComplete: true,
   mvToday: 100_000,
-  pricesCurrentSinceBaseline: true,
+  latePrice: { complete: true, value: 0 },
   currency: "USD",
   baseline: { value: 100_000, currency: "USD" },
   baselineDateKnown: true,
+  baselinePositionsKnown: true,
   flow: { complete: true, value: 0 },
   movePercent: 5,
   ...over,
@@ -105,6 +106,7 @@ describe("decideMovement", () => {
       baselineValue: 100_000,
       currentValue: 92_000,
       externalFlow: 0,
+      latePriceAdjustment: 0,
     });
     expect(d.rebaselineTo).toBe(92_000);
   });
@@ -120,30 +122,74 @@ describe("decideMovement", () => {
       baselineValue: 100_000,
       currentValue: 106_000,
       externalFlow: 0,
+      latePriceAdjustment: 0,
     });
   });
 
-  it("withholds and does not rebaseline on a holding priced before the baseline", () => {
-    // INV-PORTMOVE-008: part of today's value is carried from before the period,
-    // so the difference is not a market move. Withholding rather than
-    // rebaselining is what stops the catch-up firing on the day the price lands.
+  it("re-baselines without firing when the baseline carries no per-security closes", () => {
+    // A baseline written before the snapshot existed cannot tell a late close
+    // from a market move, so it is replaced rather than compared against.
     const d = decideMovement(
-      base({
-        mvToday: 92_000,
-        baseline: { value: 100_000, currency: "USD" },
-        pricesCurrentSinceBaseline: false,
-      }),
+      base({ baselinePositionsKnown: false, mvToday: 70_000 }),
     );
-    expect(d).toEqual({ fire: null, rebaselineTo: null });
+    expect(d).toEqual({ fire: null, rebaselineTo: 70_000 });
   });
 
-  it("ignores stale prices before there is a baseline to be stale against", () => {
+  it("restates the baseline at a late close instead of booking the catch-up (#1391)", () => {
+    // INV-PORTMOVE-008. A holding carried at an old close was worth 30,000 at
+    // the baseline; its new close adds 28,000. Market: +1,000 on the rest.
+    // Booked as a move that is +29%; restated, the baseline is 128,000 and the
+    // period's own move is +1,000 / 128,000 = +0.78%, below the threshold.
     const d = decideMovement(
-      base({ baseline: null, pricesCurrentSinceBaseline: false }),
+      base({
+        mvToday: 129_000,
+        baseline: { value: 100_000, currency: "USD" },
+        latePrice: { complete: true, value: 28_000 },
+      }),
     );
-    // The producer passes `true` here; even so, a first capture must not be
-    // blocked by a rule about a period that does not exist yet.
-    expect(d.rebaselineTo).toBe(100_000);
+    expect(d.fire).toBeNull();
+    // The baseline advances: a late close never holds the alert up (#1435).
+    expect(d.rebaselineTo).toBe(129_000);
+  });
+
+  it("fires on the period's own move over the restated baseline, and carries the restatement", () => {
+    // Restated baseline 110,000; today 99,000 -> -11,000 / 110,000 = -10%.
+    const d = decideMovement(
+      base({
+        mvToday: 99_000,
+        baseline: { value: 100_000, currency: "USD" },
+        latePrice: { complete: true, value: 10_000 },
+      }),
+    );
+    expect(d.fire).toEqual({
+      changePercent: -10,
+      direction: "down",
+      movementValue: -11_000,
+      baselineValue: 100_000,
+      currentValue: 99_000,
+      externalFlow: 0,
+      latePriceAdjustment: 10_000,
+    });
+    expect(d.rebaselineTo).toBe(99_000);
+  });
+
+  it("re-baselines without firing when a late close cannot be valued", () => {
+    // The movement is unknown, so nothing fires. Keeping the baseline would keep
+    // the closes that make it unknown and stall every later run, so it moves.
+    const d = decideMovement(
+      base({
+        mvToday: 60_000,
+        latePrice: { complete: false, value: 0 },
+      }),
+    );
+    expect(d).toEqual({ fire: null, rebaselineTo: 60_000 });
+  });
+
+  it("ignores late-price evidence before there is a baseline to restate", () => {
+    const d = decideMovement(
+      base({ baseline: null, latePrice: { complete: false, value: 0 } }),
+    );
+    expect(d).toEqual({ fire: null, rebaselineTo: 100_000 });
   });
 
   it("stays silent below the threshold but still rebaselines", () => {
