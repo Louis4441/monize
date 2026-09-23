@@ -39,6 +39,9 @@ function notificationRoute(notification: Notification): string | null {
       return '/settings';
     case 'PROVIDER_OUTAGE':
     case 'PROVIDER_RECOVERED':
+    // A server setting, fixed in the deployment's configuration: no page here
+    // says more than the notification does.
+    case 'JWT_SECRET_WEAK':
       return null;
     default:
       return notification.budgetId ? `/budgets/${notification.budgetId}` : null;

@@ -121,6 +121,8 @@ export function useNotificationCopy() {
         return t('system.backupPartial.title');
       case 'ENCRYPTION_KEY_MISSING':
         return t('system.encryptionKeyMissing.title');
+      case 'JWT_SECRET_WEAK':
+        return t('system.jwtSecretWeak.title');
       case 'SMTP_FAILURE':
         return t('system.smtpFailure.title');
       case 'PROVIDER_OUTAGE':
@@ -187,6 +189,8 @@ export function useNotificationCopy() {
       }
       case 'ENCRYPTION_KEY_MISSING':
         return t('system.encryptionKeyMissing.message');
+      case 'JWT_SECRET_WEAK':
+        return t('system.jwtSecretWeak.message');
       case 'SMTP_FAILURE':
         return t('system.smtpFailure.message', { error: data.lastError ?? '' });
       case 'PROVIDER_OUTAGE':

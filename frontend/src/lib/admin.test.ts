@@ -78,6 +78,13 @@ describe('adminApi', () => {
     expect(result.temporaryPassword).toBe('abc123');
   });
 
+  it('getDeploymentStatus reads the admin deployment status', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { jwtSecretWeakness: 'placeholder' } });
+    const result = await adminApi.getDeploymentStatus();
+    expect(apiClient.get).toHaveBeenCalledWith('/admin/deployment-status');
+    expect(result).toEqual({ jwtSecretWeakness: 'placeholder' });
+  });
+
   it('resetUserTwoFactor posts to the reset-2fa endpoint', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({ data: { reset: true } });
     const result = await adminApi.resetUserTwoFactor('u-1');

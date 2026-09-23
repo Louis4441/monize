@@ -55,7 +55,24 @@ export interface AdminUserStorage {
   attachments: AdminAttachmentStorage;
 }
 
+/**
+ * Deployment configuration an administrator has to fix, from the admin-only
+ * `GET /admin/deployment-status`. Reason codes only: the server never sends
+ * the secret, or anything derived from it.
+ */
+export interface DeploymentStatus {
+  /** Why JWT_SECRET is weak, or `null` when it is not. */
+  jwtSecretWeakness: 'placeholder' | 'predictable' | null;
+}
+
 export const adminApi = {
+  getDeploymentStatus: async (): Promise<DeploymentStatus> => {
+    const response = await apiClient.get<DeploymentStatus>(
+      '/admin/deployment-status',
+    );
+    return response.data;
+  },
+
   getUsers: async (): Promise<AdminUser[]> => {
     const response = await apiClient.get<AdminUser[]>('/admin/users');
     return response.data;

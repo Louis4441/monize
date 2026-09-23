@@ -44,7 +44,24 @@ vi.mock('./UpdateAvailableBanner', () => ({
   ),
 }));
 
+vi.mock('./WeakJwtSecretBanner', () => ({
+  WeakJwtSecretBanner: () => (
+    <div data-testid="weak-jwt-secret-banner">WeakJwtSecretBanner</div>
+  ),
+}));
+
 describe('SwipeShell', () => {
+  it('mounts the weak JWT_SECRET banner on app pages but not on auth routes', () => {
+    mockPathname = '/dashboard';
+    const { unmount } = render(<SwipeShell><p>Content</p></SwipeShell>);
+    expect(screen.getByTestId('weak-jwt-secret-banner')).toBeInTheDocument();
+    unmount();
+
+    mockPathname = '/login';
+    render(<SwipeShell><p>Content</p></SwipeShell>);
+    expect(screen.queryByTestId('weak-jwt-secret-banner')).not.toBeInTheDocument();
+  });
+
   it('renders AppHeader and children on app pages', () => {
     mockPathname = '/dashboard';
     render(<SwipeShell><p>Dashboard content</p></SwipeShell>);

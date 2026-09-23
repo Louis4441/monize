@@ -95,6 +95,10 @@
       "title": "[XX-Encryption key not configured-XX]",
       "message": "[XX-ENCRYPTION_KEY is not set, so backups are written unencrypted and secrets cannot be stored. A future release will refuse to start without it.-XX]"
     },
+    "jwtSecretWeak": {
+      "title": "[XX-JWT_SECRET is weak-XX]",
+      "message": "[XX-JWT_SECRET is a published placeholder or too predictable, so session tokens can be forged. Generate a strong one (openssl rand -base64 32). Changing it stops authenticator codes from working and forgets trusted devices: users sign in with a backup code and set up 2FA again, and you reset 2FA in User Management for anyone without one. See docs/backend/modules-and-runtime.md (Changing JWT_SECRET) first.-XX]"
+    },
     "smtpFailure": {
       "title": "[XX-Email delivery is failing-XX]",
       "message": "[XX-Monize could not send email: {error}. Notifications and reminders are not being delivered.-XX]"

@@ -659,6 +659,29 @@ describe('NotificationList', () => {
       expect(mockPush).not.toHaveBeenCalled();
     });
 
+    it('renders a weak JWT_SECRET alert in the reader language and opens no page', () => {
+      const onClose = vi.fn();
+      render(
+        <NotificationList
+          {...defaultProps}
+          notifications={[
+            systemNotification({
+              id: 'sys-1',
+              type: 'JWT_SECRET_WEAK',
+              data: { system: true, reason: 'placeholder' },
+            }),
+          ]}
+          onClose={onClose}
+        />,
+      );
+      expect(screen.getByText('JWT_SECRET is weak')).toBeInTheDocument();
+      expect(screen.getByText(/users sign in with a backup code/)).toBeInTheDocument();
+      expect(screen.queryByText('STORED ENGLISH TITLE')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('notification-item-sys-1'));
+      expect(onClose).toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
     // The producer knows which page its notification is about; the client only
     // knows the type. So the server's target wins over the type table.
     it('follows the server target in preference to the type it would derive', () => {
