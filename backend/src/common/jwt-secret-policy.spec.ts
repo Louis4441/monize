@@ -61,6 +61,15 @@ describe("jwtSecretProblem", () => {
     );
   });
 
+  it("judges a multi-byte secret without throwing", () => {
+    // A prefix repeated to the same UTF-16 length can differ in byte length;
+    // the constant-time comparison must treat that as "not a repeat".
+    expect(
+      jwtSecretProblem("é" + "Kq8vZ2mX9pL4rT7wB1nC6yH3jF5dG0sA"),
+    ).toBeNull();
+    expect(jwtSecretProblem("éé".repeat(20))).toMatch(/distinct|repeat/i);
+  });
+
   it("accepts what the documented generators print", () => {
     // 200 draws of each shape; the spec's arithmetic puts a false refusal of a
     // 32-byte hex secret near 1e-19, so a failure here is the rule's fault.

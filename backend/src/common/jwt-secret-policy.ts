@@ -20,6 +20,8 @@
  * was typed rather than generated.
  */
 
+import { timingSafeEqual } from "crypto";
+
 /** Shortest `JWT_SECRET` the server will start with. */
 export const MIN_JWT_SECRET_LENGTH = 32;
 
@@ -69,7 +71,17 @@ function isRepeatedUnit(secret: string): boolean {
   for (let unit = 1; unit <= secret.length / 2; unit++) {
     if (secret.length % unit !== 0) continue;
     const head = secret.slice(0, unit);
-    if (head.repeat(secret.length / unit) === secret) return true;
+    // Compared in constant time because the right-hand side is the signing
+    // secret itself (CWE-208). Byte lengths can differ for multi-byte input,
+    // which timingSafeEqual refuses, and which also means "not a repeat".
+    const candidate = Buffer.from(head.repeat(secret.length / unit));
+    const actual = Buffer.from(secret);
+    if (
+      candidate.length === actual.length &&
+      timingSafeEqual(candidate, actual)
+    ) {
+      return true;
+    }
   }
   return false;
 }
