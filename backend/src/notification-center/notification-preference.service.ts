@@ -398,13 +398,15 @@ export class NotificationPreferenceService {
       percent == null
         ? manager.query(
             `INSERT INTO notification_portfolio_state
-               (user_id, move_alert_percent, baseline_value, baseline_currency, baseline_captured_on)
-             VALUES ($1, NULL, NULL, NULL, NULL)
+               (user_id, move_alert_percent, baseline_value, baseline_currency,
+                baseline_captured_on, baseline_positions)
+             VALUES ($1, NULL, NULL, NULL, NULL, NULL)
              ON CONFLICT (user_id) DO UPDATE
                SET move_alert_percent = NULL,
                    baseline_value = NULL,
                    baseline_currency = NULL,
-                   baseline_captured_on = NULL`,
+                   baseline_captured_on = NULL,
+                   baseline_positions = NULL`,
             [userId],
           )
         : manager.query(

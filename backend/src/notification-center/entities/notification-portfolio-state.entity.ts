@@ -71,6 +71,15 @@ export class NotificationPortfolioState {
   })
   baselineCapturedOn: string | null;
 
+  /**
+   * The per-security closes the baseline was valued at (INV-PORTMOVE-008),
+   * written and read by `PortfolioMovementAlertService` as
+   * `BaselinePosition[]`. NULL means none were recorded, and the next run
+   * replaces the baseline rather than comparing against it.
+   */
+  @Column({ type: "jsonb", name: "baseline_positions", nullable: true })
+  baselinePositions: unknown;
+
   @Column({
     type: "timestamp",
     name: "created_at",
