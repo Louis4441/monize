@@ -236,6 +236,28 @@ export default function AdminUsersPage() {
     });
   };
 
+  const handleResetTwoFactor = (user: AdminUser) => {
+    const userName = user.firstName || user.email || 'this user';
+
+    setConfirmDialog({
+      isOpen: true,
+      title: t('usersPage.dialogs.resetTwoFactorTitle'),
+      message: t('usersPage.dialogs.resetTwoFactorMessage', { name: userName }),
+      variant: 'warning',
+      confirmLabel: t('usersPage.dialogs.resetTwoFactorConfirm'),
+      onConfirm: async () => {
+        try {
+          await adminApi.resetUserTwoFactor(user.id);
+          toast.success(t('usersPage.toasts.twoFactorReset', { name: userName }));
+          loadUsers();
+        } catch (error) {
+          toast.error(getErrorMessage(error, t('usersPage.toasts.resetTwoFactorFailed')));
+        }
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
+  };
+
   const handleDeleteUser = (user: AdminUser) => {
     const userName = user.firstName || user.email || 'this user';
 
@@ -289,6 +311,7 @@ export default function AdminUsersPage() {
               onChangeRole={handleChangeRole}
               onToggleStatus={handleToggleStatus}
               onResetPassword={handleResetPassword}
+              onResetTwoFactor={handleResetTwoFactor}
               onDeleteUser={handleDeleteUser}
             />
           )}

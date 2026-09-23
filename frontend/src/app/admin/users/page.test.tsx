@@ -81,6 +81,7 @@ const mockCreateUser = vi.fn();
 const mockUpdateUserRole = vi.fn();
 const mockUpdateUserStatus = vi.fn();
 const mockResetUserPassword = vi.fn();
+const mockResetUserTwoFactor = vi.fn();
 const mockDeleteUser = vi.fn();
 const mockGetUserStorage = vi.fn();
 
@@ -91,6 +92,7 @@ vi.mock('@/lib/admin', () => ({
     updateUserRole: (...args: any[]) => mockUpdateUserRole(...args),
     updateUserStatus: (...args: any[]) => mockUpdateUserStatus(...args),
     resetUserPassword: (...args: any[]) => mockResetUserPassword(...args),
+    resetUserTwoFactor: (...args: any[]) => mockResetUserTwoFactor(...args),
     deleteUser: (...args: any[]) => mockDeleteUser(...args),
     getUserStorage: (...args: any[]) => mockGetUserStorage(...args),
   },
@@ -172,7 +174,7 @@ vi.mock('@/components/admin/ResetPasswordModal', () => ({
 }));
 
 vi.mock('@/components/admin/UserManagementTable', () => ({
-  UserManagementTable: ({ users, storage, currentUserId, onChangeRole, onToggleStatus, onResetPassword, onDeleteUser }: any) => (
+  UserManagementTable: ({ users, storage, currentUserId, onChangeRole, onToggleStatus, onResetPassword, onResetTwoFactor, onDeleteUser }: any) => (
     <div data-testid="user-table">
       <span data-testid="storage-status">{storage.status}</span>
       {storage.status === 'ready' && (
@@ -192,6 +194,7 @@ vi.mock('@/components/admin/UserManagementTable', () => ({
                 {user.isActive ? 'Disable' : 'Enable'}
               </button>
               <button onClick={() => onResetPassword(user)}>Reset Password</button>
+              <button onClick={() => onResetTwoFactor(user)}>Reset 2FA</button>
               <button onClick={() => onDeleteUser(user)}>Delete</button>
             </>
           )}
@@ -368,6 +371,50 @@ describe('AdminUsersPage', () => {
         expect(screen.getByTestId('reset-password-modal')).toBeInTheDocument();
         expect(screen.getByText(/TempPass123!/)).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('Two-factor reset', () => {
+    it('confirms, resets, reports success and reloads the list', async () => {
+      mockResetUserTwoFactor.mockResolvedValue({ reset: true });
+      const toast = await import('react-hot-toast');
+      render(<AdminUsersPage />);
+      await waitFor(() => expect(screen.getByTestId('user-table')).toBeInTheDocument());
+      expect(mockGetUsers).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getAllByText('Reset 2FA')[0]);
+      await waitFor(() => {
+        expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
+        expect(screen.getByText(/switches off two-factor authentication for Alice/)).toBeInTheDocument();
+      });
+      expect(mockResetUserTwoFactor).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByText('Reset 2FA', { selector: '[data-testid="confirm-dialog"] button' }));
+      await waitFor(() => expect(mockResetUserTwoFactor).toHaveBeenCalledWith('user-1'));
+      await waitFor(() =>
+        expect(toast.default.success).toHaveBeenCalledWith(
+          'Two-factor authentication was reset for Alice. They have been signed out.',
+        ),
+      );
+      await waitFor(() => expect(mockGetUsers).toHaveBeenCalledTimes(2));
+      expect(screen.queryByTestId('confirm-dialog')).not.toBeInTheDocument();
+    });
+
+    it('reports a refusal (such as a user with no 2FA) as an error toast', async () => {
+      mockResetUserTwoFactor.mockRejectedValue(new Error('400'));
+      const toast = await import('react-hot-toast');
+      render(<AdminUsersPage />);
+      await waitFor(() => expect(screen.getByTestId('user-table')).toBeInTheDocument());
+
+      fireEvent.click(screen.getAllByText('Reset 2FA')[0]);
+      await waitFor(() => expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument());
+      fireEvent.click(screen.getByText('Reset 2FA', { selector: '[data-testid="confirm-dialog"] button' }));
+
+      await waitFor(() =>
+        expect(toast.default.error).toHaveBeenCalledWith(
+          'Failed to reset two-factor authentication',
+        ),
+      );
     });
   });
 

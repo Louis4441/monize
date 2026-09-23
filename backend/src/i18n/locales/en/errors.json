@@ -92,7 +92,9 @@
     "cannotDeleteOwnAccount": "You cannot delete your own account",
     "deleteLastAdmin": "Cannot delete the last admin account.",
     "cannotResetOwnPassword": "You cannot reset your own password through the admin panel",
-    "noLocalPassword": "Cannot reset password for accounts without a local password"
+    "noLocalPassword": "Cannot reset password for accounts without a local password",
+    "cannotResetOwnTwoFactor": "You cannot reset your own two-factor authentication through the admin panel",
+    "twoFactorNotEnabled": "This user does not have two-factor authentication set up."
   },
   "ai": {
     "queryStreamFailed": "An unexpected error occurred while processing your query.",

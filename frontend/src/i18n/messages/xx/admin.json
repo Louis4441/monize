@@ -62,6 +62,7 @@
     "clickToDisable": "[XX-Click to disable-XX]",
     "clickToEnable": "[XX-Click to enable-XX]",
     "resetPassword": "[XX-Reset Password-XX]",
+    "resetTwoFactor": "[XX-Reset 2FA-XX]",
     "noUsers": "[XX-No users found.-XX]",
     "storageLoading": "[XX-Loading…-XX]",
     "storageUnavailable": "[XX-Unavailable-XX]",
@@ -96,7 +97,9 @@
       "loadFailed": "[XX-Failed to load users-XX]",
       "deleteFailed": "[XX-Failed to delete user-XX]",
       "disableFailed": "[XX-Failed to disable user-XX]",
-      "resetFailed": "[XX-Failed to reset password-XX]"
+      "resetFailed": "[XX-Failed to reset password-XX]",
+      "twoFactorReset": "[XX-Two-factor authentication was reset for {name}. They have been signed out.-XX]",
+      "resetTwoFactorFailed": "[XX-Failed to reset two-factor authentication-XX]"
     },
     "dialogs": {
       "promoteTitle": "[XX-Promote User?-XX]",
@@ -111,6 +114,9 @@
       "resetTitle": "[XX-Reset Password?-XX]",
       "resetMessage": "[XX-This will generate a new temporary password for {name}. They will be required to change it on next login.-XX]",
       "resetConfirm": "[XX-Reset Password-XX]",
+      "resetTwoFactorTitle": "[XX-Reset Two-Factor Authentication?-XX]",
+      "resetTwoFactorMessage": "[XX-This switches off two-factor authentication for {name}, deletes their backup codes and trusted devices, and signs them out everywhere. They can then sign in with their password and set up 2FA again. Use it when they have lost their authenticator and backup codes, or after JWT_SECRET was changed.-XX]",
+      "resetTwoFactorConfirm": "[XX-Reset 2FA-XX]",
       "deleteTitle": "[XX-Delete User?-XX]",
       "deleteMessage": "[XX-Are you sure you want to delete {name}? This will permanently remove their account and all associated data. This action cannot be undone. If they are a delegate of another account, their own data is removed but their login is kept so the delegation still works -- they become a delegate-only user.-XX]",
       "deleteConfirm": "[XX-Delete User-XX]",

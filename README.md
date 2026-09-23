@@ -198,7 +198,7 @@ monize/
 │   ├── src/
 │   │   ├── auth/              # Authentication (Local, OIDC, 2FA, trusted devices, PAT)
 │   │   ├── users/             # User management & preferences
-│   │   ├── admin/             # Admin user management (roles, status, password reset)
+│   │   ├── admin/             # Admin user management (roles, status, password and 2FA reset)
 │   │   ├── accounts/          # Account management
 │   │   ├── transactions/      # Transaction management
 │   │   ├── categories/        # Category management (hierarchical)
@@ -430,6 +430,7 @@ Swagger UI is available at `/api/docs` in **development mode only** (disabled in
 - `GET /api/v1/portfolio/summary` - Investment portfolio summary
 - `GET /api/v1/portfolio/top-movers` - Daily top movers
 - `GET /api/v1/admin/users` - Admin: list all users
+- `POST /api/v1/admin/users/:id/reset-2fa` - Admin: reset a user's two-factor authentication and sign them out
 - `POST /api/v1/ai/query` - Natural language financial query
 - `POST /api/v1/ai/query/stream` - Streaming financial query (SSE)
 - `GET /api/v1/ai/configs` - List AI provider configurations

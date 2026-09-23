@@ -121,4 +121,17 @@ export const adminApi = {
     );
     return response.data;
   },
+
+  /**
+   * Switch a user's two-factor authentication off so they can sign in with
+   * their password and enroll again: clears their TOTP secret and backup codes,
+   * deletes their trusted devices and signs them out. Refused (400) for a user
+   * with no 2FA set up, and (403) for the calling admin themself.
+   */
+  resetUserTwoFactor: async (userId: string): Promise<{ reset: true }> => {
+    const response = await apiClient.post<{ reset: true }>(
+      `/admin/users/${userId}/reset-2fa`,
+    );
+    return response.data;
+  },
 };
