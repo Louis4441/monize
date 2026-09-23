@@ -421,8 +421,11 @@ export class OAuthProviderService implements OnModuleInit {
 
   /**
    * Revoke every OIDC artifact bound to a user — access tokens, refresh
-   * tokens, authorization codes, grants, sessions. Called from admin flows
-   * (deactivate, password reset) so revocation takes effect immediately
+   * tokens, authorization codes, grants, sessions. Called wherever the
+   * account's credentials are replaced (admin deactivate/delete/password reset,
+   * and via `revokeOAuthGrantsAfterCommit` in `auth/credential-revocation.ts`
+   * the emailed reset, a password change, a delegate reset, an emergency-access
+   * claim and an OIDC link confirmation) so revocation takes effect immediately
    * instead of waiting for the access-token TTL to expire.
    *
    * Implementation: a single SQL DELETE on the payload store, keyed on the
@@ -433,8 +436,9 @@ export class OAuthProviderService implements OnModuleInit {
    * `oauth_payloads`, and the only one keyed by an application user id -- the
    * exemption's original rationale claimed the table was "never queried per
    * end-user", which was untrue from the moment this method was written. It is
-   * a bounded exception, not a defect: the only caller is `AdminService` behind
-   * `@Roles("admin")`, `userId` is server-derived and never request-supplied,
+   * a bounded exception, not a defect: every caller derives `userId` on the
+   * server from something already verified (the admin's target, the session's
+   * subject, the row a single-use token matched) and never from the request,
    * and the predicate deletes only rows whose own payload already names that
    * subject.
    *

@@ -91,6 +91,7 @@ implied.
 | INV-AUTH-002 | A failed-login counter records every failure | enforced |
 | INV-AUTH-003 | A destructive OIDC action requires a provider round trip | enforced |
 | INV-AUTH-004 | A logout reports only what it achieved | enforced |
+| INV-AUTH-005 | A replaced password ends every credential issued on the old one | enforced |
 | INV-ACTIVITY-001 | Activity is attributed to whoever acted, not to whoever was acted for | enforced |
 | INV-PROFILE-001 | A user-profile response is an allowlist | enforced |
 | INV-DISPLAY-001 | A figure addressed to a person is rendered in that person's number locale | enforced |
@@ -114,6 +115,8 @@ implied.
 | INV-BACKUP-005 | An off-machine copy is verified before it is recorded as done, and a claim nobody finishes is reclaimed | partial |
 | INV-BACKUP-006 | An artifact is published whole or not at all, on every storage target | enforced |
 | INV-BACKUP-007 | The automatic backup store and the off-machine destination are two places | enforced |
+| INV-BACKUP-008 | The server stores nothing that decrypts to a user's password | partial |
+| INV-BACKUP-009 | A restore writes only the restoring user's rows, and every reference it writes names a row of the same file | enforced |
 | INV-PUSH-001 | A push subscription belongs to the authenticated caller, and no request touches another account's device | enforced |
 | INV-PUSH-002 | The VAPID private key never leaves the server, and is never stored unencrypted | enforced |
 | INV-PUSH-006 | A push channel is offered only while its key pair can actually be used | enforced |
@@ -2516,21 +2519,66 @@ reporting, and conflating them hid the fact that only the first has a mechanism.
 Statement           A failed login attempt increments the counter the lockout
                     threshold reads.
 Source of truth     users.failed_login_attempts
-Enforcement         An atomic CTE increments in the database. recordFailedAttempt
-                    (auth.service.ts) runs one UPDATE users SET
-                    failed_login_attempts = failed_login_attempts + 1 with the
-                    lockout threshold folded into the same statement -- not a
-                    JavaScript read-modify-write across the bcrypt compare -- so
-                    two concurrent failures cannot lose an increment. The
-                    success-path reset writes a fixed absolute value and was always
-                    safe.
+Enforcement         An atomic CTE increments in the database. recordFailedLogin
+                    (auth/login-lockout.ts, called by AuthService) runs one UPDATE
+                    users SET failed_login_attempts = failed_login_attempts + 1
+                    with the lockout threshold folded into the same statement --
+                    not a JavaScript read-modify-write across the bcrypt compare --
+                    so two concurrent failures cannot lose an increment. The same
+                    statement bounds the lock (30 minutes doubling per five
+                    failures, at most 4 hours) and forgets the escalation once a
+                    lock expired more than 24 hours ago, so a stranger who knows
+                    the address cannot extend a lockout without limit. A password
+                    reset (email, admin, owner of a delegate, emergency claim)
+                    clears the counter and the lock. The success-path reset writes
+                    a fixed absolute value and was always safe.
 Concurrency scope   per account
 Failure response    the counter equals the number of failures; lockout is not
                     delayed.
-Required tests      Present: auth.service.spec.ts asserts recordFailedAttempt is
-                    the single incrementing statement (matched on
-                    failed_login_attempts + RETURNING). A two-connection "N
-                    concurrent failures, counter equals N" test is still owed.
+Required tests      Two connections: test/integration/login-lockout.integration.spec.ts
+                    runs N concurrent failures on two pools and asserts the counter
+                    equals N, and proves the cap and the decay against real
+                    PostgreSQL. Unit: login-lockout.spec.ts pins the parameters;
+                    auth.service.spec.ts asserts the login emits the single
+                    incrementing statement; auth-email.service.spec.ts asserts a
+                    reset clears the lock.
+Status              enforced
+```
+
+### INV-AUTH-005 -- a replaced password ends every credential issued on the old one
+
+```text
+Statement           When a password is set because the old one may be known to
+                    someone else (emailed reset, change from settings, admin reset,
+                    an owner's reset of a delegate, emergency-access claim) or an
+                    account is linked to an identity provider, no personal access
+                    token, trusted device, refresh token or OAuth grant issued
+                    before it keeps working. Minting a new PAT needs a step-up.
+Source of truth     personal_access_tokens.is_revoked, trusted_devices,
+                    refresh_tokens.is_revoked, the OAuth provider's payload store
+Enforcement         backend/src/auth/credential-revocation.ts.
+                    revokeStandingCredentials revokes PATs and deletes trusted
+                    devices inside the password write's own withScopedDb
+                    transaction, so a refused reset revokes nothing and a committed
+                    one leaves neither live. After the commit, refresh tokens go
+                    through each path's existing revocation and
+                    revokeOAuthGrantsAfterCommit calls
+                    OAuthProviderService.revokeAllForUser; a failure there is logged
+                    at error with the account id and rethrown, never reported as a
+                    clean reset. POST /auth/tokens carries
+                    @RequireStepUp("personal-access-token") under StepUpGuard.
+Concurrency scope   per account
+Failure response    a failed OAuth sweep after the commit surfaces as an error; the
+                    password has changed and the log line names the account whose
+                    grants need revoking by hand.
+Required tests      Unit: auth-email.service.spec.ts, users.service.spec.ts,
+                    admin.service.spec.ts, delegation.service.spec.ts,
+                    emergency-access-claim.controller.spec.ts and auth.service.spec.ts
+                    (confirmOidcLink) assert each path revokes PATs, trusted devices
+                    and OAuth grants; credential-revocation.spec.ts covers the
+                    helper's error path; pat.controller.spec.ts asserts the step-up
+                    metadata. Still owed: a real-database test that a PAT minted
+                    before a reset is refused by the bearer guard after it.
 Status              enforced
 ```
 
@@ -3401,12 +3449,13 @@ Status              enforced
 
 Encryption is settled and worth not re-litigating: a support backup is
 unconditionally encrypted because it exists to leave the user's machine, and an
-automatic backup whose stored password cannot be decrypted is *refused* rather
+automatic backup whose stored key cannot be decrypted is *refused* rather
 than written in clear.
 
 What was *not* settled, and is the one thing this invariant does not claim: that
 an automatic backup is encrypted at all. It is encrypted whenever the server
-holds a usable copy of the user's password, and until issue #1269 that copy was
+holds a usable backup key for the user (INV-BACKUP-008 says what that key is and
+is not); until issue #1269 what it held instead, a copy of the password, was
 keyed on `AI_ENCRYPTION_KEY` while that variable was optional -- so a deployment
 that configured no AI provider wrote plaintext indefinitely, and nothing said so.
 The key is `ENCRYPTION_KEY` (`common/encryption/encryption-key.ts`); the former
@@ -3416,7 +3465,7 @@ future release will refuse to serve -- so the enforcement today is entirely
 *visibility*: the boot warning, a warning on every unencrypted automatic backup,
 and `getStatus` reporting "this server cannot encrypt" separately from "this user
 has not enabled it". Plaintext remains a legitimate outcome for an account with
-no captured password, which is why the boot check announces rather than refuses;
+no backup key yet, which is why the boot check announces rather than refuses;
 when the requirement lands, the unkeyed branch of `logEncryptionKeyStatus`
 becomes a throw and this paragraph becomes one sentence.
 
@@ -3700,6 +3749,78 @@ Required tests      Unit: backup-store-config.spec.ts (the comparison, including
 Status              enforced
 ```
 
+### INV-BACKUP-008 -- the server stores nothing that decrypts to a password
+
+```text
+Statement           No column holds a user's login password, or an OIDC
+                    account's dedicated backup password, in a form the server
+                    can decrypt. An automatic backup is encrypted under a random
+                    per-user data key; the server holds that key under
+                    ENCRYPTION_KEY and wrapped under the password, never the
+                    password itself.
+Source of truth     users.backup_key_enc, backup_key_wrap and
+                    backup_key_password_ref
+                    (docs/specs/backup-envelope-key-wrapping.md).
+Enforcement         BackupEncryptionService is the only writer of the backup
+                    columns and has no path that encrypts a password:
+                    storeBackupKey writes the wrapped key and clears
+                    backup_password_enc in the same conditional UPDATE, from
+                    registration, login, change-password, the Settings
+                    confirmation, the OIDC form and the cron's lazy conversion.
+Concurrency scope   per user
+Retry semantics     n/a
+Crash semantics     The conversion is one UPDATE; a crash before it leaves the
+                    legacy copy, which the next sign-in or backup converts.
+Failure response    n/a
+Required tests      Unit: backup-encryption.service.spec.ts asserts, on every
+                    write path, that backup_password_enc is cleared, no column
+                    contains the password, and what the server can decrypt is a
+                    random 32-byte key the password unwraps.
+Status              partial -- rows written before the change keep their
+                    recoverable backup_password_enc until that user's next
+                    sign-in or automatic backup converts them, and the column
+                    is dropped only in a later release.
+### INV-BACKUP-009 -- a restore stays inside the restoring user's rows
+
+```text
+Statement           Restoring an uploaded backup inserts rows owned by the
+                    restoring user and updates no row it did not insert. Every
+                    UUID primary key and every reference column it writes names
+                    a row of the same file, never another user's row, whatever
+                    spelling of the UUID the file uses.
+Source of truth     The uploaded document, which is untrusted.
+Enforcement         resolveRestoreReferences (backup/restore-references.ts),
+                    before re-authentication and before any write: every UUID key
+                    and reference is canonicalised (canonicalUuid accepts every
+                    form PostgreSQL's uuid input does), and a reference that does
+                    not name a row of the referenced table in the file refuses
+                    the restore -- except the two SEVERED_WHEN_UNRESOLVED
+                    columns a genuine export can carry (a cross-owner transfer's
+                    counterpart, a legacy backup's institution), which are set
+                    NULL. Every key is then remapped to a fresh id, and a UUID
+                    nested in a JSONB or array value that names no row of the
+                    file is replaced by one that names nothing (remapRestoreRow).
+                    The Phase-3 repair UPDATEs carry user_id = $3, or the owning
+                    parent's (DeferredFkRepair.ownedThrough). The reference
+                    columns are RESTORE_REFERENCE_COLUMNS, checked against every
+                    foreign key and scalar UUID column in database/schema.sql.
+                    Holds with RLS_MODE=off, the default.
+Concurrency scope   per restore (one transaction under the maintenance lease)
+Retry semantics     A refused file is refused identically on retry; nothing was
+                    written.
+Crash semantics     n/a -- the check writes nothing.
+Failure response    400 naming the table, column and value that does not resolve.
+Required tests      Unit: restore-references.spec.ts (schema coverage in both
+                    directions; a foreign account, schedule and security; a
+                    non-hyphenated and upper-case victim id; a JSONB-embedded id;
+                    the two severed columns); restore-plan.spec.ts ("confines
+                    every repair to the restoring user's rows"). Integration:
+                    backup-restore.integration.spec.ts (a crafted file naming a
+                    second user's rows is refused and leaves both users' data
+                    untouched).
+Status              enforced
+```
+
 ### INV-CRON-001 -- one logical effect per tick
 
 ```text
@@ -3812,8 +3933,8 @@ Source of truth     push_instance_config.vapid_private_key_enc
 Enforcement         Storage: PushConfigService.ensureKeyPair refuses to generate a
                     pair at all when EncryptionService is unconfigured, so an
                     instance without ENCRYPTION_KEY has no push rather than a
-                    plaintext secret; the operator already learns about the
-                    missing key from the weekly ENCRYPTION_KEY_MISSING alert.
+                    plaintext secret; a server without the key no longer boots
+                    (checkClusterBoot), so that branch is defence in depth.
                     Exposure: no response shape in src/push/ declares a private
                     field, and push-secret.guard.spec.ts scans the whole of src/
                     for a second reader of the column, a second caller of
@@ -4019,7 +4140,7 @@ Status              enforced
 ### INV-ALERT-001 -- a system alert is raised once, and only the insert winner emails
 
 ```text
-Statement           A system-level alert (BACKUP_FAILED, ENCRYPTION_KEY_MISSING,
+Statement           A system-level alert (BACKUP_FAILED, JWT_SECRET_WEAK,
                     PROVIDER_OUTAGE, SMTP_FAILURE, SCHEDULED_POST_FAILED, ...)
                     is materialized at most once per (recipient, dedupe key)
                     however many replicas raise it, and its admin email is sent
@@ -4606,10 +4727,13 @@ Statement           A process running under CLUSTER_MODE=multi serves traffic
 Source of truth     The environment, read by checkClusterBoot, and the state of
                     this replica's own LISTEN session.
 Enforcement         backend/src/common/cluster/cluster-mode.ts checkClusterBoot is the
-                    boot matrix as a pure function of the environment: in multi
-                    it refuses a missing or too-short JWT_SECRET (every replica
-                    derives the CSRF and OAuth cookie keys and the restore
-                    upload ticket from it), the per-pod `local` attachment
+                    boot matrix as a pure function of the environment: in
+                    every mode it refuses a JWT_SECRET that
+                    jwtSecretFatalProblem refuses (missing or too short; every
+                    replica derives the CSRF and OAuth cookie keys and the
+                    restore upload ticket from it; a long-enough but weak one
+                    boots and is reported instead) and a missing ENCRYPTION_KEY;
+                    in multi also the per-pod `local` attachment
                     provider and the automatic backup directory unless the
                     operator asserts a shared volume, and it reports every
                     refusal at once so one restart is enough. backend/src/main.ts logs

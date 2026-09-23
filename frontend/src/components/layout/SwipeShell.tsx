@@ -11,6 +11,7 @@ import { SwipeIndicator } from './SwipeIndicator';
 import { PushEnableBanner } from './PushEnableBanner';
 import { ShareStashSweeper } from '@/components/share/ShareStashSweeper';
 import { UpdateAvailableBanner } from './UpdateAvailableBanner';
+import { WeakJwtSecretBanner } from './WeakJwtSecretBanner';
 import { AiChatBubble } from '@/components/ai/AiChatBubble';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { useScrollToTopOnNavigation } from '@/hooks/useScrollToTopOnNavigation';
@@ -50,6 +51,7 @@ export function SwipeShell({ children, httpsHeadersActive = false }: SwipeShellP
       <BackendDownBanner httpsHeadersActive={httpsHeadersActive} />
       <DemoModeBanner />
       <UpdateAvailableBanner />
+      <WeakJwtSecretBanner />
       <PushEnableBanner />
       {/* Renders nothing: the stash lifetime sweep, all that is left of the
           share inbox banner that used to sit here. */}

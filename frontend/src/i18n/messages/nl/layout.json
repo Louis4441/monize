@@ -34,6 +34,12 @@
     "dismiss": "Sluiten",
     "dismissAriaLabel": "Updatemelding sluiten"
   },
+  "jwtSecretBanner": {
+    "label": "JWT_SECRET is zwak.",
+    "detail": "Het is een gepubliceerde voorbeeldwaarde of te voorspelbaar, waardoor sessietokens kunnen worden vervalst. Genereer een sterke waarde met <code>openssl rand -base64 32</code>. Wijzigen zorgt ervoor dat codes uit authenticator-apps niet meer werken en vertrouwde apparaten worden vergeten: gebruikers loggen in met een back-upcode en stellen 2FA opnieuw in, en voor wie er geen heeft stel je de 2FA opnieuw in via <users>Gebruikersbeheer</users>. Lees eerst <code>docs/backend/modules-and-runtime.md</code> (Changing JWT_SECRET).",
+    "dismiss": "Sluiten",
+    "dismissAriaLabel": "JWT_SECRET-waarschuwing sluiten"
+  },
   "actionHistory": {
     "title": "Actiegeschiedenis",
     "buttonAriaLabel": "Actiegeschiedenis",

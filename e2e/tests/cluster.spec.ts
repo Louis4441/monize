@@ -199,12 +199,25 @@ test.describe('CLUSTER_MODE=multi', () => {
     // and under round-robin they land on different replicas. Before the queue
     // was a table those three held promises in one process's `Map`s, so this
     // turn could only complete when all three happened to hit the same pod.
-    await registerViaApi(request);
+    const user = await registerViaApi(request);
     const api = createApiClient(request);
-    const pat = await api.post<{ token: string }>('/auth/tokens', {
-      name: `cluster-agent-${uniqueId()}`,
-      scopes: 'read',
+    // Minting a PAT is step-up protected: prove the password again first.
+    const stepUp = await api.post<{ stepUpToken: string }>('/auth/step-up', {
+      purpose: 'personal-access-token',
+      password: user.password,
     });
+    const created = await request.post('/api/v1/auth/tokens', {
+      headers: {
+        'X-CSRF-Token': (await csrfToken(request)) ?? '',
+        'X-Step-Up-Token': stepUp.stepUpToken,
+      },
+      data: { name: `cluster-agent-${uniqueId()}`, scopes: 'read' },
+    });
+    expect(
+      created.ok(),
+      `creating the PAT failed (${created.status()}): ${await created.text()}`,
+    ).toBeTruthy();
+    const pat = (await created.json()) as { token: string };
 
     // A genuinely separate client: its own context, no session cookies, a
     // bearer token. That is what an MCP agent is.

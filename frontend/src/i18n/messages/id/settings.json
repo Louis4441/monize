@@ -19,10 +19,12 @@
     "passwordRequired": "Kata sandi saat ini diperlukan untuk mengubah surel",
     "noChanges": "Tidak ada perubahan untuk disimpan",
     "passwordConfirmNote": "Konfirmasi kata sandi diperlukan saat mengubah alamat surel Anda.",
+    "pendingEmailNotice": "Tautan konfirmasi telah dikirim ke {email}. Alamat surel Anda akan berubah setelah Anda membukanya.",
     "saveButton": "Simpan Profil",
     "savingButton": "Menyimpan...",
     "toasts": {
       "success": "Profil berhasil diperbarui",
+      "confirmationSent": "Periksa {email} untuk tautan konfirmasi alamat surel baru Anda",
       "updateFailed": "Gagal memperbarui profil"
     },
     "validation": {
@@ -58,14 +60,28 @@
       "addLayerDescription": "Tambahkan lapisan keamanan ekstra ke akun Anda.",
       "enableButton": "Aktifkan 2FA",
       "disableButton": "Nonaktifkan 2FA",
+      "resetButton": "Setel Ulang 2FA",
       "disableModal": {
         "title": "Nonaktifkan Autentikasi Dua Faktor",
-        "description": "Masukkan kode 6 digit Anda saat ini untuk mengonfirmasi menonaktifkan 2FA.",
+        "description": "Masukkan kode 6 digit dari aplikasi autentikator Anda, atau salah satu kode cadangan Anda (xxxx-xxxx), untuk mengonfirmasi menonaktifkan 2FA.",
         "verificationCodeLabel": "Kode Verifikasi",
         "disablingButton": "Menonaktifkan...",
         "toasts": {
           "disabled": "Autentikasi dua faktor dinonaktifkan",
           "disableFailed": "Gagal menonaktifkan 2FA"
+        }
+      },
+      "resetModal": {
+        "title": "Setel Ulang Autentikasi Dua Faktor",
+        "description": "Gunakan ini jika aplikasi autentikator atau kode cadangan Anda mungkin telah terekspos, atau jika kode autentikator Anda berhenti berfungsi (misalnya setelah rahasia server diubah).",
+        "effect": "Autentikator, kode cadangan, dan perangkat tepercaya Anda saat ini akan berhenti berfungsi, dan Anda akan keluar dari semua perangkat lain. Setelah itu Anda langsung menyiapkan autentikator baru.",
+        "passwordLabel": "Kata Sandi Akun",
+        "codeLabel": "Kode Autentikator atau Cadangan",
+        "codeHint": "Masukkan kode 6 digit dari aplikasi autentikator Anda. Jika autentikator Anda tidak lagi berfungsi, masukkan salah satu kode cadangan Anda (xxxx-xxxx) sebagai gantinya.",
+        "resettingButton": "Menyetel ulang...",
+        "toasts": {
+          "reset": "Autentikasi dua faktor disetel ulang. Siapkan autentikator baru Anda sekarang.",
+          "resetFailed": "Gagal menyetel ulang 2FA"
         }
       }
     },
@@ -582,7 +598,11 @@
       "copyUrlFailed": "Gagal menyalin URL",
       "loadFailed": "Gagal memuat token API",
       "createFailed": "Gagal membuat token",
-      "revokeFailed": "Gagal mencabut token"
+      "revokeFailed": "Gagal mencabut token",
+      "reauthFailed": "Gagal mengonfirmasi autentikasi ulang"
+    },
+    "stepUp": {
+      "reason": "Token dapat mengakses akun Anda tanpa masuk, jadi konfirmasikan bahwa ini memang Anda sebelum membuatnya."
     },
     "relative": {
       "never": "Tidak pernah",
@@ -905,7 +925,8 @@
       "shared": "Data bersama"
     },
     "sections": {
-      "description": "Berikan akses hanya-baca ke seluruh bagian aplikasi. Data yang dicakup akun juga masih memerlukan akses per-akun."
+      "description": "Berikan akses hanya-baca ke seluruh bagian aplikasi. Data yang dicakup akun juga masih memerlukan akses per-akun.",
+      "aiRequiresFullAccess": "Asisten AI membaca seluruh akun dan bagian, sehingga hanya menjawab untuk delegasi ini setelah ia dapat membaca semua akun Anda dan setiap bagian lainnya."
     },
     "accounts": {
       "noAccounts": "Tidak ada akun untuk diberikan.",
@@ -1164,6 +1185,7 @@
       "ollamaCloudNote": "Nama model harus menyertakan akhiran -cloud (misalnya gpt-oss:20b-cloud).",
       "apiKeyLabel": "Kunci API",
       "baseUrlLabel": "URL Dasar",
+      "baseUrlPrivateNote": "Alamat pribadi atau lokal (localhost, 192.168.x.x, atau nama kontainer) hanya berfungsi untuk administrator, atau jika operator server mengizinkan alamat tersebut. Jika tidak, gunakan alamat yang dapat dijangkau dari internet.",
       "priorityLabel": "Prioritas",
       "priorityHelp": "Angka lebih kecil = prioritas lebih tinggi. Digunakan untuk urutan cadangan.",
       "costRatesHeading": "Tarif biaya (opsional)",

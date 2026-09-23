@@ -62,6 +62,7 @@
     "clickToDisable": "Clique para desativar",
     "clickToEnable": "Clique para ativar",
     "resetPassword": "Repor Palavra-passe",
+    "resetTwoFactor": "Repor 2FA",
     "noUsers": "Nenhum utilizador encontrado.",
     "storageLoading": "A carregar…",
     "storageUnavailable": "Indisponível",
@@ -96,7 +97,9 @@
       "loadFailed": "Falha ao carregar utilizadores",
       "deleteFailed": "Falha ao eliminar utilizador",
       "disableFailed": "Falha ao desativar utilizador",
-      "resetFailed": "Falha ao repor palavra-passe"
+      "resetFailed": "Falha ao repor palavra-passe",
+      "twoFactorReset": "A autenticação de dois fatores de {name} foi reposta. As suas sessões foram terminadas.",
+      "resetTwoFactorFailed": "Falha ao repor a autenticação de dois fatores"
     },
     "dialogs": {
       "promoteTitle": "Promover Utilizador?",
@@ -111,6 +114,9 @@
       "resetTitle": "Repor Palavra-passe?",
       "resetMessage": "Isto irá gerar uma nova palavra-passe temporária para {name}. Será obrigado a alterá-la no próximo início de sessão.",
       "resetConfirm": "Repor Palavra-passe",
+      "resetTwoFactorTitle": "Repor a Autenticação de Dois Fatores?",
+      "resetTwoFactorMessage": "Isto desativa a autenticação de dois fatores de {name}, elimina os seus códigos de recuperação e dispositivos de confiança e termina todas as suas sessões. Depois poderá iniciar sessão com a palavra-passe e voltar a configurar o 2FA. Utilize esta opção quando tiver perdido a aplicação autenticadora e os códigos de recuperação, ou depois de alterar o JWT_SECRET.",
+      "resetTwoFactorConfirm": "Repor 2FA",
       "deleteTitle": "Eliminar Utilizador?",
       "deleteMessage": "Tem a certeza de que pretende eliminar {name}? Isto irá remover permanentemente a sua conta e todos os dados associados. Esta ação não pode ser desfeita. Se for delegado de outra conta, os seus próprios dados são removidos mas o seu início de sessão é mantido para que a delegação continue a funcionar — passa a ser um utilizador apenas delegado.",
       "deleteConfirm": "Eliminar Utilizador",

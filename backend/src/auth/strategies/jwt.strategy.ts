@@ -10,6 +10,7 @@ import {
   withUserContext,
 } from "../../common/db/with-context";
 import { tr } from "../../i18n/translate";
+import { jwtSecretFatalProblem } from "../../common/jwt-secret-policy";
 
 /**
  * Extract JWT from request - tries Authorization header first, then auth_token cookie
@@ -39,10 +40,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const jwtSecret = configService.get<string>("JWT_SECRET");
 
     // SECURITY: Fail startup if JWT_SECRET is missing or too short.
-    // A weak secret undermines all JWT signature verification.
-    if (!jwtSecret || jwtSecret.length < 32) {
+    // `checkClusterBoot` applies the same rule first. A long-enough but weak
+    // secret (a published placeholder, a typed pattern) boots and is reported
+    // by the boot warning, the admin system alert and the admin banner
+    // instead -- see `jwt-secret-policy.ts` for why it is not refused here.
+    const problem = jwtSecretFatalProblem(jwtSecret);
+    if (problem !== null || !jwtSecret) {
       throw new Error(
-        "JWT_SECRET environment variable must be at least 32 characters. " +
+        `${problem ?? "JWT_SECRET is not set."} JWT_SECRET environment ` +
+          "variable must be at least 32 characters of random data. " +
           "Generate one with: openssl rand -base64 32",
       );
     }

@@ -78,6 +78,11 @@ export const authApi = {
     return response.data;
   },
 
+  confirmEmailChange: async (token: string): Promise<{ message: string }> => {
+    const response = await apiClient.post<{ message: string }>('/auth/confirm-email-change', { token });
+    return response.data;
+  },
+
   resendVerification: async (email: string): Promise<{ message: string }> => {
     const response = await apiClient.post<{ message: string }>('/auth/resend-verification', { email });
     return response.data;
@@ -108,6 +113,16 @@ export const authApi = {
     return response.data;
   },
 
+  /**
+   * Replace an exposed or unusable authenticator: needs the account password
+   * and an authenticator or backup code, and works under FORCE_2FA. The
+   * session making the request is kept, so enrollment can follow at once.
+   */
+  reset2FA: async (currentPassword: string, code: string): Promise<{ message: string }> => {
+    const response = await apiClient.post<{ message: string }>('/auth/2fa/reset', { currentPassword, code });
+    return response.data;
+  },
+
   get2FAStatus: async (): Promise<{ enabled: boolean }> => {
     const response = await apiClient.get<{ enabled: boolean }>('/auth/2fa/status');
     return response.data;
@@ -133,8 +148,20 @@ export const authApi = {
     return response.data;
   },
 
-  createToken: async (data: CreatePatData): Promise<CreatePatResponse> => {
-    const response = await apiClient.post<CreatePatResponse>('/auth/tokens', data);
+  /**
+   * Minting a PAT is step-up protected (purpose `personal-access-token`): pass
+   * the token from `useStepUpTokenStore`. Without one the server answers
+   * `STEP_UP_REQUIRED`, which the caller maps with `rethrowStepUpError`.
+   */
+  createToken: async (
+    data: CreatePatData,
+    stepUpToken?: string | null,
+  ): Promise<CreatePatResponse> => {
+    const response = stepUpToken
+      ? await apiClient.post<CreatePatResponse>('/auth/tokens', data, {
+          headers: { 'X-Step-Up-Token': stepUpToken },
+        })
+      : await apiClient.post<CreatePatResponse>('/auth/tokens', data);
     return response.data;
   },
 

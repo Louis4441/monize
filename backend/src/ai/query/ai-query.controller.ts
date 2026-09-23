@@ -17,6 +17,7 @@ import { tr } from "../../i18n/translate";
 import { SSE_HEADERS, sseData } from "../../common/sse.util";
 import {
   AllowDelegate,
+  DelegateRequiresFullScope,
   DelegateRequiresSection,
 } from "../../delegation/decorators/delegate-access.decorator";
 
@@ -28,6 +29,9 @@ import {
 // endpoints only read the owner's data (effective-user scoping) using the
 // owner's configured provider. Reachable only with the "ai" grant.
 @DelegateRequiresSection("ai")
+// ...and only for a delegate who can read the whole ledger: the answer draws
+// on every account and section and is not narrowed to the delegate's grants.
+@DelegateRequiresFullScope()
 export class AiQueryController {
   private readonly logger = new Logger(AiQueryController.name);
 

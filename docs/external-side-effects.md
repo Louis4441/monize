@@ -260,9 +260,11 @@ bucket until the new store has a full retention window.
 **Encryption.** A support backup is unconditionally encrypted -- the DTO's
 `password` is required, and there is no code path returning an unencrypted
 support buffer, because a support backup exists in order to leave the user's
-machine. An automatic backup is encrypted when a usable password exists; when a
-stored password cannot be decrypted (a rotated key) the backup is **refused**
-rather than silently written in clear. Refusing is the right failure: it is
+machine. An automatic backup is encrypted when a usable backup key exists (a
+data key the server holds, wrapped under the user's password, never the password
+itself; `docs/specs/backup-envelope-key-wrapping.md`); when a stored key cannot
+be decrypted (a rotated `ENCRYPTION_KEY`) the backup is **refused** rather than
+silently written in clear. Refusing is the right failure: it is
 visible, and it does not downgrade.
 
 **The writability probe** on the `local` store names its file with
@@ -329,7 +331,7 @@ in it:
 `EmailService` is a thin `nodemailer` wrapper. It writes nothing to the
 database. There is no outbox, no queue table, no "sent" ledger anywhere.
 
-Every caller is a cron, and each has a different amount of protection:
+Most callers are crons, and each has a different amount of protection:
 
 | Sender | Duplicate protection |
 | --- | --- |
@@ -338,6 +340,7 @@ Every caller is a cron, and each has a different amount of protection:
 | `BudgetAlertService` | Full, by insert-winner, since migration 140. The in-memory dedup against existing rows by `(budgetId, type, budgetCategoryId, periodStart)` is a check-then-act and never was the arbiter; the unique fingerprint index is, through `NotificationService.create`, which answers `null` for the replica that loses the race so only the winner emails. `isEmailSent` is set after the send, so a crash in between leaves it `false` forever without causing a duplicate. |
 | Emergency-access grant | The one deliberate design. See section 5. |
 | `SystemAlertService` | Full, by insert-winner. Each admin's alert row goes through `NotificationService.create`, whose `INSERT ... ON CONFLICT DO NOTHING RETURNING id` is arbitrated for these rows by the partial unique index from migration 170, and the email goes only to rows the INSERT returned -- with the same at-most-once trade as `ProviderOutageAlertService`: a crash between the commit and SMTP loses that email, and the in-app row survives as the durable notice (`docs/specs/system-alerts.md`, INV-ALERT-001). |
+| Self-service email change (`EmailChangeService`) | Request-driven, not a cron, and none needed: nothing is claimed by the send. The pending address and the sha256 of a single-use token commit first, then the link goes to the new address and a notice to the current one, so a link never names a token the database does not hold. A failed send is logged and the request still succeeds; the pending change expires after 24 hours or is replaced (token and all) by the next request. The confirmation (`AuthEmailService.confirmEmailChange`) sends nothing: one conditional `UPDATE ... WHERE email_change_token = $hash AND email_change_token_expiry > now()` applies it, the unique index on `users.email` refuses a lost race as a 409, and refresh tokens are revoked after the commit. Without SMTP the change applies on the password check alone, as registration creates verified accounts when it cannot send. |
 | `ProviderOutageAlertService` | Full, and the opposite trade from the reminders. The notice is claimed with a single conditional `UPDATE ... WHERE state = 'down' AND outage_notified_at IS NULL AND outage_started_at <= now() - 15min AND (last_notified_at IS NULL OR last_notified_at <= now() - 6h) RETURNING ...`, so one replica sends per episode and a flapping provider cannot mail its way around the floor. The claim is taken *before* the send, which makes it **at most once**: a process killed in between loses that alert. Deliberate -- a duplicated monitoring email is the failure mode being designed against, the outage is still in the log and in `provider_health`, and a provider still down when the 6-hour floor elapses becomes notifiable again. |
 
 `BudgetAlertService` is a useful illustration of EXT-001 both before and after

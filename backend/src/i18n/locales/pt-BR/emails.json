@@ -117,6 +117,21 @@
     "button": "Verificar e-mail",
     "disclaimer": "Este link expira em 24 horas. Se você não criou uma conta Monize, pode ignorar este e-mail com segurança."
   },
+  "emailChangeConfirm": {
+    "subject": "Confirme o seu novo e-mail do Monize",
+    "heading": "Confirme o seu novo endereço de e-mail",
+    "greeting": "Olá {{ name }},",
+    "intro": "Foi feita uma solicitação para usar este endereço em uma conta Monize. Seu e-mail não será alterado até que você confirme clicando no botão abaixo:",
+    "button": "Confirmar alteração de e-mail",
+    "disclaimer": "Este link expira em 24 horas. Se você não solicitou esta alteração, pode ignorar este e-mail com segurança."
+  },
+  "emailChangeNotice": {
+    "subject": "Alteração de e-mail do Monize solicitada",
+    "heading": "Alteração de e-mail solicitada",
+    "greeting": "Olá {{ name }},",
+    "body1": "Foi feita uma solicitação para alterar o endereço de e-mail da sua conta Monize para {{ email }}. A alteração só entra em vigor depois de ser confirmada a partir desse endereço.",
+    "body2": "Se você não fez esta solicitação, altere sua senha imediatamente e revise os dispositivos conectados à sua conta."
+  },
   "accountInvite": {
     "subject": "Sua conta Monize está pronta",
     "heading": "Sua conta Monize está pronta",
@@ -251,6 +266,10 @@
       "encryptionKeyMissing": {
         "title": "Chave de criptografia não configurada",
         "message": "A ENCRYPTION_KEY não está definida, então os backups são gravados sem criptografia e segredos não podem ser armazenados. Uma versão futura não iniciará sem ela."
+      },
+      "jwtSecretWeak": {
+        "title": "O JWT_SECRET é fraco",
+        "message": "O JWT_SECRET é um valor de exemplo publicado ou previsível demais, então tokens de sessão podem ser falsificados. Gere um valor forte (openssl rand -base64 32). Alterá-lo faz os códigos dos aplicativos autenticadores pararem de funcionar e esquece os dispositivos confiáveis: os usuários entram com um código de recuperação e configuram o 2FA de novo, e você redefine o 2FA em Gerenciamento de Usuários para quem não tiver um. Leia antes docs/backend/modules-and-runtime.md (Changing JWT_SECRET)."
       },
       "smtpFailure": {
         "title": "O envio de email está falhando",

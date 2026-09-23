@@ -62,6 +62,7 @@
     "clickToDisable": "點擊以停用",
     "clickToEnable": "點擊以啟用",
     "resetPassword": "重設密碼",
+    "resetTwoFactor": "重設 2FA",
     "noUsers": "找不到使用者。",
     "storageLoading": "載入中…",
     "storageUnavailable": "無法取得",
@@ -96,7 +97,9 @@
       "loadFailed": "載入使用者失敗",
       "deleteFailed": "刪除使用者失敗",
       "disableFailed": "停用使用者失敗",
-      "resetFailed": "重設密碼失敗"
+      "resetFailed": "重設密碼失敗",
+      "twoFactorReset": "已重設 {name} 的雙重驗證。該使用者已登出。",
+      "resetTwoFactorFailed": "重設雙重驗證失敗"
     },
     "dialogs": {
       "promoteTitle": "升級使用者？",
@@ -111,6 +114,9 @@
       "resetTitle": "重設密碼？",
       "resetMessage": "這將為 {name} 產生新的臨時密碼。他們下次登入時必須變更密碼。",
       "resetConfirm": "重設密碼",
+      "resetTwoFactorTitle": "重設雙重驗證？",
+      "resetTwoFactorMessage": "這將關閉 {name} 的雙重驗證，刪除其備份驗證碼和受信任的裝置，並讓其在所有位置登出。之後，該使用者可以使用密碼登入並重新設定 2FA。適用於使用者遺失驗證器 App 和備份驗證碼，或變更 JWT_SECRET 之後的情況。",
+      "resetTwoFactorConfirm": "重設 2FA",
       "deleteTitle": "刪除使用者？",
       "deleteMessage": "確定要刪除 {name}？這將永久移除其帳號及所有相關資料。此操作無法復原。若他們是其他帳號的委派人，其個人資料將被移除，但登入憑證將保留以維持委派關係——他們將成為僅限委派的使用者。",
       "deleteConfirm": "刪除使用者",

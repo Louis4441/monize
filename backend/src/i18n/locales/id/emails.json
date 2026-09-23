@@ -117,6 +117,21 @@
     "button": "Verifikasi Surel",
     "disclaimer": "Tautan ini akan kedaluwarsa dalam 24 jam. Jika Anda tidak membuat akun Monize, Anda dapat mengabaikan surel ini dengan aman."
   },
+  "emailChangeConfirm": {
+    "subject": "Konfirmasi surel Monize baru Anda",
+    "heading": "Konfirmasi alamat surel baru Anda",
+    "greeting": "Hai {{ name }},",
+    "intro": "Ada permintaan untuk menggunakan alamat ini untuk akun Monize. Surel Anda tidak akan berubah sampai Anda mengonfirmasinya dengan mengeklik tombol di bawah:",
+    "button": "Konfirmasi Perubahan Surel",
+    "disclaimer": "Tautan ini akan kedaluwarsa dalam 24 jam. Jika Anda tidak meminta perubahan ini, Anda dapat mengabaikan surel ini dengan aman."
+  },
+  "emailChangeNotice": {
+    "subject": "Permintaan perubahan surel Monize",
+    "heading": "Perubahan surel diminta",
+    "greeting": "Hai {{ name }},",
+    "body1": "Ada permintaan untuk mengubah alamat surel akun Monize Anda menjadi {{ email }}. Perubahan hanya berlaku setelah dikonfirmasi dari alamat tersebut.",
+    "body2": "Jika Anda tidak membuat permintaan ini, segera ubah kata sandi Anda dan periksa perangkat yang masuk ke akun Anda."
+  },
   "accountInvite": {
     "subject": "Akun Monize Anda siap",
     "heading": "Akun Monize Anda siap",
@@ -251,6 +266,10 @@
       "encryptionKeyMissing": {
         "title": "Kunci enkripsi belum dikonfigurasi",
         "message": "ENCRYPTION_KEY belum disetel, sehingga cadangan ditulis tanpa enkripsi dan rahasia tidak dapat disimpan. Versi mendatang tidak akan dapat dijalankan tanpanya."
+      },
+      "jwtSecretWeak": {
+        "title": "JWT_SECRET lemah",
+        "message": "JWT_SECRET adalah nilai contoh yang dipublikasikan atau terlalu mudah ditebak, sehingga token sesi bisa dipalsukan. Buat nilai yang kuat (openssl rand -base64 32). Mengubahnya membuat kode aplikasi autentikator tidak berlaku lagi dan melupakan perangkat tepercaya: pengguna masuk dengan kode cadangan lalu menyiapkan ulang 2FA, dan Anda mereset 2FA di Manajemen Pengguna bagi yang tidak memilikinya. Baca dulu docs/backend/modules-and-runtime.md (Changing JWT_SECRET)."
       },
       "smtpFailure": {
         "title": "Pengiriman email gagal",

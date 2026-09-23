@@ -164,6 +164,139 @@ describe('proxy MCP-at-root routing', () => {
   });
 });
 
+describe('proxy client address forwarding', () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    fetchMock.mockReset();
+  });
+
+  function forwardedFor(): string | null {
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    return new Headers(init.headers).get('x-forwarded-for');
+  }
+
+  // The backend keys every per-IP rate limit on this header. A client that
+  // could choose it could reset its own login-attempt counter on every try.
+  it('forwards the address the edge appended, never a client-sent one', async () => {
+    await proxy(
+      makeRequest('/api/v1/auth/login', {
+        method: 'POST',
+        headers: {
+          'x-real-ip': '1.1.1.1',
+          'x-forwarded-for': '2.2.2.2, 3.3.3.3, 198.51.100.9',
+        },
+      }),
+    );
+    expect(forwardedFor()).toBe('198.51.100.9');
+  });
+
+  it('honours TRUSTED_PROXY_HOPS and CLIENT_IP_HEADER', async () => {
+    vi.stubEnv('TRUSTED_PROXY_HOPS', '2');
+    await proxy(
+      makeRequest('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'x-forwarded-for': '2.2.2.2, 198.51.100.9, 10.0.0.2' },
+      }),
+    );
+    expect(forwardedFor()).toBe('198.51.100.9');
+
+    fetchMock.mockClear();
+    vi.stubEnv('CLIENT_IP_HEADER', 'x-real-ip');
+    await proxy(
+      makeRequest('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'x-real-ip': '203.0.113.4', 'x-forwarded-for': '10.0.0.2' },
+      }),
+    );
+    expect(forwardedFor()).toBe('203.0.113.4');
+  });
+
+  it('forwards no address at all when none was vouched for', async () => {
+    await proxy(
+      makeRequest('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'x-real-ip': '1.1.1.1' },
+      }),
+    );
+    expect(forwardedFor()).toBeNull();
+  });
+});
+
+/**
+ * Next copies every matched request's body into memory, up to
+ * `proxyClientMaxBodySize`, before this proxy runs. So the proxy's own limit is
+ * the backend's default (10 MB), and the routes that need more are kept out of
+ * the matcher altogether and streamed by route handlers.
+ */
+describe('proxy request body limit', () => {
+  const fetchMock = vi.fn();
+  const MIB = 1024 * 1024;
+
+  beforeEach(() => {
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    fetchMock.mockReset();
+  });
+
+  function bodyOf(size: number): ReadableStream<Uint8Array> {
+    let sent = 0;
+    return new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent >= size) return controller.close();
+        const chunk = Math.min(MIB, size - sent);
+        sent += chunk;
+        controller.enqueue(new Uint8Array(chunk));
+      },
+    });
+  }
+
+  function post(path: string, body: ReadableStream<Uint8Array>, headers: Record<string, string> = {}) {
+    return new NextRequest(`${BASE}${path}`, {
+      method: 'POST',
+      headers,
+      body,
+      duplex: 'half',
+    } as ConstructorParameters<typeof NextRequest>[1]);
+  }
+
+  it('refuses a declared body over 10 MB with 413, before forwarding', async () => {
+    const response = await proxy(
+      post('/api/v1/auth/login', bodyOf(1), { 'content-length': String(300 * MIB) }),
+    );
+
+    expect(response.status).toBe(413);
+    expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses an undeclared body once it passes 10 MB', async () => {
+    const response = await proxy(post('/api/v1/auth/login', bodyOf(11 * MIB)));
+
+    expect(response.status).toBe(413);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('forwards a body within the limit whole', async () => {
+    const response = await proxy(post('/api/v1/transactions', bodyOf(2 * MIB)));
+
+    expect(response.status).toBe(200);
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect((init.body as Uint8Array).byteLength).toBe(2 * MIB);
+  });
+});
+
 describe('proxy security headers', () => {
   const originalDisable = process.env.DISABLE_HTTPS_HEADERS;
 

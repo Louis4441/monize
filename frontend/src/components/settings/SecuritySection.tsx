@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import '@/lib/zodConfig';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -39,10 +40,25 @@ interface SecuritySectionProps {
   onPreferencesUpdated: (prefs: UserPreferences) => void;
 }
 
+/**
+ * Disabling 2FA takes the two proofs sign-in takes: a 6-digit authenticator
+ * code, or one backup code (xxxx-xxxx, consumed). The backup code is how a
+ * user whose authenticator codes stopped working -- the server's JWT_SECRET
+ * changed under their enrollment -- switches 2FA off and enrolls again.
+ */
+function normalizeDisableCode(raw: string): string {
+  return raw.replace(/[^A-Fa-f0-9-]/g, '').toLowerCase();
+}
+
+function isDisableCodeComplete(code: string): boolean {
+  return /^(\d{6}|[a-f0-9]{4}-[a-f0-9]{4})$/.test(code);
+}
+
 export function SecuritySection({ user, preferences, force2fa, onPreferencesUpdated }: SecuritySectionProps) {
   const t = useTranslations('settings.security');
   const tc = useTranslations('common');
   const updatePreferencesStore = usePreferencesStore((state) => state.updatePreferences);
+  const router = useRouter();
   const { formatDate } = useDateFormat();
 
   const {
@@ -64,6 +80,11 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
   const [showTwoFactorDisable, setShowTwoFactorDisable] = useState(false);
   const [disableCode, setDisableCode] = useState('');
   const [isDisabling2FA, setIsDisabling2FA] = useState(false);
+
+  const [showTwoFactorReset, setShowTwoFactorReset] = useState(false);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [isResetting2FA, setIsResetting2FA] = useState(false);
 
   const [showBackupCodes, setShowBackupCodes] = useState(false);
   const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
@@ -89,7 +110,7 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
   };
 
   const handleDisable2FA = async () => {
-    if (disableCode.length !== 6) return;
+    if (!isDisableCodeComplete(disableCode)) return;
     setIsDisabling2FA(true);
     try {
       await authApi.disable2FA(disableCode);
@@ -105,6 +126,44 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
       toast.error(getErrorMessage(error, t('twoFactor.disableModal.toasts.disableFailed')));
     } finally {
       setIsDisabling2FA(false);
+    }
+  };
+
+  const closeResetModal = () => {
+    setShowTwoFactorReset(false);
+    setResetPassword('');
+    setResetCode('');
+  };
+
+  /**
+   * Replace the authenticator: the server clears the secret, the backup codes
+   * and the trusted devices, and keeps this session. Enrollment starts at once
+   * -- in place, or on /setup-2fa when FORCE_2FA owes one (ProtectedRoute would
+   * send the user there anyway once the store says 2FA is off, and that page
+   * records the new enrollment before it leaves, so the two cannot loop).
+   */
+  const handleReset2FA = async (event?: FormEvent) => {
+    event?.preventDefault();
+    if (!resetPassword || !isDisableCodeComplete(resetCode)) return;
+    setIsResetting2FA(true);
+    try {
+      await authApi.reset2FA(resetPassword, resetCode);
+      closeResetModal();
+      setTwoFactorEnabled(false);
+      setTrustedDevices([]);
+      const updated = { ...preferences, twoFactorEnabled: false };
+      onPreferencesUpdated(updated);
+      updatePreferencesStore(updated);
+      toast.success(t('twoFactor.resetModal.toasts.reset'));
+      if (force2fa) {
+        router.push('/setup-2fa');
+      } else {
+        setShowTwoFactorSetup(true);
+      }
+    } catch (error) {
+      toast.error(getErrorMessage(error, t('twoFactor.resetModal.toasts.resetFailed')));
+    } finally {
+      setIsResetting2FA(false);
     }
   };
 
@@ -216,8 +275,9 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
         </div>
       </form>
 
-      {/* Two-Factor Authentication */}
-      <div className="border-t border-gray-200 dark:border-gray-700 mt-6 pt-6">
+      {/* Two-Factor Authentication. `id` is the target of the sign-in-by-backup-code
+          redirect (`/settings#two-factor`), which useScrollSpy scrolls to. */}
+      <div id="two-factor" className="border-t border-gray-200 dark:border-gray-700 mt-6 pt-6 scroll-mt-32 lg:scroll-mt-22">
         <h3 className="text-base font-medium text-gray-900 dark:text-gray-100 mb-3">
           {t('twoFactor.heading')}
         </h3>
@@ -230,7 +290,7 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
         ) : (
           <>
             {twoFactorEnabled ? (
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
                     {t('twoFactor.enabledBadge')}
@@ -239,19 +299,31 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
                     {t('twoFactor.enabledDescription')}
                   </p>
                 </div>
-                {force2fa ? (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 italic">
-                    {t('twoFactor.requiredByAdmin')}
-                  </p>
-                ) : (
+                <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+                  {force2fa && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                      {t('twoFactor.requiredByAdmin')}
+                    </p>
+                  )}
+                  {/* Offered under FORCE_2FA too: replacing an exposed or
+                      unusable authenticator is not switching 2FA off. */}
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setShowTwoFactorDisable(true)}
+                    onClick={() => setShowTwoFactorReset(true)}
                   >
-                    {t('twoFactor.disableButton')}
+                    {t('twoFactor.resetButton')}
                   </Button>
-                )}
+                  {!force2fa && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowTwoFactorDisable(true)}
+                    >
+                      {t('twoFactor.disableButton')}
+                    </Button>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="flex items-center justify-between">
@@ -299,11 +371,10 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
           <Input
             label={t('twoFactor.disableModal.verificationCodeLabel')}
             type="text"
-            inputMode="numeric"
             autoComplete="one-time-code"
-            maxLength={6}
+            maxLength={9}
             value={disableCode}
-            onChange={(e) => setDisableCode(e.target.value.replace(/\D/g, ''))}
+            onChange={(e) => setDisableCode(normalizeDisableCode(e.target.value))}
             placeholder="000000"
           />
           <div className="flex gap-2 justify-end">
@@ -316,12 +387,61 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
             <Button
               variant="danger"
               onClick={handleDisable2FA}
-              disabled={disableCode.length !== 6 || isDisabling2FA}
+              disabled={!isDisableCodeComplete(disableCode) || isDisabling2FA}
             >
               {isDisabling2FA ? t('twoFactor.disableModal.disablingButton') : t('twoFactor.disableButton')}
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* 2FA Reset Modal */}
+      <Modal
+        isOpen={showTwoFactorReset}
+        onClose={closeResetModal}
+        title={t('twoFactor.resetModal.title')}
+        description={t('twoFactor.resetModal.description')}
+        padding="md"
+      >
+        <form onSubmit={handleReset2FA} className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {t('twoFactor.resetModal.effect')}
+          </p>
+          <Input
+            label={t('twoFactor.resetModal.passwordLabel')}
+            type="password"
+            autoComplete="current-password"
+            maxLength={128}
+            value={resetPassword}
+            onChange={(e) => setResetPassword(e.target.value)}
+          />
+          <div>
+            <Input
+              label={t('twoFactor.resetModal.codeLabel')}
+              type="text"
+              autoComplete="one-time-code"
+              maxLength={9}
+              value={resetCode}
+              onChange={(e) => setResetCode(normalizeDisableCode(e.target.value))}
+              placeholder="000000"
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {t('twoFactor.resetModal.codeHint')}
+            </p>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button type="button" variant="outline" onClick={closeResetModal}>
+              {tc('cancel')}
+            </Button>
+            <Button
+              type="submit"
+              variant="danger"
+              disabled={!resetPassword || !isDisableCodeComplete(resetCode) || isResetting2FA}
+            >
+              {isResetting2FA ? t('twoFactor.resetModal.resettingButton') : t('twoFactor.resetButton')}
+            </Button>
+          </div>
+        </form>
       </Modal>
 
       {/* Backup Code Verification Modal */}

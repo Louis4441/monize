@@ -5,6 +5,7 @@ import { UnauthorizedException } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { TokenService } from "./token.service";
 import { RefreshToken } from "./entities/refresh-token.entity";
+import { hashToken } from "./crypto.util";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
 jest.mock("../common/db/scoped-db", () =>
@@ -519,6 +520,37 @@ describe("TokenService", () => {
         .filter((c) => String(c[0]).includes("pg_advisory_xact_lock"))
         .map((c) => (c[1] as unknown[])[1]);
       expect(lockedFamilies.slice(0, 2)).toEqual(["family-1", "family-2"]);
+    });
+
+    it("keeps no session unless asked to", async () => {
+      stageFirstRound([{ family_id: "family-1" }]);
+      refreshTokensRepository.update.mockResolvedValue({ affected: 0 });
+
+      await service.revokeAllUserRefreshTokens("user-1");
+
+      const select = scopedManager.query.mock.calls.find((c) =>
+        String(c[0]).includes("DISTINCT family_id"),
+      );
+      expect(select![1]).toEqual(["user-1", null]);
+    });
+
+    it("leaves the caller's own session out of the captured set when asked to", async () => {
+      stageFirstRound([{ family_id: "family-1" }]);
+      refreshTokensRepository.update.mockResolvedValue({ affected: 0 });
+
+      await service.revokeAllUserRefreshTokens("user-1", "raw-current-token");
+
+      const select = scopedManager.query.mock.calls.find((c) =>
+        String(c[0]).includes("DISTINCT family_id"),
+      );
+      // The kept family is resolved in SQL from the token's hash, among this
+      // user's own rows only; the raw token never reaches the database.
+      expect(String(select![0])).toMatch(
+        /family_id IS DISTINCT FROM[\s\S]*kept\.user_id = \$1 AND kept\.token_hash = \$2/,
+      );
+      expect(hashToken).toHaveBeenCalledWith("raw-current-token");
+      expect(select![1]).toEqual(["user-1", "hashed-token"]);
+      expect(JSON.stringify(select![1])).not.toContain("raw-current-token");
     });
 
     it("does nothing when the user has no live sessions", async () => {

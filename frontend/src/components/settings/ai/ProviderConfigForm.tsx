@@ -383,16 +383,21 @@ export function ProviderConfigForm({ isOpen, onClose, onSubmit, editConfig }: Pr
           )}
 
           {needsBaseUrl && (
-            <Input
-              label={t('baseUrlLabel')}
-              {...register('baseUrl')}
-              error={errors.baseUrl?.message}
-              placeholder={
-                provider === 'ollama'
-                  ? 'http://localhost:11434'
-                  : 'https://api.example.com/v1'
-              }
-            />
+            <div>
+              <Input
+                label={t('baseUrlLabel')}
+                {...register('baseUrl')}
+                error={errors.baseUrl?.message}
+                placeholder={
+                  provider === 'ollama'
+                    ? 'http://localhost:11434'
+                    : 'https://api.example.com/v1'
+                }
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {t('baseUrlPrivateNote')}
+              </p>
+            </div>
           )}
 
           <Controller

@@ -81,7 +81,9 @@
     "cannotDeleteOwnAccount": "Kendi hesabınızı silemezsiniz",
     "deleteLastAdmin": "Son yönetici hesabı silinemez.",
     "cannotResetOwnPassword": "Yönetici panelinden kendi şifrenizi sıfırlayamazsınız",
-    "noLocalPassword": "Yerel şifresi olmayan hesapların şifresi sıfırlanamaz"
+    "noLocalPassword": "Yerel şifresi olmayan hesapların şifresi sıfırlanamaz",
+    "cannotResetOwnTwoFactor": "Yönetici panelinden kendi iki faktörlü kimlik doğrulamanızı sıfırlayamazsınız",
+    "twoFactorNotEnabled": "Bu kullanıcı için iki faktörlü kimlik doğrulama ayarlanmamış."
   },
   "ai": {
     "queryStreamFailed": "Sorgunuz işlenirken beklenmeyen bir hata oluştu.",
@@ -101,6 +103,9 @@
     "relayAgentOffline": "MCP relay aracınız bağlı değil. Aracınızı bağlayın ve tekrar deneyin.",
     "relayCompletionTimedOut": "MCP relay aracınız zamanında yanıt vermedi. Bağlı olduğundan emin olun ve tekrar deneyin.",
     "unknownProvider": "Bilinmeyen yapay zeka sağlayıcısı: {{ provider }}",
+    "privateBaseUrlRefused": "Bu temel URL özel veya yerel bir ağ adresini (localhost, 192.168.x.x veya bir kapsayıcı adı gibi) gösteriyor. Sunucu operatörü bu adrese AI_PRIVATE_BASE_URL_ALLOWLIST içinde izin vermediği sürece yalnızca bir yönetici bunu kullanabilir.",
+    "modelVerifyFailed": "Yapılandırılan model doğrulanamadı. Temel URL'yi ve sağlayıcıya erişilebildiğini kontrol edin.",
+    "modelVerifyFailedStatus": "Yapılandırılan model doğrulanamadı: sağlayıcı HTTP {{ status }} durum koduyla yanıt verdi.",
     "forecastDataGatherFailed": "Tahmin için finansal veriler toplanamadı. Lütfen tekrar deneyin.",
     "forecastInsufficientHistory": "Tahmin için yetersiz işlem geçmişi. En az 2 aylık veri gereklidir.",
     "forecastGenerateFailed": "Tahmin oluşturulamadı. Lütfen tekrar deneyin.",
@@ -139,6 +144,7 @@
     "accountDeactivated": "Hesap devre dışı bırakıldı",
     "emailNotVerified": "Oturum açmadan önce lütfen e-posta adresinizi doğrulayın. Gelen kutunuzdaki doğrulama bağlantısını kontrol edin.",
     "invalidOrExpiredEmailVerificationToken": "Geçersiz veya süresi dolmuş doğrulama bağlantısı",
+    "invalidOrExpiredEmailChangeToken": "Geçersiz veya süresi dolmuş e-posta değişikliği bağlantısı",
     "oidcNoSubject": "OIDC sağlayıcısı konu tanımlayıcısı döndürmedi",
     "registrationDisabled": "Yeni hesap kaydı devre dışı bırakıldı.",
     "invalidOrExpiredLinkToken": "Geçersiz veya süresi dolmuş bağlantı kodu",
@@ -201,6 +207,8 @@
     "unsupportedBackupVersion": "Desteklenmeyen yedek sürümü: {{ version }}. Beklenen: {{ expected }}",
     "missingExportedAt": "Geçersiz yedek biçimi: exportedAt eksik",
     "tableNotAllowed": "{{ table }} tablosuna yedek geri yüklemede izin verilmiyor",
+    "invalidRestoreIdentifier": "Geçersiz yedek dosyası: {{ table }}.{{ column }} geçerli bir tanımlayıcı olmayan \"{{ value }}\" değerini içeriyor. Değiştirilmemiş bir yedek dosyasından geri yükleyin.",
+    "unresolvedRestoreReference": "Geçersiz yedek dosyası: {{ table }}.{{ column }}, {{ referencedTable }} tablosundaki {{ value }} satırına başvuruyor, ancak dosya bu satırı içermiyor. Bir yedek yalnızca aynı dosyadaki diğer satırlara başvuran satırları geri yükleyebilir; değiştirilmemiş bir yedek dosyasından geri yükleyin.",
     "encryptionNotConfigured": "Sunucu şifreleme için yapılandırılmamış (JWT_SECRET eksik veya çok kısa)",
     "backupPasswordOidcOnly": "Yedek şifresi yalnızca OIDC kullanıcıları için yapılandırılabilir; yerel kullanıcılar giriş şifrelerini kullanır",
     "backupPasswordLocalOnly": "Bu hesabın yedekleri şifreleyecek bir oturum açma parolası yok; bunun yerine bir yedekleme parolası belirleyin",
@@ -293,6 +301,7 @@
     "actionNotAvailableAsDelegate": "Bu işlem başka bir kullanıcı adına hareket ederken kullanılamaz. Yalnızca hesap sahibi bunu yapabilir.",
     "capabilityNotGranted": "Hesap sahibi, {{ resource }} üzerinde {{ operation }} yapmanız için izin vermedi. Delege erişim ayarlarında bunu etkinleştirmelerini isteyin.",
     "sectionNotGranted": "Hesap sahibi {{ sectionLabel }} bölümünü sizinle paylaşmadı.",
+    "fullScopeRequired": "Yapay Zeka Asistanı hesap sahibinin tüm hesaplarını ve bölümlerini okur; bu nedenle yalnızca her hesabı ve her bölümü okuyabilen bir temsilci tarafından kullanılabilir. Hesap sahibinden geri kalanını da sizinle paylaşmasını isteyin veya zaten erişiminiz olan sayfaları kullanın.",
     "accountNotShared": "Hesap sahibi bu hesabı sizinle paylaşmadı.",
     "accountOperationNotGranted": "Hesap sahibi, bu hesaptaki işlemler üzerinde {{ operation }} yapmanız için izin vermedi.",
     "jointOwnAccount": "Bu sizin kendi hesabınız; ortak hesap erişimi burada geçerli değildir.",
@@ -350,6 +359,7 @@
   "monteCarlo": {
     "scenarioNotFound": "{{ id }} senaryosu bulunamadı",
     "atLeastOneAccountRequired": "En az bir accountId gereklidir",
+    "tooManyCashFlows": "Bir senaryoda en fazla {{ max }} nakit akışı olabilir",
     "currentValueUnavailable": "Seçilen hesapların güncel değeri belirlenemedi, bu nedenle bir simülasyon bu değerden başlayamaz. Bir başlangıç değeri girin veya fiyatlar ve döviz kurları hazır olduğunda yeniden deneyin.",
     "historicalReturnsUnavailable": "Seçilen hesapların geçmiş getirileri hesaplanamadığı için simülasyon bunları kullanamaz. Beklenen getiri ve volatiliteyi elle girin veya fiyatlar ve döviz kurları hazır olduğunda yeniden deneyin."
   },

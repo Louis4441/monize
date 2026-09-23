@@ -62,6 +62,7 @@
     "clickToDisable": "Cliquer pour désactiver",
     "clickToEnable": "Cliquer pour activer",
     "resetPassword": "Réinitialiser le mot de passe",
+    "resetTwoFactor": "Réinitialiser la 2FA",
     "noUsers": "Aucun utilisateur trouvé.",
     "storageLoading": "Chargement…",
     "storageUnavailable": "Indisponible",
@@ -96,7 +97,9 @@
       "loadFailed": "Échec du chargement des utilisateurs",
       "deleteFailed": "Échec de la suppression de l'utilisateur",
       "disableFailed": "Échec de la désactivation de l'utilisateur",
-      "resetFailed": "Échec de la réinitialisation du mot de passe"
+      "resetFailed": "Échec de la réinitialisation du mot de passe",
+      "twoFactorReset": "L'authentification à deux facteurs de {name} a été réinitialisée. Ses sessions ont été fermées.",
+      "resetTwoFactorFailed": "Échec de la réinitialisation de l'authentification à deux facteurs"
     },
     "dialogs": {
       "promoteTitle": "Promouvoir l'utilisateur ?",
@@ -111,6 +114,9 @@
       "resetTitle": "Réinitialiser le mot de passe ?",
       "resetMessage": "Cela va générer un nouveau mot de passe temporaire pour {name}. Il devra le modifier à la prochaine connexion.",
       "resetConfirm": "Réinitialiser le mot de passe",
+      "resetTwoFactorTitle": "Réinitialiser l'authentification à deux facteurs ?",
+      "resetTwoFactorMessage": "Cela désactive l'authentification à deux facteurs de {name}, supprime ses codes de secours et ses appareils de confiance, et le déconnecte partout. Il pourra ensuite se connecter avec son mot de passe et reconfigurer la 2FA. À utiliser s'il a perdu son application d'authentification et ses codes de secours, ou après une modification de JWT_SECRET.",
+      "resetTwoFactorConfirm": "Réinitialiser la 2FA",
       "deleteTitle": "Supprimer l'utilisateur ?",
       "deleteMessage": "Voulez-vous vraiment supprimer {name} ? Cela supprimera définitivement son compte et toutes les données associées. Cette action est irréversible. S'il est le délégué d'un autre compte, ses propres données seront supprimées mais son accès sera conservé afin que la délégation reste fonctionnelle — il deviendra un utilisateur délégué uniquement.",
       "deleteConfirm": "Supprimer l'utilisateur",

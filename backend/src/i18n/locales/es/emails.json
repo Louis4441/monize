@@ -117,6 +117,21 @@
     "button": "Verificar correo electrónico",
     "disclaimer": "Este enlace expirará en 24 horas. Si no creaste una cuenta de Monize, puedes ignorar este correo con seguridad."
   },
+  "emailChangeConfirm": {
+    "subject": "Confirma tu nuevo correo electrónico de Monize",
+    "heading": "Confirma tu nueva dirección de correo electrónico",
+    "greeting": "Hola, {{ name }}:",
+    "intro": "Se solicitó usar esta dirección para una cuenta de Monize. Tu correo electrónico no cambiará hasta que lo confirmes haciendo clic en el botón de abajo:",
+    "button": "Confirmar cambio de correo electrónico",
+    "disclaimer": "Este enlace expirará en 24 horas. Si no solicitaste este cambio, puedes ignorar este correo con seguridad."
+  },
+  "emailChangeNotice": {
+    "subject": "Solicitud de cambio de correo electrónico de Monize",
+    "heading": "Cambio de correo electrónico solicitado",
+    "greeting": "Hola, {{ name }}:",
+    "body1": "Se solicitó cambiar la dirección de correo electrónico de tu cuenta de Monize a {{ email }}. El cambio solo se aplicará una vez que se confirme desde esa dirección.",
+    "body2": "Si no hiciste esta solicitud, cambia tu contraseña de inmediato y revisa los dispositivos con sesión iniciada en tu cuenta."
+  },
   "accountInvite": {
     "subject": "Tu cuenta de Monize está lista",
     "heading": "Tu cuenta de Monize está lista",
@@ -251,6 +266,10 @@
       "encryptionKeyMissing": {
         "title": "Clave de cifrado sin configurar",
         "message": "ENCRYPTION_KEY no está definida, por lo que las copias de seguridad se escriben sin cifrar y no se pueden guardar secretos. Una versión futura no arrancará sin ella."
+      },
+      "jwtSecretWeak": {
+        "title": "JWT_SECRET es débil",
+        "message": "JWT_SECRET es un valor de ejemplo publicado o demasiado predecible, así que se pueden falsificar tokens de sesión. Genera uno seguro (openssl rand -base64 32). Cambiarlo hace que dejen de funcionar los códigos de las aplicaciones de autenticación y olvida los dispositivos de confianza: los usuarios inician sesión con un código de respaldo y vuelven a configurar la 2FA, y tú restableces la 2FA en Gestión de usuarios para quien no tenga uno. Consulta antes docs/backend/modules-and-runtime.md (Changing JWT_SECRET)."
       },
       "smtpFailure": {
         "title": "El envío de correo está fallando",

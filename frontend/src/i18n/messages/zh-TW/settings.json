@@ -19,10 +19,12 @@
     "passwordRequired": "更改電子郵件時需要目前密碼",
     "noChanges": "無變更可儲存",
     "passwordConfirmNote": "更改電子郵件地址時需要密碼確認。",
+    "pendingEmailNotice": "確認連結已傳送至 {email}。點擊該連結後，您的電子郵件地址即會變更。",
     "saveButton": "儲存個人資料",
     "savingButton": "儲存中...",
     "toasts": {
       "success": "個人資料更新成功",
+      "confirmationSent": "請查看 {email} 中用於確認新電子郵件地址的連結",
       "updateFailed": "更新個人資料失敗"
     },
     "validation": {
@@ -58,14 +60,28 @@
       "addLayerDescription": "為您的帳戶新增額外的安全層。",
       "enableButton": "啟用 2FA",
       "disableButton": "停用 2FA",
+      "resetButton": "重設 2FA",
       "disableModal": {
         "title": "停用雙重驗證",
-        "description": "輸入您目前的 6 位數驗證碼以確認停用 2FA。",
+        "description": "輸入驗證器 App 中的 6 位數驗證碼，或您的任一備份驗證碼（xxxx-xxxx），以確認停用 2FA。",
         "verificationCodeLabel": "驗證碼",
         "disablingButton": "停用中...",
         "toasts": {
           "disabled": "雙重驗證已停用",
           "disableFailed": "停用 2FA 失敗"
+        }
+      },
+      "resetModal": {
+        "title": "重設雙重驗證",
+        "description": "如果您的驗證器 App 或備份驗證碼可能已外洩，或驗證碼已無法使用（例如伺服器金鑰變更後），請使用此功能。",
+        "effect": "您目前的驗證器、備份驗證碼和受信任裝置將失效，並且您會在所有其他裝置上登出。接著您將立即設定新的驗證器。",
+        "passwordLabel": "帳戶密碼",
+        "codeLabel": "驗證碼或備份驗證碼",
+        "codeHint": "輸入驗證器 App 中的 6 位數驗證碼。如果驗證器已無法使用，請改為輸入您的任一備份驗證碼（xxxx-xxxx）。",
+        "resettingButton": "重設中...",
+        "toasts": {
+          "reset": "雙重驗證已重設。請立即設定新的驗證器。",
+          "resetFailed": "重設 2FA 失敗"
         }
       }
     },
@@ -582,7 +598,11 @@
       "copyUrlFailed": "複製 URL 失敗",
       "loadFailed": "載入 API 權杖失敗",
       "createFailed": "建立權杖失敗",
-      "revokeFailed": "撤銷權杖失敗"
+      "revokeFailed": "撤銷權杖失敗",
+      "reauthFailed": "確認重新驗證失敗"
+    },
+    "stepUp": {
+      "reason": "權杖無需登入即可存取您的帳號，因此在建立權杖前請先確認您的身份。"
     },
     "relative": {
       "never": "從未",
@@ -905,7 +925,8 @@
       "shared": "共用資料"
     },
     "sections": {
-      "description": "授予整個應用程式區段的唯讀存取。以科目為範圍的資料仍需要個別科目存取。"
+      "description": "授予整個應用程式區段的唯讀存取。以科目為範圍的資料仍需要個別科目存取。",
+      "aiRequiresFullAccess": "AI 助理會讀取所有科目與區段，因此只有當此委派人能讀取您的所有科目及其他所有區段時，它才會為其回答。"
     },
     "accounts": {
       "noAccounts": "無可授予的科目。",
@@ -1164,6 +1185,7 @@
       "ollamaCloudNote": "模型名稱必須包含 -cloud 後綴（例如：gpt-oss:20b-cloud）。",
       "apiKeyLabel": "API 金鑰",
       "baseUrlLabel": "基礎 URL",
+      "baseUrlPrivateNote": "私人或本機位址（localhost、192.168.x.x 或容器名稱）僅適用於管理員，或伺服器營運者已允許該位址的情況。否則，請使用可從網際網路存取的位址。",
       "priorityLabel": "優先順序",
       "priorityHelp": "數字越小，優先順序越高。用於後備排序。",
       "costRatesHeading": "費率（選填）",

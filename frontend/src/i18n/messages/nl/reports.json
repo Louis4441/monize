@@ -941,6 +941,7 @@
     "removeCashFlow": "Kasstroom verwijderen",
     "removeTitle": "Verwijderen",
     "addCashFlow": "+ Kasstroom toevoegen",
+    "cashFlowLimitReached": "Een scenario kan maximaal {max} kasstromen hebben.",
     "returnAssumptions": "Rendementsaannames",
     "specifyReturn": "Verwacht rendement opgeven",
     "useHistoricalReturns": "Historische rendementen van geselecteerde rekeningen gebruiken",

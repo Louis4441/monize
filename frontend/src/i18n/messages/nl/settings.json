@@ -19,10 +19,12 @@
     "passwordRequired": "Huidig wachtwoord is vereist om e-mail te wijzigen",
     "noChanges": "Geen wijzigingen om op te slaan",
     "passwordConfirmNote": "Wachtwoordbevestiging is vereist bij het wijzigen van jouw e-mailadres.",
+    "pendingEmailNotice": "Er is een bevestigingslink naar {email} gestuurd. Je e-mailadres wordt gewijzigd zodra je die link volgt.",
     "saveButton": "Profiel opslaan",
     "savingButton": "Opslaan...",
     "toasts": {
       "success": "Profiel succesvol bijgewerkt",
+      "confirmationSent": "Kijk in {email} voor een link om je nieuwe e-mailadres te bevestigen",
       "updateFailed": "Bijwerken van profiel mislukt"
     },
     "validation": {
@@ -58,14 +60,28 @@
       "addLayerDescription": "Voeg een extra beveiligingslaag toe aan jouw account.",
       "enableButton": "2FA inschakelen",
       "disableButton": "2FA uitschakelen",
+      "resetButton": "2FA opnieuw instellen",
       "disableModal": {
         "title": "Tweefactorauthenticatie uitschakelen",
-        "description": "Voer jouw huidige 6-cijferige code in om het uitschakelen van 2FA te bevestigen.",
+        "description": "Voer de 6-cijferige code uit jouw authenticator-app of een van jouw back-upcodes (xxxx-xxxx) in om het uitschakelen van 2FA te bevestigen.",
         "verificationCodeLabel": "Verificatiecode",
         "disablingButton": "Uitschakelen...",
         "toasts": {
           "disabled": "Tweefactorauthenticatie uitgeschakeld",
           "disableFailed": "Uitschakelen van tweefactorauthenticatie mislukt"
+        }
+      },
+      "resetModal": {
+        "title": "Tweefactorauthenticatie opnieuw instellen",
+        "description": "Gebruik dit als jouw authenticator-app of back-upcodes mogelijk zijn uitgelekt, of als jouw authenticatorcodes niet meer werken (bijvoorbeeld na een wijziging van het servergeheim).",
+        "effect": "Je huidige authenticator, back-upcodes en vertrouwde apparaten werken daarna niet meer, en je wordt op alle andere apparaten afgemeld. Daarna stel je meteen een nieuwe authenticator in.",
+        "passwordLabel": "Accountwachtwoord",
+        "codeLabel": "Authenticator- of back-upcode",
+        "codeHint": "Voer de 6-cijferige code uit jouw authenticator-app in. Als je authenticator niet meer werkt, voer dan in plaats daarvan een van jouw back-upcodes (xxxx-xxxx) in.",
+        "resettingButton": "Opnieuw instellen...",
+        "toasts": {
+          "reset": "Tweefactorauthenticatie opnieuw ingesteld. Stel nu je nieuwe authenticator in.",
+          "resetFailed": "Opnieuw instellen van 2FA mislukt"
         }
       }
     },
@@ -582,7 +598,11 @@
       "copyUrlFailed": "Kopiëren van URL mislukt",
       "loadFailed": "Laden van API-tokens mislukt",
       "createFailed": "Aanmaken van token mislukt",
-      "revokeFailed": "Intrekken van token mislukt"
+      "revokeFailed": "Intrekken van token mislukt",
+      "reauthFailed": "Bevestigen van opnieuw verifiëren mislukt"
+    },
+    "stepUp": {
+      "reason": "Met een token is je account bereikbaar zonder in te loggen, dus bevestig dat jij het bent voordat je er een aanmaakt."
     },
     "relative": {
       "never": "Nooit",
@@ -905,7 +925,8 @@
       "shared": "Gedeelde gegevens"
     },
     "sections": {
-      "description": "Verleen alleen-lezentoegang tot hele appsecties. Rekeninggebonden gegevens vereisen ook per-rekeningtoegang."
+      "description": "Verleen alleen-lezentoegang tot hele appsecties. Rekeninggebonden gegevens vereisen ook per-rekeningtoegang.",
+      "aiRequiresFullAccess": "De AI-assistent leest alle rekeningen en secties en antwoordt daarom pas voor deze gedelegeerde zodra die al je rekeningen en elke andere sectie kan lezen."
     },
     "accounts": {
       "noAccounts": "Geen rekeningen om te verlenen.",
@@ -1164,6 +1185,7 @@
       "ollamaCloudNote": "Modelnamen moeten het achtervoegsel -cloud bevatten (bijv. gpt-oss:20b-cloud).",
       "apiKeyLabel": "API-sleutel",
       "baseUrlLabel": "Basis-URL",
+      "baseUrlPrivateNote": "Een privé- of lokaal adres (localhost, 192.168.x.x of een containernaam) werkt alleen voor een beheerder, of wanneer de serverbeheerder dat adres toestaat. Gebruik anders een adres dat bereikbaar is vanaf internet.",
       "priorityLabel": "Prioriteit",
       "priorityHelp": "Lager getal = hogere prioriteit. Gebruikt voor de terugvalopvolgorde.",
       "costRatesHeading": "Kostentarieven (optioneel)",

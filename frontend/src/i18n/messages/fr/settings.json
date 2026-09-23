@@ -19,10 +19,12 @@
     "passwordRequired": "Le mot de passe actuel est requis pour modifier l'e-mail",
     "noChanges": "Aucune modification à enregistrer",
     "passwordConfirmNote": "La confirmation du mot de passe est requise lors du changement de votre adresse e-mail.",
+    "pendingEmailNotice": "Un lien de confirmation a été envoyé à {email}. Votre adresse e-mail sera modifiée une fois que vous l'aurez suivi.",
     "saveButton": "Enregistrer le profil",
     "savingButton": "Enregistrement...",
     "toasts": {
       "success": "Profil mis à jour avec succès",
+      "confirmationSent": "Consultez {email} pour trouver le lien de confirmation de votre nouvelle adresse e-mail",
       "updateFailed": "Échec de la mise à jour du profil"
     },
     "validation": {
@@ -58,14 +60,28 @@
       "addLayerDescription": "Ajoutez une couche de sécurité supplémentaire à votre compte.",
       "enableButton": "Activer la 2FA",
       "disableButton": "Désactiver la 2FA",
+      "resetButton": "Réinitialiser la 2FA",
       "disableModal": {
         "title": "Désactiver l'authentification à deux facteurs",
-        "description": "Saisissez votre code à 6 chiffres actuel pour confirmer la désactivation de la 2FA.",
+        "description": "Saisissez le code à 6 chiffres de votre application d'authentification, ou l'un de vos codes de secours (xxxx-xxxx), pour confirmer la désactivation de la 2FA.",
         "verificationCodeLabel": "Code de vérification",
         "disablingButton": "Désactivation...",
         "toasts": {
           "disabled": "Authentification à deux facteurs désactivée",
           "disableFailed": "Échec de la désactivation de l'authentification à deux facteurs"
+        }
+      },
+      "resetModal": {
+        "title": "Réinitialiser l'authentification à deux facteurs",
+        "description": "Utilisez cette option si votre application d'authentification ou vos codes de secours ont pu être exposés, ou si vos codes d'authentification ne fonctionnent plus (par exemple après un changement du secret du serveur).",
+        "effect": "Votre authentificateur actuel, vos codes de secours et vos appareils de confiance cesseront de fonctionner, et vous serez déconnecté de tous vos autres appareils. Vous configurerez ensuite immédiatement un nouvel authentificateur.",
+        "passwordLabel": "Mot de passe du compte",
+        "codeLabel": "Code d'authentification ou de secours",
+        "codeHint": "Saisissez le code à 6 chiffres de votre application d'authentification. Si votre authentificateur ne fonctionne plus, saisissez plutôt l'un de vos codes de secours (xxxx-xxxx).",
+        "resettingButton": "Réinitialisation...",
+        "toasts": {
+          "reset": "Authentification à deux facteurs réinitialisée. Configurez votre nouvel authentificateur maintenant.",
+          "resetFailed": "Échec de la réinitialisation de la 2FA"
         }
       }
     },
@@ -582,7 +598,11 @@
       "copyUrlFailed": "Échec de la copie de l'URL",
       "loadFailed": "Échec du chargement des jetons d'API",
       "createFailed": "Échec de la création du jeton",
-      "revokeFailed": "Échec de la révocation du jeton"
+      "revokeFailed": "Échec de la révocation du jeton",
+      "reauthFailed": "Échec de la confirmation de la réauthentification"
+    },
+    "stepUp": {
+      "reason": "Un jeton peut accéder à votre compte sans connexion ; confirmez donc votre identité avant d'en créer un."
     },
     "relative": {
       "never": "Jamais",
@@ -905,7 +925,8 @@
       "shared": "Données partagées"
     },
     "sections": {
-      "description": "Accordez un accès en lecture seule à des sections entières de l'application. Les données liées à un compte nécessitent également un accès par compte."
+      "description": "Accordez un accès en lecture seule à des sections entières de l'application. Les données liées à un compte nécessitent également un accès par compte.",
+      "aiRequiresFullAccess": "L'Assistant IA consulte l'ensemble des comptes et des sections ; il ne répond donc pour ce délégué qu'une fois que celui-ci peut lire tous vos comptes et toutes les autres sections."
     },
     "accounts": {
       "noAccounts": "Aucun compte à accorder.",
@@ -1164,6 +1185,7 @@
       "ollamaCloudNote": "Les noms de modèles doivent inclure le suffixe -cloud (ex. : gpt-oss:20b-cloud).",
       "apiKeyLabel": "Clé API",
       "baseUrlLabel": "URL de base",
+      "baseUrlPrivateNote": "Une adresse privée ou locale (localhost, 192.168.x.x ou un nom de conteneur) ne fonctionne que pour un administrateur, ou si l'opérateur du serveur autorise cette adresse. Sinon, utilisez une adresse accessible depuis Internet.",
       "priorityLabel": "Priorité",
       "priorityHelp": "Numéro inférieur = priorité supérieure. Utilisé pour l'ordre de basculement.",
       "costRatesHeading": "Tarifs de coût (facultatif)",

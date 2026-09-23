@@ -19,10 +19,12 @@
     "passwordRequired": "Das aktuelle Passwort ist zum Ändern der E-Mail-Adresse erforderlich",
     "noChanges": "Keine Änderungen zu speichern",
     "passwordConfirmNote": "Die Passwortbestätigung ist beim Ändern Ihrer E-Mail-Adresse erforderlich.",
+    "pendingEmailNotice": "Ein Bestätigungslink wurde an {email} gesendet. Ihre E-Mail-Adresse ändert sich, sobald Sie ihm folgen.",
     "saveButton": "Profil speichern",
     "savingButton": "Wird gespeichert...",
     "toasts": {
       "success": "Profil erfolgreich aktualisiert",
+      "confirmationSent": "Prüfen Sie {email} auf einen Link zur Bestätigung Ihrer neuen E-Mail-Adresse",
       "updateFailed": "Profil konnte nicht aktualisiert werden"
     },
     "validation": {
@@ -58,14 +60,28 @@
       "addLayerDescription": "Fügen Sie Ihrem Konto eine zusätzliche Sicherheitsebene hinzu.",
       "enableButton": "2FA aktivieren",
       "disableButton": "2FA deaktivieren",
+      "resetButton": "2FA zurücksetzen",
       "disableModal": {
         "title": "Zwei-Faktor-Authentifizierung deaktivieren",
-        "description": "Geben Sie Ihren aktuellen 6-stelligen Code ein, um die Deaktivierung der 2FA zu bestätigen.",
+        "description": "Geben Sie den 6-stelligen Code aus Ihrer Authentifizierungs-App oder einen Ihrer Backup-Codes (xxxx-xxxx) ein, um die Deaktivierung der 2FA zu bestätigen.",
         "verificationCodeLabel": "Verifizierungscode",
         "disablingButton": "Wird deaktiviert...",
         "toasts": {
           "disabled": "Zwei-Faktor-Authentifizierung deaktiviert",
           "disableFailed": "Zwei-Faktor-Authentifizierung konnte nicht deaktiviert werden"
+        }
+      },
+      "resetModal": {
+        "title": "Zwei-Faktor-Authentifizierung zurücksetzen",
+        "description": "Verwenden Sie dies, wenn Ihre Authentifizierungs-App oder Ihre Backup-Codes offengelegt worden sein könnten oder wenn Ihre Authentifizierungscodes nicht mehr funktionieren (zum Beispiel nach einer Änderung des Server-Secrets).",
+        "effect": "Ihr bisheriger Authentifikator, Ihre Backup-Codes und Ihre vertrauenswürdigen Geräte funktionieren danach nicht mehr, und Sie werden auf allen anderen Geräten abgemeldet. Anschließend richten Sie sofort einen neuen Authentifikator ein.",
+        "passwordLabel": "Kontopasswort",
+        "codeLabel": "Authentifizierungs- oder Backup-Code",
+        "codeHint": "Geben Sie den 6-stelligen Code aus Ihrer Authentifizierungs-App ein. Wenn Ihr Authentifikator nicht mehr funktioniert, geben Sie stattdessen einen Ihrer Backup-Codes (xxxx-xxxx) ein.",
+        "resettingButton": "Wird zurückgesetzt...",
+        "toasts": {
+          "reset": "Zwei-Faktor-Authentifizierung zurückgesetzt. Richten Sie jetzt Ihren neuen Authentifikator ein.",
+          "resetFailed": "2FA konnte nicht zurückgesetzt werden"
         }
       }
     },
@@ -582,7 +598,11 @@
       "copyUrlFailed": "URL konnte nicht kopiert werden",
       "loadFailed": "API-Token konnten nicht geladen werden",
       "createFailed": "Token konnte nicht erstellt werden",
-      "revokeFailed": "Token konnte nicht widerrufen werden"
+      "revokeFailed": "Token konnte nicht widerrufen werden",
+      "reauthFailed": "Die erneute Authentifizierung konnte nicht bestätigt werden"
+    },
+    "stepUp": {
+      "reason": "Ein Token kann ohne Anmeldung auf Ihr Konto zugreifen. Bestätigen Sie daher Ihre Identität, bevor Sie eines erstellen."
     },
     "relative": {
       "never": "Nie",
@@ -905,7 +925,8 @@
       "shared": "Gemeinsame Daten"
     },
     "sections": {
-      "description": "Schreibgeschützten Zugriff auf ganze App-Bereiche gewähren. Kontobezogene Daten benötigen zusätzlich Zugriff pro Konto."
+      "description": "Schreibgeschützten Zugriff auf ganze App-Bereiche gewähren. Kontobezogene Daten benötigen zusätzlich Zugriff pro Konto.",
+      "aiRequiresFullAccess": "Der KI-Assistent liest alle Konten und Bereiche und antwortet für diesen Delegierten daher erst, wenn er alle Ihre Konten und jeden anderen Bereich lesen darf."
     },
     "accounts": {
       "noAccounts": "Keine Konten zum Gewähren.",
@@ -1164,6 +1185,7 @@
       "ollamaCloudNote": "Modellnamen müssen das Suffix -cloud enthalten (z. B. gpt-oss:20b-cloud).",
       "apiKeyLabel": "API-Schlüssel",
       "baseUrlLabel": "Basis-URL",
+      "baseUrlPrivateNote": "Eine private oder lokale Adresse (localhost, 192.168.x.x oder ein Containername) funktioniert nur für Administratoren oder wenn der Serverbetreiber diese Adresse erlaubt. Verwenden Sie andernfalls eine aus dem Internet erreichbare Adresse.",
       "priorityLabel": "Priorität",
       "priorityHelp": "Niedrigere Zahl = höhere Priorität. Wird für die Fallback-Reihenfolge verwendet.",
       "costRatesHeading": "Kostensätze (optional)",

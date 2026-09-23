@@ -5,6 +5,13 @@
     "cash": "Nakit",
     "brokerage": "Aracılık"
   },
+  "oauthConsent": {
+    "destinationLabel": "Erişime izin verirseniz Monize yetkilendirmeyi şu adrese gönderecek:",
+    "destinationUnknown": "Monize bu yetkilendirmenin nereye gönderileceğini belirleyemedi. Erişime izin vermeyin.",
+    "unverifiedNotice": "Bu uygulama kendisini bu Monize sunucusuna kendisi kaydetti ve Monize onu kimin işlettiğini doğrulamadı; adı, kendisine verdiği addır. Yalnızca bu bağlantıyı o uygulamadan kendiniz başlattıysanız ve yukarıdaki adres ona aitse erişime izin verin.",
+    "claimedWebsite": "Uygulamanın belirttiği web sitesi: {{ website }}",
+    "websiteMismatch": "Uygulama web sitesinin {{ website }} olduğunu söylüyor, ancak yetkilendirme farklı bir adrese gönderilecek."
+  },
   "import": {
     "voidedTransactionNote": "Kaynakta geçersiz kılındı; orijinal tutar dışa aktarmada yer almadığı için sıfır olarak içe aktarıldı."
   },

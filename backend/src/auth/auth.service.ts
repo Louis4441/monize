@@ -40,7 +40,11 @@ import { DelegationService } from "../delegation/delegation.service";
 import { BackupEncryptionService } from "../backup/backup-encryption.service";
 import { withSystemContext } from "../common/db/with-context";
 import { withScopedDb } from "../common/db/scoped-db";
-import { returnedRows } from "../common/db/query-result";
+import { recordFailedLogin } from "./login-lockout";
+import {
+  revokeOAuthGrantsAfterCommit,
+  revokeStandingCredentials,
+} from "./credential-revocation";
 import { tr } from "../i18n/translate";
 import { currentRequestLocale } from "../i18n/request-locale";
 import { I18nService } from "nestjs-i18n";
@@ -53,8 +57,6 @@ export class AuthService {
   private jwtSecret: string;
   /** Derived key for CSRF HMAC -- cryptographically isolated from the JWT signing key */
   private csrfKey: string;
-  private readonly MAX_FAILED_ATTEMPTS = 5;
-  private readonly BASE_LOCKOUT_MS = 30 * 60 * 1000; // 30 minutes
 
   constructor(
     private jwtService: JwtService,
@@ -94,114 +96,48 @@ export class AuthService {
   }
 
   /**
-   * Hand the just-proven password to the backup encryption service so the
-   * automatic backup cron can encrypt this user's backups with it. This is the
-   * only moment the server holds their password in plaintext, and the feature
-   * asks them to configure nothing, so it is captured here.
+   * Hand the just-proven password, with the hash it was verified against, to the
+   * backup encryption service, which wraps the user's backup key under it so the
+   * automatic backup cron can encrypt without it. This is the only moment the
+   * server holds their password in plaintext, and the feature asks them to
+   * configure nothing, so the wrap is made here. The password itself is never
+   * stored (docs/specs/backup-envelope-key-wrapping.md).
    *
    * Resolved lazily via ModuleRef: BackupModule imports AuthModule, so an
    * injected dependency the other way would be a cycle. Best-effort in every
    * sense -- signing in must not fail because a backup convenience did.
    */
-  private async rememberBackupPassword(
+  private async rewrapBackupKey(
     userId: string,
     password: string,
+    verifiedPasswordHash: string,
   ): Promise<void> {
     try {
       const backupEncryption = this.moduleRef.get(BackupEncryptionService, {
         strict: false,
       });
-      await backupEncryption.rememberLoginPassword(userId, password);
+      await backupEncryption.rewrapBackupKey(
+        userId,
+        password,
+        verifiedPasswordHash,
+      );
     } catch (err) {
       this.logger.warn(
-        `Could not store the backup password for user ${userId}: ${err.message}`,
+        `Could not wrap the backup key for user ${userId}: ${err.message}`,
       );
     }
   }
 
   /**
-   * Record one failed login in a single guarded statement: increment the
-   * counter, and in the *same* UPDATE lock the account when that increment
-   * crosses the threshold. Returns what the database committed, plus whether
-   * this write is the one that moved the row from not-locked to locked.
-   *
-   * Two things this fixes, both from the maintainer review of PR #1097:
-   *
-   * 1. **The increment and the lock were two transactions.** The counter grew
-   *    in one committed statement and `locked_until` was written by a second,
-   *    so a concurrent attempt could interleave between them -- a legitimate
-   *    user locked out on a stale count, or the lockout window written from a
-   *    count that a parallel failure had already moved past. Folding the
-   *    threshold `CASE` into the increment makes the decision atomic with the
-   *    value it is decided from.
-   * 2. **The lockout email fired per failed attempt above the threshold, not
-   *    per transition.** Every committed count `>= MAX` looked lockable, so two
-   *    parallel failures both mailed the victim for one lockout. Only the write
-   *    that actually crossed from not-locked to locked reports `justLocked`, by
-   *    comparing the pre-update `locked_until` (returned from a CTE, since
-   *    `RETURNING` sees only the post-update row) against the new one.
-   *
-   * The lockout window keeps the exponential backoff the application code used
-   * (`BASE_LOCKOUT_MS * 2^(floor(attempts / MAX) - 1)`), computed in SQL from
-   * the committed count so it matches the value the same statement wrote.
-   *
-   * Returns `attempts: 0` / `justLocked: false` when no row matched, so a caller
-   * cannot mistake a missing user for a first failed attempt.
+   * Record one failed login. The statement, its lockout arithmetic (bounded, and
+   * forgotten a day after the lock expires) and the once-per-lockout `justLocked`
+   * are `recordFailedLogin` in `./login-lockout`; this only gives it a scoped
+   * transaction.
    */
-  private async recordFailedAttempt(userId: string): Promise<{
-    attempts: number;
-    justLocked: boolean;
-    lockedUntil: Date | null;
-  }> {
-    const rows = await withScopedDb(this.dataSource, (manager) =>
-      manager.query(
-        `WITH prev AS (
-           SELECT id, locked_until FROM users WHERE id = $1
-         )
-         UPDATE users u
-            SET failed_login_attempts = u.failed_login_attempts + 1,
-                locked_until = CASE
-                  WHEN u.failed_login_attempts + 1 >= $2
-                    THEN CURRENT_TIMESTAMP + (
-                      ROUND(
-                        $3::numeric
-                        * power(
-                            2,
-                            floor((u.failed_login_attempts + 1)::numeric / $2) - 1
-                          )
-                      )::text || ' milliseconds'
-                    )::interval
-                  ELSE u.locked_until
-                END
-           FROM prev
-          WHERE u.id = prev.id
-          RETURNING u.failed_login_attempts AS attempts,
-                    u.locked_until AS new_locked_until,
-                    prev.locked_until AS old_locked_until`,
-        [userId, this.MAX_FAILED_ATTEMPTS, this.BASE_LOCKOUT_MS],
-      ),
+  private recordFailedAttempt(userId: string) {
+    return withScopedDb(this.dataSource, (manager) =>
+      recordFailedLogin(manager, userId),
     );
-    const updated = returnedRows<{
-      attempts: number | string;
-      new_locked_until: Date | string | null;
-      old_locked_until: Date | string | null;
-    }>(rows);
-    if (updated.length === 0) {
-      return { attempts: 0, justLocked: false, lockedUntil: null };
-    }
-    const row = updated[0];
-    const toDate = (value: Date | string | null): Date | null =>
-      value == null ? null : value instanceof Date ? value : new Date(value);
-    const now = Date.now();
-    const newLockedUntil = toDate(row.new_locked_until);
-    const oldLockedUntil = toDate(row.old_locked_until);
-    const wasLocked = oldLockedUntil != null && oldLockedUntil.getTime() > now;
-    const isLocked = newLockedUntil != null && newLockedUntil.getTime() > now;
-    return {
-      attempts: Number(row.attempts),
-      justLocked: !wasLocked && isLocked,
-      lockedUntil: newLockedUntil,
-    };
   }
 
   // RLS: register/login/refresh/verify/OIDC lookups are public, pre-identity
@@ -240,18 +176,23 @@ export class AuthService {
       //  - authProvider === 'local' (an OIDC user can't be claimed via a
       //    password registration),
       //  - it appears in account_delegates.delegate_user_id, and
-      //  - it owns no data (no accounts, no delegations as owner, not admin).
+      //  - it owns no data (no accounts, no delegations as owner, not admin),
+      //  - it already has a password (the owner provisioned it with a temp
+      //    password and shared it out-of-band).
       //
-      // If the delegate row already has a password (the owner provisioned
-      // it with a temp password and shared it out-of-band), the registrant
-      // must prove they hold that temp password via `currentPassword`.
-      // Without that proof anyone who knows the email could take over the
-      // delegate row.
+      // The registrant must prove they hold that password via
+      // `currentPassword`. Without that proof anyone who knows the email
+      // could take over the delegate row. An invited row has no password at
+      // all -- only an emailed invite (reset) token -- so there is nothing
+      // to prove here: it is activated through the invite link, which is the
+      // proof of mailbox control, and never through /register.
+      const delegatePasswordHash = existingUser.passwordHash;
       const isPureDelegate =
+        !!delegatePasswordHash &&
         existingUser.authProvider === "local" &&
         (await this.delegationService.isDelegateUser(existingUser.id)) &&
         !(await this.delegationService.isFullAccount(existingUser.id));
-      if (!isPureDelegate) {
+      if (!delegatePasswordHash || !isPureDelegate) {
         throw new ConflictException(
           tr(
             "errors.auth.unableToCompleteRegistration",
@@ -260,33 +201,31 @@ export class AuthService {
         );
       }
 
-      if (existingUser.passwordHash) {
-        // The registrant proves they hold the delegate password in one of
-        // two ways: either they typed it into the dedicated "Delegate
-        // password" prompt (currentPassword), or the new-account password
-        // they typed up front happens to be the same value -- in which
-        // case the front end doesn't need to ask for it a second time.
-        const newPasswordMatches = await bcrypt.compare(
-          password,
-          existingUser.passwordHash,
+      // The registrant proves they hold the delegate password in one of
+      // two ways: either they typed it into the dedicated "Delegate
+      // password" prompt (currentPassword), or the new-account password
+      // they typed up front happens to be the same value -- in which
+      // case the front end doesn't need to ask for it a second time.
+      const newPasswordMatches = await bcrypt.compare(
+        password,
+        delegatePasswordHash,
+      );
+      let claimOk = newPasswordMatches;
+      if (!claimOk) {
+        const supplied = (currentPassword ?? "").trim();
+        claimOk =
+          supplied.length > 0 &&
+          (await bcrypt.compare(supplied, delegatePasswordHash));
+      }
+      if (!claimOk) {
+        throw new UnauthorizedException(
+          tr(
+            "errors.auth.delegateClaimPasswordRequired",
+            "An account with this email already exists as a shared user. " +
+              "Provide the temporary password your administrator gave you " +
+              "to claim it.",
+          ),
         );
-        let claimOk = newPasswordMatches;
-        if (!claimOk) {
-          const supplied = (currentPassword ?? "").trim();
-          claimOk =
-            supplied.length > 0 &&
-            (await bcrypt.compare(supplied, existingUser.passwordHash));
-        }
-        if (!claimOk) {
-          throw new UnauthorizedException(
-            tr(
-              "errors.auth.delegateClaimPasswordRequired",
-              "An account with this email already exists as a shared user. " +
-                "Provide the temporary password your administrator gave you " +
-                "to claim it.",
-            ),
-          );
-        }
       }
 
       const breached = await this.passwordBreachService.isBreached(password);
@@ -307,9 +246,10 @@ export class AuthService {
       existingUser.resetTokenExpiry = null;
       existingUser.failedLoginAttempts = 0;
       existingUser.lockedUntil = null;
-      // The row being claimed was provisioned by an account owner who invited
-      // this email as a delegate, so the address is already trusted -- the
-      // claimant can sign in immediately without an email-verification step.
+      // The row being claimed was provisioned by an account owner for this
+      // email and the claimant proved they hold the password the owner gave
+      // them, so the address is already trusted -- the claimant can sign in
+      // immediately without an email-verification step.
       existingUser.emailVerified = true;
       // Promote out of the owner-managed delegate state -- the user is
       // claiming the row as their own account from here on, so they
@@ -401,7 +341,7 @@ export class AuthService {
 
     // Automatic backups start encrypted from the first one, without waiting
     // for the account's first sign-in.
-    await this.rememberBackupPassword(user.id, password);
+    await this.rewrapBackupKey(user.id, password, passwordHash);
 
     if (requireVerification) {
       // Account exists but cannot sign in until the email is verified, so we
@@ -517,11 +457,11 @@ export class AuthService {
     }
 
     // The password is proven correct and the account is usable: this is where
-    // the plaintext exists, so this is where the backup copy is refreshed. It
-    // runs before the 2FA branch because every exit below it is a successful
-    // password check, and a stale copy is what produces a backup the user
-    // cannot decrypt.
-    await this.rememberBackupPassword(user.id, password);
+    // the plaintext exists, so this is where the backup key is re-wrapped if
+    // the password moved. It runs before the 2FA branch because every exit
+    // below it is a successful password check, and a stale wrap is what
+    // produces a backup the user cannot decrypt.
+    await this.rewrapBackupKey(user.id, password, user.passwordHash);
 
     // Reset failed attempts on successful login.
     //
@@ -962,14 +902,22 @@ export class AuthService {
       );
     }
 
-    // Complete the link
+    // Complete the link. The account now signs in through the identity
+    // provider, so every credential issued on the strength of the local
+    // password ends with it: PATs and trusted devices in the same transaction,
+    // sessions and OAuth grants after it (`credential-revocation.ts`).
     user.oidcSubject = user.pendingOidcSubject;
     user.authProvider = "oidc";
     user.oidcLinkPending = false;
     user.oidcLinkToken = null;
     user.oidcLinkExpiresAt = null;
     user.pendingOidcSubject = null;
-    await this.scoped(User, (repo) => repo.save(user));
+    await withScopedDb(this.dataSource, async (manager) => {
+      await manager.getRepository(User).save(user);
+      await revokeStandingCredentials(manager, user.id);
+    });
+    await this.tokenService.revokeAllUserRefreshTokens(user.id);
+    await revokeOAuthGrantsAfterCommit(this.moduleRef, user.id, this.logger);
 
     return user;
   }
@@ -1034,6 +982,20 @@ export class AuthService {
 
   async disable2FA(userId: string, code: string) {
     return this.twoFactorService.disable2FA(userId, code);
+  }
+
+  async reset2FA(
+    userId: string,
+    currentPassword: string,
+    code: string,
+    currentRefreshToken?: string,
+  ) {
+    return this.twoFactorService.reset2FA(
+      userId,
+      currentPassword,
+      code,
+      currentRefreshToken,
+    );
   }
 
   async generateBackupCodes(userId: string, code: string) {
@@ -1120,6 +1082,14 @@ export class AuthService {
   async verifyEmail(token: string) {
     // RLS: public verify-email path (verification token, no req.user).
     return withSystemContext(() => this.authEmailService.verifyEmail(token));
+  }
+
+  async confirmEmailChange(token: string) {
+    // RLS: public confirm-email-change path (token in the emailed link, no
+    // req.user) -- the same shape as verifyEmail above.
+    return withSystemContext(() =>
+      this.authEmailService.confirmEmailChange(token),
+    );
   }
 
   async checkVerificationEmailLimit(email: string) {

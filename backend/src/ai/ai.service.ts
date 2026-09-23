@@ -42,6 +42,13 @@ import {
   SELF_HOSTED_PROVIDERS,
   AiProviderType,
 } from "./entities/ai-provider-config.entity";
+import { User } from "../users/entities/user.entity";
+import { privateBaseUrlAllowlist } from "./validators/private-base-url-allowlist";
+import {
+  AiBaseUrlRefusedError,
+  assertBaseUrlAllowed,
+  egressPolicyForConfig,
+} from "./ai-base-url-policy";
 
 const DEFAULT_MAX_AI_PROVIDERS_PER_USER = 10;
 
@@ -95,6 +102,14 @@ export class AiService {
       );
     }
     this.maxProvidersPerUser = maxProviders.value;
+
+    // An entry that cannot be read allows nothing; say so once, at boot.
+    const allowlist = privateBaseUrlAllowlist();
+    if (allowlist.invalid.length > 0) {
+      this.logger.warn(
+        `AI_PRIVATE_BASE_URL_ALLOWLIST: ignoring ${allowlist.invalid.length} unreadable entr${allowlist.invalid.length === 1 ? "y" : "ies"}; expected comma-separated host or host:port values`,
+      );
+    }
 
     // SECURITY: Validate AI_DEFAULT_BASE_URL at startup.
     // Self-hosted providers (ollama, openai-compatible) only need basic URL
@@ -170,11 +185,10 @@ export class AiService {
     userId: string,
     dto: CreateAiConfigDto,
   ): Promise<AiProviderConfigResponse> {
-    // Validate baseUrl: self-hosted providers allow private URLs,
-    // cloud providers require full SSRF validation
-    if (dto.baseUrl) {
-      await this.validateBaseUrl(dto.baseUrl, dto.provider);
-    }
+    // Validate the URL the provider will call: a public host for every cloud
+    // provider, and for a self-hosted one unless its owner is an admin or the
+    // operator allowlisted the address. An Ollama with no baseUrl is loopback.
+    await this.validateBaseUrl(userId, dto.provider, dto.baseUrl);
 
     // One transaction, and the owner's row locked inside it. The per-user cap is
     // a read-modify-write, and the transaction alone is not the fix: two
@@ -244,10 +258,11 @@ export class AiService {
   ): Promise<AiProviderConfigResponse> {
     const config = await this.getConfig(userId, configId);
 
-    // Validate baseUrl: self-hosted providers allow private URLs,
-    // cloud providers require full SSRF validation
-    if (dto.baseUrl) {
-      await this.validateBaseUrl(dto.baseUrl, config.provider);
+    // Same policy as createConfig, for a baseUrl the request changes (a
+    // cleared one included: an Ollama without a baseUrl is loopback). An
+    // unchanged stored URL is checked where it is used.
+    if (dto.baseUrl !== undefined) {
+      await this.validateBaseUrl(userId, config.provider, dto.baseUrl);
     }
 
     if (dto.displayName !== undefined)
@@ -327,9 +342,7 @@ export class AiService {
     userId: string,
     dto: TestAiConfigDto,
   ): Promise<AiConnectionTestResponse> {
-    if (dto.baseUrl) {
-      await this.validateBaseUrl(dto.baseUrl, dto.provider);
-    }
+    await this.validateBaseUrl(userId, dto.provider, dto.baseUrl);
 
     // Build a transient, non-persisted config from the draft values.
     const transient = new AiProviderConfig();
@@ -396,8 +409,14 @@ export class AiService {
 
     let provider;
     try {
-      provider = this.providerFactory.createProvider(config);
+      provider = await this.buildProvider(config);
     } catch (error) {
+      if (error instanceof AiBaseUrlRefusedError) {
+        this.logger.warn(
+          `Test connection refused for ${logLabel}: base URL outside the owner's egress policy`,
+        );
+        return { available: false, error: error.message };
+      }
       const rawMessage =
         error instanceof Error ? error.message : "Unknown error";
       this.logger.warn(`Test connection failed for ${logLabel}: ${rawMessage}`);
@@ -466,10 +485,13 @@ export class AiService {
     request: AiCompletionRequest,
     feature: string,
   ): Promise<AiCompletionResponse> {
-    return this.completeAcrossProviders(userId, feature, (config, isRelay) =>
-      isRelay
-        ? this.completeViaRelay(userId, request)
-        : this.providerFactory.createProvider(config).complete(request),
+    return this.completeAcrossProviders(
+      userId,
+      feature,
+      async (config, isRelay) =>
+        isRelay
+          ? this.completeViaRelay(userId, request)
+          : (await this.buildProvider(config)).complete(request),
     );
   }
 
@@ -526,7 +548,7 @@ export class AiService {
             viaRelay: true,
           };
         }
-        const provider = this.providerFactory.createProvider(config);
+        const provider = await this.buildProvider(config);
         if (provider.supportsWebSearch && provider.completeWithWebSearch) {
           return provider.completeWithWebSearch(jsonRequest, search);
         }
@@ -563,6 +585,7 @@ export class AiService {
 
     const errors: string[] = [];
     let relayError: BadRequestException | null = null;
+    let baseUrlRefusal: AiBaseUrlRefusedError | null = null;
 
     for (const config of configs) {
       const isRelay = config.provider === "mcp_relay";
@@ -595,6 +618,9 @@ export class AiService {
         if (isRelay && error instanceof BadRequestException && !relayError) {
           relayError = error;
         }
+        if (error instanceof AiBaseUrlRefusedError && !baseUrlRefusal) {
+          baseUrlRefusal = error;
+        }
 
         this.logger.warn(`AI provider ${config.provider} failed: ${message}`);
 
@@ -618,6 +644,13 @@ export class AiService {
     // act on, instead of the generic message that suggests a misconfiguration.
     if (relayError && configs.every((c) => c.provider === "mcp_relay")) {
       throw relayError;
+    }
+
+    // A provider refused for the address its base URL points at names its own
+    // repair (an admin, or the operator's allowlist); the generic message
+    // below would send the user looking at settings that are not the problem.
+    if (baseUrlRefusal) {
+      throw baseUrlRefusal;
     }
 
     throw new BadRequestException(
@@ -758,17 +791,32 @@ export class AiService {
     userId: string,
   ): Promise<{ provider: AiProvider; config: AiProviderConfig }> {
     const configs = await this.getActiveConfigs(userId);
+    let refusal: AiBaseUrlRefusedError | undefined;
 
     for (const config of configs) {
       // Relay is not an LLM; never instantiate it as one.
       if (config.provider === "mcp_relay") {
         continue;
       }
-      const provider = this.providerFactory.createProvider(config);
+      let provider: AiProvider;
+      try {
+        provider = await this.buildProvider(config);
+      } catch (error) {
+        // A provider whose base URL its owner may not use is skipped like one
+        // without tool support -- and named if nothing else answers, because
+        // "configure a provider" is not the fix for it.
+        if (error instanceof AiBaseUrlRefusedError) {
+          refusal ??= error;
+          continue;
+        }
+        throw error;
+      }
       if (provider.supportsToolUse) {
         return { provider, config };
       }
     }
+
+    if (refusal) throw refusal;
 
     throw new BadRequestException(
       tr(
@@ -847,32 +895,44 @@ export class AiService {
     return config;
   }
 
-  private async validateBaseUrl(
-    baseUrl: string,
+  /** The save-time (and draft-test) check; see `assertBaseUrlAllowed`. */
+  private validateBaseUrl(
+    userId: string,
     provider: AiProviderType,
+    baseUrl: string | null | undefined,
   ): Promise<void> {
-    if (SELF_HOSTED_PROVIDERS.has(provider)) {
-      if (!validateUrlBasicSafety(baseUrl)) {
-        throw new BadRequestException(
-          tr(
-            "errors.params.mustBeUrl",
-            'The value of "baseUrl" must be a valid HTTP or HTTPS URL',
-            { param: "baseUrl" },
-          ),
-        );
-      }
-    } else {
-      const isSafe = await validateUrlIsSafe(baseUrl);
-      if (!isSafe) {
-        throw new BadRequestException(
-          tr(
-            "errors.params.mustBeExternalUrl",
-            'The value of "baseUrl" must be a valid HTTP or HTTPS URL pointing to a host outside this server',
-            { param: "baseUrl" },
-          ),
-        );
-      }
-    }
+    return assertBaseUrlAllowed(provider, baseUrl, () =>
+      this.ownerIsAdmin(userId),
+    );
+  }
+
+  /**
+   * Whether the owner of a provider config is an admin, read from their row
+   * rather than from a request: the same answer serves the save, a test, and a
+   * completion a background job runs with no request at all.
+   */
+  private async ownerIsAdmin(userId: string): Promise<boolean> {
+    const owner = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(User).findOne({
+        where: { id: userId },
+        select: { id: true, role: true },
+      }),
+    );
+    return owner?.role === "admin";
+  }
+
+  /**
+   * The one way this service builds a provider from a config: the stored base
+   * URL is checked against its owner's policy at USE time -- a row saved before
+   * the policy existed, or by an admin since demoted, is refused here with a
+   * message that names the fix -- and the provider is built with that policy,
+   * which its fetch enforces again on the connection it makes.
+   */
+  private async buildProvider(config: AiProviderConfig): Promise<AiProvider> {
+    const policy = await egressPolicyForConfig(config, () =>
+      this.ownerIsAdmin(config.userId),
+    );
+    return this.providerFactory.createProvider(config, policy);
   }
 
   private toResponseDto(config: AiProviderConfig): AiProviderConfigResponse {

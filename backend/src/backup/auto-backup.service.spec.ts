@@ -460,7 +460,7 @@ describe("AutoBackupService", () => {
 
     mockBackupEncryption = {
       // Nothing stored by default: an ordinary unencrypted backup.
-      resolveBackupPassword: jest.fn().mockResolvedValue({ status: "none" }),
+      resolveBackupKey: jest.fn().mockResolvedValue({ status: "none" }),
     };
 
     mockSystemAlerts = {
@@ -2024,16 +2024,21 @@ describe("AutoBackupService", () => {
         backupEncryptionEnabled: true,
         backupPasswordEnc: "enc:secret",
       });
-      mockBackupEncryption.resolveBackupPassword.mockResolvedValue({
-        status: "password",
-        password: "secret",
+      // The stored key, not a password: the cron never holds one.
+      const key = {
+        dataKey: Buffer.alloc(32, 1),
+        wrap: Buffer.alloc(76, 2),
+      };
+      mockBackupEncryption.resolveBackupKey.mockResolvedValue({
+        status: "key",
+        key,
       });
 
       const result = await service.runManualBackup(userId);
 
       expect(mockBackupService.exportToBuffer).toHaveBeenCalledWith(
         userId,
-        "secret",
+        key,
       );
       expect(result.filename).toMatch(
         /^monize-backup-daily-\d{4}-\d{2}-\d{2}\.mzbe$/,
@@ -2057,7 +2062,7 @@ describe("AutoBackupService", () => {
         backupEncryptionEnabled: false,
         backupPasswordEnc: null,
       });
-      mockBackupEncryption.resolveBackupPassword.mockResolvedValue({
+      mockBackupEncryption.resolveBackupKey.mockResolvedValue({
         status: "none",
       });
       const warn = jest
@@ -2086,7 +2091,7 @@ describe("AutoBackupService", () => {
         backupPasswordEnc: "enc:bad",
       });
       // Cron has no way to recover the password (e.g. master key rotated).
-      mockBackupEncryption.resolveBackupPassword.mockResolvedValue({
+      mockBackupEncryption.resolveBackupKey.mockResolvedValue({
         status: "unrecoverable",
       });
 

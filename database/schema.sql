@@ -32,6 +32,9 @@ CREATE TABLE users (
     email_verified BOOLEAN NOT NULL DEFAULT false, -- gates local login; new self-service registrants must verify their email when SMTP is enabled (bootstrap/admin/delegate/OIDC accounts are created verified)
     email_verification_token VARCHAR(255), -- hashed token emailed for email verification
     email_verification_token_expiry TIMESTAMP,
+    pending_email VARCHAR(255), -- requested new address, applied only when the emailed confirmation link is followed
+    email_change_token VARCHAR(255), -- hashed single-use token emailed to pending_email
+    email_change_token_expiry TIMESTAMP,
     role VARCHAR(20) NOT NULL DEFAULT 'user', -- 'admin', 'user'
     must_change_password BOOLEAN NOT NULL DEFAULT false,
     two_factor_secret VARCHAR(255), -- encrypted TOTP secret for 2FA
@@ -45,11 +48,15 @@ CREATE TABLE users (
     pending_oidc_subject VARCHAR(255),
     is_delegate_only BOOLEAN NOT NULL DEFAULT false, -- true when the row exists solely as an owner-managed delegate identity (created via Shared Access, never claimed via /register)
     backup_encryption_enabled BOOLEAN NOT NULL DEFAULT false,
-    backup_password_enc TEXT -- backup password (login password for local, dedicated password for OIDC) encrypted with ENCRYPTION_KEY for auto-backup use
+    backup_password_enc TEXT, -- legacy: recoverable backup password; superseded by backup_key_*, cleared as each row is converted, never written
+    backup_key_enc TEXT, -- backup data key (base64) encrypted with ENCRYPTION_KEY, so the auto-backup cron can encrypt without the password
+    backup_key_wrap TEXT, -- the same data key wrapped under the backup password's scrypt key (base64); copied into every automatic backup header
+    backup_key_password_ref VARCHAR(64) -- SHA-256 of the password_hash the wrap was made for; NULL for an OIDC dedicated backup password
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_reset_token ON users(reset_token) WHERE reset_token IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_email_verification_token ON users(email_verification_token) WHERE email_verification_token IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_users_email_change_token ON users(email_change_token) WHERE email_change_token IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_oidc_link_token ON users(oidc_link_token) WHERE oidc_link_token IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_last_activity_at ON users(last_activity_at) WHERE last_activity_at IS NOT NULL;
 

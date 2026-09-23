@@ -8,31 +8,49 @@ import { OpenAiProvider } from "./providers/openai.provider";
 import { OllamaProvider } from "./providers/ollama.provider";
 import { OllamaCloudProvider } from "./providers/ollama-cloud.provider";
 import { OpenAiCompatibleProvider } from "./providers/openai-compatible.provider";
+import { providerFetch } from "./providers/long-running-fetch";
+import { AiEgressPolicy } from "./providers/provider-egress";
 
 @Injectable()
 export class AiProviderFactory {
   constructor(private readonly encryptionService: EncryptionService) {}
 
-  createProvider(config: AiProviderConfig): AiProvider {
+  /**
+   * Build the provider for a config. `egress` decides which addresses its
+   * requests may connect to (`provider-egress.ts`); it defaults to the
+   * strictest, so a caller that has not decided cannot reach a private host.
+   * `AiService.resolveEgressPolicy` is where the owner's entitlement is read.
+   */
+  createProvider(
+    config: AiProviderConfig,
+    egress: AiEgressPolicy = "public-only",
+  ): AiProvider {
     const apiKey = config.apiKeyEnc
       ? this.encryptionService.decrypt(config.apiKeyEnc)
       : "";
+    const fetchImpl = providerFetch(egress);
 
     switch (config.provider) {
       case "anthropic":
-        return new AnthropicProvider(apiKey, config.model || undefined);
+        return new AnthropicProvider(
+          apiKey,
+          config.model || undefined,
+          fetchImpl,
+        );
 
       case "openai":
         return new OpenAiProvider(
           apiKey,
           config.model || undefined,
           config.baseUrl || undefined,
+          fetchImpl,
         );
 
       case "ollama":
         return new OllamaProvider(
           config.baseUrl || undefined,
           config.model || undefined,
+          fetchImpl,
         );
 
       case "ollama-cloud":
@@ -51,6 +69,7 @@ export class AiProviderFactory {
           apiKey,
           undefined,
           config.model || undefined,
+          fetchImpl,
         );
 
       case "openai-compatible":
@@ -67,6 +86,7 @@ export class AiProviderFactory {
           apiKey,
           config.baseUrl,
           config.model || "gpt-4o",
+          fetchImpl,
         );
 
       default:

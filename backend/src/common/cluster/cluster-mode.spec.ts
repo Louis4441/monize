@@ -8,7 +8,21 @@ import {
   parseClusterMode,
 } from "./cluster-mode";
 
-const GOOD_SECRET = "x".repeat(MIN_JWT_SECRET_LENGTH);
+/** The shape "openssl rand -base64 32" prints; a fixture, never a real key. */
+const GOOD_SECRET = "FkVtZprB4sKbrwNIl6YiZarB8gB9RrKoO0rt7sFg4YM=";
+
+/** The shape "openssl rand -hex 32" prints; a fixture, never a real key. */
+const GOOD_ENCRYPTION_KEY =
+  "3f9c2a7be41d8056c9e2f7a13b8d4c60e5f1a2b3c4d5e6f708192a3b4c5d6e7f";
+
+/**
+ * Both secrets every boot needs, spread into the rows that are about
+ * something else so they do not also test the secret refusals.
+ */
+const SECRETS = {
+  JWT_SECRET: GOOD_SECRET,
+  ENCRYPTION_KEY: GOOD_ENCRYPTION_KEY,
+} as const;
 
 /**
  * What a `multi` deployment must assert about its storage before it can boot.
@@ -69,7 +83,7 @@ describe("getClusterMode", () => {
 
 describe("checkClusterBoot", () => {
   it("passes a default single-replica deployment", () => {
-    const report = checkClusterBoot({ JWT_SECRET: GOOD_SECRET });
+    const report = checkClusterBoot({ ...SECRETS });
     expect(report).toEqual({ mode: "single", refusals: [], warnings: [] });
   });
 
@@ -90,7 +104,7 @@ describe("checkClusterBoot", () => {
         name: "multi with a secret",
         env: {
           CLUSTER_MODE: "multi",
-          JWT_SECRET: GOOD_SECRET,
+          ...SECRETS,
           ...SHARED_STORAGE,
         },
         mode: "multi",
@@ -103,7 +117,7 @@ describe("checkClusterBoot", () => {
         name: "multi with attachments on s3",
         env: {
           CLUSTER_MODE: "multi",
-          JWT_SECRET: GOOD_SECRET,
+          ...SECRETS,
           ATTACHMENT_STORAGE_PROVIDER: "s3",
           ...SHARED_STORAGE,
         },
@@ -115,7 +129,7 @@ describe("checkClusterBoot", () => {
         name: "multi with per-pod attachments",
         env: {
           CLUSTER_MODE: "multi",
-          JWT_SECRET: GOOD_SECRET,
+          ...SECRETS,
           ATTACHMENT_STORAGE_PROVIDER: "local",
           ...SHARED_STORAGE,
         },
@@ -127,7 +141,7 @@ describe("checkClusterBoot", () => {
         name: "multi with local attachments on an asserted shared volume",
         env: {
           CLUSTER_MODE: "multi",
-          JWT_SECRET: GOOD_SECRET,
+          ...SECRETS,
           ATTACHMENT_STORAGE_PROVIDER: "local",
           ATTACHMENT_SHARED_VOLUME: "true",
           ...SHARED_STORAGE,
@@ -142,7 +156,7 @@ describe("checkClusterBoot", () => {
         name: "multi with LOCAL attachments spelled loudly",
         env: {
           CLUSTER_MODE: "multi",
-          JWT_SECRET: GOOD_SECRET,
+          ...SECRETS,
           ATTACHMENT_STORAGE_PROVIDER: "  LOCAL ",
           ...SHARED_STORAGE,
         },
@@ -154,7 +168,7 @@ describe("checkClusterBoot", () => {
         name: "multi without the backup assertion",
         env: {
           CLUSTER_MODE: "multi",
-          JWT_SECRET: GOOD_SECRET,
+          ...SECRETS,
           ATTACHMENT_STORAGE_PROVIDER: "s3",
         },
         mode: "multi",
@@ -168,7 +182,7 @@ describe("checkClusterBoot", () => {
         name: "multi with a backup assertion that is not true",
         env: {
           CLUSTER_MODE: "multi",
-          JWT_SECRET: GOOD_SECRET,
+          ...SECRETS,
           ATTACHMENT_STORAGE_PROVIDER: "s3",
           BACKUP_SHARED_VOLUME: "yes",
         },
@@ -183,7 +197,7 @@ describe("checkClusterBoot", () => {
         name: "multi with an s3 backup store needs no shared volume",
         env: {
           CLUSTER_MODE: "multi",
-          JWT_SECRET: GOOD_SECRET,
+          ...SECRETS,
           ATTACHMENT_STORAGE_PROVIDER: "s3",
           BACKUP_STORAGE_PROVIDER: "s3",
           BACKUP_STORE_S3_BUCKET: "monize-store",
@@ -198,7 +212,7 @@ describe("checkClusterBoot", () => {
         name: "multi with the backup store left unset still needs the assertion",
         env: {
           CLUSTER_MODE: "multi",
-          JWT_SECRET: GOOD_SECRET,
+          ...SECRETS,
           ATTACHMENT_STORAGE_PROVIDER: "s3",
           BACKUP_STORAGE_PROVIDER: "local",
         },
@@ -211,7 +225,7 @@ describe("checkClusterBoot", () => {
         name: "the local-store refusal offers the s3 store as an answer",
         env: {
           CLUSTER_MODE: "multi",
-          JWT_SECRET: GOOD_SECRET,
+          ...SECRETS,
           ATTACHMENT_STORAGE_PROVIDER: "s3",
         },
         mode: "multi",
@@ -222,7 +236,7 @@ describe("checkClusterBoot", () => {
         // A typo would otherwise be read as `local` and put the recovery points
         // on a pod's disk while the operator believed they were in a bucket.
         name: "an unrecognised backup store, in single",
-        env: { JWT_SECRET: GOOD_SECRET, BACKUP_STORAGE_PROVIDER: "S3-bucket" },
+        env: { ...SECRETS, BACKUP_STORAGE_PROVIDER: "S3-bucket" },
         mode: "single",
         refusals: [/is not a backup storage target/],
         warnings: [],
@@ -233,7 +247,7 @@ describe("checkClusterBoot", () => {
         // both is a 3-2-1 arrangement that is actually a 1.
         name: "an s3 store sharing its bucket with the off-machine destination",
         env: {
-          JWT_SECRET: GOOD_SECRET,
+          ...SECRETS,
           BACKUP_STORAGE_PROVIDER: "s3",
           BACKUP_STORE_S3_BUCKET: "one-bucket",
           BACKUP_STORE_S3_PREFIX: "backups/",
@@ -247,7 +261,7 @@ describe("checkClusterBoot", () => {
       {
         name: "an s3 store and an off-machine destination in two buckets",
         env: {
-          JWT_SECRET: GOOD_SECRET,
+          ...SECRETS,
           BACKUP_STORAGE_PROVIDER: "s3",
           BACKUP_STORE_S3_BUCKET: "monize-store",
           BACKUP_S3_BUCKET: "monize-offsite",
@@ -261,7 +275,7 @@ describe("checkClusterBoot", () => {
         // names alone would refuse a perfectly good configuration.
         name: "the same bucket name on two different endpoints",
         env: {
-          JWT_SECRET: GOOD_SECRET,
+          ...SECRETS,
           BACKUP_STORAGE_PROVIDER: "s3",
           BACKUP_STORE_S3_BUCKET: "backups",
           BACKUP_STORE_S3_ENDPOINT: "http://minio:9000",
@@ -278,7 +292,7 @@ describe("checkClusterBoot", () => {
         // wording.
         name: "an s3 store with no off-machine destination configured",
         env: {
-          JWT_SECRET: GOOD_SECRET,
+          ...SECRETS,
           BACKUP_STORAGE_PROVIDER: "s3",
           BACKUP_STORE_S3_BUCKET: "monize-store",
         },
@@ -290,7 +304,7 @@ describe("checkClusterBoot", () => {
         name: "single ignores the storage settings entirely",
         env: {
           CLUSTER_MODE: "single",
-          JWT_SECRET: GOOD_SECRET,
+          ...SECRETS,
           ATTACHMENT_STORAGE_PROVIDER: "local",
         },
         mode: "single",
@@ -299,21 +313,25 @@ describe("checkClusterBoot", () => {
       },
       {
         name: "JWT_SECRET missing in single",
-        env: {},
+        env: { ENCRYPTION_KEY: GOOD_ENCRYPTION_KEY },
         mode: "single",
         refusals: [/JWT_SECRET is not set/],
         warnings: [],
       },
       {
         name: "JWT_SECRET missing in multi",
-        env: { CLUSTER_MODE: "multi", ...SHARED_STORAGE },
+        env: {
+          CLUSTER_MODE: "multi",
+          ENCRYPTION_KEY: GOOD_ENCRYPTION_KEY,
+          ...SHARED_STORAGE,
+        },
         mode: "multi",
         refusals: [/JWT_SECRET is not set/],
         warnings: [/ATTACHMENT_STORAGE_PROVIDER=database/],
       },
       {
         name: "JWT_SECRET too short",
-        env: { JWT_SECRET: "short" },
+        env: { JWT_SECRET: "short", ENCRYPTION_KEY: GOOD_ENCRYPTION_KEY },
         mode: "single",
         refusals: [/JWT_SECRET is shorter than 32 characters/],
         warnings: [],
@@ -322,14 +340,78 @@ describe("checkClusterBoot", () => {
         // Measured the way JwtStrategy measures it: this one boots there, so it
         // must boot here. A trimmed length would refuse a running deployment.
         name: "JWT_SECRET long enough only with its whitespace",
-        env: { JWT_SECRET: `  ${"y".repeat(MIN_JWT_SECRET_LENGTH - 2)}  ` },
+        env: {
+          JWT_SECRET: `  ${GOOD_SECRET.slice(0, MIN_JWT_SECRET_LENGTH - 4)}  `,
+          ENCRYPTION_KEY: GOOD_ENCRYPTION_KEY,
+        },
+        mode: "single",
+        refusals: [],
+        warnings: [],
+      },
+      {
+        // The value `.env.example` used to ship. Weak, and public -- but it
+        // boots: replacing it stops every user's authenticator codes working,
+        // so it is reported (boot warning, admin alert, admin banner) rather
+        // than refused.
+        name: "JWT_SECRET left at the retired .env.example placeholder boots",
+        env: {
+          JWT_SECRET: "your-super-secret-jwt-key-change-in-production",
+          ENCRYPTION_KEY: GOOD_ENCRYPTION_KEY,
+        },
+        mode: "single",
+        refusals: [],
+        warnings: [],
+      },
+      {
+        name: "JWT_SECRET that is one character repeated boots",
+        env: {
+          JWT_SECRET: "x".repeat(MIN_JWT_SECRET_LENGTH),
+          ENCRYPTION_KEY: GOOD_ENCRYPTION_KEY,
+        },
+        mode: "single",
+        refusals: [],
+        warnings: [],
+      },
+      {
+        name: "ENCRYPTION_KEY missing in single",
+        env: { JWT_SECRET: GOOD_SECRET },
+        mode: "single",
+        refusals: [/^ENCRYPTION_KEY is not set.*openssl rand -hex 32/],
+        warnings: [],
+      },
+      {
+        name: "ENCRYPTION_KEY missing in multi",
+        env: {
+          CLUSTER_MODE: "multi",
+          JWT_SECRET: GOOD_SECRET,
+          ...SHARED_STORAGE,
+        },
+        mode: "multi",
+        refusals: [/^ENCRYPTION_KEY is not set/],
+        warnings: [/ATTACHMENT_STORAGE_PROVIDER=database/],
+      },
+      {
+        // A value below the floor is not a key: the write paths would refuse
+        // it, so the boot does too.
+        name: "ENCRYPTION_KEY too short",
+        env: { JWT_SECRET: GOOD_SECRET, ENCRYPTION_KEY: "too-short" },
+        mode: "single",
+        refusals: [/^ENCRYPTION_KEY is not set \(or is shorter than 32/],
+        warnings: [],
+      },
+      {
+        name: "the legacy AI_ENCRYPTION_KEY still supplies the key",
+        env: {
+          JWT_SECRET: GOOD_SECRET,
+          AI_ENCRYPTION_KEY: GOOD_ENCRYPTION_KEY,
+        },
         mode: "single",
         refusals: [],
         warnings: [],
       },
       {
         name: "an unparsable CLUSTER_MODE",
-        env: { CLUSTER_MODE: "cluster", JWT_SECRET: GOOD_SECRET },
+        env: { CLUSTER_MODE: "cluster", ...SECRETS },
         mode: null,
         refusals: [/Invalid CLUSTER_MODE "cluster"/],
         warnings: [],
@@ -355,7 +437,7 @@ describe("checkClusterBoot", () => {
     // deprecated alias names the same directory as the current variable.
     const withAlias = checkClusterBoot({
       CLUSTER_MODE: "multi",
-      JWT_SECRET: GOOD_SECRET,
+      ...SECRETS,
       ATTACHMENT_STORAGE_PROVIDER: "local",
       ATTACHMENT_LOCAL_DIR: "/srv/legacy-attachments",
       BACKUP_CONTAINER_DIR: "/srv/backups",
@@ -368,7 +450,7 @@ describe("checkClusterBoot", () => {
   it("prefers the current directory variable over the deprecated alias", () => {
     const both = checkClusterBoot({
       CLUSTER_MODE: "multi",
-      JWT_SECRET: GOOD_SECRET,
+      ...SECRETS,
       ATTACHMENT_STORAGE_PROVIDER: "local",
       ATTACHMENT_CONTAINER_DIR: "/srv/current",
       ATTACHMENT_LOCAL_DIR: "/srv/legacy",
@@ -384,7 +466,7 @@ describe("checkClusterBoot", () => {
     // mount, and the defaults are the chart's.
     const defaults = checkClusterBoot({
       CLUSTER_MODE: "multi",
-      JWT_SECRET: GOOD_SECRET,
+      ...SECRETS,
       ATTACHMENT_STORAGE_PROVIDER: "local",
     });
 
@@ -393,13 +475,14 @@ describe("checkClusterBoot", () => {
   });
 
   it("reports every problem at once, so one restart is enough", () => {
-    // An unreadable mode does not stop the secret being judged: an operator
-    // who fixed one and restarted to find the other waiting is the failure
+    // An unreadable mode does not stop the secrets being judged: an operator
+    // who fixed one and restarted to find the next waiting is the failure
     // this asserts against.
     const report = checkClusterBoot({ CLUSTER_MODE: "cluster" });
-    expect(report.refusals).toHaveLength(2);
+    expect(report.refusals).toHaveLength(3);
     expect(report.refusals.join("\n")).toMatch(/Invalid CLUSTER_MODE/);
     expect(report.refusals.join("\n")).toMatch(/JWT_SECRET/);
+    expect(report.refusals.join("\n")).toMatch(/ENCRYPTION_KEY/);
   });
 });
 

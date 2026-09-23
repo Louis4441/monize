@@ -2,6 +2,7 @@ import { Module, forwardRef } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { SystemAlertService } from "./system-alert.service";
 import { SystemAlertMonitorService } from "./system-alert-monitor.service";
+import { DeploymentStatusController } from "./deployment-status.controller";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { NotificationCenterModule } from "../notification-center/notification-center.module";
 
@@ -23,6 +24,9 @@ import { NotificationCenterModule } from "../notification-center/notification-ce
     NotificationCenterModule,
   ],
   providers: [SystemAlertService, SystemAlertMonitorService],
+  // The admin banner's signal (a weak JWT_SECRET), read through the monitor so
+  // the banner and the weekly alert apply one rule.
+  controllers: [DeploymentStatusController],
   exports: [SystemAlertService],
 })
 export class SystemAlertsModule {}

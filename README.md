@@ -198,7 +198,7 @@ monize/
 │   ├── src/
 │   │   ├── auth/              # Authentication (Local, OIDC, 2FA, trusted devices, PAT)
 │   │   ├── users/             # User management & preferences
-│   │   ├── admin/             # Admin user management (roles, status, password reset)
+│   │   ├── admin/             # Admin user management (roles, status, password and 2FA reset)
 │   │   ├── accounts/          # Account management
 │   │   ├── transactions/      # Transaction management
 │   │   ├── categories/        # Category management (hierarchical)
@@ -264,9 +264,11 @@ cd monize
 cp .env.example .env
 ```
 
-3. Edit `.env` and configure:
+3. Edit `.env` and configure. `JWT_SECRET` and `ENCRYPTION_KEY` ship empty, and
+   the backend will not start until both are filled in:
    - `POSTGRES_PASSWORD` - secure database password
    - `JWT_SECRET` - generate with `openssl rand -base64 32`
+   - `ENCRYPTION_KEY` - generate with `openssl rand -hex 32`
    - `PUBLIC_APP_URL` - your public frontend URL
    - OIDC settings (optional) for SSO authentication
 
@@ -303,7 +305,8 @@ DATABASE_PORT=5432
 DATABASE_NAME=monize
 DATABASE_USER=your_user
 DATABASE_PASSWORD=your_password
-JWT_SECRET=your-secret-key
+JWT_SECRET=            # required: openssl rand -base64 32
+ENCRYPTION_KEY=        # required: openssl rand -hex 32
 PUBLIC_APP_URL=http://localhost:3001
 ```
 
@@ -329,7 +332,8 @@ npm run dev
 | `POSTGRES_DB` | Database name | `monize` |
 | `POSTGRES_USER` | Database user | `monize_user` |
 | `POSTGRES_PASSWORD` | Database password | `secure-password` |
-| `JWT_SECRET` | JWT signing key (min 32 chars) | `openssl rand -base64 32` |
+| `JWT_SECRET` | JWT signing key (min 32 random chars; the server will not start without it). A published placeholder or typed pattern still starts but is reported to administrators. Changing it later stops authenticator (2FA) codes from working: see [Changing JWT_SECRET](docs/backend/modules-and-runtime.md#changing-jwt_secret) | `openssl rand -base64 32` |
+| `ENCRYPTION_KEY` | Encrypts AI provider keys, emergency-access credentials, each user's backup key and the Web Push and OIDC signing keys (min 32 chars; the server will not start without it). Keep it safe and keep it unchanged -- losing it makes every stored secret unreadable. Formerly `AI_ENCRYPTION_KEY`, which is still accepted | `openssl rand -hex 32` |
 | `PUBLIC_APP_URL` | Public frontend URL | `https://money.example.com` |
 
 ### Optional Variables
@@ -351,11 +355,11 @@ npm run dev
 | `SMTP_USER` | SMTP username | - |
 | `SMTP_PASSWORD` | SMTP password | - |
 | `EMAIL_FROM` | Email sender address | - |
-| `ENCRYPTION_KEY` | **Set this.** Encrypts AI provider keys, emergency-access credentials and the password your backups are encrypted with (`openssl rand -hex 32`). Without it, backups are written unencrypted and no secret can be stored; the server warns on every boot and will require it in a future release. Keep it safe and keep it unchanged -- losing it makes every stored secret unreadable. Formerly `AI_ENCRYPTION_KEY`, which is still accepted | - |
 | `AI_DEFAULT_PROVIDER` | System-level default AI provider (the centrally managed AI) | - |
 | `AI_DEFAULT_MODEL` | Default model for the provider | - |
 | `AI_DEFAULT_API_KEY` | System-wide AI API key | - |
 | `AI_DEFAULT_BASE_URL` | Base URL for Ollama or compatible endpoints | - |
+| `AI_PRIVATE_BASE_URL_ALLOWLIST` | Comma-separated `host` or `host:port` private addresses a non-admin user's Ollama or OpenAI-compatible provider may use. Without an entry, only an admin can point a provider at a private or local address | - |
 | `AI_QUERY_MAX_ITERATIONS` | Analysis steps per AI Assistant question, centrally managed provider only | `5` |
 | `AI_QUERY_MAX_TOOL_CALLS` | Data lookups per question, centrally managed provider only | `15` |
 | `AI_QUERY_TIMEOUT_MINUTES` | Wall-clock minutes per question, centrally managed provider only | `20` |
@@ -422,6 +426,7 @@ Swagger UI is available at `/api/docs` in **development mode only** (disabled in
 - `POST /api/v1/auth/login` - Login with local credentials
 - `POST /api/v1/auth/2fa/verify` - Verify TOTP 2FA code
 - `POST /api/v1/auth/2fa/setup` - Set up 2FA
+- `POST /api/v1/auth/2fa/reset` - Reset (replace) your own 2FA with your password and an authenticator or backup code, also under `FORCE_2FA`
 - `GET /api/v1/auth/2fa/trusted-devices` - List trusted devices
 - `GET /api/v1/auth/oidc` - Initiate OIDC authentication
 - `GET /api/v1/accounts` - List accounts
@@ -429,6 +434,7 @@ Swagger UI is available at `/api/docs` in **development mode only** (disabled in
 - `GET /api/v1/portfolio/summary` - Investment portfolio summary
 - `GET /api/v1/portfolio/top-movers` - Daily top movers
 - `GET /api/v1/admin/users` - Admin: list all users
+- `POST /api/v1/admin/users/:id/reset-2fa` - Admin: reset a user's two-factor authentication and sign them out
 - `POST /api/v1/ai/query` - Natural language financial query
 - `POST /api/v1/ai/query/stream` - Streaming financial query (SSE)
 - `GET /api/v1/ai/configs` - List AI provider configurations

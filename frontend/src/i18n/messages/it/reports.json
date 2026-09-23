@@ -941,6 +941,7 @@
     "removeCashFlow": "Rimuovi flusso di cassa",
     "removeTitle": "Rimuovi",
     "addCashFlow": "+ Aggiungi flusso di cassa",
+    "cashFlowLimitReached": "Uno scenario può avere al massimo {max} flussi di cassa.",
     "returnAssumptions": "Ipotesi di rendimento",
     "specifyReturn": "Specifica il rendimento atteso",
     "useHistoricalReturns": "Usa i rendimenti storici dai conti selezionati",

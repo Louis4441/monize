@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useNotificationCopy } from '@/hooks/useNotificationCopy';
@@ -39,6 +40,9 @@ function notificationRoute(notification: Notification): string | null {
       return '/settings';
     case 'PROVIDER_OUTAGE':
     case 'PROVIDER_RECOVERED':
+    // A server setting, fixed in the deployment's configuration: no page here
+    // says more than the notification does.
+    case 'JWT_SECRET_WEAK':
       return null;
     default:
       return notification.budgetId ? `/budgets/${notification.budgetId}` : null;
@@ -159,16 +163,30 @@ export function NotificationList({
   const router = useRouter();
   const copy = useNotificationCopy();
   const unreadCount = notifications.filter((a) => !a.isRead && !dismissingIds.has(a.id)).length;
+  // Rows whose full message is showing. A notification with no page to open
+  // (a server-configuration alert, say) has nowhere else to show text that
+  // does not fit the two-line preview, so clicking it expands in place.
+  const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(() => new Set());
 
   const handleAlertClick = (notification: Notification) => {
     if (canManageNotifications && !notification.isRead) {
       onMarkRead(notification.id);
     }
-    onClose();
     const route = notificationRoute(notification);
     if (route) {
+      onClose();
       router.push(route);
+      return;
     }
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      if (next.has(notification.id)) {
+        next.delete(notification.id);
+      } else {
+        next.add(notification.id);
+      }
+      return next;
+    });
   };
 
   const filtered = hasActiveNotificationFilters(filters);
@@ -343,11 +361,13 @@ export function NotificationList({
               const styles = severityStyles(notification.severity);
               const isDismissing = dismissingIds.has(notification.id);
               const isCollapsing = collapsingIds.has(notification.id);
+              const expandable = notificationRoute(notification) === null;
+              const isExpanded = expandable && expandedIds.has(notification.id);
               return (
                 <div
                   key={notification.id}
                   className={`transition-all duration-300 overflow-hidden ${
-                    isCollapsing ? 'max-h-0 opacity-0' : 'max-h-28'
+                    isCollapsing ? 'max-h-0 opacity-0' : isExpanded ? 'max-h-[40rem]' : 'max-h-28'
                   }`}
                 >
                   {isDismissing ? (
@@ -373,6 +393,7 @@ export function NotificationList({
                         onClick={() => handleAlertClick(notification)}
                         className="w-full text-left px-4 py-3 pr-16 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                         data-testid={`notification-item-${notification.id}`}
+                        aria-expanded={expandable ? isExpanded : undefined}
                       >
                         <div className="flex items-start gap-3">
                           {/* Unread dot */}
@@ -399,10 +420,19 @@ export function NotificationList({
                                 {format.relativeTime(new Date(notification.createdAt))}
                               </span>
                             </div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                            <p
+                              className={`text-sm font-medium text-gray-900 dark:text-gray-100 ${
+                                isExpanded ? 'break-words' : 'truncate'
+                              }`}
+                            >
                               {copy(notification).title}
                             </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mt-0.5">
+                            <p
+                              className={`text-xs text-gray-500 dark:text-gray-400 mt-0.5 ${
+                                isExpanded ? 'whitespace-pre-line break-words' : 'line-clamp-2'
+                              }`}
+                              data-testid={`notification-message-${notification.id}`}
+                            >
                               {copy(notification).message}
                             </p>
                           </div>

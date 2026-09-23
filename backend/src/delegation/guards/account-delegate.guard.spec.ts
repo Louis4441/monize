@@ -3,6 +3,7 @@ import { AccountDelegateGuard } from "./account-delegate.guard";
 import {
   ALLOW_DELEGATE_KEY,
   DELEGATED_ACCOUNT_PARAM_KEY,
+  DELEGATED_BODY_ACCOUNTS_KEY,
   DELEGATED_TRANSACTION_PARAM_KEY,
   DELEGATED_TRANSFER_BODY_KEY,
   DELEGATED_TRANSFER_PARAM_KEY,
@@ -10,6 +11,7 @@ import {
   DELEGATE_OPERATION_KEY,
   DELEGATE_CAPABILITY_KEY,
   DELEGATE_SECTION_KEY,
+  DELEGATE_FULL_SCOPE_KEY,
 } from "../decorators/delegate-access.decorator";
 
 describe("AccountDelegateGuard", () => {
@@ -37,6 +39,7 @@ describe("AccountDelegateGuard", () => {
       accountIdsForScheduled: jest.fn(),
       hasCapability: jest.fn(),
       hasSection: jest.fn(),
+      grantsWholeLedger: jest.fn(),
     };
     crossOwnerAccess = {
       isAccountOwnedBy: jest.fn().mockResolvedValue(false),
@@ -738,5 +741,153 @@ describe("AccountDelegateGuard", () => {
     const ctx = makeContext({ headers: { authorization: "Bearer x" } });
     await expect(guard.canActivate(ctx)).resolves.toBe(true);
     expect(delegationService.hasAccountPermission).not.toHaveBeenCalled();
+  });
+
+  describe("@DelegatedBodyAccounts", () => {
+    const actingWithPaths = (paths: string[], operation = "edit") => {
+      jwtService.verify.mockReturnValue({
+        sub: "d1111111-1111-4111-8111-111111111111",
+        actingAsUserId: "01111111-1111-4111-8111-111111111111",
+        delegationId: "g1",
+      });
+      reflector.getAllAndOverride.mockImplementation((key: string) => {
+        if (key === ALLOW_DELEGATE_KEY) return true;
+        if (key === DELEGATED_BODY_ACCOUNTS_KEY) return paths;
+        if (key === DELEGATE_OPERATION_KEY) return operation;
+        return undefined;
+      });
+      delegationService.hasAccountPermission.mockImplementation(
+        async (_g: string, accountId: string) => accountId === "granted",
+      );
+    };
+
+    it("refuses an ungranted account named in any element of an array path", async () => {
+      actingWithPaths(["splits[].transferAccountId"]);
+      const ctx = makeContext({
+        headers: { authorization: "Bearer x" },
+        body: {
+          splits: [
+            { transferAccountId: "granted" },
+            { categoryId: "c1" },
+            { transferAccountId: "ungranted" },
+          ],
+        },
+      });
+      await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(delegationService.hasAccountPermission).toHaveBeenCalledWith(
+        "g1",
+        "ungranted",
+        "edit",
+      );
+    });
+
+    it("allows when every named account is granted, checking each id once", async () => {
+      actingWithPaths(["accountId", "splits[].transferAccountId"]);
+      const ctx = makeContext({
+        headers: { authorization: "Bearer x" },
+        body: {
+          accountId: "granted",
+          splits: [
+            { transferAccountId: "granted" },
+            { transferAccountId: "granted" },
+          ],
+        },
+      });
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
+      expect(delegationService.hasAccountPermission).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not relax a body account the delegate owns", async () => {
+      actingWithPaths(["accountId"]);
+      crossOwnerAccess.isAccountOwnedBy.mockResolvedValue(true);
+      const ctx = makeContext({
+        headers: { authorization: "Bearer x" },
+        body: { accountId: "delegates-own" },
+      });
+      await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(crossOwnerAccess.isAccountOwnedBy).not.toHaveBeenCalled();
+    });
+
+    it("reads only the body, never a same-named route or query value", async () => {
+      actingWithPaths(["accountId"]);
+      const ctx = makeContext({
+        headers: { authorization: "Bearer x" },
+        params: { accountId: "granted" },
+        query: { accountId: "granted" },
+        body: { accountId: "ungranted" },
+      });
+      await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
+
+    it("skips absent, null and non-string values (the DTO rejects the malformed ones)", async () => {
+      actingWithPaths(["accountId", "splits[].transferAccountId"]);
+      const ctx = makeContext({
+        headers: { authorization: "Bearer x" },
+        body: {
+          splits: [{ transferAccountId: null }, null, 7, { amount: 1 }],
+        },
+      });
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
+      expect(delegationService.hasAccountPermission).not.toHaveBeenCalled();
+    });
+
+    it("leaves a normal (non-delegate) request untouched", async () => {
+      jwtService.verify.mockReturnValue({
+        sub: "11111111-1111-4111-8111-111111111111",
+      });
+      const ctx = makeContext({
+        headers: { authorization: "Bearer x" },
+        body: { accountId: "ungranted" },
+      });
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
+      expect(delegationService.hasAccountPermission).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("@DelegateRequiresFullScope", () => {
+    const actingOnFullScopeRoute = () => {
+      jwtService.verify.mockReturnValue({
+        sub: "d1111111-1111-4111-8111-111111111111",
+        actingAsUserId: "01111111-1111-4111-8111-111111111111",
+        delegationId: "g1",
+      });
+      reflector.getAllAndOverride.mockImplementation((key: string) => {
+        if (key === ALLOW_DELEGATE_KEY) return true;
+        if (key === DELEGATE_FULL_SCOPE_KEY) return true;
+        return undefined;
+      });
+    };
+
+    it("refuses a delegate whose grants do not cover the whole ledger", async () => {
+      actingOnFullScopeRoute();
+      delegationService.grantsWholeLedger.mockResolvedValue(false);
+      const ctx = makeContext({ headers: { authorization: "Bearer x" } });
+      await expect(guard.canActivate(ctx)).rejects.toThrow(
+        /reads across all of the account owner's accounts and sections/,
+      );
+      expect(delegationService.grantsWholeLedger).toHaveBeenCalledWith("g1");
+    });
+
+    it("allows a delegate who can read every account and section", async () => {
+      actingOnFullScopeRoute();
+      delegationService.grantsWholeLedger.mockResolvedValue(true);
+      const ctx = makeContext({ headers: { authorization: "Bearer x" } });
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    });
+
+    it("leaves the owner's own request untouched", async () => {
+      jwtService.verify.mockReturnValue({
+        sub: "01111111-1111-4111-8111-111111111111",
+      });
+      const ctx = makeContext({ headers: { authorization: "Bearer x" } });
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
+      expect(delegationService.grantsWholeLedger).not.toHaveBeenCalled();
+    });
   });
 });

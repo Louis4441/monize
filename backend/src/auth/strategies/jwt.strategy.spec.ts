@@ -93,6 +93,28 @@ describe("JwtStrategy", () => {
         "JWT_SECRET environment variable must be at least 32 characters",
       );
     });
+
+    it.each([
+      [
+        "the retired .env.example placeholder",
+        "your-super-secret-jwt-key-change-in-production",
+      ],
+      ["one character repeated", "x".repeat(40)],
+    ])("starts with a long-enough but weak secret (%s)", (_label, secret) => {
+      // Weak is reported (boot warning, admin alert, admin banner), never
+      // refused: replacing the secret stops every user's authenticator codes
+      // working and forgets trusted devices, so the operator decides when.
+      const weakConfig = { get: jest.fn().mockReturnValue(secret) };
+
+      expect(
+        () =>
+          new JwtStrategy(
+            weakConfig as any,
+            authService as any,
+            delegationService as any,
+          ),
+      ).not.toThrow();
+    });
   });
 
   describe("validate", () => {

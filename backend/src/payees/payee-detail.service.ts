@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { DataSource, EntityManager } from "typeorm";
+import { DataSource, EntityManager, In } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { roundMoney } from "../common/round.util";
 import { Account } from "../accounts/entities/account.entity";
@@ -7,6 +7,7 @@ import { Transaction } from "../transactions/entities/transaction.entity";
 import { PayeeAlias } from "./entities/payee-alias.entity";
 import { PayeesService } from "./payees.service";
 import { countUncategorizedTransactionsForPayee } from "./payee-backfill.util";
+import { restrictToAccountScope } from "../delegation/delegate-account-scope.util";
 import {
   PayeeAccountBreakdownRow,
   PayeeDetailDto,
@@ -53,6 +54,11 @@ function dateText(expression: string): string {
  * here would let this page drift from the register and the reports. Currency
  * conversion is likewise absent on purpose: every amount is in the currency of
  * the row it came from, and the client owns display currency.
+ *
+ * `accountScope` narrows every transaction figure and the overpayment account
+ * list to those accounts (an acting delegate's READ grants, from
+ * `delegateReadableAccountScope`); `undefined` means the whole ledger, and an
+ * empty scope yields none.
  */
 @Injectable()
 export class PayeeDetailService {
@@ -61,17 +67,21 @@ export class PayeeDetailService {
     private readonly payeesService: PayeesService,
   ) {}
 
-  async getDetail(userId: string, payeeId: string): Promise<PayeeDetailDto> {
+  async getDetail(
+    userId: string,
+    payeeId: string,
+    accountScope?: readonly string[],
+  ): Promise<PayeeDetailDto> {
     // Validates ownership and existence (localized 404), loads defaultCategory.
     const payee = await this.payeesService.findOne(userId, payeeId);
 
     return withScopedDb(this.dataSource, async (m) => {
       const [stats, accounts, largestTransaction, overpaymentForAccounts] =
         await Promise.all([
-          this.getStats(m, userId, payeeId),
-          this.getAccountBreakdown(m, userId, payeeId),
-          this.getLargestTransaction(m, userId, payeeId),
-          this.getOverpaymentAccounts(m, userId, payeeId),
+          this.getStats(m, userId, payeeId, accountScope),
+          this.getAccountBreakdown(m, userId, payeeId, accountScope),
+          this.getLargestTransaction(m, userId, payeeId, accountScope),
+          this.getOverpaymentAccounts(m, userId, payeeId, accountScope),
         ]);
 
       return {
@@ -88,19 +98,24 @@ export class PayeeDetailService {
     m: EntityManager,
     userId: string,
     payeeId: string,
+    accountScope: readonly string[] | undefined,
   ): Promise<PayeeDetailStats> {
-    const row = await realTransactionScope(
-      m
-        .createQueryBuilder(Transaction, "t")
-        .select("COUNT(*)", "count")
-        .addSelect(dateText("MIN(t.transaction_date)"), "first")
-        .addSelect(dateText("MAX(t.transaction_date)"), "last")
-        .where("t.user_id = :userId", { userId })
-        .andWhere("t.payee_id = :payeeId", { payeeId }),
+    const row = await restrictToAccountScope(
+      realTransactionScope(
+        m
+          .createQueryBuilder(Transaction, "t")
+          .select("COUNT(*)", "count")
+          .addSelect(dateText("MIN(t.transaction_date)"), "first")
+          .addSelect(dateText("MAX(t.transaction_date)"), "last")
+          .where("t.user_id = :userId", { userId })
+          .andWhere("t.payee_id = :payeeId", { payeeId }),
+      ),
+      "t.account_id",
+      accountScope,
     ).getRawOne<{ count: string; first: string | null; last: string | null }>();
 
     const [uncategorizedCount, aliasCount] = await Promise.all([
-      countUncategorizedTransactionsForPayee(m, userId, payeeId),
+      countUncategorizedTransactionsForPayee(m, userId, payeeId, accountScope),
       m.getRepository(PayeeAlias).count({ where: { userId, payeeId } }),
     ]);
 
@@ -117,20 +132,25 @@ export class PayeeDetailService {
     m: EntityManager,
     userId: string,
     payeeId: string,
+    accountScope: readonly string[] | undefined,
   ): Promise<PayeeAccountBreakdownRow[]> {
-    const rows = await realTransactionScope(
-      m
-        .createQueryBuilder(Transaction, "t")
-        .innerJoin(Account, "account", "account.id = t.account_id")
-        .select("account.id", "accountId")
-        .addSelect("account.name", "accountName")
-        .addSelect("account.account_type", "accountType")
-        .addSelect("account.currency_code", "currencyCode")
-        .addSelect("COUNT(*)", "transactionCount")
-        .addSelect("SUM(t.amount)", "total")
-        .addSelect(dateText("MAX(t.transaction_date)"), "lastTransactionDate")
-        .where("t.user_id = :userId", { userId })
-        .andWhere("t.payee_id = :payeeId", { payeeId }),
+    const rows = await restrictToAccountScope(
+      realTransactionScope(
+        m
+          .createQueryBuilder(Transaction, "t")
+          .innerJoin(Account, "account", "account.id = t.account_id")
+          .select("account.id", "accountId")
+          .addSelect("account.name", "accountName")
+          .addSelect("account.account_type", "accountType")
+          .addSelect("account.currency_code", "currencyCode")
+          .addSelect("COUNT(*)", "transactionCount")
+          .addSelect("SUM(t.amount)", "total")
+          .addSelect(dateText("MAX(t.transaction_date)"), "lastTransactionDate")
+          .where("t.user_id = :userId", { userId })
+          .andWhere("t.payee_id = :payeeId", { payeeId }),
+      ),
+      "t.account_id",
+      accountScope,
     )
       .groupBy("account.id")
       .addGroupBy("account.name")
@@ -162,20 +182,25 @@ export class PayeeDetailService {
     m: EntityManager,
     userId: string,
     payeeId: string,
+    accountScope: readonly string[] | undefined,
   ): Promise<PayeeLargestTransaction | null> {
-    const row = await realTransactionScope(
-      m
-        .createQueryBuilder(Transaction, "t")
-        .innerJoin(Account, "account", "account.id = t.account_id")
-        .select("t.id", "id")
-        .addSelect(dateText("t.transaction_date"), "transactionDate")
-        .addSelect("t.amount", "amount")
-        .addSelect("t.currency_code", "currencyCode")
-        .addSelect("t.description", "description")
-        .addSelect("account.id", "accountId")
-        .addSelect("account.name", "accountName")
-        .where("t.user_id = :userId", { userId })
-        .andWhere("t.payee_id = :payeeId", { payeeId }),
+    const row = await restrictToAccountScope(
+      realTransactionScope(
+        m
+          .createQueryBuilder(Transaction, "t")
+          .innerJoin(Account, "account", "account.id = t.account_id")
+          .select("t.id", "id")
+          .addSelect(dateText("t.transaction_date"), "transactionDate")
+          .addSelect("t.amount", "amount")
+          .addSelect("t.currency_code", "currencyCode")
+          .addSelect("t.description", "description")
+          .addSelect("account.id", "accountId")
+          .addSelect("account.name", "accountName")
+          .where("t.user_id = :userId", { userId })
+          .andWhere("t.payee_id = :payeeId", { payeeId }),
+      ),
+      "t.account_id",
+      accountScope,
     )
       .orderBy("ABS(t.amount)", "DESC")
       .addOrderBy("t.transaction_date", "DESC")
@@ -209,9 +234,15 @@ export class PayeeDetailService {
     m: EntityManager,
     userId: string,
     payeeId: string,
+    accountScope: readonly string[] | undefined,
   ): Promise<{ accountId: string; accountName: string }[]> {
+    if (accountScope !== undefined && accountScope.length === 0) return [];
     const rows = await m.getRepository(Account).find({
-      where: { userId, overpaymentPayeeId: payeeId },
+      where: {
+        userId,
+        overpaymentPayeeId: payeeId,
+        ...(accountScope ? { id: In([...accountScope]) } : {}),
+      },
       select: ["id", "name"],
       order: { name: "ASC" },
     });

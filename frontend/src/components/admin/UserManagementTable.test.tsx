@@ -11,6 +11,7 @@ describe('UserManagementTable', () => {
   const onChangeRole = vi.fn();
   const onToggleStatus = vi.fn();
   const onResetPassword = vi.fn();
+  const onResetTwoFactor = vi.fn();
   const onDeleteUser = vi.fn();
 
   const users = [
@@ -54,6 +55,7 @@ describe('UserManagementTable', () => {
     onChangeRole,
     onToggleStatus,
     onResetPassword,
+    onResetTwoFactor,
     onDeleteUser,
   };
 
@@ -120,6 +122,16 @@ describe('UserManagementTable', () => {
     expect(resetButtons).toHaveLength(1);
     fireEvent.click(resetButtons[0]);
     expect(onResetPassword).toHaveBeenCalledWith(expect.objectContaining({ id: 'u3' }));
+  });
+
+  it('offers Reset 2FA for every other user and never for the admin themself', () => {
+    render(<UserManagementTable {...defaultProps} />);
+    // The list carries no 2FA state, so the action is offered for both other
+    // users; the server refuses one with none, and the page reports it.
+    const resetTwoFactorButtons = screen.getAllByText('Reset 2FA');
+    expect(resetTwoFactorButtons).toHaveLength(2);
+    fireEvent.click(resetTwoFactorButtons[1]);
+    expect(onResetTwoFactor).toHaveBeenCalledWith(expect.objectContaining({ id: 'u3' }));
   });
 
   it('does not show actions for current user (self)', () => {

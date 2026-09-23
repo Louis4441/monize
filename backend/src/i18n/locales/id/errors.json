@@ -81,7 +81,9 @@
     "cannotDeleteOwnAccount": "Anda tidak dapat menghapus akun Anda sendiri",
     "deleteLastAdmin": "Tidak dapat menghapus akun admin terakhir.",
     "cannotResetOwnPassword": "Anda tidak dapat mereset kata sandi Anda sendiri melalui panel admin",
-    "noLocalPassword": "Tidak dapat mereset kata sandi untuk akun tanpa kata sandi lokal"
+    "noLocalPassword": "Tidak dapat mereset kata sandi untuk akun tanpa kata sandi lokal",
+    "cannotResetOwnTwoFactor": "Anda tidak dapat mereset autentikasi dua faktor Anda sendiri melalui panel admin",
+    "twoFactorNotEnabled": "Pengguna ini belum menyiapkan autentikasi dua faktor."
   },
   "ai": {
     "queryStreamFailed": "Terjadi kesalahan tak terduga saat memproses permintaan Anda.",
@@ -101,6 +103,9 @@
     "relayAgentOffline": "Agen relay MCP Anda tidak terhubung. Hubungkan agen Anda dan coba lagi.",
     "relayCompletionTimedOut": "Agen relay MCP Anda tidak menjawab tepat waktu. Pastikan agen terhubung, lalu coba lagi.",
     "unknownProvider": "Penyedia AI tidak dikenal: {{ provider }}",
+    "privateBaseUrlRefused": "URL dasar ini mengarah ke alamat jaringan pribadi atau lokal (seperti localhost, 192.168.x.x, atau nama kontainer). Hanya administrator yang dapat menggunakannya, kecuali operator server mengizinkan alamat tersebut di AI_PRIVATE_BASE_URL_ALLOWLIST.",
+    "modelVerifyFailed": "Tidak dapat memverifikasi model yang dikonfigurasi. Periksa URL dasar dan pastikan penyedia dapat dijangkau.",
+    "modelVerifyFailedStatus": "Tidak dapat memverifikasi model yang dikonfigurasi: penyedia merespons dengan status HTTP {{ status }}.",
     "forecastDataGatherFailed": "Gagal mengumpulkan data keuangan untuk peramalan. Coba lagi.",
     "forecastInsufficientHistory": "Riwayat transaksi tidak mencukupi untuk peramalan. Diperlukan minimal 2 bulan data.",
     "forecastGenerateFailed": "Gagal menghasilkan perkiraan. Coba lagi.",
@@ -139,6 +144,7 @@
     "accountDeactivated": "Akun dinonaktifkan",
     "emailNotVerified": "Harap verifikasi alamat email Anda sebelum masuk. Periksa kotak masuk Anda untuk tautan verifikasi.",
     "invalidOrExpiredEmailVerificationToken": "Tautan verifikasi tidak valid atau kedaluwarsa",
+    "invalidOrExpiredEmailChangeToken": "Tautan perubahan surel tidak valid atau kedaluwarsa",
     "oidcNoSubject": "Penyedia OIDC tidak mengembalikan pengenal subjek",
     "registrationDisabled": "Pendaftaran akun baru dinonaktifkan.",
     "invalidOrExpiredLinkToken": "Token tautan tidak valid atau kedaluwarsa",
@@ -201,6 +207,8 @@
     "unsupportedBackupVersion": "Versi cadangan tidak didukung: {{ version }}. Diharapkan {{ expected }}",
     "missingExportedAt": "Format cadangan tidak valid: exportedAt tidak ada",
     "tableNotAllowed": "Tabel {{ table }} tidak diizinkan dalam pemulihan cadangan",
+    "invalidRestoreIdentifier": "File cadangan tidak valid: {{ table }}.{{ column }} berisi \"{{ value }}\", yang bukan pengenal yang valid. Pulihkan dari file cadangan yang tidak dimodifikasi.",
+    "unresolvedRestoreReference": "File cadangan tidak valid: {{ table }}.{{ column }} merujuk ke baris {{ value }} pada {{ referencedTable }}, yang tidak ada di dalam file. Cadangan hanya dapat memulihkan baris yang merujuk ke baris lain dalam file yang sama; pulihkan dari file cadangan yang tidak dimodifikasi.",
     "encryptionNotConfigured": "Server tidak dikonfigurasi untuk enkripsi (JWT_SECRET tidak ada atau terlalu pendek)",
     "backupPasswordOidcOnly": "Kata sandi cadangan hanya dapat dikonfigurasi untuk pengguna OIDC; pengguna lokal menggunakan kata sandi masuk mereka",
     "backupPasswordLocalOnly": "Akun ini tidak memiliki kata sandi login untuk mengenkripsi cadangan; setel kata sandi cadangan sebagai gantinya",
@@ -293,6 +301,7 @@
     "actionNotAvailableAsDelegate": "Tindakan ini tidak tersedia saat Anda bertindak atas nama pengguna lain. Hanya pemilik akun yang dapat melakukannya.",
     "capabilityNotGranted": "Pemilik akun belum memberikan izin kepada Anda untuk {{ operation }} {{ resource }}. Minta mereka untuk mengaktifkannya di pengaturan akses delegasi Anda.",
     "sectionNotGranted": "Pemilik akun belum berbagi bagian {{ sectionLabel }} dengan Anda.",
+    "fullScopeRequired": "Asisten AI membaca seluruh akun dan bagian milik pemilik akun, sehingga hanya tersedia bagi delegasi yang dapat membaca setiap akun dan setiap bagian. Minta pemilik untuk membagikan sisanya kepada Anda, atau gunakan halaman yang sudah dapat Anda akses.",
     "accountNotShared": "Pemilik akun belum berbagi akun ini dengan Anda.",
     "accountOperationNotGranted": "Pemilik akun belum memberikan izin kepada Anda untuk {{ operation }} transaksi di akun ini.",
     "jointOwnAccount": "Ini akun Anda sendiri; akses akun bersama tidak berlaku di sini.",
@@ -350,6 +359,7 @@
   "monteCarlo": {
     "scenarioNotFound": "Skenario {{ id }} tidak ditemukan",
     "atLeastOneAccountRequired": "Diperlukan minimal satu accountId",
+    "tooManyCashFlows": "Skenario dapat memiliki paling banyak {{ max }} arus kas",
     "currentValueUnavailable": "Nilai saat ini dari akun yang dipilih tidak dapat ditentukan, sehingga simulasi tidak dapat dimulai dari nilai itu. Masukkan nilai awal secara eksplisit, atau coba lagi setelah harga dan nilai tukar tersedia.",
     "historicalReturnsUnavailable": "Imbal hasil historis untuk akun yang dipilih tidak dapat dihitung, sehingga simulasi tidak dapat menggunakannya. Masukkan imbal hasil yang diharapkan dan volatilitas secara manual, atau coba lagi setelah harga dan kurs tersedia."
   },

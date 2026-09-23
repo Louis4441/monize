@@ -19,10 +19,12 @@
     "passwordRequired": "A senha atual é obrigatória para alterar o e-mail",
     "noChanges": "Sem alterações para salvar",
     "passwordConfirmNote": "A confirmação da senha é necessária ao alterar seu endereço de e-mail.",
+    "pendingEmailNotice": "Um link de confirmação foi enviado para {email}. Seu endereço de e-mail será alterado quando você abri-lo.",
     "saveButton": "Salvar Perfil",
     "savingButton": "Salvando...",
     "toasts": {
       "success": "Perfil atualizado com sucesso",
+      "confirmationSent": "Verifique {email} para encontrar um link de confirmação do seu novo endereço de e-mail",
       "updateFailed": "Falha ao atualizar o perfil"
     },
     "validation": {
@@ -58,14 +60,28 @@
       "addLayerDescription": "Adicione uma camada extra de segurança à sua conta.",
       "enableButton": "Ativar 2FA",
       "disableButton": "Desativar 2FA",
+      "resetButton": "Redefinir 2FA",
       "disableModal": {
         "title": "Desativar Autenticação de Dois Fatores",
-        "description": "Digite seu código atual de 6 dígitos para confirmar a desativação do 2FA.",
+        "description": "Digite o código de 6 dígitos do seu aplicativo autenticador, ou um dos seus códigos de recuperação (xxxx-xxxx), para confirmar a desativação do 2FA.",
         "verificationCodeLabel": "Código de Verificação",
         "disablingButton": "Desativando...",
         "toasts": {
           "disabled": "Autenticação de dois fatores desativada",
           "disableFailed": "Falha ao desativar a autenticação de dois fatores"
+        }
+      },
+      "resetModal": {
+        "title": "Redefinir Autenticação de Dois Fatores",
+        "description": "Use esta opção se o seu aplicativo autenticador ou seus códigos de recuperação podem ter sido expostos, ou se seus códigos de autenticação pararam de funcionar (por exemplo, após uma alteração do segredo do servidor).",
+        "effect": "Seu autenticador atual, seus códigos de recuperação e seus dispositivos confiáveis deixarão de funcionar, e você será desconectado de todos os outros dispositivos. Em seguida, você configura um novo autenticador imediatamente.",
+        "passwordLabel": "Senha da conta",
+        "codeLabel": "Código do autenticador ou de recuperação",
+        "codeHint": "Digite o código de 6 dígitos do seu aplicativo autenticador. Se o seu autenticador não funcionar mais, digite um dos seus códigos de recuperação (xxxx-xxxx).",
+        "resettingButton": "Redefinindo...",
+        "toasts": {
+          "reset": "Autenticação de dois fatores redefinida. Configure seu novo autenticador agora.",
+          "resetFailed": "Falha ao redefinir o 2FA"
         }
       }
     },
@@ -582,7 +598,11 @@
       "copyUrlFailed": "Falha ao copiar URL",
       "loadFailed": "Falha ao carregar os tokens de API",
       "createFailed": "Falha ao criar o token",
-      "revokeFailed": "Falha ao revogar o token"
+      "revokeFailed": "Falha ao revogar o token",
+      "reauthFailed": "Falha ao confirmar a reautenticação"
+    },
+    "stepUp": {
+      "reason": "Um token pode acessar sua conta sem fazer login, por isso confirme que é você antes de criar um."
     },
     "relative": {
       "never": "Nunca",
@@ -905,7 +925,8 @@
       "shared": "Dados compartilhados"
     },
     "sections": {
-      "description": "Conceda acesso somente leitura a seções inteiras do aplicativo. Os dados no âmbito de conta ainda precisam de acesso por conta."
+      "description": "Conceda acesso somente leitura a seções inteiras do aplicativo. Os dados no âmbito de conta ainda precisam de acesso por conta.",
+      "aiRequiresFullAccess": "O Assistente de IA lê todas as contas e seções, por isso só responde para este delegado quando ele puder ler todas as suas contas e todas as outras seções."
     },
     "accounts": {
       "noAccounts": "Sem contas para conceder.",
@@ -1164,6 +1185,7 @@
       "ollamaCloudNote": "Os nomes dos modelos devem incluir o sufixo -cloud (ex.: gpt-oss:20b-cloud).",
       "apiKeyLabel": "Chave de API",
       "baseUrlLabel": "URL Base",
+      "baseUrlPrivateNote": "Um endereço privado ou local (localhost, 192.168.x.x ou o nome de um contêiner) só funciona para um administrador ou quando o operador do servidor permite esse endereço. Caso contrário, use um endereço acessível pela internet.",
       "priorityLabel": "Prioridade",
       "priorityHelp": "Número menor = maior prioridade. Utilizado para a ordem de fallback.",
       "costRatesHeading": "Taxas de custo (opcional)",

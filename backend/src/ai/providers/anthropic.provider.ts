@@ -15,7 +15,8 @@ import {
   ModelVerificationResult,
 } from "./ai-provider.interface";
 import { contentToPlainText, isContentBlocks } from "./content-blocks.util";
-import { longRunningFetch } from "./long-running-fetch";
+import { providerFetch } from "./long-running-fetch";
+import { unverifiedModelReason } from "./model-verification.util";
 import { toolsField } from "./tools-field.util";
 import {
   anthropicWebSearchTool,
@@ -42,12 +43,17 @@ export class AnthropicProvider implements AiProvider {
   private readonly client: Anthropic;
   private readonly modelId: string;
 
-  constructor(apiKey: string, model?: string) {
+  constructor(
+    apiKey: string,
+    model?: string,
+    /** The egress-policy fetch; see `OpenAiProvider`'s constructor. */
+    fetchImpl: typeof fetch = providerFetch("public-only"),
+  ) {
     this.client = new Anthropic({
       apiKey,
       // Inject our long-running fetch wrapper so SDK calls inherit the
       // disabled bodyTimeout/headersTimeout. See long-running-fetch.ts.
-      fetch: longRunningFetch,
+      fetch: fetchImpl,
     });
     this.modelId = model || "claude-sonnet-4-20250514";
   }
@@ -521,7 +527,6 @@ export class AnthropicProvider implements AiProvider {
       return { ok: true, model: this.modelId };
     } catch (error) {
       const status = (error as { status?: number })?.status;
-      const raw = error instanceof Error ? error.message : String(error);
       if (status === 404) {
         return {
           ok: false,
@@ -539,7 +544,7 @@ export class AnthropicProvider implements AiProvider {
       return {
         ok: false,
         model: this.modelId,
-        reason: `Could not verify model: ${raw}`,
+        reason: unverifiedModelReason(this.name, this.modelId, error, status),
       };
     } finally {
       clearTimeout(timeout);

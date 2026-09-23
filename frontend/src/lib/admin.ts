@@ -55,7 +55,24 @@ export interface AdminUserStorage {
   attachments: AdminAttachmentStorage;
 }
 
+/**
+ * Deployment configuration an administrator has to fix, from the admin-only
+ * `GET /admin/deployment-status`. Reason codes only: the server never sends
+ * the secret, or anything derived from it.
+ */
+export interface DeploymentStatus {
+  /** Why JWT_SECRET is weak, or `null` when it is not. */
+  jwtSecretWeakness: 'placeholder' | 'predictable' | null;
+}
+
 export const adminApi = {
+  getDeploymentStatus: async (): Promise<DeploymentStatus> => {
+    const response = await apiClient.get<DeploymentStatus>(
+      '/admin/deployment-status',
+    );
+    return response.data;
+  },
+
   getUsers: async (): Promise<AdminUser[]> => {
     const response = await apiClient.get<AdminUser[]>('/admin/users');
     return response.data;
@@ -118,6 +135,19 @@ export const adminApi = {
   ): Promise<ResetPasswordResponse> => {
     const response = await apiClient.post<ResetPasswordResponse>(
       `/admin/users/${userId}/reset-password`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Switch a user's two-factor authentication off so they can sign in with
+   * their password and enroll again: clears their TOTP secret and backup codes,
+   * deletes their trusted devices and signs them out. Refused (400) for a user
+   * with no 2FA set up, and (403) for the calling admin themself.
+   */
+  resetUserTwoFactor: async (userId: string): Promise<{ reset: true }> => {
+    const response = await apiClient.post<{ reset: true }>(
+      `/admin/users/${userId}/reset-2fa`,
     );
     return response.data;
   },

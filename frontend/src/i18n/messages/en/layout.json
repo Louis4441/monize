@@ -34,6 +34,12 @@
     "dismiss": "Dismiss",
     "dismissAriaLabel": "Dismiss update notification"
   },
+  "jwtSecretBanner": {
+    "label": "JWT_SECRET is weak.",
+    "detail": "It is a published placeholder or too predictable, so session tokens can be forged. Generate a strong one with <code>openssl rand -base64 32</code>. Changing it stops authenticator codes from working and forgets trusted devices: users sign in with a backup code and set up 2FA again, and you reset 2FA in <users>User Management</users> for anyone without one. Read <code>docs/backend/modules-and-runtime.md</code> (Changing JWT_SECRET) first.",
+    "dismiss": "Dismiss",
+    "dismissAriaLabel": "Dismiss JWT_SECRET warning"
+  },
   "actionHistory": {
     "title": "Action History",
     "buttonAriaLabel": "Action History",

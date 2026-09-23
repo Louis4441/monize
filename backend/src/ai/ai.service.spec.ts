@@ -9,6 +9,7 @@ import { AiProviderFactory } from "./ai-provider.factory";
 import { AiUsageService } from "./ai-usage.service";
 import { AiRelayService, RelayTimeoutError } from "./relay/ai-relay.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+import { User } from "../users/entities/user.entity";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -18,6 +19,7 @@ describe("AiService", () => {
   let service: AiService;
   let scopedManager: Record<string, jest.Mock>;
   let mockConfigRepository: Record<string, jest.Mock>;
+  let mockUserRepository: Record<string, jest.Mock>;
   let mockEncryptionService: Partial<
     Record<keyof EncryptionService, jest.Mock>
   >;
@@ -110,8 +112,15 @@ describe("AiService", () => {
       enqueuePrompt: jest.fn().mockResolvedValue({ text: "Relay answer" }),
     };
 
+    // The owner is an admin unless a test says otherwise, which is the
+    // entitlement every self-hosted-provider test below was written under.
+    mockUserRepository = {
+      findOne: jest.fn().mockResolvedValue({ id: userId, role: "admin" }),
+    };
+
     const scoped = createScopedDbMocks([
       [AiProviderConfig, mockConfigRepository],
+      [User, mockUserRepository],
     ]);
     scopedManager = scoped.manager as unknown as Record<string, jest.Mock>;
     scopedManager.query.mockResolvedValue([{ id: userId }]);
@@ -247,7 +256,7 @@ describe("AiService", () => {
       expect(mockConfigRepository.save).toHaveBeenCalled();
     });
 
-    it("allows private/local baseUrl for self-hosted providers", async () => {
+    it("allows private/local baseUrl for an admin's self-hosted provider", async () => {
       await service.createConfig(userId, {
         provider: "ollama",
         baseUrl: "http://192.168.1.100:11434",
@@ -827,6 +836,7 @@ describe("AiService", () => {
       expect(mockRelayService.enqueuePrompt).not.toHaveBeenCalled();
       expect(mockProviderFactory.createProvider).toHaveBeenCalledWith(
         anthropicConfig,
+        "public-only",
       );
       // The relay failure is logged as a provider error before the fallback.
       expect(mockUsageService.logUsage).toHaveBeenCalledWith(
@@ -907,6 +917,7 @@ describe("AiService", () => {
       expect(result.content).toBe("Response text");
       expect(mockProviderFactory.createProvider).toHaveBeenCalledWith(
         anthropicConfig,
+        "public-only",
       );
     });
 

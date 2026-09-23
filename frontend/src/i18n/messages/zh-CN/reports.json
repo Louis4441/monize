@@ -941,6 +941,7 @@
     "removeCashFlow": "移除现金流",
     "removeTitle": "移除",
     "addCashFlow": "+ 添加现金流",
+    "cashFlowLimitReached": "一个情景最多只能有 {max} 个现金流。",
     "returnAssumptions": "收益假设",
     "specifyReturn": "指定预期收益率",
     "useHistoricalReturns": "使用所选账户的历史回报",

@@ -34,6 +34,7 @@ interface UserManagementTableProps {
   onChangeRole: (user: AdminUser, role: 'admin' | 'user') => void;
   onToggleStatus: (user: AdminUser) => void;
   onResetPassword: (user: AdminUser) => void;
+  onResetTwoFactor: (user: AdminUser) => void;
   onDeleteUser: (user: AdminUser) => void;
 }
 
@@ -44,6 +45,7 @@ export function UserManagementTable({
   onChangeRole,
   onToggleStatus,
   onResetPassword,
+  onResetTwoFactor,
   onDeleteUser,
 }: UserManagementTableProps) {
   const t = useTranslations('admin');
@@ -185,6 +187,16 @@ export function UserManagementTable({
                           {t('userTable.resetPassword')}
                         </Button>
                       )}
+                      {/* Offered for every other user: the list does not carry
+                          2FA state, and the server refuses (400) a user with
+                          none, which the page reports. */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onResetTwoFactor(user)}
+                      >
+                        {t('userTable.resetTwoFactor')}
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"

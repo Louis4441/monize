@@ -19,10 +19,12 @@
     "passwordRequired": "La contraseña actual es necesaria para cambiar el correo electrónico",
     "noChanges": "No hay cambios para guardar",
     "passwordConfirmNote": "Se requiere confirmación de contraseña al cambiar tu dirección de correo electrónico.",
+    "pendingEmailNotice": "Se envió un enlace de confirmación a {email}. Tu dirección de correo electrónico cambiará cuando lo sigas.",
     "saveButton": "Guardar perfil",
     "savingButton": "Guardando...",
     "toasts": {
       "success": "Perfil actualizado correctamente",
+      "confirmationSent": "Revisa {email} para encontrar un enlace que confirme tu nueva dirección de correo electrónico",
       "updateFailed": "Error al actualizar el perfil"
     },
     "validation": {
@@ -58,14 +60,28 @@
       "addLayerDescription": "Agrega una capa adicional de seguridad a tu cuenta.",
       "enableButton": "Habilitar 2FA",
       "disableButton": "Deshabilitar 2FA",
+      "resetButton": "Restablecer 2FA",
       "disableModal": {
         "title": "Deshabilitar autenticación de dos factores",
-        "description": "Ingresa tu código actual de 6 dígitos para confirmar la desactivación de 2FA.",
+        "description": "Ingresa el código de 6 dígitos de tu aplicación de autenticación, o uno de tus códigos de respaldo (xxxx-xxxx), para confirmar la desactivación de 2FA.",
         "verificationCodeLabel": "Código de verificación",
         "disablingButton": "Deshabilitando...",
         "toasts": {
           "disabled": "Autenticación de dos factores deshabilitada",
           "disableFailed": "Error al deshabilitar la autenticación de dos factores"
+        }
+      },
+      "resetModal": {
+        "title": "Restablecer autenticación de dos factores",
+        "description": "Úsalo si tu aplicación de autenticación o tus códigos de respaldo pueden haber quedado expuestos, o si tus códigos de autenticación dejaron de funcionar (por ejemplo, tras un cambio del secreto del servidor).",
+        "effect": "Tu autenticador actual, tus códigos de respaldo y tus dispositivos de confianza dejarán de funcionar, y se cerrará tu sesión en todos los demás dispositivos. Después configurarás un nuevo autenticador de inmediato.",
+        "passwordLabel": "Contraseña de la cuenta",
+        "codeLabel": "Código de autenticación o de respaldo",
+        "codeHint": "Ingresa el código de 6 dígitos de tu aplicación de autenticación. Si tu autenticador ya no funciona, ingresa en su lugar uno de tus códigos de respaldo (xxxx-xxxx).",
+        "resettingButton": "Restableciendo...",
+        "toasts": {
+          "reset": "Autenticación de dos factores restablecida. Configura tu nuevo autenticador ahora.",
+          "resetFailed": "Error al restablecer 2FA"
         }
       }
     },
@@ -582,7 +598,11 @@
       "copyUrlFailed": "Error al copiar la URL",
       "loadFailed": "Error al cargar los tokens de API",
       "createFailed": "Error al crear el token",
-      "revokeFailed": "Error al revocar el token"
+      "revokeFailed": "Error al revocar el token",
+      "reauthFailed": "Error al confirmar la reautenticación"
+    },
+    "stepUp": {
+      "reason": "Un token puede acceder a tu cuenta sin iniciar sesión, así que confirma que eres tú antes de crear uno."
     },
     "relative": {
       "never": "Nunca",
@@ -905,7 +925,8 @@
       "shared": "Datos compartidos"
     },
     "sections": {
-      "description": "Otorga acceso de solo lectura a secciones completas de la aplicación. Los datos con alcance de cuenta también necesitan acceso por cuenta."
+      "description": "Otorga acceso de solo lectura a secciones completas de la aplicación. Los datos con alcance de cuenta también necesitan acceso por cuenta.",
+      "aiRequiresFullAccess": "El Asistente AI consulta todas las cuentas y secciones, por lo que solo responde a este delegado cuando puede leer todas tus cuentas y todas las demás secciones."
     },
     "accounts": {
       "noAccounts": "No hay cuentas para otorgar.",
@@ -1164,6 +1185,7 @@
       "ollamaCloudNote": "Los nombres de modelos deben incluir el sufijo -cloud (p. ej., gpt-oss:20b-cloud).",
       "apiKeyLabel": "Clave de API",
       "baseUrlLabel": "URL base",
+      "baseUrlPrivateNote": "Una dirección privada o local (localhost, 192.168.x.x o el nombre de un contenedor) solo funciona para un administrador o cuando el operador del servidor permite esa dirección. De lo contrario, usa una dirección accesible desde internet.",
       "priorityLabel": "Prioridad",
       "priorityHelp": "Número menor = mayor prioridad. Se usa para el orden de reserva.",
       "costRatesHeading": "Tarifas de costo (opcional)",

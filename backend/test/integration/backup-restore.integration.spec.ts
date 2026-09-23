@@ -3,7 +3,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { ConfigModule } from "@nestjs/config";
 import { DataSource } from "typeorm";
 import { createHash, randomUUID } from "crypto";
-import { gunzipSync } from "zlib";
+import { gunzipSync, gzipSync } from "zlib";
 import {
   BackupService,
   BackupPasswordRequiredError,
@@ -990,6 +990,142 @@ describe("Backup export/restore round-trip (integration)", () => {
     ).rejects.toThrow("Invalid password");
 
     expect(await countRows("accounts", userB.id)).toBe(0);
+  });
+
+  /**
+   * INV-BACKUP-009: the uploaded file is untrusted, and this suite runs at
+   * RLS_MODE=off -- the default -- where the restore code is the only barrier
+   * between a crafted file and another user's rows.
+   */
+  describe("a crafted file naming another user's rows", () => {
+    type Doc = Record<string, unknown> & {
+      accounts: Record<string, unknown>[];
+    };
+
+    async function exportDoc(userId: string): Promise<Doc> {
+      const { buffer } = await withUserContext(userId, () =>
+        service.exportToBuffer(userId),
+      );
+      return JSON.parse(gunzipSync(buffer).toString("utf8")) as Doc;
+    }
+
+    async function accountSnapshot(userId: string): Promise<unknown[]> {
+      return dataSource.query(
+        `SELECT id, name, linked_account_id, current_balance
+           FROM accounts WHERE user_id = $1 ORDER BY id`,
+        [userId],
+      );
+    }
+
+    it("refuses a reference to a row the file does not contain", async () => {
+      const victim = await createTestUserDirect(dataSource, {
+        email: "ref-victim@example.com",
+      });
+      const intruder = await createTestUserDirect(dataSource, {
+        email: "ref-intruder@example.com",
+      });
+      const seeded = await seedUserData(victim.id);
+      const before = await accountSnapshot(victim.id);
+
+      // The transfer's inbound leg, the investment transfer's inbound leg and
+      // nothing else now point at an account the file no longer carries: the
+      // victim's own savings account, by its real id.
+      const doc = await exportDoc(victim.id);
+      const crafted = {
+        ...doc,
+        accounts: doc.accounts.filter(
+          (row) => row.id !== seeded.savingsAccountId,
+        ),
+      };
+
+      await expect(
+        withUserContext(intruder.id, () =>
+          service.restoreData(intruder.id, {
+            compressedData: gzipSync(Buffer.from(JSON.stringify(crafted))),
+            password: PASSWORD,
+          }),
+        ),
+      ).rejects.toThrow(seeded.savingsAccountId);
+
+      // Refused before anything was written, on either side.
+      expect(await countRows("accounts", intruder.id)).toBe(0);
+      expect(await countRows("transactions", intruder.id)).toBe(0);
+      expect(await accountSnapshot(victim.id)).toEqual(before);
+      const [{ n }] = await dataSource.query(
+        `SELECT COUNT(*)::int AS n FROM transactions WHERE account_id = $1`,
+        [seeded.savingsAccountId],
+      );
+      // The victim's own transfer-in leg, and nobody else's.
+      expect(n).toBe(1);
+    });
+
+    it("does not let a primary key spelled without hyphens redirect the Phase-3 repair", async () => {
+      const victim = await createTestUserDirect(dataSource, {
+        email: "pk-victim@example.com",
+      });
+      const intruder = await createTestUserDirect(dataSource, {
+        email: "pk-intruder@example.com",
+      });
+      const seeded = await seedUserData(victim.id);
+      const before = await accountSnapshot(victim.id);
+
+      // PostgreSQL reads this as the victim's checking account id. The remap
+      // used to test ids with the hyphenated pattern only, so it passed through
+      // unremapped, its insert conflicted and was skipped, and the deferred
+      // UPDATE ... WHERE id = $2 then linked the VICTIM's account to the
+      // intruder's.
+      const spelled = seeded.accountId.replace(/-/g, "").toUpperCase();
+      const doc = await exportDoc(victim.id);
+      const template = doc.accounts.find((row) => row.id === seeded.accountId)!;
+      const ownId = randomUUID();
+      const crafted = {
+        version: doc.version,
+        exportedAt: doc.exportedAt,
+        accounts: [
+          {
+            ...template,
+            id: spelled,
+            name: "Intruder A",
+            institution_id: null,
+            linked_account_id: ownId,
+          },
+          {
+            ...template,
+            id: ownId,
+            name: "Intruder B",
+            institution_id: null,
+            linked_account_id: null,
+          },
+        ],
+      };
+
+      const result = await withUserContext(intruder.id, () =>
+        service.restoreData(intruder.id, {
+          compressedData: gzipSync(Buffer.from(JSON.stringify(crafted))),
+          password: PASSWORD,
+        }),
+      );
+
+      expect(result.restored.accounts).toBe(2);
+      expect(await accountSnapshot(victim.id)).toEqual(before);
+      // Both rows came back as the intruder's own, under fresh ids, linked to
+      // each other.
+      const restored: {
+        id: string;
+        name: string;
+        linked_account_id: string | null;
+      }[] = await dataSource.query(
+        `SELECT id, name, linked_account_id FROM accounts
+          WHERE user_id = $1 ORDER BY name`,
+        [intruder.id],
+      );
+      expect(restored.map((row) => row.name)).toEqual([
+        "Intruder A",
+        "Intruder B",
+      ]);
+      expect(restored[0].id).not.toBe(seeded.accountId);
+      expect(restored[0].linked_account_id).toBe(restored[1].id);
+    });
   });
 
   // Guard against the class of bug this change fixed: a new entity/table added

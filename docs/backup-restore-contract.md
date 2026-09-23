@@ -29,7 +29,7 @@ concerns this document describes:
 | `backend/src/backup/export-json-stream.ts` | The document, assembled one row at a time under a chunk budget (and the in-memory collection the support export needs). |
 | `backend/src/backup/export-attachments.ts` | The completeness audit that holds no bytes, and the external objects carried one at a time. |
 | `backend/src/backup/export-writer.ts` | gzip, the encrypted container, backpressure, and unwinding when the client leaves. |
-| `backend/src/backup/backup-envelope.ts`, `backup-stream-crypto.ts` | The encrypted-backup format: both container versions, and the framed one's writer and reader. |
+| `backend/src/backup/backup-envelope.ts`, `backup-stream-crypto.ts`, `backup-key-wrap.ts` | The encrypted-backup format: all three container versions, the framed writer and reader, and the key-wrapped (v3) container the automatic backup writes. |
 | `backend/src/backup/backup-restore.service.ts` | §3 and §6: the processing gate, decryption, decompression, format validation, re-authentication ordering, id remapping, and the one transaction the rest runs inside. |
 | `backend/src/backup/backup-attachment-transfer.service.ts` | §4's restore half: staging carried bytes, the legacy ownership proof, and both object-store cleanup paths. |
 | `backend/src/backup/backup-restore-database.service.ts` | The restore's SQL: teardown, currency preparation, row inserts, deferred-FK repair. |
@@ -143,6 +143,7 @@ delete:
 - decryption;
 - decompression, under a hard expanded-size ceiling (section 6);
 - version and envelope validation;
+- **the reference graph** (below);
 - re-authentication (section 5);
 - **staging of external attachment objects** (section 4).
 
@@ -156,6 +157,48 @@ write — the check precedes every `DELETE FROM` on every path.
 Any SQL or foreign-key error rolls the whole transaction back. The one effect
 that is not transactional is the object store; that is what makes staging-first
 necessary rather than merely tidy.
+
+### A restored reference names a row of the same file (INV-BACKUP-009)
+
+The uploaded document is untrusted, and `RLS_MODE` defaults to `off`, so the
+restore code is the only thing between a crafted file and another user's rows.
+`insertRows` forces `user_id` on the tables that have one; every other
+identifier comes from the file. That used to be enough only for the ids the
+remap recognised: a reference to a row the file did not contain (another user's
+account on a transaction, their security on a price or holding, their schedule
+on an override) was inserted verbatim, and a primary key spelled in a UUID form
+PostgreSQL accepts but `UUID_REGEX` does not (no hyphens, braces) escaped the
+remap, conflicted on insert, and was then rewritten in place by the Phase-3
+`UPDATE ... WHERE id = $2`.
+
+`resolveRestoreReferences` (`backend/src/backup/restore-references.ts`) now runs
+before re-authentication -- it is free, and it writes nothing:
+
+- every UUID primary key and reference column is canonicalised with
+  `canonicalUuid`, which accepts exactly the spellings PostgreSQL's `uuid`
+  input does; a key or reference that is not a UUID refuses the restore;
+- every reference must name a row of the referenced table **in the same file**,
+  or the restore is refused with a 400 naming the table, column and value. The
+  reference columns are `RESTORE_REFERENCE_COLUMNS`, which
+  `restore-references.spec.ts` checks against every foreign key and every scalar
+  UUID column of every restored table in `database/schema.sql`;
+- two columns a genuine export can leave dangling are set NULL instead and
+  logged (`SEVERED_WHEN_UNRESOLVED`): `transactions.linked_transaction_id`,
+  whose counterpart is another user's transaction on a cross-owner transfer --
+  so a restore now comes back with such a leg unlinked rather than re-linked
+  one-way to a row the file cannot vouch for -- and `accounts.institution_id`
+  from a backup older than the institution export.
+
+Every key is then remapped to a fresh id, so the restored graph is closed over
+rows this restore inserted. A UUID nested in a JSONB or array value
+(`tag_ids`, override `splits`, `monte_carlo_scenarios.account_ids`, report
+filters) cannot be classified by column, so one that names no row of the file is
+replaced with a fresh id that names nothing (`remapRestoreRow`); it was a stale
+reference or someone else's, and neither may come back as a working pointer.
+Finally, every Phase-3 repair is confined to the restoring user's rows --
+`user_id = $3`, or the owning parent's for a table without one
+(`DeferredFkRepair.ownedThrough`) -- as the guard that still holds if an id ever
+reaches it by another route.
 
 ## 4. Attachments: the bytes travel
 
@@ -804,6 +847,15 @@ cleanly is worse than one that does not decrypt at all. v1 envelopes still open:
 every backup a user already holds is one, and the support export still writes one
 because it assembles in memory anyway.
 
+**The key-wrapped container (`MZBE` v3).** The automatic backup's frames are
+v2's, sealed under a per-file key derived (HKDF) from the user's random data key
+rather than under a key derived from the password, and the header carries that
+data key wrapped under the password. The cron holds the data key and never the
+password; the file still opens with the password alone, and the restore prompt
+does not change. Readers accept v1, v2 and v3; the manual download still writes
+v2 under the password typed for it. `docs/specs/backup-envelope-key-wrapping.md`
+has the layout and the key flow.
+
 **What this does not settle.** The claim is bounded peak RSS, and the honest
 measurement of that is the cgroup-constrained harness this repository still does
 not have (`DR-F3R6-002` / `DR-F3R7-003`). What the suite proves instead is the
@@ -1042,14 +1094,18 @@ location"; it never answered "where do my backups live".
   only thing telling the user was `partial-` in the name it showed them.
 
 - **Encryption is on by default, and its key is announced before it is enforced
-  (issue #1269).** An automatic backup is encrypted with the user's own password
-  whenever the server holds a usable copy: captured for a local account when they
-  type it (registration, login, password change) or when they confirm it in
-  Settings, and set explicitly by an OIDC account. The copy lives in
-  `users.backup_password_enc` under `EncryptionService`, keyed by
-  `ENCRYPTION_KEY`. `AI_ENCRYPTION_KEY` is the variable's former name: still
-  read, and still preferred where both are set, so an existing deployment
-  upgrades without re-keying a column.
+  (issue #1269).** An automatic backup opens with the user's own password
+  whenever the server holds a usable backup key for them: a random data key
+  wrapped under the password when a local account types it (registration, login,
+  password change) or confirms it in Settings, and under the dedicated backup
+  password an OIDC account sets. The server keeps the data key in
+  `users.backup_key_enc` under `EncryptionService`, keyed by `ENCRYPTION_KEY`,
+  and the wrap in `users.backup_key_wrap`; it never keeps the password
+  (INV-BACKUP-008). The retired `users.backup_password_enc`, which did, is
+  converted and cleared at each user's next sign-in or automatic backup.
+  `AI_ENCRYPTION_KEY` is the variable's former name: still read, and still
+  preferred where both are set, so an existing deployment upgrades without
+  re-keying a column.
 
   The key is **announced before it is enforced**. A deployment with neither
   variable still boots — refusing would turn an upgrade into an outage for
@@ -1065,24 +1121,29 @@ location"; it never answered "where do my backups live".
   plaintext, while the release notes, the docs and Settings all said backups were
   encrypted by default. Two rules follow. **A plaintext automatic backup is
   logged, every time** — it stays a legitimate outcome (an OIDC account with no
-  backup password; a local account whose password has not been captured yet) but
+  backup password; a local account with no backup key yet) but
   never a silent one. And **"this server cannot encrypt" is reported separately
   from "this user has not enabled it"** (`available` beside `enabled` in
   `getStatus`), because the two have different fixes and rendering both as a
   blank space is what made the defect invisible.
 
 - **`ENCRYPTION_KEY` does not open a backup file; the user's password does.** The
-  artifact is encrypted with the password it was written under, so a restore
-  needs *that* password and nothing else — losing `ENCRYPTION_KEY` does not lock
-  anyone out of a backup they can still supply the password for. What losing it
-  does cost: every AI provider key and emergency-access credential in the
-  database becomes unreadable, the stored copy of each user's backup password
-  becomes unreadable, and automatic backups then *refuse to run* (the
-  `unrecoverable` outcome above) until the copy is recaptured at the next
-  sign-in. The password half has its own trap, which the wiki states plainly: a
-  local account's artifact opens with the login password **as it was when that
-  artifact was written**, so changing a password strands every backup taken
-  before the change unless the old one is written down.
+  artifact carries its data key wrapped under the password it was written under,
+  so a restore needs *that* password and nothing else — losing `ENCRYPTION_KEY`
+  does not lock anyone out of a backup they can still supply the password for.
+  What losing it does cost: every AI provider key and emergency-access credential
+  in the database becomes unreadable, each user's stored backup data key becomes
+  unreadable, and automatic backups then *refuse to run* (the `unrecoverable`
+  outcome above) until a fresh key is wrapped at the next sign-in. The password
+  half has its own trap, which the wiki states plainly: a local account's
+  artifact opens with the login password **as it was when that artifact was
+  written**, so changing a password strands every backup taken before the change
+  unless the old one is written down. A password change wraps a fresh data key,
+  so the old password opens only the files written before it. A password changed
+  by a reset link, an admin or an emergency claim does not re-wrap: the key's
+  `backup_key_password_ref` no longer matches the account's hash, and the next
+  automatic backup drops it and is written unencrypted (and logged) until the
+  user signs in again, rather than under a password they no longer know.
 
 On Kubernetes this needs `backend.persistence.backups.enabled` (see
 `helm/README.md`). With a read-only root filesystem and no mount, a schedule
@@ -1108,7 +1169,9 @@ Known and unresolved; none of these is a bug report waiting to be filed:
   it reports the file as not being in the encrypted Monize format. Restoring
   backwards across that boundary means an unencrypted export, or restoring on a
   build at least as new as the one that produced the file. The reverse direction
-  is fine: every version reads v1.
+  is fine: every version reads v1. Automatic backups are `MZBE` v3 from the
+  release that stopped storing passwords, and the same holds one step further on:
+  a build from before it does not open them.
 - **AI provider keys written by an older build do not cross instances.** Keys now
   travel decrypted and are re-encrypted on arrival (§1), so a current artifact is
   portable. One made before that carries `api_key_enc` under the exporting

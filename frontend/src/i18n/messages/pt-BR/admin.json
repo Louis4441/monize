@@ -62,6 +62,7 @@
     "clickToDisable": "Clique para desativar",
     "clickToEnable": "Clique para ativar",
     "resetPassword": "Redefinir Senha",
+    "resetTwoFactor": "Redefinir 2FA",
     "noUsers": "Nenhum usuário encontrado.",
     "storageLoading": "Carregando…",
     "storageUnavailable": "Indisponível",
@@ -96,7 +97,9 @@
       "loadFailed": "Falha ao carregar usuários",
       "deleteFailed": "Falha ao excluir usuário",
       "disableFailed": "Falha ao desativar usuário",
-      "resetFailed": "Falha ao redefinir senha"
+      "resetFailed": "Falha ao redefinir senha",
+      "twoFactorReset": "A autenticação de dois fatores de {name} foi redefinida. As sessões foram encerradas.",
+      "resetTwoFactorFailed": "Falha ao redefinir a autenticação de dois fatores"
     },
     "dialogs": {
       "promoteTitle": "Promover Usuário?",
@@ -111,6 +114,9 @@
       "resetTitle": "Redefinir Senha?",
       "resetMessage": "Isto irá gerar uma nova senha temporária para {name}. O usuário será obrigado a alterá-la no próximo login.",
       "resetConfirm": "Redefinir Senha",
+      "resetTwoFactorTitle": "Redefinir a Autenticação de Dois Fatores?",
+      "resetTwoFactorMessage": "Isto desativa a autenticação de dois fatores de {name}, exclui os códigos de recuperação e os dispositivos confiáveis e encerra todas as sessões. Depois, o usuário poderá entrar com a senha e configurar o 2FA de novo. Use quando o usuário tiver perdido o aplicativo autenticador e os códigos de recuperação, ou depois de alterar o JWT_SECRET.",
+      "resetTwoFactorConfirm": "Redefinir 2FA",
       "deleteTitle": "Excluir Usuário?",
       "deleteMessage": "Tem certeza de que deseja excluir {name}? Isto irá remover permanentemente a sua conta e todos os dados associados. Esta ação não pode ser desfeita. Se for delegado de outra conta, os seus próprios dados são removidos mas o seu login é mantido para que a delegação continue a funcionar — passa a ser um usuário apenas delegado.",
       "deleteConfirm": "Excluir Usuário",

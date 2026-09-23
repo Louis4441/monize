@@ -22,6 +22,8 @@ import { BackupEncryptionService } from "../backup/backup-encryption.service";
 import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { TrustedDevice } from "../users/entities/trusted-device.entity";
+import { PersonalAccessToken } from "./entities/personal-access-token.entity";
+import { OAUTH_GRANT_REVOKER } from "./credential-revocation";
 import { RefreshToken } from "./entities/refresh-token.entity";
 import { encrypt, derivePurposeKey } from "./crypto.util";
 import { PasswordBreachService } from "./password-breach.service";
@@ -65,6 +67,8 @@ describe("AuthService", () => {
   let preferencesRow: UserPreferenceRepoMock;
   let trustedDevicesRepository: Record<string, jest.Mock>;
   let refreshTokensRepository: Record<string, jest.Mock>;
+  let patRepository: Record<string, jest.Mock>;
+  let oauthProviderService: { revokeAllForUser: jest.Mock };
   let jwtService: Partial<JwtService>;
   let configService: { get: jest.Mock };
   let delegationService: {
@@ -74,7 +78,7 @@ describe("AuthService", () => {
   let dataSource: Record<string, jest.Mock>;
   let passwordBreachService: { isBreached: jest.Mock };
   let emailService: { sendMail: jest.Mock; getStatus: jest.Mock };
-  let backupEncryptionService: { rememberLoginPassword: jest.Mock };
+  let backupEncryptionService: { rewrapBackupKey: jest.Mock };
 
   const mockUser = {
     id: "user-1",
@@ -139,6 +143,9 @@ describe("AuthService", () => {
       delete: jest.fn(),
     };
 
+    patRepository = { update: jest.fn() };
+    oauthProviderService = { revokeAllForUser: jest.fn().mockResolvedValue(0) };
+
     jwtService = {
       sign: jest.fn().mockReturnValue("mock-jwt-token"),
       verify: jest.fn(),
@@ -154,6 +161,7 @@ describe("AuthService", () => {
       // The spec provides a real TokenService, whose refresh-token writes now
       // go through the same scoped manager.
       [RefreshToken, refreshTokensRepository as never],
+      [PersonalAccessToken, patRepository as never],
     ]);
     scopedManager = scoped.manager;
     // Two statements now reach the manager directly on ordinary paths: the SQL
@@ -192,7 +200,7 @@ describe("AuthService", () => {
     };
 
     backupEncryptionService = {
-      rememberLoginPassword: jest.fn().mockResolvedValue(undefined),
+      rewrapBackupKey: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -218,6 +226,7 @@ describe("AuthService", () => {
           },
         },
         { provide: DataSource, useValue: dataSource },
+        { provide: OAUTH_GRANT_REVOKER, useValue: oauthProviderService },
         { provide: PasswordBreachService, useValue: passwordBreachService },
         { provide: EmailService, useValue: emailService },
         {
@@ -348,6 +357,23 @@ describe("AuthService", () => {
       expect(result.user).not.toHaveProperty("passwordHash");
     });
 
+    it("wraps the backup key under the new password, bound to the hash it created", async () => {
+      usersRepository.findOne.mockResolvedValue(null);
+      const txManager = setupRegisterTransactionMock(1);
+
+      await service.register({
+        email: "new@example.com",
+        password: "StrongPass123!",
+      });
+
+      const createdHash = txManager.save.mock.calls[0][0].passwordHash;
+      expect(backupEncryptionService.rewrapBackupKey).toHaveBeenCalledWith(
+        "new-user",
+        "StrongPass123!",
+        createdHash,
+      );
+    });
+
     it("makes first user an admin", async () => {
       usersRepository.findOne.mockResolvedValue(null);
       const txManager = setupRegisterTransactionMock(0); // first user
@@ -404,38 +430,49 @@ describe("AuthService", () => {
       ).rejects.toThrow(ConflictException);
     });
 
-    it("claims an invited (passwordless) delegate instead of duplicating", async () => {
+    it("refuses to claim an invited (passwordless) delegate through /register", async () => {
+      // An invited row carries only an emailed invite token. Letting
+      // /register set its password would hand the row -- verified email and
+      // a session included -- to anyone who knows the address, without ever
+      // proving control of the mailbox. The invite link is the only way in.
+      const expiry = new Date(Date.now() + 60_000);
       const invitedDelegate = {
         id: "deleg-1",
         email: "shared@example.com",
         authProvider: "local",
         passwordHash: null,
+        emailVerified: true,
+        isDelegateOnly: true,
         resetToken: "tok",
-        resetTokenExpiry: new Date(),
+        resetTokenExpiry: expiry,
       };
       usersRepository.findOne.mockResolvedValue(invitedDelegate);
       delegationService.isDelegateUser.mockResolvedValue(true);
+      delegationService.isFullAccount.mockResolvedValue(false);
       passwordBreachService.isBreached.mockResolvedValue(false);
       usersRepository.save.mockImplementation(async (u: any) => u);
 
-      const result = await service.register({
+      const attempt = service.register({
         email: "shared@example.com",
         password: "StrongPass123!",
-        firstName: "Real",
+        firstName: "Attacker",
       });
 
-      expect(delegationService.isDelegateUser).toHaveBeenCalledWith("deleg-1");
-      expect(invitedDelegate.passwordHash).toBeTruthy();
-      expect(usersRepository.save).toHaveBeenCalledWith(invitedDelegate);
-      // The claim path reuses the existing row: no SERIALIZABLE create
-      // transaction is opened (every other scoped read is transaction(cb)).
+      // The same generic refusal a non-claimable row gets, so the response
+      // discloses nothing more than it did before.
+      await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+      await expect(attempt).rejects.toThrow("Unable to complete registration");
+      expect(usersRepository.save).not.toHaveBeenCalled();
+      expect(invitedDelegate.passwordHash).toBeNull();
+      expect(invitedDelegate.resetToken).toBe("tok");
+      expect(invitedDelegate.resetTokenExpiry).toBe(expiry);
+      expect(invitedDelegate.isDelegateOnly).toBe(true);
+      // Nor does it fall through to creating a duplicate account.
       expect(
         dataSource.transaction.mock.calls.some(
           (call) => call[0] === "SERIALIZABLE",
         ),
       ).toBe(false);
-      expect(result.accessToken).toBeDefined();
-      expect(result.user).not.toHaveProperty("passwordHash");
     });
 
     it("claims a delegate with a temp password when the correct currentPassword is supplied", async () => {
@@ -631,25 +668,28 @@ describe("AuthService", () => {
     });
 
     it("marks a claimed delegate as email-verified", async () => {
-      const invitedDelegate = {
+      const tempPwHash = await bcrypt.hash("Temp-Pw-9!aB", 4);
+      const tempDelegate = {
         id: "deleg-verify",
         email: "shared-verify@example.com",
         authProvider: "local",
-        passwordHash: null,
+        passwordHash: tempPwHash,
         emailVerified: false,
-        resetToken: "tok",
-        resetTokenExpiry: new Date(),
+        resetToken: null,
+        resetTokenExpiry: null,
       };
-      usersRepository.findOne.mockResolvedValue(invitedDelegate);
+      usersRepository.findOne.mockResolvedValue(tempDelegate);
       delegationService.isDelegateUser.mockResolvedValue(true);
+      delegationService.isFullAccount.mockResolvedValue(false);
       usersRepository.save.mockImplementation(async (u: any) => u);
 
       await service.register({
         email: "shared-verify@example.com",
         password: "StrongPass123!",
+        currentPassword: "Temp-Pw-9!aB",
       });
 
-      expect(invitedDelegate.emailVerified).toBe(true);
+      expect(tempDelegate.emailVerified).toBe(true);
     });
   });
 
@@ -727,7 +767,7 @@ describe("AuthService", () => {
       );
     });
 
-    it("captures the password so automatic backups can be encrypted", async () => {
+    it("re-wraps the backup key so automatic backups can be encrypted", async () => {
       const hashedPassword = await bcrypt.hash("ValidPass123!", 10);
       const user = { ...mockUser, passwordHash: hashedPassword };
       usersRepository.findOne.mockResolvedValue(user);
@@ -740,13 +780,16 @@ describe("AuthService", () => {
       });
 
       // Signing in is the only moment the server holds the plaintext, and the
-      // user is never asked to configure backup encryption.
-      expect(
-        backupEncryptionService.rememberLoginPassword,
-      ).toHaveBeenCalledWith(user.id, "ValidPass123!");
+      // user is never asked to configure backup encryption. The hash it was
+      // verified against goes with it, so the wrap is bound to that hash.
+      expect(backupEncryptionService.rewrapBackupKey).toHaveBeenCalledWith(
+        user.id,
+        "ValidPass123!",
+        hashedPassword,
+      );
     });
 
-    it("captures the password before the 2FA challenge", async () => {
+    it("re-wraps the backup key before the 2FA challenge", async () => {
       const hashedPassword = await bcrypt.hash("ValidPass123!", 10);
       const user = {
         ...mockUser,
@@ -766,9 +809,11 @@ describe("AuthService", () => {
       // The password is already proven correct here, and this exit returns
       // without reaching the code below it.
       expect(result.requires2FA).toBe(true);
-      expect(
-        backupEncryptionService.rememberLoginPassword,
-      ).toHaveBeenCalledWith(user.id, "ValidPass123!");
+      expect(backupEncryptionService.rewrapBackupKey).toHaveBeenCalledWith(
+        user.id,
+        "ValidPass123!",
+        hashedPassword,
+      );
     });
 
     it("captures nothing when the password is wrong", async () => {
@@ -781,18 +826,16 @@ describe("AuthService", () => {
       await expect(
         service.login({ email: "test@example.com", password: "WrongPass" }),
       ).rejects.toThrow(UnauthorizedException);
-      expect(
-        backupEncryptionService.rememberLoginPassword,
-      ).not.toHaveBeenCalled();
+      expect(backupEncryptionService.rewrapBackupKey).not.toHaveBeenCalled();
     });
 
-    it("signs in even when the backup password cannot be stored", async () => {
+    it("signs in even when the backup key cannot be wrapped", async () => {
       const hashedPassword = await bcrypt.hash("ValidPass123!", 10);
       const user = { ...mockUser, passwordHash: hashedPassword };
       usersRepository.findOne.mockResolvedValue(user);
       preferencesRepository.findOne.mockResolvedValue(null);
       usersRepository.save.mockResolvedValue(user);
-      backupEncryptionService.rememberLoginPassword.mockRejectedValue(
+      backupEncryptionService.rewrapBackupKey.mockRejectedValue(
         new Error("db down"),
       );
 
@@ -926,7 +969,15 @@ describe("AuthService", () => {
       // carry the id, the threshold, and the base lockout window.
       const increment = failedAttemptCall();
       expect(increment).toBeDefined();
-      expect(increment![1]).toEqual([mockUser.id, 5, 30 * 60 * 1000]);
+      // Threshold, base window, the cap on doublings (4 hours at most) and the
+      // decay window after which an expired lock's escalation is forgotten.
+      expect(increment![1]).toEqual([
+        mockUser.id,
+        5,
+        30 * 60 * 1000,
+        3,
+        24 * 60 * 60 * 1000,
+      ]);
       // The lockout is folded into that same UPDATE (a CASE on the threshold),
       // so no separate query-builder lockout write remains in the login path.
       expect(usersRepository.createQueryBuilder).not.toHaveBeenCalled();
@@ -1588,6 +1639,25 @@ describe("AuthService", () => {
   // ---------------------------------------------------------------
   // disable2FA
   // ---------------------------------------------------------------
+
+  describe("reset2FA", () => {
+    it("hands the whole request to TwoFactorService, the session to keep included", async () => {
+      const twoFactor = (service as any).twoFactorService as TwoFactorService;
+      const reset = jest
+        .spyOn(twoFactor, "reset2FA")
+        .mockResolvedValue({ message: "ok" });
+
+      await expect(
+        service.reset2FA("user-1", "pw", "abcd-ef01", "current-refresh"),
+      ).resolves.toEqual({ message: "ok" });
+      expect(reset).toHaveBeenCalledWith(
+        "user-1",
+        "pw",
+        "abcd-ef01",
+        "current-refresh",
+      );
+    });
+  });
 
   describe("disable2FA", () => {
     it("validates code, clears secret, disables preferences, revokes trusted devices", async () => {
@@ -3255,6 +3325,53 @@ describe("AuthService", () => {
       expect(result.pendingOidcSubject).toBeNull();
     });
 
+    it("confirmOidcLink ends every credential the local password stood behind", async () => {
+      // The account now signs in through the identity provider; a PAT, a
+      // trusted device, a session or an MCP client's OAuth grant issued on the
+      // strength of the local password must not survive the switch.
+      stageOneTokenFamily();
+      const pendingUser = {
+        ...mockUser,
+        oidcLinkPending: true,
+        oidcLinkExpiresAt: new Date(Date.now() + 3600000),
+        pendingOidcSubject: "oidc-sub-confirmed",
+      };
+      usersRepository.findOne.mockResolvedValue(pendingUser);
+      usersRepository.save.mockImplementation((u) => u);
+
+      await service.confirmOidcLink("some-token");
+
+      expect(patRepository.update).toHaveBeenCalledWith(
+        { userId: mockUser.id, isRevoked: false },
+        { isRevoked: true },
+      );
+      expect(trustedDevicesRepository.delete).toHaveBeenCalledWith({
+        userId: mockUser.id,
+      });
+      expect(refreshTokensRepository.update).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: mockUser.id, isRevoked: false }),
+        { isRevoked: true },
+      );
+      expect(oauthProviderService.revokeAllForUser).toHaveBeenCalledWith(
+        mockUser.id,
+      );
+    });
+
+    it("confirmOidcLink revokes nothing for an expired link", async () => {
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        oidcLinkPending: true,
+        oidcLinkExpiresAt: new Date(Date.now() - 3600000),
+        pendingOidcSubject: "oidc-sub-expired",
+      });
+      usersRepository.save.mockImplementation((u) => u);
+
+      await expect(service.confirmOidcLink("expired-token")).rejects.toThrow();
+
+      expect(patRepository.update).not.toHaveBeenCalled();
+      expect(oauthProviderService.revokeAllForUser).not.toHaveBeenCalled();
+    });
+
     it("confirmOidcLink throws for expired token", async () => {
       const pastDate = new Date(Date.now() - 3600000);
       const expiredUser = {
@@ -3888,6 +4005,23 @@ describe("AuthService", () => {
       // The consumption block returns early without writing, so its
       // transaction commits empty -- same net effect as the old rollback.
       expect(dataSource.transaction).toHaveBeenCalled();
+    });
+  });
+
+  describe("confirmEmailChange", () => {
+    // The link is followed signed out, so the service seeds its own identity
+    // around the token lookup, the same way verifyEmail does.
+    it("hands the token to AuthEmailService", async () => {
+      const authEmail = (
+        service as unknown as { authEmailService: AuthEmailService }
+      ).authEmailService;
+      const confirm = jest
+        .spyOn(authEmail, "confirmEmailChange")
+        .mockResolvedValue(undefined);
+
+      await service.confirmEmailChange("change-token");
+
+      expect(confirm).toHaveBeenCalledWith("change-token");
     });
   });
 });

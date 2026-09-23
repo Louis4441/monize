@@ -325,10 +325,20 @@ export interface DeferredFkRepair {
   column: string;
   /**
    * When set, the UPDATE only applies if a row with the referenced id exists in
-   * this table. Used for `institution_id` so legacy backups that predate
-   * institution export leave the column NULL instead of failing.
+   * this table AND belongs to the restoring user. Used for `institution_id` so
+   * legacy backups that predate institution export leave the column NULL
+   * instead of failing. Must name a table with a `user_id` column.
    */
   requireReferencedTable?: string;
+  /**
+   * For a table with no `user_id` of its own: the column and user-scoped parent
+   * table that say whose row it is. Every repair UPDATE is confined to rows the
+   * restoring user owns -- `user_id = $3` directly, or through this parent --
+   * so no id in the file, however it got there, can make Phase 3 write another
+   * user's row. `restore-plan.spec.ts` fails a repair on a non-user-scoped
+   * table that does not declare one.
+   */
+  ownedThrough?: { column: string; table: string };
 }
 
 /**
@@ -356,5 +366,12 @@ export const DEFERRED_FK_REPAIRS: ReadonlyArray<DeferredFkRepair> = [
   { table: "investment_transactions", column: "linked_transaction_id" },
   { table: "payees", column: "default_category_id" },
   { table: "scheduled_transactions", column: "investment_security_id" },
-  { table: "scheduled_transaction_splits", column: "investment_security_id" },
+  {
+    table: "scheduled_transaction_splits",
+    column: "investment_security_id",
+    ownedThrough: {
+      column: "scheduled_transaction_id",
+      table: "scheduled_transactions",
+    },
+  },
 ];

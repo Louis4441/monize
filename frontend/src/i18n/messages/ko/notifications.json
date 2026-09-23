@@ -95,6 +95,10 @@
       "title": "암호화 키가 설정되지 않음",
       "message": "ENCRYPTION_KEY가 설정되어 있지 않아 백업이 암호화되지 않은 채 기록되고 비밀 정보를 저장할 수 없습니다. 향후 릴리스에서는 이 키 없이 시작되지 않습니다."
     },
+    "jwtSecretWeak": {
+      "title": "JWT_SECRET이 취약합니다",
+      "message": "JWT_SECRET이 공개된 예시 값이거나 너무 쉽게 추측할 수 있어 세션 토큰이 위조될 수 있습니다. 강력한 값을 생성하세요(openssl rand -base64 32). 값을 변경하면 인증 앱 코드가 더 이상 작동하지 않고 신뢰할 수 있는 기기도 해제됩니다. 사용자는 백업 코드로 로그인한 뒤 2FA를 다시 설정하고, 백업 코드가 없는 사용자는 사용자 관리에서 2FA를 재설정하세요. 먼저 docs/backend/modules-and-runtime.md(Changing JWT_SECRET)를 확인하세요."
+    },
     "smtpFailure": {
       "title": "이메일 발송이 실패하고 있음",
       "message": "Monize가 이메일을 보내지 못했습니다: {error}. 알림과 미리 알림이 전달되지 않고 있습니다."

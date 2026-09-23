@@ -19,10 +19,12 @@
     "passwordRequired": "E-posta adresini değiştirmek için mevcut şifre gereklidir",
     "noChanges": "Kaydedilecek değişiklik yok",
     "passwordConfirmNote": "E-posta adresinizi değiştirirken şifre onayı gereklidir.",
+    "pendingEmailNotice": "{email} adresine bir onay bağlantısı gönderildi. Bağlantıyı açtığınızda e-posta adresiniz değişecek.",
     "saveButton": "Profili Kaydet",
     "savingButton": "Kaydediliyor...",
     "toasts": {
       "success": "Profil başarıyla güncellendi",
+      "confirmationSent": "Yeni e-posta adresinizi onaylamak için bağlantıyı {email} adresinde kontrol edin",
       "updateFailed": "Profil güncellenemedi"
     },
     "validation": {
@@ -58,14 +60,28 @@
       "addLayerDescription": "Hesabınıza ekstra bir güvenlik katmanı ekleyin.",
       "enableButton": "2FA'yı Etkinleştir",
       "disableButton": "2FA'yı Devre Dışı Bırak",
+      "resetButton": "2FA'yı Sıfırla",
       "disableModal": {
         "title": "İki Faktörlü Kimlik Doğrulamayı Devre Dışı Bırak",
-        "description": "2FA'yı devre dışı bırakmayı onaylamak için mevcut 6 haneli kodunuzu girin.",
+        "description": "2FA'yı devre dışı bırakmayı onaylamak için kimlik doğrulama uygulamanızdaki 6 haneli kodu veya yedek kodlarınızdan birini (xxxx-xxxx) girin.",
         "verificationCodeLabel": "Doğrulama Kodu",
         "disablingButton": "Devre Dışı Bırakılıyor...",
         "toasts": {
           "disabled": "İki faktörlü kimlik doğrulama devre dışı bırakıldı",
           "disableFailed": "2FA devre dışı bırakılamadı"
+        }
+      },
+      "resetModal": {
+        "title": "İki Faktörlü Kimlik Doğrulamayı Sıfırla",
+        "description": "Kimlik doğrulama uygulamanız veya yedek kodlarınız açığa çıkmış olabilirse ya da kimlik doğrulama kodlarınız çalışmayı durdurduysa (örneğin sunucu sırrı değiştirildikten sonra) bunu kullanın.",
+        "effect": "Mevcut kimlik doğrulayıcınız, yedek kodlarınız ve güvenilir cihazlarınız çalışmayı durdurur ve diğer tüm cihazlarda oturumunuz kapatılır. Ardından hemen yeni bir kimlik doğrulayıcı kurarsınız.",
+        "passwordLabel": "Hesap Şifresi",
+        "codeLabel": "Kimlik Doğrulama veya Yedek Kod",
+        "codeHint": "Kimlik doğrulama uygulamanızdaki 6 haneli kodu girin. Kimlik doğrulayıcınız artık çalışmıyorsa bunun yerine yedek kodlarınızdan birini (xxxx-xxxx) girin.",
+        "resettingButton": "Sıfırlanıyor...",
+        "toasts": {
+          "reset": "İki faktörlü kimlik doğrulama sıfırlandı. Şimdi yeni kimlik doğrulayıcınızı kurun.",
+          "resetFailed": "2FA sıfırlanamadı"
         }
       }
     },
@@ -582,7 +598,11 @@
       "copyUrlFailed": "URL kopyalanamadı",
       "loadFailed": "API belirteçleri yüklenemedi",
       "createFailed": "Belirteç oluşturulamadı",
-      "revokeFailed": "Belirteç iptal edilemedi"
+      "revokeFailed": "Belirteç iptal edilemedi",
+      "reauthFailed": "Yeniden kimlik doğrulama onaylanamadı"
+    },
+    "stepUp": {
+      "reason": "Bir belirteç oturum açmadan hesabınıza erişebilir; bu nedenle oluşturmadan önce siz olduğunuzu onaylayın."
     },
     "relative": {
       "never": "Hiçbir zaman",
@@ -905,7 +925,8 @@
       "shared": "Paylaşılan veri"
     },
     "sections": {
-      "description": "Uygulama bölümlerine salt okunur erişim verin. Hesap kapsamlı veriler yine de hesap başına erişim gerektirir."
+      "description": "Uygulama bölümlerine salt okunur erişim verin. Hesap kapsamlı veriler yine de hesap başına erişim gerektirir.",
+      "aiRequiresFullAccess": "Yapay Zeka Asistanı tüm hesapları ve bölümleri okur; bu nedenle bu temsilci için yalnızca tüm hesaplarınızı ve diğer tüm bölümleri okuyabildiğinde yanıt verir."
     },
     "accounts": {
       "noAccounts": "Verilecek hesap yok.",
@@ -1164,6 +1185,7 @@
       "ollamaCloudNote": "Model adları -cloud sonekini içermelidir (örn. gpt-oss:20b-cloud).",
       "apiKeyLabel": "API Anahtarı",
       "baseUrlLabel": "Temel URL",
+      "baseUrlPrivateNote": "Özel veya yerel bir adres (localhost, 192.168.x.x veya bir kapsayıcı adı) yalnızca bir yönetici için ya da sunucu operatörü bu adrese izin verdiğinde çalışır. Aksi takdirde internetten erişilebilen bir adres kullanın.",
       "priorityLabel": "Öncelik",
       "priorityHelp": "Düşük sayı = yüksek öncelik. Yedek sıralama için kullanılır.",
       "costRatesHeading": "Maliyet oranları (isteğe bağlı)",

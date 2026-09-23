@@ -20,6 +20,7 @@ import {
   monteCarloApi,
   AccountHoldingStats,
   CashFlowType,
+  MAX_CASH_FLOWS,
 } from '@/lib/monte-carlo';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { getCurrencySymbol } from '@/lib/format';
@@ -905,9 +906,19 @@ export function MonteCarloReport() {
                 ))}
               </div>
             )}
-            <Button variant="outline" size="sm" onClick={addCashFlow}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addCashFlow}
+              disabled={form.cashFlows.length >= MAX_CASH_FLOWS}
+            >
               {t('monteCarlo.addCashFlow')}
             </Button>
+            {form.cashFlows.length >= MAX_CASH_FLOWS && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                {t('monteCarlo.cashFlowLimitReached', { max: MAX_CASH_FLOWS })}
+              </p>
+            )}
           </fieldset>
 
           <fieldset className="border border-gray-200 dark:border-gray-700 rounded-md p-4">

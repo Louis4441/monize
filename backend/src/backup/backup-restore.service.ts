@@ -20,17 +20,25 @@ import { tr } from "../i18n/translate";
 import { gemConfigFingerprint } from "../strategies/gem-signal.service";
 import { GemStrategy } from "../strategies/entities/gem-strategy.entity";
 import { GemStrategyAsset } from "../strategies/entities/gem-strategy-asset.entity";
-import { collectRowIdRemap, deepRemapIds } from "./backup-id-remap.util";
+import { collectRowIdRemap } from "./backup-id-remap.util";
 import {
   BackupDecryptionError,
   decryptBackup,
+  decryptBackupWithDataKey,
   isEncryptedBackup,
 } from "./backup-crypto.util";
 import { resolveRestoreExpandedLimitBytes } from "./backup-limits";
-import { resolveStoredBackupPassword } from "./backup-password.util";
+import {
+  resolveStoredBackupDataKey,
+  resolveStoredBackupPassword,
+} from "./backup-password.util";
 import { restoreProcessingGate } from "./restore-processing-gate";
 import { validateRestoredNotifications } from "./notification-restore-bounds";
 import { RESTORE_PLAN } from "./restore-plan";
+import {
+  remapRestoreRow,
+  resolveRestoreReferences,
+} from "./restore-references";
 import {
   BACKUP_VERSION,
   BackupData,
@@ -169,6 +177,21 @@ export class BackupRestoreService {
         }
 
         validateRestoredNotifications(rawData.notifications);
+
+        // Every primary key and reference in canonical UUID form, and every
+        // reference naming a row of the same file -- refused here, before the
+        // re-authentication and before anything is written, when one does not.
+        // A reference outside the file is how a crafted backup reached another
+        // user's rows (restore-references.ts); the remap below can only close
+        // the graph over ids it recognises, so recognition comes first.
+        const references = resolveRestoreReferences(rawData);
+        for (const { table, column, rows } of references.severed) {
+          this.logger.warn(
+            `Backup for user ${userId}: ${rows} ${table}.${column} value(s) ` +
+              "name rows the file does not contain; restoring them unlinked.",
+          );
+        }
+
         await this.verifyAuthentication(user, input);
 
         // A support (de-identified) backup restores like any other, but the data
@@ -188,9 +211,15 @@ export class BackupRestoreService {
         // Without this, restoring one user's backup into another user's account on
         // the SAME system would collide on the original UUIDs: the inserts would be
         // silently skipped by ON CONFLICT DO NOTHING, and the Phase-3 deferred-FK
-        // UPDATEs (keyed only by id) would mutate the OTHER user's rows.
-        const idRemap = this.buildBackupIdRemap(rawData);
-        const data = this.remapBackupIds(rawData, idRemap);
+        // UPDATEs would mutate the OTHER user's rows.
+        //
+        // The remap alone never guaranteed that. It only covers ids it recognises
+        // and references to rows the file contains; a key spelled in another UUID
+        // form, or a reference to a row the file does not carry, passed through
+        // untouched. `resolveRestoreReferences` above is what closes both, and
+        // the Phase-3 UPDATEs are additionally scoped to this user's rows.
+        const idRemap = this.buildBackupIdRemap(references.data);
+        const data = this.remapBackupIds(references.data, idRemap);
         this.rehashGemSignalFingerprints(data, idRemap);
 
         this.logger.log(`Starting backup restore for user ${userId}`);
@@ -303,7 +332,7 @@ export class BackupRestoreService {
 
                 // Phase 3: Restore deferred FK columns that were stripped during insert
                 // to avoid circular/forward reference violations.
-                await this.db.restoreDeferredFkColumns(manager, data);
+                await this.db.restoreDeferredFkColumns(manager, data, userId);
 
                 this.logger.log(`Backup restore completed for user ${userId}`);
                 // `skippedAttachments` and `unusableAiProviderKeys` are reported
@@ -355,7 +384,9 @@ export class BackupRestoreService {
    * If the upload is encrypted, decrypt it using (in order of preference):
    * 1) the explicit backupPassword the frontend sent for this restore,
    * 2) the user's auth password (most backups encrypt with this),
-   * 3) the user's currently stored backup password.
+   * 3) the retired stored backup password, for a row not yet converted,
+   * 4) the user's stored backup data key, which opens the automatic backups
+   *    written since their last re-wrap (docs/specs/backup-envelope-key-wrapping.md).
    *
    * Returns the inner gzipped JSON payload, or the input unchanged if it's
    * not encrypted. Throws BackupPasswordRequiredError when we know it's
@@ -370,19 +401,28 @@ export class BackupRestoreService {
       return input.compressedData;
     }
 
-    const candidates: string[] = [];
-    if (input.backupPassword) candidates.push(input.backupPassword);
-    if (input.password) candidates.push(input.password);
-    const stored = resolveStoredBackupPassword(
+    const envelope = input.compressedData;
+    const candidates: Array<() => Promise<Buffer>> = [];
+    const passwords = [
+      input.backupPassword,
+      input.password,
+      resolveStoredBackupPassword(user, this.encryption, this.logger),
+    ];
+    for (const pw of passwords) {
+      if (pw) candidates.push(() => decryptBackup(envelope, pw));
+    }
+    const dataKey = resolveStoredBackupDataKey(
       user,
       this.encryption,
       this.logger,
     );
-    if (stored) candidates.push(stored);
+    if (dataKey) {
+      candidates.push(() => decryptBackupWithDataKey(envelope, dataKey));
+    }
 
-    for (const pw of candidates) {
+    for (const attempt of candidates) {
       try {
-        return await decryptBackup(input.compressedData, pw);
+        return await attempt();
       } catch (err) {
         if (!(err instanceof BackupDecryptionError)) throw err;
         // try next candidate
@@ -626,16 +666,6 @@ export class BackupRestoreService {
   }
 
   /**
-   * Builds a map from every primary-key UUID in the backup to a freshly
-   * generated UUID. Currencies are intentionally excluded: they are shared,
-   * global rows keyed by `code` (not by a per-user UUID) and are referenced by
-   * code, so they must keep their original identifiers. Non-UUID ids (e.g.
-   * `security_prices.id` is BIGSERIAL) are also excluded -- they get a fresh
-   * value assigned by the DB on insert (see insertRows), and remapping them
-   * to UUIDs here would (a) corrupt them and (b) clobber unrelated bigint
-   * values in other columns that happen to share the same string form.
-   */
-  /**
    * Re-hash each GEM signal's `config_fingerprint` onto the remapped security
    * ids.
    *
@@ -719,6 +749,20 @@ export class BackupRestoreService {
     }
   }
 
+  /**
+   * Builds a map from every primary-key UUID in the backup to a freshly
+   * generated UUID. Currencies are intentionally excluded: they are shared,
+   * global rows keyed by `code` (not by a per-user UUID) and are referenced by
+   * code, so they must keep their original identifiers. Non-UUID ids (e.g.
+   * `security_prices.id` is BIGSERIAL) are also excluded -- they get a fresh
+   * value assigned by the DB on insert (see insertRows), and remapping them
+   * to UUIDs here would (a) corrupt them and (b) clobber unrelated bigint
+   * values in other columns that happen to share the same string form.
+   *
+   * Every restored table's UUID keys are canonical by the time this runs
+   * (`resolveRestoreReferences`), which is what makes "in the map" the same
+   * question as "a row of this file" for the database's own comparison.
+   */
   private buildBackupIdRemap(data: BackupData): Map<string, string> {
     const remap = new Map<string, string>();
     for (const [table, rows] of Object.entries(data)) {
@@ -734,24 +778,24 @@ export class BackupRestoreService {
    * transaction `tag_ids` or override `splits`) rewritten via the remap. The
    * `user_id` columns are never remapped here -- they are not backup row ids,
    * and insertRows() forces them to the restoring user. Currencies are passed
-   * through unchanged.
+   * through unchanged. A UUID nested in a JSONB or array value that names no
+   * row of the file is replaced by a fresh id that names nothing
+   * (`remapRestoreRow`), so it cannot survive as a pointer to another user's row.
    */
   private remapBackupIds(
     data: BackupData,
     remap: Map<string, string>,
   ): BackupData {
-    if (remap.size === 0) return data;
+    // One map for the whole document, so a stale id nested in two places is
+    // replaced by the same fresh id in both (see `remapRestoreRow`).
+    const unresolved = new Map<string, string>();
     const result: Record<string, unknown> = { ...data };
     for (const [table, rows] of Object.entries(data)) {
       if (table === "currencies" || !Array.isArray(rows)) continue;
-      result[table] = rows.map((row) => this.deepRemapIds(row, remap));
+      result[table] = rows.map((row) =>
+        remapRestoreRow(row, remap, unresolved, randomUUID),
+      );
     }
     return result as unknown as BackupData;
-  }
-
-  /** See backup-id-remap.util.ts -- shared with the support (de-identified)
-   *  export so the two walkers cannot drift. */
-  private deepRemapIds(value: unknown, remap: Map<string, string>): unknown {
-    return deepRemapIds(value, remap);
   }
 }

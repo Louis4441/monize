@@ -92,7 +92,9 @@
     "cannotDeleteOwnAccount": "You cannot delete your own account",
     "deleteLastAdmin": "Cannot delete the last admin account.",
     "cannotResetOwnPassword": "You cannot reset your own password through the admin panel",
-    "noLocalPassword": "Cannot reset password for accounts without a local password"
+    "noLocalPassword": "Cannot reset password for accounts without a local password",
+    "cannotResetOwnTwoFactor": "You cannot reset your own two-factor authentication through the admin panel",
+    "twoFactorNotEnabled": "This user does not have two-factor authentication set up."
   },
   "ai": {
     "queryStreamFailed": "An unexpected error occurred while processing your query.",
@@ -112,6 +114,9 @@
     "relayAgentOffline": "Your MCP relay agent is not connected. Connect your agent and try again.",
     "relayCompletionTimedOut": "Your MCP relay agent did not answer in time. Make sure it is connected, then try again.",
     "unknownProvider": "Unknown AI provider: {{ provider }}",
+    "privateBaseUrlRefused": "This base URL points to a private or local network address (such as localhost, 192.168.x.x or a container name). Only an administrator can use one, unless the server operator allows that address in AI_PRIVATE_BASE_URL_ALLOWLIST.",
+    "modelVerifyFailed": "Could not verify the configured model. Check the base URL and that the provider is reachable.",
+    "modelVerifyFailedStatus": "Could not verify the configured model: the provider answered with HTTP status {{ status }}.",
     "forecastDataGatherFailed": "Failed to gather financial data for forecasting. Please try again.",
     "forecastInsufficientHistory": "Insufficient transaction history for forecasting. At least 2 months of data are required.",
     "forecastGenerateFailed": "Failed to generate forecast. Please try again.",
@@ -150,6 +155,7 @@
     "accountDeactivated": "Account is deactivated",
     "emailNotVerified": "Please verify your email address before signing in. Check your inbox for the verification link.",
     "invalidOrExpiredEmailVerificationToken": "Invalid or expired verification link",
+    "invalidOrExpiredEmailChangeToken": "Invalid or expired email change link",
     "oidcNoSubject": "OIDC provider did not return a subject identifier",
     "registrationDisabled": "New account registration is disabled.",
     "invalidOrExpiredLinkToken": "Invalid or expired link token",
@@ -212,6 +218,8 @@
     "unsupportedBackupVersion": "Unsupported backup version: {{ version }}. Expected {{ expected }}",
     "missingExportedAt": "Invalid backup format: missing exportedAt",
     "tableNotAllowed": "Table {{ table }} is not allowed in backup restore",
+    "invalidRestoreIdentifier": "Invalid backup file: {{ table }}.{{ column }} holds \"{{ value }}\", which is not a valid identifier. Restore from an unmodified backup file.",
+    "unresolvedRestoreReference": "Invalid backup file: {{ table }}.{{ column }} refers to {{ referencedTable }} row {{ value }}, which the file does not contain. A backup can only restore rows that refer to other rows in the same file; restore from an unmodified backup file.",
     "encryptionNotConfigured": "Server is not configured for encryption (ENCRYPTION_KEY missing or too short)",
     "backupPasswordOidcOnly": "Backup password is only configurable for OIDC users; local users use their login password",
     "backupPasswordLocalOnly": "This account has no login password to encrypt backups with; set a backup password instead",
@@ -304,6 +312,7 @@
     "actionNotAvailableAsDelegate": "This action isn't available while you're acting on behalf of another user. Only the account owner can do this.",
     "capabilityNotGranted": "The account owner has not granted you permission to {{ operation }} {{ resource }}. Ask them to enable this in your delegated-access settings.",
     "sectionNotGranted": "The account owner has not shared the {{ sectionLabel }} section with you.",
+    "fullScopeRequired": "The AI Assistant reads across all of the account owner's accounts and sections, so it is only available to a delegate who can read every account and every section. Ask the owner to share the rest with you, or use the pages you already have access to.",
     "accountNotShared": "The account owner has not shared this account with you.",
     "accountOperationNotGranted": "The account owner has not granted you permission to {{ operation }} transactions in this account.",
     "jointOwnAccount": "This is your own account; joint-account access does not apply to it.",
@@ -361,6 +370,7 @@
   "monteCarlo": {
     "scenarioNotFound": "Scenario {{ id }} not found",
     "atLeastOneAccountRequired": "At least one accountId is required",
+    "tooManyCashFlows": "A scenario can have at most {{ max }} cash flows",
     "currentValueUnavailable": "The current value of the selected accounts could not be determined, so a simulation cannot start from it. Enter a starting value explicitly, or retry once prices and exchange rates are available.",
     "historicalReturnsUnavailable": "Historical returns for the selected accounts could not be computed, so a simulation cannot use them. Enter an expected return and volatility manually, or retry once prices and exchange rates are available."
   },

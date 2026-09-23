@@ -941,6 +941,7 @@
     "removeCashFlow": "Xóa dòng tiền",
     "removeTitle": "Xóa",
     "addCashFlow": "+ Thêm dòng tiền",
+    "cashFlowLimitReached": "Một kịch bản có thể có tối đa {max} dòng tiền.",
     "returnAssumptions": "Giả định lợi nhuận",
     "specifyReturn": "Chỉ định lợi nhuận kỳ vọng",
     "useHistoricalReturns": "Sử dụng lợi nhuận lịch sử từ các tài khoản đã chọn",

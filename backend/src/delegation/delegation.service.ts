@@ -32,9 +32,14 @@ import { DelegateAccountFavourite } from "./entities/delegate-account-favourite.
 import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { RefreshToken } from "../auth/entities/refresh-token.entity";
+import {
+  revokeOAuthGrantsAfterCommit,
+  revokeStandingCredentials,
+} from "../auth/credential-revocation";
 import { Account, AccountType } from "../accounts/entities/account.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
+import { ScheduledTransactionOverride } from "../scheduled-transactions/entities/scheduled-transaction-override.entity";
 import { hashToken } from "../auth/crypto.util";
 import { generateReadablePassword } from "../admin/utils/password-generator";
 import { I18nService } from "nestjs-i18n";
@@ -44,6 +49,7 @@ import { resolveUserEmailLocale } from "../i18n/resolve-user-email-locale";
 import { EmailService } from "../notifications/email.service";
 import { delegateInviteTemplate } from "../notifications/email-templates";
 import { ConfigService } from "@nestjs/config";
+import { ModuleRef } from "@nestjs/core";
 import { CreateDelegateDto } from "./dto/create-delegate.dto";
 import { AccountGrantDto } from "./dto/set-grants.dto";
 import {
@@ -123,6 +129,7 @@ export class DelegationService {
     private configService: ConfigService,
     private dataSource: DataSource,
     private readonly i18n: I18nService,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   /**
@@ -347,17 +354,37 @@ export class DelegationService {
    * transfer counterpart when it is a transfer. Empty if the row does not
    * exist (the owner-scoped service then returns 404).
    */
+  /**
+   * Every account a scheduled transaction moves money in, primary account
+   * first. Posting (manually or by the auto-post cron) writes into all of
+   * them -- the transfer counterpart, the investment funding account, each
+   * split's transfer account and any per-occurrence override split's -- so a
+   * delegate write gated on only the primary account could move money
+   * through an account it was never granted.
+   */
   async accountIdsForScheduled(scheduledId: string): Promise<string[]> {
     const st = await this.scoped(ScheduledTransaction, (repo) =>
       repo.findOne({
         where: { id: scheduledId },
-        select: ["accountId", "transferAccountId", "isTransfer"],
+        relations: { splits: true },
       }),
     );
     if (!st) return [];
+    const overrides = await this.scoped(ScheduledTransactionOverride, (repo) =>
+      repo.find({
+        where: { scheduledTransactionId: scheduledId },
+        select: ["id", "splits"],
+      }),
+    );
     const ids = new Set<string>([st.accountId]);
-    if (st.isTransfer && st.transferAccountId) {
-      ids.add(st.transferAccountId);
+    const add = (id: string | null | undefined) => {
+      if (id) ids.add(id);
+    };
+    if (st.isTransfer) add(st.transferAccountId);
+    add(st.investmentFundingAccountId);
+    for (const split of st.splits ?? []) add(split.transferAccountId);
+    for (const override of overrides) {
+      for (const split of override.splits ?? []) add(split.transferAccountId);
     }
     return [...ids];
   }
@@ -370,6 +397,33 @@ export class DelegationService {
       }),
     );
     return grants.map((g) => g.accountId);
+  }
+
+  /**
+   * Whether the active delegation can read everything the owner has: every
+   * section, and a READ grant on every account the owner owns (closed ones
+   * included). A route that cannot narrow its answer to a delegate's grants
+   * (@DelegateRequiresFullScope) is reachable only then. Reads the owner's
+   * account ids, so it runs under the guard's delegate context.
+   */
+  async grantsWholeLedger(delegationId: string): Promise<boolean> {
+    const delegation = await this.scoped(AccountDelegate, (repo) =>
+      repo.findOne({
+        where: { id: delegationId, status: "active" },
+      }),
+    );
+    if (!delegation) return false;
+    if (!SECTION_FIELDS.every((field) => !!delegation[field])) return false;
+    const readable = await this.readableAccountIds(delegationId);
+    const ungranted = await this.scoped(Account, (repo) =>
+      repo.count({
+        where: {
+          userId: delegation.ownerUserId,
+          ...(readable.length > 0 ? { id: Not(In(readable)) } : {}),
+        },
+      }),
+    );
+    return ungranted === 0;
   }
 
   /**
@@ -1084,27 +1138,46 @@ export class DelegationService {
       // this check the front end's email-lookup race (Add clicked before
       // the 400ms debounced lookup finishes) lets a stray dto.password
       // overwrite a real user's password.
+      //
+      // A pure delegate row is owner-managed only by the owner whose
+      // delegation it is. Once ANY other owner has a delegation to it, its
+      // login also opens that owner's data: setting its password, minting an
+      // invite token or clearing its lockout here would let this owner sign
+      // in as the delegate and switch into the other owner's context. The
+      // reset path holds the same rule (`canOwnerResetDelegatePassword`);
+      // here the caller only links the delegation.
       let mayManageCredentials = true;
       if (delegateUser) {
         if (delegateUser.oidcSubject || delegateUser.role === "admin") {
           mayManageCredentials = false;
         } else {
-          const [ownsAccounts, ownsDelegations, alreadyDelegate] =
-            await Promise.all([
-              manager.count(Account, {
-                where: { userId: delegateUser.id },
-              }),
-              manager.count(AccountDelegate, {
-                where: { ownerUserId: delegateUser.id },
-              }),
-              manager.count(AccountDelegate, {
-                where: { delegateUserId: delegateUser.id },
-              }),
-            ]);
+          const [
+            ownsAccounts,
+            ownsDelegations,
+            alreadyDelegate,
+            delegateOfAnotherOwner,
+          ] = await Promise.all([
+            manager.count(Account, {
+              where: { userId: delegateUser.id },
+            }),
+            manager.count(AccountDelegate, {
+              where: { ownerUserId: delegateUser.id },
+            }),
+            manager.count(AccountDelegate, {
+              where: { delegateUserId: delegateUser.id },
+            }),
+            manager.count(AccountDelegate, {
+              where: {
+                delegateUserId: delegateUser.id,
+                ownerUserId: Not(ownerUserId),
+              },
+            }),
+          ]);
           const isPureDelegateRow = alreadyDelegate > 0;
           if (
             ownsAccounts > 0 ||
             ownsDelegations > 0 ||
+            delegateOfAnotherOwner > 0 ||
             (!isPureDelegateRow && !!delegateUser.passwordHash)
           ) {
             mayManageCredentials = false;
@@ -1462,11 +1535,20 @@ export class DelegationService {
     // `refresh_tokens` is keyed to them. A scoped UPDATE matched nothing, so
     // the old password's sessions survived a reset that reported success --
     // the one outcome a credential rotation must never have.
-    await this.systemScoped(RefreshToken, (repo) =>
-      repo.update(
+    // PATs and trusted devices go with them, in the same transaction, and the
+    // OAuth grants after it: a reset that left either live would keep the old
+    // password's access working (`credential-revocation.ts`).
+    await this.systemScoped(RefreshToken, async (repo) => {
+      await repo.update(
         { userId: delegate.id, isRevoked: false },
         { isRevoked: true },
-      ),
+      );
+      await revokeStandingCredentials(repo.manager, delegate.id);
+    });
+    await revokeOAuthGrantsAfterCommit(
+      this.moduleRef,
+      delegate.id,
+      this.logger,
     );
 
     return { temporaryPassword };

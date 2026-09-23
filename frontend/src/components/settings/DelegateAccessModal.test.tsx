@@ -356,6 +356,16 @@ describe('DelegateAccessModal', () => {
     expect(onSaved).toHaveBeenCalled();
   });
 
+  it('says the AI Assistant needs every account and section', () => {
+    renderModal();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Sections' }));
+
+    expect(
+      screen.getByText(/only answers for this delegate once they can read all of your accounts/i),
+    ).toBeInTheDocument();
+  });
+
   it('marks the form dirty when a toggle changes', async () => {
     const { setFormDirty } = renderModal();
     await act(async () => {

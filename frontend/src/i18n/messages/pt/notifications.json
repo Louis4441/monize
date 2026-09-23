@@ -95,6 +95,10 @@
       "title": "Chave de encriptação não configurada",
       "message": "A ENCRYPTION_KEY não está definida, pelo que as cópias de segurança são escritas sem encriptação e não é possível guardar segredos. Uma versão futura não arrancará sem ela."
     },
+    "jwtSecretWeak": {
+      "title": "O JWT_SECRET é fraco",
+      "message": "O JWT_SECRET é um valor de exemplo publicado ou demasiado previsível, pelo que os tokens de sessão podem ser falsificados. Gere um valor forte (openssl rand -base64 32). Alterá-lo faz com que os códigos das aplicações autenticadoras deixem de funcionar e esquece os dispositivos de confiança: os utilizadores iniciam sessão com um código de recuperação e voltam a configurar o 2FA, e o administrador repõe o 2FA em Gestão de Utilizadores para quem não tiver um. Consulte primeiro docs/backend/modules-and-runtime.md (Changing JWT_SECRET)."
+    },
     "smtpFailure": {
       "title": "O envio de email está a falhar",
       "message": "O Monize não conseguiu enviar email: {error}. As notificações e os lembretes não estão a ser entregues."

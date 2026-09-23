@@ -19,10 +19,12 @@
     "passwordRequired": "Bieżące hasło jest wymagane do zmiany adresu e-mail",
     "noChanges": "Brak zmian do zapisania",
     "passwordConfirmNote": "Potwierdzenie hasłem jest wymagane przy zmianie adresu e-mail.",
+    "pendingEmailNotice": "Link potwierdzający został wysłany na adres {email}. Twój adres e-mail zmieni się po kliknięciu tego linku.",
     "saveButton": "Zapisz profil",
     "savingButton": "Zapisywanie...",
     "toasts": {
       "success": "Zaktualizowano profil",
+      "confirmationSent": "Sprawdź skrzynkę {email}, aby znaleźć link potwierdzający nowy adres e-mail",
       "updateFailed": "Nie udało się zaktualizować profilu"
     },
     "validation": {
@@ -58,14 +60,28 @@
       "addLayerDescription": "Dodaj dodatkową warstwę zabezpieczeń do swojego konta.",
       "enableButton": "Włącz 2FA",
       "disableButton": "Wyłącz 2FA",
+      "resetButton": "Zresetuj 2FA",
       "disableModal": {
         "title": "Wyłącz uwierzytelnianie dwuskładnikowe",
-        "description": "Wpisz bieżący 6-cyfrowy kod, aby potwierdzić wyłączenie 2FA.",
+        "description": "Wpisz 6-cyfrowy kod z aplikacji uwierzytelniającej lub jeden z kodów zapasowych (xxxx-xxxx), aby potwierdzić wyłączenie 2FA.",
         "verificationCodeLabel": "Kod weryfikacyjny",
         "disablingButton": "Wyłączanie...",
         "toasts": {
           "disabled": "Wyłączono uwierzytelnianie dwuskładnikowe",
           "disableFailed": "Nie udało się wyłączyć uwierzytelniania dwuskładnikowego"
+        }
+      },
+      "resetModal": {
+        "title": "Zresetuj uwierzytelnianie dwuskładnikowe",
+        "description": "Użyj tej opcji, jeśli aplikacja uwierzytelniająca lub kody zapasowe mogły zostać ujawnione albo jeśli kody uwierzytelniające przestały działać (na przykład po zmianie sekretu serwera).",
+        "effect": "Obecny uwierzytelniacz, kody zapasowe i zaufane urządzenia przestaną działać, a Ty zostaniesz wylogowany na wszystkich innych urządzeniach. Następnie od razu skonfigurujesz nowy uwierzytelniacz.",
+        "passwordLabel": "Hasło konta",
+        "codeLabel": "Kod uwierzytelniający lub zapasowy",
+        "codeHint": "Wpisz 6-cyfrowy kod z aplikacji uwierzytelniającej. Jeśli uwierzytelniacz już nie działa, wpisz zamiast tego jeden z kodów zapasowych (xxxx-xxxx).",
+        "resettingButton": "Resetowanie...",
+        "toasts": {
+          "reset": "Uwierzytelnianie dwuskładnikowe zostało zresetowane. Skonfiguruj teraz nowy uwierzytelniacz.",
+          "resetFailed": "Nie udało się zresetować 2FA"
         }
       }
     },
@@ -582,7 +598,11 @@
       "copyUrlFailed": "Nie udało się skopiować adresu URL",
       "loadFailed": "Nie udało się wczytać tokenów API",
       "createFailed": "Nie udało się utworzyć tokenu",
-      "revokeFailed": "Nie udało się odwołać tokenu"
+      "revokeFailed": "Nie udało się odwołać tokenu",
+      "reauthFailed": "Nie udało się potwierdzić ponownego uwierzytelnienia"
+    },
+    "stepUp": {
+      "reason": "Token daje dostęp do Twojego konta bez logowania, dlatego potwierdź swoją tożsamość przed jego utworzeniem."
     },
     "relative": {
       "never": "Nigdy",
@@ -905,7 +925,8 @@
       "shared": "Dane współdzielone"
     },
     "sections": {
-      "description": "Przyznaj dostęp tylko do odczytu do całych sekcji aplikacji. Dane przypisane do kont nadal wymagają dostępu na poziomie poszczególnych kont."
+      "description": "Przyznaj dostęp tylko do odczytu do całych sekcji aplikacji. Dane przypisane do kont nadal wymagają dostępu na poziomie poszczególnych kont.",
+      "aiRequiresFullAccess": "Asystent AI odczytuje wszystkie konta i sekcje, dlatego odpowiada temu pełnomocnikowi dopiero wtedy, gdy może on odczytać wszystkie Twoje konta i każdą pozostałą sekcję."
     },
     "accounts": {
       "noAccounts": "Brak kont do przyznania.",
@@ -1164,6 +1185,7 @@
       "ollamaCloudNote": "Nazwy modeli muszą zawierać sufiks -cloud (np. gpt-oss:20b-cloud).",
       "apiKeyLabel": "Klucz API",
       "baseUrlLabel": "Bazowy adres URL",
+      "baseUrlPrivateNote": "Adres prywatny lub lokalny (localhost, 192.168.x.x lub nazwa kontenera) działa tylko dla administratora albo gdy operator serwera zezwoli na ten adres. W przeciwnym razie użyj adresu dostępnego z internetu.",
       "priorityLabel": "Priorytet",
       "priorityHelp": "Niższa liczba = wyższy priorytet. Używane do kolejności przełączania awaryjnego.",
       "costRatesHeading": "Stawki kosztów (opcjonalnie)",

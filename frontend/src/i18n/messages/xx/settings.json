@@ -19,10 +19,12 @@
     "passwordRequired": "[XX-Current password is required to change email-XX]",
     "noChanges": "[XX-No changes to save-XX]",
     "passwordConfirmNote": "[XX-Password confirmation is required when changing your email address.-XX]",
+    "pendingEmailNotice": "[XX-A confirmation link was sent to {email}. Your email address changes once you follow it.-XX]",
     "saveButton": "[XX-Save Profile-XX]",
     "savingButton": "[XX-Saving...-XX]",
     "toasts": {
       "success": "[XX-Profile updated successfully-XX]",
+      "confirmationSent": "[XX-Check {email} for a link to confirm your new email address-XX]",
       "updateFailed": "[XX-Failed to update profile-XX]"
     },
     "validation": {
@@ -58,14 +60,28 @@
       "addLayerDescription": "[XX-Add an extra layer of security to your account.-XX]",
       "enableButton": "[XX-Enable 2FA-XX]",
       "disableButton": "[XX-Disable 2FA-XX]",
+      "resetButton": "[XX-Reset 2FA-XX]",
       "disableModal": {
         "title": "[XX-Disable Two-Factor Authentication-XX]",
-        "description": "[XX-Enter your current 6-digit code to confirm disabling 2FA.-XX]",
+        "description": "[XX-Enter the 6-digit code from your authenticator app, or one of your backup codes (xxxx-xxxx), to confirm disabling 2FA.-XX]",
         "verificationCodeLabel": "[XX-Verification Code-XX]",
         "disablingButton": "[XX-Disabling...-XX]",
         "toasts": {
           "disabled": "[XX-Two-factor authentication disabled-XX]",
           "disableFailed": "[XX-Failed to disable 2FA-XX]"
+        }
+      },
+      "resetModal": {
+        "title": "[XX-Reset Two-Factor Authentication-XX]",
+        "description": "[XX-Use this if your authenticator app or backup codes may have been exposed, or if your authenticator codes stopped working (for example after a server secret change).-XX]",
+        "effect": "[XX-Your current authenticator, backup codes and trusted devices stop working, and you are signed out on every other device. You then set up a new authenticator straight away.-XX]",
+        "passwordLabel": "[XX-Account Password-XX]",
+        "codeLabel": "[XX-Authenticator or Backup Code-XX]",
+        "codeHint": "[XX-Enter the 6-digit code from your authenticator app. If your authenticator no longer works, enter one of your backup codes (xxxx-xxxx) instead.-XX]",
+        "resettingButton": "[XX-Resetting...-XX]",
+        "toasts": {
+          "reset": "[XX-Two-factor authentication reset. Set up your new authenticator now.-XX]",
+          "resetFailed": "[XX-Failed to reset 2FA-XX]"
         }
       }
     },
@@ -582,7 +598,11 @@
       "copyUrlFailed": "[XX-Failed to copy URL-XX]",
       "loadFailed": "[XX-Failed to load API tokens-XX]",
       "createFailed": "[XX-Failed to create token-XX]",
-      "revokeFailed": "[XX-Failed to revoke token-XX]"
+      "revokeFailed": "[XX-Failed to revoke token-XX]",
+      "reauthFailed": "[XX-Failed to confirm re-authentication-XX]"
+    },
+    "stepUp": {
+      "reason": "[XX-A token can reach your account without signing in, so confirm it is you before creating one.-XX]"
     },
     "relative": {
       "never": "[XX-Never-XX]",
@@ -905,7 +925,8 @@
       "shared": "[XX-Shared data-XX]"
     },
     "sections": {
-      "description": "[XX-Grant read-only access to whole app sections. Account-scoped data still also needs per-account access.-XX]"
+      "description": "[XX-Grant read-only access to whole app sections. Account-scoped data still also needs per-account access.-XX]",
+      "aiRequiresFullAccess": "[XX-The AI Assistant reads across every account and section, so it only answers for this delegate once they can read all of your accounts and every other section.-XX]"
     },
     "accounts": {
       "noAccounts": "[XX-No accounts to grant.-XX]",
@@ -1164,6 +1185,7 @@
       "ollamaCloudNote": "[XX-Model names must include the -cloud suffix (e.g. gpt-oss:20b-cloud).-XX]",
       "apiKeyLabel": "[XX-API Key-XX]",
       "baseUrlLabel": "[XX-Base URL-XX]",
+      "baseUrlPrivateNote": "[XX-A private or local address (localhost, 192.168.x.x or a container name) works only for an administrator, or when the server operator allows that address. Otherwise use an address reachable from the internet.-XX]",
       "priorityLabel": "[XX-Priority-XX]",
       "priorityHelp": "[XX-Lower number = higher priority. Used for fallback ordering.-XX]",
       "costRatesHeading": "[XX-Cost rates (optional)-XX]",

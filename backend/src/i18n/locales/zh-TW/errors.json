@@ -81,7 +81,9 @@
     "cannotDeleteOwnAccount": "您無法刪除自己的帳戶",
     "deleteLastAdmin": "無法刪除最後一個管理員帳戶。",
     "cannotResetOwnPassword": "您無法透過管理面板重設自己的密碼",
-    "noLocalPassword": "無法重設沒有本機密碼的帳戶密碼"
+    "noLocalPassword": "無法重設沒有本機密碼的帳戶密碼",
+    "cannotResetOwnTwoFactor": "您無法透過管理面板重設自己的雙重驗證",
+    "twoFactorNotEnabled": "此使用者尚未設定雙重驗證。"
   },
   "ai": {
     "queryStreamFailed": "處理您的查詢時發生意外錯誤。",
@@ -101,6 +103,9 @@
     "relayAgentOffline": "您的 MCP 中繼代理程式未連線。請連線您的代理程式後再試一次。",
     "relayCompletionTimedOut": "您的 MCP 中繼代理程式未及時回答。請確認其已連線，然後再試一次。",
     "unknownProvider": "未知的 AI 提供者：{{ provider }}",
+    "privateBaseUrlRefused": "此基礎 URL 指向私人或本機網路位址（例如 localhost、192.168.x.x 或容器名稱）。只有管理員可以使用此類位址，除非伺服器營運者在 AI_PRIVATE_BASE_URL_ALLOWLIST 中允許該位址。",
+    "modelVerifyFailed": "無法驗證已設定的模型。請檢查基礎 URL 以及提供者是否可連線。",
+    "modelVerifyFailedStatus": "無法驗證已設定的模型：提供者回應了 HTTP 狀態碼 {{ status }}。",
     "forecastDataGatherFailed": "無法收集預測所需的財務資料。請再試一次。",
     "forecastInsufficientHistory": "預測所需的交易記錄不足。至少需要 2 個月的資料。",
     "forecastGenerateFailed": "無法產生預測。請再試一次。",
@@ -139,6 +144,7 @@
     "accountDeactivated": "帳戶已停用",
     "emailNotVerified": "請在登入前驗證您的電子郵件地址。請查看收件匣中的驗證連結。",
     "invalidOrExpiredEmailVerificationToken": "驗證連結無效或已過期",
+    "invalidOrExpiredEmailChangeToken": "電子郵件變更連結無效或已過期",
     "oidcNoSubject": "OIDC 提供者未回傳主體識別碼",
     "registrationDisabled": "新帳戶注册已停用。",
     "invalidOrExpiredLinkToken": "連結令牌無效或已過期",
@@ -201,6 +207,8 @@
     "unsupportedBackupVersion": "不支援的備份版本：{{ version }}。預期版本：{{ expected }}",
     "missingExportedAt": "無效的備份格式：缺少 exportedAt",
     "tableNotAllowed": "備份還原不允許資料表 {{ table }}",
+    "invalidRestoreIdentifier": "備份檔案無效：{{ table }}.{{ column }} 的值為 \"{{ value }}\"，這不是有效的識別碼。請從未經修改的備份檔案還原。",
+    "unresolvedRestoreReference": "備份檔案無效：{{ table }}.{{ column }} 參照了 {{ referencedTable }} 的資料列 {{ value }}，但檔案中不包含該資料列。備份只能還原參照同一檔案中其他資料列的資料列；請從未經修改的備份檔案還原。",
     "encryptionNotConfigured": "伺服器未設定加密（缺少 JWT_SECRET 或長度不足）",
     "backupPasswordOidcOnly": "備份密碼僅適用於 OIDC 使用者；本機使用者使用其登入密碼",
     "backupPasswordLocalOnly": "此帳戶沒有可用於加密備份的登入密碼；請改為設定備份密碼",
@@ -293,6 +301,7 @@
     "actionNotAvailableAsDelegate": "您以代理他人身份操作時，此操作不可用。只有帳戶擁有者才能執行此操作。",
     "capabilityNotGranted": "帳戶擁有者尚未授予您{{ operation }} {{ resource }}的權限。請要求他們在委派存取設定中啟用此功能。",
     "sectionNotGranted": "帳戶擁有者尚未與您分享 {{ sectionLabel }} 區段。",
+    "fullScopeRequired": "AI 助理會讀取帳戶擁有者的所有科目與區段，因此僅供能讀取每個科目與每個區段的委派人使用。請要求擁有者將其餘部分也分享給您，或使用您已有存取權的頁面。",
     "accountNotShared": "帳戶擁有者尚未與您分享此科目。",
     "accountOperationNotGranted": "帳戶擁有者尚未授予您在此科目{{ operation }}交易的權限。",
     "jointOwnAccount": "這是您自己的帳戶，聯名帳戶存取不適用。",
@@ -350,6 +359,7 @@
   "monteCarlo": {
     "scenarioNotFound": "找不到情境 {{ id }}",
     "atLeastOneAccountRequired": "至少需要一個 accountId",
+    "tooManyCashFlows": "一個情境最多只能有 {{ max }} 個現金流",
     "currentValueUnavailable": "無法確定所選帳戶的目前價值，因此模擬無法以該值為起點。請手動輸入起始金額，或在價格與匯率可用後重試。",
     "historicalReturnsUnavailable": "無法計算所選帳戶的歷史報酬，因此模擬無法使用。請手動輸入預期報酬與波動率，或在價格與匯率可用後重試。"
   },

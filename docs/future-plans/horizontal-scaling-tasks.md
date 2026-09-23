@@ -774,8 +774,10 @@ Rotation is out of scope; leave a `// rotation: see design doc WP4` marker.
    the same thing at far higher cost, and the spec that says it is where the
    race between two starting replicas is also tested.
 3. **The warning text is in `encryption-key.ts`.** `main.ts` only calls
-   `logEncryptionKeyStatus`; the words are `MISSING_ENCRYPTION_KEY_WARNING_LINES`,
-   and that is the line that now also names the per-process JWKS. The service
+   `logEncryptionKeyStatus`; the words were `MISSING_ENCRYPTION_KEY_WARNING_LINES`,
+   and that is the line that also named the per-process JWKS. (Both were removed
+   when `ENCRYPTION_KEY` became required at boot; `missingEncryptionKeyRefusal`
+   is the refusal now.) The service
    logs its own, more specific warning at the point it declines to store keys.
 
 The provider's development-key `NOTICE` was not asserted on: it is emitted by

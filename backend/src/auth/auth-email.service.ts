@@ -1,16 +1,30 @@
 import { Injectable, BadRequestException, Logger } from "@nestjs/common";
-import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
+import { ModuleRef } from "@nestjs/core";
+import {
+  DataSource,
+  EntityTarget,
+  MoreThan,
+  ObjectLiteral,
+  Repository,
+} from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import * as bcrypt from "bcryptjs";
 import * as crypto from "crypto";
 
 import { User } from "../users/entities/user.entity";
-import { TrustedDevice } from "../users/entities/trusted-device.entity";
 import { hashToken } from "./crypto.util";
 import { PasswordBreachService } from "./password-breach.service";
 import { tr } from "../i18n/translate";
 import { TokenService } from "./token.service";
 import { AuthAttemptCounterService } from "./auth-attempt-counter.service";
+import {
+  emailInUseConflict,
+  isUniqueViolation,
+} from "../users/email-change.util";
+import {
+  revokeOAuthGrantsAfterCommit,
+  revokeStandingCredentials,
+} from "./credential-revocation";
 
 /**
  * `auth_attempt_counters.scope` for the two per-email throttles.
@@ -40,6 +54,7 @@ export class AuthEmailService {
     private passwordBreachService: PasswordBreachService,
     private tokenService: TokenService,
     private readonly attemptCounters: AuthAttemptCounterService,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   /**
@@ -124,38 +139,52 @@ export class AuthEmailService {
     const saltRounds = 12;
     const passwordHash = await bcrypt.hash(newPassword, saltRounds);
 
-    // M11: Atomic UPDATE...WHERE to prevent TOCTOU race condition.
-    const result = await this.scoped(User, (repo) =>
-      repo
+    // M11: Atomic UPDATE...WHERE to prevent TOCTOU race condition. The
+    // standing credentials go in the same transaction, so an invalid token
+    // revokes nothing and a committed reset cannot leave a PAT or a trusted
+    // device behind it (`credential-revocation.ts`).
+    const userId = await withScopedDb(this.dataSource, async (manager) => {
+      const result = await manager
+        .getRepository(User)
         .createQueryBuilder()
         .update(User)
         .set({
           passwordHash,
           resetToken: null,
           resetTokenExpiry: null,
+          // Proving control of the mailbox is the recovery path out of a
+          // lockout: without this, anyone who knew the address could keep the
+          // owner locked out by failing a password once per lock window.
+          failedLoginAttempts: 0,
+          lockedUntil: null,
         })
         .where("resetToken = :hashedToken", { hashedToken })
         .andWhere("resetTokenExpiry > :now", { now: new Date() })
         .returning("id")
-        .execute(),
-    );
+        .execute();
 
-    if (!result.affected || result.affected === 0) {
-      throw new BadRequestException(
-        tr(
-          "errors.auth.invalidOrExpiredResetToken",
-          "Invalid or expired reset token",
-        ),
-      );
-    }
+      if (!result.affected || result.affected === 0) {
+        throw new BadRequestException(
+          tr(
+            "errors.auth.invalidOrExpiredResetToken",
+            "Invalid or expired reset token",
+          ),
+        );
+      }
 
-    // Revoke all refresh tokens to force re-login on all devices
-    const userId = result.raw?.[0]?.id;
+      const id: string | undefined = result.raw?.[0]?.id;
+      if (id) {
+        await revokeStandingCredentials(manager, id);
+      }
+      return id;
+    });
+
+    // After the commit: every session on every device, then the OAuth grants
+    // an MCP client holds -- a reset that left either live would hand the
+    // account straight back to whoever the owner was locking out.
     if (userId) {
       await this.tokenService.revokeAllUserRefreshTokens(userId);
-      // SECURITY: Revoke trusted devices so a stolen trusted-device cookie
-      // cannot bypass 2FA after a password reset.
-      await this.scoped(TrustedDevice, (repo) => repo.delete({ userId }));
+      await revokeOAuthGrantsAfterCommit(this.moduleRef, userId, this.logger);
     }
   }
 
@@ -227,6 +256,71 @@ export class AuthEmailService {
         ),
       );
     }
+  }
+
+  /**
+   * Apply the self-service email change owning `token` (staged by
+   * `EmailChangeService` when the change was requested).
+   *
+   * One transaction: find the live pending change, refuse when another account
+   * already holds the address, then the conditional UPDATE, which is what makes
+   * the link single-use -- it matches only while the stored hash and expiry are
+   * still those the lookup saw, so a second click, a newer request that
+   * replaced the token, or an expired link all update nothing. The unique index
+   * on `users.email` decides a race the in-transaction check cannot see, and is
+   * answered as the same 409, never a 500. Other sessions are signed out after
+   * the commit, as a password reset does.
+   */
+  async confirmEmailChange(token: string): Promise<void> {
+    const hashedToken = hashToken(token);
+    const invalid = () =>
+      new BadRequestException(
+        tr(
+          "errors.auth.invalidOrExpiredEmailChangeToken",
+          "Invalid or expired email change link",
+        ),
+      );
+
+    let userId: string;
+    try {
+      userId = await withScopedDb(this.dataSource, async (manager) => {
+        const repo = manager.getRepository(User);
+        const now = new Date();
+        const pending = await repo.findOne({
+          where: {
+            emailChangeToken: hashedToken,
+            emailChangeTokenExpiry: MoreThan(now),
+          },
+        });
+        if (!pending || !pending.pendingEmail) throw invalid();
+        const newEmail = pending.pendingEmail;
+
+        const holder = await repo.findOne({ where: { email: newEmail } });
+        if (holder && holder.id !== pending.id) throw emailInUseConflict();
+
+        const result = await repo
+          .createQueryBuilder()
+          .update(User)
+          .set({
+            email: newEmail,
+            emailVerified: true,
+            pendingEmail: null,
+            emailChangeToken: null,
+            emailChangeTokenExpiry: null,
+          })
+          .where("id = :id", { id: pending.id })
+          .andWhere("emailChangeToken = :hashedToken", { hashedToken })
+          .andWhere("emailChangeTokenExpiry > :now", { now })
+          .execute();
+        if (!result.affected) throw invalid();
+        return pending.id;
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) throw emailInUseConflict();
+      throw error;
+    }
+
+    await this.tokenService.revokeAllUserRefreshTokens(userId);
   }
 
   checkVerificationEmailLimit(email: string): Promise<boolean> {

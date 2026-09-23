@@ -13,6 +13,7 @@ import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { RefreshToken } from "../auth/entities/refresh-token.entity";
 import { PersonalAccessToken } from "../auth/entities/personal-access-token.entity";
+import { TrustedDevice } from "../users/entities/trusted-device.entity";
 import { OAuthProviderService } from "../oauth/oauth-provider.service";
 import { UsersService } from "../users/users.service";
 import { EmailService } from "../notifications/email.service";
@@ -30,6 +31,7 @@ describe("AdminService", () => {
   let preferencesRepository: Record<string, jest.Mock>;
   let refreshTokensRepository: Record<string, jest.Mock>;
   let patRepository: Record<string, jest.Mock>;
+  let trustedDevicesRepository: Record<string, jest.Mock>;
   let oauthProviderService: Record<string, jest.Mock>;
   let usersService: Record<string, jest.Mock>;
   let emailService: Record<string, jest.Mock>;
@@ -114,6 +116,8 @@ describe("AdminService", () => {
       revokeAllForUser: jest.fn().mockResolvedValue(0),
     };
 
+    trustedDevicesRepository = { delete: jest.fn() };
+
     usersService = {
       isActingDelegate: jest.fn().mockResolvedValue(false),
       purgeForDowngrade: jest.fn().mockResolvedValue(undefined),
@@ -155,6 +159,7 @@ describe("AdminService", () => {
       [UserPreference, preferencesRepository as never],
       [RefreshToken, refreshTokensRepository as never],
       [PersonalAccessToken, patRepository as never],
+      [TrustedDevice, trustedDevicesRepository as never],
     ]);
     Object.assign(scoped.manager, transactionManager);
     transactionManager = scoped.manager;
@@ -797,6 +802,20 @@ describe("AdminService", () => {
       expect(savedUser.passwordHash).not.toBe(result.temporaryPassword);
     });
 
+    it("clears a login lockout so the temporary password works", async () => {
+      usersRepository.findOne.mockResolvedValue({
+        ...mockTargetUser,
+        failedLoginAttempts: 25,
+        lockedUntil: new Date(Date.now() + 4 * 60 * 60 * 1000),
+      });
+
+      await service.resetUserPassword("admin-1", "user-2");
+
+      const savedUser = usersRepository.save.mock.calls[0][0];
+      expect(savedUser.failedLoginAttempts).toBe(0);
+      expect(savedUser.lockedUntil).toBeNull();
+    });
+
     it("revokes all refresh tokens after password reset", async () => {
       usersRepository.findOne.mockResolvedValue({ ...mockTargetUser });
 
@@ -817,6 +836,18 @@ describe("AdminService", () => {
         { userId: "user-2", isRevoked: false },
         { isRevoked: true },
       );
+    });
+
+    it("revokes trusted devices on password reset", async () => {
+      // A trusted-device cookie skips 2FA; it must not outlive the password an
+      // administrator just replaced.
+      usersRepository.findOne.mockResolvedValue({ ...mockTargetUser });
+
+      await service.resetUserPassword("admin-1", "user-2");
+
+      expect(trustedDevicesRepository.delete).toHaveBeenCalledWith({
+        userId: "user-2",
+      });
     });
 
     it("revokes all OIDC artifacts on password reset", async () => {

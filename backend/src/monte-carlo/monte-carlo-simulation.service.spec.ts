@@ -634,6 +634,101 @@ describe("MonteCarloSimulationService", () => {
         without.finalDistribution.median,
       );
     });
+
+    it("a seeded run with cash flows reproduces the per-path summation exactly", () => {
+      // The per-year cash-flow totals are computed once per run rather than
+      // once per (simulation, year). These figures were captured from the
+      // implementation that summed inside the simulation loop; any drift in
+      // value or summation order changes them.
+      const result = service.run({
+        startingValue: 250000,
+        yearsToRetirement: 5,
+        annualContribution: 10000,
+        contributionGrowthRate: 0.03,
+        yearsInRetirement: 5,
+        annualWithdrawal: 30000,
+        expectedReturn: 0.06,
+        volatility: 0.12,
+        inflationRate: 0.025,
+        showRealValues: false,
+        simulationCount: 200,
+        targetValue: 100000,
+        randomSeed: "7",
+        cashFlows: [
+          {
+            amount: 20000,
+            flowType: "ONE_TIME",
+            startYear: 3,
+            endYear: null,
+            inflationAdjust: false,
+          },
+          {
+            amount: -4000,
+            flowType: "RECURRING",
+            startYear: 2,
+            endYear: 8,
+            inflationAdjust: true,
+          },
+          {
+            amount: 1500.5,
+            flowType: "RECURRING",
+            startYear: 6,
+            endYear: null,
+            inflationAdjust: false,
+          },
+          {
+            amount: -75000,
+            flowType: "ONE_TIME",
+            startYear: 7,
+            endYear: null,
+            inflationAdjust: true,
+          },
+          {
+            amount: 99999,
+            flowType: "ONE_TIME",
+            startYear: 40,
+            endYear: null,
+            inflationAdjust: false,
+          },
+        ],
+      });
+
+      expect(result.percentiles.p10).toEqual([
+        234912.07, 235794.1476, 267049.397, 268403.1885, 276041.9422,
+        248223.9758, 145056.5835, 108908.3092, 78361.1044, 46617.7657,
+      ]);
+      expect(result.percentiles.p50).toEqual([
+        272123.2397, 291165.5587, 342292.3594, 358148.4682, 379490.3424,
+        373965.7835, 274582.7551, 252193.8083, 225532.8884, 196637.0482,
+      ]);
+      expect(result.percentiles.p90).toEqual([
+        311877.5222, 350311.3485, 418464.1577, 473856.3085, 509719.7934,
+        534833.5114, 453521.916, 445334.7902, 446440.9695, 460381.0653,
+      ]);
+      expect(result.finalDistribution).toEqual({
+        min: 0,
+        max: 882802.7745,
+        mean: 237340.0618,
+        median: 196637.0482,
+        stdev: 159306.6819,
+        depletionRate: 0.015,
+      });
+      expect(result.successRate).toBe(0.755);
+      expect(result.performanceSummary.maxDrawdown).toEqual({
+        p10: -0.8412,
+        p25: -0.6494,
+        p50: -0.49,
+        p75: -0.3192,
+        p90: -0.2175,
+      });
+      expect(result.performanceSummary.endBalanceReal).toEqual({
+        p10: 36417.7241,
+        p25: 100383.5156,
+        p50: 153612.5478,
+        p75: 267827.709,
+        p90: 359648.9524,
+      });
+    });
   });
 
   describe("edge cases", () => {

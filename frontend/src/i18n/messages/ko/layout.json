@@ -34,6 +34,12 @@
     "dismiss": "닫기",
     "dismissAriaLabel": "업데이트 알림 닫기"
   },
+  "jwtSecretBanner": {
+    "label": "JWT_SECRET이 취약합니다.",
+    "detail": "공개된 예시 값이거나 너무 쉽게 추측할 수 있어 세션 토큰이 위조될 수 있습니다. <code>openssl rand -base64 32</code>로 강력한 값을 생성하세요. 값을 변경하면 인증 앱 코드가 더 이상 작동하지 않고 신뢰할 수 있는 기기도 해제됩니다. 사용자는 백업 코드로 로그인한 뒤 2FA를 다시 설정하고, 백업 코드가 없는 사용자는 <users>사용자 관리</users>에서 2FA를 재설정하세요. 먼저 <code>docs/backend/modules-and-runtime.md</code>(Changing JWT_SECRET)를 읽어 보세요.",
+    "dismiss": "닫기",
+    "dismissAriaLabel": "JWT_SECRET 경고 닫기"
+  },
   "actionHistory": {
     "title": "작업 내역",
     "buttonAriaLabel": "작업 내역",

@@ -26,6 +26,7 @@ import { GetInsightsQueryDto } from "./dto/ai-insights.dto";
 import { InsightType } from "../entities/ai-insight.entity";
 import {
   AllowDelegate,
+  DelegateRequiresFullScope,
   DelegateRequiresSection,
 } from "../../delegation/decorators/delegate-access.decorator";
 
@@ -37,6 +38,9 @@ import {
 // delegate, and only with the owner's "ai" grant. Generate/dismiss have no
 // @AllowDelegate() -> fail closed.
 @DelegateRequiresSection("ai")
+// ...and only for a delegate who can read the whole ledger: the answer draws
+// on every account and section and is not narrowed to the delegate's grants.
+@DelegateRequiresFullScope()
 export class AiInsightsController {
   private readonly logger = new Logger(AiInsightsController.name);
 

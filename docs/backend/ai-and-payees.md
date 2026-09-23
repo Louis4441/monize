@@ -4,6 +4,18 @@ The two completion paths, the continuation nudge, bulk-tool refusals, the cached
 
 Paths beginning with `src/`, `test/` or `scripts/`, and layer configuration filenames, are relative to `backend/`; other source paths are relative to `backend/src/`. Explicit repository prefixes are preserved. `backend/CLAUDE.md` is the short index; this document is where the reasoning lives.
 
+## A provider's base URL is a request the server makes on the user's behalf
+
+Any signed-up user can add an AI provider, and its base URL is a host this server then POSTs to and reads the answer from. So where that URL may point is decided per owner, not per provider type (`src/ai/ai-base-url-policy.ts`):
+
+- **Cloud providers** (OpenAI, Anthropic, Ollama Cloud) reach public hosts only, whoever owns them.
+- **Self-hosted providers** (Ollama, OpenAI-compatible) reach a private, loopback or link-local address only when the owner is an admin (`users.role`, read from the row so a background completion gets the same answer as a request), or when the host and port are on the operator's `AI_PRIVATE_BASE_URL_ALLOWLIST` (`src/ai/validators/private-base-url-allowlist.ts`). An Ollama provider with no base URL is loopback and is checked as such.
+- **The operator's `AI_DEFAULT_*` provider** is unrestricted, as before.
+
+The policy is enforced three times, because each one alone has a gap. `AiService.validateBaseUrl` refuses the URL on create, update and draft test. `AiService.buildProvider` refuses a stored row at use time (a row saved before the rule, or by an admin since demoted) with `AiBaseUrlRefusedError`, which the provider loops surface instead of the generic "all providers failed". And every provider sends through `providerFetch(policy)` (`src/ai/providers/long-running-fetch.ts`): a request that may not reach a private address goes through the agent whose `publicOnlyLookup` (`src/ai/providers/provider-egress.ts`) refuses the connection if any DNS answer is private, so the address checked is the address connected to and DNS rebinding has no window. IP literals, which skip the lookup, are checked before dispatch. `AiProviderFactory.createProvider` defaults to `public-only`, so a caller that has not decided cannot reach a private host.
+
+Provider requests never follow a redirect (`redirect: "error"`), and a model check that fails for an unrecognised cause returns `unverifiedModelReason` (`src/ai/providers/model-verification.util.ts`): a translated message with at most the HTTP status, never the upstream body or the SDK's error text, which is logged instead. A base URL of the user's choosing makes whatever that host answered someone else's data.
+
 ## `complete()` is not `completeWithTools()` with the tools left off
 
 Both take `AiCompletionRequest`, but `complete()` maps messages through `toSimpleMessages`, which **filters `role: "tool"` out entirely** -- summarising a tool-use conversation through it sends a transcript stripped of every tool result and returns a confident summary of nothing.

@@ -113,8 +113,9 @@ ships.
 multipart part, `original`, beside the existing `file`. The controller swaps
 `FileInterceptor("file")` for `FileFieldsInterceptor([{ name: "file", maxCount: 1 }, { name: "original", maxCount: 1 }])`
 with the same `memoryStorage()` and per-file `MAX_ATTACHMENT_BYTES` limit.
-Body ceilings already exceed two 10 MB parts (`main.ts` and the Next proxy's
-`proxyClientMaxBodySize`).
+Body ceilings already exceed two 10 MB parts (`main.ts`, and the frontend's
+streaming route handler for this path, `LARGE_UPLOAD_ROUTES` in
+`frontend/src/lib/proxy-body-limit.ts`).
 
 `AttachmentsService.create(userId, transactionId, file, original?)`:
 

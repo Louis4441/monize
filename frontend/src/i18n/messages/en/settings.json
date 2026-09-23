@@ -19,10 +19,12 @@
     "passwordRequired": "Current password is required to change email",
     "noChanges": "No changes to save",
     "passwordConfirmNote": "Password confirmation is required when changing your email address.",
+    "pendingEmailNotice": "A confirmation link was sent to {email}. Your email address changes once you follow it.",
     "saveButton": "Save Profile",
     "savingButton": "Saving...",
     "toasts": {
       "success": "Profile updated successfully",
+      "confirmationSent": "Check {email} for a link to confirm your new email address",
       "updateFailed": "Failed to update profile"
     },
     "validation": {
@@ -58,14 +60,28 @@
       "addLayerDescription": "Add an extra layer of security to your account.",
       "enableButton": "Enable 2FA",
       "disableButton": "Disable 2FA",
+      "resetButton": "Reset 2FA",
       "disableModal": {
         "title": "Disable Two-Factor Authentication",
-        "description": "Enter your current 6-digit code to confirm disabling 2FA.",
+        "description": "Enter the 6-digit code from your authenticator app, or one of your backup codes (xxxx-xxxx), to confirm disabling 2FA.",
         "verificationCodeLabel": "Verification Code",
         "disablingButton": "Disabling...",
         "toasts": {
           "disabled": "Two-factor authentication disabled",
           "disableFailed": "Failed to disable 2FA"
+        }
+      },
+      "resetModal": {
+        "title": "Reset Two-Factor Authentication",
+        "description": "Use this if your authenticator app or backup codes may have been exposed, or if your authenticator codes stopped working (for example after a server secret change).",
+        "effect": "Your current authenticator, backup codes and trusted devices stop working, and you are signed out on every other device. You then set up a new authenticator straight away.",
+        "passwordLabel": "Account Password",
+        "codeLabel": "Authenticator or Backup Code",
+        "codeHint": "Enter the 6-digit code from your authenticator app. If your authenticator no longer works, enter one of your backup codes (xxxx-xxxx) instead.",
+        "resettingButton": "Resetting...",
+        "toasts": {
+          "reset": "Two-factor authentication reset. Set up your new authenticator now.",
+          "resetFailed": "Failed to reset 2FA"
         }
       }
     },
@@ -582,7 +598,11 @@
       "copyUrlFailed": "Failed to copy URL",
       "loadFailed": "Failed to load API tokens",
       "createFailed": "Failed to create token",
-      "revokeFailed": "Failed to revoke token"
+      "revokeFailed": "Failed to revoke token",
+      "reauthFailed": "Failed to confirm re-authentication"
+    },
+    "stepUp": {
+      "reason": "A token can reach your account without signing in, so confirm it is you before creating one."
     },
     "relative": {
       "never": "Never",
@@ -905,7 +925,8 @@
       "shared": "Shared data"
     },
     "sections": {
-      "description": "Grant read-only access to whole app sections. Account-scoped data still also needs per-account access."
+      "description": "Grant read-only access to whole app sections. Account-scoped data still also needs per-account access.",
+      "aiRequiresFullAccess": "The AI Assistant reads across every account and section, so it only answers for this delegate once they can read all of your accounts and every other section."
     },
     "accounts": {
       "noAccounts": "No accounts to grant.",
@@ -1164,6 +1185,7 @@
       "ollamaCloudNote": "Model names must include the -cloud suffix (e.g. gpt-oss:20b-cloud).",
       "apiKeyLabel": "API Key",
       "baseUrlLabel": "Base URL",
+      "baseUrlPrivateNote": "A private or local address (localhost, 192.168.x.x or a container name) works only for an administrator, or when the server operator allows that address. Otherwise use an address reachable from the internet.",
       "priorityLabel": "Priority",
       "priorityHelp": "Lower number = higher priority. Used for fallback ordering.",
       "costRatesHeading": "Cost rates (optional)",

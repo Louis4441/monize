@@ -18,7 +18,8 @@ import {
   isContentBlocks,
   unsupportedAttachmentNote,
 } from "./content-blocks.util";
-import { longRunningFetch } from "./long-running-fetch";
+import { providerFetch } from "./long-running-fetch";
+import { unverifiedModelReason } from "./model-verification.util";
 import { toolsField } from "./tools-field.util";
 import { serverToolsField } from "./web-search-tool.util";
 
@@ -31,13 +32,24 @@ export class OpenAiProvider implements AiProvider {
   protected readonly client: OpenAI;
   protected readonly modelId: string;
 
-  constructor(apiKey: string, model?: string, baseUrl?: string) {
+  constructor(
+    apiKey: string,
+    model?: string,
+    baseUrl?: string,
+    /**
+     * The fetch the SDK sends through. It carries the egress policy (which
+     * addresses the request may reach) and never follows a redirect; the
+     * factory passes the one the config's owner is entitled to, and the
+     * default is the strictest.
+     */
+    fetchImpl: typeof fetch = providerFetch("public-only"),
+  ) {
     this.client = new OpenAI({
       apiKey,
       ...(baseUrl && { baseURL: baseUrl }),
       // Inject our long-running fetch wrapper so SDK calls inherit the
       // disabled bodyTimeout/headersTimeout. See long-running-fetch.ts.
-      fetch: longRunningFetch,
+      fetch: fetchImpl,
     });
     this.modelId = model || "gpt-4o";
   }
@@ -478,7 +490,6 @@ export class OpenAiProvider implements AiProvider {
       return { ok: true, model: this.modelId };
     } catch (error) {
       const status = (error as { status?: number })?.status;
-      const raw = error instanceof Error ? error.message : String(error);
       if (status === 404) {
         return {
           ok: false,
@@ -496,7 +507,7 @@ export class OpenAiProvider implements AiProvider {
       return {
         ok: false,
         model: this.modelId,
-        reason: `Could not verify model: ${raw}`,
+        reason: unverifiedModelReason(this.name, this.modelId, error, status),
       };
     } finally {
       clearTimeout(timeout);

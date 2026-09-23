@@ -941,6 +941,7 @@
     "removeCashFlow": "キャッシュフローを削除",
     "removeTitle": "削除",
     "addCashFlow": "+ キャッシュフローを追加",
+    "cashFlowLimitReached": "シナリオのキャッシュフローは最大 {max} 件までです。",
     "returnAssumptions": "リターンの仮定",
     "specifyReturn": "期待リターンを指定",
     "useHistoricalReturns": "選択した口座の過去リターンを使用",

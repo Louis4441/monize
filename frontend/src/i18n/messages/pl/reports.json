@@ -941,6 +941,7 @@
     "removeCashFlow": "Usuń przepływ",
     "removeTitle": "Usuń",
     "addCashFlow": "+ Dodaj przepływ",
+    "cashFlowLimitReached": "Scenariusz może mieć co najwyżej {max} przepływów.",
     "returnAssumptions": "Założenia dotyczące zwrotu",
     "specifyReturn": "Określ oczekiwany zwrot",
     "useHistoricalReturns": "Użyj historycznych zwrotów z wybranych kont",

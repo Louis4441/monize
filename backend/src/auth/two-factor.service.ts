@@ -4,6 +4,8 @@ import {
   BadRequestException,
   ForbiddenException,
   NotFoundException,
+  HttpException,
+  HttpStatus,
   Logger,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
@@ -42,6 +44,38 @@ export const TWO_FACTOR_USER_SCOPE = "2fa-user";
 
 /** `single_use_tokens.purpose` for a spent TOTP code. Shared by both TOTP paths. */
 export const TOTP_CLAIM_PURPOSE = "totp";
+
+/** Which proof a self-service 2FA reset was refused on. */
+type ResetRefusal = "credential" | "second-factor";
+
+/**
+ * What each refusal logs and answers. Both are 400, not 401: the session is
+ * valid, and a 401 would send the client into its refresh-and-sign-out path.
+ * A lookup rather than a comparison of the reason, so no equality test sits
+ * next to the credential it describes.
+ */
+const RESET_REFUSALS: Record<
+  ResetRefusal,
+  { subject: string; error: () => BadRequestException }
+> = {
+  credential: {
+    subject: "account password",
+    error: () =>
+      new BadRequestException(
+        tr(
+          "errors.auth.currentPasswordIncorrect",
+          "Current password is incorrect",
+        ),
+      ),
+  },
+  "second-factor": {
+    subject: "authenticator or backup code",
+    error: () =>
+      new BadRequestException(
+        tr("errors.auth.invalidVerificationCode", "Invalid verification code"),
+      ),
+  },
+};
 
 @Injectable()
 export class TwoFactorService {
@@ -118,6 +152,59 @@ export class TwoFactorService {
     return encrypt(plainSecret, this.totpEncryptionKey);
   }
 
+  /**
+   * The user's TOTP secret, or `null` when it cannot be decrypted.
+   *
+   * The key is derived from `JWT_SECRET`, so a changed `JWT_SECRET` leaves
+   * every enrolled secret undecryptable. That is an unanswerable TOTP check,
+   * not a server error: the caller treats it as a wrong code (counted like
+   * one), and a backup code -- bcrypt-hashed, independent of `JWT_SECRET` --
+   * still works, because only the TOTP branch ever calls this. The warning
+   * names the likely cause and never the secret.
+   */
+  private readableTotpSecret(
+    user: User,
+  ): { secret: string; needsReEncrypt: boolean } | null {
+    if (!user.twoFactorSecret) return null;
+    try {
+      return this.decryptTotpSecret(user.twoFactorSecret);
+    } catch {
+      this.logger.warn(
+        `TOTP secret for user ${user.id} cannot be decrypted (JWT_SECRET has ` +
+          "probably changed since it was enrolled). Authenticator codes are " +
+          "refused until the user re-enrolls; a backup code still signs in " +
+          "and resets 2FA from Settings, and an administrator can reset it " +
+          "for a user without one.",
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Check a 6-digit code against the user's TOTP secret. `valid: false` for a
+   * wrong code and for a secret that cannot be decrypted alike; `reEncrypted`
+   * is the secret under the current key when it was still under the legacy
+   * one, for the caller to persist after its own success path.
+   */
+  private checkTotpCode(
+    user: User,
+    code: string,
+  ): { valid: boolean; reEncrypted: string | null } {
+    const readable = this.readableTotpSecret(user);
+    if (readable === null) return { valid: false, reEncrypted: null };
+    const valid = otplib.verifySync({
+      token: code,
+      secret: readable.secret,
+    }).valid;
+    return {
+      valid,
+      reEncrypted:
+        valid && readable.needsReEncrypt
+          ? this.reEncryptTotpSecret(readable.secret)
+          : null,
+    };
+  }
+
   async verify2FA(
     tempToken: string,
     code: string,
@@ -165,11 +252,7 @@ export class TwoFactorService {
     }
 
     // Per-user rate limiting: prevents brute-force multiplication via multiple tempTokens
-    const userAttempts = await this.attemptCounters.peek(
-      TWO_FACTOR_USER_SCOPE,
-      payload.sub,
-    );
-    if (userAttempts >= this.MAX_USER_2FA_ATTEMPTS) {
+    if (await this.userTotpBudgetSpent(payload.sub)) {
       this.logger.warn(
         `2FA verification blocked: too many attempts for user ${payload.sub}`,
       );
@@ -199,14 +282,17 @@ export class TwoFactorService {
       );
     }
 
-    const { secret, needsReEncrypt } = this.decryptTotpSecret(
-      user.twoFactorSecret,
-    );
-
-    // L5: Try TOTP for 6-digit codes, backup codes for XXXX-XXXX format
+    // L5: Try TOTP for 6-digit codes, backup codes for XXXX-XXXX format. The
+    // TOTP secret is decrypted on the TOTP branch only: a backup code is
+    // bcrypt-hashed and must keep working when the secret cannot be decrypted
+    // (a changed JWT_SECRET), which is exactly when a user needs it.
     let isValid = false;
-    if (/^\d{6}$/.test(code)) {
-      isValid = otplib.verifySync({ token: code, secret }).valid;
+    let reEncryptedSecret: string | null = null;
+    const isBackupCode = !/^\d{6}$/.test(code);
+    if (!isBackupCode) {
+      const totp = this.checkTotpCode(user, code);
+      isValid = totp.valid;
+      reEncryptedSecret = totp.reEncrypted;
       // SECURITY: burn the code, so it cannot be replayed on any replica.
       //
       // Claimed *after* verification, so guessing wrong codes cannot exhaust
@@ -236,28 +322,8 @@ export class TwoFactorService {
         "sliding",
       );
 
-      // Track failed attempt per-user
-      const { count: newUserCount } = await this.attemptCounters.increment(
-        TWO_FACTOR_USER_SCOPE,
-        payload.sub,
-        this.ATTEMPT_WINDOW_MS,
-        "sliding",
-      );
-
-      // Lock account after exceeding per-user threshold
-      if (newUserCount >= this.MAX_USER_2FA_ATTEMPTS) {
-        await this.scoped(User, (repo) =>
-          repo
-            .createQueryBuilder()
-            .update(User)
-            .set({ lockedUntil: new Date(Date.now() + this.BASE_LOCKOUT_MS) })
-            .where("id = :id", { id: user.id })
-            .execute(),
-        );
-        this.logger.warn(
-          `Account locked after ${newUserCount} failed 2FA attempts for user ${user.id}`,
-        );
-      }
+      // Track failed attempt per-user, locking the account at the threshold
+      await this.recordUserTotpFailure(user.id);
 
       this.logger.warn(
         `2FA verification failed: invalid code for user ${user.id}`,
@@ -272,8 +338,9 @@ export class TwoFactorService {
     await this.attemptCounters.reset(TWO_FACTOR_USER_SCOPE, payload.sub);
 
     // Re-encrypt with purpose-derived key if still using old key material
-    if (needsReEncrypt) {
-      user.twoFactorSecret = this.reEncryptTotpSecret(secret);
+    // (only ever set on the TOTP branch).
+    if (reEncryptedSecret !== null) {
+      user.twoFactorSecret = reEncryptedSecret;
     }
 
     // Update last login
@@ -300,7 +367,86 @@ export class TwoFactorService {
       refreshToken,
       trustedDeviceRef,
       rememberMe,
+      // A sign-in by backup code usually means the authenticator is lost or no
+      // longer verifies (a changed JWT_SECRET), so the client takes the user to
+      // Settings > Security to reset it. The count is what is left after this
+      // one was consumed; `verifyBackupCode` keeps `user.backupCodes` current.
+      ...(isBackupCode
+        ? {
+            usedBackupCode: true as const,
+            backupCodesRemaining: user.backupCodes
+              ? (JSON.parse(user.backupCodes) as string[]).length
+              : 0,
+          }
+        : {}),
     };
+  }
+
+  /**
+   * Whether `userId`'s per-user TOTP budget is spent.
+   *
+   * One budget per secret, shared by every path that checks a code against it:
+   * the login verification and the two authenticated management endpoints
+   * (`disable2FA`, `generateBackupCodes`). Guessing through a stolen session is
+   * guessing the same six digits, so it draws from the same allowance -- a
+   * separate counter per endpoint would multiply what an attacker gets. Keyed
+   * by user rather than by client address, so no forwarded header moves it.
+   */
+  private async userTotpBudgetSpent(userId: string): Promise<boolean> {
+    const attempts = await this.attemptCounters.peek(
+      TWO_FACTOR_USER_SCOPE,
+      userId,
+    );
+    return attempts >= this.MAX_USER_2FA_ATTEMPTS;
+  }
+
+  /**
+   * Count one wrong code against `userId` and lock the account when the count
+   * reaches the threshold. "sliding", because that is what the `Map` entries
+   * this replaced did: each failure pushed the expiry out, so a run of failures
+   * only lapses after a full quiet window. Under a fixed window an attacker
+   * spacing attempts one per window never accumulates (see `AttemptWindow`).
+   */
+  private async recordUserTotpFailure(userId: string): Promise<void> {
+    const { count } = await this.attemptCounters.increment(
+      TWO_FACTOR_USER_SCOPE,
+      userId,
+      this.ATTEMPT_WINDOW_MS,
+      "sliding",
+    );
+    if (count >= this.MAX_USER_2FA_ATTEMPTS) {
+      await this.scoped(User, (repo) =>
+        repo
+          .createQueryBuilder()
+          .update(User)
+          .set({ lockedUntil: new Date(Date.now() + this.BASE_LOCKOUT_MS) })
+          .where("id = :id", { id: userId })
+          .execute(),
+      );
+      this.logger.warn(
+        `Account locked after ${count} failed 2FA attempts for user ${userId}`,
+      );
+    }
+  }
+
+  /**
+   * Refuse an authenticated 2FA-management request whose user has spent the
+   * TOTP budget. 429 rather than 401: the session is valid, and a 401 would
+   * send the client into its refresh-and-sign-out path.
+   */
+  private async assertManagementTotpBudget(userId: string): Promise<void> {
+    if (await this.userTotpBudgetSpent(userId)) {
+      this.logger.warn(
+        `2FA management blocked: too many attempts for user ${userId}`,
+      );
+      throw new HttpException(
+        tr(
+          "errors.http.tooManyRequests",
+          "Too many requests. Please wait a few minutes and try again.",
+        ),
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
   }
 
   /**
@@ -337,19 +483,17 @@ export class TwoFactorService {
       return false;
     }
 
-    const { secret, needsReEncrypt } = this.decryptTotpSecret(
-      user.twoFactorSecret,
-    );
-    const isValid = otplib.verifySync({ token: code, secret }).valid;
-    if (!isValid) return false;
+    // An undecryptable secret is a code that cannot verify, not a 500.
+    const { valid, reEncrypted } = this.checkTotpCode(user, code);
+    if (!valid) return false;
 
     // Same claim, same purpose, same key as the login path -- which is what
     // stops a code presented at login from being replayed against a step-up
     // endpoint, and now across replicas rather than within one process.
     if (!(await this.claimTotpCode(user.id, code))) return false;
 
-    if (needsReEncrypt) {
-      user.twoFactorSecret = this.reEncryptTotpSecret(secret);
+    if (reEncrypted !== null) {
+      user.twoFactorSecret = reEncrypted;
       await this.scoped(User, (repo) => repo.save(user));
     }
 
@@ -442,9 +586,13 @@ export class TwoFactorService {
       );
     }
 
-    // H5: Promote pending secret to active secret on successful confirmation
+    // H5: Promote pending secret to active secret on successful confirmation.
+    // Backup codes belong to the enrolment they were issued with: a fresh
+    // enrolment starts with none, so codes left from an earlier one can never
+    // stand in for the new authenticator (the setup flow issues new ones next).
     user.twoFactorSecret = user.pendingTwoFactorSecret;
     user.pendingTwoFactorSecret = null;
+    user.backupCodes = null;
     await this.scoped(User, (repo) => repo.save(user));
 
     // Enable 2FA in preferences. One column, materializing the row when absent:
@@ -483,17 +631,29 @@ export class TwoFactorService {
       );
     }
 
-    const { secret } = this.decryptTotpSecret(user.twoFactorSecret);
-    const isValid = otplib.verifySync({ token: code, secret }).valid;
+    await this.assertManagementTotpBudget(user.id);
+
+    // A 6-digit authenticator code, or a backup code (consumed): the same two
+    // proofs sign-in accepts. The backup code is what lets a user whose TOTP
+    // secret can no longer be decrypted (a changed JWT_SECRET) switch 2FA off
+    // and enroll again, without an administrator. Only the TOTP branch
+    // decrypts the secret.
+    const isValid = /^\d{6}$/.test(code)
+      ? this.checkTotpCode(user, code).valid
+      : await this.verifyBackupCode(user, code);
 
     if (!isValid) {
+      await this.recordUserTotpFailure(user.id);
       throw new BadRequestException(
         tr("errors.auth.invalidVerificationCode", "Invalid verification code"),
       );
     }
+    await this.attemptCounters.reset(TWO_FACTOR_USER_SCOPE, user.id);
 
-    // Clear secret and disable
+    // Clear secret and disable. The backup codes go with it: left in place they
+    // would still sign in after a later re-enrolment.
     user.twoFactorSecret = null;
+    user.backupCodes = null;
     await this.scoped(User, (repo) => repo.save(user));
 
     // Same as the enable path: write the one column, and do it unconditionally.
@@ -509,6 +669,135 @@ export class TwoFactorService {
     await this.scoped(TrustedDevice, (repo) => repo.delete({ userId }));
 
     return { message: "Two-factor authentication disabled successfully" };
+  }
+
+  /**
+   * Self-service reset of an exposed or unusable authenticator: clear the TOTP
+   * secret (active and pending), the backup codes and the enabled flag, and
+   * every trusted device, so the user can enroll a new authenticator at once.
+   *
+   * Allowed under `FORCE_2FA`, which is the point: disabling is refused there,
+   * so without this a user whose authenticator leaked, or whose secret the
+   * server can no longer decrypt (a changed `JWT_SECRET`), needed an
+   * administrator. The forced-enrolment redirect then sends them straight back
+   * into setup.
+   *
+   * It takes both proofs -- the account password and a second factor -- and
+   * never one alone: a 6-digit authenticator code or one backup code, as sign-in
+   * accepts. There is deliberately no password-only path, not even when the
+   * TOTP secret is undecryptable: a stolen session plus a phished or reused
+   * password must not be enough to strip the second factor. With an
+   * undecryptable secret a 6-digit code is simply an invalid code (counted), and
+   * a backup code -- bcrypt-hashed, independent of `JWT_SECRET` -- still works.
+   * A user with neither needs the administrator reset.
+   *
+   * Every failure, password or code, draws on the same per-user TOTP budget as
+   * sign-in and the other management endpoints (`assertManagementTotpBudget`),
+   * so a stolen session cannot guess either through this route. The checks run
+   * inside the transaction that clears the secret, against the row locked for
+   * update, so a refused request has written nothing and a concurrent enrolment
+   * cannot interleave; the failure is counted after that transaction, because a
+   * counter joined to it would roll back with the refusal.
+   *
+   * Only the refresh-token families other than `currentRefreshToken`'s are
+   * revoked, after the commit (`TokenService.revokeAllUserRefreshTokens`
+   * converges over several transactions of its own): a session the exposed
+   * factor may have admitted ends, while the one asking stays signed in to
+   * enroll. Personal access tokens and OAuth grants are left alone; they never
+   * passed a second factor, so replacing it does not bear on them, and the
+   * password is unchanged.
+   */
+  async reset2FA(
+    userId: string,
+    currentPassword: string,
+    code: string,
+    currentRefreshToken?: string,
+  ): Promise<{ message: string }> {
+    await this.assertManagementTotpBudget(userId);
+
+    const refusal = await withScopedDb(
+      this.dataSource,
+      async (manager): Promise<ResetRefusal | null> => {
+        const users = manager.getRepository(User);
+        const user = await users.findOne({
+          where: { id: userId },
+          lock: { mode: "pessimistic_write" },
+        });
+        if (!user) {
+          throw new NotFoundException(
+            tr("errors.auth.userNotFound", "User not found"),
+          );
+        }
+        if (user.authProvider === "oidc") {
+          throw new BadRequestException(
+            tr(
+              "errors.auth.twoFactorNotAvailableForSso",
+              "Two-factor authentication is not available for SSO accounts",
+            ),
+          );
+        }
+        if (!user.passwordHash) {
+          throw new BadRequestException(
+            tr(
+              "errors.auth.twoFactorRequiresPassword",
+              "Two-factor authentication requires an account password",
+            ),
+          );
+        }
+        if (!user.twoFactorSecret) {
+          throw new BadRequestException(
+            tr("errors.auth.twoFactorNotEnabled", "2FA is not enabled"),
+          );
+        }
+
+        if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+          return "credential";
+        }
+
+        // Only the TOTP branch decrypts the secret; an undecryptable one is a
+        // wrong code. The claim burns a valid code so it cannot be replayed on
+        // any replica, and joins this transaction. The backup-code branch
+        // consumes the code under the lock this transaction already holds.
+        const codeValid = /^\d{6}$/.test(code)
+          ? this.checkTotpCode(user, code).valid &&
+            (await this.claimTotpCode(user.id, code))
+          : await this.verifyBackupCode(user, code);
+        if (!codeValid) return "second-factor";
+
+        await users.update(
+          { id: userId },
+          {
+            twoFactorSecret: null,
+            pendingTwoFactorSecret: null,
+            backupCodes: null,
+          },
+        );
+        await patchUserPreferences(manager, userId, {
+          twoFactorEnabled: false,
+        });
+        // A trusted-device cookie skips the second factor being replaced.
+        await manager.getRepository(TrustedDevice).delete({ userId });
+        return null;
+      },
+    );
+
+    if (refusal) {
+      const { subject, error } = RESET_REFUSALS[refusal];
+      await this.recordUserTotpFailure(userId);
+      this.logger.warn(
+        `2FA reset refused: wrong ${subject} for user ${userId}`,
+      );
+      throw error();
+    }
+
+    await this.attemptCounters.reset(TWO_FACTOR_USER_SCOPE, userId);
+    await this.tokenService.revokeAllUserRefreshTokens(
+      userId,
+      currentRefreshToken,
+    );
+    this.logger.log(`Two-factor authentication reset by user ${userId}`);
+
+    return { message: "Two-factor authentication reset successfully" };
   }
 
   // L5: Backup code methods
@@ -532,14 +821,18 @@ export class TwoFactorService {
       );
     }
 
-    const { secret } = this.decryptTotpSecret(user.twoFactorSecret);
-    const isValid = otplib.verifySync({ token: code, secret }).valid;
+    await this.assertManagementTotpBudget(user.id);
+
+    // TOTP only, as before; an undecryptable secret is a wrong code, not a 500.
+    const isValid = this.checkTotpCode(user, code).valid;
 
     if (!isValid) {
+      await this.recordUserTotpFailure(user.id);
       throw new BadRequestException(
         tr("errors.auth.invalidVerificationCode", "Invalid verification code"),
       );
     }
+    await this.attemptCounters.reset(TWO_FACTOR_USER_SCOPE, user.id);
 
     const codes: string[] = [];
     for (let i = 0; i < this.BACKUP_CODE_COUNT; i++) {

@@ -941,6 +941,7 @@
     "removeCashFlow": "Remover fluxo de caixa",
     "removeTitle": "Remover",
     "addCashFlow": "+ Adicionar fluxo de caixa",
+    "cashFlowLimitReached": "Um cenário pode ter no máximo {max} fluxos de caixa.",
     "returnAssumptions": "Pressupostos de rentabilidade",
     "specifyReturn": "Especificar rentabilidade esperada",
     "useHistoricalReturns": "Usar rentabilidades históricas das contas selecionadas",

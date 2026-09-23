@@ -81,7 +81,9 @@
     "cannotDeleteOwnAccount": "No puedes eliminar tu propia cuenta",
     "deleteLastAdmin": "No se puede eliminar la última cuenta de administrador.",
     "cannotResetOwnPassword": "No puedes restablecer tu propia contraseña desde el panel de administración",
-    "noLocalPassword": "No se puede restablecer la contraseña de cuentas sin contraseña local"
+    "noLocalPassword": "No se puede restablecer la contraseña de cuentas sin contraseña local",
+    "cannotResetOwnTwoFactor": "No puedes restablecer tu propia autenticación de dos factores desde el panel de administración",
+    "twoFactorNotEnabled": "Este usuario no tiene configurada la autenticación de dos factores."
   },
   "ai": {
     "queryStreamFailed": "Se produjo un error inesperado al procesar tu consulta.",
@@ -101,6 +103,9 @@
     "relayAgentOffline": "Tu agente de relay MCP no está conectado. Conecta tu agente e inténtalo de nuevo.",
     "relayCompletionTimedOut": "Tu agente de relay MCP no respondió a tiempo. Asegúrate de que esté conectado e inténtalo de nuevo.",
     "unknownProvider": "Proveedor de AI desconocido: {{ provider }}",
+    "privateBaseUrlRefused": "Esta URL base apunta a una dirección de red privada o local (como localhost, 192.168.x.x o el nombre de un contenedor). Solo un administrador puede usarla, a menos que el operador del servidor permita esa dirección en AI_PRIVATE_BASE_URL_ALLOWLIST.",
+    "modelVerifyFailed": "No se pudo verificar el modelo configurado. Comprueba la URL base y que el proveedor sea accesible.",
+    "modelVerifyFailedStatus": "No se pudo verificar el modelo configurado: el proveedor respondió con el estado HTTP {{ status }}.",
     "forecastDataGatherFailed": "Error al recopilar datos financieros para el pronóstico. Inténtalo de nuevo.",
     "forecastInsufficientHistory": "Historial de transacciones insuficiente para el pronóstico. Se requieren al menos 2 meses de datos.",
     "forecastGenerateFailed": "Error al generar el pronóstico. Inténtalo de nuevo.",
@@ -139,6 +144,7 @@
     "accountDeactivated": "La cuenta está desactivada",
     "emailNotVerified": "Verifica tu correo electrónico antes de iniciar sesión. Revisa tu bandeja de entrada para encontrar el enlace de verificación.",
     "invalidOrExpiredEmailVerificationToken": "Enlace de verificación no válido o caducado",
+    "invalidOrExpiredEmailChangeToken": "Enlace de cambio de correo electrónico no válido o caducado",
     "oidcNoSubject": "El proveedor OIDC no devolvió un identificador de sujeto",
     "registrationDisabled": "El registro de nuevas cuentas está deshabilitado.",
     "invalidOrExpiredLinkToken": "Token de enlace no válido o caducado",
@@ -201,6 +207,8 @@
     "unsupportedBackupVersion": "Versión de copia de seguridad no admitida: {{ version }}. Se esperaba {{ expected }}",
     "missingExportedAt": "Formato de copia de seguridad no válido: falta exportedAt",
     "tableNotAllowed": "La tabla {{ table }} no está permitida en la restauración de copia de seguridad",
+    "invalidRestoreIdentifier": "Archivo de copia de seguridad no válido: {{ table }}.{{ column }} contiene \"{{ value }}\", que no es un identificador válido. Restaura desde un archivo de copia de seguridad sin modificar.",
+    "unresolvedRestoreReference": "Archivo de copia de seguridad no válido: {{ table }}.{{ column }} hace referencia a la fila {{ value }} de {{ referencedTable }}, que el archivo no contiene. Una copia de seguridad solo puede restaurar filas que hagan referencia a otras filas del mismo archivo; restaura desde un archivo de copia de seguridad sin modificar.",
     "encryptionNotConfigured": "El servidor no está configurado para el cifrado (falta JWT_SECRET o es demasiado corto)",
     "backupPasswordOidcOnly": "La contraseña de copia de seguridad solo es configurable para usuarios OIDC; los usuarios locales usan su contraseña de inicio de sesión",
     "backupPasswordLocalOnly": "Esta cuenta no tiene contraseña de inicio de sesión con la que cifrar las copias de seguridad; establece una contraseña de copia de seguridad en su lugar",
@@ -293,6 +301,7 @@
     "actionNotAvailableAsDelegate": "Esta acción no está disponible mientras actúas en nombre de otro usuario. Solo el titular de la cuenta puede hacerlo.",
     "capabilityNotGranted": "El titular de la cuenta no te ha concedido permiso para {{ operation }} {{ resource }}. Pídele que lo habilite en tu configuración de acceso delegado.",
     "sectionNotGranted": "El titular de la cuenta no ha compartido contigo la sección {{ sectionLabel }}.",
+    "fullScopeRequired": "El Asistente AI consulta todas las cuentas y secciones del titular de la cuenta, por lo que solo está disponible para un delegado que pueda leer todas las cuentas y todas las secciones. Pide al titular que comparta el resto contigo o usa las páginas a las que ya tienes acceso.",
     "accountNotShared": "El titular de la cuenta no ha compartido esta cuenta contigo.",
     "accountOperationNotGranted": "El titular de la cuenta no te ha concedido permiso para {{ operation }} transacciones en esta cuenta.",
     "jointOwnAccount": "Esta es su propia cuenta; el acceso de cuenta conjunta no se aplica aquí.",
@@ -350,6 +359,7 @@
   "monteCarlo": {
     "scenarioNotFound": "Escenario {{ id }} no encontrado",
     "atLeastOneAccountRequired": "Se requiere al menos un accountId",
+    "tooManyCashFlows": "Un escenario puede tener como máximo {{ max }} flujos de caja",
     "currentValueUnavailable": "No se pudo determinar el valor actual de las cuentas seleccionadas, por lo que una simulación no puede partir de él. Introduzca un valor inicial explícitamente o vuelva a intentarlo cuando haya precios y tipos de cambio disponibles.",
     "historicalReturnsUnavailable": "No se pudieron calcular los rendimientos históricos de las cuentas seleccionadas, por lo que una simulación no puede usarlos. Introduzca manualmente un rendimiento esperado y una volatilidad, o reinténtelo cuando los precios y los tipos de cambio estén disponibles."
   },

@@ -13,6 +13,9 @@ import { EncryptionService } from "../common/encryption/encryption.service";
 import { hashToken } from "../auth/crypto.util";
 import { getRequestContext } from "../common/request-context";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+import { PersonalAccessToken } from "../auth/entities/personal-access-token.entity";
+import { TrustedDevice } from "../users/entities/trusted-device.entity";
+import { OAUTH_GRANT_REVOKER } from "../auth/credential-revocation";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -23,6 +26,9 @@ describe("EmergencyAccessClaimController", () => {
   let contactsRepo: Record<string, jest.Mock>;
   let settingsRepo: Record<string, jest.Mock>;
   let usersRepo: Record<string, jest.Mock>;
+  let patRepo: Record<string, jest.Mock>;
+  let trustedDevicesRepo: Record<string, jest.Mock>;
+  let oauthProviderService: { revokeAllForUser: jest.Mock };
   let tokenService: Record<string, jest.Mock>;
   let authService: Record<string, jest.Mock>;
   let passwordBreach: Record<string, jest.Mock>;
@@ -59,6 +65,9 @@ describe("EmergencyAccessClaimController", () => {
     };
     settingsRepo = { findOne: jest.fn() };
     usersRepo = { findOne: jest.fn() };
+    patRepo = { update: jest.fn() };
+    trustedDevicesRepo = { delete: jest.fn() };
+    oauthProviderService = { revokeAllForUser: jest.fn().mockResolvedValue(0) };
     tokenService = {
       revokeAllUserRefreshTokens: jest.fn(),
       generateTokenPair: jest
@@ -103,6 +112,8 @@ describe("EmergencyAccessClaimController", () => {
       [EmergencyAccessContact, contactsRepo as never],
       [EmergencyAccessSettings, settingsRepo as never],
       [User, usersRepo as never],
+      [PersonalAccessToken, patRepo as never],
+      [TrustedDevice, trustedDevicesRepo as never],
     ]);
     Object.assign(scoped.manager, queryRunner.manager);
     queryRunner.manager = scoped.manager;
@@ -130,6 +141,7 @@ describe("EmergencyAccessClaimController", () => {
         { provide: PasswordBreachService, useValue: passwordBreach },
         { provide: EncryptionService, useValue: encryption },
         { provide: ConfigService, useValue: configService },
+        { provide: OAUTH_GRANT_REVOKER, useValue: oauthProviderService },
       ],
     }).compile();
 
@@ -321,6 +333,36 @@ describe("EmergencyAccessClaimController", () => {
         expect.any(Object),
       );
       expect(res.json).toHaveBeenCalledWith({ ok: true });
+    });
+
+    it("ends the previous holder's PATs, trusted devices and OAuth grants", async () => {
+      // The claim replaced the password and cut the web sessions, but a
+      // personal access token or an MCP client's OAuth grant the previous
+      // holder had handed out kept working on the claimed account.
+      queryRunner.manager.findOne.mockResolvedValue({ id: ownerId });
+      usersRepo.findOne.mockResolvedValue({ id: ownerId, isActive: true });
+
+      await controller.complete(
+        { token: RAW_TOKEN, newPassword: "Aa1!correcthorse" },
+        makeRes() as never,
+      );
+
+      expect(patRepo.update).toHaveBeenCalledWith(
+        { userId: ownerId, isRevoked: false },
+        { isRevoked: true },
+      );
+      expect(trustedDevicesRepo.delete).toHaveBeenCalledWith({
+        userId: ownerId,
+      });
+      expect(oauthProviderService.revokeAllForUser).toHaveBeenCalledWith(
+        ownerId,
+      );
+      // After the commit, like the session revocation it follows.
+      expect(
+        oauthProviderService.revokeAllForUser.mock.invocationCallOrder[0],
+      ).toBeGreaterThan(
+        tokenService.revokeAllUserRefreshTokens.mock.invocationCallOrder[0],
+      );
     });
 
     it("rolls back when the token is no longer valid in-transaction", async () => {
@@ -530,6 +572,7 @@ describe("EmergencyAccessClaimController", () => {
           { provide: PasswordBreachService, useValue: passwordBreach },
           { provide: EncryptionService, useValue: encryption },
           { provide: ConfigService, useValue: configService },
+          { provide: OAUTH_GRANT_REVOKER, useValue: oauthProviderService },
         ],
       }).compile();
       const prodController = prodModule.get(EmergencyAccessClaimController);

@@ -37,6 +37,7 @@ import { assertRuntimeRoleSafe } from "./common/db/runtime-role-check";
 import { assertRequiredDbFunctions } from "./common/db/required-db-functions";
 import { ConfigService } from "@nestjs/config";
 import { logEncryptionKeyStatus } from "./common/encryption/encryption-key";
+import { logJwtSecretStatus } from "./common/jwt-secret-policy";
 
 // node-oidc-provider writes its notices straight to console.info/console.warn,
 // which would otherwise be the only unformatted lines in the log. Installed
@@ -85,11 +86,11 @@ pgUtils.prepareValue = function (val: unknown, seen?: unknown[]): unknown {
 /**
  * Check the cluster boot matrix and exit if this configuration cannot serve.
  *
- * Runs before `NestFactory.create` on purpose. Everything it refuses is already
- * fatal further in -- `JwtStrategy` throws on a missing `JWT_SECRET` -- but it
- * is fatal as a dependency-injection failure, which reaches the operator as a
- * stack trace through Nest's container rather than as a sentence naming the
- * variable. The refusal shape is `assertRequiredDbFunctionsOrExit` below: log
+ * Runs before `NestFactory.create` on purpose. Much of what it refuses is also
+ * fatal further in -- `JwtStrategy` throws on a missing `JWT_SECRET` -- but
+ * there it is fatal as a dependency-injection failure, which reaches the
+ * operator as a stack trace through Nest's container rather than as a sentence
+ * naming the variable. A missing `ENCRYPTION_KEY` is refused only here. The refusal shape is `assertRequiredDbFunctionsOrExit` below: log
  * the reason, `process.exit(1)`, before anything listens.
  */
 function assertClusterBootOrExit(): void {
@@ -100,6 +101,8 @@ function assertClusterBootOrExit(): void {
   const report = checkClusterBoot({
     CLUSTER_MODE: process.env.CLUSTER_MODE,
     JWT_SECRET: process.env.JWT_SECRET,
+    ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
+    AI_ENCRYPTION_KEY: process.env.AI_ENCRYPTION_KEY,
     ATTACHMENT_STORAGE_PROVIDER: process.env.ATTACHMENT_STORAGE_PROVIDER,
     ATTACHMENT_CONTAINER_DIR: process.env.ATTACHMENT_CONTAINER_DIR,
     ATTACHMENT_LOCAL_DIR: process.env.ATTACHMENT_LOCAL_DIR,
@@ -229,22 +232,26 @@ async function assertRequiredDbFunctionsOrExit(
 }
 
 /**
- * Say what this deployment's encryption key situation is, at every boot.
+ * Say at every boot what an operator should fix but that does not stop the
+ * server: `ENCRYPTION_KEY` still supplied under its former name, and a
+ * `JWT_SECRET` that is long enough but weak (a published placeholder, a typed
+ * pattern). Both are refusals only where they are unsafe to serve at all -- a
+ * missing key or a missing/short secret -- and those exit in
+ * `assertClusterBootOrExit` before this runs.
  *
- * Deliberately a warning and not a refusal, unlike the two database checks
- * below. `ENCRYPTION_KEY` is not required yet: refusing to boot would turn an
- * upgrade into an outage for every deployment that never set the variable under
- * its old name, `AI_ENCRYPTION_KEY`, which was optional and documented as being
- * for cloud AI providers. But an unkeyed server is precisely the state issue
- * #1269 was reported from -- backups written in plaintext with nothing saying so
- * -- so the absence is announced loudly, on every start, and named as a coming
- * hard requirement. The individual write paths still refuse; only the boot does
- * not.
+ * The weak secret is a warning rather than a refusal because replacing it
+ * stops every user's authenticator codes working (their TOTP secrets are
+ * encrypted under a key derived from it); the warning says so, and the same
+ * finding reaches administrators in the app as a system alert and a banner.
  */
-function reportEncryptionKeyStatus(configService: ConfigService): void {
+function reportSecretStatus(configService: ConfigService): void {
   logEncryptionKeyStatus(
     (name) => configService.get<string>(name, ""),
     new Logger("EncryptionKeyCheck"),
+  );
+  logJwtSecretStatus(
+    configService.get<string>("JWT_SECRET"),
+    new Logger("JwtSecretCheck"),
   );
 }
 
@@ -257,9 +264,8 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
-  // Before anything that could store a secret: a server with no key writes
-  // plaintext where it promises ciphertext, and used to say nothing.
-  reportEncryptionKeyStatus(app.get(ConfigService));
+  // Before anything listens: the warnings belong at the top of the log.
+  reportSecretStatus(app.get(ConfigService));
 
   // RLS_MODE=enforce promises a database-level tenant boundary. Selecting the
   // application role and supplying its password does not deliver one: a

@@ -83,6 +83,7 @@ const examples = {
     expectedAttachments: 5,
   },
   ENCRYPTION_KEY_MISSING: { system: true },
+  JWT_SECRET_WEAK: { system: true, reason: "placeholder" },
   SMTP_FAILURE: { system: true, lastError: "ECONNREFUSED" },
   PROVIDER_OUTAGE: { system: true, providerLabel: "Yahoo Finance" },
   PROVIDER_RECOVERED: { system: true, providerLabel: "Yahoo Finance" },

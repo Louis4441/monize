@@ -941,6 +941,7 @@
     "removeCashFlow": "नकद प्रवाह हटाएँ",
     "removeTitle": "हटाएँ",
     "addCashFlow": "+ नकद प्रवाह जोड़ें",
+    "cashFlowLimitReached": "एक परिदृश्य में अधिकतम {max} नकद प्रवाह हो सकते हैं।",
     "returnAssumptions": "रिटर्न अनुमान",
     "specifyReturn": "अपेक्षित रिटर्न निर्दिष्ट करें",
     "useHistoricalReturns": "चयनित खातों से ऐतिहासिक रिटर्न उपयोग करें",

@@ -19,10 +19,12 @@
     "passwordRequired": "Cần có mật khẩu hiện tại để thay đổi email",
     "noChanges": "Không có thay đổi nào để lưu",
     "passwordConfirmNote": "Cần xác nhận mật khẩu khi thay đổi địa chỉ email.",
+    "pendingEmailNotice": "Liên kết xác nhận đã được gửi đến {email}. Địa chỉ email của bạn sẽ thay đổi sau khi bạn mở liên kết đó.",
     "saveButton": "Lưu hồ sơ",
     "savingButton": "Đang lưu...",
     "toasts": {
       "success": "Hồ sơ đã được cập nhật thành công",
+      "confirmationSent": "Kiểm tra {email} để nhận liên kết xác nhận địa chỉ email mới của bạn",
       "updateFailed": "Không thể cập nhật hồ sơ"
     },
     "validation": {
@@ -58,14 +60,28 @@
       "addLayerDescription": "Thêm một lớp bảo mật cho tài khoản của bạn.",
       "enableButton": "Bật 2FA",
       "disableButton": "Tắt 2FA",
+      "resetButton": "Đặt lại 2FA",
       "disableModal": {
         "title": "Tắt xác thực hai yếu tố",
-        "description": "Nhập mã 6 chữ số hiện tại của bạn để xác nhận tắt 2FA.",
+        "description": "Nhập mã 6 chữ số từ ứng dụng xác thực của bạn, hoặc một trong các mã dự phòng (xxxx-xxxx), để xác nhận tắt 2FA.",
         "verificationCodeLabel": "Mã xác minh",
         "disablingButton": "Đang tắt...",
         "toasts": {
           "disabled": "Xác thực hai yếu tố đã bị tắt",
           "disableFailed": "Không thể tắt 2FA"
+        }
+      },
+      "resetModal": {
+        "title": "Đặt lại xác thực hai yếu tố",
+        "description": "Dùng tùy chọn này nếu ứng dụng xác thực hoặc mã dự phòng của bạn có thể đã bị lộ, hoặc nếu mã xác thực của bạn không còn hoạt động (ví dụ sau khi thay đổi bí mật máy chủ).",
+        "effect": "Trình xác thực hiện tại, mã dự phòng và thiết bị tin cậy của bạn sẽ ngừng hoạt động, và bạn sẽ bị đăng xuất khỏi mọi thiết bị khác. Sau đó bạn thiết lập ngay một trình xác thực mới.",
+        "passwordLabel": "Mật khẩu tài khoản",
+        "codeLabel": "Mã xác thực hoặc mã dự phòng",
+        "codeHint": "Nhập mã 6 chữ số từ ứng dụng xác thực của bạn. Nếu trình xác thực không còn hoạt động, hãy nhập một trong các mã dự phòng (xxxx-xxxx) thay thế.",
+        "resettingButton": "Đang đặt lại...",
+        "toasts": {
+          "reset": "Đã đặt lại xác thực hai yếu tố. Hãy thiết lập trình xác thực mới ngay bây giờ.",
+          "resetFailed": "Không thể đặt lại 2FA"
         }
       }
     },
@@ -582,7 +598,11 @@
       "copyUrlFailed": "Không thể sao chép URL",
       "loadFailed": "Không thể tải mã thông báo API",
       "createFailed": "Không thể tạo mã thông báo",
-      "revokeFailed": "Không thể thu hồi mã thông báo"
+      "revokeFailed": "Không thể thu hồi mã thông báo",
+      "reauthFailed": "Không thể xác nhận xác thực lại"
+    },
+    "stepUp": {
+      "reason": "Mã thông báo có thể truy cập tài khoản của bạn mà không cần đăng nhập, vì vậy hãy xác nhận danh tính trước khi tạo."
     },
     "relative": {
       "never": "Không bao giờ",
@@ -905,7 +925,8 @@
       "shared": "Dữ liệu chia sẻ"
     },
     "sections": {
-      "description": "Cấp quyền truy cập chỉ đọc vào toàn bộ các phần ứng dụng. Dữ liệu phạm vi tài khoản vẫn cần quyền truy cập từng tài khoản."
+      "description": "Cấp quyền truy cập chỉ đọc vào toàn bộ các phần ứng dụng. Dữ liệu phạm vi tài khoản vẫn cần quyền truy cập từng tài khoản.",
+      "aiRequiresFullAccess": "Trợ lý AI đọc toàn bộ tài khoản và các phần, vì vậy chỉ trả lời cho người đại diện này khi họ có thể đọc tất cả tài khoản của bạn và mọi phần khác."
     },
     "accounts": {
       "noAccounts": "Không có tài khoản nào để cấp.",
@@ -1164,6 +1185,7 @@
       "ollamaCloudNote": "Tên mô hình phải bao gồm hậu tố -cloud (VD: gpt-oss:20b-cloud).",
       "apiKeyLabel": "Khóa API",
       "baseUrlLabel": "URL cơ sở",
+      "baseUrlPrivateNote": "Địa chỉ riêng hoặc cục bộ (localhost, 192.168.x.x hoặc tên container) chỉ hoạt động với quản trị viên, hoặc khi người vận hành máy chủ cho phép địa chỉ đó. Nếu không, hãy dùng địa chỉ có thể truy cập từ internet.",
       "priorityLabel": "Ưu tiên",
       "priorityHelp": "Số nhỏ hơn = ưu tiên cao hơn. Được sử dụng để đặt thứ tự dự phòng.",
       "costRatesHeading": "Tỷ lệ chi phí (tùy chọn)",

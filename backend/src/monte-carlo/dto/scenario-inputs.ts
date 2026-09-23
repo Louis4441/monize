@@ -1,4 +1,5 @@
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsInt,
@@ -12,7 +13,7 @@ import {
   ValidateNested,
 } from "class-validator";
 import { Type } from "class-transformer";
-import { CashFlowDto } from "./cash-flow.dto";
+import { CashFlowDto, MAX_SCENARIO_CASH_FLOWS } from "./cash-flow.dto";
 
 /**
  * Shared input fields used by both `CreateScenarioDto` and the ad-hoc
@@ -102,6 +103,7 @@ export class ScenarioInputs {
    * base contribution/withdrawal phases. */
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(MAX_SCENARIO_CASH_FLOWS)
   @ValidateNested({ each: true })
   @Type(() => CashFlowDto)
   cashFlows?: CashFlowDto[];

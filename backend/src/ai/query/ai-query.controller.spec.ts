@@ -1,4 +1,10 @@
+import { Reflector } from "@nestjs/core";
 import { Test, TestingModule } from "@nestjs/testing";
+import {
+  ALLOW_DELEGATE_KEY,
+  DELEGATE_FULL_SCOPE_KEY,
+  DELEGATE_SECTION_KEY,
+} from "../../delegation/decorators/delegate-access.decorator";
 import { AiQueryController } from "./ai-query.controller";
 import { AiQueryService, QueryResult } from "./ai-query.service";
 
@@ -35,6 +41,27 @@ describe("AiQueryController", () => {
     }).compile();
 
     controller = module.get<AiQueryController>(AiQueryController);
+  });
+
+  it("admits an acting delegate only with the ai section and a whole-ledger grant", () => {
+    const reflector = new Reflector();
+    for (const handler of [
+      AiQueryController.prototype.query,
+      AiQueryController.prototype.streamQuery,
+    ]) {
+      const targets = [handler, AiQueryController];
+      expect(reflector.getAllAndOverride(ALLOW_DELEGATE_KEY, targets)).toBe(
+        true,
+      );
+      expect(reflector.getAllAndOverride(DELEGATE_SECTION_KEY, targets)).toBe(
+        "ai",
+      );
+      // The tools read every account and section; nothing narrows them to
+      // the delegate's grants, so the route needs all of them.
+      expect(
+        reflector.getAllAndOverride(DELEGATE_FULL_SCOPE_KEY, targets),
+      ).toBe(true);
+    }
   });
 
   describe("query()", () => {

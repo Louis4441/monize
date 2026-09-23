@@ -99,4 +99,19 @@ export class AdminController {
   resetPassword(@Request() req, @Param("id", ParseUUIDPipe) id: string) {
     return this.adminService.resetUserPassword(req.user.id, id);
   }
+
+  @Post(":id/reset-2fa")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Reset a user's two-factor authentication and sign them out (admin only)",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "2FA cleared, trusted devices removed, sessions revoked",
+  })
+  @ApiResponse({ status: 400, description: "The user has no 2FA set up" })
+  resetTwoFactor(@Request() req, @Param("id", ParseUUIDPipe) id: string) {
+    return this.adminService.resetUserTwoFactor(req.user.id, id);
+  }
 }

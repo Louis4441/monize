@@ -85,10 +85,26 @@ describe("OpenAiProvider", () => {
     // long-running fetch wrapper so SDK calls inherit disabled timeouts.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const OpenAI = require("openai").default;
+    const sdkOptions = OpenAI.mock.calls[OpenAI.mock.calls.length - 1][0];
+    expect(typeof sdkOptions.fetch).toBe("function");
+    expect(sdkOptions.fetch).not.toBe(global.fetch);
+  });
+
+  it("hands the SDK the egress-policy fetch the factory passes", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { longRunningFetch } = require("./long-running-fetch");
-    expect(OpenAI).toHaveBeenCalledWith(
-      expect.objectContaining({ fetch: longRunningFetch }),
+    const OpenAI = require("openai").default;
+    const egressFetch = jest.fn() as unknown as typeof fetch;
+    new OpenAiProvider(
+      "sk-test",
+      "gpt-4o",
+      "https://api.example.test/v1",
+      egressFetch,
+    );
+    expect(OpenAI).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        fetch: egressFetch,
+        baseURL: "https://api.example.test/v1",
+      }),
     );
   });
 
@@ -711,7 +727,8 @@ describe("OpenAiProvider", () => {
       const result = await provider.verifyModel();
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.reason).toContain("ECONNREFUSED");
+        expect(result.reason).not.toContain("ECONNREFUSED");
+        expect(result.reason).toMatch(/could not verify the configured model/i);
       }
     });
 
@@ -720,7 +737,8 @@ describe("OpenAiProvider", () => {
       const result = await provider.verifyModel();
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.reason).toContain("plain-string");
+        expect(result.reason).not.toContain("plain-string");
+        expect(result.reason).toMatch(/could not verify the configured model/i);
       }
     });
 

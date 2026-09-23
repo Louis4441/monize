@@ -1,11 +1,12 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { NotFoundException } from "@nestjs/common";
-import { DataSource } from "typeorm";
+import { DataSource, In } from "typeorm";
 import { PayeeDetailService } from "./payee-detail.service";
 import { PayeesService } from "./payees.service";
 import { Payee } from "./entities/payee.entity";
 import { PayeeAlias } from "./entities/payee-alias.entity";
 import { Account } from "../accounts/entities/account.entity";
+import { Transaction } from "../transactions/entities/transaction.entity";
 import {
   createScopedDbMocks,
   DataSourceMock,
@@ -269,5 +270,62 @@ describe("PayeeDetailService", () => {
     await service.getDetail(USER_ID, PAYEE_ID);
 
     expect(mockDataSource.transaction).toHaveBeenCalledTimes(1);
+  });
+
+  describe("an account scope (an acting delegate's READ grants)", () => {
+    /** Queue three builders and hand them back so a test can read their clauses. */
+    function capturedBuilders() {
+      // Replaces the builders `given` queued, keeping its other stubs.
+      txManager.createQueryBuilder.mockReset();
+      const builders = [queryBuilder(), queryBuilder(), queryBuilder()];
+      for (const builder of builders) {
+        txManager.createQueryBuilder.mockImplementationOnce(() => builder);
+      }
+      return builders;
+    }
+
+    it("narrows every transaction figure and the overpayment list to the scoped accounts", async () => {
+      given({});
+      const builders = capturedBuilders();
+
+      await service.getDetail(USER_ID, PAYEE_ID, ["acc-a"]);
+
+      for (const builder of builders) {
+        expect(builder.andWhere).toHaveBeenCalledWith(
+          "t.account_id IN (:...delegateScopeAccountIds)",
+          { delegateScopeAccountIds: ["acc-a"] },
+        );
+      }
+      expect(txManager.count).toHaveBeenCalledWith(
+        Transaction,
+        expect.objectContaining({
+          where: expect.objectContaining({ accountId: In(["acc-a"]) }),
+        }),
+      );
+      expect(accountRepository.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId: USER_ID,
+            overpaymentPayeeId: PAYEE_ID,
+            id: In(["acc-a"]),
+          },
+        }),
+      );
+    });
+
+    it("reveals nothing for an empty scope", async () => {
+      given({});
+      const builders = capturedBuilders();
+
+      const detail = await service.getDetail(USER_ID, PAYEE_ID, []);
+
+      for (const builder of builders) {
+        expect(builder.andWhere).toHaveBeenCalledWith("1 = 0");
+      }
+      expect(txManager.count).not.toHaveBeenCalled();
+      expect(accountRepository.find).not.toHaveBeenCalled();
+      expect(detail.stats.uncategorizedCount).toBe(0);
+      expect(detail.overpaymentForAccounts).toEqual([]);
+    });
   });
 });

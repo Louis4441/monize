@@ -28,6 +28,7 @@ import { restoreProcessingGate } from "./restore-processing-gate";
 import { User } from "../users/entities/user.entity";
 import { EncryptionService } from "../common/encryption/encryption.service";
 import { encryptBackup } from "./backup-crypto.util";
+import { createWrappedBackupKey } from "./backup-key-wrap";
 import * as bcrypt from "bcryptjs";
 import {
   createScopedDbMocks,
@@ -2472,6 +2473,13 @@ describe("BackupService", () => {
       ) {
         return {
           ...validBackupData,
+          // The transactions the attachments hang off travel in the same file,
+          // as the exporter writes them; a reference to a row the file does not
+          // carry refuses the restore (INV-BACKUP-009).
+          transactions: [
+            { id: TX_ID, user_id: userId },
+            { id: "44444444-4444-4444-8444-444444444444", user_id: userId },
+          ],
           transaction_attachments: [
             {
               id: OLD_ID,
@@ -3574,9 +3582,10 @@ describe("BackupService", () => {
           ownedAttachments = [];
           const data = {
             ...validBackupData,
-            transactions: Array.from({ length: 40 }, () => ({
-              id: randomUUID(),
-            })),
+            transactions: [
+              { id: TX_ID },
+              ...Array.from({ length: 40 }, () => ({ id: randomUUID() })),
+            ],
             transaction_attachments: [attachmentRow(OLD_ID)],
             attachment_blobs: [
               { attachment_id: OLD_ID, data: BYTES.toString("base64") },
@@ -3616,9 +3625,10 @@ describe("BackupService", () => {
           ];
           const data = {
             ...validBackupData,
-            transactions: Array.from({ length: 30 }, () => ({
-              id: randomUUID(),
-            })),
+            transactions: [
+              { id: TX_ID },
+              ...Array.from({ length: 30 }, () => ({ id: randomUUID() })),
+            ],
             transaction_attachments: [
               attachmentRow(CARRIED),
               attachmentRow(LEGACY_A),
@@ -3948,11 +3958,16 @@ describe("BackupService", () => {
       const backupWithData = {
         ...validBackupData,
         categories: [
-          { id: "cat-1", user_id: userId, name: "Food", parent_id: null },
+          {
+            id: "c0000000-0000-4000-8000-000000000001",
+            user_id: userId,
+            name: "Food",
+            parent_id: null,
+          },
         ],
         accounts: [
           {
-            id: "acc-1",
+            id: "a0000000-0000-4000-8000-000000000001",
             user_id: userId,
             name: "Checking",
             account_type: "CHEQUING",
@@ -3985,7 +4000,7 @@ describe("BackupService", () => {
         ...validBackupData,
         investment_reports: [
           {
-            id: "ir-1",
+            id: "e0000000-0000-4000-8000-000000000001",
             user_id: "different-user-id",
             name: "By Symbol",
             description: null,
@@ -4147,7 +4162,11 @@ describe("BackupService", () => {
       const backupWithDifferentUser = {
         ...validBackupData,
         categories: [
-          { id: "cat-1", user_id: "different-user-id", name: "Food" },
+          {
+            id: "c0000000-0000-4000-8000-000000000001",
+            user_id: "different-user-id",
+            name: "Food",
+          },
         ],
       };
 
@@ -4216,6 +4235,7 @@ describe("BackupService", () => {
       const accountId = randomUUID();
       const backupWithInvSplit = {
         ...validBackupData,
+        accounts: [{ id: accountId, user_id: userId, name: "Brokerage" }],
         securities: [
           { id: securityId, user_id: userId, symbol: "VEA", name: "Vanguard" },
         ],
@@ -4275,7 +4295,11 @@ describe("BackupService", () => {
           c[0].includes('"investment_security_id"'),
       );
       expect(update).toBeDefined();
-      expect(update![1]).toEqual([newSecurityId, newSplitId]);
+      expect(update![1]).toEqual([newSecurityId, newSplitId, userId]);
+      // The split has no user_id of its own; the repair is confined through its
+      // schedule's owner (INV-BACKUP-009).
+      expect(update![0]).toContain('FROM "scheduled_transactions" o');
+      expect(update![0]).toContain("o.user_id = $3");
     });
 
     it("should defer circular FK columns and update them after all inserts", async () => {
@@ -4376,7 +4400,9 @@ describe("BackupService", () => {
       const child = catRows.find((r) => r.name === "Child");
       expect(parent!.id).not.toBe(catParentId);
       expect(child!.id).not.toBe(catChildId);
-      expect(parentIdUpdate![1]).toEqual([parent!.id, child!.id]);
+      expect(parentIdUpdate![1]).toEqual([parent!.id, child!.id, userId]);
+      // Confined to the restoring user's rows, whatever id the file carried.
+      expect(parentIdUpdate![0]).toContain("user_id = $3");
 
       const linkedAccountUpdate = updateCalls.find(
         (call: unknown[]) =>
@@ -4453,11 +4479,13 @@ describe("BackupService", () => {
           c[0].includes('"institution_id"'),
       );
       expect(institutionUpdate).toBeDefined();
-      // The guard only sets the FK when the referenced institution exists.
+      // The guard only sets the FK when the referenced institution exists and
+      // is the restoring user's.
       expect(institutionUpdate![0]).toContain(
         'EXISTS (SELECT 1 FROM "institutions"',
       );
-      expect(institutionUpdate![1]).toEqual([instRow.id, acctRow.id]);
+      expect(institutionUpdate![0]).toContain("WHERE id = $1 AND user_id = $3");
+      expect(institutionUpdate![1]).toEqual([instRow.id, acctRow.id, userId]);
     });
 
     it("restores a legacy backup whose accounts reference institutions not in the backup", async () => {
@@ -4500,22 +4528,21 @@ describe("BackupService", () => {
       // institution_id must not be inserted directly.
       expect(accountInsert![0]).not.toContain("institution_id");
 
-      // The Phase-3 UPDATE is still guarded; with no institution it sets nothing.
+      // The dangling reference names no row of the file, so it is severed
+      // before Phase 3 (SEVERED_WHEN_UNRESOLVED) and never reaches an UPDATE --
+      // where the old EXISTS guard would have accepted any user's institution
+      // that happened to carry the id.
       const institutionUpdate = mockQueryRunner.query.mock.calls.find(
         (c: unknown[]) =>
           typeof c[0] === "string" &&
           c[0].includes('UPDATE "accounts"') &&
           c[0].includes('"institution_id"'),
       );
-      expect(institutionUpdate).toBeDefined();
-      expect(institutionUpdate![0]).toContain(
-        'EXISTS (SELECT 1 FROM "institutions"',
+      expect(institutionUpdate).toBeUndefined();
+      const params = mockQueryRunner.query.mock.calls.flatMap((c: unknown[]) =>
+        Array.isArray(c[1]) ? c[1] : [],
       );
-      // The dangling original id is never reused (no remap target existed).
-      expect(institutionUpdate![1]).toEqual([
-        danglingInstitutionId,
-        insertColumnMap(accountInsert!).id,
-      ]);
+      expect(params).not.toContain(danglingInstitutionId);
     });
 
     it("base64-decodes institution logo_data (bytea) on restore", async () => {
@@ -4791,12 +4818,14 @@ describe("BackupService", () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
       const acctId = randomUUID();
+      const secId = randomUUID();
       const backup = {
         ...validBackupData,
+        securities: [{ id: secId, user_id: userId, symbol: "VEA" }],
         // A bigserial-style id and a non-id field with the same string value.
         // Neither should be rewritten as a UUID.
         security_prices: [
-          { id: "5", security_id: acctId, price_date: "2024-06-01" },
+          { id: "5", security_id: secId, price_date: "2024-06-01" },
         ],
         accounts: [
           {
@@ -4950,7 +4979,7 @@ describe("BackupService", () => {
         ],
         accounts: [
           {
-            id: "acc-1",
+            id: "a0000000-0000-4000-8000-000000000001",
             user_id: userId,
             name: "MYR Account",
             currency_code: "MYR",
@@ -4996,7 +5025,7 @@ describe("BackupService", () => {
         currencies: [],
         accounts: [
           {
-            id: "acc-1",
+            id: "a0000000-0000-4000-8000-000000000001",
             user_id: userId,
             name: "USD Account",
             currency_code: "USD",
@@ -5031,9 +5060,12 @@ describe("BackupService", () => {
       ];
       const backupWithJsonb = {
         ...validBackupData,
+        accounts: [
+          { id: "a0000000-0000-4000-8000-000000000001", user_id: userId },
+        ],
         securities: [
           {
-            id: "sec-1",
+            id: "5ec00000-0000-4000-8000-000000000001",
             user_id: userId,
             symbol: "VEA",
             name: "Vanguard FTSE",
@@ -5045,9 +5077,9 @@ describe("BackupService", () => {
         ],
         scheduled_transactions: [
           {
-            id: "sched-1",
+            id: "d0000000-0000-4000-8000-000000000001",
             user_id: userId,
-            account_id: "acc-1",
+            account_id: "a0000000-0000-4000-8000-000000000001",
             tag_ids: ["tag-1", "tag-2"],
           },
         ],
@@ -5085,9 +5117,12 @@ describe("BackupService", () => {
 
       const backupWithTimestamps = {
         ...validBackupData,
+        accounts: [
+          { id: "a0000000-0000-4000-8000-000000000001", user_id: userId },
+        ],
         categories: [
           {
-            id: "cat-1",
+            id: "c0000000-0000-4000-8000-000000000001",
             user_id: userId,
             name: "Food",
             created_at: "2024-06-15T10:30:00.000Z",
@@ -5095,9 +5130,9 @@ describe("BackupService", () => {
         ],
         transactions: [
           {
-            id: "txn-1",
+            id: "70000000-0000-4000-8000-000000000001",
             user_id: userId,
-            account_id: "acc-1",
+            account_id: "a0000000-0000-4000-8000-000000000001",
             amount: 100,
             created_at: "2024-07-01T08:00:00.000Z",
             updated_at: "2024-07-02T09:00:00.000Z",
@@ -5144,17 +5179,17 @@ describe("BackupService", () => {
         ...validBackupData,
         accounts: [
           {
-            id: "acc-1",
+            id: "a0000000-0000-4000-8000-000000000001",
             user_id: userId,
             name: "Checking",
-            linked_account_id: "acc-2",
+            linked_account_id: "a0000000-0000-4000-8000-000000000002",
             updated_at: "2024-06-01T00:00:00.000Z",
           },
           {
-            id: "acc-2",
+            id: "a0000000-0000-4000-8000-000000000002",
             user_id: userId,
             name: "Savings",
-            linked_account_id: "acc-1",
+            linked_account_id: "a0000000-0000-4000-8000-000000000001",
             updated_at: "2024-06-02T00:00:00.000Z",
           },
         ],
@@ -5542,7 +5577,7 @@ describe("BackupService", () => {
         ...validBackupData,
         monte_carlo_scenarios: [
           {
-            id: "mc-1",
+            id: "3c000000-0000-4000-8000-000000000001",
             user_id: userId,
             name: "S1",
             account_ids: ["acc-a", "acc-b"],
@@ -5648,6 +5683,44 @@ describe("BackupService", () => {
         });
         const result = await service.restoreData(userId, {
           compressedData: await encryptedBlob(validBackupData, "stored-bk-pw"),
+          oidcIdToken: oidcArtifact(),
+        });
+        expect(result.message).toBe("Backup restored successfully");
+      });
+
+      it("restores what the automatic backup writes (key-wrapped container) with the password alone", async () => {
+        // The cron encrypts under a stored data key it can read without the
+        // password; the file must still open with nothing but that password,
+        // and without the server's copy of the key.
+        const key = await createWrappedBackupKey("login-password");
+        const { buffer } = await service.exportToBuffer(userId, key);
+        expect(buffer[4]).toBe(3);
+
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        const result = await service.restoreData(userId, {
+          compressedData: buffer,
+          password: "login-password",
+        });
+
+        expect(result.message).toBe("Backup restored successfully");
+      });
+
+      it("opens an automatic backup with the stored data key when no password opens it", async () => {
+        const key = await createWrappedBackupKey("dedicated-password");
+        const { buffer } = await service.exportToBuffer(userId, key);
+
+        mockUserRepo.findOne.mockResolvedValue({
+          ...mockUser,
+          authProvider: "oidc",
+          passwordHash: null,
+          oidcSubject: "sub-1",
+          backupEncryptionEnabled: true,
+          backupKeyEnc: `enc:${key.dataKey.toString("base64")}`,
+          backupKeyWrap: key.wrap.toString("base64"),
+        });
+        const result = await service.restoreData(userId, {
+          compressedData: buffer,
           oidcIdToken: oidcArtifact(),
         });
         expect(result.message).toBe("Backup restored successfully");

@@ -95,6 +95,10 @@
       "title": "Klucz szyfrowania nie jest skonfigurowany",
       "message": "ENCRYPTION_KEY nie jest ustawiony, więc kopie zapasowe są zapisywane bez szyfrowania, a sekrety nie mogą być przechowywane. Przyszła wersja nie uruchomi się bez niego."
     },
+    "jwtSecretWeak": {
+      "title": "JWT_SECRET jest słaby",
+      "message": "JWT_SECRET to opublikowana wartość przykładowa lub jest zbyt łatwy do odgadnięcia, więc tokeny sesji można sfałszować. Wygeneruj silną wartość (openssl rand -base64 32). Zmiana sprawi, że kody z aplikacji uwierzytelniających przestaną działać, a zaufane urządzenia zostaną zapomniane: użytkownicy logują się kodem zapasowym i ponownie konfigurują 2FA, a tym, którzy go nie mają, resetujesz 2FA w Zarządzaniu użytkownikami. Najpierw przeczytaj docs/backend/modules-and-runtime.md (Changing JWT_SECRET)."
+    },
     "smtpFailure": {
       "title": "Wysyłanie e-maili nie działa",
       "message": "Monize nie mógł wysłać e-maila: {error}. Powiadomienia i przypomnienia nie są dostarczane."

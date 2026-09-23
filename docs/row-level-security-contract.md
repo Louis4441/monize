@@ -138,23 +138,29 @@ Exactly two, both in `backend/src/oauth/`:
    provider identifier.
 
 2. **`OAuthProviderService.revokeAllForUser`** -- a single parameterized
-   `DELETE` keyed on `payload ->> 'accountId'`, used by admin flows (deactivate,
-   password reset) so revocation takes effect immediately rather than at
-   token-TTL expiry.
+   `DELETE` keyed on `payload ->> 'accountId'`, used wherever an account's
+   credentials are replaced, so revocation takes effect immediately rather than
+   at token-TTL expiry: the admin flows (deactivate, delete, password reset) and,
+   through `revokeOAuthGrantsAfterCommit` (`backend/src/auth/credential-revocation.ts`),
+   the emailed password reset, a password change, an owner's reset of a
+   delegate's password, an emergency-access claim and an OIDC account-link
+   confirmation.
 
    This one **is** keyed by an application user identifier, which the original
    rationale explicitly claimed never happened ("never queried per end-user").
-   It is a bounded exception, not a defect: its only caller is
-   `backend/src/admin/admin.service.ts`, behind `@Roles("admin")`; the id is
-   server-derived and never request-supplied; and it deletes only rows whose own
-   payload already names that subject.
+   It is a bounded exception, not a defect: every caller derives the id on the
+   server from something it has already verified -- the admin's target behind
+   `@Roles("admin")`, the session's own subject, the row a single-use reset,
+   claim or link token matched -- and never reads it from the request; and the
+   statement deletes only rows whose own payload already names that subject.
+   The id reaches the table only through this one method, never through a new
+   query.
 
    It is deliberately **not** wrapped in `withSystemContext`. The table is
    exempt, so a bypass GUC would change nothing about what the query can reach
    -- it would buy the appearance of a control rather than a control, and widen
    the `WITH_CONTEXT_ALLOWLIST` fence for no gain. The real protection is the
-   admin-only caller and the server-derived id, and saying so is more useful
-   than dressing it up.
+   server-derived id, and saying so is more useful than dressing it up.
 
 Anything else is a defect. Both guards in section 5 fail on a third path.
 
@@ -199,7 +205,7 @@ Reconsider this decision when any of these happens:
 
 - `oauth_payloads` gains `user_id`, `owner_user_id` or an equivalent tenant key;
 - a query begins selecting rows by **request-supplied** application user input
-  (the admin-initiated, server-derived case in section 3 is the accepted bound,
+  (the server-derived case in section 3 is the accepted bound,
   and is the reason this trigger is phrased that way);
 - non-OAuth domain data is stored in the table;
 - another module starts using `OAuthPayload`;

@@ -110,10 +110,18 @@ describe("AnthropicProvider", () => {
     // long-running fetch wrapper so SDK calls inherit disabled timeouts.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Anthropic = require("@anthropic-ai/sdk").default;
+    const sdkOptions = Anthropic.mock.calls[Anthropic.mock.calls.length - 1][0];
+    expect(typeof sdkOptions.fetch).toBe("function");
+    expect(sdkOptions.fetch).not.toBe(global.fetch);
+  });
+
+  it("hands the SDK the egress-policy fetch the factory passes", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { longRunningFetch } = require("./long-running-fetch");
-    expect(Anthropic).toHaveBeenCalledWith(
-      expect.objectContaining({ fetch: longRunningFetch }),
+    const Anthropic = require("@anthropic-ai/sdk").default;
+    const egressFetch = jest.fn() as unknown as typeof fetch;
+    new AnthropicProvider("sk-test", "claude-sonnet-4-20250514", egressFetch);
+    expect(Anthropic).toHaveBeenLastCalledWith(
+      expect.objectContaining({ fetch: egressFetch }),
     );
   });
 
@@ -603,7 +611,8 @@ describe("AnthropicProvider", () => {
       const result = await provider.verifyModel();
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.reason).toContain("ECONNREFUSED");
+        expect(result.reason).not.toContain("ECONNREFUSED");
+        expect(result.reason).toMatch(/could not verify the configured model/i);
       }
     });
 
@@ -612,7 +621,8 @@ describe("AnthropicProvider", () => {
       const result = await provider.verifyModel();
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.reason).toContain("string-error");
+        expect(result.reason).not.toContain("string-error");
+        expect(result.reason).toMatch(/could not verify the configured model/i);
       }
     });
   });

@@ -25,6 +25,7 @@ import {
 import { ExportBufferSink } from "./export-buffer-sink";
 import { collectExportTables, exportJsonChunks } from "./export-json-stream";
 import { ExportWriter, RESPONSE_CLOSED_MESSAGE } from "./export-writer";
+import { BackupEncryptionInput } from "./backup-key-wrap";
 import {
   buildExportTableQueries,
   ExportTableQuery,
@@ -191,7 +192,7 @@ export class BackupExportService {
    */
   async exportToBuffer(
     userId: string,
-    encryptionPassword?: string,
+    encryption?: BackupEncryptionInput,
   ): Promise<{ buffer: Buffer; report: BackupCompletenessReport }> {
     const limit = this.exportBufferLimitBytes;
     const sink = new ExportBufferSink(
@@ -206,7 +207,7 @@ export class BackupExportService {
         ),
     );
 
-    const report = await this.writeExport(userId, sink, encryptionPassword, {
+    const report = await this.writeExport(userId, sink, encryption, {
       onChunkTable: (table) => sink.noteTable(table),
     });
     return { buffer: sink.toBuffer(), report };
@@ -253,13 +254,13 @@ export class BackupExportService {
   private async writeExport(
     userId: string,
     target: Writable,
-    encryptionPassword: string | undefined,
+    encryption: BackupEncryptionInput | undefined,
     hooks: {
       onReport?: (report: BackupCompletenessReport) => void;
       onChunkTable?: (table: string | null) => void;
     },
   ): Promise<BackupCompletenessReport> {
-    const writer = await ExportWriter.create(target, encryptionPassword);
+    const writer = await ExportWriter.create(target, encryption);
     const onTargetClose = (): void => {
       if (!target.writableFinished) {
         writer.abort(new Error(RESPONSE_CLOSED_MESSAGE));

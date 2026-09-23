@@ -3,7 +3,6 @@ import {
   BadRequestException,
   Logger,
   NotFoundException,
-  ConflictException,
   ForbiddenException,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -24,9 +23,12 @@ import {
   ensureUserPreferencesRow,
   type UserPreferencePatch,
 } from "./user-preference-writer";
-import { TrustedDevice } from "./entities/trusted-device.entity";
 import { RefreshToken } from "../auth/entities/refresh-token.entity";
 import { PersonalAccessToken } from "../auth/entities/personal-access-token.entity";
+import {
+  revokeOAuthGrantsAfterCommit,
+  revokeStandingCredentials,
+} from "../auth/credential-revocation";
 import { UpdateProfileDto } from "./dto/update-profile.dto";
 import { UpdatePreferencesDto } from "./dto/update-preferences.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
@@ -43,6 +45,15 @@ import {
 } from "../auth/oidc/oidc-reauth.service";
 import { toUserProfile } from "./user-profile";
 import { UserMaintenanceService } from "../common/jobs/user-maintenance.service";
+import {
+  EmailChangeService,
+  type StagedEmailChange,
+} from "./email-change.service";
+import {
+  emailInUseConflict,
+  isUniqueViolation,
+  normalizeEmail,
+} from "./email-change.util";
 
 @Injectable()
 export class UsersService {
@@ -55,6 +66,7 @@ export class UsersService {
     private demoModeService: DemoModeService,
     private oidcReauth: OidcReauthService,
     private maintenance: UserMaintenanceService,
+    private emailChange: EmailChangeService,
   ) {}
 
   /**
@@ -95,8 +107,13 @@ export class UsersService {
     }
 
     // SECURITY: Require password confirmation when changing email to prevent
-    // account takeover via compromised session
-    if (dto.email && dto.email !== user.email) {
+    // account takeover via compromised session. The address is normalized the
+    // way registration normalizes it, and with SMTP configured the change is
+    // only staged here: `users.email` moves when the link sent to the new
+    // address is followed (`AuthEmailService.confirmEmailChange`).
+    let stagedChange: StagedEmailChange | null = null;
+    const newEmail = dto.email !== undefined ? normalizeEmail(dto.email) : null;
+    if (newEmail && newEmail !== user.email) {
       if (!dto.currentPassword) {
         throw new BadRequestException(
           tr(
@@ -125,17 +142,22 @@ export class UsersService {
           ),
         );
       }
+      // Advisory only: under RLS enforcement this scope sees no other user's
+      // row. The unique index is the guard, at confirmation (or at the save
+      // below when the change applies immediately).
       const existingUser = await this.scoped(User, (repo) =>
         repo.findOne({
-          where: { email: dto.email },
+          where: { email: newEmail },
         }),
       );
       if (existingUser) {
-        throw new ConflictException(
-          tr("errors.users.emailInUse", "Email already in use"),
-        );
+        throw emailInUseConflict();
       }
-      user.email = dto.email;
+      if (this.emailChange.requiresConfirmation()) {
+        stagedChange = this.emailChange.stage(user, newEmail);
+      } else {
+        this.emailChange.applyImmediately(user, newEmail);
+      }
     }
 
     if (dto.firstName !== undefined) {
@@ -145,7 +167,16 @@ export class UsersService {
       user.lastName = dto.lastName;
     }
 
-    const saved = await this.scoped(User, (repo) => repo.save(user));
+    let saved: User;
+    try {
+      saved = await this.scoped(User, (repo) => repo.save(user));
+    } catch (error) {
+      if (isUniqueViolation(error)) throw emailInUseConflict();
+      throw error;
+    }
+    if (stagedChange) {
+      await this.emailChange.sendMessages(saved, stagedChange);
+    }
     return toUserProfile(saved);
   }
 
@@ -385,39 +416,42 @@ export class UsersService {
       );
     }
 
-    // Hash and save new password
+    // Hash and save new password. Every credential the old password stood
+    // behind goes in the same transaction: web sessions, API tokens (PATs) and
+    // trusted devices (a stolen trusted-device cookie must not bypass 2FA after
+    // the user rotates their password). `credential-revocation.ts`.
     const saltRounds = 12;
     user.passwordHash = await bcrypt.hash(dto.newPassword, saltRounds);
     user.mustChangePassword = false;
-    await this.scoped(User, (repo) => repo.save(user));
+    await withScopedDb(this.dataSource, async (manager) => {
+      await manager.getRepository(User).save(user);
+      await manager
+        .getRepository(RefreshToken)
+        .update({ userId, isRevoked: false }, { isRevoked: true });
+      await revokeStandingCredentials(manager, userId);
+    });
 
-    // Re-sync the encrypted-backup password so the auto-backup cron keeps
-    // working with the new login password. Best-effort; failures here log
+    // Re-wrap the backup key under the new login password so automatic
+    // backups written from now on open with it (earlier ones keep opening with
+    // the password they were written under). Best-effort; failures here log
     // but don't fail the password change.
     try {
       const backupEncryption = this.moduleRef.get(BackupEncryptionService, {
         strict: false,
       });
-      await backupEncryption.rememberLoginPassword(userId, dto.newPassword);
+      await backupEncryption.rewrapBackupKey(
+        userId,
+        dto.newPassword,
+        user.passwordHash,
+      );
     } catch (err) {
       this.logger.warn(
-        `Could not sync backup password after change: ${err.message}`,
+        `Could not re-wrap the backup key after change: ${err.message}`,
       );
     }
 
-    // SECURITY: Revoke all refresh tokens to force re-login on all devices
-    await this.scoped(RefreshToken, (repo) =>
-      repo.update({ userId, isRevoked: false }, { isRevoked: true }),
-    );
-
-    // SECURITY: Revoke all PATs — credential change invalidates API access
-    await this.scoped(PersonalAccessToken, (repo) =>
-      repo.update({ userId, isRevoked: false }, { isRevoked: true }),
-    );
-
-    // SECURITY: Revoke trusted devices so a stolen trusted-device cookie
-    // cannot bypass 2FA after the user rotates their password.
-    await this.scoped(TrustedDevice, (repo) => repo.delete({ userId }));
+    // SECURITY: and the OAuth grants an MCP client holds, after the commit.
+    await revokeOAuthGrantsAfterCommit(this.moduleRef, userId, this.logger);
   }
 
   /**

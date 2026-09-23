@@ -95,6 +95,10 @@
       "title": "Chiave di cifratura non configurata",
       "message": "ENCRYPTION_KEY non è impostata: i backup vengono scritti in chiaro e i segreti non possono essere salvati. Una versione futura non si avvierà senza di essa."
     },
+    "jwtSecretWeak": {
+      "title": "JWT_SECRET è debole",
+      "message": "JWT_SECRET è un valore di esempio pubblicato o troppo prevedibile, quindi i token di sessione possono essere falsificati. Generane uno robusto (openssl rand -base64 32). Cambiarlo rende inutilizzabili i codici delle app di autenticazione e dimentica i dispositivi attendibili: gli utenti accedono con un codice di backup e riconfigurano la 2FA, e tu reimposti la 2FA in Gestione utenti per chi non ne ha uno. Leggi prima docs/backend/modules-and-runtime.md (Changing JWT_SECRET)."
+    },
     "smtpFailure": {
       "title": "L'invio delle email non funziona",
       "message": "Monize non è riuscito a inviare email: {error}. Notifiche e promemoria non vengono recapitati."

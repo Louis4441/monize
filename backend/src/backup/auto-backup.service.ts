@@ -2096,12 +2096,14 @@ export class AutoBackupService {
       );
     }
 
-    // Backups are encrypted with the user's own password whenever the server
-    // holds a usable copy of it -- there is nothing for them to switch on.
-    const resolution = await this.backupEncryption.resolveBackupPassword(user);
+    // Backups are encrypted under the user's backup key whenever the server
+    // holds a usable one -- a data key wrapped under their own password, so the
+    // file opens with that password -- and there is nothing for them to switch
+    // on.
+    const resolution = await this.backupEncryption.resolveBackupKey(user);
     if (resolution.status === "unrecoverable") {
-      // A password is stored but cannot be decrypted (typically
-      // ENCRYPTION_KEY was rotated). Their previous backups are encrypted,
+      // A key is stored but cannot be decrypted (typically ENCRYPTION_KEY was
+      // rotated). Their previous backups are encrypted,
       // so quietly writing this one in plaintext would be a downgrade nobody
       // sees. Fail loud instead.
       throw new BadRequestException(
@@ -2119,17 +2121,16 @@ export class AutoBackupService {
       // default, and a line per backup is what makes that answerable from the
       // logs instead of from the file extension.
       this.logger.warn(
-        `Backup for user ${userId} is being written unencrypted: no backup password is stored` +
+        `Backup for user ${userId} is being written unencrypted: no usable backup key is stored` +
           (user.authProvider === "local"
-            ? " (it is captured when they next sign in, or from Settings -> Backup & Restore)"
-            : " (set one in Settings -> Backup & Restore)"),
+            ? " (one is made when they next sign in, or from Settings -> Backup & Restore)"
+            : " (set a backup password in Settings -> Backup & Restore)"),
       );
     }
-    const encryptionPassword =
-      resolution.status === "password" ? resolution.password : undefined;
+    const encryption = resolution.status === "key" ? resolution.key : undefined;
 
     const dateStr = this.getLocalDateString(new Date(), timezone);
-    const ext = encryptionPassword ? "mzbe" : "json.gz";
+    const ext = encryption ? "mzbe" : "json.gz";
 
     // Leftovers from an interrupted write, cleared before this one rather than
     // by retention: a partial write is not a backup, so counting it towards
@@ -2144,7 +2145,7 @@ export class AutoBackupService {
 
     const { buffer, report } = await this.backupService.exportToBuffer(
       userId,
-      encryptionPassword,
+      encryption,
     );
     // The name is chosen AFTER the export, from what the export found. Choosing
     // it first published an incomplete artifact over that day's complete one and
@@ -2167,7 +2168,7 @@ export class AutoBackupService {
     const digest = createHash("sha256").update(buffer).digest("hex");
 
     this.logger.log(
-      `Backup written to ${location.display}/${filename}${encryptionPassword ? " (encrypted)" : ""} ` +
+      `Backup written to ${location.display}/${filename}${encryption ? " (encrypted)" : ""} ` +
         `(sha256 ${digest}, ${buffer.length} bytes)`,
     );
     return { filename, report, digest, sizeBytes: buffer.length };

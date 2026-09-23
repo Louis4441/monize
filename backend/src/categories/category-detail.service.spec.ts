@@ -291,4 +291,57 @@ describe("CategoryDetailService", () => {
 
     expect(mockDataSource.transaction).toHaveBeenCalledTimes(1);
   });
+
+  describe("an account scope (an acting delegate's READ grants)", () => {
+    /** Queue three builders and hand them back so a test can read their clauses. */
+    function capturedBuilders() {
+      // Replaces the builders `given` queued, keeping its other stubs.
+      txManager.createQueryBuilder.mockReset();
+      const builders = [queryBuilder(), queryBuilder(), queryBuilder()];
+      for (const builder of builders) {
+        txManager.createQueryBuilder.mockImplementationOnce(() => builder);
+      }
+      return builders;
+    }
+
+    it("narrows every transaction figure to the scoped accounts", async () => {
+      given({});
+      const builders = capturedBuilders();
+
+      await service.getDetail(USER_ID, CATEGORY_ID, ["acc-a", "acc-b"]);
+
+      for (const builder of builders) {
+        expect(builder.andWhere).toHaveBeenCalledWith(
+          "t.account_id IN (:...delegateScopeAccountIds)",
+          { delegateScopeAccountIds: ["acc-a", "acc-b"] },
+        );
+      }
+    });
+
+    it("matches no transaction for an empty scope, never the whole ledger", async () => {
+      given({});
+      const builders = capturedBuilders();
+
+      await service.getDetail(USER_ID, CATEGORY_ID, []);
+
+      for (const builder of builders) {
+        expect(builder.andWhere).toHaveBeenCalledWith("1 = 0");
+      }
+    });
+
+    it("leaves the owner's (unscoped) figures across every account", async () => {
+      given({});
+      const builders = capturedBuilders();
+
+      await service.getDetail(USER_ID, CATEGORY_ID);
+
+      for (const builder of builders) {
+        const clauses = builder.andWhere.mock.calls.map((call) => call[0]);
+        expect(clauses).not.toContain(
+          "t.account_id IN (:...delegateScopeAccountIds)",
+        );
+        expect(clauses).not.toContain("1 = 0");
+      }
+    });
+  });
 });

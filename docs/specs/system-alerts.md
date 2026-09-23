@@ -10,7 +10,7 @@ status was visible only on a Settings section most operators never revisit,
 and promotion-copy and retention-delete failures did not even leave that --
 they logged a `warn` and the status stayed `success`. A missing
 `ENCRYPTION_KEY` was a startup log warning (issue #1269's silent state, one
-release on). A provider outage emailed the administrators but showed nothing
+release on; it now refuses the boot instead). A provider outage emailed the administrators but showed nothing
 in the app, and a deployment without SMTP got nothing at all -- including,
 by construction, any report that SMTP itself was broken.
 
@@ -44,7 +44,8 @@ transaction failing to post -- goes to that user, in-app only.
 |---|---|---|---|---|---|
 | `BACKUP_FAILED` | critical | admins | auto-backup cron catch (**automatic runs only**) | `BACKUP_FAILED:<userId>:<utc-date>` | yes, once per day |
 | `BACKUP_PARTIAL` | warning | admins | partial artifact; promotion-copy failure; retention-delete failure (`data.reason` names which), **automatic runs only** | `BACKUP_PARTIAL:<userId>:<reason>:<utc-date>` | yes, once per reason per day |
-| `ENCRYPTION_KEY_MISSING` | warning | admins | the 15-minute sweep | `ENCRYPTION_KEY_MISSING:<iso-week>` | yes |
+| `ENCRYPTION_KEY_MISSING` | warning | admins | **retired**: the server now refuses to start without `ENCRYPTION_KEY`, so a running process cannot observe the state. The type stays so rows already raised still render | `ENCRYPTION_KEY_MISSING:<iso-week>` | yes |
+| `JWT_SECRET_WEAK` | warning | admins | the 15-minute sweep, and also when an admin's client reads `GET /admin/deployment-status` for the banner (same weekly dedupe key, not awaited), while `jwtSecretWeakness` flags `JWT_SECRET` (a published placeholder or a typed pattern that is long enough to boot); `data.reason` is `placeholder` or `predictable`, never the secret | `JWT_SECRET_WEAK:<iso-week>` | yes |
 | `PROVIDER_OUTAGE` | warning | admins | outage claim win | `PROVIDER_OUTAGE:<provider>:<outage start ISO>` | no (bespoke email exists) |
 | `PROVIDER_RECOVERED` | success | admins | recovery claim win | `PROVIDER_RECOVERED:<provider>:<outage start ISO>` | no |
 | `SMTP_FAILURE` | warning | admins | 15-minute sweep over `EmailService.getFailureSnapshot()` | `SMTP_FAILURE:<utc-date>` | **never** |

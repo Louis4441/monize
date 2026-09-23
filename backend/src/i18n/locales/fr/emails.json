@@ -117,6 +117,21 @@
     "button": "Vérifier l'e-mail",
     "disclaimer": "Ce lien expirera dans 24 heures. Si vous n'avez pas créé de compte Monize, vous pouvez ignorer cet e-mail en toute sécurité."
   },
+  "emailChangeConfirm": {
+    "subject": "Confirmez votre nouvelle adresse e-mail Monize",
+    "heading": "Confirmez votre nouvelle adresse e-mail",
+    "greeting": "Bonjour {{ name }},",
+    "intro": "Une demande a été faite pour utiliser cette adresse pour un compte Monize. Votre adresse e-mail ne changera pas tant que vous ne l'aurez pas confirmée en cliquant sur le bouton ci-dessous :",
+    "button": "Confirmer le changement d'e-mail",
+    "disclaimer": "Ce lien expirera dans 24 heures. Si vous n'avez pas demandé ce changement, vous pouvez ignorer cet e-mail en toute sécurité."
+  },
+  "emailChangeNotice": {
+    "subject": "Demande de changement d'adresse e-mail Monize",
+    "heading": "Changement d'adresse e-mail demandé",
+    "greeting": "Bonjour {{ name }},",
+    "body1": "Une demande a été faite pour remplacer l'adresse e-mail de votre compte Monize par {{ email }}. Le changement ne prendra effet qu'une fois confirmé depuis cette adresse.",
+    "body2": "Si vous n'êtes pas à l'origine de cette demande, changez immédiatement votre mot de passe et vérifiez les appareils connectés à votre compte."
+  },
   "accountInvite": {
     "subject": "Votre compte Monize est prêt",
     "heading": "Votre compte Monize est prêt",
@@ -251,6 +266,10 @@
       "encryptionKeyMissing": {
         "title": "Clé de chiffrement non configurée",
         "message": "ENCRYPTION_KEY n'est pas définie : les sauvegardes sont écrites en clair et les secrets ne peuvent pas être enregistrés. Une future version refusera de démarrer sans elle."
+      },
+      "jwtSecretWeak": {
+        "title": "JWT_SECRET est faible",
+        "message": "JWT_SECRET est une valeur d'exemple publiée ou trop prévisible : des jetons de session peuvent donc être falsifiés. Générez-en une robuste (openssl rand -base64 32). La modifier rend inutilisables les codes des applications d'authentification et oublie les appareils de confiance : les utilisateurs se connectent avec un code de secours et reconfigurent la 2FA, et vous réinitialisez la 2FA dans Gestion des utilisateurs pour ceux qui n'en ont pas. Consultez d'abord docs/backend/modules-and-runtime.md (Changing JWT_SECRET)."
       },
       "smtpFailure": {
         "title": "L'envoi d'e-mails échoue",

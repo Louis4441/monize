@@ -161,16 +161,17 @@ data as it was and the uploaded file is kept for one more attempt.
 
 Two self-hosting failures look like the app is broken and are configuration:
 
-- **The upload dies immediately and the backend logs `Request aborted`.** The
-  Next.js proxy in front of the API caps a forwarded request body at 10MB by
-  default, and *truncates* rather than rejecting anything larger, so nothing
-  reports a size problem. `MNY_IMPORT_LIMIT_MB` sizes that ceiling and must be
-  set on the **frontend** as well as the backend.
+- **The upload is refused as too large (413).** The frontend streams the
+  upload to the backend through its own route handler
+  (`frontend/src/app/api/v1/import/mny/parse/route.ts`), which refuses a body
+  over `MNY_IMPORT_LIMIT_MB` (plus 8MB of multipart framing). The variable must
+  be set on the **frontend** as well as the backend. The general `/api` proxy
+  refuses any body over 10MB, and the import route is kept out of it for that
+  reason (`LARGE_UPLOAD_ROUTES`, `frontend/src/lib/proxy-body-limit.ts`).
 - **The server is killed partway through every attempt.** It is running out of
   memory. A Money file is held in memory while it is read, so the backend needs
-  roughly twice the file size available, and the frontend needs another copy
-  because the proxy buffers the upload. See `helm/README.md` for the sizing
-  rules.
+  roughly twice the file size available. The frontend streams the upload and
+  holds no copy of it. See `helm/README.md` for the sizing rules.
 
 ## Accuracy, and how to check it
 

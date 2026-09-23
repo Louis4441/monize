@@ -28,6 +28,7 @@ import { TransactionsService } from "./transactions.service";
 import {
   AllowDelegate,
   DelegatedAccountParam,
+  DelegatedBodyAccounts,
   DelegatedTransactionParam,
   DelegatedTransferBody,
   DelegatedTransferParam,
@@ -233,6 +234,7 @@ export class TransactionsController {
   @ApiResponse({ status: 401, description: "Unauthorized" })
   @AllowDelegate()
   @DelegatedAccountParam("accountId")
+  @DelegatedBodyAccounts("splits[].transferAccountId")
   @DelegateRequires("create")
   async create(
     @Request() req,
@@ -1444,6 +1446,7 @@ export class TransactionsController {
   @ApiResponse({ status: 404, description: "Transaction not found" })
   @AllowDelegate()
   @DelegatedTransactionParam("id")
+  @DelegatedBodyAccounts("accountId", "splits[].transferAccountId")
   @DelegateRequires("edit")
   async update(
     @Request() req,
@@ -1687,6 +1690,7 @@ export class TransactionsController {
   @ApiResponse({ status: 404, description: "Transaction not found" })
   @AllowDelegate()
   @DelegatedTransferParam("id")
+  @DelegatedTransferBody()
   @DelegateRequires("edit")
   updateTransfer(
     @Request() req,

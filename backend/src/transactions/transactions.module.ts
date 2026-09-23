@@ -37,7 +37,9 @@ import { CurrenciesModule } from "../currencies/currencies.module";
     forwardRef(() => AccountsModule),
     forwardRef(() => NetWorthModule),
     forwardRef(() => SecuritiesModule),
-    PayeesModule,
+    // PayeesModule reaches DelegationModule (the payee detail page's delegate
+    // scope), which reaches back here -- see `src/module-graph.spec.ts`.
+    forwardRef(() => PayeesModule),
     TagsModule,
     ActionHistoryModule,
     // forwardRef on both: each lies on a require cycle, so a bare reference is

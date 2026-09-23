@@ -51,6 +51,18 @@ export const DelegatedTransferBody = (
 ) => SetMetadata(DELEGATED_TRANSFER_BODY_KEY, [fromKey, toKey]);
 
 /**
+ * Every further account a write names in its BODY, beyond the one the route's
+ * other decorators resolve: the delegate needs the route's operation on each
+ * (strictly -- no cross-owner relaxation, because these rows are written as
+ * the owner). A path is a dot-separated body key and a `[]` suffix walks an
+ * array, so "splits[].transferAccountId" checks every split line. Only the
+ * body is read: it is what the route's DTO binds.
+ */
+export const DELEGATED_BODY_ACCOUNTS_KEY = "delegatedBodyAccounts";
+export const DelegatedBodyAccounts = (...paths: string[]) =>
+  SetMetadata(DELEGATED_BODY_ACCOUNTS_KEY, paths);
+
+/**
  * A transfer edit/delete-by-id route: BOTH legs' accounts (resolved from the
  * transaction id) must satisfy the required operation.
  */
@@ -101,3 +113,15 @@ export type DelegateSection =
 export const DELEGATE_SECTION_KEY = "delegateSection";
 export const DelegateRequiresSection = (section: DelegateSection) =>
   SetMetadata(DELEGATE_SECTION_KEY, section);
+
+/**
+ * A route whose answer draws on the owner's WHOLE ledger and cannot be
+ * narrowed to a delegate's grants (the AI assistant reads every account and
+ * section through its tools). A delegate may reach it only when the
+ * delegation grants READ on every one of the owner's accounts and every
+ * section, so the route reveals nothing the delegate could not already open
+ * elsewhere.
+ */
+export const DELEGATE_FULL_SCOPE_KEY = "delegateFullScope";
+export const DelegateRequiresFullScope = () =>
+  SetMetadata(DELEGATE_FULL_SCOPE_KEY, true);

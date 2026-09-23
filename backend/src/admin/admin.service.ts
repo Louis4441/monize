@@ -20,9 +20,12 @@ import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { RefreshToken } from "../auth/entities/refresh-token.entity";
 import { PersonalAccessToken } from "../auth/entities/personal-access-token.entity";
+import { TrustedDevice } from "../users/entities/trusted-device.entity";
+import { patchUserPreferences } from "../users/user-preference-writer";
 import { generateReadablePassword } from "./utils/password-generator";
 import { hashToken } from "../auth/crypto.util";
 import { OAuthProviderService } from "../oauth/oauth-provider.service";
+import { revokeStandingCredentials } from "../auth/credential-revocation";
 import { UsersService } from "../users/users.service";
 import {
   lockAdminsForUpdate,
@@ -594,6 +597,9 @@ export class AdminService {
     targetUser.mustChangePassword = true;
     targetUser.resetToken = null;
     targetUser.resetTokenExpiry = null;
+    // An admin reset is a recovery action: the temporary password must work.
+    targetUser.failedLoginAttempts = 0;
+    targetUser.lockedUntil = null;
     await withScopedDb(this.dataSource, (manager) =>
       manager.getRepository(User).save(targetUser),
     );
@@ -606,9 +612,112 @@ export class AdminService {
   }
 
   /**
+   * Switch off a user's two-factor authentication so they can sign in with
+   * their password and enroll again.
+   *
+   * The recovery for a user who lost their authenticator and their backup
+   * codes, and for everyone enrolled before a `JWT_SECRET` change: the TOTP
+   * secret is encrypted under a key derived from it, so after a change it can
+   * no longer be decrypted and authenticator codes stop working. That is why
+   * this never decrypts anything -- it clears the columns, whatever they hold.
+   *
+   * One transaction: the TOTP secret, the staged setup secret and the backup
+   * codes are cleared, the preference flag is switched off, trusted devices
+   * (which skip the second factor) are deleted and the user's refresh tokens
+   * are revoked, so a reset cannot commit half done or leave a session that was
+   * established under the old enrollment. Under FORCE_2FA the user is sent to
+   * set 2FA up again at their next sign-in (`ProtectedRoute`).
+   *
+   * Refused for the caller themself, like the other credential actions here: a
+   * stolen admin session must not be able to strip its own second factor
+   * without the code `disable2FA` asks for. Refused with a 400, rather than
+   * reported as a success, for a user with no 2FA state at all, so the admin
+   * learns they picked the wrong account.
+   */
+  async resetUserTwoFactor(
+    adminId: string,
+    targetUserId: string,
+  ): Promise<{ reset: true }> {
+    return withSystemContext(() =>
+      this.resetUserTwoFactorWithinContext(adminId, targetUserId),
+    );
+  }
+
+  private async resetUserTwoFactorWithinContext(
+    adminId: string,
+    targetUserId: string,
+  ): Promise<{ reset: true }> {
+    if (adminId === targetUserId) {
+      throw new ForbiddenException(
+        tr(
+          "errors.admin.cannotResetOwnTwoFactor",
+          "You cannot reset your own two-factor authentication through the admin panel",
+        ),
+      );
+    }
+
+    await withScopedDb(this.dataSource, async (manager) => {
+      const users = manager.getRepository(User);
+      // Locked, so the "has 2FA" check and the clearing below see one state
+      // even against a concurrent enrollment by the user.
+      const targetUser = await users.findOne({
+        where: { id: targetUserId },
+        lock: { mode: "pessimistic_write" },
+      });
+      if (!targetUser) {
+        throw new NotFoundException(
+          tr("errors.admin.userNotFound", "User not found"),
+        );
+      }
+      const preferences = await manager
+        .getRepository(UserPreference)
+        .findOne({ where: { userId: targetUserId } });
+      const hasTwoFactor =
+        targetUser.twoFactorSecret !== null ||
+        targetUser.pendingTwoFactorSecret !== null ||
+        targetUser.backupCodes !== null ||
+        preferences?.twoFactorEnabled === true;
+      if (!hasTwoFactor) {
+        throw new BadRequestException(
+          tr(
+            "errors.admin.twoFactorNotEnabled",
+            "This user does not have two-factor authentication set up.",
+          ),
+        );
+      }
+
+      await users.update(
+        { id: targetUserId },
+        {
+          twoFactorSecret: null,
+          pendingTwoFactorSecret: null,
+          backupCodes: null,
+        },
+      );
+      await patchUserPreferences(manager, targetUserId, {
+        twoFactorEnabled: false,
+      });
+      await manager.getRepository(TrustedDevice).delete({
+        userId: targetUserId,
+      });
+      await manager
+        .getRepository(RefreshToken)
+        .update(
+          { userId: targetUserId, isRevoked: false },
+          { isRevoked: true },
+        );
+    });
+
+    this.logger.log(
+      `Administrator ${adminId} reset two-factor authentication for user ${targetUserId}`,
+    );
+    return { reset: true };
+  }
+
+  /**
    * Revoke every authenticated surface for a user: web sessions (refresh
-   * tokens), CLI/API access (PATs) and MCP/OAuth clients. The two token
-   * revocations share one transaction so a user can never be left half
+   * tokens), CLI/API access (PATs), trusted devices and MCP/OAuth clients. The
+   * row revocations share one transaction so a user can never be left half
    * revoked; the OIDC sweep runs after, as it always did.
    */
   private async revokeSessionsAndTokens(targetUserId: string): Promise<void> {
@@ -619,12 +728,7 @@ export class AdminService {
           { userId: targetUserId, isRevoked: false },
           { isRevoked: true },
         );
-      await manager
-        .getRepository(PersonalAccessToken)
-        .update(
-          { userId: targetUserId, isRevoked: false },
-          { isRevoked: true },
-        );
+      await revokeStandingCredentials(manager, targetUserId);
     });
     await this.oauthProviderService.revokeAllForUser(targetUserId);
   }

@@ -117,6 +117,21 @@
     "button": "Xác minh email",
     "disclaimer": "Liên kết này sẽ hết hạn sau 24 giờ. Nếu bạn không tạo tài khoản Monize, bạn có thể bỏ qua email này một cách an toàn."
   },
+  "emailChangeConfirm": {
+    "subject": "Xác nhận email Monize mới của bạn",
+    "heading": "Xác nhận địa chỉ email mới của bạn",
+    "greeting": "Xin chào {{ name }},",
+    "intro": "Đã có yêu cầu sử dụng địa chỉ này cho một tài khoản Monize. Email của bạn sẽ không thay đổi cho đến khi bạn xác nhận bằng cách nhấp vào nút bên dưới:",
+    "button": "Xác nhận thay đổi email",
+    "disclaimer": "Liên kết này sẽ hết hạn sau 24 giờ. Nếu bạn không yêu cầu thay đổi này, bạn có thể bỏ qua email này một cách an toàn."
+  },
+  "emailChangeNotice": {
+    "subject": "Đã yêu cầu thay đổi email Monize",
+    "heading": "Đã yêu cầu thay đổi email",
+    "greeting": "Xin chào {{ name }},",
+    "body1": "Đã có yêu cầu thay đổi địa chỉ email của tài khoản Monize của bạn thành {{ email }}. Thay đổi chỉ có hiệu lực sau khi được xác nhận từ địa chỉ đó.",
+    "body2": "Nếu bạn không thực hiện yêu cầu này, hãy đổi mật khẩu ngay lập tức và kiểm tra các thiết bị đang đăng nhập vào tài khoản của bạn."
+  },
   "accountInvite": {
     "subject": "Tài khoản Monize của bạn đã sẵn sàng",
     "heading": "Tài khoản Monize của bạn đã sẵn sàng",
@@ -251,6 +266,10 @@
       "encryptionKeyMissing": {
         "title": "Chưa cấu hình khóa mã hóa",
         "message": "ENCRYPTION_KEY chưa được đặt, nên các bản sao lưu được ghi không mã hóa và không thể lưu trữ thông tin bí mật. Phiên bản tương lai sẽ không khởi động nếu thiếu khóa này."
+      },
+      "jwtSecretWeak": {
+        "title": "JWT_SECRET yếu",
+        "message": "JWT_SECRET là giá trị mẫu đã được công bố hoặc quá dễ đoán, nên token phiên có thể bị giả mạo. Hãy tạo một giá trị mạnh (openssl rand -base64 32). Việc thay đổi sẽ khiến mã từ ứng dụng xác thực không còn dùng được và quên các thiết bị đáng tin cậy: người dùng đăng nhập bằng mã dự phòng rồi thiết lập lại 2FA, còn với những ai không có mã dự phòng, bạn đặt lại 2FA trong Quản lý người dùng. Hãy đọc trước docs/backend/modules-and-runtime.md (Changing JWT_SECRET)."
       },
       "smtpFailure": {
         "title": "Gửi email đang thất bại",

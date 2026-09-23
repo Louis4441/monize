@@ -81,7 +81,9 @@
     "cannotDeleteOwnAccount": "自分のアカウントは削除できません",
     "deleteLastAdmin": "最後の管理者アカウントは削除できません。",
     "cannotResetOwnPassword": "管理パネルから自分のパスワードをリセットすることはできません",
-    "noLocalPassword": "ローカルパスワードのないアカウントのパスワードはリセットできません"
+    "noLocalPassword": "ローカルパスワードのないアカウントのパスワードはリセットできません",
+    "cannotResetOwnTwoFactor": "管理パネルから自分の二要素認証をリセットすることはできません",
+    "twoFactorNotEnabled": "このユーザーは二要素認証を設定していません。"
   },
   "ai": {
     "queryStreamFailed": "クエリの処理中に予期しないエラーが発生しました。",
@@ -101,6 +103,9 @@
     "relayAgentOffline": "MCP リレーエージェントが接続されていません。エージェントを接続してから、もう一度お試しください。",
     "relayCompletionTimedOut": "MCP リレーエージェントが時間内に応答しませんでした。接続されていることを確認して、もう一度お試しください。",
     "unknownProvider": "不明なAIプロバイダー：{{ provider }}",
+    "privateBaseUrlRefused": "このベースURLはプライベートまたはローカルのネットワークアドレス（localhost、192.168.x.x、コンテナ名など）を指しています。サーバー運用者が AI_PRIVATE_BASE_URL_ALLOWLIST でそのアドレスを許可していない限り、管理者のみが使用できます。",
+    "modelVerifyFailed": "設定されたモデルを確認できませんでした。ベースURLと、プロバイダーに接続できることを確認してください。",
+    "modelVerifyFailedStatus": "設定されたモデルを確認できませんでした：プロバイダーがHTTPステータス {{ status }} を返しました。",
     "forecastDataGatherFailed": "予測用の財務データの収集に失敗しました。再試行してください。",
     "forecastInsufficientHistory": "予測に必要な取引履歴が不足しています。少なくとも2ヶ月のデータが必要です。",
     "forecastGenerateFailed": "予測の生成に失敗しました。再試行してください。",
@@ -139,6 +144,7 @@
     "accountDeactivated": "アカウントが無効化されています",
     "emailNotVerified": "サインインする前にメールアドレスを確認してください。受信トレイで確認リンクを確認してください。",
     "invalidOrExpiredEmailVerificationToken": "無効または期限切れの確認リンクです",
+    "invalidOrExpiredEmailChangeToken": "無効または期限切れのメールアドレス変更リンクです",
     "oidcNoSubject": "OIDCプロバイダーがサブジェクト識別子を返しませんでした",
     "registrationDisabled": "新しいアカウント登録は無効になっています。",
     "invalidOrExpiredLinkToken": "無効または期限切れのリンクトークンです",
@@ -201,6 +207,8 @@
     "unsupportedBackupVersion": "サポートされていないバックアップバージョン：{{ version }}。期待値：{{ expected }}",
     "missingExportedAt": "無効なバックアップ形式：exportedAt がありません",
     "tableNotAllowed": "テーブル {{ table }} はバックアップの復元では許可されていません",
+    "invalidRestoreIdentifier": "無効なバックアップファイル：{{ table }}.{{ column }} に \"{{ value }}\" が含まれていますが、これは有効な識別子ではありません。変更されていないバックアップファイルから復元してください。",
+    "unresolvedRestoreReference": "無効なバックアップファイル：{{ table }}.{{ column }} が {{ referencedTable }} の行 {{ value }} を参照していますが、この行はファイルに含まれていません。バックアップで復元できるのは、同じファイル内の他の行を参照する行のみです。変更されていないバックアップファイルから復元してください。",
     "encryptionNotConfigured": "サーバーは暗号化用に構成されていません（JWT_SECRET が未設定または短すぎます）",
     "backupPasswordOidcOnly": "バックアップパスワードはOIDCユーザーのみ設定可能です。ローカルユーザーはログインパスワードを使用します",
     "backupPasswordLocalOnly": "このアカウントにはバックアップの暗号化に使えるログインパスワードがありません。代わりにバックアップパスワードを設定してください",
@@ -293,6 +301,7 @@
     "actionNotAvailableAsDelegate": "別のユーザーを代理している間はこのアクションは利用できません。アカウント所有者のみが行えます。",
     "capabilityNotGranted": "アカウント所有者は {{ resource }} を {{ operation }} する権限を付与していません。委任アクセス設定でこれを有効にするよう依頼してください。",
     "sectionNotGranted": "アカウント所有者は {{ sectionLabel }} セクションをあなたと共有していません。",
+    "fullScopeRequired": "AI アシスタントはアカウント所有者のすべての口座とセクションを横断して読み取るため、すべての口座とすべてのセクションを閲覧できる代理人のみが利用できます。残りも共有するよう所有者に依頼するか、すでにアクセスできるページをご利用ください。",
     "accountNotShared": "アカウント所有者はこの口座をあなたと共有していません。",
     "accountOperationNotGranted": "アカウント所有者はこの口座での取引を {{ operation }} する権限を付与していません。",
     "jointOwnAccount": "これは自分の口座です。共同口座のアクセスは適用されません。",
@@ -350,6 +359,7 @@
   "monteCarlo": {
     "scenarioNotFound": "シナリオ {{ id }} が見つかりません",
     "atLeastOneAccountRequired": "少なくとも1つの accountId が必要です",
+    "tooManyCashFlows": "シナリオのキャッシュフローは最大 {{ max }} 件までです",
     "currentValueUnavailable": "選択した口座の現在価値を判定できなかったため、その値からシミュレーションを開始できません。開始額を明示的に入力するか、価格と為替レートが取得できてから再試行してください。",
     "historicalReturnsUnavailable": "選択した口座の過去のリターンを計算できなかったため、シミュレーションで使用できません。期待リターンとボラティリティを手動で入力するか、価格と為替レートが利用可能になってから再試行してください。"
   },

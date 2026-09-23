@@ -62,6 +62,7 @@
     "clickToDisable": "Klicken zum Deaktivieren",
     "clickToEnable": "Klicken zum Aktivieren",
     "resetPassword": "Passwort zurücksetzen",
+    "resetTwoFactor": "2FA zurücksetzen",
     "noUsers": "Keine Benutzer gefunden.",
     "storageLoading": "Wird geladen…",
     "storageUnavailable": "Nicht verfügbar",
@@ -96,7 +97,9 @@
       "loadFailed": "Benutzer konnten nicht geladen werden",
       "deleteFailed": "Benutzer konnte nicht gelöscht werden",
       "disableFailed": "Benutzer konnte nicht deaktiviert werden",
-      "resetFailed": "Passwort konnte nicht zurückgesetzt werden"
+      "resetFailed": "Passwort konnte nicht zurückgesetzt werden",
+      "twoFactorReset": "Die Zwei-Faktor-Authentifizierung für {name} wurde zurückgesetzt. Die Person wurde abgemeldet.",
+      "resetTwoFactorFailed": "Zwei-Faktor-Authentifizierung konnte nicht zurückgesetzt werden"
     },
     "dialogs": {
       "promoteTitle": "Benutzer befördern?",
@@ -111,6 +114,9 @@
       "resetTitle": "Passwort zurücksetzen?",
       "resetMessage": "Dadurch wird ein neues temporäres Passwort für {name} generiert. Die Person muss es bei der nächsten Anmeldung ändern.",
       "resetConfirm": "Passwort zurücksetzen",
+      "resetTwoFactorTitle": "Zwei-Faktor-Authentifizierung zurücksetzen?",
+      "resetTwoFactorMessage": "Dadurch wird die Zwei-Faktor-Authentifizierung für {name} ausgeschaltet, ihre Backup-Codes und vertrauenswürdigen Geräte werden gelöscht und sie wird überall abgemeldet. Danach kann sich die Person mit ihrem Passwort anmelden und 2FA neu einrichten. Verwenden Sie dies, wenn sie ihre Authentifizierungs-App und ihre Backup-Codes verloren hat oder nachdem JWT_SECRET geändert wurde.",
+      "resetTwoFactorConfirm": "2FA zurücksetzen",
       "deleteTitle": "Benutzer löschen?",
       "deleteMessage": "Möchten Sie {name} wirklich löschen? Das Konto und alle zugehörigen Daten werden dauerhaft entfernt. Diese Aktion kann nicht rückgängig gemacht werden. Wenn die Person Delegierter eines anderen Kontos ist, werden die eigenen Daten entfernt, die Anmeldung jedoch beibehalten, damit die Delegation weiterhin funktioniert – die Person wird zum reinen Delegierten.",
       "deleteConfirm": "Benutzer löschen",

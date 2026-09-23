@@ -62,6 +62,7 @@
     "clickToDisable": "Kliknij, aby wyłączyć",
     "clickToEnable": "Kliknij, aby włączyć",
     "resetPassword": "Zresetuj hasło",
+    "resetTwoFactor": "Zresetuj 2FA",
     "noUsers": "Nie znaleziono użytkowników.",
     "storageLoading": "Wczytywanie…",
     "storageUnavailable": "Niedostępne",
@@ -96,7 +97,9 @@
       "loadFailed": "Nie udało się wczytać użytkowników",
       "deleteFailed": "Nie udało się usunąć użytkownika",
       "disableFailed": "Nie udało się wyłączyć użytkownika",
-      "resetFailed": "Nie udało się zresetować hasła"
+      "resetFailed": "Nie udało się zresetować hasła",
+      "twoFactorReset": "Uwierzytelnianie dwuskładnikowe użytkownika {name} zostało zresetowane. Użytkownik został wylogowany.",
+      "resetTwoFactorFailed": "Nie udało się zresetować uwierzytelniania dwuskładnikowego"
     },
     "dialogs": {
       "promoteTitle": "Awansować użytkownika?",
@@ -111,6 +114,9 @@
       "resetTitle": "Zresetować hasło?",
       "resetMessage": "Spowoduje to wygenerowanie nowego hasła tymczasowego dla użytkownika {name}. Przy następnym logowaniu będzie wymagana jego zmiana.",
       "resetConfirm": "Zresetuj hasło",
+      "resetTwoFactorTitle": "Zresetować uwierzytelnianie dwuskładnikowe?",
+      "resetTwoFactorMessage": "Spowoduje to wyłączenie uwierzytelniania dwuskładnikowego użytkownika {name}, usunięcie jego kodów zapasowych i zaufanych urządzeń oraz wylogowanie go ze wszystkich sesji. Następnie będzie mógł zalogować się hasłem i ponownie skonfigurować 2FA. Użyj tej opcji, gdy utracił aplikację uwierzytelniającą i kody zapasowe albo po zmianie JWT_SECRET.",
+      "resetTwoFactorConfirm": "Zresetuj 2FA",
       "deleteTitle": "Usunąć użytkownika?",
       "deleteMessage": "Czy na pewno chcesz usunąć użytkownika {name}? Spowoduje to trwałe usunięcie jego konta i wszystkich powiązanych danych. Tej operacji nie można cofnąć. Jeśli jest delegatem innego konta, jego własne dane zostaną usunięte, ale login pozostanie zachowany, aby delegacja nadal działała -- stanie się użytkownikiem wyłącznie delegowanym.",
       "deleteConfirm": "Usuń użytkownika",
