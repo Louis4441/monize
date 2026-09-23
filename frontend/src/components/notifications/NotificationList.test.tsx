@@ -640,7 +640,7 @@ describe('NotificationList', () => {
       expect(mockPush).toHaveBeenCalledWith('/bills');
     });
 
-    it('marks a provider notification read and closes without navigating -- no page says more than the notification', () => {
+    it('marks a provider notification read and expands it in place -- no page says more than the notification', () => {
       const onMarkRead = vi.fn();
       const onClose = vi.fn();
       render(
@@ -655,8 +655,9 @@ describe('NotificationList', () => {
       );
       fireEvent.click(screen.getByTestId('notification-item-sys-1'));
       expect(onMarkRead).toHaveBeenCalledWith('sys-1');
-      expect(onClose).toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
       expect(mockPush).not.toHaveBeenCalled();
+      expect(screen.getByTestId('notification-item-sys-1')).toHaveAttribute('aria-expanded', 'true');
     });
 
     it('renders a weak JWT_SECRET alert in the reader language and opens no page', () => {
@@ -677,9 +678,36 @@ describe('NotificationList', () => {
       expect(screen.getByText('JWT_SECRET is weak')).toBeInTheDocument();
       expect(screen.getByText(/users sign in with a backup code/)).toBeInTheDocument();
       expect(screen.queryByText('STORED ENGLISH TITLE')).not.toBeInTheDocument();
+      // The message is longer than the two-line preview: it starts clamped, and
+      // clicking the row (which has no page to open) shows it in full instead
+      // of closing the panel.
+      const message = screen.getByTestId('notification-message-sys-1');
+      expect(message).toHaveClass('line-clamp-2');
       fireEvent.click(screen.getByTestId('notification-item-sys-1'));
-      expect(onClose).toHaveBeenCalled();
+      expect(message).not.toHaveClass('line-clamp-2');
+      expect(screen.getByTestId('notification-item-sys-1')).toHaveAttribute('aria-expanded', 'true');
+      expect(onClose).not.toHaveBeenCalled();
       expect(mockPush).not.toHaveBeenCalled();
+      // A second click collapses it again.
+      fireEvent.click(screen.getByTestId('notification-item-sys-1'));
+      expect(message).toHaveClass('line-clamp-2');
+    });
+
+    it('keeps a routed notification a plain link: no expansion, closes and navigates', () => {
+      const onClose = vi.fn();
+      render(
+        <NotificationList
+          {...defaultProps}
+          notifications={[
+            systemNotification({ id: 'sys-2', type: 'BACKUP_FAILED', data: {} }),
+          ]}
+          onClose={onClose}
+        />,
+      );
+      expect(screen.getByTestId('notification-item-sys-2')).not.toHaveAttribute('aria-expanded');
+      fireEvent.click(screen.getByTestId('notification-item-sys-2'));
+      expect(onClose).toHaveBeenCalled();
+      expect(mockPush).toHaveBeenCalled();
     });
 
     // The producer knows which page its notification is about; the client only
