@@ -29,6 +29,17 @@ export class DeploymentStatusController {
       "Deployment configuration an administrator should fix, e.g. a weak JWT_SECRET (admin only)",
   })
   getStatus(): DeploymentStatus {
-    return this.monitor.getDeploymentStatus();
+    const status = this.monitor.getDeploymentStatus();
+    // The banner this feeds and the System alert must appear together. The
+    // alert is otherwise raised only by the 15-minute sweep, so an admin who
+    // signs in right after a restart would see the banner with no alert behind
+    // it. Raising here is idempotent (the alert's weekly dedupe key) and is not
+    // awaited: the fan-out may email every administrator, and an unreachable
+    // SMTP relay must not hold the banner's request. `checkJwtSecret` never
+    // throws.
+    if (status.jwtSecretWeakness !== null) {
+      void this.monitor.checkJwtSecret();
+    }
+    return status;
   }
 }

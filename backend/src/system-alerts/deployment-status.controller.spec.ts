@@ -6,18 +6,22 @@ import { SystemAlertMonitorService } from "./system-alert-monitor.service";
 describe("DeploymentStatusController", () => {
   const RETIRED_PLACEHOLDER = "your-super-secret-jwt-key-change-in-production";
 
-  const controllerWith = (jwtSecret: string | undefined) =>
-    new DeploymentStatusController(
+  let raiseAdminAlert: jest.Mock;
+
+  const controllerWith = (jwtSecret: string | undefined) => {
+    raiseAdminAlert = jest.fn().mockResolvedValue(undefined);
+    return new DeploymentStatusController(
       new SystemAlertMonitorService(
         {
           get: jest.fn((name: string) =>
             name === "JWT_SECRET" ? jwtSecret : undefined,
           ),
         } as never,
-        { raiseAdminAlert: jest.fn() } as never,
+        { raiseAdminAlert } as never,
         { getStatus: jest.fn(), getFailureSnapshot: jest.fn() } as never,
       ),
     );
+  };
 
   it("reports a weak JWT_SECRET by reason code, never by value", () => {
     const status = controllerWith(RETIRED_PLACEHOLDER).getStatus();
@@ -30,6 +34,26 @@ describe("DeploymentStatusController", () => {
     expect(controllerWith("x".repeat(40)).getStatus()).toEqual({
       jwtSecretWeakness: "predictable",
     });
+  });
+
+  // The banner reads this endpoint; the System alert used to wait for the
+  // 15-minute sweep, so the two could disagree right after a restart.
+  it("raises the System alert alongside a weak-secret status", () => {
+    controllerWith(RETIRED_PLACEHOLDER).getStatus();
+
+    expect(raiseAdminAlert).toHaveBeenCalledTimes(1);
+    expect(raiseAdminAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "JWT_SECRET_WEAK",
+        data: { system: true, reason: "placeholder" },
+        dedupeKey: expect.stringMatching(/^JWT_SECRET_WEAK:/),
+      }),
+    );
+  });
+
+  it("raises no alert for a strong secret", () => {
+    controllerWith("FkVtZprB4sKbrwNIl6YiZarB8gB9RrKoO0rt7sFg4YM=").getStatus();
+    expect(raiseAdminAlert).not.toHaveBeenCalled();
   });
 
   it("reports nothing for a strong secret", () => {
