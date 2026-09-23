@@ -143,6 +143,11 @@ export class AuthEmailService {
           passwordHash,
           resetToken: null,
           resetTokenExpiry: null,
+          // Proving control of the mailbox is the recovery path out of a
+          // lockout: without this, anyone who knew the address could keep the
+          // owner locked out by failing a password once per lock window.
+          failedLoginAttempts: 0,
+          lockedUntil: null,
         })
         .where("resetToken = :hashedToken", { hashedToken })
         .andWhere("resetTokenExpiry > :now", { now: new Date() })

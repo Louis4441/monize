@@ -960,7 +960,15 @@ describe("AuthService", () => {
       // carry the id, the threshold, and the base lockout window.
       const increment = failedAttemptCall();
       expect(increment).toBeDefined();
-      expect(increment![1]).toEqual([mockUser.id, 5, 30 * 60 * 1000]);
+      // Threshold, base window, the cap on doublings (4 hours at most) and the
+      // decay window after which an expired lock's escalation is forgotten.
+      expect(increment![1]).toEqual([
+        mockUser.id,
+        5,
+        30 * 60 * 1000,
+        3,
+        24 * 60 * 60 * 1000,
+      ]);
       // The lockout is folded into that same UPDATE (a CASE on the threshold),
       // so no separate query-builder lockout write remains in the login path.
       expect(usersRepository.createQueryBuilder).not.toHaveBeenCalled();

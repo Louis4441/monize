@@ -594,6 +594,9 @@ export class AdminService {
     targetUser.mustChangePassword = true;
     targetUser.resetToken = null;
     targetUser.resetTokenExpiry = null;
+    // An admin reset is a recovery action: the temporary password must work.
+    targetUser.failedLoginAttempts = 0;
+    targetUser.lockedUntil = null;
     await withScopedDb(this.dataSource, (manager) =>
       manager.getRepository(User).save(targetUser),
     );

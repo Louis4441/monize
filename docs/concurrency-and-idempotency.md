@@ -427,7 +427,7 @@ anywhere in the codebase -- conditional `WHERE` is the whole of its optimistic
 concurrency control.
 
 The failed-login counter is the codebase's one use of mechanism 1 on a column
-the security model reads. `recordFailedAttempt` (`backend/src/auth/auth.service.ts`)
+the security model reads. `recordFailedLogin` (`backend/src/auth/login-lockout.ts`)
 is a single `UPDATE users u SET failed_login_attempts = u.failed_login_attempts + 1,
 locked_until = CASE WHEN ... END FROM prev WHERE u.id = prev.id RETURNING`, so the
 increment and the lockout decision it feeds are one statement over one row: the

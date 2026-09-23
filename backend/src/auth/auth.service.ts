@@ -40,7 +40,7 @@ import { DelegationService } from "../delegation/delegation.service";
 import { BackupEncryptionService } from "../backup/backup-encryption.service";
 import { withSystemContext } from "../common/db/with-context";
 import { withScopedDb } from "../common/db/scoped-db";
-import { returnedRows } from "../common/db/query-result";
+import { recordFailedLogin } from "./login-lockout";
 import { tr } from "../i18n/translate";
 import { currentRequestLocale } from "../i18n/request-locale";
 import { I18nService } from "nestjs-i18n";
@@ -53,8 +53,6 @@ export class AuthService {
   private jwtSecret: string;
   /** Derived key for CSRF HMAC -- cryptographically isolated from the JWT signing key */
   private csrfKey: string;
-  private readonly MAX_FAILED_ATTEMPTS = 5;
-  private readonly BASE_LOCKOUT_MS = 30 * 60 * 1000; // 30 minutes
 
   constructor(
     private jwtService: JwtService,
@@ -127,88 +125,15 @@ export class AuthService {
   }
 
   /**
-   * Record one failed login in a single guarded statement: increment the
-   * counter, and in the *same* UPDATE lock the account when that increment
-   * crosses the threshold. Returns what the database committed, plus whether
-   * this write is the one that moved the row from not-locked to locked.
-   *
-   * Two things this fixes, both from the maintainer review of PR #1097:
-   *
-   * 1. **The increment and the lock were two transactions.** The counter grew
-   *    in one committed statement and `locked_until` was written by a second,
-   *    so a concurrent attempt could interleave between them -- a legitimate
-   *    user locked out on a stale count, or the lockout window written from a
-   *    count that a parallel failure had already moved past. Folding the
-   *    threshold `CASE` into the increment makes the decision atomic with the
-   *    value it is decided from.
-   * 2. **The lockout email fired per failed attempt above the threshold, not
-   *    per transition.** Every committed count `>= MAX` looked lockable, so two
-   *    parallel failures both mailed the victim for one lockout. Only the write
-   *    that actually crossed from not-locked to locked reports `justLocked`, by
-   *    comparing the pre-update `locked_until` (returned from a CTE, since
-   *    `RETURNING` sees only the post-update row) against the new one.
-   *
-   * The lockout window keeps the exponential backoff the application code used
-   * (`BASE_LOCKOUT_MS * 2^(floor(attempts / MAX) - 1)`), computed in SQL from
-   * the committed count so it matches the value the same statement wrote.
-   *
-   * Returns `attempts: 0` / `justLocked: false` when no row matched, so a caller
-   * cannot mistake a missing user for a first failed attempt.
+   * Record one failed login. The statement, its lockout arithmetic (bounded, and
+   * forgotten a day after the lock expires) and the once-per-lockout `justLocked`
+   * are `recordFailedLogin` in `./login-lockout`; this only gives it a scoped
+   * transaction.
    */
-  private async recordFailedAttempt(userId: string): Promise<{
-    attempts: number;
-    justLocked: boolean;
-    lockedUntil: Date | null;
-  }> {
-    const rows = await withScopedDb(this.dataSource, (manager) =>
-      manager.query(
-        `WITH prev AS (
-           SELECT id, locked_until FROM users WHERE id = $1
-         )
-         UPDATE users u
-            SET failed_login_attempts = u.failed_login_attempts + 1,
-                locked_until = CASE
-                  WHEN u.failed_login_attempts + 1 >= $2
-                    THEN CURRENT_TIMESTAMP + (
-                      ROUND(
-                        $3::numeric
-                        * power(
-                            2,
-                            floor((u.failed_login_attempts + 1)::numeric / $2) - 1
-                          )
-                      )::text || ' milliseconds'
-                    )::interval
-                  ELSE u.locked_until
-                END
-           FROM prev
-          WHERE u.id = prev.id
-          RETURNING u.failed_login_attempts AS attempts,
-                    u.locked_until AS new_locked_until,
-                    prev.locked_until AS old_locked_until`,
-        [userId, this.MAX_FAILED_ATTEMPTS, this.BASE_LOCKOUT_MS],
-      ),
+  private recordFailedAttempt(userId: string) {
+    return withScopedDb(this.dataSource, (manager) =>
+      recordFailedLogin(manager, userId),
     );
-    const updated = returnedRows<{
-      attempts: number | string;
-      new_locked_until: Date | string | null;
-      old_locked_until: Date | string | null;
-    }>(rows);
-    if (updated.length === 0) {
-      return { attempts: 0, justLocked: false, lockedUntil: null };
-    }
-    const row = updated[0];
-    const toDate = (value: Date | string | null): Date | null =>
-      value == null ? null : value instanceof Date ? value : new Date(value);
-    const now = Date.now();
-    const newLockedUntil = toDate(row.new_locked_until);
-    const oldLockedUntil = toDate(row.old_locked_until);
-    const wasLocked = oldLockedUntil != null && oldLockedUntil.getTime() > now;
-    const isLocked = newLockedUntil != null && newLockedUntil.getTime() > now;
-    return {
-      attempts: Number(row.attempts),
-      justLocked: !wasLocked && isLocked,
-      lockedUntil: newLockedUntil,
-    };
   }
 
   // RLS: register/login/refresh/verify/OIDC lookups are public, pre-identity

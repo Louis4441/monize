@@ -2518,21 +2518,29 @@ reporting, and conflating them hid the fact that only the first has a mechanism.
 Statement           A failed login attempt increments the counter the lockout
                     threshold reads.
 Source of truth     users.failed_login_attempts
-Enforcement         An atomic CTE increments in the database. recordFailedAttempt
-                    (auth.service.ts) runs one UPDATE users SET
-                    failed_login_attempts = failed_login_attempts + 1 with the
-                    lockout threshold folded into the same statement -- not a
-                    JavaScript read-modify-write across the bcrypt compare -- so
-                    two concurrent failures cannot lose an increment. The
-                    success-path reset writes a fixed absolute value and was always
-                    safe.
+Enforcement         An atomic CTE increments in the database. recordFailedLogin
+                    (auth/login-lockout.ts, called by AuthService) runs one UPDATE
+                    users SET failed_login_attempts = failed_login_attempts + 1
+                    with the lockout threshold folded into the same statement --
+                    not a JavaScript read-modify-write across the bcrypt compare --
+                    so two concurrent failures cannot lose an increment. The same
+                    statement bounds the lock (30 minutes doubling per five
+                    failures, at most 4 hours) and forgets the escalation once a
+                    lock expired more than 24 hours ago, so a stranger who knows
+                    the address cannot extend a lockout without limit. A password
+                    reset (email, admin, owner of a delegate, emergency claim)
+                    clears the counter and the lock. The success-path reset writes
+                    a fixed absolute value and was always safe.
 Concurrency scope   per account
 Failure response    the counter equals the number of failures; lockout is not
                     delayed.
-Required tests      Present: auth.service.spec.ts asserts recordFailedAttempt is
-                    the single incrementing statement (matched on
-                    failed_login_attempts + RETURNING). A two-connection "N
-                    concurrent failures, counter equals N" test is still owed.
+Required tests      Two connections: test/integration/login-lockout.integration.spec.ts
+                    runs N concurrent failures on two pools and asserts the counter
+                    equals N, and proves the cap and the decay against real
+                    PostgreSQL. Unit: login-lockout.spec.ts pins the parameters;
+                    auth.service.spec.ts asserts the login emits the single
+                    incrementing statement; auth-email.service.spec.ts asserts a
+                    reset clears the lock.
 Status              enforced
 ```
 

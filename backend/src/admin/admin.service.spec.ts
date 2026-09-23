@@ -797,6 +797,20 @@ describe("AdminService", () => {
       expect(savedUser.passwordHash).not.toBe(result.temporaryPassword);
     });
 
+    it("clears a login lockout so the temporary password works", async () => {
+      usersRepository.findOne.mockResolvedValue({
+        ...mockTargetUser,
+        failedLoginAttempts: 25,
+        lockedUntil: new Date(Date.now() + 4 * 60 * 60 * 1000),
+      });
+
+      await service.resetUserPassword("admin-1", "user-2");
+
+      const savedUser = usersRepository.save.mock.calls[0][0];
+      expect(savedUser.failedLoginAttempts).toBe(0);
+      expect(savedUser.lockedUntil).toBeNull();
+    });
+
     it("revokes all refresh tokens after password reset", async () => {
       usersRepository.findOne.mockResolvedValue({ ...mockTargetUser });
 

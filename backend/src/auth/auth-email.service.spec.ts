@@ -207,6 +207,23 @@ describe("AuthEmailService", () => {
       );
     });
 
+    it("clears the login lockout in the same statement that sets the password", async () => {
+      // A reset is the owner's way out of a lockout somebody else can keep
+      // renewing by failing a password once per window. Before, the counter and
+      // the lock survived the reset, so the new password was refused too.
+      mockExecute.mockResolvedValue({ affected: 1, raw: [{ id: "user-1" }] });
+      passwordBreachService.isBreached.mockResolvedValue(false);
+
+      await service.resetPassword("valid-token", "NewSecurePassword123!");
+
+      expect(mockSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        }),
+      );
+    });
+
     it("should throw BadRequestException when password is breached", async () => {
       passwordBreachService.isBreached.mockResolvedValue(true);
 
