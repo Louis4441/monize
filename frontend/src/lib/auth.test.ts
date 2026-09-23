@@ -85,6 +85,12 @@ describe('authApi', () => {
     expect(apiClient.post).toHaveBeenCalledWith('/auth/2fa/disable', { code: '123456' });
   });
 
+  it('reset2FA posts the password and the code', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { message: 'ok' } });
+    await authApi.reset2FA('pw', 'abcd-ef01');
+    expect(apiClient.post).toHaveBeenCalledWith('/auth/2fa/reset', { currentPassword: 'pw', code: 'abcd-ef01' });
+  });
+
   it('getTrustedDevices fetches devices list', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [{ id: 'd-1' }] });
     const result = await authApi.getTrustedDevices();

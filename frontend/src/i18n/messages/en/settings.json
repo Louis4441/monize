@@ -60,6 +60,7 @@
       "addLayerDescription": "Add an extra layer of security to your account.",
       "enableButton": "Enable 2FA",
       "disableButton": "Disable 2FA",
+      "resetButton": "Reset 2FA",
       "disableModal": {
         "title": "Disable Two-Factor Authentication",
         "description": "Enter the 6-digit code from your authenticator app, or one of your backup codes (xxxx-xxxx), to confirm disabling 2FA.",
@@ -68,6 +69,19 @@
         "toasts": {
           "disabled": "Two-factor authentication disabled",
           "disableFailed": "Failed to disable 2FA"
+        }
+      },
+      "resetModal": {
+        "title": "Reset Two-Factor Authentication",
+        "description": "Use this if your authenticator app or backup codes may have been exposed, or if your authenticator codes stopped working (for example after a server secret change).",
+        "effect": "Your current authenticator, backup codes and trusted devices stop working, and you are signed out on every other device. You then set up a new authenticator straight away.",
+        "passwordLabel": "Account Password",
+        "codeLabel": "Authenticator or Backup Code",
+        "codeHint": "Enter the 6-digit code from your authenticator app. If your authenticator no longer works, enter one of your backup codes (xxxx-xxxx) instead.",
+        "resettingButton": "Resetting...",
+        "toasts": {
+          "reset": "Two-factor authentication reset. Set up your new authenticator now.",
+          "resetFailed": "Failed to reset 2FA"
         }
       }
     },

@@ -113,6 +113,16 @@ export const authApi = {
     return response.data;
   },
 
+  /**
+   * Replace an exposed or unusable authenticator: needs the account password
+   * and an authenticator or backup code, and works under FORCE_2FA. The
+   * session making the request is kept, so enrollment can follow at once.
+   */
+  reset2FA: async (currentPassword: string, code: string): Promise<{ message: string }> => {
+    const response = await apiClient.post<{ message: string }>('/auth/2fa/reset', { currentPassword, code });
+    return response.data;
+  },
+
   get2FAStatus: async (): Promise<{ enabled: boolean }> => {
     const response = await apiClient.get<{ enabled: boolean }>('/auth/2fa/status');
     return response.data;
