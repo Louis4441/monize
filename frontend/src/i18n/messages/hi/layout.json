@@ -34,6 +34,12 @@
     "dismiss": "खारिज करें",
     "dismissAriaLabel": "अपडेट अधिसूचना खारिज करें"
   },
+  "jwtSecretBanner": {
+    "label": "JWT_SECRET कमज़ोर है।",
+    "detail": "यह एक प्रकाशित प्लेसहोल्डर है या बहुत अनुमान योग्य है, इसलिए सत्र टोकन जाली बनाए जा सकते हैं। <code>openssl rand -base64 32</code> से एक मज़बूत मान बनाएं। इसे बदलने से प्रमाणीकरक ऐप के कोड काम करना बंद कर देते हैं और विश्वसनीय डिवाइस भुला दिए जाते हैं: उपयोगकर्ता बैकअप कोड से साइन इन करके 2FA फिर से सेट करते हैं, और जिनके पास बैकअप कोड नहीं है उनके लिए आप <users>उपयोगकर्ता प्रबंधन</users> में 2FA रीसेट करते हैं। पहले <code>docs/backend/modules-and-runtime.md</code> (Changing JWT_SECRET) पढ़ें।",
+    "dismiss": "खारिज करें",
+    "dismissAriaLabel": "JWT_SECRET चेतावनी खारिज करें"
+  },
   "actionHistory": {
     "title": "क्रिया इतिहास",
     "buttonAriaLabel": "क्रिया इतिहास",

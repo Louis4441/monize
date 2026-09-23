@@ -62,7 +62,7 @@
       "disableButton": "2FA'yı Devre Dışı Bırak",
       "disableModal": {
         "title": "İki Faktörlü Kimlik Doğrulamayı Devre Dışı Bırak",
-        "description": "2FA'yı devre dışı bırakmayı onaylamak için mevcut 6 haneli kodunuzu girin.",
+        "description": "2FA'yı devre dışı bırakmayı onaylamak için kimlik doğrulama uygulamanızdaki 6 haneli kodu veya yedek kodlarınızdan birini (xxxx-xxxx) girin.",
         "verificationCodeLabel": "Doğrulama Kodu",
         "disablingButton": "Devre Dışı Bırakılıyor...",
         "toasts": {

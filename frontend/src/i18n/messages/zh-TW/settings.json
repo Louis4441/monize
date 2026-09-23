@@ -62,7 +62,7 @@
       "disableButton": "停用 2FA",
       "disableModal": {
         "title": "停用雙重驗證",
-        "description": "輸入您目前的 6 位數驗證碼以確認停用 2FA。",
+        "description": "輸入驗證器 App 中的 6 位數驗證碼，或您的任一備份驗證碼（xxxx-xxxx），以確認停用 2FA。",
         "verificationCodeLabel": "驗證碼",
         "disablingButton": "停用中...",
         "toasts": {

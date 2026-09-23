@@ -95,6 +95,10 @@
       "title": "Şifreleme anahtarı yapılandırılmamış",
       "message": "ENCRYPTION_KEY ayarlanmadığından yedekler şifrelenmeden yazılıyor ve gizli bilgiler saklanamıyor. Gelecek bir sürüm bu anahtar olmadan başlamayacak."
     },
+    "jwtSecretWeak": {
+      "title": "JWT_SECRET zayıf",
+      "message": "JWT_SECRET yayımlanmış bir örnek değer ya da fazla tahmin edilebilir; bu nedenle oturum belirteçleri taklit edilebilir. Güçlü bir değer oluşturun (openssl rand -base64 32). Değiştirmek, kimlik doğrulama uygulamalarının kodlarını geçersiz kılar ve güvenilen cihazları unutur: kullanıcılar bir yedek kodla giriş yapıp 2FA'yı yeniden kurar, yedek kodu olmayanlar için 2FA'yı Kullanıcı Yönetimi'nden siz sıfırlarsınız. Önce docs/backend/modules-and-runtime.md (Changing JWT_SECRET) belgesini okuyun."
+    },
     "smtpFailure": {
       "title": "E-posta gönderimi başarısız oluyor",
       "message": "Monize e-posta gönderemedi: {error}. Bildirimler ve hatırlatıcılar iletilemiyor."

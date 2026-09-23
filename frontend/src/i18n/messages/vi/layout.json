@@ -34,6 +34,12 @@
     "dismiss": "Bỏ qua",
     "dismissAriaLabel": "Bỏ qua thông báo cập nhật"
   },
+  "jwtSecretBanner": {
+    "label": "JWT_SECRET yếu.",
+    "detail": "Đây là giá trị mẫu đã được công bố hoặc quá dễ đoán, nên token phiên có thể bị giả mạo. Hãy tạo một giá trị mạnh bằng <code>openssl rand -base64 32</code>. Việc thay đổi sẽ khiến mã từ ứng dụng xác thực không còn dùng được và quên các thiết bị đáng tin cậy: người dùng đăng nhập bằng mã dự phòng rồi thiết lập lại 2FA, còn với những ai không có mã dự phòng, bạn đặt lại 2FA trong <users>Quản lý người dùng</users>. Hãy đọc trước <code>docs/backend/modules-and-runtime.md</code> (Changing JWT_SECRET).",
+    "dismiss": "Bỏ qua",
+    "dismissAriaLabel": "Bỏ qua cảnh báo JWT_SECRET"
+  },
   "actionHistory": {
     "title": "Lịch sử hành động",
     "buttonAriaLabel": "Lịch sử hành động",

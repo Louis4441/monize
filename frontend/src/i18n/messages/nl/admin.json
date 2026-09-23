@@ -62,6 +62,7 @@
     "clickToDisable": "Klik om uit te schakelen",
     "clickToEnable": "Klik om in te schakelen",
     "resetPassword": "Wachtwoord opnieuw instellen",
+    "resetTwoFactor": "2FA opnieuw instellen",
     "noUsers": "Geen gebruikers gevonden.",
     "storageLoading": "Laden…",
     "storageUnavailable": "Niet beschikbaar",
@@ -96,7 +97,9 @@
       "loadFailed": "Gebruikers laden mislukt",
       "deleteFailed": "Gebruiker verwijderen mislukt",
       "disableFailed": "Gebruiker uitschakelen mislukt",
-      "resetFailed": "Wachtwoord opnieuw instellen mislukt"
+      "resetFailed": "Wachtwoord opnieuw instellen mislukt",
+      "twoFactorReset": "De tweestapsverificatie van {name} is opnieuw ingesteld. Ze zijn afgemeld.",
+      "resetTwoFactorFailed": "Tweestapsverificatie opnieuw instellen mislukt"
     },
     "dialogs": {
       "promoteTitle": "Gebruiker promoveren?",
@@ -111,6 +114,9 @@
       "resetTitle": "Wachtwoord opnieuw instellen?",
       "resetMessage": "Er wordt een nieuw tijdelijk wachtwoord gegenereerd voor {name}. Ze moeten het bij de volgende inlog wijzigen.",
       "resetConfirm": "Wachtwoord opnieuw instellen",
+      "resetTwoFactorTitle": "Tweestapsverificatie opnieuw instellen?",
+      "resetTwoFactorMessage": "Hiermee wordt de tweestapsverificatie van {name} uitgeschakeld, worden hun back-upcodes en vertrouwde apparaten verwijderd en worden ze overal afgemeld. Daarna kunnen ze inloggen met hun wachtwoord en 2FA opnieuw instellen. Gebruik dit als ze hun authenticator-app en back-upcodes kwijt zijn, of nadat JWT_SECRET is gewijzigd.",
+      "resetTwoFactorConfirm": "2FA opnieuw instellen",
       "deleteTitle": "Gebruiker verwijderen?",
       "deleteMessage": "Weet je zeker dat je {name} wilt verwijderen? Hiermee wordt het account en alle bijbehorende gegevens permanent verwijderd. Dit kan niet ongedaan worden gemaakt. Als ze gedelegeerde zijn van een ander account, worden hun eigen gegevens verwijderd maar blijft de login bewaard zodat de delegatie werkt — ze worden dan een gebruiker met uitsluitend gedelegeerde toegang.",
       "deleteConfirm": "Gebruiker verwijderen",

@@ -267,6 +267,10 @@
         "title": "Clé de chiffrement non configurée",
         "message": "ENCRYPTION_KEY n'est pas définie : les sauvegardes sont écrites en clair et les secrets ne peuvent pas être enregistrés. Une future version refusera de démarrer sans elle."
       },
+      "jwtSecretWeak": {
+        "title": "JWT_SECRET est faible",
+        "message": "JWT_SECRET est une valeur d'exemple publiée ou trop prévisible : des jetons de session peuvent donc être falsifiés. Générez-en une robuste (openssl rand -base64 32). La modifier rend inutilisables les codes des applications d'authentification et oublie les appareils de confiance : les utilisateurs se connectent avec un code de secours et reconfigurent la 2FA, et vous réinitialisez la 2FA dans Gestion des utilisateurs pour ceux qui n'en ont pas. Consultez d'abord docs/backend/modules-and-runtime.md (Changing JWT_SECRET)."
+      },
       "smtpFailure": {
         "title": "L'envoi d'e-mails échoue",
         "message": "Monize n'a pas pu envoyer d'e-mail : {{ error }}. Les notifications et les rappels ne sont pas distribués."

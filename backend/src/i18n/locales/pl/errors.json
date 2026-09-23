@@ -81,7 +81,9 @@
     "cannotDeleteOwnAccount": "Nie możesz usunąć własnego konta",
     "deleteLastAdmin": "Nie można usunąć ostatniego konta administratora.",
     "cannotResetOwnPassword": "Nie możesz zresetować własnego hasła z panelu administratora",
-    "noLocalPassword": "Nie można zresetować hasła dla kont bez lokalnego hasła"
+    "noLocalPassword": "Nie można zresetować hasła dla kont bez lokalnego hasła",
+    "cannotResetOwnTwoFactor": "Nie możesz zresetować własnego uwierzytelniania dwuskładnikowego z panelu administratora",
+    "twoFactorNotEnabled": "Ten użytkownik nie ma skonfigurowanego uwierzytelniania dwuskładnikowego."
   },
   "ai": {
     "queryStreamFailed": "Wystąpił nieoczekiwany błąd podczas przetwarzania zapytania.",

@@ -81,7 +81,9 @@
     "cannotDeleteOwnAccount": "Je kunt je eigen account niet verwijderen",
     "deleteLastAdmin": "Kan het laatste beheerdersaccount niet verwijderen.",
     "cannotResetOwnPassword": "Je kunt je eigen wachtwoord niet opnieuw instellen via het beheerpaneel",
-    "noLocalPassword": "Kan het wachtwoord niet opnieuw instellen voor accounts zonder lokaal wachtwoord"
+    "noLocalPassword": "Kan het wachtwoord niet opnieuw instellen voor accounts zonder lokaal wachtwoord",
+    "cannotResetOwnTwoFactor": "Je kunt je eigen tweestapsverificatie niet opnieuw instellen via het beheerpaneel",
+    "twoFactorNotEnabled": "Deze gebruiker heeft geen tweestapsverificatie ingesteld."
   },
   "ai": {
     "queryStreamFailed": "Er is een onverwachte fout opgetreden bij het verwerken van je vraag.",

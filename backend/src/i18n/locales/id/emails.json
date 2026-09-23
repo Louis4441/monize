@@ -267,6 +267,10 @@
         "title": "Kunci enkripsi belum dikonfigurasi",
         "message": "ENCRYPTION_KEY belum disetel, sehingga cadangan ditulis tanpa enkripsi dan rahasia tidak dapat disimpan. Versi mendatang tidak akan dapat dijalankan tanpanya."
       },
+      "jwtSecretWeak": {
+        "title": "JWT_SECRET lemah",
+        "message": "JWT_SECRET adalah nilai contoh yang dipublikasikan atau terlalu mudah ditebak, sehingga token sesi bisa dipalsukan. Buat nilai yang kuat (openssl rand -base64 32). Mengubahnya membuat kode aplikasi autentikator tidak berlaku lagi dan melupakan perangkat tepercaya: pengguna masuk dengan kode cadangan lalu menyiapkan ulang 2FA, dan Anda mereset 2FA di Manajemen Pengguna bagi yang tidak memilikinya. Baca dulu docs/backend/modules-and-runtime.md (Changing JWT_SECRET)."
+      },
       "smtpFailure": {
         "title": "Pengiriman email gagal",
         "message": "Monize tidak dapat mengirim email: {{ error }}. Notifikasi dan pengingat tidak terkirim."

@@ -62,7 +62,7 @@
       "disableButton": "Nonaktifkan 2FA",
       "disableModal": {
         "title": "Nonaktifkan Autentikasi Dua Faktor",
-        "description": "Masukkan kode 6 digit Anda saat ini untuk mengonfirmasi menonaktifkan 2FA.",
+        "description": "Masukkan kode 6 digit dari aplikasi autentikator Anda, atau salah satu kode cadangan Anda (xxxx-xxxx), untuk mengonfirmasi menonaktifkan 2FA.",
         "verificationCodeLabel": "Kode Verifikasi",
         "disablingButton": "Menonaktifkan...",
         "toasts": {

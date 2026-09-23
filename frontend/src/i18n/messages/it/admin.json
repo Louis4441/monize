@@ -62,6 +62,7 @@
     "clickToDisable": "Clicca per disabilitare",
     "clickToEnable": "Clicca per abilitare",
     "resetPassword": "Reimposta password",
+    "resetTwoFactor": "Reimposta 2FA",
     "noUsers": "Nessun utente trovato.",
     "storageLoading": "Caricamento…",
     "storageUnavailable": "Non disponibile",
@@ -96,7 +97,9 @@
       "loadFailed": "Caricamento utenti non riuscito",
       "deleteFailed": "Eliminazione utente non riuscita",
       "disableFailed": "Disabilitazione utente non riuscita",
-      "resetFailed": "Reimpostazione password non riuscita"
+      "resetFailed": "Reimpostazione password non riuscita",
+      "twoFactorReset": "L'autenticazione a due fattori di {name} è stata reimpostata. È stato disconnesso.",
+      "resetTwoFactorFailed": "Reimpostazione dell'autenticazione a due fattori non riuscita"
     },
     "dialogs": {
       "promoteTitle": "Promuovere l'utente?",
@@ -111,6 +114,9 @@
       "resetTitle": "Reimpostare la password?",
       "resetMessage": "Verrà generata una nuova password temporanea per {name}. Dovrà cambiarla al prossimo accesso.",
       "resetConfirm": "Reimposta password",
+      "resetTwoFactorTitle": "Reimpostare l'autenticazione a due fattori?",
+      "resetTwoFactorMessage": "Questa operazione disattiva l'autenticazione a due fattori per {name}, elimina i suoi codici di backup e i dispositivi attendibili e lo disconnette ovunque. Potrà poi accedere con la sua password e riconfigurare la 2FA. Usala quando ha perso l'app di autenticazione e i codici di backup, oppure dopo una modifica di JWT_SECRET.",
+      "resetTwoFactorConfirm": "Reimposta 2FA",
       "deleteTitle": "Eliminare l'utente?",
       "deleteMessage": "Sei sicuro di voler eliminare {name}? Il suo account e tutti i dati associati verranno rimossi definitivamente. L'operazione non può essere annullata. Se è un delegato di un altro account, i suoi dati vengono rimossi ma il suo accesso viene mantenuto affinché la delega continui a funzionare — diventerà un utente solo delegato.",
       "deleteConfirm": "Elimina utente",

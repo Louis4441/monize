@@ -267,6 +267,10 @@
         "title": "Verschlüsselungsschlüssel nicht konfiguriert",
         "message": "ENCRYPTION_KEY ist nicht gesetzt, daher werden Backups unverschlüsselt geschrieben und Geheimnisse können nicht gespeichert werden. Eine zukünftige Version wird ohne den Schlüssel nicht mehr starten."
       },
+      "jwtSecretWeak": {
+        "title": "JWT_SECRET ist unsicher",
+        "message": "JWT_SECRET ist ein veröffentlichter Platzhalter oder zu leicht zu erraten, sodass Sitzungstoken gefälscht werden können. Erzeugen Sie einen starken Wert (openssl rand -base64 32). Eine Änderung macht Codes aus Authentifizierungs-Apps ungültig und vergisst vertrauenswürdige Geräte: Benutzer melden sich mit einem Backup-Code an und richten 2FA neu ein, und für alle ohne Backup-Code setzen Sie die 2FA in der Benutzerverwaltung zurück. Lesen Sie vorher docs/backend/modules-and-runtime.md (Changing JWT_SECRET)."
+      },
       "smtpFailure": {
         "title": "E-Mail-Zustellung schlägt fehl",
         "message": "Monize konnte keine E-Mail senden: {{ error }}. Benachrichtigungen und Erinnerungen werden nicht zugestellt."

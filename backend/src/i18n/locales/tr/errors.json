@@ -81,7 +81,9 @@
     "cannotDeleteOwnAccount": "Kendi hesabınızı silemezsiniz",
     "deleteLastAdmin": "Son yönetici hesabı silinemez.",
     "cannotResetOwnPassword": "Yönetici panelinden kendi şifrenizi sıfırlayamazsınız",
-    "noLocalPassword": "Yerel şifresi olmayan hesapların şifresi sıfırlanamaz"
+    "noLocalPassword": "Yerel şifresi olmayan hesapların şifresi sıfırlanamaz",
+    "cannotResetOwnTwoFactor": "Yönetici panelinden kendi iki faktörlü kimlik doğrulamanızı sıfırlayamazsınız",
+    "twoFactorNotEnabled": "Bu kullanıcı için iki faktörlü kimlik doğrulama ayarlanmamış."
   },
   "ai": {
     "queryStreamFailed": "Sorgunuz işlenirken beklenmeyen bir hata oluştu.",

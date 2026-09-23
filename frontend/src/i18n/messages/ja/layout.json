@@ -34,6 +34,12 @@
     "dismiss": "閉じる",
     "dismissAriaLabel": "更新通知を閉じる"
   },
+  "jwtSecretBanner": {
+    "label": "JWT_SECRET が脆弱です。",
+    "detail": "公開済みのプレースホルダーであるか推測されやすいため、セッショントークンを偽造される可能性があります。<code>openssl rand -base64 32</code> で強力な値を生成してください。変更すると認証アプリのコードが使えなくなり、信頼済みデバイスも解除されます。ユーザーはバックアップコードでサインインして 2FA を設定し直し、バックアップコードのないユーザーは<users>ユーザー管理</users>で 2FA をリセットしてください。事前に <code>docs/backend/modules-and-runtime.md</code>（Changing JWT_SECRET）をお読みください。",
+    "dismiss": "閉じる",
+    "dismissAriaLabel": "JWT_SECRET の警告を閉じる"
+  },
   "actionHistory": {
     "title": "操作履歴",
     "buttonAriaLabel": "操作履歴",

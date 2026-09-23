@@ -81,7 +81,9 @@
     "cannotDeleteOwnAccount": "Sie können Ihr eigenes Konto nicht löschen",
     "deleteLastAdmin": "Das letzte Administratorkonto kann nicht gelöscht werden.",
     "cannotResetOwnPassword": "Sie können Ihr eigenes Passwort nicht über das Admin-Panel zurücksetzen",
-    "noLocalPassword": "Passwort kann für Konten ohne lokales Passwort nicht zurückgesetzt werden"
+    "noLocalPassword": "Passwort kann für Konten ohne lokales Passwort nicht zurückgesetzt werden",
+    "cannotResetOwnTwoFactor": "Sie können Ihre eigene Zwei-Faktor-Authentifizierung nicht über das Admin-Panel zurücksetzen",
+    "twoFactorNotEnabled": "Für diesen Benutzer ist keine Zwei-Faktor-Authentifizierung eingerichtet."
   },
   "ai": {
     "queryStreamFailed": "Bei der Verarbeitung Ihrer Anfrage ist ein unerwarteter Fehler aufgetreten.",

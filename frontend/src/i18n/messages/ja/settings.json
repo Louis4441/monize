@@ -62,7 +62,7 @@
       "disableButton": "2FAを無効化",
       "disableModal": {
         "title": "二要素認証を無効化",
-        "description": "現在の6桁のコードを入力して2FAの無効化を確認してください。",
+        "description": "2FAの無効化を確認するには、認証アプリの6桁のコード、またはバックアップコード（xxxx-xxxx）のいずれかを入力してください。",
         "verificationCodeLabel": "確認コード",
         "disablingButton": "無効化中...",
         "toasts": {

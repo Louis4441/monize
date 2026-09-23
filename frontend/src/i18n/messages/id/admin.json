@@ -62,6 +62,7 @@
     "clickToDisable": "Klik untuk menonaktifkan",
     "clickToEnable": "Klik untuk mengaktifkan",
     "resetPassword": "Reset Kata Sandi",
+    "resetTwoFactor": "Reset 2FA",
     "noUsers": "Tidak ada pengguna ditemukan.",
     "storageLoading": "Memuat…",
     "storageUnavailable": "Tidak tersedia",
@@ -96,7 +97,9 @@
       "loadFailed": "Gagal memuat pengguna",
       "deleteFailed": "Gagal menghapus pengguna",
       "disableFailed": "Gagal menonaktifkan pengguna",
-      "resetFailed": "Gagal mereset kata sandi"
+      "resetFailed": "Gagal mereset kata sandi",
+      "twoFactorReset": "Autentikasi dua faktor untuk {name} telah direset. Mereka telah dikeluarkan dari semua sesi.",
+      "resetTwoFactorFailed": "Gagal mereset autentikasi dua faktor"
     },
     "dialogs": {
       "promoteTitle": "Promosikan Pengguna?",
@@ -111,6 +114,9 @@
       "resetTitle": "Reset Kata Sandi?",
       "resetMessage": "Ini akan membuat kata sandi sementara baru untuk {name}. Mereka akan diminta untuk menggantinya saat login berikutnya.",
       "resetConfirm": "Reset Kata Sandi",
+      "resetTwoFactorTitle": "Reset Autentikasi Dua Faktor?",
+      "resetTwoFactorMessage": "Ini akan menonaktifkan autentikasi dua faktor untuk {name}, menghapus kode cadangan dan perangkat tepercaya mereka, serta mengeluarkan mereka dari semua sesi. Setelah itu mereka dapat masuk dengan kata sandi dan menyiapkan ulang 2FA. Gunakan ini jika mereka kehilangan aplikasi autentikator dan kode cadangan, atau setelah JWT_SECRET diubah.",
+      "resetTwoFactorConfirm": "Reset 2FA",
       "deleteTitle": "Hapus Pengguna?",
       "deleteMessage": "Apakah Anda yakin ingin menghapus {name}? Ini akan menghapus akun dan semua data terkait mereka secara permanen. Tindakan ini tidak dapat dibatalkan. Jika mereka adalah delegasi akun lain, data mereka sendiri dihapus tetapi login mereka dipertahankan agar delegasi tetap berfungsi -- mereka menjadi pengguna delegasi saja.",
       "deleteConfirm": "Hapus Pengguna",

@@ -81,7 +81,9 @@
     "cannotDeleteOwnAccount": "Vous ne pouvez pas supprimer votre propre compte",
     "deleteLastAdmin": "Impossible de supprimer le dernier compte administrateur.",
     "cannotResetOwnPassword": "Vous ne pouvez pas réinitialiser votre propre mot de passe via le panneau d'administration",
-    "noLocalPassword": "Impossible de réinitialiser le mot de passe pour les comptes sans mot de passe local"
+    "noLocalPassword": "Impossible de réinitialiser le mot de passe pour les comptes sans mot de passe local",
+    "cannotResetOwnTwoFactor": "Vous ne pouvez pas réinitialiser votre propre authentification à deux facteurs via le panneau d'administration",
+    "twoFactorNotEnabled": "Cet utilisateur n'a pas configuré l'authentification à deux facteurs."
   },
   "ai": {
     "queryStreamFailed": "Une erreur inattendue s'est produite lors du traitement de votre requête.",

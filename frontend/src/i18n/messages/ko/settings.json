@@ -62,7 +62,7 @@
       "disableButton": "2FA 비활성화",
       "disableModal": {
         "title": "이중 인증 비활성화",
-        "description": "2FA 비활성화를 확인하려면 현재 6자리 코드를 입력하세요.",
+        "description": "2FA 비활성화를 확인하려면 인증 앱의 6자리 코드 또는 백업 코드(xxxx-xxxx) 중 하나를 입력하세요.",
         "verificationCodeLabel": "인증 코드",
         "disablingButton": "비활성화 중...",
         "toasts": {

@@ -34,6 +34,12 @@
     "dismiss": "Cerrar",
     "dismissAriaLabel": "Cerrar notificación de actualización"
   },
+  "jwtSecretBanner": {
+    "label": "JWT_SECRET es débil.",
+    "detail": "Es un valor de ejemplo publicado o demasiado predecible, así que se pueden falsificar tokens de sesión. Genera uno seguro con <code>openssl rand -base64 32</code>. Cambiarlo hace que dejen de funcionar los códigos de las aplicaciones de autenticación y olvida los dispositivos de confianza: los usuarios inician sesión con un código de respaldo y vuelven a configurar la 2FA, y tú restableces la 2FA en <users>Gestión de usuarios</users> para quien no tenga uno. Consulta antes <code>docs/backend/modules-and-runtime.md</code> (Changing JWT_SECRET).",
+    "dismiss": "Cerrar",
+    "dismissAriaLabel": "Cerrar aviso de JWT_SECRET"
+  },
   "actionHistory": {
     "title": "Historial de acciones",
     "buttonAriaLabel": "Historial de acciones",

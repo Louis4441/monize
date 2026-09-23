@@ -95,6 +95,10 @@
       "title": "Encryptiesleutel niet geconfigureerd",
       "message": "ENCRYPTION_KEY is niet ingesteld, dus back-ups worden onversleuteld weggeschreven en geheimen kunnen niet worden opgeslagen. Een toekomstige versie start niet meer zonder deze sleutel."
     },
+    "jwtSecretWeak": {
+      "title": "JWT_SECRET is zwak",
+      "message": "JWT_SECRET is een gepubliceerde voorbeeldwaarde of te voorspelbaar, waardoor sessietokens kunnen worden vervalst. Genereer een sterke waarde (openssl rand -base64 32). Wijzigen zorgt ervoor dat codes uit authenticator-apps niet meer werken en vertrouwde apparaten worden vergeten: gebruikers loggen in met een back-upcode en stellen 2FA opnieuw in, en voor wie er geen heeft stel je de 2FA opnieuw in via Gebruikersbeheer. Lees eerst docs/backend/modules-and-runtime.md (Changing JWT_SECRET)."
+    },
     "smtpFailure": {
       "title": "E-mailbezorging mislukt",
       "message": "Monize kon geen e-mail verzenden: {error}. Meldingen en herinneringen worden niet bezorgd."

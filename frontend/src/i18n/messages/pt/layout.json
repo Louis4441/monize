@@ -34,6 +34,12 @@
     "dismiss": "Dispensar",
     "dismissAriaLabel": "Dispensar notificação de atualização"
   },
+  "jwtSecretBanner": {
+    "label": "O JWT_SECRET é fraco.",
+    "detail": "É um valor de exemplo publicado ou demasiado previsível, pelo que os tokens de sessão podem ser falsificados. Gere um valor forte com <code>openssl rand -base64 32</code>. Alterá-lo faz com que os códigos das aplicações autenticadoras deixem de funcionar e esquece os dispositivos de confiança: os utilizadores iniciam sessão com um código de recuperação e voltam a configurar o 2FA, e o administrador repõe o 2FA em <users>Gestão de Utilizadores</users> para quem não tiver um. Leia primeiro <code>docs/backend/modules-and-runtime.md</code> (Changing JWT_SECRET).",
+    "dismiss": "Dispensar",
+    "dismissAriaLabel": "Dispensar aviso do JWT_SECRET"
+  },
   "actionHistory": {
     "title": "Histórico de ações",
     "buttonAriaLabel": "Histórico de ações",

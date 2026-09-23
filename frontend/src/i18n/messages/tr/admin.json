@@ -62,6 +62,7 @@
     "clickToDisable": "Devre dışı bırakmak için tıklayın",
     "clickToEnable": "Etkinleştirmek için tıklayın",
     "resetPassword": "Şifreyi Sıfırla",
+    "resetTwoFactor": "2FA'yı Sıfırla",
     "noUsers": "Kullanıcı bulunamadı.",
     "storageLoading": "Yükleniyor…",
     "storageUnavailable": "Kullanılamıyor",
@@ -96,7 +97,9 @@
       "loadFailed": "Kullanıcılar yüklenemedi",
       "deleteFailed": "Kullanıcı silinemedi",
       "disableFailed": "Kullanıcı devre dışı bırakılamadı",
-      "resetFailed": "Şifre sıfırlanamadı"
+      "resetFailed": "Şifre sıfırlanamadı",
+      "twoFactorReset": "{name} için iki faktörlü kimlik doğrulama sıfırlandı. Tüm oturumları kapatıldı.",
+      "resetTwoFactorFailed": "İki faktörlü kimlik doğrulama sıfırlanamadı"
     },
     "dialogs": {
       "promoteTitle": "Kullanıcı Yükseltilsin mi?",
@@ -111,6 +114,9 @@
       "resetTitle": "Şifre Sıfırlansın mı?",
       "resetMessage": "Bu işlem {name} için yeni bir geçici şifre oluşturacaktır. Bir sonraki girişlerinde şifrelerini değiştirmeleri gerekecektir.",
       "resetConfirm": "Şifreyi Sıfırla",
+      "resetTwoFactorTitle": "İki Faktörlü Kimlik Doğrulama Sıfırlansın mı?",
+      "resetTwoFactorMessage": "Bu işlem {name} için iki faktörlü kimlik doğrulamayı kapatır, yedek kodlarını ve güvenilen cihazlarını siler ve tüm oturumlarını kapatır. Ardından şifresiyle giriş yapıp 2FA'yı yeniden kurabilir. Kimlik doğrulama uygulamasını ve yedek kodlarını kaybettiğinde ya da JWT_SECRET değiştirildikten sonra kullanın.",
+      "resetTwoFactorConfirm": "2FA'yı Sıfırla",
       "deleteTitle": "Kullanıcı Silinsin mi?",
       "deleteMessage": "{name} adlı kullanıcıyı silmek istediğinizden emin misiniz? Bu işlem hesabını ve tüm ilişkili verilerini kalıcı olarak kaldıracaktır. Bu işlem geri alınamaz. Başka bir hesabın temsilcisiyse kendi verileri kaldırılır ancak delegasyon çalışmaya devam edebilmesi için girişleri korunur -- salt temsilci kullanıcı olurlar.",
       "deleteConfirm": "Kullanıcıyı Sil",

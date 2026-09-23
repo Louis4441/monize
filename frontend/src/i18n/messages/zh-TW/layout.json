@@ -34,6 +34,12 @@
     "dismiss": "關閉",
     "dismissAriaLabel": "關閉更新通知"
   },
+  "jwtSecretBanner": {
+    "label": "JWT_SECRET 強度不足。",
+    "detail": "它是公開的範例值或過於容易猜測，工作階段權杖可能遭到偽造。請使用 <code>openssl rand -base64 32</code> 產生一個強金鑰。變更後，驗證器 App 的驗證碼將失效，受信任的裝置也會被清除：使用者以備份驗證碼登入後重新設定 2FA，對於沒有備份驗證碼的使用者，請在<users>使用者管理</users>中重設其 2FA。請先閱讀 <code>docs/backend/modules-and-runtime.md</code>（Changing JWT_SECRET）。",
+    "dismiss": "關閉",
+    "dismissAriaLabel": "關閉 JWT_SECRET 警告"
+  },
   "actionHistory": {
     "title": "操作記錄",
     "buttonAriaLabel": "操作記錄",

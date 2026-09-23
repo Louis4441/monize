@@ -62,7 +62,7 @@
       "disableButton": "Tắt 2FA",
       "disableModal": {
         "title": "Tắt xác thực hai yếu tố",
-        "description": "Nhập mã 6 chữ số hiện tại của bạn để xác nhận tắt 2FA.",
+        "description": "Nhập mã 6 chữ số từ ứng dụng xác thực của bạn, hoặc một trong các mã dự phòng (xxxx-xxxx), để xác nhận tắt 2FA.",
         "verificationCodeLabel": "Mã xác minh",
         "disablingButton": "Đang tắt...",
         "toasts": {

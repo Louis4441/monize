@@ -62,7 +62,7 @@
       "disableButton": "2FA deaktivieren",
       "disableModal": {
         "title": "Zwei-Faktor-Authentifizierung deaktivieren",
-        "description": "Geben Sie Ihren aktuellen 6-stelligen Code ein, um die Deaktivierung der 2FA zu bestätigen.",
+        "description": "Geben Sie den 6-stelligen Code aus Ihrer Authentifizierungs-App oder einen Ihrer Backup-Codes (xxxx-xxxx) ein, um die Deaktivierung der 2FA zu bestätigen.",
         "verificationCodeLabel": "Verifizierungscode",
         "disablingButton": "Wird deaktiviert...",
         "toasts": {

@@ -62,7 +62,7 @@
       "disableButton": "Désactiver la 2FA",
       "disableModal": {
         "title": "Désactiver l'authentification à deux facteurs",
-        "description": "Saisissez votre code à 6 chiffres actuel pour confirmer la désactivation de la 2FA.",
+        "description": "Saisissez le code à 6 chiffres de votre application d'authentification, ou l'un de vos codes de secours (xxxx-xxxx), pour confirmer la désactivation de la 2FA.",
         "verificationCodeLabel": "Code de vérification",
         "disablingButton": "Désactivation...",
         "toasts": {

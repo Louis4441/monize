@@ -62,7 +62,7 @@
       "disableButton": "Wyłącz 2FA",
       "disableModal": {
         "title": "Wyłącz uwierzytelnianie dwuskładnikowe",
-        "description": "Wpisz bieżący 6-cyfrowy kod, aby potwierdzić wyłączenie 2FA.",
+        "description": "Wpisz 6-cyfrowy kod z aplikacji uwierzytelniającej lub jeden z kodów zapasowych (xxxx-xxxx), aby potwierdzić wyłączenie 2FA.",
         "verificationCodeLabel": "Kod weryfikacyjny",
         "disablingButton": "Wyłączanie...",
         "toasts": {

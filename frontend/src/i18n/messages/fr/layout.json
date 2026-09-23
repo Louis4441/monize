@@ -34,6 +34,12 @@
     "dismiss": "Fermer",
     "dismissAriaLabel": "Fermer la notification de mise à jour"
   },
+  "jwtSecretBanner": {
+    "label": "JWT_SECRET est faible.",
+    "detail": "C'est une valeur d'exemple publiée ou trop prévisible : des jetons de session peuvent donc être falsifiés. Générez-en une robuste avec <code>openssl rand -base64 32</code>. La modifier rend inutilisables les codes des applications d'authentification et oublie les appareils de confiance : les utilisateurs se connectent avec un code de secours et reconfigurent la 2FA, et vous réinitialisez la 2FA dans <users>Gestion des utilisateurs</users> pour ceux qui n'en ont pas. Consultez d'abord <code>docs/backend/modules-and-runtime.md</code> (Changing JWT_SECRET).",
+    "dismiss": "Fermer",
+    "dismissAriaLabel": "Fermer l'avertissement JWT_SECRET"
+  },
   "actionHistory": {
     "title": "Historique des actions",
     "buttonAriaLabel": "Historique des actions",

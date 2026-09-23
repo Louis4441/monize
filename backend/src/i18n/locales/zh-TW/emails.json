@@ -267,6 +267,10 @@
         "title": "尚未設定加密金鑰",
         "message": "未設定 ENCRYPTION_KEY，備份將以未加密方式寫入，且無法儲存機密資訊。未來版本將在缺少該金鑰時拒絕啟動。"
       },
+      "jwtSecretWeak": {
+        "title": "JWT_SECRET 強度不足",
+        "message": "JWT_SECRET 是公開的範例值或過於容易猜測，工作階段權杖可能遭到偽造。請產生一個強金鑰（openssl rand -base64 32）。變更後，驗證器 App 的驗證碼將失效，受信任的裝置也會被清除：使用者以備份驗證碼登入後重新設定 2FA，對於沒有備份驗證碼的使用者，請在使用者管理中重設其 2FA。請先閱讀 docs/backend/modules-and-runtime.md（Changing JWT_SECRET）。"
+      },
       "smtpFailure": {
         "title": "郵件傳送失敗",
         "message": "Monize 無法傳送郵件：{{ error }}。通知與提醒未能送達。"

@@ -34,6 +34,12 @@
     "dismiss": "Tutup",
     "dismissAriaLabel": "Tutup notifikasi pembaruan"
   },
+  "jwtSecretBanner": {
+    "label": "JWT_SECRET lemah.",
+    "detail": "Nilainya adalah contoh yang dipublikasikan atau terlalu mudah ditebak, sehingga token sesi bisa dipalsukan. Buat nilai yang kuat dengan <code>openssl rand -base64 32</code>. Mengubahnya membuat kode aplikasi autentikator tidak berlaku lagi dan melupakan perangkat tepercaya: pengguna masuk dengan kode cadangan lalu menyiapkan ulang 2FA, dan Anda mereset 2FA di <users>Manajemen Pengguna</users> bagi yang tidak memilikinya. Baca dulu <code>docs/backend/modules-and-runtime.md</code> (Changing JWT_SECRET).",
+    "dismiss": "Tutup",
+    "dismissAriaLabel": "Tutup peringatan JWT_SECRET"
+  },
   "actionHistory": {
     "title": "Riwayat Tindakan",
     "buttonAriaLabel": "Riwayat Tindakan",

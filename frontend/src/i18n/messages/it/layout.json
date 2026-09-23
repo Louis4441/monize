@@ -34,6 +34,12 @@
     "dismiss": "Chiudi",
     "dismissAriaLabel": "Chiudi notifica aggiornamento"
   },
+  "jwtSecretBanner": {
+    "label": "JWT_SECRET è debole.",
+    "detail": "È un valore di esempio pubblicato o troppo prevedibile, quindi i token di sessione possono essere falsificati. Generane uno robusto con <code>openssl rand -base64 32</code>. Cambiarlo rende inutilizzabili i codici delle app di autenticazione e dimentica i dispositivi attendibili: gli utenti accedono con un codice di backup e riconfigurano la 2FA, e tu reimposti la 2FA in <users>Gestione utenti</users> per chi non ne ha uno. Leggi prima <code>docs/backend/modules-and-runtime.md</code> (Changing JWT_SECRET).",
+    "dismiss": "Chiudi",
+    "dismissAriaLabel": "Chiudi avviso JWT_SECRET"
+  },
   "actionHistory": {
     "title": "Cronologia azioni",
     "buttonAriaLabel": "Cronologia azioni",

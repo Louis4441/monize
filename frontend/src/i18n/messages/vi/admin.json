@@ -62,6 +62,7 @@
     "clickToDisable": "Nhấn để vô hiệu hóa",
     "clickToEnable": "Nhấn để kích hoạt",
     "resetPassword": "Đặt lại mật khẩu",
+    "resetTwoFactor": "Đặt lại 2FA",
     "noUsers": "Không tìm thấy người dùng nào.",
     "storageLoading": "Đang tải…",
     "storageUnavailable": "Không khả dụng",
@@ -96,7 +97,9 @@
       "loadFailed": "Không thể tải người dùng",
       "deleteFailed": "Không thể xóa người dùng",
       "disableFailed": "Không thể vô hiệu hóa người dùng",
-      "resetFailed": "Không thể đặt lại mật khẩu"
+      "resetFailed": "Không thể đặt lại mật khẩu",
+      "twoFactorReset": "Đã đặt lại xác thực hai yếu tố cho {name}. Họ đã bị đăng xuất.",
+      "resetTwoFactorFailed": "Không thể đặt lại xác thực hai yếu tố"
     },
     "dialogs": {
       "promoteTitle": "Thăng cấp người dùng?",
@@ -111,6 +114,9 @@
       "resetTitle": "Đặt lại mật khẩu?",
       "resetMessage": "Điều này sẽ tạo mật khẩu tạm thời mới cho {name}. Họ sẽ phải đổi mật khẩu khi đăng nhập tiếp theo.",
       "resetConfirm": "Đặt lại mật khẩu",
+      "resetTwoFactorTitle": "Đặt lại xác thực hai yếu tố?",
+      "resetTwoFactorMessage": "Thao tác này tắt xác thực hai yếu tố của {name}, xóa mã dự phòng và các thiết bị đáng tin cậy của họ, đồng thời đăng xuất họ khỏi mọi nơi. Sau đó họ có thể đăng nhập bằng mật khẩu và thiết lập lại 2FA. Hãy dùng khi họ đã mất ứng dụng xác thực và mã dự phòng, hoặc sau khi JWT_SECRET được thay đổi.",
+      "resetTwoFactorConfirm": "Đặt lại 2FA",
       "deleteTitle": "Xóa người dùng?",
       "deleteMessage": "Bạn có chắc chắn muốn xóa {name}? Điều này sẽ xóa vĩnh viễn tài khoản và tất cả dữ liệu liên quan của họ. Hành động này không thể hoàn tác. Nếu họ là người được ủy quyền của tài khoản khác, dữ liệu của họ bị xóa nhưng thông tin đăng nhập được giữ lại để ủy quyền vẫn hoạt động -- họ trở thành người dùng chỉ có ủy quyền.",
       "deleteConfirm": "Xóa người dùng",

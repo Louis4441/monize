@@ -62,7 +62,7 @@
       "disableButton": "2FA uitschakelen",
       "disableModal": {
         "title": "Tweefactorauthenticatie uitschakelen",
-        "description": "Voer jouw huidige 6-cijferige code in om het uitschakelen van 2FA te bevestigen.",
+        "description": "Voer de 6-cijferige code uit jouw authenticator-app of een van jouw back-upcodes (xxxx-xxxx) in om het uitschakelen van 2FA te bevestigen.",
         "verificationCodeLabel": "Verificatiecode",
         "disablingButton": "Uitschakelen...",
         "toasts": {

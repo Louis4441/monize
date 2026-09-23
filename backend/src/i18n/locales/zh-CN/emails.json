@@ -267,6 +267,10 @@
         "title": "未配置加密密钥",
         "message": "未设置 ENCRYPTION_KEY，备份将以未加密方式写入，且无法保存机密信息。未来版本将在缺少该密钥时拒绝启动。"
       },
+      "jwtSecretWeak": {
+        "title": "JWT_SECRET 强度不足",
+        "message": "JWT_SECRET 是公开的示例值或过于容易猜测，会话令牌可能被伪造。请生成一个强密钥（openssl rand -base64 32）。更改后，身份验证器应用中的验证码将失效，受信任设备也会被清除：用户使用备用码登录后重新设置 2FA，对于没有备用码的用户，请在用户管理中重置其 2FA。请先阅读 docs/backend/modules-and-runtime.md（Changing JWT_SECRET）。"
+      },
       "smtpFailure": {
         "title": "邮件发送失败",
         "message": "Monize 无法发送邮件：{{ error }}。通知和提醒未能送达。"

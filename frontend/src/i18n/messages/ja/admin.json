@@ -62,6 +62,7 @@
     "clickToDisable": "クリックして無効化",
     "clickToEnable": "クリックして有効化",
     "resetPassword": "パスワードをリセット",
+    "resetTwoFactor": "2FA をリセット",
     "noUsers": "ユーザーが見つかりません。",
     "storageLoading": "読み込み中…",
     "storageUnavailable": "取得できません",
@@ -96,7 +97,9 @@
       "loadFailed": "ユーザーの読み込みに失敗しました",
       "deleteFailed": "ユーザーの削除に失敗しました",
       "disableFailed": "ユーザーの無効化に失敗しました",
-      "resetFailed": "パスワードのリセットに失敗しました"
+      "resetFailed": "パスワードのリセットに失敗しました",
+      "twoFactorReset": "{name} の二要素認証をリセットしました。ユーザーはサインアウトされました。",
+      "resetTwoFactorFailed": "二要素認証のリセットに失敗しました"
     },
     "dialogs": {
       "promoteTitle": "ユーザーを昇格しますか？",
@@ -111,6 +114,9 @@
       "resetTitle": "パスワードをリセットしますか？",
       "resetMessage": "{name} の新しい一時パスワードが生成されます。ユーザーは次回ログイン時にパスワードの変更が求められます。",
       "resetConfirm": "パスワードをリセット",
+      "resetTwoFactorTitle": "二要素認証をリセットしますか？",
+      "resetTwoFactorMessage": "{name} の二要素認証を無効にし、バックアップコードと信頼済みデバイスを削除して、すべてのセッションからサインアウトさせます。その後、ユーザーはパスワードでサインインして 2FA を設定し直せます。認証アプリとバックアップコードを失った場合や、JWT_SECRET を変更した後に使用してください。",
+      "resetTwoFactorConfirm": "2FA をリセット",
       "deleteTitle": "ユーザーを削除しますか？",
       "deleteMessage": "{name} を削除してよろしいですか？アカウントと関連するすべてのデータが完全に削除されます。この操作は取り消せません。別のアカウントの代理ユーザーである場合、そのユーザーのデータは削除されますが、委任が引き続き機能するようにログイン情報は保持されます（代理専用ユーザーになります）。",
       "deleteConfirm": "ユーザーを削除",

@@ -81,7 +81,9 @@
     "cannotDeleteOwnAccount": "Bạn không thể xóa tài khoản của chính mình",
     "deleteLastAdmin": "Không thể xóa tài khoản quản trị viên cuối cùng.",
     "cannotResetOwnPassword": "Bạn không thể đặt lại mật khẩu của chính mình qua bảng quản trị",
-    "noLocalPassword": "Không thể đặt lại mật khẩu cho tài khoản không có mật khẩu cục bộ"
+    "noLocalPassword": "Không thể đặt lại mật khẩu cho tài khoản không có mật khẩu cục bộ",
+    "cannotResetOwnTwoFactor": "Bạn không thể đặt lại xác thực hai yếu tố của chính mình qua bảng quản trị",
+    "twoFactorNotEnabled": "Người dùng này chưa thiết lập xác thực hai yếu tố."
   },
   "ai": {
     "queryStreamFailed": "Đã xảy ra lỗi không mong đợi khi xử lý truy vấn của bạn.",

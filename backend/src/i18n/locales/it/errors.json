@@ -81,7 +81,9 @@
     "cannotDeleteOwnAccount": "Non puoi eliminare il tuo account",
     "deleteLastAdmin": "Impossibile eliminare l'ultimo account amministratore.",
     "cannotResetOwnPassword": "Non puoi reimpostare la tua password tramite il pannello di amministrazione",
-    "noLocalPassword": "Impossibile reimpostare la password per account senza password locale"
+    "noLocalPassword": "Impossibile reimpostare la password per account senza password locale",
+    "cannotResetOwnTwoFactor": "Non puoi reimpostare la tua autenticazione a due fattori tramite il pannello di amministrazione",
+    "twoFactorNotEnabled": "Questo utente non ha configurato l'autenticazione a due fattori."
   },
   "ai": {
     "queryStreamFailed": "Si è verificato un errore imprevisto durante l'elaborazione della tua richiesta.",

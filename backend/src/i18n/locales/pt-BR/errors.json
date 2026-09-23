@@ -81,7 +81,9 @@
     "cannotDeleteOwnAccount": "Não é possível excluir sua própria conta",
     "deleteLastAdmin": "Não é possível excluir a última conta de administrador.",
     "cannotResetOwnPassword": "Não é possível redefinir sua própria senha pelo painel de administração",
-    "noLocalPassword": "Não é possível redefinir a senha de contas sem senha local"
+    "noLocalPassword": "Não é possível redefinir a senha de contas sem senha local",
+    "cannotResetOwnTwoFactor": "Não é possível redefinir sua própria autenticação de dois fatores pelo painel de administração",
+    "twoFactorNotEnabled": "Este usuário não tem a autenticação de dois fatores configurada."
   },
   "ai": {
     "queryStreamFailed": "Ocorreu um erro inesperado ao processar sua consulta.",

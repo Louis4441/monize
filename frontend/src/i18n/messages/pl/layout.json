@@ -34,6 +34,12 @@
     "dismiss": "Zamknij",
     "dismissAriaLabel": "Zamknij powiadomienie o aktualizacji"
   },
+  "jwtSecretBanner": {
+    "label": "JWT_SECRET jest słaby.",
+    "detail": "To opublikowana wartość przykładowa lub jest zbyt łatwy do odgadnięcia, więc tokeny sesji można sfałszować. Wygeneruj silną wartość poleceniem <code>openssl rand -base64 32</code>. Zmiana sprawi, że kody z aplikacji uwierzytelniających przestaną działać, a zaufane urządzenia zostaną zapomniane: użytkownicy logują się kodem zapasowym i ponownie konfigurują 2FA, a tym, którzy go nie mają, resetujesz 2FA w <users>Zarządzaniu użytkownikami</users>. Najpierw przeczytaj <code>docs/backend/modules-and-runtime.md</code> (Changing JWT_SECRET).",
+    "dismiss": "Zamknij",
+    "dismissAriaLabel": "Zamknij ostrzeżenie o JWT_SECRET"
+  },
   "actionHistory": {
     "title": "Historia akcji",
     "buttonAriaLabel": "Historia akcji",

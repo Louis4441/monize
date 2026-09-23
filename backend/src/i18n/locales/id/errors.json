@@ -81,7 +81,9 @@
     "cannotDeleteOwnAccount": "Anda tidak dapat menghapus akun Anda sendiri",
     "deleteLastAdmin": "Tidak dapat menghapus akun admin terakhir.",
     "cannotResetOwnPassword": "Anda tidak dapat mereset kata sandi Anda sendiri melalui panel admin",
-    "noLocalPassword": "Tidak dapat mereset kata sandi untuk akun tanpa kata sandi lokal"
+    "noLocalPassword": "Tidak dapat mereset kata sandi untuk akun tanpa kata sandi lokal",
+    "cannotResetOwnTwoFactor": "Anda tidak dapat mereset autentikasi dua faktor Anda sendiri melalui panel admin",
+    "twoFactorNotEnabled": "Pengguna ini belum menyiapkan autentikasi dua faktor."
   },
   "ai": {
     "queryStreamFailed": "Terjadi kesalahan tak terduga saat memproses permintaan Anda.",
