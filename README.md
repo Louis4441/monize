@@ -356,6 +356,7 @@ npm run dev
 | `AI_DEFAULT_MODEL` | Default model for the provider | - |
 | `AI_DEFAULT_API_KEY` | System-wide AI API key | - |
 | `AI_DEFAULT_BASE_URL` | Base URL for Ollama or compatible endpoints | - |
+| `AI_PRIVATE_BASE_URL_ALLOWLIST` | Comma-separated `host` or `host:port` private addresses a non-admin user's Ollama or OpenAI-compatible provider may use. Without an entry, only an admin can point a provider at a private or local address | - |
 | `AI_QUERY_MAX_ITERATIONS` | Analysis steps per AI Assistant question, centrally managed provider only | `5` |
 | `AI_QUERY_MAX_TOOL_CALLS` | Data lookups per question, centrally managed provider only | `15` |
 | `AI_QUERY_TIMEOUT_MINUTES` | Wall-clock minutes per question, centrally managed provider only | `20` |

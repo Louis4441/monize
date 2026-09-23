@@ -107,7 +107,7 @@ function isPrivateIpv6(hostname: string): boolean {
  * endpoint's own validator spec. Stripping the brackets once, where the hostname
  * is derived, is what makes the existing rules apply to IPv6 at all.
  */
-function unbracketHost(hostname: string): string {
+export function unbracketHost(hostname: string): string {
   return hostname.startsWith("[") && hostname.endsWith("]")
     ? hostname.slice(1, -1)
     : hostname;
@@ -280,7 +280,7 @@ function normalizeIp(hostname: string): string | null {
  * an AAAA record of `::7f00:1` is the rebinding half of the same bypass, and it
  * never passes through `normalizeIp`.
  */
-function isPrivateIp(ip: string): boolean {
+export function isPrivateIp(ip: string): boolean {
   const embedded = embeddedIpv4(ip);
   const candidates = embedded ? [ip, embedded] : [ip];
   for (const candidate of candidates) {
@@ -497,8 +497,10 @@ export function IsSafeUrl(
  * SSRF guard for AI provider baseUrl values. Dispatches on the sibling
  * `provider` field: cloud providers get the strict IsSafeUrl check (blocks
  * private IPs, metadata endpoints, DNS-rebinding) while self-hosted providers
- * (ollama, openai-compatible) intentionally allow private/local URLs since
- * they run on LAN.
+ * (ollama, openai-compatible) get only the shape check here. Whether a
+ * self-hosted URL may be private depends on its owner (an admin, or the
+ * operator's AI_PRIVATE_BASE_URL_ALLOWLIST), which a DTO cannot know:
+ * `AiService.validateBaseUrl` decides it (`ai-base-url-policy.ts`).
  */
 @ValidatorConstraint({ async: true })
 export class IsSafeProviderBaseUrlConstraint implements ValidatorConstraintInterface {
