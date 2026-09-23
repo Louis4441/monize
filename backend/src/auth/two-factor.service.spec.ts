@@ -284,6 +284,9 @@ describe("TwoFactorService", () => {
       expect(result.refreshToken).toBe("mock-refresh-token");
       expect(result.user).toBeDefined();
       expect(result.trustedDeviceRef).toBeUndefined();
+      // A TOTP sign-in says nothing about backup codes.
+      expect(result).not.toHaveProperty("usedBackupCode");
+      expect(result).not.toHaveProperty("backupCodesRemaining");
     });
 
     it("should create a trusted device when rememberDevice is true", async () => {
@@ -1427,6 +1430,19 @@ describe("TwoFactorService", () => {
       expect(otplib.verifySync).not.toHaveBeenCalled();
       // Consumed: one of the two codes is left.
       expect(JSON.parse(storedCodes!)).toHaveLength(1);
+      // The client learns it was a backup code, and how many remain, so it
+      // can send the user to reset 2FA.
+      expect(result.usedBackupCode).toBe(true);
+      expect(result.backupCodesRemaining).toBe(1);
+    });
+
+    it("reports none left after the last backup code", async () => {
+      storedCodes = JSON.stringify([await bcrypt.hash(BACKUP_CODE, 4)]);
+
+      const result = await service.verify2FA("temp", BACKUP_CODE);
+
+      expect(result.usedBackupCode).toBe(true);
+      expect(result.backupCodesRemaining).toBe(0);
     });
 
     it("keeps a backup code single-use", async () => {

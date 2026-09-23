@@ -19,12 +19,15 @@ import { AuthShell } from '@/components/auth/AuthShell';
 import { IncompleteLogoutNotice } from '@/components/auth/IncompleteLogoutNotice';
 import { clearLogoutIncomplete } from '@/lib/logout-state';
 import { DEMO_USER_EMAIL, DEMO_USER_PASSWORD } from '@/lib/demo-credentials';
-import { User } from '@/types/auth';
+import { TwoFactorSignInDetails, User } from '@/types/auth';
 import { createLogger } from '@/lib/logger';
 import { buildEmailSchema } from '@/lib/zod-helpers';
 import { safeReturnTo } from '@/lib/return-to';
 
 const logger = createLogger('Login');
+
+/** The 2FA controls in Settings > Security (`id="two-factor"` in SecuritySection). */
+const SECURITY_TWO_FACTOR_HREF = '/settings#two-factor';
 
 const buildLoginSchema = (t: (key: string) => string, tc: (key: string) => string) => z.object({
   email: buildEmailSchema(tc),
@@ -128,7 +131,7 @@ export default function LoginPage() {
     }
   };
 
-  const handle2FAVerified = (user: User) => {
+  const handle2FAVerified = (user: User, details?: TwoFactorSignInDetails) => {
     clearLogoutIncomplete();
     login(user, 'httpOnly');
     if (authMethods.demo) {
@@ -138,6 +141,18 @@ export default function LoginPage() {
     }
     if (user.mustChangePassword) {
       router.push('/change-password');
+    } else if (details?.usedBackupCode) {
+      // A backup code usually means the authenticator is lost or no longer
+      // verifies (a changed server secret): take the user to the 2FA controls
+      // in Settings > Security, where Reset 2FA replaces it. This outranks
+      // returnTo, which the user can reach again once 2FA is sorted out.
+      toast(
+        details.backupCodesRemaining === null
+          ? t('toasts.signedInWithBackupCode')
+          : t('toasts.signedInWithBackupCodeRemaining', { count: details.backupCodesRemaining }),
+        { duration: 10000 },
+      );
+      router.push(SECURITY_TWO_FACTOR_HREF);
     } else if (returnTo) {
       window.location.href = returnTo;
     } else {

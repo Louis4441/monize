@@ -275,8 +275,9 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
         </div>
       </form>
 
-      {/* Two-Factor Authentication */}
-      <div className="border-t border-gray-200 dark:border-gray-700 mt-6 pt-6">
+      {/* Two-Factor Authentication. `id` is the target of the sign-in-by-backup-code
+          redirect (`/settings#two-factor`), which useScrollSpy scrolls to. */}
+      <div id="two-factor" className="border-t border-gray-200 dark:border-gray-700 mt-6 pt-6 scroll-mt-32 lg:scroll-mt-22">
         <h3 className="text-base font-medium text-gray-900 dark:text-gray-100 mb-3">
           {t('twoFactor.heading')}
         </h3>
@@ -289,7 +290,7 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
         ) : (
           <>
             {twoFactorEnabled ? (
-              <div id="two-factor" className="flex flex-wrap items-center justify-between gap-3 scroll-mt-32 lg:scroll-mt-22">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
                     {t('twoFactor.enabledBadge')}

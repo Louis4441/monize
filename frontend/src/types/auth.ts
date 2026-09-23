@@ -109,6 +109,21 @@ export interface AuthResponse {
   emailNotVerified?: boolean;
   /** Registration succeeded but the user must verify their email before logging in. */
   verificationRequired?: boolean;
+  /**
+   * 2FA sign-in only, and only when it was completed with a backup code (the
+   * server omits both fields for an authenticator code). The client then sends
+   * the user to Settings > Security to reset their 2FA.
+   */
+  usedBackupCode?: boolean;
+  /** Backup codes left after the one this sign-in consumed. */
+  backupCodesRemaining?: number;
+}
+
+/** How a 2FA sign-in was completed, as far as the next page cares. */
+export interface TwoFactorSignInDetails {
+  usedBackupCode: boolean;
+  /** `null` when the server did not say (never for a backup-code sign-in). */
+  backupCodesRemaining: number | null;
 }
 
 export interface TwoFactorSetupResponse {

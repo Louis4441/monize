@@ -1415,6 +1415,37 @@ describe("AuthController", () => {
       expect(res.json).toHaveBeenCalledWith({ user: verifyResult.user });
     });
 
+    it("tells the client a backup code was used, and how many are left", async () => {
+      authService.verify2FA.mockResolvedValue({
+        accessToken: "2fa-access",
+        refreshToken: "2fa-refresh",
+        user: { id: "user-1", email: "test@example.com" },
+        trustedDeviceRef: undefined,
+        rememberMe: false,
+        usedBackupCode: true,
+        backupCodesRemaining: 3,
+      });
+      const res = mockRes();
+
+      await controller.verify2FA(
+        { tempToken: "temp-token", code: "abcd-ef01" } as any,
+        { headers: {}, socket: {} } as any,
+        res as any,
+      );
+
+      // Cookies as for any sign-in; only the body gains the two fields.
+      expect(res.cookie).toHaveBeenCalledWith(
+        "auth_token",
+        "2fa-access",
+        expect.any(Object),
+      );
+      expect(res.json).toHaveBeenCalledWith({
+        user: { id: "user-1", email: "test@example.com" },
+        usedBackupCode: true,
+        backupCodesRemaining: 3,
+      });
+    });
+
     it("sets trusted_device cookie when rememberDevice is true", async () => {
       const verifyResult = {
         accessToken: "2fa-access",

@@ -288,7 +288,8 @@ export class TwoFactorService {
     // (a changed JWT_SECRET), which is exactly when a user needs it.
     let isValid = false;
     let reEncryptedSecret: string | null = null;
-    if (/^\d{6}$/.test(code)) {
+    const isBackupCode = !/^\d{6}$/.test(code);
+    if (!isBackupCode) {
       const totp = this.checkTotpCode(user, code);
       isValid = totp.valid;
       reEncryptedSecret = totp.reEncrypted;
@@ -366,6 +367,18 @@ export class TwoFactorService {
       refreshToken,
       trustedDeviceRef,
       rememberMe,
+      // A sign-in by backup code usually means the authenticator is lost or no
+      // longer verifies (a changed JWT_SECRET), so the client takes the user to
+      // Settings > Security to reset it. The count is what is left after this
+      // one was consumed; `verifyBackupCode` keeps `user.backupCodes` current.
+      ...(isBackupCode
+        ? {
+            usedBackupCode: true as const,
+            backupCodesRemaining: user.backupCodes
+              ? (JSON.parse(user.backupCodes) as string[]).length
+              : 0,
+          }
+        : {}),
     };
   }
 

@@ -44,12 +44,18 @@ const twoFactorUser = {
   role: 'user', hasPassword: true, mustChangePassword: false,
 };
 
+// How the mock TwoFactorVerify reports the sign-in was completed.
+let twoFactorDetails: { usedBackupCode: boolean; backupCodesRemaining: number | null } = {
+  usedBackupCode: false,
+  backupCodesRemaining: null,
+};
+
 // Mock TwoFactorVerify
 vi.mock('@/components/auth/TwoFactorVerify', () => ({
   TwoFactorVerify: ({ onVerified, onCancel }: any) => (
     <div data-testid="two-factor-verify">
       TwoFactorVerify
-      <button data-testid="verify-2fa" onClick={() => onVerified({ ...twoFactorUser })}>Verify</button>
+      <button data-testid="verify-2fa" onClick={() => onVerified({ ...twoFactorUser }, { ...twoFactorDetails })}>Verify</button>
       <button data-testid="cancel-2fa" onClick={onCancel}>Cancel</button>
     </div>
   ),
@@ -79,6 +85,7 @@ describe('LoginPage', () => {
     mockLogin.mockClear();
     mockReturnTo = null;
     twoFactorUser.mustChangePassword = false;
+    twoFactorDetails = { usedBackupCode: false, backupCodesRemaining: null };
     (authApi.getAuthMethods as ReturnType<typeof vi.fn>).mockResolvedValue({
       local: true,
       oidc: false,
@@ -521,6 +528,82 @@ describe('LoginPage', () => {
     });
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith('/change-password');
+    });
+  });
+
+  describe('after a sign-in completed with a backup code', () => {
+    const signInThrough2FA = async () => {
+      (authApi.login as ReturnType<typeof vi.fn>).mockResolvedValue({ requires2FA: true, tempToken: 'temp-123' });
+      render(<LoginPage />);
+      await waitFor(() => expect(screen.getByLabelText(/email/i)).toBeInTheDocument());
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'test@example.com' } });
+        fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+      });
+      await waitFor(() => expect(screen.getByTestId('verify-2fa')).toBeInTheDocument());
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('verify-2fa'));
+      });
+    };
+
+    it('goes to the 2FA controls in Settings > Security, ignoring returnTo', async () => {
+      mockReturnTo = '/bills';
+      twoFactorDetails = { usedBackupCode: true, backupCodesRemaining: 2 };
+      const hrefBefore = window.location.href;
+
+      await signInThrough2FA();
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/settings#two-factor');
+      });
+      expect(mockPush).not.toHaveBeenCalledWith('/dashboard');
+      expect(window.location.href).toBe(hrefBefore);
+      expect(mockLogin).toHaveBeenCalled();
+      expect(toast).toHaveBeenCalledWith(
+        'You signed in with a backup code (2 left). If your authenticator is lost, exposed or no longer works, use Reset 2FA here to set up a new one.',
+        expect.objectContaining({ duration: expect.any(Number) }),
+      );
+    });
+
+    it('says so when that was the last backup code', async () => {
+      twoFactorDetails = { usedBackupCode: true, backupCodesRemaining: 0 };
+
+      await signInThrough2FA();
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/settings#two-factor');
+      });
+      expect(toast).toHaveBeenCalledWith(
+        expect.stringContaining('your last backup code'),
+        expect.anything(),
+      );
+    });
+
+    it('still sends a user who must change their password there first', async () => {
+      twoFactorUser.mustChangePassword = true;
+      twoFactorDetails = { usedBackupCode: true, backupCodesRemaining: 2 };
+
+      await signInThrough2FA();
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/change-password');
+      });
+      expect(mockPush).not.toHaveBeenCalledWith('/settings#two-factor');
+    });
+
+    it('leaves an authenticator-code sign-in on its usual route', async () => {
+      twoFactorDetails = { usedBackupCode: false, backupCodesRemaining: null };
+
+      await signInThrough2FA();
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/dashboard');
+      });
+      expect(mockPush).not.toHaveBeenCalledWith('/settings#two-factor');
+      expect(toast).not.toHaveBeenCalled();
     });
   });
 

@@ -1095,7 +1095,17 @@ export class AuthController {
       });
     }
 
-    res.json({ user: result.user });
+    // `usedBackupCode` and `backupCodesRemaining` ride along only on a sign-in
+    // by backup code; a TOTP sign-in's reply is unchanged.
+    res.json(
+      result.usedBackupCode
+        ? {
+            user: result.user,
+            usedBackupCode: true,
+            backupCodesRemaining: result.backupCodesRemaining,
+          }
+        : { user: result.user },
+    );
   }
 
   @Post("2fa/setup")
