@@ -136,7 +136,7 @@ implied.
 | INV-DISPATCH-003 | The throttle gates only the notification-mode fan-out, never the in-app row or a report, and never an escalation | enforced |
 | INV-DISPATCH-004 | A failed push or email never rolls back, or surfaces through, the notification it is about | enforced |
 | INV-PORTMOVE-007 | A portfolio movement's external flow is converted at the date each amount crossed the boundary | enforced |
-| INV-PORTMOVE-008 | A portfolio movement is withheld while a held position's price predates the period it measures | enforced |
+| INV-PORTMOVE-008 | A late close restates a portfolio movement's baseline instead of being booked as the period's move, and a carried close never withholds it | enforced |
 | INV-RLS-001 | Enforced mode refuses to run on a role that can bypass RLS | enforced |
 | INV-CACHE-001 | A money-moving write invalidates every derived cache | enforced |
 | INV-DAYNOTE-001 | A calendar date is covered by at most one of a user's notes, and a save never reads first | enforced |
@@ -4464,43 +4464,56 @@ Why it exists       The producer converted a whole window at the run day's rate,
 Status              enforced
 ```
 
-### INV-PORTMOVE-008 -- a movement needs evidence from its own period
+### INV-PORTMOVE-008 -- a late close restates the baseline, never the period's move
 
 ```text
-Statement           While a security held in a non-zero quantity has no accepted
-                    close dated on or after the baseline date, the run is
-                    incomplete for the movement: no alert, and the baseline is
-                    not advanced. The position is NOT dropped from the valuation
-                    and the two runs' position sets are not intersected -- it is
-                    the comparison that is refused, not the value.
-Source of truth     security_prices (the observation that priced the position).
+Statement           Every stored movement baseline records, per security held in
+                    a non-zero quantity, the close that valued it and that
+                    close's date. A baseline position whose close was more than
+                    LATE_PRICE_TOLERANCE_DAYS (4) older than the baseline date,
+                    and whose latest observation is now a different one, is a
+                    late close: baselineQuantity x (newClose - oldClose) at
+                    today's rate is added to the baseline, the movement is
+                    measured against the restated baseline, and the restatement
+                    is named in the alert. A carried close that is still the
+                    latest neither restates nor withholds; the baseline advances
+                    on every complete run.
+Source of truth     security_prices (the observation that priced the position);
+                    notification_portfolio_state.baseline_positions (the
+                    observation that priced it at the baseline).
 Enforcement         PortfolioService.getLatestPriceObservations returns the dated
-                    form of the query getLatestPrices already ran, so the check
-                    reads the very rows that produced today's value;
-                    stalePricedSecurityIds
-                    (notification-center/portfolio-price-freshness.util.ts) is the
-                    policy and decideMovement applies it before the arithmetic.
-                    A baseline with no capture date has no period for a close to
-                    be stale against, so decideMovement's baselineDateKnown arm
-                    replaces such a baseline rather than reaching this check.
+                    form of the query getLatestPrices already ran, so the
+                    snapshot and the comparison read the very rows that produced
+                    the value; snapshotPositions and latePriceAdjustment
+                    (notification-center/portfolio-price-freshness.util.ts) are
+                    the policy and decideMovement applies the restatement before
+                    the arithmetic. A baseline with no capture date or no closes
+                    is replaced (baselineDateKnown / baselinePositionsKnown
+                    arms) rather than compared.
 Concurrency scope   per user, per run
-Retry semantics     Read-only and idempotent.
-Crash semantics     No write precedes the decision.
-Failure response    No notification; baseline unchanged; the producer logs the
-                    securities it is waiting on.
+Retry semantics     Idempotent: a second run the same day recomputes the same
+                    figures from the same rows; the dedupe key holds one alert.
+Crash semantics     The baseline and its closes are one INSERT ... ON CONFLICT
+                    statement, so they cannot disagree.
+Failure response    A late close that cannot be valued: no notification, and the
+                    baseline moves to today's complete value (keeping the closes
+                    that made it unknown would stall every later run); the
+                    producer logs the securities it could not value.
 Required tests      notification-center/portfolio-price-freshness.util.spec.ts,
                     notification-center/portfolio-movement.util.spec.ts (the
-                    guard's position in the order),
-                    notification-center/portfolio-movement-alert.service.spec.ts.
+                    arm's position in the order),
+                    notification-center/portfolio-movement-alert.service.spec.ts,
+                    test/integration/portfolio-movement-flow.integration.spec.ts
+                    (the closes round-trip through the JSONB column).
 Why it exists       A carried close contributes the same figure to both ends of
-                    the comparison only until it arrives or disappears; the run
-                    it changes on books the whole catch-up as one day's market
-                    move -- the 94% "movement" in kenlasko/monize#1391. Carrying
-                    a close forward is legitimate for VALUATION
-                    (docs/time-series-contract.md section 2.1, second exception),
-                    which is why this refuses the movement rather than the price.
-                    Consequence by design: a permanently dead feed silences this
-                    user's alert until the holding is priced or closed.
+                    the comparison only until its replacement arrives; the run it
+                    changes on books the whole catch-up as one day's market move
+                    -- the 94% "movement" in kenlasko/monize#1391. The first fix
+                    withheld the run and kept the baseline while any held close
+                    predated the baseline date, so one holding priced by hand
+                    silenced the alert for good (kenlasko/monize#1435).
+                    Restating the baseline removes the catch-up without refusing
+                    the period.
 Status              enforced
 ```
 
