@@ -94,6 +94,7 @@ vi.mock('@/lib/auth', () => ({
     revokeAllTrustedDevices: vi.fn(),
     logout: vi.fn().mockResolvedValue(undefined),
     getTokens: vi.fn().mockResolvedValue([]),
+    getSelfProfile: vi.fn().mockResolvedValue(null),
     createToken: vi.fn(),
     revokeToken: vi.fn(),
   },
