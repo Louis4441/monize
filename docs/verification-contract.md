@@ -131,6 +131,7 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-BACKUP-005 verified, claimed, leased | **required** | -- | required | **required** | optional | required (not yet met) | optional | -- |
 | INV-BACKUP-006 published whole or not at all | **required** | -- | -- | -- | -- | optional | **required** | -- |
 | INV-BACKUP-007 store and egress are two places | **required** | -- | -- | -- | -- | -- | -- | -- |
+| INV-BACKUP-008 no recoverable password stored | **required** | -- | -- | -- | -- | -- | -- | -- |
 | INV-PUSH-001 subscription ownership | required | -- | **required** | required (not yet met) | -- | -- | -- | optional |
 | INV-PUSH-002 private key stays server-side | supporting | **required** | -- | -- | -- | -- | -- | -- |
 | INV-PUSH-006 channel offered only while usable | **required** | -- | optional | -- | -- | -- | -- | -- |

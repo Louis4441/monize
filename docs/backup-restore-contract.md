@@ -29,7 +29,7 @@ concerns this document describes:
 | `backend/src/backup/export-json-stream.ts` | The document, assembled one row at a time under a chunk budget (and the in-memory collection the support export needs). |
 | `backend/src/backup/export-attachments.ts` | The completeness audit that holds no bytes, and the external objects carried one at a time. |
 | `backend/src/backup/export-writer.ts` | gzip, the encrypted container, backpressure, and unwinding when the client leaves. |
-| `backend/src/backup/backup-envelope.ts`, `backup-stream-crypto.ts` | The encrypted-backup format: both container versions, and the framed one's writer and reader. |
+| `backend/src/backup/backup-envelope.ts`, `backup-stream-crypto.ts`, `backup-key-wrap.ts` | The encrypted-backup format: all three container versions, the framed writer and reader, and the key-wrapped (v3) container the automatic backup writes. |
 | `backend/src/backup/backup-restore.service.ts` | §3 and §6: the processing gate, decryption, decompression, format validation, re-authentication ordering, id remapping, and the one transaction the rest runs inside. |
 | `backend/src/backup/backup-attachment-transfer.service.ts` | §4's restore half: staging carried bytes, the legacy ownership proof, and both object-store cleanup paths. |
 | `backend/src/backup/backup-restore-database.service.ts` | The restore's SQL: teardown, currency preparation, row inserts, deferred-FK repair. |
@@ -804,6 +804,15 @@ cleanly is worse than one that does not decrypt at all. v1 envelopes still open:
 every backup a user already holds is one, and the support export still writes one
 because it assembles in memory anyway.
 
+**The key-wrapped container (`MZBE` v3).** The automatic backup's frames are
+v2's, sealed under a per-file key derived (HKDF) from the user's random data key
+rather than under a key derived from the password, and the header carries that
+data key wrapped under the password. The cron holds the data key and never the
+password; the file still opens with the password alone, and the restore prompt
+does not change. Readers accept v1, v2 and v3; the manual download still writes
+v2 under the password typed for it. `docs/specs/backup-envelope-key-wrapping.md`
+has the layout and the key flow.
+
 **What this does not settle.** The claim is bounded peak RSS, and the honest
 measurement of that is the cgroup-constrained harness this repository still does
 not have (`DR-F3R6-002` / `DR-F3R7-003`). What the suite proves instead is the
@@ -1042,14 +1051,18 @@ location"; it never answered "where do my backups live".
   only thing telling the user was `partial-` in the name it showed them.
 
 - **Encryption is on by default, and its key is announced before it is enforced
-  (issue #1269).** An automatic backup is encrypted with the user's own password
-  whenever the server holds a usable copy: captured for a local account when they
-  type it (registration, login, password change) or when they confirm it in
-  Settings, and set explicitly by an OIDC account. The copy lives in
-  `users.backup_password_enc` under `EncryptionService`, keyed by
-  `ENCRYPTION_KEY`. `AI_ENCRYPTION_KEY` is the variable's former name: still
-  read, and still preferred where both are set, so an existing deployment
-  upgrades without re-keying a column.
+  (issue #1269).** An automatic backup opens with the user's own password
+  whenever the server holds a usable backup key for them: a random data key
+  wrapped under the password when a local account types it (registration, login,
+  password change) or confirms it in Settings, and under the dedicated backup
+  password an OIDC account sets. The server keeps the data key in
+  `users.backup_key_enc` under `EncryptionService`, keyed by `ENCRYPTION_KEY`,
+  and the wrap in `users.backup_key_wrap`; it never keeps the password
+  (INV-BACKUP-008). The retired `users.backup_password_enc`, which did, is
+  converted and cleared at each user's next sign-in or automatic backup.
+  `AI_ENCRYPTION_KEY` is the variable's former name: still read, and still
+  preferred where both are set, so an existing deployment upgrades without
+  re-keying a column.
 
   The key is **announced before it is enforced**. A deployment with neither
   variable still boots — refusing would turn an upgrade into an outage for
@@ -1065,24 +1078,29 @@ location"; it never answered "where do my backups live".
   plaintext, while the release notes, the docs and Settings all said backups were
   encrypted by default. Two rules follow. **A plaintext automatic backup is
   logged, every time** — it stays a legitimate outcome (an OIDC account with no
-  backup password; a local account whose password has not been captured yet) but
+  backup password; a local account with no backup key yet) but
   never a silent one. And **"this server cannot encrypt" is reported separately
   from "this user has not enabled it"** (`available` beside `enabled` in
   `getStatus`), because the two have different fixes and rendering both as a
   blank space is what made the defect invisible.
 
 - **`ENCRYPTION_KEY` does not open a backup file; the user's password does.** The
-  artifact is encrypted with the password it was written under, so a restore
-  needs *that* password and nothing else — losing `ENCRYPTION_KEY` does not lock
-  anyone out of a backup they can still supply the password for. What losing it
-  does cost: every AI provider key and emergency-access credential in the
-  database becomes unreadable, the stored copy of each user's backup password
-  becomes unreadable, and automatic backups then *refuse to run* (the
-  `unrecoverable` outcome above) until the copy is recaptured at the next
-  sign-in. The password half has its own trap, which the wiki states plainly: a
-  local account's artifact opens with the login password **as it was when that
-  artifact was written**, so changing a password strands every backup taken
-  before the change unless the old one is written down.
+  artifact carries its data key wrapped under the password it was written under,
+  so a restore needs *that* password and nothing else — losing `ENCRYPTION_KEY`
+  does not lock anyone out of a backup they can still supply the password for.
+  What losing it does cost: every AI provider key and emergency-access credential
+  in the database becomes unreadable, each user's stored backup data key becomes
+  unreadable, and automatic backups then *refuse to run* (the `unrecoverable`
+  outcome above) until a fresh key is wrapped at the next sign-in. The password
+  half has its own trap, which the wiki states plainly: a local account's
+  artifact opens with the login password **as it was when that artifact was
+  written**, so changing a password strands every backup taken before the change
+  unless the old one is written down. A password change wraps a fresh data key,
+  so the old password opens only the files written before it. A password changed
+  by a reset link, an admin or an emergency claim does not re-wrap: the key's
+  `backup_key_password_ref` no longer matches the account's hash, and the next
+  automatic backup drops it and is written unencrypted (and logged) until the
+  user signs in again, rather than under a password they no longer know.
 
 On Kubernetes this needs `backend.persistence.backups.enabled` (see
 `helm/README.md`). With a read-only root filesystem and no mount, a schedule
@@ -1108,7 +1126,9 @@ Known and unresolved; none of these is a bug report waiting to be filed:
   it reports the file as not being in the encrypted Monize format. Restoring
   backwards across that boundary means an unencrypted export, or restoring on a
   build at least as new as the one that produced the file. The reverse direction
-  is fine: every version reads v1.
+  is fine: every version reads v1. Automatic backups are `MZBE` v3 from the
+  release that stopped storing passwords, and the same holds one step further on:
+  a build from before it does not open them.
 - **AI provider keys written by an older build do not cross instances.** Keys now
   travel decrypted and are re-encrypted on arrival (§1), so a current artifact is
   portable. One made before that carries `api_key_enc` under the exporting

@@ -260,9 +260,11 @@ bucket until the new store has a full retention window.
 **Encryption.** A support backup is unconditionally encrypted -- the DTO's
 `password` is required, and there is no code path returning an unencrypted
 support buffer, because a support backup exists in order to leave the user's
-machine. An automatic backup is encrypted when a usable password exists; when a
-stored password cannot be decrypted (a rotated key) the backup is **refused**
-rather than silently written in clear. Refusing is the right failure: it is
+machine. An automatic backup is encrypted when a usable backup key exists (a
+data key the server holds, wrapped under the user's password, never the password
+itself; `docs/specs/backup-envelope-key-wrapping.md`); when a stored key cannot
+be decrypted (a rotated `ENCRYPTION_KEY`) the backup is **refused** rather than
+silently written in clear. Refusing is the right failure: it is
 visible, and it does not downgrade.
 
 **The writability probe** on the `local` store names its file with

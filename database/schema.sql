@@ -45,7 +45,10 @@ CREATE TABLE users (
     pending_oidc_subject VARCHAR(255),
     is_delegate_only BOOLEAN NOT NULL DEFAULT false, -- true when the row exists solely as an owner-managed delegate identity (created via Shared Access, never claimed via /register)
     backup_encryption_enabled BOOLEAN NOT NULL DEFAULT false,
-    backup_password_enc TEXT -- backup password (login password for local, dedicated password for OIDC) encrypted with ENCRYPTION_KEY for auto-backup use
+    backup_password_enc TEXT, -- legacy: recoverable backup password; superseded by backup_key_*, cleared as each row is converted, never written
+    backup_key_enc TEXT, -- backup data key (base64) encrypted with ENCRYPTION_KEY, so the auto-backup cron can encrypt without the password
+    backup_key_wrap TEXT, -- the same data key wrapped under the backup password's scrypt key (base64); copied into every automatic backup header
+    backup_key_password_ref VARCHAR(64) -- SHA-256 of the password_hash the wrap was made for; NULL for an OIDC dedicated backup password
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_reset_token ON users(reset_token) WHERE reset_token IS NOT NULL;

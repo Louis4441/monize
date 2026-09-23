@@ -28,6 +28,7 @@ import { restoreProcessingGate } from "./restore-processing-gate";
 import { User } from "../users/entities/user.entity";
 import { EncryptionService } from "../common/encryption/encryption.service";
 import { encryptBackup } from "./backup-crypto.util";
+import { createWrappedBackupKey } from "./backup-key-wrap";
 import * as bcrypt from "bcryptjs";
 import {
   createScopedDbMocks,
@@ -5648,6 +5649,44 @@ describe("BackupService", () => {
         });
         const result = await service.restoreData(userId, {
           compressedData: await encryptedBlob(validBackupData, "stored-bk-pw"),
+          oidcIdToken: oidcArtifact(),
+        });
+        expect(result.message).toBe("Backup restored successfully");
+      });
+
+      it("restores what the automatic backup writes (key-wrapped container) with the password alone", async () => {
+        // The cron encrypts under a stored data key it can read without the
+        // password; the file must still open with nothing but that password,
+        // and without the server's copy of the key.
+        const key = await createWrappedBackupKey("login-password");
+        const { buffer } = await service.exportToBuffer(userId, key);
+        expect(buffer[4]).toBe(3);
+
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        const result = await service.restoreData(userId, {
+          compressedData: buffer,
+          password: "login-password",
+        });
+
+        expect(result.message).toBe("Backup restored successfully");
+      });
+
+      it("opens an automatic backup with the stored data key when no password opens it", async () => {
+        const key = await createWrappedBackupKey("dedicated-password");
+        const { buffer } = await service.exportToBuffer(userId, key);
+
+        mockUserRepo.findOne.mockResolvedValue({
+          ...mockUser,
+          authProvider: "oidc",
+          passwordHash: null,
+          oidcSubject: "sub-1",
+          backupEncryptionEnabled: true,
+          backupKeyEnc: `enc:${key.dataKey.toString("base64")}`,
+          backupKeyWrap: key.wrap.toString("base64"),
+        });
+        const result = await service.restoreData(userId, {
+          compressedData: buffer,
           oidcIdToken: oidcArtifact(),
         });
         expect(result.message).toBe("Backup restored successfully");

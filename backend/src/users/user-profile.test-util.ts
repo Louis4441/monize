@@ -73,6 +73,9 @@ export function fullyPopulatedUser(overrides: Partial<User> = {}): User {
     isDelegateOnly: false,
     backupEncryptionEnabled: true,
     backupPasswordEnc: leak("encrypted-backup-password"),
+    backupKeyEnc: leak("encrypted-backup-data-key"),
+    backupKeyWrap: leak("wrapped-backup-data-key"),
+    backupKeyPasswordRef: leak("backup-key-password-ref"),
   });
   return Object.assign(user, overrides);
 }

@@ -94,27 +94,34 @@ export class AuthService {
   }
 
   /**
-   * Hand the just-proven password to the backup encryption service so the
-   * automatic backup cron can encrypt this user's backups with it. This is the
-   * only moment the server holds their password in plaintext, and the feature
-   * asks them to configure nothing, so it is captured here.
+   * Hand the just-proven password, with the hash it was verified against, to the
+   * backup encryption service, which wraps the user's backup key under it so the
+   * automatic backup cron can encrypt without it. This is the only moment the
+   * server holds their password in plaintext, and the feature asks them to
+   * configure nothing, so the wrap is made here. The password itself is never
+   * stored (docs/specs/backup-envelope-key-wrapping.md).
    *
    * Resolved lazily via ModuleRef: BackupModule imports AuthModule, so an
    * injected dependency the other way would be a cycle. Best-effort in every
    * sense -- signing in must not fail because a backup convenience did.
    */
-  private async rememberBackupPassword(
+  private async rewrapBackupKey(
     userId: string,
     password: string,
+    verifiedPasswordHash: string,
   ): Promise<void> {
     try {
       const backupEncryption = this.moduleRef.get(BackupEncryptionService, {
         strict: false,
       });
-      await backupEncryption.rememberLoginPassword(userId, password);
+      await backupEncryption.rewrapBackupKey(
+        userId,
+        password,
+        verifiedPasswordHash,
+      );
     } catch (err) {
       this.logger.warn(
-        `Could not store the backup password for user ${userId}: ${err.message}`,
+        `Could not wrap the backup key for user ${userId}: ${err.message}`,
       );
     }
   }
@@ -405,7 +412,7 @@ export class AuthService {
 
     // Automatic backups start encrypted from the first one, without waiting
     // for the account's first sign-in.
-    await this.rememberBackupPassword(user.id, password);
+    await this.rewrapBackupKey(user.id, password, passwordHash);
 
     if (requireVerification) {
       // Account exists but cannot sign in until the email is verified, so we
@@ -521,11 +528,11 @@ export class AuthService {
     }
 
     // The password is proven correct and the account is usable: this is where
-    // the plaintext exists, so this is where the backup copy is refreshed. It
-    // runs before the 2FA branch because every exit below it is a successful
-    // password check, and a stale copy is what produces a backup the user
-    // cannot decrypt.
-    await this.rememberBackupPassword(user.id, password);
+    // the plaintext exists, so this is where the backup key is re-wrapped if
+    // the password moved. It runs before the 2FA branch because every exit
+    // below it is a successful password check, and a stale wrap is what
+    // produces a backup the user cannot decrypt.
+    await this.rewrapBackupKey(user.id, password, user.passwordHash);
 
     // Reset failed attempts on successful login.
     //

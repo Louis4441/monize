@@ -114,6 +114,7 @@ implied.
 | INV-BACKUP-005 | An off-machine copy is verified before it is recorded as done, and a claim nobody finishes is reclaimed | partial |
 | INV-BACKUP-006 | An artifact is published whole or not at all, on every storage target | enforced |
 | INV-BACKUP-007 | The automatic backup store and the off-machine destination are two places | enforced |
+| INV-BACKUP-008 | The server stores nothing that decrypts to a user's password | partial |
 | INV-PUSH-001 | A push subscription belongs to the authenticated caller, and no request touches another account's device | enforced |
 | INV-PUSH-002 | The VAPID private key never leaves the server, and is never stored unencrypted | enforced |
 | INV-PUSH-006 | A push channel is offered only while its key pair can actually be used | enforced |
@@ -3401,12 +3402,13 @@ Status              enforced
 
 Encryption is settled and worth not re-litigating: a support backup is
 unconditionally encrypted because it exists to leave the user's machine, and an
-automatic backup whose stored password cannot be decrypted is *refused* rather
+automatic backup whose stored key cannot be decrypted is *refused* rather
 than written in clear.
 
 What was *not* settled, and is the one thing this invariant does not claim: that
 an automatic backup is encrypted at all. It is encrypted whenever the server
-holds a usable copy of the user's password, and until issue #1269 that copy was
+holds a usable backup key for the user (INV-BACKUP-008 says what that key is and
+is not); until issue #1269 what it held instead, a copy of the password, was
 keyed on `AI_ENCRYPTION_KEY` while that variable was optional -- so a deployment
 that configured no AI provider wrote plaintext indefinitely, and nothing said so.
 The key is `ENCRYPTION_KEY` (`common/encryption/encryption-key.ts`); the former
@@ -3416,7 +3418,7 @@ future release will refuse to serve -- so the enforcement today is entirely
 *visibility*: the boot warning, a warning on every unencrypted automatic backup,
 and `getStatus` reporting "this server cannot encrypt" separately from "this user
 has not enabled it". Plaintext remains a legitimate outcome for an account with
-no captured password, which is why the boot check announces rather than refuses;
+no backup key yet, which is why the boot check announces rather than refuses;
 when the requirement lands, the unkeyed branch of `logEncryptionKeyStatus`
 becomes a throw and this paragraph becomes one sentence.
 
@@ -3698,6 +3700,39 @@ Required tests      Unit: backup-store-config.spec.ts (the comparison, including
                     configured both ways refusing to start rather than refusing
                     at the first backup -- is task S2's third stage.
 Status              enforced
+```
+
+### INV-BACKUP-008 -- the server stores nothing that decrypts to a password
+
+```text
+Statement           No column holds a user's login password, or an OIDC
+                    account's dedicated backup password, in a form the server
+                    can decrypt. An automatic backup is encrypted under a random
+                    per-user data key; the server holds that key under
+                    ENCRYPTION_KEY and wrapped under the password, never the
+                    password itself.
+Source of truth     users.backup_key_enc, backup_key_wrap and
+                    backup_key_password_ref
+                    (docs/specs/backup-envelope-key-wrapping.md).
+Enforcement         BackupEncryptionService is the only writer of the backup
+                    columns and has no path that encrypts a password:
+                    storeBackupKey writes the wrapped key and clears
+                    backup_password_enc in the same conditional UPDATE, from
+                    registration, login, change-password, the Settings
+                    confirmation, the OIDC form and the cron's lazy conversion.
+Concurrency scope   per user
+Retry semantics     n/a
+Crash semantics     The conversion is one UPDATE; a crash before it leaves the
+                    legacy copy, which the next sign-in or backup converts.
+Failure response    n/a
+Required tests      Unit: backup-encryption.service.spec.ts asserts, on every
+                    write path, that backup_password_enc is cleared, no column
+                    contains the password, and what the server can decrypt is a
+                    random 32-byte key the password unwraps.
+Status              partial -- rows written before the change keep their
+                    recoverable backup_password_enc until that user's next
+                    sign-in or automatic backup converts them, and the column
+                    is dropped only in a later release.
 ```
 
 ### INV-CRON-001 -- one logical effect per tick

@@ -52,7 +52,7 @@ describe("UsersService", () => {
   let maintenance: UserMaintenanceMock;
   let exchangeRateService: { refreshAllRates: jest.Mock };
   let currenciesService: { ensureSystemCurrency: jest.Mock };
-  let backupEncryptionService: { rememberLoginPassword: jest.Mock };
+  let backupEncryptionService: { rewrapBackupKey: jest.Mock };
   let moduleRef: { get: jest.Mock };
   let mockQueryRunner: Record<string, jest.Mock>;
   let mockDataSource: Record<string, jest.Mock>;
@@ -132,7 +132,7 @@ describe("UsersService", () => {
     };
 
     backupEncryptionService = {
-      rememberLoginPassword: jest.fn().mockResolvedValue(undefined),
+      rewrapBackupKey: jest.fn().mockResolvedValue(undefined),
     };
 
     currenciesService = {
@@ -762,7 +762,7 @@ describe("UsersService", () => {
       );
     });
 
-    it("syncs the stored backup password to the new login password", async () => {
+    it("re-wraps the backup key under the new login password", async () => {
       const hashedPassword = await bcrypt.hash("OldPass123!", 10);
       usersRepository.findOne.mockResolvedValue({
         ...mockUser,
@@ -774,9 +774,17 @@ describe("UsersService", () => {
         newPassword: "NewPass456!",
       });
 
-      expect(
-        backupEncryptionService.rememberLoginPassword,
-      ).toHaveBeenCalledWith("user-1", "NewPass456!");
+      // Bound to the hash just written, so the wrap is recorded against the
+      // password it was made under.
+      const [, , boundHash] =
+        backupEncryptionService.rewrapBackupKey.mock.calls[0];
+      expect(backupEncryptionService.rewrapBackupKey).toHaveBeenCalledWith(
+        "user-1",
+        "NewPass456!",
+        expect.any(String),
+      );
+      expect(boundHash).not.toBe(hashedPassword);
+      expect(await bcrypt.compare("NewPass456!", boundHash)).toBe(true);
     });
 
     it("password change still succeeds when backup-password sync fails", async () => {
@@ -785,7 +793,7 @@ describe("UsersService", () => {
         ...mockUser,
         passwordHash: hashedPassword,
       });
-      backupEncryptionService.rememberLoginPassword.mockRejectedValue(
+      backupEncryptionService.rewrapBackupKey.mockRejectedValue(
         new Error("sync failed"),
       );
 

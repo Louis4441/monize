@@ -24,10 +24,14 @@ import { collectRowIdRemap, deepRemapIds } from "./backup-id-remap.util";
 import {
   BackupDecryptionError,
   decryptBackup,
+  decryptBackupWithDataKey,
   isEncryptedBackup,
 } from "./backup-crypto.util";
 import { resolveRestoreExpandedLimitBytes } from "./backup-limits";
-import { resolveStoredBackupPassword } from "./backup-password.util";
+import {
+  resolveStoredBackupDataKey,
+  resolveStoredBackupPassword,
+} from "./backup-password.util";
 import { restoreProcessingGate } from "./restore-processing-gate";
 import { validateRestoredNotifications } from "./notification-restore-bounds";
 import { RESTORE_PLAN } from "./restore-plan";
@@ -355,7 +359,9 @@ export class BackupRestoreService {
    * If the upload is encrypted, decrypt it using (in order of preference):
    * 1) the explicit backupPassword the frontend sent for this restore,
    * 2) the user's auth password (most backups encrypt with this),
-   * 3) the user's currently stored backup password.
+   * 3) the retired stored backup password, for a row not yet converted,
+   * 4) the user's stored backup data key, which opens the automatic backups
+   *    written since their last re-wrap (docs/specs/backup-envelope-key-wrapping.md).
    *
    * Returns the inner gzipped JSON payload, or the input unchanged if it's
    * not encrypted. Throws BackupPasswordRequiredError when we know it's
@@ -370,19 +376,28 @@ export class BackupRestoreService {
       return input.compressedData;
     }
 
-    const candidates: string[] = [];
-    if (input.backupPassword) candidates.push(input.backupPassword);
-    if (input.password) candidates.push(input.password);
-    const stored = resolveStoredBackupPassword(
+    const envelope = input.compressedData;
+    const candidates: Array<() => Promise<Buffer>> = [];
+    const passwords = [
+      input.backupPassword,
+      input.password,
+      resolveStoredBackupPassword(user, this.encryption, this.logger),
+    ];
+    for (const pw of passwords) {
+      if (pw) candidates.push(() => decryptBackup(envelope, pw));
+    }
+    const dataKey = resolveStoredBackupDataKey(
       user,
       this.encryption,
       this.logger,
     );
-    if (stored) candidates.push(stored);
+    if (dataKey) {
+      candidates.push(() => decryptBackupWithDataKey(envelope, dataKey));
+    }
 
-    for (const pw of candidates) {
+    for (const attempt of candidates) {
       try {
-        return await decryptBackup(input.compressedData, pw);
+        return await attempt();
       } catch (err) {
         if (!(err instanceof BackupDecryptionError)) throw err;
         // try next candidate

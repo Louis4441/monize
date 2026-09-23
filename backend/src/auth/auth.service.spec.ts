@@ -74,7 +74,7 @@ describe("AuthService", () => {
   let dataSource: Record<string, jest.Mock>;
   let passwordBreachService: { isBreached: jest.Mock };
   let emailService: { sendMail: jest.Mock; getStatus: jest.Mock };
-  let backupEncryptionService: { rememberLoginPassword: jest.Mock };
+  let backupEncryptionService: { rewrapBackupKey: jest.Mock };
 
   const mockUser = {
     id: "user-1",
@@ -192,7 +192,7 @@ describe("AuthService", () => {
     };
 
     backupEncryptionService = {
-      rememberLoginPassword: jest.fn().mockResolvedValue(undefined),
+      rewrapBackupKey: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -346,6 +346,23 @@ describe("AuthService", () => {
       expect(result.accessToken).toBeDefined();
       expect(result.refreshToken).toBeDefined();
       expect(result.user).not.toHaveProperty("passwordHash");
+    });
+
+    it("wraps the backup key under the new password, bound to the hash it created", async () => {
+      usersRepository.findOne.mockResolvedValue(null);
+      const txManager = setupRegisterTransactionMock(1);
+
+      await service.register({
+        email: "new@example.com",
+        password: "StrongPass123!",
+      });
+
+      const createdHash = txManager.save.mock.calls[0][0].passwordHash;
+      expect(backupEncryptionService.rewrapBackupKey).toHaveBeenCalledWith(
+        "new-user",
+        "StrongPass123!",
+        createdHash,
+      );
     });
 
     it("makes first user an admin", async () => {
@@ -741,7 +758,7 @@ describe("AuthService", () => {
       );
     });
 
-    it("captures the password so automatic backups can be encrypted", async () => {
+    it("re-wraps the backup key so automatic backups can be encrypted", async () => {
       const hashedPassword = await bcrypt.hash("ValidPass123!", 10);
       const user = { ...mockUser, passwordHash: hashedPassword };
       usersRepository.findOne.mockResolvedValue(user);
@@ -754,13 +771,16 @@ describe("AuthService", () => {
       });
 
       // Signing in is the only moment the server holds the plaintext, and the
-      // user is never asked to configure backup encryption.
-      expect(
-        backupEncryptionService.rememberLoginPassword,
-      ).toHaveBeenCalledWith(user.id, "ValidPass123!");
+      // user is never asked to configure backup encryption. The hash it was
+      // verified against goes with it, so the wrap is bound to that hash.
+      expect(backupEncryptionService.rewrapBackupKey).toHaveBeenCalledWith(
+        user.id,
+        "ValidPass123!",
+        hashedPassword,
+      );
     });
 
-    it("captures the password before the 2FA challenge", async () => {
+    it("re-wraps the backup key before the 2FA challenge", async () => {
       const hashedPassword = await bcrypt.hash("ValidPass123!", 10);
       const user = {
         ...mockUser,
@@ -780,9 +800,11 @@ describe("AuthService", () => {
       // The password is already proven correct here, and this exit returns
       // without reaching the code below it.
       expect(result.requires2FA).toBe(true);
-      expect(
-        backupEncryptionService.rememberLoginPassword,
-      ).toHaveBeenCalledWith(user.id, "ValidPass123!");
+      expect(backupEncryptionService.rewrapBackupKey).toHaveBeenCalledWith(
+        user.id,
+        "ValidPass123!",
+        hashedPassword,
+      );
     });
 
     it("captures nothing when the password is wrong", async () => {
@@ -795,18 +817,16 @@ describe("AuthService", () => {
       await expect(
         service.login({ email: "test@example.com", password: "WrongPass" }),
       ).rejects.toThrow(UnauthorizedException);
-      expect(
-        backupEncryptionService.rememberLoginPassword,
-      ).not.toHaveBeenCalled();
+      expect(backupEncryptionService.rewrapBackupKey).not.toHaveBeenCalled();
     });
 
-    it("signs in even when the backup password cannot be stored", async () => {
+    it("signs in even when the backup key cannot be wrapped", async () => {
       const hashedPassword = await bcrypt.hash("ValidPass123!", 10);
       const user = { ...mockUser, passwordHash: hashedPassword };
       usersRepository.findOne.mockResolvedValue(user);
       preferencesRepository.findOne.mockResolvedValue(null);
       usersRepository.save.mockResolvedValue(user);
-      backupEncryptionService.rememberLoginPassword.mockRejectedValue(
+      backupEncryptionService.rewrapBackupKey.mockRejectedValue(
         new Error("db down"),
       );
 

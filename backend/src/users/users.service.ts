@@ -391,17 +391,22 @@ export class UsersService {
     user.mustChangePassword = false;
     await this.scoped(User, (repo) => repo.save(user));
 
-    // Re-sync the encrypted-backup password so the auto-backup cron keeps
-    // working with the new login password. Best-effort; failures here log
+    // Re-wrap the backup key under the new login password so automatic
+    // backups written from now on open with it (earlier ones keep opening with
+    // the password they were written under). Best-effort; failures here log
     // but don't fail the password change.
     try {
       const backupEncryption = this.moduleRef.get(BackupEncryptionService, {
         strict: false,
       });
-      await backupEncryption.rememberLoginPassword(userId, dto.newPassword);
+      await backupEncryption.rewrapBackupKey(
+        userId,
+        dto.newPassword,
+        user.passwordHash,
+      );
     } catch (err) {
       this.logger.warn(
-        `Could not sync backup password after change: ${err.message}`,
+        `Could not re-wrap the backup key after change: ${err.message}`,
       );
     }
 
