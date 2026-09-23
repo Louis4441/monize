@@ -294,15 +294,15 @@ than refusing it. A disconnect *after* the slot is granted changes nothing: that
 restore is part-way through replacing the user's data and runs to completion. The
 startup log prints the slot count with both bounds beside it.
 
-**The frontend needs headroom too.** Every `/api/*` call is forwarded by the
-Next.js proxy, which buffers the request body before sending it on, so a `.mny`
-upload is held in the frontend container as well as the backend. Set
-`frontend.resources.limits.memory` to at least `MNY_IMPORT_LIMIT_MB` plus its
-`100Mi` baseline — so `400Mi` at the default 300.
+**The frontend does not need matching headroom.** Ordinary `/api/*` bodies are
+buffered by the Next.js proxy only up to 11MB, and anything larger is refused.
+The large-upload routes (`.mny` import, restore, attachments, AI queries) are
+served by route handlers that stream the body to the backend without holding
+it, so the frontend's default memory limit covers them.
 
 Set `MNY_IMPORT_LIMIT_MB` on **both** deployments if you change it. The frontend
-reads it to size the proxy's own body ceiling (Next caps proxied bodies at 10MB
-otherwise, and truncates rather than rejecting anything larger).
+reads it to bound the streamed `.mny` import and restore uploads, and refuses a
+larger body with 413.
 
 
 #### Storage for data kept outside Postgres
