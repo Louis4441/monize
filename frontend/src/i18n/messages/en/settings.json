@@ -1167,6 +1167,7 @@
       "ollamaCloudNote": "Model names must include the -cloud suffix (e.g. gpt-oss:20b-cloud).",
       "apiKeyLabel": "API Key",
       "baseUrlLabel": "Base URL",
+      "baseUrlPrivateNote": "A private or local address (localhost, 192.168.x.x or a container name) works only for an administrator, or when the server operator allows that address. Otherwise use an address reachable from the internet.",
       "priorityLabel": "Priority",
       "priorityHelp": "Lower number = higher priority. Used for fallback ordering.",
       "costRatesHeading": "Cost rates (optional)",
