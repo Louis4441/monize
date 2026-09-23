@@ -323,7 +323,11 @@ describe('SettingsPage', () => {
       expect(screen.getByText('Settings')).toBeInTheDocument();
     });
 
+    // Top-level sections only: a section can hold its own scroll target (the
+    // 2FA block inside Security is one), which shares the offset class but is
+    // not a nav entry.
     const anchors = Array.from(container.querySelectorAll('[id].scroll-mt-32'))
+      .filter((el) => !el.parentElement?.closest('[id].scroll-mt-32'))
       .map((el) => el.id)
       .filter(Boolean);
     // The sidebar renders one item per section, in the list's order.
