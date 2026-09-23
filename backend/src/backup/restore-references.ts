@@ -1,7 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import { tr } from "../i18n/translate";
-import { randomUUID } from "crypto";
-import { canonicalUuid, collectRowIdRemap } from "./backup-id-remap.util";
+import { canonicalUuid } from "./backup-id-remap.util";
 import { BackupData, backupTables, BackupTables } from "./backup-format";
 import { RESTORE_PLAN } from "./restore-plan";
 
@@ -392,54 +391,4 @@ function remapNested(
     );
   }
   return value;
-}
-
-/**
- * Builds a map from every primary-key UUID in the backup to a freshly
- * generated UUID. Currencies are intentionally excluded: they are shared,
- * global rows keyed by `code` (not by a per-user UUID) and are referenced by
- * code, so they must keep their original identifiers. Non-UUID ids (e.g.
- * `security_prices.id` is BIGSERIAL) are also excluded -- they get a fresh
- * value assigned by the DB on insert (see insertRows), and remapping them
- * to UUIDs here would (a) corrupt them and (b) clobber unrelated bigint
- * values in other columns that happen to share the same string form.
- *
- * Every restored table's UUID keys are canonical by the time this runs
- * (`resolveRestoreReferences`), which is what makes "in the map" the same
- * question as "a row of this file" for the database's own comparison.
- */
-export function buildBackupIdRemap(data: BackupData): Map<string, string> {
-  const remap = new Map<string, string>();
-  for (const [table, rows] of Object.entries(data)) {
-    if (table === "currencies" || !Array.isArray(rows)) continue;
-    collectRowIdRemap(rows, remap, randomUUID);
-  }
-  return remap;
-}
-
-/**
- * Returns a deep copy of the backup with every id and every reference to an
- * id (FK columns plus ids embedded in JSONB values such as scheduled
- * transaction `tag_ids` or override `splits`) rewritten via the remap. The
- * `user_id` columns are never remapped here -- they are not backup row ids,
- * and insertRows() forces them to the restoring user. Currencies are passed
- * through unchanged. A UUID nested in a JSONB or array value that names no
- * row of the file is replaced by a fresh id that names nothing
- * (`remapRestoreRow`), so it cannot survive as a pointer to another user's row.
- */
-export function remapBackupIds(
-  data: BackupData,
-  remap: Map<string, string>,
-): BackupData {
-  // One map for the whole document, so a stale id nested in two places is
-  // replaced by the same fresh id in both (see `remapRestoreRow`).
-  const unresolved = new Map<string, string>();
-  const result: Record<string, unknown> = { ...data };
-  for (const [table, rows] of Object.entries(data)) {
-    if (table === "currencies" || !Array.isArray(rows)) continue;
-    result[table] = rows.map((row) =>
-      remapRestoreRow(row, remap, unresolved, randomUUID),
-    );
-  }
-  return result as unknown as BackupData;
 }

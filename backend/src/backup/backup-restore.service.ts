@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
 import * as bcrypt from "bcryptjs";
+import { randomUUID } from "crypto";
 import { gunzip } from "zlib";
 import { promisify } from "util";
 import { withScopedDb } from "../common/db/scoped-db";
@@ -19,6 +20,7 @@ import { tr } from "../i18n/translate";
 import { gemConfigFingerprint } from "../strategies/gem-signal.service";
 import { GemStrategy } from "../strategies/entities/gem-strategy.entity";
 import { GemStrategyAsset } from "../strategies/entities/gem-strategy-asset.entity";
+import { collectRowIdRemap } from "./backup-id-remap.util";
 import {
   BackupDecryptionError,
   decryptBackup,
@@ -34,8 +36,7 @@ import { restoreProcessingGate } from "./restore-processing-gate";
 import { validateRestoredNotifications } from "./notification-restore-bounds";
 import { RESTORE_PLAN } from "./restore-plan";
 import {
-  buildBackupIdRemap,
-  remapBackupIds,
+  remapRestoreRow,
   resolveRestoreReferences,
 } from "./restore-references";
 import {
@@ -217,8 +218,8 @@ export class BackupRestoreService {
         // form, or a reference to a row the file does not carry, passed through
         // untouched. `resolveRestoreReferences` above is what closes both, and
         // the Phase-3 UPDATEs are additionally scoped to this user's rows.
-        const idRemap = buildBackupIdRemap(references.data);
-        const data = remapBackupIds(references.data, idRemap);
+        const idRemap = this.buildBackupIdRemap(references.data);
+        const data = this.remapBackupIds(references.data, idRemap);
         this.rehashGemSignalFingerprints(data, idRemap);
 
         this.logger.log(`Starting backup restore for user ${userId}`);
@@ -746,5 +747,55 @@ export class BackupRestoreService {
         }
       }
     }
+  }
+
+  /**
+   * Builds a map from every primary-key UUID in the backup to a freshly
+   * generated UUID. Currencies are intentionally excluded: they are shared,
+   * global rows keyed by `code` (not by a per-user UUID) and are referenced by
+   * code, so they must keep their original identifiers. Non-UUID ids (e.g.
+   * `security_prices.id` is BIGSERIAL) are also excluded -- they get a fresh
+   * value assigned by the DB on insert (see insertRows), and remapping them
+   * to UUIDs here would (a) corrupt them and (b) clobber unrelated bigint
+   * values in other columns that happen to share the same string form.
+   *
+   * Every restored table's UUID keys are canonical by the time this runs
+   * (`resolveRestoreReferences`), which is what makes "in the map" the same
+   * question as "a row of this file" for the database's own comparison.
+   */
+  private buildBackupIdRemap(data: BackupData): Map<string, string> {
+    const remap = new Map<string, string>();
+    for (const [table, rows] of Object.entries(data)) {
+      if (table === "currencies" || !Array.isArray(rows)) continue;
+      collectRowIdRemap(rows, remap, randomUUID);
+    }
+    return remap;
+  }
+
+  /**
+   * Returns a deep copy of the backup with every id and every reference to an
+   * id (FK columns plus ids embedded in JSONB values such as scheduled
+   * transaction `tag_ids` or override `splits`) rewritten via the remap. The
+   * `user_id` columns are never remapped here -- they are not backup row ids,
+   * and insertRows() forces them to the restoring user. Currencies are passed
+   * through unchanged. A UUID nested in a JSONB or array value that names no
+   * row of the file is replaced by a fresh id that names nothing
+   * (`remapRestoreRow`), so it cannot survive as a pointer to another user's row.
+   */
+  private remapBackupIds(
+    data: BackupData,
+    remap: Map<string, string>,
+  ): BackupData {
+    // One map for the whole document, so a stale id nested in two places is
+    // replaced by the same fresh id in both (see `remapRestoreRow`).
+    const unresolved = new Map<string, string>();
+    const result: Record<string, unknown> = { ...data };
+    for (const [table, rows] of Object.entries(data)) {
+      if (table === "currencies" || !Array.isArray(rows)) continue;
+      result[table] = rows.map((row) =>
+        remapRestoreRow(row, remap, unresolved, randomUUID),
+      );
+    }
+    return result as unknown as BackupData;
   }
 }
