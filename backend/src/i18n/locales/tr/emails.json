@@ -117,6 +117,21 @@
     "button": "E-postayı Doğrula",
     "disclaimer": "Bu bağlantının geçerlilik süresi 24 saattir. Bir Monize hesabı oluşturmadıysanız, bu e-postayı güvenle yoksayabilirsiniz."
   },
+  "emailChangeConfirm": {
+    "subject": "Yeni Monize e-postanızı onaylayın",
+    "heading": "Yeni e-posta adresinizi onaylayın",
+    "greeting": "Merhaba {{ name }},",
+    "intro": "Bu adresin bir Monize hesabı için kullanılması talep edildi. Aşağıdaki düğmeye tıklayarak onaylayana kadar e-posta adresiniz değişmeyecek:",
+    "button": "E-posta Değişikliğini Onayla",
+    "disclaimer": "Bu bağlantının geçerlilik süresi 24 saattir. Bu değişikliği siz talep etmediyseniz, bu e-postayı güvenle yoksayabilirsiniz."
+  },
+  "emailChangeNotice": {
+    "subject": "Monize e-posta değişikliği talep edildi",
+    "heading": "E-posta değişikliği talep edildi",
+    "greeting": "Merhaba {{ name }},",
+    "body1": "Monize hesabınızın e-posta adresinin {{ email }} olarak değiştirilmesi talep edildi. Değişiklik yalnızca o adresten onaylandıktan sonra geçerli olur.",
+    "body2": "Bu talebi siz yapmadıysanız, şifrenizi hemen değiştirin ve hesabınızda oturum açmış cihazları gözden geçirin."
+  },
   "accountInvite": {
     "subject": "Monize hesabınız hazır",
     "heading": "Monize hesabınız hazır",

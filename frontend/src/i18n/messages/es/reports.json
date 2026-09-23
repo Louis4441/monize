@@ -941,6 +941,7 @@
     "removeCashFlow": "Eliminar flujo de caja",
     "removeTitle": "Eliminar",
     "addCashFlow": "+ Agregar flujo de caja",
+    "cashFlowLimitReached": "Un escenario puede tener como máximo {max} flujos de caja.",
     "returnAssumptions": "Supuestos de retorno",
     "specifyReturn": "Especificar retorno esperado",
     "useHistoricalReturns": "Usar retornos históricos de las cuentas seleccionadas",

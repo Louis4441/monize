@@ -19,10 +19,12 @@
     "passwordRequired": "メールアドレスを変更するには現在のパスワードが必要です",
     "noChanges": "保存する変更がありません",
     "passwordConfirmNote": "メールアドレスを変更する場合はパスワードの確認が必要です。",
+    "pendingEmailNotice": "確認リンクを {email} に送信しました。リンクを開くとメールアドレスが変更されます。",
     "saveButton": "プロフィールを保存",
     "savingButton": "保存中...",
     "toasts": {
       "success": "プロフィールを更新しました",
+      "confirmationSent": "新しいメールアドレスを確認するためのリンクを {email} でご確認ください",
       "updateFailed": "プロフィールの更新に失敗しました"
     },
     "validation": {
@@ -582,7 +584,11 @@
       "copyUrlFailed": "URLのコピーに失敗しました",
       "loadFailed": "APIトークンの読み込みに失敗しました",
       "createFailed": "トークンの作成に失敗しました",
-      "revokeFailed": "トークンの取り消しに失敗しました"
+      "revokeFailed": "トークンの取り消しに失敗しました",
+      "reauthFailed": "再認証の確認に失敗しました"
+    },
+    "stepUp": {
+      "reason": "トークンを使うとサインインせずにアカウントにアクセスできるため、作成する前に本人確認を行ってください。"
     },
     "relative": {
       "never": "なし",
@@ -905,7 +911,8 @@
       "shared": "共有データ"
     },
     "sections": {
-      "description": "アプリセクション全体への読み取り専用アクセスを付与します。口座スコープのデータには口座ごとのアクセスも必要です。"
+      "description": "アプリセクション全体への読み取り専用アクセスを付与します。口座スコープのデータには口座ごとのアクセスも必要です。",
+      "aiRequiresFullAccess": "AI アシスタントはすべての口座とセクションを横断して読み取るため、このデリゲートがすべての口座と他のすべてのセクションを閲覧できる場合にのみ回答します。"
     },
     "accounts": {
       "noAccounts": "付与する口座がありません。",
@@ -1164,6 +1171,7 @@
       "ollamaCloudNote": "モデル名には -cloud サフィックスを含める必要があります（例: gpt-oss:20b-cloud）。",
       "apiKeyLabel": "APIキー",
       "baseUrlLabel": "ベースURL",
+      "baseUrlPrivateNote": "プライベートまたはローカルのアドレス（localhost、192.168.x.x、コンテナ名）は、管理者の場合、またはサーバー運用者がそのアドレスを許可している場合にのみ使用できます。それ以外の場合は、インターネットから到達可能なアドレスを使用してください。",
       "priorityLabel": "優先度",
       "priorityHelp": "数値が小さいほど優先度が高くなります。フォールバックの順序に使用されます。",
       "costRatesHeading": "コスト率（任意）",

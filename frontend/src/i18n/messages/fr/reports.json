@@ -941,6 +941,7 @@
     "removeCashFlow": "Supprimer le flux de trésorerie",
     "removeTitle": "Supprimer",
     "addCashFlow": "+ Ajouter un flux de trésorerie",
+    "cashFlowLimitReached": "Un scénario peut comporter au plus {max} flux de trésorerie.",
     "returnAssumptions": "Hypothèses de rendement",
     "specifyReturn": "Spécifier le rendement attendu",
     "useHistoricalReturns": "Utiliser les rendements historiques des comptes sélectionnés",

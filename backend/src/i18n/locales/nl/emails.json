@@ -117,6 +117,21 @@
     "button": "E-mail bevestigen",
     "disclaimer": "Deze koppeling verloopt over 24 uur. Als je geen Monize-account hebt aangemaakt, kun je deze e-mail veilig negeren."
   },
+  "emailChangeConfirm": {
+    "subject": "Bevestig je nieuwe Monize-e-mailadres",
+    "heading": "Bevestig je nieuwe e-mailadres",
+    "greeting": "Hoi {{ name }},",
+    "intro": "Er is gevraagd om dit adres te gebruiken voor een Monize-account. Je e-mailadres verandert pas wanneer je dit bevestigt door op de knop hieronder te klikken:",
+    "button": "E-mailwijziging bevestigen",
+    "disclaimer": "Deze koppeling verloopt over 24 uur. Als je deze wijziging niet hebt aangevraagd, kun je deze e-mail veilig negeren."
+  },
+  "emailChangeNotice": {
+    "subject": "Wijziging van je Monize-e-mailadres aangevraagd",
+    "heading": "E-mailwijziging aangevraagd",
+    "greeting": "Hoi {{ name }},",
+    "body1": "Er is gevraagd om het e-mailadres van je Monize-account te wijzigen in {{ email }}. De wijziging gaat pas in zodra deze vanaf dat adres is bevestigd.",
+    "body2": "Als je dit verzoek niet hebt gedaan, wijzig dan direct je wachtwoord en controleer de apparaten die bij je account zijn ingelogd."
+  },
   "accountInvite": {
     "subject": "Je Monize-account is klaar",
     "heading": "Je Monize-account is klaar",

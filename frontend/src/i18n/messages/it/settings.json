@@ -19,10 +19,12 @@
     "passwordRequired": "La password attuale è necessaria per cambiare l'email",
     "noChanges": "Nessuna modifica da salvare",
     "passwordConfirmNote": "La conferma della password è necessaria quando si cambia l'indirizzo email.",
+    "pendingEmailNotice": "È stato inviato un link di conferma a {email}. Il tuo indirizzo email cambierà quando lo aprirai.",
     "saveButton": "Salva profilo",
     "savingButton": "Salvataggio...",
     "toasts": {
       "success": "Profilo aggiornato con successo",
+      "confirmationSent": "Controlla {email} per trovare il link di conferma del nuovo indirizzo email",
       "updateFailed": "Impossibile aggiornare il profilo"
     },
     "validation": {
@@ -582,7 +584,11 @@
       "copyUrlFailed": "Impossibile copiare l'URL",
       "loadFailed": "Impossibile caricare i token API",
       "createFailed": "Impossibile creare il token",
-      "revokeFailed": "Impossibile revocare il token"
+      "revokeFailed": "Impossibile revocare il token",
+      "reauthFailed": "Impossibile confermare la nuova autenticazione"
+    },
+    "stepUp": {
+      "reason": "Un token può accedere al tuo account senza effettuare l'accesso, quindi conferma la tua identità prima di crearne uno."
     },
     "relative": {
       "never": "Mai",
@@ -905,7 +911,8 @@
       "shared": "Dati condivisi"
     },
     "sections": {
-      "description": "Concedi accesso in sola lettura a intere sezioni dell'app. I dati limitati per conto richiedono comunque l'accesso per singolo conto."
+      "description": "Concedi accesso in sola lettura a intere sezioni dell'app. I dati limitati per conto richiedono comunque l'accesso per singolo conto.",
+      "aiRequiresFullAccess": "L'Assistente AI legge tutti i conti e le sezioni, quindi risponde per questo delegato solo quando può leggere tutti i tuoi conti e ogni altra sezione."
     },
     "accounts": {
       "noAccounts": "Nessun conto da concedere.",
@@ -1164,6 +1171,7 @@
       "ollamaCloudNote": "I nomi dei modelli devono includere il suffisso -cloud (es. gpt-oss:20b-cloud).",
       "apiKeyLabel": "Chiave API",
       "baseUrlLabel": "URL di base",
+      "baseUrlPrivateNote": "Un indirizzo privato o locale (localhost, 192.168.x.x o il nome di un container) funziona solo per un amministratore o quando l'operatore del server consente quell'indirizzo. Altrimenti usa un indirizzo raggiungibile da Internet.",
       "priorityLabel": "Priorità",
       "priorityHelp": "Numero più basso = priorità più alta. Usato per l'ordinamento di fallback.",
       "costRatesHeading": "Tariffe di costo (facoltativo)",

@@ -941,6 +941,7 @@
     "removeCashFlow": "Cashflow entfernen",
     "removeTitle": "Entfernen",
     "addCashFlow": "+ Cashflow hinzufügen",
+    "cashFlowLimitReached": "Ein Szenario kann höchstens {max} Cashflows haben.",
     "returnAssumptions": "Renditeannahmen",
     "specifyReturn": "Erwartete Rendite angeben",
     "useHistoricalReturns": "Historische Renditen der gewählten Konten verwenden",

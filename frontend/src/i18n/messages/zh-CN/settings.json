@@ -19,10 +19,12 @@
     "passwordRequired": "更改电子邮件需要当前密码",
     "noChanges": "没有需要保存的更改",
     "passwordConfirmNote": "更改电子邮件地址时需要密码确认。",
+    "pendingEmailNotice": "确认链接已发送至 {email}。点击该链接后，您的电子邮件地址即会更改。",
     "saveButton": "保存个人资料",
     "savingButton": "保存中...",
     "toasts": {
       "success": "个人资料已成功更新",
+      "confirmationSent": "请查看 {email} 中用于确认新电子邮件地址的链接",
       "updateFailed": "更新个人资料失败"
     },
     "validation": {
@@ -582,7 +584,11 @@
       "copyUrlFailed": "复制 URL 失败",
       "loadFailed": "加载 API 令牌失败",
       "createFailed": "创建令牌失败",
-      "revokeFailed": "撤销令牌失败"
+      "revokeFailed": "撤销令牌失败",
+      "reauthFailed": "确认重新验证失败"
+    },
+    "stepUp": {
+      "reason": "令牌无需登录即可访问您的账户，因此在创建令牌前请先确认您的身份。"
     },
     "relative": {
       "never": "从未",
@@ -905,7 +911,8 @@
       "shared": "共享数据"
     },
     "sections": {
-      "description": "授予对整个应用功能区域的只读访问权限。账户范围的数据还需要逐账户访问权限。"
+      "description": "授予对整个应用功能区域的只读访问权限。账户范围的数据还需要逐账户访问权限。",
+      "aiRequiresFullAccess": "AI 助手会读取所有账户和功能区域，因此只有当该委托人能够读取您的所有账户和其他所有功能区域时，它才会为其回答。"
     },
     "accounts": {
       "noAccounts": "无账户可授权。",
@@ -1164,6 +1171,7 @@
       "ollamaCloudNote": "模型名称必须包含 -cloud 后缀（例如：gpt-oss:20b-cloud）。",
       "apiKeyLabel": "API 密钥",
       "baseUrlLabel": "基础 URL",
+      "baseUrlPrivateNote": "私有或本地地址（localhost、192.168.x.x 或容器名称）仅适用于管理员，或服务器运营者已允许该地址的情况。否则，请使用可从互联网访问的地址。",
       "priorityLabel": "优先级",
       "priorityHelp": "数字越小，优先级越高。用于回退排序。",
       "costRatesHeading": "费率（可选）",

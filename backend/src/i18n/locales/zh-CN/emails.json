@@ -117,6 +117,21 @@
     "button": "验证邮箱",
     "disclaimer": "此链接将在 24 小时后过期。如果您未创建 Monize 账户，可以安全忽略此邮件。"
   },
+  "emailChangeConfirm": {
+    "subject": "确认您的 Monize 新邮箱",
+    "heading": "确认您的新邮箱地址",
+    "greeting": "您好，{{ name }}，",
+    "intro": "有人请求将此地址用于 Monize 账户。在您点击下方按钮确认之前，您的邮箱不会更改：",
+    "button": "确认更改邮箱",
+    "disclaimer": "此链接将在 24 小时后过期。如果您未请求此更改，可以安全忽略此邮件。"
+  },
+  "emailChangeNotice": {
+    "subject": "已请求更改 Monize 邮箱",
+    "heading": "已请求更改邮箱",
+    "greeting": "您好，{{ name }}，",
+    "body1": "有人请求将您的 Monize 账户邮箱地址更改为 {{ email }}。只有从该地址确认后，更改才会生效。",
+    "body2": "如果这不是您发起的请求，请立即更改密码，并检查已登录您账户的设备。"
+  },
   "accountInvite": {
     "subject": "您的 Monize 账户已准备就绪",
     "heading": "您的 Monize 账户已准备就绪",

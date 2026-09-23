@@ -19,10 +19,12 @@
     "passwordRequired": "A palavra-passe atual é obrigatória para alterar o e-mail",
     "noChanges": "Sem alterações a guardar",
     "passwordConfirmNote": "A confirmação da palavra-passe é necessária ao alterar o seu endereço de e-mail.",
+    "pendingEmailNotice": "Foi enviado um link de confirmação para {email}. O seu endereço de e-mail será alterado quando o abrir.",
     "saveButton": "Guardar Perfil",
     "savingButton": "A guardar...",
     "toasts": {
       "success": "Perfil atualizado com sucesso",
+      "confirmationSent": "Consulte {email} para encontrar um link que confirma o seu novo endereço de e-mail",
       "updateFailed": "Falha ao atualizar o perfil"
     },
     "validation": {
@@ -582,7 +584,11 @@
       "copyUrlFailed": "Falha ao copiar URL",
       "loadFailed": "Falha ao carregar os tokens de API",
       "createFailed": "Falha ao criar o token",
-      "revokeFailed": "Falha ao revogar o token"
+      "revokeFailed": "Falha ao revogar o token",
+      "reauthFailed": "Falha ao confirmar a reautenticação"
+    },
+    "stepUp": {
+      "reason": "Um token pode aceder à sua conta sem iniciar sessão, por isso confirme que é você antes de criar um."
     },
     "relative": {
       "never": "Nunca",
@@ -905,7 +911,8 @@
       "shared": "Dados partilhados"
     },
     "sections": {
-      "description": "Conceda acesso só de leitura a secções inteiras da aplicação. Os dados no âmbito de conta ainda necessitam de acesso por conta."
+      "description": "Conceda acesso só de leitura a secções inteiras da aplicação. Os dados no âmbito de conta ainda necessitam de acesso por conta.",
+      "aiRequiresFullAccess": "O Assistente de IA lê todas as contas e secções, pelo que só responde a este delegado quando este puder ler todas as suas contas e todas as outras secções."
     },
     "accounts": {
       "noAccounts": "Sem contas para conceder.",
@@ -1164,6 +1171,7 @@
       "ollamaCloudNote": "Os nomes dos modelos devem incluir o sufixo -cloud (ex.: gpt-oss:20b-cloud).",
       "apiKeyLabel": "Chave de API",
       "baseUrlLabel": "URL Base",
+      "baseUrlPrivateNote": "Um endereço privado ou local (localhost, 192.168.x.x ou o nome de um contentor) só funciona para um administrador ou quando o operador do servidor permite esse endereço. Caso contrário, utilize um endereço acessível a partir da Internet.",
       "priorityLabel": "Prioridade",
       "priorityHelp": "Número menor = maior prioridade. Utilizado para a ordem de fallback.",
       "costRatesHeading": "Taxas de custo (opcional)",

@@ -941,6 +941,7 @@
     "removeCashFlow": "Nakit akışını kaldır",
     "removeTitle": "Kaldır",
     "addCashFlow": "+ Nakit akışı ekle",
+    "cashFlowLimitReached": "Bir senaryoda en fazla {max} nakit akışı olabilir.",
     "returnAssumptions": "Getiri varsayımları",
     "specifyReturn": "Beklenen getiriyi belirt",
     "useHistoricalReturns": "Seçilen hesaplardan geçmiş getirileri kullan",

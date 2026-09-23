@@ -117,6 +117,21 @@
     "button": "E-Mail bestätigen",
     "disclaimer": "Dieser Link läuft in 24 Stunden ab. Wenn Sie kein Monize-Konto erstellt haben, können Sie diese E-Mail ignorieren."
   },
+  "emailChangeConfirm": {
+    "subject": "Bestätigen Sie Ihre neue Monize-E-Mail-Adresse",
+    "heading": "Bestätigen Sie Ihre neue E-Mail-Adresse",
+    "greeting": "Hallo {{ name }},",
+    "intro": "Es wurde angefordert, diese Adresse für ein Monize-Konto zu verwenden. Ihre E-Mail-Adresse ändert sich erst, wenn Sie dies über die Schaltfläche unten bestätigen:",
+    "button": "E-Mail-Änderung bestätigen",
+    "disclaimer": "Dieser Link läuft in 24 Stunden ab. Wenn Sie diese Änderung nicht angefordert haben, können Sie diese E-Mail ignorieren."
+  },
+  "emailChangeNotice": {
+    "subject": "Änderung Ihrer Monize-E-Mail-Adresse angefordert",
+    "heading": "Änderung der E-Mail-Adresse angefordert",
+    "greeting": "Hallo {{ name }},",
+    "body1": "Es wurde angefordert, die E-Mail-Adresse Ihres Monize-Kontos in {{ email }} zu ändern. Die Änderung wird erst wirksam, wenn sie von dieser Adresse aus bestätigt wurde.",
+    "body2": "Wenn Sie diese Anfrage nicht gestellt haben, ändern Sie sofort Ihr Passwort und überprüfen Sie die Geräte, die bei Ihrem Konto angemeldet sind."
+  },
   "accountInvite": {
     "subject": "Ihr Monize-Konto ist bereit",
     "heading": "Ihr Monize-Konto ist bereit",

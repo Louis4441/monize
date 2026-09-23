@@ -19,10 +19,12 @@
     "passwordRequired": "E-posta adresini değiştirmek için mevcut şifre gereklidir",
     "noChanges": "Kaydedilecek değişiklik yok",
     "passwordConfirmNote": "E-posta adresinizi değiştirirken şifre onayı gereklidir.",
+    "pendingEmailNotice": "{email} adresine bir onay bağlantısı gönderildi. Bağlantıyı açtığınızda e-posta adresiniz değişecek.",
     "saveButton": "Profili Kaydet",
     "savingButton": "Kaydediliyor...",
     "toasts": {
       "success": "Profil başarıyla güncellendi",
+      "confirmationSent": "Yeni e-posta adresinizi onaylamak için bağlantıyı {email} adresinde kontrol edin",
       "updateFailed": "Profil güncellenemedi"
     },
     "validation": {
@@ -582,7 +584,11 @@
       "copyUrlFailed": "URL kopyalanamadı",
       "loadFailed": "API belirteçleri yüklenemedi",
       "createFailed": "Belirteç oluşturulamadı",
-      "revokeFailed": "Belirteç iptal edilemedi"
+      "revokeFailed": "Belirteç iptal edilemedi",
+      "reauthFailed": "Yeniden kimlik doğrulama onaylanamadı"
+    },
+    "stepUp": {
+      "reason": "Bir belirteç oturum açmadan hesabınıza erişebilir; bu nedenle oluşturmadan önce siz olduğunuzu onaylayın."
     },
     "relative": {
       "never": "Hiçbir zaman",
@@ -905,7 +911,8 @@
       "shared": "Paylaşılan veri"
     },
     "sections": {
-      "description": "Uygulama bölümlerine salt okunur erişim verin. Hesap kapsamlı veriler yine de hesap başına erişim gerektirir."
+      "description": "Uygulama bölümlerine salt okunur erişim verin. Hesap kapsamlı veriler yine de hesap başına erişim gerektirir.",
+      "aiRequiresFullAccess": "Yapay Zeka Asistanı tüm hesapları ve bölümleri okur; bu nedenle bu temsilci için yalnızca tüm hesaplarınızı ve diğer tüm bölümleri okuyabildiğinde yanıt verir."
     },
     "accounts": {
       "noAccounts": "Verilecek hesap yok.",
@@ -1164,6 +1171,7 @@
       "ollamaCloudNote": "Model adları -cloud sonekini içermelidir (örn. gpt-oss:20b-cloud).",
       "apiKeyLabel": "API Anahtarı",
       "baseUrlLabel": "Temel URL",
+      "baseUrlPrivateNote": "Özel veya yerel bir adres (localhost, 192.168.x.x veya bir kapsayıcı adı) yalnızca bir yönetici için ya da sunucu operatörü bu adrese izin verdiğinde çalışır. Aksi takdirde internetten erişilebilen bir adres kullanın.",
       "priorityLabel": "Öncelik",
       "priorityHelp": "Düşük sayı = yüksek öncelik. Yedek sıralama için kullanılır.",
       "costRatesHeading": "Maliyet oranları (isteğe bağlı)",

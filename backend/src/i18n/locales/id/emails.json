@@ -117,6 +117,21 @@
     "button": "Verifikasi Surel",
     "disclaimer": "Tautan ini akan kedaluwarsa dalam 24 jam. Jika Anda tidak membuat akun Monize, Anda dapat mengabaikan surel ini dengan aman."
   },
+  "emailChangeConfirm": {
+    "subject": "Konfirmasi surel Monize baru Anda",
+    "heading": "Konfirmasi alamat surel baru Anda",
+    "greeting": "Hai {{ name }},",
+    "intro": "Ada permintaan untuk menggunakan alamat ini untuk akun Monize. Surel Anda tidak akan berubah sampai Anda mengonfirmasinya dengan mengeklik tombol di bawah:",
+    "button": "Konfirmasi Perubahan Surel",
+    "disclaimer": "Tautan ini akan kedaluwarsa dalam 24 jam. Jika Anda tidak meminta perubahan ini, Anda dapat mengabaikan surel ini dengan aman."
+  },
+  "emailChangeNotice": {
+    "subject": "Permintaan perubahan surel Monize",
+    "heading": "Perubahan surel diminta",
+    "greeting": "Hai {{ name }},",
+    "body1": "Ada permintaan untuk mengubah alamat surel akun Monize Anda menjadi {{ email }}. Perubahan hanya berlaku setelah dikonfirmasi dari alamat tersebut.",
+    "body2": "Jika Anda tidak membuat permintaan ini, segera ubah kata sandi Anda dan periksa perangkat yang masuk ke akun Anda."
+  },
   "accountInvite": {
     "subject": "Akun Monize Anda siap",
     "heading": "Akun Monize Anda siap",

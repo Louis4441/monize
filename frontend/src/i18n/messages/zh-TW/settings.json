@@ -19,10 +19,12 @@
     "passwordRequired": "更改電子郵件時需要目前密碼",
     "noChanges": "無變更可儲存",
     "passwordConfirmNote": "更改電子郵件地址時需要密碼確認。",
+    "pendingEmailNotice": "確認連結已傳送至 {email}。點擊該連結後，您的電子郵件地址即會變更。",
     "saveButton": "儲存個人資料",
     "savingButton": "儲存中...",
     "toasts": {
       "success": "個人資料更新成功",
+      "confirmationSent": "請查看 {email} 中用於確認新電子郵件地址的連結",
       "updateFailed": "更新個人資料失敗"
     },
     "validation": {
@@ -582,7 +584,11 @@
       "copyUrlFailed": "複製 URL 失敗",
       "loadFailed": "載入 API 權杖失敗",
       "createFailed": "建立權杖失敗",
-      "revokeFailed": "撤銷權杖失敗"
+      "revokeFailed": "撤銷權杖失敗",
+      "reauthFailed": "確認重新驗證失敗"
+    },
+    "stepUp": {
+      "reason": "權杖無需登入即可存取您的帳號，因此在建立權杖前請先確認您的身份。"
     },
     "relative": {
       "never": "從未",
@@ -905,7 +911,8 @@
       "shared": "共用資料"
     },
     "sections": {
-      "description": "授予整個應用程式區段的唯讀存取。以科目為範圍的資料仍需要個別科目存取。"
+      "description": "授予整個應用程式區段的唯讀存取。以科目為範圍的資料仍需要個別科目存取。",
+      "aiRequiresFullAccess": "AI 助理會讀取所有科目與區段，因此只有當此委派人能讀取您的所有科目及其他所有區段時，它才會為其回答。"
     },
     "accounts": {
       "noAccounts": "無可授予的科目。",
@@ -1164,6 +1171,7 @@
       "ollamaCloudNote": "模型名稱必須包含 -cloud 後綴（例如：gpt-oss:20b-cloud）。",
       "apiKeyLabel": "API 金鑰",
       "baseUrlLabel": "基礎 URL",
+      "baseUrlPrivateNote": "私人或本機位址（localhost、192.168.x.x 或容器名稱）僅適用於管理員，或伺服器營運者已允許該位址的情況。否則，請使用可從網際網路存取的位址。",
       "priorityLabel": "優先順序",
       "priorityHelp": "數字越小，優先順序越高。用於後備排序。",
       "costRatesHeading": "費率（選填）",

@@ -117,6 +117,21 @@
     "button": "Xác minh email",
     "disclaimer": "Liên kết này sẽ hết hạn sau 24 giờ. Nếu bạn không tạo tài khoản Monize, bạn có thể bỏ qua email này một cách an toàn."
   },
+  "emailChangeConfirm": {
+    "subject": "Xác nhận email Monize mới của bạn",
+    "heading": "Xác nhận địa chỉ email mới của bạn",
+    "greeting": "Xin chào {{ name }},",
+    "intro": "Đã có yêu cầu sử dụng địa chỉ này cho một tài khoản Monize. Email của bạn sẽ không thay đổi cho đến khi bạn xác nhận bằng cách nhấp vào nút bên dưới:",
+    "button": "Xác nhận thay đổi email",
+    "disclaimer": "Liên kết này sẽ hết hạn sau 24 giờ. Nếu bạn không yêu cầu thay đổi này, bạn có thể bỏ qua email này một cách an toàn."
+  },
+  "emailChangeNotice": {
+    "subject": "Đã yêu cầu thay đổi email Monize",
+    "heading": "Đã yêu cầu thay đổi email",
+    "greeting": "Xin chào {{ name }},",
+    "body1": "Đã có yêu cầu thay đổi địa chỉ email của tài khoản Monize của bạn thành {{ email }}. Thay đổi chỉ có hiệu lực sau khi được xác nhận từ địa chỉ đó.",
+    "body2": "Nếu bạn không thực hiện yêu cầu này, hãy đổi mật khẩu ngay lập tức và kiểm tra các thiết bị đang đăng nhập vào tài khoản của bạn."
+  },
   "accountInvite": {
     "subject": "Tài khoản Monize của bạn đã sẵn sàng",
     "heading": "Tài khoản Monize của bạn đã sẵn sàng",

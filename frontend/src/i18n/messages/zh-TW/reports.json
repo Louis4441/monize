@@ -941,6 +941,7 @@
     "removeCashFlow": "移除現金流",
     "removeTitle": "移除",
     "addCashFlow": "+ 新增現金流",
+    "cashFlowLimitReached": "一個情境最多只能有 {max} 個現金流。",
     "returnAssumptions": "報酬率假設",
     "specifyReturn": "指定預期報酬率",
     "useHistoricalReturns": "使用所選科目的歷史報酬率",

@@ -941,6 +941,7 @@
     "removeCashFlow": "Hapus arus kas",
     "removeTitle": "Hapus",
     "addCashFlow": "+ Tambah arus kas",
+    "cashFlowLimitReached": "Skenario dapat memiliki paling banyak {max} arus kas.",
     "returnAssumptions": "Asumsi imbal hasil",
     "specifyReturn": "Tentukan imbal hasil yang diharapkan",
     "useHistoricalReturns": "Gunakan imbal hasil historis dari akun yang dipilih",

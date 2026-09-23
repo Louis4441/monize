@@ -941,6 +941,7 @@
     "removeCashFlow": "Удалить денежный поток",
     "removeTitle": "Удалить",
     "addCashFlow": "+ Добавить денежный поток",
+    "cashFlowLimitReached": "Сценарий может содержать не более {max} денежных потоков.",
     "returnAssumptions": "Предположения о доходности",
     "specifyReturn": "Указать ожидаемую доходность",
     "useHistoricalReturns": "Использовать исторические данные из выбранных счетов",
