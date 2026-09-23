@@ -8,6 +8,11 @@ import { Account } from "../accounts/entities/account.entity";
 import { MonteCarloCashFlow } from "./entities/monte-carlo-cash-flow.entity";
 import { CreateScenarioDto } from "./dto/create-scenario.dto";
 import {
+  CashFlowDto,
+  CashFlowTypeDto,
+  MAX_SCENARIO_CASH_FLOWS,
+} from "./dto/cash-flow.dto";
+import {
   createScopedDbMocks,
   DataSourceMock,
   ManagerMock,
@@ -311,6 +316,88 @@ describe("MonteCarloService", () => {
       const result = await service.runAdHoc(userId, validInputs);
       expect(result.percentiles.p50).toHaveLength(10);
       expect(scenariosRepository.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("cash-flow count bound", () => {
+    // The simulation is synchronous and its cost grows with the number of
+    // cash flows, so every path that stores or runs a list refuses one over
+    // MAX_SCENARIO_CASH_FLOWS -- before writing or simulating anything.
+    const flows = (n: number): CashFlowDto[] =>
+      Array.from({ length: n }, (_, i) => ({
+        name: `Flow ${i}`,
+        amount: 100,
+        flowType: CashFlowTypeDto.ONE_TIME,
+        startYear: 1,
+        inflationAdjust: false,
+      }));
+    const storedFlows = (n: number) =>
+      flows(n).map(
+        (cf, i) =>
+          ({
+            ...cf,
+            id: `cf-${i}`,
+            scenarioId: "scn-1",
+            endYear: null,
+            sortOrder: i,
+          }) as unknown as MonteCarloCashFlow,
+      );
+
+    it("refuses a saved scenario holding more than the limit (e.g. restored rows) before simulating", async () => {
+      scenariosRepository.findOne.mockResolvedValueOnce(
+        buildScenario({ cashFlows: storedFlows(MAX_SCENARIO_CASH_FLOWS + 1) }),
+      );
+      const runSpy = jest.spyOn(MonteCarloSimulationService.prototype, "run");
+      await expect(service.runSaved(userId, "scn-1")).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(runSpy).not.toHaveBeenCalled();
+      expect(scenariosRepository.save).not.toHaveBeenCalled();
+      runSpy.mockRestore();
+    });
+
+    it("runs a saved scenario at exactly the limit", async () => {
+      scenariosRepository.findOne.mockResolvedValueOnce(
+        buildScenario({ cashFlows: storedFlows(MAX_SCENARIO_CASH_FLOWS) }),
+      );
+      scenariosRepository.save.mockImplementationOnce((s) =>
+        Promise.resolve(s),
+      );
+      const result = await service.runSaved(userId, "scn-1");
+      expect(result.percentiles.p50).toHaveLength(5);
+    });
+
+    it("refuses an ad-hoc run over the limit", async () => {
+      await expect(
+        service.runAdHoc(userId, {
+          ...validInputs,
+          cashFlows: flows(MAX_SCENARIO_CASH_FLOWS + 1),
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("refuses to create a scenario over the limit without writing", async () => {
+      await expect(
+        service.create(userId, {
+          ...validInputs,
+          cashFlows: flows(MAX_SCENARIO_CASH_FLOWS + 1),
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(scenariosRepository.save).not.toHaveBeenCalled();
+      expect(cashFlowsRepository.delete).not.toHaveBeenCalled();
+      expect(cashFlowsRepository.save).not.toHaveBeenCalled();
+    });
+
+    it("refuses to update a scenario over the limit without writing", async () => {
+      scenariosRepository.findOne.mockResolvedValue(buildScenario());
+      await expect(
+        service.update(userId, "scn-1", {
+          cashFlows: flows(MAX_SCENARIO_CASH_FLOWS + 1),
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(scenariosRepository.save).not.toHaveBeenCalled();
+      expect(cashFlowsRepository.delete).not.toHaveBeenCalled();
+      expect(cashFlowsRepository.save).not.toHaveBeenCalled();
     });
   });
 

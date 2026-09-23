@@ -361,6 +361,7 @@
   "monteCarlo": {
     "scenarioNotFound": "[XX-Scenario {{ id }} not found-XX]",
     "atLeastOneAccountRequired": "[XX-At least one accountId is required-XX]",
+    "tooManyCashFlows": "[XX-A scenario can have at most {{ max }} cash flows-XX]",
     "currentValueUnavailable": "[XX-The current value of the selected accounts could not be determined, so a simulation cannot start from it. Enter a starting value explicitly, or retry once prices and exchange rates are available.-XX]",
     "historicalReturnsUnavailable": "[XX-Historical returns for the selected accounts could not be computed, so a simulation cannot use them. Enter an expected return and volatility manually, or retry once prices and exchange rates are available.-XX]"
   },

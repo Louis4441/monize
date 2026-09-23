@@ -14,12 +14,23 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import { Throttle } from "@nestjs/throttler";
 import { MonteCarloService } from "./monte-carlo.service";
 import { CreateScenarioDto } from "./dto/create-scenario.dto";
 import { UpdateScenarioDto } from "./dto/update-scenario.dto";
 import { RunScenarioDto } from "./dto/run-scenario.dto";
 import { ReorderScenariosDto } from "./dto/reorder-scenarios.dto";
 import { parseUuids } from "../common/query-param-utils";
+import { rateLimit } from "../common/throttle.util";
+
+/**
+ * A simulation runs synchronously on the event loop (up to 50,000 paths x 200
+ * years), so the two run routes carry a per-route ceiling well under the
+ * global 100 a minute, like the other CPU- or provider-heavy routes.
+ */
+export const MONTE_CARLO_RUN_THROTTLE = {
+  default: { ttl: 60_000, limit: rateLimit(10) },
+};
 
 interface AuthRequest extends Request {
   user: { id: string };
@@ -69,6 +80,7 @@ export class MonteCarloController {
   }
 
   @Post("scenarios/:id/run")
+  @Throttle(MONTE_CARLO_RUN_THROTTLE)
   runSaved(
     @Request() req: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,
@@ -77,6 +89,7 @@ export class MonteCarloController {
   }
 
   @Post("run")
+  @Throttle(MONTE_CARLO_RUN_THROTTLE)
   run(@Request() req: AuthRequest, @Body() dto: RunScenarioDto) {
     return this.monteCarloService.runAdHoc(req.user.id, dto);
   }

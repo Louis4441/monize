@@ -12,7 +12,7 @@ import { MonteCarloCashFlow } from "./entities/monte-carlo-cash-flow.entity";
 import { CreateScenarioDto } from "./dto/create-scenario.dto";
 import { UpdateScenarioDto } from "./dto/update-scenario.dto";
 import { RunScenarioDto } from "./dto/run-scenario.dto";
-import { CashFlowDto } from "./dto/cash-flow.dto";
+import { CashFlowDto, MAX_SCENARIO_CASH_FLOWS } from "./dto/cash-flow.dto";
 import {
   CashFlowSpec,
   MonteCarloSimulationService,
@@ -108,6 +108,7 @@ export class MonteCarloService {
     userId: string,
     dto: CreateScenarioDto,
   ): Promise<MonteCarloScenario> {
+    assertCashFlowCount(dto.cashFlows);
     const saved = await withScopedDb(this.dataSource, (m) => {
       const repo = m.getRepository(MonteCarloScenario);
       const scenario = repo.create({
@@ -208,6 +209,7 @@ export class MonteCarloService {
     id: string,
     dto: UpdateScenarioDto,
   ): Promise<MonteCarloScenario> {
+    assertCashFlowCount(dto.cashFlows);
     const scenario = await this.findOne(userId, id);
 
     // Explicit property mapping (no Object.assign — prevents mass assignment).
@@ -290,6 +292,9 @@ export class MonteCarloService {
 
   async runSaved(userId: string, id: string): Promise<SimulationResult> {
     const scenario = await this.findOne(userId, id);
+    // A stored list is not bounded by the DTO: rows written before the cap,
+    // or restored from a backup, can exceed it. Refuse before any work.
+    assertCashFlowCount(scenario.cashFlows);
 
     const startingValue =
       scenario.useCurrentBalance && scenario.accountIds.length > 0
@@ -335,6 +340,7 @@ export class MonteCarloService {
     userId: string,
     dto: RunScenarioDto,
   ): Promise<SimulationResult> {
+    assertCashFlowCount(dto.cashFlows);
     const startingValue =
       dto.useCurrentBalance && dto.accountIds.length > 0
         ? this.requireCurrentValue(
@@ -942,6 +948,23 @@ function computeMeanStdev(series: number[]): {
     mean: Math.round(mean * 1_000_000) / 1_000_000,
     stdev: Math.round(Math.sqrt(variance) * 1_000_000) / 1_000_000,
   };
+}
+
+/**
+ * Refuse a cash-flow list longer than `MAX_SCENARIO_CASH_FLOWS`. The DTO holds
+ * the same bound for requests; this holds it for every caller, including a
+ * saved scenario whose rows never passed through the DTO.
+ */
+function assertCashFlowCount(flows: readonly unknown[] | undefined): void {
+  if (Array.isArray(flows) && flows.length > MAX_SCENARIO_CASH_FLOWS) {
+    throw new BadRequestException(
+      tr(
+        "errors.monteCarlo.tooManyCashFlows",
+        `A scenario can have at most ${MAX_SCENARIO_CASH_FLOWS} cash flows`,
+        { max: MAX_SCENARIO_CASH_FLOWS },
+      ),
+    );
+  }
 }
 
 function toCashFlowSpec(cf: {

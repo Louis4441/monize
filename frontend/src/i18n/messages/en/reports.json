@@ -941,6 +941,7 @@
     "removeCashFlow": "Remove cash flow",
     "removeTitle": "Remove",
     "addCashFlow": "+ Add cash flow",
+    "cashFlowLimitReached": "A scenario can have at most {max} cash flows.",
     "returnAssumptions": "Return assumptions",
     "specifyReturn": "Specify expected return",
     "useHistoricalReturns": "Use historical returns from selected accounts",

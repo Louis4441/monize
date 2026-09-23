@@ -2,6 +2,13 @@ import apiClient from './api';
 
 export type CashFlowType = 'ONE_TIME' | 'RECURRING';
 
+/**
+ * Most cash flows one scenario may carry. Equal to the server's
+ * `MAX_SCENARIO_CASH_FLOWS` (backend/src/monte-carlo/dto/cash-flow.dto.ts),
+ * which refuses a longer list.
+ */
+export const MAX_CASH_FLOWS = 100;
+
 export interface CashFlow {
   /** Display name (e.g. "Pension", "Roof renovation"). */
   name: string;
