@@ -264,9 +264,11 @@ cd monize
 cp .env.example .env
 ```
 
-3. Edit `.env` and configure:
+3. Edit `.env` and configure. `JWT_SECRET` and `ENCRYPTION_KEY` ship empty, and
+   the backend will not start until both are filled in:
    - `POSTGRES_PASSWORD` - secure database password
    - `JWT_SECRET` - generate with `openssl rand -base64 32`
+   - `ENCRYPTION_KEY` - generate with `openssl rand -hex 32`
    - `PUBLIC_APP_URL` - your public frontend URL
    - OIDC settings (optional) for SSO authentication
 
@@ -303,7 +305,8 @@ DATABASE_PORT=5432
 DATABASE_NAME=monize
 DATABASE_USER=your_user
 DATABASE_PASSWORD=your_password
-JWT_SECRET=your-secret-key
+JWT_SECRET=            # required: openssl rand -base64 32
+ENCRYPTION_KEY=        # required: openssl rand -hex 32
 PUBLIC_APP_URL=http://localhost:3001
 ```
 
@@ -329,7 +332,8 @@ npm run dev
 | `POSTGRES_DB` | Database name | `monize` |
 | `POSTGRES_USER` | Database user | `monize_user` |
 | `POSTGRES_PASSWORD` | Database password | `secure-password` |
-| `JWT_SECRET` | JWT signing key (min 32 random chars; the `.env.example` placeholder is refused at startup) | `openssl rand -base64 32` |
+| `JWT_SECRET` | JWT signing key (min 32 random chars; the server will not start without it). A published placeholder or typed pattern still starts but is reported to administrators. Changing it later stops authenticator (2FA) codes from working: see [Changing JWT_SECRET](docs/backend/modules-and-runtime.md#changing-jwt_secret) | `openssl rand -base64 32` |
+| `ENCRYPTION_KEY` | Encrypts AI provider keys, emergency-access credentials, each user's backup key and the Web Push and OIDC signing keys (min 32 chars; the server will not start without it). Keep it safe and keep it unchanged -- losing it makes every stored secret unreadable. Formerly `AI_ENCRYPTION_KEY`, which is still accepted | `openssl rand -hex 32` |
 | `PUBLIC_APP_URL` | Public frontend URL | `https://money.example.com` |
 
 ### Optional Variables
@@ -351,7 +355,6 @@ npm run dev
 | `SMTP_USER` | SMTP username | - |
 | `SMTP_PASSWORD` | SMTP password | - |
 | `EMAIL_FROM` | Email sender address | - |
-| `ENCRYPTION_KEY` | **Set this.** Encrypts AI provider keys, emergency-access credentials and the password your backups are encrypted with (`openssl rand -hex 32`). Without it, backups are written unencrypted and no secret can be stored; the server warns on every boot and will require it in a future release. Keep it safe and keep it unchanged -- losing it makes every stored secret unreadable. Formerly `AI_ENCRYPTION_KEY`, which is still accepted | - |
 | `AI_DEFAULT_PROVIDER` | System-level default AI provider (the centrally managed AI) | - |
 | `AI_DEFAULT_MODEL` | Default model for the provider | - |
 | `AI_DEFAULT_API_KEY` | System-wide AI API key | - |

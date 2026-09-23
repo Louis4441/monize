@@ -161,9 +161,46 @@ Four decisions are load-bearing:
 ## Environment
 
 Key env vars (see `.env.example` for full list):
-- `JWT_SECRET` -- minimum 32 chars, enforced at startup by `jwtSecretProblem` (`backend/src/common/jwt-secret-policy.ts`), which `checkClusterBoot` and `JwtStrategy` both call; it also refuses the `.env.example` placeholder, any value containing a placeholder phrase, and a value with fewer than 8 distinct characters or made of one repeated unit
-- `ENCRYPTION_KEY` -- minimum 32 chars; encrypts AI provider keys, emergency-access credentials and the stored backup password. Not yet enforced at startup (a deployment without one boots and is warned on every start that a future release will require it), but nothing that needs a secret works without it. `AI_ENCRYPTION_KEY` is the former name, still read and still preferred where both are set
+- `JWT_SECRET` -- required, minimum 32 chars. `backend/src/common/jwt-secret-policy.ts` holds the rule in two severities, read by every caller through `assessJwtSecret`: missing or shorter than 32 is **fatal** (`jwtSecretFatalProblem`, refused by `checkClusterBoot` and `JwtStrategy`); long enough but a published placeholder, built around a placeholder phrase, fewer than 8 distinct characters or one repeated unit is **weak** (`jwtSecretWeakness`) and boots, reported by the boot warning (`logJwtSecretStatus`), the weekly `JWT_SECRET_WEAK` admin system alert and the admin-only banner behind `GET /admin/deployment-status`. Weak is not refused because replacing it has consequences an operator must plan (below)
+- `ENCRYPTION_KEY` -- required, minimum 32 chars; `checkClusterBoot` refuses to start without one (`missingEncryptionKeyRefusal`). Encrypts AI provider keys, emergency-access credentials, each user's backup data key and the Web Push and OIDC signing keys. A deployment that ran without one can set one safely: every encrypting path refused or skipped storing while it was unset, so nothing is stored under a key it never had (automatic backups already written stay plaintext `.json.gz`, and a local account's backups are encrypted from its next sign-in). A deployment that once had a key must restore that exact value; a different one cannot read what the old one stored. `AI_ENCRYPTION_KEY` is the former name, still read and still preferred where both are set. The `isConfigured()` refusals in the services are unreachable in a booted server and stay for entry points that build `EncryptionService` outside it
 - `DATABASE_*` -- PostgreSQL connection
 - `DEMO_MODE=true` -- enables demo restrictions, daily reset at 4 AM UTC
 - `LOCAL_AUTH_ENABLED` / `REGISTRATION_ENABLED` -- auth toggles
 - `OIDC_*` -- OpenID Connect provider config
+
+## Changing JWT_SECRET
+
+Replace a weak `JWT_SECRET` (the boot warning, the `JWT_SECRET_WEAK` alert or the admin banner said so) with `openssl rand -base64 32`, and restart. Every consequence below was traced to the code that derives from the secret; plan for them before the restart.
+
+**What stops working.** Everything signed or encrypted under the old secret:
+
+- Access tokens (`auth.module.ts`, `delegation.module.ts`) are rejected. Signed-in users are **not** signed out: refresh tokens are random values stored hashed (`token.service.ts`), so the web client's 401 handler refreshes and carries on. CSRF tokens (`csrf.guard.ts`) are refused once and the client fetches a new one the same way.
+- In-flight, short-lived artifacts fail and must be started again: a sign-in waiting for its 2FA code (the five-minute pending token), step-up and OIDC re-authentication tokens, OAuth provider interaction cookies (`oauth-provider.service.ts`), restore upload tickets, pending AI and MCP confirmations (`ai-action-signing.service.ts`, `mcp-request-state.ts`) and push chart artifacts.
+- Trusted-device cookies (the `trusted-device-cookie` key in `auth.controller.ts`) can no longer be decrypted and are ignored, so every user with 2FA is asked for a code again.
+- **TOTP secrets.** Each user's authenticator secret is encrypted under `derivePurposeKey(JWT_SECRET, "totp-encryption")` (`two-factor.service.ts`). After the change it cannot be decrypted, so every 6-digit authenticator code is answered with "Invalid verification code" (counted like a wrong code: ten in a row lock the account for 30 minutes) and the server logs `TOTP secret for user <id> cannot be decrypted`. **Backup codes keep working**: they are bcrypt hashes, checked without touching the TOTP secret.
+
+**How users get back in**, in order of preference:
+
+1. **Keep or restore the previous value** if you can; nothing above happens. A published placeholder should still be replaced, once you can follow the rest of this section.
+2. **A backup code.** A user with an unused backup code signs in with it ("Use a backup code instead"), then in Settings > Security disables 2FA with another backup code and enables it again with their authenticator. Under `FORCE_2FA=true` users cannot disable 2FA themselves, so they need step 3.
+3. **An administrator's reset.** Admin > User Management > Reset 2FA (`POST /api/v1/admin/users/:id/reset-2fa`) clears the user's TOTP secret, staged secret and backup codes, switches 2FA off, deletes their trusted devices and revokes their refresh tokens, without decrypting anything. The user signs in with their password and enrolls again; under `FORCE_2FA` they are sent to set it up at that sign-in. An administrator cannot reset their own 2FA this way.
+4. **SQL, when no administrator can sign in**: typically the administrator has 2FA and no backup code left, so cannot reach User Management. Run it against the database as its owner or a superuser (the `POSTGRES_USER` the stack was created with; the application role is subject to row-level security), for that one account, then sign in and use step 3 for everyone else. It writes exactly what the admin reset writes.
+
+   ```sql
+   -- psql, e.g. docker compose -f docker-compose.prod.yml exec postgres psql -U "$POSTGRES_USER" "$POSTGRES_DB"
+   \set email 'admin@example.com'
+   BEGIN;
+   UPDATE users
+      SET two_factor_secret = NULL, pending_two_factor_secret = NULL, backup_codes = NULL
+    WHERE lower(email) = lower(:'email');
+   UPDATE user_preferences SET two_factor_enabled = false
+    WHERE user_id IN (SELECT id FROM users WHERE lower(email) = lower(:'email'));
+   DELETE FROM trusted_devices
+    WHERE user_id IN (SELECT id FROM users WHERE lower(email) = lower(:'email'));
+   UPDATE refresh_tokens SET is_revoked = true
+    WHERE is_revoked = false
+      AND user_id IN (SELECT id FROM users WHERE lower(email) = lower(:'email'));
+   COMMIT;
+   ```
+
+   If the first statement reports `UPDATE 0`, the address matched no account.

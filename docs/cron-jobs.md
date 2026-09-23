@@ -32,7 +32,7 @@ One row per `@Cron` handler. The Cron column is the decorator's expression verba
 | `mortgage-reminder.service` | `0 08 * * *` | Daily 8 AM | Mortgage payment reminders |
 | `bill-reminder.service` | `0 08 * * *` | Daily 8 AM | Bill payment reminders |
 | `provider-outage-alert.service` | `*/10 * * * *` | Every 10 minutes | Alert the administrators when a market-data provider has been unreachable for 15 minutes, and once more when it recovers -- an in-app alert row per admin plus an email where SMTP is configured; claimed per episode with a 6-hour floor between alerts |
-| `system-alert-monitor.service` | `*/15 * * * *` | Every 15 minutes | Raise admin alerts for two deployment states nobody else reports: no `ENCRYPTION_KEY` (weekly bucket) and failing SMTP delivery (daily bucket, in-app only -- the email channel cannot report itself, and a per-recipient rejection is not counted). Deliberately not a bootstrap hook: a fresh install has no administrator yet when it boots, and Nest awaits bootstrap hooks inside `app.listen()`. The `idx_notifications_dedupe` unique index makes each row at most once per bucket across replicas |
+| `system-alert-monitor.service` | `*/15 * * * *` | Every 15 minutes | Raise admin alerts for two deployment states nobody else reports: a weak `JWT_SECRET` (`JWT_SECRET_WEAK`, weekly bucket; a missing `ENCRYPTION_KEY` used to be the other, and now refuses the boot instead) and failing SMTP delivery (daily bucket, in-app only -- the email channel cannot report itself, and a per-recipient rejection is not counted). Deliberately not a bootstrap hook: a fresh install has no administrator yet when it boots, and Nest awaits bootstrap hooks inside `app.listen()`. The `idx_notifications_dedupe` unique index makes each row at most once per bucket across replicas |
 | `budget-period-cron.service` | `0 0 1 * *` | 1st of month, midnight | Close each owner's expired budget periods and create the next month's. Claimed per owner per month with `claimOnce(BudgetPeriodRollover, ownerUserId, "<YYYY-MM>")` (UTC), so a losing replica skips the owner entirely; the claim is handed back with `releasePermanentClaim` when the owner's pass did not complete, because a claim is not a record that the work was done -- a month kept after a failure asserts a rollover that did not happen, and this cron has no later tick to notice. Nothing rolls over twice as a result: the guarded writes below are what enforce "once". A failed owner is **not** retried inside the month; see the gap in `docs/concurrency-and-idempotency.md`. The writes stay guarded underneath it -- `closePeriod` locks the OPEN period row and the next period is `ON CONFLICT (budget_id, period_start) DO NOTHING` -- and a `NoOpenPeriodError` is a logged skip, not a counted error |
 | `budget-alert.service` | `0 7 * * *` | Daily 7 AM | Budget threshold alerts |
 | `budget-alert.service` | `0 7 * * 1` | Mondays 7 AM | Weekly budget digest |
@@ -63,9 +63,11 @@ One row per `@Cron` handler. The Cron column is the decorator's expression verba
 
 The 9 AM sweep does three separable things, and the order matters. **Revocation runs
 first**, ahead of both delivery gates: voiding a returned owner's outstanding links needs
-only the database, and an install whose SMTP or encryption key has gone away must still be
-able to kill a link it already delivered. The SMTP and `ENCRYPTION_KEY` gates then stop
-the *delivery* sweep, which is inert rather than failing per contact.
+only the database, and an install whose SMTP has gone away must still be able to kill a
+link it already delivered. The SMTP gate then stops the *delivery* sweep, which is inert
+rather than failing per contact; its `ENCRYPTION_KEY` gate is unreachable in a booted
+server (the boot refuses without a key) and stays for entry points that build the
+service outside it.
 
 **Delivery is derived, not scheduled.** A grant advances the owner's
 `emergency_access_settings.grant_generation`, and a contact whose

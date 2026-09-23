@@ -94,35 +94,26 @@ describe("JwtStrategy", () => {
       );
     });
 
-    it("throws if JWT_SECRET is the .env.example placeholder", () => {
-      // 46 characters: the length floor alone admitted it, and it is public.
-      const placeholderConfig = {
-        get: jest
-          .fn()
-          .mockReturnValue("your-super-secret-jwt-key-change-in-production"),
-      };
+    it.each([
+      [
+        "the retired .env.example placeholder",
+        "your-super-secret-jwt-key-change-in-production",
+      ],
+      ["one character repeated", "x".repeat(40)],
+    ])("starts with a long-enough but weak secret (%s)", (_label, secret) => {
+      // Weak is reported (boot warning, admin alert, admin banner), never
+      // refused: replacing the secret stops every user's authenticator codes
+      // working and forgets trusted devices, so the operator decides when.
+      const weakConfig = { get: jest.fn().mockReturnValue(secret) };
 
-      expect(() => {
-        new JwtStrategy(
-          placeholderConfig as any,
-          authService as any,
-          delegationService as any,
-        );
-      }).toThrow("JWT_SECRET is still the example placeholder");
-    });
-
-    it("throws if JWT_SECRET is one character repeated", () => {
-      const repeatedConfig = {
-        get: jest.fn().mockReturnValue("x".repeat(40)),
-      };
-
-      expect(() => {
-        new JwtStrategy(
-          repeatedConfig as any,
-          authService as any,
-          delegationService as any,
-        );
-      }).toThrow("JWT_SECRET is too predictable");
+      expect(
+        () =>
+          new JwtStrategy(
+            weakConfig as any,
+            authService as any,
+            delegationService as any,
+          ),
+      ).not.toThrow();
     });
   });
 

@@ -47,51 +47,64 @@ describe("SystemAlertMonitorService", () => {
     );
   });
 
-  describe("encryption key check", () => {
-    it("raises a weekly-bucketed admin alert when neither key name supplies one", async () => {
-      await service.checkEncryptionKey(new Date("2026-08-30T12:00:00Z"));
+  describe("weak JWT_SECRET check", () => {
+    const RETIRED_PLACEHOLDER =
+      "your-super-secret-jwt-key-change-in-production";
+    const STRONG = "FkVtZprB4sKbrwNIl6YiZarB8gB9RrKoO0rt7sFg4YM=";
+
+    it("raises a weekly-bucketed admin alert carrying only the reason code", async () => {
+      env.JWT_SECRET = RETIRED_PLACEHOLDER;
+      await service.checkJwtSecret(new Date("2026-08-30T12:00:00Z"));
       expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: NotificationType.ENCRYPTION_KEY_MISSING,
+          type: NotificationType.JWT_SECRET_WEAK,
           severity: NotificationSeverity.WARNING,
-          dedupeKey: "ENCRYPTION_KEY_MISSING:2026-W35",
-          data: { system: true },
+          dedupeKey: "JWT_SECRET_WEAK:2026-W35",
+          data: { system: true, reason: "placeholder" },
         }),
       );
+      // Never the secret, nor any part of it, in anything the row stores.
+      const [input] = systemAlerts.raiseAdminAlert.mock.calls[0];
+      expect(JSON.stringify(input)).not.toContain("your-super-secret");
     });
 
-    it("stays silent when ENCRYPTION_KEY is set", async () => {
-      env.ENCRYPTION_KEY = "k".repeat(32);
-      await service.checkEncryptionKey();
+    it("tells the admin how to fix it and what fixing it costs", async () => {
+      env.JWT_SECRET = "x".repeat(40);
+      await service.checkJwtSecret();
+      const [input] = systemAlerts.raiseAdminAlert.mock.calls[0];
+      expect(input.data).toEqual({ system: true, reason: "predictable" });
+      expect(input.message).toContain("openssl rand -base64 32");
+      expect(input.message).toMatch(/stops authenticator codes from working/);
+      expect(input.message).toMatch(/backup code/);
+      expect(input.message).toMatch(/reset 2FA in User Management/);
+      expect(input.message).toContain("docs/backend/modules-and-runtime.md");
+    });
+
+    it("stays silent for a strong secret", async () => {
+      env.JWT_SECRET = STRONG;
+      await service.checkJwtSecret();
       expect(systemAlerts.raiseAdminAlert).not.toHaveBeenCalled();
     });
 
-    it("stays silent when the legacy AI_ENCRYPTION_KEY supplies the key", async () => {
-      env.AI_ENCRYPTION_KEY = "k".repeat(32);
-      await service.checkEncryptionKey();
+    it("stays silent for a fatal secret, which never boots to be swept", async () => {
+      env.JWT_SECRET = "short";
+      await service.checkJwtSecret();
       expect(systemAlerts.raiseAdminAlert).not.toHaveBeenCalled();
-    });
-
-    it("treats a key below the length floor as absent -- it cannot encrypt anything", async () => {
-      env.ENCRYPTION_KEY = "too-short";
-      await service.checkEncryptionKey(new Date("2026-08-30T12:00:00Z"));
-      expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledTimes(1);
     });
 
     it("runs on the sweep, not on bootstrap", async () => {
-      // Boot-only never fired on a fresh install (no administrator exists yet
-      // when the server first starts, so the fan-out stood down), never
-      // re-raised on the weekly bucket it is keyed on, and made Nest await a
-      // per-administrator SMTP fan-out inside `app.listen()`.
+      // Boot-only never fires on a fresh install (no administrator exists yet
+      // when the server first starts, so the fan-out stands down), never
+      // re-raises on the weekly bucket it is keyed on, and would make Nest
+      // await a per-administrator SMTP fan-out inside `app.listen()`.
       expect(
         (service as unknown as Record<string, unknown>).onApplicationBootstrap,
       ).toBeUndefined();
 
+      env.JWT_SECRET = RETIRED_PLACEHOLDER;
       await service.sweepSystemHealth(new Date("2026-08-30T12:00:00Z"));
       expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: NotificationType.ENCRYPTION_KEY_MISSING,
-        }),
+        expect.objectContaining({ type: NotificationType.JWT_SECRET_WEAK }),
       );
     });
 
@@ -99,6 +112,7 @@ describe("SystemAlertMonitorService", () => {
       // The weekly dedupe key -- not the number of sweeps -- is what bounds
       // the noise, and a raise that found no administrator has written
       // nothing to dedupe against.
+      env.JWT_SECRET = RETIRED_PLACEHOLDER;
       systemAlerts.raiseAdminAlert.mockResolvedValue({
         created: 0,
         emailed: 0,
@@ -107,15 +121,24 @@ describe("SystemAlertMonitorService", () => {
       await service.sweepSystemHealth(new Date("2026-08-30T12:15:00Z"));
       expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledTimes(2);
     });
+
+    it("no longer raises ENCRYPTION_KEY_MISSING: a keyless server does not boot", async () => {
+      await service.sweepSystemHealth(new Date("2026-08-30T12:00:00Z"));
+      expect(systemAlerts.raiseAdminAlert).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: NotificationType.ENCRYPTION_KEY_MISSING,
+        }),
+      );
+    });
   });
 
   describe("SMTP health sweep", () => {
     const now = new Date("2026-08-30T12:00:00Z");
 
-    it("is not stopped by the encryption-key check beside it", async () => {
-      // One handler, two independent facts: a configured key must not mean
+    it("is not stopped by the JWT_SECRET check beside it", async () => {
+      // One handler, two independent facts: a sound secret must not mean
       // the SMTP check is skipped, and vice versa.
-      env.ENCRYPTION_KEY = "k".repeat(32);
+      env.JWT_SECRET = "FkVtZprB4sKbrwNIl6YiZarB8gB9RrKoO0rt7sFg4YM=";
       emailService.getFailureSnapshot.mockReturnValue(
         snapshot({ lastFailureAt: new Date("2026-08-30T11:50:00Z") }),
       );

@@ -3933,8 +3933,8 @@ Source of truth     push_instance_config.vapid_private_key_enc
 Enforcement         Storage: PushConfigService.ensureKeyPair refuses to generate a
                     pair at all when EncryptionService is unconfigured, so an
                     instance without ENCRYPTION_KEY has no push rather than a
-                    plaintext secret; the operator already learns about the
-                    missing key from the weekly ENCRYPTION_KEY_MISSING alert.
+                    plaintext secret; a server without the key no longer boots
+                    (checkClusterBoot), so that branch is defence in depth.
                     Exposure: no response shape in src/push/ declares a private
                     field, and push-secret.guard.spec.ts scans the whole of src/
                     for a second reader of the column, a second caller of
@@ -4140,7 +4140,7 @@ Status              enforced
 ### INV-ALERT-001 -- a system alert is raised once, and only the insert winner emails
 
 ```text
-Statement           A system-level alert (BACKUP_FAILED, ENCRYPTION_KEY_MISSING,
+Statement           A system-level alert (BACKUP_FAILED, JWT_SECRET_WEAK,
                     PROVIDER_OUTAGE, SMTP_FAILURE, SCHEDULED_POST_FAILED, ...)
                     is materialized at most once per (recipient, dedupe key)
                     however many replicas raise it, and its admin email is sent
@@ -4727,11 +4727,13 @@ Statement           A process running under CLUSTER_MODE=multi serves traffic
 Source of truth     The environment, read by checkClusterBoot, and the state of
                     this replica's own LISTEN session.
 Enforcement         backend/src/common/cluster/cluster-mode.ts checkClusterBoot is the
-                    boot matrix as a pure function of the environment: in multi
-                    it refuses a JWT_SECRET that jwtSecretProblem refuses
-                    (missing, too short, a published placeholder; every replica
-                    derives the CSRF and OAuth cookie keys and the restore
-                    upload ticket from it), the per-pod `local` attachment
+                    boot matrix as a pure function of the environment: in
+                    every mode it refuses a JWT_SECRET that
+                    jwtSecretFatalProblem refuses (missing or too short; every
+                    replica derives the CSRF and OAuth cookie keys and the
+                    restore upload ticket from it; a long-enough but weak one
+                    boots and is reported instead) and a missing ENCRYPTION_KEY;
+                    in multi also the per-pod `local` attachment
                     provider and the automatic backup directory unless the
                     operator asserts a shared volume, and it reports every
                     refusal at once so one restart is enough. backend/src/main.ts logs

@@ -326,6 +326,10 @@ export function composeLocalizedNotificationCopy(
             "system.encryptionKeyMissing.message",
           )
         : null;
+    case NotificationType.JWT_SECRET_WEAK:
+      return data.system === true
+        ? pair("system.jwtSecretWeak.title", "system.jwtSecretWeak.message")
+        : null;
     case NotificationType.SMTP_FAILURE:
       return data.system === true && strings(data, "lastError")
         ? pair("system.smtpFailure.title", "system.smtpFailure.message", {

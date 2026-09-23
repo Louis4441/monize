@@ -60,10 +60,9 @@ export class OauthSigningKeysService {
    *
    * `null` means "carry on without one": no `ENCRYPTION_KEY`, so there is
    * nowhere to put private signing keys that is better than not storing them,
-   * and the caller keeps today's per-process behaviour. The operator already
-   * hears about the missing key at boot
-   * (`MISSING_ENCRYPTION_KEY_WARNING_LINES`), which names this among the things
-   * it costs them.
+   * and the caller keeps per-process keys. Unreachable in a booted server,
+   * which refuses to start without a key (`checkClusterBoot`); kept for the
+   * entry points that construct this service outside that path.
    *
    * The whole method runs under system context, the initial read included: the
    * provider's `onModuleInit` has no request to inherit an identity from, so a

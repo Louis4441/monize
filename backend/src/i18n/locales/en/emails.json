@@ -267,6 +267,10 @@
         "title": "Encryption key not configured",
         "message": "ENCRYPTION_KEY is not set, so backups are written unencrypted and secrets cannot be stored. A future release will refuse to start without it."
       },
+      "jwtSecretWeak": {
+        "title": "JWT_SECRET is weak",
+        "message": "JWT_SECRET is a published placeholder or too predictable, so session tokens can be forged. Generate a strong one (openssl rand -base64 32). Changing it stops authenticator codes from working and forgets trusted devices: users sign in with a backup code and set up 2FA again, and you reset 2FA in User Management for anyone without one. See docs/backend/modules-and-runtime.md (Changing JWT_SECRET) first."
+      },
       "smtpFailure": {
         "title": "Email delivery is failing",
         "message": "Monize could not send email: {{ error }}. Notifications and reminders are not being delivered."

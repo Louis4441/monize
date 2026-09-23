@@ -6,10 +6,11 @@ import {
   NotificationType,
 } from "../notification-center/entities/notification.entity";
 import {
-  ENCRYPTION_KEY_ENV,
-  resolveEncryptionKey,
-} from "../common/encryption/encryption-key";
+  JwtSecretWeakness,
+  jwtSecretWeakness,
+} from "../common/jwt-secret-policy";
 import { EmailService } from "../notifications/email.service";
+import { NOTIFICATION_EMAIL_MESSAGES } from "../notifications/notification-email-messages";
 import { SystemAlertService } from "./system-alert.service";
 
 /**
@@ -19,14 +20,26 @@ import { SystemAlertService } from "./system-alert.service";
  */
 export const SMTP_FAILURE_LOOKBACK_MS = 24 * 60 * 60_000;
 
+/** The admin-only deployment status: configuration an administrator must fix. */
+export interface DeploymentStatus {
+  /** Why `JWT_SECRET` is weak, or `null` when it is not. */
+  jwtSecretWeakness: JwtSecretWeakness | null;
+}
+
 /**
  * Watches for deployment states nobody currently reports and raises them as
  * admin system alerts:
  *
- * - **Missing encryption key** (issue #1269's silent state), re-raised once
- *   per ISO week while it stays unset. The startup log warning in `main.ts`
- *   stays; this is the in-app copy an operator who never reads container logs
- *   actually sees.
+ * - **Weak `JWT_SECRET`** (a published placeholder or a typed pattern that
+ *   is long enough to boot), re-raised once per ISO week while it stays. The
+ *   startup log warning in `main.ts` stays; this is the in-app copy an
+ *   operator who never reads container logs actually sees, and the admin
+ *   banner (`GET /admin/deployment-status`) is the third.
+ *
+ *   The missing-`ENCRYPTION_KEY` alert this sweep used to raise is gone: the
+ *   server now refuses to start without a key (`checkClusterBoot`), so the
+ *   state cannot be observed from a running process. The
+ *   `ENCRYPTION_KEY_MISSING` type stays for the rows already raised.
  *
  *   Deliberately on the sweep rather than on `onApplicationBootstrap`, for
  *   three reasons that all bit the boot-time version: a fresh install has no
@@ -58,33 +71,51 @@ export class SystemAlertMonitorService {
   ) {}
 
   /**
-   * Both checks, on one schedule. Each is independent: the encryption key is
+   * Both checks, on one schedule. Each is independent: the signing secret is
    * a fact about configuration, SMTP health a fact about the last sends, and
    * neither may stop the other from being reported.
    */
   @Cron("*/15 * * * *")
   async sweepSystemHealth(now: Date = new Date()): Promise<void> {
-    await this.checkEncryptionKey(now);
+    await this.checkJwtSecret(now);
     await this.sweepEmailHealth(now);
   }
 
-  /** `raiseAdminAlert` never throws, so nor does this. */
-  async checkEncryptionKey(now: Date = new Date()): Promise<void> {
-    const resolved = resolveEncryptionKey((name) =>
-      this.configService.get<string>(name),
+  /**
+   * What the admin banner needs to know about this deployment's configuration.
+   * A reason code only: never the secret, nor anything derived from it.
+   * Read by `GET /admin/deployment-status`, through the same rule as the alert
+   * below, so the banner and the alert cannot disagree.
+   */
+  getDeploymentStatus(): DeploymentStatus {
+    return {
+      jwtSecretWeakness:
+        jwtSecretWeakness(this.configService.get<string>("JWT_SECRET"))
+          ?.reason ?? null,
+    };
+  }
+
+  /**
+   * Raise the weak-`JWT_SECRET` alert while the secret stays weak. The rule is
+   * `jwtSecretWeakness`, the one the boot warning and the admin banner read,
+   * and the alert carries only its reason code: never the secret or any part
+   * of it. `raiseAdminAlert` never throws, so nor does this.
+   */
+  async checkJwtSecret(now: Date = new Date()): Promise<void> {
+    const weakness = jwtSecretWeakness(
+      this.configService.get<string>("JWT_SECRET"),
     );
-    if (resolved !== null) return;
+    if (weakness === null) return;
 
     await this.systemAlerts.raiseAdminAlert({
-      type: NotificationType.ENCRYPTION_KEY_MISSING,
+      type: NotificationType.JWT_SECRET_WEAK,
       severity: NotificationSeverity.WARNING,
-      title: "Encryption key not configured",
-      message:
-        `${ENCRYPTION_KEY_ENV} is not set. Backups are written unencrypted ` +
-        "and secrets (AI provider keys, emergency access) cannot be stored. " +
-        "A future release will refuse to start without it.",
-      data: { system: true },
-      dedupeKey: `ENCRYPTION_KEY_MISSING:${isoWeekBucket(now)}`,
+      // The stored English fallback is the catalog's own English, so the row
+      // and the localized copy cannot say different things.
+      title: NOTIFICATION_EMAIL_MESSAGES["system.jwtSecretWeak.title"],
+      message: NOTIFICATION_EMAIL_MESSAGES["system.jwtSecretWeak.message"],
+      data: { system: true, reason: weakness.reason },
+      dedupeKey: `JWT_SECRET_WEAK:${isoWeekBucket(now)}`,
     });
   }
 

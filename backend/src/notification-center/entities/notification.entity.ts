@@ -30,7 +30,11 @@ export enum NotificationType {
   // SystemAlertService.
   BACKUP_FAILED = "BACKUP_FAILED",
   BACKUP_PARTIAL = "BACKUP_PARTIAL",
+  // No longer raised: the server refuses to start without ENCRYPTION_KEY.
+  // Kept so the rows already raised still read and render.
   ENCRYPTION_KEY_MISSING = "ENCRYPTION_KEY_MISSING",
+  // JWT_SECRET is long enough to boot but a published placeholder or typed.
+  JWT_SECRET_WEAK = "JWT_SECRET_WEAK",
   PROVIDER_OUTAGE = "PROVIDER_OUTAGE",
   PROVIDER_RECOVERED = "PROVIDER_RECOVERED",
   SMTP_FAILURE = "SMTP_FAILURE",
@@ -72,6 +76,7 @@ export const SYSTEM_NOTIFICATION_TYPES: readonly NotificationType[] = [
   NotificationType.BACKUP_FAILED,
   NotificationType.BACKUP_PARTIAL,
   NotificationType.ENCRYPTION_KEY_MISSING,
+  NotificationType.JWT_SECRET_WEAK,
   NotificationType.PROVIDER_OUTAGE,
   NotificationType.PROVIDER_RECOVERED,
   NotificationType.SMTP_FAILURE,
