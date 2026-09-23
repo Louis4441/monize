@@ -331,7 +331,7 @@ describe("BackupEncryptionService", () => {
     });
 
     it("re-wraps under a fresh key after a password change", async () => {
-      const { user, key } = await keyedUser("old-password", "old-hash", {
+      const { user, key } = await keyedUser("old-p4ssw0rd", "old-hash", {
         passwordHash: "new-hash",
       });
       usersRepo.findOne.mockResolvedValue(user);
@@ -348,7 +348,7 @@ describe("BackupEncryptionService", () => {
       await expect(
         unwrapBackupKey(
           Buffer.from(stored.backupKeyWrap, "base64"),
-          "old-password",
+          "old-p4ssw0rd",
         ),
       ).rejects.toThrow();
     });
@@ -434,7 +434,7 @@ describe("BackupEncryptionService", () => {
     });
 
     it("uses an OIDC dedicated-password key, which has no login hash to go stale against", async () => {
-      const { user } = await keyedUser("dedicated-password", null, {
+      const { user } = await keyedUser("dedicated-p4ssw0rd", null, {
         authProvider: "oidc",
         passwordHash: null,
       });
@@ -442,7 +442,7 @@ describe("BackupEncryptionService", () => {
       const envelope = await sealedWith(await service.resolveBackupKey(user));
 
       expect(
-        (await decryptBackup(envelope, "dedicated-password")).equals(payload),
+        (await decryptBackup(envelope, "dedicated-p4ssw0rd")).equals(payload),
       ).toBe(true);
     });
 
@@ -450,7 +450,7 @@ describe("BackupEncryptionService", () => {
       // A reset link, an admin or an emergency claim changed the hash without
       // re-wrapping. A backup under the old password is a file the user cannot
       // open; better an unencrypted one until the next sign-in.
-      const { user } = await keyedUser("old-password", "old-hash", {
+      const { user } = await keyedUser("old-p4ssw0rd", "old-hash", {
         passwordHash: "new-hash",
       });
 
@@ -524,22 +524,22 @@ describe("BackupEncryptionService", () => {
           authProvider: "oidc",
           passwordHash: null,
           backupEncryptionEnabled: true,
-          backupPasswordEnc: "enc:dedicated-password",
+          backupPasswordEnc: "enc:dedicated-p4ssw0rd",
         });
 
         const envelope = await sealedWith(await service.resolveBackupKey(user));
 
         expect(bcrypt.compare).not.toHaveBeenCalled();
         expect(
-          (await decryptBackup(envelope, "dedicated-password")).equals(payload),
+          (await decryptBackup(envelope, "dedicated-p4ssw0rd")).equals(payload),
         ).toBe(true);
         const [criteria, stored] = onlyUpdate();
         expect(criteria).toEqual({
           id: userId,
-          backupPasswordEnc: "enc:dedicated-password",
+          backupPasswordEnc: "enc:dedicated-p4ssw0rd",
         });
         expect(stored.backupKeyPasswordRef).toBeNull();
-        await expectNoRecoverablePassword(stored, "dedicated-password");
+        await expectNoRecoverablePassword(stored, "dedicated-p4ssw0rd");
       });
 
       it("still encrypts this backup when the conversion write fails", async () => {
@@ -565,13 +565,13 @@ describe("BackupEncryptionService", () => {
         const result = await service.resolveBackupKey(
           makeUser({
             backupEncryptionEnabled: true,
-            backupPasswordEnc: "enc:old-password",
+            backupPasswordEnc: "enc:old-p4ssw0rd",
           }),
         );
 
         expect(result).toEqual({ status: "none" });
         expect(usersRepo.update).toHaveBeenCalledWith(
-          { id: userId, backupPasswordEnc: "enc:old-password" },
+          { id: userId, backupPasswordEnc: "enc:old-p4ssw0rd" },
           expect.objectContaining({
             backupEncryptionEnabled: false,
             backupPasswordEnc: null,
