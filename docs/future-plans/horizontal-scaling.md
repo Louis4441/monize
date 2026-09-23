@@ -114,7 +114,7 @@ no dedupe state and that the automatic backup writes with a bare
 4. **An unsafe mode refuses to boot; a sub-optimal one warns.** Refusal copies
    `assertRequiredDbFunctionsOrExit` in `backend/src/main.ts` (log the reason,
    `process.exit(1)`, before `app.listen`). Warning copies
-   `reportEncryptionKeyStatus` in the same file. The parse-and-throw shape for
+   `reportSecretStatus` in the same file. The parse-and-throw shape for
    the setting itself is `parseRlsMode` in `backend/src/common/db/rls-config.ts`.
 5. **Every process-local `Map` or `Set` that survives is allowlisted with a
    reason.** `backend/src/common/db/derived-state-writers.guard.spec.ts` does
