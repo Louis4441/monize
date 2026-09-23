@@ -7,6 +7,11 @@ import {
   RESTORABLE_TABLES,
   RESTORE_PLAN,
 } from "./restore-plan";
+import {
+  parseForeignKeys,
+  readSchema,
+  SCHEMA_PATH,
+} from "./__fixtures__/schema-foreign-keys";
 
 /**
  * Proves the restore's insertion order against the real schema.
@@ -25,68 +30,7 @@ import {
  * export succeeded and the file was valid.
  */
 
-interface ForeignKey {
-  table: string;
-  column: string;
-  referencedTable: string;
-}
-
-const SCHEMA_PATH = join(__dirname, "..", "..", "..", "database", "schema.sql");
-
-/**
- * Extracts every foreign key from schema.sql: column-level `REFERENCES`,
- * table-level `FOREIGN KEY (...) REFERENCES ...`, and the `ALTER TABLE ... ADD
- * CONSTRAINT ... FOREIGN KEY` statements the schema uses for references it
- * cannot declare inline (forward references to tables defined further down).
- */
-function parseForeignKeys(sql: string): ForeignKey[] {
-  // Strip line comments first -- several columns document their FK in a comment
-  // ("FK added after categories table"), which would otherwise match.
-  const clean = sql
-    .split("\n")
-    .map((line) => line.replace(/--.*$/, ""))
-    .join("\n");
-
-  const foreignKeys: ForeignKey[] = [];
-
-  const tableBlocks = clean.matchAll(
-    /CREATE TABLE(?: IF NOT EXISTS)?\s+(\w+)\s*\(([\s\S]*?)\n\);/g,
-  );
-  for (const [, table, body] of tableBlocks) {
-    for (const match of body.matchAll(
-      /^\s*(\w+)\s+[A-Za-z0-9_() ,]*?REFERENCES\s+(\w+)\s*\(\w+\)/gm,
-    )) {
-      foreignKeys.push({
-        table,
-        column: match[1],
-        referencedTable: match[2],
-      });
-    }
-    for (const match of body.matchAll(
-      /FOREIGN KEY\s*\((\w+)\)\s*REFERENCES\s+(\w+)\s*\(\w+\)/g,
-    )) {
-      foreignKeys.push({
-        table,
-        column: match[1],
-        referencedTable: match[2],
-      });
-    }
-  }
-
-  for (const match of clean.matchAll(
-    /ALTER TABLE\s+(?:IF EXISTS\s+)?(\w+)\s+ADD CONSTRAINT\s+\w+\s+FOREIGN KEY\s*\((\w+)\)\s*REFERENCES\s+(\w+)\s*\(\w+\)/g,
-  )) {
-    foreignKeys.push({
-      table: match[1],
-      column: match[2],
-      referencedTable: match[3],
-    });
-  }
-
-  return foreignKeys;
-}
-
-const foreignKeys = parseForeignKeys(readFileSync(SCHEMA_PATH, "utf8"));
+const foreignKeys = parseForeignKeys(readSchema());
 const insertPosition = new Map(
   RESTORE_PLAN.map((step, index) => [step.table, index]),
 );
@@ -191,6 +135,36 @@ describe("restore plan", () => {
       // A renamed or dropped column left in the list means the restore strips a
       // column that no longer exists and repairs nothing.
       expect(notAForeignKey).toEqual([]);
+    });
+
+    it("confines every repair to the restoring user's rows", () => {
+      // The Phase-3 UPDATE is keyed by an id from the uploaded file. On a table
+      // with its own user_id it is scoped by `user_id = $3`; on one without, it
+      // has to name the user-scoped parent that says whose row it is, or the
+      // UPDATE writes whichever user's row carries that id.
+      const scoped = new Map(
+        RESTORE_PLAN.map((step) => [step.table, step.scopeToUser]),
+      );
+      const unconfined = DEFERRED_FK_REPAIRS.filter((repair) =>
+        scoped.get(repair.table)
+          ? repair.ownedThrough !== undefined
+          : repair.ownedThrough === undefined ||
+            scoped.get(repair.ownedThrough.table) !== true ||
+            !foreignKeys.some(
+              (fk) =>
+                fk.table === repair.table &&
+                fk.column === repair.ownedThrough!.column &&
+                fk.referencedTable === repair.ownedThrough!.table,
+            ),
+      ).map((repair) => `${repair.table}.${repair.column}`);
+      expect(unconfined).toEqual([]);
+
+      const unscopedReference = DEFERRED_FK_REPAIRS.filter(
+        (repair) =>
+          repair.requireReferencedTable !== undefined &&
+          scoped.get(repair.requireReferencedTable) !== true,
+      ).map((repair) => `${repair.table}.${repair.column}`);
+      expect(unscopedReference).toEqual([]);
     });
 
     it("defers accounts.linked_loan_account_id", () => {

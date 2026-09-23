@@ -346,6 +346,7 @@ export class BackupRestoreDatabaseService {
   async restoreDeferredFkColumns(
     manager: EntityManager,
     data: BackupData,
+    userId: string,
   ): Promise<void> {
     const byTable = backupTables(data);
 
@@ -355,20 +356,33 @@ export class BackupRestoreDatabaseService {
     // from the backup instead of stamping. No trigger DDL: the old
     // DISABLE/ENABLE pair required table ownership, which the runtime role
     // does not have under RLS enforcement.
+    //
+    // Each one is confined to the restoring user's rows ($3). The ids come from
+    // the uploaded file; `resolveRestoreReferences` and the remap make every
+    // one of them a fresh id this restore inserted, and this predicate is what
+    // still holds if that ever stops being true -- an UPDATE keyed only by an
+    // uploaded id is an UPDATE of whichever user's row carries it.
     for (const {
       table,
       column,
       requireReferencedTable,
+      ownedThrough,
     } of DEFERRED_FK_REPAIRS) {
       const rows = byTable[table];
       if (!rows) continue;
-      const sql = requireReferencedTable
-        ? `UPDATE "${table}" SET "${column}" = $1 WHERE id = $2
-           AND EXISTS (SELECT 1 FROM "${requireReferencedTable}" WHERE id = $1)`
-        : `UPDATE "${table}" SET "${column}" = $1 WHERE id = $2`;
+      const owner = ownedThrough
+        ? `EXISTS (SELECT 1 FROM "${ownedThrough.table}" o
+             WHERE o.id = "${table}"."${ownedThrough.column}" AND o.user_id = $3)`
+        : "user_id = $3";
+      const referenced = requireReferencedTable
+        ? ` AND EXISTS (SELECT 1 FROM "${requireReferencedTable}"
+             WHERE id = $1 AND user_id = $3)`
+        : "";
+      const sql = `UPDATE "${table}" SET "${column}" = $1
+           WHERE id = $2 AND ${owner}${referenced}`;
       for (const row of rows) {
         if (row[column] != null && row.id != null) {
-          await manager.query(sql, [row[column], row.id]);
+          await manager.query(sql, [row[column], row.id, userId]);
         }
       }
     }

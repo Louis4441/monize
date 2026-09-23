@@ -7,7 +7,6 @@ import {
 } from "@nestjs/common";
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
 import * as bcrypt from "bcryptjs";
-import { randomUUID } from "crypto";
 import { gunzip } from "zlib";
 import { promisify } from "util";
 import { withScopedDb } from "../common/db/scoped-db";
@@ -20,7 +19,6 @@ import { tr } from "../i18n/translate";
 import { gemConfigFingerprint } from "../strategies/gem-signal.service";
 import { GemStrategy } from "../strategies/entities/gem-strategy.entity";
 import { GemStrategyAsset } from "../strategies/entities/gem-strategy-asset.entity";
-import { collectRowIdRemap, deepRemapIds } from "./backup-id-remap.util";
 import {
   BackupDecryptionError,
   decryptBackup,
@@ -35,6 +33,11 @@ import {
 import { restoreProcessingGate } from "./restore-processing-gate";
 import { validateRestoredNotifications } from "./notification-restore-bounds";
 import { RESTORE_PLAN } from "./restore-plan";
+import {
+  buildBackupIdRemap,
+  remapBackupIds,
+  resolveRestoreReferences,
+} from "./restore-references";
 import {
   BACKUP_VERSION,
   BackupData,
@@ -173,6 +176,21 @@ export class BackupRestoreService {
         }
 
         validateRestoredNotifications(rawData.notifications);
+
+        // Every primary key and reference in canonical UUID form, and every
+        // reference naming a row of the same file -- refused here, before the
+        // re-authentication and before anything is written, when one does not.
+        // A reference outside the file is how a crafted backup reached another
+        // user's rows (restore-references.ts); the remap below can only close
+        // the graph over ids it recognises, so recognition comes first.
+        const references = resolveRestoreReferences(rawData);
+        for (const { table, column, rows } of references.severed) {
+          this.logger.warn(
+            `Backup for user ${userId}: ${rows} ${table}.${column} value(s) ` +
+              "name rows the file does not contain; restoring them unlinked.",
+          );
+        }
+
         await this.verifyAuthentication(user, input);
 
         // A support (de-identified) backup restores like any other, but the data
@@ -192,9 +210,15 @@ export class BackupRestoreService {
         // Without this, restoring one user's backup into another user's account on
         // the SAME system would collide on the original UUIDs: the inserts would be
         // silently skipped by ON CONFLICT DO NOTHING, and the Phase-3 deferred-FK
-        // UPDATEs (keyed only by id) would mutate the OTHER user's rows.
-        const idRemap = this.buildBackupIdRemap(rawData);
-        const data = this.remapBackupIds(rawData, idRemap);
+        // UPDATEs would mutate the OTHER user's rows.
+        //
+        // The remap alone never guaranteed that. It only covers ids it recognises
+        // and references to rows the file contains; a key spelled in another UUID
+        // form, or a reference to a row the file does not carry, passed through
+        // untouched. `resolveRestoreReferences` above is what closes both, and
+        // the Phase-3 UPDATEs are additionally scoped to this user's rows.
+        const idRemap = buildBackupIdRemap(references.data);
+        const data = remapBackupIds(references.data, idRemap);
         this.rehashGemSignalFingerprints(data, idRemap);
 
         this.logger.log(`Starting backup restore for user ${userId}`);
@@ -307,7 +331,7 @@ export class BackupRestoreService {
 
                 // Phase 3: Restore deferred FK columns that were stripped during insert
                 // to avoid circular/forward reference violations.
-                await this.db.restoreDeferredFkColumns(manager, data);
+                await this.db.restoreDeferredFkColumns(manager, data, userId);
 
                 this.logger.log(`Backup restore completed for user ${userId}`);
                 // `skippedAttachments` and `unusableAiProviderKeys` are reported
@@ -641,16 +665,6 @@ export class BackupRestoreService {
   }
 
   /**
-   * Builds a map from every primary-key UUID in the backup to a freshly
-   * generated UUID. Currencies are intentionally excluded: they are shared,
-   * global rows keyed by `code` (not by a per-user UUID) and are referenced by
-   * code, so they must keep their original identifiers. Non-UUID ids (e.g.
-   * `security_prices.id` is BIGSERIAL) are also excluded -- they get a fresh
-   * value assigned by the DB on insert (see insertRows), and remapping them
-   * to UUIDs here would (a) corrupt them and (b) clobber unrelated bigint
-   * values in other columns that happen to share the same string form.
-   */
-  /**
    * Re-hash each GEM signal's `config_fingerprint` onto the remapped security
    * ids.
    *
@@ -732,41 +746,5 @@ export class BackupRestoreService {
         }
       }
     }
-  }
-
-  private buildBackupIdRemap(data: BackupData): Map<string, string> {
-    const remap = new Map<string, string>();
-    for (const [table, rows] of Object.entries(data)) {
-      if (table === "currencies" || !Array.isArray(rows)) continue;
-      collectRowIdRemap(rows, remap, randomUUID);
-    }
-    return remap;
-  }
-
-  /**
-   * Returns a deep copy of the backup with every id and every reference to an
-   * id (FK columns plus ids embedded in JSONB values such as scheduled
-   * transaction `tag_ids` or override `splits`) rewritten via the remap. The
-   * `user_id` columns are never remapped here -- they are not backup row ids,
-   * and insertRows() forces them to the restoring user. Currencies are passed
-   * through unchanged.
-   */
-  private remapBackupIds(
-    data: BackupData,
-    remap: Map<string, string>,
-  ): BackupData {
-    if (remap.size === 0) return data;
-    const result: Record<string, unknown> = { ...data };
-    for (const [table, rows] of Object.entries(data)) {
-      if (table === "currencies" || !Array.isArray(rows)) continue;
-      result[table] = rows.map((row) => this.deepRemapIds(row, remap));
-    }
-    return result as unknown as BackupData;
-  }
-
-  /** See backup-id-remap.util.ts -- shared with the support (de-identified)
-   *  export so the two walkers cannot drift. */
-  private deepRemapIds(value: unknown, remap: Map<string, string>): unknown {
-    return deepRemapIds(value, remap);
   }
 }

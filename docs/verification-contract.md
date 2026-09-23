@@ -132,6 +132,7 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-BACKUP-006 published whole or not at all | **required** | -- | -- | -- | -- | optional | **required** | -- |
 | INV-BACKUP-007 store and egress are two places | **required** | -- | -- | -- | -- | -- | -- | -- |
 | INV-BACKUP-008 no recoverable password stored | **required** | -- | -- | -- | -- | -- | -- | -- |
+| INV-BACKUP-009 restore stays inside the user's rows | **required** | **required** | **required** | -- | -- | -- | -- | -- |
 | INV-PUSH-001 subscription ownership | required | -- | **required** | required (not yet met) | -- | -- | -- | optional |
 | INV-PUSH-002 private key stays server-side | supporting | **required** | -- | -- | -- | -- | -- | -- |
 | INV-PUSH-006 channel offered only while usable | **required** | -- | optional | -- | -- | -- | -- | -- |
@@ -275,6 +276,13 @@ the outstanding half of the row and is recorded as such in task S2 rather than
 left to read as met. `INV-BACKUP-007` is pure configuration arithmetic --
 endpoint, bucket and normalised prefix -- so it needs nothing but a unit test,
 and the boot-time refusal it also calls for is that task's third stage.
+`INV-BACKUP-009` needs all three of its columns: the unit spec
+(`restore-references.spec.ts`) proves the refusal and the canonicalisation, the
+source scan in the same file proves `RESTORE_REFERENCE_COLUMNS` covers every
+foreign key and UUID column in `database/schema.sql`, and only a real database
+shows that a UUID spelling the remap missed is the same row to PostgreSQL --
+`backup-restore.integration.spec.ts`, "a crafted file naming another user's
+rows".
 
 ## 4. CI ownership
 

@@ -213,6 +213,8 @@
     "unsupportedBackupVersion": "[XX-Unsupported backup version: {{ version }}. Expected {{ expected }}-XX]",
     "missingExportedAt": "[XX-Invalid backup format: missing exportedAt-XX]",
     "tableNotAllowed": "[XX-Table {{ table }} is not allowed in backup restore-XX]",
+    "invalidRestoreIdentifier": "[XX-Invalid backup file: {{ table }}.{{ column }} holds \"{{ value }}\", which is not a valid identifier. Restore from an unmodified backup file.-XX]",
+    "unresolvedRestoreReference": "[XX-Invalid backup file: {{ table }}.{{ column }} refers to {{ referencedTable }} row {{ value }}, which the file does not contain. A backup can only restore rows that refer to other rows in the same file; restore from an unmodified backup file.-XX]",
     "encryptionNotConfigured": "[XX-Server is not configured for encryption (ENCRYPTION_KEY missing or too short)-XX]",
     "backupPasswordOidcOnly": "[XX-Backup password is only configurable for OIDC users; local users use their login password-XX]",
     "backupPasswordLocalOnly": "[XX-This account has no login password to encrypt backups with; set a backup password instead-XX]",

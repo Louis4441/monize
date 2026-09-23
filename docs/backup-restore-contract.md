@@ -143,6 +143,7 @@ delete:
 - decryption;
 - decompression, under a hard expanded-size ceiling (section 6);
 - version and envelope validation;
+- **the reference graph** (below);
 - re-authentication (section 5);
 - **staging of external attachment objects** (section 4).
 
@@ -156,6 +157,48 @@ write — the check precedes every `DELETE FROM` on every path.
 Any SQL or foreign-key error rolls the whole transaction back. The one effect
 that is not transactional is the object store; that is what makes staging-first
 necessary rather than merely tidy.
+
+### A restored reference names a row of the same file (INV-BACKUP-009)
+
+The uploaded document is untrusted, and `RLS_MODE` defaults to `off`, so the
+restore code is the only thing between a crafted file and another user's rows.
+`insertRows` forces `user_id` on the tables that have one; every other
+identifier comes from the file. That used to be enough only for the ids the
+remap recognised: a reference to a row the file did not contain (another user's
+account on a transaction, their security on a price or holding, their schedule
+on an override) was inserted verbatim, and a primary key spelled in a UUID form
+PostgreSQL accepts but `UUID_REGEX` does not (no hyphens, braces) escaped the
+remap, conflicted on insert, and was then rewritten in place by the Phase-3
+`UPDATE ... WHERE id = $2`.
+
+`resolveRestoreReferences` (`backend/src/backup/restore-references.ts`) now runs
+before re-authentication -- it is free, and it writes nothing:
+
+- every UUID primary key and reference column is canonicalised with
+  `canonicalUuid`, which accepts exactly the spellings PostgreSQL's `uuid`
+  input does; a key or reference that is not a UUID refuses the restore;
+- every reference must name a row of the referenced table **in the same file**,
+  or the restore is refused with a 400 naming the table, column and value. The
+  reference columns are `RESTORE_REFERENCE_COLUMNS`, which
+  `restore-references.spec.ts` checks against every foreign key and every scalar
+  UUID column of every restored table in `database/schema.sql`;
+- two columns a genuine export can leave dangling are set NULL instead and
+  logged (`SEVERED_WHEN_UNRESOLVED`): `transactions.linked_transaction_id`,
+  whose counterpart is another user's transaction on a cross-owner transfer --
+  so a restore now comes back with such a leg unlinked rather than re-linked
+  one-way to a row the file cannot vouch for -- and `accounts.institution_id`
+  from a backup older than the institution export.
+
+Every key is then remapped to a fresh id, so the restored graph is closed over
+rows this restore inserted. A UUID nested in a JSONB or array value
+(`tag_ids`, override `splits`, `monte_carlo_scenarios.account_ids`, report
+filters) cannot be classified by column, so one that names no row of the file is
+replaced with a fresh id that names nothing (`remapRestoreRow`); it was a stale
+reference or someone else's, and neither may come back as a working pointer.
+Finally, every Phase-3 repair is confined to the restoring user's rows --
+`user_id = $3`, or the owning parent's for a table without one
+(`DeferredFkRepair.ownedThrough`) -- as the guard that still holds if an id ever
+reaches it by another route.
 
 ## 4. Attachments: the bytes travel
 

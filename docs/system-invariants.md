@@ -115,6 +115,7 @@ implied.
 | INV-BACKUP-006 | An artifact is published whole or not at all, on every storage target | enforced |
 | INV-BACKUP-007 | The automatic backup store and the off-machine destination are two places | enforced |
 | INV-BACKUP-008 | The server stores nothing that decrypts to a user's password | partial |
+| INV-BACKUP-009 | A restore writes only the restoring user's rows, and every reference it writes names a row of the same file | enforced |
 | INV-PUSH-001 | A push subscription belongs to the authenticated caller, and no request touches another account's device | enforced |
 | INV-PUSH-002 | The VAPID private key never leaves the server, and is never stored unencrypted | enforced |
 | INV-PUSH-006 | A push channel is offered only while its key pair can actually be used | enforced |
@@ -3733,6 +3734,45 @@ Status              partial -- rows written before the change keep their
                     recoverable backup_password_enc until that user's next
                     sign-in or automatic backup converts them, and the column
                     is dropped only in a later release.
+### INV-BACKUP-009 -- a restore stays inside the restoring user's rows
+
+```text
+Statement           Restoring an uploaded backup inserts rows owned by the
+                    restoring user and updates no row it did not insert. Every
+                    UUID primary key and every reference column it writes names
+                    a row of the same file, never another user's row, whatever
+                    spelling of the UUID the file uses.
+Source of truth     The uploaded document, which is untrusted.
+Enforcement         resolveRestoreReferences (backup/restore-references.ts),
+                    before re-authentication and before any write: every UUID key
+                    and reference is canonicalised (canonicalUuid accepts every
+                    form PostgreSQL's uuid input does), and a reference that does
+                    not name a row of the referenced table in the file refuses
+                    the restore -- except the two SEVERED_WHEN_UNRESOLVED
+                    columns a genuine export can carry (a cross-owner transfer's
+                    counterpart, a legacy backup's institution), which are set
+                    NULL. Every key is then remapped to a fresh id, and a UUID
+                    nested in a JSONB or array value that names no row of the
+                    file is replaced by one that names nothing (remapRestoreRow).
+                    The Phase-3 repair UPDATEs carry user_id = $3, or the owning
+                    parent's (DeferredFkRepair.ownedThrough). The reference
+                    columns are RESTORE_REFERENCE_COLUMNS, checked against every
+                    foreign key and scalar UUID column in database/schema.sql.
+                    Holds with RLS_MODE=off, the default.
+Concurrency scope   per restore (one transaction under the maintenance lease)
+Retry semantics     A refused file is refused identically on retry; nothing was
+                    written.
+Crash semantics     n/a -- the check writes nothing.
+Failure response    400 naming the table, column and value that does not resolve.
+Required tests      Unit: restore-references.spec.ts (schema coverage in both
+                    directions; a foreign account, schedule and security; a
+                    non-hyphenated and upper-case victim id; a JSONB-embedded id;
+                    the two severed columns); restore-plan.spec.ts ("confines
+                    every repair to the restoring user's rows"). Integration:
+                    backup-restore.integration.spec.ts (a crafted file naming a
+                    second user's rows is refused and leaves both users' data
+                    untouched).
+Status              enforced
 ```
 
 ### INV-CRON-001 -- one logical effect per tick
