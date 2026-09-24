@@ -131,6 +131,9 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
   >('auto');
   const [pickerQuery, setPickerQuery] = useState<string>('');
   const [pickerCandidates, setPickerCandidates] = useState<LookupCandidate[]>([]);
+  // Bumped by Clear/Revert to remount the exchange combobox, whose internal
+  // display text does not follow a programmatic reset of a custom value.
+  const [resetNonce, setResetNonce] = useState(0);
   const [msnReady, setMsnReady] = useState<boolean | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>(
@@ -399,6 +402,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       setAssetRows([]);
     }
     setHasLookupResult(false);
+    setResetNonce((n) => n + 1);
   }, [reset, defaultValues, defaultCurrency, security]);
 
   // Drop an asset class from the user's list. The backend removes it from every
@@ -590,6 +594,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
         />
 
         <Combobox
+          key={`exchange-${resetNonce}`}
           label={t('form.exchangeLabel')}
           options={EXCHANGE_OPTIONS}
           value={watch('exchange') || ''}
