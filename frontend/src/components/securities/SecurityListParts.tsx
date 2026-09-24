@@ -248,7 +248,7 @@ export function SecurityProviderBadge({
   defaultQuoteProvider,
 }: {
   security: Security;
-  defaultQuoteProvider: 'yahoo' | 'msn';
+  defaultQuoteProvider: 'yahoo' | 'msn' | 'lse' | 'deutsche_boerse';
 }) {
   const t = useTranslations('securities');
   const effective = security.quoteProvider ?? defaultQuoteProvider;

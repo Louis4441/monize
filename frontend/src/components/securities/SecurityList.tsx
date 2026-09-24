@@ -147,7 +147,7 @@ interface SecurityRowProps {
   onDelete?: (security: Security) => void;
   getRowHandlers: (security: Security) => LongPressRowHandlers;
   index: number;
-  defaultQuoteProvider: 'yahoo' | 'msn';
+  defaultQuoteProvider: 'yahoo' | 'msn' | 'lse' | 'deutsche_boerse';
   /** The reader's own currency, so a value quoted in another one says which. */
   defaultCurrency: string;
   isHighlighted?: boolean;

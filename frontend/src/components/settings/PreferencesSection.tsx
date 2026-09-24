@@ -73,6 +73,8 @@ const TIME_FORMAT_OPTIONS = [
 const QUOTE_PROVIDER_OPTIONS = [
   { value: 'yahoo', label: 'Yahoo Finance' },
   { value: 'msn', label: 'MSN Money' },
+  { value: 'lse', label: 'LSE' },
+  { value: 'deutsche_boerse', label: 'Deutsche Börse' },
 ];
 
 /**
@@ -188,7 +190,10 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
     preferences.preferredExchanges ?? [],
     commitPreference,
   );
-  const defaultQuoteProvider = useSavedPreference<'defaultQuoteProvider', 'yahoo' | 'msn'>(
+  const defaultQuoteProvider = useSavedPreference<
+    'defaultQuoteProvider',
+    'yahoo' | 'msn' | 'lse' | 'deutsche_boerse'
+  >(
     'defaultQuoteProvider',
     preferences.defaultQuoteProvider ?? 'yahoo',
     commitPreference,
@@ -349,7 +354,7 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
                 label={t('defaultQuoteProviderLabel')}
                 options={QUOTE_PROVIDER_OPTIONS}
                 value={defaultQuoteProvider.value}
-                onChange={(e) => defaultQuoteProvider.set(e.target.value as 'yahoo' | 'msn')}
+                onChange={(e) => defaultQuoteProvider.set(e.target.value as 'yahoo' | 'msn' | 'lse' | 'deutsche_boerse')}
               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 {t('defaultQuoteProviderHelp')}

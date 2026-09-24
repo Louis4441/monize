@@ -65,7 +65,7 @@ const buildSecuritySchema = (t: (key: string) => string) => z.object({
   description: z.string().max(5000, t('validation.descriptionMax')).optional(),
   website: z.string().max(2048).optional(),
   irWebsite: z.string().max(2048).optional(),
-  quoteProvider: z.enum(['', 'yahoo', 'msn']).optional(),
+  quoteProvider: z.enum(['', 'yahoo', 'msn', 'lse', 'deutsche_boerse']).optional(),
   msnInstrumentId: z.string().max(50).optional(),
   priceChartEnabled: z.boolean().optional(),
   priceAlertPercent: z.string().optional().refine((v) => !v?.trim() || (Number.isFinite(Number(v)) && Number(v) >= 0.1 && Number(v) <= 1000), t('priceAlert.range')),
@@ -75,15 +75,19 @@ const buildSecuritySchema = (t: (key: string) => string) => z.object({
 type SecurityFormData = z.infer<ReturnType<typeof buildSecuritySchema>>;
 
 const quoteProviderOverrideOptions = [
-  { value: '', label: 'Use default' },
-  { value: 'yahoo', label: 'Yahoo Finance' },
-  { value: 'msn', label: 'MSN Money' },
+  { value: '', labelKey: 'form.providers.auto' },
+  { value: 'yahoo', labelKey: 'form.providers.yahoo' },
+  { value: 'msn', labelKey: 'form.providers.msn' },
+  { value: 'lse', labelKey: 'form.providers.lse' },
+  { value: 'deutsche_boerse', labelKey: 'form.providers.deutsche_boerse' },
 ];
 
 const lookupProviderOptions = [
   { value: 'auto', labelKey: 'form.providers.auto' },
   { value: 'yahoo', labelKey: 'form.providers.yahoo' },
   { value: 'msn', labelKey: 'form.providers.msn' },
+  { value: 'lse', labelKey: 'form.providers.lse' },
+  { value: 'deutsche_boerse', labelKey: 'form.providers.deutsche_boerse' },
 ];
 
 interface SecurityFormProps {
@@ -122,7 +126,9 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [hasLookupResult, setHasLookupResult] = useState(false);
   const [currencies, setCurrencies] = useState<CurrencyInfo[]>([]);
-  const [lookupProvider, setLookupProvider] = useState<'auto' | 'yahoo' | 'msn'>('auto');
+  const [lookupProvider, setLookupProvider] = useState<
+    'auto' | 'yahoo' | 'msn' | 'lse' | 'deutsche_boerse'
+  >('auto');
   const [pickerQuery, setPickerQuery] = useState<string>('');
   const [pickerCandidates, setPickerCandidates] = useState<LookupCandidate[]>([]);
   const [msnReady, setMsnReady] = useState<boolean | null>(null);
@@ -323,7 +329,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       if (result.exchange) details.push(`Exchange: ${result.exchange}`);
       if (result.securityType) details.push(`Type: ${result.securityType}`);
       if (result.currencyCode) details.push(`Currency: ${result.currencyCode}`);
-      if (result.provider) details.push(`Provider: ${result.provider === 'msn' ? 'MSN' : 'Yahoo'}`);
+      if (result.provider) details.push(`Provider: ${t(`form.providers.${result.provider}`)}`);
       toast.success(t('form.toasts.found', { details: details.join(', ') }));
     },
     [setValue, lookupProvider, userDefaultProvider, t],
@@ -528,7 +534,14 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
             options={lookupProviderOptions.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
             value={lookupProvider}
             onChange={(e) =>
-              setLookupProvider(e.target.value as 'auto' | 'yahoo' | 'msn')
+              setLookupProvider(
+                e.target.value as
+                  | 'auto'
+                  | 'yahoo'
+                  | 'msn'
+                  | 'lse'
+                  | 'deutsche_boerse',
+              )
             }
             className="mb-[1px] w-24"
           />
@@ -604,14 +617,20 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
         <Select
           label={t('form.quoteProviderLabel')}
           options={[
-            { value: '', label: t('form.quoteProviderUseDefault', { provider: userDefaultProvider === 'msn' ? 'MSN Money' : 'Yahoo Finance' }) },
-            ...quoteProviderOverrideOptions.slice(1),
+            { value: '', label: t('form.quoteProviderUseDefault', { provider: t(`form.providers.${userDefaultProvider}`) }) },
+            ...quoteProviderOverrideOptions
+              .slice(1)
+              .map((o) => ({ value: o.value, label: t(o.labelKey) })),
           ]}
           value={watch('quoteProvider') || ''}
           onChange={(e) =>
-            setValue('quoteProvider', (e.target.value as 'yahoo' | 'msn' | ''), {
-              shouldDirty: true,
-            })
+            setValue(
+              'quoteProvider',
+              e.target.value as 'yahoo' | 'msn' | 'lse' | 'deutsche_boerse' | '',
+              {
+                shouldDirty: true,
+              },
+            )
           }
           error={errors.quoteProvider?.message}
         />

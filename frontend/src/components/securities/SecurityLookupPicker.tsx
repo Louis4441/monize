@@ -10,7 +10,7 @@ export interface LookupCandidate {
   exchange: string | null;
   securityType: string | null;
   currencyCode: string | null;
-  provider?: 'yahoo' | 'msn';
+  provider?: 'yahoo' | 'msn' | 'lse' | 'deutsche_boerse';
   msnInstrumentId?: string | null;
 }
 
@@ -22,13 +22,29 @@ interface SecurityLookupPickerProps {
   onCancel: () => void;
 }
 
-function providerBadge(provider: 'yahoo' | 'msn' | undefined) {
+const PROVIDER_BADGE_LABELS: Record<string, string> = {
+  yahoo: 'Yahoo',
+  msn: 'MSN',
+  lse: 'LSE',
+  deutsche_boerse: 'Deutsche Börse',
+};
+
+const PROVIDER_BADGE_CLASSES: Record<string, string> = {
+  yahoo: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+  msn: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
+  lse: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
+  deutsche_boerse:
+    'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300',
+};
+
+function providerBadge(
+  provider: 'yahoo' | 'msn' | 'lse' | 'deutsche_boerse' | undefined,
+) {
   if (!provider) return null;
-  const label = provider === 'msn' ? 'MSN' : 'Yahoo';
+  const label = PROVIDER_BADGE_LABELS[provider] ?? provider;
   const cls =
-    provider === 'msn'
-      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300'
-      : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300';
+    PROVIDER_BADGE_CLASSES[provider] ??
+    'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300';
   return (
     <span className={`inline-flex items-center rounded text-xs font-medium px-2 py-0.5 ${cls}`}>
       {label}

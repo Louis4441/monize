@@ -704,7 +704,7 @@ export const investmentsApi = {
   lookupSecurityCandidates: async (
     query: string,
     preferredExchanges?: string[],
-    provider?: 'yahoo' | 'msn' | 'auto',
+    provider?: 'yahoo' | 'msn' | 'lse' | 'deutsche_boerse' | 'auto',
   ): Promise<
     Array<{
       symbol: string;
@@ -712,7 +712,7 @@ export const investmentsApi = {
       exchange: string | null;
       securityType: string | null;
       currencyCode: string | null;
-      provider?: 'yahoo' | 'msn';
+      provider?: 'yahoo' | 'msn' | 'lse' | 'deutsche_boerse';
       msnInstrumentId?: string | null;
     }>
   > => {
