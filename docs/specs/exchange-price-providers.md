@@ -80,16 +80,20 @@ as every other outbound call.
   and reported as GBP, like the other providers.
 - **A refused or unreachable upstream returns `null` (no answer), never a
   substituted figure.** An empty window returns a series with no bars.
-- **The Börse Frankfurt token endpoint is guarded by an `x-security` request
-  signature the site computes from a rotating client secret embedded in its own
-  JavaScript.** That secret is not in the captured traffic and is not ours to
-  ship. It is supplied out of band through `DEUTSCHE_BOERSE_SECURITY_SALT`
-  (documented in `.env.example`), and the signature is `md5(salt + traceId)`,
-  the scheme observed in the traffic. While the salt is unset the provider
-  reports no data rather than issuing a request the endpoint would reject, and
-  the value must be refreshed when the endpoint begins returning 401. This is a
-  known fragility, recorded here rather than hidden: a maintainer must weigh the
-  venue's terms of use before relying on it.
+- **The Börse Frankfurt market-data requests carry a client-computed signature,
+  reproduced exactly -- not a login or an API key.** The site's own public
+  JavaScript signs every request to the market-data host before a visitor has
+  authenticated anything, so it is reproducible without credentials. Verified
+  byte-for-byte against the captured traffic (`boerseSecurityHeaders`):
+  `Client-Date` is the ISO-8601 instant in Europe/Berlin; `X-Client-TraceId` is
+  `md5(Client-Date + requestUrl + salt)`; `X-Security` is `md5(now,
+  "yyyyMMddHHmm")` -- the current Frankfurt minute, with no salt. The salt is a
+  fixed constant lifted from the site's app bundle (`tracing.salt`) and bundled
+  in the code, so the provider works with no configuration; the site rotates it
+  on a rebuild, and a stale value simply makes the token endpoint answer 401 (no
+  data), never a wrong number, so refreshing it is a one-line code change. The
+  remaining honest caveats are that rotation and the venue's terms of use, which
+  a maintainer must weigh before relying on the feed.
 
 ## 5. Test matrix
 

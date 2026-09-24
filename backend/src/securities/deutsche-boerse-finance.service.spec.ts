@@ -2,6 +2,7 @@ import { Logger } from "@nestjs/common";
 import {
   DeutscheBoerseFinanceService,
   WebSocketLike,
+  boerseSecurityHeaders,
 } from "./deutsche-boerse-finance.service";
 import { ProviderHealthService } from "../provider-health/provider-health.service";
 import { createTestProviderHealth } from "../test-helpers/provider-health-testing";
@@ -157,27 +158,54 @@ describe("DeutscheBoerseFinanceService", () => {
   let service: DeutscheBoerseFinanceService;
   let health: ProviderHealthService;
   let originalFetch: typeof global.fetch;
-  const originalSalt = process.env.DEUTSCHE_BOERSE_SECURITY_SALT;
 
   beforeEach(() => {
     health = createTestProviderHealth();
     service = new DeutscheBoerseFinanceService(health);
     originalFetch = global.fetch;
-    process.env.DEUTSCHE_BOERSE_SECURITY_SALT = "test-salt";
     service.wsFactory = () => new FakeSocket(FRAMES);
     jest.spyOn(Logger.prototype, "warn").mockImplementation(() => undefined);
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
-    if (originalSalt === undefined)
-      delete process.env.DEUTSCHE_BOERSE_SECURITY_SALT;
-    else process.env.DEUTSCHE_BOERSE_SECURITY_SALT = originalSalt;
     jest.restoreAllMocks();
   });
 
   it("names itself deutsche_boerse", () => {
     expect(service.name).toBe("deutsche_boerse");
+  });
+
+  describe("boerseSecurityHeaders", () => {
+    // Verified byte-for-byte against the captured token request: the site sent
+    // Client-Date 2026-09-24T09:21:48+02:00 for the instant 07:21:48.596Z, and
+    // the two md5 headers below.
+    it("reproduces the site's request signature exactly", () => {
+      const h = boerseSecurityHeaders(
+        "https://api.live.deutsche-boerse.com/v1/mdstokenservice/token",
+        new Date("2026-09-24T07:21:48.596Z"),
+      );
+      expect(h["Client-Date"]).toBe("2026-09-24T09:21:48+02:00");
+      expect(h["X-Client-TraceId"]).toBe("e602e743bed34421319a627d3b0d14cc");
+      expect(h["X-Security"]).toBe("df1c4e51a6b948acabe9b4d593f1d361");
+    });
+
+    it("uses the winter (CET) offset out of daylight saving", () => {
+      const h = boerseSecurityHeaders(
+        "https://x/",
+        new Date("2026-01-15T08:00:00.000Z"),
+      );
+      expect(h["Client-Date"]).toBe("2026-01-15T09:00:00+01:00");
+    });
+
+    it("folds the salt into the trace id but not X-Security", () => {
+      const at = new Date("2026-09-24T07:21:48.596Z");
+      const a = boerseSecurityHeaders("https://x/", at, "salt-a");
+      const b = boerseSecurityHeaders("https://x/", at, "salt-b");
+      expect(a["X-Client-TraceId"]).not.toBe(b["X-Client-TraceId"]);
+      // X-Security is salt-independent, so it stays identical.
+      expect(a["X-Security"]).toBe(b["X-Security"]);
+    });
   });
 
   describe("fetchHistoricalWindowSeries", () => {
@@ -219,18 +247,6 @@ describe("DeutscheBoerseFinanceService", () => {
       );
       const listMsg = captured!.sent.find((m) => m.includes("listTimeseries"));
       expect(listMsg).toContain("DELAYED[IE00B6R52259,EUR@ETR>STX]");
-    });
-
-    it("returns null when the security salt is not configured", async () => {
-      delete process.env.DEUTSCHE_BOERSE_SECURITY_SALT;
-      global.fetch = routeFetch();
-      const series = await service.fetchHistoricalWindowSeries(
-        "IE00B6R52259",
-        null,
-        new Date("2025-09-01T00:00:00Z"),
-        new Date("2025-10-01T00:00:00Z"),
-      );
-      expect(series).toBeNull();
     });
 
     it("returns null when the token request fails", async () => {

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { createHash, randomBytes } from "crypto";
+import { createHash } from "crypto";
 import {
   QuoteProvider,
   QuoteProviderName,
@@ -29,6 +29,18 @@ const DBG_ORIGIN = "https://live.deutsche-boerse.com";
 /** Börse Frankfurt keeps Frankfurt time; Xetra (ETR) is the primary venue. */
 const DBG_TIMEZONE = "Europe/Berlin";
 const DEFAULT_SOURCE = "ETR";
+
+/**
+ * The request-signing constant Börse Frankfurt's own public JavaScript uses to
+ * build its `X-Client-TraceId`. It is a fixed string embedded in the site's app
+ * bundle (`tracing.salt`), not a credential and not tied to any login -- the
+ * page computes the anti-scraping headers client-side with it before a visitor
+ * has authenticated anything. It is reproduced here so this provider signs the
+ * way the browser does. The site rotates it when it rebuilds the bundle; a stale
+ * value simply makes the token endpoint answer 401 and the provider return no
+ * data, never a wrong number, so refreshing it is a one-line code change.
+ */
+const DBG_SALT = "af5a8d16eb5dc49f8a72b26fd9185475c7a";
 
 const TOKEN_SAFETY_MARGIN_MS = 30_000;
 const CURRENCY_CACHE_TTL_MS = 60_000;
@@ -70,12 +82,11 @@ interface DbgTimeseriesFrame {
  * price-history page streams the bars over a websocket (`/v1/mds/ws`). Reaching
  * them, reconstructed from the browser's own traffic, is:
  *
- *  1. Obtain a short-lived market-data token from `mdstokenservice/token`. That
- *     endpoint is guarded by an `x-security` request signature the site computes
- *     from a client secret embedded in its own JavaScript. That secret is not in
- *     the captured traffic and it rotates, so it is supplied out of band through
- *     `DEUTSCHE_BOERSE_SECURITY_SALT`; without it this provider reports no answer
- *     rather than sending a request that would be rejected.
+ *  1. Obtain a short-lived market-data token from `mdstokenservice/token`. Every
+ *     request to the market-data host carries the same `Client-Date` /
+ *     `X-Client-TraceId` / `X-Security` signature the site's own public
+ *     JavaScript computes client-side (see `boerseSecurityHeaders`) -- no login,
+ *     no credential. It needs no configuration.
  *  2. Open the websocket, authenticate with the token, then ask for the daily
  *     series with `listTimeseries` for a `marketstateId` built from the ISIN, the
  *     instrument's currency and the venue (`DELAYED[<isin>,<ccy>@ETR>STX]`).
@@ -116,6 +127,12 @@ export class DeutscheBoerseFinanceService implements QuoteProvider {
     try {
       response = await fetch(url, {
         ...init,
+        // Every call to the market-data host carries the same client-computed
+        // signature the site's own JavaScript adds through its HTTP interceptor.
+        headers: {
+          ...(init.headers as Record<string, string> | undefined),
+          ...boerseSecurityHeaders(url),
+        },
         signal: AbortSignal.timeout(
           DeutscheBoerseFinanceService.FETCH_TIMEOUT_MS,
         ),
@@ -146,22 +163,6 @@ export class DeutscheBoerseFinanceService implements QuoteProvider {
     };
   }
 
-  /**
-   * The `x-client-traceid`/`x-security` pair the token endpoint requires, or
-   * `null` when the client secret is not configured. The signature is
-   * `md5(salt + traceId)` -- the scheme observed in the site's traffic; it is
-   * kept behind the env var because the salt rotates and is not ours to embed.
-   */
-  private signRequest(): { traceId: string; security: string } | null {
-    const salt = process.env.DEUTSCHE_BOERSE_SECURITY_SALT;
-    if (!salt) return null;
-    const traceId = randomBytes(16).toString("hex");
-    const security = createHash("md5")
-      .update(`${salt}${traceId}`)
-      .digest("hex");
-    return { traceId, security };
-  }
-
   private async ensureToken(): Promise<string | null> {
     if (
       this.token &&
@@ -179,22 +180,10 @@ export class DeutscheBoerseFinanceService implements QuoteProvider {
   }
 
   private async mintToken(): Promise<string | null> {
-    const signature = this.signRequest();
-    if (!signature) {
-      this.logger.warn(
-        "Deutsche Börse security salt is not configured; provider is unavailable",
-      );
-      return null;
-    }
     try {
       const response = await this.request(
         `${DBG_API}/v1/mdstokenservice/token`,
-        {
-          headers: this.headers({
-            "x-client-traceid": signature.traceId,
-            "x-security": signature.security,
-          }),
-        },
+        { headers: this.headers() },
       );
       if (!response.ok) {
         this.logger.warn(
@@ -516,6 +505,93 @@ export class DeutscheBoerseFinanceService implements QuoteProvider {
   getTradingDate(quote: QuoteResult): Date {
     return getTradingDateFromQuote(quote);
   }
+}
+
+/**
+ * The `Client-Date` / `X-Client-TraceId` / `X-Security` triple Börse Frankfurt's
+ * own page computes client-side for every market-data request, reproduced
+ * exactly (verified byte-for-byte against captured traffic):
+ *
+ *   Client-Date      = ISO-8601 of `now` in Europe/Berlin, to the second, with
+ *                      the numeric offset ("2026-09-24T09:21:48+02:00").
+ *   X-Client-TraceId = md5(Client-Date + requestUrl + salt).
+ *   X-Security       = md5(now in Europe/Berlin, "yyyyMMddHHmm") -- the current
+ *                      minute; no salt, no url.
+ *
+ * The exchange keeps Frankfurt time, so the stamps are computed in that zone
+ * regardless of where the server runs. `now` is injectable for testing.
+ */
+export function boerseSecurityHeaders(
+  url: string,
+  now: Date = new Date(),
+  salt: string = DBG_SALT,
+): Record<string, string> {
+  const p = berlinParts(now);
+  const offset = berlinOffset(now, p);
+  const clientDate = `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}${offset}`;
+  const minuteStamp = `${p.year}${p.month}${p.day}${p.hour}${p.minute}`;
+  return {
+    "Client-Date": clientDate,
+    "X-Client-TraceId": md5(clientDate + url + salt),
+    "X-Security": md5(minuteStamp),
+  };
+}
+
+function md5(value: string): string {
+  return createHash("md5").update(value).digest("hex");
+}
+
+interface BerlinParts {
+  year: string;
+  month: string;
+  day: string;
+  hour: string;
+  minute: string;
+  second: string;
+}
+
+/** The wall-clock fields of an instant in Europe/Berlin, each zero-padded. */
+function berlinParts(date: Date): BerlinParts {
+  const fmt = new Intl.DateTimeFormat("en-GB", {
+    timeZone: DBG_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const parts: Record<string, string> = {};
+  for (const { type, value } of fmt.formatToParts(date)) parts[type] = value;
+  // Some ICU builds render midnight as "24"; normalise it to "00".
+  const hour = parts.hour === "24" ? "00" : parts.hour;
+  return {
+    year: parts.year,
+    month: parts.month,
+    day: parts.day,
+    hour,
+    minute: parts.minute,
+    second: parts.second,
+  };
+}
+
+/** The `+HH:MM` / `-HH:MM` Europe/Berlin offset for the instant (CET or CEST). */
+function berlinOffset(date: Date, p: BerlinParts): string {
+  const asIfUtc = Date.UTC(
+    Number(p.year),
+    Number(p.month) - 1,
+    Number(p.day),
+    Number(p.hour),
+    Number(p.minute),
+    Number(p.second),
+  );
+  const minutes = Math.round((asIfUtc - date.getTime()) / 60000);
+  const sign = minutes < 0 ? "-" : "+";
+  const abs = Math.abs(minutes);
+  const hh = String(Math.trunc(abs / 60)).padStart(2, "0");
+  const mm = String(abs % 60).padStart(2, "0");
+  return `${sign}${hh}:${mm}`;
 }
 
 interface ParsedFrame {
