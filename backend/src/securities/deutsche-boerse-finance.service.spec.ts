@@ -17,14 +17,22 @@ function jsonResponse(data: unknown, ok = true, status = 200) {
 
 const TOKEN = { token: "header.payload.sig" };
 const CURRENCY = [{ currency: "EUR", isin: "IE00B6R52259" }];
-const DATA_SHEET = {
-  exchangeSymbol: "IUSQ",
-  instrumentName: {
-    originalValue: "iShares MSCI All Country World UCITS ETF USD (Acc)",
-  },
-  instrumentTypeKey: "etf",
-  isin: "IE00B6R52259",
-};
+// The global search wraps hits in nested arrays, exactly as the site returns.
+const SEARCH = [
+  [
+    {
+      isin: "IE00B6R52259",
+      wkn: null,
+      symbol: "IUSQ",
+      name: {
+        originalValue: "iShares MSCI All Country World UCITS ETF USD (Acc)",
+      },
+      type: "ETP",
+      typeName: { originalValue: "ETP" },
+      currency: "EUR",
+    },
+  ],
+];
 const FRAMES = [
   {
     date: "2025-09-23",
@@ -58,9 +66,9 @@ function routeFetch(
         (overrides.currency ?? (() => jsonResponse(CURRENCY)))(),
       );
     }
-    if (url.includes("/v1/data/data_sheet_header")) {
+    if (url.includes("/v1/global_search/")) {
       return Promise.resolve(
-        (overrides.dataSheet ?? (() => jsonResponse(DATA_SHEET)))(),
+        (overrides.search ?? (() => jsonResponse(SEARCH)))(),
       );
     }
     return Promise.resolve(jsonResponse({}, false, 404));
@@ -456,30 +464,30 @@ describe("DeutscheBoerseFinanceService", () => {
   });
 
   describe("lookupSecurity", () => {
-    it("resolves a valid ISIN with the data-sheet name and type", async () => {
+    it("finds an instrument by its Börse Frankfurt ticker through global search", async () => {
       global.fetch = routeFetch();
-      const result = await service.lookupSecurity("IE00B6R52259");
+      // Searching by the venue ticker resolves to the ISIN-addressed candidate.
+      const result = await service.lookupSecurity("IUSQ");
       expect(result).toMatchObject({
         symbol: "IE00B6R52259",
         name: "iShares MSCI All Country World UCITS ETF USD (Acc)",
-        securityType: "ETF",
+        securityType: "ETP",
         currencyCode: "EUR",
         provider: "deutsche_boerse",
       });
     });
 
-    it("falls back to the ISIN as name when the data sheet is unavailable", async () => {
-      global.fetch = routeFetch({
-        dataSheet: () => jsonResponse({}, false, 404),
-      });
-      const result = await service.lookupSecurity("IE00B6R52259");
-      expect(result?.name).toBe("IE00B6R52259");
-      expect(result?.securityType).toBeNull();
+    it("returns nothing when search has no match", async () => {
+      global.fetch = routeFetch({ search: () => jsonResponse([[]]) });
+      expect(await service.lookupSecurityMany("ZZZ")).toEqual([]);
+      expect(await service.lookupSecurity("ZZZ")).toBeNull();
     });
 
-    it("rejects a non-ISIN query", async () => {
-      global.fetch = routeFetch();
-      expect(await service.lookupSecurity("AAPL")).toBeNull();
+    it("drops a search hit without a valid ISIN", async () => {
+      global.fetch = routeFetch({
+        search: () => jsonResponse([[{ symbol: "IUSQ", isin: "not-an-isin" }]]),
+      });
+      expect(await service.lookupSecurityMany("IUSQ")).toEqual([]);
     });
   });
 

@@ -65,10 +65,13 @@ export interface WebSocketLike {
 
 export type WebSocketFactory = (url: string) => WebSocketLike;
 
-/** The fields this provider reads from the instrument data sheet. */
-interface DbgDataSheet {
-  instrumentName?: { originalValue?: string };
-  instrumentTypeKey?: string;
+/** One instrument as the Börse Frankfurt global search returns it. */
+interface DbgSearchResult {
+  isin?: string;
+  symbol?: string;
+  name?: { originalValue?: string };
+  type?: string;
+  currency?: string;
 }
 
 /** One daily bar as a `dataTimeseries` frame carries it. */
@@ -512,59 +515,70 @@ export class DeutscheBoerseFinanceService implements QuoteProvider {
     };
   }
 
-  async lookupSecurity(
+  /**
+   * Search Börse Frankfurt by symbol, name or ISIN through its global search,
+   * which answers with the instrument's ISIN, name, currency and type in one
+   * call. The candidate's symbol stays the ISIN because pricing addresses the
+   * instrument by it, but the query itself may be a ticker (e.g. `IUSQ`).
+   */
+  async lookupSecurityMany(
     query: string,
     _preferredExchanges?: string[],
-  ): Promise<SecurityLookupResult | null> {
-    // The provider is addressed by ISIN; only an ISIN-shaped query can resolve.
-    const isin = query.trim().toUpperCase();
-    if (!isIsin(isin)) return null;
-    const currency = await this.fetchCurrency(isin);
-    if (!currency) return null;
-    // The currency endpoint carries no name; the data sheet does. The symbol
-    // stays the ISIN because pricing addresses the instrument by it.
-    const sheet = await this.fetchDataSheet(isin);
-    return {
-      symbol: isin,
-      name: sheet?.name ?? isin,
-      exchange: DEFAULT_SOURCE,
-      securityType: sheet?.type ?? null,
-      currencyCode: currency,
-      provider: "deutsche_boerse",
-    };
+  ): Promise<SecurityLookupResult[]> {
+    const items = await this.globalSearch(query);
+    const results: SecurityLookupResult[] = [];
+    const seen = new Set<string>();
+    for (const item of items) {
+      const isin =
+        typeof item.isin === "string" ? item.isin.trim().toUpperCase() : "";
+      if (!isIsin(isin) || seen.has(isin)) continue;
+      seen.add(isin);
+      results.push({
+        symbol: isin,
+        name:
+          item.name?.originalValue?.trim() ||
+          (typeof item.symbol === "string" ? item.symbol : isin),
+        exchange: DEFAULT_SOURCE,
+        securityType:
+          typeof item.type === "string" ? item.type.toUpperCase() : null,
+        currencyCode:
+          typeof item.currency === "string"
+            ? item.currency.toUpperCase()
+            : null,
+        provider: "deutsche_boerse",
+      });
+    }
+    return results;
   }
 
-  /** The instrument's name and type from the data sheet, best-effort. */
-  private async fetchDataSheet(
-    isin: string,
-  ): Promise<{ name: string | null; type: string | null } | null> {
+  async lookupSecurity(
+    query: string,
+    preferredExchanges?: string[],
+  ): Promise<SecurityLookupResult | null> {
+    const many = await this.lookupSecurityMany(query, preferredExchanges);
+    return many[0] ?? null;
+  }
+
+  /** Börse Frankfurt global search: instruments matching a symbol, name or ISIN. */
+  private async globalSearch(query: string): Promise<DbgSearchResult[]> {
+    const q = query.trim();
+    if (!q) return [];
     try {
       const response = await this.request(
-        `${DBG_API}/v1/data/data_sheet_header?isin=${encodeURIComponent(isin)}`,
+        `${DBG_API}/v1/global_search/limitedsearch/en?searchTerms=${encodeURIComponent(q)}`,
         { headers: this.headers() },
       );
-      if (!response.ok) {
-        if (response.status !== 404) {
-          this.logger.warn(
-            `Deutsche Börse data sheet for ${isin} returned ${response.status}`,
-          );
-        }
-        return null;
-      }
-      const body = await this.readBody<DbgDataSheet>(response);
-      const name = body?.instrumentName?.originalValue?.trim() || null;
-      const type = body?.instrumentTypeKey
-        ? body.instrumentTypeKey.toUpperCase()
-        : null;
-      return { name, type };
+      if (!response.ok) return [];
+      const body = await this.readBody<unknown>(response);
+      return flattenSearchResults(body);
     } catch (error) {
       this.health.logFailure(
         this.logger,
         HEALTH_PROVIDER_ID,
-        `Deutsche Börse data sheet for ${isin}`,
+        `Deutsche Börse search for ${q}`,
         error,
       );
-      return null;
+      return [];
     }
   }
 
@@ -692,6 +706,23 @@ function numOrNull(value: number | undefined): number | null {
 /** Whether a string is ISIN-shaped (2 letters, 9 alphanumerics, 1 check digit). */
 function isIsin(value: string): boolean {
   return /^[A-Z]{2}[A-Z0-9]{9}\d$/.test(value.trim().toUpperCase());
+}
+
+/**
+ * The global search wraps its hits in nested arrays (`[[{...}]]`), sometimes
+ * grouped by category. Walk any depth and collect the leaf objects.
+ */
+function flattenSearchResults(body: unknown): DbgSearchResult[] {
+  const out: DbgSearchResult[] = [];
+  const visit = (node: unknown): void => {
+    if (Array.isArray(node)) {
+      for (const child of node) visit(child);
+      return;
+    }
+    if (node && typeof node === "object") out.push(node as DbgSearchResult);
+  };
+  visit(body);
+  return out;
 }
 
 /** The `exp` claim of a JWT as epoch milliseconds, or null when unreadable. */

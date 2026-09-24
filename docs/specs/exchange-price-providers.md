@@ -67,9 +67,13 @@ chain.
 
 ## 3. Deutsche Börse / Börse Frankfurt (`deutsche_boerse`)
 
-`backend/src/securities/deutsche-boerse-finance.service.ts`. Addressed by ISIN
-(e.g. `IE00B6R52259`). Börse Frankfurt streams daily history over a websocket
-rather than a REST endpoint:
+`backend/src/securities/deutsche-boerse-finance.service.ts`. **Priced** by ISIN
+(e.g. `IE00B6R52259`), but **searched** by symbol, name or ISIN through the
+global search (`api.live.deutsche-boerse.com/v1/global_search/limitedsearch/en?searchTerms=`),
+which answers with the ISIN, name, currency and type in one call -- so a lookup
+by the Frankfurt ticker (`IUSQ`) resolves to the ISIN-addressed candidate.
+Börse Frankfurt streams daily history over a websocket rather than a REST
+endpoint:
 
 1. `GET api.live.deutsche-boerse.com/v1/mdstokenservice/token` (see section 4)
    -> a market-data token (JWT, scope `websocket`, ~7 min).
