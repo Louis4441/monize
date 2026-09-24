@@ -413,24 +413,22 @@ export class DeutscheBoerseFinanceService implements QuoteProvider {
   }
 
   private async loadSeries(
-    isin: string,
+    symbol: string,
     fromDate: Date,
     toDate: Date,
   ): Promise<HistoricalSeries | null> {
-    // Börse Frankfurt is addressed by ISIN. A bare ticker reaching this provider
-    // through the fallback path must not mint a token or hit the currency
-    // endpoint for something it can never price -- short-circuit it here.
-    if (!isIsin(isin)) return null;
+    // A Deutsche Börse security is keyed by its Frankfurt ticker (e.g. IUSQ);
+    // pricing addresses the instrument by ISIN, so resolve a ticker to its ISIN
+    // through the search. An unresolvable symbol prices nothing (this provider
+    // is not a blanket fallback, so it only ever sees its own securities).
+    const isin = await this.resolveIsin(symbol);
+    if (!isin) return null;
     const token = await this.ensureToken();
     if (!token) return null;
     const currency = await this.fetchCurrency(isin);
     if (!currency) return null;
 
-    const marketstateId = this.marketstateId(
-      isin.trim().toUpperCase(),
-      currency,
-      DEFAULT_SOURCE,
-    );
+    const marketstateId = this.marketstateId(isin, currency, DEFAULT_SOURCE);
     const frames = await this.streamTimeseries(
       marketstateId,
       fromDate,
@@ -459,9 +457,27 @@ export class DeutscheBoerseFinanceService implements QuoteProvider {
     return {
       prices,
       currencyCode: currency,
-      symbol: isin.trim().toUpperCase(),
+      symbol: symbol.trim().toUpperCase(),
       exchange: DEFAULT_SOURCE,
     };
+  }
+
+  /**
+   * The ISIN a series is fetched for: the value itself when it is already an
+   * ISIN, otherwise the ISIN of the exact ticker match from the global search.
+   * `null` when a ticker resolves to no Börse Frankfurt instrument.
+   */
+  private async resolveIsin(symbol: string): Promise<string | null> {
+    const s = symbol.trim().toUpperCase();
+    if (isIsin(s)) return s;
+    for (const hit of await this.globalSearch(s)) {
+      const isin =
+        typeof hit.isin === "string" ? hit.isin.trim().toUpperCase() : "";
+      const sym =
+        typeof hit.symbol === "string" ? hit.symbol.trim().toUpperCase() : "";
+      if (sym === s && isIsin(isin)) return isin;
+    }
+    return null;
   }
 
   async fetchHistoricalSeries(
@@ -518,8 +534,8 @@ export class DeutscheBoerseFinanceService implements QuoteProvider {
   /**
    * Search Börse Frankfurt by symbol, name or ISIN through its global search,
    * which answers with the instrument's ISIN, name, currency and type in one
-   * call. The candidate's symbol stays the ISIN because pricing addresses the
-   * instrument by it, but the query itself may be a ticker (e.g. `IUSQ`).
+   * call. The candidate's symbol is the Frankfurt ticker (e.g. `IUSQ`); pricing
+   * resolves it back to the ISIN it addresses the instrument by.
    */
   async lookupSecurityMany(
     query: string,
@@ -533,8 +549,12 @@ export class DeutscheBoerseFinanceService implements QuoteProvider {
         typeof item.isin === "string" ? item.isin.trim().toUpperCase() : "";
       if (!isIsin(isin) || seen.has(isin)) continue;
       seen.add(isin);
+      const symbol =
+        typeof item.symbol === "string" && item.symbol.trim()
+          ? item.symbol.trim().toUpperCase()
+          : isin;
       results.push({
-        symbol: isin,
+        symbol,
         name:
           item.name?.originalValue?.trim() ||
           (typeof item.symbol === "string" ? item.symbol : isin),

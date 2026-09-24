@@ -322,17 +322,29 @@ describe("DeutscheBoerseFinanceService", () => {
       expect(series!.currencyCode).toBe("EUR");
     });
 
-    it("short-circuits a non-ISIN symbol without any network call", async () => {
-      const fetchMock = routeFetch();
-      global.fetch = fetchMock;
+    it("prices a ticker symbol by resolving it to an ISIN", async () => {
+      global.fetch = routeFetch();
+      service.wsFactory = () => new FakeSocket(FRAMES);
       const series = await service.fetchHistoricalWindowSeries(
-        "AAPL",
+        "IUSQ",
+        null,
+        new Date("2025-09-01T00:00:00Z"),
+        new Date("2025-10-01T00:00:00Z"),
+      );
+      expect(series).not.toBeNull();
+      expect(series!.symbol).toBe("IUSQ");
+      expect(series!.prices).toHaveLength(2);
+    });
+
+    it("returns null for a symbol the search cannot resolve", async () => {
+      global.fetch = routeFetch({ search: () => jsonResponse([[]]) });
+      const series = await service.fetchHistoricalWindowSeries(
+        "NOPE",
         null,
         new Date("2025-09-01T00:00:00Z"),
         new Date("2025-10-01T00:00:00Z"),
       );
       expect(series).toBeNull();
-      expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it("skips frames with no date or no close", async () => {
@@ -466,10 +478,10 @@ describe("DeutscheBoerseFinanceService", () => {
   describe("lookupSecurity", () => {
     it("finds an instrument by its Börse Frankfurt ticker through global search", async () => {
       global.fetch = routeFetch();
-      // Searching by the venue ticker resolves to the ISIN-addressed candidate.
+      // Searching by the venue ticker returns the ticker as the symbol.
       const result = await service.lookupSecurity("IUSQ");
       expect(result).toMatchObject({
-        symbol: "IE00B6R52259",
+        symbol: "IUSQ",
         name: "iShares MSCI All Country World UCITS ETF USD (Acc)",
         securityType: "ETP",
         currencyCode: "EUR",
