@@ -19,11 +19,21 @@ listing on another exchange.
 
 Both are new values of `QuoteProviderName`
 (`backend/src/securities/providers/quote-provider.interface.ts`), selectable as a
-per-security override or the user default, and take part in the same
-primary-then-fallback resolution (`QuoteProviderRegistry`) and the same currency
+per-security override or the user default, and go through the same currency
 acceptance check as Yahoo and MSN. `QUOTE_PROVIDER_NAMES` is the single source of
 truth the DTO validators and the `quote_provider` / `default_quote_provider`
-CHECK constraints read.
+CHECK constraints read (bound by `quote-provider-names.guard.spec.ts`).
+
+**Search and price-refresh treat the exchange providers differently, on
+purpose.** A lookup (`lookupSecurityCandidates`, `provider: auto`) aggregates
+candidates from *every* provider so a security's own venue surfaces alongside the
+ticker providers, and the user picks the listing they hold. Price refresh does
+not: `QuoteProviderRegistry.resolveForSecurity` only ever falls back to the
+general ticker providers (`GENERAL_FALLBACK_PROVIDERS` = Yahoo, MSN), never to an
+exchange-specific provider a security did not opt into -- otherwise a US ticker
+that merely collides with a same-currency London or Frankfurt listing could be
+silently repriced from it. An exchange provider prices a security only when that
+security names it.
 
 The retrieval mechanics were reconstructed from captured browser traffic of each
 venue's own price-history page; neither venue publishes a documented public API,
@@ -31,9 +41,13 @@ so section 4 records the operational caveats honestly.
 
 ## 2. London Stock Exchange (`lse`)
 
-`backend/src/securities/lse-finance.service.ts`. Addressed by TIDM (e.g.
-`AGGU`). The LSE company page serves its chart from a third-party widget backend
-(financial.com, an LSEG partner). The chain, all through the circuit breaker:
+`backend/src/securities/lse-finance.service.ts`. Priced by TIDM (e.g. `AGGU`),
+but **searched** by ISIN, TIDM or name through the LSE autocomplete
+(`api.londonstockexchange.com/api/gw/lse/search/autocomplete?q=&size=5`), keeping
+only the real LSE listings (`islse`) and enriching each with its master record
+for a currency. That is what lets a lookup by ISIN surface the London listing.
+The LSE company page serves its chart from a third-party widget backend
+(financial.com, an LSEG partner). The price chain, all through the circuit breaker:
 
 1. Build the Reuters Instrument Code as `<TIDM>.L` (the LSE convention).
 2. `GET api.londonstockexchange.com/api/gw/feedhandler/token/saml` -> a SAML

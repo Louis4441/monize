@@ -8,6 +8,21 @@ import { QuoteProvider, QuoteProviderName } from "./quote-provider.interface";
 
 export const DEFAULT_QUOTE_PROVIDER: QuoteProviderName = "yahoo";
 
+/**
+ * Providers that price a security from its bare ticker and so may back up any
+ * security's primary provider. The exchange-specific providers (`lse`,
+ * `deutsche_boerse`) are addressed by a venue identifier (a London TIDM, a
+ * Börse Frankfurt ISIN), not a generic ticker, so a symbol that merely collides
+ * with a listing on those venues must never be repriced from them: they take
+ * part only when a security explicitly names one as its provider, never as a
+ * blanket fallback (which would let a US ticker be priced from a same-symbol
+ * London line in the same currency).
+ */
+const GENERAL_FALLBACK_PROVIDERS: ReadonlySet<QuoteProviderName> = new Set([
+  "yahoo",
+  "msn",
+]);
+
 @Injectable()
 export class QuoteProviderRegistry {
   constructor(
@@ -35,9 +50,14 @@ export class QuoteProviderRegistry {
   }
 
   /**
-   * Return providers in order [primary, fallback] for a security.
-   * Primary = security override, else user default, else "yahoo".
-   * Fallback = the other provider (if any).
+   * Return the providers to try in order for a security: the primary first, then
+   * the general (ticker-based) providers as fallback.
+   *
+   * Primary = security override, else user default, else "yahoo". The fallback is
+   * only `GENERAL_FALLBACK_PROVIDERS` (never an exchange-specific provider the
+   * security did not opt into), so a Yahoo/MSN security is never silently
+   * repriced from a same-symbol LSE or Börse Frankfurt listing. An
+   * exchange-specific primary still keeps the general providers behind it.
    */
   resolveForSecurity(
     security: Pick<Security, "quoteProvider">,
@@ -50,7 +70,9 @@ export class QuoteProviderRegistry {
 
     const providers: QuoteProvider[] = [this.getByName(primary)];
     for (const p of this.listAll()) {
-      if (p.name !== primary) providers.push(p);
+      if (p.name === primary) continue;
+      if (!GENERAL_FALLBACK_PROVIDERS.has(p.name)) continue;
+      providers.push(p);
     }
     return providers;
   }

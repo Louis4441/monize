@@ -285,7 +285,7 @@ describe("DeutscheBoerseFinanceService", () => {
       expect(series).toBeNull();
     });
 
-    it("returns an empty-priced series with no frames rather than crashing", async () => {
+    it("treats an empty window (authenticated, no frames) as an empty answer", async () => {
       global.fetch = routeFetch();
       service.wsFactory = () => new FakeSocket([]);
       const series = await service.fetchHistoricalWindowSeries(
@@ -294,8 +294,24 @@ describe("DeutscheBoerseFinanceService", () => {
         new Date("2025-09-01T00:00:00Z"),
         new Date("2025-10-01T00:00:00Z"),
       );
-      // No frames: the exchange produced no answer.
+      // A holiday-only or just-listed window is an answer with no bars, not a
+      // failure: a series with empty prices, never null.
+      expect(series).not.toBeNull();
+      expect(series!.prices).toHaveLength(0);
+      expect(series!.currencyCode).toBe("EUR");
+    });
+
+    it("short-circuits a non-ISIN symbol without any network call", async () => {
+      const fetchMock = routeFetch();
+      global.fetch = fetchMock;
+      const series = await service.fetchHistoricalWindowSeries(
+        "AAPL",
+        null,
+        new Date("2025-09-01T00:00:00Z"),
+        new Date("2025-10-01T00:00:00Z"),
+      );
       expect(series).toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it("skips frames with no date or no close", async () => {

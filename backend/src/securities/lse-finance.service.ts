@@ -61,6 +61,16 @@ interface LseInstrument {
   lastpricedate: string | null;
 }
 
+/** One match from the LSE search autocomplete endpoint. */
+interface LseAutocompleteInstrument {
+  tidm?: string;
+  code?: string;
+  description?: string;
+  category?: string;
+  /** `true` for a real LSE listing; null/absent for a mirror or venue entry. */
+  islse?: boolean | null;
+}
+
 /** One daily bar as the financial.com timeseries endpoint returns it. */
 interface LseTimeseriesRow {
   _DATE_END?: string;
@@ -320,8 +330,13 @@ export class LseFinanceService implements QuoteProvider {
     const gbx = isGbxCurrency(instrument.currency);
     const price = (v: number | null): number | undefined =>
       v == null ? undefined : gbx ? convertGbxToGbp(v) : v;
-    const time = instrument.lastpricedate
-      ? Math.floor(new Date(instrument.lastpricedate).getTime() / 1000)
+    // An unparseable date must not become a NaN epoch that then corrupts
+    // quoted_at and the derived trading date; only a real timestamp is used.
+    const parsedTime = instrument.lastpricedate
+      ? new Date(instrument.lastpricedate).getTime()
+      : NaN;
+    const time = Number.isFinite(parsedTime)
+      ? Math.floor(parsedTime / 1000)
       : undefined;
 
     return {
@@ -413,16 +428,20 @@ export class LseFinanceService implements QuoteProvider {
       return null;
     }
 
-    // The currency the bars are in is the instrument's own, read separately;
-    // the series carries it to the acceptance point so the numbers are never
-    // stored against a security in the wrong currency.
+    // The currency the bars are in is the instrument's own, read separately.
+    // Without it we cannot tell pence from pounds, so a GBX series would be
+    // stored 100x too large; withhold the whole answer rather than guess, and
+    // the caller keeps its previous data. (An unverifiable currency is a
+    // different, safe outcome only when the numbers are already in one unit.)
     const instrument = await this.fetchInstrument(symbol);
-    const gbx = isGbxCurrency(instrument?.currency);
-    const currencyCode = instrument?.currency
-      ? gbx
-        ? "GBP"
-        : instrument.currency
-      : null;
+    if (!instrument?.currency) {
+      this.logger.warn(
+        `LSE currency unknown for ${ric}; withholding historical series`,
+      );
+      return null;
+    }
+    const gbx = isGbxCurrency(instrument.currency);
+    const currencyCode = gbx ? "GBP" : instrument.currency;
 
     const prices: HistoricalPrice[] = [];
     for (const row of rows) {
@@ -451,10 +470,43 @@ export class LseFinanceService implements QuoteProvider {
     };
   }
 
-  async lookupSecurity(
+  /**
+   * The LSE search autocomplete matches a query by ISIN, TIDM or name and
+   * returns the listings it finds; only the real LSE lines (`islse`) are kept,
+   * so a Turquoise or venue-mirror entry does not masquerade as the main-market
+   * listing. Each kept listing is enriched with its master record so the
+   * candidate carries a currency.
+   */
+  async lookupSecurityMany(
     query: string,
     _preferredExchanges?: string[],
+  ): Promise<SecurityLookupResult[]> {
+    const instruments = await this.autocomplete(query);
+    const results: SecurityLookupResult[] = [];
+    for (const inst of instruments) {
+      if (inst.islse !== true || !inst.tidm) continue;
+      const detail = await this.fetchInstrument(inst.tidm);
+      const gbx = isGbxCurrency(detail?.currency);
+      results.push({
+        symbol: inst.tidm,
+        name: detail?.name ?? inst.description ?? inst.tidm,
+        exchange: detail?.market ?? "LSE",
+        securityType: detail?.instrumenttype ?? null,
+        currencyCode: detail?.currency ? (gbx ? "GBP" : detail.currency) : null,
+        provider: "lse",
+      });
+    }
+    return results;
+  }
+
+  async lookupSecurity(
+    query: string,
+    preferredExchanges?: string[],
   ): Promise<SecurityLookupResult | null> {
+    const many = await this.lookupSecurityMany(query, preferredExchanges);
+    if (many.length > 0) return many[0];
+
+    // Nothing from search: treat the query as a bare TIDM (the pre-search path).
     const instrument = await this.fetchInstrument(query);
     if (!instrument) return null;
     const gbx = isGbxCurrency(instrument.currency);
@@ -470,6 +522,33 @@ export class LseFinanceService implements QuoteProvider {
         : null,
       provider: "lse",
     };
+  }
+
+  /** LSE search autocomplete: instruments matching an ISIN, TIDM or name. */
+  private async autocomplete(
+    query: string,
+  ): Promise<LseAutocompleteInstrument[]> {
+    const q = query.trim();
+    if (!q) return [];
+    try {
+      const response = await this.request(
+        `${LseFinanceService.PAGE_API}/api/gw/lse/search/autocomplete?q=${encodeURIComponent(q)}&size=5`,
+        { headers: this.pageHeaders() },
+      );
+      if (!response.ok) return [];
+      const body = await this.readBody<{
+        instruments?: LseAutocompleteInstrument[];
+      }>(response);
+      return Array.isArray(body.instruments) ? body.instruments : [];
+    } catch (error) {
+      this.health.logFailure(
+        this.logger,
+        HEALTH_PROVIDER_ID,
+        `LSE search for ${q}`,
+        error,
+      );
+      return [];
+    }
   }
 
   /**

@@ -29,6 +29,29 @@ const ALLDATA_USD = {
   lastpricedate: "2026-09-24T07:07:54.000",
 };
 
+const AUTOCOMPLETE = {
+  instruments: [
+    {
+      url: "https://www.londonstockexchange.com/stock/AGGU/ishares",
+      code: "IE00BZ043R46",
+      tidm: "AGGU",
+      description: "ISHARES III PLC ISH GLOBAL AGG BOND ETF USD HEDGED ACC",
+      category: "ETFS",
+      islse: true,
+    },
+    {
+      url: "https://www.londonstockexchange.com/turquoise-stock/E:AGGUL",
+      code: "IE00BZ043R46",
+      tidm: "AGGUL",
+      description: "ISHARES CORE GLB AGG USD-H A",
+      category: "TURQUOISE",
+      islse: null,
+    },
+  ],
+  issuers: [],
+  news: [],
+};
+
 const SAML = { encodedToken: "ENCODED_SAML" };
 const SESSION = { sid: "sid-1", token: "jwt-token", expiresAt: 4102444800 };
 const TIMESERIES = {
@@ -55,6 +78,11 @@ function routeFetch(
   overrides: Partial<Record<string, () => Response>> = {},
 ): jest.Mock {
   return jest.fn((url: string) => {
+    if (url.includes("/search/autocomplete")) {
+      return Promise.resolve(
+        (overrides.autocomplete ?? (() => jsonResponse(AUTOCOMPLETE)))(),
+      );
+    }
     if (url.includes("/instruments/alldata/")) {
       return Promise.resolve(
         (overrides.alldata ?? (() => jsonResponse(ALLDATA_USD)))(),
@@ -139,6 +167,16 @@ describe("LseFinanceService", () => {
       });
       expect(await service.fetchQuote("NOPE")).toBeNull();
     });
+
+    it("omits regularMarketTime when lastpricedate is unparseable", async () => {
+      global.fetch = routeFetch({
+        alldata: () =>
+          jsonResponse({ ...ALLDATA_USD, lastpricedate: "24/09/2026 09:00" }),
+      });
+      const quote = await service.fetchQuote("AGGU");
+      expect(quote).not.toBeNull();
+      expect(quote?.regularMarketTime).toBeUndefined();
+    });
   });
 
   describe("fetchHistoricalWindowSeries", () => {
@@ -185,6 +223,19 @@ describe("LseFinanceService", () => {
       );
       expect(series!.currencyCode).toBe("GBP");
       expect(series!.prices[0].close).toBeCloseTo(5.5, 5);
+    });
+
+    it("withholds the series when the instrument currency is unknown", async () => {
+      // Timeseries answers, but the separate instrument fetch has no currency:
+      // storing GBX bars unconverted would be a 100x error, so answer nothing.
+      global.fetch = routeFetch({ alldata: () => jsonResponse({}) });
+      const series = await service.fetchHistoricalWindowSeries(
+        "AGGU",
+        null,
+        new Date("2026-03-01T00:00:00Z"),
+        new Date("2026-07-01T00:00:00Z"),
+      );
+      expect(series).toBeNull();
     });
 
     it("returns null when the SAML session cannot be minted", async () => {
@@ -316,9 +367,31 @@ describe("LseFinanceService", () => {
 
     it("returns null for an unknown instrument", async () => {
       global.fetch = routeFetch({
+        autocomplete: () => jsonResponse({ instruments: [] }),
         alldata: () => jsonResponse({}, false, 404),
       });
       expect(await service.lookupSecurity("NOPE")).toBeNull();
+    });
+
+    it("finds the LSE listing by ISIN through search autocomplete", async () => {
+      global.fetch = routeFetch();
+      const results = await service.lookupSecurityMany("IE00BZ043R46");
+      // Only the real LSE listing (islse true) is kept; the Turquoise mirror is
+      // dropped, and the candidate carries the currency from its master record.
+      expect(results).toHaveLength(1);
+      expect(results[0]).toMatchObject({
+        symbol: "AGGU",
+        currencyCode: "USD",
+        exchange: "MAINMARKET",
+        provider: "lse",
+      });
+    });
+
+    it("returns nothing when search has no LSE match", async () => {
+      global.fetch = routeFetch({
+        autocomplete: () => jsonResponse({ instruments: [] }),
+      });
+      expect(await service.lookupSecurityMany("ZZZ")).toEqual([]);
     });
   });
 

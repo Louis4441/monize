@@ -36,49 +36,39 @@ describe("QuoteProviderRegistry", () => {
     expect(registry.getByName("deutsche_boerse").name).toBe("deutsche_boerse");
   });
 
-  it("resolveForSecurity honors the security's explicit override", () => {
+  it("resolveForSecurity honors the override and falls back to general providers only", () => {
     const security = { quoteProvider: "msn" } as Security;
     const ordered = registry.resolveForSecurity(security, "yahoo");
-    expect(ordered.map((p) => p.name)).toEqual([
-      "msn",
-      "yahoo",
-      "lse",
-      "deutsche_boerse",
-    ]);
+    // Exchange-specific providers are never a blanket fallback.
+    expect(ordered.map((p) => p.name)).toEqual(["msn", "yahoo"]);
   });
 
-  it("resolveForSecurity puts an LSE override first", () => {
+  it("resolveForSecurity keeps general providers behind an exchange-specific primary", () => {
     const security = { quoteProvider: "lse" } as Security;
     const ordered = registry.resolveForSecurity(security, "yahoo");
-    expect(ordered[0].name).toBe("lse");
-    expect(ordered.map((p) => p.name).sort()).toEqual([
+    expect(ordered.map((p) => p.name)).toEqual(["lse", "yahoo", "msn"]);
+  });
+
+  it("resolveForSecurity does not add the other exchange provider as a fallback", () => {
+    const security = { quoteProvider: "deutsche_boerse" } as Security;
+    const ordered = registry.resolveForSecurity(security, "yahoo");
+    expect(ordered.map((p) => p.name)).toEqual([
       "deutsche_boerse",
-      "lse",
-      "msn",
       "yahoo",
+      "msn",
     ]);
   });
 
   it("resolveForSecurity falls back to user default when security has no override", () => {
     const security = { quoteProvider: null } as Security;
     const ordered = registry.resolveForSecurity(security, "msn");
-    expect(ordered.map((p) => p.name)).toEqual([
-      "msn",
-      "yahoo",
-      "lse",
-      "deutsche_boerse",
-    ]);
+    expect(ordered.map((p) => p.name)).toEqual(["msn", "yahoo"]);
   });
 
   it("resolveForSecurity falls back to yahoo when both security and user have no preference", () => {
     const security = { quoteProvider: null } as Security;
     const ordered = registry.resolveForSecurity(security, null);
-    expect(ordered.map((p) => p.name)).toEqual([
-      "yahoo",
-      "msn",
-      "lse",
-      "deutsche_boerse",
-    ]);
+    expect(ordered.map((p) => p.name)).toEqual(["yahoo", "msn"]);
   });
 
   it("listAll returns every provider", () => {

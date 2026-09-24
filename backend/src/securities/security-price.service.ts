@@ -169,6 +169,22 @@ function sourceFor(provider: QuoteProviderName | undefined): string {
 }
 
 /**
+ * The providers ordered with the user's default first, the rest in registry
+ * order. Used where every provider is consulted -- lookup aggregation and the
+ * authoritative-currency probe -- rather than the narrower price-refresh
+ * fallback in `QuoteProviderRegistry.resolveForSecurity`.
+ */
+function orderProvidersByDefault(
+  providers: QuoteProvider[],
+  defaultName: QuoteProviderName | null | undefined,
+): QuoteProvider[] {
+  const primary = defaultName ?? DEFAULT_QUOTE_PROVIDER;
+  return [...providers].sort(
+    (a, b) => (b.name === primary ? 1 : 0) - (a.name === primary ? 1 : 0),
+  );
+}
+
+/**
  * A security is eligible for price refresh when skipPriceUpdates is false,
  * OR the user has explicitly opted in by setting a per-security provider
  * override or supplying an MSN Instrument ID. The latter exists because
@@ -1182,19 +1198,26 @@ export class SecurityPriceService {
       return fetchFromProvider(this.providers.getByName(provider));
     }
 
-    // auto: try the user's primary provider first; only fall back to the
-    // secondary provider when the primary returns no candidates. Mirrors
-    // fetchQuoteWithFallback so lookups respect the same Primary/Secondary
-    // preference used during price refresh.
-    const ordered = this.providers.resolveForSecurity(
-      { quoteProvider: null },
+    // auto: aggregate candidates from every provider, the user's default first,
+    // so a security's own exchange surfaces alongside the ticker providers -- an
+    // LSE line searched by its TIDM, a Börse Frankfurt line searched by ISIN --
+    // and the user picks the listing they actually hold. Search is where the
+    // exchange-specific providers earn their place; price refresh keeps the
+    // narrower general-provider fallback (resolveForSecurity).
+    const aggregated: SecurityLookupResult[] = [];
+    const seen = new Set<string>();
+    for (const p of orderProvidersByDefault(
+      this.providers.listAll(),
       ctx.defaultQuoteProvider,
-    );
-    for (const p of ordered) {
-      const results = await fetchFromProvider(p);
-      if (results.length > 0) return results;
+    )) {
+      for (const result of await fetchFromProvider(p)) {
+        const key = `${result.symbol}|${result.exchange ?? ""}`.toUpperCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        aggregated.push(result);
+      }
     }
-    return [];
+    return aggregated;
   }
 
   /**
@@ -1214,8 +1237,8 @@ export class SecurityPriceService {
       defaultQuoteProvider: DEFAULT_QUOTE_PROVIDER,
       preferredExchanges: [],
     };
-    const ordered = this.providers.resolveForSecurity(
-      { quoteProvider: null },
+    const ordered = orderProvidersByDefault(
+      this.providers.listAll(),
       ctx.defaultQuoteProvider,
     );
     for (const p of ordered) {

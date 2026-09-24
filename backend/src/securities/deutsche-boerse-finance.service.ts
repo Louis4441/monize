@@ -260,9 +260,9 @@ export class DeutscheBoerseFinanceService implements QuoteProvider {
 
   /**
    * Run one websocket exchange: authenticate, request the daily series for the
-   * window, and resolve the streamed frames. Rejections and a socket that never
-   * authenticates are counted against the breaker; a clean set of frames is a
-   * success.
+   * window, and resolve the streamed frames. A socket that errors or closes
+   * before authenticating is a transport failure the breaker counts; anything
+   * after authentication -- frames, or an empty window -- is an answer.
    */
   private async streamTimeseries(
     marketstateId: string,
@@ -291,7 +291,10 @@ export class DeutscheBoerseFinanceService implements QuoteProvider {
       let settled = false;
       let idleTimer: ReturnType<typeof setTimeout> | undefined;
 
-      const finish = (result: DbgTimeseriesFrame[] | null) => {
+      const finish = (
+        result: DbgTimeseriesFrame[] | null,
+        outcome: "answer" | "transport",
+      ) => {
         if (settled) return;
         settled = true;
         if (idleTimer) clearTimeout(idleTimer);
@@ -301,15 +304,21 @@ export class DeutscheBoerseFinanceService implements QuoteProvider {
         } catch {
           // A socket that never opened has nothing to close.
         }
-        if (result && result.length > 0) {
+        if (outcome === "answer") {
+          // The exchange authenticated and answered. An empty window (a holiday
+          // span, a just-listed instrument) is a valid answer, not a failure --
+          // recording it as one would open the breaker for every security over
+          // one dataless ISIN, which is exactly what LSE's empty result avoids.
           this.health.recordSuccess(HEALTH_PROVIDER_ID);
         } else {
-          // No frames means the exchange did not produce an answer. Treat it
-          // like a transport miss so a probe slot is not held open.
-          const counted = this.health.recordFailure(
-            HEALTH_PROVIDER_ID,
-            new Error("no timeseries frames"),
+          // The socket errored or closed before it authenticated: a real
+          // transport failure the breaker must count, so a websocket outage
+          // opens it rather than retrying every ISIN for the full timeout.
+          const error = Object.assign(
+            new Error("Deutsche Börse websocket failed before delivering data"),
+            { code: "ECONNRESET" },
           );
+          const counted = this.health.recordFailure(HEALTH_PROVIDER_ID, error);
           if (!counted && admission === "probe") {
             this.health.releaseProbe(HEALTH_PROVIDER_ID);
           }
@@ -318,13 +327,21 @@ export class DeutscheBoerseFinanceService implements QuoteProvider {
       };
 
       const hardTimer = setTimeout(
-        () => finish(frames.length ? frames : null),
+        () =>
+          finish(
+            authenticated ? frames : null,
+            authenticated ? "answer" : "transport",
+          ),
         WS_TOTAL_TIMEOUT_MS,
       );
 
+      // Only armed after authentication, so an idle stream is always an answer.
       const armIdle = () => {
         if (idleTimer) clearTimeout(idleTimer);
-        idleTimer = setTimeout(() => finish(frames), WS_IDLE_TIMEOUT_MS);
+        idleTimer = setTimeout(
+          () => finish(frames, "answer"),
+          WS_IDLE_TIMEOUT_MS,
+        );
       };
 
       socket.addEventListener("open", () => {
@@ -367,11 +384,21 @@ export class DeutscheBoerseFinanceService implements QuoteProvider {
       });
 
       socket.addEventListener("error", () => {
-        finish(frames.length ? frames : null);
+        // An error with data already in hand keeps the data; otherwise it is a
+        // transport failure.
+        finish(
+          frames.length ? frames : null,
+          frames.length ? "answer" : "transport",
+        );
       });
 
       socket.addEventListener("close", () => {
-        finish(frames.length ? frames : null);
+        // A close after authentication ends the stream normally (frames or an
+        // empty window); a close before it is a connection failure.
+        finish(
+          authenticated ? frames : null,
+          authenticated ? "answer" : "transport",
+        );
       });
     });
   }
@@ -381,6 +408,10 @@ export class DeutscheBoerseFinanceService implements QuoteProvider {
     fromDate: Date,
     toDate: Date,
   ): Promise<HistoricalSeries | null> {
+    // Börse Frankfurt is addressed by ISIN. A bare ticker reaching this provider
+    // through the fallback path must not mint a token or hit the currency
+    // endpoint for something it can never price -- short-circuit it here.
+    if (!isIsin(isin)) return null;
     const token = await this.ensureToken();
     if (!token) return null;
     const currency = await this.fetchCurrency(isin);
@@ -481,7 +512,7 @@ export class DeutscheBoerseFinanceService implements QuoteProvider {
   ): Promise<SecurityLookupResult | null> {
     // The provider is addressed by ISIN; only an ISIN-shaped query can resolve.
     const isin = query.trim().toUpperCase();
-    if (!/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin)) return null;
+    if (!isIsin(isin)) return null;
     const currency = await this.fetchCurrency(isin);
     if (!currency) return null;
     return {
@@ -613,6 +644,11 @@ function parseFrame(data: unknown): ParsedFrame | null {
 
 function numOrNull(value: number | undefined): number | null {
   return value == null || isNaN(Number(value)) ? null : Number(value);
+}
+
+/** Whether a string is ISIN-shaped (2 letters, 9 alphanumerics, 1 check digit). */
+function isIsin(value: string): boolean {
+  return /^[A-Z]{2}[A-Z0-9]{9}\d$/.test(value.trim().toUpperCase());
 }
 
 /** The `exp` claim of a JWT as epoch milliseconds, or null when unreadable. */
