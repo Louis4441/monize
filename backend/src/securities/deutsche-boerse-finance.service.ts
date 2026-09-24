@@ -74,6 +74,13 @@ interface DbgSearchResult {
   currency?: string;
 }
 
+/** The fields this provider reads from the ISIN-keyed data sheet. */
+interface DbgDataSheet {
+  exchangeSymbol?: string;
+  instrumentName?: { originalValue?: string };
+  instrumentTypeKey?: string;
+}
+
 /** One daily bar as a `dataTimeseries` frame carries it. */
 interface DbgTimeseriesFrame {
   date?: string;
@@ -532,10 +539,12 @@ export class DeutscheBoerseFinanceService implements QuoteProvider {
   }
 
   /**
-   * Search Börse Frankfurt by symbol, name or ISIN through its global search,
-   * which answers with the instrument's ISIN, name, currency and type in one
-   * call. The candidate's symbol is the Frankfurt ticker (e.g. `IUSQ`); pricing
-   * resolves it back to the ISIN it addresses the instrument by.
+   * Search Börse Frankfurt by symbol, name or ISIN through its global search.
+   * A ticker query answers with the symbol, name, currency and type inline; an
+   * ISIN query omits the symbol and currency, so every hit is enriched from the
+   * ISIN-keyed data sheet (ticker, name, type) and the currency endpoint when
+   * those fields are missing. The candidate's symbol is the Frankfurt ticker
+   * (e.g. `IUSQ`); pricing resolves it back to the ISIN it addresses.
    */
   async lookupSecurityMany(
     query: string,
@@ -549,26 +558,68 @@ export class DeutscheBoerseFinanceService implements QuoteProvider {
         typeof item.isin === "string" ? item.isin.trim().toUpperCase() : "";
       if (!isIsin(isin) || seen.has(isin)) continue;
       seen.add(isin);
-      const symbol =
-        typeof item.symbol === "string" && item.symbol.trim()
-          ? item.symbol.trim().toUpperCase()
-          : isin;
+
+      let symbol = upperOrNull(item.symbol);
+      let name = item.name?.originalValue?.trim() || null;
+      let type = upperOrNull(item.type);
+      let currency = upperOrNull(item.currency);
+
+      if (!symbol || !name || !type) {
+        const sheet = await this.fetchDataSheet(isin);
+        symbol ??= sheet?.symbol ?? null;
+        name ??= sheet?.name ?? null;
+        type ??= sheet?.type ?? null;
+      }
+      // A candidate must carry a currency, or the security would be created
+      // without one; the currency endpoint is the ISIN-keyed source.
+      if (!currency) currency = await this.fetchCurrency(isin);
+
       results.push({
-        symbol,
-        name:
-          item.name?.originalValue?.trim() ||
-          (typeof item.symbol === "string" ? item.symbol : isin),
+        symbol: symbol ?? isin,
+        name: name ?? symbol ?? isin,
         exchange: DEFAULT_SOURCE,
-        securityType:
-          typeof item.type === "string" ? item.type.toUpperCase() : null,
-        currencyCode:
-          typeof item.currency === "string"
-            ? item.currency.toUpperCase()
-            : null,
+        securityType: type,
+        currencyCode: currency,
         provider: "deutsche_boerse",
       });
     }
     return results;
+  }
+
+  /** The ticker, name and type from the ISIN-keyed data sheet, best-effort. */
+  private async fetchDataSheet(isin: string): Promise<{
+    symbol: string | null;
+    name: string | null;
+    type: string | null;
+  } | null> {
+    try {
+      const response = await this.request(
+        `${DBG_API}/v1/data/data_sheet_header?isin=${encodeURIComponent(isin)}`,
+        { headers: this.headers() },
+      );
+      if (!response.ok) {
+        if (response.status !== 404) {
+          this.logger.warn(
+            `Deutsche Börse data sheet for ${isin} returned ${response.status}`,
+          );
+        }
+        return null;
+      }
+      const body = await this.readBody<DbgDataSheet>(response);
+      return {
+        symbol: upperOrNull(body?.exchangeSymbol),
+        name: body?.instrumentName?.originalValue?.trim() || null,
+        type: upperOrNull(body?.instrumentTypeKey),
+      };
+    } catch (error) {
+      this.health.logFailure(
+        this.logger,
+        HEALTH_PROVIDER_ID,
+        `Deutsche Börse data sheet for ${isin}`,
+        error,
+      );
+      return null;
+    }
   }
 
   async lookupSecurity(
@@ -721,6 +772,13 @@ function parseFrame(data: unknown): ParsedFrame | null {
 
 function numOrNull(value: number | undefined): number | null {
   return value == null || isNaN(Number(value)) ? null : Number(value);
+}
+
+/** A non-empty string trimmed and upper-cased, or null. */
+function upperOrNull(value: unknown): string | null {
+  return typeof value === "string" && value.trim()
+    ? value.trim().toUpperCase()
+    : null;
 }
 
 /** Whether a string is ISIN-shaped (2 letters, 9 alphanumerics, 1 check digit). */

@@ -33,6 +33,16 @@ const SEARCH = [
     },
   ],
 ];
+
+// The data sheet is ISIN-keyed and carries the ticker (exchangeSymbol).
+const DATA_SHEET = {
+  exchangeSymbol: "IUSQ",
+  instrumentName: {
+    originalValue: "iShares MSCI All Country World UCITS ETF USD (Acc)",
+  },
+  instrumentTypeKey: "etf",
+  isin: "IE00B6R52259",
+};
 const FRAMES = [
   {
     date: "2025-09-23",
@@ -69,6 +79,11 @@ function routeFetch(
     if (url.includes("/v1/global_search/")) {
       return Promise.resolve(
         (overrides.search ?? (() => jsonResponse(SEARCH)))(),
+      );
+    }
+    if (url.includes("/v1/data/data_sheet_header")) {
+      return Promise.resolve(
+        (overrides.dataSheet ?? (() => jsonResponse(DATA_SHEET)))(),
       );
     }
     return Promise.resolve(jsonResponse({}, false, 404));
@@ -484,6 +499,32 @@ describe("DeutscheBoerseFinanceService", () => {
         symbol: "IUSQ",
         name: "iShares MSCI All Country World UCITS ETF USD (Acc)",
         securityType: "ETP",
+        currencyCode: "EUR",
+        provider: "deutsche_boerse",
+      });
+    });
+
+    it("enriches the ticker and currency when search omits them (ISIN query)", async () => {
+      // An ISIN query returns the hit without a symbol or currency; the data
+      // sheet supplies the ticker and the currency endpoint the currency.
+      global.fetch = routeFetch({
+        search: () =>
+          jsonResponse([
+            [
+              {
+                isin: "IE00B6R52259",
+                name: {
+                  originalValue:
+                    "iShares MSCI All Country World UCITS ETF USD (Acc)",
+                },
+              },
+            ],
+          ]),
+      });
+      const result = await service.lookupSecurity("IE00B6R52259");
+      expect(result).toMatchObject({
+        symbol: "IUSQ",
+        securityType: "ETF",
         currencyCode: "EUR",
         provider: "deutsche_boerse",
       });
