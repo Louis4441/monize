@@ -156,7 +156,16 @@ function trackPriceWrite<T>(work: Promise<T>): Promise<T> {
 }
 
 function sourceFor(provider: QuoteProviderName | undefined): string {
-  return provider === "msn" ? "msn_finance" : "yahoo_finance";
+  switch (provider) {
+    case "msn":
+      return "msn_finance";
+    case "lse":
+      return "lse";
+    case "deutsche_boerse":
+      return "deutsche_boerse";
+    default:
+      return "yahoo_finance";
+  }
 }
 
 /**
@@ -1140,7 +1149,7 @@ export class SecurityPriceService {
     userId: string,
     query: string,
     preferredExchanges?: string[],
-    provider?: "yahoo" | "msn" | "auto",
+    provider?: "yahoo" | "msn" | "lse" | "deutsche_boerse" | "auto",
   ): Promise<SecurityLookupResult[]> {
     const contexts = await this.loadUserContexts([userId]);
     const ctx = contexts.get(userId) || {
@@ -1169,7 +1178,7 @@ export class SecurityPriceService {
       }
     };
 
-    if (provider === "yahoo" || provider === "msn") {
+    if (provider && provider !== "auto") {
       return fetchFromProvider(this.providers.getByName(provider));
     }
 

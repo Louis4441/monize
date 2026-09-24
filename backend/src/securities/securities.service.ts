@@ -97,7 +97,7 @@ export interface CreateSecurityPreview {
   exchange: string | null;
   currencyCode: string;
   isFavourite: boolean;
-  quoteProvider: "yahoo" | "msn" | null;
+  quoteProvider: "yahoo" | "msn" | "lse" | "deutsche_boerse" | null;
   msnInstrumentId: string | null;
 }
 
@@ -1243,7 +1243,7 @@ export class SecuritiesService {
     input: {
       query: string;
       exchange?: string;
-      provider?: "yahoo" | "msn" | "auto";
+      provider?: "yahoo" | "msn" | "lse" | "deutsche_boerse" | "auto";
     },
   ): Promise<LlmSecurityLookup> {
     const query = (input.query ?? "").trim();

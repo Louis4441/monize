@@ -703,9 +703,9 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
         },
         provider: {
           type: "string",
-          enum: ["yahoo", "msn", "auto"],
+          enum: ["yahoo", "msn", "lse", "deutsche_boerse", "auto"],
           description:
-            "Optional quote provider to query: 'yahoo', 'msn', or 'auto' (the user's configured default, the recommended choice). Omit for 'auto'.",
+            "Optional quote provider to query: 'yahoo', 'msn', 'lse' (London Stock Exchange, by ticker), 'deutsche_boerse' (Börse Frankfurt, by ISIN), or 'auto' (the user's configured default, the recommended choice). Omit for 'auto'.",
         },
       },
       required: ["search"],

@@ -14,6 +14,8 @@
 export const TRACKED_PROVIDERS = {
   yahoo_finance: "Yahoo Finance",
   msn_finance: "MSN Finance",
+  lse: "London Stock Exchange",
+  deutsche_boerse: "Deutsche Börse",
   google_places: "Google Places",
 } as const;
 

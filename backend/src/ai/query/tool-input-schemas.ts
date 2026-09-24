@@ -296,7 +296,9 @@ export const managePayeesSchema = z.object({
 export const lookupSecuritiesSchema = z.object({
   search: z.string().min(1).max(100),
   exchange: z.enum(SECURITY_EXCHANGES).optional(),
-  provider: z.enum(["yahoo", "msn", "auto"]).optional(),
+  provider: z
+    .enum(["yahoo", "msn", "lse", "deutsche_boerse", "auto"])
+    .optional(),
 });
 
 export const manageSecuritiesSchema = z.object({

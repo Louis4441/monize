@@ -1,6 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { MsnFinanceService } from "../msn-finance.service";
 import { YahooFinanceService } from "../yahoo-finance.service";
+import { LseFinanceService } from "../lse-finance.service";
+import { DeutscheBoerseFinanceService } from "../deutsche-boerse-finance.service";
 import { Security } from "../entities/security.entity";
 import { QuoteProvider, QuoteProviderName } from "./quote-provider.interface";
 
@@ -11,14 +13,25 @@ export class QuoteProviderRegistry {
   constructor(
     private readonly yahoo: YahooFinanceService,
     private readonly msn: MsnFinanceService,
+    private readonly lse: LseFinanceService,
+    private readonly deutscheBoerse: DeutscheBoerseFinanceService,
   ) {}
 
   getByName(name: QuoteProviderName): QuoteProvider {
-    return name === "msn" ? this.msn : this.yahoo;
+    switch (name) {
+      case "msn":
+        return this.msn;
+      case "lse":
+        return this.lse;
+      case "deutsche_boerse":
+        return this.deutscheBoerse;
+      default:
+        return this.yahoo;
+    }
   }
 
   listAll(): QuoteProvider[] {
-    return [this.yahoo, this.msn];
+    return [this.yahoo, this.msn, this.lse, this.deutscheBoerse];
   }
 
   /**

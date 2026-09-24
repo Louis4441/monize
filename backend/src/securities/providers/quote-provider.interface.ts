@@ -1,4 +1,21 @@
-export type QuoteProviderName = "yahoo" | "msn";
+/**
+ * The quote providers a security can be priced by, as one list.
+ *
+ * This array is the single source of truth: the `QuoteProviderName` union is
+ * derived from it, and the DTO validators (`@IsIn(QUOTE_PROVIDER_NAMES)` on the
+ * per-security override and the user default) and the database CHECK on
+ * `quote_provider` / `default_quote_provider` all read the same set. Adding a
+ * provider means one entry here plus the paired migration -- never a second
+ * hand-written list of the same names that can drift out of step.
+ */
+export const QUOTE_PROVIDER_NAMES = [
+  "yahoo",
+  "msn",
+  "lse",
+  "deutsche_boerse",
+] as const;
+
+export type QuoteProviderName = (typeof QUOTE_PROVIDER_NAMES)[number];
 
 export interface QuoteResult {
   symbol: string;

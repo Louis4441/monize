@@ -384,9 +384,25 @@ describe("SecurityPriceService", () => {
 
     health = createTestProviderHealth();
     yahoo = new YahooFinanceService(health);
+    // LSE and Deutsche Börse take part in the auto fallback order; the price
+    // service tests exercise Yahoo/MSN, so these stand in as inert no-ops that
+    // add no fetches and answer nothing, exactly as the msn double does.
+    const inertProvider = (name: string) =>
+      ({
+        name,
+        fetchQuote: jest.fn().mockResolvedValue(null),
+        fetchHistorical: jest.fn().mockResolvedValue(null),
+        fetchHistoricalSeries: jest.fn().mockResolvedValue(null),
+        lookupSecurity: jest.fn().mockResolvedValue(null),
+        fetchStockSectorInfo: jest.fn().mockResolvedValue(null),
+        fetchEtfSectorWeightings: jest.fn().mockResolvedValue(null),
+        getTradingDate: jest.fn(() => new Date()),
+      }) as never;
     const providers = new QuoteProviderRegistry(
       yahoo,
       msnFinanceService as never,
+      inertProvider("lse"),
+      inertProvider("deutsche_boerse"),
     );
 
     fetchSync = createFetchSyncMock();
