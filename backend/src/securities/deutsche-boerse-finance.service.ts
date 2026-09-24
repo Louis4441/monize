@@ -65,6 +65,12 @@ export interface WebSocketLike {
 
 export type WebSocketFactory = (url: string) => WebSocketLike;
 
+/** The fields this provider reads from the instrument data sheet. */
+interface DbgDataSheet {
+  instrumentName?: { originalValue?: string };
+  instrumentTypeKey?: string;
+}
+
 /** One daily bar as a `dataTimeseries` frame carries it. */
 interface DbgTimeseriesFrame {
   date?: string;
@@ -515,14 +521,51 @@ export class DeutscheBoerseFinanceService implements QuoteProvider {
     if (!isIsin(isin)) return null;
     const currency = await this.fetchCurrency(isin);
     if (!currency) return null;
+    // The currency endpoint carries no name; the data sheet does. The symbol
+    // stays the ISIN because pricing addresses the instrument by it.
+    const sheet = await this.fetchDataSheet(isin);
     return {
       symbol: isin,
-      name: isin,
+      name: sheet?.name ?? isin,
       exchange: DEFAULT_SOURCE,
-      securityType: null,
+      securityType: sheet?.type ?? null,
       currencyCode: currency,
       provider: "deutsche_boerse",
     };
+  }
+
+  /** The instrument's name and type from the data sheet, best-effort. */
+  private async fetchDataSheet(
+    isin: string,
+  ): Promise<{ name: string | null; type: string | null } | null> {
+    try {
+      const response = await this.request(
+        `${DBG_API}/v1/data/data_sheet_header?isin=${encodeURIComponent(isin)}`,
+        { headers: this.headers() },
+      );
+      if (!response.ok) {
+        if (response.status !== 404) {
+          this.logger.warn(
+            `Deutsche Börse data sheet for ${isin} returned ${response.status}`,
+          );
+        }
+        return null;
+      }
+      const body = await this.readBody<DbgDataSheet>(response);
+      const name = body?.instrumentName?.originalValue?.trim() || null;
+      const type = body?.instrumentTypeKey
+        ? body.instrumentTypeKey.toUpperCase()
+        : null;
+      return { name, type };
+    } catch (error) {
+      this.health.logFailure(
+        this.logger,
+        HEALTH_PROVIDER_ID,
+        `Deutsche Börse data sheet for ${isin}`,
+        error,
+      );
+      return null;
+    }
   }
 
   async fetchStockSectorInfo(): Promise<StockSectorInfo | null> {
