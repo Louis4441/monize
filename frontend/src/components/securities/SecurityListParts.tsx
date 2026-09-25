@@ -139,6 +139,8 @@ export function formatPriceSource(source: string | null | undefined): string {
   switch (source) {
     case 'yahoo_finance': return 'Yahoo';
     case 'msn_finance': return 'MSN';
+    case 'lse': return 'LSE';
+    case 'deutsche_boerse': return 'Deutsche Börse';
     case 'manual': return 'Manual';
     case 'buy':
     case 'sell':
@@ -155,6 +157,10 @@ export function priceSourceBadgeClass(source: string | null | undefined): string
       return 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300';
     case 'msn_finance':
       return 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300';
+    case 'lse':
+      return 'bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300';
+    case 'deutsche_boerse':
+      return 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300';
     case 'manual':
       return 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300';
     case 'buy':
@@ -248,15 +254,12 @@ export function SecurityProviderBadge({
   defaultQuoteProvider,
 }: {
   security: Security;
-  defaultQuoteProvider: 'yahoo' | 'msn';
+  defaultQuoteProvider: 'yahoo' | 'msn' | 'lse' | 'deutsche_boerse';
 }) {
   const t = useTranslations('securities');
   const effective = security.quoteProvider ?? defaultQuoteProvider;
   const isOverride = !!security.quoteProvider;
-  const baseClass =
-    effective === 'msn'
-      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300'
-      : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300';
+  const baseClass = PROVIDER_BADGE_CLASS[effective] ?? PROVIDER_BADGE_CLASS.yahoo;
   return (
     <span
       className={`inline-flex items-center rounded text-xs font-medium px-2 py-0.5 ${baseClass} ${
@@ -264,10 +267,19 @@ export function SecurityProviderBadge({
       }`}
       title={isOverride ? t('list.providerTitle.override') : t('list.providerTitle.inherited')}
     >
-      {effective === 'msn' ? 'MSN' : 'Yahoo'}
+      {t(`form.providers.${effective}`)}
     </span>
   );
 }
+
+/** Badge colours per quote provider, shared by the provider badge. */
+const PROVIDER_BADGE_CLASS: Record<string, string> = {
+  yahoo: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
+  msn: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
+  lse: 'bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300',
+  deutsche_boerse:
+    'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
+};
 
 /**
  * Where the most recent price came from, in both layouts. A security that has

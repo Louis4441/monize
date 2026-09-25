@@ -1550,7 +1550,13 @@ export class ToolExecutorService {
   ): Promise<ToolResult> {
     const query = input.search as string;
     const exchange = input.exchange as string | undefined;
-    const provider = input.provider as "yahoo" | "msn" | "auto" | undefined;
+    const provider = input.provider as
+      | "yahoo"
+      | "msn"
+      | "lse"
+      | "deutsche_boerse"
+      | "auto"
+      | undefined;
 
     let data;
     try {

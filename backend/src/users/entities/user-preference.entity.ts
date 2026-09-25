@@ -152,7 +152,9 @@ export class UserPreference {
     length: 20,
     default: "yahoo",
   })
-  defaultQuoteProvider: "yahoo" | "msn";
+  // Written-out literals, not the QuoteProviderName alias, for the same reason
+  // as defaultMapProvider below: entity-varchar-capacity.spec.ts measures them.
+  defaultQuoteProvider: "yahoo" | "msn" | "lse" | "deutsche_boerse";
 
   /**
    * Which map service an address link opens. "device" means decide from the

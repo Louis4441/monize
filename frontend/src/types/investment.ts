@@ -25,7 +25,7 @@ export type InvestmentAction =
   | 'CAPITAL_GAIN_LONG'
   | 'REDEEM';
 
-export type QuoteProviderName = 'yahoo' | 'msn';
+export type QuoteProviderName = 'yahoo' | 'msn' | 'lse' | 'deutsche_boerse';
 
 
 export interface Security {
@@ -644,7 +644,7 @@ export interface SecurityNewsResult {
    * Which provider supplied the headlines, or null when the security's quote
    * provider supplies none. Distinguishes "nothing published" from "cannot ask".
    */
-  provider: 'yahoo' | 'msn' | null;
+  provider: QuoteProviderName | null;
   items: SecurityNewsItem[];
 }
 

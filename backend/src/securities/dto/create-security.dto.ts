@@ -18,6 +18,10 @@ import {
 import { Type } from "class-transformer";
 import { SanitizeHtml } from "../../common/decorators/sanitize-html.decorator";
 import { IsCurrencyCode } from "../../common/validators/is-currency-code.validator";
+import {
+  QUOTE_PROVIDER_NAMES,
+  QuoteProviderName,
+} from "../providers/quote-provider.interface";
 
 /**
  * One slice of a manual allocation breakdown (e.g. a country and its share of
@@ -191,11 +195,11 @@ export class CreateSecurityDto {
     description:
       "Per-security provider override; omit or null to use the user default",
     required: false,
-    enum: ["yahoo", "msn"],
+    enum: QUOTE_PROVIDER_NAMES,
   })
   @IsOptional()
-  @IsIn(["yahoo", "msn"])
-  quoteProvider?: "yahoo" | "msn";
+  @IsIn([...QUOTE_PROVIDER_NAMES])
+  quoteProvider?: QuoteProviderName;
 
   @ApiProperty({
     example: "a1u3p2",

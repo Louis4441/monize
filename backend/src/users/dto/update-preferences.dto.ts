@@ -15,6 +15,10 @@ import {
 } from "class-validator";
 import { IsDashboardWidgetConfig } from "../validators/is-dashboard-widget-config.validator";
 import { IsNumberLocale } from "../../common/validators/is-number-locale.validator";
+import {
+  QUOTE_PROVIDER_NAMES,
+  QuoteProviderName,
+} from "../../securities/providers/quote-provider.interface";
 
 /**
  * Map services an address link can be sent to.
@@ -267,11 +271,11 @@ export class UpdatePreferencesDto {
     description:
       "Default provider for stock quotes. Per-security overrides fall back to this value.",
     example: "yahoo",
-    enum: ["yahoo", "msn"],
+    enum: QUOTE_PROVIDER_NAMES,
   })
   @IsOptional()
-  @IsIn(["yahoo", "msn"])
-  defaultQuoteProvider?: "yahoo" | "msn";
+  @IsIn([...QUOTE_PROVIDER_NAMES])
+  defaultQuoteProvider?: QuoteProviderName;
 
   @ApiPropertyOptional({
     description:

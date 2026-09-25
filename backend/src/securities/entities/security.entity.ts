@@ -172,7 +172,7 @@ export class Security {
   @ApiProperty({
     example: "yahoo",
     description:
-      "Per-security quote provider override ('yahoo' | 'msn'); NULL = use user default",
+      "Per-security quote provider override ('yahoo' | 'msn' | 'lse' | 'deutsche_boerse'); NULL = use user default",
     nullable: true,
   })
   @Column({
@@ -181,7 +181,9 @@ export class Security {
     nullable: true,
     name: "quote_provider",
   })
-  quoteProvider: "yahoo" | "msn" | null;
+  // Written-out literals, not the QuoteProviderName alias: entity-varchar-capacity.spec.ts
+  // reads this annotation to check the longest value against the column width.
+  quoteProvider: "yahoo" | "msn" | "lse" | "deutsche_boerse" | null;
 
   @ApiProperty({
     example: "a1u3p2",

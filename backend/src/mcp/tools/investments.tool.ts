@@ -1577,7 +1577,7 @@ export class McpInvestmentsTools {
       exchange: string | null;
       currencyCode: string;
       isFavourite: boolean;
-      quoteProvider: "yahoo" | "msn" | null;
+      quoteProvider: "yahoo" | "msn" | "lse" | "deutsche_boerse" | null;
       msnInstrumentId: string | null;
     },
   ) {

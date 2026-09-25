@@ -142,7 +142,9 @@
     "providers": {
       "auto": "[XX-Auto-XX]",
       "yahoo": "[XX-Yahoo-XX]",
-      "msn": "[XX-MSN-XX]"
+      "msn": "[XX-MSN-XX]",
+      "lse": "[XX-LSE-XX]",
+      "deutsche_boerse": "[XX-Deutsche Börse-XX]"
     },
     "types": {
       "select": "[XX-Select type...-XX]",

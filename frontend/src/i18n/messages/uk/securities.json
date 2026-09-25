@@ -142,7 +142,9 @@
     "providers": {
       "auto": "Авто",
       "yahoo": "Yahoo",
-      "msn": "MSN"
+      "msn": "MSN",
+      "lse": "LSE",
+      "deutsche_boerse": "Deutsche Börse"
     },
     "types": {
       "select": "Оберіть тип...",

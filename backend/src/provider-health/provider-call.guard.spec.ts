@@ -58,6 +58,8 @@ describe("outbound provider calls are answerable to the breaker", () => {
     );
     expect(callers.map((file) => file.path).sort()).toEqual([
       "payees/lookup/google-places/google-places.client.ts",
+      "securities/deutsche-boerse-finance.service.ts",
+      "securities/lse-finance.service.ts",
       "securities/msn-finance.service.ts",
       "securities/security-news.service.ts",
       "securities/yahoo-finance.service.ts",

@@ -17,6 +17,8 @@ import { SecurityToolPrepService } from "./security-tool-prep.service";
 import { SecurityPriceService } from "./security-price.service";
 import { YahooFinanceService } from "./yahoo-finance.service";
 import { MsnFinanceService } from "./msn-finance.service";
+import { LseFinanceService } from "./lse-finance.service";
+import { DeutscheBoerseFinanceService } from "./deutsche-boerse-finance.service";
 import { QuoteProviderRegistry } from "./providers/quote-provider.registry";
 import { HoldingsService } from "./holdings.service";
 import { HoldingsDriftReportService } from "./holdings-drift-report.service";
@@ -78,6 +80,8 @@ import { ProviderHealthModule } from "../provider-health/provider-health.module"
     SecurityPriceService,
     YahooFinanceService,
     MsnFinanceService,
+    LseFinanceService,
+    DeutscheBoerseFinanceService,
     QuoteProviderRegistry,
     HoldingsService,
     HoldingsDriftReportService,
@@ -108,6 +112,8 @@ import { ProviderHealthModule } from "../provider-health/provider-health.module"
     SecurityPriceService,
     YahooFinanceService,
     MsnFinanceService,
+    LseFinanceService,
+    DeutscheBoerseFinanceService,
     QuoteProviderRegistry,
     HoldingsService,
     InvestmentTransactionsService,

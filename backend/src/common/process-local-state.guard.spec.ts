@@ -252,6 +252,14 @@ const ALLOWED = new Map<string, string>([
     "provider instrument-id lookups; a miss costs one resolution call",
   ],
   [
+    "securities/lse-finance.service.ts#instrumentCache",
+    "short-TTL LSE instrument master (currency, name); a miss costs one lookup",
+  ],
+  [
+    "securities/deutsche-boerse-finance.service.ts#currencyCache",
+    "short-TTL Deutsche Börse ISIN currency; a miss costs one lookup",
+  ],
+  [
     "securities/portfolio-summary-memo.ts#entries",
     "a request-coalescing memo keyed by user, scope, currency and the acting " +
       "identity, held for seconds; its invalidation is announced on the " +

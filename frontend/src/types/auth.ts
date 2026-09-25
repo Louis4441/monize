@@ -174,7 +174,7 @@ export interface UserPreferences {
   showCreatedAt: boolean;
   timeFormat: '24h' | '12h';
   preferredExchanges: string[];
-  defaultQuoteProvider: 'yahoo' | 'msn';
+  defaultQuoteProvider: 'yahoo' | 'msn' | 'lse' | 'deutsche_boerse';
   /** Which map service an address link opens; 'device' decides from the platform. */
   defaultMapProvider: MapProvider;
   recentTransactionsLimit: number;
@@ -321,7 +321,7 @@ export interface UpdatePreferencesData {
   showCreatedAt?: boolean;
   timeFormat?: '24h' | '12h';
   preferredExchanges?: string[];
-  defaultQuoteProvider?: 'yahoo' | 'msn';
+  defaultQuoteProvider?: 'yahoo' | 'msn' | 'lse' | 'deutsche_boerse';
   defaultMapProvider?: MapProvider;
   recentTransactionsLimit?: number;
   aiBubbleEnabled?: boolean;
