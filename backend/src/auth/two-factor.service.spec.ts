@@ -118,6 +118,7 @@ describe("TwoFactorService", () => {
     usersRepository = {
       findOne: jest.fn(),
       save: jest.fn().mockImplementation((u) => Promise.resolve(u)),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
       create: jest.fn().mockImplementation((dto) => dto),
       createQueryBuilder: jest.fn().mockReturnValue({
         update: jest.fn().mockReturnThis(),
@@ -577,15 +578,138 @@ describe("TwoFactorService", () => {
       const result = await service.disable2FA("user-1", "123456");
 
       expect(result.message).toContain("disabled successfully");
-      const savedUser = usersRepository.save.mock.calls[0][0];
-      expect(savedUser.twoFactorSecret).toBeNull();
+      // Checked against the row locked for update, in the transaction that
+      // writes.
+      expect(usersRepository.findOne).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        lock: { mode: "pessimistic_write" },
+      });
       // The backup codes go with the secret, or they would still sign in after
       // a later re-enrolment.
-      expect(savedUser.backupCodes).toBeNull();
+      expect(usersRepository.update).toHaveBeenCalledWith(
+        { id: "user-1" },
+        { twoFactorSecret: null, backupCodes: null },
+      );
       expect(preferencesRow.row()!.twoFactorEnabled).toBe(false);
       expect(trustedDevicesRepository.delete).toHaveBeenCalledWith({
         userId: "user-1",
       });
+    });
+
+    it("clears the secret, the flag and the trusted devices in one transaction", async () => {
+      const encryptedSecret = encrypt("TOTP_SECRET", TEST_TOTP_KEY);
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        twoFactorSecret: encryptedSecret,
+      });
+      (otplib.verifySync as jest.Mock).mockReturnValue({ valid: true });
+      preferencesRow.seed({ userId: "user-1", twoFactorEnabled: true });
+
+      // Number every transaction and record which one each write ran in.
+      const runInTransaction = dataSource.transaction.getMockImplementation()!;
+      let opened = 0;
+      let current = 0;
+      dataSource.transaction.mockImplementation(async (...args: unknown[]) => {
+        const outer = current;
+        current = ++opened;
+        try {
+          return await runInTransaction(...args);
+        } finally {
+          current = outer;
+        }
+      });
+      const writtenIn: Record<string, number> = {};
+      usersRepository.update.mockImplementation(async () => {
+        writtenIn.user = current;
+        return { affected: 1 };
+      });
+      trustedDevicesRepository.delete.mockImplementation(async () => {
+        writtenIn.devices = current;
+        return { affected: 1 };
+      });
+      const buildPreferenceQuery = preferencesRepository.createQueryBuilder;
+      preferencesRepository.createQueryBuilder = jest.fn(
+        (...args: unknown[]) => {
+          writtenIn.preferences = current;
+          return buildPreferenceQuery(...args);
+        },
+      );
+
+      await service.disable2FA("user-1", "123456");
+
+      // Three separate transactions let a failure after the first leave the
+      // secret cleared under a flag still reading "enabled": sign-in stopped
+      // asking for a code while Settings still showed 2FA on.
+      expect(writtenIn.user).toBeGreaterThan(0);
+      expect(writtenIn.preferences).toBe(writtenIn.user);
+      expect(writtenIn.devices).toBe(writtenIn.user);
+    });
+
+    it("writes nothing when the code is wrong", async () => {
+      const encryptedSecret = encrypt("TOTP_SECRET", TEST_TOTP_KEY);
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        twoFactorSecret: encryptedSecret,
+      });
+      (otplib.verifySync as jest.Mock).mockReturnValue({ valid: false });
+      preferencesRow.seed({ userId: "user-1", twoFactorEnabled: true });
+
+      await expect(service.disable2FA("user-1", "000000")).rejects.toThrow(
+        "Invalid verification code",
+      );
+
+      expect(usersRepository.update).not.toHaveBeenCalled();
+      expect(preferencesRow.row()!.twoFactorEnabled).toBe(true);
+      expect(trustedDevicesRepository.delete).not.toHaveBeenCalled();
+    });
+
+    it("clears a flag left on over a missing secret, without asking for a code", async () => {
+      // The state that left a user unable to enroll again: sign-in no longer
+      // challenged, Settings still said enabled, and disable refused with
+      // "2FA is not enabled". There is no second factor for a code to prove.
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        twoFactorSecret: null,
+        backupCodes: JSON.stringify(["$2a$04$leftover"]),
+      });
+      preferencesRow.seed({ userId: "user-1", twoFactorEnabled: true });
+      const warn = jest
+        .spyOn(
+          (service as unknown as { logger: { warn: () => void } }).logger,
+          "warn",
+        )
+        .mockImplementation(() => undefined);
+
+      const result = await service.disable2FA("user-1", "anything");
+
+      expect(result.message).toContain("disabled successfully");
+      expect(otplib.verifySync).not.toHaveBeenCalled();
+      expect(attemptCounters.increment).not.toHaveBeenCalled();
+      expect(usersRepository.update).toHaveBeenCalledWith(
+        { id: "user-1" },
+        { twoFactorSecret: null, backupCodes: null },
+      );
+      expect(preferencesRow.row()!.twoFactorEnabled).toBe(false);
+      expect(trustedDevicesRepository.delete).toHaveBeenCalledWith({
+        userId: "user-1",
+      });
+      expect(warn).toHaveBeenCalledWith(
+        "Cleared stale 2FA state (no TOTP secret) for user user-1",
+      );
+    });
+
+    it("leaves an enrolment in progress alone when nothing is stale", async () => {
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        twoFactorSecret: null,
+        pendingTwoFactorSecret: encrypt("PENDING", TEST_TOTP_KEY),
+      });
+      preferencesRow.seed({ userId: "user-1", twoFactorEnabled: false });
+
+      await expect(service.disable2FA("user-1", "123456")).rejects.toThrow(
+        "2FA is not enabled",
+      );
+      expect(usersRepository.update).not.toHaveBeenCalled();
     });
 
     it("should throw ForbiddenException when FORCE_2FA is enabled", async () => {
@@ -1502,7 +1626,10 @@ describe("TwoFactorService", () => {
 
       expect(result.message).toContain("disabled successfully");
       expect(otplib.verifySync).not.toHaveBeenCalled();
-      expect(usersRepository.save.mock.calls[0][0].twoFactorSecret).toBeNull();
+      expect(usersRepository.update).toHaveBeenCalledWith(
+        { id: "user-1" },
+        { twoFactorSecret: null, backupCodes: null },
+      );
       expect(preferencesRow.row()!.twoFactorEnabled).toBe(false);
       expect(trustedDevicesRepository.delete).toHaveBeenCalledWith({
         userId: "user-1",
@@ -1839,11 +1966,42 @@ describe("TwoFactorService", () => {
     });
 
     it("refuses when 2FA is not enabled", async () => {
-      userRow = { ...userRow, twoFactorSecret: null };
+      userRow = { ...userRow, twoFactorSecret: null, backupCodes: null };
+      preferencesRow.seed({ userId: "user-1", twoFactorEnabled: false });
 
       await expect(
         service.reset2FA("user-1", PASSWORD, "123456"),
       ).rejects.toThrow("2FA is not enabled");
+      expect(usersRepository.update).not.toHaveBeenCalled();
+      expect(tokenService.revokeAllUserRefreshTokens).not.toHaveBeenCalled();
+    });
+
+    it("clears a flag left on over a missing secret with the password alone", async () => {
+      // No secret means no second factor to strip, and sign-in already admits
+      // the account on its password; refusing left the user unable to enroll.
+      userRow = { ...userRow, twoFactorSecret: null };
+
+      const result = await service.reset2FA("user-1", PASSWORD, "ignored");
+
+      expect(result.message).toContain("reset successfully");
+      expect(otplib.verifySync).not.toHaveBeenCalled();
+      expect(usersRepository.update).toHaveBeenCalledWith(
+        { id: "user-1" },
+        {
+          twoFactorSecret: null,
+          pendingTwoFactorSecret: null,
+          backupCodes: null,
+        },
+      );
+      expect(preferencesRow.row()!.twoFactorEnabled).toBe(false);
+    });
+
+    it("still refuses a wrong password when repairing a stale flag", async () => {
+      userRow = { ...userRow, twoFactorSecret: null };
+
+      await expect(
+        service.reset2FA("user-1", "wrong-password", "ignored"),
+      ).rejects.toThrow("Current password is incorrect");
       expectNothingWritten();
     });
 

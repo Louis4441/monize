@@ -57,6 +57,7 @@ import {
   DelegateCapabilityOp,
   DelegateSection,
 } from "./decorators/delegate-access.decorator";
+import { isTwoFactorActive } from "../auth/two-factor-state";
 
 export interface ResourceCapabilities {
   create: boolean;
@@ -267,9 +268,7 @@ export class DelegationService {
           repo.findOne({ where: { userId: ownerUserId } }),
         ),
       ]);
-      const ownerRequires2FA = !!(
-        ownerPref?.twoFactorEnabled && owner?.twoFactorSecret
-      );
+      const ownerRequires2FA = isTwoFactorActive(ownerPref, owner);
       if (!ownerRequires2FA) return false;
 
       const [delegate, delegatePref] = await Promise.all([
@@ -280,9 +279,7 @@ export class DelegationService {
           repo.findOne({ where: { userId: delegateUserId } }),
         ),
       ]);
-      const delegateHas2FA = !!(
-        delegatePref?.twoFactorEnabled && delegate?.twoFactorSecret
-      );
+      const delegateHas2FA = isTwoFactorActive(delegatePref, delegate);
       return !delegateHas2FA;
     });
   }

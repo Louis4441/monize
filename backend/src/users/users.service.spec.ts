@@ -600,9 +600,61 @@ describe("UsersService", () => {
       expect(result.theme).toBe("system");
       expect(result.favouriteReportIds).toEqual([]);
     });
+
+    it("reports 2FA as enabled only when a secret is stored under the flag", async () => {
+      preferencesRow.seed({ ...mockPreferences, twoFactorEnabled: true });
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        twoFactorSecret: "encrypted-secret",
+      });
+
+      const result = await service.getPreferences("user-1");
+
+      expect(result.twoFactorEnabled).toBe(true);
+      expect(result).toBeInstanceOf(UserPreference);
+    });
+
+    it("reports 2FA as off when the flag is on but no secret is stored", async () => {
+      // Sign-in does not ask for a code in this state, so Settings must not
+      // say 2FA is on: that hid the Enable button and left the user no way to
+      // enroll again. The stored column is left as it is; disabling or
+      // resetting 2FA is what clears it.
+      preferencesRow.seed({ ...mockPreferences, twoFactorEnabled: true });
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        twoFactorSecret: null,
+      });
+
+      const result = await service.getPreferences("user-1");
+
+      expect(result.twoFactorEnabled).toBe(false);
+      // Still a UserPreference, so the serializer keeps its @Exclude() columns
+      // out of the response.
+      expect(result).toBeInstanceOf(UserPreference);
+      expect(preferencesRow.row()!.twoFactorEnabled).toBe(true);
+      expect(preferencesRow.patches()).toHaveLength(0);
+    });
   });
 
   describe("updatePreferences -- writes only what was asked for", () => {
+    it("reports 2FA the way sign-in enforces it in the saved preferences", async () => {
+      // The client replaces its preferences with this response, so reading the
+      // raw flag here would put the stale "enabled" straight back after any
+      // Settings save.
+      preferencesRow.seed({ ...mockPreferences, twoFactorEnabled: true });
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        twoFactorSecret: null,
+      });
+
+      const result = await service.updatePreferences("user-1", {
+        theme: "dark",
+      });
+
+      expect(result.twoFactorEnabled).toBe(false);
+      expect(result.theme).toBe("dark");
+    });
+
     it("sends exactly the supplied columns to the database", async () => {
       // The regression: this used to mutate a loaded entity and `repo.save` it,
       // which writes back every column that differs from what the entity holds.

@@ -106,6 +106,7 @@ describe("AuthService", () => {
       findOne: jest.fn(),
       create: jest.fn(),
       save: jest.fn(),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
       count: jest.fn(),
       // The login path no longer uses a query builder: the failed-attempt
       // increment/lockout and the success reset are both raw guarded SQL on the
@@ -913,6 +914,31 @@ describe("AuthService", () => {
       );
     });
 
+    it("does not ask for a code when the flag is on but no secret is stored", async () => {
+      // Sign-in, status and preferences all read 2FA through
+      // `isTwoFactorActive`; a flag left over a cleared secret admits the
+      // password alone, and the other two surfaces now report it that way.
+      const hashedPassword = await bcrypt.hash("ValidPass123!", 10);
+      const user = {
+        ...mockUser,
+        passwordHash: hashedPassword,
+        twoFactorSecret: null,
+      };
+      usersRepository.findOne.mockResolvedValue(user);
+      usersRepository.save.mockResolvedValue(user);
+      preferencesRepository.findOne.mockResolvedValue({
+        twoFactorEnabled: true,
+      });
+
+      const result = await service.login({
+        email: "test@example.com",
+        password: "ValidPass123!",
+      });
+
+      expect(result).not.toHaveProperty("requires2FA");
+      expect(result.accessToken).toBeDefined();
+    });
+
     it("rejects login when account is locked", async () => {
       usersRepository.findOne.mockResolvedValue({
         ...mockUser,
@@ -1676,8 +1702,10 @@ describe("AuthService", () => {
       expect(result.message).toContain("disabled successfully");
 
       // Secret should be cleared
-      const savedUser = usersRepository.save.mock.calls[0][0];
-      expect(savedUser.twoFactorSecret).toBeNull();
+      expect(usersRepository.update).toHaveBeenCalledWith(
+        { id: "user-1" },
+        { twoFactorSecret: null, backupCodes: null },
+      );
 
       // Preferences should be disabled
       expect(preferencesRow.row()!.twoFactorEnabled).toBe(false);
@@ -3894,15 +3922,39 @@ describe("AuthService", () => {
   // ---------------------------------------------------------------
 
   describe("is2FAEnabled", () => {
-    it("returns true when the user's preferences have 2FA enabled", async () => {
+    it("returns true when the flag is on and a secret is stored", async () => {
       preferencesRepository.findOne.mockResolvedValue({
         userId: "u1",
         twoFactorEnabled: true,
+      });
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        id: "u1",
+        twoFactorSecret: "encrypted-secret",
       });
       await expect(service.is2FAEnabled("u1")).resolves.toBe(true);
       expect(preferencesRepository.findOne).toHaveBeenCalledWith({
         where: { userId: "u1" },
       });
+      expect(usersRepository.findOne).toHaveBeenCalledWith({
+        where: { id: "u1" },
+      });
+    });
+
+    it("returns false when the flag is on but no secret is stored", async () => {
+      // The state issue #1429's reporter was left in: sign-in no longer asked
+      // for a code, while Settings, reading the flag alone, still said enabled
+      // and offered no way to enroll again. Status answers what sign-in does.
+      preferencesRepository.findOne.mockResolvedValue({
+        userId: "u1",
+        twoFactorEnabled: true,
+      });
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        id: "u1",
+        twoFactorSecret: null,
+      });
+      await expect(service.is2FAEnabled("u1")).resolves.toBe(false);
     });
 
     it("returns false when preferences are missing or 2FA is disabled", async () => {

@@ -25,6 +25,7 @@ import * as QRCode from "qrcode";
 import { UAParser } from "ua-parser-js";
 
 import { User } from "../users/entities/user.entity";
+import { UserPreference } from "../users/entities/user-preference.entity";
 import { toUserProfile } from "../users/user-profile";
 import { TrustedDevice } from "../users/entities/trusted-device.entity";
 import { encrypt, decrypt, derivePurposeKey, hashToken } from "./crypto.util";
@@ -76,6 +77,24 @@ const RESET_REFUSALS: Record<
       ),
   },
 };
+
+/**
+ * 2FA state left behind without the secret it belongs to: the preference flag
+ * still on, or backup codes still stored, while no confirmed TOTP secret is.
+ * Sign-in does not challenge such an account (`isTwoFactorActive`), so disable
+ * and reset clear the leftovers instead of refusing with "2FA is not enabled",
+ * which left the user no way to enroll again. A pending (unconfirmed) secret is
+ * not stale: it is an enrolment in progress.
+ */
+function hasStaleTwoFactor(
+  user: Pick<User, "twoFactorSecret" | "backupCodes">,
+  preferences: Pick<UserPreference, "twoFactorEnabled"> | null,
+): boolean {
+  return (
+    !user.twoFactorSecret &&
+    (preferences?.twoFactorEnabled === true || !!user.backupCodes)
+  );
+}
 
 @Injectable()
 export class TwoFactorService {
@@ -606,6 +625,23 @@ export class TwoFactorService {
     return { message: "Two-factor authentication enabled successfully" };
   }
 
+  /**
+   * Switch 2FA off with an authenticator or backup code.
+   *
+   * One transaction against the user row locked for update: the check and the
+   * three writes (secret and backup codes, the preference flag, the trusted
+   * devices) commit together or not at all. They used to be three separate
+   * transactions, so a failure after the first left the secret cleared under a
+   * flag still reading "enabled" -- sign-in no longer asked for a code while
+   * Settings still showed 2FA on, and every way out refused with "2FA is not
+   * enabled". A wrong code is counted after the transaction, because a counter
+   * joined to it would roll back with the refusal.
+   *
+   * An account already in that state (flag or backup codes left over a missing
+   * secret) is repaired rather than refused: there is no second factor for a
+   * code to prove, sign-in already admits it without one, and clearing the
+   * leftovers is what lets the user enroll again.
+   */
   async disable2FA(userId: string, code: string) {
     const force2fa =
       this.configService.get<string>("FORCE_2FA", "false").toLowerCase() ===
@@ -619,54 +655,67 @@ export class TwoFactorService {
       );
     }
 
-    const user = await this.scoped(User, (repo) =>
-      repo.findOne({
-        where: { id: userId },
-      }),
+    await this.assertManagementTotpBudget(userId);
+
+    const outcome = await withScopedDb(
+      this.dataSource,
+      async (manager): Promise<"disabled" | "repaired" | "refused"> => {
+        const user = await manager.getRepository(User).findOne({
+          where: { id: userId },
+          lock: { mode: "pessimistic_write" },
+        });
+        const preferences = await manager
+          .getRepository(UserPreference)
+          .findOne({ where: { userId } });
+
+        if (
+          !user ||
+          (!user.twoFactorSecret && !hasStaleTwoFactor(user, preferences))
+        ) {
+          throw new BadRequestException(
+            tr("errors.auth.twoFactorNotEnabled", "2FA is not enabled"),
+          );
+        }
+
+        if (user.twoFactorSecret) {
+          // A 6-digit authenticator code, or a backup code (consumed): the same
+          // two proofs sign-in accepts. The backup code is what lets a user
+          // whose TOTP secret can no longer be decrypted (a changed JWT_SECRET)
+          // switch 2FA off and enroll again, without an administrator. Only the
+          // TOTP branch decrypts the secret.
+          const isValid = /^\d{6}$/.test(code)
+            ? this.checkTotpCode(user, code).valid
+            : await this.verifyBackupCode(user, code);
+          if (!isValid) return "refused";
+        }
+
+        // The backup codes go with the secret: left in place they would still
+        // sign in after a later re-enrolment. The flag is written
+        // unconditionally, materializing the row when absent, so a user whose
+        // preferences never existed does not stay flagged as enabled.
+        await manager
+          .getRepository(User)
+          .update({ id: userId }, { twoFactorSecret: null, backupCodes: null });
+        await patchUserPreferences(manager, userId, {
+          twoFactorEnabled: false,
+        });
+        await manager.getRepository(TrustedDevice).delete({ userId });
+        return user.twoFactorSecret ? "disabled" : "repaired";
+      },
     );
 
-    if (!user || !user.twoFactorSecret) {
-      throw new BadRequestException(
-        tr("errors.auth.twoFactorNotEnabled", "2FA is not enabled"),
-      );
-    }
-
-    await this.assertManagementTotpBudget(user.id);
-
-    // A 6-digit authenticator code, or a backup code (consumed): the same two
-    // proofs sign-in accepts. The backup code is what lets a user whose TOTP
-    // secret can no longer be decrypted (a changed JWT_SECRET) switch 2FA off
-    // and enroll again, without an administrator. Only the TOTP branch
-    // decrypts the secret.
-    const isValid = /^\d{6}$/.test(code)
-      ? this.checkTotpCode(user, code).valid
-      : await this.verifyBackupCode(user, code);
-
-    if (!isValid) {
-      await this.recordUserTotpFailure(user.id);
+    if (outcome === "refused") {
+      await this.recordUserTotpFailure(userId);
       throw new BadRequestException(
         tr("errors.auth.invalidVerificationCode", "Invalid verification code"),
       );
     }
-    await this.attemptCounters.reset(TWO_FACTOR_USER_SCOPE, user.id);
-
-    // Clear secret and disable. The backup codes go with it: left in place they
-    // would still sign in after a later re-enrolment.
-    user.twoFactorSecret = null;
-    user.backupCodes = null;
-    await this.scoped(User, (repo) => repo.save(user));
-
-    // Same as the enable path: write the one column, and do it unconditionally.
-    // Reading the row to decide whether to write it left a window in which
-    // another request's preference change was read, kept in memory, and written
-    // back -- and skipping the write entirely when no row exists meant a user
-    // whose preferences had never materialized stayed flagged as 2FA-enabled.
-    await withScopedDb(this.dataSource, (manager) =>
-      patchUserPreferences(manager, userId, { twoFactorEnabled: false }),
-    );
-
-    // Revoke all trusted devices
-    await this.scoped(TrustedDevice, (repo) => repo.delete({ userId }));
+    await this.attemptCounters.reset(TWO_FACTOR_USER_SCOPE, userId);
+    if (outcome === "repaired") {
+      this.logger.warn(
+        `Cleared stale 2FA state (no TOTP secret) for user ${userId}`,
+      );
+    }
 
     return { message: "Two-factor authentication disabled successfully" };
   }
@@ -744,7 +793,10 @@ export class TwoFactorService {
             ),
           );
         }
-        if (!user.twoFactorSecret) {
+        const preferences = await manager
+          .getRepository(UserPreference)
+          .findOne({ where: { userId } });
+        if (!user.twoFactorSecret && !hasStaleTwoFactor(user, preferences)) {
           throw new BadRequestException(
             tr("errors.auth.twoFactorNotEnabled", "2FA is not enabled"),
           );
@@ -758,11 +810,16 @@ export class TwoFactorService {
         // wrong code. The claim burns a valid code so it cannot be replayed on
         // any replica, and joins this transaction. The backup-code branch
         // consumes the code under the lock this transaction already holds.
-        const codeValid = /^\d{6}$/.test(code)
-          ? this.checkTotpCode(user, code).valid &&
-            (await this.claimTotpCode(user.id, code))
-          : await this.verifyBackupCode(user, code);
-        if (!codeValid) return "second-factor";
+        // With no secret stored there is no second factor for a code to prove
+        // (sign-in already admits the account without one), so a flag left
+        // over it is cleared on the password alone.
+        if (user.twoFactorSecret) {
+          const codeValid = /^\d{6}$/.test(code)
+            ? this.checkTotpCode(user, code).valid &&
+              (await this.claimTotpCode(user.id, code))
+            : await this.verifyBackupCode(user, code);
+          if (!codeValid) return "second-factor";
+        }
 
         await users.update(
           { id: userId },
