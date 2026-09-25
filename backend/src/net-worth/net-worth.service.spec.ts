@@ -3048,6 +3048,108 @@ describe("NetWorthService", () => {
     });
 
     /**
+     * The intraday chart values a past day at what the daily series held that
+     * day (INV-INTRADAY-001), so the positions are recorded by the same fold
+     * that produced `series`: a buy mid-window changes the recorded share
+     * count on its own day, and each recorded close value sums to the day's
+     * `securitiesValue`.
+     */
+    it("records each day's share count, close and value from the same fold", async () => {
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "brok-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_BROKERAGE",
+          currency_code: "USD",
+          opening_balance: 0,
+        },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        {
+          account_id: "brok-1",
+          security_id: "sec-1",
+          action: "BUY",
+          quantity: "10",
+          transaction_date: "2025-02-01",
+        },
+        {
+          account_id: "brok-1",
+          security_id: "sec-1",
+          action: "BUY",
+          quantity: "5",
+          transaction_date: "2025-03-02",
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([
+        { id: "sec-1", currencyCode: "USD", skipPriceUpdates: false },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        { security_id: "sec-1", price_date: "2025-03-01", close_price: "100" },
+        { security_id: "sec-1", price_date: "2025-03-02", close_price: "102" },
+      ]);
+
+      const { series, positions, securities } =
+        await service.getDailyInvestmentPositions("user-1", {
+          startDate: "2025-03-01",
+          endDate: "2025-03-02",
+        });
+
+      expect(series.map((d) => d.value)).toEqual([1000, 1530]);
+      expect(positions.map((d) => d.date)).toEqual([
+        "2025-03-01",
+        "2025-03-02",
+      ]);
+      expect(positions[0].quantities.get("sec-1")).toBe(10);
+      expect(positions[1].quantities.get("sec-1")).toBe(15);
+      expect(positions[0].closes.get("sec-1")).toBe(100);
+      expect(positions[1].closes.get("sec-1")).toBe(102);
+      expect(positions[1].closeValues.get("sec-1")).toBe(
+        series[1].securitiesValue,
+      );
+      expect(securities.get("sec-1")).toMatchObject({ id: "sec-1" });
+    });
+
+    it("records each day's cash per currency beside the value it was folded into", async () => {
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "cash-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_CASH",
+          currency_code: "USD",
+          opening_balance: 5000,
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([]);
+      reportQuery.mockResolvedValueOnce([
+        { date: "2025-03-01", balance: "5000", account_id: "cash-1" },
+        { date: "2025-03-02", balance: "7000", account_id: "cash-1" },
+      ]);
+
+      const { series, positions } = await service.getDailyInvestmentPositions(
+        "user-1",
+        { startDate: "2025-03-01", endDate: "2025-03-02" },
+      );
+
+      expect(series.map((d) => d.value)).toEqual([5000, 7000]);
+      expect(positions[0].cashByCurrency.get("USD")).toBe(5000);
+      expect(positions[1].cashByCurrency.get("USD")).toBe(7000);
+    });
+
+    it("answers no days and no positions for a scope with no investment account", async () => {
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+      reportQuery.mockResolvedValueOnce([]);
+
+      const result = await service.getDailyInvestmentPositions("user-1", {
+        startDate: "2025-03-01",
+      });
+
+      expect(result.series).toEqual([]);
+      expect(result.positions).toEqual([]);
+    });
+
+    /**
      * Cash held in an investment account is not an investment
      * (INV-PORTRESULT-002). The scope above holds 5,000 of cash and takes in
      * another 100, and owns no security at all: the INVESTED value is zero on

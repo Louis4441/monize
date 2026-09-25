@@ -40,7 +40,12 @@ import {
   portfolioSummaryMemo,
 } from "./portfolio-summary-memo";
 import { mapWithConcurrency } from "../common/concurrency.util";
-import { formatDateYMD, todayYMD } from "../common/date-utils";
+import { addDaysYMD, formatDateYMD, todayYMD } from "../common/date-utils";
+import {
+  NetWorthService,
+  type DailyInvestmentValue,
+  type DailyPositions,
+} from "../net-worth/net-worth.service";
 import {
   keepNewestSession,
   priceDateYmd,
@@ -447,23 +452,98 @@ interface IntradayLoaded {
     currencyCode: string;
     amount: number;
   }>;
-  /**
-   * Stale-holding amounts grouped by native currency, used by the total series
-   * so its per-currency rounding matches the pre-refactor output exactly.
-   */
-  staleByCurrency: Array<[string, number]>;
   /** Cash grouped by native currency (currency -> amount). */
   cashByCurrency: Array<[string, number]>;
   fxByCurrency: Map<string, IntradayFxSeries>;
   dailyRateIndex: DailyRateIndex;
   /** Latest spot rate per `${currency}->${display}` fallback. */
   spotRate: FxRateCache;
+  /**
+   * The positions held at the close of each day of the window, ascending
+   * (INV-INTRADAY-001). When present, a bar is valued at its own day's share
+   * counts and cash; `sources[].quantity`, `cashByCurrency`'s amounts and
+   * `staleSources` are then unused. `null` only when the scope has no
+   * investment account for the fold to replay.
+   */
+  ledgerDays: LedgerDay[] | null;
+  /**
+   * Grid timestamps that are a finished session's closing point, mapped to the
+   * index of the ledger day whose daily figure the point carries.
+   */
+  sessionCloses: Map<number, number>;
+  /**
+   * With the ledger: holdings with no intraday bars (failed fetch, inactive
+   * security), valued per day at that day's quantity and stored close.
+   */
+  closeValued: Array<{
+    securityId: string;
+    symbol: string;
+    name: string;
+    currencyCode: string;
+  }>;
 }
 
 interface IntradayCacheEntry {
   expiresAt: number;
   loaded: IntradayLoaded;
 }
+
+/** One held security as the intraday loader sees it. */
+interface IntradayHolding {
+  securityId: string;
+  symbol: string;
+  name: string;
+  exchange: string | null;
+  currencyCode: string;
+  /** Today's share count; only the legacy (no-ledger) path values bars by it. */
+  quantity: number;
+  /** Its quote provider can serve intraday bars (false for MSN Money). */
+  hasIntraday: boolean;
+  /** Worth asking for bars at all (false for an inactive security). */
+  fetchIntraday: boolean;
+}
+
+/** What the scope held at one intraday bar; see `makeIntradayPositionsAt`. */
+interface IntradayBarPositions {
+  /** Shares of a security held at the bar; the legacy path answers today's. */
+  quantityOf(securityId: string, todayQuantity: number): number;
+  /** Cash per native currency. */
+  cash: Iterable<[string, number]>;
+  /** Holdings with no bars, as a native-currency amount at a daily close. */
+  closeValued: Array<{
+    securityId: string;
+    symbol: string;
+    name: string;
+    currencyCode: string;
+    amount: number;
+  }>;
+}
+
+/** One calendar day of the ledger fold, as the intraday series reads it. */
+interface LedgerDay {
+  date: string;
+  positions: DailyPositions;
+  daily: DailyInvestmentValue;
+}
+
+/** Below this a replayed share count is zero, as the daily fold treats it. */
+const LEDGER_QUANTITY_EPSILON = 0.00000001;
+
+/**
+ * How far back the 1D ledger reaches: its grid is the latest session, which a
+ * weekend and a holiday can put four days behind today.
+ */
+const LEDGER_1D_LOOKBACK_DAYS = 7;
+
+const INTERVAL_MS: Record<IntradayInterval, number> = {
+  "1m": 60_000,
+  "2m": 120_000,
+  "5m": 300_000,
+  "15m": 900_000,
+  "30m": 1_800_000,
+  "60m": 3_600_000,
+  "90m": 5_400_000,
+};
 
 const RANGE_TO_YAHOO: Record<
   IntradayRangeKey,
@@ -540,6 +620,10 @@ export class PortfolioService {
     // already close a cycle.
     @Inject(forwardRef(() => PortfolioPeriodResultService))
     private periodResult: PortfolioPeriodResultService,
+    // The intraday series values each past day at the positions the daily
+    // series holds that day (INV-INTRADAY-001). forwardRef for the same cycle.
+    @Inject(forwardRef(() => NetWorthService))
+    private netWorth: NetWorthService,
   ) {}
 
   /**
@@ -1703,8 +1787,22 @@ export class PortfolioService {
     // at the end rather than per bar.
     const unratedCurrencies = new Set<string>();
     const contribution = this.makeIntradayContribution(fxAt, unratedCurrencies);
+    const positionsAt = this.makeIntradayPositionsAt(loaded);
 
     for (const ts of loaded.timestamps) {
+      // A finished session's closing point IS the daily series' figure for
+      // the day: same closes, same rates, same cash (INV-INTRADAY-001).
+      const closeDay = loaded.sessionCloses.get(ts);
+      if (closeDay !== undefined && loaded.ledgerDays) {
+        const { daily } = loaded.ledgerDays[closeDay];
+        points.push({
+          timestamp: new Date(ts).toISOString(),
+          value: daily.value,
+          securitiesValue: daily.securitiesValue,
+        });
+        continue;
+      }
+      const at = positionsAt(ts);
       let totalCents = 0; // integer arithmetic to avoid float drift
       // The INVESTED part of the same bar: the securities, with the cash
       // beside them left out. The investment charts plot it, because cash held
@@ -1713,12 +1811,19 @@ export class PortfolioService {
       // and monthly series expose the same component under the same name.
       let securitiesCents = 0;
       // Cash contributions, valued at the FX rate prevailing at this bar.
-      for (const [ccy, amount] of loaded.cashByCurrency) {
+      for (const [ccy, amount] of at.cash) {
         totalCents += contribution(amount, ccy, ts);
       }
-      // Stale-holding contributions (last daily close * quantity), grouped by
-      // currency so the per-currency rounding matches the historical total.
-      for (const [ccy, amount] of loaded.staleByCurrency) {
+      // Holdings with no bars (daily close * quantity), grouped by currency so
+      // the per-currency rounding matches the historical total.
+      const closeValuedByCurrency = new Map<string, number>();
+      for (const h of at.closeValued) {
+        closeValuedByCurrency.set(
+          h.currencyCode,
+          (closeValuedByCurrency.get(h.currencyCode) ?? 0) + h.amount,
+        );
+      }
+      for (const [ccy, amount] of closeValuedByCurrency) {
         const cents = contribution(amount, ccy, ts);
         totalCents += cents;
         securitiesCents += cents;
@@ -1727,7 +1832,8 @@ export class PortfolioService {
         const src = loaded.sources[i];
         cursors[i] = this.advanceIntradayCursor(src.times, cursors[i], ts);
         const price = this.intradayPriceAt(src, cursors[i], ts);
-        const cents = contribution(src.quantity * price, src.currencyCode, ts);
+        const quantity = at.quantityOf(src.securityId, src.quantity);
+        const cents = contribution(quantity * price, src.currencyCode, ts);
         totalCents += cents;
         securitiesCents += cents;
       }
@@ -1797,27 +1903,50 @@ export class PortfolioService {
       }
     };
 
+    const positionsAt = this.makeIntradayPositionsAt(loaded);
+    // Every held security gets its band up front, so a finished session's
+    // closing point can fill any of them.
+    for (const src of loaded.sources) {
+      ensureSec(src.securityId, src.symbol, src.name);
+    }
+    for (const h of loaded.closeValued) {
+      ensureSec(h.securityId, h.symbol, h.name);
+    }
+
     for (let ti = 0; ti < n; ti++) {
       const ts = loaded.timestamps[ti];
+      // A finished session's closing point carries each position at the close
+      // the daily series valued it at, and the day's cash (INV-INTRADAY-001).
+      const closeDay = loaded.sessionCloses.get(ts);
+      if (closeDay !== undefined && loaded.ledgerDays) {
+        const { daily, positions } = loaded.ledgerDays[closeDay];
+        cash[ti] = roundMoney(daily.value - daily.securitiesValue);
+        for (const [id, value] of positions.closeValues) {
+          if (value === null || !secValues.has(id)) continue;
+          secValues.get(id)![ti] = value;
+        }
+        continue;
+      }
+      const at = positionsAt(ts);
       let cashCents = 0;
-      for (const [ccy, amount] of loaded.cashByCurrency) {
+      for (const [ccy, amount] of at.cash) {
         cashCents += contribution(amount, ccy, ts);
       }
       cash[ti] = cashCents / 10000;
-      // Stale (last-close) holdings keep their own band, unlike the total
-      // series which only needs a per-currency subtotal.
-      for (const s of loaded.staleSources) {
-        ensureSec(s.securityId, s.symbol, s.name);
-        secValues.get(s.securityId)![ti] =
-          contribution(s.amount, s.currencyCode, ts) / 10000;
+      // Holdings with no bars keep their own band, unlike the total series
+      // which only needs a per-currency subtotal.
+      for (const h of at.closeValued) {
+        ensureSec(h.securityId, h.symbol, h.name);
+        secValues.get(h.securityId)![ti] =
+          contribution(h.amount, h.currencyCode, ts) / 10000;
       }
       for (let i = 0; i < loaded.sources.length; i++) {
         const src = loaded.sources[i];
         cursors[i] = this.advanceIntradayCursor(src.times, cursors[i], ts);
         const price = this.intradayPriceAt(src, cursors[i], ts);
-        ensureSec(src.securityId, src.symbol, src.name);
+        const quantity = at.quantityOf(src.securityId, src.quantity);
         secValues.get(src.securityId)![ti] =
-          contribution(src.quantity * price, src.currencyCode, ts) / 10000;
+          contribution(quantity * price, src.currencyCode, ts) / 10000;
       }
     }
 
@@ -1835,6 +1964,67 @@ export class PortfolioService {
       query.limit ?? 10,
     );
     return { series, points, ...meta };
+  }
+
+  /**
+   * What the scope held at grid bar `ts`: the share count per security, the
+   * cash per currency, and the holdings valued at a daily close.
+   *
+   * With the ledger these are the positions at the close of the bar's own UTC
+   * day (INV-INTRADAY-001); a bar on a day the fold did not reach takes the
+   * latest day before it. Without it (no investment account to replay) they
+   * are today's, which is all the legacy path ever knew. Bars must be asked
+   * for in ascending order: the lookup keeps a cursor.
+   */
+  private makeIntradayPositionsAt(
+    loaded: IntradayLoaded,
+  ): (ts: number) => IntradayBarPositions {
+    const days = loaded.ledgerDays;
+    if (!days) {
+      const legacy: IntradayBarPositions = {
+        quantityOf: (_id, todayQuantity) => todayQuantity,
+        cash: loaded.cashByCurrency,
+        closeValued: loaded.staleSources,
+      };
+      return () => legacy;
+    }
+    let cursor = -1;
+    let lastCursor = -2;
+    let lastAnswer: IntradayBarPositions = {
+      quantityOf: () => 0,
+      cash: [],
+      closeValued: [],
+    };
+    return (ts: number) => {
+      const date = formatDateYMD(new Date(ts));
+      while (cursor + 1 < days.length && days[cursor + 1].date <= date) {
+        cursor++;
+      }
+      if (cursor === lastCursor) return lastAnswer;
+      lastCursor = cursor;
+      if (cursor < 0) {
+        // Before the first day the fold reached: nothing is known to be held.
+        return lastAnswer;
+      }
+      const { positions } = days[cursor];
+      const closeValued: IntradayBarPositions["closeValued"] = [];
+      for (const h of loaded.closeValued) {
+        const quantity = positions.quantities.get(h.securityId) ?? 0;
+        const close = positions.closes.get(h.securityId);
+        // An unpriced position is unknown, not zero; it is left out as the
+        // daily fold leaves it out (`pricesComplete`).
+        if (Math.abs(quantity) < LEDGER_QUANTITY_EPSILON || close == null) {
+          continue;
+        }
+        closeValued.push({ ...h, amount: quantity * close });
+      }
+      lastAnswer = {
+        quantityOf: (id) => positions.quantities.get(id) ?? 0,
+        cash: [...positions.cashByCurrency],
+        closeValued,
+      };
+      return lastAnswer;
+    };
   }
 
   /** Advance a forward-fill cursor to the latest sample at or before `ts`. */
@@ -2054,17 +2244,67 @@ export class PortfolioService {
     const { cashAccounts, standaloneAccounts, holdingsAccountIds } =
       this.calculationService.categoriseAccounts(accounts);
 
-    let activeHoldings: Array<{
-      securityId: string;
-      symbol: string;
-      name: string;
-      exchange: string | null;
-      currencyCode: string;
-      quantity: number;
-      hasIntraday: boolean;
-    }> = [];
+    const userDefaultProvider = pref?.defaultQuoteProvider ?? null;
+    const toIntradayHolding = (
+      security: Security,
+      quantity: number,
+      fetchIntraday: boolean,
+    ): IntradayHolding => {
+      // Resolve the security's primary quote provider; only providers that
+      // implement fetchIntradaySeries can contribute to this chart. MSN Money
+      // does not expose intraday quotes -- see the note in the user
+      // preferences UI under "Default Stock Quote Provider".
+      const [primaryProvider] = this.quoteProviderRegistry.resolveForSecurity(
+        security,
+        userDefaultProvider,
+      );
+      return {
+        securityId: security.id,
+        symbol: security.symbol,
+        name: security.name,
+        exchange: security.exchange,
+        currencyCode: security.currencyCode,
+        quantity,
+        hasIntraday: typeof primaryProvider.fetchIntradaySeries === "function",
+        fetchIntraday,
+      };
+    };
 
-    if (holdingsAccountIds.length > 0) {
+    // Every bar is valued at the positions held at the close of its own day,
+    // from the fold the daily series is built by (INV-INTRADAY-001).
+    const ledger = await this.loadIntradayLedger(
+      userId,
+      range,
+      accountIds,
+      displayCurrency,
+      now,
+    );
+
+    let activeHoldings: IntradayHolding[] = [];
+    if (ledger) {
+      // Every security held on any day of the window, not only today: a
+      // position sold mid-window keeps its bars up to the sale. An inactive
+      // security has no quote feed, so it is valued at its stored closes, as
+      // the daily series values it.
+      const latest = ledger.days[ledger.days.length - 1].positions.quantities;
+      const held = new Set<string>();
+      for (const day of ledger.days) {
+        for (const [id, qty] of day.positions.quantities) {
+          if (Math.abs(qty) >= LEDGER_QUANTITY_EPSILON) held.add(id);
+        }
+      }
+      for (const id of held) {
+        const security = ledger.securities.get(id);
+        if (!security) continue;
+        activeHoldings.push(
+          toIntradayHolding(
+            security,
+            latest.get(id) ?? 0,
+            security.isActive !== false,
+          ),
+        );
+      }
+    } else if (holdingsAccountIds.length > 0) {
       const holdings = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(Holding).find({
           where: { accountId: In(holdingsAccountIds) },
@@ -2072,20 +2312,7 @@ export class PortfolioService {
         }),
       );
 
-      const userDefaultProvider = pref?.defaultQuoteProvider ?? null;
-
-      const aggregated = new Map<
-        string,
-        {
-          securityId: string;
-          symbol: string;
-          name: string;
-          exchange: string | null;
-          currencyCode: string;
-          quantity: number;
-          hasIntraday: boolean;
-        }
-      >();
+      const aggregated = new Map<string, IntradayHolding>();
       for (const h of holdings) {
         const qty = Number(h.quantity);
         if (!h.security || h.security.isActive === false) continue;
@@ -2094,26 +2321,10 @@ export class PortfolioService {
         if (existing) {
           existing.quantity += qty;
         } else {
-          // Resolve the security's primary quote provider; only providers
-          // that implement fetchIntradaySeries can contribute to this chart.
-          // MSN Money does not expose intraday quotes — see the note in the
-          // user preferences UI under "Default Stock Quote Provider".
-          const [primaryProvider] =
-            this.quoteProviderRegistry.resolveForSecurity(
-              h.security,
-              userDefaultProvider,
-            );
-          const hasIntraday =
-            typeof primaryProvider.fetchIntradaySeries === "function";
-          aggregated.set(h.securityId, {
-            securityId: h.securityId,
-            symbol: h.security.symbol,
-            name: h.security.name,
-            exchange: h.security.exchange,
-            currencyCode: h.security.currencyCode,
-            quantity: qty,
-            hasIntraday,
-          });
+          aggregated.set(
+            h.securityId,
+            toIntradayHolding(h.security, qty, true),
+          );
         }
       }
       activeHoldings = [...aggregated.values()];
@@ -2121,7 +2332,7 @@ export class PortfolioService {
 
     const fetchedAt = new Date().toISOString();
     const skippedSymbols = activeHoldings
-      .filter((h) => !h.hasIntraday)
+      .filter((h) => h.fetchIntraday && !h.hasIntraday)
       .map((h) => h.symbol);
 
     // When any holding's provider lacks intraday support (MSN Money), do not
@@ -2150,11 +2361,13 @@ export class PortfolioService {
       timestamps: [],
       sources: [],
       staleSources: [],
-      staleByCurrency: [],
       cashByCurrency: [],
       fxByCurrency: new Map(),
       dailyRateIndex: new Map() as DailyRateIndex,
       spotRate: new Map(),
+      ledgerDays: null,
+      sessionCloses: new Map(),
+      closeValued: [],
       ...overrides,
     });
 
@@ -2167,7 +2380,7 @@ export class PortfolioService {
       return loaded;
     }
 
-    const intradayHoldings = activeHoldings.filter((h) => h.hasIntraday);
+    const intradayHoldings = activeHoldings.filter((h) => h.fetchIntraday);
     const seriesBySecurity = new Map<string, IntradayPoint[]>();
     const failedSymbols: string[] = [];
     const intervalCandidates = [yahooParams, ...RANGE_FALLBACKS[range]];
@@ -2209,10 +2422,9 @@ export class PortfolioService {
     // We deliberately do NOT cache this failure result: caching it would
     // leave the "Couldn't load intraday prices" banner pinned on screen
     // even after the user clicks Refresh and the issue resolves.
-    if (
-      failedSymbols.length > 0 &&
-      failedSymbols.length === intradayHoldings.length
-    ) {
+    // The same holds when nothing held has a quote feed at all (only inactive
+    // securities): there is no intraday grid to value them on.
+    if (seriesBySecurity.size === 0) {
       return emptyLoaded({ failedSymbols, fallbackToDaily: true });
     }
 
@@ -2236,46 +2448,80 @@ export class PortfolioService {
       timestamps = timestamps.filter((ts) => ts >= cutoffMs);
     }
 
+    // Each finished session ends on the daily series' own figure for the day,
+    // one grid step after its last bar (INV-INTRADAY-001).
+    const sessionCloses = ledger
+      ? this.planSessionCloses(
+          timestamps,
+          ledger.days,
+          yahooParams.interval,
+          now,
+        )
+      : new Map<number, number>();
+    timestamps = [...timestamps, ...sessionCloses.keys()].sort((a, b) => a - b);
+
     // Cash held in the user's investment cash and standalone accounts is
     // part of the portfolio value just like holdings -- the daily-snapshot
     // endpoint already includes it (see net-worth.service.getDailyInvestments)
     // and we mirror that here so the 1D/1W/1M intraday chart agrees with
     // longer-range views.
-    const cashAccountList = [...cashAccounts, ...standaloneAccounts];
-    const cashIds = cashAccountList.map((a) => a.id);
-    const effectiveBalances =
-      await this.calculationService.computeEffectiveBalances(cashIds);
-
+    //
     // Group cash by native currency so FX can be applied at each timestamp.
     // Cash amounts don't move intraday, but their display-currency value does
     // when FX moves -- so foreign-currency cash can't be a flat additive
-    // offset across the chart.
+    // offset across the chart. With the ledger, each day's own balances are
+    // read from it per bar instead; today's balance is only the legacy answer.
     const cashByCurrency = new Map<string, number>();
-    for (const account of cashAccountList) {
-      const balance =
-        effectiveBalances.get(account.id) ?? Number(account.currentBalance);
-      cashByCurrency.set(
-        account.currencyCode,
-        (cashByCurrency.get(account.currencyCode) ?? 0) + balance,
-      );
+    if (ledger) {
+      for (const day of ledger.days) {
+        for (const ccy of day.positions.cashByCurrency.keys()) {
+          cashByCurrency.set(ccy, 0);
+        }
+      }
+    } else {
+      const cashAccountList = [...cashAccounts, ...standaloneAccounts];
+      const cashIds = cashAccountList.map((a) => a.id);
+      const effectiveBalances =
+        await this.calculationService.computeEffectiveBalances(cashIds);
+      for (const account of cashAccountList) {
+        const balance =
+          effectiveBalances.get(account.id) ?? Number(account.currentBalance);
+        cashByCurrency.set(
+          account.currencyCode,
+          (cashByCurrency.get(account.currencyCode) ?? 0) + balance,
+        );
+      }
     }
 
     // For holdings whose intraday fetch failed (Yahoo errored, was
     // rate-limited past the retry budget, or simply has no minute-resolution
     // data for this security -- common for mutual funds and illiquid names),
-    // fall back to the security's latest known daily close. Kept both grouped
-    // by currency (for the total series' per-currency rounding) and per
-    // security (so the breakdown can give each stale holding its own band).
+    // fall back to the security's latest known daily close. Kept per security
+    // so the breakdown can give each one its own band; the total series groups
+    // them by currency for its per-currency rounding.
     // Without this, a single mutual fund in the user's portfolio would
     // either undercount the chart (if we ignored it) or pin the
     // "Couldn't load intraday prices" banner permanently (if we treated
     // it as a hard failure).
+    //
+    // With the ledger, such a holding (and an inactive one) is valued per day
+    // at that day's quantity and stored close instead -- the same figure the
+    // daily series gives it -- rather than as a flat line at today's.
     const failedHoldings = intradayHoldings.filter(
       (h) => !seriesBySecurity.has(h.securityId),
     );
-    const staleByCurrency = new Map<string, number>();
+    const closeValued: IntradayLoaded["closeValued"] = ledger
+      ? activeHoldings
+          .filter((h) => !seriesBySecurity.has(h.securityId))
+          .map(({ securityId, symbol, name, currencyCode }) => ({
+            securityId,
+            symbol,
+            name,
+            currencyCode,
+          }))
+      : [];
     const staleSources: IntradayLoaded["staleSources"] = [];
-    if (failedHoldings.length > 0) {
+    if (!ledger && failedHoldings.length > 0) {
       const latestPrices = await this.getLatestPrices(
         failedHoldings.map((h) => h.securityId),
       );
@@ -2283,10 +2529,6 @@ export class PortfolioService {
         const lastClose = latestPrices.get(h.securityId);
         if (lastClose == null) continue;
         const amount = h.quantity * lastClose;
-        staleByCurrency.set(
-          h.currencyCode,
-          (staleByCurrency.get(h.currencyCode) ?? 0) + amount,
-        );
         staleSources.push({
           securityId: h.securityId,
           symbol: h.symbol,
@@ -2305,6 +2547,7 @@ export class PortfolioService {
     const rateCache: FxRateCache = new Map();
     const fxCurrencies = new Set<string>([
       ...intradayHoldings.map((h) => h.currencyCode),
+      ...closeValued.map((h) => h.currencyCode),
       ...cashByCurrency.keys(),
     ]);
     fxCurrencies.delete(displayCurrency);
@@ -2402,17 +2645,119 @@ export class PortfolioService {
       timestamps,
       sources,
       staleSources,
-      staleByCurrency: [...staleByCurrency],
       cashByCurrency: [...cashByCurrency],
       fxByCurrency,
       dailyRateIndex,
       spotRate: rateCache,
+      ledgerDays: ledger?.days ?? null,
+      sessionCloses,
+      closeValued,
     };
     this.intradayCache.set(cacheKey, {
       expiresAt: now + INTRADAY_CACHE_TTL_MS,
       loaded,
     });
     return loaded;
+  }
+
+  /**
+   * The positions held at the close of each day the intraday window can
+   * reach, from the fold `getDailyInvestments` is built by, so a past bar
+   * holds exactly what the daily series holds that day (INV-INTRADAY-001).
+   *
+   * Days are UTC calendar days: the grid's bars are keyed the same way (the
+   * FX lookup and the frontend's first-day trim both read the UTC date), and a
+   * North American session never crosses a UTC midnight. `null` when the fold
+   * has no day at all, which happens only when the scope has no investment
+   * account -- and then there are no holdings for the legacy path to find
+   * either.
+   */
+  private async loadIntradayLedger(
+    userId: string,
+    range: IntradayRangeKey,
+    accountIds: string[] | undefined,
+    displayCurrency: string,
+    now: number,
+  ): Promise<{ days: LedgerDay[]; securities: Map<string, Security> } | null> {
+    const today = formatDateYMD(new Date(now));
+    const startDate = addDaysYMD(
+      today,
+      -(RANGE_LOOKBACK_DAYS[range] ?? LEDGER_1D_LOOKBACK_DAYS),
+    );
+    const { series, positions, securities } =
+      await this.netWorth.getDailyInvestmentPositions(userId, {
+        startDate,
+        endDate: today,
+        accountIds,
+        displayCurrency,
+      });
+    if (positions.length === 0) return null;
+    return {
+      days: positions.map((dayPositions, i) => ({
+        date: dayPositions.date,
+        positions: dayPositions,
+        daily: series[i],
+      })),
+      securities,
+    };
+  }
+
+  /**
+   * Where each finished session's closing point goes: one grid step after the
+   * day's last bar (so a 15-minute series ends each day at 16:00, not at the
+   * 15:45 bar's start), mapped to the ledger day whose daily figure it
+   * carries.
+   *
+   * A session is finished when a later day has bars, or its day is before
+   * today (UTC). Today's session is live and ends on its latest bar. A day the
+   * daily series could not value completely (an unpriced position, a missing
+   * rate or cash balance) gets no closing point: its bars stand rather than a
+   * subtotal wearing a total's name.
+   */
+  private planSessionCloses(
+    timestamps: number[],
+    days: LedgerDay[],
+    interval: IntradayInterval,
+    now: number,
+  ): Map<number, number> {
+    const closes = new Map<number, number>();
+    if (timestamps.length === 0) return closes;
+    const dayIndex = new Map(days.map((d, i) => [d.date, i]));
+    const today = formatDateYMD(new Date(now));
+
+    // The grid's own step: a holding on a coarser fallback interval must not
+    // stretch the finer bars' day.
+    let step = INTERVAL_MS[interval];
+    for (let i = 1; i < timestamps.length; i++) {
+      const gap = timestamps[i] - timestamps[i - 1];
+      const sameDay =
+        formatDateYMD(new Date(timestamps[i])) ===
+        formatDateYMD(new Date(timestamps[i - 1]));
+      if (sameDay && gap > 0 && gap < step) step = gap;
+    }
+
+    for (let i = 0; i < timestamps.length; i++) {
+      const date = formatDateYMD(new Date(timestamps[i]));
+      const next = timestamps[i + 1];
+      const lastOfDay =
+        next === undefined || formatDateYMD(new Date(next)) !== date;
+      if (!lastOfDay) continue;
+      if (next === undefined && date >= today) continue;
+      const idx = dayIndex.get(date);
+      if (idx === undefined) continue;
+      const daily = days[idx].daily;
+      if (
+        daily.pricesComplete === false ||
+        daily.fxComplete === false ||
+        daily.cashComplete === false
+      ) {
+        continue;
+      }
+      const closeTs = timestamps[i] + step;
+      if (next !== undefined && closeTs >= next) continue;
+      closes.set(closeTs, idx);
+    }
+    return closes;
   }
 
   private buildIntradayCacheKey(
