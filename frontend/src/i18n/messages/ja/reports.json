@@ -322,6 +322,14 @@
     "seriesInflows": "流入",
     "seriesOutflows": "流出"
   },
+  "tagBreakdown": {
+    "label": "タグキー別に分類",
+    "none": "なし",
+    "untagged": "タグなし",
+    "inflows": "タグ付き流入",
+    "outflows": "タグ付き流出",
+    "sharesExceedNote": "このキーの下で複数の値がタグ付けされた行は、それぞれの値としてカウントされるため、値ごとの割合の合計が100%を超えることがあります。"
+  },
   "categoryPerformance": {
     "noBudgets": "予算が見つかりません。カテゴリパフォーマンスを確認するには予算を作成してください。",
     "noData": "カテゴリデータがまだありません。",

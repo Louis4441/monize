@@ -322,6 +322,14 @@
     "seriesInflows": "Zuflüsse",
     "seriesOutflows": "Abflüsse"
   },
+  "tagBreakdown": {
+    "label": "Nach Tag-Schlüssel aufschlüsseln",
+    "none": "Keine",
+    "untagged": "Ohne Tag",
+    "inflows": "Getaggte Zuflüsse",
+    "outflows": "Getaggte Abflüsse",
+    "sharesExceedNote": "Eine Zeile, die unter diesem Schlüssel mit mehr als einem Wert getaggt ist, zählt für jeden davon, sodass die Anteile pro Wert in Summe mehr als 100 % ergeben können."
+  },
   "categoryPerformance": {
     "noBudgets": "Kein Budget gefunden. Erstellen Sie ein Budget, um die Kategorieleistung zu sehen.",
     "noData": "Noch keine Kategoriedaten verfügbar.",

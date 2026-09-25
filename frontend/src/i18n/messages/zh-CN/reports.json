@@ -322,6 +322,14 @@
     "seriesInflows": "流入",
     "seriesOutflows": "流出"
   },
+  "tagBreakdown": {
+    "label": "按标签键细分",
+    "none": "无",
+    "untagged": "未标记",
+    "inflows": "已标记的流入",
+    "outflows": "已标记的流出",
+    "sharesExceedNote": "如果一行在该键下被标记了多个值，则会计入每个值，因此各值的占比之和可能超过 100%。"
+  },
   "categoryPerformance": {
     "noBudgets": "未找到预算。创建预算以查看分类表现。",
     "noData": "暂无分类数据。",

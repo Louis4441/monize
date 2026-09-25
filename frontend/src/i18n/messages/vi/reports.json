@@ -322,6 +322,14 @@
     "seriesInflows": "Dòng vào",
     "seriesOutflows": "Dòng ra"
   },
+  "tagBreakdown": {
+    "label": "Phân tách theo khóa thẻ",
+    "none": "Không có",
+    "untagged": "Không gắn thẻ",
+    "inflows": "Dòng vào có gắn thẻ",
+    "outflows": "Dòng ra có gắn thẻ",
+    "sharesExceedNote": "Một dòng được gắn nhiều hơn một giá trị theo khóa này sẽ được tính vào từng giá trị đó, vì vậy tỷ lệ theo từng giá trị có thể cộng lại vượt quá 100%."
+  },
   "categoryPerformance": {
     "noBudgets": "Không tìm thấy ngân sách. Tạo ngân sách để xem hiệu suất danh mục.",
     "noData": "Chưa có dữ liệu danh mục.",
