@@ -15,6 +15,10 @@ import {
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import { PortfolioPeriodResultService } from "../net-worth/portfolio-period-result.service";
+import {
+  NetWorthService,
+  type DailyInvestmentsWithPositions,
+} from "../net-worth/net-worth.service";
 import { NO_INVESTED_PERIOD } from "../net-worth/invested-period-result.util";
 import {
   EMPTY_INCOMPLETE_RANGES,
@@ -43,6 +47,11 @@ describe("PortfolioService", () => {
   let quoteProviderRegistry: { resolveForSecurity: jest.Mock };
   let sectorWeightingService: { getLlmLookThrough: jest.Mock };
   let periodResultService: { getInvestedResultSinceInception: jest.Mock };
+  let netWorthService: {
+    getDailyInvestmentPositions: jest.MockedFunction<
+      NetWorthService["getDailyInvestmentPositions"]
+    >;
+  };
 
   const userId = "user-1";
 
@@ -339,6 +348,18 @@ describe("PortfolioService", () => {
       ),
     };
 
+    // Default: a scope with no investment account for the ledger fold to
+    // replay, which is what the real method answers for one -- the intraday
+    // loader then reads today's holdings and balances. The per-day ledger
+    // tests configure the days explicitly.
+    netWorthService = {
+      getDailyInvestmentPositions: jest.fn().mockResolvedValue({
+        series: [],
+        positions: [],
+        securities: new Map(),
+      }),
+    };
+
     service = new PortfolioService(
       dataSource as never,
       calculationService,
@@ -346,6 +367,7 @@ describe("PortfolioService", () => {
       quoteProviderRegistry as never,
       sectorWeightingService as never,
       periodResultService as unknown as PortfolioPeriodResultService,
+      netWorthService as unknown as NetWorthService,
     );
   });
 
@@ -4869,6 +4891,411 @@ describe("PortfolioService", () => {
       expect(result.skippedSymbols).toEqual(["VFV.TO"]);
       expect(result.series).toEqual([]);
       expect(result.points).toEqual([]);
+    });
+  });
+
+  // INV-INTRADAY-001, docs/specs/intraday-historical-positions.md: every bar
+  // is valued at the positions held at the close of its own day, and a
+  // finished session ends on the daily series' own figure for that day.
+  describe("intraday series on the ledger's per-day positions", () => {
+    const xgro = {
+      id: "sec-xgro",
+      symbol: "XGRO.TO",
+      name: "iShares Core Growth ETF Portfolio",
+      securityType: "ETF",
+      exchange: "TSX",
+      currencyCode: "CAD",
+      isActive: true,
+    } as unknown as Security;
+    const xcns = {
+      id: "sec-xcns",
+      symbol: "XCNS.TO",
+      name: "iShares Core Conservative ETF Portfolio",
+      securityType: "ETF",
+      exchange: "TSX",
+      currencyCode: "CAD",
+      isActive: true,
+    } as unknown as Security;
+    const fund = {
+      id: "sec-fund",
+      symbol: "TDB900",
+      name: "TD Canadian Index Fund",
+      securityType: "MUTUAL_FUND",
+      exchange: null,
+      currencyCode: "CAD",
+      isActive: true,
+    } as unknown as Security;
+
+    interface DayFixture {
+      date: string;
+      quantities?: Record<string, number>;
+      closes?: Record<string, number | null>;
+      closeValues?: Record<string, number | null>;
+      cash?: Record<string, number>;
+      value: number;
+      securitiesValue: number;
+      pricesComplete?: boolean;
+    }
+
+    /** What `getDailyInvestmentPositions` answers for these days. */
+    const ledgerOf = (
+      days: DayFixture[],
+      securities: Security[],
+    ): DailyInvestmentsWithPositions => ({
+      series: days.map((d) => ({
+        date: d.date,
+        value: d.value,
+        securitiesValue: d.securitiesValue,
+        fxComplete: true,
+        missingRatePairs: [],
+        pricesComplete: d.pricesComplete ?? true,
+        unpricedSecurityIds: [],
+        cashComplete: true,
+        unknownCashAccountIds: [],
+      })),
+      positions: days.map((d) => ({
+        date: d.date,
+        quantities: new Map(Object.entries(d.quantities ?? {})),
+        closes: new Map(Object.entries(d.closes ?? {})),
+        closeValues: new Map(Object.entries(d.closeValues ?? {})),
+        cashByCurrency: new Map(Object.entries(d.cash ?? {})),
+      })),
+      securities: new Map(securities.map((sec) => [sec.id, sec])),
+    });
+
+    const bar = (iso: string, close: number) => ({
+      timestamp: new Date(iso),
+      open: null,
+      close,
+    });
+
+    const seriesBySymbol = (bars: Record<string, ReturnType<typeof bar>[]>) =>
+      yahooFinanceService.fetchIntradaySeries.mockImplementation(
+        async (symbol: string) => bars[symbol] ?? null,
+      );
+
+    beforeEach(() => {
+      prefRepository.findOne.mockResolvedValue(mockPref);
+      accountsRepository.find.mockResolvedValue([
+        mockBrokerageAccount,
+        mockCashAccount,
+      ]);
+      // Today's holdings row disagrees with every past day on purpose: the
+      // ledger path must never read it.
+      holdingsRepository.find.mockResolvedValue([mockHoldingVFV]);
+    });
+
+    it("ends each finished session on the daily close, one step after its last bar (XGRO, Sep 2)", async () => {
+      const qty = 2891.173;
+      netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+        ledgerOf(
+          [
+            {
+              date: "2026-09-01",
+              quantities: { [xgro.id]: qty },
+              closes: { [xgro.id]: 38.53 },
+              closeValues: { [xgro.id]: 111396.8957 },
+              value: 111396.8957,
+              securitiesValue: 111396.8957,
+            },
+            {
+              date: "2026-09-02",
+              quantities: { [xgro.id]: qty },
+              closes: { [xgro.id]: 38.58 },
+              closeValues: { [xgro.id]: 111541.4543 },
+              value: 111541.4543,
+              securitiesValue: 111541.4543,
+            },
+          ],
+          [xgro],
+        ),
+      );
+      seriesBySymbol({
+        "XGRO.TO": [
+          bar("2026-09-01T19:30:00.000Z", 38.5),
+          bar("2026-09-01T19:45:00.000Z", 38.53),
+          bar("2026-09-02T19:30:00.000Z", 38.55),
+          // The last 15-minute bar's last trade, not the closing auction.
+          bar("2026-09-02T19:45:00.000Z", 38.575),
+        ],
+      });
+
+      const result = await service.getIntradayValueSeries(userId, {
+        range: "1m",
+      });
+
+      expect(result.points.map((p) => p.timestamp)).toEqual([
+        "2026-09-01T19:30:00.000Z",
+        "2026-09-01T19:45:00.000Z",
+        "2026-09-01T20:00:00.000Z",
+        "2026-09-02T19:30:00.000Z",
+        "2026-09-02T19:45:00.000Z",
+        "2026-09-02T20:00:00.000Z",
+      ]);
+      // The 15:45 bar is the last trade ...
+      expect(result.points[4].value).toBeCloseTo(qty * 38.575, 4);
+      // ... and the 16:00 point is the daily series' figure, to the cent.
+      expect(result.points[5].value).toBe(111541.4543);
+      expect(result.points[5].securitiesValue).toBe(111541.4543);
+      expect(result.points[2].value).toBe(111396.8957);
+    });
+
+    it("values each day at that day's share count and cash, not today's (a deposit, then a buy)", async () => {
+      netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+        ledgerOf(
+          [
+            {
+              date: "2026-08-28",
+              quantities: { [xcns.id]: 100 },
+              closes: { [xcns.id]: 40 },
+              closeValues: { [xcns.id]: 4000 },
+              cash: { CAD: 2000 },
+              value: 6000,
+              securitiesValue: 4000,
+            },
+            {
+              date: "2026-08-31",
+              quantities: { [xcns.id]: 150 },
+              closes: { [xcns.id]: 41 },
+              closeValues: { [xcns.id]: 6150 },
+              cash: { CAD: 0 },
+              value: 6150,
+              securitiesValue: 6150,
+            },
+          ],
+          [xcns],
+        ),
+      );
+      seriesBySymbol({
+        "XCNS.TO": [
+          bar("2026-08-28T14:00:00.000Z", 40),
+          bar("2026-08-31T14:00:00.000Z", 41),
+        ],
+      });
+
+      const result = await service.getIntradayValueSeries(userId, {
+        range: "1m",
+      });
+      const at = (iso: string) =>
+        result.points.find((p) => p.timestamp === iso)!;
+
+      // Aug 28: the pre-buy 100 shares and the $2,000 not yet invested.
+      expect(at("2026-08-28T14:00:00.000Z").value).toBeCloseTo(6000, 4);
+      expect(at("2026-08-28T14:00:00.000Z").securitiesValue).toBeCloseTo(
+        4000,
+        4,
+      );
+      // Aug 31: the bought shares, the cash spent.
+      expect(at("2026-08-31T14:00:00.000Z").value).toBeCloseTo(6150, 4);
+      // Today's holdings and balances were never consulted.
+      expect(holdingsRepository.find).not.toHaveBeenCalled();
+    });
+
+    it("keeps a position sold mid-window up to the sale, though nothing holds it today", async () => {
+      holdingsRepository.find.mockResolvedValue([]);
+      netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+        ledgerOf(
+          [
+            {
+              date: "2026-09-10",
+              quantities: { [xgro.id]: 10 },
+              closes: { [xgro.id]: 38 },
+              closeValues: { [xgro.id]: 380 },
+              value: 380,
+              securitiesValue: 380,
+            },
+            {
+              date: "2026-09-11",
+              quantities: { [xgro.id]: 0 },
+              cash: { CAD: 385 },
+              value: 385,
+              securitiesValue: 0,
+            },
+          ],
+          [xgro],
+        ),
+      );
+      seriesBySymbol({
+        "XGRO.TO": [
+          bar("2026-09-10T15:00:00.000Z", 38.2),
+          bar("2026-09-11T15:00:00.000Z", 38.6),
+        ],
+      });
+
+      const result = await service.getIntradayValueSeries(userId, {
+        range: "1m",
+      });
+      const at = (iso: string) =>
+        result.points.find((p) => p.timestamp === iso)!;
+
+      expect(yahooFinanceService.fetchIntradaySeries).toHaveBeenCalledWith(
+        "XGRO.TO",
+        "TSX",
+        expect.anything(),
+      );
+      expect(at("2026-09-10T15:00:00.000Z").securitiesValue).toBeCloseTo(
+        382,
+        4,
+      );
+      expect(at("2026-09-11T15:00:00.000Z").securitiesValue).toBe(0);
+      expect(at("2026-09-11T15:00:00.000Z").value).toBeCloseTo(385, 4);
+    });
+
+    it("values a holding with no intraday bars at each day's own close", async () => {
+      netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+        ledgerOf(
+          [
+            {
+              date: "2026-09-14",
+              quantities: { [xgro.id]: 10, [fund.id]: 5 },
+              closes: { [xgro.id]: 38, [fund.id]: 20 },
+              value: 480,
+              securitiesValue: 480,
+            },
+            {
+              date: "2026-09-15",
+              quantities: { [xgro.id]: 10, [fund.id]: 5 },
+              closes: { [xgro.id]: 39, [fund.id]: 21 },
+              value: 495,
+              securitiesValue: 495,
+            },
+          ],
+          [xgro, fund],
+        ),
+      );
+      seriesBySymbol({
+        "XGRO.TO": [
+          bar("2026-09-14T15:00:00.000Z", 38),
+          bar("2026-09-15T15:00:00.000Z", 39),
+        ],
+      });
+
+      const result = await service.getIntradayValueSeries(userId, {
+        range: "1m",
+      });
+      const at = (iso: string) =>
+        result.points.find((p) => p.timestamp === iso)!;
+
+      // 10 x 38 + 5 x 20, then 10 x 39 + 5 x 21: the fund moves with its
+      // closes rather than sitting flat at the latest one.
+      expect(at("2026-09-14T15:00:00.000Z").value).toBeCloseTo(480, 4);
+      expect(at("2026-09-15T15:00:00.000Z").value).toBeCloseTo(495, 4);
+    });
+
+    it("gives today's live session no closing point", async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+        ledgerOf(
+          [
+            {
+              date: today,
+              quantities: { [xgro.id]: 10 },
+              closes: { [xgro.id]: 38 },
+              value: 380,
+              securitiesValue: 380,
+            },
+          ],
+          [xgro],
+        ),
+      );
+      seriesBySymbol({
+        "XGRO.TO": [
+          bar(`${today}T00:00:00.000Z`, 38.1),
+          bar(`${today}T00:01:00.000Z`, 38.2),
+        ],
+      });
+
+      const result = await service.getIntradayValueSeries(userId, {
+        range: "1d",
+      });
+
+      expect(result.points.map((p) => p.timestamp)).toEqual([
+        `${today}T00:00:00.000Z`,
+        `${today}T00:01:00.000Z`,
+      ]);
+      expect(result.points[1].value).toBeCloseTo(382, 4);
+    });
+
+    it("leaves a day the daily series could not value completely on its bars", async () => {
+      netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+        ledgerOf(
+          [
+            {
+              date: "2026-09-16",
+              quantities: { [xgro.id]: 10 },
+              closes: { [xgro.id]: null },
+              value: 0,
+              securitiesValue: 0,
+              pricesComplete: false,
+            },
+            {
+              date: "2026-09-17",
+              quantities: { [xgro.id]: 10 },
+              closes: { [xgro.id]: 39 },
+              value: 390,
+              securitiesValue: 390,
+            },
+          ],
+          [xgro],
+        ),
+      );
+      seriesBySymbol({
+        "XGRO.TO": [
+          bar("2026-09-16T19:45:00.000Z", 38.5),
+          bar("2026-09-17T19:45:00.000Z", 39),
+        ],
+      });
+
+      const result = await service.getIntradayValueSeries(userId, {
+        range: "1m",
+      });
+
+      // No subtotal wearing Sep 16's closing caption; Sep 17 still closes.
+      expect(result.points.map((p) => p.timestamp)).toEqual([
+        "2026-09-16T19:45:00.000Z",
+        "2026-09-17T19:45:00.000Z",
+        "2026-09-17T20:00:00.000Z",
+      ]);
+      expect(result.points[0].value).toBeCloseTo(385, 4);
+    });
+
+    it("carries each position at its daily close in the breakdown's closing point", async () => {
+      netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+        ledgerOf(
+          [
+            {
+              date: "2026-09-18",
+              quantities: { [xgro.id]: 10, [xcns.id]: 20 },
+              closes: { [xgro.id]: 38, [xcns.id]: 40 },
+              closeValues: { [xgro.id]: 380, [xcns.id]: 800 },
+              cash: { CAD: 50 },
+              value: 1230,
+              securitiesValue: 1180,
+            },
+          ],
+          [xgro, xcns],
+        ),
+      );
+      seriesBySymbol({
+        "XGRO.TO": [bar("2026-09-18T19:45:00.000Z", 37.9)],
+        "XCNS.TO": [bar("2026-09-18T19:45:00.000Z", 39.9)],
+      });
+
+      const result = await service.getIntradayBreakdown(userId, {
+        range: "1m",
+      });
+
+      expect(result.points).toHaveLength(2);
+      const bars = result.points[0];
+      expect(bars.values[xgro.id]).toBeCloseTo(379, 4);
+      expect(bars.values[xcns.id]).toBeCloseTo(798, 4);
+      expect(bars.values.cash).toBeCloseTo(50, 4);
+      const close = result.points[1];
+      expect(close.timestamp).toBe("2026-09-18T20:00:00.000Z");
+      expect(close.values[xgro.id]).toBe(380);
+      expect(close.values[xcns.id]).toBe(800);
+      expect(close.values.cash).toBe(50);
+      expect(close.total).toBe(1230);
     });
   });
 });

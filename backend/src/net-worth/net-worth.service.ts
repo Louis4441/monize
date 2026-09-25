@@ -167,6 +167,42 @@ export interface DailyInvestmentValue {
   unknownCashAccountIds: string[];
 }
 
+/**
+ * What one day of the daily investment fold was valued from, recorded by the
+ * fold itself (`getDailyInvestmentPositions`). The intraday chart values a past
+ * day's bars from these rather than from today's holdings and balances
+ * (`docs/specs/intraday-historical-positions.md`, INV-INTRADAY-001).
+ */
+export interface DailyPositions {
+  date: string;
+  /** securityId -> shares held at this day's close, summed over the scope. */
+  quantities: Map<string, number>;
+  /**
+   * securityId -> the accepted close on or before this day, in the security's
+   * currency; `null` when nothing priced the position (`pricesComplete`).
+   */
+  closes: Map<string, number | null>;
+  /**
+   * securityId -> the position's value at that close in the display currency,
+   * the component the day's `securitiesValue` was summed from; `null` when it
+   * could not be priced or converted.
+   */
+  closeValues: Map<string, number | null>;
+  /**
+   * Cash currency -> the balance held at this day's close, over the scope's
+   * cash accounts that have a balance for the day (`cashComplete`).
+   */
+  cashByCurrency: Map<string, number>;
+}
+
+export interface DailyInvestmentsWithPositions {
+  series: DailyInvestmentValue[];
+  /** One entry per day of `series`, same order. */
+  positions: DailyPositions[];
+  /** Every security the replay touched, keyed by id. */
+  securities: Map<string, Security>;
+}
+
 export type InvestmentBreakdownGranularity = "daily" | "monthly";
 
 /**
@@ -1443,6 +1479,60 @@ export class NetWorthService {
     displayCurrency?: string,
     options?: SeriesFetchOptions,
   ): Promise<DailyInvestmentValue[]> {
+    const { series } = await this.loadDailyInvestments(
+      userId,
+      { startDate, endDate, accountIds, displayCurrency, options },
+      false,
+    );
+    return series;
+  }
+
+  /**
+   * `getDailyInvestments` together with what each of its days was folded
+   * from: the share count per security, the accepted close each was valued
+   * at, and the cash per currency. One fold answers both, so the intraday
+   * chart cannot hold a different position on a past day than the daily series
+   * does (`docs/specs/intraday-historical-positions.md`, INV-INTRADAY-001).
+   */
+  async getDailyInvestmentPositions(
+    userId: string,
+    opts: {
+      startDate: string;
+      endDate?: string;
+      accountIds?: string[];
+      displayCurrency?: string;
+    } & SeriesFetchOptions,
+  ): Promise<DailyInvestmentsWithPositions> {
+    const { fetchMissing, ...window } = opts;
+    return this.loadDailyInvestments(
+      userId,
+      { ...window, options: { fetchMissing } },
+      true,
+    );
+  }
+
+  private async loadDailyInvestments(
+    userId: string,
+    {
+      startDate,
+      endDate,
+      accountIds,
+      displayCurrency,
+      options,
+    }: {
+      startDate?: string;
+      endDate?: string;
+      accountIds?: string[];
+      displayCurrency?: string;
+      options?: SeriesFetchOptions;
+    },
+    collectPositions: boolean,
+  ): Promise<DailyInvestmentsWithPositions> {
+    const empty: DailyInvestmentsWithPositions = {
+      series: [],
+      positions: [],
+      securities: new Map(),
+    };
     const pref = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(UserPreference).findOne({ where: { userId } }),
     );
@@ -1463,7 +1553,7 @@ export class NetWorthService {
         userId,
         accountIds,
       );
-      if (idArray.length === 0) return [];
+      if (idArray.length === 0) return empty;
       const placeholders = idArray.map((_, i) => `$${i + 2}`).join(", ");
       accountFilter = `AND a.id IN (${placeholders})`;
       acctParams.push(...idArray);
@@ -1479,7 +1569,7 @@ export class NetWorthService {
       acctParams,
     );
 
-    if (investAccounts.length === 0) return [];
+    if (investAccounts.length === 0) return empty;
 
     // "All time" (no startDate) begins where the scope's own history begins.
     const start =
@@ -1584,7 +1674,7 @@ export class NetWorthService {
       acctCurrency.set(a.id, a.currency_code);
     }
 
-    return this.computeWithRateFill(
+    const folded = await this.computeWithRateFill(
       async () =>
         this.foldDailyInvestments(
           await this.buildRateIndex(currencies, defaultCurrency, start, end),
@@ -1598,11 +1688,13 @@ export class NetWorthService {
             cashBalances,
             acctCurrency,
             defaultCurrency,
+            collectPositions,
           },
         ),
-      (points) => points,
+      (result) => result.series,
       options,
     );
+    return { ...folded, securities: securityMap };
   }
 
   /** The day-by-day fold of `getDailyInvestments`, at one rate index. */
@@ -1618,8 +1710,10 @@ export class NetWorthService {
       cashBalances: Map<string, Map<string, number>>;
       acctCurrency: Map<string, string>;
       defaultCurrency: string;
+      /** Also record what each day was folded from; see `DailyPositions`. */
+      collectPositions?: boolean;
     },
-  ): DailyInvestmentValue[] {
+  ): { series: DailyInvestmentValue[]; positions: DailyPositions[] } {
     const {
       dates,
       invTxs,
@@ -1630,6 +1724,7 @@ export class NetWorthService {
       cashBalances,
       acctCurrency,
       defaultCurrency,
+      collectPositions = false,
     } = input;
 
     // Replay holdings per-account day by day and compute market value
@@ -1638,6 +1733,7 @@ export class NetWorthService {
     let txIdx = 0;
 
     const result: DailyInvestmentValue[] = [];
+    const positions: DailyPositions[] = [];
 
     for (const dateStr of dates) {
       // Process investment transactions up to this date
@@ -1672,6 +1768,15 @@ export class NetWorthService {
       // walk below skips them, so without this set `value` would be a subtotal
       // with nothing beside it to say so.
       const unpricedSecurityIds = new Set<string>();
+      const dayPositions: DailyPositions | null = collectPositions
+        ? {
+            date: dateStr,
+            quantities: new Map(),
+            closes: new Map(),
+            closeValues: new Map(),
+            cashByCurrency: new Map(),
+          }
+        : null;
 
       for (const [, acctHoldings] of holdingsByAccount) {
         for (const [secId, qty] of acctHoldings) {
@@ -1691,21 +1796,34 @@ export class NetWorthService {
             txPricesBySec.get(secId),
             dateStr,
           );
+          if (dayPositions) {
+            dayPositions.quantities.set(
+              secId,
+              (dayPositions.quantities.get(secId) ?? 0) + qty,
+            );
+            dayPositions.closes.set(secId, price ?? null);
+          }
 
           if (price != null) {
             const valueInSecCurrency = qty * price;
             const secCurrency = security?.currencyCode || defaultCurrency;
-            dayValue.add(
-              this.convertCurrency(
-                valueInSecCurrency,
-                secCurrency,
-                defaultCurrency,
-                dateStr,
-                rateIndex,
-              ),
+            const converted = this.convertCurrency(
+              valueInSecCurrency,
               secCurrency,
               defaultCurrency,
+              dateStr,
+              rateIndex,
             );
+            dayValue.add(converted, secCurrency, defaultCurrency);
+            if (dayPositions) {
+              const prior = dayPositions.closeValues.get(secId);
+              dayPositions.closeValues.set(
+                secId,
+                converted === null || prior === null
+                  ? null
+                  : (prior ?? 0) + converted,
+              );
+            }
           } else {
             // A held position with no accepted close on or before this day. Its
             // market value is UNKNOWN, not zero: skipping it silently is what
@@ -1713,6 +1831,7 @@ export class NetWorthService {
             // as it was (additive change, design 6.2); the flag is what a
             // consumer reads before printing it.
             unpricedSecurityIds.add(secId);
+            dayPositions?.closeValues.set(secId, null);
           }
         }
       }
@@ -1745,7 +1864,12 @@ export class NetWorthService {
           currency,
           defaultCurrency,
         );
+        dayPositions?.cashByCurrency.set(
+          currency,
+          (dayPositions.cashByCurrency.get(currency) ?? 0) + bal,
+        );
       }
+      if (dayPositions) positions.push(dayPositions);
 
       result.push({
         date: dateStr,
@@ -1767,7 +1891,7 @@ export class NetWorthService {
       });
     }
 
-    return result;
+    return { series: result, positions };
   }
 
   /**

@@ -143,6 +143,10 @@ What is shared, and why each one is a single writer:
 
 Two subtleties the shapes encode. A **zero baseline** yields no percentage but a known movement, so `movement` survives with `complete: false` -- the cell stays blank, the day panel may show the figure. And the detail endpoint's **`remainder`** (the move no per-security close explains: a dividend, a position first priced that day, cash interest) is `null` whenever any component is unknown, because a remainder computed from a subtotal is a reconciliation that reconciles nothing.
 
+## An intraday bar is valued at its own day's positions
+
+The 1D / 1W / MTD / 1M series (`PortfolioService.loadIntradayData`) takes its prices from the quote provider's bars and everything else from the daily investment fold: `NetWorthService.getDailyInvestmentPositions` returns, per calendar day, the share counts, closes and cash the fold valued that day at, and each bar reads the entry for its own UTC day. Never value a past bar with the `holdings` row or an account's current balance -- both are today's, and a trade or deposit last week then moves every bar before it. Each finished session also gets one closing point, one grid step after its last bar, carrying the daily series' own `value` for the day, so the intraday chart and the 3M chart agree on every close to the cent. `docs/specs/intraday-historical-positions.md`, INV-INTRADAY-001.
+
 ## The portfolio summary is computed once per user, scope and minute, and forgotten where it stops being true
 
 `PortfolioService.getPortfolioSummary` is the most expensive read in the application: live FX priming, a per-holding cost-basis replay, and a day-by-day since-inception result. Opening the Investments page issued three requests that each needed it -- `GET /portfolio/summary`, `GET /portfolio/allocation/by-tag` and `GET /portfolio/tag-keys` -- and they start together, so the server computed the same valuation three times concurrently.

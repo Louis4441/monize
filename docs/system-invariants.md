@@ -74,6 +74,7 @@ implied.
 | INV-PRICE-001 | A stored price is in the currency the security is recorded in | partial |
 | INV-PORTRESULT-001 | A period change is not a return: value change, external flows and investment result are three figures | enforced |
 | INV-PORTRESULT-002 | Cash is not an investment: the invested part's P&L and TWR exclude deposits, withdrawals and idle cash | enforced |
+| INV-INTRADAY-001 | An intraday bar is valued at its own day's positions, and a finished session closes on the daily series' figure | enforced |
 | INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
 | INV-REPORT-002 | A chart's down-sampling never reaches a count, a total or an export | enforced |
 | INV-LOAN-001 | A recurring overpayment's cadence is a calendar, not a payment interval | enforced |
@@ -1220,6 +1221,51 @@ figure moves when they pay cash in without buying anything. The invested
 measure is the answer to the question the caption asks, and the account-level
 measure -- which is the right answer to a different question -- keeps its own
 fields, its own caption and its own consumers.
+
+### INV-INTRADAY-001 -- an intraday bar holds what its own day held
+
+```text
+Statement           A bar of the 1D / 1W / MTD / 1M Portfolio Value series on
+                    calendar day D is valued at the share counts and cash held
+                    at the close of D, never at today's holdings row or today's
+                    balance. Every finished session in the window ends on one
+                    closing point, one grid step after its last bar, whose value
+                    and securitiesValue are getDailyInvestments' figures for D.
+                    Today's session is live and has no closing point.
+Source of truth     the daily investment fold (NetWorthService.foldDailyInvestments):
+                    applyActionToQuantity over the ledger, loadDailyCashBalances,
+                    positionCloseAsOf
+Enforcement         One fold, two readers. getDailyInvestmentPositions returns
+                    the fold's series together with the per-day quantities,
+                    closes, close values and cash it recorded while folding;
+                    PortfolioService.loadIntradayData values each bar from the
+                    entry for the bar's UTC day and inserts the closing points
+                    (planSessionCloses). The security set is every security held
+                    on any day of the window, so a position sold mid-window keeps
+                    its bars up to the sale.
+Concurrency scope   --
+Failure response    A day the daily series could not value completely
+                    (pricesComplete, fxComplete or cashComplete false) gets no
+                    closing point; its bars stand. A holding with no intraday
+                    bars is valued per day at that day's quantity and close.
+Required tests      portfolio.service.spec.ts "intraday series on the ledger's
+                    per-day positions" (a buy and a deposit mid-window, a sale
+                    mid-window, the XGRO Sep 2 closing point, a no-bars holding,
+                    today's live session, an incomplete day, the breakdown's
+                    closing point); net-worth.service.spec.ts
+                    getDailyInvestmentPositions.
+Status              enforced
+```
+
+Before this, `loadIntradayData` multiplied every bar in the window by today's
+`holdings.quantity` and added today's cash balance, so any trade or deposit in
+the last month moved every earlier bar by its size: a CA RRSP with two $2,000
+XCNS purchases read about $4,000 high on every day before them, while the 3M
+chart (the daily fold) matched the statement. The closing point also absorbs the
+difference between the last 15-minute bar's final trade and the official close
+(XGRO on 2026-09-02: 38.575 against 38.58, $14.46 on 2,891.173 shares).
+`docs/specs/intraday-historical-positions.md` has the truth table and the test
+matrix.
 
 ### INV-REPORT-001 -- a report's account scope is investment linkage, not account type
 

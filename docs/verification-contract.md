@@ -91,6 +91,7 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-TRADE-001 executed total is the fact | **required** | -- | required | -- | -- | -- | -- | optional |
 | INV-PORTRESULT-001 period change is not a return | **required** | -- | optional | -- | -- | -- | -- | optional |
 | INV-PORTRESULT-002 cash is not an investment | **required** | **required** | **required** | -- | -- | -- | -- | optional |
+| INV-INTRADAY-001 an intraday bar holds what its own day held | **required** | -- | supporting | -- | -- | -- | -- | optional |
 | INV-REPORT-001 report account scope | supporting | **required** | **required** | -- | -- | -- | -- | optional |
 | INV-REPORT-002 chart reduction | **required** | **required** | -- | -- | -- | -- | -- | -- |
 | INV-LOAN-001 overpayment cadence | **required** | -- | -- | -- | -- | -- | -- | optional |
