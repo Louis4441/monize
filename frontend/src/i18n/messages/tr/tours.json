@@ -355,6 +355,28 @@
             "body": "Bakiye uyarıları hesabın kendisinde durur: herhangi bir hesabı düzenleyip **Şunun altında bildir** ya da **Şunun üstünde bildir** değerini girin. Bakiye sınırı *geçtiğinde* tetiklenirler, böylece onu orada tutan her ödemeden sonra değil, bir kez haber alırsınız. Bu turu istediğiniz zaman Ayarlar’dan tekrarlayabilirsiniz."
           }
         }
+      },
+      "reportTagBreakdown": {
+        "title": "Bir raporu etikete göre ayırma",
+        "steps": {
+          "welcome": {
+            "title": "Raporlarınızı yalnızca kategoriye değil, etikete göre de görün",
+            "body": "Gelir - Gider Karşılaştırması ve Nakit Akışı artık seçtiğiniz bir etiketin değerine göre ayrılabiliyor — örneğin ev harcamaları ile bir yan iş harcamaları — ve aralarındaki transferleri, bir transferi asla gelir saymadan gösteriyor."
+          },
+          "breakdown": {
+            "title": "Etiket anahtarına göre ayır",
+            "body": "Burada **scope** gibi bir etiket anahtarı seçin; rapor, o anahtarla kullandığınız her değer için bir bölüme, artık kalan her şey için de bir **Etiketsiz** bölümüne ayrılır.",
+            "fallbackBody": "Bu kontrol, bir işlemi **scope:household** gibi bir **anahtar:değer** etiketiyle işaretlediğinizde görünür. Bir tane ekleyin; Etiket anahtarına göre ayır burada görünecektir."
+          },
+          "buckets": {
+            "title": "Değer başına toplamlar, transferler ayrı gösterilir",
+            "body": "Bir anahtar seçmek, her değer için bir sekme artı bir **Etiketsiz** sekmesi açar; her birinin kendi geliri ve gideri vardır. Hesaplar arasında taşınan para **Etiketli girişler** ve **Etiketli çıkışlar** olarak gösterilir — görünürdür ama asla gelir olarak sayılmaz."
+          },
+          "finish": {
+            "title": "İşte etiket ayrımı bu kadar",
+            "body": "Bu görünümü istediğiniz her yerde işlemleri scope:household gibi bir anahtar:değer çiftiyle etiketleyin ve bu turu istediğiniz zaman Ayarlar'dan tekrar açın."
+          }
+        }
       }
     }
   }

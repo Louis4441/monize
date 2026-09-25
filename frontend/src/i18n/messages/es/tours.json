@@ -355,6 +355,28 @@
             "body": "Los avisos de saldo viven en la propia cuenta: edita cualquier cuenta y fija **Avisar por debajo de** o **Avisar por encima de**. Saltan cuando el saldo *cruza* el límite, así que te avisan una vez y no después de cada pago que lo mantiene ahí. Puedes repetir este recorrido cuando quieras desde Ajustes."
           }
         }
+      },
+      "reportTagBreakdown": {
+        "title": "Desglosar un informe por etiqueta",
+        "steps": {
+          "welcome": {
+            "title": "Vea sus informes por etiqueta, no solo por categoría",
+            "body": "Ingresos vs gastos y el flujo de caja ahora pueden desglosarse por el valor de una etiqueta que usted elija — gasto doméstico frente a un puesto aparte, por ejemplo — y muestran las transferencias entre ellos sin contar nunca una transferencia como ingreso."
+          },
+          "breakdown": {
+            "title": "Desglosar por clave de etiqueta",
+            "body": "Elija aquí una clave de etiqueta, como **scope**, y el informe se divide en una sección por cada valor que haya usado con ella, más una sección **Sin etiquetar** para el resto.",
+            "fallbackBody": "Este control aparece en cuanto etiqueta una transacción con una etiqueta **clave:valor**, como **scope:household**. Añada una y Desglosar por clave de etiqueta aparecerá aquí."
+          },
+          "buckets": {
+            "title": "Totales por valor, con las transferencias separadas",
+            "body": "Al elegir una clave se abre una pestaña por valor más **Sin etiquetar**, cada una con sus propios ingresos y gastos. El dinero movido entre cuentas aparece como **Entradas etiquetadas** y **Salidas etiquetadas** — visible, pero nunca contado como ingreso."
+          },
+          "finish": {
+            "title": "Eso es el desglose por etiqueta",
+            "body": "Etiquete las transacciones con un par clave:valor como scope:household donde quiera esta vista, y vuelva a esta guía cuando quiera desde Ajustes."
+          }
+        }
       }
     }
   }

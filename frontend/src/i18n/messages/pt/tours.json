@@ -355,6 +355,28 @@
             "body": "Os alertas de saldo vivem na própria conta: edite qualquer conta e defina **Avisar abaixo de** ou **Avisar acima de**. Disparam quando o saldo *cruza* o limite, por isso é avisado uma vez em vez de a cada pagamento que o mantém lá. Pode repetir esta visita quando quiser a partir das Definições."
           }
         }
+      },
+      "reportTagBreakdown": {
+        "title": "Repartir um relatório por etiqueta",
+        "steps": {
+          "welcome": {
+            "title": "Veja os seus relatórios por etiqueta, não só por categoria",
+            "body": "Receitas vs Despesas e a Demonstração de Fluxo de Caixa já podem ser repartidas pelo valor de uma etiqueta à sua escolha — despesas domésticas versus uma atividade paralela, por exemplo — e mostram as transferências entre elas sem nunca contar uma transferência como receita."
+          },
+          "breakdown": {
+            "title": "Repartir por chave de etiqueta",
+            "body": "Escolha aqui uma chave de etiqueta, como **scope**, e o relatório divide-se numa secção por cada valor usado com ela, mais uma secção **Sem etiqueta** para o resto.",
+            "fallbackBody": "Este controlo aparece assim que etiquetar uma transação com uma etiqueta **chave:valor**, como **scope:household**. Adicione uma, e Repartir por chave de etiqueta aparecerá aqui."
+          },
+          "buckets": {
+            "title": "Totais por valor, com as transferências à parte",
+            "body": "Escolher uma chave abre um separador por valor mais **Sem etiqueta**, cada um com as suas próprias receitas e despesas. O dinheiro movido entre contas aparece como **Entradas etiquetadas** e **Saídas etiquetadas** — visível, mas nunca contado como receita."
+          },
+          "finish": {
+            "title": "É assim a repartição por etiqueta",
+            "body": "Etiquete transações com um par chave:valor como scope:household onde quiser esta vista, e volte a esta visita guiada quando quiser a partir de Definições."
+          }
+        }
       }
     }
   }

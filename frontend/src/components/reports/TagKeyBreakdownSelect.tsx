@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { Select } from '@/components/ui/Select';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 
 interface TagKeyBreakdownSelectProps {
   /** Distinct KEY:VALUE tag keys in the user's tags (`collectTagKeys`). */
@@ -37,7 +38,10 @@ export function TagKeyBreakdownSelect({
   if (tagKeys.length === 0) return null;
 
   return (
-    <div className="w-48 shrink-0">
+    <div
+      className="w-48 shrink-0"
+      {...tourAnchor(TOUR_ANCHORS.reportTagBreakdownSelect)}
+    >
       <Select
         aria-label={t('tagBreakdown.label')}
         options={options}
