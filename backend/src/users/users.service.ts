@@ -44,6 +44,7 @@ import {
   type OidcReauthPurpose,
 } from "../auth/oidc/oidc-reauth.service";
 import { toUserProfile } from "./user-profile";
+import { isTwoFactorActive } from "../auth/two-factor-state";
 import { UserMaintenanceService } from "../common/jobs/user-maintenance.service";
 import {
   EmailChangeService,
@@ -197,7 +198,29 @@ export class UsersService {
         .findOne({ where: { userId } });
       // The insert above guarantees the row; the non-null assertion records that
       // rather than inventing a fallback that could mask a real absence.
-      return preferences!;
+      return this.asReported(manager, userId, preferences!);
+    });
+  }
+
+  /**
+   * The preferences row as the client should read it: `twoFactorEnabled` says
+   * whether sign-in actually asks for a second factor (`isTwoFactorActive`), not
+   * only what the column holds. A flag left on over a cleared secret otherwise
+   * shows Settings a 2FA that sign-in never asks for, and hides the Enable
+   * button the user needs to enroll again. A copy, so the entity TypeORM loaded
+   * is not mutated, and still a `UserPreference`, so the serializer keeps
+   * honouring its `@Exclude()` columns.
+   */
+  private async asReported(
+    manager: EntityManager,
+    userId: string,
+    preferences: UserPreference,
+  ): Promise<UserPreference> {
+    const user = await manager
+      .getRepository(User)
+      .findOne({ where: { id: userId } });
+    return Object.assign(new UserPreference(), preferences, {
+      twoFactorEnabled: isTwoFactorActive(preferences, user),
     });
   }
 
@@ -328,7 +351,10 @@ export class UsersService {
             .execute();
         }
         const after = await repo.findOne({ where: { userId } });
-        return { saved: after!, previousDefaultCurrency };
+        return {
+          saved: await this.asReported(manager, userId, after!),
+          previousDefaultCurrency,
+        };
       },
     );
 

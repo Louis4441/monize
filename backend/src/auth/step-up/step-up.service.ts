@@ -22,6 +22,7 @@ import {
 } from "../oidc/oidc-reauth.service";
 import { tr } from "../../i18n/translate";
 import { AuthAttemptCounterService } from "../auth-attempt-counter.service";
+import { isTwoFactorActive } from "../two-factor-state";
 
 interface VerifyArgs {
   password?: string;
@@ -124,8 +125,7 @@ export class StepUpAuthService {
         where: { userId },
       }),
     );
-    const twoFactorEnabled =
-      !!preferences?.twoFactorEnabled && !!user.twoFactorSecret;
+    const twoFactorEnabled = isTwoFactorActive(preferences, user);
 
     let verified = false;
 

@@ -50,6 +50,7 @@ import { currentRequestLocale } from "../i18n/request-locale";
 import { I18nService } from "nestjs-i18n";
 import { emailTranslator } from "../i18n/email-translator";
 import { resolveUserEmailLocale } from "../i18n/resolve-user-email-locale";
+import { isTwoFactorActive } from "./two-factor-state";
 
 @Injectable()
 export class AuthService {
@@ -497,7 +498,7 @@ export class AuthService {
       }),
     );
 
-    if (preferences?.twoFactorEnabled && user.twoFactorSecret) {
+    if (isTwoFactorActive(preferences, user)) {
       // Check for trusted device
       if (trustedDeviceRef) {
         const isTrusted = await this.twoFactorService.validateTrustedDevice(
@@ -802,12 +803,15 @@ export class AuthService {
    * authenticated user's 2FA state without exposing the secret.
    */
   async is2FAEnabled(userId: string): Promise<boolean> {
-    const prefs = await this.scoped(UserPreference, (repo) =>
-      repo.findOne({
-        where: { userId },
-      }),
-    );
-    return !!prefs?.twoFactorEnabled;
+    const [prefs, user] = await Promise.all([
+      this.scoped(UserPreference, (repo) =>
+        repo.findOne({
+          where: { userId },
+        }),
+      ),
+      this.scoped(User, (repo) => repo.findOne({ where: { id: userId } })),
+    ]);
+    return isTwoFactorActive(prefs, user);
   }
 
   async getUserStateById(
