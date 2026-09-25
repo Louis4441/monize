@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@/test/render";
+import { render, screen, waitFor, fireEvent, act } from "@/test/render";
 import { CashFlowReport } from "./CashFlowReport";
 
 const mockPush = vi.fn();
@@ -70,6 +70,11 @@ vi.mock("@/lib/built-in-reports", () => ({
   },
 }));
 
+const mockGetAllTags = vi.fn().mockResolvedValue([]);
+vi.mock("@/lib/tags", () => ({
+  tagsApi: { getAll: (...args: any[]) => mockGetAllTags(...args) },
+}));
+
 vi.mock("@/lib/logger", () => ({
   createLogger: () => ({
     error: vi.fn(),
@@ -93,11 +98,15 @@ describe("CashFlowReport", () => {
     mockPush.mockClear();
   });
 
-  it("shows loading state initially", () => {
+  it("shows loading state initially", async () => {
     mockGetCashFlow.mockReturnValue(new Promise(() => {}));
     mockGetIncomeBySource.mockReturnValue(new Promise(() => {}));
     mockGetSpendingByCategory.mockReturnValue(new Promise(() => {}));
-    render(<CashFlowReport />);
+    // The tag-key lookup resolves on mount alongside the report fetches;
+    // flush it inside act() so its state update lands before the assertion.
+    await act(async () => {
+      render(<CashFlowReport />);
+    });
     expect(document.querySelector(".animate-pulse")).toBeTruthy();
   });
 
@@ -350,6 +359,123 @@ describe("CashFlowReport", () => {
     render(<CashFlowReport />);
     await waitFor(() => {
       expect(screen.getByText("Other Expenses")).toBeInTheDocument();
+    });
+  });
+
+  describe("tag key breakdown", () => {
+    beforeEach(() => {
+      mockGetIncomeBySource.mockResolvedValue({ data: [], totalIncome: 0 });
+      mockGetSpendingByCategory.mockResolvedValue({ data: [], totalSpending: 0 });
+    });
+
+    it("hides the selector when the user has no KEY:VALUE tags", async () => {
+      mockGetAllTags.mockResolvedValue([{ id: "t1", name: "groceries" }]);
+      mockGetCashFlow.mockResolvedValue({
+        data: [],
+        totals: { income: 0, expenses: 0, net: 0, knownIncome: 0, knownExpenses: 0, knownNet: 0 },
+      });
+      render(<CashFlowReport />);
+      await waitFor(() => expect(screen.getByText("Monthly Cash Flow")).toBeInTheDocument());
+      expect(screen.queryByRole("combobox", { name: "Break down by tag key" })).toBeNull();
+    });
+
+    it('shows the selector and sends no tagKey while "None" is selected', async () => {
+      mockGetAllTags.mockResolvedValue([{ id: "t1", name: "scope:household" }]);
+      mockGetCashFlow.mockResolvedValue({
+        data: [],
+        totals: { income: 0, expenses: 0, net: 0, knownIncome: 0, knownExpenses: 0, knownNet: 0 },
+      });
+      render(<CashFlowReport />);
+      await waitFor(() =>
+        expect(screen.getByRole("combobox", { name: "Break down by tag key" })).toBeInTheDocument(),
+      );
+      const lastCall = mockGetCashFlow.mock.calls.at(-1)?.[0];
+      expect(lastCall).not.toHaveProperty("tagKey");
+    });
+
+    it("renders value buckets and the untagged bucket once a key is chosen", async () => {
+      mockGetAllTags.mockResolvedValue([{ id: "t1", name: "scope:household" }]);
+      mockGetCashFlow.mockResolvedValue({
+        data: [],
+        totals: { income: 0, expenses: 0, net: 0, knownIncome: 0, knownExpenses: 0, knownNet: 0 },
+        currency: "CAD",
+        missingCurrencies: [],
+        excludedCount: 0,
+      });
+      render(<CashFlowReport />);
+      const select = await screen.findByRole("combobox", { name: "Break down by tag key" });
+
+      mockGetCashFlow.mockResolvedValue({
+        data: [],
+        totals: { income: 0, expenses: 0, net: 0, knownIncome: 0, knownExpenses: 0, knownNet: 0 },
+        currency: "CAD",
+        missingCurrencies: [],
+        excludedCount: 0,
+        tagKey: "scope",
+        buckets: [
+          {
+            value: "household",
+            isUntagged: false,
+            data: [],
+            totals: { income: 0, expenses: 0, net: 0, knownIncome: 500, knownExpenses: 200, knownNet: 300 },
+            taggedInflows: 1000,
+            taggedOutflows: 1000,
+            missingCurrencies: [],
+            excludedCount: 0,
+          },
+          {
+            value: "__untagged__",
+            isUntagged: true,
+            data: [],
+            totals: { income: 0, expenses: 0, net: 0, knownIncome: 0, knownExpenses: 0, knownNet: 0 },
+            taggedInflows: 0,
+            taggedOutflows: 0,
+            missingCurrencies: [],
+            excludedCount: 0,
+          },
+        ],
+      });
+      await act(async () => {
+        fireEvent.change(select, { target: { value: "scope" } });
+      });
+
+      await waitFor(() =>
+        expect(mockGetCashFlow.mock.calls.at(-1)?.[0]).toMatchObject({ tagKey: "scope" }),
+      );
+      expect(await screen.findByRole("tab", { name: "household" })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Untagged" })).toBeInTheDocument();
+
+      const taggedFlows = screen.getByTestId("tagged-flows");
+      expect(taggedFlows).toHaveTextContent("Tagged inflows");
+      expect(taggedFlows).toHaveTextContent("Tagged outflows");
+    });
+
+    it("shows the missing-rate treatment for an incomplete bucket", async () => {
+      mockGetAllTags.mockResolvedValue([{ id: "t1", name: "scope:household" }]);
+      mockGetCashFlow.mockResolvedValue({
+        data: [],
+        totals: { income: 0, expenses: 0, net: 0, knownIncome: 0, knownExpenses: 0, knownNet: 0 },
+        currency: "CAD",
+        missingCurrencies: [],
+        excludedCount: 0,
+        tagKey: "scope",
+        buckets: [
+          {
+            value: "household",
+            isUntagged: false,
+            data: [],
+            totals: { income: null, expenses: null, net: null, knownIncome: 500, knownExpenses: 200, knownNet: 300 },
+            taggedInflows: 1000,
+            taggedOutflows: 1000,
+            missingCurrencies: ["JPY"],
+            excludedCount: 1,
+          },
+        ],
+      });
+      render(<CashFlowReport />);
+      await screen.findByRole("combobox", { name: "Break down by tag key" });
+
+      expect((await screen.findAllByTestId("partial-total")).length).toBeGreaterThan(0);
     });
   });
 });
