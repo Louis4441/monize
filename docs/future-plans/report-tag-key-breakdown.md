@@ -57,6 +57,13 @@ no transfer-flow branch.
 Deferred; budget-period + category based in the budgets module. Separate design
 note before implementation.
 
+### Not in scope: a rules engine
+
+Auto-tagging by condition (source/destination account, payee, amount, etc.) is
+explicitly excluded by owner decision. Tags are applied manually through the
+existing transaction-form tag control; nothing in this feature writes a tag on a
+user's behalf.
+
 ## What to run (per phase, before pushing)
 
 - `backend/`: `npm run lint && npx tsc --noEmit && npm run typecheck`,

@@ -238,8 +238,9 @@ sync; no backend-composed copy is added (reports are request-scoped).
 - **Budget vs Actual** breakdown: it is budget-period + category based in a
   different module; a tag dimension there is a separate change, deferred to a
   later phase.
-- **The rules engine** (auto-adding tags by condition): a separate feature and
-  spec; this spec assumes tags are applied manually or by future rules.
+- **The rules engine** (auto-adding tags by condition): explicitly NOT in scope
+  by owner decision. Tags are applied manually (the transaction form's existing
+  tag MultiSelect); this feature never auto-writes a tag.
 - **Split-level tag editing UI**: the backend M2M exists and this report reads
   split tags (B4); exposing a split-tag editor in the form is a separate change.
 - Persisting a chosen `tagKey` as a saved report preference.
