@@ -483,6 +483,31 @@ describe('PortfolioValueReport', () => {
     }
   });
 
+  it('draws YTD from the previous year-end close and names the window to the server', async () => {
+    mockDateRangeValue = 'ytd';
+    mockGetInvestmentsDaily.mockResolvedValue([
+      { date: '2025-12-31', value: 50000 },
+      { date: '2026-01-02', value: 50500 },
+    ]);
+    mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    await act(async () => {
+      render(<PortfolioValueReport />);
+    });
+
+    // The chart opens on 31 December, whose value is the last session's
+    // close, rather than on the year's first trading day.
+    expect(mockGetInvestmentsDaily).toHaveBeenCalledWith(
+      expect.objectContaining({ startDate: `${new Date().getFullYear() - 1}-12-31` }),
+    );
+    // The figures are the server's `ytd` preset, which opens on the same day.
+    await waitFor(() =>
+      expect(mockGetPeriodResult).toHaveBeenCalledWith(
+        expect.objectContaining({ period: 'ytd' }),
+      ),
+    );
+  });
+
   describe('custom range', () => {
     const lastSelectorProps = () =>
       mockDateRangeSelectorProps.mock.calls[mockDateRangeSelectorProps.mock.calls.length - 1][0];

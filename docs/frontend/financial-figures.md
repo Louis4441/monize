@@ -116,7 +116,7 @@ For a dated range the baseline is the close before the **first point on screen**
 The rules are not uniform -- each matches the platform being compared against:
 
 - **3M, 6M, 1Y, 2Y, 5Y** open on the calendar day *before* the period (2Y follows the calendar, not a 730-day count).
-- **YTD** opens on the year's first *trading* day (`netWorthApi.getFirstPricedDay` answers from `security_prices`). A null answer keeps the calendar boundary rather than claiming a trading day nobody observed.
+- **YTD** opens on 31 December of the previous year, so the year is measured from the close of its last trading session; the server's `ytd` preset (`portfolio-period-presets.util.ts`) opens on the same day. A year-end on a weekend or holiday still carries the last session's close, and `startPriceDate` names that session.
 - **1M** keeps its window and collapses its first *day* to that day's close (`trimIntradayToFirstDayClose`) -- it is an intraday chart, and opening mid-session a month ago mixes a mid-session price into a series of closes. 1D deliberately opens at the open; 1W and MTD are measured from the prior close already.
 
 Both intraday adjustments live inside `trimIntradayPoints`, which every intraday render site calls -- a shaping step applied at three of four call sites is a chart that disagrees with itself.

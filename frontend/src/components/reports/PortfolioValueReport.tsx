@@ -336,12 +336,9 @@ export function PortfolioValueReport() {
   // The window this chart requests is not the period the range names: a price
   // series opens on the close it is measured from. See
   // `portfolio-range-window.ts` for the per-range rules.
-  const accountIdsCsvForWindow =
-    selectedAccountIds.length > 0 ? selectedAccountIds.join(',') : undefined;
   const chartWindow = usePortfolioRangeWindow({
     range: dateRange,
     base: resolvedRange,
-    accountIdsCsv: accountIdsCsvForWindow,
   });
 
   // Per-security stacked view. Available on every range: intraday ranges pull
