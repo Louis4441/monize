@@ -1280,8 +1280,11 @@ export function PortfolioValueReport() {
 
       {/* Controls */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
-        <div className="flex flex-wrap gap-4 items-center justify-between">
-          <div className="flex w-full flex-wrap gap-2 items-center sm:w-auto">
+        {/* Both rows align on the first line's text rather than centring, so
+            the custom range's date fields open below the controls without
+            moving the picker, the switches or the actions down with them. */}
+        <div className="flex flex-wrap gap-4 items-baseline">
+          <div className="flex w-full flex-wrap gap-2 items-baseline sm:w-auto">
             {/* Full width on a phone: at `w-48` the picker and the ten range
                 buttons beside it are wider than the screen. */}
             <ReportAccountMultiSelect
@@ -1302,9 +1305,11 @@ export function PortfolioValueReport() {
               activeColour="bg-emerald-600"
             />
           </div>
-          {/* Four controls: they wrap on a phone rather than carrying the
-              export off the right of the card. */}
-          <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
+          {/* The view switches and the actions are one trailing group, so the
+              switches sit against Refresh/Export at the right edge. They wrap
+              on a phone rather than carrying the export off the card, and the
+              actions take a line of their own there. */}
+          <div className="flex w-full flex-wrap items-center gap-3 sm:ml-auto sm:w-auto">
             {/* Total vs. per-security stacked view, available on every range. */}
             <div className="inline-flex rounded-md overflow-hidden border border-gray-200 dark:border-gray-600">
               {(['total', 'securities'] as const).map((mode) => {
@@ -1334,13 +1339,13 @@ export function PortfolioValueReport() {
               options={['area', 'table']}
               activeColour="bg-emerald-600"
             />
+            <ReportToolbarActions
+              onRefreshComplete={() => setReloadKey((k) => k + 1)}
+              onExportPdf={handleExportPdf}
+              onExportCsv={handleExportCsv}
+              disabled={chartPoints.length === 0}
+            />
           </div>
-          <ReportToolbarActions
-            onRefreshComplete={() => setReloadKey((k) => k + 1)}
-            onExportPdf={handleExportPdf}
-            onExportCsv={handleExportCsv}
-            disabled={chartPoints.length === 0}
-          />
         </div>
       </div>
 

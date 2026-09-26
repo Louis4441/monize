@@ -454,6 +454,35 @@ describe('PortfolioValueReport', () => {
     expect(lastCall.ranges).toEqual(['1d', '1w', 'mtd', '1m', '3m', 'ytd', '1y', '2y', '5y', 'all']);
   });
 
+  it('keeps the view switches beside the actions and the toolbar pinned to its first line', async () => {
+    mockDateRangeValue = 'custom';
+    mockCustomStart = '2025-01-01';
+    mockCustomEnd = '2026-01-01';
+    mockGetInvestmentsDaily.mockResolvedValue([]);
+    mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    await act(async () => {
+      render(<PortfolioValueReport />);
+    });
+
+    // One trailing group: the Total/By security and Table/Chart switches sit
+    // against Refresh/Export at the right edge, not beside the range buttons.
+    const totalSwitch = screen.getByRole('button', { name: 'Total' });
+    const trailing = totalSwitch.parentElement!.parentElement!;
+    expect(trailing.className).toContain('sm:ml-auto');
+    expect(trailing).toContainElement(screen.getByTestId('export-pdf'));
+
+    // Both rows align on the first line's text. Centred, they slid down to the
+    // middle of the custom range's date fields when those opened below.
+    const toolbar = trailing.parentElement!;
+    const leading = toolbar.firstElementChild as HTMLElement;
+    expect(leading).toContainElement(screen.getByTestId('date-range-selector'));
+    for (const row of [toolbar, leading]) {
+      expect(row.className).toContain('items-baseline');
+      expect(row.className).not.toContain('items-center');
+    }
+  });
+
   describe('custom range', () => {
     const lastSelectorProps = () =>
       mockDateRangeSelectorProps.mock.calls[mockDateRangeSelectorProps.mock.calls.length - 1][0];
