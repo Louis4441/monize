@@ -1200,7 +1200,6 @@
     "incompleteTooltip": "此时间段内有些天缺少价格、汇率或现金余额，因此依赖每一天数据的数字不会显示。",
     "measuredFromClose": "自 {date} 收盘起",
     "unmeasuredFlowTooltip": "资金以此处无法计算的方式转入或转出这些账户：例如某笔交易通过这些账户之外的账户结算，或某个拆分将投资行与普通支出混在一起。投资结果不会显示，因为其中一部分将是您自己的资金。",
-    "closeBoundsTooltip": "这些数据是根据已保存的 {start} 和 {end} 收盘价计算得出的。上方图表显示的是当天的实时价格，因此图表可能会变化，而这些数据保持不变。",
     "notAvailable": "不适用",
     "intradayUnavailable": "详细日内定价不可用",
     "intradayUnavailableTitle": "此账户组合不支持日内视图",

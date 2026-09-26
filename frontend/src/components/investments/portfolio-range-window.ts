@@ -20,7 +20,7 @@ import { resolveRangePreset, type ResolveRangeOptions } from '@/lib/date-range';
  * | 1D, 1W, MTD | unchanged | already measured from the prior close, via `PRIOR_CLOSE_BASELINE_RANGES` |
  * | 1M | unchanged | intraday; the first *day* is collapsed to its close by `trimIntradayToFirstDayClose` |
  * | 3M, 6M | the day before the period starts | so the first plotted close precedes the period |
- * | YTD | the year's first **trading** day | not 1 January, which carries December's close |
+ * | YTD | 31 December of the previous year | the year is measured from its last session's close, which that day carries |
  * | 1Y, 2Y, 5Y | the day before the anniversary | today - 1 year - 1 day, and so on |
  *
  * A rule naming an exact day overrides month alignment, which is why these do
@@ -32,8 +32,12 @@ export type PortfolioWindowStart =
   | { kind: 'inherit' }
   /** The calendar day before `years`/`months` ago. */
   | { kind: 'dayBefore'; years?: number; months?: number }
-  /** The first day of the year on which anything held was actually priced. */
-  | { kind: 'firstPricedDayOfYear' };
+  /**
+   * 31 December of the previous year. A day is valued from the latest close
+   * on or before it, so a year-end on a weekend or holiday still carries the
+   * last session's close, and the period result's `startPriceDate` names it.
+   */
+  | { kind: 'previousYearEnd' };
 
 export const PORTFOLIO_WINDOW_STARTS: Readonly<
   Record<string, PortfolioWindowStart>
@@ -44,20 +48,11 @@ export const PORTFOLIO_WINDOW_STARTS: Readonly<
   '1m': { kind: 'inherit' },
   '3m': { kind: 'dayBefore', months: 3 },
   '6m': { kind: 'dayBefore', months: 6 },
-  ytd: { kind: 'firstPricedDayOfYear' },
+  ytd: { kind: 'previousYearEnd' },
   '1y': { kind: 'dayBefore', years: 1 },
   '2y': { kind: 'dayBefore', years: 2 },
   '5y': { kind: 'dayBefore', years: 5 },
 };
-
-export interface PortfolioWindowOptions extends ResolveRangeOptions {
-  /**
-   * The year's first priced day, from `netWorthApi.getFirstPricedDay`. Null or
-   * absent -- not loaded yet, or the scope holds nothing priced -- keeps the
-   * calendar boundary rather than inventing a trading day.
-   */
-  ytdFirstPricedDay?: string | null;
-}
 
 /**
  * The window a Portfolio Value chart should request for `range`.
@@ -67,7 +62,7 @@ export interface PortfolioWindowOptions extends ResolveRangeOptions {
  */
 export function resolvePortfolioRangeWindow(
   range: string,
-  options: PortfolioWindowOptions = {},
+  options: ResolveRangeOptions = {},
 ): { start: string; end: string } {
   return applyPortfolioWindowStart(
     range,
@@ -86,32 +81,19 @@ export function resolvePortfolioRangeWindow(
 export function applyPortfolioWindowStart(
   range: string,
   base: { start: string; end: string },
-  options: PortfolioWindowOptions = {},
+  options: ResolveRangeOptions = {},
 ): { start: string; end: string } {
   const rule = PORTFOLIO_WINDOW_STARTS[range];
   if (!rule || rule.kind === 'inherit') return base;
 
-  if (rule.kind === 'firstPricedDayOfYear') {
-    return { ...base, start: options.ytdFirstPricedDay || base.start };
+  const now = options.now ?? new Date();
+  if (rule.kind === 'previousYearEnd') {
+    return { ...base, start: `${now.getFullYear() - 1}-12-31` };
   }
 
-  const now = options.now ?? new Date();
   const anniversary =
     rule.years !== undefined
       ? subYears(now, rule.years)
       : subMonths(now, rule.months ?? 0);
   return { ...base, start: format(subDays(anniversary, 1), 'yyyy-MM-dd') };
-}
-
-/**
- * Does this range need the year's first priced day looked up before its window
- * can be resolved? Only YTD does, so only YTD pays for the extra request.
- */
-export function needsFirstPricedDay(range: string): boolean {
-  return PORTFOLIO_WINDOW_STARTS[range]?.kind === 'firstPricedDayOfYear';
-}
-
-/** 1 January of the year `now` falls in, as YYYY-MM-DD. */
-export function startOfYearIso(now: Date = new Date()): string {
-  return `${now.getFullYear()}-01-01`;
 }

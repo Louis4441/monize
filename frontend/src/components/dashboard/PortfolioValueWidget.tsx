@@ -91,7 +91,6 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
   const { start, end } = usePortfolioRangeWindow({
     range: config.range,
     base: baseWindow,
-    accountIdsCsv,
   });
 
   const { data: series, isLoading: dataLoading, reload: reloadSeries } = useReportData(() => {

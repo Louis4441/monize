@@ -58,7 +58,7 @@ from one of three new read models built out of those endpoints' services.
 | Per-account daily ledger balances | `GET /accounts/daily-balances` (`AccountsService.getDailyBalances`) | Per account, in the account's currency, no conversion. |
 | Per-account projected balances | `GET /accounts/:id/balance-forecast` (`BalanceForecastService`) | Withholds the whole series when one occurrence cannot be priced; names the gaps. |
 | Daily investment value | `GET /net-worth/investments-daily` (`NetWorthService.getDailyInvestments`) | One point per calendar day at the latest accepted close on or before it; carries `fxComplete` / `missingRatePairs` but, today, silently skips an unpriced holding (section 6.2). |
-| "Was this a trading day for this portfolio" | `GET /net-worth/investments-first-priced-day` | The predicate generalised to a set of dates is what the change layer needs. |
+| "Was this a trading day for this portfolio" | `NetWorthService.getLastPricedDays` | Already asks over a set of dates which securities the scope held and when they were priced; the change layer needs the same subquery as an exact-day predicate. |
 | The day's market movement, net of the user's own contributions | `docs/specs/portfolio-movement-notifications.md`, `PortfolioMovementAlertService.externalFlow`, `portfolio-movement.util.ts` | The measure and its invariants are already decided there; this plan reuses them rather than adopting the price-only measure (which misreports a dividend). |
 | Per-security close-to-close change | `PortfolioService.getMonthOverMonthMovers` | The right shape at the wrong granularity; the template for the popup's rows. |
 | Week start | `user_preferences.week_starts_on`, `usePreferencesStore(...weekStartsOn)` | Already read by the Transactions page. The Bills calendar hardcodes Sunday; the new grid does not. |
@@ -323,7 +323,7 @@ Service `DailyMovementService` (`backend/src/securities/daily-movement.service.t
   from `investment-filter.util.ts`, never a hand-written action list;
   INV-REPORT-001).
 - `isTradingDay` from one query over `security_prices` for the securities held
-  on each day, the `getFirstPricedDay` subquery generalised to a date set.
+  on each day, the `getLastPricedDays` subquery matched on the exact day.
 - `decide(input): { movement, movementPercent, complete, reasons }` is a pure
   function beside `decideMovement` in `portfolio-movement.util.ts`, table-tested
   against truth table B.
@@ -661,7 +661,7 @@ Backend: `backend/src/accounts/accounts.controller.ts`,
 `backend/src/accounts/balance-forecast.service.ts`,
 `backend/src/accounts/balance-forecast.util.ts`,
 `backend/src/net-worth/net-worth.service.ts` (`getDailyInvestments`,
-`buildRateIndex`, `getFirstPricedDay`),
+`buildRateIndex`, `getLastPricedDays`),
 `backend/src/net-worth/position-price.util.ts`,
 `backend/src/securities/portfolio.service.ts` (`getTopMovers`,
 `getMonthOverMonthMovers`), `backend/src/securities/portfolio.controller.ts`,

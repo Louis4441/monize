@@ -1200,7 +1200,6 @@
     "incompleteTooltip": "此期間內有些天缺少價格、匯率或現金餘額，因此依賴每一天資料的數字不會顯示。",
     "measuredFromClose": "自 {date} 收盤起",
     "unmeasuredFlowTooltip": "資金以此處無法計算的方式轉入或轉出這些帳戶：例如某筆交易透過這些帳戶以外的帳戶結算，或某個拆分將投資項目與一般支出混在一起。投資結果不會顯示，因為其中一部分將是您自己的資金。",
-    "closeBoundsTooltip": "這些數據是根據已儲存的 {start} 和 {end} 收盤價計算得出。上方圖表顯示的是當天的即時價格，因此圖表可能會變動，而這些數據保持不變。",
     "notAvailable": "不適用",
     "intradayUnavailable": "無法取得詳細的盤中報價",
     "intradayUnavailableTitle": "此科目組合無法使用盤中檢視",

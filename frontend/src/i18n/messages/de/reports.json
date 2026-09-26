@@ -1200,7 +1200,6 @@
     "incompleteTooltip": "Für einige Tage in diesem Zeitraum fehlt ein Kurs, ein Wechselkurs oder ein Kassenbestand, daher werden die davon abhängigen Zahlen nicht angezeigt.",
     "measuredFromClose": "Seit dem Handelsschluss am {date}",
     "unmeasuredFlowTooltip": "Geld wurde auf eine Weise auf diese Konten ein- oder ausgezahlt, die hier nicht erfasst werden kann: ein Geschäft, das über ein Konto außerhalb dieser Gruppe abgewickelt wurde, oder eine Aufteilung, die eine Investitionsposition mit gewöhnlichen Ausgaben vermischt. Das Anlageergebnis wird nicht angezeigt, da ein Teil davon Ihr eigenes Geld wäre.",
-    "closeBoundsTooltip": "Diese Werte werden zwischen den gespeicherten Schlusskursen vom {start} und {end} gemessen. Das Diagramm oben zeigt Kurse in Echtzeit während des Tages, sodass es sich bewegen kann, während diese Werte es nicht tun.",
     "notAvailable": "k. A.",
     "intradayUnavailable": "Detaillierte Intraday-Kurse nicht verfügbar",
     "intradayUnavailableTitle": "Intraday-Ansicht für diese Kontokombination nicht verfügbar",
