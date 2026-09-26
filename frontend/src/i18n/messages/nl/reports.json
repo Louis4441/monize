@@ -322,6 +322,14 @@
     "seriesInflows": "Instroom",
     "seriesOutflows": "Uitstroom"
   },
+  "tagBreakdown": {
+    "label": "Uitsplitsen naar labelsleutel",
+    "none": "Geen",
+    "untagged": "Zonder label",
+    "inflows": "Gelabelde instroom",
+    "outflows": "Gelabelde uitstroom",
+    "sharesExceedNote": "Een rij die onder deze sleutel met meer dan één waarde is gelabeld, telt voor elk van die waarden mee, waardoor de aandelen per waarde samen meer dan 100% kunnen zijn."
+  },
   "categoryPerformance": {
     "noBudgets": "Geen budgetten gevonden. Maak een budget aan om categorieprestaties te zien.",
     "noData": "Nog geen categoriegegevens beschikbaar.",

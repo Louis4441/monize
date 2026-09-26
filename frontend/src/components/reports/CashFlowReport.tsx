@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useRouter } from "next/navigation";
 import {
@@ -31,6 +31,10 @@ import { ChartTooltip } from "@/components/reports/ChartTooltip";
 import { ReportError } from "@/components/reports/ReportError";
 import { chartColors } from "@/lib/chart-colors";
 import { useTranslations } from 'next-intl';
+import { useExchangeRates } from "@/hooks/useExchangeRates";
+import { useTagKeys } from "@/hooks/useTagKeys";
+import { TagKeyBreakdownSelect } from "@/components/reports/TagKeyBreakdownSelect";
+import { TagKeyBreakdownBuckets } from "@/components/reports/TagKeyBreakdownBuckets";
 
 interface ChartDataItem {
   name: string;
@@ -49,6 +53,7 @@ export function CashFlowReport() {
   const { formatCurrencyCompact: formatCurrency, formatCurrencyAxis } =
     useNumberFormat();
   const formatChartDate = useChartDateFormat();
+  const { defaultCurrency } = useExchangeRates();
   const {
     dateRange,
     setDateRange,
@@ -59,6 +64,8 @@ export function CashFlowReport() {
     resolvedRange,
     isValid,
   } = useDateRange({ defaultRange: "6m", alignment: "month" });
+  const tagKeys = useTagKeys();
+  const [tagKey, setTagKey] = useState('');
 
   const { start: rangeStart, end: rangeEnd } = resolvedRange;
 
@@ -69,13 +76,16 @@ export function CashFlowReport() {
       // Fetch all data in parallel
       const [cashFlowResponse, incomeResponse, spendingResponse] =
         await Promise.all([
-          builtInReportsApi.getCashFlow(params),
+          builtInReportsApi.getCashFlow({
+            ...params,
+            ...(tagKey ? { tagKey } : {}),
+          }),
           builtInReportsApi.getIncomeBySource(params),
           builtInReportsApi.getSpendingByCategory(params),
         ]);
       return { cashFlowResponse, incomeResponse, spendingResponse };
     },
-    [isValid, rangeStart, rangeEnd],
+    [isValid, rangeStart, rangeEnd, tagKey],
   );
 
   // Map monthly data. `name` must be unique across the dataset (used as
@@ -115,6 +125,7 @@ export function CashFlowReport() {
     }),
     [response],
   );
+  const reportingCurrency = response?.cashFlowResponse.currency ?? defaultCurrency;
 
   const handleExportPdf = async () => {
     const { exportToPdf } = await import("@/lib/pdf-export");
@@ -267,6 +278,7 @@ export function CashFlowReport() {
             customEndDate={endDate}
             onCustomEndDateChange={setEndDate}
           />
+          <TagKeyBreakdownSelect tagKeys={tagKeys} value={tagKey} onChange={setTagKey} />
           <ReportToolbarActions onExportPdf={handleExportPdf} />
         </div>
       </div>
@@ -392,6 +404,15 @@ export function CashFlowReport() {
         </div>
       </div>
         </>
+      )}
+
+      {!isLoading && !error && response?.cashFlowResponse.tagKey && response.cashFlowResponse.buckets && (
+        <TagKeyBreakdownBuckets
+          tagKey={response.cashFlowResponse.tagKey}
+          buckets={response.cashFlowResponse.buckets}
+          reportingCurrency={reportingCurrency}
+          idPrefix="cash-flow-tag"
+        />
       )}
     </div>
   );

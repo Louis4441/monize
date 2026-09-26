@@ -322,6 +322,14 @@
     "seriesInflows": "Arus Masuk",
     "seriesOutflows": "Arus Keluar"
   },
+  "tagBreakdown": {
+    "label": "Rincian berdasarkan kunci tag",
+    "none": "Tidak ada",
+    "untagged": "Tanpa tag",
+    "inflows": "Arus masuk bertag",
+    "outflows": "Arus keluar bertag",
+    "sharesExceedNote": "Baris yang diberi tag dengan lebih dari satu nilai di bawah kunci ini dihitung untuk masing-masing nilai tersebut, sehingga persentase per nilai dapat berjumlah lebih dari 100%."
+  },
   "categoryPerformance": {
     "noBudgets": "Tidak ada anggaran ditemukan. Buat anggaran untuk melihat kinerja kategori.",
     "noData": "Belum ada data kategori yang tersedia.",

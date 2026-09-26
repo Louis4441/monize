@@ -54,6 +54,7 @@ export const TOUR_ANCHORS = {
   // Reports
   reportForeignCurrencyFees: 'report-foreign-currency-fees',
   reportGemStrategy: 'report-gem-strategy',
+  reportTagBreakdownSelect: 'report-tag-breakdown-select',
 
   // GEM strategy report (the page, its Overview tab, and its tab bar)
   gemStrategyHeader: 'gem-strategy-header',

@@ -322,6 +322,14 @@
     "seriesInflows": "Entradas",
     "seriesOutflows": "Salidas"
   },
+  "tagBreakdown": {
+    "label": "Desglosar por clave de etiqueta",
+    "none": "Ninguna",
+    "untagged": "Sin etiquetar",
+    "inflows": "Entradas etiquetadas",
+    "outflows": "Salidas etiquetadas",
+    "sharesExceedNote": "Una fila etiquetada con más de un valor bajo esta clave cuenta para cada uno de ellos, por lo que los porcentajes por valor pueden sumar más del 100%."
+  },
   "categoryPerformance": {
     "noBudgets": "No se encontraron presupuestos. Crea un presupuesto para ver el rendimiento por categoría.",
     "noData": "Aún no hay datos de categorías disponibles.",

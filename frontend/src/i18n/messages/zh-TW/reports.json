@@ -322,6 +322,14 @@
     "seriesInflows": "流入",
     "seriesOutflows": "流出"
   },
+  "tagBreakdown": {
+    "label": "依標籤鍵細分",
+    "none": "無",
+    "untagged": "未標記",
+    "inflows": "已標記的流入",
+    "outflows": "已標記的流出",
+    "sharesExceedNote": "若某筆記錄在此鍵下標記了多個值，則會計入每個值，因此各值的佔比加總可能超過 100%。"
+  },
   "categoryPerformance": {
     "noBudgets": "找不到預算。請建立預算以查看類別績效。",
     "noData": "尚無可用的類別資料。",
