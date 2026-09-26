@@ -1192,7 +1192,6 @@
     "incompleteTooltip": "Certains jours de cette période manquent d'un cours, d'un taux de change ou d'un solde de trésorerie, les chiffres qui dépendent de chaque jour ne sont donc pas affichés.",
     "measuredFromClose": "Depuis la clôture de la séance du {date}",
     "unmeasuredFlowTooltip": "De l'argent est entré ou sorti de ces comptes d'une manière qui ne peut pas être comptabilisée ici : une opération réglée depuis un compte extérieur à ceux-ci, ou une répartition qui mélange une ligne d'investissement avec une dépense ordinaire. Le résultat de l'investissement n'est pas affiché, car une partie de celui-ci serait votre propre argent.",
-    "closeBoundsTooltip": "Ces chiffres sont mesurés entre les valeurs de clôture enregistrées du {start} et du {end}. Le graphique ci-dessus affiche les cours en direct au cours de la journée, il peut donc évoluer alors que ces chiffres restent fixes.",
     "notAvailable": "N/A",
     "intradayUnavailable": "Données de prix intraday détaillées indisponibles",
     "intradayUnavailableTitle": "Vue intraday indisponible pour cette combinaison de comptes",

@@ -1192,7 +1192,6 @@
     "incompleteTooltip": "[XX-Some days in this window are missing a price, an exchange rate or a cash balance, so the figures that depend on every day are not shown.-XX]",
     "measuredFromClose": "[XX-Since the close of trading on {date}-XX]",
     "unmeasuredFlowTooltip": "[XX-Money moved into or out of these accounts in a way that cannot be counted here: a trade settled from an account outside them, or a split that mixes an investment line with ordinary spending. The investment result is not shown, because part of it would be your own money.-XX]",
-    "closeBoundsTooltip": "[XX-These figures are measured between the stored closing values of {start} and {end}. The chart above shows live prices during the day, so it can move while they do not.-XX]",
     "notAvailable": "[XX-N/A-XX]",
     "intradayUnavailable": "[XX-Detailed intraday pricing unavailable-XX]",
     "intradayUnavailableTitle": "[XX-Intraday view unavailable for this account mix-XX]",

@@ -25,6 +25,7 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { gainLossColor } from '@/lib/format';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useDateRange } from '@/hooks/useDateRange';
+import { useFinancialToday } from '@/hooks/useFinancialToday';
 import { usePortfolioRangeWindow } from '@/hooks/usePortfolioRangeWindow';
 import { usePortfolioPeriodResult } from '@/hooks/usePortfolioPeriodResult';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -122,6 +123,17 @@ import { preferredCurrency } from '@/lib/default-currency';
 const logger = createLogger('PortfolioValueReport');
 
 const DAILY_RANGES = new Set(['1w', '1m', '3m', 'ytd', '1y']);
+
+/**
+ * The longest custom window drawn from daily closes, matching the longest
+ * daily preset (1Y); anything wider is drawn monthly, as 2Y and up are.
+ */
+const CUSTOM_DAILY_MAX_DAYS = 366;
+
+/** Whole days from `start` to `end` (YYYY-MM-DD); both parse as UTC midnight. */
+function spanInDays(start: string, end: string): number {
+  return (Date.parse(end) - Date.parse(start)) / 86_400_000;
+}
 
 /** Nothing reported missing. A frozen module constant, so the identity is stable. */
 const NO_INCOMPLETE_DATA: IncompleteDataCauses = {
@@ -281,20 +293,45 @@ export function PortfolioValueReport() {
     RANGE_STORAGE_KEY,
     '2y',
   );
-  const { dateRange, setDateRange, resolvedRange, isValid } = useDateRange({
+  const {
+    dateRange,
+    setDateRange,
+    startDate: customStartDate,
+    setStartDate: setCustomStartDate,
+    endDate: customEndDate,
+    setEndDate: setCustomEndDate,
+    resolvedRange,
+    isValid: datesEntered,
+  } = useDateRange({
     defaultRange: persistedRange,
     alignment: 'month',
   });
+  const today = useFinancialToday();
   const handleRangeChange = useCallback(
     (next: string) => {
       setDateRange(next);
+      if (next === 'custom') {
+        // The To date opens on today; the From date is the reader's to pick.
+        if (!customEndDate) setCustomEndDate(today);
+        // Only the presets are remembered: the custom dates are not stored, so
+        // a remembered "custom" would reopen on a window with no dates.
+        return;
+      }
       setPersistedRange(next);
     },
-    [setDateRange, setPersistedRange],
+    [setDateRange, setPersistedRange, customEndDate, setCustomEndDate, today],
   );
 
+  const isCustom = dateRange === 'custom';
+  // A custom window with its dates reversed is not a window: nothing loads
+  // until the reader corrects it.
+  const isValid = datesEntered && (!isCustom || customStartDate <= customEndDate);
   const isIntraday = INTRADAY_RANGES.has(dateRange);
-  const useDaily = !isIntraday && DAILY_RANGES.has(dateRange);
+  const useDaily =
+    !isIntraday &&
+    (isCustom
+      ? isValid && spanInDays(customStartDate, customEndDate) <= CUSTOM_DAILY_MAX_DAYS
+      : DAILY_RANGES.has(dateRange));
 
   // The window this chart requests is not the period the range names: a price
   // series opens on the close it is measured from. See
@@ -1159,19 +1196,6 @@ export function PortfolioValueReport() {
           <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
             {t('portfolioValue.valueChange')}
             <InfoTooltip placement="top" text={t('portfolioValue.valueChangeTooltip')} />
-            {/* An intraday chart draws live prices while these figures are
-                measured between two STORED closes, so the line can move while
-                the cards read 0.00. The dates are on the wire; naming them is
-                the difference between a wrong figure and a dated one. */}
-            {isIntraday && periodResult && (
-              <InfoTooltip
-                placement="top"
-                text={t('portfolioValue.closeBoundsTooltip', {
-                  start: formatChartDate(periodResult.startDate, 'MMM d, yyyy'),
-                  end: formatChartDate(periodResult.endDate, 'MMM d, yyyy'),
-                })}
-              />
-            )}
           </div>
           <div className={`text-xl font-bold ${valueChange === null ? '' : gainLossColor(valueChange)}`}>
             {valueChange === null ? (
@@ -1270,6 +1294,11 @@ export function PortfolioValueReport() {
               ranges={['1d', '1w', 'mtd', '1m', '3m', 'ytd', '1y', '2y', '5y', 'all']}
               value={dateRange}
               onChange={handleRangeChange}
+              showCustom
+              customStartDate={customStartDate}
+              onCustomStartDateChange={setCustomStartDate}
+              customEndDate={customEndDate}
+              onCustomEndDateChange={setCustomEndDate}
               activeColour="bg-emerald-600"
             />
           </div>
