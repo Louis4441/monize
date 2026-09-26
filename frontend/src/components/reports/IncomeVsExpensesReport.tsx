@@ -39,6 +39,9 @@ import { useChartDateFormat } from "@/hooks/useChartDateFormat";
 import { useTranslations } from 'next-intl';
 import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { PartialTotal } from "@/components/ui/PartialTotal";
+import { useTagKeys } from "@/hooks/useTagKeys";
+import { TagKeyBreakdownSelect } from "@/components/reports/TagKeyBreakdownSelect";
+import { TagKeyBreakdownBuckets } from "@/components/reports/TagKeyBreakdownBuckets";
 type IncomeVsExpensesSortField = 'name' | 'income' | 'expenses' | 'savings' | 'savingsRate';
 
 /**
@@ -88,6 +91,8 @@ export function IncomeVsExpensesReport() {
     useNumberFormat();
   const { defaultCurrency } = useExchangeRates();
   const [viewType, setViewType] = useState<'bar' | 'table'>('bar');
+  const tagKeys = useTagKeys();
+  const [tagKey, setTagKey] = useState('');
   const {
     dateRange,
     setDateRange,
@@ -111,9 +116,10 @@ export function IncomeVsExpensesReport() {
         ? builtInReportsApi.getIncomeVsExpenses({
             startDate: rangeStart || undefined,
             endDate: rangeEnd,
+            ...(tagKey ? { tagKey } : {}),
           })
         : Promise.resolve(null),
-    [isValid, rangeStart, rangeEnd],
+    [isValid, rangeStart, rangeEnd, tagKey],
   );
 
   // Map response to chart data. `name` must be unique across the dataset
@@ -326,6 +332,7 @@ export function IncomeVsExpensesReport() {
               onChange={(v) => setViewType(v as 'bar' | 'table')}
               options={['bar', 'table']}
             />
+            <TagKeyBreakdownSelect tagKeys={tagKeys} value={tagKey} onChange={setTagKey} />
           </div>
           <ReportToolbarActions
             onExportPdf={handleExportPdf}
@@ -623,6 +630,15 @@ export function IncomeVsExpensesReport() {
           </>
         )}
       </div>
+
+      {!isLoading && !error && response?.tagKey && response.buckets && (
+        <TagKeyBreakdownBuckets
+          tagKey={response.tagKey}
+          buckets={response.buckets}
+          reportingCurrency={reportingCurrency}
+          idPrefix="income-vs-expenses-tag"
+        />
+      )}
     </div>
   );
 }

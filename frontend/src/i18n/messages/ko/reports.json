@@ -322,6 +322,14 @@
     "seriesInflows": "유입액",
     "seriesOutflows": "유출액"
   },
+  "tagBreakdown": {
+    "label": "태그 키별로 분류",
+    "none": "없음",
+    "untagged": "태그 없음",
+    "inflows": "태그된 유입액",
+    "outflows": "태그된 유출액",
+    "sharesExceedNote": "이 키에서 둘 이상의 값으로 태그된 행은 각 값에 대해 집계되므로, 값별 비율의 합이 100%를 초과할 수 있습니다."
+  },
   "categoryPerformance": {
     "noBudgets": "예산을 찾을 수 없습니다. 카테고리 성과를 보려면 예산을 만드세요.",
     "noData": "아직 이용 가능한 카테고리 데이터가 없습니다.",

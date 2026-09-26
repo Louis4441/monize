@@ -355,6 +355,28 @@
             "body": "Les alertes de solde vivent sur le compte lui-même : modifiez un compte et renseignez **Prévenir en dessous de** ou **Prévenir au-dessus de**. Elles se déclenchent quand le solde *franchit* le seuil, vous êtes donc prévenu une fois plutôt qu’après chaque paiement qui l’y maintient. Vous pouvez refaire cette visite à tout moment depuis les Paramètres."
           }
         }
+      },
+      "reportTagBreakdown": {
+        "title": "Répartir un rapport par étiquette",
+        "steps": {
+          "welcome": {
+            "title": "Vos rapports par étiquette, pas seulement par catégorie",
+            "body": "Revenus vs dépenses et l'état des flux de trésorerie peuvent désormais se répartir selon la valeur d'une étiquette de votre choix — les dépenses du foyer face à une activité annexe, par exemple — et affichent les virements entre elles sans jamais compter un virement comme un revenu."
+          },
+          "breakdown": {
+            "title": "Répartir par clé d'étiquette",
+            "body": "Choisissez ici une clé d'étiquette, telle que **scope**, et le rapport se divise en une section par valeur utilisée avec elle, plus une section **Sans étiquette** pour le reste.",
+            "fallbackBody": "Ce champ apparaît dès qu'une transaction porte une étiquette **clé:valeur**, comme **scope:household**. Ajoutez-en une, et Répartir par clé d'étiquette s'affichera ici."
+          },
+          "buckets": {
+            "title": "Des totaux par valeur, virements à part",
+            "body": "Choisir une clé ouvre un onglet par valeur plus **Sans étiquette**, chacun avec ses propres revenus et dépenses. L'argent déplacé entre comptes apparaît comme **Entrées étiquetées** et **Sorties étiquetées** — visible, mais jamais compté comme un revenu."
+          },
+          "finish": {
+            "title": "Voilà pour la répartition par étiquette",
+            "body": "Étiquetez vos transactions avec une paire clé:valeur comme scope:household partout où vous voulez cette vue, et revenez à cette visite guidée à tout moment depuis Paramètres."
+          }
+        }
       }
     }
   }

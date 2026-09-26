@@ -355,6 +355,28 @@
             "body": "Gli avvisi sul saldo stanno sul conto stesso: modifica un conto e imposta **Avvisa sotto** o **Avvisa sopra**. Scattano quando il saldo *attraversa* la soglia, così te lo dicono una volta invece che dopo ogni pagamento che ce lo tiene. Puoi rifare questo percorso quando vuoi dalle Impostazioni."
           }
         }
+      },
+      "reportTagBreakdown": {
+        "title": "Suddividere un report per tag",
+        "steps": {
+          "welcome": {
+            "title": "Guarda i tuoi report per tag, non solo per categoria",
+            "body": "Entrate vs uscite e il Rendiconto finanziario ora possono suddividersi in base al valore di un tag a tua scelta — spese di casa contro una piccola attività secondaria, ad esempio — e mostrano i giroconti tra loro senza mai contare un giroconto come entrata."
+          },
+          "breakdown": {
+            "title": "Suddividi per chiave del tag",
+            "body": "Scegli qui una chiave del tag, come **scope**, e il report si suddivide in una sezione per ogni valore usato con essa, più una sezione **Senza tag** per il resto.",
+            "fallbackBody": "Questo controllo compare non appena assegni a una transazione un tag **chiave:valore**, come **scope:household**. Aggiungine uno e Suddividi per chiave del tag comparirà qui."
+          },
+          "buckets": {
+            "title": "Totali per valore, giroconti tenuti separati",
+            "body": "Scegliendo una chiave si apre una scheda per valore più **Senza tag**, ciascuna con proprie entrate e uscite. Il denaro spostato tra conti compare come **Entrate con tag** e **Uscite con tag** — visibile, ma mai contato come entrata."
+          },
+          "finish": {
+            "title": "Ecco la suddivisione per tag",
+            "body": "Assegna alle transazioni una coppia chiave:valore come scope:household ovunque desideri questa vista, e rivedi questo tour in qualsiasi momento da Impostazioni."
+          }
+        }
       }
     }
   }

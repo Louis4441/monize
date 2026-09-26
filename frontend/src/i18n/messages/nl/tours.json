@@ -355,6 +355,28 @@
             "body": "Saldowaarschuwingen staan bij de rekening zelf: bewerk een rekening en zet **Waarschuwen onder** of **Waarschuwen boven**. Ze gaan af wanneer het saldo de grens *passeert*, dus je hoort het één keer in plaats van na elke betaling die het daar houdt. Je kunt deze rondleiding altijd opnieuw doen vanuit Instellingen."
           }
         }
+      },
+      "reportTagBreakdown": {
+        "title": "Rapport uitsplitsen naar label",
+        "steps": {
+          "welcome": {
+            "title": "Bekijk rapporten per label, niet alleen per categorie",
+            "body": "Inkomsten vs. uitgaven en het kasstroomoverzicht kunnen nu worden uitgesplitst naar de waarde van een label dat u kiest — huishoudelijke uitgaven tegenover een bijverdienste, bijvoorbeeld — en tonen overboekingen ertussen zonder een overboeking ooit als inkomen te tellen."
+          },
+          "breakdown": {
+            "title": "Uitsplitsen naar labelsleutel",
+            "body": "Kies hier een labelsleutel, zoals **scope**, en het rapport splitst zich op in één sectie per waarde die u ermee hebt gebruikt, plus een sectie **Zonder label** voor de rest.",
+            "fallbackBody": "Dit veld verschijnt zodra u een transactie een **sleutel:waarde**-label geeft, zoals **scope:household**. Voeg er een toe, en Uitsplitsen naar labelsleutel verschijnt hier."
+          },
+          "buckets": {
+            "title": "Totalen per waarde, overboekingen apart gehouden",
+            "body": "Een sleutel kiezen opent een tabblad per waarde plus **Zonder label**, elk met eigen inkomsten en uitgaven. Geld dat tussen rekeningen is verplaatst, verschijnt als **Gelabelde instroom** en **Gelabelde uitstroom** — zichtbaar, maar nooit meegeteld als inkomen."
+          },
+          "finish": {
+            "title": "Dat is de labeluitsplitsing",
+            "body": "Geef transacties overal waar u deze weergave wilt een sleutel:waarde-paar zoals scope:household, en bekijk deze rondleiding voortaan altijd opnieuw via Instellingen."
+          }
+        }
       }
     }
   }

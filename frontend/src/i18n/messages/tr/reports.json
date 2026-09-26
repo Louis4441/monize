@@ -322,6 +322,14 @@
     "seriesInflows": "Girişler",
     "seriesOutflows": "Çıkışlar"
   },
+  "tagBreakdown": {
+    "label": "Etiket anahtarına göre ayır",
+    "none": "Yok",
+    "untagged": "Etiketsiz",
+    "inflows": "Etiketli girişler",
+    "outflows": "Etiketli çıkışlar",
+    "sharesExceedNote": "Bu anahtar altında birden fazla değerle etiketlenen bir satır, değerlerin her biri için sayılır; bu nedenle değer başına paylar toplamda %100'ü aşabilir."
+  },
   "categoryPerformance": {
     "noBudgets": "Bütçe bulunamadı. Kategori performansını görmek için bütçe oluşturun.",
     "noData": "Henüz kategori verisi mevcut değil.",

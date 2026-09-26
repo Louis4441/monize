@@ -6,6 +6,7 @@ export * from "./income-by-source.dto";
 export * from "./monthly-spending-trend.dto";
 export * from "./income-vs-expenses.dto";
 export * from "./income-vs-expenses-query.dto";
+export * from "./cash-flow-query.dto";
 export * from "./year-over-year.dto";
 export * from "./weekend-vs-weekday.dto";
 export * from "./spending-anomalies.dto";

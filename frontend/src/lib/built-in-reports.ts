@@ -17,6 +17,7 @@ import {
   MonthlyCategoryBreakdownResponse,
   SpendingByCategoryParams,
   IncomeVsExpensesParams,
+  CashFlowParams,
 } from '@/types/built-in-reports';
 import { MonthlyComparisonResponse } from '@/types/monthly-comparison';
 
@@ -92,7 +93,7 @@ export const builtInReportsApi = {
   },
 
   getCashFlow: async (
-    params: ReportQueryParams,
+    params: CashFlowParams,
   ): Promise<IncomeVsExpensesResponse> => {
     const response = await apiClient.get<IncomeVsExpensesResponse>(
       '/built-in-reports/cash-flow',

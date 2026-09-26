@@ -322,6 +322,14 @@
     "seriesInflows": "Entrées",
     "seriesOutflows": "Sorties"
   },
+  "tagBreakdown": {
+    "label": "Répartir par clé d'étiquette",
+    "none": "Aucune",
+    "untagged": "Sans étiquette",
+    "inflows": "Entrées étiquetées",
+    "outflows": "Sorties étiquetées",
+    "sharesExceedNote": "Une ligne étiquetée avec plusieurs valeurs pour cette clé compte pour chacune d'elles ; la somme des parts par valeur peut donc dépasser 100 %."
+  },
   "categoryPerformance": {
     "noBudgets": "Aucun budget trouvé. Créez un budget pour voir la performance par catégorie.",
     "noData": "Aucune donnée de catégorie disponible.",

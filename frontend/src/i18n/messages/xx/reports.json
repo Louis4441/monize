@@ -322,6 +322,14 @@
     "seriesInflows": "[XX-Inflows-XX]",
     "seriesOutflows": "[XX-Outflows-XX]"
   },
+  "tagBreakdown": {
+    "label": "[XX-Break down by tag key-XX]",
+    "none": "[XX-None-XX]",
+    "untagged": "[XX-Untagged-XX]",
+    "inflows": "[XX-Tagged inflows-XX]",
+    "outflows": "[XX-Tagged outflows-XX]",
+    "sharesExceedNote": "[XX-A row tagged with more than one value under this key counts toward each of them, so per-value shares can add up to more than 100%.-XX]"
+  },
   "categoryPerformance": {
     "noBudgets": "[XX-No budgets found. Create a budget to see category performance.-XX]",
     "noData": "[XX-No category data available yet.-XX]",

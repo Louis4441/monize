@@ -97,6 +97,11 @@ vi.mock("@/lib/built-in-reports", () => ({
   },
 }));
 
+const mockGetAllTags = vi.fn().mockResolvedValue([]);
+vi.mock("@/lib/tags", () => ({
+  tagsApi: { getAll: (...args: any[]) => mockGetAllTags(...args) },
+}));
+
 vi.mock("@/lib/logger", () => ({
   createLogger: () => ({
     error: vi.fn(),
@@ -112,9 +117,13 @@ describe("IncomeVsExpensesReport", () => {
     mockPush.mockClear();
   });
 
-  it("shows loading state initially", () => {
+  it("shows loading state initially", async () => {
     mockGetIncomeVsExpenses.mockReturnValue(new Promise(() => {}));
-    render(<IncomeVsExpensesReport />);
+    // The tag-key lookup resolves on mount alongside the report fetch; flush
+    // it inside act() so its state update lands before the assertion.
+    await act(async () => {
+      render(<IncomeVsExpensesReport />);
+    });
     expect(document.querySelector(".animate-pulse")).toBeTruthy();
   });
 
@@ -357,5 +366,118 @@ describe("IncomeVsExpensesReport", () => {
     await waitFor(() => expect(screen.getByTestId("bar-chart")).toBeInTheDocument());
 
     expect(screen.queryByTestId("partial-total")).toBeNull();
+  });
+
+  describe("tag key breakdown", () => {
+    it("hides the selector when the user has no KEY:VALUE tags", async () => {
+      mockGetAllTags.mockResolvedValue([{ id: "t1", name: "groceries" }]);
+      mockGetIncomeVsExpenses.mockResolvedValue({
+        data: [],
+        totals: { income: 0, expenses: 0, net: 0, knownIncome: 0, knownExpenses: 0, knownNet: 0 },
+      });
+      render(<IncomeVsExpensesReport />);
+      await waitFor(() => expect(screen.getByText("No data for this period.")).toBeInTheDocument());
+      expect(screen.queryByRole("combobox", { name: "Break down by tag key" })).toBeNull();
+    });
+
+    it('shows the selector and sends no tagKey while "None" is selected', async () => {
+      mockGetAllTags.mockResolvedValue([{ id: "t1", name: "scope:household" }]);
+      mockGetIncomeVsExpenses.mockResolvedValue({
+        data: [],
+        totals: { income: 0, expenses: 0, net: 0, knownIncome: 0, knownExpenses: 0, knownNet: 0 },
+      });
+      render(<IncomeVsExpensesReport />);
+      await waitFor(() =>
+        expect(screen.getByRole("combobox", { name: "Break down by tag key" })).toBeInTheDocument(),
+      );
+      const lastCall = mockGetIncomeVsExpenses.mock.calls.at(-1)?.[0];
+      expect(lastCall).not.toHaveProperty("tagKey");
+    });
+
+    it("renders value buckets and the untagged bucket once a key is chosen", async () => {
+      mockGetAllTags.mockResolvedValue([{ id: "t1", name: "scope:household" }]);
+      mockGetIncomeVsExpenses.mockResolvedValue({
+        data: [],
+        totals: { income: 0, expenses: 0, net: 0, knownIncome: 0, knownExpenses: 0, knownNet: 0 },
+        currency: "CAD",
+        missingCurrencies: [],
+        excludedCount: 0,
+      });
+      render(<IncomeVsExpensesReport />);
+      const select = await screen.findByRole("combobox", { name: "Break down by tag key" });
+
+      mockGetIncomeVsExpenses.mockResolvedValue({
+        data: [],
+        totals: { income: 0, expenses: 0, net: 0, knownIncome: 0, knownExpenses: 0, knownNet: 0 },
+        currency: "CAD",
+        missingCurrencies: [],
+        excludedCount: 0,
+        tagKey: "scope",
+        buckets: [
+          {
+            value: "household",
+            isUntagged: false,
+            data: [],
+            totals: { income: 0, expenses: 0, net: 0, knownIncome: 500, knownExpenses: 200, knownNet: 300 },
+            taggedInflows: 1000,
+            taggedOutflows: 1000,
+            missingCurrencies: [],
+            excludedCount: 0,
+          },
+          {
+            value: "__untagged__",
+            isUntagged: true,
+            data: [],
+            totals: { income: 0, expenses: 0, net: 0, knownIncome: 0, knownExpenses: 0, knownNet: 0 },
+            taggedInflows: 0,
+            taggedOutflows: 0,
+            missingCurrencies: [],
+            excludedCount: 0,
+          },
+        ],
+      });
+      await act(async () => {
+        fireEvent.change(select, { target: { value: "scope" } });
+      });
+
+      await waitFor(() =>
+        expect(mockGetIncomeVsExpenses.mock.calls.at(-1)?.[0]).toMatchObject({ tagKey: "scope" }),
+      );
+      expect(await screen.findByRole("tab", { name: "household" })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Untagged" })).toBeInTheDocument();
+
+      // Tagged flows render as their own labelled pair, distinct from income/expenses.
+      const taggedFlows = screen.getByTestId("tagged-flows");
+      expect(taggedFlows).toHaveTextContent("Tagged inflows");
+      expect(taggedFlows).toHaveTextContent("Tagged outflows");
+    });
+
+    it("shows the missing-rate treatment for an incomplete bucket", async () => {
+      mockGetAllTags.mockResolvedValue([{ id: "t1", name: "scope:household" }]);
+      mockGetIncomeVsExpenses.mockResolvedValue({
+        data: [],
+        totals: { income: 0, expenses: 0, net: 0, knownIncome: 0, knownExpenses: 0, knownNet: 0 },
+        currency: "CAD",
+        missingCurrencies: [],
+        excludedCount: 0,
+        tagKey: "scope",
+        buckets: [
+          {
+            value: "household",
+            isUntagged: false,
+            data: [],
+            totals: { income: null, expenses: null, net: null, knownIncome: 500, knownExpenses: 200, knownNet: 300 },
+            taggedInflows: 1000,
+            taggedOutflows: 1000,
+            missingCurrencies: ["JPY"],
+            excludedCount: 1,
+          },
+        ],
+      });
+      render(<IncomeVsExpensesReport />);
+      await screen.findByRole("combobox", { name: "Break down by tag key" });
+
+      expect((await screen.findAllByTestId("partial-total")).length).toBeGreaterThan(0);
+    });
   });
 });

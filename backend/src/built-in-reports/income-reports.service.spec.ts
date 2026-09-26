@@ -3,6 +3,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { IncomeReportsService } from "./income-reports.service";
 import { ReportCurrencyService } from "./report-currency.service";
+import { UNTAGGED_TAG_BUCKET_ID, IncomeExpenseTagBucket } from "./dto";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { Category } from "../categories/entities/category.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
@@ -622,6 +623,411 @@ describe("IncomeReportsService", () => {
       // even plan ("could not determine data type of parameter $3").
       expect(params).toEqual([mockUserId, "2025-01-31", "2025-01-01"]);
       expect(sql).not.toContain("make_interval");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // getIncomeVsExpenses -- tag-key breakdown (docs/specs/report-tag-key-breakdown.md)
+  // ---------------------------------------------------------------------------
+  describe("getIncomeVsExpenses tag-key breakdown", () => {
+    const row = (
+      periodStart: string,
+      income: string,
+      expenses: string,
+      currency = "USD",
+    ) => ({
+      period_start: periodStart,
+      currency_code: currency,
+      income,
+      expenses,
+    });
+
+    const valueRow = (
+      periodStart: string,
+      value: string | null,
+      income: string,
+      expenses: string,
+      currency = "USD",
+    ) => ({
+      period_start: periodStart,
+      currency_code: currency,
+      value,
+      income,
+      expenses,
+    });
+
+    const flowRow = (
+      value: string,
+      inflow: string,
+      outflow: string,
+      currency = "USD",
+    ) => ({ value, currency_code: currency, inflow, outflow });
+
+    function bucketByValue(
+      buckets: IncomeExpenseTagBucket[] | undefined,
+      value: string,
+    ) {
+      const bucket = buckets?.find((b) => b.value === value);
+      expect(bucket).toBeDefined();
+      return bucket!;
+    }
+
+    // -- I1: opt-in is inert by default --------------------------------------
+
+    it("adds no tagKey/buckets fields when tagKey is absent (I1 parity)", async () => {
+      scopedManager.query.mockResolvedValue([
+        row("2025-01-01", "1000.00", "400.00"),
+      ]);
+
+      const result = await service.getIncomeVsExpenses(
+        mockUserId,
+        "2025-01-01",
+        "2025-01-31",
+      );
+
+      expect(result).not.toHaveProperty("tagKey");
+      expect(result).not.toHaveProperty("buckets");
+      // Exactly one query -- the tag-key breakdown queries never ran.
+      expect(scopedManager.query).toHaveBeenCalledTimes(1);
+    });
+
+    it("treats a blank tagKey the same as absent", async () => {
+      scopedManager.query.mockResolvedValue([
+        row("2025-01-01", "1000.00", "400.00"),
+      ]);
+
+      const result = await service.getIncomeVsExpenses(
+        mockUserId,
+        "2025-01-01",
+        "2025-01-31",
+        { tagKey: "   " },
+      );
+
+      expect(result).not.toHaveProperty("tagKey");
+      expect(result).not.toHaveProperty("buckets");
+      expect(scopedManager.query).toHaveBeenCalledTimes(1);
+    });
+
+    // -- B1-B4: value partition ------------------------------------------------
+
+    it("partitions into value buckets plus a reserved untagged bucket; All stays the un-partitioned figure", async () => {
+      scopedManager.query
+        // All (unchanged base query)
+        .mockResolvedValueOnce([row("2025-01-01", "1000.00", "0.00")])
+        // Value/untagged breakdown -- a row tagged with BOTH household and
+        // stall contributes to both (B1), so their sum can exceed All (B3).
+        .mockResolvedValueOnce([
+          valueRow("2025-01-01", "household", "700.00", "0.00"),
+          valueRow("2025-01-01", "stall", "500.00", "0.00"),
+          valueRow("2025-01-01", null, "300.00", "0.00"),
+        ])
+        // No tagged transfer legs in this fixture.
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.getIncomeVsExpenses(
+        mockUserId,
+        "2025-01-01",
+        "2025-01-31",
+        { tagKey: "scope" },
+      );
+
+      expect(result.tagKey).toBe("scope");
+      // All: the base query's own answer, untouched by the value partition.
+      expect(result.totals.income).toBe(1000);
+
+      const household = bucketByValue(result.buckets, "household");
+      expect(household.isUntagged).toBe(false);
+      expect(household.totals.income).toBe(700);
+
+      const stall = bucketByValue(result.buckets, "stall");
+      expect(stall.totals.income).toBe(500);
+
+      const untagged = bucketByValue(result.buckets, UNTAGGED_TAG_BUCKET_ID);
+      expect(untagged.isUntagged).toBe(true);
+      expect(untagged.totals.income).toBe(300);
+
+      // B3: All is the reconciliation anchor, not the sum of the value
+      // buckets, which double-count the multi-valued row.
+      expect(household.totals.income! + stall.totals.income!).toBeGreaterThan(
+        result.totals.income!,
+      );
+    });
+
+    it("mirrors the split-tag and transaction-tag SQL shape, de-duped so a tag at both levels attributes once (B4, I7)", async () => {
+      scopedManager.query.mockResolvedValue([]);
+
+      await service.getIncomeVsExpenses(
+        mockUserId,
+        "2025-01-01",
+        "2025-01-31",
+        { tagKey: "scope" },
+      );
+
+      const valueSql = scopedManager.query.mock.calls[1][0];
+      expect(valueSql).toContain("transaction_tags");
+      expect(valueSql).toContain("transaction_split_tags");
+      // UNION (not UNION ALL) de-dupes a value present at both levels; the
+      // outer UNNEST fans a row out once per DISTINCT matching value, not per
+      // matching tag, so two matching split tags are summed once.
+      expect(valueSql).toMatch(/\bUNION\b(?!\s+ALL)/);
+      expect(valueSql).toContain("ARRAY_AGG(DISTINCT");
+      expect(valueSql).toContain("CROSS JOIN UNNEST");
+    });
+
+    // -- I2/I3, section 3.1/3.2: transfer visibility ---------------------------
+
+    it("truth table 3.1: a self-transfer tagged on both legs adds nothing to income/expenses/net", async () => {
+      scopedManager.query
+        .mockResolvedValueOnce([]) // All: no categorized rows
+        .mockResolvedValueOnce([]) // no categorized value rows either
+        .mockResolvedValueOnce([
+          flowRow("household", "1000.00", "1000.00"), // both legs tagged
+        ])
+        .mockResolvedValueOnce([]); // no split-leg transfers in this fixture
+
+      const result = await service.getIncomeVsExpenses(
+        mockUserId,
+        "2025-01-01",
+        "2025-01-31",
+        { tagKey: "scope" },
+      );
+
+      expect(result.totals.income).toBe(0);
+      expect(result.totals.expenses).toBe(0);
+      expect(result.totals.net).toBe(0);
+
+      const household = bucketByValue(result.buckets, "household");
+      expect(household.totals.income).toBe(0);
+      expect(household.totals.expenses).toBe(0);
+      expect(household.taggedInflows).toBe(1000);
+      expect(household.taggedOutflows).toBe(1000);
+    });
+
+    it("truth table 3.2: income stays 100, never 200, when a salary is later moved through tagged transfers", async () => {
+      scopedManager.query
+        .mockResolvedValueOnce([row("2025-01-01", "100.00", "0.00")]) // the salary, categorized income
+        .mockResolvedValueOnce([
+          valueRow("2025-01-01", "household", "0.00", "0.00"),
+        ])
+        .mockResolvedValueOnce([
+          // brokerage-side inflow leg, and the later withdrawal-into-checking leg
+          flowRow("household", "100.00", "100.00"),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.getIncomeVsExpenses(
+        mockUserId,
+        "2025-01-01",
+        "2025-01-31",
+        { tagKey: "scope" },
+      );
+
+      expect(result.totals.income).toBe(100);
+
+      const household = bucketByValue(result.buckets, "household");
+      expect(household.totals.income).toBe(0);
+      expect(household.taggedInflows).toBe(100);
+      expect(household.taggedOutflows).toBe(100);
+    });
+
+    it("an untagged transfer appears nowhere (no flow row is emitted for it)", async () => {
+      scopedManager.query
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([valueRow("2025-01-01", null, "0.00", "0.00")])
+        // The untagged transfer leg produced NO row at all (CROSS JOIN UNNEST
+        // of a NULL/empty tag-values array yields zero rows), unlike the
+        // untagged categorized bucket above.
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.getIncomeVsExpenses(
+        mockUserId,
+        "2025-01-01",
+        "2025-01-31",
+        { tagKey: "scope" },
+      );
+
+      const untagged = bucketByValue(result.buckets, UNTAGGED_TAG_BUCKET_ID);
+      expect(untagged.taggedInflows).toBe(0);
+      expect(untagged.taggedOutflows).toBe(0);
+    });
+
+    // -- I6: VOID never contributes ---------------------------------------------
+
+    it("keeps the VOID exclusion on both new queries", async () => {
+      scopedManager.query.mockResolvedValue([]);
+
+      await service.getIncomeVsExpenses(
+        mockUserId,
+        "2025-01-01",
+        "2025-01-31",
+        { tagKey: "scope" },
+      );
+
+      const valueSql = scopedManager.query.mock.calls[1][0];
+      const wholeFlowSql = scopedManager.query.mock.calls[2][0];
+      const splitFlowSql = scopedManager.query.mock.calls[3][0];
+      expect(valueSql).toContain("t.status != 'VOID'");
+      expect(wholeFlowSql).toContain("t.status != 'VOID'");
+      expect(splitFlowSql).toContain("t.status != 'VOID'");
+    });
+
+    // -- I5: investment linkage exclusion (issue #1257) --------------------------
+
+    it("keeps investmentExclusionSql on both new queries", async () => {
+      scopedManager.query.mockResolvedValue([]);
+
+      await service.getIncomeVsExpenses(
+        mockUserId,
+        "2025-01-01",
+        "2025-01-31",
+        { tagKey: "scope" },
+      );
+
+      const valueSql = scopedManager.query.mock.calls[1][0];
+      const wholeFlowSql = scopedManager.query.mock.calls[2][0];
+      const splitFlowSql = scopedManager.query.mock.calls[3][0];
+      // The shared INVESTMENT_EXCLUSION (or its no-splits variant) constant,
+      // which is what keeps a salary paid into an INVESTMENT-type cash sleeve
+      // counted (issue #1257) while still excluding the brokerage-sleeve
+      // register and the cash leg a trade generated.
+      expect(valueSql).toContain("investment_transactions");
+      expect(wholeFlowSql).toContain("investment_transactions");
+      expect(splitFlowSql).toContain("investment_transactions");
+      expect(valueSql).toContain("INVESTMENT_BROKERAGE");
+      expect(wholeFlowSql).toContain("INVESTMENT_BROKERAGE");
+      expect(splitFlowSql).toContain("INVESTMENT_BROKERAGE");
+    });
+
+    // -- I4: FX completeness per bucket -------------------------------------------
+
+    it("blanks only the incomplete bucket's totals when one value's currency has no rate", async () => {
+      scopedManager.query
+        .mockResolvedValueOnce([]) // All
+        .mockResolvedValueOnce([
+          valueRow("2025-01-01", "household", "600.00", "0.00"), // USD, converts fine
+          valueRow("2025-01-01", "stall", "300000.00", "0.00", "JPY"), // no JPY rate
+        ])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.getIncomeVsExpenses(
+        mockUserId,
+        "2025-01-01",
+        "2025-01-31",
+        { tagKey: "scope" },
+      );
+
+      const household = bucketByValue(result.buckets, "household");
+      expect(household.totals.income).toBe(600);
+      expect(household.missingCurrencies).toEqual([]);
+
+      const stall = bucketByValue(result.buckets, "stall");
+      expect(stall.totals.income).toBeNull();
+      expect(stall.totals.knownIncome).toBe(0);
+      expect(stall.missingCurrencies).toEqual(["JPY"]);
+      expect(stall.excludedCount).toBe(1);
+    });
+
+    it("blanks a bucket's totals when only its tagged-flow currency has no rate", async () => {
+      scopedManager.query
+        .mockResolvedValueOnce([]) // All
+        .mockResolvedValueOnce([
+          valueRow("2025-01-01", "household", "600.00", "0.00"),
+        ])
+        .mockResolvedValueOnce([
+          flowRow("household", "300000.00", "0.00", "JPY"), // no JPY rate
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.getIncomeVsExpenses(
+        mockUserId,
+        "2025-01-01",
+        "2025-01-31",
+        { tagKey: "scope" },
+      );
+
+      const household = bucketByValue(result.buckets, "household");
+      // The categorized income (600 USD) converted fine, but the bucket's
+      // totals are still blanked: a missing rate anywhere in the bucket makes
+      // its totals unknowable (I4), not just the figure that hit the gap.
+      expect(household.totals.income).toBeNull();
+      expect(household.totals.knownIncome).toBe(600);
+      expect(household.missingCurrencies).toEqual(["JPY"]);
+      expect(household.excludedCount).toBe(1);
+      // The tagged flow itself is still disclosed as the known partial (0
+      // here, since the only flow row was the excluded JPY one).
+      expect(household.taggedInflows).toBe(0);
+    });
+
+    // -- window/account filters thread into the extra queries too ----------------
+
+    it("threads accountIds and startDate into both extra queries", async () => {
+      scopedManager.query.mockResolvedValue([]);
+
+      await service.getIncomeVsExpenses(
+        mockUserId,
+        "2025-01-01",
+        "2025-01-31",
+        { tagKey: "scope", accountIds: ["acct-1"] },
+      );
+
+      const [, valueParams] = scopedManager.query.mock.calls[1];
+      const [, wholeFlowParams] = scopedManager.query.mock.calls[2];
+      const [, splitFlowParams] = scopedManager.query.mock.calls[3];
+      expect(valueParams).toContain("2025-01-01");
+      expect(valueParams).toContainEqual(["acct-1"]);
+      expect(wholeFlowParams).toContain("2025-01-01");
+      expect(wholeFlowParams).toContainEqual(["acct-1"]);
+      expect(splitFlowParams).toContain("2025-01-01");
+      expect(splitFlowParams).toContainEqual(["acct-1"]);
+    });
+
+    it("buckets by week and omits the startDate filter, on all three extra queries, when asked", async () => {
+      scopedManager.query.mockResolvedValue([]);
+
+      await service.getIncomeVsExpenses(mockUserId, undefined, "2025-01-31", {
+        tagKey: "scope",
+        bucket: "week",
+      });
+
+      const [valueSql, valueParams] = scopedManager.query.mock.calls[1];
+      const [wholeFlowSql] = scopedManager.query.mock.calls[2];
+      const [splitFlowSql] = scopedManager.query.mock.calls[3];
+
+      expect(valueSql).toContain("date_trunc('week'");
+      // Default weekStartsOn is Monday (1); weekTruncOffsetDays(1) === 0.
+      expect(valueParams).toEqual([mockUserId, "2025-01-31", 0, "scope"]);
+      for (const sql of [valueSql, wholeFlowSql, splitFlowSql]) {
+        expect(sql).not.toContain("transaction_date >=");
+      }
+    });
+
+    it("groups multiple rows for the same value across periods and currencies without losing any (no fan-out)", async () => {
+      scopedManager.query
+        .mockResolvedValueOnce([row("2025-01-01", "0.00", "0.00")])
+        .mockResolvedValueOnce([
+          valueRow("2025-01-01", "household", "100.00", "0.00"),
+          valueRow("2025-02-01", "household", "200.00", "0.00"),
+        ])
+        .mockResolvedValueOnce([
+          flowRow("household", "50.00", "0.00", "USD"),
+          flowRow("household", "10.00", "0.00", "EUR"),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.getIncomeVsExpenses(
+        mockUserId,
+        "2025-01-01",
+        "2025-02-28",
+        { tagKey: "scope" },
+      );
+
+      const household = bucketByValue(result.buckets, "household");
+      expect(household.totals.income).toBe(300);
+      // EUR->USD is 1.1 in the fixture rates.
+      expect(household.taggedInflows).toBe(50 + 10 * 1.1);
     });
   });
 });

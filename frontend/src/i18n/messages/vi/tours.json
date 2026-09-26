@@ -355,6 +355,28 @@
             "body": "Cảnh báo số dư nằm ngay trên tài khoản: sửa bất kỳ tài khoản nào và đặt **Thông báo khi dưới** hoặc **Thông báo khi trên**. Chúng kích hoạt khi số dư *vượt qua* ngưỡng, nên bạn được báo một lần thay vì sau mỗi khoản chi giữ nó ở đó. Bạn có thể xem lại hướng dẫn này bất cứ lúc nào trong Cài đặt."
           }
         }
+      },
+      "reportTagBreakdown": {
+        "title": "Phân tách báo cáo theo thẻ",
+        "steps": {
+          "welcome": {
+            "title": "Xem báo cáo theo thẻ, không chỉ theo danh mục",
+            "body": "Thu nhập so với chi phí và Bảng lưu chuyển tiền tệ giờ đây có thể phân tách theo giá trị của một thẻ bạn chọn — chẳng hạn chi tiêu gia đình so với một sạp hàng phụ — và hiển thị các khoản chuyển tiền giữa chúng mà không bao giờ tính khoản chuyển tiền là thu nhập."
+          },
+          "breakdown": {
+            "title": "Phân tách theo khóa thẻ",
+            "body": "Chọn một khóa thẻ ở đây, chẳng hạn **scope**, báo cáo sẽ chia thành một phần cho mỗi giá trị đã dùng với khóa đó, cộng thêm phần **Không gắn thẻ** cho phần còn lại.",
+            "fallbackBody": "Tùy chọn này xuất hiện ngay khi bạn gắn cho một giao dịch một thẻ **khóa:giá trị**, chẳng hạn **scope:household**. Hãy thêm một thẻ, Phân tách theo khóa thẻ sẽ hiện ra ở đây."
+          },
+          "buckets": {
+            "title": "Tổng theo từng giá trị, các khoản chuyển tiền tách riêng",
+            "body": "Chọn một khóa sẽ mở một thẻ tab cho mỗi giá trị cộng thêm **Không gắn thẻ**, mỗi thẻ có thu nhập và chi phí riêng. Tiền chuyển giữa các tài khoản hiển thị là **Dòng vào có gắn thẻ** và **Dòng ra có gắn thẻ** — có thể thấy được, nhưng không bao giờ được tính là thu nhập."
+          },
+          "finish": {
+            "title": "Đó là phần phân tách theo thẻ",
+            "body": "Hãy gắn thẻ cho giao dịch bằng một cặp khóa:giá trị như scope:household ở bất cứ đâu bạn muốn xem này, và xem lại hướng dẫn này bất cứ lúc nào từ Cài đặt."
+          }
+        }
       }
     }
   }
