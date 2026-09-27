@@ -17,6 +17,7 @@
     "warningCount": "{count, plural, one {# waarschuwing} other {# waarschuwingen}}",
     "errorLoadFailed": "Inzichten laden mislukt. Probeer het opnieuw.",
     "errorGenerateFailed": "Inzichten genereren mislukt. Controleer of je een AI-provider hebt geconfigureerd.",
+    "errorDismissFailed": "Inzicht sluiten mislukt. Probeer het opnieuw.",
     "errorTimeout": "Het genereren van inzichten duurt langer dan verwacht. Even geduld of vernieuw de pagina."
   },
   "card": {

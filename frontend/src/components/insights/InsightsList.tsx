@@ -125,6 +125,7 @@ export function InsightsList() {
 
   const handleDismiss = async (id: string) => {
     setDismissingId(id);
+    setError(null);
     try {
       await aiApi.dismissInsight(id);
       setInsights((prev) =>
@@ -135,6 +136,7 @@ export function InsightsList() {
       setTotal((prev) => (showDismissed ? prev : prev - 1));
     } catch (err) {
       logger.error('Failed to dismiss insight:', err);
+      setError(t('list.errorDismissFailed'));
     } finally {
       setDismissingId(null);
     }

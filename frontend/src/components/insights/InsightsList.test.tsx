@@ -290,6 +290,45 @@ describe('InsightsList', () => {
     });
   });
 
+  it('shows an error and keeps the insight when dismiss fails', async () => {
+    mockGetInsights.mockResolvedValue({
+      insights: [
+        {
+          id: 'i1',
+          type: 'anomaly',
+          title: 'Test Insight',
+          description: 'Desc',
+          severity: 'info',
+          data: {},
+          isDismissed: false,
+          generatedAt: '2026-02-18T00:00:00.000Z',
+          expiresAt: '2026-02-25T00:00:00.000Z',
+          createdAt: '2026-02-18T00:00:00.000Z',
+        },
+      ],
+      total: 1,
+      lastGeneratedAt: '2026-02-18T00:00:00.000Z',
+      isGenerating: false,
+    });
+    mockDismissInsight.mockRejectedValue(new Error('Request failed with status code 502'));
+
+    await renderInsights();
+
+    await waitFor(() => {
+      expect(screen.getByText('Test Insight')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Dismiss'));
+    });
+
+    expect(
+      screen.getByText('Failed to dismiss the insight. Please try again.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Test Insight')).toBeInTheDocument();
+    expect(screen.getByText('Dismiss')).toBeInTheDocument();
+  });
+
   it('shows error message on load failure', async () => {
     mockGetInsights.mockRejectedValue(new Error('Network error'));
 

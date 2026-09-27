@@ -17,6 +17,7 @@
     "warningCount": "{count, plural, one {# ikaz} other {# ikaz}}",
     "errorLoadFailed": "İçgörüler yüklenemedi. Lütfen tekrar deneyin.",
     "errorGenerateFailed": "İçgörüler oluşturulamadı. Yapılandırılmış bir yapay zeka sağlayıcınız olduğundan emin olun.",
+    "errorDismissFailed": "İçgörü kapatılamadı. Lütfen tekrar deneyin.",
     "errorTimeout": "İçgörü oluşturma beklenenden uzun sürüyor. Lütfen bekleyin veya sayfayı yenileyin."
   },
   "card": {
