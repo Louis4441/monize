@@ -17,6 +17,7 @@
     "warningCount": "{count, plural, one {# ostrzeżenie} few {# ostrzeżenia} many {# ostrzeżeń} other {# ostrzeżenia}}",
     "errorLoadFailed": "Nie udało się wczytać analizy. Spróbuj ponownie.",
     "errorGenerateFailed": "Nie udało się wygenerować analizy. Upewnij się, że dostawca AI jest skonfigurowany.",
+    "errorDismissFailed": "Nie udało się zamknąć analizy. Spróbuj ponownie.",
     "errorTimeout": "Generowanie analizy trwa dłużej niż zwykle. Poczekaj lub odśwież stronę."
   },
   "card": {

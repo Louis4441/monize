@@ -17,6 +17,7 @@
     "warningCount": "{count, plural, one {# pemberitahuan} other {# pemberitahuan}}",
     "errorLoadFailed": "Gagal memuat wawasan. Silakan coba lagi.",
     "errorGenerateFailed": "Gagal membuat wawasan. Pastikan Anda telah mengonfigurasi penyedia AI.",
+    "errorDismissFailed": "Gagal menutup wawasan. Silakan coba lagi.",
     "errorTimeout": "Pembuatan wawasan memakan waktu lebih lama dari yang diharapkan. Harap tunggu atau muat ulang halaman."
   },
   "card": {

@@ -17,6 +17,7 @@
     "warningCount": "{count, plural, one {# avvertimento} other {# avvertimenti}}",
     "errorLoadFailed": "Caricamento analisi non riuscito. Riprova.",
     "errorGenerateFailed": "Generazione analisi non riuscita. Assicurati di avere un provider AI configurato.",
+    "errorDismissFailed": "Impossibile ignorare l'analisi. Riprova.",
     "errorTimeout": "La generazione dell'analisi sta impiegando più del previsto. Attendi o aggiorna la pagina."
   },
   "card": {
