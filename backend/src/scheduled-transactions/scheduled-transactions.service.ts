@@ -566,14 +566,22 @@ export class ScheduledTransactionsService {
               totalSkipped++;
               continue;
             }
-            if (error instanceof NotFoundException) {
-              // The cron selected this row moments ago; it is gone because the
+            if (
+              error instanceof NotFoundException &&
+              !(await this.scheduleStillExists(scheduled.userId, scheduled.id))
+            ) {
+              // The cron selected this row moments ago and it is gone: the
               // winning replica posted a ONCE schedule and deleted it inside
               // the same posting transaction (post(): `m.delete(
-              // ScheduledTransaction, id)` in the locked claim block), or
-              // because the user deleted it in between. Neither is "could not
-              // be posted", and telling the user their money did not move when
-              // it did is exactly the false alert this branch prevents.
+              // ScheduledTransaction, id)` in the locked claim block), or the
+              // user deleted it in between. Neither is "could not be posted".
+              //
+              // Only when the SCHEDULE is gone. post() also reaches services
+              // that throw NotFoundException for a missing account, security
+              // or transfer target, and that schedule is genuinely broken: it
+              // fails every hour until someone fixes it, so it falls through to
+              // the alert below. A NotFoundException alone cannot tell the two
+              // apart; the row's existence can.
               this.logger.debug(
                 `Auto-post skipped scheduled transaction ${scheduled.id}: ` +
                   "no longer exists (posted and removed elsewhere, or deleted)",
@@ -1616,6 +1624,33 @@ export class ScheduledTransactionsService {
     }
 
     return scheduled;
+  }
+
+  /**
+   * Whether the schedule row is still there, read under the owner's context.
+   *
+   * The auto-post cron asks this after a NotFoundException to tell "the
+   * schedule is gone" (posted and removed by another replica, or deleted) from
+   * "something the schedule points at is gone" (an account or security), which
+   * throw the same exception. A read that fails answers `true`: an unknown
+   * outcome must reach the user as an alert, never be skipped as "gone".
+   */
+  private async scheduleStillExists(
+    userId: string,
+    id: string,
+  ): Promise<boolean> {
+    try {
+      const count = await withUserContext(userId, () =>
+        withScopedDb(this.dataSource, (m) =>
+          m
+            .getRepository(ScheduledTransaction)
+            .count({ where: { id, userId } }),
+        ),
+      );
+      return count > 0;
+    } catch {
+      return true;
+    }
   }
 
   async findDue(userId: string): Promise<ScheduledTransaction[]> {
