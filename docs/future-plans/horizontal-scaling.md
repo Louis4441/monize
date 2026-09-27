@@ -446,7 +446,7 @@ Each of these is listed in the widened guard's allowlist with the reason here.
 | Support-backup raw export cache | `backend/src/backup/support-backup/support-backup.service.ts` | preview and generate landing on different replicas degrade to two exports. Acceptable; documented on the endpoint |
 | Budget actuals promise cache | `backend/src/budgets/budgets.service.ts` | already stale within one replica for its TTL; multi-replica does not change the contract |
 | Restore admission gate | `backend/src/backup/restore-processing-gate.ts` | memory is per pod, so the gate is correctly per pod. Cluster-wide restore admission is an open question |
-| Email failure snapshot | `backend/src/notifications/email.service.ts` | the alert that reads it dedupes at the database; the threshold becomes per replica, which the class comment already anticipates |
+| Email failure snapshot | `backend/src/notifications/email.service.ts` | per replica by design and forgotten on restart, so it only decides whether to look: the SMTP-failure sweep raises only after a live `verifyConnection()` probe from the same replica fails, so the alert means "this replica cannot reach the relay now", which holds under any replica count; a stale memory of one failed send no longer raises it. The alert dedupes at the database (`SMTP_FAILURE:<UTC day>`) |
 
 ## Invariants to add
 

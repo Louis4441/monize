@@ -5,9 +5,11 @@ import { Transporter } from "nodemailer";
 import { resolvePositiveInt } from "../common/env-number.util";
 
 /**
- * What this replica's own SMTP sends have done lately. Purely in-process --
- * the `SMTP_FAILURE` system alert that reads it dedupes across replicas at the
- * database, so per-replica memory is enough -- and only about *configured*
+ * What this replica's own SMTP transport has done lately: its sends, and its
+ * connection probes (`verifyConnection`). Purely in-process and forgotten on
+ * restart, so it is only ever a *reason to look*: the `SMTP_FAILURE` sweep
+ * probes the relay before it believes a failure recorded here, and the alert
+ * it raises dedupes across replicas at the database. Only about *configured*
  * transport failures: an unconfigured deployment throws before the snapshot
  * and is a setup state, not a failure.
  *
@@ -240,11 +242,7 @@ export class EmailService implements OnModuleInit {
       // Record for the SMTP-health sweep, then rethrow unchanged -- callers
       // already own their per-recipient isolation and their own logging.
       if (isSmtpTransportFailure(error)) {
-        this.lastFailureAt = new Date();
-        this.lastFailureMessage = (
-          error instanceof Error ? error.message : String(error)
-        ).slice(0, FAILURE_MESSAGE_MAX_LENGTH);
-        this.failuresSinceSuccess += 1;
+        this.recordTransportFailure(error);
       } else {
         // The relay answered and refused this address or message. Counted so
         // the state is visible, never as evidence that delivery is broken.
@@ -252,18 +250,56 @@ export class EmailService implements OnModuleInit {
       }
       throw error;
     }
-    this.lastSuccessAt = new Date();
-    this.failuresSinceSuccess = 0;
+    this.recordTransportSuccess();
     this.logger.log(`Email sent to ${to}: ${subject}`);
   }
 
+  /**
+   * Open a connection to the relay (greeting, STARTTLS or implicit TLS,
+   * authentication) without sending a message, and say whether it worked.
+   *
+   * This is also the health probe `SystemAlertMonitorService.sweepEmailHealth`
+   * runs before it raises `SMTP_FAILURE`, so the outcome is recorded in the
+   * failure snapshot exactly as a send's would be: the snapshot then describes
+   * the transport as of the last probe, not only as of the last send. A
+   * replica that failed one send and has sent nothing since is otherwise stuck
+   * reporting that failure for as long as it stays quiet.
+   *
+   * Unconfigured returns `false` and records nothing -- a setup state, not a
+   * failure, the same rule `sendMail` follows.
+   */
   async verifyConnection(): Promise<boolean> {
     if (!this.transporter) return false;
     try {
       await this.transporter.verify();
-      return true;
-    } catch {
+    } catch (error) {
+      // Every `verify()` failure is a transport failure, recorded without
+      // consulting `isSmtpTransportFailure`. That helper separates "the relay
+      // refused this recipient or message" (an SMTP `responseCode`) from "the
+      // deployment cannot send", but a probe carries no recipient and no
+      // message: a coded answer here (a 421 greeting, a refused EHLO or
+      // STARTTLS, a 535 login) refused the connection itself, so nothing this
+      // replica sends can be delivered either. Asking the helper would file a
+      // 421 greeting as a recipient rejection.
+      this.recordTransportFailure(error);
       return false;
     }
+    this.recordTransportSuccess();
+    return true;
+  }
+
+  /** The relay could not be used at all: nothing reached anybody. */
+  private recordTransportFailure(error: unknown): void {
+    this.lastFailureAt = new Date();
+    this.lastFailureMessage = (
+      error instanceof Error ? error.message : String(error)
+    ).slice(0, FAILURE_MESSAGE_MAX_LENGTH);
+    this.failuresSinceSuccess += 1;
+  }
+
+  /** The relay accepted a message or a probe connection. */
+  private recordTransportSuccess(): void {
+    this.lastSuccessAt = new Date();
+    this.failuresSinceSuccess = 0;
   }
 }

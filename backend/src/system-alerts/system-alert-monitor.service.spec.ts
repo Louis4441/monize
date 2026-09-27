@@ -7,14 +7,22 @@ import {
   NotificationSeverity,
   NotificationType,
 } from "../notification-center/entities/notification.entity";
-import type { EmailFailureSnapshot } from "../notifications/email.service";
+import type {
+  EmailFailureSnapshot,
+  EmailService,
+} from "../notifications/email.service";
 
 describe("SystemAlertMonitorService", () => {
   let systemAlerts: { raiseAdminAlert: jest.Mock };
-  let emailService: {
-    getStatus: jest.Mock;
-    getFailureSnapshot: jest.Mock;
-  };
+  let emailService: jest.Mocked<
+    Pick<EmailService, "getStatus" | "getFailureSnapshot" | "verifyConnection">
+  >;
+  /**
+   * The replica's snapshot as the real `EmailService` holds it: one mutable
+   * record that `getFailureSnapshot` copies out and `verifyConnection` writes
+   * to, so a probe's outcome is visible to the re-read that follows it.
+   */
+  let current: EmailFailureSnapshot;
   let env: Record<string, string | undefined>;
   let service: SystemAlertMonitorService;
 
@@ -31,19 +39,50 @@ describe("SystemAlertMonitorService", () => {
     };
   }
 
+  /** The probe instant: just after the sweep's `now` below. */
+  const PROBED_AT = new Date("2026-08-30T12:00:01Z");
+
+  /** What `verifyConnection` does when `transporter.verify()` succeeds. */
+  function probeSucceeds(): Promise<boolean> {
+    current = {
+      ...current,
+      lastSuccessAt: PROBED_AT,
+      failuresSinceSuccess: 0,
+    };
+    return Promise.resolve(true);
+  }
+
+  /** What `verifyConnection` does when `transporter.verify()` rejects. */
+  function probeFails(message: string): () => Promise<boolean> {
+    return () => {
+      current = {
+        ...current,
+        lastFailureAt: PROBED_AT,
+        lastFailureMessage: message,
+        failuresSinceSuccess: current.failuresSinceSuccess + 1,
+      };
+      return Promise.resolve(false);
+    };
+  }
+
   beforeEach(() => {
     env = {};
+    current = snapshot();
     systemAlerts = {
       raiseAdminAlert: jest.fn().mockResolvedValue({ created: 1, emailed: 1 }),
     };
     emailService = {
       getStatus: jest.fn().mockReturnValue({ configured: true }),
-      getFailureSnapshot: jest.fn().mockReturnValue(snapshot()),
+      getFailureSnapshot: jest.fn(() => ({ ...current })),
+      // Default: the relay is still unreachable when the sweep probes it.
+      verifyConnection: jest
+        .fn()
+        .mockImplementation(probeFails("ECONNREFUSED 10.0.0.1:587")),
     };
     service = new SystemAlertMonitorService(
       { get: jest.fn((name: string) => env[name]) } as never,
       systemAlerts as never,
-      emailService as never,
+      emailService as unknown as EmailService,
     );
   });
 
@@ -139,9 +178,7 @@ describe("SystemAlertMonitorService", () => {
       // One handler, two independent facts: a sound secret must not mean
       // the SMTP check is skipped, and vice versa.
       env.JWT_SECRET = "FkVtZprB4sKbrwNIl6YiZarB8gB9RrKoO0rt7sFg4YM=";
-      emailService.getFailureSnapshot.mockReturnValue(
-        snapshot({ lastFailureAt: new Date("2026-08-30T11:50:00Z") }),
-      );
+      current = snapshot({ lastFailureAt: new Date("2026-08-30T11:50:00Z") });
       await service.sweepSystemHealth(now);
       expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledTimes(1);
       expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
@@ -149,65 +186,114 @@ describe("SystemAlertMonitorService", () => {
       );
     });
 
-    it("raises a daily-bucketed, never-emailed alert when the last send failed", async () => {
-      emailService.getFailureSnapshot.mockReturnValue(
-        snapshot({
-          lastFailureAt: new Date("2026-08-30T11:50:00Z"),
-          lastFailureMessage: "ECONNREFUSED 10.0.0.1:587",
-          failuresSinceSuccess: 3,
-        }),
+    it("raises a daily-bucketed, never-emailed alert when the last send failed and the probe fails", async () => {
+      current = snapshot({
+        lastFailureAt: new Date("2026-08-30T11:50:00Z"),
+        lastFailureMessage: "ECONNREFUSED 10.0.0.1:587",
+        failuresSinceSuccess: 3,
+      });
+      emailService.verifyConnection.mockImplementation(
+        probeFails("connect ETIMEDOUT 10.0.0.1:587"),
       );
       await service.sweepEmailHealth(now);
+      expect(emailService.verifyConnection).toHaveBeenCalledTimes(1);
+      expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledTimes(1);
       expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
         expect.objectContaining({
           type: NotificationType.SMTP_FAILURE,
           severity: NotificationSeverity.WARNING,
+          // Unchanged by the probe: one alert per UTC day across replicas.
           dedupeKey: "SMTP_FAILURE:2026-08-30",
           email: false,
           data: expect.objectContaining({
             system: true,
-            lastError: "ECONNREFUSED 10.0.0.1:587",
-            failuresSinceSuccess: 3,
+            probe: "failed",
+            // The probe's own error, read back after it ran -- what is wrong
+            // now, not what went wrong on the send ten minutes ago.
+            lastError: "connect ETIMEDOUT 10.0.0.1:587",
+            failuresSinceSuccess: 4,
+            lastFailureAt: PROBED_AT.toISOString(),
           }),
         }),
       );
+      const [input] = systemAlerts.raiseAdminAlert.mock.calls[0];
+      expect(input.message).toMatch(/could not send email/);
+      expect(input.message).toContain("connect ETIMEDOUT 10.0.0.1:587");
+    });
+
+    it("stays silent when the probe reaches the relay -- one failed send is a memory, not an outage", async () => {
+      // The multi-replica defect: this replica saw one failed send, SMTP has
+      // since recovered and every other replica is sending fine, and nothing
+      // has been sent from here since. Without the probe the stale failure
+      // raised "Email delivery is failing" for the whole deployment for up
+      // to 24 hours, and again after UTC midnight.
+      current = snapshot({
+        lastFailureAt: new Date("2026-08-30T11:50:00Z"),
+        lastFailureMessage: "ECONNREFUSED 10.0.0.1:587",
+        failuresSinceSuccess: 1,
+      });
+      emailService.verifyConnection.mockImplementation(probeSucceeds);
+      await service.sweepEmailHealth(now);
+      expect(emailService.verifyConnection).toHaveBeenCalledTimes(1);
+      expect(systemAlerts.raiseAdminAlert).not.toHaveBeenCalled();
+      // And the recovery is now in the snapshot, so the next sweep does not
+      // probe again.
+      await service.sweepEmailHealth(new Date("2026-08-30T12:15:00Z"));
+      expect(emailService.verifyConnection).toHaveBeenCalledTimes(1);
+    });
+
+    it("stays silent when a send succeeded while the probe was failing", async () => {
+      // `verify()` failed, but a concurrent `sendMail` delivered after the
+      // probe recorded its failure: the fresh snapshot, not the probe's
+      // boolean alone, decides.
+      current = snapshot({ lastFailureAt: new Date("2026-08-30T11:50:00Z") });
+      emailService.verifyConnection.mockImplementation(async () => {
+        const failed = await probeFails("ETIMEDOUT")();
+        current = {
+          ...current,
+          lastSuccessAt: new Date("2026-08-30T12:00:02Z"),
+          failuresSinceSuccess: 0,
+        };
+        return failed;
+      });
+      await service.sweepEmailHealth(now);
+      expect(systemAlerts.raiseAdminAlert).not.toHaveBeenCalled();
     });
 
     it("stays silent when a success postdates the failure -- delivery recovered", async () => {
-      emailService.getFailureSnapshot.mockReturnValue(
-        snapshot({
-          lastFailureAt: new Date("2026-08-30T11:00:00Z"),
-          lastSuccessAt: new Date("2026-08-30T11:30:00Z"),
-        }),
-      );
+      current = snapshot({
+        lastFailureAt: new Date("2026-08-30T11:00:00Z"),
+        lastSuccessAt: new Date("2026-08-30T11:30:00Z"),
+      });
       await service.sweepEmailHealth(now);
       expect(systemAlerts.raiseAdminAlert).not.toHaveBeenCalled();
+      expect(emailService.verifyConnection).not.toHaveBeenCalled();
     });
 
-    it("stays silent when nothing has failed", async () => {
+    it("stays silent and sends no probe traffic when nothing has failed", async () => {
       await service.sweepEmailHealth(now);
       expect(systemAlerts.raiseAdminAlert).not.toHaveBeenCalled();
+      // A healthy replica never connects to the relay on the sweep's behalf.
+      expect(emailService.verifyConnection).not.toHaveBeenCalled();
     });
 
     it("ignores a failure older than the lookback -- yesterday's alert already exists", async () => {
-      emailService.getFailureSnapshot.mockReturnValue(
-        snapshot({
-          lastFailureAt: new Date(
-            now.getTime() - SMTP_FAILURE_LOOKBACK_MS - 60_000,
-          ),
-        }),
-      );
+      current = snapshot({
+        lastFailureAt: new Date(
+          now.getTime() - SMTP_FAILURE_LOOKBACK_MS - 60_000,
+        ),
+      });
       await service.sweepEmailHealth(now);
       expect(systemAlerts.raiseAdminAlert).not.toHaveBeenCalled();
+      expect(emailService.verifyConnection).not.toHaveBeenCalled();
     });
 
     it("stays silent when SMTP is not configured -- a setup state, not a failure", async () => {
       emailService.getStatus.mockReturnValue({ configured: false });
-      emailService.getFailureSnapshot.mockReturnValue(
-        snapshot({ lastFailureAt: new Date("2026-08-30T11:50:00Z") }),
-      );
+      current = snapshot({ lastFailureAt: new Date("2026-08-30T11:50:00Z") });
       await service.sweepEmailHealth(now);
       expect(systemAlerts.raiseAdminAlert).not.toHaveBeenCalled();
+      expect(emailService.verifyConnection).not.toHaveBeenCalled();
     });
   });
 

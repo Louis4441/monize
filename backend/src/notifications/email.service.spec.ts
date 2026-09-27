@@ -221,6 +221,70 @@ describe("EmailService", () => {
         expect(service.getFailureSnapshot().failuresSinceSuccess).toBe(1);
       });
 
+      describe("verifyConnection (the SMTP-health sweep's probe)", () => {
+        it("records a successful probe as a success and resets the failure count", async () => {
+          const transporter = (nodemailer.createTransport as jest.Mock).mock
+            .results[0].value;
+          transporter.sendMail.mockRejectedValueOnce(
+            new Error("connect ECONNREFUSED"),
+          );
+          await expect(service.sendMail("a@e.f", "S", "B")).rejects.toThrow();
+          const failedAt = service.getFailureSnapshot().lastFailureAt as Date;
+          expect(service.getFailureSnapshot().failuresSinceSuccess).toBe(1);
+
+          await expect(service.verifyConnection()).resolves.toBe(true);
+
+          const snapshot = service.getFailureSnapshot();
+          expect(snapshot.failuresSinceSuccess).toBe(0);
+          expect(snapshot.lastSuccessAt).toBeInstanceOf(Date);
+          // Not older than the failure: the sweep reads "success after
+          // failure" as recovered, which is what a reachable relay is.
+          expect(snapshot.lastSuccessAt!.getTime()).toBeGreaterThanOrEqual(
+            failedAt.getTime(),
+          );
+          expect(snapshot.lastFailureAt).toBe(failedAt);
+        });
+
+        it("records a failed probe as a transport failure, bounded", async () => {
+          const transporter = (nodemailer.createTransport as jest.Mock).mock
+            .results[0].value;
+          transporter.verify.mockRejectedValueOnce(
+            Object.assign(new Error("connect ETIMEDOUT " + "x".repeat(400)), {
+              code: "ETIMEDOUT",
+            }),
+          );
+
+          await expect(service.verifyConnection()).resolves.toBe(false);
+
+          const snapshot = service.getFailureSnapshot();
+          expect(snapshot.lastFailureAt).toBeInstanceOf(Date);
+          expect(snapshot.lastFailureMessage).toHaveLength(300);
+          expect(snapshot.lastFailureMessage).toMatch(/^connect ETIMEDOUT/);
+          expect(snapshot.failuresSinceSuccess).toBe(1);
+          expect(snapshot.recipientRejections).toBe(0);
+        });
+
+        it("counts a probe refused with an SMTP answer as transport -- a probe has no recipient to blame", async () => {
+          // `isSmtpTransportFailure` would file a coded answer as a
+          // recipient rejection; a 421 greeting refuses every send.
+          const transporter = (nodemailer.createTransport as jest.Mock).mock
+            .results[0].value;
+          transporter.verify.mockRejectedValueOnce(
+            Object.assign(new Error("421 Service not available"), {
+              code: "EPROTOCOL",
+              responseCode: 421,
+            }),
+          );
+
+          await expect(service.verifyConnection()).resolves.toBe(false);
+
+          const snapshot = service.getFailureSnapshot();
+          expect(snapshot.failuresSinceSuccess).toBe(1);
+          expect(snapshot.lastFailureMessage).toBe("421 Service not available");
+          expect(snapshot.recipientRejections).toBe(0);
+        });
+      });
+
       it("does not count the unconfigured throw -- that is a setup state, not a transport failure", async () => {
         const unconfigured = new EmailService({
           get: jest.fn().mockReturnValue(undefined),
@@ -314,9 +378,12 @@ describe("EmailService", () => {
       ).rejects.toThrow("SMTP is not configured");
     });
 
-    it("returns false for verifyConnection", async () => {
+    it("returns false for verifyConnection and records nothing", async () => {
       const result = await service.verifyConnection();
       expect(result).toBe(false);
+      // Unconfigured is a setup state, not a transport failure.
+      expect(service.getFailureSnapshot().lastFailureAt).toBeNull();
+      expect(service.getFailureSnapshot().failuresSinceSuccess).toBe(0);
     });
   });
 
