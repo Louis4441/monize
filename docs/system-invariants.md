@@ -4867,6 +4867,12 @@ Enforcement         backend/src/auth/auth-attempt-counter.service.ts is the one 
                     nothing reads a pruned row, because an expired window is
                     reported as zero whether or not the sweep has run.
 Concurrency scope   per (scope, key) -- a user, an email address or an IP,
+                    The AI and MCP daily write caps
+                    (backend/src/common/daily-write-limiter.ts) count on the
+                    same table under scopes ai-write and mcp-write, in a fixed
+                    window ending at the next UTC midnight -- a soft guardrail
+                    rather than an attempt budget, since the cap is read before
+                    the write and counted after it.
                     globally across replicas
 Retry semantics     Every attempt counts exactly once: the increment is the
                     statement, not a read-modify-write, so a retried request

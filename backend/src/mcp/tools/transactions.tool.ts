@@ -1088,7 +1088,7 @@ export class McpTransactionsTools {
     item: ManageItem,
     attachmentDtos?: AttachmentDto[],
   ) {
-    const budget = this.writeLimiter.reserve(userId, 1);
+    const budget = await this.writeLimiter.reserve(userId, 1);
     if (budget) return budget;
     const { preview, createPayee, splits } =
       await this.prepService.prepareCreateSingle(
@@ -1140,7 +1140,7 @@ export class McpTransactionsTools {
       },
       { createPayeeIfMissing: createPayee },
     );
-    this.writeLimiter.record(userId, "create_transaction");
+    await this.writeLimiter.record(userId, "create_transaction");
     const attachments =
       attachmentDtos && attachmentRefs
         ? await this.persistAttachmentsDirect(
@@ -1202,7 +1202,7 @@ export class McpTransactionsTools {
       );
     }
 
-    const budget = this.writeLimiter.reserve(userId, okCount);
+    const budget = await this.writeLimiter.reserve(userId, okCount);
     if (budget) return budget;
 
     if (single) {
@@ -1250,7 +1250,7 @@ export class McpTransactionsTools {
           },
           { createPayeeIfMissing: std.okCreatePayee[0] },
         );
-        this.writeLimiter.record(userId, "create_transaction");
+        await this.writeLimiter.record(userId, "create_transaction");
         const attachments =
           attachmentDtos && attachmentRefs
             ? await this.persistAttachmentsDirect(
@@ -1298,7 +1298,7 @@ export class McpTransactionsTools {
         payeeName: preview.payeeName ?? undefined,
         categoryId: preview.categoryId ?? undefined,
       });
-      this.writeLimiter.record(userId, "create_transfer");
+      await this.writeLimiter.record(userId, "create_transfer");
       return toolResult({ id: result.fromTransaction.id, count: 1 });
     }
 
@@ -1379,7 +1379,7 @@ export class McpTransactionsTools {
         { createPayeeIfMissing: std.okCreatePayee[i] },
       );
       ids.push(tx.id);
-      this.writeLimiter.record(userId, "create_transaction");
+      await this.writeLimiter.record(userId, "create_transaction");
     }
     for (const preview of xfer.okPreviews) {
       const payeeId = await this.resolveTransferPayeeId(userId, preview);
@@ -1398,7 +1398,7 @@ export class McpTransactionsTools {
         categoryId: preview.categoryId ?? undefined,
       });
       ids.push(result.fromTransaction.id);
-      this.writeLimiter.record(userId, "create_transfer");
+      await this.writeLimiter.record(userId, "create_transfer");
     }
     return toolResult({ ids, count: ids.length, skipped });
   }
@@ -1418,7 +1418,7 @@ export class McpTransactionsTools {
         userId,
         this.toUpdateRow(items[0]),
       );
-      const budget = this.writeLimiter.reserve(userId, 1);
+      const budget = await this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       if (result.kind === "transfer" && attachmentDtos) {
         return toolError(
@@ -1456,7 +1456,7 @@ export class McpTransactionsTools {
             categoryId: preview.categoryId,
           },
         );
-        this.writeLimiter.record(userId, "update_transfer");
+        await this.writeLimiter.record(userId, "update_transfer");
         return toolResult({ id: r.fromTransaction.id, count: 1 });
       }
       const preview = result.preview;
@@ -1519,7 +1519,7 @@ export class McpTransactionsTools {
         },
         { createPayeeIfMissing: result.createPayee },
       );
-      this.writeLimiter.record(userId, "update_transaction");
+      await this.writeLimiter.record(userId, "update_transaction");
       const attachments =
         attachmentDtos && attachmentRefs
           ? await this.persistAttachmentsDirect(
@@ -1565,7 +1565,7 @@ export class McpTransactionsTools {
         return toolError(
           `None of the transaction edits could be prepared.${describeSkippedRows(skipped, items.length)}`,
         );
-      const budget = this.writeLimiter.reserve(userId, cards.length);
+      const budget = await this.writeLimiter.reserve(userId, cards.length);
       if (budget) return budget;
       return this.runIndividual(server, ctx, userId, cards, skipped);
     }
@@ -1579,7 +1579,7 @@ export class McpTransactionsTools {
       return toolError(
         `None of the transaction edits could be prepared.${describeSkippedRows(bulk.skipped, items.length)}`,
       );
-    const budget = this.writeLimiter.reserve(userId, bulk.okRows.length);
+    const budget = await this.writeLimiter.reserve(userId, bulk.okRows.length);
     if (budget) return budget;
     const action = this.actionBuilder.buildBatchActions(
       userId,
@@ -1621,7 +1621,7 @@ export class McpTransactionsTools {
         { createPayeeIfMissing: row.createPayee === true },
       );
       ids.push(tx.id);
-      this.writeLimiter.record(userId, "update_transaction");
+      await this.writeLimiter.record(userId, "update_transaction");
     }
     return toolResult({ ids, count: ids.length, skipped: bulk.skipped });
   }
@@ -1640,7 +1640,7 @@ export class McpTransactionsTools {
         userId,
         items[0].transactionId as string,
       );
-      const budget = this.writeLimiter.reserve(userId, 1);
+      const budget = await this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildDeleteTransaction(userId, preview);
       const outcome = await this.emitOrConfirm(
@@ -1657,7 +1657,7 @@ export class McpTransactionsTools {
           "Cancelled: the confirmation was declined, so the transaction was not deleted.",
         );
       await this.transactionsService.removeAny(userId, preview.transactionId);
-      this.writeLimiter.record(userId, "delete_transaction");
+      await this.writeLimiter.record(userId, "delete_transaction");
       return toolResult({ id: preview.transactionId, deleted: true, count: 1 });
     }
 
@@ -1681,7 +1681,7 @@ export class McpTransactionsTools {
         return toolError(
           `None of the transactions could be prepared.${describeSkippedRows(skipped, items.length)}`,
         );
-      const budget = this.writeLimiter.reserve(userId, cards.length);
+      const budget = await this.writeLimiter.reserve(userId, cards.length);
       if (budget) return budget;
       return this.runIndividual(server, ctx, userId, cards, skipped);
     }
@@ -1694,7 +1694,7 @@ export class McpTransactionsTools {
       return toolError(
         `None of the transactions could be prepared.${describeSkippedRows(bulk.skipped, items.length)}`,
       );
-    const budget = this.writeLimiter.reserve(userId, bulk.okRows.length);
+    const budget = await this.writeLimiter.reserve(userId, bulk.okRows.length);
     if (budget) return budget;
     const action = this.actionBuilder.buildBatchActions(
       userId,
@@ -1723,7 +1723,7 @@ export class McpTransactionsTools {
     for (const row of bulk.okRows) {
       await this.transactionsService.removeAny(userId, row.transactionId);
       ids.push(row.transactionId);
-      this.writeLimiter.record(userId, "delete_transaction");
+      await this.writeLimiter.record(userId, "delete_transaction");
     }
     return toolResult({ ids, count: ids.length, skipped: bulk.skipped });
   }
@@ -1804,7 +1804,7 @@ export class McpTransactionsTools {
           },
           { createPayeeIfMissing: d.createPayee === true },
         );
-        this.writeLimiter.record(userId, "create_transaction");
+        await this.writeLimiter.record(userId, "create_transaction");
         return tx.id;
       }
       case "create_transfer": {
@@ -1822,7 +1822,7 @@ export class McpTransactionsTools {
           payeeId,
           payeeName: d.payeeName ?? undefined,
         });
-        this.writeLimiter.record(userId, "create_transfer");
+        await this.writeLimiter.record(userId, "create_transfer");
         return r.fromTransaction.id;
       }
       case "update_transaction": {
@@ -1840,7 +1840,7 @@ export class McpTransactionsTools {
           },
           { createPayeeIfMissing: d.createPayee === true },
         );
-        this.writeLimiter.record(userId, "update_transaction");
+        await this.writeLimiter.record(userId, "update_transaction");
         return tx.id;
       }
       case "update_transfer": {
@@ -1859,12 +1859,12 @@ export class McpTransactionsTools {
             categoryId: d.categoryId,
           },
         );
-        this.writeLimiter.record(userId, "update_transfer");
+        await this.writeLimiter.record(userId, "update_transfer");
         return r.fromTransaction.id;
       }
       case "delete_transaction": {
         await this.transactionsService.removeAny(userId, d.transactionId);
-        this.writeLimiter.record(userId, "delete_transaction");
+        await this.writeLimiter.record(userId, "delete_transaction");
         return d.transactionId;
       }
       default:

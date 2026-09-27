@@ -439,7 +439,6 @@ Each of these is listed in the widened guard's allowlist with the reason here.
 |---|---|---|
 | Provider circuit breaker | `backend/src/provider-health/provider-health.service.ts` | describes this replica's own sockets; episode start and notification markers are already shared rows (`docs/backend/securities-and-providers.md`) |
 | Yahoo request semaphore and crumb | `backend/src/securities/yahoo-finance.service.ts` | a per-process handshake; N replicas mean N crumbs, which the provider tolerates. WP8's fetch claim removes the cron-driven multiplication |
-| `DailyWriteLimiter` | `backend/src/common/daily-write-limiter.ts` | documented as a soft guardrail, not a security boundary. Revisit if MCP write abuse is ever observed |
 | `EmptyWindowMemory` and the empty-window caches | `backend/src/common/time-series/history-fill.ts` | "a cache, not a guard"; a cold replica costs one extra fetch behind an idempotent upsert |
 | Intraday, news and instrument-id caches | `backend/src/securities/portfolio.service.ts`, `backend/src/securities/security-news.service.ts` | short TTL, miss costs one provider call |
 | Activity-write throttle | `backend/src/common/interceptors/request-context.interceptor.ts` | up to N writes per five minutes instead of one; harmless |
