@@ -518,9 +518,11 @@ one replica too -- but `multi` widens the window, and the chart's default
 - **Cluster-wide restore admission.** The per-pod gate protects a pod's memory;
   N pods can each admit a restore. A `claimLease` per user around restore would
   add a cluster ceiling. Not needed for correctness.
-- **Frontend body buffer.** `frontend/src/proxy.ts` buffers the whole request
-  body, so each frontend replica's memory request must still cover
-  `MNY_IMPORT_LIMIT_MB + 8`. Document in the Helm values, no code.
+- **Frontend body buffer.** Settled: `frontend/src/proxy.ts` buffers only
+  bodies within `DEFAULT_PROXY_BODY_LIMIT_BYTES` (10 MiB), and the
+  `LARGE_UPLOAD_ROUTES` in `frontend/src/lib/proxy-body-limit.ts` are excluded
+  from its matcher and streamed by `frontend/src/lib/large-upload-proxy.ts`, so
+  a frontend replica's memory no longer has to cover `MNY_IMPORT_LIMIT_MB`.
 - **pgBouncer and the runtime pool.** The pool itself still holds no session
   state: every `LISTEN` and every `pg_notify()` lives on the one dedicated
   connection above, so transaction-mode pooling stays possible for the API

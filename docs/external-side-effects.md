@@ -440,14 +440,21 @@ step-1b resume path before it claims the grant, and releases it by token once
 delivery ends, so a replica whose sweep sees the freshly claimed grant cannot
 resume, and re-send, a delivery that is still in progress on the winner.
 
-The reminder path is weaker: `lastReminderSentAt` is written after the send, and
-the once-per-day gate reads it, so a crash between send and save re-permits a
-send later the same day. Combined with every replica firing every cron, a
-duplicate reminder is reachable.
+The reminder path keeps exclusion and the delivery record apart. It takes
+`claimLease(JobClaimType.EmergencyAccessReminder, owner, <server-local day>)` so two
+replicas cannot send at the same moment, then re-reads `last_reminder_sent_at`
+under that lease and skips if today's reminder is already recorded; the record
+is written only after the send succeeds, and a failed send hands the lease back
+without writing it. What remains is the window between the SMTP accept and that
+`UPDATE`: a process killed there leaves no record, so a replica whose sweep
+reaches that owner after the ten-minute lease has expired sends the reminder
+again the same day. A duplicate reminder is the survivable direction against a
+missing one.
 
 Claim consumption itself sends no email, so there is no external-effect question
-there -- but the consumption is a check-then-act with no lock and no conditional
-`WHERE`, which `docs/concurrency-and-idempotency.md` covers.
+there; it is a single conditional `UPDATE ... WHERE claim_token_used_at IS NULL`
+(INV-CLAIM-001), which `docs/concurrency-and-idempotency.md` lists among the
+conditional claims that exist.
 
 ## 6. Providers: AI, prices, FX
 
@@ -480,15 +487,24 @@ outage is not part of whatever request happened to discover it, so a rollback
 must not erase it. The write is fire-and-forget and swallows its own failures --
 availability bookkeeping must never turn a provider outage into a failed request.
 
-**AI insights are the weak case.** The reentrancy guard is a `Set<userId>` in
-process memory, which coordinates one replica with itself and nothing across
-replicas. The 12-hour cooldown is a plain read of the most recent
-`generatedAt` -- a check-then-act. Rows are inserted with no idempotency key, so
-a manual regenerate racing the daily cron, or two replicas both past the cooldown
-read, produces duplicate insight rows. Ordering is at least correct on failure:
-the provider is called and the response parsed before anything is saved, so a
-failed call leaves no partial rows, and a total provider failure throws rather
-than fabricating a result.
+**AI insights are the weak case.** Exclusion is now a durable lease:
+`generateInsights` (`backend/src/ai/insights/ai-insights.service.ts`) takes
+`claimLease(JobClaimType.AiInsightGeneration, userId, ...)` and releases it by
+token in its `finally`, so two replicas, or a manual regenerate and the daily
+cron, cannot generate for one user at the same time. The in-process
+`generatingUsers` `Set` remains only as a local short-circuit. What the lease
+does not cover is the 12-hour cooldown: it is a read of the most recent
+`generatedAt` taken *before* the lease and not re-read under it, and only saved
+rows set it. A generation that saves nothing (a provider failure, a response
+that parses to no insights -- `saveInsights` returns early on an empty list)
+leaves no cooldown, so the next replica's cron or a manual regenerate calls the
+provider again: repeated cost, no rows. And a replica that read the cooldown
+before the winner's save committed, but claims the lease only after the winner
+released it, generates and saves a second set -- a narrow window, but a
+duplicate-rows one, since the inserts carry no idempotency key. Ordering is at
+least correct on failure: the provider is called and the response parsed before
+anything is saved, so a failed call leaves no partial rows, and a total provider
+failure throws rather than fabricating a result.
 
 ### Payee contact enrichment
 
@@ -613,8 +629,8 @@ added rather than as it stands.
 | Attachment provider comment | Claims joint commit for all providers; true only of the database provider | EXT-004 |
 | Backup restore validation, plaintext `.json.gz` | No content hash of its own: truncation and random corruption are caught by the gzip trailer and `JSON.parse`, a deliberate alteration is not. An encrypted `.mzbe` is authenticated frame by frame and has no such gap | EXT-002 |
 | Mortgage reminder delivery key | The lease and the delivery record are in place; what is not is the run date. `buildMortgageReminderClaimKey` reads `new Date()` per user, so a run crossing local midnight claims some users under D and the rest under D+1 while the windows are measured from D -- the duplicate the bill reminder closed by taking the date as a parameter | EXT-001 |
-| Emergency-access reminder | `lastReminderSentAt` written after the send, and it is the gate | EXT-001 |
-| AI insight generation | Process-local `Set` as the reentrancy guard; cooldown is a check-then-act; inserts carry no idempotency key | EXT-001 |
+| Emergency-access reminder | The lease and the delivery record are in place, and `last_reminder_sent_at` is re-read under the lease. What remains: a process killed between the SMTP accept and the record's `UPDATE` leaves no record, so a replica whose sweep reaches the owner after the lease expires sends again the same day -- the survivable direction | EXT-001 |
+| AI insight generation | The lease excludes concurrent generation; the cooldown is read before the lease and not re-read under it, and only saved rows set it. A generation that saved nothing is repeated by the next replica or a manual regenerate (provider cost, no rows); a replica that read the cooldown before the winner's save and claims after its release saves a second set (inserts carry no idempotency key) | EXT-001 |
 | Payee contact enrichment | In-flight guard and admission queue are process-local; two replicas can both pay for one lookup (the second UPDATE affects zero rows, so the data is right and only the cost is duplicated) | EXT-001 |
 | Off-machine backup copy (email) | An accepted trade, not an omission: a claim expired by the lease is re-attempted, and SMTP offers no way to tell a message already delivered from one never sent, so the same artifact can arrive twice. Delivering a duplicate copy is the survivable direction against never delivering it | EXT-003 |
 | Off-machine backup copy (S3) | A stuck `uploading` row is reclaimed after the lease and re-attempted, reconciled by digest. What remains: nothing reconciles a bucket object against the ledger, so an object written by an attempt whose row never reached `uploaded` is referenced by nothing -- bytes nobody references, the survivable side, and the operator's lifecycle policy is what ages them out | EXT-003 |
