@@ -3,6 +3,7 @@ import type { ClusterMode } from "../common/cluster/cluster-mode";
 import type { ReplicaCensusService } from "../common/cluster/replica-census.service";
 import {
   isoWeekBucket,
+  REPEATED_SEND_FAILURES,
   SMTP_FAILURE_LOOKBACK_MS,
   SystemAlertMonitorService,
 } from "./system-alert-monitor.service";
@@ -48,6 +49,8 @@ describe("SystemAlertMonitorService", () => {
       lastSuccessAt: null,
       failuresSinceSuccess: 0,
       recipientRejections: 0,
+      lastProbeAt: null,
+      lastProbeError: null,
       ...overrides,
     };
   }
@@ -55,25 +58,19 @@ describe("SystemAlertMonitorService", () => {
   /** The probe instant: just after the sweep's `now` below. */
   const PROBED_AT = new Date("2026-08-30T12:00:01Z");
 
-  /** What `verifyConnection` does when `transporter.verify()` succeeds. */
+  /**
+   * What `verifyConnection` does when `transporter.verify()` succeeds: the
+   * probe's own fields, never the send record.
+   */
   function probeSucceeds(): Promise<boolean> {
-    current = {
-      ...current,
-      lastSuccessAt: PROBED_AT,
-      failuresSinceSuccess: 0,
-    };
+    current = { ...current, lastProbeAt: PROBED_AT, lastProbeError: null };
     return Promise.resolve(true);
   }
 
   /** What `verifyConnection` does when `transporter.verify()` rejects. */
   function probeFails(message: string): () => Promise<boolean> {
     return () => {
-      current = {
-        ...current,
-        lastFailureAt: PROBED_AT,
-        lastFailureMessage: message,
-        failuresSinceSuccess: current.failuresSinceSuccess + 1,
-      };
+      current = { ...current, lastProbeAt: PROBED_AT, lastProbeError: message };
       return Promise.resolve(false);
     };
   }
@@ -226,8 +223,9 @@ describe("SystemAlertMonitorService", () => {
             // The probe's own error, read back after it ran -- what is wrong
             // now, not what went wrong on the send ten minutes ago.
             lastError: "connect ETIMEDOUT 10.0.0.1:587",
-            failuresSinceSuccess: 4,
-            lastFailureAt: PROBED_AT.toISOString(),
+            // The send record, untouched by the probe.
+            failuresSinceSuccess: 3,
+            lastFailureAt: "2026-08-30T11:50:00.000Z",
           }),
         }),
       );
@@ -251,10 +249,40 @@ describe("SystemAlertMonitorService", () => {
       await service.sweepEmailHealth(now);
       expect(emailService.verifyConnection).toHaveBeenCalledTimes(1);
       expect(systemAlerts.raiseAdminAlert).not.toHaveBeenCalled();
-      // And the recovery is now in the snapshot, so the next sweep does not
-      // probe again.
+      // The probe is not a delivery, so the send record still holds the one
+      // failure: the next sweep probes again, and stays silent again.
+      expect(current.failuresSinceSuccess).toBe(1);
       await service.sweepEmailHealth(new Date("2026-08-30T12:15:00Z"));
-      expect(emailService.verifyConnection).toHaveBeenCalledTimes(1);
+      expect(emailService.verifyConnection).toHaveBeenCalledTimes(2);
+      expect(systemAlerts.raiseAdminAlert).not.toHaveBeenCalled();
+    });
+
+    it("raises when sends keep failing even though the probe reaches the relay", async () => {
+      // A relay that accepts the greeting, TLS and login but fails every
+      // message during DATA: the probe passes and nothing is delivered. When
+      // the probe's pass was recorded as a send success it erased these
+      // failures and the alert never fired.
+      current = snapshot({
+        lastFailureAt: new Date("2026-08-30T11:50:00Z"),
+        lastFailureMessage: "Connection closed unexpectedly during DATA",
+        failuresSinceSuccess: REPEATED_SEND_FAILURES,
+      });
+      emailService.verifyConnection.mockImplementation(probeSucceeds);
+
+      await service.sweepEmailHealth(now);
+
+      expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledTimes(1);
+      expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: NotificationType.SMTP_FAILURE,
+          data: expect.objectContaining({
+            probe: "passed",
+            // The send's error: the connection is fine, the messages are not.
+            lastError: "Connection closed unexpectedly during DATA",
+            failuresSinceSuccess: REPEATED_SEND_FAILURES,
+          }),
+        }),
+      );
     });
 
     it("stays silent when a send succeeded while the probe was failing", async () => {

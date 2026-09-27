@@ -134,6 +134,8 @@ describe("EmailService", () => {
           lastSuccessAt: null,
           failuresSinceSuccess: 0,
           recipientRejections: 0,
+          lastProbeAt: null,
+          lastProbeError: null,
         });
       });
 
@@ -222,7 +224,10 @@ describe("EmailService", () => {
       });
 
       describe("verifyConnection (the SMTP-health sweep's probe)", () => {
-        it("records a successful probe as a success and resets the failure count", async () => {
+        it("records a successful probe in its own fields and leaves the send failures alone", async () => {
+          // A relay can take the login and still fail every message, so a
+          // passing probe is not a delivery: recording it as one erased the
+          // failures the SMTP alert exists to report.
           const transporter = (nodemailer.createTransport as jest.Mock).mock
             .results[0].value;
           transporter.sendMail.mockRejectedValueOnce(
@@ -230,22 +235,19 @@ describe("EmailService", () => {
           );
           await expect(service.sendMail("a@e.f", "S", "B")).rejects.toThrow();
           const failedAt = service.getFailureSnapshot().lastFailureAt as Date;
-          expect(service.getFailureSnapshot().failuresSinceSuccess).toBe(1);
 
           await expect(service.verifyConnection()).resolves.toBe(true);
 
           const snapshot = service.getFailureSnapshot();
-          expect(snapshot.failuresSinceSuccess).toBe(0);
-          expect(snapshot.lastSuccessAt).toBeInstanceOf(Date);
-          // Not older than the failure: the sweep reads "success after
-          // failure" as recovered, which is what a reachable relay is.
-          expect(snapshot.lastSuccessAt!.getTime()).toBeGreaterThanOrEqual(
-            failedAt.getTime(),
-          );
+          expect(snapshot.lastProbeAt).toBeInstanceOf(Date);
+          expect(snapshot.lastProbeError).toBeNull();
+          // The send record is exactly what the send left.
+          expect(snapshot.failuresSinceSuccess).toBe(1);
+          expect(snapshot.lastSuccessAt).toBeNull();
           expect(snapshot.lastFailureAt).toBe(failedAt);
         });
 
-        it("records a failed probe as a transport failure, bounded", async () => {
+        it("records a failed probe in its own fields, bounded, and not as a send failure", async () => {
           const transporter = (nodemailer.createTransport as jest.Mock).mock
             .results[0].value;
           transporter.verify.mockRejectedValueOnce(
@@ -257,14 +259,15 @@ describe("EmailService", () => {
           await expect(service.verifyConnection()).resolves.toBe(false);
 
           const snapshot = service.getFailureSnapshot();
-          expect(snapshot.lastFailureAt).toBeInstanceOf(Date);
-          expect(snapshot.lastFailureMessage).toHaveLength(300);
-          expect(snapshot.lastFailureMessage).toMatch(/^connect ETIMEDOUT/);
-          expect(snapshot.failuresSinceSuccess).toBe(1);
+          expect(snapshot.lastProbeAt).toBeInstanceOf(Date);
+          expect(snapshot.lastProbeError).toHaveLength(300);
+          expect(snapshot.lastProbeError).toMatch(/^connect ETIMEDOUT/);
+          expect(snapshot.lastFailureAt).toBeNull();
+          expect(snapshot.failuresSinceSuccess).toBe(0);
           expect(snapshot.recipientRejections).toBe(0);
         });
 
-        it("counts a probe refused with an SMTP answer as transport -- a probe has no recipient to blame", async () => {
+        it("keeps a probe refused with an SMTP answer as the probe's error -- a probe has no recipient to blame", async () => {
           // `isSmtpTransportFailure` would file a coded answer as a
           // recipient rejection; a 421 greeting refuses every send.
           const transporter = (nodemailer.createTransport as jest.Mock).mock
@@ -279,8 +282,7 @@ describe("EmailService", () => {
           await expect(service.verifyConnection()).resolves.toBe(false);
 
           const snapshot = service.getFailureSnapshot();
-          expect(snapshot.failuresSinceSuccess).toBe(1);
-          expect(snapshot.lastFailureMessage).toBe("421 Service not available");
+          expect(snapshot.lastProbeError).toBe("421 Service not available");
           expect(snapshot.recipientRejections).toBe(0);
         });
       });

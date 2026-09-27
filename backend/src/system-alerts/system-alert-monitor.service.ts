@@ -25,6 +25,14 @@ import { ReplicaCensusService } from "../common/cluster/replica-census.service";
  */
 export const SMTP_FAILURE_LOOKBACK_MS = 24 * 60 * 60_000;
 
+/**
+ * Consecutive failed sends that raise the alert even when a probe of the relay
+ * passes. One failure the probe contradicts is a memory; two in a row with no
+ * success between them is the relay accepting a login and refusing messages,
+ * which a connection check cannot see.
+ */
+export const REPEATED_SEND_FAILURES = 2;
+
 /** The admin-only deployment status: configuration an administrator must fix. */
 export interface DeploymentStatus {
   /** Why `JWT_SECRET` is weak, or `null` when it is not. */
@@ -186,14 +194,23 @@ export class SystemAlertMonitorService {
     }
 
     // The snapshot is a memory of this replica's last sends; ask the relay
-    // whether the failure is still true before telling every administrator
-    // so. The probe records its own outcome, so re-read the snapshot: a
-    // success there (the probe's, or a send that landed meanwhile) wins.
+    // whether it is reachable now. The probe records only into its own
+    // fields, so the send record read back below is still the sends' own.
     const reachable = await this.emailService.verifyConnection();
     const fresh = this.emailService.getFailureSnapshot();
-    if (reachable || succeededSinceFailure(fresh)) return;
+    // A send that landed while the probe ran is the best evidence there is.
+    if (succeededSinceFailure(fresh)) return;
+    // A reachable relay contradicts a single failed send -- a transient
+    // outage this replica has not sent through since. It does not contradict
+    // repeated ones: a relay that takes the login and refuses every message
+    // passes the probe and delivers nothing.
+    if (reachable && fresh.failuresSinceSuccess < REPEATED_SEND_FAILURES) {
+      return;
+    }
 
-    const lastError = fresh.lastFailureMessage ?? snapshot.lastFailureMessage;
+    const lastError = reachable
+      ? fresh.lastFailureMessage
+      : (fresh.lastProbeError ?? fresh.lastFailureMessage);
     const lastFailureAt = fresh.lastFailureAt ?? snapshot.lastFailureAt;
     await this.systemAlerts.raiseAdminAlert({
       type: NotificationType.SMTP_FAILURE,
@@ -207,7 +224,9 @@ export class SystemAlertMonitorService {
         "Notifications and reminders are not being delivered.",
       data: {
         system: true,
-        probe: "failed",
+        // "failed": the relay cannot be reached now. "passed": it can, and
+        // sends keep failing anyway -- look past the connection.
+        probe: reachable ? "passed" : "failed",
         lastError,
         failuresSinceSuccess: fresh.failuresSinceSuccess,
         lastFailureAt: lastFailureAt.toISOString(),

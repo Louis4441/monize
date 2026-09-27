@@ -31,6 +31,15 @@ export interface EmailFailureSnapshot {
   failuresSinceSuccess: number;
   /** Addresses the relay answered about and refused. Never raises the alert. */
   recipientRejections: number;
+  /**
+   * When `verifyConnection` last probed the relay, or `null` if it never has.
+   * The probe's own record, apart from the sends': a relay that accepts a
+   * connection and a login can still fail every message, so a passing probe
+   * must not read as a delivered one.
+   */
+  lastProbeAt: Date | null;
+  /** The last probe's error, bounded; `null` when it connected or never ran. */
+  lastProbeError: string | null;
 }
 
 /**
@@ -148,6 +157,8 @@ export class EmailService implements OnModuleInit {
   private lastFailureMessage: string | null = null;
   private lastSuccessAt: Date | null = null;
   private failuresSinceSuccess = 0;
+  private lastProbeAt: Date | null = null;
+  private lastProbeError: string | null = null;
   private recipientRejections = 0;
 
   constructor(private configService: ConfigService) {}
@@ -203,6 +214,8 @@ export class EmailService implements OnModuleInit {
       lastSuccessAt: this.lastSuccessAt,
       failuresSinceSuccess: this.failuresSinceSuccess,
       recipientRejections: this.recipientRejections,
+      lastProbeAt: this.lastProbeAt,
+      lastProbeError: this.lastProbeError,
     };
   }
 
@@ -259,11 +272,12 @@ export class EmailService implements OnModuleInit {
    * authentication) without sending a message, and say whether it worked.
    *
    * This is also the health probe `SystemAlertMonitorService.sweepEmailHealth`
-   * runs before it raises `SMTP_FAILURE`, so the outcome is recorded in the
-   * failure snapshot exactly as a send's would be: the snapshot then describes
-   * the transport as of the last probe, not only as of the last send. A
-   * replica that failed one send and has sent nothing since is otherwise stuck
-   * reporting that failure for as long as it stays quiet.
+   * runs before it raises `SMTP_FAILURE`. Its outcome goes in the probe's own
+   * fields (`lastProbeAt`, `lastProbeError`) and never in the send record: a
+   * relay can accept the greeting, TLS and login and still fail every message
+   * during DATA, so a passing probe recorded as a delivery would erase exactly
+   * the failures the alert exists to report. The sweep weighs the two records
+   * itself.
    *
    * Unconfigured returns `false` and records nothing -- a setup state, not a
    * failure, the same rule `sendMail` follows.
@@ -281,25 +295,33 @@ export class EmailService implements OnModuleInit {
       // STARTTLS, a 535 login) refused the connection itself, so nothing this
       // replica sends can be delivered either. Asking the helper would file a
       // 421 greeting as a recipient rejection.
-      this.recordTransportFailure(error);
+      this.lastProbeAt = new Date();
+      this.lastProbeError = boundedMessage(error);
       return false;
     }
-    this.recordTransportSuccess();
+    this.lastProbeAt = new Date();
+    this.lastProbeError = null;
     return true;
   }
 
   /** The relay could not be used at all: nothing reached anybody. */
   private recordTransportFailure(error: unknown): void {
     this.lastFailureAt = new Date();
-    this.lastFailureMessage = (
-      error instanceof Error ? error.message : String(error)
-    ).slice(0, FAILURE_MESSAGE_MAX_LENGTH);
+    this.lastFailureMessage = boundedMessage(error);
     this.failuresSinceSuccess += 1;
   }
 
-  /** The relay accepted a message or a probe connection. */
+  /** The relay accepted a message. */
   private recordTransportSuccess(): void {
     this.lastSuccessAt = new Date();
     this.failuresSinceSuccess = 0;
   }
+}
+
+/** An error's message, cut to what the snapshot keeps. */
+function boundedMessage(error: unknown): string {
+  return (error instanceof Error ? error.message : String(error)).slice(
+    0,
+    FAILURE_MESSAGE_MAX_LENGTH,
+  );
 }
