@@ -494,6 +494,26 @@ export class EmergencyAccessMonitorService {
   }
 
   /**
+   * Hand the grant-notice lease back, addressed by the token this attempt holds,
+   * for the reason {@link releaseReminderLease} gives. A failure here is not
+   * worth failing the sweep over: the lease expires on its own.
+   */
+  private async releaseGrantNoticeLease(
+    ownerUserId: string,
+    dayKey: string,
+    leaseToken: string,
+  ): Promise<void> {
+    await this.jobClaims
+      .releaseLease(
+        JobClaimType.EmergencyAccessGrantNotify,
+        ownerUserId,
+        dayKey,
+        leaseToken,
+      )
+      .catch(() => undefined);
+  }
+
+  /**
    * The delivery record for one contact and one grant cycle.
    *
    * The generation is what removes the contact from `contactsAwaitingNotice`; the
@@ -721,53 +741,93 @@ export class EmergencyAccessMonitorService {
         return "skipped";
       }
 
-      // Claim the ungranted -> granted transition atomically, BEFORE generating a
-      // single token.
+      // The delivery lease, taken BEFORE the grant claim below and held until the
+      // sends are done. It is the same lease step 1b takes, keyed the same way, and
+      // that sharing is the point.
       //
-      // Every replica fires this cron and `grantedAt` was written only after the
-      // emails went out, so two replicas could both see `grantedAt === null`,
-      // both generate a fresh random token for the same contact, and both send.
-      // Whichever token hash was stored last is the only valid one, so the other
-      // delivered link is dead -- and the recipient of a dead emergency-access
-      // link during a high-stakes recovery has no way to tell it from a revoked
-      // one (audit P4-014). The loser now stands down before writing anything.
-      const generation = await this.claimGrant(settings.ownerUserId);
-      if (generation === null) {
-        return "skipped";
-      }
-
-      const pending = await this.contactsAwaitingNotice(
+      // `claimGrant` decides which replica opens the cycle; it says nothing about
+      // who may *send* for it once it is open. A replica whose sweep read this
+      // owner's settings after the winner's claim committed saw `granted_at` set,
+      // went to step 1b, found the same contacts still pending -- the winner had
+      // not reached `markContactNotified` for them yet -- and took the lease
+      // uncontested, because the winner never held it. `credentialFor` then
+      // re-sent the stored credential, and a contact received the same
+      // emergency-access link twice in the same minute. Holding the lease here
+      // makes the two paths one critical section: whichever replica holds it is
+      // the only one delivering this owner's grant today.
+      //
+      // Released when this attempt is finished, whatever it delivered, so a later
+      // step-1b pass can resume a partial delivery without waiting out the lease;
+      // the contacts already served are excluded by `contactsAwaitingNotice`'s
+      // generation predicate, not by the lease. A replica killed while holding it
+      // costs the lease window, not the notice.
+      const leaseKey = todayKeyFrom(new Date(now));
+      const lease = await this.jobClaims.claimLease(
+        JobClaimType.EmergencyAccessGrantNotify,
         settings.ownerUserId,
-        generation,
+        leaseKey,
+        SEND_LEASE_MS,
       );
-      const delivered = await this.notifyGrantContacts(
-        settings,
-        noticeOwner,
-        pending,
-        appUrl,
-        now,
-        generation,
-      );
+      if (!lease) return "skipped";
 
-      // Only keep the grant if at least one contact actually received a link.
-      // Otherwise hand it back so the next run retries -- a transient SMTP
-      // failure must not permanently disable the safeguard. That behaviour
-      // predates the claim and has to survive it, which is what the release
-      // below is for.
-      //
-      // A *partial* delivery keeps the grant and leaves the rest owed: the
-      // contacts whose `notified_grant_generation` is still behind this cycle are
-      // picked up by step 1b below, without re-issuing a token for anyone who
-      // already holds a working link.
-      if (delivered === 0) {
-        this.logger.error(
-          `Emergency access grant for user ${settings.ownerUserId} delivered no contact emails; releasing the grant claim for retry`,
+      try {
+        // Claim the ungranted -> granted transition atomically, BEFORE generating a
+        // single token.
+        //
+        // Every replica fires this cron and `grantedAt` was written only after the
+        // emails went out, so two replicas could both see `grantedAt === null`,
+        // both generate a fresh random token for the same contact, and both send.
+        // Whichever token hash was stored last is the only valid one, so the other
+        // delivered link is dead -- and the recipient of a dead emergency-access
+        // link during a high-stakes recovery has no way to tell it from a revoked
+        // one (audit P4-014). The loser now stands down before writing anything.
+        const generation = await this.claimGrant(settings.ownerUserId);
+        if (generation === null) {
+          return "skipped";
+        }
+
+        const pending = await this.contactsAwaitingNotice(
+          settings.ownerUserId,
+          generation,
         );
-        await this.releaseGrant(settings.ownerUserId);
-        return "skipped";
-      }
+        const delivered = await this.notifyGrantContacts(
+          settings,
+          noticeOwner,
+          pending,
+          appUrl,
+          now,
+          generation,
+        );
 
-      return "granted";
+        // Only keep the grant if at least one contact actually received a link.
+        // Otherwise hand it back so the next run retries -- a transient SMTP
+        // failure must not permanently disable the safeguard. That behaviour
+        // predates the claim and has to survive it, which is what the release
+        // below is for.
+        //
+        // A *partial* delivery keeps the grant and leaves the rest owed: the
+        // contacts whose `notified_grant_generation` is still behind this cycle are
+        // picked up by step 1b below, without re-issuing a token for anyone who
+        // already holds a working link.
+        if (delivered === 0) {
+          this.logger.error(
+            `Emergency access grant for user ${settings.ownerUserId} delivered no contact emails; releasing the grant claim for retry`,
+          );
+          await this.releaseGrant(settings.ownerUserId);
+          return "skipped";
+        }
+
+        return "granted";
+      } finally {
+        // Last, after any `releaseGrant` above: handing the lease back first would
+        // open a window in which step 1b could resume a cycle this attempt is
+        // about to hand back.
+        await this.releaseGrantNoticeLease(
+          settings.ownerUserId,
+          leaseKey,
+          lease,
+        );
+      }
     }
 
     // Step 1b: a grant that was claimed but never delivered.
@@ -801,7 +861,9 @@ export class EmergencyAccessMonitorService {
       if (pending.length === 0) return "skipped";
 
       // A lease, so two replicas do not both resume the same grant, and a replica
-      // killed while resuming does not block tomorrow's attempt.
+      // killed while resuming does not block tomorrow's attempt. The same lease
+      // step 1 holds while it delivers, so a resume cannot start under a first
+      // delivery that is still sending.
       const lease = await this.jobClaims.claimLease(
         JobClaimType.EmergencyAccessGrantNotify,
         settings.ownerUserId,

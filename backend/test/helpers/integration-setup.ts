@@ -27,6 +27,8 @@ import { settlePendingHistoryWrites } from "@/action-history/action-history.serv
 import { DatabaseStorageProvider } from "@/attachments/storage/database-storage.provider";
 import { ATTACHMENT_STORAGE_PROVIDER } from "@/attachments/storage/attachment-storage.interface";
 import { AttachmentStorageRegistry } from "@/attachments/storage/attachment-storage.registry";
+import { CLUSTER_MODE } from "@/common/cluster/cluster-mode";
+import { ReplicaCensusService } from "@/common/cluster/replica-census.service";
 
 /**
  * Shared PostgreSQL connection options for integration suites. Specs that need
@@ -87,6 +89,24 @@ export const INTEGRATION_TYPEORM_OPTIONS: TypeOrmModuleOptions = {
   exports: [I18nService],
 })
 class TestI18nModule {}
+
+/**
+ * What the app's `@Global` `ClusterModule` supplies, without it: that module
+ * reads `CLUSTER_MODE` from the environment and, in `multi`, builds a `LISTEN`
+ * connection. Integration suites run as one `single` process, so the mode is
+ * the literal and the replica census is the real class over the suite's own
+ * `DataSource` (it opens nothing until it is asked). `SystemAlertMonitorService`
+ * injects both, so every suite that reaches `SystemAlertsModule` needs them.
+ */
+@Global()
+@Module({
+  providers: [
+    { provide: CLUSTER_MODE, useValue: "single" },
+    ReplicaCensusService,
+  ],
+  exports: [CLUSTER_MODE, ReplicaCensusService],
+})
+class TestClusterModule {}
 
 /**
  * What the real `ScheduledTransactionsModule` lets other modules inject, read
@@ -155,6 +175,7 @@ export async function createIntegrationModule(
     imports: [
       ConfigModule.forRoot({ isGlobal: true }),
       TestI18nModule,
+      TestClusterModule,
       TypeOrmModule.forRoot({
         ...INTEGRATION_TYPEORM_OPTIONS,
         ...typeOrmOptions,

@@ -7,7 +7,6 @@ import { getRequestContext } from "../common/request-context";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import {
   createJobClaimMock,
-  TEST_LEASE_TOKEN,
   jobClaimProvider,
   type JobClaimMock,
 } from "../test-helpers/job-claim-testing";
@@ -230,22 +229,44 @@ describe("DemoResetService", () => {
       });
     });
 
-    it("takes a lease before wiping anything", async () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it("claims the UTC day permanently before wiping anything", async () => {
+      // 23:30 in UTC-5 is already the next UTC day: the key follows UTC, like
+      // the intra-day window key, so every replica derives the same one.
+      jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
+      jest.setSystemTime(new Date("2026-03-14T04:00:00.000Z"));
+
       await service.resetDemoData();
 
-      expect(jobClaims.claimLease).toHaveBeenCalledWith(
+      expect(jobClaims.claimOnce).toHaveBeenCalledWith(
         JobClaimType.DemoReset,
         "demo-user-id",
-        expect.any(String),
-        expect.any(Number),
+        "reset:2026-03-14",
+      );
+      // A lease records only "running now"; it is freed on success, so a
+      // replica whose tick lands after the first finished would reset again.
+      expect(jobClaims.claimLease).not.toHaveBeenCalled();
+      expect(jobClaims.releaseLease).not.toHaveBeenCalled();
+    });
+
+    it("keys the claim by a YYYY-MM-DD day", async () => {
+      await service.resetDemoData();
+
+      expect(jobClaims.claimOnce).toHaveBeenCalledWith(
+        JobClaimType.DemoReset,
+        "demo-user-id",
+        expect.stringMatching(/^reset:\d{4}-\d{2}-\d{2}$/),
       );
     });
 
-    it("wipes nothing when another replica holds the lease", async () => {
-      // A wipe-and-reseed is the one job a duplicate run cannot repair by
-      // repeating: the second replica's DELETE lands inside the first
-      // replica's seed and both finish with a partial demo.
-      jobClaims.claimLease.mockResolvedValue(null);
+    it("wipes nothing when another replica already reset the demo today", async () => {
+      // The second replica's tick may land after the first has finished; a
+      // day already claimed means the demo was reset today, and a second
+      // wipe-and-reseed is exactly what the claim exists to stop.
+      jobClaims.claimOnce.mockResolvedValue(false);
 
       await service.resetDemoData();
 
@@ -256,7 +277,7 @@ describe("DemoResetService", () => {
       expect(demoSeedService.seedDemoData).not.toHaveBeenCalled();
     });
 
-    it("hands the lease back even when the reset throws", async () => {
+    it("keeps the day claimed when the reset throws", async () => {
       queryRunner.query.mockImplementation((sql: string) => {
         if (sql.includes("SELECT id FROM users")) {
           return Promise.resolve([{ id: "demo-user-id" }]);
@@ -267,16 +288,12 @@ describe("DemoResetService", () => {
         return Promise.resolve([]);
       });
 
-      await service.resetDemoData();
+      await expect(service.resetDemoData()).resolves.toBeUndefined();
 
-      expect(jobClaims.releaseLease).toHaveBeenCalledWith(
-        JobClaimType.DemoReset,
-        "demo-user-id",
-        expect.any(String),
-        // With the token: a reset that outran its own lease must not release the
-        // one the replica now reseeding holds (audit DR-RRV4-01).
-        TEST_LEASE_TOKEN,
-      );
+      // A partial reset beats a doubled one, and tomorrow's key is fresh.
+      expect(jobClaims.claimOnce).toHaveBeenCalledTimes(1);
+      expect(jobClaims.releasePermanentClaim).not.toHaveBeenCalled();
+      expect(jobClaims.releaseLease).not.toHaveBeenCalled();
     });
 
     it("does not claim anything when there is no demo user", async () => {
@@ -284,6 +301,7 @@ describe("DemoResetService", () => {
 
       await service.resetDemoData();
 
+      expect(jobClaims.claimOnce).not.toHaveBeenCalled();
       expect(jobClaims.claimLease).not.toHaveBeenCalled();
     });
   });

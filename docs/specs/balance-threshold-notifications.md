@@ -57,7 +57,9 @@ warns that balance paths are easy to wire on one route and miss on another (VOID
 future-dated, split parents, bulk, transfer legs, recalc), the evaluation has a
 **built-in backstop**: the latch is durable, so a crossing missed because one path
 did not trigger is caught by the **next** balance change on that account (evaluated
-slightly late, never lost). A guard test scans the balance-update call sites for the
+slightly late, never lost), and a trigger lost with its process (the seam's debounce
+timer is memory) is re-run within about 30 minutes by `NetWorthService.sweepStaleSnapshots`,
+which evaluates every account whose row is newer than its snapshots. A guard test scans the balance-update call sites for the
 trigger, the same shape `deletion-balance.guard.spec.ts` uses.
 
 ---

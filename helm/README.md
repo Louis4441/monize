@@ -140,7 +140,7 @@ the write proceeds under the client's own approval prompt.
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `backend.image.registry` | Image registry | `ghcr.io` |
-| `backend.image.repository` | Image repository | `kenlasko/monize/backend` |
+| `backend.image.repository` | Image repository | `kenlasko/monize-backend` |
 | `backend.image.tag` | Image tag | `latest` |
 | `backend.image.pullPolicy` | Image pull policy | `IfNotPresent` |
 | `backend.replicas` | Number of replicas | `1` |
@@ -429,7 +429,7 @@ Notes on sizing and behaviour:
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `frontend.image.registry` | Image registry | `ghcr.io` |
-| `frontend.image.repository` | Image repository | `kenlasko/monize/frontend` |
+| `frontend.image.repository` | Image repository | `kenlasko/monize-frontend` |
 | `frontend.image.tag` | Image tag | `latest` |
 | `frontend.image.pullPolicy` | Image pull policy | `IfNotPresent` |
 | `frontend.replicas` | Number of replicas | `1` |

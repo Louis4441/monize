@@ -112,6 +112,60 @@ export class AuthAttemptCounterService {
   }
 
   /**
+   * Add `by` to a counter whose window ends at the next UTC midnight, and
+   * return the window's running total.
+   *
+   * For daily budgets (the AI and MCP write caps), where the day is the
+   * window. Both the amount and the day boundary are the database's: one
+   * statement whatever `by` is, and the window end is computed from the
+   * database clock (`date_trunc('day', now() AT TIME ZONE 'UTC') + 1 day`,
+   * back to `timestamptz`) rather than as a duration measured on this process's
+   * clock, so replicas whose clocks disagree still share one midnight. The
+   * window is fixed: the first write of a day sets its end and later writes
+   * leave it.
+   *
+   * Runs outside the caller's transaction for the reason `increment` gives.
+   */
+  async incrementUntilUtcMidnight(
+    scope: string,
+    key: string,
+    by: number,
+  ): Promise<{ count: number; windowExpiresAt: Date }> {
+    const rows = await runOutsideActiveScopedManager(() =>
+      withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `INSERT INTO auth_attempt_counters (scope, key, count, window_expires_at)
+           VALUES ($1, $2, $3,
+                   (date_trunc('day', now() AT TIME ZONE 'UTC') + interval '1 day') AT TIME ZONE 'UTC')
+           ON CONFLICT (scope, key) DO UPDATE
+              SET count = CASE
+                    WHEN auth_attempt_counters.window_expires_at < CURRENT_TIMESTAMP THEN EXCLUDED.count
+                    ELSE auth_attempt_counters.count + EXCLUDED.count
+                  END,
+                  window_expires_at = CASE
+                    WHEN auth_attempt_counters.window_expires_at < CURRENT_TIMESTAMP
+                      THEN EXCLUDED.window_expires_at
+                    ELSE auth_attempt_counters.window_expires_at
+                  END
+           RETURNING count AS count, window_expires_at AS window_expires_at`,
+          [scope, key, Math.round(by)],
+        ),
+      ),
+    );
+    const [row] = returnedRows<{
+      count: number | string;
+      window_expires_at: Date | string;
+    }>(rows);
+    return {
+      count: Number(row.count),
+      windowExpiresAt:
+        row.window_expires_at instanceof Date
+          ? row.window_expires_at
+          : new Date(row.window_expires_at),
+    };
+  }
+
+  /**
    * How many failures the current window holds, or 0 when it has passed.
    *
    * The expiry is compared in SQL rather than against a clock this process

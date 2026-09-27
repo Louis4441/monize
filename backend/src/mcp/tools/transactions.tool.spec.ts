@@ -1,6 +1,8 @@
 import { BadRequestException } from "@nestjs/common";
 import { McpTransactionsTools } from "./transactions.tool";
 import { McpWriteLimiter } from "../mcp-write-limiter";
+import { AuthAttemptCounterService } from "../../auth/auth-attempt-counter.service";
+import { createAuthAttemptCounterMock } from "../../test-helpers/auth-attempt-counter-testing";
 import { CLIENT_CAPABILITIES_META_KEY } from "@modelcontextprotocol/server";
 import { installConfirmSupport } from "../mcp-confirm";
 import { McpRequestStateCodec } from "../mcp-request-state";
@@ -153,7 +155,9 @@ describe("McpTransactionsTools", () => {
       actionBuilder as any,
       prepService as any,
       accountsService as any,
-      new McpWriteLimiter(),
+      new McpWriteLimiter(
+        createAuthAttemptCounterMock() as unknown as AuthAttemptCounterService,
+      ),
       attachmentPrepService as any,
       attachmentsService as any,
       relayAttachmentStore as any,

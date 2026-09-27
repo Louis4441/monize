@@ -3,7 +3,12 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
-import { BudgetAlertService, DIGEST_TYPES } from "./budget-alert.service";
+import {
+  BudgetAlertService,
+  DIGEST_LEASE_MS,
+  DIGEST_TYPES,
+} from "./budget-alert.service";
+import { JobClaimType } from "../common/jobs/job-claim.service";
 import { NotificationService } from "../notification-center/notification.service";
 import { NotificationDispatchService } from "../notifications/notification-dispatch.service";
 import { NotificationPreferenceService } from "../notification-center/notification-preference.service";
@@ -27,6 +32,12 @@ import {
   createScopedDbMocks,
   DataSourceMock,
 } from "../test-helpers/scoped-db-testing";
+import {
+  createJobClaimMock,
+  jobClaimProvider,
+  JobClaimMock,
+  TEST_LEASE_TOKEN,
+} from "../test-helpers/job-claim-testing";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -119,6 +130,7 @@ describe("BudgetAlertService", () => {
   let scheduledTransactionsRepository: Record<string, jest.Mock>;
   let emailService: Record<string, jest.Mock>;
   let configService: Record<string, jest.Mock>;
+  let jobClaims: JobClaimMock;
 
   const mockQueryBuilder = {
     select: jest.fn().mockReturnThis(),
@@ -131,6 +143,10 @@ describe("BudgetAlertService", () => {
   };
 
   beforeEach(async () => {
+    // Wins the lease and reports "not yet delivered" by default, so every test
+    // written before the digest took a lease still exercises the send.
+    jobClaims = createJobClaimMock();
+
     budgetsRepository = {
       find: jest.fn().mockResolvedValue([]),
     };
@@ -302,6 +318,7 @@ describe("BudgetAlertService", () => {
           },
         },
         { provide: DataSource, useValue: scopedDataSource },
+        jobClaimProvider(jobClaims),
         {
           // Mirror the real resolver's master-gate: with no per-category row,
           // resolveEmail == the user's notification_email. So the existing
@@ -362,7 +379,7 @@ describe("BudgetAlertService", () => {
     });
     it("uses the same localized copy in the weekly digest", async () => {
       alertsRepository.find.mockResolvedValue([alert()]);
-      await service["sendDigestForUser"]("u1", [makeBudget()]);
+      await service["sendDigestForUser"]("u1", [makeBudget()], "2026-02-16");
       const html = emailService.sendMail.mock.calls[0][2];
       expect(html).toContain("Jedzenie: limit przekroczony");
       expect(html).not.toContain("Stored title");
@@ -1568,6 +1585,125 @@ describe("BudgetAlertService", () => {
       budgetsRepository.find.mockRejectedValue(new Error("Connection error"));
 
       await expect(service.sendWeeklyDigest()).resolves.not.toThrow();
+    });
+
+    /**
+     * Every backend replica fires this cron. Before the lease, nothing claimed or
+     * recorded the send, so with N replicas each user got N copies of the Monday
+     * digest. A single-replica suite never asked who else was sending; these do.
+     */
+    describe("across replicas", () => {
+      const userId = "11111111-1111-1111-1111-111111111111";
+
+      beforeEach(() => {
+        budgetsRepository.find.mockResolvedValue([makeBudget()]);
+        alertsRepository.find.mockResolvedValue([
+          makeAlert({ type: NotificationType.THRESHOLD_WARNING }),
+        ]);
+      });
+
+      it("leases the user's digest for the run date and records delivery after the send", async () => {
+        await service.sendWeeklyDigest();
+
+        expect(jobClaims.claimLease).toHaveBeenCalledWith(
+          JobClaimType.BudgetWeeklyDigest,
+          userId,
+          expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+          DIGEST_LEASE_MS,
+        );
+        const runDate = jobClaims.claimLease.mock.calls[0][2];
+        expect(emailService.sendMail).toHaveBeenCalledTimes(1);
+        expect(jobClaims.markDelivered).toHaveBeenCalledWith(
+          JobClaimType.BudgetWeeklyDigest,
+          userId,
+          runDate,
+          TEST_LEASE_TOKEN,
+        );
+        // The delivery record follows the side effect, never precedes it: a
+        // record written first would make a failed send permanent.
+        expect(
+          jobClaims.markDelivered.mock.invocationCallOrder[0],
+        ).toBeGreaterThan(emailService.sendMail.mock.invocationCallOrder[0]);
+        expect(jobClaims.releaseLease).not.toHaveBeenCalled();
+      });
+
+      it("keys the lease by the UTC day, whatever this replica's TZ says", async () => {
+        // Two replicas with different TZ settings must spell one Monday the
+        // same way, or each wins its own lease and the user gets two digests.
+        // At 20:00Z on the 15th it is already the 16th in Auckland. Jest
+        // sandboxes process.env, so TZ cannot be changed from here; the local
+        // calendar getters are what a far-east replica's clock would answer,
+        // and they are what a server-local date is built from.
+        jest.useFakeTimers({
+          now: new Date("2026-03-15T20:00:00.000Z"),
+          doNotFake: ["nextTick", "setImmediate", "queueMicrotask"],
+        });
+        const local = [
+          jest.spyOn(Date.prototype, "getFullYear").mockReturnValue(2026),
+          jest.spyOn(Date.prototype, "getMonth").mockReturnValue(2),
+          jest.spyOn(Date.prototype, "getDate").mockReturnValue(16),
+        ];
+        try {
+          await service.sendWeeklyDigest();
+        } finally {
+          local.forEach((spy) => spy.mockRestore());
+          jest.useRealTimers();
+        }
+
+        expect(jobClaims.claimLease).toHaveBeenCalledWith(
+          JobClaimType.BudgetWeeklyDigest,
+          userId,
+          "2026-03-15",
+          DIGEST_LEASE_MS,
+        );
+      });
+
+      it("sends nothing when another replica holds this user's lease", async () => {
+        jobClaims.claimLease.mockResolvedValue(null);
+
+        await service.sendWeeklyDigest();
+
+        expect(emailService.sendMail).not.toHaveBeenCalled();
+        expect(jobClaims.markDelivered).not.toHaveBeenCalled();
+      });
+
+      it("sends nothing and hands the lease back when the digest was already delivered", async () => {
+        jobClaims.wasDelivered.mockResolvedValue(true);
+
+        await service.sendWeeklyDigest();
+
+        expect(emailService.sendMail).not.toHaveBeenCalled();
+        expect(jobClaims.markDelivered).not.toHaveBeenCalled();
+        expect(jobClaims.releaseLease).toHaveBeenCalledWith(
+          JobClaimType.BudgetWeeklyDigest,
+          userId,
+          expect.any(String),
+          TEST_LEASE_TOKEN,
+        );
+      });
+
+      it("releases the lease without a delivery record when the send fails", async () => {
+        emailService.sendMail.mockRejectedValue(new Error("SMTP down"));
+
+        await expect(service.sendWeeklyDigest()).resolves.toBeUndefined();
+
+        expect(jobClaims.markDelivered).not.toHaveBeenCalled();
+        expect(jobClaims.releaseLease).toHaveBeenCalledWith(
+          JobClaimType.BudgetWeeklyDigest,
+          userId,
+          expect.any(String),
+          TEST_LEASE_TOKEN,
+        );
+      });
+
+      it("takes no lease for a user with no budget news", async () => {
+        alertsRepository.find.mockResolvedValue([]);
+
+        await service.sendWeeklyDigest();
+
+        expect(jobClaims.claimLease).not.toHaveBeenCalled();
+        expect(emailService.sendMail).not.toHaveBeenCalled();
+      });
     });
   });
 

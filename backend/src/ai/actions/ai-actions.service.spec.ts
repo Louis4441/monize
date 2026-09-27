@@ -30,6 +30,11 @@ import {
   singleUseKey,
   type SingleUseTokenMock,
 } from "../../test-helpers/single-use-token-testing";
+import {
+  createAuthAttemptCounterMock,
+  type AuthAttemptCounterMock,
+} from "../../test-helpers/auth-attempt-counter-testing";
+import { AuthAttemptCounterService } from "../../auth/auth-attempt-counter.service";
 
 const USER = "user-1";
 const ACC = "11111111-1111-4111-8111-111111111111";
@@ -45,6 +50,7 @@ describe("AiActionsService", () => {
   let service: AiActionsService;
   let signing: AiActionSigningService;
   let limiter: AiWriteLimiter;
+  let counters: AuthAttemptCounterMock;
   let transactions: Record<string, jest.Mock>;
   let payees: Record<string, jest.Mock>;
   let investments: Record<string, jest.Mock>;
@@ -60,7 +66,10 @@ describe("AiActionsService", () => {
         .mockReturnValue("test-secret-key-at-least-32-chars-long!!"),
     } as unknown as ConfigService;
     signing = new AiActionSigningService(config);
-    limiter = new AiWriteLimiter();
+    counters = createAuthAttemptCounterMock();
+    limiter = new AiWriteLimiter(
+      counters as unknown as AuthAttemptCounterService,
+    );
     transactions = {
       create: jest.fn().mockResolvedValue({ id: "tx-new" }),
       update: jest.fn().mockResolvedValue({ id: TX }),
@@ -1040,7 +1049,7 @@ describe("AiActionsService", () => {
   // tomorrow and confirm the same card.
   it("does not claim when the write limit refuses first", async () => {
     for (let i = 0; i < AI_DAILY_WRITE_LIMIT; i++) {
-      limiter.record(USER, "create_transaction");
+      await limiter.record(USER, "create_transaction");
     }
 
     await expect(
@@ -1067,7 +1076,7 @@ describe("AiActionsService", () => {
 
   it("rejects when the daily write limit is reached", async () => {
     for (let i = 0; i < AI_DAILY_WRITE_LIMIT; i++) {
-      limiter.record(USER, "create_transaction");
+      await limiter.record(USER, "create_transaction");
     }
     await expect(
       service.confirm(USER, dtoFor(createTxDescriptor())),
@@ -1167,12 +1176,46 @@ describe("AiActionsService", () => {
         skipped: [],
       });
       await service.confirm(USER, dtoFor(bulkTxDescriptor()));
-      expect(limiter.checkLimit(USER).currentCount).toBe(2);
+      expect((await limiter.checkLimit(USER)).currentCount).toBe(2);
+      // The scope is the contract between replicas: every one of them must
+      // count AI writes under the same name, keyed by the user.
+      // One statement for the whole batch, adding the number of rows created.
+      expect(counters.incrementUntilUtcMidnight).toHaveBeenCalledTimes(1);
+      expect(counters.incrementUntilUtcMidnight).toHaveBeenCalledWith(
+        "ai-write",
+        USER,
+        2,
+      );
+      expect(counters.increment).not.toHaveBeenCalled();
+      expect(counters.peek).toHaveBeenCalledWith("ai-write", USER);
+    });
+
+    // The count is a row now, so recording it can fail -- after the write has
+    // committed. That failure must not reach the release in the `catch`, or
+    // the descriptor for a write that happened would be confirmable again.
+    it("keeps the claim when counting a committed write fails", async () => {
+      transactions.createBulk.mockResolvedValue({
+        created: [{ id: "tx-1" }, { id: "tx-2" }],
+        skipped: [],
+      });
+      counters.incrementUntilUtcMidnight.mockRejectedValueOnce(
+        new Error("pool exhausted"),
+      );
+      const descriptor = bulkTxDescriptor();
+
+      const result = await service.confirm(USER, dtoFor(descriptor));
+
+      expect(result.count).toBe(2);
+      expect(singleUseTokens.release).not.toHaveBeenCalled();
+      await expect(
+        service.confirm(USER, dtoFor(descriptor)),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(transactions.createBulk).toHaveBeenCalledTimes(1);
     });
 
     it("rejects the batch when it would exceed the daily cap", async () => {
       for (let i = 0; i < AI_DAILY_WRITE_LIMIT - 1; i++) {
-        limiter.record(USER, "create_transaction");
+        await limiter.record(USER, "create_transaction");
       }
       // Two rows + 49 existing = 51 > 50 cap.
       await expect(

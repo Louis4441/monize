@@ -347,6 +347,142 @@ describe("NetWorthService", () => {
 
       await expect(service.sweepStaleSnapshots()).resolves.toBeUndefined();
     });
+
+    describe("balance-threshold recovery", () => {
+      // The debounce timer runs two jobs, the recalc and the threshold
+      // evaluation; a pod killed inside the window loses both. The sweep must
+      // recover both halves, or a crossing lost with the timer is not raised
+      // until the account is written again. Re-evaluation is safe: the
+      // crossing is a compare-and-set latch on accounts.*_alert_armed.
+      let evaluateAccounts: jest.Mock;
+      let alertingService: NetWorthService;
+
+      beforeEach(() => {
+        evaluateAccounts = jest.fn().mockResolvedValue(undefined);
+        alertingService = new NetWorthService(
+          dataSource as never,
+          { evaluateAccounts } as never,
+        );
+        accountRepository.findOne.mockImplementation(
+          async ({ where }: { where: { id: string } }) => ({
+            ...mockRegularAccount,
+            id: where.id,
+          }),
+        );
+      });
+
+      it("re-evaluates each stale account's thresholds after its recompute", async () => {
+        serveStale([{ user_id: ownerA, account_id: "acc-1" }]);
+        const order: string[] = [];
+        const recalcSpy = jest
+          .spyOn(alertingService, "recalculateAccount")
+          .mockImplementation(async () => {
+            order.push("recalc");
+          });
+        evaluateAccounts.mockImplementation(async () => {
+          order.push("evaluate");
+        });
+
+        await alertingService.sweepStaleSnapshots();
+
+        expect(recalcSpy).toHaveBeenCalledWith(ownerA, "acc-1");
+        expect(evaluateAccounts).toHaveBeenCalledTimes(1);
+        expect(evaluateAccounts).toHaveBeenCalledWith(ownerA, ["acc-1"]);
+        expect(order).toEqual(["recalc", "evaluate"]);
+      });
+
+      it("says both halves were skipped when the owner id itself is refused", async () => {
+        // withUserContext validates the id before either half runs; the log
+        // must not read like an ordinary recompute failure, or the skipped
+        // threshold evaluation goes unnoticed.
+        serveStale([{ user_id: "not-a-user-id", account_id: "acc-9" }]);
+        const recalcSpy = jest.spyOn(alertingService, "recalculateAccount");
+        const warnSpy = jest
+          .spyOn((alertingService as any).logger, "warn")
+          .mockImplementation(() => undefined);
+
+        await expect(
+          alertingService.sweepStaleSnapshots(),
+        ).resolves.toBeUndefined();
+
+        expect(recalcSpy).not.toHaveBeenCalled();
+        expect(evaluateAccounts).not.toHaveBeenCalled();
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringMatching(
+            /^Stale snapshot sweep skipped account acc-9: its owner id was refused, so neither the snapshot recompute nor the balance-threshold evaluation ran/,
+          ),
+        );
+        warnSpy.mockRestore();
+      });
+
+      it("keeps sweeping and warns when the evaluation rejects", async () => {
+        serveStale([
+          { user_id: ownerA, account_id: "acc-1" },
+          { user_id: ownerB, account_id: "acc-2" },
+        ]);
+        evaluateAccounts.mockRejectedValueOnce(new Error("notify down"));
+        const warnSpy = jest
+          .spyOn((alertingService as any).logger, "warn")
+          .mockImplementation(() => undefined);
+
+        await expect(
+          alertingService.sweepStaleSnapshots(),
+        ).resolves.toBeUndefined();
+
+        // Both recomputes ran and wrote; the failure touched neither.
+        expect(lockAccounts.mock.calls.map((call) => call[1])).toEqual([
+          ["acc-1"],
+          ["acc-2"],
+        ]);
+        expect(snapshotWriteBlocks()).toBe(2);
+        // The second account was still evaluated.
+        expect(evaluateAccounts).toHaveBeenCalledWith(ownerB, ["acc-2"]);
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining(
+            "Balance-threshold evaluation failed for account acc-1: notify down",
+          ),
+        );
+        warnSpy.mockRestore();
+      });
+
+      it("still evaluates when the recompute fails", async () => {
+        // Independent halves, as on the timer: the evaluation reads the
+        // committed balance, not the snapshots the recompute failed to write.
+        serveStale([{ user_id: ownerA, account_id: "acc-1" }]);
+        jest
+          .spyOn(alertingService, "recalculateAccount")
+          .mockRejectedValue(new Error("DB down"));
+        const warnSpy = jest
+          .spyOn((alertingService as any).logger, "warn")
+          .mockImplementation(() => undefined);
+
+        await expect(
+          alertingService.sweepStaleSnapshots(),
+        ).resolves.toBeUndefined();
+
+        expect(evaluateAccounts).toHaveBeenCalledWith(ownerA, ["acc-1"]);
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining(
+            "Stale snapshot recompute failed for account acc-1: DB down",
+          ),
+        );
+        warnSpy.mockRestore();
+      });
+
+      it("still recomputes when no alert service is wired", async () => {
+        // The constructor's @Optional(): a harness without NotificationsModule
+        // skips the evaluation rather than failing the sweep.
+        serveStale([{ user_id: ownerA, account_id: "acc-1" }]);
+
+        await expect(service.sweepStaleSnapshots()).resolves.toBeUndefined();
+
+        expect(lockAccounts.mock.calls.map((call) => call[1])).toEqual([
+          ["acc-1"],
+        ]);
+        expect(snapshotWriteBlocks()).toBe(1);
+        expect(evaluateAccounts).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("recalculateAccount", () => {

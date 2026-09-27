@@ -439,14 +439,14 @@ Each of these is listed in the widened guard's allowlist with the reason here.
 |---|---|---|
 | Provider circuit breaker | `backend/src/provider-health/provider-health.service.ts` | describes this replica's own sockets; episode start and notification markers are already shared rows (`docs/backend/securities-and-providers.md`) |
 | Yahoo request semaphore and crumb | `backend/src/securities/yahoo-finance.service.ts` | a per-process handshake; N replicas mean N crumbs, which the provider tolerates. WP8's fetch claim removes the cron-driven multiplication |
-| `DailyWriteLimiter` | `backend/src/common/daily-write-limiter.ts` | documented as a soft guardrail, not a security boundary. Revisit if MCP write abuse is ever observed |
 | `EmptyWindowMemory` and the empty-window caches | `backend/src/common/time-series/history-fill.ts` | "a cache, not a guard"; a cold replica costs one extra fetch behind an idempotent upsert |
 | Intraday, news and instrument-id caches | `backend/src/securities/portfolio.service.ts`, `backend/src/securities/security-news.service.ts` | short TTL, miss costs one provider call |
 | Activity-write throttle | `backend/src/common/interceptors/request-context.interceptor.ts` | up to N writes per five minutes instead of one; harmless |
 | Support-backup raw export cache | `backend/src/backup/support-backup/support-backup.service.ts` | preview and generate landing on different replicas degrade to two exports. Acceptable; documented on the endpoint |
 | Budget actuals promise cache | `backend/src/budgets/budgets.service.ts` | already stale within one replica for its TTL; multi-replica does not change the contract |
 | Restore admission gate | `backend/src/backup/restore-processing-gate.ts` | memory is per pod, so the gate is correctly per pod. Cluster-wide restore admission is an open question |
-| Email failure snapshot | `backend/src/notifications/email.service.ts` | the alert that reads it dedupes at the database; the threshold becomes per replica, which the class comment already anticipates |
+| Email failure snapshot | `backend/src/notifications/email.service.ts` | per replica by design and forgotten on restart, so it only decides whether to look: the SMTP-failure sweep asks a live `verifyConnection()` probe from the same replica before raising: a failed probe raises, and a passing one clears a single stale failed send but not repeated ones (a relay can take the login and refuse every message). Either way the alert describes this replica's delivery now, which holds under any replica count. The alert dedupes at the database (`SMTP_FAILURE:<UTC day>`) |
+| `INSTANCE_ID` / `application_name` | `backend/src/common/cluster/instance-id.ts` | a random UUID and start time minted once per process and stamped on every pooled PostgreSQL session; correct per replica by definition, since it exists to tell processes apart in `pg_stat_activity` for the replica census (`backend/src/common/cluster/replica-census.service.ts`). Identity for observation only, never for authorization or ownership |
 
 ## Invariants to add
 
@@ -519,9 +519,11 @@ one replica too -- but `multi` widens the window, and the chart's default
 - **Cluster-wide restore admission.** The per-pod gate protects a pod's memory;
   N pods can each admit a restore. A `claimLease` per user around restore would
   add a cluster ceiling. Not needed for correctness.
-- **Frontend body buffer.** `frontend/src/proxy.ts` buffers the whole request
-  body, so each frontend replica's memory request must still cover
-  `MNY_IMPORT_LIMIT_MB + 8`. Document in the Helm values, no code.
+- **Frontend body buffer.** Settled: `frontend/src/proxy.ts` buffers only
+  bodies within `DEFAULT_PROXY_BODY_LIMIT_BYTES` (10 MiB), and the
+  `LARGE_UPLOAD_ROUTES` in `frontend/src/lib/proxy-body-limit.ts` are excluded
+  from its matcher and streamed by `frontend/src/lib/large-upload-proxy.ts`, so
+  a frontend replica's memory no longer has to cover `MNY_IMPORT_LIMIT_MB`.
 - **pgBouncer and the runtime pool.** The pool itself still holds no session
   state: every `LISTEN` and every `pg_notify()` lives on the one dedicated
   connection above, so transaction-mode pooling stays possible for the API

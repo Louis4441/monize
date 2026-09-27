@@ -416,7 +416,12 @@ worth keeping: CONC-003 can only be checked against a list of all writers.
 ### Conditional claims that exist
 
 `mny-import-job.service.ts` `claim` and `reapStaleJobs`; the sibling-token
-voiding in the three emergency-access call sites; the Google Places monthly quota
+voiding in the three emergency-access call sites; the emergency-access claim
+consumption itself (`emergency-access-claim.controller.ts` `complete`), a
+single `UPDATE emergency_access_contacts ... WHERE claim_token_hash = $1 AND claim_token_used_at IS NULL AND claim_token_expires_at >= CURRENT_TIMESTAMP RETURNING`
+run before any credential is touched, so the loser of two concurrent completes
+gets zero rows and is refused having written nothing (INV-CLAIM-001; the
+two-connection test is still owed); the Google Places monthly quota
 claim (`payee-lookup-quota.service.ts`, INV-PAYEE-002), whose conditional
 `ON CONFLICT DO UPDATE ... WHERE requests < cap` is both the increment and the
 limit, so no caller ever reads a count it then writes back. Its compensating
@@ -443,11 +448,13 @@ with `INSERT INTO scheduled_transaction_postings ... ON CONFLICT (scheduled_tran
 inside the transaction that writes the money, so the unique key from migration
 140 is the serialization point and the losing replica's `ConflictException` is
 counted as a skip, not an error (INV-OCCURRENCE-001). The demo reset
-(`backend/src/database/demo-reset.service.ts`) takes `claimLease(JobClaimType.DemoReset, ...)`
-around the whole wipe-and-reseed and releases it **by lease token**, so a run
-that outran its lease cannot free the one a replica now reseeding holds; the
-lease expiry is what keeps a killed replica from leaving the demo
-un-resettable.
+(`backend/src/database/demo-reset.service.ts`) takes
+`claimOnce(JobClaimType.DemoReset, demoUserId, "reset:<UTC day>")` before the
+wipe-and-reseed. The claim is permanent, so it records "reset today" as well as
+"running now": a replica whose tick arrives after the first has finished skips
+rather than wiping a freshly seeded demo. It is deliberately not released on
+failure -- a partial reset beats a doubled one -- so a replica killed mid-reset
+leaves the demo as it is until the next UTC day's key.
 
 The monthly budget rollover (`budget-period-cron.service.ts`) claims
 `claimOnce(BudgetPeriodRollover, ownerUserId, "<YYYY-MM>")` inside each owner's
@@ -478,7 +485,6 @@ this table when a mechanism lands, not when someone judges the window small.
 | `accounts.current_balance` | Three postures coexist on one column: a lock-free atomic delta (`updateBalance`, `import-context.updateAccountBalance`), an unlocked read-then-write absolute recompute (`recalculateCurrentBalance`, the hourly `applyDueTransactionBalances`, `import-post-processing`, `write-transactions`, `action-history.recalculateBalance`), and a pessimistically locked read-then-write (`update`, `close`). A delta committing between a recompute's SELECT and its UPDATE is silently discarded. | CONC-001, CONC-003 |
 | `holdings.quantity` / `average_cost` | Every mutation path is a JavaScript read-modify-write inside a transaction with no lock and no atomic delta. `UNIQUE(account_id, security_id)` prevents duplicate rows and does nothing about a lost update to the same row. | CONC-001 |
 | Budget rollover after a failed owner pass | The claim is handed back, so a failure is no longer recorded as a success -- but nothing re-runs it inside the month. `budget-period-cron` is `0 0 1 * *`, so there is no later tick, and the request path has no repair: `getOrCreateCurrentPeriod` has **no production caller**, and would return a previous month's still-OPEN period unchanged if it had one. The owner's previous period therefore stays OPEN until the next month's tick, which closes it and creates the month it runs in -- skipping the month that was missed. Closing it needs either a request-path repair with a caller, or a tick frequency that gives the claim somewhere to be retried. | CONC-006 |
-| Emergency-access claim consumption | Check-then-act: the in-transaction re-read passes no `lock` option, and the consuming write is an entity `save` by primary key with no `WHERE claim_token_used_at IS NULL`. The code immediately beside it uses the CAS predicate correctly for voiding *sibling* tokens. The comment claims re-validation "under lock". There is no partial unique index on unused tokens to act as a backstop. | CONC-001, CONC-002, CONC-007 |
 | Logout vs rotation | Logout's family revoke is an unlocked bulk `UPDATE`. It happens to be safe because `isRevoked = true` is idempotent and the end state is order-independent -- but this is a property of the value, not a protocol, and it stops holding the moment logout writes anything else. | CONC-003 (tolerated; document, do not copy) |
 | MNY import retry after a committed write | `writeAll`'s transaction commits before post-processing, verification, staged-file deletion and the terminal status update. A failure in that window leaves committed rows behind a retryable job, and a retry re-parses with fresh UUIDs. No checkpoint, run id, or per-record key. See INV-IMPORT-002. | CONC-006, CONC-007 |
 

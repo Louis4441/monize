@@ -1756,11 +1756,15 @@ that creates a missing period on demand exists before relying on it for
 repair; if it does not, use `claimLease` with a short TTL instead so a failed
 run can retry next tick.
 
-**Notes:** the repair path exists --
-`BudgetPeriodService.getOrCreateCurrentPeriod`, reached by opening the Budgets
-screen, which inserts the month's period with
-`ON CONFLICT (budget_id, period_start) DO NOTHING` -- so the permanent
-`claimOnce` is the right primitive and `claimLease` was not needed.
+**Notes:** the repair path this task relied on does not exist.
+`BudgetPeriodService.getOrCreateCurrentPeriod` (`backend/src/budgets/budget-period.service.ts`)
+has no production caller -- opening the Budgets screen does not reach it --
+so nothing repairs a failed rollover inside the month. The cron now hands an
+incomplete owner's claim back with `releasePermanentClaim`, which stops a
+failure being recorded as a success but, with a `0 0 1 * *` schedule, gives
+it no later tick to retry on. The accurate statement of what remains is the
+"Budget rollover after a failed owner pass" row in the gap register of
+`docs/concurrency-and-idempotency.md`.
 
 The loop is now over owners rather than over budgets: `groupByOwner` collects
 each owner's active budgets, one claim is taken for the owner, and the whole
@@ -1780,8 +1784,9 @@ was a heuristic rather than the fact.
 key from one instant. `job_claims.claim_type` is a plain `VARCHAR(64)` with no
 CHECK constraint, so the new member needed no migration.
 
-The gap row in `docs/concurrency-and-idempotency.md` is retired and the job
-moved into the resolved-claims paragraphs beside the demo reset.
+The job moved into the resolved-claims paragraphs of
+`docs/concurrency-and-idempotency.md` beside the demo reset; its gap row was
+rewritten, not retired, to the missing in-month retry named above.
 
 ### C2 -- Fetch crons behind a deployment-wide sync claim
 

@@ -1,6 +1,8 @@
 import { BadRequestException } from "@nestjs/common";
 import { McpInvestmentsTools } from "./investments.tool";
 import { McpWriteLimiter } from "../mcp-write-limiter";
+import { AuthAttemptCounterService } from "../../auth/auth-attempt-counter.service";
+import { createAuthAttemptCounterMock } from "../../test-helpers/auth-attempt-counter-testing";
 import { mcpTestCtx, McpTestContext } from "../testing/mcp-test-context";
 
 describe("McpInvestmentsTools", () => {
@@ -134,7 +136,9 @@ describe("McpInvestmentsTools", () => {
       relayService as any,
       actionBuilder as any,
       accountsService as any,
-      new McpWriteLimiter(),
+      new McpWriteLimiter(
+        createAuthAttemptCounterMock() as unknown as AuthAttemptCounterService,
+      ),
     );
 
     elicitInput = jest.fn();
@@ -1230,7 +1234,7 @@ describe("McpInvestmentsTools", () => {
       );
       (tool as any).writeLimiter.checkLimit = jest
         .fn()
-        .mockReturnValue({ allowed: false, currentCount: 500, limit: 500 });
+        .mockResolvedValue({ allowed: false, currentCount: 500, limit: 500 });
 
       const result = await handlers["manage_investment_transactions"](
         createArgs,

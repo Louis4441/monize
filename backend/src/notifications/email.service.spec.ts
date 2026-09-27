@@ -134,6 +134,8 @@ describe("EmailService", () => {
           lastSuccessAt: null,
           failuresSinceSuccess: 0,
           recipientRejections: 0,
+          lastProbeAt: null,
+          lastProbeError: null,
         });
       });
 
@@ -219,6 +221,70 @@ describe("EmailService", () => {
         );
         await expect(service.sendMail("a@e.f", "S", "B")).rejects.toThrow();
         expect(service.getFailureSnapshot().failuresSinceSuccess).toBe(1);
+      });
+
+      describe("verifyConnection (the SMTP-health sweep's probe)", () => {
+        it("records a successful probe in its own fields and leaves the send failures alone", async () => {
+          // A relay can take the login and still fail every message, so a
+          // passing probe is not a delivery: recording it as one erased the
+          // failures the SMTP alert exists to report.
+          const transporter = (nodemailer.createTransport as jest.Mock).mock
+            .results[0].value;
+          transporter.sendMail.mockRejectedValueOnce(
+            new Error("connect ECONNREFUSED"),
+          );
+          await expect(service.sendMail("a@e.f", "S", "B")).rejects.toThrow();
+          const failedAt = service.getFailureSnapshot().lastFailureAt as Date;
+
+          await expect(service.verifyConnection()).resolves.toBe(true);
+
+          const snapshot = service.getFailureSnapshot();
+          expect(snapshot.lastProbeAt).toBeInstanceOf(Date);
+          expect(snapshot.lastProbeError).toBeNull();
+          // The send record is exactly what the send left.
+          expect(snapshot.failuresSinceSuccess).toBe(1);
+          expect(snapshot.lastSuccessAt).toBeNull();
+          expect(snapshot.lastFailureAt).toBe(failedAt);
+        });
+
+        it("records a failed probe in its own fields, bounded, and not as a send failure", async () => {
+          const transporter = (nodemailer.createTransport as jest.Mock).mock
+            .results[0].value;
+          transporter.verify.mockRejectedValueOnce(
+            Object.assign(new Error("connect ETIMEDOUT " + "x".repeat(400)), {
+              code: "ETIMEDOUT",
+            }),
+          );
+
+          await expect(service.verifyConnection()).resolves.toBe(false);
+
+          const snapshot = service.getFailureSnapshot();
+          expect(snapshot.lastProbeAt).toBeInstanceOf(Date);
+          expect(snapshot.lastProbeError).toHaveLength(300);
+          expect(snapshot.lastProbeError).toMatch(/^connect ETIMEDOUT/);
+          expect(snapshot.lastFailureAt).toBeNull();
+          expect(snapshot.failuresSinceSuccess).toBe(0);
+          expect(snapshot.recipientRejections).toBe(0);
+        });
+
+        it("keeps a probe refused with an SMTP answer as the probe's error -- a probe has no recipient to blame", async () => {
+          // `isSmtpTransportFailure` would file a coded answer as a
+          // recipient rejection; a 421 greeting refuses every send.
+          const transporter = (nodemailer.createTransport as jest.Mock).mock
+            .results[0].value;
+          transporter.verify.mockRejectedValueOnce(
+            Object.assign(new Error("421 Service not available"), {
+              code: "EPROTOCOL",
+              responseCode: 421,
+            }),
+          );
+
+          await expect(service.verifyConnection()).resolves.toBe(false);
+
+          const snapshot = service.getFailureSnapshot();
+          expect(snapshot.lastProbeError).toBe("421 Service not available");
+          expect(snapshot.recipientRejections).toBe(0);
+        });
       });
 
       it("does not count the unconfigured throw -- that is a setup state, not a transport failure", async () => {
@@ -314,9 +380,12 @@ describe("EmailService", () => {
       ).rejects.toThrow("SMTP is not configured");
     });
 
-    it("returns false for verifyConnection", async () => {
+    it("returns false for verifyConnection and records nothing", async () => {
       const result = await service.verifyConnection();
       expect(result).toBe(false);
+      // Unconfigured is a setup state, not a transport failure.
+      expect(service.getFailureSnapshot().lastFailureAt).toBeNull();
+      expect(service.getFailureSnapshot().failuresSinceSuccess).toBe(0);
     });
   });
 

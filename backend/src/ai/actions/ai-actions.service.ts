@@ -159,7 +159,7 @@ export class AiActionsService {
     const writeCount = this.proposedWriteCount(
       descriptor as AiActionDescriptor,
     );
-    const limit = this.writeLimiter.checkLimit(userId);
+    const limit = await this.writeLimiter.checkLimit(userId);
     if (limit.currentCount + writeCount > limit.limit) {
       throw new BadRequestException(
         tr(
@@ -202,11 +202,14 @@ export class AiActionsService {
         descriptor as AiActionDescriptor,
       );
       // Record one write per entity actually created (bulk actions create
-      // best-effort, so this may be fewer than the proposed count).
-      const recorded = result.count ?? 1;
-      for (let i = 0; i < recorded; i++) {
-        this.writeLimiter.record(userId, descriptor.type);
-      }
+      // best-effort, so this may be fewer than the proposed count). `record`
+      // never rejects, so a counter failure cannot reach the `catch` below and
+      // release the claim on a write that has already committed.
+      await this.writeLimiter.record(
+        userId,
+        descriptor.type,
+        result.count ?? 1,
+      );
       return result;
     } catch (err) {
       // Best-effort, and it must never replace the error it is cleaning up

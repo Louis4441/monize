@@ -3880,7 +3880,9 @@ Enforcement         Per job, and now mostly a durable cross-replica claim.
                     (INV-OCCURRENCE-001, occurrence-key claim), budget rollover
                     (ON CONFLICT (budget_id, period_start) DO NOTHING RETURNING with
                     the loser re-reading the winner), AI insight generation
-                    (claimLease, not a process-local Set), demo reset (claimLease).
+                    (claimLease with the cooldown re-read under it, not a
+                    process-local Set), demo reset (claimOnce
+                    keyed by the UTC day).
                     The MNY reaper's conditional CAS and the price/FX refreshes'
                     natural-key ON CONFLICT were already real.
                     Still partial: the account-balance recompute is idempotent
@@ -4866,6 +4868,12 @@ Enforcement         backend/src/auth/auth-attempt-counter.service.ts is the one 
                     backend/src/auth/auth-state-sweeper.service.ts prunes expired rows;
                     nothing reads a pruned row, because an expired window is
                     reported as zero whether or not the sweep has run.
+                    The AI and MCP daily write caps
+                    (backend/src/common/daily-write-limiter.ts) count on the
+                    same table under scopes ai-write and mcp-write, in a fixed
+                    window ending at the next UTC midnight -- a soft guardrail
+                    rather than an attempt budget, since the cap is read before
+                    the write and counted after it.
 Concurrency scope   per (scope, key) -- a user, an email address or an IP,
                     globally across replicas
 Retry semantics     Every attempt counts exactly once: the increment is the

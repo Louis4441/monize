@@ -23,6 +23,7 @@ import { CsrfRefreshInterceptor } from "./common/interceptors/csrf-refresh.inter
 import { RequestContextInterceptor } from "./common/interceptors/request-context.interceptor";
 import { parseRlsMode, resolveRlsDatabaseAuth } from "./common/db/rls-config";
 import { ClusterModule } from "./common/cluster/cluster.module";
+import { APPLICATION_NAME } from "./common/cluster/instance-id";
 import { DemoModeModule } from "./common/demo-mode.module";
 import { EventBusModule } from "./common/events/event-bus.module";
 import { JobClaimModule } from "./common/jobs/job-claim.module";
@@ -105,6 +106,12 @@ import { I18nModule } from "./i18n/i18n.module";
           username,
           password,
           database: configService.get("DATABASE_NAME"),
+          // PostgreSQL's `application_name` on every pooled session: this
+          // process's id and start time, so `pg_stat_activity` can attribute a
+          // session to a process and `ReplicaCensusService` can count how many
+          // backend processes share the database (CLUSTER_MODE=single is an
+          // assertion the process otherwise cannot check). Observation only.
+          applicationName: APPLICATION_NAME,
           entities: [__dirname + "/**/*.entity{.ts,.js}"],
           synchronize: false, // Use migrations in production
           logging: ["error"],
