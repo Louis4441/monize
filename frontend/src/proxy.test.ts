@@ -231,6 +231,47 @@ describe('proxy client address forwarding', () => {
 });
 
 /**
+ * An edge that relays an HTTP/3 request of undeclared length (Caddy, for a
+ * bodiless PATCH) sends it on over HTTP/1.1 with `Transfer-Encoding: chunked`.
+ * undici's fetch refuses that header, and `keep-alive` and `upgrade` with it,
+ * before the request leaves, so forwarding them turned the call into a 502.
+ */
+describe('proxy hop-by-hop headers', () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    fetchMock.mockReset();
+  });
+
+  it('does not forward connection-level headers to the backend', async () => {
+    const response = await proxy(
+      makeRequest('/api/v1/ai/insights/i1/dismiss', {
+        method: 'PATCH',
+        headers: {
+          'transfer-encoding': 'chunked',
+          'keep-alive': 'timeout=5',
+          upgrade: 'h2c',
+          'x-csrf-token': 'token',
+        },
+      }),
+    );
+
+    expect(response.status).toBe(204);
+    const forwarded = new Headers((fetchMock.mock.calls[0][1] as RequestInit).headers);
+    expect(forwarded.has('transfer-encoding')).toBe(false);
+    expect(forwarded.has('keep-alive')).toBe(false);
+    expect(forwarded.has('upgrade')).toBe(false);
+    expect(forwarded.get('x-csrf-token')).toBe('token');
+  });
+});
+
+/**
  * Next copies every matched request's body into memory, up to
  * `proxyClientMaxBodySize`, before this proxy runs. So the proxy's own limit is
  * the backend's default (10 MB), and the routes that need more are kept out of
