@@ -6,8 +6,12 @@ import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { emailTranslator } from "../i18n/email-translator";
 import { DEFAULT_LOCALE } from "../i18n/config";
-import { getMonthEndYMD } from "../common/date-utils";
+import { getMonthEndYMD, todayYMD } from "../common/date-utils";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
+import {
+  JobClaimService,
+  JobClaimType,
+} from "../common/jobs/job-claim.service";
 import { Budget } from "./entities/budget.entity";
 import {
   Notification,
@@ -92,6 +96,13 @@ export const DIGEST_TYPES: readonly NotificationType[] = [
   NotificationType.BILL_DUE,
 ];
 
+/**
+ * How long one replica holds a user's weekly digest: one SMTP round trip with
+ * room to spare, and short enough that a replica killed mid-send hands the user
+ * back to the next run rather than locking them out.
+ */
+export const DIGEST_LEASE_MS = 10 * 60 * 1000;
+
 function isReminderReEmit(row: Notification): boolean {
   const value = (row.data as Record<string, unknown> | null | undefined)
     ?.reminderId;
@@ -118,6 +129,8 @@ export class BudgetAlertService {
     // top of the in-app row, without changing the batched critical email below,
     // which is report-mode and stays as it is.
     private readonly dispatch: NotificationDispatchService,
+    // The weekly digest's lease and delivery record, so N replicas send one.
+    private readonly jobClaims: JobClaimService,
   ) {}
 
   @Cron("0 7 * * *")
@@ -212,6 +225,12 @@ export class BudgetAlertService {
         budgetsByUser.set(budget.userId, existing);
       }
 
+      // The run's date, read ONCE for every user. It is the digest's claim
+      // key, and a run that spans midnight while reading the date per user
+      // claims the early users under one key and the rest under another --
+      // which is how the bill reminder's two passes came to disagree.
+      const runDate = todayYMD();
+
       let sentCount = 0;
       let skipCount = 0;
 
@@ -219,7 +238,7 @@ export class BudgetAlertService {
         try {
           // RLS: per-user body keeps the user's RLS net.
           const sent = await withUserContext(userId, () =>
-            this.sendDigestForUser(userId, userBudgets),
+            this.sendDigestForUser(userId, userBudgets, runDate),
           );
           if (sent) {
             sentCount++;
@@ -771,6 +790,7 @@ export class BudgetAlertService {
   private async sendDigestForUser(
     userId: string,
     budgets: Budget[],
+    runDate: string,
   ): Promise<boolean> {
     const prefs = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(UserPreference).findOne({
@@ -900,8 +920,77 @@ export class BudgetAlertService {
       "emails.budgetWeeklyDigest.subject",
       "Monize: Your weekly budget summary",
     );
-    await this.emailService.sendMail(user.email, subject, html);
-    return true;
+
+    // Claim this user's digest for the run date before anything leaves the
+    // process.
+    //
+    // Every backend replica fires this cron (docs/cron-jobs.md), and nothing
+    // here claimed or recorded the send -- so with N replicas each user got N
+    // copies of the Monday digest. Not a rare race: the normal outcome of
+    // running more than one replica.
+    //
+    // A **lease** plus a durable **delivery record**, not `claimOnce`. A
+    // permanent claim taken before the send is the only record that the send
+    // was owed, so a replica killed in between would leave a row every later
+    // run reads as "already handled" and the digest would silently never go
+    // out. The lease is the exclusion for one send; `delivered_at`, written
+    // after the send and re-read here, is what says it was done.
+    //
+    // The contract is at-least-once: a process killed after the SMTP server
+    // accepted but before the record committed re-sends next run. For a weekly
+    // summary that is the right trade.
+    const leaseToken = await this.jobClaims.claimLease(
+      JobClaimType.BudgetWeeklyDigest,
+      userId,
+      runDate,
+      DIGEST_LEASE_MS,
+    );
+    if (!leaseToken) {
+      // Another replica holds this user's digest for today.
+      return false;
+    }
+    if (
+      await this.jobClaims.wasDelivered(
+        JobClaimType.BudgetWeeklyDigest,
+        userId,
+        runDate,
+      )
+    ) {
+      // Already sent, durably. Hand the lease back rather than holding it for
+      // its whole TTL.
+      await this.jobClaims.releaseLease(
+        JobClaimType.BudgetWeeklyDigest,
+        userId,
+        runDate,
+        leaseToken,
+      );
+      return false;
+    }
+
+    try {
+      await this.emailService.sendMail(user.email, subject, html);
+      // The delivery record, after the side effect and never before it.
+      await this.jobClaims.markDelivered(
+        JobClaimType.BudgetWeeklyDigest,
+        userId,
+        runDate,
+        leaseToken,
+      );
+      return true;
+    } catch (error) {
+      // Hand the lease back so a transient SMTP outage costs a retry rather
+      // than the user's week. A failed release must not mask the send error,
+      // which the caller logs per user; the lease then simply expires.
+      await this.jobClaims
+        .releaseLease(
+          JobClaimType.BudgetWeeklyDigest,
+          userId,
+          runDate,
+          leaseToken,
+        )
+        .catch(() => undefined);
+      throw error;
+    }
   }
 
   async checkSeasonalSpikes(
