@@ -566,6 +566,21 @@ export class ScheduledTransactionsService {
               totalSkipped++;
               continue;
             }
+            if (error instanceof NotFoundException) {
+              // The cron selected this row moments ago; it is gone because the
+              // winning replica posted a ONCE schedule and deleted it inside
+              // the same posting transaction (post(): `m.delete(
+              // ScheduledTransaction, id)` in the locked claim block), or
+              // because the user deleted it in between. Neither is "could not
+              // be posted", and telling the user their money did not move when
+              // it did is exactly the false alert this branch prevents.
+              this.logger.debug(
+                `Auto-post skipped scheduled transaction ${scheduled.id}: ` +
+                  "no longer exists (posted and removed elsewhere, or deleted)",
+              );
+              totalSkipped++;
+              continue;
+            }
             totalError++;
             this.logger.error(
               `Failed to auto-post "${scheduled.name}" (ID: ${scheduled.id}): ${error.message}`,

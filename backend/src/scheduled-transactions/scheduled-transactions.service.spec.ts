@@ -5090,6 +5090,43 @@ describe("ScheduledTransactionsService", () => {
       postSpy.mockRestore();
     });
 
+    // Every replica fires this cron. The winner posts a ONCE schedule and
+    // deletes it inside the posting transaction, so the loser's post() finds
+    // no row and throws NotFoundException, not ConflictException. That is a
+    // posted transaction, never "could not be posted".
+    it("raises nothing for a NotFoundException -- a ONCE schedule posted and deleted by the winner", async () => {
+      const st1 = makeScheduled({
+        id: "st-once-gone",
+        autoPost: true,
+        frequency: "ONCE",
+      });
+      scheduledRepo.find.mockResolvedValue([st1]);
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      const postSpy = jest
+        .spyOn(service, "post")
+        .mockRejectedValue(
+          new NotFoundException(
+            "Scheduled transaction with ID st-once-gone not found",
+          ),
+        );
+      const logSpy = jest.spyOn((service as any).logger, "log");
+      const errorSpy = jest.spyOn((service as any).logger, "error");
+
+      await service.processAutoPostTransactions();
+
+      expect(mockSystemAlerts.raiseUserAlert).not.toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledWith(
+        "Auto-post processing complete: 0 succeeded, " +
+          "1 already claimed elsewhere, 0 failed",
+      );
+      expect(errorSpy).not.toHaveBeenCalled();
+      postSpy.mockRestore();
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+    });
+
     it("should auto-post transfer transactions using prepareTransfer", async () => {
       const transfer = makeScheduled({
         id: "st-transfer",
