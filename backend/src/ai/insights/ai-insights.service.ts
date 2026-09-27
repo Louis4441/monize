@@ -161,20 +161,7 @@ export class AiInsightsService {
       return this.getInsights(userId);
     }
 
-    const recentInsight = await withScopedDb(this.dataSource, (manager) =>
-      manager
-        .getRepository(AiInsight)
-        .createQueryBuilder("i")
-        .where("i.userId = :userId", { userId })
-        .andWhere("i.generatedAt > :cutoff", {
-          cutoff: new Date(
-            Date.now() - MIN_GENERATION_INTERVAL_HOURS * 60 * 60 * 1000,
-          ),
-        })
-        .getOne(),
-    );
-
-    if (recentInsight) {
+    if (await this.hasRecentInsight(userId)) {
       this.logger.log(
         `Insights generation skipped user=${userId}: last run within ${MIN_GENERATION_INTERVAL_HOURS}h cooldown`,
       );
@@ -209,9 +196,27 @@ export class AiInsightsService {
 
     this.generatingUsers.add(userId);
     const startTime = Date.now();
-    this.logger.log(`Insights generation start user=${userId}`);
 
     try {
+      // The cooldown again, now that this replica holds the lease.
+      //
+      // The read above happened before the claim, so on its own it is a
+      // check-then-act: a replica that read "no recent insight" while another
+      // was still generating, then won the lease the moment the winner released
+      // it, generated and saved a second set -- duplicate rows with no
+      // idempotency key, and the provider paid twice. The winner saves before
+      // it releases (the `finally` below), so a read taken under the lease sees
+      // those rows and stands down. A generation that saved nothing leaves no
+      // row, so the next holder still retries it, which is the point of the
+      // lease being released rather than kept.
+      if (await this.hasRecentInsight(userId)) {
+        this.logger.log(
+          `Insights generation skipped user=${userId}: another replica generated within the ${MIN_GENERATION_INTERVAL_HOURS}h cooldown while this one waited`,
+        );
+        return this.getInsights(userId);
+      }
+
+      this.logger.log(`Insights generation start user=${userId}`);
       const preferences = await withScopedDb(this.dataSource, (manager) =>
         manager.getRepository(UserPreference).findOne({
           where: { userId },
@@ -321,6 +326,30 @@ export class AiInsightsService {
           ),
         );
     }
+  }
+
+  /**
+   * Whether this user has an insight generated inside the cooldown window.
+   *
+   * Read twice by `generateInsights`: before the lease, as the cheap early out
+   * that also converges with a pod that takes no lease, and again under the
+   * lease, which is the read that actually decides. One helper, so the two
+   * reads cannot drift into two different windows.
+   */
+  private async hasRecentInsight(userId: string): Promise<boolean> {
+    const recent = await withScopedDb(this.dataSource, (manager) =>
+      manager
+        .getRepository(AiInsight)
+        .createQueryBuilder("i")
+        .where("i.userId = :userId", { userId })
+        .andWhere("i.generatedAt > :cutoff", {
+          cutoff: new Date(
+            Date.now() - MIN_GENERATION_INTERVAL_HOURS * 60 * 60 * 1000,
+          ),
+        })
+        .getOne(),
+    );
+    return recent !== null;
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_6AM)

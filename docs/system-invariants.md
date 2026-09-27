@@ -3880,7 +3880,8 @@ Enforcement         Per job, and now mostly a durable cross-replica claim.
                     (INV-OCCURRENCE-001, occurrence-key claim), budget rollover
                     (ON CONFLICT (budget_id, period_start) DO NOTHING RETURNING with
                     the loser re-reading the winner), AI insight generation
-                    (claimLease, not a process-local Set), demo reset (claimOnce
+                    (claimLease with the cooldown re-read under it, not a
+                    process-local Set), demo reset (claimOnce
                     keyed by the UTC day).
                     The MNY reaper's conditional CAS and the price/FX refreshes'
                     natural-key ON CONFLICT were already real.

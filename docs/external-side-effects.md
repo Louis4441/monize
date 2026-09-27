@@ -487,21 +487,23 @@ outage is not part of whatever request happened to discover it, so a rollback
 must not erase it. The write is fire-and-forget and swallows its own failures --
 availability bookkeeping must never turn a provider outage into a failed request.
 
-**AI insights are the weak case.** Exclusion is now a durable lease:
+**AI insights.** Exclusion is a durable lease:
 `generateInsights` (`backend/src/ai/insights/ai-insights.service.ts`) takes
 `claimLease(JobClaimType.AiInsightGeneration, userId, ...)` and releases it by
 token in its `finally`, so two replicas, or a manual regenerate and the daily
 cron, cannot generate for one user at the same time. The in-process
-`generatingUsers` `Set` remains only as a local short-circuit. What the lease
-does not cover is the 12-hour cooldown: it is a read of the most recent
-`generatedAt` taken *before* the lease and not re-read under it, and only saved
-rows set it. A generation that saves nothing (a provider failure, a response
+`generatingUsers` `Set` remains only as a local short-circuit. The 12-hour
+cooldown (a read of the most recent `generatedAt`) is taken twice: before the
+lease as the cheap early out, and again under it, which is the read that
+decides. The winner saves before its `finally` releases the lease, so a replica
+that read "nothing recent" while the winner was still generating, and claims the
+lease the moment it is released, finds the winner's rows and stands down instead
+of saving a second set; the inserts carry no idempotency key, so this re-read is
+what keeps the rows single. What remains is cost: only saved rows set the
+cooldown, so a generation that saves nothing (a provider failure, a response
 that parses to no insights -- `saveInsights` returns early on an empty list)
-leaves no cooldown, so the next replica's cron or a manual regenerate calls the
-provider again: repeated cost, no rows. And a replica that read the cooldown
-before the winner's save committed, but claims the lease only after the winner
-released it, generates and saves a second set -- a narrow window, but a
-duplicate-rows one, since the inserts carry no idempotency key. Ordering is at
+is retried by the next holder, which is the reason the lease is released rather
+than kept. Ordering is at
 least correct on failure: the provider is called and the response parsed before
 anything is saved, so a failed call leaves no partial rows, and a total provider
 failure throws rather than fabricating a result.
@@ -630,7 +632,7 @@ added rather than as it stands.
 | Backup restore validation, plaintext `.json.gz` | No content hash of its own: truncation and random corruption are caught by the gzip trailer and `JSON.parse`, a deliberate alteration is not. An encrypted `.mzbe` is authenticated frame by frame and has no such gap | EXT-002 |
 | Mortgage reminder delivery key | The lease and the delivery record are in place; what is not is the run date. `buildMortgageReminderClaimKey` reads `new Date()` per user, so a run crossing local midnight claims some users under D and the rest under D+1 while the windows are measured from D -- the duplicate the bill reminder closed by taking the date as a parameter | EXT-001 |
 | Emergency-access reminder | The lease and the delivery record are in place, and `last_reminder_sent_at` is re-read under the lease. What remains: a process killed between the SMTP accept and the record's `UPDATE` leaves no record, so a replica whose sweep reaches the owner after the lease expires sends again the same day -- the survivable direction | EXT-001 |
-| AI insight generation | The lease excludes concurrent generation; the cooldown is read before the lease and not re-read under it, and only saved rows set it. A generation that saved nothing is repeated by the next replica or a manual regenerate (provider cost, no rows); a replica that read the cooldown before the winner's save and claims after its release saves a second set (inserts carry no idempotency key) | EXT-001 |
+| AI insight generation | Duplicate rows are closed: the lease excludes concurrent generation and the cooldown is re-read under it. What remains is cost: only saved rows set the cooldown, so a generation that saved nothing is repeated by the next holder, a replica or a manual regenerate (a provider call, no rows) | EXT-001 |
 | Payee contact enrichment | In-flight guard and admission queue are process-local; two replicas can both pay for one lookup (the second UPDATE affects zero rows, so the data is right and only the cost is duplicated) | EXT-001 |
 | Off-machine backup copy (email) | An accepted trade, not an omission: a claim expired by the lease is re-attempted, and SMTP offers no way to tell a message already delivered from one never sent, so the same artifact can arrive twice. Delivering a duplicate copy is the survivable direction against never delivering it | EXT-003 |
 | Off-machine backup copy (S3) | A stuck `uploading` row is reclaimed after the lease and re-attempted, reconciled by digest. What remains: nothing reconciles a bucket object against the ledger, so an object written by an attempt whose row never reached `uploaded` is referenced by nothing -- bytes nobody references, the survivable side, and the operator's lifecycle policy is what ages them out | EXT-003 |
