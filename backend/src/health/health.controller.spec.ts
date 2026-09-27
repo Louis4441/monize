@@ -5,6 +5,7 @@ import {
   PG_LISTENER,
   PgListener,
 } from "../common/cluster/pg-listener.provider";
+import { ReplicaCensusService } from "../common/cluster/replica-census.service";
 import { PostgresThrottlerStorage } from "../common/throttler/postgres-throttler-storage";
 import {
   EVENT_BUS_READINESS_GRACE_MS,
@@ -22,6 +23,8 @@ describe("HealthController", () => {
    * instant, so failing on the state alone would empty the endpoint list.
    */
   let throttlerStorage: { degradedReason: jest.Mock };
+  /** One process on the database by default: a correctly deployed single. */
+  let census: { countActiveProcesses: jest.Mock };
 
   const build = async (
     mode: ClusterMode,
@@ -30,6 +33,7 @@ describe("HealthController", () => {
   ): Promise<void> => {
     mockDataSource = { query: jest.fn() };
     throttlerStorage = { degradedReason: jest.fn(() => null) };
+    census = { countActiveProcesses: jest.fn().mockResolvedValue(1) };
     listener =
       connected === null
         ? null
@@ -50,6 +54,10 @@ describe("HealthController", () => {
         {
           provide: PostgresThrottlerStorage,
           useValue: throttlerStorage as unknown as PostgresThrottlerStorage,
+        },
+        {
+          provide: ReplicaCensusService,
+          useValue: census as unknown as ReplicaCensusService,
         },
       ],
     }).compile();
@@ -124,6 +132,62 @@ describe("HealthController", () => {
         // a cross-replica channel as a fault.
         expect(result.checks).not.toHaveProperty("eventBus");
       });
+
+      it("reports one backend process as ok", async () => {
+        databaseUp();
+
+        const result = await controller.check();
+
+        expect(result.status).toBe("ok");
+        expect(result.checks.replicas).toBe(1);
+      });
+
+      it("degrades when a second process shares the database", async () => {
+        // single asserted there is one process; with two, every rate limit and
+        // every cache invalidation is per process, silently.
+        databaseUp();
+        census.countActiveProcesses.mockResolvedValue(2);
+
+        const result = await controller.check();
+
+        expect(result.status).toBe("degraded");
+        expect(result.checks.database).toBe("healthy");
+        expect(result.checks.replicas).toBe(2);
+      });
+
+      it("omits the count, and does not degrade, when the census fails", async () => {
+        // A health read must not fail on a count of its peers.
+        databaseUp();
+        census.countActiveProcesses.mockRejectedValue(
+          new Error("connection terminated"),
+        );
+
+        const result = await controller.check();
+
+        expect(result.status).toBe("ok");
+        expect(result.checks).not.toHaveProperty("replicas");
+      });
+
+      it("does not take the census while the database is down", async () => {
+        databaseDown();
+
+        const result = await controller.check();
+
+        expect(result.status).toBe("degraded");
+        expect(result.checks).not.toHaveProperty("replicas");
+        expect(census.countActiveProcesses).not.toHaveBeenCalled();
+      });
+
+      it("leaves the census out of the probes", async () => {
+        databaseUp();
+        census.countActiveProcesses.mockResolvedValue(2);
+
+        // A second replica is an operator's configuration to fix, not a reason
+        // to restart this one or to take it out of the load balancer.
+        await expect(controller.ready()).resolves.toEqual({ status: "ok" });
+        expect(controller.live()).toEqual({ status: "ok" });
+        expect(census.countActiveProcesses).not.toHaveBeenCalled();
+      });
     });
 
     describe("live()", () => {
@@ -168,6 +232,19 @@ describe("HealthController", () => {
 
         expect(result.status).toBe("ok");
         expect(result.checks.eventBus).toBe("healthy");
+      });
+
+      it("reports no replica count, and never takes the census", async () => {
+        // Peers are expected in multi, and a count there is a figure to watch
+        // with nothing wrong at any value.
+        databaseUp();
+        census.countActiveProcesses.mockResolvedValue(3);
+
+        const result = await controller.check();
+
+        expect(result.status).toBe("ok");
+        expect(result.checks).not.toHaveProperty("replicas");
+        expect(census.countActiveProcesses).not.toHaveBeenCalled();
       });
     });
 

@@ -446,6 +446,7 @@ Each of these is listed in the widened guard's allowlist with the reason here.
 | Budget actuals promise cache | `backend/src/budgets/budgets.service.ts` | already stale within one replica for its TTL; multi-replica does not change the contract |
 | Restore admission gate | `backend/src/backup/restore-processing-gate.ts` | memory is per pod, so the gate is correctly per pod. Cluster-wide restore admission is an open question |
 | Email failure snapshot | `backend/src/notifications/email.service.ts` | per replica by design and forgotten on restart, so it only decides whether to look: the SMTP-failure sweep raises only after a live `verifyConnection()` probe from the same replica fails, so the alert means "this replica cannot reach the relay now", which holds under any replica count; a stale memory of one failed send no longer raises it. The alert dedupes at the database (`SMTP_FAILURE:<UTC day>`) |
+| `INSTANCE_ID` / `application_name` | `backend/src/common/cluster/instance-id.ts` | a random UUID and start time minted once per process and stamped on every pooled PostgreSQL session; correct per replica by definition, since it exists to tell processes apart in `pg_stat_activity` for the replica census (`backend/src/common/cluster/replica-census.service.ts`). Identity for observation only, never for authorization or ownership |
 
 ## Invariants to add
 

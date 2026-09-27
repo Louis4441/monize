@@ -1,4 +1,6 @@
+import { Global, Module } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import { DataSource } from "typeorm";
 
 import {
   PG_LISTENER,
@@ -10,6 +12,18 @@ import { EVENT_BUS, EventBus } from "./event-bus.interface";
 import { MemoryEventBus } from "./memory-event-bus";
 
 /**
+ * Stands in for `TypeOrmModule.forRoot`, global in the application: the
+ * `ClusterModule` this module imports builds `ReplicaCensusService` over the
+ * `DataSource`, which is constructed here and never queried.
+ */
+@Global()
+@Module({
+  providers: [{ provide: DataSource, useValue: { transaction: jest.fn() } }],
+  exports: [DataSource],
+})
+class FakeDataSourceModule {}
+
+/**
  * The binding, not the bus. Which implementation the token resolves to is the
  * whole of what this module decides, and it is what task R6 changes -- so the
  * assertion is on `name`, the field an implementation cannot get wrong without
@@ -18,7 +32,7 @@ import { MemoryEventBus } from "./memory-event-bus";
 describe("EventBusModule", () => {
   it("binds EVENT_BUS to the in-process bus", async () => {
     const module = await Test.createTestingModule({
-      imports: [EventBusModule],
+      imports: [FakeDataSourceModule, EventBusModule],
     }).compile();
 
     const bus = module.get<EventBus>(EVENT_BUS);
@@ -30,7 +44,7 @@ describe("EventBusModule", () => {
 
   it("hands every consumer the same instance", async () => {
     const module = await Test.createTestingModule({
-      imports: [EventBusModule],
+      imports: [FakeDataSourceModule, EventBusModule],
     }).compile();
 
     // A per-consumer bus would deliver nothing across two of them, which is the
@@ -55,7 +69,9 @@ describe("EventBusModule", () => {
      */
     const buildMulti = (listener: unknown) => {
       process.env.CLUSTER_MODE = "multi";
-      return Test.createTestingModule({ imports: [EventBusModule] })
+      return Test.createTestingModule({
+        imports: [FakeDataSourceModule, EventBusModule],
+      })
         .overrideProvider(PG_LISTENER)
         .useValue(listener)
         .compile();

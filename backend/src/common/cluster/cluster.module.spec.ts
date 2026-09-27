@@ -1,9 +1,23 @@
+import { Global, Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
+import { DataSource } from "typeorm";
 
 import { CLUSTER_MODE } from "./cluster-mode";
 import { ClusterModule } from "./cluster.module";
 import { PG_LISTENER, PgListener } from "./pg-listener.provider";
+import { ReplicaCensusService } from "./replica-census.service";
+
+/**
+ * Stands in for `TypeOrmModule.forRoot`, which is global in the application:
+ * the census is constructed with the `DataSource` and never queries it here.
+ */
+@Global()
+@Module({
+  providers: [{ provide: DataSource, useValue: { transaction: jest.fn() } }],
+  exports: [DataSource],
+})
+class FakeDataSourceModule {}
 
 /**
  * The module's whole job is a branch, so the spec is that branch both ways.
@@ -20,7 +34,11 @@ describe("ClusterModule", () => {
     if (mode === undefined) delete process.env.CLUSTER_MODE;
     else process.env.CLUSTER_MODE = mode;
     return Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true }), ClusterModule],
+      imports: [
+        ConfigModule.forRoot({ isGlobal: true }),
+        FakeDataSourceModule,
+        ClusterModule,
+      ],
     }).compile();
   };
 
@@ -69,6 +87,19 @@ describe("ClusterModule", () => {
       expect(close).toHaveBeenCalledTimes(1);
     });
   });
+
+  it.each(["single", "multi"])(
+    "exports the replica census in %s",
+    async (mode) => {
+      const module = await build(mode);
+
+      expect(module.get(ReplicaCensusService)).toBeInstanceOf(
+        ReplicaCensusService,
+      );
+
+      await module.close();
+    },
+  );
 
   it("refuses to build on an unreadable mode", async () => {
     // Same refusal as the boot matrix: a typo must not silently pick a mode.

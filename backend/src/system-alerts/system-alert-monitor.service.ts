@@ -15,6 +15,8 @@ import {
 } from "../notifications/email.service";
 import { NOTIFICATION_EMAIL_MESSAGES } from "../notifications/notification-email-messages";
 import { SystemAlertService } from "./system-alert.service";
+import { CLUSTER_MODE, ClusterMode } from "../common/cluster/cluster-mode";
+import { ReplicaCensusService } from "../common/cluster/replica-census.service";
 
 /**
  * A failure older than this cannot raise a fresh SMTP alert: with a quiet
@@ -67,9 +69,20 @@ export interface DeploymentStatus {
  *   recorded is never probed. In-app only by definition -- the email channel
  *   cannot report itself. Skipped entirely when SMTP is not configured:
  *   unconfigured is a setup state announced at boot, not a failure.
+ * - **More than one backend process under `CLUSTER_MODE=single`**: the mode is
+ *   an operator's assertion, and a second replica started without the flag (a
+ *   compose file scaled up, a bare Kubernetes Deployment) runs with rate limits
+ *   and cache invalidation that are per process, silently. The sweep asks
+ *   `ReplicaCensusService` how many backend processes, each running for over
+ *   ten minutes, hold a session on this database, and logs a warning naming
+ *   `CLUSTER_MODE=multi` when it is more than one. A log line and the
+ *   `replicas` field of `/health`, not an admin alert: it is an operator's
+ *   configuration, and no new notification type exists for it. Nothing in
+ *   `multi`, which already handles peers.
  *
- * No database access of its own -- `SystemAlertService` seeds its own RLS
- * context -- so this file does not need the with-context lint allowlist.
+ * No database access of its own -- `SystemAlertService` and
+ * `ReplicaCensusService` seed their own RLS context -- so this file does not
+ * need the with-context lint allowlist.
  */
 @Injectable()
 export class SystemAlertMonitorService {
@@ -80,18 +93,39 @@ export class SystemAlertMonitorService {
     private readonly systemAlerts: SystemAlertService,
     @Inject(forwardRef(() => EmailService))
     private readonly emailService: EmailService,
+    @Inject(CLUSTER_MODE)
+    private readonly clusterMode: ClusterMode,
+    private readonly census: ReplicaCensusService,
   ) {}
 
   /**
-   * Both checks, on one schedule. Each is independent: the signing secret is
-   * a fact about configuration, SMTP health a fact about whether this replica
-   * can reach the relay now, and neither may stop the other from being
-   * reported.
+   * The three checks, on one schedule. Each is independent: the signing secret
+   * is a fact about configuration, SMTP health a fact about whether this
+   * replica can reach the relay now, the replica count a fact about the
+   * deployment, and none may stop another from being reported: each runs on
+   * its own, and one that throws is logged and the next still runs. The census
+   * runs last, so a database that is slow to answer it delays nothing else.
    */
   @Cron("*/15 * * * *")
   async sweepSystemHealth(now: Date = new Date()): Promise<void> {
-    await this.checkJwtSecret(now);
-    await this.sweepEmailHealth(now);
+    await this.isolated("JWT_SECRET", () => this.checkJwtSecret(now));
+    await this.isolated("SMTP", () => this.sweepEmailHealth(now));
+    await this.isolated("replica", () => this.checkReplicaCount());
+  }
+
+  /** Run one check so that its failure is reported and stops nothing else. */
+  private async isolated(
+    name: string,
+    check: () => Promise<void>,
+  ): Promise<void> {
+    try {
+      await check();
+    } catch (error) {
+      this.logger.warn(
+        `The ${name} check failed this sweep: ` +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
   }
 
   /**
@@ -183,6 +217,41 @@ export class SystemAlertMonitorService {
       // anyway, but the intent belongs at the call site too.
       email: false,
     });
+  }
+
+  /**
+   * Warn when `CLUSTER_MODE=single` is contradicted by the database: more than
+   * one backend process, each running for over ten minutes, holding a session.
+   * Every sweep that still sees it warns again -- a log line every fifteen
+   * minutes is the reminder, and no in-process memory decides otherwise.
+   *
+   * Never throws. A census failure is warned on its own and ends the check; it
+   * says nothing about how many replicas there are.
+   */
+  async checkReplicaCount(): Promise<void> {
+    // multi already shares its counters and its event bus through PostgreSQL,
+    // so a peer is expected there, not a finding.
+    if (this.clusterMode !== "single") return;
+
+    let processes: number;
+    try {
+      processes = await this.census.countActiveProcesses();
+    } catch (error) {
+      this.logger.warn(
+        "Could not count the backend processes on this database, so a " +
+          "second replica running under CLUSTER_MODE=single would go " +
+          `unnoticed this sweep: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return;
+    }
+    if (processes > 1) {
+      this.logger.warn(
+        `CLUSTER_MODE=single but ${processes} backend processes, each ` +
+          "running for over 10 minutes, are connected to this database; rate " +
+          "limits and cache invalidation are per process in single mode -- " +
+          "set CLUSTER_MODE=multi",
+      );
+    }
   }
 }
 

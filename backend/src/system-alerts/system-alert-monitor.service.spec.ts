@@ -1,3 +1,6 @@
+import { Logger } from "@nestjs/common";
+import type { ClusterMode } from "../common/cluster/cluster-mode";
+import type { ReplicaCensusService } from "../common/cluster/replica-census.service";
 import {
   isoWeekBucket,
   SMTP_FAILURE_LOOKBACK_MS,
@@ -24,7 +27,17 @@ describe("SystemAlertMonitorService", () => {
    */
   let current: EmailFailureSnapshot;
   let env: Record<string, string | undefined>;
+  let census: { countActiveProcesses: jest.Mock };
   let service: SystemAlertMonitorService;
+
+  const build = (mode: ClusterMode): SystemAlertMonitorService =>
+    new SystemAlertMonitorService(
+      { get: jest.fn((name: string) => env[name]) } as never,
+      systemAlerts as never,
+      emailService as unknown as EmailService,
+      mode,
+      census as unknown as ReplicaCensusService,
+    );
 
   function snapshot(
     overrides: Partial<EmailFailureSnapshot> = {},
@@ -79,11 +92,13 @@ describe("SystemAlertMonitorService", () => {
         .fn()
         .mockImplementation(probeFails("ECONNREFUSED 10.0.0.1:587")),
     };
-    service = new SystemAlertMonitorService(
-      { get: jest.fn((name: string) => env[name]) } as never,
-      systemAlerts as never,
-      emailService as unknown as EmailService,
-    );
+    // One process on the database: what a correctly deployed single sees.
+    census = { countActiveProcesses: jest.fn().mockResolvedValue(1) };
+    service = build("single");
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe("weak JWT_SECRET check", () => {
@@ -294,6 +309,98 @@ describe("SystemAlertMonitorService", () => {
       await service.sweepEmailHealth(now);
       expect(systemAlerts.raiseAdminAlert).not.toHaveBeenCalled();
       expect(emailService.verifyConnection).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("replica census", () => {
+    let warn: jest.SpyInstance;
+    const now = new Date("2026-08-30T12:00:00Z");
+
+    beforeEach(() => {
+      warn = jest
+        .spyOn(Logger.prototype, "warn")
+        .mockImplementation(() => undefined);
+    });
+
+    const replicaWarnings = (): string[] =>
+      warn.mock.calls
+        .map(([message]) => String(message))
+        .filter((message) => message.includes("CLUSTER_MODE"));
+
+    it("warns, naming CLUSTER_MODE=multi, when single sees a second process", async () => {
+      census.countActiveProcesses.mockResolvedValue(2);
+
+      await service.sweepSystemHealth(now);
+
+      const [message, ...rest] = replicaWarnings();
+      expect(rest).toEqual([]);
+      expect(message).toMatch(/^CLUSTER_MODE=single but 2 backend processes/);
+      expect(message).toContain("rate limits and cache invalidation");
+      expect(message).toMatch(/set CLUSTER_MODE=multi$/);
+      // A log line, not a notification: no new alert type exists for it.
+      expect(systemAlerts.raiseAdminAlert).not.toHaveBeenCalled();
+    });
+
+    it("warns again on the next sweep -- no in-process memory suppresses it", async () => {
+      census.countActiveProcesses.mockResolvedValue(3);
+
+      await service.sweepSystemHealth(now);
+      await service.sweepSystemHealth(new Date("2026-08-30T12:15:00Z"));
+
+      expect(replicaWarnings()).toHaveLength(2);
+    });
+
+    it("stays silent when single is alone", async () => {
+      await service.sweepSystemHealth(now);
+
+      expect(census.countActiveProcesses).toHaveBeenCalledTimes(1);
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it("never takes the census in multi, where peers are expected", async () => {
+      service = build("multi");
+      census.countActiveProcesses.mockResolvedValue(4);
+
+      await service.sweepSystemHealth(now);
+
+      expect(census.countActiveProcesses).not.toHaveBeenCalled();
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it("warns once about a failed census and still runs the other two checks", async () => {
+      census.countActiveProcesses.mockRejectedValue(
+        new Error("connection terminated"),
+      );
+      env.JWT_SECRET = "your-super-secret-jwt-key-change-in-production";
+      current = snapshot({ lastFailureAt: new Date("2026-08-30T11:50:00Z") });
+
+      await expect(service.sweepSystemHealth(now)).resolves.toBeUndefined();
+
+      expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ type: NotificationType.JWT_SECRET_WEAK }),
+      );
+      expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ type: NotificationType.SMTP_FAILURE }),
+      );
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toMatch(
+        /Could not count the backend processes.*connection terminated/,
+      );
+    });
+
+    it("is not stopped by a check before it", async () => {
+      // An alert that fails to raise must not skip the census after it.
+      systemAlerts.raiseAdminAlert.mockRejectedValue(new Error("db down"));
+      env.JWT_SECRET = "your-super-secret-jwt-key-change-in-production";
+      census.countActiveProcesses.mockResolvedValue(2);
+
+      await expect(service.sweepSystemHealth(now)).resolves.toBeUndefined();
+
+      expect(census.countActiveProcesses).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls.map(([message]) => message)).toEqual([
+        "The JWT_SECRET check failed this sweep: db down",
+        expect.stringMatching(/^CLUSTER_MODE=single but 2 backend processes/),
+      ]);
     });
   });
 

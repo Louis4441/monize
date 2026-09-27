@@ -16,6 +16,7 @@ import {
   PG_LISTENER_RECONNECT_MAX_MS,
   PgListener,
 } from "../common/cluster/pg-listener.provider";
+import { ReplicaCensusService } from "../common/cluster/replica-census.service";
 import { PostgresThrottlerStorage } from "../common/throttler/postgres-throttler-storage";
 
 /**
@@ -50,6 +51,7 @@ export class HealthController {
     @Inject(PG_LISTENER)
     private readonly listener: PgListener | null,
     private readonly throttlerStorage: PostgresThrottlerStorage,
+    private readonly census: ReplicaCensusService,
   ) {}
 
   @Get()
@@ -58,10 +60,16 @@ export class HealthController {
     const dbHealthy = await this.checkDatabase();
     const busHealthy = this.checkNotificationChannel();
     const throttlerDegraded = this.throttlerStorage.degradedReason();
+    // Not asked while the database is down: the census would fail too, and a
+    // monitor polling an outage would get one warning per poll for it.
+    const replicas = dbHealthy ? await this.countReplicas() : null;
 
     return {
       status:
-        dbHealthy && busHealthy !== false && throttlerDegraded === null
+        dbHealthy &&
+        busHealthy !== false &&
+        throttlerDegraded === null &&
+        !(replicas !== null && replicas > 1)
           ? "ok"
           : "degraded",
       timestamp: new Date().toISOString(),
@@ -82,6 +90,12 @@ export class HealthController {
         // grant -- fails open silently and stays green on every other signal,
         // so this is the one place an operator or an alert can see it.
         ...(throttlerDegraded === null ? {} : { rateLimiting: "disabled" }),
+        // Reported only in single, the mode that asserts there is one process.
+        // In multi peers are expected and handled, and a count there would be
+        // a figure to watch with nothing wrong at any value. More than one in
+        // single means rate limits and cache invalidation are per process, so
+        // it degrades the status (ReplicaCensusService says what is counted).
+        ...(replicas === null ? {} : { replicas }),
       },
     };
   }
@@ -135,6 +149,26 @@ export class HealthController {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * Backend processes on this database, or `null` when there is nothing to
+   * report: in `multi`, or when the census itself failed. A health read must
+   * not fail, or degrade, because a count of its peers could not be taken.
+   */
+  private async countReplicas(): Promise<number | null> {
+    if (this.clusterMode !== "single") {
+      return null;
+    }
+    try {
+      return await this.census.countActiveProcesses();
+    } catch (error) {
+      this.logger.warn(
+        "Could not count the backend processes on this database: " +
+          (error instanceof Error ? error.message : String(error)),
+      );
+      return null;
     }
   }
 
