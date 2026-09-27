@@ -122,11 +122,17 @@ describe("ReplicaCensusService", () => {
     });
 
     it("stops reporting a count older than two sweeps", async () => {
+      // Bracket the census's own timestamp: it was taken no earlier than
+      // `before` and no later than `after`, so these two probes sit on either
+      // side of the limit however many milliseconds the census took.
+      const before = Date.now();
       await service.countActiveProcesses();
-      const now = Date.now();
-      expect(service.lastKnownCount(now + REPLICA_CENSUS_MAX_AGE_MS)).toBe(1);
+      const after = Date.now();
+      expect(service.lastKnownCount(before + REPLICA_CENSUS_MAX_AGE_MS)).toBe(
+        1,
+      );
       expect(
-        service.lastKnownCount(now + REPLICA_CENSUS_MAX_AGE_MS + 60_000),
+        service.lastKnownCount(after + REPLICA_CENSUS_MAX_AGE_MS + 1),
       ).toBeNull();
     });
 
