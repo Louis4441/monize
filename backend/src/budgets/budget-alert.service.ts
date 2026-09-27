@@ -6,7 +6,7 @@ import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { emailTranslator } from "../i18n/email-translator";
 import { DEFAULT_LOCALE } from "../i18n/config";
-import { getMonthEndYMD, todayYMD } from "../common/date-utils";
+import { getMonthEndYMD } from "../common/date-utils";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
 import {
   JobClaimService,
@@ -229,7 +229,12 @@ export class BudgetAlertService {
       // key, and a run that spans midnight while reading the date per user
       // claims the early users under one key and the rest under another --
       // which is how the bill reminder's two passes came to disagree.
-      const runDate = todayYMD();
+      //
+      // The UTC day, not `todayYMD()`: outside a request that is the server's
+      // local date, so two replicas with different TZ settings would key the
+      // same Monday's digest differently and both send it. UTC is the same
+      // string on every replica, as the demo reset's key is.
+      const runDate = new Date().toISOString().slice(0, 10);
 
       let sentCount = 0;
       let skipCount = 0;

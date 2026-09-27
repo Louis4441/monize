@@ -1627,6 +1627,37 @@ describe("BudgetAlertService", () => {
         expect(jobClaims.releaseLease).not.toHaveBeenCalled();
       });
 
+      it("keys the lease by the UTC day, whatever this replica's TZ says", async () => {
+        // Two replicas with different TZ settings must spell one Monday the
+        // same way, or each wins its own lease and the user gets two digests.
+        // At 20:00Z on the 15th it is already the 16th in Auckland. Jest
+        // sandboxes process.env, so TZ cannot be changed from here; the local
+        // calendar getters are what a far-east replica's clock would answer,
+        // and they are what a server-local date is built from.
+        jest.useFakeTimers({
+          now: new Date("2026-03-15T20:00:00.000Z"),
+          doNotFake: ["nextTick", "setImmediate", "queueMicrotask"],
+        });
+        const local = [
+          jest.spyOn(Date.prototype, "getFullYear").mockReturnValue(2026),
+          jest.spyOn(Date.prototype, "getMonth").mockReturnValue(2),
+          jest.spyOn(Date.prototype, "getDate").mockReturnValue(16),
+        ];
+        try {
+          await service.sendWeeklyDigest();
+        } finally {
+          local.forEach((spy) => spy.mockRestore());
+          jest.useRealTimers();
+        }
+
+        expect(jobClaims.claimLease).toHaveBeenCalledWith(
+          JobClaimType.BudgetWeeklyDigest,
+          userId,
+          "2026-03-15",
+          DIGEST_LEASE_MS,
+        );
+      });
+
       it("sends nothing when another replica holds this user's lease", async () => {
         jobClaims.claimLease.mockResolvedValue(null);
 
