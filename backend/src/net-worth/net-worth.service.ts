@@ -472,6 +472,18 @@ export class NetWorthService {
    * per-account lock, and the loser's work is simply redundant. Accounts with no
    * snapshots at all are deliberately not swept -- there is nothing to compare
    * against, and including them would recompute every empty account forever.
+   *
+   * The lost timer carried two jobs, so the sweep recovers both halves of the
+   * seam: after the recompute it re-runs the balance-threshold evaluation the
+   * timer would have run (docs/specs/balance-threshold-notifications.md).
+   * Re-evaluating is safe because the crossing is a durable latch flipped by a
+   * compare-and-set on `accounts.low_alert_armed` / `high_alert_armed`: an
+   * account whose timer did fire, or that a racing replica already evaluated,
+   * finds the latch already in the state its balance implies and raises
+   * nothing. The two halves are isolated from each other exactly as on the
+   * timer -- a notification failure never stops the recompute or the sweep,
+   * and a failed recompute does not skip the evaluation, which reads the
+   * account's committed balance rather than its snapshots.
    */
   @Cron(CronExpression.EVERY_30_MINUTES)
   async sweepStaleSnapshots(): Promise<void> {
@@ -515,10 +527,33 @@ export class NetWorthService {
         account_id: string;
       }>) {
         try {
-          await withUserContext(row.user_id, () =>
-            this.recalculateAccount(row.user_id, row.account_id),
-          );
+          await withUserContext(row.user_id, async () => {
+            try {
+              await this.recalculateAccount(row.user_id, row.account_id);
+            } catch (err) {
+              this.logger.warn(
+                `Stale snapshot recompute failed for account ${row.account_id}: ${
+                  err instanceof Error ? err.message : String(err)
+                }`,
+              );
+            }
+            // The other half of the lost timer (see the doc comment). Its own
+            // try/catch, as on the timer, so a notification failure never
+            // affects the recompute or stops the sweep.
+            try {
+              await this.balanceAlerts?.evaluateAccounts(row.user_id, [
+                row.account_id,
+              ]);
+            } catch (err) {
+              this.logger.warn(
+                `Balance-threshold evaluation failed for account ${row.account_id}: ${
+                  err instanceof Error ? err.message : String(err)
+                }`,
+              );
+            }
+          });
         } catch (err) {
+          // withUserContext itself refused the owner id (it validates it).
           this.logger.warn(
             `Stale snapshot recompute failed for account ${row.account_id}: ${
               err instanceof Error ? err.message : String(err)
