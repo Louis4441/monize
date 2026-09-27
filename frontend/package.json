@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "i18n:pseudo": "node scripts/i18n-pseudo.mjs",
-    "i18n:check": "node scripts/i18n-pseudo.mjs --check"
+    "i18n:check": "node scripts/i18n-pseudo.mjs --check",
+    "postinstall": "patch-package --error-on-fail"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
@@ -66,6 +67,7 @@
     "eslint-config-next": "^16.1.6",
     "jsdom": "^28.1.0",
     "msw": "^2.12.9",
+    "patch-package": "^8.0.1",
     "postcss": "^8.5.23",
     "tailwindcss": "^4.1.18",
     "typescript": "~6.0.3",
