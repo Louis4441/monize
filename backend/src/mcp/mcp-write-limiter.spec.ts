@@ -39,20 +39,20 @@ describe("McpWriteLimiter", () => {
       await limiter.checkLimit("user-1");
 
       expect(MCP_WRITE_SCOPE).toBe("mcp-write");
-      expect(counters.increment).toHaveBeenCalledWith(
+      expect(counters.incrementUntilUtcMidnight).toHaveBeenCalledWith(
         "mcp-write",
         "user-1",
-        expect.any(Number),
-        "fixed",
+        1,
       );
       expect(counters.peek).toHaveBeenCalledWith("mcp-write", "user-1");
     });
 
-    it("opens a window no longer than one day", async () => {
+    it("leaves the day boundary to the database, not this process's clock", async () => {
+      // The window end is computed in SQL (next UTC midnight on the database
+      // clock), so the limiter passes no duration at all.
       await limiter.record("user-1", "create_transaction");
-      const windowMs = counters.increment.mock.calls[0][2];
-      expect(windowMs).toBeGreaterThan(0);
-      expect(windowMs).toBeLessThanOrEqual(24 * 60 * 60 * 1000);
+      expect(counters.increment).not.toHaveBeenCalled();
+      expect(counters.incrementUntilUtcMidnight.mock.calls[0]).toHaveLength(3);
     });
   });
 
@@ -144,7 +144,9 @@ describe("McpWriteLimiter", () => {
     });
 
     it("never rejects after the write it counts has committed", async () => {
-      counters.increment.mockRejectedValueOnce(new Error("pool exhausted"));
+      counters.incrementUntilUtcMidnight.mockRejectedValueOnce(
+        new Error("pool exhausted"),
+      );
       await expect(
         limiter.record("user-1", "create_transaction"),
       ).resolves.toBeUndefined();
@@ -189,7 +191,7 @@ describe("McpWriteLimiter", () => {
 
     it("does not count a reservation as a write", async () => {
       await limiter.reserve("user-1", 5);
-      expect(counters.increment).not.toHaveBeenCalled();
+      expect(counters.incrementUntilUtcMidnight).not.toHaveBeenCalled();
     });
 
     it("accounts for already-recorded writes when reserving", async () => {

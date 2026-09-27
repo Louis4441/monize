@@ -72,8 +72,8 @@ describe("Daily LLM write limit (real PostgreSQL)", () => {
   });
 
   it("loses no write when both replicas record at once", async () => {
-    const spyA = jest.spyOn(countersA, "increment");
-    const spyB = jest.spyOn(countersB, "increment");
+    const spyA = jest.spyOn(countersA, "incrementUntilUtcMidnight");
+    const spyB = jest.spyOn(countersB, "incrementUntilUtcMidnight");
     try {
       await asUser(() =>
         Promise.all([
@@ -84,17 +84,18 @@ describe("Daily LLM write limit (real PostgreSQL)", () => {
         ]),
       );
 
-      // Every increment returned a distinct running total: had any statement
-      // read the count and written it back, two would share a number and the
-      // row would hold fewer than twenty.
+      // One statement per record, each adding its five, and every one
+      // returned a distinct running total: had any statement read the count
+      // and written it back, two would share a number and the row would hold
+      // fewer than twenty.
       const returned = await Promise.all(
         [...spyA.mock.results, ...spyB.mock.results].map(
           (r) => r.value as Promise<{ count: number }>,
         ),
       );
-      expect(returned.map((r) => r.count).sort((a, b) => a - b)).toEqual(
-        Array.from({ length: 20 }, (_, i) => i + 1),
-      );
+      expect(returned.map((r) => r.count).sort((a, b) => a - b)).toEqual([
+        5, 10, 15, 20,
+      ]);
     } finally {
       spyA.mockRestore();
       spyB.mockRestore();
@@ -147,16 +148,15 @@ describe("Daily LLM write limit (real PostgreSQL)", () => {
         WHERE scope = 'mcp-write' AND key = $1`,
       [USER],
     );
-    const expires = new Date(row.expires);
-    const now = new Date();
-    const nextMidnight = Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate() + 1,
+    // Exactly the database's next UTC midnight: the boundary is computed in
+    // SQL from the database clock, so no replica's clock can move it.
+    const [db]: { midnight: Date | string }[] = await dataSourceA.query(
+      `SELECT (date_trunc('day', now() AT TIME ZONE 'UTC') + interval '1 day')
+                AT TIME ZONE 'UTC' AS midnight`,
     );
-    // The window is computed from this process's clock and stamped against the
-    // database's; the two agree here to well inside a minute.
-    expect(Math.abs(expires.getTime() - nextMidnight)).toBeLessThan(60_000);
+    expect(new Date(row.expires).getTime()).toBe(
+      new Date(db.midnight).getTime(),
+    );
   });
 
   it("starts a new day at zero once the window has passed", async () => {

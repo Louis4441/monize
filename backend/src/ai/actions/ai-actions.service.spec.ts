@@ -1179,12 +1179,14 @@ describe("AiActionsService", () => {
       expect((await limiter.checkLimit(USER)).currentCount).toBe(2);
       // The scope is the contract between replicas: every one of them must
       // count AI writes under the same name, keyed by the user.
-      expect(counters.increment).toHaveBeenCalledTimes(2);
-      for (const call of counters.increment.mock.calls) {
-        expect(call[0]).toBe("ai-write");
-        expect(call[1]).toBe(USER);
-        expect(call[3]).toBe("fixed");
-      }
+      // One statement for the whole batch, adding the number of rows created.
+      expect(counters.incrementUntilUtcMidnight).toHaveBeenCalledTimes(1);
+      expect(counters.incrementUntilUtcMidnight).toHaveBeenCalledWith(
+        "ai-write",
+        USER,
+        2,
+      );
+      expect(counters.increment).not.toHaveBeenCalled();
       expect(counters.peek).toHaveBeenCalledWith("ai-write", USER);
     });
 
@@ -1196,7 +1198,9 @@ describe("AiActionsService", () => {
         created: [{ id: "tx-1" }, { id: "tx-2" }],
         skipped: [],
       });
-      counters.increment.mockRejectedValueOnce(new Error("pool exhausted"));
+      counters.incrementUntilUtcMidnight.mockRejectedValueOnce(
+        new Error("pool exhausted"),
+      );
       const descriptor = bulkTxDescriptor();
 
       const result = await service.confirm(USER, dtoFor(descriptor));

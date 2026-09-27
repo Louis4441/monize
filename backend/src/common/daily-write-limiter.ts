@@ -16,8 +16,10 @@
  *
  * The window is fixed and ends at the next UTC midnight. The first write of the
  * day creates (or restarts) the row with `window_expires_at` at that midnight and
- * nothing moves it; every later comparison against it is made in SQL, so two
- * replicas agree about whether the day has turned however their clocks differ.
+ * nothing moves it. The midnight itself and every comparison against it are
+ * computed by the database (`AuthAttemptCounterService.incrementUntilUtcMidnight`),
+ * never from this process's clock, so replicas agree about when the day turns
+ * however their clocks differ.
  *
  * The scope names the surface (`AI_WRITE_SCOPE`, `MCP_WRITE_SCOPE`); the two
  * surfaces keep separate budgets, as they did in memory. Scopes are the contract
@@ -36,22 +38,6 @@ export const AI_WRITE_SCOPE = "ai-write";
 
 /** Counter scope for writes made through the MCP server tools. */
 export const MCP_WRITE_SCOPE = "mcp-write";
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/**
- * Milliseconds from `now` to the next UTC midnight: the length of the window a
- * day's first write opens. Exactly midnight is the start of a day, so it yields
- * a whole day, never zero.
- */
-export function msUntilNextUtcMidnight(now: Date = new Date()): number {
-  const dayStart = Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-  );
-  return dayStart + DAY_MS - now.getTime();
-}
 
 /**
  * Resolve a daily write limit from a (possibly string) environment value,
@@ -99,19 +85,13 @@ export class DailyWriteLimiter {
    * logged and the day's count is short by what was lost -- the soft-guardrail
    * trade this limiter has always made. `tool` names the operation in that log.
    *
-   * One increment per unit, sequentially: the counter adds one per statement,
-   * and each statement takes its own short-lived connection.
+   * One statement whatever `count` is (`incrementUntilUtcMidnight` adds it),
+   * so a bulk action costs one round trip and is counted whole or not at all.
    */
   async record(userId: string, tool: string, count = 1): Promise<void> {
+    if (count <= 0) return;
     try {
-      for (let i = 0; i < count; i++) {
-        await this.counters.increment(
-          this.scope,
-          userId,
-          msUntilNextUtcMidnight(),
-          "fixed",
-        );
-      }
+      await this.counters.incrementUntilUtcMidnight(this.scope, userId, count);
     } catch (err: unknown) {
       this.logger.warn(
         `Could not count ${tool} against the ${this.scope} daily limit: ${
