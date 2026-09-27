@@ -15,19 +15,6 @@ import {
 } from "../common/jobs/job-claim.service";
 import { invalidatePortfolioSummary } from "../securities/portfolio-summary-memo";
 
-/**
- * How long one replica may hold the demo reset before another may retake it.
- *
- * A wipe-and-reseed is not idempotent while it is running: a second replica
- * starting halfway through deletes the rows the first is still seeding and both
- * finish with a partial demo. The lease expires so a replica killed mid-reset
- * does not leave the demo un-resettable until someone restarts the cluster.
- */
-export const DEMO_RESET_LEASE_MS = 30 * 60 * 1000;
-
-/** Lease and claim keys; one demo user, so the key names the window instead. */
-export const DEMO_RESET_CLAIM_KEY = "reset";
-
 @Injectable()
 export class DemoResetService {
   private readonly logger = new Logger(DemoResetService.name);
@@ -69,37 +56,28 @@ export class DemoResetService {
       }
 
       // Every replica fires this cron. A wipe-and-reseed is the one shape a
-      // duplicate run cannot repair by repeating: the second replica's DELETE
-      // lands in the middle of the first replica's seed and both finish with a
-      // partial demo. The lease is the exclusion; it expires so a killed replica
-      // does not leave the demo un-resettable.
-      const leased = await this.jobClaims.claimLease(
+      // duplicate run cannot repair by repeating: a second replica's DELETE
+      // lands in the middle of the first replica's seed, or -- if its 4 AM tick
+      // arrives after the first has finished -- wipes and reseeds a demo that
+      // was already reset. The claim is keyed by the UTC day and permanent, so
+      // it records "done today", not only "running now"; a permanent claim also
+      // makes overlap impossible, so a lease has nothing left to add. It is not
+      // released on failure: a partial reset beats a doubled one, and
+      // tomorrow's key is fresh.
+      const utcDay = new Date().toISOString().slice(0, 10);
+      const claimed = await this.jobClaims.claimOnce(
         JobClaimType.DemoReset,
         demoUserId,
-        DEMO_RESET_CLAIM_KEY,
-        DEMO_RESET_LEASE_MS,
+        `reset:${utcDay}`,
       );
-      if (!leased) {
+      if (!claimed) {
         this.logger.log(
-          "Another replica is already resetting the demo data; skipping",
+          "Demo data already reset today by another replica; skipping",
         );
         return;
       }
 
-      try {
-        await this.performDemoReset(demoUserId);
-      } finally {
-        await this.jobClaims
-          // By token: a reset that outran its lease must not free the one the
-          // replica now reseeding holds (DR-RRV4-01).
-          .releaseLease(
-            JobClaimType.DemoReset,
-            demoUserId,
-            DEMO_RESET_CLAIM_KEY,
-            leased,
-          )
-          .catch(() => undefined);
-      }
+      await this.performDemoReset(demoUserId);
     } catch (error) {
       this.logger.error(
         "Demo reset failed",

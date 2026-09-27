@@ -19,8 +19,8 @@ One row per `@Cron` handler. The Cron column is the decorator's expression verba
 
 | Service | Cron | Schedule | Purpose |
 |---------|------|----------|---------|
-| `demo-reset.service` | `0 4 * * *` | Daily 4 AM | Demo database reset |
-| `demo-reset.service` | `0 */3 * * *` | Every 3 hours | Generate intra-day demo transactions |
+| `demo-reset.service` | `0 4 * * *` | Daily 4 AM | Demo database reset. Each replica first takes `claimOnce(DemoReset, demoUserId, "reset:<UTC day>")`, a permanent claim that is not released on failure, so the demo is wiped and reseeded at most once per UTC day even when a replica's tick lands after another has finished |
+| `demo-reset.service` | `0 */3 * * *` | Every 3 hours | Generate intra-day demo transactions. Each replica first takes `claimOnce(DemoIntraday, demoUserId, "<UTC day>-<hour>")`, a permanent claim that is not released on failure, so each three-hour window is generated at most once |
 | `ai-usage.service` | `0 4 * * *` | Daily 4 AM | AI usage cleanup |
 | `ai-insights.service` | `0 06 * * *` | Daily 6 AM | Generate AI insights |
 | `token.service` | `0 03 * * *` | Daily 3 AM | Expired refresh-token purge |
