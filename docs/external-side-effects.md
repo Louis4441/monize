@@ -435,6 +435,11 @@ That is a compensating decision expressed as a state transition: the durable
 "the grant happened" marker is withheld until an external effect is confirmed,
 and withholding it *is* the retry. Copy this shape.
 
+Step 1 also takes the same `EmergencyAccessGrantNotify` delivery lease as the
+step-1b resume path before it claims the grant, and releases it by token once
+delivery ends, so a replica whose sweep sees the freshly claimed grant cannot
+resume, and re-send, a delivery that is still in progress on the winner.
+
 The reminder path is weaker: `lastReminderSentAt` is written after the send, and
 the once-per-day gate reads it, so a crash between send and save re-permits a
 send later the same day. Combined with every replica firing every cron, a
