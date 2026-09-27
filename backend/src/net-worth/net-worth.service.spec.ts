@@ -391,6 +391,30 @@ describe("NetWorthService", () => {
         expect(order).toEqual(["recalc", "evaluate"]);
       });
 
+      it("says both halves were skipped when the owner id itself is refused", async () => {
+        // withUserContext validates the id before either half runs; the log
+        // must not read like an ordinary recompute failure, or the skipped
+        // threshold evaluation goes unnoticed.
+        serveStale([{ user_id: "not-a-user-id", account_id: "acc-9" }]);
+        const recalcSpy = jest.spyOn(alertingService, "recalculateAccount");
+        const warnSpy = jest
+          .spyOn((alertingService as any).logger, "warn")
+          .mockImplementation(() => undefined);
+
+        await expect(
+          alertingService.sweepStaleSnapshots(),
+        ).resolves.toBeUndefined();
+
+        expect(recalcSpy).not.toHaveBeenCalled();
+        expect(evaluateAccounts).not.toHaveBeenCalled();
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringMatching(
+            /^Stale snapshot sweep skipped account acc-9: its owner id was refused, so neither the snapshot recompute nor the balance-threshold evaluation ran/,
+          ),
+        );
+        warnSpy.mockRestore();
+      });
+
       it("keeps sweeping and warns when the evaluation rejects", async () => {
         serveStale([
           { user_id: ownerA, account_id: "acc-1" },

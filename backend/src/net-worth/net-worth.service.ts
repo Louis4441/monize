@@ -553,11 +553,14 @@ export class NetWorthService {
             }
           });
         } catch (err) {
-          // withUserContext itself refused the owner id (it validates it).
+          // withUserContext itself refused the owner id (it validates it), so
+          // neither half ran; say both, not just the recompute.
           this.logger.warn(
-            `Stale snapshot recompute failed for account ${row.account_id}: ${
-              err instanceof Error ? err.message : String(err)
-            }`,
+            `Stale snapshot sweep skipped account ${row.account_id}: its owner ` +
+              `id was refused, so neither the snapshot recompute nor the ` +
+              `balance-threshold evaluation ran: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
           );
         }
       }
