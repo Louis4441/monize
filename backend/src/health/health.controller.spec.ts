@@ -24,7 +24,7 @@ describe("HealthController", () => {
    */
   let throttlerStorage: { degradedReason: jest.Mock };
   /** One process on the database by default: a correctly deployed single. */
-  let census: { countActiveProcesses: jest.Mock };
+  let census: { countActiveProcesses: jest.Mock; lastKnownCount: jest.Mock };
 
   const build = async (
     mode: ClusterMode,
@@ -33,7 +33,10 @@ describe("HealthController", () => {
   ): Promise<void> => {
     mockDataSource = { query: jest.fn() };
     throttlerStorage = { degradedReason: jest.fn(() => null) };
-    census = { countActiveProcesses: jest.fn().mockResolvedValue(1) };
+    census = {
+      countActiveProcesses: jest.fn().mockResolvedValue(1),
+      lastKnownCount: jest.fn().mockReturnValue(1),
+    };
     listener =
       connected === null
         ? null
@@ -146,7 +149,7 @@ describe("HealthController", () => {
         // single asserted there is one process; with two, every rate limit and
         // every cache invalidation is per process, silently.
         databaseUp();
-        census.countActiveProcesses.mockResolvedValue(2);
+        census.lastKnownCount.mockReturnValue(2);
 
         const result = await controller.check();
 
@@ -155,12 +158,11 @@ describe("HealthController", () => {
         expect(result.checks.replicas).toBe(2);
       });
 
-      it("omits the count, and does not degrade, when the census fails", async () => {
-        // A health read must not fail on a count of its peers.
+      it("omits the count, and does not degrade, when no recent census exists", async () => {
+        // Before the first sweep, or after the census has failed for two
+        // sweeps: nothing current to report, which is not a problem.
         databaseUp();
-        census.countActiveProcesses.mockRejectedValue(
-          new Error("connection terminated"),
-        );
+        census.lastKnownCount.mockReturnValue(null);
 
         const result = await controller.check();
 
@@ -168,25 +170,29 @@ describe("HealthController", () => {
         expect(result.checks).not.toHaveProperty("replicas");
       });
 
-      it("does not take the census while the database is down", async () => {
+      it("never queries the census, whatever the database state", async () => {
+        // The endpoint is unauthenticated and unthrottled; a pg_stat_activity
+        // scan per request would let anyone load the database. It reads the
+        // count the fifteen-minute sweep left behind.
+        databaseUp();
+        await controller.check();
         databaseDown();
+        await controller.check();
 
-        const result = await controller.check();
-
-        expect(result.status).toBe("degraded");
-        expect(result.checks).not.toHaveProperty("replicas");
         expect(census.countActiveProcesses).not.toHaveBeenCalled();
+        expect(census.lastKnownCount).toHaveBeenCalledTimes(2);
       });
 
       it("leaves the census out of the probes", async () => {
         databaseUp();
-        census.countActiveProcesses.mockResolvedValue(2);
+        census.lastKnownCount.mockReturnValue(2);
 
         // A second replica is an operator's configuration to fix, not a reason
         // to restart this one or to take it out of the load balancer.
         await expect(controller.ready()).resolves.toEqual({ status: "ok" });
         expect(controller.live()).toEqual({ status: "ok" });
         expect(census.countActiveProcesses).not.toHaveBeenCalled();
+        expect(census.lastKnownCount).not.toHaveBeenCalled();
       });
     });
 
@@ -238,13 +244,14 @@ describe("HealthController", () => {
         // Peers are expected in multi, and a count there is a figure to watch
         // with nothing wrong at any value.
         databaseUp();
-        census.countActiveProcesses.mockResolvedValue(3);
+        census.lastKnownCount.mockReturnValue(3);
 
         const result = await controller.check();
 
         expect(result.status).toBe("ok");
         expect(result.checks).not.toHaveProperty("replicas");
         expect(census.countActiveProcesses).not.toHaveBeenCalled();
+        expect(census.lastKnownCount).not.toHaveBeenCalled();
       });
     });
 

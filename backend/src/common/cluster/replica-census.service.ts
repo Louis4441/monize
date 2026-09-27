@@ -10,6 +10,13 @@ import { APPLICATION_NAME_PREFIX } from "./instance-id";
 export const REPLICA_CENSUS_MIN_AGE_MINUTES = 10;
 
 /**
+ * How long a count stays reportable. The system-alert sweep refreshes it every
+ * fifteen minutes; two missed sweeps and the figure is no longer a fact about
+ * now, so the health endpoint reports nothing rather than an old number.
+ */
+export const REPLICA_CENSUS_MAX_AGE_MS = 35 * 60 * 1000;
+
+/**
  * Reads the start time back out of `monize-backend:<uuid>@<started>`. A name
  * that does not end that way yields NULL, so it never matches and never raises.
  */
@@ -43,6 +50,16 @@ const STARTED_AT_PATTERN = "@([0-9]{1,12})$";
  * process starting and stopping, and drives only a warning and a health field.
  * Nothing may be decided from it.
  *
+ * `pg_stat_activity` covers every database on the server, so the count is
+ * limited to `current_database()`: a staging and a production deployment on
+ * one PostgreSQL server are two single-replica deployments, not one with two
+ * replicas.
+ *
+ * The last count is kept, with when it was taken, for `GET /health`: that
+ * endpoint is unauthenticated and unthrottled, so it reads this cache and never
+ * queries. The cache is two scalars describing this process's own last read,
+ * per replica by construction.
+ *
  * `pg_stat_activity` is a system view with no owner column, and the callers are
  * a cron and the health endpoint, neither of which carries a user identity --
  * so the read seeds a system context, and this file is on
@@ -50,6 +67,9 @@ const STARTED_AT_PATTERN = "@([0-9]{1,12})$";
  */
 @Injectable()
 export class ReplicaCensusService {
+  private lastCount: number | null = null;
+  private lastCountAt = 0;
+
   constructor(private readonly dataSource: DataSource) {}
 
   /** Distinct backend processes, running for over ten minutes, connected now. */
@@ -59,7 +79,8 @@ export class ReplicaCensusService {
         m.query(
           `SELECT count(DISTINCT application_name)::int AS n
              FROM pg_stat_activity
-            WHERE starts_with(application_name, $1)
+            WHERE datname = current_database()
+              AND starts_with(application_name, $1)
               AND substring(application_name FROM $2)::bigint
                   < extract(epoch FROM now())::bigint - $3::int * 60`,
           [
@@ -71,6 +92,20 @@ export class ReplicaCensusService {
       ),
     );
     const [row] = returnedRows<{ n: number | string }>(result);
-    return Number(row?.n ?? 0);
+    const count = Number(row?.n ?? 0);
+    this.lastCount = count;
+    this.lastCountAt = Date.now();
+    return count;
+  }
+
+  /**
+   * The count the last census took, or `null` when none was taken within
+   * {@link REPLICA_CENSUS_MAX_AGE_MS}. Never queries: this is what a caller
+   * that must not cost a database round trip reads.
+   */
+  lastKnownCount(now: number = Date.now()): number | null {
+    if (this.lastCount === null) return null;
+    if (now - this.lastCountAt > REPLICA_CENSUS_MAX_AGE_MS) return null;
+    return this.lastCount;
   }
 }

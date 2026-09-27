@@ -7,6 +7,7 @@ import {
   PROCESS_STARTED_AT_EPOCH_S,
 } from "./instance-id";
 import {
+  REPLICA_CENSUS_MAX_AGE_MS,
   REPLICA_CENSUS_MIN_AGE_MINUTES,
   ReplicaCensusService,
 } from "./replica-census.service";
@@ -63,6 +64,9 @@ describe("ReplicaCensusService", () => {
     const [sql, params] = censusCall();
     expect(sql).toMatch(/count\(DISTINCT application_name\)::int AS n/);
     expect(sql).toMatch(/FROM pg_stat_activity/);
+    // The view spans the server: another Monize database on it (staging beside
+    // production) is another deployment, not a second replica of this one.
+    expect(sql).toMatch(/WHERE datname = current_database\(\)/);
     // A prefix test with no pattern characters: the prefix is compared as-is.
     expect(sql).toMatch(/starts_with\(application_name, \$1\)/);
     expect(sql).not.toMatch(/LIKE/);
@@ -107,6 +111,44 @@ describe("ReplicaCensusService", () => {
   ])("reads n from %j as %d", async (rows, expected) => {
     answer = rows;
     await expect(service.countActiveProcesses()).resolves.toBe(expected);
+  });
+
+  describe("the cached count GET /health reads", () => {
+    it("is null before any census, then the last count taken", async () => {
+      expect(service.lastKnownCount()).toBeNull();
+      answer = [{ n: 2 }];
+      await service.countActiveProcesses();
+      expect(service.lastKnownCount()).toBe(2);
+    });
+
+    it("stops reporting a count older than two sweeps", async () => {
+      await service.countActiveProcesses();
+      const now = Date.now();
+      expect(service.lastKnownCount(now + REPLICA_CENSUS_MAX_AGE_MS)).toBe(1);
+      expect(
+        service.lastKnownCount(now + REPLICA_CENSUS_MAX_AGE_MS + 60_000),
+      ).toBeNull();
+    });
+
+    it("never queries", () => {
+      manager.query.mockClear();
+      service.lastKnownCount();
+      expect(manager.query).not.toHaveBeenCalled();
+    });
+
+    it("keeps the previous count when a census fails", async () => {
+      answer = [{ n: 2 }];
+      await service.countActiveProcesses();
+      manager.query.mockImplementation(async (sql: string) => {
+        if (String(sql).includes("pg_stat_activity")) {
+          throw new Error("connection terminated");
+        }
+        return [];
+      });
+      await expect(service.countActiveProcesses()).rejects.toThrow();
+      // Until it ages out: a failed read is not evidence the peer left.
+      expect(service.lastKnownCount()).toBe(2);
+    });
   });
 
   it("propagates a database failure to the caller, which decides what it means", async () => {

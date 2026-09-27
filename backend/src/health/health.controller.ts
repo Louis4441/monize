@@ -60,9 +60,7 @@ export class HealthController {
     const dbHealthy = await this.checkDatabase();
     const busHealthy = this.checkNotificationChannel();
     const throttlerDegraded = this.throttlerStorage.degradedReason();
-    // Not asked while the database is down: the census would fail too, and a
-    // monitor polling an outage would get one warning per poll for it.
-    const replicas = dbHealthy ? await this.countReplicas() : null;
+    const replicas = this.countReplicas();
 
     return {
       status:
@@ -153,23 +151,18 @@ export class HealthController {
   }
 
   /**
-   * Backend processes on this database, or `null` when there is nothing to
-   * report: in `multi`, or when the census itself failed. A health read must
-   * not fail, or degrade, because a count of its peers could not be taken.
+   * Backend processes on this database as of the last census, or `null` when
+   * there is nothing to report: in `multi`, or when no census was taken
+   * recently. Read from the census's cache, never queried: this endpoint is
+   * unauthenticated and unthrottled, so a scan of `pg_stat_activity` per
+   * request would hand anyone a way to load the database. The fifteen-minute
+   * system-alert sweep keeps the cache fresh.
    */
-  private async countReplicas(): Promise<number | null> {
+  private countReplicas(): number | null {
     if (this.clusterMode !== "single") {
       return null;
     }
-    try {
-      return await this.census.countActiveProcesses();
-    } catch (error) {
-      this.logger.warn(
-        "Could not count the backend processes on this database: " +
-          (error instanceof Error ? error.message : String(error)),
-      );
-      return null;
-    }
+    return this.census.lastKnownCount();
   }
 
   /**

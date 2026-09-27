@@ -382,9 +382,11 @@ describe("SystemAlertMonitorService", () => {
       expect(systemAlerts.raiseAdminAlert).toHaveBeenCalledWith(
         expect.objectContaining({ type: NotificationType.SMTP_FAILURE }),
       );
+      // One warning, from the sweep's isolation: the census no longer has a
+      // catch of its own saying the same thing twice.
       expect(warn).toHaveBeenCalledTimes(1);
-      expect(String(warn.mock.calls[0][0])).toMatch(
-        /Could not count the backend processes.*connection terminated/,
+      expect(String(warn.mock.calls[0][0])).toBe(
+        "The replica check failed this sweep: connection terminated",
       );
     });
 

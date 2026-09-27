@@ -225,25 +225,16 @@ export class SystemAlertMonitorService {
    * Every sweep that still sees it warns again -- a log line every fifteen
    * minutes is the reminder, and no in-process memory decides otherwise.
    *
-   * Never throws. A census failure is warned on its own and ends the check; it
-   * says nothing about how many replicas there are.
+   * A census failure propagates to `isolated()`, which logs it and lets the
+   * sweep's other checks run; it says nothing about how many replicas there
+   * are. This is also the call that refreshes the count `GET /health` reports.
    */
   async checkReplicaCount(): Promise<void> {
     // multi already shares its counters and its event bus through PostgreSQL,
     // so a peer is expected there, not a finding.
     if (this.clusterMode !== "single") return;
 
-    let processes: number;
-    try {
-      processes = await this.census.countActiveProcesses();
-    } catch (error) {
-      this.logger.warn(
-        "Could not count the backend processes on this database, so a " +
-          "second replica running under CLUSTER_MODE=single would go " +
-          `unnoticed this sweep: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      return;
-    }
+    const processes = await this.census.countActiveProcesses();
     if (processes > 1) {
       this.logger.warn(
         `CLUSTER_MODE=single but ${processes} backend processes, each ` +
