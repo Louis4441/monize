@@ -1,0 +1,65 @@
+{
+  "page": {
+    "title": "Quy tắc",
+    "subtitle": "Tự động điền thẻ, danh mục và người nhận khi một giao dịch được tạo hoặc nhập",
+    "createButton": "Tạo quy tắc",
+    "loading": "Đang tải quy tắc...",
+    "totalCount": "{count, plural, other {# quy tắc}}"
+  },
+  "empty": {
+    "title": "Chưa có quy tắc nào",
+    "body": "Quy tắc theo dõi các giao dịch mới và giao dịch đã nhập, rồi điền thẻ, danh mục hoặc người nhận khi điều kiện được thỏa mãn. Hãy tạo quy tắc đầu tiên để bắt đầu.",
+    "createButton": "Tạo quy tắc đầu tiên"
+  },
+  "error": {
+    "title": "Không thể tải quy tắc của bạn",
+    "body": "Không có gì được hiển thị vì yêu cầu thất bại, không phải vì bạn không có quy tắc nào. Hãy kiểm tra kết nối và thử lại.",
+    "retry": "Thử lại"
+  },
+  "list": {
+    "header": {
+      "order": "Thứ tự",
+      "enabled": "Bật",
+      "name": "Quy tắc",
+      "summary": "Tóm tắt",
+      "actions": "Thao tác"
+    },
+    "summary": "{trigger, select, create {Khi tạo} import {Khi nhập} both {Khi tạo hoặc nhập} other {Không có trình kích hoạt}} · {conditions, plural, =0 {Không có điều kiện} other {# điều kiện}} · {actions, plural, =0 {Không có hành động} other {# hành động}}",
+    "enabledLabel": "Bật {name}"
+  },
+  "actions": {
+    "moveUp": "Di chuyển lên",
+    "moveDown": "Di chuyển xuống"
+  },
+  "invalid": {
+    "badge": "Không hợp lệ",
+    "tooltip": "Bị bỏ qua cho đến khi được sửa: {reasons}.",
+    "reasons": {
+      "referenceMissing": "một thẻ, người nhận, danh mục hoặc tài khoản mà quy tắc dùng không còn tồn tại",
+      "noActions": "quy tắc không có hành động nào",
+      "tooLarge": "các điều kiện quá lớn",
+      "duplicateAction": "quy tắc lặp lại một hành động chỉ được phép một lần",
+      "unreadable": "không thể đọc định nghĩa đã lưu",
+      "other": "định nghĩa không hợp lệ"
+    }
+  },
+  "duplicate": {
+    "name": "{name} (bản sao)"
+  },
+  "delete": {
+    "title": "Xóa quy tắc",
+    "message": "Bạn có chắc muốn xóa \"{name}\" không? Hành động này không thể hoàn tác."
+  },
+  "toasts": {
+    "enabled": "Đã bật quy tắc",
+    "disabled": "Đã tắt quy tắc",
+    "toggleFailed": "Không thể thay đổi quy tắc",
+    "deleted": "Đã xóa quy tắc",
+    "deleteFailed": "Không thể xóa quy tắc",
+    "duplicated": "Đã nhân bản quy tắc. Bản sao sẽ tắt cho đến khi bạn bật",
+    "duplicateFailed": "Không thể nhân bản quy tắc",
+    "reorderFailed": "Không thể thay đổi thứ tự quy tắc",
+    "listChanged": "Danh sách quy tắc đã thay đổi ở nơi khác và đã được tải lại. Hãy thử lại",
+    "loadFailed": "Không thể tải quy tắc"
+  }
+}

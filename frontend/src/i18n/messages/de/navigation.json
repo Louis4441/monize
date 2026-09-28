@@ -10,6 +10,7 @@
   "payees": "Zahlungsempfänger",
   "institutions": "Institute",
   "tags": "Etiketten",
+  "rules": "Regeln",
   "securities": "Wertpapiere",
   "currencies": "Währungen",
   "import": "Buchungen importieren",

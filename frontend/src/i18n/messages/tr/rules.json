@@ -1,0 +1,65 @@
+{
+  "page": {
+    "title": "Kurallar",
+    "subtitle": "Bir işlem oluşturulduğunda veya içe aktarıldığında etiketleri, kategorileri ve alıcıları otomatik doldurun",
+    "createButton": "Kural oluştur",
+    "loading": "Kurallar yükleniyor...",
+    "totalCount": "{count, plural, one {# kural} other {# kural}}"
+  },
+  "empty": {
+    "title": "Henüz kural yok",
+    "body": "Bir kural, yeni ve içe aktarılan işlemleri izler ve koşulları karşılandığında etiketleri, kategorileri veya alıcıları doldurur. Başlamak için ilk kuralınızı oluşturun.",
+    "createButton": "İlk kuralınızı oluşturun"
+  },
+  "error": {
+    "title": "Kurallarınız yüklenemedi",
+    "body": "Hiçbir şey gösterilmiyor çünkü istek başarısız oldu; kuralınız olmadığı için değil. Bağlantınızı kontrol edip tekrar deneyin.",
+    "retry": "Tekrar dene"
+  },
+  "list": {
+    "header": {
+      "order": "Sıra",
+      "enabled": "Etkin",
+      "name": "Kural",
+      "summary": "Özet",
+      "actions": "İşlemler"
+    },
+    "summary": "{trigger, select, create {Oluşturulduğunda} import {İçe aktarıldığında} both {Oluşturulduğunda veya içe aktarıldığında} other {Tetikleyici yok}} · {conditions, plural, =0 {Koşul yok} one {# koşul} other {# koşul}} · {actions, plural, =0 {Eylem yok} one {# eylem} other {# eylem}}",
+    "enabledLabel": "{name} kuralını etkinleştir"
+  },
+  "actions": {
+    "moveUp": "Yukarı taşı",
+    "moveDown": "Aşağı taşı"
+  },
+  "invalid": {
+    "badge": "Geçersiz",
+    "tooltip": "Düzeltilene kadar atlanır: {reasons}.",
+    "reasons": {
+      "referenceMissing": "kullandığı bir etiket, alıcı, kategori veya hesap artık yok",
+      "noActions": "hiç eylemi yok",
+      "tooLarge": "koşulları çok büyük",
+      "duplicateAction": "yalnızca bir kez izin verilen bir eylemi tekrarlıyor",
+      "unreadable": "kayıtlı tanımı okunamıyor",
+      "other": "tanımı geçerli değil"
+    }
+  },
+  "duplicate": {
+    "name": "{name} (kopya)"
+  },
+  "delete": {
+    "title": "Kuralı sil",
+    "message": "\"{name}\" kuralını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz."
+  },
+  "toasts": {
+    "enabled": "Kural etkinleştirildi",
+    "disabled": "Kural devre dışı bırakıldı",
+    "toggleFailed": "Kural değiştirilemedi",
+    "deleted": "Kural silindi",
+    "deleteFailed": "Kural silinemedi",
+    "duplicated": "Kural çoğaltıldı. Kopya, etkinleştirene kadar kapalıdır",
+    "duplicateFailed": "Kural çoğaltılamadı",
+    "reorderFailed": "Kuralların sırası değiştirilemedi",
+    "listChanged": "Kural listesi başka bir yerde değişti ve yeniden yüklendi. Tekrar deneyin",
+    "loadFailed": "Kurallar yüklenemedi"
+  }
+}

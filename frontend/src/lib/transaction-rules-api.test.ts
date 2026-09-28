@@ -1,0 +1,90 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import apiClient from './api';
+import { transactionRulesApi } from './transaction-rules-api';
+import { invalidateCache } from './apiCache';
+
+vi.mock('./api', () => ({
+  default: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), put: vi.fn(), delete: vi.fn() },
+}));
+
+const definition = {
+  name: 'Coffee',
+  triggers: ['create' as const],
+  condition: { all: [] },
+  actions: [{ type: 'add_tags' as const, tagIds: ['t-1'] }],
+};
+
+describe('transactionRulesApi', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    invalidateCache('transaction-rules:');
+  });
+
+  it('getAll fetches /transaction-rules and caches the list', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [{ id: 'r-1' }] });
+    const first = await transactionRulesApi.getAll();
+    await transactionRulesApi.getAll();
+    expect(apiClient.get).toHaveBeenCalledWith('/transaction-rules');
+    expect(apiClient.get).toHaveBeenCalledTimes(1);
+    expect(first).toHaveLength(1);
+  });
+
+  it('getById is never cached', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { id: 'r-1' } });
+    await transactionRulesApi.getById('r-1');
+    await transactionRulesApi.getById('r-1');
+    expect(apiClient.get).toHaveBeenCalledWith('/transaction-rules/r-1');
+    expect(apiClient.get).toHaveBeenCalledTimes(2);
+  });
+
+  it('create posts the definition and drops the cached list', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { id: 'r-2' } });
+    await transactionRulesApi.getAll();
+    const created = await transactionRulesApi.create(definition);
+    await transactionRulesApi.getAll();
+    expect(apiClient.post).toHaveBeenCalledWith('/transaction-rules', definition);
+    expect(created.id).toBe('r-2');
+    expect(apiClient.get).toHaveBeenCalledTimes(2);
+  });
+
+  it('update patches the rule with its revision', async () => {
+    vi.mocked(apiClient.patch).mockResolvedValue({ data: { id: 'r-1' } });
+    await transactionRulesApi.update('r-1', { name: 'New', revision: 3 });
+    expect(apiClient.patch).toHaveBeenCalledWith('/transaction-rules/r-1', {
+      name: 'New',
+      revision: 3,
+    });
+  });
+
+  it('setEnabled patches /enabled', async () => {
+    vi.mocked(apiClient.patch).mockResolvedValue({ data: { id: 'r-1', enabled: false } });
+    const rule = await transactionRulesApi.setEnabled('r-1', false);
+    expect(apiClient.patch).toHaveBeenCalledWith('/transaction-rules/r-1/enabled', {
+      enabled: false,
+    });
+    expect(rule.enabled).toBe(false);
+  });
+
+  it('reorder puts the full id list', async () => {
+    vi.mocked(apiClient.put).mockResolvedValue({ data: [{ id: 'b' }, { id: 'a' }] });
+    const rules = await transactionRulesApi.reorder(['b', 'a']);
+    expect(apiClient.put).toHaveBeenCalledWith('/transaction-rules/reorder', { ids: ['b', 'a'] });
+    expect(rules.map((r) => r.id)).toEqual(['b', 'a']);
+  });
+
+  it('delete calls DELETE /transaction-rules/:id', async () => {
+    vi.mocked(apiClient.delete).mockResolvedValue({});
+    await transactionRulesApi.delete('r-1');
+    expect(apiClient.delete).toHaveBeenCalledWith('/transaction-rules/r-1');
+  });
+
+  it('drops the cached list even when a write is refused', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+    vi.mocked(apiClient.put).mockRejectedValue(new Error('409'));
+    await transactionRulesApi.getAll();
+    await expect(transactionRulesApi.reorder(['a'])).rejects.toThrow('409');
+    await transactionRulesApi.getAll();
+    expect(apiClient.get).toHaveBeenCalledTimes(2);
+  });
+});

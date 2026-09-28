@@ -10,6 +10,7 @@
   "payees": "Odbiorcy",
   "institutions": "Instytucje",
   "tags": "Tagi",
+  "rules": "Reguły",
   "securities": "Papiery wartościowe",
   "currencies": "Waluty",
   "import": "Import transakcji",

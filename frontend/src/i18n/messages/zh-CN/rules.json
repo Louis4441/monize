@@ -1,0 +1,65 @@
+{
+  "page": {
+    "title": "规则",
+    "subtitle": "在交易创建或导入时，自动填写标签、分类和收款方",
+    "createButton": "创建规则",
+    "loading": "正在加载规则...",
+    "totalCount": "{count, plural, other {# 条规则}}"
+  },
+  "empty": {
+    "title": "还没有规则",
+    "body": "规则会监视新建和导入的交易，并在条件匹配时填写标签、分类或收款方。创建您的第一条规则即可开始。",
+    "createButton": "创建第一条规则"
+  },
+  "error": {
+    "title": "无法加载您的规则",
+    "body": "没有显示内容是因为请求失败，而不是因为您没有规则。请检查网络连接后重试。",
+    "retry": "重试"
+  },
+  "list": {
+    "header": {
+      "order": "顺序",
+      "enabled": "启用",
+      "name": "规则",
+      "summary": "摘要",
+      "actions": "操作"
+    },
+    "summary": "{trigger, select, create {创建时} import {导入时} both {创建或导入时} other {无触发条件}} · {conditions, plural, =0 {无条件} other {# 个条件}} · {actions, plural, =0 {无操作} other {# 个操作}}",
+    "enabledLabel": "启用 {name}"
+  },
+  "actions": {
+    "moveUp": "上移",
+    "moveDown": "下移"
+  },
+  "invalid": {
+    "badge": "无效",
+    "tooltip": "在修复之前将被跳过：{reasons}。",
+    "reasons": {
+      "referenceMissing": "它使用的标签、收款方、分类或账户已不存在",
+      "noActions": "它没有任何操作",
+      "tooLarge": "它的条件过大",
+      "duplicateAction": "它重复了只允许出现一次的操作",
+      "unreadable": "无法读取它已保存的定义",
+      "other": "它的定义无效"
+    }
+  },
+  "duplicate": {
+    "name": "{name}（副本）"
+  },
+  "delete": {
+    "title": "删除规则",
+    "message": "确定要删除“{name}”吗？此操作无法撤销。"
+  },
+  "toasts": {
+    "enabled": "规则已启用",
+    "disabled": "规则已停用",
+    "toggleFailed": "无法更改规则",
+    "deleted": "规则已删除",
+    "deleteFailed": "无法删除规则",
+    "duplicated": "规则已复制。副本在您启用之前保持关闭",
+    "duplicateFailed": "无法复制规则",
+    "reorderFailed": "无法更改规则顺序",
+    "listChanged": "规则列表已在别处更改并重新加载。请重试",
+    "loadFailed": "无法加载规则"
+  }
+}

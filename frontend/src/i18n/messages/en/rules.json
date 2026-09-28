@@ -1,0 +1,65 @@
+{
+  "page": {
+    "title": "Rules",
+    "subtitle": "Fill in tags, categories and payees automatically when a transaction is created or imported",
+    "createButton": "Create rule",
+    "loading": "Loading rules...",
+    "totalCount": "{count, plural, one {# rule} other {# rules}}"
+  },
+  "empty": {
+    "title": "No rules yet",
+    "body": "A rule watches new and imported transactions and fills in tags, categories or payees when its conditions match. Create your first rule to get started.",
+    "createButton": "Create your first rule"
+  },
+  "error": {
+    "title": "Your rules could not be loaded",
+    "body": "Nothing is shown because the request failed, not because you have no rules. Check your connection and try again.",
+    "retry": "Try again"
+  },
+  "list": {
+    "header": {
+      "order": "Order",
+      "enabled": "Enabled",
+      "name": "Rule",
+      "summary": "Summary",
+      "actions": "Actions"
+    },
+    "summary": "{trigger, select, create {When created} import {When imported} both {When created or imported} other {No trigger}} · {conditions, plural, =0 {No conditions} one {# condition} other {# conditions}} · {actions, plural, =0 {No actions} one {# action} other {# actions}}",
+    "enabledLabel": "Enable {name}"
+  },
+  "actions": {
+    "moveUp": "Move up",
+    "moveDown": "Move down"
+  },
+  "invalid": {
+    "badge": "Invalid",
+    "tooltip": "Skipped until fixed: {reasons}.",
+    "reasons": {
+      "referenceMissing": "a tag, payee, category or account it uses no longer exists",
+      "noActions": "it has no actions",
+      "tooLarge": "its conditions are too large",
+      "duplicateAction": "it repeats an action that is allowed only once",
+      "unreadable": "its saved definition cannot be read",
+      "other": "its definition is not valid"
+    }
+  },
+  "duplicate": {
+    "name": "{name} (copy)"
+  },
+  "delete": {
+    "title": "Delete rule",
+    "message": "Are you sure you want to delete \"{name}\"? This action cannot be undone."
+  },
+  "toasts": {
+    "enabled": "Rule enabled",
+    "disabled": "Rule disabled",
+    "toggleFailed": "Failed to change the rule",
+    "deleted": "Rule deleted",
+    "deleteFailed": "Failed to delete the rule",
+    "duplicated": "Rule duplicated. The copy is switched off until you enable it",
+    "duplicateFailed": "Failed to duplicate the rule",
+    "reorderFailed": "Failed to change the order of the rules",
+    "listChanged": "The list of rules changed elsewhere and has been reloaded. Try again",
+    "loadFailed": "Failed to load rules"
+  }
+}

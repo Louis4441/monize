@@ -1,0 +1,65 @@
+{
+  "page": {
+    "title": "Aturan",
+    "subtitle": "Isi tag, kategori, dan penerima secara otomatis saat transaksi dibuat atau diimpor",
+    "createButton": "Buat aturan",
+    "loading": "Memuat aturan...",
+    "totalCount": "{count, plural, other {# aturan}}"
+  },
+  "empty": {
+    "title": "Belum ada aturan",
+    "body": "Aturan memantau transaksi baru dan yang diimpor, lalu mengisi tag, kategori, atau penerima saat kondisinya terpenuhi. Buat aturan pertama Anda untuk memulai.",
+    "createButton": "Buat aturan pertama Anda"
+  },
+  "error": {
+    "title": "Aturan Anda tidak dapat dimuat",
+    "body": "Tidak ada yang ditampilkan karena permintaan gagal, bukan karena Anda tidak punya aturan. Periksa koneksi Anda dan coba lagi.",
+    "retry": "Coba lagi"
+  },
+  "list": {
+    "header": {
+      "order": "Urutan",
+      "enabled": "Aktif",
+      "name": "Aturan",
+      "summary": "Ringkasan",
+      "actions": "Tindakan"
+    },
+    "summary": "{trigger, select, create {Saat dibuat} import {Saat diimpor} both {Saat dibuat atau diimpor} other {Tanpa pemicu}} · {conditions, plural, =0 {Tanpa kondisi} other {# kondisi}} · {actions, plural, =0 {Tanpa tindakan} other {# tindakan}}",
+    "enabledLabel": "Aktifkan {name}"
+  },
+  "actions": {
+    "moveUp": "Pindah ke atas",
+    "moveDown": "Pindah ke bawah"
+  },
+  "invalid": {
+    "badge": "Tidak valid",
+    "tooltip": "Dilewati sampai diperbaiki: {reasons}.",
+    "reasons": {
+      "referenceMissing": "tag, penerima, kategori, atau akun yang digunakannya sudah tidak ada",
+      "noActions": "tidak memiliki tindakan",
+      "tooLarge": "kondisinya terlalu besar",
+      "duplicateAction": "mengulang tindakan yang hanya diizinkan sekali",
+      "unreadable": "definisi yang tersimpan tidak dapat dibaca",
+      "other": "definisinya tidak valid"
+    }
+  },
+  "duplicate": {
+    "name": "{name} (salinan)"
+  },
+  "delete": {
+    "title": "Hapus aturan",
+    "message": "Yakin ingin menghapus \"{name}\"? Tindakan ini tidak dapat dibatalkan."
+  },
+  "toasts": {
+    "enabled": "Aturan diaktifkan",
+    "disabled": "Aturan dinonaktifkan",
+    "toggleFailed": "Gagal mengubah aturan",
+    "deleted": "Aturan dihapus",
+    "deleteFailed": "Gagal menghapus aturan",
+    "duplicated": "Aturan diduplikasi. Salinan tetap nonaktif sampai Anda mengaktifkannya",
+    "duplicateFailed": "Gagal menduplikasi aturan",
+    "reorderFailed": "Gagal mengubah urutan aturan",
+    "listChanged": "Daftar aturan berubah di tempat lain dan telah dimuat ulang. Coba lagi",
+    "loadFailed": "Gagal memuat aturan"
+  }
+}

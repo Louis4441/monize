@@ -10,6 +10,7 @@
   "payees": "支払先",
   "institutions": "金融機関",
   "tags": "タグ",
+  "rules": "ルール",
   "securities": "有価証券",
   "currencies": "通貨",
   "import": "取引をインポート",

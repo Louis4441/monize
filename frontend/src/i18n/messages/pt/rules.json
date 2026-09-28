@@ -1,0 +1,65 @@
+{
+  "page": {
+    "title": "Regras",
+    "subtitle": "Preencha etiquetas, categorias e beneficiários automaticamente quando uma transação é criada ou importada",
+    "createButton": "Criar regra",
+    "loading": "A carregar regras...",
+    "totalCount": "{count, plural, one {# regra} other {# regras}}"
+  },
+  "empty": {
+    "title": "Ainda não há regras",
+    "body": "Uma regra vigia as transações novas e importadas e preenche etiquetas, categorias ou beneficiários quando as suas condições se verificam. Crie a sua primeira regra para começar.",
+    "createButton": "Criar a sua primeira regra"
+  },
+  "error": {
+    "title": "Não foi possível carregar as suas regras",
+    "body": "Não é apresentado nada porque o pedido falhou, não porque não tenha regras. Verifique a ligação e tente novamente.",
+    "retry": "Tentar novamente"
+  },
+  "list": {
+    "header": {
+      "order": "Ordem",
+      "enabled": "Ativa",
+      "name": "Regra",
+      "summary": "Resumo",
+      "actions": "Ações"
+    },
+    "summary": "{trigger, select, create {Ao criar} import {Ao importar} both {Ao criar ou importar} other {Sem acionador}} · {conditions, plural, =0 {Sem condições} one {# condição} other {# condições}} · {actions, plural, =0 {Sem ações} one {# ação} other {# ações}}",
+    "enabledLabel": "Ativar {name}"
+  },
+  "actions": {
+    "moveUp": "Mover para cima",
+    "moveDown": "Mover para baixo"
+  },
+  "invalid": {
+    "badge": "Inválida",
+    "tooltip": "Ignorada até ser corrigida: {reasons}.",
+    "reasons": {
+      "referenceMissing": "uma etiqueta, beneficiário, categoria ou conta que utiliza já não existe",
+      "noActions": "não tem ações",
+      "tooLarge": "as suas condições são demasiado extensas",
+      "duplicateAction": "repete uma ação que só é permitida uma vez",
+      "unreadable": "não é possível ler a definição guardada",
+      "other": "a sua definição não é válida"
+    }
+  },
+  "duplicate": {
+    "name": "{name} (cópia)"
+  },
+  "delete": {
+    "title": "Eliminar regra",
+    "message": "Tem a certeza de que quer eliminar \"{name}\"? Esta ação não pode ser anulada."
+  },
+  "toasts": {
+    "enabled": "Regra ativada",
+    "disabled": "Regra desativada",
+    "toggleFailed": "Não foi possível alterar a regra",
+    "deleted": "Regra eliminada",
+    "deleteFailed": "Não foi possível eliminar a regra",
+    "duplicated": "Regra duplicada. A cópia fica desativada até a ativar",
+    "duplicateFailed": "Não foi possível duplicar a regra",
+    "reorderFailed": "Não foi possível alterar a ordem das regras",
+    "listChanged": "A lista de regras foi alterada noutro local e foi recarregada. Tente novamente",
+    "loadFailed": "Não foi possível carregar as regras"
+  }
+}

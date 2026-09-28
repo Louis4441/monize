@@ -1,0 +1,65 @@
+{
+  "page": {
+    "title": "[XX-Rules-XX]",
+    "subtitle": "[XX-Fill in tags, categories and payees automatically when a transaction is created or imported-XX]",
+    "createButton": "[XX-Create rule-XX]",
+    "loading": "[XX-Loading rules...-XX]",
+    "totalCount": "[XX-{count, plural, one {# rule} other {# rules}}-XX]"
+  },
+  "empty": {
+    "title": "[XX-No rules yet-XX]",
+    "body": "[XX-A rule watches new and imported transactions and fills in tags, categories or payees when its conditions match. Create your first rule to get started.-XX]",
+    "createButton": "[XX-Create your first rule-XX]"
+  },
+  "error": {
+    "title": "[XX-Your rules could not be loaded-XX]",
+    "body": "[XX-Nothing is shown because the request failed, not because you have no rules. Check your connection and try again.-XX]",
+    "retry": "[XX-Try again-XX]"
+  },
+  "list": {
+    "header": {
+      "order": "[XX-Order-XX]",
+      "enabled": "[XX-Enabled-XX]",
+      "name": "[XX-Rule-XX]",
+      "summary": "[XX-Summary-XX]",
+      "actions": "[XX-Actions-XX]"
+    },
+    "summary": "[XX-{trigger, select, create {When created} import {When imported} both {When created or imported} other {No trigger}} · {conditions, plural, =0 {No conditions} one {# condition} other {# conditions}} · {actions, plural, =0 {No actions} one {# action} other {# actions}}-XX]",
+    "enabledLabel": "[XX-Enable {name}-XX]"
+  },
+  "actions": {
+    "moveUp": "[XX-Move up-XX]",
+    "moveDown": "[XX-Move down-XX]"
+  },
+  "invalid": {
+    "badge": "[XX-Invalid-XX]",
+    "tooltip": "[XX-Skipped until fixed: {reasons}.-XX]",
+    "reasons": {
+      "referenceMissing": "[XX-a tag, payee, category or account it uses no longer exists-XX]",
+      "noActions": "[XX-it has no actions-XX]",
+      "tooLarge": "[XX-its conditions are too large-XX]",
+      "duplicateAction": "[XX-it repeats an action that is allowed only once-XX]",
+      "unreadable": "[XX-its saved definition cannot be read-XX]",
+      "other": "[XX-its definition is not valid-XX]"
+    }
+  },
+  "duplicate": {
+    "name": "[XX-{name} (copy)-XX]"
+  },
+  "delete": {
+    "title": "[XX-Delete rule-XX]",
+    "message": "[XX-Are you sure you want to delete \"{name}\"? This action cannot be undone.-XX]"
+  },
+  "toasts": {
+    "enabled": "[XX-Rule enabled-XX]",
+    "disabled": "[XX-Rule disabled-XX]",
+    "toggleFailed": "[XX-Failed to change the rule-XX]",
+    "deleted": "[XX-Rule deleted-XX]",
+    "deleteFailed": "[XX-Failed to delete the rule-XX]",
+    "duplicated": "[XX-Rule duplicated. The copy is switched off until you enable it-XX]",
+    "duplicateFailed": "[XX-Failed to duplicate the rule-XX]",
+    "reorderFailed": "[XX-Failed to change the order of the rules-XX]",
+    "listChanged": "[XX-The list of rules changed elsewhere and has been reloaded. Try again-XX]",
+    "loadFailed": "[XX-Failed to load rules-XX]"
+  }
+}

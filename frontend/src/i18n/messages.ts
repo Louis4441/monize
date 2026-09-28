@@ -44,6 +44,7 @@ const NAMESPACES = [
   "payees",
   "reconcile",
   "reports",
+  "rules",
   "scheduledTransactions",
   "securities",
   "securityDetail",

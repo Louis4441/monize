@@ -1,0 +1,65 @@
+{
+  "page": {
+    "title": "規則",
+    "subtitle": "在交易建立或匯入時，自動填入標籤、分類與收款對象",
+    "createButton": "建立規則",
+    "loading": "正在載入規則...",
+    "totalCount": "{count, plural, other {# 條規則}}"
+  },
+  "empty": {
+    "title": "尚無規則",
+    "body": "規則會監看新增與匯入的交易，並在條件符合時填入標籤、分類或收款對象。建立您的第一條規則即可開始。",
+    "createButton": "建立第一條規則"
+  },
+  "error": {
+    "title": "無法載入您的規則",
+    "body": "未顯示任何內容是因為請求失敗，而不是因為您沒有規則。請檢查網路連線後再試一次。",
+    "retry": "重試"
+  },
+  "list": {
+    "header": {
+      "order": "順序",
+      "enabled": "啟用",
+      "name": "規則",
+      "summary": "摘要",
+      "actions": "操作"
+    },
+    "summary": "{trigger, select, create {建立時} import {匯入時} both {建立或匯入時} other {無觸發條件}} · {conditions, plural, =0 {無條件} other {# 個條件}} · {actions, plural, =0 {無動作} other {# 個動作}}",
+    "enabledLabel": "啟用 {name}"
+  },
+  "actions": {
+    "moveUp": "上移",
+    "moveDown": "下移"
+  },
+  "invalid": {
+    "badge": "無效",
+    "tooltip": "在修正之前將被略過：{reasons}。",
+    "reasons": {
+      "referenceMissing": "它使用的標籤、收款對象、分類或帳戶已不存在",
+      "noActions": "它沒有任何動作",
+      "tooLarge": "它的條件過大",
+      "duplicateAction": "它重複了只允許出現一次的動作",
+      "unreadable": "無法讀取它已儲存的定義",
+      "other": "它的定義無效"
+    }
+  },
+  "duplicate": {
+    "name": "{name}（副本）"
+  },
+  "delete": {
+    "title": "刪除規則",
+    "message": "確定要刪除「{name}」嗎？此動作無法復原。"
+  },
+  "toasts": {
+    "enabled": "規則已啟用",
+    "disabled": "規則已停用",
+    "toggleFailed": "無法變更規則",
+    "deleted": "規則已刪除",
+    "deleteFailed": "無法刪除規則",
+    "duplicated": "規則已複製。副本在您啟用之前保持關閉",
+    "duplicateFailed": "無法複製規則",
+    "reorderFailed": "無法變更規則順序",
+    "listChanged": "規則清單已在其他地方變更並重新載入。請再試一次",
+    "loadFailed": "無法載入規則"
+  }
+}

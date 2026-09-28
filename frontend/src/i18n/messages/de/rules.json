@@ -1,0 +1,65 @@
+{
+  "page": {
+    "title": "Regeln",
+    "subtitle": "Tags, Kategorien und Zahlungsempfänger automatisch ergänzen, wenn eine Transaktion angelegt oder importiert wird",
+    "createButton": "Regel erstellen",
+    "loading": "Regeln werden geladen...",
+    "totalCount": "{count, plural, one {# Regel} other {# Regeln}}"
+  },
+  "empty": {
+    "title": "Noch keine Regeln",
+    "body": "Eine Regel beobachtet neue und importierte Transaktionen und ergänzt Tags, Kategorien oder Zahlungsempfänger, wenn ihre Bedingungen zutreffen. Erstellen Sie Ihre erste Regel, um loszulegen.",
+    "createButton": "Erste Regel erstellen"
+  },
+  "error": {
+    "title": "Ihre Regeln konnten nicht geladen werden",
+    "body": "Es wird nichts angezeigt, weil die Anfrage fehlgeschlagen ist, nicht weil Sie keine Regeln haben. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+    "retry": "Erneut versuchen"
+  },
+  "list": {
+    "header": {
+      "order": "Reihenfolge",
+      "enabled": "Aktiv",
+      "name": "Regel",
+      "summary": "Zusammenfassung",
+      "actions": "Aktionen"
+    },
+    "summary": "{trigger, select, create {Beim Anlegen} import {Beim Import} both {Beim Anlegen oder Import} other {Kein Auslöser}} · {conditions, plural, =0 {Keine Bedingungen} one {# Bedingung} other {# Bedingungen}} · {actions, plural, =0 {Keine Aktionen} one {# Aktion} other {# Aktionen}}",
+    "enabledLabel": "{name} aktivieren"
+  },
+  "actions": {
+    "moveUp": "Nach oben",
+    "moveDown": "Nach unten"
+  },
+  "invalid": {
+    "badge": "Ungültig",
+    "tooltip": "Wird übersprungen, bis der Fehler behoben ist: {reasons}.",
+    "reasons": {
+      "referenceMissing": "ein verwendeter Tag, Zahlungsempfänger, eine Kategorie oder ein Konto existiert nicht mehr",
+      "noActions": "sie hat keine Aktionen",
+      "tooLarge": "ihre Bedingungen sind zu umfangreich",
+      "duplicateAction": "sie wiederholt eine Aktion, die nur einmal erlaubt ist",
+      "unreadable": "ihre gespeicherte Definition kann nicht gelesen werden",
+      "other": "ihre Definition ist ungültig"
+    }
+  },
+  "duplicate": {
+    "name": "{name} (Kopie)"
+  },
+  "delete": {
+    "title": "Regel löschen",
+    "message": "Möchten Sie „{name}“ wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+  },
+  "toasts": {
+    "enabled": "Regel aktiviert",
+    "disabled": "Regel deaktiviert",
+    "toggleFailed": "Die Regel konnte nicht geändert werden",
+    "deleted": "Regel gelöscht",
+    "deleteFailed": "Die Regel konnte nicht gelöscht werden",
+    "duplicated": "Regel dupliziert. Die Kopie ist ausgeschaltet, bis Sie sie aktivieren",
+    "duplicateFailed": "Die Regel konnte nicht dupliziert werden",
+    "reorderFailed": "Die Reihenfolge der Regeln konnte nicht geändert werden",
+    "listChanged": "Die Regelliste wurde an anderer Stelle geändert und neu geladen. Versuchen Sie es erneut",
+    "loadFailed": "Regeln konnten nicht geladen werden"
+  }
+}

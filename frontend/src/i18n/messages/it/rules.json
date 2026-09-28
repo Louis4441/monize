@@ -1,0 +1,65 @@
+{
+  "page": {
+    "title": "Regole",
+    "subtitle": "Compila automaticamente tag, categorie e beneficiari quando una transazione viene creata o importata",
+    "createButton": "Crea regola",
+    "loading": "Caricamento delle regole...",
+    "totalCount": "{count, plural, one {# regola} other {# regole}}"
+  },
+  "empty": {
+    "title": "Ancora nessuna regola",
+    "body": "Una regola controlla le transazioni nuove e importate e compila tag, categorie o beneficiari quando le sue condizioni sono soddisfatte. Crea la tua prima regola per iniziare.",
+    "createButton": "Crea la tua prima regola"
+  },
+  "error": {
+    "title": "Impossibile caricare le tue regole",
+    "body": "Non viene mostrato nulla perché la richiesta non è riuscita, non perché non hai regole. Controlla la connessione e riprova.",
+    "retry": "Riprova"
+  },
+  "list": {
+    "header": {
+      "order": "Ordine",
+      "enabled": "Attiva",
+      "name": "Regola",
+      "summary": "Riepilogo",
+      "actions": "Azioni"
+    },
+    "summary": "{trigger, select, create {Alla creazione} import {All'importazione} both {Alla creazione o all'importazione} other {Nessun trigger}} · {conditions, plural, =0 {Nessuna condizione} one {# condizione} other {# condizioni}} · {actions, plural, =0 {Nessuna azione} one {# azione} other {# azioni}}",
+    "enabledLabel": "Attiva {name}"
+  },
+  "actions": {
+    "moveUp": "Sposta su",
+    "moveDown": "Sposta giù"
+  },
+  "invalid": {
+    "badge": "Non valida",
+    "tooltip": "Ignorata finché non viene corretta: {reasons}.",
+    "reasons": {
+      "referenceMissing": "un tag, beneficiario, una categoria o un conto che usa non esiste più",
+      "noActions": "non ha azioni",
+      "tooLarge": "le sue condizioni sono troppo estese",
+      "duplicateAction": "ripete un'azione consentita una sola volta",
+      "unreadable": "la definizione salvata non può essere letta",
+      "other": "la sua definizione non è valida"
+    }
+  },
+  "duplicate": {
+    "name": "{name} (copia)"
+  },
+  "delete": {
+    "title": "Elimina regola",
+    "message": "Vuoi davvero eliminare \"{name}\"? Questa azione non può essere annullata."
+  },
+  "toasts": {
+    "enabled": "Regola attivata",
+    "disabled": "Regola disattivata",
+    "toggleFailed": "Impossibile modificare la regola",
+    "deleted": "Regola eliminata",
+    "deleteFailed": "Impossibile eliminare la regola",
+    "duplicated": "Regola duplicata. La copia resta disattivata finché non la attivi",
+    "duplicateFailed": "Impossibile duplicare la regola",
+    "reorderFailed": "Impossibile modificare l'ordine delle regole",
+    "listChanged": "L'elenco delle regole è cambiato altrove ed è stato ricaricato. Riprova",
+    "loadFailed": "Impossibile caricare le regole"
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "page": {
+    "title": "Reguły",
+    "subtitle": "Automatycznie uzupełniaj tagi, kategorie i odbiorców, gdy transakcja zostanie utworzona lub zaimportowana",
+    "createButton": "Utwórz regułę",
+    "loading": "Wczytywanie reguł...",
+    "totalCount": "{count, plural, one {# reguła} few {# reguły} many {# reguł} other {# reguły}}"
+  },
+  "empty": {
+    "title": "Brak reguł",
+    "body": "Reguła obserwuje nowe i zaimportowane transakcje i uzupełnia tagi, kategorie lub odbiorców, gdy spełnione są jej warunki. Utwórz pierwszą regułę, aby zacząć.",
+    "createButton": "Utwórz pierwszą regułę"
+  },
+  "error": {
+    "title": "Nie udało się wczytać reguł",
+    "body": "Nic nie jest wyświetlane, ponieważ żądanie nie powiodło się, a nie dlatego, że nie masz reguł. Sprawdź połączenie i spróbuj ponownie.",
+    "retry": "Spróbuj ponownie"
+  },
+  "list": {
+    "header": {
+      "order": "Kolejność",
+      "enabled": "Włączona",
+      "name": "Reguła",
+      "summary": "Podsumowanie",
+      "actions": "Akcje"
+    },
+    "summary": "{trigger, select, create {Po utworzeniu} import {Po imporcie} both {Po utworzeniu lub imporcie} other {Brak wyzwalacza}} · {conditions, plural, =0 {Brak warunków} one {# warunek} few {# warunki} many {# warunków} other {# warunku}} · {actions, plural, =0 {Brak akcji} one {# akcja} few {# akcje} many {# akcji} other {# akcji}}",
+    "enabledLabel": "Włącz regułę {name}"
+  },
+  "actions": {
+    "moveUp": "Przenieś w górę",
+    "moveDown": "Przenieś w dół"
+  },
+  "invalid": {
+    "badge": "Nieprawidłowa",
+    "tooltip": "Pomijana do czasu naprawy: {reasons}.",
+    "reasons": {
+      "referenceMissing": "używany przez nią tag, odbiorca, kategoria lub konto już nie istnieje",
+      "noActions": "nie ma żadnych akcji",
+      "tooLarge": "jej warunki są zbyt rozbudowane",
+      "duplicateAction": "powtarza akcję dozwoloną tylko raz",
+      "unreadable": "jej zapisanej definicji nie można odczytać",
+      "other": "jej definicja jest nieprawidłowa"
+    }
+  },
+  "duplicate": {
+    "name": "{name} (kopia)"
+  },
+  "delete": {
+    "title": "Usuń regułę",
+    "message": "Czy na pewno chcesz usunąć regułę „{name}”? Tej czynności nie można cofnąć."
+  },
+  "toasts": {
+    "enabled": "Reguła włączona",
+    "disabled": "Reguła wyłączona",
+    "toggleFailed": "Nie udało się zmienić reguły",
+    "deleted": "Reguła usunięta",
+    "deleteFailed": "Nie udało się usunąć reguły",
+    "duplicated": "Reguła zduplikowana. Kopia jest wyłączona, dopóki jej nie włączysz",
+    "duplicateFailed": "Nie udało się zduplikować reguły",
+    "reorderFailed": "Nie udało się zmienić kolejności reguł",
+    "listChanged": "Lista reguł została zmieniona w innym miejscu i wczytana ponownie. Spróbuj jeszcze raz",
+    "loadFailed": "Nie udało się wczytać reguł"
+  }
+}

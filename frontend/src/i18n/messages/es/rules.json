@@ -1,0 +1,65 @@
+{
+  "page": {
+    "title": "Reglas",
+    "subtitle": "Completa etiquetas, categorías y beneficiarios automáticamente cuando se crea o se importa una transacción",
+    "createButton": "Crear regla",
+    "loading": "Cargando reglas...",
+    "totalCount": "{count, plural, one {# regla} other {# reglas}}"
+  },
+  "empty": {
+    "title": "Aún no hay reglas",
+    "body": "Una regla vigila las transacciones nuevas e importadas y completa etiquetas, categorías o beneficiarios cuando se cumplen sus condiciones. Crea tu primera regla para empezar.",
+    "createButton": "Crea tu primera regla"
+  },
+  "error": {
+    "title": "No se pudieron cargar tus reglas",
+    "body": "No se muestra nada porque la solicitud falló, no porque no tengas reglas. Comprueba tu conexión e inténtalo de nuevo.",
+    "retry": "Intentar de nuevo"
+  },
+  "list": {
+    "header": {
+      "order": "Orden",
+      "enabled": "Activa",
+      "name": "Regla",
+      "summary": "Resumen",
+      "actions": "Acciones"
+    },
+    "summary": "{trigger, select, create {Al crear} import {Al importar} both {Al crear o importar} other {Sin disparador}} · {conditions, plural, =0 {Sin condiciones} one {# condición} other {# condiciones}} · {actions, plural, =0 {Sin acciones} one {# acción} other {# acciones}}",
+    "enabledLabel": "Activar {name}"
+  },
+  "actions": {
+    "moveUp": "Subir",
+    "moveDown": "Bajar"
+  },
+  "invalid": {
+    "badge": "No válida",
+    "tooltip": "Se omite hasta que se corrija: {reasons}.",
+    "reasons": {
+      "referenceMissing": "una etiqueta, beneficiario, categoría o cuenta que usa ya no existe",
+      "noActions": "no tiene acciones",
+      "tooLarge": "sus condiciones son demasiado extensas",
+      "duplicateAction": "repite una acción que solo se permite una vez",
+      "unreadable": "no se puede leer su definición guardada",
+      "other": "su definición no es válida"
+    }
+  },
+  "duplicate": {
+    "name": "{name} (copia)"
+  },
+  "delete": {
+    "title": "Eliminar regla",
+    "message": "¿Seguro que quieres eliminar «{name}»? Esta acción no se puede deshacer."
+  },
+  "toasts": {
+    "enabled": "Regla activada",
+    "disabled": "Regla desactivada",
+    "toggleFailed": "No se pudo cambiar la regla",
+    "deleted": "Regla eliminada",
+    "deleteFailed": "No se pudo eliminar la regla",
+    "duplicated": "Regla duplicada. La copia está desactivada hasta que la actives",
+    "duplicateFailed": "No se pudo duplicar la regla",
+    "reorderFailed": "No se pudo cambiar el orden de las reglas",
+    "listChanged": "La lista de reglas cambió en otro lugar y se ha recargado. Inténtalo de nuevo",
+    "loadFailed": "No se pudieron cargar las reglas"
+  }
+}

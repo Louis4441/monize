@@ -1,0 +1,65 @@
+{
+  "page": {
+    "title": "Règles",
+    "subtitle": "Renseignez automatiquement les tags, catégories et bénéficiaires lorsqu'une transaction est créée ou importée",
+    "createButton": "Créer une règle",
+    "loading": "Chargement des règles...",
+    "totalCount": "{count, plural, one {# règle} other {# règles}}"
+  },
+  "empty": {
+    "title": "Aucune règle pour le moment",
+    "body": "Une règle surveille les transactions nouvelles et importées et renseigne des tags, des catégories ou des bénéficiaires lorsque ses conditions sont remplies. Créez votre première règle pour commencer.",
+    "createButton": "Créer votre première règle"
+  },
+  "error": {
+    "title": "Vos règles n'ont pas pu être chargées",
+    "body": "Rien ne s'affiche parce que la requête a échoué, et non parce que vous n'avez aucune règle. Vérifiez votre connexion et réessayez.",
+    "retry": "Réessayer"
+  },
+  "list": {
+    "header": {
+      "order": "Ordre",
+      "enabled": "Activée",
+      "name": "Règle",
+      "summary": "Résumé",
+      "actions": "Actions"
+    },
+    "summary": "{trigger, select, create {À la création} import {À l'import} both {À la création ou à l'import} other {Aucun déclencheur}} · {conditions, plural, =0 {Aucune condition} one {# condition} other {# conditions}} · {actions, plural, =0 {Aucune action} one {# action} other {# actions}}",
+    "enabledLabel": "Activer {name}"
+  },
+  "actions": {
+    "moveUp": "Monter",
+    "moveDown": "Descendre"
+  },
+  "invalid": {
+    "badge": "Invalide",
+    "tooltip": "Ignorée tant qu'elle n'est pas corrigée : {reasons}.",
+    "reasons": {
+      "referenceMissing": "un tag, bénéficiaire, une catégorie ou un compte qu'elle utilise n'existe plus",
+      "noActions": "elle n'a aucune action",
+      "tooLarge": "ses conditions sont trop volumineuses",
+      "duplicateAction": "elle répète une action autorisée une seule fois",
+      "unreadable": "sa définition enregistrée est illisible",
+      "other": "sa définition n'est pas valide"
+    }
+  },
+  "duplicate": {
+    "name": "{name} (copie)"
+  },
+  "delete": {
+    "title": "Supprimer la règle",
+    "message": "Voulez-vous vraiment supprimer « {name} » ? Cette action est irréversible."
+  },
+  "toasts": {
+    "enabled": "Règle activée",
+    "disabled": "Règle désactivée",
+    "toggleFailed": "Échec de la modification de la règle",
+    "deleted": "Règle supprimée",
+    "deleteFailed": "Échec de la suppression de la règle",
+    "duplicated": "Règle dupliquée. La copie est désactivée tant que vous ne l'activez pas",
+    "duplicateFailed": "Échec de la duplication de la règle",
+    "reorderFailed": "Échec de la modification de l'ordre des règles",
+    "listChanged": "La liste des règles a changé ailleurs et a été rechargée. Réessayez",
+    "loadFailed": "Échec du chargement des règles"
+  }
+}

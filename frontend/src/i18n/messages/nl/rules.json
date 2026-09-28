@@ -1,0 +1,65 @@
+{
+  "page": {
+    "title": "Regels",
+    "subtitle": "Vul tags, categorieën en begunstigden automatisch in wanneer een transactie wordt aangemaakt of geïmporteerd",
+    "createButton": "Regel maken",
+    "loading": "Regels laden...",
+    "totalCount": "{count, plural, one {# regel} other {# regels}}"
+  },
+  "empty": {
+    "title": "Nog geen regels",
+    "body": "Een regel let op nieuwe en geïmporteerde transacties en vult tags, categorieën of begunstigden in wanneer aan de voorwaarden is voldaan. Maak je eerste regel om te beginnen.",
+    "createButton": "Maak je eerste regel"
+  },
+  "error": {
+    "title": "Je regels konden niet worden geladen",
+    "body": "Er wordt niets getoond omdat het verzoek mislukte, niet omdat je geen regels hebt. Controleer je verbinding en probeer het opnieuw.",
+    "retry": "Opnieuw proberen"
+  },
+  "list": {
+    "header": {
+      "order": "Volgorde",
+      "enabled": "Actief",
+      "name": "Regel",
+      "summary": "Samenvatting",
+      "actions": "Acties"
+    },
+    "summary": "{trigger, select, create {Bij aanmaken} import {Bij importeren} both {Bij aanmaken of importeren} other {Geen trigger}} · {conditions, plural, =0 {Geen voorwaarden} one {# voorwaarde} other {# voorwaarden}} · {actions, plural, =0 {Geen acties} one {# actie} other {# acties}}",
+    "enabledLabel": "{name} inschakelen"
+  },
+  "actions": {
+    "moveUp": "Omhoog",
+    "moveDown": "Omlaag"
+  },
+  "invalid": {
+    "badge": "Ongeldig",
+    "tooltip": "Wordt overgeslagen tot het is opgelost: {reasons}.",
+    "reasons": {
+      "referenceMissing": "een tag, begunstigde, categorie of rekening die ze gebruikt bestaat niet meer",
+      "noActions": "ze heeft geen acties",
+      "tooLarge": "de voorwaarden zijn te uitgebreid",
+      "duplicateAction": "ze herhaalt een actie die maar één keer is toegestaan",
+      "unreadable": "de opgeslagen definitie kan niet worden gelezen",
+      "other": "de definitie is niet geldig"
+    }
+  },
+  "duplicate": {
+    "name": "{name} (kopie)"
+  },
+  "delete": {
+    "title": "Regel verwijderen",
+    "message": "Weet je zeker dat je \"{name}\" wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt."
+  },
+  "toasts": {
+    "enabled": "Regel ingeschakeld",
+    "disabled": "Regel uitgeschakeld",
+    "toggleFailed": "De regel kon niet worden gewijzigd",
+    "deleted": "Regel verwijderd",
+    "deleteFailed": "De regel kon niet worden verwijderd",
+    "duplicated": "Regel gedupliceerd. De kopie staat uit tot je haar inschakelt",
+    "duplicateFailed": "De regel kon niet worden gedupliceerd",
+    "reorderFailed": "De volgorde van de regels kon niet worden gewijzigd",
+    "listChanged": "De lijst met regels is elders gewijzigd en opnieuw geladen. Probeer het opnieuw",
+    "loadFailed": "Regels konden niet worden geladen"
+  }
+}

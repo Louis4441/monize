@@ -1,0 +1,156 @@
+/**
+ * Transaction rules as the API returns and accepts them. Mirrors
+ * `backend/src/transaction-rules/rule-condition.types.ts`,
+ * `rule-action.types.ts` and `rule-trigger.types.ts`; the field and operator
+ * table itself (which operators a field allows) belongs to the editor
+ * (`lib/rule-fields.ts`), not to these types.
+ */
+
+export type RuleTrigger = 'create' | 'import';
+
+export type RuleField =
+  | 'accountId'
+  | 'fromAccountId'
+  | 'toAccountId'
+  | 'type'
+  | 'payeeId'
+  | 'payeeText'
+  | 'categoryId'
+  | 'description'
+  | 'memo'
+  | 'amount'
+  | 'absAmount'
+  | 'currencyCode'
+  | 'tagIds'
+  | 'hasSplits';
+
+export type RuleOperator =
+  | 'eq'
+  | 'neq'
+  | 'in'
+  | 'notIn'
+  | 'isEmpty'
+  | 'contains'
+  | 'startsWith'
+  | 'matches'
+  | 'lt'
+  | 'lte'
+  | 'gt'
+  | 'gte'
+  | 'between'
+  | 'hasAny'
+  | 'hasAll'
+  | 'hasNone'
+  | 'inSubtree';
+
+export type RuleTransactionType = 'EXPENSE' | 'INCOME' | 'TRANSFER';
+
+/** A leaf value: a scalar, a list of scalars, or a [min, max] pair. */
+export type RuleLeafValue =
+  | string
+  | number
+  | boolean
+  | readonly string[]
+  | readonly number[];
+
+export interface RuleConditionLeaf {
+  readonly field: RuleField;
+  readonly op: RuleOperator;
+  /** Absent for `isEmpty`. */
+  readonly value?: RuleLeafValue;
+}
+
+export interface RuleAllGroup {
+  readonly all: readonly RuleConditionNode[];
+  readonly not?: boolean;
+}
+
+export interface RuleAnyGroup {
+  readonly any: readonly RuleConditionNode[];
+  readonly not?: boolean;
+}
+
+export type RuleConditionGroup = RuleAllGroup | RuleAnyGroup;
+export type RuleConditionNode = RuleConditionGroup | RuleConditionLeaf;
+
+export interface AddTagsAction {
+  readonly type: 'add_tags';
+  readonly tagIds: readonly string[];
+}
+
+export interface RemoveTagsAction {
+  readonly type: 'remove_tags';
+  readonly tagIds: readonly string[];
+}
+
+export interface SetCategoryAction {
+  readonly type: 'set_category';
+  readonly categoryId: string;
+  readonly onlyIfEmpty: boolean;
+}
+
+export interface SetPayeeAction {
+  readonly type: 'set_payee';
+  readonly payeeId: string;
+  readonly onlyIfEmpty: boolean;
+}
+
+/** Queues a person-approved AI review; never changes the row itself. */
+export interface RequestAiReviewAction {
+  readonly type: 'request_ai_review';
+  readonly instruction: string;
+}
+
+export type RuleAction =
+  | AddTagsAction
+  | RemoveTagsAction
+  | SetCategoryAction
+  | SetPayeeAction
+  | RequestAiReviewAction;
+
+export type RuleActionType = RuleAction['type'];
+
+/** Why a stored rule cannot run: a validation code or `REFERENCE_NOT_FOUND`. */
+export interface RuleInvalidReason {
+  path: string;
+  code: string;
+}
+
+export interface TransactionRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  /** Evaluation order, ascending. */
+  position: number;
+  triggers: RuleTrigger[];
+  condition: RuleConditionNode;
+  actions: RuleAction[];
+  stopProcessing: boolean;
+  /** Compare-and-swap token: send the value last read with every update. */
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+  /**
+   * True when the stored definition fails validation or names an id that no
+   * longer exists. The rule is kept and skipped at run time; its `condition`
+   * and `actions` may then be malformed (a restore leaves `{}` and `[]`).
+   */
+  invalid: boolean;
+  invalidReasons: RuleInvalidReason[];
+}
+
+export interface CreateTransactionRuleData {
+  name: string;
+  enabled?: boolean;
+  triggers: RuleTrigger[];
+  condition: RuleConditionNode;
+  actions: RuleAction[];
+  stopProcessing?: boolean;
+}
+
+export interface UpdateTransactionRuleData extends Partial<CreateTransactionRuleData> {
+  revision: number;
+}
+
+/** Error codes the rules endpoints answer 409 with. */
+export type TransactionRuleConflictCode = 'REVISION_CONFLICT' | 'RULE_LIST_CHANGED';
