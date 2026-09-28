@@ -12,6 +12,7 @@
 
 import type { DatedConversion } from "../../currencies/exchange-rate.service";
 import { todayYMD } from "../../common/date-utils";
+import { roundToDecimals, sumMoney } from "../../common/round.util";
 
 export type CalculateOperation =
   | "percentage"
@@ -163,22 +164,6 @@ export async function executeConversion(
 }
 
 /**
- * Round a number to 2 decimal places using integer arithmetic.
- */
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
-/**
- * Safe summation using integer arithmetic (4 decimal places)
- * to avoid floating-point accumulation drift.
- */
-function safeSum(values: number[]): number {
-  const total = values.reduce((sum, v) => sum + Math.round(v * 10000), 0);
-  return total / 10000;
-}
-
-/**
  * Execute a calculation and return the result with formatting.
  *
  * Operations:
@@ -210,7 +195,7 @@ export function executeCalculation(
       if (whole === 0) {
         return { error: "Cannot calculate percentage: divisor is zero." };
       }
-      result = round2((part / whole) * 100);
+      result = roundToDecimals((part / whole) * 100, 2);
       break;
     }
 
@@ -220,7 +205,7 @@ export function executeCalculation(
           error: "Difference requires exactly 2 values: [a, b].",
         };
       }
-      result = round2(values[0] - values[1]);
+      result = roundToDecimals(values[0] - values[1], 2);
       break;
     }
 
@@ -231,12 +216,12 @@ export function executeCalculation(
       if (values[1] === 0) {
         return { error: "Cannot calculate ratio: divisor is zero." };
       }
-      result = round2(values[0] / values[1]);
+      result = roundToDecimals(values[0] / values[1], 2);
       break;
     }
 
     case "sum": {
-      result = round2(safeSum(values));
+      result = roundToDecimals(sumMoney(values), 2);
       break;
     }
 
@@ -244,7 +229,7 @@ export function executeCalculation(
       if (values.length === 0) {
         return { error: "Average requires at least one value." };
       }
-      result = round2(safeSum(values) / values.length);
+      result = roundToDecimals(sumMoney(values) / values.length, 2);
       break;
     }
 
