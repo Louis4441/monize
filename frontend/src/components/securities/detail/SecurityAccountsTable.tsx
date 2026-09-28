@@ -3,8 +3,7 @@
 import { ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { gainLossColor } from '@/lib/format';
-import { withCurrencyCode } from '@/lib/security-detail';
+import { gainLossColor, withCurrencyCode } from '@/lib/format';
 import type { SecurityDetail } from '@/types/investment';
 
 interface SecurityAccountsTableProps {

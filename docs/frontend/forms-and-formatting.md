@@ -84,8 +84,28 @@ a pure validator takes the formatter as an argument (`validateSelection` in
 a `.` decimal beside a reader's own `1 234,56 zł`.
 
 **The ISO code beside a foreign amount is not this rule.** `withCurrencyCode`
-appends it deliberately when a security's currency is not the reader's; localize
-the number *before* the suffix and leave the suffix alone.
+(`lib/format.ts`) appends it deliberately when an account's or a security's
+currency is not the reader's; localize the number *before* the suffix
+(`withCurrencyCode(formatCurrency(amount, code), code, defaultCurrency)`) and
+leave the suffix alone.
+
+**A component does not declare its own `formatCurrency`.** Destructure the
+hook's and call it. Nine components had wrapped it under the same name to add
+something the name no longer said (an `abs`, a dash for `null`, a bound currency,
+a `|| 0`, a hand-rolled ISO suffix), so a reader could not tell the hook's
+formatter from a local one with different rules. A wrapper that binds a currency
+for a chart or renders `null` as a dash is named for what it does (`formatValue`,
+`formatMoney`, `formatInAccountCurrency`).
+
+**A small helper is imported, never re-declared.** Rounding is `roundToCents`
+(2dp), `roundMoney` (4dp, the backend `roundMoney`'s strategy included, so a
+preview rounds a midpoint the way the commit will), `roundToDecimals` and
+`sumMoney` from `lib/format.ts`; a bound is `clamp` (`lib/clamp.ts`); an id check
+is `isUuid` (`lib/uuid.ts`). `round2` had four copies and `roundMoney` three, at
+two rounding strategies, beside helpers that already existed.
+`src/test/shared-helpers.guard.test.ts` fails a second declaration of any of
+them, a whole-string UUID regex outside `lib/uuid.ts`, and a `formatCurrency`
+declared outside the two formatter modules.
 
 `src/test/number-locale.guard.test.ts` scans for all four fingerprints with a
 classified allowlist (a `new Date(...).toLocaleString()` is a date, which

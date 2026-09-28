@@ -60,7 +60,7 @@ export function GroupedHoldingsList({
     });
   };
 
-  const formatCurrency = (value: number | null) => {
+  const formatMoney = (value: number | null) => {
     if (value === null) return '-';
     return formatCurrencyBase(value);
   };
@@ -186,7 +186,7 @@ export function GroupedHoldingsList({
           const fmtAcct = (value: number | null) => {
             if (value === null) return '-';
             if (acctDisplayCurrency) return `${formatCurrencyBase(value, acctDisplayCurrency)} ${acctDisplayCurrency}`;
-            return formatCurrency(value);
+            return formatMoney(value);
           };
 
           return (
@@ -281,7 +281,7 @@ export function GroupedHoldingsList({
                           holding={holding}
                           defaultCurrency={defaultCurrency}
                           accountCurrency={account.currencyCode}
-                          formatCurrency={formatCurrency}
+                          formatMoney={formatMoney}
                           formatCurrencyWithCode={formatCurrencyBase}
                           formatPrice={formatPrice}
                           formatQuantity={formatQuantity}
@@ -392,7 +392,7 @@ interface HoldingRowProps {
   holding: HoldingWithMarketValue;
   defaultCurrency: string;
   accountCurrency: string;
-  formatCurrency: (value: number | null) => string;
+  formatMoney: (value: number | null) => string;
   formatCurrencyWithCode: (value: number, currencyCode: string) => string;
   formatPrice: (value: number | null, currencyCode?: string) => string;
   formatQuantity: (value: number) => string;
@@ -406,7 +406,7 @@ const HoldingRow = memo(function HoldingRow({
   holding,
   defaultCurrency,
   accountCurrency,
-  formatCurrency,
+  formatMoney,
   formatCurrencyWithCode,
   formatPrice,
   formatQuantity,
@@ -423,7 +423,7 @@ const HoldingRow = memo(function HoldingRow({
   const fmtVal = (value: number | null) => {
     if (value === null) return '-';
     if (isForeign) return `${formatCurrencyWithCode(value, holding.currencyCode)} ${holding.currencyCode}`;
-    return formatCurrency(value);
+    return formatMoney(value);
   };
 
   const fmtPrice = (value: number | null) => {

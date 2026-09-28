@@ -65,13 +65,13 @@ type ChartPoint = ForecastDataPoint & { balances?: Record<string, number> };
 function CashFlowTooltip({
   active,
   payload,
-  formatCurrency,
+  formatValue,
   formatChartDate,
   lines = [],
 }: {
   active?: boolean;
   payload?: Array<{ payload: ChartPoint }>;
-  formatCurrency: (v: number) => string;
+  formatValue: (v: number) => string;
   formatChartDate: (date: Date | string, pattern: 'MMM d') => string;
   lines?: AccountLine[];
 }) {
@@ -100,7 +100,7 @@ function CashFlowTooltip({
             gainLossColor(data.balance)
           }`}
         >
-          {formatCurrency(data.balance)}
+          {formatValue(data.balance)}
         </p>
         {accountRows.length > 0 && (
           <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 space-y-0.5">
@@ -113,7 +113,7 @@ function CashFlowTooltip({
                 />
                 <span className="truncate text-gray-700 dark:text-gray-300">{line.name}</span>
                 <span className="ml-auto shrink-0 font-medium text-gray-900 dark:text-gray-100">
-                  {formatCurrency(balances[line.accountId])}
+                  {formatValue(balances[line.accountId])}
                 </span>
               </p>
             ))}
@@ -133,7 +133,7 @@ function CashFlowTooltip({
                       gainLossColor(tx.amount)
                     }
                   >
-                    {formatCurrency(tx.amount)}
+                    {formatValue(tx.amount)}
                   </span>{' '}
                   {accountName
                     ? t('forecast.tooltipTransactionForAccount', {
@@ -203,7 +203,7 @@ export function CashFlowForecastChart({
 }: CashFlowForecastChartProps) {
   const t = useTranslations('bills');
   const tc = useTranslations('common');
-  const { formatCurrency: formatCurrencyFull, formatCurrencyAxis, formatCurrencyFlag } =
+  const { formatCurrency, formatCurrencyAxis, formatCurrencyFlag } =
     useNumberFormat();
   const formatChartDate = useChartDateFormat();
   const { convertToDefault, defaultCurrency } = useExchangeRates();
@@ -264,9 +264,9 @@ export function CashFlowForecastChart({
     };
   }, [accounts, orderedAccountIds, defaultCurrency]);
 
-  const formatCurrency = useCallback(
-    (value: number) => formatCurrencyFull(value, chartCurrency),
-    [formatCurrencyFull, chartCurrency],
+  const formatValue = useCallback(
+    (value: number) => formatCurrency(value, chartCurrency),
+    [formatCurrency, chartCurrency],
   );
 
   const formatAxis = useCallback(
@@ -514,7 +514,7 @@ export function CashFlowForecastChart({
               <Tooltip
                 content={
                   <CashFlowTooltip
-                    formatCurrency={formatCurrency}
+                    formatValue={formatValue}
                     formatChartDate={formatChartDate}
                     lines={accountLines}
                   />
@@ -568,7 +568,7 @@ export function CashFlowForecastChart({
               <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
               <XAxis dataKey="date" tickFormatter={(value: string) => formatChartDate(value, 'MMM d')} tick={{ fill: chartColors.axis, fontSize: 12 }} tickLine={false} axisLine={{ stroke: chartColors.grid }} interval="preserveStartEnd" />
               <YAxis tick={{ fill: chartColors.axis, fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={formatAxis} width="auto" domain={['auto', 'auto']} />
-              <Tooltip content={<CashFlowTooltip formatCurrency={formatCurrency} formatChartDate={formatChartDate} />} />
+              <Tooltip content={<CashFlowTooltip formatValue={formatValue} formatChartDate={formatChartDate} />} />
               <ReferenceLine y={0} stroke={chartColors.expense} strokeDasharray="5 5" strokeOpacity={0.5} />
               <Line type="monotone" dataKey="balance" stroke={chartColors.axis} strokeWidth={2} dot={false} strokeDasharray="5 5" />
             </LineChart>
@@ -607,7 +607,7 @@ export function CashFlowForecastChart({
                 width="auto"
                 domain={['auto', 'auto']}
               />
-              <Tooltip content={<CashFlowTooltip formatCurrency={formatCurrency} formatChartDate={formatChartDate} />} />
+              <Tooltip content={<CashFlowTooltip formatValue={formatValue} formatChartDate={formatChartDate} />} />
               {/* Reference line at $0 */}
               <ReferenceLine
                 y={0}
@@ -651,7 +651,7 @@ export function CashFlowForecastChart({
                   : 'text-red-600 dark:text-red-400'
               }`}
             >
-              {formatCurrency(summary.startingBalance)}
+              {formatValue(summary.startingBalance)}
             </div>
           </div>
           <div>
@@ -661,7 +661,7 @@ export function CashFlowForecastChart({
                 gainLossColor(summary.endingBalance)
               }`}
             >
-              {formatCurrency(summary.endingBalance)}
+              {formatValue(summary.endingBalance)}
             </div>
           </div>
           <div>
@@ -675,7 +675,7 @@ export function CashFlowForecastChart({
                   : 'text-red-600 dark:text-red-400'
               }`}
             >
-              {formatCurrency(summary.minBalance)}
+              {formatValue(summary.minBalance)}
               {summary.goesNegative && (
                 <span className="ml-1 text-xs text-red-500">!</span>
               )}

@@ -5,6 +5,7 @@ import {
   RecurringOverpaymentFrequency,
   generateLoanSchedule,
 } from '@/lib/loan-schedule';
+import { roundToCents } from '@/lib/format';
 
 /**
  * Goal-seek helpers for the overpayment simulator: given a target (a total
@@ -274,7 +275,7 @@ function solveTargetInterestWithBaseline(
     status: 'ok',
     amount,
     result,
-    interestSaved: round2(baseline.totalInterest - result.totalInterest),
+    interestSaved: roundToCents(baseline.totalInterest - result.totalInterest),
   };
 }
 
@@ -305,10 +306,6 @@ export function solveRecurringForInterestSavings(
     step,
     window,
   );
-}
-
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
 }
 
 /**
@@ -356,7 +353,7 @@ export function solveRecurringForPayoffMonth(
     // The date target is met either way, but the saving is only a number when
     // the baseline paid off too -- otherwise it is a horizon minus a lifetime.
     interestSaved: baseline.paidOff
-      ? round2(baseline.totalInterest - result.totalInterest)
+      ? roundToCents(baseline.totalInterest - result.totalInterest)
       : null,
   };
 }

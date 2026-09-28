@@ -33,7 +33,7 @@ interface ReconcileTableProps {
   lastReconciledDate: string | null;
   /** Server-chosen date a row must precede to count as overdue. */
   overdueBefore: string;
-  formatCurrency: (amount: number | string | null | undefined) => string;
+  formatCurrency: (amount: number) => string;
   onEdit: (transaction: Transaction) => void;
   onDelete: (transaction: Transaction) => void;
   onCycleStatus: (transaction: Transaction) => void;

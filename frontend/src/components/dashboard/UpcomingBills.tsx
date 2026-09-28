@@ -30,7 +30,7 @@ import {
   nextOccurrenceEffectiveAmount,
   occurrenceSettlementAccountId,
 } from '@/lib/scheduled-effective-amount';
-import { roundMoney } from '@/lib/investmentFold';
+import { roundMoney } from '@/lib/format';
 import { buildScheduledCalendarDays } from '@/lib/scheduled-calendar';
 import { ScheduledCalendarGrid } from '@/components/bills/ScheduledCalendarGrid';
 import { useWidgetConfig } from '@/hooks/useWidgetConfig';
@@ -55,7 +55,7 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
   const t = useTranslations('dashboard');
   const router = useRouter();
   const { formatDate } = useDateFormat();
-  const { formatCurrency: formatCurrencyBase } = useNumberFormat();
+  const { formatCurrency } = useNumberFormat();
   const formatChartDate = useChartDateFormat();
   const { config, updateConfig } = useWidgetConfig<UpcomingBillsConfig>(
     WIDGET_ID,
@@ -163,10 +163,6 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
     return result;
   }, [upcomingItems, accountMap]);
 
-  const formatCurrency = (amount: number, currency: string) => {
-    return formatCurrencyBase(Math.abs(amount), currency);
-  };
-
   const isOverdue = (dateStr: string) => {
     const date = parseLocalDate(dateStr);
     return isPast(date) && !isToday(date);
@@ -229,7 +225,7 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
       text:
         effective.amount === null
           ? null
-          : `${sign}${formatCurrency(effective.amount, effective.currencyCode)}`,
+          : `${sign}${formatCurrency(Math.abs(effective.amount), effective.currencyCode)}`,
       className: SCHEDULED_KIND_AMOUNT_CLASSES[type],
     };
   };

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
-import { gainLossColor } from '@/lib/format';
+import { gainLossColor, withCurrencyCode } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Account } from '@/types/account';
@@ -33,7 +33,7 @@ export function FavouriteAccounts({ accounts, brokerageMarketValues, unpricedHol
   const tAccounts = useTranslations('accounts');
   const router = useRouter();
   const preferences = usePreferencesStore((s) => s.preferences);
-  const { formatCurrency: formatCurrencyBase } = useNumberFormat();
+  const { formatCurrency } = useNumberFormat();
   const defaultCurrency = preferredCurrency(preferences?.defaultCurrency);
   const [reordering, setReordering] = useState(false);
   const [localOrder, setLocalOrder] = useState<{ accounts: Account[]; order: Account[] } | null>(null);
@@ -85,16 +85,10 @@ export function FavouriteAccounts({ accounts, brokerageMarketValues, unpricedHol
     );
   };
 
-  const formatCurrency = (amount: number | string | null | undefined, currency: string) => {
-    const numericAmount = Number(amount) || 0;
-    const formatted = formatCurrencyBase(numericAmount, currency);
-
-    // Only show currency code if it differs from user's default currency
-    if (currency !== defaultCurrency) {
-      return `${formatted} ${currency}`;
-    }
-    return formatted;
-  };
+  // An account's figures are in its own currency, named when that is not the
+  // reader's.
+  const formatInAccountCurrency = (amount: number, currencyCode: string) =>
+    withCurrencyCode(formatCurrency(amount, currencyCode), currencyCode, defaultCurrency);
 
   const applyReorder = useCallback(
     async (from: number, to: number) => {
@@ -323,13 +317,13 @@ export function FavouriteAccounts({ accounts, brokerageMarketValues, unpricedHol
                         gainLossColor(displayValue)
                       }`}
                     >
-                      {formatCurrency(displayValue, account.currencyCode)}
+                      {formatInAccountCurrency(displayValue, account.currencyCode)}
                     </div>
                     {holdsSecurities && marketValue !== undefined && (
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         {tAccounts('row.combinedBreakdown', {
-                          investments: formatCurrency(marketValue, account.currencyCode),
-                          cash: formatCurrency(
+                          investments: formatInAccountCurrency(marketValue, account.currencyCode),
+                          cash: formatInAccountCurrency(
                             logical?.cash
                               ? (Number(logical.cash.currentBalance) || 0) +
                                   (Number(logical.cash.futureTransactionsSum) || 0)

@@ -44,9 +44,8 @@ import {
   LoanScheduleInput,
   LoanScheduleResult,
   ScheduleRow,
-  round2,
-  round4,
 } from "@/lib/loan-schedule-types";
+import { roundMoney, roundToCents, roundToDecimals } from "@/lib/format";
 
 /**
  * Contractual payment for a mortgage amortized over a given period.
@@ -76,11 +75,11 @@ export function calculateMortgagePaymentAmount(
     );
     // Accelerated payments derive from the monthly payment, rounded to
     // storage precision first as the backend does
-    const monthlyPayment = round4(
+    const monthlyPayment = roundMoney(
       solvePayment(principal, monthlyRate, amortizationMonths),
     );
     const divisor = frequency === "ACCELERATED_BIWEEKLY" ? 2 : 4;
-    return round4(monthlyPayment / divisor);
+    return roundMoney(monthlyPayment / divisor);
   }
 
   const periodsPerYear = getPeriodsPerYear(frequency);
@@ -91,7 +90,7 @@ export function calculateMortgagePaymentAmount(
     isCanadian,
     isVariableRate,
   );
-  return round4(solvePayment(principal, periodicRate, totalPayments));
+  return roundMoney(solvePayment(principal, periodicRate, totalPayments));
 }
 
 /**
@@ -115,8 +114,8 @@ export function calculatePaymentForTerm(
     isCanadian,
     isVariableRate,
   );
-  if (periodicRate === 0) return round4(balance / periods);
-  return round4(
+  if (periodicRate === 0) return roundMoney(balance / periods);
+  return roundMoney(
     (balance * periodicRate) / (1 - Math.pow(1 + periodicRate, -periods)),
   );
 }
@@ -280,14 +279,14 @@ export function generateBudgetSchedule(
     rows.push({
       paymentNumber,
       date: rowDate,
-      payment: round2(regularPrincipal + interest),
-      principal: round2(regularPrincipal),
-      interest: round2(interest),
-      extraPrincipal: round2(overpayment),
-      balance: round2(balance),
-      annualRate: round4(currentAnnualRate),
-      cumulativePrincipal: round2(cumulativePrincipal),
-      cumulativeInterest: round2(cumulativeInterest),
+      payment: roundToCents(regularPrincipal + interest),
+      principal: roundToCents(regularPrincipal),
+      interest: roundToCents(interest),
+      extraPrincipal: roundToCents(overpayment),
+      balance: roundToCents(balance),
+      annualRate: roundToDecimals(currentAnnualRate, 4),
+      cumulativePrincipal: roundToCents(cumulativePrincipal),
+      cumulativeInterest: roundToCents(cumulativeInterest),
     });
 
     currentDate = advanceDate(currentDate, frequency);
@@ -297,13 +296,13 @@ export function generateBudgetSchedule(
   return {
     rows,
     payoffDate: paidOff && rows.length > 0 ? rows[rows.length - 1].date : null,
-    totalInterest: round2(cumulativeInterest - initialCumulativeInterest),
-    totalPaid: round2(totalPaid),
-    totalExtraPrincipal: round2(totalExtraPrincipal),
+    totalInterest: roundToCents(cumulativeInterest - initialCumulativeInterest),
+    totalPaid: roundToCents(totalPaid),
+    totalExtraPrincipal: roundToCents(totalExtraPrincipal),
     numPayments: rows.length,
     paidOff,
     coveredInterest,
-    finalPaymentAmount: round2(lastInstallment),
+    finalPaymentAmount: roundToCents(lastInstallment),
   };
 }
 
@@ -538,14 +537,14 @@ export function generateLoanSchedule(
     rows.push({
       paymentNumber,
       date: rowDate,
-      payment: round2(principal + interest),
-      principal: round2(principal),
-      interest: round2(interest),
-      extraPrincipal: round2(extraPrincipal),
-      balance: round2(balance),
-      annualRate: round4(currentAnnualRate),
-      cumulativePrincipal: round2(cumulativePrincipal),
-      cumulativeInterest: round2(cumulativeInterest),
+      payment: roundToCents(principal + interest),
+      principal: roundToCents(principal),
+      interest: roundToCents(interest),
+      extraPrincipal: roundToCents(extraPrincipal),
+      balance: roundToCents(balance),
+      annualRate: roundToDecimals(currentAnnualRate, 4),
+      cumulativePrincipal: roundToCents(cumulativePrincipal),
+      cumulativeInterest: roundToCents(cumulativeInterest),
     });
 
     currentDate = advanceDate(currentDate, frequency);
@@ -556,13 +555,13 @@ export function generateLoanSchedule(
   return {
     rows,
     payoffDate: paidOff && rows.length > 0 ? rows[rows.length - 1].date : null,
-    totalInterest: round2(cumulativeInterest - initialCumulativeInterest),
-    totalPaid: round2(totalPaid),
-    totalExtraPrincipal: round2(totalExtraPrincipal),
+    totalInterest: roundToCents(cumulativeInterest - initialCumulativeInterest),
+    totalPaid: roundToCents(totalPaid),
+    totalExtraPrincipal: roundToCents(totalExtraPrincipal),
     numPayments: rows.length,
     paidOff,
     coveredInterest,
-    finalPaymentAmount: round2(currentPayment),
+    finalPaymentAmount: roundToCents(currentPayment),
   };
 }
 

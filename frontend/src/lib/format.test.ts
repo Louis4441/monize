@@ -5,6 +5,8 @@ import {
   getDecimalPlacesForCurrency,
   roundToDecimals,
   roundToCents,
+  roundMoney,
+  withCurrencyCode,
   adaptiveFractionDigits,
   formatAmount,
   formatAmountWithCommas,
@@ -151,6 +153,37 @@ describe('roundToDecimals', () => {
   it('keeps sub-1e-6 precision when decimalPlaces is large enough', () => {
     expect(roundToDecimals(1e-7, 8)).toBe(1e-7);
     expect(roundToDecimals(1.23e-7, 9)).toBe(1.23e-7);
+  });
+});
+
+describe('roundMoney', () => {
+  it('rounds to money precision (4dp)', () => {
+    expect(roundMoney(1.23456)).toBe(1.2346);
+    expect(roundMoney(1.23454)).toBe(1.2345);
+    expect(roundMoney(99.99999)).toBe(100);
+    expect(roundMoney(100)).toBe(100);
+  });
+
+  it('rounds a midpoint half away from zero, as the backend roundMoney does', () => {
+    // 159.73545 * 10000 is 1597354.4999999998 in binary, so the plain
+    // Math.round(x * 10000) / 10000 the removed copies used gave 159.7354.
+    expect(roundMoney(159.73545)).toBe(159.7355);
+    expect(roundMoney(-159.73545)).toBe(-159.7355);
+    expect(roundMoney(1.49995)).toBe(1.5);
+  });
+});
+
+describe('withCurrencyCode', () => {
+  it('appends the code when the currency is not the reader\'s', () => {
+    expect(withCurrencyCode('$1,300.00', 'USD', 'CAD')).toBe('$1,300.00 USD');
+  });
+
+  it('leaves an amount in the reader\'s own currency alone', () => {
+    expect(withCurrencyCode('$1,300.00', 'CAD', 'CAD')).toBe('$1,300.00');
+  });
+
+  it('leaves an amount with no currency code alone', () => {
+    expect(withCurrencyCode('$1,300.00', '', 'CAD')).toBe('$1,300.00');
   });
 });
 

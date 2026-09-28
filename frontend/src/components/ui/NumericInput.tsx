@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, forwardRef, InputHTMLAttributes, Focu
 import { cn, inputBaseClasses, inputErrorClasses } from '@/lib/utils';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { filterNumberTyping, formatNumberForEdit, parseLocaleNumber } from '@/lib/number-parse';
+import { roundToDecimals } from '@/lib/format';
 
 interface NumericInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value' | 'type'> {
   label?: string;
@@ -84,12 +85,6 @@ export const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
     // Local display state - allows free typing
     const [displayValue, setDisplayValue] = useState(() => formatValue(value, decimalPlaces));
     const [isFocused, setIsFocused] = useState(false);
-
-    // Round to specified decimal places
-    function roundToDecimals(val: number, decimals: number): number {
-      const multiplier = Math.pow(10, decimals);
-      return Math.round(val * multiplier) / multiplier;
-    }
 
     // Parse input string to number, in the user's number convention.
     function parseValue(input: string): number | undefined {
