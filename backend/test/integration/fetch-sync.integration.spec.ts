@@ -178,9 +178,14 @@ describe("FetchSyncService (real PostgreSQL)", () => {
       return jest
         .spyOn(service, "claim")
         .mockImplementation(async (job, leaseMs) => {
-          const token = await claim(job, leaseMs);
-          if (++claimsSettled === 2) releaseBody();
-          return token;
+          // Counted in `finally` so a claim that throws still releases the
+          // winner's body: the test then fails on that error instead of
+          // leaving the body awaiting a claim that never settles.
+          try {
+            return await claim(job, leaseMs);
+          } finally {
+            if (++claimsSettled === 2) releaseBody();
+          }
         });
     });
 
