@@ -172,6 +172,7 @@
       "ref": "Ref: {number}",
       "investmentLabel": "Yatırım",
       "linkedInvestmentTitle": "Yatırımlarda Görüntüle",
+      "linkedInvestmentBadgeTitle": "Bu işlem bir yatırım işlemiyle bağlantılıdır",
       "filterByDate": "\"{date}\" tarihine göre filtrele",
       "filterByAccount": "\"{name}\" adına göre filtrele",
       "filterByPayee": "\"{name}\" adına göre filtrele",

@@ -144,6 +144,7 @@
   },
   "dateInput": {
     "shortcutsTitle": "Pintasan keyboard",
+    "openPicker": "Buka pemilih tanggal",
     "today": "Hari ini",
     "firstDayOfYear": "Hari pertama tahun ini",
     "lastDayOfYear": "Hari terakhir tahun ini",

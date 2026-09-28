@@ -172,6 +172,7 @@
       "ref": "Реф: {number}",
       "investmentLabel": "Інвестиція",
       "linkedInvestmentTitle": "Переглянути в Інвестиціях",
+      "linkedInvestmentBadgeTitle": "Ця транзакція пов'язана з інвестиційною транзакцією",
       "filterByDate": "Фільтрувати за датою «{date}»",
       "filterByAccount": "Фільтрувати за «{name}»",
       "filterByPayee": "Фільтрувати за «{name}»",

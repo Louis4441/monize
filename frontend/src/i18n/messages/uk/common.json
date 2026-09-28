@@ -144,6 +144,7 @@
   },
   "dateInput": {
     "shortcutsTitle": "Комбінації клавіш",
+    "openPicker": "Відкрити вибір дати",
     "today": "Сьогодні",
     "firstDayOfYear": "Перший день року",
     "lastDayOfYear": "Останній день року",

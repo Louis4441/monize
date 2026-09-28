@@ -144,6 +144,7 @@
   },
   "dateInput": {
     "shortcutsTitle": "Sneltoetsen",
+    "openPicker": "Datumkiezer openen",
     "today": "Vandaag",
     "firstDayOfYear": "Eerste dag van het jaar",
     "lastDayOfYear": "Laatste dag van het jaar",

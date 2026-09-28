@@ -144,6 +144,7 @@
   },
   "dateInput": {
     "shortcutsTitle": "キーボードショートカット",
+    "openPicker": "日付ピッカーを開く",
     "today": "今日",
     "firstDayOfYear": "年の初日",
     "lastDayOfYear": "年の最終日",

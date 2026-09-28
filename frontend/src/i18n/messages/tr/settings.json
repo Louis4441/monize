@@ -493,6 +493,15 @@
       "description": "Hesabınızdaki finansal verileri kaldırın. Bu işlem geri alınamaz.",
       "openButton": "Verileri Sil...",
       "alwaysDeletedHeading": "Aşağıdakiler her zaman silinecektir:",
+      "alwaysDeletedItems": {
+        "transactions": "Tüm işlemler ve bölünmeler",
+        "scheduled": "Tüm zamanlanmış/tekrarlayan işlemler",
+        "securities": "Tüm menkul kıymetler, fiyatlar, pozisyonlar ve yatırım işlemleri",
+        "budgets": "Tüm bütçeler ve bütçe uyarıları",
+        "monthlySummaries": "Aylık hesap bakiyesi özetleri",
+        "customReports": "Özel raporlar, etiketler ve içe aktarma eşlemeleri",
+        "actionHistory": "İşlem geçmişi (geri al/yeniden yap)"
+      },
       "optionalHeading": "İsteğe bağlı olarak ayrıca şunları silin:",
       "accountsOption": "Hesaplar",
       "categoriesOption": "Kategoriler",

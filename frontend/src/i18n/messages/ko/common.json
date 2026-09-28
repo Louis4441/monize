@@ -144,6 +144,7 @@
   },
   "dateInput": {
     "shortcutsTitle": "키보드 단축키",
+    "openPicker": "날짜 선택기 열기",
     "today": "오늘",
     "firstDayOfYear": "연도 첫째 날",
     "lastDayOfYear": "연도 마지막 날",

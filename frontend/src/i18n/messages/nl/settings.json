@@ -493,6 +493,15 @@
       "description": "Verwijder financiële gegevens uit jouw account. Dit kan niet ongedaan worden gemaakt.",
       "openButton": "Gegevens verwijderen...",
       "alwaysDeletedHeading": "Het volgende wordt altijd verwijderd:",
+      "alwaysDeletedItems": {
+        "transactions": "Alle transacties en splitsingen",
+        "scheduled": "Alle geplande/terugkerende transacties",
+        "securities": "Alle effecten, koersen, posities en beleggingstransacties",
+        "budgets": "Alle budgetten en budgetwaarschuwingen",
+        "monthlySummaries": "Maandelijkse rekeningsaldo-overzichten",
+        "customReports": "Aangepaste rapporten, tags en importtoewijzingen",
+        "actionHistory": "Actiegeschiedenis (ongedaan maken/opnieuw)"
+      },
       "optionalHeading": "Optioneel ook verwijderen:",
       "accountsOption": "Rekeningen",
       "categoriesOption": "Categorieën",

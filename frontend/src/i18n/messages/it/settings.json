@@ -493,6 +493,15 @@
       "description": "Rimuovi i dati finanziari dal tuo account. Questa operazione non può essere annullata.",
       "openButton": "Elimina dati...",
       "alwaysDeletedHeading": "Verrà sempre eliminato quanto segue:",
+      "alwaysDeletedItems": {
+        "transactions": "Tutte le transazioni e le suddivisioni",
+        "scheduled": "Tutte le transazioni pianificate/ricorrenti",
+        "securities": "Tutti i titoli, i prezzi, le posizioni e le transazioni di investimento",
+        "budgets": "Tutti i budget e gli avvisi di budget",
+        "monthlySummaries": "Riepiloghi mensili del saldo del conto",
+        "customReports": "Report personalizzati, tag e mappature di importazione",
+        "actionHistory": "Cronologia azioni (annulla/ripristina)"
+      },
       "optionalHeading": "Facoltativamente elimina anche:",
       "accountsOption": "Conti",
       "categoriesOption": "Categorie",

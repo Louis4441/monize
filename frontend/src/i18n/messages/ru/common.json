@@ -144,6 +144,7 @@
   },
   "dateInput": {
     "shortcutsTitle": "Сочетания клавиш",
+    "openPicker": "Открыть выбор даты",
     "today": "Сегодня",
     "firstDayOfYear": "Первый день года",
     "lastDayOfYear": "Последний день года",
