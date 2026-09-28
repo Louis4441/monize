@@ -10,7 +10,7 @@
  * - SGML tags may or may not have closing tags
  * - STMTTRN elements contain individual transactions
  * - DTPOSTED = date (YYYYMMDD or YYYYMMDDHHMMSS[.XXX:TZ])
- * - TRNAMT = amount (signed decimal)
+ * - TRNAMT = amount (signed decimal; a period or a comma separates the decimals)
  * - NAME = payee name
  * - MEMO = memo/description
  * - FITID = financial institution transaction ID
@@ -195,8 +195,11 @@ export function parseOfx(content: string): QifParseResult {
       sampleDates.push(dateStr.substring(0, 8));
     }
 
+    // The OFX specification lets an amount use a comma as its decimal
+    // separator and allows no digit grouping, so "-18,36" is -18.36; a bare
+    // parseFloat stopped at the comma and imported -18.
     const amountStr = getTagValue(block, "TRNAMT");
-    const amount = parseFloat(amountStr);
+    const amount = parseFloat(amountStr.replace(",", "."));
     if (isNaN(amount)) continue;
 
     const trnType = getTagValue(block, "TRNTYPE").toUpperCase();

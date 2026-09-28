@@ -545,6 +545,11 @@ describe("OFX Parser", () => {
       expect(result.transactions[0].amount).toBe(101.0);
     });
 
+    it("parses a comma as the decimal separator (-18,36 -> -18.36)", () => {
+      const result = parseOfx(buildOfxWithAmount("-18,36"));
+      expect(result.transactions[0].amount).toBe(-18.36);
+    });
+
     it("skips transactions with non-numeric amounts", () => {
       const result = parseOfx(buildOfxWithAmount("abc"));
       expect(result.transactions).toHaveLength(0);

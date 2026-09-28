@@ -25,6 +25,7 @@
  */
 
 import { applyQifClearedField } from "./qif-status.util";
+import { normalizeAmountSeparators } from "./amount-separators.util";
 
 export interface QifTransaction {
   date: string;
@@ -628,8 +629,9 @@ function parseQifDate(dateStr: string, format?: DateFormat): string {
 }
 
 function parseQifAmount(amountStr: string): number | null {
-  // Remove currency symbols, spaces, and commas
-  const cleaned = amountStr.replace(/[$£€,\s]/g, "");
+  // Remove currency symbols and spaces, then read the grouping and decimal
+  // separators the way the CSV import does ("1,234.56", "-18,36").
+  const cleaned = normalizeAmountSeparators(amountStr.replace(/[$£€\s]/g, ""));
   const amount = parseFloat(cleaned);
   return isNaN(amount) ? null : amount;
 }
