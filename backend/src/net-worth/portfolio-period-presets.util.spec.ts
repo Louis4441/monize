@@ -27,3 +27,27 @@ describe("presetWindowStart", () => {
     expect(presetWindowStart("all", "2026-09-26")).toBeNull();
   });
 });
+
+/**
+ * The day each range is measured from, on Monday 28 September 2026. The
+ * client's chart window (`portfolio-range-window.test.ts`) pins the same
+ * table for the same day: a chart opens its series on the close its figures
+ * are measured from, so the two files must not drift apart (issue #1461).
+ */
+describe("presetEarliestDate", () => {
+  it("is the day the chart window opens on, for every preset the chart offers", () => {
+    const today = "2026-09-28";
+    expect(presetEarliestDate("1w", today)).toBe("2026-09-20");
+    expect(presetEarliestDate("1m", today)).toBe("2026-08-29");
+    expect(presetEarliestDate("3m", today)).toBe("2026-06-30");
+    expect(presetEarliestDate("ytd", today)).toBe("2025-12-31");
+    expect(presetEarliestDate("1y", today)).toBe("2025-09-28");
+    expect(presetEarliestDate("2y", today)).toBe("2024-09-28");
+    expect(presetEarliestDate("5y", today)).toBe("2021-09-28");
+  });
+
+  it("steps a leap-day anniversary back to 28 February", () => {
+    expect(presetEarliestDate("1y", "2028-02-29")).toBe("2027-02-28");
+    expect(presetEarliestDate("5y", "2028-02-29")).toBe("2023-02-28");
+  });
+});

@@ -14,8 +14,16 @@ const dateRangeState = { dateRange: '1y', resolvedRange: { start: '2023-01-01', 
 
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: any) => <div data-testid="responsive-container">{children}</div>,
-  AreaChart: ({ children, margin }: any) => (
-    <div data-testid="area-chart" data-margin={JSON.stringify(margin)}>{children}</div>
+  // `data-points` carries the rows the chart was handed, so a test can see
+  // what is plotted rather than only what the cards say.
+  AreaChart: ({ children, margin, data }: any) => (
+    <div
+      data-testid="area-chart"
+      data-margin={JSON.stringify(margin)}
+      data-points={JSON.stringify(data ?? [])}
+    >
+      {children}
+    </div>
   ),
   // Invoke the dot render-prop so the high/low value bubbles (and their dismiss
   // controls) are exercised; indices 0..2 cover both extremes of the test
@@ -251,6 +259,36 @@ describe('InvestmentValueChart', () => {
       );
       // And no marker to hover: the line replaced it.
       expect(screen.queryByText(/Measured from the previous trading day/)).toBeNull();
+    });
+
+    it('dates the opening point by that session, not by the boundary it was requested on', async () => {
+      // 1Y on Monday 28 September 2026 is measured from Sunday the 28th a
+      // year earlier, whose value is Friday the 26th's close. The series is
+      // requested from the Sunday; its first point is shown as the Friday the
+      // caption names, so the two cannot disagree about where the year opens.
+      vi.mocked(netWorthApi.getInvestmentsDaily).mockResolvedValue([
+        { date: '2025-09-28', value: 10000 },
+        { date: '2025-09-29', value: 10100 },
+        { date: '2026-09-28', value: 15000 },
+      ]);
+      vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockResolvedValue(
+        periodResult({ startDate: '2025-09-28', startPriceDate: '2025-09-26' }),
+      );
+      render(<InvestmentValueChart />);
+      await screen.findByText('Portfolio Value Over Time');
+
+      await waitFor(() =>
+        expect(screen.getByTestId('measured-from-close')).toHaveTextContent(
+          'Since the close of trading on Sep 26, 2025',
+        ),
+      );
+      const names = () =>
+        JSON.parse(
+          screen.getByTestId('area-chart').getAttribute('data-points') ?? '[]',
+        ).map((p: { name: string }) => p.name);
+      await waitFor(() =>
+        expect(names()).toEqual(['Sep 26, 2025', 'Sep 29, 2025', 'Sep 28, 2026']),
+      );
     });
 
     it('says nothing when the server could not name a session', async () => {
@@ -893,12 +931,14 @@ describe('InvestmentValueChart', () => {
     });
 
     /**
-     * The window a price chart requests is not the period the range names: 1Y
-     * opens on the close of the day *before* the anniversary, so on
-     * 12 Aug 2026 the first point is 11 Aug 2025. The clock is pinned because
+     * The series is requested from the day the server measures 1Y from: the
+     * same day a year earlier (`presetEarliestDate`), not the month-aligned
+     * start `useDateRange` resolved and not the day before the anniversary,
+     * which is where the chart used to open while the figures under it were
+     * measured from a day later (issue #1461). The clock is pinned because
      * otherwise this is a test about the day it ran.
      */
-    it('opens 1Y on the day before the anniversary, not on useDateRange start', async () => {
+    it('opens 1Y on the anniversary the figures are measured from, not on useDateRange start', async () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date(2026, 7, 12));
       try {
@@ -920,7 +960,7 @@ describe('InvestmentValueChart', () => {
       }
       await waitFor(() =>
         expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledWith(
-          expect.objectContaining({ startDate: '2025-08-11' }),
+          expect.objectContaining({ startDate: '2025-08-12' }),
         )
       );
     });

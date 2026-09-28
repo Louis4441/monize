@@ -44,6 +44,32 @@ export function previousCalendarDay(iso: string): string {
 }
 
 /**
+ * The session a series' opening point is dated by, or null when the point's
+ * own date already names it.
+ *
+ * A daily series is requested from the day the period is measured from
+ * (`usePortfolioRangeWindow`'s `start`), and the series values every calendar
+ * day from the latest close on or before it, so a window opening on a Sunday
+ * carries Friday's close under Sunday's date. The caption under the chart
+ * names the session (`startPriceDate`); a first point labelled with the
+ * boundary names a day the market was shut, and the two disagree about where
+ * the same series opens. The point is the fact the server stated -- one
+ * value, one session -- so it is dated by that session. Only the point that
+ * opens the period's own window qualifies: an intraday series opens on a
+ * closing point the server already dated, and a monthly series' first bucket
+ * is a month, not a day.
+ */
+export function openingSessionDate(
+  firstPointIso: string | undefined,
+  periodResult: { startDate: string; startPriceDate?: string | null } | null,
+): string | null {
+  if (!periodResult?.startPriceDate) return null;
+  if (periodResult.startPriceDate === periodResult.startDate) return null;
+  if (isoDatePart(firstPointIso) !== periodResult.startDate) return null;
+  return periodResult.startPriceDate;
+}
+
+/**
  * The date part of a chart point. Daily points already carry a YYYY-MM-DD
  * date; intraday points carry a full ISO timestamp, whose date half is taken
  * as-is (UTC), matching how the MTD range filters its own intraday points.

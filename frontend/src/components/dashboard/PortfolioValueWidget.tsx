@@ -25,6 +25,7 @@ import { useWidgetConfig } from '@/hooks/useWidgetConfig';
 import { resolveRangePreset } from '@/lib/date-range';
 import { usePortfolioRangeWindow } from '@/hooks/usePortfolioRangeWindow';
 import { usePortfolioPeriodResult } from '@/hooks/usePortfolioPeriodResult';
+import { openingSessionDate } from '@/components/investments/portfolio-change-baseline';
 import {
   hasUnmeasuredFlow,
   periodResultUnknownReason,
@@ -88,7 +89,7 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
   // A price series opens on the close it is measured from, not on the period
   // boundary the range names -- see `portfolio-range-window.ts`. Shared with
   // the Portfolio Value report and the Investments chart so all three agree.
-  const { start, end } = usePortfolioRangeWindow({
+  const { start, periodStart, end } = usePortfolioRangeWindow({
     range: config.range,
     base: baseWindow,
   });
@@ -144,37 +145,42 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
     void triggerManualRefresh(scope);
   }, [config.accountIds, summary, triggerManualRefresh]);
 
-  const chartData = useMemo(
-    () =>
-      (series ?? []).map((row) => {
-        const parsed = parseISO(row.date.length === 7 ? `${row.date}-01` : row.date);
-        return {
-          date: row.date,
-          label: formatChartDate(parsed, isDaily ? 'MMM d' : 'MMM yyyy'),
-          value: Math.round(row.value),
-        };
-      }),
-    [series, formatChartDate, isDaily],
-  );
-
   const totalPortfolioValue = summary?.totalPortfolioValue ?? null;
 
   // What the portfolio DID over this window, as the server worked it out. A
   // change read off the plotted series counts the reader's own deposits as
   // performance (INV-PORTRESULT-001), so nothing here subtracts two points: the
   // widget asks the same endpoint the Portfolio Value report reads, for the
-  // same scope, and prints what comes back. The window it DRAWS opens earlier
-  // than the period its range names, so the range is named rather than dated
-  // and the server resolves it.
+  // same scope, and prints what comes back. A range the server has a preset
+  // for is named rather than dated and the server resolves it; the series
+  // above was requested from the day that preset is measured from.
   const { periodResult } = usePortfolioPeriodResult({
     range: config.range,
     startDate: start,
+    periodStartDate: periodStart,
     endDate: end,
-    firstPointIso: series?.[0]?.date,
-    hasSeries: chartData.length > 0,
+    hasSeries: (series?.length ?? 0) > 0,
     accountIds: accountIdsCsv,
     displayCurrency: defaultCurrency,
   });
+
+  // The opening point is dated by the session its close came from, which is
+  // the session the period result is measured from, rather than by a boundary
+  // the market was shut on (`openingSessionDate`).
+  const openingSession = openingSessionDate(series?.[0]?.date, periodResult);
+  const chartData = useMemo(
+    () =>
+      (series ?? []).map((row, index) => {
+        const date = index === 0 && openingSession ? openingSession : row.date;
+        const parsed = parseISO(date.length === 7 ? `${date}-01` : date);
+        return {
+          date: row.date,
+          label: formatChartDate(parsed, isDaily ? 'MMM d' : 'MMM yyyy'),
+          value: Math.round(row.value),
+        };
+      }),
+    [series, formatChartDate, isDaily, openingSession],
+  );
 
   // The widget plots the invested value, so its headline reads the invested
   // part's own figures -- the same measure the Investments page's performance

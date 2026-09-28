@@ -113,6 +113,7 @@ import {
   hasUnmeasuredFlow,
   periodResultUnknownReason,
 } from '@/components/investments/portfolio-period-result';
+import { openingSessionDate } from '@/components/investments/portfolio-change-baseline';
 import {
   investedValue,
   breakdownCashKey,
@@ -232,7 +233,7 @@ export function PortfolioValueReport() {
   // zero (#1389). The chart breaks instead (`connectNulls={false}`), the table
   // and the CSV print it as unavailable, and `IncompleteDataDetails` names the
   // cause beside the withheld KPIs.
-  const [chartPoints, setChartPoints] = useState<
+  const [loadedPoints, setLoadedPoints] = useState<
     Array<{ name: string; Value: number | null; iso: string; complete?: boolean }>
   >([]);
   const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
@@ -264,7 +265,7 @@ export function PortfolioValueReport() {
     'monize-reports-portfolio-value-series-mode',
     'total',
   );
-  const [breakdown, setBreakdown] = useState<SecuritiesBreakdown | null>(null);
+  const [loadedBreakdown, setBreakdown] = useState<SecuritiesBreakdown | null>(null);
   // High/low value bubbles the user has temporarily dismissed, keyed by the
   // value they marked so a later data change with a new extreme shows the
   // bubble again. Component-local (not persisted), so it resets on navigation.
@@ -351,10 +352,10 @@ export function PortfolioValueReport() {
   // securities view drive it off the loaded breakdown's kind (which reflects
   // any intraday->daily fallback) rather than the range's own flags.
   const axisIntraday = securitiesActive
-    ? breakdown?.kind === 'intraday'
+    ? loadedBreakdown?.kind === 'intraday'
     : isIntraday;
   const axisDaily = securitiesActive
-    ? breakdown?.kind === 'daily'
+    ? loadedBreakdown?.kind === 'daily'
     : useDaily;
 
   const selectedAccount = isSingleAccount
@@ -417,7 +418,7 @@ export function PortfolioValueReport() {
       if (useDaily || isIntraday) {
         const data = await netWorthApi.getInvestmentsDaily(params);
         if (loadSeqRef.current !== seq) return;
-        setChartPoints(
+        setLoadedPoints(
           data.map((d) => {
             // A day short of a price or a rate is a subtotal; the KPIs below
             // refuse to name it a high, a low or a change, and the chart
@@ -439,7 +440,7 @@ export function PortfolioValueReport() {
       } else {
         const data = await netWorthApi.getInvestmentsMonthly(params);
         if (loadSeqRef.current !== seq) return;
-        setChartPoints(
+        setLoadedPoints(
           data.map((d) => ({
             name: formatChartDate(d.month, 'MMM yyyy'),
             Value: investedValue(d),
@@ -509,7 +510,7 @@ export function PortfolioValueReport() {
           })),
         ),
       );
-      setChartPoints(
+      setLoadedPoints(
         points.map((p) => ({
           name: p.name,
           Value: p.complete ? p.invested : null,
@@ -541,7 +542,7 @@ export function PortfolioValueReport() {
       if (data.fallbackToDaily) {
         if (dateRange === '1d') {
           setBreakdown(null);
-          setChartPoints([]);
+          setLoadedPoints([]);
           setIntradayUnavailable({ skipped: data.skippedSymbols });
         } else {
           setIntradayFallbackNotice({ skipped: data.skippedSymbols });
@@ -554,7 +555,7 @@ export function PortfolioValueReport() {
       const points = trimIntradayPoints(
         data.points,
         dateRange,
-        chartWindow.start,
+        chartWindow.periodStart,
       ).map((p) => ({
         name: formatIntradayLabel(p.timestamp, dateRange),
         iso: p.timestamp,
@@ -564,7 +565,7 @@ export function PortfolioValueReport() {
       }));
       setBreakdown({ series: data.series, points, kind: 'intraday' });
       setIncompleteCauses(NO_INCOMPLETE_DATA);
-      setChartPoints(
+      setLoadedPoints(
         points.map((p) => ({ name: p.name, Value: p.invested, iso: p.iso })),
       );
     };
@@ -606,8 +607,8 @@ export function PortfolioValueReport() {
           );
           const cached = readIntradayCache(cacheKey);
           if (cached && !cached.fallbackToDaily) {
-            setChartPoints(
-              trimIntradayPoints(cached.points, dateRange, chartWindow.start).map((p) => ({
+            setLoadedPoints(
+              trimIntradayPoints(cached.points, dateRange, chartWindow.periodStart).map((p) => ({
                 name: formatIntradayLabel(p.timestamp, dateRange),
                 Value: investedValue(p),
                 iso: p.timestamp,
@@ -647,7 +648,7 @@ export function PortfolioValueReport() {
           if (response.fallbackToDaily) {
             if (dateRange === '1d') {
               // No sensible daily fallback for a single-day chart.
-              setChartPoints([]);
+              setLoadedPoints([]);
               setIntradayUnavailable({ skipped: response.skippedSymbols });
             } else {
               // 1W / MTD / 1M silently fall back to the daily endpoint, with a
@@ -657,8 +658,8 @@ export function PortfolioValueReport() {
               await loadDailyOrMonthly();
             }
           } else {
-            setChartPoints(
-              trimIntradayPoints(response.points, dateRange, chartWindow.start).map(
+            setLoadedPoints(
+              trimIntradayPoints(response.points, dateRange, chartWindow.periodStart).map(
                 (p) => ({
                   name: formatIntradayLabel(p.timestamp, dateRange),
                   Value: investedValue(p),
@@ -720,13 +721,41 @@ export function PortfolioValueReport() {
   const { periodResult } = usePortfolioPeriodResult({
     range: dateRange,
     startDate: isValid ? chartWindow.start : '',
+    periodStartDate: isValid ? chartWindow.periodStart : '',
     endDate: chartWindow.end,
-    firstPointIso: chartPoints[0]?.iso,
-    hasSeries: chartPoints.length > 0,
+    hasSeries: loadedPoints.length > 0,
     accountIds: periodAccountIdsCsv,
     displayCurrency: foreignCurrency || undefined,
     reloadKey,
   });
+
+  // The series as drawn, in both views. It was requested from the day the
+  // period is measured from, and its opening point is dated by the session
+  // that day's close came from -- the session the caption under the chart
+  // names -- rather than by a boundary the market was shut on
+  // (`openingSessionDate`). The stacked view's points open on the same day.
+  const openingSession = openingSessionDate(loadedPoints[0]?.iso, periodResult);
+  const chartPoints = useMemo(() => {
+    if (!openingSession) return loadedPoints;
+    const [first, ...rest] = loadedPoints;
+    return [
+      { ...first, name: formatChartDate(openingSession, 'MMM d, yyyy') },
+      ...rest,
+    ];
+  }, [loadedPoints, openingSession, formatChartDate]);
+  const breakdown = useMemo(() => {
+    if (!openingSession || !loadedBreakdown || loadedBreakdown.points.length === 0) {
+      return loadedBreakdown;
+    }
+    const [first, ...rest] = loadedBreakdown.points;
+    return {
+      ...loadedBreakdown,
+      points: [
+        { ...first, name: formatChartDate(openingSession, 'MMM d, yyyy') },
+        ...rest,
+      ],
+    };
+  }, [loadedBreakdown, openingSession, formatChartDate]);
 
   const summary = useMemo(() => {
     if (chartPoints.length === 0) {

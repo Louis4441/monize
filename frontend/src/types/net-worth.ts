@@ -304,6 +304,8 @@ export interface IntradayBreakdownPoint {
   timestamp: string;
   total: number;
   values: Record<string, number>;
+  /** Set on a session's closing point; see `getIntradayValue`. */
+  sessionClose?: true;
 }
 
 export interface IntradayBreakdown {

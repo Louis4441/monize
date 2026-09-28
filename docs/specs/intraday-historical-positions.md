@@ -67,11 +67,23 @@ a six-figure position.
 5. **The security set is every security held on any day of the window**, not
    the set held today, so a position sold mid-window keeps its bars up to the
    sale and is zero after it.
-6. **The previous day's close stays the baseline.** Nothing here removes the
-   first day's closing point; the 1M chart collapses its first day to that point
-   (`trimIntradayToFirstDayClose`), and 1D / 1W / MTD measure their change from
-   the prior close through the period-result service. Both now read a closing
-   figure that equals the daily series.
+6. **The series opens on the close the range is measured from.** A 1W and a
+   1M series begin with the closing point of the day the period-result service
+   measures the same range from (`presetEarliestDate`: the day before the
+   window for 1W, the window's first day for 1M), carrying that ledger day's
+   daily figure -- the period result's own opening value -- and dated on the
+   session that figure came from (`getLastPricedDays`, the lookup behind
+   `startPriceDate`). The day's own bars precede that close and are not in the
+   series, so a 1M window opening on a session shows that session's close, not
+   its morning, and a window opening on a weekend opens on Friday's close dated
+   Friday. The point is stamped one grid step after the session's last fetched
+   bar; when the provider's month of bars did not reach the session, at the
+   hour the newest finished session in the window closed at. A measured-from
+   day whose figure is a subtotal gets no opening point (rule 2's refusal), and
+   the series opens on its first bar. Closing points, this one included, carry
+   `sessionClose: true`; MTD is trimmed on the client to its month and keeps
+   the one closing point before it (`trimIntradayPoints`). 1D opens at the
+   open. (Issue #1461.)
 
 ## 3. Numerical examples
 
@@ -112,3 +124,8 @@ series' Aug 28 total ($930,475.80).
 | No-intraday holding | each day valued at that day's close, not a flat latest close |
 | Today's session | no synthetic close point after its last bar |
 | Breakdown view | the close point carries per-security bands at the daily closes, summing to the daily total within rounding |
+| 1W on a Monday | opens on Friday's closing point with Sunday's (the measured-from day's) figure, flagged `sessionClose`; Friday's bars absent; `getLastPricedDays` asked for the Sunday |
+| 1M opening on a Saturday, no bars that far back | opens on Friday's close stamped at the hour the newest finished session closed |
+| 1M opening on a session | that session's close first, its bars dropped |
+| Measured-from day incomplete | no opening point, no session lookup; the first bar opens the series |
+| Breakdown view | opens on the same point, each position at its daily close |

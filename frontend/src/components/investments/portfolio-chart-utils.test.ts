@@ -57,8 +57,51 @@ describe('trimIntradayPoints', () => {
     ).toContain('2026-08-01T13:30:00.000Z');
   });
 
+  /**
+   * The month is measured from the previous session's close, which the server
+   * flags as a closing point at the end of that session. It is the point the
+   * chart opens on, so the caption "since the close of trading on the 31st"
+   * and the first point on screen name one session (issue #1461).
+   */
+  it('keeps the closing point the month is measured from', () => {
+    const series = [
+      { timestamp: '2026-07-31T13:30:00.000Z', value: 1 },
+      { timestamp: '2026-07-31T19:45:00.000Z', value: 2 },
+      { timestamp: '2026-07-31T20:00:00.000Z', value: 3, sessionClose: true as const },
+      { timestamp: '2026-08-03T13:30:00.000Z', value: 4 },
+    ];
+    expect(trimIntradayPoints(series, 'mtd', '2026-08-01')).toEqual([
+      series[2],
+      series[3],
+    ]);
+  });
+
+  it('never opens on a bar of the previous month in the close\'s place', () => {
+    // The last point before the window is a 15:45 bar, not a close: the
+    // previous session's figure was a subtotal and got no closing point.
+    const series = [
+      { timestamp: '2026-07-31T19:45:00.000Z', value: 2 },
+      { timestamp: '2026-08-03T13:30:00.000Z', value: 4 },
+    ];
+    expect(trimIntradayPoints(series, 'mtd', '2026-08-01')).toEqual([
+      series[1],
+    ]);
+  });
+
+  it('keeps only the opening close when nothing falls inside the window yet', () => {
+    const series = [
+      { timestamp: '2026-07-31T20:00:00.000Z', value: 3, sessionClose: true as const },
+    ];
+    expect(trimIntradayPoints(series, 'mtd', '2026-08-01')).toEqual(series);
+  });
+
+  /**
+   * 1D, 1W and 1M arrive already shaped: the server trims them to their
+   * window and opens 1W and 1M on the close they are measured from
+   * (`PortfolioService.planOpeningClose`). Nothing here second-guesses it.
+   */
   it('leaves the other ranges alone -- their series is already the window', () => {
-    for (const range of ['1d', '1w']) {
+    for (const range of ['1d', '1w', '1m']) {
       expect(trimIntradayPoints(points, range, '2026-08-01')).toBe(points);
     }
   });
@@ -66,81 +109,9 @@ describe('trimIntradayPoints', () => {
   it('does not trim without a window start', () => {
     expect(trimIntradayPoints(points, 'mtd', '')).toBe(points);
   });
-});
-
-/**
- * A 1D chart opens at the day's open, which is what every quote source shows.
- * A 1M chart is a different claim: the month is measured from a close, so
- * opening partway through the session a month ago mixes a mid-session price
- * into a series of closes and reports a change covering part of a session
- * nobody asked about.
- */
-describe('trimIntradayToFirstDayClose (via trimIntradayPoints)', () => {
-  const session = (day: string, times: string[], from = 0) =>
-    times.map((t, i) => ({
-      timestamp: `${day}T${t}:00.000Z`,
-      value: from + i,
-    }));
-
-  it('drops every bar of the first day except its last', () => {
-    const points = [
-      ...session('2026-07-13', ['13:30', '15:00', '19:59'], 10),
-      ...session('2026-07-14', ['13:30', '19:59'], 20),
-    ];
-
-    expect(trimIntradayPoints(points, '1m', '')).toEqual([
-      points[2],
-      points[3],
-      points[4],
-    ]);
-  });
-
-  it('leaves later days untouched, however many bars they have', () => {
-    const points = [
-      ...session('2026-07-13', ['13:30', '19:59'], 10),
-      ...session('2026-07-14', ['13:30', '15:00', '19:59'], 20),
-    ];
-
-    expect(trimIntradayPoints(points, '1m', '').length).toBe(4);
-  });
-
-  /**
-   * Collapsing a single-day series would leave one point and no chart, so the
-   * series is kept whole. It cannot be wrong in the way this guards against:
-   * with one day there is no earlier close to measure from either way.
-   */
-  it('leaves a one-day series alone', () => {
-    const points = session('2026-07-13', ['13:30', '15:00', '19:59']);
-    expect(trimIntradayPoints(points, '1m', '')).toBe(points);
-  });
-
-  it('is a no-op when the first day already has one bar', () => {
-    const points = [
-      ...session('2026-07-13', ['19:59']),
-      ...session('2026-07-14', ['13:30', '19:59'], 20),
-    ];
-    expect(trimIntradayPoints(points, '1m', '')).toBe(points);
-  });
 
   it('handles an empty series', () => {
-    expect(trimIntradayPoints([], '1m', '')).toEqual([]);
-  });
-
-  /**
-   * 1W and MTD are measured from the prior close already
-   * (`PRIOR_CLOSE_BASELINE_RANGES`), so their first bar is not the baseline and
-   * collapsing it would only throw away detail.
-   */
-  it('does not touch 1D, 1W or MTD', () => {
-    const points = [
-      ...session('2026-07-13', ['13:30', '15:00', '19:59'], 10),
-      ...session('2026-07-14', ['13:30', '19:59'], 20),
-    ];
-    for (const range of ['1d', '1w']) {
-      expect(trimIntradayPoints(points, range, '')).toBe(points);
-    }
-    // MTD still gets its own window trim, and nothing else.
-    expect(trimIntradayPoints(points, 'mtd', '2026-07-13').length).toBe(5);
+    expect(trimIntradayPoints([], 'mtd', '2026-08-01')).toEqual([]);
   });
 });
 

@@ -1231,7 +1231,10 @@ Statement           A bar of the 1D / 1W / MTD / 1M Portfolio Value series on
                     balance. Every finished session in the window ends on one
                     closing point, one grid step after its last bar, whose value
                     and securitiesValue are getDailyInvestments' figures for D.
-                    Today's session is live and has no closing point.
+                    A 1W / 1M series opens on the closing point of the day the
+                    period-result service measures the range from, dated on
+                    the session that close came from. Today's session is live
+                    and has no closing point.
 Source of truth     the daily investment fold (NetWorthService.foldDailyInvestments):
                     applyActionToQuantity over the ledger, loadDailyCashBalances,
                     positionCloseAsOf
@@ -1240,20 +1243,25 @@ Enforcement         One fold, two readers. getDailyInvestmentPositions returns
                     closes, close values and cash it recorded while folding;
                     PortfolioService.loadIntradayData values each bar from the
                     entry for the bar's UTC day and inserts the closing points
-                    (planSessionCloses). The security set is every security held
-                    on any day of the window, so a position sold mid-window keeps
-                    its bars up to the sale.
+                    (planSessionCloses, planOpeningClose; the window and the
+                    measured-from day are presetWindowStart and
+                    presetEarliestDate, the period result's own arithmetic).
+                    The security set is every security held on any day of the
+                    window, so a position sold mid-window keeps its bars up to
+                    the sale.
 Concurrency scope   --
 Failure response    A day the daily series could not value completely
                     (pricesComplete, fxComplete or cashComplete false) gets no
-                    closing point; its bars stand. A holding with no intraday
-                    bars is valued per day at that day's quantity and close.
+                    closing point; its bars stand, and a measured-from day in
+                    that state gives the series no opening point. A holding
+                    with no intraday bars is valued per day at that day's
+                    quantity and close.
 Required tests      portfolio.service.spec.ts "intraday series on the ledger's
                     per-day positions" (a buy and a deposit mid-window, a sale
                     mid-window, the XGRO Sep 2 closing point, a no-bars holding,
                     today's live session, an incomplete day, the breakdown's
-                    closing point); net-worth.service.spec.ts
-                    getDailyInvestmentPositions.
+                    closing point) and "the close the series opens on";
+                    net-worth.service.spec.ts getDailyInvestmentPositions.
 Status              enforced
 ```
 

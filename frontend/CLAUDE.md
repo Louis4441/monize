@@ -50,6 +50,7 @@ npm run i18n:check         # Verify the pseudo-locale is up to date (CI gate)
 | Row density | `useDensityPreference(view)` and `DensityToggle` | a local density `useState` or a second store |
 | Scheduled occurrence amount, date, account | `nextOccurrenceEffectiveAmount`, `nextOccurrenceDueDate`, `occurrenceSettlementAccountId` (`lib/scheduled-effective-amount.ts`) | `nextOverride?.amount ?? amount`, `nextDueDate`, `st.accountId` |
 | Reporting currency fallback | `preferredCurrency` (`lib/default-currency.ts`) | `pref?.defaultCurrency \|\| 'USD'` |
+| A portfolio chart's window and opening point | `usePortfolioRangeWindow` (`start` for the series, `periodStart` for the period) and `openingSessionDate` for the first label | `resolveRangePreset`, a lookback of your own, a first point dated by a day the market was shut |
 | An investment row's money | the row's own `amountCurrencyCode` / `priceCurrencyCode` / `commissionCurrencyCode` | the account's currency, the reader's, or a client-side sum across rows |
 | CSV | `exportToCsv` / `exportCsvSections` (`lib/csv-export.ts`) | a second `text/csv` Blob |
 | Random id | `crypto.randomUUID()` | `Math.random()` |

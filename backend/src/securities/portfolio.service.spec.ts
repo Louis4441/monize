@@ -51,6 +51,9 @@ describe("PortfolioService", () => {
     getDailyInvestmentPositions: jest.MockedFunction<
       NetWorthService["getDailyInvestmentPositions"]
     >;
+    getLastPricedDays: jest.MockedFunction<
+      NetWorthService["getLastPricedDays"]
+    >;
   };
 
   const userId = "user-1";
@@ -358,6 +361,7 @@ describe("PortfolioService", () => {
         positions: [],
         securities: new Map(),
       }),
+      getLastPricedDays: jest.fn().mockResolvedValue(new Map()),
     };
 
     service = new PortfolioService(
@@ -5312,6 +5316,270 @@ describe("PortfolioService", () => {
       expect(close.values[xcns.id]).toBe(800);
       expect(close.values.cash).toBe(50);
       expect(close.total).toBe(1230);
+      expect(close.sessionClose).toBe(true);
+      expect(bars.sessionClose).toBeUndefined();
+    });
+
+    /**
+     * The series opens on the close the range is measured from, dated on the
+     * session that close came from -- the same day and the same figure the
+     * period-result service reports for the range, so the chart's first point
+     * and its "since the close of trading on" caption agree (issue #1461).
+     */
+    describe("the close the series opens on", () => {
+      // Monday 28 September 2026, the day the issue was reported on. 1W is
+      // served at five-minute bars, so its sessions end on a 19:55 bar and
+      // close at 20:00.
+      const monday = "2026-09-28T14:00:00.000Z";
+      const day = (
+        date: string,
+        value: number,
+        extra: Partial<DayFixture> = {},
+      ): DayFixture => ({
+        date,
+        quantities: { [xgro.id]: 10 },
+        closes: { [xgro.id]: value / 10 },
+        closeValues: { [xgro.id]: value },
+        value,
+        securitiesValue: value,
+        ...extra,
+      });
+
+      it("opens 1W on the prior session's close, from the day the period is measured from", async () => {
+        jest.setSystemTime(new Date(monday));
+        // 1W opens on the 21st and is measured from the 20th (a Sunday),
+        // whose figure is Friday the 18th's close. The 20th is given its own
+        // figure here so the test can tell which day was read.
+        netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+          ledgerOf(
+            [
+              day("2026-09-18", 380),
+              day("2026-09-19", 380),
+              day("2026-09-20", 381),
+              day("2026-09-21", 390),
+            ],
+            [xgro],
+          ),
+        );
+        netWorthService.getLastPricedDays.mockResolvedValue(
+          new Map([["2026-09-20", "2026-09-18"]]),
+        );
+        seriesBySymbol({
+          "XGRO.TO": [
+            bar("2026-09-18T19:30:00.000Z", 37.9),
+            bar("2026-09-18T19:55:00.000Z", 38),
+            bar("2026-09-21T13:30:00.000Z", 38.5),
+            bar("2026-09-21T19:55:00.000Z", 39),
+          ],
+        });
+
+        const result = await service.getIntradayValueSeries(userId, {
+          range: "1w",
+        });
+
+        expect(result.points.map((p) => p.timestamp)).toEqual([
+          "2026-09-18T20:00:00.000Z",
+          "2026-09-21T13:30:00.000Z",
+          "2026-09-21T19:55:00.000Z",
+          "2026-09-21T20:00:00.000Z",
+        ]);
+        // Friday's close carries the measured-from day's figure, flagged as
+        // a close; Friday's own bars are not in a one-week window.
+        expect(result.points[0]).toEqual({
+          timestamp: "2026-09-18T20:00:00.000Z",
+          value: 381,
+          securitiesValue: 381,
+          sessionClose: true,
+        });
+        expect(result.points[1].sessionClose).toBeUndefined();
+        // The session is the period result's own lookup, for the same day.
+        expect(netWorthService.getLastPricedDays).toHaveBeenCalledWith(
+          userId,
+          ["2026-09-20"],
+          undefined,
+        );
+        // The ledger reaches back to the measured-from day.
+        expect(
+          netWorthService.getDailyInvestmentPositions,
+        ).toHaveBeenCalledWith(
+          userId,
+          expect.objectContaining({
+            startDate: "2026-09-20",
+            endDate: "2026-09-28",
+          }),
+        );
+      });
+
+      it("dates a 1M window that opens on a weekend by the session before it, at the hour the window's sessions close", async () => {
+        jest.setSystemTime(new Date(monday));
+        // 1M opens on Saturday 29 August and is measured from it; the close
+        // is Friday the 28th's, which the provider's month of bars did not
+        // reach, so the point is stamped at the hour the newest finished
+        // session closed at.
+        netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+          ledgerOf(
+            [
+              day("2026-08-29", 1000),
+              day("2026-08-30", 1000),
+              day("2026-08-31", 1010),
+              day("2026-09-01", 1020),
+            ],
+            [xgro],
+          ),
+        );
+        netWorthService.getLastPricedDays.mockResolvedValue(
+          new Map([["2026-08-29", "2026-08-28"]]),
+        );
+        seriesBySymbol({
+          "XGRO.TO": [
+            bar("2026-08-31T13:30:00.000Z", 100.5),
+            bar("2026-08-31T19:45:00.000Z", 101),
+            bar("2026-09-01T13:30:00.000Z", 101.5),
+            bar("2026-09-01T19:45:00.000Z", 102),
+          ],
+        });
+
+        const result = await service.getIntradayValueSeries(userId, {
+          range: "1m",
+        });
+
+        expect(result.points.map((p) => p.timestamp)).toEqual([
+          "2026-08-28T20:00:00.000Z",
+          "2026-08-31T13:30:00.000Z",
+          "2026-08-31T19:45:00.000Z",
+          "2026-08-31T20:00:00.000Z",
+          "2026-09-01T13:30:00.000Z",
+          "2026-09-01T19:45:00.000Z",
+          "2026-09-01T20:00:00.000Z",
+        ]);
+        expect(result.points[0].value).toBe(1000);
+        expect(result.points[0].sessionClose).toBe(true);
+      });
+
+      it("opens a 1M window that starts on a session at that session's close, not its morning", async () => {
+        // Wednesday 30 September: 1M opens on Monday 31 August, a session.
+        jest.setSystemTime(new Date("2026-09-30T14:00:00.000Z"));
+        netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+          ledgerOf([day("2026-08-31", 1010), day("2026-09-01", 1020)], [xgro]),
+        );
+        netWorthService.getLastPricedDays.mockResolvedValue(
+          new Map([["2026-08-31", "2026-08-31"]]),
+        );
+        seriesBySymbol({
+          "XGRO.TO": [
+            bar("2026-08-31T13:30:00.000Z", 100.5),
+            bar("2026-08-31T19:45:00.000Z", 101),
+            bar("2026-09-01T13:30:00.000Z", 101.5),
+            bar("2026-09-01T19:45:00.000Z", 102),
+          ],
+        });
+
+        const result = await service.getIntradayValueSeries(userId, {
+          range: "1m",
+        });
+
+        expect(result.points.map((p) => p.timestamp)).toEqual([
+          "2026-08-31T20:00:00.000Z",
+          "2026-09-01T13:30:00.000Z",
+          "2026-09-01T19:45:00.000Z",
+          "2026-09-01T20:00:00.000Z",
+        ]);
+        expect(result.points[0].value).toBe(1010);
+      });
+
+      it("opens on the first bar when the measured-from day's figure is a subtotal", async () => {
+        jest.setSystemTime(new Date(monday));
+        netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+          ledgerOf(
+            [
+              day("2026-09-20", 0, {
+                closes: { [xgro.id]: null },
+                closeValues: { [xgro.id]: null },
+                pricesComplete: false,
+              }),
+              day("2026-09-21", 390),
+            ],
+            [xgro],
+          ),
+        );
+        seriesBySymbol({
+          "XGRO.TO": [
+            bar("2026-09-18T19:55:00.000Z", 38),
+            bar("2026-09-21T19:55:00.000Z", 39),
+          ],
+        });
+
+        const result = await service.getIntradayValueSeries(userId, {
+          range: "1w",
+        });
+
+        // No subtotal wearing the opening close's caption, and no lookup for
+        // a session it would not be dated on.
+        expect(result.points.map((p) => p.timestamp)).toEqual([
+          "2026-09-21T19:55:00.000Z",
+          "2026-09-21T20:00:00.000Z",
+        ]);
+        expect(netWorthService.getLastPricedDays).not.toHaveBeenCalled();
+      });
+
+      it("opens the breakdown on the same point, each position at its close", async () => {
+        jest.setSystemTime(new Date(monday));
+        netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+          ledgerOf(
+            [
+              {
+                date: "2026-09-20",
+                quantities: { [xgro.id]: 10, [xcns.id]: 20 },
+                closes: { [xgro.id]: 38, [xcns.id]: 40 },
+                closeValues: { [xgro.id]: 380, [xcns.id]: 800 },
+                cash: { CAD: 50 },
+                value: 1230,
+                securitiesValue: 1180,
+              },
+              {
+                date: "2026-09-21",
+                quantities: { [xgro.id]: 10, [xcns.id]: 20 },
+                closes: { [xgro.id]: 39, [xcns.id]: 41 },
+                closeValues: { [xgro.id]: 390, [xcns.id]: 820 },
+                cash: { CAD: 50 },
+                value: 1260,
+                securitiesValue: 1210,
+              },
+            ],
+            [xgro, xcns],
+          ),
+        );
+        netWorthService.getLastPricedDays.mockResolvedValue(
+          new Map([["2026-09-20", "2026-09-18"]]),
+        );
+        seriesBySymbol({
+          "XGRO.TO": [
+            bar("2026-09-18T19:55:00.000Z", 38),
+            bar("2026-09-21T19:55:00.000Z", 39),
+          ],
+          "XCNS.TO": [
+            bar("2026-09-18T19:55:00.000Z", 40),
+            bar("2026-09-21T19:55:00.000Z", 41),
+          ],
+        });
+
+        const result = await service.getIntradayBreakdown(userId, {
+          range: "1w",
+        });
+
+        expect(result.points.map((p) => p.timestamp)).toEqual([
+          "2026-09-18T20:00:00.000Z",
+          "2026-09-21T19:55:00.000Z",
+          "2026-09-21T20:00:00.000Z",
+        ]);
+        const opening = result.points[0];
+        expect(opening.sessionClose).toBe(true);
+        expect(opening.values[xgro.id]).toBe(380);
+        expect(opening.values[xcns.id]).toBe(800);
+        expect(opening.values.cash).toBe(50);
+        expect(opening.total).toBe(1230);
+        expect(result.points[1].sessionClose).toBeUndefined();
+      });
     });
   });
 });

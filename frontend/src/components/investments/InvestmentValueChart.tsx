@@ -43,6 +43,7 @@ import {
   hasUnmeasuredFlow,
   periodResultUnknownReason,
 } from './portfolio-period-result';
+import { openingSessionDate } from './portfolio-change-baseline';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
 import { preferredCurrency } from '@/lib/default-currency';
@@ -84,8 +85,8 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
   const { defaultCurrency } = useExchangeRates();
   const isMobile = useIsMobile();
   // `iso` is the point's own date/timestamp, kept beside the display label so
-  // the prior-close baseline can be looked up for the data actually on screen.
-  const [chartPoints, setChartPoints] = useState<
+  // the opening point can be dated by its session once the server names it.
+  const [loadedPoints, setLoadedPoints] = useState<
     Array<{ name: string; Value: number; iso: string }>
   >([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -190,7 +191,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
         // 1W/MTD/1M intraday fallback also uses the daily endpoint.
         const data = await netWorthApi.getInvestmentsDaily(params);
         if (loadSeqRef.current !== seq) return;
-        setChartPoints(
+        setLoadedPoints(
           data.map((d) => ({
             name: formatChartDate(d.date, 'MMM d, yyyy'),
             Value: investedValue(d),
@@ -200,7 +201,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
       } else {
         const data = await netWorthApi.getInvestmentsMonthly(params);
         if (loadSeqRef.current !== seq) return;
-        setChartPoints(
+        setLoadedPoints(
           data.map((d) => ({
             name: formatChartDate(d.month, 'MMM yyyy'),
             Value: investedValue(d),
@@ -233,9 +234,9 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
             const cachedPoints = trimIntradayPoints(
               cached.points,
               dateRange,
-              chartWindow.start,
+              chartWindow.periodStart,
             );
-            setChartPoints(
+            setLoadedPoints(
               cachedPoints.map((p) => ({
                 name: formatIntradayLabel(p.timestamp, dateRange),
                 Value: investedValue(p),
@@ -277,7 +278,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
             // Some holdings (typically MSN-tracked) lack intraday support.
             if (dateRange === '1d') {
               // No sensible daily-resolution fallback for a single day.
-              setChartPoints([]);
+              setLoadedPoints([]);
               setIntradayUnavailable({ skipped: response.skippedSymbols });
               setIsLoading(false);
               return;
@@ -295,9 +296,9 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
           const responsePoints = trimIntradayPoints(
             response.points,
             dateRange,
-            chartWindow.start,
+            chartWindow.periodStart,
           );
-          setChartPoints(
+          setLoadedPoints(
             responsePoints.map((p) => ({
               name: formatIntradayLabel(p.timestamp, dateRange),
               Value: investedValue(p),
@@ -374,13 +375,24 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
   const { periodResult } = usePortfolioPeriodResult({
     range: dateRange,
     startDate: chartWindow.start,
+    periodStartDate: chartWindow.periodStart,
     endDate: chartWindow.end,
-    firstPointIso: chartPoints[0]?.iso,
-    hasSeries: chartPoints.length > 0,
+    hasSeries: loadedPoints.length > 0,
     accountIds: accountIds?.length ? accountIds.join(',') : undefined,
     displayCurrency: foreignCurrency || undefined,
     reloadKey: refreshKey,
   });
+
+  // The series as drawn. It was requested from the day the period is measured
+  // from, and its opening point is dated by the session that day's close came
+  // from -- the same session the caption below names -- rather than by a
+  // boundary the market was shut on (`openingSessionDate`).
+  const chartPoints = useMemo(() => {
+    const session = openingSessionDate(loadedPoints[0]?.iso, periodResult);
+    if (!session) return loadedPoints;
+    const [first, ...rest] = loadedPoints;
+    return [{ ...first, name: formatChartDate(session, 'MMM d, yyyy') }, ...rest];
+  }, [loadedPoints, periodResult, formatChartDate]);
 
   // The three figures the cards print, and the one repair a withheld one points
   // at. `null` is the server's answer that it withheld the figure and said why.

@@ -232,6 +232,11 @@ export const investmentsApi = {
       timestamp: string;
       value: number;
       securitiesValue?: number;
+      /**
+       * Set on a session's closing point, the daily series' figure for the
+       * day, including the point a 1W / 1M series opens on. Absent on a bar.
+       */
+      sessionClose?: true;
     }>;
     interval: '1m' | '2m' | '5m' | '15m' | '30m' | '60m' | '90m';
     currency: string;

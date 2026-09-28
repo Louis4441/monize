@@ -359,7 +359,7 @@ describe('PortfolioValueWidget', () => {
     expect(getInvestmentsPeriodResult).not.toHaveBeenCalled();
   });
 
-  it('asks for the MTD period against the close before the first point drawn', async () => {
+  it('asks for the MTD period against the close before the month, which its series opens on', async () => {
     configState.current = { range: 'mtd', accountIds: ['i1'] };
     getInvestmentsDaily.mockResolvedValue([
       { date: '2026-07-01', value: 9500 },
@@ -369,11 +369,24 @@ describe('PortfolioValueWidget', () => {
       periodResult({ investmentResult: 400, returnPercent: 4 }),
     );
     await renderWidget();
-    // The client picks the date; the server measures. MTD reports against the
-    // previous close, so the day before the first point goes out as the
-    // baseline, for the same account scope as the series.
+    // The client picks the dates; the server measures. MTD reports against
+    // the previous close, so the last day of the previous month -- the day
+    // the series was requested from -- goes out as the baseline, for the
+    // same account scope as the series.
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const monthStart = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+    const lastOfPreviousMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+    const baseline = `${lastOfPreviousMonth.getFullYear()}-${pad(lastOfPreviousMonth.getMonth() + 1)}-${pad(lastOfPreviousMonth.getDate())}`;
+    expect(getInvestmentsDaily).toHaveBeenCalledWith(
+      expect.objectContaining({ startDate: baseline }),
+    );
     expect(getInvestmentsPeriodResult).toHaveBeenCalledWith(
-      expect.objectContaining({ baselineDate: '2026-06-30', accountIds: 'i1' }),
+      expect.objectContaining({
+        startDate: monthStart,
+        baselineDate: baseline,
+        accountIds: 'i1',
+      }),
     );
     expect(screen.getByTestId('portfolio-period-change')).toHaveTextContent(
       '+$400(+4.0%)',
