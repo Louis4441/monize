@@ -447,7 +447,10 @@ reached by the hourly cron and by a manual post alike) claims the occurrence
 with `INSERT INTO scheduled_transaction_postings ... ON CONFLICT (scheduled_transaction_id, original_due_date) DO NOTHING RETURNING id`
 inside the transaction that writes the money, so the unique key from migration
 140 is the serialization point and the losing replica's `ConflictException` is
-counted as a skip, not an error (INV-OCCURRENCE-001). The demo reset
+counted as a skip, not an error (INV-OCCURRENCE-001). The cron passes the
+occurrence it selected as `expectedDueDate`, because the claim key is only as
+good as the date it is built from: a replica that re-read the schedule after the
+winner advanced it keyed the claim on the next occurrence and posted that. The demo reset
 (`backend/src/database/demo-reset.service.ts`) takes
 `claimOnce(JobClaimType.DemoReset, demoUserId, "reset:<UTC day>")` before the
 wipe-and-reseed. The claim is permanent, so it records "reset today" as well as

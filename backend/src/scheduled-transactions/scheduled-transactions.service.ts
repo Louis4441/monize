@@ -551,9 +551,12 @@ export class ScheduledTransactionsService {
               // Auto-post: refuse under the lock if the user turned the schedule
               // inactive or off auto-post after cron selected it (issue #1154
               // re-review). The ConflictException is treated as "claimed
-              // elsewhere" and skipped below.
+              // elsewhere" and skipped below. `expectedDueDate` pins the post
+              // to the occurrence selected here, so a replica that loses the
+              // race skips rather than posting the next one (issue #1452).
               this.post(scheduled.userId, scheduled.id, undefined, {
                 requireActiveAutoPost: true,
+                expectedDueDate: ensureYMD(scheduled.nextDueDate),
               }),
             );
             totalSuccess++;
@@ -2645,11 +2648,39 @@ export class ScheduledTransactionsService {
     userId: string,
     id: string,
     postDto?: PostScheduledTransactionDto,
-    options: { requireActiveAutoPost?: boolean } = {},
+    options: {
+      requireActiveAutoPost?: boolean;
+      /**
+       * The occurrence the caller selected. When set, the post refuses with
+       * `ConflictException` unless it is still the due one, instead of posting
+       * whatever the schedule's `next_due_date` has advanced to since.
+       */
+      expectedDueDate?: string;
+    } = {},
   ): Promise<ScheduledTransaction | null> {
     const scheduled = await this.findOne(userId, id);
 
     const nextDueDateStr = ensureYMD(scheduled.nextDueDate);
+
+    // The auto-post cron selects a due occurrence, then posts it. Without this,
+    // a replica whose selection went stale -- another replica posted the
+    // occurrence and advanced `next_due_date` in between -- re-read the row
+    // above and posted the NEXT, not-yet-due occurrence: a fresh claim key, so
+    // neither the claim nor the lock stopped it, and every extra replica
+    // posted the bill once more (issue #1452). Refusing here keeps the loser
+    // off the FX lookup; the under-lock check against `nextDueDateStr` below
+    // is what holds it inside the posting transaction.
+    if (
+      options.expectedDueDate !== undefined &&
+      nextDueDateStr !== ensureYMD(options.expectedDueDate)
+    ) {
+      throw new ConflictException(
+        tr(
+          "errors.scheduled.occurrenceAlreadyPosted",
+          "This occurrence has already been posted.",
+        ),
+      );
+    }
 
     const storedOverride = await withScopedDb(this.dataSource, (m) =>
       m

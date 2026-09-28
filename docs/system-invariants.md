@@ -2198,8 +2198,10 @@ Statement           One scheduled occurrence may create at most one financial
                     effect.
 Source of truth     scheduled_transaction_postings, one row per occurrence
 Enforcement         A durable occurrence key claimed atomically.
-                    processAutoPostTransactions locks the schedule and CAS-checks
-                    next_due_date is still due, then claims the occurrence with
+                    processAutoPostTransactions passes the occurrence it selected
+                    as post()'s expectedDueDate; post() locks the schedule and
+                    CAS-checks next_due_date is still that occurrence, then claims
+                    it with
                     INSERT INTO scheduled_transaction_postings ... ON CONFLICT
                     (scheduled_transaction_id, original_due_date) DO NOTHING
                     RETURNING id (scheduled-transactions.service.ts), throwing
@@ -2213,7 +2215,13 @@ Retry semantics     Safe: a re-post is refused by the occurrence claim.
 Crash semantics     A crash between claim and advance leaves the claim row, so the
                     next tick is refused rather than reposting.
 Failure response    the losing claim gets ConflictException, having posted nothing.
-Required tests      The unique index gives DB-level exactly-once; a two-instance
+                    A replica whose selection went stale (the winner already
+                    advanced next_due_date) is refused by expectedDueDate; without
+                    it, post() re-read the row and posted the NEXT occurrence under
+                    a fresh claim key, once per extra replica.
+Required tests      Present (unit): scheduled-transactions.service.spec.ts, a cron
+                    whose post() re-reads an advanced next_due_date posts nothing.
+                    The unique index gives DB-level exactly-once; a two-instance
                     "two replicas, one posting" integration test is still owed as
                     the gold-standard proof.
 Status              enforced
