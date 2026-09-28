@@ -45,6 +45,9 @@
 | F3 | Test panel and manual-run dialog | F2, B8 | inert | [ ] |
 | F4 | Application history per rule (trace view) | F1, B8 | inert | [ ] |
 | F5 | Expression mode (CEL subset): dependency proposal first | F2 | inert | [ ] |
+| R1 | `ai_review_requests` table, enqueue from `request_ai_review` in the applier, expiry cron | D1, B4 | inert | [ ] |
+| R2 | MCP and assistant tools: list, claim, submit proposal; proposal stored as a signed `PendingAiAction` | R1, A1 | inert | [ ] |
+| R3 | Review inbox in the UI: pending, proposed (confirmation card), expired | R2, F1 | inert | [ ] |
 | E1 | E2E: create a rule, import a QIF, see the tag | F2, B6 | none | [ ] |
 | Q1 | `docs/system-invariants.md` entries, doc lines, README feature line | B7 | none | [ ] |
 | Q2 | Translate every locale | F4 | none | [ ] |
@@ -169,6 +172,10 @@ Files: `frontend/src/components/rules/RuleApplications.tsx`, tests.
 ### F5. Expression mode
 
 Starts with a written dependency proposal (CEL parser, editor library, bundle size measured), agreed before code. Then: a Visual / Expression toggle; the expression view renders the tree as CEL; input outside the subset is refused with the part named; autocomplete of fields, operators and entity names inserting ids.
+
+### R1 to R3. The AI review queue
+
+Design section 6.5. R1 is a separate migration (a new user-owned table with its own RLS policy and backup classification, as D1). Claiming is a conditional `UPDATE ... WHERE status = 'pending' RETURNING`; a submitted proposal is validated by `AiActionBuilderService` exactly like a proposal from the chat, and only the confirm path commits it. Email ingestion is not part of these tasks.
 
 ### E1. End to end
 

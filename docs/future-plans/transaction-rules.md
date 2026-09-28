@@ -30,7 +30,8 @@ counts in a category).
   test and save rules through the same action path the other writes use, and a
   human confirms every save.
 
-Out of scope for this plan: report definitions and alerts (a separate plan,
+Out of scope for this plan: reading or parsing email (a later plan, which
+produces AI review requests through section 6.5); report definitions and alerts (a separate plan,
 which can reuse the condition model from section 5); rules that change amount,
 account, date or status; rules that run on a schedule; sharing rules between
 users.
@@ -204,8 +205,10 @@ The same function runs in the preview, the test panel and the commit (I3).
 | `remove_tags` | `tagIds[]` (1..20) | Removes the tags if present | never |
 | `set_category` | `categoryId`, `onlyIfEmpty` | Sets the category | the row has splits; the row is a transfer leg |
 | `set_payee` | `payeeId`, `onlyIfEmpty` | Sets the payee | the row is a leg of a cross-owner transfer |
+| `request_ai_review` | `instruction` (1..1000 chars), at most one per rule | Adds a durable request to the AI review queue (section 6.5) | never |
 
-No action changes `amount`, `accountId`, `date`, `status`, splits or links. So
+The first four are ledger actions (`isLedgerAction`); `request_ai_review` writes
+only to the queue. No action changes `amount`, `accountId`, `date`, `status`, splits or links. So
 a rule cannot move a balance (I1). A refused action is skipped and the trace
 records the reason; the other actions of the rule still run.
 
@@ -246,11 +249,48 @@ With `onlyIfEmpty: true` a rule does not replace steps 1 and 2. With
 `onlyIfEmpty: false` a rule replaces them. The editor says this in an
 `InfoTooltip` on the flag.
 
+### 6.5 The AI review queue (prepared now, used by later features)
+
+A rule can ask an AI to look at a row, for example "split this Allegro
+purchase by the items in the order". Monize does not always have an AI
+provider; the user may work only through the MCP relay, on their own
+subscription, and the relay's prompt queue expires within minutes when no
+agent answers. So a review request is a durable row:
+
+```
+ai_review_requests
+  id, user_id, transaction_id, rule_id (nullable: a manual request has none)
+  kind        varchar  -- 'transaction_review' now; later kinds reuse the table
+  instruction text     -- the rule's instruction, user data
+  status      varchar  -- pending | claimed | proposed | applied | rejected | expired
+  claimed_by, claimed_at, proposal jsonb, created_at, expires_at (default 30 days)
+```
+
+- **Producers:** the `request_ai_review` action, in the same transaction as the
+  insert (I2); later, a "Ask AI later" button on a transaction, and email or
+  share ingestion.
+- **Consumers:** the in-app assistant when a provider is configured, and any
+  MCP client, the relay agent included, through three tools:
+  `list_ai_review_requests`, `claim_ai_review_request` (a conditional
+  `UPDATE ... WHERE status = 'pending'`, so two agents cannot claim one) and
+  `submit_ai_review_proposal`.
+- **A proposal is never a write.** It is a signed `PendingAiAction` built by
+  `AiActionBuilderService` (for example an `update_transaction` with split
+  lines), stored on the request and shown as a confirmation card in a review
+  inbox. Only the human's approval commits it, through the existing confirm
+  path. The server validates the proposal like any other action: split lines
+  must sum to the amount; a difference (delivery cost) is named, not assigned.
+- **Privacy:** the request carries the instruction and the transaction id,
+  not a copy of the row. What an agent reads, it reads through the existing
+  read tools, under the user's scopes.
+- Pending requests expire; an expired request is reported in the inbox, not
+  deleted silently.
+
 ## 7. Invariants
 
 | ID | Statement | Mechanism |
 |---|---|---|
-| I1 | A rule never moves a balance | The action list in section 6.1 is a closed union type; the DTO refuses any other action; a unit test asserts that no action writes `amount`, `account_id`, `status` or a link. |
+| I1 | A rule never moves a balance, and an AI proposal is never committed without a human approval | The action list in section 6.1 is a closed union type; a proposal is a `PendingAiAction` committed only by the confirm path; the DTO refuses any other action; a unit test asserts that no action writes `amount`, `account_id`, `status` or a link. |
 | I2 | A rule applies in the same transaction as the insert, on every creation path in 6.3 | The applier takes an `EntityManager`; a source-scanning guard lists every `create(Transaction)` / `insert` site on `transactions` and fails on a site that is neither a call to the applier nor in the exempt list. |
 | I3 | A preview shows what the commit will do | `previewCreate`, the test panel and the manual-run preview call the same `planRuleEffects(facts, rules)`; the commit applies its result. A test compares preview and commit for the same input. |
 | I4 | A rule runs at most once per row per trigger, in `position` order | One call site per path; a test with two rules and `stopProcessing`. |
