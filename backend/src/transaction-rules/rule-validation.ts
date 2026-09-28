@@ -1,0 +1,399 @@
+import { UUID_REGEX } from "../common/query-param-utils";
+import { RULE_ACTION_TYPES, RuleAction } from "./rule-action.types";
+import {
+  RULE_CONDITION_FIELDS,
+  RULE_OPERATOR_SHAPES,
+  RuleConditionFieldSpec,
+  RuleConditionLeaf,
+  RuleConditionNode,
+  RuleField,
+} from "./rule-condition.types";
+
+/** Bounds from design section 4. The DTO layer and the validator share them. */
+export const MAX_RULE_CONDITION_DEPTH = 4;
+export const MAX_RULE_CONDITION_LEAVES = 50;
+/** Groups and leaves together; stops a tree of thousands of empty groups. */
+export const MAX_RULE_CONDITION_NODES = 100;
+export const MAX_RULE_ACTIONS = 10;
+export const MIN_RULE_TAG_IDS = 1;
+export const MAX_RULE_TAG_IDS = 20;
+/** Trimmed length of a `request_ai_review` instruction. */
+export const MIN_RULE_AI_INSTRUCTION_LENGTH = 1;
+export const MAX_RULE_AI_INSTRUCTION_LENGTH = 1000;
+export const MAX_RULE_AI_REVIEW_ACTIONS = 1;
+/** Same limit as `matchesAliasPattern`, which returns false beyond it. */
+export const MAX_RULE_TEXT_LENGTH = 500;
+/** Entries in an `in` / `notIn` / `hasAny` / `hasAll` / `hasNone` list. */
+export const MAX_RULE_VALUE_LIST = 50;
+
+export const RULE_VALIDATION_CODES = [
+  "INVALID_SHAPE",
+  "UNKNOWN_KEY",
+  "UNKNOWN_FIELD",
+  "UNKNOWN_ACTION",
+  "OPERATOR_NOT_ALLOWED",
+  "VALUE_REQUIRED",
+  "VALUE_NOT_ALLOWED",
+  "VALUE_TYPE",
+  "VALUE_OUT_OF_RANGE",
+  "VALUE_TOO_LONG",
+  "VALUE_EMPTY",
+  "INVALID_UUID",
+  "INVALID_ENUM",
+  "INVALID_CURRENCY",
+  "ARRAY_EMPTY",
+  "ARRAY_TOO_LARGE",
+  "RANGE_ORDER",
+  "MAX_DEPTH",
+  "MAX_LEAVES",
+  "MAX_NODES",
+  "NO_ACTIONS",
+  "TOO_MANY_ACTIONS",
+  "DUPLICATE_ACTION",
+] as const;
+export type RuleValidationCode = (typeof RULE_VALIDATION_CODES)[number];
+
+export interface RuleValidationError {
+  /** Dotted path into the definition, e.g. `condition.all[0].value`. */
+  readonly path: string;
+  readonly code: RuleValidationCode;
+}
+
+export interface RuleDefinition {
+  readonly condition: RuleConditionNode;
+  readonly actions: readonly RuleAction[];
+}
+
+export interface RuleReferencedIds {
+  readonly accountIds: string[];
+  readonly payeeIds: string[];
+  readonly categoryIds: string[];
+  readonly tagIds: string[];
+}
+
+const CURRENCY_CODE = /^[A-Za-z]{3}$/;
+const MONEY_SCALE = 10000;
+
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+
+const hasKey = (o: Record<string, unknown>, k: string): boolean =>
+  Object.prototype.hasOwnProperty.call(o, k);
+
+type Sink = (path: string, code: RuleValidationCode) => void;
+
+function checkKeys(
+  obj: Record<string, unknown>,
+  allowed: readonly string[],
+  path: string,
+  push: Sink,
+): void {
+  for (const key of Object.keys(obj)) {
+    if (!allowed.includes(key)) push(`${path}.${key}`, "UNKNOWN_KEY");
+  }
+}
+
+/**
+ * Validate a rule definition. Never throws for user input: every problem is a
+ * `{ path, code }` entry and an empty list means the definition is acceptable.
+ *
+ * Shape and bounds only. Whether each referenced id belongs to the owner is
+ * the service's job (see `collectReferencedIds`), inside the write's
+ * transaction.
+ */
+export function validateRuleDefinition(input: {
+  condition: unknown;
+  actions: unknown;
+}): RuleValidationError[] {
+  const errors: RuleValidationError[] = [];
+  const push: Sink = (path, code) => errors.push({ path, code });
+  const budget = {
+    leaves: 0,
+    nodes: 0,
+    leavesReported: false,
+    nodesReported: false,
+  };
+  validateNode(input.condition, "condition", 1, budget, push);
+  validateActions(input.actions, push);
+  return errors;
+}
+
+interface Budget {
+  leaves: number;
+  nodes: number;
+  leavesReported: boolean;
+  nodesReported: boolean;
+}
+
+function validateNode(
+  node: unknown,
+  path: string,
+  depth: number,
+  budget: Budget,
+  push: Sink,
+): void {
+  if (!isRecord(node)) return push(path, "INVALID_SHAPE");
+  if (++budget.nodes > MAX_RULE_CONDITION_NODES) {
+    if (!budget.nodesReported) push(path, "MAX_NODES");
+    budget.nodesReported = true;
+    return;
+  }
+  const isAll = hasKey(node, "all");
+  const isAny = hasKey(node, "any");
+  if (isAll || isAny) {
+    if (isAll && isAny) return push(path, "INVALID_SHAPE");
+    return validateGroup(
+      node,
+      isAll ? "all" : "any",
+      path,
+      depth,
+      budget,
+      push,
+    );
+  }
+  if (hasKey(node, "field")) {
+    if (++budget.leaves > MAX_RULE_CONDITION_LEAVES) {
+      if (!budget.leavesReported) push(path, "MAX_LEAVES");
+      budget.leavesReported = true;
+      return;
+    }
+    return validateLeaf(node, path, push);
+  }
+  push(path, "INVALID_SHAPE");
+}
+
+function validateGroup(
+  node: Record<string, unknown>,
+  key: "all" | "any",
+  path: string,
+  depth: number,
+  budget: Budget,
+  push: Sink,
+): void {
+  checkKeys(node, [key, "not"], path, push);
+  if (hasKey(node, "not") && typeof node.not !== "boolean") {
+    push(`${path}.not`, "VALUE_TYPE");
+  }
+  if (depth > MAX_RULE_CONDITION_DEPTH) return push(path, "MAX_DEPTH");
+  const children = node[key];
+  if (!Array.isArray(children)) return push(`${path}.${key}`, "INVALID_SHAPE");
+  children.forEach((child, i) =>
+    validateNode(child, `${path}.${key}[${i}]`, depth + 1, budget, push),
+  );
+}
+
+function validateLeaf(
+  node: Record<string, unknown>,
+  path: string,
+  push: Sink,
+): void {
+  checkKeys(node, ["field", "op", "value"], path, push);
+  const field = node.field;
+  if (typeof field !== "string" || !hasKey(RULE_CONDITION_FIELDS, field)) {
+    return push(`${path}.field`, "UNKNOWN_FIELD");
+  }
+  const spec: RuleConditionFieldSpec =
+    RULE_CONDITION_FIELDS[field as RuleField];
+  const op = node.op;
+  if (
+    typeof op !== "string" ||
+    !(spec.operators as readonly string[]).includes(op)
+  ) {
+    return push(`${path}.op`, "OPERATOR_NOT_ALLOWED");
+  }
+  const valuePath = `${path}.value`;
+  const shape = RULE_OPERATOR_SHAPES[op as keyof typeof RULE_OPERATOR_SHAPES];
+  const value = node.value;
+  if (shape === "none") {
+    if (hasKey(node, "value")) push(valuePath, "VALUE_NOT_ALLOWED");
+    return;
+  }
+  if (value === undefined) return push(valuePath, "VALUE_REQUIRED");
+  const checkOne = (v: unknown, p: string): boolean =>
+    validateScalar(v, spec.kind, spec.enumValues ?? [], p, push);
+  if (shape === "scalar") {
+    checkOne(value, valuePath);
+  } else if (shape === "list") {
+    validateList(value, valuePath, push, MAX_RULE_VALUE_LIST, 1, checkOne);
+  } else if (!Array.isArray(value) || value.length !== 2) {
+    push(valuePath, "VALUE_TYPE");
+  } else {
+    const ok = value.map((v, i) => checkOne(v, `${valuePath}[${i}]`));
+    if (ok[0] && ok[1] && (value[0] as number) > (value[1] as number)) {
+      push(valuePath, "RANGE_ORDER");
+    }
+  }
+}
+
+function validateList(
+  value: unknown,
+  path: string,
+  push: Sink,
+  max: number,
+  min: number,
+  checkOne: (v: unknown, p: string) => boolean,
+): void {
+  if (!Array.isArray(value)) return push(path, "VALUE_TYPE");
+  if (value.length < min) return push(path, "ARRAY_EMPTY");
+  if (value.length > max) return push(path, "ARRAY_TOO_LARGE");
+  value.forEach((v, i) => checkOne(v, `${path}[${i}]`));
+}
+
+/** Check one scalar against a value kind; returns whether it is acceptable. */
+function validateScalar(
+  value: unknown,
+  kind: string,
+  enumValues: readonly string[],
+  path: string,
+  push: Sink,
+): boolean {
+  const fail = (code: RuleValidationCode): false => {
+    push(path, code);
+    return false;
+  };
+  switch (kind) {
+    case "boolean":
+      return typeof value === "boolean" || fail("VALUE_TYPE");
+    case "money":
+      if (typeof value !== "number") return fail("VALUE_TYPE");
+      if (!Number.isFinite(value)) return fail("VALUE_OUT_OF_RANGE");
+      return (
+        Number.isSafeInteger(Math.round(value * MONEY_SCALE)) ||
+        fail("VALUE_OUT_OF_RANGE")
+      );
+    case "text":
+      if (typeof value !== "string") return fail("VALUE_TYPE");
+      return value.length <= MAX_RULE_TEXT_LENGTH || fail("VALUE_TOO_LONG");
+    case "enum":
+      if (typeof value !== "string") return fail("VALUE_TYPE");
+      return enumValues.includes(value) || fail("INVALID_ENUM");
+    case "currency":
+      if (typeof value !== "string") return fail("VALUE_TYPE");
+      return CURRENCY_CODE.test(value) || fail("INVALID_CURRENCY");
+    default:
+      // accountId, payeeId, categoryId, tagIds
+      if (typeof value !== "string") return fail("VALUE_TYPE");
+      return UUID_REGEX.test(value) || fail("INVALID_UUID");
+  }
+}
+
+function validateActions(actions: unknown, push: Sink): void {
+  if (!Array.isArray(actions)) return push("actions", "INVALID_SHAPE");
+  if (actions.length === 0) return push("actions", "NO_ACTIONS");
+  if (actions.length > MAX_RULE_ACTIONS) push("actions", "TOO_MANY_ACTIONS");
+  let aiReviews = 0;
+  actions.slice(0, MAX_RULE_ACTIONS).forEach((action, i) => {
+    const path = `actions[${i}]`;
+    validateAction(action, path, push);
+    if (isRecord(action) && action.type === "request_ai_review") {
+      if (++aiReviews > MAX_RULE_AI_REVIEW_ACTIONS) {
+        push(path, "DUPLICATE_ACTION");
+      }
+    }
+  });
+}
+
+function validateAction(action: unknown, path: string, push: Sink): void {
+  if (!isRecord(action)) return push(path, "INVALID_SHAPE");
+  const type = action.type;
+  if (
+    typeof type !== "string" ||
+    !(RULE_ACTION_TYPES as readonly string[]).includes(type)
+  ) {
+    return push(`${path}.type`, "UNKNOWN_ACTION");
+  }
+  const uuid = (v: unknown, p: string): boolean =>
+    validateScalar(v, "tagIds", [], p, push);
+  if (type === "add_tags" || type === "remove_tags") {
+    checkKeys(action, ["type", "tagIds"], path, push);
+    validateList(
+      action.tagIds,
+      `${path}.tagIds`,
+      push,
+      MAX_RULE_TAG_IDS,
+      MIN_RULE_TAG_IDS,
+      uuid,
+    );
+    return;
+  }
+  if (type === "request_ai_review") {
+    checkKeys(action, ["type", "instruction"], path, push);
+    validateInstruction(action.instruction, `${path}.instruction`, push);
+    return;
+  }
+  const idKey = type === "set_category" ? "categoryId" : "payeeId";
+  checkKeys(action, ["type", idKey, "onlyIfEmpty"], path, push);
+  uuid(action[idKey], `${path}.${idKey}`);
+  if (typeof action.onlyIfEmpty !== "boolean") {
+    push(`${path}.onlyIfEmpty`, "VALUE_TYPE");
+  }
+}
+
+function validateInstruction(value: unknown, path: string, push: Sink): void {
+  if (typeof value !== "string") return push(path, "VALUE_TYPE");
+  const length = value.trim().length;
+  if (length < MIN_RULE_AI_INSTRUCTION_LENGTH) return push(path, "VALUE_EMPTY");
+  if (length > MAX_RULE_AI_INSTRUCTION_LENGTH) push(path, "VALUE_TOO_LONG");
+}
+
+/**
+ * Every account, payee, category and tag id a (valid) definition names, each
+ * once, so the service can check ownership of all of them in the write's
+ * transaction. Call it after `validateRuleDefinition` returned no errors.
+ */
+export function collectReferencedIds(
+  definition: RuleDefinition,
+): RuleReferencedIds {
+  const sets = {
+    accountIds: new Set<string>(),
+    payeeIds: new Set<string>(),
+    categoryIds: new Set<string>(),
+    tagIds: new Set<string>(),
+  };
+  const addAll = (target: Set<string>, value: unknown): void => {
+    for (const id of Array.isArray(value) ? value : [value]) {
+      target.add(id as string);
+    }
+  };
+  const visit = (node: RuleConditionNode): void => {
+    if ("all" in node || "any" in node) {
+      const children = "all" in node ? node.all : node.any;
+      children.forEach(visit);
+      return;
+    }
+    collectLeafIds(node, sets, addAll);
+  };
+  visit(definition.condition);
+  for (const action of definition.actions) {
+    if (action.type === "set_category") sets.categoryIds.add(action.categoryId);
+    else if (action.type === "set_payee") sets.payeeIds.add(action.payeeId);
+    else if (action.type !== "request_ai_review") {
+      addAll(sets.tagIds, action.tagIds);
+    }
+  }
+  return {
+    accountIds: [...sets.accountIds],
+    payeeIds: [...sets.payeeIds],
+    categoryIds: [...sets.categoryIds],
+    tagIds: [...sets.tagIds],
+  };
+}
+
+function collectLeafIds(
+  leaf: RuleConditionLeaf,
+  sets: Record<keyof RuleReferencedIds, Set<string>>,
+  addAll: (target: Set<string>, value: unknown) => void,
+): void {
+  if (leaf.value === undefined) return;
+  switch (RULE_CONDITION_FIELDS[leaf.field].kind) {
+    case "accountId":
+      return addAll(sets.accountIds, leaf.value);
+    case "payeeId":
+      return addAll(sets.payeeIds, leaf.value);
+    case "categoryId":
+      return addAll(sets.categoryIds, leaf.value);
+    case "tagIds":
+      return addAll(sets.tagIds, leaf.value);
+    default:
+  }
+}
