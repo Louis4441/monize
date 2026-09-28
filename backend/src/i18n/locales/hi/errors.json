@@ -512,7 +512,10 @@
   "tags": {
     "notFound": "ID {{ id }} वाला टैग नहीं मिला",
     "nameConflict": "\"{{ name }}\" नाम का एक टैग पहले से मौजूद है",
-    "oneOrMoreNotFound": "एक या अधिक टैग नहीं मिले"
+    "oneOrMoreNotFound": "एक या अधिक टैग नहीं मिले",
+    "oneOrMoreTransactionsNotFound": "एक या अधिक लेन-देन नहीं मिले",
+    "tooManyTags": "एक बार में अधिकतम {{ max }} टैग बदले जा सकते हैं",
+    "tooManyTransactions": "एक बार में अधिकतम {{ max }} लेन-देन बदले जा सकते हैं"
   },
   "transactions": {
     "invalidStatus": "अमान्य लेनदेन स्थिति: {{ status }}",

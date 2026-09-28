@@ -512,7 +512,10 @@
   "tags": {
     "notFound": "Label met ID {{ id }} niet gevonden",
     "nameConflict": "Er bestaat al een label met de naam \"{{ name }}\"",
-    "oneOrMoreNotFound": "Een of meer labels niet gevonden"
+    "oneOrMoreNotFound": "Een of meer labels niet gevonden",
+    "oneOrMoreTransactionsNotFound": "Een of meer transacties niet gevonden",
+    "tooManyTags": "Er kunnen maximaal {{ max }} tags in één aanroep worden gewijzigd",
+    "tooManyTransactions": "Er kunnen maximaal {{ max }} transacties in één aanroep worden gewijzigd"
   },
   "transactions": {
     "invalidStatus": "Ongeldige transactiestatus: {{ status }}",

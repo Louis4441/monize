@@ -512,7 +512,10 @@
   "tags": {
     "notFound": "{{ id }} kimliğine sahip etiket bulunamadı",
     "nameConflict": "\"{{ name }}\" adlı etiket zaten mevcut",
-    "oneOrMoreNotFound": "Bir veya daha fazla etiket bulunamadı"
+    "oneOrMoreNotFound": "Bir veya daha fazla etiket bulunamadı",
+    "oneOrMoreTransactionsNotFound": "Bir veya daha fazla işlem bulunamadı",
+    "tooManyTags": "Tek bir çağrıda en fazla {{ max }} etiket değiştirilebilir",
+    "tooManyTransactions": "Tek bir çağrıda en fazla {{ max }} işlem değiştirilebilir"
   },
   "transactions": {
     "invalidStatus": "Geçersiz işlem durumu: {{ status }}",

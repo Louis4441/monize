@@ -512,7 +512,10 @@
   "tags": {
     "notFound": "Тег с ID {{ id }} не найден",
     "nameConflict": "Тег с именем \"{{ name }}\" уже существует",
-    "oneOrMoreNotFound": "Один или несколько тегов не найдены"
+    "oneOrMoreNotFound": "Один или несколько тегов не найдены",
+    "oneOrMoreTransactionsNotFound": "Одна или несколько транзакций не найдены",
+    "tooManyTags": "За один вызов можно изменить не более {{ max }} тегов",
+    "tooManyTransactions": "За один вызов можно изменить не более {{ max }} транзакций"
   },
   "transactions": {
     "invalidStatus": "Недопустимый статус проводки: {{ status }}",

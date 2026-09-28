@@ -512,7 +512,10 @@
   "tags": {
     "notFound": "未找到 ID 为 {{ id }} 的标签",
     "nameConflict": "名为\"{{ name }}\"的标签已存在",
-    "oneOrMoreNotFound": "一个或多个标签未找到"
+    "oneOrMoreNotFound": "一个或多个标签未找到",
+    "oneOrMoreTransactionsNotFound": "未找到一个或多个交易",
+    "tooManyTags": "每次调用最多可更改 {{ max }} 个标签",
+    "tooManyTransactions": "每次调用最多可更改 {{ max }} 笔交易"
   },
   "transactions": {
     "invalidStatus": "无效的交易状态：{{ status }}",

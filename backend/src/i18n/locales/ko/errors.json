@@ -512,7 +512,10 @@
   "tags": {
     "notFound": "ID가 {{ id }}인 태그를 찾을 수 없습니다",
     "nameConflict": "\"{{ name }}\"(이)라는 태그가 이미 존재합니다",
-    "oneOrMoreNotFound": "하나 이상의 태그를 찾을 수 없습니다"
+    "oneOrMoreNotFound": "하나 이상의 태그를 찾을 수 없습니다",
+    "oneOrMoreTransactionsNotFound": "하나 이상의 거래를 찾을 수 없습니다",
+    "tooManyTags": "한 번에 최대 {{ max }}개의 태그만 변경할 수 있습니다",
+    "tooManyTransactions": "한 번에 최대 {{ max }}개의 거래만 변경할 수 있습니다"
   },
   "transactions": {
     "invalidStatus": "유효하지 않은 거래 상태입니다: {{ status }}",

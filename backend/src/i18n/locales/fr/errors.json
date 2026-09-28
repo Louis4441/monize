@@ -512,7 +512,10 @@
   "tags": {
     "notFound": "Étiquette avec l'ID {{ id }} introuvable",
     "nameConflict": "Une étiquette nommée « {{ name }} » existe déjà",
-    "oneOrMoreNotFound": "Une ou plusieurs étiquettes introuvables"
+    "oneOrMoreNotFound": "Une ou plusieurs étiquettes introuvables",
+    "oneOrMoreTransactionsNotFound": "Une ou plusieurs opérations sont introuvables",
+    "tooManyTags": "Au plus {{ max }} étiquettes peuvent être modifiées en un seul appel",
+    "tooManyTransactions": "Au plus {{ max }} opérations peuvent être modifiées en un seul appel"
   },
   "transactions": {
     "invalidStatus": "Statut de transaction invalide : {{ status }}",

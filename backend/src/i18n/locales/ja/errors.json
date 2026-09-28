@@ -512,7 +512,10 @@
   "tags": {
     "notFound": "ID {{ id }} のタグが見つかりません",
     "nameConflict": "「{{ name }}」という名前のタグはすでに存在します",
-    "oneOrMoreNotFound": "1つ以上のタグが見つかりません"
+    "oneOrMoreNotFound": "1つ以上のタグが見つかりません",
+    "oneOrMoreTransactionsNotFound": "1 件以上の取引が見つかりません",
+    "tooManyTags": "1 回の呼び出しで変更できるタグは最大 {{ max }} 件です",
+    "tooManyTransactions": "1 回の呼び出しで変更できる取引は最大 {{ max }} 件です"
   },
   "transactions": {
     "invalidStatus": "無効な取引ステータス：{{ status }}",

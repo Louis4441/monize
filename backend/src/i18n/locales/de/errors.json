@@ -512,7 +512,10 @@
   "tags": {
     "notFound": "Etikett mit ID {{ id }} nicht gefunden",
     "nameConflict": "Ein Etikett mit dem Namen \"{{ name }}\" existiert bereits",
-    "oneOrMoreNotFound": "Ein oder mehrere Etiketten nicht gefunden"
+    "oneOrMoreNotFound": "Ein oder mehrere Etiketten nicht gefunden",
+    "oneOrMoreTransactionsNotFound": "Eine oder mehrere Buchungen nicht gefunden",
+    "tooManyTags": "Höchstens {{ max }} Etiketten können in einem Aufruf geändert werden",
+    "tooManyTransactions": "Höchstens {{ max }} Buchungen können in einem Aufruf geändert werden"
   },
   "transactions": {
     "invalidStatus": "Ungültiger Buchungsstatus: {{ status }}",

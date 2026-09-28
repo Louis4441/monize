@@ -512,7 +512,10 @@
   "tags": {
     "notFound": "Etiqueta com ID {{ id }} não encontrada",
     "nameConflict": "Já existe uma etiqueta com o nome \"{{ name }}\"",
-    "oneOrMoreNotFound": "Uma ou mais etiquetas não foram encontradas"
+    "oneOrMoreNotFound": "Uma ou mais etiquetas não foram encontradas",
+    "oneOrMoreTransactionsNotFound": "Uma ou mais transações não foram encontradas",
+    "tooManyTags": "É possível alterar no máximo {{ max }} tags em uma única chamada",
+    "tooManyTransactions": "É possível alterar no máximo {{ max }} transações em uma única chamada"
   },
   "transactions": {
     "invalidStatus": "Status de transação inválido: {{ status }}",

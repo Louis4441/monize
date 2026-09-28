@@ -512,7 +512,10 @@
   "tags": {
     "notFound": "Không tìm thấy thẻ với ID {{ id }}",
     "nameConflict": "Thẻ có tên \"{{ name }}\" đã tồn tại",
-    "oneOrMoreNotFound": "Không tìm thấy một hoặc nhiều thẻ"
+    "oneOrMoreNotFound": "Không tìm thấy một hoặc nhiều thẻ",
+    "oneOrMoreTransactionsNotFound": "Không tìm thấy một hoặc nhiều giao dịch",
+    "tooManyTags": "Mỗi lần gọi chỉ có thể thay đổi tối đa {{ max }} thẻ",
+    "tooManyTransactions": "Mỗi lần gọi chỉ có thể thay đổi tối đa {{ max }} giao dịch"
   },
   "transactions": {
     "invalidStatus": "Trạng thái giao tác không hợp lệ: {{ status }}",

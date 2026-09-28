@@ -512,7 +512,10 @@
   "tags": {
     "notFound": "Tag dengan ID {{ id }} tidak ditemukan",
     "nameConflict": "Tag bernama \"{{ name }}\" sudah ada",
-    "oneOrMoreNotFound": "Satu atau lebih tag tidak ditemukan"
+    "oneOrMoreNotFound": "Satu atau lebih tag tidak ditemukan",
+    "oneOrMoreTransactionsNotFound": "Satu atau lebih transaksi tidak ditemukan",
+    "tooManyTags": "Maksimal {{ max }} tag dapat diubah dalam satu panggilan",
+    "tooManyTransactions": "Maksimal {{ max }} transaksi dapat diubah dalam satu panggilan"
   },
   "transactions": {
     "invalidStatus": "Status transaksi tidak valid: {{ status }}",

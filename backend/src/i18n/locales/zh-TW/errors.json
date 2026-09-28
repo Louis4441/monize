@@ -512,7 +512,10 @@
   "tags": {
     "notFound": "找不到 ID 為 {{ id }} 的標籤",
     "nameConflict": "已有名為「{{ name }}」的標籤",
-    "oneOrMoreNotFound": "找不到一個或多個標籤"
+    "oneOrMoreNotFound": "找不到一個或多個標籤",
+    "oneOrMoreTransactionsNotFound": "找不到一筆或多筆交易",
+    "tooManyTags": "每次呼叫最多可變更 {{ max }} 個標籤",
+    "tooManyTransactions": "每次呼叫最多可變更 {{ max }} 筆交易"
   },
   "transactions": {
     "invalidStatus": "無效的交易狀態：{{ status }}",

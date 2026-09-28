@@ -512,7 +512,10 @@
   "tags": {
     "notFound": "Nie znaleziono tagu o ID {{ id }}",
     "nameConflict": "Tag o nazwie \"{{ name }}\" już istnieje",
-    "oneOrMoreNotFound": "Nie znaleziono jednego lub więcej tagów"
+    "oneOrMoreNotFound": "Nie znaleziono jednego lub więcej tagów",
+    "oneOrMoreTransactionsNotFound": "Nie znaleziono jednej lub więcej transakcji",
+    "tooManyTags": "W jednym wywołaniu można zmienić najwyżej {{ max }} tagów",
+    "tooManyTransactions": "W jednym wywołaniu można zmienić najwyżej {{ max }} transakcji"
   },
   "transactions": {
     "invalidStatus": "Nieprawidłowy status transakcji: {{ status }}",

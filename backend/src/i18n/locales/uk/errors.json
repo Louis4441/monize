@@ -512,7 +512,10 @@
   "tags": {
     "notFound": "Тег з ідентифікатором {{ id }} не знайдено",
     "nameConflict": "Тег з назвою «{{ name }}» вже існує",
-    "oneOrMoreNotFound": "Один або кілька тегів не знайдено"
+    "oneOrMoreNotFound": "Один або кілька тегів не знайдено",
+    "oneOrMoreTransactionsNotFound": "Одну або кілька транзакцій не знайдено",
+    "tooManyTags": "За один виклик можна змінити не більше {{ max }} тегів",
+    "tooManyTransactions": "За один виклик можна змінити не більше {{ max }} транзакцій"
   },
   "transactions": {
     "invalidStatus": "Недійсний статус операції: {{ status }}",
