@@ -2,7 +2,7 @@
 
 import { memo, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
-import { gainLossColor } from '@/lib/format';
+import { gainLossColor, withCurrencyCode } from '@/lib/format';
 import { Account, AccountType } from '@/types/account';
 import { AccountTypePill, AccountTypeIcon } from '@/lib/account-type-meta';
 import { hasAccountDetailView } from '@/lib/account-detail-views';
@@ -350,7 +350,6 @@ export interface AccountRowProps {
   /** How many of this account's holdings have no price. Drives the unknown-value tooltip. */
   unpricedHoldingsCount?: number;
   defaultCurrency: string;
-  formatCurrency: (amount: number | string | null | undefined, currency: string) => string;
   formatCurrencyBase: (value: number, currencyCode?: string) => string;
   /** Returns `null` when no rate for the pair is known. */
   convertToDefault: (value: number, fromCurrency: string) => number | null;
@@ -383,7 +382,6 @@ export const AccountRow = memo(function AccountRow({
   brokerageMarketValue,
   unpricedHoldingsCount,
   defaultCurrency,
-  formatCurrency,
   formatCurrencyBase,
   convertToDefault,
   formatAccountType,
@@ -399,6 +397,14 @@ export const AccountRow = memo(function AccountRow({
   onToggleNetWorthExclusion,
 }: AccountRowProps) {
   const t = useTranslations('accounts');
+  // Every figure in the row is in the account's own currency, named when that
+  // is not the reader's. `Number` because a decimal column can arrive as text.
+  const formatInAccountCurrency = (amount: number) =>
+    withCurrencyCode(
+      formatCurrencyBase(Number(amount), account.currencyCode),
+      account.currencyCode,
+      defaultCurrency,
+    );
   // A folded pair is one account with two ledgers behind it, so the row drops
   // the pairing chrome (the chain-link icon and the "Paired with" line) that
   // exists to explain two rows to each other, and shows the entity's name.
@@ -466,7 +472,7 @@ export const AccountRow = memo(function AccountRow({
       : {
           figure: (
             <div className={`text-sm font-medium ${gainLossColor(combined.combinedValue)}`}>
-              {formatCurrency(combined.combinedValue, account.currencyCode)}
+              {formatInAccountCurrency(combined.combinedValue)}
             </div>
           ),
           details: (
@@ -474,8 +480,8 @@ export const AccountRow = memo(function AccountRow({
               {density === 'normal' && brokerageMarketValue !== undefined && (
                 <div className="text-xs text-gray-500 dark:text-gray-400">
                   {t('row.combinedBreakdown', {
-                    investments: formatCurrency(brokerageMarketValue, account.currencyCode),
-                    cash: formatCurrency(cashComponent, account.currencyCode),
+                    investments: formatInAccountCurrency(brokerageMarketValue),
+                    cash: formatInAccountCurrency(cashComponent),
                   })}
                 </div>
               )}
@@ -496,7 +502,7 @@ export const AccountRow = memo(function AccountRow({
       ? {
           figure: (
             <div className="text-sm font-medium text-green-600 dark:text-green-400">
-              {formatCurrency(brokerageMarketValue, account.currencyCode)}
+              {formatInAccountCurrency(brokerageMarketValue)}
             </div>
           ),
           details: (
@@ -519,7 +525,7 @@ export const AccountRow = memo(function AccountRow({
       : {
           figure: (
             <div className={`text-sm font-medium ${gainLossColor(ownTotalBalance)}`}>
-              {formatCurrency(ownTotalBalance, account.currencyCode)}
+              {formatInAccountCurrency(ownTotalBalance)}
             </div>
           ),
           details: (
@@ -533,7 +539,7 @@ export const AccountRow = memo(function AccountRow({
               )}
               {density !== 'dense' && account.creditLimit && (
                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {t('row.limit', { amount: formatCurrency(account.creditLimit, account.currencyCode) })}
+                  {t('row.limit', { amount: formatInAccountCurrency(account.creditLimit) })}
                 </div>
               )}
             </>

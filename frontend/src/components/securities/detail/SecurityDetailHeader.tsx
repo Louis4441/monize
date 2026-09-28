@@ -9,8 +9,7 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useNow } from '@/hooks/useNow';
 import { getMarketState } from '@/lib/market-hours';
-import { withCurrencyCode } from '@/lib/security-detail';
-import { gainLossColor } from '@/lib/format';
+import { gainLossColor, withCurrencyCode } from '@/lib/format';
 import type { Security } from '@/types/investment';
 import { SecuritySwitcher } from './SecuritySwitcher';
 

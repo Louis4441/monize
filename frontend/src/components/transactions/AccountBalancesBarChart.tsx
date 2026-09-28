@@ -86,11 +86,11 @@ interface ChartDataPoint {
 function AccountBalanceTooltip({
   active,
   payload,
-  formatCurrency,
+  formatValue,
 }: {
   active?: boolean;
   payload?: Array<{ payload: ChartDataPoint }>;
-  formatCurrency: (v: number) => string;
+  formatValue: (v: number) => string;
 }) {
   if (active && payload?.[0]) {
     const data = payload[0].payload;
@@ -104,7 +104,7 @@ function AccountBalanceTooltip({
             gainLossColor(data.balance)
           }`}
         >
-          {formatCurrency(data.balance)}
+          {formatValue(data.balance)}
         </p>
       </div>
     );
@@ -120,14 +120,14 @@ export function AccountBalancesBarChart({
 }: AccountBalancesBarChartProps) {
   const t = useTranslations('transactions');
   const chartTitle = t('charts.accountBalances.title');
-  const { formatCurrency: formatCurrencyFull, formatCurrencyAxis, formatNumber } = useNumberFormat();
+  const { formatCurrency, formatCurrencyAxis, formatNumber } = useNumberFormat();
   const chartRef = useRef<HTMLDivElement>(null);
   const [scaleMode, setScaleMode] = useState<ScaleMode>('auto');
   const isMobile = useIsMobile();
 
-  const formatCurrency = useCallback(
-    (value: number) => formatCurrencyFull(value, currencyCode),
-    [formatCurrencyFull, currencyCode],
+  const formatValue = useCallback(
+    (value: number) => formatCurrency(value, currencyCode),
+    [formatCurrency, currencyCode],
   );
 
   const formatAxis = useCallback(
@@ -295,7 +295,7 @@ export function AccountBalancesBarChart({
               allowDataOverflow={false}
             />
             <Tooltip
-              content={<AccountBalanceTooltip formatCurrency={formatCurrency} />}
+              content={<AccountBalanceTooltip formatValue={formatValue} />}
               // Keep the highlight rect visually present but transparent to
               // pointer events so clicks fall through to BarChart's onClick.
               cursor={{ fill: chartColors.grid, fillOpacity: 0.35, style: { pointerEvents: 'none' } }}
@@ -325,7 +325,7 @@ export function AccountBalancesBarChart({
                 <LabelList
                   dataKey="balance"
                   position="top"
-                  formatter={(value: unknown) => formatCurrency(Number(value))}
+                  formatter={(value: unknown) => formatValue(Number(value))}
                   style={{ fill: chartColors.axis, fontSize: 11, fontWeight: 500 }}
                 />
               )}
@@ -344,7 +344,7 @@ export function AccountBalancesBarChart({
                 gainLossColor(summary.avgBalance)
               }`}
             >
-              {formatCurrency(summary.avgBalance)}
+              {formatValue(summary.avgBalance)}
             </div>
           </div>
           <div>
@@ -354,7 +354,7 @@ export function AccountBalancesBarChart({
                 gainLossColor(summary.total)
               }`}
             >
-              {formatCurrency(summary.total)}
+              {formatValue(summary.total)}
             </div>
           </div>
           <div>

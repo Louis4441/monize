@@ -1,6 +1,5 @@
 /**
- * The shapes a loan schedule is described by, and the two roundings applied to
- * them.
+ * The shapes a loan schedule is described by.
  *
  * At the bottom of this module graph on purpose: `loan-schedule.ts` and
  * `loan-comparison.ts` both need these, and a type module neither of them
@@ -220,13 +219,4 @@ export interface ScenarioComparison {
    * "Unknown" for time and interest saved on the same card row.
    */
   installmentReduction: number | null;
-}
-
-export function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
-/** Storage precision (decimal(20,4)), matching backend roundMoney */
-export function round4(value: number): number {
-  return Math.round(value * 10000) / 10000;
 }

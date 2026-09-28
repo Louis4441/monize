@@ -20,10 +20,11 @@ import { Category } from '@/types/category';
 import { Account } from '@/types/account';
 import { scheduledTransactionsApi } from '@/lib/scheduled-transactions';
 import { investmentsApi } from '@/lib/investments';
-import { totalFromQuantity, quantityFromTotal, roundPrice, roundMoney, usableClose } from '@/lib/investmentFold';
+import { totalFromQuantity, quantityFromTotal, roundPrice, usableClose } from '@/lib/investmentFold';
 import { getLocalDateString } from '@/lib/utils';
 import { buildCategoryTree } from '@/lib/categoryUtils';
 import {
+  roundMoney,
   roundToCents,
   roundToDecimals,
   getCurrencySymbol,

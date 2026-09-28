@@ -188,13 +188,13 @@ function calendarTicks(from: number, to: number, unit: 'year' | 'month'): number
 function BalanceTooltip({
   active,
   payload,
-  formatCurrency,
+  formatValue,
   neutral = false,
   markersByDate,
 }: {
   active?: boolean;
   payload?: Array<{ payload: ChartPoint }>;
-  formatCurrency: (v: number) => string;
+  formatValue: (v: number) => string;
   /** Skip the by-sign colouring, for a series whose sign means nothing. */
   neutral?: boolean;
   /** Events pinned on each day, listed under the value. */
@@ -214,7 +214,7 @@ function BalanceTooltip({
               : gainLossColor(data.balance ?? 0)
           }`}
         >
-          {data.balance === null ? '\u2014' : formatCurrency(data.balance)}
+          {data.balance === null ? '\u2014' : formatValue(data.balance)}
         </p>
         {markersByDate?.get(data.date)?.map((marker, i) => (
           <p
@@ -255,7 +255,7 @@ export function BalanceHistoryChart({
   const tc = useTranslations('common');
   const chartTitle = title ?? t('charts.balanceHistory.title');
   const {
-    formatCurrency: formatCurrencyFull,
+    formatCurrency,
     formatCurrencyPrecise,
     formatCurrencyAxis,
     formatCurrencyFlag,
@@ -279,19 +279,19 @@ export function BalanceHistoryChart({
   const [dismissedLow, setDismissedLow] = useState<number | null>(null);
   const downloadFilename = accountName ? `${chartTitle} - ${accountName}` : chartTitle;
 
-  const formatCurrency = useCallback(
+  const formatValue = useCallback(
     (value: number) =>
       isPercent
         ? formatSignedPercent(value)
         : precise
           ? formatCurrencyPrecise(value, currencyCode)
-          : formatCurrencyFull(value, currencyCode),
+          : formatCurrency(value, currencyCode),
     [
       isPercent,
       formatSignedPercent,
       precise,
       formatCurrencyPrecise,
-      formatCurrencyFull,
+      formatCurrency,
       currencyCode,
     ],
   );
@@ -570,7 +570,7 @@ export function BalanceHistoryChart({
             <Tooltip
               content={
                 <BalanceTooltip
-                  formatCurrency={formatCurrency}
+                  formatValue={formatValue}
                   neutral={neutralValues}
                   markersByDate={markersByDate}
                 />
@@ -684,20 +684,20 @@ export function BalanceHistoryChart({
           <div>
             <div className="text-sm text-gray-500 dark:text-gray-400">{summaryLabels?.starting ?? t('charts.balanceHistory.starting')}</div>
             <div className={`font-semibold ${valueColor(summary.startBalance)}`}>
-              {formatCurrency(summary.startBalance)}
+              {formatValue(summary.startBalance)}
             </div>
           </div>
           <div>
             <div className="text-sm text-gray-500 dark:text-gray-400">{summaryLabels?.current ?? t('charts.balanceHistory.current')}</div>
             <div className={`font-semibold ${valueColor(summary.currentBalance)}`}>
-              {formatCurrency(summary.currentBalance)}
+              {formatValue(summary.currentBalance)}
             </div>
           </div>
           {summary.hasFutureData && (
             <div>
               <div className="text-sm text-gray-500 dark:text-gray-400">{summaryLabels?.ending ?? t('charts.balanceHistory.ending')}</div>
               <div className={`font-semibold ${valueColor(summary.endBalance)}`}>
-                {formatCurrency(summary.endBalance)}
+                {formatValue(summary.endBalance)}
               </div>
             </div>
           )}
@@ -714,7 +714,7 @@ export function BalanceHistoryChart({
                   : t('charts.balanceHistory.minBalance')}
             </div>
             <div className={`font-semibold ${valueColor(summary.minBalance)}`}>
-              {formatCurrency(summary.minBalance)}
+              {formatValue(summary.minBalance)}
               {isBalanceSeries && summary.goesNegative && !isLiability && (
                 <span className="ml-1 text-xs text-red-500">!</span>
               )}

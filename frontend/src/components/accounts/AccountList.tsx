@@ -756,17 +756,6 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
     [onRefresh, t],
   );
 
-  const formatCurrency = useCallback((amount: number | string | null | undefined, currency: string) => {
-    const numericAmount = Number(amount) || 0;
-    const formatted = formatCurrencyBase(numericAmount, currency);
-
-    // Only show currency code if it differs from user's default currency
-    if (currency !== defaultCurrency) {
-      return `${formatted} ${currency}`;
-    }
-    return formatted;
-  }, [formatCurrencyBase, defaultCurrency]);
-
   if (accounts.length === 0) {
     return (
       <EmptyState title={t('list.empty')} />
@@ -1078,7 +1067,6 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
                   brokerageMarketValue={item.logical.holdingsAccountId ? brokerageMarketValues?.get(item.logical.holdingsAccountId) : undefined}
                   unpricedHoldingsCount={item.logical.holdingsAccountId ? unpricedHoldingCounts?.get(item.logical.holdingsAccountId) : undefined}
                   defaultCurrency={defaultCurrency}
-                  formatCurrency={formatCurrency}
                   formatCurrencyBase={formatCurrencyBase}
                   convertToDefault={convertToDefault}
                   formatAccountType={(type) => formatAccountType(type, tc)}

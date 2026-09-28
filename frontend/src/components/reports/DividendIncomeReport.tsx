@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/Table';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { exportToCsv } from '@/lib/csv-export';
+import { roundMoney } from '@/lib/format';
 import { chartColors, CHART_SERIES } from '@/lib/chart-colors';
 import { useTranslations } from 'next-intl';
 import { useMainAccountName } from '@/hooks/useMainAccountName';
@@ -809,8 +810,8 @@ export function DividendIncomeReport() {
 
   // '' (an empty cell), not 0, for an unknown value: a spreadsheet summing the
   // column must not absorb an unknown as a zero.
-  const round4 = (n: number | null): number | '' =>
-    n === null ? '' : Math.round(n * 10000) / 10000;
+  const csvMoney = (n: number | null): number | '' =>
+    n === null ? '' : roundMoney(n);
 
   const handleExportCsv = () => {
     const accountLabel = selectedAccount
@@ -833,10 +834,10 @@ export function DividendIncomeReport() {
       const rows = securityData.map((s) => [
         s.symbol,
         s.name,
-        round4(s.dividends),
-        round4(s.interest),
-        round4(s.capitalGains),
-        round4(s.total),
+        csvMoney(s.dividends),
+        csvMoney(s.interest),
+        csvMoney(s.capitalGains),
+        csvMoney(s.total),
         currencyCode,
       ]);
       exportToCsv(`${filenameBase}-by-security-${scope}`, headers, rows);
@@ -850,12 +851,12 @@ export function DividendIncomeReport() {
       if (visibleSeries.capitalGains) headers.push(t('dividendIncome.colCapitalGains'));
       headers.push(t('dividendIncome.colTotal'), t('dividendIncome.colCurrency'));
       const rows = displayedDailyData.map((row) => {
-        const out: (string | number)[] = [row.date, round4(row.startValue), round4(row.endValue)];
-        if (visibleSeries.dividends) out.push(round4(row.dividends));
-        if (visibleSeries.interest) out.push(round4(row.interest));
-        if (visibleSeries.capitalGains) out.push(round4(row.capitalGains));
+        const out: (string | number)[] = [row.date, csvMoney(row.startValue), csvMoney(row.endValue)];
+        if (visibleSeries.dividends) out.push(csvMoney(row.dividends));
+        if (visibleSeries.interest) out.push(csvMoney(row.interest));
+        if (visibleSeries.capitalGains) out.push(csvMoney(row.capitalGains));
         out.push(
-          round4(visibleTotal(row.dividends, row.interest, row.capitalGains)),
+          csvMoney(visibleTotal(row.dividends, row.interest, row.capitalGains)),
           currencyCode,
         );
         return out;
@@ -875,14 +876,14 @@ export function DividendIncomeReport() {
     const rows = monthlyData.map((row) => {
       const out: (string | number)[] = [
         row.month,
-        round4(row.startValue),
-        round4(row.endValue),
+        csvMoney(row.startValue),
+        csvMoney(row.endValue),
       ];
-      if (visibleSeries.dividends) out.push(round4(row.dividends));
-      if (visibleSeries.interest) out.push(round4(row.interest));
-      if (visibleSeries.capitalGains) out.push(round4(row.capitalGains));
+      if (visibleSeries.dividends) out.push(csvMoney(row.dividends));
+      if (visibleSeries.interest) out.push(csvMoney(row.interest));
+      if (visibleSeries.capitalGains) out.push(csvMoney(row.capitalGains));
       out.push(
-        round4(visibleTotal(row.dividends, row.interest, row.capitalGains)),
+        csvMoney(visibleTotal(row.dividends, row.interest, row.capitalGains)),
         currencyCode,
       );
       return out;

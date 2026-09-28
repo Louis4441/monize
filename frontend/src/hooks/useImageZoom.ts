@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent } from 'react';
+import { clamp } from '@/lib/clamp';
 
 /**
  * Pan and zoom for a fixed-size preview, so fine print can be checked before a
@@ -59,10 +60,6 @@ export interface ImageZoom {
   };
   /** Spread on the element holding the image (and any overlay): the transform. */
   contentStyle: CSSProperties;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
 }
 
 /**
