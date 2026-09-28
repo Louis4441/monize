@@ -259,6 +259,7 @@ function getInputMode(): InputMode {
 export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
   ({ onDateChange, onKeyDown, onChange: externalOnChange, onBlur: externalOnBlur, value: externalValue, label, id, name, ...props }, ref) => {
     const inputId = id || (label ? `input-${label.toLowerCase().replace(/\s+/g, '-')}` : undefined);
+    const t = useTranslations('common');
     const { datePattern } = useDateFormat();
     const mode = getInputMode();
 
@@ -615,7 +616,7 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
             type="button"
             tabIndex={-1}
             onClick={handleCalendarClick}
-            aria-label="Open date picker"
+            aria-label={t('dateInput.openPicker')}
             className="absolute top-px bottom-px right-px z-10 flex items-center pr-2.5 pl-1 bg-white dark:bg-gray-800 rounded-r-md text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
           >
             {calendarIconSvg}
