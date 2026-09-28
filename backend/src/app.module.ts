@@ -60,6 +60,7 @@ import { OAuthModule } from "./oauth/oauth.module";
 import { BudgetsModule } from "./budgets/budgets.module";
 import { CalendarModule } from "./calendar/calendar.module";
 import { TagsModule } from "./tags/tags.module";
+import { TransactionRulesModule } from "./transaction-rules/transaction-rules.module";
 import { LoanScenariosModule } from "./loan-scenarios/loan-scenarios.module";
 import { LoanRateChangesModule } from "./loan-rate-changes/loan-rate-changes.module";
 import { BackupModule } from "./backup/backup.module";
@@ -203,6 +204,7 @@ import { I18nModule } from "./i18n/i18n.module";
     BudgetsModule,
     CalendarModule,
     TagsModule,
+    TransactionRulesModule,
     LoanScenariosModule,
     LoanRateChangesModule,
     BackupModule,

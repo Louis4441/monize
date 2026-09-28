@@ -517,6 +517,14 @@
     "tooManyTags": "Mỗi lần gọi chỉ có thể thay đổi tối đa {{ max }} thẻ",
     "tooManyTransactions": "Mỗi lần gọi chỉ có thể thay đổi tối đa {{ max }} giao dịch"
   },
+  "transactionRules": {
+    "notFound": "Không tìm thấy quy tắc giao dịch có ID {{ id }}",
+    "limitReached": "Chỉ có thể tạo tối đa {{ max }} quy tắc",
+    "invalidDefinition": "Định nghĩa quy tắc không hợp lệ",
+    "referenceNotFound": "Quy tắc nhắc đến tài khoản, người nhận, danh mục hoặc thẻ không tồn tại",
+    "revisionConflict": "Quy tắc này đã được thay đổi ở nơi khác. Hãy tải lại rồi thử lại",
+    "reorderMismatch": "Danh sách quy tắc đã thay đổi. Hãy tải lại rồi thử lại"
+  },
   "transactions": {
     "invalidStatus": "Trạng thái giao tác không hợp lệ: {{ status }}",
     "reconciledLocked": "Giao dịch này đã đối soát và bị khóa. Hãy tắt \"Khóa giao dịch đã đối soát\" trong Cài đặt để thay đổi.",

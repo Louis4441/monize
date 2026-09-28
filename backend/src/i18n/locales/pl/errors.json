@@ -517,6 +517,14 @@
     "tooManyTags": "W jednym wywołaniu można zmienić najwyżej {{ max }} tagów",
     "tooManyTransactions": "W jednym wywołaniu można zmienić najwyżej {{ max }} transakcji"
   },
+  "transactionRules": {
+    "notFound": "Nie znaleziono reguły transakcji o ID {{ id }}",
+    "limitReached": "Można utworzyć najwyżej {{ max }} reguł",
+    "invalidDefinition": "Definicja reguły jest nieprawidłowa",
+    "referenceNotFound": "Reguła wskazuje konto, odbiorcę, kategorię lub tag, które nie istnieją",
+    "revisionConflict": "Ta reguła została zmieniona gdzie indziej. Załaduj ją ponownie i spróbuj jeszcze raz",
+    "reorderMismatch": "Lista reguł uległa zmianie. Załaduj ją ponownie i spróbuj jeszcze raz"
+  },
   "transactions": {
     "invalidStatus": "Nieprawidłowy status transakcji: {{ status }}",
     "reconciledLocked": "Ta transakcja jest uzgodniona i zablokowana. Wyłącz opcję „Zablokuj uzgodnione transakcje” w Ustawieniach, aby ją zmienić.",

@@ -517,6 +517,14 @@
     "tooManyTags": "1 回の呼び出しで変更できるタグは最大 {{ max }} 件です",
     "tooManyTransactions": "1 回の呼び出しで変更できる取引は最大 {{ max }} 件です"
   },
+  "transactionRules": {
+    "notFound": "ID {{ id }} の取引ルールが見つかりません",
+    "limitReached": "作成できるルールは最大 {{ max }} 件です",
+    "invalidDefinition": "ルールの定義が無効です",
+    "referenceNotFound": "ルールが存在しない口座、支払先、カテゴリー、またはタグを指定しています",
+    "revisionConflict": "このルールは別の場所で変更されました。再読み込みしてもう一度お試しください",
+    "reorderMismatch": "ルールの一覧が変更されました。再読み込みしてもう一度お試しください"
+  },
   "transactions": {
     "invalidStatus": "無効な取引ステータス：{{ status }}",
     "reconciledLocked": "この取引は照合済みでロックされています。変更するには設定で「照合済み取引をロックする」をオフにしてください。",

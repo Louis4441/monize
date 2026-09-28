@@ -517,6 +517,14 @@
     "tooManyTags": "每次调用最多可更改 {{ max }} 个标签",
     "tooManyTransactions": "每次调用最多可更改 {{ max }} 笔交易"
   },
+  "transactionRules": {
+    "notFound": "未找到 ID 为 {{ id }} 的交易规则",
+    "limitReached": "最多只能创建 {{ max }} 条规则",
+    "invalidDefinition": "规则定义无效",
+    "referenceNotFound": "规则引用了不存在的账户、收款方、类别或标签",
+    "revisionConflict": "此规则已在别处被修改。请重新加载后再试",
+    "reorderMismatch": "规则列表已更改。请重新加载后再试"
+  },
   "transactions": {
     "invalidStatus": "无效的交易状态：{{ status }}",
     "reconciledLocked": "该交易已对账并被锁定。要修改它，请在设置中关闭“锁定已对账交易”。",

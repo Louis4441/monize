@@ -517,6 +517,14 @@
     "tooManyTags": "Se pueden cambiar como máximo {{ max }} etiquetas en una sola llamada",
     "tooManyTransactions": "Se pueden cambiar como máximo {{ max }} transacciones en una sola llamada"
   },
+  "transactionRules": {
+    "notFound": "No se encontró la regla de transacciones con ID {{ id }}",
+    "limitReached": "Se pueden crear como máximo {{ max }} reglas",
+    "invalidDefinition": "La definición de la regla no es válida",
+    "referenceNotFound": "La regla menciona una cuenta, un beneficiario, una categoría o una etiqueta que no existe",
+    "revisionConflict": "Esta regla se modificó en otro lugar. Recárgala e inténtalo de nuevo",
+    "reorderMismatch": "La lista de reglas ha cambiado. Recárgala e inténtalo de nuevo"
+  },
   "transactions": {
     "invalidStatus": "Estado de transacción no válido: {{ status }}",
     "reconciledLocked": "Esta transacción está conciliada y bloqueada. Desactiva «Bloquear transacciones conciliadas» en Ajustes para cambiarla.",

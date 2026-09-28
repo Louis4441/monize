@@ -517,6 +517,14 @@
     "tooManyTags": "Höchstens {{ max }} Etiketten können in einem Aufruf geändert werden",
     "tooManyTransactions": "Höchstens {{ max }} Buchungen können in einem Aufruf geändert werden"
   },
+  "transactionRules": {
+    "notFound": "Transaktionsregel mit der ID {{ id }} nicht gefunden",
+    "limitReached": "Es können höchstens {{ max }} Regeln angelegt werden",
+    "invalidDefinition": "Die Regeldefinition ist ungültig",
+    "referenceNotFound": "Die Regel nennt ein Konto, einen Zahlungsempfänger, eine Kategorie oder ein Tag, das nicht existiert",
+    "revisionConflict": "Diese Regel wurde anderswo geändert. Laden Sie sie neu und versuchen Sie es erneut",
+    "reorderMismatch": "Die Liste der Regeln hat sich geändert. Laden Sie sie neu und versuchen Sie es erneut"
+  },
   "transactions": {
     "invalidStatus": "Ungültiger Buchungsstatus: {{ status }}",
     "reconciledLocked": "Diese Buchung ist abgeglichen und gesperrt. Deaktivieren Sie „Abgeglichene Buchungen sperren“ in den Einstellungen, um sie zu ändern.",

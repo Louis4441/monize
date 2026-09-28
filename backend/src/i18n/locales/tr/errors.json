@@ -517,6 +517,14 @@
     "tooManyTags": "Tek bir çağrıda en fazla {{ max }} etiket değiştirilebilir",
     "tooManyTransactions": "Tek bir çağrıda en fazla {{ max }} işlem değiştirilebilir"
   },
+  "transactionRules": {
+    "notFound": "{{ id }} kimlikli işlem kuralı bulunamadı",
+    "limitReached": "En fazla {{ max }} kural oluşturulabilir",
+    "invalidDefinition": "Kural tanımı geçerli değil",
+    "referenceNotFound": "Kural, var olmayan bir hesabı, alıcıyı, kategoriyi veya etiketi belirtiyor",
+    "revisionConflict": "Bu kural başka bir yerde değiştirildi. Yeniden yükleyip tekrar deneyin",
+    "reorderMismatch": "Kural listesi değişti. Yeniden yükleyip tekrar deneyin"
+  },
   "transactions": {
     "invalidStatus": "Geçersiz işlem durumu: {{ status }}",
     "reconciledLocked": "Bu işlem mutabık kılınmış ve kilitli. Değiştirmek için Ayarlar'da 'Mutabık kılınan işlemleri kilitle' seçeneğini kapatın.",

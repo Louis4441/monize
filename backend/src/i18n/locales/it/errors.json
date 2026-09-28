@@ -517,6 +517,14 @@
     "tooManyTags": "Al massimo {{ max }} tag possono essere modificati in una sola chiamata",
     "tooManyTransactions": "Al massimo {{ max }} transazioni possono essere modificate in una sola chiamata"
   },
+  "transactionRules": {
+    "notFound": "Regola di transazione con ID {{ id }} non trovata",
+    "limitReached": "È possibile creare al massimo {{ max }} regole",
+    "invalidDefinition": "La definizione della regola non è valida",
+    "referenceNotFound": "La regola indica un conto, un beneficiario, una categoria o un tag che non esiste",
+    "revisionConflict": "Questa regola è stata modificata altrove. Ricaricala e riprova",
+    "reorderMismatch": "L'elenco delle regole è cambiato. Ricaricalo e riprova"
+  },
   "transactions": {
     "invalidStatus": "Stato transazione non valido: {{ status }}",
     "reconciledLocked": "Questa transazione è riconciliata e bloccata. Disattiva «Blocca le transazioni riconciliate» nelle Impostazioni per modificarla.",

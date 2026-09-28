@@ -528,6 +528,14 @@
     "tooManyTags": "At most {{ max }} tags can be changed in one call",
     "tooManyTransactions": "At most {{ max }} transactions can be changed in one call"
   },
+  "transactionRules": {
+    "notFound": "Transaction rule with ID {{ id }} not found",
+    "limitReached": "At most {{ max }} rules can be created",
+    "invalidDefinition": "The rule definition is not valid",
+    "referenceNotFound": "The rule names an account, payee, category or tag that does not exist",
+    "revisionConflict": "This rule was changed elsewhere. Reload it and try again",
+    "reorderMismatch": "The list of rules has changed. Reload it and try again"
+  },
   "transactions": {
     "invalidStatus": "Invalid transaction status: {{ status }}",
     "reconciledLocked": "This transaction is reconciled and locked. Turn off 'Lock reconciled transactions' in Settings to change it.",

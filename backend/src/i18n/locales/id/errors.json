@@ -517,6 +517,14 @@
     "tooManyTags": "Maksimal {{ max }} tag dapat diubah dalam satu panggilan",
     "tooManyTransactions": "Maksimal {{ max }} transaksi dapat diubah dalam satu panggilan"
   },
+  "transactionRules": {
+    "notFound": "Aturan transaksi dengan ID {{ id }} tidak ditemukan",
+    "limitReached": "Paling banyak {{ max }} aturan yang dapat dibuat",
+    "invalidDefinition": "Definisi aturan tidak valid",
+    "referenceNotFound": "Aturan menyebut akun, penerima, kategori, atau tag yang tidak ada",
+    "revisionConflict": "Aturan ini diubah di tempat lain. Muat ulang lalu coba lagi",
+    "reorderMismatch": "Daftar aturan telah berubah. Muat ulang lalu coba lagi"
+  },
   "transactions": {
     "invalidStatus": "Status transaksi tidak valid: {{ status }}",
     "reconciledLocked": "Transaksi ini sudah direkonsiliasi dan terkunci. Nonaktifkan \"Kunci transaksi yang direkonsiliasi\" di Pengaturan untuk mengubahnya.",

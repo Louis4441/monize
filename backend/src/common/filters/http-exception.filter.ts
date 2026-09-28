@@ -55,6 +55,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     // object response (e.g. "CURRENCY_INACTIVE"), letting the client branch on
     // the specific failure without parsing the localized message.
     let errorCode: string | undefined;
+    // Optional structured list (e.g. transaction rules: `{ path, code }` per
+    // problem) so the client can point at the offending field.
+    let errors: unknown[] | undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -77,6 +80,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           message = (resp.message as string | string[]) || exception.message;
           if (typeof resp.errorCode === "string") {
             errorCode = resp.errorCode;
+          }
+          if (Array.isArray(resp.errors)) {
+            errors = resp.errors;
           }
         } else {
           message = exception.message;
@@ -126,6 +132,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       statusCode: status,
       message,
       ...(errorCode ? { errorCode } : {}),
+      ...(errors ? { errors } : {}),
       ...(this.isProduction ? {} : { timestamp: new Date().toISOString() }),
     });
   }

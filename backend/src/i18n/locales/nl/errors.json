@@ -517,6 +517,14 @@
     "tooManyTags": "Er kunnen maximaal {{ max }} tags in één aanroep worden gewijzigd",
     "tooManyTransactions": "Er kunnen maximaal {{ max }} transacties in één aanroep worden gewijzigd"
   },
+  "transactionRules": {
+    "notFound": "Transactieregel met ID {{ id }} niet gevonden",
+    "limitReached": "Er kunnen maximaal {{ max }} regels worden aangemaakt",
+    "invalidDefinition": "De regeldefinitie is ongeldig",
+    "referenceNotFound": "De regel verwijst naar een rekening, begunstigde, categorie of tag die niet bestaat",
+    "revisionConflict": "Deze regel is elders gewijzigd. Laad hem opnieuw en probeer het nogmaals",
+    "reorderMismatch": "De lijst met regels is gewijzigd. Laad hem opnieuw en probeer het nogmaals"
+  },
   "transactions": {
     "invalidStatus": "Ongeldige transactiestatus: {{ status }}",
     "reconciledLocked": "Deze transactie is afgestemd en vergrendeld. Zet 'Afgestemde transacties vergrendelen' uit in Instellingen om haar te wijzigen.",

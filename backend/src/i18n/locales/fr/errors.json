@@ -517,6 +517,14 @@
     "tooManyTags": "Au plus {{ max }} étiquettes peuvent être modifiées en un seul appel",
     "tooManyTransactions": "Au plus {{ max }} opérations peuvent être modifiées en un seul appel"
   },
+  "transactionRules": {
+    "notFound": "Règle de transaction avec l'ID {{ id }} introuvable",
+    "limitReached": "Vous pouvez créer au maximum {{ max }} règles",
+    "invalidDefinition": "La définition de la règle n'est pas valide",
+    "referenceNotFound": "La règle mentionne un compte, un bénéficiaire, une catégorie ou une étiquette qui n'existe pas",
+    "revisionConflict": "Cette règle a été modifiée ailleurs. Rechargez-la et réessayez",
+    "reorderMismatch": "La liste des règles a changé. Rechargez-la et réessayez"
+  },
   "transactions": {
     "invalidStatus": "Statut de transaction invalide : {{ status }}",
     "reconciledLocked": "Cette transaction est rapprochée et verrouillée. Désactivez « Verrouiller les transactions rapprochées » dans les Paramètres pour la modifier.",

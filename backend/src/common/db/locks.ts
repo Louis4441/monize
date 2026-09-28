@@ -82,6 +82,8 @@ export enum LockScope {
   TokenFamily = 2,
   /** One user's import slot, held across a destructive wipe + import. */
   UserImport = 3,
+  /** One user's transaction-rule list (positions, the per-user cap). */
+  TransactionRules = 4,
 }
 
 /**
@@ -134,6 +136,19 @@ export function lockHoldingScope(
   accountIds: readonly string[],
 ): Promise<void> {
   return acquireAdvisoryLocks(manager, LockScope.Holdings, accountIds);
+}
+
+/**
+ * Serialize every write to one user's transaction-rule list. Create's
+ * `max + 1`, the per-user cap, delete's compaction and reorder each read the
+ * whole list and then write it; a row lock on one rule cannot stop a
+ * concurrent insert of another, so the list is locked as a whole.
+ */
+export function lockTransactionRuleList(
+  manager: EntityManager,
+  userId: string,
+): Promise<void> {
+  return acquireAdvisoryLock(manager, LockScope.TransactionRules, userId);
 }
 
 /** Serialize refresh-token rotation against family revocation. */
