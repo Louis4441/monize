@@ -796,7 +796,8 @@ function parseCsvDate(dateStr: string, format: string): string | null {
 
 /**
  * Parse an amount string from a CSV field.
- * Handles currency symbols, commas, spaces, and parentheses-as-negative notation.
+ * Handles currency symbols, spaces, parentheses-as-negative notation, and
+ * both US (1,234.56) and European (1.234,56 / 18,36) grouping/decimal styles.
  */
 function parseCsvAmount(value: string): number | null {
   let cleaned = value.trim();
@@ -812,8 +813,31 @@ function parseCsvAmount(value: string): number | null {
 
   // Strip currency symbols and whitespace
   cleaned = cleaned.replace(/[$£€¥₹\s]/g, "");
-  // Strip commas used as thousands separators
-  cleaned = cleaned.replace(/,/g, "");
+
+  const hasComma = cleaned.includes(",");
+  const hasDot = cleaned.includes(".");
+
+  if (hasComma && hasDot) {
+    // Whichever separator appears last is the decimal separator; the other
+    // is a grouping (thousands) separator, e.g. "1.234,56" or "1,234.56".
+    if (cleaned.lastIndexOf(",") > cleaned.lastIndexOf(".")) {
+      cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+    } else {
+      cleaned = cleaned.replace(/,/g, "");
+    }
+  } else if (hasComma) {
+    // Only commas: a single comma followed by exactly three digits reads as
+    // a thousands grouping (e.g. "1,234" -> 1234); anything else -- one
+    // comma with 1-2 trailing digits, or several commas -- is a decimal
+    // comma or repeated grouping (e.g. "18,36" -> 18.36, "1,234,567" -> 1234567).
+    const commaCount = (cleaned.match(/,/g) ?? []).length;
+    const digitsAfterLastComma = cleaned.length - cleaned.lastIndexOf(",") - 1;
+    if (commaCount === 1 && digitsAfterLastComma !== 3) {
+      cleaned = cleaned.replace(",", ".");
+    } else {
+      cleaned = cleaned.replace(/,/g, "");
+    }
+  }
 
   const amount = parseFloat(cleaned);
   return isNaN(amount) ? null : amount;
