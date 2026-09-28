@@ -2,17 +2,30 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
   Logger,
 } from "@nestjs/common";
 import { tr } from "../i18n/translate";
 import { DataSource, EntityManager, QueryRunner, In } from "typeorm";
 import { Tag } from "./entities/tag.entity";
 import { TransactionTag } from "./entities/transaction-tag.entity";
+import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplitTag } from "./entities/transaction-split-tag.entity";
 import { CreateTagDto } from "./dto/create-tag.dto";
 import { UpdateTagDto } from "./dto/update-tag.dto";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { withScopedDb } from "../common/db/scoped-db";
+
+/** Upper bounds for one additive/removal call (design 6.2). */
+export const MAX_TAGS_PER_CALL = 100;
+export const MAX_TRANSACTIONS_PER_CALL = 1000;
+
+/**
+ * Rows per INSERT in addTransactionTags. A link binds two parameters and one
+ * PostgreSQL statement takes at most 65535, so the 1000 x 100 upper bound
+ * (200000 parameters) is written in batches, all on the caller's transaction.
+ */
+export const TAG_LINK_INSERT_BATCH = 5000;
 
 @Injectable()
 export class TagsService {
@@ -290,6 +303,124 @@ export class TagsService {
         );
         await manager.save(TransactionTag, newTags);
       }
+    });
+  }
+
+  /**
+   * Validate and dedupe the inputs of addTransactionTags /
+   * removeTransactionTags: bounds first (no query), then tag ownership and
+   * transaction ownership on the caller's manager, before any write. Returns
+   * null when there is nothing to do.
+   */
+  private async prepareTransactionTagChange(
+    m: EntityManager,
+    userId: string,
+    transactionIds: readonly string[],
+    tagIds: readonly string[],
+  ): Promise<{ txIds: string[]; tIds: string[] } | null> {
+    const txIds = [...new Set(transactionIds)];
+    const tIds = [...new Set(tagIds)];
+    if (txIds.length === 0 || tIds.length === 0) {
+      return null;
+    }
+    if (tIds.length > MAX_TAGS_PER_CALL) {
+      throw new BadRequestException(
+        tr(
+          "errors.tags.tooManyTags",
+          `At most ${MAX_TAGS_PER_CALL} tags can be changed in one call`,
+          { max: MAX_TAGS_PER_CALL },
+        ),
+      );
+    }
+    if (txIds.length > MAX_TRANSACTIONS_PER_CALL) {
+      throw new BadRequestException(
+        tr(
+          "errors.tags.tooManyTransactions",
+          `At most ${MAX_TRANSACTIONS_PER_CALL} transactions can be changed in one call`,
+          { max: MAX_TRANSACTIONS_PER_CALL },
+        ),
+      );
+    }
+
+    // Same ownership check as setTransactionTags / setTransactionTagsBulk.
+    const tags = await m.find(Tag, { where: { id: In(tIds), userId } });
+    if (tags.length !== tIds.length) {
+      throw new NotFoundException(
+        tr("errors.tags.oneOrMoreNotFound", "One or more tags not found"),
+      );
+    }
+
+    // The existing methods rely on RLS alone for the transaction side; the
+    // additive path checks it explicitly so a foreign id is refused, not
+    // silently skipped or written.
+    const ownedTransactions = await m.count(Transaction, {
+      where: { id: In(txIds), userId },
+    });
+    if (ownedTransactions !== txIds.length) {
+      throw new NotFoundException(
+        tr(
+          "errors.tags.oneOrMoreTransactionsNotFound",
+          "One or more transactions not found",
+        ),
+      );
+    }
+    return { txIds, tIds };
+  }
+
+  /**
+   * Add tags to many transactions without touching the tags they already
+   * carry. Runs on the caller's EntityManager (its withScopedDb transaction).
+   * Idempotent: (transaction_id, tag_id) is the primary key and the insert is
+   * ON CONFLICT DO NOTHING, so a repeat leaves one link.
+   */
+  async addTransactionTags(
+    m: EntityManager,
+    userId: string,
+    transactionIds: readonly string[],
+    tagIds: readonly string[],
+  ): Promise<void> {
+    const plan = await this.prepareTransactionTagChange(
+      m,
+      userId,
+      transactionIds,
+      tagIds,
+    );
+    if (!plan) {
+      return;
+    }
+    const rows = plan.txIds.flatMap((transactionId) =>
+      plan.tIds.map((tagId) => ({ transactionId, tagId })),
+    );
+    for (let i = 0; i < rows.length; i += TAG_LINK_INSERT_BATCH) {
+      await m
+        .createQueryBuilder()
+        .insert()
+        .into(TransactionTag)
+        .values(rows.slice(i, i + TAG_LINK_INSERT_BATCH))
+        .orIgnore()
+        .execute();
+    }
+  }
+
+  /** Remove exactly the named (transaction, tag) links; other tags stay. */
+  async removeTransactionTags(
+    m: EntityManager,
+    userId: string,
+    transactionIds: readonly string[],
+    tagIds: readonly string[],
+  ): Promise<void> {
+    const plan = await this.prepareTransactionTagChange(
+      m,
+      userId,
+      transactionIds,
+      tagIds,
+    );
+    if (!plan) {
+      return;
+    }
+    await m.delete(TransactionTag, {
+      transactionId: In(plan.txIds),
+      tagId: In(plan.tIds),
     });
   }
 

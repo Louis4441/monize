@@ -523,7 +523,10 @@
   "tags": {
     "notFound": "[XX-Tag with ID {{ id }} not found-XX]",
     "nameConflict": "[XX-A tag named \"{{ name }}\" already exists-XX]",
-    "oneOrMoreNotFound": "[XX-One or more tags not found-XX]"
+    "oneOrMoreNotFound": "[XX-One or more tags not found-XX]",
+    "oneOrMoreTransactionsNotFound": "[XX-One or more transactions not found-XX]",
+    "tooManyTags": "[XX-At most {{ max }} tags can be changed in one call-XX]",
+    "tooManyTransactions": "[XX-At most {{ max }} transactions can be changed in one call-XX]"
   },
   "transactions": {
     "invalidStatus": "[XX-Invalid transaction status: {{ status }}-XX]",
