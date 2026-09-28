@@ -239,6 +239,25 @@ export const RULES: Record<string, TableRules> = {
     created_at: keep,
     updated_at: keep,
   },
+  transaction_rules: {
+    id: keep,
+    user_id: keep,
+    name: mask,
+    enabled: keep,
+    position: keep,
+    triggers: keep, // a subset of {create, import}
+    // Free-text match patterns (payee text, descriptions, memos) and the
+    // user's own review instructions, nested in documents that also carry the
+    // ids of accounts, payees, categories and tags. Both are NOT NULL, so they
+    // are replaced by an empty document rather than dropped; a rule restored
+    // from a support backup is invalid and skipped, never evaluated.
+    condition: konst({}),
+    actions: konst([]),
+    stop_processing: keep,
+    revision: keep,
+    created_at: keep,
+    updated_at: keep,
+  },
   transactions: {
     id: keep,
     user_id: keep,

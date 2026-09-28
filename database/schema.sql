@@ -613,6 +613,56 @@ CREATE TABLE transaction_split_tags (
 CREATE INDEX idx_transaction_split_tags_tag ON transaction_split_tags(tag_id);
 CREATE INDEX idx_transaction_split_tags_split ON transaction_split_tags(transaction_split_id);
 
+-- Transaction Rules: per-user rules applied when a transaction is created or
+-- imported (docs/future-plans/transaction-rules.md section 4). position is the
+-- evaluation order, unique per user and deferrable so a reorder can rewrite
+-- several positions in one transaction. condition/actions are validated by the
+-- application on write. The defaults on triggers, condition, actions and the
+-- trace's source/changes exist for the RLS spec's generic row seeder.
+CREATE TABLE transaction_rules (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT true,
+    position INTEGER NOT NULL,
+    triggers TEXT[] NOT NULL DEFAULT ARRAY['create', 'import']::text[],
+    condition JSONB NOT NULL DEFAULT '{}'::jsonb,
+    actions JSONB NOT NULL DEFAULT '[]'::jsonb,
+    stop_processing BOOLEAN NOT NULL DEFAULT false,
+    revision INTEGER NOT NULL DEFAULT 1, -- compare-and-swap counter for updates
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ck_transaction_rules_name_length
+      CHECK (char_length(name) BETWEEN 1 AND 100),
+    CONSTRAINT ck_transaction_rules_position CHECK (position >= 0),
+    CONSTRAINT ck_transaction_rules_revision CHECK (revision >= 1),
+    CONSTRAINT ck_transaction_rules_triggers
+      CHECK (cardinality(triggers) >= 1 AND triggers <@ ARRAY['create', 'import']::text[]),
+    CONSTRAINT uq_transaction_rules_user_position
+      UNIQUE (user_id, position) DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE INDEX idx_transaction_rules_user_position ON transaction_rules(user_id, position);
+
+-- Transaction Rule Applications (the trace: what each rule changed on which
+-- transaction). Trimmed by a retention cron.
+CREATE TABLE transaction_rule_applications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    rule_id UUID NOT NULL REFERENCES transaction_rules(id) ON DELETE CASCADE,
+    transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+    source VARCHAR(20) NOT NULL DEFAULT 'manual', -- 'create' | 'import' | 'manual'
+    changes JSONB NOT NULL DEFAULT '{}'::jsonb, -- before/after per field
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ck_transaction_rule_applications_source
+      CHECK (source IN ('create', 'import', 'manual'))
+);
+
+CREATE INDEX idx_transaction_rule_applications_rule
+    ON transaction_rule_applications(rule_id, applied_at DESC);
+CREATE INDEX idx_transaction_rule_applications_transaction
+    ON transaction_rule_applications(transaction_id);
+
 -- Securities (stocks, bonds, mutual funds, ETFs)
 -- Defined before scheduled_transactions because that table (and others below)
 -- carry inline FKs to securities(id); the FK target must exist first when the
@@ -2383,6 +2433,7 @@ CREATE INDEX idx_single_use_tokens_expiry
 
 -- Trigger for tags updated_at
 CREATE TRIGGER update_tags_updated_at BEFORE UPDATE ON tags FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_transaction_rules_updated_at BEFORE UPDATE ON transaction_rules FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Action History (undo/redo support)
 CREATE TABLE action_history (
@@ -2964,6 +3015,8 @@ DECLARE
         'scheduled_transactions',
         'securities',
         'transaction_attachments',
+        'transaction_rule_applications',
+        'transaction_rules',
         'user_currency_preferences'
     ];
 BEGIN

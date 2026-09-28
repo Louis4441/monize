@@ -37,6 +37,12 @@ export class BackupRestoreDatabaseService {
       userId,
     ]);
 
+    // Transaction rules (their trace rows cascade from the rule and from the
+    // transactions deleted below; the trace is not part of a backup).
+    await manager.query("DELETE FROM transaction_rules WHERE user_id = $1", [
+      userId,
+    ]);
+
     // GEM strategies (accounts, assets and signals cascade on strategy delete,
     // but are deleted explicitly first so the order is self-documenting)
     await manager.query("DELETE FROM gem_strategy_signals WHERE user_id = $1", [

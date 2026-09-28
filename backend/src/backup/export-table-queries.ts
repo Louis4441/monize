@@ -209,6 +209,14 @@ export const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   "ai_relay_actions",
   "ai_relay_attachments",
   "ai_relay_attachment_blobs",
+  // The rule trace: what each rule changed on which transaction, trimmed by a
+  // retention cron. A log of what already happened to rows the restore is
+  // replacing, keyed to transaction ids that a restore re-mints, so a restored
+  // row would describe an edit of a transaction that no longer exists under
+  // that id. The rules themselves (`transaction_rules`) are exported; the trace
+  // rebuilds as they run. It cascades from the rule and the transaction, so a
+  // restore's deletes clear it.
+  "transaction_rule_applications",
 ]);
 
 export function buildExportTableQueries(
@@ -305,6 +313,15 @@ export function buildExportTableQueries(
     {
       key: "tags",
       sql: "SELECT * FROM tags WHERE user_id = $1 ORDER BY name",
+    },
+    {
+      // The user's rules. Their account, payee, category and tag ids live in
+      // the condition/actions JSONB rather than in foreign keys, and the
+      // restore's id remap rewrites ids nested inside JSONB, so the rules keep
+      // pointing at the restored rows. Ordered by position so the file reads in
+      // evaluation order.
+      key: "transaction_rules",
+      sql: "SELECT * FROM transaction_rules WHERE user_id = $1 ORDER BY position",
     },
     {
       key: "transactions",
