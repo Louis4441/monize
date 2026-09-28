@@ -4975,6 +4975,11 @@ describe("PortfolioService", () => {
       );
 
     beforeEach(() => {
+      // Every fixture day below is a fixed calendar date meant to read as
+      // "finished" against the 1M lookback's 30-day cutoff and against
+      // planSessionCloses' own-day check; bracket "now" so neither drifts
+      // out from under the assertions as real time passes.
+      jest.useFakeTimers().setSystemTime(new Date("2026-09-20T12:00:00.000Z"));
       prefRepository.findOne.mockResolvedValue(mockPref);
       accountsRepository.find.mockResolvedValue([
         mockBrokerageAccount,
@@ -4983,6 +4988,10 @@ describe("PortfolioService", () => {
       // Today's holdings row disagrees with every past day on purpose: the
       // ledger path must never read it.
       holdingsRepository.find.mockResolvedValue([mockHoldingVFV]);
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
     });
 
     it("ends each finished session on the daily close, one step after its last bar (XGRO, Sep 2)", async () => {
