@@ -1,5 +1,6 @@
 import { Module, forwardRef } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
+import { AuthAttemptCounterModule } from "../auth/auth-attempt-counter.module";
 import { AccountsModule } from "../accounts/accounts.module";
 import { TransactionsModule } from "../transactions/transactions.module";
 import { CategoriesModule } from "../categories/categories.module";
@@ -45,6 +46,10 @@ import { McpSpendingAnalysisPrompt } from "./prompts/spending-analysis.prompt";
 @Module({
   imports: [
     AuthModule,
+    // The shared counter rows behind the daily MCP write cap (`McpWriteLimiter`).
+    // AuthModule re-exports it too; named here so the limiter's dependency does
+    // not rest on that re-export.
+    AuthAttemptCounterModule,
     forwardRef(() => AccountsModule),
     forwardRef(() => TransactionsModule),
     forwardRef(() => CategoriesModule),

@@ -28,6 +28,7 @@ import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { ReportError } from '@/components/reports/ReportError';
 import { exportToCsv } from '@/lib/csv-export';
+import { roundMoney, sumMoney } from '@/lib/format';
 import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 
 const RANGE_STORAGE_KEY = 'monize-reports-monthly-category-breakdown-range';
@@ -198,18 +199,6 @@ function compareKeys(
       ? a.localeCompare(b)
       : (a as number) - (b as number);
   return dir === 'asc' ? cmp : -cmp;
-}
-
-const SCALE = 10000;
-function roundMoney(value: number): number {
-  return Math.round(value * SCALE) / SCALE;
-}
-function sumMoney(values: number[]): number {
-  const units = values.reduce(
-    (acc, v) => acc + (Number.isFinite(v) ? Math.round(v * SCALE) : 0),
-    0,
-  );
-  return units / SCALE;
 }
 
 function processGroup(

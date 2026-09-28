@@ -144,6 +144,7 @@
   },
   "dateInput": {
     "shortcutsTitle": "鍵盤快速鍵",
+    "openPicker": "開啟日期選擇器",
     "today": "今天",
     "firstDayOfYear": "年初第一天",
     "lastDayOfYear": "年末最後一天",

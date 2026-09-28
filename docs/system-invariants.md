@@ -2198,8 +2198,10 @@ Statement           One scheduled occurrence may create at most one financial
                     effect.
 Source of truth     scheduled_transaction_postings, one row per occurrence
 Enforcement         A durable occurrence key claimed atomically.
-                    processAutoPostTransactions locks the schedule and CAS-checks
-                    next_due_date is still due, then claims the occurrence with
+                    processAutoPostTransactions passes the occurrence it selected
+                    as post()'s expectedDueDate; post() locks the schedule and
+                    CAS-checks next_due_date is still that occurrence, then claims
+                    it with
                     INSERT INTO scheduled_transaction_postings ... ON CONFLICT
                     (scheduled_transaction_id, original_due_date) DO NOTHING
                     RETURNING id (scheduled-transactions.service.ts), throwing
@@ -2213,7 +2215,13 @@ Retry semantics     Safe: a re-post is refused by the occurrence claim.
 Crash semantics     A crash between claim and advance leaves the claim row, so the
                     next tick is refused rather than reposting.
 Failure response    the losing claim gets ConflictException, having posted nothing.
-Required tests      The unique index gives DB-level exactly-once; a two-instance
+                    A replica whose selection went stale (the winner already
+                    advanced next_due_date) is refused by expectedDueDate; without
+                    it, post() re-read the row and posted the NEXT occurrence under
+                    a fresh claim key, once per extra replica.
+Required tests      Present (unit): scheduled-transactions.service.spec.ts, a cron
+                    whose post() re-reads an advanced next_due_date posts nothing.
+                    The unique index gives DB-level exactly-once; a two-instance
                     "two replicas, one posting" integration test is still owed as
                     the gold-standard proof.
 Status              enforced
@@ -3880,7 +3888,9 @@ Enforcement         Per job, and now mostly a durable cross-replica claim.
                     (INV-OCCURRENCE-001, occurrence-key claim), budget rollover
                     (ON CONFLICT (budget_id, period_start) DO NOTHING RETURNING with
                     the loser re-reading the winner), AI insight generation
-                    (claimLease, not a process-local Set), demo reset (claimLease).
+                    (claimLease with the cooldown re-read under it, not a
+                    process-local Set), demo reset (claimOnce
+                    keyed by the UTC day).
                     The MNY reaper's conditional CAS and the price/FX refreshes'
                     natural-key ON CONFLICT were already real.
                     Still partial: the account-balance recompute is idempotent
@@ -4866,6 +4876,12 @@ Enforcement         backend/src/auth/auth-attempt-counter.service.ts is the one 
                     backend/src/auth/auth-state-sweeper.service.ts prunes expired rows;
                     nothing reads a pruned row, because an expired window is
                     reported as zero whether or not the sweep has run.
+                    The AI and MCP daily write caps
+                    (backend/src/common/daily-write-limiter.ts) count on the
+                    same table under scopes ai-write and mcp-write, in a fixed
+                    window ending at the next UTC midnight -- a soft guardrail
+                    rather than an attempt budget, since the cap is read before
+                    the write and counted after it.
 Concurrency scope   per (scope, key) -- a user, an email address or an IP,
                     globally across replicas
 Retry semantics     Every attempt counts exactly once: the increment is the

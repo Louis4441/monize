@@ -310,6 +310,18 @@ describe('DividendIncomeReport', () => {
     expect(screen.getByText('By Security')).toBeInTheDocument();
   });
 
+  it('labels the chart/table display switch for the monthly view', async () => {
+    mockGetTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    mockGetCapitalGains.mockResolvedValue([]);
+    render(<DividendIncomeReport />);
+    await waitFor(() => {
+      expect(
+        screen.getByRole('group', { name: 'Monthly display mode' }),
+      ).toBeInTheDocument();
+    });
+  });
+
   it('populates the security filter from loaded data and narrows results when one is picked', async () => {
     mockGetTransactions.mockResolvedValue({
       data: [

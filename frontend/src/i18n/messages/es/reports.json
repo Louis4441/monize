@@ -322,6 +322,14 @@
     "seriesInflows": "Entradas",
     "seriesOutflows": "Salidas"
   },
+  "tagBreakdown": {
+    "label": "Desglosar por clave de etiqueta",
+    "none": "Ninguna",
+    "untagged": "Sin etiquetar",
+    "inflows": "Entradas etiquetadas",
+    "outflows": "Salidas etiquetadas",
+    "sharesExceedNote": "Una fila etiquetada con más de un valor bajo esta clave cuenta para cada uno de ellos, por lo que los porcentajes por valor pueden sumar más del 100%."
+  },
   "categoryPerformance": {
     "noBudgets": "No se encontraron presupuestos. Crea un presupuesto para ver el rendimiento por categoría.",
     "noData": "Aún no hay datos de categorías disponibles.",
@@ -471,6 +479,7 @@
     "allAccountsPlaceholder": "Todas las cuentas",
     "filterBySecurityLabel": "Filtrar por valor",
     "filterByAccountLabel": "Filtrar por cuenta",
+    "monthlyDisplayModeLabel": "Modo de visualización mensual",
     "allSecurities": "Todos los valores",
     "viewMonthly": "Mensual",
     "viewDaily": "Diario",
@@ -1192,7 +1201,6 @@
     "incompleteTooltip": "A algunos días de este período les falta un precio, un tipo de cambio o un saldo de efectivo, por lo que no se muestran las cifras que dependen de todos los días.",
     "measuredFromClose": "Desde el cierre de la sesión del {date}",
     "unmeasuredFlowTooltip": "Se movió dinero hacia dentro o fuera de estas cuentas de una forma que no se puede contabilizar aquí: una operación liquidada desde una cuenta ajena a ellas, o un desglose que mezcla una línea de inversión con un gasto ordinario. El resultado de la inversión no se muestra, porque parte de él sería su propio dinero.",
-    "closeBoundsTooltip": "Estas cifras se miden entre los valores de cierre almacenados del {start} y el {end}. El gráfico de arriba muestra precios en tiempo real durante el día, por lo que puede variar aunque estas cifras no lo hagan.",
     "notAvailable": "N/A",
     "intradayUnavailable": "Precios intradía detallados no disponibles",
     "intradayUnavailableTitle": "Vista intradía no disponible para esta combinación de cuentas",
@@ -1717,6 +1725,19 @@
     "title": "Comparar escenarios de Monte Carlo",
     "subtitle": "Métricas comparadas de hasta 4 escenarios guardados.",
     "backToMonteCarlo": "Volver a Monte Carlo",
+    "downloadCsv": "Descargar CSV",
+    "downloadCsvTitle": "Descargar la comparación como archivo CSV",
+    "downloadCsvWaitTitle": "Espere a que se carguen al menos 2 escenarios",
+    "emptyHeading": "No se seleccionaron escenarios",
+    "emptyBody": "Elige escenarios del informe de Monte Carlo para compararlos uno junto a otro.",
+    "emptyButton": "Ir a la simulación de Monte Carlo",
+    "needsMoreHeading": "Se necesitan al menos 2 escenarios",
+    "needsMoreBody": "La comparación requiere 2 o más escenarios guardados. Actualmente tiene uno seleccionado (id: <mono>{id}</mono>).",
+    "needsMoreButton": "Elegir más escenarios",
+    "scenarioFallback": "Escenario",
+    "removeAriaLabel": "Quitar {title} de la comparación",
+    "removeTitle": "Quitar de la comparación",
+    "runFailed": "La ejecución falló",
     "errors": {
       "loadScenarioFailed": "No se pudo cargar el escenario.",
       "simulationFailed": "La simulación falló."

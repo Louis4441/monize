@@ -172,6 +172,7 @@
       "ref": "参照: {number}",
       "investmentLabel": "投資",
       "linkedInvestmentTitle": "投資で表示",
+      "linkedInvestmentBadgeTitle": "この取引は投資取引にリンクされています",
       "filterByDate": "日付「{date}」でフィルター",
       "filterByAccount": "「{name}」でフィルター",
       "filterByPayee": "「{name}」でフィルター",

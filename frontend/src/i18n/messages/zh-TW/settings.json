@@ -493,6 +493,15 @@
       "description": "從您的帳戶中移除財務資料。此操作無法復原。",
       "openButton": "刪除資料...",
       "alwaysDeletedHeading": "以下內容將始終被刪除：",
+      "alwaysDeletedItems": {
+        "transactions": "所有交易與拆分",
+        "scheduled": "所有排程/週期性交易",
+        "securities": "所有證券、價格、持股與投資交易",
+        "budgets": "所有預算與預算提醒",
+        "monthlySummaries": "每月科目結餘摘要",
+        "customReports": "自訂報表、標籤與匯入對應",
+        "actionHistory": "操作紀錄（復原/重做）"
+      },
       "optionalHeading": "選擇性也刪除：",
       "accountsOption": "科目",
       "categoriesOption": "類別",

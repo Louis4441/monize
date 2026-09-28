@@ -125,6 +125,57 @@ describe("AuthAttemptCounterService", () => {
     });
   });
 
+  describe("incrementUntilUtcMidnight", () => {
+    it("adds the whole amount in one statement and returns what the database wrote", async () => {
+      const windowExpiresAt = new Date("2026-03-16T00:00:00.000Z");
+      manager.query.mockResolvedValue([
+        { count: "7", window_expires_at: windowExpiresAt.toISOString() },
+      ]);
+
+      const result = await service.incrementUntilUtcMidnight(
+        "mcp-write",
+        "user-1",
+        4,
+      );
+
+      expect(result).toEqual({ count: 7, windowExpiresAt });
+      expect(manager.query).toHaveBeenCalledTimes(1);
+      const [sql, params] = manager.query.mock.calls[0];
+      expect(sql).toContain("INSERT INTO auth_attempt_counters");
+      expect(sql).toContain("ON CONFLICT (scope, key) DO UPDATE");
+      // The amount is added, not one per call, and a lapsed window restarts
+      // at the amount rather than at 1.
+      expect(sql).toContain("auth_attempt_counters.count + EXCLUDED.count");
+      expect(sql).toMatch(/THEN EXCLUDED\.count/);
+      expect(params).toEqual(["mcp-write", "user-1", 4]);
+    });
+
+    it("computes the day boundary in SQL, never from this process's clock", async () => {
+      manager.query.mockResolvedValue([
+        { count: 1, window_expires_at: new Date() },
+      ]);
+
+      await service.incrementUntilUtcMidnight("ai-write", "user-1", 1);
+
+      const [sql, params] = manager.query.mock.calls[0];
+      expect(sql).toContain(
+        "(date_trunc('day', now() AT TIME ZONE 'UTC') + interval '1 day') AT TIME ZONE 'UTC'",
+      );
+      // No duration from this process in the parameters: only scope, key, amount.
+      expect(params).toHaveLength(3);
+    });
+
+    it("runs outside the caller's transaction, like increment", async () => {
+      manager.query.mockResolvedValue([
+        { count: 1, window_expires_at: new Date() },
+      ]);
+
+      await service.incrementUntilUtcMidnight("ai-write", "user-1", 1);
+
+      expect(runOutsideActiveScopedManager).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("peek", () => {
     it("ignores a row whose window has passed", async () => {
       manager.query.mockResolvedValue([]);

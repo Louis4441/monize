@@ -18,6 +18,7 @@ import { Category } from '@/types/category';
 import { Payee } from '@/types/payee';
 import { Tag } from '@/types/tag';
 import { TransactionStatus } from '@/types/transaction';
+import { isUuid } from '@/lib/uuid';
 
 // LocalStorage keys for filter persistence
 const STORAGE_KEYS = {
@@ -56,11 +57,6 @@ export type HasAttachmentsFilter = '' | 'yes' | 'no';
 function sanitizeHasAttachments(value: string): HasAttachmentsFilter {
   return value === 'yes' || value === 'no' ? value : '';
 }
-
-// Mirrors the backend's targetTransactionId validation so a malformed deep-link
-// value is ignored rather than sent on to a 4xx.
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const VALID_TRANSACTION_STATUSES = new Set<string>(Object.values(TransactionStatus));
 
@@ -483,7 +479,7 @@ export function useTransactionFilters({ accounts, categories, payees, tags, week
     // link). The backend resolves which page contains it; we flash/scroll to it
     // once it renders. A bogus value is ignored so the list still loads.
     const targetId = searchParams.get('targetTransactionId');
-    if (targetId && UUID_REGEX.test(targetId)) {
+    if (targetId && isUuid(targetId)) {
       targetTransactionIdRef.current = targetId;
       setHighlightTransactionId(targetId);
       appliedTargetRef.current = targetId;
@@ -509,7 +505,7 @@ export function useTransactionFilters({ accounts, categories, payees, tags, week
   useEffect(() => {
     if (!filtersInitialized) return;
     const targetId = searchParams.get('targetTransactionId');
-    if (!targetId || !UUID_REGEX.test(targetId)) {
+    if (!targetId || !isUuid(targetId)) {
       // The param has been consumed/stripped (or was never a valid deep link),
       // so allow a future identical link to re-trigger -- e.g. clicking the
       // same "View transaction" link again to jump back to the row.
@@ -565,7 +561,7 @@ export function useTransactionFilters({ accounts, categories, payees, tags, week
     if (!filtersInitialized) return;
     // Never fight the targetTransactionId watcher over one URL change.
     const targetId = searchParams.get('targetTransactionId');
-    if (targetId && UUID_REGEX.test(targetId)) return;
+    if (targetId && isUuid(targetId)) return;
     const signature = buildEntityParamSignature(searchParams);
     if (!signature) {
       // Params consumed (rewritten to plural) or never present: allow the
@@ -588,7 +584,7 @@ export function useTransactionFilters({ accounts, categories, payees, tags, week
     // targetTransactionId handling (special category pseudo-ids excepted).
     const isSpecialCategory =
       entity.kind === 'category' && isSpecialCategoryFilterId(entity.id);
-    if (!isSpecialCategory && !UUID_REGEX.test(entity.id)) return;
+    if (!isSpecialCategory && !isUuid(entity.id)) return;
 
     setFilterAccountIds(entity.kind === 'account' ? [entity.id] : []);
     setFilterCategoryIds(entity.kind === 'category' ? [entity.id] : []);

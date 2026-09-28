@@ -41,6 +41,7 @@ npm run i18n:check         # Verify the pseudo-locale is up to date (CI gate)
 | Date entry | `DateInput` | a raw `<input type="date">` |
 | Money entry / other numbers | `CurrencyInput` / `NumericInput` | any `type="number"` input; `parseFloat` on typed text |
 | Number a person reads | `useNumberFormat()` (`formatCurrency`, `formatNumber`, `formatPercent`, `formatShareQuantity`, `formatBytes`) | `toFixed`, `toLocaleString()`, the raw `@/lib/format` helpers, a literal `%` |
+| Rounding, a bound, an id check, a foreign ISO code | `roundToCents` / `roundMoney` / `sumMoney` / `withCurrencyCode` (`lib/format.ts`), `clamp` (`lib/clamp.ts`), `isUuid` (`lib/uuid.ts`) | a local `round2`, `clamp` or UUID regex, or a component's own `formatCurrency` |
 | Today, for a financial decision | `useFinancialToday()` / `financialTodayYmd` | `new Date().toISOString().slice(0, 10)` |
 | Help that explains a figure or setting | `InfoTooltip` (opens on hover, focus and tap) | a hand-rolled `role="tooltip"`, or a help icon hidden below a breakpoint |
 | Clickable table row | `useLongPress({ onClick })` spread on the `<tr>` | a button around the name |

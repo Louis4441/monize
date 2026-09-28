@@ -123,6 +123,72 @@ export const RELEASE_1_16_NOTIFICATIONS_TOUR: TourDefinition = {
   ],
 };
 
+/**
+ * "Break down by tag key" (`docs/specs/report-tag-key-breakdown.md`): the
+ * opt-in control on Income vs Expenses and Cash Flow that splits either
+ * report into per-tag-value buckets plus an Untagged bucket, and surfaces
+ * tagged transfer flows as their own figure -- never folded into income
+ * (INV-REPORT-003).
+ *
+ * **The anchored step is `fallbackWhenMissing`.** `TagKeyBreakdownSelect`
+ * renders nothing until the user has at least one `KEY:VALUE` tag, so a
+ * fresh account (or one that only categorizes, never tags) never mounts the
+ * anchor. Skipping the step outright would be wrong here -- unlike an anchor
+ * lost to a refactor, the absence is itself the thing worth a sentence: the
+ * fallback explains that tagging a transaction `scope:household` (say) is
+ * what makes the control appear, so the reader leaves knowing what to do
+ * next rather than the step silently vanishing. A short `anchorTimeoutMs`
+ * keeps that stand-in from sitting behind a blank screen.
+ *
+ * The buckets view is deliberately anchorless: `TagKeyBreakdownBuckets` only
+ * mounts once a key is picked, which a passive tour cannot force (there is no
+ * synthetic key to select on the reader's behalf), so it gets an unobtrusive
+ * anchorless step describing what appears instead of pointing at it.
+ */
+export const RELEASE_1_16_REPORT_TAG_BREAKDOWN_TOUR: TourDefinition = {
+  id: 'release-1.16.0/report-tag-breakdown',
+  area: 'reports',
+  version: RELEASE_1_16_MINOR,
+  i18nPrefix: 'release.v1_16_0.reportTagBreakdown',
+  steps: [
+    {
+      // Route-agnostic welcome: shows wherever the tour was launched, so it
+      // never fights a closing What's New modal's history.back().
+      id: 'welcome',
+      anchorId: null,
+    },
+    {
+      // The control itself. It renders nothing without a KEY:VALUE tag, so
+      // the fallback carries the "how do I get this" answer instead of the
+      // step disappearing. allowInteraction so the reader can try it when it
+      // is there.
+      id: 'breakdown',
+      route: '/reports/income-vs-expenses',
+      anchorId: TOUR_ANCHORS.reportTagBreakdownSelect,
+      placement: 'bottom',
+      allowInteraction: true,
+      fallbackWhenMissing: true,
+      anchorTimeoutMs: 2500,
+    },
+    {
+      // The buckets view, described rather than anchored: it only mounts
+      // once a key is picked, which nothing here can do for the reader.
+      // Unobtrusive because the step is about a whole card of tabs, and
+      // dimming would hide the very content it names.
+      id: 'buckets',
+      route: '/reports/income-vs-expenses',
+      anchorId: null,
+      unobtrusive: true,
+    },
+    {
+      id: 'finish',
+      route: '/reports/income-vs-expenses',
+      anchorId: null,
+    },
+  ],
+};
+
 export const RELEASE_1_16_TOURS: readonly TourDefinition[] = [
   RELEASE_1_16_NOTIFICATIONS_TOUR,
+  RELEASE_1_16_REPORT_TAG_BREAKDOWN_TOUR,
 ];

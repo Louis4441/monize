@@ -195,6 +195,12 @@ describe('DangerZoneSection', () => {
       expect(screen.getByText('Categories')).toBeInTheDocument();
       expect(screen.getByText('Payees')).toBeInTheDocument();
       expect(screen.getByText('Currency preferences')).toBeInTheDocument();
+      expect(
+        screen.getByText('All transactions and splits'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('Action history (undo/redo)'),
+      ).toBeInTheDocument();
     });
 
     it('requires password for local auth users', () => {

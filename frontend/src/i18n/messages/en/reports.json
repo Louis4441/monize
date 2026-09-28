@@ -322,6 +322,14 @@
     "seriesInflows": "Inflows",
     "seriesOutflows": "Outflows"
   },
+  "tagBreakdown": {
+    "label": "Break down by tag key",
+    "none": "None",
+    "untagged": "Untagged",
+    "inflows": "Tagged inflows",
+    "outflows": "Tagged outflows",
+    "sharesExceedNote": "A row tagged with more than one value under this key counts toward each of them, so per-value shares can add up to more than 100%."
+  },
   "categoryPerformance": {
     "noBudgets": "No budgets found. Create a budget to see category performance.",
     "noData": "No category data available yet.",
@@ -471,6 +479,7 @@
     "allAccountsPlaceholder": "All Accounts",
     "filterBySecurityLabel": "Filter by security",
     "filterByAccountLabel": "Filter by account",
+    "monthlyDisplayModeLabel": "Monthly display mode",
     "allSecurities": "All Securities",
     "viewMonthly": "Monthly",
     "viewDaily": "Daily",
@@ -1192,7 +1201,6 @@
     "incompleteTooltip": "Some days in this window are missing a price, an exchange rate or a cash balance, so the figures that depend on every day are not shown.",
     "measuredFromClose": "Since the close of trading on {date}",
     "unmeasuredFlowTooltip": "Money moved into or out of these accounts in a way that cannot be counted here: a trade settled from an account outside them, or a split that mixes an investment line with ordinary spending. The investment result is not shown, because part of it would be your own money.",
-    "closeBoundsTooltip": "These figures are measured between the stored closing values of {start} and {end}. The chart above shows live prices during the day, so it can move while they do not.",
     "notAvailable": "N/A",
     "intradayUnavailable": "Detailed intraday pricing unavailable",
     "intradayUnavailableTitle": "Intraday view unavailable for this account mix",
@@ -1717,6 +1725,19 @@
     "title": "Compare Monte Carlo Scenarios",
     "subtitle": "Side-by-side metrics for up to 4 saved scenarios.",
     "backToMonteCarlo": "Back to Monte Carlo",
+    "downloadCsv": "Download CSV",
+    "downloadCsvTitle": "Download the comparison as a CSV file",
+    "downloadCsvWaitTitle": "Wait for at least 2 scenarios to finish loading",
+    "emptyHeading": "No scenarios selected",
+    "emptyBody": "Pick scenarios from the Monte Carlo report to compare them side-by-side.",
+    "emptyButton": "Go to Monte Carlo Simulation",
+    "needsMoreHeading": "Need at least 2 scenarios",
+    "needsMoreBody": "Comparison requires 2 or more saved scenarios. You currently have one selected (id: <mono>{id}</mono>).",
+    "needsMoreButton": "Pick more scenarios",
+    "scenarioFallback": "Scenario",
+    "removeAriaLabel": "Remove {title} from comparison",
+    "removeTitle": "Remove from comparison",
+    "runFailed": "Run failed",
     "errors": {
       "loadScenarioFailed": "Failed to load scenario.",
       "simulationFailed": "Simulation failed."

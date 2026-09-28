@@ -355,6 +355,28 @@
             "body": "Progi salda są przy samym koncie: otwórz konto do edycji i ustaw **Powiadom poniżej** albo **Powiadom powyżej**. Uruchamiają się, gdy saldo *przekroczy* granicę, więc usłyszysz o tym raz, a nie po każdej kolejnej płatności. Ten przewodnik możesz powtórzyć w każdej chwili w Ustawieniach."
           }
         }
+      },
+      "reportTagBreakdown": {
+        "title": "Podział raportu według tagu",
+        "steps": {
+          "welcome": {
+            "title": "Zobacz raporty według tagu, nie tylko kategorii",
+            "body": "Przychody a wydatki oraz rachunek przepływów pieniężnych można teraz podzielić według wartości wybranego tagu — na przykład wydatki domowe kontra dodatkowa działalność — i pokazać przelewy między nimi, nigdy nie licząc przelewu jako przychodu."
+          },
+          "breakdown": {
+            "title": "Podziel według klucza tagu",
+            "body": "Wybierz tutaj klucz tagu, na przykład **scope**, a raport podzieli się na sekcję dla każdej użytej z nim wartości, plus sekcję **Bez tagu** dla reszty.",
+            "fallbackBody": "Ta kontrolka pojawia się, gdy oznaczysz transakcję tagiem **klucz:wartość**, na przykład **scope:household**. Dodaj taki tag, a Podziel według klucza tagu pojawi się tutaj."
+          },
+          "buckets": {
+            "title": "Sumy według wartości, przelewy pokazane osobno",
+            "body": "Wybór klucza otwiera zakładkę dla każdej wartości oraz zakładkę **Bez tagu**, każda z własnymi przychodami i wydatkami. Pieniądze przenoszone między kontami pokazywane są jako **Wpływy z tagiem** i **Wypływy z tagiem** — widoczne, ale nigdy nie liczone jako przychód."
+          },
+          "finish": {
+            "title": "Tak wygląda podział według tagu",
+            "body": "Oznaczaj transakcje parą klucz:wartość, na przykład scope:household, wszędzie tam, gdzie chcesz ten widok, i wracaj do tej wycieczki w dowolnym momencie z Ustawień."
+          }
+        }
       }
     }
   }

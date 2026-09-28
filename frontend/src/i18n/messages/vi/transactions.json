@@ -172,6 +172,7 @@
       "ref": "Tham chiếu: {number}",
       "investmentLabel": "Đầu tư",
       "linkedInvestmentTitle": "Xem trong Đầu tư",
+      "linkedInvestmentBadgeTitle": "Giao dịch này được liên kết với một giao dịch đầu tư",
       "filterByDate": "Lọc theo ngày \"{date}\"",
       "filterByAccount": "Lọc theo \"{name}\"",
       "filterByPayee": "Lọc theo \"{name}\"",

@@ -17,6 +17,7 @@
     "warningCount": "{count, plural, one {# warning} other {# warnings}}",
     "errorLoadFailed": "Failed to load insights. Please try again.",
     "errorGenerateFailed": "Failed to generate insights. Make sure you have an AI provider configured.",
+    "errorDismissFailed": "Failed to dismiss the insight. Please try again.",
     "errorTimeout": "Insight generation is taking longer than expected. Please wait or refresh the page."
   },
   "card": {

@@ -4975,6 +4975,11 @@ describe("PortfolioService", () => {
       );
 
     beforeEach(() => {
+      // Every fixture day below is a fixed calendar date meant to read as
+      // "finished" against the 1M lookback's 30-day cutoff and against
+      // planSessionCloses' own-day check; bracket "now" so neither drifts
+      // out from under the assertions as real time passes.
+      jest.useFakeTimers().setSystemTime(new Date("2026-09-20T12:00:00.000Z"));
       prefRepository.findOne.mockResolvedValue(mockPref);
       accountsRepository.find.mockResolvedValue([
         mockBrokerageAccount,
@@ -4983,6 +4988,10 @@ describe("PortfolioService", () => {
       // Today's holdings row disagrees with every past day on purpose: the
       // ledger path must never read it.
       holdingsRepository.find.mockResolvedValue([mockHoldingVFV]);
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
     });
 
     it("ends each finished session on the daily close, one step after its last bar (XGRO, Sep 2)", async () => {
@@ -5041,54 +5050,61 @@ describe("PortfolioService", () => {
     });
 
     it("values each day at that day's share count and cash, not today's (a deposit, then a buy)", async () => {
-      netWorthService.getDailyInvestmentPositions.mockResolvedValue(
-        ledgerOf(
-          [
-            {
-              date: "2026-08-28",
-              quantities: { [xcns.id]: 100 },
-              closes: { [xcns.id]: 40 },
-              closeValues: { [xcns.id]: 4000 },
-              cash: { CAD: 2000 },
-              value: 6000,
-              securitiesValue: 4000,
-            },
-            {
-              date: "2026-08-31",
-              quantities: { [xcns.id]: 150 },
-              closes: { [xcns.id]: 41 },
-              closeValues: { [xcns.id]: 6150 },
-              cash: { CAD: 0 },
-              value: 6150,
-              securitiesValue: 6150,
-            },
+      // Pinned so the fixture's Aug 28 stays inside the 1M range's rolling
+      // 30-day cutoff regardless of the real date the suite runs on.
+      jest.useFakeTimers().setSystemTime(new Date("2026-09-05T12:00:00.000Z"));
+      try {
+        netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+          ledgerOf(
+            [
+              {
+                date: "2026-08-28",
+                quantities: { [xcns.id]: 100 },
+                closes: { [xcns.id]: 40 },
+                closeValues: { [xcns.id]: 4000 },
+                cash: { CAD: 2000 },
+                value: 6000,
+                securitiesValue: 4000,
+              },
+              {
+                date: "2026-08-31",
+                quantities: { [xcns.id]: 150 },
+                closes: { [xcns.id]: 41 },
+                closeValues: { [xcns.id]: 6150 },
+                cash: { CAD: 0 },
+                value: 6150,
+                securitiesValue: 6150,
+              },
+            ],
+            [xcns],
+          ),
+        );
+        seriesBySymbol({
+          "XCNS.TO": [
+            bar("2026-08-28T14:00:00.000Z", 40),
+            bar("2026-08-31T14:00:00.000Z", 41),
           ],
-          [xcns],
-        ),
-      );
-      seriesBySymbol({
-        "XCNS.TO": [
-          bar("2026-08-28T14:00:00.000Z", 40),
-          bar("2026-08-31T14:00:00.000Z", 41),
-        ],
-      });
+        });
 
-      const result = await service.getIntradayValueSeries(userId, {
-        range: "1m",
-      });
-      const at = (iso: string) =>
-        result.points.find((p) => p.timestamp === iso)!;
+        const result = await service.getIntradayValueSeries(userId, {
+          range: "1m",
+        });
+        const at = (iso: string) =>
+          result.points.find((p) => p.timestamp === iso)!;
 
-      // Aug 28: the pre-buy 100 shares and the $2,000 not yet invested.
-      expect(at("2026-08-28T14:00:00.000Z").value).toBeCloseTo(6000, 4);
-      expect(at("2026-08-28T14:00:00.000Z").securitiesValue).toBeCloseTo(
-        4000,
-        4,
-      );
-      // Aug 31: the bought shares, the cash spent.
-      expect(at("2026-08-31T14:00:00.000Z").value).toBeCloseTo(6150, 4);
-      // Today's holdings and balances were never consulted.
-      expect(holdingsRepository.find).not.toHaveBeenCalled();
+        // Aug 28: the pre-buy 100 shares and the $2,000 not yet invested.
+        expect(at("2026-08-28T14:00:00.000Z").value).toBeCloseTo(6000, 4);
+        expect(at("2026-08-28T14:00:00.000Z").securitiesValue).toBeCloseTo(
+          4000,
+          4,
+        );
+        // Aug 31: the bought shares, the cash spent.
+        expect(at("2026-08-31T14:00:00.000Z").value).toBeCloseTo(6150, 4);
+        // Today's holdings and balances were never consulted.
+        expect(holdingsRepository.find).not.toHaveBeenCalled();
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it("keeps a position sold mid-window up to the sale, though nothing holds it today", async () => {

@@ -21,7 +21,7 @@ backend:
   # -- Image settings
   image:
     registry: ghcr.io
-    repository: kenlasko/monize/backend
+    repository: kenlasko/monize-backend
     tag: latest
     pullPolicy: IfNotPresent
 
@@ -427,7 +427,7 @@ frontend:
   # -- Image settings
   image:
     registry: ghcr.io
-    repository: kenlasko/monize/frontend
+    repository: kenlasko/monize-frontend
     tag: latest
     pullPolicy: IfNotPresent
 

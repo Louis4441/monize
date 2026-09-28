@@ -13,8 +13,8 @@ import {
   generateLoanSchedule,
   getPeriodsPerYear,
   monthsBetween,
-  round2,
 } from '@/lib/loan-schedule';
+import { roundToCents } from '@/lib/format';
 
 /**
  * "How much have my overpayments already helped?" — compares the original
@@ -94,7 +94,7 @@ export function computePastImpact(
   // today's balance plus every principal dollar already repaid. That equals
   // the opening balance whenever one is known and stays positive when it is
   // blank, so the contractual baseline can still be built from transactions.
-  const reconstructedPrincipal = round2(
+  const reconstructedPrincipal = roundToCents(
     history.currentBalance + history.cumulativePrincipal,
   );
   const originalPrincipal =
@@ -277,7 +277,7 @@ export function computePastImpact(
     originalSchedule.paidOff && projectedRemainingInterest !== null
       ? Math.max(
           0,
-          round2(
+          roundToCents(
             originalSchedule.totalInterest -
               (history.cumulativeInterest + projectedRemainingInterest),
           ),

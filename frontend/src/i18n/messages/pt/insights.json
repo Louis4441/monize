@@ -17,6 +17,7 @@
     "warningCount": "{count, plural, one {# aviso} other {# avisos}}",
     "errorLoadFailed": "Falha ao carregar análises. Tente novamente.",
     "errorGenerateFailed": "Falha ao gerar análises. Certifique-se de que tem um fornecedor de IA configurado.",
+    "errorDismissFailed": "Falha ao dispensar a análise. Tente novamente.",
     "errorTimeout": "A geração de análises está a demorar mais do que o esperado. Aguarde ou recarregue a página."
   },
   "card": {

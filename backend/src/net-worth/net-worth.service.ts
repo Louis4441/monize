@@ -56,6 +56,22 @@ import { enumerateDaysYMD } from "./series-dates.util";
 import { positionCloseAsOf, PricePoint } from "./position-price.util";
 import { preferredCurrency } from "../common/default-currency.util";
 import {
+  DateColumn,
+  DailyCashBalanceRow,
+  EarliestRow,
+  FirstMonthRow,
+  FirstMonthTradeRow,
+  InvestmentEarliestRow,
+  MonthlyBalanceRow,
+  MonthlyCashBalanceRow,
+  MonthlySnapshotRow,
+  NumericColumn,
+  ReplayTransactionRow,
+  ScopedInvestmentAccountRow,
+  StoredPriceRow,
+  TransactionPriceRow,
+} from "./net-worth-rows";
+import {
   LEDGER_MOVEMENT_PREDICATE,
   ledgerMovementPredicate,
 } from "../common/ledger-balance.sql";
@@ -356,7 +372,7 @@ export class NetWorthService {
    * the migration. Reporting reads here are independent single statements, so
    * each gets its own tenant transaction rather than one long-held connection.
    */
-  private scopedQuery<T = any>(sql: string, params?: any[]): Promise<T> {
+  private scopedQuery<T>(sql: string, params: unknown[]): Promise<T[]> {
     return withScopedDb(this.dataSource, (m) => m.query(sql, params));
   }
 
@@ -472,6 +488,18 @@ export class NetWorthService {
    * per-account lock, and the loser's work is simply redundant. Accounts with no
    * snapshots at all are deliberately not swept -- there is nothing to compare
    * against, and including them would recompute every empty account forever.
+   *
+   * The lost timer carried two jobs, so the sweep recovers both halves of the
+   * seam: after the recompute it re-runs the balance-threshold evaluation the
+   * timer would have run (docs/specs/balance-threshold-notifications.md).
+   * Re-evaluating is safe because the crossing is a durable latch flipped by a
+   * compare-and-set on `accounts.low_alert_armed` / `high_alert_armed`: an
+   * account whose timer did fire, or that a racing replica already evaluated,
+   * finds the latch already in the state its balance implies and raises
+   * nothing. The two halves are isolated from each other exactly as on the
+   * timer -- a notification failure never stops the recompute or the sweep,
+   * and a failed recompute does not skip the evaluation, which reads the
+   * account's committed balance rather than its snapshots.
    */
   @Cron(CronExpression.EVERY_30_MINUTES)
   async sweepStaleSnapshots(): Promise<void> {
@@ -515,14 +543,40 @@ export class NetWorthService {
         account_id: string;
       }>) {
         try {
-          await withUserContext(row.user_id, () =>
-            this.recalculateAccount(row.user_id, row.account_id),
-          );
+          await withUserContext(row.user_id, async () => {
+            try {
+              await this.recalculateAccount(row.user_id, row.account_id);
+            } catch (err) {
+              this.logger.warn(
+                `Stale snapshot recompute failed for account ${row.account_id}: ${
+                  err instanceof Error ? err.message : String(err)
+                }`,
+              );
+            }
+            // The other half of the lost timer (see the doc comment). Its own
+            // try/catch, as on the timer, so a notification failure never
+            // affects the recompute or stops the sweep.
+            try {
+              await this.balanceAlerts?.evaluateAccounts(row.user_id, [
+                row.account_id,
+              ]);
+            } catch (err) {
+              this.logger.warn(
+                `Balance-threshold evaluation failed for account ${row.account_id}: ${
+                  err instanceof Error ? err.message : String(err)
+                }`,
+              );
+            }
+          });
         } catch (err) {
+          // withUserContext itself refused the owner id (it validates it), so
+          // neither half ran; say both, not just the recompute.
           this.logger.warn(
-            `Stale snapshot recompute failed for account ${row.account_id}: ${
-              err instanceof Error ? err.message : String(err)
-            }`,
+            `Stale snapshot sweep skipped account ${row.account_id}: its owner ` +
+              `id was refused, so neither the snapshot recompute nor the ` +
+              `balance-threshold evaluation ran: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
           );
         }
       }
@@ -804,7 +858,7 @@ export class NetWorthService {
     // rows are governed solely by the pre-filtered scope (see
     // JointNetWorthScope). One predicate for the series and (via
     // getLatestNetWorth) the latest month, so the two can never disagree.
-    const snapshots: any[] = await this.scopedQuery(
+    const snapshots = await this.scopedQuery<MonthlySnapshotRow>(
       `SELECT mab.month, mab.balance, mab.market_value,
               a.id as account_id, a.account_type, a.account_sub_type, a.currency_code
        FROM monthly_account_balances mab
@@ -847,7 +901,7 @@ export class NetWorthService {
 
   /** The month-by-month fold of `getMonthlyNetWorth`, at one rate index. */
   private foldMonthlyNetWorth(
-    snapshots: any[],
+    snapshots: MonthlySnapshotRow[],
     defaultCurrency: string,
     rateIndex: RateIndex,
   ): {
@@ -1016,14 +1070,14 @@ export class NetWorthService {
     const end = endDate || new Date().toISOString().slice(0, 10);
 
     let accountFilter = "";
-    const params: any[] = [userId, start, end];
+    const params: unknown[] = [userId, start, end];
 
     if (accountIds && accountIds.length > 0) {
       // The brokerage and its cash sleeve are one portfolio; the widening rule
       // is `resolveInvestmentScopeAccountIds`, shared with every other surface
       // that takes this filter.
       const idArray = await resolveInvestmentScopeAccountIds(
-        (sql, params) => this.scopedQuery(sql, params as any[]),
+        (sql, params) => this.scopedQuery(sql, params),
         userId,
         accountIds,
       );
@@ -1039,7 +1093,7 @@ export class NetWorthService {
       accountFilter = `AND ${UNFILTERED_INVESTMENT_SCOPE_SQL}`;
     }
 
-    const snapshots: any[] = await this.scopedQuery(
+    const snapshots = await this.scopedQuery<MonthlySnapshotRow>(
       `SELECT mab.month, mab.balance, mab.market_value,
               a.id as account_id, a.account_type, a.account_sub_type, a.currency_code
        FROM monthly_account_balances mab
@@ -1089,7 +1143,7 @@ export class NetWorthService {
    */
   private async foldMonthlyInvestments(
     userId: string,
-    snapshots: any[],
+    snapshots: MonthlySnapshotRow[],
     defaultCurrency: string,
     currencies: Set<string>,
     start: string,
@@ -1248,7 +1302,7 @@ export class NetWorthService {
    */
   private async computeFirstActiveMonthCostBasis(
     userId: string,
-    snapshots: any[],
+    snapshots: MonthlySnapshotRow[],
     defaultCurrency: string,
     start: string,
     end: string,
@@ -1265,7 +1319,7 @@ export class NetWorthService {
 
     const accountIds = [...new Set(eligibleSnapshots.map((s) => s.account_id))];
 
-    const firstMonthRows: any[] = await this.scopedQuery(
+    const firstMonthRows = await this.scopedQuery<FirstMonthRow>(
       `SELECT account_id, MIN(month)::DATE as first_month
        FROM monthly_account_balances
        WHERE account_id = ANY($1::UUID[]) AND user_id = $2
@@ -1287,7 +1341,7 @@ export class NetWorthService {
     if (targetMonthByAccount.size === 0) return result;
 
     const targetAccountIds = [...targetMonthByAccount.keys()];
-    const txRows: any[] = await this.scopedQuery(
+    const txRows = await this.scopedQuery<FirstMonthTradeRow>(
       `SELECT it.account_id, it.action, it.quantity, it.price, it.transaction_date,
               s.currency_code AS security_currency
        FROM investment_transactions it
@@ -1363,60 +1417,10 @@ export class NetWorthService {
   }
 
   /**
-   * The first day on or after `onOrAfter` on which any security the scope holds
-   * actually has a price -- a trading day for this portfolio, as opposed to a
-   * calendar day.
-   *
-   * `getDailyInvestments` values *every* calendar day at the latest close at or
-   * before it, which is what makes a chart continuous and what makes 1 January
-   * plot the previous 31 December's close. A YTD chart asked to open on the
-   * first trading day of the year therefore cannot find it in that series: a
-   * carried-forward holiday and a genuinely flat session look identical there.
-   * `security_prices` rows exist only for days a price was struck, so the
-   * question is answerable here and nowhere else.
-   *
-   * Returns **null** when the scope holds nothing priced, rather than a
-   * substituted date: the caller then keeps the calendar boundary it already
-   * had, and no chart claims a trading day nobody observed.
-   */
-  async getFirstPricedDay(
-    userId: string,
-    onOrAfter: string,
-    accountIds?: string[],
-  ): Promise<{ date: string | null }> {
-    const params: any[] = [userId, onOrAfter];
-    let accountFilter = "";
-    if (accountIds && accountIds.length > 0) {
-      const placeholders = accountIds.map((_, i) => `$${i + 3}`).join(", ");
-      accountFilter = `AND a.id IN (${placeholders})`;
-      params.push(...accountIds);
-    }
-
-    const rows: Array<{ date: string | null }> = await this.scopedQuery(
-      `SELECT MIN(sp.price_date)::TEXT AS date
-         FROM security_prices sp
-        WHERE sp.price_date >= $2::DATE
-          AND sp.security_id IN (
-                SELECT DISTINCT it.security_id
-                  FROM investment_transactions it
-                  JOIN accounts a ON a.id = it.account_id
-                 WHERE a.user_id = $1
-                   AND it.security_id IS NOT NULL
-                   AND it.status != 'VOID'
-                   AND it.transaction_date <= $2::DATE
-                   ${accountFilter}
-              )`,
-      params,
-    );
-    return { date: rows[0]?.date ?? null };
-  }
-
-  /**
    * The newest day on or before each boundary on which any security the scope
    * held by then actually has a close -- the trading session a boundary's value
    * came from, as opposed to the calendar day it is dated.
    *
-   * The mirror of {@link getFirstPricedDay}, and it exists for the same reason:
    * `getDailyInvestments` values EVERY calendar day at the latest close at or
    * before it, so a Sunday boundary carries Friday's close and a reader told
    * the figure is measured "from Sunday" is being told the wrong day. Only
@@ -1438,7 +1442,7 @@ export class NetWorthService {
     );
     if (unique.length === 0) return result;
 
-    const params: any[] = [userId, unique];
+    const params: unknown[] = [userId, unique];
     let accountFilter = "";
     if (accountIds && accountIds.length > 0) {
       const placeholders = accountIds.map((_, i) => `$${i + 3}`).join(", ");
@@ -1543,13 +1547,13 @@ export class NetWorthService {
     const end = endDate || todayYMD();
 
     let accountFilter = "";
-    const acctParams: any[] = [userId];
+    const acctParams: unknown[] = [userId];
 
     if (accountIds && accountIds.length > 0) {
       // The brokerage and its cash sleeve are one portfolio; see
       // `resolveInvestmentScopeAccountIds`.
       const idArray = await resolveInvestmentScopeAccountIds(
-        (sql, params) => this.scopedQuery(sql, params as any[]),
+        (sql, params) => this.scopedQuery(sql, params),
         userId,
         accountIds,
       );
@@ -1562,7 +1566,7 @@ export class NetWorthService {
     }
 
     // Get investment accounts in scope
-    const investAccounts: any[] = await this.scopedQuery(
+    const investAccounts = await this.scopedQuery<ScopedInvestmentAccountRow>(
       `SELECT a.id, a.account_type, a.account_sub_type, a.currency_code, a.opening_balance
        FROM accounts a
        WHERE a.user_id = $1 ${accountFilter}`,
@@ -1590,9 +1594,9 @@ export class NetWorthService {
       .filter((a) => isValuationCashAccount(a))
       .map((a) => a.id);
     // Load investment transactions up to end date for holdings replay
-    const invTxs: any[] =
+    const invTxs: ReplayTransactionRow[] =
       brokerageIds.length > 0
-        ? await this.scopedQuery(
+        ? await this.scopedQuery<ReplayTransactionRow>(
             `SELECT account_id, security_id, action, quantity, transaction_date
            FROM investment_transactions
            WHERE account_id = ANY($1::UUID[])
@@ -1606,7 +1610,9 @@ export class NetWorthService {
     // Collect security IDs and load prices for the date range
     const securityIds = [
       ...new Set(
-        invTxs.filter((t: any) => t.security_id).map((t: any) => t.security_id),
+        invTxs
+          .map((t) => t.security_id)
+          .filter((id): id is string => id !== null),
       ),
     ];
 
@@ -1633,11 +1639,7 @@ export class NetWorthService {
     // would be two answers to "what did this account hold that day" (#1389).
     const cashBalances = new Map<string, Map<string, number>>();
     if (cashIds.length > 0) {
-      const cashRows: any[] = await this.loadDailyCashBalances(
-        cashIds,
-        start,
-        end,
-      );
+      const cashRows = await this.loadDailyCashBalances(cashIds, start, end);
       for (const r of cashRows) {
         if (!cashBalances.has(r.account_id))
           cashBalances.set(r.account_id, new Map());
@@ -1702,7 +1704,7 @@ export class NetWorthService {
     rateIndex: RateIndex,
     input: {
       dates: string[];
-      invTxs: any[];
+      invTxs: ReplayTransactionRow[];
       securityMap: Map<string, Security>;
       pricesBySec: Map<string, PricePoint[]>;
       txPricesBySec: Map<string, PricePoint[]>;
@@ -1965,9 +1967,9 @@ export class NetWorthService {
 
     // Investment transactions from inception up to the window end, so holdings
     // can be replayed forward to each sample point.
-    const invTxs: any[] =
+    const invTxs: ReplayTransactionRow[] =
       brokerageIds.length > 0
-        ? await this.scopedQuery(
+        ? await this.scopedQuery<ReplayTransactionRow>(
             `SELECT account_id, security_id, action, quantity, transaction_date
              FROM investment_transactions
              WHERE account_id = ANY($1::UUID[])
@@ -1980,7 +1982,9 @@ export class NetWorthService {
 
     const securityIds = [
       ...new Set(
-        invTxs.filter((t: any) => t.security_id).map((t: any) => t.security_id),
+        invTxs
+          .map((t) => t.security_id)
+          .filter((id): id is string => id !== null),
       ),
     ];
     const securities =
@@ -2017,16 +2021,24 @@ export class NetWorthService {
     // --- Cash balances -------------------------------------------------------
     const cashBalances = new Map<string, Map<string, number>>();
     if (cashIds.length > 0) {
-      const cashRows: any[] =
+      const cashRows: Array<{
+        account_id: string;
+        day: string;
+        balance: NumericColumn;
+      }> =
         granularity === "monthly"
-          ? await this.loadMonthlyCashBalances(cashIds, start, end)
-          : await this.loadDailyCashBalances(cashIds, start, end);
+          ? (await this.loadMonthlyCashBalances(cashIds, start, end)).map(
+              (r) => ({ ...r, day: r.month }),
+            )
+          : (await this.loadDailyCashBalances(cashIds, start, end)).map(
+              (r) => ({ ...r, day: r.date }),
+            );
       for (const r of cashRows) {
         if (!cashBalances.has(r.account_id))
           cashBalances.set(r.account_id, new Map());
         cashBalances
           .get(r.account_id)!
-          .set(this.toDateString(r.date ?? r.month), Number(r.balance));
+          .set(this.toDateString(r.day), Number(r.balance));
       }
     }
 
@@ -2074,7 +2086,7 @@ export class NetWorthService {
       limit: number;
       defaultCurrency: string;
       sampleDates: string[];
-      invTxs: any[];
+      invTxs: ReplayTransactionRow[];
       securityMap: Map<string, Security>;
       storedSeries: Map<string, PricePoint[]>;
       txSeries: Map<string, PricePoint[]>;
@@ -2253,21 +2265,13 @@ export class NetWorthService {
   private async resolveScopedInvestmentAccounts(
     userId: string,
     accountIds?: string[],
-  ): Promise<
-    Array<{
-      id: string;
-      account_type: string;
-      account_sub_type: string | null;
-      currency_code: string;
-      opening_balance: string | number;
-    }>
-  > {
+  ): Promise<ScopedInvestmentAccountRow[]> {
     let accountFilter = "";
-    const acctParams: any[] = [userId];
+    const acctParams: unknown[] = [userId];
 
     if (accountIds && accountIds.length > 0) {
       const idArray = await resolveInvestmentScopeAccountIds(
-        (sql, params) => this.scopedQuery(sql, params as any[]),
+        (sql, params) => this.scopedQuery(sql, params),
         userId,
         accountIds,
       );
@@ -2279,7 +2283,7 @@ export class NetWorthService {
       accountFilter = `AND ${UNFILTERED_INVESTMENT_SCOPE_SQL}`;
     }
 
-    return this.scopedQuery(
+    return this.scopedQuery<ScopedInvestmentAccountRow>(
       `SELECT a.id, a.account_type, a.account_sub_type, a.currency_code, a.opening_balance
        FROM accounts a
        WHERE a.user_id = $1 ${accountFilter}`,
@@ -2364,8 +2368,8 @@ export class NetWorthService {
     cashIds: string[],
     start: string,
     end: string,
-  ): Promise<any[]> {
-    return this.scopedQuery(
+  ): Promise<DailyCashBalanceRow[]> {
+    return this.scopedQuery<DailyCashBalanceRow>(
       `WITH target_accounts AS (
           SELECT id, opening_balance
           FROM accounts WHERE id = ANY($1::UUID[])
@@ -2409,8 +2413,8 @@ export class NetWorthService {
     cashIds: string[],
     start: string,
     end: string,
-  ): Promise<any[]> {
-    return this.scopedQuery(
+  ): Promise<MonthlyCashBalanceRow[]> {
+    return this.scopedQuery<MonthlyCashBalanceRow>(
       `WITH target_accounts AS (
           SELECT id, opening_balance FROM accounts WHERE id = ANY($1::UUID[])
         ),
@@ -2564,7 +2568,7 @@ export class NetWorthService {
   ): Promise<void> {
     const openingBalance = Number(account.openingBalance) || 0;
 
-    const [{ earliest }] = await this.scopedQuery(
+    const [{ earliest }] = await this.scopedQuery<EarliestRow>(
       `SELECT MIN(transaction_date) as earliest
        FROM transactions
        WHERE account_id = $1
@@ -2580,7 +2584,7 @@ export class NetWorthService {
       if (daStr < startDate) startDate = daStr;
     }
 
-    const rows: any[] = await this.scopedQuery(
+    const rows = await this.scopedQuery<MonthlyBalanceRow>(
       `WITH monthly_tx_sums AS (
         SELECT DATE_TRUNC('month', transaction_date)::DATE as month,
                SUM(amount) as total
@@ -2643,7 +2647,7 @@ export class NetWorthService {
     const openingBalance = Number(account.openingBalance) || 0;
 
     // Find earliest date from both regular and investment transactions
-    const [{ earliest }] = await this.scopedQuery(
+    const [{ earliest }] = await this.scopedQuery<EarliestRow>(
       `SELECT MIN(transaction_date) as earliest
        FROM transactions
        WHERE account_id = $1
@@ -2651,7 +2655,7 @@ export class NetWorthService {
       [account.id],
     );
 
-    const [{ inv_earliest }] = await this.scopedQuery(
+    const [{ inv_earliest }] = await this.scopedQuery<InvestmentEarliestRow>(
       `SELECT MIN(transaction_date) as inv_earliest
        FROM investment_transactions
        WHERE account_id = $1
@@ -2668,7 +2672,7 @@ export class NetWorthService {
         : account.createdAt.toISOString().substring(0, 10);
 
     // Compute cost-basis via cumulative transaction sums
-    const costRows: any[] = await this.scopedQuery(
+    const costRows = await this.scopedQuery<MonthlyBalanceRow>(
       `WITH monthly_tx_sums AS (
         SELECT DATE_TRUNC('month', transaction_date)::DATE as month,
                SUM(amount) as total
@@ -2883,7 +2887,7 @@ export class NetWorthService {
     const result = new Map<string, PricePoint[]>();
     if (securityIds.length === 0) return result;
 
-    const rows: any[] = await this.scopedQuery(
+    const rows = await this.scopedQuery<StoredPriceRow>(
       `WITH boundary AS (
          SELECT DISTINCT ON (security_id) security_id, price_date, close_price
            FROM security_prices
@@ -2952,7 +2956,7 @@ export class NetWorthService {
     const result = new Map<string, PricePoint[]>();
     if (securityIds.length === 0) return result;
 
-    const rows: any[] = await this.scopedQuery(
+    const rows = await this.scopedQuery<TransactionPriceRow>(
       `WITH boundary_dates AS (
          SELECT DISTINCT ON (security_id) security_id, transaction_date
            FROM investment_transactions
@@ -3053,7 +3057,7 @@ export class NetWorthService {
     endDate: string,
   ): Promise<RateIndex> {
     return buildRateIndex(
-      (sql, params) => this.scopedQuery(sql, params as any[]),
+      (sql, params) => this.scopedQuery(sql, params),
       currencies,
       defaultCurrency,
       startDate,
@@ -3085,7 +3089,10 @@ export class NetWorthService {
     return convertAtDate(amount, from, to, monthEnd, rateIndex, this.logger);
   }
 
-  private resolveStartDate(account: Account, earliest: any): string {
+  private resolveStartDate(
+    account: Account,
+    earliest: DateColumn | null,
+  ): string {
     if (earliest) {
       return this.toDateString(earliest);
     }

@@ -322,6 +322,14 @@
     "seriesInflows": "Zuflüsse",
     "seriesOutflows": "Abflüsse"
   },
+  "tagBreakdown": {
+    "label": "Nach Tag-Schlüssel aufschlüsseln",
+    "none": "Keine",
+    "untagged": "Ohne Tag",
+    "inflows": "Getaggte Zuflüsse",
+    "outflows": "Getaggte Abflüsse",
+    "sharesExceedNote": "Eine Zeile, die unter diesem Schlüssel mit mehr als einem Wert getaggt ist, zählt für jeden davon, sodass die Anteile pro Wert in Summe mehr als 100 % ergeben können."
+  },
   "categoryPerformance": {
     "noBudgets": "Kein Budget gefunden. Erstellen Sie ein Budget, um die Kategorieleistung zu sehen.",
     "noData": "Noch keine Kategoriedaten verfügbar.",
@@ -471,6 +479,7 @@
     "allAccountsPlaceholder": "Alle Konten",
     "filterBySecurityLabel": "Nach Wertpapier filtern",
     "filterByAccountLabel": "Nach Konto filtern",
+    "monthlyDisplayModeLabel": "Monatlicher Anzeigemodus",
     "allSecurities": "Alle Wertpapiere",
     "viewMonthly": "Monatlich",
     "viewDaily": "Täglich",
@@ -1192,7 +1201,6 @@
     "incompleteTooltip": "Für einige Tage in diesem Zeitraum fehlt ein Kurs, ein Wechselkurs oder ein Kassenbestand, daher werden die davon abhängigen Zahlen nicht angezeigt.",
     "measuredFromClose": "Seit dem Handelsschluss am {date}",
     "unmeasuredFlowTooltip": "Geld wurde auf eine Weise auf diese Konten ein- oder ausgezahlt, die hier nicht erfasst werden kann: ein Geschäft, das über ein Konto außerhalb dieser Gruppe abgewickelt wurde, oder eine Aufteilung, die eine Investitionsposition mit gewöhnlichen Ausgaben vermischt. Das Anlageergebnis wird nicht angezeigt, da ein Teil davon Ihr eigenes Geld wäre.",
-    "closeBoundsTooltip": "Diese Werte werden zwischen den gespeicherten Schlusskursen vom {start} und {end} gemessen. Das Diagramm oben zeigt Kurse in Echtzeit während des Tages, sodass es sich bewegen kann, während diese Werte es nicht tun.",
     "notAvailable": "k. A.",
     "intradayUnavailable": "Detaillierte Intraday-Kurse nicht verfügbar",
     "intradayUnavailableTitle": "Intraday-Ansicht für diese Kontokombination nicht verfügbar",
@@ -1717,6 +1725,19 @@
     "title": "Monte Carlo Szenarien vergleichen",
     "subtitle": "Nebeneinander-Kennzahlen für bis zu 4 gespeicherte Szenarien.",
     "backToMonteCarlo": "Zurück zu Monte Carlo",
+    "downloadCsv": "CSV herunterladen",
+    "downloadCsvTitle": "Den Vergleich als CSV-Datei herunterladen",
+    "downloadCsvWaitTitle": "Warten Sie, bis mindestens 2 Szenarien geladen sind",
+    "emptyHeading": "Keine Szenarien ausgewählt",
+    "emptyBody": "Wählen Sie Szenarien aus dem Monte-Carlo-Bericht aus, um sie nebeneinander zu vergleichen.",
+    "emptyButton": "Zur Monte-Carlo-Simulation",
+    "needsMoreHeading": "Mindestens 2 Szenarien erforderlich",
+    "needsMoreBody": "Der Vergleich erfordert 2 oder mehr gespeicherte Szenarien. Sie haben derzeit eines ausgewählt (id: <mono>{id}</mono>).",
+    "needsMoreButton": "Weitere Szenarien auswählen",
+    "scenarioFallback": "Szenario",
+    "removeAriaLabel": "{title} aus dem Vergleich entfernen",
+    "removeTitle": "Aus dem Vergleich entfernen",
+    "runFailed": "Durchlauf fehlgeschlagen",
     "errors": {
       "loadScenarioFailed": "Szenario konnte nicht geladen werden.",
       "simulationFailed": "Simulation fehlgeschlagen."

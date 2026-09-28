@@ -15,7 +15,7 @@ import { TokenService } from "./token.service";
 import { TwoFactorService } from "./two-factor.service";
 import { AuthEmailService } from "./auth-email.service";
 import { AuthStateSweeperService } from "./auth-state-sweeper.service";
-import { AuthAttemptCounterService } from "./auth-attempt-counter.service";
+import { AuthAttemptCounterModule } from "./auth-attempt-counter.module";
 import { SingleUseTokenModule } from "./single-use-token.module";
 import { PatController } from "./pat.controller";
 import { StepUpAuthService } from "./step-up/step-up.service";
@@ -28,6 +28,7 @@ import { DelegationModule } from "../delegation/delegation.module";
 @Module({
   imports: [
     PassportModule,
+    AuthAttemptCounterModule,
     SingleUseTokenModule,
     UsersModule,
     NotificationsModule,
@@ -50,7 +51,6 @@ import { DelegationModule } from "../delegation/delegation.module";
   providers: [
     AuthService,
     AuthStateSweeperService,
-    AuthAttemptCounterService,
     TokenService,
     TwoFactorService,
     AuthEmailService,
@@ -66,7 +66,7 @@ import { DelegationModule } from "../delegation/delegation.module";
   controllers: [AuthController, PatController, StepUpAuthController],
   exports: [
     AuthService,
-    AuthAttemptCounterService,
+    AuthAttemptCounterModule,
     SingleUseTokenModule,
     TokenService,
     TwoFactorService,

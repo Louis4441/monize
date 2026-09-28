@@ -493,6 +493,15 @@
       "description": "Hapus data keuangan dari akun Anda. Ini tidak dapat dibatalkan.",
       "openButton": "Hapus Data...",
       "alwaysDeletedHeading": "Berikut ini akan selalu dihapus:",
+      "alwaysDeletedItems": {
+        "transactions": "Semua transaksi dan pemisahan",
+        "scheduled": "Semua transaksi terjadwal/berulang",
+        "securities": "Semua efek, harga, kepemilikan, dan transaksi investasi",
+        "budgets": "Semua anggaran dan peringatan anggaran",
+        "monthlySummaries": "Ringkasan saldo akun bulanan",
+        "customReports": "Laporan khusus, tag, dan pemetaan impor",
+        "actionHistory": "Riwayat tindakan (batalkan/ulangi)"
+      },
       "optionalHeading": "Opsional juga hapus:",
       "accountsOption": "Akun",
       "categoriesOption": "Kategori",

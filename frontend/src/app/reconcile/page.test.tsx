@@ -110,7 +110,8 @@ vi.mock('next/dynamic', () => ({
   },
 }));
 
-vi.mock('@/lib/format', () => ({
+vi.mock('@/lib/format', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/format')>()),
   getCurrencySymbol: (code: string) => code === 'CAD' ? 'CA$' : '$',
   getDecimalPlacesForCurrency: () => 2,
 }));
@@ -266,6 +267,21 @@ describe('ReconcilePage', () => {
       expect(screen.getByText(/Visa/)).toBeInTheDocument();
       expect(screen.queryByText(/Brokerage/)).not.toBeInTheDocument();
       expect(screen.queryByText(/Old Savings/)).not.toBeInTheDocument();
+    });
+
+    it("labels each account option in that account's own currency", async () => {
+      // The option labels once went through the selected account's currency, so
+      // choosing a CAD account relabelled every USD balance in the list as CAD.
+      mockGetAll.mockResolvedValue([
+        ...mockAccounts,
+        { id: 'acc-6', name: 'Loonie Chequing', accountType: 'CHEQUING', accountSubType: null, currencyCode: 'CAD', currentBalance: 250, isClosed: false },
+      ]);
+      render(<ReconcilePage />);
+      await waitFor(() => expect(screen.getByText(/Loonie Chequing/)).toBeInTheDocument());
+      fireEvent.change(screen.getByLabelText('Account'), { target: { value: 'acc-6' } });
+
+      expect(screen.getByRole('option', { name: 'Loonie Chequing ($250.00 CAD)' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Checking ($1500.00)' })).toBeInTheDocument();
     });
 
     it('navigates to accounts on cancel', async () => {

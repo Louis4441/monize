@@ -17,6 +17,7 @@
     "warningCount": "{count, plural, one {# 件の警告} other {# 件の警告}}",
     "errorLoadFailed": "インサイトの読み込みに失敗しました。もう一度お試しください。",
     "errorGenerateFailed": "インサイトの生成に失敗しました。AI プロバイダーが設定されていることを確認してください。",
+    "errorDismissFailed": "インサイトを非表示にできませんでした。もう一度お試しください。",
     "errorTimeout": "インサイトの生成に予想以上の時間がかかっています。しばらくお待ちいただくか、ページを更新してください。"
   },
   "card": {

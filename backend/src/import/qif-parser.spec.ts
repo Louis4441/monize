@@ -542,6 +542,24 @@ T0.00
       const result = parseQif(qif);
       expect(result.transactions[0].amount).toBe(0);
     });
+
+    it("handles a European decimal comma (-18,36 -> -18.36)", () => {
+      const qif = `!Type:Bank
+D01/15/2026
+T-18,36
+^`;
+      const result = parseQif(qif);
+      expect(result.transactions[0].amount).toBe(-18.36);
+    });
+
+    it("handles European thousands-dot with decimal comma (1.234,56 -> 1234.56)", () => {
+      const qif = `!Type:Bank
+D01/15/2026
+T1.234,56
+^`;
+      const result = parseQif(qif);
+      expect(result.transactions[0].amount).toBe(1234.56);
+    });
   });
 
   describe("parseQif - edge cases", () => {

@@ -6,8 +6,10 @@ import {
   IsIn,
   IsInt,
   IsOptional,
+  IsString,
   IsUUID,
   Max,
+  MaxLength,
   Min,
 } from "class-validator";
 import { ReportQueryDto } from "./report-query.dto";
@@ -21,6 +23,10 @@ function csv({ value }: { value: unknown }): unknown {
     .map((part) => part.trim())
     .filter((part) => part.length > 0);
 }
+
+/** Surrounding whitespace is a paste artifact, never part of a tag key. */
+const trimmed = ({ value }: { value: unknown }) =>
+  typeof value === "string" ? value.trim() : value;
 
 /**
  * Income vs Expenses is the one answer the full report and the dashboard widget
@@ -60,4 +66,22 @@ export class IncomeVsExpensesQueryDto extends ReportQueryDto {
   @Min(0)
   @Max(6)
   weekStartsOn?: number;
+
+  /**
+   * Bare KEY of a `KEY:VALUE` tag (e.g. "scope") to partition the report by
+   * (`docs/specs/report-tag-key-breakdown.md`). Absent -> today's response,
+   * byte-for-byte unchanged. Present -> the response additionally carries
+   * `tagKey` and `buckets`, one per discovered value plus the reserved
+   * untagged bucket. Never a value list -- the server discovers the values
+   * itself, the client never asserts them.
+   */
+  @ApiPropertyOptional({
+    description:
+      "Bare KEY of a KEY:VALUE tag to break the report down by (e.g. 'scope'). Absent renders today's response unchanged.",
+  })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(100)
+  tagKey?: string;
 }

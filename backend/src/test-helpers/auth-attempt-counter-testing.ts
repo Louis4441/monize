@@ -18,7 +18,10 @@ import {
  * path by pre-seeding a count.
  */
 export type AuthAttemptCounterMock = jest.Mocked<
-  Pick<AuthAttemptCounterService, "increment" | "peek" | "reset">
+  Pick<
+    AuthAttemptCounterService,
+    "increment" | "incrementUntilUtcMidnight" | "peek" | "reset"
+  >
 > & {
   /** The rows, keyed `scope\u0000key`, for a spec that wants to seed or inspect one. */
   rows: Map<string, { count: number; windowExpiresAt: Date }>;
@@ -56,6 +59,32 @@ export function createAuthAttemptCounterMock(): AuthAttemptCounterMock {
                   window === "sliding"
                     ? new Date(now + windowMs)
                     : existing.windowExpiresAt,
+              };
+        rows.set(id, next);
+        return next;
+      },
+    ),
+    // The daily-budget variant: add `by`, window ending at the next UTC
+    // midnight (computed here from the fake clock, as the database computes it
+    // from its own), reset in place once that midnight has passed.
+    incrementUntilUtcMidnight: jest.fn(
+      async (scope: string, key: string, by: number) => {
+        const id = rowKey(scope, key);
+        const existing = rows.get(id);
+        const now = new Date();
+        const midnight = new Date(
+          Date.UTC(
+            now.getUTCFullYear(),
+            now.getUTCMonth(),
+            now.getUTCDate() + 1,
+          ),
+        );
+        const next =
+          !existing || existing.windowExpiresAt.getTime() < now.getTime()
+            ? { count: by, windowExpiresAt: midnight }
+            : {
+                count: existing.count + by,
+                windowExpiresAt: existing.windowExpiresAt,
               };
         rows.set(id, next);
         return next;

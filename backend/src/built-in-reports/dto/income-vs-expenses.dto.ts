@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 /**
  * One month of the Cash Flow report, which buckets by month and nothing else.
@@ -77,6 +77,61 @@ export class IncomeExpenseTotals {
   knownNet: number;
 }
 
+/**
+ * The reserved id of the "untagged" value bucket (`docs/specs/report-tag-key-breakdown.md`
+ * section 1.1, rule B2): rows carrying no `K:*` tag for the requested key. Not
+ * a value a user can create -- the frontend renders it from
+ * `reports.tagBreakdown.untagged` rather than showing this id.
+ */
+export const UNTAGGED_TAG_BUCKET_ID = "__untagged__";
+
+/**
+ * One value bucket of a tag-key breakdown (Income vs Expenses / Cash Flow
+ * only carry `taggedInflows`/`taggedOutflows`; section 4 of the spec).
+ *
+ * `data`/`totals`/`missingCurrencies`/`excludedCount` are computed through the
+ * exact same per-currency conversion and completeness path as the top-level
+ * (All) figures (I4): one bucket's missing rate never blanks another's.
+ */
+export class IncomeExpenseTagBucket {
+  /** The tag's value, or {@link UNTAGGED_TAG_BUCKET_ID} for the reserved bucket. */
+  @ApiProperty({ example: "household" })
+  value: string;
+
+  /** True only for the reserved untagged bucket. */
+  @ApiProperty({ example: false })
+  isUntagged: boolean;
+
+  @ApiProperty({ type: [IncomeExpensePeriodItem] })
+  data: IncomeExpensePeriodItem[];
+
+  @ApiProperty({ type: IncomeExpenseTotals })
+  totals: IncomeExpenseTotals;
+
+  /**
+   * Transfer legs carrying this bucket's value, positive side (INV-REPORT-003).
+   * Never folded into `income`, `expenses` or `net` -- a transfer is never
+   * income (I2). The part that converted; see `missingCurrencies` below.
+   */
+  @ApiProperty({ example: 1000.0 })
+  taggedInflows: number;
+
+  /** Transfer legs carrying this bucket's value, negative side, as a positive magnitude. */
+  @ApiProperty({ example: 1000.0 })
+  taggedOutflows: number;
+
+  /**
+   * Source currencies with no usable rate into the report's currency, across
+   * both this bucket's categorized rows and its tagged transfer legs.
+   */
+  @ApiProperty({ type: [String], example: [] })
+  missingCurrencies: string[];
+
+  /** How many aggregate rows this bucket left out, by any cause. */
+  @ApiProperty({ example: 0 })
+  excludedCount: number;
+}
+
 export class IncomeVsExpensesResponse {
   /**
    * Every bucket in the window, in order, including the ones nothing happened
@@ -103,4 +158,20 @@ export class IncomeVsExpensesResponse {
   /** How many aggregate rows were left out, by any cause. */
   @ApiProperty({ example: 0 })
   excludedCount: number;
+
+  /**
+   * The tag key the caller asked to break the report down by. Present only
+   * when the request carried `tagKey` (I1: absent otherwise, not `null`).
+   */
+  @ApiPropertyOptional({ example: "scope" })
+  tagKey?: string;
+
+  /**
+   * One bucket per discovered value of `tagKey`, plus the reserved untagged
+   * bucket ({@link UNTAGGED_TAG_BUCKET_ID}). Present only when `tagKey` was
+   * supplied; the fields above keep describing the unpartitioned (All) figure,
+   * so a client ignoring this field still renders today's report.
+   */
+  @ApiPropertyOptional({ type: [IncomeExpenseTagBucket] })
+  buckets?: IncomeExpenseTagBucket[];
 }

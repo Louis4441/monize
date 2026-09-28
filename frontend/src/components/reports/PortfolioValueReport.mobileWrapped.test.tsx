@@ -25,7 +25,6 @@ const mockGetInvestmentsDaily = vi.fn();
 const mockGetInvestmentsMonthly = vi.fn();
 const mockGetInvestmentsBreakdown = vi.fn();
 const mockGetPeriodResult = vi.fn();
-const mockGetFirstPricedDay = vi.fn();
 const mockGetPortfolioSummary = vi.fn();
 const mockGetInvestmentAccounts = vi.fn();
 const mockGetIntradayValue = vi.fn();
@@ -97,7 +96,6 @@ vi.mock('@/lib/net-worth', () => ({
     getInvestmentsMonthly: (...args: any[]) => mockGetInvestmentsMonthly(...args),
     getInvestmentsBreakdown: (...args: any[]) => mockGetInvestmentsBreakdown(...args),
     getInvestmentsPeriodResult: (...args: any[]) => mockGetPeriodResult(...args),
-    getFirstPricedDay: (...args: any[]) => mockGetFirstPricedDay(...args),
   },
 }));
 
@@ -121,7 +119,6 @@ async function renderReport() {
   mockGetInvestmentsMonthly.mockResolvedValue([]);
   mockGetInvestmentsDaily.mockResolvedValue([]);
   mockGetInvestmentsBreakdown.mockResolvedValue({ series: [], points: [] });
-  mockGetFirstPricedDay.mockResolvedValue({ date: null });
   mockGetIntradayValue.mockResolvedValue({ points: [], fallbackToDaily: false, skippedSymbols: [] });
   mockGetIntradayBreakdown.mockResolvedValue({ series: [], points: [], fallbackToDaily: false, skippedSymbols: [] });
   mockGetPortfolioSummary.mockResolvedValue({ holdingsByAccount: HOLDINGS_BY_ACCOUNT });

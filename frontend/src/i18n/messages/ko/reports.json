@@ -322,6 +322,14 @@
     "seriesInflows": "유입액",
     "seriesOutflows": "유출액"
   },
+  "tagBreakdown": {
+    "label": "태그 키별로 분류",
+    "none": "없음",
+    "untagged": "태그 없음",
+    "inflows": "태그된 유입액",
+    "outflows": "태그된 유출액",
+    "sharesExceedNote": "이 키에서 둘 이상의 값으로 태그된 행은 각 값에 대해 집계되므로, 값별 비율의 합이 100%를 초과할 수 있습니다."
+  },
   "categoryPerformance": {
     "noBudgets": "예산을 찾을 수 없습니다. 카테고리 성과를 보려면 예산을 만드세요.",
     "noData": "아직 이용 가능한 카테고리 데이터가 없습니다.",
@@ -471,6 +479,7 @@
     "allAccountsPlaceholder": "모든 계정",
     "filterBySecurityLabel": "유가증권으로 필터링",
     "filterByAccountLabel": "계정으로 필터링",
+    "monthlyDisplayModeLabel": "월별 표시 모드",
     "allSecurities": "모든 유가증권",
     "viewMonthly": "월별",
     "viewDaily": "일별",
@@ -1192,7 +1201,6 @@
     "incompleteTooltip": "이 기간의 일부 날짜에 가격, 환율 또는 현금 잔액이 없어서 모든 날짜에 의존하는 수치는 표시되지 않습니다.",
     "measuredFromClose": "{date} 거래 마감 시점부터",
     "unmeasuredFlowTooltip": "이 계좌들에 입금되거나 출금된 돈 중 일부는 여기서 집계할 수 없는 방식으로 이동했습니다. 이 계좌 밖의 계좌에서 결제된 거래이거나, 투자 항목과 일반 지출이 섞인 분할 항목일 수 있습니다. 투자 결과의 일부가 본인의 자금일 수 있으므로 투자 결과는 표시되지 않습니다.",
-    "closeBoundsTooltip": "이 수치는 저장된 {start}와(과) {end}의 종가 사이에서 측정됩니다. 위 차트는 하루 동안의 실시간 가격을 보여주므로, 이 수치가 변하지 않는 동안에도 차트는 움직일 수 있습니다.",
     "notAvailable": "N/A",
     "intradayUnavailable": "상세 당일 가격 정보를 이용할 수 없습니다",
     "intradayUnavailableTitle": "이 계정 조합에 대한 당일 보기를 이용할 수 없습니다",
@@ -1717,6 +1725,19 @@
     "title": "몬테카를로 시나리오 비교",
     "subtitle": "최대 4개의 저장된 시나리오에 대한 나란히 보기 지표입니다.",
     "backToMonteCarlo": "몬테카를로로 돌아가기",
+    "downloadCsv": "CSV 다운로드",
+    "downloadCsvTitle": "비교 내용을 CSV 파일로 다운로드",
+    "downloadCsvWaitTitle": "최소 2개의 시나리오가 로드될 때까지 기다리세요",
+    "emptyHeading": "선택된 시나리오가 없습니다",
+    "emptyBody": "몬테카를로 보고서에서 시나리오를 선택하여 나란히 비교하세요.",
+    "emptyButton": "몬테카를로 시뮬레이션으로 이동",
+    "needsMoreHeading": "최소 2개의 시나리오가 필요합니다",
+    "needsMoreBody": "비교하려면 저장된 시나리오가 2개 이상 필요합니다. 현재 하나가 선택되어 있습니다(id: <mono>{id}</mono>).",
+    "needsMoreButton": "시나리오 더 선택하기",
+    "scenarioFallback": "시나리오",
+    "removeAriaLabel": "비교에서 {title} 제거",
+    "removeTitle": "비교에서 제거",
+    "runFailed": "실행 실패",
     "errors": {
       "loadScenarioFailed": "시나리오를 불러오지 못했습니다.",
       "simulationFailed": "시뮬레이션에 실패했습니다."

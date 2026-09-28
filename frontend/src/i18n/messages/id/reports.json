@@ -322,6 +322,14 @@
     "seriesInflows": "Arus Masuk",
     "seriesOutflows": "Arus Keluar"
   },
+  "tagBreakdown": {
+    "label": "Rincian berdasarkan kunci tag",
+    "none": "Tidak ada",
+    "untagged": "Tanpa tag",
+    "inflows": "Arus masuk bertag",
+    "outflows": "Arus keluar bertag",
+    "sharesExceedNote": "Baris yang diberi tag dengan lebih dari satu nilai di bawah kunci ini dihitung untuk masing-masing nilai tersebut, sehingga persentase per nilai dapat berjumlah lebih dari 100%."
+  },
   "categoryPerformance": {
     "noBudgets": "Tidak ada anggaran ditemukan. Buat anggaran untuk melihat kinerja kategori.",
     "noData": "Belum ada data kategori yang tersedia.",
@@ -471,6 +479,7 @@
     "allAccountsPlaceholder": "Semua Akun",
     "filterBySecurityLabel": "Filter berdasarkan keamanan dokumen",
     "filterByAccountLabel": "Filter berdasarkan akun",
+    "monthlyDisplayModeLabel": "Mode tampilan bulanan",
     "allSecurities": "Semua Keamanan Dokumen",
     "viewMonthly": "Bulanan",
     "viewDaily": "Harian",
@@ -1192,7 +1201,6 @@
     "incompleteTooltip": "Beberapa hari dalam periode ini tidak memiliki harga, kurs, atau saldo kas, sehingga angka yang bergantung pada setiap hari tidak ditampilkan.",
     "measuredFromClose": "Sejak penutupan perdagangan pada {date}",
     "unmeasuredFlowTooltip": "Uang berpindah masuk atau keluar dari akun-akun ini dengan cara yang tidak dapat dihitung di sini: sebuah transaksi yang diselesaikan dari akun di luar kelompok ini, atau pemisahan yang mencampur baris investasi dengan pengeluaran biasa. Hasil investasi tidak ditampilkan, karena sebagian darinya adalah uang Anda sendiri.",
-    "closeBoundsTooltip": "Angka-angka ini diukur antara nilai penutupan tersimpan pada {start} dan {end}. Grafik di atas menampilkan harga langsung sepanjang hari, sehingga bisa berubah meskipun angka-angka ini tidak.",
     "notAvailable": "T/A",
     "intradayUnavailable": "Harga intraday terperinci tidak tersedia",
     "intradayUnavailableTitle": "Tampilan intraday tidak tersedia untuk campuran akun ini",
@@ -1717,6 +1725,19 @@
     "title": "Bandingkan Skenario Monte Carlo",
     "subtitle": "Metrik berdampingan untuk hingga 4 skenario yang disimpan.",
     "backToMonteCarlo": "Kembali ke Monte Carlo",
+    "downloadCsv": "Unduh CSV",
+    "downloadCsvTitle": "Unduh perbandingan sebagai file CSV",
+    "downloadCsvWaitTitle": "Tunggu setidaknya 2 skenario selesai dimuat",
+    "emptyHeading": "Tidak ada skenario yang dipilih",
+    "emptyBody": "Pilih skenario dari laporan Monte Carlo untuk membandingkannya berdampingan.",
+    "emptyButton": "Buka Simulasi Monte Carlo",
+    "needsMoreHeading": "Perlu setidaknya 2 skenario",
+    "needsMoreBody": "Perbandingan memerlukan 2 atau lebih skenario yang disimpan. Anda saat ini memiliki satu yang dipilih (id: <mono>{id}</mono>).",
+    "needsMoreButton": "Pilih lebih banyak skenario",
+    "scenarioFallback": "Skenario",
+    "removeAriaLabel": "Hapus {title} dari perbandingan",
+    "removeTitle": "Hapus dari perbandingan",
+    "runFailed": "Jalankan gagal",
     "errors": {
       "loadScenarioFailed": "Gagal memuat skenario.",
       "simulationFailed": "Simulasi gagal."

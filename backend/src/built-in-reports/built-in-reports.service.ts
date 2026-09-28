@@ -92,6 +92,7 @@ export class BuiltInReportsService {
       accountIds?: string[];
       bucket?: IncomeExpenseBucket;
       weekStartsOn?: WeekStartsOn;
+      tagKey?: string;
     },
   ): Promise<IncomeVsExpensesResponse> {
     return this.incomeReports.getIncomeVsExpenses(

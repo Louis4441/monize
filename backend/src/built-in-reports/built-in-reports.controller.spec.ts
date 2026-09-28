@@ -178,6 +178,28 @@ describe("BuiltInReportsController", () => {
         { accountIds: undefined, bucket: undefined, weekStartsOn: undefined },
       );
     });
+
+    it("threads tagKey through to service.getIncomeVsExpenses", async () => {
+      mockService.getIncomeVsExpenses.mockResolvedValue({ data: [] });
+
+      await controller.getIncomeVsExpenses(mockReq, {
+        startDate: "2024-01-01",
+        endDate: "2024-12-31",
+        tagKey: "scope",
+      } as any);
+
+      expect(mockService.getIncomeVsExpenses).toHaveBeenCalledWith(
+        "user-1",
+        "2024-01-01",
+        "2024-12-31",
+        {
+          accountIds: undefined,
+          bucket: undefined,
+          weekStartsOn: undefined,
+          tagKey: "scope",
+        },
+      );
+    });
   });
 
   describe("getCashFlow()", () => {
@@ -193,6 +215,26 @@ describe("BuiltInReportsController", () => {
         "user-1",
         "2024-01-01",
         "2024-12-31",
+        { tagKey: undefined },
+      );
+    });
+
+    it("threads tagKey through to service.getIncomeVsExpenses", async () => {
+      const query = {
+        startDate: "2024-01-01",
+        endDate: "2024-12-31",
+        tagKey: "scope",
+      };
+      const expected = { months: [] };
+      mockService.getIncomeVsExpenses.mockResolvedValue(expected);
+
+      await controller.getCashFlow(mockReq, query as any);
+
+      expect(mockService.getIncomeVsExpenses).toHaveBeenCalledWith(
+        "user-1",
+        "2024-01-01",
+        "2024-12-31",
+        { tagKey: "scope" },
       );
     });
   });

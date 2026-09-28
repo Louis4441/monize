@@ -464,26 +464,6 @@ export function filterPriceWindow(
   );
 }
 
-/**
- * A formatted amount with its currency code appended, when the security is not
- * quoted in the user's own currency.
- *
- * Every figure on the detail page is in the security's currency and none of them
- * is converted, so a reader whose default is CAD needs to be told that "$1,300"
- * is not their $1,300. Symbols do not carry that: `$` is four currencies and `kr`
- * is three. Matches how the Investments page marks a foreign holding, so the two
- * screens read the same way.
- */
-export function withCurrencyCode(
-  formatted: string,
-  currencyCode: string,
-  defaultCurrency: string,
-): string {
-  return currencyCode && currencyCode !== defaultCurrency
-    ? `${formatted} ${currencyCode}`
-    : formatted;
-}
-
 /** Most decimal places a price column will show, matching NUMERIC(24,10). */
 export const MAX_PRICE_DECIMALS = 10;
 

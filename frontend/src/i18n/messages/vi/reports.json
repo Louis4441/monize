@@ -322,6 +322,14 @@
     "seriesInflows": "Dòng vào",
     "seriesOutflows": "Dòng ra"
   },
+  "tagBreakdown": {
+    "label": "Phân tách theo khóa thẻ",
+    "none": "Không có",
+    "untagged": "Không gắn thẻ",
+    "inflows": "Dòng vào có gắn thẻ",
+    "outflows": "Dòng ra có gắn thẻ",
+    "sharesExceedNote": "Một dòng được gắn nhiều hơn một giá trị theo khóa này sẽ được tính vào từng giá trị đó, vì vậy tỷ lệ theo từng giá trị có thể cộng lại vượt quá 100%."
+  },
   "categoryPerformance": {
     "noBudgets": "Không tìm thấy ngân sách. Tạo ngân sách để xem hiệu suất danh mục.",
     "noData": "Chưa có dữ liệu danh mục.",
@@ -471,6 +479,7 @@
     "allAccountsPlaceholder": "Tất cả tài khoản",
     "filterBySecurityLabel": "Lọc theo chứng khoán",
     "filterByAccountLabel": "Lọc theo tài khoản",
+    "monthlyDisplayModeLabel": "Chế độ hiển thị hàng tháng",
     "allSecurities": "Tất cả chứng khoán",
     "viewMonthly": "Hàng tháng",
     "viewDaily": "Hàng ngày",
@@ -1192,7 +1201,6 @@
     "incompleteTooltip": "Một số ngày trong khoảng thời gian này thiếu giá, tỷ giá hối đoái hoặc số dư tiền mặt, nên các số liệu phụ thuộc vào từng ngày sẽ không được hiển thị.",
     "measuredFromClose": "Kể từ khi đóng cửa phiên giao dịch ngày {date}",
     "unmeasuredFlowTooltip": "Tiền đã chuyển vào hoặc ra khỏi các tài khoản này theo cách không thể tính được ở đây: một giao dịch được thanh toán từ một tài khoản bên ngoài nhóm này, hoặc một khoản tách lẫn một dòng đầu tư với chi tiêu thông thường. Kết quả đầu tư không được hiển thị, vì một phần của nó sẽ là tiền của chính bạn.",
-    "closeBoundsTooltip": "Các số liệu này được đo giữa các giá đóng cửa đã lưu của {start} và {end}. Biểu đồ ở trên hiển thị giá theo thời gian thực trong ngày, vì vậy nó có thể thay đổi trong khi các số liệu này không đổi.",
     "notAvailable": "N/A",
     "intradayUnavailable": "Không có giá nội ngày chi tiết",
     "intradayUnavailableTitle": "Chế độ xem nội ngày không khả dụng cho kết hợp tài khoản này",
@@ -1717,6 +1725,19 @@
     "title": "So sánh kịch bản Monte Carlo",
     "subtitle": "Số liệu cạnh nhau cho tối đa 4 kịch bản đã lưu.",
     "backToMonteCarlo": "Quay lại Monte Carlo",
+    "downloadCsv": "Tải xuống CSV",
+    "downloadCsvTitle": "Tải xuống bảng so sánh dưới dạng tệp CSV",
+    "downloadCsvWaitTitle": "Chờ ít nhất 2 kịch bản tải xong",
+    "emptyHeading": "Chưa chọn kịch bản nào",
+    "emptyBody": "Chọn các kịch bản từ báo cáo Monte Carlo để so sánh chúng cạnh nhau.",
+    "emptyButton": "Đến trang Mô phỏng Monte Carlo",
+    "needsMoreHeading": "Cần ít nhất 2 kịch bản",
+    "needsMoreBody": "So sánh yêu cầu 2 kịch bản đã lưu trở lên. Bạn hiện đã chọn một kịch bản (id: <mono>{id}</mono>).",
+    "needsMoreButton": "Chọn thêm kịch bản",
+    "scenarioFallback": "Kịch bản",
+    "removeAriaLabel": "Xóa {title} khỏi so sánh",
+    "removeTitle": "Xóa khỏi so sánh",
+    "runFailed": "Chạy thất bại",
     "errors": {
       "loadScenarioFailed": "Không thể tải kịch bản.",
       "simulationFailed": "Mô phỏng thất bại."

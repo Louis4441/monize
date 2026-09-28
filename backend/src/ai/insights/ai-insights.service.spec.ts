@@ -16,6 +16,7 @@ import {
   createJobClaimMock,
   JobClaimMock,
   jobClaimProvider,
+  TEST_LEASE_TOKEN,
 } from "../../test-helpers/job-claim-testing";
 
 jest.mock("../../common/db/scoped-db", () =>
@@ -310,6 +311,44 @@ describe("AiInsightsService", () => {
       // start remains uncovered, which is exactly the exposure two
       // previous-release replicas already have with each other today.
       expect(jobClaims.claimLease.mock.calls.length).toBe(leasesBefore);
+    });
+
+    it("re-reads the cooldown under the lease and stands down when another replica just generated", async () => {
+      // The race the second read closes: this replica read "no recent insight"
+      // while another was still generating, then won the lease as soon as the
+      // winner released it. By then the winner's rows are committed, so the
+      // read under the lease finds them. Without it, this replica generates and
+      // saves a duplicate set and pays the provider again.
+      const qb = mockQb();
+      qb.getOne
+        .mockResolvedValueOnce(null) // before the lease: nothing yet
+        .mockResolvedValueOnce(makeInsight()); // under the lease: the winner's row
+      qb.getMany.mockResolvedValue([makeInsight()]);
+      mockInsightRepo.createQueryBuilder.mockReturnValue(qb);
+      // The job-claim double is shared across this file (the others are rebuilt
+      // in beforeEach), so look only at the calls this test made.
+      const leasesBefore = jobClaims.claimLease.mock.calls.length;
+      const releasesBefore = jobClaims.releaseLease.mock.calls.length;
+
+      const result = await service.generateInsights(userId);
+
+      expect(jobClaims.claimLease.mock.calls.slice(leasesBefore)).toEqual([
+        [
+          "ai_insight_generation",
+          userId,
+          expect.any(String),
+          expect.any(Number),
+        ],
+      ]);
+      expect(qb.getOne).toHaveBeenCalledTimes(2);
+      expect(mockAggregatorService.computeAggregates).not.toHaveBeenCalled();
+      expect(mockAiService.complete).not.toHaveBeenCalled();
+      expect(mockInsightRepo.save).not.toHaveBeenCalled();
+      expect(result.insights).toHaveLength(1);
+      // Standing down still hands the lease back, by this attempt's token.
+      expect(jobClaims.releaseLease.mock.calls.slice(releasesBefore)).toEqual([
+        ["ai_insight_generation", userId, expect.any(String), TEST_LEASE_TOKEN],
+      ]);
     });
 
     it("generates insights when no recent insights exist", async () => {

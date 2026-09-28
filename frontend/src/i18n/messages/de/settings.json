@@ -493,6 +493,15 @@
       "description": "Finanzdaten aus Ihrem Konto entfernen. Dies kann nicht rückgängig gemacht werden.",
       "openButton": "Daten löschen...",
       "alwaysDeletedHeading": "Folgendes wird immer gelöscht:",
+      "alwaysDeletedItems": {
+        "transactions": "Alle Transaktionen und Splits",
+        "scheduled": "Alle geplanten/wiederkehrenden Transaktionen",
+        "securities": "Alle Wertpapiere, Kurse, Bestände und Anlagetransaktionen",
+        "budgets": "Alle Budgets und Budgetwarnungen",
+        "monthlySummaries": "Monatliche Kontosaldo-Zusammenfassungen",
+        "customReports": "Benutzerdefinierte Berichte, Tags und Importzuordnungen",
+        "actionHistory": "Aktionsverlauf (Rückgängig/Wiederholen)"
+      },
       "optionalHeading": "Optional auch löschen:",
       "accountsOption": "Konten",
       "categoriesOption": "Kategorien",

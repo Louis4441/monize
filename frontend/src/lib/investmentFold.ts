@@ -11,6 +11,8 @@
  * price - commission).
  */
 
+import { roundMoney } from '@/lib/format';
+
 /**
  * The latest usable market close from a security-price response, or null. Only a
  * positive, finite close is a price: 0, negative, NaN and an empty response are
@@ -28,17 +30,6 @@ export function usableClose(
   const price = Number(latest.closePrice);
   if (!Number.isFinite(price) || price <= 0) return null;
   return { price, date: latest.priceDate ?? null };
-}
-
-/**
- * Round to money precision (4dp, `decimal(20,4)`) -- the scale a total and a
- * balance are stored at. Kept here beside the fold so the two conversions and
- * their call sites round money one way. (Plain `Math.round`, matching the fold;
- * `lib/format.ts`'s `roundToDecimals` applies an epsilon nudge and is a different
- * strategy on the boundary -- do not swap one for the other.)
- */
-export function roundMoney(value: number): number {
-  return Math.round(value * 10_000) / 10_000;
 }
 
 /** Round a share price to its stored/display precision (6dp). */

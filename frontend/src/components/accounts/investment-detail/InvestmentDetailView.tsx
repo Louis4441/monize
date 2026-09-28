@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { accountsApi } from '@/lib/accounts';
 import { investmentsApi } from '@/lib/investments';
+import { roundToCents } from '@/lib/format';
 import { PortfolioSummaryCard } from '@/components/investments/PortfolioSummaryCard';
 import { AssetAllocationChart } from '@/components/investments/AssetAllocationChart';
 import { InvestmentValueChart } from '@/components/investments/InvestmentValueChart';
@@ -21,10 +22,6 @@ interface InvestmentDetailViewProps {
    * than being raised here.
    */
   refreshKey?: number;
-}
-
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
 }
 
 /**
@@ -107,8 +104,8 @@ export function InvestmentDetailView({ account, refreshKey = 0 }: InvestmentDeta
       setCash(resolvedCash);
       setSummary(summaryData);
       const income = incomeTx.reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
-      setDividendInterestYtd(round2(income));
-      setRealizedGainsYtd(round2(realized.reduce((sum, r) => sum + (Number(r.realizedGain) || 0), 0)));
+      setDividendInterestYtd(roundToCents(income));
+      setRealizedGainsYtd(roundToCents(realized.reduce((sum, r) => sum + (Number(r.realizedGain) || 0), 0)));
       setLoadedForId(account.id);
     })();
     return () => {

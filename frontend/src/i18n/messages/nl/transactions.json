@@ -172,6 +172,7 @@
       "ref": "Ref: {number}",
       "investmentLabel": "Belegging",
       "linkedInvestmentTitle": "Bekijk in Beleggingen",
+      "linkedInvestmentBadgeTitle": "Deze transactie is gekoppeld aan een beleggingstransactie",
       "filterByDate": "Filteren op datum \"{date}\"",
       "filterByAccount": "Filteren op \"{name}\"",
       "filterByPayee": "Filteren op \"{name}\"",

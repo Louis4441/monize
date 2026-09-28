@@ -337,7 +337,8 @@ Most callers are crons, and each has a different amount of protection:
 | --- | --- |
 | `BillReminderService` | Full, and the opposite trade from `ProviderOutageAlertService`. A `claimLease(JobClaimType.BillReminder, ...)` excludes the other replicas for the length of an SMTP round trip, and `markDelivered` writes the durable record **after** the send; the next run re-reads it and skips. The key is `buildReminderClaimKey` -- the run's date plus a sha256 digest of which bills the reminder covers -- so a second bill falling due later the same day is still a reminder to send, and the same set is not re-sent tomorrow. The run's date is passed in rather than read per user, because a run spanning local midnight otherwise claims the early users under one key and the rest under another. The contract is **at-least-once**: a process killed after SMTP accepted but before the record committed re-sends next run, which is the right way round for a reminder. |
 | `MortgageReminderService` | The same lease plus delivery record, under `JobClaimType.MortgageReminder`, checked with `wasDelivered` before the send and written with `markDelivered` after it; a lease the send does not use is handed straight back rather than held for its TTL. Its key is fingerprinted on the mortgages and their term-end dates, but the date half is read from the clock inside the key builder rather than passed in from the run, so the midnight split the bill reminder pinned is still reachable here. |
-| `BudgetAlertService` | Full, by insert-winner, since migration 140. The in-memory dedup against existing rows by `(budgetId, type, budgetCategoryId, periodStart)` is a check-then-act and never was the arbiter; the unique fingerprint index is, through `NotificationService.create`, which answers `null` for the replica that loses the race so only the winner emails. `isEmailSent` is set after the send, so a crash in between leaves it `false` forever without causing a duplicate. |
+| `BudgetAlertService`, daily alerts (`0 7 * * *`) | Full, by insert-winner, since migration 140. The in-memory dedup against existing rows by `(budgetId, type, budgetCategoryId, periodStart)` is a check-then-act and never was the arbiter; the unique fingerprint index is, through `NotificationService.create`, which answers `null` for the replica that loses the race so only the winner emails. `isEmailSent` is set after the send, so a crash in between leaves it `false` forever without causing a duplicate. |
+| `BudgetAlertService`, weekly digest (`0 7 * * 1`) | Full, by lease plus delivery record, the bill reminder's shape. The digest is composed from rows the daily alerts already wrote, so nothing is inserted and the fingerprint index has nothing to arbitrate; before this it sent unconditionally, so N replicas sent N copies. `JobClaimService.claimLease` under `JobClaimType.BudgetWeeklyDigest`, keyed by user and the run date read once per run, excludes the other replicas for the length of one SMTP round trip; `wasDelivered` is re-read under the lease and `markDelivered` is written after the send. A failed send releases the lease so the next run retries. **At-least-once**: a crash between SMTP accepting and the record committing re-sends once. |
 | Emergency-access grant | The one deliberate design. See section 5. |
 | `SystemAlertService` | Full, by insert-winner. Each admin's alert row goes through `NotificationService.create`, whose `INSERT ... ON CONFLICT DO NOTHING RETURNING id` is arbitrated for these rows by the partial unique index from migration 170, and the email goes only to rows the INSERT returned -- with the same at-most-once trade as `ProviderOutageAlertService`: a crash between the commit and SMTP loses that email, and the in-app row survives as the durable notice (`docs/specs/system-alerts.md`, INV-ALERT-001). |
 | Self-service email change (`EmailChangeService`) | Request-driven, not a cron, and none needed: nothing is claimed by the send. The pending address and the sha256 of a single-use token commit first, then the link goes to the new address and a notice to the current one, so a link never names a token the database does not hold. A failed send is logged and the request still succeeds; the pending change expires after 24 hours or is replaced (token and all) by the next request. The confirmation (`AuthEmailService.confirmEmailChange`) sends nothing: one conditional `UPDATE ... WHERE email_change_token = $hash AND email_change_token_expiry > now()` applies it, the unique index on `users.email` refuses a lost race as a 409, and refresh tokens are revoked after the commit. Without SMTP the change applies on the password check alone, as registration creates verified accounts when it cannot send. |
@@ -434,14 +435,26 @@ That is a compensating decision expressed as a state transition: the durable
 "the grant happened" marker is withheld until an external effect is confirmed,
 and withholding it *is* the retry. Copy this shape.
 
-The reminder path is weaker: `lastReminderSentAt` is written after the send, and
-the once-per-day gate reads it, so a crash between send and save re-permits a
-send later the same day. Combined with every replica firing every cron, a
-duplicate reminder is reachable.
+Step 1 also takes the same `EmergencyAccessGrantNotify` delivery lease as the
+step-1b resume path before it claims the grant, and releases it by token once
+delivery ends, so a replica whose sweep sees the freshly claimed grant cannot
+resume, and re-send, a delivery that is still in progress on the winner.
+
+The reminder path keeps exclusion and the delivery record apart. It takes
+`claimLease(JobClaimType.EmergencyAccessReminder, owner, <server-local day>)` so two
+replicas cannot send at the same moment, then re-reads `last_reminder_sent_at`
+under that lease and skips if today's reminder is already recorded; the record
+is written only after the send succeeds, and a failed send hands the lease back
+without writing it. What remains is the window between the SMTP accept and that
+`UPDATE`: a process killed there leaves no record, so a replica whose sweep
+reaches that owner after the ten-minute lease has expired sends the reminder
+again the same day. A duplicate reminder is the survivable direction against a
+missing one.
 
 Claim consumption itself sends no email, so there is no external-effect question
-there -- but the consumption is a check-then-act with no lock and no conditional
-`WHERE`, which `docs/concurrency-and-idempotency.md` covers.
+there; it is a single conditional `UPDATE ... WHERE claim_token_used_at IS NULL`
+(INV-CLAIM-001), which `docs/concurrency-and-idempotency.md` lists among the
+conditional claims that exist.
 
 ## 6. Providers: AI, prices, FX
 
@@ -474,15 +487,26 @@ outage is not part of whatever request happened to discover it, so a rollback
 must not erase it. The write is fire-and-forget and swallows its own failures --
 availability bookkeeping must never turn a provider outage into a failed request.
 
-**AI insights are the weak case.** The reentrancy guard is a `Set<userId>` in
-process memory, which coordinates one replica with itself and nothing across
-replicas. The 12-hour cooldown is a plain read of the most recent
-`generatedAt` -- a check-then-act. Rows are inserted with no idempotency key, so
-a manual regenerate racing the daily cron, or two replicas both past the cooldown
-read, produces duplicate insight rows. Ordering is at least correct on failure:
-the provider is called and the response parsed before anything is saved, so a
-failed call leaves no partial rows, and a total provider failure throws rather
-than fabricating a result.
+**AI insights.** Exclusion is a durable lease:
+`generateInsights` (`backend/src/ai/insights/ai-insights.service.ts`) takes
+`claimLease(JobClaimType.AiInsightGeneration, userId, ...)` and releases it by
+token in its `finally`, so two replicas, or a manual regenerate and the daily
+cron, cannot generate for one user at the same time. The in-process
+`generatingUsers` `Set` remains only as a local short-circuit. The 12-hour
+cooldown (a read of the most recent `generatedAt`) is taken twice: before the
+lease as the cheap early out, and again under it, which is the read that
+decides. The winner saves before its `finally` releases the lease, so a replica
+that read "nothing recent" while the winner was still generating, and claims the
+lease the moment it is released, finds the winner's rows and stands down instead
+of saving a second set; the inserts carry no idempotency key, so this re-read is
+what keeps the rows single. What remains is cost: only saved rows set the
+cooldown, so a generation that saves nothing (a provider failure, a response
+that parses to no insights -- `saveInsights` returns early on an empty list)
+is retried by the next holder, which is the reason the lease is released rather
+than kept. Ordering is at
+least correct on failure: the provider is called and the response parsed before
+anything is saved, so a failed call leaves no partial rows, and a total provider
+failure throws rather than fabricating a result.
 
 ### Payee contact enrichment
 
@@ -607,8 +631,8 @@ added rather than as it stands.
 | Attachment provider comment | Claims joint commit for all providers; true only of the database provider | EXT-004 |
 | Backup restore validation, plaintext `.json.gz` | No content hash of its own: truncation and random corruption are caught by the gzip trailer and `JSON.parse`, a deliberate alteration is not. An encrypted `.mzbe` is authenticated frame by frame and has no such gap | EXT-002 |
 | Mortgage reminder delivery key | The lease and the delivery record are in place; what is not is the run date. `buildMortgageReminderClaimKey` reads `new Date()` per user, so a run crossing local midnight claims some users under D and the rest under D+1 while the windows are measured from D -- the duplicate the bill reminder closed by taking the date as a parameter | EXT-001 |
-| Emergency-access reminder | `lastReminderSentAt` written after the send, and it is the gate | EXT-001 |
-| AI insight generation | Process-local `Set` as the reentrancy guard; cooldown is a check-then-act; inserts carry no idempotency key | EXT-001 |
+| Emergency-access reminder | The lease and the delivery record are in place, and `last_reminder_sent_at` is re-read under the lease. What remains: a process killed between the SMTP accept and the record's `UPDATE` leaves no record, so a replica whose sweep reaches the owner after the lease expires sends again the same day -- the survivable direction | EXT-001 |
+| AI insight generation | Duplicate rows are closed: the lease excludes concurrent generation and the cooldown is re-read under it. What remains is cost: only saved rows set the cooldown, so a generation that saved nothing is repeated by the next holder, a replica or a manual regenerate (a provider call, no rows) | EXT-001 |
 | Payee contact enrichment | In-flight guard and admission queue are process-local; two replicas can both pay for one lookup (the second UPDATE affects zero rows, so the data is right and only the cost is duplicated) | EXT-001 |
 | Off-machine backup copy (email) | An accepted trade, not an omission: a claim expired by the lease is re-attempted, and SMTP offers no way to tell a message already delivered from one never sent, so the same artifact can arrive twice. Delivering a duplicate copy is the survivable direction against never delivering it | EXT-003 |
 | Off-machine backup copy (S3) | A stuck `uploading` row is reclaimed after the lease and re-attempted, reconciled by digest. What remains: nothing reconciles a bucket object against the ledger, so an object written by an attempt whose row never reached `uploaded` is referenced by nothing -- bytes nobody references, the survivable side, and the operator's lifecycle policy is what ages them out | EXT-003 |

@@ -322,6 +322,14 @@
     "seriesInflows": "Wpływy",
     "seriesOutflows": "Wypływy"
   },
+  "tagBreakdown": {
+    "label": "Podziel według klucza tagu",
+    "none": "Brak",
+    "untagged": "Bez tagu",
+    "inflows": "Wpływy z tagiem",
+    "outflows": "Wypływy z tagiem",
+    "sharesExceedNote": "Wiersz oznaczony więcej niż jedną wartością w ramach tego klucza jest liczony do każdej z nich, więc udziały poszczególnych wartości mogą sumować się do więcej niż 100%."
+  },
   "categoryPerformance": {
     "noBudgets": "Nie znaleziono budżetów. Utwórz budżet, aby zobaczyć wyniki kategorii.",
     "noData": "Brak danych kategorii.",
@@ -471,6 +479,7 @@
     "allAccountsPlaceholder": "Wszystkie konta",
     "filterBySecurityLabel": "Filtruj według papieru",
     "filterByAccountLabel": "Filtruj według konta",
+    "monthlyDisplayModeLabel": "Miesięczny tryb wyświetlania",
     "allSecurities": "Wszystkie papiery",
     "viewMonthly": "Miesięczny",
     "viewDaily": "Codziennie",
@@ -1192,7 +1201,6 @@
     "incompleteTooltip": "W niektórych dniach tego okresu brakuje ceny, kursu wymiany lub salda gotówkowego, dlatego wartości zależne od każdego dnia nie są wyświetlane.",
     "measuredFromClose": "Od zamknięcia notowań {date}",
     "unmeasuredFlowTooltip": "Pieniądze wpłynęły na te konta lub z nich wypłynęły w sposób, którego nie da się tu policzyć: transakcja rozliczona z konta spoza tej grupy albo podział łączący pozycję inwestycyjną ze zwykłym wydatkiem. Wynik inwestycyjny nie jest pokazywany, ponieważ część z niego byłaby Twoimi własnymi pieniędzmi.",
-    "closeBoundsTooltip": "Te wartości są mierzone między zapisanymi kursami zamknięcia z dnia {start} i {end}. Wykres powyżej pokazuje ceny na żywo w ciągu dnia, więc może się poruszać, podczas gdy te wartości pozostają bez zmian.",
     "notAvailable": "Brak",
     "intradayUnavailable": "Szczegółowe ceny śróddzienne niedostępne",
     "intradayUnavailableTitle": "Widok śróddzienny niedostępny dla tego zestawu kont",
@@ -1717,6 +1725,19 @@
     "title": "Porównaj scenariusze Monte Carlo",
     "subtitle": "Zestawienie metryk dla maksymalnie 4 zapisanych scenariuszy.",
     "backToMonteCarlo": "Powrót do Monte Carlo",
+    "downloadCsv": "Pobierz CSV",
+    "downloadCsvTitle": "Pobierz porównanie jako plik CSV",
+    "downloadCsvWaitTitle": "Poczekaj, aż co najmniej 2 scenariusze zakończą wczytywanie",
+    "emptyHeading": "Nie wybrano scenariuszy",
+    "emptyBody": "Wybierz scenariusze z raportu Monte Carlo, aby porównać je obok siebie.",
+    "emptyButton": "Przejdź do symulacji Monte Carlo",
+    "needsMoreHeading": "Potrzebne co najmniej 2 scenariusze",
+    "needsMoreBody": "Porównanie wymaga co najmniej 2 zapisanych scenariuszy. Obecnie masz wybrany jeden (id: <mono>{id}</mono>).",
+    "needsMoreButton": "Wybierz więcej scenariuszy",
+    "scenarioFallback": "Scenariusz",
+    "removeAriaLabel": "Usuń {title} z porównania",
+    "removeTitle": "Usuń z porównania",
+    "runFailed": "Uruchomienie nie powiodło się",
     "errors": {
       "loadScenarioFailed": "Nie udało się załadować scenariusza.",
       "simulationFailed": "Symulacja nie powiodła się."

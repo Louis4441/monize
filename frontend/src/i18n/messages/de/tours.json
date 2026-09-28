@@ -355,6 +355,28 @@
             "body": "Kontostandsgrenzen liegen am Konto selbst: Bearbeiten Sie ein Konto und setzen Sie **Benachrichtigen unter** oder **Benachrichtigen über**. Sie lösen aus, wenn der Saldo die Grenze *überschreitet* — Sie hören also einmal davon und nicht nach jeder weiteren Buchung. Diese Führung können Sie jederzeit in den Einstellungen wiederholen."
           }
         }
+      },
+      "reportTagBreakdown": {
+        "title": "Bericht nach Tag aufschlüsseln",
+        "steps": {
+          "welcome": {
+            "title": "Berichte nach Tag sehen, nicht nur nach Kategorie",
+            "body": "Einnahmen vs. Ausgaben und die Kapitalflussrechnung lassen sich jetzt nach dem Wert eines Tags aufschlüsseln, den Sie wählen — Haushaltsausgaben gegenüber einem Nebenerwerb zum Beispiel — und zeigen Umbuchungen zwischen ihnen, ohne eine Umbuchung je als Einnahme zu zählen."
+          },
+          "breakdown": {
+            "title": "Nach Tag-Schlüssel aufschlüsseln",
+            "body": "Wählen Sie hier einen Tag-Schlüssel, etwa **scope**, und der Bericht teilt sich in einen Abschnitt pro verwendetem Wert auf, plus einen Abschnitt **Ohne Tag** für den Rest.",
+            "fallbackBody": "Dieses Feld erscheint, sobald Sie eine Buchung mit einem **Schlüssel:Wert**-Tag versehen haben, etwa **scope:household**. Fügen Sie eines hinzu, und Nach Tag-Schlüssel aufschlüsseln erscheint hier."
+          },
+          "buckets": {
+            "title": "Summen je Wert, Umbuchungen getrennt ausgewiesen",
+            "body": "Die Wahl eines Schlüssels öffnet einen Tab je Wert plus **Ohne Tag**, jeder mit eigenen Einnahmen und Ausgaben. Zwischen Konten verschobenes Geld erscheint als **Getaggte Zuflüsse** und **Getaggte Abflüsse** — sichtbar, aber nie als Einnahme gezählt."
+          },
+          "finish": {
+            "title": "Das ist die Tag-Aufschlüsselung",
+            "body": "Versehen Sie Buchungen überall dort, wo Sie diese Ansicht möchten, mit einem Schlüssel:Wert-Paar wie scope:household, und rufen Sie diese Tour jederzeit erneut aus den Einstellungen auf."
+          }
+        }
       }
     }
   }

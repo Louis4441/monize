@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { totalFromQuantity, quantityFromTotal, roundPrice, roundMoney, usableClose } from './investmentFold';
+import { totalFromQuantity, quantityFromTotal, roundPrice, usableClose } from './investmentFold';
 
 describe('usableClose', () => {
   it('returns the latest positive close with its date', () => {
@@ -29,15 +29,6 @@ describe('usableClose', () => {
 
   it('defaults a missing date to null', () => {
     expect(usableClose([{ closePrice: 10 }])).toEqual({ price: 10, date: null });
-  });
-});
-
-describe('roundMoney', () => {
-  it('rounds to money precision (4dp)', () => {
-    expect(roundMoney(1.23456)).toBe(1.2346);
-    expect(roundMoney(1.23454)).toBe(1.2345);
-    expect(roundMoney(99.99999)).toBe(100);
-    expect(roundMoney(100)).toBe(100);
   });
 });
 

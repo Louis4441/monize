@@ -7,13 +7,17 @@ import {
   PgListener,
   resolveListenerClientConfig,
 } from "./pg-listener.provider";
+import { ReplicaCensusService } from "./replica-census.service";
 
 /**
  * What this process needs in order to be one replica of several.
  *
  * Two providers, the shape of `DemoModeModule`: the parsed `CLUSTER_MODE`, and
  * the `LISTEN`/`NOTIFY` connection -- `null` in `single`, where the only
- * subscriber is in the publishing process and there is nothing to wake.
+ * subscriber is in the publishing process and there is nothing to wake. A
+ * third, `ReplicaCensusService`, counts the backend processes on this database,
+ * so a `single` deployment that is not actually alone can say so (the system
+ * alert sweep and `/health` read it).
  *
  * `@Global()` and imported only by `AppModule`. The listener is reached from
  * the event bus, from readiness, and later from anything else that has to wake
@@ -46,8 +50,9 @@ import {
           : null,
       inject: [CLUSTER_MODE, ConfigService],
     },
+    ReplicaCensusService,
   ],
-  exports: [CLUSTER_MODE, PG_LISTENER],
+  exports: [CLUSTER_MODE, PG_LISTENER, ReplicaCensusService],
 })
 export class ClusterModule implements OnModuleDestroy {
   constructor(

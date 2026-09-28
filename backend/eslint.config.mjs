@@ -83,6 +83,10 @@ const WITH_CONTEXT_ALLOWLIST = [
   // claims table that belongs to no single user, from cron entry points with no
   // request to inherit an identity from -- system context by construction.
   "src/common/jobs/job-claim.service.ts",
+  // The replica census: one read of pg_stat_activity, a system view with no
+  // owner column, from the system-alert cron and the health endpoint, neither
+  // of which carries a user identity -- system context by construction.
+  "src/common/cluster/replica-census.service.ts",
   // The HTTP throttler's counters in CLUSTER_MODE=multi. ThrottlerGuard runs
   // before RequestContextInterceptor, so there is no request identity to
   // inherit, and http_throttle_counters has no owner column to establish one

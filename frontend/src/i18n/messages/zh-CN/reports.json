@@ -322,6 +322,14 @@
     "seriesInflows": "流入",
     "seriesOutflows": "流出"
   },
+  "tagBreakdown": {
+    "label": "按标签键细分",
+    "none": "无",
+    "untagged": "未标记",
+    "inflows": "已标记的流入",
+    "outflows": "已标记的流出",
+    "sharesExceedNote": "如果一行在该键下被标记了多个值，则会计入每个值，因此各值的占比之和可能超过 100%。"
+  },
   "categoryPerformance": {
     "noBudgets": "未找到预算。创建预算以查看分类表现。",
     "noData": "暂无分类数据。",
@@ -471,6 +479,7 @@
     "allAccountsPlaceholder": "所有账户",
     "filterBySecurityLabel": "按证券筛选",
     "filterByAccountLabel": "按账户筛选",
+    "monthlyDisplayModeLabel": "月度显示模式",
     "allSecurities": "所有证券",
     "viewMonthly": "月度",
     "viewDaily": "日度",
@@ -1192,7 +1201,6 @@
     "incompleteTooltip": "此时间段内有些天缺少价格、汇率或现金余额，因此依赖每一天数据的数字不会显示。",
     "measuredFromClose": "自 {date} 收盘起",
     "unmeasuredFlowTooltip": "资金以此处无法计算的方式转入或转出这些账户：例如某笔交易通过这些账户之外的账户结算，或某个拆分将投资行与普通支出混在一起。投资结果不会显示，因为其中一部分将是您自己的资金。",
-    "closeBoundsTooltip": "这些数据是根据已保存的 {start} 和 {end} 收盘价计算得出的。上方图表显示的是当天的实时价格，因此图表可能会变化，而这些数据保持不变。",
     "notAvailable": "不适用",
     "intradayUnavailable": "详细日内定价不可用",
     "intradayUnavailableTitle": "此账户组合不支持日内视图",
@@ -1717,6 +1725,19 @@
     "title": "对比蒙特卡洛情景",
     "subtitle": "最多 4 个已保存情景的并排指标对比。",
     "backToMonteCarlo": "返回蒙特卡洛",
+    "downloadCsv": "下载 CSV",
+    "downloadCsvTitle": "将对比结果下载为 CSV 文件",
+    "downloadCsvWaitTitle": "请等待至少 2 个情景加载完成",
+    "emptyHeading": "未选择情景",
+    "emptyBody": "从蒙特卡洛报告中选择情景以并排对比。",
+    "emptyButton": "前往蒙特卡洛模拟",
+    "needsMoreHeading": "至少需要 2 个情景",
+    "needsMoreBody": "对比至少需要 2 个已保存的情景。您当前已选择 1 个（id：<mono>{id}</mono>）。",
+    "needsMoreButton": "选择更多情景",
+    "scenarioFallback": "情景",
+    "removeAriaLabel": "从对比中移除{title}",
+    "removeTitle": "从对比中移除",
+    "runFailed": "运行失败",
     "errors": {
       "loadScenarioFailed": "加载情景失败。",
       "simulationFailed": "模拟失败。"

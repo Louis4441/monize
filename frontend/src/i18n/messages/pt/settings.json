@@ -493,6 +493,15 @@
       "description": "Remova os dados financeiros da sua conta. Esta ação não pode ser desfeita.",
       "openButton": "Eliminar Dados...",
       "alwaysDeletedHeading": "O seguinte será sempre eliminado:",
+      "alwaysDeletedItems": {
+        "transactions": "Todas as transações e divisões",
+        "scheduled": "Todas as transações agendadas/recorrentes",
+        "securities": "Todos os títulos, preços, posições e transações de investimento",
+        "budgets": "Todos os orçamentos e alertas de orçamento",
+        "monthlySummaries": "Resumos mensais do saldo da conta",
+        "customReports": "Relatórios personalizados, etiquetas e mapeamentos de importação",
+        "actionHistory": "Histórico de ações (desfazer/refazer)"
+      },
       "optionalHeading": "Opcionalmente, também eliminar:",
       "accountsOption": "Contas",
       "categoriesOption": "Categorias",

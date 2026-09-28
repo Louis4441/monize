@@ -14,8 +14,7 @@ import {
 } from '@/components/accounts/shared/SummaryCardGrid';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
-import { gainLossColor } from '@/lib/format';
-import { withCurrencyCode } from '@/lib/security-detail';
+import { gainLossColor, withCurrencyCode } from '@/lib/format';
 import type { SecurityDetail } from '@/types/investment';
 
 interface SecuritySummaryCardsProps {

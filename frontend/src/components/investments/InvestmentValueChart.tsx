@@ -129,7 +129,6 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
   const chartWindow = usePortfolioRangeWindow({
     range: dateRange,
     base: resolvedRange,
-    accountIdsCsv: accountIds?.length ? accountIds.join(',') : undefined,
   });
 
   // Determine the effective currency for display

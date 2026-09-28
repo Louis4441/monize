@@ -30,7 +30,8 @@ vi.mock('@hookform/resolvers/zod', () => ({
   },
 }));
 
-vi.mock('@/lib/format', () => ({
+vi.mock('@/lib/format', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/format')>()),
   FX_RATE_DISPLAY_DECIMALS: 6,
   getCurrencySymbol: () => '$',
   getDecimalPlacesForCurrency: () => 2,

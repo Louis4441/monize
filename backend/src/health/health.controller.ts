@@ -16,6 +16,7 @@ import {
   PG_LISTENER_RECONNECT_MAX_MS,
   PgListener,
 } from "../common/cluster/pg-listener.provider";
+import { ReplicaCensusService } from "../common/cluster/replica-census.service";
 import { PostgresThrottlerStorage } from "../common/throttler/postgres-throttler-storage";
 
 /**
@@ -50,6 +51,7 @@ export class HealthController {
     @Inject(PG_LISTENER)
     private readonly listener: PgListener | null,
     private readonly throttlerStorage: PostgresThrottlerStorage,
+    private readonly census: ReplicaCensusService,
   ) {}
 
   @Get()
@@ -58,10 +60,14 @@ export class HealthController {
     const dbHealthy = await this.checkDatabase();
     const busHealthy = this.checkNotificationChannel();
     const throttlerDegraded = this.throttlerStorage.degradedReason();
+    const replicas = this.countReplicas();
 
     return {
       status:
-        dbHealthy && busHealthy !== false && throttlerDegraded === null
+        dbHealthy &&
+        busHealthy !== false &&
+        throttlerDegraded === null &&
+        !(replicas !== null && replicas > 1)
           ? "ok"
           : "degraded",
       timestamp: new Date().toISOString(),
@@ -82,6 +88,12 @@ export class HealthController {
         // grant -- fails open silently and stays green on every other signal,
         // so this is the one place an operator or an alert can see it.
         ...(throttlerDegraded === null ? {} : { rateLimiting: "disabled" }),
+        // Reported only in single, the mode that asserts there is one process.
+        // In multi peers are expected and handled, and a count there would be
+        // a figure to watch with nothing wrong at any value. More than one in
+        // single means rate limits and cache invalidation are per process, so
+        // it degrades the status (ReplicaCensusService says what is counted).
+        ...(replicas === null ? {} : { replicas }),
       },
     };
   }
@@ -136,6 +148,21 @@ export class HealthController {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Backend processes on this database as of the last census, or `null` when
+   * there is nothing to report: in `multi`, or when no census was taken
+   * recently. Read from the census's cache, never queried: this endpoint is
+   * unauthenticated and unthrottled, so a scan of `pg_stat_activity` per
+   * request would hand anyone a way to load the database. The fifteen-minute
+   * system-alert sweep keeps the cache fresh.
+   */
+  private countReplicas(): number | null {
+    if (this.clusterMode !== "single") {
+      return null;
+    }
+    return this.census.lastKnownCount();
   }
 
   /**

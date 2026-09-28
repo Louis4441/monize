@@ -322,6 +322,14 @@
     "seriesInflows": "Entradas",
     "seriesOutflows": "Saídas"
   },
+  "tagBreakdown": {
+    "label": "Detalhar por chave de etiqueta",
+    "none": "Nenhuma",
+    "untagged": "Sem etiqueta",
+    "inflows": "Entradas etiquetadas",
+    "outflows": "Saídas etiquetadas",
+    "sharesExceedNote": "Uma linha marcada com mais de um valor nesta chave conta para cada um deles, então as porcentagens por valor podem somar mais de 100%."
+  },
   "categoryPerformance": {
     "noBudgets": "Nenhum orçamento encontrado. Crie um orçamento para ver o desempenho por categoria.",
     "noData": "Ainda não há dados de categorias disponíveis.",
@@ -471,6 +479,7 @@
     "allAccountsPlaceholder": "Todas as Contas",
     "filterBySecurityLabel": "Filtrar por título",
     "filterByAccountLabel": "Filtrar por conta",
+    "monthlyDisplayModeLabel": "Modo de exibição mensal",
     "allSecurities": "Todos os Títulos",
     "viewMonthly": "Mensal",
     "viewDaily": "Diário",
@@ -1192,7 +1201,6 @@
     "incompleteTooltip": "Alguns dias deste período estão sem um preço, uma taxa de câmbio ou um saldo de caixa, então os valores que dependem de todos os dias não são exibidos.",
     "measuredFromClose": "Desde o fechamento do pregão de {date}",
     "unmeasuredFlowTooltip": "Dinheiro entrou ou saiu dessas contas de uma forma que não pode ser contabilizada aqui: uma operação liquidada a partir de uma conta fora desse grupo, ou um desdobramento que mistura uma linha de investimento com um gasto comum. O resultado do investimento não é exibido, porque parte dele seria seu próprio dinheiro.",
-    "closeBoundsTooltip": "Esses valores são medidos entre os valores de fechamento armazenados de {start} e {end}. O gráfico acima mostra preços em tempo real ao longo do dia, então ele pode variar enquanto esses valores permanecem fixos.",
     "notAvailable": "N/D",
     "intradayUnavailable": "Dados de preço intradiário detalhados indisponíveis",
     "intradayUnavailableTitle": "Vista intradiária indisponível para esta combinação de contas",
@@ -1717,6 +1725,19 @@
     "title": "Comparar Cenários Monte Carlo",
     "subtitle": "Métricas lado a lado para até 4 cenários salvos.",
     "backToMonteCarlo": "Voltar para Monte Carlo",
+    "downloadCsv": "Baixar CSV",
+    "downloadCsvTitle": "Baixar a comparação como arquivo CSV",
+    "downloadCsvWaitTitle": "Aguarde pelo menos 2 cenários terminarem de carregar",
+    "emptyHeading": "Nenhum cenário selecionado",
+    "emptyBody": "Escolha cenários do relatório Monte Carlo para compará-los lado a lado.",
+    "emptyButton": "Ir para a Simulação Monte Carlo",
+    "needsMoreHeading": "São necessários pelo menos 2 cenários",
+    "needsMoreBody": "A comparação requer 2 ou mais cenários salvos. Você tem atualmente um selecionado (id: <mono>{id}</mono>).",
+    "needsMoreButton": "Escolher mais cenários",
+    "scenarioFallback": "Cenário",
+    "removeAriaLabel": "Remover {title} da comparação",
+    "removeTitle": "Remover da comparação",
+    "runFailed": "Execução falhou",
     "errors": {
       "loadScenarioFailed": "Não foi possível carregar o cenário.",
       "simulationFailed": "A simulação falhou."

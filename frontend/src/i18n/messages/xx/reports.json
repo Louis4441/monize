@@ -322,6 +322,14 @@
     "seriesInflows": "[XX-Inflows-XX]",
     "seriesOutflows": "[XX-Outflows-XX]"
   },
+  "tagBreakdown": {
+    "label": "[XX-Break down by tag key-XX]",
+    "none": "[XX-None-XX]",
+    "untagged": "[XX-Untagged-XX]",
+    "inflows": "[XX-Tagged inflows-XX]",
+    "outflows": "[XX-Tagged outflows-XX]",
+    "sharesExceedNote": "[XX-A row tagged with more than one value under this key counts toward each of them, so per-value shares can add up to more than 100%.-XX]"
+  },
   "categoryPerformance": {
     "noBudgets": "[XX-No budgets found. Create a budget to see category performance.-XX]",
     "noData": "[XX-No category data available yet.-XX]",
@@ -471,6 +479,7 @@
     "allAccountsPlaceholder": "[XX-All Accounts-XX]",
     "filterBySecurityLabel": "[XX-Filter by security-XX]",
     "filterByAccountLabel": "[XX-Filter by account-XX]",
+    "monthlyDisplayModeLabel": "[XX-Monthly display mode-XX]",
     "allSecurities": "[XX-All Securities-XX]",
     "viewMonthly": "[XX-Monthly-XX]",
     "viewDaily": "[XX-Daily-XX]",
@@ -1192,7 +1201,6 @@
     "incompleteTooltip": "[XX-Some days in this window are missing a price, an exchange rate or a cash balance, so the figures that depend on every day are not shown.-XX]",
     "measuredFromClose": "[XX-Since the close of trading on {date}-XX]",
     "unmeasuredFlowTooltip": "[XX-Money moved into or out of these accounts in a way that cannot be counted here: a trade settled from an account outside them, or a split that mixes an investment line with ordinary spending. The investment result is not shown, because part of it would be your own money.-XX]",
-    "closeBoundsTooltip": "[XX-These figures are measured between the stored closing values of {start} and {end}. The chart above shows live prices during the day, so it can move while they do not.-XX]",
     "notAvailable": "[XX-N/A-XX]",
     "intradayUnavailable": "[XX-Detailed intraday pricing unavailable-XX]",
     "intradayUnavailableTitle": "[XX-Intraday view unavailable for this account mix-XX]",
@@ -1717,6 +1725,19 @@
     "title": "[XX-Compare Monte Carlo Scenarios-XX]",
     "subtitle": "[XX-Side-by-side metrics for up to 4 saved scenarios.-XX]",
     "backToMonteCarlo": "[XX-Back to Monte Carlo-XX]",
+    "downloadCsv": "[XX-Download CSV-XX]",
+    "downloadCsvTitle": "[XX-Download the comparison as a CSV file-XX]",
+    "downloadCsvWaitTitle": "[XX-Wait for at least 2 scenarios to finish loading-XX]",
+    "emptyHeading": "[XX-No scenarios selected-XX]",
+    "emptyBody": "[XX-Pick scenarios from the Monte Carlo report to compare them side-by-side.-XX]",
+    "emptyButton": "[XX-Go to Monte Carlo Simulation-XX]",
+    "needsMoreHeading": "[XX-Need at least 2 scenarios-XX]",
+    "needsMoreBody": "[XX-Comparison requires 2 or more saved scenarios. You currently have one selected (id: <mono>{id}</mono>).-XX]",
+    "needsMoreButton": "[XX-Pick more scenarios-XX]",
+    "scenarioFallback": "[XX-Scenario-XX]",
+    "removeAriaLabel": "[XX-Remove {title} from comparison-XX]",
+    "removeTitle": "[XX-Remove from comparison-XX]",
+    "runFailed": "[XX-Run failed-XX]",
     "errors": {
       "loadScenarioFailed": "[XX-Failed to load scenario.-XX]",
       "simulationFailed": "[XX-Simulation failed.-XX]"

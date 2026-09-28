@@ -669,7 +669,7 @@ export class McpInvestmentsTools {
           userId,
           this.toInvCreateRow(items[0]),
         );
-      const budget = this.writeLimiter.reserve(userId, 1);
+      const budget = await this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildCreateInvestmentTransaction(
         userId,
@@ -705,7 +705,7 @@ export class McpInvestmentsTools {
         exchangeRate: preview.exchangeRate,
         description: preview.description ?? undefined,
       });
-      this.writeLimiter.record(userId, "create_investment_transaction");
+      await this.writeLimiter.record(userId, "create_investment_transaction");
       return toolResult({ id: tx.id, date: tx.transactionDate, count: 1 });
     }
 
@@ -719,7 +719,10 @@ export class McpInvestmentsTools {
         `None of the investment transactions could be prepared.${describeSkippedRows(bulk.skipped, items.length)}`,
       );
     }
-    const budget = this.writeLimiter.reserve(userId, bulk.okPreviews.length);
+    const budget = await this.writeLimiter.reserve(
+      userId,
+      bulk.okPreviews.length,
+    );
     if (budget) return budget;
 
     if (approvalMode === "individual") {
@@ -773,7 +776,7 @@ export class McpInvestmentsTools {
       skipped.push({ index: bulk.okIndex[s.index], reason: s.reason });
     }
     for (let i = 0; i < result.created.length; i++) {
-      this.writeLimiter.record(userId, "create_investment_transaction");
+      await this.writeLimiter.record(userId, "create_investment_transaction");
     }
     return toolResult({
       ids: result.created.map((t) => t.id),
@@ -798,7 +801,7 @@ export class McpInvestmentsTools {
           items[0].transactionId as string,
           this.toInvUpdateRow(items[0]),
         );
-      const budget = this.writeLimiter.reserve(userId, 1);
+      const budget = await this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildUpdateInvestmentTransaction(
         userId,
@@ -839,7 +842,7 @@ export class McpInvestmentsTools {
           description: preview.description ?? undefined,
         },
       );
-      this.writeLimiter.record(userId, "update_investment_transaction");
+      await this.writeLimiter.record(userId, "update_investment_transaction");
       return toolResult({ id: tx.id, count: 1 });
     }
 
@@ -868,7 +871,7 @@ export class McpInvestmentsTools {
         return toolError(
           `None of the investment transaction edits could be prepared.${describeSkippedRows(skipped, items.length)}`,
         );
-      const budget = this.writeLimiter.reserve(userId, cards.length);
+      const budget = await this.writeLimiter.reserve(userId, cards.length);
       if (budget) return budget;
       return this.runInvIndividual(server, ctx, userId, cards, skipped);
     }
@@ -882,7 +885,7 @@ export class McpInvestmentsTools {
       return toolError(
         `None of the investment transaction edits could be prepared.${describeSkippedRows(bulk.skipped, items.length)}`,
       );
-    const budget = this.writeLimiter.reserve(userId, bulk.okRows.length);
+    const budget = await this.writeLimiter.reserve(userId, bulk.okRows.length);
     if (budget) return budget;
     const action = this.actionBuilder.buildBatchUpdateInvestmentTransactions(
       userId,
@@ -924,7 +927,7 @@ export class McpInvestmentsTools {
         },
       );
       ids.push(tx.id);
-      this.writeLimiter.record(userId, "update_investment_transaction");
+      await this.writeLimiter.record(userId, "update_investment_transaction");
     }
     return toolResult({ ids, count: ids.length, skipped: bulk.skipped });
   }
@@ -944,7 +947,7 @@ export class McpInvestmentsTools {
           userId,
           items[0].transactionId as string,
         );
-      const budget = this.writeLimiter.reserve(userId, 1);
+      const budget = await this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildDeleteInvestmentTransaction(
         userId,
@@ -976,7 +979,7 @@ export class McpInvestmentsTools {
         userId,
         preview.transactionId,
       );
-      this.writeLimiter.record(userId, "delete_investment_transaction");
+      await this.writeLimiter.record(userId, "delete_investment_transaction");
       return toolResult({ id: preview.transactionId, deleted: true, count: 1 });
     }
 
@@ -1004,7 +1007,7 @@ export class McpInvestmentsTools {
         return toolError(
           `None of the investment transactions could be prepared.${describeSkippedRows(skipped, items.length)}`,
         );
-      const budget = this.writeLimiter.reserve(userId, cards.length);
+      const budget = await this.writeLimiter.reserve(userId, cards.length);
       if (budget) return budget;
       return this.runInvIndividual(server, ctx, userId, cards, skipped);
     }
@@ -1018,7 +1021,7 @@ export class McpInvestmentsTools {
       return toolError(
         `None of the investment transactions could be prepared.${describeSkippedRows(bulk.skipped, items.length)}`,
       );
-    const budget = this.writeLimiter.reserve(userId, bulk.okRows.length);
+    const budget = await this.writeLimiter.reserve(userId, bulk.okRows.length);
     if (budget) return budget;
     const action = this.actionBuilder.buildBatchDeleteInvestmentTransactions(
       userId,
@@ -1049,7 +1052,7 @@ export class McpInvestmentsTools {
         row.transactionId,
       );
       ids.push(row.transactionId);
-      this.writeLimiter.record(userId, "delete_investment_transaction");
+      await this.writeLimiter.record(userId, "delete_investment_transaction");
     }
     return toolResult({ ids, count: ids.length, skipped: bulk.skipped });
   }
@@ -1113,7 +1116,7 @@ export class McpInvestmentsTools {
           exchangeRate: d.exchangeRate,
           description: d.description ?? undefined,
         });
-        this.writeLimiter.record(userId, "create_investment_transaction");
+        await this.writeLimiter.record(userId, "create_investment_transaction");
         return tx.id;
       }
       case "update_investment_transaction": {
@@ -1132,7 +1135,7 @@ export class McpInvestmentsTools {
             description: d.description ?? undefined,
           },
         );
-        this.writeLimiter.record(userId, "update_investment_transaction");
+        await this.writeLimiter.record(userId, "update_investment_transaction");
         return tx.id;
       }
       case "delete_investment_transaction": {
@@ -1140,7 +1143,7 @@ export class McpInvestmentsTools {
           userId,
           d.transactionId,
         );
-        this.writeLimiter.record(userId, "delete_investment_transaction");
+        await this.writeLimiter.record(userId, "delete_investment_transaction");
         return d.transactionId;
       }
       default:
@@ -1323,7 +1326,7 @@ export class McpInvestmentsTools {
           userId,
           this.toSecCreateRow(items[0]),
         );
-      const budget = this.writeLimiter.reserve(userId, 1);
+      const budget = await this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildCreateSecurity(userId, preview);
       const outcome = await this.emitOrConfirmSec(
@@ -1356,7 +1359,10 @@ export class McpInvestmentsTools {
         `None of the securities could be prepared.${describeSkippedRows(prep.skipped, items.length)}`,
       );
     }
-    const budget = this.writeLimiter.reserve(userId, prep.okPreviews.length);
+    const budget = await this.writeLimiter.reserve(
+      userId,
+      prep.okPreviews.length,
+    );
     if (budget) return budget;
 
     if (approvalMode === "individual") {
@@ -1410,7 +1416,7 @@ export class McpInvestmentsTools {
           userId,
           this.toSecUpdateRow(items[0]),
         );
-      const budget = this.writeLimiter.reserve(userId, 1);
+      const budget = await this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildUpdateSecurity(userId, preview);
       const outcome = await this.emitOrConfirmSec(
@@ -1443,7 +1449,10 @@ export class McpInvestmentsTools {
         `None of the security edits could be prepared.${describeSkippedRows(prep.skipped, items.length)}`,
       );
     }
-    const budget = this.writeLimiter.reserve(userId, prep.okPreviews.length);
+    const budget = await this.writeLimiter.reserve(
+      userId,
+      prep.okPreviews.length,
+    );
     if (budget) return budget;
 
     if (approvalMode === "individual") {
@@ -1497,7 +1506,7 @@ export class McpInvestmentsTools {
           userId,
           this.toSecDeleteRow(items[0]),
         );
-      const budget = this.writeLimiter.reserve(userId, 1);
+      const budget = await this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildDeleteSecurity(userId, preview);
       const outcome = await this.emitOrConfirmSec(
@@ -1513,7 +1522,7 @@ export class McpInvestmentsTools {
           "Cancelled: the confirmation was declined, so the security was not deleted.",
         );
       await this.securitiesService.remove(userId, preview.securityId);
-      this.writeLimiter.record(userId, "delete_security");
+      await this.writeLimiter.record(userId, "delete_security");
       return toolResult({ id: preview.securityId, deleted: true, count: 1 });
     }
 
@@ -1526,7 +1535,10 @@ export class McpInvestmentsTools {
         `None of the securities could be prepared.${describeSkippedRows(prep.skipped, items.length)}`,
       );
     }
-    const budget = this.writeLimiter.reserve(userId, prep.okPreviews.length);
+    const budget = await this.writeLimiter.reserve(
+      userId,
+      prep.okPreviews.length,
+    );
     if (budget) return budget;
 
     if (approvalMode === "individual") {
@@ -1563,7 +1575,7 @@ export class McpInvestmentsTools {
     for (const preview of prep.okPreviews) {
       await this.securitiesService.remove(userId, preview.securityId);
       ids.push(preview.securityId);
-      this.writeLimiter.record(userId, "delete_security");
+      await this.writeLimiter.record(userId, "delete_security");
     }
     return toolResult({ ids, count: ids.length, skipped: prep.skipped });
   }
@@ -1591,7 +1603,7 @@ export class McpInvestmentsTools {
       quoteProvider: preview.quoteProvider ?? undefined,
       msnInstrumentId: preview.msnInstrumentId ?? undefined,
     });
-    this.writeLimiter.record(userId, "create_security");
+    await this.writeLimiter.record(userId, "create_security");
     return security;
   }
 
@@ -1619,7 +1631,7 @@ export class McpInvestmentsTools {
         assetWeightings: preview.assetWeightings ?? [],
       },
     );
-    this.writeLimiter.record(userId, "update_security");
+    await this.writeLimiter.record(userId, "update_security");
     return security;
   }
 
@@ -1689,7 +1701,7 @@ export class McpInvestmentsTools {
       }
       case "delete_security": {
         await this.securitiesService.remove(userId, d.securityId);
-        this.writeLimiter.record(userId, "delete_security");
+        await this.writeLimiter.record(userId, "delete_security");
         return d.securityId;
       }
       default:

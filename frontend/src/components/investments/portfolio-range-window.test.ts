@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  PORTFOLIO_WINDOW_STARTS,
   applyPortfolioWindowStart,
-  needsFirstPricedDay,
   resolvePortfolioRangeWindow,
-  startOfYearIso,
 } from './portfolio-range-window';
 import { resolveRangePreset } from '@/lib/date-range';
 
@@ -86,21 +83,24 @@ describe('resolvePortfolioRangeWindow', () => {
   });
 
   describe('YTD', () => {
-    it('opens on the year’s first priced day when one is known', () => {
-      expect(startFor('ytd', { ytdFirstPricedDay: '2026-01-02' })).toBe(
-        '2026-01-02',
-      );
+    /**
+     * The year is measured from the close of the previous year's last trading
+     * session. 31 December carries that close even when it fell on a weekend
+     * or holiday, because a day is valued from the latest close on or before
+     * it. Opening on the year's first trading day dropped that day's move.
+     */
+    it('opens on 31 December of the previous year', () => {
+      expect(startFor('ytd')).toBe('2025-12-31');
     });
 
-    /**
-     * Unknown is not "1 January is a trading day": the lookup has not answered,
-     * or the scope holds nothing priced. Keeping the calendar boundary draws
-     * every real close it has, one day wider than asked for -- the failure that
-     * matters would be claiming a trading day nobody observed.
-     */
-    it('falls back to the calendar boundary when it is unknown', () => {
-      expect(startFor('ytd')).toBe('2026-01-01');
-      expect(startFor('ytd', { ytdFirstPricedDay: null })).toBe('2026-01-01');
+    it('opens on the previous 31 December on the first and last days of the year', () => {
+      const on = (now: Date) => resolvePortfolioRangeWindow('ytd', { now }).start;
+      expect(on(new Date(2026, 0, 1))).toBe('2025-12-31');
+      expect(on(new Date(2026, 11, 31))).toBe('2025-12-31');
+    });
+
+    it('ignores month alignment', () => {
+      expect(startFor('ytd', { alignment: 'month' })).toBe('2025-12-31');
     });
   });
 });
@@ -124,22 +124,5 @@ describe('applyPortfolioWindowStart', () => {
   it('returns an inherited range untouched', () => {
     const base = { start: '2026-07-13', end: '2026-08-12' };
     expect(applyPortfolioWindowStart('1m', base, { now: NOW })).toEqual(base);
-  });
-});
-
-describe('needsFirstPricedDay', () => {
-  it('is true for YTD alone, so only YTD pays for the extra request', () => {
-    const asking = Object.keys(PORTFOLIO_WINDOW_STARTS).filter(
-      needsFirstPricedDay,
-    );
-    expect(asking).toEqual(['ytd']);
-  });
-});
-
-describe('startOfYearIso', () => {
-  it('is 1 January of the year “now” falls in', () => {
-    expect(startOfYearIso(NOW)).toBe('2026-01-01');
-    expect(startOfYearIso(new Date(2026, 0, 1))).toBe('2026-01-01');
-    expect(startOfYearIso(new Date(2026, 11, 31))).toBe('2026-01-01');
   });
 });

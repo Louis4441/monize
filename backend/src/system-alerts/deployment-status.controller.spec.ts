@@ -19,6 +19,9 @@ describe("DeploymentStatusController", () => {
         } as never,
         { raiseAdminAlert } as never,
         { getStatus: jest.fn(), getFailureSnapshot: jest.fn() } as never,
+        // The replica census is the sweep's; the banner never reads it.
+        "single",
+        { countActiveProcesses: jest.fn() } as never,
       ),
     );
   };

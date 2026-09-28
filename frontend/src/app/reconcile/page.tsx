@@ -32,7 +32,7 @@ import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useFormModal } from '@/hooks/useFormModal';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { nextCycleStatus } from '@/lib/transaction-status-cycle';
-import { getCurrencySymbol } from '@/lib/format';
+import { getCurrencySymbol, withCurrencyCode } from '@/lib/format';
 import { getErrorMessage } from '@/lib/errors';
 import { notifyReconciliationChanged } from '@/lib/reconciliationSignal';
 
@@ -82,7 +82,7 @@ function ReconcileContent() {
   const tc = useTranslations('common');
   const searchParams = useSearchParams();
   const preselectedAccountId = searchParams.get('accountId');
-  const { formatCurrency: formatCurrencyBase, defaultCurrency } = useNumberFormat();
+  const { formatCurrency, defaultCurrency } = useNumberFormat();
   const reconciledLocked = usePreferencesStore(
     (s) => s.preferences?.lockReconciledTransactions ?? false,
   );
@@ -331,7 +331,7 @@ function ReconcileContent() {
 
   const handleFinishReconciliation = async () => {
     if (Math.abs(calculatedDifference) > 0.01) {
-      toast.error(t('toasts.differenceRequired', { amount: formatCurrency(0) }));
+      toast.error(t('toasts.differenceRequired', { amount: formatAccountAmount(0) }));
       return;
     }
 
@@ -398,17 +398,10 @@ function ReconcileContent() {
     );
   };
 
-  const formatCurrency = (amount: number | string | null | undefined) => {
-    const numericAmount = Number(amount) || 0;
-    const currency = selectedAccount?.currencyCode || defaultCurrency;
-    const formatted = formatCurrencyBase(numericAmount, currency);
-
-    // Only show currency code if it differs from user's default currency
-    if (currency !== defaultCurrency) {
-      return `${formatted} ${currency}`;
-    }
-    return formatted;
-  };
+  // Every figure on this screen is in the reconciled account's own currency.
+  const accountCurrency = selectedAccount?.currencyCode || defaultCurrency;
+  const formatAccountAmount = (amount: number) =>
+    withCurrencyCode(formatCurrency(amount, accountCurrency), accountCurrency, defaultCurrency);
 
   const renderSetupStep = () => (
     <div className="max-w-xl mx-auto">
@@ -427,7 +420,13 @@ function ReconcileContent() {
               { value: '', label: t('setup.accountPlaceholder') },
               ...accounts.map((a) => ({
                 value: a.id,
-                label: `${a.name} (${formatCurrency(a.currentBalance)})`,
+                // Each option is in its own account's currency, not the one
+                // already selected.
+                label: `${a.name} (${withCurrencyCode(
+                  formatCurrency(Number(a.currentBalance), a.currencyCode),
+                  a.currencyCode,
+                  defaultCurrency,
+                )})`,
               })),
             ]}
             value={selectedAccountId}
@@ -485,19 +484,19 @@ function ReconcileContent() {
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">{t('summary.statementBalance')}</p>
               <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                {formatCurrency(statementBalance ?? 0)}
+                {formatAccountAmount(statementBalance ?? 0)}
               </p>
             </div>
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">{t('summary.reconciledBalance')}</p>
               <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                {formatCurrency(reconciliationData.reconciledBalance)}
+                {formatAccountAmount(Number(reconciliationData.reconciledBalance))}
               </p>
             </div>
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400 uppercase">{t('summary.selected', { count: selectedCount })}</p>
               <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                {formatCurrency(sumAmounts(selectedTransactions))}
+                {formatAccountAmount(sumAmounts(selectedTransactions))}
               </p>
             </div>
             <div>
@@ -509,7 +508,7 @@ function ReconcileContent() {
                     : 'text-red-600 dark:text-red-400'
                 }`}
               >
-                {formatCurrency(calculatedDifference)}
+                {formatAccountAmount(calculatedDifference)}
               </p>
             </div>
           </div>
@@ -572,7 +571,7 @@ function ReconcileContent() {
               groupByFlow={groupByFlow}
               lastReconciledDate={reconciliationData.lastReconciledDate ?? null}
               overdueBefore={reconciliationData.overdueBefore ?? ''}
-              formatCurrency={formatCurrency}
+              formatCurrency={formatAccountAmount}
               onEdit={transactionModal.openEdit}
               onDelete={setDeleteTarget}
               onCycleStatus={handleCycleStatus}
@@ -632,7 +631,7 @@ function ReconcileContent() {
                 <p className="text-sm text-gray-700 dark:text-gray-300">
                   {t.rich('complete.existingPayment', {
                     name: paymentBill.name,
-                    amount: formatCurrency(reconciledPaymentAmount),
+                    amount: formatAccountAmount(reconciledPaymentAmount),
                     b: (chunks) => <span className="font-medium">{chunks}</span>,
                   })}
                 </p>
@@ -646,7 +645,7 @@ function ReconcileContent() {
               <>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
                   {t.rich('complete.noPayment', {
-                    amount: formatCurrency(reconciledPaymentAmount),
+                    amount: formatAccountAmount(reconciledPaymentAmount),
                     b: (chunks) => <span className="font-medium">{chunks}</span>,
                   })}
                 </p>

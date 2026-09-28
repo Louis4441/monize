@@ -144,6 +144,7 @@
   },
   "dateInput": {
     "shortcutsTitle": "कीबोर्ड शॉर्टकट",
+    "openPicker": "दिनांक चयनकर्ता खोलें",
     "today": "आज",
     "firstDayOfYear": "वर्ष का पहला दिन",
     "lastDayOfYear": "वर्ष का अंतिम दिन",

@@ -493,6 +493,15 @@
       "description": "Xóa dữ liệu tài chính khỏi tài khoản của bạn. Không thể hoàn tác.",
       "openButton": "Xóa dữ liệu...",
       "alwaysDeletedHeading": "Những thứ sau sẽ luôn được xóa:",
+      "alwaysDeletedItems": {
+        "transactions": "Tất cả giao dịch và các khoản chia tách",
+        "scheduled": "Tất cả giao dịch định kỳ/đã lên lịch",
+        "securities": "Tất cả chứng khoán, giá, số lượng nắm giữ và giao dịch đầu tư",
+        "budgets": "Tất cả ngân sách và cảnh báo ngân sách",
+        "monthlySummaries": "Tóm tắt số dư tài khoản hàng tháng",
+        "customReports": "Báo cáo tùy chỉnh, thẻ và ánh xạ nhập",
+        "actionHistory": "Lịch sử thao tác (hoàn tác/làm lại)"
+      },
       "optionalHeading": "Tùy chọn cũng xóa:",
       "accountsOption": "Tài khoản",
       "categoriesOption": "Danh mục",

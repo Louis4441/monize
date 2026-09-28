@@ -101,6 +101,17 @@ describe("executeCalculation", () => {
       });
     });
 
+    it("rounds a cent midpoint half away from zero, like roundToDecimals", () => {
+      // 1.005 * 100 is 100.49999999999999 in binary, so the local
+      // Math.round(x * 100) / 100 this tool once had answered 1.00.
+      const result = executeCalculation({
+        operation: "difference",
+        values: [1.005, 0],
+      });
+
+      expect(result).toMatchObject({ result: 1.01, formattedResult: "1.01" });
+    });
+
     it("returns error with fewer than 2 values", () => {
       const result = executeCalculation({
         operation: "difference",

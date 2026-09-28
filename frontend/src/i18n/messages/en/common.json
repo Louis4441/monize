@@ -144,6 +144,7 @@
   },
   "dateInput": {
     "shortcutsTitle": "Keyboard shortcuts",
+    "openPicker": "Open date picker",
     "today": "Today",
     "firstDayOfYear": "First day of year",
     "lastDayOfYear": "Last day of year",

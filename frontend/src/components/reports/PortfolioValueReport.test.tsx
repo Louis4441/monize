@@ -4,6 +4,7 @@ import { PortfolioValueReport } from './PortfolioValueReport';
 import { renderChartFlagDot } from '@/components/investments/portfolio-chart-utils';
 import { chartColors } from '@/lib/chart-colors';
 import { usePreferencesStore } from '@/store/preferencesStore';
+import { financialTodayYmd } from '@/lib/financial-today';
 
 vi.mock('@/lib/pdf-export', () => ({
   exportToPdf: vi.fn().mockResolvedValue(undefined),
@@ -34,19 +35,41 @@ const STABLE_RESOLVED_RANGE = { start: '2024-01-01', end: '2026-01-01' };
 
 let mockDateRangeValue = '2y';
 const mockSetDateRange = vi.fn();
+// The custom window's dates. A case on the custom range sets both; the
+// resolved range then follows them, as `resolveRangePreset` does for 'custom'.
+let mockCustomStart = '';
+let mockCustomEnd = '';
+const mockSetStartDate = vi.fn();
+const mockSetEndDate = vi.fn();
 
 vi.mock('@/hooks/useDateRange', () => ({
-  useDateRange: () => ({
-    dateRange: mockDateRangeValue,
-    setDateRange: mockSetDateRange,
-    startDate: '',
-    setStartDate: vi.fn(),
-    endDate: '',
-    setEndDate: vi.fn(),
-    resolvedRange: STABLE_RESOLVED_RANGE,
-    isValid: true,
-  }),
+  useDateRange: () => {
+    const isCustom = mockDateRangeValue === 'custom';
+    return {
+      dateRange: mockDateRangeValue,
+      setDateRange: mockSetDateRange,
+      startDate: mockCustomStart,
+      setStartDate: mockSetStartDate,
+      endDate: mockCustomEnd,
+      setEndDate: mockSetEndDate,
+      resolvedRange: isCustom ? mockCustomResolvedRange() : STABLE_RESOLVED_RANGE,
+      isValid: !isCustom || (mockCustomStart !== '' && mockCustomEnd !== ''),
+    };
+  },
 }));
+
+// Memoized per date pair so the report's load effect sees a stable window.
+let mockCustomRangeCache: { start: string; end: string } | null = null;
+function mockCustomResolvedRange() {
+  if (
+    !mockCustomRangeCache ||
+    mockCustomRangeCache.start !== mockCustomStart ||
+    mockCustomRangeCache.end !== mockCustomEnd
+  ) {
+    mockCustomRangeCache = { start: mockCustomStart, end: mockCustomEnd };
+  }
+  return mockCustomRangeCache;
+}
 
 let mockSeriesMode = 'total';
 // Stateful stand-in for the real hook: seed `mockStoredValues` to simulate a
@@ -272,6 +295,8 @@ describe('PortfolioValueReport', () => {
     // A null store is the pre-load state, where the hook takes the default.
     usePreferencesStore.setState({ preferences: null });
     mockDateRangeValue = '2y';
+    mockCustomStart = '';
+    mockCustomEnd = '';
     mockSeriesMode = 'total';
     mockStoredValues.clear();
     mockGetPeriodResult.mockResolvedValue(periodResult());
@@ -427,6 +452,159 @@ describe('PortfolioValueReport', () => {
     const lastCall = mockDateRangeSelectorProps.mock.calls[mockDateRangeSelectorProps.mock.calls.length - 1][0];
     // Same list, in the same order, as the Investments page chart offers.
     expect(lastCall.ranges).toEqual(['1d', '1w', 'mtd', '1m', '3m', 'ytd', '1y', '2y', '5y', 'all']);
+  });
+
+  it('keeps the view switches beside the actions and the toolbar pinned to its first line', async () => {
+    mockDateRangeValue = 'custom';
+    mockCustomStart = '2025-01-01';
+    mockCustomEnd = '2026-01-01';
+    mockGetInvestmentsDaily.mockResolvedValue([]);
+    mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    await act(async () => {
+      render(<PortfolioValueReport />);
+    });
+
+    // One trailing group: the Total/By security and Table/Chart switches sit
+    // against Refresh/Export at the right edge, not beside the range buttons.
+    const totalSwitch = screen.getByRole('button', { name: 'Total' });
+    const trailing = totalSwitch.parentElement!.parentElement!;
+    expect(trailing.className).toContain('sm:ml-auto');
+    expect(trailing).toContainElement(screen.getByTestId('export-pdf'));
+
+    // Both rows align on the first line's text. Centred, they slid down to the
+    // middle of the custom range's date fields when those opened below.
+    const toolbar = trailing.parentElement!;
+    const leading = toolbar.firstElementChild as HTMLElement;
+    expect(leading).toContainElement(screen.getByTestId('date-range-selector'));
+    for (const row of [toolbar, leading]) {
+      expect(row.className).toContain('items-baseline');
+      expect(row.className).not.toContain('items-center');
+    }
+  });
+
+  it('draws YTD from the previous year-end close and names the window to the server', async () => {
+    mockDateRangeValue = 'ytd';
+    mockGetInvestmentsDaily.mockResolvedValue([
+      { date: '2025-12-31', value: 50000 },
+      { date: '2026-01-02', value: 50500 },
+    ]);
+    mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    await act(async () => {
+      render(<PortfolioValueReport />);
+    });
+
+    // The chart opens on 31 December, whose value is the last session's
+    // close, rather than on the year's first trading day.
+    expect(mockGetInvestmentsDaily).toHaveBeenCalledWith(
+      expect.objectContaining({ startDate: `${new Date().getFullYear() - 1}-12-31` }),
+    );
+    // The figures are the server's `ytd` preset, which opens on the same day.
+    await waitFor(() =>
+      expect(mockGetPeriodResult).toHaveBeenCalledWith(
+        expect.objectContaining({ period: 'ytd' }),
+      ),
+    );
+  });
+
+  describe('custom range', () => {
+    const lastSelectorProps = () =>
+      mockDateRangeSelectorProps.mock.calls[mockDateRangeSelectorProps.mock.calls.length - 1][0];
+
+    const renderLoaded = async (daily: Array<{ date: string; value: number }> = []) => {
+      mockGetInvestmentsMonthly.mockResolvedValue([]);
+      mockGetInvestmentsDaily.mockResolvedValue(daily);
+      mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+      mockGetInvestmentAccounts.mockResolvedValue([]);
+      await act(async () => {
+        render(<PortfolioValueReport />);
+      });
+    };
+
+    it('offers a custom range after All Time, with its dates wired through', async () => {
+      mockDateRangeValue = 'custom';
+      mockCustomStart = '2025-01-15';
+      mockCustomEnd = '2025-06-30';
+      await renderLoaded();
+      const props = lastSelectorProps();
+      expect(props.showCustom).toBe(true);
+      expect(props.customStartDate).toBe('2025-01-15');
+      expect(props.customEndDate).toBe('2025-06-30');
+      expect(props.onCustomStartDateChange).toBe(mockSetStartDate);
+      expect(props.onCustomEndDateChange).toBe(mockSetEndDate);
+    });
+
+    it('opens the To date on today and does not remember the custom choice', async () => {
+      await renderLoaded();
+      act(() => {
+        lastSelectorProps().onChange('custom');
+      });
+      expect(mockSetDateRange).toHaveBeenCalledWith('custom');
+      expect(mockSetEndDate).toHaveBeenCalledWith(financialTodayYmd(undefined));
+      expect(mockSetStartDate).not.toHaveBeenCalled();
+      expect(mockStoredValues.has('monize-reports-portfolio-value-range')).toBe(false);
+    });
+
+    it('keeps a To date the reader already chose', async () => {
+      mockCustomEnd = '2025-03-31';
+      await renderLoaded();
+      act(() => {
+        lastSelectorProps().onChange('custom');
+      });
+      expect(mockSetEndDate).not.toHaveBeenCalled();
+    });
+
+    it('still remembers a preset', async () => {
+      await renderLoaded();
+      act(() => {
+        lastSelectorProps().onChange('1y');
+      });
+      expect(mockStoredValues.get('monize-reports-portfolio-value-range')).toBe('1y');
+    });
+
+    it('draws a window of up to a year from daily closes over exactly its dates', async () => {
+      mockDateRangeValue = 'custom';
+      mockCustomStart = '2025-01-01';
+      mockCustomEnd = '2026-01-01';
+      await renderLoaded([
+        { date: '2025-01-01', value: 50000 },
+        { date: '2026-01-01', value: 55000 },
+      ]);
+      expect(mockGetInvestmentsDaily).toHaveBeenCalledWith(
+        expect.objectContaining({ startDate: '2025-01-01', endDate: '2026-01-01' }),
+      );
+      expect(mockGetInvestmentsMonthly).not.toHaveBeenCalled();
+      // A custom window is dated, not named: the server has no preset for it.
+      await waitFor(() =>
+        expect(mockGetPeriodResult).toHaveBeenCalledWith(
+          expect.objectContaining({ startDate: '2025-01-01', endDate: '2026-01-01' }),
+        ),
+      );
+    });
+
+    it('draws a window longer than a year from monthly values', async () => {
+      mockDateRangeValue = 'custom';
+      // 367 days: one past the longest window drawn daily.
+      mockCustomStart = '2024-12-30';
+      mockCustomEnd = '2026-01-01';
+      await renderLoaded();
+      expect(mockGetInvestmentsMonthly).toHaveBeenCalledWith(
+        expect.objectContaining({ startDate: '2024-12-30', endDate: '2026-01-01' }),
+      );
+      expect(mockGetInvestmentsDaily).not.toHaveBeenCalled();
+    });
+
+    it('loads nothing while the From date is missing or after the To date', async () => {
+      mockDateRangeValue = 'custom';
+      mockCustomEnd = '2026-01-01';
+      await renderLoaded();
+      mockCustomStart = '2026-02-01';
+      await renderLoaded();
+      expect(mockGetInvestmentsDaily).not.toHaveBeenCalled();
+      expect(mockGetInvestmentsMonthly).not.toHaveBeenCalled();
+      expect(mockGetPeriodResult).not.toHaveBeenCalled();
+    });
   });
 
   it('handles loadData error gracefully', async () => {
@@ -1198,7 +1376,7 @@ describe('PortfolioValueReport', () => {
     });
   });
 
-  it('dates the closes the cards are measured between on an intraday range', async () => {
+  it('does not repeat the measured-from dates beside the value change on an intraday range', async () => {
     mockDateRangeValue = '1d';
     mockGetIntradayValue.mockResolvedValue({
       points: [
@@ -1219,17 +1397,18 @@ describe('PortfolioValueReport', () => {
     );
     render(<PortfolioValueReport />);
 
-    // The chart draws live prices; these figures are two stored closes, and the
-    // reader is told which, rather than left with a card that reads 0.00 beside
-    // a line that moved.
+    // The chart's own caption already names the close the figures are
+    // measured from, so the card carries no second, dated marker.
+    await waitFor(() => expect(mockGetPeriodResult).toHaveBeenCalled());
     await waitFor(() =>
-      expect(
-        screen.getByLabelText(/measured between the stored closing values/i),
-      ).toBeInTheDocument(),
+      expect(screen.getByText(/Since the close of trading on/)).toBeInTheDocument(),
     );
     expect(
-      screen.getByLabelText(/Jan 14, 2026.*Jan 15, 2026/i),
-    ).toBeInTheDocument();
+      screen.queryByLabelText(/measured between the stored closing values/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(/Jan 14, 2026.*Jan 15, 2026/i),
+    ).not.toBeInTheDocument();
   });
 
   it('names the movement it could not count when the result is withheld', async () => {

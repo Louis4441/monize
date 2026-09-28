@@ -322,6 +322,14 @@
     "seriesInflows": "Girişler",
     "seriesOutflows": "Çıkışlar"
   },
+  "tagBreakdown": {
+    "label": "Etiket anahtarına göre ayır",
+    "none": "Yok",
+    "untagged": "Etiketsiz",
+    "inflows": "Etiketli girişler",
+    "outflows": "Etiketli çıkışlar",
+    "sharesExceedNote": "Bu anahtar altında birden fazla değerle etiketlenen bir satır, değerlerin her biri için sayılır; bu nedenle değer başına paylar toplamda %100'ü aşabilir."
+  },
   "categoryPerformance": {
     "noBudgets": "Bütçe bulunamadı. Kategori performansını görmek için bütçe oluşturun.",
     "noData": "Henüz kategori verisi mevcut değil.",
@@ -471,6 +479,7 @@
     "allAccountsPlaceholder": "Tüm Hesaplar",
     "filterBySecurityLabel": "Menkul kıymete göre filtrele",
     "filterByAccountLabel": "Hesaba göre filtrele",
+    "monthlyDisplayModeLabel": "Aylık görüntüleme modu",
     "allSecurities": "Tüm Menkul Kıymetler",
     "viewMonthly": "Aylık",
     "viewDaily": "Günlük",
@@ -1192,7 +1201,6 @@
     "incompleteTooltip": "Bu dönemdeki bazı günlerde fiyat, döviz kuru veya nakit bakiyesi eksik, bu yüzden her güne bağlı olan rakamlar gösterilmiyor.",
     "measuredFromClose": "{date} tarihli işlem kapanışından bu yana",
     "unmeasuredFlowTooltip": "Bu hesaplara para, burada sayılamayacak bir şekilde girdi veya çıktı: bu hesapların dışındaki bir hesaptan kapatılan bir işlem ya da bir yatırım kalemini olağan bir harcamayla karıştıran bir bölme. Yatırım sonucunun bir kısmı kendi paranız olacağından yatırım sonucu gösterilmiyor.",
-    "closeBoundsTooltip": "Bu rakamlar, {start} ve {end} tarihlerine ait kayıtlı kapanış değerleri arasında ölçülür. Yukarıdaki grafik gün içindeki canlı fiyatları gösterir, bu yüzden bu rakamlar sabit kalırken grafik hareket edebilir.",
     "notAvailable": "Y/A",
     "intradayUnavailable": "Ayrıntılı gün içi fiyatlandırma mevcut değil",
     "intradayUnavailableTitle": "Bu hesap kombinasyonu için gün içi görünüm mevcut değil",
@@ -1717,6 +1725,19 @@
     "title": "Monte Carlo Senaryolarını Karşılaştır",
     "subtitle": "En fazla 4 kayıtlı senaryo için yan yana ölçütler.",
     "backToMonteCarlo": "Monte Carlo'ya Geri Dön",
+    "downloadCsv": "CSV İndir",
+    "downloadCsvTitle": "Karşılaştırmayı CSV dosyası olarak indir",
+    "downloadCsvWaitTitle": "En az 2 senaryonun yüklenmesini bekleyin",
+    "emptyHeading": "Senaryo seçilmedi",
+    "emptyBody": "Yan yana karşılaştırmak için Monte Carlo raporundan senaryo seçin.",
+    "emptyButton": "Monte Carlo Simülasyonuna Git",
+    "needsMoreHeading": "En az 2 senaryo gerekli",
+    "needsMoreBody": "Karşılaştırma 2 veya daha fazla kayıtlı senaryo gerektirir. Şu anda bir tanesi seçili (id: <mono>{id}</mono>).",
+    "needsMoreButton": "Daha fazla senaryo seç",
+    "scenarioFallback": "Senaryo",
+    "removeAriaLabel": "{title} öğesini karşılaştırmadan kaldır",
+    "removeTitle": "Karşılaştırmadan kaldır",
+    "runFailed": "Çalıştırma başarısız oldu",
     "errors": {
       "loadScenarioFailed": "Senaryo yüklenemedi.",
       "simulationFailed": "Simülasyon başarısız."

@@ -13,7 +13,7 @@ import type {
   RateTimelineRow,
   ScenarioComparison,
 } from '@/lib/loan-schedule-types';
-import { round2 } from '@/lib/loan-schedule-types';
+import { roundToCents } from '@/lib/format';
 
 /**
  * The annual rate (percentage) in effect on a given date: the latest row with
@@ -175,13 +175,13 @@ export function compareSchedules(
       ? monthsBetween(scenario.payoffDate, baseline.payoffDate)
       : null,
     interestSaved: comparable
-      ? round2(baseline.totalInterest - scenario.totalInterest)
+      ? roundToCents(baseline.totalInterest - scenario.totalInterest)
       : null,
     // A truncated schedule's `finalPaymentAmount` is the installment at its last
     // PROJECTED row, not its last payment -- there is no last payment -- so a
     // drop measured from it is as unknown as the rest.
     installmentReduction: comparable
-      ? round2(baseline.finalPaymentAmount - scenario.finalPaymentAmount)
+      ? roundToCents(baseline.finalPaymentAmount - scenario.finalPaymentAmount)
       : null,
   };
 }

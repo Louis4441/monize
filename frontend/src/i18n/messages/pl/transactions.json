@@ -172,6 +172,7 @@
       "ref": "Nr: {number}",
       "investmentLabel": "Inwestycja",
       "linkedInvestmentTitle": "Zobacz w Inwestycjach",
+      "linkedInvestmentBadgeTitle": "Ta transakcja jest powiązana z transakcją inwestycyjną",
       "filterByDate": "Filtruj według daty \"{date}\"",
       "filterByAccount": "Filtruj według \"{name}\"",
       "filterByPayee": "Filtruj według \"{name}\"",

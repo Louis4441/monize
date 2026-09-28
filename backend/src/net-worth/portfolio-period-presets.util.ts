@@ -5,14 +5,22 @@
  * The dates are the client's own range arithmetic moved to the server, so the
  * batch route answers exactly what one call to the single-range route per
  * window would have: `frontend/src/lib/date-range.ts` resolves `1w` as seven
- * days back, `1m` as thirty days, `3m` as ninety, `ytd` as January 1, `1y` as
- * the same day a year earlier, `2y` as seven hundred and thirty days back and
- * `5y` as the same day five years earlier, and
+ * days back, `1m` as thirty days, `3m` as ninety, `1y` as the same day a year
+ * earlier, `2y` as seven hundred and thirty days back and `5y` as the same day
+ * five years earlier, and
  * `frontend/src/components/investments/portfolio-change-baseline.ts`
  * decides which of them measure from the previous close instead of from their
  * first point. `1d` and `10y` are the windows with no client counterpart: a
  * day's move IS the prior close against the newest one, so its window is the
  * end day alone, and `10y` follows `5y`'s same-day-N-years-earlier arithmetic.
+ *
+ * `ytd` is not the client's January 1: it opens on 31 December of the previous
+ * year, so the year is measured from the close of its last trading session,
+ * as every quote source reports it and as the charts' own YTD window
+ * (`frontend/src/components/investments/portfolio-range-window.ts`) draws it.
+ * A day is valued from the latest close on or before it, so a 31 December that
+ * fell on a weekend or holiday still carries the last session's close, and
+ * `startPriceDate` names that session.
  *
  * `all` is the one window whose start no arithmetic answers: it opens on the
  * day the scope's own history begins, which only a query knows, so
@@ -120,7 +128,7 @@ export function presetWindowStart(
     case "3m":
       return addDaysYMD(today, -90);
     case "ytd":
-      return `${today.slice(0, 4)}-01-01`;
+      return `${Number(today.slice(0, 4)) - 1}-12-31`;
     case "1y":
       return yearsEarlier(today, 1);
     // A rolling two years is 730 days on the client, not two calendar years;

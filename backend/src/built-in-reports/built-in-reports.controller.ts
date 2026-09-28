@@ -10,6 +10,7 @@ import { BuiltInReportsService } from "./built-in-reports.service";
 import type { WeekStartsOn } from "./income-expense-buckets";
 import {
   IncomeVsExpensesQueryDto,
+  CashFlowQueryDto,
   ReportQueryDto,
   SpendingByCategoryQueryDto,
   SpendingByCategoryResponse,
@@ -113,6 +114,7 @@ export class BuiltInReportsController {
         accountIds: query.accountIds,
         bucket: query.bucket,
         weekStartsOn: query.weekStartsOn as WeekStartsOn | undefined,
+        tagKey: query.tagKey,
       },
     );
   }
@@ -122,13 +124,14 @@ export class BuiltInReportsController {
   @ApiResponse({ status: 200, type: IncomeVsExpensesResponse })
   getCashFlow(
     @Request() req,
-    @Query() query: ReportQueryDto,
+    @Query() query: CashFlowQueryDto,
   ): Promise<IncomeVsExpensesResponse> {
     // Cash flow uses the same logic as income vs expenses
     return this.reportsService.getIncomeVsExpenses(
       req.user.id,
       query.startDate,
       query.endDate,
+      { tagKey: query.tagKey },
     );
   }
 

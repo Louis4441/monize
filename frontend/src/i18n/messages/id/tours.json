@@ -355,6 +355,28 @@
             "body": "Peringatan saldo ada pada rekeningnya sendiri: sunting rekening mana pun lalu isi **Beri tahu di bawah** atau **Beri tahu di atas**. Keduanya berbunyi saat saldo *melewati* batasnya, jadi Anda diberi tahu sekali, bukan setelah setiap pembayaran yang menahannya di sana. Panduan ini bisa Anda ulang kapan saja dari Pengaturan."
           }
         }
+      },
+      "reportTagBreakdown": {
+        "title": "Rincian laporan berdasarkan tag",
+        "steps": {
+          "welcome": {
+            "title": "Lihat laporan Anda berdasarkan tag, bukan hanya kategori",
+            "body": "Pendapatan vs Pengeluaran dan Laporan Arus Kas kini dapat dirinci berdasarkan nilai tag pilihan Anda — misalnya belanja rumah tangga dibanding usaha sampingan — dan menampilkan transfer di antara keduanya tanpa pernah menghitung transfer sebagai pendapatan."
+          },
+          "breakdown": {
+            "title": "Rincian berdasarkan kunci tag",
+            "body": "Pilih kunci tag di sini, misalnya **scope**, dan laporan akan terbagi menjadi satu bagian per nilai yang pernah Anda gunakan, ditambah bagian **Tanpa tag** untuk sisanya.",
+            "fallbackBody": "Kontrol ini muncul setelah Anda memberi tag **kunci:nilai** pada suatu transaksi, misalnya **scope:household**. Tambahkan satu, dan Rincian berdasarkan kunci tag akan muncul di sini."
+          },
+          "buckets": {
+            "title": "Total per nilai, transfer tetap terpisah",
+            "body": "Memilih kunci membuka satu tab per nilai ditambah **Tanpa tag**, masing-masing dengan pendapatan dan pengeluarannya sendiri. Uang yang dipindahkan antar akun ditampilkan sebagai **Arus masuk bertag** dan **Arus keluar bertag** — terlihat, tetapi tidak pernah dihitung sebagai pendapatan."
+          },
+          "finish": {
+            "title": "Itulah rincian berdasarkan tag",
+            "body": "Beri tag transaksi dengan pasangan kunci:nilai seperti scope:household di mana pun Anda ingin tampilan ini, dan buka kembali tur ini kapan saja dari Pengaturan."
+          }
+        }
       }
     }
   }

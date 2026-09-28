@@ -375,7 +375,7 @@ export class McpPayeesTools {
         this.toCreateRow(items[0]),
         { lookupContact: true },
       );
-      const budget = this.writeLimiter.reserve(userId, 1);
+      const budget = await this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildCreatePayee(userId, preview);
       const outcome = await this.emitOrConfirm(
@@ -403,7 +403,7 @@ export class McpPayeesTools {
         },
         preview.contactLookup ? { contactLookup: preview.contactLookup } : {},
       );
-      this.writeLimiter.record(userId, "create_payee");
+      await this.writeLimiter.record(userId, "create_payee");
       return toolResult({ id: payee.id, name: payee.name, count: 1 });
     }
 
@@ -416,7 +416,10 @@ export class McpPayeesTools {
         `None of the payees could be prepared.${describeSkippedRows(prep.skipped, items.length)}`,
       );
     }
-    const budget = this.writeLimiter.reserve(userId, prep.okPreviews.length);
+    const budget = await this.writeLimiter.reserve(
+      userId,
+      prep.okPreviews.length,
+    );
     if (budget) return budget;
 
     if (approvalMode === "individual") {
@@ -464,7 +467,7 @@ export class McpPayeesTools {
         preview.contactLookup ? { contactLookup: preview.contactLookup } : {},
       );
       ids.push(payee.id);
-      this.writeLimiter.record(userId, "create_payee");
+      await this.writeLimiter.record(userId, "create_payee");
     }
     return toolResult({ ids, count: ids.length, skipped: prep.skipped });
   }
@@ -481,7 +484,7 @@ export class McpPayeesTools {
         userId,
         this.toUpdateRow(items[0]),
       );
-      const budget = this.writeLimiter.reserve(userId, 1);
+      const budget = await this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildUpdatePayee(userId, preview);
       const outcome = await this.emitOrConfirm(
@@ -505,7 +508,7 @@ export class McpPayeesTools {
         email: preview.email,
         phone: preview.phone,
       });
-      this.writeLimiter.record(userId, "update_payee");
+      await this.writeLimiter.record(userId, "update_payee");
       return toolResult({ id: payee.id, name: payee.name, count: 1 });
     }
 
@@ -518,7 +521,10 @@ export class McpPayeesTools {
         `None of the payee edits could be prepared.${describeSkippedRows(prep.skipped, items.length)}`,
       );
     }
-    const budget = this.writeLimiter.reserve(userId, prep.okPreviews.length);
+    const budget = await this.writeLimiter.reserve(
+      userId,
+      prep.okPreviews.length,
+    );
     if (budget) return budget;
 
     if (approvalMode === "individual") {
@@ -562,7 +568,7 @@ export class McpPayeesTools {
         phone: preview.phone,
       });
       ids.push(payee.id);
-      this.writeLimiter.record(userId, "update_payee");
+      await this.writeLimiter.record(userId, "update_payee");
     }
     return toolResult({ ids, count: ids.length, skipped: prep.skipped });
   }
@@ -579,7 +585,7 @@ export class McpPayeesTools {
         userId,
         this.toDeleteRow(items[0]),
       );
-      const budget = this.writeLimiter.reserve(userId, 1);
+      const budget = await this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildDeletePayee(userId, preview);
       const outcome = await this.emitOrConfirm(
@@ -596,7 +602,7 @@ export class McpPayeesTools {
           "Cancelled: the confirmation was declined, so the payee was not deleted.",
         );
       await this.payeesService.remove(userId, preview.payeeId);
-      this.writeLimiter.record(userId, "delete_payee");
+      await this.writeLimiter.record(userId, "delete_payee");
       return toolResult({ id: preview.payeeId, deleted: true, count: 1 });
     }
 
@@ -609,7 +615,10 @@ export class McpPayeesTools {
         `None of the payees could be prepared.${describeSkippedRows(prep.skipped, items.length)}`,
       );
     }
-    const budget = this.writeLimiter.reserve(userId, prep.okPreviews.length);
+    const budget = await this.writeLimiter.reserve(
+      userId,
+      prep.okPreviews.length,
+    );
     if (budget) return budget;
 
     if (approvalMode === "individual") {
@@ -646,7 +655,7 @@ export class McpPayeesTools {
     for (const preview of prep.okPreviews) {
       await this.payeesService.remove(userId, preview.payeeId);
       ids.push(preview.payeeId);
-      this.writeLimiter.record(userId, "delete_payee");
+      await this.writeLimiter.record(userId, "delete_payee");
     }
     return toolResult({ ids, count: ids.length, skipped: prep.skipped });
   }
@@ -722,7 +731,7 @@ export class McpPayeesTools {
           },
           contactLookupOptions(d),
         );
-        this.writeLimiter.record(userId, "create_payee");
+        await this.writeLimiter.record(userId, "create_payee");
         return payee.id;
       }
       case "update_payee": {
@@ -734,12 +743,12 @@ export class McpPayeesTools {
           email: d.email,
           phone: d.phone,
         });
-        this.writeLimiter.record(userId, "update_payee");
+        await this.writeLimiter.record(userId, "update_payee");
         return payee.id;
       }
       case "delete_payee": {
         await this.payeesService.remove(userId, d.payeeId);
-        this.writeLimiter.record(userId, "delete_payee");
+        await this.writeLimiter.record(userId, "delete_payee");
         return d.payeeId;
       }
       default:

@@ -20,6 +20,7 @@ import { buildAccountDropdownOptions } from '@/lib/account-utils';
 import { useAccountOptionLabel } from '@/hooks/useMainAccountName';
 import { InvestmentSplitFields } from './InvestmentSplitFields';
 import { TRANSACTION_NOTE_MAX_LENGTH } from '@/lib/transaction-note';
+import { isUuid } from '@/lib/uuid';
 
 export type SplitType = 'category' | 'transfer' | 'investment';
 
@@ -983,13 +984,7 @@ export function createEmptySplits(transactionAmount: number): SplitRow[] {
 // pre-migration override's `override-N`, or a `temp-...` row the user just
 // added) is not, and must never be treated as source identity (issue #1167
 // R8-F1) -- it would be rejected by the DTO's `@IsUUID` and could masquerade as
-// a persistent id.
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-function isUuid(value: string | null | undefined): value is string {
-  return typeof value === 'string' && UUID_RE.test(value);
-}
-
+// a persistent id, so it is checked with `isUuid`.
 export function toSplitRows(splits: {
   id?: string;
   kind?: 'category' | 'transfer' | 'investment';

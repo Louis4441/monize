@@ -90,10 +90,40 @@ export function roundToDecimals(value: number, decimalPlaces: number): number {
 }
 
 /**
+ * A formatted amount with its currency code appended, when that currency is not
+ * the reader's own.
+ *
+ * A figure shown unconverted in an account's or a security's currency needs to
+ * say so: a reader whose default is CAD has to be told that "$1,300" is not
+ * their $1,300, and symbols do not carry that (`$` is four currencies and `kr`
+ * is three). `formatted` comes from `useNumberFormat().formatCurrency`, so the
+ * number itself still follows the reader's locale.
+ */
+export function withCurrencyCode(
+  formatted: string,
+  currencyCode: string,
+  defaultCurrency: string,
+): string {
+  return currencyCode && currencyCode !== defaultCurrency
+    ? `${formatted} ${currencyCode}`
+    : formatted;
+}
+
+/**
  * Round a number to 2 decimal places (cents)
  */
 export function roundToCents(value: number): number {
   return roundToDecimals(value, 2);
+}
+
+/**
+ * Round a monetary value to its storage precision (4dp, `decimal(20,4)`), the
+ * scale a total and a balance are stored at. Mirrors the backend `roundMoney`
+ * (`backend/src/common/round.util.ts`), strategy included, so a figure the
+ * client previews rounds on the boundary the way the server will commit it.
+ */
+export function roundMoney(value: number): number {
+  return roundToDecimals(value, 4);
 }
 
 /**

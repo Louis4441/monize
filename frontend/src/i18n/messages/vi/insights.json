@@ -17,6 +17,7 @@
     "warningCount": "{count, plural, one {# lưu ý} other {# lưu ý}}",
     "errorLoadFailed": "Không thể tải thông tin. Vui lòng thử lại.",
     "errorGenerateFailed": "Không thể tạo thông tin. Đảm bảo bạn đã cấu hình nhà cung cấp AI.",
+    "errorDismissFailed": "Không thể ẩn thông tin. Vui lòng thử lại.",
     "errorTimeout": "Quá trình tạo thông tin mất nhiều thời gian hơn dự kiến. Vui lòng chờ hoặc làm mới trang."
   },
   "card": {

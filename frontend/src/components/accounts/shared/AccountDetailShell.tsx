@@ -10,6 +10,9 @@ import { formatAccountType } from '@/lib/account-utils';
 import type { Account } from '@/types/account';
 import { AccountSwitcher } from './AccountSwitcher';
 import { useMainAccountName } from '@/hooks/useMainAccountName';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('AccountDetailShell');
 
 export interface AccountDetailShellProps {
   account: Account;
@@ -79,7 +82,7 @@ export function AccountDetailShell({
     try {
       await onExport();
     } catch (error) {
-      console.error('PDF export failed:', error);
+      logger.error('PDF export failed:', error);
       toast.error(tc('exportDropdown.failedPdf'));
     } finally {
       if (mountedRef.current) setIsExporting(false);

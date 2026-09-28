@@ -112,6 +112,15 @@ open question is recorded in the plan.
 a rate limiter whose table or grant is missing must not turn into an outage of
 the product. `/health` reports `rateLimiting: disabled` the moment it happens.
 
+**`single` stays an assertion, but no longer a silent one.** Every backend
+session carries `application_name = monize-backend:<instance id>@<start>`
+(`backend/src/common/cluster/instance-id.ts`), and a `single` process that
+finds another long-running backend process on its database
+(`backend/src/common/cluster/replica-census.service.ts`) says so in its log
+every fifteen minutes and as `checks.replicas` with a `degraded` status on
+`GET /health`. The Helm guard remains the only refusal; the census exists for
+the compose file or the bare cluster that scaled without setting the mode.
+
 **Per-replica state now needs a written reason.**
 `backend/src/common/process-local-state.guard.spec.ts` scans every file under
 `backend/src` for a class-scope `Map` or `Set` and fails one that is not

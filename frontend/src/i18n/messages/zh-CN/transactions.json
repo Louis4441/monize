@@ -172,6 +172,7 @@
       "ref": "参考：{number}",
       "investmentLabel": "投资",
       "linkedInvestmentTitle": "在投资中查看",
+      "linkedInvestmentBadgeTitle": "此交易已关联到一笔投资交易",
       "filterByDate": "按日期筛选\"{date}\"",
       "filterByAccount": "按\"{name}\"筛选",
       "filterByPayee": "按\"{name}\"筛选",

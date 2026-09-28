@@ -4,7 +4,7 @@ import { useTranslations, useMessages } from 'next-intl';
 import { Security } from '@/types/investment';
 import { DensityLevel } from '@/hooks/useTableDensity';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { withCurrencyCode } from '@/lib/security-detail';
+import { withCurrencyCode } from '@/lib/format';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
 import type { RowAction } from '@/components/ui/row-actions/rowAction';
 

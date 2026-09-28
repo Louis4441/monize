@@ -355,6 +355,28 @@
             "body": "Balance alerts live on the account itself: edit any account and set **Notify below** or **Notify above**. They fire when the balance *crosses* the line, so you are told once rather than after every payment that keeps it there. You can retake this tour anytime from Settings."
           }
         }
+      },
+      "reportTagBreakdown": {
+        "title": "Break down a report by tag",
+        "steps": {
+          "welcome": {
+            "title": "See your reports by tag, not just category",
+            "body": "Income vs Expenses and Cash Flow can now split by the value of a tag you choose — household spending versus a side stall, say — and show transfers between them without ever counting a transfer as income."
+          },
+          "breakdown": {
+            "title": "Break down by tag key",
+            "body": "Pick a tag key here, such as **scope**, and the report splits into one section per value you have used it with, plus an **Untagged** section for everything else.",
+            "fallbackBody": "This control appears once you have tagged a transaction with a **key:value** tag, such as **scope:household**. Add one, and Break down by tag key shows up here."
+          },
+          "buckets": {
+            "title": "Per-value totals, and transfers kept separate",
+            "body": "Choosing a key opens a tab per value plus **Untagged**, each with its own income and expenses. Money moved between accounts shows as **Tagged inflows** and **Tagged outflows** — visible, but never counted as income."
+          },
+          "finish": {
+            "title": "That's the tag breakdown",
+            "body": "Tag transactions with a key:value pair like scope:household wherever you want this view, and revisit this tour anytime from Settings."
+          }
+        }
       }
     }
   }

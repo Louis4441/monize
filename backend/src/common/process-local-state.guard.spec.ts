@@ -32,8 +32,8 @@ import { extractTsComments } from "./repo-paths.util";
  *  - It does not match arrays, scalars or `WeakMap`/`WeakSet`, so it is not the
  *    whole of the "is this per-replica state correct?" question. The design
  *    doc's "Per-replica state that stays" table is; `yahoo-finance.service.ts`'s
- *    crumb, `daily-write-limiter.ts`'s array and `email.service.ts`'s failure
- *    scalars are in that table and out of this regex's reach.
+ *    crumb and `email.service.ts`'s failure scalars are in that table and out
+ *    of this regex's reach.
  *  - It reads code, not comments: a `private readonly x = new Map()` written out
  *    in a doc comment as an example is blanked before the scan.
  *
@@ -323,8 +323,10 @@ const ALLOWED = new Map<string, string>([
   [
     "net-worth/net-worth.service.ts#recalcTimers",
     "a debounce registry, not a guard: duplicate work is an absolute " +
-      "recomputation under the account lock, and a lost timer is recovered by " +
-      "`sweepStaleSnapshots` reading `accounts.updated_at`",
+      "recomputation under the account lock, and a lost timer's two jobs -- the " +
+      "snapshot recompute and the balance-threshold evaluation behind its " +
+      "compare-and-set latch -- are both recovered by `sweepStaleSnapshots` " +
+      "reading `accounts.updated_at`",
   ],
 
   // -- Not process state at all: per-request value objects ----------------

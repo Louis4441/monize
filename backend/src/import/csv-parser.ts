@@ -11,6 +11,7 @@
 import type { QifTransaction, QifParseResult } from "./qif-parser";
 import { escapeRegExp } from "../common/escape-regexp.util";
 import { roundToDecimals } from "../common/round.util";
+import { normalizeAmountSeparators } from "./amount-separators.util";
 
 export interface CsvHeadersResult {
   headers: string[];
@@ -796,7 +797,9 @@ function parseCsvDate(dateStr: string, format: string): string | null {
 
 /**
  * Parse an amount string from a CSV field.
- * Handles currency symbols, commas, spaces, and parentheses-as-negative notation.
+ * Handles currency symbols, spaces, parentheses-as-negative notation, and
+ * both US (1,234.56) and European (1.234,56 / 18,36) grouping/decimal styles
+ * (`normalizeAmountSeparators`).
  */
 function parseCsvAmount(value: string): number | null {
   let cleaned = value.trim();
@@ -812,8 +815,8 @@ function parseCsvAmount(value: string): number | null {
 
   // Strip currency symbols and whitespace
   cleaned = cleaned.replace(/[$£€¥₹\s]/g, "");
-  // Strip commas used as thousands separators
-  cleaned = cleaned.replace(/,/g, "");
+
+  cleaned = normalizeAmountSeparators(cleaned);
 
   const amount = parseFloat(cleaned);
   return isNaN(amount) ? null : amount;

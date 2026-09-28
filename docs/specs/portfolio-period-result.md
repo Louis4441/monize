@@ -264,7 +264,9 @@ the Investments page, the chart and any later surface from disagreeing about
 where a month begins. The arithmetic follows the client's own range picker
 where the two offer the same caption -- `2y` is a rolling 730 days, as the
 chart's `2y` button draws it -- so one page does not open the same window on
-two days.
+two days. `ytd` opens on 31 December of the previous year rather than on
+1 January, so the year is measured from the close of its last trading session;
+the charts' YTD window opens on the same day.
 
 ### 8.1 Which windows a scope is shown
 
@@ -341,6 +343,7 @@ Backend unit (`portfolio-period-result.util.spec.ts`,
 | an explicit `baselineDate` | the baseline's close is the start, flows after it |
 | `period: '1d'` | the window is the day and the close before it, never the week the chart draws |
 | `period: '3m'`, `'1y'`, `'5y'` | the day `presetWindowStart` names, not the day before it |
+| `period: 'ytd'` | opens on 31 December of the previous year, whose value is that year's last close; flows from 1 January on are inside the window |
 | `period: 'all'` | opens on the close before the scope's first holding, and equals `getInvestedResultSinceInception` |
 | `period: 'all'` on a scope that never held anything | every figure `null`, reason `noValueSeries`, no series valued |
 | a boundary on a day with no close | `startPriceDate` is the session before it; `null` where nothing was priced |

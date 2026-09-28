@@ -62,8 +62,6 @@ function createDefaultProps(overrides: Partial<AccountRowProps> = {}): AccountRo
     accountNameMap: new Map(),
     brokerageMarketValue: undefined,
     defaultCurrency: 'CAD',
-    formatCurrency: (amount: number | string | null | undefined, _currency: string) =>
-      `$${Number(amount || 0).toFixed(2)}`,
     formatCurrencyBase: (value: number, _currencyCode?: string) =>
       `$${value.toFixed(2)}`,
     convertToDefault: (value: number, _fromCurrency: string) => value,

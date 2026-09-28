@@ -19,6 +19,7 @@ import { ForecastAggregatorService } from "./forecast/forecast-aggregator.servic
 import { AiActionsController } from "./actions/ai-actions.controller";
 import { AiActionsService } from "./actions/ai-actions.service";
 import { SingleUseTokenModule } from "../auth/single-use-token.module";
+import { AuthAttemptCounterModule } from "../auth/auth-attempt-counter.module";
 import { AiActionBuilderModule } from "./actions/ai-action-builder.module";
 import { AiWriteLimiter } from "./actions/ai-write-limiter";
 import { AccountsModule } from "../accounts/accounts.module";
@@ -55,6 +56,9 @@ import { CurrenciesModule } from "../currencies/currencies.module";
     // claim. A module holding only that service, so this does not pull the auth
     // layer in to reach a class whose sole dependency is DataSource.
     SingleUseTokenModule,
+    // The shared counter rows behind the daily AI write cap (`AiWriteLimiter`),
+    // for the same reason: the counter service alone, not the auth layer.
+    AuthAttemptCounterModule,
     // AiService routes non-chat completions (insights, forecast) through the
     // reverse MCP relay when the user's provider list reaches an mcp_relay
     // config.

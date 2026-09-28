@@ -4,7 +4,10 @@ FROM node:24-alpine AS development
 WORKDIR /app
 
 # Install dependencies
+# patches/ is applied by the postinstall hook (patch-package), so it has to
+# be in place before the install runs.
 COPY package*.json ./
+COPY patches ./patches
 RUN npm ci
 
 # Copy source code
@@ -19,7 +22,10 @@ FROM node:24-slim AS builder
 
 WORKDIR /app
 
+# patches/ is applied by the postinstall hook (patch-package), so it has to
+# be in place before the install runs.
 COPY package*.json ./
+COPY patches ./patches
 RUN npm ci
 
 COPY . .

@@ -1,5 +1,7 @@
 import { McpPayeesTools } from "./payees.tool";
 import { McpWriteLimiter } from "../mcp-write-limiter";
+import { AuthAttemptCounterService } from "../../auth/auth-attempt-counter.service";
+import { createAuthAttemptCounterMock } from "../../test-helpers/auth-attempt-counter-testing";
 import { mcpTestCtx, McpTestContext } from "../testing/mcp-test-context";
 
 describe("McpPayeesTools", () => {
@@ -83,7 +85,9 @@ describe("McpPayeesTools", () => {
       prepService as any,
       relayService as any,
       actionBuilder as any,
-      new McpWriteLimiter(),
+      new McpWriteLimiter(
+        createAuthAttemptCounterMock() as unknown as AuthAttemptCounterService,
+      ),
     );
 
     elicitInput = jest.fn().mockResolvedValue({ action: "accept" });

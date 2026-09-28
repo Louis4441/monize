@@ -181,8 +181,11 @@ export async function proxy(request: NextRequest) {
     logger.debug(`${request.method} ${pathname} -> ${apiUrl}`);
 
     // X-Forwarded-For replaced with the one vouched-for address, the locale
-    // forwarded: `backendRequestHeaders`.
-    const headers = backendRequestHeaders(request);
+    // forwarded: `backendRequestHeaders`. Hop-by-hop headers are dropped: the
+    // body is buffered below, so undici frames it itself, and it refuses a
+    // caller-supplied `transfer-encoding` (sent by an edge that relays an
+    // HTTP/3 request of undeclared length) before the request leaves.
+    const headers = backendRequestHeaders(request, { stripHopByHop: true });
 
     // No body this path can legitimately need is larger than the backend's own
     // default limit; the routes that need more are not matched by this proxy

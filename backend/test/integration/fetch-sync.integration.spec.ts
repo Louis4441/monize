@@ -162,21 +162,53 @@ describe("FetchSyncService (real PostgreSQL)", () => {
   });
 
   it("runs the body once across two replicas' withLease", async () => {
+    // Two replicas on one tick overlap: the loser's claim lands while the
+    // winner is still fetching. The body therefore holds the lease until both
+    // claims have come back. An instant body let the winner claim, run and
+    // release (markSuccess frees the lease for the next tick) before the other
+    // claim reached PostgreSQL, which then rightly took the free lease -- two
+    // sequential ticks, not the race this test is about, and a CI flake.
+    let claimsSettled = 0;
+    let releaseBody!: () => void;
+    const bothClaimsSettled = new Promise<void>((resolve) => {
+      releaseBody = resolve;
+    });
+    const spies = [serviceA, serviceB].map((service) => {
+      const claim = service.claim.bind(service);
+      return jest
+        .spyOn(service, "claim")
+        .mockImplementation(async (job, leaseMs) => {
+          // Counted in `finally` so a claim that throws still releases the
+          // winner's body: the test then fails on that error instead of
+          // leaving the body awaiting a claim that never settles.
+          try {
+            return await claim(job, leaseMs);
+          } finally {
+            if (++claimsSettled === 2) releaseBody();
+          }
+        });
+    });
+
     let runs = 0;
     const body = async () => {
       runs++;
+      await bothClaimsSettled;
     };
 
-    const outcomes = await withSystemContext(() =>
-      Promise.all([
-        serviceA.withLease(JOB, LEASE_MS, body),
-        serviceB.withLease(JOB, LEASE_MS, body),
-      ]),
-    );
+    try {
+      const outcomes = await withSystemContext(() =>
+        Promise.all([
+          serviceA.withLease(JOB, LEASE_MS, body),
+          serviceB.withLease(JOB, LEASE_MS, body),
+        ]),
+      );
 
-    // Provider calls per tick go from N to 1, which is the acceptance for C2.
-    expect(runs).toBe(1);
-    expect(outcomes.filter(Boolean)).toHaveLength(1);
+      // Provider calls per tick go from N to 1, which is the acceptance for C2.
+      expect(runs).toBe(1);
+      expect(outcomes.filter(Boolean)).toHaveLength(1);
+    } finally {
+      spies.forEach((spy) => spy.mockRestore());
+    }
   });
 
   it("releases the lease when the body throws", async () => {

@@ -117,6 +117,45 @@ export interface IncomeExpenseTotals {
   knownNet: number;
 }
 
+/**
+ * The reserved id of the "untagged" value bucket
+ * (`docs/specs/report-tag-key-breakdown.md` section 1.1, rule B2): rows
+ * carrying no `K:*` tag for the requested key. Not a value a user can create --
+ * render it from `reports.tagBreakdown.untagged`, never this id.
+ */
+export const UNTAGGED_TAG_BUCKET_ID = '__untagged__';
+
+/**
+ * One value bucket of a tag-key breakdown (Income vs Expenses / Cash Flow
+ * only carry `taggedInflows`/`taggedOutflows`).
+ *
+ * `data`/`totals`/`missingCurrencies`/`excludedCount` are computed through the
+ * exact same per-currency conversion and completeness path as the top-level
+ * (All) figures: one bucket's missing rate never blanks another's.
+ */
+export interface IncomeExpenseTagBucket {
+  /** The tag's value, or `UNTAGGED_TAG_BUCKET_ID` for the reserved bucket. */
+  value: string;
+  /** True only for the reserved untagged bucket. */
+  isUntagged: boolean;
+  data: IncomeExpensePeriodItem[];
+  totals: IncomeExpenseTotals;
+  /**
+   * Transfer legs carrying this bucket's value, positive side. Never folded
+   * into `income`, `expenses` or `net` -- a transfer is never income.
+   */
+  taggedInflows: number;
+  /** Transfer legs carrying this bucket's value, negative side, as a positive magnitude. */
+  taggedOutflows: number;
+  /**
+   * Source currencies with no usable rate into the report's currency, across
+   * both this bucket's categorized rows and its tagged transfer legs.
+   */
+  missingCurrencies: string[];
+  /** How many aggregate rows this bucket left out, by any cause. */
+  excludedCount: number;
+}
+
 export interface IncomeVsExpensesResponse {
   /** Every bucket in the window, in order, including the empty ones. */
   data: IncomeExpensePeriodItem[];
@@ -127,6 +166,18 @@ export interface IncomeVsExpensesResponse {
   missingCurrencies: string[];
   /** How many aggregate rows were left out, by any cause. */
   excludedCount: number;
+  /**
+   * The tag key the caller asked to break the report down by. Present only
+   * when the request carried `tagKey` (absent otherwise, never `null`).
+   */
+  tagKey?: string;
+  /**
+   * One bucket per discovered value of `tagKey`, plus the reserved untagged
+   * bucket (`UNTAGGED_TAG_BUCKET_ID`). Present only when `tagKey` was
+   * supplied; the fields above keep describing the unpartitioned (All)
+   * figure, so a caller ignoring this field still renders today's report.
+   */
+  buckets?: IncomeExpenseTagBucket[];
 }
 
 /** Query parameters Income vs Expenses accepts beyond the window. */
@@ -137,11 +188,27 @@ export interface IncomeVsExpensesParams extends ReportQueryParams {
   bucket?: 'month' | 'week';
   /** Day a week bucket starts on, 0 = Sunday through 6 = Saturday. */
   weekStartsOn?: number;
+  /**
+   * Bare KEY of a `KEY:VALUE` tag (e.g. "scope") to break the report down by
+   * (`docs/specs/report-tag-key-breakdown.md`). Absent renders today's
+   * response unchanged.
+   */
+  tagKey?: string;
 }
 
 export interface ReportQueryParams {
   startDate?: string;
   endDate: string;
+}
+
+/** Query parameters the Cash Flow report accepts beyond the window. */
+export interface CashFlowParams extends ReportQueryParams {
+  /**
+   * Bare KEY of a `KEY:VALUE` tag (e.g. "scope") to break the report down by
+   * (`docs/specs/report-tag-key-breakdown.md`). Absent renders today's
+   * response unchanged.
+   */
+  tagKey?: string;
 }
 
 // Monthly category breakdown types

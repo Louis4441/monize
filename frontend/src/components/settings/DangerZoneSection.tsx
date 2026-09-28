@@ -181,15 +181,13 @@ export function DangerZoneSection({ user }: DangerZoneSectionProps) {
               {t('deleteData.alwaysDeletedHeading')}
             </p>
             <ul className="text-sm text-gray-700 dark:text-gray-300 list-disc ml-5 space-y-1">
-              <li>All transactions and splits</li>
-              <li>All scheduled/recurring transactions</li>
-              <li>
-                All securities, prices, holdings, and investment transactions
-              </li>
-              <li>All budgets and budget alerts</li>
-              <li>Monthly account balance summaries</li>
-              <li>Custom reports, tags, and import mappings</li>
-              <li>Action history (undo/redo)</li>
+              <li>{t('deleteData.alwaysDeletedItems.transactions')}</li>
+              <li>{t('deleteData.alwaysDeletedItems.scheduled')}</li>
+              <li>{t('deleteData.alwaysDeletedItems.securities')}</li>
+              <li>{t('deleteData.alwaysDeletedItems.budgets')}</li>
+              <li>{t('deleteData.alwaysDeletedItems.monthlySummaries')}</li>
+              <li>{t('deleteData.alwaysDeletedItems.customReports')}</li>
+              <li>{t('deleteData.alwaysDeletedItems.actionHistory')}</li>
             </ul>
 
             <p className="text-sm font-medium text-red-700 dark:text-red-300 pt-2">

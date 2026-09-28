@@ -322,6 +322,14 @@
     "seriesInflows": "Instroom",
     "seriesOutflows": "Uitstroom"
   },
+  "tagBreakdown": {
+    "label": "Uitsplitsen naar labelsleutel",
+    "none": "Geen",
+    "untagged": "Zonder label",
+    "inflows": "Gelabelde instroom",
+    "outflows": "Gelabelde uitstroom",
+    "sharesExceedNote": "Een rij die onder deze sleutel met meer dan één waarde is gelabeld, telt voor elk van die waarden mee, waardoor de aandelen per waarde samen meer dan 100% kunnen zijn."
+  },
   "categoryPerformance": {
     "noBudgets": "Geen budgetten gevonden. Maak een budget aan om categorieprestaties te zien.",
     "noData": "Nog geen categoriegegevens beschikbaar.",
@@ -471,6 +479,7 @@
     "allAccountsPlaceholder": "Alle rekeningen",
     "filterBySecurityLabel": "Filteren op waardepapier",
     "filterByAccountLabel": "Filteren op rekening",
+    "monthlyDisplayModeLabel": "Maandelijkse weergavemodus",
     "allSecurities": "Alle waardepapieren",
     "viewMonthly": "Maandelijks",
     "viewDaily": "Dagelijks",
@@ -1192,7 +1201,6 @@
     "incompleteTooltip": "Voor sommige dagen in deze periode ontbreekt een koers, een wisselkoers of een liquide saldo, waardoor de cijfers die van elke dag afhangen niet worden weergegeven.",
     "measuredFromClose": "Sinds de slotkoers van {date}",
     "unmeasuredFlowTooltip": "Er is geld in of uit deze rekeningen verplaatst op een manier die hier niet kan worden meegeteld: een transactie die is afgewikkeld via een rekening buiten deze groep, of een splitsing die een investeringsregel combineert met gewone uitgaven. Het beleggingsresultaat wordt niet getoond, omdat een deel ervan uw eigen geld zou zijn.",
-    "closeBoundsTooltip": "Deze cijfers worden gemeten tussen de opgeslagen slotkoersen van {start} en {end}. De grafiek hierboven toont live koersen gedurende de dag, dus die kan bewegen terwijl deze cijfers dat niet doen.",
     "notAvailable": "N/B",
     "intradayUnavailable": "Gedetailleerde intraday-koersen niet beschikbaar",
     "intradayUnavailableTitle": "Intraday-weergave niet beschikbaar voor deze rekeningcombinatie",
@@ -1717,6 +1725,19 @@
     "title": "Monte Carlo-scenario's vergelijken",
     "subtitle": "Statistieken naast elkaar voor maximaal 4 opgeslagen scenario's.",
     "backToMonteCarlo": "Terug naar Monte Carlo",
+    "downloadCsv": "CSV downloaden",
+    "downloadCsvTitle": "Download de vergelijking als CSV-bestand",
+    "downloadCsvWaitTitle": "Wacht tot minstens 2 scenario's klaar zijn met laden",
+    "emptyHeading": "Geen scenario's geselecteerd",
+    "emptyBody": "Kies scenario's uit het Monte Carlo-rapport om ze naast elkaar te vergelijken.",
+    "emptyButton": "Ga naar de Monte Carlo-simulatie",
+    "needsMoreHeading": "Minstens 2 scenario's nodig",
+    "needsMoreBody": "Vergelijken vereist 2 of meer opgeslagen scenario's. U hebt er momenteel één geselecteerd (id: <mono>{id}</mono>).",
+    "needsMoreButton": "Meer scenario's kiezen",
+    "scenarioFallback": "Scenario",
+    "removeAriaLabel": "{title} verwijderen uit vergelijking",
+    "removeTitle": "Verwijderen uit vergelijking",
+    "runFailed": "Uitvoering mislukt",
     "errors": {
       "loadScenarioFailed": "Scenario kon niet worden geladen.",
       "simulationFailed": "Simulatie mislukt."
