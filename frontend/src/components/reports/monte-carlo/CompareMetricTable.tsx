@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import {
   MonteCarloScenario,
@@ -89,7 +90,8 @@ function ColumnHeader({
   onRemove: () => void;
   onRerun: () => void;
 }) {
-  const title = column.scenario?.name ?? 'Scenario';
+  const t = useTranslations('reports');
+  const title = column.scenario?.name ?? t('monteCarloComparePage.scenarioFallback');
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between gap-2">
@@ -99,9 +101,9 @@ function ColumnHeader({
         <button
           type="button"
           onClick={onRemove}
-          aria-label={`Remove ${title} from comparison`}
+          aria-label={t('monteCarloComparePage.removeAriaLabel', { title })}
           className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-          title="Remove from comparison"
+          title={t('monteCarloComparePage.removeTitle')}
         >
           <svg
             className="w-4 h-4"
@@ -153,6 +155,7 @@ function GroupBlock({
   formatters: CompareCellFormatters;
   onRetry: (id: string) => void;
 }) {
+  const t = useTranslations('reports');
   return (
     <>
       <tr className="bg-gray-100 dark:bg-gray-900/60">
@@ -206,7 +209,7 @@ function GroupBlock({
                 <td key={col.id} className="px-3 py-1.5">
                   <div className="flex flex-col gap-1">
                     <span className="text-xs text-red-600 dark:text-red-400">
-                      {col.error ?? 'Run failed'}
+                      {col.error ?? t('monteCarloComparePage.runFailed')}
                     </span>
                     <Button
                       size="sm"

@@ -493,6 +493,15 @@
       "description": "계정에서 재무 데이터를 제거합니다. 이 작업은 취소할 수 없습니다.",
       "openButton": "데이터 삭제...",
       "alwaysDeletedHeading": "다음 항목은 항상 삭제됩니다:",
+      "alwaysDeletedItems": {
+        "transactions": "모든 거래 및 분할",
+        "scheduled": "모든 예약/반복 거래",
+        "securities": "모든 유가증권, 가격, 보유 종목 및 투자 거래",
+        "budgets": "모든 예산 및 예산 알림",
+        "monthlySummaries": "월별 계정 잔액 요약",
+        "customReports": "사용자 지정 보고서, 태그 및 가져오기 매핑",
+        "actionHistory": "작업 기록(실행 취소/다시 실행)"
+      },
       "optionalHeading": "선택적으로 삭제 가능:",
       "accountsOption": "계정",
       "categoriesOption": "카테고리",

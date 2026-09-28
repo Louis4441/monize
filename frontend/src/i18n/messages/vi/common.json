@@ -144,6 +144,7 @@
   },
   "dateInput": {
     "shortcutsTitle": "Phím tắt bàn phím",
+    "openPicker": "Mở bộ chọn ngày",
     "today": "Hôm nay",
     "firstDayOfYear": "Ngày đầu năm",
     "lastDayOfYear": "Ngày cuối năm",

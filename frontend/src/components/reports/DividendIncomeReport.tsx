@@ -1194,7 +1194,7 @@ export function DividendIncomeReport() {
               <div
                 className="inline-flex rounded-md border border-gray-200 dark:border-gray-600 overflow-hidden text-sm"
                 role="group"
-                aria-label="Monthly display mode"
+                aria-label={t('dividendIncome.monthlyDisplayModeLabel')}
               >
                 <button
                   onClick={() => setMonthlyDisplay('chart')}

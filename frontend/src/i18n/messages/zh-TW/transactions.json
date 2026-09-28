@@ -172,6 +172,7 @@
       "ref": "參考：{number}",
       "investmentLabel": "投資",
       "linkedInvestmentTitle": "在投資中查看",
+      "linkedInvestmentBadgeTitle": "此交易已連結至一筆投資交易",
       "filterByDate": "依日期「{date}」篩選",
       "filterByAccount": "依「{name}」篩選",
       "filterByPayee": "依「{name}」篩選",

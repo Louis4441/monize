@@ -172,6 +172,7 @@
       "ref": "참조: {number}",
       "investmentLabel": "투자",
       "linkedInvestmentTitle": "투자에서 보기",
+      "linkedInvestmentBadgeTitle": "이 거래는 투자 거래에 연결되어 있습니다",
       "filterByDate": "날짜 \"{date}\"로 필터링",
       "filterByAccount": "\"{name}\"으로 필터링",
       "filterByPayee": "\"{name}\"으로 필터링",

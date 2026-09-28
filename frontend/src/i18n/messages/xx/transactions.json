@@ -172,6 +172,7 @@
       "ref": "[XX-Ref: {number}-XX]",
       "investmentLabel": "[XX-Investment-XX]",
       "linkedInvestmentTitle": "[XX-View in Investments-XX]",
+      "linkedInvestmentBadgeTitle": "[XX-This transaction is linked to an investment transaction-XX]",
       "filterByDate": "[XX-Filter by date \"{date}\"-XX]",
       "filterByAccount": "[XX-Filter by \"{name}\"-XX]",
       "filterByPayee": "[XX-Filter by \"{name}\"-XX]",

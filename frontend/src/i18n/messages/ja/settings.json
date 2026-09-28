@@ -493,6 +493,15 @@
       "description": "アカウントから財務データを削除します。この操作は元に戻せません。",
       "openButton": "データを削除...",
       "alwaysDeletedHeading": "以下は常に削除されます:",
+      "alwaysDeletedItems": {
+        "transactions": "すべての取引と分割",
+        "scheduled": "すべての予定/定期取引",
+        "securities": "すべての有価証券、価格、保有銘柄、投資取引",
+        "budgets": "すべての予算と予算アラート",
+        "monthlySummaries": "口座残高の月次サマリー",
+        "customReports": "カスタムレポート、タグ、インポートマッピング",
+        "actionHistory": "操作履歴（元に戻す/やり直す）"
+      },
       "optionalHeading": "オプションで追加削除:",
       "accountsOption": "口座",
       "categoriesOption": "カテゴリ",

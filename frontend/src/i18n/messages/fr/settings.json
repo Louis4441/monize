@@ -493,6 +493,15 @@
       "description": "Supprimez les données financières de votre compte. Cette action est irréversible.",
       "openButton": "Supprimer les données...",
       "alwaysDeletedHeading": "Les éléments suivants seront toujours supprimés :",
+      "alwaysDeletedItems": {
+        "transactions": "Toutes les transactions et répartitions",
+        "scheduled": "Toutes les transactions programmées/récurrentes",
+        "securities": "Tous les titres, cours, positions et transactions d'investissement",
+        "budgets": "Tous les budgets et alertes de budget",
+        "monthlySummaries": "Résumés mensuels du solde des comptes",
+        "customReports": "Rapports personnalisés, étiquettes et correspondances d'importation",
+        "actionHistory": "Historique des actions (annuler/rétablir)"
+      },
       "optionalHeading": "Supprimer également en option :",
       "accountsOption": "Comptes",
       "categoriesOption": "Catégories",

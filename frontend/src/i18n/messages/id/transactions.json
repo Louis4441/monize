@@ -172,6 +172,7 @@
       "ref": "Ref: {number}",
       "investmentLabel": "Investasi",
       "linkedInvestmentTitle": "Lihat di Investasi",
+      "linkedInvestmentBadgeTitle": "Transaksi ini ditautkan ke transaksi investasi",
       "filterByDate": "Filter berdasarkan tanggal \"{date}\"",
       "filterByAccount": "Filter berdasarkan \"{name}\"",
       "filterByPayee": "Filter berdasarkan \"{name}\"",

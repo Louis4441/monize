@@ -172,6 +172,7 @@
       "ref": "संदर्भ: {number}",
       "investmentLabel": "निवेश",
       "linkedInvestmentTitle": "निवेश में देखें",
+      "linkedInvestmentBadgeTitle": "यह लेनदेन एक निवेश लेनदेन से जुड़ा हुआ है",
       "filterByDate": "तिथि \"{date}\" से फ़िल्टर करें",
       "filterByAccount": "\"{name}\" से फ़िल्टर करें",
       "filterByPayee": "\"{name}\" से फ़िल्टर करें",

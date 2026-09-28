@@ -273,7 +273,12 @@ describe('TransactionRow', () => {
 
   it('renders Investment badge when linkedInvestmentTransactionId', () => {
     renderRow({}, { linkedInvestmentTransactionId: 'inv1' });
-    expect(screen.getByText('Investment')).toBeInTheDocument();
+    const badge = screen.getByText('Investment');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveAttribute(
+      'title',
+      'This transaction is linked to an investment transaction',
+    );
   });
 
   it('renders split badge with summary', () => {

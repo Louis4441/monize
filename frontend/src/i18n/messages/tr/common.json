@@ -144,6 +144,7 @@
   },
   "dateInput": {
     "shortcutsTitle": "Klavye kısayolları",
+    "openPicker": "Tarih seçiciyi aç",
     "today": "Bugün",
     "firstDayOfYear": "Yılın ilk günü",
     "lastDayOfYear": "Yılın son günü",

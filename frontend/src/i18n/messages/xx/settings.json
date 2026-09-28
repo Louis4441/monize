@@ -493,6 +493,15 @@
       "description": "[XX-Remove financial data from your account. This cannot be undone.-XX]",
       "openButton": "[XX-Delete Data...-XX]",
       "alwaysDeletedHeading": "[XX-The following will always be deleted:-XX]",
+      "alwaysDeletedItems": {
+        "transactions": "[XX-All transactions and splits-XX]",
+        "scheduled": "[XX-All scheduled/recurring transactions-XX]",
+        "securities": "[XX-All securities, prices, holdings, and investment transactions-XX]",
+        "budgets": "[XX-All budgets and budget alerts-XX]",
+        "monthlySummaries": "[XX-Monthly account balance summaries-XX]",
+        "customReports": "[XX-Custom reports, tags, and import mappings-XX]",
+        "actionHistory": "[XX-Action history (undo/redo)-XX]"
+      },
       "optionalHeading": "[XX-Optionally also delete:-XX]",
       "accountsOption": "[XX-Accounts-XX]",
       "categoriesOption": "[XX-Categories-XX]",
