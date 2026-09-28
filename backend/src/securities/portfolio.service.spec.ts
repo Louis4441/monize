@@ -5641,6 +5641,37 @@ describe("PortfolioService", () => {
         expect(result.points[0].value).toBe(381);
       });
 
+      it("has no opening close when the window holds only today's live session and no bars reach the session", async () => {
+        // Monday morning, the provider's bars start today and Friday's were
+        // not fetched: no finished session says when a close falls, so the
+        // series opens on its first bar rather than on a guessed hour.
+        jest.setSystemTime(new Date(monday));
+        netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+          ledgerOf([day("2026-09-20", 381), day("2026-09-28", 390)], [xgro]),
+        );
+        netWorthService.getLastPricedDays.mockResolvedValue(
+          new Map([["2026-09-20", "2026-09-18"]]),
+        );
+        seriesBySymbol({
+          "XGRO.TO": [
+            bar("2026-09-28T13:30:00.000Z", 38.5),
+            bar("2026-09-28T13:35:00.000Z", 38.6),
+          ],
+        });
+
+        const result = await service.getIntradayValueSeries(userId, {
+          range: "1w",
+        });
+
+        expect(result.points.map((p) => p.timestamp)).toEqual([
+          "2026-09-28T13:30:00.000Z",
+          "2026-09-28T13:35:00.000Z",
+        ]);
+        expect(result.points.every((p) => p.sessionClose === undefined)).toBe(
+          true,
+        );
+      });
+
       it("opens 1M on its first session's last bar when there is no close to open on", async () => {
         // Wednesday 30 September: 1M is measured from Monday 31 August, whose
         // figure is a subtotal. The month still does not open partway through
