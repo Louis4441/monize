@@ -779,6 +779,48 @@ describe("CSV Parser", () => {
 
         expect(result.transactions[0].amount).toBe(0);
       });
+
+      it("handles a European decimal comma (18,36 -> 18.36)", () => {
+        const csv = 'Date,Amount,Payee\n01/15/2026,"18,36",Store\n';
+        const result = parseCsv(csv, baseConfig());
+
+        expect(result.transactions[0].amount).toBe(18.36);
+      });
+
+      it("handles a European decimal comma with a semicolon-delimited CSV", () => {
+        const csv = "Date;Amount;Payee\n01/15/2026;18,36;Store\n";
+        const result = parseCsv(csv, baseConfig({ delimiter: ";" }));
+
+        expect(result.transactions[0].amount).toBe(18.36);
+      });
+
+      it("handles European thousands-dot with decimal comma (1.234,56 -> 1234.56)", () => {
+        const csv = 'Date,Amount,Payee\n01/15/2026,"1.234,56",Store\n';
+        const result = parseCsv(csv, baseConfig());
+
+        expect(result.transactions[0].amount).toBe(1234.56);
+      });
+
+      it("treats a single comma with three trailing digits as thousands grouping (1,234 -> 1234)", () => {
+        const csv = 'Date,Amount,Payee\n01/15/2026,"1,234",Store\n';
+        const result = parseCsv(csv, baseConfig());
+
+        expect(result.transactions[0].amount).toBe(1234);
+      });
+
+      it("handles repeated comma thousands grouping (1,234,567.89 -> 1234567.89)", () => {
+        const csv = 'Date,Amount,Payee\n01/15/2026,"1,234,567.89",Store\n';
+        const result = parseCsv(csv, baseConfig());
+
+        expect(result.transactions[0].amount).toBe(1234567.89);
+      });
+
+      it("handles a negative European decimal comma amount", () => {
+        const csv = 'Date,Amount,Payee\n01/15/2026,"-18,36",Store\n';
+        const result = parseCsv(csv, baseConfig());
+
+        expect(result.transactions[0].amount).toBe(-18.36);
+      });
     });
 
     describe("categories extraction", () => {
