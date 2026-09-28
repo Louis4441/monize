@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   buildIntradayCacheKey,
@@ -7,111 +9,31 @@ import {
   computeTightYAxisDomain,
   INTRADAY_CACHE_PREFIX,
   INTRADAY_RANGES,
-  intradayRangeParam,
+  isIntradayRange,
   niceAxisStep,
-  trimIntradayPoints,
   readIntradayCache,
   renderChartFlagDot,
   renderMinMaxFlagDots,
   writeIntradayCache,
 } from './portfolio-chart-utils';
 
-describe('intradayRangeParam', () => {
-  it('serves mtd from the rolling 1m series', () => {
-    expect(intradayRangeParam('mtd')).toBe('1m');
+describe('INTRADAY_RANGES', () => {
+  it('is the set the intraday endpoint accepts', () => {
+    // The backend's IntradayValueQueryDto enum, read from its source: a range
+    // in one set and not the other is a 400 at runtime.
+    const dto = readFileSync(
+      join(__dirname, '..', '..', '..', '..', 'backend/src/securities/dto/intraday-value.dto.ts'),
+      'utf8',
+    );
+    const match = dto.match(/export const INTRADAY_RANGES = \[([^\]]+)\] as const;/);
+    expect(match, 'backend INTRADAY_RANGES not found').toBeTruthy();
+    const accepted = match![1].match(/"([^"]+)"/g)!.map((q) => q.slice(1, -1));
+    expect([...INTRADAY_RANGES].sort()).toEqual([...accepted].sort());
   });
 
-  it('passes every other intraday range through unchanged', () => {
-    for (const range of ['1d', '1w', '1m']) {
-      expect(intradayRangeParam(range)).toBe(range);
-    }
-  });
-
-  it('maps every intraday range onto one the endpoint accepts', () => {
-    // The backend's IntradayValueQueryDto enum. A range added to
-    // INTRADAY_RANGES without a mapping here is a 400 at runtime.
-    const accepted = new Set(['1d', '1w', '1m']);
-    for (const range of INTRADAY_RANGES) {
-      expect(accepted.has(intradayRangeParam(range))).toBe(true);
-    }
-  });
-});
-
-describe('trimIntradayPoints', () => {
-  const points = [
-    { timestamp: '2026-07-28T13:30:00.000Z', value: 1 },
-    { timestamp: '2026-08-01T13:30:00.000Z', value: 2 },
-    { timestamp: '2026-08-12T13:30:00.000Z', value: 3 },
-  ];
-
-  it('drops the bars the rolling month reached back into', () => {
-    expect(trimIntradayPoints(points, 'mtd', '2026-08-01')).toEqual([
-      points[1],
-      points[2],
-    ]);
-  });
-
-  it('keeps a bar that starts exactly on the window boundary', () => {
-    expect(
-      trimIntradayPoints(points, 'mtd', '2026-08-01').map((p) => p.timestamp),
-    ).toContain('2026-08-01T13:30:00.000Z');
-  });
-
-  /**
-   * The month is measured from the previous session's close, which the server
-   * flags as a closing point at the end of that session. It is the point the
-   * chart opens on, so the caption "since the close of trading on the 31st"
-   * and the first point on screen name one session (issue #1461).
-   */
-  it('keeps the closing point the month is measured from', () => {
-    const series = [
-      { timestamp: '2026-07-31T13:30:00.000Z', value: 1 },
-      { timestamp: '2026-07-31T19:45:00.000Z', value: 2 },
-      { timestamp: '2026-07-31T20:00:00.000Z', value: 3, sessionClose: true as const },
-      { timestamp: '2026-08-03T13:30:00.000Z', value: 4 },
-    ];
-    expect(trimIntradayPoints(series, 'mtd', '2026-08-01')).toEqual([
-      series[2],
-      series[3],
-    ]);
-  });
-
-  it('never opens on a bar of the previous month in the close\'s place', () => {
-    // The last point before the window is a 15:45 bar, not a close: the
-    // previous session's figure was a subtotal and got no closing point.
-    const series = [
-      { timestamp: '2026-07-31T19:45:00.000Z', value: 2 },
-      { timestamp: '2026-08-03T13:30:00.000Z', value: 4 },
-    ];
-    expect(trimIntradayPoints(series, 'mtd', '2026-08-01')).toEqual([
-      series[1],
-    ]);
-  });
-
-  it('keeps only the opening close when nothing falls inside the window yet', () => {
-    const series = [
-      { timestamp: '2026-07-31T20:00:00.000Z', value: 3, sessionClose: true as const },
-    ];
-    expect(trimIntradayPoints(series, 'mtd', '2026-08-01')).toEqual(series);
-  });
-
-  /**
-   * 1D, 1W and 1M arrive already shaped: the server trims them to their
-   * window and opens 1W and 1M on the close they are measured from
-   * (`PortfolioService.planOpeningClose`). Nothing here second-guesses it.
-   */
-  it('leaves the other ranges alone -- their series is already the window', () => {
-    for (const range of ['1d', '1w', '1m']) {
-      expect(trimIntradayPoints(points, range, '2026-08-01')).toBe(points);
-    }
-  });
-
-  it('does not trim without a window start', () => {
-    expect(trimIntradayPoints(points, 'mtd', '')).toBe(points);
-  });
-
-  it('handles an empty series', () => {
-    expect(trimIntradayPoints([], 'mtd', '2026-08-01')).toEqual([]);
+  it('narrows a range string to one the endpoint accepts', () => {
+    expect(isIntradayRange('mtd')).toBe(true);
+    expect(isIntradayRange('3m')).toBe(false);
   });
 });
 

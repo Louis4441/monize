@@ -1,7 +1,13 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsIn, IsOptional, IsString, MaxLength } from "class-validator";
 
-export const INTRADAY_RANGES = ["1d", "1w", "1m"] as const;
+/**
+ * The chart ranges served intraday. `mtd` is served on its own: its window
+ * opens on the 1st and is measured from the previous month's last session,
+ * which a rolling month trimmed on the client does not always reach (on the
+ * 31st a thirty-day window opens on the 1st itself).
+ */
+export const INTRADAY_RANGES = ["1d", "1w", "mtd", "1m"] as const;
 export type IntradayRangeKey = (typeof INTRADAY_RANGES)[number];
 
 export class IntradayValueQueryDto {

@@ -493,7 +493,7 @@ describe('InvestmentValueChart', () => {
     expect(lastCall.ranges).toEqual(['1d', '1w', 'mtd', '1m', '3m', 'ytd', '1y', '2y', '5y', 'all']);
   });
 
-  it('uses intraday API for mtd range and passes 1m to backend', async () => {
+  it('uses intraday API for mtd range, served on its own window', async () => {
     dateRangeState.dateRange = 'mtd';
     dateRangeState.resolvedRange = { start: '2024-01-01', end: '2024-01-15' };
     vi.mocked(investmentsApi.getIntradayValue).mockResolvedValue({
@@ -513,12 +513,12 @@ describe('InvestmentValueChart', () => {
     await screen.findByText('Portfolio Value Over Time');
     await waitFor(() =>
       expect(investmentsApi.getIntradayValue).toHaveBeenCalledWith(
-        expect.objectContaining({ range: '1m' }),
+        expect.objectContaining({ range: 'mtd' }),
       )
     );
-    // MTD reports against the previous close, so the day before the chart's
-    // first point goes out as the period's baseline. Nothing is valued twice:
-    // the daily endpoint is not reached at all.
+    // MTD reports against the previous close, so the last day of the previous
+    // month goes out as the period's baseline. Nothing is valued twice: the
+    // daily endpoint is not reached at all.
     await waitFor(() =>
       expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith(
         expect.objectContaining({ baselineDate: '2023-12-31' }),
@@ -527,18 +527,20 @@ describe('InvestmentValueChart', () => {
     expect(netWorthApi.getInvestmentsDaily).not.toHaveBeenCalled();
   });
 
-  it('filters mtd intraday points to current month only', async () => {
+  it('plots the mtd series as the server shaped it, opening close included', async () => {
     dateRangeState.dateRange = 'mtd';
     dateRangeState.resolvedRange = { start: '2024-01-01', end: '2024-01-15' };
     vi.mocked(investmentsApi.getIntradayValue).mockResolvedValue({
       points: [
-        { timestamp: '2023-12-28T14:30:00.000Z', value: 8000 },
-        { timestamp: '2024-01-01T14:30:00.000Z', value: 9000 },
+        // The server opens the month on the previous session's closing
+        // point, which the month is measured from (issue #1461).
+        { timestamp: '2023-12-29T21:00:00.000Z', value: 8000, sessionClose: true },
+        { timestamp: '2024-01-02T14:30:00.000Z', value: 9000 },
         { timestamp: '2024-01-10T14:30:00.000Z', value: 10000 },
       ],
       interval: '15m',
       currency: 'CAD',
-      range: '1m',
+      range: 'mtd',
       fetchedAt: '2024-01-15T15:00:00.000Z',
       skippedSymbols: [],
       failedSymbols: [],
@@ -546,10 +548,9 @@ describe('InvestmentValueChart', () => {
     });
     render(<InvestmentValueChart />);
     await screen.findByText('Portfolio Value Over Time');
-    // highest should be 10000 (Jan 10), not 9000 or 8000 from December
     expect(screen.getByText('$10000.00')).toBeInTheDocument();
-    // December point (8000) filtered out, so lowest is 9000
-    expect(screen.getByText('$9000.00')).toBeInTheDocument();
+    // The opening close is on the chart: nothing here trims it away.
+    expect(screen.getByText('$8000.00')).toBeInTheDocument();
   });
 
   // Range-boundary regression (issue #UI-03, part 3): the first plotted point

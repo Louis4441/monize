@@ -217,11 +217,11 @@ export const investmentsApi = {
     return response.data;
   },
 
-  // Intraday portfolio value series (1D / 1W / 1M ranges).
+  // Intraday portfolio value series (1D / 1W / MTD / 1M ranges).
   // Bypasses apiCache; the chart caches in sessionStorage instead so a manual
   // Refresh can selectively invalidate just the intraday entries.
   getIntradayValue: async (params: {
-    range: '1d' | '1w' | '1m';
+    range: '1d' | '1w' | 'mtd' | '1m';
     accountIds?: string;
     displayCurrency?: string;
   }): Promise<{
@@ -240,7 +240,7 @@ export const investmentsApi = {
     }>;
     interval: '1m' | '2m' | '5m' | '15m' | '30m' | '60m' | '90m';
     currency: string;
-    range: '1d' | '1w' | '1m';
+    range: '1d' | '1w' | 'mtd' | '1m';
     fetchedAt: string;
     skippedSymbols: string[];
     failedSymbols: string[];
@@ -255,7 +255,7 @@ export const investmentsApi = {
   // metadata as getIntradayValue so the caller can apply identical fallback
   // handling. Backend caches for 60s; not cached in sessionStorage here.
   getIntradayBreakdown: async (params: {
-    range: '1d' | '1w' | '1m';
+    range: '1d' | '1w' | 'mtd' | '1m';
     accountIds?: string;
     displayCurrency?: string;
   }): Promise<IntradayBreakdown> => {

@@ -7,52 +7,28 @@ import { createLogger } from '@/lib/logger';
 const logger = createLogger('PortfolioValueChart');
 
 /**
- * Ranges that pull intraday bars from the live quote provider. 1W/1M move
+ * Ranges that pull intraday bars from the live quote provider. 1W/MTD/1M move
  * from daily-snapshot data to intraday bars when every holding's provider
  * supports it; otherwise the backend signals fallbackToDaily=true and we
  * switch back to the daily endpoint.
- */
-export const INTRADAY_RANGES = new Set(['1d', '1w', 'mtd', '1m']);
-
-/**
- * The range the backend serves a chart range from. MTD has no series of its
- * own -- its window is 1 to 31 days long, so it rides on the rolling 1M series
- * and the caller trims it with {@link trimIntradayPoints}. Every intraday
- * request goes through this: passing 'mtd' straight through is a 400 from the
- * `IntradayValueQueryDto` enum, which is the shape of failure that reads as an
- * outage rather than as a missing case.
- */
-export function intradayRangeParam(range: string): '1d' | '1w' | '1m' {
-  return (range === 'mtd' ? '1m' : range) as '1d' | '1w' | '1m';
-}
-
-/**
- * Shape an intraday series into the one the chart shows.
  *
- * The server opens 1D, 1W and 1M on the point they are measured from
- * (`PortfolioService.planOpeningClose`), so those pass through untouched. MTD
- * has no series of its own: it is served the rolling month, which reaches
- * back into the previous one, and is trimmed here to its window --
- * `windowStart` is the month's first day (`periodStart`), compared against the
- * ISO timestamps' own prefix -- keeping the one point before it that the month
- * is measured from: the previous session's closing point, which the server
- * flags (`sessionClose`). A bar before the window is never kept in its place;
- * a month measured from the close of the 31st does not open on its 15:45 bar.
- *
- * Every intraday render site calls this one function, including the
- * sessionStorage-cached response and the per-security breakdown: a shaping
- * step applied at three of four call sites is a chart that disagrees with
- * itself depending on which code path drew it.
+ * Each is served on its own window, already shaped: the server trims the bars
+ * to the range and opens 1W, MTD and 1M on the close they are measured from
+ * (`PortfolioService.planOpeningClose`), so nothing here reshapes a series.
+ * `portfolio-chart-utils.test.ts` holds this set equal to the backend's
+ * `INTRADAY_RANGES`; a range in one and not the other is a 400 at runtime.
  */
-export function trimIntradayPoints<
-  T extends { timestamp: string; sessionClose?: boolean },
->(points: T[], range: string, windowStart: string): T[] {
-  if (range !== 'mtd' || !windowStart) return points;
-  const firstInWindow = points.findIndex((p) => p.timestamp >= windowStart);
-  const windowed = firstInWindow === -1 ? [] : points.slice(firstInWindow);
-  const before = firstInWindow === -1 ? points.length : firstInWindow;
-  const opening = before > 0 ? points[before - 1] : undefined;
-  return opening?.sessionClose === true ? [opening, ...windowed] : windowed;
+export type IntradayRange = '1d' | '1w' | 'mtd' | '1m';
+
+export const INTRADAY_RANGES: ReadonlySet<string> = new Set<IntradayRange>([
+  '1d',
+  '1w',
+  'mtd',
+  '1m',
+]);
+
+export function isIntradayRange(range: string): range is IntradayRange {
+  return INTRADAY_RANGES.has(range);
 }
 
 /**

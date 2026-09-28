@@ -54,10 +54,11 @@ export function previousCalendarDay(iso: string): string {
  * names the session (`startPriceDate`); a first point labelled with the
  * boundary names a day the market was shut, and the two disagree about where
  * the same series opens. The point is the fact the server stated -- one
- * value, one session -- so it is dated by that session. Only the point that
- * opens the period's own window qualifies: an intraday series opens on a
- * closing point the server already dated, and a monthly series' first bucket
- * is a month, not a day.
+ * value, one session -- so it is dated by that session. Only a DAILY point
+ * dated on the period's own boundary qualifies, so `firstPointIso` must be
+ * that boundary's YYYY-MM-DD exactly: an intraday bar on the same day is a
+ * mid-session price, not the close, and the server dates an intraday series'
+ * opening close itself; a monthly series' first bucket is a month, not a day.
  */
 export function openingSessionDate(
   firstPointIso: string | undefined,
@@ -65,8 +66,24 @@ export function openingSessionDate(
 ): string | null {
   if (!periodResult?.startPriceDate) return null;
   if (periodResult.startPriceDate === periodResult.startDate) return null;
-  if (isoDatePart(firstPointIso) !== periodResult.startDate) return null;
+  if (firstPointIso !== periodResult.startDate) return null;
   return periodResult.startPriceDate;
+}
+
+/**
+ * The series with its opening point relabelled for `session`, or the series
+ * itself when there is no session to date it by. One place for the three
+ * surfaces that draw a portfolio series, so the rule cannot drift between
+ * them.
+ */
+export function relabelOpeningPoint<T>(
+  points: T[],
+  session: string | null,
+  relabel: (point: T, session: string) => T,
+): T[] {
+  if (!session || points.length === 0) return points;
+  const [first, ...rest] = points;
+  return [relabel(first, session), ...rest];
 }
 
 /**

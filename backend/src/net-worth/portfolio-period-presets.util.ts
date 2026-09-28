@@ -146,12 +146,11 @@ export function presetWindowStart(
 }
 
 /**
- * The earliest day the preset can need a value for.
- *
- * For a prior-close preset that is the day before its window opens: the actual
- * baseline is the day before the window's FIRST POINT, which cannot be earlier
- * than this. It is what the series and the flows are loaded from, never what
- * the result is measured from.
+ * The day the preset is measured from, and so the earliest day it needs a
+ * value for: the day before its window opens for a prior-close preset, the
+ * window's own first day otherwise. The period result's series and flows are
+ * loaded from it, its `startDate` reports it, and the intraday series and the
+ * client's chart window open on its close.
  */
 export function presetEarliestDate(
   preset: PortfolioPeriodPreset,

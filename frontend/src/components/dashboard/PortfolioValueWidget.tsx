@@ -25,7 +25,10 @@ import { useWidgetConfig } from '@/hooks/useWidgetConfig';
 import { resolveRangePreset } from '@/lib/date-range';
 import { usePortfolioRangeWindow } from '@/hooks/usePortfolioRangeWindow';
 import { usePortfolioPeriodResult } from '@/hooks/usePortfolioPeriodResult';
-import { openingSessionDate } from '@/components/investments/portfolio-change-baseline';
+import {
+  openingSessionDate,
+  relabelOpeningPoint,
+} from '@/components/investments/portfolio-change-baseline';
 import {
   hasUnmeasuredFlow,
   periodResultUnknownReason,
@@ -170,15 +173,21 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
   const openingSession = openingSessionDate(series?.[0]?.date, periodResult);
   const chartData = useMemo(
     () =>
-      (series ?? []).map((row, index) => {
-        const date = index === 0 && openingSession ? openingSession : row.date;
-        const parsed = parseISO(date.length === 7 ? `${date}-01` : date);
-        return {
-          date: row.date,
-          label: formatChartDate(parsed, isDaily ? 'MMM d' : 'MMM yyyy'),
-          value: Math.round(row.value),
-        };
-      }),
+      relabelOpeningPoint(
+        (series ?? []).map((row) => {
+          const parsed = parseISO(row.date.length === 7 ? `${row.date}-01` : row.date);
+          return {
+            date: row.date,
+            label: formatChartDate(parsed, isDaily ? 'MMM d' : 'MMM yyyy'),
+            value: Math.round(row.value),
+          };
+        }),
+        openingSession,
+        (point, session) => ({
+          ...point,
+          label: formatChartDate(parseISO(session), isDaily ? 'MMM d' : 'MMM yyyy'),
+        }),
+      ),
     [series, formatChartDate, isDaily, openingSession],
   );
 

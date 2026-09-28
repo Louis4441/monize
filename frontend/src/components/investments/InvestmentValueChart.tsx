@@ -28,14 +28,12 @@ import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { createLogger } from '@/lib/logger';
 import {
-  INTRADAY_RANGES,
+  isIntradayRange,
   buildIntradayCacheKey,
   readIntradayCache,
   writeIntradayCache,
   clearAllIntradayCache,
   computeTightYAxisDomain,
-  intradayRangeParam,
-  trimIntradayPoints,
   renderChartFlagDot,
   ChartFlagShadowFilter,
 } from './portfolio-chart-utils';
@@ -43,7 +41,10 @@ import {
   hasUnmeasuredFlow,
   periodResultUnknownReason,
 } from './portfolio-period-result';
-import { openingSessionDate } from './portfolio-change-baseline';
+import {
+  openingSessionDate,
+  relabelOpeningPoint,
+} from './portfolio-change-baseline';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
 import { preferredCurrency } from '@/lib/default-currency';
@@ -122,7 +123,8 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
     [setDateRange, setPersistedRange],
   );
 
-  const isIntraday = INTRADAY_RANGES.has(dateRange);
+  const intradayRange = isIntradayRange(dateRange) ? dateRange : null;
+  const isIntraday = intradayRange !== null;
   const useDaily = !isIntraday && DAILY_RANGES.has(dateRange);
 
   // A price series opens on the close it is measured from, which is not the
@@ -220,7 +222,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
       setIntradayUnavailable(null);
       setIntradayFallbackNotice(null);
       try {
-        if (isIntraday) {
+        if (intradayRange) {
           const cacheKey = buildIntradayCacheKey(
             dateRange,
             accountIds,
@@ -231,13 +233,8 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
           // Hydrate from cache immediately so the chart appears even before
           // the network round-trip resolves.
           if (cached && !cached.fallbackToDaily) {
-            const cachedPoints = trimIntradayPoints(
-              cached.points,
-              dateRange,
-              chartWindow.periodStart,
-            );
             setLoadedPoints(
-              cachedPoints.map((p) => ({
+              cached.points.map((p) => ({
                 name: formatIntradayLabel(p.timestamp, dateRange),
                 Value: investedValue(p),
                 iso: p.timestamp,
@@ -249,7 +246,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
           let response;
           try {
             response = await investmentsApi.getIntradayValue({
-              range: intradayRangeParam(dateRange),
+              range: intradayRange,
               accountIds: accountIds?.length ? accountIds.join(',') : undefined,
               displayCurrency: foreignCurrency || undefined,
             });
@@ -293,13 +290,8 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
             return;
           }
 
-          const responsePoints = trimIntradayPoints(
-            response.points,
-            dateRange,
-            chartWindow.periodStart,
-          );
           setLoadedPoints(
-            responsePoints.map((p) => ({
+            response.points.map((p) => ({
               name: formatIntradayLabel(p.timestamp, dateRange),
               Value: investedValue(p),
               iso: p.timestamp,
@@ -317,9 +309,8 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
       }
     },
     [
-      isIntraday,
+      intradayRange,
       dateRange,
-      chartWindow,
       accountIds,
       effectiveCurrency,
       foreignCurrency,
@@ -387,12 +378,18 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
   // from, and its opening point is dated by the session that day's close came
   // from -- the same session the caption below names -- rather than by a
   // boundary the market was shut on (`openingSessionDate`).
-  const chartPoints = useMemo(() => {
-    const session = openingSessionDate(loadedPoints[0]?.iso, periodResult);
-    if (!session) return loadedPoints;
-    const [first, ...rest] = loadedPoints;
-    return [{ ...first, name: formatChartDate(session, 'MMM d, yyyy') }, ...rest];
-  }, [loadedPoints, periodResult, formatChartDate]);
+  const chartPoints = useMemo(
+    () =>
+      relabelOpeningPoint(
+        loadedPoints,
+        openingSessionDate(loadedPoints[0]?.iso, periodResult),
+        (point, session) => ({
+          ...point,
+          name: formatChartDate(session, 'MMM d, yyyy'),
+        }),
+      ),
+    [loadedPoints, periodResult, formatChartDate],
+  );
 
   // The three figures the cards print, and the one repair a withheld one points
   // at. `null` is the server's answer that it withheld the figure and said why.

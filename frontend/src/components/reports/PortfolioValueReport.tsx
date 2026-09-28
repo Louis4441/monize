@@ -99,13 +99,12 @@ type SecuritiesBreakdown = {
   kind: 'daily' | 'monthly' | 'intraday';
 };
 import {
-  INTRADAY_RANGES,
+  type IntradayRange,
+  isIntradayRange,
   buildIntradayCacheKey,
   readIntradayCache,
   writeIntradayCache,
   computeTightYAxisDomain,
-  intradayRangeParam,
-  trimIntradayPoints,
   renderChartFlagDot,
   ChartFlagShadowFilter,
 } from '@/components/investments/portfolio-chart-utils';
@@ -113,7 +112,10 @@ import {
   hasUnmeasuredFlow,
   periodResultUnknownReason,
 } from '@/components/investments/portfolio-period-result';
-import { openingSessionDate } from '@/components/investments/portfolio-change-baseline';
+import {
+  openingSessionDate,
+  relabelOpeningPoint,
+} from '@/components/investments/portfolio-change-baseline';
 import {
   investedValue,
   breakdownCashKey,
@@ -327,7 +329,8 @@ export function PortfolioValueReport() {
   // A custom window with its dates reversed is not a window: nothing loads
   // until the reader corrects it.
   const isValid = datesEntered && (!isCustom || customStartDate <= customEndDate);
-  const isIntraday = INTRADAY_RANGES.has(dateRange);
+  const intradayRange = isIntradayRange(dateRange) ? dateRange : null;
+  const isIntraday = intradayRange !== null;
   const useDaily =
     !isIntraday &&
     (isCustom
@@ -523,11 +526,11 @@ export function PortfolioValueReport() {
     // Per-security intraday breakdown (1D/1W/MTD/1M). Mirrors the total intraday
     // chart's fallback handling: 1D shows an "unavailable" note, the rest silently
     // fall back to the daily-snapshot breakdown with a small warning icon.
-    const loadIntradayBreakdown = async () => {
+    const loadIntradayBreakdown = async (range: IntradayRange) => {
       let data;
       try {
         data = await investmentsApi.getIntradayBreakdown({
-          range: intradayRangeParam(dateRange),
+          range,
           accountIds: accountIdsCsv,
           displayCurrency: foreignCurrency || undefined,
         });
@@ -552,11 +555,7 @@ export function PortfolioValueReport() {
       }
 
       const cashKey = breakdownCashKey(data.series);
-      const points = trimIntradayPoints(
-        data.points,
-        dateRange,
-        chartWindow.periodStart,
-      ).map((p) => ({
+      const points = data.points.map((p) => ({
         name: formatIntradayLabel(p.timestamp, dateRange),
         iso: p.timestamp,
         total: p.total,
@@ -593,12 +592,12 @@ export function PortfolioValueReport() {
         });
 
         if (securitiesActive) {
-          if (isIntraday) {
-            await loadIntradayBreakdown();
+          if (intradayRange) {
+            await loadIntradayBreakdown(intradayRange);
           } else {
             await loadDailyMonthlyBreakdown(breakdownGranularity);
           }
-        } else if (isIntraday) {
+        } else if (intradayRange) {
           setBreakdown(null);
           const cacheKey = buildIntradayCacheKey(
             dateRange,
@@ -608,7 +607,7 @@ export function PortfolioValueReport() {
           const cached = readIntradayCache(cacheKey);
           if (cached && !cached.fallbackToDaily) {
             setLoadedPoints(
-              trimIntradayPoints(cached.points, dateRange, chartWindow.periodStart).map((p) => ({
+              cached.points.map((p) => ({
                 name: formatIntradayLabel(p.timestamp, dateRange),
                 Value: investedValue(p),
                 iso: p.timestamp,
@@ -620,7 +619,7 @@ export function PortfolioValueReport() {
           let response;
           try {
             response = await investmentsApi.getIntradayValue({
-              range: intradayRangeParam(dateRange),
+              range: intradayRange,
               accountIds: accountIdsCsv,
               displayCurrency: foreignCurrency || undefined,
             });
@@ -659,7 +658,7 @@ export function PortfolioValueReport() {
             }
           } else {
             setLoadedPoints(
-              trimIntradayPoints(response.points, dateRange, chartWindow.periodStart).map(
+              response.points.map(
                 (p) => ({
                   name: formatIntradayLabel(p.timestamp, dateRange),
                   Value: investedValue(p),
@@ -698,6 +697,7 @@ export function PortfolioValueReport() {
     foreignCurrency,
     effectiveCurrency,
     useDaily,
+    intradayRange,
     isIntraday,
     dateRange,
     securitiesActive,
@@ -735,27 +735,28 @@ export function PortfolioValueReport() {
   // names -- rather than by a boundary the market was shut on
   // (`openingSessionDate`). The stacked view's points open on the same day.
   const openingSession = openingSessionDate(loadedPoints[0]?.iso, periodResult);
-  const chartPoints = useMemo(() => {
-    if (!openingSession) return loadedPoints;
-    const [first, ...rest] = loadedPoints;
-    return [
-      { ...first, name: formatChartDate(openingSession, 'MMM d, yyyy') },
-      ...rest,
-    ];
-  }, [loadedPoints, openingSession, formatChartDate]);
+  const labelBySession = useCallback(
+    <T extends { name: string }>(point: T, session: string): T => ({
+      ...point,
+      name: formatChartDate(session, 'MMM d, yyyy'),
+    }),
+    [formatChartDate],
+  );
+  const chartPoints = useMemo(
+    () => relabelOpeningPoint(loadedPoints, openingSession, labelBySession),
+    [loadedPoints, openingSession, labelBySession],
+  );
   const breakdown = useMemo(() => {
-    if (!openingSession || !loadedBreakdown || loadedBreakdown.points.length === 0) {
-      return loadedBreakdown;
-    }
-    const [first, ...rest] = loadedBreakdown.points;
+    if (!openingSession || !loadedBreakdown) return loadedBreakdown;
     return {
       ...loadedBreakdown,
-      points: [
-        { ...first, name: formatChartDate(openingSession, 'MMM d, yyyy') },
-        ...rest,
-      ],
+      points: relabelOpeningPoint(
+        loadedBreakdown.points,
+        openingSession,
+        labelBySession,
+      ),
     };
-  }, [loadedBreakdown, openingSession, formatChartDate]);
+  }, [loadedBreakdown, openingSession, labelBySession]);
 
   const summary = useMemo(() => {
     if (chartPoints.length === 0) {

@@ -5037,8 +5037,10 @@ describe("PortfolioService", () => {
         range: "1m",
       });
 
+      // The ledger does not reach the day the month is measured from, so
+      // there is no close to open on and the month opens on its first
+      // session's last bar rather than its 15:30 one.
       expect(result.points.map((p) => p.timestamp)).toEqual([
-        "2026-09-01T19:30:00.000Z",
         "2026-09-01T19:45:00.000Z",
         "2026-09-01T20:00:00.000Z",
         "2026-09-02T19:30:00.000Z",
@@ -5046,11 +5048,11 @@ describe("PortfolioService", () => {
         "2026-09-02T20:00:00.000Z",
       ]);
       // The 15:45 bar is the last trade ...
-      expect(result.points[4].value).toBeCloseTo(qty * 38.575, 4);
+      expect(result.points[3].value).toBeCloseTo(qty * 38.575, 4);
       // ... and the 16:00 point is the daily series' figure, to the cent.
-      expect(result.points[5].value).toBe(111541.4543);
-      expect(result.points[5].securitiesValue).toBe(111541.4543);
-      expect(result.points[2].value).toBe(111396.8957);
+      expect(result.points[4].value).toBe(111541.4543);
+      expect(result.points[4].securitiesValue).toBe(111541.4543);
+      expect(result.points[1].value).toBe(111396.8957);
     });
 
     it("values each day at that day's share count and cash, not today's (a deposit, then a buy)", async () => {
@@ -5520,6 +5522,163 @@ describe("PortfolioService", () => {
           "2026-09-21T20:00:00.000Z",
         ]);
         expect(netWorthService.getLastPricedDays).not.toHaveBeenCalled();
+      });
+
+      it("serves MTD on its own window, opened on the previous month's last close", async () => {
+        // Saturday 31 October: a thirty-day 1M window opens on 1 October
+        // itself, so MTD cannot be cut out of it. Its own window opens on the
+        // 1st and is measured from 30 September, whose bars the provider's
+        // month did not reach: the point is stamped at the hour the newest
+        // finished session (2 October) closed at.
+        jest.setSystemTime(new Date("2026-10-31T14:00:00.000Z"));
+        netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+          ledgerOf(
+            [
+              day("2026-09-30", 1000),
+              day("2026-10-01", 1010),
+              day("2026-10-02", 1020),
+            ],
+            [xgro],
+          ),
+        );
+        netWorthService.getLastPricedDays.mockResolvedValue(
+          new Map([["2026-09-30", "2026-09-30"]]),
+        );
+        seriesBySymbol({
+          "XGRO.TO": [
+            bar("2026-10-01T13:30:00.000Z", 100.5),
+            bar("2026-10-01T19:45:00.000Z", 101),
+            bar("2026-10-02T13:30:00.000Z", 101.5),
+            bar("2026-10-02T19:45:00.000Z", 102),
+          ],
+        });
+
+        const result = await service.getIntradayValueSeries(userId, {
+          range: "mtd",
+        });
+
+        expect(result.range).toBe("mtd");
+        expect(result.points.map((p) => p.timestamp)).toEqual([
+          "2026-09-30T20:00:00.000Z",
+          "2026-10-01T13:30:00.000Z",
+          "2026-10-01T19:45:00.000Z",
+          "2026-10-01T20:00:00.000Z",
+          "2026-10-02T13:30:00.000Z",
+          "2026-10-02T19:45:00.000Z",
+          "2026-10-02T20:00:00.000Z",
+        ]);
+        expect(result.points[0]).toEqual({
+          timestamp: "2026-09-30T20:00:00.000Z",
+          value: 1000,
+          securitiesValue: 1000,
+          sessionClose: true,
+        });
+        expect(
+          netWorthService.getDailyInvestmentPositions,
+        ).toHaveBeenCalledWith(
+          userId,
+          expect.objectContaining({ startDate: "2026-09-30" }),
+        );
+      });
+
+      it("fetches one month of bars for MTD and 1M, not one per range", async () => {
+        jest.setSystemTime(new Date("2026-10-31T14:00:00.000Z"));
+        netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+          ledgerOf([day("2026-10-01", 1010), day("2026-10-02", 1020)], [xgro]),
+        );
+        seriesBySymbol({
+          "XGRO.TO": [
+            bar("2026-10-01T19:45:00.000Z", 101),
+            bar("2026-10-02T19:45:00.000Z", 102),
+          ],
+        });
+
+        await service.getIntradayValueSeries(userId, { range: "1m" });
+        await service.getIntradayValueSeries(userId, { range: "mtd" });
+
+        expect(yahooFinanceService.fetchIntradaySeries).toHaveBeenCalledTimes(
+          1,
+        );
+      });
+
+      it("takes the closing hour from an unvalued session's last bar when no close was planned", async () => {
+        jest.setSystemTime(new Date(monday));
+        netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+          ledgerOf(
+            [
+              day("2026-09-20", 381),
+              // Monday's figure is a subtotal, so Monday gets no closing point.
+              day("2026-09-21", 0, {
+                closes: { [xgro.id]: null },
+                closeValues: { [xgro.id]: null },
+                pricesComplete: false,
+              }),
+            ],
+            [xgro],
+          ),
+        );
+        netWorthService.getLastPricedDays.mockResolvedValue(
+          new Map([["2026-09-20", "2026-09-18"]]),
+        );
+        seriesBySymbol({
+          "XGRO.TO": [
+            bar("2026-09-21T13:30:00.000Z", 38.5),
+            bar("2026-09-21T19:55:00.000Z", 39),
+          ],
+        });
+
+        const result = await service.getIntradayValueSeries(userId, {
+          range: "1w",
+        });
+
+        // Friday's close is still the opening point, at the hour Monday's
+        // session ended (its last bar plus one five-minute step).
+        expect(result.points.map((p) => p.timestamp)).toEqual([
+          "2026-09-18T20:00:00.000Z",
+          "2026-09-21T13:30:00.000Z",
+          "2026-09-21T19:55:00.000Z",
+        ]);
+        expect(result.points[0].value).toBe(381);
+      });
+
+      it("opens 1M on its first session's last bar when there is no close to open on", async () => {
+        // Wednesday 30 September: 1M is measured from Monday 31 August, whose
+        // figure is a subtotal. The month still does not open partway through
+        // that morning.
+        jest.setSystemTime(new Date("2026-09-30T14:00:00.000Z"));
+        netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+          ledgerOf(
+            [
+              day("2026-08-31", 0, {
+                closes: { [xgro.id]: null },
+                closeValues: { [xgro.id]: null },
+                pricesComplete: false,
+              }),
+              day("2026-09-01", 1020),
+            ],
+            [xgro],
+          ),
+        );
+        seriesBySymbol({
+          "XGRO.TO": [
+            bar("2026-08-31T13:30:00.000Z", 100.5),
+            bar("2026-08-31T19:45:00.000Z", 101),
+            bar("2026-09-01T13:30:00.000Z", 101.5),
+            bar("2026-09-01T19:45:00.000Z", 102),
+          ],
+        });
+
+        const result = await service.getIntradayValueSeries(userId, {
+          range: "1m",
+        });
+
+        expect(result.points.map((p) => p.timestamp)).toEqual([
+          "2026-08-31T19:45:00.000Z",
+          "2026-09-01T13:30:00.000Z",
+          "2026-09-01T19:45:00.000Z",
+          "2026-09-01T20:00:00.000Z",
+        ]);
+        expect(result.points[0].sessionClose).toBeUndefined();
       });
 
       it("opens the breakdown on the same point, each position at its close", async () => {

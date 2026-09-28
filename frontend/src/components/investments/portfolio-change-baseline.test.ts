@@ -104,6 +104,18 @@ describe('openingSessionDate', () => {
     ).toBeNull();
   });
 
+  it('never dates an intraday bar on the boundary day as a close', () => {
+    // A 1M series whose measured-from day got no opening close opens on that
+    // day's own bars: a 09:30 price is not the previous session's close, and
+    // is left with its own timestamp label.
+    expect(
+      openingSessionDate(
+        '2026-08-31T13:30:00.000Z',
+        period('2026-08-31', '2026-08-28'),
+      ),
+    ).toBeNull();
+  });
+
   it('is unknown while the server has not named a session', () => {
     expect(openingSessionDate('2025-09-28', null)).toBeNull();
     expect(
