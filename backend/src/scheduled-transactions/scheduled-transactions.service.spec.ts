@@ -3650,6 +3650,34 @@ describe("ScheduledTransactionsService", () => {
       expect(transactionsService.create).toHaveBeenCalledTimes(1);
     });
 
+    it("post({expectedDueDate}) refuses once the selected occurrence is no longer the due one (issue #1452)", async () => {
+      // The caller selected the 2025-02-15 occurrence; another replica posted
+      // it and advanced the schedule before this post re-read the row.
+      stubFindOne(makeScheduled({ autoPost: true, nextDueDate: "2025-03-15" }));
+      const overrideQb = mockQueryBuilder();
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+
+      await expect(
+        service.post(userId, stId, undefined, {
+          requireActiveAutoPost: true,
+          expectedDueDate: "2025-02-15",
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(transactionsService.create).not.toHaveBeenCalled();
+
+      // The occurrence that is still due posts.
+      await service.post(userId, stId, undefined, {
+        requireActiveAutoPost: true,
+        expectedDueDate: "2025-03-15",
+      });
+      expect(transactionsService.create).toHaveBeenCalledTimes(1);
+      expect(transactionsService.create).toHaveBeenCalledWith(
+        userId,
+        expect.objectContaining({ transactionDate: "2025-03-15" }),
+      );
+    });
+
     it("post() honours inline quantity / price overrides", async () => {
       const scheduled = makeScheduled({
         isInvestment: true,
@@ -5089,6 +5117,42 @@ describe("ScheduledTransactionsService", () => {
 
       expect(mockSystemAlerts.raiseUserAlert).not.toHaveBeenCalled();
       postSpy.mockRestore();
+    });
+
+    // Issue #1452: with two replicas, a bill posted twice. This replica
+    // selected the 2025-02-15 occurrence; by the time its post() re-read the
+    // row another replica had posted it and advanced next_due_date to
+    // 2025-03-15. The post used to take the re-read date as the occurrence and
+    // post the next month's bill under a fresh claim key.
+    it("skips a schedule another replica posted after this run selected it, rather than posting the next occurrence", async () => {
+      const selected = makeScheduled({
+        id: stId,
+        autoPost: true,
+        nextDueDate: "2025-02-15",
+      });
+      scheduledRepo.find.mockResolvedValue([selected]);
+      stubFindOne(
+        makeScheduled({
+          id: stId,
+          autoPost: true,
+          nextDueDate: "2025-03-15",
+          lastPostedDate: "2025-02-15",
+        }),
+      );
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      const logSpy = jest.spyOn((service as any).logger, "log");
+
+      await service.processAutoPostTransactions();
+
+      expect(transactionsService.create).not.toHaveBeenCalled();
+      expect(mockSystemAlerts.raiseUserAlert).not.toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledWith(
+        "Auto-post processing complete: 0 succeeded, " +
+          "1 already claimed elsewhere, 0 failed",
+      );
+      logSpy.mockRestore();
     });
 
     // Every replica fires this cron. The winner posts a ONCE schedule and
