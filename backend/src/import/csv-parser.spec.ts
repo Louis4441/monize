@@ -821,6 +821,20 @@ describe("CSV Parser", () => {
 
         expect(result.transactions[0].amount).toBe(-18.36);
       });
+
+      it("reads a decimal comma on a zero integer part as decimals (0,125 -> 0.125)", () => {
+        const csv = 'Date,Amount,Payee\n01/15/2026,"0,125",Store\n';
+        const result = parseCsv(csv, baseConfig());
+
+        expect(result.transactions[0].amount).toBe(0.125);
+      });
+
+      it("handles repeated dot thousands grouping (1.234.567 -> 1234567)", () => {
+        const csv = "Date;Amount;Payee\n01/15/2026;1.234.567;Store\n";
+        const result = parseCsv(csv, baseConfig({ delimiter: ";" }));
+
+        expect(result.transactions[0].amount).toBe(1234567);
+      });
     });
 
     describe("categories extraction", () => {
