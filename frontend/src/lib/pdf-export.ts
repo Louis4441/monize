@@ -8,6 +8,9 @@ import { captureAllChartsAsImages } from './pdf-export-charts';
 import { addSummaryCardsToPdf } from './pdf-export-cards';
 import { addTableToPdf, type CellValue } from './pdf-export-tables';
 import { PDF_FONT, registerPdfFonts } from './pdf-fonts';
+import { createLogger } from './logger';
+
+const logger = createLogger('PdfExport');
 
 export type { PdfSummaryCard } from './pdf-export-cards';
 export type { CellValue } from './pdf-export-tables';
@@ -159,7 +162,7 @@ export async function exportToPdf(options: PdfExportOptions): Promise<void> {
       }
     } catch (error) {
       // Chart capture failed; continue with table only
-      console.warn('PDF chart capture failed, generating table-only PDF:', error);
+      logger.warn('PDF chart capture failed, generating table-only PDF:', error);
     }
   }
 

@@ -5,6 +5,9 @@ import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import { cn } from '@/lib/utils';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('ExportDropdown');
 
 interface ExportDropdownBaseProps {
   disabled?: boolean;
@@ -67,7 +70,7 @@ export function ExportDropdown({
     try {
       await onExportPdf();
     } catch (error) {
-      console.error('PDF export failed:', error);
+      logger.error('PDF export failed:', error);
       toast.error(t('exportDropdown.failedPdf'));
     } finally {
       setIsExporting(false);
