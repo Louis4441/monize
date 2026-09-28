@@ -17,6 +17,7 @@
 
 import { ContactLookupSource } from "../../payees/lookup/payee-contact-lookup.types";
 import { InvestmentAction } from "../../securities/entities/investment-transaction.entity";
+import type { RuleEffectsPreview } from "../../transaction-rules/transaction-rules-applier.service";
 
 export type AiActionType =
   | "create_transaction"
@@ -721,6 +722,11 @@ export interface AiActionPreview {
   /** True when approving the transaction will also create a new payee. */
   payeeWillBeCreated?: boolean;
   categoryName?: string | null;
+  /**
+   * What the user's transaction rules will do to a created transaction on
+   * approval (display-only, not signed). Absent when no rule matches.
+   */
+  ruleEffects?: RuleEffectsPreview;
   newCategoryName?: string | null;
   currentCategoryName?: string | null;
   description?: string | null;
@@ -810,6 +816,8 @@ export interface AiActionPreviewRow {
   payeeWillBeCreated?: boolean;
   categoryName?: string | null;
   description?: string | null;
+  /** The rule effects of a created row (display-only). */
+  ruleEffects?: RuleEffectsPreview;
   /**
    * The complete replacement split set for this row, when the edit rewrites a
    * split transaction's categories. Present means `categoryName` is null: the

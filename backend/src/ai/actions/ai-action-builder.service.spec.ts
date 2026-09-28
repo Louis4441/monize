@@ -1,4 +1,7 @@
-import { AiActionBuilderService } from "./ai-action-builder.service";
+import {
+  AiActionBuilderService,
+  transactionPreviewRow,
+} from "./ai-action-builder.service";
 import { AiActionSigningService } from "./ai-action-signing.service";
 import {
   CategorizeTransactionPreview,
@@ -63,6 +66,46 @@ describe("AiActionBuilderService", () => {
       amount: -50,
       categoryName: "Groceries",
     });
+  });
+
+  it("carries the rule effects of a create into the display-only preview, never the signed descriptor", () => {
+    const ruleEffects = {
+      changes: { categoryId: "c9", addTagIds: ["t1"], removeTagIds: [] },
+      trace: [],
+      aiReviewRequests: [],
+      labels: {
+        categories: { c9: "Groceries" },
+        payees: {},
+        tags: {},
+        rules: {},
+      },
+    };
+    const preview: CreateTransactionPreview = {
+      accountId: "a1",
+      accountName: "Checking",
+      amount: -50,
+      transactionDate: "2025-01-15",
+      payeeId: null,
+      payeeName: "Store",
+      payeeMatched: false,
+      payeeWillBeCreated: false,
+      categoryId: null,
+      categoryName: null,
+      description: null,
+      currencyCode: "USD",
+      ruleEffects,
+    };
+
+    const action = builder.buildCreateTransaction("u1", preview);
+    expect(action.preview.ruleEffects).toBe(ruleEffects);
+    expect(JSON.stringify(action.descriptor)).not.toContain("ruleEffects");
+    expect(transactionPreviewRow(preview).ruleEffects).toBe(ruleEffects);
+
+    const without = builder.buildCreateTransaction("u1", {
+      ...preview,
+      ruleEffects: undefined,
+    });
+    expect("ruleEffects" in without.preview).toBe(false);
   });
 
   it("builds a categorize_transaction action and omits a null account name", () => {

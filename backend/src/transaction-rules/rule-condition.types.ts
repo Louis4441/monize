@@ -169,7 +169,8 @@ export interface RuleFacts {
   readonly fromAccountId: string | null;
   /** Null when the row is not a transfer. */
   readonly toAccountId: string | null;
-  readonly type: RuleTransactionType;
+  /** Null when the row is neither income nor spending (a zero amount, no link). */
+  readonly type: RuleTransactionType | null;
   readonly payeeId: string | null;
   readonly payeeText: string | null;
   readonly categoryId: string | null;

@@ -26,6 +26,10 @@ import { CreateTransactionSplitDto } from "./dto/create-transaction-split.dto";
 import { CreateTransferDto } from "./dto/create-transfer.dto";
 import { UpdateTransferDto } from "./dto/update-transfer.dto";
 import { TagsService } from "../tags/tags.service";
+import {
+  RuleEffectsPreview,
+  TransactionRulesApplierService,
+} from "../transaction-rules/transaction-rules-applier.service";
 import { AccountsService } from "../accounts/accounts.service";
 import { PayeesService } from "../payees/payees.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
@@ -244,6 +248,12 @@ export interface CreateTransactionPreview {
   categoryName: string | null;
   description: string | null;
   currencyCode: string;
+  /**
+   * What the user's transaction rules will do to this row on commit (same
+   * planner as the commit, design I3). Absent when the user has no rule that
+   * matches, so a preview with no rules is unchanged.
+   */
+  ruleEffects?: RuleEffectsPreview;
 }
 
 /** Resolved preview of a proposed transaction re-categorization. */
@@ -324,6 +334,7 @@ export class TransactionsService {
     private dataSource: DataSource,
     private actionHistoryService: ActionHistoryService,
     private crossOwnerAccess: CrossOwnerAccessService,
+    private rulesApplier: TransactionRulesApplierService,
   ) {}
 
   /**
@@ -403,8 +414,15 @@ export class TransactionsService {
     // option unset, in which case the name is stored verbatim.
     let resolvedPayeeId = transactionData.payeeId;
     let resolvedPayeeName = transactionData.payeeName;
+    // The raw payee text a rule's `payeeText` reads: what the caller typed, or
+    // the payee's own name when only an id was given.
+    let payeeText: string | null = transactionData.payeeName ?? null;
     if (transactionData.payeeId) {
-      await this.payeesService.findOne(userId, transactionData.payeeId);
+      const linkedPayee = await this.payeesService.findOne(
+        userId,
+        transactionData.payeeId,
+      );
+      payeeText ??= linkedPayee?.name ?? null;
     } else if (
       options?.createPayeeIfMissing &&
       typeof transactionData.payeeName === "string" &&
@@ -513,6 +531,18 @@ export class TransactionsService {
           );
         }
 
+        // Transaction rules (design 6.3, 6.4): after the row, its splits, its
+        // explicit tags and the payee default category, before the balance
+        // and the commit, on this manager, so a rollback drops the rule
+        // effects with the insert. They change category, payee and tags only.
+        await this.rulesApplier.applyToNew(
+          m,
+          userId,
+          [savedTransaction.id],
+          "create",
+          { payeeTextById: new Map([[savedTransaction.id, payeeText]]) },
+        );
+
         if (savedTransaction.status !== TransactionStatus.VOID) {
           if (isTransactionInFuture(createTransactionDto.transactionDate)) {
             await this.accountsService.recalculateCurrentBalance(
@@ -593,6 +623,8 @@ export class TransactionsService {
       description?: string;
       /** Auto-create a payee for an unmatched name. Defaults to true. */
       createPayeeIfMissing?: boolean;
+      /** The row will carry split lines (rules do not set a category then). */
+      hasSplits?: boolean;
     },
   ): Promise<CreateTransactionPreview> {
     const account = await this.accountsService.findOne(userId, input.accountId);
@@ -649,6 +681,25 @@ export class TransactionsService {
     const payeeWillBeCreated =
       !!payeeName && !payeeMatched && input.createPayeeIfMissing !== false;
 
+    // The same planner the commit runs (design I3), over the facts create()
+    // would build. A payee that does not exist yet has no id to read, so a
+    // rule on `payeeId` sees it empty here and may differ on commit.
+    const description = stripHtml(input.description) || null;
+    const ruleEffects = await withScopedDb(this.dataSource, (m) =>
+      this.rulesApplier.previewForRow(m, userId, {
+        accountId: input.accountId,
+        currencyCode: account.currencyCode,
+        amount: input.amount,
+        isTransfer: false,
+        payeeId,
+        payeeText: inputPayeeName,
+        categoryId: input.hasSplits ? null : categoryId,
+        description,
+        tagIds: [],
+        hasSplits: input.hasSplits === true,
+      }),
+    );
+
     return {
       accountId: input.accountId,
       accountName: account.name,
@@ -660,8 +711,9 @@ export class TransactionsService {
       payeeWillBeCreated,
       categoryId,
       categoryName,
-      description: stripHtml(input.description) || null,
+      description,
       currencyCode: account.currencyCode,
+      ...(ruleEffects ? { ruleEffects } : {}),
     };
   }
 

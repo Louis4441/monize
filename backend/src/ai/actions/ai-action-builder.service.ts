@@ -90,6 +90,7 @@ export function transactionPreviewRow(
     payeeWillBeCreated: preview.payeeWillBeCreated,
     categoryName: preview.categoryName,
     description: preview.description,
+    ...(preview.ruleEffects ? { ruleEffects: preview.ruleEffects } : {}),
   };
 }
 
@@ -235,6 +236,7 @@ export class AiActionBuilderService {
         payeeWillBeCreated: preview.payeeWillBeCreated,
         categoryName: preview.categoryName,
         description: preview.description,
+        ...(preview.ruleEffects ? { ruleEffects: preview.ruleEffects } : {}),
         ...(splits ? { splits: splits.map(toSplitPreview) } : {}),
         ...(attachments?.length
           ? { attachments: attachments.map(toAttachmentPreview) }
