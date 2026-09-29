@@ -17,8 +17,7 @@ export type RuleActionSkipReason =
   | "no_change"
   | "row_has_splits"
   | "row_is_transfer_leg"
-  | "cross_owner_transfer_leg"
-  | "ai_review_queue_unavailable";
+  | "cross_owner_transfer_leg";
 
 export type RuleSkipReason = "disabled" | "invalid";
 
@@ -47,8 +46,13 @@ export interface RuleTraceChanges {
   readonly tagIds?: RuleFieldChange<readonly string[]>;
 }
 
+/** What became of a `request_ai_review` action: a new request, or one already open. */
+export type AiReviewOutcome = "queued" | "already_queued";
+
 export interface RuleAppliedAction {
   readonly type: RuleAction["type"];
+  /** Set on `request_ai_review` only. */
+  readonly outcome?: AiReviewOutcome;
 }
 
 export interface RuleSkippedAction {
@@ -330,32 +334,47 @@ export function planRuleEffects(
 }
 
 /**
- * Until the AI review queue exists (task R1) a collected `request_ai_review`
- * cannot be enqueued, so the trace says so on the rule that asked. The
- * applier and the preview both pass the plan through this, so the two show
- * the same trace.
+ * A collected `request_ai_review` is queued by the commit (`enqueue` in the
+ * caller's transaction), so the trace says "queued" on the rule that asked. The
+ * applier and the preview both pass the plan through this, so the two show the
+ * same trace. The commit then calls `recordAiReviewAlreadyQueued` for the
+ * requests the queue's dedupe skipped.
  */
-export function recordAiReviewQueueUnavailable(
+export function recordAiReviewQueued(effects: RuleEffects): RuleEffects {
+  return withAiReviewOutcome(effects, null, "queued");
+}
+
+/** Relabel the trace of the rules whose request was already open as "already_queued". */
+export function recordAiReviewAlreadyQueued(
   effects: RuleEffects,
+  ruleIds: ReadonlySet<string>,
 ): RuleEffects {
-  if (effects.aiReviewRequests.length === 0) return effects;
-  const asked = new Set(effects.aiReviewRequests.map((r) => r.ruleId));
+  return withAiReviewOutcome(effects, ruleIds, "already_queued");
+}
+
+function withAiReviewOutcome(
+  effects: RuleEffects,
+  onlyRuleIds: ReadonlySet<string> | null,
+  outcome: AiReviewOutcome,
+): RuleEffects {
+  const asked = new Set(
+    effects.aiReviewRequests
+      .map((r) => r.ruleId)
+      .filter((id) => onlyRuleIds === null || onlyRuleIds.has(id)),
+  );
+  if (asked.size === 0) return effects;
   return {
     ...effects,
-    trace: effects.trace.map((entry) =>
-      asked.has(entry.ruleId)
-        ? {
-            ...entry,
-            skipped: [
-              ...entry.skipped,
-              {
-                type: "request_ai_review" as const,
-                reason: "ai_review_queue_unavailable" as const,
-              },
-            ],
-          }
-        : entry,
-    ),
+    trace: effects.trace.map((entry) => {
+      if (!asked.has(entry.ruleId)) return entry;
+      const others = entry.applied.filter(
+        (a) => a.type !== "request_ai_review",
+      );
+      return {
+        ...entry,
+        applied: [...others, { type: "request_ai_review" as const, outcome }],
+      };
+    }),
   };
 }
 

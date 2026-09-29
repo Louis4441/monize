@@ -1,0 +1,323 @@
+import { Test } from "@nestjs/testing";
+import { BadRequestException } from "@nestjs/common";
+import { ToolExecutorService } from "./tool-executor.service";
+import { AiActionBuilderService } from "../actions/ai-action-builder.service";
+import { AiActionSigningService } from "../actions/ai-action-signing.service";
+import { AccountsService } from "../../accounts/accounts.service";
+import { CategoriesService } from "../../categories/categories.service";
+import { TransactionAnalyticsService } from "../../transactions/transaction-analytics.service";
+import { NetWorthService } from "../../net-worth/net-worth.service";
+import { BudgetReportsService } from "../../budgets/budget-reports.service";
+import { PortfolioService } from "../../securities/portfolio.service";
+import { SecuritiesService } from "../../securities/securities.service";
+import { SecurityToolPrepService } from "../../securities/security-tool-prep.service";
+import { InvestmentTransactionsService } from "../../securities/investment-transactions.service";
+import { ScheduledTransactionsService } from "../../scheduled-transactions/scheduled-transactions.service";
+import { TransactionsService } from "../../transactions/transactions.service";
+import { PayeesService } from "../../payees/payees.service";
+import { PayeeToolPrepService } from "../../payees/payee-tool-prep.service";
+import { TransactionToolPrepService } from "../../transactions/transaction-tool-prep.service";
+import { BuiltInReportsService } from "../../built-in-reports/built-in-reports.service";
+import { AttachmentToolPrepService } from "../../attachments/attachment-tool-prep.service";
+import { RelayAttachmentStore } from "../relay/relay-attachment.store";
+import { ExchangeRateService } from "../../currencies/exchange-rate.service";
+import { TransactionRuleToolPrepService } from "../../transaction-rules/rule-tool-prep.service";
+
+const USER = "user-1";
+const RULE = "e0000000-0000-4000-8000-000000000005";
+const CAT = "c0000000-0000-4000-8000-000000000003";
+const FINGERPRINT = "f".repeat(64);
+
+const labels = {
+  accounts: {},
+  payees: {},
+  categories: { [CAT]: "Bills: Streaming" },
+  tags: {},
+};
+const rule = {
+  name: "Streaming",
+  enabled: true,
+  triggers: ["create", "import"] as ("create" | "import")[],
+  stopProcessing: false,
+  condition: { field: "payeeId", op: "eq", value: "p1" } as const,
+  actions: [{ type: "set_category", categoryId: CAT, onlyIfEmpty: true }],
+};
+const test = {
+  matchedCount: 2,
+  scanned: 30,
+  truncated: false,
+  rows: [],
+  skipped: [],
+  skippedCount: 0,
+  aiReviewRequests: 0,
+  labels: { categories: {}, payees: {}, tags: {}, rules: {} },
+};
+
+describe("ToolExecutorService transaction rule tools", () => {
+  let service: ToolExecutorService;
+  let prep: Record<string, jest.Mock>;
+  let signing: { sign: jest.Mock };
+
+  beforeEach(async () => {
+    prep = {
+      list: jest.fn().mockResolvedValue({
+        rules: [{ id: RULE, name: "Streaming", revision: 3 }],
+        totalCount: 1,
+        truncated: false,
+      }),
+      prepareCreate: jest
+        .fn()
+        .mockResolvedValue({ ok: true, preview: { rule, labels, test } }),
+      prepareUpdate: jest.fn().mockResolvedValue({
+        ok: true,
+        preview: {
+          ruleId: RULE,
+          expectedRevision: 3,
+          rule,
+          current: rule,
+          labels,
+          test,
+        },
+      }),
+      prepareDelete: jest.fn().mockResolvedValue({
+        ok: true,
+        preview: { ruleId: RULE, expectedRevision: 3, rule, labels },
+      }),
+      prepareRun: jest.fn().mockResolvedValue({
+        ok: true,
+        preview: {
+          ruleId: RULE,
+          rule,
+          labels,
+          filters: {},
+          fingerprint: FINGERPRINT,
+          test,
+        },
+      }),
+      prepareTest: jest
+        .fn()
+        .mockResolvedValue({ ok: true, preview: { rule, labels, test } }),
+      toLlmTest: jest.fn().mockReturnValue({
+        matchedCount: 2,
+        scanned: 30,
+        truncated: false,
+        rows: [],
+        skippedCount: 0,
+        skipped: [],
+      }),
+    };
+    signing = { sign: jest.fn().mockReturnValue("sig") };
+
+    const unused = [
+      AccountsService,
+      CategoriesService,
+      TransactionAnalyticsService,
+      NetWorthService,
+      BudgetReportsService,
+      PortfolioService,
+      SecuritiesService,
+      SecurityToolPrepService,
+      InvestmentTransactionsService,
+      ScheduledTransactionsService,
+      TransactionsService,
+      PayeesService,
+      PayeeToolPrepService,
+      TransactionToolPrepService,
+      BuiltInReportsService,
+      AttachmentToolPrepService,
+      RelayAttachmentStore,
+      ExchangeRateService,
+    ].map((provide) => ({ provide, useValue: {} }));
+    const module = await Test.createTestingModule({
+      providers: [
+        ToolExecutorService,
+        AiActionBuilderService,
+        { provide: AiActionSigningService, useValue: signing },
+        { provide: TransactionRuleToolPrepService, useValue: prep },
+        ...unused,
+      ],
+    }).compile();
+    service = module.get(ToolExecutorService);
+  });
+
+  describe("list_transaction_rules", () => {
+    it("returns the rules from the shared prep service and passes the filters", async () => {
+      const result = await service.execute(USER, "list_transaction_rules", {
+        search: "stream",
+        limit: "5",
+      });
+
+      expect(prep.list).toHaveBeenCalledWith(USER, {
+        ruleId: undefined,
+        search: "stream",
+        limit: 5,
+      });
+      expect(result.isError).toBeUndefined();
+      expect(result.pendingAction).toBeUndefined();
+      expect(result.data).toMatchObject({ totalCount: 1, truncated: false });
+    });
+
+    it("rejects a ruleId that is not a UUID", async () => {
+      const result = await service.execute(USER, "list_transaction_rules", {
+        ruleId: "nope",
+      });
+      expect(result.isError).toBe(true);
+      expect(prep.list).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("manage_transaction_rules", () => {
+    const draft = {
+      condition: { field: "payeeId", op: "eq", value: "Netflix" },
+      actions: [{ type: "set_category", categoryName: "Bills: Streaming" }],
+    };
+
+    it.each([
+      [
+        "create",
+        { operation: "create", name: "Streaming", ...draft },
+        "prepareCreate",
+        "create_transaction_rule",
+      ],
+      [
+        "update",
+        { operation: "update", ruleId: RULE, name: "New" },
+        "prepareUpdate",
+        "update_transaction_rule",
+      ],
+      [
+        "delete",
+        { operation: "delete", ruleId: RULE },
+        "prepareDelete",
+        "delete_transaction_rule",
+      ],
+      [
+        "run",
+        { operation: "run", ruleId: RULE, accountNames: ["Checking"] },
+        "prepareRun",
+        "run_transaction_rule",
+      ],
+    ])(
+      "%s proposes one signed card and tells the model nothing was done",
+      async (_op, input, method, type) => {
+        const result = await service.execute(
+          USER,
+          "manage_transaction_rules",
+          input,
+        );
+
+        expect(prep[method]).toHaveBeenCalledTimes(1);
+        expect(result.isError).toBeUndefined();
+        expect(result.pendingAction).toMatchObject({
+          type,
+          signature: "sig",
+          descriptor: { type, userId: USER },
+        });
+        expect(result.pendingActions).toBeUndefined();
+        expect(result.data).toMatchObject({ status: "preview_shown" });
+        expect(JSON.stringify(result.data)).not.toContain("sig");
+        expect(signing.sign).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it("passes the model's fields and run filters through as given", async () => {
+      await service.execute(USER, "manage_transaction_rules", {
+        operation: "run",
+        ruleId: RULE,
+        accountNames: ["Checking"],
+        startDate: "2026-01-01",
+        endDate: "2026-02-01",
+        limit: "20",
+      });
+      expect(prep.prepareRun).toHaveBeenCalledWith(
+        USER,
+        expect.objectContaining({ ruleId: RULE }),
+        {
+          accountNames: ["Checking"],
+          startDate: "2026-01-01",
+          endDate: "2026-02-01",
+          limit: 20,
+        },
+      );
+    });
+
+    it("test answers with the test result and neither a card nor a signature", async () => {
+      const result = await service.execute(USER, "manage_transaction_rules", {
+        operation: "test",
+        ...draft,
+      });
+
+      expect(prep.prepareTest).toHaveBeenCalledTimes(1);
+      expect(result.pendingAction).toBeUndefined();
+      expect(result.pendingActions).toBeUndefined();
+      expect(signing.sign).not.toHaveBeenCalled();
+      expect(prep.prepareCreate).not.toHaveBeenCalled();
+      expect(result.data).toMatchObject({ matchedCount: 2, scanned: 30 });
+      expect(result.summary).toContain("Nothing was saved");
+    });
+
+    it("returns a validation refusal as a tool error with the structured entries and no card", async () => {
+      const errors = [
+        { path: "condition.all[0].op", code: "OPERATOR_NOT_ALLOWED" },
+      ];
+      prep.prepareCreate.mockResolvedValue({
+        ok: false,
+        message: "The rule definition is not valid",
+        errors,
+      });
+      const result = await service.execute(USER, "manage_transaction_rules", {
+        operation: "create",
+        name: "x",
+        ...draft,
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.data).toEqual({
+        error: "The rule definition is not valid",
+        errors,
+      });
+      expect(result.pendingAction).toBeUndefined();
+      expect(signing.sign).not.toHaveBeenCalled();
+    });
+
+    it("passes a 4xx from the prep service on to the model and hides anything else", async () => {
+      prep.prepareDelete.mockRejectedValueOnce(
+        new BadRequestException("Bad rule"),
+      );
+      const refused = await service.execute(USER, "manage_transaction_rules", {
+        operation: "delete",
+        ruleId: RULE,
+      });
+      expect(refused).toMatchObject({
+        isError: true,
+        data: { error: "Bad rule" },
+      });
+
+      prep.prepareDelete.mockRejectedValueOnce(new Error("db exploded"));
+      const failed = await service.execute(USER, "manage_transaction_rules", {
+        operation: "delete",
+        ruleId: RULE,
+      });
+      expect(failed.isError).toBe(true);
+      expect(JSON.stringify(failed.data)).not.toContain("db exploded");
+    });
+
+    it.each([
+      [{ operation: "create", name: "x" }],
+      [{ operation: "update", ruleId: RULE }],
+      [{ operation: "delete" }],
+      [{ operation: "run" }],
+      [{ operation: "test" }],
+      [{ operation: "merge", ruleId: RULE }],
+      [{ operation: "delete", ruleId: "not-a-uuid" }],
+    ])("rejects %j before any preview is prepared", async (input) => {
+      const result = await service.execute(
+        USER,
+        "manage_transaction_rules",
+        input,
+      );
+      expect(result.isError).toBe(true);
+      for (const fn of Object.values(prep)) expect(fn).not.toHaveBeenCalled();
+    });
+  });
+});

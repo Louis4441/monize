@@ -17,7 +17,18 @@
 
 import { ContactLookupSource } from "../../payees/lookup/payee-contact-lookup.types";
 import { InvestmentAction } from "../../securities/entities/investment-transaction.entity";
-import type { RuleEffectsPreview } from "../../transaction-rules/transaction-rules-applier.service";
+import type {
+  RuleEffectsLabels,
+  RuleEffectsPreview,
+} from "../../transaction-rules/transaction-rules-applier.service";
+import type { RuleAction } from "../../transaction-rules/rule-action.types";
+import type { RuleConditionNode } from "../../transaction-rules/rule-condition.types";
+import type { RuleDefinitionLabels } from "../../transaction-rules/rule-labels";
+import type {
+  RuleRunMatchedRow,
+  RuleRunSkippedRow,
+} from "../../transaction-rules/rule-run.types";
+import type { RuleTrigger } from "../../transaction-rules/rule-trigger.types";
 
 export type AiActionType =
   | "create_transaction"
@@ -37,7 +48,11 @@ export type AiActionType =
   | "delete_investment_transaction"
   | "create_transfer"
   | "update_transfer"
-  | "batch_actions";
+  | "batch_actions"
+  | "create_transaction_rule"
+  | "update_transaction_rule"
+  | "delete_transaction_rule"
+  | "run_transaction_rule";
 
 export const AI_ACTION_TYPES: AiActionType[] = [
   "create_transaction",
@@ -58,6 +73,10 @@ export const AI_ACTION_TYPES: AiActionType[] = [
   "create_transfer",
   "update_transfer",
   "batch_actions",
+  "create_transaction_rule",
+  "update_transaction_rule",
+  "delete_transaction_rule",
+  "run_transaction_rule",
 ];
 
 /**
@@ -671,6 +690,65 @@ export interface BatchActionsDescriptor extends BaseDescriptor {
   rows: BatchActionRow[];
 }
 
+/**
+ * A transaction rule as a descriptor carries it: ids resolved at preview time
+ * (never names), the actions with their `onlyIfEmpty` defaults applied. Confirm
+ * hands it to `TransactionRulesService`, which validates it again and checks
+ * every id against the owner inside the write's transaction.
+ */
+export interface RuleDefinitionDescriptor {
+  name: string;
+  enabled: boolean;
+  triggers: RuleTrigger[];
+  condition: RuleConditionNode;
+  actions: RuleAction[];
+  stopProcessing: boolean;
+}
+
+/** Create a rule (appended at the end of the user's list). */
+export interface CreateTransactionRuleDescriptor extends BaseDescriptor {
+  type: "create_transaction_rule";
+  rule: RuleDefinitionDescriptor;
+}
+
+/**
+ * Edit a rule. Carries the full resulting state and the revision the card was
+ * built from: a rule changed since is refused with 409 and nothing is written.
+ */
+export interface UpdateTransactionRuleDescriptor extends BaseDescriptor {
+  type: "update_transaction_rule";
+  ruleId: string;
+  expectedRevision: number;
+  rule: RuleDefinitionDescriptor;
+}
+
+/** Delete a rule, if it is still at the revision the card showed. */
+export interface DeleteTransactionRuleDescriptor extends BaseDescriptor {
+  type: "delete_transaction_rule";
+  ruleId: string;
+  expectedRevision: number;
+}
+
+/** Which existing transactions a rule run looks at (ids, as the run service reads them). */
+export interface RuleRunFiltersDescriptor {
+  accountIds?: string[];
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+}
+
+/**
+ * Run a saved rule on existing transactions. `fingerprint` is the hash of the
+ * plan the card showed (it covers the rule revision too): the commit re-plans
+ * and refuses with 409 PREVIEW_CHANGED, writing nothing, when it differs.
+ */
+export interface RunTransactionRuleDescriptor extends BaseDescriptor {
+  type: "run_transaction_rule";
+  ruleId: string;
+  filters: RuleRunFiltersDescriptor;
+  fingerprint: string;
+}
+
 export type AiActionDescriptor =
   | CreateTransactionDescriptor
   | CategorizeTransactionDescriptor
@@ -689,7 +767,11 @@ export type AiActionDescriptor =
   | DeleteInvestmentTransactionDescriptor
   | CreateTransferDescriptor
   | UpdateTransferDescriptor
-  | BatchActionsDescriptor;
+  | BatchActionsDescriptor
+  | CreateTransactionRuleDescriptor
+  | UpdateTransactionRuleDescriptor
+  | DeleteTransactionRuleDescriptor
+  | RunTransactionRuleDescriptor;
 
 /**
  * Display-only preview of one category-split line on a split create/update card.
@@ -706,6 +788,53 @@ export interface AiActionAttachmentPreview {
   filename: string;
   contentType: string;
   byteSize: number;
+}
+
+/** Rows of a rule test a card lists; the counts cover all of them. */
+export const RULE_CARD_PREVIEW_ROWS = 10;
+
+/** What running a rule on existing transactions would do, as a card shows it. */
+export interface AiActionRuleTestPreview {
+  /** Transactions the rule would change. */
+  matchedCount: number;
+  /** Transactions examined. */
+  scanned: number;
+  /** More transactions matched the filters than the run examines. */
+  truncated: boolean;
+  /** The first {@link RULE_CARD_PREVIEW_ROWS} rows that would change. */
+  rows: RuleRunMatchedRow[];
+  /** Rows the rule reached and left alone, and why (first rows only). */
+  skipped: RuleRunSkippedRow[];
+  skippedCount: number;
+  /** Rows whose run would queue an AI review request (queued on approval, never on preview). */
+  aiReviewRequests: number;
+  /** Names for the ids in `rows`. */
+  labels: RuleEffectsLabels;
+}
+
+/** A stored rule as it was before an edit, for the card's "was" side. */
+export interface AiActionRuleState {
+  name: string;
+  enabled: boolean;
+  triggers: RuleTrigger[];
+  condition: RuleConditionNode;
+  actions: RuleAction[];
+  stopProcessing: boolean;
+}
+
+/**
+ * The rule a rule card shows. The client renders the definition in words with
+ * its own translations, so this carries the structure and the names of the ids
+ * in it (`labels`), not a sentence.
+ */
+export interface AiActionRulePreview extends AiActionRuleState {
+  labels: RuleDefinitionLabels;
+  /** update: the rule as stored now. */
+  current?: AiActionRuleState;
+  /** run: the filters, as ids (`labels.accounts` names the accounts). */
+  filters?: RuleRunFiltersDescriptor;
+  /** create/update/run: what running it on existing transactions would change. */
+  test?: AiActionRuleTestPreview;
 }
 
 /**
@@ -789,6 +918,8 @@ export interface AiActionPreview {
    * dropped -- so the confirmation card can show the whole table with badges.
    */
   rows?: AiActionPreviewRow[];
+  /** create/update/delete/run_transaction_rule: the rule and its test. */
+  rule?: AiActionRulePreview;
 }
 
 /**

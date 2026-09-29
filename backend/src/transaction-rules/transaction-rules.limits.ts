@@ -9,3 +9,6 @@ export const MAX_RULE_RUN_ACCOUNTS = 100;
 /** Latest applications returned by the trace read (default and ceiling). */
 export const DEFAULT_RULE_APPLICATIONS_LIMIT = 50;
 export const MAX_RULE_APPLICATIONS_LIMIT = 200;
+/** Rules the assistant and MCP list tool returns per call (default and ceiling). */
+export const DEFAULT_RULE_TOOL_LIST_LIMIT = 50;
+export const MAX_RULE_TOOL_LIST_LIMIT = 200;

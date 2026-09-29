@@ -46,6 +46,8 @@ export interface RuleRunPreview {
   /** Hash of the planned changes and the rule revision; the commit must echo it. */
   readonly fingerprint: string;
   readonly labels: RuleEffectsLabels;
+  /** Rows whose run would queue an AI review request (queued on commit, never on preview). */
+  readonly aiReviewRequests: number;
 }
 
 export interface RuleRunResult {

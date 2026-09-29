@@ -4,6 +4,7 @@ import { Category } from "../categories/entities/category.entity";
 import { Payee } from "../payees/entities/payee.entity";
 import { Tag } from "../tags/entities/tag.entity";
 import { TransactionTag } from "../tags/entities/transaction-tag.entity";
+import { AiReviewRequestsService } from "../ai-review/ai-review-requests.service";
 import { TagsService } from "../tags/tags.service";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import {
@@ -12,7 +13,8 @@ import {
   RulePlanContext,
   hasRuleEffects,
   planRuleEffects,
-  recordAiReviewQueueUnavailable,
+  recordAiReviewAlreadyQueued,
+  recordAiReviewQueued,
 } from "./rule-effects";
 import {
   RuleFactsInput,
@@ -75,11 +77,16 @@ export type RuleRowInput = Omit<RuleFactsInput, "categoryAncestorIds">;
  * (design 6.3). It never opens its own transaction: every read and write goes
  * through the `EntityManager` it is handed, so a rollback of the insert rolls
  * back the rule effects (INV-RULE-002). It changes only category, payee and
- * tags -- never amount, account, date, status or a link (INV-RULE-001).
+ * tags -- never amount, account, date, status or a link (INV-RULE-001). A
+ * `request_ai_review` action is queued through the same manager
+ * (`queueAiReviews`), so it is written or dropped with the row that asked.
  */
 @Injectable()
 export class TransactionRulesApplierService {
-  constructor(private readonly tagsService: TagsService) {}
+  constructor(
+    private readonly tagsService: TagsService,
+    private readonly aiReviewRequests: AiReviewRequestsService,
+  ) {}
 
   /**
    * The user's enabled rules for a trigger, in `position` order, without the
@@ -231,7 +238,7 @@ export class TransactionRulesApplierService {
       await this.writeEffects(m, userId, row.id, effects, source);
       applied.push({ transactionId: row.id, effects });
     }
-    return applied;
+    return this.queueAiReviews(m, userId, applied);
   }
 
   /**
@@ -292,12 +299,57 @@ export class TransactionRulesApplierService {
         chains,
         { crossOwnerTransferLeg: !sameOwner },
       );
+      // One review request per transfer, on the outgoing leg (`primary`).
+      const [queued] = await this.queueAiReviews(m, ownerId, [
+        { transactionId: primary.id, effects },
+      ]);
       for (const row of rows) {
         await this.writeEffects(m, ownerId, row.id, effects, "create");
-        applied.push({ transactionId: row.id, effects });
+        applied.push({ transactionId: row.id, effects: queued.effects });
       }
     }
     return applied;
+  }
+
+  /**
+   * Queue the `request_ai_review` actions the plans collected, in the caller's
+   * transaction and through one `enqueue` (the queue's partial unique index
+   * dedupes a request already open for the same row and rule). Returns the
+   * rows with a trace that says "queued", or "already_queued" where the
+   * dedupe skipped it. The manual run calls it on commit, never on preview.
+   */
+  async queueAiReviews(
+    m: EntityManager,
+    userId: string,
+    rows: readonly AppliedRuleRow[],
+  ): Promise<AppliedRuleRow[]> {
+    const requests = rows.flatMap((row) =>
+      row.effects.aiReviewRequests.map((request) => ({
+        transactionId: row.transactionId,
+        ruleId: request.ruleId,
+        instruction: request.instruction,
+      })),
+    );
+    if (requests.length === 0) return [...rows];
+    const { alreadyQueued } = await this.aiReviewRequests.enqueue(
+      m,
+      userId,
+      requests,
+    );
+    return rows.map((row) => {
+      const skipped = new Set(
+        alreadyQueued
+          .filter((key) => key.transactionId === row.transactionId)
+          .map((key) => key.ruleId)
+          .filter((id): id is string => id !== null),
+      );
+      return skipped.size === 0
+        ? row
+        : {
+            transactionId: row.transactionId,
+            effects: recordAiReviewAlreadyQueued(row.effects, skipped),
+          };
+    });
   }
 
   planWithChains(
@@ -311,7 +363,7 @@ export class TransactionRulesApplierService {
       categoryAncestorIds:
         input.categoryId === null ? [] : chains.get(input.categoryId),
     });
-    return recordAiReviewQueueUnavailable(
+    return recordAiReviewQueued(
       planRuleEffects(facts, rules, {
         ...context,
         categoryChains: chains,

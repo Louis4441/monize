@@ -4,7 +4,8 @@ import {
   PlannableRule,
   hasRuleEffects,
   planRuleEffects,
-  recordAiReviewQueueUnavailable,
+  recordAiReviewAlreadyQueued,
+  recordAiReviewQueued,
 } from "./rule-effects";
 import { RuleFactsInput, buildRuleFacts } from "./rule-facts";
 
@@ -411,22 +412,35 @@ describe("planRuleEffects: disabled, invalid, AI review", () => {
     expect(hasRuleEffects(plan)).toBe(true);
   });
 
-  it("recordAiReviewQueueUnavailable marks the asking rule's trace as skipped", () => {
+  it("recordAiReviewQueued traces the asking rule's request as queued, not skipped", () => {
     const r = rule([{ type: "request_ai_review", instruction: "look" }]);
     const other = rule([addTags(TAG_A)]);
-    const plan = recordAiReviewQueueUnavailable(
-      planRuleEffects(facts(), [r, other]),
-    );
-    expect(plan.trace[0].skipped).toEqual([
-      { type: "request_ai_review", reason: "ai_review_queue_unavailable" },
+    const plan = recordAiReviewQueued(planRuleEffects(facts(), [r, other]));
+    expect(plan.trace[0].applied).toEqual([
+      { type: "request_ai_review", outcome: "queued" },
     ]);
-    expect(plan.trace[1].skipped).toEqual([]);
+    expect(plan.trace[0].skipped).toEqual([]);
+    expect(plan.trace[1].applied).toEqual([{ type: "add_tags" }]);
     expect(plan.aiReviewRequests).toHaveLength(1);
   });
 
-  it("recordAiReviewQueueUnavailable returns the same plan when nothing asked", () => {
+  it("recordAiReviewQueued returns the same plan when nothing asked", () => {
     const plan = planRuleEffects(facts(), [rule([addTags(TAG_A)])]);
-    expect(recordAiReviewQueueUnavailable(plan)).toBe(plan);
+    expect(recordAiReviewQueued(plan)).toBe(plan);
+  });
+
+  it("recordAiReviewAlreadyQueued relabels only the rules named", () => {
+    const a = rule([{ type: "request_ai_review", instruction: "one" }]);
+    const b = rule([{ type: "request_ai_review", instruction: "two" }]);
+    const queued = recordAiReviewQueued(planRuleEffects(facts(), [a, b]));
+    const plan = recordAiReviewAlreadyQueued(queued, new Set([b.id]));
+    expect(plan.trace[0].applied).toEqual([
+      { type: "request_ai_review", outcome: "queued" },
+    ]);
+    expect(plan.trace[1].applied).toEqual([
+      { type: "request_ai_review", outcome: "already_queued" },
+    ]);
+    expect(recordAiReviewAlreadyQueued(queued, new Set())).toBe(queued);
   });
 });
 

@@ -663,6 +663,49 @@ CREATE INDEX idx_transaction_rule_applications_rule
 CREATE INDEX idx_transaction_rule_applications_transaction
     ON transaction_rule_applications(transaction_id);
 
+-- AI review requests: the durable queue behind a rule's `request_ai_review`
+-- action (docs/future-plans/transaction-rules.md section 6.5). pending ->
+-- claimed -> proposed -> applied | rejected, expired from any open state; the
+-- transitions are conditional UPDATEs. At most one open request per
+-- (transaction_id, rule_id): the partial unique index is the dedupe. rule_id is
+-- nullable, and NULLs are distinct there, so a manual request is not deduped
+-- (NULLS NOT DISTINCT would make deleting a rule fail on two open requests).
+-- The defaults on kind, status and expires_at exist for the RLS spec's generic
+-- row seeder.
+CREATE TABLE ai_review_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+    rule_id UUID REFERENCES transaction_rules(id) ON DELETE SET NULL,
+    kind VARCHAR(40) NOT NULL DEFAULT 'transaction_review',
+    instruction TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    claimed_by TEXT,
+    claimed_at TIMESTAMPTZ,
+    proposal JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP + INTERVAL '30 days',
+    CONSTRAINT ck_ai_review_requests_kind
+      CHECK (kind IN ('transaction_review')),
+    CONSTRAINT ck_ai_review_requests_instruction_length
+      CHECK (char_length(instruction) BETWEEN 1 AND 1000),
+    CONSTRAINT ck_ai_review_requests_status
+      CHECK (status IN ('pending', 'claimed', 'proposed', 'applied', 'rejected', 'expired'))
+);
+
+CREATE INDEX idx_ai_review_requests_claim
+    ON ai_review_requests(user_id, status, created_at);
+CREATE INDEX idx_ai_review_requests_transaction
+    ON ai_review_requests(transaction_id);
+CREATE INDEX idx_ai_review_requests_rule
+    ON ai_review_requests(rule_id) WHERE rule_id IS NOT NULL;
+CREATE INDEX idx_ai_review_requests_expiry
+    ON ai_review_requests(expires_at) WHERE status IN ('pending', 'claimed', 'proposed');
+CREATE UNIQUE INDEX uq_ai_review_requests_open
+    ON ai_review_requests(transaction_id, rule_id)
+    WHERE status IN ('pending', 'claimed', 'proposed');
+
 -- Securities (stocks, bonds, mutual funds, ETFs)
 -- Defined before scheduled_transactions because that table (and others below)
 -- carry inline FKs to securities(id); the FK target must exist first when the
@@ -2434,6 +2477,7 @@ CREATE INDEX idx_single_use_tokens_expiry
 -- Trigger for tags updated_at
 CREATE TRIGGER update_tags_updated_at BEFORE UPDATE ON tags FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_transaction_rules_updated_at BEFORE UPDATE ON transaction_rules FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_ai_review_requests_updated_at BEFORE UPDATE ON ai_review_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Action History (undo/redo support)
 CREATE TABLE action_history (
@@ -2983,6 +3027,7 @@ DECLARE
         'ai_relay_agents',
         'ai_relay_attachments',
         'ai_relay_prompts',
+        'ai_review_requests',
         'ai_usage_logs',
         'auto_backup_settings',
         'backup_offsite_settings',

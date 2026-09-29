@@ -217,6 +217,14 @@ export const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   // rebuilds as they run. It cascades from the rule and the transaction, so a
   // restore's deletes clear it.
   "transaction_rule_applications",
+  // The AI review queue: pending work with a 30-day life, each row naming a
+  // transaction id that a restore re-mints, and a claim naming an MCP session
+  // that no longer exists. A restored request would point at a transaction that
+  // is gone under that id, and a stored proposal is a signed action built
+  // against the old ids. The rules that produce requests
+  // (`transaction_rules`) are exported and ask again as they run. It cascades
+  // from the user and the transaction, so a restore's deletes clear it.
+  "ai_review_requests",
 ]);
 
 export function buildExportTableQueries(

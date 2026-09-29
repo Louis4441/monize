@@ -43,7 +43,9 @@ import { CurrenciesModule } from "../currencies/currencies.module";
     forwardRef(() => PayeesModule),
     TagsModule,
     // The rules step of create() and previewCreate().
-    TransactionRulesModule,
+    // forwardRef: the rules module reaches TransactionsModule back through the
+    // assistant's rule tools (AccountsModule, PayeesModule).
+    forwardRef(() => TransactionRulesModule),
     ActionHistoryModule,
     // forwardRef on both: each lies on a require cycle, so a bare reference is
     // `undefined` here under some load orders -- see `src/module-graph.spec.ts`.

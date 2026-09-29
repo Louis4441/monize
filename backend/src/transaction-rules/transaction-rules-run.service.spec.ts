@@ -90,7 +90,11 @@ const plainUnit = (r: Transaction): CandidateUnit => ({
   crossOwnerTransferLeg: false,
 });
 
-function setup(units: CandidateUnit[], truncated = false) {
+function setup(
+  units: CandidateUnit[],
+  truncated = false,
+  stored: TransactionRule = storedRule(),
+) {
   (loadCandidateUnits as jest.Mock).mockResolvedValue({ units, truncated });
   (toRuleResponses as jest.Mock).mockResolvedValue([
     { invalid: false, invalidReasons: [] },
@@ -98,7 +102,13 @@ function setup(units: CandidateUnit[], truncated = false) {
   (isReconciledLockEnabled as jest.Mock).mockResolvedValue(false);
 
   const applierDeps = { addTransactionTags: jest.fn() };
-  const applier = new TransactionRulesApplierService(applierDeps as never);
+  const enqueue = jest
+    .fn()
+    .mockResolvedValue({ queued: [], alreadyQueued: [] });
+  const applier = new TransactionRulesApplierService(
+    applierDeps as never,
+    { enqueue } as never,
+  );
   const loadTagIds = jest
     .spyOn(applier, "loadTagIds")
     .mockResolvedValue(new Map<string, string[]>());
@@ -114,7 +124,7 @@ function setup(units: CandidateUnit[], truncated = false) {
     .mockResolvedValue(undefined);
 
   const rulesService = {
-    getOwnedRule: jest.fn().mockResolvedValue(storedRule()),
+    getOwnedRule: jest.fn().mockResolvedValue(stored),
     checkedDefinition: jest
       .fn()
       .mockImplementation(async (_m, _u, condition, actions) => ({
@@ -143,6 +153,7 @@ function setup(units: CandidateUnit[], truncated = false) {
     dataSource,
     rulesService,
     writeEffects,
+    enqueue,
     record,
     loadTagIds,
   };
@@ -510,6 +521,40 @@ describe("TransactionRulesRunService", () => {
           (r: { id: string }) => r.id,
         ),
       ).toEqual(["out", "in"]);
+    });
+
+    it("queues an AI review on commit only, on the primary leg, even when the rule changes no ledger field", async () => {
+      const asking = storedRule({
+        actions: [{ type: "request_ai_review", instruction: "split it" }],
+      });
+      const s = setup([plainUnit(row("t1"))], false, asking);
+      const preview = await s.service.previewRun(USER, RULE_ID, filters);
+      expect(preview.matched).toEqual([]);
+      expect(preview.aiReviewRequests).toBe(1);
+      expect(s.enqueue).not.toHaveBeenCalled();
+
+      const result = await s.service.run(USER, RULE_ID, {
+        ...filters,
+        fingerprint: preview.fingerprint,
+      });
+
+      expect(result.changed).toBe(0);
+      expect(s.writeEffects).not.toHaveBeenCalled();
+      expect(s.enqueue).toHaveBeenCalledTimes(1);
+      expect(s.enqueue).toHaveBeenCalledWith(s.manager, USER, [
+        { transactionId: "t1", ruleId: RULE_ID, instruction: "split it" },
+      ]);
+    });
+
+    it("does not queue when the fingerprint is stale", async () => {
+      const asking = storedRule({
+        actions: [{ type: "request_ai_review", instruction: "split it" }],
+      });
+      const s = setup([plainUnit(row("t1"))], false, asking);
+      await expect(
+        s.service.run(USER, RULE_ID, { ...filters, fingerprint: "stale" }),
+      ).rejects.toThrow();
+      expect(s.enqueue).not.toHaveBeenCalled();
     });
 
     it("refuses a stale fingerprint with 409 before any write or history entry", async () => {

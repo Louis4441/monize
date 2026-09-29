@@ -46,6 +46,8 @@ type RunRule = PlannableRule & { name: string; revision: number };
 interface Plan {
   readonly preview: RuleRunPreview;
   readonly writable: readonly PlannedUnit[];
+  /** Units whose rule asked for an AI review, changed or not (queued on commit only). */
+  readonly asking: readonly PlannedUnit[];
   readonly tagsByRow: ReadonlyMap<string, readonly string[]>;
 }
 
@@ -163,6 +165,16 @@ export class TransactionRulesRunService {
           await this.applier.writeEffects(m, userId, leg.id, effects, "manual");
         }
       }
+      // Review requests are queued on commit only, never on preview, one per
+      // unit on its primary (outgoing) leg, in this same transaction.
+      await this.applier.queueAiReviews(
+        m,
+        userId,
+        plan.asking.map(({ unit, effects }) => ({
+          transactionId: unit.primary.id,
+          effects,
+        })),
+      );
       return { rule, plan, before, after };
     });
 
@@ -289,6 +301,7 @@ export class TransactionRulesRunService {
 
     const skipped: RuleRunSkippedRow[] = [];
     const changing: PlannedUnit[] = [];
+    const asking: PlannedUnit[] = [];
     for (const unit of units) {
       const { primary } = unit;
       const effects = this.applier.planWithChains(
@@ -318,6 +331,7 @@ export class TransactionRulesRunService {
       if (entry && Object.keys(entry.changes).length > 0) {
         changing.push({ unit, effects });
       }
+      if (effects.aiReviewRequests.length > 0) asking.push({ unit, effects });
     }
 
     // I6: a reconciled row is not altered while the strict lock is on.
@@ -376,8 +390,10 @@ export class TransactionRulesRunService {
           })),
         ),
         labels,
+        aiReviewRequests: asking.length,
       },
       writable,
+      asking,
       tagsByRow,
     };
   }

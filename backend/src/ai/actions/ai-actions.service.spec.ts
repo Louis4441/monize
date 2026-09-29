@@ -123,6 +123,8 @@ describe("AiActionsService", () => {
       attachments as never,
       attachmentStore as never,
       singleUseTokens as never,
+      {} as never,
+      {} as never,
     );
   });
 

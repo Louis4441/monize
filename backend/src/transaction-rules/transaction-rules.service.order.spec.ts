@@ -4,6 +4,7 @@ import {
   USER_ID,
   buildHarness,
   storedRule,
+  thrown,
 } from "./transaction-rules.test-helpers";
 
 jest.mock("../common/db/scoped-db", () =>
@@ -85,6 +86,54 @@ describe("TransactionRulesService remove", () => {
     expect(h.rules.delete.mock.invocationCallOrder[0]).toBeLessThan(
       h.manager.query.mock.invocationCallOrder[1],
     );
+  });
+});
+
+describe("TransactionRulesService remove with an expected revision", () => {
+  it("refuses a rule edited since the card showed it, before deleting anything", async () => {
+    const h = buildHarness();
+    h.rules.findOne.mockResolvedValue(storedRule({ revision: 4 }));
+
+    const error = await thrown(h.service.remove(USER_ID, RULE_ID, 3));
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect(error.getResponse()).toMatchObject({
+      errorCode: "REVISION_CONFLICT",
+    });
+    expect(h.writes()).toEqual([]);
+  });
+
+  it("deletes a rule still at the revision the card showed", async () => {
+    const h = buildHarness();
+    h.rules.findOne.mockResolvedValue(storedRule({ revision: 3 }));
+
+    await h.service.remove(USER_ID, RULE_ID, 3);
+
+    expect(h.rules.findOne).toHaveBeenCalledWith({
+      where: { id: RULE_ID, userId: USER_ID },
+    });
+    expect(h.rules.delete).toHaveBeenCalledWith({
+      id: RULE_ID,
+      userId: USER_ID,
+    });
+  });
+
+  it("is 404 for a rule that is gone, without deleting", async () => {
+    const h = buildHarness();
+
+    await expect(h.service.remove(USER_ID, RULE_ID, 3)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(h.writes()).toEqual([]);
+  });
+
+  it("keeps deleting without a check when the caller states no expectation", async () => {
+    const h = buildHarness();
+
+    await h.service.remove(USER_ID, RULE_ID);
+
+    expect(h.rules.findOne).not.toHaveBeenCalled();
+    expect(h.rules.delete).toHaveBeenCalled();
   });
 });
 

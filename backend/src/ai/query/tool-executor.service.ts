@@ -34,6 +34,12 @@ import {
   UpdateRowInput,
   SplitLineInput,
 } from "../../transactions/transaction-tool-prep.service";
+import {
+  RuleToolInput,
+  RuleToolRefusal,
+  RuleToolRunInput,
+  TransactionRuleToolPrepService,
+} from "../../transaction-rules/rule-tool-prep.service";
 import { AccountType } from "../../accounts/entities/account.entity";
 import { CategoriesService } from "../../categories/categories.service";
 import { TransactionAnalyticsService } from "../../transactions/transaction-analytics.service";
@@ -189,6 +195,7 @@ export class ToolExecutorService {
     // CurrenciesModule through a forwardRef (`src/module-graph.spec.ts`).
     @Inject(forwardRef(() => ExchangeRateService))
     private readonly exchangeRateService: ExchangeRateService,
+    private readonly ruleToolPrep: TransactionRuleToolPrepService,
   ) {}
 
   async execute(
@@ -283,6 +290,12 @@ export class ToolExecutorService {
           break;
         case "generate_report":
           result = await this.generateReport(userId, validatedInput);
+          break;
+        case "list_transaction_rules":
+          result = await this.listTransactionRules(userId, validatedInput);
+          break;
+        case "manage_transaction_rules":
+          result = await this.manageTransactionRules(userId, validatedInput);
           break;
         default:
           this.logger.warn(`execute unknown tool=${toolName} user=${userId}`);
@@ -1295,6 +1308,136 @@ export class ToolExecutorService {
         prep.previewRows,
       ),
     };
+  }
+
+  /** A rule refusal as a tool error: the message, plus the structured entries the REST API would return. */
+  private ruleToolError(refusal: RuleToolRefusal): ToolResult {
+    return {
+      data: { error: refusal.message, errors: refusal.errors },
+      summary: refusal.message,
+      sources: [],
+      isError: true,
+    };
+  }
+
+  private async listTransactionRules(
+    userId: string,
+    input: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const list = await this.ruleToolPrep.list(userId, {
+      ruleId: input.ruleId as string | undefined,
+      search: input.search as string | undefined,
+      limit: input.limit as number | undefined,
+    });
+    return {
+      data: list,
+      summary: `Found ${list.totalCount} transaction rule${list.totalCount === 1 ? "" : "s"}${list.truncated ? ` (showing ${list.rules.length})` : ""}.`,
+      sources: [
+        {
+          type: "transaction_rules",
+          description: "Transaction rules, in the order they run",
+        },
+      ],
+    };
+  }
+
+  /**
+   * Unified rule write handler. create/update/delete/run resolve names, validate
+   * and test through the shared TransactionRuleToolPrepService and propose ONE
+   * card; test shares that path and proposes nothing, so it writes nothing. A
+   * validation failure comes back to the model as a tool error carrying the
+   * structured entries, never as a card.
+   */
+  private async manageTransactionRules(
+    userId: string,
+    input: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const operation = input.operation as
+      | "create"
+      | "update"
+      | "delete"
+      | "run"
+      | "test";
+    const rule: RuleToolInput = {
+      ruleId: input.ruleId as string | undefined,
+      name: input.name as string | undefined,
+      enabled: input.enabled as boolean | undefined,
+      triggers: input.triggers as RuleToolInput["triggers"],
+      stopProcessing: input.stopProcessing as boolean | undefined,
+      condition: input.condition as Record<string, unknown> | undefined,
+      actions: input.actions as Record<string, unknown>[] | undefined,
+    };
+    const run: RuleToolRunInput = {
+      accountNames: input.accountNames as string[] | undefined,
+      startDate: input.startDate as string | undefined,
+      endDate: input.endDate as string | undefined,
+      limit: input.limit as number | undefined,
+    };
+    const awaiting = (
+      summary: string,
+      pendingAction: PendingAiAction,
+    ): ToolResult => ({
+      data: PENDING_ACTION_TOOL_RESULT,
+      summary: `${summary} Awaiting user confirmation.`,
+      sources: [],
+      pendingAction,
+    });
+
+    try {
+      if (operation === "create") {
+        const prep = await this.ruleToolPrep.prepareCreate(userId, rule);
+        if (!prep.ok) return this.ruleToolError(prep);
+        return awaiting(
+          `Prepared to create rule "${prep.preview.rule.name}" (would change ${prep.preview.test.matchedCount} of ${prep.preview.test.scanned} recent transactions).`,
+          this.actionBuilder.buildCreateTransactionRule(userId, prep.preview),
+        );
+      }
+      if (operation === "update") {
+        const prep = await this.ruleToolPrep.prepareUpdate(userId, rule);
+        if (!prep.ok) return this.ruleToolError(prep);
+        return awaiting(
+          `Prepared an edit to rule "${prep.preview.current.name}".`,
+          this.actionBuilder.buildUpdateTransactionRule(userId, prep.preview),
+        );
+      }
+      if (operation === "delete") {
+        const prep = await this.ruleToolPrep.prepareDelete(userId, rule);
+        if (!prep.ok) return this.ruleToolError(prep);
+        return awaiting(
+          `Prepared to delete rule "${prep.preview.rule.name}".`,
+          this.actionBuilder.buildDeleteTransactionRule(userId, prep.preview),
+        );
+      }
+      if (operation === "run") {
+        const prep = await this.ruleToolPrep.prepareRun(userId, rule, run);
+        if (!prep.ok) return this.ruleToolError(prep);
+        return awaiting(
+          `Prepared to run rule "${prep.preview.rule.name}" on ${prep.preview.test.matchedCount} transaction${prep.preview.test.matchedCount === 1 ? "" : "s"}.`,
+          this.actionBuilder.buildRunTransactionRule(userId, prep.preview),
+        );
+      }
+      const prep = await this.ruleToolPrep.prepareTest(userId, rule, run);
+      if (!prep.ok) return this.ruleToolError(prep);
+      const test = this.ruleToolPrep.toLlmTest(
+        prep.preview.test,
+        prep.preview.labels,
+      );
+      return {
+        data: { rule: prep.preview.rule.name, ...test },
+        summary: `Tested rule "${prep.preview.rule.name}": it would change ${test.matchedCount} of ${test.scanned} transactions. Nothing was saved or changed.`,
+        sources: [
+          {
+            type: "transaction_rules",
+            description: "Rule test against existing transactions",
+          },
+        ],
+      };
+    } catch (err) {
+      return this.toolErrorFromException(
+        err,
+        "Could not prepare the transaction rule.",
+      );
+    }
   }
 
   /**

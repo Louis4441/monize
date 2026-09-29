@@ -3,6 +3,11 @@ import { Category } from "../categories/entities/category.entity";
 import { Payee } from "../payees/entities/payee.entity";
 import { Tag } from "../tags/entities/tag.entity";
 import { TransactionTag } from "../tags/entities/transaction-tag.entity";
+import {
+  AiReviewEnqueueInput,
+  AiReviewEnqueueResult,
+  AiReviewRequestsService,
+} from "../ai-review/ai-review-requests.service";
 import { TagsService } from "../tags/tags.service";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { RuleAction } from "./rule-action.types";
@@ -121,8 +126,22 @@ function harness(fx: Fixture = {}) {
     addTransactionTags: jest.fn().mockResolvedValue(undefined),
     removeTransactionTags: jest.fn().mockResolvedValue(undefined),
   };
+  const enqueue = jest.fn(
+    async (
+      _m: unknown,
+      _userId: string,
+      requests: readonly AiReviewEnqueueInput[],
+    ): Promise<AiReviewEnqueueResult> => ({
+      queued: requests.map(({ transactionId, ruleId }) => ({
+        transactionId,
+        ruleId,
+      })),
+      alreadyQueued: [],
+    }),
+  );
   const service = new TransactionRulesApplierService(
     tags as unknown as TagsService,
+    { enqueue } as unknown as AiReviewRequestsService,
   );
   const writes = (): unknown[] => [
     ...m.update.mock.calls,
@@ -130,7 +149,15 @@ function harness(fx: Fixture = {}) {
     ...tags.addTransactionTags.mock.calls,
     ...tags.removeTransactionTags.mock.calls,
   ];
-  return { m: m as never, mock: m, tags, service, ruleRepo, writes };
+  return {
+    m: m as never,
+    mock: m,
+    tags,
+    service,
+    ruleRepo,
+    writes,
+    enqueue,
+  };
 }
 
 describe("TransactionRulesApplierService.loadRulesFor", () => {
@@ -306,7 +333,7 @@ describe("TransactionRulesApplierService.applyToNew", () => {
     expect(h.tags.addTransactionTags).toHaveBeenCalled();
   });
 
-  it("records request_ai_review in the trace as skipped, not applied", async () => {
+  it("queues request_ai_review in the caller's manager and traces it as queued", async () => {
     const h = harness({
       rules: [
         rule(RULE_1, [{ type: "request_ai_review", instruction: "look" }]),
@@ -317,10 +344,41 @@ describe("TransactionRulesApplierService.applyToNew", () => {
     expect(result[0].effects.aiReviewRequests).toEqual([
       { ruleId: RULE_1, instruction: "look" },
     ]);
-    expect(result[0].effects.trace[0].skipped).toEqual([
-      { type: "request_ai_review", reason: "ai_review_queue_unavailable" },
+    expect(h.enqueue).toHaveBeenCalledTimes(1);
+    expect(h.enqueue).toHaveBeenCalledWith(h.m, USER, [
+      { transactionId: TX, ruleId: RULE_1, instruction: "look" },
     ]);
+    expect(result[0].effects.trace[0].applied).toEqual([
+      { type: "request_ai_review", outcome: "queued" },
+    ]);
+    expect(result[0].effects.trace[0].skipped).toEqual([]);
     expect(h.writes()).toEqual([]);
+  });
+
+  it("traces a request the queue already held as already_queued", async () => {
+    const h = harness({
+      rules: [
+        rule(RULE_1, [{ type: "request_ai_review", instruction: "look" }]),
+      ],
+      rows: [row()],
+    });
+    h.enqueue.mockResolvedValueOnce({
+      queued: [],
+      alreadyQueued: [{ transactionId: TX, ruleId: RULE_1 }],
+    });
+    const result = await h.service.applyToNew(h.m, USER, [TX], "import");
+    expect(result[0].effects.trace[0].applied).toEqual([
+      { type: "request_ai_review", outcome: "already_queued" },
+    ]);
+  });
+
+  it("enqueues nothing when no rule asked for a review", async () => {
+    const h = harness({
+      rules: [rule(RULE_1, [{ type: "add_tags", tagIds: [TAG_A] }])],
+      rows: [row()],
+    });
+    await h.service.applyToNew(h.m, USER, [TX], "create");
+    expect(h.enqueue).not.toHaveBeenCalled();
   });
 
   it("uses the rules it is given instead of loading them (an import loads once per file)", async () => {
@@ -403,6 +461,27 @@ describe("TransactionRulesApplierService.applyToNewTransfer", () => {
     fromOwnerId: USER,
     toOwnerId: USER,
   };
+
+  it("queues one AI review per transfer, on the outgoing leg, and traces both legs as queued", async () => {
+    const h = harness({
+      known: [ACCOUNT, OTHER],
+      rules: [
+        rule(RULE_1, [{ type: "request_ai_review", instruction: "look" }]),
+      ],
+      rows: [fromLeg(), toLeg()],
+    });
+    const applied = await h.service.applyToNewTransfer(h.m, sameOwner);
+    expect(h.enqueue).toHaveBeenCalledTimes(1);
+    expect(h.enqueue).toHaveBeenCalledWith(h.m, USER, [
+      { transactionId: FROM_TX, ruleId: RULE_1, instruction: "look" },
+    ]);
+    expect(applied).toHaveLength(2);
+    for (const { effects } of applied) {
+      expect(effects.trace[0].applied).toEqual([
+        { type: "request_ai_review", outcome: "queued" },
+      ]);
+    }
+  });
 
   it("with no rules reads nothing else and writes nothing (neutral)", async () => {
     const h = harness({ rules: [], rows: [fromLeg(), toLeg()] });

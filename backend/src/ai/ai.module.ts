@@ -34,6 +34,7 @@ import { BuiltInReportsModule } from "../built-in-reports/built-in-reports.modul
 import { AttachmentsModule } from "../attachments/attachments.module";
 import { AiRelayModule } from "./relay/ai-relay.module";
 import { CurrenciesModule } from "../currencies/currencies.module";
+import { TransactionRulesModule } from "../transaction-rules/transaction-rules.module";
 
 @Module({
   imports: [
@@ -65,6 +66,8 @@ import { CurrenciesModule } from "../currencies/currencies.module";
     AiRelayModule,
     // ExchangeRateService, for the `calculate` tool's currency conversion.
     forwardRef(() => CurrenciesModule),
+    // Commit and name-resolve the rule actions and tools.
+    forwardRef(() => TransactionRulesModule),
   ],
   providers: [
     AiService,

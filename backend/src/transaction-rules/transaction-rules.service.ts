@@ -160,9 +160,26 @@ export class TransactionRulesService {
     });
   }
 
-  async remove(userId: string, id: string): Promise<void> {
+  /**
+   * `expectedRevision` is the caller's expectation (a confirmation card names
+   * the revision it showed): a rule edited since is refused with 409 before the
+   * delete, in the same transaction and under the same list lock.
+   */
+  async remove(
+    userId: string,
+    id: string,
+    expectedRevision?: number,
+  ): Promise<void> {
     await withScopedDb(this.dataSource, async (m) => {
       await this.lockRuleList(m, userId);
+      if (expectedRevision !== undefined) {
+        const rule = await this.findOwned(
+          m.getRepository(TransactionRule),
+          userId,
+          id,
+        );
+        if (rule.revision !== expectedRevision) throw this.revisionConflict();
+      }
       const result = await m
         .getRepository(TransactionRule)
         .delete({ id, userId });
