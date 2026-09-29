@@ -8,6 +8,7 @@ import {
   REGISTER_PAYEE_CELL_FLOOR,
   REGISTER_PAYEE_NAME_CAP,
   registerColumnClass,
+  registerPayeeLayout,
   type RegisterColumnId,
 } from './register-columns';
 
@@ -259,6 +260,33 @@ describe('the register column contract', () => {
         'never a hand-written sm:max-w-[...] -- a fixed cap is what kept the ' +
         'longest payee from rendering while Description held the slack.',
     ).toEqual([]);
+  });
+
+  it('lets a long payee wrap or ellipsize, never widen the table', () => {
+    // A nowrap `truncate` name counts its full width (up to the 35-60cqw cap)
+    // in the column's min-content, so with the Account column showing the
+    // table outgrew its container and Amount scrolled out from behind the
+    // sticky Actions column (issue #1470). Normal wraps: `wrap-anywhere`, not
+    // `break-words`, is what lowers the min-content. Compact and Dense keep
+    // one line inside `minmax(0, max-content)` tracks, whose min-content is 0.
+    const normal = registerPayeeLayout('normal');
+    expect(normal.name).toContain('wrap-anywhere');
+    expect(normal.name).not.toContain('truncate');
+    for (const density of ['compact', 'dense'] as const) {
+      const layout = registerPayeeLayout(density);
+      expect(layout.name).toContain('truncate');
+      expect(layout.container).toMatch(/\bgrid\b/);
+      expect(layout.container).toContain('auto-cols-[minmax(0,max-content)]');
+    }
+
+    // The row takes both halves from the helper, so a hand-written
+    // `truncate` beside the cap cannot quietly come back.
+    const row = withoutComments(
+      REGISTER_SOURCES['/src/components/transactions/TransactionRow.tsx'],
+    );
+    expect(row).toContain('registerPayeeLayout(density)');
+    expect(row).not.toMatch(/truncate \$\{REGISTER_PAYEE_NAME_CAP\}/);
+    expect(row.match(/\$\{payeeLayout\.name\} \$\{REGISTER_PAYEE_NAME_CAP\}/g) ?? []).toHaveLength(2);
   });
 
   it('floors the payee column so Description cannot take what it needs', () => {

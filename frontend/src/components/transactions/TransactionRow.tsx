@@ -13,6 +13,7 @@ import {
   REGISTER_DESCRIPTION_CELL_FLEX,
   REGISTER_PAYEE_CELL_FLOOR,
   REGISTER_PAYEE_NAME_CAP,
+  registerPayeeLayout,
 } from '@/components/transactions/register-columns';
 import { PayeeLogo } from '@/components/payees/PayeeLogo';
 import { Transaction, TransactionSplit, TransactionStatus } from '@/types/transaction';
@@ -283,6 +284,7 @@ export const TransactionRow = memo(function TransactionRow({
   staleReason,
 }: TransactionRowProps) {
   const compactPadding = registerDateColumnPadding(compactDates);
+  const payeeLayout = registerPayeeLayout(density);
   const t = useTranslations('transactions');
   const tc = useTranslations('common');
   // The reconciliation chips live in the reconcile catalog so the register and
@@ -659,14 +661,17 @@ export const TransactionRow = memo(function TransactionRow({
       )}
       {/* Two things give the payee room when the year is hidden: this
           phone-width cap widens, and the inset between this column and the
-          date closes (registerDateColumnPadding). It stays a cap, with
-          truncate below, so a long payee cannot push Amount off screen.
+          date closes (registerDateColumnPadding). It stays a cap, with the
+          name wrapping or truncating below, so a long payee cannot push
+          Amount off screen.
           REGISTER_PAYEE_CELL_FLOOR is the other half: Description's w-full is
           a claim on the whole table settled against this column's content, so
           without a floor a filtered register hands Description the width the
           payee was using (see register-columns.ts). */}
       <td className={`${cellPadding} ${compactPadding.payee} ${compactDates ? 'max-w-[160px]' : 'max-w-[100px]'} sm:max-w-none ${REGISTER_PAYEE_CELL_FLOOR} overflow-hidden`}>
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Normal wraps a long payee, Compact and Dense ellipsize it; neither
+            lets it push Amount off screen (registerPayeeLayout). */}
+        <div className={payeeLayout.container}>
           {/* Brand badge beside the name, never inside the button: the button's
               text is the payee name, and a decorative glyph in it changes what
               every textContent assertion reads. Hidden at dense, where the row
@@ -683,14 +688,14 @@ export const TransactionRow = memo(function TransactionRow({
           {transaction.payeeId && onPayeeClick ? (
             <button
               onClick={(e) => { e.stopPropagation(); onPayeeClick(transaction.payeeId!); }}
-              className={`text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline block truncate ${REGISTER_PAYEE_NAME_CAP} text-left ${isVoid ? 'line-through' : ''}`}
+              className={`text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline block ${payeeLayout.name} ${REGISTER_PAYEE_NAME_CAP} text-left ${isVoid ? 'line-through' : ''}`}
               title={t('list.row.viewPayeeTitle', { name: payeeLabel ?? '' })}
             >
               {payeeLabel || '-'}
             </button>
           ) : (
             <div
-              className={`text-sm font-medium text-gray-900 dark:text-gray-100 truncate ${REGISTER_PAYEE_NAME_CAP} ${isVoid ? 'line-through' : ''}`}
+              className={`text-sm font-medium text-gray-900 dark:text-gray-100 ${payeeLayout.name} ${REGISTER_PAYEE_NAME_CAP} ${isVoid ? 'line-through' : ''}`}
               title={payeeLabel || undefined}
             >
               {payeeLabel || '-'}

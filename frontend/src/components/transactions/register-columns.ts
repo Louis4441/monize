@@ -63,6 +63,10 @@
  *   The cap survives only below the low tier, where there is no Description
  *   to yield and an uncapped payee would push Amount and Balance into the
  *   horizontal scroll instead.
+ * - **A long payee wraps or ellipsizes; it never widens the table.** Normal
+ *   wraps the name onto more lines, Compact and Dense cut it to one line with
+ *   an ellipsis (`registerPayeeLayout`). Either way the payee cell stops
+ *   holding the column open, so Amount stays on screen at every density.
  * - **A yielding column takes the leftover, so the columns above it have to
  *   say what they need.** `w-full` does not mean "take what is spare": it is
  *   a claim on 100% of the table, and an auto-layout table settles that claim
@@ -243,3 +247,43 @@ export const REGISTER_PAYEE_CELL_FLOOR = 'sm:min-w-[max(240px,16cqw)]';
 
 export const REGISTER_PAYEE_NAME_CAP =
   'sm:max-w-[max(280px,35cqw)] @min-[1536px]:max-w-[60cqw]';
+
+/**
+ * How a payee name too long for its column gives way, by density -- the
+ * classes for the payee cell's inner row (`container`) and the name itself
+ * (`name`).
+ *
+ * A single-line `truncate` name is not enough on its own: a table column is
+ * never narrower than its cells' min-content, and a nowrap name's min-content
+ * is its whole width up to `REGISTER_PAYEE_NAME_CAP` (35-60% of the
+ * register). With the Account column showing, that pushed the table past its
+ * container and Amount and Balance scrolled out from behind the sticky
+ * Actions column -- at every density, worst at Normal's wider padding. So:
+ *
+ * - **Normal** wraps the name onto as many lines as it needs. `wrap-anywhere`
+ *   (not `break-words`) is what lowers the min-content to a character, so
+ *   even a payee that is one unbroken token cannot hold the column open;
+ *   ordinary names still break at their spaces.
+ * - **Compact and Dense** keep one line and ellipsize, like the phone caps.
+ *   The row is a grid whose tracks are `minmax(0, max-content)`: under a
+ *   min-content constraint every track sizes to 0, so the cell stops forcing
+ *   the column wide, while the max-content size is still the full name, so
+ *   the column grows to show all of it whenever the register has the room.
+ *   (A `min-w-0` flex item does not do this: Chrome still counts its full
+ *   width in the flex container's min-content.)
+ *
+ * Measured in Chromium with the Account column showing and a 60-character
+ * payee: the table overflowed a 1280px register by 259px at Normal and 115px
+ * at Compact before, 0px at both after.
+ */
+export function registerPayeeLayout(density: 'normal' | 'compact' | 'dense'): {
+  container: string;
+  name: string;
+} {
+  return density === 'normal'
+    ? { container: 'flex items-center gap-2 min-w-0', name: 'wrap-anywhere' }
+    : {
+        container: 'grid grid-flow-col auto-cols-[minmax(0,max-content)] items-center gap-2',
+        name: 'truncate',
+      };
+}

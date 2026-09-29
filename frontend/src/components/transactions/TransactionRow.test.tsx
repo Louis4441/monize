@@ -1087,6 +1087,39 @@ describe('TransactionRow payee brand icon', () => {
   });
 });
 
+describe('TransactionRow long payee names', () => {
+  // A nowrap `truncate` name counts its full width in the column's
+  // min-content, so with the Account column showing it pushed Amount and
+  // Balance behind the sticky Actions column (issue #1470). Normal now wraps
+  // the name; Compact and Dense ellipsize it inside a grid that does not hold
+  // the column open. jsdom does no layout, so what is checkable here is that
+  // each density's classes reach both payee renderings (the filter button and
+  // the plain name).
+  const renderings = [
+    ['the payee button', { onPayeeClick: vi.fn() }],
+    ['the plain payee name', {}],
+  ] as const;
+
+  it.each(renderings)('wraps %s onto more lines at normal density', (_label, props) => {
+    renderRow({ ...props, density: 'normal' });
+    const name = screen.getByText('Coffee Co');
+    expect(name.className).toContain('wrap-anywhere');
+    expect(name.className).not.toContain('truncate');
+  });
+
+  it.each(
+    (['compact', 'dense'] as const).flatMap((density) =>
+      renderings.map(([label, props]) => [density, label, props] as const),
+    ),
+  )('ellipsizes at %s density on %s without holding the column open', (density, _label, props) => {
+    renderRow({ ...props, density });
+    const name = screen.getByText('Coffee Co');
+    expect(name.className).toContain('truncate');
+    expect(name.className).not.toContain('wrap-anywhere');
+    expect(name.parentElement!.className).toContain('auto-cols-[minmax(0,max-content)]');
+  });
+});
+
 describe('TransactionRow compact dates (the day/month view)', () => {
   // Born as a phone-only trade -- the payee is what runs out of room there,
   // and the year is the part a register row can spare -- and now the user's
