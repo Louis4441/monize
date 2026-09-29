@@ -254,6 +254,45 @@
     "run": {
       "button": "Chạy trên các giao dịch hiện có",
       "saveFirst": "Hãy lưu thay đổi để chạy quy tắc đã lưu."
+    },
+    "expression": {
+      "modeLabel": "Chế độ xem điều kiện",
+      "visual": "Trực quan",
+      "expression": "Biểu thức",
+      "label": "Biểu thức điều kiện",
+      "help": "Viết các điều kiện dưới dạng văn bản. Dùng && cho tất cả, || cho một trong số đó và !( ... ) để phủ định. Gọi các mục theo tên: account(\"Tên\"), payee(\"Tên\"), category(\"Cha: Con\") và tag(\"Tên\"). Dấu gạch dưới _ là một giá trị chưa được chọn. matchesGlob dùng * làm ký tự đại diện. Chỉ hỗ trợ cú pháp được đưa ra trong phần gợi ý.",
+      "blocked": "Hãy sửa biểu thức để quay lại chế độ Trực quan hoặc để lưu.",
+      "errorAt": "Dòng {line}, cột {column}: {message}",
+      "suggestions": "Gợi ý",
+      "errors": {
+        "tooLong": "Biểu thức quá dài. Giới hạn là {max} ký tự.",
+        "unexpectedChar": "Ký tự {char} không được hỗ trợ.",
+        "unterminatedString": "Văn bản này thiếu dấu ngoặc kép đóng.",
+        "invalidEscape": "Chuỗi thoát này không được hỗ trợ.",
+        "badNumber": "Đây không phải là số hợp lệ.",
+        "expectedExpression": "Ở đây cần một điều kiện.",
+        "expectedField": "Ở đây cần tên một trường.",
+        "expectedOperator": "Sau trường cần một toán tử hoặc một phương thức.",
+        "expectedValue": "Ở đây cần một giá trị.",
+        "expectedSymbol": "Ở đây cần {symbol}.",
+        "unexpectedToken": "Không mong đợi: {token}.",
+        "unsupported": "Phần này không được hỗ trợ. Chỉ dùng cú pháp được đưa ra trong phần gợi ý.",
+        "unknownField": "Trường không xác định: {name}.",
+        "unknownFunction": "Hàm hoặc phương thức không xác định: {name}.",
+        "operatorNotAllowed": "Trường {field} không thể dùng với {operator}.",
+        "wrongValueType": "{expected, select, text {Cần văn bản trong dấu ngoặc kép.} number {Cần một số.} boolean {Cần true hoặc false.} list {Cần một danh sách trong dấu ngoặc vuông.} account {Cần một tài khoản, ví dụ account(\"Tên\").} payee {Cần một người nhận, ví dụ payee(\"Tên\").} category {Cần một danh mục, ví dụ category(\"Cha: Con\").} tag {Cần một thẻ, ví dụ tag(\"Tên\").} other {Giá trị này sai loại.}}",
+        "invalidEnum": "Hãy dùng một trong các giá trị: {values}.",
+        "invalidCurrency": "Hãy dùng mã tiền tệ ba chữ cái trong dấu ngoặc kép, ví dụ \"CAD\".",
+        "valueTooLong": "Văn bản quá dài. Giới hạn là {max} ký tự.",
+        "listTooLong": "Danh sách quá dài. Giới hạn là {max} mục.",
+        "unknownEntity": "{kind, select, account {Không có tài khoản nào tên {name}.} payee {Không có người nhận nào tên {name}.} category {Không có danh mục nào tên {name}.} tag {Không có thẻ nào tên {name}.} other {Không có mục nào tên {name}.}}",
+        "ambiguousEntity": "{count} mục có tên {name}. Hãy thêm số thứ tự của mục bạn muốn, ví dụ {example}.",
+        "entityOrdinal": "Số của {name} phải từ 1 đến {count}.",
+        "maxDepth": "Các nhóm lồng nhau quá sâu. Giới hạn là {max} cấp.",
+        "maxLeaves": "Có quá nhiều điều kiện. Giới hạn là {max}.",
+        "maxNodes": "Có quá nhiều điều kiện và nhóm. Giới hạn là {max}.",
+        "tooNested": "Quá nhiều dấu ngoặc lồng nhau."
+      }
     }
   },
   "test": {

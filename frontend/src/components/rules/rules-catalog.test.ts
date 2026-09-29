@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import en from '@/i18n/messages/en/rules.json';
+import { CEL_ERROR_KEYS, EntityIndex, complete } from '@/lib/rule-cel';
 import {
   RULE_ACTION_TYPES,
   RULE_FIELDS,
@@ -40,5 +41,25 @@ describe('the rule editor catalog', () => {
     expect(Object.keys(editor.errors.codes as object).sort()).toEqual(
       [...RULE_VALIDATION_CODES, 'REFERENCE_NOT_FOUND', 'NAME_REQUIRED', 'UNKNOWN'].sort(),
     );
+  });
+
+  it('has a sentence for every expression error kind, and a label for every suggestion hint', () => {
+    const expression = editor.expression as Record<string, Record<string, unknown>>;
+    expect(Object.keys(expression.errors).sort()).toEqual([...CEL_ERROR_KEYS].sort());
+    for (const key of CEL_ERROR_KEYS) expect(typeof expression.errors[key], key).toBe('string');
+
+    // Every hint autocomplete can attach names a label the catalog has.
+    const index = new EntityIndex();
+    const hints = new Set<string>();
+    for (const field of RULE_FIELDS) {
+      for (const text of [`transaction.${field} `, `transaction.${field}.`, `transaction.${field} == `, 'transaction.']) {
+        for (const item of complete(text, text.length, index)?.items ?? []) if (item.hint) hints.add(item.hint);
+      }
+    }
+    expect(hints.size).toBeGreaterThan(20);
+    for (const hint of hints) {
+      const [group, key] = hint.split('.');
+      expect(typeof editor[group]?.[key], hint).toBe('string');
+    }
   });
 });

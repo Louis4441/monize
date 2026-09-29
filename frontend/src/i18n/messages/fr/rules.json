@@ -254,6 +254,45 @@
     "run": {
       "button": "Exécuter sur les transactions existantes",
       "saveFirst": "Enregistrez vos modifications pour exécuter la règle enregistrée."
+    },
+    "expression": {
+      "modeLabel": "Vue des conditions",
+      "visual": "Visuel",
+      "expression": "Expression",
+      "label": "Expression de la condition",
+      "help": "Écrivez les conditions sous forme de texte. Utilisez && pour toutes, || pour l'une d'elles et !( ... ) pour la négation. Désignez les éléments par leur nom : account(\"Nom\"), payee(\"Nom\"), category(\"Parent : Enfant\") et tag(\"Nom\"). Un tiret bas _ représente une valeur pas encore choisie. matchesGlob utilise * comme caractère générique. Seule la syntaxe proposée dans les suggestions est prise en charge.",
+      "blocked": "Corrigez l'expression pour revenir à la vue visuelle ou enregistrer.",
+      "errorAt": "Ligne {line}, colonne {column} : {message}",
+      "suggestions": "Suggestions",
+      "errors": {
+        "tooLong": "L'expression est trop longue. La limite est de {max} caractères.",
+        "unexpectedChar": "Le caractère {char} n'est pas pris en charge.",
+        "unterminatedString": "Ce texte n'a pas de guillemet fermant.",
+        "invalidEscape": "Cette séquence d'échappement n'est pas prise en charge.",
+        "badNumber": "Ce n'est pas un nombre valide.",
+        "expectedExpression": "Une condition est attendue ici.",
+        "expectedField": "Un nom de champ est attendu ici.",
+        "expectedOperator": "Un opérateur ou une méthode est attendu après le champ.",
+        "expectedValue": "Une valeur est attendue ici.",
+        "expectedSymbol": "{symbol} est attendu ici.",
+        "unexpectedToken": "Élément inattendu : {token}.",
+        "unsupported": "Cette partie n'est pas prise en charge. Utilisez uniquement la syntaxe proposée dans les suggestions.",
+        "unknownField": "Champ inconnu : {name}.",
+        "unknownFunction": "Fonction ou méthode inconnue : {name}.",
+        "operatorNotAllowed": "Le champ {field} ne peut pas être utilisé avec {operator}.",
+        "wrongValueType": "{expected, select, text {Un texte entre guillemets est attendu.} number {Un nombre est attendu.} boolean {true ou false est attendu.} list {Une liste entre crochets est attendue.} account {Un compte est attendu, par exemple account(\"Nom\").} payee {Un bénéficiaire est attendu, par exemple payee(\"Nom\").} category {Une catégorie est attendue, par exemple category(\"Parent : Enfant\").} tag {Un tag est attendu, par exemple tag(\"Nom\").} other {Cette valeur n'est pas du bon type.}}",
+        "invalidEnum": "Utilisez l'une de ces valeurs : {values}.",
+        "invalidCurrency": "Utilisez un code de devise à trois lettres entre guillemets, par exemple \"CAD\".",
+        "valueTooLong": "Le texte est trop long. La limite est de {max} caractères.",
+        "listTooLong": "La liste est trop longue. La limite est de {max} éléments.",
+        "unknownEntity": "{kind, select, account {Aucun compte ne s'appelle {name}.} payee {Aucun bénéficiaire ne s'appelle {name}.} category {Aucune catégorie ne s'appelle {name}.} tag {Aucun tag ne s'appelle {name}.} other {Aucun élément ne s'appelle {name}.}}",
+        "ambiguousEntity": "{count} éléments s'appellent {name}. Ajoutez le numéro de celui voulu, par exemple {example}.",
+        "entityOrdinal": "Le numéro pour {name} doit être compris entre 1 et {count}.",
+        "maxDepth": "Les groupes sont imbriqués trop profondément. La limite est de {max} niveaux.",
+        "maxLeaves": "Il y a trop de conditions. La limite est de {max}.",
+        "maxNodes": "Il y a trop de conditions et de groupes. La limite est de {max}.",
+        "tooNested": "Trop de parenthèses imbriquées."
+      }
     }
   },
   "test": {

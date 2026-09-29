@@ -254,6 +254,45 @@
     "run": {
       "button": "Ejecutar en transacciones existentes",
       "saveFirst": "Guarda tus cambios para ejecutar la regla guardada."
+    },
+    "expression": {
+      "modeLabel": "Vista de condiciones",
+      "visual": "Visual",
+      "expression": "Expresión",
+      "label": "Expresión de la condición",
+      "help": "Escribe las condiciones como texto. Usa && para todas, || para cualquiera y !( ... ) para negar. Indica los elementos por su nombre: account(\"Nombre\"), payee(\"Nombre\"), category(\"Principal: Secundaria\") y tag(\"Nombre\"). Un guion bajo _ representa un valor que aún no se ha elegido. matchesGlob usa * como comodín. Solo se admite la sintaxis que ofrecen las sugerencias.",
+      "blocked": "Corrige la expresión para volver a la vista visual o guardar.",
+      "errorAt": "Línea {line}, columna {column}: {message}",
+      "suggestions": "Sugerencias",
+      "errors": {
+        "tooLong": "La expresión es demasiado larga. El límite es de {max} caracteres.",
+        "unexpectedChar": "El carácter {char} no se admite.",
+        "unterminatedString": "Este texto no tiene comillas de cierre.",
+        "invalidEscape": "Esta secuencia de escape no se admite.",
+        "badNumber": "No es un número válido.",
+        "expectedExpression": "Aquí se espera una condición.",
+        "expectedField": "Aquí se espera el nombre de un campo.",
+        "expectedOperator": "Después del campo se espera un operador o un método.",
+        "expectedValue": "Aquí se espera un valor.",
+        "expectedSymbol": "Aquí se espera {symbol}.",
+        "unexpectedToken": "Inesperado: {token}.",
+        "unsupported": "Esta parte no se admite. Usa solo la sintaxis que ofrecen las sugerencias.",
+        "unknownField": "Campo desconocido: {name}.",
+        "unknownFunction": "Función o método desconocido: {name}.",
+        "operatorNotAllowed": "El campo {field} no se puede usar con {operator}.",
+        "wrongValueType": "{expected, select, text {Se espera texto entre comillas.} number {Se espera un número.} boolean {Se espera true o false.} list {Se espera una lista entre corchetes.} account {Se espera una cuenta, por ejemplo account(\"Nombre\").} payee {Se espera un beneficiario, por ejemplo payee(\"Nombre\").} category {Se espera una categoría, por ejemplo category(\"Principal: Secundaria\").} tag {Se espera una etiqueta, por ejemplo tag(\"Nombre\").} other {Este valor es de un tipo incorrecto.}}",
+        "invalidEnum": "Usa uno de estos: {values}.",
+        "invalidCurrency": "Usa un código de moneda de tres letras entre comillas, por ejemplo \"CAD\".",
+        "valueTooLong": "El texto es demasiado largo. El límite es de {max} caracteres.",
+        "listTooLong": "La lista es demasiado larga. El límite es de {max} elementos.",
+        "unknownEntity": "{kind, select, account {Ninguna cuenta se llama {name}.} payee {Ningún beneficiario se llama {name}.} category {Ninguna categoría se llama {name}.} tag {Ninguna etiqueta se llama {name}.} other {Ningún elemento se llama {name}.}}",
+        "ambiguousEntity": "{count} elementos se llaman {name}. Añade el número del que quieres, por ejemplo {example}.",
+        "entityOrdinal": "El número para {name} debe estar entre 1 y {count}.",
+        "maxDepth": "Los grupos están anidados a demasiada profundidad. El límite es de {max} niveles.",
+        "maxLeaves": "Hay demasiadas condiciones. El límite es {max}.",
+        "maxNodes": "Hay demasiadas condiciones y grupos. El límite es {max}.",
+        "tooNested": "Demasiados paréntesis anidados."
+      }
     }
   },
   "test": {

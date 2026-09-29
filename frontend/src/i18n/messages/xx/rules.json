@@ -254,6 +254,45 @@
     "run": {
       "button": "[XX-Run on existing transactions-XX]",
       "saveFirst": "[XX-Save your changes to run the saved rule.-XX]"
+    },
+    "expression": {
+      "modeLabel": "[XX-Condition view-XX]",
+      "visual": "[XX-Visual-XX]",
+      "expression": "[XX-Expression-XX]",
+      "label": "[XX-Condition expression-XX]",
+      "help": "[XX-Write the conditions as text. Use && for all of these, || for any of these and !( ... ) for not. Refer to items by name: account(\"Name\"), payee(\"Name\"), category(\"Parent: Child\") and tag(\"Name\"). An underscore _ stands for a value you have not chosen yet. matchesGlob uses * as a wildcard. Only the syntax offered in the suggestions is supported.-XX]",
+      "blocked": "[XX-Fix the expression to switch back to Visual or to save.-XX]",
+      "errorAt": "[XX-Line {line}, column {column}: {message}-XX]",
+      "suggestions": "[XX-Suggestions-XX]",
+      "errors": {
+        "tooLong": "[XX-The expression is too long. The limit is {max} characters.-XX]",
+        "unexpectedChar": "[XX-The character {char} is not supported.-XX]",
+        "unterminatedString": "[XX-This text has no closing quote.-XX]",
+        "invalidEscape": "[XX-This escape sequence is not supported.-XX]",
+        "badNumber": "[XX-This is not a valid number.-XX]",
+        "expectedExpression": "[XX-A condition is expected here.-XX]",
+        "expectedField": "[XX-A field name is expected here.-XX]",
+        "expectedOperator": "[XX-An operator or a method is expected after the field.-XX]",
+        "expectedValue": "[XX-A value is expected here.-XX]",
+        "expectedSymbol": "[XX-Expected {symbol} here.-XX]",
+        "unexpectedToken": "[XX-Unexpected {token}.-XX]",
+        "unsupported": "[XX-This part is not supported. Use only the syntax offered in the suggestions.-XX]",
+        "unknownField": "[XX-Unknown field {name}.-XX]",
+        "unknownFunction": "[XX-Unknown function or method {name}.-XX]",
+        "operatorNotAllowed": "[XX-The field {field} cannot be used with {operator}.-XX]",
+        "wrongValueType": "[XX-{expected, select, text {Expected text in quotes.} number {Expected a number.} boolean {Expected true or false.} list {Expected a list in square brackets.} account {Expected an account, for example account(\"Name\").} payee {Expected a payee, for example payee(\"Name\").} category {Expected a category, for example category(\"Parent: Child\").} tag {Expected a tag, for example tag(\"Name\").} other {This value is of the wrong kind.}}-XX]",
+        "invalidEnum": "[XX-Use one of: {values}.-XX]",
+        "invalidCurrency": "[XX-Use a three letter currency code in quotes, for example \"CAD\".-XX]",
+        "valueTooLong": "[XX-The text is too long. The limit is {max} characters.-XX]",
+        "listTooLong": "[XX-The list is too long. The limit is {max} items.-XX]",
+        "unknownEntity": "[XX-{kind, select, account {No account is named {name}.} payee {No payee is named {name}.} category {No category is named {name}.} tag {No tag is named {name}.} other {No item is named {name}.}}-XX]",
+        "ambiguousEntity": "[XX-{count} items are named {name}. Add the number of the one you mean, for example {example}.-XX]",
+        "entityOrdinal": "[XX-The number for {name} must be from 1 to {count}.-XX]",
+        "maxDepth": "[XX-Groups are nested too deeply. The limit is {max} levels.-XX]",
+        "maxLeaves": "[XX-There are too many conditions. The limit is {max}.-XX]",
+        "maxNodes": "[XX-There are too many conditions and groups. The limit is {max}.-XX]",
+        "tooNested": "[XX-Too many nested parentheses.-XX]"
+      }
     }
   },
   "test": {

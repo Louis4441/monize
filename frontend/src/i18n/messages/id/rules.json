@@ -254,6 +254,45 @@
     "run": {
       "button": "Jalankan pada transaksi yang ada",
       "saveFirst": "Simpan perubahan Anda untuk menjalankan aturan yang tersimpan."
+    },
+    "expression": {
+      "modeLabel": "Tampilan kondisi",
+      "visual": "Visual",
+      "expression": "Ekspresi",
+      "label": "Ekspresi kondisi",
+      "help": "Tulis kondisi sebagai teks. Gunakan && untuk semua, || untuk salah satu, dan !( ... ) untuk negasi. Sebut item dengan namanya: account(\"Nama\"), payee(\"Nama\"), category(\"Induk: Anak\") dan tag(\"Nama\"). Garis bawah _ berarti nilai yang belum dipilih. matchesGlob memakai * sebagai wildcard. Hanya sintaks yang ditawarkan pada saran yang didukung.",
+      "blocked": "Perbaiki ekspresi untuk kembali ke tampilan Visual atau untuk menyimpan.",
+      "errorAt": "Baris {line}, kolom {column}: {message}",
+      "suggestions": "Saran",
+      "errors": {
+        "tooLong": "Ekspresi terlalu panjang. Batasnya {max} karakter.",
+        "unexpectedChar": "Karakter {char} tidak didukung.",
+        "unterminatedString": "Teks ini tidak memiliki tanda kutip penutup.",
+        "invalidEscape": "Urutan escape ini tidak didukung.",
+        "badNumber": "Ini bukan angka yang valid.",
+        "expectedExpression": "Di sini diharapkan sebuah kondisi.",
+        "expectedField": "Di sini diharapkan nama bidang.",
+        "expectedOperator": "Setelah bidang diharapkan operator atau metode.",
+        "expectedValue": "Di sini diharapkan sebuah nilai.",
+        "expectedSymbol": "Di sini diharapkan {symbol}.",
+        "unexpectedToken": "Tidak diharapkan: {token}.",
+        "unsupported": "Bagian ini tidak didukung. Gunakan hanya sintaks yang ditawarkan pada saran.",
+        "unknownField": "Bidang tidak dikenal: {name}.",
+        "unknownFunction": "Fungsi atau metode tidak dikenal: {name}.",
+        "operatorNotAllowed": "Bidang {field} tidak dapat dipakai dengan {operator}.",
+        "wrongValueType": "{expected, select, text {Diharapkan teks dalam tanda kutip.} number {Diharapkan sebuah angka.} boolean {Diharapkan true atau false.} list {Diharapkan daftar dalam tanda kurung siku.} account {Diharapkan sebuah akun, misalnya account(\"Nama\").} payee {Diharapkan seorang penerima, misalnya payee(\"Nama\").} category {Diharapkan sebuah kategori, misalnya category(\"Induk: Anak\").} tag {Diharapkan sebuah tag, misalnya tag(\"Nama\").} other {Jenis nilai ini salah.}}",
+        "invalidEnum": "Gunakan salah satu dari: {values}.",
+        "invalidCurrency": "Gunakan kode mata uang tiga huruf dalam tanda kutip, misalnya \"CAD\".",
+        "valueTooLong": "Teks terlalu panjang. Batasnya {max} karakter.",
+        "listTooLong": "Daftar terlalu panjang. Batasnya {max} item.",
+        "unknownEntity": "{kind, select, account {Tidak ada akun bernama {name}.} payee {Tidak ada penerima bernama {name}.} category {Tidak ada kategori bernama {name}.} tag {Tidak ada tag bernama {name}.} other {Tidak ada item bernama {name}.}}",
+        "ambiguousEntity": "{count} item bernama {name}. Tambahkan nomor item yang dimaksud, misalnya {example}.",
+        "entityOrdinal": "Nomor untuk {name} harus antara 1 dan {count}.",
+        "maxDepth": "Grup bersarang terlalu dalam. Batasnya {max} tingkat.",
+        "maxLeaves": "Kondisi terlalu banyak. Batasnya {max}.",
+        "maxNodes": "Kondisi dan grup terlalu banyak. Batasnya {max}.",
+        "tooNested": "Terlalu banyak tanda kurung bersarang."
+      }
     }
   },
   "test": {

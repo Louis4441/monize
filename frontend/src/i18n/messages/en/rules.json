@@ -254,6 +254,45 @@
     "run": {
       "button": "Run on existing transactions",
       "saveFirst": "Save your changes to run the saved rule."
+    },
+    "expression": {
+      "modeLabel": "Condition view",
+      "visual": "Visual",
+      "expression": "Expression",
+      "label": "Condition expression",
+      "help": "Write the conditions as text. Use && for all of these, || for any of these and !( ... ) for not. Refer to items by name: account(\"Name\"), payee(\"Name\"), category(\"Parent: Child\") and tag(\"Name\"). An underscore _ stands for a value you have not chosen yet. matchesGlob uses * as a wildcard. Only the syntax offered in the suggestions is supported.",
+      "blocked": "Fix the expression to switch back to Visual or to save.",
+      "errorAt": "Line {line}, column {column}: {message}",
+      "suggestions": "Suggestions",
+      "errors": {
+        "tooLong": "The expression is too long. The limit is {max} characters.",
+        "unexpectedChar": "The character {char} is not supported.",
+        "unterminatedString": "This text has no closing quote.",
+        "invalidEscape": "This escape sequence is not supported.",
+        "badNumber": "This is not a valid number.",
+        "expectedExpression": "A condition is expected here.",
+        "expectedField": "A field name is expected here.",
+        "expectedOperator": "An operator or a method is expected after the field.",
+        "expectedValue": "A value is expected here.",
+        "expectedSymbol": "Expected {symbol} here.",
+        "unexpectedToken": "Unexpected {token}.",
+        "unsupported": "This part is not supported. Use only the syntax offered in the suggestions.",
+        "unknownField": "Unknown field {name}.",
+        "unknownFunction": "Unknown function or method {name}.",
+        "operatorNotAllowed": "The field {field} cannot be used with {operator}.",
+        "wrongValueType": "{expected, select, text {Expected text in quotes.} number {Expected a number.} boolean {Expected true or false.} list {Expected a list in square brackets.} account {Expected an account, for example account(\"Name\").} payee {Expected a payee, for example payee(\"Name\").} category {Expected a category, for example category(\"Parent: Child\").} tag {Expected a tag, for example tag(\"Name\").} other {This value is of the wrong kind.}}",
+        "invalidEnum": "Use one of: {values}.",
+        "invalidCurrency": "Use a three letter currency code in quotes, for example \"CAD\".",
+        "valueTooLong": "The text is too long. The limit is {max} characters.",
+        "listTooLong": "The list is too long. The limit is {max} items.",
+        "unknownEntity": "{kind, select, account {No account is named {name}.} payee {No payee is named {name}.} category {No category is named {name}.} tag {No tag is named {name}.} other {No item is named {name}.}}",
+        "ambiguousEntity": "{count} items are named {name}. Add the number of the one you mean, for example {example}.",
+        "entityOrdinal": "The number for {name} must be from 1 to {count}.",
+        "maxDepth": "Groups are nested too deeply. The limit is {max} levels.",
+        "maxLeaves": "There are too many conditions. The limit is {max}.",
+        "maxNodes": "There are too many conditions and groups. The limit is {max}.",
+        "tooNested": "Too many nested parentheses."
+      }
     }
   },
   "test": {

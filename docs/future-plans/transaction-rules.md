@@ -87,17 +87,45 @@ users.
    rule against the latest N transactions (default 200, filterable by account
    and date range) and shows a table: transaction, matched yes/no, and the
    changes the actions would make. The test writes nothing.
-7. **Expression mode is a later phase and needs a dependency decision.** The
-   text mode shows the same tree as a CEL expression and accepts CEL input for
-   the supported subset only (the operators in section 5.2). An expression
-   outside the subset is refused with a message that names the part that is
-   not supported. The CEL parser and the editor library are new dependencies
-   and need their own agreement (task F5). Candidates to evaluate:
-   `@bufbuild/cel` (uses an RE2 engine), `@marcbachmann/cel-js`,
-   `react-querybuilder` (has `parseCEL` and a CEL formatter; pulls Redux
-   Toolkit), CodeMirror 6 with `@codemirror/autocomplete`. Monaco is not a
-   candidate: bundle size is checked on every PR and it needs workers under the
-   CSP. Phases 1 to 3 need no new dependency.
+7. **Expression mode is a CEL-syntax view of the same tree, built with no
+   dependency.** The repo owner decided against a CEL library and an editor
+   library (the candidates were `@bufbuild/cel`, `@marcbachmann/cel-js`,
+   `react-querybuilder` and CodeMirror 6; Monaco was excluded for bundle size and
+   its workers under the CSP). The stored form stays the JSON tree and the
+   backend is unchanged. `frontend/src/lib/rule-cel/` prints the tree as text and
+   parses text back with a hand-written recursive-descent parser (no `eval`, no
+   `new Function`), and accepts only the subset that maps one to one onto the tree
+   (the operators in section 5.2).
+   - **Text of a rule.** A field is `transaction.<field>`. Comparisons are `==`,
+     `!=`, `<`, `<=`, `>`, `>=`; `in` takes a list and `!(x in [...])` is "is none
+     of". Methods: `contains`, `startsWith`, `matchesGlob` (a glob with `*`, never
+     a regular expression), `between(a, b)`, `inSubtree`, `hasAny`, `hasAll`,
+     `hasNone`. `isEmpty(x)` is the empty test. Groups are `&&` (all) and `||`
+     (any) with CEL precedence, `!( ... )` for not, and parentheses. A group inside
+     another is always printed in parentheses, so `a && b && c` (one group) and
+     `a && (b && c)` (a group in a group) stay different rules. A group of one is
+     `all(x)` / `any(x)`, an empty one `true` / `false`. A value not chosen yet
+     prints as `_`, so a half-built rule can be shown and edited.
+   - **Names, not ids.** Items are written `account("Name")`, `payee("Name")`,
+     `category("Parent: Child")` and `tag("Name")`. A name that two items share
+     takes its number among them, ordered by id: `payee("Amazon", 2)`. An item that
+     no longer exists prints as `missing("<id>")`, the only place an id appears,
+     so opening a rule never loses a reference.
+   - **Refusals.** Text outside the subset is refused with the position (line and
+     column) and a translated message that names the part: an unknown field or
+     function, an operator the field does not allow, a value of the wrong kind, an
+     unknown or ambiguous name, a text over 20000 characters, and the depth, leaf
+     and node limits of section 5. While the text does not parse, Save, the test
+     panel and the switch back to Visual are disabled, and the tree keeps the last
+     text that did parse.
+   - **Round trip.** `parse(print(tree))` equals the tree for every tree the visual
+     editor can build; `roundtrip.test.ts` checks a table and several hundred
+     generated trees.
+   - **Autocomplete** is a suggestion list under the text box (no library),
+     chosen by caret context: fields after `transaction.`, the methods and
+     operators the field allows, enum values, and entity names inside
+     `account("`, `payee("`, `category("` and `tag("`. It inserts the name form,
+     never an id.
 8. **Rules are per user.** A rule belongs to the owner of the rows it changes.
    A transaction a delegate or a joint-account partner creates on the owner's
    account runs the owner's rules, because `create()` runs as the owner

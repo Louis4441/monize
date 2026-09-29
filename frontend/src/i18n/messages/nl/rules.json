@@ -254,6 +254,45 @@
     "run": {
       "button": "Uitvoeren op bestaande transacties",
       "saveFirst": "Sla je wijzigingen op om de opgeslagen regel uit te voeren."
+    },
+    "expression": {
+      "modeLabel": "Weergave van voorwaarden",
+      "visual": "Visueel",
+      "expression": "Expressie",
+      "label": "Expressie van de voorwaarde",
+      "help": "Schrijf de voorwaarden als tekst. Gebruik && voor alle, || voor een van deze en !( ... ) voor niet. Verwijs naar items met hun naam: account(\"Naam\"), payee(\"Naam\"), category(\"Hoofd: Sub\") en tag(\"Naam\"). Een underscore _ staat voor een waarde die nog niet is gekozen. matchesGlob gebruikt * als jokerteken. Alleen de syntaxis uit de suggesties wordt ondersteund.",
+      "blocked": "Herstel de expressie om terug te gaan naar Visueel of om op te slaan.",
+      "errorAt": "Regel {line}, kolom {column}: {message}",
+      "suggestions": "Suggesties",
+      "errors": {
+        "tooLong": "De expressie is te lang. De limiet is {max} tekens.",
+        "unexpectedChar": "Het teken {char} wordt niet ondersteund.",
+        "unterminatedString": "Deze tekst mist een afsluitend aanhalingsteken.",
+        "invalidEscape": "Deze escapereeks wordt niet ondersteund.",
+        "badNumber": "Dit is geen geldig getal.",
+        "expectedExpression": "Hier wordt een voorwaarde verwacht.",
+        "expectedField": "Hier wordt een veldnaam verwacht.",
+        "expectedOperator": "Na het veld wordt een operator of methode verwacht.",
+        "expectedValue": "Hier wordt een waarde verwacht.",
+        "expectedSymbol": "Hier wordt {symbol} verwacht.",
+        "unexpectedToken": "Onverwacht: {token}.",
+        "unsupported": "Dit onderdeel wordt niet ondersteund. Gebruik alleen de syntaxis uit de suggesties.",
+        "unknownField": "Onbekend veld {name}.",
+        "unknownFunction": "Onbekende functie of methode {name}.",
+        "operatorNotAllowed": "Het veld {field} kan niet worden gebruikt met {operator}.",
+        "wrongValueType": "{expected, select, text {Verwacht wordt tekst tussen aanhalingstekens.} number {Verwacht wordt een getal.} boolean {Verwacht wordt true of false.} list {Verwacht wordt een lijst tussen blokhaken.} account {Verwacht wordt een rekening, bijvoorbeeld account(\"Naam\").} payee {Verwacht wordt een begunstigde, bijvoorbeeld payee(\"Naam\").} category {Verwacht wordt een categorie, bijvoorbeeld category(\"Hoofd: Sub\").} tag {Verwacht wordt een tag, bijvoorbeeld tag(\"Naam\").} other {Deze waarde is van het verkeerde soort.}}",
+        "invalidEnum": "Gebruik een van deze waarden: {values}.",
+        "invalidCurrency": "Gebruik een valutacode van drie letters tussen aanhalingstekens, bijvoorbeeld \"CAD\".",
+        "valueTooLong": "De tekst is te lang. De limiet is {max} tekens.",
+        "listTooLong": "De lijst is te lang. De limiet is {max} items.",
+        "unknownEntity": "{kind, select, account {Geen rekening heet {name}.} payee {Geen begunstigde heet {name}.} category {Geen categorie heet {name}.} tag {Geen tag heet {name}.} other {Geen item heet {name}.}}",
+        "ambiguousEntity": "{count} items heten {name}. Voeg het nummer van het bedoelde item toe, bijvoorbeeld {example}.",
+        "entityOrdinal": "Het nummer voor {name} moet tussen 1 en {count} liggen.",
+        "maxDepth": "Groepen zijn te diep genest. De limiet is {max} niveaus.",
+        "maxLeaves": "Er zijn te veel voorwaarden. De limiet is {max}.",
+        "maxNodes": "Er zijn te veel voorwaarden en groepen. De limiet is {max}.",
+        "tooNested": "Te veel geneste haakjes."
+      }
     }
   },
   "test": {

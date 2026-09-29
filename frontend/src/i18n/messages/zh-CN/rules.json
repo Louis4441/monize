@@ -254,6 +254,45 @@
     "run": {
       "button": "在现有交易上运行",
       "saveFirst": "请保存更改以运行已保存的规则。"
+    },
+    "expression": {
+      "modeLabel": "条件视图",
+      "visual": "可视化",
+      "expression": "表达式",
+      "label": "条件表达式",
+      "help": "以文本形式编写条件。用 && 表示全部满足，用 || 表示满足任意一个，用 !( ... ) 表示取反。用名称引用项目：account(\"名称\")、payee(\"名称\")、category(\"上级: 下级\") 和 tag(\"名称\")。下划线 _ 表示尚未选择的值。matchesGlob 以 * 作为通配符。仅支持建议中提供的语法。",
+      "blocked": "请先修正表达式，才能切换回可视化视图或保存。",
+      "errorAt": "第 {line} 行，第 {column} 列：{message}",
+      "suggestions": "建议",
+      "errors": {
+        "tooLong": "表达式太长。上限为 {max} 个字符。",
+        "unexpectedChar": "不支持字符 {char}。",
+        "unterminatedString": "此文本缺少结束引号。",
+        "invalidEscape": "不支持此转义序列。",
+        "badNumber": "这不是有效的数字。",
+        "expectedExpression": "此处需要一个条件。",
+        "expectedField": "此处需要字段名称。",
+        "expectedOperator": "字段后需要运算符或方法。",
+        "expectedValue": "此处需要一个值。",
+        "expectedSymbol": "此处需要 {symbol}。",
+        "unexpectedToken": "意外的内容：{token}。",
+        "unsupported": "不支持这一部分。请只使用建议中提供的语法。",
+        "unknownField": "未知字段 {name}。",
+        "unknownFunction": "未知的函数或方法 {name}。",
+        "operatorNotAllowed": "字段 {field} 不能与 {operator} 一起使用。",
+        "wrongValueType": "{expected, select, text {需要带引号的文本。} number {需要一个数字。} boolean {需要 true 或 false。} list {需要方括号中的列表。} account {需要一个账户，例如 account(\"名称\")。} payee {需要一个收款方，例如 payee(\"名称\")。} category {需要一个分类，例如 category(\"上级: 下级\")。} tag {需要一个标签，例如 tag(\"名称\")。} other {此值的类型不正确。}}",
+        "invalidEnum": "请使用以下之一：{values}。",
+        "invalidCurrency": "请使用带引号的三个字母货币代码，例如 \"CAD\"。",
+        "valueTooLong": "文本太长。上限为 {max} 个字符。",
+        "listTooLong": "列表太长。上限为 {max} 项。",
+        "unknownEntity": "{kind, select, account {没有名为 {name} 的账户。} payee {没有名为 {name} 的收款方。} category {没有名为 {name} 的分类。} tag {没有名为 {name} 的标签。} other {没有名为 {name} 的项目。}}",
+        "ambiguousEntity": "有 {count} 个项目名为 {name}。请加上所指项目的编号，例如 {example}。",
+        "entityOrdinal": "{name} 的编号必须在 1 到 {count} 之间。",
+        "maxDepth": "分组嵌套过深。上限为 {max} 层。",
+        "maxLeaves": "条件过多。上限为 {max}。",
+        "maxNodes": "条件和分组过多。上限为 {max}。",
+        "tooNested": "嵌套的括号过多。"
+      }
     }
   },
   "test": {

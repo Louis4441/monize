@@ -254,6 +254,45 @@
     "run": {
       "button": "Esegui sulle transazioni esistenti",
       "saveFirst": "Salva le modifiche per eseguire la regola salvata."
+    },
+    "expression": {
+      "modeLabel": "Vista delle condizioni",
+      "visual": "Visuale",
+      "expression": "Espressione",
+      "label": "Espressione della condizione",
+      "help": "Scrivi le condizioni come testo. Usa && per tutte, || per una qualsiasi e !( ... ) per la negazione. Indica gli elementi per nome: account(\"Nome\"), payee(\"Nome\"), category(\"Principale: Secondaria\") e tag(\"Nome\"). Un trattino basso _ indica un valore non ancora scelto. matchesGlob usa * come carattere jolly. È supportata solo la sintassi proposta nei suggerimenti.",
+      "blocked": "Correggi l'espressione per tornare alla vista visuale o per salvare.",
+      "errorAt": "Riga {line}, colonna {column}: {message}",
+      "suggestions": "Suggerimenti",
+      "errors": {
+        "tooLong": "L'espressione è troppo lunga. Il limite è di {max} caratteri.",
+        "unexpectedChar": "Il carattere {char} non è supportato.",
+        "unterminatedString": "Questo testo non ha le virgolette di chiusura.",
+        "invalidEscape": "Questa sequenza di escape non è supportata.",
+        "badNumber": "Non è un numero valido.",
+        "expectedExpression": "Qui è prevista una condizione.",
+        "expectedField": "Qui è previsto il nome di un campo.",
+        "expectedOperator": "Dopo il campo è previsto un operatore o un metodo.",
+        "expectedValue": "Qui è previsto un valore.",
+        "expectedSymbol": "Qui è previsto {symbol}.",
+        "unexpectedToken": "Elemento imprevisto: {token}.",
+        "unsupported": "Questa parte non è supportata. Usa solo la sintassi proposta nei suggerimenti.",
+        "unknownField": "Campo sconosciuto: {name}.",
+        "unknownFunction": "Funzione o metodo sconosciuto: {name}.",
+        "operatorNotAllowed": "Il campo {field} non può essere usato con {operator}.",
+        "wrongValueType": "{expected, select, text {È previsto un testo tra virgolette.} number {È previsto un numero.} boolean {È previsto true o false.} list {È previsto un elenco tra parentesi quadre.} account {È previsto un conto, ad esempio account(\"Nome\").} payee {È previsto un beneficiario, ad esempio payee(\"Nome\").} category {È prevista una categoria, ad esempio category(\"Principale: Secondaria\").} tag {È previsto un tag, ad esempio tag(\"Nome\").} other {Questo valore è del tipo sbagliato.}}",
+        "invalidEnum": "Usa uno di questi valori: {values}.",
+        "invalidCurrency": "Usa un codice valuta di tre lettere tra virgolette, ad esempio \"CAD\".",
+        "valueTooLong": "Il testo è troppo lungo. Il limite è di {max} caratteri.",
+        "listTooLong": "L'elenco è troppo lungo. Il limite è di {max} elementi.",
+        "unknownEntity": "{kind, select, account {Nessun conto si chiama {name}.} payee {Nessun beneficiario si chiama {name}.} category {Nessuna categoria si chiama {name}.} tag {Nessun tag si chiama {name}.} other {Nessun elemento si chiama {name}.}}",
+        "ambiguousEntity": "{count} elementi si chiamano {name}. Aggiungi il numero di quello desiderato, ad esempio {example}.",
+        "entityOrdinal": "Il numero per {name} deve essere compreso tra 1 e {count}.",
+        "maxDepth": "I gruppi sono annidati troppo in profondità. Il limite è di {max} livelli.",
+        "maxLeaves": "Ci sono troppe condizioni. Il limite è {max}.",
+        "maxNodes": "Ci sono troppe condizioni e gruppi. Il limite è {max}.",
+        "tooNested": "Troppe parentesi annidate."
+      }
     }
   },
   "test": {

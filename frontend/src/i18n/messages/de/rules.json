@@ -254,6 +254,45 @@
     "run": {
       "button": "Auf bestehende Buchungen anwenden",
       "saveFirst": "Speichere deine Änderungen, um die gespeicherte Regel anzuwenden."
+    },
+    "expression": {
+      "modeLabel": "Bedingungsansicht",
+      "visual": "Visuell",
+      "expression": "Ausdruck",
+      "label": "Bedingungsausdruck",
+      "help": "Schreibe die Bedingungen als Text. Nutze && für alle, || für eine beliebige davon und !( ... ) für Nicht. Elemente werden über ihren Namen angegeben: account(\"Name\"), payee(\"Name\"), category(\"Ober: Unter\") und tag(\"Name\"). Ein Unterstrich _ steht für einen Wert, der noch nicht gewählt ist. matchesGlob nutzt * als Platzhalter. Unterstützt wird nur die Syntax aus den Vorschlägen.",
+      "blocked": "Korrigiere den Ausdruck, um zur visuellen Ansicht zurückzukehren oder zu speichern.",
+      "errorAt": "Zeile {line}, Spalte {column}: {message}",
+      "suggestions": "Vorschläge",
+      "errors": {
+        "tooLong": "Der Ausdruck ist zu lang. Das Limit beträgt {max} Zeichen.",
+        "unexpectedChar": "Das Zeichen {char} wird nicht unterstützt.",
+        "unterminatedString": "Diesem Text fehlt das schließende Anführungszeichen.",
+        "invalidEscape": "Diese Escape-Sequenz wird nicht unterstützt.",
+        "badNumber": "Das ist keine gültige Zahl.",
+        "expectedExpression": "Hier wird eine Bedingung erwartet.",
+        "expectedField": "Hier wird ein Feldname erwartet.",
+        "expectedOperator": "Nach dem Feld wird ein Operator oder eine Methode erwartet.",
+        "expectedValue": "Hier wird ein Wert erwartet.",
+        "expectedSymbol": "Hier wird {symbol} erwartet.",
+        "unexpectedToken": "Unerwartet: {token}.",
+        "unsupported": "Dieser Teil wird nicht unterstützt. Nutze nur die Syntax aus den Vorschlägen.",
+        "unknownField": "Unbekanntes Feld {name}.",
+        "unknownFunction": "Unbekannte Funktion oder Methode {name}.",
+        "operatorNotAllowed": "Das Feld {field} kann nicht mit {operator} verwendet werden.",
+        "wrongValueType": "{expected, select, text {Erwartet wird ein Text in Anführungszeichen.} number {Erwartet wird eine Zahl.} boolean {Erwartet wird true oder false.} list {Erwartet wird eine Liste in eckigen Klammern.} account {Erwartet wird ein Konto, zum Beispiel account(\"Name\").} payee {Erwartet wird ein Zahlungsempfänger, zum Beispiel payee(\"Name\").} category {Erwartet wird eine Kategorie, zum Beispiel category(\"Ober: Unter\").} tag {Erwartet wird ein Tag, zum Beispiel tag(\"Name\").} other {Dieser Wert hat die falsche Art.}}",
+        "invalidEnum": "Verwende einen dieser Werte: {values}.",
+        "invalidCurrency": "Verwende einen dreistelligen Währungscode in Anführungszeichen, zum Beispiel \"CAD\".",
+        "valueTooLong": "Der Text ist zu lang. Das Limit beträgt {max} Zeichen.",
+        "listTooLong": "Die Liste ist zu lang. Das Limit beträgt {max} Einträge.",
+        "unknownEntity": "{kind, select, account {Kein Konto heißt {name}.} payee {Kein Zahlungsempfänger heißt {name}.} category {Keine Kategorie heißt {name}.} tag {Kein Tag heißt {name}.} other {Kein Element heißt {name}.}}",
+        "ambiguousEntity": "{count} Elemente heißen {name}. Füge die Nummer des gemeinten hinzu, zum Beispiel {example}.",
+        "entityOrdinal": "Die Nummer für {name} muss zwischen 1 und {count} liegen.",
+        "maxDepth": "Gruppen sind zu tief verschachtelt. Das Limit beträgt {max} Ebenen.",
+        "maxLeaves": "Es gibt zu viele Bedingungen. Das Limit beträgt {max}.",
+        "maxNodes": "Es gibt zu viele Bedingungen und Gruppen. Das Limit beträgt {max}.",
+        "tooNested": "Zu viele verschachtelte Klammern."
+      }
     }
   },
   "test": {

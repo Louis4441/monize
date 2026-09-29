@@ -1,15 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
-import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { RuleActionCard } from '@/components/rules/RuleActionCard';
-import { RuleConditionGroup, type RuleTreeEnv } from '@/components/rules/RuleConditionGroup';
+import type { RuleTreeEnv } from '@/components/rules/RuleConditionGroup';
 import { RuleEditorBanners } from '@/components/rules/RuleEditorBanners';
 import { RuleErrorList } from '@/components/rules/RuleCardShell';
+import { RuleIfSection } from '@/components/rules/RuleIfSection';
 import { RuleApplications } from '@/components/rules/RuleApplications';
 import { RuleSection } from '@/components/rules/RuleSection';
 import { RuleTestPanel } from '@/components/rules/RuleTestPanel';
@@ -18,6 +18,7 @@ import { RuleWhenSection } from '@/components/rules/RuleWhenSection';
 import { createTreeHandlers } from '@/components/rules/rule-tree-handlers';
 import { useCardActions } from '@/components/rules/use-rule-card-actions';
 import { useRuleErrorMessage } from '@/components/rules/use-rule-error-message';
+import { useRuleExpression } from '@/components/rules/use-rule-expression';
 import { useRuleOptions } from '@/components/rules/use-rule-options';
 import { Button, buttonClassName } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -26,6 +27,7 @@ import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import type { RuleLookups } from '@/hooks/useRuleLookups';
 import { getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
+import { EntityIndex, buildCatalog } from '@/lib/rule-cel';
 import {
   availableActionTypes,
   canAddAction,
@@ -107,6 +109,16 @@ export function RuleEditorBody({ rule, lookups, onSaved, onReload }: RuleEditorB
     edit((current) => ({ ...current, condition: fn(current.condition) }));
 
   const handlers = createTreeHandlers(editCondition);
+  const index = useMemo(() => new EntityIndex(buildCatalog(lookups)), [lookups]);
+  const expression = useRuleExpression({
+    condition: draft.condition,
+    index,
+    onCondition: (condition) => editCondition(() => condition),
+  });
+  // The expression view has no cards, so every condition error is listed under its box.
+  const conditionCodes = [
+    ...new Set(Object.entries(errors.byKey).flatMap(([key, codes]) => (key.startsWith('c:') ? codes : []))),
+  ];
 
   const env: RuleTreeEnv = {
     root: draft.condition,
@@ -126,6 +138,7 @@ export function RuleEditorBody({ rule, lookups, onSaved, onReload }: RuleEditorB
   };
 
   const save = async () => {
+    if (expression.error !== null) return;
     const gaps = draftGaps(draft);
     if (gaps.length > 0) {
       fail(gaps, null);
@@ -160,7 +173,6 @@ export function RuleEditorBody({ rule, lookups, onSaved, onReload }: RuleEditorB
 
   const nameErrors = errors.byKey[NAME_KEY] ?? [];
   const listErrors = errors.byKey[ACTIONS_LIST_KEY] ?? [];
-  const noConditions = draft.condition.children.length === 0;
 
   return (
     <div className="space-y-6">
@@ -205,15 +217,7 @@ export function RuleEditorBody({ rule, lookups, onSaved, onReload }: RuleEditorB
           onStopProcessingChange={(stopProcessing) => edit((current) => ({ ...current, stopProcessing }))}
         />
 
-        <RuleSection title={t('sections.if')} description={t('if.description')}>
-          {noConditions && (
-            <p className="mb-3 flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400">
-              <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-              {t('if.everyTransaction')}
-            </p>
-          )}
-          <RuleConditionGroup group={draft.condition} path={[]} env={env} />
-        </RuleSection>
+        <RuleIfSection expression={expression} env={env} index={index} conditionCodes={conditionCodes} />
 
         <RuleSection title={t('sections.then')} description={t('then.description')}>
           <div className="space-y-3">
@@ -255,7 +259,7 @@ export function RuleEditorBody({ rule, lookups, onSaved, onReload }: RuleEditorB
           </div>
         </RuleSection>
 
-        <RuleTestPanel draft={draft} accountOptions={options.accounts} />
+        <RuleTestPanel draft={draft} accountOptions={options.accounts} blocked={expression.error !== null} />
 
         {rule && <RuleApplications ruleId={rule.id} options={options} />}
 
@@ -281,7 +285,7 @@ export function RuleEditorBody({ rule, lookups, onSaved, onReload }: RuleEditorB
             type="button"
             className="w-full sm:w-auto"
             isLoading={saving}
-            disabled={saving || (rule !== null && !dirty)}
+            disabled={saving || expression.error !== null || (rule !== null && !dirty)}
             onClick={() => void save()}
           >
             {t('save.button')}

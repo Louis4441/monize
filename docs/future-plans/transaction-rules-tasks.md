@@ -39,14 +39,14 @@
 | B7 | Guard: every insert site on `transactions` calls the applier or is exempt | B5, B6 | none | [x] |
 | B8 | Manual run: preview endpoint, commit endpoint, action history, reconciled skip; application trace and retention | B4 | inert | [x] retention cron open (needs a WITH_CONTEXT_ALLOWLIST decision) |
 | A1 | AI action types and builder; AI assistant tools | B8 | inert | [x] |
-| A2 | MCP tool `manage_transaction_rules` | A1 | inert | [ ] |
+| A2 | MCP tool `manage_transaction_rules` | A1 | inert | [x] |
 | F1 | Tools menu entry, rules API client, list page | B2 | inert | [x] |
 | F2 | Rule editor (visual, Home Assistant layout) | F1 | inert | [x] |
 | F3 | Test panel and manual-run dialog | F2, B8 | inert | [x] |
 | F4 | Application history per rule (trace view) | F1, B8 | inert | [x] |
-| F5 | Expression mode (CEL subset): dependency proposal first | F2 | inert | [ ] |
+| F5 | Expression mode (CEL-syntax view of the same tree, no new dependency) | F2 | inert | [x] |
 | R1 | `ai_review_requests` table, enqueue from `request_ai_review` in the applier, expiry cron | D1, B4 | inert | [x] expiry cron open (same decision as B8) |
-| R2 | MCP and assistant tools: list, claim, submit proposal; proposal stored as a signed `PendingAiAction` | R1, A1 | inert | [ ] |
+| R2 | MCP and assistant tools: list, claim, submit proposal; proposal stored as a signed `PendingAiAction` | R1, A1 | inert | [x] |
 | R3 | Review inbox in the UI: pending, proposed (confirmation card), expired | R2, F1 | inert | [ ] |
 | E1 | E2E: create a rule, import a QIF, see the tag | F2, B6 | none | [ ] |
 | Q1 | `docs/system-invariants.md` entries, doc lines, README feature line | B7 | none | [x] |
@@ -171,7 +171,15 @@ Files: `frontend/src/components/rules/RuleApplications.tsx`, tests.
 
 ### F5. Expression mode
 
-Starts with a written dependency proposal (CEL parser, editor library, bundle size measured), agreed before code. Then: a Visual / Expression toggle; the expression view renders the tree as CEL; input outside the subset is refused with the part named; autocomplete of fields, operators and entity names inserting ids.
+Files: `frontend/src/lib/rule-cel/` (`printer.ts`, `parser.ts`, `parser-values.ts`, `lexer.ts`, `complete.ts`, `catalog.ts`, `limits.ts`, `types.ts`, with tests), `frontend/src/components/rules/RuleIfSection.tsx`, `RuleExpressionEditor.tsx`, `RuleExpressionSuggestions.tsx`, `use-rule-expression.ts`, `use-expression-suggestions.ts`, the `rules.editor.expression` catalog.
+
+Decided by the repo owner: no new dependency, the stored form stays the JSON tree, the backend is unchanged (design section 3.7).
+
+- A Visual / Expression switch on the If section (`SEGMENTED_GROUP_CLASS` and `segmentClass`). The expression view is a text box with the tree printed as CEL-syntax text; each edit is parsed, and a valid text replaces the draft's tree, so switching back to Visual shows the same rule.
+- Text outside the subset is refused with a line, a column and a translated message naming the part. While it is refused, Save, the test panel and the switch back to Visual are disabled.
+- Autocomplete without a library: a keyboard-navigable suggestion list (`role="listbox"`, `aria-activedescendant`; Down, Up, Enter, Escape) offering fields, methods, operators, enum values and entity names by caret context. It inserts names, never ids.
+- `parse(print(tree))` equals the tree for every tree the visual editor can build (table tests plus generated trees).
+- Every locale carries the new strings; the pseudo-locale is regenerated.
 
 ### R1 to R3. The AI review queue
 

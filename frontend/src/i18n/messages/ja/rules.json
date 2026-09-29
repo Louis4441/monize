@@ -254,6 +254,45 @@
     "run": {
       "button": "既存の取引に対して実行",
       "saveFirst": "保存済みのルールを実行するには、変更を保存してください。"
+    },
+    "expression": {
+      "modeLabel": "条件の表示",
+      "visual": "ビジュアル",
+      "expression": "式",
+      "label": "条件式",
+      "help": "条件をテキストで記述します。すべてに一致するなら &&、いずれかに一致するなら ||、否定には !( ... ) を使います。項目は名前で指定します: account(\"名前\")、payee(\"名前\")、category(\"親: 子\")、tag(\"名前\")。アンダースコア _ は、まだ選択していない値を表します。matchesGlob は * をワイルドカードとして使います。候補に表示される構文のみ使用できます。",
+      "blocked": "ビジュアル表示に戻すか保存するには、式を修正してください。",
+      "errorAt": "{line} 行目、{column} 列目: {message}",
+      "suggestions": "候補",
+      "errors": {
+        "tooLong": "式が長すぎます。上限は {max} 文字です。",
+        "unexpectedChar": "文字 {char} は使用できません。",
+        "unterminatedString": "このテキストに閉じの引用符がありません。",
+        "invalidEscape": "このエスケープシーケンスは使用できません。",
+        "badNumber": "有効な数値ではありません。",
+        "expectedExpression": "ここには条件が必要です。",
+        "expectedField": "ここにはフィールド名が必要です。",
+        "expectedOperator": "フィールドの後には演算子またはメソッドが必要です。",
+        "expectedValue": "ここには値が必要です。",
+        "expectedSymbol": "ここには {symbol} が必要です。",
+        "unexpectedToken": "予期しない要素です: {token}。",
+        "unsupported": "この部分は使用できません。候補に表示される構文のみ使用してください。",
+        "unknownField": "不明なフィールド {name} です。",
+        "unknownFunction": "不明な関数またはメソッド {name} です。",
+        "operatorNotAllowed": "フィールド {field} は {operator} と併用できません。",
+        "wrongValueType": "{expected, select, text {引用符で囲んだテキストが必要です。} number {数値が必要です。} boolean {true または false が必要です。} list {角かっこで囲んだリストが必要です。} account {口座が必要です。例: account(\"名前\")。} payee {支払先が必要です。例: payee(\"名前\")。} category {カテゴリが必要です。例: category(\"親: 子\")。} tag {タグが必要です。例: tag(\"名前\")。} other {この値の種類が正しくありません。}}",
+        "invalidEnum": "次のいずれかを使用してください: {values}。",
+        "invalidCurrency": "引用符で囲んだ 3 文字の通貨コードを使用してください。例: \"CAD\"。",
+        "valueTooLong": "テキストが長すぎます。上限は {max} 文字です。",
+        "listTooLong": "リストが長すぎます。上限は {max} 件です。",
+        "unknownEntity": "{kind, select, account {{name} という名前の口座はありません。} payee {{name} という名前の支払先はありません。} category {{name} という名前のカテゴリはありません。} tag {{name} という名前のタグはありません。} other {{name} という名前の項目はありません。}}",
+        "ambiguousEntity": "{count} 件の項目が {name} という名前です。目的の項目の番号を追加してください。例: {example}。",
+        "entityOrdinal": "{name} の番号は 1 から {count} までにしてください。",
+        "maxDepth": "グループの入れ子が深すぎます。上限は {max} 階層です。",
+        "maxLeaves": "条件が多すぎます。上限は {max} です。",
+        "maxNodes": "条件とグループが多すぎます。上限は {max} です。",
+        "tooNested": "入れ子のかっこが多すぎます。"
+      }
     }
   },
   "test": {

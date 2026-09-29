@@ -39,6 +39,8 @@ interface RuleTestPanelProps {
   /** The draft as it is now, saved or not. */
   draft: RuleDraft;
   accountOptions: readonly RuleOption[];
+  /** The condition text does not parse, so the draft is not what the reader sees. */
+  blocked?: boolean;
 }
 
 /**
@@ -47,7 +49,7 @@ interface RuleTestPanelProps {
  * draft or the filters afterwards leaves the result on screen but marks it as
  * out of date, because it no longer describes what the reader is looking at.
  */
-export function RuleTestPanel({ draft, accountOptions }: RuleTestPanelProps) {
+export function RuleTestPanel({ draft, accountOptions, blocked = false }: RuleTestPanelProps) {
   const t = useTranslations('rules.test');
   const errorMessage = useRuleRunErrorMessage();
   const [filters, setFilters] = useState<RunFiltersState>(DEFAULT_RUN_FILTERS);
@@ -62,7 +64,7 @@ export function RuleTestPanel({ draft, accountOptions }: RuleTestPanelProps) {
   const key = useMemo(() => JSON.stringify(request), [request]);
 
   // The name is not part of a test; every other gap would be refused by the server.
-  const incomplete = draftGaps(draft).some((entry) => entry.path !== NAME_KEY);
+  const incomplete = blocked || draftGaps(draft).some((entry) => entry.path !== NAME_KEY);
   const backwards = hasBackwardsRange(filters);
   const busy = state.status === 'loading';
 

@@ -254,6 +254,45 @@
     "run": {
       "button": "Uruchom na istniejących transakcjach",
       "saveFirst": "Zapisz zmiany, aby uruchomić zapisaną regułę."
+    },
+    "expression": {
+      "modeLabel": "Widok warunków",
+      "visual": "Wizualny",
+      "expression": "Wyrażenie",
+      "label": "Wyrażenie warunku",
+      "help": "Zapisz warunki jako tekst. Użyj &&, gdy wszystkie muszą być spełnione, || dla któregokolwiek i !( ... ) dla negacji. Elementy wskazuj nazwą: account(\"Nazwa\"), payee(\"Nazwa\"), category(\"Nadrzędna: Podrzędna\") i tag(\"Nazwa\"). Podkreślenie _ oznacza wartość, której jeszcze nie wybrano. matchesGlob używa * jako znaku wieloznacznego. Obsługiwana jest tylko składnia z podpowiedzi.",
+      "blocked": "Popraw wyrażenie, aby wrócić do widoku wizualnego lub zapisać.",
+      "errorAt": "Wiersz {line}, kolumna {column}: {message}",
+      "suggestions": "Podpowiedzi",
+      "errors": {
+        "tooLong": "Wyrażenie jest za długie. Limit to {max} znaków.",
+        "unexpectedChar": "Znak {char} nie jest obsługiwany.",
+        "unterminatedString": "Ten tekst nie ma zamykającego cudzysłowu.",
+        "invalidEscape": "Ta sekwencja specjalna nie jest obsługiwana.",
+        "badNumber": "To nie jest poprawna liczba.",
+        "expectedExpression": "W tym miejscu oczekiwany jest warunek.",
+        "expectedField": "W tym miejscu oczekiwana jest nazwa pola.",
+        "expectedOperator": "Po polu oczekiwany jest operator lub metoda.",
+        "expectedValue": "W tym miejscu oczekiwana jest wartość.",
+        "expectedSymbol": "W tym miejscu oczekiwany jest znak {symbol}.",
+        "unexpectedToken": "Nieoczekiwany element {token}.",
+        "unsupported": "Ta część nie jest obsługiwana. Użyj tylko składni z podpowiedzi.",
+        "unknownField": "Nieznane pole {name}.",
+        "unknownFunction": "Nieznana funkcja lub metoda {name}.",
+        "operatorNotAllowed": "Pola {field} nie można użyć z {operator}.",
+        "wrongValueType": "{expected, select, text {Oczekiwany jest tekst w cudzysłowie.} number {Oczekiwana jest liczba.} boolean {Oczekiwane jest true lub false.} list {Oczekiwana jest lista w nawiasach kwadratowych.} account {Oczekiwane jest konto, na przykład account(\"Nazwa\").} payee {Oczekiwany jest odbiorca, na przykład payee(\"Nazwa\").} category {Oczekiwana jest kategoria, na przykład category(\"Nadrzędna: Podrzędna\").} tag {Oczekiwany jest tag, na przykład tag(\"Nazwa\").} other {Wartość jest niewłaściwego rodzaju.}}",
+        "invalidEnum": "Użyj jednej z wartości: {values}.",
+        "invalidCurrency": "Użyj trzyliterowego kodu waluty w cudzysłowie, na przykład \"CAD\".",
+        "valueTooLong": "Tekst jest za długi. Limit to {max} znaków.",
+        "listTooLong": "Lista jest za długa. Limit to {max} pozycji.",
+        "unknownEntity": "{kind, select, account {Żadne konto nie nazywa się {name}.} payee {Żaden odbiorca nie nazywa się {name}.} category {Żadna kategoria nie nazywa się {name}.} tag {Żaden tag nie nazywa się {name}.} other {Żaden element nie nazywa się {name}.}}",
+        "ambiguousEntity": "Nazwę {name} nosi kilka elementów ({count}). Dodaj numer właściwego, na przykład {example}.",
+        "entityOrdinal": "Numer dla {name} musi mieścić się w zakresie od 1 do {count}.",
+        "maxDepth": "Grupy są zagnieżdżone zbyt głęboko. Limit to {max} poziomy.",
+        "maxLeaves": "Warunków jest za dużo. Limit to {max}.",
+        "maxNodes": "Warunków i grup jest za dużo. Limit to {max}.",
+        "tooNested": "Zbyt wiele zagnieżdżonych nawiasów."
+      }
     }
   },
   "test": {

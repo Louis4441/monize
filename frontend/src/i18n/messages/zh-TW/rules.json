@@ -254,6 +254,45 @@
     "run": {
       "button": "在現有交易上執行",
       "saveFirst": "請儲存變更以執行已儲存的規則。"
+    },
+    "expression": {
+      "modeLabel": "條件檢視",
+      "visual": "視覺化",
+      "expression": "運算式",
+      "label": "條件運算式",
+      "help": "以文字形式撰寫條件。用 && 表示全部符合，用 || 表示符合任一個，用 !( ... ) 表示否定。以名稱參照項目：account(\"名稱\")、payee(\"名稱\")、category(\"上層: 下層\") 和 tag(\"名稱\")。底線 _ 代表尚未選擇的值。matchesGlob 以 * 作為萬用字元。僅支援建議中提供的語法。",
+      "blocked": "請先修正運算式，才能切換回視覺化檢視或儲存。",
+      "errorAt": "第 {line} 行，第 {column} 欄：{message}",
+      "suggestions": "建議",
+      "errors": {
+        "tooLong": "運算式太長。上限為 {max} 個字元。",
+        "unexpectedChar": "不支援字元 {char}。",
+        "unterminatedString": "此文字缺少結尾引號。",
+        "invalidEscape": "不支援此跳脫序列。",
+        "badNumber": "這不是有效的數字。",
+        "expectedExpression": "此處需要一個條件。",
+        "expectedField": "此處需要欄位名稱。",
+        "expectedOperator": "欄位後需要運算子或方法。",
+        "expectedValue": "此處需要一個值。",
+        "expectedSymbol": "此處需要 {symbol}。",
+        "unexpectedToken": "非預期的內容：{token}。",
+        "unsupported": "不支援這一部分。請只使用建議中提供的語法。",
+        "unknownField": "未知的欄位 {name}。",
+        "unknownFunction": "未知的函式或方法 {name}。",
+        "operatorNotAllowed": "欄位 {field} 不能與 {operator} 一起使用。",
+        "wrongValueType": "{expected, select, text {需要帶引號的文字。} number {需要一個數字。} boolean {需要 true 或 false。} list {需要方括號中的清單。} account {需要一個帳戶，例如 account(\"名稱\")。} payee {需要一個收款對象，例如 payee(\"名稱\")。} category {需要一個分類，例如 category(\"上層: 下層\")。} tag {需要一個標籤，例如 tag(\"名稱\")。} other {此值的類型不正確。}}",
+        "invalidEnum": "請使用下列其中之一：{values}。",
+        "invalidCurrency": "請使用帶引號的三個字母貨幣代碼，例如 \"CAD\"。",
+        "valueTooLong": "文字太長。上限為 {max} 個字元。",
+        "listTooLong": "清單太長。上限為 {max} 項。",
+        "unknownEntity": "{kind, select, account {沒有名為 {name} 的帳戶。} payee {沒有名為 {name} 的收款對象。} category {沒有名為 {name} 的分類。} tag {沒有名為 {name} 的標籤。} other {沒有名為 {name} 的項目。}}",
+        "ambiguousEntity": "有 {count} 個項目名為 {name}。請加上所指項目的編號，例如 {example}。",
+        "entityOrdinal": "{name} 的編號必須介於 1 到 {count} 之間。",
+        "maxDepth": "群組巢狀過深。上限為 {max} 層。",
+        "maxLeaves": "條件過多。上限為 {max}。",
+        "maxNodes": "條件和群組過多。上限為 {max}。",
+        "tooNested": "巢狀括號過多。"
+      }
     }
   },
   "test": {

@@ -254,6 +254,45 @@
     "run": {
       "button": "Mevcut işlemlerde çalıştır",
       "saveFirst": "Kaydedilmiş kuralı çalıştırmak için değişikliklerinizi kaydedin."
+    },
+    "expression": {
+      "modeLabel": "Koşul görünümü",
+      "visual": "Görsel",
+      "expression": "İfade",
+      "label": "Koşul ifadesi",
+      "help": "Koşulları metin olarak yazın. Hepsi için &&, herhangi biri için || ve olumsuzlama için !( ... ) kullanın. Öğeleri adıyla belirtin: account(\"Ad\"), payee(\"Ad\"), category(\"Üst: Alt\") ve tag(\"Ad\"). Alt çizgi _ henüz seçilmemiş bir değeri gösterir. matchesGlob, * karakterini joker olarak kullanır. Yalnızca önerilerde sunulan söz dizimi desteklenir.",
+      "blocked": "Görsel görünüme dönmek veya kaydetmek için ifadeyi düzeltin.",
+      "errorAt": "Satır {line}, sütun {column}: {message}",
+      "suggestions": "Öneriler",
+      "errors": {
+        "tooLong": "İfade çok uzun. Sınır {max} karakterdir.",
+        "unexpectedChar": "{char} karakteri desteklenmiyor.",
+        "unterminatedString": "Bu metnin kapanış tırnağı yok.",
+        "invalidEscape": "Bu kaçış dizisi desteklenmiyor.",
+        "badNumber": "Bu geçerli bir sayı değil.",
+        "expectedExpression": "Burada bir koşul bekleniyor.",
+        "expectedField": "Burada bir alan adı bekleniyor.",
+        "expectedOperator": "Alandan sonra bir işleç veya yöntem bekleniyor.",
+        "expectedValue": "Burada bir değer bekleniyor.",
+        "expectedSymbol": "Burada {symbol} bekleniyor.",
+        "unexpectedToken": "Beklenmeyen: {token}.",
+        "unsupported": "Bu kısım desteklenmiyor. Yalnızca önerilerde sunulan söz dizimini kullanın.",
+        "unknownField": "Bilinmeyen alan: {name}.",
+        "unknownFunction": "Bilinmeyen işlev veya yöntem: {name}.",
+        "operatorNotAllowed": "{field} alanı {operator} ile kullanılamaz.",
+        "wrongValueType": "{expected, select, text {Tırnak içinde bir metin bekleniyor.} number {Bir sayı bekleniyor.} boolean {true veya false bekleniyor.} list {Köşeli parantez içinde bir liste bekleniyor.} account {Bir hesap bekleniyor, örneğin account(\"Ad\").} payee {Bir alıcı bekleniyor, örneğin payee(\"Ad\").} category {Bir kategori bekleniyor, örneğin category(\"Üst: Alt\").} tag {Bir etiket bekleniyor, örneğin tag(\"Ad\").} other {Bu değer yanlış türde.}}",
+        "invalidEnum": "Şunlardan birini kullanın: {values}.",
+        "invalidCurrency": "Tırnak içinde üç harfli bir para birimi kodu kullanın, örneğin \"CAD\".",
+        "valueTooLong": "Metin çok uzun. Sınır {max} karakterdir.",
+        "listTooLong": "Liste çok uzun. Sınır {max} öğedir.",
+        "unknownEntity": "{kind, select, account {{name} adında bir hesap yok.} payee {{name} adında bir alıcı yok.} category {{name} adında bir kategori yok.} tag {{name} adında bir etiket yok.} other {{name} adında bir öğe yok.}}",
+        "ambiguousEntity": "{count} öğenin adı {name}. Kastettiğiniz öğenin numarasını ekleyin, örneğin {example}.",
+        "entityOrdinal": "{name} için numara 1 ile {count} arasında olmalıdır.",
+        "maxDepth": "Gruplar çok derin iç içe geçmiş. Sınır {max} düzeydir.",
+        "maxLeaves": "Çok fazla koşul var. Sınır {max}.",
+        "maxNodes": "Çok fazla koşul ve grup var. Sınır {max}.",
+        "tooNested": "Çok fazla iç içe parantez var."
+      }
     }
   },
   "test": {
