@@ -1,8 +1,13 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { ConflictException, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from "@nestjs/common";
 import { DataSource } from "typeorm";
-import { TagsService } from "./tags.service";
+import { TagsService, TAG_LINK_INSERT_BATCH } from "./tags.service";
 import { Tag } from "./entities/tag.entity";
+import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionTag } from "./entities/transaction-tag.entity";
 import { TransactionSplitTag } from "./entities/transaction-split-tag.entity";
 import { ActionHistoryService } from "../action-history/action-history.service";
@@ -454,6 +459,220 @@ describe("TagsService", () => {
       expect(qrManager.delete).toHaveBeenCalled();
       expect(qrManager.save).toHaveBeenCalled();
       expect(mockManager.find).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("addTransactionTags() / removeTransactionTags()", () => {
+    let insertChain: Record<string, jest.Mock>;
+
+    beforeEach(() => {
+      mockManager.find.mockReset();
+      mockManager.count.mockReset();
+      mockManager.delete.mockReset();
+      mockManager.createQueryBuilder.mockReset();
+      insertChain = {
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orIgnore: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue(undefined),
+      };
+      mockManager.createQueryBuilder.mockReturnValue(insertChain);
+      // Every requested tag / transaction id is owned by the caller.
+      mockManager.find.mockImplementation(
+        async (_e: unknown, opts: { where: { id: { value: string[] } } }) =>
+          opts.where.id.value.map((id) => ({ id })),
+      );
+      mockManager.count.mockImplementation(
+        async (_e: unknown, opts: { where: { id: { value: string[] } } }) =>
+          opts.where.id.value.length,
+      );
+    });
+
+    it("adds every transaction x tag link with ON CONFLICT DO NOTHING and never deletes", async () => {
+      await service.addTransactionTags(
+        mockManager as any,
+        userId,
+        ["txn-1", "txn-2"],
+        ["tag-1", "tag-2"],
+      );
+
+      expect(insertChain.into).toHaveBeenCalledWith(TransactionTag);
+      expect(insertChain.values).toHaveBeenCalledWith([
+        { transactionId: "txn-1", tagId: "tag-1" },
+        { transactionId: "txn-1", tagId: "tag-2" },
+        { transactionId: "txn-2", tagId: "tag-1" },
+        { transactionId: "txn-2", tagId: "tag-2" },
+      ]);
+      expect(insertChain.orIgnore).toHaveBeenCalledTimes(1);
+      expect(mockManager.delete).not.toHaveBeenCalled();
+    });
+
+    it("is idempotent: a second call issues the same ignore-conflict insert", async () => {
+      const args = [mockManager as any, userId, ["txn-1"], ["tag-1"]] as const;
+      await service.addTransactionTags(...args);
+      await service.addTransactionTags(...args);
+
+      expect(insertChain.orIgnore).toHaveBeenCalledTimes(2);
+      expect(insertChain.values).toHaveBeenNthCalledWith(1, [
+        { transactionId: "txn-1", tagId: "tag-1" },
+      ]);
+      expect(insertChain.values).toHaveBeenNthCalledWith(2, [
+        { transactionId: "txn-1", tagId: "tag-1" },
+      ]);
+    });
+
+    it("dedupes transaction and tag ids", async () => {
+      await service.addTransactionTags(
+        mockManager as any,
+        userId,
+        ["txn-1", "txn-1"],
+        ["tag-1", "tag-1"],
+      );
+
+      expect(insertChain.values).toHaveBeenCalledWith([
+        { transactionId: "txn-1", tagId: "tag-1" },
+      ]);
+    });
+
+    it("checks ownership of tags and transactions against userId", async () => {
+      await service.addTransactionTags(
+        mockManager as any,
+        userId,
+        ["txn-1"],
+        ["tag-1"],
+      );
+
+      expect(mockManager.find).toHaveBeenCalledWith(Tag, {
+        where: { id: expect.anything(), userId },
+      });
+      expect(mockManager.count).toHaveBeenCalledWith(Transaction, {
+        where: { id: expect.anything(), userId },
+      });
+    });
+
+    it("refuses a foreign or missing tag before any write", async () => {
+      mockManager.find.mockResolvedValue([mockTag]);
+
+      await expect(
+        service.addTransactionTags(
+          mockManager as any,
+          userId,
+          ["txn-1"],
+          ["tag-1", "tag-foreign"],
+        ),
+      ).rejects.toThrow(NotFoundException);
+      expect(mockManager.createQueryBuilder).not.toHaveBeenCalled();
+      expect(mockManager.delete).not.toHaveBeenCalled();
+    });
+
+    it("refuses a foreign transaction before any write", async () => {
+      mockManager.count.mockResolvedValue(1);
+
+      await expect(
+        service.addTransactionTags(
+          mockManager as any,
+          userId,
+          ["txn-1", "txn-foreign"],
+          ["tag-1"],
+        ),
+      ).rejects.toThrow("One or more transactions not found");
+      expect(mockManager.createQueryBuilder).not.toHaveBeenCalled();
+    });
+
+    it("issues no query for empty transactionIds or tagIds", async () => {
+      await service.addTransactionTags(
+        mockManager as any,
+        userId,
+        [],
+        ["tag-1"],
+      );
+      await service.addTransactionTags(
+        mockManager as any,
+        userId,
+        ["txn-1"],
+        [],
+      );
+      await service.removeTransactionTags(
+        mockManager as any,
+        userId,
+        [],
+        ["tag-1"],
+      );
+      await service.removeTransactionTags(
+        mockManager as any,
+        userId,
+        ["txn-1"],
+        [],
+      );
+
+      expect(mockManager.find).not.toHaveBeenCalled();
+      expect(mockManager.count).not.toHaveBeenCalled();
+      expect(mockManager.createQueryBuilder).not.toHaveBeenCalled();
+      expect(mockManager.delete).not.toHaveBeenCalled();
+    });
+
+    it("removes only the named links", async () => {
+      await service.removeTransactionTags(
+        mockManager as any,
+        userId,
+        ["txn-1", "txn-2"],
+        ["tag-1"],
+      );
+
+      expect(mockManager.delete).toHaveBeenCalledTimes(1);
+      expect(mockManager.delete).toHaveBeenCalledWith(TransactionTag, {
+        transactionId: expect.objectContaining({ value: ["txn-1", "txn-2"] }),
+        tagId: expect.objectContaining({ value: ["tag-1"] }),
+      });
+      expect(mockManager.createQueryBuilder).not.toHaveBeenCalled();
+    });
+
+    it("refuses removal with a foreign tag without deleting", async () => {
+      mockManager.find.mockResolvedValue([]);
+
+      await expect(
+        service.removeTransactionTags(
+          mockManager as any,
+          userId,
+          ["txn-1"],
+          ["tag-foreign"],
+        ),
+      ).rejects.toThrow(NotFoundException);
+      expect(mockManager.delete).not.toHaveBeenCalled();
+    });
+
+    it("rejects more than 100 tags and more than 1000 transactions", async () => {
+      const tags = Array.from({ length: 101 }, (_, i) => `tag-${i}`);
+      const txns = Array.from({ length: 1001 }, (_, i) => `txn-${i}`);
+
+      await expect(
+        service.addTransactionTags(mockManager as any, userId, ["txn-1"], tags),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.removeTransactionTags(mockManager as any, userId, txns, [
+          "tag-1",
+        ]),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockManager.find).not.toHaveBeenCalled();
+      expect(mockManager.createQueryBuilder).not.toHaveBeenCalled();
+      expect(mockManager.delete).not.toHaveBeenCalled();
+    });
+
+    it("accepts exactly 100 tags and 1000 transactions", async () => {
+      const tags = Array.from({ length: 100 }, (_, i) => `tag-${i}`);
+      const txns = Array.from({ length: 1000 }, (_, i) => `txn-${i}`);
+
+      await service.addTransactionTags(mockManager as any, userId, txns, tags);
+
+      // 100000 links would bind 200000 parameters in one statement, above
+      // PostgreSQL's 65535; they are written in batches that each fit.
+      expect(insertChain.execute).toHaveBeenCalledTimes(
+        100000 / TAG_LINK_INSERT_BATCH,
+      );
+      for (const [batch] of insertChain.values.mock.calls) {
+        expect(batch.length * 2).toBeLessThanOrEqual(65535);
+      }
     });
   });
 

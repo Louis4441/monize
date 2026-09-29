@@ -6,6 +6,8 @@ import { AssistantMarkdown } from './AssistantMarkdown';
 import { ResultChart } from './ResultChart';
 import { TransactionConfirmationCard } from './TransactionConfirmationCard';
 import { BulkConfirmationCard } from './BulkConfirmationCard';
+import { RuleConfirmationCard } from './RuleConfirmationCard';
+import { aiActionCardKind } from '@/lib/ai-action-card';
 import { MessageAttachmentChips } from './AttachmentChips';
 import { JsonHighlight } from '@/components/ui/JsonHighlight';
 import { useAiChatStore } from '@/store/aiChatStore';
@@ -247,13 +249,13 @@ export const ChatMessage = memo(function ChatMessage({
         {pendingActions && pendingActions.length > 0 && (
           <div className="mt-2 flex flex-col gap-2">
             {pendingActions.map((action) => {
-              const isBulk =
-                action.type === 'create_transactions' ||
-                action.type === 'create_investment_transactions' ||
-                action.type === 'batch_actions';
-              const Card = isBulk
-                ? BulkConfirmationCard
-                : TransactionConfirmationCard;
+              const kind = aiActionCardKind(action.type);
+              const Card =
+                kind === 'bulk'
+                  ? BulkConfirmationCard
+                  : kind === 'rule'
+                    ? RuleConfirmationCard
+                    : TransactionConfirmationCard;
               return (
                 <Card
                   key={action.actionId}

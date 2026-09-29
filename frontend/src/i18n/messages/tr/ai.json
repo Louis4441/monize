@@ -194,7 +194,37 @@
     "deletePayeesTitle": "Bu alacaklılar silinsin mi?",
     "createdPayees": "{count, plural, =0 {Alacaklı oluşturulmadı} other {# alacaklı oluşturuldu}}",
     "updatedPayees": "{count, plural, =0 {Alacaklı güncellenmedi} other {# alacaklı güncellendi}}",
-    "deletedPayees": "{count, plural, =0 {Alacaklı silinmedi} other {# alacaklı silindi}}"
+    "deletedPayees": "{count, plural, =0 {Alacaklı silinmedi} other {# alacaklı silindi}}",
+    "createRuleTitle": "Bu kural oluşturulsun mu?",
+    "updateRuleTitle": "Bu kural düzenlemesi uygulansın mı?",
+    "deleteRuleTitle": "Bu kural silinsin mi?",
+    "runRuleTitle": "Bu kural mevcut işlemler üzerinde çalıştırılsın mı?",
+    "createdRule": "Kural oluşturuldu",
+    "updatedRule": "Kural güncellendi",
+    "deletedRule": "Kural silindi",
+    "ranRule": "Kural çalıştırması tamamlandı",
+    "viewRules": "Kuralları göster",
+    "unknownTitle": "Bu eylem onaylansın mı?",
+    "unknownDone": "Eylem tamamlandı",
+    "rule": {
+      "noPreview": "Bu kuralın ayrıntıları kullanılamıyor, bu yüzden burada incelenemez. İptal edip yeniden isteyin.",
+      "changesTitle": "Neler değişiyor",
+      "noChanges": "Kural olduğu gibi kalır.",
+      "was": "Önceki",
+      "now": "Yeni",
+      "testTitle": "Mevcut işlemlerinizde deneme",
+      "runPreviewTitle": "Bu çalıştırma neyi değiştirir",
+      "filtersTitle": "Şunlar üzerinde çalışır",
+      "rowsShown": "{count} kaydın ilk {shown} tanesi gösteriliyor.",
+      "skippedMore": "Nedenler yalnızca ilk {shown} kayıt için gösteriliyor.",
+      "aiReviewRequests": "{count, plural, one {# yapay zekâ inceleme isteği kuyruğa alınırdı.} other {# yapay zekâ inceleme isteği kuyruğa alınırdı.}}"
+    },
+    "ruleEffects": {
+      "title": "Kurallarınız ayrıca şunları yapacak:",
+      "category": "Kategoriyi {name} olarak ayarla",
+      "payee": "Alıcıyı {name} olarak ayarla",
+      "aiReview": "{count, plural, one {# yapay zekâ inceleme isteğini kuyruğa al} other {# yapay zekâ inceleme isteğini kuyruğa al}}"
+    }
   },
   "table": {
     "downloadTitle": "Tabloyu CSV olarak indir",

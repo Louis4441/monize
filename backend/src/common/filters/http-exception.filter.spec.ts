@@ -66,6 +66,27 @@ describe("GlobalExceptionFilter", () => {
     );
   });
 
+  it("forwards a structured errors list from an object response", () => {
+    const errors = [{ path: "actions[0]", code: "REFERENCE_NOT_FOUND" }];
+    const exception = new BadRequestException({
+      message: "Invalid rule",
+      errorCode: "INVALID_RULE",
+      errors,
+    });
+
+    filter.catch(exception, mockHost);
+
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Invalid rule", errors }),
+    );
+  });
+
+  it("omits errors when the object response has none", () => {
+    filter.catch(new BadRequestException({ message: "Nope" }), mockHost);
+
+    expect(mockResponse.json.mock.calls[0][0]).not.toHaveProperty("errors");
+  });
+
   it("omits errorCode when the object response has none", () => {
     const exception = new ConflictException("Plain conflict");
 

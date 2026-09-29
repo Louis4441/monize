@@ -121,6 +121,16 @@
     "attachmentRefExpired": "Tệp đính kèm không còn khả dụng. Vui lòng tải tệp lên lại và hỏi lại.",
     "modelNoImageSupport": "Mô hình AI đã chọn không thể đọc hình ảnh hoặc PDF. Hãy xóa tệp đính kèm và hỏi bằng văn bản, hoặc chuyển sang một mô hình hỗ trợ hình ảnh trong Cài đặt AI."
   },
+  "aiReview": {
+    "notFound": "Không tìm thấy yêu cầu xem xét AI có ID {{ id }}",
+    "notClaimed": "Yêu cầu xem xét AI này không do bạn nhận. Hãy nhận yêu cầu đang chờ tiếp theo trước; không thể trả lời một yêu cầu bạn chưa nhận.",
+    "notProposed": "Yêu cầu xem xét AI này không còn chờ phê duyệt nên đề xuất của nó chưa được áp dụng.",
+    "notOpen": "Yêu cầu xem xét AI này không còn mở.",
+    "nothingProposed": "Một đề xuất cần ít nhất một thay đổi: splits, categoryName, payeeName hoặc description.",
+    "splitsAndCategory": "Gửi splits hoặc categoryName, không gửi cả hai: giao dịch chia nhỏ không có một danh mục duy nhất.",
+    "transferNotSupported": "Không thể xem xét một khoản chuyển tiền bằng đề xuất. Hãy từ chối yêu cầu thay vào đó.",
+    "splitDifference": "Các dòng chia cộng lại là {{ sum }} nhưng giao dịch là {{ amount }}: {{ difference }} chưa được phân bổ. Hãy làm cho các dòng cộng lại bằng giao dịch; phần dư như phí giao hàng cần một dòng riêng hoặc được nêu cho người dùng thay vì phân bổ."
+  },
   "auth": {
     "tooManyAttemptsLoginAgain": "Quá nhiều lần xác minh thất bại. Vui lòng đăng nhập lại.",
     "invalidOrExpiredVerificationToken": "Mã xác minh không hợp lệ hoặc đã hết hạn",
@@ -512,7 +522,22 @@
   "tags": {
     "notFound": "Không tìm thấy thẻ với ID {{ id }}",
     "nameConflict": "Thẻ có tên \"{{ name }}\" đã tồn tại",
-    "oneOrMoreNotFound": "Không tìm thấy một hoặc nhiều thẻ"
+    "oneOrMoreNotFound": "Không tìm thấy một hoặc nhiều thẻ",
+    "oneOrMoreTransactionsNotFound": "Không tìm thấy một hoặc nhiều giao dịch",
+    "tooManyTags": "Mỗi lần gọi chỉ có thể thay đổi tối đa {{ max }} thẻ",
+    "tooManyTransactions": "Mỗi lần gọi chỉ có thể thay đổi tối đa {{ max }} giao dịch"
+  },
+  "transactionRules": {
+    "notFound": "Không tìm thấy quy tắc giao dịch có ID {{ id }}",
+    "limitReached": "Chỉ có thể tạo tối đa {{ max }} quy tắc",
+    "invalidDefinition": "Định nghĩa quy tắc không hợp lệ",
+    "referenceNotFound": "Quy tắc nhắc đến tài khoản, người nhận, danh mục hoặc thẻ không tồn tại",
+    "revisionConflict": "Quy tắc này đã được thay đổi ở nơi khác. Hãy tải lại rồi thử lại",
+    "reorderMismatch": "Danh sách quy tắc đã thay đổi. Hãy tải lại rồi thử lại",
+    "previewChanged": "Các giao dịch hoặc quy tắc đã thay đổi kể từ bản xem trước. Hãy xem lại bản xem trước mới và chạy lại",
+    "ruleInvalid": "Quy tắc này không hợp lệ nên không thể chạy. Hãy mở và sửa quy tắc trước",
+    "dateRangeInvalid": "Ngày bắt đầu không được sau ngày kết thúc",
+    "runTooLarge": "Lần chạy này thay đổi quá nhiều giao dịch để có thể hoàn tác trong một bước. Hãy thu hẹp tài khoản hoặc khoảng ngày rồi thử lại"
   },
   "transactions": {
     "invalidStatus": "Trạng thái giao tác không hợp lệ: {{ status }}",

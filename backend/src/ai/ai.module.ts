@@ -34,6 +34,9 @@ import { BuiltInReportsModule } from "../built-in-reports/built-in-reports.modul
 import { AttachmentsModule } from "../attachments/attachments.module";
 import { AiRelayModule } from "./relay/ai-relay.module";
 import { CurrenciesModule } from "../currencies/currencies.module";
+import { TransactionRulesModule } from "../transaction-rules/transaction-rules.module";
+import { AiReviewModule } from "../ai-review/ai-review.module";
+import { AiReviewQueueModule } from "../ai-review/ai-review-queue.module";
 
 @Module({
   imports: [
@@ -65,6 +68,12 @@ import { CurrenciesModule } from "../currencies/currencies.module";
     AiRelayModule,
     // ExchangeRateService, for the `calculate` tool's currency conversion.
     forwardRef(() => CurrenciesModule),
+    // Commit and name-resolve the rule actions and tools.
+    forwardRef(() => TransactionRulesModule),
+    // Marks an AI review request applied in the confirm transaction, and lets
+    // the assistant work the queue.
+    AiReviewModule,
+    AiReviewQueueModule,
   ],
   providers: [
     AiService,
@@ -88,6 +97,8 @@ import { CurrenciesModule } from "../currencies/currencies.module";
     AiForecastController,
     AiActionsController,
   ],
-  exports: [AiService, AiUsageService, EncryptionModule],
+  // AiActionsService: the MCP rule tools commit a descriptor a client's own
+  // dialog approved through the same executors `/ai/actions/confirm` uses.
+  exports: [AiService, AiUsageService, EncryptionModule, AiActionsService],
 })
 export class AiModule {}

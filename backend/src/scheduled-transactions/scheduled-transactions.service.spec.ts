@@ -2519,6 +2519,37 @@ describe("ScheduledTransactionsService", () => {
       expect(wroteInsideTransaction).toBe(true);
     });
 
+    it("writes a scheduled transfer's legs (and so the create rules) on the posting transaction's manager", async () => {
+      // The rules step lives in writeTransferLegs and runs on the manager it is
+      // handed, so a scheduled transfer gets the rules in the same unit as the
+      // occurrence claim and a rollback drops both.
+      mockDataSource.transaction.mockImplementation(async (...args: any[]) => {
+        const fn = args[args.length - 1] as (m: unknown) => unknown;
+        return fn(mockQueryRunner.manager);
+      });
+      const scheduled = makeScheduled({
+        isTransfer: true,
+        transferAccountId: "acc-2",
+      });
+      stubFindOne(scheduled);
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      accountsRepo.findOne.mockResolvedValue(null);
+
+      await service.post(userId, stId);
+
+      expect(transactionsService.writeTransferLegs).toHaveBeenCalledTimes(1);
+      expect(transactionsService.writeTransferLegs.mock.calls[0][1]).toBe(
+        mockQueryRunner.manager,
+      );
+      expect(
+        transactionsService.completeTransfer.mock.invocationCallOrder[0],
+      ).toBeGreaterThan(
+        transactionsService.writeTransferLegs.mock.invocationCallOrder[0],
+      );
+    });
+
     it("completes the transfer only after the posting transaction commits", async () => {
       // `completeTransfer` records action history, and the recorder swallows its
       // own failures by design: inside the caller's transaction that is either a

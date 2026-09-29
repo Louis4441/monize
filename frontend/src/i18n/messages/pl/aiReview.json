@@ -1,0 +1,69 @@
+{
+  "page": {
+    "title": "Skrzynka przeglądów AI",
+    "subtitle": "Transakcje, które reguła kazała sprawdzić sztucznej inteligencji, oraz zmiany zaproponowane przez asystenta do Twojej akceptacji."
+  },
+  "filter": {
+    "label": "Filtruj według statusu",
+    "open": "Otwarte",
+    "pending": "Oczekujące",
+    "claimed": "W trakcie przeglądu",
+    "proposed": "Zaproponowane",
+    "applied": "Zastosowane",
+    "rejected": "Odrzucone",
+    "expired": "Wygasłe"
+  },
+  "status": {
+    "pending": "Oczekuje",
+    "claimed": "W trakcie przeglądu",
+    "proposed": "Zaproponowano",
+    "applied": "Zastosowano",
+    "rejected": "Odrzucono",
+    "expired": "Wygasło"
+  },
+  "columns": {
+    "date": "Data",
+    "request": "Prośba",
+    "amount": "Kwota",
+    "status": "Status"
+  },
+  "row": {
+    "noPayee": "Brak odbiorcy",
+    "transactionMissing": "Ta transakcja już nie istnieje",
+    "rule": "Reguła: {name}",
+    "manualRequest": "Zgłoszono ręcznie",
+    "agentNote": "Uwaga asystenta: {reason}",
+    "dates": "Utworzono {created}, wygasa {expires}",
+    "viewTransaction": "Zobacz transakcję"
+  },
+  "actions": {
+    "dismiss": "Odrzuć"
+  },
+  "proposal": {
+    "errorTitle": "Tej propozycji nie można już zastosować"
+  },
+  "dismissDialog": {
+    "title": "Odrzucić tę prośbę?",
+    "message": "Nikt nie zostanie ponownie poproszony o sprawdzenie tej transakcji. Sama transakcja nie zostanie zmieniona.",
+    "confirm": "Odrzuć prośbę"
+  },
+  "loading": "Wczytywanie próśb o przegląd...",
+  "error": {
+    "title": "Nie udało się wczytać próśb o przegląd",
+    "body": "Lista się nie wczytała, więc może nie być pusta. Sprawdź połączenie i spróbuj ponownie.",
+    "retry": "Spróbuj ponownie"
+  },
+  "empty": {
+    "title": "Brak próśb o przegląd",
+    "body": "Prośby pojawiają się tutaj, gdy reguła z akcją „Poproś o przegląd AI” pasuje do transakcji. Asystent AI lub klient MCP, na przykład agent przekaźnika, opracowuje kolejkę i proponuje zmianę do Twojej akceptacji.",
+    "filteredTitle": "Brak próśb o tym statusie",
+    "filteredBody": "Wybierz inny status, aby zobaczyć pozostałe prośby."
+  },
+  "toasts": {
+    "approved": "Propozycja zastosowana",
+    "dismissed": "Prośba odrzucona",
+    "dismissFailed": "Nie udało się odrzucić prośby",
+    "approveFailed": "Nie udało się zastosować propozycji",
+    "changed": "Ta prośba w międzyczasie się zmieniła. Lista została wczytana ponownie."
+  }
+}

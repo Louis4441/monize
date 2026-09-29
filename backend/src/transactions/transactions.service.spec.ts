@@ -19,6 +19,15 @@ import { TransactionReconciliationService } from "./transaction-reconciliation.s
 import { TransactionAnalyticsService } from "./transaction-analytics.service";
 import { TransactionBulkUpdateService } from "./transaction-bulk-update.service";
 import { TagsService } from "../tags/tags.service";
+import { TransactionRulesApplierService } from "../transaction-rules/transaction-rules-applier.service";
+import {
+  PlannableRule,
+  planRuleEffects,
+} from "../transaction-rules/rule-effects";
+import {
+  buildRuleFacts,
+  RuleFactsInput,
+} from "../transaction-rules/rule-facts";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { isTransactionInFuture } from "../common/date-utils";
 import { buildTransactionSearchClause } from "./transaction-search.util";
@@ -65,6 +74,7 @@ describe("TransactionsService", () => {
   let payeesService: Record<string, jest.Mock>;
   let netWorthService: Record<string, jest.Mock>;
   let tagsService: Record<string, jest.Mock>;
+  let rulesApplier: Record<string, jest.Mock>;
   // The withScopedDb EntityManager, under the legacy `mockQueryRunner.manager`
   // shape so the pre-RLS manager assertions still read naturally.
   let mockQueryRunner: Record<string, any>;
@@ -348,9 +358,18 @@ describe("TransactionsService", () => {
 
     mockQueryRunner = { manager };
 
+    // No rules by default: applyToNew has nothing to do and the preview has
+    // no effects, which is what every spec below assumed before rules existed.
+    rulesApplier = {
+      applyToNew: jest.fn().mockResolvedValue([]),
+      applyToNewTransfer: jest.fn().mockResolvedValue([]),
+      previewForRow: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TransactionsService,
+        { provide: TransactionRulesApplierService, useValue: rulesApplier },
         { provide: AccountsService, useValue: accountsService },
         { provide: PayeesService, useValue: payeesService },
         {
@@ -358,6 +377,7 @@ describe("TransactionsService", () => {
           useValue: {
             findByIds: jest.fn().mockResolvedValue([]),
             setTransactionTags: jest.fn().mockResolvedValue(undefined),
+            addTransactionTags: jest.fn().mockResolvedValue(undefined),
             setSplitTags: jest.fn().mockResolvedValue(undefined),
           },
         },
@@ -507,6 +527,327 @@ describe("TransactionsService", () => {
           splits: [{ amount: -100, transferAccountId: "acc-2" }],
         } as any),
       ).resolves.toBeDefined();
+    });
+  });
+
+  describe("transaction rules (create and previewCreate)", () => {
+    const rowInDb = {
+      id: "tx-1",
+      userId: "user-1",
+      accountId: "account-1",
+      amount: -50,
+      status: TransactionStatus.UNRECONCILED,
+      splits: [],
+    };
+
+    it("runs the applier inside the write transaction, after the tags and before the balance", async () => {
+      transactionsRepository.findOne.mockResolvedValue(rowInDb);
+      const order: string[] = [];
+      tagsService.setTransactionTags.mockImplementation(async () => {
+        order.push("tags");
+      });
+      rulesApplier.applyToNew.mockImplementation(async () => {
+        order.push("rules");
+        return [];
+      });
+      accountsService.updateBalance.mockImplementation(async () => {
+        order.push("balance");
+      });
+
+      await service.create("user-1", {
+        accountId: "account-1",
+        transactionDate: "2026-01-15",
+        amount: -50,
+        currencyCode: "USD",
+        tagIds: ["tag-1"],
+        payeeName: "Biedronka 123",
+      } as any);
+
+      expect(order).toEqual(["tags", "rules", "balance"]);
+      // Same EntityManager as the row insert, the saved id, trigger "create",
+      // and the raw payee text the caller supplied.
+      expect(rulesApplier.applyToNew).toHaveBeenCalledTimes(1);
+      const [manager, userId, ids, source, options] =
+        rulesApplier.applyToNew.mock.calls[0];
+      expect(manager).toBe(mockQueryRunner.manager);
+      expect(userId).toBe("user-1");
+      expect(ids).toEqual(["tx-1"]);
+      expect(source).toBe("create");
+      expect(options.payeeTextById.get("tx-1")).toBe("Biedronka 123");
+    });
+
+    it("hands a rule the payee's own name as payeeText when only an id was given", async () => {
+      transactionsRepository.findOne.mockResolvedValue(rowInDb);
+      payeesService.findOne.mockResolvedValue({
+        id: "payee-1",
+        name: "Biedronka",
+        defaultCategoryId: null,
+      });
+
+      await service.create("user-1", {
+        accountId: "account-1",
+        transactionDate: "2026-01-15",
+        amount: -50,
+        currencyCode: "USD",
+        payeeId: "payee-1",
+      } as any);
+
+      const options = rulesApplier.applyToNew.mock.calls[0][4];
+      expect(options.payeeTextById.get("tx-1")).toBe("Biedronka");
+    });
+
+    it("does not run the applier when the request is rejected before the write", async () => {
+      await expect(
+        service.create("user-1", {
+          accountId: "account-1",
+          transactionDate: "2026-01-15",
+          amount: 100,
+          currencyCode: "EUR",
+        } as any),
+      ).rejects.toThrow(/must match the account currency/);
+      expect(rulesApplier.applyToNew).not.toHaveBeenCalled();
+    });
+
+    it("with no rules the row, the tags and the balance are written exactly as before", async () => {
+      transactionsRepository.findOne.mockResolvedValue(rowInDb);
+
+      const result = await service.create("user-1", {
+        accountId: "account-1",
+        transactionDate: "2026-01-15",
+        amount: -50,
+        currencyCode: "USD",
+      } as any);
+
+      expect(result).toEqual(rowInDb);
+      expect(transactionsRepository.save).toHaveBeenCalledTimes(1);
+      expect(accountsService.updateBalance).toHaveBeenCalledWith(
+        "account-1",
+        -50,
+      );
+      expect(tagsService.setTransactionTags).not.toHaveBeenCalled();
+      expect(transactionsRepository.update).not.toHaveBeenCalled();
+    });
+
+    it("previewCreate leaves ruleEffects out when no rule matches", async () => {
+      accountsService.findOne.mockResolvedValue(mockAccount);
+      const preview = await service.previewCreate("user-1", {
+        accountId: "account-1",
+        amount: -50,
+        transactionDate: "2026-01-15",
+      });
+      expect("ruleEffects" in preview).toBe(false);
+    });
+
+    it("previewCreate returns the applier's plan, planned from the facts create() would build", async () => {
+      accountsService.findOne.mockResolvedValue(mockAccount);
+      payeesService.resolveByName.mockResolvedValue({
+        id: "payee-1",
+        name: "Biedronka",
+        defaultCategoryId: "cat-9",
+        defaultCategory: { name: "Groceries" },
+      });
+      const plan = {
+        changes: { addTagIds: ["tag-1"], removeTagIds: [] },
+        trace: [],
+        aiReviewRequests: [],
+        labels: { categories: {}, payees: {}, tags: {}, rules: {} },
+      };
+      rulesApplier.previewForRow.mockResolvedValue(plan);
+
+      const preview = await service.previewCreate("user-1", {
+        accountId: "account-1",
+        amount: -50,
+        transactionDate: "2026-01-15",
+        payeeName: "biedronka",
+        description: "milk",
+      });
+
+      expect(preview.ruleEffects).toBe(plan);
+      expect(rulesApplier.previewForRow).toHaveBeenCalledWith(
+        mockQueryRunner.manager,
+        "user-1",
+        {
+          accountId: "account-1",
+          currencyCode: "USD",
+          amount: -50,
+          isTransfer: false,
+          payeeId: "payee-1",
+          payeeText: "biedronka",
+          // The payee default category is step 2 of design 6.4: the rules see it.
+          categoryId: "cat-9",
+          description: "milk",
+          tagIds: [],
+          hasSplits: false,
+          // A new row: no reference number, the stored calendar date, the
+          // entity default status and no attachment (design 10.3).
+          referenceNumber: null,
+          transactionDate: "2026-01-15",
+          status: TransactionStatus.UNRECONCILED,
+          hasAttachment: false,
+        },
+      );
+    });
+
+    describe("previewCreate and create() plan the same effects on the X3 facts", () => {
+      const TAG = {
+        ref: "00000000-0000-4000-8000-000000000001",
+        day: "00000000-0000-4000-8000-000000000002",
+        weekday: "00000000-0000-4000-8000-000000000003",
+        status: "00000000-0000-4000-8000-000000000004",
+        unreconciled: "00000000-0000-4000-8000-000000000005",
+        noattachment: "00000000-0000-4000-8000-000000000006",
+      };
+      const rules: PlannableRule[] = [
+        {
+          id: "r-ref",
+          enabled: true,
+          stopProcessing: false,
+          condition: {
+            all: [{ field: "referenceNumber", op: "eq", value: "CHQ-1" }],
+          },
+          actions: [{ type: "add_tags", tagIds: [TAG.ref] }],
+        },
+        {
+          id: "r-day",
+          enabled: true,
+          stopProcessing: false,
+          condition: { all: [{ field: "dayOfMonth", op: "eq", value: 15 }] },
+          actions: [{ type: "add_tags", tagIds: [TAG.day] }],
+        },
+        {
+          id: "r-weekday",
+          enabled: true,
+          stopProcessing: false,
+          condition: { all: [{ field: "weekday", op: "eq", value: "THU" }] },
+          actions: [{ type: "add_tags", tagIds: [TAG.weekday] }],
+        },
+        {
+          id: "r-status",
+          enabled: true,
+          stopProcessing: false,
+          condition: { all: [{ field: "status", op: "eq", value: "CLEARED" }] },
+          actions: [{ type: "add_tags", tagIds: [TAG.status] }],
+        },
+        {
+          id: "r-unreconciled",
+          enabled: true,
+          stopProcessing: false,
+          condition: {
+            all: [{ field: "status", op: "eq", value: "UNRECONCILED" }],
+          },
+          actions: [{ type: "add_tags", tagIds: [TAG.unreconciled] }],
+        },
+        {
+          id: "r-noattachment",
+          enabled: true,
+          stopProcessing: false,
+          condition: {
+            all: [{ field: "hasAttachment", op: "eq", value: false }],
+          },
+          actions: [{ type: "add_tags", tagIds: [TAG.noattachment] }],
+        },
+      ];
+
+      // The preview plans over the facts it is given; the commit plans over the
+      // facts of the stored row, which the database fills with its defaults.
+      const wireRealPlanner = () => {
+        const planned: { preview?: string[]; commit?: string[] } = {};
+        rulesApplier.previewForRow.mockImplementation(
+          async (_m: unknown, _user: string, input: RuleFactsInput) => {
+            planned.preview = planRuleEffects(
+              buildRuleFacts(input),
+              rules,
+            ).changes.addTagIds.slice();
+            return null;
+          },
+        );
+        rulesApplier.applyToNew.mockImplementation(async () => {
+          const stored = transactionsRepository.create.mock.calls[0][0];
+          planned.commit = planRuleEffects(
+            buildRuleFacts({
+              accountId: stored.accountId,
+              currencyCode: stored.currencyCode,
+              amount: stored.amount,
+              isTransfer: false,
+              payeeId: stored.payeeId ?? null,
+              payeeText: null,
+              categoryId: stored.categoryId ?? null,
+              description: stored.description ?? null,
+              tagIds: [],
+              hasSplits: false,
+              referenceNumber: stored.referenceNumber ?? null,
+              transactionDate: stored.transactionDate,
+              status: stored.status ?? TransactionStatus.UNRECONCILED,
+              hasAttachment: false,
+            }),
+            rules,
+          ).changes.addTagIds.slice();
+          return [];
+        });
+        return planned;
+      };
+
+      it.each([
+        [
+          "a reference number, a CLEARED status and a Thursday the 15th",
+          { referenceNumber: "CHQ-1", status: TransactionStatus.CLEARED },
+          [TAG.ref, TAG.day, TAG.weekday, TAG.status, TAG.noattachment],
+        ],
+        [
+          "no reference number and no status (the entity default)",
+          {},
+          [TAG.day, TAG.weekday, TAG.unreconciled, TAG.noattachment],
+        ],
+      ])("for %s", async (_label, extra, expected) => {
+        accountsService.findOne.mockResolvedValue(mockAccount);
+        transactionsRepository.findOne.mockResolvedValue({
+          id: "tx-1",
+          userId: "user-1",
+          accountId: "account-1",
+          amount: -50,
+          splits: [],
+        });
+        const planned = wireRealPlanner();
+        const dto = {
+          accountId: "account-1",
+          transactionDate: "2026-01-15",
+          amount: -50,
+          currencyCode: "USD",
+          ...extra,
+        };
+
+        await service.previewCreate("user-1", dto);
+        await service.create("user-1", dto as any);
+
+        expect(planned.preview).toEqual(expected);
+        expect(planned.commit).toEqual(planned.preview);
+      });
+
+      it("reads the calendar date from the digits of a timestamp input, as the date column stores it", async () => {
+        accountsService.findOne.mockResolvedValue(mockAccount);
+        await service.previewCreate("user-1", {
+          accountId: "account-1",
+          amount: -50,
+          transactionDate: "2026-01-15T23:30:00-05:00",
+        });
+        expect(rulesApplier.previewForRow.mock.calls[0][2]).toEqual(
+          expect.objectContaining({ transactionDate: "2026-01-15" }),
+        );
+      });
+    });
+
+    it("previewCreate plans a split row without a category, as create() writes it", async () => {
+      accountsService.findOne.mockResolvedValue(mockAccount);
+      await service.previewCreate("user-1", {
+        accountId: "account-1",
+        amount: -50,
+        transactionDate: "2026-01-15",
+        categoryId: "cat-1",
+        hasSplits: true,
+      });
+      expect(rulesApplier.previewForRow.mock.calls[0][2]).toEqual(
+        expect.objectContaining({ categoryId: null, hasSplits: true }),
+      );
     });
   });
 
@@ -1244,6 +1585,44 @@ describe("TransactionsService", () => {
       );
     });
 
+    it("runs beforeWrite on the write's own manager after the lock and before any write", async () => {
+      transactionsRepository.findOne.mockResolvedValue({ ...mockTx });
+      lockedRow = { ...mockTx };
+      mockQueryRunner.manager.findOne.mockResolvedValueOnce({ ...mockTx });
+      const order: string[] = [];
+      mockQueryRunner.manager.update.mockImplementation(async () => {
+        order.push("write");
+      });
+      const beforeWrite = jest.fn(async (m: unknown) => {
+        expect(m).toBe(mockQueryRunner.manager);
+        order.push("hook");
+      });
+
+      await service.update("user-1", "tx-1", { description: "x" } as any, {
+        beforeWrite,
+      });
+
+      expect(beforeWrite).toHaveBeenCalledTimes(1);
+      expect(order).toEqual(["hook", "write"]);
+    });
+
+    it("writes nothing when beforeWrite refuses", async () => {
+      transactionsRepository.findOne.mockResolvedValue({ ...mockTx });
+      lockedRow = { ...mockTx };
+      mockQueryRunner.manager.update.mockClear();
+
+      await expect(
+        service.update("user-1", "tx-1", { description: "x" } as any, {
+          beforeWrite: async () => {
+            throw new Error("request no longer open");
+          },
+        }),
+      ).rejects.toThrow("request no longer open");
+
+      expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
+      expect(accountsService.updateBalance).not.toHaveBeenCalled();
+    });
+
     it("touches the account (no balance write) when only a past-dated transaction's date moves", async () => {
       // A past->past date change with unchanged amount and account leaves
       // current_balance identical, so no balance write runs -- but moving the row
@@ -1978,11 +2357,15 @@ describe("TransactionsService", () => {
         tagIds: ["tag-1"],
       } as any);
 
-      expect(tagsService.setTransactionTags).toHaveBeenCalledTimes(1);
-      expect(tagsService.setTransactionTags).toHaveBeenCalledWith(
-        "own-leg",
-        ["tag-1"],
+      // Additive (a new transfer may already carry rule tags), on the
+      // effective user's leg only.
+      expect(tagsService.setTransactionTags).not.toHaveBeenCalled();
+      expect(tagsService.addTransactionTags).toHaveBeenCalledTimes(1);
+      expect(tagsService.addTransactionTags).toHaveBeenCalledWith(
+        expect.anything(),
         "user-1",
+        ["own-leg"],
+        ["tag-1"],
       );
       // The foreign leg is passed through untouched, not re-fetched as user-1.
       expect(result.toTransaction).toBe(foreignLeg);
@@ -2121,15 +2504,15 @@ describe("TransactionsService", () => {
         tagIds: ["tag-1"],
       } as any);
 
-      expect(tagsService.setTransactionTags).toHaveBeenCalledWith(
-        "tx-from",
-        ["tag-1"],
+      // One additive call for both legs: explicit tags and the tags the
+      // rules added inside the leg transaction end up as a union.
+      expect(tagsService.setTransactionTags).not.toHaveBeenCalled();
+      expect(tagsService.addTransactionTags).toHaveBeenCalledTimes(1);
+      expect(tagsService.addTransactionTags).toHaveBeenCalledWith(
+        expect.anything(),
         "user-1",
-      );
-      expect(tagsService.setTransactionTags).toHaveBeenCalledWith(
-        "tx-to",
+        ["tx-from", "tx-to"],
         ["tag-1"],
-        "user-1",
       );
     });
 
@@ -2163,6 +2546,7 @@ describe("TransactionsService", () => {
       } as any);
 
       expect(tagsService.setTransactionTags).not.toHaveBeenCalled();
+      expect(tagsService.addTransactionTags).not.toHaveBeenCalled();
     });
   });
 
@@ -7539,6 +7923,84 @@ describe("TransactionsService", () => {
         "s2",
         "s3",
       ]);
+    });
+
+    describe("getLlmTransactionById", () => {
+      it("projects one transaction like a list row, with a split's complete lines and qualified names", async () => {
+        categoriesRepository.find.mockResolvedValue([
+          { id: "biz", name: "Business", parentId: null },
+          { id: "biz-cell", name: "Cell Phone", parentId: "biz" },
+        ]);
+        jest.spyOn(service, "findOne").mockResolvedValue({
+          id: "t-split",
+          transactionDate: "2026-01-15",
+          payeeName: "Rogers",
+          category: null,
+          amount: -90,
+          account: { name: "WS Chequing" },
+          description: "bill",
+          status: "cleared",
+          isSplit: true,
+          splits: [],
+        } as any);
+        splitsRepository.find.mockResolvedValue([
+          {
+            id: "s1",
+            transactionId: "t-split",
+            amount: -40,
+            memo: "a",
+            category: { id: "biz-cell", name: "Cell Phone" },
+          },
+          {
+            id: "s2",
+            transactionId: "t-split",
+            amount: -50,
+            memo: null,
+            category: null,
+          },
+        ]);
+
+        const rows = await service.getLlmTransactionById("user-1", "t-split");
+
+        expect(service.findOne).toHaveBeenCalledWith("user-1", "t-split");
+        expect(rows.map((r) => [r.splitId, r.categoryName, r.amount])).toEqual([
+          ["s1", "Business: Cell Phone", -40],
+          ["s2", undefined, -50],
+        ]);
+        expect(rows[0]).toMatchObject({
+          id: "t-split",
+          payeeName: "Rogers",
+          accountName: "WS Chequing",
+          description: "a",
+        });
+      });
+
+      it("answers a plain transaction as one row without reading splits", async () => {
+        splitsRepository.find.mockClear();
+        jest.spyOn(service, "findOne").mockResolvedValue({
+          id: "t-plain",
+          transactionDate: "2026-01-14",
+          payeeName: "Coffee",
+          category: null,
+          amount: -5,
+          account: { name: "Checking" },
+          description: null,
+          status: "cleared",
+          isSplit: false,
+        } as any);
+        const rows = await service.getLlmTransactionById("user-1", "t-plain");
+        expect(rows).toHaveLength(1);
+        expect(splitsRepository.find).not.toHaveBeenCalled();
+      });
+
+      it("refuses another user's transaction the way findOne does", async () => {
+        jest
+          .spyOn(service, "findOne")
+          .mockRejectedValue(new NotFoundException("nope"));
+        await expect(
+          service.getLlmTransactionById("user-1", "t-other"),
+        ).rejects.toThrow("nope");
+      });
     });
 
     it("does not query splits when the page holds no split transactions", async () => {

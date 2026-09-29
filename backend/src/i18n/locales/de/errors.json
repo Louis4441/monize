@@ -121,6 +121,16 @@
     "attachmentRefExpired": "Die angehängte Datei ist nicht mehr verfügbar. Bitte laden Sie sie erneut hoch und fragen Sie noch einmal.",
     "modelNoImageSupport": "Das ausgewählte KI-Modell kann keine Bilder oder PDFs lesen. Entfernen Sie den Anhang und fragen Sie in Textform, oder wechseln Sie in den KI-Einstellungen zu einem Modell mit Bildverarbeitung."
   },
+  "aiReview": {
+    "notFound": "KI-Prüfanfrage mit der ID {{ id }} nicht gefunden",
+    "notClaimed": "Diese KI-Prüfanfrage wurde nicht von Ihnen übernommen. Übernehmen Sie zuerst die nächste offene; eine nicht übernommene Anfrage kann nicht beantwortet werden.",
+    "notProposed": "Diese KI-Prüfanfrage wartet nicht mehr auf Freigabe, daher wurde ihr Vorschlag nicht angewendet.",
+    "notOpen": "Diese KI-Prüfanfrage ist nicht mehr offen.",
+    "nothingProposed": "Ein Vorschlag braucht mindestens eine Änderung: splits, categoryName, payeeName oder description.",
+    "splitsAndCategory": "Senden Sie entweder splits oder categoryName, nicht beides: Eine aufgeteilte Buchung hat keine einzelne Kategorie.",
+    "transferNotSupported": "Eine Überweisung kann nicht per Vorschlag geprüft werden. Lehnen Sie die Anfrage stattdessen ab.",
+    "splitDifference": "Die Teilbeträge ergeben zusammen {{ sum }}, die Buchung beträgt aber {{ amount }}: {{ difference }} sind nicht zugeordnet. Die Zeilen müssen zur Buchung passen; ein Rest wie Lieferkosten braucht eine eigene Zeile oder wird dem Nutzer genannt, statt zugeordnet zu werden."
+  },
   "auth": {
     "tooManyAttemptsLoginAgain": "Zu viele Verifikationsversuche. Bitte melden Sie sich erneut an.",
     "invalidOrExpiredVerificationToken": "Ungültiger oder abgelaufener Verifikations-Token",
@@ -512,7 +522,22 @@
   "tags": {
     "notFound": "Etikett mit ID {{ id }} nicht gefunden",
     "nameConflict": "Ein Etikett mit dem Namen \"{{ name }}\" existiert bereits",
-    "oneOrMoreNotFound": "Ein oder mehrere Etiketten nicht gefunden"
+    "oneOrMoreNotFound": "Ein oder mehrere Etiketten nicht gefunden",
+    "oneOrMoreTransactionsNotFound": "Eine oder mehrere Buchungen nicht gefunden",
+    "tooManyTags": "Höchstens {{ max }} Etiketten können in einem Aufruf geändert werden",
+    "tooManyTransactions": "Höchstens {{ max }} Buchungen können in einem Aufruf geändert werden"
+  },
+  "transactionRules": {
+    "notFound": "Transaktionsregel mit der ID {{ id }} nicht gefunden",
+    "limitReached": "Es können höchstens {{ max }} Regeln angelegt werden",
+    "invalidDefinition": "Die Regeldefinition ist ungültig",
+    "referenceNotFound": "Die Regel nennt ein Konto, einen Zahlungsempfänger, eine Kategorie oder ein Tag, das nicht existiert",
+    "revisionConflict": "Diese Regel wurde anderswo geändert. Laden Sie sie neu und versuchen Sie es erneut",
+    "reorderMismatch": "Die Liste der Regeln hat sich geändert. Laden Sie sie neu und versuchen Sie es erneut",
+    "previewChanged": "Die Transaktionen oder die Regel haben sich seit der Vorschau geändert. Prüfen Sie die neue Vorschau und führen Sie die Regel erneut aus",
+    "ruleInvalid": "Diese Regel ist ungültig und kann nicht ausgeführt werden. Öffnen Sie sie und reparieren Sie sie zuerst",
+    "dateRangeInvalid": "Das Startdatum darf nicht nach dem Enddatum liegen",
+    "runTooLarge": "Dieser Lauf ändert zu viele Transaktionen, um in einem Schritt rückgängig gemacht zu werden. Schränken Sie die Konten oder Daten ein und versuchen Sie es erneut"
   },
   "transactions": {
     "invalidStatus": "Ungültiger Buchungsstatus: {{ status }}",

@@ -1,0 +1,69 @@
+{
+  "page": {
+    "title": "Caixa de revisão de IA",
+    "subtitle": "Transações que uma regra pediu a uma IA para rever e as alterações que um assistente propõe para a sua aprovação."
+  },
+  "filter": {
+    "label": "Filtrar por estado",
+    "open": "Abertos",
+    "pending": "Pendente",
+    "claimed": "Em revisão",
+    "proposed": "Proposto",
+    "applied": "Aplicado",
+    "rejected": "Rejeitado",
+    "expired": "Expirado"
+  },
+  "status": {
+    "pending": "Pendente",
+    "claimed": "Em revisão",
+    "proposed": "Proposto",
+    "applied": "Aplicado",
+    "rejected": "Rejeitado",
+    "expired": "Expirado"
+  },
+  "columns": {
+    "date": "Data",
+    "request": "Pedido",
+    "amount": "Montante",
+    "status": "Estado"
+  },
+  "row": {
+    "noPayee": "Sem beneficiário",
+    "transactionMissing": "Esta transação já não existe",
+    "rule": "Regra: {name}",
+    "manualRequest": "Pedido manualmente",
+    "agentNote": "Nota do assistente: {reason}",
+    "dates": "Criado em {created}, expira em {expires}",
+    "viewTransaction": "Ver transação"
+  },
+  "actions": {
+    "dismiss": "Dispensar"
+  },
+  "proposal": {
+    "errorTitle": "Esta proposta já não pode ser aplicada"
+  },
+  "dismissDialog": {
+    "title": "Dispensar este pedido?",
+    "message": "Ninguém voltará a ser solicitado para rever esta transação. A própria transação não é alterada.",
+    "confirm": "Dispensar pedido"
+  },
+  "loading": "A carregar os pedidos de revisão...",
+  "error": {
+    "title": "Não foi possível carregar os pedidos de revisão",
+    "body": "A lista não foi carregada, por isso pode não estar vazia. Verifique a ligação e tente novamente.",
+    "retry": "Tentar novamente"
+  },
+  "empty": {
+    "title": "Sem pedidos de revisão",
+    "body": "Os pedidos aparecem aqui quando uma regra com a ação «Pedir uma revisão da IA» corresponde a uma transação. Um assistente de IA, ou um cliente MCP como o agente de retransmissão, trata a fila e propõe uma alteração para aprovar.",
+    "filteredTitle": "Sem pedidos com este estado",
+    "filteredBody": "Escolha outro estado para ver outros pedidos."
+  },
+  "toasts": {
+    "approved": "Proposta aplicada",
+    "dismissed": "Pedido dispensado",
+    "dismissFailed": "Não foi possível dispensar o pedido",
+    "approveFailed": "Não foi possível aplicar a proposta",
+    "changed": "Este pedido mudou entretanto. A lista foi recarregada."
+  }
+}

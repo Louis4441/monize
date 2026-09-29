@@ -1,0 +1,69 @@
+{
+  "page": {
+    "title": "Hộp thư xem xét của AI",
+    "subtitle": "Các giao dịch mà một quy tắc đã nhờ AI xem xét, cùng những thay đổi trợ lý đề xuất để bạn phê duyệt."
+  },
+  "filter": {
+    "label": "Lọc theo trạng thái",
+    "open": "Đang mở",
+    "pending": "Đang chờ",
+    "claimed": "Đang xem xét",
+    "proposed": "Đã đề xuất",
+    "applied": "Đã áp dụng",
+    "rejected": "Đã từ chối",
+    "expired": "Đã hết hạn"
+  },
+  "status": {
+    "pending": "Đang chờ",
+    "claimed": "Đang xem xét",
+    "proposed": "Đã đề xuất",
+    "applied": "Đã áp dụng",
+    "rejected": "Đã từ chối",
+    "expired": "Đã hết hạn"
+  },
+  "columns": {
+    "date": "Ngày",
+    "request": "Yêu cầu",
+    "amount": "Số tiền",
+    "status": "Trạng thái"
+  },
+  "row": {
+    "noPayee": "Không có người nhận",
+    "transactionMissing": "Giao dịch này không còn tồn tại",
+    "rule": "Quy tắc: {name}",
+    "manualRequest": "Yêu cầu thủ công",
+    "agentNote": "Ghi chú của trợ lý: {reason}",
+    "dates": "Tạo ngày {created}, hết hạn ngày {expires}",
+    "viewTransaction": "Xem giao dịch"
+  },
+  "actions": {
+    "dismiss": "Bỏ qua"
+  },
+  "proposal": {
+    "errorTitle": "Đề xuất này không thể áp dụng nữa"
+  },
+  "dismissDialog": {
+    "title": "Bỏ qua yêu cầu này?",
+    "message": "Sẽ không ai được nhờ xem xét giao dịch này nữa. Bản thân giao dịch không bị thay đổi.",
+    "confirm": "Bỏ qua yêu cầu"
+  },
+  "loading": "Đang tải các yêu cầu xem xét...",
+  "error": {
+    "title": "Không thể tải các yêu cầu xem xét",
+    "body": "Danh sách chưa được tải nên có thể không trống. Hãy kiểm tra kết nối và thử lại.",
+    "retry": "Thử lại"
+  },
+  "empty": {
+    "title": "Chưa có yêu cầu xem xét",
+    "body": "Yêu cầu xuất hiện ở đây khi một quy tắc có hành động “Yêu cầu AI xem xét” khớp với một giao dịch. Trợ lý AI, hoặc một ứng dụng khách MCP như tác nhân chuyển tiếp, sẽ xử lý hàng đợi và đề xuất thay đổi để bạn phê duyệt.",
+    "filteredTitle": "Không có yêu cầu nào ở trạng thái này",
+    "filteredBody": "Hãy chọn trạng thái khác để xem các yêu cầu khác."
+  },
+  "toasts": {
+    "approved": "Đã áp dụng đề xuất",
+    "dismissed": "Đã bỏ qua yêu cầu",
+    "dismissFailed": "Không thể bỏ qua yêu cầu",
+    "approveFailed": "Không thể áp dụng đề xuất",
+    "changed": "Yêu cầu này đã thay đổi trong lúc đó. Danh sách đã được tải lại."
+  }
+}

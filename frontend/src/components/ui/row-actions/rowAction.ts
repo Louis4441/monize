@@ -29,7 +29,9 @@ export type ActionIconKey =
   | 'activate'
   | 'favorite'
   | 'transactions'
-  | 'filter';
+  | 'filter'
+  | 'moveUp'
+  | 'moveDown';
 
 /**
  * A single per-row action. Callers build these from already-translated labels and

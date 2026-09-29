@@ -17,6 +17,7 @@ import { CurrenciesService } from "../../currencies/currencies.service";
 import { roundMoney, roundToDecimals } from "../../common/round.util";
 import { tr } from "../../i18n/translate";
 import { ImportPostProcessingService } from "../import-post-processing.service";
+import { TransactionRulesApplierService } from "../../transaction-rules/transaction-rules-applier.service";
 import { ImportJob } from "./entities/import-job.entity";
 import { MnyStagedFileMissingError } from "./mny-errors";
 import {
@@ -54,6 +55,7 @@ import {
   writeTransactions,
 } from "./writers/write-transactions";
 import { writeInvestments, writeSecurities } from "./writers/write-investments";
+import { applyImportRules } from "./writers/apply-import-rules";
 import { writeBills } from "./writers/write-bills";
 import { throttleProgress } from "./writers/progress-throttle";
 import { writeLoans } from "./writers/write-loans";
@@ -122,6 +124,7 @@ export class MnyImportService {
     private currencies: CurrenciesService,
     @Inject(forwardRef(() => HoldingsService))
     private holdings: HoldingsService,
+    private rulesApplier: TransactionRulesApplierService,
   ) {}
 
   /**
@@ -479,6 +482,20 @@ export class MnyImportService {
         payeeNameByHandle: parsed.payees.nameByHandle,
         onProgress: (processed, total) =>
           reportTransactions({ phase: "transactions", processed, total }),
+      });
+
+      // Transaction rules (design 6.3): one bulk pass over the regular rows just
+      // inserted, in this transaction. Transfers and the cash rows a trade
+      // adopts are not evaluated.
+      await applyImportRules(manager, this.rulesApplier, userId, {
+        transactions: parsed.transactions.transactions,
+        writtenTransactionIds: transactions.writtenTransactionIds,
+        payeeNameByHandle: parsed.payees.nameByHandle,
+        investmentCashTransactionIds: new Set(
+          [...parsed.transactions.investmentCashSources.values()]
+            .map((source) => source.transactionId)
+            .filter((id): id is string => id !== null),
+        ),
       });
 
       await context.reportProgress({

@@ -194,7 +194,37 @@
     "deletePayeesTitle": "Excluir estes beneficiários?",
     "createdPayees": "{count, plural, =0 {Nenhum beneficiário criado} one {# beneficiário criado} other {# beneficiários criados}}",
     "updatedPayees": "{count, plural, =0 {Nenhum beneficiário atualizado} one {# beneficiário atualizado} other {# beneficiários atualizados}}",
-    "deletedPayees": "{count, plural, =0 {Nenhum beneficiário excluído} one {# beneficiário excluído} other {# beneficiários excluídos}}"
+    "deletedPayees": "{count, plural, =0 {Nenhum beneficiário excluído} one {# beneficiário excluído} other {# beneficiários excluídos}}",
+    "createRuleTitle": "Criar esta regra?",
+    "updateRuleTitle": "Aplicar esta edição da regra?",
+    "deleteRuleTitle": "Excluir esta regra?",
+    "runRuleTitle": "Executar esta regra nas transações existentes?",
+    "createdRule": "Regra criada",
+    "updatedRule": "Regra atualizada",
+    "deletedRule": "Regra excluída",
+    "ranRule": "Execução da regra concluída",
+    "viewRules": "Ver regras",
+    "unknownTitle": "Aprovar esta ação?",
+    "unknownDone": "Ação concluída",
+    "rule": {
+      "noPreview": "Os detalhes desta regra não estão disponíveis, então ela não pode ser revisada aqui. Cancele e pergunte de novo.",
+      "changesTitle": "O que muda",
+      "noChanges": "A regra continua como está.",
+      "was": "Antes",
+      "now": "Agora",
+      "testTitle": "Teste nas suas transações existentes",
+      "runPreviewTitle": "O que esta execução altera",
+      "filtersTitle": "Executa em",
+      "rowsShown": "Mostrando as primeiras {shown} de {count}.",
+      "skippedMore": "Os motivos são mostrados apenas para as primeiras {shown}.",
+      "aiReviewRequests": "{count, plural, one {# pedido de revisão da IA seria colocado na fila.} other {# pedidos de revisão da IA seriam colocados na fila.}}"
+    },
+    "ruleEffects": {
+      "title": "Suas regras também vão:",
+      "category": "Definir a categoria como {name}",
+      "payee": "Definir o favorecido como {name}",
+      "aiReview": "{count, plural, one {Colocar na fila # pedido de revisão da IA} other {Colocar na fila # pedidos de revisão da IA}}"
+    }
   },
   "table": {
     "downloadTitle": "Baixar tabela como CSV",

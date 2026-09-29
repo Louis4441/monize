@@ -106,6 +106,10 @@ export function AppHeader() {
       })
     : navLinks;
   const showAiMenu = !isDelegateView || !!delegateSections?.ai;
+  // The review inbox is owner-only: the API refuses a delegate session.
+  const visibleAiLinks = isDelegateView
+    ? aiLinks.filter((l) => !l.ownerOnly)
+    : aiLinks;
   // A delegate sees only the Tools sections they were granted manage
   // capability for (payees/categories/tags). Everyone else sees all.
   const toolsCapabilityByHref: Record<
@@ -190,7 +194,7 @@ export function AppHeader() {
   const isToolsActive = toolsLinks.some((link) =>
     isNavSectionActive(pathname, link.href),
   );
-  const isAiActive = aiLinks.some((link) =>
+  const isAiActive = visibleAiLinks.some((link) =>
     isNavSectionActive(pathname, link.href),
   );
 
@@ -319,7 +323,7 @@ export function AppHeader() {
                   href: l.href,
                   label: t(l.labelKey),
                 }))}
-                aiLinks={aiLinks.map((l) => ({
+                aiLinks={visibleAiLinks.map((l) => ({
                   href: l.href,
                   label: t(l.labelKey),
                 }))}
@@ -398,7 +402,7 @@ export function AppHeader() {
                       {aiOpen && (
                         <div className="absolute left-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg dark:shadow-gray-700/50 border border-gray-200 dark:border-gray-700 z-50">
                           <div className="py-1">
-                            {aiLinks.map((link) => {
+                            {visibleAiLinks.map((link) => {
                               const active = isNavSectionActive(
                                 pathname,
                                 link.href,

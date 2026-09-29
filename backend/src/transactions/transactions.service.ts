@@ -26,6 +26,10 @@ import { CreateTransactionSplitDto } from "./dto/create-transaction-split.dto";
 import { CreateTransferDto } from "./dto/create-transfer.dto";
 import { UpdateTransferDto } from "./dto/update-transfer.dto";
 import { TagsService } from "../tags/tags.service";
+import {
+  RuleEffectsPreview,
+  TransactionRulesApplierService,
+} from "../transaction-rules/transaction-rules-applier.service";
 import { AccountsService } from "../accounts/accounts.service";
 import { PayeesService } from "../payees/payees.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
@@ -244,6 +248,12 @@ export interface CreateTransactionPreview {
   categoryName: string | null;
   description: string | null;
   currencyCode: string;
+  /**
+   * What the user's transaction rules will do to this row on commit (same
+   * planner as the commit, design I3). Absent when the user has no rule that
+   * matches, so a preview with no rules is unchanged.
+   */
+  ruleEffects?: RuleEffectsPreview;
 }
 
 /** Resolved preview of a proposed transaction re-categorization. */
@@ -324,6 +334,7 @@ export class TransactionsService {
     private dataSource: DataSource,
     private actionHistoryService: ActionHistoryService,
     private crossOwnerAccess: CrossOwnerAccessService,
+    private rulesApplier: TransactionRulesApplierService,
   ) {}
 
   /**
@@ -403,8 +414,15 @@ export class TransactionsService {
     // option unset, in which case the name is stored verbatim.
     let resolvedPayeeId = transactionData.payeeId;
     let resolvedPayeeName = transactionData.payeeName;
+    // The raw payee text a rule's `payeeText` reads: what the caller typed, or
+    // the payee's own name when only an id was given.
+    let payeeText: string | null = transactionData.payeeName ?? null;
     if (transactionData.payeeId) {
-      await this.payeesService.findOne(userId, transactionData.payeeId);
+      const linkedPayee = await this.payeesService.findOne(
+        userId,
+        transactionData.payeeId,
+      );
+      payeeText ??= linkedPayee?.name ?? null;
     } else if (
       options?.createPayeeIfMissing &&
       typeof transactionData.payeeName === "string" &&
@@ -513,6 +531,18 @@ export class TransactionsService {
           );
         }
 
+        // Transaction rules (design 6.3, 6.4): after the row, its splits, its
+        // explicit tags and the payee default category, before the balance
+        // and the commit, on this manager, so a rollback drops the rule
+        // effects with the insert. They change category, payee and tags only.
+        await this.rulesApplier.applyToNew(
+          m,
+          userId,
+          [savedTransaction.id],
+          "create",
+          { payeeTextById: new Map([[savedTransaction.id, payeeText]]) },
+        );
+
         if (savedTransaction.status !== TransactionStatus.VOID) {
           if (isTransactionInFuture(createTransactionDto.transactionDate)) {
             await this.accountsService.recalculateCurrentBalance(
@@ -593,6 +623,12 @@ export class TransactionsService {
       description?: string;
       /** Auto-create a payee for an unmatched name. Defaults to true. */
       createPayeeIfMissing?: boolean;
+      /** The row will carry split lines (rules do not set a category then). */
+      hasSplits?: boolean;
+      /** Stored as given by create(); absent stores null. */
+      referenceNumber?: string;
+      /** Stored as given by create(); absent stores the entity default (UNRECONCILED). */
+      status?: TransactionStatus;
     },
   ): Promise<CreateTransactionPreview> {
     const account = await this.accountsService.findOne(userId, input.accountId);
@@ -649,6 +685,32 @@ export class TransactionsService {
     const payeeWillBeCreated =
       !!payeeName && !payeeMatched && input.createPayeeIfMissing !== false;
 
+    // The same planner the commit runs (design I3), over the facts create()
+    // would build. A payee that does not exist yet has no id to read, so a
+    // rule on `payeeId` sees it empty here and may differ on commit.
+    const description = stripHtml(input.description) || null;
+    const ruleEffects = await withScopedDb(this.dataSource, (m) =>
+      this.rulesApplier.previewForRow(m, userId, {
+        accountId: input.accountId,
+        currencyCode: account.currencyCode,
+        amount: input.amount,
+        isTransfer: false,
+        payeeId,
+        payeeText: inputPayeeName,
+        categoryId: input.hasSplits ? null : categoryId,
+        description,
+        tagIds: [],
+        hasSplits: input.hasSplits === true,
+        // The values create() stores (the same facts `storedRowFacts` reads
+        // from the row): the date is the stored calendar date, the status the
+        // entity default when none is given, and a new row has no attachment.
+        referenceNumber: input.referenceNumber ?? null,
+        transactionDate: input.transactionDate.slice(0, 10),
+        status: input.status ?? TransactionStatus.UNRECONCILED,
+        hasAttachment: false,
+      }),
+    );
+
     return {
       accountId: input.accountId,
       accountName: account.name,
@@ -660,8 +722,9 @@ export class TransactionsService {
       payeeWillBeCreated,
       categoryId,
       categoryName,
-      description: stripHtml(input.description) || null,
+      description,
       currencyCode: account.currencyCode,
+      ...(ruleEffects ? { ruleEffects } : {}),
     };
   }
 
@@ -2219,7 +2282,16 @@ export class TransactionsService {
     userId: string,
     id: string,
     updateTransactionDto: UpdateTransactionDto,
-    options?: { createPayeeIfMissing?: boolean },
+    options?: {
+      createPayeeIfMissing?: boolean;
+      /**
+       * Runs inside the write's own transaction, after the row is locked and the
+       * reconciliation lock has passed and before anything is written. A throw
+       * refuses the update with nothing written; what the hook itself writes
+       * (an AI review request marked applied) commits or rolls back with it.
+       */
+      beforeWrite?: (m: EntityManager) => Promise<void>;
+    },
   ): Promise<Transaction> {
     const transaction = await this.findOne(userId, id);
     const beforeSnapshot = this.snapshotTransaction(transaction);
@@ -2340,6 +2412,7 @@ export class TransactionsService {
       // Strict reconciled lock, against the LOCKED row and before any write:
       // an edit refused here must not already have happened.
       await assertReconciledRowsMutable(m, userId, [locked]);
+      if (options?.beforeWrite) await options.beforeWrite(m);
 
       const oldAmount = locked.amount;
       const oldLockedAccountId = locked.accountId;
@@ -3183,11 +3256,23 @@ export class TransactionsService {
     if (tagIds && tagIds.length > 0) {
       // Tags are per-user reference data: never write the effective user's
       // tag ids onto a cross-owner counterpart leg.
-      const refresh = async (leg: Transaction) => {
-        if (leg.userId !== userId) return leg;
-        await this.tagsService.setTransactionTags(leg.id, tagIds, userId);
-        return this.findOne(userId, leg.id);
-      };
+      const ownLegs = [result.fromTransaction, result.toTransaction].filter(
+        (leg) => leg.userId === userId,
+      );
+      // Additive, not a replacement: the legs may already carry the tags the
+      // transaction rules added inside the leg transaction (design 6.3), and
+      // this is a newly created transfer, so there is nothing else to replace.
+      // updateTransfer keeps its replace semantics.
+      await withScopedDb(this.dataSource, (m) =>
+        this.tagsService.addTransactionTags(
+          m,
+          userId,
+          ownLegs.map((leg) => leg.id),
+          tagIds,
+        ),
+      );
+      const refresh = async (leg: Transaction) =>
+        leg.userId === userId ? this.findOne(userId, leg.id) : leg;
 
       return {
         fromTransaction: await refresh(result.fromTransaction),
@@ -3490,56 +3575,9 @@ export class TransactionsService {
     const nameOf = (category?: { id: string; name: string } | null) =>
       category ? (categoryNames.get(category.id) ?? category.name) : undefined;
 
-    const transactions = result.data.flatMap((t): LlmTransactionRow[] => {
-      const splits = completeSplits.get(t.id) ?? t.splits;
-      const rows: LlmTransactionRow[] =
-        t.isSplit && Array.isArray(splits) && splits.length > 0
-          ? splits.map((s) => ({
-              id: t.id,
-              splitId: s.id,
-              date: t.transactionDate,
-              payeeName: t.payeeName,
-              categoryName: nameOf(s.category),
-              amount: Number(s.amount),
-              accountName: t.account?.name,
-              description: s.memo ?? t.description,
-              status: t.status,
-              isSplit: true,
-            }))
-          : [
-              {
-                id: t.id,
-                date: t.transactionDate,
-                // A blank transfer payee resolves to "Transfer to/from
-                // <account>" from the counterpart's current name (issue
-                // #1214) -- the same label the register shows the user, so
-                // the model and the screen describe the row identically. The
-                // mask above already rewrote unreadable counterpart names.
-                payeeName:
-                  t.payeeName ??
-                  (t.isTransfer && t.linkedTransaction?.account?.name
-                    ? transferPayeeLabel(
-                        t.amount,
-                        t.linkedTransaction.account.name,
-                      )
-                    : t.payeeName),
-                categoryName: nameOf(t.category),
-                amount: Number(t.amount),
-                accountName: t.account?.name,
-                description: t.description,
-                status: t.status,
-                // Read-only foreign-currency metadata, emitted only for a
-                // foreign-entered transaction.
-                ...(t.originalCurrencyCode
-                  ? {
-                      originalAmount: Number(t.originalAmount),
-                      originalCurrencyCode: t.originalCurrencyCode,
-                      exchangeRate: Number(t.exchangeRate),
-                    }
-                  : {}),
-              },
-            ];
-      return rows.filter((row) => {
+    const transactions = result.data
+      .flatMap((t) => this.toLlmRows(t, completeSplits.get(t.id), nameOf))
+      .filter((row) => {
         if (filters.minAmount !== undefined && row.amount < filters.minAmount) {
           return false;
         }
@@ -3548,13 +3586,99 @@ export class TransactionsService {
         }
         return true;
       });
-    });
 
     return {
       transactions,
       total: result.pagination.total,
       hasMore: result.pagination.hasMore,
     };
+  }
+
+  /**
+   * One transaction as the flat rows a model reads: one row, or one per split
+   * line with its real category. The single projection behind
+   * {@link getLlmTransactionRows} and {@link getLlmTransactionById}, so the two
+   * describe a row identically.
+   */
+  private toLlmRows(
+    t: Transaction,
+    completeSplits: TransactionSplit[] | undefined,
+    nameOf: (
+      category?: { id: string; name: string } | null,
+    ) => string | undefined,
+  ): LlmTransactionRow[] {
+    const splits = completeSplits ?? t.splits;
+    return t.isSplit && Array.isArray(splits) && splits.length > 0
+      ? splits.map((s) => ({
+          id: t.id,
+          splitId: s.id,
+          date: t.transactionDate,
+          payeeName: t.payeeName,
+          categoryName: nameOf(s.category),
+          amount: Number(s.amount),
+          accountName: t.account?.name,
+          description: s.memo ?? t.description,
+          status: t.status,
+          isSplit: true,
+        }))
+      : [
+          {
+            id: t.id,
+            date: t.transactionDate,
+            // A blank transfer payee resolves to "Transfer to/from
+            // <account>" from the counterpart's current name (issue
+            // #1214) -- the same label the register shows the user, so
+            // the model and the screen describe the row identically. The
+            // mask applied by the caller already rewrote unreadable
+            // counterpart names.
+            payeeName:
+              t.payeeName ??
+              (t.isTransfer && t.linkedTransaction?.account?.name
+                ? transferPayeeLabel(t.amount, t.linkedTransaction.account.name)
+                : t.payeeName),
+            categoryName: nameOf(t.category),
+            amount: Number(t.amount),
+            accountName: t.account?.name,
+            description: t.description,
+            status: t.status,
+            // Read-only foreign-currency metadata, emitted only for a
+            // foreign-entered transaction.
+            ...(t.originalCurrencyCode
+              ? {
+                  originalAmount: Number(t.originalAmount),
+                  originalCurrencyCode: t.originalCurrencyCode,
+                  exchangeRate: Number(t.exchangeRate),
+                }
+              : {}),
+          },
+        ];
+  }
+
+  /**
+   * One of the user's transactions as the rows {@link getLlmTransactionRows}
+   * returns (a split expands to its complete line set), through the same
+   * cross-owner mask and qualified category names. NotFound when it is not
+   * readable by the user.
+   */
+  async getLlmTransactionById(
+    userId: string,
+    id: string,
+  ): Promise<LlmTransactionRow[]> {
+    const t = await this.findOne(userId, id);
+    if (payloadHasCrossOwnerTransfer([t])) {
+      const readable =
+        await this.crossOwnerAccess.readableAccountIdSetFor(userId);
+      maskTransactionsAgainst(readable, [t]);
+    }
+    const categoryNames = await withScopedDb(this.dataSource, (m) =>
+      loadQualifiedCategoryNames(m, userId),
+    );
+    const completeSplits = await this.loadCompleteSplits(
+      t.isSplit ? [t.id] : [],
+    );
+    return this.toLlmRows(t, completeSplits.get(t.id), (category) =>
+      category ? (categoryNames.get(category.id) ?? category.name) : undefined,
+    );
   }
 
   /**

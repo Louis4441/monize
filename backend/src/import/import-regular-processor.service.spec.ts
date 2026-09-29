@@ -1,4 +1,5 @@
 import { ImportRegularProcessorService } from "./import-regular-processor.service";
+import { TransactionRulesApplierService } from "../transaction-rules/transaction-rules-applier.service";
 import { ImportContext } from "./import-context";
 import { TransactionStatus } from "../transactions/entities/transaction.entity";
 import { AccountType } from "../accounts/entities/account.entity";
@@ -95,7 +96,9 @@ describe("ImportRegularProcessorService", () => {
   };
 
   beforeEach(() => {
-    service = new ImportRegularProcessorService();
+    service = new ImportRegularProcessorService({
+      applyToNew: jest.fn().mockResolvedValue([]),
+    } as unknown as TransactionRulesApplierService);
   });
 
   describe("processTransaction", () => {

@@ -194,7 +194,37 @@
     "deletePayeesTitle": "删除这些收款人？",
     "createdPayees": "{count, plural, =0 {未创建收款人} other {已创建 # 个收款人}}",
     "updatedPayees": "{count, plural, =0 {未更新收款人} other {已更新 # 个收款人}}",
-    "deletedPayees": "{count, plural, =0 {未删除收款人} other {已删除 # 个收款人}}"
+    "deletedPayees": "{count, plural, =0 {未删除收款人} other {已删除 # 个收款人}}",
+    "createRuleTitle": "创建此规则？",
+    "updateRuleTitle": "应用此规则的修改？",
+    "deleteRuleTitle": "删除此规则？",
+    "runRuleTitle": "对现有交易运行此规则？",
+    "createdRule": "规则已创建",
+    "updatedRule": "规则已更新",
+    "deletedRule": "规则已删除",
+    "ranRule": "规则运行完成",
+    "viewRules": "查看规则",
+    "unknownTitle": "批准此操作？",
+    "unknownDone": "操作已完成",
+    "rule": {
+      "noPreview": "此规则的详情不可用，无法在此审核。请取消后重新询问。",
+      "changesTitle": "将发生的变化",
+      "noChanges": "规则保持不变。",
+      "was": "修改前",
+      "now": "修改后",
+      "testTitle": "用现有交易测试",
+      "runPreviewTitle": "此次运行将更改的内容",
+      "filtersTitle": "运行范围",
+      "rowsShown": "显示 {count} 笔中的前 {shown} 笔。",
+      "skippedMore": "仅显示前 {shown} 笔的原因。",
+      "aiReviewRequests": "{count, plural, other {将有 # 个 AI 审核请求加入队列。}}"
+    },
+    "ruleEffects": {
+      "title": "你的规则还会：",
+      "category": "将分类设置为 {name}",
+      "payee": "将收款方设置为 {name}",
+      "aiReview": "{count, plural, other {将 # 个 AI 审核请求加入队列}}"
+    }
   },
   "table": {
     "downloadTitle": "将表格下载为 CSV",

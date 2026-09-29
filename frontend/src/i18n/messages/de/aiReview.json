@@ -1,0 +1,69 @@
+{
+  "page": {
+    "title": "KI-Prüfungseingang",
+    "subtitle": "Buchungen, die eine Regel von einer KI prüfen lassen wollte, und die Änderungen, die ein Assistent zur Freigabe vorschlägt."
+  },
+  "filter": {
+    "label": "Nach Status filtern",
+    "open": "Offen",
+    "pending": "Ausstehend",
+    "claimed": "In Prüfung",
+    "proposed": "Vorgeschlagen",
+    "applied": "Angewendet",
+    "rejected": "Abgelehnt",
+    "expired": "Abgelaufen"
+  },
+  "status": {
+    "pending": "Ausstehend",
+    "claimed": "In Prüfung",
+    "proposed": "Vorgeschlagen",
+    "applied": "Angewendet",
+    "rejected": "Abgelehnt",
+    "expired": "Abgelaufen"
+  },
+  "columns": {
+    "date": "Datum",
+    "request": "Anfrage",
+    "amount": "Betrag",
+    "status": "Status"
+  },
+  "row": {
+    "noPayee": "Kein Zahlungsempfänger",
+    "transactionMissing": "Diese Buchung existiert nicht mehr",
+    "rule": "Regel: {name}",
+    "manualRequest": "Manuell angefordert",
+    "agentNote": "Hinweis des Assistenten: {reason}",
+    "dates": "Erstellt {created}, läuft ab {expires}",
+    "viewTransaction": "Buchung anzeigen"
+  },
+  "actions": {
+    "dismiss": "Verwerfen"
+  },
+  "proposal": {
+    "errorTitle": "Dieser Vorschlag kann nicht mehr angewendet werden"
+  },
+  "dismissDialog": {
+    "title": "Diese Anfrage verwerfen?",
+    "message": "Niemand wird erneut gebeten, diese Buchung zu prüfen. Die Buchung selbst wird nicht geändert.",
+    "confirm": "Anfrage verwerfen"
+  },
+  "loading": "Prüfungsanfragen werden geladen...",
+  "error": {
+    "title": "Prüfungsanfragen konnten nicht geladen werden",
+    "body": "Die Liste wurde nicht geladen und ist daher möglicherweise nicht leer. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+    "retry": "Erneut versuchen"
+  },
+  "empty": {
+    "title": "Keine Prüfungsanfragen",
+    "body": "Anfragen erscheinen hier, wenn eine Regel mit der Aktion „KI-Prüfung anfordern“ auf eine Buchung zutrifft. Ein KI-Assistent oder ein MCP-Client wie der Relay-Agent arbeitet die Warteschlange ab und schlägt eine Änderung zur Freigabe vor.",
+    "filteredTitle": "Keine Anfragen mit diesem Status",
+    "filteredBody": "Wählen Sie einen anderen Status, um weitere Anfragen zu sehen."
+  },
+  "toasts": {
+    "approved": "Vorschlag angewendet",
+    "dismissed": "Anfrage verworfen",
+    "dismissFailed": "Die Anfrage konnte nicht verworfen werden",
+    "approveFailed": "Der Vorschlag konnte nicht angewendet werden",
+    "changed": "Diese Anfrage hat sich inzwischen geändert. Die Liste wurde neu geladen."
+  }
+}

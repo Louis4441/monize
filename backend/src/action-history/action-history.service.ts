@@ -8,6 +8,7 @@ import { tr } from "../i18n/translate";
 import { DataSource, EntityManager } from "typeorm";
 import { Cron } from "@nestjs/schedule";
 import { ActionHistory } from "./entities/action-history.entity";
+import { RULE_RUN_ENTITY_TYPE, undoRuleRun } from "./rule-run-undo";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
 import { assertReconciledRowsMutable } from "../transactions/reconciled-lock.util";
@@ -60,7 +61,7 @@ export interface UndoRedoResult {
 }
 
 const MAX_HISTORY_PER_USER = 100;
-const MAX_JSONB_SIZE_BYTES = 512 * 1024; // 500 KB
+export const MAX_JSONB_SIZE_BYTES = 512 * 1024; // 500 KB
 
 // Whitelist of allowed table names and column names for reinsertEntity()
 // to prevent SQL injection via crafted JSONB keys
@@ -509,6 +510,9 @@ export class ActionHistoryService {
         break;
       case "bulk_transaction":
         await this.undoBulkTransaction(action, manager);
+        break;
+      case RULE_RUN_ENTITY_TYPE:
+        await undoRuleRun(action, manager);
         break;
       default:
         throw new ConflictException(

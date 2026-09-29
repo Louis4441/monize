@@ -2,6 +2,7 @@ import { EntityManager } from "typeorm";
 import { Account } from "../accounts/entities/account.entity";
 import { applyAccountBalanceDelta } from "../accounts/accounts.service";
 import { roundMoney } from "../common/round.util";
+import { TransactionRule } from "../transaction-rules/transaction-rule.entity";
 import { ImportResultDto } from "./dto/import.dto";
 
 export interface ImportContext {
@@ -22,6 +23,11 @@ export interface ImportContext {
   /** Tracks how many QIF entries with each transfer signature have been seen in the current block,
    *  used to distinguish genuinely different transfers that share date/amount/account. */
   transferDupCounts: Map<string, number>;
+  /**
+   * The user's enabled rules with trigger "import", loaded once per file by
+   * the import service (design 6.3). Absent or empty means no rule runs.
+   */
+  importRules?: readonly TransactionRule[];
 }
 
 /**

@@ -25,6 +25,12 @@ import { UpdatePayeeDto } from "../../payees/dto/update-payee.dto";
 import { CreateInvestmentTransactionDto } from "../../securities/dto/create-investment-transaction.dto";
 import { UpdateInvestmentTransactionDto } from "../../securities/dto/update-investment-transaction.dto";
 import { CreateSecurityDto } from "../../securities/dto/create-security.dto";
+import { CreateTransactionRuleDto } from "../../transaction-rules/dto/create-transaction-rule.dto";
+import { UpdateTransactionRuleDto } from "../../transaction-rules/dto/update-transaction-rule.dto";
+import { RunTransactionRuleDto } from "../../transaction-rules/dto/rule-run.dto";
+import type { RuleRunResult } from "../../transaction-rules/rule-run.types";
+import { TransactionRulesService } from "../../transaction-rules/transaction-rules.service";
+import { TransactionRulesRunService } from "../../transaction-rules/transaction-rules-run.service";
 import { UpdateSecurityDto } from "../../securities/dto/update-security.dto";
 import { tr } from "../../i18n/translate";
 import { AiActionSigningService } from "./ai-action-signing.service";
@@ -61,6 +67,10 @@ import {
   BatchCreateSecurityRow,
   BatchUpdateSecurityRow,
   BatchDeleteSecurityRow,
+  CreateTransactionRuleDescriptor,
+  UpdateTransactionRuleDescriptor,
+  DeleteTransactionRuleDescriptor,
+  RunTransactionRuleDescriptor,
   TransactionRowDescriptor,
   MAX_BULK_ACTION_ROWS,
   AttachmentRefDescriptor,
@@ -71,6 +81,7 @@ import { UpdateTransferDto } from "../../transactions/dto/update-transfer.dto";
 import { BulkCreateSkip } from "../../common/bulk-create.types";
 import { ConfirmAiActionDto } from "./dto/confirm-ai-action.dto";
 import { SingleUseTokenService } from "../../auth/single-use-token.service";
+import { AiReviewRequestsService } from "../../ai-review/ai-review-requests.service";
 
 export interface ConfirmActionResult {
   type: AiActionDescriptor["type"];
@@ -82,6 +93,8 @@ export interface ConfirmActionResult {
   count?: number;
   /** Rows that were skipped best-effort (bulk actions), by input index. */
   skipped?: BulkCreateSkip[];
+  /** run_transaction_rule: rows changed, rows left alone and why, and the undo entry. */
+  ruleRun?: RuleRunResult;
 }
 
 /**
@@ -108,6 +121,9 @@ export class AiActionsService {
     private readonly attachmentsService: AttachmentsService,
     private readonly relayAttachmentStore: RelayAttachmentStore,
     private readonly singleUseTokens: SingleUseTokenService,
+    private readonly transactionRulesService: TransactionRulesService,
+    private readonly transactionRulesRunService: TransactionRulesRunService,
+    private readonly aiReviewRequests: AiReviewRequestsService,
   ) {}
 
   async confirm(
@@ -241,6 +257,21 @@ export class AiActionsService {
   }
 
   /**
+   * Commit a descriptor the caller built in this process and a person approved
+   * outside the confirm endpoint: an MCP client's own dialog. It skips what
+   * `confirm` does for a descriptor that ARRIVED from a client (signature,
+   * expiry, the anti-replay claim, the AI write cap) because none of that
+   * applies to one that never left the server; the caller owns the MCP write
+   * cap. Never pass it anything read from a request.
+   */
+  async commitApproved(
+    userId: string,
+    descriptor: AiActionDescriptor,
+  ): Promise<ConfirmActionResult> {
+    return this.execute(userId, descriptor);
+  }
+
+  /**
    * How many writes a descriptor proposes: the row count for bulk actions, one
    * for singular actions. Used to pre-check the daily write cap.
    */
@@ -296,7 +327,90 @@ export class AiActionsService {
         return this.executeUpdateTransfer(userId, descriptor);
       case "batch_actions":
         return this.executeBatchActions(userId, descriptor);
+      case "create_transaction_rule":
+        return this.executeCreateTransactionRule(userId, descriptor);
+      case "update_transaction_rule":
+        return this.executeUpdateTransactionRule(userId, descriptor);
+      case "delete_transaction_rule":
+        return this.executeDeleteTransactionRule(userId, descriptor);
+      case "run_transaction_rule":
+        return this.executeRunTransactionRule(userId, descriptor);
     }
+  }
+
+  // The rule executors commit through TransactionRulesService and
+  // TransactionRulesRunService, which validate the definition and check that
+  // every referenced id and the rule itself belong to `userId` inside the
+  // write's own transaction -- the descriptor's signature is not the check.
+
+  private async executeCreateTransactionRule(
+    userId: string,
+    descriptor: CreateTransactionRuleDescriptor,
+  ): Promise<ConfirmActionResult> {
+    const dto = await this.toValidatedDto(CreateTransactionRuleDto, {
+      name: descriptor.rule.name,
+      enabled: descriptor.rule.enabled,
+      triggers: descriptor.rule.triggers,
+      condition: descriptor.rule.condition,
+      actions: descriptor.rule.actions,
+      stopProcessing: descriptor.rule.stopProcessing,
+    });
+    const rule = await this.transactionRulesService.create(userId, dto);
+    return { type: "create_transaction_rule", id: rule.id };
+  }
+
+  private async executeUpdateTransactionRule(
+    userId: string,
+    descriptor: UpdateTransactionRuleDescriptor,
+  ): Promise<ConfirmActionResult> {
+    const dto = await this.toValidatedDto(UpdateTransactionRuleDto, {
+      name: descriptor.rule.name,
+      enabled: descriptor.rule.enabled,
+      triggers: descriptor.rule.triggers,
+      condition: descriptor.rule.condition,
+      actions: descriptor.rule.actions,
+      stopProcessing: descriptor.rule.stopProcessing,
+      revision: descriptor.expectedRevision,
+    });
+    const rule = await this.transactionRulesService.update(
+      userId,
+      descriptor.ruleId,
+      dto,
+    );
+    return { type: "update_transaction_rule", id: rule.id };
+  }
+
+  private async executeDeleteTransactionRule(
+    userId: string,
+    descriptor: DeleteTransactionRuleDescriptor,
+  ): Promise<ConfirmActionResult> {
+    await this.transactionRulesService.remove(
+      userId,
+      descriptor.ruleId,
+      descriptor.expectedRevision,
+    );
+    return { type: "delete_transaction_rule", id: descriptor.ruleId };
+  }
+
+  /**
+   * A 409 PREVIEW_CHANGED from the run (the transactions or the rule moved
+   * since the card was built) propagates as it is: the user reads the refusal,
+   * nothing was written, and the claim on the descriptor is released.
+   */
+  private async executeRunTransactionRule(
+    userId: string,
+    descriptor: RunTransactionRuleDescriptor,
+  ): Promise<ConfirmActionResult> {
+    const dto = await this.toValidatedDto(RunTransactionRuleDto, {
+      ...descriptor.filters,
+      fingerprint: descriptor.fingerprint,
+    });
+    const ruleRun = await this.transactionRulesRunService.run(
+      userId,
+      descriptor.ruleId,
+      dto,
+    );
+    return { type: "run_transaction_rule", id: descriptor.ruleId, ruleRun };
   }
 
   private async executeCreateTransfer(
@@ -610,11 +724,29 @@ export class AiActionsService {
       // (invariant I1) -- never as a separate follow-up write.
       splits: descriptor.splits ? toSplitDtoRows(descriptor.splits) : undefined,
     });
+    // An edit that answers an AI review request marks it applied in the write's
+    // own transaction, under the row lock and before anything is written: a
+    // request that was dismissed or expired since the card was built refuses the
+    // edit (409) with nothing changed, and the two commit or roll back together.
+    const reviewRequestId = descriptor.aiReviewRequestId;
     const transaction = await this.transactionsService.update(
       userId,
       descriptor.transactionId,
       dto,
-      { createPayeeIfMissing: descriptor.createPayee === true },
+      {
+        createPayeeIfMissing: descriptor.createPayee === true,
+        ...(typeof reviewRequestId === "string"
+          ? {
+              beforeWrite: (m) =>
+                this.aiReviewRequests.markApplied(
+                  m,
+                  userId,
+                  reviewRequestId,
+                  descriptor.transactionId,
+                ),
+            }
+          : {}),
+      },
     );
     await this.persistAttachments(userId, transaction.id, files, refIds);
     return { type: "update_transaction", id: transaction.id };

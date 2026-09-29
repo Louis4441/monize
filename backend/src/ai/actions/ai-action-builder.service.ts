@@ -33,8 +33,20 @@ import {
   toSplitPreview,
   AiActionAttachmentPreview,
   AiActionEnvelope,
+  AiActionRuleState,
+  CreateTransactionRuleDescriptor,
+  DeleteTransactionRuleDescriptor,
+  RuleDefinitionDescriptor,
+  RunTransactionRuleDescriptor,
+  UpdateTransactionRuleDescriptor,
   AttachmentRefDescriptor,
 } from "./ai-action.types";
+import type {
+  CreateRulePreview,
+  DeleteRulePreview,
+  RunRulePreview,
+  UpdateRulePreview,
+} from "../../transaction-rules/rule-tool-prep.service";
 import {
   CategorizeTransactionPreview,
   CreateTransactionPreview,
@@ -60,6 +72,18 @@ import {
   UpdateSecurityPreview,
   DeleteSecurityPreview,
 } from "../../securities/securities.service";
+
+/** The rule a descriptor carries: a copy, so a later edit of the preview cannot reach a signed value. */
+function toRuleDescriptor(rule: AiActionRuleState): RuleDefinitionDescriptor {
+  return {
+    name: rule.name,
+    enabled: rule.enabled,
+    triggers: [...rule.triggers],
+    condition: rule.condition,
+    actions: [...rule.actions],
+    stopProcessing: rule.stopProcessing,
+  };
+}
 
 /** Map an attachment ref to its display-only confirmation-card shape. */
 function toAttachmentPreview(
@@ -90,6 +114,7 @@ export function transactionPreviewRow(
     payeeWillBeCreated: preview.payeeWillBeCreated,
     categoryName: preview.categoryName,
     description: preview.description,
+    ...(preview.ruleEffects ? { ruleEffects: preview.ruleEffects } : {}),
   };
 }
 
@@ -165,6 +190,9 @@ export function transferPreviewRow(
     payeeName: preview.payeeName,
     payeeWillBeCreated: preview.payeeWillBeCreated,
     categoryName: preview.categoryName,
+    ...("ruleEffects" in preview && preview.ruleEffects
+      ? { ruleEffects: preview.ruleEffects }
+      : {}),
   };
 }
 
@@ -235,6 +263,7 @@ export class AiActionBuilderService {
         payeeWillBeCreated: preview.payeeWillBeCreated,
         categoryName: preview.categoryName,
         description: preview.description,
+        ...(preview.ruleEffects ? { ruleEffects: preview.ruleEffects } : {}),
         ...(splits ? { splits: splits.map(toSplitPreview) } : {}),
         ...(attachments?.length
           ? { attachments: attachments.map(toAttachmentPreview) }
@@ -526,6 +555,7 @@ export class AiActionBuilderService {
     preview: UpdateTransactionPreview,
     splits?: ResolvedSplitLine[],
     attachments?: AttachmentRefDescriptor[],
+    options: { aiReviewRequestId?: string } = {},
   ): PendingAiAction {
     const { actionId, expiresAt } = this.newEnvelope();
     const descriptor: UpdateTransactionDescriptor = {
@@ -546,6 +576,9 @@ export class AiActionBuilderService {
       currencyCode: preview.currencyCode,
       ...(splits ? { splits: splits.map(toSplitRowDescriptor) } : {}),
       ...(attachments?.length ? { attachments } : {}),
+      ...(options.aiReviewRequestId
+        ? { aiReviewRequestId: options.aiReviewRequestId }
+        : {}),
     };
     return {
       actionId,
@@ -804,6 +837,7 @@ export class AiActionBuilderService {
         payeeName: preview.payeeName,
         payeeWillBeCreated: preview.payeeWillBeCreated,
         categoryName: preview.categoryName,
+        ...(preview.ruleEffects ? { ruleEffects: preview.ruleEffects } : {}),
       },
     };
   }
@@ -919,5 +953,138 @@ export class AiActionBuilderService {
       rows,
       previewRows,
     );
+  }
+  /**
+   * The four rule builders take a preview produced by
+   * `TransactionRuleToolPrepService`, which has already resolved every name to
+   * an id, validated the definition and run the test. The descriptor carries
+   * the ids and, where the commit needs one, the expectation it must still find
+   * (an update's revision, a run's plan fingerprint); the card carries the same
+   * rule with the names of its ids, which the client renders in words.
+   */
+  buildCreateTransactionRule(
+    userId: string,
+    preview: CreateRulePreview,
+  ): PendingAiAction {
+    const { actionId, expiresAt } = this.newEnvelope();
+    const descriptor: CreateTransactionRuleDescriptor = {
+      type: "create_transaction_rule",
+      userId,
+      actionId,
+      expiresAt,
+      rule: toRuleDescriptor(preview.rule),
+    };
+    return {
+      actionId,
+      type: "create_transaction_rule",
+      expiresAt,
+      descriptor,
+      signature: this.signingService.sign(descriptor),
+      preview: {
+        rule: {
+          ...preview.rule,
+          labels: preview.labels,
+          test: preview.test,
+        },
+      },
+    };
+  }
+
+  buildUpdateTransactionRule(
+    userId: string,
+    preview: UpdateRulePreview,
+  ): PendingAiAction {
+    const { actionId, expiresAt } = this.newEnvelope();
+    const descriptor: UpdateTransactionRuleDescriptor = {
+      type: "update_transaction_rule",
+      userId,
+      actionId,
+      expiresAt,
+      ruleId: preview.ruleId,
+      expectedRevision: preview.expectedRevision,
+      rule: toRuleDescriptor(preview.rule),
+    };
+    return {
+      actionId,
+      type: "update_transaction_rule",
+      expiresAt,
+      descriptor,
+      signature: this.signingService.sign(descriptor),
+      preview: {
+        rule: {
+          ...preview.rule,
+          labels: preview.labels,
+          current: preview.current,
+          ...(preview.test ? { test: preview.test } : {}),
+        },
+      },
+    };
+  }
+
+  buildDeleteTransactionRule(
+    userId: string,
+    preview: DeleteRulePreview,
+  ): PendingAiAction {
+    const { actionId, expiresAt } = this.newEnvelope();
+    const descriptor: DeleteTransactionRuleDescriptor = {
+      type: "delete_transaction_rule",
+      userId,
+      actionId,
+      expiresAt,
+      ruleId: preview.ruleId,
+      expectedRevision: preview.expectedRevision,
+    };
+    return {
+      actionId,
+      type: "delete_transaction_rule",
+      expiresAt,
+      descriptor,
+      signature: this.signingService.sign(descriptor),
+      preview: { rule: { ...preview.rule, labels: preview.labels } },
+    };
+  }
+
+  buildRunTransactionRule(
+    userId: string,
+    preview: RunRulePreview,
+  ): PendingAiAction {
+    const { actionId, expiresAt } = this.newEnvelope();
+    const descriptor: RunTransactionRuleDescriptor = {
+      type: "run_transaction_rule",
+      userId,
+      actionId,
+      expiresAt,
+      ruleId: preview.ruleId,
+      filters: {
+        ...(preview.filters.accountIds
+          ? { accountIds: [...preview.filters.accountIds] }
+          : {}),
+        ...(preview.filters.startDate
+          ? { startDate: preview.filters.startDate }
+          : {}),
+        ...(preview.filters.endDate
+          ? { endDate: preview.filters.endDate }
+          : {}),
+        ...(preview.filters.limit !== undefined
+          ? { limit: preview.filters.limit }
+          : {}),
+      },
+      fingerprint: preview.fingerprint,
+    };
+    return {
+      actionId,
+      type: "run_transaction_rule",
+      expiresAt,
+      descriptor,
+      signature: this.signingService.sign(descriptor),
+      preview: {
+        rule: {
+          ...preview.rule,
+          labels: preview.labels,
+          filters: preview.filters,
+          test: preview.test,
+        },
+      },
+    };
   }
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@/test/render';
+import { render, screen, fireEvent, within } from '@/test/render';
 import { TransactionConfirmationCard } from './TransactionConfirmationCard';
 import type { PendingAction } from '@/types/ai';
 
@@ -858,6 +858,133 @@ describe('TransactionConfirmationCard', () => {
       expect(
         screen.getByRole('link', { name: 'View transaction' }),
       ).toHaveAttribute('href', '/transactions?targetTransactionId=tx-1');
+    });
+  });
+  describe('rule effects', () => {
+    const effects = {
+      changes: {
+        categoryId: 'cat-1',
+        payeeId: 'pay-1',
+        addTagIds: ['tag-1', 'tag-9'],
+        removeTagIds: ['tag-2'],
+      },
+      aiReviewRequests: [{ ruleId: 'r1', instruction: 'Check the receipt' }],
+      labels: {
+        categories: { 'cat-1': 'Food: Coffee' },
+        payees: { 'pay-1': 'Starbucks' },
+        tags: { 'tag-1': 'coffee', 'tag-2': 'treat' },
+        rules: { r1: 'Coffee' },
+      },
+    };
+
+    it('lists what the rules will also do on a created transaction, by name', () => {
+      render(
+        <TransactionConfirmationCard
+          action={makeAction({ preview: { ...makeAction().preview, ruleEffects: effects } })}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      const block = screen.getByTestId('rule-effects');
+      expect(within(block).getByText('Your rules will also:')).toBeInTheDocument();
+      expect(within(block).getByText('Set the category to Food: Coffee')).toBeInTheDocument();
+      expect(within(block).getByText('Set the payee to Starbucks')).toBeInTheDocument();
+      // A tag that no longer exists reads as a deleted item, never as its id.
+      expect(within(block).getByText('Tags added: coffee and a deleted item')).toBeInTheDocument();
+      expect(within(block).getByText('Tags removed: treat')).toBeInTheDocument();
+      expect(within(block).getByText('Queue 1 AI review request')).toBeInTheDocument();
+      expect(block.textContent).not.toMatch(/tag-|cat-1|pay-1/);
+    });
+
+    it('lists only the effects that exist', () => {
+      render(
+        <TransactionConfirmationCard
+          action={makeAction({
+            preview: {
+              ...makeAction().preview,
+              ruleEffects: { ...effects, changes: { addTagIds: ['tag-1'], removeTagIds: [] }, aiReviewRequests: [] },
+            },
+          })}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      const block = screen.getByTestId('rule-effects');
+      expect(within(block).getAllByRole('listitem')).toHaveLength(1);
+      expect(within(block).getByText('Tags added: coffee')).toBeInTheDocument();
+    });
+
+    it('lists them on a transfer card too', () => {
+      render(
+        <TransactionConfirmationCard
+          action={makeAction({
+            type: 'create_transfer',
+            descriptor: { type: 'create_transfer' },
+            preview: {
+              fromAccountName: 'Checking',
+              toAccountName: 'Savings',
+              amount: 100,
+              currencyCode: 'USD',
+              transactionDate: '2026-01-15',
+              ruleEffects: effects,
+            },
+          })}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(within(screen.getByTestId('rule-effects')).getByText('Set the payee to Starbucks')).toBeInTheDocument();
+    });
+
+    it('renders nothing when no rule has an effect', () => {
+      const { container } = render(
+        <TransactionConfirmationCard action={makeAction()} onConfirm={vi.fn()} onCancel={vi.fn()} />,
+      );
+      expect(screen.queryByTestId('rule-effects')).toBeNull();
+      expect(screen.queryByText('Your rules will also:')).toBeNull();
+      expect(container.textContent).not.toContain('Your rules');
+    });
+
+    it('renders nothing for effects that change nothing', () => {
+      render(
+        <TransactionConfirmationCard
+          action={makeAction({
+            preview: {
+              ...makeAction().preview,
+              ruleEffects: { ...effects, changes: { addTagIds: [], removeTagIds: [] }, aiReviewRequests: [] },
+            },
+          })}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.queryByTestId('rule-effects')).toBeNull();
+    });
+  });
+
+  describe('an action type this client does not know', () => {
+    it('is titled generically and shows no other action\'s rows', () => {
+      render(
+        <TransactionConfirmationCard
+          action={makeAction({ type: 'archive_everything' as never, preview: {} })}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByText('Approve this action?')).toBeInTheDocument();
+      expect(screen.queryByText('Create this payee?')).toBeNull();
+      expect(screen.queryByText('Name')).toBeNull();
+    });
+
+    it('confirms it without claiming a payee was created', () => {
+      render(
+        <TransactionConfirmationCard
+          action={makeAction({ type: 'archive_everything' as never, status: 'confirmed' })}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByText('Action completed')).toBeInTheDocument();
     });
   });
 });

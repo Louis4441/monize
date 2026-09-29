@@ -128,7 +128,8 @@
       "updatedInvestmentTransaction": "Zaktualizowano transakcję {action}",
       "deletedInvestmentTransaction": "Usunięto transakcję {action}",
       "transferredSecurity": "Przeniesiono papier wartościowy między kontami",
-      "updatedSecurityTransfer": "Zaktualizowano transfer papierów wartościowych"
+      "updatedSecurityTransfer": "Zaktualizowano transfer papierów wartościowych",
+      "ranTransactionRule": "Uruchomiono regułę „{name}” dla {count, plural, one {# transakcji} few {# transakcji} many {# transakcji} other {# transakcji}}"
     },
     "timeAgo": {
       "justNow": "przed chwilą",

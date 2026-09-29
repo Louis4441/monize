@@ -151,6 +151,8 @@ implied.
 | INV-HA-003 | A single-use artifact is consumed at most once across every replica | enforced |
 | INV-HA-004 | One deployment publishes one OIDC signing key set, stable across restarts | enforced |
 | INV-HA-005 | A relay prompt is claimed by exactly one agent poll and answered at most once | enforced |
+| INV-RULE-001 | A transaction rule never moves a balance | enforced |
+| INV-RULE-002 | A transaction rule applies inside the transaction that inserts the row, on every creation path | partial |
 
 ## Imports
 
@@ -5093,6 +5095,124 @@ Required tests      Two connections and two instances:
                     both connections are dropped.
 Status              enforced
 ```
+
+## Transaction rules
+
+Design: `docs/future-plans/transaction-rules.md` (invariants I1 and I2 there).
+
+### INV-RULE-001 -- a transaction rule never moves a balance
+
+```text
+Statement           Running a rule never changes an amount, an account, a date,
+                    a status, a split or a link, and so never moves a balance.
+                    A rule may change only a row's category, payee (with its
+                    payee_name), description and tags, or queue a request for a
+                    human-approved AI review that does not touch the row.
+Source of truth     the transactions row and transaction_tags; the rule's stored
+                    action list in transaction_rules.actions
+Enforcement         The action list is a closed union: RULE_ACTION_TYPES and
+                    RuleAction in backend/src/transaction-rules/rule-action.types.ts
+                    (add_tags, remove_tags, set_category, set_payee,
+                    set_payee_from_text, set_description, request_ai_review),
+                    so an action that writes anything else is not
+                    representable, and rule-validation.ts refuses a stored or
+                    submitted action outside it. The applier
+                    (TransactionRulesApplierService.writeEffects) writes one
+                    UPDATE limited to categoryId, payeeId, payeeName and
+                    description, tag rows through TagsService, and its own
+                    trace rows in
+                    transaction_rule_applications; it assigns no other column.
+                    A rule therefore never calls the balance helpers, and a rule
+                    application needs no balance recompute.
+Concurrency scope   per transaction row, inside the transaction that already
+                    holds the row's write
+Retry semantics     Re-running a rule re-derives the same category, payee and tag
+                    set; it adds no ledger effect.
+Crash semantics     Before commit, no rule effect exists; the rule step shares the
+                    insert's transaction, so a rollback drops both.
+Failure response    A submitted action outside the union is refused by
+                    rule-validation.ts before any write. loadRulesFor drops a
+                    stored rule whose view is invalid, so it is never applied.
+Required tests      Present: rule-effects.spec.ts ("changes only category, payee
+                    and tags: never amount, account, date, status or a link") and
+                    transaction-rules-applier.service.spec.ts ("never updates
+                    amount, account, date, status or links") assert the written
+                    columns; rule-validation.actions.spec.ts and
+                    rule-validation.spec.ts assert the union is closed. These are
+                    unit specs over the applier's write, so they prove the
+                    columns written, not a balance on real rows. Missing: none
+                    owed for the union itself; the integration specs under
+                    INV-RULE-002 read balances after a rule ran.
+Status              enforced
+```
+
+### INV-RULE-002 -- a rule applies inside the inserting transaction, on every creation path
+
+```text
+Statement           Every path that creates a transaction the user's rules are
+                    meant to see runs them inside the transaction that inserts
+                    the row, after the row, its splits and its explicit tags are
+                    written and before the commit, so a rollback of the insert
+                    rolls back the rule effects and no committed row escapes the
+                    rules a path is supposed to apply.
+Source of truth     transaction_rules (enabled rules for the trigger, in position
+                    order); transaction_rule_applications for the trace
+Enforcement         The applier takes the caller's EntityManager
+                    (TransactionRulesApplierService.applyToNew,
+                    applyToNewTransfer, loadRulesFor), so it cannot open a
+                    transaction of its own. Call sites: TransactionsService.create
+                    (REST, joint register, scheduled posting, AI, MCP, createBulk);
+                    writeTransferLegs in transaction-transfer.service.ts;
+                    ImportRegularProcessorService.processTransaction (QIF, OFX,
+                    CSV); applyImportRules over the rows writeTransactions
+                    inserted, in MnyImportService. The guard
+                    backend/src/transaction-rules/rule-application-sites.guard.spec.ts
+                    scans the tracked sources for every insert into
+                    `transactions` (create(Transaction, ...), new Transaction(),
+                    INSERT INTO transactions, insert().into, a held repository's
+                    insert/save, and any INSERT INTO "${table}") and fails on a
+                    file that is neither in APPLYING_SITES (the spec asserts the
+                    owning file still calls the applier, comments stripped) nor in
+                    EXEMPT_INSERT_SITES with a reason. Both lists must contain only
+                    files that still hold an insert site. Exempt by decision:
+                    backup restore, seed and demo data, action-history undo and
+                    redo, the cash legs of an investment transaction (REST, QIF,
+                    MNY), and the transfer counterpart and split transfer legs
+                    created by the import processors and by createSplits /
+                    addSplit (open question Q2 of the design).
+Concurrency scope   per inserted row; the rules are read inside the same
+                    transaction as the insert
+Retry semantics     A retried request that inserts again is a new row and runs the
+                    rules again; a retry that is refused before the insert runs
+                    none.
+Crash semantics     Before commit, neither the row nor a rule effect exists. After
+                    commit, both do. There is no state where a row committed and
+                    its rule effects did not, because they share the transaction.
+Failure response    A stored rule that no longer validates is not loaded
+                    (loadRulesFor). A failure after the rule step, or inside it,
+                    rolls the insert and the rule effects back together; the
+                    integration specs cover a failure after the step.
+Required tests      Present: the guard above (including the scanner's own cases
+                    in both directions); the integration specs
+                    backend/test/integration/transaction-rules-apply.integration.spec.ts,
+                    transaction-rules-import.integration.spec.ts and
+                    transaction-rules-transfer.integration.spec.ts, on real
+                    PostgreSQL, including that a rolled-back insert leaves no
+                    rule effect. Missing: the guard's unit is the file, not the
+                    statement, so it cannot see that a listed applying file
+                    still holds an unevaluated insert (the import processor's
+                    transfer legs), and it cannot see a creation path that goes
+                    through a helper it does not scan for; the transfer legs are
+                    tracked by Q2 rather than by a failing check.
+Status              partial
+```
+
+Status is `partial` because the guard holds the file, not each insert: the
+transfer counterpart and split-transfer legs inside two applying files are
+unevaluated by decision (Q2), and the exemption list is a reviewed decision, not
+a proof that no exempt path should ever apply rules. It becomes `enforced` when
+Q2 is decided and those legs either call the applier or move to a per-site
+exemption the guard can check.
 
 ## Candidates not yet admitted
 

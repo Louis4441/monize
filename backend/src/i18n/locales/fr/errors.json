@@ -121,6 +121,16 @@
     "attachmentRefExpired": "Le fichier joint n'est plus disponible. Veuillez le téléverser à nouveau et redemander.",
     "modelNoImageSupport": "Le modèle d'IA sélectionné ne peut pas lire les images ni les PDF. Supprimez la pièce jointe et posez votre question par texte, ou passez à un modèle prenant en charge la vision dans les Paramètres IA."
   },
+  "aiReview": {
+    "notFound": "Demande de revue IA avec l'ID {{ id }} introuvable",
+    "notClaimed": "Cette demande de revue IA n'est pas prise en charge par vous. Prenez d'abord la prochaine en attente ; une demande que vous n'avez pas prise ne peut pas recevoir de réponse.",
+    "notProposed": "Cette demande de revue IA n'attend plus d'approbation, sa proposition n'a donc pas été appliquée.",
+    "notOpen": "Cette demande de revue IA n'est plus ouverte.",
+    "nothingProposed": "Une proposition nécessite au moins une modification : splits, categoryName, payeeName ou description.",
+    "splitsAndCategory": "Envoyez soit splits, soit categoryName, pas les deux : une transaction ventilée n'a pas de catégorie unique.",
+    "transferNotSupported": "Un virement ne peut pas être revu par proposition. Rejetez plutôt la demande.",
+    "splitDifference": "Les lignes de ventilation totalisent {{ sum }} alors que la transaction est de {{ amount }} : {{ difference }} n'est pas affecté. Faites correspondre les lignes à la transaction ; un reliquat tel que des frais de livraison nécessite sa propre ligne, ou est signalé à l'utilisateur au lieu d'être affecté."
+  },
   "auth": {
     "tooManyAttemptsLoginAgain": "Trop de tentatives de vérification. Veuillez vous reconnecter.",
     "invalidOrExpiredVerificationToken": "Jeton de vérification invalide ou expiré",
@@ -512,7 +522,22 @@
   "tags": {
     "notFound": "Étiquette avec l'ID {{ id }} introuvable",
     "nameConflict": "Une étiquette nommée « {{ name }} » existe déjà",
-    "oneOrMoreNotFound": "Une ou plusieurs étiquettes introuvables"
+    "oneOrMoreNotFound": "Une ou plusieurs étiquettes introuvables",
+    "oneOrMoreTransactionsNotFound": "Une ou plusieurs opérations sont introuvables",
+    "tooManyTags": "Au plus {{ max }} étiquettes peuvent être modifiées en un seul appel",
+    "tooManyTransactions": "Au plus {{ max }} opérations peuvent être modifiées en un seul appel"
+  },
+  "transactionRules": {
+    "notFound": "Règle de transaction avec l'ID {{ id }} introuvable",
+    "limitReached": "Vous pouvez créer au maximum {{ max }} règles",
+    "invalidDefinition": "La définition de la règle n'est pas valide",
+    "referenceNotFound": "La règle mentionne un compte, un bénéficiaire, une catégorie ou une étiquette qui n'existe pas",
+    "revisionConflict": "Cette règle a été modifiée ailleurs. Rechargez-la et réessayez",
+    "reorderMismatch": "La liste des règles a changé. Rechargez-la et réessayez",
+    "previewChanged": "Les transactions ou la règle ont changé depuis l'aperçu. Vérifiez le nouvel aperçu puis relancez",
+    "ruleInvalid": "Cette règle n'est pas valide et ne peut pas être exécutée. Ouvrez-la et réparez-la d'abord",
+    "dateRangeInvalid": "La date de début ne doit pas être postérieure à la date de fin",
+    "runTooLarge": "Cette exécution modifie trop de transactions pour être annulée en une seule étape. Restreignez les comptes ou les dates et réessayez"
   },
   "transactions": {
     "invalidStatus": "Statut de transaction invalide : {{ status }}",

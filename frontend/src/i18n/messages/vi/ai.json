@@ -194,7 +194,37 @@
     "deletePayeesTitle": "Xóa những người nhận này?",
     "createdPayees": "{count, plural, =0 {Không có người nhận nào được tạo} other {Đã tạo # người nhận}}",
     "updatedPayees": "{count, plural, =0 {Không có người nhận nào được cập nhật} other {Đã cập nhật # người nhận}}",
-    "deletedPayees": "{count, plural, =0 {Không có người nhận nào được xóa} other {Đã xóa # người nhận}}"
+    "deletedPayees": "{count, plural, =0 {Không có người nhận nào được xóa} other {Đã xóa # người nhận}}",
+    "createRuleTitle": "Tạo quy tắc này?",
+    "updateRuleTitle": "Áp dụng chỉnh sửa quy tắc này?",
+    "deleteRuleTitle": "Xóa quy tắc này?",
+    "runRuleTitle": "Chạy quy tắc này trên các giao dịch hiện có?",
+    "createdRule": "Đã tạo quy tắc",
+    "updatedRule": "Đã cập nhật quy tắc",
+    "deletedRule": "Đã xóa quy tắc",
+    "ranRule": "Đã chạy xong quy tắc",
+    "viewRules": "Xem quy tắc",
+    "unknownTitle": "Phê duyệt hành động này?",
+    "unknownDone": "Đã hoàn tất hành động",
+    "rule": {
+      "noPreview": "Không có chi tiết của quy tắc này nên không thể xem xét tại đây. Hãy hủy và hỏi lại.",
+      "changesTitle": "Những gì thay đổi",
+      "noChanges": "Quy tắc được giữ nguyên.",
+      "was": "Trước",
+      "now": "Sau",
+      "testTitle": "Thử trên các giao dịch hiện có của bạn",
+      "runPreviewTitle": "Lần chạy này thay đổi gì",
+      "filtersTitle": "Chạy trên",
+      "rowsShown": "Hiển thị {shown} đầu tiên trong tổng số {count}.",
+      "skippedMore": "Lý do chỉ được hiển thị cho {shown} đầu tiên.",
+      "aiReviewRequests": "{count, plural, other {# yêu cầu AI xem xét sẽ được đưa vào hàng đợi.}}"
+    },
+    "ruleEffects": {
+      "title": "Các quy tắc của bạn cũng sẽ:",
+      "category": "Đặt danh mục thành {name}",
+      "payee": "Đặt người nhận thành {name}",
+      "aiReview": "{count, plural, other {Đưa # yêu cầu AI xem xét vào hàng đợi}}"
+    }
   },
   "table": {
     "downloadTitle": "Tải bảng dưới dạng CSV",

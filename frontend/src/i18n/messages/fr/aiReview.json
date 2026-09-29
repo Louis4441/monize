@@ -1,0 +1,69 @@
+{
+  "page": {
+    "title": "Boîte de révision par l'IA",
+    "subtitle": "Les transactions qu'une règle a demandé de faire réviser par une IA, et les modifications qu'un assistant propose à votre approbation."
+  },
+  "filter": {
+    "label": "Filtrer par statut",
+    "open": "Ouvertes",
+    "pending": "En attente",
+    "claimed": "En cours de révision",
+    "proposed": "Proposée",
+    "applied": "Appliquée",
+    "rejected": "Rejetée",
+    "expired": "Expirée"
+  },
+  "status": {
+    "pending": "En attente",
+    "claimed": "En cours de révision",
+    "proposed": "Proposée",
+    "applied": "Appliquée",
+    "rejected": "Rejetée",
+    "expired": "Expirée"
+  },
+  "columns": {
+    "date": "Date",
+    "request": "Demande",
+    "amount": "Montant",
+    "status": "Statut"
+  },
+  "row": {
+    "noPayee": "Aucun bénéficiaire",
+    "transactionMissing": "Cette transaction n'existe plus",
+    "rule": "Règle : {name}",
+    "manualRequest": "Demandée manuellement",
+    "agentNote": "Note de l'assistant : {reason}",
+    "dates": "Créée le {created}, expire le {expires}",
+    "viewTransaction": "Voir la transaction"
+  },
+  "actions": {
+    "dismiss": "Ignorer"
+  },
+  "proposal": {
+    "errorTitle": "Cette proposition ne peut plus être appliquée"
+  },
+  "dismissDialog": {
+    "title": "Ignorer cette demande ?",
+    "message": "Plus personne ne sera sollicité pour réviser cette transaction. La transaction elle-même n'est pas modifiée.",
+    "confirm": "Ignorer la demande"
+  },
+  "loading": "Chargement des demandes de révision...",
+  "error": {
+    "title": "Impossible de charger les demandes de révision",
+    "body": "La liste ne s'est pas chargée : elle n'est peut-être pas vide. Vérifiez votre connexion et réessayez.",
+    "retry": "Réessayer"
+  },
+  "empty": {
+    "title": "Aucune demande de révision",
+    "body": "Les demandes apparaissent ici lorsqu'une règle dotée de l'action « Demander une révision par l'IA » correspond à une transaction. Un assistant IA, ou un client MCP comme l'agent relais, traite la file et propose une modification à approuver.",
+    "filteredTitle": "Aucune demande avec ce statut",
+    "filteredBody": "Choisissez un autre statut pour voir d'autres demandes."
+  },
+  "toasts": {
+    "approved": "Proposition appliquée",
+    "dismissed": "Demande ignorée",
+    "dismissFailed": "Impossible d'ignorer la demande",
+    "approveFailed": "Impossible d'appliquer la proposition",
+    "changed": "Cette demande a changé entre-temps. La liste a été rechargée."
+  }
+}

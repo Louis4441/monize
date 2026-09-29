@@ -13,7 +13,18 @@ import {
   SECURITY_TYPES,
 } from "../../securities/security-enums";
 import { TRANSACTION_NOTE_MAX_LENGTH } from "../../common/transaction-note";
+import {
+  AI_REVIEW_OPERATIONS,
+  MAX_AI_REVIEW_TOOL_LIST_LIMIT,
+} from "../../ai-review/ai-review-work.types";
 import { TRANSACTION_SORT_FIELDS } from "../../transactions/register-order";
+import { RULE_TRIGGERS } from "../../transaction-rules/rule-trigger.types";
+import { MAX_RULE_ACTIONS } from "../../transaction-rules/rule-validation";
+import {
+  MAX_RULE_RUN_ACCOUNTS,
+  MAX_RULE_RUN_LIMIT,
+  MAX_RULE_TOOL_LIST_LIMIT,
+} from "../../transaction-rules/transaction-rules.limits";
 
 /**
  * LLM07-F1: Zod schemas for validating AI tool inputs server-side.
@@ -153,6 +164,95 @@ export const listPayeesSchema = z.object({
   hasPhone: booleanArg().optional(),
   hasDefaultCategory: booleanArg().optional(),
 });
+
+export const listTransactionRulesSchema = z.object({
+  search: z.string().max(100).optional(),
+  ruleId: z.string().uuid().optional(),
+  limit: numberArg(
+    z.number().int().min(1).max(MAX_RULE_TOOL_LIST_LIMIT),
+  ).optional(),
+});
+
+/** Serialised size of a condition or an action a model may send; the validator bounds the rest. */
+const MAX_RULE_JSON_CHARS = 20000;
+
+const ruleJson = z
+  .record(z.string(), z.unknown())
+  .refine(
+    (value) => JSON.stringify(value).length <= MAX_RULE_JSON_CHARS,
+    "too large",
+  );
+
+/** The object half of `manage_transaction_rules`, exported so a second surface reuses the fields. */
+export const manageTransactionRulesFields = z.object({
+  operation: z.enum(["create", "update", "delete", "run", "test"]),
+  ruleId: z.string().uuid().optional(),
+  name: z.string().max(200).optional(),
+  enabled: booleanArg().optional(),
+  triggers: z
+    .array(z.enum(RULE_TRIGGERS))
+    .min(1)
+    .max(RULE_TRIGGERS.length)
+    .optional(),
+  stopProcessing: booleanArg().optional(),
+  condition: ruleJson.optional(),
+  actions: z.array(ruleJson).min(1).max(MAX_RULE_ACTIONS).optional(),
+  // run and test only
+  accountNames: z
+    .array(z.string().max(100))
+    .max(MAX_RULE_RUN_ACCOUNTS)
+    .optional(),
+  startDate: isoDateSchema.optional(),
+  endDate: isoDateSchema.optional(),
+  limit: numberArg(z.number().int().min(1).max(MAX_RULE_RUN_LIMIT)).optional(),
+});
+
+/**
+ * Per-operation requirements, mirroring `manageTransactionsSchema`: create
+ * needs a name, a condition and actions; update a ruleId and at least one
+ * change; delete and run a ruleId; test a ruleId or a draft.
+ */
+export const manageTransactionRulesSchema =
+  manageTransactionRulesFields.superRefine((value, ctx) => {
+    const need = (field: string, message: string): void => {
+      ctx.addIssue({ code: "custom", path: [field], message });
+    };
+    switch (value.operation) {
+      case "create":
+        if (!value.name) need("name", "name is required.");
+        if (!value.condition) need("condition", "condition is required.");
+        if (!value.actions) need("actions", "actions is required.");
+        break;
+      case "update":
+        if (!value.ruleId) need("ruleId", "ruleId is required.");
+        if (
+          value.name === undefined &&
+          value.enabled === undefined &&
+          value.triggers === undefined &&
+          value.stopProcessing === undefined &&
+          value.condition === undefined &&
+          value.actions === undefined
+        ) {
+          need(
+            "ruleId",
+            "Provide at least one field to change (name, enabled, triggers, stopProcessing, condition, or actions).",
+          );
+        }
+        break;
+      case "delete":
+      case "run":
+        if (!value.ruleId) need("ruleId", "ruleId is required.");
+        break;
+      case "test":
+        if (!value.ruleId && !(value.condition && value.actions)) {
+          need(
+            "ruleId",
+            "Provide a ruleId, or condition and actions for a draft.",
+          );
+        }
+        break;
+    }
+  });
 
 /** Report month in YYYY-MM form, used by the month_comparison report type. */
 const reportMonthSchema = z.string().regex(/^\d{4}-\d{2}$/, "Expected YYYY-MM");
@@ -707,6 +807,90 @@ export const manageTransactionsSchema = z
     });
   });
 
+/**
+ * The object half of `ai_review_requests`, exported so the MCP tool reuses the
+ * fields. A proposal is an edit of the reviewed transaction expressed exactly
+ * like an update in `manage_transactions` (category lines, category, payee,
+ * description); it cannot carry an amount, a date or an account.
+ */
+/**
+ * A category line as `manage_transactions` takes it, with the amount read the
+ * tolerant way (`"-20"` from a hand-written tool call is -20, `""` is refused).
+ */
+const reviewSplitLineSchema = manageTransactionSplitSchema.extend({
+  amount: numberArg(amountSchema),
+});
+
+export const aiReviewRequestsFields = z.object({
+  operation: z.enum(AI_REVIEW_OPERATIONS),
+  requestId: z.string().uuid().optional(),
+  splits: z
+    .array(reviewSplitLineSchema)
+    .min(2)
+    .max(MAX_SPLIT_LINES)
+    .optional()
+    .describe(
+      "submit: two or more category lines with signed amounts that add up to the transaction amount, replacing its category.",
+    ),
+  categoryName: z
+    .string()
+    .max(100)
+    .optional()
+    .describe("submit: one category instead of splits."),
+  payeeName: z.string().max(100).optional().describe("submit: the payee."),
+  description: z
+    .string()
+    .max(TRANSACTION_NOTE_MAX_LENGTH)
+    .optional()
+    .describe("submit: the description or memo."),
+  reason: z
+    .string()
+    .max(500)
+    .optional()
+    .describe("reject: why, for the next reader."),
+  cannotBeDone: booleanArg()
+    .optional()
+    .describe(
+      "reject: true closes the request; default false returns it to the queue.",
+    ),
+  limit: numberArg(z.number().int().min(1).max(MAX_AI_REVIEW_TOOL_LIST_LIMIT))
+    .optional()
+    .describe("list: default 20."),
+});
+
+export const aiReviewRequestsSchema = aiReviewRequestsFields.superRefine(
+  (value, ctx) => {
+    const need = (field: string, message: string): void => {
+      ctx.addIssue({ code: "custom", path: [field], message });
+    };
+    if (value.operation === "submit" || value.operation === "reject") {
+      if (!value.requestId) need("requestId", "requestId is required.");
+    }
+    if (value.operation === "submit") {
+      if (
+        value.splits === undefined &&
+        value.categoryName === undefined &&
+        value.payeeName === undefined &&
+        value.description === undefined
+      ) {
+        need(
+          "splits",
+          "Provide at least one change: splits, categoryName, payeeName or description.",
+        );
+      }
+      if (value.splits !== undefined && value.categoryName !== undefined) {
+        need(
+          "categoryName",
+          "Do not set categoryName together with splits; put categories in the splits array.",
+        );
+      }
+    }
+    if (value.operation === "reject" && !value.reason) {
+      need("reason", "reason is required.");
+    }
+  },
+);
+
 export const toolInputSchemas: Record<string, z.ZodSchema> = {
   list_transactions: listTransactionsSchema,
   list_accounts: listAccountsSchema,
@@ -726,6 +910,9 @@ export const toolInputSchemas: Record<string, z.ZodSchema> = {
   manage_investment_transactions: manageInvestmentTransactionsSchema,
   list_payees: listPayeesSchema,
   generate_report: generateReportSchema,
+  list_transaction_rules: listTransactionRulesSchema,
+  manage_transaction_rules: manageTransactionRulesSchema,
+  ai_review_requests: aiReviewRequestsSchema,
 };
 
 /**

@@ -1,0 +1,100 @@
+import { EntityManager } from "typeorm";
+import { lockTransactionRows } from "../common/db/locks";
+import { Transaction } from "../transactions/entities/transaction.entity";
+import { assertReconciledRowsMutable } from "../transactions/reconciled-lock.util";
+import { ActionHistory } from "./entities/action-history.entity";
+
+/** The entity type a manual rule run is recorded under. */
+export const RULE_RUN_ENTITY_TYPE = "transaction_rule_run";
+
+interface RuleRunRowSnapshot {
+  id: string;
+  categoryId?: string | null;
+  payeeId?: string | null;
+  payeeName?: string | null;
+  description?: string | null;
+  tagIds?: string[];
+}
+
+/**
+ * Put every row of a rule run back to the snapshot in `beforeData` (undo), or
+ * to the one in `afterData` (redo, which swaps the two before it gets here).
+ *
+ * The snapshot holds only the fields the run changed: category, payee with its
+ * name, description, and the tag set. A payee the run created stays: it is
+ * reference data, as when a form creates one. The rows are locked in ascending id order and checked
+ * against the strict reconciled lock first (INV-RECONCILE-001: an undo alters
+ * the row like the edit did), so a refusal leaves every row as it was. Every
+ * write is scoped to the action's user.
+ */
+export async function undoRuleRun(
+  action: ActionHistory,
+  manager: EntityManager,
+): Promise<void> {
+  const rows = action.beforeData?.transactions;
+  if (!Array.isArray(rows) || rows.length === 0) return;
+  const snapshots = rows as RuleRunRowSnapshot[];
+
+  const locked = await lockTransactionRows(
+    manager,
+    snapshots.map((row) => row.id),
+    action.userId,
+  );
+  await assertReconciledRowsMutable(manager, action.userId, [
+    ...locked.values(),
+  ]);
+
+  const tagRows: { transactionId: string; tagId: string }[] = [];
+  const tagOwners: string[] = [];
+  for (const row of snapshots) {
+    // A row deleted since the run has nothing to restore.
+    if (!locked.has(row.id)) continue;
+    const fields: Partial<
+      Pick<Transaction, "categoryId" | "payeeId" | "payeeName" | "description">
+    > = {};
+    if ("categoryId" in row) fields.categoryId = row.categoryId ?? null;
+    if ("payeeId" in row) fields.payeeId = row.payeeId ?? null;
+    if ("payeeName" in row) fields.payeeName = row.payeeName ?? null;
+    if ("description" in row) fields.description = row.description ?? null;
+    if (Object.keys(fields).length > 0) {
+      await manager.update(
+        Transaction,
+        { id: row.id, userId: action.userId },
+        fields,
+      );
+    }
+    if (Array.isArray(row.tagIds)) {
+      tagOwners.push(row.id);
+      for (const tagId of row.tagIds) {
+        tagRows.push({ transactionId: row.id, tagId });
+      }
+    }
+  }
+
+  if (tagOwners.length === 0) return;
+  // Two statements for the whole run: replace the tag set of every row that
+  // recorded one. A tag deleted since is skipped by the join.
+  await manager.query(
+    `DELETE FROM transaction_tags tt
+      USING transactions t
+      WHERE tt.transaction_id = t.id
+        AND t.user_id = $1
+        AND t.id = ANY($2::uuid[])`,
+    [action.userId, tagOwners],
+  );
+  if (tagRows.length > 0) {
+    await manager.query(
+      `INSERT INTO transaction_tags (transaction_id, tag_id)
+       SELECT p.transaction_id, p.tag_id
+         FROM unnest($2::uuid[], $3::uuid[]) AS p(transaction_id, tag_id)
+         JOIN transactions t ON t.id = p.transaction_id AND t.user_id = $1
+         JOIN tags g ON g.id = p.tag_id AND g.user_id = $1
+       ON CONFLICT DO NOTHING`,
+      [
+        action.userId,
+        tagRows.map((row) => row.transactionId),
+        tagRows.map((row) => row.tagId),
+      ],
+    );
+  }
+}

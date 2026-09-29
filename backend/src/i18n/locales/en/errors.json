@@ -132,6 +132,16 @@
     "attachmentRefExpired": "The attached file is no longer available. Please re-upload it and ask again.",
     "modelNoImageSupport": "The selected AI model can't read images or PDFs. Remove the attachment and ask in text, or switch to a vision-capable model in AI Settings."
   },
+  "aiReview": {
+    "notFound": "AI review request with ID {{ id }} not found",
+    "notClaimed": "This AI review request is not claimed by you. Claim the next pending one first; a request you did not claim cannot be answered.",
+    "notProposed": "This AI review request is no longer waiting for approval, so its proposal was not applied.",
+    "notOpen": "This AI review request is no longer open.",
+    "nothingProposed": "A proposal needs at least one change: splits, categoryName, payeeName or description.",
+    "splitsAndCategory": "Send either splits or categoryName, not both: a split transaction has no single category.",
+    "transferNotSupported": "A transfer cannot be reviewed by proposal. Reject the request instead.",
+    "splitDifference": "The split lines add up to {{ sum }} but the transaction is {{ amount }}: {{ difference }} is not assigned. Make the lines add up to the transaction; a leftover such as a delivery cost needs its own line, or is named to the user instead of being assigned."
+  },
   "auth": {
     "tooManyAttemptsLoginAgain": "Too many verification attempts. Please log in again.",
     "invalidOrExpiredVerificationToken": "Invalid or expired verification token",
@@ -523,7 +533,22 @@
   "tags": {
     "notFound": "Tag with ID {{ id }} not found",
     "nameConflict": "A tag named \"{{ name }}\" already exists",
-    "oneOrMoreNotFound": "One or more tags not found"
+    "oneOrMoreNotFound": "One or more tags not found",
+    "oneOrMoreTransactionsNotFound": "One or more transactions not found",
+    "tooManyTags": "At most {{ max }} tags can be changed in one call",
+    "tooManyTransactions": "At most {{ max }} transactions can be changed in one call"
+  },
+  "transactionRules": {
+    "notFound": "Transaction rule with ID {{ id }} not found",
+    "limitReached": "At most {{ max }} rules can be created",
+    "invalidDefinition": "The rule definition is not valid",
+    "referenceNotFound": "The rule names an account, payee, category or tag that does not exist",
+    "revisionConflict": "This rule was changed elsewhere. Reload it and try again",
+    "reorderMismatch": "The list of rules has changed. Reload it and try again",
+    "previewChanged": "The transactions or the rule changed since the preview. Review the new preview and run again",
+    "ruleInvalid": "This rule is not valid, so it cannot be run. Open it and repair it first",
+    "dateRangeInvalid": "The start date must not be after the end date",
+    "runTooLarge": "This run changes too many transactions to be undone in one step. Narrow the accounts or the dates and try again"
   },
   "transactions": {
     "invalidStatus": "Invalid transaction status: {{ status }}",

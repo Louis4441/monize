@@ -128,7 +128,8 @@
       "updatedInvestmentTransaction": "{action}-Transaktion aktualisiert",
       "deletedInvestmentTransaction": "{action}-Transaktion gelöscht",
       "transferredSecurity": "Wertpapier zwischen Konten übertragen",
-      "updatedSecurityTransfer": "Wertpapierübertragung aktualisiert"
+      "updatedSecurityTransfer": "Wertpapierübertragung aktualisiert",
+      "ranTransactionRule": "Regel „{name}“ auf {count, plural, one {# Buchung} other {# Buchungen}} angewendet"
     },
     "timeAgo": {
       "justNow": "gerade eben",

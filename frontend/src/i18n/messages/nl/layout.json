@@ -128,7 +128,8 @@
       "updatedInvestmentTransaction": "{action}-transactie bijgewerkt",
       "deletedInvestmentTransaction": "{action}-transactie verwijderd",
       "transferredSecurity": "Waardepapier overgeboekt tussen rekeningen",
-      "updatedSecurityTransfer": "Waardepapieroverboeking bijgewerkt"
+      "updatedSecurityTransfer": "Waardepapieroverboeking bijgewerkt",
+      "ranTransactionRule": "Regel “{name}” uitgevoerd op {count, plural, one {# transactie} other {# transacties}}"
     },
     "timeAgo": {
       "justNow": "zojuist",

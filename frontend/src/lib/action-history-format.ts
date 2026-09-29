@@ -22,6 +22,7 @@ export const KNOWN_DESCRIPTION_KEYS = new Set<string>([
   'createdTransfer',
   'createdInvestmentTransaction', 'updatedInvestmentTransaction', 'deletedInvestmentTransaction',
   'transferredSecurity', 'updatedSecurityTransfer',
+  'ranTransactionRule',
 ]);
 
 // Description keys whose `action` param carries an InvestmentAction enum value

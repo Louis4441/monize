@@ -161,6 +161,15 @@ The caller key is the session id on a 2025-era connection and the credential id 
 - A relay turn is a prompt **claimed by this caller** (`waitForPrompt` records `claimedBy`), or one of its claims that timed out within the late-answer retention window. It is not connection liveness, not user-wide, and not unbounded in time -- each of those was tried, and each routed a direct client's confirmation into a web chat nobody was watching (the worst version captured every direct write the user made afterwards, permanently).
 - Liveness is caller-scoped for the same reason: a direct client's tool calls are not evidence that another caller's agent is still working.
 
+## A proposal is not a write: `ai_review_requests`
+
+`ai_review_requests` (`tools/ai-review.tool.ts`, `operation`: list, claim, submit, reject) lets an agent work the AI review queue a rule fills (`request_ai_review`). It confirms nothing and spends none of the daily write cap, because none of its operations writes the ledger: `submit` stores a **signed `update_transaction` card** on the request and stops, and the person approves it in the review inbox through `/ai/actions/confirm`, which is counted where it happens. Do not "fix" this by adding `confirmWrite` here; a dialog in the agent's client for a proposal the person has not yet seen would ask the wrong person at the wrong time.
+
+- **The claim key is `callerKey(ctx)`** (the session id on a 2025-era connection, the credential id on 2026-07-28), so two agents on one token share a claim: mint the queue agent its own token. A request is answered only by the key that claimed it; `submitProposal` and `release` are conditional `UPDATE`s on `claimed_by`, so the read check before them refuses early and the update is the authority.
+- **`claim` returns the request and its transaction through `getLlmTransactionById`**, the projection `list_transactions` uses, never a raw row. The instruction is the user's own text; the tool guidance tells the model to treat it, and the transaction's text, as data.
+- **`reject` returns the request to `pending`** with the claim cleared and the reason kept for the next agent, or closes it (`rejected`) with `cannotBeDone`. Returning is the default so an agent that merely could not read an order does not close the request for everyone; closing exists so an impossible request is not handed out forever.
+- **Scopes:** `read` for `list`, `write` for the rest.
+
 ## `toolResult` and structured content
 
 `toolResult(data)` is the only success path. It sanitizes every string in the payload (`sanitizeToolResultStrings`), normalizes non-finite numbers to `null`, and returns **`structuredContent` alone**: objects pass through; bare arrays are wrapped under `items`; primitives under `value`.
@@ -223,7 +232,7 @@ All tools operate on the user's own closed dataset, so `openWorldHint` is always
 | `CREATE` | adds a new record | `readOnlyHint:false, destructiveHint:false, idempotentHint:false` |
 | `UPDATE` | sets fields to given values | `readOnlyHint:false, destructiveHint:false, idempotentHint:true` |
 
-There is no destructive preset for a read tool. The four `manage_*` tools take `operation: "delete"` and are annotated `destructiveHint: true`.
+There is no destructive preset for a read tool. The five `manage_*` tools (`manage_transactions`, `manage_payees`, `manage_securities`, `manage_investment_transactions`, `manage_transaction_rules`) take `operation: "delete"` and are annotated `destructiveHint: true`; `manage_transaction_rules` also folds its two reads (`list`, `test`) into the one tool to keep `tools/list` small, and requires `read` for those and `write` for the rest. `ai_review_requests` is `CREATE`: it changes queue rows, never the ledger (next section).
 
 **A scanner flagging "delete" in those descriptions is reporting a real capability, not a defect.** Do not reword it away: a description that hides what the tool can do is worse than the finding. The mitigations are the annotation, the `write` scope, `McpWriteLimiter`'s daily cap, and a user confirmation before every write (a relay card, or an elicitation dialog). `lookup_securities` is the one rename that was worth making -- its text field is `search`, matching every other read tool, because `query` was flagged purely as a name and nothing there builds SQL.
 

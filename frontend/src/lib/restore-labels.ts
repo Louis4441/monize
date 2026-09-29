@@ -13,6 +13,7 @@ export const RESTORE_LABELS: Record<string, string> = {
   payeeAliases: 'Payee Aliases',
   accounts: 'Accounts',
   tags: 'Tags',
+  transactionRules: 'Transaction Rules',
   scheduledTransactions: 'Scheduled Transactions',
   scheduledTransactionSplits: 'Scheduled Transaction Splits',
   scheduledTransactionOverrides: 'Scheduled Transaction Overrides',

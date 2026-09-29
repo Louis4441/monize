@@ -121,6 +121,16 @@
     "attachmentRefExpired": "附加的檔案已無法使用。請重新上傳後再次詢問。",
     "modelNoImageSupport": "所選的 AI 模型無法讀取圖片或 PDF。請移除附件並以文字提問，或在 AI 設定中切換至支援視覺的模型。"
   },
+  "aiReview": {
+    "notFound": "找不到 ID 為 {{ id }} 的 AI 審核請求",
+    "notClaimed": "此 AI 審核請求不是由您認領的。請先認領下一個待處理的請求；未認領的請求無法回覆。",
+    "notProposed": "此 AI 審核請求已不再等待核准，因此其提案未被套用。",
+    "notOpen": "此 AI 審核請求已不再開放。",
+    "nothingProposed": "提案至少需要一項變更：splits、categoryName、payeeName 或 description。",
+    "splitsAndCategory": "請傳送 splits 或 categoryName，不要同時傳送：拆分交易沒有單一分類。",
+    "transferNotSupported": "轉帳無法透過提案進行審核。請改為拒絕該請求。",
+    "splitDifference": "拆分行合計為 {{ sum }}，但交易金額為 {{ amount }}：{{ difference }} 尚未分配。請讓各行合計等於交易金額；運費等餘額需要單獨一行，或告知使用者而不是自行分配。"
+  },
   "auth": {
     "tooManyAttemptsLoginAgain": "驗證嘗試次數過多。請重新登入。",
     "invalidOrExpiredVerificationToken": "驗證令牌無效或已過期",
@@ -512,7 +522,22 @@
   "tags": {
     "notFound": "找不到 ID 為 {{ id }} 的標籤",
     "nameConflict": "已有名為「{{ name }}」的標籤",
-    "oneOrMoreNotFound": "找不到一個或多個標籤"
+    "oneOrMoreNotFound": "找不到一個或多個標籤",
+    "oneOrMoreTransactionsNotFound": "找不到一筆或多筆交易",
+    "tooManyTags": "每次呼叫最多可變更 {{ max }} 個標籤",
+    "tooManyTransactions": "每次呼叫最多可變更 {{ max }} 筆交易"
+  },
+  "transactionRules": {
+    "notFound": "找不到 ID 為 {{ id }} 的交易規則",
+    "limitReached": "最多只能建立 {{ max }} 條規則",
+    "invalidDefinition": "規則定義無效",
+    "referenceNotFound": "規則參照了不存在的帳戶、收款人、類別或標籤",
+    "revisionConflict": "此規則已在別處被修改。請重新載入後再試",
+    "reorderMismatch": "規則清單已變更。請重新載入後再試",
+    "previewChanged": "自預覽以來，交易或規則已變更。請查看新的預覽後重新執行",
+    "ruleInvalid": "此規則無效，無法執行。請先開啟並修復它",
+    "dateRangeInvalid": "開始日期不能晚於結束日期",
+    "runTooLarge": "本次執行變更的交易過多，無法一步復原。請縮小帳戶或日期範圍後再試一次"
   },
   "transactions": {
     "invalidStatus": "無效的交易狀態：{{ status }}",

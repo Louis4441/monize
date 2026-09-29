@@ -1,0 +1,473 @@
+{
+  "page": {
+    "title": "[XX-Rules-XX]",
+    "subtitle": "[XX-Fill in tags, categories and payees automatically when a transaction is created or imported-XX]",
+    "createButton": "[XX-Create rule-XX]",
+    "loading": "[XX-Loading rules...-XX]",
+    "totalCount": "[XX-{count, plural, one {# rule} other {# rules}}-XX]"
+  },
+  "empty": {
+    "title": "[XX-No rules yet-XX]",
+    "body": "[XX-A rule watches new and imported transactions and fills in tags, categories or payees when its conditions match. Create your first rule to get started.-XX]",
+    "createButton": "[XX-Create your first rule-XX]"
+  },
+  "error": {
+    "title": "[XX-Your rules could not be loaded-XX]",
+    "body": "[XX-Nothing is shown because the request failed, not because you have no rules. Check your connection and try again.-XX]",
+    "retry": "[XX-Try again-XX]"
+  },
+  "list": {
+    "header": {
+      "order": "[XX-Order-XX]",
+      "enabled": "[XX-Enabled-XX]",
+      "name": "[XX-Rule-XX]",
+      "summary": "[XX-Summary-XX]",
+      "actions": "[XX-Actions-XX]"
+    },
+    "summary": "[XX-{trigger, select, create {When created} import {When imported} both {When created or imported} other {No trigger}} · {conditions, plural, =0 {No conditions} one {# condition} other {# conditions}} · {actions, plural, =0 {No actions} one {# action} other {# actions}}-XX]",
+    "enabledLabel": "[XX-Enable {name}-XX]"
+  },
+  "actions": {
+    "moveUp": "[XX-Move up-XX]",
+    "moveDown": "[XX-Move down-XX]",
+    "run": "[XX-Run on existing transactions-XX]",
+    "runInvalid": "[XX-Repair the rule before running it-XX]"
+  },
+  "invalid": {
+    "badge": "[XX-Invalid-XX]",
+    "tooltip": "[XX-Skipped until fixed: {reasons}.-XX]",
+    "reasons": {
+      "referenceMissing": "[XX-a tag, payee, category or account it uses no longer exists-XX]",
+      "noActions": "[XX-it has no actions-XX]",
+      "tooLarge": "[XX-its conditions are too large-XX]",
+      "duplicateAction": "[XX-it repeats an action that is allowed only once-XX]",
+      "unreadable": "[XX-its saved definition cannot be read-XX]",
+      "other": "[XX-its definition is not valid-XX]"
+    }
+  },
+  "duplicate": {
+    "name": "[XX-{name} (copy)-XX]"
+  },
+  "delete": {
+    "title": "[XX-Delete rule-XX]",
+    "message": "[XX-Are you sure you want to delete \"{name}\"? This action cannot be undone.-XX]"
+  },
+  "toasts": {
+    "enabled": "[XX-Rule enabled-XX]",
+    "disabled": "[XX-Rule disabled-XX]",
+    "toggleFailed": "[XX-Failed to change the rule-XX]",
+    "deleted": "[XX-Rule deleted-XX]",
+    "deleteFailed": "[XX-Failed to delete the rule-XX]",
+    "duplicated": "[XX-Rule duplicated. The copy is switched off until you enable it-XX]",
+    "duplicateFailed": "[XX-Failed to duplicate the rule-XX]",
+    "reorderFailed": "[XX-Failed to change the order of the rules-XX]",
+    "listChanged": "[XX-The list of rules changed elsewhere and has been reloaded. Try again-XX]",
+    "loadFailed": "[XX-Failed to load rules-XX]"
+  },
+  "editor": {
+    "page": {
+      "newTitle": "[XX-New rule-XX]",
+      "editTitle": "[XX-Edit rule-XX]",
+      "subtitle": "[XX-Choose when the rule runs, which transactions it matches and what it changes-XX]",
+      "backToRules": "[XX-Back to Rules-XX]",
+      "loading": "[XX-Loading the rule...-XX]"
+    },
+    "name": {
+      "label": "[XX-Name-XX]",
+      "placeholder": "[XX-For example, Tag coffee shops-XX]"
+    },
+    "enabled": {
+      "label": "[XX-Rule enabled-XX]"
+    },
+    "sections": {
+      "when": "[XX-When-XX]",
+      "if": "[XX-If-XX]",
+      "then": "[XX-Then-XX]"
+    },
+    "when": {
+      "description": "[XX-Choose when the rule looks at a transaction-XX]",
+      "created": "[XX-A transaction is created-XX]",
+      "imported": "[XX-A transaction is imported-XX]",
+      "atLeastOne": "[XX-Keep at least one option selected-XX]",
+      "stopProcessing": "[XX-Stop processing other rules-XX]",
+      "stopProcessingHelp": "[XX-When this rule matches a transaction, the rules after it in the list are skipped for that transaction.-XX]"
+    },
+    "if": {
+      "description": "[XX-The actions run only for transactions that match-XX]",
+      "everyTransaction": "[XX-No conditions yet, so this rule applies to every transaction.-XX]"
+    },
+    "then": {
+      "description": "[XX-Actions run in this order-XX]",
+      "empty": "[XX-No actions yet. Add at least one.-XX]",
+      "limit": "[XX-A rule can have at most {max} actions.-XX]"
+    },
+    "group": {
+      "matchAll": "[XX-All of these-XX]",
+      "matchAny": "[XX-Any of these-XX]",
+      "matchLabel": "[XX-Match-XX]",
+      "not": "[XX-Not-XX]",
+      "notLabel": "[XX-Negate this group: it matches when its conditions do not-XX]",
+      "title": "[XX-Group-XX]",
+      "addCondition": "[XX-+ Add condition-XX]",
+      "addGroup": "[XX-+ Add group-XX]",
+      "depthLimit": "[XX-Groups can be nested at most {max} levels deep.-XX]",
+      "sizeLimit": "[XX-The condition limit has been reached.-XX]",
+      "empty": "[XX-This group is empty.-XX]"
+    },
+    "condition": {
+      "title": "[XX-Condition-XX]",
+      "field": "[XX-Field-XX]",
+      "operator": "[XX-Operator-XX]",
+      "value": "[XX-Value-XX]"
+    },
+    "fields": {
+      "accountId": "[XX-Account-XX]",
+      "fromAccountId": "[XX-From account (transfers)-XX]",
+      "toAccountId": "[XX-To account (transfers)-XX]",
+      "type": "[XX-Type-XX]",
+      "payeeId": "[XX-Payee-XX]",
+      "payeeText": "[XX-Payee text as received-XX]",
+      "categoryId": "[XX-Category-XX]",
+      "description": "[XX-Description-XX]",
+      "memo": "[XX-Memo-XX]",
+      "amount": "[XX-Amount (with sign)-XX]",
+      "absAmount": "[XX-Amount (ignoring sign)-XX]",
+      "currencyCode": "[XX-Currency-XX]",
+      "tagIds": "[XX-Tags-XX]",
+      "hasSplits": "[XX-Has splits-XX]",
+      "referenceNumber": "[XX-Reference number-XX]",
+      "dayOfMonth": "[XX-Day of the month-XX]",
+      "weekday": "[XX-Day of the week-XX]",
+      "status": "[XX-Status-XX]",
+      "hasAttachment": "[XX-Has an attachment-XX]"
+    },
+    "operators": {
+      "eq": "[XX-is-XX]",
+      "neq": "[XX-is not-XX]",
+      "in": "[XX-is any of-XX]",
+      "notIn": "[XX-is none of-XX]",
+      "isEmpty": "[XX-is empty-XX]",
+      "contains": "[XX-contains-XX]",
+      "startsWith": "[XX-starts with-XX]",
+      "matches": "[XX-matches the pattern-XX]",
+      "lt": "[XX-is less than-XX]",
+      "lte": "[XX-is at most-XX]",
+      "gt": "[XX-is greater than-XX]",
+      "gte": "[XX-is at least-XX]",
+      "between": "[XX-is between-XX]",
+      "hasAny": "[XX-has any of-XX]",
+      "hasAll": "[XX-has all of-XX]",
+      "hasNone": "[XX-has none of-XX]",
+      "inSubtree": "[XX-is in, or under-XX]"
+    },
+    "types": {
+      "EXPENSE": "[XX-Expense-XX]",
+      "INCOME": "[XX-Income-XX]",
+      "TRANSFER": "[XX-Transfer-XX]"
+    },
+    "value": {
+      "account": "[XX-Choose an account-XX]",
+      "accounts": "[XX-Choose accounts-XX]",
+      "payee": "[XX-Choose a payee-XX]",
+      "payees": "[XX-Choose payees-XX]",
+      "category": "[XX-Choose a category-XX]",
+      "categories": "[XX-Choose categories-XX]",
+      "tags": "[XX-Choose tags-XX]",
+      "currency": "[XX-Choose a currency-XX]",
+      "currencies": "[XX-Choose currencies-XX]",
+      "types": "[XX-Choose types-XX]",
+      "matchesHint": "[XX-Use * for any text, for example *coffee*. Use {capture} to keep the text at that spot for the actions of this rule, for example {example}. A name is lowercase letters and digits, and a pattern can keep up to {max} texts.-XX]",
+      "amount": "[XX-Amount-XX]",
+      "from": "[XX-From-XX]",
+      "to": "[XX-To-XX]",
+      "yes": "[XX-Yes-XX]",
+      "no": "[XX-No-XX]",
+      "days": "[XX-Choose days-XX]",
+      "weekdays": "[XX-Choose days of the week-XX]",
+      "statuses": "[XX-Choose statuses-XX]"
+    },
+    "action": {
+      "title": "[XX-Action-XX]",
+      "type": "[XX-Action type-XX]",
+      "tags": "[XX-Tags-XX]",
+      "category": "[XX-Category-XX]",
+      "payee": "[XX-Payee-XX]",
+      "instruction": "[XX-What should be checked-XX]",
+      "instructionPlaceholder": "[XX-For example, split this purchase by the receipt-XX]",
+      "instructionHelp": "[XX-The rule only asks for a review. A person approves any change before it is made.-XX]",
+      "onlyIfEmpty": "[XX-Only if empty-XX]",
+      "onlyIfEmptyHelp": "[XX-When on, the rule fills in the category or payee only if the transaction has none. It does not replace one set by hand or by the payee's default category. Turn it off to replace it.-XX]",
+      "add": "[XX-+ Add action-XX]",
+      "reviewInbox": "[XX-See the review inbox-XX]",
+      "payeeTemplate": "[XX-Payee name-XX]",
+      "descriptionTemplate": "[XX-Description text-XX]",
+      "templateHelp": "[XX-Plain text. Each placeholder in braces is replaced with text from the transaction. Select a placeholder below to insert it.-XX]",
+      "joinHelp": "[XX-The text is joined to the current description exactly as written, so include any space or separator you want.-XX]",
+      "placeholders": "[XX-Placeholders-XX]",
+      "placeholdersHelp": "[XX-{payeeText} is the payee text as received. {description} is the description as it stands when this action runs. The other placeholders are the captures named in the patterns of this rule.-XX]",
+      "insertPlaceholder": "[XX-Insert {name}-XX]",
+      "unknownPlaceholders": "[XX-Not defined by this rule: {names}. Choose a placeholder from the list, or capture it in a pattern above.-XX]",
+      "invalidPlaceholders": "[XX-Not a valid placeholder: {names}. A name is lowercase letters and digits.-XX]",
+      "createIfMissing": "[XX-Create the payee if it does not exist-XX]",
+      "createIfMissingHelp": "[XX-When on, and no payee matches the name (by name, alias or a close match), a new payee is created with it. A payee created by a rule is kept if you undo the run.-XX]",
+      "onlyIfEmptyDescriptionHelp": "[XX-When on, the rule writes the description only if the transaction has none. Turn it off to write it every time.-XX]",
+      "mode": "[XX-How to write it-XX]",
+      "modes": {
+        "replace": "[XX-Replace the description-XX]",
+        "append": "[XX-Add after the description-XX]",
+        "prepend": "[XX-Add before the description-XX]"
+      }
+    },
+    "actionTypes": {
+      "add_tags": "[XX-Add tags-XX]",
+      "remove_tags": "[XX-Remove tags-XX]",
+      "set_category": "[XX-Set the category-XX]",
+      "set_payee": "[XX-Set the payee-XX]",
+      "request_ai_review": "[XX-Ask for an AI review-XX]",
+      "set_payee_from_text": "[XX-Set the payee from text-XX]",
+      "set_description": "[XX-Set the description-XX]"
+    },
+    "save": {
+      "button": "[XX-Save rule-XX]",
+      "createdToast": "[XX-Rule created-XX]",
+      "savedToast": "[XX-Rule saved-XX]",
+      "failedToast": "[XX-Failed to save the rule-XX]",
+      "summary": "[XX-The rule was not saved. Fix the items marked below and try again.-XX]"
+    },
+    "loadError": {
+      "title": "[XX-The rule could not be loaded-XX]",
+      "body": "[XX-Nothing is shown because the request failed, not because the rule is empty. Check your connection and try again.-XX]",
+      "lookupsBody": "[XX-The lists of accounts, payees, categories, tags and currencies could not be loaded, so the rule cannot be shown safely. Check your connection and try again.-XX]",
+      "notFound": "[XX-This rule no longer exists. It may have been deleted.-XX]",
+      "retry": "[XX-Try again-XX]"
+    },
+    "invalid": {
+      "title": "[XX-This rule cannot run-XX]",
+      "repaired": "[XX-Some parts of the saved definition could not be read and were removed or reset here. Review the rule before saving.-XX]"
+    },
+    "conflict": {
+      "title": "[XX-This rule was changed elsewhere-XX]",
+      "body": "[XX-Reload it to see the latest version. Your unsaved edits will be lost.-XX]",
+      "reload": "[XX-Reload-XX]"
+    },
+    "errors": {
+      "codes": {
+        "INVALID_SHAPE": "[XX-This part is not in a form the editor understands.-XX]",
+        "UNKNOWN_KEY": "[XX-This part has a setting that does not exist.-XX]",
+        "UNKNOWN_FIELD": "[XX-Choose a field.-XX]",
+        "UNKNOWN_ACTION": "[XX-Choose an action.-XX]",
+        "OPERATOR_NOT_ALLOWED": "[XX-This field does not allow that operator.-XX]",
+        "VALUE_REQUIRED": "[XX-Enter or choose a value.-XX]",
+        "VALUE_NOT_ALLOWED": "[XX-This operator takes no value.-XX]",
+        "VALUE_TYPE": "[XX-The value is of the wrong kind for this field.-XX]",
+        "VALUE_OUT_OF_RANGE": "[XX-The value is out of range.-XX]",
+        "VALUE_TOO_LONG": "[XX-The text is too long.-XX]",
+        "VALUE_EMPTY": "[XX-Enter some text.-XX]",
+        "INVALID_UUID": "[XX-Choose an item from the list.-XX]",
+        "INVALID_ENUM": "[XX-Choose one of the listed values.-XX]",
+        "INVALID_CURRENCY": "[XX-Choose a currency.-XX]",
+        "ARRAY_EMPTY": "[XX-Choose at least one item.-XX]",
+        "ARRAY_TOO_LARGE": "[XX-Too many items are chosen.-XX]",
+        "RANGE_ORDER": "[XX-The first value must not be greater than the second.-XX]",
+        "MAX_DEPTH": "[XX-Groups are nested too deeply. The limit is {maxDepth} levels.-XX]",
+        "MAX_LEAVES": "[XX-There are too many conditions. The limit is {maxLeaves}.-XX]",
+        "MAX_NODES": "[XX-There are too many conditions and groups. The limit is {maxNodes}.-XX]",
+        "NO_ACTIONS": "[XX-Add at least one action.-XX]",
+        "TOO_MANY_ACTIONS": "[XX-There are too many actions. The limit is {maxActions}.-XX]",
+        "DUPLICATE_ACTION": "[XX-A rule can ask for an AI review only once.-XX]",
+        "INVALID_CAPTURE": "[XX-A capture name must be lowercase letters and digits, starting with a letter, and up to 20 long.-XX]",
+        "TOO_MANY_CAPTURES": "[XX-A pattern can hold at most 5 captures.-XX]",
+        "DUPLICATE_CAPTURE": "[XX-Each capture name can be used once in a rule.-XX]",
+        "UNKNOWN_CAPTURE": "[XX-The text uses a capture that no condition of this rule defines.-XX]",
+        "REFERENCE_NOT_FOUND": "[XX-An item chosen here no longer exists. Choose another.-XX]",
+        "NAME_REQUIRED": "[XX-Enter a name for the rule.-XX]",
+        "UNKNOWN": "[XX-This part is not valid.-XX]"
+      }
+    },
+    "run": {
+      "button": "[XX-Run on existing transactions-XX]",
+      "saveFirst": "[XX-Save your changes to run the saved rule.-XX]"
+    },
+    "expression": {
+      "modeLabel": "[XX-Condition view-XX]",
+      "visual": "[XX-Visual-XX]",
+      "expression": "[XX-Expression-XX]",
+      "label": "[XX-Condition expression-XX]",
+      "help": "[XX-Write the conditions as text. Use && for all of these, || for any of these and !( ... ) for not. Refer to items by name: account(\"Name\"), payee(\"Name\"), category(\"Parent: Child\") and tag(\"Name\"). An underscore _ stands for a value you have not chosen yet. matchesGlob uses * as a wildcard. Only the syntax offered in the suggestions is supported.-XX]",
+      "blocked": "[XX-Fix the expression to switch back to Visual or to save.-XX]",
+      "errorAt": "[XX-Line {line}, column {column}: {message}-XX]",
+      "suggestions": "[XX-Suggestions-XX]",
+      "errors": {
+        "tooLong": "[XX-The expression is too long. The limit is {max} characters.-XX]",
+        "unexpectedChar": "[XX-The character {char} is not supported.-XX]",
+        "unterminatedString": "[XX-This text has no closing quote.-XX]",
+        "invalidEscape": "[XX-This escape sequence is not supported.-XX]",
+        "badNumber": "[XX-This is not a valid number.-XX]",
+        "expectedExpression": "[XX-A condition is expected here.-XX]",
+        "expectedField": "[XX-A field name is expected here.-XX]",
+        "expectedOperator": "[XX-An operator or a method is expected after the field.-XX]",
+        "expectedValue": "[XX-A value is expected here.-XX]",
+        "expectedSymbol": "[XX-Expected {symbol} here.-XX]",
+        "unexpectedToken": "[XX-Unexpected {token}.-XX]",
+        "unsupported": "[XX-This part is not supported. Use only the syntax offered in the suggestions.-XX]",
+        "unknownField": "[XX-Unknown field {name}.-XX]",
+        "unknownFunction": "[XX-Unknown function or method {name}.-XX]",
+        "operatorNotAllowed": "[XX-The field {field} cannot be used with {operator}.-XX]",
+        "wrongValueType": "[XX-{expected, select, text {Expected text in quotes.} number {Expected a number.} boolean {Expected true or false.} list {Expected a list in square brackets.} account {Expected an account, for example account(\"Name\").} payee {Expected a payee, for example payee(\"Name\").} category {Expected a category, for example category(\"Parent: Child\").} tag {Expected a tag, for example tag(\"Name\").} other {This value is of the wrong kind.}}-XX]",
+        "invalidEnum": "[XX-Use one of: {values}.-XX]",
+        "invalidCurrency": "[XX-Use a three letter currency code in quotes, for example \"CAD\".-XX]",
+        "valueTooLong": "[XX-The text is too long. The limit is {max} characters.-XX]",
+        "listTooLong": "[XX-The list is too long. The limit is {max} items.-XX]",
+        "unknownEntity": "[XX-{kind, select, account {No account is named {name}.} payee {No payee is named {name}.} category {No category is named {name}.} tag {No tag is named {name}.} other {No item is named {name}.}}-XX]",
+        "ambiguousEntity": "[XX-{count} items are named {name}. Add the number of the one you mean, for example {example}.-XX]",
+        "entityOrdinal": "[XX-The number for {name} must be from 1 to {count}.-XX]",
+        "maxDepth": "[XX-Groups are nested too deeply. The limit is {max} levels.-XX]",
+        "maxLeaves": "[XX-There are too many conditions. The limit is {max}.-XX]",
+        "maxNodes": "[XX-There are too many conditions and groups. The limit is {max}.-XX]",
+        "tooNested": "[XX-Too many nested parentheses.-XX]"
+      }
+    }
+  },
+  "test": {
+    "title": "[XX-Test-XX]",
+    "description": "[XX-Try the rule on your existing transactions. Nothing is changed.-XX]",
+    "button": "[XX-Test rule-XX]",
+    "again": "[XX-Test again-XX]",
+    "incomplete": "[XX-Complete the conditions and actions above to test the rule.-XX]",
+    "idle": "[XX-Choose which transactions to try the rule on, then select Test rule.-XX]",
+    "running": "[XX-Testing the rule...-XX]",
+    "failed": "[XX-The test could not be completed. {message}-XX]",
+    "stale": "[XX-The rule or the filters changed since this result. Test again to see the current result.-XX]"
+  },
+  "run": {
+    "title": "[XX-Run \"{name}\" on existing transactions-XX]",
+    "description": "[XX-Preview what the rule would change, then confirm. You can undo the run from the action history.-XX]",
+    "previewButton": "[XX-Preview-XX]",
+    "confirmButton": "[XX-Confirm and run-XX]",
+    "idle": "[XX-Choose accounts and dates, then select Preview. Nothing changes until you confirm.-XX]",
+    "loadingPreview": "[XX-Loading the preview...-XX]",
+    "previewFailed": "[XX-The preview could not be loaded, so nothing can be run. {message}-XX]",
+    "stale": "[XX-The filters changed since this preview. Preview again before you run.-XX]",
+    "accountsLoading": "[XX-Loading accounts...-XX]",
+    "accountsFailed": "[XX-Your accounts could not be loaded, so the filters are unavailable.-XX]",
+    "retry": "[XX-Try again-XX]",
+    "summary": "[XX-{matched, plural, one {# transaction would change} other {# transactions would change}} out of {scanned, plural, one {# transaction} other {# transactions}} scanned.-XX]",
+    "truncated": "[XX-More transactions matched than the limit allows. Only the newest are included. Raise the limit or narrow the dates to include the rest.-XX]",
+    "noMatches": {
+      "title": "[XX-No transactions would change-XX]",
+      "body": "[XX-None of the scanned transactions match the rule, or the rule would change nothing on them.-XX]"
+    },
+    "table": {
+      "date": "[XX-Date-XX]",
+      "payee": "[XX-Payee-XX]",
+      "amount": "[XX-Amount-XX]",
+      "change": "[XX-Planned change-XX]",
+      "noPayee": "[XX-No payee-XX]"
+    },
+    "skipped": {
+      "title": "[XX-{count, plural, one {# transaction is left alone} other {# transactions are left alone}}-XX]",
+      "line": "[XX-{count, plural, one {# transaction} other {# transactions}}: {reason}-XX]"
+    },
+    "skipReasons": {
+      "reconciled_locked": "[XX-it is reconciled and locked-XX]",
+      "transfer_leg_category": "[XX-it is a transfer, which has no category-XX]",
+      "split_category": "[XX-it is split, so the category belongs to the splits-XX]",
+      "cross_owner_transfer_payee": "[XX-it is a transfer to another owner, whose payee this rule may not change-XX]",
+      "empty_render": "[XX-the text of an action came out empty for it-XX]",
+      "payee_not_found": "[XX-no payee has the name the rule built, and it does not create one-XX]",
+      "other": "[XX-the rule cannot change it-XX]"
+    },
+    "change": {
+      "category": "[XX-Category: {before} → {after}-XX]",
+      "payee": "[XX-Payee: {before} → {after}-XX]",
+      "tagsAdded": "[XX-Tags added: {tags}-XX]",
+      "tagsRemoved": "[XX-Tags removed: {tags}-XX]",
+      "none": "[XX-none-XX]",
+      "unknown": "[XX-a deleted item-XX]",
+      "payeeCreated": "[XX-{done, select, yes {A new payee was created: {name}} other {A new payee will be created: {name}}}-XX]",
+      "description": "[XX-Description: {before} → {after}-XX]",
+      "descriptionSet": "[XX-Set the description to {value}-XX]"
+    },
+    "filters": {
+      "accounts": "[XX-Accounts-XX]",
+      "allAccounts": "[XX-All accounts-XX]",
+      "startDate": "[XX-From-XX]",
+      "endDate": "[XX-To-XX]",
+      "backwards": "[XX-The start date must not be after the end date.-XX]",
+      "limit": "[XX-Newest transactions to examine-XX]",
+      "help": "[XX-Only the newest transactions in the range are examined, up to {max}.-XX]"
+    },
+    "errors": {
+      "PREVIEW_CHANGED": "[XX-The transactions or the rule changed since the preview. Review the new preview and run again.-XX]",
+      "RUN_TOO_LARGE": "[XX-This run changes too many transactions to be undone in one step. Narrow the accounts or the dates and try again.-XX]",
+      "INVALID_RULE": "[XX-This rule is not valid, so it cannot be run. Open it and repair it first.-XX]",
+      "DATE_RANGE_INVALID": "[XX-The start date must not be after the end date.-XX]",
+      "draftInvalid": "[XX-The rule is incomplete or not valid. Check the conditions and actions above.-XX]",
+      "testFailed": "[XX-Something went wrong while testing the rule.-XX]",
+      "previewFailed": "[XX-Something went wrong while loading the preview.-XX]",
+      "runFailed": "[XX-The run could not be completed. Check the action history before you try again.-XX]"
+    },
+    "toast": {
+      "done": "[XX-{count, plural, =0 {No transactions were changed} one {# transaction changed} other {# transactions changed}}. You can undo this from the action history.-XX]"
+    },
+    "done": {
+      "summary": "[XX-{count, plural, =0 {No transactions were changed.} one {# transaction was changed.} other {# transactions were changed.}}-XX]",
+      "undo": "[XX-You can undo the run from the action history.-XX]"
+    }
+  },
+  "applications": {
+    "title": "[XX-History-XX]",
+    "description": "[XX-The latest transactions this rule changed, newest first.-XX]",
+    "loading": "[XX-Loading the history...-XX]",
+    "error": {
+      "title": "[XX-The history could not be loaded-XX]",
+      "body": "[XX-Nothing is shown because the request failed, not because the rule has not run. Check your connection and try again.-XX]",
+      "retry": "[XX-Try again-XX]"
+    },
+    "empty": {
+      "title": "[XX-This rule has not changed anything yet-XX]",
+      "body": "[XX-When it changes a transaction, the change is listed here.-XX]"
+    },
+    "source": {
+      "create": "[XX-Created-XX]",
+      "import": "[XX-Imported-XX]",
+      "manual": "[XX-Manual run-XX]",
+      "other": "[XX-Other-XX]"
+    },
+    "table": {
+      "date": "[XX-Date-XX]",
+      "payee": "[XX-Payee-XX]",
+      "amount": "[XX-Amount-XX]",
+      "source": "[XX-Source-XX]",
+      "change": "[XX-Change-XX]",
+      "appliedAt": "[XX-Applied-XX]",
+      "open": "[XX-Open transaction-XX]",
+      "noPayee": "[XX-No payee-XX]",
+      "view": "[XX-View-XX]"
+    }
+  },
+  "words": {
+    "everyTransaction": "[XX-Every transaction-XX]",
+    "group": {
+      "all": "[XX-All of these:-XX]",
+      "any": "[XX-Any of these:-XX]",
+      "notAll": "[XX-Not all of these:-XX]",
+      "notAny": "[XX-None of these:-XX]"
+    },
+    "leaf": "[XX-{field} {operator} {value}-XX]",
+    "leafNoValue": "[XX-{field} {operator}-XX]",
+    "range": "[XX-{from} and {to}-XX]",
+    "text": "[XX-\"{value}\"-XX]",
+    "unknownCondition": "[XX-A condition this version cannot show-XX]",
+    "unknownAction": "[XX-An action this version cannot show-XX]",
+    "action": {
+      "add_tags": "[XX-Add tags: {tags}-XX]",
+      "remove_tags": "[XX-Remove tags: {tags}-XX]",
+      "set_category": "[XX-Set the category to {name}{onlyIfEmpty, select, yes { (only if empty)} other {}}-XX]",
+      "set_payee": "[XX-Set the payee to {name}{onlyIfEmpty, select, yes { (only if empty)} other {}}-XX]",
+      "request_ai_review": "[XX-Ask for an AI review: {instruction}-XX]",
+      "set_payee_from_text": "[XX-Set the payee from text: \"{template}\"{createIfMissing, select, yes { (created if missing)} other {}}{onlyIfEmpty, select, yes { (only if empty)} other {}}-XX]",
+      "set_description": "[XX-Set the description ({mode, select, append {append} prepend {prepend} other {replace}}): \"{template}\"{onlyIfEmpty, select, yes { (only if empty)} other {}}-XX]"
+    }
+  }
+}

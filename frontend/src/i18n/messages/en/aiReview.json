@@ -1,0 +1,69 @@
+{
+  "page": {
+    "title": "AI review inbox",
+    "subtitle": "Transactions a rule asked an AI to review, and the edits an assistant proposed for you to approve."
+  },
+  "filter": {
+    "label": "Filter by status",
+    "open": "Open",
+    "pending": "Pending",
+    "claimed": "In review",
+    "proposed": "Proposed",
+    "applied": "Applied",
+    "rejected": "Rejected",
+    "expired": "Expired"
+  },
+  "status": {
+    "pending": "Pending",
+    "claimed": "In review",
+    "proposed": "Proposed",
+    "applied": "Applied",
+    "rejected": "Rejected",
+    "expired": "Expired"
+  },
+  "columns": {
+    "date": "Date",
+    "request": "Request",
+    "amount": "Amount",
+    "status": "Status"
+  },
+  "row": {
+    "noPayee": "No payee",
+    "transactionMissing": "This transaction no longer exists",
+    "rule": "Rule: {name}",
+    "manualRequest": "Requested manually",
+    "agentNote": "Note from the assistant: {reason}",
+    "dates": "Created {created}, expires {expires}",
+    "viewTransaction": "View transaction"
+  },
+  "actions": {
+    "dismiss": "Dismiss"
+  },
+  "proposal": {
+    "errorTitle": "This proposal can no longer be applied"
+  },
+  "dismissDialog": {
+    "title": "Dismiss this request?",
+    "message": "Nobody will be asked to review this transaction again. The transaction itself is not changed.",
+    "confirm": "Dismiss request"
+  },
+  "loading": "Loading review requests...",
+  "error": {
+    "title": "Could not load the review requests",
+    "body": "The list did not load, so it may not be empty. Check your connection and try again.",
+    "retry": "Try again"
+  },
+  "empty": {
+    "title": "No review requests",
+    "body": "Requests appear here when a rule with the Ask for an AI review action matches a transaction. An AI assistant, or an MCP client such as the relay agent, works through the queue and proposes an edit for you to approve.",
+    "filteredTitle": "No requests with this status",
+    "filteredBody": "Choose another status to see other requests."
+  },
+  "toasts": {
+    "approved": "Proposal applied",
+    "dismissed": "Request dismissed",
+    "dismissFailed": "Could not dismiss the request",
+    "approveFailed": "Could not apply the proposal",
+    "changed": "This request changed in the meantime. The list was reloaded."
+  }
+}

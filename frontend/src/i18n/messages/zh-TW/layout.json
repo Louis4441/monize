@@ -128,7 +128,8 @@
       "updatedInvestmentTransaction": "已更新 {action} 交易",
       "deletedInvestmentTransaction": "已刪除 {action} 交易",
       "transferredSecurity": "已在科目間移轉證券",
-      "updatedSecurityTransfer": "已更新證券移轉"
+      "updatedSecurityTransfer": "已更新證券移轉",
+      "ranTransactionRule": "已在 {count, plural, other {# 筆交易}}上執行規則「{name}」"
     },
     "timeAgo": {
       "justNow": "剛剛",

@@ -194,7 +194,37 @@
     "deletePayeesTitle": "이 수취인들을 삭제하시겠습니까?",
     "createdPayees": "{count, plural, =0 {생성된 수취인이 없습니다} other {# 명의 수취인이 생성되었습니다}}",
     "updatedPayees": "{count, plural, =0 {업데이트된 수취인이 없습니다} other {# 명의 수취인이 수정되었습니다}}",
-    "deletedPayees": "{count, plural, =0 {삭제된 수취인이 없습니다} other {# 명의 수취인이 삭제되었습니다}}"
+    "deletedPayees": "{count, plural, =0 {삭제된 수취인이 없습니다} other {# 명의 수취인이 삭제되었습니다}}",
+    "createRuleTitle": "이 규칙을 만들까요?",
+    "updateRuleTitle": "이 규칙 수정을 적용할까요?",
+    "deleteRuleTitle": "이 규칙을 삭제할까요?",
+    "runRuleTitle": "이 규칙을 기존 거래에 실행할까요?",
+    "createdRule": "규칙을 만들었습니다",
+    "updatedRule": "규칙을 업데이트했습니다",
+    "deletedRule": "규칙을 삭제했습니다",
+    "ranRule": "규칙 실행이 완료되었습니다",
+    "viewRules": "규칙 보기",
+    "unknownTitle": "이 작업을 승인할까요?",
+    "unknownDone": "작업이 완료되었습니다",
+    "rule": {
+      "noPreview": "이 규칙의 세부 정보를 불러올 수 없어 여기서 검토할 수 없습니다. 취소하고 다시 요청하세요.",
+      "changesTitle": "변경 내용",
+      "noChanges": "규칙은 그대로 유지됩니다.",
+      "was": "이전",
+      "now": "이후",
+      "testTitle": "기존 거래로 테스트",
+      "runPreviewTitle": "이번 실행으로 바뀌는 내용",
+      "filtersTitle": "실행 대상",
+      "rowsShown": "{count}건 중 처음 {shown}건을 표시합니다.",
+      "skippedMore": "사유는 처음 {shown}건에 대해서만 표시됩니다.",
+      "aiReviewRequests": "{count, plural, other {AI 검토 요청 #건이 대기열에 추가됩니다.}}"
+    },
+    "ruleEffects": {
+      "title": "규칙이 다음도 수행합니다:",
+      "category": "카테고리를 {name}(으)로 지정",
+      "payee": "수취인을 {name}(으)로 지정",
+      "aiReview": "{count, plural, other {AI 검토 요청 #건을 대기열에 추가}}"
+    }
   },
   "table": {
     "downloadTitle": "CSV로 표 다운로드",

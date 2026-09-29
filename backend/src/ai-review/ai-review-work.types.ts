@@ -1,0 +1,121 @@
+import type { PendingAiAction } from "../ai/actions/ai-action.types";
+import type { LlmTransactionRow } from "../transactions/transactions.service";
+import type {
+  AiReviewRequestKind,
+  AiReviewRequestStatus,
+} from "./ai-review-request.entity";
+
+/** What an agent can do with the queue, on both tool surfaces. */
+export const AI_REVIEW_OPERATIONS = [
+  "list",
+  "claim",
+  "submit",
+  "reject",
+] as const;
+export type AiReviewOperation = (typeof AI_REVIEW_OPERATIONS)[number];
+
+export const DEFAULT_AI_REVIEW_TOOL_LIST_LIMIT = 20;
+export const MAX_AI_REVIEW_TOOL_LIST_LIMIT = 50;
+
+/**
+ * The claim key of the in-app assistant. The assistant has no connection to
+ * key on, so every chat of one user shares it; an MCP client is keyed by its
+ * own caller key (`callerKey` in `mcp/mcp-context.ts`), which never equals it.
+ */
+export const ASSISTANT_CLAIM_KEY = "assistant";
+
+/** One category line of a proposal, exactly as `manage_transactions` takes it. */
+export interface AiReviewSplitLine {
+  categoryName: string;
+  amount: number;
+  memo?: string;
+}
+
+/**
+ * The edit an agent proposes for a `transaction_review` request. No amount, no
+ * date and no account: a review may re-categorise, re-label and split, never
+ * move money (design invariant I1).
+ */
+export interface AiReviewProposalInput {
+  splits?: AiReviewSplitLine[];
+  categoryName?: string;
+  payeeName?: string;
+  description?: string;
+}
+
+/** A request as a model reads it. The claim key itself never leaves the server. */
+export interface LlmAiReviewRequest {
+  id: string;
+  kind: AiReviewRequestKind;
+  status: AiReviewRequestStatus;
+  instruction: string;
+  transactionId: string;
+  ruleId: string | null;
+  /** True when the caller holds the claim. */
+  claimedByYou: boolean;
+  createdAt: string;
+  expiresAt: string;
+  /** Why an earlier agent gave the request up, when one did. */
+  agentNote?: { reason: string; at: string };
+}
+
+export interface LlmAiReviewList {
+  requests: LlmAiReviewRequest[];
+  totalCount: number;
+  truncated: boolean;
+}
+
+export interface LlmAiReviewClaim {
+  /** Null when nothing is pending; under contention that is not proof the queue is empty. */
+  request: LlmAiReviewRequest | null;
+  /** The reviewed transaction, one row or one per split line. */
+  transaction?: LlmTransactionRow[];
+}
+
+/** A stored proposal: what the agent sent and the signed card built from it. */
+export interface StoredAiReviewProposal {
+  input: AiReviewProposalInput;
+  action: PendingAiAction;
+  proposedAt: string;
+}
+
+export interface AiReviewSubmitResult {
+  request: LlmAiReviewRequest;
+  action: PendingAiAction;
+}
+
+/** The reviewed transaction as the inbox shows it (not a raw row). */
+export interface AiReviewTransactionSummary {
+  id: string;
+  date: string;
+  amount: number;
+  currencyCode: string;
+  payeeName: string | null;
+  description: string | null;
+  accountId: string;
+  accountName: string | null;
+  categoryName: string | null;
+  isSplit: boolean;
+}
+
+/** One inbox entry: the request, its transaction and, when proposed, the card. */
+export interface AiReviewInboxItem {
+  id: string;
+  kind: AiReviewRequestKind;
+  status: AiReviewRequestStatus;
+  instruction: string;
+  transactionId: string;
+  ruleId: string | null;
+  ruleName: string | null;
+  createdAt: string;
+  expiresAt: string;
+  /** Null when the transaction no longer exists. */
+  transaction: AiReviewTransactionSummary | null;
+  agentNote?: { reason: string; at: string };
+  /**
+   * When `proposed`: the confirmation card, rebuilt from the stored proposal
+   * against the transaction as it is now (so a stale proposal cannot overwrite a
+   * later edit), or the reason it can no longer be built.
+   */
+  proposal?: { action: PendingAiAction } | { error: string };
+}

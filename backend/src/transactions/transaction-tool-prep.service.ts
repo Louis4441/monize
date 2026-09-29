@@ -471,6 +471,7 @@ export class TransactionToolPrepService {
       categoryId,
       description: row.description,
       createPayeeIfMissing: createPayee,
+      hasSplits: !!splits,
     });
     return { preview, createPayee, splits };
   }

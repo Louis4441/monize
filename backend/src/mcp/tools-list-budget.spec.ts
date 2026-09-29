@@ -30,6 +30,25 @@ import { McpServerService } from "./mcp-server.service";
 // not price), and `calculate` gained the `convert` operation -- a currency
 // pair and a rate date on the input, the rate and its date on the output. Both
 // exist so a model never converts a currency itself, which is worth the bytes.
+//
+// Raised, as a reviewed decision (owner-approved with the tools): the rule tool
+// `manage_transaction_rules` (3,896 bytes: the rule language a model must be
+// told to write a condition and its actions, plus the shared A1 field shapes)
+// and the review-queue tool `ai_review_requests` (2,981 bytes: four operations
+// and the split-line shape of a proposal). Total 51,600 -> 58,480 = the two
+// tools (6,877 bytes) plus the previous 72-byte margin; no existing cap moved.
+//
+// Raised, as a reviewed decision (owner-approved with rule captures, design
+// 10.1 and 10.2): `manage_transaction_rules` states the two text actions
+// (`set_payee_from_text`, `set_description`) and the `{name}` capture syntax a
+// model must be told to write them. 3,896 -> 4,217 bytes (+321); cap 3,950 ->
+// 4,250 and total 58,480 -> 58,800 (58,726 measured, the previous margin kept).
+//
+// Raised, as a reviewed decision (owner-approved with the X3 condition fields,
+// design 10.3): the rule language lists five more fields with their operators
+// (generated from the field table) and the values a model must write for
+// `weekday`, `dayOfMonth`, `status` and the two booleans. 4,217 -> 4,522 bytes
+// (+305); cap 4,250 -> 4,560 and total 58,800 -> 59,110 (59,031 measured).
 const TOOL_BYTE_BUDGET: Record<string, number> = {
   list_accounts: 2500,
   list_transactions: 3550,
@@ -48,12 +67,14 @@ const TOOL_BYTE_BUDGET: Record<string, number> = {
   list_upcoming_bills: 3000,
   calculate: 2000,
   get_budget_status: 2550,
+  manage_transaction_rules: 4560,
+  ai_review_requests: 3050,
   get_next_prompt: 1400,
   post_response: 1050,
   report_progress: 1250,
 };
 
-const TOTAL_BYTE_BUDGET = 51_600;
+const TOTAL_BYTE_BUDGET = 59_110;
 const INSTRUCTIONS_BYTE_BUDGET = 2_600;
 
 /**
@@ -80,6 +101,8 @@ const EXPECTED_TOOL_ORDER = [
   "list_upcoming_bills",
   "calculate",
   "get_budget_status",
+  "manage_transaction_rules",
+  "ai_review_requests",
   "get_next_prompt",
   "post_response",
   "report_progress",
@@ -291,6 +314,8 @@ describe("tools/list payload budget", () => {
     // provider doubles are enough to read them back off the server.
     const noopProvider = { register: () => {} } as any;
     const service = new McpServerService(
+      noopProvider,
+      noopProvider,
       noopProvider,
       noopProvider,
       noopProvider,

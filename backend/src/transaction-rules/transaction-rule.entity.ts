@@ -1,0 +1,77 @@
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  Unique,
+} from "typeorm";
+import { User } from "../users/entities/user.entity";
+import { RuleAction } from "./rule-action.types";
+import { RuleConditionNode } from "./rule-condition.types";
+import { RuleTrigger } from "./rule-trigger.types";
+
+/**
+ * A per-user rule (design section 4). `condition` and `actions` are validated
+ * by the application on write (`validateRuleDefinition`); a row restored from a
+ * support backup can still hold the column defaults (`{}` and `[]`), which the
+ * service reports as invalid rather than throwing.
+ *
+ * Column defaults mirror `database/migrations/20260928193705_add_transaction_
+ * rules.sql`: the RLS spec builds its schema from these entities.
+ */
+@Entity("transaction_rules")
+// Deferrable so a reorder rewrites several positions in one transaction
+// without colliding part-way through.
+@Unique("uq_transaction_rules_user_position", ["userId", "position"], {
+  deferrable: "INITIALLY DEFERRED",
+})
+export class TransactionRule {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  @Column({ type: "uuid", name: "user_id" })
+  userId: string;
+
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "user_id" })
+  user?: User;
+
+  @Column({ type: "varchar", length: 100 })
+  name: string;
+
+  @Column({ type: "boolean", default: true })
+  enabled: boolean;
+
+  /** Evaluation order, unique per user. */
+  @Column({ type: "int" })
+  position: number;
+
+  @Column({
+    type: "text",
+    array: true,
+    default: () => "ARRAY['create', 'import']::text[]",
+  })
+  triggers: RuleTrigger[];
+
+  @Column({ type: "jsonb", default: () => "'{}'::jsonb" })
+  condition: RuleConditionNode;
+
+  @Column({ type: "jsonb", default: () => "'[]'::jsonb" })
+  actions: RuleAction[];
+
+  @Column({ type: "boolean", name: "stop_processing", default: false })
+  stopProcessing: boolean;
+
+  /** Compare-and-swap counter for updates. */
+  @Column({ type: "int", default: 1 })
+  revision: number;
+
+  @CreateDateColumn({ name: "created_at" })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: "updated_at" })
+  updatedAt: Date;
+}

@@ -121,6 +121,16 @@
     "attachmentRefExpired": "Il file allegato non è più disponibile. Caricalo di nuovo e ripeti la richiesta.",
     "modelNoImageSupport": "Il modello IA selezionato non può leggere immagini o PDF. Rimuovi l'allegato e chiedi in formato testo, oppure passa a un modello con supporto visivo nelle impostazioni IA."
   },
+  "aiReview": {
+    "notFound": "Richiesta di revisione IA con ID {{ id }} non trovata",
+    "notClaimed": "Questa richiesta di revisione IA non è stata presa in carico da te. Prendi prima in carico la prossima in attesa; una richiesta che non hai preso in carico non può ricevere risposta.",
+    "notProposed": "Questa richiesta di revisione IA non è più in attesa di approvazione, quindi la sua proposta non è stata applicata.",
+    "notOpen": "Questa richiesta di revisione IA non è più aperta.",
+    "nothingProposed": "Una proposta richiede almeno una modifica: splits, categoryName, payeeName o description.",
+    "splitsAndCategory": "Invia splits oppure categoryName, non entrambi: una transazione suddivisa non ha una categoria unica.",
+    "transferNotSupported": "Un trasferimento non può essere rivisto tramite proposta. Rifiuta invece la richiesta.",
+    "splitDifference": "Le righe di suddivisione sommano {{ sum }} ma la transazione è {{ amount }}: {{ difference }} non è assegnato. Fai in modo che le righe sommino all'importo della transazione; un residuo come le spese di consegna richiede una riga propria, oppure viene indicato all'utente invece di essere assegnato."
+  },
   "auth": {
     "tooManyAttemptsLoginAgain": "Troppi tentativi di verifica. Accedi di nuovo.",
     "invalidOrExpiredVerificationToken": "Token di verifica non valido o scaduto",
@@ -512,7 +522,22 @@
   "tags": {
     "notFound": "Etichetta con ID {{ id }} non trovata",
     "nameConflict": "Esiste già un'etichetta chiamata \"{{ name }}\"",
-    "oneOrMoreNotFound": "Una o più etichette non trovate"
+    "oneOrMoreNotFound": "Una o più etichette non trovate",
+    "oneOrMoreTransactionsNotFound": "Una o più transazioni non trovate",
+    "tooManyTags": "Al massimo {{ max }} tag possono essere modificati in una sola chiamata",
+    "tooManyTransactions": "Al massimo {{ max }} transazioni possono essere modificate in una sola chiamata"
+  },
+  "transactionRules": {
+    "notFound": "Regola di transazione con ID {{ id }} non trovata",
+    "limitReached": "È possibile creare al massimo {{ max }} regole",
+    "invalidDefinition": "La definizione della regola non è valida",
+    "referenceNotFound": "La regola indica un conto, un beneficiario, una categoria o un tag che non esiste",
+    "revisionConflict": "Questa regola è stata modificata altrove. Ricaricala e riprova",
+    "reorderMismatch": "L'elenco delle regole è cambiato. Ricaricalo e riprova",
+    "previewChanged": "Le transazioni o la regola sono cambiate dopo l'anteprima. Controlla la nuova anteprima ed esegui di nuovo",
+    "ruleInvalid": "Questa regola non è valida e non può essere eseguita. Aprila e correggila prima",
+    "dateRangeInvalid": "La data di inizio non deve essere successiva alla data di fine",
+    "runTooLarge": "Questa esecuzione modifica troppe transazioni per essere annullata in un solo passaggio. Restringi i conti o le date e riprova"
   },
   "transactions": {
     "invalidStatus": "Stato transazione non valido: {{ status }}",

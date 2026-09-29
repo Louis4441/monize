@@ -22,6 +22,7 @@ import { NetWorthModule } from "../net-worth/net-worth.module";
 import { ActionHistoryModule } from "../action-history/action-history.module";
 import { SecuritiesModule } from "../securities/securities.module";
 import { DelegationModule } from "../delegation/delegation.module";
+import { TransactionRulesModule } from "../transaction-rules/transaction-rules.module";
 import { CurrenciesModule } from "../currencies/currencies.module";
 
 @Module({
@@ -41,6 +42,10 @@ import { CurrenciesModule } from "../currencies/currencies.module";
     // scope), which reaches back here -- see `src/module-graph.spec.ts`.
     forwardRef(() => PayeesModule),
     TagsModule,
+    // The rules step of create() and previewCreate().
+    // forwardRef: the rules module reaches TransactionsModule back through the
+    // assistant's rule tools (AccountsModule, PayeesModule).
+    forwardRef(() => TransactionRulesModule),
     ActionHistoryModule,
     // forwardRef on both: each lies on a require cycle, so a bare reference is
     // `undefined` here under some load orders -- see `src/module-graph.spec.ts`.

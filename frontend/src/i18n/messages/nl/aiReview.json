@@ -1,0 +1,69 @@
+{
+  "page": {
+    "title": "AI-controlepostvak",
+    "subtitle": "Transacties die een regel door een AI wilde laten controleren, en de wijzigingen die een assistent ter goedkeuring voorstelt."
+  },
+  "filter": {
+    "label": "Filteren op status",
+    "open": "Open",
+    "pending": "In afwachting",
+    "claimed": "In controle",
+    "proposed": "Voorgesteld",
+    "applied": "Toegepast",
+    "rejected": "Afgewezen",
+    "expired": "Verlopen"
+  },
+  "status": {
+    "pending": "In afwachting",
+    "claimed": "In controle",
+    "proposed": "Voorgesteld",
+    "applied": "Toegepast",
+    "rejected": "Afgewezen",
+    "expired": "Verlopen"
+  },
+  "columns": {
+    "date": "Datum",
+    "request": "Verzoek",
+    "amount": "Bedrag",
+    "status": "Status"
+  },
+  "row": {
+    "noPayee": "Geen begunstigde",
+    "transactionMissing": "Deze transactie bestaat niet meer",
+    "rule": "Regel: {name}",
+    "manualRequest": "Handmatig aangevraagd",
+    "agentNote": "Opmerking van de assistent: {reason}",
+    "dates": "Aangemaakt op {created}, verloopt op {expires}",
+    "viewTransaction": "Transactie bekijken"
+  },
+  "actions": {
+    "dismiss": "Negeren"
+  },
+  "proposal": {
+    "errorTitle": "Dit voorstel kan niet meer worden toegepast"
+  },
+  "dismissDialog": {
+    "title": "Dit verzoek negeren?",
+    "message": "Niemand wordt nog gevraagd deze transactie te controleren. De transactie zelf wordt niet gewijzigd.",
+    "confirm": "Verzoek negeren"
+  },
+  "loading": "Controleverzoeken laden...",
+  "error": {
+    "title": "Controleverzoeken konden niet worden geladen",
+    "body": "De lijst is niet geladen en is dus mogelijk niet leeg. Controleer je verbinding en probeer het opnieuw.",
+    "retry": "Opnieuw proberen"
+  },
+  "empty": {
+    "title": "Geen controleverzoeken",
+    "body": "Verzoeken verschijnen hier wanneer een regel met de actie ‘AI-controle aanvragen’ bij een transactie past. Een AI-assistent, of een MCP-client zoals de relay-agent, werkt de wachtrij af en stelt een wijziging voor die jij kunt goedkeuren.",
+    "filteredTitle": "Geen verzoeken met deze status",
+    "filteredBody": "Kies een andere status om andere verzoeken te zien."
+  },
+  "toasts": {
+    "approved": "Voorstel toegepast",
+    "dismissed": "Verzoek genegeerd",
+    "dismissFailed": "Het verzoek kon niet worden genegeerd",
+    "approveFailed": "Het voorstel kon niet worden toegepast",
+    "changed": "Dit verzoek is intussen gewijzigd. De lijst is opnieuw geladen."
+  }
+}

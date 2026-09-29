@@ -1,0 +1,69 @@
+{
+  "page": {
+    "title": "AI 审核收件箱",
+    "subtitle": "规则请求 AI 审核的交易，以及助手提出、等待您批准的修改。"
+  },
+  "filter": {
+    "label": "按状态筛选",
+    "open": "未完成",
+    "pending": "待处理",
+    "claimed": "审核中",
+    "proposed": "已提议",
+    "applied": "已应用",
+    "rejected": "已拒绝",
+    "expired": "已过期"
+  },
+  "status": {
+    "pending": "待处理",
+    "claimed": "审核中",
+    "proposed": "已提议",
+    "applied": "已应用",
+    "rejected": "已拒绝",
+    "expired": "已过期"
+  },
+  "columns": {
+    "date": "日期",
+    "request": "请求",
+    "amount": "金额",
+    "status": "状态"
+  },
+  "row": {
+    "noPayee": "无收款人",
+    "transactionMissing": "此交易已不存在",
+    "rule": "规则：{name}",
+    "manualRequest": "手动请求",
+    "agentNote": "助手备注：{reason}",
+    "dates": "创建于 {created}，到期于 {expires}",
+    "viewTransaction": "查看交易"
+  },
+  "actions": {
+    "dismiss": "忽略"
+  },
+  "proposal": {
+    "errorTitle": "此提议已无法应用"
+  },
+  "dismissDialog": {
+    "title": "忽略此请求？",
+    "message": "不会再有人被要求审核这笔交易。交易本身不会更改。",
+    "confirm": "忽略请求"
+  },
+  "loading": "正在加载审核请求...",
+  "error": {
+    "title": "无法加载审核请求",
+    "body": "列表未能加载，因此可能并不为空。请检查网络连接后重试。",
+    "retry": "重试"
+  },
+  "empty": {
+    "title": "没有审核请求",
+    "body": "当带有“请求 AI 审核”操作的规则匹配到某笔交易时，请求会出现在这里。AI 助手或中继代理等 MCP 客户端会处理队列，并提出修改供您批准。",
+    "filteredTitle": "没有此状态的请求",
+    "filteredBody": "选择其他状态以查看其他请求。"
+  },
+  "toasts": {
+    "approved": "提议已应用",
+    "dismissed": "请求已忽略",
+    "dismissFailed": "无法忽略该请求",
+    "approveFailed": "无法应用该提议",
+    "changed": "此请求在此期间已发生变化。列表已重新加载。"
+  }
+}

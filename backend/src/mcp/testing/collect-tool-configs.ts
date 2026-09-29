@@ -8,6 +8,8 @@ import { McpScheduledTools } from "../tools/scheduled.tool";
 import { McpCalculateTools } from "../tools/calculate.tool";
 import { McpBudgetsTools } from "../tools/budgets.tool";
 import { McpRelayTools } from "../tools/relay.tool";
+import { McpRulesTools } from "../tools/rules.tool";
+import { McpAiReviewTools } from "../tools/ai-review.tool";
 
 /**
  * Test helper: capture every tool's `registerTool` config without booting Nest.
@@ -71,6 +73,14 @@ export function collectToolConfigs(): CapturedToolConfig[] {
     new McpScheduledTools({} as any) as unknown as ToolProvider,
     new McpCalculateTools({} as any) as unknown as ToolProvider,
     new McpBudgetsTools({} as any) as unknown as ToolProvider,
+    new McpRulesTools(
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    ) as unknown as ToolProvider,
+    new McpAiReviewTools({} as any) as unknown as ToolProvider,
     new McpRelayTools({} as any) as unknown as ToolProvider,
   ];
 

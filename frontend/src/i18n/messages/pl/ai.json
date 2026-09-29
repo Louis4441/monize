@@ -194,7 +194,37 @@
     "deletePayeesTitle": "Usunąć tych odbiorców?",
     "createdPayees": "{count, plural, =0 {Nie utworzono odbiorców} one {Utworzono # odbiorcę} other {Utworzono # odbiorców}}",
     "updatedPayees": "{count, plural, =0 {Nie zaktualizowano odbiorców} one {Zaktualizowano # odbiorcę} other {Zaktualizowano # odbiorców}}",
-    "deletedPayees": "{count, plural, =0 {Nie usunięto odbiorców} one {Usunięto # odbiorcę} other {Usunięto # odbiorców}}"
+    "deletedPayees": "{count, plural, =0 {Nie usunięto odbiorców} one {Usunięto # odbiorcę} other {Usunięto # odbiorców}}",
+    "createRuleTitle": "Utworzyć tę regułę?",
+    "updateRuleTitle": "Zastosować tę zmianę reguły?",
+    "deleteRuleTitle": "Usunąć tę regułę?",
+    "runRuleTitle": "Uruchomić tę regułę na istniejących transakcjach?",
+    "createdRule": "Utworzono regułę",
+    "updatedRule": "Zaktualizowano regułę",
+    "deletedRule": "Usunięto regułę",
+    "ranRule": "Uruchomienie reguły zakończone",
+    "viewRules": "Pokaż reguły",
+    "unknownTitle": "Zatwierdzić tę akcję?",
+    "unknownDone": "Akcja zakończona",
+    "rule": {
+      "noPreview": "Szczegóły tej reguły są niedostępne, więc nie można jej tutaj sprawdzić. Anuluj i zapytaj ponownie.",
+      "changesTitle": "Co się zmieni",
+      "noChanges": "Reguła pozostaje bez zmian.",
+      "was": "Było",
+      "now": "Będzie",
+      "testTitle": "Test na istniejących transakcjach",
+      "runPreviewTitle": "Co zmieni to uruchomienie",
+      "filtersTitle": "Uruchamiana na",
+      "rowsShown": "Pokazano pierwsze {shown} z {count}.",
+      "skippedMore": "Powody pokazano tylko dla pierwszych {shown}.",
+      "aiReviewRequests": "{count, plural, one {# prośba o przegląd AI trafiłaby do kolejki.} few {# prośby o przegląd AI trafiłyby do kolejki.} many {# próśb o przegląd AI trafiłoby do kolejki.} other {# prośby o przegląd AI trafiłoby do kolejki.}}"
+    },
+    "ruleEffects": {
+      "title": "Twoje reguły dodatkowo:",
+      "category": "Ustaw kategorię na {name}",
+      "payee": "Ustaw odbiorcę na {name}",
+      "aiReview": "{count, plural, one {Dodaj do kolejki # prośbę o przegląd AI} few {Dodaj do kolejki # prośby o przegląd AI} many {Dodaj do kolejki # próśb o przegląd AI} other {Dodaj do kolejki # prośby o przegląd AI}}"
+    }
   },
   "table": {
     "downloadTitle": "Pobierz tabelę jako CSV",

@@ -6,6 +6,10 @@ const WRITE_TOOLS = new Set([
   "manage_payees",
   "manage_securities",
   "manage_investment_transactions",
+  "manage_transaction_rules",
+  // Claims, proposes and releases queue rows; the ledger is written only by the
+  // user's approval elsewhere, so it is a write tool that is not destructive.
+  "ai_review_requests",
 ]);
 // Write tools whose repeated calls converge to the same state.
 const IDEMPOTENT_WRITES = new Set<string>([]);
@@ -17,9 +21,10 @@ const DESTRUCTIVE_TOOLS = new Set([
   "manage_payees",
   "manage_securities",
   "manage_investment_transactions",
+  "manage_transaction_rules",
 ]);
 
-const EXPECTED_TOOL_COUNT = 20;
+const EXPECTED_TOOL_COUNT = 22;
 
 describe("MCP tool spec compliance", () => {
   const configs = collectToolConfigs();

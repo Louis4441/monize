@@ -1,0 +1,67 @@
+import { describe, expect, it } from 'vitest';
+import { render, screen } from '@/test/render';
+import { RuleActionsInWords, RuleConditionInWords, type RuleWordsLabels } from './RuleInWords';
+import type { RuleAction, RuleConditionNode } from '@/types/transaction-rule';
+
+const labels: RuleWordsLabels = { accounts: {}, payees: {}, categories: {}, tags: {} };
+
+function words(condition: RuleConditionNode) {
+  render(<RuleConditionInWords condition={condition} labels={labels} />);
+}
+
+describe('the conditions in words: the newer fields', () => {
+  it.each([
+    [{ field: 'referenceNumber', op: 'startsWith', value: 'CHK' }, 'Reference number starts with "CHK"'],
+    [{ field: 'referenceNumber', op: 'matches', value: 'CHK-{n}' }, 'Reference number matches the pattern "CHK-{n}"'],
+    [{ field: 'referenceNumber', op: 'isEmpty' }, 'Reference number is empty'],
+    [{ field: 'dayOfMonth', op: 'gte', value: 28 }, 'Day of the month is at least 28'],
+    [{ field: 'dayOfMonth', op: 'between', value: [10, 20] }, 'Day of the month is between 10 and 20'],
+    [{ field: 'dayOfMonth', op: 'in', value: [1, 15, 31] }, 'Day of the month is any of 1, 15, and 31'],
+    [{ field: 'weekday', op: 'eq', value: 'MON' }, 'Day of the week is Mon'],
+    [{ field: 'weekday', op: 'in', value: ['SAT', 'SUN'] }, 'Day of the week is any of Sat and Sun'],
+    [{ field: 'status', op: 'neq', value: 'VOID' }, 'Status is not Void'],
+    [{ field: 'status', op: 'in', value: ['CLEARED', 'RECONCILED'] }, 'Status is any of Cleared and Reconciled'],
+    [{ field: 'hasAttachment', op: 'eq', value: true }, 'Has an attachment is Yes'],
+    [{ field: 'hasAttachment', op: 'eq', value: false }, 'Has an attachment is No'],
+  ] as const)('reads %j', (leaf, text) => {
+    words({ all: [leaf as never] });
+    expect(screen.getByText(text)).toBeInTheDocument();
+    expect(screen.queryByText('A condition this version cannot show')).not.toBeInTheDocument();
+  });
+
+  it('still says only that a condition exists when the field or the operator is newer than this client', () => {
+    words({ all: [{ field: 'futureField', op: 'eq', value: 'x' } as never] });
+    expect(screen.getByText('A condition this version cannot show')).toBeInTheDocument();
+  });
+
+  it('shows a value newer than this client as it is stored', () => {
+    words({ all: [{ field: 'status', op: 'eq', value: 'PENDING' }] });
+    expect(screen.getByText('Status is PENDING')).toBeInTheDocument();
+  });
+});
+
+describe('the actions in words: the text actions', () => {
+  function actions(list: RuleAction[]) {
+    render(<RuleActionsInWords actions={list} labels={labels} />);
+  }
+
+  it('says where the payee comes from, whether it is created and whether it is only filled in', () => {
+    actions([
+      { type: 'set_payee_from_text', template: '{payee}', createIfMissing: false, onlyIfEmpty: false },
+      { type: 'set_payee_from_text', template: '{payee} Ltd', createIfMissing: true, onlyIfEmpty: true },
+    ]);
+    expect(screen.getByText('Set the payee from text: "{payee}"')).toBeInTheDocument();
+    expect(screen.getByText('Set the payee from text: "{payee} Ltd" (created if missing) (only if empty)')).toBeInTheDocument();
+  });
+
+  it('names the way the description is written', () => {
+    actions([
+      { type: 'set_description', template: '{payee}', mode: 'replace', onlyIfEmpty: false },
+      { type: 'set_description', template: ' / {ref}', mode: 'append', onlyIfEmpty: true },
+      { type: 'set_description', template: '{ref}: ', mode: 'prepend', onlyIfEmpty: false },
+    ]);
+    expect(screen.getByText('Set the description (replace): "{payee}"')).toBeInTheDocument();
+    expect(screen.getByText('Set the description (append): " / {ref}" (only if empty)')).toBeInTheDocument();
+    expect(screen.getByText('Set the description (prepend): "{ref}: "')).toBeInTheDocument();
+  });
+});

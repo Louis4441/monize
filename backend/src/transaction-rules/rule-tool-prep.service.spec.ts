@@ -1,0 +1,658 @@
+import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { DataSource } from "typeorm";
+import { Category } from "../categories/entities/category.entity";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+import { RULE_CARD_PREVIEW_ROWS } from "../ai/actions/ai-action.types";
+import { RuleRunPreview } from "./rule-run.types";
+import { TransactionRuleResponseDto } from "./dto/transaction-rule-response.dto";
+import { TransactionRuleToolPrepService } from "./rule-tool-prep.service";
+import {
+  ACCOUNT_ID,
+  CATEGORY_ID,
+  PAYEE_ID,
+  RULE_ID,
+  TAG_ID,
+  USER_ID,
+  VALID_ACTIONS,
+  VALID_CONDITION,
+} from "./transaction-rules.test-helpers";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
+
+const OTHER_CATEGORY_ID = "c0000000-0000-4000-8000-0000000000c2";
+
+function storedDto(
+  over: Partial<TransactionRuleResponseDto> = {},
+): TransactionRuleResponseDto {
+  return {
+    id: RULE_ID,
+    name: "Groceries",
+    enabled: true,
+    position: 0,
+    triggers: ["create", "import"],
+    condition: VALID_CONDITION,
+    actions: VALID_ACTIONS,
+    stopProcessing: false,
+    revision: 3,
+    createdAt: new Date("2026-09-01T00:00:00Z"),
+    updatedAt: new Date("2026-09-01T00:00:00Z"),
+    invalid: false,
+    invalidReasons: [],
+    ...over,
+  };
+}
+
+function runPreview(rows = 2): RuleRunPreview {
+  return {
+    matched: Array.from({ length: rows }, (_, i) => ({
+      transactionId: `t-${i}`,
+      date: "2026-09-01",
+      payeeName: "Netflix",
+      amount: -15.99,
+      currencyCode: "USD",
+      changes: {
+        categoryId: { before: null, after: CATEGORY_ID },
+        tagIds: { before: [], after: [TAG_ID] },
+      },
+    })),
+    skipped: [{ transactionId: "t-x", reason: "reconciled_locked" }],
+    scanned: 40,
+    truncated: false,
+    fingerprint: "f".repeat(64),
+    labels: {
+      categories: { [CATEGORY_ID]: "Bills: Streaming" },
+      payees: {},
+      tags: { [TAG_ID]: "Subscriptions" },
+      rules: {},
+    },
+    aiReviewRequests: 0,
+  };
+}
+
+function build() {
+  const categories = [
+    { id: CATEGORY_ID, name: "Streaming", parentId: "parent-bills" },
+    { id: "parent-bills", name: "Bills", parentId: null },
+    { id: OTHER_CATEGORY_ID, name: "Streaming", parentId: "parent-fun" },
+    { id: "parent-fun", name: "Fun", parentId: null },
+  ];
+  const categoryRepo = { find: jest.fn().mockResolvedValue(categories) };
+  const { manager, dataSource } = createScopedDbMocks([
+    [Category, categoryRepo],
+  ]);
+  const named: Record<string, string> = {
+    [ACCOUNT_ID]: "Checking",
+    [PAYEE_ID]: "Netflix",
+    [TAG_ID]: "Subscriptions",
+  };
+  // `loadRuleLabels` reads accounts, payees and tags with `find({ where: { id: In(ids) } })`.
+  manager.find.mockImplementation(
+    async (_entity: unknown, opts: { where: { id: { value: string[] } } }) =>
+      opts.where.id.value
+        .filter((id) => named[id])
+        .map((id) => ({ id, name: named[id] })),
+  );
+  const rulesService = {
+    get: jest.fn().mockResolvedValue(storedDto()),
+    list: jest.fn().mockResolvedValue([storedDto()]),
+  };
+  const runService = {
+    previewDraft: jest.fn().mockResolvedValue(runPreview()),
+    previewRun: jest.fn().mockResolvedValue(runPreview()),
+  };
+  const accountsService = {
+    resolveAccountFilter: jest.fn(async (_u: string, names: string[]) =>
+      names.every((n) => n === "Checking")
+        ? { accountIds: names.map(() => ACCOUNT_ID) }
+        : { error: `Unknown account: ${names.join(", ")}` },
+    ),
+    findAll: jest.fn().mockResolvedValue([{ name: "Checking" }]),
+  };
+  const payeesService = {
+    resolveByName: jest.fn(async (_u: string, name: string) =>
+      name === "Netflix" ? { id: PAYEE_ID, name } : null,
+    ),
+  };
+  const tagsService = {
+    findAll: jest.fn().mockResolvedValue([
+      { id: TAG_ID, name: "Subscriptions" },
+      { id: "t2", name: "Groceries" },
+    ]),
+  };
+  const service = new TransactionRuleToolPrepService(
+    dataSource as unknown as DataSource,
+    rulesService as never,
+    runService as never,
+    accountsService as never,
+    payeesService as never,
+    tagsService as never,
+  );
+  return {
+    service,
+    rulesService,
+    runService,
+    accountsService,
+    payeesService,
+    tagsService,
+  };
+}
+
+const namedCondition = {
+  all: [
+    { field: "accountId", op: "eq", value: "Checking" },
+    { field: "payeeId", op: "eq", value: "Netflix" },
+  ],
+};
+const namedActions = [
+  { type: "set_category", categoryName: "Bills: Streaming" },
+  { type: "add_tags", tagNames: ["subscriptions"] },
+];
+
+describe("TransactionRuleToolPrepService", () => {
+  describe("prepareCreate", () => {
+    it("resolves names with the shared resolvers and tests the rule with ids", async () => {
+      const { service, runService } = build();
+      const prep = await service.prepareCreate(USER_ID, {
+        name: "  Streaming <b> ",
+        condition: namedCondition,
+        actions: namedActions,
+      });
+
+      expect(prep.ok).toBe(true);
+      if (!prep.ok) return;
+      expect(prep.preview.rule).toEqual({
+        name: "Streaming b",
+        enabled: true,
+        triggers: ["create", "import"],
+        stopProcessing: false,
+        condition: VALID_CONDITION,
+        actions: [
+          { type: "set_category", categoryId: CATEGORY_ID, onlyIfEmpty: true },
+          { type: "add_tags", tagIds: [TAG_ID] },
+        ],
+      });
+      expect(runService.previewDraft).toHaveBeenCalledWith(USER_ID, {
+        condition: VALID_CONDITION,
+        actions: [
+          { type: "set_category", categoryId: CATEGORY_ID, onlyIfEmpty: true },
+          { type: "add_tags", tagIds: [TAG_ID] },
+        ],
+        filters: {},
+      });
+      expect(prep.preview.labels).toEqual({
+        accounts: { [ACCOUNT_ID]: "Checking" },
+        payees: { [PAYEE_ID]: "Netflix" },
+        categories: { [CATEGORY_ID]: "Bills: Streaming" },
+        tags: { [TAG_ID]: "Subscriptions" },
+      });
+    });
+
+    it("trims the test to the first rows and keeps the counts of all of them", async () => {
+      const { service, runService } = build();
+      runService.previewDraft.mockResolvedValue(
+        runPreview(RULE_CARD_PREVIEW_ROWS + 5),
+      );
+      const prep = await service.prepareCreate(USER_ID, {
+        name: "Streaming",
+        condition: namedCondition,
+        actions: namedActions,
+      });
+      if (!prep.ok) throw new Error("expected a preview");
+      expect(prep.preview.test.matchedCount).toBe(RULE_CARD_PREVIEW_ROWS + 5);
+      expect(prep.preview.test.rows).toHaveLength(RULE_CARD_PREVIEW_ROWS);
+      expect(prep.preview.test.scanned).toBe(40);
+      expect(prep.preview.test.skippedCount).toBe(1);
+    });
+
+    it("refuses an unknown name with its path and does not test the rule", async () => {
+      const { service, runService } = build();
+      const prep = await service.prepareCreate(USER_ID, {
+        name: "Streaming",
+        condition: {
+          all: [{ field: "payeeId", op: "eq", value: "Nope" }],
+        },
+        actions: namedActions,
+      });
+      expect(prep).toMatchObject({
+        ok: false,
+        message: expect.stringContaining("Unknown payee: 'Nope'"),
+        errors: [
+          {
+            path: "condition.all[0].value",
+            code: "NAME_NOT_FOUND",
+            name: "Nope",
+            kind: "payees",
+          },
+        ],
+      });
+      expect(runService.previewDraft).not.toHaveBeenCalled();
+    });
+
+    it("refuses an ambiguous category and names the qualified candidates", async () => {
+      const { service } = build();
+      const prep = await service.prepareCreate(USER_ID, {
+        name: "Streaming",
+        condition: namedCondition,
+        actions: [{ type: "set_category", categoryName: "Streaming" }],
+      });
+      expect(prep).toMatchObject({
+        ok: false,
+        message: expect.stringContaining("Ambiguous category: 'Streaming'"),
+        errors: [
+          {
+            path: "actions[0].categoryName",
+            code: "NAME_AMBIGUOUS",
+            suggestions: expect.arrayContaining([
+              "Bills: Streaming",
+              "Fun: Streaming",
+            ]),
+          },
+        ],
+      });
+    });
+
+    it("suggests the closest account when a name does not resolve", async () => {
+      const { service } = build();
+      const prep = await service.prepareCreate(USER_ID, {
+        name: "Streaming",
+        condition: { field: "accountId", op: "eq", value: "Checkin" },
+        actions: namedActions,
+      });
+      expect(prep).toMatchObject({
+        ok: false,
+        errors: [
+          {
+            code: "NAME_NOT_FOUND",
+            kind: "accounts",
+            suggestions: ["Checking"],
+          },
+        ],
+      });
+    });
+
+    it("returns the validator's structured errors as they are", async () => {
+      const { service, runService } = build();
+      runService.previewDraft.mockRejectedValue(
+        new BadRequestException({
+          message: "The rule definition is not valid",
+          errorCode: "INVALID_RULE",
+          errors: [
+            { path: "condition.all[0].op", code: "OPERATOR_NOT_ALLOWED" },
+          ],
+        }),
+      );
+      const prep = await service.prepareCreate(USER_ID, {
+        name: "Streaming",
+        condition: namedCondition,
+        actions: namedActions,
+      });
+      expect(prep).toEqual({
+        ok: false,
+        message: "The rule definition is not valid",
+        errors: [{ path: "condition.all[0].op", code: "OPERATOR_NOT_ALLOWED" }],
+      });
+    });
+
+    it("keeps the error code when a 4xx carries no entries", async () => {
+      const { service, runService } = build();
+      runService.previewDraft.mockRejectedValue(
+        new BadRequestException({
+          message: "range",
+          errorCode: "DATE_RANGE_INVALID",
+        }),
+      );
+      const prep = await service.prepareCreate(USER_ID, {
+        name: "Streaming",
+        condition: namedCondition,
+        actions: namedActions,
+      });
+      expect(prep).toMatchObject({
+        ok: false,
+        errors: [{ path: "", code: "DATE_RANGE_INVALID" }],
+      });
+    });
+
+    it("throws a failure that is not the caller's to fix", async () => {
+      const { service, runService } = build();
+      runService.previewDraft.mockRejectedValue(new Error("connection lost"));
+      await expect(
+        service.prepareCreate(USER_ID, {
+          name: "Streaming",
+          condition: namedCondition,
+          actions: namedActions,
+        }),
+      ).rejects.toThrow("connection lost");
+    });
+
+    it.each(["", "   ", "<>", "x".repeat(101)])(
+      "refuses the name %j",
+      async (name) => {
+        const { service, runService } = build();
+        const prep = await service.prepareCreate(USER_ID, {
+          name,
+          condition: namedCondition,
+          actions: namedActions,
+        });
+        expect(prep).toMatchObject({
+          ok: false,
+          errors: [{ path: "name", code: "INVALID_NAME" }],
+        });
+        expect(runService.previewDraft).not.toHaveBeenCalled();
+      },
+    );
+
+    it("refuses a definition naming more than the bound of distinct names", async () => {
+      const { service, payeesService } = build();
+      const prep = await service.prepareCreate(USER_ID, {
+        name: "Streaming",
+        condition: {
+          any: Array.from({ length: 4 }, (_, leaf) => ({
+            field: "tagIds",
+            op: "hasAny",
+            value: Array.from({ length: 50 }, (_, i) => `tag-${leaf}-${i}`),
+          })),
+        },
+        actions: namedActions,
+      });
+      expect(prep).toMatchObject({
+        ok: false,
+        errors: [{ code: "TOO_MANY_NAMES" }],
+      });
+      expect(payeesService.resolveByName).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("prepareUpdate", () => {
+    it("carries the revision it read and the full resulting rule", async () => {
+      const { service, runService } = build();
+      const prep = await service.prepareUpdate(USER_ID, {
+        ruleId: RULE_ID,
+        name: "Renamed",
+        actions: [{ type: "add_tags", tagNames: ["Subscriptions"] }],
+      });
+      if (!prep.ok) throw new Error(`expected a preview: ${prep.message}`);
+      expect(prep.preview.ruleId).toBe(RULE_ID);
+      expect(prep.preview.expectedRevision).toBe(3);
+      expect(prep.preview.current.name).toBe("Groceries");
+      expect(prep.preview.rule).toEqual({
+        name: "Renamed",
+        enabled: true,
+        triggers: ["create", "import"],
+        stopProcessing: false,
+        // The condition the model did not send is the stored one, ids intact.
+        condition: VALID_CONDITION,
+        actions: [{ type: "add_tags", tagIds: [TAG_ID] }],
+      });
+      expect(runService.previewDraft).toHaveBeenCalledTimes(1);
+      expect(prep.preview.test).toBeDefined();
+    });
+
+    it("does not test a change that leaves condition and actions alone", async () => {
+      const { service, runService } = build();
+      const prep = await service.prepareUpdate(USER_ID, {
+        ruleId: RULE_ID,
+        enabled: false,
+      });
+      if (!prep.ok) throw new Error("expected a preview");
+      expect(prep.preview.rule.enabled).toBe(false);
+      expect(prep.preview.test).toBeUndefined();
+      expect(runService.previewDraft).not.toHaveBeenCalled();
+    });
+
+    it("refuses an edit that sends the stored values back", async () => {
+      const { service, runService } = build();
+      const prep = await service.prepareUpdate(USER_ID, {
+        ruleId: RULE_ID,
+        name: "Groceries",
+        triggers: ["create", "import"],
+        condition: namedCondition,
+        actions: [
+          { type: "set_category", categoryName: "Bills: Streaming" },
+          { type: "add_tags", tagNames: ["Subscriptions"] },
+        ],
+      });
+      expect(prep).toMatchObject({
+        ok: false,
+        message: expect.stringContaining("nothing to change"),
+      });
+      expect(runService.previewDraft).toHaveBeenCalledTimes(0);
+    });
+
+    it("refuses a rule that does not exist", async () => {
+      const { service, rulesService } = build();
+      rulesService.get.mockRejectedValue(new NotFoundException("gone"));
+      const prep = await service.prepareUpdate(USER_ID, {
+        ruleId: RULE_ID,
+        name: "x",
+      });
+      expect(prep).toMatchObject({ ok: false, message: "gone" });
+    });
+
+    it("asks for a ruleId when none was given", async () => {
+      const { service, rulesService } = build();
+      const prep = await service.prepareUpdate(USER_ID, { name: "x" });
+      expect(prep).toMatchObject({
+        ok: false,
+        errors: [{ path: "ruleId", code: "VALUE_REQUIRED" }],
+      });
+      expect(rulesService.get).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("prepareDelete", () => {
+    it("names the rule and the revision it showed", async () => {
+      const { service } = build();
+      const prep = await service.prepareDelete(USER_ID, { ruleId: RULE_ID });
+      if (!prep.ok) throw new Error("expected a preview");
+      expect(prep.preview.expectedRevision).toBe(3);
+      expect(prep.preview.rule.name).toBe("Groceries");
+      expect(prep.preview.labels.categories[CATEGORY_ID]).toBe(
+        "Bills: Streaming",
+      );
+    });
+  });
+
+  describe("prepareRun", () => {
+    it("carries the plan's fingerprint and the resolved filters", async () => {
+      const { service, runService } = build();
+      const prep = await service.prepareRun(
+        USER_ID,
+        { ruleId: RULE_ID },
+        {
+          accountNames: ["Checking"],
+          startDate: "2026-01-01",
+          endDate: "2026-06-30",
+          limit: 50,
+        },
+      );
+      if (!prep.ok) throw new Error("expected a preview");
+      const filters = {
+        accountIds: [ACCOUNT_ID],
+        startDate: "2026-01-01",
+        endDate: "2026-06-30",
+        limit: 50,
+      };
+      expect(runService.previewRun).toHaveBeenCalledWith(
+        USER_ID,
+        RULE_ID,
+        filters,
+      );
+      expect(prep.preview).toMatchObject({
+        ruleId: RULE_ID,
+        fingerprint: "f".repeat(64),
+        filters,
+      });
+      expect(prep.preview.labels.accounts[ACCOUNT_ID]).toBe("Checking");
+    });
+
+    it("refuses a run that would change nothing instead of offering a card for it", async () => {
+      const { service, runService } = build();
+      runService.previewRun.mockResolvedValue({
+        ...runPreview(0),
+        scanned: 12,
+      });
+      const prep = await service.prepareRun(USER_ID, { ruleId: RULE_ID }, {});
+      expect(prep).toMatchObject({
+        ok: false,
+        message: expect.stringContaining("no transactions (12 examined"),
+      });
+    });
+
+    it("refuses a rule that cannot run with the run service's entries", async () => {
+      const { service, runService } = build();
+      runService.previewRun.mockRejectedValue(
+        new BadRequestException({
+          message: "not valid",
+          errorCode: "INVALID_RULE",
+          errors: [{ path: "actions[0]", code: "REFERENCE_NOT_FOUND" }],
+        }),
+      );
+      const prep = await service.prepareRun(USER_ID, { ruleId: RULE_ID }, {});
+      expect(prep).toMatchObject({
+        ok: false,
+        errors: [{ path: "actions[0]", code: "REFERENCE_NOT_FOUND" }],
+      });
+    });
+
+    it("refuses an unknown account without previewing", async () => {
+      const { service, runService } = build();
+      const prep = await service.prepareRun(
+        USER_ID,
+        { ruleId: RULE_ID },
+        { accountNames: ["Nowhere"] },
+      );
+      expect(prep).toMatchObject({
+        ok: false,
+        errors: [{ path: "accountNames", code: "NAME_NOT_FOUND" }],
+      });
+      expect(runService.previewRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("prepareTest", () => {
+    it("tests a draft through the draft preview and nothing else", async () => {
+      const { service, runService, rulesService } = build();
+      const prep = await service.prepareTest(
+        USER_ID,
+        { condition: namedCondition, actions: namedActions },
+        { accountNames: ["Checking"], limit: 20 },
+      );
+      if (!prep.ok) throw new Error("expected a result");
+      expect(prep.preview.ruleId).toBeUndefined();
+      expect(runService.previewDraft).toHaveBeenCalledWith(
+        USER_ID,
+        expect.objectContaining({
+          filters: { accountIds: [ACCOUNT_ID], limit: 20 },
+        }),
+      );
+      expect(runService.previewRun).not.toHaveBeenCalled();
+      expect(rulesService.get).not.toHaveBeenCalled();
+    });
+
+    it("tests a saved rule through the run preview", async () => {
+      const { service, runService } = build();
+      const prep = await service.prepareTest(USER_ID, { ruleId: RULE_ID }, {});
+      if (!prep.ok) throw new Error("expected a result");
+      expect(prep.preview.ruleId).toBe(RULE_ID);
+      expect(runService.previewRun).toHaveBeenCalledWith(USER_ID, RULE_ID, {});
+      expect(runService.previewDraft).not.toHaveBeenCalled();
+    });
+
+    it("tests a saved rule with a replaced condition as a draft built on it", async () => {
+      const { service, runService } = build();
+      const prep = await service.prepareTest(
+        USER_ID,
+        {
+          ruleId: RULE_ID,
+          condition: { field: "payeeId", op: "eq", value: "Netflix" },
+        },
+        {},
+      );
+      if (!prep.ok) throw new Error("expected a result");
+      expect(runService.previewDraft).toHaveBeenCalledWith(
+        USER_ID,
+        expect.objectContaining({
+          condition: { field: "payeeId", op: "eq", value: PAYEE_ID },
+          actions: VALID_ACTIONS,
+        }),
+      );
+      expect(prep.preview.rule.name).toBe("Groceries");
+    });
+  });
+
+  describe("toLlmTest", () => {
+    it("names the category, payee and tag ids in each change", async () => {
+      const { service } = build();
+      const prep = await service.prepareTest(USER_ID, { ruleId: RULE_ID }, {});
+      if (!prep.ok) throw new Error("expected a result");
+      const llm = service.toLlmTest(prep.preview.test, prep.preview.labels);
+      expect(llm.matchedCount).toBe(2);
+      expect(llm.rows[0].changes).toEqual({
+        category: { before: null, after: "Bills: Streaming" },
+        tags: { before: [], after: ["Subscriptions"] },
+      });
+      expect(llm.skipped).toEqual([
+        { transactionId: "t-x", reason: "reconciled_locked" },
+      ]);
+    });
+  });
+
+  describe("list", () => {
+    it("returns rules in the name form the tools accept back", async () => {
+      const { service } = build();
+      const list = await service.list(USER_ID);
+      expect(list.totalCount).toBe(1);
+      expect(list.truncated).toBe(false);
+      expect(list.rules[0]).toMatchObject({
+        id: RULE_ID,
+        revision: 3,
+        condition: {
+          all: [
+            { field: "accountId", op: "eq", value: "Checking" },
+            { field: "payeeId", op: "eq", value: "Netflix" },
+          ],
+        },
+        actions: [
+          {
+            type: "set_category",
+            categoryName: "Bills: Streaming",
+            onlyIfEmpty: true,
+          },
+          { type: "add_tags", tagNames: ["Subscriptions"] },
+        ],
+        invalid: false,
+      });
+    });
+
+    it("says how many it left out, filters by name, and leaves an invalid rule as stored", async () => {
+      const { service, rulesService } = build();
+      rulesService.list.mockResolvedValue([
+        storedDto({ id: "r1", name: "Alpha" }),
+        storedDto({ id: "r2", name: "Beta" }),
+        storedDto({
+          id: "r3",
+          name: "Broken",
+          condition: {} as never,
+          actions: [],
+          invalid: true,
+          invalidReasons: [{ path: "condition", code: "INVALID_SHAPE" }],
+        }),
+      ]);
+      const page = await service.list(USER_ID, { limit: 1 });
+      expect(page).toMatchObject({ totalCount: 3, truncated: true });
+      expect(page.rules).toHaveLength(1);
+
+      const search = await service.list(USER_ID, { search: "BRO" });
+      expect(search.rules).toEqual([
+        expect.objectContaining({
+          id: "r3",
+          condition: {},
+          invalid: true,
+          invalidReasons: [{ path: "condition", code: "INVALID_SHAPE" }],
+        }),
+      ]);
+    });
+  });
+});

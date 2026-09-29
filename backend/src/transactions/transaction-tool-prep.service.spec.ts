@@ -244,7 +244,7 @@ describe("TransactionToolPrepService", () => {
       // A split parent carries no single category.
       expect(transactions.previewCreate).toHaveBeenCalledWith(
         userId,
-        expect.objectContaining({ categoryId: undefined }),
+        expect.objectContaining({ categoryId: undefined, hasSplits: true }),
       );
     });
 

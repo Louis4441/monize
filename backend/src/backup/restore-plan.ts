@@ -93,6 +93,13 @@ export const RESTORE_PLAN: ReadonlyArray<RestoreStep> = [
   { table: "accounts", countKey: "accounts", scopeToUser: true },
   { table: "tags", countKey: "tags", scopeToUser: true },
   {
+    // Only references users(id): the account, payee, category and tag ids a
+    // rule names are inside its JSONB, rewritten by the restore's id remap.
+    table: "transaction_rules",
+    countKey: "transactionRules",
+    scopeToUser: true,
+  },
+  {
     table: "scheduled_transactions",
     countKey: "scheduledTransactions",
     scopeToUser: true,
