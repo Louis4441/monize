@@ -618,7 +618,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
         {/* The securities line's own change: its last point less its first.
             It includes what was paid into them, which is why it stands beside
             the result rather than under a "Return" caption. */}
-        <div>
+        <div className="max-sm:col-start-1">
           <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
             {t('investmentValueChart.valueChange')}
             <InfoTooltip
@@ -640,7 +640,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
         {/* What the holdings earned over the window: the value change beside
             it, less what was paid in, plus what was paid out, both named on
             the secondary lines beneath. */}
-        <div>
+        <div className="max-sm:col-start-2 max-sm:row-span-2">
           <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
             {t('investmentValueChart.investmentResult')}
             <InfoTooltip
@@ -685,7 +685,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
             })}
           </div>
         </div>
-        <div>
+        <div className="max-sm:col-start-1">
           <div className="text-xs text-gray-500 dark:text-gray-400">{t('investmentValueChart.investmentReturn')}</div>
           <div className={`text-lg font-bold ${returnPercent === null ? '' : gainLossColor(returnPercent)}`}>
             {returnPercent === null ? (
