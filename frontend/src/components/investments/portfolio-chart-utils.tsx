@@ -7,96 +7,28 @@ import { createLogger } from '@/lib/logger';
 const logger = createLogger('PortfolioValueChart');
 
 /**
- * Ranges that pull intraday bars from the live quote provider. 1W/1M move
+ * Ranges that pull intraday bars from the live quote provider. 1W/MTD/1M move
  * from daily-snapshot data to intraday bars when every holding's provider
  * supports it; otherwise the backend signals fallbackToDaily=true and we
  * switch back to the daily endpoint.
+ *
+ * Each is served on its own window, already shaped: the server trims the bars
+ * to the range and opens 1W, MTD and 1M on the close they are measured from
+ * (`PortfolioService.planOpeningClose`), so nothing here reshapes a series.
+ * `portfolio-chart-utils.test.ts` holds this set equal to the backend's
+ * `INTRADAY_RANGES`; a range in one and not the other is a 400 at runtime.
  */
-export const INTRADAY_RANGES = new Set(['1d', '1w', 'mtd', '1m']);
+export type IntradayRange = '1d' | '1w' | 'mtd' | '1m';
 
-/**
- * The range the backend serves a chart range from. MTD has no series of its
- * own -- its window is 1 to 31 days long, so it rides on the rolling 1M series
- * and the caller trims it with {@link trimIntradayPoints}. Every intraday
- * request goes through this: passing 'mtd' straight through is a 400 from the
- * `IntradayValueQueryDto` enum, which is the shape of failure that reads as an
- * outage rather than as a missing case.
- */
-export function intradayRangeParam(range: string): '1d' | '1w' | '1m' {
-  return (range === 'mtd' ? '1m' : range) as '1d' | '1w' | '1m';
-}
+export const INTRADAY_RANGES: ReadonlySet<string> = new Set<IntradayRange>([
+  '1d',
+  '1w',
+  'mtd',
+  '1m',
+]);
 
-/**
- * Shape an intraday series into the one the chart shows.
- *
- * Two adjustments, both keyed off the range and neither optional:
- *
- * - **MTD is trimmed to its window.** It is served a rolling month that reaches
- *   back into the previous one. `windowStart` is a YYYY-MM-DD date compared
- *   against the ISO timestamps' own prefix, so no parsing is involved.
- * - **1M opens at its first day's close** (see
- *   {@link trimIntradayToFirstDayClose}).
- *
- * They live in one function because every intraday render site calls this one,
- * and a shaping step applied at three of four call sites is a chart that
- * disagrees with itself depending on which code path drew it.
- */
-export function trimIntradayPoints<T extends { timestamp: string }>(
-  points: T[],
-  range: string,
-  windowStart: string,
-): T[] {
-  const windowed =
-    range === 'mtd' && windowStart
-      ? points.filter((p) => p.timestamp >= windowStart)
-      : points;
-  return trimIntradayToFirstDayClose(windowed, range);
-}
-
-/**
- * Ranges whose intraday series opens at the *close* of its first day rather
- * than partway through it.
- *
- * A 1D chart starts at the day's open, which is what every quote source shows
- * and what `IntradayPoint.open` exists to supply. A 1M chart is a different
- * claim: the month is measured from a close, so opening on the first bar of the
- * day a month ago mixes a mid-session price into a series of closes and reports
- * a change that includes part of a session nobody asked about.
- *
- * 1W and MTD are absent deliberately -- both are measured from the prior close
- * already (`PRIOR_CLOSE_BASELINE_RANGES`), so their first bar is not the
- * baseline and collapsing it would only throw away detail.
- */
-const FIRST_DAY_CLOSE_RANGES = new Set(['1m']);
-
-/**
- * Drop the first day's intraday bars except its last, so the series begins at
- * that day's closing price.
- *
- * Left alone when the whole series is one day: collapsing it would leave a
- * single point and no chart. The last bar of a completed session is its close;
- * for a session still open it is the latest price, which is the best available
- * answer and the same one every other point in the series carries.
- */
-export function trimIntradayToFirstDayClose<T extends { timestamp: string }>(
-  points: T[],
-  range: string,
-): T[] {
-  if (!FIRST_DAY_CLOSE_RANGES.has(range) || points.length === 0) return points;
-  const firstDay = points[0].timestamp.slice(0, 10);
-  let lastOfFirstDay = 0;
-  while (
-    lastOfFirstDay + 1 < points.length &&
-    points[lastOfFirstDay + 1].timestamp.slice(0, 10) === firstDay
-  ) {
-    lastOfFirstDay += 1;
-  }
-  // Every point is on the first day: one day of data, nothing to trim against.
-  if (lastOfFirstDay === points.length - 1) return points;
-  // Already the day's only bar. Returning the same reference keeps this a
-  // no-op for callers that compare identity to decide whether to re-render.
-  if (lastOfFirstDay === 0) return points;
-  return points.slice(lastOfFirstDay);
+export function isIntradayRange(range: string): range is IntradayRange {
+  return INTRADAY_RANGES.has(range);
 }
 
 /**
@@ -107,7 +39,12 @@ export const INTRADAY_CACHE_PREFIX = 'monize-intraday|';
 
 export interface IntradayCachePayload {
   fetchedAt: number;
-  points: Array<{ timestamp: string; value: number }>;
+  points: Array<{
+    timestamp: string;
+    value: number;
+    securitiesValue?: number;
+    sessionClose?: true;
+  }>;
   interval: '1m' | '2m' | '5m' | '15m' | '30m' | '60m' | '90m';
   currency: string;
   fallbackToDaily: boolean;

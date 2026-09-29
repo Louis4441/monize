@@ -42,6 +42,10 @@ import {
 import { mapWithConcurrency } from "../common/concurrency.util";
 import { addDaysYMD, formatDateYMD, todayYMD } from "../common/date-utils";
 import {
+  presetEarliestDate,
+  presetWindowStart,
+} from "../net-worth/portfolio-period-presets.util";
+import {
   NetWorthService,
   type DailyInvestmentValue,
   type DailyPositions,
@@ -554,18 +558,37 @@ const RANGE_TO_YAHOO: Record<
   // on a Wednesday would only reach back to the previous Thursday. Pull a
   // full month and let the cutoff filter trim to exactly 7 calendar days.
   "1w": { interval: "5m", range: "1mo" },
+  mtd: { interval: "15m", range: "1mo" },
   "1m": { interval: "15m", range: "1mo" },
 };
 
-// Calendar-day lookback used to trim the intraday series to a precise
-// "beginning of (today - N days)" boundary. Yahoo's range parameter is
-// approximate (e.g. "5d" returns 5 trading days, "1mo" excludes the
-// boundary date), so we over-fetch and filter here.
-const RANGE_LOOKBACK_DAYS: Record<IntradayRangeKey, number | null> = {
-  "1d": null,
-  "1w": 7,
-  "1m": 30,
-};
+/**
+ * Where a range's window opens and which day it is measured from, as the
+ * period-result service resolves the same preset (`presetWindowStart`,
+ * `presetEarliestDate`): 1W opens seven days back and is measured from the
+ * close before that, 1M opens thirty days back and is measured from that day's
+ * own close. MTD has no preset: it opens on the 1st and is measured from the
+ * previous month's last day, the window the client dates the period result
+ * with. Yahoo's range parameter is approximate ("5d" is five trading days,
+ * "1mo" excludes the boundary date), so the bars are over-fetched and trimmed
+ * to the window here, and the series opens on the measured-from day's close
+ * (`planOpeningClose`). 1D is the provider's latest session, whatever day it
+ * fell on, and opens at its open.
+ */
+function intradayWindow(
+  range: IntradayRangeKey,
+  today: string,
+): { windowStart: string; measuredFrom: string } | null {
+  if (range === "1d") return null;
+  if (range === "mtd") {
+    const windowStart = `${today.slice(0, 7)}-01`;
+    return { windowStart, measuredFrom: addDaysYMD(windowStart, -1) };
+  }
+  const windowStart = presetWindowStart(range, today);
+  const measuredFrom = presetEarliestDate(range, today);
+  if (windowStart === null || measuredFrom === null) return null;
+  return { windowStart, measuredFrom };
+}
 
 // Per-range fallback chain attempted (per holding, in order) when the
 // primary interval fails. Yahoo's narrowest intervals are the most
@@ -589,6 +612,11 @@ const RANGE_FALLBACKS: Record<
   ],
   "1w": [
     { interval: "15m", range: "1mo" },
+    { interval: "30m", range: "1mo" },
+    { interval: "60m", range: "1mo" },
+    { interval: "90m", range: "1mo" },
+  ],
+  mtd: [
     { interval: "30m", range: "1mo" },
     { interval: "60m", range: "1mo" },
     { interval: "90m", range: "1mo" },
@@ -1799,6 +1827,7 @@ export class PortfolioService {
           timestamp: new Date(ts).toISOString(),
           value: daily.value,
           securitiesValue: daily.securitiesValue,
+          sessionClose: true,
         });
         continue;
       }
@@ -1962,6 +1991,7 @@ export class PortfolioService {
       secMeta,
       cash,
       query.limit ?? 10,
+      loaded.sessionCloses,
     );
     return { series, points, ...meta };
   }
@@ -2137,6 +2167,7 @@ export class PortfolioService {
     secMeta: Map<string, { symbol: string; name: string }>,
     cash: number[],
     limit: number,
+    sessionCloses: ReadonlyMap<number, number>,
   ): { series: IntradayBreakdownSeries[]; points: IntradayBreakdownPoint[] } {
     const peak = new Map<string, number>();
     for (const [id, arr] of secValues) {
@@ -2200,6 +2231,7 @@ export class PortfolioService {
         timestamp: new Date(ts).toISOString(),
         total: round4(total),
         values,
+        ...(sessionCloses.has(ts) ? { sessionClose: true as const } : {}),
       };
     });
 
@@ -2272,12 +2304,14 @@ export class PortfolioService {
 
     // Every bar is valued at the positions held at the close of its own day,
     // from the fold the daily series is built by (INV-INTRADAY-001).
+    const today = formatDateYMD(new Date(now));
+    const window = intradayWindow(range, today);
     const ledger = await this.loadIntradayLedger(
       userId,
-      range,
+      window?.measuredFrom ?? addDaysYMD(today, -LEDGER_1D_LOOKBACK_DAYS),
       accountIds,
       displayCurrency,
-      now,
+      today,
     );
 
     let activeHoldings: IntradayHolding[] = [];
@@ -2435,29 +2469,56 @@ export class PortfolioService {
     }
     let timestamps = [...timestampSet].sort((a, b) => a - b);
 
-    // Trim to a precise "start of (today - N days)" boundary. Yahoo's range
+    // Trim to the window the range names (`intradayWindow`). Yahoo's range
     // parameter is approximate (e.g. "1mo" excludes the calendar-month
     // boundary date), so we over-fetched above and now drop any bars that
-    // fall before the requested calendar window.
-    const lookbackDays = RANGE_LOOKBACK_DAYS[range];
-    if (lookbackDays != null) {
-      const cutoff = new Date();
-      cutoff.setUTCHours(0, 0, 0, 0);
-      cutoff.setUTCDate(cutoff.getUTCDate() - lookbackDays);
-      const cutoffMs = cutoff.getTime();
+    // fall before the window; the bars before it are kept aside, because the
+    // close the window is measured from may be among them.
+    const fetchedBars = timestamps;
+    if (window) {
+      const cutoffMs = Date.parse(`${window.windowStart}T00:00:00.000Z`);
       timestamps = timestamps.filter((ts) => ts >= cutoffMs);
     }
 
     // Each finished session ends on the daily series' own figure for the day,
     // one grid step after its last bar (INV-INTRADAY-001).
+    const step = this.gridStep(timestamps, yahooParams.interval);
     const sessionCloses = ledger
-      ? this.planSessionCloses(
-          timestamps,
-          ledger.days,
-          yahooParams.interval,
-          now,
-        )
+      ? this.planSessionCloses(timestamps, ledger.days, step, now)
       : new Map<number, number>();
+
+    // The series opens on the close the range is measured from, which is
+    // where the period-result service opens the same range.
+    const opening =
+      ledger && window
+        ? await this.planOpeningClose({
+            userId,
+            accountIds:
+              accountIds && accountIds.length > 0
+                ? accounts.map((a) => a.id)
+                : undefined,
+            measuredFrom: window.measuredFrom,
+            days: ledger.days,
+            fetchedBars,
+            windowBars: timestamps,
+            step,
+            sessionCloses,
+            today,
+          })
+        : null;
+    if (opening) {
+      sessionCloses.set(opening.ts, opening.dayIndex);
+      // The measured-from day's own bars precede the close it is measured
+      // from: a 1M window opening on a session shows that session's close,
+      // not its morning.
+      timestamps = timestamps.filter((ts) => ts > opening.ts);
+    } else if (range === "1m") {
+      // No close to open on (the day's figure is a subtotal, nothing priced,
+      // no ledger). The month is still measured from a close, so it opens on
+      // its first session's last bar rather than partway through the morning,
+      // as it always has; the caption above names the session it has.
+      timestamps = this.keepLastBarOfFirstDay(timestamps);
+    }
     timestamps = [...timestamps, ...sessionCloses.keys()].sort((a, b) => a - b);
 
     // Cash held in the user's investment cash and standalone accounts is
@@ -2666,24 +2727,20 @@ export class PortfolioService {
    * holds exactly what the daily series holds that day (INV-INTRADAY-001).
    *
    * Days are UTC calendar days: the grid's bars are keyed the same way (the
-   * FX lookup and the frontend's first-day trim both read the UTC date), and a
-   * North American session never crosses a UTC midnight. `null` when the fold
+   * FX lookup reads the UTC date), and a North American session never crosses
+   * a UTC midnight. `startDate` is the day the range is measured from, so the
+   * opening close's figure is among the days. `null` when the fold
    * has no day at all, which happens only when the scope has no investment
    * account -- and then there are no holdings for the legacy path to find
    * either.
    */
   private async loadIntradayLedger(
     userId: string,
-    range: IntradayRangeKey,
+    startDate: string,
     accountIds: string[] | undefined,
     displayCurrency: string,
-    now: number,
+    today: string,
   ): Promise<{ days: LedgerDay[]; securities: Map<string, Security> } | null> {
-    const today = formatDateYMD(new Date(now));
-    const startDate = addDaysYMD(
-      today,
-      -(RANGE_LOOKBACK_DAYS[range] ?? LEDGER_1D_LOOKBACK_DAYS),
-    );
     const { series, positions, securities } =
       await this.netWorth.getDailyInvestmentPositions(userId, {
         startDate,
@@ -2717,24 +2774,13 @@ export class PortfolioService {
   private planSessionCloses(
     timestamps: number[],
     days: LedgerDay[],
-    interval: IntradayInterval,
+    step: number,
     now: number,
   ): Map<number, number> {
     const closes = new Map<number, number>();
     if (timestamps.length === 0) return closes;
     const dayIndex = new Map(days.map((d, i) => [d.date, i]));
     const today = formatDateYMD(new Date(now));
-
-    // The grid's own step: a holding on a coarser fallback interval must not
-    // stretch the finer bars' day.
-    let step = INTERVAL_MS[interval];
-    for (let i = 1; i < timestamps.length; i++) {
-      const gap = timestamps[i] - timestamps[i - 1];
-      const sameDay =
-        formatDateYMD(new Date(timestamps[i])) ===
-        formatDateYMD(new Date(timestamps[i - 1]));
-      if (sameDay && gap > 0 && gap < step) step = gap;
-    }
 
     for (let i = 0; i < timestamps.length; i++) {
       const date = formatDateYMD(new Date(timestamps[i]));
@@ -2758,6 +2804,150 @@ export class PortfolioService {
       closes.set(closeTs, idx);
     }
     return closes;
+  }
+
+  /**
+   * Every bar of the first day dropped except its last, so the series begins
+   * on the nearest thing to that day's close. Left alone when the whole series
+   * is one day: collapsing it would leave a single point and no chart.
+   */
+  private keepLastBarOfFirstDay(timestamps: number[]): number[] {
+    if (timestamps.length === 0) return timestamps;
+    const firstDay = formatDateYMD(new Date(timestamps[0]));
+    let lastOfFirstDay = 0;
+    while (
+      lastOfFirstDay + 1 < timestamps.length &&
+      formatDateYMD(new Date(timestamps[lastOfFirstDay + 1])) === firstDay
+    ) {
+      lastOfFirstDay += 1;
+    }
+    if (lastOfFirstDay === timestamps.length - 1) return timestamps;
+    return timestamps.slice(lastOfFirstDay);
+  }
+
+  /**
+   * The grid's own step: the interval's, or the smallest same-day gap where
+   * a holding on a coarser fallback interval must not stretch the finer bars'
+   * day.
+   */
+  private gridStep(timestamps: number[], interval: IntradayInterval): number {
+    let step = INTERVAL_MS[interval];
+    for (let i = 1; i < timestamps.length; i++) {
+      const gap = timestamps[i] - timestamps[i - 1];
+      const sameDay =
+        formatDateYMD(new Date(timestamps[i])) ===
+        formatDateYMD(new Date(timestamps[i - 1]));
+      if (sameDay && gap > 0 && gap < step) step = gap;
+    }
+    return step;
+  }
+
+  /**
+   * The point a 1W / 1M series opens on: the close the range is measured
+   * from, so the chart's first point and the "since the close of trading on"
+   * caption beside it name one session and carry one figure.
+   *
+   * `measuredFrom` is the day the period-result service measures the same
+   * range from (`presetEarliestDate`). Its ledger day's daily figure is the
+   * value, which is the period result's own opening value, and the session
+   * that figure came from is `getLastPricedDays` -- the same lookup behind the
+   * period result's `startPriceDate` -- so a Monday 1W window measured from
+   * Sunday opens on Friday's close, dated Friday.
+   *
+   * The point is stamped one grid step after the session's last fetched bar
+   * when the provider's over-fetch reached that day, which it does for 1W and
+   * usually for MTD and 1M. Otherwise it is stamped on the session's date at
+   * the time of day the window's newest finished session closed at -- its
+   * planned closing point, or its last bar plus one step where that day got
+   * none; across a daylight-saving change that reads an hour off in the
+   * label, and nowhere else. Null when the ledger has no such day, when the
+   * day's figure is a subtotal (an unpriced position, a missing rate or cash
+   * balance: no closing point wears a total's caption), when nothing was
+   * priced on or before it, or when the window holds no finished session to
+   * take a closing hour from.
+   */
+  private async planOpeningClose(params: {
+    userId: string;
+    accountIds: string[] | undefined;
+    measuredFrom: string;
+    days: LedgerDay[];
+    /** Every bar the provider returned, including those before the window. */
+    fetchedBars: number[];
+    /** The bars inside the window. */
+    windowBars: number[];
+    step: number;
+    /** The closes planned inside the window. */
+    sessionCloses: ReadonlyMap<number, number>;
+    today: string;
+  }): Promise<{ ts: number; dayIndex: number } | null> {
+    const { measuredFrom, days } = params;
+    const dayIndex = days.findIndex((d) => d.date === measuredFrom);
+    if (dayIndex === -1) return null;
+    const daily = days[dayIndex].daily;
+    if (
+      daily.pricesComplete === false ||
+      daily.fxComplete === false ||
+      daily.cashComplete === false
+    ) {
+      return null;
+    }
+    const session = (
+      await this.netWorth.getLastPricedDays(
+        params.userId,
+        [measuredFrom],
+        params.accountIds,
+      )
+    ).get(measuredFrom);
+    if (!session) return null;
+
+    let lastBarOfSession: number | undefined;
+    for (const ts of params.fetchedBars) {
+      const date = formatDateYMD(new Date(ts));
+      if (date === session) lastBarOfSession = ts;
+      else if (date > session) break;
+    }
+    if (lastBarOfSession !== undefined) {
+      return { ts: lastBarOfSession + params.step, dayIndex };
+    }
+
+    const newestClose = this.newestSessionClose(params);
+    if (newestClose === null) {
+      this.logger.debug(
+        `Intraday series has no close to open on: ${session} is outside the fetched bars and the window holds no finished session to take a closing hour from`,
+      );
+      return null;
+    }
+    const closeTimeOfDay =
+      newestClose -
+      Date.parse(`${formatDateYMD(new Date(newestClose))}T00:00:00.000Z`);
+    return {
+      ts: Date.parse(`${session}T00:00:00.000Z`) + closeTimeOfDay,
+      dayIndex,
+    };
+  }
+
+  /**
+   * When the window's newest finished session closed: its planned closing
+   * point, or -- for a day the daily series could not value completely, which
+   * got none -- its last bar plus one grid step. Null when every bar in the
+   * window is today's, whose close is not a fact yet.
+   */
+  private newestSessionClose(params: {
+    windowBars: number[];
+    step: number;
+    sessionCloses: ReadonlyMap<number, number>;
+    today: string;
+  }): number | null {
+    let newest: number | null = null;
+    for (const ts of params.sessionCloses.keys()) {
+      if (newest === null || ts > newest) newest = ts;
+    }
+    if (newest !== null) return newest;
+    for (let i = params.windowBars.length - 1; i >= 0; i--) {
+      const ts = params.windowBars[i];
+      if (formatDateYMD(new Date(ts)) < params.today) return ts + params.step;
+    }
+    return null;
   }
 
   private buildIntradayCacheKey(

@@ -508,6 +508,37 @@ describe('PortfolioValueReport', () => {
     );
   });
 
+  it('dates the opening point by the session the caption names', async () => {
+    // 1Y is measured from the same day a year earlier. When that is a Sunday
+    // its value is Friday's close, and the series is requested from the
+    // Sunday: the first point is shown as the Friday under the chart's own
+    // caption, so the two cannot disagree about where the year opens.
+    mockDateRangeValue = '1y';
+    mockGetInvestmentsDaily.mockResolvedValue([
+      { date: '2025-09-28', value: 50000 },
+      { date: '2025-09-29', value: 50500 },
+    ]);
+    mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    mockGetPeriodResult.mockResolvedValue(
+      periodResult({ startDate: '2025-09-28', startPriceDate: '2025-09-26' }),
+    );
+    await act(async () => {
+      render(<PortfolioValueReport />);
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('report-measured-from-close')).toHaveTextContent(
+        'Since the close of trading on Sep 26, 2025',
+      ),
+    );
+    const names = () =>
+      JSON.parse(
+        screen.getByTestId('area-chart').getAttribute('data-points') ?? '[]',
+      ).map((p: { name: string }) => p.name);
+    await waitFor(() => expect(names()).toEqual(['Sep 26, 2025', 'Sep 29, 2025']));
+  });
+
   describe('custom range', () => {
     const lastSelectorProps = () =>
       mockDateRangeSelectorProps.mock.calls[mockDateRangeSelectorProps.mock.calls.length - 1][0];
@@ -1436,7 +1467,9 @@ describe('PortfolioValueReport', () => {
 
   describe('mtd range', () => {
     /** An intraday response carrying `points`, otherwise unremarkable. */
-    const intraday = (points: Array<{ timestamp: string; value: number }>) => ({
+    const intraday = (
+      points: Array<{ timestamp: string; value: number; sessionClose?: true }>,
+    ) => ({
       points,
       interval: '15m',
       currency: 'CAD',
@@ -1446,7 +1479,7 @@ describe('PortfolioValueReport', () => {
       fallbackToDaily: false,
     });
 
-    it('asks the backend for the 1m series, which is what serves mtd', async () => {
+    it('asks the backend for the mtd series on its own window', async () => {
       mockDateRangeValue = 'mtd';
       mockGetIntradayValue.mockResolvedValue(
         intraday([{ timestamp: '2024-01-02T14:30:00Z', value: 50000 }]),
@@ -1457,44 +1490,40 @@ describe('PortfolioValueReport', () => {
       await waitFor(() => {
         expect(mockGetIntradayValue).toHaveBeenCalled();
       });
-      // 'mtd' is not in the endpoint's enum -- sending it verbatim is a 400.
+      // The server trims the month and opens it on the close it is measured
+      // from; a rolling 1m series cut on the client does not always reach
+      // that close (issue #1461).
       expect(mockGetIntradayValue).toHaveBeenCalledWith(
-        expect.objectContaining({ range: '1m' }),
+        expect.objectContaining({ range: 'mtd' }),
       );
     });
 
-    it('trims the rolling month back to the window the chart shows', async () => {
+    it('plots the mtd series as served, opening on the previous session\'s closing point', async () => {
       mockDateRangeValue = 'mtd';
       mockGetIntradayValue.mockResolvedValue(
         intraday([
-          // The 1m series reaches into the previous month; mtd starts at
-          // STABLE_RESOLVED_RANGE.start (2024-01-01).
-          { timestamp: '2023-12-28T14:30:00Z', value: 40000 },
+          // The server's closing point for the last session before the
+          // window: the close the month is measured from.
+          { timestamp: '2023-12-29T20:00:00Z', value: 40000, sessionClose: true },
           { timestamp: '2024-01-02T14:30:00Z', value: 50000 },
           { timestamp: '2024-01-10T14:30:00Z', value: 52000 },
         ]),
       );
-      // The prior close is Dec 31's -- the day before the first point shown.
-      mockGetInvestmentsDaily.mockResolvedValue([
-        { date: '2023-12-31', value: 49000 },
-      ]);
       mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
       mockGetInvestmentAccounts.mockResolvedValue([]);
       render(<PortfolioValueReport />);
       await waitFor(() => {
-        expect(screen.getByText('Highest Value')).toBeInTheDocument();
+        expect(screen.getByText('Lowest Value')).toBeInTheDocument();
       });
 
-      // 40000 came from December and is not part of the month to date, so it
-      // must not become the chart's low.
       await waitFor(() =>
         expect(
           screen.getByText('Lowest Value').parentElement!.textContent,
-        ).toContain('$50000'),
+        ).toContain('$40000'),
       );
       expect(
-        screen.getByText('Lowest Value').parentElement!.textContent,
-      ).not.toContain('$40000');
+        screen.getByText('Highest Value').parentElement!.textContent,
+      ).toContain('$52000');
     });
 
     it('asks for the period result against the close before the month started', async () => {
@@ -1515,11 +1544,17 @@ describe('PortfolioValueReport', () => {
         expect(screen.getByText('Value Change')).toBeInTheDocument();
       });
 
-      // The baseline is the day before the first point ON SCREEN, and the
-      // server measures from it: the client picks the date and nothing else.
+      // The baseline is the close before the month -- the last day of the
+      // previous month, where the series was requested from -- and the server
+      // measures from it: the client picks the dates and nothing else. Never
+      // the day before the first bar on screen: the point the chart opens on
+      // IS that close, and a day before it measured from the wrong session.
       await waitFor(() =>
         expect(mockGetPeriodResult).toHaveBeenCalledWith(
-          expect.objectContaining({ baselineDate: '2024-01-01' }),
+          expect.objectContaining({
+            startDate: '2024-01-01',
+            baselineDate: '2023-12-31',
+          }),
         ),
       );
       await waitFor(() =>
@@ -1534,7 +1569,7 @@ describe('PortfolioValueReport', () => {
       ).not.toContain('+$2000');
     });
 
-    it('asks the per-security breakdown for the 1m series too', async () => {
+    it('asks the per-security breakdown for the mtd series too', async () => {
       mockDateRangeValue = 'mtd';
       mockSeriesMode = 'securities';
       mockGetIntradayBreakdown.mockResolvedValue({
@@ -1558,10 +1593,9 @@ describe('PortfolioValueReport', () => {
         expect(mockGetIntradayBreakdown).toHaveBeenCalled();
       });
       expect(mockGetIntradayBreakdown).toHaveBeenCalledWith(
-        expect.objectContaining({ range: '1m' }),
+        expect.objectContaining({ range: 'mtd' }),
       );
-      // The December bar is trimmed here as well, so the stacked view and the
-      // total view cover the same days.
+      // The same window as the total view, shaped by the server for both.
       await waitFor(() =>
         expect(
           screen.getByText('Highest Value').parentElement!.textContent,

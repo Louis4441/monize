@@ -304,6 +304,8 @@ export interface IntradayBreakdownPoint {
   timestamp: string;
   total: number;
   values: Record<string, number>;
+  /** Set on a session's closing point; see `getIntradayValue`. */
+  sessionClose?: true;
 }
 
 export interface IntradayBreakdown {
@@ -311,7 +313,7 @@ export interface IntradayBreakdown {
   points: IntradayBreakdownPoint[];
   interval: '1m' | '2m' | '5m' | '15m' | '30m' | '60m' | '90m';
   currency: string;
-  range: '1d' | '1w' | '1m';
+  range: '1d' | '1w' | 'mtd' | '1m';
   fetchedAt: string;
   skippedSymbols: string[];
   failedSymbols: string[];

@@ -225,14 +225,17 @@ for the ranges no preset covers (`mtd`, a custom window); a caller sends one
 form or the other, never both. The client does no arithmetic over the figures
 either way.
 
-The window a price chart DRAWS is deliberately not the period its range names
-(`frontend/src/components/investments/portfolio-range-window.ts`): it opens 3M,
-1Y, 2Y and 5Y a day early so the first plotted close precedes the period,
-widens 1D to a week so a daily fallback has more than one point, and resolves
-`all` to no start date at all. Sending that window to this route is what made
-the chart's card measure a week under "1D", disagree with the performance card
-under "3M" and report nothing under "All time". A chart therefore names
-its range; it never sends the window it drew.
+The window a price chart DRAWS opens on the close the range is measured from
+(`frontend/src/components/investments/portfolio-range-window.ts` mirrors
+`presetEarliestDate` day for day; `PortfolioService.planOpeningClose` opens
+the intraday 1W and 1M series on the same day's close), but it is still not
+the period: `resolveRangePreset` widens 1D to a week so a daily fallback has
+more than one point, and resolves `all` to no start date at all. Sending the
+drawn window to this route is what made the chart's card measure a week under
+"1D" and report nothing under "All time". A chart therefore names its range;
+it never sends the window it drew. The chart's own first point is then the
+close `startPriceDate` names, dated by that session
+(`docs/frontend/financial-figures.md`, issue #1461).
 
 **`startPriceDate`** answers which trading SESSION `startDate`'s value came
 from: the newest day on or before it carrying a close for anything the scope

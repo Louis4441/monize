@@ -44,6 +44,49 @@ export function previousCalendarDay(iso: string): string {
 }
 
 /**
+ * The session a series' opening point is dated by, or null when the point's
+ * own date already names it.
+ *
+ * A daily series is requested from the day the period is measured from
+ * (`usePortfolioRangeWindow`'s `start`), and the series values every calendar
+ * day from the latest close on or before it, so a window opening on a Sunday
+ * carries Friday's close under Sunday's date. The caption under the chart
+ * names the session (`startPriceDate`); a first point labelled with the
+ * boundary names a day the market was shut, and the two disagree about where
+ * the same series opens. The point is the fact the server stated -- one
+ * value, one session -- so it is dated by that session. Only a DAILY point
+ * dated on the period's own boundary qualifies, so `firstPointIso` must be
+ * that boundary's YYYY-MM-DD exactly: an intraday bar on the same day is a
+ * mid-session price, not the close, and the server dates an intraday series'
+ * opening close itself; a monthly series' first bucket is a month, not a day.
+ */
+export function openingSessionDate(
+  firstPointIso: string | undefined,
+  periodResult: { startDate: string; startPriceDate?: string | null } | null,
+): string | null {
+  if (!periodResult?.startPriceDate) return null;
+  if (periodResult.startPriceDate === periodResult.startDate) return null;
+  if (firstPointIso !== periodResult.startDate) return null;
+  return periodResult.startPriceDate;
+}
+
+/**
+ * The series with its opening point relabelled for `session`, or the series
+ * itself when there is no session to date it by. One place for the three
+ * surfaces that draw a portfolio series, so the rule cannot drift between
+ * them.
+ */
+export function relabelOpeningPoint<T>(
+  points: T[],
+  session: string | null,
+  relabel: (point: T, session: string) => T,
+): T[] {
+  if (!session || points.length === 0) return points;
+  const [first, ...rest] = points;
+  return [relabel(first, session), ...rest];
+}
+
+/**
  * The date part of a chart point. Daily points already carry a YYYY-MM-DD
  * date; intraday points carry a full ISO timestamp, whose date half is taken
  * as-is (UTC), matching how the MTD range filters its own intraday points.

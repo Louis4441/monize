@@ -44,6 +44,7 @@ function result(
 
 const base = {
   startDate: "2026-01-02",
+  periodStartDate: "2026-01-02",
   endDate: "2026-06-30",
   hasSeries: true,
 };
@@ -65,7 +66,6 @@ describe("usePortfolioPeriodResult", () => {
       usePortfolioPeriodResult({
         ...base,
         range: "1y",
-        firstPointIso: "2026-01-02",
         accountIds: "a1,a2",
         displayCurrency: "USD",
       }),
@@ -86,9 +86,9 @@ describe("usePortfolioPeriodResult", () => {
     renderHook(() =>
       usePortfolioPeriodResult({
         ...base,
-        startDate: "2026-06-23",
+        startDate: "2026-06-22",
+        periodStartDate: "2026-06-23",
         range: "1d",
-        firstPointIso: "2026-06-30T13:30:00.000Z",
       }),
     );
     await waitFor(() =>
@@ -108,8 +108,8 @@ describe("usePortfolioPeriodResult", () => {
       usePortfolioPeriodResult({
         ...base,
         startDate: "",
+        periodStartDate: "",
         range: "all",
-        firstPointIso: "2019-04-01",
       }),
     );
     await waitFor(() =>
@@ -119,12 +119,19 @@ describe("usePortfolioPeriodResult", () => {
     );
   });
 
-  it("sends the day before the first point on screen for a range with no preset", async () => {
+  it("dates a range with no preset from the window it draws, the day before the period as its baseline", async () => {
+    // MTD draws its series from the last day of the previous month, the close
+    // the month is measured from and the point the chart opens on; the period
+    // itself opens on the 1st. The baseline is that day, never the day before
+    // the first point on screen: the first point on screen IS the baseline's
+    // close, and a day before it measured from the wrong session.
     const { result: hook } = renderHook(() =>
       usePortfolioPeriodResult({
         ...base,
         range: "mtd",
-        firstPointIso: "2026-07-01T13:30:00.000Z",
+        startDate: "2026-06-30",
+        periodStartDate: "2026-07-01",
+        endDate: "2026-07-15",
       }),
     );
     // Waited on the ANSWER, not on the call: the payload is adopted in the
@@ -132,25 +139,32 @@ describe("usePortfolioPeriodResult", () => {
     // state the callback has not written yet and fails under load.
     await waitFor(() => expect(hook.current.periodResult).not.toBeNull());
     expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith({
-      startDate: "2026-01-02",
-      endDate: "2026-06-30",
+      startDate: "2026-07-01",
+      endDate: "2026-07-15",
       baselineDate: "2026-06-30",
       accountIds: undefined,
       displayCurrency: undefined,
     });
   });
 
-  it("waits for the first point rather than guessing a prior close", async () => {
-    renderHook(() =>
+  it("sends no baseline for a dated window measured from its own first day", async () => {
+    const { result: hook } = renderHook(() =>
       usePortfolioPeriodResult({
         ...base,
-        range: "mtd",
-        firstPointIso: undefined,
+        range: "custom",
+        startDate: "2026-03-04",
+        periodStartDate: "2026-03-04",
+        endDate: "2026-05-06",
       }),
     );
-    await waitFor(() =>
-      expect(netWorthApi.getInvestmentsPeriodResult).not.toHaveBeenCalled(),
-    );
+    await waitFor(() => expect(hook.current.periodResult).not.toBeNull());
+    expect(netWorthApi.getInvestmentsPeriodResult).toHaveBeenCalledWith({
+      startDate: "2026-03-04",
+      endDate: "2026-05-06",
+      baselineDate: undefined,
+      accountIds: undefined,
+      displayCurrency: undefined,
+    });
   });
 
   it("asks nothing for a dated window while the series is empty", async () => {
@@ -170,7 +184,6 @@ describe("usePortfolioPeriodResult", () => {
       usePortfolioPeriodResult({
         ...base,
         range: "1y",
-        firstPointIso: "2026-01-02",
       }),
     );
     await waitFor(() =>
@@ -186,7 +199,6 @@ describe("usePortfolioPeriodResult", () => {
         ...base,
         hasSeries: true,
         range,
-        firstPointIso: "2026-01-02",
       }),
     );
     await waitFor(() => expect(hook.current.periodResult).not.toBeNull());

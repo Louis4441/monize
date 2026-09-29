@@ -1,7 +1,13 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsIn, IsOptional, IsString, MaxLength } from "class-validator";
 
-export const INTRADAY_RANGES = ["1d", "1w", "1m"] as const;
+/**
+ * The chart ranges served intraday. `mtd` is served on its own: its window
+ * opens on the 1st and is measured from the previous month's last session,
+ * which a rolling month trimmed on the client does not always reach (on the
+ * 31st a thirty-day window opens on the 1st itself).
+ */
+export const INTRADAY_RANGES = ["1d", "1w", "mtd", "1m"] as const;
 export type IntradayRangeKey = (typeof INTRADAY_RANGES)[number];
 
 export class IntradayValueQueryDto {
@@ -40,6 +46,14 @@ export interface IntradayValuePoint {
    * `docs/specs/portfolio-period-result.md` section 10.7).
    */
   securitiesValue: number;
+  /**
+   * Set on a session's closing point: the daily series' own figure for the
+   * day, stamped at the session's close (INV-INTRADAY-001), which includes the
+   * point the series opens on. Absent on a live bar. A client shaping the
+   * series reads it to keep the close a window is measured from, and never
+   * infers a close from a timestamp.
+   */
+  sessionClose?: true;
 }
 
 /**
@@ -61,6 +75,8 @@ export interface IntradayBreakdownPoint {
   total: number;
   /** Per-series value keyed by {@link IntradayBreakdownSeries.key}. */
   values: Record<string, number>;
+  /** As on {@link IntradayValuePoint}: set on a session's closing point. */
+  sessionClose?: true;
 }
 
 /**

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isoDatePart,
+  openingSessionDate,
   previousCalendarDay,
   shiftIsoDate,
   usesPriorCloseBaseline,
@@ -62,5 +63,67 @@ describe('isoDatePart', () => {
     expect(isoDatePart('2026-08')).toBeNull();
     expect(isoDatePart(undefined)).toBeNull();
     expect(isoDatePart('')).toBeNull();
+  });
+});
+
+/**
+ * A daily series requested from a Sunday carries Friday's close under
+ * Sunday's date; the caption under the chart names Friday. The opening point
+ * is dated by that session, and only the point that opens the period's own
+ * window is (issue #1461).
+ */
+describe('openingSessionDate', () => {
+  const period = (startDate: string, startPriceDate: string | null) => ({
+    startDate,
+    startPriceDate,
+  });
+
+  it('names the session behind a boundary the market was shut on', () => {
+    expect(
+      openingSessionDate('2025-09-28', period('2025-09-28', '2025-09-26')),
+    ).toBe('2025-09-26');
+  });
+
+  it('leaves a point alone when its own date is the session', () => {
+    expect(
+      openingSessionDate('2026-06-30', period('2026-06-30', '2026-06-30')),
+    ).toBeNull();
+  });
+
+  it('leaves a series alone that does not open on the period boundary', () => {
+    // A monthly bucket, an intraday close the server already dated, or a
+    // window still loading for another range.
+    expect(
+      openingSessionDate('2025-09-01', period('2025-09-28', '2025-09-26')),
+    ).toBeNull();
+    expect(
+      openingSessionDate(
+        '2026-09-18T20:00:00.000Z',
+        period('2026-09-20', '2026-09-18'),
+      ),
+    ).toBeNull();
+  });
+
+  it('never dates an intraday bar on the boundary day as a close', () => {
+    // A 1M series whose measured-from day got no opening close opens on that
+    // day's own bars: a 09:30 price is not the previous session's close, and
+    // is left with its own timestamp label.
+    expect(
+      openingSessionDate(
+        '2026-08-31T13:30:00.000Z',
+        period('2026-08-31', '2026-08-28'),
+      ),
+    ).toBeNull();
+  });
+
+  it('is unknown while the server has not named a session', () => {
+    expect(openingSessionDate('2025-09-28', null)).toBeNull();
+    expect(
+      openingSessionDate('2025-09-28', period('2025-09-28', null)),
+    ).toBeNull();
+    expect(openingSessionDate('2025-09-28', { startDate: '2025-09-28' })).toBeNull();
+    expect(
+      openingSessionDate(undefined, period('2025-09-28', '2025-09-26')),
+    ).toBeNull();
   });
 });

@@ -2,25 +2,24 @@
  * The trailing windows the Investments page reports a portfolio result over,
  * and where each one starts.
  *
- * The dates are the client's own range arithmetic moved to the server, so the
- * batch route answers exactly what one call to the single-range route per
- * window would have: `frontend/src/lib/date-range.ts` resolves `1w` as seven
- * days back, `1m` as thirty days, `3m` as ninety, `1y` as the same day a year
- * earlier, `2y` as seven hundred and thirty days back and `5y` as the same day
- * five years earlier, and
- * `frontend/src/components/investments/portfolio-change-baseline.ts`
- * decides which of them measure from the previous close instead of from their
- * first point. `1d` and `10y` are the windows with no client counterpart: a
- * day's move IS the prior close against the newest one, so its window is the
- * end day alone, and `10y` follows `5y`'s same-day-N-years-earlier arithmetic.
+ * This file is the one arithmetic for those windows. The batch route and the
+ * single-range route resolve every preset from it, the intraday series
+ * (`PortfolioService.loadIntradayData`) trims its bars to `presetWindowStart`
+ * and opens on the close of `presetEarliestDate`, and the client's chart
+ * window (`frontend/src/components/investments/portfolio-range-window.ts`)
+ * mirrors it day for day so the series a chart draws opens where the figures
+ * under it are measured from; `portfolio-period-presets.util.spec.ts` and
+ * `portfolio-range-window.test.ts` pin both to the same dates. `1w` is seven
+ * days back, `1m` thirty, `3m` ninety, `1y` the same day a year earlier, `2y`
+ * seven hundred and thirty days back, `5y` and `10y` the same day five and ten
+ * years earlier. A day's move IS the prior close against the newest one, so
+ * `1d`'s window is the end day alone.
  *
- * `ytd` is not the client's January 1: it opens on 31 December of the previous
- * year, so the year is measured from the close of its last trading session,
- * as every quote source reports it and as the charts' own YTD window
- * (`frontend/src/components/investments/portfolio-range-window.ts`) draws it.
- * A day is valued from the latest close on or before it, so a 31 December that
- * fell on a weekend or holiday still carries the last session's close, and
- * `startPriceDate` names that session.
+ * `ytd` is not 1 January: it opens on 31 December of the previous year, so the
+ * year is measured from the close of its last trading session, as every quote
+ * source reports it. A day is valued from the latest close on or before it, so
+ * a 31 December that fell on a weekend or holiday still carries the last
+ * session's close, and `startPriceDate` names that session.
  *
  * `all` is the one window whose start no arithmetic answers: it opens on the
  * day the scope's own history begins, which only a query knows, so
@@ -74,7 +73,8 @@ export function isHistoryGatedPreset(preset: PortfolioPeriodPreset): boolean {
  * the first point inside them drops whatever the portfolio did between the
  * previous close and that point. Every quote source reports these against the
  * prior close, so this does too -- the same rule, and the same set, as
- * `usesPriorCloseBaseline` on the client.
+ * `usesPriorCloseBaseline` on the client, which also holds `mtd`, a range
+ * with no preset here.
  *
  * `all` is here for a different reason with the same arithmetic: its window
  * opens on the day the scope's first holding was bought, and that day's close
@@ -146,12 +146,11 @@ export function presetWindowStart(
 }
 
 /**
- * The earliest day the preset can need a value for.
- *
- * For a prior-close preset that is the day before its window opens: the actual
- * baseline is the day before the window's FIRST POINT, which cannot be earlier
- * than this. It is what the series and the flows are loaded from, never what
- * the result is measured from.
+ * The day the preset is measured from, and so the earliest day it needs a
+ * value for: the day before its window opens for a prior-close preset, the
+ * window's own first day otherwise. The period result's series and flows are
+ * loaded from it, its `startDate` reports it, and the intraday series and the
+ * client's chart window open on its close.
  */
 export function presetEarliestDate(
   preset: PortfolioPeriodPreset,

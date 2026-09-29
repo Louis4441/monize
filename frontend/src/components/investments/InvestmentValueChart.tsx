@@ -28,14 +28,12 @@ import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { createLogger } from '@/lib/logger';
 import {
-  INTRADAY_RANGES,
+  isIntradayRange,
   buildIntradayCacheKey,
   readIntradayCache,
   writeIntradayCache,
   clearAllIntradayCache,
   computeTightYAxisDomain,
-  intradayRangeParam,
-  trimIntradayPoints,
   renderChartFlagDot,
   ChartFlagShadowFilter,
 } from './portfolio-chart-utils';
@@ -43,6 +41,10 @@ import {
   hasUnmeasuredFlow,
   periodResultUnknownReason,
 } from './portfolio-period-result';
+import {
+  openingSessionDate,
+  relabelOpeningPoint,
+} from './portfolio-change-baseline';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { UnknownAmount } from '@/components/ui/UnknownAmount';
 import { preferredCurrency } from '@/lib/default-currency';
@@ -84,8 +86,8 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
   const { defaultCurrency } = useExchangeRates();
   const isMobile = useIsMobile();
   // `iso` is the point's own date/timestamp, kept beside the display label so
-  // the prior-close baseline can be looked up for the data actually on screen.
-  const [chartPoints, setChartPoints] = useState<
+  // the opening point can be dated by its session once the server names it.
+  const [loadedPoints, setLoadedPoints] = useState<
     Array<{ name: string; Value: number; iso: string }>
   >([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -121,7 +123,8 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
     [setDateRange, setPersistedRange],
   );
 
-  const isIntraday = INTRADAY_RANGES.has(dateRange);
+  const intradayRange = isIntradayRange(dateRange) ? dateRange : null;
+  const isIntraday = intradayRange !== null;
   const useDaily = !isIntraday && DAILY_RANGES.has(dateRange);
 
   // A price series opens on the close it is measured from, which is not the
@@ -190,7 +193,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
         // 1W/MTD/1M intraday fallback also uses the daily endpoint.
         const data = await netWorthApi.getInvestmentsDaily(params);
         if (loadSeqRef.current !== seq) return;
-        setChartPoints(
+        setLoadedPoints(
           data.map((d) => ({
             name: formatChartDate(d.date, 'MMM d, yyyy'),
             Value: investedValue(d),
@@ -200,7 +203,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
       } else {
         const data = await netWorthApi.getInvestmentsMonthly(params);
         if (loadSeqRef.current !== seq) return;
-        setChartPoints(
+        setLoadedPoints(
           data.map((d) => ({
             name: formatChartDate(d.month, 'MMM yyyy'),
             Value: investedValue(d),
@@ -219,7 +222,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
       setIntradayUnavailable(null);
       setIntradayFallbackNotice(null);
       try {
-        if (isIntraday) {
+        if (intradayRange) {
           const cacheKey = buildIntradayCacheKey(
             dateRange,
             accountIds,
@@ -230,13 +233,8 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
           // Hydrate from cache immediately so the chart appears even before
           // the network round-trip resolves.
           if (cached && !cached.fallbackToDaily) {
-            const cachedPoints = trimIntradayPoints(
-              cached.points,
-              dateRange,
-              chartWindow.start,
-            );
-            setChartPoints(
-              cachedPoints.map((p) => ({
+            setLoadedPoints(
+              cached.points.map((p) => ({
                 name: formatIntradayLabel(p.timestamp, dateRange),
                 Value: investedValue(p),
                 iso: p.timestamp,
@@ -248,7 +246,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
           let response;
           try {
             response = await investmentsApi.getIntradayValue({
-              range: intradayRangeParam(dateRange),
+              range: intradayRange,
               accountIds: accountIds?.length ? accountIds.join(',') : undefined,
               displayCurrency: foreignCurrency || undefined,
             });
@@ -277,7 +275,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
             // Some holdings (typically MSN-tracked) lack intraday support.
             if (dateRange === '1d') {
               // No sensible daily-resolution fallback for a single day.
-              setChartPoints([]);
+              setLoadedPoints([]);
               setIntradayUnavailable({ skipped: response.skippedSymbols });
               setIsLoading(false);
               return;
@@ -292,13 +290,8 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
             return;
           }
 
-          const responsePoints = trimIntradayPoints(
-            response.points,
-            dateRange,
-            chartWindow.start,
-          );
-          setChartPoints(
-            responsePoints.map((p) => ({
+          setLoadedPoints(
+            response.points.map((p) => ({
               name: formatIntradayLabel(p.timestamp, dateRange),
               Value: investedValue(p),
               iso: p.timestamp,
@@ -316,9 +309,8 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
       }
     },
     [
-      isIntraday,
+      intradayRange,
       dateRange,
-      chartWindow,
       accountIds,
       effectiveCurrency,
       foreignCurrency,
@@ -374,13 +366,30 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
   const { periodResult } = usePortfolioPeriodResult({
     range: dateRange,
     startDate: chartWindow.start,
+    periodStartDate: chartWindow.periodStart,
     endDate: chartWindow.end,
-    firstPointIso: chartPoints[0]?.iso,
-    hasSeries: chartPoints.length > 0,
+    hasSeries: loadedPoints.length > 0,
     accountIds: accountIds?.length ? accountIds.join(',') : undefined,
     displayCurrency: foreignCurrency || undefined,
     reloadKey: refreshKey,
   });
+
+  // The series as drawn. It was requested from the day the period is measured
+  // from, and its opening point is dated by the session that day's close came
+  // from -- the same session the caption below names -- rather than by a
+  // boundary the market was shut on (`openingSessionDate`).
+  const chartPoints = useMemo(
+    () =>
+      relabelOpeningPoint(
+        loadedPoints,
+        openingSessionDate(loadedPoints[0]?.iso, periodResult),
+        (point, session) => ({
+          ...point,
+          name: formatChartDate(session, 'MMM d, yyyy'),
+        }),
+      ),
+    [loadedPoints, periodResult, formatChartDate],
+  );
 
   // The three figures the cards print, and the one repair a withheld one points
   // at. `null` is the server's answer that it withheld the figure and said why.
