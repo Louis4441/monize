@@ -450,9 +450,11 @@ Decisions made in X3:
   reads from the stored row: the reference number, the stored calendar date
   (the first ten characters of the input), the status with its `UNRECONCILED`
   default, and `hasAttachment` false (`previewCreate`, `previewCreateTransfer`).
-- The visual editor has no card for the five fields (task X5): a leaf on one is
-  kept intact and shown with its field name and stored value, and its sentence
-  reads as an unknown condition; the expression mode parses and prints them.
+- The visual editor has a control for each of the five fields (task X5): the
+  text control for `referenceNumber`, a 1 to 31 number input for `dayOfMonth`,
+  translated day and status names for `weekday` and `status`, a switch for
+  `hasAttachment`; the expression mode parses and prints them. Only a field
+  the editor does not know is kept as a read-only stored value.
 
 ### 10.4 Rule effects in the import preview (X4)
 
