@@ -61,5 +61,193 @@
     "reorderFailed": "Failed to change the order of the rules",
     "listChanged": "The list of rules changed elsewhere and has been reloaded. Try again",
     "loadFailed": "Failed to load rules"
+  },
+  "editor": {
+    "page": {
+      "newTitle": "New rule",
+      "editTitle": "Edit rule",
+      "subtitle": "Choose when the rule runs, which transactions it matches and what it changes",
+      "backToRules": "Back to Rules",
+      "loading": "Loading the rule..."
+    },
+    "name": {
+      "label": "Name",
+      "placeholder": "For example, Tag coffee shops"
+    },
+    "enabled": {
+      "label": "Rule enabled"
+    },
+    "sections": {
+      "when": "When",
+      "if": "If",
+      "then": "Then"
+    },
+    "when": {
+      "description": "Choose when the rule looks at a transaction",
+      "created": "A transaction is created",
+      "imported": "A transaction is imported",
+      "atLeastOne": "Keep at least one option selected",
+      "stopProcessing": "Stop processing other rules",
+      "stopProcessingHelp": "When this rule matches a transaction, the rules after it in the list are skipped for that transaction."
+    },
+    "if": {
+      "description": "The actions run only for transactions that match",
+      "everyTransaction": "No conditions yet, so this rule applies to every transaction."
+    },
+    "then": {
+      "description": "Actions run in this order",
+      "empty": "No actions yet. Add at least one.",
+      "limit": "A rule can have at most {max} actions."
+    },
+    "group": {
+      "matchAll": "All of these",
+      "matchAny": "Any of these",
+      "matchLabel": "Match",
+      "not": "Not",
+      "notLabel": "Negate this group: it matches when its conditions do not",
+      "title": "Group",
+      "addCondition": "+ Add condition",
+      "addGroup": "+ Add group",
+      "depthLimit": "Groups can be nested at most {max} levels deep.",
+      "sizeLimit": "The condition limit has been reached.",
+      "empty": "This group is empty."
+    },
+    "condition": {
+      "title": "Condition",
+      "field": "Field",
+      "operator": "Operator",
+      "value": "Value"
+    },
+    "fields": {
+      "accountId": "Account",
+      "fromAccountId": "From account (transfers)",
+      "toAccountId": "To account (transfers)",
+      "type": "Type",
+      "payeeId": "Payee",
+      "payeeText": "Payee text as received",
+      "categoryId": "Category",
+      "description": "Description",
+      "memo": "Memo",
+      "amount": "Amount (with sign)",
+      "absAmount": "Amount (ignoring sign)",
+      "currencyCode": "Currency",
+      "tagIds": "Tags",
+      "hasSplits": "Has splits"
+    },
+    "operators": {
+      "eq": "is",
+      "neq": "is not",
+      "in": "is any of",
+      "notIn": "is none of",
+      "isEmpty": "is empty",
+      "contains": "contains",
+      "startsWith": "starts with",
+      "matches": "matches the pattern",
+      "lt": "is less than",
+      "lte": "is at most",
+      "gt": "is greater than",
+      "gte": "is at least",
+      "between": "is between",
+      "hasAny": "has any of",
+      "hasAll": "has all of",
+      "hasNone": "has none of",
+      "inSubtree": "is in, or under"
+    },
+    "types": {
+      "EXPENSE": "Expense",
+      "INCOME": "Income",
+      "TRANSFER": "Transfer"
+    },
+    "value": {
+      "account": "Choose an account",
+      "accounts": "Choose accounts",
+      "payee": "Choose a payee",
+      "payees": "Choose payees",
+      "category": "Choose a category",
+      "categories": "Choose categories",
+      "tags": "Choose tags",
+      "currency": "Choose a currency",
+      "currencies": "Choose currencies",
+      "types": "Choose types",
+      "matchesHint": "Use * as a wildcard. For example, *coffee* matches any text that contains coffee.",
+      "amount": "Amount",
+      "from": "From",
+      "to": "To",
+      "yes": "Yes",
+      "no": "No"
+    },
+    "action": {
+      "title": "Action",
+      "type": "Action type",
+      "tags": "Tags",
+      "category": "Category",
+      "payee": "Payee",
+      "instruction": "What should be checked",
+      "instructionPlaceholder": "For example, split this purchase by the receipt",
+      "instructionHelp": "The rule only asks for a review. A person approves any change before it is made.",
+      "onlyIfEmpty": "Only if empty",
+      "onlyIfEmptyHelp": "When on, the rule fills in the category or payee only if the transaction has none. It does not replace one set by hand or by the payee's default category. Turn it off to replace it.",
+      "add": "+ Add action"
+    },
+    "actionTypes": {
+      "add_tags": "Add tags",
+      "remove_tags": "Remove tags",
+      "set_category": "Set the category",
+      "set_payee": "Set the payee",
+      "request_ai_review": "Ask for an AI review"
+    },
+    "save": {
+      "button": "Save rule",
+      "createdToast": "Rule created",
+      "savedToast": "Rule saved",
+      "failedToast": "Failed to save the rule",
+      "summary": "The rule was not saved. Fix the items marked below and try again."
+    },
+    "loadError": {
+      "title": "The rule could not be loaded",
+      "body": "Nothing is shown because the request failed, not because the rule is empty. Check your connection and try again.",
+      "lookupsBody": "The lists of accounts, payees, categories, tags and currencies could not be loaded, so the rule cannot be shown safely. Check your connection and try again.",
+      "notFound": "This rule no longer exists. It may have been deleted.",
+      "retry": "Try again"
+    },
+    "invalid": {
+      "title": "This rule cannot run",
+      "repaired": "Some parts of the saved definition could not be read and were removed or reset here. Review the rule before saving."
+    },
+    "conflict": {
+      "title": "This rule was changed elsewhere",
+      "body": "Reload it to see the latest version. Your unsaved edits will be lost.",
+      "reload": "Reload"
+    },
+    "errors": {
+      "codes": {
+        "INVALID_SHAPE": "This part is not in a form the editor understands.",
+        "UNKNOWN_KEY": "This part has a setting that does not exist.",
+        "UNKNOWN_FIELD": "Choose a field.",
+        "UNKNOWN_ACTION": "Choose an action.",
+        "OPERATOR_NOT_ALLOWED": "This field does not allow that operator.",
+        "VALUE_REQUIRED": "Enter or choose a value.",
+        "VALUE_NOT_ALLOWED": "This operator takes no value.",
+        "VALUE_TYPE": "The value is of the wrong kind for this field.",
+        "VALUE_OUT_OF_RANGE": "The value is out of range.",
+        "VALUE_TOO_LONG": "The text is too long.",
+        "VALUE_EMPTY": "Enter some text.",
+        "INVALID_UUID": "Choose an item from the list.",
+        "INVALID_ENUM": "Choose one of the listed values.",
+        "INVALID_CURRENCY": "Choose a currency.",
+        "ARRAY_EMPTY": "Choose at least one item.",
+        "ARRAY_TOO_LARGE": "Too many items are chosen.",
+        "RANGE_ORDER": "The first amount must not be greater than the second.",
+        "MAX_DEPTH": "Groups are nested too deeply. The limit is {maxDepth} levels.",
+        "MAX_LEAVES": "There are too many conditions. The limit is {maxLeaves}.",
+        "MAX_NODES": "There are too many conditions and groups. The limit is {maxNodes}.",
+        "NO_ACTIONS": "Add at least one action.",
+        "TOO_MANY_ACTIONS": "There are too many actions. The limit is {maxActions}.",
+        "DUPLICATE_ACTION": "A rule can ask for an AI review only once.",
+        "REFERENCE_NOT_FOUND": "An item chosen here no longer exists. Choose another.",
+        "NAME_REQUIRED": "Enter a name for the rule.",
+        "UNKNOWN": "This part is not valid."
+      }
+    }
   }
 }

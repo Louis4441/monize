@@ -61,5 +61,193 @@
     "reorderFailed": "[XX-Failed to change the order of the rules-XX]",
     "listChanged": "[XX-The list of rules changed elsewhere and has been reloaded. Try again-XX]",
     "loadFailed": "[XX-Failed to load rules-XX]"
+  },
+  "editor": {
+    "page": {
+      "newTitle": "[XX-New rule-XX]",
+      "editTitle": "[XX-Edit rule-XX]",
+      "subtitle": "[XX-Choose when the rule runs, which transactions it matches and what it changes-XX]",
+      "backToRules": "[XX-Back to Rules-XX]",
+      "loading": "[XX-Loading the rule...-XX]"
+    },
+    "name": {
+      "label": "[XX-Name-XX]",
+      "placeholder": "[XX-For example, Tag coffee shops-XX]"
+    },
+    "enabled": {
+      "label": "[XX-Rule enabled-XX]"
+    },
+    "sections": {
+      "when": "[XX-When-XX]",
+      "if": "[XX-If-XX]",
+      "then": "[XX-Then-XX]"
+    },
+    "when": {
+      "description": "[XX-Choose when the rule looks at a transaction-XX]",
+      "created": "[XX-A transaction is created-XX]",
+      "imported": "[XX-A transaction is imported-XX]",
+      "atLeastOne": "[XX-Keep at least one option selected-XX]",
+      "stopProcessing": "[XX-Stop processing other rules-XX]",
+      "stopProcessingHelp": "[XX-When this rule matches a transaction, the rules after it in the list are skipped for that transaction.-XX]"
+    },
+    "if": {
+      "description": "[XX-The actions run only for transactions that match-XX]",
+      "everyTransaction": "[XX-No conditions yet, so this rule applies to every transaction.-XX]"
+    },
+    "then": {
+      "description": "[XX-Actions run in this order-XX]",
+      "empty": "[XX-No actions yet. Add at least one.-XX]",
+      "limit": "[XX-A rule can have at most {max} actions.-XX]"
+    },
+    "group": {
+      "matchAll": "[XX-All of these-XX]",
+      "matchAny": "[XX-Any of these-XX]",
+      "matchLabel": "[XX-Match-XX]",
+      "not": "[XX-Not-XX]",
+      "notLabel": "[XX-Negate this group: it matches when its conditions do not-XX]",
+      "title": "[XX-Group-XX]",
+      "addCondition": "[XX-+ Add condition-XX]",
+      "addGroup": "[XX-+ Add group-XX]",
+      "depthLimit": "[XX-Groups can be nested at most {max} levels deep.-XX]",
+      "sizeLimit": "[XX-The condition limit has been reached.-XX]",
+      "empty": "[XX-This group is empty.-XX]"
+    },
+    "condition": {
+      "title": "[XX-Condition-XX]",
+      "field": "[XX-Field-XX]",
+      "operator": "[XX-Operator-XX]",
+      "value": "[XX-Value-XX]"
+    },
+    "fields": {
+      "accountId": "[XX-Account-XX]",
+      "fromAccountId": "[XX-From account (transfers)-XX]",
+      "toAccountId": "[XX-To account (transfers)-XX]",
+      "type": "[XX-Type-XX]",
+      "payeeId": "[XX-Payee-XX]",
+      "payeeText": "[XX-Payee text as received-XX]",
+      "categoryId": "[XX-Category-XX]",
+      "description": "[XX-Description-XX]",
+      "memo": "[XX-Memo-XX]",
+      "amount": "[XX-Amount (with sign)-XX]",
+      "absAmount": "[XX-Amount (ignoring sign)-XX]",
+      "currencyCode": "[XX-Currency-XX]",
+      "tagIds": "[XX-Tags-XX]",
+      "hasSplits": "[XX-Has splits-XX]"
+    },
+    "operators": {
+      "eq": "[XX-is-XX]",
+      "neq": "[XX-is not-XX]",
+      "in": "[XX-is any of-XX]",
+      "notIn": "[XX-is none of-XX]",
+      "isEmpty": "[XX-is empty-XX]",
+      "contains": "[XX-contains-XX]",
+      "startsWith": "[XX-starts with-XX]",
+      "matches": "[XX-matches the pattern-XX]",
+      "lt": "[XX-is less than-XX]",
+      "lte": "[XX-is at most-XX]",
+      "gt": "[XX-is greater than-XX]",
+      "gte": "[XX-is at least-XX]",
+      "between": "[XX-is between-XX]",
+      "hasAny": "[XX-has any of-XX]",
+      "hasAll": "[XX-has all of-XX]",
+      "hasNone": "[XX-has none of-XX]",
+      "inSubtree": "[XX-is in, or under-XX]"
+    },
+    "types": {
+      "EXPENSE": "[XX-Expense-XX]",
+      "INCOME": "[XX-Income-XX]",
+      "TRANSFER": "[XX-Transfer-XX]"
+    },
+    "value": {
+      "account": "[XX-Choose an account-XX]",
+      "accounts": "[XX-Choose accounts-XX]",
+      "payee": "[XX-Choose a payee-XX]",
+      "payees": "[XX-Choose payees-XX]",
+      "category": "[XX-Choose a category-XX]",
+      "categories": "[XX-Choose categories-XX]",
+      "tags": "[XX-Choose tags-XX]",
+      "currency": "[XX-Choose a currency-XX]",
+      "currencies": "[XX-Choose currencies-XX]",
+      "types": "[XX-Choose types-XX]",
+      "matchesHint": "[XX-Use * as a wildcard. For example, *coffee* matches any text that contains coffee.-XX]",
+      "amount": "[XX-Amount-XX]",
+      "from": "[XX-From-XX]",
+      "to": "[XX-To-XX]",
+      "yes": "[XX-Yes-XX]",
+      "no": "[XX-No-XX]"
+    },
+    "action": {
+      "title": "[XX-Action-XX]",
+      "type": "[XX-Action type-XX]",
+      "tags": "[XX-Tags-XX]",
+      "category": "[XX-Category-XX]",
+      "payee": "[XX-Payee-XX]",
+      "instruction": "[XX-What should be checked-XX]",
+      "instructionPlaceholder": "[XX-For example, split this purchase by the receipt-XX]",
+      "instructionHelp": "[XX-The rule only asks for a review. A person approves any change before it is made.-XX]",
+      "onlyIfEmpty": "[XX-Only if empty-XX]",
+      "onlyIfEmptyHelp": "[XX-When on, the rule fills in the category or payee only if the transaction has none. It does not replace one set by hand or by the payee's default category. Turn it off to replace it.-XX]",
+      "add": "[XX-+ Add action-XX]"
+    },
+    "actionTypes": {
+      "add_tags": "[XX-Add tags-XX]",
+      "remove_tags": "[XX-Remove tags-XX]",
+      "set_category": "[XX-Set the category-XX]",
+      "set_payee": "[XX-Set the payee-XX]",
+      "request_ai_review": "[XX-Ask for an AI review-XX]"
+    },
+    "save": {
+      "button": "[XX-Save rule-XX]",
+      "createdToast": "[XX-Rule created-XX]",
+      "savedToast": "[XX-Rule saved-XX]",
+      "failedToast": "[XX-Failed to save the rule-XX]",
+      "summary": "[XX-The rule was not saved. Fix the items marked below and try again.-XX]"
+    },
+    "loadError": {
+      "title": "[XX-The rule could not be loaded-XX]",
+      "body": "[XX-Nothing is shown because the request failed, not because the rule is empty. Check your connection and try again.-XX]",
+      "lookupsBody": "[XX-The lists of accounts, payees, categories, tags and currencies could not be loaded, so the rule cannot be shown safely. Check your connection and try again.-XX]",
+      "notFound": "[XX-This rule no longer exists. It may have been deleted.-XX]",
+      "retry": "[XX-Try again-XX]"
+    },
+    "invalid": {
+      "title": "[XX-This rule cannot run-XX]",
+      "repaired": "[XX-Some parts of the saved definition could not be read and were removed or reset here. Review the rule before saving.-XX]"
+    },
+    "conflict": {
+      "title": "[XX-This rule was changed elsewhere-XX]",
+      "body": "[XX-Reload it to see the latest version. Your unsaved edits will be lost.-XX]",
+      "reload": "[XX-Reload-XX]"
+    },
+    "errors": {
+      "codes": {
+        "INVALID_SHAPE": "[XX-This part is not in a form the editor understands.-XX]",
+        "UNKNOWN_KEY": "[XX-This part has a setting that does not exist.-XX]",
+        "UNKNOWN_FIELD": "[XX-Choose a field.-XX]",
+        "UNKNOWN_ACTION": "[XX-Choose an action.-XX]",
+        "OPERATOR_NOT_ALLOWED": "[XX-This field does not allow that operator.-XX]",
+        "VALUE_REQUIRED": "[XX-Enter or choose a value.-XX]",
+        "VALUE_NOT_ALLOWED": "[XX-This operator takes no value.-XX]",
+        "VALUE_TYPE": "[XX-The value is of the wrong kind for this field.-XX]",
+        "VALUE_OUT_OF_RANGE": "[XX-The value is out of range.-XX]",
+        "VALUE_TOO_LONG": "[XX-The text is too long.-XX]",
+        "VALUE_EMPTY": "[XX-Enter some text.-XX]",
+        "INVALID_UUID": "[XX-Choose an item from the list.-XX]",
+        "INVALID_ENUM": "[XX-Choose one of the listed values.-XX]",
+        "INVALID_CURRENCY": "[XX-Choose a currency.-XX]",
+        "ARRAY_EMPTY": "[XX-Choose at least one item.-XX]",
+        "ARRAY_TOO_LARGE": "[XX-Too many items are chosen.-XX]",
+        "RANGE_ORDER": "[XX-The first amount must not be greater than the second.-XX]",
+        "MAX_DEPTH": "[XX-Groups are nested too deeply. The limit is {maxDepth} levels.-XX]",
+        "MAX_LEAVES": "[XX-There are too many conditions. The limit is {maxLeaves}.-XX]",
+        "MAX_NODES": "[XX-There are too many conditions and groups. The limit is {maxNodes}.-XX]",
+        "NO_ACTIONS": "[XX-Add at least one action.-XX]",
+        "TOO_MANY_ACTIONS": "[XX-There are too many actions. The limit is {maxActions}.-XX]",
+        "DUPLICATE_ACTION": "[XX-A rule can ask for an AI review only once.-XX]",
+        "REFERENCE_NOT_FOUND": "[XX-An item chosen here no longer exists. Choose another.-XX]",
+        "NAME_REQUIRED": "[XX-Enter a name for the rule.-XX]",
+        "UNKNOWN": "[XX-This part is not valid.-XX]"
+      }
+    }
   }
 }

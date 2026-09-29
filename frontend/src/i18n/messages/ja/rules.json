@@ -61,5 +61,193 @@
     "reorderFailed": "ルールの順序を変更できませんでした",
     "listChanged": "ルールの一覧が別の場所で変更されたため、再読み込みしました。もう一度お試しください",
     "loadFailed": "ルールを読み込めませんでした"
+  },
+  "editor": {
+    "page": {
+      "newTitle": "新しいルール",
+      "editTitle": "ルールを編集",
+      "subtitle": "ルールを実行するタイミング、対象となる取引、変更する内容を選択します",
+      "backToRules": "ルールに戻る",
+      "loading": "ルールを読み込み中..."
+    },
+    "name": {
+      "label": "名前",
+      "placeholder": "例：カフェにタグを付ける"
+    },
+    "enabled": {
+      "label": "ルールを有効にする"
+    },
+    "sections": {
+      "when": "いつ",
+      "if": "もし",
+      "then": "そのとき"
+    },
+    "when": {
+      "description": "ルールが取引を確認するタイミングを選択します",
+      "created": "取引が作成されたとき",
+      "imported": "取引がインポートされたとき",
+      "atLeastOne": "少なくとも1つのオプションを選択したままにしてください",
+      "stopProcessing": "ほかのルールの処理を停止",
+      "stopProcessingHelp": "このルールが取引に一致した場合、一覧でこのルールより後にあるルールは、その取引についてはスキップされます。"
+    },
+    "if": {
+      "description": "アクションは一致する取引にのみ実行されます",
+      "everyTransaction": "条件がまだないため、このルールはすべての取引に適用されます。"
+    },
+    "then": {
+      "description": "アクションはこの順に実行されます",
+      "empty": "アクションがまだありません。少なくとも1つ追加してください。",
+      "limit": "1つのルールに設定できるアクションは最大{max}件です。"
+    },
+    "group": {
+      "matchAll": "次のすべて",
+      "matchAny": "次のいずれか",
+      "matchLabel": "一致条件",
+      "not": "NOT",
+      "notLabel": "このグループを否定：条件を満たさないときに一致します",
+      "title": "グループ",
+      "addCondition": "+ 条件を追加",
+      "addGroup": "+ グループを追加",
+      "depthLimit": "グループのネストは最大{max}階層までです。",
+      "sizeLimit": "条件数の上限に達しました。",
+      "empty": "このグループは空です。"
+    },
+    "condition": {
+      "title": "条件",
+      "field": "項目",
+      "operator": "演算子",
+      "value": "値"
+    },
+    "fields": {
+      "accountId": "口座",
+      "fromAccountId": "振替元口座（振替）",
+      "toAccountId": "振替先口座（振替）",
+      "type": "種類",
+      "payeeId": "支払先",
+      "payeeText": "受信したままの支払先テキスト",
+      "categoryId": "カテゴリ",
+      "description": "説明",
+      "memo": "メモ",
+      "amount": "金額（符号あり）",
+      "absAmount": "金額（符号なし）",
+      "currencyCode": "通貨",
+      "tagIds": "タグ",
+      "hasSplits": "分割あり"
+    },
+    "operators": {
+      "eq": "である",
+      "neq": "ではない",
+      "in": "のいずれかである",
+      "notIn": "のいずれでもない",
+      "isEmpty": "が空である",
+      "contains": "を含む",
+      "startsWith": "で始まる",
+      "matches": "パターンに一致する",
+      "lt": "より小さい",
+      "lte": "以下である",
+      "gt": "より大きい",
+      "gte": "以上である",
+      "between": "の間である",
+      "hasAny": "のいずれかを持つ",
+      "hasAll": "のすべてを持つ",
+      "hasNone": "のいずれも持たない",
+      "inSubtree": "に含まれる（下位を含む）"
+    },
+    "types": {
+      "EXPENSE": "支出",
+      "INCOME": "収入",
+      "TRANSFER": "振替"
+    },
+    "value": {
+      "account": "口座を選択",
+      "accounts": "口座を選択",
+      "payee": "支払先を選択",
+      "payees": "支払先を選択",
+      "category": "カテゴリを選択",
+      "categories": "カテゴリを選択",
+      "tags": "タグを選択",
+      "currency": "通貨を選択",
+      "currencies": "通貨を選択",
+      "types": "種類を選択",
+      "matchesHint": "ワイルドカードとして * を使用できます。たとえば *コーヒー* は、コーヒーを含むすべてのテキストに一致します。",
+      "amount": "金額",
+      "from": "から",
+      "to": "まで",
+      "yes": "はい",
+      "no": "いいえ"
+    },
+    "action": {
+      "title": "アクション",
+      "type": "アクションの種類",
+      "tags": "タグ",
+      "category": "カテゴリ",
+      "payee": "支払先",
+      "instruction": "確認してほしい内容",
+      "instructionPlaceholder": "例：この購入をレシートに従って分割する",
+      "instructionHelp": "ルールはレビューを依頼するだけです。変更は、実行される前に必ず人が承認します。",
+      "onlyIfEmpty": "空の場合のみ",
+      "onlyIfEmptyHelp": "オンにすると、取引にカテゴリまたは支払先がない場合にのみルールが入力します。手動で設定した値や、支払先の既定のカテゴリで設定された値は置き換えません。置き換えるにはオフにしてください。",
+      "add": "+ アクションを追加"
+    },
+    "actionTypes": {
+      "add_tags": "タグを追加",
+      "remove_tags": "タグを削除",
+      "set_category": "カテゴリを設定",
+      "set_payee": "支払先を設定",
+      "request_ai_review": "AIレビューを依頼"
+    },
+    "save": {
+      "button": "ルールを保存",
+      "createdToast": "ルールを作成しました",
+      "savedToast": "ルールを保存しました",
+      "failedToast": "ルールを保存できませんでした",
+      "summary": "ルールは保存されませんでした。下に示された項目を修正して、もう一度お試しください。"
+    },
+    "loadError": {
+      "title": "ルールを読み込めませんでした",
+      "body": "ルールが空だからではなく、リクエストが失敗したため何も表示されていません。接続を確認して、もう一度お試しください。",
+      "lookupsBody": "口座、支払先、カテゴリ、タグ、通貨の一覧を読み込めなかったため、ルールを安全に表示できません。接続を確認して、もう一度お試しください。",
+      "notFound": "このルールは存在しません。削除された可能性があります。",
+      "retry": "再試行"
+    },
+    "invalid": {
+      "title": "このルールは実行できません",
+      "repaired": "保存された定義の一部を読み取れなかったため、ここでは削除またはリセットされています。保存する前にルールを確認してください。"
+    },
+    "conflict": {
+      "title": "このルールはほかの場所で変更されました",
+      "body": "最新の版を表示するには再読み込みしてください。未保存の編集内容は失われます。",
+      "reload": "再読み込み"
+    },
+    "errors": {
+      "codes": {
+        "INVALID_SHAPE": "この部分はエディターが解釈できない形式です。",
+        "UNKNOWN_KEY": "この部分に存在しない設定があります。",
+        "UNKNOWN_FIELD": "項目を選択してください。",
+        "UNKNOWN_ACTION": "アクションを選択してください。",
+        "OPERATOR_NOT_ALLOWED": "この項目ではその演算子は使用できません。",
+        "VALUE_REQUIRED": "値を入力または選択してください。",
+        "VALUE_NOT_ALLOWED": "この演算子には値を指定できません。",
+        "VALUE_TYPE": "この項目に適さない種類の値です。",
+        "VALUE_OUT_OF_RANGE": "値が範囲外です。",
+        "VALUE_TOO_LONG": "テキストが長すぎます。",
+        "VALUE_EMPTY": "テキストを入力してください。",
+        "INVALID_UUID": "一覧から項目を選択してください。",
+        "INVALID_ENUM": "表示されている値のいずれかを選択してください。",
+        "INVALID_CURRENCY": "通貨を選択してください。",
+        "ARRAY_EMPTY": "少なくとも1つ選択してください。",
+        "ARRAY_TOO_LARGE": "選択した項目が多すぎます。",
+        "RANGE_ORDER": "最初の金額は2番目の金額以下にしてください。",
+        "MAX_DEPTH": "グループのネストが深すぎます。上限は{maxDepth}階層です。",
+        "MAX_LEAVES": "条件が多すぎます。上限は{maxLeaves}件です。",
+        "MAX_NODES": "条件とグループが多すぎます。上限は{maxNodes}件です。",
+        "NO_ACTIONS": "アクションを少なくとも1つ追加してください。",
+        "TOO_MANY_ACTIONS": "アクションが多すぎます。上限は{maxActions}件です。",
+        "DUPLICATE_ACTION": "1つのルールでAIレビューを依頼できるのは1回だけです。",
+        "REFERENCE_NOT_FOUND": "ここで選択した項目は存在しなくなりました。別の項目を選択してください。",
+        "NAME_REQUIRED": "ルールの名前を入力してください。",
+        "UNKNOWN": "この部分は無効です。"
+      }
+    }
   }
 }

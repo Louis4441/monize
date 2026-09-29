@@ -61,5 +61,193 @@
     "reorderFailed": "Gagal mengubah urutan aturan",
     "listChanged": "Daftar aturan berubah di tempat lain dan telah dimuat ulang. Coba lagi",
     "loadFailed": "Gagal memuat aturan"
+  },
+  "editor": {
+    "page": {
+      "newTitle": "Aturan baru",
+      "editTitle": "Ubah aturan",
+      "subtitle": "Pilih kapan aturan berjalan, transaksi mana yang dicakup, dan apa yang diubahnya",
+      "backToRules": "Kembali ke Aturan",
+      "loading": "Memuat aturan..."
+    },
+    "name": {
+      "label": "Nama",
+      "placeholder": "Contoh: Beri tag kafe"
+    },
+    "enabled": {
+      "label": "Aturan aktif"
+    },
+    "sections": {
+      "when": "Kapan",
+      "if": "Jika",
+      "then": "Maka"
+    },
+    "when": {
+      "description": "Pilih kapan aturan memeriksa sebuah transaksi",
+      "created": "Transaksi dibuat",
+      "imported": "Transaksi diimpor",
+      "atLeastOne": "Biarkan setidaknya satu opsi tetap dipilih",
+      "stopProcessing": "Hentikan pemrosesan aturan lain",
+      "stopProcessingHelp": "Jika aturan ini cocok dengan sebuah transaksi, aturan yang berada setelahnya dalam daftar dilewati untuk transaksi tersebut."
+    },
+    "if": {
+      "description": "Tindakan hanya dijalankan untuk transaksi yang cocok",
+      "everyTransaction": "Belum ada kondisi, jadi aturan ini berlaku untuk setiap transaksi."
+    },
+    "then": {
+      "description": "Tindakan dijalankan dalam urutan ini",
+      "empty": "Belum ada tindakan. Tambahkan setidaknya satu.",
+      "limit": "Satu aturan dapat memiliki paling banyak {max} tindakan."
+    },
+    "group": {
+      "matchAll": "Semua ini",
+      "matchAny": "Salah satu dari ini",
+      "matchLabel": "Kecocokan",
+      "not": "Bukan",
+      "notLabel": "Balikkan grup ini: cocok jika kondisinya tidak terpenuhi",
+      "title": "Grup",
+      "addCondition": "+ Tambah kondisi",
+      "addGroup": "+ Tambah grup",
+      "depthLimit": "Grup dapat bersarang paling dalam {max} tingkat.",
+      "sizeLimit": "Batas kondisi telah tercapai.",
+      "empty": "Grup ini kosong."
+    },
+    "condition": {
+      "title": "Kondisi",
+      "field": "Bidang",
+      "operator": "Operator",
+      "value": "Nilai"
+    },
+    "fields": {
+      "accountId": "Akun",
+      "fromAccountId": "Dari akun (transfer)",
+      "toAccountId": "Ke akun (transfer)",
+      "type": "Jenis",
+      "payeeId": "Penerima",
+      "payeeText": "Teks penerima sebagaimana diterima",
+      "categoryId": "Kategori",
+      "description": "Deskripsi",
+      "memo": "Memo",
+      "amount": "Jumlah (dengan tanda)",
+      "absAmount": "Jumlah (tanpa tanda)",
+      "currencyCode": "Mata uang",
+      "tagIds": "Tag",
+      "hasSplits": "Memiliki pemisahan"
+    },
+    "operators": {
+      "eq": "adalah",
+      "neq": "bukan",
+      "in": "adalah salah satu dari",
+      "notIn": "bukan salah satu dari",
+      "isEmpty": "kosong",
+      "contains": "mengandung",
+      "startsWith": "diawali dengan",
+      "matches": "cocok dengan pola",
+      "lt": "kurang dari",
+      "lte": "paling banyak",
+      "gt": "lebih dari",
+      "gte": "paling sedikit",
+      "between": "berada di antara",
+      "hasAny": "memiliki salah satu dari",
+      "hasAll": "memiliki semua dari",
+      "hasNone": "tidak memiliki satu pun dari",
+      "inSubtree": "berada di dalam atau di bawah"
+    },
+    "types": {
+      "EXPENSE": "Pengeluaran",
+      "INCOME": "Pemasukan",
+      "TRANSFER": "Transfer"
+    },
+    "value": {
+      "account": "Pilih akun",
+      "accounts": "Pilih akun-akun",
+      "payee": "Pilih penerima",
+      "payees": "Pilih penerima-penerima",
+      "category": "Pilih kategori",
+      "categories": "Pilih kategori-kategori",
+      "tags": "Pilih tag",
+      "currency": "Pilih mata uang",
+      "currencies": "Pilih mata uang-mata uang",
+      "types": "Pilih jenis",
+      "matchesHint": "Gunakan * sebagai karakter pengganti. Misalnya, *kopi* cocok dengan teks apa pun yang mengandung kopi.",
+      "amount": "Jumlah",
+      "from": "Dari",
+      "to": "Sampai",
+      "yes": "Ya",
+      "no": "Tidak"
+    },
+    "action": {
+      "title": "Tindakan",
+      "type": "Jenis tindakan",
+      "tags": "Tag",
+      "category": "Kategori",
+      "payee": "Penerima",
+      "instruction": "Apa yang perlu diperiksa",
+      "instructionPlaceholder": "Contoh: pisahkan pembelian ini sesuai struk",
+      "instructionHelp": "Aturan hanya meminta peninjauan. Seseorang menyetujui setiap perubahan sebelum dilakukan.",
+      "onlyIfEmpty": "Hanya jika kosong",
+      "onlyIfEmptyHelp": "Jika aktif, aturan mengisi kategori atau penerima hanya bila transaksi belum memilikinya. Aturan tidak menggantikan nilai yang diatur secara manual atau oleh kategori bawaan penerima. Nonaktifkan untuk menggantikannya.",
+      "add": "+ Tambah tindakan"
+    },
+    "actionTypes": {
+      "add_tags": "Tambah tag",
+      "remove_tags": "Hapus tag",
+      "set_category": "Atur kategori",
+      "set_payee": "Atur penerima",
+      "request_ai_review": "Minta peninjauan AI"
+    },
+    "save": {
+      "button": "Simpan aturan",
+      "createdToast": "Aturan dibuat",
+      "savedToast": "Aturan disimpan",
+      "failedToast": "Gagal menyimpan aturan",
+      "summary": "Aturan tidak disimpan. Perbaiki item yang ditandai di bawah, lalu coba lagi."
+    },
+    "loadError": {
+      "title": "Aturan tidak dapat dimuat",
+      "body": "Tidak ada yang ditampilkan karena permintaan gagal, bukan karena aturannya kosong. Periksa koneksi Anda dan coba lagi.",
+      "lookupsBody": "Daftar akun, penerima, kategori, tag, dan mata uang tidak dapat dimuat, sehingga aturan tidak dapat ditampilkan dengan aman. Periksa koneksi Anda dan coba lagi.",
+      "notFound": "Aturan ini sudah tidak ada. Mungkin telah dihapus.",
+      "retry": "Coba lagi"
+    },
+    "invalid": {
+      "title": "Aturan ini tidak dapat berjalan",
+      "repaired": "Beberapa bagian dari definisi tersimpan tidak dapat dibaca dan dihapus atau diatur ulang di sini. Tinjau aturan sebelum menyimpan."
+    },
+    "conflict": {
+      "title": "Aturan ini diubah di tempat lain",
+      "body": "Muat ulang untuk melihat versi terbaru. Perubahan Anda yang belum disimpan akan hilang.",
+      "reload": "Muat ulang"
+    },
+    "errors": {
+      "codes": {
+        "INVALID_SHAPE": "Bagian ini tidak berbentuk sesuatu yang dipahami editor.",
+        "UNKNOWN_KEY": "Bagian ini memiliki pengaturan yang tidak ada.",
+        "UNKNOWN_FIELD": "Pilih bidang.",
+        "UNKNOWN_ACTION": "Pilih tindakan.",
+        "OPERATOR_NOT_ALLOWED": "Bidang ini tidak mengizinkan operator tersebut.",
+        "VALUE_REQUIRED": "Masukkan atau pilih nilai.",
+        "VALUE_NOT_ALLOWED": "Operator ini tidak menerima nilai.",
+        "VALUE_TYPE": "Nilai memiliki jenis yang salah untuk bidang ini.",
+        "VALUE_OUT_OF_RANGE": "Nilai berada di luar rentang.",
+        "VALUE_TOO_LONG": "Teks terlalu panjang.",
+        "VALUE_EMPTY": "Masukkan teks.",
+        "INVALID_UUID": "Pilih item dari daftar.",
+        "INVALID_ENUM": "Pilih salah satu nilai yang tersedia.",
+        "INVALID_CURRENCY": "Pilih mata uang.",
+        "ARRAY_EMPTY": "Pilih setidaknya satu item.",
+        "ARRAY_TOO_LARGE": "Terlalu banyak item yang dipilih.",
+        "RANGE_ORDER": "Jumlah pertama tidak boleh lebih besar dari jumlah kedua.",
+        "MAX_DEPTH": "Grup bersarang terlalu dalam. Batasnya {maxDepth} tingkat.",
+        "MAX_LEAVES": "Terlalu banyak kondisi. Batasnya {maxLeaves}.",
+        "MAX_NODES": "Terlalu banyak kondisi dan grup. Batasnya {maxNodes}.",
+        "NO_ACTIONS": "Tambahkan setidaknya satu tindakan.",
+        "TOO_MANY_ACTIONS": "Terlalu banyak tindakan. Batasnya {maxActions}.",
+        "DUPLICATE_ACTION": "Satu aturan hanya dapat meminta peninjauan AI satu kali.",
+        "REFERENCE_NOT_FOUND": "Item yang dipilih di sini sudah tidak ada. Pilih yang lain.",
+        "NAME_REQUIRED": "Masukkan nama untuk aturan.",
+        "UNKNOWN": "Bagian ini tidak valid."
+      }
+    }
   }
 }

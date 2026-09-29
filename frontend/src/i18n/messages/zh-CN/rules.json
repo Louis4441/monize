@@ -61,5 +61,193 @@
     "reorderFailed": "无法更改规则顺序",
     "listChanged": "规则列表已在别处更改并重新加载。请重试",
     "loadFailed": "无法加载规则"
+  },
+  "editor": {
+    "page": {
+      "newTitle": "新建规则",
+      "editTitle": "编辑规则",
+      "subtitle": "选择规则何时运行、适用于哪些交易，以及要更改什么",
+      "backToRules": "返回规则",
+      "loading": "正在加载规则..."
+    },
+    "name": {
+      "label": "名称",
+      "placeholder": "例如：为咖啡店添加标签"
+    },
+    "enabled": {
+      "label": "启用规则"
+    },
+    "sections": {
+      "when": "何时",
+      "if": "如果",
+      "then": "则"
+    },
+    "when": {
+      "description": "选择规则何时检查交易",
+      "created": "创建交易时",
+      "imported": "导入交易时",
+      "atLeastOne": "请至少保持选中一个选项",
+      "stopProcessing": "停止处理其他规则",
+      "stopProcessingHelp": "此规则与某笔交易匹配后，列表中排在它之后的规则将不再对该交易运行。"
+    },
+    "if": {
+      "description": "仅对匹配的交易执行操作",
+      "everyTransaction": "尚无条件，因此此规则适用于每一笔交易。"
+    },
+    "then": {
+      "description": "操作按此顺序执行",
+      "empty": "尚无操作。请至少添加一个。",
+      "limit": "一条规则最多可以有 {max} 个操作。"
+    },
+    "group": {
+      "matchAll": "满足以下全部",
+      "matchAny": "满足以下任意一项",
+      "matchLabel": "匹配方式",
+      "not": "非",
+      "notLabel": "对此组取反：当其条件不成立时匹配",
+      "title": "条件组",
+      "addCondition": "+ 添加条件",
+      "addGroup": "+ 添加条件组",
+      "depthLimit": "条件组最多可嵌套 {max} 层。",
+      "sizeLimit": "已达到条件数量上限。",
+      "empty": "此条件组为空。"
+    },
+    "condition": {
+      "title": "条件",
+      "field": "字段",
+      "operator": "运算符",
+      "value": "值"
+    },
+    "fields": {
+      "accountId": "账户",
+      "fromAccountId": "转出账户（转账）",
+      "toAccountId": "转入账户（转账）",
+      "type": "类型",
+      "payeeId": "收款方",
+      "payeeText": "收到的收款方原文",
+      "categoryId": "分类",
+      "description": "说明",
+      "memo": "备注",
+      "amount": "金额（含正负号）",
+      "absAmount": "金额（忽略正负号）",
+      "currencyCode": "币种",
+      "tagIds": "标签",
+      "hasSplits": "有拆分"
+    },
+    "operators": {
+      "eq": "等于",
+      "neq": "不等于",
+      "in": "属于以下任一项",
+      "notIn": "不属于以下任何一项",
+      "isEmpty": "为空",
+      "contains": "包含",
+      "startsWith": "开头为",
+      "matches": "匹配模式",
+      "lt": "小于",
+      "lte": "不大于",
+      "gt": "大于",
+      "gte": "不小于",
+      "between": "介于",
+      "hasAny": "含有以下任一项",
+      "hasAll": "含有以下全部",
+      "hasNone": "不含以下任何一项",
+      "inSubtree": "属于该分类或其子分类"
+    },
+    "types": {
+      "EXPENSE": "支出",
+      "INCOME": "收入",
+      "TRANSFER": "转账"
+    },
+    "value": {
+      "account": "选择账户",
+      "accounts": "选择账户",
+      "payee": "选择收款方",
+      "payees": "选择收款方",
+      "category": "选择分类",
+      "categories": "选择分类",
+      "tags": "选择标签",
+      "currency": "选择币种",
+      "currencies": "选择币种",
+      "types": "选择类型",
+      "matchesHint": "使用 * 作为通配符。例如，*咖啡* 可匹配任何包含“咖啡”的文本。",
+      "amount": "金额",
+      "from": "从",
+      "to": "到",
+      "yes": "是",
+      "no": "否"
+    },
+    "action": {
+      "title": "操作",
+      "type": "操作类型",
+      "tags": "标签",
+      "category": "分类",
+      "payee": "收款方",
+      "instruction": "需要检查什么",
+      "instructionPlaceholder": "例如：按收据拆分这笔消费",
+      "instructionHelp": "规则只会请求审核。任何更改在执行前都需要由人工批准。",
+      "onlyIfEmpty": "仅在为空时",
+      "onlyIfEmptyHelp": "开启后，仅当交易没有分类或收款方时，规则才会填写。它不会替换手动设置的值，也不会替换由收款方默认分类设置的值。关闭后可进行替换。",
+      "add": "+ 添加操作"
+    },
+    "actionTypes": {
+      "add_tags": "添加标签",
+      "remove_tags": "移除标签",
+      "set_category": "设置分类",
+      "set_payee": "设置收款方",
+      "request_ai_review": "请求 AI 审核"
+    },
+    "save": {
+      "button": "保存规则",
+      "createdToast": "规则已创建",
+      "savedToast": "规则已保存",
+      "failedToast": "无法保存规则",
+      "summary": "规则未保存。请修正下方标记的项目后重试。"
+    },
+    "loadError": {
+      "title": "无法加载规则",
+      "body": "之所以没有显示任何内容，是因为请求失败，而不是规则为空。请检查网络连接后重试。",
+      "lookupsBody": "无法加载账户、收款方、分类、标签和币种列表，因此无法安全地显示规则。请检查网络连接后重试。",
+      "notFound": "此规则已不存在，可能已被删除。",
+      "retry": "重试"
+    },
+    "invalid": {
+      "title": "此规则无法运行",
+      "repaired": "已保存定义中的部分内容无法读取，已在此处移除或重置。保存前请检查规则。"
+    },
+    "conflict": {
+      "title": "此规则已在别处被更改",
+      "body": "请重新加载以查看最新版本。您未保存的修改将会丢失。",
+      "reload": "重新加载"
+    },
+    "errors": {
+      "codes": {
+        "INVALID_SHAPE": "此部分的格式编辑器无法识别。",
+        "UNKNOWN_KEY": "此部分包含一个不存在的设置。",
+        "UNKNOWN_FIELD": "请选择字段。",
+        "UNKNOWN_ACTION": "请选择操作。",
+        "OPERATOR_NOT_ALLOWED": "此字段不允许使用该运算符。",
+        "VALUE_REQUIRED": "请输入或选择一个值。",
+        "VALUE_NOT_ALLOWED": "此运算符不接受值。",
+        "VALUE_TYPE": "该值的类型不适用于此字段。",
+        "VALUE_OUT_OF_RANGE": "该值超出范围。",
+        "VALUE_TOO_LONG": "文本过长。",
+        "VALUE_EMPTY": "请输入文本。",
+        "INVALID_UUID": "请从列表中选择一项。",
+        "INVALID_ENUM": "请选择列出的值之一。",
+        "INVALID_CURRENCY": "请选择币种。",
+        "ARRAY_EMPTY": "请至少选择一项。",
+        "ARRAY_TOO_LARGE": "选择的项目过多。",
+        "RANGE_ORDER": "第一个金额不能大于第二个金额。",
+        "MAX_DEPTH": "条件组嵌套过深。上限为 {maxDepth} 层。",
+        "MAX_LEAVES": "条件过多。上限为 {maxLeaves} 个。",
+        "MAX_NODES": "条件和条件组过多。上限为 {maxNodes} 个。",
+        "NO_ACTIONS": "请至少添加一个操作。",
+        "TOO_MANY_ACTIONS": "操作过多。上限为 {maxActions} 个。",
+        "DUPLICATE_ACTION": "一条规则只能请求一次 AI 审核。",
+        "REFERENCE_NOT_FOUND": "此处选择的项目已不存在。请选择其他项目。",
+        "NAME_REQUIRED": "请输入规则名称。",
+        "UNKNOWN": "此部分无效。"
+      }
+    }
   }
 }

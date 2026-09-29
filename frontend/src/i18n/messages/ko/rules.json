@@ -61,5 +61,193 @@
     "reorderFailed": "규칙 순서를 변경하지 못했습니다",
     "listChanged": "규칙 목록이 다른 곳에서 변경되어 다시 불러왔습니다. 다시 시도하세요",
     "loadFailed": "규칙을 불러오지 못했습니다"
+  },
+  "editor": {
+    "page": {
+      "newTitle": "새 규칙",
+      "editTitle": "규칙 편집",
+      "subtitle": "규칙이 실행되는 시점, 적용되는 거래, 변경할 내용을 선택하세요",
+      "backToRules": "규칙으로 돌아가기",
+      "loading": "규칙을 불러오는 중..."
+    },
+    "name": {
+      "label": "이름",
+      "placeholder": "예: 카페에 태그 지정"
+    },
+    "enabled": {
+      "label": "규칙 사용"
+    },
+    "sections": {
+      "when": "언제",
+      "if": "만약",
+      "then": "그러면"
+    },
+    "when": {
+      "description": "규칙이 거래를 확인하는 시점을 선택하세요",
+      "created": "거래가 생성될 때",
+      "imported": "거래를 가져올 때",
+      "atLeastOne": "하나 이상의 옵션을 선택한 상태로 두세요",
+      "stopProcessing": "다른 규칙 처리 중지",
+      "stopProcessingHelp": "이 규칙이 거래와 일치하면, 목록에서 이 규칙 뒤에 있는 규칙은 해당 거래에 대해 건너뜁니다."
+    },
+    "if": {
+      "description": "일치하는 거래에 대해서만 동작이 실행됩니다",
+      "everyTransaction": "아직 조건이 없으므로 이 규칙은 모든 거래에 적용됩니다."
+    },
+    "then": {
+      "description": "동작은 이 순서대로 실행됩니다",
+      "empty": "아직 동작이 없습니다. 하나 이상 추가하세요.",
+      "limit": "하나의 규칙에는 동작을 최대 {max}개까지 둘 수 있습니다."
+    },
+    "group": {
+      "matchAll": "다음 모두",
+      "matchAny": "다음 중 하나라도",
+      "matchLabel": "일치 방식",
+      "not": "NOT",
+      "notLabel": "이 그룹 부정: 그룹의 조건을 만족하지 않을 때 일치합니다",
+      "title": "그룹",
+      "addCondition": "+ 조건 추가",
+      "addGroup": "+ 그룹 추가",
+      "depthLimit": "그룹은 최대 {max}단계까지 중첩할 수 있습니다.",
+      "sizeLimit": "조건 개수 한도에 도달했습니다.",
+      "empty": "이 그룹은 비어 있습니다."
+    },
+    "condition": {
+      "title": "조건",
+      "field": "필드",
+      "operator": "연산자",
+      "value": "값"
+    },
+    "fields": {
+      "accountId": "계좌",
+      "fromAccountId": "출금 계좌(이체)",
+      "toAccountId": "입금 계좌(이체)",
+      "type": "유형",
+      "payeeId": "수취인",
+      "payeeText": "수신 그대로의 수취인 텍스트",
+      "categoryId": "카테고리",
+      "description": "설명",
+      "memo": "메모",
+      "amount": "금액(부호 포함)",
+      "absAmount": "금액(부호 제외)",
+      "currencyCode": "통화",
+      "tagIds": "태그",
+      "hasSplits": "분할 있음"
+    },
+    "operators": {
+      "eq": "다음과 같음",
+      "neq": "다음과 같지 않음",
+      "in": "다음 중 하나임",
+      "notIn": "다음 중 어느 것도 아님",
+      "isEmpty": "비어 있음",
+      "contains": "다음을 포함함",
+      "startsWith": "다음으로 시작함",
+      "matches": "패턴과 일치함",
+      "lt": "다음보다 작음",
+      "lte": "다음 이하임",
+      "gt": "다음보다 큼",
+      "gte": "다음 이상임",
+      "between": "다음 사이임",
+      "hasAny": "다음 중 하나라도 가짐",
+      "hasAll": "다음을 모두 가짐",
+      "hasNone": "다음 중 어느 것도 가지지 않음",
+      "inSubtree": "다음에 속하거나 그 하위임"
+    },
+    "types": {
+      "EXPENSE": "지출",
+      "INCOME": "수입",
+      "TRANSFER": "이체"
+    },
+    "value": {
+      "account": "계좌 선택",
+      "accounts": "계좌 선택",
+      "payee": "수취인 선택",
+      "payees": "수취인 선택",
+      "category": "카테고리 선택",
+      "categories": "카테고리 선택",
+      "tags": "태그 선택",
+      "currency": "통화 선택",
+      "currencies": "통화 선택",
+      "types": "유형 선택",
+      "matchesHint": "와일드카드로 *를 사용하세요. 예를 들어 *커피*는 커피가 들어간 모든 텍스트와 일치합니다.",
+      "amount": "금액",
+      "from": "시작",
+      "to": "끝",
+      "yes": "예",
+      "no": "아니요"
+    },
+    "action": {
+      "title": "동작",
+      "type": "동작 유형",
+      "tags": "태그",
+      "category": "카테고리",
+      "payee": "수취인",
+      "instruction": "확인할 내용",
+      "instructionPlaceholder": "예: 이 구매를 영수증에 따라 분할",
+      "instructionHelp": "규칙은 검토를 요청할 뿐입니다. 모든 변경은 적용되기 전에 사람이 승인합니다.",
+      "onlyIfEmpty": "비어 있는 경우에만",
+      "onlyIfEmptyHelp": "켜면 거래에 카테고리나 수취인이 없을 때만 규칙이 채웁니다. 직접 지정했거나 수취인의 기본 카테고리로 지정된 값은 바꾸지 않습니다. 바꾸려면 끄세요.",
+      "add": "+ 동작 추가"
+    },
+    "actionTypes": {
+      "add_tags": "태그 추가",
+      "remove_tags": "태그 제거",
+      "set_category": "카테고리 지정",
+      "set_payee": "수취인 지정",
+      "request_ai_review": "AI 검토 요청"
+    },
+    "save": {
+      "button": "규칙 저장",
+      "createdToast": "규칙을 만들었습니다",
+      "savedToast": "규칙을 저장했습니다",
+      "failedToast": "규칙을 저장하지 못했습니다",
+      "summary": "규칙이 저장되지 않았습니다. 아래에 표시된 항목을 수정한 후 다시 시도하세요."
+    },
+    "loadError": {
+      "title": "규칙을 불러오지 못했습니다",
+      "body": "규칙이 비어 있어서가 아니라 요청이 실패했기 때문에 아무것도 표시되지 않습니다. 연결을 확인한 후 다시 시도하세요.",
+      "lookupsBody": "계좌, 수취인, 카테고리, 태그, 통화 목록을 불러오지 못해 규칙을 안전하게 표시할 수 없습니다. 연결을 확인한 후 다시 시도하세요.",
+      "notFound": "이 규칙은 더 이상 존재하지 않습니다. 삭제되었을 수 있습니다.",
+      "retry": "다시 시도"
+    },
+    "invalid": {
+      "title": "이 규칙은 실행할 수 없습니다",
+      "repaired": "저장된 정의의 일부를 읽을 수 없어 여기에서 제거되거나 초기화되었습니다. 저장하기 전에 규칙을 검토하세요."
+    },
+    "conflict": {
+      "title": "이 규칙이 다른 곳에서 변경되었습니다",
+      "body": "최신 버전을 보려면 다시 불러오세요. 저장하지 않은 변경 내용은 사라집니다.",
+      "reload": "다시 불러오기"
+    },
+    "errors": {
+      "codes": {
+        "INVALID_SHAPE": "이 부분은 편집기가 이해할 수 없는 형태입니다.",
+        "UNKNOWN_KEY": "이 부분에 존재하지 않는 설정이 있습니다.",
+        "UNKNOWN_FIELD": "필드를 선택하세요.",
+        "UNKNOWN_ACTION": "동작을 선택하세요.",
+        "OPERATOR_NOT_ALLOWED": "이 필드에서는 해당 연산자를 사용할 수 없습니다.",
+        "VALUE_REQUIRED": "값을 입력하거나 선택하세요.",
+        "VALUE_NOT_ALLOWED": "이 연산자에는 값을 지정할 수 없습니다.",
+        "VALUE_TYPE": "이 필드에 맞지 않는 종류의 값입니다.",
+        "VALUE_OUT_OF_RANGE": "값이 범위를 벗어났습니다.",
+        "VALUE_TOO_LONG": "텍스트가 너무 깁니다.",
+        "VALUE_EMPTY": "텍스트를 입력하세요.",
+        "INVALID_UUID": "목록에서 항목을 선택하세요.",
+        "INVALID_ENUM": "나열된 값 중 하나를 선택하세요.",
+        "INVALID_CURRENCY": "통화를 선택하세요.",
+        "ARRAY_EMPTY": "하나 이상 선택하세요.",
+        "ARRAY_TOO_LARGE": "선택한 항목이 너무 많습니다.",
+        "RANGE_ORDER": "첫 번째 금액은 두 번째 금액보다 클 수 없습니다.",
+        "MAX_DEPTH": "그룹이 너무 깊게 중첩되었습니다. 한도는 {maxDepth}단계입니다.",
+        "MAX_LEAVES": "조건이 너무 많습니다. 한도는 {maxLeaves}개입니다.",
+        "MAX_NODES": "조건과 그룹이 너무 많습니다. 한도는 {maxNodes}개입니다.",
+        "NO_ACTIONS": "동작을 하나 이상 추가하세요.",
+        "TOO_MANY_ACTIONS": "동작이 너무 많습니다. 한도는 {maxActions}개입니다.",
+        "DUPLICATE_ACTION": "하나의 규칙에서 AI 검토는 한 번만 요청할 수 있습니다.",
+        "REFERENCE_NOT_FOUND": "여기에서 선택한 항목이 더 이상 존재하지 않습니다. 다른 항목을 선택하세요.",
+        "NAME_REQUIRED": "규칙 이름을 입력하세요.",
+        "UNKNOWN": "이 부분은 올바르지 않습니다."
+      }
+    }
   }
 }

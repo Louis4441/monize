@@ -61,5 +61,193 @@
     "reorderFailed": "Não foi possível alterar a ordem das regras",
     "listChanged": "A lista de regras foi alterada noutro local e foi recarregada. Tente novamente",
     "loadFailed": "Não foi possível carregar as regras"
+  },
+  "editor": {
+    "page": {
+      "newTitle": "Nova regra",
+      "editTitle": "Editar regra",
+      "subtitle": "Escolha quando a regra é executada, que transações abrange e o que altera",
+      "backToRules": "Voltar às regras",
+      "loading": "A carregar a regra..."
+    },
+    "name": {
+      "label": "Nome",
+      "placeholder": "Por exemplo: Etiquetar cafés"
+    },
+    "enabled": {
+      "label": "Regra ativada"
+    },
+    "sections": {
+      "when": "Quando",
+      "if": "Se",
+      "then": "Então"
+    },
+    "when": {
+      "description": "Escolha quando a regra examina uma transação",
+      "created": "Uma transação é criada",
+      "imported": "Uma transação é importada",
+      "atLeastOne": "Mantenha pelo menos uma opção selecionada",
+      "stopProcessing": "Parar de processar as outras regras",
+      "stopProcessingHelp": "Quando esta regra corresponde a uma transação, as regras que vêm depois dela na lista são ignoradas para essa transação."
+    },
+    "if": {
+      "description": "As ações são executadas apenas para as transações que correspondem",
+      "everyTransaction": "Ainda não há condições, por isso esta regra aplica-se a todas as transações."
+    },
+    "then": {
+      "description": "As ações são executadas por esta ordem",
+      "empty": "Ainda não há ações. Adicione pelo menos uma.",
+      "limit": "Uma regra pode ter no máximo {max} ações."
+    },
+    "group": {
+      "matchAll": "Todas estas",
+      "matchAny": "Qualquer uma destas",
+      "matchLabel": "Correspondência",
+      "not": "Não",
+      "notLabel": "Negar este grupo: corresponde quando as suas condições não se verificam",
+      "title": "Grupo",
+      "addCondition": "+ Adicionar condição",
+      "addGroup": "+ Adicionar grupo",
+      "depthLimit": "Os grupos podem ser aninhados em no máximo {max} níveis.",
+      "sizeLimit": "Foi atingido o limite de condições.",
+      "empty": "Este grupo está vazio."
+    },
+    "condition": {
+      "title": "Condição",
+      "field": "Campo",
+      "operator": "Operador",
+      "value": "Valor"
+    },
+    "fields": {
+      "accountId": "Conta",
+      "fromAccountId": "Conta de origem (transferências)",
+      "toAccountId": "Conta de destino (transferências)",
+      "type": "Tipo",
+      "payeeId": "Beneficiário",
+      "payeeText": "Texto do beneficiário tal como recebido",
+      "categoryId": "Categoria",
+      "description": "Descrição",
+      "memo": "Nota",
+      "amount": "Montante (com sinal)",
+      "absAmount": "Montante (sem sinal)",
+      "currencyCode": "Moeda",
+      "tagIds": "Etiquetas",
+      "hasSplits": "Tem divisões"
+    },
+    "operators": {
+      "eq": "é",
+      "neq": "não é",
+      "in": "é um de",
+      "notIn": "não é nenhum de",
+      "isEmpty": "está vazio",
+      "contains": "contém",
+      "startsWith": "começa por",
+      "matches": "corresponde ao padrão",
+      "lt": "é inferior a",
+      "lte": "é no máximo",
+      "gt": "é superior a",
+      "gte": "é no mínimo",
+      "between": "está entre",
+      "hasAny": "tem qualquer uma de",
+      "hasAll": "tem todas de",
+      "hasNone": "não tem nenhuma de",
+      "inSubtree": "está em ou abaixo de"
+    },
+    "types": {
+      "EXPENSE": "Despesa",
+      "INCOME": "Receita",
+      "TRANSFER": "Transferência"
+    },
+    "value": {
+      "account": "Escolha uma conta",
+      "accounts": "Escolha contas",
+      "payee": "Escolha um beneficiário",
+      "payees": "Escolha beneficiários",
+      "category": "Escolha uma categoria",
+      "categories": "Escolha categorias",
+      "tags": "Escolha etiquetas",
+      "currency": "Escolha uma moeda",
+      "currencies": "Escolha moedas",
+      "types": "Escolha tipos",
+      "matchesHint": "Use * como caráter universal. Por exemplo, *café* corresponde a qualquer texto que contenha café.",
+      "amount": "Montante",
+      "from": "De",
+      "to": "Até",
+      "yes": "Sim",
+      "no": "Não"
+    },
+    "action": {
+      "title": "Ação",
+      "type": "Tipo de ação",
+      "tags": "Etiquetas",
+      "category": "Categoria",
+      "payee": "Beneficiário",
+      "instruction": "O que deve ser verificado",
+      "instructionPlaceholder": "Por exemplo: dividir esta compra de acordo com o recibo",
+      "instructionHelp": "A regra limita-se a pedir uma revisão. Uma pessoa aprova qualquer alteração antes de esta ser feita.",
+      "onlyIfEmpty": "Apenas se vazio",
+      "onlyIfEmptyHelp": "Quando ativado, a regra preenche a categoria ou o beneficiário apenas se a transação não tiver nenhum. Não substitui um valor definido manualmente ou pela categoria predefinida do beneficiário. Desative para o substituir.",
+      "add": "+ Adicionar ação"
+    },
+    "actionTypes": {
+      "add_tags": "Adicionar etiquetas",
+      "remove_tags": "Remover etiquetas",
+      "set_category": "Definir a categoria",
+      "set_payee": "Definir o beneficiário",
+      "request_ai_review": "Pedir uma revisão da IA"
+    },
+    "save": {
+      "button": "Guardar regra",
+      "createdToast": "Regra criada",
+      "savedToast": "Regra guardada",
+      "failedToast": "Não foi possível guardar a regra",
+      "summary": "A regra não foi guardada. Corrija os itens assinalados abaixo e tente novamente."
+    },
+    "loadError": {
+      "title": "Não foi possível carregar a regra",
+      "body": "Nada é apresentado porque o pedido falhou, não porque a regra esteja vazia. Verifique a sua ligação e tente novamente.",
+      "lookupsBody": "Não foi possível carregar as listas de contas, beneficiários, categorias, etiquetas e moedas, pelo que a regra não pode ser apresentada com segurança. Verifique a sua ligação e tente novamente.",
+      "notFound": "Esta regra já não existe. Pode ter sido eliminada.",
+      "retry": "Tentar novamente"
+    },
+    "invalid": {
+      "title": "Esta regra não pode ser executada",
+      "repaired": "Algumas partes da definição guardada não puderam ser lidas e foram aqui removidas ou repostas. Reveja a regra antes de guardar."
+    },
+    "conflict": {
+      "title": "Esta regra foi alterada noutro local",
+      "body": "Recarregue-a para ver a versão mais recente. As suas alterações não guardadas serão perdidas.",
+      "reload": "Recarregar"
+    },
+    "errors": {
+      "codes": {
+        "INVALID_SHAPE": "Esta parte não tem uma forma que o editor entenda.",
+        "UNKNOWN_KEY": "Esta parte tem uma definição que não existe.",
+        "UNKNOWN_FIELD": "Escolha um campo.",
+        "UNKNOWN_ACTION": "Escolha uma ação.",
+        "OPERATOR_NOT_ALLOWED": "Este campo não permite esse operador.",
+        "VALUE_REQUIRED": "Introduza ou escolha um valor.",
+        "VALUE_NOT_ALLOWED": "Este operador não aceita valor.",
+        "VALUE_TYPE": "O valor não é do tipo certo para este campo.",
+        "VALUE_OUT_OF_RANGE": "O valor está fora do intervalo.",
+        "VALUE_TOO_LONG": "O texto é demasiado longo.",
+        "VALUE_EMPTY": "Introduza algum texto.",
+        "INVALID_UUID": "Escolha um item da lista.",
+        "INVALID_ENUM": "Escolha um dos valores listados.",
+        "INVALID_CURRENCY": "Escolha uma moeda.",
+        "ARRAY_EMPTY": "Escolha pelo menos um item.",
+        "ARRAY_TOO_LARGE": "Estão escolhidos itens a mais.",
+        "RANGE_ORDER": "O primeiro montante não pode ser superior ao segundo.",
+        "MAX_DEPTH": "Os grupos estão aninhados demasiado fundo. O limite é de {maxDepth} níveis.",
+        "MAX_LEAVES": "Há condições a mais. O limite é {maxLeaves}.",
+        "MAX_NODES": "Há condições e grupos a mais. O limite é {maxNodes}.",
+        "NO_ACTIONS": "Adicione pelo menos uma ação.",
+        "TOO_MANY_ACTIONS": "Há ações a mais. O limite é {maxActions}.",
+        "DUPLICATE_ACTION": "Uma regra só pode pedir uma revisão da IA uma vez.",
+        "REFERENCE_NOT_FOUND": "Um item escolhido aqui já não existe. Escolha outro.",
+        "NAME_REQUIRED": "Introduza um nome para a regra.",
+        "UNKNOWN": "Esta parte não é válida."
+      }
+    }
   }
 }

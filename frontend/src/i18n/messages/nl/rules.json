@@ -61,5 +61,193 @@
     "reorderFailed": "De volgorde van de regels kon niet worden gewijzigd",
     "listChanged": "De lijst met regels is elders gewijzigd en opnieuw geladen. Probeer het opnieuw",
     "loadFailed": "Regels konden niet worden geladen"
+  },
+  "editor": {
+    "page": {
+      "newTitle": "Nieuwe regel",
+      "editTitle": "Regel bewerken",
+      "subtitle": "Kies wanneer de regel wordt uitgevoerd, welke transacties ze omvat en wat ze wijzigt",
+      "backToRules": "Terug naar regels",
+      "loading": "Regel laden..."
+    },
+    "name": {
+      "label": "Naam",
+      "placeholder": "Bijvoorbeeld: Cafés taggen"
+    },
+    "enabled": {
+      "label": "Regel ingeschakeld"
+    },
+    "sections": {
+      "when": "Wanneer",
+      "if": "Als",
+      "then": "Dan"
+    },
+    "when": {
+      "description": "Kies wanneer de regel een transactie bekijkt",
+      "created": "Een transactie wordt aangemaakt",
+      "imported": "Een transactie wordt geïmporteerd",
+      "atLeastOne": "Houd minstens één optie aangevinkt",
+      "stopProcessing": "Verwerking van andere regels stoppen",
+      "stopProcessingHelp": "Als deze regel bij een transactie past, worden de regels die in de lijst na haar komen voor die transactie overgeslagen."
+    },
+    "if": {
+      "description": "De acties worden alleen uitgevoerd voor transacties die passen",
+      "everyTransaction": "Nog geen voorwaarden, dus deze regel geldt voor elke transactie."
+    },
+    "then": {
+      "description": "De acties worden in deze volgorde uitgevoerd",
+      "empty": "Nog geen acties. Voeg er minstens één toe.",
+      "limit": "Een regel kan maximaal {max} acties hebben."
+    },
+    "group": {
+      "matchAll": "Al deze",
+      "matchAny": "Een van deze",
+      "matchLabel": "Overeenkomst",
+      "not": "Niet",
+      "notLabel": "Deze groep omkeren: ze komt overeen als haar voorwaarden niet gelden",
+      "title": "Groep",
+      "addCondition": "+ Voorwaarde toevoegen",
+      "addGroup": "+ Groep toevoegen",
+      "depthLimit": "Groepen kunnen maximaal {max} niveaus diep genest worden.",
+      "sizeLimit": "De limiet voor voorwaarden is bereikt.",
+      "empty": "Deze groep is leeg."
+    },
+    "condition": {
+      "title": "Voorwaarde",
+      "field": "Veld",
+      "operator": "Operator",
+      "value": "Waarde"
+    },
+    "fields": {
+      "accountId": "Rekening",
+      "fromAccountId": "Van rekening (overboekingen)",
+      "toAccountId": "Naar rekening (overboekingen)",
+      "type": "Type",
+      "payeeId": "Begunstigde",
+      "payeeText": "Tekst van de begunstigde zoals ontvangen",
+      "categoryId": "Categorie",
+      "description": "Omschrijving",
+      "memo": "Notitie",
+      "amount": "Bedrag (met teken)",
+      "absAmount": "Bedrag (zonder teken)",
+      "currencyCode": "Valuta",
+      "tagIds": "Tags",
+      "hasSplits": "Heeft splitsingen"
+    },
+    "operators": {
+      "eq": "is",
+      "neq": "is niet",
+      "in": "is een van",
+      "notIn": "is geen van",
+      "isEmpty": "is leeg",
+      "contains": "bevat",
+      "startsWith": "begint met",
+      "matches": "komt overeen met het patroon",
+      "lt": "is kleiner dan",
+      "lte": "is hooguit",
+      "gt": "is groter dan",
+      "gte": "is minstens",
+      "between": "ligt tussen",
+      "hasAny": "heeft een van",
+      "hasAll": "heeft alle van",
+      "hasNone": "heeft geen van",
+      "inSubtree": "valt in of onder"
+    },
+    "types": {
+      "EXPENSE": "Uitgave",
+      "INCOME": "Inkomsten",
+      "TRANSFER": "Overboeking"
+    },
+    "value": {
+      "account": "Kies een rekening",
+      "accounts": "Kies rekeningen",
+      "payee": "Kies een begunstigde",
+      "payees": "Kies begunstigden",
+      "category": "Kies een categorie",
+      "categories": "Kies categorieën",
+      "tags": "Kies tags",
+      "currency": "Kies een valuta",
+      "currencies": "Kies valuta's",
+      "types": "Kies typen",
+      "matchesHint": "Gebruik * als jokerteken. Bijvoorbeeld: *koffie* komt overeen met elke tekst die koffie bevat.",
+      "amount": "Bedrag",
+      "from": "Van",
+      "to": "Tot",
+      "yes": "Ja",
+      "no": "Nee"
+    },
+    "action": {
+      "title": "Actie",
+      "type": "Actietype",
+      "tags": "Tags",
+      "category": "Categorie",
+      "payee": "Begunstigde",
+      "instruction": "Wat moet worden gecontroleerd",
+      "instructionPlaceholder": "Bijvoorbeeld: splits deze aankoop volgens de bon",
+      "instructionHelp": "De regel vraagt alleen om een controle. Een persoon keurt elke wijziging goed voordat ze wordt doorgevoerd.",
+      "onlyIfEmpty": "Alleen als leeg",
+      "onlyIfEmptyHelp": "Indien ingeschakeld vult de regel de categorie of begunstigde alleen in als de transactie er geen heeft. Een met de hand of via de standaardcategorie van de begunstigde ingestelde waarde wordt niet vervangen. Schakel uit om te vervangen.",
+      "add": "+ Actie toevoegen"
+    },
+    "actionTypes": {
+      "add_tags": "Tags toevoegen",
+      "remove_tags": "Tags verwijderen",
+      "set_category": "Categorie instellen",
+      "set_payee": "Begunstigde instellen",
+      "request_ai_review": "AI-controle aanvragen"
+    },
+    "save": {
+      "button": "Regel opslaan",
+      "createdToast": "Regel aangemaakt",
+      "savedToast": "Regel opgeslagen",
+      "failedToast": "De regel kon niet worden opgeslagen",
+      "summary": "De regel is niet opgeslagen. Corrigeer de hieronder gemarkeerde onderdelen en probeer het opnieuw."
+    },
+    "loadError": {
+      "title": "De regel kon niet worden geladen",
+      "body": "Er wordt niets getoond omdat het verzoek is mislukt, niet omdat de regel leeg is. Controleer je verbinding en probeer het opnieuw.",
+      "lookupsBody": "De lijsten met rekeningen, begunstigden, categorieën, tags en valuta's konden niet worden geladen, dus de regel kan niet veilig worden getoond. Controleer je verbinding en probeer het opnieuw.",
+      "notFound": "Deze regel bestaat niet meer. Mogelijk is ze verwijderd.",
+      "retry": "Opnieuw proberen"
+    },
+    "invalid": {
+      "title": "Deze regel kan niet worden uitgevoerd",
+      "repaired": "Sommige delen van de opgeslagen definitie konden niet worden gelezen en zijn hier verwijderd of teruggezet. Controleer de regel voordat je opslaat."
+    },
+    "conflict": {
+      "title": "Deze regel is elders gewijzigd",
+      "body": "Laad haar opnieuw om de nieuwste versie te zien. Je niet-opgeslagen wijzigingen gaan verloren.",
+      "reload": "Opnieuw laden"
+    },
+    "errors": {
+      "codes": {
+        "INVALID_SHAPE": "Dit onderdeel heeft een vorm die de editor niet begrijpt.",
+        "UNKNOWN_KEY": "Dit onderdeel bevat een instelling die niet bestaat.",
+        "UNKNOWN_FIELD": "Kies een veld.",
+        "UNKNOWN_ACTION": "Kies een actie.",
+        "OPERATOR_NOT_ALLOWED": "Dit veld staat die operator niet toe.",
+        "VALUE_REQUIRED": "Voer een waarde in of kies er een.",
+        "VALUE_NOT_ALLOWED": "Deze operator neemt geen waarde aan.",
+        "VALUE_TYPE": "De waarde is van het verkeerde soort voor dit veld.",
+        "VALUE_OUT_OF_RANGE": "De waarde valt buiten het bereik.",
+        "VALUE_TOO_LONG": "De tekst is te lang.",
+        "VALUE_EMPTY": "Voer wat tekst in.",
+        "INVALID_UUID": "Kies een item uit de lijst.",
+        "INVALID_ENUM": "Kies een van de vermelde waarden.",
+        "INVALID_CURRENCY": "Kies een valuta.",
+        "ARRAY_EMPTY": "Kies minstens één item.",
+        "ARRAY_TOO_LARGE": "Er zijn te veel items gekozen.",
+        "RANGE_ORDER": "Het eerste bedrag mag niet groter zijn dan het tweede.",
+        "MAX_DEPTH": "De groepen zijn te diep genest. De limiet is {maxDepth} niveaus.",
+        "MAX_LEAVES": "Er zijn te veel voorwaarden. De limiet is {maxLeaves}.",
+        "MAX_NODES": "Er zijn te veel voorwaarden en groepen. De limiet is {maxNodes}.",
+        "NO_ACTIONS": "Voeg minstens één actie toe.",
+        "TOO_MANY_ACTIONS": "Er zijn te veel acties. De limiet is {maxActions}.",
+        "DUPLICATE_ACTION": "Een regel kan maar één keer om een AI-controle vragen.",
+        "REFERENCE_NOT_FOUND": "Een hier gekozen item bestaat niet meer. Kies een ander.",
+        "NAME_REQUIRED": "Voer een naam voor de regel in.",
+        "UNKNOWN": "Dit onderdeel is ongeldig."
+      }
+    }
   }
 }

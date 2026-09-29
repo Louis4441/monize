@@ -61,5 +61,193 @@
     "reorderFailed": "Die Reihenfolge der Regeln konnte nicht geändert werden",
     "listChanged": "Die Regelliste wurde an anderer Stelle geändert und neu geladen. Versuchen Sie es erneut",
     "loadFailed": "Regeln konnten nicht geladen werden"
+  },
+  "editor": {
+    "page": {
+      "newTitle": "Neue Regel",
+      "editTitle": "Regel bearbeiten",
+      "subtitle": "Legen Sie fest, wann die Regel läuft, welche Transaktionen sie erfasst und was sie ändert",
+      "backToRules": "Zurück zu Regeln",
+      "loading": "Regel wird geladen..."
+    },
+    "name": {
+      "label": "Name",
+      "placeholder": "Zum Beispiel: Cafés taggen"
+    },
+    "enabled": {
+      "label": "Regel aktiviert"
+    },
+    "sections": {
+      "when": "Wann",
+      "if": "Wenn",
+      "then": "Dann"
+    },
+    "when": {
+      "description": "Legen Sie fest, wann die Regel eine Transaktion prüft",
+      "created": "Eine Transaktion wird erstellt",
+      "imported": "Eine Transaktion wird importiert",
+      "atLeastOne": "Mindestens eine Option muss ausgewählt bleiben",
+      "stopProcessing": "Weitere Regeln nicht mehr verarbeiten",
+      "stopProcessingHelp": "Wenn diese Regel auf eine Transaktion zutrifft, werden die Regeln, die in der Liste danach stehen, für diese Transaktion übersprungen."
+    },
+    "if": {
+      "description": "Die Aktionen laufen nur für Transaktionen, die zutreffen",
+      "everyTransaction": "Noch keine Bedingungen, daher gilt diese Regel für jede Transaktion."
+    },
+    "then": {
+      "description": "Die Aktionen laufen in dieser Reihenfolge",
+      "empty": "Noch keine Aktionen. Fügen Sie mindestens eine hinzu.",
+      "limit": "Eine Regel kann höchstens {max} Aktionen haben."
+    },
+    "group": {
+      "matchAll": "Alle dieser Bedingungen",
+      "matchAny": "Eine dieser Bedingungen",
+      "matchLabel": "Übereinstimmung",
+      "not": "Nicht",
+      "notLabel": "Diese Gruppe umkehren: sie trifft zu, wenn ihre Bedingungen nicht zutreffen",
+      "title": "Gruppe",
+      "addCondition": "+ Bedingung hinzufügen",
+      "addGroup": "+ Gruppe hinzufügen",
+      "depthLimit": "Gruppen können höchstens {max} Ebenen tief verschachtelt werden.",
+      "sizeLimit": "Das Limit für Bedingungen ist erreicht.",
+      "empty": "Diese Gruppe ist leer."
+    },
+    "condition": {
+      "title": "Bedingung",
+      "field": "Feld",
+      "operator": "Operator",
+      "value": "Wert"
+    },
+    "fields": {
+      "accountId": "Konto",
+      "fromAccountId": "Von Konto (Überweisungen)",
+      "toAccountId": "Auf Konto (Überweisungen)",
+      "type": "Typ",
+      "payeeId": "Zahlungsempfänger",
+      "payeeText": "Zahlungsempfänger-Text wie empfangen",
+      "categoryId": "Kategorie",
+      "description": "Beschreibung",
+      "memo": "Notiz",
+      "amount": "Betrag (mit Vorzeichen)",
+      "absAmount": "Betrag (ohne Vorzeichen)",
+      "currencyCode": "Währung",
+      "tagIds": "Tags",
+      "hasSplits": "Hat Aufteilungen"
+    },
+    "operators": {
+      "eq": "ist",
+      "neq": "ist nicht",
+      "in": "ist eines von",
+      "notIn": "ist keines von",
+      "isEmpty": "ist leer",
+      "contains": "enthält",
+      "startsWith": "beginnt mit",
+      "matches": "entspricht dem Muster",
+      "lt": "ist kleiner als",
+      "lte": "ist höchstens",
+      "gt": "ist größer als",
+      "gte": "ist mindestens",
+      "between": "liegt zwischen",
+      "hasAny": "hat eines von",
+      "hasAll": "hat alle von",
+      "hasNone": "hat keines von",
+      "inSubtree": "liegt in oder unterhalb von"
+    },
+    "types": {
+      "EXPENSE": "Ausgabe",
+      "INCOME": "Einnahme",
+      "TRANSFER": "Überweisung"
+    },
+    "value": {
+      "account": "Konto auswählen",
+      "accounts": "Konten auswählen",
+      "payee": "Zahlungsempfänger auswählen",
+      "payees": "Zahlungsempfänger auswählen",
+      "category": "Kategorie auswählen",
+      "categories": "Kategorien auswählen",
+      "tags": "Tags auswählen",
+      "currency": "Währung auswählen",
+      "currencies": "Währungen auswählen",
+      "types": "Typen auswählen",
+      "matchesHint": "Verwenden Sie * als Platzhalter. Zum Beispiel trifft *Kaffee* auf jeden Text zu, der Kaffee enthält.",
+      "amount": "Betrag",
+      "from": "Von",
+      "to": "Bis",
+      "yes": "Ja",
+      "no": "Nein"
+    },
+    "action": {
+      "title": "Aktion",
+      "type": "Aktionstyp",
+      "tags": "Tags",
+      "category": "Kategorie",
+      "payee": "Zahlungsempfänger",
+      "instruction": "Was soll geprüft werden",
+      "instructionPlaceholder": "Zum Beispiel: diesen Einkauf nach dem Beleg aufteilen",
+      "instructionHelp": "Die Regel bittet nur um eine Prüfung. Eine Person bestätigt jede Änderung, bevor sie vorgenommen wird.",
+      "onlyIfEmpty": "Nur wenn leer",
+      "onlyIfEmptyHelp": "Wenn aktiviert, füllt die Regel Kategorie oder Zahlungsempfänger nur aus, wenn die Transaktion keine hat. Ein von Hand oder durch die Standardkategorie des Zahlungsempfängers gesetzter Wert wird nicht ersetzt. Deaktivieren Sie die Option, um ihn zu ersetzen.",
+      "add": "+ Aktion hinzufügen"
+    },
+    "actionTypes": {
+      "add_tags": "Tags hinzufügen",
+      "remove_tags": "Tags entfernen",
+      "set_category": "Kategorie festlegen",
+      "set_payee": "Zahlungsempfänger festlegen",
+      "request_ai_review": "KI-Prüfung anfordern"
+    },
+    "save": {
+      "button": "Regel speichern",
+      "createdToast": "Regel erstellt",
+      "savedToast": "Regel gespeichert",
+      "failedToast": "Die Regel konnte nicht gespeichert werden",
+      "summary": "Die Regel wurde nicht gespeichert. Korrigieren Sie die unten markierten Punkte und versuchen Sie es erneut."
+    },
+    "loadError": {
+      "title": "Die Regel konnte nicht geladen werden",
+      "body": "Es wird nichts angezeigt, weil die Anfrage fehlgeschlagen ist, nicht weil die Regel leer ist. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+      "lookupsBody": "Die Listen der Konten, Zahlungsempfänger, Kategorien, Tags und Währungen konnten nicht geladen werden, daher kann die Regel nicht sicher angezeigt werden. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+      "notFound": "Diese Regel existiert nicht mehr. Möglicherweise wurde sie gelöscht.",
+      "retry": "Erneut versuchen"
+    },
+    "invalid": {
+      "title": "Diese Regel kann nicht laufen",
+      "repaired": "Einige Teile der gespeicherten Definition konnten nicht gelesen werden und wurden hier entfernt oder zurückgesetzt. Prüfen Sie die Regel vor dem Speichern."
+    },
+    "conflict": {
+      "title": "Diese Regel wurde an anderer Stelle geändert",
+      "body": "Laden Sie sie neu, um die aktuelle Version zu sehen. Ihre nicht gespeicherten Änderungen gehen verloren.",
+      "reload": "Neu laden"
+    },
+    "errors": {
+      "codes": {
+        "INVALID_SHAPE": "Dieser Teil hat eine Form, die der Editor nicht versteht.",
+        "UNKNOWN_KEY": "Dieser Teil enthält eine Einstellung, die es nicht gibt.",
+        "UNKNOWN_FIELD": "Wählen Sie ein Feld.",
+        "UNKNOWN_ACTION": "Wählen Sie eine Aktion.",
+        "OPERATOR_NOT_ALLOWED": "Dieses Feld erlaubt diesen Operator nicht.",
+        "VALUE_REQUIRED": "Geben Sie einen Wert ein oder wählen Sie einen aus.",
+        "VALUE_NOT_ALLOWED": "Dieser Operator nimmt keinen Wert an.",
+        "VALUE_TYPE": "Der Wert hat die falsche Art für dieses Feld.",
+        "VALUE_OUT_OF_RANGE": "Der Wert liegt außerhalb des zulässigen Bereichs.",
+        "VALUE_TOO_LONG": "Der Text ist zu lang.",
+        "VALUE_EMPTY": "Geben Sie einen Text ein.",
+        "INVALID_UUID": "Wählen Sie einen Eintrag aus der Liste.",
+        "INVALID_ENUM": "Wählen Sie einen der angebotenen Werte.",
+        "INVALID_CURRENCY": "Wählen Sie eine Währung.",
+        "ARRAY_EMPTY": "Wählen Sie mindestens einen Eintrag.",
+        "ARRAY_TOO_LARGE": "Es sind zu viele Einträge ausgewählt.",
+        "RANGE_ORDER": "Der erste Betrag darf nicht größer sein als der zweite.",
+        "MAX_DEPTH": "Die Gruppen sind zu tief verschachtelt. Das Limit sind {maxDepth} Ebenen.",
+        "MAX_LEAVES": "Es gibt zu viele Bedingungen. Das Limit ist {maxLeaves}.",
+        "MAX_NODES": "Es gibt zu viele Bedingungen und Gruppen. Das Limit ist {maxNodes}.",
+        "NO_ACTIONS": "Fügen Sie mindestens eine Aktion hinzu.",
+        "TOO_MANY_ACTIONS": "Es gibt zu viele Aktionen. Das Limit ist {maxActions}.",
+        "DUPLICATE_ACTION": "Eine Regel kann nur einmal um eine KI-Prüfung bitten.",
+        "REFERENCE_NOT_FOUND": "Ein hier gewählter Eintrag existiert nicht mehr. Wählen Sie einen anderen.",
+        "NAME_REQUIRED": "Geben Sie einen Namen für die Regel ein.",
+        "UNKNOWN": "Dieser Teil ist ungültig."
+      }
+    }
   }
 }

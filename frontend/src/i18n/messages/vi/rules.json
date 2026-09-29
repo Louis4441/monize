@@ -61,5 +61,193 @@
     "reorderFailed": "Không thể thay đổi thứ tự quy tắc",
     "listChanged": "Danh sách quy tắc đã thay đổi ở nơi khác và đã được tải lại. Hãy thử lại",
     "loadFailed": "Không thể tải quy tắc"
+  },
+  "editor": {
+    "page": {
+      "newTitle": "Quy tắc mới",
+      "editTitle": "Chỉnh sửa quy tắc",
+      "subtitle": "Chọn thời điểm quy tắc chạy, giao dịch nào được áp dụng và quy tắc thay đổi điều gì",
+      "backToRules": "Quay lại Quy tắc",
+      "loading": "Đang tải quy tắc..."
+    },
+    "name": {
+      "label": "Tên",
+      "placeholder": "Ví dụ: Gắn thẻ các quán cà phê"
+    },
+    "enabled": {
+      "label": "Bật quy tắc"
+    },
+    "sections": {
+      "when": "Khi nào",
+      "if": "Nếu",
+      "then": "Thì"
+    },
+    "when": {
+      "description": "Chọn thời điểm quy tắc xem xét một giao dịch",
+      "created": "Một giao dịch được tạo",
+      "imported": "Một giao dịch được nhập",
+      "atLeastOne": "Giữ ít nhất một tùy chọn được chọn",
+      "stopProcessing": "Dừng xử lý các quy tắc khác",
+      "stopProcessingHelp": "Khi quy tắc này khớp với một giao dịch, các quy tắc đứng sau nó trong danh sách sẽ bị bỏ qua đối với giao dịch đó."
+    },
+    "if": {
+      "description": "Các hành động chỉ chạy với những giao dịch khớp",
+      "everyTransaction": "Chưa có điều kiện nào, nên quy tắc này áp dụng cho mọi giao dịch."
+    },
+    "then": {
+      "description": "Các hành động chạy theo thứ tự này",
+      "empty": "Chưa có hành động nào. Hãy thêm ít nhất một hành động.",
+      "limit": "Một quy tắc có tối đa {max} hành động."
+    },
+    "group": {
+      "matchAll": "Tất cả những điều sau",
+      "matchAny": "Bất kỳ điều nào sau đây",
+      "matchLabel": "Khớp",
+      "not": "Không",
+      "notLabel": "Đảo ngược nhóm này: nhóm khớp khi các điều kiện của nó không được thỏa mãn",
+      "title": "Nhóm",
+      "addCondition": "+ Thêm điều kiện",
+      "addGroup": "+ Thêm nhóm",
+      "depthLimit": "Các nhóm chỉ có thể lồng nhau tối đa {max} cấp.",
+      "sizeLimit": "Đã đạt giới hạn số điều kiện.",
+      "empty": "Nhóm này trống."
+    },
+    "condition": {
+      "title": "Điều kiện",
+      "field": "Trường",
+      "operator": "Toán tử",
+      "value": "Giá trị"
+    },
+    "fields": {
+      "accountId": "Tài khoản",
+      "fromAccountId": "Từ tài khoản (chuyển khoản)",
+      "toAccountId": "Đến tài khoản (chuyển khoản)",
+      "type": "Loại",
+      "payeeId": "Người nhận",
+      "payeeText": "Văn bản người nhận như đã nhận",
+      "categoryId": "Danh mục",
+      "description": "Mô tả",
+      "memo": "Ghi chú",
+      "amount": "Số tiền (có dấu)",
+      "absAmount": "Số tiền (không dấu)",
+      "currencyCode": "Tiền tệ",
+      "tagIds": "Thẻ",
+      "hasSplits": "Có chia nhỏ"
+    },
+    "operators": {
+      "eq": "là",
+      "neq": "không phải là",
+      "in": "là một trong",
+      "notIn": "không phải là một trong",
+      "isEmpty": "trống",
+      "contains": "chứa",
+      "startsWith": "bắt đầu bằng",
+      "matches": "khớp với mẫu",
+      "lt": "nhỏ hơn",
+      "lte": "tối đa là",
+      "gt": "lớn hơn",
+      "gte": "tối thiểu là",
+      "between": "nằm giữa",
+      "hasAny": "có bất kỳ thẻ nào trong",
+      "hasAll": "có tất cả thẻ trong",
+      "hasNone": "không có thẻ nào trong",
+      "inSubtree": "nằm trong hoặc dưới"
+    },
+    "types": {
+      "EXPENSE": "Chi tiêu",
+      "INCOME": "Thu nhập",
+      "TRANSFER": "Chuyển khoản"
+    },
+    "value": {
+      "account": "Chọn một tài khoản",
+      "accounts": "Chọn các tài khoản",
+      "payee": "Chọn một người nhận",
+      "payees": "Chọn các người nhận",
+      "category": "Chọn một danh mục",
+      "categories": "Chọn các danh mục",
+      "tags": "Chọn các thẻ",
+      "currency": "Chọn một loại tiền tệ",
+      "currencies": "Chọn các loại tiền tệ",
+      "types": "Chọn các loại",
+      "matchesHint": "Dùng * làm ký tự đại diện. Ví dụ, *cà phê* khớp với mọi văn bản có chứa cà phê.",
+      "amount": "Số tiền",
+      "from": "Từ",
+      "to": "Đến",
+      "yes": "Có",
+      "no": "Không"
+    },
+    "action": {
+      "title": "Hành động",
+      "type": "Loại hành động",
+      "tags": "Thẻ",
+      "category": "Danh mục",
+      "payee": "Người nhận",
+      "instruction": "Cần kiểm tra điều gì",
+      "instructionPlaceholder": "Ví dụ: chia khoản mua này theo hóa đơn",
+      "instructionHelp": "Quy tắc chỉ yêu cầu xem xét. Một người sẽ duyệt mọi thay đổi trước khi thực hiện.",
+      "onlyIfEmpty": "Chỉ khi trống",
+      "onlyIfEmptyHelp": "Khi bật, quy tắc chỉ điền danh mục hoặc người nhận nếu giao dịch chưa có. Quy tắc không thay thế giá trị đã đặt thủ công hoặc theo danh mục mặc định của người nhận. Hãy tắt để thay thế.",
+      "add": "+ Thêm hành động"
+    },
+    "actionTypes": {
+      "add_tags": "Thêm thẻ",
+      "remove_tags": "Xóa thẻ",
+      "set_category": "Đặt danh mục",
+      "set_payee": "Đặt người nhận",
+      "request_ai_review": "Yêu cầu AI xem xét"
+    },
+    "save": {
+      "button": "Lưu quy tắc",
+      "createdToast": "Đã tạo quy tắc",
+      "savedToast": "Đã lưu quy tắc",
+      "failedToast": "Không thể lưu quy tắc",
+      "summary": "Quy tắc chưa được lưu. Hãy sửa các mục được đánh dấu bên dưới rồi thử lại."
+    },
+    "loadError": {
+      "title": "Không thể tải quy tắc",
+      "body": "Không có gì được hiển thị vì yêu cầu thất bại, chứ không phải vì quy tắc trống. Hãy kiểm tra kết nối và thử lại.",
+      "lookupsBody": "Không thể tải danh sách tài khoản, người nhận, danh mục, thẻ và tiền tệ, nên không thể hiển thị quy tắc một cách an toàn. Hãy kiểm tra kết nối và thử lại.",
+      "notFound": "Quy tắc này không còn tồn tại. Có thể nó đã bị xóa.",
+      "retry": "Thử lại"
+    },
+    "invalid": {
+      "title": "Quy tắc này không thể chạy",
+      "repaired": "Một số phần của định nghĩa đã lưu không đọc được và đã bị xóa hoặc đặt lại ở đây. Hãy xem lại quy tắc trước khi lưu."
+    },
+    "conflict": {
+      "title": "Quy tắc này đã được thay đổi ở nơi khác",
+      "body": "Hãy tải lại để xem phiên bản mới nhất. Các thay đổi chưa lưu của bạn sẽ bị mất.",
+      "reload": "Tải lại"
+    },
+    "errors": {
+      "codes": {
+        "INVALID_SHAPE": "Phần này có dạng mà trình chỉnh sửa không hiểu.",
+        "UNKNOWN_KEY": "Phần này có một thiết lập không tồn tại.",
+        "UNKNOWN_FIELD": "Hãy chọn một trường.",
+        "UNKNOWN_ACTION": "Hãy chọn một hành động.",
+        "OPERATOR_NOT_ALLOWED": "Trường này không cho phép toán tử đó.",
+        "VALUE_REQUIRED": "Hãy nhập hoặc chọn một giá trị.",
+        "VALUE_NOT_ALLOWED": "Toán tử này không nhận giá trị.",
+        "VALUE_TYPE": "Giá trị không đúng loại đối với trường này.",
+        "VALUE_OUT_OF_RANGE": "Giá trị nằm ngoài phạm vi.",
+        "VALUE_TOO_LONG": "Văn bản quá dài.",
+        "VALUE_EMPTY": "Hãy nhập một đoạn văn bản.",
+        "INVALID_UUID": "Hãy chọn một mục từ danh sách.",
+        "INVALID_ENUM": "Hãy chọn một trong các giá trị được liệt kê.",
+        "INVALID_CURRENCY": "Hãy chọn một loại tiền tệ.",
+        "ARRAY_EMPTY": "Hãy chọn ít nhất một mục.",
+        "ARRAY_TOO_LARGE": "Đã chọn quá nhiều mục.",
+        "RANGE_ORDER": "Số tiền thứ nhất không được lớn hơn số tiền thứ hai.",
+        "MAX_DEPTH": "Các nhóm lồng nhau quá sâu. Giới hạn là {maxDepth} cấp.",
+        "MAX_LEAVES": "Có quá nhiều điều kiện. Giới hạn là {maxLeaves}.",
+        "MAX_NODES": "Có quá nhiều điều kiện và nhóm. Giới hạn là {maxNodes}.",
+        "NO_ACTIONS": "Hãy thêm ít nhất một hành động.",
+        "TOO_MANY_ACTIONS": "Có quá nhiều hành động. Giới hạn là {maxActions}.",
+        "DUPLICATE_ACTION": "Một quy tắc chỉ có thể yêu cầu AI xem xét một lần.",
+        "REFERENCE_NOT_FOUND": "Một mục được chọn ở đây không còn tồn tại. Hãy chọn mục khác.",
+        "NAME_REQUIRED": "Hãy nhập tên cho quy tắc.",
+        "UNKNOWN": "Phần này không hợp lệ."
+      }
+    }
   }
 }

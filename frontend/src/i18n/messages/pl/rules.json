@@ -61,5 +61,193 @@
     "reorderFailed": "Nie udało się zmienić kolejności reguł",
     "listChanged": "Lista reguł została zmieniona w innym miejscu i wczytana ponownie. Spróbuj jeszcze raz",
     "loadFailed": "Nie udało się wczytać reguł"
+  },
+  "editor": {
+    "page": {
+      "newTitle": "Nowa reguła",
+      "editTitle": "Edycja reguły",
+      "subtitle": "Wybierz, kiedy reguła działa, które transakcje obejmuje i co zmienia",
+      "backToRules": "Wróć do reguł",
+      "loading": "Wczytywanie reguły..."
+    },
+    "name": {
+      "label": "Nazwa",
+      "placeholder": "Na przykład: Oznacz kawiarnie"
+    },
+    "enabled": {
+      "label": "Reguła włączona"
+    },
+    "sections": {
+      "when": "Kiedy",
+      "if": "Jeśli",
+      "then": "Wtedy"
+    },
+    "when": {
+      "description": "Wybierz, kiedy reguła sprawdza transakcję",
+      "created": "Transakcja zostaje utworzona",
+      "imported": "Transakcja zostaje zaimportowana",
+      "atLeastOne": "Zostaw zaznaczoną co najmniej jedną opcję",
+      "stopProcessing": "Zatrzymaj przetwarzanie kolejnych reguł",
+      "stopProcessingHelp": "Gdy ta reguła pasuje do transakcji, reguły znajdujące się po niej na liście są dla tej transakcji pomijane."
+    },
+    "if": {
+      "description": "Akcje wykonują się tylko dla transakcji, które pasują",
+      "everyTransaction": "Brak warunków, więc ta reguła dotyczy każdej transakcji."
+    },
+    "then": {
+      "description": "Akcje wykonują się w tej kolejności",
+      "empty": "Brak akcji. Dodaj co najmniej jedną.",
+      "limit": "Reguła może mieć najwyżej {max} akcji."
+    },
+    "group": {
+      "matchAll": "Wszystkie z poniższych",
+      "matchAny": "Dowolny z poniższych",
+      "matchLabel": "Dopasowanie",
+      "not": "Nie",
+      "notLabel": "Zaprzecz tej grupie: pasuje, gdy jej warunki nie są spełnione",
+      "title": "Grupa",
+      "addCondition": "+ Dodaj warunek",
+      "addGroup": "+ Dodaj grupę",
+      "depthLimit": "Grupy mogą być zagnieżdżone na najwyżej {max} poziomach.",
+      "sizeLimit": "Osiągnięto limit warunków.",
+      "empty": "Ta grupa jest pusta."
+    },
+    "condition": {
+      "title": "Warunek",
+      "field": "Pole",
+      "operator": "Operator",
+      "value": "Wartość"
+    },
+    "fields": {
+      "accountId": "Konto",
+      "fromAccountId": "Z konta (przelewy)",
+      "toAccountId": "Na konto (przelewy)",
+      "type": "Typ",
+      "payeeId": "Odbiorca",
+      "payeeText": "Tekst odbiorcy w otrzymanej postaci",
+      "categoryId": "Kategoria",
+      "description": "Opis",
+      "memo": "Notatka",
+      "amount": "Kwota (ze znakiem)",
+      "absAmount": "Kwota (bez znaku)",
+      "currencyCode": "Waluta",
+      "tagIds": "Tagi",
+      "hasSplits": "Ma podziały"
+    },
+    "operators": {
+      "eq": "jest",
+      "neq": "nie jest",
+      "in": "jest jednym z",
+      "notIn": "nie jest żadnym z",
+      "isEmpty": "jest puste",
+      "contains": "zawiera",
+      "startsWith": "zaczyna się od",
+      "matches": "pasuje do wzorca",
+      "lt": "jest mniejsza niż",
+      "lte": "wynosi najwyżej",
+      "gt": "jest większa niż",
+      "gte": "wynosi co najmniej",
+      "between": "jest między",
+      "hasAny": "ma dowolny z",
+      "hasAll": "ma wszystkie z",
+      "hasNone": "nie ma żadnego z",
+      "inSubtree": "jest w kategorii lub pod nią"
+    },
+    "types": {
+      "EXPENSE": "Wydatek",
+      "INCOME": "Przychód",
+      "TRANSFER": "Przelew"
+    },
+    "value": {
+      "account": "Wybierz konto",
+      "accounts": "Wybierz konta",
+      "payee": "Wybierz odbiorcę",
+      "payees": "Wybierz odbiorców",
+      "category": "Wybierz kategorię",
+      "categories": "Wybierz kategorie",
+      "tags": "Wybierz tagi",
+      "currency": "Wybierz walutę",
+      "currencies": "Wybierz waluty",
+      "types": "Wybierz typy",
+      "matchesHint": "Użyj * jako symbolu wieloznacznego. Na przykład *kawa* pasuje do każdego tekstu zawierającego słowo kawa.",
+      "amount": "Kwota",
+      "from": "Od",
+      "to": "Do",
+      "yes": "Tak",
+      "no": "Nie"
+    },
+    "action": {
+      "title": "Akcja",
+      "type": "Typ akcji",
+      "tags": "Tagi",
+      "category": "Kategoria",
+      "payee": "Odbiorca",
+      "instruction": "Co należy sprawdzić",
+      "instructionPlaceholder": "Na przykład: podziel ten zakup według paragonu",
+      "instructionHelp": "Reguła tylko prosi o sprawdzenie. Każdą zmianę zatwierdza człowiek, zanim zostanie wprowadzona.",
+      "onlyIfEmpty": "Tylko jeśli puste",
+      "onlyIfEmptyHelp": "Gdy włączone, reguła uzupełnia kategorię lub odbiorcę tylko wtedy, gdy transakcja ich nie ma. Nie zastępuje wartości ustawionej ręcznie ani domyślną kategorią odbiorcy. Wyłącz, aby zastępować.",
+      "add": "+ Dodaj akcję"
+    },
+    "actionTypes": {
+      "add_tags": "Dodaj tagi",
+      "remove_tags": "Usuń tagi",
+      "set_category": "Ustaw kategorię",
+      "set_payee": "Ustaw odbiorcę",
+      "request_ai_review": "Poproś o przegląd AI"
+    },
+    "save": {
+      "button": "Zapisz regułę",
+      "createdToast": "Reguła utworzona",
+      "savedToast": "Reguła zapisana",
+      "failedToast": "Nie udało się zapisać reguły",
+      "summary": "Reguła nie została zapisana. Popraw oznaczone poniżej elementy i spróbuj ponownie."
+    },
+    "loadError": {
+      "title": "Nie udało się wczytać reguły",
+      "body": "Nic nie jest wyświetlane, ponieważ żądanie nie powiodło się, a nie dlatego, że reguła jest pusta. Sprawdź połączenie i spróbuj ponownie.",
+      "lookupsBody": "Nie udało się wczytać list kont, odbiorców, kategorii, tagów i walut, więc nie można bezpiecznie wyświetlić reguły. Sprawdź połączenie i spróbuj ponownie.",
+      "notFound": "Ta reguła już nie istnieje. Mogła zostać usunięta.",
+      "retry": "Spróbuj ponownie"
+    },
+    "invalid": {
+      "title": "Ta reguła nie może działać",
+      "repaired": "Niektórych części zapisanej definicji nie udało się odczytać i zostały tu usunięte lub zresetowane. Sprawdź regułę przed zapisaniem."
+    },
+    "conflict": {
+      "title": "Ta reguła została zmieniona w innym miejscu",
+      "body": "Wczytaj ją ponownie, aby zobaczyć najnowszą wersję. Niezapisane zmiany zostaną utracone.",
+      "reload": "Wczytaj ponownie"
+    },
+    "errors": {
+      "codes": {
+        "INVALID_SHAPE": "Ta część ma postać, której edytor nie rozumie.",
+        "UNKNOWN_KEY": "Ta część zawiera ustawienie, które nie istnieje.",
+        "UNKNOWN_FIELD": "Wybierz pole.",
+        "UNKNOWN_ACTION": "Wybierz akcję.",
+        "OPERATOR_NOT_ALLOWED": "To pole nie dopuszcza tego operatora.",
+        "VALUE_REQUIRED": "Wpisz lub wybierz wartość.",
+        "VALUE_NOT_ALLOWED": "Ten operator nie przyjmuje wartości.",
+        "VALUE_TYPE": "Wartość jest nieodpowiedniego rodzaju dla tego pola.",
+        "VALUE_OUT_OF_RANGE": "Wartość jest poza zakresem.",
+        "VALUE_TOO_LONG": "Tekst jest zbyt długi.",
+        "VALUE_EMPTY": "Wpisz jakiś tekst.",
+        "INVALID_UUID": "Wybierz pozycję z listy.",
+        "INVALID_ENUM": "Wybierz jedną z wymienionych wartości.",
+        "INVALID_CURRENCY": "Wybierz walutę.",
+        "ARRAY_EMPTY": "Wybierz co najmniej jedną pozycję.",
+        "ARRAY_TOO_LARGE": "Wybrano zbyt wiele pozycji.",
+        "RANGE_ORDER": "Pierwsza kwota nie może być większa od drugiej.",
+        "MAX_DEPTH": "Grupy są zagnieżdżone zbyt głęboko. Limit to {maxDepth} poziomy.",
+        "MAX_LEAVES": "Warunków jest zbyt wiele. Limit to {maxLeaves}.",
+        "MAX_NODES": "Warunków i grup jest zbyt wiele. Limit to {maxNodes}.",
+        "NO_ACTIONS": "Dodaj co najmniej jedną akcję.",
+        "TOO_MANY_ACTIONS": "Akcji jest zbyt wiele. Limit to {maxActions}.",
+        "DUPLICATE_ACTION": "Reguła może prosić o przegląd AI tylko raz.",
+        "REFERENCE_NOT_FOUND": "Wybrana tu pozycja już nie istnieje. Wybierz inną.",
+        "NAME_REQUIRED": "Wpisz nazwę reguły.",
+        "UNKNOWN": "Ta część jest nieprawidłowa."
+      }
+    }
   }
 }
