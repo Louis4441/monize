@@ -134,7 +134,12 @@
       "absAmount": "Tutar (işaretsiz)",
       "currencyCode": "Para birimi",
       "tagIds": "Etiketler",
-      "hasSplits": "Bölünmüş kalemleri var"
+      "hasSplits": "Bölünmüş kalemleri var",
+      "referenceNumber": "Referans Numarası",
+      "dayOfMonth": "Ayın günü",
+      "weekday": "Haftanın günü",
+      "status": "Durum",
+      "hasAttachment": "Eki var"
     },
     "operators": {
       "eq": "şudur",
@@ -171,12 +176,15 @@
       "currency": "Bir para birimi seçin",
       "currencies": "Para birimlerini seçin",
       "types": "Türleri seçin",
-      "matchesHint": "Joker karakter olarak * kullanın. Örneğin *kahve*, kahve içeren her metinle eşleşir.",
+      "matchesHint": "Herhangi bir metin için * kullanın, örneğin *kahve*. Bu kuralın eylemleri için o konumdaki metni saklamak üzere {capture} kullanın, örneğin {example}. Ad küçük harf ve rakamlardan oluşur; bir desen en fazla {max} metin saklayabilir.",
       "amount": "Tutar",
       "from": "Başlangıç",
       "to": "Bitiş",
       "yes": "Evet",
-      "no": "Hayır"
+      "no": "Hayır",
+      "days": "Günleri seçin",
+      "weekdays": "Haftanın günlerini seçin",
+      "statuses": "Durumları seçin"
     },
     "action": {
       "title": "Eylem",
@@ -190,7 +198,25 @@
       "onlyIfEmpty": "Yalnızca boşsa",
       "onlyIfEmptyHelp": "Açıkken kural, kategoriyi veya alıcıyı yalnızca işlemde yoksa doldurur. Elle ya da alıcının varsayılan kategorisiyle ayarlanmış bir değerin yerine geçmez. Değiştirmek için kapatın.",
       "add": "+ Eylem ekle",
-      "reviewInbox": "İnceleme kutusunu gör"
+      "reviewInbox": "İnceleme kutusunu gör",
+      "payeeTemplate": "Alıcı adı",
+      "descriptionTemplate": "Açıklama metni",
+      "templateHelp": "Düz metin. Süslü parantez içindeki her yer tutucu, işlemdeki metinle değiştirilir. Eklemek için aşağıdan bir yer tutucu seçin.",
+      "joinHelp": "Metin, yazıldığı gibi mevcut açıklamaya eklenir; bu yüzden istediğiniz boşluğu veya ayırıcıyı kendiniz ekleyin.",
+      "placeholders": "Yer tutucular",
+      "placeholdersHelp": "{payeeText}, alındığı haliyle alıcı metnidir. {description}, bu eylem çalıştığı andaki açıklamadır. Diğer yer tutucular, bu kuralın desenlerinde adlandırılan yakalamalardır.",
+      "insertPlaceholder": "{name} ekle",
+      "unknownPlaceholders": "Bu kural tarafından tanımlanmadı: {names}. Listeden bir yer tutucu seçin veya yukarıdaki bir desende yakalayın.",
+      "invalidPlaceholders": "Geçerli bir yer tutucu değil: {names}. Ad küçük harf ve rakamlardan oluşur.",
+      "createIfMissing": "Alıcı yoksa oluştur",
+      "createIfMissingHelp": "Açıkken ve hiçbir alıcı ada uymuyorsa (ad, takma ad veya yakın eşleşme), yeni bir alıcı oluşturulur. Bir kuralın oluşturduğu alıcı, çalıştırmayı geri alsanız da kalır.",
+      "onlyIfEmptyDescriptionHelp": "Açıkken kural, açıklamayı yalnızca işlemin açıklaması yoksa yazar. Her seferinde yazması için kapatın.",
+      "mode": "Nasıl yazılacağı",
+      "modes": {
+        "replace": "Açıklamayı değiştir",
+        "append": "Açıklamanın sonuna ekle",
+        "prepend": "Açıklamanın başına ekle"
+      }
     },
     "actionTypes": {
       "add_tags": "Etiket ekle",
@@ -242,7 +268,7 @@
         "INVALID_CURRENCY": "Bir para birimi seçin.",
         "ARRAY_EMPTY": "En az bir öğe seçin.",
         "ARRAY_TOO_LARGE": "Çok fazla öğe seçildi.",
-        "RANGE_ORDER": "İlk tutar ikinci tutardan büyük olmamalı.",
+        "RANGE_ORDER": "İlk değer ikinci değerden büyük olmamalı.",
         "MAX_DEPTH": "Gruplar çok derin iç içe geçmiş. Sınır {maxDepth} düzeydir.",
         "MAX_LEAVES": "Çok fazla koşul var. Sınır {maxLeaves}.",
         "MAX_NODES": "Çok fazla koşul ve grup var. Sınır {maxNodes}.",
@@ -347,6 +373,8 @@
       "transfer_leg_category": "bir transfer ve transferlerin kategorisi yok",
       "split_category": "bölünmüş, bu yüzden kategori bölümlere ait",
       "cross_owner_transfer_payee": "başka bir sahibe yapılan bir transfer ve bu kural onun alıcısını değiştiremez",
+      "empty_render": "bir eylemin metni bunun için boş çıktı",
+      "payee_not_found": "kuralın oluşturduğu ada sahip bir alıcı yok ve kural da oluşturmuyor",
       "other": "kural bunu değiştiremez"
     },
     "change": {
@@ -355,7 +383,10 @@
       "tagsAdded": "Eklenen etiketler: {tags}",
       "tagsRemoved": "Kaldırılan etiketler: {tags}",
       "none": "yok",
-      "unknown": "silinmiş bir öğe"
+      "unknown": "silinmiş bir öğe",
+      "payeeCreated": "{done, select, yes {Yeni bir alıcı oluşturuldu: {name}} other {Yeni bir alıcı oluşturulacak: {name}}}",
+      "description": "Açıklama: {before} → {after}",
+      "descriptionSet": "Açıklamayı {value} olarak ayarla"
     },
     "filters": {
       "accounts": "Hesaplar",
@@ -435,8 +466,8 @@
       "set_category": "Kategoriyi {name} olarak ayarla{onlyIfEmpty, select, yes { (yalnızca boşsa)} other {}}",
       "set_payee": "Alıcıyı {name} olarak ayarla{onlyIfEmpty, select, yes { (yalnızca boşsa)} other {}}",
       "request_ai_review": "Yapay zekâ incelemesi iste: {instruction}",
-      "set_payee_from_text": "Alıcıyı “{template}” olarak ayarla{createIfMissing, select, yes { (yoksa oluşturulur)} other {}}{onlyIfEmpty, select, yes { (yalnızca boşsa)} other {}}",
-      "set_description": "{mode, select, append {Açıklamanın sonuna “{template}” ekle} prepend {Açıklamanın başına “{template}” ekle} other {Açıklamayı “{template}” olarak ayarla}}{onlyIfEmpty, select, yes { (yalnızca boşsa)} other {}}"
+      "set_payee_from_text": "Alıcıyı metinden ayarla: “{template}”{createIfMissing, select, yes { (yoksa oluşturulur)} other {}}{onlyIfEmpty, select, yes { (yalnızca boşsa)} other {}}",
+      "set_description": "Açıklamayı ayarla ({mode, select, append {sona ekle} prepend {başa ekle} other {değiştir}}): “{template}”{onlyIfEmpty, select, yes { (yalnızca boşsa)} other {}}"
     }
   }
 }

@@ -10,6 +10,8 @@
 import { AxiosError } from 'axios';
 import type { RuleDraft } from '@/lib/rule-draft';
 import {
+  MAX_RULE_DESCRIPTION_TEMPLATE_LENGTH,
+  MAX_RULE_PAYEE_TEMPLATE_LENGTH,
   MAX_RULE_TAG_IDS,
   MAX_RULE_VALUE_LIST,
   RULE_OPERATOR_SHAPES,
@@ -17,6 +19,7 @@ import {
   type RuleErrorCode,
 } from '@/lib/rule-fields';
 import { actionKey } from '@/lib/rule-actions';
+import { checkTemplate, scanCaptures } from '@/lib/rule-captures';
 import { conditionKey, type EditorGroup, type EditorNode } from '@/lib/rule-tree';
 
 export interface RuleErrorEntry {
@@ -137,6 +140,23 @@ function conditionEntries(node: EditorNode, path: string, out: RuleErrorEntry[])
   }
 }
 
+/** What is wrong with the text of a text action, as the codes the server answers with. */
+function templateEntries(
+  path: string,
+  type: 'set_payee_from_text' | 'set_description',
+  template: string,
+  captures: readonly string[],
+): RuleErrorEntry[] {
+  if (template.trim() === '') return [{ path, code: 'VALUE_EMPTY' }];
+  const max = type === 'set_payee_from_text' ? MAX_RULE_PAYEE_TEMPLATE_LENGTH : MAX_RULE_DESCRIPTION_TEMPLATE_LENGTH;
+  if (template.length > max) return [{ path, code: 'VALUE_TOO_LONG' }];
+  const { malformed, unknown } = checkTemplate(template, captures);
+  return [
+    ...(malformed.length > 0 ? [{ path, code: 'INVALID_CAPTURE' }] : []),
+    ...(unknown.length > 0 ? [{ path, code: 'UNKNOWN_CAPTURE' }] : []),
+  ];
+}
+
 /**
  * The gaps in a draft, as the entries the server would answer with, so they
  * land on the same cards. Only completeness is checked here; the server stays
@@ -147,6 +167,8 @@ export function draftGaps(draft: RuleDraft): RuleErrorEntry[] {
   if (draft.name.trim() === '') out.push({ path: NAME_KEY, code: 'NAME_REQUIRED' });
   const root: EditorGroup = draft.condition;
   conditionEntries(root, 'condition', out);
+  const scan = scanCaptures(root);
+  for (const issue of scan.issues) for (const code of issue.codes) out.push({ path: issue.path, code });
   if (draft.actions.length === 0) out.push({ path: ACTIONS_LIST_KEY, code: 'NO_ACTIONS' });
   draft.actions.forEach((action, i) => {
     const path = `actions[${i}]`;
@@ -160,6 +182,8 @@ export function draftGaps(draft: RuleDraft): RuleErrorEntry[] {
       out.push({ path, code: 'VALUE_REQUIRED' });
     } else if (action.type === 'request_ai_review' && action.instruction.trim() === '') {
       out.push({ path, code: 'VALUE_EMPTY' });
+    } else if (action.type === 'set_payee_from_text' || action.type === 'set_description') {
+      out.push(...templateEntries(path, action.type, action.template, scan.names));
     }
   });
   return out;

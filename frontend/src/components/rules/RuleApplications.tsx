@@ -144,7 +144,7 @@ export function RuleApplications({ ruleId, options }: RuleApplicationsProps) {
                 </Td>
                 <Td>
                   <ul className="space-y-0.5">
-                    {changeText(application.changes, names).map((line) => (
+                    {changeText(application.changes, names, { done: true }).map((line) => (
                       <li key={line}>{line}</li>
                     ))}
                   </ul>

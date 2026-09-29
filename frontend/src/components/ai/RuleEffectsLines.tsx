@@ -12,6 +12,7 @@ import type { PendingActionRuleEffects } from '@/types/ai';
 export function RuleEffectsLines({ effects }: { effects: PendingActionRuleEffects | undefined }) {
   const t = useTranslations('ai.confirmAction.ruleEffects');
   const tr = useTranslations('rules.run.change');
+  const tw = useTranslations('rules.words');
   const format = useFormatter();
   if (!effects) return null;
 
@@ -36,6 +37,14 @@ export function RuleEffectsLines({ effects }: { effects: PendingActionRuleEffect
         name: changes.payeeId === null ? tr('none') : (labels.payees[changes.payeeId] ?? tr('unknown')),
       }),
     );
+  } else if (changes.createPayee !== undefined) {
+    // A payee named by text that does not exist yet: the save creates it.
+    lines.push(tr('payeeCreated', { done: 'no', name: changes.createPayee }));
+  } else if (changes.payeeName !== undefined) {
+    lines.push(t('payee', { name: changes.payeeName }));
+  }
+  if (typeof changes.description === 'string') {
+    lines.push(tr('descriptionSet', { value: tw('text', { value: changes.description }) }));
   }
   if (changes.addTagIds.length > 0) lines.push(tr('tagsAdded', { tags: tagNames(changes.addTagIds) }));
   if (changes.removeTagIds.length > 0) lines.push(tr('tagsRemoved', { tags: tagNames(changes.removeTagIds) }));

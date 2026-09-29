@@ -134,7 +134,12 @@
       "absAmount": "Betrag (ohne Vorzeichen)",
       "currencyCode": "Währung",
       "tagIds": "Tags",
-      "hasSplits": "Hat Aufteilungen"
+      "hasSplits": "Hat Aufteilungen",
+      "referenceNumber": "Referenznummer",
+      "dayOfMonth": "Tag des Monats",
+      "weekday": "Wochentag",
+      "status": "Status",
+      "hasAttachment": "Hat einen Anhang"
     },
     "operators": {
       "eq": "ist",
@@ -171,12 +176,15 @@
       "currency": "Währung auswählen",
       "currencies": "Währungen auswählen",
       "types": "Typen auswählen",
-      "matchesHint": "Verwenden Sie * als Platzhalter. Zum Beispiel trifft *Kaffee* auf jeden Text zu, der Kaffee enthält.",
+      "matchesHint": "Verwenden Sie * für beliebigen Text, zum Beispiel *Kaffee*. Mit {capture} behalten Sie den Text an dieser Stelle für die Aktionen dieser Regel, zum Beispiel {example}. Ein Name besteht aus Kleinbuchstaben und Ziffern, und ein Muster kann bis zu {max} Texte behalten.",
       "amount": "Betrag",
       "from": "Von",
       "to": "Bis",
       "yes": "Ja",
-      "no": "Nein"
+      "no": "Nein",
+      "days": "Tage auswählen",
+      "weekdays": "Wochentage auswählen",
+      "statuses": "Status auswählen"
     },
     "action": {
       "title": "Aktion",
@@ -190,7 +198,25 @@
       "onlyIfEmpty": "Nur wenn leer",
       "onlyIfEmptyHelp": "Wenn aktiviert, füllt die Regel Kategorie oder Zahlungsempfänger nur aus, wenn die Transaktion keine hat. Ein von Hand oder durch die Standardkategorie des Zahlungsempfängers gesetzter Wert wird nicht ersetzt. Deaktivieren Sie die Option, um ihn zu ersetzen.",
       "add": "+ Aktion hinzufügen",
-      "reviewInbox": "Zum Prüfungseingang"
+      "reviewInbox": "Zum Prüfungseingang",
+      "payeeTemplate": "Name des Zahlungsempfängers",
+      "descriptionTemplate": "Text der Beschreibung",
+      "templateHelp": "Reiner Text. Jeder Platzhalter in geschweiften Klammern wird durch Text aus der Transaktion ersetzt. Wählen Sie unten einen Platzhalter aus, um ihn einzufügen.",
+      "joinHelp": "Der Text wird genau so an die aktuelle Beschreibung angefügt, wie er geschrieben ist. Fügen Sie also gewünschte Leerzeichen oder Trennzeichen selbst ein.",
+      "placeholders": "Platzhalter",
+      "placeholdersHelp": "{payeeText} ist der Zahlungsempfängertext, wie er empfangen wurde. {description} ist die Beschreibung, wie sie beim Ausführen dieser Aktion vorliegt. Die übrigen Platzhalter sind die Erfassungen, die in den Mustern dieser Regel benannt sind.",
+      "insertPlaceholder": "{name} einfügen",
+      "unknownPlaceholders": "Von dieser Regel nicht definiert: {names}. Wählen Sie einen Platzhalter aus der Liste oder erfassen Sie ihn in einem Muster weiter oben.",
+      "invalidPlaceholders": "Kein gültiger Platzhalter: {names}. Ein Name besteht aus Kleinbuchstaben und Ziffern.",
+      "createIfMissing": "Zahlungsempfänger anlegen, falls nicht vorhanden",
+      "createIfMissingHelp": "Wenn aktiviert und kein Zahlungsempfänger zum Namen passt (nach Name, Alias oder ähnlicher Übereinstimmung), wird ein neuer Zahlungsempfänger angelegt. Ein von einer Regel angelegter Zahlungsempfänger bleibt erhalten, wenn Sie den Lauf rückgängig machen.",
+      "onlyIfEmptyDescriptionHelp": "Wenn aktiviert, schreibt die Regel die Beschreibung nur, wenn die Transaktion keine hat. Deaktivieren Sie die Option, um sie jedes Mal zu schreiben.",
+      "mode": "Art des Schreibens",
+      "modes": {
+        "replace": "Beschreibung ersetzen",
+        "append": "Nach der Beschreibung anfügen",
+        "prepend": "Vor der Beschreibung einfügen"
+      }
     },
     "actionTypes": {
       "add_tags": "Tags hinzufügen",
@@ -242,7 +268,7 @@
         "INVALID_CURRENCY": "Wählen Sie eine Währung.",
         "ARRAY_EMPTY": "Wählen Sie mindestens einen Eintrag.",
         "ARRAY_TOO_LARGE": "Es sind zu viele Einträge ausgewählt.",
-        "RANGE_ORDER": "Der erste Betrag darf nicht größer sein als der zweite.",
+        "RANGE_ORDER": "Der erste Wert darf nicht größer sein als der zweite.",
         "MAX_DEPTH": "Die Gruppen sind zu tief verschachtelt. Das Limit sind {maxDepth} Ebenen.",
         "MAX_LEAVES": "Es gibt zu viele Bedingungen. Das Limit ist {maxLeaves}.",
         "MAX_NODES": "Es gibt zu viele Bedingungen und Gruppen. Das Limit ist {maxNodes}.",
@@ -347,6 +373,8 @@
       "transfer_leg_category": "sie ist eine Überweisung und hat keine Kategorie",
       "split_category": "sie ist aufgeteilt, die Kategorie gehört daher zu den Teilbuchungen",
       "cross_owner_transfer_payee": "sie ist eine Überweisung an einen anderen Eigentümer, dessen Zahlungsempfänger diese Regel nicht ändern darf",
+      "empty_render": "der Text einer Aktion ist dafür leer geworden",
+      "payee_not_found": "kein Zahlungsempfänger hat den von der Regel gebildeten Namen, und sie legt keinen an",
       "other": "die Regel kann sie nicht ändern"
     },
     "change": {
@@ -355,7 +383,10 @@
       "tagsAdded": "Tags hinzugefügt: {tags}",
       "tagsRemoved": "Tags entfernt: {tags}",
       "none": "keine",
-      "unknown": "ein gelöschtes Element"
+      "unknown": "ein gelöschtes Element",
+      "payeeCreated": "{done, select, yes {Ein neuer Zahlungsempfänger wurde angelegt: {name}} other {Ein neuer Zahlungsempfänger wird angelegt: {name}}}",
+      "description": "Beschreibung: {before} → {after}",
+      "descriptionSet": "Beschreibung festlegen auf {value}"
     },
     "filters": {
       "accounts": "Konten",
@@ -435,8 +466,8 @@
       "set_category": "Kategorie festlegen auf {name}{onlyIfEmpty, select, yes { (nur wenn leer)} other {}}",
       "set_payee": "Zahlungsempfänger festlegen auf {name}{onlyIfEmpty, select, yes { (nur wenn leer)} other {}}",
       "request_ai_review": "KI-Prüfung anfordern: {instruction}",
-      "set_payee_from_text": "Zahlungsempfänger festlegen auf „{template}“{createIfMissing, select, yes { (angelegt, falls nicht vorhanden)} other {}}{onlyIfEmpty, select, yes { (nur wenn leer)} other {}}",
-      "set_description": "{mode, select, append {„{template}“ an die Beschreibung anhängen} prepend {„{template}“ vor die Beschreibung setzen} other {Beschreibung festlegen auf „{template}“}}{onlyIfEmpty, select, yes { (nur wenn leer)} other {}}"
+      "set_payee_from_text": "Zahlungsempfänger aus Text festlegen: „{template}“{createIfMissing, select, yes { (angelegt, falls nicht vorhanden)} other {}}{onlyIfEmpty, select, yes { (nur wenn leer)} other {}}",
+      "set_description": "Beschreibung festlegen ({mode, select, append {anfügen} prepend {voranstellen} other {ersetzen}}): „{template}“{onlyIfEmpty, select, yes { (nur wenn leer)} other {}}"
     }
   }
 }

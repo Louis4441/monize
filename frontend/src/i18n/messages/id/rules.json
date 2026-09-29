@@ -134,7 +134,12 @@
       "absAmount": "Jumlah (tanpa tanda)",
       "currencyCode": "Mata uang",
       "tagIds": "Tag",
-      "hasSplits": "Memiliki pemisahan"
+      "hasSplits": "Memiliki pemisahan",
+      "referenceNumber": "Nomor Referensi",
+      "dayOfMonth": "Hari dalam bulan",
+      "weekday": "Hari dalam minggu",
+      "status": "Status",
+      "hasAttachment": "Memiliki lampiran"
     },
     "operators": {
       "eq": "adalah",
@@ -171,12 +176,15 @@
       "currency": "Pilih mata uang",
       "currencies": "Pilih mata uang-mata uang",
       "types": "Pilih jenis",
-      "matchesHint": "Gunakan * sebagai karakter pengganti. Misalnya, *kopi* cocok dengan teks apa pun yang mengandung kopi.",
+      "matchesHint": "Gunakan * untuk teks apa pun, misalnya *kopi*. Gunakan {capture} untuk menyimpan teks di posisi itu bagi tindakan aturan ini, misalnya {example}. Nama terdiri dari huruf kecil dan angka, dan satu pola dapat menyimpan hingga {max} teks.",
       "amount": "Jumlah",
       "from": "Dari",
       "to": "Sampai",
       "yes": "Ya",
-      "no": "Tidak"
+      "no": "Tidak",
+      "days": "Pilih hari",
+      "weekdays": "Pilih hari dalam minggu",
+      "statuses": "Pilih status"
     },
     "action": {
       "title": "Tindakan",
@@ -190,7 +198,25 @@
       "onlyIfEmpty": "Hanya jika kosong",
       "onlyIfEmptyHelp": "Jika aktif, aturan mengisi kategori atau penerima hanya bila transaksi belum memilikinya. Aturan tidak menggantikan nilai yang diatur secara manual atau oleh kategori bawaan penerima. Nonaktifkan untuk menggantikannya.",
       "add": "+ Tambah tindakan",
-      "reviewInbox": "Lihat kotak masuk peninjauan"
+      "reviewInbox": "Lihat kotak masuk peninjauan",
+      "payeeTemplate": "Nama penerima",
+      "descriptionTemplate": "Teks deskripsi",
+      "templateHelp": "Teks biasa. Setiap placeholder dalam kurung kurawal diganti dengan teks dari transaksi. Pilih placeholder di bawah untuk menyisipkannya.",
+      "joinHelp": "Teks digabungkan ke deskripsi saat ini persis seperti yang ditulis, jadi sertakan spasi atau pemisah yang Anda inginkan.",
+      "placeholders": "Placeholder",
+      "placeholdersHelp": "{payeeText} adalah teks penerima seperti yang diterima. {description} adalah deskripsi pada saat tindakan ini dijalankan. Placeholder lainnya adalah tangkapan yang dinamai dalam pola aturan ini.",
+      "insertPlaceholder": "Sisipkan {name}",
+      "unknownPlaceholders": "Tidak didefinisikan oleh aturan ini: {names}. Pilih placeholder dari daftar, atau tangkap di pola di atas.",
+      "invalidPlaceholders": "Bukan placeholder yang valid: {names}. Nama terdiri dari huruf kecil dan angka.",
+      "createIfMissing": "Buat penerima jika belum ada",
+      "createIfMissingHelp": "Jika aktif, dan tidak ada penerima yang cocok dengan nama tersebut (menurut nama, alias, atau kecocokan dekat), penerima baru dibuat. Penerima yang dibuat oleh aturan tetap ada jika Anda membatalkan proses.",
+      "onlyIfEmptyDescriptionHelp": "Jika aktif, aturan menulis deskripsi hanya jika transaksi belum memilikinya. Nonaktifkan untuk menulisnya setiap kali.",
+      "mode": "Cara menulis",
+      "modes": {
+        "replace": "Ganti deskripsi",
+        "append": "Tambahkan setelah deskripsi",
+        "prepend": "Tambahkan sebelum deskripsi"
+      }
     },
     "actionTypes": {
       "add_tags": "Tambah tag",
@@ -242,7 +268,7 @@
         "INVALID_CURRENCY": "Pilih mata uang.",
         "ARRAY_EMPTY": "Pilih setidaknya satu item.",
         "ARRAY_TOO_LARGE": "Terlalu banyak item yang dipilih.",
-        "RANGE_ORDER": "Jumlah pertama tidak boleh lebih besar dari jumlah kedua.",
+        "RANGE_ORDER": "Nilai pertama tidak boleh lebih besar dari nilai kedua.",
         "MAX_DEPTH": "Grup bersarang terlalu dalam. Batasnya {maxDepth} tingkat.",
         "MAX_LEAVES": "Terlalu banyak kondisi. Batasnya {maxLeaves}.",
         "MAX_NODES": "Terlalu banyak kondisi dan grup. Batasnya {maxNodes}.",
@@ -347,6 +373,8 @@
       "transfer_leg_category": "merupakan transfer, yang tidak memiliki kategori",
       "split_category": "dipecah, sehingga kategori milik pecahannya",
       "cross_owner_transfer_payee": "merupakan transfer ke pemilik lain, yang penerimanya tidak boleh diubah aturan ini",
+      "empty_render": "teks sebuah tindakan menjadi kosong untuknya",
+      "payee_not_found": "tidak ada penerima dengan nama yang dibentuk aturan, dan aturan tidak membuatnya",
       "other": "aturan tidak dapat mengubahnya"
     },
     "change": {
@@ -355,7 +383,10 @@
       "tagsAdded": "Tag ditambahkan: {tags}",
       "tagsRemoved": "Tag dihapus: {tags}",
       "none": "tidak ada",
-      "unknown": "item yang sudah dihapus"
+      "unknown": "item yang sudah dihapus",
+      "payeeCreated": "{done, select, yes {Penerima baru telah dibuat: {name}} other {Penerima baru akan dibuat: {name}}}",
+      "description": "Deskripsi: {before} → {after}",
+      "descriptionSet": "Atur deskripsi menjadi {value}"
     },
     "filters": {
       "accounts": "Akun",
@@ -435,8 +466,8 @@
       "set_category": "Atur kategori ke {name}{onlyIfEmpty, select, yes { (hanya jika kosong)} other {}}",
       "set_payee": "Atur penerima ke {name}{onlyIfEmpty, select, yes { (hanya jika kosong)} other {}}",
       "request_ai_review": "Minta peninjauan AI: {instruction}",
-      "set_payee_from_text": "Atur penerima ke “{template}”{createIfMissing, select, yes { (dibuat jika belum ada)} other {}}{onlyIfEmpty, select, yes { (hanya jika kosong)} other {}}",
-      "set_description": "{mode, select, append {Tambahkan “{template}” di akhir deskripsi} prepend {Letakkan “{template}” sebelum deskripsi} other {Atur deskripsi ke “{template}”}}{onlyIfEmpty, select, yes { (hanya jika kosong)} other {}}"
+      "set_payee_from_text": "Atur penerima dari teks: “{template}”{createIfMissing, select, yes { (dibuat jika belum ada)} other {}}{onlyIfEmpty, select, yes { (hanya jika kosong)} other {}}",
+      "set_description": "Atur deskripsi ({mode, select, append {tambahkan setelah} prepend {tambahkan sebelum} other {ganti}}): “{template}”{onlyIfEmpty, select, yes { (hanya jika kosong)} other {}}"
     }
   }
 }

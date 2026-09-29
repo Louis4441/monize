@@ -1,8 +1,9 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { act, fireEvent, render, screen, within } from '@/test/render';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, within } from '@/test/render';
 import { RuleApplications, transactionHref } from './RuleApplications';
 import { testOptions } from './rule-test-harness';
 import { COFFEE_ID, PAYEE_ID, TAG_ID, makeApplication } from './rules-test-fixtures';
+import { usePreferencesStore } from '@/store/preferencesStore';
 
 const api = vi.hoisted(() => ({ getApplications: vi.fn() }));
 
@@ -19,8 +20,28 @@ async function renderApplications() {
   return result;
 }
 
+/**
+ * The time of an application is an instant, shown in the timezone the person
+ * chose in Preferences (`formatDateTime`), and only falls back to the
+ * browser's when they chose none. The test names its own zone, so what it
+ * expects does not depend on the `TZ` of the process that runs it.
+ */
+function setPreferredTimezone(timezone: string) {
+  usePreferencesStore.setState({
+    preferences: { timezone, timeFormat: '24h', dateFormat: 'MM/DD/YYYY' },
+    isLoaded: true,
+  } as never);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  setPreferredTimezone('UTC');
+});
+
+afterEach(() => {
+  // Unmount before the store is reset, or the mounted table re-renders outside act().
+  cleanup();
+  usePreferencesStore.setState({ preferences: null, isLoaded: false } as never);
 });
 
 describe('RuleApplications', () => {
@@ -51,8 +72,8 @@ describe('RuleApplications', () => {
     expect(rows[0]).toHaveTextContent('-$4.50');
     expect(rows[0]).toHaveTextContent('Imported');
     expect(rows[0]).toHaveTextContent('Category: none → Food: Coffee');
-    expect(rows[0]).toHaveTextContent('08/14/2026')
-    expect(rows[0]).toHaveTextContent('09/01/2026');
+    expect(rows[0]).toHaveTextContent('08/14/2026');
+    expect(rows[0]).toHaveTextContent('09/01/2026 12:00');
 
     expect(rows[1]).toHaveTextContent('No payee');
     expect(rows[1]).toHaveTextContent('Manual run');
@@ -66,6 +87,36 @@ describe('RuleApplications', () => {
     const link = within(rows[0]).getByRole('link');
     expect(link).toHaveAttribute('href', '/transactions?targetTransactionId=tx-1');
     expect(within(rows[1]).getByRole('link')).toHaveAttribute('href', '/transactions?targetTransactionId=tx-2');
+  });
+
+  it('shows when a rule applied in the timezone of the preference, not the timezone of the process', async () => {
+    // 12:00 UTC on 1 September is already 2 September, 02:00 in Kiritimati (UTC+14).
+    setPreferredTimezone('Pacific/Kiritimati');
+    api.getApplications.mockResolvedValue([makeApplication()]);
+    await renderApplications();
+    const row = screen.getAllByRole('row')[1];
+    expect(row).toHaveTextContent('09/02/2026 02:00');
+    expect(row).not.toHaveTextContent('09/01/2026');
+    // The transaction's own date is a calendar date and never moves.
+    expect(row).toHaveTextContent('08/14/2026');
+  });
+
+  it('reads the changes of the text actions in the past tense: the payee created, the description written', async () => {
+    api.getApplications.mockResolvedValue([
+      makeApplication({
+        changes: {
+          payeeId: { before: null, after: PAYEE_ID },
+          payeeName: { before: null, after: 'Corner Cafe' },
+          payeeCreated: true,
+          description: { before: null, after: 'POS 1 / REF 9' },
+        },
+      }),
+    ]);
+    await renderApplications();
+    const row = screen.getAllByRole('row')[1];
+    expect(row).toHaveTextContent('Payee: none → Corner Cafe');
+    expect(row).toHaveTextContent('A new payee was created: Corner Cafe');
+    expect(row).toHaveTextContent('Description: none → "POS 1 / REF 9"');
   });
 
   it('builds the deep link the register jumps to', () => {

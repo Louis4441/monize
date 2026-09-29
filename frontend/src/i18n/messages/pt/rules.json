@@ -134,7 +134,12 @@
       "absAmount": "Montante (sem sinal)",
       "currencyCode": "Moeda",
       "tagIds": "Etiquetas",
-      "hasSplits": "Tem divisões"
+      "hasSplits": "Tem divisões",
+      "referenceNumber": "Número de Referência",
+      "dayOfMonth": "Dia do mês",
+      "weekday": "Dia da semana",
+      "status": "Estado",
+      "hasAttachment": "Tem um anexo"
     },
     "operators": {
       "eq": "é",
@@ -171,12 +176,15 @@
       "currency": "Escolha uma moeda",
       "currencies": "Escolha moedas",
       "types": "Escolha tipos",
-      "matchesHint": "Use * como caráter universal. Por exemplo, *café* corresponde a qualquer texto que contenha café.",
+      "matchesHint": "Use * para qualquer texto, por exemplo *café*. Use {capture} para guardar o texto nesse ponto para as ações desta regra, por exemplo {example}. Um nome é composto por letras minúsculas e algarismos, e um padrão pode guardar até {max} textos.",
       "amount": "Montante",
       "from": "De",
       "to": "Até",
       "yes": "Sim",
-      "no": "Não"
+      "no": "Não",
+      "days": "Escolher dias",
+      "weekdays": "Escolher dias da semana",
+      "statuses": "Escolher estados"
     },
     "action": {
       "title": "Ação",
@@ -190,7 +198,25 @@
       "onlyIfEmpty": "Apenas se vazio",
       "onlyIfEmptyHelp": "Quando ativado, a regra preenche a categoria ou o beneficiário apenas se a transação não tiver nenhum. Não substitui um valor definido manualmente ou pela categoria predefinida do beneficiário. Desative para o substituir.",
       "add": "+ Adicionar ação",
-      "reviewInbox": "Ver a caixa de revisão"
+      "reviewInbox": "Ver a caixa de revisão",
+      "payeeTemplate": "Nome do beneficiário",
+      "descriptionTemplate": "Texto da descrição",
+      "templateHelp": "Texto simples. Cada marcador entre chavetas é substituído por texto da transação. Selecione um marcador abaixo para o inserir.",
+      "joinHelp": "O texto é juntado à descrição atual exatamente como está escrito, por isso inclua o espaço ou o separador que pretende.",
+      "placeholders": "Marcadores",
+      "placeholdersHelp": "{payeeText} é o texto do beneficiário tal como foi recebido. {description} é a descrição tal como está quando esta ação é executada. Os restantes marcadores são as capturas nomeadas nos padrões desta regra.",
+      "insertPlaceholder": "Inserir {name}",
+      "unknownPlaceholders": "Não definido por esta regra: {names}. Escolha um marcador da lista ou capture-o num padrão acima.",
+      "invalidPlaceholders": "Marcador inválido: {names}. Um nome é composto por letras minúsculas e algarismos.",
+      "createIfMissing": "Criar o beneficiário se não existir",
+      "createIfMissingHelp": "Se ativado e nenhum beneficiário corresponder ao nome (por nome, alias ou correspondência aproximada), é criado um novo beneficiário. Um beneficiário criado por uma regra é mantido se anular a execução.",
+      "onlyIfEmptyDescriptionHelp": "Se ativado, a regra escreve a descrição apenas se a transação não tiver nenhuma. Desative para a escrever sempre.",
+      "mode": "Como escrever",
+      "modes": {
+        "replace": "Substituir a descrição",
+        "append": "Acrescentar depois da descrição",
+        "prepend": "Acrescentar antes da descrição"
+      }
     },
     "actionTypes": {
       "add_tags": "Adicionar etiquetas",
@@ -242,7 +268,7 @@
         "INVALID_CURRENCY": "Escolha uma moeda.",
         "ARRAY_EMPTY": "Escolha pelo menos um item.",
         "ARRAY_TOO_LARGE": "Estão escolhidos itens a mais.",
-        "RANGE_ORDER": "O primeiro montante não pode ser superior ao segundo.",
+        "RANGE_ORDER": "O primeiro valor não pode ser superior ao segundo.",
         "MAX_DEPTH": "Os grupos estão aninhados demasiado fundo. O limite é de {maxDepth} níveis.",
         "MAX_LEAVES": "Há condições a mais. O limite é {maxLeaves}.",
         "MAX_NODES": "Há condições e grupos a mais. O limite é {maxNodes}.",
@@ -347,6 +373,8 @@
       "transfer_leg_category": "é uma transferência, que não tem categoria",
       "split_category": "está dividida, pelo que a categoria pertence às divisões",
       "cross_owner_transfer_payee": "é uma transferência para outro proprietário, cujo beneficiário esta regra não pode alterar",
+      "empty_render": "o texto de uma ação ficou vazio para ela",
+      "payee_not_found": "nenhum beneficiário tem o nome que a regra construiu, e a regra não o cria",
       "other": "a regra não a pode alterar"
     },
     "change": {
@@ -355,7 +383,10 @@
       "tagsAdded": "Etiquetas adicionadas: {tags}",
       "tagsRemoved": "Etiquetas removidas: {tags}",
       "none": "nenhuma",
-      "unknown": "um item eliminado"
+      "unknown": "um item eliminado",
+      "payeeCreated": "{done, select, yes {Foi criado um novo beneficiário: {name}} other {Vai ser criado um novo beneficiário: {name}}}",
+      "description": "Descrição: {before} → {after}",
+      "descriptionSet": "Definir a descrição como {value}"
     },
     "filters": {
       "accounts": "Contas",
@@ -435,8 +466,8 @@
       "set_category": "Definir a categoria como {name}{onlyIfEmpty, select, yes { (apenas se vazia)} other {}}",
       "set_payee": "Definir o beneficiário como {name}{onlyIfEmpty, select, yes { (apenas se vazio)} other {}}",
       "request_ai_review": "Pedir uma revisão da IA: {instruction}",
-      "set_payee_from_text": "Definir o beneficiário como «{template}»{createIfMissing, select, yes { (criado se não existir)} other {}}{onlyIfEmpty, select, yes { (apenas se vazio)} other {}}",
-      "set_description": "{mode, select, append {Acrescentar «{template}» ao fim da descrição} prepend {Colocar «{template}» antes da descrição} other {Definir a descrição como «{template}»}}{onlyIfEmpty, select, yes { (apenas se vazio)} other {}}"
+      "set_payee_from_text": "Definir o beneficiário a partir do texto: «{template}»{createIfMissing, select, yes { (criado se não existir)} other {}}{onlyIfEmpty, select, yes { (apenas se vazio)} other {}}",
+      "set_description": "Definir a descrição ({mode, select, append {acrescentar depois} prepend {acrescentar antes} other {substituir}}): «{template}»{onlyIfEmpty, select, yes { (apenas se vazio)} other {}}"
     }
   }
 }

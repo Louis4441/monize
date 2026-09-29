@@ -28,6 +28,7 @@ import type { RuleLookups } from '@/hooks/useRuleLookups';
 import { getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
 import { EntityIndex, buildCatalog } from '@/lib/rule-cel';
+import { scanCaptures } from '@/lib/rule-captures';
 import {
   availableActionTypes,
   canAddAction,
@@ -110,6 +111,8 @@ export function RuleEditorBody({ rule, lookups, onSaved, onReload }: RuleEditorB
 
   const handlers = createTreeHandlers(editCondition);
   const index = useMemo(() => new EntityIndex(buildCatalog(lookups)), [lookups]);
+  // The names the patterns of this rule capture: what a text action may use as `{name}`.
+  const captures = useMemo(() => scanCaptures(draft.condition).names, [draft.condition]);
   const expression = useRuleExpression({
     condition: draft.condition,
     index,
@@ -230,6 +233,7 @@ export function RuleEditorBody({ rule, lookups, onSaved, onReload }: RuleEditorB
                 action={action}
                 types={availableActionTypes(draft.actions, index)}
                 options={options}
+                captures={captures}
                 errors={errors.byKey[actionKey(index)] ?? []}
                 onChange={(next) => setActions((list) => updateAction(list, index, next))}
                 actions={cardActions({

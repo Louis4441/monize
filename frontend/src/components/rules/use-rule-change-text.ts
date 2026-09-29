@@ -11,17 +11,29 @@ export interface RuleChangeNames {
   tag: (id: string) => string | undefined;
 }
 
+export interface RuleChangeTextOptions {
+  /** The change was written (the history), not planned (a preview): a created payee reads in the past tense. */
+  done?: boolean;
+}
+
 /**
  * Turns the `{field: {before, after}}` a preview or a trace holds into one
  * sentence per changed field, using names and never raw ids. An id with no
- * name (deleted since) reads as such instead of leaking the id.
+ * name (deleted since) reads as such instead of leaking the id. A payee named
+ * by text has no id until it exists: it reads by name, with a note when the
+ * rule creates it. A description reads in quotes.
  */
-export function useRuleChangeText(): (changes: RuleRunChanges, names: RuleChangeNames) => string[] {
+export function useRuleChangeText(): (
+  changes: RuleRunChanges,
+  names: RuleChangeNames,
+  options?: RuleChangeTextOptions,
+) => string[] {
   const t = useTranslations('rules.run.change');
+  const tw = useTranslations('rules.words');
   const format = useFormatter();
 
   return useCallback(
-    (changes, names) => {
+    (changes, names, options = {}) => {
       const lines: string[] = [];
       const one = (id: string | null, resolve: (id: string) => string | undefined) =>
         id === null ? t('none') : (resolve(id) ?? t('unknown'));
@@ -42,6 +54,17 @@ export function useRuleChangeText(): (changes: RuleRunChanges, names: RuleChange
           }),
         );
       }
+      if (changes.payeeName && !changes.payeeId) {
+        const text = (name: string | null) => (name === null || name === '' ? t('none') : name);
+        lines.push(t('payee', { before: text(changes.payeeName.before), after: text(changes.payeeName.after) }));
+      }
+      if (changes.payeeCreated === true && changes.payeeName?.after) {
+        lines.push(t('payeeCreated', { done: options.done === true ? 'yes' : 'no', name: changes.payeeName.after }));
+      }
+      if (changes.description) {
+        const text = (value: string | null) => (value === null || value.trim() === '' ? t('none') : tw('text', { value }));
+        lines.push(t('description', { before: text(changes.description.before), after: text(changes.description.after) }));
+      }
       if (changes.tagIds) {
         const before = new Set(changes.tagIds.before);
         const after = new Set(changes.tagIds.after);
@@ -57,6 +80,6 @@ export function useRuleChangeText(): (changes: RuleRunChanges, names: RuleChange
       }
       return lines;
     },
-    [t, format],
+    [t, tw, format],
   );
 }

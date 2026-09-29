@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { RuleCardShell, RuleErrorList } from '@/components/rules/RuleCardShell';
 import { RuleConditionCard } from '@/components/rules/RuleConditionCard';
@@ -9,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import type { RowAction } from '@/components/ui/row-actions/rowAction';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { SEGMENTED_GROUP_CLASS, segmentClass } from '@/components/ui/segmented-control';
+import { scanCaptures } from '@/lib/rule-captures';
 import { MAX_RULE_CONDITION_DEPTH } from '@/lib/rule-fields';
 import {
   canDuplicateNode,
@@ -64,6 +66,11 @@ export function RuleConditionGroup({ group, path, env, actions }: RuleConditionG
   const { handlers, root, capacity } = env;
   const errors = env.errors[conditionKey(path)] ?? [];
   const canGroup = canNestGroup(path);
+  // A pattern is checked against the whole rule (a name may be used once), so the scan reads the root.
+  const captureCodes = useMemo(
+    () => new Map(scanCaptures(root).issues.map((issue) => [issue.uid, issue.codes])),
+    [root],
+  );
 
   const header = (
     <div className="flex flex-wrap items-center gap-3">
@@ -121,6 +128,7 @@ export function RuleConditionGroup({ group, path, env, actions }: RuleConditionG
             options={env.options}
             actions={childActions}
             errors={env.errors[conditionKey(childPath)] ?? []}
+            captureCodes={captureCodes.get(child.uid)}
             onChange={(next) => handlers.replace(childPath, next)}
           />
         );

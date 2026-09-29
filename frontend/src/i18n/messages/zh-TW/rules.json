@@ -134,7 +134,12 @@
       "absAmount": "金額（忽略正負號）",
       "currencyCode": "幣別",
       "tagIds": "標籤",
-      "hasSplits": "有拆分"
+      "hasSplits": "有拆分",
+      "referenceNumber": "參考號碼",
+      "dayOfMonth": "每月的日期",
+      "weekday": "星期幾",
+      "status": "狀態",
+      "hasAttachment": "有附件"
     },
     "operators": {
       "eq": "等於",
@@ -171,12 +176,15 @@
       "currency": "選擇幣別",
       "currencies": "選擇幣別",
       "types": "選擇類型",
-      "matchesHint": "使用 * 作為萬用字元。例如，*咖啡* 可符合任何包含「咖啡」的文字。",
+      "matchesHint": "用 * 比對任意文字，例如 *咖啡*。用 {capture} 保留該位置的文字，供此規則的動作使用，例如 {example}。名稱由小寫字母和數字組成，一個模式最多可保留 {max} 段文字。",
       "amount": "金額",
       "from": "從",
       "to": "到",
       "yes": "是",
-      "no": "否"
+      "no": "否",
+      "days": "選擇日期",
+      "weekdays": "選擇星期",
+      "statuses": "選擇狀態"
     },
     "action": {
       "title": "動作",
@@ -190,7 +198,25 @@
       "onlyIfEmpty": "僅在為空時",
       "onlyIfEmptyHelp": "開啟後，只有在交易沒有分類或收款對象時，規則才會填入。它不會取代手動設定的值，也不會取代由收款對象預設分類所設定的值。關閉後即可取代。",
       "add": "+ 新增動作",
-      "reviewInbox": "檢視審核收件匣"
+      "reviewInbox": "檢視審核收件匣",
+      "payeeTemplate": "收款對象名稱",
+      "descriptionTemplate": "說明文字",
+      "templateHelp": "純文字。大括號中的每個預留位置都會被交易中的文字取代。在下方選擇預留位置即可插入。",
+      "joinHelp": "文字會依所寫原樣接在目前說明之後或之前，因此請自行加入需要的空格或分隔符號。",
+      "placeholders": "預留位置",
+      "placeholdersHelp": "{payeeText} 是收到時的收款對象文字。{description} 是此動作執行時的說明。其餘預留位置是此規則的模式中命名的擷取。",
+      "insertPlaceholder": "插入 {name}",
+      "unknownPlaceholders": "此規則未定義：{names}。請從清單中選擇預留位置，或在上方的模式中擷取它。",
+      "invalidPlaceholders": "不是有效的預留位置：{names}。名稱由小寫字母和數字組成。",
+      "createIfMissing": "收款對象不存在時建立",
+      "createIfMissingHelp": "開啟後，若沒有收款對象符合該名稱（依名稱、別名或相近符合），則建立新的收款對象。規則建立的收款對象在復原執行後仍會保留。",
+      "onlyIfEmptyDescriptionHelp": "開啟後，僅當交易沒有說明時，規則才會寫入說明。關閉後每次都會寫入。",
+      "mode": "寫入方式",
+      "modes": {
+        "replace": "取代說明",
+        "append": "加在說明之後",
+        "prepend": "加在說明之前"
+      }
     },
     "actionTypes": {
       "add_tags": "新增標籤",
@@ -242,7 +268,7 @@
         "INVALID_CURRENCY": "請選擇幣別。",
         "ARRAY_EMPTY": "請至少選擇一項。",
         "ARRAY_TOO_LARGE": "選擇的項目過多。",
-        "RANGE_ORDER": "第一個金額不可大於第二個金額。",
+        "RANGE_ORDER": "第一個值不可大於第二個值。",
         "MAX_DEPTH": "群組巢狀過深。上限為 {maxDepth} 層。",
         "MAX_LEAVES": "條件過多。上限為 {maxLeaves} 個。",
         "MAX_NODES": "條件和群組過多。上限為 {maxNodes} 個。",
@@ -347,6 +373,8 @@
       "transfer_leg_category": "是轉帳，轉帳沒有分類",
       "split_category": "已拆分，因此分類屬於各拆分項",
       "cross_owner_transfer_payee": "是轉給其他擁有者的轉帳，此規則不能變更其收款對象",
+      "empty_render": "某個動作的文字對它而言為空",
+      "payee_not_found": "沒有收款對象使用規則產生的名稱，且規則不會建立",
       "other": "規則無法變更它"
     },
     "change": {
@@ -355,7 +383,10 @@
       "tagsAdded": "已新增的標籤：{tags}",
       "tagsRemoved": "已移除的標籤：{tags}",
       "none": "無",
-      "unknown": "已刪除的項目"
+      "unknown": "已刪除的項目",
+      "payeeCreated": "{done, select, yes {已建立新收款對象：{name}} other {將建立新收款對象：{name}}}",
+      "description": "說明：{before} → {after}",
+      "descriptionSet": "將說明設為 {value}"
     },
     "filters": {
       "accounts": "帳戶",
@@ -435,8 +466,8 @@
       "set_category": "將分類設定為 {name}{onlyIfEmpty, select, yes {（僅在為空時）} other {}}",
       "set_payee": "將收款對象設定為 {name}{onlyIfEmpty, select, yes {（僅在為空時）} other {}}",
       "request_ai_review": "請求 AI 審核：{instruction}",
-      "set_payee_from_text": "將收款對象設定為「{template}」{createIfMissing, select, yes {（不存在則建立）} other {}}{onlyIfEmpty, select, yes {（僅在為空時）} other {}}",
-      "set_description": "{mode, select, append {在說明結尾附加「{template}」} prepend {在說明開頭加上「{template}」} other {將說明設定為「{template}」}}{onlyIfEmpty, select, yes {（僅在為空時）} other {}}"
+      "set_payee_from_text": "依文字設定收款對象：「{template}」{createIfMissing, select, yes {（不存在則建立）} other {}}{onlyIfEmpty, select, yes {（僅在為空時）} other {}}",
+      "set_description": "設定說明（{mode, select, append {附加} prepend {前置} other {取代}}）：「{template}」{onlyIfEmpty, select, yes {（僅在為空時）} other {}}"
     }
   }
 }

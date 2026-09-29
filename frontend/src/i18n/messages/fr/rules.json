@@ -134,7 +134,12 @@
       "absAmount": "Montant (sans signe)",
       "currencyCode": "Devise",
       "tagIds": "Tags",
-      "hasSplits": "A des ventilations"
+      "hasSplits": "A des ventilations",
+      "referenceNumber": "Numéro de référence",
+      "dayOfMonth": "Jour du mois",
+      "weekday": "Jour de la semaine",
+      "status": "Statut",
+      "hasAttachment": "A une pièce jointe"
     },
     "operators": {
       "eq": "est",
@@ -171,12 +176,15 @@
       "currency": "Choisir une devise",
       "currencies": "Choisir des devises",
       "types": "Choisir des types",
-      "matchesHint": "Utilisez * comme caractère générique. Par exemple, *café* correspond à tout texte contenant café.",
+      "matchesHint": "Utilisez * pour n'importe quel texte, par exemple *café*. Utilisez {capture} pour conserver le texte à cet endroit pour les actions de cette règle, par exemple {example}. Un nom se compose de lettres minuscules et de chiffres, et un motif peut conserver jusqu'à {max} textes.",
       "amount": "Montant",
       "from": "De",
       "to": "À",
       "yes": "Oui",
-      "no": "Non"
+      "no": "Non",
+      "days": "Choisir des jours",
+      "weekdays": "Choisir des jours de la semaine",
+      "statuses": "Choisir des statuts"
     },
     "action": {
       "title": "Action",
@@ -190,7 +198,25 @@
       "onlyIfEmpty": "Seulement si vide",
       "onlyIfEmptyHelp": "Si cette option est activée, la règle renseigne la catégorie ou le bénéficiaire uniquement lorsque la transaction n'en a pas. Elle ne remplace pas une valeur définie à la main ou par la catégorie par défaut du bénéficiaire. Désactivez-la pour la remplacer.",
       "add": "+ Ajouter une action",
-      "reviewInbox": "Voir la boîte de révision"
+      "reviewInbox": "Voir la boîte de révision",
+      "payeeTemplate": "Nom du bénéficiaire",
+      "descriptionTemplate": "Texte de la description",
+      "templateHelp": "Texte brut. Chaque espace réservé entre accolades est remplacé par du texte de la transaction. Sélectionnez un espace réservé ci-dessous pour l'insérer.",
+      "joinHelp": "Le texte est ajouté à la description actuelle exactement tel qu'il est écrit ; incluez donc l'espace ou le séparateur voulu.",
+      "placeholders": "Espaces réservés",
+      "placeholdersHelp": "{payeeText} est le texte du bénéficiaire tel qu'il a été reçu. {description} est la description telle qu'elle est au moment où cette action s'exécute. Les autres espaces réservés sont les captures nommées dans les motifs de cette règle.",
+      "insertPlaceholder": "Insérer {name}",
+      "unknownPlaceholders": "Non défini par cette règle : {names}. Choisissez un espace réservé dans la liste ou capturez-le dans un motif plus haut.",
+      "invalidPlaceholders": "Espace réservé non valide : {names}. Un nom se compose de lettres minuscules et de chiffres.",
+      "createIfMissing": "Créer le bénéficiaire s'il n'existe pas",
+      "createIfMissingHelp": "Si l'option est activée et qu'aucun bénéficiaire ne correspond au nom (par nom, alias ou correspondance proche), un nouveau bénéficiaire est créé. Un bénéficiaire créé par une règle est conservé si vous annulez l'exécution.",
+      "onlyIfEmptyDescriptionHelp": "Si l'option est activée, la règle n'écrit la description que si la transaction n'en a pas. Désactivez-la pour l'écrire à chaque fois.",
+      "mode": "Façon d'écrire",
+      "modes": {
+        "replace": "Remplacer la description",
+        "append": "Ajouter après la description",
+        "prepend": "Ajouter avant la description"
+      }
     },
     "actionTypes": {
       "add_tags": "Ajouter des tags",
@@ -242,7 +268,7 @@
         "INVALID_CURRENCY": "Choisissez une devise.",
         "ARRAY_EMPTY": "Choisissez au moins un élément.",
         "ARRAY_TOO_LARGE": "Trop d'éléments sont choisis.",
-        "RANGE_ORDER": "Le premier montant ne doit pas être supérieur au second.",
+        "RANGE_ORDER": "La première valeur ne doit pas être supérieure à la seconde.",
         "MAX_DEPTH": "Les groupes sont imbriqués trop profondément. La limite est de {maxDepth} niveaux.",
         "MAX_LEAVES": "Il y a trop de conditions. La limite est de {maxLeaves}.",
         "MAX_NODES": "Il y a trop de conditions et de groupes. La limite est de {maxNodes}.",
@@ -347,6 +373,8 @@
       "transfer_leg_category": "c’est un virement, qui n’a pas de catégorie",
       "split_category": "elle est ventilée, donc la catégorie appartient aux lignes de ventilation",
       "cross_owner_transfer_payee": "c’est un virement vers un autre propriétaire, dont la règle ne peut pas modifier le bénéficiaire",
+      "empty_render": "le texte d'une action est resté vide pour elle",
+      "payee_not_found": "aucun bénéficiaire n'a le nom construit par la règle, et elle n'en crée pas",
       "other": "la règle ne peut pas la modifier"
     },
     "change": {
@@ -355,7 +383,10 @@
       "tagsAdded": "Tags ajoutés : {tags}",
       "tagsRemoved": "Tags retirés : {tags}",
       "none": "aucune",
-      "unknown": "un élément supprimé"
+      "unknown": "un élément supprimé",
+      "payeeCreated": "{done, select, yes {Un nouveau bénéficiaire a été créé : {name}} other {Un nouveau bénéficiaire sera créé : {name}}}",
+      "description": "Description : {before} → {after}",
+      "descriptionSet": "Définir la description sur {value}"
     },
     "filters": {
       "accounts": "Comptes",
@@ -435,8 +466,8 @@
       "set_category": "Définir la catégorie sur {name}{onlyIfEmpty, select, yes { (seulement si vide)} other {}}",
       "set_payee": "Définir le bénéficiaire sur {name}{onlyIfEmpty, select, yes { (seulement si vide)} other {}}",
       "request_ai_review": "Demander une révision par l'IA : {instruction}",
-      "set_payee_from_text": "Définir le bénéficiaire sur « {template} »{createIfMissing, select, yes { (créé s’il n’existe pas)} other {}}{onlyIfEmpty, select, yes { (seulement si vide)} other {}}",
-      "set_description": "{mode, select, append {Ajouter « {template} » à la fin de la description} prepend {Placer « {template} » avant la description} other {Définir la description sur « {template} »}}{onlyIfEmpty, select, yes { (seulement si vide)} other {}}"
+      "set_payee_from_text": "Définir le bénéficiaire à partir du texte : « {template} »{createIfMissing, select, yes { (créé s’il n’existe pas)} other {}}{onlyIfEmpty, select, yes { (seulement si vide)} other {}}",
+      "set_description": "Définir la description ({mode, select, append {ajouter après} prepend {ajouter avant} other {remplacer}}) : « {template} »{onlyIfEmpty, select, yes { (seulement si vide)} other {}}"
     }
   }
 }

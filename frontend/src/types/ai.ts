@@ -393,6 +393,12 @@ export interface PendingActionRuleEffects {
   changes: {
     categoryId?: string | null;
     payeeId?: string | null;
+    /** The name `set_payee_from_text` chose, when no payee id is known for it. */
+    payeeName?: string;
+    /** A payee that does not exist yet and is created when the row is saved. */
+    createPayee?: string;
+    /** The description `set_description` writes. */
+    description?: string | null;
     addTagIds: string[];
     removeTagIds: string[];
   };

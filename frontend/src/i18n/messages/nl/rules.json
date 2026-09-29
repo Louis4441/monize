@@ -134,7 +134,12 @@
       "absAmount": "Bedrag (zonder teken)",
       "currencyCode": "Valuta",
       "tagIds": "Tags",
-      "hasSplits": "Heeft splitsingen"
+      "hasSplits": "Heeft splitsingen",
+      "referenceNumber": "Referentienummer",
+      "dayOfMonth": "Dag van de maand",
+      "weekday": "Dag van de week",
+      "status": "Status",
+      "hasAttachment": "Heeft een bijlage"
     },
     "operators": {
       "eq": "is",
@@ -171,12 +176,15 @@
       "currency": "Kies een valuta",
       "currencies": "Kies valuta's",
       "types": "Kies typen",
-      "matchesHint": "Gebruik * als jokerteken. Bijvoorbeeld: *koffie* komt overeen met elke tekst die koffie bevat.",
+      "matchesHint": "Gebruik * voor willekeurige tekst, bijvoorbeeld *koffie*. Gebruik {capture} om de tekst op die plek te bewaren voor de acties van deze regel, bijvoorbeeld {example}. Een naam bestaat uit kleine letters en cijfers, en een patroon kan maximaal {max} teksten bewaren.",
       "amount": "Bedrag",
       "from": "Van",
       "to": "Tot",
       "yes": "Ja",
-      "no": "Nee"
+      "no": "Nee",
+      "days": "Kies dagen",
+      "weekdays": "Kies dagen van de week",
+      "statuses": "Kies statussen"
     },
     "action": {
       "title": "Actie",
@@ -190,7 +198,25 @@
       "onlyIfEmpty": "Alleen als leeg",
       "onlyIfEmptyHelp": "Indien ingeschakeld vult de regel de categorie of begunstigde alleen in als de transactie er geen heeft. Een met de hand of via de standaardcategorie van de begunstigde ingestelde waarde wordt niet vervangen. Schakel uit om te vervangen.",
       "add": "+ Actie toevoegen",
-      "reviewInbox": "Naar het controlepostvak"
+      "reviewInbox": "Naar het controlepostvak",
+      "payeeTemplate": "Naam van de begunstigde",
+      "descriptionTemplate": "Tekst van de omschrijving",
+      "templateHelp": "Platte tekst. Elke tijdelijke aanduiding tussen accolades wordt vervangen door tekst uit de transactie. Selecteer hieronder een tijdelijke aanduiding om die in te voegen.",
+      "joinHelp": "De tekst wordt precies zoals geschreven aan de huidige omschrijving gekoppeld, dus neem de gewenste spatie of het gewenste scheidingsteken zelf op.",
+      "placeholders": "Tijdelijke aanduidingen",
+      "placeholdersHelp": "{payeeText} is de tekst van de begunstigde zoals ontvangen. {description} is de omschrijving zoals die is wanneer deze actie wordt uitgevoerd. De andere tijdelijke aanduidingen zijn de opnamen die in de patronen van deze regel een naam hebben.",
+      "insertPlaceholder": "{name} invoegen",
+      "unknownPlaceholders": "Niet gedefinieerd door deze regel: {names}. Kies een tijdelijke aanduiding uit de lijst of leg deze vast in een patroon hierboven.",
+      "invalidPlaceholders": "Geen geldige tijdelijke aanduiding: {names}. Een naam bestaat uit kleine letters en cijfers.",
+      "createIfMissing": "Begunstigde aanmaken als die niet bestaat",
+      "createIfMissingHelp": "Als dit aan staat en geen begunstigde overeenkomt met de naam (op naam, alias of een dichte overeenkomst), wordt een nieuwe begunstigde aangemaakt. Een door een regel aangemaakte begunstigde blijft bestaan als u de uitvoering ongedaan maakt.",
+      "onlyIfEmptyDescriptionHelp": "Als dit aan staat, schrijft de regel de omschrijving alleen als de transactie er geen heeft. Zet het uit om de omschrijving elke keer te schrijven.",
+      "mode": "Hoe te schrijven",
+      "modes": {
+        "replace": "Omschrijving vervangen",
+        "append": "Toevoegen na de omschrijving",
+        "prepend": "Toevoegen vóór de omschrijving"
+      }
     },
     "actionTypes": {
       "add_tags": "Tags toevoegen",
@@ -242,7 +268,7 @@
         "INVALID_CURRENCY": "Kies een valuta.",
         "ARRAY_EMPTY": "Kies minstens één item.",
         "ARRAY_TOO_LARGE": "Er zijn te veel items gekozen.",
-        "RANGE_ORDER": "Het eerste bedrag mag niet groter zijn dan het tweede.",
+        "RANGE_ORDER": "De eerste waarde mag niet groter zijn dan de tweede.",
         "MAX_DEPTH": "De groepen zijn te diep genest. De limiet is {maxDepth} niveaus.",
         "MAX_LEAVES": "Er zijn te veel voorwaarden. De limiet is {maxLeaves}.",
         "MAX_NODES": "Er zijn te veel voorwaarden en groepen. De limiet is {maxNodes}.",
@@ -347,6 +373,8 @@
       "transfer_leg_category": "ze is een overboeking, die geen categorie heeft",
       "split_category": "ze is gesplitst, dus de categorie hoort bij de splitsingen",
       "cross_owner_transfer_payee": "ze is een overboeking naar een andere eigenaar, van wie deze regel de begunstigde niet mag wijzigen",
+      "empty_render": "de tekst van een actie is hiervoor leeg uitgekomen",
+      "payee_not_found": "geen begunstigde heeft de naam die de regel heeft gemaakt, en de regel maakt er geen aan",
       "other": "de regel kan haar niet wijzigen"
     },
     "change": {
@@ -355,7 +383,10 @@
       "tagsAdded": "Tags toegevoegd: {tags}",
       "tagsRemoved": "Tags verwijderd: {tags}",
       "none": "geen",
-      "unknown": "een verwijderd item"
+      "unknown": "een verwijderd item",
+      "payeeCreated": "{done, select, yes {Er is een nieuwe begunstigde aangemaakt: {name}} other {Er wordt een nieuwe begunstigde aangemaakt: {name}}}",
+      "description": "Omschrijving: {before} → {after}",
+      "descriptionSet": "Omschrijving instellen op {value}"
     },
     "filters": {
       "accounts": "Rekeningen",
@@ -435,8 +466,8 @@
       "set_category": "Categorie instellen op {name}{onlyIfEmpty, select, yes { (alleen als leeg)} other {}}",
       "set_payee": "Begunstigde instellen op {name}{onlyIfEmpty, select, yes { (alleen als leeg)} other {}}",
       "request_ai_review": "AI-controle aanvragen: {instruction}",
-      "set_payee_from_text": "Begunstigde instellen op “{template}”{createIfMissing, select, yes { (aangemaakt als die ontbreekt)} other {}}{onlyIfEmpty, select, yes { (alleen als leeg)} other {}}",
-      "set_description": "{mode, select, append {“{template}” achter de omschrijving toevoegen} prepend {“{template}” voor de omschrijving zetten} other {Omschrijving instellen op “{template}”}}{onlyIfEmpty, select, yes { (alleen als leeg)} other {}}"
+      "set_payee_from_text": "Begunstigde instellen vanuit tekst: “{template}”{createIfMissing, select, yes { (aangemaakt als die ontbreekt)} other {}}{onlyIfEmpty, select, yes { (alleen als leeg)} other {}}",
+      "set_description": "Omschrijving instellen ({mode, select, append {toevoegen na} prepend {toevoegen vóór} other {vervangen}}): “{template}”{onlyIfEmpty, select, yes { (alleen als leeg)} other {}}"
     }
   }
 }

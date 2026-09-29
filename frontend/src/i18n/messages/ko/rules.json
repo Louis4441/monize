@@ -134,7 +134,12 @@
       "absAmount": "금액(부호 제외)",
       "currencyCode": "통화",
       "tagIds": "태그",
-      "hasSplits": "분할 있음"
+      "hasSplits": "분할 있음",
+      "referenceNumber": "참조 번호",
+      "dayOfMonth": "월의 일",
+      "weekday": "요일",
+      "status": "상태",
+      "hasAttachment": "첨부 파일 있음"
     },
     "operators": {
       "eq": "다음과 같음",
@@ -171,12 +176,15 @@
       "currency": "통화 선택",
       "currencies": "통화 선택",
       "types": "유형 선택",
-      "matchesHint": "와일드카드로 *를 사용하세요. 예를 들어 *커피*는 커피가 들어간 모든 텍스트와 일치합니다.",
+      "matchesHint": "모든 텍스트에는 *를 사용하세요. 예: *커피*. 이 규칙의 작업에서 쓸 수 있도록 그 위치의 텍스트를 보관하려면 {capture}를 사용하세요. 예: {example}. 이름은 영문 소문자와 숫자로 이루어지며, 패턴 하나에 최대 {max}개의 텍스트를 보관할 수 있습니다.",
       "amount": "금액",
       "from": "시작",
       "to": "끝",
       "yes": "예",
-      "no": "아니요"
+      "no": "아니요",
+      "days": "일 선택",
+      "weekdays": "요일 선택",
+      "statuses": "상태 선택"
     },
     "action": {
       "title": "동작",
@@ -190,7 +198,25 @@
       "onlyIfEmpty": "비어 있는 경우에만",
       "onlyIfEmptyHelp": "켜면 거래에 카테고리나 수취인이 없을 때만 규칙이 채웁니다. 직접 지정했거나 수취인의 기본 카테고리로 지정된 값은 바꾸지 않습니다. 바꾸려면 끄세요.",
       "add": "+ 동작 추가",
-      "reviewInbox": "검토 수신함 보기"
+      "reviewInbox": "검토 수신함 보기",
+      "payeeTemplate": "수취인 이름",
+      "descriptionTemplate": "설명 텍스트",
+      "templateHelp": "일반 텍스트입니다. 중괄호 안의 자리 표시자는 거래의 텍스트로 바뀝니다. 삽입하려면 아래에서 자리 표시자를 선택하세요.",
+      "joinHelp": "텍스트는 작성한 그대로 현재 설명에 이어 붙으므로, 필요한 공백이나 구분자를 직접 넣으세요.",
+      "placeholders": "자리 표시자",
+      "placeholdersHelp": "{payeeText}는 받은 그대로의 수취인 텍스트입니다. {description}은 이 작업이 실행될 때의 설명입니다. 나머지 자리 표시자는 이 규칙의 패턴에서 이름을 붙인 캡처입니다.",
+      "insertPlaceholder": "{name} 삽입",
+      "unknownPlaceholders": "이 규칙에 정의되지 않음: {names}. 목록에서 자리 표시자를 고르거나 위의 패턴에서 캡처하세요.",
+      "invalidPlaceholders": "올바른 자리 표시자가 아님: {names}. 이름은 영문 소문자와 숫자로 이루어집니다.",
+      "createIfMissing": "수취인이 없으면 만들기",
+      "createIfMissingHelp": "켜면, 이름(이름, 별칭 또는 유사 일치)에 맞는 수취인이 없을 때 새 수취인을 만듭니다. 규칙이 만든 수취인은 실행을 취소해도 유지됩니다.",
+      "onlyIfEmptyDescriptionHelp": "켜면 거래에 설명이 없을 때만 규칙이 설명을 씁니다. 매번 쓰려면 끄세요.",
+      "mode": "쓰는 방식",
+      "modes": {
+        "replace": "설명 바꾸기",
+        "append": "설명 뒤에 추가",
+        "prepend": "설명 앞에 추가"
+      }
     },
     "actionTypes": {
       "add_tags": "태그 추가",
@@ -242,7 +268,7 @@
         "INVALID_CURRENCY": "통화를 선택하세요.",
         "ARRAY_EMPTY": "하나 이상 선택하세요.",
         "ARRAY_TOO_LARGE": "선택한 항목이 너무 많습니다.",
-        "RANGE_ORDER": "첫 번째 금액은 두 번째 금액보다 클 수 없습니다.",
+        "RANGE_ORDER": "첫 번째 값은 두 번째 값보다 클 수 없습니다.",
         "MAX_DEPTH": "그룹이 너무 깊게 중첩되었습니다. 한도는 {maxDepth}단계입니다.",
         "MAX_LEAVES": "조건이 너무 많습니다. 한도는 {maxLeaves}개입니다.",
         "MAX_NODES": "조건과 그룹이 너무 많습니다. 한도는 {maxNodes}개입니다.",
@@ -347,6 +373,8 @@
       "transfer_leg_category": "이체이며 이체에는 카테고리가 없습니다",
       "split_category": "분할되어 있어 카테고리가 분할 항목에 속합니다",
       "cross_owner_transfer_payee": "다른 소유자에게 보내는 이체이며, 이 규칙으로 그 수취인을 변경할 수 없습니다",
+      "empty_render": "작업의 텍스트가 비어 버렸기 때문",
+      "payee_not_found": "규칙이 만든 이름의 수취인이 없고 규칙이 만들지도 않기 때문",
       "other": "규칙으로 변경할 수 없습니다"
     },
     "change": {
@@ -355,7 +383,10 @@
       "tagsAdded": "추가된 태그: {tags}",
       "tagsRemoved": "제거된 태그: {tags}",
       "none": "없음",
-      "unknown": "삭제된 항목"
+      "unknown": "삭제된 항목",
+      "payeeCreated": "{done, select, yes {새 수취인을 만들었습니다: {name}} other {새 수취인을 만듭니다: {name}}}",
+      "description": "설명: {before} → {after}",
+      "descriptionSet": "설명을 {value}(으)로 지정"
     },
     "filters": {
       "accounts": "계정",
@@ -435,8 +466,8 @@
       "set_category": "카테고리를 {name}(으)로 지정{onlyIfEmpty, select, yes { (비어 있는 경우에만)} other {}}",
       "set_payee": "수취인을 {name}(으)로 지정{onlyIfEmpty, select, yes { (비어 있는 경우에만)} other {}}",
       "request_ai_review": "AI 검토 요청: {instruction}",
-      "set_payee_from_text": "수취인을 “{template}”(으)로 지정{createIfMissing, select, yes { (없으면 생성)} other {}}{onlyIfEmpty, select, yes { (비어 있는 경우에만)} other {}}",
-      "set_description": "{mode, select, append {설명 끝에 “{template}” 추가} prepend {설명 앞에 “{template}” 추가} other {설명을 “{template}”(으)로 지정}}{onlyIfEmpty, select, yes { (비어 있는 경우에만)} other {}}"
+      "set_payee_from_text": "텍스트로 수취인 지정: “{template}”{createIfMissing, select, yes { (없으면 생성)} other {}}{onlyIfEmpty, select, yes { (비어 있는 경우에만)} other {}}",
+      "set_description": "설명 지정 ({mode, select, append {뒤에 추가} prepend {앞에 추가} other {바꾸기}}): “{template}”{onlyIfEmpty, select, yes { (비어 있는 경우에만)} other {}}"
     }
   }
 }

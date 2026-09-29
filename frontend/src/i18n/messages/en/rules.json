@@ -134,7 +134,12 @@
       "absAmount": "Amount (ignoring sign)",
       "currencyCode": "Currency",
       "tagIds": "Tags",
-      "hasSplits": "Has splits"
+      "hasSplits": "Has splits",
+      "referenceNumber": "Reference number",
+      "dayOfMonth": "Day of the month",
+      "weekday": "Day of the week",
+      "status": "Status",
+      "hasAttachment": "Has an attachment"
     },
     "operators": {
       "eq": "is",
@@ -171,12 +176,15 @@
       "currency": "Choose a currency",
       "currencies": "Choose currencies",
       "types": "Choose types",
-      "matchesHint": "Use * as a wildcard. For example, *coffee* matches any text that contains coffee.",
+      "matchesHint": "Use * for any text, for example *coffee*. Use {capture} to keep the text at that spot for the actions of this rule, for example {example}. A name is lowercase letters and digits, and a pattern can keep up to {max} texts.",
       "amount": "Amount",
       "from": "From",
       "to": "To",
       "yes": "Yes",
-      "no": "No"
+      "no": "No",
+      "days": "Choose days",
+      "weekdays": "Choose days of the week",
+      "statuses": "Choose statuses"
     },
     "action": {
       "title": "Action",
@@ -190,7 +198,25 @@
       "onlyIfEmpty": "Only if empty",
       "onlyIfEmptyHelp": "When on, the rule fills in the category or payee only if the transaction has none. It does not replace one set by hand or by the payee's default category. Turn it off to replace it.",
       "add": "+ Add action",
-      "reviewInbox": "See the review inbox"
+      "reviewInbox": "See the review inbox",
+      "payeeTemplate": "Payee name",
+      "descriptionTemplate": "Description text",
+      "templateHelp": "Plain text. Each placeholder in braces is replaced with text from the transaction. Select a placeholder below to insert it.",
+      "joinHelp": "The text is joined to the current description exactly as written, so include any space or separator you want.",
+      "placeholders": "Placeholders",
+      "placeholdersHelp": "{payeeText} is the payee text as received. {description} is the description as it stands when this action runs. The other placeholders are the captures named in the patterns of this rule.",
+      "insertPlaceholder": "Insert {name}",
+      "unknownPlaceholders": "Not defined by this rule: {names}. Choose a placeholder from the list, or capture it in a pattern above.",
+      "invalidPlaceholders": "Not a valid placeholder: {names}. A name is lowercase letters and digits.",
+      "createIfMissing": "Create the payee if it does not exist",
+      "createIfMissingHelp": "When on, and no payee matches the name (by name, alias or a close match), a new payee is created with it. A payee created by a rule is kept if you undo the run.",
+      "onlyIfEmptyDescriptionHelp": "When on, the rule writes the description only if the transaction has none. Turn it off to write it every time.",
+      "mode": "How to write it",
+      "modes": {
+        "replace": "Replace the description",
+        "append": "Add after the description",
+        "prepend": "Add before the description"
+      }
     },
     "actionTypes": {
       "add_tags": "Add tags",
@@ -242,7 +268,7 @@
         "INVALID_CURRENCY": "Choose a currency.",
         "ARRAY_EMPTY": "Choose at least one item.",
         "ARRAY_TOO_LARGE": "Too many items are chosen.",
-        "RANGE_ORDER": "The first amount must not be greater than the second.",
+        "RANGE_ORDER": "The first value must not be greater than the second.",
         "MAX_DEPTH": "Groups are nested too deeply. The limit is {maxDepth} levels.",
         "MAX_LEAVES": "There are too many conditions. The limit is {maxLeaves}.",
         "MAX_NODES": "There are too many conditions and groups. The limit is {maxNodes}.",
@@ -347,6 +373,8 @@
       "transfer_leg_category": "it is a transfer, which has no category",
       "split_category": "it is split, so the category belongs to the splits",
       "cross_owner_transfer_payee": "it is a transfer to another owner, whose payee this rule may not change",
+      "empty_render": "the text of an action came out empty for it",
+      "payee_not_found": "no payee has the name the rule built, and it does not create one",
       "other": "the rule cannot change it"
     },
     "change": {
@@ -355,7 +383,10 @@
       "tagsAdded": "Tags added: {tags}",
       "tagsRemoved": "Tags removed: {tags}",
       "none": "none",
-      "unknown": "a deleted item"
+      "unknown": "a deleted item",
+      "payeeCreated": "{done, select, yes {A new payee was created: {name}} other {A new payee will be created: {name}}}",
+      "description": "Description: {before} → {after}",
+      "descriptionSet": "Set the description to {value}"
     },
     "filters": {
       "accounts": "Accounts",
@@ -435,8 +466,8 @@
       "set_category": "Set the category to {name}{onlyIfEmpty, select, yes { (only if empty)} other {}}",
       "set_payee": "Set the payee to {name}{onlyIfEmpty, select, yes { (only if empty)} other {}}",
       "request_ai_review": "Ask for an AI review: {instruction}",
-      "set_payee_from_text": "Set the payee to \"{template}\"{createIfMissing, select, yes { (created if missing)} other {}}{onlyIfEmpty, select, yes { (only if empty)} other {}}",
-      "set_description": "{mode, select, append {Append \"{template}\" to the description} prepend {Put \"{template}\" before the description} other {Set the description to \"{template}\"}}{onlyIfEmpty, select, yes { (only if empty)} other {}}"
+      "set_payee_from_text": "Set the payee from text: \"{template}\"{createIfMissing, select, yes { (created if missing)} other {}}{onlyIfEmpty, select, yes { (only if empty)} other {}}",
+      "set_description": "Set the description ({mode, select, append {append} prepend {prepend} other {replace}}): \"{template}\"{onlyIfEmpty, select, yes { (only if empty)} other {}}"
     }
   }
 }

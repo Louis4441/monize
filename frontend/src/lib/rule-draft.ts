@@ -9,7 +9,7 @@
  * editor says so. Writing is the opposite: `draftToPayload` emits exactly what
  * the create and update DTOs accept, and the server validates it again.
  */
-import { createAction, isEditorActionType, type EditorAction } from '@/lib/rule-actions';
+import { createAction, isDescriptionMode, isEditorActionType, type EditorAction } from '@/lib/rule-actions';
 import {
   RULE_CONDITION_FIELDS,
   RULE_OPERATOR_SHAPES,
@@ -156,6 +156,27 @@ function readAction(input: unknown, repairs: Repairs): EditorAction | null {
         onlyIfEmpty: typeof input.onlyIfEmpty === 'boolean' ? input.onlyIfEmpty : true,
       } as EditorAction;
     }
+    case 'set_payee_from_text': {
+      // The template is kept exactly as stored (no trim), so opening and saving loses nothing.
+      if (typeof input.template !== 'string') repairs.note();
+      return {
+        ...blank,
+        template: typeof input.template === 'string' ? input.template : '',
+        createIfMissing: typeof input.createIfMissing === 'boolean' ? input.createIfMissing : blank.createIfMissing,
+        onlyIfEmpty: typeof input.onlyIfEmpty === 'boolean' ? input.onlyIfEmpty : blank.onlyIfEmpty,
+      };
+    }
+    case 'set_description': {
+      if (typeof input.template !== 'string') repairs.note();
+      // A missing mode or flag reads as the server's default; a mode it does not know is repaired.
+      if (input.mode !== undefined && !isDescriptionMode(input.mode)) repairs.note();
+      return {
+        ...blank,
+        template: typeof input.template === 'string' ? input.template : '',
+        mode: isDescriptionMode(input.mode) ? input.mode : blank.mode,
+        onlyIfEmpty: typeof input.onlyIfEmpty === 'boolean' ? input.onlyIfEmpty : blank.onlyIfEmpty,
+      };
+    }
     case 'request_ai_review':
       if (typeof input.instruction !== 'string') repairs.note();
       return { ...blank, instruction: typeof input.instruction === 'string' ? input.instruction : '' };
@@ -216,6 +237,20 @@ export function actionToApi(action: EditorAction): RuleAction {
       return { type: 'set_category', categoryId: action.categoryId, onlyIfEmpty: action.onlyIfEmpty };
     case 'set_payee':
       return { type: 'set_payee', payeeId: action.payeeId, onlyIfEmpty: action.onlyIfEmpty };
+    case 'set_payee_from_text':
+      return {
+        type: 'set_payee_from_text',
+        template: action.template,
+        createIfMissing: action.createIfMissing,
+        onlyIfEmpty: action.onlyIfEmpty,
+      };
+    case 'set_description':
+      return {
+        type: 'set_description',
+        template: action.template,
+        mode: action.mode,
+        onlyIfEmpty: action.onlyIfEmpty,
+      };
     case 'request_ai_review':
       return { type: 'request_ai_review', instruction: action.instruction };
   }

@@ -44,18 +44,117 @@ describe('RuleConditionCard', () => {
     );
   });
 
-  it.each([
-    ['dayOfMonth', 'gte', 15, '15'],
-    ['dayOfMonth', 'in', [1, 15], '[1,15]'],
-    ['weekday', 'eq', 'SUN', '"SUN"'],
-    ['status', 'in', ['VOID'], '["VOID"]'],
-    ['hasAttachment', 'eq', true, 'true'],
-    ['referenceNumber', 'eq', 'CHK-1', '"CHK-1"'],
-  ] as const)('shows a %s leaf (task X5) with its field name and stored value, without crashing', (field, op, value, shown) => {
-    render(<Card initial={leaf({ field, op, value })} />);
-    expect(screen.getByLabelText('Field')).toHaveValue(field);
-    expect(optionLabels(screen.getByLabelText('Field'))).toContain(field);
-    expect(screen.getByText(shown)).toBeInTheDocument();
+  it('shows a leaf on a field this client does not know with its stored value, never a wrong control', () => {
+    render(<Card initial={leaf({ field: 'futureField' as never, op: 'eq', value: 'x' })} />);
+    expect(screen.getByLabelText('Field')).toHaveValue('futureField');
+    expect(screen.getByText('"x"')).toBeInTheDocument();
+  });
+
+  it('takes a reference number like a description: text, with the text operators', () => {
+    const onLeaf = vi.fn();
+    render(<Card initial={createLeaf('referenceNumber')} onLeaf={onLeaf} />);
+    expect(screen.getByLabelText('Field')).toHaveValue('referenceNumber');
+    expect(optionLabels(screen.getByLabelText('Operator'))).toEqual(
+      ['is', 'contains', 'starts with', 'matches the pattern', 'is empty'],
+    );
+    fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'CHK-1' } });
+    expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ field: 'referenceNumber', value: 'CHK-1' }));
+  });
+
+  it('takes a day of the month as a whole number from 1 to 31', () => {
+    const onLeaf = vi.fn();
+    render(<Card initial={createLeaf('dayOfMonth')} onLeaf={onLeaf} />);
+    const day = screen.getByLabelText('Value');
+    expect(day).toHaveValue('');
+    fireEvent.change(day, { target: { value: '15' } });
+    fireEvent.blur(day);
+    expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ field: 'dayOfMonth', op: 'eq', value: 15 }));
+
+    fireEvent.change(day, { target: { value: '45' } });
+    fireEvent.blur(day);
+    expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ value: 31 }));
+  });
+
+  it('takes two days for between, and a list of days for in, sorted', () => {
+    const onLeaf = vi.fn();
+    render(<Card initial={createLeaf('dayOfMonth')} onLeaf={onLeaf} />);
+    fireEvent.change(screen.getByLabelText('Operator'), { target: { value: 'between' } });
+    fireEvent.change(screen.getByLabelText('From'), { target: { value: '5' } });
+    fireEvent.blur(screen.getByLabelText('From'));
+    fireEvent.change(screen.getByLabelText('To'), { target: { value: '20' } });
+    fireEvent.blur(screen.getByLabelText('To'));
+    expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ op: 'between', value: [5, 20] }));
+
+    fireEvent.change(screen.getByLabelText('Operator'), { target: { value: 'in' } });
+    fireEvent.click(screen.getByText('Choose days'));
+    fireEvent.click(screen.getByLabelText('15'));
+    fireEvent.click(screen.getByLabelText('1'));
+    expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ op: 'in', value: [1, 15] }));
+  });
+
+  it('keeps a single day when the operator becomes in', () => {
+    const onLeaf = vi.fn();
+    render(<Card initial={leaf({ field: 'dayOfMonth', op: 'eq', value: 28 })} onLeaf={onLeaf} />);
+    fireEvent.change(screen.getByLabelText('Operator'), { target: { value: 'in' } });
+    expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ op: 'in', value: [28] }));
+  });
+
+  it('offers the weekdays Monday first, in the reader\'s language, and reports the code', () => {
+    const onLeaf = vi.fn();
+    render(<Card initial={createLeaf('weekday')} onLeaf={onLeaf} />);
+    const select = screen.getByLabelText('Value');
+    expect(optionLabels(select)).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+    expect(select).toHaveValue('MON');
+    fireEvent.change(select, { target: { value: 'SUN' } });
+    expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ field: 'weekday', value: 'SUN' }));
+
+    fireEvent.change(screen.getByLabelText('Operator'), { target: { value: 'in' } });
+    // The pick made under "is" carries over, and more are added to it.
+    fireEvent.click(screen.getByRole('button', { name: 'Sun' }));
+    fireEvent.click(screen.getByLabelText('Sat'));
+    expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ op: 'in', value: ['SUN', 'SAT'] }));
+  });
+
+  it('offers the transaction statuses under the names the transaction filter uses', () => {
+    const onLeaf = vi.fn();
+    render(<Card initial={createLeaf('status')} onLeaf={onLeaf} />);
+    const select = screen.getByLabelText('Value');
+    expect(optionLabels(select)).toEqual(['Unreconciled', 'Cleared', 'Reconciled', 'Void']);
+    fireEvent.change(select, { target: { value: 'VOID' } });
+    expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ field: 'status', op: 'eq', value: 'VOID' }));
+
+    fireEvent.change(screen.getByLabelText('Operator'), { target: { value: 'in' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Void' }));
+    fireEvent.click(screen.getByLabelText('Cleared'));
+    expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ op: 'in', value: ['VOID', 'CLEARED'] }));
+  });
+
+  it('uses a switch named after the field for has an attachment', () => {
+    const onLeaf = vi.fn();
+    render(<Card initial={createLeaf('hasAttachment')} onLeaf={onLeaf} />);
+    expect(screen.getByText('Yes')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('switch', { name: 'Has an attachment' }));
+    expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ field: 'hasAttachment', value: false }));
+    expect(screen.getByText('No')).toBeInTheDocument();
+  });
+
+  it('explains captures under a pattern, and flags a name the server would refuse', () => {
+    const onLeaf = vi.fn();
+    render(
+      <RuleConditionCard
+        leaf={leaf({ field: 'description', op: 'matches', value: '*{Payee}*' })}
+        options={testOptions}
+        actions={[]}
+        errors={['INVALID_CAPTURE']}
+        captureCodes={['INVALID_CAPTURE']}
+        onChange={onLeaf}
+      />,
+    );
+    expect(screen.getByText(/Use \{name\} to keep the text at that spot/)).toBeInTheDocument();
+    expect(screen.getByText(/Use \* for any text/)).toBeInTheDocument();
+    expect(screen.getByText(/A pattern can hold at most|A capture name must be lowercase/)).toBeInTheDocument();
+    // shown once, under the pattern, not again in the card's list
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('starts over when the field changes: first operator of the new field, empty value', () => {
@@ -126,7 +225,7 @@ describe('RuleConditionCard', () => {
     expect(screen.queryByText(/wildcard/)).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Operator'), { target: { value: 'matches' } });
-    expect(screen.getByText(/Use \* as a wildcard/)).toBeInTheDocument();
+    expect(screen.getByText(/Use \* for any text/)).toBeInTheDocument();
     expect(screen.getByLabelText('Value')).toHaveValue('coffee');
   });
 

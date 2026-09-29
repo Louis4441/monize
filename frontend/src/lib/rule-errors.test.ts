@@ -157,4 +157,45 @@ describe('draftGaps', () => {
       { path: 'actions[4]', code: 'VALUE_EMPTY' },
     ]);
   });
+
+  it('asks for the text of a text action, and bounds it like the server', () => {
+    const actions = [
+      createAction('set_payee_from_text'),
+      { ...createAction('set_description'), template: '   ' },
+      { ...createAction('set_payee_from_text'), template: 'x'.repeat(201) },
+      { ...createAction('set_description'), template: 'x'.repeat(201) },
+    ] as RuleDraft['actions'];
+    expect(draftGaps(draft({ actions }))).toEqual([
+      { path: 'actions[0]', code: 'VALUE_EMPTY' },
+      { path: 'actions[1]', code: 'VALUE_EMPTY' },
+      { path: 'actions[2]', code: 'VALUE_TOO_LONG' },
+    ]);
+  });
+
+  it('refuses a placeholder no pattern of the rule defines, and a malformed one', () => {
+    const condition = createGroup('all', [leaf({ field: 'description', op: 'matches', value: '*{payee}*' })]);
+    const actions = [
+      { ...createAction('set_payee_from_text'), template: '{payee} {payeeText} {description}' },
+      { ...createAction('set_description'), template: '{nope}' },
+      { ...createAction('set_description'), template: '{Payee}' },
+    ] as RuleDraft['actions'];
+    expect(draftGaps(draft({ condition, actions }))).toEqual([
+      { path: 'actions[1]', code: 'UNKNOWN_CAPTURE' },
+      { path: 'actions[2]', code: 'INVALID_CAPTURE' },
+    ]);
+  });
+
+  it('refuses the patterns the server refuses, at the leaf', () => {
+    const condition = createGroup('all', [
+      leaf({ field: 'description', op: 'matches', value: '*{a}*' }),
+      leaf({ field: 'memo', op: 'matches', value: '*{a}*' }),
+      leaf({ field: 'referenceNumber', op: 'matches', value: '{Bad}' }),
+      leaf({ field: 'payeeText', op: 'matches', value: '{a1}{a2}{a3}{a4}{a5}{a6}' }),
+    ]);
+    expect(draftGaps(draft({ condition, actions: [tags] }))).toEqual([
+      { path: 'condition.all[1]', code: 'DUPLICATE_CAPTURE' },
+      { path: 'condition.all[2]', code: 'INVALID_CAPTURE' },
+      { path: 'condition.all[3]', code: 'TOO_MANY_CAPTURES' },
+    ]);
+  });
 });

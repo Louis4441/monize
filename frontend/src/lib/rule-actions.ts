@@ -6,30 +6,59 @@
 import {
   MAX_RULE_ACTIONS,
   MAX_RULE_AI_REVIEW_ACTIONS,
-  RULE_ACTION_TYPES,
   isRuleActionType,
 } from '@/lib/rule-fields';
 import { newUid } from '@/lib/rule-tree';
-import type { RuleActionType } from '@/types/transaction-rule';
+import type { RuleActionType, RuleDescriptionMode } from '@/types/transaction-rule';
 
-/**
- * The server accepts two text actions (`set_payee_from_text`, `set_description`)
- * that the editor has no card for yet (task X5), so the editor neither offers
- * nor holds them.
- */
-const TEXT_ACTION_TYPES: readonly RuleActionType[] = ['set_payee_from_text', 'set_description'];
-export type EditorActionType = Exclude<RuleActionType, 'set_payee_from_text' | 'set_description'>;
+/** Every action the server accepts has a card, so the editor holds and offers all of them. */
+export type EditorActionType = RuleActionType;
 
-export const isEditorActionType = (value: unknown): value is EditorActionType =>
-  isRuleActionType(value) && !TEXT_ACTION_TYPES.includes(value);
+export const isEditorActionType = (value: unknown): value is EditorActionType => isRuleActionType(value);
+
+/** The order the type picker lists them in: the ones that write the row first, the review last. */
+export const EDITOR_ACTION_TYPES: readonly EditorActionType[] = [
+  'add_tags',
+  'remove_tags',
+  'set_category',
+  'set_payee',
+  'set_payee_from_text',
+  'set_description',
+  'request_ai_review',
+];
+
+/** The ways `set_description` joins its text to the current one. */
+export const DESCRIPTION_MODES: readonly RuleDescriptionMode[] = ['replace', 'append', 'prepend'];
+
+export const isDescriptionMode = (value: unknown): value is RuleDescriptionMode =>
+  typeof value === 'string' && (DESCRIPTION_MODES as readonly string[]).includes(value);
 
 export type EditorAction =
   | { readonly uid: string; readonly type: 'add_tags' | 'remove_tags'; readonly tagIds: readonly string[] }
   | { readonly uid: string; readonly type: 'set_category'; readonly categoryId: string; readonly onlyIfEmpty: boolean }
   | { readonly uid: string; readonly type: 'set_payee'; readonly payeeId: string; readonly onlyIfEmpty: boolean }
+  | {
+      readonly uid: string;
+      readonly type: 'set_payee_from_text';
+      readonly template: string;
+      readonly createIfMissing: boolean;
+      readonly onlyIfEmpty: boolean;
+    }
+  | {
+      readonly uid: string;
+      readonly type: 'set_description';
+      readonly template: string;
+      readonly mode: RuleDescriptionMode;
+      readonly onlyIfEmpty: boolean;
+    }
   | { readonly uid: string; readonly type: 'request_ai_review'; readonly instruction: string };
 
-/** A blank action of `type`. `onlyIfEmpty` starts on: a rule fills, it does not overwrite. */
+/**
+ * A blank action of `type`. `onlyIfEmpty` starts on: a rule fills, it does not
+ * overwrite. The two text actions start where the server's defaults are
+ * (`withActionDefaults`): a payee is filled and never created, a description is
+ * replaced and written even when there is one.
+ */
 export function createAction(type: EditorActionType = 'add_tags'): EditorAction {
   const uid = newUid();
   switch (type) {
@@ -40,6 +69,10 @@ export function createAction(type: EditorActionType = 'add_tags'): EditorAction 
       return { uid, type, categoryId: '', onlyIfEmpty: true };
     case 'set_payee':
       return { uid, type, payeeId: '', onlyIfEmpty: true };
+    case 'set_payee_from_text':
+      return { uid, type, template: '', createIfMissing: false, onlyIfEmpty: true };
+    case 'set_description':
+      return { uid, type, template: '', mode: 'replace', onlyIfEmpty: false };
     case 'request_ai_review':
       return { uid, type, instruction: '' };
   }
@@ -65,7 +98,7 @@ export function canAddAction(actions: readonly EditorAction[]): boolean {
  */
 export function availableActionTypes(actions: readonly EditorAction[], index: number): EditorActionType[] {
   const othersWithReview = countAiReviews(actions.filter((_, i) => i !== index));
-  return RULE_ACTION_TYPES.filter(isEditorActionType).filter(
+  return EDITOR_ACTION_TYPES.filter(
     (type) => type !== 'request_ai_review' || othersWithReview < MAX_RULE_AI_REVIEW_ACTIONS,
   );
 }

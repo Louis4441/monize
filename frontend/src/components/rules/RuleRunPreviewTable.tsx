@@ -17,6 +17,8 @@ export function useSkipReasonText(): (reason: string) => string {
       case 'transfer_leg_category':
       case 'split_category':
       case 'cross_owner_transfer_payee':
+      case 'empty_render':
+      case 'payee_not_found':
         return t(reason);
       default:
         // A reason newer than this client still says that the row was left alone.

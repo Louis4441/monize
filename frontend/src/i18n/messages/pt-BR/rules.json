@@ -134,7 +134,12 @@
       "absAmount": "Valor (sem sinal)",
       "currencyCode": "Moeda",
       "tagIds": "Tags",
-      "hasSplits": "Tem divisões"
+      "hasSplits": "Tem divisões",
+      "referenceNumber": "Número de Referência",
+      "dayOfMonth": "Dia do mês",
+      "weekday": "Dia da semana",
+      "status": "Status",
+      "hasAttachment": "Tem um anexo"
     },
     "operators": {
       "eq": "é",
@@ -171,12 +176,15 @@
       "currency": "Escolha uma moeda",
       "currencies": "Escolha moedas",
       "types": "Escolha tipos",
-      "matchesHint": "Use * como curinga. Por exemplo, *café* corresponde a qualquer texto que contenha café.",
+      "matchesHint": "Use * para qualquer texto, por exemplo *café*. Use {capture} para guardar o texto nesse ponto para as ações desta regra, por exemplo {example}. Um nome é formado por letras minúsculas e números, e um padrão pode guardar até {max} textos.",
       "amount": "Valor",
       "from": "De",
       "to": "Até",
       "yes": "Sim",
-      "no": "Não"
+      "no": "Não",
+      "days": "Escolher dias",
+      "weekdays": "Escolher dias da semana",
+      "statuses": "Escolher status"
     },
     "action": {
       "title": "Ação",
@@ -190,7 +198,25 @@
       "onlyIfEmpty": "Somente se vazio",
       "onlyIfEmptyHelp": "Quando ativado, a regra preenche a categoria ou o favorecido somente se a transação não tiver nenhum. Ela não substitui um valor definido manualmente ou pela categoria padrão do favorecido. Desative para substituí-lo.",
       "add": "+ Adicionar ação",
-      "reviewInbox": "Ver a caixa de revisão"
+      "reviewInbox": "Ver a caixa de revisão",
+      "payeeTemplate": "Nome do favorecido",
+      "descriptionTemplate": "Texto da descrição",
+      "templateHelp": "Texto simples. Cada marcador entre chaves é substituído por texto da transação. Selecione um marcador abaixo para inseri-lo.",
+      "joinHelp": "O texto é juntado à descrição atual exatamente como está escrito, então inclua o espaço ou o separador que quiser.",
+      "placeholders": "Marcadores",
+      "placeholdersHelp": "{payeeText} é o texto do favorecido como foi recebido. {description} é a descrição como está quando esta ação é executada. Os outros marcadores são as capturas nomeadas nos padrões desta regra.",
+      "insertPlaceholder": "Inserir {name}",
+      "unknownPlaceholders": "Não definido por esta regra: {names}. Escolha um marcador da lista ou capture-o em um padrão acima.",
+      "invalidPlaceholders": "Marcador inválido: {names}. Um nome é formado por letras minúsculas e números.",
+      "createIfMissing": "Criar o favorecido se ele não existir",
+      "createIfMissingHelp": "Se ativado e nenhum favorecido corresponder ao nome (por nome, alias ou correspondência aproximada), um novo favorecido é criado. Um favorecido criado por uma regra é mantido se você desfizer a execução.",
+      "onlyIfEmptyDescriptionHelp": "Se ativado, a regra escreve a descrição somente se a transação não tiver nenhuma. Desative para escrevê-la sempre.",
+      "mode": "Como escrever",
+      "modes": {
+        "replace": "Substituir a descrição",
+        "append": "Acrescentar depois da descrição",
+        "prepend": "Acrescentar antes da descrição"
+      }
     },
     "actionTypes": {
       "add_tags": "Adicionar tags",
@@ -347,6 +373,8 @@
       "transfer_leg_category": "é uma transferência, que não tem categoria",
       "split_category": "está dividida, então a categoria pertence às divisões",
       "cross_owner_transfer_payee": "é uma transferência para outro proprietário, cujo favorecido esta regra não pode alterar",
+      "empty_render": "o texto de uma ação ficou vazio para ela",
+      "payee_not_found": "nenhum favorecido tem o nome que a regra construiu, e a regra não o cria",
       "other": "a regra não pode alterá-la"
     },
     "change": {
@@ -355,7 +383,10 @@
       "tagsAdded": "Tags adicionadas: {tags}",
       "tagsRemoved": "Tags removidas: {tags}",
       "none": "nenhuma",
-      "unknown": "um item excluído"
+      "unknown": "um item excluído",
+      "payeeCreated": "{done, select, yes {Um novo favorecido foi criado: {name}} other {Um novo favorecido será criado: {name}}}",
+      "description": "Descrição: {before} → {after}",
+      "descriptionSet": "Definir a descrição como {value}"
     },
     "filters": {
       "accounts": "Contas",
@@ -435,8 +466,8 @@
       "set_category": "Definir a categoria como {name}{onlyIfEmpty, select, yes { (somente se vazia)} other {}}",
       "set_payee": "Definir o favorecido como {name}{onlyIfEmpty, select, yes { (somente se vazio)} other {}}",
       "request_ai_review": "Pedir uma revisão da IA: {instruction}",
-      "set_payee_from_text": "Definir o favorecido como “{template}”{createIfMissing, select, yes { (criado se não existir)} other {}}{onlyIfEmpty, select, yes { (somente se vazio)} other {}}",
-      "set_description": "{mode, select, append {Acrescentar “{template}” ao fim da descrição} prepend {Colocar “{template}” antes da descrição} other {Definir a descrição como “{template}”}}{onlyIfEmpty, select, yes { (somente se vazio)} other {}}"
+      "set_payee_from_text": "Definir o favorecido a partir do texto: “{template}”{createIfMissing, select, yes { (criado se não existir)} other {}}{onlyIfEmpty, select, yes { (somente se vazio)} other {}}",
+      "set_description": "Definir a descrição ({mode, select, append {acrescentar depois} prepend {acrescentar antes} other {substituir}}): “{template}”{onlyIfEmpty, select, yes { (somente se vazio)} other {}}"
     }
   }
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  EDITOR_ACTION_TYPES,
   availableActionTypes,
   canAddAction,
   canDuplicateAction,
@@ -12,7 +13,7 @@ import {
   updateAction,
   type EditorAction,
 } from './rule-actions';
-import { MAX_RULE_ACTIONS } from './rule-fields';
+import { MAX_RULE_ACTIONS, RULE_ACTION_TYPES } from './rule-fields';
 
 const many = (n: number): EditorAction[] => Array.from({ length: n }, () => createAction('add_tags'));
 
@@ -20,6 +21,11 @@ describe('createAction', () => {
   it('starts set_category and set_payee with onlyIfEmpty on', () => {
     expect(createAction('set_category')).toMatchObject({ categoryId: '', onlyIfEmpty: true });
     expect(createAction('set_payee')).toMatchObject({ payeeId: '', onlyIfEmpty: true });
+  });
+
+  it('starts the text actions where the server defaults are: a payee is filled and not created, a description replaced', () => {
+    expect(createAction('set_payee_from_text')).toMatchObject({ template: '', createIfMissing: false, onlyIfEmpty: true });
+    expect(createAction('set_description')).toMatchObject({ template: '', mode: 'replace', onlyIfEmpty: false });
   });
 
   it('starts the other types blank', () => {
@@ -84,5 +90,31 @@ describe('list edits', () => {
     expect(next[1].uid).not.toBe(list[0].uid);
     expect(next[1]).toMatchObject({ type: 'add_tags' });
     expect(next[2].uid).toBe(list[1].uid);
+  });
+});
+
+describe('the action types the editor offers', () => {
+  it('are all the types the server accepts, each once', () => {
+    expect([...EDITOR_ACTION_TYPES].sort()).toEqual([...RULE_ACTION_TYPES].sort());
+  });
+
+  it('lists the text actions after set_payee and the review last', () => {
+    expect(availableActionTypes([createAction('add_tags')], 0)).toEqual([
+      'add_tags',
+      'remove_tags',
+      'set_category',
+      'set_payee',
+      'set_payee_from_text',
+      'set_description',
+      'request_ai_review',
+    ]);
+  });
+
+  it('duplicates a text action with a new uid', () => {
+    const list = [{ ...createAction('set_description'), template: 'x' }] as EditorAction[];
+    const next = duplicateAction(list, 0);
+    expect(next).toHaveLength(2);
+    expect(next[1]).toMatchObject({ type: 'set_description', template: 'x' });
+    expect(next[1].uid).not.toBe(next[0].uid);
   });
 });

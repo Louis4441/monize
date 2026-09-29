@@ -123,14 +123,11 @@ export const RULE_CONDITION_FIELDS: Readonly<Record<RuleField, RuleFieldSpec>> =
 export const RULE_FIELDS = Object.keys(RULE_CONDITION_FIELDS) as RuleField[];
 
 /**
- * The fields the visual editor has a control and a label for. The others
- * (`referenceNumber`, `dayOfMonth`, `weekday`, `status`, `hasAttachment`)
- * parse, print and save through the expression mode and the API; their cards
- * are task X5, until then the editor shows such a leaf with its field name and
- * its stored value and keeps it intact.
+ * The fields the visual editor has a control and a label for: all of them. A
+ * field newer than this client is not in the table, so it never reaches a card;
+ * `RuleValueControl` still shows such a leaf's stored value as it is.
  */
-const X5_FIELDS: readonly RuleField[] = ['referenceNumber', 'dayOfMonth', 'weekday', 'status', 'hasAttachment'];
-export const EDITOR_RULE_FIELDS: readonly RuleField[] = RULE_FIELDS.filter((f) => !X5_FIELDS.includes(f));
+export const EDITOR_RULE_FIELDS: readonly RuleField[] = RULE_FIELDS;
 export const isEditorRuleField = (field: RuleField): boolean => EDITOR_RULE_FIELDS.includes(field);
 
 export const RULE_ACTION_TYPES = [

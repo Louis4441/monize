@@ -134,7 +134,12 @@
       "absAmount": "[XX-Amount (ignoring sign)-XX]",
       "currencyCode": "[XX-Currency-XX]",
       "tagIds": "[XX-Tags-XX]",
-      "hasSplits": "[XX-Has splits-XX]"
+      "hasSplits": "[XX-Has splits-XX]",
+      "referenceNumber": "[XX-Reference number-XX]",
+      "dayOfMonth": "[XX-Day of the month-XX]",
+      "weekday": "[XX-Day of the week-XX]",
+      "status": "[XX-Status-XX]",
+      "hasAttachment": "[XX-Has an attachment-XX]"
     },
     "operators": {
       "eq": "[XX-is-XX]",
@@ -171,12 +176,15 @@
       "currency": "[XX-Choose a currency-XX]",
       "currencies": "[XX-Choose currencies-XX]",
       "types": "[XX-Choose types-XX]",
-      "matchesHint": "[XX-Use * as a wildcard. For example, *coffee* matches any text that contains coffee.-XX]",
+      "matchesHint": "[XX-Use * for any text, for example *coffee*. Use {capture} to keep the text at that spot for the actions of this rule, for example {example}. A name is lowercase letters and digits, and a pattern can keep up to {max} texts.-XX]",
       "amount": "[XX-Amount-XX]",
       "from": "[XX-From-XX]",
       "to": "[XX-To-XX]",
       "yes": "[XX-Yes-XX]",
-      "no": "[XX-No-XX]"
+      "no": "[XX-No-XX]",
+      "days": "[XX-Choose days-XX]",
+      "weekdays": "[XX-Choose days of the week-XX]",
+      "statuses": "[XX-Choose statuses-XX]"
     },
     "action": {
       "title": "[XX-Action-XX]",
@@ -190,7 +198,25 @@
       "onlyIfEmpty": "[XX-Only if empty-XX]",
       "onlyIfEmptyHelp": "[XX-When on, the rule fills in the category or payee only if the transaction has none. It does not replace one set by hand or by the payee's default category. Turn it off to replace it.-XX]",
       "add": "[XX-+ Add action-XX]",
-      "reviewInbox": "[XX-See the review inbox-XX]"
+      "reviewInbox": "[XX-See the review inbox-XX]",
+      "payeeTemplate": "[XX-Payee name-XX]",
+      "descriptionTemplate": "[XX-Description text-XX]",
+      "templateHelp": "[XX-Plain text. Each placeholder in braces is replaced with text from the transaction. Select a placeholder below to insert it.-XX]",
+      "joinHelp": "[XX-The text is joined to the current description exactly as written, so include any space or separator you want.-XX]",
+      "placeholders": "[XX-Placeholders-XX]",
+      "placeholdersHelp": "[XX-{payeeText} is the payee text as received. {description} is the description as it stands when this action runs. The other placeholders are the captures named in the patterns of this rule.-XX]",
+      "insertPlaceholder": "[XX-Insert {name}-XX]",
+      "unknownPlaceholders": "[XX-Not defined by this rule: {names}. Choose a placeholder from the list, or capture it in a pattern above.-XX]",
+      "invalidPlaceholders": "[XX-Not a valid placeholder: {names}. A name is lowercase letters and digits.-XX]",
+      "createIfMissing": "[XX-Create the payee if it does not exist-XX]",
+      "createIfMissingHelp": "[XX-When on, and no payee matches the name (by name, alias or a close match), a new payee is created with it. A payee created by a rule is kept if you undo the run.-XX]",
+      "onlyIfEmptyDescriptionHelp": "[XX-When on, the rule writes the description only if the transaction has none. Turn it off to write it every time.-XX]",
+      "mode": "[XX-How to write it-XX]",
+      "modes": {
+        "replace": "[XX-Replace the description-XX]",
+        "append": "[XX-Add after the description-XX]",
+        "prepend": "[XX-Add before the description-XX]"
+      }
     },
     "actionTypes": {
       "add_tags": "[XX-Add tags-XX]",
@@ -242,7 +268,7 @@
         "INVALID_CURRENCY": "[XX-Choose a currency.-XX]",
         "ARRAY_EMPTY": "[XX-Choose at least one item.-XX]",
         "ARRAY_TOO_LARGE": "[XX-Too many items are chosen.-XX]",
-        "RANGE_ORDER": "[XX-The first amount must not be greater than the second.-XX]",
+        "RANGE_ORDER": "[XX-The first value must not be greater than the second.-XX]",
         "MAX_DEPTH": "[XX-Groups are nested too deeply. The limit is {maxDepth} levels.-XX]",
         "MAX_LEAVES": "[XX-There are too many conditions. The limit is {maxLeaves}.-XX]",
         "MAX_NODES": "[XX-There are too many conditions and groups. The limit is {maxNodes}.-XX]",
@@ -347,6 +373,8 @@
       "transfer_leg_category": "[XX-it is a transfer, which has no category-XX]",
       "split_category": "[XX-it is split, so the category belongs to the splits-XX]",
       "cross_owner_transfer_payee": "[XX-it is a transfer to another owner, whose payee this rule may not change-XX]",
+      "empty_render": "[XX-the text of an action came out empty for it-XX]",
+      "payee_not_found": "[XX-no payee has the name the rule built, and it does not create one-XX]",
       "other": "[XX-the rule cannot change it-XX]"
     },
     "change": {
@@ -355,7 +383,10 @@
       "tagsAdded": "[XX-Tags added: {tags}-XX]",
       "tagsRemoved": "[XX-Tags removed: {tags}-XX]",
       "none": "[XX-none-XX]",
-      "unknown": "[XX-a deleted item-XX]"
+      "unknown": "[XX-a deleted item-XX]",
+      "payeeCreated": "[XX-{done, select, yes {A new payee was created: {name}} other {A new payee will be created: {name}}}-XX]",
+      "description": "[XX-Description: {before} → {after}-XX]",
+      "descriptionSet": "[XX-Set the description to {value}-XX]"
     },
     "filters": {
       "accounts": "[XX-Accounts-XX]",
@@ -435,8 +466,8 @@
       "set_category": "[XX-Set the category to {name}{onlyIfEmpty, select, yes { (only if empty)} other {}}-XX]",
       "set_payee": "[XX-Set the payee to {name}{onlyIfEmpty, select, yes { (only if empty)} other {}}-XX]",
       "request_ai_review": "[XX-Ask for an AI review: {instruction}-XX]",
-      "set_payee_from_text": "[XX-Set the payee to \"{template}\"{createIfMissing, select, yes { (created if missing)} other {}}{onlyIfEmpty, select, yes { (only if empty)} other {}}-XX]",
-      "set_description": "[XX-{mode, select, append {Append \"{template}\" to the description} prepend {Put \"{template}\" before the description} other {Set the description to \"{template}\"}}{onlyIfEmpty, select, yes { (only if empty)} other {}}-XX]"
+      "set_payee_from_text": "[XX-Set the payee from text: \"{template}\"{createIfMissing, select, yes { (created if missing)} other {}}{onlyIfEmpty, select, yes { (only if empty)} other {}}-XX]",
+      "set_description": "[XX-Set the description ({mode, select, append {append} prepend {prepend} other {replace}}): \"{template}\"{onlyIfEmpty, select, yes { (only if empty)} other {}}-XX]"
     }
   }
 }

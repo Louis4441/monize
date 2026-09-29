@@ -134,7 +134,12 @@
       "absAmount": "金額（符号なし）",
       "currencyCode": "通貨",
       "tagIds": "タグ",
-      "hasSplits": "分割あり"
+      "hasSplits": "分割あり",
+      "referenceNumber": "参照番号",
+      "dayOfMonth": "月の日",
+      "weekday": "曜日",
+      "status": "状態",
+      "hasAttachment": "添付ファイルあり"
     },
     "operators": {
       "eq": "である",
@@ -171,12 +176,15 @@
       "currency": "通貨を選択",
       "currencies": "通貨を選択",
       "types": "種類を選択",
-      "matchesHint": "ワイルドカードとして * を使用できます。たとえば *コーヒー* は、コーヒーを含むすべてのテキストに一致します。",
+      "matchesHint": "任意のテキストには * を使います。例: *コーヒー*。このルールのアクションのためにその位置のテキストを保持するには {capture} を使います。例: {example}。名前は小文字の英字と数字で、1つのパターンで最大 {max} 個のテキストを保持できます。",
       "amount": "金額",
       "from": "から",
       "to": "まで",
       "yes": "はい",
-      "no": "いいえ"
+      "no": "いいえ",
+      "days": "日を選択",
+      "weekdays": "曜日を選択",
+      "statuses": "ステータスを選択"
     },
     "action": {
       "title": "アクション",
@@ -190,7 +198,25 @@
       "onlyIfEmpty": "空の場合のみ",
       "onlyIfEmptyHelp": "オンにすると、取引にカテゴリまたは支払先がない場合にのみルールが入力します。手動で設定した値や、支払先の既定のカテゴリで設定された値は置き換えません。置き換えるにはオフにしてください。",
       "add": "+ アクションを追加",
-      "reviewInbox": "レビュー受信箱を見る"
+      "reviewInbox": "レビュー受信箱を見る",
+      "payeeTemplate": "支払先の名前",
+      "descriptionTemplate": "説明のテキスト",
+      "templateHelp": "プレーンテキストです。波かっこで囲んだプレースホルダーは、取引のテキストに置き換えられます。挿入するには、下のプレースホルダーを選択してください。",
+      "joinHelp": "テキストは書いたとおりに現在の説明へ連結されるため、必要なスペースや区切り文字を含めてください。",
+      "placeholders": "プレースホルダー",
+      "placeholdersHelp": "{payeeText} は受信したままの支払先テキストです。{description} はこのアクションの実行時点の説明です。ほかのプレースホルダーは、このルールのパターンで名前を付けたキャプチャです。",
+      "insertPlaceholder": "{name} を挿入",
+      "unknownPlaceholders": "このルールでは定義されていません: {names}。一覧からプレースホルダーを選ぶか、上のパターンでキャプチャしてください。",
+      "invalidPlaceholders": "有効なプレースホルダーではありません: {names}。名前は小文字の英字と数字です。",
+      "createIfMissing": "支払先がなければ作成する",
+      "createIfMissingHelp": "オンにすると、名前(名前、エイリアス、近い一致)に合う支払先がない場合に新しい支払先を作成します。ルールが作成した支払先は、実行を元に戻しても残ります。",
+      "onlyIfEmptyDescriptionHelp": "オンにすると、取引に説明がない場合にのみルールが説明を書き込みます。毎回書き込むにはオフにします。",
+      "mode": "書き込み方",
+      "modes": {
+        "replace": "説明を置き換える",
+        "append": "説明の後ろに追加",
+        "prepend": "説明の前に追加"
+      }
     },
     "actionTypes": {
       "add_tags": "タグを追加",
@@ -242,7 +268,7 @@
         "INVALID_CURRENCY": "通貨を選択してください。",
         "ARRAY_EMPTY": "少なくとも1つ選択してください。",
         "ARRAY_TOO_LARGE": "選択した項目が多すぎます。",
-        "RANGE_ORDER": "最初の金額は2番目の金額以下にしてください。",
+        "RANGE_ORDER": "最初の値は2番目の値以下にしてください。",
         "MAX_DEPTH": "グループのネストが深すぎます。上限は{maxDepth}階層です。",
         "MAX_LEAVES": "条件が多すぎます。上限は{maxLeaves}件です。",
         "MAX_NODES": "条件とグループが多すぎます。上限は{maxNodes}件です。",
@@ -347,6 +373,8 @@
       "transfer_leg_category": "振替であり、カテゴリがありません",
       "split_category": "分割されているため、カテゴリは分割行に属します",
       "cross_owner_transfer_payee": "他の所有者への振替で、その支払先はこのルールでは変更できません",
+      "empty_render": "アクションのテキストが空になったため",
+      "payee_not_found": "ルールが作った名前の支払先がなく、ルールは作成しないため",
       "other": "ルールでは変更できません"
     },
     "change": {
@@ -355,7 +383,10 @@
       "tagsAdded": "追加したタグ: {tags}",
       "tagsRemoved": "外したタグ: {tags}",
       "none": "なし",
-      "unknown": "削除された項目"
+      "unknown": "削除された項目",
+      "payeeCreated": "{done, select, yes {新しい支払先を作成しました: {name}} other {新しい支払先を作成します: {name}}}",
+      "description": "説明: {before} → {after}",
+      "descriptionSet": "説明を{value}に設定"
     },
     "filters": {
       "accounts": "口座",
@@ -435,8 +466,8 @@
       "set_category": "カテゴリを {name} に設定{onlyIfEmpty, select, yes {（空の場合のみ）} other {}}",
       "set_payee": "支払先を {name} に設定{onlyIfEmpty, select, yes {（空の場合のみ）} other {}}",
       "request_ai_review": "AIレビューを依頼: {instruction}",
-      "set_payee_from_text": "支払先を「{template}」に設定{createIfMissing, select, yes {（なければ作成）} other {}}{onlyIfEmpty, select, yes {（空の場合のみ）} other {}}",
-      "set_description": "{mode, select, append {説明の末尾に「{template}」を追加} prepend {説明の先頭に「{template}」を追加} other {説明を「{template}」に設定}}{onlyIfEmpty, select, yes {（空の場合のみ）} other {}}"
+      "set_payee_from_text": "テキストから支払先を設定：「{template}」{createIfMissing, select, yes {（なければ作成）} other {}}{onlyIfEmpty, select, yes {（空の場合のみ）} other {}}",
+      "set_description": "説明を設定（{mode, select, append {後ろに追加} prepend {前に追加} other {置換}}）：「{template}」{onlyIfEmpty, select, yes {（空の場合のみ）} other {}}"
     }
   }
 }

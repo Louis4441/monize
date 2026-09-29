@@ -25,8 +25,59 @@ describe('emptyDraft', () => {
   });
 });
 
+describe('the text actions', () => {
+  const actions = [
+    { type: 'set_payee_from_text', template: ' {payee}  ', createIfMissing: true, onlyIfEmpty: false },
+    { type: 'set_description', template: '{description} | {ref}', mode: 'prepend', onlyIfEmpty: true },
+  ];
+
+  it('opens and saves as stored: the text untrimmed, every flag and mode kept', () => {
+    const { draft, repaired } = read({ actions: actions as never });
+    expect(repaired).toBe(0);
+    expect(draft.actions.map((a) => a.type)).toEqual(['set_payee_from_text', 'set_description']);
+    expect(draft.actions.map(actionToApi)).toEqual(actions);
+  });
+
+  it('reads a missing flag or mode as the default the server applies', () => {
+    const { draft, repaired } = read({
+      actions: [
+        { type: 'set_payee_from_text', template: '{payee}' },
+        { type: 'set_description', template: 'x' },
+      ] as never,
+    });
+    expect(repaired).toBe(0);
+    expect(draft.actions.map(actionToApi)).toEqual([
+      { type: 'set_payee_from_text', template: '{payee}', createIfMissing: false, onlyIfEmpty: true },
+      { type: 'set_description', template: 'x', mode: 'replace', onlyIfEmpty: false },
+    ]);
+  });
+
+  it('counts a mode or a template it cannot read as repaired', () => {
+    const { draft, repaired } = read({
+      actions: [
+        { type: 'set_description', template: 'x', mode: 'swap', onlyIfEmpty: false },
+        { type: 'set_payee_from_text', template: 5, createIfMissing: false, onlyIfEmpty: true },
+      ] as never,
+    });
+    expect(repaired).toBe(2);
+    expect(draft.actions.map(actionToApi)).toEqual([
+      { type: 'set_description', template: 'x', mode: 'replace', onlyIfEmpty: false },
+      { type: 'set_payee_from_text', template: '', createIfMissing: false, onlyIfEmpty: true },
+    ]);
+  });
+
+  it('writes exactly the keys the DTO takes', () => {
+    expect(Object.keys(actionToApi(createAction('set_payee_from_text'))).sort()).toEqual(
+      ['createIfMissing', 'onlyIfEmpty', 'template', 'type'],
+    );
+    expect(Object.keys(actionToApi(createAction('set_description'))).sort()).toEqual(
+      ['mode', 'onlyIfEmpty', 'template', 'type'],
+    );
+  });
+});
+
 describe('draftFromRule: the X3 fields', () => {
-  it('keeps a condition on a field the editor has no card for, values and operators intact', () => {
+  it('keeps a condition on each of the fields, values and operators intact', () => {
     const condition = {
       all: [
         { field: 'dayOfMonth', op: 'in', value: [1, 15] },

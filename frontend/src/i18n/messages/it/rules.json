@@ -134,7 +134,12 @@
       "absAmount": "Importo (senza segno)",
       "currencyCode": "Valuta",
       "tagIds": "Tag",
-      "hasSplits": "Ha suddivisioni"
+      "hasSplits": "Ha suddivisioni",
+      "referenceNumber": "Numero di riferimento",
+      "dayOfMonth": "Giorno del mese",
+      "weekday": "Giorno della settimana",
+      "status": "Stato",
+      "hasAttachment": "Ha un allegato"
     },
     "operators": {
       "eq": "è",
@@ -171,12 +176,15 @@
       "currency": "Scegli una valuta",
       "currencies": "Scegli le valute",
       "types": "Scegli i tipi",
-      "matchesHint": "Usa * come carattere jolly. Ad esempio, *caffè* corrisponde a qualsiasi testo che contiene caffè.",
+      "matchesHint": "Usa * per qualsiasi testo, ad esempio *caffè*. Usa {capture} per conservare il testo in quel punto per le azioni di questa regola, ad esempio {example}. Un nome è formato da lettere minuscole e cifre, e un modello può conservare fino a {max} testi.",
       "amount": "Importo",
       "from": "Da",
       "to": "A",
       "yes": "Sì",
-      "no": "No"
+      "no": "No",
+      "days": "Scegli i giorni",
+      "weekdays": "Scegli i giorni della settimana",
+      "statuses": "Scegli gli stati"
     },
     "action": {
       "title": "Azione",
@@ -190,7 +198,25 @@
       "onlyIfEmpty": "Solo se vuoto",
       "onlyIfEmptyHelp": "Se attivo, la regola compila la categoria o il beneficiario solo quando la transazione non ne ha. Non sostituisce un valore impostato a mano o dalla categoria predefinita del beneficiario. Disattivalo per sostituirlo.",
       "add": "+ Aggiungi azione",
-      "reviewInbox": "Vedi la posta di revisione"
+      "reviewInbox": "Vedi la posta di revisione",
+      "payeeTemplate": "Nome del beneficiario",
+      "descriptionTemplate": "Testo della descrizione",
+      "templateHelp": "Testo semplice. Ogni segnaposto tra parentesi graffe viene sostituito con testo della transazione. Seleziona un segnaposto qui sotto per inserirlo.",
+      "joinHelp": "Il testo viene unito alla descrizione attuale esattamente come è scritto, quindi includi lo spazio o il separatore che desideri.",
+      "placeholders": "Segnaposto",
+      "placeholdersHelp": "{payeeText} è il testo del beneficiario così come è stato ricevuto. {description} è la descrizione così com'è quando questa azione viene eseguita. Gli altri segnaposto sono le catture nominate nei modelli di questa regola.",
+      "insertPlaceholder": "Inserisci {name}",
+      "unknownPlaceholders": "Non definito da questa regola: {names}. Scegli un segnaposto dall'elenco oppure catturalo in un modello qui sopra.",
+      "invalidPlaceholders": "Segnaposto non valido: {names}. Un nome è formato da lettere minuscole e cifre.",
+      "createIfMissing": "Crea il beneficiario se non esiste",
+      "createIfMissingHelp": "Se attivo, e nessun beneficiario corrisponde al nome (per nome, alias o corrispondenza approssimata), viene creato un nuovo beneficiario. Un beneficiario creato da una regola viene mantenuto se annulli l'esecuzione.",
+      "onlyIfEmptyDescriptionHelp": "Se attivo, la regola scrive la descrizione solo se la transazione non ne ha una. Disattivalo per scriverla ogni volta.",
+      "mode": "Come scriverla",
+      "modes": {
+        "replace": "Sostituisci la descrizione",
+        "append": "Aggiungi dopo la descrizione",
+        "prepend": "Aggiungi prima della descrizione"
+      }
     },
     "actionTypes": {
       "add_tags": "Aggiungi tag",
@@ -242,7 +268,7 @@
         "INVALID_CURRENCY": "Scegli una valuta.",
         "ARRAY_EMPTY": "Scegli almeno un elemento.",
         "ARRAY_TOO_LARGE": "Sono stati scelti troppi elementi.",
-        "RANGE_ORDER": "Il primo importo non deve essere maggiore del secondo.",
+        "RANGE_ORDER": "Il primo valore non deve essere maggiore del secondo.",
         "MAX_DEPTH": "I gruppi sono annidati troppo in profondità. Il limite è di {maxDepth} livelli.",
         "MAX_LEAVES": "Ci sono troppe condizioni. Il limite è {maxLeaves}.",
         "MAX_NODES": "Ci sono troppe condizioni e gruppi. Il limite è {maxNodes}.",
@@ -347,6 +373,8 @@
       "transfer_leg_category": "è un trasferimento, che non ha categoria",
       "split_category": "è suddivisa, quindi la categoria appartiene alle suddivisioni",
       "cross_owner_transfer_payee": "è un trasferimento verso un altro proprietario, il cui beneficiario questa regola non può modificare",
+      "empty_render": "il testo di un'azione è risultato vuoto per essa",
+      "payee_not_found": "nessun beneficiario ha il nome costruito dalla regola, e la regola non lo crea",
       "other": "la regola non può modificarla"
     },
     "change": {
@@ -355,7 +383,10 @@
       "tagsAdded": "Tag aggiunti: {tags}",
       "tagsRemoved": "Tag rimossi: {tags}",
       "none": "nessuna",
-      "unknown": "un elemento eliminato"
+      "unknown": "un elemento eliminato",
+      "payeeCreated": "{done, select, yes {È stato creato un nuovo beneficiario: {name}} other {Verrà creato un nuovo beneficiario: {name}}}",
+      "description": "Descrizione: {before} → {after}",
+      "descriptionSet": "Imposta la descrizione su {value}"
     },
     "filters": {
       "accounts": "Conti",
@@ -435,8 +466,8 @@
       "set_category": "Imposta la categoria su {name}{onlyIfEmpty, select, yes { (solo se vuota)} other {}}",
       "set_payee": "Imposta il beneficiario su {name}{onlyIfEmpty, select, yes { (solo se vuoto)} other {}}",
       "request_ai_review": "Richiedi una revisione dell'IA: {instruction}",
-      "set_payee_from_text": "Imposta il beneficiario su «{template}»{createIfMissing, select, yes { (creato se non esiste)} other {}}{onlyIfEmpty, select, yes { (solo se vuoto)} other {}}",
-      "set_description": "{mode, select, append {Aggiungi «{template}» alla fine della descrizione} prepend {Metti «{template}» prima della descrizione} other {Imposta la descrizione su «{template}»}}{onlyIfEmpty, select, yes { (solo se vuoto)} other {}}"
+      "set_payee_from_text": "Imposta il beneficiario dal testo: «{template}»{createIfMissing, select, yes { (creato se non esiste)} other {}}{onlyIfEmpty, select, yes { (solo se vuoto)} other {}}",
+      "set_description": "Imposta la descrizione ({mode, select, append {aggiungi dopo} prepend {aggiungi prima} other {sostituisci}}): «{template}»{onlyIfEmpty, select, yes { (solo se vuoto)} other {}}"
     }
   }
 }

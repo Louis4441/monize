@@ -97,10 +97,12 @@ function coerceValue(leaf: EditorLeaf, op: RuleOperator): EditorValue {
   const fresh = defaultValue(leaf.field, op);
   const value = leaf.value;
   if (from === 'scalar' && to === 'list') {
+    if (typeof value === 'number') return [value];
     return typeof value === 'string' && value !== '' ? [value] : fresh;
   }
   if (from === 'list' && to === 'scalar') {
-    return Array.isArray(value) && typeof value[0] === 'string' ? value[0] : fresh;
+    if (Array.isArray(value) && (typeof value[0] === 'string' || typeof value[0] === 'number')) return value[0];
+    return fresh;
   }
   if (from === 'scalar' && to === 'range') {
     return typeof value === 'number' ? [value, undefined] : fresh;

@@ -9,6 +9,7 @@ import type { RowAction } from '@/components/ui/row-actions/rowAction';
 import {
   EDITOR_RULE_FIELDS,
   RULE_CONDITION_FIELDS,
+  type RuleFieldSpec,
   isEditorRuleField,
   isRuleField,
   isRuleOperator,
@@ -21,6 +22,8 @@ interface RuleConditionCardProps {
   actions: RowAction[];
   errors: readonly string[];
   onChange: (leaf: EditorLeaf) => void;
+  /** Codes this leaf's `matches` pattern is refused with; shown under the pattern, not repeated in the card's list. */
+  captureCodes?: readonly string[];
 }
 
 /**
@@ -29,12 +32,17 @@ interface RuleConditionCardProps {
  * value over, because the old ones meant something else. On a phone the three
  * controls stack; from `sm` they sit side by side.
  */
-export function RuleConditionCard({ leaf, options, actions, errors, onChange }: RuleConditionCardProps) {
+export function RuleConditionCard({ leaf, options, actions, errors, onChange, captureCodes = [] }: RuleConditionCardProps) {
   const t = useTranslations('rules.editor');
-  const operators = RULE_CONDITION_FIELDS[leaf.field].operators;
+  // A field this client does not know has no table entry: it keeps the operator it was stored with.
+  const operators = (RULE_CONDITION_FIELDS[leaf.field] as RuleFieldSpec | undefined)?.operators ?? [leaf.op];
 
   return (
-    <RuleCardShell label={t('condition.title')} actions={actions} errors={errors}>
+    <RuleCardShell
+      label={t('condition.title')}
+      actions={actions}
+      errors={errors.filter((code) => !captureCodes.includes(code))}
+    >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)]">
         <Select
           id={`${leaf.uid}-field`}
@@ -42,7 +50,7 @@ export function RuleConditionCard({ leaf, options, actions, errors, onChange }: 
           value={leaf.field}
           options={[
             ...EDITOR_RULE_FIELDS.map((field) => ({ value: field, label: t(`fields.${field}`) })),
-            // A field whose card is task X5 keeps its own name until then; it is never hidden or reset.
+            // A field this client does not know keeps its own name; it is never hidden or reset.
             ...(isEditorRuleField(leaf.field) ? [] : [{ value: leaf.field, label: leaf.field }]),
           ]}
           onChange={(e) => {
@@ -58,7 +66,12 @@ export function RuleConditionCard({ leaf, options, actions, errors, onChange }: 
             if (isRuleOperator(e.target.value)) onChange(changeLeafOperator(leaf, e.target.value));
           }}
         />
-        <RuleValueControl leaf={leaf} options={options} onChange={(value) => onChange({ ...leaf, value })} />
+        <RuleValueControl
+          leaf={leaf}
+          options={options}
+          captureCodes={captureCodes}
+          onChange={(value) => onChange({ ...leaf, value })}
+        />
       </div>
     </RuleCardShell>
   );

@@ -134,7 +134,12 @@
       "absAmount": "Số tiền (không dấu)",
       "currencyCode": "Tiền tệ",
       "tagIds": "Thẻ",
-      "hasSplits": "Có chia nhỏ"
+      "hasSplits": "Có chia nhỏ",
+      "referenceNumber": "Số tham chiếu",
+      "dayOfMonth": "Ngày trong tháng",
+      "weekday": "Ngày trong tuần",
+      "status": "Trạng thái",
+      "hasAttachment": "Có tệp đính kèm"
     },
     "operators": {
       "eq": "là",
@@ -171,12 +176,15 @@
       "currency": "Chọn một loại tiền tệ",
       "currencies": "Chọn các loại tiền tệ",
       "types": "Chọn các loại",
-      "matchesHint": "Dùng * làm ký tự đại diện. Ví dụ, *cà phê* khớp với mọi văn bản có chứa cà phê.",
+      "matchesHint": "Dùng * cho bất kỳ văn bản nào, ví dụ *cà phê*. Dùng {capture} để giữ văn bản tại vị trí đó cho các hành động của quy tắc này, ví dụ {example}. Tên gồm chữ thường và chữ số, và một mẫu có thể giữ tối đa {max} văn bản.",
       "amount": "Số tiền",
       "from": "Từ",
       "to": "Đến",
       "yes": "Có",
-      "no": "Không"
+      "no": "Không",
+      "days": "Chọn ngày",
+      "weekdays": "Chọn ngày trong tuần",
+      "statuses": "Chọn trạng thái"
     },
     "action": {
       "title": "Hành động",
@@ -190,7 +198,25 @@
       "onlyIfEmpty": "Chỉ khi trống",
       "onlyIfEmptyHelp": "Khi bật, quy tắc chỉ điền danh mục hoặc người nhận nếu giao dịch chưa có. Quy tắc không thay thế giá trị đã đặt thủ công hoặc theo danh mục mặc định của người nhận. Hãy tắt để thay thế.",
       "add": "+ Thêm hành động",
-      "reviewInbox": "Xem hộp thư xem xét"
+      "reviewInbox": "Xem hộp thư xem xét",
+      "payeeTemplate": "Tên người nhận",
+      "descriptionTemplate": "Văn bản mô tả",
+      "templateHelp": "Văn bản thuần. Mỗi trình giữ chỗ trong dấu ngoặc nhọn được thay bằng văn bản từ giao dịch. Chọn một trình giữ chỗ bên dưới để chèn.",
+      "joinHelp": "Văn bản được nối vào mô tả hiện tại đúng như đã viết, nên hãy tự thêm khoảng trắng hoặc dấu phân cách bạn muốn.",
+      "placeholders": "Trình giữ chỗ",
+      "placeholdersHelp": "{payeeText} là văn bản người nhận như đã nhận được. {description} là mô tả tại thời điểm hành động này chạy. Các trình giữ chỗ còn lại là các phần bắt giữ được đặt tên trong các mẫu của quy tắc này.",
+      "insertPlaceholder": "Chèn {name}",
+      "unknownPlaceholders": "Quy tắc này chưa định nghĩa: {names}. Hãy chọn một trình giữ chỗ trong danh sách, hoặc bắt giữ nó ở một mẫu phía trên.",
+      "invalidPlaceholders": "Không phải trình giữ chỗ hợp lệ: {names}. Tên gồm chữ thường và chữ số.",
+      "createIfMissing": "Tạo người nhận nếu chưa có",
+      "createIfMissingHelp": "Khi bật, và không có người nhận nào khớp với tên (theo tên, bí danh hoặc khớp gần đúng), một người nhận mới sẽ được tạo. Người nhận do quy tắc tạo ra vẫn được giữ lại nếu bạn hoàn tác lần chạy.",
+      "onlyIfEmptyDescriptionHelp": "Khi bật, quy tắc chỉ ghi mô tả nếu giao dịch chưa có mô tả. Tắt để ghi mỗi lần.",
+      "mode": "Cách ghi",
+      "modes": {
+        "replace": "Thay thế mô tả",
+        "append": "Thêm vào sau mô tả",
+        "prepend": "Thêm vào trước mô tả"
+      }
     },
     "actionTypes": {
       "add_tags": "Thêm thẻ",
@@ -242,7 +268,7 @@
         "INVALID_CURRENCY": "Hãy chọn một loại tiền tệ.",
         "ARRAY_EMPTY": "Hãy chọn ít nhất một mục.",
         "ARRAY_TOO_LARGE": "Đã chọn quá nhiều mục.",
-        "RANGE_ORDER": "Số tiền thứ nhất không được lớn hơn số tiền thứ hai.",
+        "RANGE_ORDER": "Giá trị thứ nhất không được lớn hơn giá trị thứ hai.",
         "MAX_DEPTH": "Các nhóm lồng nhau quá sâu. Giới hạn là {maxDepth} cấp.",
         "MAX_LEAVES": "Có quá nhiều điều kiện. Giới hạn là {maxLeaves}.",
         "MAX_NODES": "Có quá nhiều điều kiện và nhóm. Giới hạn là {maxNodes}.",
@@ -347,6 +373,8 @@
       "transfer_leg_category": "là giao dịch chuyển khoản, không có danh mục",
       "split_category": "đã được chia nhỏ nên danh mục thuộc về các phần chia",
       "cross_owner_transfer_payee": "là chuyển khoản cho chủ sở hữu khác, người nhận của nó quy tắc này không được thay đổi",
+      "empty_render": "văn bản của một hành động bị trống đối với nó",
+      "payee_not_found": "không có người nhận nào mang tên mà quy tắc đã tạo, và quy tắc không tạo mới",
       "other": "quy tắc không thể thay đổi nó"
     },
     "change": {
@@ -355,7 +383,10 @@
       "tagsAdded": "Thẻ đã thêm: {tags}",
       "tagsRemoved": "Thẻ đã gỡ: {tags}",
       "none": "không có",
-      "unknown": "một mục đã bị xóa"
+      "unknown": "một mục đã bị xóa",
+      "payeeCreated": "{done, select, yes {Đã tạo người nhận mới: {name}} other {Sẽ tạo người nhận mới: {name}}}",
+      "description": "Mô tả: {before} → {after}",
+      "descriptionSet": "Đặt mô tả thành {value}"
     },
     "filters": {
       "accounts": "Tài khoản",
@@ -435,8 +466,8 @@
       "set_category": "Đặt danh mục thành {name}{onlyIfEmpty, select, yes { (chỉ khi trống)} other {}}",
       "set_payee": "Đặt người nhận thành {name}{onlyIfEmpty, select, yes { (chỉ khi trống)} other {}}",
       "request_ai_review": "Yêu cầu AI xem xét: {instruction}",
-      "set_payee_from_text": "Đặt người nhận thành “{template}”{createIfMissing, select, yes { (tạo mới nếu chưa có)} other {}}{onlyIfEmpty, select, yes { (chỉ khi trống)} other {}}",
-      "set_description": "{mode, select, append {Thêm “{template}” vào cuối mô tả} prepend {Thêm “{template}” vào đầu mô tả} other {Đặt mô tả thành “{template}”}}{onlyIfEmpty, select, yes { (chỉ khi trống)} other {}}"
+      "set_payee_from_text": "Đặt người nhận từ văn bản: “{template}”{createIfMissing, select, yes { (tạo mới nếu chưa có)} other {}}{onlyIfEmpty, select, yes { (chỉ khi trống)} other {}}",
+      "set_description": "Đặt mô tả ({mode, select, append {thêm vào sau} prepend {thêm vào trước} other {thay thế}}): “{template}”{onlyIfEmpty, select, yes { (chỉ khi trống)} other {}}"
     }
   }
 }

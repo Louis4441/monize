@@ -144,6 +144,51 @@ describe('RuleTestPanel', () => {
     expect(skipped).toHaveTextContent('1 transaction: the rule cannot change it');
   });
 
+  it('describes what the text actions would do: the payee named by text, a payee that will be created, the description', async () => {
+    api.previewDraft.mockResolvedValue(
+      makePreview({
+        matched: [
+          {
+            transactionId: 'tx-1',
+            date: '2026-08-14',
+            payeeName: null,
+            amount: -4.5,
+            currencyCode: 'CAD',
+            changes: {
+              payeeName: { before: null, after: 'Corner Cafe Ltd' },
+              payeeCreated: true,
+              description: { before: 'POS 123', after: 'POS 123 / REF 9' },
+            },
+          },
+          {
+            transactionId: 'tx-2',
+            date: '2026-08-15',
+            payeeName: 'Old',
+            amount: -1,
+            currencyCode: 'CAD',
+            changes: { payeeName: { before: 'Old', after: 'Corner Cafe' }, description: { before: null, after: 'Note' } },
+          },
+        ],
+        skipped: [
+          { transactionId: 's-1', reason: 'empty_render' },
+          { transactionId: 's-2', reason: 'payee_not_found' },
+        ],
+      }),
+    );
+    await renderPanel();
+    await runTest();
+    const rows = screen.getAllByRole('row').slice(1);
+    expect(rows[0]).toHaveTextContent('Payee: none → Corner Cafe Ltd');
+    expect(rows[0]).toHaveTextContent('A new payee will be created: Corner Cafe Ltd');
+    expect(rows[0]).toHaveTextContent('Description: "POS 123" → "POS 123 / REF 9"');
+    expect(rows[1]).toHaveTextContent('Payee: Old → Corner Cafe');
+    expect(rows[1]).not.toHaveTextContent('will be created');
+    expect(rows[1]).toHaveTextContent('Description: none → "Note"');
+    const skipped = screen.getByTestId('rule-run-skipped');
+    expect(skipped).toHaveTextContent('1 transaction: the text of an action came out empty for it');
+    expect(skipped).toHaveTextContent('1 transaction: no payee has the name the rule built, and it does not create one');
+  });
+
   it('shows a failed request as an error, never as an empty result', async () => {
     api.previewDraft.mockRejectedValue(refused(500, { message: 'Database unavailable' }));
     await renderPanel();

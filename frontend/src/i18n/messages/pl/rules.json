@@ -134,7 +134,12 @@
       "absAmount": "Kwota (bez znaku)",
       "currencyCode": "Waluta",
       "tagIds": "Tagi",
-      "hasSplits": "Ma podziały"
+      "hasSplits": "Ma podziały",
+      "referenceNumber": "Numer referencyjny",
+      "dayOfMonth": "Dzień miesiąca",
+      "weekday": "Dzień tygodnia",
+      "status": "Status",
+      "hasAttachment": "Ma załącznik"
     },
     "operators": {
       "eq": "jest",
@@ -171,12 +176,15 @@
       "currency": "Wybierz walutę",
       "currencies": "Wybierz waluty",
       "types": "Wybierz typy",
-      "matchesHint": "Użyj * jako symbolu wieloznacznego. Na przykład *kawa* pasuje do każdego tekstu zawierającego słowo kawa.",
+      "matchesHint": "Użyj *, aby dopasować dowolny tekst, na przykład *kawa*. Użyj {capture}, aby zachować tekst z tego miejsca dla akcji tej reguły, na przykład {example}. Nazwa składa się z małych liter i cyfr, a jeden wzorzec może zachować do {max} tekstów.",
       "amount": "Kwota",
       "from": "Od",
       "to": "Do",
       "yes": "Tak",
-      "no": "Nie"
+      "no": "Nie",
+      "days": "Wybierz dni",
+      "weekdays": "Wybierz dni tygodnia",
+      "statuses": "Wybierz statusy"
     },
     "action": {
       "title": "Akcja",
@@ -190,7 +198,25 @@
       "onlyIfEmpty": "Tylko jeśli puste",
       "onlyIfEmptyHelp": "Gdy włączone, reguła uzupełnia kategorię lub odbiorcę tylko wtedy, gdy transakcja ich nie ma. Nie zastępuje wartości ustawionej ręcznie ani domyślną kategorią odbiorcy. Wyłącz, aby zastępować.",
       "add": "+ Dodaj akcję",
-      "reviewInbox": "Zobacz skrzynkę przeglądów"
+      "reviewInbox": "Zobacz skrzynkę przeglądów",
+      "payeeTemplate": "Nazwa odbiorcy",
+      "descriptionTemplate": "Tekst opisu",
+      "templateHelp": "Zwykły tekst. Każdy symbol zastępczy w nawiasach klamrowych zostanie zastąpiony tekstem z transakcji. Wybierz poniżej symbol zastępczy, aby go wstawić.",
+      "joinHelp": "Tekst jest dołączany do bieżącego opisu dokładnie tak, jak został wpisany, więc dodaj spację lub separator, jeśli są potrzebne.",
+      "placeholders": "Symbole zastępcze",
+      "placeholdersHelp": "{payeeText} to tekst odbiorcy w postaci, w jakiej został otrzymany. {description} to opis w chwili uruchomienia tej akcji. Pozostałe symbole zastępcze to przechwytywania nazwane we wzorcach tej reguły.",
+      "insertPlaceholder": "Wstaw {name}",
+      "unknownPlaceholders": "Nie zdefiniowano w tej regule: {names}. Wybierz symbol zastępczy z listy lub przechwyć go we wzorcu powyżej.",
+      "invalidPlaceholders": "Nieprawidłowy symbol zastępczy: {names}. Nazwa składa się z małych liter i cyfr.",
+      "createIfMissing": "Utwórz odbiorcę, jeśli nie istnieje",
+      "createIfMissingHelp": "Gdy opcja jest włączona i żaden odbiorca nie pasuje do nazwy (według nazwy, aliasu lub zbliżonego dopasowania), tworzony jest nowy odbiorca. Odbiorca utworzony przez regułę zostaje, jeśli cofniesz uruchomienie.",
+      "onlyIfEmptyDescriptionHelp": "Gdy opcja jest włączona, reguła zapisuje opis tylko wtedy, gdy transakcja go nie ma. Wyłącz ją, aby zapisywać opis za każdym razem.",
+      "mode": "Sposób zapisu",
+      "modes": {
+        "replace": "Zastąp opis",
+        "append": "Dodaj po opisie",
+        "prepend": "Dodaj przed opisem"
+      }
     },
     "actionTypes": {
       "add_tags": "Dodaj tagi",
@@ -242,7 +268,7 @@
         "INVALID_CURRENCY": "Wybierz walutę.",
         "ARRAY_EMPTY": "Wybierz co najmniej jedną pozycję.",
         "ARRAY_TOO_LARGE": "Wybrano zbyt wiele pozycji.",
-        "RANGE_ORDER": "Pierwsza kwota nie może być większa od drugiej.",
+        "RANGE_ORDER": "Pierwsza wartość nie może być większa od drugiej.",
         "MAX_DEPTH": "Grupy są zagnieżdżone zbyt głęboko. Limit to {maxDepth} poziomy.",
         "MAX_LEAVES": "Warunków jest zbyt wiele. Limit to {maxLeaves}.",
         "MAX_NODES": "Warunków i grup jest zbyt wiele. Limit to {maxNodes}.",
@@ -347,6 +373,8 @@
       "transfer_leg_category": "jest przelewem, który nie ma kategorii",
       "split_category": "jest podzielona, więc kategoria należy do podziałów",
       "cross_owner_transfer_payee": "jest przelewem do innego właściciela, którego odbiorcy ta reguła nie może zmieniać",
+      "empty_render": "tekst akcji okazał się dla niej pusty",
+      "payee_not_found": "żaden odbiorca nie ma nazwy zbudowanej przez regułę, a reguła go nie tworzy",
       "other": "reguła nie może jej zmienić"
     },
     "change": {
@@ -355,7 +383,10 @@
       "tagsAdded": "Dodane tagi: {tags}",
       "tagsRemoved": "Usunięte tagi: {tags}",
       "none": "brak",
-      "unknown": "usunięty element"
+      "unknown": "usunięty element",
+      "payeeCreated": "{done, select, yes {Utworzono nowego odbiorcę: {name}} other {Zostanie utworzony nowy odbiorca: {name}}}",
+      "description": "Opis: {before} → {after}",
+      "descriptionSet": "Ustaw opis na {value}"
     },
     "filters": {
       "accounts": "Konta",
@@ -435,8 +466,8 @@
       "set_category": "Ustaw kategorię na {name}{onlyIfEmpty, select, yes { (tylko jeśli pusta)} other {}}",
       "set_payee": "Ustaw odbiorcę na {name}{onlyIfEmpty, select, yes { (tylko jeśli pusty)} other {}}",
       "request_ai_review": "Poproś o przegląd AI: {instruction}",
-      "set_payee_from_text": "Ustaw odbiorcę na „{template}”{createIfMissing, select, yes { (utworzony, jeśli nie istnieje)} other {}}{onlyIfEmpty, select, yes { (tylko jeśli pusty)} other {}}",
-      "set_description": "{mode, select, append {Dopisz „{template}” na końcu opisu} prepend {Dopisz „{template}” na początku opisu} other {Ustaw opis na „{template}”}}{onlyIfEmpty, select, yes { (tylko jeśli pusty)} other {}}"
+      "set_payee_from_text": "Ustaw odbiorcę z tekstu: „{template}”{createIfMissing, select, yes { (utworzony, jeśli nie istnieje)} other {}}{onlyIfEmpty, select, yes { (tylko jeśli pusty)} other {}}",
+      "set_description": "Ustaw opis ({mode, select, append {dołącz na końcu} prepend {dołącz na początku} other {zastąp}}): „{template}”{onlyIfEmpty, select, yes { (tylko jeśli pusty)} other {}}"
     }
   }
 }

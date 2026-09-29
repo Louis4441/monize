@@ -223,3 +223,25 @@ describe('immutable edits', () => {
     expect(getNode(top, path)?.kind).toBe('group');
   });
 });
+
+describe('changing the operator of a day of the month', () => {
+  const day = (op: 'eq' | 'in' | 'between', value: never) => ({ ...createLeaf('dayOfMonth'), op, value });
+
+  it('carries one day into a list and back, and into a range as its first end', () => {
+    expect(changeLeafOperator(day('eq', 15 as never), 'in').value).toEqual([15]);
+    expect(changeLeafOperator(day('in', [3, 9] as never), 'eq').value).toBe(3);
+    expect(changeLeafOperator(day('eq', 15 as never), 'between').value).toEqual([15, undefined]);
+  });
+
+  it('starts empty when there is nothing to carry', () => {
+    expect(changeLeafOperator(day('eq', undefined as never), 'in').value).toEqual([]);
+    expect(changeLeafOperator(day('in', [] as never), 'eq').value).toBeUndefined();
+  });
+
+  it('defaults a weekday to Monday, a status to the first status and an attachment to yes', () => {
+    expect(createLeaf('weekday').value).toBe('MON');
+    expect(createLeaf('status').value).toBe('UNRECONCILED');
+    expect(createLeaf('hasAttachment').value).toBe(true);
+    expect(createLeaf('dayOfMonth').value).toBeUndefined();
+  });
+});
