@@ -37,20 +37,20 @@
 | B5 | Transfers: rule step in `writeTransferLegs`; `completeTransfer` merges tags | B4 | neutral | [x] |
 | B6 | Import: QIF / OFX / CSV processor and MNY `writeAll` | B4 | inert | [x] |
 | B7 | Guard: every insert site on `transactions` calls the applier or is exempt | B5, B6 | none | [x] |
-| B8 | Manual run: preview endpoint, commit endpoint, action history, reconciled skip; application trace and retention | B4 | inert | [ ] |
-| A1 | AI action types and builder; AI assistant tools | B8 | inert | [ ] |
+| B8 | Manual run: preview endpoint, commit endpoint, action history, reconciled skip; application trace and retention | B4 | inert | [x] retention cron open (needs a WITH_CONTEXT_ALLOWLIST decision) |
+| A1 | AI action types and builder; AI assistant tools | B8 | inert | [x] |
 | A2 | MCP tool `manage_transaction_rules` | A1 | inert | [ ] |
 | F1 | Tools menu entry, rules API client, list page | B2 | inert | [x] |
 | F2 | Rule editor (visual, Home Assistant layout) | F1 | inert | [x] |
-| F3 | Test panel and manual-run dialog | F2, B8 | inert | [ ] |
-| F4 | Application history per rule (trace view) | F1, B8 | inert | [ ] |
+| F3 | Test panel and manual-run dialog | F2, B8 | inert | [x] |
+| F4 | Application history per rule (trace view) | F1, B8 | inert | [x] |
 | F5 | Expression mode (CEL subset): dependency proposal first | F2 | inert | [ ] |
-| R1 | `ai_review_requests` table, enqueue from `request_ai_review` in the applier, expiry cron | D1, B4 | inert | [ ] |
+| R1 | `ai_review_requests` table, enqueue from `request_ai_review` in the applier, expiry cron | D1, B4 | inert | [x] expiry cron open (same decision as B8) |
 | R2 | MCP and assistant tools: list, claim, submit proposal; proposal stored as a signed `PendingAiAction` | R1, A1 | inert | [ ] |
 | R3 | Review inbox in the UI: pending, proposed (confirmation card), expired | R2, F1 | inert | [ ] |
 | E1 | E2E: create a rule, import a QIF, see the tag | F2, B6 | none | [ ] |
-| Q1 | `docs/system-invariants.md` entries, doc lines, README feature line | B7 | none | [ ] invariants done, README line open |
-| Q2 | Translate every locale | F4 | none | [ ] |
+| Q1 | `docs/system-invariants.md` entries, doc lines, README feature line | B7 | none | [x] |
+| Q2 | Translate every locale | F4 | none | [x] done per task; native review of the translations open |
 
 ## Tasks
 

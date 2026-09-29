@@ -78,6 +78,7 @@ Monize is running in my [Kubernetes cluster](https://github.com/kenlasko/k8s).
 - Transaction reconciliation and clearing
 - Bulk update and bulk delete operations with filter-based selection
 - Payees with auto-categorization rules, aliases with wildcard patterns, and merge capability
+- Transaction rules (Tools > Rules): when a transaction is created or imported and it matches your conditions (account, payee, category, text, amount, tags), add or remove tags, set the category or payee, or queue it for an AI review. A visual editor, a test on existing transactions before you save, a run on existing transactions with undo, and a history of every change a rule made. A rule never changes an amount, an account or a date
 - Multi-currency transactions with automatic exchange rate tracking
 - Import from CSV, OFX/QFX, and QIF (Quicken and Microsoft Money) with smart column auto-matching
 - Microsoft Money full-file import: read a `.mny` file directly -- accounts, transfers, splits, investments, price history, exchange rates and scheduled bills -- and reconcile every balance against the file afterwards ([guide](docs/import-ms-money.md))
