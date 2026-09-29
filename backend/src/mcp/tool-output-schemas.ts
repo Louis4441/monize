@@ -421,6 +421,54 @@ export const getBudgetStatusOutput = toolOutput({
 });
 
 // ---------------------------------------------------------------------------
+// rules.tool.ts
+// ---------------------------------------------------------------------------
+
+/**
+ * `manage_transaction_rules`: one tool, several result branches, so every field
+ * is optional. list returns `rules` with `totalCount`/`truncated`; test returns
+ * the counts and `rows` (the first changes); a committed write returns `id`
+ * (`deleted` for a delete); a card shown in the web chat returns `status`.
+ */
+export const manageTransactionRulesOutput = toolOutput({
+  rules: z.array(looseObject({ id: str, name: str })).optional(),
+  totalCount: num.optional(),
+  truncated: bool.optional(),
+  rule: str.optional(),
+  matchedCount: num.optional(),
+  scanned: num.optional(),
+  skippedCount: num.optional(),
+  rows: rows().optional(),
+  id: str.optional(),
+  deleted: bool.optional(),
+  status: str.optional(),
+  message: str.optional(),
+});
+
+// ---------------------------------------------------------------------------
+// ai-review.tool.ts
+// ---------------------------------------------------------------------------
+
+const reviewRequest = looseObject({ id: str, status: str });
+
+/**
+ * `ai_review_requests`: list returns `requests`; claim returns the `request`
+ * (null when nothing is pending) with its `transaction` rows; submit returns
+ * the `proposal` card preview and `status: "proposed"`; reject returns the
+ * `request` in its new status.
+ */
+export const aiReviewRequestsOutput = toolOutput({
+  requests: z.array(reviewRequest).optional(),
+  totalCount: num.optional(),
+  truncated: bool.optional(),
+  request: reviewRequest.nullable().optional(),
+  transaction: rows().optional(),
+  proposal: looseObject({}).optional(),
+  status: str.optional(),
+  message: str.optional(),
+});
+
+// ---------------------------------------------------------------------------
 // relay.tool.ts
 // ---------------------------------------------------------------------------
 

@@ -121,6 +121,16 @@
     "attachmentRefExpired": "Het bijgevoegde bestand is niet meer beschikbaar. Upload het opnieuw en vraag het nog een keer.",
     "modelNoImageSupport": "Het geselecteerde AI-model kan geen afbeeldingen of PDF's lezen. Verwijder de bijlage en stel je vraag in tekst, of schakel over naar een model met beeldondersteuning in AI-instellingen."
   },
+  "aiReview": {
+    "notFound": "AI-beoordelingsverzoek met ID {{ id }} niet gevonden",
+    "notClaimed": "Dit AI-beoordelingsverzoek is niet door u geclaimd. Claim eerst het volgende openstaande verzoek; een verzoek dat u niet hebt geclaimd kan niet worden beantwoord.",
+    "notProposed": "Dit AI-beoordelingsverzoek wacht niet meer op goedkeuring, dus het voorstel is niet toegepast.",
+    "notOpen": "Dit AI-beoordelingsverzoek is niet meer open.",
+    "nothingProposed": "Een voorstel heeft minstens één wijziging nodig: splits, categoryName, payeeName of description.",
+    "splitsAndCategory": "Stuur splits of categoryName, niet beide: een gesplitste transactie heeft geen enkele categorie.",
+    "transferNotSupported": "Een overboeking kan niet met een voorstel worden beoordeeld. Wijs het verzoek in plaats daarvan af.",
+    "splitDifference": "De splitsregels tellen op tot {{ sum }}, maar de transactie is {{ amount }}: {{ difference }} is niet toegewezen. Laat de regels optellen tot de transactie; een restbedrag zoals verzendkosten heeft een eigen regel nodig of wordt aan de gebruiker gemeld in plaats van toegewezen."
+  },
   "auth": {
     "tooManyAttemptsLoginAgain": "Te veel verificatiepogingen. Log opnieuw in.",
     "invalidOrExpiredVerificationToken": "Ongeldig of verlopen verificatietoken",

@@ -78,6 +78,7 @@ describe("AiActionsService transaction rule actions", () => {
       singleUseTokens as never,
       rules as never,
       runs as never,
+      {} as never,
     );
   });
 
@@ -199,6 +200,14 @@ describe("AiActionsService transaction rule actions", () => {
     });
   });
 
+  it("commits a descriptor built in this process through the same executors, without the confirm endpoint's claim", async () => {
+    const descriptor = runDescriptor();
+    const result = await service.commitApproved(USER, descriptor);
+    expect(runs.run).toHaveBeenCalledTimes(1);
+    expect(result.type).toBe("run_transaction_rule");
+    expect(singleUseTokens.claim).not.toHaveBeenCalled();
+  });
+
   it("counts a run as one write however many rows it changed", async () => {
     const limiter = new AiWriteLimiter(
       counters as unknown as AuthAttemptCounterService,
@@ -215,6 +224,7 @@ describe("AiActionsService transaction rule actions", () => {
       singleUseTokens as never,
       rules as never,
       runs as never,
+      {} as never,
     );
     await service.confirm(USER, dtoFor(runDescriptor()));
     expect((await limiter.checkLimit(USER)).currentCount).toBe(1);

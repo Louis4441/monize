@@ -555,6 +555,7 @@ export class AiActionBuilderService {
     preview: UpdateTransactionPreview,
     splits?: ResolvedSplitLine[],
     attachments?: AttachmentRefDescriptor[],
+    options: { aiReviewRequestId?: string } = {},
   ): PendingAiAction {
     const { actionId, expiresAt } = this.newEnvelope();
     const descriptor: UpdateTransactionDescriptor = {
@@ -575,6 +576,9 @@ export class AiActionBuilderService {
       currencyCode: preview.currencyCode,
       ...(splits ? { splits: splits.map(toSplitRowDescriptor) } : {}),
       ...(attachments?.length ? { attachments } : {}),
+      ...(options.aiReviewRequestId
+        ? { aiReviewRequestId: options.aiReviewRequestId }
+        : {}),
     };
     return {
       actionId,

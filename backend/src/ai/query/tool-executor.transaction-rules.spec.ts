@@ -21,6 +21,7 @@ import { BuiltInReportsService } from "../../built-in-reports/built-in-reports.s
 import { AttachmentToolPrepService } from "../../attachments/attachment-tool-prep.service";
 import { RelayAttachmentStore } from "../relay/relay-attachment.store";
 import { ExchangeRateService } from "../../currencies/exchange-rate.service";
+import { AiReviewWorkService } from "../../ai-review/ai-review-work.service";
 import { TransactionRuleToolPrepService } from "../../transaction-rules/rule-tool-prep.service";
 
 const USER = "user-1";
@@ -133,6 +134,7 @@ describe("ToolExecutorService transaction rule tools", () => {
         ToolExecutorService,
         AiActionBuilderService,
         { provide: AiActionSigningService, useValue: signing },
+        { provide: AiReviewWorkService, useValue: {} },
         { provide: TransactionRuleToolPrepService, useValue: prep },
         ...unused,
       ],

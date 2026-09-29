@@ -13,6 +13,10 @@ import {
   SECURITY_TYPES,
 } from "../../securities/security-enums";
 import { TRANSACTION_NOTE_MAX_LENGTH } from "../../common/transaction-note";
+import {
+  AI_REVIEW_OPERATIONS,
+  MAX_AI_REVIEW_TOOL_LIST_LIMIT,
+} from "../../ai-review/ai-review-work.types";
 import { TRANSACTION_SORT_FIELDS } from "../../transactions/register-order";
 import { RULE_TRIGGERS } from "../../transaction-rules/rule-trigger.types";
 import { MAX_RULE_ACTIONS } from "../../transaction-rules/rule-validation";
@@ -803,6 +807,90 @@ export const manageTransactionsSchema = z
     });
   });
 
+/**
+ * The object half of `ai_review_requests`, exported so the MCP tool reuses the
+ * fields. A proposal is an edit of the reviewed transaction expressed exactly
+ * like an update in `manage_transactions` (category lines, category, payee,
+ * description); it cannot carry an amount, a date or an account.
+ */
+/**
+ * A category line as `manage_transactions` takes it, with the amount read the
+ * tolerant way (`"-20"` from a hand-written tool call is -20, `""` is refused).
+ */
+const reviewSplitLineSchema = manageTransactionSplitSchema.extend({
+  amount: numberArg(amountSchema),
+});
+
+export const aiReviewRequestsFields = z.object({
+  operation: z.enum(AI_REVIEW_OPERATIONS),
+  requestId: z.string().uuid().optional(),
+  splits: z
+    .array(reviewSplitLineSchema)
+    .min(2)
+    .max(MAX_SPLIT_LINES)
+    .optional()
+    .describe(
+      "submit: two or more category lines with signed amounts that add up to the transaction amount, replacing its category.",
+    ),
+  categoryName: z
+    .string()
+    .max(100)
+    .optional()
+    .describe("submit: one category instead of splits."),
+  payeeName: z.string().max(100).optional().describe("submit: the payee."),
+  description: z
+    .string()
+    .max(TRANSACTION_NOTE_MAX_LENGTH)
+    .optional()
+    .describe("submit: the description or memo."),
+  reason: z
+    .string()
+    .max(500)
+    .optional()
+    .describe("reject: why, for the next reader."),
+  cannotBeDone: booleanArg()
+    .optional()
+    .describe(
+      "reject: true closes the request; default false returns it to the queue.",
+    ),
+  limit: numberArg(z.number().int().min(1).max(MAX_AI_REVIEW_TOOL_LIST_LIMIT))
+    .optional()
+    .describe("list: default 20."),
+});
+
+export const aiReviewRequestsSchema = aiReviewRequestsFields.superRefine(
+  (value, ctx) => {
+    const need = (field: string, message: string): void => {
+      ctx.addIssue({ code: "custom", path: [field], message });
+    };
+    if (value.operation === "submit" || value.operation === "reject") {
+      if (!value.requestId) need("requestId", "requestId is required.");
+    }
+    if (value.operation === "submit") {
+      if (
+        value.splits === undefined &&
+        value.categoryName === undefined &&
+        value.payeeName === undefined &&
+        value.description === undefined
+      ) {
+        need(
+          "splits",
+          "Provide at least one change: splits, categoryName, payeeName or description.",
+        );
+      }
+      if (value.splits !== undefined && value.categoryName !== undefined) {
+        need(
+          "categoryName",
+          "Do not set categoryName together with splits; put categories in the splits array.",
+        );
+      }
+    }
+    if (value.operation === "reject" && !value.reason) {
+      need("reason", "reason is required.");
+    }
+  },
+);
+
 export const toolInputSchemas: Record<string, z.ZodSchema> = {
   list_transactions: listTransactionsSchema,
   list_accounts: listAccountsSchema,
@@ -824,6 +912,7 @@ export const toolInputSchemas: Record<string, z.ZodSchema> = {
   generate_report: generateReportSchema,
   list_transaction_rules: listTransactionRulesSchema,
   manage_transaction_rules: manageTransactionRulesSchema,
+  ai_review_requests: aiReviewRequestsSchema,
 };
 
 /**

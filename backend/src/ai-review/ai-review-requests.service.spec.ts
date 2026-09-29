@@ -213,3 +213,150 @@ describe("AiReviewRequestsService.expireStale", () => {
     expect(sql).toMatch(/expires_at <= CURRENT_TIMESTAMP/);
   });
 });
+
+describe("AiReviewRequestsService.listForUser options", () => {
+  it("takes several statuses, newest first, and leaves out expired requests on ask", async () => {
+    const { service, repo } = setup();
+    await service.listForUser(USER, {
+      statuses: ["pending", "claimed", "proposed"],
+      order: "DESC",
+      unexpiredOnly: true,
+    });
+    const arg = repo.find.mock.calls[0][0];
+    expect(arg.order).toEqual({ createdAt: "DESC", id: "DESC" });
+    expect(arg.where.userId).toBe(USER);
+    expect(arg.where.status.value).toEqual(["pending", "claimed", "proposed"]);
+    expect(arg.where.expiresAt).toBeDefined();
+  });
+});
+
+describe("AiReviewRequestsService.getForUser", () => {
+  it("looks a request up by id AND user, so another user's id reads as absent", async () => {
+    const { service, manager } = setup();
+    const findOne = jest.fn().mockResolvedValue(null);
+    manager.getRepository.mockReturnValue({ findOne });
+    expect(await service.getForUser(USER, TX_1)).toBeNull();
+    expect(findOne).toHaveBeenCalledWith({ where: { id: TX_1, userId: USER } });
+  });
+});
+
+describe("the agent's conditional writes", () => {
+  const row = {
+    id: "30000000-0000-4000-8000-000000000001",
+    user_id: USER,
+    transaction_id: TX_1,
+    rule_id: RULE_1,
+    kind: "transaction_review",
+    instruction: "look",
+    status: "proposed",
+    claimed_by: "agent-1",
+    claimed_at: new Date("2026-09-29T09:00:00Z"),
+    proposal: { input: {} },
+    created_at: new Date("2026-09-29T09:00:00Z"),
+    updated_at: new Date("2026-09-29T10:00:00Z"),
+    expires_at: new Date("2026-10-29T09:00:00Z"),
+  };
+
+  it("submits only for the caller that holds the claim, in one conditional UPDATE", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([[row], 1]);
+
+    const stored = await service.submitProposal(USER, row.id, "agent-1", {
+      input: { description: "x" },
+    });
+
+    expect(manager.query).toHaveBeenCalledTimes(1);
+    const [sql, params] = manager.query.mock.calls[0];
+    expect(sql).toMatch(/SET status = 'proposed'/);
+    expect(sql).toMatch(
+      /WHERE id = \$1\s+AND user_id = \$2\s+AND status = 'claimed'\s+AND claimed_by = \$3\s+AND expires_at > CURRENT_TIMESTAMP\s+RETURNING/,
+    );
+    expect(params).toEqual([
+      row.id,
+      USER,
+      "agent-1",
+      JSON.stringify({ input: { description: "x" } }),
+    ]);
+    expect(stored).toBeInstanceOf(AiReviewRequest);
+    expect(stored?.status).toBe("proposed");
+  });
+
+  it("returns null, having written nothing, when the caller does not hold the claim", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([[], 0]);
+    expect(
+      await service.submitProposal(USER, row.id, "agent-2", {}),
+    ).toBeNull();
+  });
+
+  it("releases back to pending or closes the request, clearing the claim, only for the claimant", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([[{ ...row, status: "pending" }], 1]);
+
+    await service.release(USER, row.id, "agent-1", {
+      final: false,
+      note: "could not read the order",
+    });
+
+    const [sql, params] = manager.query.mock.calls[0];
+    expect(sql).toMatch(
+      /SET status = CASE WHEN \$4::boolean THEN 'rejected' ELSE 'pending' END,\s+claimed_by = NULL,\s+claimed_at = NULL/,
+    );
+    expect(sql).toMatch(
+      /WHERE id = \$1\s+AND user_id = \$2\s+AND status = 'claimed'\s+AND claimed_by = \$3/,
+    );
+    expect(params).toEqual([
+      row.id,
+      USER,
+      "agent-1",
+      false,
+      "could not read the order",
+    ]);
+  });
+
+  it("bounds the note an agent leaves", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([[], 0]);
+    await service.release(USER, row.id, "agent-1", {
+      final: true,
+      note: "x".repeat(2000),
+    });
+    expect(manager.query.mock.calls[0][1][4]).toHaveLength(500);
+  });
+
+  it("dismisses only an open request of the user's", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([[{ ...row, status: "rejected" }], 1]);
+    const dismissed = await service.dismiss(USER, row.id);
+    const [sql, params] = manager.query.mock.calls[0];
+    expect(sql).toMatch(/SET status = 'rejected'/);
+    expect(sql).toMatch(/status IN \('pending', 'claimed', 'proposed'\)/);
+    expect(params).toEqual([row.id, USER]);
+    expect(dismissed?.status).toBe("rejected");
+
+    manager.query.mockResolvedValue([[], 0]);
+    expect(await service.dismiss(USER, row.id)).toBeNull();
+  });
+
+  it("marks applied on the CALLER's manager, bound to the user and the transaction, from proposed only", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([[{ id: row.id }], 1]);
+
+    await service.markApplied(manager as never, USER, row.id, TX_1);
+
+    const [sql, params] = manager.query.mock.calls[0];
+    expect(sql).toMatch(/SET status = 'applied'/);
+    expect(sql).toMatch(
+      /WHERE id = \$1\s+AND user_id = \$2\s+AND transaction_id = \$3\s+AND status = 'proposed'/,
+    );
+    expect(params).toEqual([row.id, USER, TX_1]);
+  });
+
+  it("refuses with a conflict when nothing is waiting for approval, so the caller's write rolls back", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([[], 0]);
+    await expect(
+      service.markApplied(manager as never, USER, row.id, TX_1),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+});

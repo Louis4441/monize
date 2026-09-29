@@ -121,6 +121,16 @@
     "attachmentRefExpired": "Eklenen dosya artık kullanılamıyor. Lütfen dosyayı yeniden yükleyip tekrar sorun.",
     "modelNoImageSupport": "Seçilen yapay zeka modeli görselleri veya PDF'leri okuyamaz. Eki kaldırıp metinle sorun ya da Yapay Zeka Ayarları'nda görsel destekli bir modele geçin."
   },
+  "aiReview": {
+    "notFound": "{{ id }} kimlikli yapay zekâ inceleme isteği bulunamadı",
+    "notClaimed": "Bu yapay zekâ inceleme isteği sizin tarafınızdan üstlenilmedi. Önce sıradaki bekleyeni üstlenin; üstlenmediğiniz bir isteğe yanıt verilemez.",
+    "notProposed": "Bu yapay zekâ inceleme isteği artık onay beklemiyor, bu yüzden önerisi uygulanmadı.",
+    "notOpen": "Bu yapay zekâ inceleme isteği artık açık değil.",
+    "nothingProposed": "Bir öneri en az bir değişiklik içermelidir: splits, categoryName, payeeName veya description.",
+    "splitsAndCategory": "splits veya categoryName gönderin, ikisini birden değil: bölünmüş bir işlemin tek bir kategorisi yoktur.",
+    "transferNotSupported": "Bir transfer öneriyle incelenemez. Bunun yerine isteği reddedin.",
+    "splitDifference": "Bölme satırlarının toplamı {{ sum }} ancak işlem tutarı {{ amount }}: {{ difference }} atanmadı. Satırların toplamını işlem tutarına eşitleyin; teslimat ücreti gibi bir artık kendi satırına ihtiyaç duyar veya atanmak yerine kullanıcıya bildirilir."
+  },
   "auth": {
     "tooManyAttemptsLoginAgain": "Çok fazla doğrulama denemesi. Lütfen tekrar giriş yapın.",
     "invalidOrExpiredVerificationToken": "Geçersiz veya süresi dolmuş doğrulama kodu",

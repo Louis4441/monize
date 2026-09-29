@@ -81,6 +81,7 @@ import { UpdateTransferDto } from "../../transactions/dto/update-transfer.dto";
 import { BulkCreateSkip } from "../../common/bulk-create.types";
 import { ConfirmAiActionDto } from "./dto/confirm-ai-action.dto";
 import { SingleUseTokenService } from "../../auth/single-use-token.service";
+import { AiReviewRequestsService } from "../../ai-review/ai-review-requests.service";
 
 export interface ConfirmActionResult {
   type: AiActionDescriptor["type"];
@@ -122,6 +123,7 @@ export class AiActionsService {
     private readonly singleUseTokens: SingleUseTokenService,
     private readonly transactionRulesService: TransactionRulesService,
     private readonly transactionRulesRunService: TransactionRulesRunService,
+    private readonly aiReviewRequests: AiReviewRequestsService,
   ) {}
 
   async confirm(
@@ -252,6 +254,21 @@ export class AiActionsService {
       }
       throw err;
     }
+  }
+
+  /**
+   * Commit a descriptor the caller built in this process and a person approved
+   * outside the confirm endpoint: an MCP client's own dialog. It skips what
+   * `confirm` does for a descriptor that ARRIVED from a client (signature,
+   * expiry, the anti-replay claim, the AI write cap) because none of that
+   * applies to one that never left the server; the caller owns the MCP write
+   * cap. Never pass it anything read from a request.
+   */
+  async commitApproved(
+    userId: string,
+    descriptor: AiActionDescriptor,
+  ): Promise<ConfirmActionResult> {
+    return this.execute(userId, descriptor);
   }
 
   /**
@@ -707,11 +724,29 @@ export class AiActionsService {
       // (invariant I1) -- never as a separate follow-up write.
       splits: descriptor.splits ? toSplitDtoRows(descriptor.splits) : undefined,
     });
+    // An edit that answers an AI review request marks it applied in the write's
+    // own transaction, under the row lock and before anything is written: a
+    // request that was dismissed or expired since the card was built refuses the
+    // edit (409) with nothing changed, and the two commit or roll back together.
+    const reviewRequestId = descriptor.aiReviewRequestId;
     const transaction = await this.transactionsService.update(
       userId,
       descriptor.transactionId,
       dto,
-      { createPayeeIfMissing: descriptor.createPayee === true },
+      {
+        createPayeeIfMissing: descriptor.createPayee === true,
+        ...(typeof reviewRequestId === "string"
+          ? {
+              beforeWrite: (m) =>
+                this.aiReviewRequests.markApplied(
+                  m,
+                  userId,
+                  reviewRequestId,
+                  descriptor.transactionId,
+                ),
+            }
+          : {}),
+      },
     );
     await this.persistAttachments(userId, transaction.id, files, refIds);
     return { type: "update_transaction", id: transaction.id };

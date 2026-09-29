@@ -58,6 +58,7 @@ describe("AiActionsService", () => {
   let attachments: Record<string, jest.Mock>;
   let attachmentStore: Record<string, jest.Mock>;
   let singleUseTokens: SingleUseTokenMock;
+  let aiReviewRequests: { markApplied: jest.Mock };
 
   beforeEach(() => {
     const config = {
@@ -113,6 +114,7 @@ describe("AiActionsService", () => {
       releaseForPrompt: jest.fn(),
     };
     singleUseTokens = createSingleUseTokenMock();
+    aiReviewRequests = { markApplied: jest.fn().mockResolvedValue(undefined) };
     service = new AiActionsService(
       transactions as never,
       payees as never,
@@ -125,6 +127,7 @@ describe("AiActionsService", () => {
       singleUseTokens as never,
       {} as never,
       {} as never,
+      aiReviewRequests as never,
     );
   });
 
@@ -881,6 +884,85 @@ describe("AiActionsService", () => {
       { createPayeeIfMissing: false },
     );
     expect(result).toEqual({ type: "update_transaction", id: TX });
+  });
+
+  describe("an edit that answers an AI review request", () => {
+    const REVIEW = "30000000-0000-4000-8000-000000000001";
+    const reviewDescriptor = (
+      over: Partial<UpdateTransactionDescriptor> = {},
+    ): UpdateTransactionDescriptor => ({
+      type: "update_transaction",
+      userId: USER,
+      actionId: `act-review-${Math.random()}`,
+      expiresAt: Date.now() + 60_000,
+      transactionId: TX,
+      accountId: ACC,
+      amount: -30,
+      transactionDate: "2026-02-01",
+      payeeId: PAYEE,
+      payeeName: "Store",
+      createPayee: false,
+      categoryId: CAT,
+      description: null,
+      currencyCode: "USD",
+      aiReviewRequestId: REVIEW,
+      ...over,
+    });
+
+    it("hands update() a hook that marks the request applied on the write's own manager, before the write", async () => {
+      await service.confirm(USER, dtoFor(reviewDescriptor()));
+
+      const options = transactions.update.mock.calls[0][3];
+      expect(options.createPayeeIfMissing).toBe(false);
+      expect(typeof options.beforeWrite).toBe("function");
+      // Nothing is marked outside the write's transaction ...
+      expect(aiReviewRequests.markApplied).not.toHaveBeenCalled();
+      // ... the hook does it on the manager update() passes.
+      const manager = { tx: "manager" };
+      await options.beforeWrite(manager);
+      expect(aiReviewRequests.markApplied).toHaveBeenCalledWith(
+        manager,
+        USER,
+        REVIEW,
+        TX,
+      );
+    });
+
+    it("lets a refusal by the hook stop the edit", async () => {
+      aiReviewRequests.markApplied.mockRejectedValue(
+        new Error("no longer open"),
+      );
+      transactions.update.mockImplementation(
+        async (_u: string, _id: string, _dto: unknown, options: any) => {
+          await options.beforeWrite({});
+          return { id: TX };
+        },
+      );
+      await expect(
+        service.confirm(USER, dtoFor(reviewDescriptor())),
+      ).rejects.toThrow("no longer open");
+    });
+
+    it("leaves an ordinary edit without the hook", async () => {
+      await service.confirm(
+        USER,
+        dtoFor(reviewDescriptor({ aiReviewRequestId: undefined })),
+      );
+      expect(transactions.update.mock.calls[0][3]).toEqual({
+        createPayeeIfMissing: false,
+      });
+    });
+
+    it("signs the request id with the rest, so a client cannot point the approval elsewhere", async () => {
+      const descriptor = reviewDescriptor();
+      const dto = dtoFor(descriptor);
+      const tampered = {
+        ...dto,
+        descriptor: { ...dto.descriptor, aiReviewRequestId: "another-request" },
+      };
+      await expect(service.confirm(USER, tampered)).rejects.toThrow();
+      expect(transactions.update).not.toHaveBeenCalled();
+    });
   });
 
   it("deletes a transaction on a valid confirmation", async () => {

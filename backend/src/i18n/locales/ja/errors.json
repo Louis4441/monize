@@ -121,6 +121,16 @@
     "attachmentRefExpired": "添付ファイルは利用できなくなりました。もう一度アップロードしてから、再度お尋ねください。",
     "modelNoImageSupport": "選択したAIモデルは画像やPDFを読み取れません。添付ファイルを削除してテキストで質問するか、AI設定で画像対応モデルに切り替えてください。"
   },
+  "aiReview": {
+    "notFound": "ID {{ id }} の AI レビューリクエストが見つかりません",
+    "notClaimed": "この AI レビューリクエストはあなたが担当していません。先に次の保留中のリクエストを担当してください。担当していないリクエストには回答できません。",
+    "notProposed": "この AI レビューリクエストは承認待ちではなくなったため、提案は適用されませんでした。",
+    "notOpen": "この AI レビューリクエストはすでに終了しています。",
+    "nothingProposed": "提案には少なくとも 1 つの変更が必要です: splits、categoryName、payeeName、または description。",
+    "splitsAndCategory": "splits か categoryName のどちらか一方だけを送ってください。分割取引には単一のカテゴリがありません。",
+    "transferNotSupported": "振替は提案によるレビューができません。代わりにリクエストを却下してください。",
+    "splitDifference": "分割行の合計は {{ sum }} ですが、取引は {{ amount }} です。{{ difference }} が未割り当てです。行の合計を取引と一致させてください。送料などの残りは専用の行にするか、割り当てずにユーザーへ伝えてください。"
+  },
   "auth": {
     "tooManyAttemptsLoginAgain": "確認の試行回数が多すぎます。もう一度ログインしてください。",
     "invalidOrExpiredVerificationToken": "無効または期限切れの確認トークンです",

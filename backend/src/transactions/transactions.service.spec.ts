@@ -1423,6 +1423,44 @@ describe("TransactionsService", () => {
       );
     });
 
+    it("runs beforeWrite on the write's own manager after the lock and before any write", async () => {
+      transactionsRepository.findOne.mockResolvedValue({ ...mockTx });
+      lockedRow = { ...mockTx };
+      mockQueryRunner.manager.findOne.mockResolvedValueOnce({ ...mockTx });
+      const order: string[] = [];
+      mockQueryRunner.manager.update.mockImplementation(async () => {
+        order.push("write");
+      });
+      const beforeWrite = jest.fn(async (m: unknown) => {
+        expect(m).toBe(mockQueryRunner.manager);
+        order.push("hook");
+      });
+
+      await service.update("user-1", "tx-1", { description: "x" } as any, {
+        beforeWrite,
+      });
+
+      expect(beforeWrite).toHaveBeenCalledTimes(1);
+      expect(order).toEqual(["hook", "write"]);
+    });
+
+    it("writes nothing when beforeWrite refuses", async () => {
+      transactionsRepository.findOne.mockResolvedValue({ ...mockTx });
+      lockedRow = { ...mockTx };
+      mockQueryRunner.manager.update.mockClear();
+
+      await expect(
+        service.update("user-1", "tx-1", { description: "x" } as any, {
+          beforeWrite: async () => {
+            throw new Error("request no longer open");
+          },
+        }),
+      ).rejects.toThrow("request no longer open");
+
+      expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
+      expect(accountsService.updateBalance).not.toHaveBeenCalled();
+    });
+
     it("touches the account (no balance write) when only a past-dated transaction's date moves", async () => {
       // A past->past date change with unchanged amount and account leaves
       // current_balance identical, so no balance write runs -- but moving the row
@@ -7723,6 +7761,84 @@ describe("TransactionsService", () => {
         "s2",
         "s3",
       ]);
+    });
+
+    describe("getLlmTransactionById", () => {
+      it("projects one transaction like a list row, with a split's complete lines and qualified names", async () => {
+        categoriesRepository.find.mockResolvedValue([
+          { id: "biz", name: "Business", parentId: null },
+          { id: "biz-cell", name: "Cell Phone", parentId: "biz" },
+        ]);
+        jest.spyOn(service, "findOne").mockResolvedValue({
+          id: "t-split",
+          transactionDate: "2026-01-15",
+          payeeName: "Rogers",
+          category: null,
+          amount: -90,
+          account: { name: "WS Chequing" },
+          description: "bill",
+          status: "cleared",
+          isSplit: true,
+          splits: [],
+        } as any);
+        splitsRepository.find.mockResolvedValue([
+          {
+            id: "s1",
+            transactionId: "t-split",
+            amount: -40,
+            memo: "a",
+            category: { id: "biz-cell", name: "Cell Phone" },
+          },
+          {
+            id: "s2",
+            transactionId: "t-split",
+            amount: -50,
+            memo: null,
+            category: null,
+          },
+        ]);
+
+        const rows = await service.getLlmTransactionById("user-1", "t-split");
+
+        expect(service.findOne).toHaveBeenCalledWith("user-1", "t-split");
+        expect(rows.map((r) => [r.splitId, r.categoryName, r.amount])).toEqual([
+          ["s1", "Business: Cell Phone", -40],
+          ["s2", undefined, -50],
+        ]);
+        expect(rows[0]).toMatchObject({
+          id: "t-split",
+          payeeName: "Rogers",
+          accountName: "WS Chequing",
+          description: "a",
+        });
+      });
+
+      it("answers a plain transaction as one row without reading splits", async () => {
+        splitsRepository.find.mockClear();
+        jest.spyOn(service, "findOne").mockResolvedValue({
+          id: "t-plain",
+          transactionDate: "2026-01-14",
+          payeeName: "Coffee",
+          category: null,
+          amount: -5,
+          account: { name: "Checking" },
+          description: null,
+          status: "cleared",
+          isSplit: false,
+        } as any);
+        const rows = await service.getLlmTransactionById("user-1", "t-plain");
+        expect(rows).toHaveLength(1);
+        expect(splitsRepository.find).not.toHaveBeenCalled();
+      });
+
+      it("refuses another user's transaction the way findOne does", async () => {
+        jest
+          .spyOn(service, "findOne")
+          .mockRejectedValue(new NotFoundException("nope"));
+        await expect(
+          service.getLlmTransactionById("user-1", "t-other"),
+        ).rejects.toThrow("nope");
+      });
     });
 
     it("does not query splits when the page holds no split transactions", async () => {

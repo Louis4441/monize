@@ -121,6 +121,16 @@
     "attachmentRefExpired": "附加的文件已不可用。请重新上传后再次询问。",
     "modelNoImageSupport": "所选的 AI 模型无法读取图片或 PDF。请移除附件并以文字提问，或在 AI 设置中切换到支持视觉的模型。"
   },
+  "aiReview": {
+    "notFound": "未找到 ID 为 {{ id }} 的 AI 审核请求",
+    "notClaimed": "此 AI 审核请求不是由您认领的。请先认领下一个待处理的请求；未认领的请求无法回复。",
+    "notProposed": "此 AI 审核请求已不再等待批准，因此其提议未被应用。",
+    "notOpen": "此 AI 审核请求已不再开放。",
+    "nothingProposed": "提议至少需要一项更改：splits、categoryName、payeeName 或 description。",
+    "splitsAndCategory": "请发送 splits 或 categoryName，不要同时发送：拆分交易没有单一分类。",
+    "transferNotSupported": "转账无法通过提议进行审核。请改为拒绝该请求。",
+    "splitDifference": "拆分行合计为 {{ sum }}，但交易金额为 {{ amount }}：{{ difference }} 尚未分配。请让各行合计等于交易金额；运费等余额需要单独一行，或告知用户而不是自行分配。"
+  },
   "auth": {
     "tooManyAttemptsLoginAgain": "验证尝试次数过多。请重新登录。",
     "invalidOrExpiredVerificationToken": "验证令牌无效或已过期",

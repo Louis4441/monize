@@ -15,6 +15,9 @@ import { AttachmentsModule } from "../attachments/attachments.module";
 import { AiRelayModule } from "../ai/relay/ai-relay.module";
 import { AiActionBuilderModule } from "../ai/actions/ai-action-builder.module";
 import { CurrenciesModule } from "../currencies/currencies.module";
+import { AiModule } from "../ai/ai.module";
+import { TransactionRulesModule } from "../transaction-rules/transaction-rules.module";
+import { AiReviewQueueModule } from "../ai-review/ai-review-queue.module";
 
 import { McpServerService } from "./mcp-server.service";
 import { McpHttpController } from "./mcp-http.controller";
@@ -31,6 +34,8 @@ import { McpScheduledTools } from "./tools/scheduled.tool";
 import { McpCalculateTools } from "./tools/calculate.tool";
 import { McpBudgetsTools } from "./tools/budgets.tool";
 import { McpRelayTools } from "./tools/relay.tool";
+import { McpRulesTools } from "./tools/rules.tool";
+import { McpAiReviewTools } from "./tools/ai-review.tool";
 
 import { McpAccountListResource } from "./resources/account-list.resource";
 import { McpCategoryTreeResource } from "./resources/category-tree.resource";
@@ -66,6 +71,12 @@ import { McpSpendingAnalysisPrompt } from "./prompts/spending-analysis.prompt";
     AiActionBuilderModule,
     // ExchangeRateService, for the `calculate` tool's currency conversion.
     forwardRef(() => CurrenciesModule),
+    // manage_transaction_rules: name resolution and previews (the rules module)
+    // and the executor an approved card commits through (the AI module).
+    forwardRef(() => TransactionRulesModule),
+    forwardRef(() => AiModule),
+    // ai_review_requests: the queue's shared tool logic.
+    AiReviewQueueModule,
   ],
   providers: [
     McpServerService,
@@ -81,6 +92,8 @@ import { McpSpendingAnalysisPrompt } from "./prompts/spending-analysis.prompt";
     McpScheduledTools,
     McpCalculateTools,
     McpBudgetsTools,
+    McpRulesTools,
+    McpAiReviewTools,
     McpAccountListResource,
     McpCategoryTreeResource,
     McpRecentTransactionsResource,

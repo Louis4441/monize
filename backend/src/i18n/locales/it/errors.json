@@ -121,6 +121,16 @@
     "attachmentRefExpired": "Il file allegato non è più disponibile. Caricalo di nuovo e ripeti la richiesta.",
     "modelNoImageSupport": "Il modello IA selezionato non può leggere immagini o PDF. Rimuovi l'allegato e chiedi in formato testo, oppure passa a un modello con supporto visivo nelle impostazioni IA."
   },
+  "aiReview": {
+    "notFound": "Richiesta di revisione IA con ID {{ id }} non trovata",
+    "notClaimed": "Questa richiesta di revisione IA non è stata presa in carico da te. Prendi prima in carico la prossima in attesa; una richiesta che non hai preso in carico non può ricevere risposta.",
+    "notProposed": "Questa richiesta di revisione IA non è più in attesa di approvazione, quindi la sua proposta non è stata applicata.",
+    "notOpen": "Questa richiesta di revisione IA non è più aperta.",
+    "nothingProposed": "Una proposta richiede almeno una modifica: splits, categoryName, payeeName o description.",
+    "splitsAndCategory": "Invia splits oppure categoryName, non entrambi: una transazione suddivisa non ha una categoria unica.",
+    "transferNotSupported": "Un trasferimento non può essere rivisto tramite proposta. Rifiuta invece la richiesta.",
+    "splitDifference": "Le righe di suddivisione sommano {{ sum }} ma la transazione è {{ amount }}: {{ difference }} non è assegnato. Fai in modo che le righe sommino all'importo della transazione; un residuo come le spese di consegna richiede una riga propria, oppure viene indicato all'utente invece di essere assegnato."
+  },
   "auth": {
     "tooManyAttemptsLoginAgain": "Troppi tentativi di verifica. Accedi di nuovo.",
     "invalidOrExpiredVerificationToken": "Token di verifica non valido o scaduto",

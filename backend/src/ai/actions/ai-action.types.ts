@@ -429,6 +429,13 @@ export interface UpdateTransactionDescriptor extends BaseDescriptor {
   splits?: SplitRowDescriptor[];
   /** Files to persist as transaction attachments after the update commits. */
   attachments?: AttachmentRefDescriptor[];
+  /**
+   * The AI review request this edit answers. Not part of the change (nothing on
+   * the transaction reads it) and not an envelope field: it is signed with the
+   * rest, so a client cannot point an approval at another request, and confirm
+   * marks that request applied in the transaction that writes the edit.
+   */
+  aiReviewRequestId?: string;
 }
 
 /** Delete an existing transaction (identified only; confirm re-checks ownership). */

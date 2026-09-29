@@ -62,6 +62,7 @@ import { CalendarModule } from "./calendar/calendar.module";
 import { TagsModule } from "./tags/tags.module";
 import { TransactionRulesModule } from "./transaction-rules/transaction-rules.module";
 import { AiReviewModule } from "./ai-review/ai-review.module";
+import { AiReviewQueueModule } from "./ai-review/ai-review-queue.module";
 import { LoanScenariosModule } from "./loan-scenarios/loan-scenarios.module";
 import { LoanRateChangesModule } from "./loan-rate-changes/loan-rate-changes.module";
 import { BackupModule } from "./backup/backup.module";
@@ -207,6 +208,7 @@ import { I18nModule } from "./i18n/i18n.module";
     TagsModule,
     TransactionRulesModule,
     AiReviewModule,
+    AiReviewQueueModule,
     LoanScenariosModule,
     LoanRateChangesModule,
     BackupModule,

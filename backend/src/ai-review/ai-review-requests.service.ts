@@ -1,7 +1,8 @@
-import { Injectable } from "@nestjs/common";
-import { DataSource, EntityManager } from "typeorm";
+import { ConflictException, Injectable } from "@nestjs/common";
+import { DataSource, EntityManager, In, MoreThan } from "typeorm";
 import { returnedRows } from "../common/db/query-result";
 import { withScopedDb } from "../common/db/scoped-db";
+import { tr } from "../i18n/translate";
 import {
   AiReviewRequest,
   AiReviewRequestStatus,
@@ -29,8 +30,24 @@ export interface AiReviewEnqueueResult {
 
 export interface ListAiReviewRequestsOptions {
   readonly status?: AiReviewRequestStatus;
+  /** Any of these statuses; wins over `status`. */
+  readonly statuses?: readonly AiReviewRequestStatus[];
   readonly limit?: number;
+  /** Oldest first is the queue's own order; an inbox reads newest first. */
+  readonly order?: "ASC" | "DESC";
+  /** Leave out requests whose life has run out, whatever their stored status. */
+  readonly unexpiredOnly?: boolean;
 }
+
+/** What an agent that gives up on a claimed request tells the queue. */
+export interface ReleaseAiReviewRequestInput {
+  /** True: the request cannot be done and becomes `rejected`. False: it returns to `pending`. */
+  readonly final: boolean;
+  readonly note: string;
+}
+
+/** The longest note an agent leaves when it gives a request up. */
+export const MAX_AI_REVIEW_NOTE_LENGTH = 500;
 
 export const DEFAULT_AI_REVIEW_LIST_LIMIT = 50;
 export const MAX_AI_REVIEW_LIST_LIMIT = 200;
@@ -134,7 +151,7 @@ export class AiReviewRequestsService {
     return { queued, alreadyQueued };
   }
 
-  /** The user's requests, oldest first, optionally in one status. */
+  /** The user's requests, oldest first unless told otherwise, optionally in some statuses. */
   async listForUser(
     userId: string,
     options: ListAiReviewRequestsOptions = {},
@@ -143,15 +160,32 @@ export class AiReviewRequestsService {
       Math.max(Math.trunc(options.limit ?? DEFAULT_AI_REVIEW_LIST_LIMIT), 1),
       MAX_AI_REVIEW_LIST_LIMIT,
     );
+    const order = options.order ?? "ASC";
+    const statusFilter = options.statuses
+      ? { status: In([...options.statuses]) }
+      : options.status
+        ? { status: options.status }
+        : {};
     return withScopedDb(this.dataSource, (m) =>
       m.getRepository(AiReviewRequest).find({
         where: {
           userId,
-          ...(options.status ? { status: options.status } : {}),
+          ...statusFilter,
+          ...(options.unexpiredOnly ? { expiresAt: MoreThan(new Date()) } : {}),
         },
-        order: { createdAt: "ASC", id: "ASC" },
+        order: { createdAt: order, id: order },
         take: limit,
       }),
+    );
+  }
+
+  /** One of the user's requests, or null. Another user's id reads as absent. */
+  async getForUser(
+    userId: string,
+    id: string,
+  ): Promise<AiReviewRequest | null> {
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(AiReviewRequest).findOne({ where: { id, userId } }),
     );
   }
 
@@ -193,6 +227,138 @@ export class AiReviewRequestsService {
       );
       return row ? toRequest(row) : null;
     });
+  }
+
+  /**
+   * Store the proposal of the agent that holds the claim and move the request to
+   * `proposed`. ONE conditional UPDATE: it matches only a `claimed` request
+   * whose `claimed_by` is this caller and whose life has not run out, so an
+   * agent that never claimed it (or lost the claim to a dismissal, an expiry or
+   * a release) writes nothing and gets null. The proposal is a signed pending
+   * action; the ledger is not touched.
+   */
+  async submitProposal(
+    userId: string,
+    id: string,
+    claimedBy: string,
+    proposal: Record<string, unknown>,
+  ): Promise<AiReviewRequest | null> {
+    return withScopedDb(this.dataSource, async (m) => {
+      const [row] = returnedRows<RequestRow>(
+        await m.query(
+          `UPDATE ai_review_requests
+              SET status = 'proposed',
+                  proposal = $4::jsonb
+            WHERE id = $1
+              AND user_id = $2
+              AND status = 'claimed'
+              AND claimed_by = $3
+              AND expires_at > CURRENT_TIMESTAMP
+           RETURNING *`,
+          [id, userId, claimedBy, JSON.stringify(proposal)],
+        ),
+      );
+      return row ? toRequest(row) : null;
+    });
+  }
+
+  /**
+   * Give up a claim. The same conditional shape as {@link submitProposal}: only
+   * the caller that holds the claim can release it. `final` false returns the
+   * request to `pending` with the claim cleared, so another agent (or this one
+   * later) can take it; `final` true marks it `rejected`, for a request that no
+   * agent can do, so the queue does not hand it out again. The agent's note is
+   * kept in `proposal` (`{ agentNote }`) so the next reader sees why.
+   */
+  async release(
+    userId: string,
+    id: string,
+    claimedBy: string,
+    input: ReleaseAiReviewRequestInput,
+  ): Promise<AiReviewRequest | null> {
+    return withScopedDb(this.dataSource, async (m) => {
+      const [row] = returnedRows<RequestRow>(
+        await m.query(
+          `UPDATE ai_review_requests
+              SET status = CASE WHEN $4::boolean THEN 'rejected' ELSE 'pending' END,
+                  claimed_by = NULL,
+                  claimed_at = NULL,
+                  proposal = jsonb_build_object(
+                    'agentNote',
+                    jsonb_build_object('reason', $5::text, 'at', CURRENT_TIMESTAMP))
+            WHERE id = $1
+              AND user_id = $2
+              AND status = 'claimed'
+              AND claimed_by = $3
+           RETURNING *`,
+          [
+            id,
+            userId,
+            claimedBy,
+            input.final,
+            input.note.slice(0, MAX_AI_REVIEW_NOTE_LENGTH),
+          ],
+        ),
+      );
+      return row ? toRequest(row) : null;
+    });
+  }
+
+  /**
+   * The person dismisses a request that is still open: `rejected`, whoever
+   * holds the claim. Null when it is not the user's or is no longer open.
+   */
+  async dismiss(userId: string, id: string): Promise<AiReviewRequest | null> {
+    return withScopedDb(this.dataSource, async (m) => {
+      const [row] = returnedRows<RequestRow>(
+        await m.query(
+          `UPDATE ai_review_requests
+              SET status = 'rejected'
+            WHERE id = $1
+              AND user_id = $2
+              AND status IN ('pending', 'claimed', 'proposed')
+           RETURNING *`,
+          [id, userId],
+        ),
+      );
+      return row ? toRequest(row) : null;
+    });
+  }
+
+  /**
+   * Mark a proposed request `applied` inside the transaction that writes what it
+   * proposed, so the two commit or roll back together. The UPDATE is bound to
+   * the user, to the transaction the proposal was about and to `proposed`; a
+   * request that was dismissed, expired or is about another transaction matches
+   * nothing and the caller's write is refused (409) before it happens -- the
+   * caller runs this first, under the row lock.
+   */
+  async markApplied(
+    m: EntityManager,
+    userId: string,
+    id: string,
+    transactionId: string,
+  ): Promise<void> {
+    const applied = returnedRows<{ id: string }>(
+      await m.query(
+        `UPDATE ai_review_requests
+            SET status = 'applied'
+          WHERE id = $1
+            AND user_id = $2
+            AND transaction_id = $3
+            AND status = 'proposed'
+         RETURNING id`,
+        [id, userId, transactionId],
+      ),
+    );
+    if (applied.length === 0) {
+      throw new ConflictException(
+        tr(
+          "errors.aiReview.notProposed",
+          "This AI review request is no longer waiting for approval, so its proposal was not applied.",
+        ),
+      );
+    }
   }
 
   /**

@@ -121,6 +121,16 @@
     "attachmentRefExpired": "File yang dilampirkan sudah tidak tersedia. Silakan unggah ulang lalu tanyakan lagi.",
     "modelNoImageSupport": "Model AI yang dipilih tidak dapat membaca gambar atau PDF. Hapus lampiran dan tanyakan dalam teks, atau beralih ke model yang mendukung visi di Pengaturan AI."
   },
+  "aiReview": {
+    "notFound": "Permintaan tinjauan AI dengan ID {{ id }} tidak ditemukan",
+    "notClaimed": "Permintaan tinjauan AI ini tidak Anda ambil. Ambil dulu permintaan tertunda berikutnya; permintaan yang tidak Anda ambil tidak dapat dijawab.",
+    "notProposed": "Permintaan tinjauan AI ini tidak lagi menunggu persetujuan, sehingga usulannya tidak diterapkan.",
+    "notOpen": "Permintaan tinjauan AI ini tidak lagi terbuka.",
+    "nothingProposed": "Usulan memerlukan setidaknya satu perubahan: splits, categoryName, payeeName, atau description.",
+    "splitsAndCategory": "Kirim splits atau categoryName, bukan keduanya: transaksi terpisah tidak memiliki satu kategori.",
+    "transferNotSupported": "Transfer tidak dapat ditinjau melalui usulan. Tolak permintaan tersebut sebagai gantinya.",
+    "splitDifference": "Baris pemisahan berjumlah {{ sum }} tetapi transaksinya {{ amount }}: {{ difference }} belum dialokasikan. Buat baris sesuai jumlah transaksi; sisa seperti biaya pengiriman perlu barisnya sendiri, atau disebutkan kepada pengguna alih-alih dialokasikan."
+  },
   "auth": {
     "tooManyAttemptsLoginAgain": "Terlalu banyak percobaan verifikasi. Silakan masuk lagi.",
     "invalidOrExpiredVerificationToken": "Token verifikasi tidak valid atau kedaluwarsa",

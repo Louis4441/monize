@@ -2271,7 +2271,16 @@ export class TransactionsService {
     userId: string,
     id: string,
     updateTransactionDto: UpdateTransactionDto,
-    options?: { createPayeeIfMissing?: boolean },
+    options?: {
+      createPayeeIfMissing?: boolean;
+      /**
+       * Runs inside the write's own transaction, after the row is locked and the
+       * reconciliation lock has passed and before anything is written. A throw
+       * refuses the update with nothing written; what the hook itself writes
+       * (an AI review request marked applied) commits or rolls back with it.
+       */
+      beforeWrite?: (m: EntityManager) => Promise<void>;
+    },
   ): Promise<Transaction> {
     const transaction = await this.findOne(userId, id);
     const beforeSnapshot = this.snapshotTransaction(transaction);
@@ -2392,6 +2401,7 @@ export class TransactionsService {
       // Strict reconciled lock, against the LOCKED row and before any write:
       // an edit refused here must not already have happened.
       await assertReconciledRowsMutable(m, userId, [locked]);
+      if (options?.beforeWrite) await options.beforeWrite(m);
 
       const oldAmount = locked.amount;
       const oldLockedAccountId = locked.accountId;
@@ -3554,56 +3564,9 @@ export class TransactionsService {
     const nameOf = (category?: { id: string; name: string } | null) =>
       category ? (categoryNames.get(category.id) ?? category.name) : undefined;
 
-    const transactions = result.data.flatMap((t): LlmTransactionRow[] => {
-      const splits = completeSplits.get(t.id) ?? t.splits;
-      const rows: LlmTransactionRow[] =
-        t.isSplit && Array.isArray(splits) && splits.length > 0
-          ? splits.map((s) => ({
-              id: t.id,
-              splitId: s.id,
-              date: t.transactionDate,
-              payeeName: t.payeeName,
-              categoryName: nameOf(s.category),
-              amount: Number(s.amount),
-              accountName: t.account?.name,
-              description: s.memo ?? t.description,
-              status: t.status,
-              isSplit: true,
-            }))
-          : [
-              {
-                id: t.id,
-                date: t.transactionDate,
-                // A blank transfer payee resolves to "Transfer to/from
-                // <account>" from the counterpart's current name (issue
-                // #1214) -- the same label the register shows the user, so
-                // the model and the screen describe the row identically. The
-                // mask above already rewrote unreadable counterpart names.
-                payeeName:
-                  t.payeeName ??
-                  (t.isTransfer && t.linkedTransaction?.account?.name
-                    ? transferPayeeLabel(
-                        t.amount,
-                        t.linkedTransaction.account.name,
-                      )
-                    : t.payeeName),
-                categoryName: nameOf(t.category),
-                amount: Number(t.amount),
-                accountName: t.account?.name,
-                description: t.description,
-                status: t.status,
-                // Read-only foreign-currency metadata, emitted only for a
-                // foreign-entered transaction.
-                ...(t.originalCurrencyCode
-                  ? {
-                      originalAmount: Number(t.originalAmount),
-                      originalCurrencyCode: t.originalCurrencyCode,
-                      exchangeRate: Number(t.exchangeRate),
-                    }
-                  : {}),
-              },
-            ];
-      return rows.filter((row) => {
+    const transactions = result.data
+      .flatMap((t) => this.toLlmRows(t, completeSplits.get(t.id), nameOf))
+      .filter((row) => {
         if (filters.minAmount !== undefined && row.amount < filters.minAmount) {
           return false;
         }
@@ -3612,13 +3575,99 @@ export class TransactionsService {
         }
         return true;
       });
-    });
 
     return {
       transactions,
       total: result.pagination.total,
       hasMore: result.pagination.hasMore,
     };
+  }
+
+  /**
+   * One transaction as the flat rows a model reads: one row, or one per split
+   * line with its real category. The single projection behind
+   * {@link getLlmTransactionRows} and {@link getLlmTransactionById}, so the two
+   * describe a row identically.
+   */
+  private toLlmRows(
+    t: Transaction,
+    completeSplits: TransactionSplit[] | undefined,
+    nameOf: (
+      category?: { id: string; name: string } | null,
+    ) => string | undefined,
+  ): LlmTransactionRow[] {
+    const splits = completeSplits ?? t.splits;
+    return t.isSplit && Array.isArray(splits) && splits.length > 0
+      ? splits.map((s) => ({
+          id: t.id,
+          splitId: s.id,
+          date: t.transactionDate,
+          payeeName: t.payeeName,
+          categoryName: nameOf(s.category),
+          amount: Number(s.amount),
+          accountName: t.account?.name,
+          description: s.memo ?? t.description,
+          status: t.status,
+          isSplit: true,
+        }))
+      : [
+          {
+            id: t.id,
+            date: t.transactionDate,
+            // A blank transfer payee resolves to "Transfer to/from
+            // <account>" from the counterpart's current name (issue
+            // #1214) -- the same label the register shows the user, so
+            // the model and the screen describe the row identically. The
+            // mask applied by the caller already rewrote unreadable
+            // counterpart names.
+            payeeName:
+              t.payeeName ??
+              (t.isTransfer && t.linkedTransaction?.account?.name
+                ? transferPayeeLabel(t.amount, t.linkedTransaction.account.name)
+                : t.payeeName),
+            categoryName: nameOf(t.category),
+            amount: Number(t.amount),
+            accountName: t.account?.name,
+            description: t.description,
+            status: t.status,
+            // Read-only foreign-currency metadata, emitted only for a
+            // foreign-entered transaction.
+            ...(t.originalCurrencyCode
+              ? {
+                  originalAmount: Number(t.originalAmount),
+                  originalCurrencyCode: t.originalCurrencyCode,
+                  exchangeRate: Number(t.exchangeRate),
+                }
+              : {}),
+          },
+        ];
+  }
+
+  /**
+   * One of the user's transactions as the rows {@link getLlmTransactionRows}
+   * returns (a split expands to its complete line set), through the same
+   * cross-owner mask and qualified category names. NotFound when it is not
+   * readable by the user.
+   */
+  async getLlmTransactionById(
+    userId: string,
+    id: string,
+  ): Promise<LlmTransactionRow[]> {
+    const t = await this.findOne(userId, id);
+    if (payloadHasCrossOwnerTransfer([t])) {
+      const readable =
+        await this.crossOwnerAccess.readableAccountIdSetFor(userId);
+      maskTransactionsAgainst(readable, [t]);
+    }
+    const categoryNames = await withScopedDb(this.dataSource, (m) =>
+      loadQualifiedCategoryNames(m, userId),
+    );
+    const completeSplits = await this.loadCompleteSplits(
+      t.isSplit ? [t.id] : [],
+    );
+    return this.toLlmRows(t, completeSplits.get(t.id), (category) =>
+      category ? (categoryNames.get(category.id) ?? category.name) : undefined,
+    );
   }
 
   /**

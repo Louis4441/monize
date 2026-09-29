@@ -121,6 +121,16 @@
     "attachmentRefExpired": "Załączony plik nie jest już dostępny. Prześlij go ponownie i zapytaj jeszcze raz.",
     "modelNoImageSupport": "Wybrany model AI nie potrafi odczytywać obrazów ani plików PDF. Usuń załącznik i zadaj pytanie tekstem albo przełącz się na model obsługujący obrazy w Ustawieniach AI."
   },
+  "aiReview": {
+    "notFound": "Nie znaleziono wniosku o przegląd AI o ID {{ id }}",
+    "notClaimed": "Ten wniosek o przegląd AI nie jest przez Ciebie przejęty. Najpierw przejmij następny oczekujący; na wniosek, którego nie przejąłeś, nie można odpowiedzieć.",
+    "notProposed": "Ten wniosek o przegląd AI nie oczekuje już na zatwierdzenie, więc jego propozycja nie została zastosowana.",
+    "notOpen": "Ten wniosek o przegląd AI nie jest już otwarty.",
+    "nothingProposed": "Propozycja wymaga co najmniej jednej zmiany: splits, categoryName, payeeName lub description.",
+    "splitsAndCategory": "Wyślij albo splits, albo categoryName, nie oba: transakcja podzielona nie ma jednej kategorii.",
+    "transferNotSupported": "Przelewu nie można przeglądać za pomocą propozycji. Odrzuć wniosek.",
+    "splitDifference": "Linie podziału sumują się do {{ sum }}, a transakcja wynosi {{ amount }}: {{ difference }} nie zostało przypisane. Dopasuj linie do kwoty transakcji; pozostałość, np. koszt dostawy, wymaga własnej linii albo jest wskazywana użytkownikowi zamiast przypisywana."
+  },
   "auth": {
     "tooManyAttemptsLoginAgain": "Zbyt wiele prób weryfikacji. Zaloguj się ponownie.",
     "invalidOrExpiredVerificationToken": "Nieprawidłowy lub wygasły token weryfikacyjny",

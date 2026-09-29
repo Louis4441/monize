@@ -24,6 +24,7 @@ import { TransactionSplitService } from "../../transactions/transaction-split.se
 import { AttachmentToolPrepService } from "../../attachments/attachment-tool-prep.service";
 import { RelayAttachmentStore } from "../relay/relay-attachment.store";
 import { AttachmentDto } from "./dto/ai-query.dto";
+import { AiReviewWorkService } from "../../ai-review/ai-review-work.service";
 import { TransactionRuleToolPrepService } from "../../transaction-rules/rule-tool-prep.service";
 
 describe("ToolExecutorService", () => {
@@ -679,6 +680,7 @@ describe("ToolExecutorService", () => {
         { provide: BuiltInReportsService, useValue: builtInReports },
         { provide: ExchangeRateService, useValue: exchangeRates },
         // Exercised in tool-executor.transaction-rules.spec.ts.
+        { provide: AiReviewWorkService, useValue: {} },
         { provide: TransactionRuleToolPrepService, useValue: {} },
         // Real prep + builder wrapping the mocked services, so the executor's
         // name resolution, preview building, and pending-action construction

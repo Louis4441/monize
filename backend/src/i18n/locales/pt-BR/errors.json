@@ -121,6 +121,16 @@
     "attachmentRefExpired": "O arquivo anexado não está mais disponível. Envie-o novamente e pergunte de novo.",
     "modelNoImageSupport": "O modelo de IA selecionado não consegue ler imagens nem PDFs. Remova o anexo e faça a pergunta por texto, ou mude para um modelo com capacidade de visão nas Configurações de IA."
   },
+  "aiReview": {
+    "notFound": "Solicitação de revisão de IA com ID {{ id }} não encontrada",
+    "notClaimed": "Esta solicitação de revisão de IA não foi assumida por você. Assuma primeiro a próxima pendente; uma solicitação que você não assumiu não pode ser respondida.",
+    "notProposed": "Esta solicitação de revisão de IA não aguarda mais aprovação, por isso a proposta dela não foi aplicada.",
+    "notOpen": "Esta solicitação de revisão de IA não está mais aberta.",
+    "nothingProposed": "Uma proposta precisa de pelo menos uma alteração: splits, categoryName, payeeName ou description.",
+    "splitsAndCategory": "Envie splits ou categoryName, não ambos: uma transação dividida não tem uma única categoria.",
+    "transferNotSupported": "Uma transferência não pode ser revisada por proposta. Rejeite a solicitação.",
+    "splitDifference": "As linhas da divisão somam {{ sum }}, mas a transação é {{ amount }}: {{ difference }} não está atribuído. Faça as linhas somarem o valor da transação; uma sobra como frete precisa da própria linha, ou é informada ao usuário em vez de atribuída."
+  },
   "auth": {
     "tooManyAttemptsLoginAgain": "Tentativas de verificação excessivas. Faça login novamente.",
     "invalidOrExpiredVerificationToken": "Token de verificação inválido ou expirado",

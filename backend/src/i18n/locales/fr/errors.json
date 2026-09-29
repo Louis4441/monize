@@ -121,6 +121,16 @@
     "attachmentRefExpired": "Le fichier joint n'est plus disponible. Veuillez le téléverser à nouveau et redemander.",
     "modelNoImageSupport": "Le modèle d'IA sélectionné ne peut pas lire les images ni les PDF. Supprimez la pièce jointe et posez votre question par texte, ou passez à un modèle prenant en charge la vision dans les Paramètres IA."
   },
+  "aiReview": {
+    "notFound": "Demande de revue IA avec l'ID {{ id }} introuvable",
+    "notClaimed": "Cette demande de revue IA n'est pas prise en charge par vous. Prenez d'abord la prochaine en attente ; une demande que vous n'avez pas prise ne peut pas recevoir de réponse.",
+    "notProposed": "Cette demande de revue IA n'attend plus d'approbation, sa proposition n'a donc pas été appliquée.",
+    "notOpen": "Cette demande de revue IA n'est plus ouverte.",
+    "nothingProposed": "Une proposition nécessite au moins une modification : splits, categoryName, payeeName ou description.",
+    "splitsAndCategory": "Envoyez soit splits, soit categoryName, pas les deux : une transaction ventilée n'a pas de catégorie unique.",
+    "transferNotSupported": "Un virement ne peut pas être revu par proposition. Rejetez plutôt la demande.",
+    "splitDifference": "Les lignes de ventilation totalisent {{ sum }} alors que la transaction est de {{ amount }} : {{ difference }} n'est pas affecté. Faites correspondre les lignes à la transaction ; un reliquat tel que des frais de livraison nécessite sa propre ligne, ou est signalé à l'utilisateur au lieu d'être affecté."
+  },
   "auth": {
     "tooManyAttemptsLoginAgain": "Trop de tentatives de vérification. Veuillez vous reconnecter.",
     "invalidOrExpiredVerificationToken": "Jeton de vérification invalide ou expiré",

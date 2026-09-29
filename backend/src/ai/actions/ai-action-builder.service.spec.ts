@@ -485,6 +485,38 @@ describe("AiActionBuilderService", () => {
     });
   });
 
+  it("signs the AI review request an update answers, and only when one is named", () => {
+    const preview: UpdateTransactionPreview = {
+      transactionId: "t1",
+      accountId: "a1",
+      accountName: "Checking",
+      amount: -75,
+      transactionDate: "2025-04-01",
+      payeeId: null,
+      payeeName: null,
+      payeeMatched: false,
+      payeeWillBeCreated: false,
+      categoryId: null,
+      categoryName: null,
+      description: null,
+      currencyCode: "USD",
+      isReconciled: false,
+    };
+
+    const plain = builder.buildUpdateTransaction("u1", preview);
+    expect(plain.descriptor).not.toHaveProperty("aiReviewRequestId");
+
+    const answering = builder.buildUpdateTransaction(
+      "u1",
+      preview,
+      undefined,
+      undefined,
+      { aiReviewRequestId: "r1" },
+    );
+    expect(answering.descriptor).toMatchObject({ aiReviewRequestId: "r1" });
+    expect(signing.sign).toHaveBeenLastCalledWith(answering.descriptor);
+  });
+
   it("builds a delete_transaction action with only the target id signed", () => {
     const preview: DeleteTransactionPreview = {
       transactionId: "t9",

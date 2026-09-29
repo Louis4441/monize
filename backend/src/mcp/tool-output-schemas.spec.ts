@@ -775,6 +775,90 @@ const cases: Array<{ name: string; schema: OutputSchema; raw: unknown }> = [
     schema: schemas.postResponseOutput,
     raw: { delivered: true },
   },
+  // manage_transaction_rules: one result branch per operation.
+  {
+    name: "manageTransactionRulesOutput (list)",
+    schema: schemas.manageTransactionRulesOutput,
+    raw: {
+      rules: [
+        {
+          id: "r1",
+          name: "Biedronka",
+          revision: 3,
+          invalid: false,
+          condition: { field: "payeeText", op: "contains", value: "x" },
+          actions: [{ type: "set_category", categoryName: "Groceries" }],
+        },
+      ],
+      totalCount: 1,
+      truncated: false,
+    },
+  },
+  {
+    name: "manageTransactionRulesOutput (test)",
+    schema: schemas.manageTransactionRulesOutput,
+    raw: {
+      rule: "Biedronka",
+      matchedCount: 3,
+      scanned: 40,
+      truncated: false,
+      rows: [{ transactionId: "t1", changes: {} }],
+      skippedCount: 0,
+      skipped: [],
+    },
+  },
+  {
+    name: "manageTransactionRulesOutput (committed create, delete and run)",
+    schema: schemas.manageTransactionRulesOutput,
+    raw: { id: "r1", deleted: true, ruleRun: { changed: 3, skipped: [] } },
+  },
+  {
+    name: "manageTransactionRulesOutput (relay card shown)",
+    schema: schemas.manageTransactionRulesOutput,
+    raw: { status: "preview_shown", message: "A card was shown." },
+  },
+  // ai_review_requests: list, claim (with and without a request), submit, reject.
+  {
+    name: "aiReviewRequestsOutput (list)",
+    schema: schemas.aiReviewRequestsOutput,
+    raw: {
+      requests: [{ id: "q1", status: "pending", instruction: "look" }],
+      totalCount: 1,
+      truncated: false,
+    },
+  },
+  {
+    name: "aiReviewRequestsOutput (claim)",
+    schema: schemas.aiReviewRequestsOutput,
+    raw: {
+      request: { id: "q1", status: "claimed", claimedByYou: true },
+      transaction: [{ id: "t1", amount: -50, date: "2026-09-01" }],
+      message: "Read the transaction.",
+    },
+  },
+  {
+    name: "aiReviewRequestsOutput (claim, nothing pending)",
+    schema: schemas.aiReviewRequestsOutput,
+    raw: { request: null, message: "No pending AI review requests." },
+  },
+  {
+    name: "aiReviewRequestsOutput (submit)",
+    schema: schemas.aiReviewRequestsOutput,
+    raw: {
+      status: "proposed",
+      request: { id: "q1", status: "proposed" },
+      proposal: { splits: [{ categoryName: "Books", amount: -30 }] },
+      message: "Proposal stored.",
+    },
+  },
+  {
+    name: "aiReviewRequestsOutput (reject)",
+    schema: schemas.aiReviewRequestsOutput,
+    raw: {
+      request: { id: "q1", status: "pending" },
+      message: "The request was returned to the queue.",
+    },
+  },
 ];
 
 describe("tool-output-schemas", () => {
