@@ -63,7 +63,7 @@
     "libphonenumber-js": "^1.13.12",
     "mdb-reader": "^3.2.0",
     "nestjs-i18n": "^10.8.4",
-    "nodemailer": "^9.0.1",
+    "nodemailer": "^10.0.2",
     "oidc-provider": "^9.8.3",
     "openai": "^6.22.0",
     "openid-client": "^6.8.2",
