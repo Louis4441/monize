@@ -29,6 +29,56 @@ describe("transaction rule tool schemas", () => {
     );
   });
 
+  describe("manage_transaction_rules: JSON strings", () => {
+    it("parses condition and actions sent as JSON strings", () => {
+      const parsed = manageTransactionRulesSchema.parse({
+        operation: "create",
+        name: "x",
+        condition: JSON.stringify(condition),
+        actions: JSON.stringify(actions),
+      });
+      expect(parsed.condition).toEqual(condition);
+      expect(parsed.actions).toEqual(actions);
+    });
+
+    it("parses actions sent as an array of JSON strings", () => {
+      const parsed = manageTransactionRulesSchema.parse({
+        operation: "test",
+        condition,
+        actions: actions.map((a) => JSON.stringify(a)),
+      });
+      expect(parsed.actions).toEqual(actions);
+    });
+
+    it.each([
+      ["not JSON", "description contains ASSECO"],
+      ["a JSON array", "[1,2]"],
+      ["a JSON number", "5"],
+    ])("refuses a condition string that is %s", (_name, text) => {
+      expect(
+        manageTransactionRulesSchema.safeParse({
+          operation: "test",
+          condition: text,
+          actions,
+        }).success,
+      ).toBe(false);
+    });
+
+    it("does not parse a string over the length bound", () => {
+      const big = JSON.stringify({
+        field: "description",
+        pad: "x".repeat(20000),
+      });
+      expect(
+        manageTransactionRulesSchema.safeParse({
+          operation: "test",
+          condition: big,
+          actions,
+        }).success,
+      ).toBe(false);
+    });
+  });
+
   describe("manage_transaction_rules", () => {
     it.each([
       [{ operation: "create", name: "Streaming", condition, actions }],

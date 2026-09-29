@@ -37,52 +37,56 @@ describe('parseCondition: accepted text', () => {
     expect(shape('  \n ')).toEqual(expected(group('all')));
     expect(shape('true')).toEqual(expected(group('all')));
     expect(shape('false')).toEqual(expected(group('any')));
-    expect(shape('transaction.memo == "a" && true')).toEqual(
-      expected(group('all', [leaf('memo', 'eq', 'a'), group('all')])),
+    expect(shape('transaction.referenceNumber == "a" && true')).toEqual(
+      expected(group('all', [leaf('referenceNumber', 'eq', 'a'), group('all')])),
     );
   });
 
   it('binds && tighter than ||, as CEL does', () => {
-    const a = leaf('memo', 'eq', 'a');
-    const b = leaf('memo', 'eq', 'b');
-    const c = leaf('memo', 'eq', 'c');
-    const [x, y, z] = ['a', 'b', 'c'].map((v) => `transaction.memo == "${v}"`);
+    const a = leaf('referenceNumber', 'eq', 'a');
+    const b = leaf('referenceNumber', 'eq', 'b');
+    const c = leaf('referenceNumber', 'eq', 'c');
+    const [x, y, z] = ['a', 'b', 'c'].map((v) => `transaction.referenceNumber == "${v}"`);
     expect(shape(`${x} || ${y} && ${z}`)).toEqual(expected(group('any', [a, group('all', [b, c])])));
     expect(shape(`${x} && ${y} || ${z}`)).toEqual(expected(group('any', [group('all', [a, b]), c])));
     expect(shape(`(${x} || ${y}) && ${z}`)).toEqual(expected(group('all', [group('any', [a, b]), c])));
   });
 
   it('keeps a chain flat and a parenthesised group nested', () => {
-    const [x, y, z] = ['a', 'b', 'c'].map((v) => `transaction.memo == "${v}"`);
-    const a = leaf('memo', 'eq', 'a');
-    const b = leaf('memo', 'eq', 'b');
-    const c = leaf('memo', 'eq', 'c');
+    const [x, y, z] = ['a', 'b', 'c'].map((v) => `transaction.referenceNumber == "${v}"`);
+    const a = leaf('referenceNumber', 'eq', 'a');
+    const b = leaf('referenceNumber', 'eq', 'b');
+    const c = leaf('referenceNumber', 'eq', 'c');
     expect(shape(`${x} && ${y} && ${z}`)).toEqual(expected(group('all', [a, b, c])));
     expect(shape(`${x} && (${y} && ${z})`)).toEqual(expected(group('all', [a, group('all', [b, c])])));
     expect(shape(`(${x} && ${y}) && ${z}`)).toEqual(expected(group('all', [group('all', [a, b]), c])));
   });
 
   it('wraps a lone condition, or a parenthesised group, in a root all-group', () => {
-    const a = leaf('memo', 'eq', 'a');
-    expect(shape('transaction.memo == "a"')).toEqual(expected(group('all', [a])));
-    expect(shape('(transaction.memo == "a")')).toEqual(expected(group('all', [a])));
-    expect(shape('(transaction.memo == "a" || transaction.memo == "a")')).toEqual(
+    const a = leaf('referenceNumber', 'eq', 'a');
+    expect(shape('transaction.referenceNumber == "a"')).toEqual(expected(group('all', [a])));
+    expect(shape('(transaction.referenceNumber == "a")')).toEqual(expected(group('all', [a])));
+    expect(shape('(transaction.referenceNumber == "a" || transaction.referenceNumber == "a")')).toEqual(
       expected(group('all', [group('any', [a, a])])),
     );
   });
 
   it('reads all(), any() and negation', () => {
-    const a = leaf('memo', 'eq', 'a');
-    expect(shape('any(transaction.memo == "a")')).toEqual(expected(group('any', [a])));
-    expect(shape('all(all(transaction.memo == "a"))')).toEqual(expected(group('all', [group('all', [a])])));
-    expect(shape('!(transaction.memo == "a" || transaction.memo == "a")')).toEqual(expected(group('any', [a, a], true)));
+    const a = leaf('referenceNumber', 'eq', 'a');
+    expect(shape('any(transaction.referenceNumber == "a")')).toEqual(expected(group('any', [a])));
+    expect(shape('all(all(transaction.referenceNumber == "a"))')).toEqual(expected(group('all', [group('all', [a])])));
+    expect(shape('!(transaction.referenceNumber == "a" || transaction.referenceNumber == "a")')).toEqual(
+      expected(group('any', [a, a], true)),
+    );
     expect(shape('!(true)')).toEqual(expected(group('all', [], true)));
-    expect(shape('!(all(transaction.memo == "a"))')).toEqual(expected(group('all', [a], true)));
+    expect(shape('!(all(transaction.referenceNumber == "a"))')).toEqual(expected(group('all', [a], true)));
     // Sugar: a negated condition is a negated group around it.
-    expect(shape('!transaction.memo == "a"')).toEqual(expected(group('all', [a], true)));
-    expect(shape('!(transaction.memo.contains("a"))')).toEqual(expected(group('all', [leaf('memo', 'contains', 'a')], true)));
+    expect(shape('!transaction.referenceNumber == "a"')).toEqual(expected(group('all', [a], true)));
+    expect(shape('!(transaction.referenceNumber.contains("a"))')).toEqual(
+      expected(group('all', [leaf('referenceNumber', 'contains', 'a')], true)),
+    );
     // A double negation wraps instead of cancelling.
-    expect(shape('!(!(transaction.memo == "a" || transaction.memo == "a"))')).toEqual(
+    expect(shape('!(!(transaction.referenceNumber == "a" || transaction.referenceNumber == "a"))')).toEqual(
       expected(group('all', [group('any', [a, a], true)], true)),
     );
   });
@@ -91,8 +95,8 @@ describe('parseCondition: accepted text', () => {
     expect(shape('!(transaction.accountId in [account("RRSP")])')).toEqual(
       expected(group('all', [leaf('accountId', 'notIn', ['acc-2'])])),
     );
-    expect(shape('transaction.memo == "a" && !(transaction.payeeId in [payee("Corner Cafe")])')).toEqual(
-      expected(group('all', [leaf('memo', 'eq', 'a'), leaf('payeeId', 'notIn', ['pay-1'])])),
+    expect(shape('transaction.referenceNumber == "a" && !(transaction.payeeId in [payee("Corner Cafe")])')).toEqual(
+      expected(group('all', [leaf('referenceNumber', 'eq', 'a'), leaf('payeeId', 'notIn', ['pay-1'])])),
     );
   });
 
@@ -103,8 +107,8 @@ describe('parseCondition: accepted text', () => {
     ['transaction.amount >= 1e3', leaf('amount', 'gte', 1000)],
     ['transaction.amount == _', leaf('amount', 'eq', undefined)],
     ['transaction.amount.between(_, 4)', leaf('amount', 'between', [undefined, 4])],
-    ["transaction.memo == 'single'", leaf('memo', 'eq', 'single')],
-    ['transaction.memo == "\\u00e9\\n\\t\\r\\\\\\"\\\'"', leaf('memo', 'eq', 'é\n\t\r\\"\'')],
+    ["transaction.referenceNumber == 'single'", leaf('referenceNumber', 'eq', 'single')],
+    ['transaction.referenceNumber == "\\u00e9\\n\\t\\r\\\\\\"\\\'"', leaf('referenceNumber', 'eq', 'é\n\t\r\\"\'')],
     ['transaction.type in ["EXPENSE"]', leaf('type', 'in', ['EXPENSE'])],
     ['transaction.type != "INCOME"', leaf('type', 'neq', 'INCOME')],
     ['transaction.currencyCode == "CAD"', leaf('currencyCode', 'eq', 'CAD')],
@@ -125,7 +129,7 @@ describe('parseCondition: accepted text', () => {
   });
 
   it('gives every node of a new tree its own uid', () => {
-    const root = parse('transaction.memo == "a" && transaction.memo == "a"');
+    const root = parse('transaction.referenceNumber == "a" && transaction.referenceNumber == "a"');
     const uids = new Set([root.uid, ...root.children.map((c) => c.uid)]);
     expect(uids.size).toBe(3);
   });
@@ -146,16 +150,16 @@ describe('parseCondition: refusals with their position', () => {
   };
 
   it('refuses a character the language does not have', () => {
-    at('transaction.memo == "a" # x', 'unexpectedChar', '#', { char: '#' });
-    at('transaction.memo = "a"', 'unexpectedChar', '=', { char: '=' });
+    at('transaction.referenceNumber == "a" # x', 'unexpectedChar', '#', { char: '#' });
+    at('transaction.referenceNumber = "a"', 'unexpectedChar', '=', { char: '=' });
     at('a & b', 'unexpectedChar', '&', { char: '&' });
   });
 
   it('refuses broken strings and numbers', () => {
-    at('transaction.memo == "abc', 'unterminatedString', '"abc');
-    at('transaction.memo == "ab\ncd"', 'unterminatedString', '"ab');
-    at('transaction.memo == "a\\qb"', 'invalidEscape', '\\q');
-    at('transaction.memo == "a\\u12"', 'invalidEscape', '\\u12');
+    at('transaction.referenceNumber == "abc', 'unterminatedString', '"abc');
+    at('transaction.referenceNumber == "ab\ncd"', 'unterminatedString', '"ab');
+    at('transaction.referenceNumber == "a\\qb"', 'invalidEscape', '\\q');
+    at('transaction.referenceNumber == "a\\u12"', 'invalidEscape', '\\u12');
     at('transaction.amount > 12abc', 'badNumber', '12abc');
     at('transaction.amount > 1.5.2', 'badNumber', '1.5.2');
   });
@@ -164,7 +168,7 @@ describe('parseCondition: refusals with their position', () => {
     const error = refusal(' '.repeat(MAX_EXPRESSION_LENGTH + 1));
     expect(error).toMatchObject({ key: 'tooLong', position: MAX_EXPRESSION_LENGTH, args: { max: MAX_EXPRESSION_LENGTH } });
     expect(parseCondition(' '.repeat(MAX_EXPRESSION_LENGTH), INDEX).ok).toBe(true);
-    const nest = (n: number) => `${'('.repeat(n)}transaction.memo == "a"${')'.repeat(n)}`;
+    const nest = (n: number) => `${'('.repeat(n)}transaction.referenceNumber == "a"${')'.repeat(n)}`;
     expect(parseCondition(nest(MAX_EXPRESSION_NESTING), INDEX).ok).toBe(true);
     expect(refusal(nest(MAX_EXPRESSION_NESTING + 1))).toMatchObject({ key: 'tooNested', position: MAX_EXPRESSION_NESTING });
     expect(refusal(`${'!'.repeat(MAX_EXPRESSION_NESTING + 1)}(true)`)).toMatchObject({ key: 'tooNested', position: MAX_EXPRESSION_NESTING });
@@ -175,21 +179,31 @@ describe('parseCondition: refusals with their position', () => {
   it('names the part that is missing', () => {
     const end = (text: string) => text.length;
     const cases: [string, string][] = [
-      ['transaction.memo == "a" &&', 'expectedExpression'],
+      ['transaction.referenceNumber == "a" &&', 'expectedExpression'],
       ['transaction.', 'expectedField'],
-      ['transaction.memo', 'expectedOperator'],
-      ['transaction.memo == ', 'expectedValue'],
+      ['transaction.referenceNumber', 'expectedOperator'],
+      ['transaction.referenceNumber == ', 'expectedValue'],
     ];
     for (const [text, key] of cases) expect(refusal(text)).toMatchObject({ key, position: end(text) });
-    at('&& transaction.memo == "a"', 'expectedExpression', '&&');
-    at('transaction.memo.contains()', 'expectedValue', ')');
-    at('transaction.memo == )', 'expectedValue', ')');
-    expect(refusal('(transaction.memo == "a"')).toMatchObject({ key: 'expectedSymbol', args: { symbol: ')' }, position: 24 });
+    at('&& transaction.referenceNumber == "a"', 'expectedExpression', '&&');
+    at('transaction.referenceNumber.contains()', 'expectedValue', ')');
+    at('transaction.referenceNumber == )', 'expectedValue', ')');
+    expect(refusal('(transaction.referenceNumber == "a"')).toMatchObject({
+      key: 'expectedSymbol',
+      args: { symbol: ')' },
+      position: 35,
+    });
     expect(refusal('transaction.type in ["EXPENSE"')).toMatchObject({ key: 'expectedSymbol', args: { symbol: ']' } });
     at('transaction.amount.between(1 2)', 'expectedSymbol', '2', { symbol: ',' });
-    at('transaction.memo == "a" transaction.memo == "b"', 'unexpectedToken', 'transaction', { token: 'transaction' }, 1);
-    at('transaction.memo == "a")', 'unexpectedToken', ')', { token: ')' });
-    at('transaction.memo.contains "a"', 'expectedSymbol', '"a"', { symbol: '(' });
+    at(
+      'transaction.referenceNumber == "a" transaction.referenceNumber == "b"',
+      'unexpectedToken',
+      'transaction',
+      { token: 'transaction' },
+      1,
+    );
+    at('transaction.referenceNumber == "a")', 'unexpectedToken', ')', { token: ')' });
+    at('transaction.referenceNumber.contains "a"', 'expectedSymbol', '"a"', { symbol: '(' });
   });
 
   it('refuses what is outside the subset', () => {
@@ -199,24 +213,24 @@ describe('parseCondition: refusals with their position', () => {
     at('foo', 'unsupported', 'foo');
     expect(refusal('transaction')).toMatchObject({ key: 'expectedSymbol', args: { symbol: '.' }, position: 11 });
     at('transaction[0]', 'expectedSymbol', '[', { symbol: '.' });
-    at('size(transaction.memo) > 1', 'unknownFunction', 'size', { name: 'size' });
-    at('has(transaction.memo)', 'unknownFunction', 'has', { name: 'has' });
-    at('transaction.memo == "a" ? true : false', 'unexpectedToken', '?', { token: '?' });
+    at('size(transaction.referenceNumber) > 1', 'unknownFunction', 'size', { name: 'size' });
+    at('has(transaction.referenceNumber)', 'unknownFunction', 'has', { name: 'has' });
+    at('transaction.referenceNumber == "a" ? true : false', 'unexpectedToken', '?', { token: '?' });
     at('a + b', 'unsupported', 'a');
     at('+ 1', 'unsupported', '+');
     at('all()', 'expectedExpression', ')');
     at('all(true, true)', 'expectedSymbol', ',', { symbol: ')' });
     at('isEmpty(5)', 'unsupported', '5');
-    at('isEmpty(other.memo)', 'unsupported', 'other');
-    expect(refusal('isEmpty(transaction.memo')).toMatchObject({ key: 'expectedSymbol', position: 24 });
+    at('isEmpty(other.referenceNumber)', 'unsupported', 'other');
+    expect(refusal('isEmpty(transaction.referenceNumber')).toMatchObject({ key: 'expectedSymbol', position: 35 });
   });
 
   it('refuses an unknown field, function or method', () => {
     at('transaction.nope == 1', 'unknownField', 'nope', { name: 'nope' });
-    at('transaction.memo.matches("a.*")', 'unknownFunction', 'matches', { name: 'matches' });
-    at('transaction.memo.size()', 'unknownFunction', 'size', { name: 'size' });
-    expect(refusal('transaction.memo.')).toMatchObject({ key: 'expectedField', position: 17 });
-    at('transaction.memo.contains("a").x', 'unexpectedToken', '.x', { token: '.' });
+    at('transaction.referenceNumber.matches("a.*")', 'unknownFunction', 'matches', { name: 'matches' });
+    at('transaction.referenceNumber.size()', 'unknownFunction', 'size', { name: 'size' });
+    expect(refusal('transaction.referenceNumber.')).toMatchObject({ key: 'expectedField', position: 28 });
+    at('transaction.referenceNumber.contains("a").x', 'unexpectedToken', '.x', { token: '.' });
   });
 
   it('refuses an operator the field does not allow, at the operator', () => {
@@ -233,8 +247,8 @@ describe('parseCondition: refusals with their position', () => {
   it('refuses a value of the wrong kind', () => {
     at('transaction.amount == "5"', 'wrongValueType', '"5"', { expected: 'number' });
     at('transaction.amount == true', 'wrongValueType', 'true', { expected: 'number' });
-    at('transaction.memo == 5', 'wrongValueType', '5', { expected: 'text' });
-    at('transaction.memo == _', 'wrongValueType', '_', { expected: 'text' });
+    at('transaction.referenceNumber == 5', 'wrongValueType', '5', { expected: 'text' });
+    at('transaction.referenceNumber == _', 'wrongValueType', '_', { expected: 'text' });
     at('transaction.hasSplits == "yes"', 'wrongValueType', '"yes"', { expected: 'boolean' });
     at('transaction.accountId == "RRSP"', 'wrongValueType', '"RRSP"', { expected: 'account' });
     at('transaction.accountId == payee("Amazon")', 'wrongValueType', 'payee', { expected: 'account' });
@@ -250,7 +264,7 @@ describe('parseCondition: refusals with their position', () => {
   it('refuses a value the field cannot hold', () => {
     at('transaction.type == "EXPENSES"', 'invalidEnum', '"EXPENSES"', { values: 'EXPENSE, INCOME, TRANSFER' });
     at('transaction.currencyCode == "CADX"', 'invalidCurrency', '"CADX"');
-    at(`transaction.memo == "${'x'.repeat(501)}"`, 'valueTooLong', '"x', { max: 500 });
+    at(`transaction.referenceNumber == "${'x'.repeat(501)}"`, 'valueTooLong', '"x', { max: 500 });
     expect(parseCondition(`transaction.description.contains("${'x'.repeat(500)}")`, INDEX).ok).toBe(true);
     const codes = (n: number) => Array.from({ length: n }, () => '"CAD"').join(', ');
     expect(refusal(`transaction.currencyCode in [${codes(51)}]`)).toMatchObject({ key: 'listTooLong', args: { max: 50 } });
@@ -273,8 +287,8 @@ describe('parseCondition: refusals with their position', () => {
   });
 
   it('refuses a tree over the depth, leaf or node limits, at the part that goes over', () => {
-    const a = 'transaction.memo == "a"';
-    const b = 'transaction.memo == "b"';
+    const a = 'transaction.referenceNumber == "a"';
+    const b = 'transaction.referenceNumber == "b"';
     const deep = `${a} && (${a} || (${a} && (${a} || (${b} && ${a}))))`;
     const error = refusal(deep);
     expect(error).toMatchObject({ key: 'maxDepth', args: { max: 4 } });
@@ -293,7 +307,7 @@ describe('parseCondition: refusals with their position', () => {
   });
 
   it('reports a line and column a person can find', () => {
-    const text = 'transaction.memo == "a" &&\n  transaction.nope == 1';
+    const text = 'transaction.referenceNumber == "a" &&\n  transaction.nope == 1';
     const error = refusal(text);
     expect(error.key).toBe('unknownField');
     expect(lineColumn(text, error.position)).toEqual({ line: 2, column: 15 });

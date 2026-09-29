@@ -260,7 +260,7 @@ describe("the text actions in the applier", () => {
     });
   });
 
-  it("refuses the payee on the leg of a cross-owner transfer without looking anything up, but still writes the description", async () => {
+  it("refuses the payee on the leg of a cross-owner transfer and the description without looking anything up, so the legs never diverge", async () => {
     const h = harness(
       [row({ isTransfer: true, linkedTransactionId: uuid(77) })],
       [rule([fromText({ createIfMissing: true }), describeAs()])],
@@ -271,11 +271,7 @@ describe("the text actions in the applier", () => {
 
     expect(h.payees.resolveByName).not.toHaveBeenCalled();
     expect(h.payees.findOrCreate).not.toHaveBeenCalled();
-    expect(h.mock.update).toHaveBeenCalledWith(
-      Transaction,
-      { id: TX, userId: USER },
-      { description: "Jan Kowalski" },
-    );
+    expect(h.mock.update).not.toHaveBeenCalled();
   });
 
   it("creates a payee once for both legs of a same-owner transfer", async () => {

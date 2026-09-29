@@ -116,6 +116,28 @@ describe("TransactionRulesService create", () => {
     await expect(h.service.create(USER_ID, createDto())).resolves.toBeDefined();
   });
 
+  it("refuses a new rule whose matches pattern is a bare word, at authoring", async () => {
+    const h = buildHarness();
+
+    const error = await thrown(
+      h.service.create(
+        USER_ID,
+        createDto({
+          condition: {
+            all: [
+              { field: "description", op: "matches", value: "NETFLIX.COM" },
+            ],
+          } as never,
+        }),
+      ),
+    );
+
+    expect(error.getResponse().errors).toEqual([
+      { path: "condition.all[0].value", code: "PATTERN_WITHOUT_WILDCARD" },
+    ]);
+    expect(h.writes()).toEqual([]);
+  });
+
   it("refuses an invalid definition with the structured errors and writes nothing", async () => {
     const h = buildHarness();
 

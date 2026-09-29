@@ -20,7 +20,7 @@ export interface Suggestion {
   readonly label: string;
   /** What replaces the range. */
   readonly insert: string;
-  /** A catalog key under `rules.editor` (`fields.memo`, `operators.eq`) that explains the item. */
+  /** A catalog key under `rules.editor` (`fields.description`, `operators.eq`) that explains the item. */
   readonly hint?: string;
 }
 

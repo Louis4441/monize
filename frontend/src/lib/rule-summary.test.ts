@@ -7,7 +7,7 @@ import {
 } from './rule-summary';
 import type { TransactionRule } from '@/types/transaction-rule';
 
-const leaf = { field: 'memo', op: 'contains', value: 'x' };
+const leaf = { field: 'referenceNumber', op: 'contains', value: 'x' };
 
 describe('ruleTriggerKind', () => {
   it('reads each combination', () => {

@@ -179,6 +179,22 @@ describe("TransactionRulesService reads", () => {
     expect(h.manager.query).not.toHaveBeenCalled();
   });
 
+  it("lists a stored rule with a regex-looking or bare-word pattern as not invalid", async () => {
+    const h = buildHarness();
+    h.rules.find.mockResolvedValue([
+      storedRule({
+        condition: {
+          all: [{ field: "description", op: "matches", value: "NETFLIX.COM" }],
+        } as never,
+      }),
+    ]);
+
+    const [rule] = await h.service.list(USER_ID);
+
+    expect(rule.invalid).toBe(false);
+    expect(rule.invalidReasons).toEqual([]);
+  });
+
   it("marks a restored rule with an empty definition invalid and does not throw", async () => {
     const h = buildHarness();
     h.rules.find.mockResolvedValue([

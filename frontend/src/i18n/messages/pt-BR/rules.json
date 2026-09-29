@@ -129,7 +129,6 @@
       "payeeText": "Texto do favorecido como recebido",
       "categoryId": "Categoria",
       "description": "Descrição",
-      "memo": "Observação",
       "amount": "Valor (com sinal)",
       "absAmount": "Valor (sem sinal)",
       "currencyCode": "Moeda",
@@ -176,7 +175,7 @@
       "currency": "Escolha uma moeda",
       "currencies": "Escolha moedas",
       "types": "Escolha tipos",
-      "matchesHint": "Use * para qualquer texto, por exemplo *café*. Use {capture} para guardar o texto nesse ponto para as ações desta regra, por exemplo {example}. Um nome é formado por letras minúsculas e números, e um padrão pode guardar até {max} textos.",
+      "matchesHint": "Use * para qualquer texto, por exemplo *café*. Um padrão sem * corresponde apenas ao texto inteiro. Use {capture} para guardar o texto nesse ponto para as ações desta regra, por exemplo {example}. Um nome é formado por letras minúsculas e números, e um padrão pode guardar até {max} textos.",
       "amount": "Valor",
       "from": "De",
       "to": "Até",
@@ -281,7 +280,9 @@
         "INVALID_CAPTURE": "O nome de uma captura usa letras minúsculas e números, começa com uma letra e tem no máximo 20 caracteres.",
         "TOO_MANY_CAPTURES": "Um padrão pode conter no máximo 5 capturas.",
         "DUPLICATE_CAPTURE": "Cada nome de captura só pode ser usado uma vez em uma regra.",
-        "UNKNOWN_CAPTURE": "O texto usa uma captura que nenhuma condição desta regra define."
+        "UNKNOWN_CAPTURE": "O texto usa uma captura que nenhuma condição desta regra define.",
+        "LOOKS_LIKE_REGEX": "Expressões regulares não são compatíveis: | \\ e as classes curtas entre colchetes como [xy] são tratados como caracteres comuns, então um padrão escrito como regex nunca corresponde ao que se pretendia. Para corresponder a um entre vários textos, adicione um grupo “Qualquer uma destas” e coloque nele uma condição para cada texto.",
+        "PATTERN_WITHOUT_WILDCARD": "Sem * este padrão precisa ser igual ao texto inteiro. Use o operador “é” para o texto inteiro, “contém” para uma parte, ou coloque * em volta do texto, por exemplo *café*."
       }
     },
     "run": {
@@ -352,6 +353,8 @@
     "accountsFailed": "Não foi possível carregar suas contas, então os filtros estão indisponíveis.",
     "retry": "Tentar novamente",
     "summary": "{matched, plural, one {# transação seria alterada} other {# transações seriam alteradas}} de {scanned, plural, one {# transação analisada} other {# transações analisadas}}.",
+    "matchesNone": "Esta regra não corresponde a nenhuma das transações examinadas ({scanned}). Confira as condições antes de salvar. Um padrão sem * corresponde apenas ao texto inteiro.",
+    "noChange": "{matched} das {scanned} transações examinadas atendem às condições da regra, mas nada mudaria (por exemplo, elas já têm o valor e «somente se vazio» está ativado). Isso não é um erro.",
     "truncated": "Mais transações correspondem do que o limite permite. Apenas as mais recentes estão incluídas. Aumente o limite ou restrinja as datas para incluir o restante.",
     "noMatches": {
       "title": "Nenhuma transação seria alterada",
@@ -380,6 +383,7 @@
     "change": {
       "category": "Categoria: {before} → {after}",
       "payee": "Favorecido: {before} → {after}",
+      "payeeNew": "Favorecido: {before} → {name} (novo)",
       "tagsAdded": "Tags adicionadas: {tags}",
       "tagsRemoved": "Tags removidas: {tags}",
       "none": "nenhuma",

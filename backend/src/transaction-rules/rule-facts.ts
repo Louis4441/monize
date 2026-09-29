@@ -97,8 +97,8 @@ const blankToNull = (value: string | null | undefined): string | null =>
 
 /**
  * Build the frozen facts the evaluator reads. Pure. The `Transaction` entity
- * has no memo column (only `description` and `referenceNumber`), so the `memo`
- * fact is always `null`: a `memo` leaf is false except for `isEmpty`.
+ * has no memo column (only `description` and `referenceNumber`), so there is
+ * no `memo` field: a stored rule that names one is invalid (`UNKNOWN_FIELD`).
  */
 export function buildRuleFacts(input: RuleFactsInput): RuleFacts {
   const scaled =
@@ -121,7 +121,6 @@ export function buildRuleFacts(input: RuleFactsInput): RuleFacts {
         : [...(input.categoryAncestorIds ?? [input.categoryId])],
     ),
     description: blankToNull(input.description),
-    memo: null,
     amount,
     currencyCode: input.currencyCode,
     tagIds: Object.freeze([...new Set(input.tagIds)]),

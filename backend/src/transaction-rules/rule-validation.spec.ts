@@ -17,7 +17,7 @@ const U4 = "44444444-4444-4444-8444-444444444444";
 const OK_ACTIONS = [{ type: "add_tags", tagIds: [U1] }];
 
 const check = (condition: unknown, actions: unknown = OK_ACTIONS) =>
-  validateRuleDefinition({ condition, actions });
+  validateRuleDefinition({ condition, actions }, { authoring: true });
 
 const leaf = (field: string, op: string, value?: unknown) =>
   value === undefined ? { field, op } : { field, op, value };
@@ -54,7 +54,7 @@ describe("validateRuleDefinition: accepted definitions", () => {
 
   it("accepts an empty group, a bare leaf and every action type", () => {
     expect(check({ all: [] })).toEqual([]);
-    expect(check(leaf("memo", "isEmpty"))).toEqual([]);
+    expect(check(leaf("referenceNumber", "isEmpty"))).toEqual([]);
     expect(
       check({ any: [] }, [
         { type: "add_tags", tagIds: [U1] },
@@ -83,6 +83,7 @@ describe("validateRuleDefinition: accepted definitions", () => {
                     ? "abc"
                     : U1;
       if (op === "isEmpty") return leaf(field, op);
+      if (op === "matches") return leaf(field, op, "*abc*");
       if (op === "between") return leaf(field, op, [one, one]);
       if (["in", "notIn", "hasAny", "hasAll", "hasNone"].includes(op)) {
         return leaf(field, op, [one]);
@@ -178,15 +179,15 @@ describe("validateRuleDefinition: fields and operators", () => {
   });
 
   it("VALUE_REQUIRED and VALUE_NOT_ALLOWED", () => {
-    expect(check(leaf("memo", "eq"))).toEqual([
+    expect(check(leaf("referenceNumber", "eq"))).toEqual([
       { path: "condition.value", code: "VALUE_REQUIRED" },
     ]);
-    expect(check(leaf("memo", "isEmpty", "x"))).toEqual([
+    expect(check(leaf("referenceNumber", "isEmpty", "x"))).toEqual([
       { path: "condition.value", code: "VALUE_NOT_ALLOWED" },
     ]);
-    expect(codes({ field: "memo", op: "isEmpty", value: undefined })).toEqual([
-      "VALUE_NOT_ALLOWED",
-    ]);
+    expect(
+      codes({ field: "referenceNumber", op: "isEmpty", value: undefined }),
+    ).toEqual(["VALUE_NOT_ALLOWED"]);
   });
 });
 
@@ -194,7 +195,7 @@ describe("validateRuleDefinition: value checks", () => {
   it("VALUE_TYPE per kind", () => {
     expect(codes(leaf("hasSplits", "eq", "true"))).toEqual(["VALUE_TYPE"]);
     expect(codes(leaf("amount", "gt", "5"))).toEqual(["VALUE_TYPE"]);
-    expect(codes(leaf("memo", "eq", 5))).toEqual(["VALUE_TYPE"]);
+    expect(codes(leaf("referenceNumber", "eq", 5))).toEqual(["VALUE_TYPE"]);
     expect(codes(leaf("type", "eq", 1))).toEqual(["VALUE_TYPE"]);
     expect(codes(leaf("currencyCode", "eq", 1))).toEqual(["VALUE_TYPE"]);
     expect(codes(leaf("accountId", "eq", 1))).toEqual(["VALUE_TYPE"]);
@@ -217,10 +218,18 @@ describe("validateRuleDefinition: value checks", () => {
 
   it("VALUE_TOO_LONG exactly above the text limit", () => {
     expect(
-      codes(leaf("memo", "contains", "a".repeat(MAX_RULE_TEXT_LENGTH))),
+      codes(
+        leaf("referenceNumber", "contains", "a".repeat(MAX_RULE_TEXT_LENGTH)),
+      ),
     ).toEqual([]);
     expect(
-      check(leaf("memo", "contains", "a".repeat(MAX_RULE_TEXT_LENGTH + 1))),
+      check(
+        leaf(
+          "referenceNumber",
+          "contains",
+          "a".repeat(MAX_RULE_TEXT_LENGTH + 1),
+        ),
+      ),
     ).toEqual([{ path: "condition.value", code: "VALUE_TOO_LONG" }]);
   });
 
@@ -312,5 +321,88 @@ describe("validateRuleDefinition: condition bounds", () => {
     expect(codes({ all: groups(MAX_RULE_CONDITION_NODES + 50) })).toEqual([
       "MAX_NODES",
     ]);
+  });
+});
+
+describe("validateRuleDefinition: glob traps in matches", () => {
+  const matches = (pattern: string) => leaf("description", "matches", pattern);
+
+  it.each([
+    "dofinansowanie|rycza[lł]t",
+    "rycza[łl]t",
+    "a[bc]",
+    "a|b",
+    "a\\b",
+    "back\\slash",
+    "*a|b*",
+  ])("refuses the regex %s with LOOKS_LIKE_REGEX", (pattern) => {
+    expect(check(matches(pattern))).toEqual([
+      { path: "condition.value", code: "LOOKS_LIKE_REGEX" },
+    ]);
+  });
+
+  it.each(["wynag", "nagroda", "two words", "a+b", "ASSECO"])(
+    "refuses the bare word %s with PATTERN_WITHOUT_WILDCARD",
+    (pattern) => {
+      expect(check(matches(pattern))).toEqual([
+        { path: "condition.value", code: "PATTERN_WITHOUT_WILDCARD" },
+      ]);
+    },
+  );
+
+  it.each([
+    "*wynag*",
+    "nagroda*",
+    "*nagroda",
+    "a*b",
+    "*",
+    "{who}",
+    "Order {n}",
+    "*[PENDING]*",
+    "^ABC*",
+    "*end$",
+    "(?i)abc*",
+    "*SP. Z O.O.*",
+    "*S.A.*",
+    "*Inc.*",
+    "x.*y",
+    ".*abc",
+  ])("accepts the glob %s", (pattern) => {
+    expect(check(matches(pattern))).toEqual([]);
+  });
+
+  it("skips the glob traps when the definition is not being authored", () => {
+    const def = {
+      condition: matches("NETFLIX.COM"),
+      actions: OK_ACTIONS,
+    };
+    expect(validateRuleDefinition(def).map((e) => e.code)).toEqual([]);
+    expect(
+      validateRuleDefinition(def, { authoring: true }).map((e) => e.code),
+    ).toEqual(["PATTERN_WITHOUT_WILDCARD"]);
+  });
+
+  it("does not report an empty pattern as a bare word", () => {
+    expect(check(matches(""))).toEqual([]);
+  });
+
+  it("reports a malformed capture as INVALID_CAPTURE, not as a missing wildcard", () => {
+    expect(codes(matches("{Bad}"))).toEqual(["INVALID_CAPTURE"]);
+  });
+
+  it("leaves eq, contains and startsWith alone", () => {
+    for (const op of ["eq", "contains", "startsWith"]) {
+      expect(check(leaf("description", op, "a|b"))).toEqual([]);
+      expect(check(leaf("description", op, "nagroda"))).toEqual([]);
+    }
+  });
+});
+
+describe("validateRuleDefinition: there is no memo field", () => {
+  it("refuses a memo leaf with UNKNOWN_FIELD", () => {
+    expect(check(leaf("memo", "contains", "ASSECO"))).toEqual([
+      { path: "condition.field", code: "UNKNOWN_FIELD" },
+    ]);
+    expect(RULE_FIELDS).not.toContain("memo");
   });
 });

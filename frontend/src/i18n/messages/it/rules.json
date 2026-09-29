@@ -129,7 +129,6 @@
       "payeeText": "Testo del beneficiario come ricevuto",
       "categoryId": "Categoria",
       "description": "Descrizione",
-      "memo": "Nota",
       "amount": "Importo (con segno)",
       "absAmount": "Importo (senza segno)",
       "currencyCode": "Valuta",
@@ -176,7 +175,7 @@
       "currency": "Scegli una valuta",
       "currencies": "Scegli le valute",
       "types": "Scegli i tipi",
-      "matchesHint": "Usa * per qualsiasi testo, ad esempio *caffè*. Usa {capture} per conservare il testo in quel punto per le azioni di questa regola, ad esempio {example}. Un nome è formato da lettere minuscole e cifre, e un modello può conservare fino a {max} testi.",
+      "matchesHint": "Usa * per qualsiasi testo, ad esempio *caffè*. Un modello senza * corrisponde solo al testo intero. Usa {capture} per conservare il testo in quel punto per le azioni di questa regola, ad esempio {example}. Un nome è formato da lettere minuscole e cifre, e un modello può conservare fino a {max} testi.",
       "amount": "Importo",
       "from": "Da",
       "to": "A",
@@ -281,7 +280,9 @@
         "INVALID_CAPTURE": "Il nome di una cattura usa lettere minuscole e cifre, inizia con una lettera e ha al massimo 20 caratteri.",
         "TOO_MANY_CAPTURES": "Un modello può contenere al massimo 5 catture.",
         "DUPLICATE_CAPTURE": "Ogni nome di cattura può essere usato una sola volta in una regola.",
-        "UNKNOWN_CAPTURE": "Il testo usa una cattura che nessuna condizione di questa regola definisce."
+        "UNKNOWN_CAPTURE": "Il testo usa una cattura che nessuna condizione di questa regola definisce.",
+        "LOOKS_LIKE_REGEX": "Le espressioni regolari non sono supportate: | \\ e le classi brevi tra parentesi come [xy] vengono trattati come caratteri normali, quindi un modello scritto come regex non corrisponde mai a ciò che si intendeva. Per far corrispondere uno tra più testi, aggiungi un gruppo “Una qualsiasi di queste” con una condizione per ogni testo.",
+        "PATTERN_WITHOUT_WILDCARD": "Senza * questo modello deve essere uguale a tutto il testo. Usa l'operatore “è” per il testo intero, “contiene” per una parte, oppure metti * attorno al testo, ad esempio *caffè*."
       }
     },
     "run": {
@@ -352,6 +353,8 @@
     "accountsFailed": "Non è stato possibile caricare i tuoi conti, quindi i filtri non sono disponibili.",
     "retry": "Riprova",
     "summary": "{matched, plural, one {# transazione verrebbe modificata} other {# transazioni verrebbero modificate}} su {scanned, plural, one {# transazione analizzata} other {# transazioni analizzate}}.",
+    "matchesNone": "Questa regola non corrisponde a nessuna delle transazioni esaminate ({scanned}). Controlla le condizioni prima di salvare. Un modello senza * corrisponde solo al testo intero.",
+    "noChange": "{matched} delle {scanned} transazioni esaminate soddisfano le condizioni della regola, ma non cambierebbe nulla (ad esempio, hanno già il valore e «solo se vuoto» è attivo). Non è un errore.",
     "truncated": "Corrispondono più transazioni di quante il limite consenta. Sono incluse solo le più recenti. Aumenta il limite o restringi le date per includere le altre.",
     "noMatches": {
       "title": "Nessuna transazione verrebbe modificata",
@@ -380,6 +383,7 @@
     "change": {
       "category": "Categoria: {before} → {after}",
       "payee": "Beneficiario: {before} → {after}",
+      "payeeNew": "Beneficiario: {before} → {name} (nuovo)",
       "tagsAdded": "Tag aggiunti: {tags}",
       "tagsRemoved": "Tag rimossi: {tags}",
       "none": "nessuna",

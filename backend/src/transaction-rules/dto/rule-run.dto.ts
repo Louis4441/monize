@@ -79,6 +79,15 @@ export class RunTransactionRuleDto extends RuleRunFiltersDto {
 
 /** An unsaved rule to test. Validated exactly like a create. */
 export class PreviewDraftRuleDto {
+  @ApiPropertyOptional({
+    format: "uuid",
+    description:
+      "The saved rule this draft edits. When the draft condition equals its stored condition, the glob-trap advice is skipped, as a save would",
+  })
+  @IsOptional()
+  @IsUUID()
+  ruleId?: string;
+
   @ApiProperty({ type: "object", additionalProperties: true })
   @IsObject()
   condition: Record<string, unknown>;

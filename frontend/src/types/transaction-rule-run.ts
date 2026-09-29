@@ -70,6 +70,11 @@ export interface RuleRunPreview {
   skipped: RuleRunSkippedRow[];
   /** Transactions examined. */
   scanned: number;
+  /**
+   * Scanned transactions whose condition matched, whether or not anything would
+   * change. Only 0 means the rule matches nothing; `matched` counts changes.
+   */
+  conditionMatchedCount: number;
   /** More rows matched the filters than `limit` allowed. */
   truncated: boolean;
   /** Echoed back by the run to confirm this exact plan. */
@@ -87,6 +92,8 @@ export interface RuleRunResult {
 
 /** An unsaved rule to test. */
 export interface PreviewDraftRuleData {
+  /** The saved rule being edited; absent for a new rule. Lets the server skip authoring advice on an unchanged condition. */
+  ruleId?: string;
   condition: RuleConditionNode;
   actions: RuleAction[];
   filters?: RuleRunFilters;

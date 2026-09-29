@@ -49,6 +49,26 @@ import { McpServerService } from "./mcp-server.service";
 // (generated from the field table) and the values a model must write for
 // `weekday`, `dayOfMonth`, `status` and the two booleans. 4,217 -> 4,522 bytes
 // (+305); cap 4,250 -> 4,560 and total 58,800 -> 59,110 (59,031 measured).
+//
+// Reshaped, as a reviewed decision (owner-approved, after Claude Code logged
+// `description truncated from 2328 to 2048 chars` and the model then guessed
+// the rule shape): the rule tool's description is now the contract only (1,877
+// characters, under the 2,048 clients keep) and the per-field detail moved into
+// the `condition` and `actions` field descriptions, which cost bytes of their
+// own. 4,522 -> 4,596 bytes measured (+74); cap 4,560 -> 4,600; the total
+// (59,105 measured) stays under 59,110.
+//
+// Reworded again (owner-approved): the regex advice now says which characters
+// are matched literally (`|`, a backslash, `.*`, a short `[xy]` class) and that
+// `^`, `$` and longer bracketed words are allowed. 4,596 -> 4,647 bytes
+// measured (+51); cap 4,600 -> 4,660; total 59,110 -> 59,170 (59,156 measured).
+//
+// Reworded for the zero-match fix (owner-approved): the guide now says that
+// `conditionMatchedCount` 0 means the rule is wrong while `matchedCount` 0
+// beside a matching condition is not an error, and the field descriptions
+// regain the true|false, unsigned absAmount and capture-name guidance the
+// rewrite dropped. 4,647 -> 4,904 bytes measured (+257); cap 4,660 -> 4,910;
+// total 59,170 -> 59,420 (59,413 measured).
 const TOOL_BYTE_BUDGET: Record<string, number> = {
   list_accounts: 2500,
   list_transactions: 3550,
@@ -67,14 +87,14 @@ const TOOL_BYTE_BUDGET: Record<string, number> = {
   list_upcoming_bills: 3000,
   calculate: 2000,
   get_budget_status: 2550,
-  manage_transaction_rules: 4560,
+  manage_transaction_rules: 4910,
   ai_review_requests: 3050,
   get_next_prompt: 1400,
   post_response: 1050,
   report_progress: 1250,
 };
 
-const TOTAL_BYTE_BUDGET = 59_110;
+const TOTAL_BYTE_BUDGET = 59_420;
 const INSTRUCTIONS_BYTE_BUDGET = 2_600;
 
 /**
@@ -394,6 +414,43 @@ describe("tools/list payload budget", () => {
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it("keeps every tool description within the length clients truncate at", () => {
+    // Claude Code logs `Tool "manage_transaction_rules" description truncated
+    // from 2328 to 2048 chars` and drops the tail, so whatever a description
+    // says last is never read. The contract of a tool goes first and the whole
+    // text stays under the limit; per-field detail belongs in the field's own
+    // description.
+    const MAX_CLIENT_DESCRIPTION_CHARS = 2048;
+    const offenders = tools
+      .filter(
+        (t) => (t.description?.length ?? 0) > MAX_CLIENT_DESCRIPTION_CHARS,
+      )
+      .map(
+        (t) =>
+          `${t.name}: description is ${t.description?.length} chars; clients truncate a tool description at ${MAX_CLIENT_DESCRIPTION_CHARS} (the tail is lost). Move detail into the field descriptions.`,
+      );
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps the rule tool's contract inside the first 2,000 characters", () => {
+    const rules = tools.find((t) => t.name === "manage_transaction_rules");
+    const description = rules?.description ?? "";
+    expect(description.length).toBeLessThanOrEqual(2000);
+    // The exact shape, the example and the glob rules are what a model got
+    // wrong when the tail was cut off.
+    for (const needle of [
+      "condition is an OBJECT and actions an ARRAY",
+      '{"field":"description","op":"contains","value":"ASSECO"}',
+      '{"type":"set_category","categoryName"',
+      "Leaf keys exactly field, op, value",
+      "WHOLE text",
+      "No regex",
+    ]) {
+      expect(description.indexOf(needle)).toBeGreaterThanOrEqual(0);
+      expect(description.indexOf(needle)).toBeLessThan(1500);
+    }
   });
 
   it("keeps every field description short enough to scan", () => {

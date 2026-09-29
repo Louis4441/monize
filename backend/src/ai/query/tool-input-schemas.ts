@@ -18,6 +18,7 @@ import {
   MAX_AI_REVIEW_TOOL_LIST_LIMIT,
 } from "../../ai-review/ai-review-work.types";
 import { TRANSACTION_SORT_FIELDS } from "../../transactions/register-order";
+import { RULE_ACTIONS_HELP, RULE_CONDITION_HELP } from "./rule-language";
 import { RULE_TRIGGERS } from "../../transaction-rules/rule-trigger.types";
 import { MAX_RULE_ACTIONS } from "../../transaction-rules/rule-validation";
 import {
@@ -176,12 +177,37 @@ export const listTransactionRulesSchema = z.object({
 /** Serialised size of a condition or an action a model may send; the validator bounds the rest. */
 const MAX_RULE_JSON_CHARS = 20000;
 
-const ruleJson = z
-  .record(z.string(), z.unknown())
-  .refine(
-    (value) => JSON.stringify(value).length <= MAX_RULE_JSON_CHARS,
-    "too large",
-  );
+/**
+ * Models routinely send an object argument as a JSON string. Parse it once,
+ * bounded by the length limit, instead of refusing; anything that does not
+ * parse is left as it came and fails the schema below with its own message.
+ */
+export function parseJsonArgument(value: unknown): unknown {
+  if (typeof value !== "string" || value.length > MAX_RULE_JSON_CHARS) {
+    return value;
+  }
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
+const ruleJson = z.preprocess(
+  parseJsonArgument,
+  z
+    .record(z.string(), z.unknown())
+    .refine(
+      (value) => JSON.stringify(value).length <= MAX_RULE_JSON_CHARS,
+      "too large",
+    ),
+);
+
+/** `actions` as an array, or a JSON string of one (whose entries may be strings too). */
+const ruleActionsJson = z.preprocess((value) => {
+  const parsed = parseJsonArgument(value);
+  return Array.isArray(parsed) ? parsed.map(parseJsonArgument) : parsed;
+}, z.array(ruleJson).min(1).max(MAX_RULE_ACTIONS));
 
 /** The object half of `manage_transaction_rules`, exported so a second surface reuses the fields. */
 export const manageTransactionRulesFields = z.object({
@@ -195,8 +221,8 @@ export const manageTransactionRulesFields = z.object({
     .max(RULE_TRIGGERS.length)
     .optional(),
   stopProcessing: booleanArg().optional(),
-  condition: ruleJson.optional(),
-  actions: z.array(ruleJson).min(1).max(MAX_RULE_ACTIONS).optional(),
+  condition: ruleJson.describe(RULE_CONDITION_HELP).optional(),
+  actions: ruleActionsJson.describe(RULE_ACTIONS_HELP).optional(),
   // run and test only
   accountNames: z
     .array(z.string().max(100))

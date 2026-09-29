@@ -37,8 +37,8 @@ const options = () => screen.queryAllByRole('option').map((o) => o.textContent);
 
 describe('RuleExpressionEditor', () => {
   it('is a labelled, monospaced, spellcheck-free box with the help beside it', () => {
-    render(<Harness initial={'transaction.memo == "a"'} />);
-    expect(box()).toHaveValue('transaction.memo == "a"');
+    render(<Harness initial={'transaction.referenceNumber == "a"'} />);
+    expect(box()).toHaveValue('transaction.referenceNumber == "a"');
     expect(box()).toHaveClass('font-mono');
     expect(box()).toHaveClass('focus-visible:ring-1');
     expect(box()).toHaveAttribute('spellcheck', 'false');
@@ -51,7 +51,7 @@ describe('RuleExpressionEditor', () => {
   describe('errors', () => {
     it('says the line, the column and the reason, marks the spot, and describes the box', () => {
       render(<Harness />);
-      type('transaction.memo == "a" &&\n  transaction.nope == 1');
+      type('transaction.referenceNumber == "a" &&\n  transaction.nope == 1');
       const alert = screen.getByRole('alert');
       expect(alert).toHaveTextContent('Line 2, column 15: Unknown field nope.');
       expect(box()).toHaveAttribute('aria-invalid', 'true');
@@ -78,9 +78,9 @@ describe('RuleExpressionEditor', () => {
     it('clears when the text is fixed', () => {
       render(<Harness />);
       type('transaction.');
-      type('transaction.memo == 5');
+      type('transaction.referenceNumber == 5');
       expect(screen.getByRole('alert')).toBeInTheDocument();
-      type('transaction.memo == "5"');
+      type('transaction.referenceNumber == "5"');
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
 
@@ -167,11 +167,11 @@ describe('RuleExpressionEditor', () => {
     it('chooses with a press of the mouse, without taking focus from the box', () => {
       render(<Harness />);
       box().focus();
-      type('transaction.mem');
-      const option = screen.getByRole('option', { name: /memo/ });
+      type('transaction.referenceN');
+      const option = screen.getByRole('option', { name: /referenceNumber/ });
       const proceeded = fireEvent.mouseDown(option);
       expect(proceeded).toBe(false);
-      expect(box()).toHaveValue('transaction.memo');
+      expect(box()).toHaveValue('transaction.referenceNumber');
       expect(document.activeElement).toBe(box());
     });
 
@@ -225,7 +225,9 @@ describe('RuleExpressionEditor', () => {
     });
 
     it('recomputes when the caret moves without the text changing', () => {
-      render(<Harness initial="transaction.memo == 'x' && transaction.am" />);
+      render(
+        <Harness initial="transaction.referenceNumber == 'x' && transaction.am" />,
+      );
       // React reports a moved caret (a click here) only for the focused box.
       box().focus();
       const end = box().value.length;
@@ -233,7 +235,7 @@ describe('RuleExpressionEditor', () => {
       fireEvent.mouseUp(box());
       expect(options()).toEqual(['amountAmount (with sign)']);
       // Just after the finished value 'x': nothing to offer.
-      box().setSelectionRange(23, 23);
+      box().setSelectionRange(34, 34);
       fireEvent.mouseUp(box());
       expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     });

@@ -64,7 +64,7 @@ describe("buildRuleFacts", () => {
   });
 
   it("has no memo: the Transaction entity has no memo column", () => {
-    expect(buildRuleFacts(base).memo).toBeNull();
+    expect(buildRuleFacts(base)).not.toHaveProperty("memo");
   });
 
   it("gives the category plus its ancestors, or an empty list without a category", () => {

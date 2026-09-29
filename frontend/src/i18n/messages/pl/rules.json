@@ -129,7 +129,6 @@
       "payeeText": "Tekst odbiorcy w otrzymanej postaci",
       "categoryId": "Kategoria",
       "description": "Opis",
-      "memo": "Notatka",
       "amount": "Kwota (ze znakiem)",
       "absAmount": "Kwota (bez znaku)",
       "currencyCode": "Waluta",
@@ -176,7 +175,7 @@
       "currency": "Wybierz walutę",
       "currencies": "Wybierz waluty",
       "types": "Wybierz typy",
-      "matchesHint": "Użyj *, aby dopasować dowolny tekst, na przykład *kawa*. Użyj {capture}, aby zachować tekst z tego miejsca dla akcji tej reguły, na przykład {example}. Nazwa składa się z małych liter i cyfr, a jeden wzorzec może zachować do {max} tekstów.",
+      "matchesHint": "Użyj *, aby dopasować dowolny tekst, na przykład *kawa*. Wzorzec bez * pasuje tylko do całego tekstu. Użyj {capture}, aby zachować tekst z tego miejsca dla akcji tej reguły, na przykład {example}. Nazwa składa się z małych liter i cyfr, a jeden wzorzec może zachować do {max} tekstów.",
       "amount": "Kwota",
       "from": "Od",
       "to": "Do",
@@ -281,7 +280,9 @@
         "INVALID_CAPTURE": "Nazwa przechwytywania składa się z małych liter i cyfr, zaczyna się od litery i ma najwyżej 20 znaków.",
         "TOO_MANY_CAPTURES": "Wzorzec może zawierać najwyżej 5 przechwyceń.",
         "DUPLICATE_CAPTURE": "Każdą nazwę przechwytywania można użyć w regule tylko raz.",
-        "UNKNOWN_CAPTURE": "Tekst używa przechwytywania, którego nie definiuje żaden warunek tej reguły."
+        "UNKNOWN_CAPTURE": "Tekst używa przechwytywania, którego nie definiuje żaden warunek tej reguły.",
+        "LOOKS_LIKE_REGEX": "Wyrażenia regularne nie są obsługiwane: | \\ oraz krótkie klasy w nawiasach, jak [xy], są traktowane jak zwykłe znaki, więc wzorzec zapisany jako regex nigdy nie dopasuje tego, o co chodziło. Aby dopasować jeden z kilku tekstów, dodaj grupę „Dowolny z poniższych” i umieść w niej po jednym warunku dla każdego tekstu.",
+        "PATTERN_WITHOUT_WILDCARD": "Bez * ten wzorzec musi być równy całemu tekstowi. Użyj operatora „jest” dla całego tekstu, „zawiera” dla jego części albo otocz tekst znakami *, na przykład *kawa*."
       }
     },
     "run": {
@@ -352,6 +353,8 @@
     "accountsFailed": "Nie udało się wczytać Twoich kont, więc filtry są niedostępne.",
     "retry": "Spróbuj ponownie",
     "summary": "{matched, plural, one {# transakcja zostałaby zmieniona} few {# transakcje zostałyby zmienione} many {# transakcji zostałoby zmienionych} other {# transakcji zostałoby zmienionych}} spośród {scanned, plural, one {# sprawdzonej transakcji} few {# sprawdzonych transakcji} many {# sprawdzonych transakcji} other {# sprawdzonych transakcji}}.",
+    "matchesNone": "Ta reguła nie pasuje do żadnej ze sprawdzonych transakcji ({scanned}). Sprawdź warunki przed zapisem. Wzorzec bez * pasuje tylko do całego tekstu.",
+    "noChange": "{matched} z {scanned} sprawdzonych transakcji spełnia warunki reguły, ale nic by się nie zmieniło (na przykład mają już tę wartość, a „tylko jeśli puste” jest włączone). To nie jest błąd.",
     "truncated": "Pasuje więcej transakcji, niż pozwala limit. Uwzględniono tylko najnowsze. Zwiększ limit lub zawęź daty, aby objąć resztę.",
     "noMatches": {
       "title": "Żadna transakcja nie zostałaby zmieniona",
@@ -380,6 +383,7 @@
     "change": {
       "category": "Kategoria: {before} → {after}",
       "payee": "Odbiorca: {before} → {after}",
+      "payeeNew": "Odbiorca: {before} → {name} (nowy)",
       "tagsAdded": "Dodane tagi: {tags}",
       "tagsRemoved": "Usunięte tagi: {tags}",
       "none": "brak",

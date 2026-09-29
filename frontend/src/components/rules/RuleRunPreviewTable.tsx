@@ -85,7 +85,14 @@ export function RuleRunPreviewTable({ preview }: RuleRunPreviewTableProps) {
         <EmptyState
           className="py-6"
           title={t('noMatches.title')}
-          description={t('noMatches.body')}
+          description={
+            preview.conditionMatchedCount > 0
+              ? t('noChange', {
+                  matched: preview.conditionMatchedCount,
+                  scanned: preview.scanned,
+                })
+              : t('noMatches.body')
+          }
         />
       ) : (
         <div className="mt-3 max-h-96 overflow-auto">

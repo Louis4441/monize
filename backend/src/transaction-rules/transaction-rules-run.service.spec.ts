@@ -294,6 +294,8 @@ describe("TransactionRulesRunService", () => {
       const preview = await service.previewRun(USER, RULE_ID, { limit: 50 });
 
       expect(preview.scanned).toBe(4);
+      // The condition matched t1, t2 and the split t4; LIDL (t3) did not.
+      expect(preview.conditionMatchedCount).toBe(3);
       expect(preview.truncated).toBe(false);
       expect(preview.matched).toEqual([
         {
@@ -328,6 +330,31 @@ describe("TransactionRulesRunService", () => {
         expect.objectContaining({ limit: 50 }),
         { lock: false },
       );
+    });
+
+    it("counts a row whose condition matched though nothing would change it, and none that did not match", async () => {
+      // Already categorized: onlyIfEmpty leaves it alone, the condition still matched.
+      const done = row("t1", { categoryId: CAT });
+      const miss = row("t2", { payeeName: "LIDL" });
+      const { service } = setup(
+        [done, miss].map(plainUnit),
+        false,
+        storedRule({
+          actions: [
+            { type: "set_category", categoryId: CAT, onlyIfEmpty: true },
+          ],
+        }),
+      );
+      const preview = await service.previewRun(USER, RULE_ID, { limit: 50 });
+      expect(preview.scanned).toBe(2);
+      expect(preview.matched).toEqual([]);
+      expect(preview.conditionMatchedCount).toBe(1);
+
+      const none = setup([plainUnit(row("t3", { payeeName: "LIDL" }))]);
+      expect(
+        (await none.service.previewRun(USER, RULE_ID, { limit: 50 }))
+          .conditionMatchedCount,
+      ).toBe(0);
     });
 
     it("says truncated when the candidate set was cut", async () => {
@@ -458,6 +485,7 @@ describe("TransactionRulesRunService", () => {
         USER,
         CONDITION,
         [{ type: "add_tags", tagIds: [TAG] }],
+        true,
       );
       expect(rulesService.getOwnedRule).not.toHaveBeenCalled();
       expect(preview.matched).toHaveLength(1);
@@ -473,6 +501,104 @@ describe("TransactionRulesRunService", () => {
       expect(writeEffects).not.toHaveBeenCalled();
       expect(record).not.toHaveBeenCalled();
       expect(manager.query).not.toHaveBeenCalled();
+    });
+
+    it("passes the caller's authoring decision to the validation", async () => {
+      const { service, rulesService, manager } = setup([plainUnit(row("t1"))]);
+      await service.previewDraft(
+        USER,
+        {
+          condition: CONDITION as unknown as Record<string, unknown>,
+          actions: [{ type: "add_tags", tagIds: [TAG] }],
+        },
+        { authoring: false },
+      );
+      expect(rulesService.checkedDefinition).toHaveBeenCalledWith(
+        manager,
+        USER,
+        CONDITION,
+        [{ type: "add_tags", tagIds: [TAG] }],
+        false,
+      );
+    });
+
+    describe("with a ruleId", () => {
+      const NETFLIX = {
+        field: "payeeText",
+        op: "matches",
+        value: "NETFLIX.COM",
+      };
+      const draft = (condition: Record<string, unknown>) => ({
+        ruleId: RULE_ID,
+        condition,
+        actions: [{ type: "add_tags", tagIds: [TAG] }],
+      });
+
+      it("skips the authoring advice when the condition equals the stored one", async () => {
+        const { service, rulesService, manager } = setup(
+          [plainUnit(row("t1", { payeeName: "NETFLIX.COM" }))],
+          false,
+          storedRule({ condition: NETFLIX as unknown as RuleConditionNode }),
+        );
+        const preview = await service.previewDraft(USER, draft({ ...NETFLIX }));
+        expect(rulesService.getOwnedRule).toHaveBeenCalledWith(
+          manager,
+          USER,
+          RULE_ID,
+        );
+        expect(rulesService.checkedDefinition).toHaveBeenCalledWith(
+          manager,
+          USER,
+          NETFLIX,
+          [{ type: "add_tags", tagIds: [TAG] }],
+          false,
+        );
+        expect(preview.matched).toHaveLength(1);
+      });
+
+      it("keeps the advice when the condition differs from the stored one", async () => {
+        const { service, rulesService, manager } = setup(
+          [plainUnit(row("t1"))],
+          false,
+          storedRule({ condition: NETFLIX as unknown as RuleConditionNode }),
+        );
+        const changed = { ...NETFLIX, value: "NETFLIX.NL" };
+        await service.previewDraft(USER, draft(changed));
+        expect(rulesService.checkedDefinition).toHaveBeenCalledWith(
+          manager,
+          USER,
+          changed,
+          [{ type: "add_tags", tagIds: [TAG] }],
+          true,
+        );
+      });
+
+      it("answers 404 for a missing or foreign rule, before validating or reading", async () => {
+        const { service, rulesService } = setup([plainUnit(row("t1"))]);
+        rulesService.getOwnedRule.mockRejectedValue(new NotFoundException());
+        await expect(
+          service.previewDraft(USER, draft({ ...NETFLIX })),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(rulesService.checkedDefinition).not.toHaveBeenCalled();
+        expect(loadCandidateUnits).not.toHaveBeenCalled();
+      });
+
+      it("lets an explicit authoring option win over the comparison", async () => {
+        const { service, rulesService, manager } = setup([
+          plainUnit(row("t1")),
+        ]);
+        await service.previewDraft(USER, draft({ ...NETFLIX }), {
+          authoring: true,
+        });
+        expect(rulesService.getOwnedRule).not.toHaveBeenCalled();
+        expect(rulesService.checkedDefinition).toHaveBeenCalledWith(
+          manager,
+          USER,
+          NETFLIX,
+          expect.anything(),
+          true,
+        );
+      });
     });
 
     it("applies the onlyIfEmpty default to the draft", async () => {
@@ -649,6 +775,8 @@ describe("TransactionRulesRunService", () => {
       const s = setup([plainUnit(row("t1"))], false, asking);
       const preview = await s.service.previewRun(USER, RULE_ID, filters);
       expect(preview.matched).toEqual([]);
+      // Nothing changes in the ledger, yet the condition matched the row.
+      expect(preview.conditionMatchedCount).toBe(1);
       expect(preview.aiReviewRequests).toBe(1);
       expect(s.enqueue).not.toHaveBeenCalled();
 

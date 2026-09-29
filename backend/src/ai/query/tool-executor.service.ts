@@ -39,6 +39,7 @@ import {
   RuleToolRefusal,
   RuleToolRunInput,
   TransactionRuleToolPrepService,
+  zeroMatchNote,
 } from "../../transaction-rules/rule-tool-prep.service";
 import { AiReviewWorkService } from "../../ai-review/ai-review-work.service";
 import {
@@ -128,6 +129,9 @@ const PENDING_ACTION_TOOL_RESULT = {
   message:
     "A confirmation card has been shown to the user. The action has NOT been performed. Do not call this tool again or claim it was done; briefly ask the user to review and approve the card.",
 };
+
+/** A sentence appended to a summary after a space; nothing when there is none. */
+const withNote = (note: string): string => (note ? ` ${note}` : "");
 
 /**
  * The contact fields a payee preview would write, for the model-facing summary
@@ -1322,8 +1326,14 @@ export class ToolExecutorService {
   /** A rule refusal as a tool error: the message, plus the structured entries the REST API would return. */
   private ruleToolError(refusal: RuleToolRefusal): ToolResult {
     return {
-      data: { error: refusal.message, errors: refusal.errors },
-      summary: refusal.message,
+      data: {
+        error: refusal.message,
+        errors: refusal.errors,
+        ...(refusal.hints?.length ? { hints: refusal.hints } : {}),
+      },
+      summary: refusal.hints?.length
+        ? `${refusal.message} Fix: ${refusal.hints.join(" ")}`
+        : refusal.message,
       sources: [],
       isError: true,
     };
@@ -1397,7 +1407,7 @@ export class ToolExecutorService {
         const prep = await this.ruleToolPrep.prepareCreate(userId, rule);
         if (!prep.ok) return this.ruleToolError(prep);
         return awaiting(
-          `Prepared to create rule "${prep.preview.rule.name}" (would change ${prep.preview.test.matchedCount} of ${prep.preview.test.scanned} recent transactions).`,
+          `Prepared to create rule "${prep.preview.rule.name}" (would change ${prep.preview.test.matchedCount} of ${prep.preview.test.scanned} recent transactions).${withNote(zeroMatchNote(prep.preview.test))}`,
           this.actionBuilder.buildCreateTransactionRule(userId, prep.preview),
         );
       }
@@ -1405,7 +1415,7 @@ export class ToolExecutorService {
         const prep = await this.ruleToolPrep.prepareUpdate(userId, rule);
         if (!prep.ok) return this.ruleToolError(prep);
         return awaiting(
-          `Prepared an edit to rule "${prep.preview.current.name}".`,
+          `Prepared an edit to rule "${prep.preview.current.name}".${prep.preview.test ? withNote(zeroMatchNote(prep.preview.test)) : ""}`,
           this.actionBuilder.buildUpdateTransactionRule(userId, prep.preview),
         );
       }
@@ -1433,7 +1443,7 @@ export class ToolExecutorService {
       );
       return {
         data: { rule: prep.preview.rule.name, ...test },
-        summary: `Tested rule "${prep.preview.rule.name}": it would change ${test.matchedCount} of ${test.scanned} transactions. Nothing was saved or changed.`,
+        summary: `Tested rule "${prep.preview.rule.name}": it would change ${test.matchedCount} of ${test.scanned} transactions. Nothing was saved or changed.${withNote(test.message ?? "")}`,
         sources: [
           {
             type: "transaction_rules",

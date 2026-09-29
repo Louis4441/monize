@@ -38,6 +38,7 @@ const labels = {
 };
 const test = {
   matchedCount: 1,
+  conditionMatchedCount: 1,
   scanned: 10,
   truncated: false,
   rows: [],

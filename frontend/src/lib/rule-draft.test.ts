@@ -102,7 +102,12 @@ describe('draftFromRule', () => {
     expect(repaired).toBe(0);
     expect(draft.name).toBe('Coffee shops');
     expect(draft.condition).toMatchObject({ kind: 'group', match: 'all', not: false });
-    expect(draft.condition.children[0]).toMatchObject({ kind: 'leaf', field: 'memo', op: 'contains', value: 'coffee' });
+    expect(draft.condition.children[0]).toMatchObject({
+      kind: 'leaf',
+      field: 'referenceNumber',
+      op: 'contains',
+      value: 'coffee',
+    });
     expect(draft.actions.map((a) => a.type)).toEqual(['add_tags', 'set_payee']);
   });
 
@@ -110,7 +115,7 @@ describe('draftFromRule', () => {
     const condition = {
       all: [
         { field: 'type', op: 'eq', value: 'TRANSFER' },
-        { any: [{ field: 'amount', op: 'between', value: [-500, -100] }, { field: 'memo', op: 'isEmpty' }], not: true },
+        { any: [{ field: 'amount', op: 'between', value: [-500, -100] }, { field: 'referenceNumber', op: 'isEmpty' }], not: true },
       ],
     };
     const actions = [
@@ -125,7 +130,7 @@ describe('draftFromRule', () => {
   });
 
   it('wraps a bare leaf in a group', () => {
-    const { draft, repaired } = read({ condition: { field: 'memo', op: 'eq', value: 'x' } });
+    const { draft, repaired } = read({ condition: { field: 'referenceNumber', op: 'eq', value: 'x' } });
     expect(repaired).toBe(0);
     expect(draft.condition.children).toHaveLength(1);
   });
@@ -143,9 +148,9 @@ describe('draftFromRule', () => {
         { field: 'nope', op: 'eq', value: 'x' },
         'text',
         { field: 'type', op: 'contains', value: 'x' },
-        { field: 'memo', op: 'eq', value: 5 },
+        { field: 'referenceNumber', op: 'eq', value: 5 },
         { field: 'amount', op: 'between', value: [1] },
-        { field: 'memo', op: 'isEmpty', value: 'stray' },
+        { field: 'referenceNumber', op: 'isEmpty', value: 'stray' },
         { all: 'not a list' },
         { all: [], any: [] },
       ],
@@ -153,7 +158,7 @@ describe('draftFromRule', () => {
     const { draft, repaired } = read({ condition } as never);
     expect(repaired).toBe(8);
     const kinds = draft.condition.children.map((c) => (c.kind === 'leaf' ? `${c.field}:${c.op}` : `group:${c.match}`));
-    expect(kinds).toEqual(['type:eq', 'memo:eq', 'amount:between', 'memo:isEmpty', 'group:all']);
+    expect(kinds).toEqual(['type:eq', 'referenceNumber:eq', 'amount:between', 'referenceNumber:isEmpty', 'group:all']);
     expect((draft.condition.children[1] as EditorLeaf).value).toBe('');
     expect((draft.condition.children[3] as EditorLeaf).value).toBeUndefined();
   });
@@ -208,9 +213,9 @@ describe('draftToPayload', () => {
   });
 
   it('writes not only when it is on, any groups as any, and omits the value of isEmpty', () => {
-    const empty: EditorLeaf = { ...createLeaf('memo'), op: 'isEmpty', value: undefined };
+    const empty: EditorLeaf = { ...createLeaf('referenceNumber'), op: 'isEmpty', value: undefined };
     const group: EditorGroup = { ...createGroup('any', [empty]), not: true };
-    expect(conditionToApi(group)).toEqual({ any: [{ field: 'memo', op: 'isEmpty' }], not: true });
+    expect(conditionToApi(group)).toEqual({ any: [{ field: 'referenceNumber', op: 'isEmpty' }], not: true });
     expect(conditionToApi(createGroup('all'))).toEqual({ all: [] });
   });
 

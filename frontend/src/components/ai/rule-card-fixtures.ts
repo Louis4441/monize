@@ -41,6 +41,7 @@ export function makeRule(overrides: Partial<PendingActionRule> = {}): PendingAct
 export function makeTest(overrides: Partial<PendingActionRuleTest> = {}): PendingActionRuleTest {
   return {
     matchedCount: 14,
+    conditionMatchedCount: 14,
     scanned: 200,
     truncated: false,
     rows: [

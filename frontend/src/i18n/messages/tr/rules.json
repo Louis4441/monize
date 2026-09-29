@@ -129,7 +129,6 @@
       "payeeText": "Alıcı metni (alındığı hâliyle)",
       "categoryId": "Kategori",
       "description": "Açıklama",
-      "memo": "Not",
       "amount": "Tutar (işaretli)",
       "absAmount": "Tutar (işaretsiz)",
       "currencyCode": "Para birimi",
@@ -176,7 +175,7 @@
       "currency": "Bir para birimi seçin",
       "currencies": "Para birimlerini seçin",
       "types": "Türleri seçin",
-      "matchesHint": "Herhangi bir metin için * kullanın, örneğin *kahve*. Bu kuralın eylemleri için o konumdaki metni saklamak üzere {capture} kullanın, örneğin {example}. Ad küçük harf ve rakamlardan oluşur; bir desen en fazla {max} metin saklayabilir.",
+      "matchesHint": "Herhangi bir metin için * kullanın, örneğin *kahve*. * içermeyen bir desen yalnızca metnin tamamıyla eşleşir. Bu kuralın eylemleri için o konumdaki metni saklamak üzere {capture} kullanın, örneğin {example}. Ad küçük harf ve rakamlardan oluşur; bir desen en fazla {max} metin saklayabilir.",
       "amount": "Tutar",
       "from": "Başlangıç",
       "to": "Bitiş",
@@ -281,7 +280,9 @@
         "INVALID_CAPTURE": "Yakalama adı küçük harf ve rakamlardan oluşur, harfle başlar ve en fazla 20 karakter uzunluğundadır.",
         "TOO_MANY_CAPTURES": "Bir desen en fazla 5 yakalama içerebilir.",
         "DUPLICATE_CAPTURE": "Her yakalama adı bir kuralda yalnızca bir kez kullanılabilir.",
-        "UNKNOWN_CAPTURE": "Metin, bu kuralın hiçbir koşulunda tanımlanmamış bir yakalama kullanıyor."
+        "UNKNOWN_CAPTURE": "Metin, bu kuralın hiçbir koşulunda tanımlanmamış bir yakalama kullanıyor.",
+        "LOOKS_LIKE_REGEX": "Düzenli ifadeler desteklenmez: | \\ ve [xy] gibi kısa köşeli parantez sınıfları sıradan karakterler olarak eşleştirilir, bu yüzden regex olarak yazılmış bir desen amaçlananla asla eşleşmez. Birkaç metinden biriyle eşleşmek için “Bunlardan herhangi biri” grubu ekleyin ve her metin için içine bir koşul koyun.",
+        "PATTERN_WITHOUT_WILDCARD": "* olmadan bu desen metnin tamamına eşit olmalıdır. Metnin tamamı için “şudur”, bir parçası için “şunu içerir” işlecini kullanın ya da metnin etrafına * koyun, örneğin *kahve*."
       }
     },
     "run": {
@@ -352,6 +353,8 @@
     "accountsFailed": "Hesaplarınız yüklenemedi, bu yüzden filtreler kullanılamıyor.",
     "retry": "Tekrar dene",
     "summary": "{scanned, plural, other {# işlem}} incelendi, {matched, plural, other {# işlem}} değişecek.",
+    "matchesNone": "Bu kural incelenen işlemlerin hiçbiriyle eşleşmiyor ({scanned}). Kaydetmeden önce koşulları kontrol edin. * içermeyen bir desen yalnızca metnin tamamıyla eşleşir.",
+    "noChange": "İncelenen {scanned} işlemden {matched} tanesi kuralın koşullarını karşılıyor, ancak hiçbir şey değişmeyecek (örneğin değer zaten var ve «yalnızca boşsa» açık). Bu bir hata değildir.",
     "truncated": "Sınırın izin verdiğinden fazla işlem eşleşti. Yalnızca en yeniler dahil edildi. Kalanı dahil etmek için sınırı artırın veya tarihleri daraltın.",
     "noMatches": {
       "title": "Hiçbir işlem değişmeyecek",
@@ -380,6 +383,7 @@
     "change": {
       "category": "Kategori: {before} → {after}",
       "payee": "Alıcı: {before} → {after}",
+      "payeeNew": "Alıcı: {before} → {name} (yeni)",
       "tagsAdded": "Eklenen etiketler: {tags}",
       "tagsRemoved": "Kaldırılan etiketler: {tags}",
       "none": "yok",

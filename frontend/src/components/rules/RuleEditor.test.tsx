@@ -364,6 +364,64 @@ describe('RuleEditor: the Test panel', () => {
   });
 });
 
+describe('RuleEditor: a test that matched nothing', () => {
+  const NONE =
+    'This rule matches none of the transactions examined (12). Check the conditions before saving.';
+
+  it('warns beside Save without blocking it, and only while the result is current', async () => {
+    mocks.rules.previewDraft.mockResolvedValue(
+      makePreview({ matched: [], conditionMatchedCount: 0, scanned: 12 }),
+    );
+    await renderEditor();
+    addTagAction(0, 'Work');
+    expect(
+      screen.queryByText(/matches none of the transactions examined/),
+    ).not.toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Test rule' }));
+    });
+    const warning = screen
+      .getAllByRole('status')
+      .find((el) => el.textContent?.includes('matches none'));
+    expect(warning).toHaveTextContent(NONE);
+    expect(saveButton()).toBeEnabled();
+
+    // An edit that changes what the rule does makes the result stale, and the warning goes with it.
+    addTagAction(1, 'Coffee run');
+    expect(
+      screen.queryByText(/matches none of the transactions examined/),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not warn beside Save when the condition matches but nothing would change', async () => {
+    mocks.rules.previewDraft.mockResolvedValue(
+      makePreview({ matched: [], conditionMatchedCount: 5, scanned: 12 }),
+    );
+    await renderEditor();
+    addTagAction(0, 'Work');
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Test rule' }));
+    });
+    expect(
+      screen.queryByText(/matches none of the transactions examined/),
+    ).not.toBeInTheDocument();
+    expect(saveButton()).toBeEnabled();
+  });
+
+  it('says nothing when the test matched something', async () => {
+    mocks.rules.previewDraft.mockResolvedValue(makePreview());
+    await renderEditor();
+    addTagAction(0, 'Work');
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Test rule' }));
+    });
+    expect(
+      screen.queryByText(/matches none of the transactions examined/),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe('RuleEditor: an existing rule', () => {
   const stored = makeRule({
     id: 'rule-9',
@@ -485,6 +543,28 @@ describe('RuleEditor: an existing rule', () => {
     expect(useRouter().replace).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Name')).toHaveValue('Cafes');
     expect(saveButton()).toBeDisabled();
+  });
+
+  it('saves a rename of a rule whose stored pattern has no wildcard, and blocks an edited condition', async () => {
+    const old = makeRule({
+      id: 'rule-9',
+      name: 'Streaming',
+      revision: 2,
+      condition: { all: [{ field: 'description', op: 'matches', value: 'NETFLIX.COM' }] },
+      actions: [{ type: 'add_tags', tagIds: [TAG_ID] }],
+    });
+    mocks.rules.getById.mockResolvedValue(old);
+    mocks.rules.update.mockResolvedValue({ ...old, name: 'Renamed', revision: 3 });
+    await renderEditor('rule-9');
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Renamed' } });
+
+    await save();
+    expect(mocks.rules.update).toHaveBeenCalledWith('rule-9', expect.objectContaining({ name: 'Renamed', revision: 2 }));
+
+    mocks.rules.update.mockClear();
+    fireEvent.change(within(card('Condition')).getByDisplayValue('NETFLIX.COM'), { target: { value: 'HBO.COM' } });
+    await save();
+    expect(mocks.rules.update).not.toHaveBeenCalled();
   });
 
   it('answers a revision conflict with a message and a Reload that fetches the rule again', async () => {

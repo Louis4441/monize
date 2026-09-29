@@ -235,6 +235,45 @@ describe("set_payee_from_text", () => {
     expect(plan.payeeLookups).toBeUndefined();
   });
 
+  it("a later rule creating another name leaves payeeCreated only on the final one", () => {
+    const plan = planRuleEffects(
+      facts(),
+      [
+        rule([fromText({ template: "Foo", createIfMissing: true })]),
+        rule([
+          fromText({
+            template: "  bar ",
+            createIfMissing: true,
+            onlyIfEmpty: false,
+          }),
+        ]),
+      ],
+      known([
+        ["Foo", null],
+        ["bar", null],
+      ]),
+    );
+    expect(plan.changes.createPayee).toBe("bar");
+    expect(plan.trace.map((entry) => entry.changes.payeeCreated)).toEqual([
+      undefined,
+      true,
+    ]);
+  });
+
+  it("a creation a later rule replaces with an existing payee is not traced as created", () => {
+    const plan = planRuleEffects(
+      facts(),
+      [
+        rule([fromText({ createIfMissing: true })]),
+        rule([{ type: "set_payee", payeeId: OTHER, onlyIfEmpty: false }]),
+      ],
+      known([["Jan Kowalski", null]]),
+    );
+    expect(plan.changes.createPayee).toBeUndefined();
+    expect(plan.changes.payeeId).toBe(OTHER);
+    expect(plan.trace.some((entry) => entry.changes.payeeCreated)).toBe(false);
+  });
+
   it("refuses on a leg of a cross-owner transfer, before any lookup", () => {
     const plan = planRuleEffects(facts(), [rule([fromText()])], {
       ...known([["Jan Kowalski", KOWALSKI]]),
@@ -349,6 +388,19 @@ describe("set_description", () => {
     }
   });
 
+  it("is refused on a leg of a cross-owner transfer, written on a same-owner one", () => {
+    const leg = facts({ isTransfer: true });
+    const refused = planRuleEffects(leg, [rule([describeAs()])], {
+      crossOwnerTransferLeg: true,
+    });
+    expect(refused.changes.description).toBeUndefined();
+    expect(refused.trace[0].skipped).toEqual([
+      { type: "set_description", reason: "cross_owner_transfer_leg" },
+    ]);
+    const allowed = planRuleEffects(leg, [rule([describeAs()])]);
+    expect(allowed.changes.description).toBe("Jan Kowalski");
+  });
+
   it("refuses a blank rendering in replace mode", () => {
     const empty = planRuleEffects(facts({ payeeText: null }), [
       rule([describeAs({ template: "{payeeText}" })], always),
@@ -386,13 +438,6 @@ describe("set_description", () => {
       rule([describeAs({ mode: "append", template: "b".repeat(100) })], always),
     ]);
     expect(long.changes.description).toHaveLength(750);
-  });
-
-  it("is allowed on a cross-owner transfer leg: it writes the row's own text", () => {
-    const plan = planRuleEffects(facts(), [rule([describeAs()])], {
-      crossOwnerTransferLeg: true,
-    });
-    expect(plan.changes.description).toBe("Jan Kowalski");
   });
 });
 

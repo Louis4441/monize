@@ -6,7 +6,10 @@ import { createGroup, createLeaf, getNode, type EditorGroup, type EditorLeaf } f
 
 Element.prototype.scrollIntoView = vi.fn();
 
-const memo = (value: string): EditorLeaf => ({ ...createLeaf('memo'), value });
+const memo = (value: string): EditorLeaf => ({
+  ...createLeaf('referenceNumber'),
+  value,
+});
 
 /** The memo values of a group's children, `[...]` for a nested group. */
 function shape(group: EditorGroup): unknown[] {

@@ -26,7 +26,7 @@ function Card({ initial, onLeaf }: { initial: EditorLeaf; onLeaf?: (leaf: Editor
   );
 }
 
-const leaf = (over: Partial<EditorLeaf>): EditorLeaf => ({ ...createLeaf('memo'), ...over });
+const leaf = (over: Partial<EditorLeaf>): EditorLeaf => ({ ...createLeaf('referenceNumber'), ...over });
 const optionLabels = (select: HTMLElement) => within(select).getAllByRole('option').map((o) => o.textContent);
 
 describe('RuleConditionCard', () => {
@@ -78,14 +78,18 @@ describe('RuleConditionCard', () => {
   it('takes two days for between, and a list of days for in, sorted', () => {
     const onLeaf = vi.fn();
     render(<Card initial={createLeaf('dayOfMonth')} onLeaf={onLeaf} />);
-    fireEvent.change(screen.getByLabelText('Operator'), { target: { value: 'between' } });
+    fireEvent.change(screen.getByLabelText('Operator'), {
+      target: { value: 'between' },
+    });
     fireEvent.change(screen.getByLabelText('From'), { target: { value: '5' } });
     fireEvent.blur(screen.getByLabelText('From'));
     fireEvent.change(screen.getByLabelText('To'), { target: { value: '20' } });
     fireEvent.blur(screen.getByLabelText('To'));
     expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ op: 'between', value: [5, 20] }));
 
-    fireEvent.change(screen.getByLabelText('Operator'), { target: { value: 'in' } });
+    fireEvent.change(screen.getByLabelText('Operator'), {
+      target: { value: 'in' },
+    });
     fireEvent.click(screen.getByText('Choose days'));
     fireEvent.click(screen.getByLabelText('15'));
     fireEvent.click(screen.getByLabelText('1'));
@@ -95,7 +99,9 @@ describe('RuleConditionCard', () => {
   it('keeps a single day when the operator becomes in', () => {
     const onLeaf = vi.fn();
     render(<Card initial={leaf({ field: 'dayOfMonth', op: 'eq', value: 28 })} onLeaf={onLeaf} />);
-    fireEvent.change(screen.getByLabelText('Operator'), { target: { value: 'in' } });
+    fireEvent.change(screen.getByLabelText('Operator'), {
+      target: { value: 'in' },
+    });
     expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ op: 'in', value: [28] }));
   });
 
@@ -108,7 +114,9 @@ describe('RuleConditionCard', () => {
     fireEvent.change(select, { target: { value: 'SUN' } });
     expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ field: 'weekday', value: 'SUN' }));
 
-    fireEvent.change(screen.getByLabelText('Operator'), { target: { value: 'in' } });
+    fireEvent.change(screen.getByLabelText('Operator'), {
+      target: { value: 'in' },
+    });
     // The pick made under "is" carries over, and more are added to it.
     fireEvent.click(screen.getByRole('button', { name: 'Sun' }));
     fireEvent.click(screen.getByLabelText('Sat'));
@@ -123,7 +131,9 @@ describe('RuleConditionCard', () => {
     fireEvent.change(select, { target: { value: 'VOID' } });
     expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ field: 'status', op: 'eq', value: 'VOID' }));
 
-    fireEvent.change(screen.getByLabelText('Operator'), { target: { value: 'in' } });
+    fireEvent.change(screen.getByLabelText('Operator'), {
+      target: { value: 'in' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Void' }));
     fireEvent.click(screen.getByLabelText('Cleared'));
     expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ op: 'in', value: ['VOID', 'CLEARED'] }));
@@ -157,13 +167,41 @@ describe('RuleConditionCard', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it.each([
+    ['LOOKS_LIKE_REGEX', 'a|b*', /Regular expressions are not supported/],
+    ['PATTERN_WITHOUT_WILDCARD', 'nagroda', /Without a \* this pattern must equal the whole text/],
+  ])('says under a pattern why the server refuses it: %s', (code, value, message) => {
+    render(
+      <RuleConditionCard
+        leaf={leaf({ field: 'description', op: 'matches', value })}
+        options={testOptions}
+        actions={[]}
+        errors={[code]}
+        captureCodes={[code]}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(message)).toBeInTheDocument();
+    // The hint says what a pattern without * matches, and the card does not list the code twice.
+    expect(screen.getByText(/A pattern without \* matches only the whole text/)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('starts over when the field changes: first operator of the new field, empty value', () => {
     const onLeaf = vi.fn();
     render(<Card initial={leaf({ field: 'amount', op: 'between', value: [1, 2] })} onLeaf={onLeaf} />);
 
-    fireEvent.change(screen.getByLabelText('Field'), { target: { value: 'memo' } });
+    fireEvent.change(screen.getByLabelText('Field'), {
+      target: { value: 'referenceNumber' },
+    });
 
-    expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ field: 'memo', op: 'eq', value: '' }));
+    expect(onLeaf).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        field: 'referenceNumber',
+        op: 'eq',
+        value: '',
+      }),
+    );
     expect(screen.getByLabelText('Operator')).toHaveValue('eq');
     expect(screen.getByLabelText('Value')).toHaveValue('');
     expect(screen.queryByLabelText('From')).not.toBeInTheDocument();
@@ -173,11 +211,15 @@ describe('RuleConditionCard', () => {
     render(<Card initial={leaf({ field: 'payeeId', op: 'eq', value: '' })} />);
     expect(screen.getByPlaceholderText('Choose a payee')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Operator'), { target: { value: 'in' } });
+    fireEvent.change(screen.getByLabelText('Operator'), {
+      target: { value: 'in' },
+    });
     expect(screen.queryByPlaceholderText('Choose a payee')).not.toBeInTheDocument();
     expect(screen.getByText('Choose payees')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Operator'), { target: { value: 'isEmpty' } });
+    fireEvent.change(screen.getByLabelText('Operator'), {
+      target: { value: 'isEmpty' },
+    });
     expect(screen.queryByText('Choose payees')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Value')).not.toBeInTheDocument();
   });
@@ -189,7 +231,9 @@ describe('RuleConditionCard', () => {
     expect(input).toHaveValue('Chequing (CAD)');
     expect(screen.queryByDisplayValue(ACCOUNT_ID)).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Field'), { target: { value: 'categoryId' } });
+    fireEvent.change(screen.getByLabelText('Field'), {
+      target: { value: 'categoryId' },
+    });
     fireEvent.focus(screen.getByPlaceholderText('Choose a category'));
     fireEvent.click(screen.getByText('Food: Coffee'));
     expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ field: 'categoryId', value: COFFEE_ID }));
@@ -220,11 +264,15 @@ describe('RuleConditionCard', () => {
   it('uses a text input, and explains the wildcard only for the pattern operator', () => {
     const onLeaf = vi.fn();
     render(<Card initial={leaf({ field: 'description', op: 'contains', value: '' })} onLeaf={onLeaf} />);
-    fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'coffee' } });
+    fireEvent.change(screen.getByLabelText('Value'), {
+      target: { value: 'coffee' },
+    });
     expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ value: 'coffee' }));
     expect(screen.queryByText(/wildcard/)).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Operator'), { target: { value: 'matches' } });
+    fireEvent.change(screen.getByLabelText('Operator'), {
+      target: { value: 'matches' },
+    });
     expect(screen.getByText(/Use \* for any text/)).toBeInTheDocument();
     expect(screen.getByLabelText('Value')).toHaveValue('coffee');
   });
@@ -237,7 +285,9 @@ describe('RuleConditionCard', () => {
     fireEvent.blur(amount);
     expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ op: 'gt', value: 12.5 }));
 
-    fireEvent.change(screen.getByLabelText('Operator'), { target: { value: 'between' } });
+    fireEvent.change(screen.getByLabelText('Operator'), {
+      target: { value: 'between' },
+    });
     expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ op: 'between', value: [12.5, undefined] }));
     fireEvent.change(screen.getByLabelText('To'), { target: { value: '30' } });
     fireEvent.blur(screen.getByLabelText('To'));
@@ -246,7 +296,15 @@ describe('RuleConditionCard', () => {
   });
 
   it('turns the range fields into positive-only inputs for an unsigned amount', () => {
-    render(<Card initial={leaf({ field: 'absAmount', op: 'between', value: [undefined, undefined] })} />);
+    render(
+      <Card
+        initial={leaf({
+          field: 'absAmount',
+          op: 'between',
+          value: [undefined, undefined],
+        })}
+      />,
+    );
     const from = screen.getByLabelText('From');
     fireEvent.change(from, { target: { value: '-5' } });
     fireEvent.blur(from);
@@ -261,7 +319,9 @@ describe('RuleConditionCard', () => {
     fireEvent.change(select, { target: { value: 'TRANSFER' } });
     expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ value: 'TRANSFER' }));
 
-    fireEvent.change(screen.getByLabelText('Operator'), { target: { value: 'in' } });
+    fireEvent.change(screen.getByLabelText('Operator'), {
+      target: { value: 'in' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Transfer' }));
     fireEvent.click(screen.getByLabelText('Income'));
     expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ value: ['TRANSFER', 'INCOME'] }));
@@ -276,7 +336,9 @@ describe('RuleConditionCard', () => {
     fireEvent.change(select, { target: { value: 'USD' } });
     expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ value: 'USD' }));
 
-    fireEvent.change(screen.getByLabelText('Operator'), { target: { value: 'in' } });
+    fireEvent.change(screen.getByLabelText('Operator'), {
+      target: { value: 'in' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'USD' }));
     fireEvent.click(screen.getByLabelText('CAD'));
     expect(onLeaf).toHaveBeenLastCalledWith(expect.objectContaining({ value: ['USD', 'CAD'] }));

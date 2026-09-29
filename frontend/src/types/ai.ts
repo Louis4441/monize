@@ -427,6 +427,8 @@ export interface PendingActionRuleState {
 /** What running a rule on existing transactions would do (`AiActionRuleTestPreview`). */
 export interface PendingActionRuleTest {
   matchedCount: number;
+  /** Transactions whose condition matched, changed or not; only 0 means it matches nothing. */
+  conditionMatchedCount: number;
   scanned: number;
   truncated: boolean;
   /** The first rows that would change; the counts cover all of them. */

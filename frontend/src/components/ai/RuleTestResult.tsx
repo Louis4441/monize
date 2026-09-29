@@ -45,6 +45,19 @@ export function RuleTestResult({ test, title }: RuleTestResultProps) {
       <p className="text-sm text-gray-900 dark:text-gray-100">
         {t('summary', { matched: test.matchedCount, scanned: test.scanned })}
       </p>
+      {test.conditionMatchedCount === 0 && test.scanned > 0 && (
+        <p role="status" className="text-sm font-medium text-amber-700 dark:text-amber-400">
+          {t('matchesNone', { scanned: test.scanned })}
+        </p>
+      )}
+      {test.conditionMatchedCount > 0 && test.matchedCount === 0 && (
+        <p role="status" className="text-sm text-gray-600 dark:text-gray-300">
+          {t('noChange', {
+            matched: test.conditionMatchedCount,
+            scanned: test.scanned,
+          })}
+        </p>
+      )}
       {test.truncated && <p className="text-sm text-amber-700 dark:text-amber-400">{t('truncated')}</p>}
 
       {test.rows.length > 0 && (
@@ -70,7 +83,10 @@ export function RuleTestResult({ test, title }: RuleTestResultProps) {
       )}
       {test.matchedCount > test.rows.length && (
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          {tc('rowsShown', { shown: test.rows.length, count: test.matchedCount })}
+          {tc('rowsShown', {
+            shown: test.rows.length,
+            count: test.matchedCount,
+          })}
         </p>
       )}
 

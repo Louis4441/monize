@@ -129,7 +129,6 @@
       "payeeText": "Payee text as received",
       "categoryId": "Category",
       "description": "Description",
-      "memo": "Memo",
       "amount": "Amount (with sign)",
       "absAmount": "Amount (ignoring sign)",
       "currencyCode": "Currency",
@@ -176,7 +175,7 @@
       "currency": "Choose a currency",
       "currencies": "Choose currencies",
       "types": "Choose types",
-      "matchesHint": "Use * for any text, for example *coffee*. Use {capture} to keep the text at that spot for the actions of this rule, for example {example}. A name is lowercase letters and digits, and a pattern can keep up to {max} texts.",
+      "matchesHint": "Use * for any text, for example *coffee*. A pattern without * matches only the whole text. Use {capture} to keep the text at that spot for the actions of this rule, for example {example}. A name is lowercase letters and digits, and a pattern can keep up to {max} texts.",
       "amount": "Amount",
       "from": "From",
       "to": "To",
@@ -279,6 +278,8 @@
         "TOO_MANY_CAPTURES": "A pattern can hold at most 5 captures.",
         "DUPLICATE_CAPTURE": "Each capture name can be used once in a rule.",
         "UNKNOWN_CAPTURE": "The text uses a capture that no condition of this rule defines.",
+        "LOOKS_LIKE_REGEX": "Regular expressions are not supported: | \\ and short bracket classes like [xy] are matched as plain characters, so a pattern written as a regex never matches what was meant. To match one of several texts, add a group of “Any of these” and put one condition in it for each text.",
+        "PATTERN_WITHOUT_WILDCARD": "Without a * this pattern must equal the whole text. Use the operator “is” for the whole text, “contains” for a part of it, or put * around the text, for example *coffee*.",
         "REFERENCE_NOT_FOUND": "An item chosen here no longer exists. Choose another.",
         "NAME_REQUIRED": "Enter a name for the rule.",
         "UNKNOWN": "This part is not valid."
@@ -352,6 +353,8 @@
     "accountsFailed": "Your accounts could not be loaded, so the filters are unavailable.",
     "retry": "Try again",
     "summary": "{matched, plural, one {# transaction would change} other {# transactions would change}} out of {scanned, plural, one {# transaction} other {# transactions}} scanned.",
+    "matchesNone": "This rule matches none of the transactions examined ({scanned}). Check the conditions before saving. A pattern without * matches only the whole text.",
+    "noChange": "{matched} of the {scanned} transactions examined match the rule's conditions, but nothing would change (for example, they already have the value and only-if-empty is on). This is not an error.",
     "truncated": "More transactions matched than the limit allows. Only the newest are included. Raise the limit or narrow the dates to include the rest.",
     "noMatches": {
       "title": "No transactions would change",
@@ -380,6 +383,7 @@
     "change": {
       "category": "Category: {before} → {after}",
       "payee": "Payee: {before} → {after}",
+      "payeeNew": "Payee: {before} → {name} (new)",
       "tagsAdded": "Tags added: {tags}",
       "tagsRemoved": "Tags removed: {tags}",
       "none": "none",

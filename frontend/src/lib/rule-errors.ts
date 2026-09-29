@@ -8,7 +8,7 @@
  * after the node is dropped and the entry lands on the card.
  */
 import { AxiosError } from 'axios';
-import type { RuleDraft } from '@/lib/rule-draft';
+import { draftToPayload, type RuleDraft } from '@/lib/rule-draft';
 import {
   MAX_RULE_DESCRIPTION_TEMPLATE_LENGTH,
   MAX_RULE_PAYEE_TEMPLATE_LENGTH,
@@ -157,18 +157,40 @@ function templateEntries(
   ];
 }
 
+/** The two advice codes of a `matches` pattern: authoring help, not a rule of the language. */
+const AUTHORING_CODES: readonly string[] = ['LOOKS_LIKE_REGEX', 'PATTERN_WITHOUT_WILDCARD'];
+
+/**
+ * Whether the glob-trap advice applies, as the server decides it: to a new
+ * rule, and to an existing one only when the condition differs from the one it
+ * was loaded with (compared as saved, so ids of the editor's nodes do not count).
+ */
+function isAuthoring(draft: RuleDraft, loaded: RuleDraft | null | undefined): boolean {
+  if (!loaded) return true;
+  return JSON.stringify(draftToPayload(draft).condition) !== JSON.stringify(draftToPayload(loaded).condition);
+}
+
 /**
  * The gaps in a draft, as the entries the server would answer with, so they
  * land on the same cards. Only completeness is checked here; the server stays
  * the authority on everything else (bounds, ownership of each id).
+ *
+ * `loaded` is the draft an existing rule was opened with: a stored pattern
+ * that predates the advice (`matches "NETFLIX.COM"`) does not stop its name,
+ * triggers or actions from being saved while its condition is left alone.
  */
-export function draftGaps(draft: RuleDraft): RuleErrorEntry[] {
+export function draftGaps(draft: RuleDraft, loaded?: RuleDraft | null): RuleErrorEntry[] {
   const out: RuleErrorEntry[] = [];
   if (draft.name.trim() === '') out.push({ path: NAME_KEY, code: 'NAME_REQUIRED' });
   const root: EditorGroup = draft.condition;
   conditionEntries(root, 'condition', out);
+  const authoring = isAuthoring(draft, loaded);
   const scan = scanCaptures(root);
-  for (const issue of scan.issues) for (const code of issue.codes) out.push({ path: issue.path, code });
+  for (const issue of scan.issues) {
+    for (const code of issue.codes) {
+      if (authoring || !AUTHORING_CODES.includes(code)) out.push({ path: issue.path, code });
+    }
+  }
   if (draft.actions.length === 0) out.push({ path: ACTIONS_LIST_KEY, code: 'NO_ACTIONS' });
   draft.actions.forEach((action, i) => {
     const path = `actions[${i}]`;

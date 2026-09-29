@@ -129,7 +129,6 @@
       "payeeText": "Văn bản người nhận như đã nhận",
       "categoryId": "Danh mục",
       "description": "Mô tả",
-      "memo": "Ghi chú",
       "amount": "Số tiền (có dấu)",
       "absAmount": "Số tiền (không dấu)",
       "currencyCode": "Tiền tệ",
@@ -176,7 +175,7 @@
       "currency": "Chọn một loại tiền tệ",
       "currencies": "Chọn các loại tiền tệ",
       "types": "Chọn các loại",
-      "matchesHint": "Dùng * cho bất kỳ văn bản nào, ví dụ *cà phê*. Dùng {capture} để giữ văn bản tại vị trí đó cho các hành động của quy tắc này, ví dụ {example}. Tên gồm chữ thường và chữ số, và một mẫu có thể giữ tối đa {max} văn bản.",
+      "matchesHint": "Dùng * cho bất kỳ văn bản nào, ví dụ *cà phê*. Mẫu không có * chỉ khớp với toàn bộ văn bản. Dùng {capture} để giữ văn bản tại vị trí đó cho các hành động của quy tắc này, ví dụ {example}. Tên gồm chữ thường và chữ số, và một mẫu có thể giữ tối đa {max} văn bản.",
       "amount": "Số tiền",
       "from": "Từ",
       "to": "Đến",
@@ -281,7 +280,9 @@
         "INVALID_CAPTURE": "Tên phần bắt giữ gồm chữ thường và chữ số, bắt đầu bằng chữ cái và dài tối đa 20 ký tự.",
         "TOO_MANY_CAPTURES": "Một mẫu có thể chứa tối đa 5 phần bắt giữ.",
         "DUPLICATE_CAPTURE": "Mỗi tên phần bắt giữ chỉ được dùng một lần trong một quy tắc.",
-        "UNKNOWN_CAPTURE": "Văn bản dùng một phần bắt giữ mà không điều kiện nào của quy tắc này định nghĩa."
+        "UNKNOWN_CAPTURE": "Văn bản dùng một phần bắt giữ mà không điều kiện nào của quy tắc này định nghĩa.",
+        "LOOKS_LIKE_REGEX": "Biểu thức chính quy không được hỗ trợ: | \\ và các lớp ngoặc vuông ngắn như [xy] được coi là ký tự thông thường, nên mẫu viết như regex không bao giờ khớp với ý định. Để khớp một trong nhiều văn bản, hãy thêm nhóm “Bất kỳ điều nào sau đây” và đặt vào đó một điều kiện cho mỗi văn bản.",
+        "PATTERN_WITHOUT_WILDCARD": "Không có * thì mẫu này phải bằng toàn bộ văn bản. Dùng toán tử “là” cho toàn bộ văn bản, “chứa” cho một phần, hoặc đặt * quanh văn bản, ví dụ *cà phê*."
       }
     },
     "run": {
@@ -352,6 +353,8 @@
     "accountsFailed": "Không thể tải tài khoản của bạn nên bộ lọc không khả dụng.",
     "retry": "Thử lại",
     "summary": "{matched, plural, other {# giao dịch}} sẽ thay đổi trong số {scanned, plural, other {# giao dịch}} đã kiểm tra.",
+    "matchesNone": "Quy tắc này không khớp với giao dịch nào trong số đã kiểm tra ({scanned}). Hãy kiểm tra các điều kiện trước khi lưu. Mẫu không có * chỉ khớp với toàn bộ văn bản.",
+    "noChange": "{matched} trong số {scanned} giao dịch được kiểm tra khớp với điều kiện của quy tắc, nhưng sẽ không có gì thay đổi (ví dụ: chúng đã có giá trị và «chỉ khi trống» đang bật). Đây không phải là lỗi.",
     "truncated": "Có nhiều giao dịch khớp hơn giới hạn cho phép. Chỉ các giao dịch mới nhất được đưa vào. Hãy tăng giới hạn hoặc thu hẹp ngày để đưa phần còn lại vào.",
     "noMatches": {
       "title": "Không có giao dịch nào sẽ thay đổi",
@@ -380,6 +383,7 @@
     "change": {
       "category": "Danh mục: {before} → {after}",
       "payee": "Người nhận: {before} → {after}",
+      "payeeNew": "Người nhận: {before} → {name} (mới)",
       "tagsAdded": "Thẻ đã thêm: {tags}",
       "tagsRemoved": "Thẻ đã gỡ: {tags}",
       "none": "không có",

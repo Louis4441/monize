@@ -12,7 +12,7 @@ import { RuleErrorList } from '@/components/rules/RuleCardShell';
 import { RuleIfSection } from '@/components/rules/RuleIfSection';
 import { RuleApplications } from '@/components/rules/RuleApplications';
 import { RuleSection } from '@/components/rules/RuleSection';
-import { RuleTestPanel } from '@/components/rules/RuleTestPanel';
+import { RuleTestPanel, type RuleTestOutcome } from '@/components/rules/RuleTestPanel';
 import { RunRuleDialog } from '@/components/rules/RunRuleDialog';
 import { RuleWhenSection } from '@/components/rules/RuleWhenSection';
 import { createTreeHandlers } from '@/components/rules/rule-tree-handlers';
@@ -80,6 +80,7 @@ interface RuleEditorBodyProps {
 export function RuleEditorBody({ rule, lookups, onSaved, onReload }: RuleEditorBodyProps) {
   const t = useTranslations('rules.editor');
   const tc = useTranslations('common');
+  const tr = useTranslations('rules.run');
   const router = useRouter();
   const options = useRuleOptions(lookups);
   const cardActions = useCardActions();
@@ -87,6 +88,8 @@ export function RuleEditorBody({ rule, lookups, onSaved, onReload }: RuleEditorB
 
   const [initial] = useState(() => (rule ? draftFromRule(rule) : { draft: emptyDraft(), repaired: 0 }));
   const [draft, setDraft] = useState<RuleDraft>(initial.draft);
+  // The draft an existing rule was opened with; a new rule has none.
+  const loadedDraft = rule ? initial.draft : null;
   // A repaired definition differs from what is stored, so it is always saveable.
   const [baseline] = useState(() => (initial.repaired > 0 ? null : draftSignature(initial.draft)));
   const [errors, setErrors] = useState<PlacedErrors>(() =>
@@ -97,6 +100,8 @@ export function RuleEditorBody({ rule, lookups, onSaved, onReload }: RuleEditorB
   const [conflict, setConflict] = useState(false);
   const [saving, setSaving] = useState(false);
   const [runOpen, setRunOpen] = useState(false);
+  // The last finished Test, so Save can say that the rule matched nothing (it never blocks).
+  const [testOutcome, setTestOutcome] = useState<RuleTestOutcome | null>(null);
 
   const dirty = baseline === null || draftSignature(draft) !== baseline;
 
@@ -142,7 +147,7 @@ export function RuleEditorBody({ rule, lookups, onSaved, onReload }: RuleEditorB
 
   const save = async () => {
     if (expression.error !== null) return;
-    const gaps = draftGaps(draft);
+    const gaps = draftGaps(draft, loadedDraft);
     if (gaps.length > 0) {
       fail(gaps, null);
       return;
@@ -151,7 +156,10 @@ export function RuleEditorBody({ rule, lookups, onSaved, onReload }: RuleEditorB
     try {
       const payload = draftToPayload(draft);
       if (rule) {
-        const saved = await transactionRulesApi.update(rule.id, { ...payload, revision: rule.revision });
+        const saved = await transactionRulesApi.update(rule.id, {
+          ...payload,
+          revision: rule.revision,
+        });
         toast.success(t('save.savedToast'));
         onSaved(saved);
       } else {
@@ -263,9 +271,25 @@ export function RuleEditorBody({ rule, lookups, onSaved, onReload }: RuleEditorB
           </div>
         </RuleSection>
 
-        <RuleTestPanel draft={draft} accountOptions={options.accounts} blocked={expression.error !== null} />
+        <RuleTestPanel
+          draft={draft}
+          accountOptions={options.accounts}
+          blocked={expression.error !== null}
+          loaded={loadedDraft}
+          ruleId={rule?.id}
+          onResult={setTestOutcome}
+        />
 
         {rule && <RuleApplications ruleId={rule.id} options={options} />}
+
+        {testOutcome &&
+          !testOutcome.stale &&
+          testOutcome.conditionMatched === 0 &&
+          testOutcome.scanned > 0 && (
+            <p role="status" className="text-sm text-amber-700 dark:text-amber-400 sm:text-right">
+              {tr('matchesNone', { scanned: testOutcome.scanned })}
+            </p>
+          )}
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
           {rule && (

@@ -129,7 +129,6 @@
       "payeeText": "Texto del beneficiario tal como llegó",
       "categoryId": "Categoría",
       "description": "Descripción",
-      "memo": "Nota",
       "amount": "Importe (con signo)",
       "absAmount": "Importe (sin signo)",
       "currencyCode": "Moneda",
@@ -176,7 +175,7 @@
       "currency": "Elige una moneda",
       "currencies": "Elige monedas",
       "types": "Elige tipos",
-      "matchesHint": "Usa * para cualquier texto, por ejemplo *café*. Usa {capture} para conservar el texto de ese lugar para las acciones de esta regla, por ejemplo {example}. Un nombre son letras minúsculas y dígitos, y un patrón puede conservar hasta {max} textos.",
+      "matchesHint": "Usa * para cualquier texto, por ejemplo *café*. Un patrón sin * solo coincide con el texto completo. Usa {capture} para conservar el texto de ese lugar para las acciones de esta regla, por ejemplo {example}. Un nombre son letras minúsculas y dígitos, y un patrón puede conservar hasta {max} textos.",
       "amount": "Importe",
       "from": "Desde",
       "to": "Hasta",
@@ -281,7 +280,9 @@
         "INVALID_CAPTURE": "El nombre de una captura usa letras minúsculas y dígitos, empieza por una letra y tiene como máximo 20 caracteres.",
         "TOO_MANY_CAPTURES": "Un patrón puede contener como máximo 5 capturas.",
         "DUPLICATE_CAPTURE": "Cada nombre de captura solo puede usarse una vez en una regla.",
-        "UNKNOWN_CAPTURE": "El texto usa una captura que ninguna condición de esta regla define."
+        "UNKNOWN_CAPTURE": "El texto usa una captura que ninguna condición de esta regla define.",
+        "LOOKS_LIKE_REGEX": "No se admiten las expresiones regulares: | \\ y las clases cortas entre corchetes como [xy] se tratan como caracteres normales, así que un patrón escrito como regex nunca coincide con lo que se pretendía. Para coincidir con uno de varios textos, añade un grupo «Cualquiera de estas» y pon en él una condición para cada texto.",
+        "PATTERN_WITHOUT_WILDCARD": "Sin * este patrón debe ser igual a todo el texto. Usa el operador «es» para el texto completo, «contiene» para una parte, o pon * alrededor del texto, por ejemplo *café*."
       }
     },
     "run": {
@@ -352,6 +353,8 @@
     "accountsFailed": "No se pudieron cargar tus cuentas, así que los filtros no están disponibles.",
     "retry": "Intentar de nuevo",
     "summary": "{matched, plural, one {# transacción cambiaría} other {# transacciones cambiarían}} de {scanned, plural, one {# transacción analizada} other {# transacciones analizadas}}.",
+    "matchesNone": "Esta regla no coincide con ninguna de las transacciones analizadas ({scanned}). Revisa las condiciones antes de guardar. Un patrón sin * solo coincide con el texto completo.",
+    "noChange": "{matched} de las {scanned} transacciones examinadas cumplen las condiciones de la regla, pero no cambiaría nada (por ejemplo, porque ya tienen el valor y «solo si está vacío» está activado). No es un error.",
     "truncated": "Coinciden más transacciones de las que permite el límite. Solo se incluyen las más recientes. Sube el límite o acota las fechas para incluir el resto.",
     "noMatches": {
       "title": "Ninguna transacción cambiaría",
@@ -380,6 +383,7 @@
     "change": {
       "category": "Categoría: {before} → {after}",
       "payee": "Beneficiario: {before} → {after}",
+      "payeeNew": "Beneficiario: {before} → {name} (nuevo)",
       "tagsAdded": "Etiquetas añadidas: {tags}",
       "tagsRemoved": "Etiquetas quitadas: {tags}",
       "none": "ninguna",

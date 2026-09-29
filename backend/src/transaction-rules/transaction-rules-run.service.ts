@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
 } from "@nestjs/common";
+import { isDeepStrictEqual } from "node:util";
 import { DataSource, EntityManager } from "typeorm";
 import {
   ActionHistoryService,
@@ -92,20 +93,40 @@ export class TransactionRulesRunService {
     });
   }
 
-  /** The same for an unsaved draft, validated exactly like a create. Writes nothing. */
+  /**
+   * The same for an unsaved draft, validated exactly like a create. Writes
+   * nothing. `authoring: false` skips the glob-trap advice, for a draft that
+   * is a stored rule whose condition an update leaves alone.
+   *
+   * With `dto.ruleId` the stored rule is loaded for the caller in the same
+   * transaction (404 when missing or foreign) and the advice is skipped only
+   * when the draft condition equals the stored one, the comparison an update
+   * makes; an explicit `options.authoring` wins.
+   */
   async previewDraft(
     userId: string,
     dto: PreviewDraftRuleDto,
+    options: { authoring?: boolean } = {},
   ): Promise<RuleRunPreview> {
     const filters = dto.filters ?? {};
     this.assertRange(filters);
     return withScopedDb(this.dataSource, async (m) => {
+      let authoring = options.authoring ?? true;
+      if (dto.ruleId !== undefined && options.authoring === undefined) {
+        const stored = await this.rulesService.getOwnedRule(
+          m,
+          userId,
+          dto.ruleId,
+        );
+        authoring = !isDeepStrictEqual(dto.condition, stored.condition);
+      }
       const definition: RuleDefinition =
         await this.rulesService.checkedDefinition(
           m,
           userId,
           dto.condition,
           dto.actions,
+          authoring,
         );
       const draft: RunRule = {
         id: "draft",
@@ -343,6 +364,7 @@ export class TransactionRulesRunService {
     // Payee names looked up for this preview or commit; nothing is created here.
     const payeeLookups = new Map<string, PayeeResolution | null>();
     const changing: PlannedUnit[] = [];
+    let conditionMatchedCount = 0;
     const asking: PlannedUnit[] = [];
     for (const unit of units) {
       const { primary } = unit;
@@ -373,6 +395,7 @@ export class TransactionRulesRunService {
         payeeLookups,
       );
       const entry = effects.trace[0];
+      if (entry?.matched) conditionMatchedCount += 1;
       for (const refused of entry?.skipped ?? []) {
         const reason = REFUSAL_REASONS[refused.reason];
         if (reason) skipped.push({ transactionId: primary.id, reason });
@@ -430,6 +453,7 @@ export class TransactionRulesRunService {
         matched,
         skipped,
         scanned: units.length,
+        conditionMatchedCount,
         truncated,
         fingerprint: planFingerprint(
           rule.revision,

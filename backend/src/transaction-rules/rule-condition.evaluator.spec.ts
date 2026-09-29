@@ -28,7 +28,6 @@ function facts(overrides: Partial<RuleFacts> = {}): RuleFacts {
     categoryId: C_LEAF,
     categoryAncestorIds: [C_LEAF, C_ROOT],
     description: "Zakupy",
-    memo: null,
     amount: -1000000,
     currencyCode: "PLN",
     tagIds: [T1, T2],
@@ -196,31 +195,48 @@ describe("evaluateRuleCondition: text fields", () => {
 
   it("matches is false beyond the alias matcher length limit", () => {
     const long = "a".repeat(501);
-    expect(ev(leaf("memo", "matches", "*"), facts({ memo: long }))).toBe(false);
-    expect(ev(leaf("memo", "matches", long), facts({ memo: "a" }))).toBe(false);
+    expect(
+      ev(
+        leaf("referenceNumber", "matches", "*"),
+        facts({ referenceNumber: long }),
+      ),
+    ).toBe(false);
+    expect(
+      ev(
+        leaf("referenceNumber", "matches", long),
+        facts({ referenceNumber: "a" }),
+      ),
+    ).toBe(false);
   });
 
   it("isEmpty is true for null and blank, false for text", () => {
-    expect(ev(leaf("memo", "isEmpty"))).toBe(true);
-    expect(ev(leaf("memo", "isEmpty"), facts({ memo: "   " }))).toBe(true);
-    expect(ev(leaf("memo", "isEmpty"), facts({ memo: "x" }))).toBe(false);
+    expect(ev(leaf("referenceNumber", "isEmpty"))).toBe(true);
+    expect(
+      ev(leaf("referenceNumber", "isEmpty"), facts({ referenceNumber: "   " })),
+    ).toBe(true);
+    expect(
+      ev(leaf("referenceNumber", "isEmpty"), facts({ referenceNumber: "x" })),
+    ).toBe(false);
   });
 
   it("an unknown text fact is false for every operator except isEmpty", () => {
     for (const op of ["eq", "contains", "startsWith", "matches"] as const) {
-      expect(ev(leaf("memo", op, "x"))).toBe(false);
-      expect(ev(leaf("memo", op, "*"))).toBe(false);
+      expect(ev(leaf("referenceNumber", op, "x"))).toBe(false);
+      expect(ev(leaf("referenceNumber", op, "*"))).toBe(false);
     }
   });
 
   it("a non-string value or an unsupported op matches nothing", () => {
     expect(
-      ev({ field: "memo", op: "eq", value: 5 } as never, facts({ memo: "5" })),
+      ev(
+        { field: "referenceNumber", op: "eq", value: 5 } as never,
+        facts({ referenceNumber: "5" }),
+      ),
     ).toBe(false);
     expect(
       ev(
-        { field: "memo", op: "lt", value: "x" } as never,
-        facts({ memo: "a" }),
+        { field: "referenceNumber", op: "lt", value: "x" } as never,
+        facts({ referenceNumber: "a" }),
       ),
     ).toBe(false);
   });

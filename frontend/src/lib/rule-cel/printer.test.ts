@@ -18,7 +18,7 @@ describe('printCondition', () => {
   });
 
   it.each([
-    [leaf('memo', 'eq', 'a'), 'transaction.memo == "a"'],
+    [leaf('referenceNumber', 'eq', 'a'), 'transaction.referenceNumber == "a"'],
     [leaf('amount', 'lt', 5), 'transaction.amount < 5'],
     [leaf('amount', 'lte', 5), 'transaction.amount <= 5'],
     [leaf('amount', 'gt', -5.5), 'transaction.amount > -5.5'],
@@ -26,9 +26,9 @@ describe('printCondition', () => {
     [leaf('accountId', 'neq', 'acc-2'), 'transaction.accountId != account("RRSP")'],
     [leaf('type', 'in', ['EXPENSE', 'INCOME']), 'transaction.type in ["EXPENSE", "INCOME"]'],
     [leaf('accountId', 'notIn', ['acc-2']), '!(transaction.accountId in [account("RRSP")])'],
-    [leaf('memo', 'contains', 'x'), 'transaction.memo.contains("x")'],
-    [leaf('memo', 'startsWith', 'x'), 'transaction.memo.startsWith("x")'],
-    [leaf('memo', 'matches', 'x*'), 'transaction.memo.matchesGlob("x*")'],
+    [leaf('referenceNumber', 'contains', 'x'), 'transaction.referenceNumber.contains("x")'],
+    [leaf('referenceNumber', 'startsWith', 'x'), 'transaction.referenceNumber.startsWith("x")'],
+    [leaf('referenceNumber', 'matches', 'x*'), 'transaction.referenceNumber.matchesGlob("x*")'],
     [leaf('absAmount', 'between', [1, 2]), 'transaction.absAmount.between(1, 2)'],
     [leaf('payeeId', 'isEmpty'), 'isEmpty(transaction.payeeId)'],
     [leaf('categoryId', 'inSubtree', 'cat-1'), 'transaction.categoryId.inSubtree(category("Food"))'],
@@ -42,40 +42,46 @@ describe('printCondition', () => {
   });
 
   it('prints a group by its size and kind', () => {
-    const a = leaf('memo', 'eq', 'a');
-    const b = leaf('memo', 'eq', 'b');
+    const a = leaf('referenceNumber', 'eq', 'a');
+    const b = leaf('referenceNumber', 'eq', 'b');
     expect(print(group('all'))).toBe('true');
     expect(print(group('any'))).toBe('false');
-    expect(print(group('any', [a]))).toBe('any(transaction.memo == "a")');
-    expect(print(group('all', [group('any', [a, b])]))).toBe('all(transaction.memo == "a" || transaction.memo == "b")');
-    expect(print(group('any', [a, b]))).toBe('transaction.memo == "a" || transaction.memo == "b"');
+    expect(print(group('any', [a]))).toBe('any(transaction.referenceNumber == "a")');
+    expect(print(group('all', [group('any', [a, b])]))).toBe(
+      'all(transaction.referenceNumber == "a" || transaction.referenceNumber == "b")',
+    );
+    expect(print(group('any', [a, b]))).toBe('transaction.referenceNumber == "a" || transaction.referenceNumber == "b"');
   });
 
   it('parenthesises a group inside another, and keeps a negated one self-delimited', () => {
-    const a = leaf('memo', 'eq', 'a');
-    const b = leaf('memo', 'eq', 'b');
+    const a = leaf('referenceNumber', 'eq', 'a');
+    const b = leaf('referenceNumber', 'eq', 'b');
     expect(print(group('all', [a, group('all', [a, b])]))).toBe(
-      'transaction.memo == "a" && (transaction.memo == "a" && transaction.memo == "b")',
+      'transaction.referenceNumber == "a" && (transaction.referenceNumber == "a" && transaction.referenceNumber == "b")',
     );
     expect(print(group('any', [a, group('any', [a, b], true)]))).toBe(
-      'transaction.memo == "a" || !(transaction.memo == "a" || transaction.memo == "b")',
+      'transaction.referenceNumber == "a" || !(transaction.referenceNumber == "a" || transaction.referenceNumber == "b")',
     );
-    expect(print(group('all', [a, group('all')]))).toBe('transaction.memo == "a" && true');
+    expect(print(group('all', [a, group('all')]))).toBe('transaction.referenceNumber == "a" && true');
   });
 
   it('prints a negated root and never a negated bare condition', () => {
-    const a = leaf('memo', 'eq', 'a');
+    const a = leaf('referenceNumber', 'eq', 'a');
     const inLeaf = leaf('accountId', 'in', ['acc-2']);
-    expect(print(group('all', [a], true))).toBe('!(all(transaction.memo == "a"))');
+    expect(print(group('all', [a], true))).toBe('!(all(transaction.referenceNumber == "a"))');
     expect(print(group('all', [inLeaf], true))).toBe('!(all(transaction.accountId in [account("RRSP")]))');
-    expect(print(group('any', [a, a], true))).toBe('!(transaction.memo == "a" || transaction.memo == "a")');
+    expect(print(group('any', [a, a], true))).toBe('!(transaction.referenceNumber == "a" || transaction.referenceNumber == "a")');
     expect(print(group('all', [], true))).toBe('!(true)');
   });
 
   it('writes a root that holds a group, and a root of one negated group, unambiguously', () => {
-    const a = leaf('memo', 'eq', 'a');
-    expect(print(group('all', [group('all', [a, a])]))).toBe('all(transaction.memo == "a" && transaction.memo == "a")');
-    expect(print(group('all', [group('all', [a, a], true)]))).toBe('all(!(transaction.memo == "a" && transaction.memo == "a"))');
+    const a = leaf('referenceNumber', 'eq', 'a');
+    expect(print(group('all', [group('all', [a, a])]))).toBe(
+      'all(transaction.referenceNumber == "a" && transaction.referenceNumber == "a")',
+    );
+    expect(print(group('all', [group('all', [a, a], true)]))).toBe(
+      'all(!(transaction.referenceNumber == "a" && transaction.referenceNumber == "a"))',
+    );
   });
 
   it('never shows an id, and writes a shared name with its number', () => {
@@ -90,8 +96,8 @@ describe('printCondition', () => {
 
   it('escapes quotes, backslashes and control characters', () => {
     expect(print(group('all', [leaf('accountId', 'eq', 'acc-4')]))).toBe('transaction.accountId == account("Say \\"hi\\" \\\\ there")');
-    expect(print(group('all', [leaf('memo', 'eq', 'a\nb\t\u0001')]))).toBe('transaction.memo == "a\\nb\\t\\u0001"');
-    expect(print(group('all', [leaf('memo', 'eq', 'a\rb\u007f')]))).toBe('transaction.memo == "a\\rb\\u007f"');
+    expect(print(group('all', [leaf('referenceNumber', 'eq', 'a\nb\t\u0001')]))).toBe('transaction.referenceNumber == "a\\nb\\t\\u0001"');
+    expect(print(group('all', [leaf('referenceNumber', 'eq', 'a\rb\u007f')]))).toBe('transaction.referenceNumber == "a\\rb\\u007f"');
   });
 
   it('writes an item that no longer exists as missing(), the only place an id appears', () => {
