@@ -74,6 +74,7 @@ implied.
 | INV-PRICE-001 | A stored price is in the currency the security is recorded in | partial |
 | INV-PORTRESULT-001 | A period change is not a return: value change, external flows and investment result are three figures | enforced |
 | INV-PORTRESULT-002 | Cash is not an investment: the invested part's P&L and TWR exclude deposits, withdrawals and idle cash | enforced |
+| INV-PORTCHART-001 | A portfolio chart opens and closes on the closes its figures are measured between | enforced |
 | INV-INTRADAY-001 | An intraday bar is valued at its own day's positions, and a finished session closes on the daily series' figure | enforced |
 | INV-REPORT-001 | A report's account scope is investment linkage, not account type | enforced |
 | INV-REPORT-002 | A chart's down-sampling never reaches a count, a total or an export | enforced |
@@ -1090,11 +1091,12 @@ Enforcement         decidePeriodResult
                     valuation instead of recomputing it, and the spec's
                     section 8 holds the two routes to identical answers.
                     PortfolioValueReport, PortfolioValueWidget and
-                    InvestmentValueChart print the account-level figures beside
-                    their own headline and derive nothing; the client-side
+                    InvestmentValueChart derive nothing; the client-side
                     arithmetic they used to share is deleted rather than left
-                    exported. What they lead with is the INVESTED part
-                    (INV-PORTRESULT-002), which the same payload carries.
+                    exported. They plot, lead with and explain the INVESTED
+                    part (INV-PORTRESULT-002), which the same payload carries,
+                    so the account-level figures are read by the notification
+                    and the calendar rather than printed beside a chart.
                     docs/specs/portfolio-period-result.md has the
                     truth table, the numerical examples and the test matrix.
 Status              enforced
@@ -1109,8 +1111,9 @@ report's per-account investment performance reads the same measure through
 `PortfolioPeriodResultService.getPeriodResult` (the `1y` window to the report
 month's end, one account per call). None of them derives a figure of its own. Which of the payload's two measures each one leads with is
 INV-PORTRESULT-002 below and `docs/specs/portfolio-period-result.md` section
-10.7: the four investment surfaces lead with the invested part and name the
-account-level value change and net external flows beside it, while the daily
+10.7: the four investment surfaces lead with the invested part and explain it
+with the invested value change, net invested capital and income beside it --
+the three that add up to it -- while the daily
 movement notification and the calendar's day layer report the account-level
 measure, which is the question they ask. The dashboard's Net Worth chart is not
 one of these surfaces -- it reports what a person is worth rather than what a
@@ -1146,7 +1149,13 @@ Statement           A figure captioned as what a portfolio's INVESTMENTS earned,
                     capital or income row did not convert, or the window holds a
                     movement the flow classifier cannot count. A window in which
                     nothing was ever invested and nothing was earned is a known
-                    zero, not unknown.
+                    zero, not unknown. The value change printed beside such a
+                    figure is the same measure's, investedValueChange =
+                    IV(e) - IV(b), and reconciles with it exactly:
+                    investedValueChange - capital flows + income = the P&L.
+                    It is two-ended, known whenever both boundary days are,
+                    and computed on the server rather than subtracted by a
+                    client.
 Source of truth     The securitiesValue component of
                     NetWorthService.getDailyInvestments -- the same replay and
                     the same accepted closes the whole value uses, with the cash
@@ -1221,6 +1230,49 @@ figure moves when they pay cash in without buying anything. The invested
 measure is the answer to the question the caption asks, and the account-level
 measure -- which is the right answer to a different question -- keeps its own
 fields, its own caption and its own consumers.
+
+### INV-PORTCHART-001 -- a portfolio chart opens and closes on its figures' closes
+
+```text
+Statement           A portfolio value chart that prints figures measured
+                    between two closes draws a line whose first point is the
+                    first of those closes and whose last point is the second,
+                    on every range, so the value change printed beside it is
+                    the line's last point less its first. A range drawn at one
+                    point a month is the daily valuation sampled at the
+                    window's first day, each month-end inside it and its last
+                    day -- never stored month-end snapshots, whose first bucket
+                    is the end of the starting month, and never a daily point
+                    spliced onto them. An open-ended window opens where the
+                    period result's all window does: the day before the
+                    scope's first investment transaction.
+Source of truth     NetWorthService.getDailyInvestments (the daily fold) and
+                    monthEndSampleDates
+                    (backend/src/net-worth/series-dates.util.ts);
+                    loadFirstInvestmentDate
+                    (backend/src/net-worth/investment-inception.util.ts) for
+                    where all time opens, shared with the period result.
+Enforcement         NetWorthService.getSampledInvestments behind
+                    GET /net-worth/investments-daily?sampling=monthEnd and the
+                    monthEnd granularity of getInvestmentBreakdown; the
+                    service spec holds the sampled points equal to the daily
+                    series' on the same days, its first and last included, and
+                    the all-time start to the day before the first investment
+                    transaction. PortfolioValueReport, InvestmentValueChart and
+                    PortfolioValueWidget request those for every non-daily
+                    range, and their tests hold the call and the opening label.
+                    docs/time-series-contract.md section 2.7 and
+                    docs/specs/portfolio-period-result.md section 10.9.
+Status              enforced for the three portfolio value surfaces. The
+                    investments-monthly route and the monthly breakdown
+                    granularity remain on the API with no portfolio chart
+                    calling them.
+```
+
+The figures and the line were each right on their own and wrong together: the
+figures were measured from the period's own start, and a long range's line
+opened on the end of the starting month. A reader subtracting the first point
+from the last got a number that matched nothing on the page.
 
 ### INV-INTRADAY-001 -- an intraday bar holds what its own day held
 

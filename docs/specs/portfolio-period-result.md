@@ -469,6 +469,20 @@ currency.
 - **`investmentPnl(b, e) = IV(e) - IV(b) - sum K(d) + sum I(d)`** over
   `d` in `(b, e]`. The lower bound is exclusive for the same reason section 2
   gives: `IV(b)` is a close and already holds everything dated `b`.
+- **`investedValueChange(b, e) = IV(e) - IV(b)`** -- what the securities are
+  worth at the end less what they were worth at the start: the last point an
+  investment chart draws less its first (section 10.9). It is the invested
+  part's counterpart of the account-level `valueChange`, and the P&L is made of
+  it exactly:
+
+  ```
+  investmentPnl = investedValueChange - investmentCapitalFlows + investmentIncome
+  ```
+
+  where `investmentCapitalFlows = sum K(d)` and `investmentIncome = sum I(d)`
+  over the same days. A surface that prints the three beside the result
+  therefore prints figures that add up, which the account-level
+  `valueChange` / `netExternalFlows` pair beside an invested result did not.
 - **`investmentReturnPercent(b, e)`** -- a true time-weighted return, chained
   daily over `(b, e]`:
 
@@ -530,6 +544,14 @@ measure for the window since inception.
   cannot count (section 6.1: `externallySettledTrade`, `mixedSplit`). Never a
   chain over a subtotal -- the rule `calculateTWR` already keeps for its own FX
   gaps. Every read is `=== false`.
+- **`investedValueChange` is two-ended.** It is a difference of two closes, not
+  a chain, so it is known whenever `IV(b)` and `IV(e)` are both complete: a
+  subtotal on a day between them, a flow that did not convert or an uncountable
+  movement withholds the P&L and the return but not this, exactly as the same
+  causes leave the account-level `valueChange` standing. It is computed on the
+  server beside the P&L, never by a client subtracting `investedValueEnd` from
+  `investedValueStart`: those two are nulled with the rest of a withheld
+  decision, so a client difference would be unknown where the change is known.
 
 `cashComplete` is deliberately NOT read: cash enters `IV` nowhere, so a cash
 account with no balance for a day cannot make the invested figures wrong. It
@@ -542,17 +564,17 @@ securities-only bit is a field nobody needs yet.
 
 ### 10.4 Truth table
 
-| IV(b) | IV(e) | any day in (b,e] | flows/income | base(d) > 0 on some day | investmentPnl | investmentReturnPercent | investedReasons |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| complete | complete | all complete | complete | yes | number | number | -- |
-| complete | complete | all complete | complete | no, and pnl = 0 | `0` | `0` | -- |
-| complete | complete | all complete | complete | no, and pnl != 0 | number | `null` | `zeroStart` |
-| subtotal | any | any | any | any | `null` | `null` | that point's causes |
-| any | subtotal | any | any | any | `null` | `null` | that point's causes |
-| complete | complete | one is a subtotal | any | any | `null` | `null` | that point's causes |
-| complete | complete | all complete | a row did not convert | any | `null` | `null` | `missingRatePairs` |
-| complete | complete | all complete | complete, but a movement is uncountable | any | `null` | `null` | `externallySettledTrade`, `mixedSplit` |
-| no series | -- | -- | -- | -- | `null` | `null` | `noValueSeries` |
+| IV(b) | IV(e) | any day in (b,e] | flows/income | base(d) > 0 on some day | investedValueChange | investmentPnl | investmentReturnPercent | investedReasons |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| complete | complete | all complete | complete | yes | number | number | number | -- |
+| complete | complete | all complete | complete | no, and pnl = 0 | number | `0` | `0` | -- |
+| complete | complete | all complete | complete | no, and pnl != 0 | number | number | `null` | `zeroStart` |
+| subtotal | any | any | any | any | `null` | `null` | `null` | that point's causes |
+| any | subtotal | any | any | any | `null` | `null` | `null` | that point's causes |
+| complete | complete | one is a subtotal | any | any | number | `null` | `null` | that point's causes |
+| complete | complete | all complete | a row did not convert | any | number | `null` | `null` | `missingRatePairs` |
+| complete | complete | all complete | complete, but a movement is uncountable | any | number | `null` | `null` | `externallySettledTrade`, `mixedSplit` |
+| no series | -- | -- | -- | -- | `null` | `null` | `null` | `noValueSeries` |
 
 `investmentCapitalFlows` and `investmentIncome` are reported as numbers
 whenever the conversion of the rows behind them succeeded, even where the
@@ -622,6 +644,12 @@ Flat prices unless stated; reporting currency = account currency unless stated.
     `missingRatePairs` and the ids or pairs behind them. Never a number that
     looks like the others.
 
+In every case above that reports a P&L, `investedValueChange -
+investmentCapitalFlows + investmentIncome = investmentPnl` to the cent. Case 4
+is the one that shows why the surfaces print `investedValueChange` rather than
+`valueChange`: the account moved by 50,800, the securities line by 800, and only
+the second is the chart's change.
+
 ### 10.6 Missing-data policy
 
 As section 6, applied to the new figures: `null` with a named reason, never a
@@ -670,9 +698,9 @@ days, O(days).
 | --- | --- | --- |
 | "Portfolio performance" card (Investments) | -- | `investmentReturnPercent` primary, `investmentPnl` secondary |
 | Portfolio summary card's "TWR (time-weighted)" | -- | `investmentReturnPercent` since inception |
-| "Portfolio value over time" chart (Investments) | `securitiesValue` | `investmentPnl`, `investmentReturnPercent` |
-| Portfolio value widget (dashboard) | `securitiesValue` | `investmentPnl`, `investmentReturnPercent` |
-| Portfolio Value report | `securitiesValue` | `investmentPnl`, `investmentReturnPercent` |
+| "Portfolio value over time" chart (Investments) | `securitiesValue` | "Value Change" `investedValueChange`, `investmentPnl` with `investmentCapitalFlows` and `investmentIncome` beneath, `investmentReturnPercent` |
+| Portfolio value widget (dashboard) | `securitiesValue` | `investmentPnl`, `investmentReturnPercent`; its tooltip names `investedValueChange`, `investmentCapitalFlows`, `investmentIncome` |
+| Portfolio Value report | `securitiesValue` | "Value Change" `investedValueChange`, "Net Invested" `investmentCapitalFlows` with `investmentIncome` beneath, `investmentPnl`, `investmentReturnPercent` |
 | Monthly Comparison report, per-account performance | -- | `investmentReturnPercent` over `1y` to the report month's end, per brokerage account |
 | Net worth chart (dashboard) | net worth, cash included | unchanged |
 | Daily movement notification, calendar day layer | `value` | `valueChange`, `netExternalFlows`, `investmentResult` |
@@ -721,7 +749,13 @@ measure and keep their own captions: `totalGainLossPercent` ("Simple Return")
 and `cagr` are cost-basis measures, not returns over time.
 
 The investment surfaces draw the INVESTED value, so the chart, its KPIs and the
-card answer one question rather than three. `value` (securities plus cash) stays
+card answer one question rather than three. The figures that explain the result
+are the invested part's too: the value change printed beside a chart is its own
+line's (`investedValueChange`), and what separates it from the result is the
+capital paid into the securities and the income they paid out, not the cash the
+reader deposited. They printed the account-level `valueChange` and
+`netExternalFlows` until the reader found that the "Value Change" under a chart
+matched neither the line nor the result beside it. `value` (securities plus cash) stays
 on the point and the account-level fields stay on the period result: the daily
 movement notification and the calendar layer measure the account, and the net
 worth chart is net worth. Nothing that is about the account loses its cash.
@@ -740,6 +774,9 @@ Backend unit:
 | --- | --- |
 | `invested-period-result.util.spec.ts` | the twelve cases above, table-driven, each with its worked numbers |
 | `invested-period-result.util.spec.ts` | a mid-window subtotal day withholds both figures; a flow that did not convert withholds both; an uncountable movement withholds both |
+| `invested-period-result.util.spec.ts` | `investedValueChange` reconciles with the P&L across the cases; it stands through an interior gap, an unconverted flow and an uncountable movement; it is `null` for a subtotal at either end and for no series; `cashComplete` does not withhold it |
+| `series-dates.util.spec.ts` | `monthEndSampleDates`: a mid-month start, a start on the 1st and on a month-end, an end on a month-end, a leap February, one day, a reversed window |
+| `net-worth.service.spec.ts` | the sampled series' points equal the daily series' on the same days, its first and last included; 'all' opens on the day before the first investment transaction; a `monthEnd` breakdown values its first point on the start day, before a purchase later that month |
 | `twr-chain.util.spec.ts` | `subPeriodFactor` refuses a non-positive base; `chainTwrPercent` over an empty chain is `null` |
 | `invested-capital-flow.util.spec.ts` | the SQL binds every placeholder it names and no other; the fold splits capital from income by the shared constant and converts each day at its own rate |
 | `investment-replay.util.spec.ts` | `INVESTED_FLOW_KIND` covers every `InvestmentAction` member (a list that means something, checked against the enum) |
@@ -766,6 +803,34 @@ deposit.
 The adversarial case, per `docs/financial-calculation-contract.md` section 8:
 case 4. A `totalValue - cash` patch at the two ends passes cases 1-4 and fails
 5, 6, 7 and 9.
+
+### 10.9 A chart's boundaries are its figures' boundaries
+
+INV-PORTCHART-001. The Investments chart, the Portfolio Value report and the
+dashboard widget each draw a line and print, beside it, figures measured
+between two closes. The line opens on the first of those closes and ends on the
+second, on every range:
+
+- **Daily ranges** request the series from the day the period is measured from
+  (`usePortfolioRangeWindow`'s `start`, mirroring
+  `portfolio-period-presets.util.ts`), so the first point IS `IV(b)`.
+- **Long ranges** (the report's 6M, 2Y, 5Y and All, the chart's 5Y and All, the
+  widget's 1Y and longer, and a custom report window over a year) are the same
+  daily valuation sampled at month-ends
+  (`sampling: 'monthEnd'` on `investments-daily`, `granularity: 'monthEnd'` on
+  `investments-breakdown`; `docs/time-series-contract.md` section 2.7). Their
+  first point is the start day's valuation and their last the end day's. They
+  drew the stored month-end snapshots until this section: the first point was
+  the end of the starting month -- or a cost-basis stand-in for an account's
+  first month -- so the line and the figures opened on different days.
+- **All** opens on the day before the scope's first investment transaction,
+  where the period result's `all` window does (`loadFirstInvestmentDate`, one
+  spelling of "when did this portfolio start" for both).
+
+The opening point is labelled by the session its close came from
+(`openingSessionDate`), on sampled ranges as on daily ones, so it reads as the
+previous market close the caption names. The consequence the reader can check:
+last point less first point is `investedValueChange`, to the cent.
 
 ---
 

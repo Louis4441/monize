@@ -290,6 +290,36 @@ opening balance is already carried; a row that was never produced says nothing
 at all. `series-dates.guard.spec.ts` scans `backend/src/net-worth/` for both
 shapes.
 
+### 2.7 A coarser chart samples the fine series and keeps its boundaries
+
+A chart drawn at a coarser resolution than the figures beside it -- a
+long-range portfolio chart at one point a month -- is the fine series
+**sampled**, not a second series. Its points are days of the same daily
+valuation (the same replay, the same accepted close, the same rate index and the
+same completeness flags), taken on the window's first day, each month-end
+strictly inside it, and its last day (`monthEndSampleDates`,
+`backend/src/net-worth/series-dates.util.ts`).
+
+Two rules follow, and each closes a way the chart and its figures disagreed:
+
+- **The boundaries are the window's, not the buckets'.** The first point is the
+  close the period figures are measured from and the last is the one they are
+  measured to, so the figure captioned as the chart's change IS its last point
+  less its first. A series of stored month-end snapshots opens on the end of the
+  starting month instead -- up to a month after the period does, holding
+  whatever happened in between -- and its first bucket can be a cost-basis
+  stand-in rather than a value at all.
+- **Nothing is spliced.** Prepending one daily point to a stored monthly series
+  puts two valuation paths into one line, which is the sampling splice section
+  1.2 exists to stop. Sample the daily fold instead; the stored snapshots stay
+  what the net-worth report reads.
+
+The portfolio routes that take `sampling: 'monthEnd'` (`investments-daily`) and
+`granularity: 'monthEnd'` (`investments-breakdown`) implement this; an
+open-ended ("all time") sample opens where the period result's `all` window
+does, the day before the scope's first investment transaction
+(`loadFirstInvestmentDate`). INV-PORTCHART-001.
+
 ## 3. Missing returns are never zero
 
 - A period with no usable prices has `return: null`. Never `0`.
