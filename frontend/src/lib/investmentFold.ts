@@ -1,6 +1,7 @@
 /**
- * The two share-price conversions the scheduled-investment dialogs share: given
- * a price, derive the total from a quantity, or the quantity from a total. Kept
+ * The share-price conversions the scheduled-investment dialogs share: given a
+ * price, derive the total from a quantity or the quantity from a total; given a
+ * quantity and a total, derive the price. Kept
  * in one place so the post dialog and the override editor cannot drift on the
  * rounding scale or the signed commission -- only on *which* of the two they
  * choose to run, which is a per-surface decision (see each call site) and is
@@ -63,4 +64,20 @@ export function quantityFromTotal(
   const cost = total - sign * commission;
   const qty = Math.max(0, cost / price);
   return Math.round(qty * 100_000_000) / 100_000_000;
+}
+
+/**
+ * Per-share price that `quantity` shares cost for `total` once the commission is
+ * backed out, never negative, at price precision (6dp). A non-positive quantity
+ * yields 0 rather than a division blow-up; callers gate on `quantity > 0`.
+ */
+export function priceFromTotal(
+  total: number,
+  quantity: number,
+  sign: number,
+  commission: number,
+): number {
+  if (!(quantity > 0)) return 0;
+  const cost = total - sign * commission;
+  return roundPrice(Math.max(0, cost / quantity));
 }
