@@ -634,16 +634,6 @@ const INTRADAY_CACHE_TTL_MS = 60_000;
 export class PortfolioService {
   private readonly logger = new Logger(PortfolioService.name);
   private readonly intradayCache = new Map<string, IntradayCacheEntry>();
-  /**
-   * The provider's bars per symbol, interval and range, for the same minute
-   * the computed series is kept: MTD and 1M are served from the same month of
-   * bars, and a reader flipping between them must not fetch every holding
-   * twice.
-   */
-  private readonly intradayBarsCache = new Map<
-    string,
-    { expiresAt: number; points: IntradayPoint[] }
-  >();
 
   constructor(
     private dataSource: DataSource,
@@ -2438,25 +2428,13 @@ export class PortfolioService {
         // as a failure when the primary interval is spotty.
         let points: IntradayPoint[] | null = null;
         for (const params of intervalCandidates) {
-          const barsKey = `${h.symbol}|${h.exchange ?? ""}|${params.interval}|${params.range}`;
-          const cachedBars = this.intradayBarsCache.get(barsKey);
-          if (cachedBars && cachedBars.expiresAt > now) {
-            points = cachedBars.points;
-            break;
-          }
           try {
             points = await this.yahooFinanceService.fetchIntradaySeries(
               h.symbol,
               h.exchange,
               params,
             );
-            if (points && points.length > 0) {
-              this.intradayBarsCache.set(barsKey, {
-                expiresAt: now + INTRADAY_CACHE_TTL_MS,
-                points,
-              });
-              break;
-            }
+            if (points && points.length > 0) break;
           } catch (error) {
             this.logger.warn(
               `Failed to fetch intraday series for ${h.symbol} at ${params.interval}: ${

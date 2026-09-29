@@ -5581,26 +5581,6 @@ describe("PortfolioService", () => {
         );
       });
 
-      it("fetches one month of bars for MTD and 1M, not one per range", async () => {
-        jest.setSystemTime(new Date("2026-10-31T14:00:00.000Z"));
-        netWorthService.getDailyInvestmentPositions.mockResolvedValue(
-          ledgerOf([day("2026-10-01", 1010), day("2026-10-02", 1020)], [xgro]),
-        );
-        seriesBySymbol({
-          "XGRO.TO": [
-            bar("2026-10-01T19:45:00.000Z", 101),
-            bar("2026-10-02T19:45:00.000Z", 102),
-          ],
-        });
-
-        await service.getIntradayValueSeries(userId, { range: "1m" });
-        await service.getIntradayValueSeries(userId, { range: "mtd" });
-
-        expect(yahooFinanceService.fetchIntradaySeries).toHaveBeenCalledTimes(
-          1,
-        );
-      });
-
       it("takes the closing hour from an unvalued session's last bar when no close was planned", async () => {
         jest.setSystemTime(new Date(monday));
         netWorthService.getDailyInvestmentPositions.mockResolvedValue(

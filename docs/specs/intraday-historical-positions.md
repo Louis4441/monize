@@ -84,9 +84,10 @@ a six-figure position.
    (`keepLastBarOfFirstDay`), as it did before this rule. Closing points, this
    one included, carry `sessionClose: true`. MTD is served on its own window,
    opening on the 1st and measured from the previous month's last day; a
-   rolling month cut on the client does not reach that close on the 31st. The
-   same month of bars serves MTD and 1M from one fetch (`intradayBarsCache`).
-   1D opens at the open. (Issue #1461.)
+   rolling month cut on the client does not reach that close on the 31st;
+   like every range, it is one fetch of bars per holding, kept for a minute
+   in `intradayCache` with the series built from it. 1D opens at the open.
+   (Issue #1461.)
 
 ## 3. Numerical examples
 
@@ -131,6 +132,6 @@ series' Aug 28 total ($930,475.80).
 | 1M opening on a Saturday, no bars that far back | opens on Friday's close stamped at the hour the newest finished session closed |
 | 1M opening on a session | that session's close first, its bars dropped |
 | Measured-from day incomplete | no opening point, no session lookup; the first bar opens the series, and 1M's first session collapses to its last bar |
-| MTD on the 31st | its own window: opens on the previous month's last close, stamped at the hour the newest finished session closed; one fetch of bars shared with 1M |
+| MTD on the 31st | its own window: opens on the previous month's last close, stamped at the hour the newest finished session closed |
 | No closing point planned in the window | the opening close takes its hour from the newest finished session's last bar plus one step |
 | Breakdown view | opens on the same point, each position at its daily close |
