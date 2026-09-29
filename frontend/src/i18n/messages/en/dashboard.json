@@ -97,7 +97,7 @@
       "noLosers": "No losers today."
     },
     "dailyChange": "Daily change",
-    "dailyChangeOn": "Daily change \u00b7 {date}",
+    "dailyChangeOn": "Daily change · {date}",
     "openPriceHistory": "Price history for {symbol}",
     "refreshPrices": "Refresh prices",
     "viewPortfolio": "View portfolio",
@@ -118,7 +118,7 @@
     "empty": "No favourite securities yet. Visit the <securitiesLink>Securities page</securitiesLink> and star the securities you want to track here.",
     "noPriceYet": "No price yet",
     "dailyChange": "Daily change",
-    "dailyChangeOn": "Daily change \u00b7 {date}",
+    "dailyChangeOn": "Daily change · {date}",
     "openPriceHistory": "Price history for {symbol}",
     "refreshPrices": "Refresh prices",
     "manage": "Manage securities"
@@ -204,8 +204,8 @@
     "empty": "No investment history to show yet.",
     "refresh": "Refresh current value",
     "investmentResult": "Investment result",
+    "periodBreakdownInvestedTooltip": "The securities moved {valueChange} in value over this window. Of that, {netInvested} was paid in, net of sales, and they paid out {income} in dividends and interest. The figure above is what the investments themselves earned, with uninvested cash left out.",
     "notAvailable": "N/A",
-    "periodBreakdownTooltip": "The account's value moved {valueChange} over this window, of which deposits and withdrawals were {netFlows}. The figure above is what the investments themselves earned, with uninvested cash left out.",
     "unmeasuredFlowTooltip": "A trade settled outside these accounts, or a split mixing an investment line with ordinary spending, means the result cannot be separated from the money moved in."
   },
   "spendingByPayee": {

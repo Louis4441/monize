@@ -66,7 +66,7 @@ type PortfolioChartSortField = 'name' | 'value';
 type PortfolioBreakdownSortColumn = TableSortColumn<PortfolioBreakdownSortField, 'right'>;
 
 // Normalized per-security breakdown ready to render. Point `name` is already
-// the display label (daily/monthly date or intraday time), so the chart, table
+// the display label (a day, a sampled month-end or an intraday time), so the chart, table
 // and CSV render the same way regardless of which endpoint produced it. `kind`
 // drives x-axis label shortening.
 type SecuritiesBreakdown = {
@@ -96,7 +96,7 @@ type SecuritiesBreakdown = {
      */
     complete?: boolean;
   }>;
-  kind: 'daily' | 'monthly' | 'intraday';
+  kind: 'daily' | 'monthEnd' | 'intraday';
 };
 import {
   type IntradayRange,
@@ -107,6 +107,9 @@ import {
   computeTightYAxisDomain,
   renderChartFlagDot,
   ChartFlagShadowFilter,
+  monthEndAxisTicks,
+  sampledPointLabel,
+  sampledTickLabel,
 } from '@/components/investments/portfolio-chart-utils';
 import {
   hasUnmeasuredFlow,
@@ -129,7 +132,8 @@ const DAILY_RANGES = new Set(['1w', '1m', '3m', 'ytd', '1y']);
 
 /**
  * The longest custom window drawn from daily closes, matching the longest
- * daily preset (1Y); anything wider is drawn monthly, as 2Y and up are.
+ * daily preset (1Y); anything wider is sampled at month-ends, as 2Y and up
+ * are, still opening and closing on the window's own closes.
  */
 const CUSTOM_DAILY_MAX_DAYS = 366;
 
@@ -346,11 +350,11 @@ export function PortfolioValueReport() {
   });
 
   // Per-security stacked view. Available on every range: intraday ranges pull
-  // the live per-security intraday series, the rest use the daily/monthly
-  // breakdown (daily for the shorter ranges, monthly for 2y/5y/all).
+  // the live per-security intraday series, the rest use the daily breakdown
+  // (every day for the shorter ranges, sampled at month-ends for the longer).
   const securitiesActive = seriesMode === 'securities';
-  const breakdownGranularity: 'daily' | 'monthly' =
-    isIntraday || useDaily ? 'daily' : 'monthly';
+  const breakdownGranularity: 'daily' | 'monthEnd' =
+    isIntraday || useDaily ? 'daily' : 'monthEnd';
   // X-axis label formatting must follow the data actually plotted. In the
   // securities view drive it off the loaded breakdown's kind (which reflects
   // any intraday->daily fallback) rather than the range's own flags.
@@ -412,54 +416,47 @@ export function PortfolioValueReport() {
 
     const loadDailyOrMonthly = async () => {
       const { start, end } = chartWindow;
-      const params = {
+      // A long range is the SAME daily valuation sampled at each month-end, so
+      // its first point is the close the figures are measured from and its
+      // last the one they are measured to -- never a stored month-end
+      // snapshot, which opens on a month boundary instead.
+      const sampled = !(useDaily || isIntraday);
+      const data = await netWorthApi.getInvestmentsDaily({
         startDate: start,
         endDate: end,
         accountIds: accountIdsCsv,
         displayCurrency: foreignCurrency || undefined,
-      };
-      if (useDaily || isIntraday) {
-        const data = await netWorthApi.getInvestmentsDaily(params);
-        if (loadSeqRef.current !== seq) return;
-        setLoadedPoints(
-          data.map((d) => {
-            // A day short of a price or a rate is a subtotal; the KPIs below
-            // refuse to name it a high, a low or a change, and the chart
-            // refuses to plot it at all. `cashComplete` is NOT read here: the
-            // chart plots the INVESTED value, which holds no cash, so a cash
-            // account with no balance for a day cannot make this point wrong.
-            // It is still reported in the incomplete-data details below.
-            const complete =
-              d.pricesComplete !== false && d.fxComplete !== false;
-            return {
-              name: formatChartDate(d.date, 'MMM d, yyyy'),
-              Value: complete ? investedValue(d) : null,
-              iso: d.date,
-              complete,
-            };
-          }),
-        );
-        setIncompleteCauses(foldIncompleteData(data));
-      } else {
-        const data = await netWorthApi.getInvestmentsMonthly(params);
-        if (loadSeqRef.current !== seq) return;
-        setLoadedPoints(
-          data.map((d) => ({
-            name: formatChartDate(d.month, 'MMM yyyy'),
-            Value: investedValue(d),
-            iso: d.month,
-          })),
-        );
-        // The monthly endpoint reports no completeness, which is no
-        // information rather than a clean bill of health.
-        setIncompleteCauses(NO_INCOMPLETE_DATA);
-      }
+        ...(sampled ? { sampling: 'monthEnd' as const } : {}),
+      });
+      if (loadSeqRef.current !== seq) return;
+      setLoadedPoints(
+        data.map((d, index) => {
+          // A day short of a price or a rate is a subtotal; the KPIs below
+          // refuse to name it a high, a low or a change, and the chart
+          // refuses to plot it at all. `cashComplete` is NOT read here: the
+          // chart plots the INVESTED value, which holds no cash, so a cash
+          // account with no balance for a day cannot make this point wrong.
+          // It is still reported in the incomplete-data details below.
+          const complete =
+            d.pricesComplete !== false && d.fxComplete !== false;
+          return {
+            name: sampled
+              ? sampledPointLabel(d.date, index, data.length, formatChartDate)
+              : formatChartDate(d.date, 'MMM d, yyyy'),
+            Value: complete ? investedValue(d) : null,
+            iso: d.date,
+            complete,
+          };
+        }),
+      );
+      setIncompleteCauses(foldIncompleteData(data));
     };
 
-    // Daily/monthly per-security breakdown. Also the fallback target when a
-    // 1W/MTD/1M intraday breakdown has no intraday data for the account mix.
+    // Daily or month-end-sampled per-security breakdown. Also the fallback
+    // target when a 1W/MTD/1M intraday breakdown has no intraday data for the
+    // account mix.
     const loadDailyMonthlyBreakdown = async (
-      granularity: 'daily' | 'monthly',
+      granularity: 'daily' | 'monthEnd',
     ) => {
       const { start, end } = chartWindow;
       const data = await netWorthApi.getInvestmentsBreakdown({
@@ -471,10 +468,10 @@ export function PortfolioValueReport() {
       });
       if (loadSeqRef.current !== seq) return;
       const cashKey = breakdownCashKey(data.series);
-      const points = data.points.map((p) => ({
+      const points = data.points.map((p, index) => ({
         name:
-          granularity === 'monthly'
-            ? formatChartDate(p.date, 'MMM yyyy')
+          granularity === 'monthEnd'
+            ? sampledPointLabel(p.date, index, data.points.length, formatChartDate)
             : formatChartDate(p.date, 'MMM d, yyyy'),
         iso: p.date,
         total: p.total,
@@ -782,12 +779,17 @@ export function PortfolioValueReport() {
   // The three figures the cards print, and the one repair a withheld one points
   // at. Every completeness read is the server's: `null` means it withheld the
   // figure and said why, and nothing here recomputes it from the chart.
-  const valueChange = periodResult?.valueChange ?? null;
-  const netExternalFlows = periodResult?.netExternalFlows ?? null;
-  // The report plots the INVESTED value, so its result and return are the
-  // invested part's: the same measure the Investments page's performance card
-  // and the dashboard widget report (section 10.7). `valueChange` above is
-  // still the account's, and still captioned as such.
+  //
+  // The report plots the INVESTED value, so every figure is the invested
+  // part's: the same measure the Investments page's performance card and the
+  // dashboard widget report (section 10.7). The value change is the line's
+  // last point less its first, and the three reconcile exactly:
+  // value change - net invested + dividends and interest = investment result.
+  // The account's own change, cash and deposits included, is a different
+  // question and is not asked here (section 10.9).
+  const valueChange = periodResult?.investedValueChange ?? null;
+  const netInvested = periodResult?.investmentCapitalFlows ?? null;
+  const investmentIncome = periodResult?.investmentIncome ?? null;
   const investmentResult = periodResult?.investmentPnl ?? null;
   const returnPercent = periodResult?.investmentReturnPercent ?? null;
   const unknownReason = periodResultUnknownReason(
@@ -868,15 +870,19 @@ export function PortfolioValueReport() {
   }, [chartPoints, chartTableSort.sortField, chartTableSort.sortDirection]);
 
   const xAxisTicks = useMemo(() => {
+    if (!axisIntraday && !axisDaily) return monthEndAxisTicks(chartPoints);
     if (chartPoints.length <= 36) return undefined;
-    if (axisIntraday || axisDaily) {
-      const step = Math.ceil(chartPoints.length / 7);
-      return chartPoints.filter((_, i) => i % step === 0).map((d) => d.name);
-    }
-    return chartPoints
-      .filter((d) => d.name.startsWith('Jan '))
-      .map((d) => d.name);
+    const step = Math.ceil(chartPoints.length / 7);
+    return chartPoints.filter((_, i) => i % step === 0).map((d) => d.name);
   }, [chartPoints, axisIntraday, axisDaily]);
+
+  // A month-end-sampled tick is formatted from its point's own date, found by
+  // its label, so the day-dated ends and the month-dated middle each read
+  // right in every locale.
+  const pointIndexByName = useMemo(
+    () => new Map(chartPoints.map((p, index) => [p.name, index])),
+    [chartPoints],
+  );
 
   const yAxisDomain = useMemo(
     () =>
@@ -961,7 +967,7 @@ export function PortfolioValueReport() {
 
   // Shared x-axis label formatter for the total and stacked charts. Driven by
   // the axis granularity flags so the securities view labels correctly whether
-  // it loaded intraday, daily or monthly data.
+  // it loaded intraday, daily or month-end-sampled data.
   const formatXAxisTick = useCallback(
     (value: string) => {
       if (axisIntraday) return value;
@@ -969,16 +975,16 @@ export function PortfolioValueReport() {
         const parts = value.split(', ');
         return parts[0] || value;
       }
-      if (chartPoints.length > 36) {
-        return value.split(' ')[1] || value;
-      }
-      if (chartPoints.length > 18) {
-        const parts = value.split(' ');
-        return parts.length === 2 ? `${parts[0]} '${parts[1].slice(2)}` : value;
-      }
-      return value.split(' ')[0];
+      const index = pointIndexByName.get(value);
+      if (index === undefined) return value;
+      return sampledTickLabel(
+        chartPoints[index].iso,
+        index,
+        chartPoints.length,
+        formatChartDate,
+      );
     },
-    [axisIntraday, axisDaily, chartPoints.length],
+    [axisIntraday, axisDaily, chartPoints, pointIndexByName, formatChartDate],
   );
 
   // Index of the first point at the highest / lowest value, for the
@@ -1065,10 +1071,15 @@ export function PortfolioValueReport() {
           color: signedColour(valueChange),
         },
         {
-          label: t('portfolioValue.netExternalFlows'),
-          value: signedMoneyText(netExternalFlows),
-          // A flow is neither a gain nor a loss, so it is not painted as one.
-          color: netExternalFlows === null ? '#6b7280' : '#111827',
+          label: t('portfolioValue.netInvested'),
+          value: signedMoneyText(netInvested),
+          // Money paid in is neither a gain nor a loss, so it is not painted as one.
+          color: netInvested === null ? '#6b7280' : '#111827',
+        },
+        {
+          label: t('portfolioValue.investmentIncome'),
+          value: signedMoneyText(investmentIncome),
+          color: investmentIncome === null ? '#6b7280' : '#111827',
         },
         {
           label: t('portfolioValue.investmentResult'),
@@ -1120,7 +1131,8 @@ export function PortfolioValueReport() {
         [t('portfolioValue.highestValue'), ...money(summary.highest)],
         [t('portfolioValue.lowestValue'), ...money(summary.lowest)],
         [t('portfolioValue.valueChange'), ...money(valueChange)],
-        [t('portfolioValue.netExternalFlows'), ...money(netExternalFlows)],
+        [t('portfolioValue.netInvested'), ...money(netInvested)],
+        [t('portfolioValue.investmentIncome'), ...money(investmentIncome)],
         [t('portfolioValue.investmentResult'), ...money(investmentResult)],
         [
           t('portfolioValue.investmentReturn'),
@@ -1216,13 +1228,14 @@ export function PortfolioValueReport() {
             )}
           </div>
         </div>
-        {/* Value change: what the portfolio is worth now against then. It
-            INCLUDES the reader's own deposits, which is why it is captioned as
-            a value change and never as a return. */}
+        {/* Value change: what the securities are worth now against then --
+            the chart's last point less its first. It includes what was paid
+            into them, which is why it is captioned as a value change and never
+            as a return. */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
             {t('portfolioValue.valueChange')}
-            <InfoTooltip placement="top" text={t('portfolioValue.valueChangeTooltip')} />
+            <InfoTooltip placement="top" text={t('portfolioValue.investedValueChangeTooltip')} />
           </div>
           <div className={`text-xl font-bold ${valueChange === null ? '' : gainLossColor(valueChange)}`}>
             {valueChange === null ? (
@@ -1232,35 +1245,36 @@ export function PortfolioValueReport() {
             )}
           </div>
         </div>
-        {/* The money the reader moved across the boundary of these accounts. It
-            is the part of the value change that is not performance. */}
+        {/* What was paid into the securities, less what came out of them, and
+            beneath it what they paid out: the two parts of the value change
+            that are not performance. */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
-            {t('portfolioValue.netExternalFlows')}
-            <InfoTooltip placement="top" text={t('portfolioValue.netExternalFlowsTooltip')} />
-            {/* The partial sum is named only where a rate is what withheld
-                the total: naming it for any other cause offers a subtotal of
-                something that was never in doubt. */}
-            {netExternalFlows === null &&
-              periodResult?.reasons.includes('missingRatePairs') && (
-              <InfoTooltip
-                placement="top"
-                text={t('portfolioValue.flowsPartial', {
-                  amount: fmtVal(periodResult.knownFlowSubtotal),
-                })}
-              />
-            )}
+            {t('portfolioValue.netInvested')}
+            <InfoTooltip placement="top" text={t('portfolioValue.netInvestedTooltip')} />
           </div>
           <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {netExternalFlows === null ? (
+            {netInvested === null ? (
               <UnknownAmount reason={unknownReason} className="text-base font-normal" />
             ) : (
-              <>{netExternalFlows >= 0 ? '+' : ''}{fmtVal(netExternalFlows)}</>
+              <>{netInvested >= 0 ? '+' : ''}{fmtVal(netInvested)}</>
             )}
           </div>
+          <div
+            className="text-sm text-gray-500 dark:text-gray-400 flex items-center"
+            data-testid="period-income"
+          >
+            {t('portfolioValue.investmentIncomeLine', {
+              amount:
+                investmentIncome === null
+                  ? t('portfolioValue.notAvailable')
+                  : `${investmentIncome >= 0 ? '+' : ''}${fmtVal(investmentIncome)}`,
+            })}
+            <InfoTooltip placement="top" text={t('portfolioValue.investmentIncomeTooltip')} />
+          </div>
         </div>
-        {/* What is left once the deposits are taken out: the only figure a
-            percentage belongs over. */}
+        {/* What is left once the money paid in is taken out and the money
+            paid out counted: the only figure a percentage belongs over. */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
             {t('portfolioValue.investmentResult')}
@@ -1268,7 +1282,7 @@ export function PortfolioValueReport() {
             {/* A withheld figure names its own cause: these two are movements
                 the server could not count as a flow, so the marker's generic
                 copy would leave the reader with nowhere to go. */}
-            {hasUnmeasuredFlow(periodResult?.reasons ?? []) && (
+            {hasUnmeasuredFlow(periodResult?.investedReasons ?? []) && (
               <InfoTooltip
                 placement="top"
                 text={t('portfolioValue.unmeasuredFlowTooltip')}

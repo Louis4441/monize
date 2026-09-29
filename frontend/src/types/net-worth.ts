@@ -65,7 +65,13 @@ export interface DailyInvestmentValue {
   unknownCashAccountIds?: string[];
 }
 
-export type InvestmentBreakdownGranularity = 'daily' | 'monthly';
+/**
+ * `monthEnd` samples the daily fold on the window's first day, each month-end
+ * inside it and its last day, so a long-range breakdown opens on the same close
+ * the period figures are measured from. `monthly` is the older month-bucket
+ * replay.
+ */
+export type InvestmentBreakdownGranularity = 'daily' | 'monthly' | 'monthEnd';
 
 /**
  * One stacked band on the Portfolio Value Over Time "by security" chart:
@@ -197,6 +203,12 @@ export interface PortfolioPeriodResult {
   investedValueStart?: number | null;
   /** IV(e): the securities at the ending close, no cash. */
   investedValueEnd?: number | null;
+  /**
+   * IV(e) - IV(b): the last point the value chart draws less its first, cash
+   * excluded. Known whenever both boundary days are complete, even where the
+   * P&L beside it is withheld. Absent from an older backend, which is unknown.
+   */
+  investedValueChange?: number | null;
   /** Net value paid into the securities after startDate: buys less disposals. */
   investmentCapitalFlows?: number | null;
   /** Dividends, interest and capital-gain distributions over the same days. */

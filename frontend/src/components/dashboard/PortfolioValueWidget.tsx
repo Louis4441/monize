@@ -104,20 +104,19 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
       accountIds: accountIdsCsv,
       displayCurrency: defaultCurrency,
     };
-    return isDaily
-      ? netWorthApi
-          .getInvestmentsDaily(params)
-          // The INVESTED part, not the account: cash is not an investment, so
-          // a deposit must not draw as a rise in portfolio value
-          // (`docs/specs/portfolio-period-result.md` section 10.7).
-          .then((rows) =>
-            rows.map((r) => ({ date: r.date, value: investedValue(r) })),
-          )
-      : netWorthApi
-          .getInvestmentsMonthly(params)
-          .then((rows) =>
-            rows.map((r) => ({ date: r.month, value: investedValue(r) })),
-          );
+    // A long range is the same daily valuation sampled at each month-end, so
+    // the sparkline opens and closes on the closes the figures beside it are
+    // measured between (`docs/specs/portfolio-period-result.md` section 10.9).
+    return netWorthApi
+      .getInvestmentsDaily(
+        isDaily ? params : { ...params, sampling: 'monthEnd' },
+      )
+      // The INVESTED part, not the account: cash is not an investment, so
+      // a deposit must not draw as a rise in portfolio value
+      // (`docs/specs/portfolio-period-result.md` section 10.7).
+      .then((rows) =>
+        rows.map((r) => ({ date: r.date, value: investedValue(r) })),
+      );
   }, [start, end, accountIdsCsv, defaultCurrency, isDaily]);
 
   // Fetch the same portfolio summary the Investments page uses so the header
@@ -174,18 +173,24 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
   const chartData = useMemo(
     () =>
       relabelOpeningPoint(
-        (series ?? []).map((row) => {
-          const parsed = parseISO(row.date.length === 7 ? `${row.date}-01` : row.date);
+        (series ?? []).map((row, index, rows) => {
+          const parsed = parseISO(row.date);
+          // A sampled series names its two ends by their day and the
+          // month-ends between them by their month.
+          const boundary = index === 0 || index === rows.length - 1;
           return {
             date: row.date,
-            label: formatChartDate(parsed, isDaily ? 'MMM d' : 'MMM yyyy'),
+            label: formatChartDate(
+              parsed,
+              isDaily || boundary ? 'MMM d' : 'MMM yyyy',
+            ),
             value: Math.round(row.value),
           };
         }),
         openingSession,
         (point, session) => ({
           ...point,
-          label: formatChartDate(parseISO(session), isDaily ? 'MMM d' : 'MMM yyyy'),
+          label: formatChartDate(parseISO(session), 'MMM d'),
         }),
       ),
     [series, formatChartDate, isDaily, openingSession],
@@ -316,9 +321,14 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
               <InfoTooltip
                 placement="top"
                 align="right"
-                text={t('portfolioValue.periodBreakdownTooltip', {
-                  valueChange: breakdownText(periodResult.valueChange),
-                  netFlows: breakdownText(periodResult.netExternalFlows),
+                text={t('portfolioValue.periodBreakdownInvestedTooltip', {
+                  valueChange: breakdownText(
+                    periodResult.investedValueChange ?? null,
+                  ),
+                  netInvested: breakdownText(
+                    periodResult.investmentCapitalFlows ?? null,
+                  ),
+                  income: breakdownText(periodResult.investmentIncome ?? null),
                 })}
               />
               {/* Two movements the server could not count as a flow; the

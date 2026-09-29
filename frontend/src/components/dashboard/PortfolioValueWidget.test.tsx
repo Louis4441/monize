@@ -26,12 +26,10 @@ vi.mock('@/hooks/useNumberFormat', async () => {
   useExchangeRates: () => ({ defaultCurrency: 'USD' }),
 }));
 
-const getInvestmentsMonthly = vi.fn();
 const getInvestmentsDaily = vi.fn();
 const getInvestmentsPeriodResult = vi.fn();
 vi.mock('@/lib/net-worth', () => ({
   netWorthApi: {
-    getInvestmentsMonthly: (...a: unknown[]) => getInvestmentsMonthly(...a),
     getInvestmentsDaily: (...a: unknown[]) => getInvestmentsDaily(...a),
     getInvestmentsPeriodResult: (...a: unknown[]) =>
       getInvestmentsPeriodResult(...a),
@@ -68,8 +66,14 @@ function periodResult(overrides: Record<string, unknown> = {}) {
   const mirrored = {
     investedValueStart: base.startValue,
     investedValueEnd: base.endValue,
-    investmentCapitalFlows: 0,
-    investmentIncome: 0,
+    investedValueChange:
+      'investedValueChange' in overrides
+        ? overrides.investedValueChange
+        : base.valueChange,
+    investmentCapitalFlows:
+      'investmentCapitalFlows' in overrides ? overrides.investmentCapitalFlows : 0,
+    investmentIncome:
+      'investmentIncome' in overrides ? overrides.investmentIncome : 0,
     investmentPnl:
       'investmentPnl' in overrides ? overrides.investmentPnl : base.investmentResult,
     investmentReturnPercent:
@@ -123,7 +127,6 @@ async function renderWidget() {
 
 describe('PortfolioValueWidget', () => {
   beforeEach(() => {
-    getInvestmentsMonthly.mockReset();
     getInvestmentsDaily.mockReset();
     getInvestmentsPeriodResult.mockReset();
     getInvestmentsPeriodResult.mockResolvedValue(periodResult());
@@ -134,15 +137,18 @@ describe('PortfolioValueWidget', () => {
   });
 
   it('renders the area chart and the Total Portfolio Value from the summary for long ranges', async () => {
-    getInvestmentsMonthly.mockResolvedValue([
-      { month: '2026-05', value: 9000 },
-      { month: '2026-06', value: 10000 },
+    getInvestmentsDaily.mockResolvedValue([
+      { date: '2026-05-28', value: 9000 },
+      { date: '2026-06-28', value: 10000 },
     ]);
     await renderWidget();
     expect(screen.getByText('Portfolio Value over Time')).toBeInTheDocument();
     expect(screen.getByText('1Y')).toBeInTheDocument();
-    expect(getInvestmentsMonthly).toHaveBeenCalled();
-    expect(getInvestmentsDaily).not.toHaveBeenCalled();
+    // A long range is the daily valuation sampled at month-ends, so the line
+    // opens on the close the figure beside it is measured from.
+    expect(getInvestmentsDaily).toHaveBeenCalledWith(
+      expect.objectContaining({ sampling: 'monthEnd' }),
+    );
     // Header shows the live summary total (same value as the Investments page),
     // not the last point of the historical series.
     expect(screen.getByText('$12345')).toBeInTheDocument();
@@ -155,17 +161,19 @@ describe('PortfolioValueWidget', () => {
     getInvestmentsDaily.mockResolvedValue([{ date: '2026-07-01', value: 5000 }]);
     await renderWidget();
     expect(getInvestmentsDaily).toHaveBeenCalled();
-    expect(getInvestmentsMonthly).not.toHaveBeenCalled();
+    expect(getInvestmentsDaily).not.toHaveBeenCalledWith(
+      expect.objectContaining({ sampling: 'monthEnd' }),
+    );
   });
 
   it('shows the empty state with no history', async () => {
-    getInvestmentsMonthly.mockResolvedValue([]);
+    getInvestmentsDaily.mockResolvedValue([]);
     await renderWidget();
     expect(screen.getByText('No investment history to show yet.')).toBeInTheDocument();
   });
 
   it('refreshes prices when the refresh button is clicked', async () => {
-    getInvestmentsMonthly.mockResolvedValue([{ month: '2026-06', value: 10000 }]);
+    getInvestmentsDaily.mockResolvedValue([{ date: '2026-06-28', value: 10000 }]);
     await renderWidget();
     await act(async () => {
       fireEvent.click(screen.getByLabelText('Refresh current value'));
@@ -180,9 +188,9 @@ describe('PortfolioValueWidget', () => {
     // that never moves. The series rose by 10,000 and the market did nothing,
     // so the headline is the server's investment result of 0 -- and the value
     // change it is NOT is named beside it rather than printed as the figure.
-    getInvestmentsMonthly.mockResolvedValue([
-      { month: '2026-01', value: 10000 },
-      { month: '2026-06', value: 20000 },
+    getInvestmentsDaily.mockResolvedValue([
+      { date: '2026-01-28', value: 10000 },
+      { date: '2026-06-28', value: 20000 },
     ]);
     getInvestmentsPeriodResult.mockResolvedValue(
       periodResult({
@@ -193,6 +201,8 @@ describe('PortfolioValueWidget', () => {
         knownFlowSubtotal: 10000,
         investmentResult: 0,
         returnPercent: 0,
+        investedValueChange: 10000,
+        investmentCapitalFlows: 10000,
       }),
     );
     await renderWidget();
@@ -205,7 +215,7 @@ describe('PortfolioValueWidget', () => {
     expect(figure).not.toHaveTextContent('100.0%');
     expect(
       screen.getByLabelText(
-        "The account's value moved +$10000 over this window, of which deposits and withdrawals were +$10000. The figure above is what the investments themselves earned, with uninvested cash left out.",
+        'The securities moved +$10000 in value over this window. Of that, +$10000 was paid in, net of sales, and they paid out +$0 in dividends and interest. The figure above is what the investments themselves earned, with uninvested cash left out.',
       ),
     ).toBeInTheDocument();
   });
@@ -216,9 +226,9 @@ describe('PortfolioValueWidget', () => {
    * reader's own money as portfolio growth (INV-PORTRESULT-002).
    */
   it('plots the invested value and reports the invested figures', async () => {
-    getInvestmentsMonthly.mockResolvedValue([
-      { month: '2026-05', value: 0, securitiesValue: 0 },
-      { month: '2026-06', value: 10000, securitiesValue: 0 },
+    getInvestmentsDaily.mockResolvedValue([
+      { date: '2026-05-28', value: 0, securitiesValue: 0 },
+      { date: '2026-06-28', value: 10000, securitiesValue: 0 },
     ]);
     getInvestmentsPeriodResult.mockResolvedValue(
       periodResult({
@@ -237,13 +247,15 @@ describe('PortfolioValueWidget', () => {
     expect(figure.textContent).toMatch(/^Investment result\+\$0\(\+0\.0%\)/);
     // The series the chart drew is the invested one, so the deposit is not on
     // it either: nothing in the widget reports 10000 as portfolio value.
-    expect(getInvestmentsMonthly).toHaveBeenCalled();
+    expect(getInvestmentsDaily).toHaveBeenCalledWith(
+      expect.objectContaining({ sampling: 'monthEnd' }),
+    );
   });
 
   it('renders a withheld result as unknown with the cause the server gave', async () => {
-    getInvestmentsMonthly.mockResolvedValue([
-      { month: '2026-05', value: 8000 },
-      { month: '2026-06', value: 10000 },
+    getInvestmentsDaily.mockResolvedValue([
+      { date: '2026-05-28', value: 8000 },
+      { date: '2026-06-28', value: 10000 },
     ]);
     getInvestmentsPeriodResult.mockResolvedValue(
       periodResult({
@@ -251,6 +263,8 @@ describe('PortfolioValueWidget', () => {
         netExternalFlows: null,
         investmentResult: null,
         returnPercent: null,
+        investmentCapitalFlows: null,
+        investmentIncome: null,
         complete: false,
         reasons: ['incompletePrices'],
         unpricedSecurityIds: ['sec-1'],
@@ -267,7 +281,7 @@ describe('PortfolioValueWidget', () => {
     // The two figures behind it are withheld in the same words, never blank.
     expect(
       screen.getByLabelText(
-        "The account's value moved N/A over this window, of which deposits and withdrawals were N/A. The figure above is what the investments themselves earned, with uninvested cash left out.",
+        'The securities moved N/A in value over this window. Of that, N/A was paid in, net of sales, and they paid out N/A in dividends and interest. The figure above is what the investments themselves earned, with uninvested cash left out.',
       ),
     ).toBeInTheDocument();
   });
@@ -275,9 +289,9 @@ describe('PortfolioValueWidget', () => {
   it('shows no figure at all when the period request fails', async () => {
     // A failed request is not a period that did nothing: never a zero, and
     // never the previous window's figure under this window's caption.
-    getInvestmentsMonthly.mockResolvedValue([
-      { month: '2026-05', value: 8000 },
-      { month: '2026-06', value: 10000 },
+    getInvestmentsDaily.mockResolvedValue([
+      { date: '2026-05-28', value: 8000 },
+      { date: '2026-06-28', value: 10000 },
     ]);
     getInvestmentsPeriodResult.mockRejectedValue(new Error('period unavailable'));
     await renderWidget();
@@ -293,9 +307,9 @@ describe('PortfolioValueWidget', () => {
     // and that edge is the card's, not the one where the settings gear starts.
     viewport(1280);
     getPortfolioSummary.mockResolvedValue({ totalPortfolioValue: 10000, holdings: [] });
-    getInvestmentsMonthly.mockResolvedValue([
-      { month: '2026-05', value: 8000 },
-      { month: '2026-06', value: 10000 },
+    getInvestmentsDaily.mockResolvedValue([
+      { date: '2026-05-28', value: 8000 },
+      { date: '2026-06-28', value: 10000 },
     ]);
     await renderWidget();
 
@@ -335,7 +349,7 @@ describe('PortfolioValueWidget', () => {
     // one place, never a second copy hidden at the other breakpoint.
     viewport(400);
     getPortfolioSummary.mockResolvedValue({ totalPortfolioValue: 10000, holdings: [] });
-    getInvestmentsMonthly.mockResolvedValue([{ month: '2026-06', value: 10000 }]);
+    getInvestmentsDaily.mockResolvedValue([{ date: '2026-06-28', value: 10000 }]);
     await renderWidget();
 
     const refresh = screen.getByLabelText('Refresh current value');
@@ -398,16 +412,35 @@ describe('PortfolioValueWidget', () => {
     // plotted close precedes the year. That is the line's window, not the
     // figure's: the server resolves 1Y from its own preset.
     configState.current = { range: '1y', accountIds: [] };
-    getInvestmentsMonthly.mockResolvedValue([{ month: '2026-06', value: 10000 }]);
+    getInvestmentsDaily.mockResolvedValue([{ date: '2026-06-28', value: 10000 }]);
     await renderWidget();
     expect(getInvestmentsPeriodResult).toHaveBeenCalledWith(
       expect.objectContaining({ period: '1y' }),
     );
   });
 
+  it("opens 'all' where the server's all-time window does", async () => {
+    // No start date goes out: the server opens a sampled all-time series on
+    // the day before the first investment, the day the period is measured
+    // from, and the figure beside it is named rather than dated.
+    configState.current = { range: 'all', accountIds: [] };
+    getInvestmentsDaily.mockResolvedValue([
+      { date: '2021-03-03', value: 0, securitiesValue: 0 },
+      { date: '2021-03-31', value: 5000, securitiesValue: 5000 },
+      { date: '2026-06-15', value: 9000, securitiesValue: 9000 },
+    ]);
+    await renderWidget();
+    expect(getInvestmentsDaily).toHaveBeenCalledWith(
+      expect.objectContaining({ startDate: undefined, sampling: 'monthEnd' }),
+    );
+    expect(getInvestmentsPeriodResult).toHaveBeenCalledWith(
+      expect.objectContaining({ period: 'all' }),
+    );
+  });
+
   it('scopes the refresh to the shown holdings when an account filter is active', async () => {
     configState.current = { range: '1y', accountIds: ['i1'] };
-    getInvestmentsMonthly.mockResolvedValue([{ month: '2026-06', value: 10000 }]);
+    getInvestmentsDaily.mockResolvedValue([{ date: '2026-06-28', value: 10000 }]);
     getPortfolioSummary.mockResolvedValue({
       totalPortfolioValue: 5000,
       holdings: [{ securityId: 's1' }, { securityId: 's2' }, { securityId: 's1' }],

@@ -3,6 +3,7 @@
 import type { ReactElement } from 'react';
 import { chartColors } from '@/lib/chart-colors';
 import { createLogger } from '@/lib/logger';
+import type { ChartDatePattern } from '@/lib/utils';
 
 const logger = createLogger('PortfolioValueChart');
 
@@ -35,6 +36,65 @@ export function isIntradayRange(range: string): range is IntradayRange {
  * sessionStorage prefix for cached intraday responses. Per-tab, so the data
  * persists during a navigation but not across browser sessions.
  */
+type FormatChartDate = (date: string, pattern: ChartDatePattern) => string;
+
+/**
+ * The label of one point of a month-end-sampled series
+ * (`sampling: 'monthEnd'` / `granularity: 'monthEnd'`).
+ *
+ * The two ends are the closes the period figures are measured between, so
+ * they are named by their day; the points in between are month-ends and are
+ * named by their month. Keyed off the point's own `iso`, never parsed back out
+ * of a localized label.
+ */
+export function sampledPointLabel(
+  iso: string,
+  index: number,
+  count: number,
+  formatChartDate: FormatChartDate,
+): string {
+  const boundary = index === 0 || index === count - 1;
+  return formatChartDate(iso, boundary ? 'MMM d, yyyy' : 'MMM yyyy');
+}
+
+/**
+ * The x-axis tick text for a month-end-sampled series, from the point's own
+ * date: the day at either end, then the month, shortening as the series grows.
+ */
+export function sampledTickLabel(
+  iso: string,
+  index: number,
+  count: number,
+  formatChartDate: FormatChartDate,
+): string {
+  if (index === 0 || index === count - 1) {
+    return formatChartDate(iso, count > 18 ? 'MMM yy' : 'MMM d');
+  }
+  if (count > 36) return formatChartDate(iso, 'yyyy');
+  if (count > 18) return formatChartDate(iso, 'MMM yy');
+  return formatChartDate(iso, 'MMM');
+}
+
+/**
+ * The ticks a long month-end-sampled series shows: one per January, read from
+ * each point's `iso` rather than from a label that only an English locale
+ * starts with "Jan ". `undefined` leaves a short series to the chart's own
+ * spacing.
+ */
+export function monthEndAxisTicks(
+  points: ReadonlyArray<{ name: string; iso: string }>,
+): string[] | undefined {
+  if (points.length <= 36) return undefined;
+  return points
+    .filter(
+      (point, index) =>
+        index > 0 &&
+        index < points.length - 1 &&
+        point.iso.slice(5, 7) === '01',
+    )
+    .map((point) => point.name);
+}
+
 export const INTRADAY_CACHE_PREFIX = 'monize-intraday|';
 
 export interface IntradayCachePayload {

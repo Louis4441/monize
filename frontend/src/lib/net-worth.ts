@@ -34,11 +34,19 @@ export const netWorthApi = {
     return response.data;
   },
 
+  /**
+   * The daily investment value series. `sampling: 'monthEnd'` keeps only the
+   * window's first day, each month-end inside it and its last day, from the
+   * same daily valuation: a long-range chart's resolution, opening and closing
+   * on the closes its period figures are measured between. With no
+   * `startDate` it opens where the period result's `all` window does.
+   */
   getInvestmentsDaily: async (params?: {
     startDate?: string;
     endDate?: string;
     accountIds?: string;
     displayCurrency?: string;
+    sampling?: 'monthEnd';
   }): Promise<DailyInvestmentValue[]> => {
     const response = await apiClient.get<DailyInvestmentValue[]>(
       '/net-worth/investments-daily',

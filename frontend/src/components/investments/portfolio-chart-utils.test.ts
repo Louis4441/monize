@@ -10,12 +10,16 @@ import {
   INTRADAY_CACHE_PREFIX,
   INTRADAY_RANGES,
   isIntradayRange,
+  monthEndAxisTicks,
   niceAxisStep,
   readIntradayCache,
   renderChartFlagDot,
   renderMinMaxFlagDots,
+  sampledPointLabel,
+  sampledTickLabel,
   writeIntradayCache,
 } from './portfolio-chart-utils';
+import { formatChartDate, type ChartDatePattern } from '@/lib/utils';
 
 describe('INTRADAY_RANGES', () => {
   it('is the set the intraday endpoint accepts', () => {
@@ -412,5 +416,40 @@ describe('renderMinMaxFlagDots', () => {
     expect(closeButton).toBeTruthy();
     closeButton.props.onClick({ stopPropagation: () => {} });
     expect(onDismissHigh).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('month-end-sampled labels and ticks', () => {
+  const fmt = (iso: string, pattern: ChartDatePattern) =>
+    formatChartDate(iso, pattern, 'en-US');
+
+  it('names the two ends by their day and the month-ends between by their month', () => {
+    const dates = ['2024-09-29', '2024-09-30', '2024-10-31', '2024-11-15'];
+    expect(
+      dates.map((iso, i) => sampledPointLabel(iso, i, dates.length, fmt)),
+    ).toEqual(['Sep 29, 2024', 'Sep 2024', 'Oct 2024', 'Nov 15, 2024']);
+  });
+
+  it('shortens the month ticks as the series grows, keeping the ends dated', () => {
+    expect(sampledTickLabel('2026-03-28', 0, 8, fmt)).toBe('Mar 28');
+    expect(sampledTickLabel('2026-04-30', 2, 8, fmt)).toBe('Apr');
+    expect(sampledTickLabel('2025-04-30', 5, 25, fmt)).toBe('Apr 25');
+    expect(sampledTickLabel('2024-01-31', 5, 62, fmt)).toBe('2024');
+  });
+
+  it('ticks a long series on each January, read from the date and not the label', () => {
+    // 2021-01-05 opens the window: a boundary is never a January tick, even
+    // though its label starts with the same month as the month-end beside it.
+    const points = Array.from({ length: 40 }, (_, i) => {
+      const month = i % 12;
+      const year = 2021 + Math.floor(i / 12);
+      const iso =
+        i === 0
+          ? '2021-01-05'
+          : `${year}-${String(month + 1).padStart(2, '0')}-28`;
+      return { iso, name: `label-${i}` };
+    });
+    expect(monthEndAxisTicks(points)).toEqual(['label-12', 'label-24', 'label-36']);
+    expect(monthEndAxisTicks(points.slice(0, 20))).toBeUndefined();
   });
 });
