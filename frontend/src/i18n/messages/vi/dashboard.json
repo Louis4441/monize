@@ -204,8 +204,8 @@
     "empty": "Chưa có lịch sử đầu tư để hiển thị.",
     "refresh": "Làm mới giá trị hiện tại",
     "investmentResult": "Kết quả đầu tư",
+    "periodBreakdownInvestedTooltip": "Giá trị chứng khoán đã thay đổi {valueChange} trong kỳ này. Trong đó, {netInvested} là tiền đưa vào sau khi trừ các khoản bán, và chứng khoán đã trả {income} tiền cổ tức và lãi. Con số ở trên là khoản mà bản thân các khoản đầu tư kiếm được, không tính tiền mặt chưa đầu tư.",
     "notAvailable": "N/A",
-    "periodBreakdownTooltip": "Giá trị tài khoản đã thay đổi {valueChange} trong khoảng thời gian này, trong đó khoản nạp và rút là {netFlows}. Con số ở trên là số tiền mà bản thân khoản đầu tư kiếm được, không tính tiền mặt chưa đầu tư.",
     "unmeasuredFlowTooltip": "Một giao dịch được thanh toán bên ngoài các tài khoản này, hoặc một khoản tách lẫn một dòng đầu tư với chi tiêu thông thường, nghĩa là kết quả không thể tách khỏi số tiền đã di chuyển."
   },
   "spendingByPayee": {

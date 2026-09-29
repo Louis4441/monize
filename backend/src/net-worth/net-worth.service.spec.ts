@@ -4536,6 +4536,147 @@ describe("NetWorthService", () => {
     });
   });
 
+  describe("getSampledInvestments", () => {
+    /** One brokerage holding 10 shares bought 2025-02-01, closes each day. */
+    const queueHoldingFixture = () => {
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "brok-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_BROKERAGE",
+          currency_code: "USD",
+          opening_balance: 0,
+        },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        {
+          account_id: "brok-1",
+          security_id: "sec-1",
+          action: "BUY",
+          quantity: "10",
+          transaction_date: "2025-02-01",
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([
+        { id: "sec-1", skipPriceUpdates: false },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        {
+          security_id: "sec-1",
+          price_date: "2025-02-27",
+          close_price: "98.00",
+        },
+        {
+          security_id: "sec-1",
+          price_date: "2025-02-28",
+          close_price: "99.00",
+        },
+        {
+          security_id: "sec-1",
+          price_date: "2025-03-14",
+          close_price: "104.00",
+        },
+        {
+          security_id: "sec-1",
+          price_date: "2025-03-31",
+          close_price: "107.00",
+        },
+        {
+          security_id: "sec-1",
+          price_date: "2025-04-10",
+          close_price: "111.00",
+        },
+      ]);
+    };
+
+    it("opens and closes on the same points the daily series does", async () => {
+      // The chart's first point IS the close the period result is measured
+      // from, and its last the close it is measured to: both are days of the
+      // one daily fold, never a month-end snapshot beside it.
+      queueHoldingFixture();
+      const daily = await service.getDailyInvestments(
+        "user-1",
+        "2025-02-27",
+        "2025-04-10",
+      );
+      reportQuery.mockReset();
+      reportQuery.mockResolvedValue([]);
+      queueHoldingFixture();
+      const sampled = await service.getSampledInvestments("user-1", {
+        startDate: "2025-02-27",
+        endDate: "2025-04-10",
+      });
+
+      expect(sampled.map((p) => p.date)).toEqual([
+        "2025-02-27",
+        "2025-02-28",
+        "2025-03-31",
+        "2025-04-10",
+      ]);
+      expect(sampled[0]).toEqual(daily[0]);
+      expect(sampled[sampled.length - 1]).toEqual(daily[daily.length - 1]);
+      for (const point of sampled) {
+        expect(point).toEqual(daily.find((d) => d.date === point.date));
+      }
+      expect(sampled[0].securitiesValue).toBe(980);
+      expect(sampled[sampled.length - 1].securitiesValue).toBe(1110);
+    });
+
+    it("opens 'all time' on the day before the first investment transaction", async () => {
+      // The period result's `all` window is measured from that day, so the
+      // chart must open on it too, not on the account's own inception.
+      reportQuery.mockImplementation((sql: string) => {
+        if (/MIN\(it\.transaction_date\)/.test(sql)) {
+          return Promise.resolve([{ date: "2024-06-12" }]);
+        }
+        if (/FROM accounts a/.test(sql)) {
+          return Promise.resolve([
+            {
+              id: "brok-1",
+              account_type: "INVESTMENT",
+              account_sub_type: "INVESTMENT_BROKERAGE",
+              currency_code: "USD",
+              opening_balance: 0,
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+      const fold = jest
+        .spyOn(
+          service as unknown as {
+            loadDailyInvestments: (...args: unknown[]) => Promise<unknown>;
+          },
+          "loadDailyInvestments",
+        )
+        .mockResolvedValue({
+          series: [],
+          positions: [],
+          securities: new Map(),
+        });
+
+      await service.getSampledInvestments("user-1", { endDate: "2026-09-28" });
+
+      expect(fold).toHaveBeenCalledWith(
+        "user-1",
+        expect.objectContaining({
+          startDate: "2024-06-11",
+          endDate: "2026-09-28",
+        }),
+        false,
+      );
+    });
+
+    it("returns nothing for a scope with no accounts", async () => {
+      reportQuery.mockResolvedValue([]);
+
+      await expect(
+        service.getSampledInvestments("user-1", { endDate: "2026-09-28" }),
+      ).resolves.toEqual([]);
+    });
+  });
+
   describe("getInvestmentBreakdown", () => {
     it("returns an empty breakdown when no accounts match", async () => {
       prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
@@ -4646,6 +4787,83 @@ describe("NetWorthService", () => {
         unpricedSecurityIds: [],
         missingRatePairs: [],
       });
+    });
+
+    it("samples a monthEnd breakdown on the window's own first and last days", async () => {
+      // The monthly bucket above values 2024-05-01 at the month end, holding a
+      // purchase made on the 15th. A monthEnd point is valued on its own day:
+      // the window opens before the purchase, and closes on the day it ends.
+      prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
+      reportQuery.mockResolvedValueOnce([
+        {
+          id: "brok-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_BROKERAGE",
+          currency_code: "USD",
+          opening_balance: 0,
+        },
+        {
+          id: "cash-1",
+          account_type: "INVESTMENT",
+          account_sub_type: "INVESTMENT_CASH",
+          currency_code: "USD",
+          opening_balance: 5000,
+        },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        {
+          account_id: "brok-1",
+          security_id: "sec-1",
+          action: "BUY",
+          quantity: "10",
+          transaction_date: "2024-05-15",
+        },
+      ]);
+      securityRepository.findByIds.mockResolvedValue([
+        {
+          id: "sec-1",
+          symbol: "AAPL",
+          name: "Apple Inc.",
+          currencyCode: "USD",
+          skipPriceUpdates: false,
+        },
+      ]);
+      reportQuery.mockResolvedValueOnce([
+        { security_id: "sec-1", price_date: "2024-05-15", close_price: "95" },
+        { security_id: "sec-1", price_date: "2024-05-31", close_price: "100" },
+        { security_id: "sec-1", price_date: "2024-06-20", close_price: "110" },
+      ]);
+      reportQuery.mockResolvedValueOnce([]);
+      // Daily cash balances, keyed by day.
+      reportQuery.mockResolvedValueOnce([
+        { account_id: "cash-1", date: "2024-05-01", balance: "5000" },
+        { account_id: "cash-1", date: "2024-05-31", balance: "4050" },
+        { account_id: "cash-1", date: "2024-06-20", balance: "4050" },
+      ]);
+
+      const result = await service.getInvestmentBreakdown("user-1", {
+        granularity: "monthEnd",
+        startDate: "2024-05-01",
+        endDate: "2024-06-20",
+      });
+
+      expect(result.granularity).toBe("monthEnd");
+      expect(result.points.map((p) => p.date)).toEqual([
+        "2024-05-01",
+        "2024-05-31",
+        "2024-06-20",
+      ]);
+      expect(result.points[0].total).toBe(5000);
+      expect(result.points[0].values["sec-1"] ?? 0).toBe(0);
+      expect(result.points[1].values).toMatchObject({
+        "sec-1": 1000,
+        cash: 4050,
+      });
+      expect(result.points[2].values).toMatchObject({
+        "sec-1": 1100,
+        cash: 4050,
+      });
+      expect(result.points.every((p) => p.cashComplete)).toBe(true);
     });
 
     it("carries fractional band and cash values at full precision (P7)", async () => {

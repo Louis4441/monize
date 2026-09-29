@@ -204,8 +204,8 @@
     "empty": "Brak historii inwestycji do wyświetlenia.",
     "refresh": "Odśwież bieżącą wartość",
     "investmentResult": "Wynik inwestycyjny",
+    "periodBreakdownInvestedTooltip": "Wartość papierów wartościowych zmieniła się w tym okresie o {valueChange}. Z tego {netInvested} to kwota wpłacona, po odjęciu sprzedaży, a papiery wypłaciły {income} w dywidendach i odsetkach. Powyższa kwota to zysk samych inwestycji, bez niezainwestowanej gotówki.",
     "notAvailable": "Brak",
-    "periodBreakdownTooltip": "Wartość konta zmieniła się o {valueChange} w tym okresie, z czego wpłaty i wypłaty wyniosły {netFlows}. Powyższa wartość to to, co zarobiły same inwestycje, z pominięciem niezainwestowanej gotówki.",
     "unmeasuredFlowTooltip": "Transakcja rozliczona poza tymi kontami albo podział łączący pozycję inwestycyjną ze zwykłym wydatkiem oznacza, że wyniku nie da się oddzielić od przesuniętych pieniędzy."
   },
   "spendingByPayee": {

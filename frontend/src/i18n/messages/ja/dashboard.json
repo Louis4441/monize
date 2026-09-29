@@ -204,8 +204,8 @@
     "empty": "表示する投資履歴がまだありません。",
     "refresh": "現在の価値を更新",
     "investmentResult": "投資成果",
+    "periodBreakdownInvestedTooltip": "この期間に証券の価値は {valueChange} 変動しました。そのうち {netInvested} は売却を差し引いた投資額で、配当と利息として {income} が支払われました。上の数値は、投資されていない現金を除いた、投資そのものの成果です。",
     "notAvailable": "N/A",
-    "periodBreakdownTooltip": "この期間、口座の価値は{valueChange}変動し、そのうち入出金は{netFlows}でした。上記の数値は、未投資の現金を除いた、投資自体が生み出した金額です。",
     "unmeasuredFlowTooltip": "これらの口座以外で決済された取引や、投資明細と通常の支出が混在する分割がある場合、成果を移動した資金と切り分けることができません。"
   },
   "spendingByPayee": {

@@ -36,6 +36,9 @@ import {
   computeTightYAxisDomain,
   renderChartFlagDot,
   ChartFlagShadowFilter,
+  monthEndAxisTicks,
+  sampledPointLabel,
+  sampledTickLabel,
 } from './portfolio-chart-utils';
 import {
   hasUnmeasuredFlow,
@@ -201,13 +204,20 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
           })),
         );
       } else {
-        const data = await netWorthApi.getInvestmentsMonthly(params);
+        // A long range is the same daily valuation sampled at each month-end,
+        // opening and closing on the closes the figures beside it are
+        // measured between -- never a stored month-end snapshot, whose first
+        // point is a month boundary rather than the period's own start.
+        const data = await netWorthApi.getInvestmentsDaily({
+          ...params,
+          sampling: 'monthEnd',
+        });
         if (loadSeqRef.current !== seq) return;
         setLoadedPoints(
-          data.map((d) => ({
-            name: formatChartDate(d.month, 'MMM yyyy'),
+          data.map((d, index) => ({
+            name: sampledPointLabel(d.date, index, data.length, formatChartDate),
             Value: investedValue(d),
-            iso: d.month,
+            iso: d.date,
           })),
         );
       }
@@ -393,12 +403,16 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
 
   // The three figures the cards print, and the one repair a withheld one points
   // at. `null` is the server's answer that it withheld the figure and said why.
-  const valueChange = periodResult?.valueChange ?? null;
-  const netExternalFlows = periodResult?.netExternalFlows ?? null;
-  // The chart plots the INVESTED value, so its headline figures are the
-  // invested part's too: the same measure the "Portfolio performance" card
-  // reports, so the two cannot disagree on one page (INV-PORTRESULT-002,
-  // `docs/specs/portfolio-period-result.md` section 10.7).
+  //
+  // The chart plots the INVESTED value, so every figure here is the invested
+  // part's: the value change is the line's last point less its first, and it
+  // reconciles with the result as change - net invested + income. The same
+  // measure the "Portfolio performance" card reports, so the two cannot
+  // disagree on one page (INV-PORTRESULT-002,
+  // `docs/specs/portfolio-period-result.md` sections 10.7 and 10.9).
+  const valueChange = periodResult?.investedValueChange ?? null;
+  const netInvested = periodResult?.investmentCapitalFlows ?? null;
+  const investmentIncome = periodResult?.investmentIncome ?? null;
   const investmentResult = periodResult?.investmentPnl ?? null;
   const returnPercent = periodResult?.investmentReturnPercent ?? null;
   const unknownReason = periodResultUnknownReason(
@@ -432,15 +446,19 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
   }, [chartPoints]);
 
   const xAxisTicks = useMemo(() => {
+    if (!isIntraday && !useDaily) return monthEndAxisTicks(chartPoints);
     if (chartPoints.length <= 36) return undefined;
-    if (isIntraday || useDaily) {
-      const step = Math.ceil(chartPoints.length / 7);
-      return chartPoints.filter((_, i) => i % step === 0).map((d) => d.name);
-    }
-    return chartPoints
-      .filter((d) => d.name.startsWith('Jan '))
-      .map((d) => d.name);
+    const step = Math.ceil(chartPoints.length / 7);
+    return chartPoints.filter((_, i) => i % step === 0).map((d) => d.name);
   }, [chartPoints, isIntraday, useDaily]);
+
+  // A month-end-sampled tick is formatted from its point's own date, found by
+  // its label, so the day-dated ends and the month-dated middle each read
+  // right in every locale.
+  const pointIndexByName = useMemo(
+    () => new Map(chartPoints.map((p, index) => [p.name, index])),
+    [chartPoints],
+  );
 
   const yAxisDomain = useMemo(
     () => computeTightYAxisDomain(chartPoints.map((d) => d.Value)),
@@ -584,7 +602,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
         <div>
           <div className="text-xs text-gray-500 dark:text-gray-400">{t('investmentValueChart.highestValue')}</div>
           <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
@@ -597,10 +615,31 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
             {fmtFull(summary.lowest)}
           </div>
         </div>
-        {/* What the holdings earned over the window, with the reader's own
-            deposits and withdrawals taken out. The value change and the flows
-            it is made of are the secondary line beneath, because a value change
-            under a "Change" caption reports a transfer as a gain (#1392). */}
+        {/* The securities line's own change: its last point less its first.
+            It includes what was paid into them, which is why it stands beside
+            the result rather than under a "Return" caption. */}
+        <div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
+            {t('investmentValueChart.valueChange')}
+            <InfoTooltip
+              placement="top"
+              text={t('investmentValueChart.valueChangeTooltip')}
+            />
+          </div>
+          <div
+            className={`text-lg font-bold ${valueChange === null ? '' : gainLossColor(valueChange)}`}
+            data-testid="period-value-change"
+          >
+            {valueChange === null ? (
+              <UnknownAmount reason={unknownReason} className="text-sm font-normal" />
+            ) : (
+              <>{valueChange >= 0 ? '+' : ''}{fmtFull(valueChange)}</>
+            )}
+          </div>
+        </div>
+        {/* What the holdings earned over the window: the value change beside
+            it, less what was paid in, plus what was paid out, both named on
+            the secondary lines beneath. */}
         <div>
           <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
             {t('investmentValueChart.investmentResult')}
@@ -625,23 +664,24 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
               <>{investmentResult >= 0 ? '+' : ''}{fmtFull(investmentResult)}</>
             )}
           </div>
-          {/* The two figures the result is the difference of. Secondary, but
-              named: a reader who deposited during the window is owed the
-              number that explains why the value moved more than the result. */}
+          {/* What separates the result from the value change: what was paid
+              into the securities, and what they paid out. Secondary, but
+              named: a reader who bought during the window is owed the number
+              that explains why the line moved more than the result. */}
           <div
             className="text-xs text-gray-500 dark:text-gray-400"
-            data-testid="period-value-change"
+            data-testid="period-net-invested"
           >
-            {t('investmentValueChart.valueChangeLine', {
-              amount: secondaryText(valueChange),
+            {t('investmentValueChart.netInvestedLine', {
+              amount: secondaryText(netInvested),
             })}
           </div>
           <div
             className="text-xs text-gray-500 dark:text-gray-400"
-            data-testid="period-net-flows"
+            data-testid="period-income"
           >
-            {t('investmentValueChart.netFlowsLine', {
-              amount: secondaryText(netExternalFlows),
+            {t('investmentValueChart.incomeLine', {
+              amount: secondaryText(investmentIncome),
             })}
           </div>
         </div>
@@ -713,13 +753,14 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
                     const parts = value.split(', ');
                     return parts[0] || value;
                   }
-                  if (chartPoints.length > 36) {
-                    return value.split(' ')[1] || value;
-                  } else if (chartPoints.length > 18) {
-                    const parts = value.split(' ');
-                    return parts.length === 2 ? `${parts[0]} '${parts[1].slice(2)}` : value;
-                  }
-                  return value.split(' ')[0];
+                  const index = pointIndexByName.get(value);
+                  if (index === undefined) return value;
+                  return sampledTickLabel(
+                    chartPoints[index].iso,
+                    index,
+                    chartPoints.length,
+                    formatChartDate,
+                  );
                 }}
               />
               <YAxis

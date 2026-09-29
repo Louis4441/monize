@@ -51,8 +51,9 @@ import {
   UNFILTERED_INVESTMENT_SCOPE_SQL,
   resolveInvestmentScopeAccountIds,
 } from "../securities/investment-scope.util";
-import { formatDateYMDLocal, todayYMD } from "../common/date-utils";
-import { enumerateDaysYMD } from "./series-dates.util";
+import { addDaysYMD, formatDateYMDLocal, todayYMD } from "../common/date-utils";
+import { enumerateDaysYMD, monthEndSampleDates } from "./series-dates.util";
+import { loadFirstInvestmentDate } from "./investment-inception.util";
 import { positionCloseAsOf, PricePoint } from "./position-price.util";
 import { preferredCurrency } from "../common/default-currency.util";
 import {
@@ -219,7 +220,13 @@ export interface DailyInvestmentsWithPositions {
   securities: Map<string, Security>;
 }
 
-export type InvestmentBreakdownGranularity = "daily" | "monthly";
+/**
+ * `monthEnd` samples the daily fold on the window's first day, each month-end
+ * inside it and its last day (`monthEndSampleDates`), so a long-range chart
+ * opens and closes on the closes its figures are measured between. `monthly`
+ * is the older month-bucket replay.
+ */
+export type InvestmentBreakdownGranularity = "daily" | "monthly" | "monthEnd";
 
 /**
  * One stacked band on the Portfolio Value Over Time "by security" chart. A
@@ -1492,6 +1499,64 @@ export class NetWorthService {
   }
 
   /**
+   * The daily series sampled for a long-range chart: the window's first day,
+   * each month-end strictly inside it, and its last day
+   * (`monthEndSampleDates`).
+   *
+   * Every point is a day of the SAME fold `getDailyInvestments` runs -- the same
+   * replay, the same accepted close, the same rate index and the same
+   * completeness flags -- so the first point is the close the period result is
+   * measured from (`investedValueStart`) and the last is the one it is measured
+   * to. The stored month-end snapshots `getMonthlyInvestments` reads open on a
+   * month boundary instead, which is a different day from the one the figures
+   * under the chart are measured from (`docs/specs/portfolio-period-result.md`
+   * section 10.9).
+   *
+   * "All time" (no `startDate`) opens where the period result's `all` window
+   * does: the day before the scope's first investment transaction.
+   */
+  async getSampledInvestments(
+    userId: string,
+    opts: {
+      startDate?: string;
+      endDate?: string;
+      accountIds?: string[];
+      displayCurrency?: string;
+    } & SeriesFetchOptions,
+  ): Promise<DailyInvestmentValue[]> {
+    const end = opts.endDate || todayYMD();
+    let startDate = opts.startDate;
+    if (!startDate) {
+      const scope = await this.resolveScopedInvestmentAccounts(
+        userId,
+        opts.accountIds,
+      );
+      if (scope.length === 0) return [];
+      startDate = await this.sampledInceptionStart(
+        userId,
+        scope.map((a) => a.id),
+        end,
+      );
+    }
+    const { series } = await this.loadDailyInvestments(
+      userId,
+      {
+        startDate,
+        endDate: end,
+        accountIds: opts.accountIds,
+        displayCurrency: opts.displayCurrency,
+        options: { fetchMissing: opts.fetchMissing },
+      },
+      false,
+    );
+    if (series.length === 0) return series;
+    const keep = new Set(
+      monthEndSampleDates(series[0].date, series[series.length - 1].date),
+    );
+    return series.filter((point) => keep.has(point.date));
+  }
+
+  /**
    * `getDailyInvestments` together with what each of its days was folded
    * from: the share count per security, the accepted close each was valued
    * at, and the cash per currency. One fold answers both, so the intraday
@@ -1946,13 +2011,14 @@ export class NetWorthService {
     );
     if (investAccounts.length === 0) return empty;
 
-    // "All time" (no startDate) begins where the scope's own history begins.
+    // "All time" (no startDate) begins where the scope's own history begins;
+    // a sampled series opens where the period result's `all` window does.
+    const scopeIds = investAccounts.map((a) => a.id);
     const start =
       opts.startDate ||
-      (await this.resolveInvestmentInception(
-        investAccounts.map((a) => a.id),
-        end,
-      ));
+      (granularity === "monthEnd"
+        ? await this.sampledInceptionStart(userId, scopeIds, end)
+        : await this.resolveInvestmentInception(scopeIds, end));
 
     const brokerageIds = investAccounts
       .filter(
@@ -2000,7 +2066,9 @@ export class NetWorthService {
     const sampleDates =
       granularity === "monthly"
         ? this.enumerateMonths(start, end)
-        : enumerateDaysYMD(start, end);
+        : granularity === "monthEnd"
+          ? monthEndSampleDates(start, end)
+          : enumerateDaysYMD(start, end);
     if (sampleDates.length === 0) return empty;
 
     // --- Price lookups -------------------------------------------------------
@@ -2307,6 +2375,28 @@ export class NetWorthService {
    * is empty, so this never has to invent a date for an empty scope; the result
    * is clamped to `end` so a reversed window still yields a single point.
    */
+  /**
+   * Where a sampled "all time" series opens: the day before the scope's first
+   * investment transaction, the same day the period result's `all` window is
+   * measured from, because that purchase's own close already holds it. A scope
+   * with no investment transaction falls back to the general inception rule;
+   * the period result has no window to measure there either.
+   */
+  private async sampledInceptionStart(
+    userId: string,
+    scopeIds: string[],
+    end: string,
+  ): Promise<string> {
+    const first = await loadFirstInvestmentDate(
+      (sql, params) => this.scopedQuery(sql, params),
+      userId,
+      scopeIds,
+    );
+    return first
+      ? addDaysYMD(first, -1)
+      : this.resolveInvestmentInception(scopeIds, end);
+  }
+
   private async resolveInvestmentInception(
     accountIds: string[],
     end: string,

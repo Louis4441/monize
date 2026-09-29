@@ -204,8 +204,8 @@
     "empty": "Belum ada riwayat investasi untuk ditampilkan.",
     "refresh": "Segarkan nilai saat ini",
     "investmentResult": "Hasil Investasi",
+    "periodBreakdownInvestedTooltip": "Nilai sekuritas berubah {valueChange} selama periode ini. Dari jumlah itu, {netInvested} adalah dana yang dimasukkan, setelah dikurangi penjualan, dan sekuritas membayar {income} berupa dividen dan bunga. Angka di atas adalah hasil investasi itu sendiri, tanpa kas yang tidak diinvestasikan.",
     "notAvailable": "N/A",
-    "periodBreakdownTooltip": "Nilai akun berubah {valueChange} selama periode ini, di mana setoran dan penarikan sebesar {netFlows}. Angka di atas adalah yang dihasilkan investasi itu sendiri, tidak termasuk tunai yang belum diinvestasikan.",
     "unmeasuredFlowTooltip": "Sebuah transaksi yang diselesaikan di luar akun-akun ini, atau pemisahan yang mencampur baris investasi dengan pengeluaran biasa, berarti hasilnya tidak dapat dipisahkan dari uang yang berpindah."
   },
   "spendingByPayee": {

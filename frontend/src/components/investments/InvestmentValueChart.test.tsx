@@ -134,8 +134,14 @@ function periodResult(
   const mirrored = {
     investedValueStart: base.startValue,
     investedValueEnd: base.endValue,
-    investmentCapitalFlows: 0,
-    investmentIncome: 0,
+    investedValueChange:
+      'investedValueChange' in overrides
+        ? overrides.investedValueChange
+        : base.valueChange,
+    investmentCapitalFlows:
+      'investmentCapitalFlows' in overrides ? overrides.investmentCapitalFlows : 0,
+    investmentIncome:
+      'investmentIncome' in overrides ? overrides.investmentIncome : 0,
     investmentPnl:
       'investmentPnl' in overrides ? overrides.investmentPnl : base.investmentResult,
     investmentReturnPercent:
@@ -371,26 +377,68 @@ describe('InvestmentValueChart', () => {
   });
 
   it('displays computed summary values', async () => {
+    const card = (label: string) =>
+      screen.getByText(label).parentElement!.parentElement!.textContent;
     render(<InvestmentValueChart />);
     await screen.findByText('Portfolio Value Over Time');
-    // highest=15000, lowest=10000 are the series' own extremes; the result and
-    // its percent are the server's, and the value change and the flows behind
-    // them are named on the secondary lines.
+    // highest=15000, lowest=10000 are the series' own extremes; the value
+    // change, the result and its percent are the server's, and what separates
+    // the result from the change is named on the secondary lines.
     expect(screen.getByText('$15000.00')).toBeInTheDocument();
     expect(screen.getByText('$10000.00')).toBeInTheDocument();
     // The period figures are second-stage: the request cannot be made until
     // the series is on screen, so wait for it rather than for the title.
     await waitFor(() =>
-      expect(screen.getByText('+$5000.00')).toBeInTheDocument(),
+      expect(card('Investment Result')).toContain('+$5000.00'),
     );
     expect(screen.getByText('+50.0%')).toBeInTheDocument();
+    // Its own card, between Lowest Value and Investment Result, and no longer
+    // repeated beneath the result.
+    expect(screen.getByTestId('period-value-change')).toHaveTextContent('+$5000.00');
+    expect(card('Investment Result')).not.toContain('Value change');
+    const cards = card('Lowest Value')!;
+    expect(cards.indexOf('Lowest Value')).toBeLessThan(cards.indexOf('Value Change'));
+    expect(cards.indexOf('Value Change')).toBeLessThan(
+      cards.indexOf('Investment Result'),
+    );
+    expect(screen.getByTestId('period-net-invested')).toHaveTextContent(
+      'Net invested +$0.00',
+    );
+    expect(screen.getByTestId('period-income')).toHaveTextContent(
+      'Dividends and interest +$0.00',
+    );
+  });
+
+  /**
+   * The value change is the line's own: the securities' last close less their
+   * first. The account's change, which holds a late cash deposit, is a
+   * different figure and is not the one printed under this chart.
+   */
+  it("reads the value change off the securities line, not the account's", async () => {
+    vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockResolvedValue(
+      periodResult({
+        startValue: 10_000,
+        endValue: 60_800,
+        valueChange: 50_800,
+        netExternalFlows: 50_000,
+        investmentResult: 800,
+        investedValueChange: 800,
+        investmentCapitalFlows: 0,
+        investmentIncome: 0,
+        investmentPnl: 800,
+        investmentReturnPercent: 10,
+      }),
+    );
+    render(<InvestmentValueChart />);
+    await screen.findByText('Portfolio Value Over Time');
+
     await waitFor(() =>
       expect(screen.getByTestId('period-value-change')).toHaveTextContent(
-        'Value change +$5000.00',
+        '+$800.00',
       ),
     );
-    expect(screen.getByTestId('period-net-flows')).toHaveTextContent(
-      'Net deposits and withdrawals +$0.00',
+    expect(screen.getByTestId('period-value-change')).not.toHaveTextContent(
+      '50800',
     );
   });
 
@@ -741,6 +789,10 @@ describe('InvestmentValueChart', () => {
           knownFlowSubtotal: 10000,
           investmentResult: 0,
           returnPercent: 0,
+          // The deposit was invested at once: the line rose by what was paid
+          // into it, which is capital, not a result.
+          investedValueChange: 10000,
+          investmentCapitalFlows: 10000,
         }),
       );
       render(<InvestmentValueChart />);
@@ -752,10 +804,10 @@ describe('InvestmentValueChart', () => {
       expect(card('Return')).toContain('+0.0%');
       // The deposit is reported as what it is, and never as performance.
       expect(screen.getByTestId('period-value-change')).toHaveTextContent(
-        'Value change +$10000.00',
+        '+$10000.00',
       );
-      expect(screen.getByTestId('period-net-flows')).toHaveTextContent(
-        'Net deposits and withdrawals +$10000.00',
+      expect(screen.getByTestId('period-net-invested')).toHaveTextContent(
+        'Net invested +$10000.00',
       );
       expect(card('Return')).not.toContain('100.0%');
     });
@@ -870,13 +922,11 @@ describe('InvestmentValueChart', () => {
       // A failed request is not a period that did nothing, and not the
       // series' own move wearing the result's caption.
       await waitFor(() =>
-        expect(screen.getAllByTestId('unknown-amount').length).toBe(2),
+        expect(screen.getAllByTestId('unknown-amount').length).toBe(3),
       );
       expect(card('Investment Result')).not.toContain('$1000.00');
       expect(card('Investment Result')).not.toContain('$0.00');
-      expect(screen.getByTestId('period-value-change')).toHaveTextContent(
-        'Value change N/A',
-      );
+      expect(screen.getByTestId('period-value-change')).not.toHaveTextContent('$');
     });
 
     it('marks a withheld result with the cause the server gave', async () => {
@@ -895,7 +945,7 @@ describe('InvestmentValueChart', () => {
       await screen.findByText('Portfolio Value Over Time');
 
       await waitFor(() =>
-        expect(screen.getAllByTestId('unknown-amount').length).toBe(2),
+        expect(screen.getAllByTestId('unknown-amount').length).toBe(3),
       );
       // An unpriced holding is a price to add, not a rate to refresh.
       expect(
@@ -1216,19 +1266,38 @@ describe('InvestmentValueChart', () => {
     });
   });
 
-  it('uses monthly API for 5y range (not in DAILY_RANGES)', async () => {
+  it('samples the daily series at month-ends for 5y (not in DAILY_RANGES)', async () => {
     dateRangeState.dateRange = '5y';
     dateRangeState.resolvedRange = { start: '2019-01-01', end: '2024-01-01' };
-    vi.mocked(netWorthApi.getInvestmentsMonthly).mockResolvedValue([
-      { month: '2019-01-01', value: 1000 },
-      { month: '2024-01-01', value: 2000 },
+    vi.mocked(netWorthApi.getInvestmentsDaily).mockResolvedValue([
+      { date: '2019-01-01', value: 1000 },
+      { date: '2019-01-31', value: 1500 },
+      { date: '2024-01-01', value: 2000 },
     ]);
+    vi.mocked(netWorthApi.getInvestmentsPeriodResult).mockResolvedValue(
+      periodResult({ startDate: '2019-01-01', startPriceDate: '2018-12-31' }),
+    );
     render(<InvestmentValueChart />);
     await screen.findByText('Portfolio Value Over Time');
     await waitFor(() =>
-      expect(netWorthApi.getInvestmentsMonthly).toHaveBeenCalled()
+      expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledWith(
+        expect.objectContaining({ sampling: 'monthEnd' }),
+      ),
     );
-    expect(netWorthApi.getInvestmentsDaily).not.toHaveBeenCalled();
+    expect(netWorthApi.getInvestmentsMonthly).not.toHaveBeenCalled();
+    // The line opens on the close the figures are measured from, named by the
+    // session it came from; the month-end between is named by its month and
+    // the last point by its own day.
+    await waitFor(() => {
+      const points = JSON.parse(
+        screen.getByTestId('area-chart').getAttribute('data-points')!,
+      ) as Array<{ name: string; iso: string }>;
+      expect(points.map((p) => p.name)).toEqual([
+        'Dec 31, 2018',
+        'Jan 2019',
+        'Jan 1, 2024',
+      ]);
+    });
   });
 
   it('renders titleSuffix when provided', async () => {
@@ -1295,7 +1364,8 @@ describe('InvestmentValueChart', () => {
       expect(screen.getByTestId('unknown-amount')).toBeInTheDocument(),
     );
     expect(screen.queryByText('+0.0%')).toBeNull();
-    expect(screen.getByText('+$0.00')).toBeInTheDocument();
+    // The value change and the result are both known zeros, not unknowns.
+    expect(screen.getAllByText('+$0.00')).toHaveLength(2);
   });
 
   it('shows empty chart message with skipped symbols in intradayUnavailable state', async () => {
@@ -1332,7 +1402,10 @@ describe('InvestmentValueChart', () => {
     render(<InvestmentValueChart />);
     const msg = await screen.findByText(/Intraday view unavailable/i);
     expect(msg).toBeInTheDocument();
-    expect(screen.queryByText(/:/)).not.toBeInTheDocument();
+    // No ": <symbols>" suffix on the description.
+    expect(
+      screen.getByText(/One or more holdings use a quote provider/),
+    ).not.toHaveTextContent(':');
   });
 
   it('shows warning icon with empty skippedSymbols in fallback notice', async () => {
@@ -1421,19 +1494,21 @@ describe('InvestmentValueChart', () => {
     expect(msg).toBeInTheDocument();
   });
 
-  it('uses monthly API for all range', async () => {
+  it('samples the daily series at month-ends for all range', async () => {
     dateRangeState.dateRange = 'all';
     dateRangeState.resolvedRange = { start: '2010-01-01', end: '2024-01-01' };
-    vi.mocked(netWorthApi.getInvestmentsMonthly).mockResolvedValue([
-      { month: '2010-01-01', value: 500 },
-      { month: '2024-01-01', value: 3000 },
+    vi.mocked(netWorthApi.getInvestmentsDaily).mockResolvedValue([
+      { date: '2010-01-01', value: 500 },
+      { date: '2024-01-01', value: 3000 },
     ]);
     render(<InvestmentValueChart />);
     await screen.findByText('Portfolio Value Over Time');
     await waitFor(() =>
-      expect(netWorthApi.getInvestmentsMonthly).toHaveBeenCalled()
+      expect(netWorthApi.getInvestmentsDaily).toHaveBeenCalledWith(
+        expect.objectContaining({ sampling: 'monthEnd' }),
+      ),
     );
-    expect(netWorthApi.getInvestmentsDaily).not.toHaveBeenCalled();
+    expect(netWorthApi.getInvestmentsMonthly).not.toHaveBeenCalled();
   });
 
   it('passes displayCurrency to intraday API when it differs from defaultCurrency', async () => {

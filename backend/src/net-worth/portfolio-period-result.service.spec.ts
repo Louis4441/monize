@@ -237,6 +237,12 @@ describe("PortfolioPeriodResultService", () => {
 
     // The invested measure never saw it: 8,800 - 8,000 with no capital flow.
     expect(result.investmentPnl).toBe(800);
+    // And its value change is the securities line the chart draws, last point
+    // less first -- not the 50,800 the account moved by.
+    expect(result.investedValueChange).toBe(800);
+    expect(result.investedValueChange).toBe(
+      result.investedValueEnd! - result.investedValueStart!,
+    );
     // +10% on the securities, not +8% on securities-plus-cash, and not a
     // fraction of a base the 50,000 joined.
     expect(result.investmentReturnPercent).toBe(10);

@@ -184,7 +184,7 @@ vi.mock('@/components/investments/portfolio-chart-utils', async (importActual) =
   ChartFlagShadowFilter: () => null,
 }));
 
-const mockGetInvestmentsMonthly = vi.fn();
+const mockGetInvestmentsSampled = vi.fn();
 const mockGetInvestmentsDaily = vi.fn();
 const mockGetInvestmentsBreakdown = vi.fn();
 const mockGetPeriodResult = vi.fn();
@@ -196,8 +196,12 @@ const mockGetSecurities = vi.fn().mockResolvedValue([]);
 
 vi.mock('@/lib/net-worth', () => ({
   netWorthApi: {
-    getInvestmentsMonthly: (...args: any[]) => mockGetInvestmentsMonthly(...args),
-    getInvestmentsDaily: (...args: any[]) => mockGetInvestmentsDaily(...args),
+    // A long range asks the daily endpoint for its month-end sample; routed
+    // to its own mock so a case states which series it is about.
+    getInvestmentsDaily: (...args: any[]) =>
+      args[0]?.sampling === 'monthEnd'
+        ? mockGetInvestmentsSampled(...args)
+        : mockGetInvestmentsDaily(...args),
     getInvestmentsBreakdown: (...args: any[]) => mockGetInvestmentsBreakdown(...args),
     getInvestmentsPeriodResult: (...args: any[]) => mockGetPeriodResult(...args),
   },
@@ -272,8 +276,14 @@ const periodResult = (overrides: Record<string, unknown> = {}) => {
   const mirrored = {
     investedValueStart: base.startValue,
     investedValueEnd: base.endValue,
-    investmentCapitalFlows: 0,
-    investmentIncome: 0,
+    investedValueChange:
+      'investedValueChange' in overrides
+        ? overrides.investedValueChange
+        : base.valueChange,
+    investmentCapitalFlows:
+      'investmentCapitalFlows' in overrides ? overrides.investmentCapitalFlows : 0,
+    investmentIncome:
+      'investmentIncome' in overrides ? overrides.investmentIncome : 0,
     investmentPnl:
       'investmentPnl' in overrides ? overrides.investmentPnl : base.investmentResult,
     investmentReturnPercent:
@@ -303,7 +313,7 @@ describe('PortfolioValueReport', () => {
   });
 
   it('shows loading state initially', () => {
-    mockGetInvestmentsMonthly.mockReturnValue(new Promise(() => {}));
+    mockGetInvestmentsSampled.mockReturnValue(new Promise(() => {}));
     mockGetPeriodResult.mockReturnValue(new Promise(() => {}));
     mockGetPortfolioSummary.mockReturnValue(new Promise(() => {}));
     mockGetInvestmentAccounts.mockReturnValue(new Promise(() => {}));
@@ -312,7 +322,7 @@ describe('PortfolioValueReport', () => {
   });
 
   it('renders empty state when no monthly data', async () => {
-    mockGetInvestmentsMonthly.mockResolvedValue([]);
+    mockGetInvestmentsSampled.mockResolvedValue([]);
     mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
     mockGetInvestmentAccounts.mockResolvedValue([]);
     render(<PortfolioValueReport />);
@@ -322,10 +332,10 @@ describe('PortfolioValueReport', () => {
   });
 
   it('renders summary cards with portfolio data', async () => {
-    mockGetInvestmentsMonthly.mockResolvedValue([
-      { month: '2024-06-01', value: 50000 },
-      { month: '2024-07-01', value: 52000 },
-      { month: '2024-08-01', value: 55000 },
+    mockGetInvestmentsSampled.mockResolvedValue([
+      { date: '2024-06-01', value: 50000 },
+      { date: '2024-07-01', value: 52000 },
+      { date: '2024-08-01', value: 55000 },
     ]);
     mockGetPortfolioSummary.mockResolvedValue({
       holdings: [],
@@ -354,15 +364,69 @@ describe('PortfolioValueReport', () => {
     });
     expect(screen.getByText('Lowest Value')).toBeInTheDocument();
     expect(screen.getByText('Value Change')).toBeInTheDocument();
-    expect(screen.getByText('Net Deposits and Withdrawals')).toBeInTheDocument();
+    expect(screen.getByText('Net Invested')).toBeInTheDocument();
     expect(screen.getByText('Investment Result')).toBeInTheDocument();
   });
 
+  /**
+   * The default 2Y window is drawn from the daily valuation sampled at
+   * month-ends, so its first point IS the close the figures are measured from
+   * and its last is today: the Value Change beside it is the line's own last
+   * point less its first, not a month-end snapshot's.
+   */
+  it('opens the long-range line on the close the figures are measured from', async () => {
+    let requestedStart = '';
+    mockGetInvestmentsSampled.mockImplementation(
+      async (params: { startDate: string; endDate: string }) => {
+        requestedStart = params.startDate;
+        return [
+          { date: params.startDate, value: 50000, securitiesValue: 50000 },
+          { date: '2025-01-31', value: 51000, securitiesValue: 51000 },
+          { date: params.endDate, value: 53000, securitiesValue: 53000 },
+        ];
+      },
+    );
+    mockGetPeriodResult.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return periodResult({
+        startDate: requestedStart,
+        startPriceDate: '2024-09-27',
+        investedValueChange: 3000,
+      });
+    });
+    mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    render(<PortfolioValueReport />);
+
+    await waitFor(() =>
+      expect(mockGetInvestmentsSampled).toHaveBeenCalledWith(
+        expect.objectContaining({ sampling: 'monthEnd' }),
+      ),
+    );
+    // The monthly snapshots are not what a long range draws any more.
+    expect(mockGetInvestmentsDaily).not.toHaveBeenCalled();
+    await waitFor(() => {
+      const points = JSON.parse(
+        screen.getByTestId('area-chart').getAttribute('data-points')!,
+      ) as Array<{ name: string; iso: string; Value: number }>;
+      // Named by the session its close came from, as the caption is.
+      expect(points[0].name).toBe('Sep 27, 2024');
+      expect(points[0].iso).toBe(requestedStart);
+      expect(points[1].name).toBe('Jan 2025');
+      expect(points[points.length - 1].Value - points[0].Value).toBe(3000);
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByText('Value Change').parentElement!.parentElement!.textContent,
+      ).toContain('3000'),
+    );
+  });
+
   it('lets the user dismiss a high or low value bubble without persisting it', async () => {
-    mockGetInvestmentsMonthly.mockResolvedValue([
-      { month: '2024-06-01', value: 50000 },
-      { month: '2024-07-01', value: 52000 },
-      { month: '2024-08-01', value: 55000 },
+    mockGetInvestmentsSampled.mockResolvedValue([
+      { date: '2024-06-01', value: 50000 },
+      { date: '2024-07-01', value: 52000 },
+      { date: '2024-08-01', value: 55000 },
     ]);
     mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
     mockGetInvestmentAccounts.mockResolvedValue([]);
@@ -389,9 +453,9 @@ describe('PortfolioValueReport', () => {
   });
 
   it('renders the area chart', async () => {
-    mockGetInvestmentsMonthly.mockResolvedValue([
-      { month: '2024-06-01', value: 50000 },
-      { month: '2024-07-01', value: 55000 },
+    mockGetInvestmentsSampled.mockResolvedValue([
+      { date: '2024-06-01', value: 50000 },
+      { date: '2024-07-01', value: 55000 },
     ]);
     mockGetPortfolioSummary.mockResolvedValue({
       ...emptyPortfolio,
@@ -408,8 +472,8 @@ describe('PortfolioValueReport', () => {
   });
 
   it('renders portfolio breakdown table when account data available', async () => {
-    mockGetInvestmentsMonthly.mockResolvedValue([
-      { month: '2024-06-01', value: 50000 },
+    mockGetInvestmentsSampled.mockResolvedValue([
+      { date: '2024-06-01', value: 50000 },
     ]);
     mockGetPortfolioSummary.mockResolvedValue({
       holdings: [],
@@ -442,7 +506,7 @@ describe('PortfolioValueReport', () => {
   });
 
   it('passes date filter ranges including 1w, mtd, 1m, 3m, ytd to DateRangeSelector', async () => {
-    mockGetInvestmentsMonthly.mockResolvedValue([]);
+    mockGetInvestmentsSampled.mockResolvedValue([]);
     mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
     mockGetInvestmentAccounts.mockResolvedValue([]);
     render(<PortfolioValueReport />);
@@ -544,7 +608,7 @@ describe('PortfolioValueReport', () => {
       mockDateRangeSelectorProps.mock.calls[mockDateRangeSelectorProps.mock.calls.length - 1][0];
 
     const renderLoaded = async (daily: Array<{ date: string; value: number }> = []) => {
-      mockGetInvestmentsMonthly.mockResolvedValue([]);
+      mockGetInvestmentsSampled.mockResolvedValue([]);
       mockGetInvestmentsDaily.mockResolvedValue(daily);
       mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
       mockGetInvestmentAccounts.mockResolvedValue([]);
@@ -605,7 +669,7 @@ describe('PortfolioValueReport', () => {
       expect(mockGetInvestmentsDaily).toHaveBeenCalledWith(
         expect.objectContaining({ startDate: '2025-01-01', endDate: '2026-01-01' }),
       );
-      expect(mockGetInvestmentsMonthly).not.toHaveBeenCalled();
+      expect(mockGetInvestmentsSampled).not.toHaveBeenCalled();
       // A custom window is dated, not named: the server has no preset for it.
       await waitFor(() =>
         expect(mockGetPeriodResult).toHaveBeenCalledWith(
@@ -620,7 +684,7 @@ describe('PortfolioValueReport', () => {
       mockCustomStart = '2024-12-30';
       mockCustomEnd = '2026-01-01';
       await renderLoaded();
-      expect(mockGetInvestmentsMonthly).toHaveBeenCalledWith(
+      expect(mockGetInvestmentsSampled).toHaveBeenCalledWith(
         expect.objectContaining({ startDate: '2024-12-30', endDate: '2026-01-01' }),
       );
       expect(mockGetInvestmentsDaily).not.toHaveBeenCalled();
@@ -633,13 +697,13 @@ describe('PortfolioValueReport', () => {
       mockCustomStart = '2026-02-01';
       await renderLoaded();
       expect(mockGetInvestmentsDaily).not.toHaveBeenCalled();
-      expect(mockGetInvestmentsMonthly).not.toHaveBeenCalled();
+      expect(mockGetInvestmentsSampled).not.toHaveBeenCalled();
       expect(mockGetPeriodResult).not.toHaveBeenCalled();
     });
   });
 
   it('handles loadData error gracefully', async () => {
-    mockGetInvestmentsMonthly.mockRejectedValue(new Error('boom'));
+    mockGetInvestmentsSampled.mockRejectedValue(new Error('boom'));
     mockGetPortfolioSummary.mockRejectedValue(new Error('boom'));
     mockGetInvestmentAccounts.mockRejectedValue(new Error('boom'));
     render(<PortfolioValueReport />);
@@ -651,10 +715,10 @@ describe('PortfolioValueReport', () => {
   it('exports pdf with breakdown', async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
     (exportToPdf as any).mockClear();
-    mockGetInvestmentsMonthly.mockResolvedValue([
-      { month: '2024-06-01', value: 50000 },
-      { month: '2024-07-01', value: 55000 },
-      { month: '2024-08-01', value: 52000 },
+    mockGetInvestmentsSampled.mockResolvedValue([
+      { date: '2024-06-01', value: 50000 },
+      { date: '2024-07-01', value: 55000 },
+      { date: '2024-08-01', value: 52000 },
     ]);
     mockGetPortfolioSummary.mockResolvedValue({
       holdings: [],
@@ -684,8 +748,8 @@ describe('PortfolioValueReport', () => {
   it('exports pdf with no portfolio breakdown rows', async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
     (exportToPdf as any).mockClear();
-    mockGetInvestmentsMonthly.mockResolvedValue([
-      { month: '2024-06-01', value: 50000 },
+    mockGetInvestmentsSampled.mockResolvedValue([
+      { date: '2024-06-01', value: 50000 },
     ]);
     mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
     mockGetInvestmentAccounts.mockResolvedValue([]);
@@ -702,8 +766,8 @@ describe('PortfolioValueReport', () => {
   });
 
   it('changes selected account', async () => {
-    mockGetInvestmentsMonthly.mockResolvedValue([
-      { month: '2024-06-01', value: 50000 },
+    mockGetInvestmentsSampled.mockResolvedValue([
+      { date: '2024-06-01', value: 50000 },
     ]);
     mockGetPortfolioSummary.mockResolvedValue({
       ...emptyPortfolio, totalPortfolioValue: 50000,
@@ -721,7 +785,7 @@ describe('PortfolioValueReport', () => {
 
   it('persists the account selection so it survives leaving the report', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    mockGetInvestmentsMonthly.mockResolvedValue([{ month: '2024-06-01', value: 50000 }]);
+    mockGetInvestmentsSampled.mockResolvedValue([{ date: '2024-06-01', value: 50000 }]);
     mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
     mockGetInvestmentAccounts.mockResolvedValue([
       { id: 'acc-1', name: 'TFSA - Cash', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
@@ -741,7 +805,7 @@ describe('PortfolioValueReport', () => {
 
   it('restores the persisted account selection on mount', async () => {
     mockStoredValues.set('monize-reports-portfolio-value-accounts', ['acc-2']);
-    mockGetInvestmentsMonthly.mockResolvedValue([{ month: '2024-06-01', value: 50000 }]);
+    mockGetInvestmentsSampled.mockResolvedValue([{ date: '2024-06-01', value: 50000 }]);
     mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
     mockGetInvestmentAccounts.mockResolvedValue([
       { id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
@@ -750,7 +814,7 @@ describe('PortfolioValueReport', () => {
     render(<PortfolioValueReport />);
 
     await waitFor(() => {
-      expect(mockGetInvestmentsMonthly).toHaveBeenCalledWith(
+      expect(mockGetInvestmentsSampled).toHaveBeenCalledWith(
         expect.objectContaining({ accountIds: 'acc-2' }),
       );
     });
@@ -761,7 +825,7 @@ describe('PortfolioValueReport', () => {
 
   it('drops persisted account IDs that no longer exist', async () => {
     mockStoredValues.set('monize-reports-portfolio-value-accounts', ['acc-1', 'gone']);
-    mockGetInvestmentsMonthly.mockResolvedValue([{ month: '2024-06-01', value: 50000 }]);
+    mockGetInvestmentsSampled.mockResolvedValue([{ date: '2024-06-01', value: 50000 }]);
     mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
     mockGetInvestmentAccounts.mockResolvedValue([
       { id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
@@ -772,16 +836,16 @@ describe('PortfolioValueReport', () => {
       expect(mockStoredValues.get('monize-reports-portfolio-value-accounts')).toEqual(['acc-1']);
     });
     await waitFor(() => {
-      expect(mockGetInvestmentsMonthly).toHaveBeenCalledWith(
+      expect(mockGetInvestmentsSampled).toHaveBeenCalledWith(
         expect.objectContaining({ accountIds: 'acc-1' }),
       );
     });
   });
 
   it('renders with negative period change', async () => {
-    mockGetInvestmentsMonthly.mockResolvedValue([
-      { month: '2024-06-01', value: 60000 },
-      { month: '2024-07-01', value: 55000 },
+    mockGetInvestmentsSampled.mockResolvedValue([
+      { date: '2024-06-01', value: 60000 },
+      { date: '2024-07-01', value: 55000 },
     ]);
     mockGetPortfolioSummary.mockResolvedValue({
       ...emptyPortfolio,
@@ -808,10 +872,10 @@ describe('PortfolioValueReport', () => {
 
   it('handles many monthly data points (>36) for axis ticks', async () => {
     const data = Array.from({ length: 50 }, (_, i) => ({
-      month: `2020-${String((i % 12) + 1).padStart(2, '0')}-01`,
+      date: `2020-${String((i % 12) + 1).padStart(2, '0')}-01`,
       value: 50000 + i * 100,
     }));
-    mockGetInvestmentsMonthly.mockResolvedValue(data);
+    mockGetInvestmentsSampled.mockResolvedValue(data);
     mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
     mockGetInvestmentAccounts.mockResolvedValue([]);
     render(<PortfolioValueReport />);
@@ -821,7 +885,7 @@ describe('PortfolioValueReport', () => {
   });
 
   it('renders account selector dropdown', async () => {
-    mockGetInvestmentsMonthly.mockResolvedValue([]);
+    mockGetInvestmentsSampled.mockResolvedValue([]);
     mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
     mockGetInvestmentAccounts.mockResolvedValue([
       { id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
@@ -833,7 +897,7 @@ describe('PortfolioValueReport', () => {
   });
 
   it('filters INVESTMENT_BROKERAGE accounts from the dropdown', async () => {
-    mockGetInvestmentsMonthly.mockResolvedValue([]);
+    mockGetInvestmentsSampled.mockResolvedValue([]);
     mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
     mockGetInvestmentAccounts.mockResolvedValue([
       { id: 'acc-cash', name: 'TFSA - Cash', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
@@ -848,7 +912,7 @@ describe('PortfolioValueReport', () => {
   });
 
   it('strips account name suffixes in the dropdown', async () => {
-    mockGetInvestmentsMonthly.mockResolvedValue([]);
+    mockGetInvestmentsSampled.mockResolvedValue([]);
     mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
     mockGetInvestmentAccounts.mockResolvedValue([
       { id: 'acc-1', name: 'TFSA - Cash', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
@@ -861,8 +925,8 @@ describe('PortfolioValueReport', () => {
   });
 
   it('shows breakdown negative gain/loss in red colour class', async () => {
-    mockGetInvestmentsMonthly.mockResolvedValue([
-      { month: '2024-06-01', value: 50000 },
+    mockGetInvestmentsSampled.mockResolvedValue([
+      { date: '2024-06-01', value: 50000 },
     ]);
     mockGetPortfolioSummary.mockResolvedValue({
       holdings: [],
@@ -886,8 +950,8 @@ describe('PortfolioValueReport', () => {
   });
 
   it('shows breakdown positive gain/loss formatted with + prefix', async () => {
-    mockGetInvestmentsMonthly.mockResolvedValue([
-      { month: '2024-06-01', value: 50000 },
+    mockGetInvestmentsSampled.mockResolvedValue([
+      { date: '2024-06-01', value: 50000 },
     ]);
     mockGetPortfolioSummary.mockResolvedValue({
       holdings: [],
@@ -908,8 +972,8 @@ describe('PortfolioValueReport', () => {
   });
 
   it('shows foreign currency label in summary cards when account currency differs from default', async () => {
-    mockGetInvestmentsMonthly.mockResolvedValue([
-      { month: '2024-06-01', value: 50000 },
+    mockGetInvestmentsSampled.mockResolvedValue([
+      { date: '2024-06-01', value: 50000 },
     ]);
     mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
     // Account with USD currency while default is CAD
@@ -994,7 +1058,8 @@ describe('PortfolioValueReport', () => {
       ['Highest Value', 51000, 'CAD'],
       ['Lowest Value', 50000, 'CAD'],
       ['Value Change', 5000, 'CAD'],
-      ['Net Deposits and Withdrawals', 0, 'CAD'],
+      ['Net Invested', 0, 'CAD'],
+      ['Dividends and Interest', 0, 'CAD'],
       ['Investment Result', 5000, 'CAD'],
       ['Investment Return', 10, '%'],
     ]);
@@ -1119,6 +1184,7 @@ describe('PortfolioValueReport', () => {
           netExternalFlows: 50000,
           investmentResult: 0,
           returnPercent: 0,
+          investedValueChange: 0,
           investmentPnl: 0,
           investmentReturnPercent: 0,
         }),
@@ -1130,9 +1196,11 @@ describe('PortfolioValueReport', () => {
 
       await waitFor(() => expect(kpi('Highest Value')).toContain('$0'));
       expect(kpi('Highest Value')).not.toContain('$60000');
-      // The account's value change is still named as such, beside a zero
-      // investment result.
-      expect(kpi('Value Change')).toContain('$50000');
+      // The value change is the plotted line's own: the securities did not
+      // move, so neither does it. The account's 50,000 (a cash deposit) is a
+      // different figure and is not the one printed beside this chart.
+      await waitFor(() => expect(kpi('Value Change')).toContain('$0'));
+      expect(kpi('Value Change')).not.toContain('$50000');
       expect(kpi('Investment Result')).toContain('$0');
     });
 
@@ -1156,6 +1224,8 @@ describe('PortfolioValueReport', () => {
           netExternalFlows: null,
           investmentResult: null,
           returnPercent: null,
+          investmentCapitalFlows: null,
+          investmentIncome: null,
           complete: false,
           reasons: ['incompletePrices'],
           unpricedSecurityIds: ['sec-1'],
@@ -1170,7 +1240,10 @@ describe('PortfolioValueReport', () => {
         expect(screen.getAllByTestId('unknown-amount')).toHaveLength(3),
       );
       expect(kpi('Value Change')).not.toContain('$');
-      expect(kpi('Net Deposits and Withdrawals')).not.toContain('$');
+      expect(kpi('Net Invested')).not.toContain('$');
+      expect(screen.getByTestId('period-income')).toHaveTextContent(
+        'Dividends and interest N/A',
+      );
       expect(kpi('Investment Result')).toContain('N/A');
     });
 
@@ -1443,8 +1516,8 @@ describe('PortfolioValueReport', () => {
   });
 
   it('names the movement it could not count when the result is withheld', async () => {
-    mockGetInvestmentsMonthly.mockResolvedValue([
-      { month: '2024-01-01', value: 50000 },
+    mockGetInvestmentsSampled.mockResolvedValue([
+      { date: '2024-01-01', value: 50000 },
     ]);
     mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
     mockGetInvestmentAccounts.mockResolvedValue([]);
@@ -1615,9 +1688,9 @@ describe('PortfolioValueReport', () => {
    */
   describe('the session the figures are measured from', () => {
     it('names it under the chart title, for every range', async () => {
-      mockGetInvestmentsMonthly.mockResolvedValue([
-        { month: '2024-06-01', value: 50000 },
-        { month: '2024-07-01', value: 55000 },
+      mockGetInvestmentsSampled.mockResolvedValue([
+        { date: '2024-06-01', value: 50000 },
+        { date: '2024-07-01', value: 55000 },
       ]);
       mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
       mockGetInvestmentAccounts.mockResolvedValue([]);
@@ -1641,8 +1714,8 @@ describe('PortfolioValueReport', () => {
     });
 
     it('says nothing when the server could not name a session', async () => {
-      mockGetInvestmentsMonthly.mockResolvedValue([
-        { month: '2024-06-01', value: 50000 },
+      mockGetInvestmentsSampled.mockResolvedValue([
+        { date: '2024-06-01', value: 50000 },
       ]);
       mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
       mockGetInvestmentAccounts.mockResolvedValue([]);
@@ -1726,9 +1799,9 @@ describe('PortfolioValueReport', () => {
     });
 
     it('names a long range too, rather than sending the window it drew', async () => {
-      mockGetInvestmentsMonthly.mockResolvedValue([
-        { month: '2024-06-01', value: 50000 },
-        { month: '2024-07-01', value: 55000 },
+      mockGetInvestmentsSampled.mockResolvedValue([
+        { date: '2024-06-01', value: 50000 },
+        { date: '2024-07-01', value: 55000 },
       ]);
       mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
       mockGetInvestmentAccounts.mockResolvedValue([]);
@@ -1761,8 +1834,8 @@ describe('PortfolioValueReport', () => {
 
   it('shows background loading indicator when data is being refreshed', async () => {
     // First load resolves; second (triggered by account change) stays pending
-    mockGetInvestmentsMonthly
-      .mockResolvedValueOnce([{ month: '2024-06-01', value: 50000 }])
+    mockGetInvestmentsSampled
+      .mockResolvedValueOnce([{ date: '2024-06-01', value: 50000 }])
       .mockReturnValueOnce(new Promise(() => {}));
     mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
     mockGetInvestmentAccounts.mockResolvedValue([
@@ -1801,8 +1874,8 @@ describe('PortfolioValueReport', () => {
   });
 
   it('prints the zero return the server sent over a single chart point', async () => {
-    mockGetInvestmentsMonthly.mockResolvedValue([
-      { month: '2024-06-01', value: 50000 },
+    mockGetInvestmentsSampled.mockResolvedValue([
+      { date: '2024-06-01', value: 50000 },
     ]);
     mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
     mockGetInvestmentAccounts.mockResolvedValue([]);
@@ -1818,8 +1891,8 @@ describe('PortfolioValueReport', () => {
   it('exports pdf using foreign-currency fmtFull when account has foreign currency', async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
     (exportToPdf as any).mockClear();
-    mockGetInvestmentsMonthly.mockResolvedValue([
-      { month: '2024-06-01', value: 40000 },
+    mockGetInvestmentsSampled.mockResolvedValue([
+      { date: '2024-06-01', value: 40000 },
     ]);
     mockGetPortfolioSummary.mockResolvedValue({
       holdings: [],
@@ -1852,10 +1925,10 @@ describe('PortfolioValueReport', () => {
   });
 
   it('switches to table view, exercises sort, and exports CSV', async () => {
-    mockGetInvestmentsMonthly.mockResolvedValue([
-      { month: '2024-01-01', value: 50000 },
-      { month: '2024-02-01', value: 52000 },
-      { month: '2024-03-01', value: 51000 },
+    mockGetInvestmentsSampled.mockResolvedValue([
+      { date: '2024-01-01', value: 50000 },
+      { date: '2024-02-01', value: 52000 },
+      { date: '2024-03-01', value: 51000 },
     ]);
     mockGetPortfolioSummary.mockResolvedValue({
       ...emptyPortfolio,
@@ -1905,7 +1978,7 @@ describe('PortfolioValueReport', () => {
   });
 
   const breakdownFixture = {
-    granularity: 'monthly' as const,
+    granularity: 'monthEnd' as const,
     currency: 'CAD',
     series: [
       { key: 'sec-1', type: 'security' as const, symbol: 'AAPL', name: 'Apple Inc.' },
@@ -1928,10 +2001,10 @@ describe('PortfolioValueReport', () => {
       expect(screen.getByTestId('area-chart')).toBeInTheDocument();
     });
     expect(mockGetInvestmentsBreakdown).toHaveBeenCalledWith(
-      expect.objectContaining({ granularity: 'monthly' }),
+      expect.objectContaining({ granularity: 'monthEnd' }),
     );
     // The total-only endpoints are not used while By security is active.
-    expect(mockGetInvestmentsMonthly).not.toHaveBeenCalled();
+    expect(mockGetInvestmentsSampled).not.toHaveBeenCalled();
   });
 
   it('uses daily granularity for the breakdown on shorter ranges', async () => {
@@ -2059,7 +2132,7 @@ describe('PortfolioValueReport', () => {
     // 800 + 200 securities, 500 cash: invested 1000/1200, cash-inclusive
     // 1500/1700. Reused by the sum-view case below with the same numbers.
     const scopedBreakdown = {
-      granularity: 'monthly' as const,
+      granularity: 'monthEnd' as const,
       currency: 'CAD',
       series: [
         { key: 'sec-1', type: 'security' as const, symbol: 'AAPL', name: 'Apple Inc.' },
@@ -2092,9 +2165,9 @@ describe('PortfolioValueReport', () => {
       // Same underlying figures reaching the report through the sum endpoint:
       // `value` folds cash in, `securitiesValue` is the invested part.
       mockSeriesMode = 'total';
-      mockGetInvestmentsMonthly.mockResolvedValue([
-        { month: '2024-06-01', value: 1500, securitiesValue: 1000 },
-        { month: '2024-07-01', value: 1700, securitiesValue: 1200 },
+      mockGetInvestmentsSampled.mockResolvedValue([
+        { date: '2024-06-01', value: 1500, securitiesValue: 1000 },
+        { date: '2024-07-01', value: 1700, securitiesValue: 1200 },
       ]);
       mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
       mockGetInvestmentAccounts.mockResolvedValue([]);

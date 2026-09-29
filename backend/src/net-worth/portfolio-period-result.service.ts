@@ -8,11 +8,10 @@ import {
 import { DataSource } from "typeorm";
 
 import { withScopedDb } from "../common/db/scoped-db";
-import { returnedRows } from "../common/db/query-result";
 import { addDaysYMD, todayYMD } from "../common/date-utils";
 import { preferredCurrency } from "../common/default-currency.util";
 import { loadExternalFlowSubtotals } from "../securities/external-flow.util";
-import { investmentEffectStatusSql } from "../securities/investment-row-effects.util";
+import { loadFirstInvestmentDate } from "./investment-inception.util";
 import {
   UNFILTERED_INVESTMENT_SCOPE_SQL,
   resolveInvestmentScopeAccountIds,
@@ -159,6 +158,11 @@ export interface PortfolioPeriodResult {
   investedValueStart: number | null;
   /** `IV(e)`: the securities at the ending close, no cash. */
   investedValueEnd: number | null;
+  /**
+   * `IV(e) - IV(b)`: the last point the value chart draws less its first. Known
+   * whenever both boundary days are complete, even where the P&L is withheld.
+   */
+  investedValueChange: number | null;
   /** Net value paid INTO the securities after `startDate`: buys less disposals. */
   investmentCapitalFlows: number | null;
   /** Dividends, interest and capital-gain distributions over the same days. */
@@ -487,22 +491,12 @@ export class PortfolioPeriodResultService {
     userId: string,
     accountIds: string[],
   ): Promise<string | null> {
-    if (accountIds.length === 0) return null;
-    const rows = returnedRows<{ date: string | null }>(
-      await withScopedDb(this.dataSource, (m) =>
-        m.query(
-          `SELECT TO_CHAR(MIN(it.transaction_date), 'YYYY-MM-DD') AS date
-             FROM investment_transactions it
-            WHERE it.user_id = $1
-              AND it.account_id = ANY($2::UUID[])
-              -- Rows as EFFECTS: renders it.status != 'VOID', because a void
-              -- row records something that did not happen.
-              AND ${investmentEffectStatusSql("it")}`,
-          [userId, accountIds],
-        ),
-      ),
+    return loadFirstInvestmentDate(
+      (sql, params) =>
+        withScopedDb(this.dataSource, (m) => m.query(sql, params)),
+      userId,
+      accountIds,
     );
-    return rows[0]?.date ?? null;
   }
 
   /** The answer for a scope or window with no valued day in it at all. */

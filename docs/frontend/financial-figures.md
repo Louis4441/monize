@@ -108,10 +108,10 @@ For a dated prior-close range the baseline is the day before the period, which i
 The line and the caption under it ("Since the close of trading on ...", `startPriceDate`) describe one session, on every range, on all three surfaces (issue #1461). Three rules hold that, and each has a guard:
 
 - **The window a price chart requests mirrors the server's preset arithmetic.** `components/investments/portfolio-range-window.ts` holds the table (`PORTFOLIO_WINDOW_STARTS`); `usePortfolioRangeWindow` returns `start`, the day the series is loaded from (`presetEarliestDate`), and `periodStart`, where the period opens (`presetWindowStart`). The two differ only on a prior-close range, where `start` is the day before. `portfolio-range-window.test.ts` and `portfolio-period-presets.util.spec.ts` pin the two files to the same dates for the same day. Separate from `resolveRangePreset` on purpose: that function answers "what period is the user asking about" for ten other reports; do not reach for it in a fourth portfolio surface, and do not "fix" a range by editing the shared resolver. A chart no longer opens "the day before the anniversary": the figures beside it never did, and the two disagreed by a day on 3M, 1Y, 2Y and 5Y.
-- **A daily series' opening point is dated by its session.** `getDailyInvestments` prices every calendar day from the latest close on or before it, so a window requested from a Sunday carries Friday's close under Sunday's date. `openingSessionDate` (`portfolio-change-baseline.ts`) names the session when the first point sits on the period result's `startDate` and `startPriceDate` differs, and the surface labels that one point with it; nothing about the value changes, and a series that does not open on the boundary (a monthly bucket, an intraday close the server already dated) is left alone. `null` from the server is unknown -- the point keeps its own date and the caption line is omitted, never the boundary in the session's place.
+- **A daily series' opening point is dated by its session.** `getDailyInvestments` prices every calendar day from the latest close on or before it, so a window requested from a Sunday carries Friday's close under Sunday's date. `openingSessionDate` (`portfolio-change-baseline.ts`) names the session when the first point sits on the period result's `startDate` and `startPriceDate` differs, and the surface labels that one point with it; nothing about the value changes, and a series that does not open on the boundary (an intraday close the server already dated) is left alone. A month-end-sampled series opens on the boundary, so its first point is relabelled like a daily one. `null` from the server is unknown -- the point keeps its own date and the caption line is omitted, never the boundary in the session's place.
 - **An intraday series arrives already shaped.** The server trims 1W, MTD and 1M to their window and opens them on the closing point of the day they are measured from (`PortfolioService.planOpeningClose`, `docs/specs/intraday-historical-positions.md`), stamped at the session's close; closing points carry `sessionClose: true`. MTD is served on its own window -- it used to ride on the rolling 1M series and be cut on the client, which on the 31st of a month does not reach the close the month is measured from -- and the client sends the range it shows (`isIntradayRange` narrows it), reshaping nothing, on the sessionStorage-cached response and the per-security breakdown alike. `portfolio-chart-utils.test.ts` holds `INTRADAY_RANGES` equal to the backend's `IntradayValueQueryDto` enum. 1D deliberately opens at the open. A 1M window with no close to open on (its measured-from day a subtotal) opens on its first session's last bar, as it always has.
 
-**A range served monthly cannot honour a day-precision rule.** 5Y and All use month buckets, so their first point is a month-end close and the caption names a session inside it. Switch the range to daily if the exact opening close matters; do not prepend a single daily point to a monthly series (the sampling splice `docs/time-series-contract.md` section 1.2 exists to stop).
+**A long range is the daily series sampled, never the stored month-end snapshots.** The ranges drawn at one point a month (the report's 6M, 2Y, 5Y, All and a custom window over a year; the chart's 5Y and All; the widget's 1Y and longer) ask `getInvestmentsDaily({ ..., sampling: 'monthEnd' })` and, in the report's "By security" view, `getInvestmentsBreakdown({ granularity: 'monthEnd' })`. The server keeps the window's first day, each month-end inside it and its last day, all from the one daily fold, so the first point is the close the figures are measured from and last point less first is the "Value Change" beside it (`docs/time-series-contract.md` section 2.7, INV-PORTCHART-001). Label the points with `sampledPointLabel` (day at the two ends, month between) and format and space the axis with `sampledTickLabel` and `monthEndAxisTicks`, which read each point's `iso` rather than parsing a localized label. Never `getInvestmentsMonthly` for a portfolio chart: its first bucket is the end of the starting month, up to a month after the period opens; and never a daily point prepended to it (the sampling splice `docs/time-series-contract.md` section 1.2 exists to stop).
 
 ## A loan's payment, payoff and remaining interest are decided once -- `deriveLoanFigures`
 
@@ -277,8 +277,14 @@ than the data that is unknown -- section 11); the card's "Simple Return" and
 surfaces LEAD with those two: `PortfolioPerformanceCard` shows
 `investmentReturnPercent` over `investmentPnl`, and `InvestmentValueChart`,
 `PortfolioValueWidget` and `PortfolioValueReport` put them where their result
-and return used to be, keeping `valueChange` and `netExternalFlows` beside them
-under their own captions. Those three also PLOT the invested value --
+and return used to be. The figures those three print beside the result are the
+invested part's as well: "Value Change" is `investedValueChange` (the plotted
+line's last point less its first), and what separates it from the result is
+"Net Invested" (`investmentCapitalFlows`) and "Dividends and interest"
+(`investmentIncome`), so `change - net invested + income = result` on screen.
+The account-level `valueChange` and `netExternalFlows` counted the reader's cash
+and did not reconcile with an invested result, so no investment chart prints
+them. Those three also PLOT the invested value --
 `investedValue(point)` (`lib/invested-value.ts`) over the point's
 `securitiesValue`, never `value` -- so a chart and the figures under it cannot
 answer two different questions. The dashboard's Net Worth chart is net worth
@@ -312,9 +318,10 @@ unconvertible amount is a rate to refresh, and a boundary (`zeroStart`,
 **Four surfaces read it**, through one request each and no arithmetic of their
 own: `PortfolioValueReport` (five cards plus the PDF and CSV exports),
 `PortfolioValueWidget` (one figure and a caption -- the investment result and
-its percent, with the value change and the net flows in the card's tooltip),
-`InvestmentValueChart` (the result and its percent as two of its four cards,
-with the value change and the net flows on the secondary lines beneath) and the
+its percent, with the invested value change, net invested and income in the
+card's tooltip), `InvestmentValueChart` (five cards: highest, lowest, the
+invested value change, the result, and its percent, with net invested and
+income on the secondary lines beneath the result) and the
 Investments page's `PortfolioPerformanceCard`, which asks the batch route
 through `hooks/usePortfolioPeriodResults.ts` -- one request for 1D, 1W, 1M, 3M,
 YTD and 1Y -- and prints each window's `returnPercent` over its
