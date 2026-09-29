@@ -29,7 +29,9 @@
   },
   "actions": {
     "moveUp": "Omhoog",
-    "moveDown": "Omlaag"
+    "moveDown": "Omlaag",
+    "run": "Uitvoeren op bestaande transacties",
+    "runInvalid": "Herstel de regel voordat je hem uitvoert"
   },
   "invalid": {
     "badge": "Ongeldig",
@@ -248,6 +250,123 @@
         "NAME_REQUIRED": "Voer een naam voor de regel in.",
         "UNKNOWN": "Dit onderdeel is ongeldig."
       }
+    },
+    "run": {
+      "button": "Uitvoeren op bestaande transacties",
+      "saveFirst": "Sla je wijzigingen op om de opgeslagen regel uit te voeren."
+    }
+  },
+  "test": {
+    "title": "Test",
+    "description": "Probeer de regel uit op je bestaande transacties. Er wordt niets gewijzigd.",
+    "button": "Regel testen",
+    "again": "Opnieuw testen",
+    "incomplete": "Vul de voorwaarden en acties hierboven aan om de regel te testen.",
+    "idle": "Kies op welke transacties je de regel wilt proberen en selecteer Regel testen.",
+    "running": "Regel wordt getest...",
+    "failed": "De test kon niet worden voltooid. {message}",
+    "stale": "De regel of de filters zijn gewijzigd sinds dit resultaat. Test opnieuw voor het huidige resultaat."
+  },
+  "run": {
+    "title": "“{name}” uitvoeren op bestaande transacties",
+    "description": "Bekijk vooraf wat de regel zou wijzigen en bevestig dan. Je kunt de uitvoering ongedaan maken via de actiegeschiedenis.",
+    "previewButton": "Voorbeeld",
+    "confirmButton": "Bevestigen en uitvoeren",
+    "idle": "Kies rekeningen en datums en selecteer Voorbeeld. Er verandert niets totdat je bevestigt.",
+    "loadingPreview": "Voorbeeld wordt geladen...",
+    "previewFailed": "Het voorbeeld kon niet worden geladen, dus er kan niets worden uitgevoerd. {message}",
+    "stale": "De filters zijn gewijzigd sinds dit voorbeeld. Vraag het voorbeeld opnieuw op voordat je uitvoert.",
+    "accountsLoading": "Rekeningen worden geladen...",
+    "accountsFailed": "Je rekeningen konden niet worden geladen, dus de filters zijn niet beschikbaar.",
+    "retry": "Opnieuw proberen",
+    "summary": "{matched, plural, one {# transactie zou wijzigen} other {# transacties zouden wijzigen}} van {scanned, plural, one {# gecontroleerde transactie} other {# gecontroleerde transacties}}.",
+    "truncated": "Er komen meer transacties overeen dan de limiet toestaat. Alleen de nieuwste zijn opgenomen. Verhoog de limiet of beperk de datums om de rest mee te nemen.",
+    "noMatches": {
+      "title": "Geen transacties zouden wijzigen",
+      "body": "Geen van de gecontroleerde transacties komt overeen met de regel, of de regel zou er niets aan wijzigen."
+    },
+    "table": {
+      "date": "Datum",
+      "payee": "Begunstigde",
+      "amount": "Bedrag",
+      "change": "Geplande wijziging",
+      "noPayee": "Geen begunstigde"
+    },
+    "skipped": {
+      "title": "{count, plural, one {# transactie blijft ongemoeid} other {# transacties blijven ongemoeid}}",
+      "line": "{count, plural, one {# transactie} other {# transacties}}: {reason}"
+    },
+    "skipReasons": {
+      "reconciled_locked": "ze is afgestemd en vergrendeld",
+      "transfer_leg_category": "ze is een overboeking, die geen categorie heeft",
+      "split_category": "ze is gesplitst, dus de categorie hoort bij de splitsingen",
+      "cross_owner_transfer_payee": "ze is een overboeking naar een andere eigenaar, van wie deze regel de begunstigde niet mag wijzigen",
+      "other": "de regel kan haar niet wijzigen"
+    },
+    "change": {
+      "category": "Categorie: {before} → {after}",
+      "payee": "Begunstigde: {before} → {after}",
+      "tagsAdded": "Tags toegevoegd: {tags}",
+      "tagsRemoved": "Tags verwijderd: {tags}",
+      "none": "geen",
+      "unknown": "een verwijderd item"
+    },
+    "filters": {
+      "accounts": "Rekeningen",
+      "allAccounts": "Alle rekeningen",
+      "startDate": "Van",
+      "endDate": "Tot",
+      "backwards": "De begindatum mag niet na de einddatum liggen.",
+      "limit": "Nieuwste transacties om te controleren",
+      "help": "Alleen de nieuwste transacties in het bereik worden gecontroleerd, maximaal {max}."
+    },
+    "errors": {
+      "PREVIEW_CHANGED": "De transacties of de regel zijn gewijzigd sinds het voorbeeld. Bekijk het nieuwe voorbeeld en voer opnieuw uit.",
+      "RUN_TOO_LARGE": "Deze uitvoering wijzigt te veel transacties om in één stap ongedaan te maken. Beperk de rekeningen of datums en probeer het opnieuw.",
+      "INVALID_RULE": "Deze regel is niet geldig en kan dus niet worden uitgevoerd. Open hem en herstel hem eerst.",
+      "DATE_RANGE_INVALID": "De begindatum mag niet na de einddatum liggen.",
+      "draftInvalid": "De regel is onvolledig of ongeldig. Controleer de voorwaarden en acties hierboven.",
+      "testFailed": "Er ging iets mis bij het testen van de regel.",
+      "previewFailed": "Er ging iets mis bij het laden van het voorbeeld.",
+      "runFailed": "De uitvoering kon niet worden voltooid. Controleer de actiegeschiedenis voordat je het opnieuw probeert."
+    },
+    "toast": {
+      "done": "{count, plural, =0 {Er zijn geen transacties gewijzigd} one {# transactie gewijzigd} other {# transacties gewijzigd}}. Je kunt dit ongedaan maken via de actiegeschiedenis."
+    },
+    "done": {
+      "summary": "{count, plural, =0 {Er zijn geen transacties gewijzigd.} one {# transactie is gewijzigd.} other {# transacties zijn gewijzigd.}}",
+      "undo": "Je kunt de uitvoering ongedaan maken via de actiegeschiedenis."
+    }
+  },
+  "applications": {
+    "title": "Geschiedenis",
+    "description": "De laatste transacties die deze regel heeft gewijzigd, de nieuwste eerst.",
+    "loading": "Geschiedenis wordt geladen...",
+    "error": {
+      "title": "De geschiedenis kon niet worden geladen",
+      "body": "Er wordt niets getoond omdat het verzoek mislukte, niet omdat de regel nog niet is uitgevoerd. Controleer je verbinding en probeer het opnieuw.",
+      "retry": "Opnieuw proberen"
+    },
+    "empty": {
+      "title": "Deze regel heeft nog niets gewijzigd",
+      "body": "Zodra ze een transactie wijzigt, staat de wijziging hier."
+    },
+    "source": {
+      "create": "Aangemaakt",
+      "import": "Geïmporteerd",
+      "manual": "Handmatige uitvoering",
+      "other": "Overig"
+    },
+    "table": {
+      "date": "Datum",
+      "payee": "Begunstigde",
+      "amount": "Bedrag",
+      "source": "Bron",
+      "change": "Wijziging",
+      "appliedAt": "Toegepast",
+      "open": "Transactie openen",
+      "noPayee": "Geen begunstigde",
+      "view": "Bekijken"
     }
   }
 }

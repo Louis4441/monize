@@ -29,7 +29,9 @@
   },
   "actions": {
     "moveUp": "Move up",
-    "moveDown": "Move down"
+    "moveDown": "Move down",
+    "run": "Run on existing transactions",
+    "runInvalid": "Repair the rule before running it"
   },
   "invalid": {
     "badge": "Invalid",
@@ -248,6 +250,123 @@
         "NAME_REQUIRED": "Enter a name for the rule.",
         "UNKNOWN": "This part is not valid."
       }
+    },
+    "run": {
+      "button": "Run on existing transactions",
+      "saveFirst": "Save your changes to run the saved rule."
+    }
+  },
+  "test": {
+    "title": "Test",
+    "description": "Try the rule on your existing transactions. Nothing is changed.",
+    "button": "Test rule",
+    "again": "Test again",
+    "incomplete": "Complete the conditions and actions above to test the rule.",
+    "idle": "Choose which transactions to try the rule on, then select Test rule.",
+    "running": "Testing the rule...",
+    "failed": "The test could not be completed. {message}",
+    "stale": "The rule or the filters changed since this result. Test again to see the current result."
+  },
+  "run": {
+    "title": "Run \"{name}\" on existing transactions",
+    "description": "Preview what the rule would change, then confirm. You can undo the run from the action history.",
+    "previewButton": "Preview",
+    "confirmButton": "Confirm and run",
+    "idle": "Choose accounts and dates, then select Preview. Nothing changes until you confirm.",
+    "loadingPreview": "Loading the preview...",
+    "previewFailed": "The preview could not be loaded, so nothing can be run. {message}",
+    "stale": "The filters changed since this preview. Preview again before you run.",
+    "accountsLoading": "Loading accounts...",
+    "accountsFailed": "Your accounts could not be loaded, so the filters are unavailable.",
+    "retry": "Try again",
+    "summary": "{matched, plural, one {# transaction would change} other {# transactions would change}} out of {scanned, plural, one {# transaction} other {# transactions}} scanned.",
+    "truncated": "More transactions matched than the limit allows. Only the newest are included. Raise the limit or narrow the dates to include the rest.",
+    "noMatches": {
+      "title": "No transactions would change",
+      "body": "None of the scanned transactions match the rule, or the rule would change nothing on them."
+    },
+    "table": {
+      "date": "Date",
+      "payee": "Payee",
+      "amount": "Amount",
+      "change": "Planned change",
+      "noPayee": "No payee"
+    },
+    "skipped": {
+      "title": "{count, plural, one {# transaction is left alone} other {# transactions are left alone}}",
+      "line": "{count, plural, one {# transaction} other {# transactions}}: {reason}"
+    },
+    "skipReasons": {
+      "reconciled_locked": "it is reconciled and locked",
+      "transfer_leg_category": "it is a transfer, which has no category",
+      "split_category": "it is split, so the category belongs to the splits",
+      "cross_owner_transfer_payee": "it is a transfer to another owner, whose payee this rule may not change",
+      "other": "the rule cannot change it"
+    },
+    "change": {
+      "category": "Category: {before} → {after}",
+      "payee": "Payee: {before} → {after}",
+      "tagsAdded": "Tags added: {tags}",
+      "tagsRemoved": "Tags removed: {tags}",
+      "none": "none",
+      "unknown": "a deleted item"
+    },
+    "filters": {
+      "accounts": "Accounts",
+      "allAccounts": "All accounts",
+      "startDate": "From",
+      "endDate": "To",
+      "backwards": "The start date must not be after the end date.",
+      "limit": "Newest transactions to examine",
+      "help": "Only the newest transactions in the range are examined, up to {max}."
+    },
+    "errors": {
+      "PREVIEW_CHANGED": "The transactions or the rule changed since the preview. Review the new preview and run again.",
+      "RUN_TOO_LARGE": "This run changes too many transactions to be undone in one step. Narrow the accounts or the dates and try again.",
+      "INVALID_RULE": "This rule is not valid, so it cannot be run. Open it and repair it first.",
+      "DATE_RANGE_INVALID": "The start date must not be after the end date.",
+      "draftInvalid": "The rule is incomplete or not valid. Check the conditions and actions above.",
+      "testFailed": "Something went wrong while testing the rule.",
+      "previewFailed": "Something went wrong while loading the preview.",
+      "runFailed": "The run could not be completed. Check the action history before you try again."
+    },
+    "toast": {
+      "done": "{count, plural, =0 {No transactions were changed} one {# transaction changed} other {# transactions changed}}. You can undo this from the action history."
+    },
+    "done": {
+      "summary": "{count, plural, =0 {No transactions were changed.} one {# transaction was changed.} other {# transactions were changed.}}",
+      "undo": "You can undo the run from the action history."
+    }
+  },
+  "applications": {
+    "title": "History",
+    "description": "The latest transactions this rule changed, newest first.",
+    "loading": "Loading the history...",
+    "error": {
+      "title": "The history could not be loaded",
+      "body": "Nothing is shown because the request failed, not because the rule has not run. Check your connection and try again.",
+      "retry": "Try again"
+    },
+    "empty": {
+      "title": "This rule has not changed anything yet",
+      "body": "When it changes a transaction, the change is listed here."
+    },
+    "source": {
+      "create": "Created",
+      "import": "Imported",
+      "manual": "Manual run",
+      "other": "Other"
+    },
+    "table": {
+      "date": "Date",
+      "payee": "Payee",
+      "amount": "Amount",
+      "source": "Source",
+      "change": "Change",
+      "appliedAt": "Applied",
+      "open": "Open transaction",
+      "noPayee": "No payee",
+      "view": "View"
     }
   }
 }

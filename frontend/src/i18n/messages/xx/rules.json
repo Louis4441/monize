@@ -29,7 +29,9 @@
   },
   "actions": {
     "moveUp": "[XX-Move up-XX]",
-    "moveDown": "[XX-Move down-XX]"
+    "moveDown": "[XX-Move down-XX]",
+    "run": "[XX-Run on existing transactions-XX]",
+    "runInvalid": "[XX-Repair the rule before running it-XX]"
   },
   "invalid": {
     "badge": "[XX-Invalid-XX]",
@@ -248,6 +250,123 @@
         "NAME_REQUIRED": "[XX-Enter a name for the rule.-XX]",
         "UNKNOWN": "[XX-This part is not valid.-XX]"
       }
+    },
+    "run": {
+      "button": "[XX-Run on existing transactions-XX]",
+      "saveFirst": "[XX-Save your changes to run the saved rule.-XX]"
+    }
+  },
+  "test": {
+    "title": "[XX-Test-XX]",
+    "description": "[XX-Try the rule on your existing transactions. Nothing is changed.-XX]",
+    "button": "[XX-Test rule-XX]",
+    "again": "[XX-Test again-XX]",
+    "incomplete": "[XX-Complete the conditions and actions above to test the rule.-XX]",
+    "idle": "[XX-Choose which transactions to try the rule on, then select Test rule.-XX]",
+    "running": "[XX-Testing the rule...-XX]",
+    "failed": "[XX-The test could not be completed. {message}-XX]",
+    "stale": "[XX-The rule or the filters changed since this result. Test again to see the current result.-XX]"
+  },
+  "run": {
+    "title": "[XX-Run \"{name}\" on existing transactions-XX]",
+    "description": "[XX-Preview what the rule would change, then confirm. You can undo the run from the action history.-XX]",
+    "previewButton": "[XX-Preview-XX]",
+    "confirmButton": "[XX-Confirm and run-XX]",
+    "idle": "[XX-Choose accounts and dates, then select Preview. Nothing changes until you confirm.-XX]",
+    "loadingPreview": "[XX-Loading the preview...-XX]",
+    "previewFailed": "[XX-The preview could not be loaded, so nothing can be run. {message}-XX]",
+    "stale": "[XX-The filters changed since this preview. Preview again before you run.-XX]",
+    "accountsLoading": "[XX-Loading accounts...-XX]",
+    "accountsFailed": "[XX-Your accounts could not be loaded, so the filters are unavailable.-XX]",
+    "retry": "[XX-Try again-XX]",
+    "summary": "[XX-{matched, plural, one {# transaction would change} other {# transactions would change}} out of {scanned, plural, one {# transaction} other {# transactions}} scanned.-XX]",
+    "truncated": "[XX-More transactions matched than the limit allows. Only the newest are included. Raise the limit or narrow the dates to include the rest.-XX]",
+    "noMatches": {
+      "title": "[XX-No transactions would change-XX]",
+      "body": "[XX-None of the scanned transactions match the rule, or the rule would change nothing on them.-XX]"
+    },
+    "table": {
+      "date": "[XX-Date-XX]",
+      "payee": "[XX-Payee-XX]",
+      "amount": "[XX-Amount-XX]",
+      "change": "[XX-Planned change-XX]",
+      "noPayee": "[XX-No payee-XX]"
+    },
+    "skipped": {
+      "title": "[XX-{count, plural, one {# transaction is left alone} other {# transactions are left alone}}-XX]",
+      "line": "[XX-{count, plural, one {# transaction} other {# transactions}}: {reason}-XX]"
+    },
+    "skipReasons": {
+      "reconciled_locked": "[XX-it is reconciled and locked-XX]",
+      "transfer_leg_category": "[XX-it is a transfer, which has no category-XX]",
+      "split_category": "[XX-it is split, so the category belongs to the splits-XX]",
+      "cross_owner_transfer_payee": "[XX-it is a transfer to another owner, whose payee this rule may not change-XX]",
+      "other": "[XX-the rule cannot change it-XX]"
+    },
+    "change": {
+      "category": "[XX-Category: {before} → {after}-XX]",
+      "payee": "[XX-Payee: {before} → {after}-XX]",
+      "tagsAdded": "[XX-Tags added: {tags}-XX]",
+      "tagsRemoved": "[XX-Tags removed: {tags}-XX]",
+      "none": "[XX-none-XX]",
+      "unknown": "[XX-a deleted item-XX]"
+    },
+    "filters": {
+      "accounts": "[XX-Accounts-XX]",
+      "allAccounts": "[XX-All accounts-XX]",
+      "startDate": "[XX-From-XX]",
+      "endDate": "[XX-To-XX]",
+      "backwards": "[XX-The start date must not be after the end date.-XX]",
+      "limit": "[XX-Newest transactions to examine-XX]",
+      "help": "[XX-Only the newest transactions in the range are examined, up to {max}.-XX]"
+    },
+    "errors": {
+      "PREVIEW_CHANGED": "[XX-The transactions or the rule changed since the preview. Review the new preview and run again.-XX]",
+      "RUN_TOO_LARGE": "[XX-This run changes too many transactions to be undone in one step. Narrow the accounts or the dates and try again.-XX]",
+      "INVALID_RULE": "[XX-This rule is not valid, so it cannot be run. Open it and repair it first.-XX]",
+      "DATE_RANGE_INVALID": "[XX-The start date must not be after the end date.-XX]",
+      "draftInvalid": "[XX-The rule is incomplete or not valid. Check the conditions and actions above.-XX]",
+      "testFailed": "[XX-Something went wrong while testing the rule.-XX]",
+      "previewFailed": "[XX-Something went wrong while loading the preview.-XX]",
+      "runFailed": "[XX-The run could not be completed. Check the action history before you try again.-XX]"
+    },
+    "toast": {
+      "done": "[XX-{count, plural, =0 {No transactions were changed} one {# transaction changed} other {# transactions changed}}. You can undo this from the action history.-XX]"
+    },
+    "done": {
+      "summary": "[XX-{count, plural, =0 {No transactions were changed.} one {# transaction was changed.} other {# transactions were changed.}}-XX]",
+      "undo": "[XX-You can undo the run from the action history.-XX]"
+    }
+  },
+  "applications": {
+    "title": "[XX-History-XX]",
+    "description": "[XX-The latest transactions this rule changed, newest first.-XX]",
+    "loading": "[XX-Loading the history...-XX]",
+    "error": {
+      "title": "[XX-The history could not be loaded-XX]",
+      "body": "[XX-Nothing is shown because the request failed, not because the rule has not run. Check your connection and try again.-XX]",
+      "retry": "[XX-Try again-XX]"
+    },
+    "empty": {
+      "title": "[XX-This rule has not changed anything yet-XX]",
+      "body": "[XX-When it changes a transaction, the change is listed here.-XX]"
+    },
+    "source": {
+      "create": "[XX-Created-XX]",
+      "import": "[XX-Imported-XX]",
+      "manual": "[XX-Manual run-XX]",
+      "other": "[XX-Other-XX]"
+    },
+    "table": {
+      "date": "[XX-Date-XX]",
+      "payee": "[XX-Payee-XX]",
+      "amount": "[XX-Amount-XX]",
+      "source": "[XX-Source-XX]",
+      "change": "[XX-Change-XX]",
+      "appliedAt": "[XX-Applied-XX]",
+      "open": "[XX-Open transaction-XX]",
+      "noPayee": "[XX-No payee-XX]",
+      "view": "[XX-View-XX]"
     }
   }
 }

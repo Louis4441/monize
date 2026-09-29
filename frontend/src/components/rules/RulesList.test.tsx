@@ -7,6 +7,7 @@ import { makeRule } from './rules-test-fixtures';
 const handlers = {
   onToggle: vi.fn(),
   onDuplicate: vi.fn(),
+  onRun: vi.fn(),
   onMove: vi.fn(),
   onDelete: vi.fn(),
 };
@@ -95,7 +96,7 @@ describe('RulesList', () => {
 
     openMenu('Coffee shops');
     const items = screen.getAllByRole('menuitem').map((i) => i.textContent);
-    expect(items).toEqual(['Duplicate', 'Move up', 'Move down', 'Delete']);
+    expect(items).toEqual(['Duplicate', 'Run on existing transactions', 'Move up', 'Move down', 'Delete']);
   });
 
   it('disables move up on the first rule and move down on the last', () => {
@@ -116,6 +117,23 @@ describe('RulesList', () => {
     renderList({ reordering: true });
     openMenu('Salary');
     expect(screen.getByRole('menuitem', { name: 'Move up' })).toBeDisabled();
+  });
+
+  it('reports the run on existing transactions', () => {
+    renderList();
+    openMenu('Salary');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Run on existing transactions' }));
+    expect(handlers.onRun).toHaveBeenCalledWith(expect.objectContaining({ id: 'b' }));
+  });
+
+  it('will not run an invalid rule', () => {
+    renderList({
+      rules: [makeRule({ id: 'a', name: 'Broken', invalid: true, invalidReasons: [{ path: 'actions', code: 'NO_ACTIONS' }] })],
+    });
+    openMenu('Broken');
+    expect(screen.getByRole('menuitem', { name: 'Run on existing transactions' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Run on existing transactions' }));
+    expect(handlers.onRun).not.toHaveBeenCalled();
   });
 
   it('reports duplicate and delete', () => {

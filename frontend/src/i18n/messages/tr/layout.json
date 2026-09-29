@@ -128,7 +128,8 @@
       "updatedInvestmentTransaction": "{action} işlemi güncellendi",
       "deletedInvestmentTransaction": "{action} işlemi silindi",
       "transferredSecurity": "Menkul kıymet hesaplar arasında transfer edildi",
-      "updatedSecurityTransfer": "Menkul kıymet transferi güncellendi"
+      "updatedSecurityTransfer": "Menkul kıymet transferi güncellendi",
+      "ranTransactionRule": "“{name}” kuralı {count, plural, other {# işlemde}} çalıştırıldı"
     },
     "timeAgo": {
       "justNow": "şimdi",

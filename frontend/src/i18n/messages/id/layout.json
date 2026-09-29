@@ -128,7 +128,8 @@
       "updatedInvestmentTransaction": "Transaksi {action} diperbarui",
       "deletedInvestmentTransaction": "Transaksi {action} dihapus",
       "transferredSecurity": "Sekuritas dipindahkan antar akun",
-      "updatedSecurityTransfer": "Transfer sekuritas diperbarui"
+      "updatedSecurityTransfer": "Transfer sekuritas diperbarui",
+      "ranTransactionRule": "Aturan “{name}” dijalankan pada {count, plural, other {# transaksi}}"
     },
     "timeAgo": {
       "justNow": "baru saja",

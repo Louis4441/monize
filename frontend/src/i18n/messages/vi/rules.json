@@ -29,7 +29,9 @@
   },
   "actions": {
     "moveUp": "Di chuyển lên",
-    "moveDown": "Di chuyển xuống"
+    "moveDown": "Di chuyển xuống",
+    "run": "Chạy trên các giao dịch hiện có",
+    "runInvalid": "Hãy sửa quy tắc trước khi chạy"
   },
   "invalid": {
     "badge": "Không hợp lệ",
@@ -248,6 +250,123 @@
         "NAME_REQUIRED": "Hãy nhập tên cho quy tắc.",
         "UNKNOWN": "Phần này không hợp lệ."
       }
+    },
+    "run": {
+      "button": "Chạy trên các giao dịch hiện có",
+      "saveFirst": "Hãy lưu thay đổi để chạy quy tắc đã lưu."
+    }
+  },
+  "test": {
+    "title": "Kiểm tra",
+    "description": "Thử quy tắc trên các giao dịch hiện có của bạn. Không có gì bị thay đổi.",
+    "button": "Kiểm tra quy tắc",
+    "again": "Kiểm tra lại",
+    "incomplete": "Hoàn thành các điều kiện và hành động ở trên để kiểm tra quy tắc.",
+    "idle": "Chọn các giao dịch để thử quy tắc, rồi chọn Kiểm tra quy tắc.",
+    "running": "Đang kiểm tra quy tắc...",
+    "failed": "Không thể hoàn tất kiểm tra. {message}",
+    "stale": "Quy tắc hoặc bộ lọc đã thay đổi kể từ kết quả này. Hãy kiểm tra lại để xem kết quả hiện tại."
+  },
+  "run": {
+    "title": "Chạy “{name}” trên các giao dịch hiện có",
+    "description": "Xem trước những gì quy tắc sẽ thay đổi, sau đó xác nhận. Bạn có thể hoàn tác lần chạy từ lịch sử hành động.",
+    "previewButton": "Xem trước",
+    "confirmButton": "Xác nhận và chạy",
+    "idle": "Chọn tài khoản và ngày, rồi chọn Xem trước. Không có gì thay đổi cho đến khi bạn xác nhận.",
+    "loadingPreview": "Đang tải bản xem trước...",
+    "previewFailed": "Không thể tải bản xem trước nên không thể chạy gì cả. {message}",
+    "stale": "Bộ lọc đã thay đổi kể từ bản xem trước này. Hãy xem trước lại trước khi chạy.",
+    "accountsLoading": "Đang tải tài khoản...",
+    "accountsFailed": "Không thể tải tài khoản của bạn nên bộ lọc không khả dụng.",
+    "retry": "Thử lại",
+    "summary": "{matched, plural, other {# giao dịch}} sẽ thay đổi trong số {scanned, plural, other {# giao dịch}} đã kiểm tra.",
+    "truncated": "Có nhiều giao dịch khớp hơn giới hạn cho phép. Chỉ các giao dịch mới nhất được đưa vào. Hãy tăng giới hạn hoặc thu hẹp ngày để đưa phần còn lại vào.",
+    "noMatches": {
+      "title": "Không có giao dịch nào sẽ thay đổi",
+      "body": "Không giao dịch nào đã kiểm tra khớp với quy tắc, hoặc quy tắc sẽ không thay đổi gì ở chúng."
+    },
+    "table": {
+      "date": "Ngày",
+      "payee": "Người nhận",
+      "amount": "Số tiền",
+      "change": "Thay đổi dự kiến",
+      "noPayee": "Không có người nhận"
+    },
+    "skipped": {
+      "title": "{count, plural, other {# giao dịch}} được giữ nguyên",
+      "line": "{count, plural, other {# giao dịch}}: {reason}"
+    },
+    "skipReasons": {
+      "reconciled_locked": "đã đối chiếu và bị khóa",
+      "transfer_leg_category": "là giao dịch chuyển khoản, không có danh mục",
+      "split_category": "đã được chia nhỏ nên danh mục thuộc về các phần chia",
+      "cross_owner_transfer_payee": "là chuyển khoản cho chủ sở hữu khác, người nhận của nó quy tắc này không được thay đổi",
+      "other": "quy tắc không thể thay đổi nó"
+    },
+    "change": {
+      "category": "Danh mục: {before} → {after}",
+      "payee": "Người nhận: {before} → {after}",
+      "tagsAdded": "Thẻ đã thêm: {tags}",
+      "tagsRemoved": "Thẻ đã gỡ: {tags}",
+      "none": "không có",
+      "unknown": "một mục đã bị xóa"
+    },
+    "filters": {
+      "accounts": "Tài khoản",
+      "allAccounts": "Tất cả tài khoản",
+      "startDate": "Từ",
+      "endDate": "Đến",
+      "backwards": "Ngày bắt đầu không được sau ngày kết thúc.",
+      "limit": "Số giao dịch mới nhất cần kiểm tra",
+      "help": "Chỉ các giao dịch mới nhất trong khoảng được kiểm tra, tối đa {max}."
+    },
+    "errors": {
+      "PREVIEW_CHANGED": "Các giao dịch hoặc quy tắc đã thay đổi kể từ bản xem trước. Hãy xem bản xem trước mới và chạy lại.",
+      "RUN_TOO_LARGE": "Lần chạy này thay đổi quá nhiều giao dịch để hoàn tác trong một bước. Hãy thu hẹp tài khoản hoặc ngày rồi thử lại.",
+      "INVALID_RULE": "Quy tắc này không hợp lệ nên không thể chạy. Hãy mở và sửa nó trước.",
+      "DATE_RANGE_INVALID": "Ngày bắt đầu không được sau ngày kết thúc.",
+      "draftInvalid": "Quy tắc chưa đầy đủ hoặc không hợp lệ. Hãy kiểm tra các điều kiện và hành động ở trên.",
+      "testFailed": "Đã xảy ra lỗi khi kiểm tra quy tắc.",
+      "previewFailed": "Đã xảy ra lỗi khi tải bản xem trước.",
+      "runFailed": "Không thể hoàn tất lần chạy. Hãy kiểm tra lịch sử hành động trước khi thử lại."
+    },
+    "toast": {
+      "done": "{count, plural, =0 {Không có giao dịch nào bị thay đổi} other {Đã thay đổi # giao dịch}}. Bạn có thể hoàn tác từ lịch sử hành động."
+    },
+    "done": {
+      "summary": "{count, plural, =0 {Không có giao dịch nào bị thay đổi.} other {Đã thay đổi # giao dịch.}}",
+      "undo": "Bạn có thể hoàn tác lần chạy từ lịch sử hành động."
+    }
+  },
+  "applications": {
+    "title": "Lịch sử",
+    "description": "Các giao dịch gần nhất mà quy tắc này đã thay đổi, mới nhất trước.",
+    "loading": "Đang tải lịch sử...",
+    "error": {
+      "title": "Không thể tải lịch sử",
+      "body": "Không hiển thị gì vì yêu cầu thất bại, không phải vì quy tắc chưa chạy. Hãy kiểm tra kết nối và thử lại.",
+      "retry": "Thử lại"
+    },
+    "empty": {
+      "title": "Quy tắc này chưa thay đổi gì",
+      "body": "Khi nó thay đổi một giao dịch, thay đổi sẽ được liệt kê ở đây."
+    },
+    "source": {
+      "create": "Đã tạo",
+      "import": "Đã nhập",
+      "manual": "Chạy thủ công",
+      "other": "Khác"
+    },
+    "table": {
+      "date": "Ngày",
+      "payee": "Người nhận",
+      "amount": "Số tiền",
+      "source": "Nguồn",
+      "change": "Thay đổi",
+      "appliedAt": "Đã áp dụng",
+      "open": "Mở giao dịch",
+      "noPayee": "Không có người nhận",
+      "view": "Xem"
     }
   }
 }

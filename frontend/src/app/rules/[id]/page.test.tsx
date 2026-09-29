@@ -3,7 +3,7 @@ import { render, screen, act } from '@/test/render';
 import EditRulePage from './page';
 import { makeRule } from '@/components/rules/rules-test-fixtures';
 
-const rules = vi.hoisted(() => ({ getById: vi.fn() }));
+const rules = vi.hoisted(() => ({ getById: vi.fn(), getApplications: vi.fn().mockResolvedValue([]) }));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),

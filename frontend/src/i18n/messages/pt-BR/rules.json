@@ -29,7 +29,9 @@
   },
   "actions": {
     "moveUp": "Mover para cima",
-    "moveDown": "Mover para baixo"
+    "moveDown": "Mover para baixo",
+    "run": "Executar nas transações existentes",
+    "runInvalid": "Repare a regra antes de executá-la"
   },
   "invalid": {
     "badge": "Inválida",
@@ -248,6 +250,123 @@
         "NAME_REQUIRED": "Digite um nome para a regra.",
         "UNKNOWN": "Esta parte não é válida."
       }
+    },
+    "run": {
+      "button": "Executar nas transações existentes",
+      "saveFirst": "Salve suas alterações para executar a regra salva."
+    }
+  },
+  "test": {
+    "title": "Teste",
+    "description": "Experimente a regra nas suas transações existentes. Nada é alterado.",
+    "button": "Testar regra",
+    "again": "Testar novamente",
+    "incomplete": "Complete as condições e ações acima para testar a regra.",
+    "idle": "Escolha em quais transações testar a regra e selecione Testar regra.",
+    "running": "Testando a regra...",
+    "failed": "Não foi possível concluir o teste. {message}",
+    "stale": "A regra ou os filtros mudaram desde este resultado. Teste novamente para ver o resultado atual."
+  },
+  "run": {
+    "title": "Executar “{name}” nas transações existentes",
+    "description": "Veja antes o que a regra alteraria e depois confirme. Você pode desfazer a execução pelo histórico de ações.",
+    "previewButton": "Pré-visualizar",
+    "confirmButton": "Confirmar e executar",
+    "idle": "Escolha contas e datas e selecione Pré-visualizar. Nada muda até você confirmar.",
+    "loadingPreview": "Carregando a pré-visualização...",
+    "previewFailed": "Não foi possível carregar a pré-visualização, então nada pode ser executado. {message}",
+    "stale": "Os filtros mudaram desde esta pré-visualização. Pré-visualize novamente antes de executar.",
+    "accountsLoading": "Carregando contas...",
+    "accountsFailed": "Não foi possível carregar suas contas, então os filtros estão indisponíveis.",
+    "retry": "Tentar novamente",
+    "summary": "{matched, plural, one {# transação seria alterada} other {# transações seriam alteradas}} de {scanned, plural, one {# transação analisada} other {# transações analisadas}}.",
+    "truncated": "Mais transações correspondem do que o limite permite. Apenas as mais recentes estão incluídas. Aumente o limite ou restrinja as datas para incluir o restante.",
+    "noMatches": {
+      "title": "Nenhuma transação seria alterada",
+      "body": "Nenhuma das transações analisadas corresponde à regra, ou a regra não mudaria nada nelas."
+    },
+    "table": {
+      "date": "Data",
+      "payee": "Favorecido",
+      "amount": "Valor",
+      "change": "Alteração planejada",
+      "noPayee": "Sem favorecido"
+    },
+    "skipped": {
+      "title": "{count, plural, one {# transação é deixada como está} other {# transações são deixadas como estão}}",
+      "line": "{count, plural, one {# transação} other {# transações}}: {reason}"
+    },
+    "skipReasons": {
+      "reconciled_locked": "está conciliada e bloqueada",
+      "transfer_leg_category": "é uma transferência, que não tem categoria",
+      "split_category": "está dividida, então a categoria pertence às divisões",
+      "cross_owner_transfer_payee": "é uma transferência para outro proprietário, cujo favorecido esta regra não pode alterar",
+      "other": "a regra não pode alterá-la"
+    },
+    "change": {
+      "category": "Categoria: {before} → {after}",
+      "payee": "Favorecido: {before} → {after}",
+      "tagsAdded": "Tags adicionadas: {tags}",
+      "tagsRemoved": "Tags removidas: {tags}",
+      "none": "nenhuma",
+      "unknown": "um item excluído"
+    },
+    "filters": {
+      "accounts": "Contas",
+      "allAccounts": "Todas as contas",
+      "startDate": "De",
+      "endDate": "Até",
+      "backwards": "A data inicial não pode ser posterior à data final.",
+      "limit": "Transações mais recentes a examinar",
+      "help": "Apenas as transações mais recentes do intervalo são examinadas, até {max}."
+    },
+    "errors": {
+      "PREVIEW_CHANGED": "As transações ou a regra mudaram desde a pré-visualização. Revise a nova pré-visualização e execute novamente.",
+      "RUN_TOO_LARGE": "Esta execução altera transações demais para ser desfeita em uma só etapa. Restrinja as contas ou as datas e tente novamente.",
+      "INVALID_RULE": "Esta regra não é válida, então não pode ser executada. Abra-a e repare-a primeiro.",
+      "DATE_RANGE_INVALID": "A data inicial não pode ser posterior à data final.",
+      "draftInvalid": "A regra está incompleta ou inválida. Verifique as condições e ações acima.",
+      "testFailed": "Algo deu errado ao testar a regra.",
+      "previewFailed": "Algo deu errado ao carregar a pré-visualização.",
+      "runFailed": "Não foi possível concluir a execução. Verifique o histórico de ações antes de tentar novamente."
+    },
+    "toast": {
+      "done": "{count, plural, =0 {Nenhuma transação foi alterada} one {# transação alterada} other {# transações alteradas}}. Você pode desfazer pelo histórico de ações."
+    },
+    "done": {
+      "summary": "{count, plural, =0 {Nenhuma transação foi alterada.} one {# transação foi alterada.} other {# transações foram alteradas.}}",
+      "undo": "Você pode desfazer a execução pelo histórico de ações."
+    }
+  },
+  "applications": {
+    "title": "Histórico",
+    "description": "As últimas transações que esta regra alterou, das mais recentes para as mais antigas.",
+    "loading": "Carregando o histórico...",
+    "error": {
+      "title": "Não foi possível carregar o histórico",
+      "body": "Nada é exibido porque a solicitação falhou, não porque a regra ainda não foi executada. Verifique sua conexão e tente novamente.",
+      "retry": "Tentar novamente"
+    },
+    "empty": {
+      "title": "Esta regra ainda não alterou nada",
+      "body": "Quando ela alterar uma transação, a alteração será listada aqui."
+    },
+    "source": {
+      "create": "Criada",
+      "import": "Importada",
+      "manual": "Execução manual",
+      "other": "Outra"
+    },
+    "table": {
+      "date": "Data",
+      "payee": "Favorecido",
+      "amount": "Valor",
+      "source": "Origem",
+      "change": "Alteração",
+      "appliedAt": "Aplicada",
+      "open": "Abrir transação",
+      "noPayee": "Sem favorecido",
+      "view": "Ver"
     }
   }
 }

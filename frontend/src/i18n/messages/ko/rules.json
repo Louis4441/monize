@@ -29,7 +29,9 @@
   },
   "actions": {
     "moveUp": "위로 이동",
-    "moveDown": "아래로 이동"
+    "moveDown": "아래로 이동",
+    "run": "기존 거래에 실행",
+    "runInvalid": "실행하기 전에 규칙을 복구하세요"
   },
   "invalid": {
     "badge": "유효하지 않음",
@@ -248,6 +250,123 @@
         "NAME_REQUIRED": "규칙 이름을 입력하세요.",
         "UNKNOWN": "이 부분은 올바르지 않습니다."
       }
+    },
+    "run": {
+      "button": "기존 거래에 실행",
+      "saveFirst": "저장된 규칙을 실행하려면 변경 사항을 저장하세요."
+    }
+  },
+  "test": {
+    "title": "테스트",
+    "description": "기존 거래에서 규칙을 시험해 보세요. 아무것도 변경되지 않습니다.",
+    "button": "규칙 테스트",
+    "again": "다시 테스트",
+    "incomplete": "규칙을 테스트하려면 위의 조건과 작업을 완성하세요.",
+    "idle": "규칙을 시험할 거래를 선택한 다음 규칙 테스트를 선택하세요.",
+    "running": "규칙을 테스트하는 중...",
+    "failed": "테스트를 완료하지 못했습니다. {message}",
+    "stale": "이 결과 이후 규칙 또는 필터가 변경되었습니다. 현재 결과를 보려면 다시 테스트하세요."
+  },
+  "run": {
+    "title": "“{name}” 규칙을 기존 거래에 실행",
+    "description": "규칙이 변경할 내용을 미리 확인한 다음 확정하세요. 실행은 작업 내역에서 되돌릴 수 있습니다.",
+    "previewButton": "미리보기",
+    "confirmButton": "확정 후 실행",
+    "idle": "계정과 날짜를 선택한 다음 미리보기를 선택하세요. 확정하기 전에는 아무것도 변경되지 않습니다.",
+    "loadingPreview": "미리보기를 불러오는 중...",
+    "previewFailed": "미리보기를 불러오지 못해 아무것도 실행할 수 없습니다. {message}",
+    "stale": "이 미리보기 이후 필터가 변경되었습니다. 실행하기 전에 다시 미리보기를 확인하세요.",
+    "accountsLoading": "계정을 불러오는 중...",
+    "accountsFailed": "계정을 불러오지 못해 필터를 사용할 수 없습니다.",
+    "retry": "다시 시도",
+    "summary": "검사한 {scanned, plural, other {# 건}}의 거래 중 {matched, plural, other {# 건}}이 변경됩니다.",
+    "truncated": "한도보다 많은 거래가 일치했습니다. 최신 거래만 포함되었습니다. 나머지를 포함하려면 한도를 올리거나 날짜를 좁히세요.",
+    "noMatches": {
+      "title": "변경될 거래가 없습니다",
+      "body": "검사한 거래 중 규칙과 일치하는 것이 없거나, 규칙이 아무것도 변경하지 않습니다."
+    },
+    "table": {
+      "date": "날짜",
+      "payee": "수취인",
+      "amount": "금액",
+      "change": "예정된 변경",
+      "noPayee": "수취인 없음"
+    },
+    "skipped": {
+      "title": "{count, plural, other {# 건}}의 거래는 그대로 둡니다",
+      "line": "{count, plural, other {# 건}}의 거래: {reason}"
+    },
+    "skipReasons": {
+      "reconciled_locked": "조정되어 잠겨 있습니다",
+      "transfer_leg_category": "이체이며 이체에는 카테고리가 없습니다",
+      "split_category": "분할되어 있어 카테고리가 분할 항목에 속합니다",
+      "cross_owner_transfer_payee": "다른 소유자에게 보내는 이체이며, 이 규칙으로 그 수취인을 변경할 수 없습니다",
+      "other": "규칙으로 변경할 수 없습니다"
+    },
+    "change": {
+      "category": "카테고리: {before} → {after}",
+      "payee": "수취인: {before} → {after}",
+      "tagsAdded": "추가된 태그: {tags}",
+      "tagsRemoved": "제거된 태그: {tags}",
+      "none": "없음",
+      "unknown": "삭제된 항목"
+    },
+    "filters": {
+      "accounts": "계정",
+      "allAccounts": "모든 계정",
+      "startDate": "시작",
+      "endDate": "종료",
+      "backwards": "시작일은 종료일보다 늦을 수 없습니다.",
+      "limit": "검사할 최신 거래 수",
+      "help": "범위 내 최신 거래만 최대 {max}건까지 검사합니다."
+    },
+    "errors": {
+      "PREVIEW_CHANGED": "미리보기 이후 거래 또는 규칙이 변경되었습니다. 새 미리보기를 확인하고 다시 실행하세요.",
+      "RUN_TOO_LARGE": "이 실행은 변경하는 거래가 너무 많아 한 번에 되돌릴 수 없습니다. 계정이나 날짜를 좁혀서 다시 시도하세요.",
+      "INVALID_RULE": "이 규칙은 유효하지 않아 실행할 수 없습니다. 먼저 규칙을 열어 복구하세요.",
+      "DATE_RANGE_INVALID": "시작일은 종료일보다 늦을 수 없습니다.",
+      "draftInvalid": "규칙이 미완성이거나 유효하지 않습니다. 위의 조건과 작업을 확인하세요.",
+      "testFailed": "규칙을 테스트하는 중 문제가 발생했습니다.",
+      "previewFailed": "미리보기를 불러오는 중 문제가 발생했습니다.",
+      "runFailed": "실행을 완료하지 못했습니다. 다시 시도하기 전에 작업 내역을 확인하세요."
+    },
+    "toast": {
+      "done": "{count, plural, =0 {변경된 거래가 없습니다} other {# 건의 거래가 변경되었습니다}}. 작업 내역에서 되돌릴 수 있습니다."
+    },
+    "done": {
+      "summary": "{count, plural, =0 {변경된 거래가 없습니다.} other {# 건의 거래가 변경되었습니다.}}",
+      "undo": "실행은 작업 내역에서 되돌릴 수 있습니다."
+    }
+  },
+  "applications": {
+    "title": "내역",
+    "description": "이 규칙이 변경한 최근 거래를 최신순으로 표시합니다.",
+    "loading": "내역을 불러오는 중...",
+    "error": {
+      "title": "내역을 불러오지 못했습니다",
+      "body": "요청이 실패하여 아무것도 표시되지 않습니다. 규칙이 실행되지 않아서가 아닙니다. 연결을 확인하고 다시 시도하세요.",
+      "retry": "다시 시도"
+    },
+    "empty": {
+      "title": "이 규칙은 아직 아무것도 변경하지 않았습니다",
+      "body": "거래를 변경하면 그 변경 내용이 여기에 표시됩니다."
+    },
+    "source": {
+      "create": "생성 시",
+      "import": "가져오기 시",
+      "manual": "수동 실행",
+      "other": "기타"
+    },
+    "table": {
+      "date": "날짜",
+      "payee": "수취인",
+      "amount": "금액",
+      "source": "출처",
+      "change": "변경",
+      "appliedAt": "적용 시각",
+      "open": "거래 열기",
+      "noPayee": "수취인 없음",
+      "view": "보기"
     }
   }
 }

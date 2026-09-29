@@ -29,7 +29,9 @@
   },
   "actions": {
     "moveUp": "上移",
-    "moveDown": "下移"
+    "moveDown": "下移",
+    "run": "在現有交易上執行",
+    "runInvalid": "請先修復規則再執行"
   },
   "invalid": {
     "badge": "無效",
@@ -248,6 +250,123 @@
         "NAME_REQUIRED": "請輸入規則名稱。",
         "UNKNOWN": "此部分無效。"
       }
+    },
+    "run": {
+      "button": "在現有交易上執行",
+      "saveFirst": "請儲存變更以執行已儲存的規則。"
+    }
+  },
+  "test": {
+    "title": "測試",
+    "description": "在你現有的交易上試用此規則。不會變更任何內容。",
+    "button": "測試規則",
+    "again": "重新測試",
+    "incomplete": "請先完成上方的條件和動作，再測試規則。",
+    "idle": "選擇要試用規則的交易，然後選擇「測試規則」。",
+    "running": "正在測試規則...",
+    "failed": "無法完成測試。{message}",
+    "stale": "自此結果產生後，規則或篩選條件已變更。請重新測試以查看目前結果。"
+  },
+  "run": {
+    "title": "在現有交易上執行「{name}」",
+    "description": "先預覽規則會變更什麼，再確認。你可以在操作記錄中復原此次執行。",
+    "previewButton": "預覽",
+    "confirmButton": "確認並執行",
+    "idle": "選擇帳戶和日期，然後選擇「預覽」。在你確認之前不會有任何變更。",
+    "loadingPreview": "正在載入預覽...",
+    "previewFailed": "無法載入預覽，因此無法執行任何內容。{message}",
+    "stale": "自此預覽產生後，篩選條件已變更。執行前請重新預覽。",
+    "accountsLoading": "正在載入帳戶...",
+    "accountsFailed": "無法載入你的帳戶，因此篩選條件無法使用。",
+    "retry": "重試",
+    "summary": "已檢查 {scanned, plural, other {# 筆交易}}，其中 {matched, plural, other {# 筆交易}}將被變更。",
+    "truncated": "符合的交易多於上限允許的數量。僅包含最新的交易。請提高上限或縮小日期範圍以包含其餘交易。",
+    "noMatches": {
+      "title": "沒有交易會被變更",
+      "body": "已檢查的交易都不符合此規則，或規則不會變更它們。"
+    },
+    "table": {
+      "date": "日期",
+      "payee": "收款對象",
+      "amount": "金額",
+      "change": "預定的變更",
+      "noPayee": "無收款對象"
+    },
+    "skipped": {
+      "title": "{count, plural, other {# 筆交易}}維持不變",
+      "line": "{count, plural, other {# 筆交易}}：{reason}"
+    },
+    "skipReasons": {
+      "reconciled_locked": "已對帳並被鎖定",
+      "transfer_leg_category": "是轉帳，轉帳沒有分類",
+      "split_category": "已拆分，因此分類屬於各拆分項",
+      "cross_owner_transfer_payee": "是轉給其他擁有者的轉帳，此規則不能變更其收款對象",
+      "other": "規則無法變更它"
+    },
+    "change": {
+      "category": "分類：{before} → {after}",
+      "payee": "收款對象：{before} → {after}",
+      "tagsAdded": "已新增的標籤：{tags}",
+      "tagsRemoved": "已移除的標籤：{tags}",
+      "none": "無",
+      "unknown": "已刪除的項目"
+    },
+    "filters": {
+      "accounts": "帳戶",
+      "allAccounts": "所有帳戶",
+      "startDate": "從",
+      "endDate": "到",
+      "backwards": "開始日期不能晚於結束日期。",
+      "limit": "要檢查的最新交易數",
+      "help": "僅檢查範圍內最新的交易，最多 {max} 筆。"
+    },
+    "errors": {
+      "PREVIEW_CHANGED": "自預覽產生後，交易或規則已變更。請查看新的預覽後再次執行。",
+      "RUN_TOO_LARGE": "此次執行變更的交易過多，無法一步復原。請縮小帳戶或日期範圍後重試。",
+      "INVALID_RULE": "此規則無效，因此無法執行。請先開啟並修復它。",
+      "DATE_RANGE_INVALID": "開始日期不能晚於結束日期。",
+      "draftInvalid": "規則不完整或無效。請檢查上方的條件和動作。",
+      "testFailed": "測試規則時發生錯誤。",
+      "previewFailed": "載入預覽時發生錯誤。",
+      "runFailed": "無法完成執行。重試之前請先查看操作記錄。"
+    },
+    "toast": {
+      "done": "{count, plural, =0 {沒有交易被變更} other {已變更 # 筆交易}}。你可以在操作記錄中復原。"
+    },
+    "done": {
+      "summary": "{count, plural, =0 {沒有交易被變更。} other {已變更 # 筆交易。}}",
+      "undo": "你可以在操作記錄中復原此次執行。"
+    }
+  },
+  "applications": {
+    "title": "記錄",
+    "description": "此規則最近變更的交易，最新的在前。",
+    "loading": "正在載入記錄...",
+    "error": {
+      "title": "無法載入記錄",
+      "body": "沒有顯示內容是因為請求失敗，而不是因為規則尚未執行。請檢查網路連線後重試。",
+      "retry": "重試"
+    },
+    "empty": {
+      "title": "此規則尚未變更任何內容",
+      "body": "當它變更交易時，變更會列在這裡。"
+    },
+    "source": {
+      "create": "建立時",
+      "import": "匯入時",
+      "manual": "手動執行",
+      "other": "其他"
+    },
+    "table": {
+      "date": "日期",
+      "payee": "收款對象",
+      "amount": "金額",
+      "source": "來源",
+      "change": "變更",
+      "appliedAt": "套用時間",
+      "open": "開啟交易",
+      "noPayee": "無收款對象",
+      "view": "檢視"
     }
   }
 }

@@ -128,7 +128,8 @@
       "updatedInvestmentTransaction": "{action} लेनदेन अपडेट हुआ",
       "deletedInvestmentTransaction": "{action} लेनदेन हटाया गया",
       "transferredSecurity": "खातों के बीच प्रतिभूति स्थानांतरित की गई",
-      "updatedSecurityTransfer": "प्रतिभूति स्थानांतरण अपडेट हुआ"
+      "updatedSecurityTransfer": "प्रतिभूति स्थानांतरण अपडेट हुआ",
+      "ranTransactionRule": "नियम “{name}” को {count, plural, one {# लेनदेन} other {# लेनदेन}} पर चलाया गया"
     },
     "timeAgo": {
       "justNow": "अभी-अभी",

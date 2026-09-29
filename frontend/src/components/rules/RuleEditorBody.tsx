@@ -10,7 +10,10 @@ import { RuleActionCard } from '@/components/rules/RuleActionCard';
 import { RuleConditionGroup, type RuleTreeEnv } from '@/components/rules/RuleConditionGroup';
 import { RuleEditorBanners } from '@/components/rules/RuleEditorBanners';
 import { RuleErrorList } from '@/components/rules/RuleCardShell';
+import { RuleApplications } from '@/components/rules/RuleApplications';
 import { RuleSection } from '@/components/rules/RuleSection';
+import { RuleTestPanel } from '@/components/rules/RuleTestPanel';
+import { RunRuleDialog } from '@/components/rules/RunRuleDialog';
 import { RuleWhenSection } from '@/components/rules/RuleWhenSection';
 import { createTreeHandlers } from '@/components/rules/rule-tree-handlers';
 import { useCardActions } from '@/components/rules/use-rule-card-actions';
@@ -90,6 +93,7 @@ export function RuleEditorBody({ rule, lookups, onSaved, onReload }: RuleEditorB
   const [message, setMessage] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [runOpen, setRunOpen] = useState(false);
 
   const dirty = baseline === null || draftSignature(draft) !== baseline;
 
@@ -251,7 +255,25 @@ export function RuleEditorBody({ rule, lookups, onSaved, onReload }: RuleEditorB
           </div>
         </RuleSection>
 
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <RuleTestPanel draft={draft} accountOptions={options.accounts} />
+
+        {rule && <RuleApplications ruleId={rule.id} options={options} />}
+
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
+          {rule && (
+            <div className="flex flex-col gap-1 sm:mr-auto">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full sm:w-auto"
+                disabled={saving || dirty}
+                onClick={() => setRunOpen(true)}
+              >
+                {t('run.button')}
+              </Button>
+              {dirty && <p className="text-xs text-gray-500 dark:text-gray-400">{t('run.saveFirst')}</p>}
+            </div>
+          )}
           <Link href="/rules" className={buttonClassName('outline', 'md', 'w-full sm:w-auto')}>
             {tc('cancel')}
           </Link>
@@ -266,6 +288,11 @@ export function RuleEditorBody({ rule, lookups, onSaved, onReload }: RuleEditorB
           </Button>
         </div>
       </fieldset>
+      <RunRuleDialog
+        rule={runOpen && rule ? { id: rule.id, name: rule.name } : null}
+        accountOptions={options.accounts}
+        onClose={() => setRunOpen(false)}
+      />
     </div>
   );
 }

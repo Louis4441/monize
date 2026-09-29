@@ -29,7 +29,9 @@
   },
   "actions": {
     "moveUp": "Subir",
-    "moveDown": "Bajar"
+    "moveDown": "Bajar",
+    "run": "Ejecutar en transacciones existentes",
+    "runInvalid": "Repara la regla antes de ejecutarla"
   },
   "invalid": {
     "badge": "No válida",
@@ -248,6 +250,123 @@
         "NAME_REQUIRED": "Introduce un nombre para la regla.",
         "UNKNOWN": "Esta parte no es válida."
       }
+    },
+    "run": {
+      "button": "Ejecutar en transacciones existentes",
+      "saveFirst": "Guarda tus cambios para ejecutar la regla guardada."
+    }
+  },
+  "test": {
+    "title": "Prueba",
+    "description": "Prueba la regla en tus transacciones existentes. No se cambia nada.",
+    "button": "Probar regla",
+    "again": "Probar de nuevo",
+    "incomplete": "Completa las condiciones y acciones de arriba para probar la regla.",
+    "idle": "Elige en qué transacciones probar la regla y selecciona Probar regla.",
+    "running": "Probando la regla...",
+    "failed": "No se pudo completar la prueba. {message}",
+    "stale": "La regla o los filtros han cambiado desde este resultado. Prueba de nuevo para ver el resultado actual."
+  },
+  "run": {
+    "title": "Ejecutar «{name}» en transacciones existentes",
+    "description": "Previsualiza lo que cambiaría la regla y luego confirma. Puedes deshacer la ejecución desde el historial de acciones.",
+    "previewButton": "Vista previa",
+    "confirmButton": "Confirmar y ejecutar",
+    "idle": "Elige cuentas y fechas y selecciona Vista previa. No cambia nada hasta que confirmes.",
+    "loadingPreview": "Cargando la vista previa...",
+    "previewFailed": "No se pudo cargar la vista previa, así que no se puede ejecutar nada. {message}",
+    "stale": "Los filtros han cambiado desde esta vista previa. Vuelve a previsualizar antes de ejecutar.",
+    "accountsLoading": "Cargando cuentas...",
+    "accountsFailed": "No se pudieron cargar tus cuentas, así que los filtros no están disponibles.",
+    "retry": "Intentar de nuevo",
+    "summary": "{matched, plural, one {# transacción cambiaría} other {# transacciones cambiarían}} de {scanned, plural, one {# transacción analizada} other {# transacciones analizadas}}.",
+    "truncated": "Coinciden más transacciones de las que permite el límite. Solo se incluyen las más recientes. Sube el límite o acota las fechas para incluir el resto.",
+    "noMatches": {
+      "title": "Ninguna transacción cambiaría",
+      "body": "Ninguna de las transacciones analizadas coincide con la regla, o la regla no cambiaría nada en ellas."
+    },
+    "table": {
+      "date": "Fecha",
+      "payee": "Beneficiario",
+      "amount": "Importe",
+      "change": "Cambio previsto",
+      "noPayee": "Sin beneficiario"
+    },
+    "skipped": {
+      "title": "{count, plural, one {# transacción se deja sin tocar} other {# transacciones se dejan sin tocar}}",
+      "line": "{count, plural, one {# transacción} other {# transacciones}}: {reason}"
+    },
+    "skipReasons": {
+      "reconciled_locked": "está conciliada y bloqueada",
+      "transfer_leg_category": "es una transferencia, que no tiene categoría",
+      "split_category": "está dividida, así que la categoría pertenece a las divisiones",
+      "cross_owner_transfer_payee": "es una transferencia a otro propietario, cuyo beneficiario esta regla no puede cambiar",
+      "other": "la regla no puede cambiarla"
+    },
+    "change": {
+      "category": "Categoría: {before} → {after}",
+      "payee": "Beneficiario: {before} → {after}",
+      "tagsAdded": "Etiquetas añadidas: {tags}",
+      "tagsRemoved": "Etiquetas quitadas: {tags}",
+      "none": "ninguna",
+      "unknown": "un elemento eliminado"
+    },
+    "filters": {
+      "accounts": "Cuentas",
+      "allAccounts": "Todas las cuentas",
+      "startDate": "Desde",
+      "endDate": "Hasta",
+      "backwards": "La fecha de inicio no puede ser posterior a la fecha de fin.",
+      "limit": "Transacciones más recientes a examinar",
+      "help": "Solo se examinan las transacciones más recientes del rango, hasta {max}."
+    },
+    "errors": {
+      "PREVIEW_CHANGED": "Las transacciones o la regla han cambiado desde la vista previa. Revisa la nueva vista previa y ejecuta de nuevo.",
+      "RUN_TOO_LARGE": "Esta ejecución cambia demasiadas transacciones para deshacerse en un solo paso. Acota las cuentas o las fechas e inténtalo de nuevo.",
+      "INVALID_RULE": "Esta regla no es válida, así que no se puede ejecutar. Ábrela y repárala primero.",
+      "DATE_RANGE_INVALID": "La fecha de inicio no puede ser posterior a la fecha de fin.",
+      "draftInvalid": "La regla está incompleta o no es válida. Revisa las condiciones y acciones de arriba.",
+      "testFailed": "Algo salió mal al probar la regla.",
+      "previewFailed": "Algo salió mal al cargar la vista previa.",
+      "runFailed": "No se pudo completar la ejecución. Revisa el historial de acciones antes de intentarlo de nuevo."
+    },
+    "toast": {
+      "done": "{count, plural, =0 {No se cambió ninguna transacción} one {# transacción cambiada} other {# transacciones cambiadas}}. Puedes deshacerlo desde el historial de acciones."
+    },
+    "done": {
+      "summary": "{count, plural, =0 {No se cambió ninguna transacción.} one {Se cambió # transacción.} other {Se cambiaron # transacciones.}}",
+      "undo": "Puedes deshacer la ejecución desde el historial de acciones."
+    }
+  },
+  "applications": {
+    "title": "Historial",
+    "description": "Las últimas transacciones que cambió esta regla, las más recientes primero.",
+    "loading": "Cargando el historial...",
+    "error": {
+      "title": "No se pudo cargar el historial",
+      "body": "No se muestra nada porque la solicitud falló, no porque la regla no se haya ejecutado. Comprueba tu conexión e inténtalo de nuevo.",
+      "retry": "Intentar de nuevo"
+    },
+    "empty": {
+      "title": "Esta regla todavía no ha cambiado nada",
+      "body": "Cuando cambie una transacción, el cambio aparecerá aquí."
+    },
+    "source": {
+      "create": "Creada",
+      "import": "Importada",
+      "manual": "Ejecución manual",
+      "other": "Otro"
+    },
+    "table": {
+      "date": "Fecha",
+      "payee": "Beneficiario",
+      "amount": "Importe",
+      "source": "Origen",
+      "change": "Cambio",
+      "appliedAt": "Aplicada",
+      "open": "Abrir transacción",
+      "noPayee": "Sin beneficiario",
+      "view": "Ver"
     }
   }
 }

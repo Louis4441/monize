@@ -128,7 +128,8 @@
       "updatedInvestmentTransaction": "已更新 {action} 交易",
       "deletedInvestmentTransaction": "已删除 {action} 交易",
       "transferredSecurity": "已在账户间转移证券",
-      "updatedSecurityTransfer": "已更新证券转移"
+      "updatedSecurityTransfer": "已更新证券转移",
+      "ranTransactionRule": "已在 {count, plural, other {# 笔交易}}上运行规则“{name}”"
     },
     "timeAgo": {
       "justNow": "刚刚",

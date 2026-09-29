@@ -128,7 +128,8 @@
       "updatedInvestmentTransaction": "Đã cập nhật giao dịch {action}",
       "deletedInvestmentTransaction": "Đã xóa giao dịch {action}",
       "transferredSecurity": "Đã chuyển chứng khoán giữa các tài khoản",
-      "updatedSecurityTransfer": "Đã cập nhật chuyển khoản chứng khoán"
+      "updatedSecurityTransfer": "Đã cập nhật chuyển khoản chứng khoán",
+      "ranTransactionRule": "Đã chạy quy tắc “{name}” trên {count, plural, other {# giao dịch}}"
     },
     "timeAgo": {
       "justNow": "vừa xong",

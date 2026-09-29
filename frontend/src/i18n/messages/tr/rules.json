@@ -29,7 +29,9 @@
   },
   "actions": {
     "moveUp": "Yukarı taşı",
-    "moveDown": "Aşağı taşı"
+    "moveDown": "Aşağı taşı",
+    "run": "Mevcut işlemlerde çalıştır",
+    "runInvalid": "Kuralı çalıştırmadan önce onarın"
   },
   "invalid": {
     "badge": "Geçersiz",
@@ -248,6 +250,123 @@
         "NAME_REQUIRED": "Kural için bir ad girin.",
         "UNKNOWN": "Bu bölüm geçersiz."
       }
+    },
+    "run": {
+      "button": "Mevcut işlemlerde çalıştır",
+      "saveFirst": "Kaydedilmiş kuralı çalıştırmak için değişikliklerinizi kaydedin."
+    }
+  },
+  "test": {
+    "title": "Test",
+    "description": "Kuralı mevcut işlemleriniz üzerinde deneyin. Hiçbir şey değişmez.",
+    "button": "Kuralı test et",
+    "again": "Yeniden test et",
+    "incomplete": "Kuralı test etmek için yukarıdaki koşulları ve eylemleri tamamlayın.",
+    "idle": "Kuralı hangi işlemlerde deneyeceğinizi seçin, ardından Kuralı test et'i seçin.",
+    "running": "Kural test ediliyor...",
+    "failed": "Test tamamlanamadı. {message}",
+    "stale": "Bu sonuçtan sonra kural veya filtreler değişti. Güncel sonucu görmek için yeniden test edin."
+  },
+  "run": {
+    "title": "“{name}” kuralını mevcut işlemlerde çalıştır",
+    "description": "Kuralın nelerin değişeceğini önizleyin, sonra onaylayın. Çalıştırmayı işlem geçmişinden geri alabilirsiniz.",
+    "previewButton": "Önizleme",
+    "confirmButton": "Onayla ve çalıştır",
+    "idle": "Hesapları ve tarihleri seçin, ardından Önizleme'yi seçin. Siz onaylayana kadar hiçbir şey değişmez.",
+    "loadingPreview": "Önizleme yükleniyor...",
+    "previewFailed": "Önizleme yüklenemedi, bu yüzden hiçbir şey çalıştırılamaz. {message}",
+    "stale": "Bu önizlemeden sonra filtreler değişti. Çalıştırmadan önce yeniden önizleyin.",
+    "accountsLoading": "Hesaplar yükleniyor...",
+    "accountsFailed": "Hesaplarınız yüklenemedi, bu yüzden filtreler kullanılamıyor.",
+    "retry": "Tekrar dene",
+    "summary": "{scanned, plural, other {# işlem}} incelendi, {matched, plural, other {# işlem}} değişecek.",
+    "truncated": "Sınırın izin verdiğinden fazla işlem eşleşti. Yalnızca en yeniler dahil edildi. Kalanı dahil etmek için sınırı artırın veya tarihleri daraltın.",
+    "noMatches": {
+      "title": "Hiçbir işlem değişmeyecek",
+      "body": "İncelenen işlemlerin hiçbiri kuralla eşleşmiyor veya kural onlarda hiçbir şeyi değiştirmeyecek."
+    },
+    "table": {
+      "date": "Tarih",
+      "payee": "Alıcı",
+      "amount": "Tutar",
+      "change": "Planlanan değişiklik",
+      "noPayee": "Alıcı yok"
+    },
+    "skipped": {
+      "title": "{count, plural, other {# işlem}} olduğu gibi bırakıldı",
+      "line": "{count, plural, other {# işlem}}: {reason}"
+    },
+    "skipReasons": {
+      "reconciled_locked": "mutabık kılınmış ve kilitli",
+      "transfer_leg_category": "bir transfer ve transferlerin kategorisi yok",
+      "split_category": "bölünmüş, bu yüzden kategori bölümlere ait",
+      "cross_owner_transfer_payee": "başka bir sahibe yapılan bir transfer ve bu kural onun alıcısını değiştiremez",
+      "other": "kural bunu değiştiremez"
+    },
+    "change": {
+      "category": "Kategori: {before} → {after}",
+      "payee": "Alıcı: {before} → {after}",
+      "tagsAdded": "Eklenen etiketler: {tags}",
+      "tagsRemoved": "Kaldırılan etiketler: {tags}",
+      "none": "yok",
+      "unknown": "silinmiş bir öğe"
+    },
+    "filters": {
+      "accounts": "Hesaplar",
+      "allAccounts": "Tüm hesaplar",
+      "startDate": "Başlangıç",
+      "endDate": "Bitiş",
+      "backwards": "Başlangıç tarihi bitiş tarihinden sonra olamaz.",
+      "limit": "İncelenecek en yeni işlemler",
+      "help": "Aralıktaki yalnızca en yeni işlemler incelenir, en fazla {max}."
+    },
+    "errors": {
+      "PREVIEW_CHANGED": "Önizlemeden sonra işlemler veya kural değişti. Yeni önizlemeyi inceleyin ve yeniden çalıştırın.",
+      "RUN_TOO_LARGE": "Bu çalıştırma, tek adımda geri alınamayacak kadar çok işlemi değiştiriyor. Hesapları veya tarihleri daraltıp yeniden deneyin.",
+      "INVALID_RULE": "Bu kural geçerli değil, bu yüzden çalıştırılamaz. Önce kuralı açıp onarın.",
+      "DATE_RANGE_INVALID": "Başlangıç tarihi bitiş tarihinden sonra olamaz.",
+      "draftInvalid": "Kural eksik veya geçersiz. Yukarıdaki koşulları ve eylemleri kontrol edin.",
+      "testFailed": "Kural test edilirken bir şeyler ters gitti.",
+      "previewFailed": "Önizleme yüklenirken bir şeyler ters gitti.",
+      "runFailed": "Çalıştırma tamamlanamadı. Yeniden denemeden önce işlem geçmişini kontrol edin."
+    },
+    "toast": {
+      "done": "{count, plural, =0 {Hiçbir işlem değiştirilmedi} other {# işlem değiştirildi}}. Bunu işlem geçmişinden geri alabilirsiniz."
+    },
+    "done": {
+      "summary": "{count, plural, =0 {Hiçbir işlem değiştirilmedi.} other {# işlem değiştirildi.}}",
+      "undo": "Çalıştırmayı işlem geçmişinden geri alabilirsiniz."
+    }
+  },
+  "applications": {
+    "title": "Geçmiş",
+    "description": "Bu kuralın değiştirdiği son işlemler, en yeniden başlayarak.",
+    "loading": "Geçmiş yükleniyor...",
+    "error": {
+      "title": "Geçmiş yüklenemedi",
+      "body": "İstek başarısız olduğu için hiçbir şey gösterilmiyor; kuralın çalışmamış olmasından değil. Bağlantınızı kontrol edip yeniden deneyin.",
+      "retry": "Tekrar dene"
+    },
+    "empty": {
+      "title": "Bu kural henüz hiçbir şeyi değiştirmedi",
+      "body": "Bir işlemi değiştirdiğinde değişiklik burada listelenir."
+    },
+    "source": {
+      "create": "Oluşturuldu",
+      "import": "İçe aktarıldı",
+      "manual": "Elle çalıştırma",
+      "other": "Diğer"
+    },
+    "table": {
+      "date": "Tarih",
+      "payee": "Alıcı",
+      "amount": "Tutar",
+      "source": "Kaynak",
+      "change": "Değişiklik",
+      "appliedAt": "Uygulandı",
+      "open": "İşlemi aç",
+      "noPayee": "Alıcı yok",
+      "view": "Görüntüle"
     }
   }
 }

@@ -128,7 +128,8 @@
       "updatedInvestmentTransaction": "Оновлено транзакцію {action}",
       "deletedInvestmentTransaction": "Видалено транзакцію {action}",
       "transferredSecurity": "Переведено цінні папери між рахунками",
-      "updatedSecurityTransfer": "Оновлено переказ цінних паперів"
+      "updatedSecurityTransfer": "Оновлено переказ цінних паперів",
+      "ranTransactionRule": "{count, plural, one {Правило «{name}» запущено для # транзакції} few {Правило «{name}» запущено для # транзакцій} many {Правило «{name}» запущено для # транзакцій} other {Правило «{name}» запущено для # транзакцій}}"
     },
     "timeAgo": {
       "justNow": "щойно",

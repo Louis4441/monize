@@ -29,7 +29,9 @@
   },
   "actions": {
     "moveUp": "Przenieś w górę",
-    "moveDown": "Przenieś w dół"
+    "moveDown": "Przenieś w dół",
+    "run": "Uruchom na istniejących transakcjach",
+    "runInvalid": "Napraw regułę przed jej uruchomieniem"
   },
   "invalid": {
     "badge": "Nieprawidłowa",
@@ -248,6 +250,123 @@
         "NAME_REQUIRED": "Wpisz nazwę reguły.",
         "UNKNOWN": "Ta część jest nieprawidłowa."
       }
+    },
+    "run": {
+      "button": "Uruchom na istniejących transakcjach",
+      "saveFirst": "Zapisz zmiany, aby uruchomić zapisaną regułę."
+    }
+  },
+  "test": {
+    "title": "Test",
+    "description": "Wypróbuj regułę na istniejących transakcjach. Nic nie zostanie zmienione.",
+    "button": "Przetestuj regułę",
+    "again": "Testuj ponownie",
+    "incomplete": "Uzupełnij warunki i akcje powyżej, aby przetestować regułę.",
+    "idle": "Wybierz transakcje, na których chcesz wypróbować regułę, a następnie wybierz Przetestuj regułę.",
+    "running": "Testowanie reguły...",
+    "failed": "Nie udało się ukończyć testu. {message}",
+    "stale": "Reguła lub filtry zmieniły się od czasu tego wyniku. Przetestuj ponownie, aby zobaczyć aktualny wynik."
+  },
+  "run": {
+    "title": "Uruchom „{name}” na istniejących transakcjach",
+    "description": "Zobacz podgląd zmian, które wprowadziłaby reguła, a następnie potwierdź. Uruchomienie można cofnąć w historii akcji.",
+    "previewButton": "Podgląd",
+    "confirmButton": "Potwierdź i uruchom",
+    "idle": "Wybierz konta i daty, a następnie wybierz Podgląd. Nic się nie zmieni, dopóki nie potwierdzisz.",
+    "loadingPreview": "Wczytywanie podglądu...",
+    "previewFailed": "Nie udało się wczytać podglądu, więc nic nie można uruchomić. {message}",
+    "stale": "Filtry zmieniły się od czasu tego podglądu. Wygeneruj podgląd ponownie przed uruchomieniem.",
+    "accountsLoading": "Wczytywanie kont...",
+    "accountsFailed": "Nie udało się wczytać Twoich kont, więc filtry są niedostępne.",
+    "retry": "Spróbuj ponownie",
+    "summary": "{matched, plural, one {# transakcja zostałaby zmieniona} few {# transakcje zostałyby zmienione} many {# transakcji zostałoby zmienionych} other {# transakcji zostałoby zmienionych}} spośród {scanned, plural, one {# sprawdzonej transakcji} few {# sprawdzonych transakcji} many {# sprawdzonych transakcji} other {# sprawdzonych transakcji}}.",
+    "truncated": "Pasuje więcej transakcji, niż pozwala limit. Uwzględniono tylko najnowsze. Zwiększ limit lub zawęź daty, aby objąć resztę.",
+    "noMatches": {
+      "title": "Żadna transakcja nie zostałaby zmieniona",
+      "body": "Żadna ze sprawdzonych transakcji nie pasuje do reguły albo reguła niczego by w nich nie zmieniła."
+    },
+    "table": {
+      "date": "Data",
+      "payee": "Odbiorca",
+      "amount": "Kwota",
+      "change": "Planowana zmiana",
+      "noPayee": "Brak odbiorcy"
+    },
+    "skipped": {
+      "title": "{count, plural, one {# transakcja pozostaje bez zmian} few {# transakcje pozostają bez zmian} many {# transakcji pozostaje bez zmian} other {# transakcji pozostaje bez zmian}}",
+      "line": "{count, plural, one {# transakcja} few {# transakcje} many {# transakcji} other {# transakcji}}: {reason}"
+    },
+    "skipReasons": {
+      "reconciled_locked": "jest uzgodniona i zablokowana",
+      "transfer_leg_category": "jest przelewem, który nie ma kategorii",
+      "split_category": "jest podzielona, więc kategoria należy do podziałów",
+      "cross_owner_transfer_payee": "jest przelewem do innego właściciela, którego odbiorcy ta reguła nie może zmieniać",
+      "other": "reguła nie może jej zmienić"
+    },
+    "change": {
+      "category": "Kategoria: {before} → {after}",
+      "payee": "Odbiorca: {before} → {after}",
+      "tagsAdded": "Dodane tagi: {tags}",
+      "tagsRemoved": "Usunięte tagi: {tags}",
+      "none": "brak",
+      "unknown": "usunięty element"
+    },
+    "filters": {
+      "accounts": "Konta",
+      "allAccounts": "Wszystkie konta",
+      "startDate": "Od",
+      "endDate": "Do",
+      "backwards": "Data początkowa nie może być późniejsza niż data końcowa.",
+      "limit": "Najnowsze transakcje do sprawdzenia",
+      "help": "Sprawdzane są tylko najnowsze transakcje z zakresu, maksymalnie {max}."
+    },
+    "errors": {
+      "PREVIEW_CHANGED": "Transakcje lub reguła zmieniły się od czasu podglądu. Sprawdź nowy podgląd i uruchom ponownie.",
+      "RUN_TOO_LARGE": "To uruchomienie zmienia zbyt wiele transakcji, aby można je było cofnąć w jednym kroku. Zawęź konta lub daty i spróbuj ponownie.",
+      "INVALID_RULE": "Ta reguła jest nieprawidłowa, więc nie można jej uruchomić. Otwórz ją i najpierw napraw.",
+      "DATE_RANGE_INVALID": "Data początkowa nie może być późniejsza niż data końcowa.",
+      "draftInvalid": "Reguła jest niekompletna lub nieprawidłowa. Sprawdź warunki i akcje powyżej.",
+      "testFailed": "Coś poszło nie tak podczas testowania reguły.",
+      "previewFailed": "Coś poszło nie tak podczas wczytywania podglądu.",
+      "runFailed": "Nie udało się ukończyć uruchomienia. Sprawdź historię akcji, zanim spróbujesz ponownie."
+    },
+    "toast": {
+      "done": "{count, plural, =0 {Nie zmieniono żadnych transakcji} one {Zmieniono # transakcję} few {Zmieniono # transakcje} many {Zmieniono # transakcji} other {Zmieniono # transakcji}}. Możesz to cofnąć w historii akcji."
+    },
+    "done": {
+      "summary": "{count, plural, =0 {Nie zmieniono żadnych transakcji.} one {Zmieniono # transakcję.} few {Zmieniono # transakcje.} many {Zmieniono # transakcji.} other {Zmieniono # transakcji.}}",
+      "undo": "Uruchomienie można cofnąć w historii akcji."
+    }
+  },
+  "applications": {
+    "title": "Historia",
+    "description": "Ostatnie transakcje zmienione przez tę regułę, od najnowszych.",
+    "loading": "Wczytywanie historii...",
+    "error": {
+      "title": "Nie udało się wczytać historii",
+      "body": "Nic nie jest pokazane, ponieważ żądanie się nie powiodło, a nie dlatego, że reguła jeszcze nie działała. Sprawdź połączenie i spróbuj ponownie.",
+      "retry": "Spróbuj ponownie"
+    },
+    "empty": {
+      "title": "Ta reguła jeszcze niczego nie zmieniła",
+      "body": "Gdy zmieni transakcję, zmiana pojawi się tutaj."
+    },
+    "source": {
+      "create": "Utworzona",
+      "import": "Zaimportowana",
+      "manual": "Uruchomienie ręczne",
+      "other": "Inne"
+    },
+    "table": {
+      "date": "Data",
+      "payee": "Odbiorca",
+      "amount": "Kwota",
+      "source": "Źródło",
+      "change": "Zmiana",
+      "appliedAt": "Zastosowano",
+      "open": "Otwórz transakcję",
+      "noPayee": "Brak odbiorcy",
+      "view": "Zobacz"
     }
   }
 }

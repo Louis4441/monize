@@ -128,7 +128,8 @@
       "updatedInvestmentTransaction": "Transaction {action} mise à jour",
       "deletedInvestmentTransaction": "Transaction {action} supprimée",
       "transferredSecurity": "Titre transféré entre comptes",
-      "updatedSecurityTransfer": "Transfert de titres mis à jour"
+      "updatedSecurityTransfer": "Transfert de titres mis à jour",
+      "ranTransactionRule": "Règle « {name} » exécutée sur {count, plural, one {# transaction} other {# transactions}}"
     },
     "timeAgo": {
       "justNow": "à l'instant",

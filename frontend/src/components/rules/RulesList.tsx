@@ -27,6 +27,8 @@ export interface RulesListProps {
   reordering: boolean;
   onToggle: (rule: TransactionRule, enabled: boolean) => void;
   onDuplicate: (rule: TransactionRule) => void;
+  /** Open the manual-run dialog for the rule. */
+  onRun: (rule: TransactionRule) => void;
   onMove: (rule: TransactionRule, direction: RuleMoveDirection) => void;
   onDelete: (rule: TransactionRule) => void;
 }
@@ -130,6 +132,7 @@ export function RulesList({
   reordering,
   onToggle,
   onDuplicate,
+  onRun,
   onMove,
   onDelete,
 }: RulesListProps) {
@@ -153,6 +156,16 @@ export function RulesList({
       { key: 'edit', label: tc('actions.edit'), icon: 'edit', tone: 'primary', onClick: () => openRule(rule) },
       { key: 'duplicate', label: tc('actions.duplicate'), icon: 'duplicate', tone: 'neutral', onClick: () => onDuplicate(rule) },
       {
+        key: 'run',
+        label: t('actions.run'),
+        icon: 'post',
+        tone: 'success',
+        // An invalid rule is refused by the server; the editor explains why.
+        disabled: rule.invalid,
+        title: rule.invalid ? t('actions.runInvalid') : undefined,
+        onClick: () => onRun(rule),
+      },
+      {
         key: 'moveUp',
         label: t('actions.moveUp'),
         icon: 'moveUp',
@@ -170,7 +183,7 @@ export function RulesList({
       },
       { key: 'delete', label: tc('actions.delete'), icon: 'delete', tone: 'delete', destructive: true, onClick: () => onDelete(rule) },
     ],
-    [t, tc, rules.length, reordering, openRule, onDuplicate, onMove, onDelete],
+    [t, tc, rules.length, reordering, openRule, onDuplicate, onRun, onMove, onDelete],
   );
 
   const rowActions = useMemo(() => rules.map((rule, index) => buildActions(rule, index)), [rules, buildActions]);

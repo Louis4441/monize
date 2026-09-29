@@ -128,7 +128,8 @@
       "updatedInvestmentTransaction": "Updated {action} transaction",
       "deletedInvestmentTransaction": "Deleted {action} transaction",
       "transferredSecurity": "Transferred security between accounts",
-      "updatedSecurityTransfer": "Updated security transfer"
+      "updatedSecurityTransfer": "Updated security transfer",
+      "ranTransactionRule": "Ran rule \"{name}\" on {count, plural, one {# transaction} other {# transactions}}"
     },
     "timeAgo": {
       "justNow": "just now",

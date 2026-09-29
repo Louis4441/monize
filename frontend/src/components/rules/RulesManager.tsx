@@ -11,6 +11,7 @@ import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { RunRuleDialog } from '@/components/rules/RunRuleDialog';
 import { RulesList, type RuleMoveDirection } from '@/components/rules/RulesList';
 import { useOnAiAction } from '@/hooks/useOnAiAction';
 import { useOnUndoRedo } from '@/hooks/useOnUndoRedo';
@@ -56,6 +57,7 @@ export function RulesManager() {
   const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(new Set());
   const [reordering, setReordering] = useState(false);
   const [deleteRule, setDeleteRule] = useState<TransactionRule | null>(null);
+  const [runRule, setRunRule] = useState<TransactionRule | null>(null);
   // Only the newest request may write the list: a reload after a 409 must not
   // be overwritten by a slower answer to an earlier one.
   const latestLoad = useRef(0);
@@ -207,6 +209,7 @@ export function RulesManager() {
         reordering={reordering}
         onToggle={handleToggle}
         onDuplicate={handleDuplicate}
+        onRun={setRunRule}
         onMove={handleMove}
         onDelete={setDeleteRule}
       />
@@ -221,6 +224,7 @@ export function RulesManager() {
           {t('page.totalCount', { count: rules.length })}
         </div>
       )}
+      <RunRuleDialog rule={runRule} onClose={() => setRunRule(null)} />
       <ConfirmDialog
         isOpen={deleteRule !== null}
         title={t('delete.title')}

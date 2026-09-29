@@ -3,6 +3,12 @@ import apiClient from './api';
 import { transactionRulesApi } from './transaction-rules-api';
 import { invalidateCache } from './apiCache';
 
+const cacheSpy = vi.hoisted(() => ({ clearAllCache: vi.fn() }));
+vi.mock('./apiCache', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./apiCache')>()),
+  clearAllCache: cacheSpy.clearAllCache,
+}));
+
 vi.mock('./api', () => ({
   default: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), put: vi.fn(), delete: vi.fn() },
 }));
@@ -86,5 +92,45 @@ describe('transactionRulesApi', () => {
     await expect(transactionRulesApi.reorder(['a'])).rejects.toThrow('409');
     await transactionRulesApi.getAll();
     expect(apiClient.get).toHaveBeenCalledTimes(2);
+  });
+
+  describe('testing and running', () => {
+    const filters = { accountIds: ['a-1'], startDate: '2026-01-01', limit: 50 };
+
+    it('previewDraft posts the unsaved rule and filters', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ data: { matched: [], fingerprint: 'f' } });
+      const body = { condition: { all: [] }, actions: definition.actions, filters };
+      const preview = await transactionRulesApi.previewDraft(body);
+      expect(apiClient.post).toHaveBeenCalledWith('/transaction-rules/preview-draft', body);
+      expect(preview.fingerprint).toBe('f');
+    });
+
+    it('previewRun posts the filters to the rule', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ data: { matched: [] } });
+      await transactionRulesApi.previewRun('r-1', filters);
+      expect(apiClient.post).toHaveBeenCalledWith('/transaction-rules/r-1/preview-run', filters);
+    });
+
+    it('run sends the filters with the fingerprint and drops every cache once it succeeded', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ data: { changed: 2, skipped: [], historyId: 'h-1' } });
+      const result = await transactionRulesApi.run('r-1', filters, 'abc');
+      expect(apiClient.post).toHaveBeenCalledWith('/transaction-rules/r-1/run', { ...filters, fingerprint: 'abc' });
+      expect(result.changed).toBe(2);
+      expect(cacheSpy.clearAllCache).toHaveBeenCalledTimes(1);
+    });
+
+    it('run keeps the cache when the server refuses, because nothing was written', async () => {
+      vi.mocked(apiClient.post).mockRejectedValue(new Error('409'));
+      await expect(transactionRulesApi.run('r-1', filters, 'abc')).rejects.toThrow('409');
+      expect(cacheSpy.clearAllCache).not.toHaveBeenCalled();
+    });
+
+    it('getApplications is never cached and passes the limit only when given', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+      await transactionRulesApi.getApplications('r-1');
+      await transactionRulesApi.getApplications('r-1', 20);
+      expect(apiClient.get).toHaveBeenNthCalledWith(1, '/transaction-rules/r-1/applications', { params: undefined });
+      expect(apiClient.get).toHaveBeenNthCalledWith(2, '/transaction-rules/r-1/applications', { params: { limit: 20 } });
+    });
   });
 });

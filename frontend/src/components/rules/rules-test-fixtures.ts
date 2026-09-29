@@ -1,4 +1,5 @@
 import type { TransactionRule } from '@/types/transaction-rule';
+import type { RuleApplication, RuleRunPreview } from '@/types/transaction-rule-run';
 
 /** A valid stored rule; a case overrides only what it is about. */
 export function makeRule(overrides: Partial<TransactionRule> = {}): TransactionRule {
@@ -52,3 +53,48 @@ export const lookupFixtures = {
     { code: 'EUR', isActive: false },
   ],
 };
+
+/** A preview with one row that gains a category and a tag; a case overrides only what it is about. */
+export function makePreview(overrides: Partial<RuleRunPreview> = {}): RuleRunPreview {
+  return {
+    matched: [
+      {
+        transactionId: 'tx-1',
+        date: '2026-08-14',
+        payeeName: 'Corner Cafe',
+        amount: -4.5,
+        currencyCode: 'CAD',
+        changes: {
+          categoryId: { before: null, after: COFFEE_ID },
+          tagIds: { before: [], after: [TAG_ID] },
+        },
+      },
+    ],
+    skipped: [],
+    scanned: 12,
+    truncated: false,
+    fingerprint: 'a'.repeat(64),
+    labels: {
+      categories: { [COFFEE_ID]: 'Food: Coffee' },
+      payees: { [PAYEE_ID]: 'Corner Cafe' },
+      tags: { [TAG_ID]: 'Coffee run' },
+      rules: {},
+    },
+    ...overrides,
+  };
+}
+
+export function makeApplication(overrides: Partial<RuleApplication> = {}): RuleApplication {
+  return {
+    id: 'app-1',
+    transactionId: 'tx-1',
+    date: '2026-08-14',
+    payeeName: 'Corner Cafe',
+    amount: -4.5,
+    currencyCode: 'CAD',
+    source: 'import',
+    changes: { categoryId: { before: null, after: COFFEE_ID } },
+    appliedAt: '2026-09-01T12:00:00.000Z',
+    ...overrides,
+  };
+}

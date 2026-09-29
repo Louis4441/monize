@@ -7,6 +7,8 @@ import { makeRule } from './rules-test-fixtures';
 import type { TransactionRule } from '@/types/transaction-rule';
 
 const api = vi.hoisted(() => ({
+  previewRun: vi.fn(),
+  run: vi.fn(),
   getAll: vi.fn(),
   create: vi.fn(),
   setEnabled: vi.fn(),
@@ -15,6 +17,10 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/transaction-rules-api', () => ({ transactionRulesApi: api }));
+vi.mock('@/lib/accounts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/accounts')>()),
+  accountsApi: { getAll: vi.fn().mockResolvedValue([]) },
+}));
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
 }));
@@ -242,5 +248,17 @@ describe('RulesManager', () => {
     await renderManager();
     await pickFromMenu('Coffee shops', 'Duplicate');
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Failed to duplicate the rule'));
+  });
+
+  it('opens the run dialog for the chosen rule from the row menu and closes it again', async () => {
+    await renderManager();
+    await pickFromMenu('Salary', 'Run on existing transactions');
+    expect(await screen.findByRole('dialog', { name: 'Run "Salary" on existing transactions' })).toBeInTheDocument();
+    expect(api.previewRun).not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

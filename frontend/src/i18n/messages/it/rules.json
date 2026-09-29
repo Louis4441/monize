@@ -29,7 +29,9 @@
   },
   "actions": {
     "moveUp": "Sposta su",
-    "moveDown": "Sposta giù"
+    "moveDown": "Sposta giù",
+    "run": "Esegui sulle transazioni esistenti",
+    "runInvalid": "Ripara la regola prima di eseguirla"
   },
   "invalid": {
     "badge": "Non valida",
@@ -248,6 +250,123 @@
         "NAME_REQUIRED": "Inserisci un nome per la regola.",
         "UNKNOWN": "Questa parte non è valida."
       }
+    },
+    "run": {
+      "button": "Esegui sulle transazioni esistenti",
+      "saveFirst": "Salva le modifiche per eseguire la regola salvata."
+    }
+  },
+  "test": {
+    "title": "Prova",
+    "description": "Prova la regola sulle tue transazioni esistenti. Non viene modificato nulla.",
+    "button": "Prova la regola",
+    "again": "Prova di nuovo",
+    "incomplete": "Completa le condizioni e le azioni qui sopra per provare la regola.",
+    "idle": "Scegli su quali transazioni provare la regola, poi seleziona Prova la regola.",
+    "running": "Prova della regola in corso...",
+    "failed": "Non è stato possibile completare la prova. {message}",
+    "stale": "La regola o i filtri sono cambiati dopo questo risultato. Riprova per vedere il risultato attuale."
+  },
+  "run": {
+    "title": "Esegui «{name}» sulle transazioni esistenti",
+    "description": "Visualizza in anteprima cosa cambierebbe la regola, poi conferma. Puoi annullare l’esecuzione dalla cronologia azioni.",
+    "previewButton": "Anteprima",
+    "confirmButton": "Conferma ed esegui",
+    "idle": "Scegli conti e date, poi seleziona Anteprima. Non cambia nulla finché non confermi.",
+    "loadingPreview": "Caricamento dell’anteprima...",
+    "previewFailed": "Non è stato possibile caricare l’anteprima, quindi non si può eseguire nulla. {message}",
+    "stale": "I filtri sono cambiati dopo questa anteprima. Rigenera l’anteprima prima di eseguire.",
+    "accountsLoading": "Caricamento dei conti...",
+    "accountsFailed": "Non è stato possibile caricare i tuoi conti, quindi i filtri non sono disponibili.",
+    "retry": "Riprova",
+    "summary": "{matched, plural, one {# transazione verrebbe modificata} other {# transazioni verrebbero modificate}} su {scanned, plural, one {# transazione analizzata} other {# transazioni analizzate}}.",
+    "truncated": "Corrispondono più transazioni di quante il limite consenta. Sono incluse solo le più recenti. Aumenta il limite o restringi le date per includere le altre.",
+    "noMatches": {
+      "title": "Nessuna transazione verrebbe modificata",
+      "body": "Nessuna delle transazioni analizzate corrisponde alla regola, oppure la regola non cambierebbe nulla."
+    },
+    "table": {
+      "date": "Data",
+      "payee": "Beneficiario",
+      "amount": "Importo",
+      "change": "Modifica prevista",
+      "noPayee": "Nessun beneficiario"
+    },
+    "skipped": {
+      "title": "{count, plural, one {# transazione viene lasciata invariata} other {# transazioni vengono lasciate invariate}}",
+      "line": "{count, plural, one {# transazione} other {# transazioni}}: {reason}"
+    },
+    "skipReasons": {
+      "reconciled_locked": "è riconciliata e bloccata",
+      "transfer_leg_category": "è un trasferimento, che non ha categoria",
+      "split_category": "è suddivisa, quindi la categoria appartiene alle suddivisioni",
+      "cross_owner_transfer_payee": "è un trasferimento verso un altro proprietario, il cui beneficiario questa regola non può modificare",
+      "other": "la regola non può modificarla"
+    },
+    "change": {
+      "category": "Categoria: {before} → {after}",
+      "payee": "Beneficiario: {before} → {after}",
+      "tagsAdded": "Tag aggiunti: {tags}",
+      "tagsRemoved": "Tag rimossi: {tags}",
+      "none": "nessuna",
+      "unknown": "un elemento eliminato"
+    },
+    "filters": {
+      "accounts": "Conti",
+      "allAccounts": "Tutti i conti",
+      "startDate": "Dal",
+      "endDate": "Al",
+      "backwards": "La data di inizio non può essere successiva alla data di fine.",
+      "limit": "Transazioni più recenti da esaminare",
+      "help": "Vengono esaminate solo le transazioni più recenti nell’intervallo, fino a {max}."
+    },
+    "errors": {
+      "PREVIEW_CHANGED": "Le transazioni o la regola sono cambiate dopo l’anteprima. Controlla la nuova anteprima ed esegui di nuovo.",
+      "RUN_TOO_LARGE": "Questa esecuzione modifica troppe transazioni per essere annullata in un solo passaggio. Restringi i conti o le date e riprova.",
+      "INVALID_RULE": "Questa regola non è valida, quindi non può essere eseguita. Aprila e riparala prima.",
+      "DATE_RANGE_INVALID": "La data di inizio non può essere successiva alla data di fine.",
+      "draftInvalid": "La regola è incompleta o non valida. Controlla le condizioni e le azioni qui sopra.",
+      "testFailed": "Qualcosa è andato storto durante la prova della regola.",
+      "previewFailed": "Qualcosa è andato storto durante il caricamento dell’anteprima.",
+      "runFailed": "Non è stato possibile completare l’esecuzione. Controlla la cronologia azioni prima di riprovare."
+    },
+    "toast": {
+      "done": "{count, plural, =0 {Nessuna transazione è stata modificata} one {# transazione modificata} other {# transazioni modificate}}. Puoi annullare dalla cronologia azioni."
+    },
+    "done": {
+      "summary": "{count, plural, =0 {Nessuna transazione è stata modificata.} one {È stata modificata # transazione.} other {Sono state modificate # transazioni.}}",
+      "undo": "Puoi annullare l’esecuzione dalla cronologia azioni."
+    }
+  },
+  "applications": {
+    "title": "Cronologia",
+    "description": "Le ultime transazioni modificate da questa regola, dalla più recente.",
+    "loading": "Caricamento della cronologia...",
+    "error": {
+      "title": "Non è stato possibile caricare la cronologia",
+      "body": "Non viene mostrato nulla perché la richiesta non è riuscita, non perché la regola non sia stata eseguita. Controlla la connessione e riprova.",
+      "retry": "Riprova"
+    },
+    "empty": {
+      "title": "Questa regola non ha ancora modificato nulla",
+      "body": "Quando modificherà una transazione, la modifica sarà elencata qui."
+    },
+    "source": {
+      "create": "Creata",
+      "import": "Importata",
+      "manual": "Esecuzione manuale",
+      "other": "Altro"
+    },
+    "table": {
+      "date": "Data",
+      "payee": "Beneficiario",
+      "amount": "Importo",
+      "source": "Origine",
+      "change": "Modifica",
+      "appliedAt": "Applicata",
+      "open": "Apri transazione",
+      "noPayee": "Nessun beneficiario",
+      "view": "Vedi"
     }
   }
 }

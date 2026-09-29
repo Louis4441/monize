@@ -14,7 +14,7 @@ const TONES = {
   amber: 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200',
 } as const;
 
-function Banner({ tone, title, children }: { tone: keyof typeof TONES; title?: string; children?: ReactNode }) {
+export function Banner({ tone, title, children }: { tone: keyof typeof TONES; title?: string; children?: ReactNode }) {
   return (
     <div role="alert" className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${TONES[tone]}`}>
       <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />

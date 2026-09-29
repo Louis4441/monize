@@ -1,10 +1,17 @@
 import apiClient from './api';
-import { dedupe, invalidateCache } from './apiCache';
+import { clearAllCache, dedupe, invalidateCache } from './apiCache';
 import type {
   CreateTransactionRuleData,
   TransactionRule,
   UpdateTransactionRuleData,
 } from '@/types/transaction-rule';
+import type {
+  PreviewDraftRuleData,
+  RuleApplication,
+  RuleRunFilters,
+  RuleRunPreview,
+  RuleRunResult,
+} from '@/types/transaction-rule-run';
 
 const CACHE_PREFIX = 'transaction-rules:';
 
@@ -77,4 +84,39 @@ export const transactionRulesApi = {
     write(async () => {
       await apiClient.delete(`/transaction-rules/${id}`);
     }),
+
+  /** Tests an unsaved rule against existing transactions. Writes nothing. */
+  previewDraft: async (data: PreviewDraftRuleData): Promise<RuleRunPreview> => {
+    const response = await apiClient.post<RuleRunPreview>('/transaction-rules/preview-draft', data);
+    return response.data;
+  },
+
+  /** What a manual run of a saved rule would change. Writes nothing. */
+  previewRun: async (id: string, filters: RuleRunFilters): Promise<RuleRunPreview> => {
+    const response = await apiClient.post<RuleRunPreview>(`/transaction-rules/${id}/preview-run`, filters);
+    return response.data;
+  },
+
+  /**
+   * Commits the preview whose `fingerprint` is sent. A run rewrites category,
+   * payee and tags of any transaction, and undo can reverse it, so no cache
+   * prefix is narrow enough: everything is dropped once the write succeeded.
+   * A refused run (409 PREVIEW_CHANGED, 400) wrote nothing and keeps the cache.
+   */
+  run: async (id: string, filters: RuleRunFilters, fingerprint: string): Promise<RuleRunResult> => {
+    const response = await apiClient.post<RuleRunResult>(`/transaction-rules/${id}/run`, {
+      ...filters,
+      fingerprint,
+    });
+    clearAllCache();
+    return response.data;
+  },
+
+  /** The latest applications of one rule, newest first. Never cached. */
+  getApplications: async (id: string, limit?: number): Promise<RuleApplication[]> => {
+    const response = await apiClient.get<RuleApplication[]>(`/transaction-rules/${id}/applications`, {
+      params: limit ? { limit } : undefined,
+    });
+    return response.data;
+  },
 };

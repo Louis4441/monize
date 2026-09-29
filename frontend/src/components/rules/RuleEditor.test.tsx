@@ -14,12 +14,13 @@ import {
   makeRule,
 } from './rules-test-fixtures';
 import { MAX_RULE_ACTIONS } from '@/lib/rule-fields';
+import { makeApplication, makePreview } from './rules-test-fixtures';
 import type { TransactionRule } from '@/types/transaction-rule';
 
 Element.prototype.scrollIntoView = vi.fn();
 
 const mocks = vi.hoisted(() => ({
-  rules: { getById: vi.fn(), create: vi.fn(), update: vi.fn() },
+  rules: { getById: vi.fn(), create: vi.fn(), update: vi.fn(), getApplications: vi.fn(), previewDraft: vi.fn(), previewRun: vi.fn(), run: vi.fn() },
   accounts: vi.fn(),
   payees: vi.fn(),
   categories: vi.fn(),
@@ -91,6 +92,7 @@ beforeEach(() => {
   mocks.categories.mockResolvedValue(lookupFixtures.categories);
   mocks.tags.mockResolvedValue(lookupFixtures.tags);
   mocks.currencies.mockResolvedValue(lookupFixtures.currencies);
+  mocks.rules.getApplications.mockResolvedValue([]);
 });
 
 describe('RuleEditor: a new rule', () => {
@@ -330,6 +332,38 @@ describe('RuleEditor: a new rule', () => {
   });
 });
 
+describe('RuleEditor: the Test panel', () => {
+  it('sits below Then, sends the unsaved draft and shows the planned change', async () => {
+    mocks.rules.previewDraft.mockResolvedValue(makePreview());
+    await renderEditor();
+    expect(screen.getByRole('region', { name: 'Test' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Run on existing transactions' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'History' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Test rule' })).toBeDisabled();
+
+    addTagAction(0, 'Work');
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Test rule' }));
+    });
+    expect(mocks.rules.previewDraft).toHaveBeenCalledWith({
+      condition: { all: [] },
+      actions: [{ type: 'add_tags', tagIds: [TAG_WORK_ID] }],
+      filters: { limit: 200 },
+    });
+    expect(screen.getByText('Corner Cafe')).toBeInTheDocument();
+    expect(mocks.rules.create).not.toHaveBeenCalled();
+
+    // A rename does not change what the rule does, so the result stays current.
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Renamed' } });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+    // Changing what it does leaves the result readable but out of date.
+    addTagAction(1, 'Coffee run');
+    expect(screen.getByRole('status')).toHaveTextContent('The rule or the filters changed since this result.');
+    expect(screen.getByText('Corner Cafe')).toBeInTheDocument();
+  });
+});
+
 describe('RuleEditor: an existing rule', () => {
   const stored = makeRule({
     id: 'rule-9',
@@ -366,6 +400,50 @@ describe('RuleEditor: an existing rule', () => {
     expect(within(card('Action', 1)).getByRole('switch', { name: 'Only if empty' })).toHaveAttribute('aria-checked', 'false');
     expect(document.body.textContent).not.toContain(ACCOUNT_ID);
     expect(document.body.textContent).not.toContain(PAYEE_ID);
+  });
+
+  it('shows the history of a saved rule and links each application to its transaction', async () => {
+    mocks.rules.getApplications.mockResolvedValue([makeApplication()]);
+    await renderEditor('rule-9');
+    expect(mocks.rules.getApplications).toHaveBeenCalledWith('rule-9');
+    const history = screen.getByRole('region', { name: 'History' });
+    expect(within(history).getByRole('link')).toHaveAttribute('href', '/transactions?targetTransactionId=tx-1');
+  });
+
+  it('runs the saved rule from the editor, and only while the draft matches what is saved', async () => {
+    mocks.rules.previewRun.mockResolvedValue(makePreview());
+    await renderEditor('rule-9');
+    const runButton = () => screen.getByRole('button', { name: 'Run on existing transactions' });
+    expect(runButton()).toBeEnabled();
+    expect(screen.queryByText('Save your changes to run the saved rule.')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Coffee' } });
+    expect(runButton()).toBeDisabled();
+    expect(screen.getByText('Save your changes to run the saved rule.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Coffee shops' } });
+
+    fireEvent.click(runButton());
+    expect(screen.getByRole('dialog', { name: 'Run "Coffee shops" on existing transactions' })).toBeInTheDocument();
+    // The editor already holds the accounts; the dialog does not fetch them again.
+    expect(mocks.accounts).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    });
+    expect(mocks.rules.previewRun).toHaveBeenCalledWith('rule-9', { limit: 200 });
+  });
+
+  it('tests the saved rule\'s current draft, not the stored one', async () => {
+    mocks.rules.previewDraft.mockResolvedValue(makePreview());
+    await renderEditor('rule-9');
+    fireEvent.click(within(card('Action', 1)).getByRole('switch', { name: 'Only if empty' }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Test rule' }));
+    });
+    expect(mocks.rules.previewDraft.mock.calls[0][0].actions[1]).toEqual({
+      type: 'set_payee',
+      payeeId: PAYEE_ID,
+      onlyIfEmpty: true,
+    });
   });
 
   it('cannot be saved until something changed', async () => {

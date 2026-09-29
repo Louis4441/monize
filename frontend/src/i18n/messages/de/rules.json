@@ -29,7 +29,9 @@
   },
   "actions": {
     "moveUp": "Nach oben",
-    "moveDown": "Nach unten"
+    "moveDown": "Nach unten",
+    "run": "Auf bestehende Buchungen anwenden",
+    "runInvalid": "Repariere die Regel, bevor du sie anwendest"
   },
   "invalid": {
     "badge": "Ungültig",
@@ -248,6 +250,123 @@
         "NAME_REQUIRED": "Geben Sie einen Namen für die Regel ein.",
         "UNKNOWN": "Dieser Teil ist ungültig."
       }
+    },
+    "run": {
+      "button": "Auf bestehende Buchungen anwenden",
+      "saveFirst": "Speichere deine Änderungen, um die gespeicherte Regel anzuwenden."
+    }
+  },
+  "test": {
+    "title": "Test",
+    "description": "Probiere die Regel an deinen bestehenden Buchungen aus. Es wird nichts geändert.",
+    "button": "Regel testen",
+    "again": "Erneut testen",
+    "incomplete": "Vervollständige die Bedingungen und Aktionen oben, um die Regel zu testen.",
+    "idle": "Wähle die Buchungen für den Test und wähle dann „Regel testen“.",
+    "running": "Regel wird getestet...",
+    "failed": "Der Test konnte nicht abgeschlossen werden. {message}",
+    "stale": "Die Regel oder die Filter haben sich seit diesem Ergebnis geändert. Teste erneut, um das aktuelle Ergebnis zu sehen."
+  },
+  "run": {
+    "title": "„{name}“ auf bestehende Buchungen anwenden",
+    "description": "Sieh dir vorab an, was die Regel ändern würde, und bestätige dann. Du kannst die Ausführung im Aktionsverlauf rückgängig machen.",
+    "previewButton": "Vorschau",
+    "confirmButton": "Bestätigen und ausführen",
+    "idle": "Wähle Konten und Zeitraum und dann „Vorschau“. Es ändert sich nichts, bis du bestätigst.",
+    "loadingPreview": "Vorschau wird geladen...",
+    "previewFailed": "Die Vorschau konnte nicht geladen werden, daher kann nichts ausgeführt werden. {message}",
+    "stale": "Die Filter haben sich seit dieser Vorschau geändert. Erstelle die Vorschau erneut, bevor du ausführst.",
+    "accountsLoading": "Konten werden geladen...",
+    "accountsFailed": "Deine Konten konnten nicht geladen werden, daher sind die Filter nicht verfügbar.",
+    "retry": "Erneut versuchen",
+    "summary": "{matched, plural, one {# Buchung würde geändert} other {# Buchungen würden geändert}} von {scanned, plural, one {# geprüften Buchung} other {# geprüften Buchungen}}.",
+    "truncated": "Es passen mehr Buchungen, als das Limit zulässt. Nur die neuesten sind enthalten. Erhöhe das Limit oder grenze den Zeitraum ein, um den Rest einzubeziehen.",
+    "noMatches": {
+      "title": "Keine Buchung würde geändert",
+      "body": "Keine der geprüften Buchungen passt zur Regel, oder die Regel würde daran nichts ändern."
+    },
+    "table": {
+      "date": "Datum",
+      "payee": "Zahlungsempfänger",
+      "amount": "Betrag",
+      "change": "Geplante Änderung",
+      "noPayee": "Kein Zahlungsempfänger"
+    },
+    "skipped": {
+      "title": "{count, plural, one {# Buchung wird übergangen} other {# Buchungen werden übergangen}}",
+      "line": "{count, plural, one {# Buchung} other {# Buchungen}}: {reason}"
+    },
+    "skipReasons": {
+      "reconciled_locked": "sie ist abgeglichen und gesperrt",
+      "transfer_leg_category": "sie ist eine Überweisung und hat keine Kategorie",
+      "split_category": "sie ist aufgeteilt, die Kategorie gehört daher zu den Teilbuchungen",
+      "cross_owner_transfer_payee": "sie ist eine Überweisung an einen anderen Eigentümer, dessen Zahlungsempfänger diese Regel nicht ändern darf",
+      "other": "die Regel kann sie nicht ändern"
+    },
+    "change": {
+      "category": "Kategorie: {before} → {after}",
+      "payee": "Zahlungsempfänger: {before} → {after}",
+      "tagsAdded": "Tags hinzugefügt: {tags}",
+      "tagsRemoved": "Tags entfernt: {tags}",
+      "none": "keine",
+      "unknown": "ein gelöschtes Element"
+    },
+    "filters": {
+      "accounts": "Konten",
+      "allAccounts": "Alle Konten",
+      "startDate": "Von",
+      "endDate": "Bis",
+      "backwards": "Das Startdatum darf nicht nach dem Enddatum liegen.",
+      "limit": "Neueste Buchungen, die geprüft werden",
+      "help": "Geprüft werden nur die neuesten Buchungen im Zeitraum, höchstens {max}."
+    },
+    "errors": {
+      "PREVIEW_CHANGED": "Die Buchungen oder die Regel haben sich seit der Vorschau geändert. Prüfe die neue Vorschau und führe erneut aus.",
+      "RUN_TOO_LARGE": "Diese Ausführung ändert zu viele Buchungen, um in einem Schritt rückgängig gemacht zu werden. Schränke die Konten oder den Zeitraum ein und versuche es erneut.",
+      "INVALID_RULE": "Diese Regel ist nicht gültig und kann daher nicht ausgeführt werden. Öffne sie und repariere sie zuerst.",
+      "DATE_RANGE_INVALID": "Das Startdatum darf nicht nach dem Enddatum liegen.",
+      "draftInvalid": "Die Regel ist unvollständig oder ungültig. Prüfe die Bedingungen und Aktionen oben.",
+      "testFailed": "Beim Testen der Regel ist etwas schiefgegangen.",
+      "previewFailed": "Beim Laden der Vorschau ist etwas schiefgegangen.",
+      "runFailed": "Die Ausführung konnte nicht abgeschlossen werden. Prüfe den Aktionsverlauf, bevor du es erneut versuchst."
+    },
+    "toast": {
+      "done": "{count, plural, =0 {Es wurden keine Buchungen geändert} one {# Buchung geändert} other {# Buchungen geändert}}. Du kannst das im Aktionsverlauf rückgängig machen."
+    },
+    "done": {
+      "summary": "{count, plural, =0 {Es wurden keine Buchungen geändert.} one {# Buchung wurde geändert.} other {# Buchungen wurden geändert.}}",
+      "undo": "Du kannst die Ausführung im Aktionsverlauf rückgängig machen."
+    }
+  },
+  "applications": {
+    "title": "Verlauf",
+    "description": "Die neuesten Buchungen, die diese Regel geändert hat, zuerst die jüngsten.",
+    "loading": "Verlauf wird geladen...",
+    "error": {
+      "title": "Der Verlauf konnte nicht geladen werden",
+      "body": "Es wird nichts angezeigt, weil die Anfrage fehlgeschlagen ist, nicht weil die Regel noch nicht gelaufen ist. Prüfe deine Verbindung und versuche es erneut.",
+      "retry": "Erneut versuchen"
+    },
+    "empty": {
+      "title": "Diese Regel hat noch nichts geändert",
+      "body": "Sobald sie eine Buchung ändert, wird die Änderung hier aufgeführt."
+    },
+    "source": {
+      "create": "Erstellt",
+      "import": "Importiert",
+      "manual": "Manuelle Ausführung",
+      "other": "Sonstige"
+    },
+    "table": {
+      "date": "Datum",
+      "payee": "Zahlungsempfänger",
+      "amount": "Betrag",
+      "source": "Quelle",
+      "change": "Änderung",
+      "appliedAt": "Angewendet",
+      "open": "Buchung öffnen",
+      "noPayee": "Kein Zahlungsempfänger",
+      "view": "Ansehen"
     }
   }
 }

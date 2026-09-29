@@ -128,7 +128,8 @@
       "updatedInvestmentTransaction": "{action} 取引を更新しました",
       "deletedInvestmentTransaction": "{action} 取引を削除しました",
       "transferredSecurity": "勘定科目間で有価証券を振替しました",
-      "updatedSecurityTransfer": "有価証券の振替を更新しました"
+      "updatedSecurityTransfer": "有価証券の振替を更新しました",
+      "ranTransactionRule": "ルール「{name}」を {count, plural, other {# 件}}の取引に対して実行しました"
     },
     "timeAgo": {
       "justNow": "たった今",
