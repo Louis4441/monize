@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AiReviewRequestsService } from "./ai-review-requests.service";
+import { AiReviewRequestsExpiryService } from "./ai-review-requests-expiry.service";
 
 /**
  * The AI review queue (design 6.5). It imports nothing from the rules module:
@@ -7,7 +8,7 @@ import { AiReviewRequestsService } from "./ai-review-requests.service";
  * actions, so the edge only runs one way.
  */
 @Module({
-  providers: [AiReviewRequestsService],
+  providers: [AiReviewRequestsService, AiReviewRequestsExpiryService],
   exports: [AiReviewRequestsService],
 })
 export class AiReviewModule {}

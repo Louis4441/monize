@@ -25,6 +25,10 @@ const WITH_CONTEXT_ALLOWLIST = [
   // belong to every user at once, from a cron with no request to inherit an
   // identity from -- system context by construction (task R4).
   "src/ai/relay/relay-sweeper.service.ts",
+  // The AI review queue's hourly upkeep: expires open requests past expires_at
+  // and releases stale claims, across every user's rows, from a cron with no
+  // request to inherit an identity from -- system context by construction.
+  "src/ai-review/ai-review-requests-expiry.service.ts",
   // Blob-tombstone sweep: a cron fan-out that reclaims orphaned attachment
   // bytes across every user, and past them -- a tombstone outlives its owner
   // and its user_id is then NULL, so no user context can see it. No request to
@@ -213,6 +217,10 @@ const WITH_CONTEXT_ALLOWLIST = [
   // context -- system for the admin fan-out, user for a per-user alert
   // (docs/specs/system-alerts.md).
   "src/system-alerts/system-alert.service.ts",
+  // Daily retention of transaction_rule_applications: the rows of every user
+  // age out together, from a cron with no request to inherit an identity from --
+  // system context by construction, in bounded batches.
+  "src/transaction-rules/transaction-rule-applications-retention.service.ts",
   "src/transactions/transaction-transfer.service.ts",
 ];
 
