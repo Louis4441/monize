@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import type { PendingAction } from '@/types/ai';
 import { formatPhoneForDisplay } from '@/lib/phone-number';
+import { RuleEffectsLines } from '@/components/ai/RuleEffectsLines';
 
 interface TransactionConfirmationCardProps {
   action: PendingAction;
@@ -70,7 +71,7 @@ export function TransactionConfirmationCard({
     create_transfer: t('confirmAction.createTransferTitle'),
     update_transfer: t('confirmAction.updateTransferTitle'),
   };
-  const title = titleByType[type] ?? t('confirmAction.createPayeeTitle');
+  const title = titleByType[type] ?? t('confirmAction.unknownTitle');
 
   const none = t('confirmAction.none');
   const rows: Array<{ label: string; value: string }> = [];
@@ -285,8 +286,7 @@ export function TransactionConfirmationCard({
       label: t('confirmAction.name'),
       value: preview.name || none,
     });
-  } else {
-    // create_payee | update_payee
+  } else if (type === 'create_payee' || type === 'update_payee') {
     rows.push({
       label: t('confirmAction.name'),
       value: preview.name || none,
@@ -393,7 +393,7 @@ export function TransactionConfirmationCard({
     update_transfer: t('confirmAction.updatedTransfer'),
   };
   const successMessage =
-    successByType[type] ?? t('confirmAction.createdPayee');
+    successByType[type] ?? t('confirmAction.unknownDone');
 
   return (
     <div className="rounded-lg border border-blue-200 dark:border-blue-900/60 bg-blue-50/60 dark:bg-blue-900/20 overflow-hidden">
@@ -413,6 +413,7 @@ export function TransactionConfirmationCard({
               {t('confirmAction.reconciledWarning')}
             </p>
           )}
+        <RuleEffectsLines effects={preview.ruleEffects} />
       </div>
       <div className="px-3 py-2 border-t border-blue-200 dark:border-blue-900/60">
         {status === 'pending' && (

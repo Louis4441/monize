@@ -368,5 +368,27 @@
       "noPayee": "Không có người nhận",
       "view": "Xem"
     }
+  },
+  "words": {
+    "everyTransaction": "Mọi giao dịch",
+    "group": {
+      "all": "Tất cả các điều sau:",
+      "any": "Bất kỳ điều nào sau đây:",
+      "notAll": "Không phải tất cả các điều sau:",
+      "notAny": "Không điều nào sau đây:"
+    },
+    "leaf": "{field} {operator} {value}",
+    "leafNoValue": "{field} {operator}",
+    "range": "{from} và {to}",
+    "text": "“{value}”",
+    "unknownCondition": "Một điều kiện mà phiên bản này không thể hiển thị",
+    "unknownAction": "Một hành động mà phiên bản này không thể hiển thị",
+    "action": {
+      "add_tags": "Thêm thẻ: {tags}",
+      "remove_tags": "Xóa thẻ: {tags}",
+      "set_category": "Đặt danh mục thành {name}{onlyIfEmpty, select, yes { (chỉ khi trống)} other {}}",
+      "set_payee": "Đặt người nhận thành {name}{onlyIfEmpty, select, yes { (chỉ khi trống)} other {}}",
+      "request_ai_review": "Yêu cầu AI xem xét: {instruction}"
+    }
   }
 }

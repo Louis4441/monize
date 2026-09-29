@@ -368,5 +368,27 @@
       "noPayee": "Alıcı yok",
       "view": "Görüntüle"
     }
+  },
+  "words": {
+    "everyTransaction": "Her işlem",
+    "group": {
+      "all": "Bunların hepsi:",
+      "any": "Bunlardan herhangi biri:",
+      "notAll": "Bunların hepsi değil:",
+      "notAny": "Bunlardan hiçbiri:"
+    },
+    "leaf": "{field} {operator} {value}",
+    "leafNoValue": "{field} {operator}",
+    "range": "{from} ve {to}",
+    "text": "“{value}”",
+    "unknownCondition": "Bu sürümün gösteremediği bir koşul",
+    "unknownAction": "Bu sürümün gösteremediği bir eylem",
+    "action": {
+      "add_tags": "Etiket ekle: {tags}",
+      "remove_tags": "Etiketleri kaldır: {tags}",
+      "set_category": "Kategoriyi {name} olarak ayarla{onlyIfEmpty, select, yes { (yalnızca boşsa)} other {}}",
+      "set_payee": "Alıcıyı {name} olarak ayarla{onlyIfEmpty, select, yes { (yalnızca boşsa)} other {}}",
+      "request_ai_review": "Yapay zekâ incelemesi iste: {instruction}"
+    }
   }
 }

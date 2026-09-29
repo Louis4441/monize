@@ -1,5 +1,12 @@
 import type { ContactLookupSource } from './payee';
 import type { InvestmentAction } from './investment';
+import type { RuleAction, RuleConditionNode, RuleTrigger } from './transaction-rule';
+import type {
+  RuleRunFilters,
+  RuleRunMatchedRow,
+  RuleRunResult,
+  RuleRunSkippedRow,
+} from './transaction-rule-run';
 
 export type AiProviderType = 'anthropic' | 'openai' | 'ollama' | 'ollama-cloud' | 'openai-compatible' | 'mcp_relay';
 
@@ -228,28 +235,50 @@ export interface ChartPayload {
   data: Array<{ label: string; value: number }>;
 }
 
-export type AiActionType =
-  | 'create_transaction'
-  | 'categorize_transaction'
-  | 'create_payee'
-  | 'update_payee'
-  | 'delete_payee'
-  | 'create_security'
-  | 'update_security'
-  | 'delete_security'
-  | 'create_investment_transaction'
-  | 'create_transactions'
-  | 'create_investment_transactions'
-  | 'update_transaction'
-  | 'delete_transaction'
-  | 'update_investment_transaction'
-  | 'delete_investment_transaction'
-  | 'create_transfer'
-  | 'update_transfer'
+/**
+ * Every action type the backend signs (`AI_ACTION_TYPES` in
+ * `backend/src/ai/actions/ai-action.types.ts`). `ai-action-types.contract.test.ts`
+ * reads that list and fails when the two differ, and `AI_ACTION_CARD_KIND`
+ * (`lib/ai-action-card.ts`) is a total map over it, so a new type cannot be
+ * added on one side only.
+ */
+export const AI_ACTION_TYPES = [
+  'create_transaction',
+  'categorize_transaction',
+  'create_payee',
+  'update_payee',
+  'delete_payee',
+  'create_security',
+  'update_security',
+  'delete_security',
+  'create_investment_transaction',
+  'create_transactions',
+  'create_investment_transactions',
+  'update_transaction',
+  'delete_transaction',
+  'update_investment_transaction',
+  'delete_investment_transaction',
+  'create_transfer',
+  'update_transfer',
   // Generic bulk envelope for update/delete/transfer-create batches proposed by
   // the unified manage_transactions tool. The descriptor carries an `operation`
   // discriminator the bulk card reads to pick its title and row layout.
-  | 'batch_actions';
+  'batch_actions',
+  // Transaction rules: one card for the four of them (`RuleConfirmationCard`).
+  'create_transaction_rule',
+  'update_transaction_rule',
+  'delete_transaction_rule',
+  'run_transaction_rule',
+] as const;
+
+export type AiActionType = (typeof AI_ACTION_TYPES)[number];
+
+/** The four transaction-rule action types. */
+export type RuleAiActionType =
+  | 'create_transaction_rule'
+  | 'update_transaction_rule'
+  | 'delete_transaction_rule'
+  | 'run_transaction_rule';
 
 export type PendingActionStatus =
   | 'pending'
@@ -342,6 +371,75 @@ export interface PendingActionPreview {
    * valid rows and the flagged ones the bulk card greys out.
    */
   rows?: PendingActionPreviewRow[];
+  /**
+   * What the user's transaction rules will also do to a created transaction or
+   * transfer on approval (display-only). Absent when no rule matches.
+   */
+  ruleEffects?: PendingActionRuleEffects;
+  /** create/update/delete/run_transaction_rule: the rule and its test. */
+  rule?: PendingActionRule;
+}
+
+/** Names for the ids a rule's effects mention; a missing id is a deleted item. */
+export interface PendingActionRuleEffectsLabels {
+  categories: Record<string, string>;
+  payees: Record<string, string>;
+  tags: Record<string, string>;
+  rules: Record<string, string>;
+}
+
+/** The net change the rules make to a created row (`RuleEffectsPreview`, without the trace). */
+export interface PendingActionRuleEffects {
+  changes: {
+    categoryId?: string | null;
+    payeeId?: string | null;
+    addTagIds: string[];
+    removeTagIds: string[];
+  };
+  aiReviewRequests: Array<{ ruleId: string; instruction: string }>;
+  labels: PendingActionRuleEffectsLabels;
+}
+
+/** Names for the ids a rule definition mentions (`RuleDefinitionLabels`). */
+export interface PendingActionRuleLabels {
+  accounts: Record<string, string>;
+  payees: Record<string, string>;
+  categories: Record<string, string>;
+  tags: Record<string, string>;
+}
+
+/** A rule definition as a card shows it (`AiActionRuleState`). */
+export interface PendingActionRuleState {
+  name: string;
+  enabled: boolean;
+  triggers: RuleTrigger[];
+  condition: RuleConditionNode;
+  actions: RuleAction[];
+  stopProcessing: boolean;
+}
+
+/** What running a rule on existing transactions would do (`AiActionRuleTestPreview`). */
+export interface PendingActionRuleTest {
+  matchedCount: number;
+  scanned: number;
+  truncated: boolean;
+  /** The first rows that would change; the counts cover all of them. */
+  rows: RuleRunMatchedRow[];
+  /** The first rows left alone, and why. */
+  skipped: RuleRunSkippedRow[];
+  skippedCount: number;
+  aiReviewRequests: number;
+  labels: PendingActionRuleEffectsLabels;
+}
+
+/** The rule a rule card shows (`AiActionRulePreview`). */
+export interface PendingActionRule extends PendingActionRuleState {
+  labels: PendingActionRuleLabels;
+  /** update: the rule as stored now. */
+  current?: PendingActionRuleState;
+  /** run: the filters, as ids (`labels.accounts` names the accounts). */
+  filters?: RuleRunFilters;
+  test?: PendingActionRuleTest;
 }
 
 /** One row in a bulk confirmation card; `status: 'error'` rows are flagged. */
@@ -412,6 +510,8 @@ export interface PendingAction {
   resultCount?: number;
   /** Rows the bulk confirm skipped, by input index (set on success). */
   resultSkipped?: Array<{ index: number; reason: string }>;
+  /** run_transaction_rule: what the run changed and left alone (set on success). */
+  resultRuleRun?: RuleRunResult;
   errorMessage?: string;
 }
 
@@ -424,6 +524,8 @@ export interface ConfirmActionResponse {
   count?: number;
   /** Bulk actions: rows skipped best-effort, by input index. */
   skipped?: Array<{ index: number; reason: string }>;
+  /** run_transaction_rule: rows changed, rows left alone and why, and the undo entry. */
+  ruleRun?: RuleRunResult;
 }
 
 export interface StreamEvent {

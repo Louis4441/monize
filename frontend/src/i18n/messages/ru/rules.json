@@ -368,5 +368,27 @@
       "noPayee": "Нет получателя",
       "view": "Открыть"
     }
+  },
+  "words": {
+    "everyTransaction": "Каждая транзакция",
+    "group": {
+      "all": "Все из этих:",
+      "any": "Любое из этих:",
+      "notAll": "Не все из этих:",
+      "notAny": "Ни одно из этих:"
+    },
+    "leaf": "{field} {operator} {value}",
+    "leafNoValue": "{field} {operator}",
+    "range": "{from} и {to}",
+    "text": "«{value}»",
+    "unknownCondition": "Условие, которое эта версия не может показать",
+    "unknownAction": "Действие, которое эта версия не может показать",
+    "action": {
+      "add_tags": "Добавить теги: {tags}",
+      "remove_tags": "Удалить теги: {tags}",
+      "set_category": "Задать категорию: {name}{onlyIfEmpty, select, yes { (только если пусто)} other {}}",
+      "set_payee": "Задать получателя: {name}{onlyIfEmpty, select, yes { (только если пусто)} other {}}",
+      "request_ai_review": "Запросить проверку ИИ: {instruction}"
+    }
   }
 }

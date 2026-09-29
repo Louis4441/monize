@@ -194,7 +194,37 @@
     "deleteSecuritiesTitle": "[XX-Delete these securities?-XX]",
     "createdSecurities": "[XX-{count, plural, =0 {No securities created} one {# security created} other {# securities created}}-XX]",
     "updatedSecurities": "[XX-{count, plural, =0 {No securities updated} one {# security updated} other {# securities updated}}-XX]",
-    "deletedSecurities": "[XX-{count, plural, =0 {No securities deleted} one {# security deleted} other {# securities deleted}}-XX]"
+    "deletedSecurities": "[XX-{count, plural, =0 {No securities deleted} one {# security deleted} other {# securities deleted}}-XX]",
+    "createRuleTitle": "[XX-Create this rule?-XX]",
+    "updateRuleTitle": "[XX-Apply this rule edit?-XX]",
+    "deleteRuleTitle": "[XX-Delete this rule?-XX]",
+    "runRuleTitle": "[XX-Run this rule on existing transactions?-XX]",
+    "createdRule": "[XX-Rule created-XX]",
+    "updatedRule": "[XX-Rule updated-XX]",
+    "deletedRule": "[XX-Rule deleted-XX]",
+    "ranRule": "[XX-Rule run completed-XX]",
+    "viewRules": "[XX-View rules-XX]",
+    "unknownTitle": "[XX-Approve this action?-XX]",
+    "unknownDone": "[XX-Action completed-XX]",
+    "rule": {
+      "noPreview": "[XX-The details of this rule are not available, so it cannot be reviewed here. Cancel and ask again.-XX]",
+      "changesTitle": "[XX-What changes-XX]",
+      "noChanges": "[XX-The rule stays as it is.-XX]",
+      "was": "[XX-Was-XX]",
+      "now": "[XX-Now-XX]",
+      "testTitle": "[XX-Test on your existing transactions-XX]",
+      "runPreviewTitle": "[XX-What this run changes-XX]",
+      "filtersTitle": "[XX-Runs on-XX]",
+      "rowsShown": "[XX-Showing the first {shown} of {count}.-XX]",
+      "skippedMore": "[XX-Reasons are shown for the first {shown} only.-XX]",
+      "aiReviewRequests": "[XX-{count, plural, one {# AI review request would be queued.} other {# AI review requests would be queued.}}-XX]"
+    },
+    "ruleEffects": {
+      "title": "[XX-Your rules will also:-XX]",
+      "category": "[XX-Set the category to {name}-XX]",
+      "payee": "[XX-Set the payee to {name}-XX]",
+      "aiReview": "[XX-{count, plural, one {Queue # AI review request} other {Queue # AI review requests}}-XX]"
+    }
   },
   "table": {
     "downloadTitle": "[XX-Download table as CSV-XX]",

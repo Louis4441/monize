@@ -368,5 +368,27 @@
       "noPayee": "Brak odbiorcy",
       "view": "Zobacz"
     }
+  },
+  "words": {
+    "everyTransaction": "Każda transakcja",
+    "group": {
+      "all": "Wszystkie z poniższych:",
+      "any": "Dowolny z poniższych:",
+      "notAll": "Nie wszystkie z poniższych:",
+      "notAny": "Żaden z poniższych:"
+    },
+    "leaf": "{field} {operator} {value}",
+    "leafNoValue": "{field} {operator}",
+    "range": "{from} i {to}",
+    "text": "„{value}”",
+    "unknownCondition": "Warunek, którego ta wersja nie potrafi pokazać",
+    "unknownAction": "Akcja, której ta wersja nie potrafi pokazać",
+    "action": {
+      "add_tags": "Dodaj tagi: {tags}",
+      "remove_tags": "Usuń tagi: {tags}",
+      "set_category": "Ustaw kategorię na {name}{onlyIfEmpty, select, yes { (tylko jeśli pusta)} other {}}",
+      "set_payee": "Ustaw odbiorcę na {name}{onlyIfEmpty, select, yes { (tylko jeśli pusty)} other {}}",
+      "request_ai_review": "Poproś o przegląd AI: {instruction}"
+    }
   }
 }

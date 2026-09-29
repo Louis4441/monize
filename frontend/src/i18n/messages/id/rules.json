@@ -368,5 +368,27 @@
       "noPayee": "Tanpa penerima",
       "view": "Lihat"
     }
+  },
+  "words": {
+    "everyTransaction": "Setiap transaksi",
+    "group": {
+      "all": "Semua ini:",
+      "any": "Salah satu dari ini:",
+      "notAll": "Tidak semua ini:",
+      "notAny": "Tidak satu pun dari ini:"
+    },
+    "leaf": "{field} {operator} {value}",
+    "leafNoValue": "{field} {operator}",
+    "range": "{from} dan {to}",
+    "text": "“{value}”",
+    "unknownCondition": "Kondisi yang tidak dapat ditampilkan versi ini",
+    "unknownAction": "Tindakan yang tidak dapat ditampilkan versi ini",
+    "action": {
+      "add_tags": "Tambah tag: {tags}",
+      "remove_tags": "Hapus tag: {tags}",
+      "set_category": "Atur kategori ke {name}{onlyIfEmpty, select, yes { (hanya jika kosong)} other {}}",
+      "set_payee": "Atur penerima ke {name}{onlyIfEmpty, select, yes { (hanya jika kosong)} other {}}",
+      "request_ai_review": "Minta peninjauan AI: {instruction}"
+    }
   }
 }

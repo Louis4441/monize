@@ -368,5 +368,27 @@
       "noPayee": "Geen begunstigde",
       "view": "Bekijken"
     }
+  },
+  "words": {
+    "everyTransaction": "Elke transactie",
+    "group": {
+      "all": "Al deze:",
+      "any": "Een van deze:",
+      "notAll": "Niet al deze:",
+      "notAny": "Geen van deze:"
+    },
+    "leaf": "{field} {operator} {value}",
+    "leafNoValue": "{field} {operator}",
+    "range": "{from} en {to}",
+    "text": "‘{value}’",
+    "unknownCondition": "Een voorwaarde die deze versie niet kan tonen",
+    "unknownAction": "Een actie die deze versie niet kan tonen",
+    "action": {
+      "add_tags": "Tags toevoegen: {tags}",
+      "remove_tags": "Tags verwijderen: {tags}",
+      "set_category": "Categorie instellen op {name}{onlyIfEmpty, select, yes { (alleen als leeg)} other {}}",
+      "set_payee": "Begunstigde instellen op {name}{onlyIfEmpty, select, yes { (alleen als leeg)} other {}}",
+      "request_ai_review": "AI-controle aanvragen: {instruction}"
+    }
   }
 }

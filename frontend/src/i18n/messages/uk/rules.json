@@ -368,5 +368,27 @@
       "noPayee": "Немає одержувача",
       "view": "Переглянути"
     }
+  },
+  "words": {
+    "everyTransaction": "Кожна транзакція",
+    "group": {
+      "all": "Усі з цих:",
+      "any": "Будь-яка з цих:",
+      "notAll": "Не всі з цих:",
+      "notAny": "Жодна з цих:"
+    },
+    "leaf": "{field} {operator} {value}",
+    "leafNoValue": "{field} {operator}",
+    "range": "{from} і {to}",
+    "text": "«{value}»",
+    "unknownCondition": "Умова, яку ця версія не може показати",
+    "unknownAction": "Дія, яку ця версія не може показати",
+    "action": {
+      "add_tags": "Додати теги: {tags}",
+      "remove_tags": "Видалити теги: {tags}",
+      "set_category": "Задати категорію: {name}{onlyIfEmpty, select, yes { (лише якщо порожньо)} other {}}",
+      "set_payee": "Задати одержувача: {name}{onlyIfEmpty, select, yes { (лише якщо порожньо)} other {}}",
+      "request_ai_review": "Запросити перевірку ШІ: {instruction}"
+    }
   }
 }

@@ -194,7 +194,37 @@
     "deletePayeesTitle": "Diese Zahlungsempfänger löschen?",
     "createdPayees": "{count, plural, =0 {Keine Zahlungsempfänger erstellt} one {# Zahlungsempfänger erstellt} other {# Zahlungsempfänger erstellt}}",
     "updatedPayees": "{count, plural, =0 {Keine Zahlungsempfänger aktualisiert} one {# Zahlungsempfänger aktualisiert} other {# Zahlungsempfänger aktualisiert}}",
-    "deletedPayees": "{count, plural, =0 {Keine Zahlungsempfänger gelöscht} one {# Zahlungsempfänger gelöscht} other {# Zahlungsempfänger gelöscht}}"
+    "deletedPayees": "{count, plural, =0 {Keine Zahlungsempfänger gelöscht} one {# Zahlungsempfänger gelöscht} other {# Zahlungsempfänger gelöscht}}",
+    "createRuleTitle": "Diese Regel erstellen?",
+    "updateRuleTitle": "Diese Regeländerung übernehmen?",
+    "deleteRuleTitle": "Diese Regel löschen?",
+    "runRuleTitle": "Diese Regel auf vorhandene Transaktionen anwenden?",
+    "createdRule": "Regel erstellt",
+    "updatedRule": "Regel aktualisiert",
+    "deletedRule": "Regel gelöscht",
+    "ranRule": "Regelausführung abgeschlossen",
+    "viewRules": "Regeln anzeigen",
+    "unknownTitle": "Diese Aktion genehmigen?",
+    "unknownDone": "Aktion abgeschlossen",
+    "rule": {
+      "noPreview": "Die Details dieser Regel sind nicht verfügbar und können hier nicht geprüft werden. Brich ab und frage erneut.",
+      "changesTitle": "Was sich ändert",
+      "noChanges": "Die Regel bleibt unverändert.",
+      "was": "Bisher",
+      "now": "Neu",
+      "testTitle": "Test mit deinen vorhandenen Transaktionen",
+      "runPreviewTitle": "Was diese Ausführung ändert",
+      "filtersTitle": "Wird ausgeführt auf",
+      "rowsShown": "Die ersten {shown} von {count} werden angezeigt.",
+      "skippedMore": "Gründe werden nur für die ersten {shown} angezeigt.",
+      "aiReviewRequests": "{count, plural, one {# KI-Prüfanfrage würde eingereiht.} other {# KI-Prüfanfragen würden eingereiht.}}"
+    },
+    "ruleEffects": {
+      "title": "Deine Regeln bewirken außerdem:",
+      "category": "Kategorie festlegen auf {name}",
+      "payee": "Zahlungsempfänger festlegen auf {name}",
+      "aiReview": "{count, plural, one {# KI-Prüfanfrage einreihen} other {# KI-Prüfanfragen einreihen}}"
+    }
   },
   "table": {
     "downloadTitle": "Tabelle als CSV herunterladen",

@@ -368,5 +368,27 @@
       "noPayee": "수취인 없음",
       "view": "보기"
     }
+  },
+  "words": {
+    "everyTransaction": "모든 거래",
+    "group": {
+      "all": "다음 모두:",
+      "any": "다음 중 하나라도:",
+      "notAll": "다음 모두는 아님:",
+      "notAny": "다음 중 어느 것도 아님:"
+    },
+    "leaf": "{field} {operator} {value}",
+    "leafNoValue": "{field} {operator}",
+    "range": "{from} 및 {to}",
+    "text": "“{value}”",
+    "unknownCondition": "이 버전에서 표시할 수 없는 조건",
+    "unknownAction": "이 버전에서 표시할 수 없는 작업",
+    "action": {
+      "add_tags": "태그 추가: {tags}",
+      "remove_tags": "태그 제거: {tags}",
+      "set_category": "카테고리를 {name}(으)로 지정{onlyIfEmpty, select, yes { (비어 있는 경우에만)} other {}}",
+      "set_payee": "수취인을 {name}(으)로 지정{onlyIfEmpty, select, yes { (비어 있는 경우에만)} other {}}",
+      "request_ai_review": "AI 검토 요청: {instruction}"
+    }
   }
 }

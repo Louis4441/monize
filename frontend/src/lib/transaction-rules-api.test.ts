@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import apiClient from './api';
-import { transactionRulesApi } from './transaction-rules-api';
+import { invalidateTransactionRulesCache, transactionRulesApi } from './transaction-rules-api';
 import { invalidateCache } from './apiCache';
 
 const cacheSpy = vi.hoisted(() => ({ clearAllCache: vi.fn() }));
@@ -33,6 +33,14 @@ describe('transactionRulesApi', () => {
     expect(apiClient.get).toHaveBeenCalledWith('/transaction-rules');
     expect(apiClient.get).toHaveBeenCalledTimes(1);
     expect(first).toHaveLength(1);
+  });
+
+  it('invalidateTransactionRulesCache drops the cached list for a write made elsewhere', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [{ id: 'r-1' }] });
+    await transactionRulesApi.getAll();
+    invalidateTransactionRulesCache();
+    await transactionRulesApi.getAll();
+    expect(apiClient.get).toHaveBeenCalledTimes(2);
   });
 
   it('getById is never cached', async () => {

@@ -368,5 +368,27 @@
       "noPayee": "No payee",
       "view": "View"
     }
+  },
+  "words": {
+    "everyTransaction": "Every transaction",
+    "group": {
+      "all": "All of these:",
+      "any": "Any of these:",
+      "notAll": "Not all of these:",
+      "notAny": "None of these:"
+    },
+    "leaf": "{field} {operator} {value}",
+    "leafNoValue": "{field} {operator}",
+    "range": "{from} and {to}",
+    "text": "\"{value}\"",
+    "unknownCondition": "A condition this version cannot show",
+    "unknownAction": "An action this version cannot show",
+    "action": {
+      "add_tags": "Add tags: {tags}",
+      "remove_tags": "Remove tags: {tags}",
+      "set_category": "Set the category to {name}{onlyIfEmpty, select, yes { (only if empty)} other {}}",
+      "set_payee": "Set the payee to {name}{onlyIfEmpty, select, yes { (only if empty)} other {}}",
+      "request_ai_review": "Ask for an AI review: {instruction}"
+    }
   }
 }

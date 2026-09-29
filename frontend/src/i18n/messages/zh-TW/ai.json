@@ -194,7 +194,37 @@
     "deletePayeesTitle": "刪除這些收款人？",
     "createdPayees": "{count, plural, =0 {未建立收款人} other {已建立 # 個收款人}}",
     "updatedPayees": "{count, plural, =0 {未更新收款人} other {已更新 # 個收款人}}",
-    "deletedPayees": "{count, plural, =0 {未刪除收款人} other {已刪除 # 個收款人}}"
+    "deletedPayees": "{count, plural, =0 {未刪除收款人} other {已刪除 # 個收款人}}",
+    "createRuleTitle": "建立此規則？",
+    "updateRuleTitle": "套用此規則的修改？",
+    "deleteRuleTitle": "刪除此規則？",
+    "runRuleTitle": "對現有交易執行此規則？",
+    "createdRule": "規則已建立",
+    "updatedRule": "規則已更新",
+    "deletedRule": "規則已刪除",
+    "ranRule": "規則執行完成",
+    "viewRules": "檢視規則",
+    "unknownTitle": "核准此動作？",
+    "unknownDone": "動作已完成",
+    "rule": {
+      "noPreview": "此規則的詳細資料無法取得，因此無法在此審核。請取消後重新詢問。",
+      "changesTitle": "將發生的變更",
+      "noChanges": "規則維持不變。",
+      "was": "修改前",
+      "now": "修改後",
+      "testTitle": "以現有交易測試",
+      "runPreviewTitle": "此次執行將更動的內容",
+      "filtersTitle": "執行範圍",
+      "rowsShown": "顯示 {count} 筆中的前 {shown} 筆。",
+      "skippedMore": "僅顯示前 {shown} 筆的原因。",
+      "aiReviewRequests": "{count, plural, other {將有 # 個 AI 審核請求加入佇列。}}"
+    },
+    "ruleEffects": {
+      "title": "你的規則還會：",
+      "category": "將分類設定為 {name}",
+      "payee": "將收款對象設定為 {name}",
+      "aiReview": "{count, plural, other {將 # 個 AI 審核請求加入佇列}}"
+    }
   },
   "table": {
     "downloadTitle": "下載表格為 CSV",

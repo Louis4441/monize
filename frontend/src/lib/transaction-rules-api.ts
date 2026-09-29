@@ -19,6 +19,15 @@ const CACHE_PREFIX = 'transaction-rules:';
 const LIST_TTL_MS = 60_000;
 
 /**
+ * Drops the cached rule list. For a write that did not go through this client
+ * (the assistant creating, editing, deleting or running a rule), so the rules
+ * page and the editor do not serve the list they read before it.
+ */
+export function invalidateTransactionRulesCache(): void {
+  invalidateCache(CACHE_PREFIX);
+}
+
+/**
  * Runs a write and drops the cached list afterwards, whether the write
  * succeeded or was refused: a 409 means the list moved under the caller, so
  * the reload that follows must not be served the payload the caller was

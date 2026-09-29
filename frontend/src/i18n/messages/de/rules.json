@@ -368,5 +368,27 @@
       "noPayee": "Kein Zahlungsempfänger",
       "view": "Ansehen"
     }
+  },
+  "words": {
+    "everyTransaction": "Jede Transaktion",
+    "group": {
+      "all": "Alle diese:",
+      "any": "Eine dieser:",
+      "notAll": "Nicht alle diese:",
+      "notAny": "Keine dieser:"
+    },
+    "leaf": "{field} {operator} {value}",
+    "leafNoValue": "{field} {operator}",
+    "range": "{from} und {to}",
+    "text": "„{value}“",
+    "unknownCondition": "Eine Bedingung, die diese Version nicht anzeigen kann",
+    "unknownAction": "Eine Aktion, die diese Version nicht anzeigen kann",
+    "action": {
+      "add_tags": "Tags hinzufügen: {tags}",
+      "remove_tags": "Tags entfernen: {tags}",
+      "set_category": "Kategorie festlegen auf {name}{onlyIfEmpty, select, yes { (nur wenn leer)} other {}}",
+      "set_payee": "Zahlungsempfänger festlegen auf {name}{onlyIfEmpty, select, yes { (nur wenn leer)} other {}}",
+      "request_ai_review": "KI-Prüfung anfordern: {instruction}"
+    }
   }
 }

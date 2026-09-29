@@ -368,5 +368,27 @@
       "noPayee": "无收款方",
       "view": "查看"
     }
+  },
+  "words": {
+    "everyTransaction": "每笔交易",
+    "group": {
+      "all": "满足以下全部：",
+      "any": "满足以下任意一项：",
+      "notAll": "不满足以下全部：",
+      "notAny": "不满足以下任何一项："
+    },
+    "leaf": "{field} {operator} {value}",
+    "leafNoValue": "{field} {operator}",
+    "range": "{from} 和 {to}",
+    "text": "“{value}”",
+    "unknownCondition": "此版本无法显示的条件",
+    "unknownAction": "此版本无法显示的操作",
+    "action": {
+      "add_tags": "添加标签：{tags}",
+      "remove_tags": "移除标签：{tags}",
+      "set_category": "将分类设置为 {name}{onlyIfEmpty, select, yes {（仅在为空时）} other {}}",
+      "set_payee": "将收款方设置为 {name}{onlyIfEmpty, select, yes {（仅在为空时）} other {}}",
+      "request_ai_review": "请求 AI 审核：{instruction}"
+    }
   }
 }

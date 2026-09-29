@@ -194,7 +194,37 @@
     "deletePayeesTitle": "¿Eliminar estos beneficiarios?",
     "createdPayees": "{count, plural, =0 {No se crearon beneficiarios} one {# beneficiario creado} other {# beneficiarios creados}}",
     "updatedPayees": "{count, plural, =0 {No se actualizaron beneficiarios} one {# beneficiario actualizado} other {# beneficiarios actualizados}}",
-    "deletedPayees": "{count, plural, =0 {No se eliminaron beneficiarios} one {# beneficiario eliminado} other {# beneficiarios eliminados}}"
+    "deletedPayees": "{count, plural, =0 {No se eliminaron beneficiarios} one {# beneficiario eliminado} other {# beneficiarios eliminados}}",
+    "createRuleTitle": "¿Crear esta regla?",
+    "updateRuleTitle": "¿Aplicar esta edición de la regla?",
+    "deleteRuleTitle": "¿Eliminar esta regla?",
+    "runRuleTitle": "¿Ejecutar esta regla en las transacciones existentes?",
+    "createdRule": "Regla creada",
+    "updatedRule": "Regla actualizada",
+    "deletedRule": "Regla eliminada",
+    "ranRule": "Ejecución de la regla completada",
+    "viewRules": "Ver reglas",
+    "unknownTitle": "¿Aprobar esta acción?",
+    "unknownDone": "Acción completada",
+    "rule": {
+      "noPreview": "Los detalles de esta regla no están disponibles, así que no se puede revisar aquí. Cancela y vuelve a preguntar.",
+      "changesTitle": "Qué cambia",
+      "noChanges": "La regla se queda como está.",
+      "was": "Antes",
+      "now": "Ahora",
+      "testTitle": "Prueba con tus transacciones existentes",
+      "runPreviewTitle": "Qué cambia esta ejecución",
+      "filtersTitle": "Se ejecuta en",
+      "rowsShown": "Se muestran las primeras {shown} de {count}.",
+      "skippedMore": "Los motivos se muestran solo para las primeras {shown}.",
+      "aiReviewRequests": "{count, plural, one {Se pondría en cola # solicitud de revisión de IA.} other {Se pondrían en cola # solicitudes de revisión de IA.}}"
+    },
+    "ruleEffects": {
+      "title": "Tus reglas también harán lo siguiente:",
+      "category": "Establecer la categoría en {name}",
+      "payee": "Establecer el beneficiario en {name}",
+      "aiReview": "{count, plural, one {Poner en cola # solicitud de revisión de IA} other {Poner en cola # solicitudes de revisión de IA}}"
+    }
   },
   "table": {
     "downloadTitle": "Descargar tabla como CSV",

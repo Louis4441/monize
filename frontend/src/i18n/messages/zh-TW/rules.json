@@ -368,5 +368,27 @@
       "noPayee": "無收款對象",
       "view": "檢視"
     }
+  },
+  "words": {
+    "everyTransaction": "每筆交易",
+    "group": {
+      "all": "符合以下全部：",
+      "any": "符合以下任一項：",
+      "notAll": "不符合以下全部：",
+      "notAny": "不符合以下任何一項："
+    },
+    "leaf": "{field} {operator} {value}",
+    "leafNoValue": "{field} {operator}",
+    "range": "{from} 和 {to}",
+    "text": "「{value}」",
+    "unknownCondition": "此版本無法顯示的條件",
+    "unknownAction": "此版本無法顯示的動作",
+    "action": {
+      "add_tags": "新增標籤：{tags}",
+      "remove_tags": "移除標籤：{tags}",
+      "set_category": "將分類設定為 {name}{onlyIfEmpty, select, yes {（僅在為空時）} other {}}",
+      "set_payee": "將收款對象設定為 {name}{onlyIfEmpty, select, yes {（僅在為空時）} other {}}",
+      "request_ai_review": "請求 AI 審核：{instruction}"
+    }
   }
 }

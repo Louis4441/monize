@@ -368,5 +368,27 @@
       "noPayee": "Sin beneficiario",
       "view": "Ver"
     }
+  },
+  "words": {
+    "everyTransaction": "Todas las transacciones",
+    "group": {
+      "all": "Todas estas:",
+      "any": "Cualquiera de estas:",
+      "notAll": "No todas estas:",
+      "notAny": "Ninguna de estas:"
+    },
+    "leaf": "{field} {operator} {value}",
+    "leafNoValue": "{field} {operator}",
+    "range": "{from} y {to}",
+    "text": "«{value}»",
+    "unknownCondition": "Una condición que esta versión no puede mostrar",
+    "unknownAction": "Una acción que esta versión no puede mostrar",
+    "action": {
+      "add_tags": "Añadir etiquetas: {tags}",
+      "remove_tags": "Quitar etiquetas: {tags}",
+      "set_category": "Establecer la categoría en {name}{onlyIfEmpty, select, yes { (solo si está vacía)} other {}}",
+      "set_payee": "Establecer el beneficiario en {name}{onlyIfEmpty, select, yes { (solo si está vacío)} other {}}",
+      "request_ai_review": "Pedir una revisión de IA: {instruction}"
+    }
   }
 }

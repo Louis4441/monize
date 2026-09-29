@@ -194,7 +194,37 @@
     "deletePayeesTitle": "これらの支払先を削除しますか？",
     "createdPayees": "{count, plural, =0 {支払先は作成されませんでした} other {# 件の支払先を作成しました}}",
     "updatedPayees": "{count, plural, =0 {支払先は更新されませんでした} other {# 件の支払先を更新しました}}",
-    "deletedPayees": "{count, plural, =0 {支払先は削除されませんでした} other {# 件の支払先を削除しました}}"
+    "deletedPayees": "{count, plural, =0 {支払先は削除されませんでした} other {# 件の支払先を削除しました}}",
+    "createRuleTitle": "このルールを作成しますか？",
+    "updateRuleTitle": "このルールの変更を適用しますか？",
+    "deleteRuleTitle": "このルールを削除しますか？",
+    "runRuleTitle": "このルールを既存の取引に実行しますか？",
+    "createdRule": "ルールを作成しました",
+    "updatedRule": "ルールを更新しました",
+    "deletedRule": "ルールを削除しました",
+    "ranRule": "ルールの実行が完了しました",
+    "viewRules": "ルールを表示",
+    "unknownTitle": "この操作を承認しますか？",
+    "unknownDone": "操作が完了しました",
+    "rule": {
+      "noPreview": "このルールの詳細を取得できないため、ここでは確認できません。キャンセルして、もう一度依頼してください。",
+      "changesTitle": "変更内容",
+      "noChanges": "ルールは変更されません。",
+      "was": "変更前",
+      "now": "変更後",
+      "testTitle": "既存の取引でテスト",
+      "runPreviewTitle": "この実行で変更される内容",
+      "filtersTitle": "実行対象",
+      "rowsShown": "{count} 件中、最初の {shown} 件を表示しています。",
+      "skippedMore": "理由は最初の {shown} 件のみ表示しています。",
+      "aiReviewRequests": "{count, plural, other {AIレビューの依頼 # 件がキューに追加されます。}}"
+    },
+    "ruleEffects": {
+      "title": "ルールにより、さらに次も行われます:",
+      "category": "カテゴリを {name} に設定",
+      "payee": "支払先を {name} に設定",
+      "aiReview": "{count, plural, other {AIレビューの依頼 # 件をキューに追加}}"
+    }
   },
   "table": {
     "downloadTitle": "テーブルを CSV でダウンロード",

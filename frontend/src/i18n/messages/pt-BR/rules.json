@@ -368,5 +368,27 @@
       "noPayee": "Sem favorecido",
       "view": "Ver"
     }
+  },
+  "words": {
+    "everyTransaction": "Todas as transações",
+    "group": {
+      "all": "Todas estas:",
+      "any": "Qualquer uma destas:",
+      "notAll": "Nem todas estas:",
+      "notAny": "Nenhuma destas:"
+    },
+    "leaf": "{field} {operator} {value}",
+    "leafNoValue": "{field} {operator}",
+    "range": "{from} e {to}",
+    "text": "“{value}”",
+    "unknownCondition": "Uma condição que esta versão não consegue mostrar",
+    "unknownAction": "Uma ação que esta versão não consegue mostrar",
+    "action": {
+      "add_tags": "Adicionar tags: {tags}",
+      "remove_tags": "Remover tags: {tags}",
+      "set_category": "Definir a categoria como {name}{onlyIfEmpty, select, yes { (somente se vazia)} other {}}",
+      "set_payee": "Definir o favorecido como {name}{onlyIfEmpty, select, yes { (somente se vazio)} other {}}",
+      "request_ai_review": "Pedir uma revisão da IA: {instruction}"
+    }
   }
 }

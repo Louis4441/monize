@@ -368,5 +368,27 @@
       "noPayee": "कोई प्राप्तकर्ता नहीं",
       "view": "देखें"
     }
+  },
+  "words": {
+    "everyTransaction": "हर लेन-देन",
+    "group": {
+      "all": "इन सभी:",
+      "any": "इनमें से कोई भी:",
+      "notAll": "इन सभी नहीं:",
+      "notAny": "इनमें से कोई नहीं:"
+    },
+    "leaf": "{field} {operator} {value}",
+    "leafNoValue": "{field} {operator}",
+    "range": "{from} और {to}",
+    "text": "“{value}”",
+    "unknownCondition": "ऐसी शर्त जिसे यह संस्करण दिखा नहीं सकता",
+    "unknownAction": "ऐसी क्रिया जिसे यह संस्करण दिखा नहीं सकता",
+    "action": {
+      "add_tags": "टैग जोड़ें: {tags}",
+      "remove_tags": "टैग हटाएँ: {tags}",
+      "set_category": "श्रेणी को {name} पर सेट करें{onlyIfEmpty, select, yes { (केवल खाली होने पर)} other {}}",
+      "set_payee": "प्राप्तकर्ता को {name} पर सेट करें{onlyIfEmpty, select, yes { (केवल खाली होने पर)} other {}}",
+      "request_ai_review": "AI समीक्षा का अनुरोध करें: {instruction}"
+    }
   }
 }

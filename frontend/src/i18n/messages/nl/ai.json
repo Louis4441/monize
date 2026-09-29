@@ -194,7 +194,37 @@
     "deletePayeesTitle": "Deze begunstigden verwijderen?",
     "createdPayees": "{count, plural, =0 {Geen begunstigden aangemaakt} one {# begunstigde aangemaakt} other {# begunstigden aangemaakt}}",
     "updatedPayees": "{count, plural, =0 {Geen begunstigden bijgewerkt} one {# begunstigde bijgewerkt} other {# begunstigden bijgewerkt}}",
-    "deletedPayees": "{count, plural, =0 {Geen begunstigden verwijderd} one {# begunstigde verwijderd} other {# begunstigden verwijderd}}"
+    "deletedPayees": "{count, plural, =0 {Geen begunstigden verwijderd} one {# begunstigde verwijderd} other {# begunstigden verwijderd}}",
+    "createRuleTitle": "Deze regel aanmaken?",
+    "updateRuleTitle": "Deze regelwijziging toepassen?",
+    "deleteRuleTitle": "Deze regel verwijderen?",
+    "runRuleTitle": "Deze regel uitvoeren op bestaande transacties?",
+    "createdRule": "Regel aangemaakt",
+    "updatedRule": "Regel bijgewerkt",
+    "deletedRule": "Regel verwijderd",
+    "ranRule": "Uitvoering van de regel voltooid",
+    "viewRules": "Regels bekijken",
+    "unknownTitle": "Deze actie goedkeuren?",
+    "unknownDone": "Actie voltooid",
+    "rule": {
+      "noPreview": "De details van deze regel zijn niet beschikbaar, dus ze kan hier niet worden bekeken. Annuleer en vraag het opnieuw.",
+      "changesTitle": "Wat verandert er",
+      "noChanges": "De regel blijft zoals hij is.",
+      "was": "Was",
+      "now": "Wordt",
+      "testTitle": "Test op je bestaande transacties",
+      "runPreviewTitle": "Wat deze uitvoering verandert",
+      "filtersTitle": "Wordt uitgevoerd op",
+      "rowsShown": "De eerste {shown} van {count} worden getoond.",
+      "skippedMore": "Redenen worden alleen getoond voor de eerste {shown}.",
+      "aiReviewRequests": "{count, plural, one {# AI-controleverzoek zou in de wachtrij worden gezet.} other {# AI-controleverzoeken zouden in de wachtrij worden gezet.}}"
+    },
+    "ruleEffects": {
+      "title": "Je regels doen ook het volgende:",
+      "category": "Categorie instellen op {name}",
+      "payee": "Begunstigde instellen op {name}",
+      "aiReview": "{count, plural, one {# AI-controleverzoek in de wachtrij zetten} other {# AI-controleverzoeken in de wachtrij zetten}}"
+    }
   },
   "table": {
     "downloadTitle": "Tabel downloaden als CSV",

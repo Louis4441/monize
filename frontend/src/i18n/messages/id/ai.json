@@ -194,7 +194,37 @@
     "deletePayeesTitle": "Hapus penerima ini?",
     "createdPayees": "{count, plural, =0 {Tidak ada penerima yang dibuat} other {# penerima dibuat}}",
     "updatedPayees": "{count, plural, =0 {Tidak ada penerima yang diperbarui} other {# penerima diperbarui}}",
-    "deletedPayees": "{count, plural, =0 {Tidak ada penerima yang dihapus} other {# penerima dihapus}}"
+    "deletedPayees": "{count, plural, =0 {Tidak ada penerima yang dihapus} other {# penerima dihapus}}",
+    "createRuleTitle": "Buat aturan ini?",
+    "updateRuleTitle": "Terapkan perubahan aturan ini?",
+    "deleteRuleTitle": "Hapus aturan ini?",
+    "runRuleTitle": "Jalankan aturan ini pada transaksi yang ada?",
+    "createdRule": "Aturan dibuat",
+    "updatedRule": "Aturan diperbarui",
+    "deletedRule": "Aturan dihapus",
+    "ranRule": "Proses aturan selesai",
+    "viewRules": "Lihat aturan",
+    "unknownTitle": "Setujui tindakan ini?",
+    "unknownDone": "Tindakan selesai",
+    "rule": {
+      "noPreview": "Detail aturan ini tidak tersedia, sehingga tidak dapat ditinjau di sini. Batalkan lalu tanyakan lagi.",
+      "changesTitle": "Yang berubah",
+      "noChanges": "Aturan tetap seperti semula.",
+      "was": "Sebelumnya",
+      "now": "Sekarang",
+      "testTitle": "Uji pada transaksi Anda yang ada",
+      "runPreviewTitle": "Yang diubah proses ini",
+      "filtersTitle": "Dijalankan pada",
+      "rowsShown": "Menampilkan {shown} pertama dari {count}.",
+      "skippedMore": "Alasan hanya ditampilkan untuk {shown} pertama.",
+      "aiReviewRequests": "{count, plural, other {# permintaan peninjauan AI akan diantrekan.}}"
+    },
+    "ruleEffects": {
+      "title": "Aturan Anda juga akan:",
+      "category": "Atur kategori ke {name}",
+      "payee": "Atur penerima ke {name}",
+      "aiReview": "{count, plural, other {Antrekan # permintaan peninjauan AI}}"
+    }
   },
   "table": {
     "downloadTitle": "Unduh tabel sebagai CSV",

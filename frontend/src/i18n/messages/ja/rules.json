@@ -368,5 +368,27 @@
       "noPayee": "支払先なし",
       "view": "表示"
     }
+  },
+  "words": {
+    "everyTransaction": "すべての取引",
+    "group": {
+      "all": "次のすべて:",
+      "any": "次のいずれか:",
+      "notAll": "次のすべてではない:",
+      "notAny": "次のいずれでもない:"
+    },
+    "leaf": "{field} {operator} {value}",
+    "leafNoValue": "{field} {operator}",
+    "range": "{from} から {to}",
+    "text": "「{value}」",
+    "unknownCondition": "このバージョンでは表示できない条件",
+    "unknownAction": "このバージョンでは表示できない操作",
+    "action": {
+      "add_tags": "タグを追加: {tags}",
+      "remove_tags": "タグを削除: {tags}",
+      "set_category": "カテゴリを {name} に設定{onlyIfEmpty, select, yes {（空の場合のみ）} other {}}",
+      "set_payee": "支払先を {name} に設定{onlyIfEmpty, select, yes {（空の場合のみ）} other {}}",
+      "request_ai_review": "AIレビューを依頼: {instruction}"
+    }
   }
 }
