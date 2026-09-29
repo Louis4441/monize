@@ -427,6 +427,9 @@ The date is the transaction's own calendar date, never a clock reading.
 
 ### 10.4 Rule effects in the import preview (X4)
 
+Deferred (owner: rules-only scope): X4 needs the import module's review step
+and stays open until that module is in scope.
+
 The import wizard's review step shows, per row, what the import-trigger
 rules will do, through `planRuleEffects` on the facts the import will build
 (I3). The commit stays unchanged; a row whose preview and commit differ

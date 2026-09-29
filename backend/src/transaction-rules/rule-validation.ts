@@ -1,5 +1,9 @@
 import { UUID_REGEX } from "../common/query-param-utils";
-import { RULE_ACTION_TYPES, RuleAction } from "./rule-action.types";
+import {
+  RULE_ACTION_TYPES,
+  RULE_DESCRIPTION_MODES,
+  RuleAction,
+} from "./rule-action.types";
 import {
   RULE_CONDITION_FIELDS,
   RULE_OPERATOR_SHAPES,
@@ -8,6 +12,12 @@ import {
   RuleConditionNode,
   RuleField,
 } from "./rule-condition.types";
+import {
+  MAX_CAPTURES_PER_PATTERN,
+  RESERVED_CAPTURE_NAMES,
+  parseGlob,
+} from "./rule-glob-capture";
+import { TEMPLATE_BUILTINS, parseTemplate } from "./rule-template";
 
 /** Bounds from design section 4. The DTO layer and the validator share them. */
 export const MAX_RULE_CONDITION_DEPTH = 4;
@@ -21,6 +31,10 @@ export const MAX_RULE_TAG_IDS = 20;
 export const MIN_RULE_AI_INSTRUCTION_LENGTH = 1;
 export const MAX_RULE_AI_INSTRUCTION_LENGTH = 1000;
 export const MAX_RULE_AI_REVIEW_ACTIONS = 1;
+/** Template lengths of `set_payee_from_text` and `set_description` (design 10.2). */
+export const MIN_RULE_TEMPLATE_LENGTH = 1;
+export const MAX_RULE_PAYEE_TEMPLATE_LENGTH = 200;
+export const MAX_RULE_DESCRIPTION_TEMPLATE_LENGTH = 500;
 /** Same limit as `matchesAliasPattern`, which returns false beyond it. */
 export const MAX_RULE_TEXT_LENGTH = 500;
 /** Entries in an `in` / `notIn` / `hasAny` / `hasAll` / `hasNone` list. */
@@ -50,6 +64,10 @@ export const RULE_VALIDATION_CODES = [
   "NO_ACTIONS",
   "TOO_MANY_ACTIONS",
   "DUPLICATE_ACTION",
+  "INVALID_CAPTURE",
+  "TOO_MANY_CAPTURES",
+  "DUPLICATE_CAPTURE",
+  "UNKNOWN_CAPTURE",
 ] as const;
 export type RuleValidationCode = (typeof RULE_VALIDATION_CODES)[number];
 
@@ -107,14 +125,15 @@ export function validateRuleDefinition(input: {
 }): RuleValidationError[] {
   const errors: RuleValidationError[] = [];
   const push: Sink = (path, code) => errors.push({ path, code });
-  const budget = {
+  const budget: Budget = {
     leaves: 0,
     nodes: 0,
     leavesReported: false,
     nodesReported: false,
+    captures: new Set<string>(),
   };
   validateNode(input.condition, "condition", 1, budget, push);
-  validateActions(input.actions, push);
+  validateActions(input.actions, budget.captures, push);
   return errors;
 }
 
@@ -123,6 +142,8 @@ interface Budget {
   nodes: number;
   leavesReported: boolean;
   nodesReported: boolean;
+  /** Capture names the `matches` leaves define so far; one name once per rule. */
+  captures: Set<string>;
 }
 
 function validateNode(
@@ -157,7 +178,7 @@ function validateNode(
       budget.leavesReported = true;
       return;
     }
-    return validateLeaf(node, path, push);
+    return validateLeaf(node, path, budget, push);
   }
   push(path, "INVALID_SHAPE");
 }
@@ -185,6 +206,7 @@ function validateGroup(
 function validateLeaf(
   node: Record<string, unknown>,
   path: string,
+  budget: Budget,
   push: Sink,
 ): void {
   checkKeys(node, ["field", "op", "value"], path, push);
@@ -212,7 +234,9 @@ function validateLeaf(
   const checkOne = (v: unknown, p: string): boolean =>
     validateScalar(v, spec.kind, spec.enumValues ?? [], p, push);
   if (shape === "scalar") {
-    checkOne(value, valuePath);
+    if (checkOne(value, valuePath) && op === "matches") {
+      validateCaptures(value as string, valuePath, budget.captures, push);
+    }
   } else if (shape === "list") {
     validateList(value, valuePath, push, MAX_RULE_VALUE_LIST, 1, checkOne);
   } else if (!Array.isArray(value) || value.length !== 2) {
@@ -223,6 +247,34 @@ function validateLeaf(
       push(valuePath, "RANGE_ORDER");
     }
   }
+}
+
+/**
+ * The `{name}` captures of a `matches` pattern (design 10.1): at most 5 per
+ * pattern, names `[a-z][a-z0-9]{0,19}`, a name once per rule, and none of the
+ * names the template language owns. A `{...}` shaped like a capture that is
+ * not a valid one is refused instead of matching as literal text.
+ */
+function validateCaptures(
+  pattern: string,
+  path: string,
+  seen: Set<string>,
+  push: Sink,
+): void {
+  const { captureNames, malformed } = parseGlob(pattern);
+  if (malformed.length > 0) push(path, "INVALID_CAPTURE");
+  if (captureNames.length > MAX_CAPTURES_PER_PATTERN) {
+    push(path, "TOO_MANY_CAPTURES");
+  }
+  let reserved = false;
+  let duplicate = false;
+  for (const name of captureNames) {
+    if (RESERVED_CAPTURE_NAMES.includes(name)) reserved = true;
+    else if (seen.has(name)) duplicate = true;
+    seen.add(name);
+  }
+  if (reserved) push(path, "INVALID_CAPTURE");
+  if (duplicate) push(path, "DUPLICATE_CAPTURE");
 }
 
 function validateList(
@@ -277,14 +329,18 @@ function validateScalar(
   }
 }
 
-function validateActions(actions: unknown, push: Sink): void {
+function validateActions(
+  actions: unknown,
+  captures: ReadonlySet<string>,
+  push: Sink,
+): void {
   if (!Array.isArray(actions)) return push("actions", "INVALID_SHAPE");
   if (actions.length === 0) return push("actions", "NO_ACTIONS");
   if (actions.length > MAX_RULE_ACTIONS) push("actions", "TOO_MANY_ACTIONS");
   let aiReviews = 0;
   actions.slice(0, MAX_RULE_ACTIONS).forEach((action, i) => {
     const path = `actions[${i}]`;
-    validateAction(action, path, push);
+    validateAction(action, path, captures, push);
     if (isRecord(action) && action.type === "request_ai_review") {
       if (++aiReviews > MAX_RULE_AI_REVIEW_ACTIONS) {
         push(path, "DUPLICATE_ACTION");
@@ -293,7 +349,12 @@ function validateActions(actions: unknown, push: Sink): void {
   });
 }
 
-function validateAction(action: unknown, path: string, push: Sink): void {
+function validateAction(
+  action: unknown,
+  path: string,
+  captures: ReadonlySet<string>,
+  push: Sink,
+): void {
   if (!isRecord(action)) return push(path, "INVALID_SHAPE");
   const type = action.type;
   if (
@@ -321,11 +382,78 @@ function validateAction(action: unknown, path: string, push: Sink): void {
     validateInstruction(action.instruction, `${path}.instruction`, push);
     return;
   }
+  if (type === "set_payee_from_text") {
+    checkKeys(
+      action,
+      ["type", "template", "createIfMissing", "onlyIfEmpty"],
+      path,
+      push,
+    );
+    validateTemplate(
+      action.template,
+      MAX_RULE_PAYEE_TEMPLATE_LENGTH,
+      `${path}.template`,
+      captures,
+      push,
+    );
+    for (const key of ["createIfMissing", "onlyIfEmpty"]) {
+      if (typeof action[key] !== "boolean")
+        push(`${path}.${key}`, "VALUE_TYPE");
+    }
+    return;
+  }
+  if (type === "set_description") {
+    checkKeys(action, ["type", "template", "mode", "onlyIfEmpty"], path, push);
+    validateTemplate(
+      action.template,
+      MAX_RULE_DESCRIPTION_TEMPLATE_LENGTH,
+      `${path}.template`,
+      captures,
+      push,
+    );
+    if (typeof action.mode !== "string") {
+      push(`${path}.mode`, "VALUE_TYPE");
+    } else if (
+      !(RULE_DESCRIPTION_MODES as readonly string[]).includes(action.mode)
+    ) {
+      push(`${path}.mode`, "INVALID_ENUM");
+    }
+    if (typeof action.onlyIfEmpty !== "boolean") {
+      push(`${path}.onlyIfEmpty`, "VALUE_TYPE");
+    }
+    return;
+  }
   const idKey = type === "set_category" ? "categoryId" : "payeeId";
   checkKeys(action, ["type", idKey, "onlyIfEmpty"], path, push);
   uuid(action[idKey], `${path}.${idKey}`);
   if (typeof action.onlyIfEmpty !== "boolean") {
     push(`${path}.onlyIfEmpty`, "VALUE_TYPE");
+  }
+}
+
+/**
+ * A template is plain text with `{capture}`, `{payeeText}` and `{description}`
+ * placeholders. A placeholder must name a capture some leaf of the rule
+ * defines (design 10.1), or one of the two built-ins.
+ */
+function validateTemplate(
+  value: unknown,
+  max: number,
+  path: string,
+  captures: ReadonlySet<string>,
+  push: Sink,
+): void {
+  if (typeof value !== "string") return push(path, "VALUE_TYPE");
+  if (value.trim().length < MIN_RULE_TEMPLATE_LENGTH) {
+    return push(path, "VALUE_EMPTY");
+  }
+  if (value.length > max) return push(path, "VALUE_TOO_LONG");
+  const { refs, malformed } = parseTemplate(value);
+  if (malformed.length > 0) push(path, "INVALID_CAPTURE");
+  if (
+    refs.some((ref) => !TEMPLATE_BUILTINS.includes(ref) && !captures.has(ref))
+  ) {
+    push(path, "UNKNOWN_CAPTURE");
   }
 }
 
@@ -367,7 +495,7 @@ export function collectReferencedIds(
   for (const action of definition.actions) {
     if (action.type === "set_category") sets.categoryIds.add(action.categoryId);
     else if (action.type === "set_payee") sets.payeeIds.add(action.payeeId);
-    else if (action.type !== "request_ai_review") {
+    else if (action.type === "add_tags" || action.type === "remove_tags") {
       addAll(sets.tagIds, action.tagIds);
     }
   }

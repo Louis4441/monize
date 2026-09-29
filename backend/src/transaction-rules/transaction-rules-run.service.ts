@@ -15,7 +15,7 @@ import { TransactionStatus } from "../transactions/entities/transaction-status.e
 import { isReconciledLockEnabled } from "../transactions/reconciled-lock.util";
 import { PreviewDraftRuleDto, RunTransactionRuleDto } from "./dto/rule-run.dto";
 import { withActionDefaults } from "./rule-references";
-import { PlannableRule } from "./rule-effects";
+import { PayeeResolution, PlannableRule } from "./rule-effects";
 import { effectiveRunLimit, loadCandidateUnits } from "./rule-run-candidates";
 import { loadRuleApplications } from "./rule-run-applications";
 import { planFingerprint } from "./rule-run-fingerprint";
@@ -56,6 +56,8 @@ const REFUSAL_REASONS: Readonly<Record<string, RuleRunSkipReason>> = {
   row_is_transfer_leg: "transfer_leg_category",
   row_has_splits: "split_category",
   cross_owner_transfer_leg: "cross_owner_transfer_payee",
+  empty_render: "empty_render",
+  payee_not_found: "payee_not_found",
 };
 
 /**
@@ -144,27 +146,58 @@ export class TransactionRulesRunService {
           fingerprint: plan.preview.fingerprint,
         });
       }
-      const { before, after } = buildRunSnapshots(
-        plan.writable,
-        plan.tagsByRow,
-        plan.preview.labels.payees,
-      );
-      // The undo entry must hold every row this run touches; refuse a run it
-      // could not hold, before the first write.
-      if (JSON.stringify({ before, after }).length > MAX_JSONB_SIZE_BYTES) {
-        throw new BadRequestException({
+      const tooLarge = (): BadRequestException =>
+        new BadRequestException({
           message: tr(
             "errors.transactionRules.runTooLarge",
             "This run changes too many transactions to be undone in one step. Narrow the accounts or the dates and try again",
           ),
           errorCode: "RUN_TOO_LARGE",
         });
+      const fits = (snapshots: object): boolean =>
+        JSON.stringify(snapshots).length <= MAX_JSONB_SIZE_BYTES;
+      // The undo entry must hold every row this run touches; refuse a run it
+      // could not hold, before the first write.
+      if (
+        !fits(
+          buildRunSnapshots(
+            plan.writable,
+            plan.tagsByRow,
+            plan.preview.labels.payees,
+          ),
+        )
+      ) {
+        throw tooLarge();
       }
+      // A payee the rule creates is created once per row (both legs of a
+      // transfer share it), inside this transaction, before the row is
+      // written; the snapshots then hold its id.
+      const written: PlannedUnit[] = [];
       for (const { unit, effects } of plan.writable) {
+        const resolved = await this.applier.resolveCreatedPayee(
+          m,
+          userId,
+          effects,
+        );
         for (const leg of unit.legs) {
-          await this.applier.writeEffects(m, userId, leg.id, effects, "manual");
+          await this.applier.writeEffects(
+            m,
+            userId,
+            leg.id,
+            resolved,
+            "manual",
+          );
         }
+        written.push({ unit, effects: resolved });
       }
+      const { before, after } = buildRunSnapshots(
+        written,
+        plan.tagsByRow,
+        plan.preview.labels.payees,
+      );
+      // The created payees' ids are longer than "will be created"; a run that
+      // no longer fits rolls back with the transaction.
+      if (!fits({ before, after })) throw tooLarge();
       // Review requests are queued on commit only, never on preview, one per
       // unit on its primary (outgoing) leg, in this same transaction.
       await this.applier.queueAiReviews(
@@ -300,11 +333,14 @@ export class TransactionRulesRunService {
     );
 
     const skipped: RuleRunSkippedRow[] = [];
+    // Payee names looked up for this preview or commit; nothing is created here.
+    const payeeLookups = new Map<string, PayeeResolution | null>();
     const changing: PlannedUnit[] = [];
     const asking: PlannedUnit[] = [];
     for (const unit of units) {
       const { primary } = unit;
-      const effects = this.applier.planWithChains(
+      const effects = await this.applier.planResolved(
+        userId,
         {
           accountId: primary.accountId,
           currencyCode: primary.currencyCode,
@@ -314,6 +350,7 @@ export class TransactionRulesRunService {
           toAccountId: unit.toAccountId,
           payeeId: primary.payeeId,
           payeeText: primary.payeeName,
+          payeeName: primary.payeeName,
           categoryId: primary.categoryId,
           description: primary.description,
           tagIds: tagsByRow.get(primary.id) ?? [],
@@ -322,6 +359,7 @@ export class TransactionRulesRunService {
         [rule],
         chains,
         { crossOwnerTransferLeg: unit.crossOwnerTransferLeg },
+        payeeLookups,
       );
       const entry = effects.trace[0];
       for (const refused of entry?.skipped ?? []) {

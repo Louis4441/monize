@@ -197,7 +197,9 @@
       "remove_tags": "Xóa thẻ",
       "set_category": "Đặt danh mục",
       "set_payee": "Đặt người nhận",
-      "request_ai_review": "Yêu cầu AI xem xét"
+      "request_ai_review": "Yêu cầu AI xem xét",
+      "set_payee_from_text": "Đặt người nhận từ văn bản",
+      "set_description": "Đặt mô tả"
     },
     "save": {
       "button": "Lưu quy tắc",
@@ -249,7 +251,11 @@
         "DUPLICATE_ACTION": "Một quy tắc chỉ có thể yêu cầu AI xem xét một lần.",
         "REFERENCE_NOT_FOUND": "Một mục được chọn ở đây không còn tồn tại. Hãy chọn mục khác.",
         "NAME_REQUIRED": "Hãy nhập tên cho quy tắc.",
-        "UNKNOWN": "Phần này không hợp lệ."
+        "UNKNOWN": "Phần này không hợp lệ.",
+        "INVALID_CAPTURE": "Tên phần bắt giữ gồm chữ thường và chữ số, bắt đầu bằng chữ cái và dài tối đa 20 ký tự.",
+        "TOO_MANY_CAPTURES": "Một mẫu có thể chứa tối đa 5 phần bắt giữ.",
+        "DUPLICATE_CAPTURE": "Mỗi tên phần bắt giữ chỉ được dùng một lần trong một quy tắc.",
+        "UNKNOWN_CAPTURE": "Văn bản dùng một phần bắt giữ mà không điều kiện nào của quy tắc này định nghĩa."
       }
     },
     "run": {
@@ -428,7 +434,9 @@
       "remove_tags": "Xóa thẻ: {tags}",
       "set_category": "Đặt danh mục thành {name}{onlyIfEmpty, select, yes { (chỉ khi trống)} other {}}",
       "set_payee": "Đặt người nhận thành {name}{onlyIfEmpty, select, yes { (chỉ khi trống)} other {}}",
-      "request_ai_review": "Yêu cầu AI xem xét: {instruction}"
+      "request_ai_review": "Yêu cầu AI xem xét: {instruction}",
+      "set_payee_from_text": "Đặt người nhận thành “{template}”{createIfMissing, select, yes { (tạo mới nếu chưa có)} other {}}{onlyIfEmpty, select, yes { (chỉ khi trống)} other {}}",
+      "set_description": "{mode, select, append {Thêm “{template}” vào cuối mô tả} prepend {Thêm “{template}” vào đầu mô tả} other {Đặt mô tả thành “{template}”}}{onlyIfEmpty, select, yes { (chỉ khi trống)} other {}}"
     }
   }
 }

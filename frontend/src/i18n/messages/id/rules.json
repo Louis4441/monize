@@ -197,7 +197,9 @@
       "remove_tags": "Hapus tag",
       "set_category": "Atur kategori",
       "set_payee": "Atur penerima",
-      "request_ai_review": "Minta peninjauan AI"
+      "request_ai_review": "Minta peninjauan AI",
+      "set_payee_from_text": "Atur penerima dari teks",
+      "set_description": "Atur deskripsi"
     },
     "save": {
       "button": "Simpan aturan",
@@ -249,7 +251,11 @@
         "DUPLICATE_ACTION": "Satu aturan hanya dapat meminta peninjauan AI satu kali.",
         "REFERENCE_NOT_FOUND": "Item yang dipilih di sini sudah tidak ada. Pilih yang lain.",
         "NAME_REQUIRED": "Masukkan nama untuk aturan.",
-        "UNKNOWN": "Bagian ini tidak valid."
+        "UNKNOWN": "Bagian ini tidak valid.",
+        "INVALID_CAPTURE": "Nama tangkapan memakai huruf kecil dan angka, diawali huruf, dan panjangnya paling banyak 20 karakter.",
+        "TOO_MANY_CAPTURES": "Satu pola dapat memuat paling banyak 5 tangkapan.",
+        "DUPLICATE_CAPTURE": "Setiap nama tangkapan hanya boleh dipakai satu kali dalam satu aturan.",
+        "UNKNOWN_CAPTURE": "Teks memakai tangkapan yang tidak didefinisikan oleh kondisi mana pun dalam aturan ini."
       }
     },
     "run": {
@@ -428,7 +434,9 @@
       "remove_tags": "Hapus tag: {tags}",
       "set_category": "Atur kategori ke {name}{onlyIfEmpty, select, yes { (hanya jika kosong)} other {}}",
       "set_payee": "Atur penerima ke {name}{onlyIfEmpty, select, yes { (hanya jika kosong)} other {}}",
-      "request_ai_review": "Minta peninjauan AI: {instruction}"
+      "request_ai_review": "Minta peninjauan AI: {instruction}",
+      "set_payee_from_text": "Atur penerima ke “{template}”{createIfMissing, select, yes { (dibuat jika belum ada)} other {}}{onlyIfEmpty, select, yes { (hanya jika kosong)} other {}}",
+      "set_description": "{mode, select, append {Tambahkan “{template}” di akhir deskripsi} prepend {Letakkan “{template}” sebelum deskripsi} other {Atur deskripsi ke “{template}”}}{onlyIfEmpty, select, yes { (hanya jika kosong)} other {}}"
     }
   }
 }

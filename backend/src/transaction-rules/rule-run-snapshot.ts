@@ -12,8 +12,10 @@ export type RowSnapshot = Record<string, unknown> & { id: string };
 
 /**
  * What each written row held before and holds after, for the fields the plan
- * changes only: category, payee (with its name) and the tag set. The undo
- * restores exactly these; redo replays the after side. A same-owner transfer
+ * changes only: category, payee (with its name), description and the tag set.
+ * The undo restores exactly these; redo replays the after side. `changes` must
+ * already hold a created payee's id (`resolveCreatedPayee`), never the name
+ * still to create. A same-owner transfer
  * contributes one entry per leg, because both legs are written.
  */
 export function buildRunSnapshots(
@@ -39,7 +41,11 @@ export function buildRunSnapshots(
         will.payeeName =
           changes.payeeId === null
             ? null
-            : (payeeNames[changes.payeeId] ?? null);
+            : (changes.payeeName ?? payeeNames[changes.payeeId] ?? null);
+      }
+      if (changes.description !== undefined) {
+        was.description = leg.description;
+        will.description = changes.description;
       }
       if (changes.addTagIds.length + changes.removeTagIds.length > 0) {
         const current = tagsByRow.get(leg.id) ?? [];

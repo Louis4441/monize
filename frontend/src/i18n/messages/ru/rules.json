@@ -197,7 +197,9 @@
       "remove_tags": "Удалить теги",
       "set_category": "Задать категорию",
       "set_payee": "Задать получателя",
-      "request_ai_review": "Запросить проверку ИИ"
+      "request_ai_review": "Запросить проверку ИИ",
+      "set_payee_from_text": "Задать получателя из текста",
+      "set_description": "Задать описание"
     },
     "save": {
       "button": "Сохранить правило",
@@ -249,7 +251,11 @@
         "DUPLICATE_ACTION": "Правило может запросить проверку ИИ только один раз.",
         "REFERENCE_NOT_FOUND": "Выбранного здесь элемента больше нет. Выберите другой.",
         "NAME_REQUIRED": "Введите название правила.",
-        "UNKNOWN": "Эта часть недопустима."
+        "UNKNOWN": "Эта часть недопустима.",
+        "INVALID_CAPTURE": "Имя захвата состоит из строчных букв и цифр, начинается с буквы и содержит не более 20 символов.",
+        "TOO_MANY_CAPTURES": "В одном шаблоне может быть не более 5 захватов.",
+        "DUPLICATE_CAPTURE": "Каждое имя захвата можно использовать в правиле только один раз.",
+        "UNKNOWN_CAPTURE": "В тексте используется захват, который не определён ни одним условием этого правила."
       }
     },
     "run": {
@@ -428,7 +434,9 @@
       "remove_tags": "Удалить теги: {tags}",
       "set_category": "Задать категорию: {name}{onlyIfEmpty, select, yes { (только если пусто)} other {}}",
       "set_payee": "Задать получателя: {name}{onlyIfEmpty, select, yes { (только если пусто)} other {}}",
-      "request_ai_review": "Запросить проверку ИИ: {instruction}"
+      "request_ai_review": "Запросить проверку ИИ: {instruction}",
+      "set_payee_from_text": "Задать получателя: «{template}»{createIfMissing, select, yes { (будет создан, если не найден)} other {}}{onlyIfEmpty, select, yes { (только если пусто)} other {}}",
+      "set_description": "{mode, select, append {Добавить «{template}» в конец описания} prepend {Добавить «{template}» в начало описания} other {Задать описание: «{template}»}}{onlyIfEmpty, select, yes { (только если пусто)} other {}}"
     }
   }
 }

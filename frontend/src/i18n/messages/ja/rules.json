@@ -197,7 +197,9 @@
       "remove_tags": "タグを削除",
       "set_category": "カテゴリを設定",
       "set_payee": "支払先を設定",
-      "request_ai_review": "AIレビューを依頼"
+      "request_ai_review": "AIレビューを依頼",
+      "set_payee_from_text": "テキストから支払先を設定",
+      "set_description": "説明を設定"
     },
     "save": {
       "button": "ルールを保存",
@@ -249,7 +251,11 @@
         "DUPLICATE_ACTION": "1つのルールでAIレビューを依頼できるのは1回だけです。",
         "REFERENCE_NOT_FOUND": "ここで選択した項目は存在しなくなりました。別の項目を選択してください。",
         "NAME_REQUIRED": "ルールの名前を入力してください。",
-        "UNKNOWN": "この部分は無効です。"
+        "UNKNOWN": "この部分は無効です。",
+        "INVALID_CAPTURE": "キャプチャ名は小文字の英字と数字で、英字から始め、20文字以内にしてください。",
+        "TOO_MANY_CAPTURES": "1つのパターンに含められるキャプチャは最大5つです。",
+        "DUPLICATE_CAPTURE": "キャプチャ名は1つのルール内で1回だけ使えます。",
+        "UNKNOWN_CAPTURE": "このルールのどの条件でも定義されていないキャプチャがテキストで使われています。"
       }
     },
     "run": {
@@ -428,7 +434,9 @@
       "remove_tags": "タグを削除: {tags}",
       "set_category": "カテゴリを {name} に設定{onlyIfEmpty, select, yes {（空の場合のみ）} other {}}",
       "set_payee": "支払先を {name} に設定{onlyIfEmpty, select, yes {（空の場合のみ）} other {}}",
-      "request_ai_review": "AIレビューを依頼: {instruction}"
+      "request_ai_review": "AIレビューを依頼: {instruction}",
+      "set_payee_from_text": "支払先を「{template}」に設定{createIfMissing, select, yes {（なければ作成）} other {}}{onlyIfEmpty, select, yes {（空の場合のみ）} other {}}",
+      "set_description": "{mode, select, append {説明の末尾に「{template}」を追加} prepend {説明の先頭に「{template}」を追加} other {説明を「{template}」に設定}}{onlyIfEmpty, select, yes {（空の場合のみ）} other {}}"
     }
   }
 }

@@ -197,7 +197,9 @@
       "remove_tags": "[XX-Remove tags-XX]",
       "set_category": "[XX-Set the category-XX]",
       "set_payee": "[XX-Set the payee-XX]",
-      "request_ai_review": "[XX-Ask for an AI review-XX]"
+      "request_ai_review": "[XX-Ask for an AI review-XX]",
+      "set_payee_from_text": "[XX-Set the payee from text-XX]",
+      "set_description": "[XX-Set the description-XX]"
     },
     "save": {
       "button": "[XX-Save rule-XX]",
@@ -247,6 +249,10 @@
         "NO_ACTIONS": "[XX-Add at least one action.-XX]",
         "TOO_MANY_ACTIONS": "[XX-There are too many actions. The limit is {maxActions}.-XX]",
         "DUPLICATE_ACTION": "[XX-A rule can ask for an AI review only once.-XX]",
+        "INVALID_CAPTURE": "[XX-A capture name must be lowercase letters and digits, starting with a letter, and up to 20 long.-XX]",
+        "TOO_MANY_CAPTURES": "[XX-A pattern can hold at most 5 captures.-XX]",
+        "DUPLICATE_CAPTURE": "[XX-Each capture name can be used once in a rule.-XX]",
+        "UNKNOWN_CAPTURE": "[XX-The text uses a capture that no condition of this rule defines.-XX]",
         "REFERENCE_NOT_FOUND": "[XX-An item chosen here no longer exists. Choose another.-XX]",
         "NAME_REQUIRED": "[XX-Enter a name for the rule.-XX]",
         "UNKNOWN": "[XX-This part is not valid.-XX]"
@@ -428,7 +434,9 @@
       "remove_tags": "[XX-Remove tags: {tags}-XX]",
       "set_category": "[XX-Set the category to {name}{onlyIfEmpty, select, yes { (only if empty)} other {}}-XX]",
       "set_payee": "[XX-Set the payee to {name}{onlyIfEmpty, select, yes { (only if empty)} other {}}-XX]",
-      "request_ai_review": "[XX-Ask for an AI review: {instruction}-XX]"
+      "request_ai_review": "[XX-Ask for an AI review: {instruction}-XX]",
+      "set_payee_from_text": "[XX-Set the payee to \"{template}\"{createIfMissing, select, yes { (created if missing)} other {}}{onlyIfEmpty, select, yes { (only if empty)} other {}}-XX]",
+      "set_description": "[XX-{mode, select, append {Append \"{template}\" to the description} prepend {Put \"{template}\" before the description} other {Set the description to \"{template}\"}}{onlyIfEmpty, select, yes { (only if empty)} other {}}-XX]"
     }
   }
 }

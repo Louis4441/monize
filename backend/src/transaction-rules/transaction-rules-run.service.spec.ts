@@ -105,9 +105,14 @@ function setup(
   const enqueue = jest
     .fn()
     .mockResolvedValue({ queued: [], alreadyQueued: [] });
+  const payees = {
+    resolveByName: jest.fn().mockResolvedValue(null),
+    findOrCreate: jest.fn(),
+  };
   const applier = new TransactionRulesApplierService(
     applierDeps as never,
     { enqueue } as never,
+    payees as never,
   );
   const loadTagIds = jest
     .spyOn(applier, "loadTagIds")
@@ -121,7 +126,7 @@ function setup(
   });
   const writeEffects = jest
     .spyOn(applier, "writeEffects")
-    .mockResolvedValue(undefined);
+    .mockImplementation(async (_m, _u, _id, effects) => effects);
 
   const rulesService = {
     getOwnedRule: jest.fn().mockResolvedValue(stored),
@@ -156,6 +161,7 @@ function setup(
     enqueue,
     record,
     loadTagIds,
+    payees,
   };
 }
 
@@ -691,8 +697,9 @@ describe("TransactionRulesRunService", () => {
     it("records after the transaction has committed", async () => {
       const s = setup([plainUnit(row("t1"))]);
       const order: string[] = [];
-      s.writeEffects.mockImplementation(async () => {
+      s.writeEffects.mockImplementation(async (_m, _u, _id, effects) => {
         order.push("write");
+        return effects;
       });
       s.record.mockImplementation(async () => {
         order.push("record");
@@ -751,6 +758,176 @@ describe("TransactionRulesRunService", () => {
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(s.dataSource.transaction).not.toHaveBeenCalled();
+    });
+  });
+  describe("the text actions (design 10.2)", () => {
+    const NEW_PAYEE = "b0000000-0000-4000-8000-0000000000aa";
+    const OLD_PAYEE = "b0000000-0000-4000-8000-0000000000bb";
+    const filters = { limit: 100 };
+    const textRule = (over: object = {}) =>
+      storedRule({
+        condition: { field: "payeeText", op: "matches", value: "SHOP {n}" },
+        actions: [
+          {
+            type: "set_payee_from_text",
+            template: "Shop {n}",
+            createIfMissing: true,
+            onlyIfEmpty: true,
+          },
+          {
+            type: "set_description",
+            template: "Bought at {n}",
+            mode: "replace",
+            onlyIfEmpty: false,
+          },
+        ] as RuleAction[],
+        ...over,
+      });
+
+    it("previews the new fields, says the payee will be created, and creates nothing", async () => {
+      const s = setup([plainUnit(row("t1", { description: "old" }))]);
+      s.rulesService.getOwnedRule.mockResolvedValue(textRule());
+
+      const preview = await s.service.previewRun(USER, RULE_ID, filters);
+
+      expect(preview.matched[0].changes).toEqual({
+        payeeName: { before: "SHOP 1", after: "Shop 1" },
+        payeeCreated: true,
+        description: { before: "old", after: "Bought at 1" },
+      });
+      expect(s.payees.resolveByName).toHaveBeenCalledWith(USER, "Shop 1");
+      expect(s.payees.findOrCreate).not.toHaveBeenCalled();
+      expect(s.writeEffects).not.toHaveBeenCalled();
+    });
+
+    it("names the rows a text action could not act on", async () => {
+      const s = setup([
+        plainUnit(row("t1", { payeeName: "SHOP  !" })),
+        plainUnit(row("t2", { payeeName: "SHOP 2!" })),
+      ]);
+      s.rulesService.getOwnedRule.mockResolvedValue(
+        textRule({
+          condition: { field: "payeeText", op: "matches", value: "SHOP {n}!" },
+          actions: [
+            {
+              type: "set_payee_from_text",
+              template: "{n}",
+              createIfMissing: false,
+              onlyIfEmpty: true,
+            },
+          ] as RuleAction[],
+        }),
+      );
+
+      const preview = await s.service.previewRun(USER, RULE_ID, filters);
+
+      expect(preview.skipped).toEqual([
+        { transactionId: "t1", reason: "empty_render" },
+        { transactionId: "t2", reason: "payee_not_found" },
+      ]);
+      expect(preview.matched).toEqual([]);
+    });
+
+    it("commits with the created payee's id in the undo snapshots, and writes the resolved plan", async () => {
+      const s = setup([plainUnit(row("t1", { description: "old" }))]);
+      s.rulesService.getOwnedRule.mockResolvedValue(textRule());
+      s.payees.findOrCreate.mockResolvedValue({
+        id: NEW_PAYEE,
+        name: "Shop 1",
+      });
+      const fingerprint = (await s.service.previewRun(USER, RULE_ID, filters))
+        .fingerprint;
+
+      const result = await s.service.run(USER, RULE_ID, {
+        ...filters,
+        fingerprint,
+      });
+
+      expect(result.changed).toBe(1);
+      expect(s.payees.findOrCreate).toHaveBeenCalledTimes(1);
+      expect(s.payees.findOrCreate).toHaveBeenCalledWith(USER, "Shop 1");
+      expect(s.writeEffects).toHaveBeenCalledWith(
+        s.manager,
+        USER,
+        "t1",
+        expect.objectContaining({
+          changes: expect.objectContaining({
+            payeeId: NEW_PAYEE,
+            payeeName: "Shop 1",
+            description: "Bought at 1",
+          }),
+        }),
+        "manual",
+      );
+      const entry = s.record.mock.calls[0][1];
+      expect(entry.beforeData.transactions).toEqual([
+        {
+          id: "t1",
+          payeeId: null,
+          payeeName: "SHOP 1",
+          description: "old",
+        },
+      ]);
+      expect(entry.afterData.transactions).toEqual([
+        {
+          id: "t1",
+          payeeId: NEW_PAYEE,
+          payeeName: "Shop 1",
+          description: "Bought at 1",
+        },
+      ]);
+    });
+
+    it("creates the payee once for both legs of a same-owner transfer", async () => {
+      const out = row("out", { isTransfer: true, linkedTransactionId: "in" });
+      const inn = row("in", { isTransfer: true, linkedTransactionId: "out" });
+      const s = setup([
+        {
+          primary: out,
+          legs: [out, inn],
+          isTransfer: true,
+          fromAccountId: "acc-1",
+          toAccountId: "acc-2",
+          crossOwnerTransferLeg: false,
+        },
+      ]);
+      s.rulesService.getOwnedRule.mockResolvedValue(textRule());
+      s.payees.findOrCreate.mockResolvedValue({
+        id: NEW_PAYEE,
+        name: "Shop 1",
+      });
+      const fingerprint = (await s.service.previewRun(USER, RULE_ID, filters))
+        .fingerprint;
+
+      await s.service.run(USER, RULE_ID, { ...filters, fingerprint });
+
+      expect(s.payees.findOrCreate).toHaveBeenCalledTimes(1);
+      expect(s.writeEffects.mock.calls.map((c) => c[2])).toEqual(["out", "in"]);
+      const entry = s.record.mock.calls[0][1];
+      expect(
+        entry.afterData.transactions.map((t: { id: string }) => t.id),
+      ).toEqual(["out", "in"]);
+    });
+
+    it("refuses a commit whose payee appeared since the preview (the plan no longer hashes the same)", async () => {
+      const s = setup([plainUnit(row("t1"))]);
+      s.rulesService.getOwnedRule.mockResolvedValue(textRule());
+      const fingerprint = (await s.service.previewRun(USER, RULE_ID, filters))
+        .fingerprint;
+      s.payees.resolveByName.mockResolvedValue({
+        id: OLD_PAYEE,
+        name: "Shop 1",
+      });
+
+      const error = await thrown(
+        s.service.run(USER, RULE_ID, { ...filters, fingerprint }),
+      );
+
+      expect(error.getResponse()).toMatchObject({
+        errorCode: "PREVIEW_CHANGED",
+      });
+      expect(s.writeEffects).not.toHaveBeenCalled();
+      expect(s.payees.findOrCreate).not.toHaveBeenCalled();
     });
   });
 });

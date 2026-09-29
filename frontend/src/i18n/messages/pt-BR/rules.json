@@ -197,7 +197,9 @@
       "remove_tags": "Remover tags",
       "set_category": "Definir a categoria",
       "set_payee": "Definir o favorecido",
-      "request_ai_review": "Pedir uma revisão da IA"
+      "request_ai_review": "Pedir uma revisão da IA",
+      "set_payee_from_text": "Definir o favorecido a partir do texto",
+      "set_description": "Definir a descrição"
     },
     "save": {
       "button": "Salvar regra",
@@ -249,7 +251,11 @@
         "DUPLICATE_ACTION": "Uma regra só pode pedir uma revisão da IA uma vez.",
         "REFERENCE_NOT_FOUND": "Um item escolhido aqui não existe mais. Escolha outro.",
         "NAME_REQUIRED": "Digite um nome para a regra.",
-        "UNKNOWN": "Esta parte não é válida."
+        "UNKNOWN": "Esta parte não é válida.",
+        "INVALID_CAPTURE": "O nome de uma captura usa letras minúsculas e números, começa com uma letra e tem no máximo 20 caracteres.",
+        "TOO_MANY_CAPTURES": "Um padrão pode conter no máximo 5 capturas.",
+        "DUPLICATE_CAPTURE": "Cada nome de captura só pode ser usado uma vez em uma regra.",
+        "UNKNOWN_CAPTURE": "O texto usa uma captura que nenhuma condição desta regra define."
       }
     },
     "run": {
@@ -428,7 +434,9 @@
       "remove_tags": "Remover tags: {tags}",
       "set_category": "Definir a categoria como {name}{onlyIfEmpty, select, yes { (somente se vazia)} other {}}",
       "set_payee": "Definir o favorecido como {name}{onlyIfEmpty, select, yes { (somente se vazio)} other {}}",
-      "request_ai_review": "Pedir uma revisão da IA: {instruction}"
+      "request_ai_review": "Pedir uma revisão da IA: {instruction}",
+      "set_payee_from_text": "Definir o favorecido como “{template}”{createIfMissing, select, yes { (criado se não existir)} other {}}{onlyIfEmpty, select, yes { (somente se vazio)} other {}}",
+      "set_description": "{mode, select, append {Acrescentar “{template}” ao fim da descrição} prepend {Colocar “{template}” antes da descrição} other {Definir a descrição como “{template}”}}{onlyIfEmpty, select, yes { (somente se vazio)} other {}}"
     }
   }
 }

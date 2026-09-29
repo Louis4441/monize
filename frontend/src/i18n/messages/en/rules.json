@@ -197,7 +197,9 @@
       "remove_tags": "Remove tags",
       "set_category": "Set the category",
       "set_payee": "Set the payee",
-      "request_ai_review": "Ask for an AI review"
+      "request_ai_review": "Ask for an AI review",
+      "set_payee_from_text": "Set the payee from text",
+      "set_description": "Set the description"
     },
     "save": {
       "button": "Save rule",
@@ -247,6 +249,10 @@
         "NO_ACTIONS": "Add at least one action.",
         "TOO_MANY_ACTIONS": "There are too many actions. The limit is {maxActions}.",
         "DUPLICATE_ACTION": "A rule can ask for an AI review only once.",
+        "INVALID_CAPTURE": "A capture name must be lowercase letters and digits, starting with a letter, and up to 20 long.",
+        "TOO_MANY_CAPTURES": "A pattern can hold at most 5 captures.",
+        "DUPLICATE_CAPTURE": "Each capture name can be used once in a rule.",
+        "UNKNOWN_CAPTURE": "The text uses a capture that no condition of this rule defines.",
         "REFERENCE_NOT_FOUND": "An item chosen here no longer exists. Choose another.",
         "NAME_REQUIRED": "Enter a name for the rule.",
         "UNKNOWN": "This part is not valid."
@@ -428,7 +434,9 @@
       "remove_tags": "Remove tags: {tags}",
       "set_category": "Set the category to {name}{onlyIfEmpty, select, yes { (only if empty)} other {}}",
       "set_payee": "Set the payee to {name}{onlyIfEmpty, select, yes { (only if empty)} other {}}",
-      "request_ai_review": "Ask for an AI review: {instruction}"
+      "request_ai_review": "Ask for an AI review: {instruction}",
+      "set_payee_from_text": "Set the payee to \"{template}\"{createIfMissing, select, yes { (created if missing)} other {}}{onlyIfEmpty, select, yes { (only if empty)} other {}}",
+      "set_description": "{mode, select, append {Append \"{template}\" to the description} prepend {Put \"{template}\" before the description} other {Set the description to \"{template}\"}}{onlyIfEmpty, select, yes { (only if empty)} other {}}"
     }
   }
 }

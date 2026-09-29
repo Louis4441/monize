@@ -3,12 +3,17 @@ import { RuleTraceChanges } from "./rule-effects";
 
 /**
  * The fields a rule can change, in one fixed key order, with the tag sets
- * sorted: the same plan always serialises to the same bytes.
+ * sorted: the same plan always serialises to the same bytes. A payee the run
+ * will create is part of the digest (`payeeCreated`), so a payee that appeared
+ * between the preview and the commit refuses the commit as a changed preview.
  */
 export function canonicalChanges(changes: RuleTraceChanges): {
   categoryId: RuleTraceChanges["categoryId"] | null;
   payeeId: RuleTraceChanges["payeeId"] | null;
   tagIds: RuleTraceChanges["tagIds"] | null;
+  payeeName?: RuleTraceChanges["payeeName"];
+  payeeCreated?: true;
+  description?: RuleTraceChanges["description"];
 } {
   const sortedSet = (
     change: RuleTraceChanges["tagIds"],
@@ -23,6 +28,11 @@ export function canonicalChanges(changes: RuleTraceChanges): {
     categoryId: changes.categoryId ?? null,
     payeeId: changes.payeeId ?? null,
     tagIds: sortedSet(changes.tagIds),
+    // The text actions' fields join the digest only when a rule changed them,
+    // after the original three keys, so a plan without them hashes as before.
+    ...(changes.payeeName ? { payeeName: changes.payeeName } : {}),
+    ...(changes.payeeCreated ? { payeeCreated: true as const } : {}),
+    ...(changes.description ? { description: changes.description } : {}),
   };
 }
 

@@ -197,7 +197,9 @@
       "remove_tags": "Rimuovi tag",
       "set_category": "Imposta la categoria",
       "set_payee": "Imposta il beneficiario",
-      "request_ai_review": "Richiedi una revisione dell'IA"
+      "request_ai_review": "Richiedi una revisione dell'IA",
+      "set_payee_from_text": "Imposta il beneficiario dal testo",
+      "set_description": "Imposta la descrizione"
     },
     "save": {
       "button": "Salva regola",
@@ -249,7 +251,11 @@
         "DUPLICATE_ACTION": "Una regola può richiedere una revisione dell'IA una sola volta.",
         "REFERENCE_NOT_FOUND": "Un elemento scelto qui non esiste più. Scegline un altro.",
         "NAME_REQUIRED": "Inserisci un nome per la regola.",
-        "UNKNOWN": "Questa parte non è valida."
+        "UNKNOWN": "Questa parte non è valida.",
+        "INVALID_CAPTURE": "Il nome di una cattura usa lettere minuscole e cifre, inizia con una lettera e ha al massimo 20 caratteri.",
+        "TOO_MANY_CAPTURES": "Un modello può contenere al massimo 5 catture.",
+        "DUPLICATE_CAPTURE": "Ogni nome di cattura può essere usato una sola volta in una regola.",
+        "UNKNOWN_CAPTURE": "Il testo usa una cattura che nessuna condizione di questa regola definisce."
       }
     },
     "run": {
@@ -428,7 +434,9 @@
       "remove_tags": "Rimuovi tag: {tags}",
       "set_category": "Imposta la categoria su {name}{onlyIfEmpty, select, yes { (solo se vuota)} other {}}",
       "set_payee": "Imposta il beneficiario su {name}{onlyIfEmpty, select, yes { (solo se vuoto)} other {}}",
-      "request_ai_review": "Richiedi una revisione dell'IA: {instruction}"
+      "request_ai_review": "Richiedi una revisione dell'IA: {instruction}",
+      "set_payee_from_text": "Imposta il beneficiario su «{template}»{createIfMissing, select, yes { (creato se non esiste)} other {}}{onlyIfEmpty, select, yes { (solo se vuoto)} other {}}",
+      "set_description": "{mode, select, append {Aggiungi «{template}» alla fine della descrizione} prepend {Metti «{template}» prima della descrizione} other {Imposta la descrizione su «{template}»}}{onlyIfEmpty, select, yes { (solo se vuoto)} other {}}"
     }
   }
 }

@@ -15,6 +15,8 @@ export const RULE_ACTION_TYPES = [
   "set_category",
   "set_payee",
   "request_ai_review",
+  "set_payee_from_text",
+  "set_description",
 ] as const;
 export type RuleActionType = (typeof RULE_ACTION_TYPES)[number];
 
@@ -40,18 +42,47 @@ export interface SetPayeeAction {
   readonly onlyIfEmpty: boolean;
 }
 
+/**
+ * Sets the payee from text (design 10.2): the template is rendered from the
+ * rule's captures, the name resolved through the existing payee resolution
+ * (exact name, alias, unique normalized match), and with `createIfMissing` a
+ * payee that does not exist is created through the existing find-or-create.
+ */
+export interface SetPayeeFromTextAction {
+  readonly type: "set_payee_from_text";
+  readonly template: string;
+  readonly createIfMissing: boolean;
+  readonly onlyIfEmpty: boolean;
+}
+
+export const RULE_DESCRIPTION_MODES = ["replace", "append", "prepend"] as const;
+export type RuleDescriptionMode = (typeof RULE_DESCRIPTION_MODES)[number];
+
+/** Writes the description from a template; `{description}` is the current text. */
+export interface SetDescriptionAction {
+  readonly type: "set_description";
+  readonly template: string;
+  readonly mode: RuleDescriptionMode;
+  readonly onlyIfEmpty: boolean;
+}
+
 export interface RequestAiReviewAction {
   readonly type: "request_ai_review";
   /** What the user wants checked, e.g. "split this purchase by the receipt". */
   readonly instruction: string;
 }
 
-/** The actions that change the row's tags, category or payee. */
+/**
+ * The actions that change the row's tags, category, payee or description.
+ * None of them touches amount, account, date, status, splits or links.
+ */
 export type LedgerRuleAction =
   | AddTagsAction
   | RemoveTagsAction
   | SetCategoryAction
-  | SetPayeeAction;
+  | SetPayeeAction
+  | SetPayeeFromTextAction
+  | SetDescriptionAction;
 
 export type RuleAction = LedgerRuleAction | RequestAiReviewAction;
 

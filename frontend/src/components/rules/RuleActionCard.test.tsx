@@ -4,20 +4,19 @@ import { fireEvent, render, screen, within } from '@/test/render';
 import { RuleActionCard } from './RuleActionCard';
 import { testOptions } from './rule-test-harness';
 import { COFFEE_ID, PAYEE_ID, TAG_ID } from './rules-test-fixtures';
-import { createAction, type EditorAction } from '@/lib/rule-actions';
+import { createAction, isEditorActionType, type EditorAction, type EditorActionType } from '@/lib/rule-actions';
 import { RULE_ACTION_TYPES, MAX_RULE_AI_INSTRUCTION_LENGTH } from '@/lib/rule-fields';
-import type { RuleActionType } from '@/types/transaction-rule';
 
 Element.prototype.scrollIntoView = vi.fn();
 
 function Card({
   initial,
-  types = RULE_ACTION_TYPES,
+  types = RULE_ACTION_TYPES.filter(isEditorActionType),
   onAction,
   errors = [],
 }: {
   initial: EditorAction;
-  types?: readonly RuleActionType[];
+  types?: readonly EditorActionType[];
   onAction?: (action: EditorAction) => void;
   errors?: string[];
 }) {

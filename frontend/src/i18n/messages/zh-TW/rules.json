@@ -197,7 +197,9 @@
       "remove_tags": "移除標籤",
       "set_category": "設定分類",
       "set_payee": "設定收款對象",
-      "request_ai_review": "請求 AI 審核"
+      "request_ai_review": "請求 AI 審核",
+      "set_payee_from_text": "依文字設定收款對象",
+      "set_description": "設定說明"
     },
     "save": {
       "button": "儲存規則",
@@ -249,7 +251,11 @@
         "DUPLICATE_ACTION": "一條規則只能請求一次 AI 審核。",
         "REFERENCE_NOT_FOUND": "此處選擇的項目已不存在。請選擇其他項目。",
         "NAME_REQUIRED": "請輸入規則名稱。",
-        "UNKNOWN": "此部分無效。"
+        "UNKNOWN": "此部分無效。",
+        "INVALID_CAPTURE": "擷取名稱由小寫字母和數字組成，以字母開頭，最長 20 個字元。",
+        "TOO_MANY_CAPTURES": "一個模式最多可包含 5 個擷取。",
+        "DUPLICATE_CAPTURE": "每個擷取名稱在一條規則中只能使用一次。",
+        "UNKNOWN_CAPTURE": "文字使用了此規則中沒有任何條件定義的擷取。"
       }
     },
     "run": {
@@ -428,7 +434,9 @@
       "remove_tags": "移除標籤：{tags}",
       "set_category": "將分類設定為 {name}{onlyIfEmpty, select, yes {（僅在為空時）} other {}}",
       "set_payee": "將收款對象設定為 {name}{onlyIfEmpty, select, yes {（僅在為空時）} other {}}",
-      "request_ai_review": "請求 AI 審核：{instruction}"
+      "request_ai_review": "請求 AI 審核：{instruction}",
+      "set_payee_from_text": "將收款對象設定為「{template}」{createIfMissing, select, yes {（不存在則建立）} other {}}{onlyIfEmpty, select, yes {（僅在為空時）} other {}}",
+      "set_description": "{mode, select, append {在說明結尾附加「{template}」} prepend {在說明開頭加上「{template}」} other {將說明設定為「{template}」}}{onlyIfEmpty, select, yes {（僅在為空時）} other {}}"
     }
   }
 }

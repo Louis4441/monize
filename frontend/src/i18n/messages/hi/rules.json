@@ -197,7 +197,9 @@
       "remove_tags": "टैग हटाएँ",
       "set_category": "श्रेणी सेट करें",
       "set_payee": "प्राप्तकर्ता सेट करें",
-      "request_ai_review": "AI समीक्षा का अनुरोध करें"
+      "request_ai_review": "AI समीक्षा का अनुरोध करें",
+      "set_payee_from_text": "टेक्स्ट से प्राप्तकर्ता सेट करें",
+      "set_description": "विवरण सेट करें"
     },
     "save": {
       "button": "नियम सहेजें",
@@ -249,7 +251,11 @@
         "DUPLICATE_ACTION": "एक नियम AI समीक्षा का अनुरोध केवल एक बार कर सकता है।",
         "REFERENCE_NOT_FOUND": "यहाँ चुना गया एक आइटम अब मौजूद नहीं है। कोई दूसरा चुनें।",
         "NAME_REQUIRED": "नियम का नाम दर्ज करें।",
-        "UNKNOWN": "यह हिस्सा अमान्य है।"
+        "UNKNOWN": "यह हिस्सा अमान्य है।",
+        "INVALID_CAPTURE": "कैप्चर का नाम छोटे अक्षरों और अंकों से बनता है, अक्षर से शुरू होता है और अधिकतम 20 वर्णों का होता है।",
+        "TOO_MANY_CAPTURES": "एक पैटर्न में अधिकतम 5 कैप्चर हो सकते हैं।",
+        "DUPLICATE_CAPTURE": "हर कैप्चर नाम एक नियम में केवल एक बार इस्तेमाल हो सकता है।",
+        "UNKNOWN_CAPTURE": "टेक्स्ट ऐसा कैप्चर इस्तेमाल करता है जिसे इस नियम की कोई शर्त परिभाषित नहीं करती।"
       }
     },
     "run": {
@@ -428,7 +434,9 @@
       "remove_tags": "टैग हटाएँ: {tags}",
       "set_category": "श्रेणी को {name} पर सेट करें{onlyIfEmpty, select, yes { (केवल खाली होने पर)} other {}}",
       "set_payee": "प्राप्तकर्ता को {name} पर सेट करें{onlyIfEmpty, select, yes { (केवल खाली होने पर)} other {}}",
-      "request_ai_review": "AI समीक्षा का अनुरोध करें: {instruction}"
+      "request_ai_review": "AI समीक्षा का अनुरोध करें: {instruction}",
+      "set_payee_from_text": "प्राप्तकर्ता को “{template}” पर सेट करें{createIfMissing, select, yes { (न होने पर बनाया जाएगा)} other {}}{onlyIfEmpty, select, yes { (केवल खाली होने पर)} other {}}",
+      "set_description": "{mode, select, append {विवरण के अंत में “{template}” जोड़ें} prepend {विवरण से पहले “{template}” रखें} other {विवरण को “{template}” पर सेट करें}}{onlyIfEmpty, select, yes { (केवल खाली होने पर)} other {}}"
     }
   }
 }

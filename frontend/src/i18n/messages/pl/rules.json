@@ -197,7 +197,9 @@
       "remove_tags": "Usuń tagi",
       "set_category": "Ustaw kategorię",
       "set_payee": "Ustaw odbiorcę",
-      "request_ai_review": "Poproś o przegląd AI"
+      "request_ai_review": "Poproś o przegląd AI",
+      "set_payee_from_text": "Ustaw odbiorcę z tekstu",
+      "set_description": "Ustaw opis"
     },
     "save": {
       "button": "Zapisz regułę",
@@ -249,7 +251,11 @@
         "DUPLICATE_ACTION": "Reguła może prosić o przegląd AI tylko raz.",
         "REFERENCE_NOT_FOUND": "Wybrana tu pozycja już nie istnieje. Wybierz inną.",
         "NAME_REQUIRED": "Wpisz nazwę reguły.",
-        "UNKNOWN": "Ta część jest nieprawidłowa."
+        "UNKNOWN": "Ta część jest nieprawidłowa.",
+        "INVALID_CAPTURE": "Nazwa przechwytywania składa się z małych liter i cyfr, zaczyna się od litery i ma najwyżej 20 znaków.",
+        "TOO_MANY_CAPTURES": "Wzorzec może zawierać najwyżej 5 przechwyceń.",
+        "DUPLICATE_CAPTURE": "Każdą nazwę przechwytywania można użyć w regule tylko raz.",
+        "UNKNOWN_CAPTURE": "Tekst używa przechwytywania, którego nie definiuje żaden warunek tej reguły."
       }
     },
     "run": {
@@ -428,7 +434,9 @@
       "remove_tags": "Usuń tagi: {tags}",
       "set_category": "Ustaw kategorię na {name}{onlyIfEmpty, select, yes { (tylko jeśli pusta)} other {}}",
       "set_payee": "Ustaw odbiorcę na {name}{onlyIfEmpty, select, yes { (tylko jeśli pusty)} other {}}",
-      "request_ai_review": "Poproś o przegląd AI: {instruction}"
+      "request_ai_review": "Poproś o przegląd AI: {instruction}",
+      "set_payee_from_text": "Ustaw odbiorcę na „{template}”{createIfMissing, select, yes { (utworzony, jeśli nie istnieje)} other {}}{onlyIfEmpty, select, yes { (tylko jeśli pusty)} other {}}",
+      "set_description": "{mode, select, append {Dopisz „{template}” na końcu opisu} prepend {Dopisz „{template}” na początku opisu} other {Ustaw opis na „{template}”}}{onlyIfEmpty, select, yes { (tylko jeśli pusty)} other {}}"
     }
   }
 }

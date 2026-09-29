@@ -8,6 +8,7 @@ import {
   AiReviewEnqueueResult,
   AiReviewRequestsService,
 } from "../ai-review/ai-review-requests.service";
+import { PayeesService } from "../payees/payees.service";
 import { TagsService } from "../tags/tags.service";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { RuleAction } from "./rule-action.types";
@@ -21,6 +22,7 @@ const uuid = (n: number): string =>
 const USER = "user-1";
 const ACCOUNT = uuid(1);
 const PAYEE = uuid(2);
+const PAYEE2 = uuid(9);
 const CAT = uuid(3);
 const PARENT = uuid(4);
 const TAG_A = uuid(5);
@@ -139,9 +141,14 @@ function harness(fx: Fixture = {}) {
       alreadyQueued: [],
     }),
   );
+  const payees = {
+    resolveByName: jest.fn().mockResolvedValue(null),
+    findOrCreate: jest.fn(),
+  };
   const service = new TransactionRulesApplierService(
     tags as unknown as TagsService,
     { enqueue } as unknown as AiReviewRequestsService,
+    payees as unknown as PayeesService,
   );
   const writes = (): unknown[] => [
     ...m.update.mock.calls,
@@ -157,6 +164,7 @@ function harness(fx: Fixture = {}) {
     ruleRepo,
     writes,
     enqueue,
+    payees,
   };
 }
 
@@ -261,6 +269,57 @@ describe("TransactionRulesApplierService.applyToNew", () => {
     await h.service.applyToNew(h.m, USER, [TX], "create");
     const patch = h.mock.update.mock.calls[0][2];
     expect(Object.keys(patch)).toEqual(["categoryId"]);
+  });
+
+  it("writes only category, payee, payee name and description for every ledger action, never amount, account, date, status or links", async () => {
+    const h = harness({
+      rules: [
+        rule(RULE_1, [
+          { type: "set_category", categoryId: CAT, onlyIfEmpty: false },
+          { type: "set_payee", payeeId: PAYEE, onlyIfEmpty: false },
+          {
+            type: "set_payee_from_text",
+            template: "Biedronka",
+            createIfMissing: true,
+            onlyIfEmpty: false,
+          },
+          {
+            type: "set_description",
+            template: "Groceries: {payeeText}",
+            mode: "replace",
+            onlyIfEmpty: false,
+          },
+          { type: "add_tags", tagIds: [TAG_A] },
+        ]),
+      ],
+      rows: [row({ payeeName: "raw text" })],
+    });
+    h.payees.resolveByName.mockResolvedValue({ id: PAYEE2, name: "Biedronka" });
+    await h.service.applyToNew(h.m, USER, [TX], "create");
+    const patch = h.mock.update.mock.calls[0][2];
+    expect(Object.keys(patch).sort()).toEqual([
+      "categoryId",
+      "description",
+      "payeeId",
+      "payeeName",
+    ]);
+    for (const forbidden of [
+      "amount",
+      "accountId",
+      "transactionDate",
+      "status",
+      "linkedTransactionId",
+      "isTransfer",
+      "isSplit",
+      "currencyCode",
+    ]) {
+      expect(patch).not.toHaveProperty(forbidden);
+    }
+    expect(patch).toMatchObject({
+      payeeId: PAYEE2,
+      payeeName: "Biedronka",
+      description: "Groceries: raw text",
+    });
   });
 
   it("records no trace row for a rule that matched but changed nothing", async () => {

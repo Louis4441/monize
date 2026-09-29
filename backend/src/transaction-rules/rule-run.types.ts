@@ -13,7 +13,11 @@ export type RuleRunSkipReason =
   | "reconciled_locked"
   | "transfer_leg_category"
   | "split_category"
-  | "cross_owner_transfer_payee";
+  | "cross_owner_transfer_payee"
+  /** A text action rendered to nothing for this row (design 10.2). */
+  | "empty_render"
+  /** No payee has the rendered name and the action does not create one. */
+  | "payee_not_found";
 
 /** `{field: {before, after}}`, the shape the trace stores. */
 export type RuleRunChanges = Readonly<

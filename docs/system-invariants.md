@@ -5046,19 +5046,21 @@ Design: `docs/future-plans/transaction-rules.md` (invariants I1 and I2 there).
 Statement           Running a rule never changes an amount, an account, a date,
                     a status, a split or a link, and so never moves a balance.
                     A rule may change only a row's category, payee (with its
-                    payee_name) and tags, or queue a request for a human-approved
-                    AI review that does not touch the row.
+                    payee_name), description and tags, or queue a request for a
+                    human-approved AI review that does not touch the row.
 Source of truth     the transactions row and transaction_tags; the rule's stored
                     action list in transaction_rules.actions
 Enforcement         The action list is a closed union: RULE_ACTION_TYPES and
                     RuleAction in backend/src/transaction-rules/rule-action.types.ts
                     (add_tags, remove_tags, set_category, set_payee,
-                    request_ai_review), so an action that writes anything else is
-                    not representable, and rule-validation.ts refuses a stored or
+                    set_payee_from_text, set_description, request_ai_review),
+                    so an action that writes anything else is not
+                    representable, and rule-validation.ts refuses a stored or
                     submitted action outside it. The applier
                     (TransactionRulesApplierService.writeEffects) writes one
-                    UPDATE limited to categoryId, payeeId and payeeName, tag rows
-                    through TagsService, and its own trace rows in
+                    UPDATE limited to categoryId, payeeId, payeeName and
+                    description, tag rows through TagsService, and its own
+                    trace rows in
                     transaction_rule_applications; it assigns no other column.
                     A rule therefore never calls the balance helpers, and a rule
                     application needs no balance recompute.

@@ -112,6 +112,8 @@ export const RULE_ACTION_TYPES = [
   'set_category',
   'set_payee',
   'request_ai_review',
+  'set_payee_from_text',
+  'set_description',
 ] as const satisfies readonly RuleActionType[];
 
 export const RULE_TRIGGERS = ['create', 'import'] as const satisfies readonly RuleTrigger[];
@@ -126,6 +128,9 @@ export const MAX_RULE_TAG_IDS = 20;
 export const MIN_RULE_AI_INSTRUCTION_LENGTH = 1;
 export const MAX_RULE_AI_INSTRUCTION_LENGTH = 1000;
 export const MAX_RULE_AI_REVIEW_ACTIONS = 1;
+export const MIN_RULE_TEMPLATE_LENGTH = 1;
+export const MAX_RULE_PAYEE_TEMPLATE_LENGTH = 200;
+export const MAX_RULE_DESCRIPTION_TEMPLATE_LENGTH = 500;
 export const MAX_RULE_TEXT_LENGTH = 500;
 export const MAX_RULE_VALUE_LIST = 50;
 export const MIN_RULE_NAME_LENGTH = 1;
@@ -155,6 +160,10 @@ export const RULE_VALIDATION_CODES = [
   'NO_ACTIONS',
   'TOO_MANY_ACTIONS',
   'DUPLICATE_ACTION',
+  'INVALID_CAPTURE',
+  'TOO_MANY_CAPTURES',
+  'DUPLICATE_CAPTURE',
+  'UNKNOWN_CAPTURE',
 ] as const;
 
 /** Every code a card can show: the validation codes plus the reference check's. */

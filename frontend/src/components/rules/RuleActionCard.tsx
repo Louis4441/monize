@@ -10,15 +10,14 @@ import { MultiSelect } from '@/components/ui/MultiSelect';
 import { Select } from '@/components/ui/Select';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import type { RowAction } from '@/components/ui/row-actions/rowAction';
-import { changeActionType, type EditorAction } from '@/lib/rule-actions';
-import { MAX_RULE_AI_INSTRUCTION_LENGTH, isRuleActionType } from '@/lib/rule-fields';
+import { changeActionType, isEditorActionType, type EditorAction, type EditorActionType } from '@/lib/rule-actions';
+import { MAX_RULE_AI_INSTRUCTION_LENGTH } from '@/lib/rule-fields';
 import { cn, inputBaseClasses } from '@/lib/utils';
-import type { RuleActionType } from '@/types/transaction-rule';
 
 interface RuleActionCardProps {
   action: EditorAction;
   /** The types this card may be set to (`availableActionTypes`). */
-  types: readonly RuleActionType[];
+  types: readonly EditorActionType[];
   options: RuleOptions;
   actions: RowAction[];
   errors: readonly string[];
@@ -124,7 +123,7 @@ export function RuleActionCard({ action, types, options, actions, errors, onChan
           value={action.type}
           options={types.map((type) => ({ value: type, label: t(`actionTypes.${type}`) }))}
           onChange={(e) => {
-            if (isRuleActionType(e.target.value)) onChange(changeActionType(action, e.target.value));
+            if (isEditorActionType(e.target.value)) onChange(changeActionType(action, e.target.value));
           }}
         />
         <ActionParameters action={action} options={options} onChange={onChange} />

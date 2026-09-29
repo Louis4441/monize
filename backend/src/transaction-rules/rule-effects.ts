@@ -1,6 +1,13 @@
 import { RuleAction, isLedgerAction } from "./rule-action.types";
-import { evaluateRuleCondition } from "./rule-condition.evaluator";
+import { evaluateRuleConditionWithCaptures } from "./rule-condition.evaluator";
 import { RuleConditionNode, RuleFacts } from "./rule-condition.types";
+import { GlobCaptures } from "./rule-glob-capture";
+import {
+  TemplateValues,
+  composeDescription,
+  renderPayeeName,
+  renderRuleTemplate,
+} from "./rule-template";
 import { validateRuleDefinition } from "./rule-validation";
 
 /** The part of a stored rule the planner reads. `TransactionRule` satisfies it. */
@@ -17,12 +24,38 @@ export type RuleActionSkipReason =
   | "no_change"
   | "row_has_splits"
   | "row_is_transfer_leg"
-  | "cross_owner_transfer_leg";
+  | "cross_owner_transfer_leg"
+  /** The template rendered to nothing (design 10.2). */
+  | "empty_render"
+  /** No payee has the rendered name and the action does not create one. */
+  | "payee_not_found"
+  /** The payee lookup for the rendered name has not been made yet (the applier looks it up and plans again). */
+  | "payee_unresolved";
 
 export type RuleSkipReason = "disabled" | "invalid";
 
 /** What the planner knows about the row beyond its facts. */
+/** An existing payee a rendered name resolved to. */
+export interface PayeeResolution {
+  readonly payeeId: string;
+  readonly name: string;
+}
+
+/**
+ * Payee lookups the caller has already made, by `payeeLookupKey`. `null`
+ * means no payee has that name. The planner does no I/O: a name that is not
+ * in the map is reported in `RuleEffects.payeeLookups` and the action waits.
+ */
+export type PayeeResolutions = ReadonlyMap<string, PayeeResolution | null>;
+
+/** Payee names resolve case-insensitively, so one lookup serves every casing. */
+export const payeeLookupKey = (name: string): string =>
+  name.trim().toLowerCase();
+
 export interface RulePlanContext {
+  /** The payee name stored on the row, for the trace only. */
+  readonly payeeName?: string | null;
+  readonly payeeResolutions?: PayeeResolutions;
   /** The row is a leg of a transfer whose other leg belongs to another owner. */
   readonly crossOwnerTransferLeg?: boolean;
   /**
@@ -42,6 +75,16 @@ export interface RuleFieldChange<T> {
 export interface RuleTraceChanges {
   readonly categoryId?: RuleFieldChange<string | null>;
   readonly payeeId?: RuleFieldChange<string | null>;
+  /** Set by `set_payee_from_text` only: the name the payee is written with. */
+  readonly payeeName?: RuleFieldChange<string | null>;
+  /**
+   * True when the rule's payee does not exist yet and is created with the
+   * write. A preview says "will be created"; the stored application row
+   * carries the created payee's id in `payeeId.after`.
+   */
+  readonly payeeCreated?: boolean;
+  /** Set by `set_description` only. */
+  readonly description?: RuleFieldChange<string | null>;
   /** Sorted tag id sets before and after the rule. */
   readonly tagIds?: RuleFieldChange<readonly string[]>;
 }
@@ -82,6 +125,14 @@ export interface AiReviewRequest {
 export interface RuleNetChanges {
   readonly categoryId?: string | null;
   readonly payeeId?: string | null;
+  /** The name the payee is written with, when `set_payee_from_text` chose it. */
+  readonly payeeName?: string;
+  /**
+   * A payee to create (find-or-create) and assign; `payeeId` is then absent.
+   * The commit turns it into an id before it writes.
+   */
+  readonly createPayee?: string;
+  readonly description?: string | null;
   readonly addTagIds: readonly string[];
   readonly removeTagIds: readonly string[];
 }
@@ -90,6 +141,8 @@ export interface RuleEffects {
   readonly changes: RuleNetChanges;
   readonly trace: readonly RuleTraceEntry[];
   readonly aiReviewRequests: readonly AiReviewRequest[];
+  /** Rendered payee names the plan needed and `payeeResolutions` did not hold. */
+  readonly payeeLookups?: readonly string[];
 }
 
 /** The ledger fields rules move, threaded through the pass (never mutated). */
@@ -97,13 +150,41 @@ interface WorkingState {
   readonly categoryId: string | null;
   readonly categoryAncestorIds: readonly string[];
   readonly payeeId: string | null;
+  /** Set when `set_payee_from_text` chose the payee; null after a `set_payee`. */
+  readonly payeeName: string | null;
+  /**
+   * A payee that does not exist yet and is created with the write (then
+   * `payeeId` is null). A later rule's `payeeId` condition reads it as empty,
+   * because there is no id to compare until the commit.
+   */
+  readonly payeeCreate: string | null;
+  readonly description: string | null;
   readonly tagIds: readonly string[];
 }
 
 const NO_CHANGES: RuleTraceChanges = Object.freeze({});
 
 function withState(facts: RuleFacts, state: WorkingState): RuleFacts {
-  return Object.freeze({ ...facts, ...state });
+  return Object.freeze({
+    ...facts,
+    categoryId: state.categoryId,
+    categoryAncestorIds: state.categoryAncestorIds,
+    payeeId: state.payeeId,
+    description: state.description,
+    tagIds: state.tagIds,
+  });
+}
+
+const hasPayee = (state: WorkingState): boolean =>
+  state.payeeId !== null || state.payeeCreate !== null;
+
+/** Everything a step reads besides the state: the row, the caller's knowledge, the rule's captures. */
+interface StepInput {
+  readonly facts: RuleFacts;
+  readonly context: RulePlanContext;
+  readonly captures: GlobCaptures;
+  /** Payee names this step needed and could not look up (filled in place). */
+  readonly lookups: string[];
 }
 
 const sameSet = (a: readonly string[], b: readonly string[]): boolean =>
@@ -132,7 +213,10 @@ function refusal(
     if (facts.hasSplits) return "row_has_splits";
     if (facts.type === "TRANSFER") return "row_is_transfer_leg";
   }
-  if (action.type === "set_payee" && context.crossOwnerTransferLeg === true) {
+  if (
+    (action.type === "set_payee" || action.type === "set_payee_from_text") &&
+    context.crossOwnerTransferLeg === true
+  ) {
     return "cross_owner_transfer_leg";
   }
   return null;
@@ -142,9 +226,9 @@ function refusal(
 function step(
   state: WorkingState,
   action: RuleAction,
-  facts: RuleFacts,
-  context: RulePlanContext,
+  input: StepInput,
 ): StepResult {
+  const { facts, context } = input;
   const refused = refusal(action, facts, context);
   if (refused !== null) return skip(state, action, refused);
   switch (action.type) {
@@ -166,16 +250,25 @@ function step(
       };
     }
     case "set_payee":
-      if (action.onlyIfEmpty && state.payeeId !== null) {
+      if (action.onlyIfEmpty && hasPayee(state)) {
         return skip(state, action, "already_set");
       }
-      if (state.payeeId === action.payeeId) {
+      if (state.payeeId === action.payeeId && state.payeeCreate === null) {
         return skip(state, action, "no_change");
       }
       return {
-        state: { ...state, payeeId: action.payeeId },
+        state: {
+          ...state,
+          payeeId: action.payeeId,
+          payeeName: null,
+          payeeCreate: null,
+        },
         applied: { type: action.type },
       };
+    case "set_payee_from_text":
+      return payeeFromText(state, action, input);
+    case "set_description":
+      return describe(state, action, input);
     case "add_tags": {
       const added = [...new Set(action.tagIds)].filter(
         (id) => !state.tagIds.includes(id),
@@ -203,6 +296,84 @@ function step(
   }
 }
 
+function templateValues(state: WorkingState, input: StepInput): TemplateValues {
+  return {
+    captures: input.captures,
+    payeeText: input.facts.payeeText,
+    description: state.description,
+  };
+}
+
+/** `set_payee_from_text` (design 10.2): render, look the name up, then set or create. */
+function payeeFromText(
+  state: WorkingState,
+  action: Extract<RuleAction, { type: "set_payee_from_text" }>,
+  input: StepInput,
+): StepResult {
+  if (action.onlyIfEmpty && hasPayee(state)) {
+    return skip(state, action, "already_set");
+  }
+  const name = renderPayeeName(action.template, templateValues(state, input));
+  if (name === "") return skip(state, action, "empty_render");
+  const resolutions = input.context.payeeResolutions;
+  const key = payeeLookupKey(name);
+  if (resolutions === undefined || !resolutions.has(key)) {
+    input.lookups.push(name);
+    return skip(state, action, "payee_unresolved");
+  }
+  const found = resolutions.get(key) ?? null;
+  if (found !== null) {
+    if (state.payeeId === found.payeeId && state.payeeCreate === null) {
+      return skip(state, action, "no_change");
+    }
+    return {
+      state: {
+        ...state,
+        payeeId: found.payeeId,
+        payeeName: found.name,
+        payeeCreate: null,
+      },
+      applied: { type: action.type },
+    };
+  }
+  if (!action.createIfMissing) return skip(state, action, "payee_not_found");
+  if (state.payeeCreate === name && state.payeeId === null) {
+    return skip(state, action, "no_change");
+  }
+  return {
+    state: { ...state, payeeId: null, payeeName: name, payeeCreate: name },
+    applied: { type: action.type },
+  };
+}
+
+/** `set_description` (design 10.2): render, then replace, append or prepend. */
+function describe(
+  state: WorkingState,
+  action: Extract<RuleAction, { type: "set_description" }>,
+  input: StepInput,
+): StepResult {
+  if (action.onlyIfEmpty && (state.description ?? "").trim() !== "") {
+    return skip(state, action, "already_set");
+  }
+  const rendered = renderRuleTemplate(
+    action.template,
+    templateValues(state, input),
+  );
+  const next = composeDescription(state.description, rendered, action.mode);
+  if (next === null) return skip(state, action, "empty_render");
+  if (next === (state.description ?? "")) {
+    return skip(
+      state,
+      action,
+      rendered.trim() === "" ? "empty_render" : "no_change",
+    );
+  }
+  return {
+    state: { ...state, description: next },
+    applied: { type: action.type },
+  };
+}
+
 function diffState(
   before: WorkingState,
   after: WorkingState,
@@ -215,6 +386,17 @@ function diffState(
       : {}),
     ...(before.payeeId !== after.payeeId
       ? { payeeId: { before: before.payeeId, after: after.payeeId } }
+      : {}),
+    ...(after.payeeName !== null && after.payeeName !== before.payeeName
+      ? { payeeName: { before: before.payeeName, after: after.payeeName } }
+      : {}),
+    ...(after.payeeCreate !== null && after.payeeCreate !== before.payeeCreate
+      ? { payeeCreated: true }
+      : {}),
+    ...((before.description ?? null) !== (after.description ?? null)
+      ? {
+          description: { before: before.description, after: after.description },
+        }
       : {}),
     ...(!sameSet(before.tagIds, after.tagIds)
       ? {
@@ -241,7 +423,17 @@ function netChanges(first: WorkingState, last: WorkingState): RuleNetChanges {
     ...(first.categoryId !== last.categoryId
       ? { categoryId: last.categoryId }
       : {}),
-    ...(first.payeeId !== last.payeeId ? { payeeId: last.payeeId } : {}),
+    ...(last.payeeCreate !== null
+      ? { createPayee: last.payeeCreate, payeeName: last.payeeCreate }
+      : first.payeeId !== last.payeeId
+        ? {
+            payeeId: last.payeeId,
+            ...(last.payeeName !== null ? { payeeName: last.payeeName } : {}),
+          }
+        : {}),
+    ...((first.description ?? null) !== (last.description ?? null)
+      ? { description: last.description }
+      : {}),
     addTagIds: last.tagIds.filter((id) => !first.tagIds.includes(id)),
     removeTagIds: first.tagIds.filter((id) => !last.tagIds.includes(id)),
   };
@@ -267,11 +459,15 @@ export function planRuleEffects(
     categoryId: facts.categoryId,
     categoryAncestorIds: facts.categoryAncestorIds,
     payeeId: facts.payeeId,
+    payeeName: context.payeeName ?? null,
+    payeeCreate: null,
+    description: facts.description,
     tagIds: facts.tagIds,
   };
   let state = initial;
   const trace: RuleTraceEntry[] = [];
   const aiReviewRequests: AiReviewRequest[] = [];
+  const lookups: string[] = [];
 
   for (const rule of rules) {
     const notRun = isPlannable(rule);
@@ -287,7 +483,11 @@ export function planRuleEffects(
       });
       continue;
     }
-    if (!evaluateRuleCondition(rule.condition, withState(facts, state))) {
+    const match = evaluateRuleConditionWithCaptures(
+      rule.condition,
+      withState(facts, state),
+    );
+    if (!match.matched) {
       trace.push({
         ruleId: rule.id,
         matched: false,
@@ -310,7 +510,12 @@ export function planRuleEffects(
         });
         continue;
       }
-      const result = step(state, action, withState(facts, state), context);
+      const result = step(state, action, {
+        facts: withState(facts, state),
+        context,
+        captures: match.captures,
+        lookups,
+      });
       state = result.state;
       if (result.applied) applied.push(result.applied);
       if (result.skipped) skipped.push(result.skipped);
@@ -330,6 +535,7 @@ export function planRuleEffects(
     changes: netChanges(initial, state),
     trace,
     aiReviewRequests,
+    ...(lookups.length > 0 ? { payeeLookups: [...new Set(lookups)] } : {}),
   };
 }
 

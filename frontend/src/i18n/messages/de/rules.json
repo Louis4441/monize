@@ -197,7 +197,9 @@
       "remove_tags": "Tags entfernen",
       "set_category": "Kategorie festlegen",
       "set_payee": "Zahlungsempfänger festlegen",
-      "request_ai_review": "KI-Prüfung anfordern"
+      "request_ai_review": "KI-Prüfung anfordern",
+      "set_payee_from_text": "Zahlungsempfänger aus Text festlegen",
+      "set_description": "Beschreibung festlegen"
     },
     "save": {
       "button": "Regel speichern",
@@ -249,7 +251,11 @@
         "DUPLICATE_ACTION": "Eine Regel kann nur einmal um eine KI-Prüfung bitten.",
         "REFERENCE_NOT_FOUND": "Ein hier gewählter Eintrag existiert nicht mehr. Wählen Sie einen anderen.",
         "NAME_REQUIRED": "Geben Sie einen Namen für die Regel ein.",
-        "UNKNOWN": "Dieser Teil ist ungültig."
+        "UNKNOWN": "Dieser Teil ist ungültig.",
+        "INVALID_CAPTURE": "Ein Erfassungsname besteht aus Kleinbuchstaben und Ziffern, beginnt mit einem Buchstaben und ist höchstens 20 Zeichen lang.",
+        "TOO_MANY_CAPTURES": "Ein Muster darf höchstens 5 Erfassungen enthalten.",
+        "DUPLICATE_CAPTURE": "Jeder Erfassungsname darf in einer Regel nur einmal vorkommen.",
+        "UNKNOWN_CAPTURE": "Der Text verwendet eine Erfassung, die keine Bedingung dieser Regel definiert."
       }
     },
     "run": {
@@ -428,7 +434,9 @@
       "remove_tags": "Tags entfernen: {tags}",
       "set_category": "Kategorie festlegen auf {name}{onlyIfEmpty, select, yes { (nur wenn leer)} other {}}",
       "set_payee": "Zahlungsempfänger festlegen auf {name}{onlyIfEmpty, select, yes { (nur wenn leer)} other {}}",
-      "request_ai_review": "KI-Prüfung anfordern: {instruction}"
+      "request_ai_review": "KI-Prüfung anfordern: {instruction}",
+      "set_payee_from_text": "Zahlungsempfänger festlegen auf „{template}“{createIfMissing, select, yes { (angelegt, falls nicht vorhanden)} other {}}{onlyIfEmpty, select, yes { (nur wenn leer)} other {}}",
+      "set_description": "{mode, select, append {„{template}“ an die Beschreibung anhängen} prepend {„{template}“ vor die Beschreibung setzen} other {Beschreibung festlegen auf „{template}“}}{onlyIfEmpty, select, yes { (nur wenn leer)} other {}}"
     }
   }
 }

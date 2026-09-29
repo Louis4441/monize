@@ -95,6 +95,24 @@ export interface SetPayeeAction {
   readonly onlyIfEmpty: boolean;
 }
 
+/** Sets the payee from a template rendered from the rule's captures (design 10.2). */
+export interface SetPayeeFromTextAction {
+  readonly type: 'set_payee_from_text';
+  readonly template: string;
+  readonly createIfMissing: boolean;
+  readonly onlyIfEmpty: boolean;
+}
+
+export type RuleDescriptionMode = 'replace' | 'append' | 'prepend';
+
+/** Writes the description from a template; `{description}` is the current text. */
+export interface SetDescriptionAction {
+  readonly type: 'set_description';
+  readonly template: string;
+  readonly mode: RuleDescriptionMode;
+  readonly onlyIfEmpty: boolean;
+}
+
 /** Queues a person-approved AI review; never changes the row itself. */
 export interface RequestAiReviewAction {
   readonly type: 'request_ai_review';
@@ -106,6 +124,8 @@ export type RuleAction =
   | RemoveTagsAction
   | SetCategoryAction
   | SetPayeeAction
+  | SetPayeeFromTextAction
+  | SetDescriptionAction
   | RequestAiReviewAction;
 
 export type RuleActionType = RuleAction['type'];

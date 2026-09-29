@@ -197,7 +197,9 @@
       "remove_tags": "Tags verwijderen",
       "set_category": "Categorie instellen",
       "set_payee": "Begunstigde instellen",
-      "request_ai_review": "AI-controle aanvragen"
+      "request_ai_review": "AI-controle aanvragen",
+      "set_payee_from_text": "Begunstigde instellen vanuit tekst",
+      "set_description": "Omschrijving instellen"
     },
     "save": {
       "button": "Regel opslaan",
@@ -249,7 +251,11 @@
         "DUPLICATE_ACTION": "Een regel kan maar één keer om een AI-controle vragen.",
         "REFERENCE_NOT_FOUND": "Een hier gekozen item bestaat niet meer. Kies een ander.",
         "NAME_REQUIRED": "Voer een naam voor de regel in.",
-        "UNKNOWN": "Dit onderdeel is ongeldig."
+        "UNKNOWN": "Dit onderdeel is ongeldig.",
+        "INVALID_CAPTURE": "Een opnamenaam bestaat uit kleine letters en cijfers, begint met een letter en is hooguit 20 tekens lang.",
+        "TOO_MANY_CAPTURES": "Een patroon mag hooguit 5 opnamen bevatten.",
+        "DUPLICATE_CAPTURE": "Elke opnamenaam mag in een regel maar één keer voorkomen.",
+        "UNKNOWN_CAPTURE": "De tekst gebruikt een opname die geen enkele voorwaarde van deze regel definieert."
       }
     },
     "run": {
@@ -428,7 +434,9 @@
       "remove_tags": "Tags verwijderen: {tags}",
       "set_category": "Categorie instellen op {name}{onlyIfEmpty, select, yes { (alleen als leeg)} other {}}",
       "set_payee": "Begunstigde instellen op {name}{onlyIfEmpty, select, yes { (alleen als leeg)} other {}}",
-      "request_ai_review": "AI-controle aanvragen: {instruction}"
+      "request_ai_review": "AI-controle aanvragen: {instruction}",
+      "set_payee_from_text": "Begunstigde instellen op “{template}”{createIfMissing, select, yes { (aangemaakt als die ontbreekt)} other {}}{onlyIfEmpty, select, yes { (alleen als leeg)} other {}}",
+      "set_description": "{mode, select, append {“{template}” achter de omschrijving toevoegen} prepend {“{template}” voor de omschrijving zetten} other {Omschrijving instellen op “{template}”}}{onlyIfEmpty, select, yes { (alleen als leeg)} other {}}"
     }
   }
 }

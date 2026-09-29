@@ -1,17 +1,22 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable, forwardRef } from "@nestjs/common";
 import { ArrayContains, EntityManager, In } from "typeorm";
 import { Category } from "../categories/entities/category.entity";
 import { Payee } from "../payees/entities/payee.entity";
+import { PayeesService } from "../payees/payees.service";
 import { Tag } from "../tags/entities/tag.entity";
 import { TransactionTag } from "../tags/entities/transaction-tag.entity";
 import { AiReviewRequestsService } from "../ai-review/ai-review-requests.service";
 import { TagsService } from "../tags/tags.service";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import {
+  PayeeResolution,
+  PayeeResolutions,
   PlannableRule,
   RuleEffects,
   RulePlanContext,
+  RuleTraceEntry,
   hasRuleEffects,
+  payeeLookupKey,
   planRuleEffects,
   recordAiReviewAlreadyQueued,
   recordAiReviewQueued,
@@ -69,8 +74,23 @@ export interface RuleEffectsPreview extends RuleEffects {
   readonly labels: RuleEffectsLabels;
 }
 
-/** The facts of a row that is not stored yet (the preview) or just stored. */
-export type RuleRowInput = Omit<RuleFactsInput, "categoryAncestorIds">;
+/**
+ * The facts of a row that is not stored yet (the preview) or just stored.
+ * `payeeName` is the name stored on the row, for the trace of a payee change
+ * only; no condition reads it (`payeeText` is the fact).
+ */
+export type RuleRowInput = Omit<RuleFactsInput, "categoryAncestorIds"> & {
+  readonly payeeName?: string | null;
+};
+
+/** Payee lookups made while planning; share one across the rows of a call. */
+export type PayeeLookupCache = Map<string, PayeeResolution | null>;
+
+/**
+ * Planning rounds for payee lookups. Each round looks up the names the last
+ * plan needed and plans again; a rule list needs one or two.
+ */
+const MAX_PAYEE_LOOKUP_ROUNDS = 12;
 
 /**
  * Applies a user's transaction rules to rows in the caller's transaction
@@ -86,6 +106,9 @@ export class TransactionRulesApplierService {
   constructor(
     private readonly tagsService: TagsService,
     private readonly aiReviewRequests: AiReviewRequestsService,
+    // forwardRef: PayeesModule reaches this module back through TransactionsModule.
+    @Inject(forwardRef(() => PayeesService))
+    private readonly payeesService: PayeesService,
   ) {}
 
   /**
@@ -122,7 +145,51 @@ export class TransactionRulesApplierService {
   ): Promise<RuleEffects> {
     if (rules.length === 0) return planRuleEffects(buildRuleFacts(input), []);
     const chains = await this.chainsFor(m, userId, rules, [input.categoryId]);
-    return this.planWithChains(input, rules, chains, context);
+    return this.planResolved(userId, input, rules, chains, context);
+  }
+
+  /**
+   * `planWithChains` with the payee lookups the plan asks for: a
+   * `set_payee_from_text` renders its name from the rule's captures, so the
+   * name is known only while planning. The names the plan reports are looked
+   * up through the payee service's `resolveByName` (exact name, alias, unique
+   * normalized match) and the plan runs again, until it needs no more. The
+   * preview never creates a payee; a name nobody has stays a
+   * `payeeCreated` note on the plan. `cache` is shared by the rows of one
+   * call so a batch looks each name up once.
+   */
+  async planResolved(
+    userId: string,
+    input: RuleRowInput,
+    rules: readonly PlannableRule[],
+    chains: ReadonlyMap<string, readonly string[]>,
+    context: Pick<RulePlanContext, "crossOwnerTransferLeg">,
+    cache: PayeeLookupCache = new Map(),
+  ): Promise<RuleEffects> {
+    let effects = this.planWithChains(input, rules, chains, context, cache);
+    for (
+      let round = 0;
+      round < MAX_PAYEE_LOOKUP_ROUNDS && effects.payeeLookups !== undefined;
+      round++
+    ) {
+      const missing = effects.payeeLookups.filter(
+        (name) => !cache.has(payeeLookupKey(name)),
+      );
+      if (missing.length === 0) break;
+      for (const name of missing) {
+        cache.set(payeeLookupKey(name), await this.lookUpPayee(userId, name));
+      }
+      effects = this.planWithChains(input, rules, chains, context, cache);
+    }
+    return effects;
+  }
+
+  private async lookUpPayee(
+    userId: string,
+    name: string,
+  ): Promise<PayeeResolution | null> {
+    const payee = await this.payeesService.resolveByName(userId, name);
+    return payee === null ? null : { payeeId: payee.id, name: payee.name };
   }
 
   /**
@@ -226,6 +293,7 @@ export class TransactionRulesApplierService {
     );
 
     const applied: AppliedRuleRow[] = [];
+    const lookups: PayeeLookupCache = new Map();
     for (const row of rows) {
       const { input, context } = await this.inputFromRow(
         m,
@@ -234,8 +302,23 @@ export class TransactionRulesApplierService {
         tagsByRow.get(row.id) ?? [],
         options.payeeTextById,
       );
-      const effects = this.planWithChains(input, rules, chains, context);
-      await this.writeEffects(m, userId, row.id, effects, source);
+      const planned = await this.planResolved(
+        userId,
+        input,
+        rules,
+        chains,
+        context,
+        lookups,
+      );
+      const effects = await this.writeEffects(
+        m,
+        userId,
+        row.id,
+        planned,
+        source,
+      );
+      // A payee this row created answers the lookups of the rows after it.
+      if (planned.changes.createPayee !== undefined) lookups.clear();
       applied.push({ transactionId: row.id, effects });
     }
     return this.queueAiReviews(m, userId, applied);
@@ -280,7 +363,8 @@ export class TransactionRulesApplierService {
       const chains = await this.chainsFor(m, ownerId, rules, [
         primary.categoryId,
       ]);
-      const effects = this.planWithChains(
+      const planned = await this.planResolved(
+        ownerId,
         {
           accountId: primary.accountId,
           currencyCode: primary.currencyCode,
@@ -290,6 +374,7 @@ export class TransactionRulesApplierService {
           toAccountId: to?.accountId ?? null,
           payeeId: primary.payeeId,
           payeeText: primary.payeeName,
+          payeeName: primary.payeeName,
           categoryId: primary.categoryId,
           description: primary.description,
           tagIds: tagIds ?? [],
@@ -299,6 +384,8 @@ export class TransactionRulesApplierService {
         chains,
         { crossOwnerTransferLeg: !sameOwner },
       );
+      // A payee the rules create is created once, for both legs.
+      const effects = await this.resolveCreatedPayee(m, ownerId, planned);
       // One review request per transfer, on the outgoing leg (`primary`).
       const [queued] = await this.queueAiReviews(m, ownerId, [
         { transactionId: primary.id, effects },
@@ -357,6 +444,7 @@ export class TransactionRulesApplierService {
     rules: readonly PlannableRule[],
     chains: ReadonlyMap<string, readonly string[]>,
     context: Pick<RulePlanContext, "crossOwnerTransferLeg">,
+    payeeResolutions?: PayeeResolutions,
   ): RuleEffects {
     const facts = buildRuleFacts({
       ...input,
@@ -367,6 +455,11 @@ export class TransactionRulesApplierService {
       planRuleEffects(facts, rules, {
         ...context,
         categoryChains: chains,
+        // A row not stored yet (the preview) has no stored name; the text the
+        // create will store is the payee text, so the trace agrees with the commit.
+        payeeName:
+          input.payeeName !== undefined ? input.payeeName : input.payeeText,
+        payeeResolutions,
       }),
     );
   }
@@ -447,6 +540,7 @@ export class TransactionRulesApplierService {
         payeeText: payeeTextById?.has(row.id)
           ? (payeeTextById.get(row.id) ?? null)
           : row.payeeName,
+        payeeName: row.payeeName,
         categoryId: row.categoryId,
         description: row.description,
         tagIds,
@@ -456,27 +550,89 @@ export class TransactionRulesApplierService {
     };
   }
 
-  /** Category and payee through the manager's parameterized UPDATE, tags through TagsService, one trace row per rule. */
+  /**
+   * Turn a payee the plan wants created into an id, in the caller's
+   * transaction: the payee service's `resolveByName` again (the plan was made
+   * before this write), then its `findOrCreate` when still nobody has the
+   * name. Returns the effects with `payeeId` / `payeeName` in place of
+   * `createPayee`, and the trace carrying the payee's id; a plan that creates
+   * nothing is returned as it is. A payee is reference data: the undo of a
+   * manual run does not delete it.
+   */
+  async resolveCreatedPayee(
+    m: EntityManager,
+    userId: string,
+    effects: RuleEffects,
+  ): Promise<RuleEffects> {
+    const name = effects.changes.createPayee;
+    if (name === undefined) return effects;
+    const existing = await this.payeesService.resolveByName(userId, name);
+    const payee =
+      existing ?? (await this.payeesService.findOrCreate(userId, name));
+    const created = existing === null;
+    // Only the last rule that asked for the creation owns its outcome.
+    const lastAsking = effects.trace.reduce(
+      (found, entry, i) => (entry.changes.payeeCreated ? i : found),
+      -1,
+    );
+    const trace: RuleTraceEntry[] = effects.trace.map((entry, i) => {
+      if (!entry.changes.payeeCreated) return entry;
+      const { payeeCreated: _asked, ...rest } = entry.changes;
+      if (i !== lastAsking) return { ...entry, changes: rest };
+      return {
+        ...entry,
+        changes: {
+          ...rest,
+          payeeId: { before: rest.payeeId?.before ?? null, after: payee.id },
+          payeeName: {
+            before: rest.payeeName?.before ?? null,
+            after: payee.name,
+          },
+          ...(created ? { payeeCreated: true } : {}),
+        },
+      };
+    });
+    const { createPayee: _create, ...rest } = effects.changes;
+    return {
+      ...effects,
+      changes: { ...rest, payeeId: payee.id, payeeName: payee.name },
+      trace,
+    };
+  }
+
+  /**
+   * Category, payee and description through the manager's parameterized
+   * UPDATE, tags through TagsService, one trace row per rule. Returns the
+   * effects as written (a payee the rules created now has its id).
+   */
   async writeEffects(
     m: EntityManager,
     userId: string,
     transactionId: string,
-    effects: RuleEffects,
+    planned: RuleEffects,
     source: RuleApplicationSource,
-  ): Promise<void> {
+  ): Promise<RuleEffects> {
+    const effects = await this.resolveCreatedPayee(m, userId, planned);
     const { changes } = effects;
     const patch: Partial<
-      Pick<Transaction, "categoryId" | "payeeId" | "payeeName">
+      Pick<Transaction, "categoryId" | "payeeId" | "payeeName" | "description">
     > = {
       ...(changes.categoryId !== undefined
         ? { categoryId: changes.categoryId }
+        : {}),
+      ...(changes.description !== undefined
+        ? { description: changes.description }
         : {}),
     };
     if (changes.payeeId !== undefined) {
       const payee =
         changes.payeeId === null
           ? null
-          : await m.findOne(Payee, { where: { id: changes.payeeId, userId } });
+          : changes.payeeName !== undefined
+            ? { name: changes.payeeName }
+            : await m.findOne(Payee, {
+                where: { id: changes.payeeId, userId },
+              });
       Object.assign(patch, {
         payeeId: changes.payeeId,
         payeeName: payee?.name ?? null,
@@ -513,5 +669,6 @@ export class TransactionRulesApplierService {
     if (traceRows.length > 0) {
       await m.insert(TransactionRuleApplication, traceRows);
     }
+    return effects;
   }
 }

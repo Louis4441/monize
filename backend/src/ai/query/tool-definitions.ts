@@ -29,7 +29,7 @@ export const RULE_LANGUAGE_GUIDE =
   RULE_FIELD_OPERATORS +
   ". Give NAMES as the value for accountId, fromAccountId, toAccountId, payeeId, categoryId (use 'Parent: Child') and tagIds; amount is signed, absAmount is not; in/notIn/hasAny/hasAll/hasNone take a list, between takes [min,max], isEmpty takes no value, type is EXPENSE|INCOME|TRANSFER. actions (1-" +
   MAX_RULE_ACTIONS +
-  ", in order): {type:'set_category',categoryName,onlyIfEmpty?}, {type:'set_payee',payeeName,onlyIfEmpty?}, {type:'add_tags'|'remove_tags',tagNames:[...]}, {type:'request_ai_review',instruction}; onlyIfEmpty defaults to true.";
+  ", in order): {type:'set_category',categoryName,onlyIfEmpty?}, {type:'set_payee',payeeName,onlyIfEmpty?}, {type:'add_tags'|'remove_tags',tagNames:[...]}, {type:'request_ai_review',instruction}, {type:'set_payee_from_text',template,createIfMissing?,onlyIfEmpty?}, {type:'set_description',template,mode?:replace|append|prepend,onlyIfEmpty?}; onlyIfEmpty defaults to true (false for set_description). matches is a glob: * is a wildcard, {name} a capture (a-z0-9, max 5, once per rule) that a template reads as {name}, {payeeText} or {description}.";
 
 export const FINANCIAL_TOOLS: AiToolDefinition[] = [
   {

@@ -79,6 +79,33 @@ describe("undoRuleRun", () => {
     expect(manager.query).not.toHaveBeenCalled();
   });
 
+  it("restores the description, alone or with the payee, and a null description", async () => {
+    const { manager, em } = harness();
+    (lockTransactionRows as jest.Mock).mockResolvedValue(locked("t1", "t2"));
+    await undoRuleRun(
+      action([
+        { id: "t1", description: "before" },
+        {
+          id: "t2",
+          payeeId: null,
+          payeeName: "raw",
+          description: null,
+        },
+      ]),
+      em,
+    );
+    expect(manager.update).toHaveBeenCalledWith(
+      Transaction,
+      { id: "t1", userId: USER },
+      { description: "before" },
+    );
+    expect(manager.update).toHaveBeenCalledWith(
+      Transaction,
+      { id: "t2", userId: USER },
+      { payeeId: null, payeeName: "raw", description: null },
+    );
+  });
+
   it("restores a null payee and null name", async () => {
     const { manager, em } = harness();
     (lockTransactionRows as jest.Mock).mockResolvedValue(locked("t1"));

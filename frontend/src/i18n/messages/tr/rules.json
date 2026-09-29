@@ -197,7 +197,9 @@
       "remove_tags": "Etiketleri kaldır",
       "set_category": "Kategoriyi ayarla",
       "set_payee": "Alıcıyı ayarla",
-      "request_ai_review": "Yapay zekâ incelemesi iste"
+      "request_ai_review": "Yapay zekâ incelemesi iste",
+      "set_payee_from_text": "Alıcıyı metinden ayarla",
+      "set_description": "Açıklamayı ayarla"
     },
     "save": {
       "button": "Kuralı kaydet",
@@ -249,7 +251,11 @@
         "DUPLICATE_ACTION": "Bir kural yapay zekâ incelemesini yalnızca bir kez isteyebilir.",
         "REFERENCE_NOT_FOUND": "Burada seçilen bir öğe artık yok. Başka bir öğe seçin.",
         "NAME_REQUIRED": "Kural için bir ad girin.",
-        "UNKNOWN": "Bu bölüm geçersiz."
+        "UNKNOWN": "Bu bölüm geçersiz.",
+        "INVALID_CAPTURE": "Yakalama adı küçük harf ve rakamlardan oluşur, harfle başlar ve en fazla 20 karakter uzunluğundadır.",
+        "TOO_MANY_CAPTURES": "Bir desen en fazla 5 yakalama içerebilir.",
+        "DUPLICATE_CAPTURE": "Her yakalama adı bir kuralda yalnızca bir kez kullanılabilir.",
+        "UNKNOWN_CAPTURE": "Metin, bu kuralın hiçbir koşulunda tanımlanmamış bir yakalama kullanıyor."
       }
     },
     "run": {
@@ -428,7 +434,9 @@
       "remove_tags": "Etiketleri kaldır: {tags}",
       "set_category": "Kategoriyi {name} olarak ayarla{onlyIfEmpty, select, yes { (yalnızca boşsa)} other {}}",
       "set_payee": "Alıcıyı {name} olarak ayarla{onlyIfEmpty, select, yes { (yalnızca boşsa)} other {}}",
-      "request_ai_review": "Yapay zekâ incelemesi iste: {instruction}"
+      "request_ai_review": "Yapay zekâ incelemesi iste: {instruction}",
+      "set_payee_from_text": "Alıcıyı “{template}” olarak ayarla{createIfMissing, select, yes { (yoksa oluşturulur)} other {}}{onlyIfEmpty, select, yes { (yalnızca boşsa)} other {}}",
+      "set_description": "{mode, select, append {Açıklamanın sonuna “{template}” ekle} prepend {Açıklamanın başına “{template}” ekle} other {Açıklamayı “{template}” olarak ayarla}}{onlyIfEmpty, select, yes { (yalnızca boşsa)} other {}}"
     }
   }
 }

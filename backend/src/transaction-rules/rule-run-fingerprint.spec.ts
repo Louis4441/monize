@@ -66,4 +66,44 @@ describe("canonicalChanges", () => {
       '{"categoryId":null,"payeeId":null,"tagIds":{"before":["a","b"],"after":["c"]}}',
     );
   });
+
+  describe("the text actions' fields", () => {
+    const base = change("a", { categoryId: { before: null, after: "c1" } });
+
+    it("hash as before when a plan has none of them", () => {
+      expect(Object.keys(canonicalChanges(base.changes))).toEqual([
+        "categoryId",
+        "payeeId",
+        "tagIds",
+      ]);
+    });
+
+    it("change with the payee name, the creation note and the description", () => {
+      const plain = planFingerprint(1, [
+        change("a", { payeeId: { before: null, after: "p1" } }),
+      ]);
+      const named = planFingerprint(1, [
+        change("a", {
+          payeeId: { before: null, after: "p1" },
+          payeeName: { before: null, after: "Acme" },
+        }),
+      ]);
+      const created = planFingerprint(1, [
+        change("a", {
+          payeeId: { before: null, after: "p1" },
+          payeeName: { before: null, after: "Acme" },
+          payeeCreated: true,
+        }),
+      ]);
+      const described = planFingerprint(1, [
+        change("a", { description: { before: "x", after: "y" } }),
+      ]);
+      const describedOther = planFingerprint(1, [
+        change("a", { description: { before: "x", after: "z" } }),
+      ]);
+      expect(
+        new Set([plain, named, created, described, describedOther]).size,
+      ).toBe(5);
+    });
+  });
 });

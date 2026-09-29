@@ -1,4 +1,4 @@
-import { matchesAliasPattern } from "../payees/alias-match.util";
+import { GlobCaptures, matchGlobWithCaptures } from "./rule-glob-capture";
 import {
   RULE_CONDITION_FIELDS,
   RuleConditionLeaf,
@@ -144,16 +144,20 @@ function evaluateText(
   const text = normalize(fact);
   if (op === "isEmpty") return text === "";
   if (typeof value !== "string") return false;
+  // `matches` reads `{name}` as a capture (design 10.1), so it gets the text
+  // with its case, exactly as the capture path does; a pattern without a
+  // capture is answered by `matchesAliasPattern` all the same.
+  if (op === "matches") {
+    return matchGlobWithCaptures(fact.trim(), value.trim()) !== null;
+  }
   const wanted = normalize(value);
   switch (op) {
     case "eq":
       return text === wanted;
     case "contains":
       return text.includes(wanted);
-    case "startsWith":
+    default: // startsWith: the field table admits no other operator
       return text.startsWith(wanted);
-    default: // matches: the field table admits no other operator
-      return matchesAliasPattern(text, wanted);
   }
 }
 
@@ -197,4 +201,76 @@ function evaluateCode(
     default: // in: the field table admits no other operator
       return asList(value).some(same);
   }
+}
+
+/** Whether a condition held for a row, and what its `matches` leaves captured. */
+export interface RuleConditionMatch {
+  readonly matched: boolean;
+  /**
+   * Captured values by name (design 10.1), from the leaves that matched. A
+   * leaf in a branch of `any` that did not match, or under `not`, captures
+   * nothing. Meant for the actions of the same rule only.
+   */
+  readonly captures: GlobCaptures;
+}
+
+const NO_MATCH: RuleConditionMatch = Object.freeze({
+  matched: false,
+  captures: Object.freeze(Object.create(null)),
+});
+
+/**
+ * `evaluateRuleCondition` that also returns the captures of the `matches`
+ * leaves. `matched` always equals `evaluateRuleCondition` for the same input
+ * (the spec compares the two); a leaf without a capture is decided by the
+ * boolean path itself.
+ */
+export function evaluateRuleConditionWithCaptures(
+  node: RuleConditionNode,
+  facts: RuleFacts,
+): RuleConditionMatch {
+  const captures = captureNode(node, facts);
+  return captures === null
+    ? NO_MATCH
+    : Object.freeze({ matched: true, captures });
+}
+
+function merge(parts: readonly GlobCaptures[]): GlobCaptures {
+  const out: Record<string, string> = Object.create(null);
+  for (const part of parts) Object.assign(out, part);
+  return Object.freeze(out);
+}
+
+/** The captures when the node holds, or null when it does not. */
+function captureNode(
+  node: RuleConditionNode,
+  facts: RuleFacts,
+): GlobCaptures | null {
+  if ("all" in node || "any" in node) {
+    const all = "all" in node;
+    const children = "all" in node ? node.all : node.any;
+    const held: GlobCaptures[] = [];
+    let ok = all;
+    for (const child of children) {
+      const got = captureNode(child, facts);
+      if (got !== null) held.push(got);
+      if (all && got === null) {
+        ok = false;
+        break;
+      }
+      if (!all && got !== null) ok = true;
+    }
+    if (node.not === true) return ok ? null : merge([]);
+    return ok ? merge(held) : null;
+  }
+  if (
+    node.op === "matches" &&
+    RULE_CONDITION_FIELDS[node.field]?.kind === "text" &&
+    typeof node.value === "string"
+  ) {
+    const fact = textFact(node, facts);
+    if (fact === null) return null;
+    return matchGlobWithCaptures(fact.trim(), node.value.trim());
+  }
+  return evaluateLeaf(node, facts) ? merge([]) : null;
 }

@@ -108,6 +108,18 @@ function useRuleWords(labels: RuleWordsLabels) {
         });
       case 'request_ai_review':
         return t('words.action.request_ai_review', { instruction: action.instruction });
+      case 'set_payee_from_text':
+        return t('words.action.set_payee_from_text', {
+          template: action.template,
+          createIfMissing: action.createIfMissing ? 'yes' : 'no',
+          onlyIfEmpty: action.onlyIfEmpty ? 'yes' : 'no',
+        });
+      case 'set_description':
+        return t('words.action.set_description', {
+          template: action.template,
+          mode: action.mode,
+          onlyIfEmpty: action.onlyIfEmpty ? 'yes' : 'no',
+        });
     }
   };
 

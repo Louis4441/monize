@@ -197,7 +197,9 @@
       "remove_tags": "Quitar etiquetas",
       "set_category": "Establecer la categoría",
       "set_payee": "Establecer el beneficiario",
-      "request_ai_review": "Pedir una revisión de IA"
+      "request_ai_review": "Pedir una revisión de IA",
+      "set_payee_from_text": "Establecer el beneficiario desde el texto",
+      "set_description": "Establecer la descripción"
     },
     "save": {
       "button": "Guardar regla",
@@ -249,7 +251,11 @@
         "DUPLICATE_ACTION": "Una regla solo puede pedir una revisión de IA una vez.",
         "REFERENCE_NOT_FOUND": "Un elemento elegido aquí ya no existe. Elige otro.",
         "NAME_REQUIRED": "Introduce un nombre para la regla.",
-        "UNKNOWN": "Esta parte no es válida."
+        "UNKNOWN": "Esta parte no es válida.",
+        "INVALID_CAPTURE": "El nombre de una captura usa letras minúsculas y dígitos, empieza por una letra y tiene como máximo 20 caracteres.",
+        "TOO_MANY_CAPTURES": "Un patrón puede contener como máximo 5 capturas.",
+        "DUPLICATE_CAPTURE": "Cada nombre de captura solo puede usarse una vez en una regla.",
+        "UNKNOWN_CAPTURE": "El texto usa una captura que ninguna condición de esta regla define."
       }
     },
     "run": {
@@ -428,7 +434,9 @@
       "remove_tags": "Quitar etiquetas: {tags}",
       "set_category": "Establecer la categoría en {name}{onlyIfEmpty, select, yes { (solo si está vacía)} other {}}",
       "set_payee": "Establecer el beneficiario en {name}{onlyIfEmpty, select, yes { (solo si está vacío)} other {}}",
-      "request_ai_review": "Pedir una revisión de IA: {instruction}"
+      "request_ai_review": "Pedir una revisión de IA: {instruction}",
+      "set_payee_from_text": "Establecer el beneficiario en «{template}»{createIfMissing, select, yes { (se crea si no existe)} other {}}{onlyIfEmpty, select, yes { (solo si está vacío)} other {}}",
+      "set_description": "{mode, select, append {Añadir «{template}» al final de la descripción} prepend {Poner «{template}» antes de la descripción} other {Establecer la descripción en «{template}»}}{onlyIfEmpty, select, yes { (solo si está vacío)} other {}}"
     }
   }
 }

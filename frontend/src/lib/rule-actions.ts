@@ -7,9 +7,21 @@ import {
   MAX_RULE_ACTIONS,
   MAX_RULE_AI_REVIEW_ACTIONS,
   RULE_ACTION_TYPES,
+  isRuleActionType,
 } from '@/lib/rule-fields';
 import { newUid } from '@/lib/rule-tree';
 import type { RuleActionType } from '@/types/transaction-rule';
+
+/**
+ * The server accepts two text actions (`set_payee_from_text`, `set_description`)
+ * that the editor has no card for yet (task X5), so the editor neither offers
+ * nor holds them.
+ */
+const TEXT_ACTION_TYPES: readonly RuleActionType[] = ['set_payee_from_text', 'set_description'];
+export type EditorActionType = Exclude<RuleActionType, 'set_payee_from_text' | 'set_description'>;
+
+export const isEditorActionType = (value: unknown): value is EditorActionType =>
+  isRuleActionType(value) && !TEXT_ACTION_TYPES.includes(value);
 
 export type EditorAction =
   | { readonly uid: string; readonly type: 'add_tags' | 'remove_tags'; readonly tagIds: readonly string[] }
@@ -18,7 +30,7 @@ export type EditorAction =
   | { readonly uid: string; readonly type: 'request_ai_review'; readonly instruction: string };
 
 /** A blank action of `type`. `onlyIfEmpty` starts on: a rule fills, it does not overwrite. */
-export function createAction(type: RuleActionType = 'add_tags'): EditorAction {
+export function createAction(type: EditorActionType = 'add_tags'): EditorAction {
   const uid = newUid();
   switch (type) {
     case 'add_tags':
@@ -34,7 +46,7 @@ export function createAction(type: RuleActionType = 'add_tags'): EditorAction {
 }
 
 /** Changing the type starts over, but the card keeps its place and its `uid`. */
-export function changeActionType(action: EditorAction, type: RuleActionType): EditorAction {
+export function changeActionType(action: EditorAction, type: EditorActionType): EditorAction {
   if (action.type === type) return action;
   return { ...createAction(type), uid: action.uid };
 }
@@ -51,9 +63,9 @@ export function canAddAction(actions: readonly EditorAction[]): boolean {
  * The types the card at `index` may be set to. `request_ai_review` is offered
  * only to the card that already is one, or while no other card is.
  */
-export function availableActionTypes(actions: readonly EditorAction[], index: number): RuleActionType[] {
+export function availableActionTypes(actions: readonly EditorAction[], index: number): EditorActionType[] {
   const othersWithReview = countAiReviews(actions.filter((_, i) => i !== index));
-  return RULE_ACTION_TYPES.filter(
+  return RULE_ACTION_TYPES.filter(isEditorActionType).filter(
     (type) => type !== 'request_ai_review' || othersWithReview < MAX_RULE_AI_REVIEW_ACTIONS,
   );
 }

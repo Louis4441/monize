@@ -25,6 +25,12 @@ export interface RuleRunFieldChange<T> {
 export interface RuleRunChanges {
   categoryId?: RuleRunFieldChange<string | null>;
   payeeId?: RuleRunFieldChange<string | null>;
+  /** Set by `set_payee_from_text`: the name the payee is written with. */
+  payeeName?: RuleRunFieldChange<string | null>;
+  /** True when the payee does not exist yet and the run will create it. */
+  payeeCreated?: boolean;
+  /** Set by `set_description`. */
+  description?: RuleRunFieldChange<string | null>;
   /** The tag id sets before and after. */
   tagIds?: RuleRunFieldChange<string[]>;
 }
@@ -42,7 +48,9 @@ export type RuleRunSkipReason =
   | 'reconciled_locked'
   | 'transfer_leg_category'
   | 'split_category'
-  | 'cross_owner_transfer_payee';
+  | 'cross_owner_transfer_payee'
+  | 'empty_render'
+  | 'payee_not_found';
 
 export interface RuleRunSkippedRow {
   transactionId: string;

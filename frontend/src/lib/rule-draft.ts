@@ -9,12 +9,11 @@
  * editor says so. Writing is the opposite: `draftToPayload` emits exactly what
  * the create and update DTOs accept, and the server validates it again.
  */
-import { createAction, type EditorAction } from '@/lib/rule-actions';
+import { createAction, isEditorActionType, type EditorAction } from '@/lib/rule-actions';
 import {
   RULE_CONDITION_FIELDS,
   RULE_OPERATOR_SHAPES,
   RULE_TRIGGERS,
-  isRuleActionType,
   isRuleField,
   isRuleOperator,
 } from '@/lib/rule-fields';
@@ -131,7 +130,7 @@ function readCondition(input: unknown, repairs: Repairs): EditorGroup {
 }
 
 function readAction(input: unknown, repairs: Repairs): EditorAction | null {
-  if (!isRecord(input) || !isRuleActionType(input.type)) {
+  if (!isRecord(input) || !isEditorActionType(input.type)) {
     repairs.note();
     return null;
   }

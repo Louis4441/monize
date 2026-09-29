@@ -37,6 +37,12 @@ import { McpServerService } from "./mcp-server.service";
 // and the review-queue tool `ai_review_requests` (2,981 bytes: four operations
 // and the split-line shape of a proposal). Total 51,600 -> 58,480 = the two
 // tools (6,877 bytes) plus the previous 72-byte margin; no existing cap moved.
+//
+// Raised, as a reviewed decision (owner-approved with rule captures, design
+// 10.1 and 10.2): `manage_transaction_rules` states the two text actions
+// (`set_payee_from_text`, `set_description`) and the `{name}` capture syntax a
+// model must be told to write them. 3,896 -> 4,217 bytes (+321); cap 3,950 ->
+// 4,250 and total 58,480 -> 58,800 (58,726 measured, the previous margin kept).
 const TOOL_BYTE_BUDGET: Record<string, number> = {
   list_accounts: 2500,
   list_transactions: 3550,
@@ -55,14 +61,14 @@ const TOOL_BYTE_BUDGET: Record<string, number> = {
   list_upcoming_bills: 3000,
   calculate: 2000,
   get_budget_status: 2550,
-  manage_transaction_rules: 3950,
+  manage_transaction_rules: 4250,
   ai_review_requests: 3050,
   get_next_prompt: 1400,
   post_response: 1050,
   report_progress: 1250,
 };
 
-const TOTAL_BYTE_BUDGET = 58_480;
+const TOTAL_BYTE_BUDGET = 58_800;
 const INSTRUCTIONS_BYTE_BUDGET = 2_600;
 
 /**

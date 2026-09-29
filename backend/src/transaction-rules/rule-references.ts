@@ -45,25 +45,49 @@ const toList = (value: unknown): string[] =>
   );
 
 /**
- * `set_category` / `set_payee` default to `onlyIfEmpty: true` (design section
- * 3, decision 3); the validator requires the flag present, so the default is
- * applied before it. Returns a new array; anything that is not a plain action
- * object is passed through for the validator to report.
+ * The flags an action may leave out: `set_category`, `set_payee` and
+ * `set_payee_from_text` fill (`onlyIfEmpty: true`, design section 3 decision
+ * 3), `set_description` overwrites (`onlyIfEmpty: false`, `mode: "replace"`),
+ * and `set_payee_from_text` creates nothing (`createIfMissing: false`).
+ */
+const ACTION_DEFAULTS: Readonly<
+  Record<string, Readonly<Record<string, unknown>>>
+> = {
+  set_category: { onlyIfEmpty: true },
+  set_payee: { onlyIfEmpty: true },
+  set_payee_from_text: { onlyIfEmpty: true, createIfMissing: false },
+  set_description: { onlyIfEmpty: false, mode: "replace" },
+};
+
+/**
+ * The validator requires each flag present, so the defaults above are applied
+ * before it. Returns a new array; anything that is not a plain action object
+ * is passed through for the validator to report.
  */
 export function withActionDefaults(actions: unknown): unknown {
   if (!Array.isArray(actions)) return actions;
   return actions.map((action) => {
     if (
-      typeof action === "object" &&
-      action !== null &&
-      !Array.isArray(action) &&
-      ((action as { type?: unknown }).type === "set_category" ||
-        (action as { type?: unknown }).type === "set_payee") &&
-      (action as { onlyIfEmpty?: unknown }).onlyIfEmpty === undefined
+      typeof action !== "object" ||
+      action === null ||
+      Array.isArray(action)
     ) {
-      return { ...(action as object), onlyIfEmpty: true };
+      return action;
     }
-    return action;
+    const type = (action as { type?: unknown }).type;
+    const defaults =
+      typeof type === "string" &&
+      Object.prototype.hasOwnProperty.call(ACTION_DEFAULTS, type)
+        ? ACTION_DEFAULTS[type]
+        : undefined;
+    if (!defaults) return action;
+    const record = action as Record<string, unknown>;
+    const missing = Object.entries(defaults).filter(
+      ([key]) => record[key] === undefined,
+    );
+    return missing.length === 0
+      ? action
+      : { ...record, ...Object.fromEntries(missing) };
   });
 }
 
@@ -96,7 +120,7 @@ function actionSites(
       out.push({ path, kind: "categoryIds", ids: [action.categoryId] });
     } else if (action.type === "set_payee") {
       out.push({ path, kind: "payeeIds", ids: [action.payeeId] });
-    } else if (action.type !== "request_ai_review") {
+    } else if (action.type === "add_tags" || action.type === "remove_tags") {
       out.push({ path, kind: "tagIds", ids: [...action.tagIds] });
     }
   });

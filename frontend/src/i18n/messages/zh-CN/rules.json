@@ -197,7 +197,9 @@
       "remove_tags": "移除标签",
       "set_category": "设置分类",
       "set_payee": "设置收款方",
-      "request_ai_review": "请求 AI 审核"
+      "request_ai_review": "请求 AI 审核",
+      "set_payee_from_text": "根据文本设置收款方",
+      "set_description": "设置说明"
     },
     "save": {
       "button": "保存规则",
@@ -249,7 +251,11 @@
         "DUPLICATE_ACTION": "一条规则只能请求一次 AI 审核。",
         "REFERENCE_NOT_FOUND": "此处选择的项目已不存在。请选择其他项目。",
         "NAME_REQUIRED": "请输入规则名称。",
-        "UNKNOWN": "此部分无效。"
+        "UNKNOWN": "此部分无效。",
+        "INVALID_CAPTURE": "捕获名称由小写字母和数字组成，以字母开头，最长 20 个字符。",
+        "TOO_MANY_CAPTURES": "一个模式最多可包含 5 个捕获。",
+        "DUPLICATE_CAPTURE": "每个捕获名称在一条规则中只能使用一次。",
+        "UNKNOWN_CAPTURE": "文本使用了此规则中没有任何条件定义的捕获。"
       }
     },
     "run": {
@@ -428,7 +434,9 @@
       "remove_tags": "移除标签：{tags}",
       "set_category": "将分类设置为 {name}{onlyIfEmpty, select, yes {（仅在为空时）} other {}}",
       "set_payee": "将收款方设置为 {name}{onlyIfEmpty, select, yes {（仅在为空时）} other {}}",
-      "request_ai_review": "请求 AI 审核：{instruction}"
+      "request_ai_review": "请求 AI 审核：{instruction}",
+      "set_payee_from_text": "将收款方设置为“{template}”{createIfMissing, select, yes {（不存在则创建）} other {}}{onlyIfEmpty, select, yes {（仅在为空时）} other {}}",
+      "set_description": "{mode, select, append {在说明末尾追加“{template}”} prepend {在说明开头加上“{template}”} other {将说明设置为“{template}”}}{onlyIfEmpty, select, yes {（仅在为空时）} other {}}"
     }
   }
 }

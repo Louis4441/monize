@@ -86,6 +86,8 @@ describe("validateRuleDefinition: actions", () => {
       "set_category",
       "set_payee",
       "request_ai_review",
+      "set_payee_from_text",
+      "set_description",
     ]);
   });
 
@@ -202,6 +204,18 @@ describe("validateRuleDefinition: request_ai_review", () => {
       { type: "remove_tags", tagIds: [U1] },
       { type: "set_category", categoryId: U1, onlyIfEmpty: true },
       { type: "set_payee", payeeId: U1, onlyIfEmpty: true },
+      {
+        type: "set_payee_from_text",
+        template: "x",
+        createIfMissing: false,
+        onlyIfEmpty: true,
+      },
+      {
+        type: "set_description",
+        template: "x",
+        mode: "replace",
+        onlyIfEmpty: false,
+      },
     ] as const) {
       expect(isLedgerAction(action)).toBe(true);
     }
@@ -238,6 +252,20 @@ describe("validateRuleDefinition: error codes", () => {
       ],
       [{ all: [] }, []],
       [{ all: [] }, Array(11).fill(OK_ACTIONS[0])],
+      [leaf("memo", "matches", "{Bad}"), OK_ACTIONS],
+      [leaf("memo", "matches", "{a}{b}{c}{d}{e}{f}"), OK_ACTIONS],
+      [leaf("memo", "matches", "{a}x{a}"), OK_ACTIONS],
+      [
+        { all: [] },
+        [
+          {
+            type: "set_description",
+            template: "{nobody}",
+            mode: "replace",
+            onlyIfEmpty: false,
+          },
+        ],
+      ],
     ];
     for (const [c, a] of inputs) {
       for (const e of check(c, a)) seen.add(e.code);

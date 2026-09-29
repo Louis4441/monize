@@ -12,6 +12,7 @@ interface RuleRunRowSnapshot {
   categoryId?: string | null;
   payeeId?: string | null;
   payeeName?: string | null;
+  description?: string | null;
   tagIds?: string[];
 }
 
@@ -20,7 +21,8 @@ interface RuleRunRowSnapshot {
  * to the one in `afterData` (redo, which swaps the two before it gets here).
  *
  * The snapshot holds only the fields the run changed: category, payee with its
- * name, and the tag set. The rows are locked in ascending id order and checked
+ * name, description, and the tag set. A payee the run created stays: it is
+ * reference data, as when a form creates one. The rows are locked in ascending id order and checked
  * against the strict reconciled lock first (INV-RECONCILE-001: an undo alters
  * the row like the edit did), so a refusal leaves every row as it was. Every
  * write is scoped to the action's user.
@@ -48,11 +50,12 @@ export async function undoRuleRun(
     // A row deleted since the run has nothing to restore.
     if (!locked.has(row.id)) continue;
     const fields: Partial<
-      Pick<Transaction, "categoryId" | "payeeId" | "payeeName">
+      Pick<Transaction, "categoryId" | "payeeId" | "payeeName" | "description">
     > = {};
     if ("categoryId" in row) fields.categoryId = row.categoryId ?? null;
     if ("payeeId" in row) fields.payeeId = row.payeeId ?? null;
     if ("payeeName" in row) fields.payeeName = row.payeeName ?? null;
+    if ("description" in row) fields.description = row.description ?? null;
     if (Object.keys(fields).length > 0) {
       await manager.update(
         Transaction,

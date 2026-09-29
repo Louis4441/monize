@@ -197,7 +197,9 @@
       "remove_tags": "Видалити теги",
       "set_category": "Задати категорію",
       "set_payee": "Задати одержувача",
-      "request_ai_review": "Запросити перевірку ШІ"
+      "request_ai_review": "Запросити перевірку ШІ",
+      "set_payee_from_text": "Задати одержувача з тексту",
+      "set_description": "Задати опис"
     },
     "save": {
       "button": "Зберегти правило",
@@ -249,7 +251,11 @@
         "DUPLICATE_ACTION": "Правило може запросити перевірку ШІ лише один раз.",
         "REFERENCE_NOT_FOUND": "Вибраного тут елемента більше немає. Виберіть інший.",
         "NAME_REQUIRED": "Введіть назву правила.",
-        "UNKNOWN": "Ця частина недійсна."
+        "UNKNOWN": "Ця частина недійсна.",
+        "INVALID_CAPTURE": "Ім’я захоплення складається з малих літер і цифр, починається з літери й має не більше 20 символів.",
+        "TOO_MANY_CAPTURES": "В одному шаблоні може бути не більше 5 захоплень.",
+        "DUPLICATE_CAPTURE": "Кожне ім’я захоплення можна використати в правилі лише один раз.",
+        "UNKNOWN_CAPTURE": "У тексті використано захоплення, яке не визначено жодною умовою цього правила."
       }
     },
     "run": {
@@ -428,7 +434,9 @@
       "remove_tags": "Видалити теги: {tags}",
       "set_category": "Задати категорію: {name}{onlyIfEmpty, select, yes { (лише якщо порожньо)} other {}}",
       "set_payee": "Задати одержувача: {name}{onlyIfEmpty, select, yes { (лише якщо порожньо)} other {}}",
-      "request_ai_review": "Запросити перевірку ШІ: {instruction}"
+      "request_ai_review": "Запросити перевірку ШІ: {instruction}",
+      "set_payee_from_text": "Задати одержувача: «{template}»{createIfMissing, select, yes { (буде створено, якщо не знайдено)} other {}}{onlyIfEmpty, select, yes { (лише якщо порожньо)} other {}}",
+      "set_description": "{mode, select, append {Додати «{template}» у кінець опису} prepend {Додати «{template}» на початок опису} other {Задати опис: «{template}»}}{onlyIfEmpty, select, yes { (лише якщо порожньо)} other {}}"
     }
   }
 }
