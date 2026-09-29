@@ -1,0 +1,69 @@
+{
+  "page": {
+    "title": "Yapay zekâ inceleme kutusu",
+    "subtitle": "Bir kuralın yapay zekâya incelettirmek istediği işlemler ve bir asistanın onayınız için önerdiği değişiklikler."
+  },
+  "filter": {
+    "label": "Duruma göre filtrele",
+    "open": "Açık",
+    "pending": "Beklemede",
+    "claimed": "İncelemede",
+    "proposed": "Önerildi",
+    "applied": "Uygulandı",
+    "rejected": "Reddedildi",
+    "expired": "Süresi doldu"
+  },
+  "status": {
+    "pending": "Beklemede",
+    "claimed": "İncelemede",
+    "proposed": "Önerildi",
+    "applied": "Uygulandı",
+    "rejected": "Reddedildi",
+    "expired": "Süresi doldu"
+  },
+  "columns": {
+    "date": "Tarih",
+    "request": "İstek",
+    "amount": "Tutar",
+    "status": "Durum"
+  },
+  "row": {
+    "noPayee": "Alıcı yok",
+    "transactionMissing": "Bu işlem artık yok",
+    "rule": "Kural: {name}",
+    "manualRequest": "Elle istendi",
+    "agentNote": "Asistanın notu: {reason}",
+    "dates": "Oluşturulma {created}, bitiş {expires}",
+    "viewTransaction": "İşlemi görüntüle"
+  },
+  "actions": {
+    "dismiss": "Yoksay"
+  },
+  "proposal": {
+    "errorTitle": "Bu öneri artık uygulanamaz"
+  },
+  "dismissDialog": {
+    "title": "Bu istek yoksayılsın mı?",
+    "message": "Bu işlemi incelemesi için artık kimseden istekte bulunulmayacak. İşlemin kendisi değişmez.",
+    "confirm": "İsteği yoksay"
+  },
+  "loading": "İnceleme istekleri yükleniyor...",
+  "error": {
+    "title": "İnceleme istekleri yüklenemedi",
+    "body": "Liste yüklenmedi, bu yüzden boş olmayabilir. Bağlantınızı kontrol edip yeniden deneyin.",
+    "retry": "Yeniden dene"
+  },
+  "empty": {
+    "title": "İnceleme isteği yok",
+    "body": "İstekler, “Yapay zekâ incelemesi iste” eylemine sahip bir kural bir işlemle eşleştiğinde burada görünür. Bir yapay zekâ asistanı ya da aktarıcı ajan gibi bir MCP istemcisi kuyruğu işler ve onayınız için bir değişiklik önerir.",
+    "filteredTitle": "Bu durumda istek yok",
+    "filteredBody": "Diğer istekleri görmek için başka bir durum seçin."
+  },
+  "toasts": {
+    "approved": "Öneri uygulandı",
+    "dismissed": "İstek yoksayıldı",
+    "dismissFailed": "İstek yoksayılamadı",
+    "approveFailed": "Öneri uygulanamadı",
+    "changed": "Bu istek bu arada değişti. Liste yeniden yüklendi."
+  }
+}

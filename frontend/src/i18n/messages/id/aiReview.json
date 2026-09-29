@@ -1,0 +1,69 @@
+{
+  "page": {
+    "title": "Kotak masuk peninjauan AI",
+    "subtitle": "Transaksi yang diminta aturan untuk ditinjau AI, dan perubahan yang diusulkan asisten untuk Anda setujui."
+  },
+  "filter": {
+    "label": "Filter menurut status",
+    "open": "Terbuka",
+    "pending": "Menunggu",
+    "claimed": "Sedang ditinjau",
+    "proposed": "Diusulkan",
+    "applied": "Diterapkan",
+    "rejected": "Ditolak",
+    "expired": "Kedaluwarsa"
+  },
+  "status": {
+    "pending": "Menunggu",
+    "claimed": "Sedang ditinjau",
+    "proposed": "Diusulkan",
+    "applied": "Diterapkan",
+    "rejected": "Ditolak",
+    "expired": "Kedaluwarsa"
+  },
+  "columns": {
+    "date": "Tanggal",
+    "request": "Permintaan",
+    "amount": "Jumlah",
+    "status": "Status"
+  },
+  "row": {
+    "noPayee": "Tanpa penerima",
+    "transactionMissing": "Transaksi ini sudah tidak ada",
+    "rule": "Aturan: {name}",
+    "manualRequest": "Diminta secara manual",
+    "agentNote": "Catatan dari asisten: {reason}",
+    "dates": "Dibuat {created}, kedaluwarsa {expires}",
+    "viewTransaction": "Lihat transaksi"
+  },
+  "actions": {
+    "dismiss": "Abaikan"
+  },
+  "proposal": {
+    "errorTitle": "Usulan ini tidak dapat diterapkan lagi"
+  },
+  "dismissDialog": {
+    "title": "Abaikan permintaan ini?",
+    "message": "Tidak ada lagi yang akan diminta meninjau transaksi ini. Transaksinya sendiri tidak berubah.",
+    "confirm": "Abaikan permintaan"
+  },
+  "loading": "Memuat permintaan peninjauan...",
+  "error": {
+    "title": "Permintaan peninjauan tidak dapat dimuat",
+    "body": "Daftar tidak termuat, jadi mungkin tidak kosong. Periksa koneksi Anda dan coba lagi.",
+    "retry": "Coba lagi"
+  },
+  "empty": {
+    "title": "Tidak ada permintaan peninjauan",
+    "body": "Permintaan muncul di sini saat aturan dengan tindakan “Minta peninjauan AI” cocok dengan sebuah transaksi. Asisten AI, atau klien MCP seperti agen relai, memproses antrean dan mengusulkan perubahan untuk Anda setujui.",
+    "filteredTitle": "Tidak ada permintaan dengan status ini",
+    "filteredBody": "Pilih status lain untuk melihat permintaan lainnya."
+  },
+  "toasts": {
+    "approved": "Usulan diterapkan",
+    "dismissed": "Permintaan diabaikan",
+    "dismissFailed": "Permintaan tidak dapat diabaikan",
+    "approveFailed": "Usulan tidak dapat diterapkan",
+    "changed": "Permintaan ini berubah sementara itu. Daftar dimuat ulang."
+  }
+}

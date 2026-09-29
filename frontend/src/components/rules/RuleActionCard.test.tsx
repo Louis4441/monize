@@ -128,4 +128,14 @@ describe('RuleActionCard', () => {
     const grid = screen.getByLabelText('Action type').closest('.grid');
     expect(grid).toHaveClass('grid-cols-1');
   });
+
+  it('links the AI review action to the review inbox', () => {
+    render(<Card initial={createAction('request_ai_review')} />);
+    expect(screen.getByRole('link', { name: 'See the review inbox' })).toHaveAttribute('href', '/ai-reviews');
+  });
+
+  it('shows no inbox link on the other action types', () => {
+    render(<Card initial={createAction('add_tags')} />);
+    expect(screen.queryByRole('link', { name: 'See the review inbox' })).not.toBeInTheDocument();
+  });
 });

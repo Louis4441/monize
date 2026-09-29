@@ -15,6 +15,7 @@ import {
   Cog6ToothIcon,
   CurrencyDollarIcon,
   HashtagIcon,
+  InboxStackIcon,
   LightBulbIcon,
   ServerStackIcon,
   ShieldCheckIcon,
@@ -30,6 +31,8 @@ export interface NavLinkDef {
   /** Translation key in the `navigation` namespace. */
   labelKey: string;
   badge?: string;
+  /** Hidden while acting as a delegate: the API refuses a delegate session on the route. */
+  ownerOnly?: boolean;
 }
 
 /**
@@ -74,6 +77,7 @@ export const ADMIN_LINKS: NavLinkDef[] = [
 export const AI_LINKS: NavLinkDef[] = [
   { href: '/insights', labelKey: 'insights' },
   { href: '/ai', labelKey: 'aiAssistant' },
+  { href: '/ai-reviews', labelKey: 'aiReviews', ownerOnly: true },
 ];
 
 /** Icon per route, including the fixed drawer entries outside the arrays. */
@@ -87,6 +91,7 @@ export const NAV_ICONS: Record<string, NavIcon> = {
   '/reports': ChartBarIcon,
   '/insights': LightBulbIcon,
   '/ai': ChatBubbleLeftRightIcon,
+  '/ai-reviews': InboxStackIcon,
   '/categories': TagIcon,
   '/payees': UsersIcon,
   '/institutions': BuildingOffice2Icon,

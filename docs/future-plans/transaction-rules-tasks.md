@@ -47,7 +47,7 @@
 | F5 | Expression mode (CEL-syntax view of the same tree, no new dependency) | F2 | inert | [x] |
 | R1 | `ai_review_requests` table, enqueue from `request_ai_review` in the applier, expiry cron | D1, B4 | inert | [x] expiry cron open (same decision as B8) |
 | R2 | MCP and assistant tools: list, claim, submit proposal; proposal stored as a signed `PendingAiAction` | R1, A1 | inert | [x] |
-| R3 | Review inbox in the UI: pending, proposed (confirmation card), expired | R2, F1 | inert | [ ] |
+| R3 | Review inbox in the UI: pending, proposed (confirmation card), expired | R2, F1 | inert | [x] |
 | E1 | E2E: create a rule, import a QIF, see the tag | F2, B6 | none | [ ] |
 | Q1 | `docs/system-invariants.md` entries, doc lines, README feature line | B7 | none | [x] |
 | Q2 | Translate every locale | F4 | none | [x] done per task; native review of the translations open |

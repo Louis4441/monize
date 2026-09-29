@@ -189,7 +189,8 @@
       "instructionHelp": "La regla solo pide una revisión. Una persona aprueba cualquier cambio antes de que se realice.",
       "onlyIfEmpty": "Solo si está vacío",
       "onlyIfEmptyHelp": "Si está activado, la regla rellena la categoría o el beneficiario solo cuando la transacción no tiene ninguno. No reemplaza uno establecido a mano ni por la categoría predeterminada del beneficiario. Desactívalo para reemplazarlo.",
-      "add": "+ Añadir acción"
+      "add": "+ Añadir acción",
+      "reviewInbox": "Ver la bandeja de revisión"
     },
     "actionTypes": {
       "add_tags": "Añadir etiquetas",

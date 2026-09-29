@@ -1,0 +1,69 @@
+{
+  "page": {
+    "title": "[XX-AI review inbox-XX]",
+    "subtitle": "[XX-Transactions a rule asked an AI to review, and the edits an assistant proposed for you to approve.-XX]"
+  },
+  "filter": {
+    "label": "[XX-Filter by status-XX]",
+    "open": "[XX-Open-XX]",
+    "pending": "[XX-Pending-XX]",
+    "claimed": "[XX-In review-XX]",
+    "proposed": "[XX-Proposed-XX]",
+    "applied": "[XX-Applied-XX]",
+    "rejected": "[XX-Rejected-XX]",
+    "expired": "[XX-Expired-XX]"
+  },
+  "status": {
+    "pending": "[XX-Pending-XX]",
+    "claimed": "[XX-In review-XX]",
+    "proposed": "[XX-Proposed-XX]",
+    "applied": "[XX-Applied-XX]",
+    "rejected": "[XX-Rejected-XX]",
+    "expired": "[XX-Expired-XX]"
+  },
+  "columns": {
+    "date": "[XX-Date-XX]",
+    "request": "[XX-Request-XX]",
+    "amount": "[XX-Amount-XX]",
+    "status": "[XX-Status-XX]"
+  },
+  "row": {
+    "noPayee": "[XX-No payee-XX]",
+    "transactionMissing": "[XX-This transaction no longer exists-XX]",
+    "rule": "[XX-Rule: {name}-XX]",
+    "manualRequest": "[XX-Requested manually-XX]",
+    "agentNote": "[XX-Note from the assistant: {reason}-XX]",
+    "dates": "[XX-Created {created}, expires {expires}-XX]",
+    "viewTransaction": "[XX-View transaction-XX]"
+  },
+  "actions": {
+    "dismiss": "[XX-Dismiss-XX]"
+  },
+  "proposal": {
+    "errorTitle": "[XX-This proposal can no longer be applied-XX]"
+  },
+  "dismissDialog": {
+    "title": "[XX-Dismiss this request?-XX]",
+    "message": "[XX-Nobody will be asked to review this transaction again. The transaction itself is not changed.-XX]",
+    "confirm": "[XX-Dismiss request-XX]"
+  },
+  "loading": "[XX-Loading review requests...-XX]",
+  "error": {
+    "title": "[XX-Could not load the review requests-XX]",
+    "body": "[XX-The list did not load, so it may not be empty. Check your connection and try again.-XX]",
+    "retry": "[XX-Try again-XX]"
+  },
+  "empty": {
+    "title": "[XX-No review requests-XX]",
+    "body": "[XX-Requests appear here when a rule with the Ask for an AI review action matches a transaction. An AI assistant, or an MCP client such as the relay agent, works through the queue and proposes an edit for you to approve.-XX]",
+    "filteredTitle": "[XX-No requests with this status-XX]",
+    "filteredBody": "[XX-Choose another status to see other requests.-XX]"
+  },
+  "toasts": {
+    "approved": "[XX-Proposal applied-XX]",
+    "dismissed": "[XX-Request dismissed-XX]",
+    "dismissFailed": "[XX-Could not dismiss the request-XX]",
+    "approveFailed": "[XX-Could not apply the proposal-XX]",
+    "changed": "[XX-This request changed in the meantime. The list was reloaded.-XX]"
+  }
+}

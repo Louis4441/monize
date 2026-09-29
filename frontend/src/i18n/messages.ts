@@ -26,6 +26,7 @@ const NAMESPACES = [
   "accountDetail-fxFees",
   "admin",
   "ai",
+  "aiReview",
   "bills",
   "budgets",
   "calendar",

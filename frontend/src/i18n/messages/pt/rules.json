@@ -189,7 +189,8 @@
       "instructionHelp": "A regra limita-se a pedir uma revisão. Uma pessoa aprova qualquer alteração antes de esta ser feita.",
       "onlyIfEmpty": "Apenas se vazio",
       "onlyIfEmptyHelp": "Quando ativado, a regra preenche a categoria ou o beneficiário apenas se a transação não tiver nenhum. Não substitui um valor definido manualmente ou pela categoria predefinida do beneficiário. Desative para o substituir.",
-      "add": "+ Adicionar ação"
+      "add": "+ Adicionar ação",
+      "reviewInbox": "Ver a caixa de revisão"
     },
     "actionTypes": {
       "add_tags": "Adicionar etiquetas",

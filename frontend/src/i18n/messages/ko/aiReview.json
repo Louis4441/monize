@@ -1,0 +1,69 @@
+{
+  "page": {
+    "title": "AI 검토 수신함",
+    "subtitle": "규칙이 AI에게 검토를 요청한 거래와, 어시스턴트가 승인용으로 제안한 변경 사항입니다."
+  },
+  "filter": {
+    "label": "상태별 필터",
+    "open": "진행 중",
+    "pending": "대기 중",
+    "claimed": "검토 중",
+    "proposed": "제안됨",
+    "applied": "적용됨",
+    "rejected": "거부됨",
+    "expired": "만료됨"
+  },
+  "status": {
+    "pending": "대기 중",
+    "claimed": "검토 중",
+    "proposed": "제안됨",
+    "applied": "적용됨",
+    "rejected": "거부됨",
+    "expired": "만료됨"
+  },
+  "columns": {
+    "date": "날짜",
+    "request": "요청",
+    "amount": "금액",
+    "status": "상태"
+  },
+  "row": {
+    "noPayee": "수취인 없음",
+    "transactionMissing": "이 거래는 더 이상 존재하지 않습니다",
+    "rule": "규칙: {name}",
+    "manualRequest": "수동으로 요청됨",
+    "agentNote": "어시스턴트의 메모: {reason}",
+    "dates": "생성 {created}, 만료 {expires}",
+    "viewTransaction": "거래 보기"
+  },
+  "actions": {
+    "dismiss": "무시"
+  },
+  "proposal": {
+    "errorTitle": "이 제안은 더 이상 적용할 수 없습니다"
+  },
+  "dismissDialog": {
+    "title": "이 요청을 무시할까요?",
+    "message": "이 거래를 검토해 달라는 요청은 더 이상 없습니다. 거래 자체는 변경되지 않습니다.",
+    "confirm": "요청 무시"
+  },
+  "loading": "검토 요청을 불러오는 중...",
+  "error": {
+    "title": "검토 요청을 불러오지 못했습니다",
+    "body": "목록을 불러오지 못했으므로 비어 있지 않을 수 있습니다. 연결을 확인하고 다시 시도하세요.",
+    "retry": "다시 시도"
+  },
+  "empty": {
+    "title": "검토 요청이 없습니다",
+    "body": "'AI 검토 요청' 동작이 있는 규칙이 거래와 일치하면 요청이 여기에 표시됩니다. AI 어시스턴트 또는 릴레이 에이전트 같은 MCP 클라이언트가 대기열을 처리하고 승인용 변경을 제안합니다.",
+    "filteredTitle": "이 상태의 요청이 없습니다",
+    "filteredBody": "다른 요청을 보려면 다른 상태를 선택하세요."
+  },
+  "toasts": {
+    "approved": "제안이 적용되었습니다",
+    "dismissed": "요청을 무시했습니다",
+    "dismissFailed": "요청을 무시하지 못했습니다",
+    "approveFailed": "제안을 적용하지 못했습니다",
+    "changed": "그 사이에 이 요청이 변경되었습니다. 목록을 다시 불러왔습니다."
+  }
+}

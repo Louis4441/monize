@@ -12,6 +12,8 @@ interface TransactionConfirmationCardProps {
   action: PendingAction;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Replaces the footer's "Cancel" where the host's negative answer means something else (the review inbox's "Dismiss"). */
+  cancelLabel?: string;
 }
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -29,6 +31,7 @@ export function TransactionConfirmationCard({
   action,
   onConfirm,
   onCancel,
+  cancelLabel,
 }: TransactionConfirmationCardProps) {
   const t = useTranslations('ai');
   const { formatCurrency, formatCurrencyPrecise, formatQuantity, formatBytes } =
@@ -419,7 +422,7 @@ export function TransactionConfirmationCard({
         {status === 'pending' && (
           <div className="flex gap-2 justify-end">
             <Button variant="outline" size="sm" onClick={onCancel}>
-              {t('confirmAction.cancel')}
+              {cancelLabel ?? t('confirmAction.cancel')}
             </Button>
             <Button variant="primary" size="sm" onClick={onConfirm}>
               {t('confirmAction.approve')}

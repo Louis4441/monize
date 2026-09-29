@@ -189,7 +189,8 @@
       "instructionHelp": "The rule only asks for a review. A person approves any change before it is made.",
       "onlyIfEmpty": "Only if empty",
       "onlyIfEmptyHelp": "When on, the rule fills in the category or payee only if the transaction has none. It does not replace one set by hand or by the payee's default category. Turn it off to replace it.",
-      "add": "+ Add action"
+      "add": "+ Add action",
+      "reviewInbox": "See the review inbox"
     },
     "actionTypes": {
       "add_tags": "Add tags",

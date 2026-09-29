@@ -189,7 +189,8 @@
       "instructionHelp": "Aturan hanya meminta peninjauan. Seseorang menyetujui setiap perubahan sebelum dilakukan.",
       "onlyIfEmpty": "Hanya jika kosong",
       "onlyIfEmptyHelp": "Jika aktif, aturan mengisi kategori atau penerima hanya bila transaksi belum memilikinya. Aturan tidak menggantikan nilai yang diatur secara manual atau oleh kategori bawaan penerima. Nonaktifkan untuk menggantikannya.",
-      "add": "+ Tambah tindakan"
+      "add": "+ Tambah tindakan",
+      "reviewInbox": "Lihat kotak masuk peninjauan"
     },
     "actionTypes": {
       "add_tags": "Tambah tag",

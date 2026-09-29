@@ -189,7 +189,8 @@
       "instructionHelp": "La règle ne fait que demander une vérification. Une personne approuve toute modification avant qu'elle soit effectuée.",
       "onlyIfEmpty": "Seulement si vide",
       "onlyIfEmptyHelp": "Si cette option est activée, la règle renseigne la catégorie ou le bénéficiaire uniquement lorsque la transaction n'en a pas. Elle ne remplace pas une valeur définie à la main ou par la catégorie par défaut du bénéficiaire. Désactivez-la pour la remplacer.",
-      "add": "+ Ajouter une action"
+      "add": "+ Ajouter une action",
+      "reviewInbox": "Voir la boîte de révision"
     },
     "actionTypes": {
       "add_tags": "Ajouter des tags",

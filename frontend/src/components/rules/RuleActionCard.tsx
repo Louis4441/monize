@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { RuleCardShell } from '@/components/rules/RuleCardShell';
 import type { RuleOptions } from '@/components/rules/use-rule-options';
@@ -97,6 +98,9 @@ function ActionParameters({ action, options, onChange }: Pick<RuleActionCardProp
             className={cn(inputBaseClasses, 'border px-3 py-2 font-sans focus-visible:ring-1 focus-visible:outline-none')}
           />
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('action.instructionHelp')}</p>
+          <Link href="/ai-reviews" className="mt-1 inline-block text-xs text-blue-600 hover:underline dark:text-blue-400">
+            {t('action.reviewInbox')}
+          </Link>
         </div>
       );
   }

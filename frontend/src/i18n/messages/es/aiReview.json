@@ -1,0 +1,69 @@
+{
+  "page": {
+    "title": "Bandeja de revisión de IA",
+    "subtitle": "Transacciones que una regla pidió revisar a una IA y las modificaciones que un asistente propone para que las apruebes."
+  },
+  "filter": {
+    "label": "Filtrar por estado",
+    "open": "Abiertas",
+    "pending": "Pendiente",
+    "claimed": "En revisión",
+    "proposed": "Propuesta",
+    "applied": "Aplicada",
+    "rejected": "Rechazada",
+    "expired": "Caducada"
+  },
+  "status": {
+    "pending": "Pendiente",
+    "claimed": "En revisión",
+    "proposed": "Propuesta",
+    "applied": "Aplicada",
+    "rejected": "Rechazada",
+    "expired": "Caducada"
+  },
+  "columns": {
+    "date": "Fecha",
+    "request": "Solicitud",
+    "amount": "Importe",
+    "status": "Estado"
+  },
+  "row": {
+    "noPayee": "Sin beneficiario",
+    "transactionMissing": "Esta transacción ya no existe",
+    "rule": "Regla: {name}",
+    "manualRequest": "Solicitada manualmente",
+    "agentNote": "Nota del asistente: {reason}",
+    "dates": "Creada el {created}, caduca el {expires}",
+    "viewTransaction": "Ver transacción"
+  },
+  "actions": {
+    "dismiss": "Descartar"
+  },
+  "proposal": {
+    "errorTitle": "Esta propuesta ya no se puede aplicar"
+  },
+  "dismissDialog": {
+    "title": "¿Descartar esta solicitud?",
+    "message": "Nadie volverá a recibir la petición de revisar esta transacción. La transacción no se modifica.",
+    "confirm": "Descartar solicitud"
+  },
+  "loading": "Cargando solicitudes de revisión...",
+  "error": {
+    "title": "No se pudieron cargar las solicitudes de revisión",
+    "body": "La lista no se cargó, así que puede que no esté vacía. Comprueba tu conexión e inténtalo de nuevo.",
+    "retry": "Reintentar"
+  },
+  "empty": {
+    "title": "No hay solicitudes de revisión",
+    "body": "Las solicitudes aparecen aquí cuando una regla con la acción «Pedir una revisión de IA» coincide con una transacción. Un asistente de IA, o un cliente MCP como el agente de retransmisión, procesa la cola y propone una modificación para que la apruebes.",
+    "filteredTitle": "No hay solicitudes con este estado",
+    "filteredBody": "Elige otro estado para ver otras solicitudes."
+  },
+  "toasts": {
+    "approved": "Propuesta aplicada",
+    "dismissed": "Solicitud descartada",
+    "dismissFailed": "No se pudo descartar la solicitud",
+    "approveFailed": "No se pudo aplicar la propuesta",
+    "changed": "Esta solicitud cambió mientras tanto. Se volvió a cargar la lista."
+  }
+}

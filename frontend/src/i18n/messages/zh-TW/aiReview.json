@@ -1,0 +1,69 @@
+{
+  "page": {
+    "title": "AI 審核收件匣",
+    "subtitle": "規則請求 AI 審核的交易，以及助理提出、等待您核准的修改。"
+  },
+  "filter": {
+    "label": "依狀態篩選",
+    "open": "未完成",
+    "pending": "待處理",
+    "claimed": "審核中",
+    "proposed": "已提議",
+    "applied": "已套用",
+    "rejected": "已拒絕",
+    "expired": "已過期"
+  },
+  "status": {
+    "pending": "待處理",
+    "claimed": "審核中",
+    "proposed": "已提議",
+    "applied": "已套用",
+    "rejected": "已拒絕",
+    "expired": "已過期"
+  },
+  "columns": {
+    "date": "日期",
+    "request": "請求",
+    "amount": "金額",
+    "status": "狀態"
+  },
+  "row": {
+    "noPayee": "無收款人",
+    "transactionMissing": "此交易已不存在",
+    "rule": "規則：{name}",
+    "manualRequest": "手動請求",
+    "agentNote": "助理備註：{reason}",
+    "dates": "建立於 {created}，到期於 {expires}",
+    "viewTransaction": "檢視交易"
+  },
+  "actions": {
+    "dismiss": "忽略"
+  },
+  "proposal": {
+    "errorTitle": "此提議已無法套用"
+  },
+  "dismissDialog": {
+    "title": "忽略此請求？",
+    "message": "不會再有人被要求審核這筆交易。交易本身不會變更。",
+    "confirm": "忽略請求"
+  },
+  "loading": "正在載入審核請求...",
+  "error": {
+    "title": "無法載入審核請求",
+    "body": "清單未能載入，因此可能並非空白。請檢查網路連線後重試。",
+    "retry": "重試"
+  },
+  "empty": {
+    "title": "沒有審核請求",
+    "body": "當帶有「請求 AI 審核」動作的規則符合某筆交易時，請求會出現在這裡。AI 助理或中繼代理等 MCP 用戶端會處理佇列，並提出修改供您核准。",
+    "filteredTitle": "沒有此狀態的請求",
+    "filteredBody": "選擇其他狀態以檢視其他請求。"
+  },
+  "toasts": {
+    "approved": "提議已套用",
+    "dismissed": "請求已忽略",
+    "dismissFailed": "無法忽略該請求",
+    "approveFailed": "無法套用該提議",
+    "changed": "此請求在此期間已變更。清單已重新載入。"
+  }
+}

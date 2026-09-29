@@ -189,7 +189,8 @@
       "instructionHelp": "La regola si limita a richiedere una revisione. Una persona approva ogni modifica prima che venga applicata.",
       "onlyIfEmpty": "Solo se vuoto",
       "onlyIfEmptyHelp": "Se attivo, la regola compila la categoria o il beneficiario solo quando la transazione non ne ha. Non sostituisce un valore impostato a mano o dalla categoria predefinita del beneficiario. Disattivalo per sostituirlo.",
-      "add": "+ Aggiungi azione"
+      "add": "+ Aggiungi azione",
+      "reviewInbox": "Vedi la posta di revisione"
     },
     "actionTypes": {
       "add_tags": "Aggiungi tag",

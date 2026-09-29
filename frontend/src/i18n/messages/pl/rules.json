@@ -189,7 +189,8 @@
       "instructionHelp": "Reguła tylko prosi o sprawdzenie. Każdą zmianę zatwierdza człowiek, zanim zostanie wprowadzona.",
       "onlyIfEmpty": "Tylko jeśli puste",
       "onlyIfEmptyHelp": "Gdy włączone, reguła uzupełnia kategorię lub odbiorcę tylko wtedy, gdy transakcja ich nie ma. Nie zastępuje wartości ustawionej ręcznie ani domyślną kategorią odbiorcy. Wyłącz, aby zastępować.",
-      "add": "+ Dodaj akcję"
+      "add": "+ Dodaj akcję",
+      "reviewInbox": "Zobacz skrzynkę przeglądów"
     },
     "actionTypes": {
       "add_tags": "Dodaj tagi",

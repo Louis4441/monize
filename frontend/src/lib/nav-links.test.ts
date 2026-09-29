@@ -28,6 +28,14 @@ describe('nav-links', () => {
     expect(NAV_ICONS['/rules']).toBeTruthy();
   });
 
+  it('puts the review inbox in the AI menu, owner-only, with an icon', () => {
+    expect(AI_LINKS).toContainEqual({ href: '/ai-reviews', labelKey: 'aiReviews', ownerOnly: true });
+    expect(NAV_ICONS['/ai-reviews']).toBeTruthy();
+    expect([...NAV_LINKS, ...TOOLS_LINKS, ...AI_LINKS].filter((l) => l.ownerOnly).map((l) => l.href)).toEqual([
+      '/ai-reviews',
+    ]);
+  });
+
   it('has a navigation label for every link', () => {
     const catalog = navigation as Record<string, unknown>;
     const missing = [...NAV_LINKS, ...TOOLS_LINKS, ...AI_LINKS]

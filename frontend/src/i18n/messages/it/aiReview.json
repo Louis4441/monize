@@ -1,0 +1,69 @@
+{
+  "page": {
+    "title": "Posta di revisione IA",
+    "subtitle": "Le transazioni che una regola ha chiesto a un'IA di rivedere e le modifiche che un assistente propone per la tua approvazione."
+  },
+  "filter": {
+    "label": "Filtra per stato",
+    "open": "Aperte",
+    "pending": "In attesa",
+    "claimed": "In revisione",
+    "proposed": "Proposta",
+    "applied": "Applicata",
+    "rejected": "Rifiutata",
+    "expired": "Scaduta"
+  },
+  "status": {
+    "pending": "In attesa",
+    "claimed": "In revisione",
+    "proposed": "Proposta",
+    "applied": "Applicata",
+    "rejected": "Rifiutata",
+    "expired": "Scaduta"
+  },
+  "columns": {
+    "date": "Data",
+    "request": "Richiesta",
+    "amount": "Importo",
+    "status": "Stato"
+  },
+  "row": {
+    "noPayee": "Nessun beneficiario",
+    "transactionMissing": "Questa transazione non esiste più",
+    "rule": "Regola: {name}",
+    "manualRequest": "Richiesta manualmente",
+    "agentNote": "Nota dell'assistente: {reason}",
+    "dates": "Creata il {created}, scade il {expires}",
+    "viewTransaction": "Vedi transazione"
+  },
+  "actions": {
+    "dismiss": "Ignora"
+  },
+  "proposal": {
+    "errorTitle": "Questa proposta non può più essere applicata"
+  },
+  "dismissDialog": {
+    "title": "Ignorare questa richiesta?",
+    "message": "A nessuno verrà più chiesto di rivedere questa transazione. La transazione stessa non viene modificata.",
+    "confirm": "Ignora richiesta"
+  },
+  "loading": "Caricamento delle richieste di revisione...",
+  "error": {
+    "title": "Impossibile caricare le richieste di revisione",
+    "body": "L'elenco non è stato caricato, quindi potrebbe non essere vuoto. Controlla la connessione e riprova.",
+    "retry": "Riprova"
+  },
+  "empty": {
+    "title": "Nessuna richiesta di revisione",
+    "body": "Le richieste compaiono qui quando una regola con l'azione «Richiedi una revisione dell'IA» corrisponde a una transazione. Un assistente IA, o un client MCP come l'agente relay, elabora la coda e propone una modifica da approvare.",
+    "filteredTitle": "Nessuna richiesta con questo stato",
+    "filteredBody": "Scegli un altro stato per vedere altre richieste."
+  },
+  "toasts": {
+    "approved": "Proposta applicata",
+    "dismissed": "Richiesta ignorata",
+    "dismissFailed": "Impossibile ignorare la richiesta",
+    "approveFailed": "Impossibile applicare la proposta",
+    "changed": "Questa richiesta è cambiata nel frattempo. L'elenco è stato ricaricato."
+  }
+}

@@ -189,7 +189,8 @@
       "instructionHelp": "Die Regel bittet nur um eine Prüfung. Eine Person bestätigt jede Änderung, bevor sie vorgenommen wird.",
       "onlyIfEmpty": "Nur wenn leer",
       "onlyIfEmptyHelp": "Wenn aktiviert, füllt die Regel Kategorie oder Zahlungsempfänger nur aus, wenn die Transaktion keine hat. Ein von Hand oder durch die Standardkategorie des Zahlungsempfängers gesetzter Wert wird nicht ersetzt. Deaktivieren Sie die Option, um ihn zu ersetzen.",
-      "add": "+ Aktion hinzufügen"
+      "add": "+ Aktion hinzufügen",
+      "reviewInbox": "Zum Prüfungseingang"
     },
     "actionTypes": {
       "add_tags": "Tags hinzufügen",

@@ -189,7 +189,8 @@
       "instructionHelp": "Quy tắc chỉ yêu cầu xem xét. Một người sẽ duyệt mọi thay đổi trước khi thực hiện.",
       "onlyIfEmpty": "Chỉ khi trống",
       "onlyIfEmptyHelp": "Khi bật, quy tắc chỉ điền danh mục hoặc người nhận nếu giao dịch chưa có. Quy tắc không thay thế giá trị đã đặt thủ công hoặc theo danh mục mặc định của người nhận. Hãy tắt để thay thế.",
-      "add": "+ Thêm hành động"
+      "add": "+ Thêm hành động",
+      "reviewInbox": "Xem hộp thư xem xét"
     },
     "actionTypes": {
       "add_tags": "Thêm thẻ",

@@ -189,7 +189,8 @@
       "instructionHelp": "De regel vraagt alleen om een controle. Een persoon keurt elke wijziging goed voordat ze wordt doorgevoerd.",
       "onlyIfEmpty": "Alleen als leeg",
       "onlyIfEmptyHelp": "Indien ingeschakeld vult de regel de categorie of begunstigde alleen in als de transactie er geen heeft. Een met de hand of via de standaardcategorie van de begunstigde ingestelde waarde wordt niet vervangen. Schakel uit om te vervangen.",
-      "add": "+ Actie toevoegen"
+      "add": "+ Actie toevoegen",
+      "reviewInbox": "Naar het controlepostvak"
     },
     "actionTypes": {
       "add_tags": "Tags toevoegen",

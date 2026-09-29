@@ -1,0 +1,69 @@
+{
+  "page": {
+    "title": "Caixa de revisão de IA",
+    "subtitle": "Transações que uma regra pediu para uma IA revisar e as alterações que um assistente propõe para a sua aprovação."
+  },
+  "filter": {
+    "label": "Filtrar por status",
+    "open": "Abertos",
+    "pending": "Pendente",
+    "claimed": "Em revisão",
+    "proposed": "Proposto",
+    "applied": "Aplicado",
+    "rejected": "Rejeitado",
+    "expired": "Expirado"
+  },
+  "status": {
+    "pending": "Pendente",
+    "claimed": "Em revisão",
+    "proposed": "Proposto",
+    "applied": "Aplicado",
+    "rejected": "Rejeitado",
+    "expired": "Expirado"
+  },
+  "columns": {
+    "date": "Data",
+    "request": "Solicitação",
+    "amount": "Valor",
+    "status": "Status"
+  },
+  "row": {
+    "noPayee": "Sem beneficiário",
+    "transactionMissing": "Esta transação não existe mais",
+    "rule": "Regra: {name}",
+    "manualRequest": "Solicitado manualmente",
+    "agentNote": "Nota do assistente: {reason}",
+    "dates": "Criado em {created}, expira em {expires}",
+    "viewTransaction": "Ver transação"
+  },
+  "actions": {
+    "dismiss": "Dispensar"
+  },
+  "proposal": {
+    "errorTitle": "Esta proposta não pode mais ser aplicada"
+  },
+  "dismissDialog": {
+    "title": "Dispensar esta solicitação?",
+    "message": "Ninguém será solicitado novamente a revisar esta transação. A transação em si não é alterada.",
+    "confirm": "Dispensar solicitação"
+  },
+  "loading": "Carregando as solicitações de revisão...",
+  "error": {
+    "title": "Não foi possível carregar as solicitações de revisão",
+    "body": "A lista não foi carregada, então pode não estar vazia. Verifique sua conexão e tente novamente.",
+    "retry": "Tentar novamente"
+  },
+  "empty": {
+    "title": "Nenhuma solicitação de revisão",
+    "body": "As solicitações aparecem aqui quando uma regra com a ação «Pedir uma revisão da IA» corresponde a uma transação. Um assistente de IA, ou um cliente MCP como o agente de retransmissão, processa a fila e propõe uma alteração para você aprovar.",
+    "filteredTitle": "Nenhuma solicitação com este status",
+    "filteredBody": "Escolha outro status para ver outras solicitações."
+  },
+  "toasts": {
+    "approved": "Proposta aplicada",
+    "dismissed": "Solicitação dispensada",
+    "dismissFailed": "Não foi possível dispensar a solicitação",
+    "approveFailed": "Não foi possível aplicar a proposta",
+    "changed": "Esta solicitação mudou nesse meio tempo. A lista foi recarregada."
+  }
+}

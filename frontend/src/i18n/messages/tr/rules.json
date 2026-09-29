@@ -189,7 +189,8 @@
       "instructionHelp": "Kural yalnızca bir inceleme ister. Yapılacak her değişikliği yapılmadan önce bir kişi onaylar.",
       "onlyIfEmpty": "Yalnızca boşsa",
       "onlyIfEmptyHelp": "Açıkken kural, kategoriyi veya alıcıyı yalnızca işlemde yoksa doldurur. Elle ya da alıcının varsayılan kategorisiyle ayarlanmış bir değerin yerine geçmez. Değiştirmek için kapatın.",
-      "add": "+ Eylem ekle"
+      "add": "+ Eylem ekle",
+      "reviewInbox": "İnceleme kutusunu gör"
     },
     "actionTypes": {
       "add_tags": "Etiket ekle",
