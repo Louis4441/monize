@@ -14,6 +14,7 @@ import { NetWorthModule } from "../net-worth/net-worth.module";
 import { SecuritiesModule } from "../securities/securities.module";
 import { CurrenciesModule } from "../currencies/currencies.module";
 import { UsersModule } from "../users/users.module";
+import { TransactionRulesModule } from "../transaction-rules/transaction-rules.module";
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { UsersModule } from "../users/users.module";
     forwardRef(() => SecuritiesModule),
     forwardRef(() => CurrenciesModule),
     forwardRef(() => UsersModule),
+    TransactionRulesModule,
   ],
   controllers: [ImportController, MnyImportController],
   providers: [

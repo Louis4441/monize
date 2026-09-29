@@ -32,6 +32,7 @@ import {
 import { writeBills } from "./writers/write-bills";
 import { writeLoans } from "./writers/write-loans";
 import { HoldingsService } from "../../securities/holdings.service";
+import { TransactionRulesApplierService } from "../../transaction-rules/transaction-rules-applier.service";
 
 jest.mock("../../common/db/scoped-db", () => ({
   withScopedDb: jest.fn(),
@@ -152,6 +153,7 @@ function parsedFile(overrides: Partial<MnyParsedFile> = {}): MnyParsedFile {
       transfersLinked: 4,
       skipped: 1,
       deferredInvestments: 2,
+      investmentCashSources: new Map(),
       warnings: [],
     },
     categories: {
@@ -250,6 +252,7 @@ describe("MnyImportService", () => {
   let usersService: Record<string, jest.Mock>;
   let currencies: Record<string, jest.Mock>;
   let holdingsService: Record<string, jest.Mock>;
+  let rulesApplier: Record<string, jest.Mock>;
   let accountRepo: Record<string, jest.Mock>;
   let preferenceRepo: Record<string, jest.Mock>;
   let service: MnyImportService;
@@ -351,6 +354,11 @@ describe("MnyImportService", () => {
       rebuildAccountsFromTransactions: jest.fn().mockResolvedValue(undefined),
     };
 
+    rulesApplier = {
+      loadRulesFor: jest.fn().mockResolvedValue([]),
+      applyToNew: jest.fn().mockResolvedValue([]),
+    };
+
     service = new MnyImportService(
       {} as DataSource,
       staging as unknown as MnyStagingService,
@@ -360,6 +368,7 @@ describe("MnyImportService", () => {
       usersService as unknown as UsersService,
       currencies as unknown as CurrenciesService,
       holdingsService as unknown as HoldingsService,
+      rulesApplier as unknown as TransactionRulesApplierService,
     );
     jest.spyOn(service["logger"], "log").mockImplementation(() => undefined);
     jest.spyOn(service["logger"], "error").mockImplementation(() => undefined);
@@ -910,6 +919,103 @@ describe("MnyImportService", () => {
       );
 
       expect(result.existingDataRemoved).toBe(true);
+    });
+  });
+
+  describe("transaction rules", () => {
+    const mapped = (id: string, over: Record<string, unknown> = {}) => ({
+      id,
+      handle: 1,
+      accountKey: "acct-1",
+      transactionDate: "2025-01-15",
+      amount: -10,
+      currencyCode: "CAD",
+      status: "UNRECONCILED",
+      payeeHandle: 5,
+      categoryHandle: null,
+      description: null,
+      referenceNumber: null,
+      isTransfer: false,
+      linkedTransactionId: null,
+      splits: [],
+      collapsedTradeHandle: null,
+      ...over,
+    });
+
+    it("runs one bulk pass over the regular rows, after writeTransactions and before the investments", async () => {
+      const rules = [{ id: "rule-1" }];
+      rulesApplier.loadRulesFor.mockResolvedValue(rules);
+      const base = parsedFile();
+      parser.parse.mockReturnValue({
+        ...base,
+        transactions: {
+          ...base.transactions,
+          transactions: [
+            mapped("tx-1"),
+            mapped("tx-2", { payeeHandle: null }),
+            mapped("tx-transfer", { isTransfer: true }),
+            mapped("tx-cash", {}),
+          ],
+          investmentCashSources: new Map([
+            [
+              9,
+              {
+                transactionId: "tx-cash",
+                splitId: null,
+              },
+            ],
+          ]),
+        },
+      });
+      mockedWriteTransactions.mockResolvedValue({
+        transactionsCreated: 4,
+        splitsCreated: 0,
+        linksApplied: 0,
+        affectedAccountIds: new Set(["account-1"]),
+        writtenTransactionIds: new Set([
+          "tx-1",
+          "tx-2",
+          "tx-transfer",
+          "tx-cash",
+        ]),
+        writtenSplitIds: new Set<string>(),
+      });
+
+      await service.runImport(
+        "user-1",
+        "staged-1",
+        DEFAULT_MNY_IMPORT_OPTIONS,
+        context,
+      );
+
+      expect(rulesApplier.loadRulesFor).toHaveBeenCalledTimes(1);
+      expect(rulesApplier.applyToNew).toHaveBeenCalledTimes(1);
+      const [manager, userId, ids, source, options] =
+        rulesApplier.applyToNew.mock.calls[0];
+      expect(manager).toBeDefined();
+      expect(userId).toBe("user-1");
+      expect(ids).toEqual(["tx-1", "tx-2"]);
+      expect(source).toBe("import");
+      expect(options.rules).toBe(rules);
+      expect(options.payeeTextById.get("tx-1")).toBe("Loblaws");
+      expect(options.payeeTextById.get("tx-2")).toBeNull();
+      expect(
+        rulesApplier.applyToNew.mock.invocationCallOrder[0],
+      ).toBeGreaterThan(mockedWriteTransactions.mock.invocationCallOrder[0]);
+      expect(rulesApplier.applyToNew.mock.invocationCallOrder[0]).toBeLessThan(
+        mockedWriteInvestments.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("does nothing when no row was written", async () => {
+      await service.runImport(
+        "user-1",
+        "staged-1",
+        DEFAULT_MNY_IMPORT_OPTIONS,
+        context,
+      );
+      expect(rulesApplier.loadRulesFor).not.toHaveBeenCalled();
+      expect(rulesApplier.applyToNew).not.toHaveBeenCalled();
     });
   });
 

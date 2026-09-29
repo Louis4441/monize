@@ -14,10 +14,13 @@ import { TransactionSplitTag } from "../tags/entities/transaction-split-tag.enti
 import { ImportContext, updateAccountBalance } from "./import-context";
 import { deletionBalanceEffect } from "../common/deletion-balance.util";
 import { tr } from "../i18n/translate";
+import { TransactionRulesApplierService } from "../transaction-rules/transaction-rules-applier.service";
 
 @Injectable()
 export class ImportRegularProcessorService {
   private readonly logger = new Logger(ImportRegularProcessorService.name);
+
+  constructor(private readonly rulesApplier: TransactionRulesApplierService) {}
 
   async processTransaction(ctx: ImportContext, qifTx: any): Promise<void> {
     // Check for duplicate transfers (from prior imports or earlier account blocks)
@@ -102,7 +105,48 @@ export class ImportRegularProcessorService {
       );
     }
 
+    // Transaction rules (design 6.3), last, so the caller's row savepoint
+    // rolls the rule effects back with a row that fails. A transfer leg the
+    // importer created is not evaluated here (transfers are a separate step).
+    if (!isTransfer) {
+      await this.applyImportRules(ctx, savedTx.id, qifTx.payee);
+    }
+
     ctx.importResult.imported++;
+  }
+
+  /**
+   * Run the file's preloaded import-trigger rules over one row just written on
+   * the import's manager. `payeeText` is the raw text from the file, before
+   * alias resolution. Counts the row when a rule changed it.
+   */
+  private async applyImportRules(
+    ctx: ImportContext,
+    transactionId: string,
+    payeeText: string | null | undefined,
+  ): Promise<void> {
+    const rules = ctx.importRules;
+    if (!rules || rules.length === 0) return;
+    const applied = await this.rulesApplier.applyToNew(
+      ctx.manager,
+      ctx.userId,
+      [transactionId],
+      "import",
+      {
+        rules,
+        payeeTextById: new Map([[transactionId, payeeText ?? null]]),
+      },
+    );
+    // A traced change is a real one: the applier writes a trace row only for
+    // a rule that changed the category, the payee or the tags.
+    if (
+      applied.some((row) =>
+        row.effects.trace.some((e) => Object.keys(e.changes).length > 0),
+      )
+    ) {
+      ctx.importResult.transactionsChangedByRules =
+        (ctx.importResult.transactionsChangedByRules ?? 0) + 1;
+    }
   }
 
   /**

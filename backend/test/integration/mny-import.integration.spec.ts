@@ -20,6 +20,7 @@ import { SecurityPrice } from "@/securities/entities/security-price.entity";
 import { Holding } from "@/securities/entities/holding.entity";
 import { InvestmentTransaction } from "@/securities/entities/investment-transaction.entity";
 import { HoldingsService } from "@/securities/holdings.service";
+import { TransactionRulesApplierService } from "@/transaction-rules/transaction-rules-applier.service";
 import { ExchangeRate } from "@/currencies/entities/exchange-rate.entity";
 import { ImportPostProcessingService } from "@/import/import-post-processing.service";
 import { ImportJob } from "@/import/mny/entities/import-job.entity";
@@ -184,6 +185,15 @@ describe("mny writers (integration)", () => {
           useValue: { backfillHistoricalRates: async () => undefined },
         },
         { provide: UsersService, useValue: { deleteData: jest.fn() } },
+        // No rules: the rules pass is covered against the real applier in
+        // transaction-rules-import.integration.spec.ts.
+        {
+          provide: TransactionRulesApplierService,
+          useValue: {
+            loadRulesFor: async () => [],
+            applyToNew: async () => [],
+          },
+        },
         {
           provide: CurrenciesService,
           useValue: {

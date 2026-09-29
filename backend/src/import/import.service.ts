@@ -66,6 +66,7 @@ import {
 import { deletionBalanceEffect } from "../common/deletion-balance.util";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
 import { tr } from "../i18n/translate";
+import { TransactionRulesApplierService } from "../transaction-rules/transaction-rules-applier.service";
 
 @Injectable()
 export class ImportService {
@@ -77,6 +78,7 @@ export class ImportService {
     private entityCreator: ImportEntityCreatorService,
     private investmentProcessor: ImportInvestmentProcessorService,
     private regularProcessor: ImportRegularProcessorService,
+    private rulesApplier: TransactionRulesApplierService,
     @Inject(forwardRef(() => HoldingsService))
     private holdingsService: HoldingsService,
   ) {}
@@ -283,6 +285,13 @@ export class ImportService {
         // First lock of the transaction: advisory before row locks.
         await this.lockImportedHoldingScopes(manager, userId);
 
+        // The user's import-trigger rules, once for the whole file (design 6.3).
+        const importRules = await this.rulesApplier.loadRulesFor(
+          manager,
+          userId,
+          "import",
+        );
+
         // Step 1: Create categories from !Type:Cat definitions
         const categoryMap = new Map<string, string | null>();
         await this.createCategoriesFromDefs(
@@ -435,6 +444,7 @@ export class ImportService {
             affectedAccountIds,
             importResult,
             transferDupCounts: new Map(),
+            importRules,
           };
 
           // Apply opening balance
@@ -1309,6 +1319,11 @@ export class ImportService {
           affectedAccountIds,
           importResult,
           transferDupCounts: new Map<string, number>(),
+          // The user's import-trigger rules, once for the whole file (design
+          // 6.3). An investment file has no regular rows to evaluate.
+          importRules: isInvestment
+            ? []
+            : await this.rulesApplier.loadRulesFor(manager, userId, "import"),
         };
 
         // Create new entities

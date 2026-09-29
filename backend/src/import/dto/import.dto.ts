@@ -370,6 +370,12 @@ export class ImportResultDto {
   mergedTransfersDeleted?: number;
 
   @ApiPropertyOptional({
+    description:
+      "Number of imported transactions that one of the user's transaction rules (trigger: import) changed. Absent when no rule changed a row.",
+  })
+  transactionsChangedByRules?: number;
+
+  @ApiPropertyOptional({
     type: [String],
     description:
       "Warnings about suspect transactions that may need manual review (e.g. potential Quicken merged transfers that could not be reliably auto-removed)",

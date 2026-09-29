@@ -33,6 +33,8 @@ import { ImportEntityCreatorService } from "./import-entity-creator.service";
 import { ImportPostProcessingService } from "./import-post-processing.service";
 import { ImportInvestmentProcessorService } from "./import-investment-processor.service";
 import { ImportRegularProcessorService } from "./import-regular-processor.service";
+import { TransactionRulesApplierService } from "../transaction-rules/transaction-rules-applier.service";
+import { TransactionRule } from "../transaction-rules/transaction-rule.entity";
 
 // Mock the qif-parser module so we can control its return values
 jest.mock("./qif-parser", () => ({
@@ -109,6 +111,7 @@ describe("ImportService", () => {
   let mockSecurityPriceService: Record<string, jest.Mock>;
   let mockExchangeRateService: Record<string, jest.Mock>;
   let mockHoldingsService: Record<string, jest.Mock>;
+  let mockRulesApplier: Record<string, jest.Mock>;
   /** How many categories the import created via the guarded insert. */
   let importedCategoryCount: number;
   let mockQueryRunner: {
@@ -313,9 +316,15 @@ describe("ImportService", () => {
       rebuildAccountsFromTransactions: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockRulesApplier = {
+      loadRulesFor: jest.fn().mockResolvedValue([]),
+      applyToNew: jest.fn().mockResolvedValue([]),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ImportService,
+        { provide: TransactionRulesApplierService, useValue: mockRulesApplier },
         { provide: DataSource, useValue: mockDataSource },
         { provide: NetWorthService, useValue: mockNetWorthService },
         { provide: SecurityPriceService, useValue: mockSecurityPriceService },
@@ -934,6 +943,107 @@ describe("ImportService", () => {
         await expect(
           service.importQifFile(userId, makeBaseDto()),
         ).rejects.toThrow();
+      });
+    });
+
+    describe("transaction rules", () => {
+      const importRules = [{ id: "rule-1" }] as unknown as TransactionRule[];
+      const twoRows = () =>
+        mockedParseQif.mockReturnValue({
+          accountType: "CHEQUING",
+          accountName: "",
+          transactions: [
+            makeQifTransaction({ date: "2025-01-15", payee: "BIEDRONKA 1" }),
+            makeQifTransaction({ date: "2025-01-16", payee: "Lidl" }),
+          ],
+          categories: [],
+          transferAccounts: [],
+          securities: [],
+          detectedDateFormat: "MM/DD/YYYY",
+          sampleDates: [],
+          openingBalance: null,
+          openingBalanceDate: null,
+        });
+
+      it("loads the import rules once for the file and applies them to each row inside its savepoint", async () => {
+        mockRulesApplier.loadRulesFor.mockResolvedValue(importRules);
+        twoRows();
+
+        const result = await service.importQifFile(userId, makeBaseDto());
+
+        expect(result.imported).toBe(2);
+        expect(mockRulesApplier.loadRulesFor).toHaveBeenCalledTimes(1);
+        expect(mockRulesApplier.loadRulesFor).toHaveBeenCalledWith(
+          mockQueryRunner.manager,
+          userId,
+          "import",
+        );
+        expect(mockRulesApplier.applyToNew).toHaveBeenCalledTimes(2);
+        const payeeTexts = mockRulesApplier.applyToNew.mock.calls.map(
+          (call) => {
+            expect(call[0]).toBe(mockQueryRunner.manager);
+            expect(call[3]).toBe("import");
+            expect(call[4].rules).toBe(importRules);
+            return [...call[4].payeeTextById.values()][0];
+          },
+        );
+        expect(payeeTexts).toEqual(["BIEDRONKA 1", "Lidl"]);
+
+        // Each application sits between its own SAVEPOINT and RELEASE.
+        const order = (sql: string) =>
+          mockQueryRunner.query.mock.calls
+            .map((call, i) => [call[0], i] as [string, number])
+            .filter(([q]) => q === sql)
+            .map(([, i]) => mockQueryRunner.query.mock.invocationCallOrder[i]);
+        const [savepoint1, savepoint2] = ["1", "2"].map(
+          (n) => order(`SAVEPOINT tx_import_${n}`)[0],
+        );
+        const [release1, release2] = ["1", "2"].map(
+          (n) => order(`RELEASE SAVEPOINT tx_import_${n}`)[0],
+        );
+        const [rules1, rules2] =
+          mockRulesApplier.applyToNew.mock.invocationCallOrder;
+        expect(savepoint1).toBeLessThan(rules1);
+        expect(rules1).toBeLessThan(release1);
+        expect(savepoint2).toBeLessThan(rules2);
+        expect(rules2).toBeLessThan(release2);
+      });
+
+      it("rolls a failed row back, rule effects included, and keeps the other row", async () => {
+        mockRulesApplier.loadRulesFor.mockResolvedValue(importRules);
+        twoRows();
+        mockRulesApplier.applyToNew.mockRejectedValueOnce(
+          new Error("rule write failed"),
+        );
+
+        const result = await service.importQifFile(userId, makeBaseDto());
+
+        expect(result.errors).toBe(1);
+        expect(result.imported).toBe(1);
+        const sqls = mockQueryRunner.query.mock.calls.map((call) => call[0]);
+        expect(sqls).toContain("ROLLBACK TO SAVEPOINT tx_import_1");
+        expect(sqls).toContain("RELEASE SAVEPOINT tx_import_2");
+      });
+
+      it("does not load rules for an investment file", async () => {
+        mockedParseQif.mockReturnValue({
+          accountType: "INVESTMENT",
+          accountName: "",
+          transactions: [],
+          categories: [],
+          transferAccounts: [],
+          securities: [],
+          detectedDateFormat: "MM/DD/YYYY",
+          sampleDates: [],
+          openingBalance: null,
+          openingBalanceDate: null,
+        });
+        accountsRepository.findOne.mockResolvedValue(mockBrokerageAccount);
+
+        await service.importQifFile(userId, makeBaseDto());
+
+        expect(mockRulesApplier.loadRulesFor).not.toHaveBeenCalled();
+        expect(mockRulesApplier.applyToNew).not.toHaveBeenCalled();
       });
     });
 
@@ -3839,6 +3949,51 @@ describe("ImportService", () => {
       await expect(
         service.importQifMultiAccountFile(userId, baseDto),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it("loads the import rules once for the whole file and applies them in every account block", async () => {
+      const importRules = [{ id: "rule-1" }] as unknown as TransactionRule[];
+      mockRulesApplier.loadRulesFor.mockResolvedValue(importRules);
+      const block = (accountName: string) => ({
+        ...makeFullParseResult().accountBlocks[0],
+        accountName,
+      });
+      mockedValidateQifContent.mockReturnValue({ valid: true });
+      mockedParseQifFull.mockReturnValue(
+        makeFullParseResult({
+          categoryDefs: [],
+          accountBlocks: [block("Checking"), block("Savings")],
+        }),
+      );
+      mockQueryRunner.manager.findOne.mockImplementation((entity, options) =>
+        Promise.resolve(
+          entity === Account && options?.where?.id
+            ? {
+                id: options.where.id,
+                userId,
+                accountType: AccountType.CHEQUING,
+                currencyCode: "CAD",
+              }
+            : null,
+        ),
+      );
+      let saveIdx = 0;
+      mockQueryRunner.manager.save.mockImplementation((entity) => {
+        saveIdx++;
+        return Promise.resolve({ ...entity, id: `saved-${saveIdx}` });
+      });
+
+      const result = await service.importQifMultiAccountFile(userId, baseDto);
+
+      expect(result.errorMessages).toEqual([]);
+      expect(result.imported).toBe(2);
+      expect(mockRulesApplier.loadRulesFor).toHaveBeenCalledTimes(1);
+      expect(mockRulesApplier.applyToNew).toHaveBeenCalledTimes(2);
+      for (const call of mockRulesApplier.applyToNew.mock.calls) {
+        expect(call[3]).toBe("import");
+        expect(call[4].rules).toBe(importRules);
+        expect([...call[4].payeeTextById.values()]).toEqual(["Grocery"]);
+      }
     });
 
     it("creates categories from definitions", async () => {
