@@ -625,6 +625,10 @@ export class TransactionsService {
       createPayeeIfMissing?: boolean;
       /** The row will carry split lines (rules do not set a category then). */
       hasSplits?: boolean;
+      /** Stored as given by create(); absent stores null. */
+      referenceNumber?: string;
+      /** Stored as given by create(); absent stores the entity default (UNRECONCILED). */
+      status?: TransactionStatus;
     },
   ): Promise<CreateTransactionPreview> {
     const account = await this.accountsService.findOne(userId, input.accountId);
@@ -697,6 +701,13 @@ export class TransactionsService {
         description,
         tagIds: [],
         hasSplits: input.hasSplits === true,
+        // The values create() stores (the same facts `storedRowFacts` reads
+        // from the row): the date is the stored calendar date, the status the
+        // entity default when none is given, and a new row has no attachment.
+        referenceNumber: input.referenceNumber ?? null,
+        transactionDate: input.transactionDate.slice(0, 10),
+        status: input.status ?? TransactionStatus.UNRECONCILED,
+        hasAttachment: false,
       }),
     );
 

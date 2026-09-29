@@ -1038,6 +1038,10 @@ export class TransactionTransferService {
       createPayeeIfMissing?: boolean;
       /** Spending category id applied to both legs (null/undefined = none). */
       categoryId?: string | null;
+      /** Stored on both legs as given by createTransfer; absent stores null. */
+      referenceNumber?: string;
+      /** Stored as given by createTransfer; absent stores UNRECONCILED. */
+      status?: TransactionStatus;
     },
   ): Promise<CreateTransferPreview> {
     if (input.fromAccountId === input.toAccountId) {
@@ -1144,6 +1148,13 @@ export class TransactionTransferService {
         description,
         tagIds: [],
         hasSplits: false,
+        // The values writeTransferLegs stores on the outgoing leg: the date is
+        // the stored calendar date, the status defaults to UNRECONCILED, and a
+        // new row has no attachment.
+        referenceNumber: input.referenceNumber ?? null,
+        transactionDate: input.transactionDate.slice(0, 10),
+        status: input.status ?? TransactionStatus.UNRECONCILED,
+        hasAttachment: false,
       }),
     );
 

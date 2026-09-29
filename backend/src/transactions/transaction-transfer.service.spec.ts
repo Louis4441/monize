@@ -16,7 +16,16 @@ import { NetWorthService } from "../net-worth/net-worth.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { CrossOwnerAccessService } from "../delegation/cross-owner-access.service";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
+import { RuleConditionLeaf } from "../transaction-rules/rule-condition.types";
 import { TransactionRulesApplierService } from "../transaction-rules/transaction-rules-applier.service";
+import {
+  PlannableRule,
+  planRuleEffects,
+} from "../transaction-rules/rule-effects";
+import {
+  buildRuleFacts,
+  RuleFactsInput,
+} from "../transaction-rules/rule-facts";
 import { isTransactionInFuture } from "../common/date-utils";
 import { withSystemContext } from "../common/db/with-context";
 import {
@@ -3740,6 +3749,12 @@ describe("TransactionTransferService", () => {
           payeeText: "Rent",
           tagIds: [],
           hasSplits: false,
+          // A new row: no reference number, the stored calendar date, the
+          // default status and no attachment (design 10.3).
+          referenceNumber: null,
+          transactionDate: "2026-01-15",
+          status: TransactionStatus.UNRECONCILED,
+          hasAttachment: false,
         }),
       );
 
@@ -3751,6 +3766,105 @@ describe("TransactionTransferService", () => {
         transactionDate: "2026-01-15",
       });
       expect("ruleEffects" in without).toBe(false);
+    });
+  });
+
+  describe("previewCreateTransfer and createTransfer plan the same effects on the X3 facts", () => {
+    const TAG = {
+      ref: "00000000-0000-4000-8000-000000000001",
+      day: "00000000-0000-4000-8000-000000000002",
+      weekday: "00000000-0000-4000-8000-000000000003",
+      status: "00000000-0000-4000-8000-000000000004",
+      unreconciled: "00000000-0000-4000-8000-000000000005",
+      noattachment: "00000000-0000-4000-8000-000000000006",
+    };
+    const tagRule = (
+      id: string,
+      condition: RuleConditionLeaf,
+    ): PlannableRule => ({
+      id,
+      enabled: true,
+      stopProcessing: false,
+      condition: { all: [condition] },
+      actions: [{ type: "add_tags", tagIds: [TAG[id as keyof typeof TAG]] }],
+    });
+    const rules: PlannableRule[] = [
+      tagRule("ref", { field: "referenceNumber", op: "eq", value: "CHQ-1" }),
+      tagRule("day", { field: "dayOfMonth", op: "eq", value: 15 }),
+      tagRule("weekday", { field: "weekday", op: "eq", value: "THU" }),
+      tagRule("status", { field: "status", op: "eq", value: "CLEARED" }),
+      tagRule("unreconciled", {
+        field: "status",
+        op: "eq",
+        value: "UNRECONCILED",
+      }),
+      tagRule("noattachment", {
+        field: "hasAttachment",
+        op: "eq",
+        value: false,
+      }),
+    ];
+
+    it.each([
+      [
+        "a reference number, a CLEARED status and a Thursday the 15th",
+        { referenceNumber: "CHQ-1", status: TransactionStatus.CLEARED },
+        [TAG.ref, TAG.day, TAG.weekday, TAG.status, TAG.noattachment],
+      ],
+      [
+        "no reference number and no status (the default)",
+        {},
+        [TAG.day, TAG.weekday, TAG.unreconciled, TAG.noattachment],
+      ],
+    ])("for %s", async (_label, extra, expected) => {
+      let preview: string[] | undefined;
+      let commit: string[] | undefined;
+      rulesApplier.previewForRow.mockImplementation(
+        async (_m: unknown, _user: string, input: RuleFactsInput) => {
+          preview = planRuleEffects(
+            buildRuleFacts(input),
+            rules,
+          ).changes.addTagIds.slice();
+          return null;
+        },
+      );
+      // The commit plans over the outgoing leg as stored: the first row
+      // writeTransferLegs creates, with the database's defaults applied.
+      rulesApplier.applyToNewTransfer.mockImplementation(async () => {
+        const stored = transactionsRepository.create.mock.calls[0][0];
+        commit = planRuleEffects(
+          buildRuleFacts({
+            accountId: stored.accountId,
+            currencyCode: stored.currencyCode,
+            amount: stored.amount,
+            isTransfer: true,
+            fromAccountId: "from-account",
+            toAccountId: "to-account",
+            payeeId: stored.payeeId ?? null,
+            payeeText: stored.payeeName ?? null,
+            categoryId: stored.categoryId ?? null,
+            description: stored.description ?? null,
+            tagIds: [],
+            hasSplits: false,
+            referenceNumber: stored.referenceNumber ?? null,
+            transactionDate: stored.transactionDate,
+            status: stored.status ?? TransactionStatus.UNRECONCILED,
+            hasAttachment: false,
+          }),
+          rules,
+        ).changes.addTagIds.slice();
+        return [];
+      });
+      mockFindOne
+        .mockResolvedValueOnce({ id: "from-tx-id", amount: -500 })
+        .mockResolvedValueOnce({ id: "to-tx-id", amount: 500 });
+      const dto = { ...baseTransferDto, ...extra };
+
+      await service.previewCreateTransfer("user-1", dto);
+      await service.createTransfer("user-1", dto, mockFindOne);
+
+      expect(preview).toEqual(expected);
+      expect(commit).toEqual(preview);
     });
   });
 

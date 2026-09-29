@@ -20,6 +20,14 @@ import { TransactionAnalyticsService } from "./transaction-analytics.service";
 import { TransactionBulkUpdateService } from "./transaction-bulk-update.service";
 import { TagsService } from "../tags/tags.service";
 import { TransactionRulesApplierService } from "../transaction-rules/transaction-rules-applier.service";
+import {
+  PlannableRule,
+  planRuleEffects,
+} from "../transaction-rules/rule-effects";
+import {
+  buildRuleFacts,
+  RuleFactsInput,
+} from "../transaction-rules/rule-facts";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { isTransactionInFuture } from "../common/date-utils";
 import { buildTransactionSearchClause } from "./transaction-search.util";
@@ -670,8 +678,162 @@ describe("TransactionsService", () => {
           description: "milk",
           tagIds: [],
           hasSplits: false,
+          // A new row: no reference number, the stored calendar date, the
+          // entity default status and no attachment (design 10.3).
+          referenceNumber: null,
+          transactionDate: "2026-01-15",
+          status: TransactionStatus.UNRECONCILED,
+          hasAttachment: false,
         },
       );
+    });
+
+    describe("previewCreate and create() plan the same effects on the X3 facts", () => {
+      const TAG = {
+        ref: "00000000-0000-4000-8000-000000000001",
+        day: "00000000-0000-4000-8000-000000000002",
+        weekday: "00000000-0000-4000-8000-000000000003",
+        status: "00000000-0000-4000-8000-000000000004",
+        unreconciled: "00000000-0000-4000-8000-000000000005",
+        noattachment: "00000000-0000-4000-8000-000000000006",
+      };
+      const rules: PlannableRule[] = [
+        {
+          id: "r-ref",
+          enabled: true,
+          stopProcessing: false,
+          condition: {
+            all: [{ field: "referenceNumber", op: "eq", value: "CHQ-1" }],
+          },
+          actions: [{ type: "add_tags", tagIds: [TAG.ref] }],
+        },
+        {
+          id: "r-day",
+          enabled: true,
+          stopProcessing: false,
+          condition: { all: [{ field: "dayOfMonth", op: "eq", value: 15 }] },
+          actions: [{ type: "add_tags", tagIds: [TAG.day] }],
+        },
+        {
+          id: "r-weekday",
+          enabled: true,
+          stopProcessing: false,
+          condition: { all: [{ field: "weekday", op: "eq", value: "THU" }] },
+          actions: [{ type: "add_tags", tagIds: [TAG.weekday] }],
+        },
+        {
+          id: "r-status",
+          enabled: true,
+          stopProcessing: false,
+          condition: { all: [{ field: "status", op: "eq", value: "CLEARED" }] },
+          actions: [{ type: "add_tags", tagIds: [TAG.status] }],
+        },
+        {
+          id: "r-unreconciled",
+          enabled: true,
+          stopProcessing: false,
+          condition: {
+            all: [{ field: "status", op: "eq", value: "UNRECONCILED" }],
+          },
+          actions: [{ type: "add_tags", tagIds: [TAG.unreconciled] }],
+        },
+        {
+          id: "r-noattachment",
+          enabled: true,
+          stopProcessing: false,
+          condition: {
+            all: [{ field: "hasAttachment", op: "eq", value: false }],
+          },
+          actions: [{ type: "add_tags", tagIds: [TAG.noattachment] }],
+        },
+      ];
+
+      // The preview plans over the facts it is given; the commit plans over the
+      // facts of the stored row, which the database fills with its defaults.
+      const wireRealPlanner = () => {
+        const planned: { preview?: string[]; commit?: string[] } = {};
+        rulesApplier.previewForRow.mockImplementation(
+          async (_m: unknown, _user: string, input: RuleFactsInput) => {
+            planned.preview = planRuleEffects(
+              buildRuleFacts(input),
+              rules,
+            ).changes.addTagIds.slice();
+            return null;
+          },
+        );
+        rulesApplier.applyToNew.mockImplementation(async () => {
+          const stored = transactionsRepository.create.mock.calls[0][0];
+          planned.commit = planRuleEffects(
+            buildRuleFacts({
+              accountId: stored.accountId,
+              currencyCode: stored.currencyCode,
+              amount: stored.amount,
+              isTransfer: false,
+              payeeId: stored.payeeId ?? null,
+              payeeText: null,
+              categoryId: stored.categoryId ?? null,
+              description: stored.description ?? null,
+              tagIds: [],
+              hasSplits: false,
+              referenceNumber: stored.referenceNumber ?? null,
+              transactionDate: stored.transactionDate,
+              status: stored.status ?? TransactionStatus.UNRECONCILED,
+              hasAttachment: false,
+            }),
+            rules,
+          ).changes.addTagIds.slice();
+          return [];
+        });
+        return planned;
+      };
+
+      it.each([
+        [
+          "a reference number, a CLEARED status and a Thursday the 15th",
+          { referenceNumber: "CHQ-1", status: TransactionStatus.CLEARED },
+          [TAG.ref, TAG.day, TAG.weekday, TAG.status, TAG.noattachment],
+        ],
+        [
+          "no reference number and no status (the entity default)",
+          {},
+          [TAG.day, TAG.weekday, TAG.unreconciled, TAG.noattachment],
+        ],
+      ])("for %s", async (_label, extra, expected) => {
+        accountsService.findOne.mockResolvedValue(mockAccount);
+        transactionsRepository.findOne.mockResolvedValue({
+          id: "tx-1",
+          userId: "user-1",
+          accountId: "account-1",
+          amount: -50,
+          splits: [],
+        });
+        const planned = wireRealPlanner();
+        const dto = {
+          accountId: "account-1",
+          transactionDate: "2026-01-15",
+          amount: -50,
+          currencyCode: "USD",
+          ...extra,
+        };
+
+        await service.previewCreate("user-1", dto);
+        await service.create("user-1", dto as any);
+
+        expect(planned.preview).toEqual(expected);
+        expect(planned.commit).toEqual(planned.preview);
+      });
+
+      it("reads the calendar date from the digits of a timestamp input, as the date column stores it", async () => {
+        accountsService.findOne.mockResolvedValue(mockAccount);
+        await service.previewCreate("user-1", {
+          accountId: "account-1",
+          amount: -50,
+          transactionDate: "2026-01-15T23:30:00-05:00",
+        });
+        expect(rulesApplier.previewForRow.mock.calls[0][2]).toEqual(
+          expect.objectContaining({ transactionDate: "2026-01-15" }),
+        );
+      });
     });
 
     it("previewCreate plans a split row without a category, as create() writes it", async () => {

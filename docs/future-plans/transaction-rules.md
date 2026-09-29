@@ -446,13 +446,10 @@ Decisions made in X3:
   create and import paths has none yet, so it is `false` there.
 - A transfer is evaluated on its outgoing leg's reference, date, status and
   attachments, like every other fact.
-- Preview gap: the previews of a create and of a transfer are built by the
-  transactions module and do not pass `referenceNumber`, `transactionDate`,
-  `status` or `hasAttachment` to `previewForRow` yet, so on those two previews a
-  rule on the new fields reads them as unknown while the commit reads the
-  stored row. The fields are optional on `RuleFactsInput` so the callers still
-  compile; passing them is a change in the transactions module, outside the
-  rules-only scope, and is listed as a follow-up.
+- The previews of a create and of a transfer pass the same facts the commit
+  reads from the stored row: the reference number, the stored calendar date
+  (the first ten characters of the input), the status with its `UNRECONCILED`
+  default, and `hasAttachment` false (`previewCreate`, `previewCreateTransfer`).
 - The visual editor has no card for the five fields (task X5): a leaf on one is
   kept intact and shown with its field name and stored value, and its sentence
   reads as an unknown condition; the expression mode parses and prints them.
