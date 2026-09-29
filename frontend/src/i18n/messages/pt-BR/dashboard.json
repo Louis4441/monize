@@ -204,8 +204,8 @@
     "empty": "Ainda não há histórico de investimentos para mostrar.",
     "refresh": "Atualizar valor atual",
     "investmentResult": "Resultado do Investimento",
+    "periodBreakdownInvestedTooltip": "O valor dos títulos variou {valueChange} neste período. Desse total, {netInvested} foi aplicado, descontadas as vendas, e os títulos pagaram {income} em dividendos e juros. O valor acima é o que os investimentos renderam por si mesmos, sem contar o dinheiro não investido.",
     "notAvailable": "N/D",
-    "periodBreakdownTooltip": "O valor da conta variou {valueChange} neste período, dos quais depósitos e retiradas foram {netFlows}. O valor acima é o que os investimentos em si renderam, com o numerário não investido excluído.",
     "unmeasuredFlowTooltip": "Uma operação liquidada fora dessas contas, ou um desdobramento que mistura uma linha de investimento com um gasto comum, significa que o resultado não pode ser separado do dinheiro movimentado."
   },
   "spendingByPayee": {

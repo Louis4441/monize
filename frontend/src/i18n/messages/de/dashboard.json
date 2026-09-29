@@ -204,8 +204,8 @@
     "empty": "Noch keine Anlagehistorie vorhanden.",
     "refresh": "Aktuellen Wert aktualisieren",
     "investmentResult": "Anlageergebnis",
+    "periodBreakdownInvestedTooltip": "Der Wert der Wertpapiere hat sich in diesem Zeitraum um {valueChange} verändert. Davon wurden {netInvested} eingezahlt, abzüglich Verkäufen, und sie haben {income} an Dividenden und Zinsen ausgeschüttet. Der Betrag oben ist das, was die Anlagen selbst erwirtschaftet haben, ohne nicht investiertes Bargeld.",
     "notAvailable": "N/A",
-    "periodBreakdownTooltip": "Der Wert des Kontos hat sich in diesem Zeitraum um {valueChange} verändert, wovon Einzahlungen und Auszahlungen {netFlows} ausmachten. Die obige Zahl ist das, was die Investitionen selbst erwirtschaftet haben, ohne nicht investierte Barmittel.",
     "unmeasuredFlowTooltip": "Ein Geschäft, das außerhalb dieser Konten abgewickelt wurde, oder eine Aufteilung, die eine Investitionsposition mit gewöhnlichen Ausgaben vermischt, bedeutet, dass das Ergebnis nicht vom bewegten Geld getrennt werden kann."
   },
   "spendingByPayee": {

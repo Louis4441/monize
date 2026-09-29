@@ -204,8 +204,8 @@
     "empty": "Henüz gösterilecek yatırım geçmişi yok.",
     "refresh": "Güncel değeri yenile",
     "investmentResult": "Yatırım Sonucu",
+    "periodBreakdownInvestedTooltip": "Menkul kıymetlerin değeri bu dönemde {valueChange} değişti. Bunun {netInvested} kadarı satışlar düşüldükten sonra yatırılan tutardı ve {income} temettü ve faiz olarak ödendi. Yukarıdaki rakam, yatırılmamış nakit hariç, yatırımların kendi kazancıdır.",
     "notAvailable": "Yok",
-    "periodBreakdownTooltip": "Hesabın değeri bu dönemde {valueChange} değişti; bunun {netFlows} kadarı yatırılan ve çekilen tutardı. Yukarıdaki rakam, yatırıma dönüştürülmemiş nakit hariç, yatırımların kendisinin kazandığı tutardır.",
     "unmeasuredFlowTooltip": "Bu hesapların dışında kapatılan bir işlem ya da bir yatırım kalemini olağan bir harcamayla karıştıran bir bölme, sonucun taşınan paradan ayrılamayacağı anlamına gelir."
   },
   "spendingByPayee": {
