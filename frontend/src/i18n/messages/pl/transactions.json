@@ -169,7 +169,6 @@
     },
     "row": {
       "viewPayeeTitle": "Zobacz szczegóły {name}",
-      "ref": "Nr: {number}",
       "investmentLabel": "Inwestycja",
       "linkedInvestmentTitle": "Zobacz w Inwestycjach",
       "linkedInvestmentBadgeTitle": "Ta transakcja jest powiązana z transakcją inwestycyjną",

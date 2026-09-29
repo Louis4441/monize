@@ -169,7 +169,6 @@
     },
     "row": {
       "viewPayeeTitle": "{name} 상세 보기",
-      "ref": "참조: {number}",
       "investmentLabel": "투자",
       "linkedInvestmentTitle": "투자에서 보기",
       "linkedInvestmentBadgeTitle": "이 거래는 투자 거래에 연결되어 있습니다",

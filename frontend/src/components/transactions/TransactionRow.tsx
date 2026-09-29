@@ -697,11 +697,6 @@ export const TransactionRow = memo(function TransactionRow({
             </div>
           )}
         </div>
-        {density === 'normal' && transaction.referenceNumber && (
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            {t('list.row.ref', { number: transaction.referenceNumber })}
-          </div>
-        )}
       </td>
       <td className={`${cellPadding} ${density !== 'normal' ? 'whitespace-nowrap' : ''} ${registerColumnClass('category')}`}>
         {transaction.linkedInvestmentTransactionId ? (

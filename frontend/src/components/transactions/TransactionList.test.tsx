@@ -1101,7 +1101,7 @@ describe('TransactionList', () => {
       });
     });
 
-    it('displays reference number when available in normal density', async () => {
+    it('displays the reference number once, in the Ref # column, not under the payee', async () => {
       const tx = createTransaction({ referenceNumber: 'CHQ-12345' });
 
       render(
@@ -1113,25 +1113,9 @@ describe('TransactionList', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('Ref: CHQ-12345')).toBeInTheDocument();
+        expect(screen.getAllByText('CHQ-12345')).toHaveLength(1);
       });
-    });
-
-    it('does not display reference number in compact density', async () => {
-      const tx = createTransaction({ referenceNumber: 'CHQ-12345' });
-
-      useDensityStore.setState({ densities: { transactions: 'compact' } });
-      render(
-        <TransactionList
-          transactions={[tx]}
-          onEdit={mockOnEdit}
-          onRefresh={mockOnRefresh}
-        />
-      );
-
-      await waitFor(() => {
-        expect(screen.queryByText('Ref: CHQ-12345')).not.toBeInTheDocument();
-      });
+      expect(screen.queryByText('Ref: CHQ-12345')).not.toBeInTheDocument();
     });
   });
 

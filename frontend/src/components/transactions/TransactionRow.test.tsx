@@ -487,18 +487,9 @@ describe('TransactionRow', () => {
     expect(tr.className).not.toContain('cursor-pointer');
   });
 
-  it('renders reference number in normal density', () => {
+  it('renders the reference number once, in the Ref # column, not under the payee', () => {
     renderRow({ density: 'normal' }, { referenceNumber: 'REF-12345' });
-    expect(screen.getByText('Ref: REF-12345')).toBeInTheDocument();
-  });
-
-  it('does not render reference number in dense density', () => {
-    renderRow({ density: 'dense' }, { referenceNumber: 'REF-12345' });
-    expect(screen.queryByText('Ref: REF-12345')).not.toBeInTheDocument();
-  });
-
-  it('does not render reference number in compact density', () => {
-    renderRow({ density: 'compact' }, { referenceNumber: 'REF-12345' });
+    expect(screen.getAllByText('REF-12345')).toHaveLength(1);
     expect(screen.queryByText('Ref: REF-12345')).not.toBeInTheDocument();
   });
 
