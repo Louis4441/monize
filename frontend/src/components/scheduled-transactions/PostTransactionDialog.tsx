@@ -20,7 +20,7 @@ import { Category } from '@/types/category';
 import { Account } from '@/types/account';
 import { scheduledTransactionsApi } from '@/lib/scheduled-transactions';
 import { investmentsApi } from '@/lib/investments';
-import { totalFromQuantity, quantityFromTotal, roundPrice, usableClose } from '@/lib/investmentFold';
+import { totalFromQuantity, quantityFromTotal, priceFromTotal, roundPrice, usableClose } from '@/lib/investmentFold';
 import { getLocalDateString } from '@/lib/utils';
 import { buildCategoryTree } from '@/lib/categoryUtils';
 import {
@@ -577,11 +577,22 @@ export function PostTransactionDialog({
   // set), so a plain null check is all that is needed here.
   const roundedMarketPrice = marketPrice != null ? roundPrice(marketPrice) : null;
 
+  // Quantity and price are the two facts a user reads off the trade
+  // confirmation, entered in that order (issue #1468). A typed quantity keeps
+  // the total and re-derives the price, so the next field the user reaches
+  // already reflects the amount invested; a typed price keeps the quantity and
+  // re-derives the total, so correcting the price never rescales a share count
+  // the user has just entered.
   const handleInvestmentQuantityChange = (raw: number | undefined) => {
     const qty = raw ?? '';
     setUserEditedInvestment(true);
     setInvestmentQuantity(qty);
-    if (qty !== '' && investmentPrice !== '' && Number(investmentPrice) > 0) {
+    if (qty === '' || !(Number(qty) > 0)) return;
+    if (investmentTotalValue !== '' && Number(investmentTotalValue) > 0) {
+      setInvestmentPrice(
+        priceFromTotal(Number(investmentTotalValue), Number(qty), investmentSign, investmentCommission),
+      );
+    } else if (investmentPrice !== '' && Number(investmentPrice) > 0) {
       setInvestmentTotalValue(
         totalFromQuantity(Number(qty), Number(investmentPrice), investmentSign, investmentCommission),
       );
@@ -593,14 +604,15 @@ export function PostTransactionDialog({
     setUserEditedInvestment(true);
     setInvestmentPrice(price);
     if (price !== '' && Number(price) > 0) {
-      if (investmentTotalValue !== '') {
-        // User has a target total -- keep it and derive quantity.
-        setInvestmentQuantity(
-          quantityFromTotal(Number(investmentTotalValue), Number(price), investmentSign, investmentCommission),
-        );
-      } else if (investmentQuantity !== '') {
+      if (investmentQuantity !== '' && Number(investmentQuantity) > 0) {
+        // Keep the quantity the user entered and derive the total.
         setInvestmentTotalValue(
           totalFromQuantity(Number(investmentQuantity), Number(price), investmentSign, investmentCommission),
+        );
+      } else if (investmentTotalValue !== '') {
+        // No quantity yet -- keep the target total and derive quantity.
+        setInvestmentQuantity(
+          quantityFromTotal(Number(investmentTotalValue), Number(price), investmentSign, investmentCommission),
         );
       }
     }

@@ -1270,7 +1270,7 @@ describe('PostTransactionDialog', () => {
       expect(totalInput.value).toBe('750');
     });
 
-    it('updates Total Price when Quantity is changed', async () => {
+    it('keeps Total Price and updates Price when Quantity is changed', async () => {
       render(
         <PostTransactionDialog
           {...defaultProps}
@@ -1279,9 +1279,28 @@ describe('PostTransactionDialog', () => {
       );
       await settlePriceLookup();
       const qtyInput = screen.getByLabelText('Quantity (shares)') as HTMLInputElement;
-      fireEvent.change(qtyInput, { target: { value: '5' } });
+      fireEvent.change(qtyInput, { target: { value: '8' } });
       const totalInput = screen.getByLabelText('Total Price') as HTMLInputElement;
-      // 5 * 100 = 500
+      const priceInput = screen.getByLabelText('Price per share') as HTMLInputElement;
+      // Total 1000 stays; price becomes 1000 / 8 = 125
+      expect(totalInput.value).toBe('1,000');
+      expect(Number(priceInput.value)).toBeCloseTo(125, 6);
+    });
+
+    it('updates Total Price from Quantity when no total is set', async () => {
+      render(
+        <PostTransactionDialog
+          {...defaultProps}
+          scheduledTransaction={investmentTransaction}
+        />,
+      );
+      await settlePriceLookup();
+      const totalInput = screen.getByLabelText('Total Price') as HTMLInputElement;
+      fireEvent.change(totalInput, { target: { value: '' } });
+      fireEvent.blur(totalInput);
+      const qtyInput = screen.getByLabelText('Quantity (shares)') as HTMLInputElement;
+      fireEvent.change(qtyInput, { target: { value: '5' } });
+      // No total to keep -- 5 * 100 = 500
       expect(totalInput.value).toBe('500');
     });
 
@@ -1302,7 +1321,7 @@ describe('PostTransactionDialog', () => {
       expect(Number(qtyInput.value)).toBeCloseTo(2.5, 6);
     });
 
-    it('updates Quantity when Price changes and Total is already set', async () => {
+    it('keeps Quantity and updates Total Price when Price changes', async () => {
       await act(async () => {
         render(
           <PostTransactionDialog
@@ -1316,9 +1335,56 @@ describe('PostTransactionDialog', () => {
       await act(async () => {
         fireEvent.change(priceInput, { target: { value: '200' } });
       });
-      // Total was 1000, price now 200 → qty should be 5
+      // Quantity 10 stays; total becomes 10 * 200 = 2000
       const qtyInput = screen.getByLabelText('Quantity (shares)') as HTMLInputElement;
+      const totalInput = screen.getByLabelText('Total Price') as HTMLInputElement;
+      expect(Number(qtyInput.value)).toBeCloseTo(10, 6);
+      expect(totalInput.value).toBe('2,000');
+    });
+
+    it('updates Quantity from Total when Price changes and no quantity is set', async () => {
+      await act(async () => {
+        render(
+          <PostTransactionDialog
+            {...defaultProps}
+            scheduledTransaction={investmentTransaction}
+          />,
+        );
+      });
+      const qtyInput = screen.getByLabelText('Quantity (shares)') as HTMLInputElement;
+      await act(async () => {
+        fireEvent.change(qtyInput, { target: { value: '' } });
+      });
+      const priceInput = screen.getByLabelText('Price per share') as HTMLInputElement;
+      await act(async () => {
+        fireEvent.change(priceInput, { target: { value: '200' } });
+      });
+      // Total 1000 kept, 1000 / 200 = 5
       expect(Number(qtyInput.value)).toBeCloseTo(5, 6);
+    });
+
+    it('enters the actual quantity then the actual price without re-editing (issue #1468)', async () => {
+      await act(async () => {
+        render(
+          <PostTransactionDialog
+            {...defaultProps}
+            scheduledTransaction={investmentTransaction}
+          />,
+        );
+      });
+      const qtyInput = screen.getByLabelText('Quantity (shares)') as HTMLInputElement;
+      const priceInput = screen.getByLabelText('Price per share') as HTMLInputElement;
+      const totalInput = screen.getByLabelText('Total Price') as HTMLInputElement;
+      await act(async () => {
+        fireEvent.change(qtyInput, { target: { value: '9.5' } });
+      });
+      await act(async () => {
+        fireEvent.change(priceInput, { target: { value: '104.2' } });
+      });
+      // Both typed facts stand; the total follows them: 9.5 * 104.2 = 989.9
+      expect(Number(qtyInput.value)).toBeCloseTo(9.5, 6);
+      expect(Number(priceInput.value)).toBeCloseTo(104.2, 6);
+      expect(totalInput.value).toBe('989.9');
     });
 
     it('auto-fills Price from latest market price on open, preserving total and adjusting quantity', async () => {
@@ -1700,9 +1766,14 @@ describe('PostTransactionDialog', () => {
       await settlePriceLookup();
       expect(screen.getByText('$4000.00')).toBeInTheDocument();
 
-      // User edits quantity to 5 → cash impact -500 → 4500.
+      // Editing quantity keeps the total (price follows), so the cash impact holds.
       const qtyInput = screen.getByLabelText('Quantity (shares)') as HTMLInputElement;
       fireEvent.change(qtyInput, { target: { value: '5' } });
+      expect(screen.getByText('$4000.00')).toBeInTheDocument();
+
+      // Editing price keeps quantity 5 → 5 * 100 = -500 → 4500.
+      const priceInput = screen.getByLabelText('Price per share') as HTMLInputElement;
+      fireEvent.change(priceInput, { target: { value: '100' } });
       expect(screen.getByText('$4500.00')).toBeInTheDocument();
       expect(screen.queryByText('$4000.00')).not.toBeInTheDocument();
     });
