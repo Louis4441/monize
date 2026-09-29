@@ -523,7 +523,11 @@
     "invalidDefinition": "La définition de la règle n'est pas valide",
     "referenceNotFound": "La règle mentionne un compte, un bénéficiaire, une catégorie ou une étiquette qui n'existe pas",
     "revisionConflict": "Cette règle a été modifiée ailleurs. Rechargez-la et réessayez",
-    "reorderMismatch": "La liste des règles a changé. Rechargez-la et réessayez"
+    "reorderMismatch": "La liste des règles a changé. Rechargez-la et réessayez",
+    "previewChanged": "Les transactions ou la règle ont changé depuis l'aperçu. Vérifiez le nouvel aperçu puis relancez",
+    "ruleInvalid": "Cette règle n'est pas valide et ne peut pas être exécutée. Ouvrez-la et réparez-la d'abord",
+    "dateRangeInvalid": "La date de début ne doit pas être postérieure à la date de fin",
+    "runTooLarge": "Cette exécution modifie trop de transactions pour être annulée en une seule étape. Restreignez les comptes ou les dates et réessayez"
   },
   "transactions": {
     "invalidStatus": "Statut de transaction invalide : {{ status }}",

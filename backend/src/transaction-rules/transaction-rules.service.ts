@@ -256,6 +256,25 @@ export class TransactionRulesService {
       : Number(row.max) + 1;
   }
 
+  /**
+   * A rule the caller owns, read in the caller's transaction (404 otherwise).
+   * `share` takes a row share lock, so an edit of the rule waits for a run
+   * that is planning and writing with the revision it read.
+   */
+  async getOwnedRule(
+    m: EntityManager,
+    userId: string,
+    id: string,
+    options: { share?: boolean } = {},
+  ): Promise<TransactionRule> {
+    const rule = await m.getRepository(TransactionRule).findOne({
+      where: { id, userId },
+      ...(options.share ? { lock: { mode: "pessimistic_read" as const } } : {}),
+    });
+    if (!rule) throw this.notFound(id);
+    return rule;
+  }
+
   private async findOwned(
     repo: Repository<TransactionRule>,
     userId: string,
@@ -312,7 +331,7 @@ export class TransactionRulesService {
    * Throws a 400 carrying the structured `errors` list; nothing has been
    * written by then.
    */
-  private async checkedDefinition(
+  async checkedDefinition(
     m: EntityManager,
     userId: string,
     condition: unknown,

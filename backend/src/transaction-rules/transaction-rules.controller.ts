@@ -1,15 +1,18 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
+  ParseIntPipe,
   ParseUUIDPipe,
   Patch,
   Post,
   Put,
+  Query,
   Request,
   UseGuards,
 } from "@nestjs/common";
@@ -22,6 +25,13 @@ import {
 import { AuthGuard } from "@nestjs/passport";
 import { OwnerOnly } from "../delegation/decorators/delegate-access.decorator";
 import { TransactionRulesService } from "./transaction-rules.service";
+import { TransactionRulesRunService } from "./transaction-rules-run.service";
+import {
+  PreviewDraftRuleDto,
+  RuleRunFiltersDto,
+  RunTransactionRuleDto,
+} from "./dto/rule-run.dto";
+import { DEFAULT_RULE_APPLICATIONS_LIMIT } from "./transaction-rules.limits";
 import { CreateTransactionRuleDto } from "./dto/create-transaction-rule.dto";
 import { UpdateTransactionRuleDto } from "./dto/update-transaction-rule.dto";
 import { ReorderTransactionRulesDto } from "./dto/reorder-transaction-rules.dto";
@@ -40,7 +50,10 @@ import { TransactionRuleResponseDto } from "./dto/transaction-rule-response.dto"
 @OwnerOnly()
 @ApiBearerAuth()
 export class TransactionRulesController {
-  constructor(private readonly rulesService: TransactionRulesService) {}
+  constructor(
+    private readonly rulesService: TransactionRulesService,
+    private readonly runService: TransactionRulesRunService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: "List my rules in evaluation order" })
@@ -71,6 +84,25 @@ export class TransactionRulesController {
     @Body() dto: ReorderTransactionRulesDto,
   ) {
     return this.rulesService.reorder(req.user.id, dto.ids);
+  }
+
+  // Registered before the `:id` routes, like "reorder": a literal segment
+  // must not be captured by ParseUUIDPipe.
+  @Post("preview-draft")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Test an unsaved rule on existing transactions (writes nothing)",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Planned changes and a fingerprint",
+  })
+  @ApiResponse({ status: 400, description: "Invalid definition" })
+  previewDraft(
+    @Request() req: { user: { id: string } },
+    @Body() dto: PreviewDraftRuleDto,
+  ) {
+    return this.runService.previewDraft(req.user.id, dto);
   }
 
   @Get(":id")
@@ -119,5 +151,55 @@ export class TransactionRulesController {
     @Param("id", ParseUUIDPipe) id: string,
   ) {
     return this.rulesService.remove(req.user.id, id);
+  }
+
+  @Post(":id/preview-run")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Preview running a rule on existing transactions (writes nothing)",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Planned changes and a fingerprint",
+  })
+  @ApiResponse({ status: 404, description: "Rule not found" })
+  previewRun(
+    @Request() req: { user: { id: string } },
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: RuleRunFiltersDto,
+  ) {
+    return this.runService.previewRun(req.user.id, id, dto);
+  }
+
+  @Post(":id/run")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Run a rule on existing transactions (one undoable history entry)",
+  })
+  @ApiResponse({ status: 200, description: "Rows changed, skipped, historyId" })
+  @ApiResponse({ status: 404, description: "Rule not found" })
+  @ApiResponse({ status: 409, description: "PREVIEW_CHANGED: preview again" })
+  run(
+    @Request() req: { user: { id: string } },
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: RunTransactionRuleDto,
+  ) {
+    return this.runService.run(req.user.id, id, dto);
+  }
+
+  @Get(":id/applications")
+  @ApiOperation({ summary: "The latest applications of a rule (its trace)" })
+  @ApiResponse({ status: 404, description: "Rule not found" })
+  applications(
+    @Request() req: { user: { id: string } },
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query(
+      "limit",
+      new DefaultValuePipe(DEFAULT_RULE_APPLICATIONS_LIMIT),
+      ParseIntPipe,
+    )
+    limit: number,
+  ) {
+    return this.runService.applications(req.user.id, id, limit);
   }
 }

@@ -523,7 +523,11 @@
     "invalidDefinition": "Kural tanımı geçerli değil",
     "referenceNotFound": "Kural, var olmayan bir hesabı, alıcıyı, kategoriyi veya etiketi belirtiyor",
     "revisionConflict": "Bu kural başka bir yerde değiştirildi. Yeniden yükleyip tekrar deneyin",
-    "reorderMismatch": "Kural listesi değişti. Yeniden yükleyip tekrar deneyin"
+    "reorderMismatch": "Kural listesi değişti. Yeniden yükleyip tekrar deneyin",
+    "previewChanged": "İşlemler veya kural önizlemeden sonra değişti. Yeni önizlemeyi inceleyin ve yeniden çalıştırın",
+    "ruleInvalid": "Bu kural geçerli değil, bu yüzden çalıştırılamaz. Önce kuralı açıp düzeltin",
+    "dateRangeInvalid": "Başlangıç tarihi bitiş tarihinden sonra olmamalıdır",
+    "runTooLarge": "Bu çalıştırma tek adımda geri alınamayacak kadar çok işlemi değiştiriyor. Hesapları veya tarihleri daraltıp yeniden deneyin"
   },
   "transactions": {
     "invalidStatus": "Geçersiz işlem durumu: {{ status }}",

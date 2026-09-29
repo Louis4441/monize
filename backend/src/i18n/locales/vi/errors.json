@@ -523,7 +523,11 @@
     "invalidDefinition": "Định nghĩa quy tắc không hợp lệ",
     "referenceNotFound": "Quy tắc nhắc đến tài khoản, người nhận, danh mục hoặc thẻ không tồn tại",
     "revisionConflict": "Quy tắc này đã được thay đổi ở nơi khác. Hãy tải lại rồi thử lại",
-    "reorderMismatch": "Danh sách quy tắc đã thay đổi. Hãy tải lại rồi thử lại"
+    "reorderMismatch": "Danh sách quy tắc đã thay đổi. Hãy tải lại rồi thử lại",
+    "previewChanged": "Các giao dịch hoặc quy tắc đã thay đổi kể từ bản xem trước. Hãy xem lại bản xem trước mới và chạy lại",
+    "ruleInvalid": "Quy tắc này không hợp lệ nên không thể chạy. Hãy mở và sửa quy tắc trước",
+    "dateRangeInvalid": "Ngày bắt đầu không được sau ngày kết thúc",
+    "runTooLarge": "Lần chạy này thay đổi quá nhiều giao dịch để có thể hoàn tác trong một bước. Hãy thu hẹp tài khoản hoặc khoảng ngày rồi thử lại"
   },
   "transactions": {
     "invalidStatus": "Trạng thái giao tác không hợp lệ: {{ status }}",

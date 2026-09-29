@@ -523,7 +523,11 @@
     "invalidDefinition": "Definicja reguły jest nieprawidłowa",
     "referenceNotFound": "Reguła wskazuje konto, odbiorcę, kategorię lub tag, które nie istnieją",
     "revisionConflict": "Ta reguła została zmieniona gdzie indziej. Załaduj ją ponownie i spróbuj jeszcze raz",
-    "reorderMismatch": "Lista reguł uległa zmianie. Załaduj ją ponownie i spróbuj jeszcze raz"
+    "reorderMismatch": "Lista reguł uległa zmianie. Załaduj ją ponownie i spróbuj jeszcze raz",
+    "previewChanged": "Transakcje lub reguła zmieniły się od czasu podglądu. Sprawdź nowy podgląd i uruchom ponownie",
+    "ruleInvalid": "Ta reguła jest nieprawidłowa, więc nie można jej uruchomić. Otwórz ją i najpierw ją napraw",
+    "dateRangeInvalid": "Data początkowa nie może być późniejsza niż data końcowa",
+    "runTooLarge": "To uruchomienie zmienia zbyt wiele transakcji, aby można je było cofnąć jednym krokiem. Zawęź konta lub daty i spróbuj ponownie"
   },
   "transactions": {
     "invalidStatus": "Nieprawidłowy status transakcji: {{ status }}",

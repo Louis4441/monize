@@ -523,7 +523,11 @@
     "invalidDefinition": "A definição da regra não é válida",
     "referenceNotFound": "A regra cita uma conta, um favorecido, uma categoria ou uma tag que não existe",
     "revisionConflict": "Esta regra foi alterada em outro lugar. Recarregue-a e tente novamente",
-    "reorderMismatch": "A lista de regras mudou. Recarregue-a e tente novamente"
+    "reorderMismatch": "A lista de regras mudou. Recarregue-a e tente novamente",
+    "previewChanged": "As transações ou a regra mudaram desde a pré-visualização. Revise a nova pré-visualização e execute novamente",
+    "ruleInvalid": "Esta regra não é válida, então não pode ser executada. Abra-a e corrija-a primeiro",
+    "dateRangeInvalid": "A data inicial não pode ser posterior à data final",
+    "runTooLarge": "Esta execução altera transações demais para ser desfeita em uma única etapa. Restrinja as contas ou as datas e tente novamente"
   },
   "transactions": {
     "invalidStatus": "Status de transação inválido: {{ status }}",

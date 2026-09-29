@@ -523,7 +523,11 @@
     "invalidDefinition": "Definisi aturan tidak valid",
     "referenceNotFound": "Aturan menyebut akun, penerima, kategori, atau tag yang tidak ada",
     "revisionConflict": "Aturan ini diubah di tempat lain. Muat ulang lalu coba lagi",
-    "reorderMismatch": "Daftar aturan telah berubah. Muat ulang lalu coba lagi"
+    "reorderMismatch": "Daftar aturan telah berubah. Muat ulang lalu coba lagi",
+    "previewChanged": "Transaksi atau aturan berubah sejak pratinjau. Tinjau pratinjau baru lalu jalankan lagi",
+    "ruleInvalid": "Aturan ini tidak valid sehingga tidak dapat dijalankan. Buka dan perbaiki terlebih dahulu",
+    "dateRangeInvalid": "Tanggal mulai tidak boleh setelah tanggal akhir",
+    "runTooLarge": "Proses ini mengubah terlalu banyak transaksi untuk dibatalkan dalam satu langkah. Persempit akun atau tanggal lalu coba lagi"
   },
   "transactions": {
     "invalidStatus": "Status transaksi tidak valid: {{ status }}",

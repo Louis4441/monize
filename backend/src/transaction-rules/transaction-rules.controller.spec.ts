@@ -5,6 +5,7 @@ import { RequestMethod } from "@nestjs/common";
 import { PATH_METADATA, METHOD_METADATA } from "@nestjs/common/constants";
 import { TransactionRulesController } from "./transaction-rules.controller";
 import { TransactionRulesService } from "./transaction-rules.service";
+import { TransactionRulesRunService } from "./transaction-rules-run.service";
 import { ALLOW_DELEGATE_KEY } from "../delegation/decorators/delegate-access.decorator";
 import { CreateTransactionRuleDto } from "./dto/create-transaction-rule.dto";
 import { UpdateTransactionRuleDto } from "./dto/update-transaction-rule.dto";
@@ -12,6 +13,7 @@ import { UpdateTransactionRuleDto } from "./dto/update-transaction-rule.dto";
 describe("TransactionRulesController", () => {
   let controller: TransactionRulesController;
   let service: Record<string, jest.Mock>;
+  let runService: Record<string, jest.Mock>;
   const req = { user: { id: "user-1" } };
 
   beforeEach(async () => {
@@ -24,11 +26,64 @@ describe("TransactionRulesController", () => {
       remove: jest.fn(),
       reorder: jest.fn(),
     };
+    runService = {
+      previewRun: jest.fn(),
+      previewDraft: jest.fn(),
+      run: jest.fn(),
+      applications: jest.fn(),
+    };
     const module = await Test.createTestingModule({
       controllers: [TransactionRulesController],
-      providers: [{ provide: TransactionRulesService, useValue: service }],
+      providers: [
+        { provide: TransactionRulesService, useValue: service },
+        { provide: TransactionRulesRunService, useValue: runService },
+      ],
     }).compile();
     controller = module.get(TransactionRulesController);
+  });
+
+  it("previews a run for the JWT user with the filters only", async () => {
+    runService.previewRun.mockResolvedValue({ matched: [] });
+    const filters = { accountIds: [], limit: 5 };
+
+    await controller.previewRun(req, "rule-1", filters);
+
+    expect(runService.previewRun).toHaveBeenCalledWith(
+      "user-1",
+      "rule-1",
+      filters,
+    );
+  });
+
+  it("previews an unsaved draft for the JWT user", async () => {
+    runService.previewDraft.mockResolvedValue({ matched: [] });
+    const dto = { condition: {}, actions: [] };
+
+    await controller.previewDraft(req, dto);
+
+    expect(runService.previewDraft).toHaveBeenCalledWith("user-1", dto);
+  });
+
+  it("runs a rule with the fingerprint of the preview", async () => {
+    runService.run.mockResolvedValue({ changed: 1 });
+    const dto = { fingerprint: "0".repeat(64), limit: 5 };
+
+    await expect(controller.run(req, "rule-1", dto)).resolves.toEqual({
+      changed: 1,
+    });
+    expect(runService.run).toHaveBeenCalledWith("user-1", "rule-1", dto);
+  });
+
+  it("reads the applications of a rule with the limit", async () => {
+    runService.applications.mockResolvedValue([]);
+
+    await controller.applications(req, "rule-1", 20);
+
+    expect(runService.applications).toHaveBeenCalledWith(
+      "user-1",
+      "rule-1",
+      20,
+    );
   });
 
   it("lists with the JWT user", async () => {
@@ -115,6 +170,22 @@ describe("TransactionRulesController", () => {
         path: ":id/enabled",
         method: RequestMethod.PATCH,
       });
+      expect(route("previewDraft")).toEqual({
+        path: "preview-draft",
+        method: RequestMethod.POST,
+      });
+      expect(route("previewRun")).toEqual({
+        path: ":id/preview-run",
+        method: RequestMethod.POST,
+      });
+      expect(route("run")).toEqual({
+        path: ":id/run",
+        method: RequestMethod.POST,
+      });
+      expect(route("applications")).toEqual({
+        path: ":id/applications",
+        method: RequestMethod.GET,
+      });
       expect(route("remove")).toEqual({
         path: ":id",
         method: RequestMethod.DELETE,
@@ -124,6 +195,13 @@ describe("TransactionRulesController", () => {
     it("registers reorder before the :id routes so it is not read as a UUID", () => {
       const order = Object.getOwnPropertyNames(proto);
       expect(order.indexOf("reorder")).toBeLessThan(order.indexOf("findOne"));
+    });
+
+    it("registers preview-draft before the :id routes so it is not read as a UUID", () => {
+      const order = Object.getOwnPropertyNames(proto);
+      expect(order.indexOf("previewDraft")).toBeLessThan(
+        order.indexOf("findOne"),
+      );
     });
 
     it("is under the JWT guard and refuses a delegate session", () => {

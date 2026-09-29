@@ -7,6 +7,7 @@ import { TransactionTag } from "../tags/entities/transaction-tag.entity";
 import { TagsService } from "../tags/tags.service";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import {
+  PlannableRule,
   RuleEffects,
   RulePlanContext,
   hasRuleEffects,
@@ -138,11 +139,12 @@ export class TransactionRulesApplierService {
     };
   }
 
-  private async labelsFor(
+  /** Names for the ids the effects and their traces mention (public: the manual run labels a whole batch). */
+  async labelsFor(
     m: EntityManager,
     userId: string,
     effects: RuleEffects,
-    rules: readonly TransactionRule[],
+    rules: readonly (PlannableRule & { name?: string })[],
   ): Promise<RuleEffectsLabels> {
     const categoryIds = new Set<string>();
     const payeeIds = new Set<string>();
@@ -179,7 +181,7 @@ export class TransactionRulesApplierService {
           .filter((rule) =>
             effects.trace.some((e) => e.ruleId === rule.id && e.matched),
           )
-          .map((rule) => [rule.id, rule.name]),
+          .map((rule) => [rule.id, rule.name ?? rule.id]),
       ),
     };
   }
@@ -298,9 +300,9 @@ export class TransactionRulesApplierService {
     return applied;
   }
 
-  private planWithChains(
+  planWithChains(
     input: RuleRowInput,
-    rules: readonly TransactionRule[],
+    rules: readonly PlannableRule[],
     chains: ReadonlyMap<string, readonly string[]>,
     context: Pick<RulePlanContext, "crossOwnerTransferLeg">,
   ): RuleEffects {
@@ -318,10 +320,10 @@ export class TransactionRulesApplierService {
   }
 
   /** One query for the chains of the rows' categories and of every category a rule sets. */
-  private chainsFor(
+  chainsFor(
     m: EntityManager,
     userId: string,
-    rules: readonly TransactionRule[],
+    rules: readonly PlannableRule[],
     rowCategoryIds: readonly (string | null)[],
   ): Promise<ReadonlyMap<string, readonly string[]>> {
     const wanted = new Set<string>();
@@ -334,7 +336,7 @@ export class TransactionRulesApplierService {
     return loadCategoryChains(m, userId, [...wanted]);
   }
 
-  private async loadTagIds(
+  async loadTagIds(
     m: EntityManager,
     transactionIds: readonly string[],
   ): Promise<Map<string, string[]>> {
@@ -403,7 +405,7 @@ export class TransactionRulesApplierService {
   }
 
   /** Category and payee through the manager's parameterized UPDATE, tags through TagsService, one trace row per rule. */
-  private async writeEffects(
+  async writeEffects(
     m: EntityManager,
     userId: string,
     transactionId: string,

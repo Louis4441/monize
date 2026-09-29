@@ -523,7 +523,11 @@
     "invalidDefinition": "La definición de la regla no es válida",
     "referenceNotFound": "La regla menciona una cuenta, un beneficiario, una categoría o una etiqueta que no existe",
     "revisionConflict": "Esta regla se modificó en otro lugar. Recárgala e inténtalo de nuevo",
-    "reorderMismatch": "La lista de reglas ha cambiado. Recárgala e inténtalo de nuevo"
+    "reorderMismatch": "La lista de reglas ha cambiado. Recárgala e inténtalo de nuevo",
+    "previewChanged": "Las transacciones o la regla han cambiado desde la vista previa. Revisa la nueva vista previa y vuelve a ejecutar",
+    "ruleInvalid": "Esta regla no es válida, por lo que no se puede ejecutar. Ábrela y repárala primero",
+    "dateRangeInvalid": "La fecha de inicio no debe ser posterior a la fecha de fin",
+    "runTooLarge": "Esta ejecución cambia demasiadas transacciones para poder deshacerse en un solo paso. Reduce las cuentas o las fechas e inténtalo de nuevo"
   },
   "transactions": {
     "invalidStatus": "Estado de transacción no válido: {{ status }}",
