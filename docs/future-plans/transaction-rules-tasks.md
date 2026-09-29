@@ -50,7 +50,7 @@
 | R3 | Review inbox in the UI: pending, proposed (confirmation card), expired | R2, F1 | inert | [x] |
 | X1 | Glob captures: matcher, evaluator returns captures, validation of names and template references (design 10.1) | B1 | none | [x] |
 | X2 | `set_payee_from_text`, `set_description`: planner, applier, trace, preview, AI/MCP field docs (design 10.2) | X1, B4 | inert | [x] editor cards are X5 |
-| X3 | Fields `referenceNumber`, `dayOfMonth`, `weekday`, `status`, `hasAttachment` in facts, evaluator, validation, editor, CEL (design 10.3) | B4, F5 | inert | [ ] |
+| X3 | Fields `referenceNumber`, `dayOfMonth`, `weekday`, `status`, `hasAttachment` in facts, evaluator, validation, editor, CEL (design 10.3) | B4, F5 | inert | [x] backend, frontend table and expression mode; editor cards and labels are X5; the create and transfer previews of the transactions module do not pass the new facts yet (see design 10.3) |
 | X4 | Import preview shows rule effects (design 10.4) | B6, X2 | inert | [ ] |
 | X5 | Editor: capture help on `matches`, template inputs with capture suggestions, new fields, CEL printer/parser support | X1, X2, X3 | inert | [ ] |
 | E1 | E2E: create a rule, import a QIF, see the tag | F2, B6 | none | [ ] |

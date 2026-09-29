@@ -59,6 +59,7 @@ function scalarText(index: EntityIndex, leaf: EditorLeaf, value: unknown): strin
   if (entity) return entityText(index, entity, typeof value === 'string' ? value : '');
   switch (spec.kind) {
     case 'money':
+    case 'dayOfMonth':
       return typeof value === 'number' && Number.isFinite(value) ? formatNumber(value) : CEL_UNFILLED;
     case 'boolean':
       return value === false ? 'false' : 'true';

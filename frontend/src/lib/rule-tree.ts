@@ -68,7 +68,7 @@ export function defaultValue(field: RuleField, op: RuleOperator): EditorValue {
     default:
       if (spec.kind === 'boolean') return true;
       if (spec.kind === 'enum') return spec.enumValues?.[0] ?? '';
-      return spec.kind === 'money' ? undefined : '';
+      return spec.kind === 'money' || spec.kind === 'dayOfMonth' ? undefined : '';
   }
 }
 

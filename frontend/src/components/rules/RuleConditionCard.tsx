@@ -6,7 +6,13 @@ import { RuleValueControl } from '@/components/rules/RuleValueControl';
 import type { RuleOptions } from '@/components/rules/use-rule-options';
 import { Select } from '@/components/ui/Select';
 import type { RowAction } from '@/components/ui/row-actions/rowAction';
-import { RULE_CONDITION_FIELDS, RULE_FIELDS, isRuleField, isRuleOperator } from '@/lib/rule-fields';
+import {
+  EDITOR_RULE_FIELDS,
+  RULE_CONDITION_FIELDS,
+  isEditorRuleField,
+  isRuleField,
+  isRuleOperator,
+} from '@/lib/rule-fields';
 import { changeLeafField, changeLeafOperator, type EditorLeaf } from '@/lib/rule-tree';
 
 interface RuleConditionCardProps {
@@ -34,7 +40,11 @@ export function RuleConditionCard({ leaf, options, actions, errors, onChange }: 
           id={`${leaf.uid}-field`}
           label={t('condition.field')}
           value={leaf.field}
-          options={RULE_FIELDS.map((field) => ({ value: field, label: t(`fields.${field}`) }))}
+          options={[
+            ...EDITOR_RULE_FIELDS.map((field) => ({ value: field, label: t(`fields.${field}`) })),
+            // A field whose card is task X5 keeps its own name until then; it is never hidden or reset.
+            ...(isEditorRuleField(leaf.field) ? [] : [{ value: leaf.field, label: leaf.field }]),
+          ]}
           onChange={(e) => {
             if (isRuleField(e.target.value)) onChange(changeLeafField(leaf, e.target.value));
           }}

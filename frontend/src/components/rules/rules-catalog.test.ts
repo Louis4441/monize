@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import en from '@/i18n/messages/en/rules.json';
 import { CEL_ERROR_KEYS, EntityIndex, complete } from '@/lib/rule-cel';
 import {
+  EDITOR_RULE_FIELDS,
   RULE_ACTION_TYPES,
   RULE_FIELDS,
   RULE_OPERATORS,
@@ -19,7 +20,8 @@ const editor = en.editor as unknown as Record<string, Record<string, unknown>>;
 
 describe('the rule editor catalog', () => {
   it.each([
-    ['fields', RULE_FIELDS],
+    // The five X3 fields have no label until the editor cards of task X5.
+    ['fields', EDITOR_RULE_FIELDS],
     ['operators', RULE_OPERATORS],
     ['types', RULE_TRANSACTION_TYPES],
     ['actionTypes', RULE_ACTION_TYPES],
@@ -35,7 +37,7 @@ describe('the rule editor catalog', () => {
   });
 
   it('has no label without a table entry to draw it', () => {
-    expect(Object.keys(editor.fields).sort()).toEqual([...RULE_FIELDS].sort());
+    expect(Object.keys(editor.fields).sort()).toEqual([...EDITOR_RULE_FIELDS].sort());
     expect(Object.keys(editor.operators).sort()).toEqual([...RULE_OPERATORS].sort());
     expect(Object.keys(editor.actionTypes).sort()).toEqual([...RULE_ACTION_TYPES].sort());
     expect(Object.keys(editor.errors.codes as object).sort()).toEqual(

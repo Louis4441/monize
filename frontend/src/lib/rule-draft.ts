@@ -62,6 +62,7 @@ type Record_ = Record<string, unknown>;
 
 const isRecord = (v: unknown): v is Record_ => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isStringList = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string');
+const isNumberList = (v: unknown): v is number[] => Array.isArray(v) && v.every((x) => typeof x === 'number');
 
 /** Counts the parts of a stored definition the editor had to drop or reset. */
 class Repairs {
@@ -79,10 +80,14 @@ function readValue(field: EditorLeaf['field'], op: EditorLeaf['op'], raw: unknow
     return undefined;
   }
   const scalarOk = (v: unknown): boolean =>
-    kind === 'money' ? typeof v === 'number' : kind === 'boolean' ? typeof v === 'boolean' : typeof v === 'string';
+    kind === 'money' || kind === 'dayOfMonth'
+      ? typeof v === 'number'
+      : kind === 'boolean'
+        ? typeof v === 'boolean'
+        : typeof v === 'string';
   let ok: boolean;
   if (shape === 'scalar') ok = scalarOk(raw);
-  else if (shape === 'list') ok = isStringList(raw);
+  else if (shape === 'list') ok = kind === 'dayOfMonth' ? isNumberList(raw) : isStringList(raw);
   else ok = Array.isArray(raw) && raw.length === 2 && raw.every((v) => typeof v === 'number');
   if (ok) return raw as EditorValue;
   repairs.note();

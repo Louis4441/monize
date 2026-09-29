@@ -1,6 +1,7 @@
 import {
   buildRuleFacts,
   deriveRuleType,
+  loadAttachmentPresence,
   loadCategoryChains,
 } from "./rule-facts";
 
@@ -155,5 +156,49 @@ describe("loadCategoryChains", () => {
     const { find, m } = manager();
     expect((await loadCategoryChains(m, "u1", [])).size).toBe(0);
     expect(find).not.toHaveBeenCalled();
+  });
+});
+
+describe("loadAttachmentPresence", () => {
+  const builder = (rows: Array<{ transactionId: string }>) => {
+    const qb: Record<string, jest.Mock> = {};
+    for (const name of ["select", "distinct", "where", "andWhere"] as const) {
+      qb[name] = jest.fn().mockReturnValue(qb);
+    }
+    qb.getRawMany = jest.fn().mockResolvedValue(rows);
+    return qb;
+  };
+
+  it("asks once for the ids, the owner and visible attachments only (a scan pair counts once)", async () => {
+    const qb = builder([{ transactionId: "t1" }]);
+    const m = {
+      getRepository: jest.fn().mockReturnValue({
+        createQueryBuilder: jest.fn().mockReturnValue(qb),
+      }),
+    };
+    const found = await loadAttachmentPresence(m as never, "u1", [
+      "t1",
+      "t2",
+      "t1",
+    ]);
+    expect([...found]).toEqual(["t1"]);
+    expect(m.getRepository).toHaveBeenCalledTimes(1);
+    expect(qb.where).toHaveBeenCalledWith("ta.userId = :userId", {
+      userId: "u1",
+    });
+    expect(qb.andWhere).toHaveBeenCalledWith(
+      "ta.transactionId IN (:...wanted)",
+      { wanted: ["t1", "t2"] },
+    );
+    expect(qb.andWhere).toHaveBeenCalledWith(
+      "ta.original_of_attachment_id IS NULL",
+    );
+    expect(qb.distinct).toHaveBeenCalledWith(true);
+  });
+
+  it("does not query for no ids", async () => {
+    const m = { getRepository: jest.fn() };
+    expect((await loadAttachmentPresence(m as never, "u1", [])).size).toBe(0);
+    expect(m.getRepository).not.toHaveBeenCalled();
   });
 });

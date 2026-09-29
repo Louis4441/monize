@@ -5,6 +5,7 @@ import { fireEvent, render, screen, within } from '@/test/render';
 import { RuleExpressionEditor } from './RuleExpressionEditor';
 import { parseCondition, type CelError } from '@/lib/rule-cel';
 import { INDEX } from '@/test/rule-cel-support';
+import { RULE_FIELDS } from '@/lib/rule-fields';
 
 /** The editor over real state and the real parser, as the section wires it. */
 function Harness({ initial = '', onText, codes = [] }: { initial?: string; onText?: (text: string) => void; codes?: string[] }) {
@@ -94,7 +95,7 @@ describe('RuleExpressionEditor', () => {
       render(<Harness />);
       type('transaction.');
       const list = screen.getByRole('listbox', { name: 'Suggestions' });
-      expect(within(list).getAllByRole('option')).toHaveLength(14);
+      expect(within(list).getAllByRole('option')).toHaveLength(RULE_FIELDS.length);
       expect(options()[0]).toBe('accountIdAccount');
       expect(box()).toHaveAttribute('aria-controls', list.id);
       expect(box()).toHaveAttribute('aria-autocomplete', 'list');

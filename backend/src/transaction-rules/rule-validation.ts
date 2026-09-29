@@ -6,6 +6,8 @@ import {
 } from "./rule-action.types";
 import {
   RULE_CONDITION_FIELDS,
+  RULE_MAX_DAY_OF_MONTH,
+  RULE_MIN_DAY_OF_MONTH,
   RULE_OPERATOR_SHAPES,
   RuleConditionFieldSpec,
   RuleConditionLeaf,
@@ -311,6 +313,14 @@ function validateScalar(
       if (!Number.isFinite(value)) return fail("VALUE_OUT_OF_RANGE");
       return (
         Number.isSafeInteger(Math.round(value * MONEY_SCALE)) ||
+        fail("VALUE_OUT_OF_RANGE")
+      );
+    case "dayOfMonth":
+      if (typeof value !== "number") return fail("VALUE_TYPE");
+      return (
+        (Number.isInteger(value) &&
+          value >= RULE_MIN_DAY_OF_MONTH &&
+          value <= RULE_MAX_DAY_OF_MONTH) ||
         fail("VALUE_OUT_OF_RANGE")
       );
     case "text":

@@ -25,6 +25,26 @@ describe('emptyDraft', () => {
   });
 });
 
+describe('draftFromRule: the X3 fields', () => {
+  it('keeps a condition on a field the editor has no card for, values and operators intact', () => {
+    const condition = {
+      all: [
+        { field: 'dayOfMonth', op: 'in', value: [1, 15] },
+        { field: 'dayOfMonth', op: 'between', value: [10, 20] },
+        { field: 'dayOfMonth', op: 'gte', value: 28 },
+        { field: 'weekday', op: 'in', value: ['SAT', 'SUN'] },
+        { field: 'status', op: 'neq', value: 'VOID' },
+        { field: 'hasAttachment', op: 'eq', value: false },
+        { field: 'referenceNumber', op: 'isEmpty' },
+        { field: 'referenceNumber', op: 'matches', value: 'CHK-{n}' },
+      ],
+    };
+    const { draft, repaired } = read({ condition: condition as never });
+    expect(repaired).toBe(0);
+    expect(conditionToApi(draft.condition)).toEqual(condition);
+  });
+});
+
 describe('draftFromRule', () => {
   it('reads a valid rule without repairing anything', () => {
     const { draft, repaired } = draftFromRule(makeRule());

@@ -1,6 +1,13 @@
 import { EntityManager } from "typeorm";
+import { primaryAttachmentSql } from "../attachments/primary-attachment.util";
+import { TransactionAttachment } from "../attachments/entities/transaction-attachment.entity";
 import { Category } from "../categories/entities/category.entity";
-import { RuleFacts, RuleTransactionType } from "./rule-condition.types";
+import {
+  RULE_WEEKDAYS,
+  RuleFacts,
+  RuleTransactionType,
+  RuleWeekday,
+} from "./rule-condition.types";
 
 /** Money scale: facts carry the amount as a scaled integer (1/10000 units). */
 const MONEY_SCALE = 10000;
@@ -29,6 +36,44 @@ export interface RuleFactsInput {
   readonly description: string | null;
   readonly tagIds: readonly string[];
   readonly hasSplits: boolean;
+  /**
+   * Design 10.3. A caller that does not know one leaves it out and the fact is
+   * unknown (`null`, and `hasAttachment` false): a leaf on it is false except
+   * `isEmpty`.
+   */
+  readonly referenceNumber?: string | null;
+  /** The transaction's calendar date, `YYYY-MM-DD`; `dayOfMonth` and `weekday` derive from it. */
+  readonly transactionDate?: string | null;
+  readonly status?: string | null;
+  /** True when the row has a visible attachment (`loadAttachmentPresence`). */
+  readonly hasAttachment?: boolean;
+}
+
+const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * The day of month and weekday of a calendar date string, read from the digits
+ * and never through the server's timezone: `Date.UTC` names the same instant
+ * everywhere and `getUTCDay` reads it back in UTC, so 2026-03-01 is a Sunday
+ * in every zone. Anything that is not a real `YYYY-MM-DD` date is unknown.
+ */
+export function calendarDayParts(
+  date: string | null | undefined,
+): { dayOfMonth: number; weekday: RuleWeekday } | null {
+  const match = typeof date === "string" ? CALENDAR_DATE.exec(date) : null;
+  if (match === null) return null;
+  const [year, month, day] = [match[1], match[2], match[3]].map(Number);
+  const at = new Date(Date.UTC(year, month - 1, day));
+  // Date.UTC rolls 2026-02-31 over to March; the round trip refuses it.
+  if (
+    at.getUTCFullYear() !== year ||
+    at.getUTCMonth() !== month - 1 ||
+    at.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  // getUTCDay: 0 = Sunday; RULE_WEEKDAYS starts on Monday.
+  return { dayOfMonth: day, weekday: RULE_WEEKDAYS[(at.getUTCDay() + 6) % 7] };
 }
 
 /**
@@ -61,6 +106,7 @@ export function buildRuleFacts(input: RuleFactsInput): RuleFacts {
       ? null
       : Math.round(Number(input.amount) * MONEY_SCALE);
   const amount = scaled !== null && Number.isFinite(scaled) ? scaled : null;
+  const parts = calendarDayParts(input.transactionDate);
   return Object.freeze({
     accountId: input.accountId,
     fromAccountId: input.isTransfer ? (input.fromAccountId ?? null) : null,
@@ -80,6 +126,11 @@ export function buildRuleFacts(input: RuleFactsInput): RuleFacts {
     currencyCode: input.currencyCode,
     tagIds: Object.freeze([...new Set(input.tagIds)]),
     hasSplits: input.hasSplits,
+    referenceNumber: blankToNull(input.referenceNumber),
+    dayOfMonth: parts?.dayOfMonth ?? null,
+    weekday: parts?.weekday ?? null,
+    status: blankToNull(input.status),
+    hasAttachment: input.hasAttachment === true,
   });
 }
 
@@ -113,4 +164,30 @@ export async function loadCategoryChains(
     chains.set(id, Object.freeze(chain));
   }
   return chains;
+}
+
+/**
+ * The ids among `transactionIds` that have a visible attachment: one query on
+ * the caller's manager, however many rows. A scanned document is stored as two
+ * rows (the picture the user sees and its hidden original), so the originals
+ * are left out exactly as the register's paperclip does
+ * (`primaryAttachmentSql`); the row counts once, and only its presence matters.
+ */
+export async function loadAttachmentPresence(
+  m: EntityManager,
+  userId: string,
+  transactionIds: readonly string[],
+): Promise<ReadonlySet<string>> {
+  const wanted = [...new Set(transactionIds)];
+  if (wanted.length === 0) return new Set();
+  const rows = await m
+    .getRepository(TransactionAttachment)
+    .createQueryBuilder("ta")
+    .select("ta.transactionId", "transactionId")
+    .distinct(true)
+    .where("ta.userId = :userId", { userId })
+    .andWhere("ta.transactionId IN (:...wanted)", { wanted })
+    .andWhere(primaryAttachmentSql("ta"))
+    .getRawMany<{ transactionId: string }>();
+  return new Set(rows.map((row) => row.transactionId));
 }

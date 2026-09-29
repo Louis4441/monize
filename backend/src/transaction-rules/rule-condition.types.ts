@@ -18,7 +18,8 @@ export type RuleValueKind =
   | "money"
   | "enum"
   | "currency"
-  | "boolean";
+  | "boolean"
+  | "dayOfMonth";
 
 export const RULE_OPERATORS = [
   "eq",
@@ -74,6 +75,34 @@ export const RULE_TRANSACTION_TYPES = [
 ] as const;
 export type RuleTransactionType = (typeof RULE_TRANSACTION_TYPES)[number];
 
+/** The days of the week a `weekday` leaf names, Monday first (ISO 8601). */
+export const RULE_WEEKDAYS = [
+  "MON",
+  "TUE",
+  "WED",
+  "THU",
+  "FRI",
+  "SAT",
+  "SUN",
+] as const;
+export type RuleWeekday = (typeof RULE_WEEKDAYS)[number];
+
+/**
+ * The reconciliation statuses a `status` leaf names. Written out here because
+ * the frontend contract test runs this file without its imports; a spec holds
+ * the list equal to `TransactionStatus`.
+ */
+export const RULE_TRANSACTION_STATUSES = [
+  "UNRECONCILED",
+  "CLEARED",
+  "RECONCILED",
+  "VOID",
+] as const;
+
+/** `dayOfMonth` takes whole days 1..31 (design 10.3). */
+export const RULE_MIN_DAY_OF_MONTH = 1;
+export const RULE_MAX_DAY_OF_MONTH = 31;
+
 export interface RuleConditionFieldSpec {
   readonly kind: RuleValueKind;
   readonly operators: readonly RuleOperator[];
@@ -122,6 +151,23 @@ export const RULE_CONDITION_FIELDS = {
   currencyCode: { kind: "currency", operators: ["eq", "in"] },
   tagIds: { kind: "tagIds", operators: ["hasAny", "hasAll", "hasNone"] },
   hasSplits: { kind: "boolean", operators: ["eq"] },
+  // Design 10.3 (X3). The date fields read the transaction's own calendar date.
+  referenceNumber: { kind: "text", operators: TEXT_OPERATORS },
+  dayOfMonth: {
+    kind: "dayOfMonth",
+    operators: ["eq", "lt", "lte", "gt", "gte", "between", "in"],
+  },
+  weekday: {
+    kind: "enum",
+    operators: ["eq", "in"],
+    enumValues: RULE_WEEKDAYS,
+  },
+  status: {
+    kind: "enum",
+    operators: ["eq", "neq", "in"],
+    enumValues: RULE_TRANSACTION_STATUSES,
+  },
+  hasAttachment: { kind: "boolean", operators: ["eq"] },
 } as const satisfies Record<string, RuleConditionFieldSpec>;
 
 export type RuleField = keyof typeof RULE_CONDITION_FIELDS;
@@ -183,4 +229,14 @@ export interface RuleFacts {
   readonly currencyCode: string | null;
   readonly tagIds: readonly string[];
   readonly hasSplits: boolean;
+  /** The reference number (check number, bank reference); null when the row has none. */
+  readonly referenceNumber: string | null;
+  /** 1..31 from the transaction's calendar date (never a clock reading); null when the date is unknown. */
+  readonly dayOfMonth: number | null;
+  /** The weekday of the transaction's calendar date; null when the date is unknown. */
+  readonly weekday: RuleWeekday | null;
+  /** The reconciliation status; null when the source does not know it yet. */
+  readonly status: string | null;
+  /** Whether the row has a visible attachment (a scan pair counts once). */
+  readonly hasAttachment: boolean;
 }

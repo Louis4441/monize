@@ -5,7 +5,7 @@ import { RuleConditionCard } from './RuleConditionCard';
 import { testOptions } from './rule-test-harness';
 import { ACCOUNT_ID, COFFEE_ID, TAG_ID } from './rules-test-fixtures';
 import en from '@/i18n/messages/en/rules.json';
-import { RULE_CONDITION_FIELDS } from '@/lib/rule-fields';
+import { EDITOR_RULE_FIELDS, RULE_CONDITION_FIELDS } from '@/lib/rule-fields';
 import { createLeaf, type EditorLeaf } from '@/lib/rule-tree';
 
 Element.prototype.scrollIntoView = vi.fn();
@@ -37,11 +37,25 @@ describe('RuleConditionCard', () => {
     );
   });
 
-  it('lists every field, in the table order', () => {
+  it('lists every field the editor has a control for, in the table order', () => {
     render(<Card initial={leaf({})} />);
     expect(optionLabels(screen.getByLabelText('Field'))).toEqual(
-      Object.keys(RULE_CONDITION_FIELDS).map((field) => en.editor.fields[field as keyof typeof en.editor.fields]),
+      EDITOR_RULE_FIELDS.map((field) => en.editor.fields[field as keyof typeof en.editor.fields]),
     );
+  });
+
+  it.each([
+    ['dayOfMonth', 'gte', 15, '15'],
+    ['dayOfMonth', 'in', [1, 15], '[1,15]'],
+    ['weekday', 'eq', 'SUN', '"SUN"'],
+    ['status', 'in', ['VOID'], '["VOID"]'],
+    ['hasAttachment', 'eq', true, 'true'],
+    ['referenceNumber', 'eq', 'CHK-1', '"CHK-1"'],
+  ] as const)('shows a %s leaf (task X5) with its field name and stored value, without crashing', (field, op, value, shown) => {
+    render(<Card initial={leaf({ field, op, value })} />);
+    expect(screen.getByLabelText('Field')).toHaveValue(field);
+    expect(optionLabels(screen.getByLabelText('Field'))).toContain(field);
+    expect(screen.getByText(shown)).toBeInTheDocument();
   });
 
   it('starts over when the field changes: first operator of the new field, empty value', () => {

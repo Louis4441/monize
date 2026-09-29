@@ -26,7 +26,8 @@ export type RuleValueKind =
   | 'money'
   | 'enum'
   | 'currency'
-  | 'boolean';
+  | 'boolean'
+  | 'dayOfMonth';
 
 export const RULE_OPERATORS = [
   'eq',
@@ -77,6 +78,16 @@ export const RULE_TRANSACTION_TYPES = [
   'TRANSFER',
 ] as const satisfies readonly RuleTransactionType[];
 
+/** The days of the week a `weekday` leaf names, Monday first. */
+export const RULE_WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
+
+/** The reconciliation statuses a `status` leaf names. */
+export const RULE_TRANSACTION_STATUSES = ['UNRECONCILED', 'CLEARED', 'RECONCILED', 'VOID'] as const;
+
+/** `dayOfMonth` takes whole days 1..31. */
+export const RULE_MIN_DAY_OF_MONTH = 1;
+export const RULE_MAX_DAY_OF_MONTH = 31;
+
 export interface RuleFieldSpec {
   readonly kind: RuleValueKind;
   readonly operators: readonly RuleOperator[];
@@ -102,9 +113,25 @@ export const RULE_CONDITION_FIELDS: Readonly<Record<RuleField, RuleFieldSpec>> =
   currencyCode: { kind: 'currency', operators: ['eq', 'in'] },
   tagIds: { kind: 'tagIds', operators: ['hasAny', 'hasAll', 'hasNone'] },
   hasSplits: { kind: 'boolean', operators: ['eq'] },
+  referenceNumber: { kind: 'text', operators: TEXT_OPERATORS },
+  dayOfMonth: { kind: 'dayOfMonth', operators: ['eq', 'lt', 'lte', 'gt', 'gte', 'between', 'in'] },
+  weekday: { kind: 'enum', operators: ['eq', 'in'], enumValues: RULE_WEEKDAYS },
+  status: { kind: 'enum', operators: ['eq', 'neq', 'in'], enumValues: RULE_TRANSACTION_STATUSES },
+  hasAttachment: { kind: 'boolean', operators: ['eq'] },
 };
 
 export const RULE_FIELDS = Object.keys(RULE_CONDITION_FIELDS) as RuleField[];
+
+/**
+ * The fields the visual editor has a control and a label for. The others
+ * (`referenceNumber`, `dayOfMonth`, `weekday`, `status`, `hasAttachment`)
+ * parse, print and save through the expression mode and the API; their cards
+ * are task X5, until then the editor shows such a leaf with its field name and
+ * its stored value and keeps it intact.
+ */
+const X5_FIELDS: readonly RuleField[] = ['referenceNumber', 'dayOfMonth', 'weekday', 'status', 'hasAttachment'];
+export const EDITOR_RULE_FIELDS: readonly RuleField[] = RULE_FIELDS.filter((f) => !X5_FIELDS.includes(f));
+export const isEditorRuleField = (field: RuleField): boolean => EDITOR_RULE_FIELDS.includes(field);
 
 export const RULE_ACTION_TYPES = [
   'add_tags',

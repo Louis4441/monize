@@ -83,6 +83,27 @@ export type RuleRowInput = Omit<RuleFactsInput, "categoryAncestorIds"> & {
   readonly payeeName?: string | null;
 };
 
+/**
+ * The X3 facts of a row this applier has just been handed: reference number,
+ * date and status from the stored row. A row written in this transaction has
+ * no attachment yet (nothing can attach to a row before it exists), so
+ * `hasAttachment` is false, the same answer the preview gives for a row that
+ * is not stored.
+ */
+function storedRowFacts(
+  row: Pick<Transaction, "referenceNumber" | "transactionDate" | "status">,
+): Pick<
+  RuleFactsInput,
+  "referenceNumber" | "transactionDate" | "status" | "hasAttachment"
+> {
+  return {
+    referenceNumber: row.referenceNumber,
+    transactionDate: row.transactionDate,
+    status: row.status,
+    hasAttachment: false,
+  };
+}
+
 /** Payee lookups made while planning; share one across the rows of a call. */
 export type PayeeLookupCache = Map<string, PayeeResolution | null>;
 
@@ -379,6 +400,7 @@ export class TransactionRulesApplierService {
           description: primary.description,
           tagIds: tagIds ?? [],
           hasSplits: primary.isSplit,
+          ...storedRowFacts(primary),
         },
         rules,
         chains,
@@ -545,6 +567,7 @@ export class TransactionRulesApplierService {
         description: row.description,
         tagIds,
         hasSplits: row.isSplit,
+        ...storedRowFacts(row),
       },
       context: { crossOwnerTransferLeg },
     };

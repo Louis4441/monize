@@ -90,7 +90,7 @@ export function readScalar(cursor: Cursor, ctx: ValueContext, unfilled: boolean)
   const spec = RULE_CONDITION_FIELDS[ctx.field];
   const entity = ENTITY_KIND_OF_FIELD[spec.kind];
   if (entity) return readReference(cursor, entity, ctx, unfilled);
-  if (spec.kind === 'money') return readNumber(cursor, unfilled);
+  if (spec.kind === 'money' || spec.kind === 'dayOfMonth') return readNumber(cursor, unfilled);
   const token = cursor.peek();
   if (spec.kind === 'boolean') {
     if (token.kind !== 'ident' || (token.text !== 'true' && token.text !== 'false')) {

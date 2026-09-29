@@ -16,6 +16,7 @@ import { isReconciledLockEnabled } from "../transactions/reconciled-lock.util";
 import { PreviewDraftRuleDto, RunTransactionRuleDto } from "./dto/rule-run.dto";
 import { withActionDefaults } from "./rule-references";
 import { PayeeResolution, PlannableRule } from "./rule-effects";
+import { loadAttachmentPresence } from "./rule-facts";
 import { effectiveRunLimit, loadCandidateUnits } from "./rule-run-candidates";
 import { loadRuleApplications } from "./rule-run-applications";
 import { planFingerprint } from "./rule-run-fingerprint";
@@ -325,6 +326,12 @@ export class TransactionRulesRunService {
       legIds.length > 0
         ? await this.applier.loadTagIds(m, legIds)
         : new Map<string, string[]>();
+    // One query for every row's attachment presence (a scan pair counts once).
+    const attached = await loadAttachmentPresence(
+      m,
+      userId,
+      units.map((unit) => unit.primary.id),
+    );
     const chains = await this.applier.chainsFor(
       m,
       userId,
@@ -355,6 +362,10 @@ export class TransactionRulesRunService {
           description: primary.description,
           tagIds: tagsByRow.get(primary.id) ?? [],
           hasSplits: primary.isSplit,
+          referenceNumber: primary.referenceNumber,
+          transactionDate: primary.transactionDate,
+          status: primary.status,
+          hasAttachment: attached.has(primary.id),
         },
         [rule],
         chains,

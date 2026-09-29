@@ -27,7 +27,7 @@ const RULE_FIELD_OPERATORS = Object.entries(RULE_CONDITION_FIELDS)
 export const RULE_LANGUAGE_GUIDE =
   "A rule: name, triggers, condition, actions. condition is {all:[...]} or {any:[...]} (add not:true to negate), nested at most 4 deep, of leaves {field, op, value}. Fields and operators: " +
   RULE_FIELD_OPERATORS +
-  ". Give NAMES as the value for accountId, fromAccountId, toAccountId, payeeId, categoryId (use 'Parent: Child') and tagIds; amount is signed, absAmount is not; in/notIn/hasAny/hasAll/hasNone take a list, between takes [min,max], isEmpty takes no value, type is EXPENSE|INCOME|TRANSFER. actions (1-" +
+  ". Give NAMES as the value for accountId, fromAccountId, toAccountId, payeeId, categoryId (use 'Parent: Child') and tagIds; amount is signed, absAmount is not; in/notIn/hasAny/hasAll/hasNone take a list, between takes [min,max], isEmpty takes no value, type is EXPENSE|INCOME|TRANSFER, weekday MON..SUN and dayOfMonth 1-31 (both from the transaction's own date), status UNRECONCILED|CLEARED|RECONCILED|VOID, hasSplits/hasAttachment true|false. actions (1-" +
   MAX_RULE_ACTIONS +
   ", in order): {type:'set_category',categoryName,onlyIfEmpty?}, {type:'set_payee',payeeName,onlyIfEmpty?}, {type:'add_tags'|'remove_tags',tagNames:[...]}, {type:'request_ai_review',instruction}, {type:'set_payee_from_text',template,createIfMissing?,onlyIfEmpty?}, {type:'set_description',template,mode?:replace|append|prepend,onlyIfEmpty?}; onlyIfEmpty defaults to true (false for set_description). matches is a glob: * is a wildcard, {name} a capture (a-z0-9, max 5, once per rule) that a template reads as {name}, {payeeText} or {description}.";
 

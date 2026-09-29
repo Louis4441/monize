@@ -809,3 +809,150 @@ describe("TransactionRulesApplierService.previewForRow", () => {
     expect(labels.rules).toEqual({ [RULE_1]: "rule 11" });
   });
 });
+
+describe("the X3 fields (design 10.3) on the write paths", () => {
+  // 2026-03-01 is a Sunday.
+  const CONDITION_X3: RuleConditionNode = {
+    all: [
+      { field: "referenceNumber", op: "eq", value: "chk-42" },
+      { field: "dayOfMonth", op: "eq", value: 1 },
+      { field: "weekday", op: "eq", value: "SUN" },
+      { field: "status", op: "eq", value: "CLEARED" },
+      { field: "hasAttachment", op: "eq", value: false },
+    ],
+  };
+  const tagRule = (condition: RuleConditionNode) =>
+    rule(RULE_1, [{ type: "add_tags", tagIds: [TAG_A] }], {}, condition);
+  const stored = (over: Partial<Transaction> = {}) =>
+    row({
+      referenceNumber: "CHK-42",
+      transactionDate: "2026-03-01",
+      status: "CLEARED" as Transaction["status"],
+      ...over,
+    });
+
+  it("create and import: reference, calendar date and status come from the stored row; a new row has no attachment", async () => {
+    for (const source of ["create", "import"] as const) {
+      const h = harness({
+        rules: [tagRule(CONDITION_X3)],
+        rows: [stored()],
+      });
+      await h.service.applyToNew(h.m, USER, [TX], source);
+      expect(h.tags.addTransactionTags).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it.each([
+    ["another reference", { referenceNumber: "CHK-43" }],
+    ["no reference", { referenceNumber: null }],
+    ["another day", { transactionDate: "2026-03-02" }],
+    ["another status", { status: "VOID" as Transaction["status"] }],
+  ])("create: %s does not match", async (_name, over) => {
+    const h = harness({
+      rules: [tagRule(CONDITION_X3)],
+      rows: [stored(over)],
+    });
+    await h.service.applyToNew(h.m, USER, [TX], "create");
+    expect(h.tags.addTransactionTags).not.toHaveBeenCalled();
+  });
+
+  it("create: a row that is not stored yet cannot have an attachment (hasAttachment true never matches)", async () => {
+    const h = harness({
+      rules: [tagRule({ field: "hasAttachment", op: "eq", value: true })],
+      rows: [stored()],
+    });
+    await h.service.applyToNew(h.m, USER, [TX], "create");
+    expect(h.tags.addTransactionTags).not.toHaveBeenCalled();
+  });
+
+  it("the preview builds the same facts from the row input, and an input that omits them reads them as unknown", async () => {
+    const h = harness({ rules: [tagRule(CONDITION_X3)] });
+    const input = {
+      accountId: ACCOUNT,
+      currencyCode: "PLN",
+      amount: -50,
+      isTransfer: false,
+      payeeId: null,
+      payeeText: null,
+      categoryId: null,
+      description: null,
+      tagIds: [],
+      hasSplits: false,
+    };
+    const full = await h.service.planForRow(
+      h.m,
+      USER,
+      {
+        ...input,
+        referenceNumber: "CHK-42",
+        transactionDate: "2026-03-01",
+        status: "CLEARED",
+        hasAttachment: false,
+      },
+      [tagRule(CONDITION_X3)],
+    );
+    expect(full.changes.addTagIds).toEqual([TAG_A]);
+    const omitted = await h.service.planForRow(h.m, USER, input, [
+      tagRule(CONDITION_X3),
+    ]);
+    expect(omitted.changes.addTagIds).toEqual([]);
+    const emptyRef = await h.service.planForRow(h.m, USER, input, [
+      tagRule({ field: "referenceNumber", op: "isEmpty" }),
+    ]);
+    expect(emptyRef.changes.addTagIds).toEqual([TAG_A]);
+  });
+
+  describe("transfers", () => {
+    const OTHER = uuid(88);
+    const FROM_TX = uuid(31);
+    const TO_TX = uuid(32);
+    const legs = {
+      fromLegId: FROM_TX,
+      toLegId: TO_TX,
+      fromOwnerId: USER,
+      toOwnerId: USER,
+    };
+    const from = (over: Partial<Transaction> = {}) =>
+      stored({
+        id: FROM_TX,
+        isTransfer: true,
+        linkedTransactionId: TO_TX,
+        amount: -50,
+        ...over,
+      });
+    const to = (over: Partial<Transaction> = {}) =>
+      stored({
+        id: TO_TX,
+        accountId: OTHER,
+        isTransfer: true,
+        linkedTransactionId: FROM_TX,
+        amount: 50,
+        referenceNumber: "OTHER-LEG",
+        status: "UNRECONCILED" as Transaction["status"],
+        ...over,
+      });
+
+    it("are evaluated on the outgoing leg's reference, date and status", async () => {
+      const h = harness({
+        known: [ACCOUNT, OTHER, TAG_A],
+        rules: [tagRule(CONDITION_X3)],
+        rows: [from(), to()],
+      });
+      await h.service.applyToNewTransfer(h.m, legs);
+      // Written to both legs: the incoming leg's own reference and status are not read.
+      expect(h.tags.addTransactionTags).toHaveBeenCalledTimes(2);
+    });
+
+    it("do not match on the incoming leg's values", async () => {
+      const h = harness({
+        known: [ACCOUNT, OTHER, TAG_A],
+        rules: [
+          tagRule({ field: "referenceNumber", op: "eq", value: "other-leg" }),
+        ],
+        rows: [from(), to()],
+      });
+      await h.service.applyToNewTransfer(h.m, legs);
+      expect(h.tags.addTransactionTags).not.toHaveBeenCalled();
+    });
+  });
+});

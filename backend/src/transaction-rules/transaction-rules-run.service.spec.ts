@@ -7,6 +7,7 @@ import { TransactionStatus } from "../transactions/entities/transaction-status.e
 import { isReconciledLockEnabled } from "../transactions/reconciled-lock.util";
 import { RuleAction } from "./rule-action.types";
 import { RuleConditionNode } from "./rule-condition.types";
+import { loadAttachmentPresence } from "./rule-facts";
 import { CandidateUnit, loadCandidateUnits } from "./rule-run-candidates";
 import { TransactionRuleApplication } from "./transaction-rule-application.entity";
 import { TransactionRule } from "./transaction-rule.entity";
@@ -22,6 +23,10 @@ jest.mock("../common/db/scoped-db", () =>
 jest.mock("./rule-run-candidates", () => ({
   ...jest.requireActual("./rule-run-candidates"),
   loadCandidateUnits: jest.fn(),
+}));
+jest.mock("./rule-facts", () => ({
+  ...jest.requireActual("./rule-facts"),
+  loadAttachmentPresence: jest.fn(),
 }));
 jest.mock("./transaction-rule-view", () => ({ toRuleResponses: jest.fn() }));
 jest.mock("../transactions/reconciled-lock.util", () => ({
@@ -100,6 +105,7 @@ function setup(
     { invalid: false, invalidReasons: [] },
   ]);
   (isReconciledLockEnabled as jest.Mock).mockResolvedValue(false);
+  (loadAttachmentPresence as jest.Mock).mockResolvedValue(new Set<string>());
 
   const applierDeps = { addTransactionTags: jest.fn() };
   const enqueue = jest
@@ -167,6 +173,113 @@ function setup(
 
 describe("TransactionRulesRunService", () => {
   beforeEach(() => jest.clearAllMocks());
+
+  describe("the X3 fields (design 10.3) on existing rows", () => {
+    const NEW_FIELDS: RuleConditionNode = {
+      all: [
+        { field: "referenceNumber", op: "startsWith", value: "chk" },
+        { field: "dayOfMonth", op: "between", value: [28, 31] },
+        { field: "weekday", op: "eq", value: "SAT" },
+        { field: "status", op: "neq", value: "VOID" },
+        { field: "hasAttachment", op: "eq", value: true },
+      ],
+    };
+    // 2026-01-31 is a Saturday.
+    const hit = (id: string, over: Partial<Transaction> = {}) =>
+      row(id, {
+        referenceNumber: "CHK-1",
+        transactionDate: "2026-01-31",
+        status: TransactionStatus.CLEARED,
+        ...over,
+      });
+
+    it("reads reference, date, status and attachment presence from the stored rows, presence in one query", async () => {
+      const rows = [
+        hit("t1"),
+        hit("t2"),
+        hit("t3", { referenceNumber: null }),
+        hit("t4", { transactionDate: "2026-01-30" }),
+        hit("t5", { status: TransactionStatus.VOID }),
+        hit("t6", { transactionDate: "2026-02-28" }),
+      ];
+      const { service } = setup(
+        rows.map(plainUnit),
+        false,
+        storedRule({ condition: NEW_FIELDS }),
+      );
+      (loadAttachmentPresence as jest.Mock).mockResolvedValue(
+        new Set(["t1", "t3", "t4", "t5", "t6"]),
+      );
+
+      const preview = await service.previewRun(USER, RULE_ID, { limit: 50 });
+
+      expect(loadAttachmentPresence).toHaveBeenCalledTimes(1);
+      expect(loadAttachmentPresence).toHaveBeenCalledWith(
+        expect.anything(),
+        USER,
+        ["t1", "t2", "t3", "t4", "t5", "t6"],
+      );
+      // t2 has no attachment, t3 no reference, t4 is the 30th (a Friday), t5
+      // is void; t6 is Saturday 2026-02-28, the 28th, so t1 and t6 pass.
+      expect(preview.matched.map((r) => r.transactionId)).toEqual(["t1", "t6"]);
+    });
+
+    it("a row without an attachment matches hasAttachment false, and only that", async () => {
+      const { service } = setup(
+        [plainUnit(hit("t1")), plainUnit(hit("t2"))],
+        false,
+        storedRule({
+          condition: { field: "hasAttachment", op: "eq", value: false },
+        }),
+      );
+      (loadAttachmentPresence as jest.Mock).mockResolvedValue(new Set(["t1"]));
+      const preview = await service.previewRun(USER, RULE_ID, {});
+      expect(preview.matched.map((r) => r.transactionId)).toEqual(["t2"]);
+    });
+
+    it("a transfer is evaluated on its outgoing leg's facts", async () => {
+      const out = hit("out", { isTransfer: true, amount: -5 });
+      const inn = hit("in", {
+        isTransfer: true,
+        amount: 5,
+        referenceNumber: "OTHER",
+      });
+      const { service } = setup(
+        [
+          {
+            primary: out,
+            legs: [out, inn],
+            isTransfer: true,
+            fromAccountId: "acc-1",
+            toAccountId: "acc-2",
+            crossOwnerTransferLeg: false,
+          },
+        ],
+        false,
+        storedRule({
+          condition: { field: "referenceNumber", op: "eq", value: "chk-1" },
+        }),
+      );
+      const preview = await service.previewRun(USER, RULE_ID, {});
+      expect(loadAttachmentPresence).toHaveBeenCalledWith(
+        expect.anything(),
+        USER,
+        ["out"],
+      );
+      expect(preview.matched.map((r) => r.transactionId)).toEqual(["out"]);
+    });
+
+    it("previews a draft on the same facts", async () => {
+      const { service } = setup([plainUnit(hit("t1"))]);
+      (loadAttachmentPresence as jest.Mock).mockResolvedValue(new Set(["t1"]));
+      const preview = await service.previewDraft(USER, {
+        condition: NEW_FIELDS as unknown as Record<string, unknown>,
+        actions: [{ type: "add_tags", tagIds: [TAG] }],
+        filters: {},
+      });
+      expect(preview.matched.map((r) => r.transactionId)).toEqual(["t1"]);
+    });
+  });
 
   describe("previewRun", () => {
     it("plans the rule over the candidates: what changes, what was left alone, what was scanned", async () => {

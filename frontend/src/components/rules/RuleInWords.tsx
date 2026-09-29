@@ -2,7 +2,13 @@
 
 import { useFormatter, useTranslations } from 'next-intl';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { RULE_CONDITION_FIELDS, isRuleActionType, isRuleField, isRuleOperator } from '@/lib/rule-fields';
+import {
+  RULE_CONDITION_FIELDS,
+  isEditorRuleField,
+  isRuleActionType,
+  isRuleField,
+  isRuleOperator,
+} from '@/lib/rule-fields';
 import type {
   RuleAction,
   RuleConditionLeaf,
@@ -52,6 +58,8 @@ function useRuleWords(labels: RuleWordsLabels) {
         return t('words.text', { value: String(value) });
       case 'money':
         return typeof value === 'number' ? formatNumber(value) : unknown;
+      case 'dayOfMonth':
+        return String(value);
       case 'boolean':
         return value === true ? t('editor.value.yes') : value === false ? t('editor.value.no') : unknown;
       case 'enum':
@@ -73,7 +81,10 @@ function useRuleWords(labels: RuleWordsLabels) {
 
   const leafText = (leaf: RuleConditionLeaf): string => {
     // A field or operator newer than this client still says that a condition exists.
-    if (!isRuleField(leaf.field) || !isRuleOperator(leaf.op)) return t('words.unknownCondition');
+    // A field without a label yet (task X5) reads the same way.
+    if (!isRuleField(leaf.field) || !isEditorRuleField(leaf.field) || !isRuleOperator(leaf.op)) {
+      return t('words.unknownCondition');
+    }
     const field = t(`editor.fields.${leaf.field}`);
     const operator = t(`editor.operators.${leaf.op}`);
     return leaf.value === undefined

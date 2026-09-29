@@ -76,10 +76,12 @@ describe("validateRuleDefinition: accepted definitions", () => {
             : spec.kind === "currency"
               ? "PLN"
               : spec.kind === "enum"
-                ? "INCOME"
-                : spec.kind === "text"
-                  ? "abc"
-                  : U1;
+                ? (spec.enumValues as readonly string[])[0]
+                : spec.kind === "dayOfMonth"
+                  ? 15
+                  : spec.kind === "text"
+                    ? "abc"
+                    : U1;
       if (op === "isEmpty") return leaf(field, op);
       if (op === "between") return leaf(field, op, [one, one]);
       if (["in", "notIn", "hasAny", "hasAll", "hasNone"].includes(op)) {

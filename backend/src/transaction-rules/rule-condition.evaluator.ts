@@ -64,14 +64,30 @@ function evaluateLeaf(leaf: RuleConditionLeaf, facts: RuleFacts): boolean {
     case "money":
       return evaluateMoney(leaf, facts);
     case "boolean":
-      return leaf.op === "eq" && facts.hasSplits === leaf.value;
+      return (
+        leaf.op === "eq" &&
+        (leaf.field === "hasAttachment"
+          ? facts.hasAttachment
+          : facts.hasSplits) === leaf.value
+      );
+    case "dayOfMonth":
+      return evaluateDayOfMonth(leaf, facts.dayOfMonth);
     default:
       // "enum" and "currency" compare as case-insensitive codes.
-      return evaluateCode(
-        leaf.op,
-        leaf.field === "type" ? facts.type : facts.currencyCode,
-        leaf.value,
-      );
+      return evaluateCode(leaf.op, codeFact(leaf, facts), leaf.value);
+  }
+}
+
+function codeFact(leaf: RuleConditionLeaf, facts: RuleFacts): string | null {
+  switch (leaf.field) {
+    case "type":
+      return facts.type;
+    case "weekday":
+      return facts.weekday;
+    case "status":
+      return facts.status;
+    default:
+      return facts.currencyCode;
   }
 }
 
@@ -96,6 +112,8 @@ function textFact(leaf: RuleConditionLeaf, facts: RuleFacts): string | null {
       return facts.payeeText;
     case "description":
       return facts.description;
+    case "referenceNumber":
+      return facts.referenceNumber;
     default:
       return facts.memo;
   }
@@ -181,6 +199,32 @@ function evaluateMoney(leaf: RuleConditionLeaf, facts: RuleFacts): boolean {
       return fact > wanted;
     default: // gte: the field table admits no other operator
       return fact >= wanted;
+  }
+}
+
+/** Whole days compared as numbers; an unknown date is false for every operator. */
+function evaluateDayOfMonth(
+  leaf: RuleConditionLeaf,
+  day: number | null,
+): boolean {
+  if (day === null) return false;
+  if (leaf.op === "between") {
+    const [min, max] = asList(leaf.value);
+    return day >= Number(min) && day <= Number(max);
+  }
+  if (leaf.op === "in") return asList(leaf.value).includes(day);
+  const wanted = Number(leaf.value);
+  switch (leaf.op) {
+    case "eq":
+      return day === wanted;
+    case "lt":
+      return day < wanted;
+    case "lte":
+      return day <= wanted;
+    case "gt":
+      return day > wanted;
+    default: // gte: the field table admits no other operator
+      return day >= wanted;
   }
 }
 

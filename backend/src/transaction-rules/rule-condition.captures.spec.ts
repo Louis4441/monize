@@ -20,6 +20,11 @@ function facts(over: Partial<RuleFacts> = {}): RuleFacts {
     currencyCode: "PLN",
     tagIds: [],
     hasSplits: false,
+    referenceNumber: null,
+    dayOfMonth: null,
+    weekday: null,
+    status: null,
+    hasAttachment: false,
     ...over,
   });
 }

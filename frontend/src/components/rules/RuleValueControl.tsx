@@ -12,6 +12,7 @@ import {
   MAX_RULE_TEXT_LENGTH,
   RULE_CONDITION_FIELDS,
   RULE_OPERATOR_SHAPES,
+  isEditorRuleField,
 } from '@/lib/rule-fields';
 import type { EditorLeaf, EditorValue } from '@/lib/rule-tree';
 
@@ -49,6 +50,16 @@ export function RuleValueControl({ leaf, options, onChange }: RuleValueControlPr
   const value = leaf.value;
 
   if (shape === 'none') return null;
+
+  // A field without a control yet (task X5): show the stored value as it is, never a wrong control.
+  if (!isEditorRuleField(leaf.field)) {
+    return (
+      <div>
+        <span className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{label}</span>
+        <code className="block py-2 text-sm text-gray-700 dark:text-gray-300">{JSON.stringify(value ?? null)}</code>
+      </div>
+    );
+  }
 
   switch (spec.kind) {
     case 'accountId':

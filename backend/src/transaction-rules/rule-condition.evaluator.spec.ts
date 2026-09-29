@@ -33,6 +33,11 @@ function facts(overrides: Partial<RuleFacts> = {}): RuleFacts {
     currencyCode: "PLN",
     tagIds: [T1, T2],
     hasSplits: false,
+    referenceNumber: null,
+    dayOfMonth: null,
+    weekday: null,
+    status: null,
+    hasAttachment: false,
     ...overrides,
   });
 }

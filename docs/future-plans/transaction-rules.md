@@ -425,6 +425,38 @@ one).
 
 The date is the transaction's own calendar date, never a clock reading.
 
+Decisions made in X3:
+
+- `dayOfMonth` and `weekday` are computed from the `YYYY-MM-DD` text
+  (`calendarDayParts` in `rule-facts.ts`: `Date.UTC` and `getUTCDay`), never
+  from a `Date` in the server timezone. A value that is not a real calendar
+  date is unknown. `dayOfMonth` is a new value kind of its own (whole days
+  1..31, `VALUE_OUT_OF_RANGE` outside it, `VALUE_TYPE` for a non-number) and
+  `weekday` values are upper case (`MON` is Monday).
+- `status` values are the four `TransactionStatus` values, listed in
+  `rule-condition.types.ts` (which the frontend contract test runs without its
+  imports) and held equal to the enum by a spec.
+- An unknown fact is false for every operator except `isEmpty` (so `status neq
+  VOID` is false on a row whose status is unknown), as for every other field.
+- `hasAttachment` counts visible attachments only: a scanned document's hidden
+  original (`original_of_attachment_id` set) is left out with the shared
+  `primaryAttachmentSql`, so a scan pair is one attachment, as in the register.
+  A manual run and a draft preview read the presence of every candidate's
+  primary row in one query (`loadAttachmentPresence`); a row written by the
+  create and import paths has none yet, so it is `false` there.
+- A transfer is evaluated on its outgoing leg's reference, date, status and
+  attachments, like every other fact.
+- Preview gap: the previews of a create and of a transfer are built by the
+  transactions module and do not pass `referenceNumber`, `transactionDate`,
+  `status` or `hasAttachment` to `previewForRow` yet, so on those two previews a
+  rule on the new fields reads them as unknown while the commit reads the
+  stored row. The fields are optional on `RuleFactsInput` so the callers still
+  compile; passing them is a change in the transactions module, outside the
+  rules-only scope, and is listed as a follow-up.
+- The visual editor has no card for the five fields (task X5): a leaf on one is
+  kept intact and shown with its field name and stored value, and its sentence
+  reads as an unknown condition; the expression mode parses and prints them.
+
 ### 10.4 Rule effects in the import preview (X4)
 
 Deferred (owner: rules-only scope): X4 needs the import module's review step

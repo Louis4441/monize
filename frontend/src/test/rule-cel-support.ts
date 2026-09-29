@@ -112,6 +112,8 @@ function scalar(rand: Random, field: RuleField, list: boolean): string | number 
       return !list && rand() < 0.1 ? '' : reference(rand, field);
     case 'money':
       return rand() < 0.1 ? undefined : pick(rand, NUMBERS);
+    case 'dayOfMonth':
+      return !list && rand() < 0.1 ? undefined : int(rand, 1, 31);
     case 'enum':
       return pick(rand, spec.enumValues ?? []);
     case 'currency':

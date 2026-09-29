@@ -22,7 +22,12 @@ export type RuleField =
   | 'absAmount'
   | 'currencyCode'
   | 'tagIds'
-  | 'hasSplits';
+  | 'hasSplits'
+  | 'referenceNumber'
+  | 'dayOfMonth'
+  | 'weekday'
+  | 'status'
+  | 'hasAttachment';
 
 export type RuleOperator =
   | 'eq'

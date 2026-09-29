@@ -12,7 +12,7 @@ import { ENTITY_KIND_OF_FIELD, isEntityKind, type CelEntityKind, type EntityInde
 import { tokenizeLoose, type Token } from '@/lib/rule-cel/lexer';
 import { quoteString } from '@/lib/rule-cel/literal';
 import { COMPARISON_TOKENS, METHOD_NAMES } from '@/lib/rule-cel/printer';
-import { RULE_CONDITION_FIELDS, RULE_FIELDS, isRuleField } from '@/lib/rule-fields';
+import { RULE_CONDITION_FIELDS, RULE_FIELDS, isEditorRuleField, isRuleField } from '@/lib/rule-fields';
 import type { RuleField } from '@/types/transaction-rule';
 
 export interface Suggestion {
@@ -84,7 +84,7 @@ function inString(text: string, caret: number, tokens: readonly Token[], open: {
     if (spec.kind === 'enum') {
       const items = (spec.enumValues ?? [])
         .filter((v) => startsWith(v, open.value))
-        .map((v) => ({ label: v, insert: quoteString(v), hint: `types.${v}` }));
+        .map((v) => ({ label: v, insert: quoteString(v), hint: field === 'type' ? `types.${v}` : undefined }));
       return items.length === 0 ? null : { from: open.start, to: stringEnd(text, caret, quote, ''), items };
     }
   }
@@ -105,7 +105,7 @@ function operatorItems(field: RuleField, typed: string): Suggestion[] {
 function valueItems(field: RuleField, index: EntityIndex, typed: string): Suggestion[] {
   const spec = RULE_CONDITION_FIELDS[field];
   if (spec.kind === 'enum') {
-    return (spec.enumValues ?? []).filter((v) => startsWith(v, typed)).map((v) => ({ label: quoteString(v), insert: quoteString(v), hint: `types.${v}` }));
+    return (spec.enumValues ?? []).filter((v) => startsWith(v, typed)).map((v) => ({ label: quoteString(v), insert: quoteString(v), hint: field === 'type' ? `types.${v}` : undefined }));
   }
   if (spec.kind === 'boolean') return ['true', 'false'].filter((v) => startsWith(v, typed)).map((v) => ({ label: v, insert: v }));
   const kind = ENTITY_KIND_OF_FIELD[spec.kind];
@@ -141,7 +141,7 @@ export function complete(text: string, caret: number, index: EntityIndex): Compl
   const previous = before[before.length - 1];
 
   if (tail(2).join(' ') === 'transaction .' && !symbol) {
-    return done(RULE_FIELDS.filter((f) => startsWith(f, typed)).map((f) => ({ label: f, insert: f, hint: `fields.${f}` })));
+    return done(RULE_FIELDS.filter((f) => startsWith(f, typed)).map((f) => ({ label: f, insert: f, hint: isEditorRuleField(f) ? `fields.${f}` : undefined })));
   }
   const fieldName = before[before.length - 2];
   if (tail(4)[0] === 'transaction' && tail(4)[1] === '.' && tail(4)[3] === '.' && fieldName?.kind === 'ident' && isRuleField(fieldName.text) && !symbol) {
