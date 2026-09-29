@@ -92,6 +92,16 @@ export interface InvestedPeriodDecision {
   investedValueStart: number | null;
   /** `IV(e)`; null when that day is a subtotal. */
   investedValueEnd: number | null;
+  /**
+   * `IV(e) - IV(b)`: what the securities are worth at the end less what they
+   * were worth at the start -- the last point a value chart draws less its
+   * first. Two-ended, like the account's `valueChange`: known whenever both
+   * boundary days are complete, even where a gap between them or an
+   * unmeasurable movement withholds the P&L. Unlike `investedValueStart` and
+   * `investedValueEnd`, it is not nulled with the rest of the decision, which
+   * is why a surface reads it rather than subtracting those two.
+   */
+  investedValueChange: number | null;
   /** Net value paid into the invested part on `(b, e]`: buys less disposals. */
   investmentCapitalFlows: number | null;
   /** Dividends, interest and capital-gain distributions received on `(b, e]`. */
@@ -132,7 +142,10 @@ export interface InvestedPeriodDecision {
 
 const WITHHELD: Omit<
   InvestedPeriodDecision,
-  "investedReasons" | "investmentCapitalFlows" | "investmentIncome"
+  | "investedReasons"
+  | "investmentCapitalFlows"
+  | "investmentIncome"
+  | "investedValueChange"
 > = {
   investedValueStart: null,
   investedValueEnd: null,
@@ -185,11 +198,26 @@ export function investedPeriodResult(
   ) {
     return {
       ...WITHHELD,
+      investedValueChange: null,
       investmentCapitalFlows: null,
       investmentIncome: null,
       investedReasons: ["noValueSeries"],
     };
   }
+
+  const start = points[startIndex];
+  const end = points[endIndex];
+
+  // Read off the two boundaries alone, before any guard below can withhold
+  // the rest: a subtotal on a day in between leaves both ends a whole value.
+  const investedValueChange =
+    pointComplete(start) && pointComplete(end)
+      ? roundMoney(
+          (Math.round(end.securitiesValue * 10000) -
+            Math.round(start.securitiesValue * 10000)) /
+            10000,
+        )
+      : null;
 
   const reasons = new Set<PeriodResultReason>();
 
@@ -226,7 +254,7 @@ export function investedPeriodResult(
     ? roundMoney(incomeMinor / 10000)
     : null;
 
-  for (const point of [points[startIndex], ...days]) {
+  for (const point of [start, ...days]) {
     if (pointComplete(point)) continue;
     if (point.pricesComplete === false) reasons.add("incompletePrices");
     if (point.fxComplete === false) reasons.add("missingRatePairs");
@@ -246,15 +274,13 @@ export function investedPeriodResult(
 
   const withheld = (): InvestedPeriodDecision => ({
     ...WITHHELD,
+    investedValueChange,
     investmentCapitalFlows,
     investmentIncome,
     investedReasons: [...reasons],
   });
 
   if (reasons.size > 0) return withheld();
-
-  const start = points[startIndex];
-  const end = points[endIndex];
 
   const pnl = roundMoney(
     (Math.round(end.securitiesValue * 10000) -
@@ -304,6 +330,7 @@ export function investedPeriodResult(
       return {
         investedValueStart: start.securitiesValue,
         investedValueEnd: end.securitiesValue,
+        investedValueChange,
         investmentCapitalFlows,
         investmentIncome,
         investmentPnl: 0,
@@ -319,6 +346,7 @@ export function investedPeriodResult(
       ...WITHHELD,
       investedValueStart: start.securitiesValue,
       investedValueEnd: end.securitiesValue,
+      investedValueChange,
       investmentCapitalFlows,
       investmentIncome,
       investmentPnl: pnl,
@@ -333,6 +361,7 @@ export function investedPeriodResult(
       ...WITHHELD,
       investedValueStart: start.securitiesValue,
       investedValueEnd: end.securitiesValue,
+      investedValueChange,
       investmentCapitalFlows,
       investmentIncome,
       investmentPnl: pnl,
@@ -343,6 +372,7 @@ export function investedPeriodResult(
   return {
     investedValueStart: start.securitiesValue,
     investedValueEnd: end.securitiesValue,
+    investedValueChange,
     investmentCapitalFlows,
     investmentIncome,
     investmentPnl: pnl,
@@ -443,6 +473,7 @@ function moneyWeightedFigures(
 /** The answer for a scope or window with no series at all. */
 export const NO_INVESTED_PERIOD: InvestedPeriodDecision = {
   ...WITHHELD,
+  investedValueChange: null,
   investmentCapitalFlows: null,
   investmentIncome: null,
   investedReasons: ["noValueSeries"],

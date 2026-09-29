@@ -28,6 +28,7 @@ describe("NetWorthController", () => {
       getMonthlyNetWorth: jest.fn(),
       getMonthlyInvestments: jest.fn(),
       getDailyInvestments: jest.fn(),
+      getSampledInvestments: jest.fn(),
       getInvestmentBreakdown: jest.fn(),
       recalculateAllAccounts: jest.fn(),
     };
@@ -530,6 +531,45 @@ describe("NetWorthController", () => {
         ),
       ).rejects.toThrow(/"accountIds".*UUID/);
     });
+
+    it("routes sampling=monthEnd to the sampled series with the scoped ids", async () => {
+      mockNetWorthService.getSampledInvestments!.mockResolvedValue("sampled");
+
+      const result = await controller.getDailyInvestments(
+        mockReq,
+        undefined,
+        "2026-09-28",
+        UUID_A,
+        "cad",
+        "monthEnd",
+      );
+
+      expect(result).toBe("sampled");
+      expect(mockNetWorthService.getSampledInvestments).toHaveBeenCalledWith(
+        "user-1",
+        {
+          startDate: undefined,
+          endDate: "2026-09-28",
+          accountIds: [UUID_A],
+          displayCurrency: "CAD",
+        },
+      );
+      expect(mockNetWorthService.getDailyInvestments).not.toHaveBeenCalled();
+    });
+
+    it("throws on an unknown sampling", async () => {
+      await expect(
+        controller.getDailyInvestments(
+          mockReq,
+          "2025-01-01",
+          undefined,
+          undefined,
+          undefined,
+          "weekly",
+        ),
+      ).rejects.toThrow(/"sampling"/);
+      expect(mockNetWorthService.getSampledInvestments).not.toHaveBeenCalled();
+    });
   });
 
   describe("getInvestmentBreakdown()", () => {
@@ -555,6 +595,17 @@ describe("NetWorthController", () => {
           accountIds: [UUID_A],
           displayCurrency: "USD",
         },
+      );
+    });
+
+    it("accepts the monthEnd granularity", async () => {
+      mockNetWorthService.getInvestmentBreakdown!.mockResolvedValue("bd");
+
+      await controller.getInvestmentBreakdown(mockReq, "monthEnd");
+
+      expect(mockNetWorthService.getInvestmentBreakdown).toHaveBeenCalledWith(
+        "user-1",
+        expect.objectContaining({ granularity: "monthEnd" }),
       );
     });
 

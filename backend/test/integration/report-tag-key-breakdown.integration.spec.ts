@@ -310,12 +310,7 @@ describe("Income vs Expenses tag-key breakdown (integration)", () => {
 
   async function getReport(tagKey?: string) {
     return withUserContext(userId, () =>
-      income.getIncomeVsExpenses(
-        userId,
-        START,
-        END,
-        tagKey ? { tagKey } : {},
-      ),
+      income.getIncomeVsExpenses(userId, START, END, tagKey ? { tagKey } : {}),
     );
   }
 

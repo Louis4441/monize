@@ -325,6 +325,169 @@ describe("investedPeriodResult (spec section 10.5)", () => {
 });
 
 /**
+ * `investedValueChange` is the difference a value chart draws: its last point
+ * less its first. It is two-ended, so it survives everything that withholds the
+ * P&L between the two boundaries, and it reconciles with the P&L exactly
+ * wherever both are known: `change - capital + income === pnl`.
+ */
+describe("investedPeriodResult, investedValueChange", () => {
+  /** Every section 10.5 case that reports a P&L, as run() inputs. */
+  const reconcilable: Array<{
+    name: string;
+    values: number[];
+    flows: Record<number, Partial<InvestedFlowDay>>;
+  }> = [
+    { name: "case 1", values: [0, 0, 0], flows: {} },
+    {
+      name: "case 2",
+      values: [0, 8_000, 8_000, 8_000],
+      flows: { 1: { capitalIn: 8_000 } },
+    },
+    {
+      name: "case 3",
+      values: [0, 8_000, 8_800, 8_800],
+      flows: { 1: { capitalIn: 8_000 } },
+    },
+    {
+      name: "case 5",
+      values: [0, 8_000, 8_800, 12_800, 12_800],
+      flows: { 1: { capitalIn: 8_000 }, 3: { capitalIn: 4_000 } },
+    },
+    {
+      name: "case 6",
+      values: [0, 8_000, 8_000, 0, 0],
+      flows: { 1: { capitalIn: 8_000 }, 3: { capitalOut: 9_000 } },
+    },
+    {
+      name: "case 8",
+      values: [8_000, 8_000, 8_000],
+      flows: { 2: { income: 100 } },
+    },
+    {
+      name: "case 9",
+      values: [0, 5_000, 6_000, 0, 6_000, 6_600],
+      flows: {
+        1: { capitalIn: 5_000 },
+        3: { capitalOut: 6_000 },
+        4: { capitalIn: 6_000 },
+      },
+    },
+    {
+      name: "case 10",
+      values: [10_000, 10_000, 10_000],
+      flows: { 1: { capitalIn: 3_000, capitalOut: 3_000 } },
+    },
+    { name: "no invested base", values: [0, 0], flows: { 1: { income: 100 } } },
+    {
+      name: "fractional cents",
+      values: [1_000.1234, 1_050.5678, 1_101.0101],
+      flows: { 1: { capitalIn: 20.0001 }, 2: { income: 0.3333 } },
+    },
+  ];
+
+  it.each(reconcilable)(
+    "$name: the change less capital plus income is the P&L",
+    ({ values, flows }) => {
+      const result = run(values, flows);
+
+      expect(result.investedValueChange).toBe(
+        Math.round((values[values.length - 1] - values[0]) * 10000) / 10000,
+      );
+      expect(result.investmentPnl).not.toBeNull();
+      const reconciled =
+        (Math.round(result.investedValueChange! * 10000) -
+          Math.round(result.investmentCapitalFlows! * 10000) +
+          Math.round(result.investmentIncome! * 10000)) /
+        10000;
+      expect(reconciled).toBe(result.investmentPnl);
+    },
+  );
+
+  it("is known when a day between the boundaries is a subtotal", () => {
+    const points = series([0, 8_000, 8_800, 8_800]);
+    points[2] = day("2026-01-03", 8_800, {
+      pricesComplete: false,
+      unpricedSecurityIds: ["sec-1"],
+    });
+
+    const result = investedPeriodResult({
+      points,
+      startIndex: 0,
+      endIndex: points.length - 1,
+      flowsByDay: new Map([["2026-01-02", flow({ capitalIn: 8_000 })]]),
+    });
+
+    expect(result.investmentPnl).toBeNull();
+    expect(result.investedValueStart).toBeNull();
+    expect(result.investedValueChange).toBe(8_800);
+  });
+
+  it("is known when a flow did not convert or a movement was uncountable", () => {
+    const unconverted = run([0, 8_000, 8_800], {
+      1: { capitalIn: 8_000, complete: false, missingPairs: ["EUR->CAD"] },
+    });
+    const uncountable = run(
+      [0, 8_000, 8_800],
+      { 1: { capitalIn: 8_000 } },
+      {
+        unmeasuredFlows: {
+          externallySettledTrades: 1,
+          externalShareTransfers: 0,
+          mixedSplitParents: 0,
+        },
+      },
+    );
+
+    expect(unconverted.investedValueChange).toBe(8_800);
+    expect(uncountable.investedValueChange).toBe(8_800);
+  });
+
+  it.each([
+    { name: "start", index: 0 },
+    { name: "end", index: 1 },
+  ])("is null when the $name boundary is a subtotal", ({ index }) => {
+    const points = series([8_000, 8_800]);
+    points[index] = { ...points[index], fxComplete: false };
+
+    const result = investedPeriodResult({
+      points,
+      startIndex: 0,
+      endIndex: 1,
+      flowsByDay: new Map(),
+    });
+
+    expect(result.investedValueChange).toBeNull();
+  });
+
+  it("does not read cashComplete", () => {
+    const points = series([8_000, 8_800]).map((point) => ({
+      ...point,
+      cashComplete: false,
+    }));
+
+    const result = investedPeriodResult({
+      points,
+      startIndex: 0,
+      endIndex: 1,
+      flowsByDay: new Map(),
+    });
+
+    expect(result.investedValueChange).toBe(800);
+  });
+
+  it("is null for a window with no series", () => {
+    const result = investedPeriodResult({
+      points: [],
+      startIndex: 0,
+      endIndex: 0,
+      flowsByDay: new Map(),
+    });
+
+    expect(result.investedValueChange).toBeNull();
+  });
+});
+
+/**
  * The money-weighted return of the same windows
  * (`docs/specs/portfolio-period-result.md` section 11.7).
  *

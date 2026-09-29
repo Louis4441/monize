@@ -1,4 +1,4 @@
-import { enumerateDaysYMD } from "./series-dates.util";
+import { enumerateDaysYMD, monthEndSampleDates } from "./series-dates.util";
 
 /**
  * The implementation this replaces, written out so the regression below can
@@ -120,5 +120,75 @@ describe("enumerateDaysYMD", () => {
     expect(days[0]).toBe("2026-01-15");
     expect(days[days.length - 1]).toBe("2026-02-14");
     expect(days).toHaveLength(31);
+  });
+});
+
+describe("monthEndSampleDates", () => {
+  it.each([
+    {
+      name: "a mid-month start opens on its own day, then that month's end",
+      start: "2024-09-29",
+      end: "2024-12-10",
+      expected: [
+        "2024-09-29",
+        "2024-09-30",
+        "2024-10-31",
+        "2024-11-30",
+        "2024-12-10",
+      ],
+    },
+    {
+      name: "a start on the 1st still reaches its own month's end",
+      start: "2026-03-01",
+      end: "2026-05-15",
+      expected: ["2026-03-01", "2026-03-31", "2026-04-30", "2026-05-15"],
+    },
+    {
+      name: "a start that is itself a month-end appears once (YTD)",
+      start: "2025-12-31",
+      end: "2026-02-10",
+      expected: ["2025-12-31", "2026-01-31", "2026-02-10"],
+    },
+    {
+      name: "an end on a month-end appears once",
+      start: "2026-01-10",
+      end: "2026-02-28",
+      expected: ["2026-01-10", "2026-01-31", "2026-02-28"],
+    },
+    {
+      name: "a leap-year February ends on the 29th",
+      start: "2024-02-10",
+      end: "2024-03-05",
+      expected: ["2024-02-10", "2024-02-29", "2024-03-05"],
+    },
+    {
+      name: "a window inside one month is its two ends",
+      start: "2026-06-03",
+      end: "2026-06-20",
+      expected: ["2026-06-03", "2026-06-20"],
+    },
+    {
+      name: "a one-day window is that day",
+      start: "2026-06-03",
+      end: "2026-06-03",
+      expected: ["2026-06-03"],
+    },
+    {
+      name: "a reversed window is no days",
+      start: "2026-06-04",
+      end: "2026-06-03",
+      expected: [],
+    },
+  ])("$name", ({ start, end, expected }) => {
+    expect(monthEndSampleDates(start, end)).toEqual(expected);
+  });
+
+  it("crosses a year end", () => {
+    expect(monthEndSampleDates("2025-11-15", "2026-01-15")).toEqual([
+      "2025-11-15",
+      "2025-11-30",
+      "2025-12-31",
+      "2026-01-15",
+    ]);
   });
 });

@@ -232,6 +232,12 @@ export class NetWorthController {
   @ApiQuery({ name: "startDate", required: false, example: "2025-01-01" })
   @ApiQuery({ name: "endDate", required: false, example: "2025-03-04" })
   @ApiQuery({
+    name: "sampling",
+    required: false,
+    description:
+      "'monthEnd' keeps only the window's first day, each month-end inside it and its last day, from the same daily valuation. With no startDate it opens on the day before the scope's first investment transaction, where the period result's 'all' window does.",
+  })
+  @ApiQuery({
     name: "accountIds",
     required: false,
     description:
@@ -251,11 +257,21 @@ export class NetWorthController {
     @Query("endDate") endDate?: string,
     @Query("accountIds") accountIds?: string,
     @Query("displayCurrency") displayCurrency?: string,
+    @Query("sampling") sampling?: string,
   ) {
     const sd = assertStringParam(startDate, "startDate");
     const ed = assertStringParam(endDate, "endDate");
     const aIds = assertStringParam(accountIds, "accountIds");
     const curr = assertStringParam(displayCurrency, "displayCurrency");
+    const sample = assertStringParam(sampling, "sampling");
+    if (sample !== undefined && sample !== "monthEnd")
+      throw new BadRequestException(
+        tr(
+          "errors.params.mustBeOneOf",
+          'The value of "sampling" must be one of: monthEnd',
+          { param: "sampling", options: "monthEnd" },
+        ),
+      );
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (sd && !dateRegex.test(sd))
       throw new BadRequestException(
@@ -289,11 +305,20 @@ export class NetWorthController {
       }
     }
     const safeCurrency = curr ? curr.slice(0, 3).toUpperCase() : undefined;
+    const scopeIds = await this.scopeIds(req, ids);
+    if (sample === "monthEnd") {
+      return this.netWorthService.getSampledInvestments(req.user.id, {
+        startDate: sd,
+        endDate: ed,
+        accountIds: scopeIds,
+        displayCurrency: safeCurrency,
+      });
+    }
     return this.netWorthService.getDailyInvestments(
       req.user.id,
       sd,
       ed,
-      await this.scopeIds(req, ids),
+      scopeIds,
       safeCurrency,
     );
   }
@@ -304,7 +329,7 @@ export class NetWorthController {
   @ApiOperation({
     summary: "What the portfolio did over a period, net of deposits",
     description:
-      "Three separate figures over the same series the chart draws: valueChange (last close minus first), netExternalFlows (cash that crossed the scope's boundary after the baseline, each day converted at its own date) and investmentResult (the difference). returnPercent is the result over the starting value, method 'simple'. Each is null with a named reason when a component is unknown; see docs/specs/portfolio-period-result.md.",
+      "Three separate figures over the same series the chart draws: valueChange (last close minus first, cash included), netExternalFlows (cash that crossed the scope's boundary after the baseline, each day converted at its own date) and investmentResult (the difference). returnPercent is the result over the starting value, method 'simple'. Each is null with a named reason when a component is unknown. The invested part of the same window rides alongside: investedValueChange (the securities' last close minus first, which is what the value chart draws), investmentCapitalFlows, investmentIncome and investmentPnl, which reconcile as investedValueChange - investmentCapitalFlows + investmentIncome = investmentPnl; see docs/specs/portfolio-period-result.md.",
   })
   @ApiQuery({
     name: "period",
@@ -492,7 +517,8 @@ export class NetWorthController {
   @ApiQuery({
     name: "granularity",
     required: true,
-    description: "'daily' or 'monthly' point resolution",
+    description:
+      "'daily', 'monthly', or 'monthEnd' (the window's first day, each month-end inside it and its last day) point resolution",
   })
   @ApiQuery({ name: "startDate", required: false, example: "2024-01-01" })
   @ApiQuery({ name: "endDate", required: false, example: "2024-12-31" })
@@ -522,12 +548,12 @@ export class NetWorthController {
     @Query("displayCurrency") displayCurrency?: string,
   ) {
     const gran = assertStringParam(granularity, "granularity");
-    if (gran !== "daily" && gran !== "monthly") {
+    if (gran !== "daily" && gran !== "monthly" && gran !== "monthEnd") {
       throw new BadRequestException(
         tr(
           "errors.params.mustBeOneOf",
-          'The value of "granularity" must be one of: daily, monthly',
-          { param: "granularity", options: "daily, monthly" },
+          'The value of "granularity" must be one of: daily, monthly, monthEnd',
+          { param: "granularity", options: "daily, monthly, monthEnd" },
         ),
       );
     }
