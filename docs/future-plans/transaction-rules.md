@@ -373,7 +373,74 @@ writes already do:
 | Frontend | editor round trip (tree in, tree out); every picker writes an id and shows a name; test panel renders matched and not-matched rows; nav entry hidden for a delegate |
 | E2E | create a rule in the UI, import a small QIF, see the tag on the row |
 
-## 10. Open questions
+## 10. Phase 2: extensions (approved direction, not built)
+
+Discussion #991 (a PKO BP CSV import script) showed what rules still cannot
+do. The import half of that script belongs to the import (plan
+[`csv-source-profiles.md`](./csv-source-profiles.md)); these four
+extensions are the rule half. All of them keep I1: they write the payee,
+the description, tags or nothing, never an amount, an account, a date, a
+status or a link.
+
+### 10.1 Captures in a glob (X1)
+
+A `matches` leaf may name captures: `{name}` in the pattern matches the
+shortest run of characters that lets the rest of the pattern match, `*`
+stays an anonymous wildcard. Example: `*Nazwa odbiorcy: {payee} Rachunek*`.
+
+- The matcher stays iterative and linear in the text length (no regex, no
+  backtracking beyond the existing glob's segment search); it lives beside
+  `matchesAliasPattern` and shares its 500-character bound.
+- At most 5 captures per pattern, names `[a-z][a-z0-9]{0,19}`, each captured
+  value trimmed and at most 200 characters.
+- Captures are visible to the actions of the same rule only, as `{name}` in
+  a template. A capture from a leaf inside an `any` group that did not match
+  is empty.
+- The validator refuses a template that names a capture no leaf of the rule
+  defines.
+
+### 10.2 Two text actions (X2)
+
+| Action | Parameters | Effect | Refused when |
+|---|---|---|---|
+| `set_payee_from_text` | `template` (1..200), `createIfMissing` (default false), `onlyIfEmpty` (default true) | Renders the template, resolves the name through the existing payee resolution (exact name, then alias, then the unique normalized match), and sets the payee; with `createIfMissing` it creates the payee through the existing find-or-create path | the rendered name is empty; the row is a cross-owner transfer leg |
+| `set_description` | `template` (1..500), `mode` (`replace`, `append`, `prepend`), `onlyIfEmpty` (default false) | Renders the template (`{description}` is the current text) and writes the description within the column's length, `stripHtml` applied | the rendered text is empty in `replace` mode |
+
+Templates are plain text with `{capture}`, `{payeeText}` and `{description}`
+placeholders; there is no expression language inside a template. The
+preview renders the same template through the same function (I3). A payee
+created by a rule is traced in the application row, and undo of a manual
+run does not delete it (a payee is reference data, as when a form creates
+one).
+
+### 10.3 More condition fields (X3)
+
+| Field | Kind | Operators |
+|---|---|---|
+| `referenceNumber` | text | `eq`, `contains`, `startsWith`, `matches`, `isEmpty` |
+| `dayOfMonth` | number 1..31, from the transaction date | `eq`, `lt`, `lte`, `gt`, `gte`, `between`, `in` |
+| `weekday` | enum `MON`..`SUN` | `eq`, `in` |
+| `status` | enum of the transaction statuses | `eq`, `neq`, `in` |
+| `hasAttachment` | bool | `eq` |
+
+The date is the transaction's own calendar date, never a clock reading.
+
+### 10.4 Rule effects in the import preview (X4)
+
+The import wizard's review step shows, per row, what the import-trigger
+rules will do, through `planRuleEffects` on the facts the import will build
+(I3). The commit stays unchanged; a row whose preview and commit differ
+(for example a payee the import creates) says so, as `previewCreate` does.
+
+### 10.5 Not in phase 2
+
+A regex operator (ReDoS, or a new RE2 dependency), an action that turns a
+row into a transfer or changes its account, amount or date (breaks I1; the
+import profile does it before the row exists), `split_by_template`,
+`notify`, an `update` trigger, rule export and rule groups. Each can be a
+later proposal.
+
+## 11. Open questions
 
 - **Q1.** Is "Rules" a direct entry in the Tools menu, or a section under
   Payees? This plan says direct entry, because a rule touches payees,

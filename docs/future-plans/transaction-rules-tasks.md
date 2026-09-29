@@ -48,6 +48,11 @@
 | R1 | `ai_review_requests` table, enqueue from `request_ai_review` in the applier, expiry cron | D1, B4 | inert | [x] expiry cron open (same decision as B8) |
 | R2 | MCP and assistant tools: list, claim, submit proposal; proposal stored as a signed `PendingAiAction` | R1, A1 | inert | [x] |
 | R3 | Review inbox in the UI: pending, proposed (confirmation card), expired | R2, F1 | inert | [x] |
+| X1 | Glob captures: matcher, evaluator returns captures, validation of names and template references (design 10.1) | B1 | none | [ ] |
+| X2 | `set_payee_from_text`, `set_description`: planner, applier, trace, preview, AI/MCP field docs (design 10.2) | X1, B4 | inert | [ ] |
+| X3 | Fields `referenceNumber`, `dayOfMonth`, `weekday`, `status`, `hasAttachment` in facts, evaluator, validation, editor, CEL (design 10.3) | B4, F5 | inert | [ ] |
+| X4 | Import preview shows rule effects (design 10.4) | B6, X2 | inert | [ ] |
+| X5 | Editor: capture help on `matches`, template inputs with capture suggestions, new fields, CEL printer/parser support | X1, X2, X3 | inert | [ ] |
 | E1 | E2E: create a rule, import a QIF, see the tag | F2, B6 | none | [ ] |
 | Q1 | `docs/system-invariants.md` entries, doc lines, README feature line | B7 | none | [x] |
 | Q2 | Translate every locale | F4 | none | [x] done per task; native review of the translations open |
@@ -184,6 +189,10 @@ Decided by the repo owner: no new dependency, the stored form stays the JSON tre
 ### R1 to R3. The AI review queue
 
 Design section 6.5. R1 is a separate migration (a new user-owned table with its own RLS policy and backup classification, as D1). Claiming is a conditional `UPDATE ... WHERE status = 'pending' RETURNING`; a submitted proposal is validated by `AiActionBuilderService` exactly like a proposal from the chat, and only the confirm path commits it. Email ingestion is not part of these tasks.
+
+### X1 to X5. Phase 2 extensions
+
+Design section 10. Each keeps I1 (the applier guard test and the closed action union are extended, never widened past payee, description and tags). X2's payee creation goes through the existing find-or-create path, never a second insert; the creation-path guard of B7 does not change because no transaction is inserted.
 
 ### E1. End to end
 
