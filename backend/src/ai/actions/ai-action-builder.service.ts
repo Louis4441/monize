@@ -166,6 +166,9 @@ export function transferPreviewRow(
     payeeName: preview.payeeName,
     payeeWillBeCreated: preview.payeeWillBeCreated,
     categoryName: preview.categoryName,
+    ...("ruleEffects" in preview && preview.ruleEffects
+      ? { ruleEffects: preview.ruleEffects }
+      : {}),
   };
 }
 
@@ -806,6 +809,7 @@ export class AiActionBuilderService {
         payeeName: preview.payeeName,
         payeeWillBeCreated: preview.payeeWillBeCreated,
         categoryName: preview.categoryName,
+        ...(preview.ruleEffects ? { ruleEffects: preview.ruleEffects } : {}),
       },
     };
   }

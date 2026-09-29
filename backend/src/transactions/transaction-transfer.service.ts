@@ -36,6 +36,10 @@ import { assertReconciledRowsMutable } from "./reconciled-lock.util";
 import { removeLockedTransactionLeg } from "./remove-transaction-leg";
 import { autoTransferPayeeName } from "./transfer-payee-label.util";
 import { withSystemContext } from "../common/db/with-context";
+import {
+  RuleEffectsPreview,
+  TransactionRulesApplierService,
+} from "../transaction-rules/transaction-rules-applier.service";
 
 export interface TransferResult {
   fromTransaction: Transaction;
@@ -121,6 +125,11 @@ export interface CreateTransferPreview {
   /** Spending category applied to both legs on create (null = none). */
   categoryId: string | null;
   categoryName: string | null;
+  /**
+   * What the user's `create` rules will do to the transfer's legs on approval
+   * (display-only, not signed). Absent when no rule matches.
+   */
+  ruleEffects?: RuleEffectsPreview;
 }
 
 /** Resolved, sanitized preview of an edit the assistant proposes to a transfer. */
@@ -160,6 +169,7 @@ export class TransactionTransferService {
     private actionHistoryService: ActionHistoryService,
     private crossOwnerAccess: CrossOwnerAccessService,
     private exchangeRateService: ExchangeRateService,
+    private rulesApplier: TransactionRulesApplierService,
   ) {}
 
   /**
@@ -708,6 +718,17 @@ export class TransactionTransferService {
         linkedTransactionId: fromId,
       });
 
+      // Transaction rules (design 6.3): after both legs and their linkage are
+      // written, before the balances and the commit, on this manager, so a
+      // rollback drops the rule effects with the legs. They change payee and
+      // tags only; a VOID transfer is still a row the rules may tag.
+      await this.rulesApplier.applyToNewTransfer(m, {
+        fromLegId: fromId,
+        toLegId: toId,
+        fromOwnerId,
+        toOwnerId,
+      });
+
       // A VOID transfer is a ledger record of something that did not happen, so
       // neither leg may move a balance -- exactly as an ordinary VOID
       // transaction skips its balance update (transactions.service create()).
@@ -1105,6 +1126,27 @@ export class TransactionTransferService {
       categoryName = category.name;
     }
 
+    // The same planner the commit runs (design I3), over the outgoing leg's
+    // facts, which is what `applyToNewTransfer` evaluates for a same-owner
+    // transfer (both accounts were resolved under this user above).
+    const description = stripHtml(input.description) || null;
+    const ruleEffects = await withScopedDb(this.dataSource, (m) =>
+      this.rulesApplier.previewForRow(m, userId, {
+        accountId: fromAccount.id,
+        currencyCode: fromAccount.currencyCode,
+        amount: -input.amount,
+        isTransfer: true,
+        fromAccountId: fromAccount.id,
+        toAccountId: toAccount.id,
+        payeeId,
+        payeeText: inputPayeeName,
+        categoryId,
+        description,
+        tagIds: [],
+        hasSplits: false,
+      }),
+    );
+
     return {
       fromAccountId: fromAccount.id,
       fromAccountName: fromAccount.name,
@@ -1116,13 +1158,14 @@ export class TransactionTransferService {
       toAmount,
       exchangeRate: previewFx.exchangeRate,
       transactionDate: input.transactionDate,
-      description: stripHtml(input.description) || null,
+      description,
       payeeId,
       payeeName,
       payeeMatched,
       payeeWillBeCreated,
       categoryId,
       categoryName,
+      ...(ruleEffects ? { ruleEffects } : {}),
     };
   }
 

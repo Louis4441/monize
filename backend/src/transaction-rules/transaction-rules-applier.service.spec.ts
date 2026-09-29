@@ -101,7 +101,7 @@ function harness(fx: Fixture = {}) {
   ]);
   const m = {
     getRepository: jest.fn((entity: unknown) => repos.get(entity)),
-    find: jest.fn(async (entity: unknown) => {
+    find: jest.fn(async (entity: unknown, _opts?: unknown) => {
       if (entity === Transaction) return fx.rows ?? [];
       if (entity === TransactionTag) return fx.links ?? [];
       if (entity === Payee) return [{ id: PAYEE, name: "Biedronka" }];
@@ -372,6 +372,243 @@ describe("TransactionRulesApplierService.applyToNew", () => {
     });
     await h.service.applyToNew(h.m, USER, [TX], "create");
     expect(h.tags.addTransactionTags).toHaveBeenCalled();
+  });
+});
+
+describe("TransactionRulesApplierService.applyToNewTransfer", () => {
+  const OTHER = uuid(88);
+  const OWNER_2 = "user-2";
+  const FROM_TX = uuid(31);
+  const TO_TX = uuid(32);
+  const fromLeg = (over: Partial<Transaction> = {}) =>
+    row({
+      id: FROM_TX,
+      isTransfer: true,
+      linkedTransactionId: TO_TX,
+      amount: -50,
+      ...over,
+    });
+  const toLeg = (over: Partial<Transaction> = {}) =>
+    row({
+      id: TO_TX,
+      accountId: OTHER,
+      isTransfer: true,
+      linkedTransactionId: FROM_TX,
+      amount: 50,
+      ...over,
+    });
+  const sameOwner = {
+    fromLegId: FROM_TX,
+    toLegId: TO_TX,
+    fromOwnerId: USER,
+    toOwnerId: USER,
+  };
+
+  it("with no rules reads nothing else and writes nothing (neutral)", async () => {
+    const h = harness({ rules: [], rows: [fromLeg(), toLeg()] });
+    expect(await h.service.applyToNewTransfer(h.m, sameOwner)).toEqual([]);
+    expect(h.mock.find).not.toHaveBeenCalled();
+    expect(h.writes()).toEqual([]);
+  });
+
+  it("evaluates a same-owner transfer once, over the outgoing leg, and mirrors tags and payee onto both legs", async () => {
+    const h = harness({
+      known: [ACCOUNT, OTHER, PAYEE, TAG_A, TAG_B],
+      rules: [
+        rule(
+          RULE_1,
+          [
+            { type: "add_tags", tagIds: [TAG_A] },
+            { type: "set_payee", payeeId: PAYEE, onlyIfEmpty: false },
+          ],
+          {},
+          {
+            all: [
+              { field: "type", op: "eq", value: "TRANSFER" },
+              { field: "accountId", op: "eq", value: ACCOUNT },
+              { field: "fromAccountId", op: "eq", value: ACCOUNT },
+              { field: "toAccountId", op: "eq", value: OTHER },
+              { field: "amount", op: "lt", value: 0 },
+            ],
+          },
+        ),
+      ],
+      rows: [fromLeg(), toLeg()],
+    });
+    const applied = await h.service.applyToNewTransfer(h.m, sameOwner);
+
+    expect(h.ruleRepo.find).toHaveBeenCalledTimes(1);
+    expect(applied.map((a) => a.transactionId).sort()).toEqual(
+      [FROM_TX, TO_TX].sort(),
+    );
+    expect(applied[0].effects).toBe(applied[1].effects);
+    for (const id of [FROM_TX, TO_TX]) {
+      expect(h.tags.addTransactionTags).toHaveBeenCalledWith(
+        h.m,
+        USER,
+        [id],
+        [TAG_A],
+      );
+      expect(h.mock.update).toHaveBeenCalledWith(
+        Transaction,
+        { id, userId: USER },
+        { payeeId: PAYEE, payeeName: "Biedronka" },
+      );
+    }
+    const traced = h.mock.insert.mock.calls.flatMap(([, rows]) =>
+      (rows as Array<{ transactionId: string; source: string }>).map(
+        (r) => `${r.transactionId}:${r.source}`,
+      ),
+    );
+    expect(traced.sort()).toEqual(
+      [`${FROM_TX}:create`, `${TO_TX}:create`].sort(),
+    );
+  });
+
+  it("removes rule-removed tags from both legs", async () => {
+    const h = harness({
+      rules: [rule(RULE_1, [{ type: "remove_tags", tagIds: [TAG_A] }])],
+      rows: [fromLeg(), toLeg()],
+      links: [{ transactionId: FROM_TX, tagId: TAG_A }],
+    });
+    await h.service.applyToNewTransfer(h.m, sameOwner);
+    expect(h.tags.removeTransactionTags).toHaveBeenCalledWith(
+      h.m,
+      USER,
+      [FROM_TX],
+      [TAG_A],
+    );
+    expect(h.tags.removeTransactionTags).toHaveBeenCalledWith(
+      h.m,
+      USER,
+      [TO_TX],
+      [TAG_A],
+    );
+  });
+
+  it("refuses set_category on the legs, traces it as skipped and writes no category", async () => {
+    const h = harness({
+      rules: [
+        rule(RULE_1, [
+          { type: "set_category", categoryId: CAT, onlyIfEmpty: false },
+          { type: "add_tags", tagIds: [TAG_A] },
+        ]),
+      ],
+      rows: [fromLeg(), toLeg()],
+    });
+    const applied = await h.service.applyToNewTransfer(h.m, sameOwner);
+    expect(applied[0].effects.trace[0].skipped).toEqual([
+      { type: "set_category", reason: "row_is_transfer_leg" },
+    ]);
+    expect(applied[0].effects.changes.categoryId).toBeUndefined();
+    expect(h.mock.update).not.toHaveBeenCalled();
+    expect(h.tags.addTransactionTags).toHaveBeenCalledTimes(2);
+  });
+
+  describe("cross-owner", () => {
+    const cross = { ...sameOwner, toOwnerId: OWNER_2 };
+    const crossHarness = (setPayee: boolean) => {
+      const h = harness({ known: [ACCOUNT, OTHER, PAYEE, TAG_A, TAG_B] });
+      const actions: RuleAction[] = [
+        { type: "add_tags", tagIds: [TAG_A] },
+        ...(setPayee
+          ? [{ type: "set_payee", payeeId: PAYEE, onlyIfEmpty: false } as const]
+          : []),
+      ];
+      h.ruleRepo.find.mockImplementation(
+        async (opts: { where: { userId: string } }) => [
+          rule(opts.where.userId === USER ? RULE_1 : RULE_2, actions, {
+            userId: opts.where.userId,
+          }),
+        ],
+      );
+      h.mock.find.mockImplementation(
+        async (entity: unknown, rawOpts?: unknown) => {
+          if (entity !== Transaction) return [];
+          const opts = rawOpts as {
+            where: { id: { value: string[] }; userId: string };
+          };
+          const mine = opts.where.userId === USER ? fromLeg() : toLeg();
+          return opts.where.id.value.includes(mine.id) ? [mine] : [];
+        },
+      );
+      return h;
+    };
+
+    it("runs each owner's rules on that owner's leg only", async () => {
+      const h = crossHarness(false);
+      const applied = await h.service.applyToNewTransfer(h.m, cross);
+
+      expect(h.ruleRepo.find.mock.calls.map((c) => c[0].where.userId)).toEqual([
+        USER,
+        OWNER_2,
+      ]);
+      expect(applied.map((a) => a.transactionId)).toEqual([FROM_TX, TO_TX]);
+      expect(h.tags.addTransactionTags).toHaveBeenCalledTimes(2);
+      expect(h.tags.addTransactionTags).toHaveBeenCalledWith(
+        h.m,
+        USER,
+        [FROM_TX],
+        [TAG_A],
+      );
+      expect(h.tags.addTransactionTags).toHaveBeenCalledWith(
+        h.m,
+        OWNER_2,
+        [TO_TX],
+        [TAG_A],
+      );
+      // Each read of the rows is scoped to the owner of the requested leg.
+      for (const call of h.mock.find.mock.calls.filter(
+        ([entity]) => entity === Transaction,
+      )) {
+        const { id, userId } = (
+          call[1] as { where: { id: { value: string[] }; userId: string } }
+        ).where;
+        expect(id.value).toEqual([userId === USER ? FROM_TX : TO_TX]);
+      }
+    });
+
+    it("refuses set_payee on a cross-owner leg and never writes the other owner's leg", async () => {
+      const h = crossHarness(true);
+      const applied = await h.service.applyToNewTransfer(h.m, cross);
+
+      for (const a of applied) {
+        expect(a.effects.trace[0].skipped).toEqual([
+          { type: "set_payee", reason: "cross_owner_transfer_leg" },
+        ]);
+      }
+      expect(h.mock.update).not.toHaveBeenCalled();
+      const written = h.tags.addTransactionTags.mock.calls.map(
+        ([, owner, ids]) => `${owner}:${ids.join()}`,
+      );
+      expect(written.sort()).toEqual(
+        [`${USER}:${FROM_TX}`, `${OWNER_2}:${TO_TX}`].sort(),
+      );
+    });
+
+    it("does not put the other owner's account in the facts", async () => {
+      const h = crossHarness(false);
+      h.ruleRepo.find.mockImplementation(
+        async (opts: { where: { userId: string } }) => [
+          rule(
+            opts.where.userId === USER ? RULE_1 : RULE_2,
+            [{ type: "add_tags", tagIds: [TAG_A] }],
+            { userId: opts.where.userId },
+            { field: "toAccountId", op: "eq", value: OTHER },
+          ),
+        ],
+      );
+      await h.service.applyToNewTransfer(h.m, cross);
+      // The from owner cannot see the destination account; the to owner's own
+      // leg is the destination, so only that owner's rule matches.
+      expect(h.tags.addTransactionTags).toHaveBeenCalledTimes(1);
+      expect(h.tags.addTransactionTags).toHaveBeenCalledWith(
+        h.m,
+        OWNER_2,
+        [TO_TX],
+        [TAG_A],
+      );
+    });
   });
 });
 

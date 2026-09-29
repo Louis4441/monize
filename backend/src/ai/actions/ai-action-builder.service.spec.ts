@@ -1,6 +1,7 @@
 import {
   AiActionBuilderService,
   transactionPreviewRow,
+  transferPreviewRow,
 } from "./ai-action-builder.service";
 import { AiActionSigningService } from "./ai-action-signing.service";
 import {
@@ -631,6 +632,50 @@ describe("AiActionBuilderService", () => {
       payeeWillBeCreated: false,
       categoryName: "Savings Goal",
     });
+  });
+
+  it("carries the rule effects of a create_transfer into the display-only preview and bulk row, never the signed descriptor", () => {
+    const ruleEffects = {
+      changes: { addTagIds: ["t1"], removeTagIds: [] },
+      trace: [],
+      aiReviewRequests: [],
+      labels: { categories: {}, payees: {}, tags: { t1: "rent" }, rules: {} },
+    };
+    const preview = {
+      fromAccountId: "a1",
+      fromAccountName: "Checking",
+      fromCurrencyCode: "USD",
+      toAccountId: "a2",
+      toAccountName: "Savings",
+      toCurrencyCode: "USD",
+      amount: 100,
+      toAmount: 100,
+      exchangeRate: 1,
+      transactionDate: "2026-01-15",
+      description: null,
+      payeeId: null,
+      payeeName: null,
+      payeeMatched: false,
+      payeeWillBeCreated: false,
+      categoryId: null,
+      categoryName: null,
+      ruleEffects,
+    };
+
+    const action = builder.buildCreateTransfer("user-1", preview);
+    expect(action.preview.ruleEffects).toBe(ruleEffects);
+    expect(JSON.stringify(action.descriptor)).not.toContain("ruleEffects");
+    expect(transferPreviewRow(preview).ruleEffects).toBe(ruleEffects);
+
+    const without = builder.buildCreateTransfer("user-1", {
+      ...preview,
+      ruleEffects: undefined,
+    });
+    expect("ruleEffects" in without.preview).toBe(false);
+    expect(
+      "ruleEffects" in
+        transferPreviewRow({ ...preview, ruleEffects: undefined }),
+    ).toBe(false);
   });
 
   it("carries payeeId=null and createPayee=true for an unmatched transfer label", () => {

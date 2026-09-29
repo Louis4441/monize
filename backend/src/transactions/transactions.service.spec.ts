@@ -354,6 +354,7 @@ describe("TransactionsService", () => {
     // no effects, which is what every spec below assumed before rules existed.
     rulesApplier = {
       applyToNew: jest.fn().mockResolvedValue([]),
+      applyToNewTransfer: jest.fn().mockResolvedValue([]),
       previewForRow: jest.fn().mockResolvedValue(null),
     };
 
@@ -368,6 +369,7 @@ describe("TransactionsService", () => {
           useValue: {
             findByIds: jest.fn().mockResolvedValue([]),
             setTransactionTags: jest.fn().mockResolvedValue(undefined),
+            addTransactionTags: jest.fn().mockResolvedValue(undefined),
             setSplitTags: jest.fn().mockResolvedValue(undefined),
           },
         },
@@ -2155,11 +2157,15 @@ describe("TransactionsService", () => {
         tagIds: ["tag-1"],
       } as any);
 
-      expect(tagsService.setTransactionTags).toHaveBeenCalledTimes(1);
-      expect(tagsService.setTransactionTags).toHaveBeenCalledWith(
-        "own-leg",
-        ["tag-1"],
+      // Additive (a new transfer may already carry rule tags), on the
+      // effective user's leg only.
+      expect(tagsService.setTransactionTags).not.toHaveBeenCalled();
+      expect(tagsService.addTransactionTags).toHaveBeenCalledTimes(1);
+      expect(tagsService.addTransactionTags).toHaveBeenCalledWith(
+        expect.anything(),
         "user-1",
+        ["own-leg"],
+        ["tag-1"],
       );
       // The foreign leg is passed through untouched, not re-fetched as user-1.
       expect(result.toTransaction).toBe(foreignLeg);
@@ -2298,15 +2304,15 @@ describe("TransactionsService", () => {
         tagIds: ["tag-1"],
       } as any);
 
-      expect(tagsService.setTransactionTags).toHaveBeenCalledWith(
-        "tx-from",
-        ["tag-1"],
+      // One additive call for both legs: explicit tags and the tags the
+      // rules added inside the leg transaction end up as a union.
+      expect(tagsService.setTransactionTags).not.toHaveBeenCalled();
+      expect(tagsService.addTransactionTags).toHaveBeenCalledTimes(1);
+      expect(tagsService.addTransactionTags).toHaveBeenCalledWith(
+        expect.anything(),
         "user-1",
-      );
-      expect(tagsService.setTransactionTags).toHaveBeenCalledWith(
-        "tx-to",
+        ["tx-from", "tx-to"],
         ["tag-1"],
-        "user-1",
       );
     });
 
@@ -2340,6 +2346,7 @@ describe("TransactionsService", () => {
       } as any);
 
       expect(tagsService.setTransactionTags).not.toHaveBeenCalled();
+      expect(tagsService.addTransactionTags).not.toHaveBeenCalled();
     });
   });
 

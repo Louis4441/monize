@@ -16,6 +16,7 @@ import { NetWorthService } from "../net-worth/net-worth.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { CrossOwnerAccessService } from "../delegation/cross-owner-access.service";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
+import { TransactionRulesApplierService } from "../transaction-rules/transaction-rules-applier.service";
 import { isTransactionInFuture } from "../common/date-utils";
 import { withSystemContext } from "../common/db/with-context";
 import {
@@ -70,6 +71,7 @@ describe("TransactionTransferService", () => {
   // shape so the pre-RLS manager assertions still read naturally.
   let mockQueryRunner: Record<string, any>;
   let exchangeRateService: Record<string, jest.Mock>;
+  let rulesApplier: Record<string, jest.Mock>;
   let mockDataSource: DataSourceMock;
 
   const mockFindOne = jest.fn();
@@ -318,6 +320,13 @@ describe("TransactionTransferService", () => {
       getLatestRate: jest.fn().mockResolvedValue(null),
     };
 
+    // No rules by default: nothing is applied and the preview has no effects,
+    // which is what every spec below assumed before rules existed.
+    rulesApplier = {
+      applyToNewTransfer: jest.fn().mockResolvedValue([]),
+      previewForRow: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TransactionTransferService,
@@ -328,6 +337,7 @@ describe("TransactionTransferService", () => {
         { provide: ActionHistoryService, useValue: actionHistoryService },
         { provide: CrossOwnerAccessService, useValue: crossOwnerAccess },
         { provide: ExchangeRateService, useValue: exchangeRateService },
+        { provide: TransactionRulesApplierService, useValue: rulesApplier },
       ],
     }).compile();
 
@@ -3607,6 +3617,140 @@ describe("TransactionTransferService", () => {
     });
     it("returns false for a normal transaction", () => {
       expect(service.isTransfer({ isTransfer: false } as any)).toBe(false);
+    });
+  });
+
+  describe("transaction rules on a new transfer (design 6.3)", () => {
+    it("runs the rules on the leg transaction's manager, after the link and before the balances", async () => {
+      mockFindOne
+        .mockResolvedValueOnce({ id: "from-tx-id", amount: -500 })
+        .mockResolvedValueOnce({ id: "to-tx-id", amount: 500 });
+
+      await service.createTransfer("user-1", baseTransferDto, mockFindOne);
+
+      expect(rulesApplier.applyToNewTransfer).toHaveBeenCalledTimes(1);
+      expect(rulesApplier.applyToNewTransfer).toHaveBeenCalledWith(
+        mockQueryRunner.manager,
+        {
+          fromLegId: "from-tx-id",
+          toLegId: "to-tx-id",
+          fromOwnerId: "user-1",
+          toOwnerId: "user-1",
+        },
+      );
+      const rulesAt =
+        rulesApplier.applyToNewTransfer.mock.invocationCallOrder[0];
+      const lastLinkAt = Math.max(
+        ...transactionsRepository.update.mock.invocationCallOrder,
+      );
+      expect(rulesAt).toBeGreaterThan(lastLinkAt);
+      expect(rulesAt).toBeLessThan(
+        Math.min(...accountsService.updateBalance.mock.invocationCallOrder),
+      );
+    });
+
+    it("runs the rules for a VOID transfer too (they never move a balance)", async () => {
+      mockFindOne
+        .mockResolvedValueOnce({ id: "from-tx-id", amount: -500 })
+        .mockResolvedValueOnce({ id: "to-tx-id", amount: 500 });
+
+      await service.createTransfer(
+        "user-1",
+        { ...baseTransferDto, status: TransactionStatus.VOID },
+        mockFindOne,
+      );
+
+      expect(rulesApplier.applyToNewTransfer).toHaveBeenCalledTimes(1);
+      expect(accountsService.updateBalance).not.toHaveBeenCalled();
+    });
+
+    it("joins the caller's manager when one is passed (scheduled posting)", async () => {
+      const prepared = await service.prepareTransfer("user-1", baseTransferDto);
+      const callerManager = mockQueryRunner.manager;
+
+      await service.writeTransferLegs(prepared, callerManager);
+
+      expect(rulesApplier.applyToNewTransfer.mock.calls[0][0]).toBe(
+        callerManager,
+      );
+    });
+
+    it("hands the applier each leg's owner on a cross-owner transfer", async () => {
+      crossOwnerAccess.accountAccessFor.mockImplementation(
+        async (_real: string, accountId: string) => ({
+          account:
+            accountId === "from-account"
+              ? mockFromAccount
+              : { ...mockToAccount, userId: "owner-2" },
+        }),
+      );
+      mockFindOne
+        .mockResolvedValueOnce({ id: "from-tx-id", amount: -500 })
+        .mockResolvedValueOnce({ id: "to-tx-id", amount: 500 });
+
+      await service.createTransfer("user-1", baseTransferDto, mockFindOne, {
+        effectiveUserId: "user-1",
+        realUserId: "user-1",
+      });
+
+      expect(rulesApplier.applyToNewTransfer).toHaveBeenCalledWith(
+        mockQueryRunner.manager,
+        {
+          fromLegId: "from-tx-id",
+          toLegId: "to-tx-id",
+          fromOwnerId: "user-1",
+          toOwnerId: "owner-2",
+        },
+      );
+    });
+
+    it("moves no balance and completes nothing when the rule step fails (the transaction rolls back)", async () => {
+      rulesApplier.applyToNewTransfer.mockRejectedValue(new Error("rule boom"));
+
+      await expect(
+        service.createTransfer("user-1", baseTransferDto, mockFindOne),
+      ).rejects.toThrow("rule boom");
+
+      expect(accountsService.updateBalance).not.toHaveBeenCalled();
+      expect(actionHistoryService.record).not.toHaveBeenCalled();
+    });
+
+    it("previewCreateTransfer carries the planner's ruleEffects, and omits the key when nothing matches", async () => {
+      const plan = { changes: { addTagIds: ["t1"] }, labels: {} };
+      rulesApplier.previewForRow.mockResolvedValue(plan);
+
+      const withRules = await service.previewCreateTransfer("user-1", {
+        fromAccountId: "from-account",
+        toAccountId: "to-account",
+        amount: 100,
+        transactionDate: "2026-01-15",
+        payeeName: "Rent",
+      });
+
+      expect(withRules.ruleEffects).toBe(plan);
+      expect(rulesApplier.previewForRow).toHaveBeenCalledWith(
+        mockQueryRunner.manager,
+        "user-1",
+        expect.objectContaining({
+          accountId: "from-account",
+          amount: -100,
+          isTransfer: true,
+          fromAccountId: "from-account",
+          toAccountId: "to-account",
+          payeeText: "Rent",
+          tagIds: [],
+          hasSplits: false,
+        }),
+      );
+
+      rulesApplier.previewForRow.mockResolvedValue(null);
+      const without = await service.previewCreateTransfer("user-1", {
+        fromAccountId: "from-account",
+        toAccountId: "to-account",
+        amount: 100,
+        transactionDate: "2026-01-15",
+      });
+      expect("ruleEffects" in without).toBe(false);
     });
   });
 

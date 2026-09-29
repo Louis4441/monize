@@ -3235,11 +3235,23 @@ export class TransactionsService {
     if (tagIds && tagIds.length > 0) {
       // Tags are per-user reference data: never write the effective user's
       // tag ids onto a cross-owner counterpart leg.
-      const refresh = async (leg: Transaction) => {
-        if (leg.userId !== userId) return leg;
-        await this.tagsService.setTransactionTags(leg.id, tagIds, userId);
-        return this.findOne(userId, leg.id);
-      };
+      const ownLegs = [result.fromTransaction, result.toTransaction].filter(
+        (leg) => leg.userId === userId,
+      );
+      // Additive, not a replacement: the legs may already carry the tags the
+      // transaction rules added inside the leg transaction (design 6.3), and
+      // this is a newly created transfer, so there is nothing else to replace.
+      // updateTransfer keeps its replace semantics.
+      await withScopedDb(this.dataSource, (m) =>
+        this.tagsService.addTransactionTags(
+          m,
+          userId,
+          ownLegs.map((leg) => leg.id),
+          tagIds,
+        ),
+      );
+      const refresh = async (leg: Transaction) =>
+        leg.userId === userId ? this.findOne(userId, leg.id) : leg;
 
       return {
         fromTransaction: await refresh(result.fromTransaction),

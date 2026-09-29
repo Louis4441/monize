@@ -32,6 +32,14 @@ export interface AppliedRuleRow {
   readonly effects: RuleEffects;
 }
 
+/** The two stored legs of a transfer just written, and who owns each. */
+export interface NewTransferLegs {
+  readonly fromLegId: string;
+  readonly toLegId: string;
+  readonly fromOwnerId: string;
+  readonly toOwnerId: string;
+}
+
 export interface ApplyToNewOptions {
   /** Rules already loaded for this call (an import loads them once per file). */
   readonly rules?: readonly TransactionRule[];
@@ -220,6 +228,72 @@ export class TransactionRulesApplierService {
       const effects = this.planWithChains(input, rules, chains, context);
       await this.writeEffects(m, userId, row.id, effects, source);
       applied.push({ transactionId: row.id, effects });
+    }
+    return applied;
+  }
+
+  /**
+   * Apply the `create` rules to the legs of a transfer just written in the
+   * caller's transaction (design 6.3). One evaluation per transfer per owner:
+   *
+   * - Same owner: evaluated once over the outgoing leg's facts, and the
+   *   result is written to BOTH legs (tags mirrored the way `syncTransferTags`
+   *   does, the payee on both). `set_category` is refused by the planner.
+   * - Cross owner: each owner's rules run on that owner's leg only, and the
+   *   other owner's leg is never read or written. The partner account is not
+   *   put in the facts, and `set_payee` is refused (`crossOwnerTransferLeg`).
+   *
+   * Nothing is written when the owner has no rule for the trigger.
+   */
+  async applyToNewTransfer(
+    m: EntityManager,
+    legs: NewTransferLegs,
+  ): Promise<AppliedRuleRow[]> {
+    const sameOwner = legs.fromOwnerId === legs.toOwnerId;
+    const applied: AppliedRuleRow[] = [];
+    const evaluations: Array<{ ownerId: string; legIds: string[] }> = sameOwner
+      ? [{ ownerId: legs.fromOwnerId, legIds: [legs.fromLegId, legs.toLegId] }]
+      : [
+          { ownerId: legs.fromOwnerId, legIds: [legs.fromLegId] },
+          { ownerId: legs.toOwnerId, legIds: [legs.toLegId] },
+        ];
+    for (const { ownerId, legIds } of evaluations) {
+      const rules = await this.loadRulesFor(m, ownerId, "create");
+      if (rules.length === 0) continue;
+      const rows = await m.find(Transaction, {
+        where: { id: In(legIds), userId: ownerId },
+      });
+      const from = rows.find((row) => row.id === legs.fromLegId);
+      const to = rows.find((row) => row.id === legs.toLegId);
+      const primary = from ?? to;
+      if (!primary) continue;
+      const tagIds = (await this.loadTagIds(m, [primary.id])).get(primary.id);
+      const chains = await this.chainsFor(m, ownerId, rules, [
+        primary.categoryId,
+      ]);
+      const effects = this.planWithChains(
+        {
+          accountId: primary.accountId,
+          currencyCode: primary.currencyCode,
+          amount: primary.amount,
+          isTransfer: true,
+          fromAccountId: from?.accountId ?? null,
+          toAccountId: to?.accountId ?? null,
+          payeeId: primary.payeeId,
+          payeeText: primary.payeeName,
+          categoryId: primary.categoryId,
+          description: primary.description,
+          tagIds: tagIds ?? [],
+          hasSplits: primary.isSplit,
+        },
+        rules,
+        chains,
+        { crossOwnerTransferLeg: !sameOwner },
+      );
+      for (const row of rows) {
+        await this.writeEffects(m, ownerId, row.id, effects, "create");
+        applied.push({ transactionId: row.id, effects });
+      }
     }
     return applied;
   }
