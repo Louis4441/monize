@@ -129,7 +129,6 @@
       "payeeText": "收到的收款方原文",
       "categoryId": "分类",
       "description": "说明",
-      "memo": "备注",
       "amount": "金额（含正负号）",
       "absAmount": "金额（忽略正负号）",
       "currencyCode": "币种",
@@ -176,7 +175,7 @@
       "currency": "选择币种",
       "currencies": "选择币种",
       "types": "选择类型",
-      "matchesHint": "用 * 匹配任意文本，例如 *咖啡*。用 {capture} 保留该位置的文本，供此规则的操作使用，例如 {example}。名称由小写字母和数字组成，一个模式最多可保留 {max} 段文本。",
+      "matchesHint": "用 * 匹配任意文本，例如 *咖啡*。 不含 * 的模式只匹配整段文本。用 {capture} 保留该位置的文本，供此规则的操作使用，例如 {example}。名称由小写字母和数字组成，一个模式最多可保留 {max} 段文本。",
       "amount": "金额",
       "from": "从",
       "to": "到",
@@ -281,7 +280,9 @@
         "INVALID_CAPTURE": "捕获名称由小写字母和数字组成，以字母开头，最长 20 个字符。",
         "TOO_MANY_CAPTURES": "一个模式最多可包含 5 个捕获。",
         "DUPLICATE_CAPTURE": "每个捕获名称在一条规则中只能使用一次。",
-        "UNKNOWN_CAPTURE": "文本使用了此规则中没有任何条件定义的捕获。"
+        "UNKNOWN_CAPTURE": "文本使用了此规则中没有任何条件定义的捕获。",
+        "LOOKS_LIKE_REGEX": "不支持正则表达式：| \\ 和 [xy] 这类简短的方括号字符类会被当作普通字符，因此按正则写的模式永远匹配不到本意。若要匹配多个文本之一，请添加“满足以下任意一项”分组，并为每个文本各放一个条件。",
+        "PATTERN_WITHOUT_WILDCARD": "不含 * 时，此模式必须与整段文本完全相同。整段文本请用“等于”，部分文本请用“包含”，或在文本两侧加上 *，例如 *咖啡*。"
       }
     },
     "run": {
@@ -352,6 +353,8 @@
     "accountsFailed": "无法加载你的账户，因此筛选条件不可用。",
     "retry": "重试",
     "summary": "已检查 {scanned, plural, other {# 笔交易}}，其中 {matched, plural, other {# 笔交易}}将被更改。",
+    "matchesNone": "此规则与已检查的所有交易都不匹配（{scanned} 笔）。保存前请检查条件。不含 * 的模式只匹配整段文本。",
+    "noChange": "在检查的 {scanned} 笔交易中，有 {matched} 笔符合规则条件，但不会有任何更改（例如它们已有该值且开启了“仅在为空时”）。这不是错误。",
     "truncated": "匹配的交易多于上限允许的数量。仅包含最新的交易。请提高上限或缩小日期范围以包含其余交易。",
     "noMatches": {
       "title": "没有交易会被更改",
@@ -380,6 +383,7 @@
     "change": {
       "category": "分类：{before} → {after}",
       "payee": "收款方：{before} → {after}",
+      "payeeNew": "收款方：{before} → {name}（新建）",
       "tagsAdded": "已添加的标签：{tags}",
       "tagsRemoved": "已移除的标签：{tags}",
       "none": "无",

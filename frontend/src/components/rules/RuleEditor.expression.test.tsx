@@ -15,9 +15,16 @@ const mocks = vi.hoisted(() => ({
   currencies: vi.fn(),
 }));
 
-vi.mock('@/lib/transaction-rules-api', () => ({ transactionRulesApi: mocks.rules }));
+vi.mock('@/lib/transaction-rules-api', () => ({
+  transactionRulesApi: mocks.rules,
+}));
 vi.mock('@/lib/logger', () => ({
-  createLogger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
+  createLogger: () => ({
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  }),
 }));
 vi.mock('@/lib/accounts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/accounts')>()),
@@ -37,11 +44,19 @@ vi.mock('@/lib/tags', async (importOriginal) => ({
 }));
 vi.mock('@/lib/exchange-rates', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/exchange-rates')>()),
-  exchangeRatesApi: { getCurrencies: (...args: unknown[]) => mocks.currencies(...args) },
+  exchangeRatesApi: {
+    getCurrencies: (...args: unknown[]) => mocks.currencies(...args),
+  },
 }));
 
 function apiError(status: number, data: unknown): AxiosError {
-  const response = { status, data, statusText: '', headers: {}, config: { headers: new AxiosHeaders() } } as AxiosResponse;
+  const response = {
+    status,
+    data,
+    statusText: '',
+    headers: {},
+    config: { headers: new AxiosHeaders() },
+  } as AxiosResponse;
   return new AxiosError('failed', 'ERR_BAD_REQUEST', undefined, undefined, response);
 }
 
@@ -54,9 +69,15 @@ async function renderEditor(ruleId?: string) {
 const saveButton = () => screen.getByRole('button', { name: 'Save rule' });
 const visualTab = () => screen.getByRole('button', { name: 'Visual' });
 const expressionTab = () => screen.getByRole('button', { name: 'Expression' });
-const box = () => screen.getByRole('textbox', { name: 'Condition expression' }) as HTMLTextAreaElement;
+const box = () =>
+  screen.getByRole('textbox', {
+    name: 'Condition expression',
+  }) as HTMLTextAreaElement;
 const cards = () => screen.queryAllByRole('group', { name: 'Condition' });
-const write = (value: string) => fireEvent.change(box(), { target: { value, selectionStart: value.length, selectionEnd: value.length } });
+const write = (value: string) =>
+  fireEvent.change(box(), {
+    target: { value, selectionStart: value.length, selectionEnd: value.length },
+  });
 const save = async () => {
   await act(async () => {
     fireEvent.click(saveButton());
@@ -121,14 +142,14 @@ describe('RuleEditor: the Visual / Expression switch', () => {
   it('an edit that parses changes the rule, and Visual then shows exactly that rule', async () => {
     await renderEditor('rule-9');
     fireEvent.click(expressionTab());
-    write('transaction.memo.contains("tea") && !(transaction.tagIds.hasAny([tag("Work")]))');
+    write('transaction.referenceNumber.contains("tea") && !(transaction.tagIds.hasAny([tag("Work")]))');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     fireEvent.click(visualTab());
 
     expect(visualTab()).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByRole('textbox', { name: 'Condition expression' })).not.toBeInTheDocument();
     const [leaf, negated] = [screen.getAllByRole('group', { name: 'Condition' })[0], screen.getByRole('group', { name: 'Group' })];
-    expect(within(leaf).getByLabelText('Field')).toHaveValue('memo');
+    expect(within(leaf).getByLabelText('Field')).toHaveValue('referenceNumber');
     expect(within(leaf).getByLabelText('Operator')).toHaveValue('contains');
     expect(within(leaf).getByLabelText('Value')).toHaveValue('tea');
     expect(within(negated).getByRole('switch', { name: /Negate this group/ })).toBeChecked();
@@ -156,9 +177,13 @@ describe('RuleEditor: the Visual / Expression switch', () => {
   it('saves the condition written as text, with the ids of the names it uses', async () => {
     mocks.rules.create.mockResolvedValue(makeRule({ id: 'new-id' }));
     await renderEditor();
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'From text' } });
+    fireEvent.change(screen.getByLabelText('Name'), {
+      target: { value: 'From text' },
+    });
     fireEvent.click(screen.getByRole('button', { name: '+ Add action' }));
-    fireEvent.change(screen.getByLabelText('Action type'), { target: { value: 'set_payee' } });
+    fireEvent.change(screen.getByLabelText('Action type'), {
+      target: { value: 'set_payee' },
+    });
     fireEvent.focus(screen.getByPlaceholderText('Choose a payee'));
     fireEvent.click(screen.getByText('Corner Cafe'));
     fireEvent.click(expressionTab());
@@ -178,7 +203,11 @@ describe('RuleEditor: the Visual / Expression switch', () => {
           {
             any: [
               { field: 'categoryId', op: 'inSubtree', value: FOOD_ID },
-              { field: 'tagIds', op: 'hasNone', value: [lookupFixtures.tags[1].id] },
+              {
+                field: 'tagIds',
+                op: 'hasNone',
+                value: [lookupFixtures.tags[1].id],
+              },
             ],
           },
           { field: 'accountId', op: 'notIn', value: [ACCOUNT_ID] },
@@ -194,7 +223,7 @@ describe('RuleEditor: text that is not a rule', () => {
   it('shows where and why, disables Save, the way back to Visual and the test, and says so', async () => {
     await renderEditor('rule-9');
     fireEvent.click(expressionTab());
-    write('transaction.memo == "a" &&\ntransaction.nope == 1');
+    write('transaction.referenceNumber == "a" &&\ntransaction.nope == 1');
 
     expect(screen.getByRole('alert')).toHaveTextContent('Line 2, column 13: Unknown field nope.');
     expect(saveButton()).toBeDisabled();
@@ -211,11 +240,13 @@ describe('RuleEditor: text that is not a rule', () => {
     await renderEditor();
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'R' } });
     fireEvent.click(screen.getByRole('button', { name: '+ Add action' }));
-    fireEvent.change(screen.getByLabelText('Action type'), { target: { value: 'set_payee' } });
+    fireEvent.change(screen.getByLabelText('Action type'), {
+      target: { value: 'set_payee' },
+    });
     fireEvent.focus(screen.getByPlaceholderText('Choose a payee'));
     fireEvent.click(screen.getByText('Corner Cafe'));
     fireEvent.click(expressionTab());
-    write('transaction.memo == 5');
+    write('transaction.referenceNumber == 5');
 
     expect(saveButton()).toBeDisabled();
     await save();
@@ -225,9 +256,9 @@ describe('RuleEditor: text that is not a rule', () => {
   it('enables everything again as soon as the text is a rule', async () => {
     await renderEditor('rule-9');
     fireEvent.click(expressionTab());
-    write('transaction.memo == ');
+    write('transaction.referenceNumber == ');
     expect(visualTab()).toBeDisabled();
-    write('transaction.memo == "ok"');
+    write('transaction.referenceNumber == "ok"');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(visualTab()).toBeEnabled();
     expect(saveButton()).toBeEnabled();
@@ -255,13 +286,13 @@ describe('RuleEditor: text that is not a rule', () => {
     );
     await renderEditor('rule-9');
     fireEvent.click(expressionTab());
-    write('transaction.memo == "changed"');
+    write('transaction.referenceNumber == "changed"');
     await save();
 
     expect(screen.getByText('An item chosen here no longer exists. Choose another.')).toBeInTheDocument();
     expect(screen.getByText(/Groups are nested too deeply/)).toBeInTheDocument();
     // The next edit clears them, as it does on the cards.
-    write('transaction.memo == "changed again"');
+    write('transaction.referenceNumber == "changed again"');
     expect(screen.queryByText('An item chosen here no longer exists. Choose another.')).not.toBeInTheDocument();
   });
 

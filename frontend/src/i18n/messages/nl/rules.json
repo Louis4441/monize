@@ -129,7 +129,6 @@
       "payeeText": "Tekst van de begunstigde zoals ontvangen",
       "categoryId": "Categorie",
       "description": "Omschrijving",
-      "memo": "Notitie",
       "amount": "Bedrag (met teken)",
       "absAmount": "Bedrag (zonder teken)",
       "currencyCode": "Valuta",
@@ -176,7 +175,7 @@
       "currency": "Kies een valuta",
       "currencies": "Kies valuta's",
       "types": "Kies typen",
-      "matchesHint": "Gebruik * voor willekeurige tekst, bijvoorbeeld *koffie*. Gebruik {capture} om de tekst op die plek te bewaren voor de acties van deze regel, bijvoorbeeld {example}. Een naam bestaat uit kleine letters en cijfers, en een patroon kan maximaal {max} teksten bewaren.",
+      "matchesHint": "Gebruik * voor willekeurige tekst, bijvoorbeeld *koffie*. Een patroon zonder * komt alleen overeen met de hele tekst. Gebruik {capture} om de tekst op die plek te bewaren voor de acties van deze regel, bijvoorbeeld {example}. Een naam bestaat uit kleine letters en cijfers, en een patroon kan maximaal {max} teksten bewaren.",
       "amount": "Bedrag",
       "from": "Van",
       "to": "Tot",
@@ -281,7 +280,9 @@
         "INVALID_CAPTURE": "Een opnamenaam bestaat uit kleine letters en cijfers, begint met een letter en is hooguit 20 tekens lang.",
         "TOO_MANY_CAPTURES": "Een patroon mag hooguit 5 opnamen bevatten.",
         "DUPLICATE_CAPTURE": "Elke opnamenaam mag in een regel maar één keer voorkomen.",
-        "UNKNOWN_CAPTURE": "De tekst gebruikt een opname die geen enkele voorwaarde van deze regel definieert."
+        "UNKNOWN_CAPTURE": "De tekst gebruikt een opname die geen enkele voorwaarde van deze regel definieert.",
+        "LOOKS_LIKE_REGEX": "Reguliere expressies worden niet ondersteund: | \\ en korte haakjesklassen zoals [xy] worden als gewone tekens behandeld, dus een patroon dat als regex is geschreven komt nooit overeen met wat bedoeld was. Om met een van meerdere teksten overeen te komen, voeg je een groep “Een van deze” toe met voor elke tekst één voorwaarde.",
+        "PATTERN_WITHOUT_WILDCARD": "Zonder * moet dit patroon gelijk zijn aan de hele tekst. Gebruik “is” voor de hele tekst, “bevat” voor een deel ervan, of zet * om de tekst, bijvoorbeeld *koffie*."
       }
     },
     "run": {
@@ -352,6 +353,8 @@
     "accountsFailed": "Je rekeningen konden niet worden geladen, dus de filters zijn niet beschikbaar.",
     "retry": "Opnieuw proberen",
     "summary": "{matched, plural, one {# transactie zou wijzigen} other {# transacties zouden wijzigen}} van {scanned, plural, one {# gecontroleerde transactie} other {# gecontroleerde transacties}}.",
+    "matchesNone": "Deze regel komt met geen van de onderzochte transacties overeen ({scanned}). Controleer de voorwaarden voordat je opslaat. Een patroon zonder * komt alleen overeen met de hele tekst.",
+    "noChange": "{matched} van de {scanned} onderzochte transacties voldoen aan de voorwaarden van de regel, maar er zou niets veranderen (bijvoorbeeld omdat ze de waarde al hebben en 'alleen als leeg' aanstaat). Dit is geen fout.",
     "truncated": "Er komen meer transacties overeen dan de limiet toestaat. Alleen de nieuwste zijn opgenomen. Verhoog de limiet of beperk de datums om de rest mee te nemen.",
     "noMatches": {
       "title": "Geen transacties zouden wijzigen",
@@ -380,6 +383,7 @@
     "change": {
       "category": "Categorie: {before} → {after}",
       "payee": "Begunstigde: {before} → {after}",
+      "payeeNew": "Begunstigde: {before} → {name} (nieuw)",
       "tagsAdded": "Tags toegevoegd: {tags}",
       "tagsRemoved": "Tags verwijderd: {tags}",
       "none": "geen",

@@ -13,15 +13,25 @@ const mocks = vi.hoisted(() => ({
   notify: vi.fn(),
 }));
 
-vi.mock('@/lib/transaction-rules-api', () => ({ transactionRulesApi: mocks.rules }));
+vi.mock('@/lib/transaction-rules-api', () => ({
+  transactionRulesApi: mocks.rules,
+}));
 vi.mock('@/lib/logger', () => ({
-  createLogger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
+  createLogger: () => ({
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  }),
 }));
 vi.mock('@/lib/accounts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/accounts')>()),
   accountsApi: { getAll: (...args: unknown[]) => mocks.accounts(...args) },
 }));
-vi.mock('@/lib/undoRedoSignal', () => ({ notifyUndoRedo: mocks.notify, subscribeUndoRedo: () => () => {} }));
+vi.mock('@/lib/undoRedoSignal', () => ({
+  notifyUndoRedo: mocks.notify,
+  subscribeUndoRedo: () => () => {},
+}));
 
 const rule = { id: 'rule-1', name: 'Coffee shops' };
 const onClose = vi.fn();
@@ -71,7 +81,11 @@ describe('RunRuleDialog', () => {
 
   it('opens with the rule named, the filters and nothing to confirm yet', async () => {
     await renderDialog();
-    expect(screen.getByRole('dialog', { name: 'Run "Coffee shops" on existing transactions' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('dialog', {
+        name: 'Run "Coffee shops" on existing transactions',
+      }),
+    ).toBeInTheDocument();
     expect(mocks.accounts).toHaveBeenCalledWith(true);
     expect(screen.getByText(/Nothing changes until you confirm/)).toBeInTheDocument();
     expect(button('Confirm and run')).toBeDisabled();
@@ -87,7 +101,9 @@ describe('RunRuleDialog', () => {
   });
 
   it('does not fetch accounts when the caller already holds them', async () => {
-    await renderDialog({ accountOptions: [{ value: ACCOUNT_ID, label: 'Held (CAD)' }] });
+    await renderDialog({
+      accountOptions: [{ value: ACCOUNT_ID, label: 'Held (CAD)' }],
+    });
     expect(mocks.accounts).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText('All accounts'));
     expect(screen.getByLabelText('Held (CAD)')).toBeInTheDocument();
@@ -106,14 +122,21 @@ describe('RunRuleDialog', () => {
   });
 
   it('previews with the chosen filters, then confirms with the fingerprint of that preview', async () => {
-    mocks.rules.run.mockResolvedValue({ changed: 1, skipped: [], historyId: 'h-1' });
+    mocks.rules.run.mockResolvedValue({
+      changed: 1,
+      skipped: [],
+      historyId: 'h-1',
+    });
     await renderDialog();
     fireEvent.click(screen.getByText('All accounts'));
     fireEvent.click(screen.getByLabelText('Chequing (CAD)'));
     fireEvent.mouseDown(document.body);
     await preview();
 
-    expect(mocks.rules.previewRun).toHaveBeenCalledWith('rule-1', { accountIds: [ACCOUNT_ID], limit: 200 });
+    expect(mocks.rules.previewRun).toHaveBeenCalledWith('rule-1', {
+      accountIds: [ACCOUNT_ID],
+      limit: 200,
+    });
     const row = screen.getByText('Corner Cafe').closest('tr') as HTMLElement;
     expect(row).toHaveTextContent('Category: none → Food: Coffee');
     expect(button('Confirm and run')).toBeEnabled();
@@ -147,7 +170,14 @@ describe('RunRuleDialog', () => {
   });
 
   it('cannot confirm a preview with nothing to change', async () => {
-    mocks.rules.previewRun.mockResolvedValue(makePreview({ matched: [], scanned: 5, fingerprint: FP }));
+    mocks.rules.previewRun.mockResolvedValue(
+      makePreview({
+        matched: [],
+        conditionMatchedCount: 0,
+        scanned: 5,
+        fingerprint: FP,
+      }),
+    );
     await renderDialog();
     await preview();
     expect(screen.getByText('No transactions would change')).toBeInTheDocument();
@@ -156,12 +186,20 @@ describe('RunRuleDialog', () => {
 
   it('on PREVIEW_CHANGED shows a message and a refreshed preview, and confirms the new fingerprint only after the reader sees it', async () => {
     mocks.rules.run
-      .mockRejectedValueOnce(refused(409, { errorCode: 'PREVIEW_CHANGED', fingerprint: 'c'.repeat(64) }))
+      .mockRejectedValueOnce(
+        refused(409, {
+          errorCode: 'PREVIEW_CHANGED',
+          fingerprint: 'c'.repeat(64),
+        }),
+      )
       .mockResolvedValueOnce({ changed: 2, skipped: [], historyId: 'h-2' });
     await renderDialog();
     await preview();
     mocks.rules.previewRun.mockResolvedValueOnce(
-      makePreview({ fingerprint: NEW_FP, matched: [{ ...makePreview().matched[0], payeeName: 'Fresh Beans' }] }),
+      makePreview({
+        fingerprint: NEW_FP,
+        matched: [{ ...makePreview().matched[0], payeeName: 'Fresh Beans' }],
+      }),
     );
     await confirm();
 

@@ -20,6 +20,7 @@ import {
   RuleToolRefusal,
   RuleToolRunInput,
   TransactionRuleToolPrepService,
+  zeroMatchNote,
 } from "../../transaction-rules/rule-tool-prep.service";
 import { RELAY_PREVIEW_SHOWN, emitRelayCard } from "../mcp-relay-confirm";
 import {
@@ -39,13 +40,18 @@ type RuleOperation = "list" | "create" | "update" | "delete" | "run" | "test";
 
 /** A refusal as text: the message, then the `{ path, code }` entries the REST API would return. */
 function refusalText(refusal: RuleToolRefusal): string {
-  return refusal.errors.length
+  const head = refusal.errors.length
     ? `${refusal.message} ${JSON.stringify(refusal.errors)}`
     : refusal.message;
+  return refusal.hints?.length
+    ? `${head} Fix: ${refusal.hints.join(" ")}`
+    : head;
 }
 
-const changes = (test: AiActionRuleTestPreview): string =>
-  `It would change ${test.matchedCount} of ${test.scanned} transactions examined${test.truncated ? " (more match than are examined)" : ""}.`;
+const changes = (test: AiActionRuleTestPreview): string => {
+  const note = zeroMatchNote(test);
+  return `It would change ${test.matchedCount} of ${test.scanned} transactions examined${test.truncated ? " (more match than are examined)" : ""}.${note ? ` ${note}` : ""}`;
+};
 
 @Injectable()
 export class McpRulesTools {
@@ -64,12 +70,8 @@ export class McpRulesTools {
         title: "Manage transaction rules",
         annotations: WRITE,
         description:
-          "Transaction rules set a category or payee and add or remove tags on new and imported transactions, in the order they run. " +
-          "list returns them with revision, and invalid=true when one cannot run. " +
-          "Every change is confirmed by the user before anything is saved; a run applies a saved rule to existing transactions and its confirmation lists what would change. " +
-          "test previews a saved or draft rule the same way and saves nothing. " +
           RULE_LANGUAGE_GUIDE +
-          " An update takes ruleId plus only the fields to change; condition or actions replaces the whole one.",
+          " Rules run in order on new and imported transactions. list returns them with revision, and invalid=true when one cannot run. Every change is confirmed by the user before anything is saved; a run applies a saved rule to existing transactions; test previews a saved or draft rule and saves nothing. update: ruleId plus only the fields to change (condition or actions replaces the whole one).",
         inputSchema: manageTransactionRulesFields.extend({
           operation: z.enum([
             "list",

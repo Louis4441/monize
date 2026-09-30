@@ -35,6 +35,7 @@ import {
   namesToIds,
 } from "./rule-name-mapping";
 import { withActionDefaults } from "./rule-references";
+import { RuleHintDefinition, ruleErrorHints } from "./rule-validation-hints";
 import { RuleRunPreview } from "./rule-run.types";
 import {
   MAX_RULE_NAME_LENGTH,
@@ -80,6 +81,8 @@ export interface RuleToolRefusal {
   ok: false;
   message: string;
   errors: RuleToolError[];
+  /** One short sentence per distinct problem: what is wrong and the correct form. */
+  hints?: string[];
 }
 
 export type RulePrep<T> = { ok: true; preview: T } | RuleToolRefusal;
@@ -162,12 +165,61 @@ export interface LlmRuleTestRow {
 }
 
 export interface LlmRuleTest {
+  /** Set when the test matched nothing: what that usually means and what to do. */
+  message?: string;
   matchedCount: number;
+  /** Transactions whose rule condition matched, changed or not. */
+  conditionMatchedCount: number;
   scanned: number;
   truncated: boolean;
   rows: LlmRuleTestRow[];
   skippedCount: number;
   skipped: { transactionId: string; reason: string }[];
+}
+
+/**
+ * The plain statement a rule whose CONDITION matches nothing deserves, for the
+ * model and the person reading the card. `null` when the condition matched
+ * something (even if no action would change it), when the count is absent
+ * (no information), or when there was nothing to match against (an empty
+ * ledger says nothing about the rule).
+ */
+export function zeroMatchWarning(test: {
+  conditionMatchedCount?: number;
+  scanned: number;
+}): string | null {
+  if (test.conditionMatchedCount !== 0 || test.scanned === 0) return null;
+  return `This rule matches none of the ${test.scanned} latest transactions.`;
+}
+
+/** Appended for the model: a condition that matches nothing is usually wrong. */
+export const ZERO_MATCH_ADVICE =
+  "A rule that matches nothing is usually wrong: re-check the field, operator and pattern (a matches pattern without * equals the whole text; use contains for a part) and test again before asking the user to confirm.";
+
+/**
+ * The condition matched but no row would change: not an error, so it carries
+ * no advice to rewrite the rule.
+ */
+export function noChangeNote(test: {
+  matchedCount: number;
+  conditionMatchedCount?: number;
+  scanned: number;
+}): string | null {
+  const matched = test.conditionMatchedCount ?? 0;
+  if (matched === 0 || test.matchedCount !== 0) return null;
+  return `The condition matches ${matched} of the ${test.scanned} latest transactions, but nothing would change (for example they already have the value and only-if-empty is on, or they are locked or reconciled). This is not an error.`;
+}
+
+/** Zero-match warning plus advice, or the no-change note, or an empty string. */
+export function zeroMatchNote(test: {
+  matchedCount: number;
+  conditionMatchedCount?: number;
+  scanned: number;
+}): string {
+  const warning = zeroMatchWarning(test);
+  return warning
+    ? `${warning} ${ZERO_MATCH_ADVICE}`
+    : (noChangeNote(test) ?? "");
 }
 
 const sanitizeName = (value: string): string =>
@@ -299,7 +351,11 @@ export class TransactionRuleToolPrepService {
 
     let test: AiActionRuleTestPreview | undefined;
     if (redefined) {
-      const tested = await this.testDraft(userId, rule, {});
+      // The same decision the REST update makes: the glob-trap advice applies
+      // only when the condition changes, so a stored rule that predates it can
+      // still have its actions edited.
+      const authoring = !isDeepStrictEqual(rule.condition, current.condition);
+      const tested = await this.testDraft(userId, rule, {}, authoring);
       if (!tested.ok) return tested;
       test = tested.value.test;
     }
@@ -427,7 +483,17 @@ export class TransactionRuleToolPrepService {
       stopProcessing: input.stopProcessing ?? base?.stopProcessing ?? false,
       ...resolved.value,
     };
-    const tested = await this.testDraft(userId, rule, filters.value.ids);
+    // The same decision prepareUpdate and the REST preview make: the glob-trap
+    // advice applies to a draft or a changed condition, not to a stored rule's
+    // unchanged one.
+    const authoring =
+      !base || !isDeepStrictEqual(rule.condition, base.condition);
+    const tested = await this.testDraft(
+      userId,
+      rule,
+      filters.value.ids,
+      authoring,
+    );
     if (!tested.ok) return tested;
     return {
       ok: true,
@@ -452,8 +518,11 @@ export class TransactionRuleToolPrepService {
       table: Readonly<Record<string, string>>,
       id: string | null,
     ): string | null => (id === null ? null : (table[id] ?? id));
+    const note = zeroMatchNote(test);
     return {
+      ...(note ? { message: note } : {}),
       matchedCount: test.matchedCount,
+      conditionMatchedCount: test.conditionMatchedCount,
       scanned: test.scanned,
       truncated: test.truncated,
       skippedCount: test.skippedCount,
@@ -764,15 +833,22 @@ export class TransactionRuleToolPrepService {
     userId: string,
     rule: AiActionRuleState,
     filters: RuleRunFiltersDescriptor,
+    authoring = true,
   ): Promise<
     { ok: true; value: { test: AiActionRuleTestPreview } } | RuleToolRefusal
   > {
-    const planned = await this.guard(() =>
-      this.runService.previewDraft(userId, {
-        condition: rule.condition as unknown as Record<string, unknown>,
-        actions: rule.actions as unknown as Record<string, unknown>[],
-        filters: { ...filters },
-      }),
+    const planned = await this.guard(
+      () =>
+        this.runService.previewDraft(
+          userId,
+          {
+            condition: rule.condition as unknown as Record<string, unknown>,
+            actions: rule.actions as unknown as Record<string, unknown>[],
+            filters: { ...filters },
+          },
+          { authoring },
+        ),
+      rule,
     );
     if (!planned.ok) return planned;
     return { ok: true, value: { test: toCardTest(planned.value) } };
@@ -785,6 +861,7 @@ export class TransactionRuleToolPrepService {
    */
   private async guard<T>(
     call: () => Promise<T>,
+    definition: RuleHintDefinition = {},
   ): Promise<{ ok: true; value: T } | RuleToolRefusal> {
     try {
       return { ok: true, value: await call() };
@@ -802,13 +879,16 @@ export class TransactionRuleToolPrepService {
         const errors = Array.isArray(detail.errors)
           ? (detail.errors as RuleToolError[])
           : [];
+        const listed =
+          errors.length === 0 && typeof detail.errorCode === "string"
+            ? [{ path: "", code: detail.errorCode }]
+            : errors;
+        const hints = ruleErrorHints(listed, definition);
         return {
           ok: false,
           message: err.message,
-          errors:
-            errors.length === 0 && typeof detail.errorCode === "string"
-              ? [{ path: "", code: detail.errorCode }]
-              : errors,
+          errors: listed,
+          ...(hints.length > 0 ? { hints } : {}),
         };
       }
       throw err;
@@ -903,6 +983,7 @@ function toState(rule: TransactionRuleResponseDto): AiActionRuleState {
 function toCardTest(preview: RuleRunPreview): AiActionRuleTestPreview {
   return {
     matchedCount: preview.matched.length,
+    conditionMatchedCount: preview.conditionMatchedCount,
     scanned: preview.scanned,
     truncated: preview.truncated,
     rows: preview.matched.slice(0, RULE_CARD_PREVIEW_ROWS),

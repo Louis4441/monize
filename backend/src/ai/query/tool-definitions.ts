@@ -5,7 +5,11 @@ import {
   COUNTRY_OPTIONS,
 } from "../../securities/security-enums";
 import { TRANSACTION_SORT_FIELDS } from "../../transactions/register-order";
-import { RULE_CONDITION_FIELDS } from "../../transaction-rules/rule-condition.types";
+import {
+  RULE_ACTIONS_HELP,
+  RULE_CONDITION_HELP,
+  RULE_LANGUAGE_GUIDE,
+} from "./rule-language";
 import { RULE_TRIGGERS } from "../../transaction-rules/rule-trigger.types";
 import { MAX_RULE_ACTIONS } from "../../transaction-rules/rule-validation";
 import {
@@ -13,23 +17,7 @@ import {
   MAX_RULE_TOOL_LIST_LIMIT,
 } from "../../transaction-rules/transaction-rules.limits";
 
-/** `field(op,op)` for every condition field, from the table the validator reads. */
-const RULE_FIELD_OPERATORS = Object.entries(RULE_CONDITION_FIELDS)
-  .map(([field, spec]) => `${field}(${spec.operators.join(",")})`)
-  .join(" ");
-
-/**
- * How a model writes a rule: the condition tree, the fields and operators the
- * validator reads, names for ids, and the action list. One text for both tool
- * surfaces (the assistant's `manage_transaction_rules` and the MCP tool of the
- * same name), so the two cannot describe different languages.
- */
-export const RULE_LANGUAGE_GUIDE =
-  "A rule: name, triggers, condition, actions. condition is {all:[...]} or {any:[...]} (add not:true to negate), nested at most 4 deep, of leaves {field, op, value}. Fields and operators: " +
-  RULE_FIELD_OPERATORS +
-  ". Give NAMES as the value for accountId, fromAccountId, toAccountId, payeeId, categoryId (use 'Parent: Child') and tagIds; amount is signed, absAmount is not; in/notIn/hasAny/hasAll/hasNone take a list, between takes [min,max], isEmpty takes no value, type is EXPENSE|INCOME|TRANSFER, weekday MON..SUN and dayOfMonth 1-31 (both from the transaction's own date), status UNRECONCILED|CLEARED|RECONCILED|VOID, hasSplits/hasAttachment true|false. actions (1-" +
-  MAX_RULE_ACTIONS +
-  ", in order): {type:'set_category',categoryName,onlyIfEmpty?}, {type:'set_payee',payeeName,onlyIfEmpty?}, {type:'add_tags'|'remove_tags',tagNames:[...]}, {type:'request_ai_review',instruction}, {type:'set_payee_from_text',template,createIfMissing?,onlyIfEmpty?}, {type:'set_description',template,mode?:replace|append|prepend,onlyIfEmpty?}; onlyIfEmpty defaults to true (false for set_description). matches is a glob: * is a wildcard, {name} a capture (a-z0-9, max 5, once per rule) that a template reads as {name}, {payeeText} or {description}.";
+export { RULE_LANGUAGE_GUIDE };
 
 export const FINANCIAL_TOOLS: AiToolDefinition[] = [
   {
@@ -1084,9 +1072,8 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
   {
     name: "manage_transaction_rules",
     description:
-      "Create, edit, delete, run or test a transaction rule. create/update/delete/run change nothing immediately: they show a confirmation card the user must approve, so briefly ask them to review it and never claim it was done. test previews a saved or draft rule on existing transactions, writes nothing and shows no card. " +
       RULE_LANGUAGE_GUIDE +
-      " update: ruleId plus only the fields to change (condition or actions replaces the whole one; read the rule with list_transaction_rules first). run applies a saved rule to existing transactions after the user approves the card, which lists what would change; test first to iterate.",
+      " Operations: create/update/delete/run change nothing immediately, they show a confirmation card the user must approve, so briefly ask them to review it and never claim it was done. test previews a saved or draft rule on existing transactions, writes nothing and shows no card. update: ruleId plus only the fields to change (condition or actions replaces the whole one; read the rule with list_transaction_rules first). run applies a saved rule to existing transactions after approval.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1114,11 +1101,12 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
           description:
             "Later rules do not run for a transaction this rule matched.",
         },
-        condition: { type: "object", description: "The condition tree." },
+        condition: { type: "object", description: RULE_CONDITION_HELP },
         actions: {
           type: "array",
           items: { type: "object" },
           maxItems: MAX_RULE_ACTIONS,
+          description: RULE_ACTIONS_HELP,
         },
         accountNames: {
           type: "array",

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -35,12 +35,28 @@ type TestState =
   | { status: 'error'; key: string; message: string }
   | { status: 'done'; key: string; preview: RuleRunPreview };
 
+/** What the last finished test found, for the save button's warning. */
+export interface RuleTestOutcome {
+  matched: number;
+  /** Scanned transactions whose condition matched, changed or not. */
+  conditionMatched: number;
+  scanned: number;
+  /** The draft or the filters changed since, so the result no longer describes the draft. */
+  stale: boolean;
+}
+
 interface RuleTestPanelProps {
   /** The draft as it is now, saved or not. */
   draft: RuleDraft;
   accountOptions: readonly RuleOption[];
   /** The condition text does not parse, so the draft is not what the reader sees. */
   blocked?: boolean;
+  /** Told the outcome of the last finished test, or null when there is none. */
+  /** The draft an existing rule was opened with (see `draftGaps`); null for a new rule. */
+  loaded?: RuleDraft | null;
+  onResult?: (outcome: RuleTestOutcome | null) => void;
+  /** The saved rule being edited; absent for a new rule. */
+  ruleId?: string;
 }
 
 /**
@@ -49,7 +65,7 @@ interface RuleTestPanelProps {
  * draft or the filters afterwards leaves the result on screen but marks it as
  * out of date, because it no longer describes what the reader is looking at.
  */
-export function RuleTestPanel({ draft, accountOptions, blocked = false }: RuleTestPanelProps) {
+export function RuleTestPanel({ draft, accountOptions, blocked = false, loaded = null, onResult, ruleId }: RuleTestPanelProps) {
   const t = useTranslations('rules.test');
   const errorMessage = useRuleRunErrorMessage();
   const [filters, setFilters] = useState<RunFiltersState>(DEFAULT_RUN_FILTERS);
@@ -59,12 +75,12 @@ export function RuleTestPanel({ draft, accountOptions, blocked = false }: RuleTe
 
   const request = useMemo(() => {
     const { condition, actions } = draftToPayload(draft);
-    return { condition, actions, filters: filtersToRequest(filters) };
-  }, [draft, filters]);
+    return { ...(ruleId ? { ruleId } : {}), condition, actions, filters: filtersToRequest(filters) };
+  }, [draft, filters, ruleId]);
   const key = useMemo(() => JSON.stringify(request), [request]);
 
   // The name is not part of a test; every other gap would be refused by the server.
-  const incomplete = blocked || draftGaps(draft).some((entry) => entry.path !== NAME_KEY);
+  const incomplete = blocked || draftGaps(draft, loaded).some((entry) => entry.path !== NAME_KEY);
   const backwards = hasBackwardsRange(filters);
   const busy = state.status === 'loading';
 
@@ -77,11 +93,29 @@ export function RuleTestPanel({ draft, accountOptions, blocked = false }: RuleTe
     } catch (error) {
       if (id !== latest.current) return;
       logger.error(error);
-      setState({ status: 'error', key, message: errorMessage(error, 'testFailed') });
+      setState({
+        status: 'error',
+        key,
+        message: errorMessage(error, 'testFailed'),
+      });
     }
   };
 
   const stale = (state.status === 'done' || state.status === 'error') && state.key !== key;
+
+  const done = state.status === 'done' ? state.preview : null;
+  useEffect(() => {
+    onResult?.(
+      done
+        ? {
+            matched: done.matched.length,
+            conditionMatched: done.conditionMatchedCount,
+            scanned: done.scanned,
+            stale,
+          }
+        : null,
+    );
+  }, [done, stale, onResult]);
 
   return (
     <RuleSection title={t('title')} description={t('description')}>

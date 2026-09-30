@@ -38,7 +38,9 @@ describe("validateRuleDefinition: captures in a matches leaf", () => {
       ]),
     ).toEqual([]);
     expect(
-      check({ all: [leaf("memo", `{a${"b".repeat(19)}}`)] }, [payee("x")]),
+      check({ all: [leaf("referenceNumber", `{a${"b".repeat(19)}}`)] }, [
+        payee("x"),
+      ]),
     ).toEqual([]);
   });
 
@@ -68,9 +70,10 @@ describe("validateRuleDefinition: captures in a matches leaf", () => {
   it("refuses a name used twice in one pattern or in two leaves of the rule", () => {
     const dup = [{ path: "condition.all[1].value", code: "DUPLICATE_CAPTURE" }];
     expect(
-      check({ all: [leaf("memo", "{n}"), leaf("description", "a{n}")] }, [
-        payee("x"),
-      ]),
+      check(
+        { all: [leaf("referenceNumber", "{n}"), leaf("description", "a{n}")] },
+        [payee("x")],
+      ),
     ).toEqual(dup);
     expect(
       check({ all: [leaf("description", "{n}-{n}")] }, [payee("x")]),
@@ -79,7 +82,7 @@ describe("validateRuleDefinition: captures in a matches leaf", () => {
       check(
         {
           any: [
-            { all: [leaf("memo", "{n}")] },
+            { all: [leaf("referenceNumber", "{n}")] },
             { all: [leaf("description", "{n}")] },
           ],
         },
@@ -92,7 +95,7 @@ describe("validateRuleDefinition: captures in a matches leaf", () => {
 
   it("reads other braces as plain text", () => {
     expect(
-      check({ all: [leaf("description", "{1} {a b}")] }, [payee("x")]),
+      check({ all: [leaf("description", "*{1} {a b}")] }, [payee("x")]),
     ).toEqual([]);
   });
 
@@ -124,9 +127,10 @@ describe("validateRuleDefinition: the text actions", () => {
 
   it("finds a capture defined in a leaf after the action list is read (conditions are read first)", () => {
     expect(
-      check({ any: [leaf("memo", "{later}"), leaf("description", "*")] }, [
-        payee("{later}"),
-      ]),
+      check(
+        { any: [leaf("referenceNumber", "{later}"), leaf("description", "*")] },
+        [payee("{later}")],
+      ),
     ).toEqual([]);
   });
 

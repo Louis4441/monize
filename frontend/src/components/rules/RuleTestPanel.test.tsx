@@ -10,7 +10,12 @@ const api = vi.hoisted(() => ({ previewDraft: vi.fn() }));
 
 vi.mock('@/lib/transaction-rules-api', () => ({ transactionRulesApi: api }));
 vi.mock('@/lib/logger', () => ({
-  createLogger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
+  createLogger: () => ({
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  }),
 }));
 
 const accountOptions = [{ value: ACCOUNT_ID, label: 'Chequing (CAD)' }];
@@ -21,16 +26,16 @@ function completeDraft(tagIds: string[] = [TAG_ID]): RuleDraft {
   return { ...base, name: 'Coffee', actions: [{ ...createAction('add_tags'), tagIds } as RuleDraft['actions'][number]] };
 }
 
-async function renderPanel(draft: RuleDraft = completeDraft()) {
+async function renderPanel(draft: RuleDraft = completeDraft(), ruleId?: string) {
   let result!: ReturnType<typeof render>;
   await act(async () => {
-    result = render(<RuleTestPanel draft={draft} accountOptions={accountOptions} />);
+    result = render(<RuleTestPanel draft={draft} accountOptions={accountOptions} ruleId={ruleId} />);
   });
   return {
     ...result,
     rerenderWith: async (next: RuleDraft) => {
       await act(async () => {
-        result.rerender(<RuleTestPanel draft={next} accountOptions={accountOptions} />);
+        result.rerender(<RuleTestPanel draft={next} accountOptions={accountOptions} ruleId={ruleId} />);
       });
     },
   };
@@ -53,6 +58,25 @@ function refused(status: number, data: unknown): AxiosError {
 describe('RuleTestPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('sends the rule id of a saved rule so an unchanged condition is not re-advised', async () => {
+    api.previewDraft.mockResolvedValue(makePreview());
+    await renderPanel(completeDraft(), 'rule-1');
+    await runTest();
+    expect(api.previewDraft).toHaveBeenCalledWith({
+      ruleId: 'rule-1',
+      condition: { all: [] },
+      actions: [{ type: 'add_tags', tagIds: [TAG_ID] }],
+      filters: { limit: 200 },
+    });
+  });
+
+  it('sends no rule id for a new rule', async () => {
+    api.previewDraft.mockResolvedValue(makePreview());
+    await renderPanel();
+    await runTest();
+    expect(api.previewDraft.mock.calls[0][0]).not.toHaveProperty('ruleId');
   });
 
   it('sends the current unsaved draft with the default limit and shows the planned changes in words', async () => {
@@ -83,7 +107,10 @@ describe('RuleTestPanel', () => {
     fireEvent.click(screen.getByLabelText('Chequing (CAD)'));
     fireEvent.mouseDown(document.body);
     await runTest();
-    expect(api.previewDraft.mock.calls[0][0].filters).toEqual({ accountIds: [ACCOUNT_ID], limit: 200 });
+    expect(api.previewDraft.mock.calls[0][0].filters).toEqual({
+      accountIds: [ACCOUNT_ID],
+      limit: 200,
+    });
   });
 
   it('names a removed tag and a payee change, and says a missing name is a deleted item', async () => {
@@ -114,12 +141,23 @@ describe('RuleTestPanel', () => {
   });
 
   it('says no rows matched instead of drawing an empty table', async () => {
-    api.previewDraft.mockResolvedValue(makePreview({ matched: [], scanned: 30 }));
+    api.previewDraft.mockResolvedValue(makePreview({ matched: [], conditionMatchedCount: 0, scanned: 30 }));
     await renderPanel();
     await runTest();
     expect(screen.getByText('No transactions would change')).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(screen.getByText('0 transactions would change out of 30 transactions scanned.')).toBeInTheDocument();
+  });
+
+  it('says the condition matches but nothing would change, instead of claiming no rows matched', async () => {
+    api.previewDraft.mockResolvedValue(makePreview({ matched: [], conditionMatchedCount: 8, scanned: 30 }));
+    await renderPanel();
+    await runTest();
+    expect(screen.getByText('No transactions would change')).toBeInTheDocument();
+    expect(
+      screen.getByText(/8 of the 30 transactions examined match the rule's conditions, but nothing would change/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/None of the scanned transactions match the rule/)).not.toBeInTheDocument();
   });
 
   it('notes a truncated scan and lists the skipped rows by reason', async () => {
@@ -220,7 +258,7 @@ describe('RuleTestPanel', () => {
     expect(screen.getByTestId('rule-test-result')).toHaveAttribute('data-stale', 'true');
     expect(screen.getByText('Corner Cafe')).toBeInTheDocument();
 
-    api.previewDraft.mockResolvedValue(makePreview({ matched: [], scanned: 3 }));
+    api.previewDraft.mockResolvedValue(makePreview({ matched: [], conditionMatchedCount: 0, scanned: 3 }));
     await runTest();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.getByText('No transactions would change')).toBeInTheDocument();

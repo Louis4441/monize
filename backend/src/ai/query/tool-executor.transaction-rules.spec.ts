@@ -45,6 +45,7 @@ const rule = {
 };
 const test = {
   matchedCount: 2,
+  conditionMatchedCount: 2,
   scanned: 30,
   truncated: false,
   rows: [],
@@ -280,6 +281,116 @@ describe("ToolExecutorService transaction rule tools", () => {
       });
       expect(result.pendingAction).toBeUndefined();
       expect(signing.sign).not.toHaveBeenCalled();
+    });
+
+    it("sends the hints beside the entries in the data and the summary", async () => {
+      prep.prepareCreate.mockResolvedValue({
+        ok: false,
+        message: "The rule definition is not valid",
+        errors: [{ path: "condition.value", code: "PATTERN_WITHOUT_WILDCARD" }],
+        hints: ["Use eq for the whole text."],
+      });
+      const result = await service.execute(USER, "manage_transaction_rules", {
+        operation: "create",
+        name: "x",
+        ...draft,
+      });
+      expect(result.isError).toBe(true);
+      expect(result.data).toMatchObject({
+        hints: ["Use eq for the whole text."],
+      });
+      expect(result.summary).toContain("Fix: Use eq for the whole text.");
+    });
+
+    it("accepts condition and actions sent as JSON strings", async () => {
+      await service.execute(USER, "manage_transaction_rules", {
+        operation: "create",
+        name: "x",
+        condition: JSON.stringify(draft.condition),
+        actions: JSON.stringify(draft.actions),
+      });
+      expect(prep.prepareCreate).toHaveBeenCalledWith(
+        USER,
+        expect.objectContaining({
+          condition: draft.condition,
+          actions: draft.actions,
+        }),
+      );
+    });
+
+    it("tells the model plainly when a create matches none of the transactions", async () => {
+      prep.prepareCreate.mockResolvedValue({
+        ok: true,
+        preview: {
+          rule,
+          labels,
+          test: {
+            ...test,
+            matchedCount: 0,
+            conditionMatchedCount: 0,
+          },
+        },
+      });
+      const result = await service.execute(USER, "manage_transaction_rules", {
+        operation: "create",
+        name: "x",
+        ...draft,
+      });
+      expect(result.summary).toContain(
+        `matches none of the ${test.scanned} latest transactions`,
+      );
+      expect(result.summary).toContain("usually wrong");
+    });
+
+    it("does not call a create wrong when the condition matches but everything already has the value (the NETFLIX case)", async () => {
+      prep.prepareCreate.mockResolvedValue({
+        ok: true,
+        preview: {
+          rule,
+          labels,
+          test: { ...test, matchedCount: 0, conditionMatchedCount: 9 },
+        },
+      });
+      const result = await service.execute(USER, "manage_transaction_rules", {
+        operation: "create",
+        name: "NETFLIX",
+        ...draft,
+      });
+      expect(result.summary).not.toContain("matches none");
+      expect(result.summary).not.toContain("usually wrong");
+      expect(result.summary).toContain(
+        `The condition matches 9 of the ${test.scanned} latest transactions, but nothing would change`,
+      );
+      expect(result.summary).toContain("not an error");
+    });
+
+    it("says nothing about a rule that matches and changes rows", async () => {
+      const result = await service.execute(USER, "manage_transaction_rules", {
+        operation: "create",
+        name: "x",
+        ...draft,
+      });
+      expect(result.summary).not.toContain("matches none");
+      expect(result.summary).not.toContain("nothing would change");
+    });
+
+    it("tells the model plainly when a test matched none", async () => {
+      prep.toLlmTest.mockReturnValue({
+        message:
+          "This rule matches none of the 30 latest transactions. Re-check.",
+        matchedCount: 0,
+        scanned: 30,
+        truncated: false,
+        rows: [],
+        skippedCount: 0,
+        skipped: [],
+      });
+      const result = await service.execute(USER, "manage_transaction_rules", {
+        operation: "test",
+        ...draft,
+      });
+      expect(result.summary).toContain("matches none of the 30 latest");
+      expect(result.data).toMatchObject({ matchedCount: 0 });
     });
 
     it("passes a 4xx from the prep service on to the model and hides anything else", async () => {

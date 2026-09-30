@@ -119,6 +119,22 @@ describe('RuleApplications', () => {
     expect(row).toHaveTextContent('Description: none → "POS 1 / REF 9"');
   });
 
+  it('reads a payee replaced by one the rule creates as one line, never "none"', async () => {
+    api.getApplications.mockResolvedValue([
+      makeApplication({
+        changes: {
+          payeeId: { before: PAYEE_ID, after: null },
+          payeeName: { before: 'Old Cafe', after: 'Corner Cafe' },
+          payeeCreated: true,
+        },
+      }),
+    ]);
+    await renderApplications();
+    const row = screen.getAllByRole('row')[1];
+    expect(row).toHaveTextContent('→ Corner Cafe (new)');
+    expect(row).not.toHaveTextContent('→ none');
+  });
+
   it('builds the deep link the register jumps to', () => {
     expect(transactionHref('11111111-1111-4111-8111-111111111111')).toBe(
       '/transactions?targetTransactionId=11111111-1111-4111-8111-111111111111',

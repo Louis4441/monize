@@ -39,6 +39,7 @@ function buildActionBuilderMock(): Record<string, jest.Mock> {
 
 const test = {
   matchedCount: 3,
+  conditionMatchedCount: 3,
   scanned: 40,
   truncated: false,
   rows: [],
@@ -179,6 +180,34 @@ describe("McpRulesTools", () => {
     }
   });
 
+  it("accepts condition and actions sent as JSON strings, as models routinely do", () => {
+    const schema = configs["manage_transaction_rules"].inputSchema;
+    const parsed = schema.parse({
+      operation: "test",
+      condition: JSON.stringify(createArgs.condition),
+      actions: JSON.stringify(createArgs.actions),
+    });
+    expect(parsed.condition).toEqual(createArgs.condition);
+    expect(parsed.actions).toEqual(createArgs.actions);
+    const perAction = schema.parse({
+      operation: "test",
+      condition: createArgs.condition,
+      actions: [JSON.stringify(createArgs.actions[0])],
+    });
+    expect(perAction.actions).toEqual(createArgs.actions);
+  });
+
+  it("still refuses a string that is not a JSON object", () => {
+    const schema = configs["manage_transaction_rules"].inputSchema;
+    expect(
+      schema.safeParse({
+        operation: "test",
+        condition: "description contains ASSECO",
+        actions: createArgs.actions,
+      }).success,
+    ).toBe(false);
+  });
+
   it("refuses a caller with no user context", async () => {
     ctx.setUser(undefined);
     const result = await handlers["manage_transaction_rules"](
@@ -301,6 +330,72 @@ describe("McpRulesTools", () => {
       expect(actionBuilder.buildCreateTransactionRule).not.toHaveBeenCalled();
       expect(aiActions.commitApproved).not.toHaveBeenCalled();
       expect(limiter.record).not.toHaveBeenCalled();
+    });
+
+    it("sends a fix for each problem beside the entries", async () => {
+      prep.prepareCreate.mockResolvedValue({
+        ok: false,
+        message: "The rule definition is not valid",
+        errors: [{ path: "condition.operator", code: "UNKNOWN_KEY" }],
+        hints: ['"operator" is not allowed in a leaf; use field, op, value.'],
+      });
+      const result = await call(createArgs);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("UNKNOWN_KEY");
+      expect(result.content[0].text).toContain(
+        'Fix: "operator" is not allowed in a leaf',
+      );
+    });
+
+    it("says on the confirmation that the rule matches none of the transactions examined", async () => {
+      server.server.getClientCapabilities.mockReturnValue({
+        elicitation: { form: {} },
+      });
+      prep.prepareCreate.mockResolvedValue({
+        ok: true,
+        preview: {
+          rule: ruleState,
+          labels: {},
+          test: { ...test, matchedCount: 0, conditionMatchedCount: 0 },
+        },
+      });
+      await call(createArgs);
+      const message = elicitInput.mock.calls[0][0].message as string;
+      expect(message).toContain(
+        "This rule matches none of the 40 latest transactions.",
+      );
+      expect(message).toContain("usually wrong");
+    });
+
+    it("says the condition matches but nothing would change, without calling the rule wrong", async () => {
+      server.server.getClientCapabilities.mockReturnValue({
+        elicitation: { form: {} },
+      });
+      prep.prepareCreate.mockResolvedValue({
+        ok: true,
+        preview: {
+          rule: ruleState,
+          labels: {},
+          test: { ...test, matchedCount: 0, conditionMatchedCount: 12 },
+        },
+      });
+      await call(createArgs);
+      const message = elicitInput.mock.calls[0][0].message as string;
+      expect(message).toContain(
+        "The condition matches 12 of the 40 latest transactions, but nothing would change",
+      );
+      expect(message).not.toContain("matches none");
+      expect(message).not.toContain("usually wrong");
+    });
+
+    it("does not warn when the rule matches something", async () => {
+      server.server.getClientCapabilities.mockReturnValue({
+        elicitation: { form: {} },
+      });
+      await call(createArgs);
+      expect(elicitInput.mock.calls[0][0].message).not.toContain(
+        "matches none",
+      );
     });
 
     it("refuses over the daily write cap without offering a card or committing", async () => {

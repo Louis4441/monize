@@ -804,6 +804,11 @@ export const RULE_CARD_PREVIEW_ROWS = 10;
 export interface AiActionRuleTestPreview {
   /** Transactions the rule would change. */
   matchedCount: number;
+  /**
+   * Transactions whose rule condition matched, whether or not an action would
+   * change them. Only 0 means the rule matches nothing.
+   */
+  conditionMatchedCount: number;
   /** Transactions examined. */
   scanned: number;
   /** More transactions matched the filters than the run examines. */

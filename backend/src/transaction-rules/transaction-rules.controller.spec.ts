@@ -7,6 +7,9 @@ import { TransactionRulesController } from "./transaction-rules.controller";
 import { TransactionRulesService } from "./transaction-rules.service";
 import { TransactionRulesRunService } from "./transaction-rules-run.service";
 import { ALLOW_DELEGATE_KEY } from "../delegation/decorators/delegate-access.decorator";
+import { plainToInstance } from "class-transformer";
+import { validate } from "class-validator";
+import { PreviewDraftRuleDto } from "./dto/rule-run.dto";
 import { CreateTransactionRuleDto } from "./dto/create-transaction-rule.dto";
 import { UpdateTransactionRuleDto } from "./dto/update-transaction-rule.dto";
 
@@ -62,6 +65,34 @@ describe("TransactionRulesController", () => {
     await controller.previewDraft(req, dto);
 
     expect(runService.previewDraft).toHaveBeenCalledWith("user-1", dto);
+  });
+
+  it("forwards the ruleId of a saved rule's draft to the service untouched", async () => {
+    runService.previewDraft.mockResolvedValue({ matched: [] });
+    const dto = {
+      ruleId: "e0000000-0000-4000-8000-000000000005",
+      condition: {},
+      actions: [],
+    };
+
+    await controller.previewDraft(req, dto);
+
+    expect(runService.previewDraft).toHaveBeenCalledWith("user-1", dto);
+  });
+
+  it("validates ruleId as an optional UUID on the preview-draft body", async () => {
+    const check = (body: object) =>
+      validate(plainToInstance(PreviewDraftRuleDto, body));
+    const base = { condition: {}, actions: [] };
+    expect(await check(base)).toHaveLength(0);
+    expect(
+      await check({
+        ...base,
+        ruleId: "e0000000-0000-4000-8000-000000000005",
+      }),
+    ).toHaveLength(0);
+    const bad = await check({ ...base, ruleId: "not-a-uuid" });
+    expect(bad.map((e) => e.property)).toEqual(["ruleId"]);
   });
 
   it("runs a rule with the fingerprint of the preview", async () => {

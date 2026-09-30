@@ -129,7 +129,6 @@
       "payeeText": "Zahlungsempfänger-Text wie empfangen",
       "categoryId": "Kategorie",
       "description": "Beschreibung",
-      "memo": "Notiz",
       "amount": "Betrag (mit Vorzeichen)",
       "absAmount": "Betrag (ohne Vorzeichen)",
       "currencyCode": "Währung",
@@ -176,7 +175,7 @@
       "currency": "Währung auswählen",
       "currencies": "Währungen auswählen",
       "types": "Typen auswählen",
-      "matchesHint": "Verwenden Sie * für beliebigen Text, zum Beispiel *Kaffee*. Mit {capture} behalten Sie den Text an dieser Stelle für die Aktionen dieser Regel, zum Beispiel {example}. Ein Name besteht aus Kleinbuchstaben und Ziffern, und ein Muster kann bis zu {max} Texte behalten.",
+      "matchesHint": "Verwenden Sie * für beliebigen Text, zum Beispiel *Kaffee*. Ein Muster ohne * trifft nur auf den gesamten Text zu. Mit {capture} behalten Sie den Text an dieser Stelle für die Aktionen dieser Regel, zum Beispiel {example}. Ein Name besteht aus Kleinbuchstaben und Ziffern, und ein Muster kann bis zu {max} Texte behalten.",
       "amount": "Betrag",
       "from": "Von",
       "to": "Bis",
@@ -281,7 +280,9 @@
         "INVALID_CAPTURE": "Ein Erfassungsname besteht aus Kleinbuchstaben und Ziffern, beginnt mit einem Buchstaben und ist höchstens 20 Zeichen lang.",
         "TOO_MANY_CAPTURES": "Ein Muster darf höchstens 5 Erfassungen enthalten.",
         "DUPLICATE_CAPTURE": "Jeder Erfassungsname darf in einer Regel nur einmal vorkommen.",
-        "UNKNOWN_CAPTURE": "Der Text verwendet eine Erfassung, die keine Bedingung dieser Regel definiert."
+        "UNKNOWN_CAPTURE": "Der Text verwendet eine Erfassung, die keine Bedingung dieser Regel definiert.",
+        "LOOKS_LIKE_REGEX": "Reguläre Ausdrücke werden nicht unterstützt: | \\ und kurze Klammerklassen wie [xy] gelten als gewöhnliche Zeichen, daher trifft ein als Regex geschriebenes Muster nie das Gemeinte. Um einen von mehreren Texten zu treffen, fügen Sie eine Gruppe „Eine dieser“ hinzu und legen Sie darin für jeden Text eine Bedingung an.",
+        "PATTERN_WITHOUT_WILDCARD": "Ohne * muss dieses Muster dem gesamten Text entsprechen. Verwenden Sie „ist“ für den ganzen Text, „enthält“ für einen Teil davon oder setzen Sie * um den Text, zum Beispiel *Kaffee*."
       }
     },
     "run": {
@@ -352,6 +353,8 @@
     "accountsFailed": "Deine Konten konnten nicht geladen werden, daher sind die Filter nicht verfügbar.",
     "retry": "Erneut versuchen",
     "summary": "{matched, plural, one {# Buchung würde geändert} other {# Buchungen würden geändert}} von {scanned, plural, one {# geprüften Buchung} other {# geprüften Buchungen}}.",
+    "matchesNone": "Diese Regel trifft auf keine der geprüften Buchungen zu ({scanned}). Prüfen Sie die Bedingungen vor dem Speichern. Ein Muster ohne * trifft nur auf den gesamten Text zu.",
+    "noChange": "{matched} von {scanned} geprüften Buchungen erfüllen die Bedingungen der Regel, aber es würde sich nichts ändern (zum Beispiel, weil sie den Wert schon haben und „nur wenn leer“ aktiv ist). Das ist kein Fehler.",
     "truncated": "Es passen mehr Buchungen, als das Limit zulässt. Nur die neuesten sind enthalten. Erhöhe das Limit oder grenze den Zeitraum ein, um den Rest einzubeziehen.",
     "noMatches": {
       "title": "Keine Buchung würde geändert",
@@ -380,6 +383,7 @@
     "change": {
       "category": "Kategorie: {before} → {after}",
       "payee": "Zahlungsempfänger: {before} → {after}",
+      "payeeNew": "Zahlungsempfänger: {before} → {name} (neu)",
       "tagsAdded": "Tags hinzugefügt: {tags}",
       "tagsRemoved": "Tags entfernt: {tags}",
       "none": "keine",

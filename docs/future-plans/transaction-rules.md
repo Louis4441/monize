@@ -197,7 +197,7 @@ leaf (`field`, `op`, `value`).
 | `payeeId` | payee id | `eq`, `neq`, `in`, `notIn`, `isEmpty` | After alias resolution. |
 | `payeeText` | text | `eq`, `contains`, `startsWith`, `matches`, `isEmpty` | The raw payee text from the source (import text or typed name). |
 | `categoryId` | category id | `eq`, `neq`, `in`, `notIn`, `isEmpty`, `inSubtree` | `inSubtree` includes child categories. |
-| `description`, `memo` | text | `eq`, `contains`, `startsWith`, `matches`, `isEmpty` | Case-insensitive. |
+| `description` | text | `eq`, `contains`, `startsWith`, `matches`, `isEmpty` | Case-insensitive. |
 | `amount` | money, signed | `eq`, `lt`, `lte`, `gt`, `gte`, `between` | In the account currency. |
 | `absAmount` | money | `lt`, `lte`, `gt`, `gte`, `between` | So "more than 100" does not depend on the sign. |
 | `currencyCode` | currency | `eq`, `in` | Derived from the account. |
@@ -205,7 +205,15 @@ leaf (`field`, `op`, `value`).
 | `hasSplits` | bool | `eq` | |
 
 - `matches` is a glob (`*`, no regex), evaluated by `matchesAliasPattern`, so no
-  pattern can cause ReDoS. There is no regex operator.
+  pattern can cause ReDoS. There is no regex operator. The pattern is matched
+  against the WHOLE text, so the validator refuses the two ways that goes
+  wrong (section 10.1, "Glob traps").
+- There is no `memo` field. The `Transaction` entity has no memo column, so a
+  `memo` leaf could only ever read `null` and was false for every operator but
+  `isEmpty`. A stored rule that still names it shows as invalid in the rules
+  list with `UNKNOWN_FIELD` and is skipped by the applier, like any rule the
+  validator no longer accepts: the field never worked, so there is nothing to
+  keep working and no migration.
 - Text comparison is case-insensitive and trims whitespace, the same as payee
   alias matching.
 - Money comparison uses scaled integers (`Math.round(Number(x) * 10000)`) on
@@ -349,6 +357,26 @@ writes already do:
   tool with `operation: "list"`, to keep the `tools/list` budget small.
   `tools-list-budget.spec.ts` is a ratchet: adding the tool raises the total
   cap, which is a reviewed decision in that PR.
+- A client truncates a tool description at 2,048 characters (Claude Code logs
+  `description truncated from 2328 to 2048 chars` and drops the tail). The
+  rule language (`RULE_LANGUAGE_GUIDE`, `backend/src/ai/query/rule-language.ts`,
+  shared by the assistant and the MCP tool) therefore leads with the contract
+  (`condition` is an object, `actions` an array, one complete example, the
+  group and leaf keys, the operators, the glob rules, the action shapes) and
+  the per-field detail lives in the `condition` and `actions` field
+  descriptions. `tools-list-budget.spec.ts` fails when any tool description
+  is over 2,048 characters and holds the rule tool's under 2,000.
+- A refused definition comes back with the `{ path, code }` entries and one
+  short English hint per distinct problem (`rule-validation-hints.ts`): what
+  is wrong and the correct form, with the allowed keys, fields or operators
+  named. `condition` and `actions` sent as JSON strings are parsed once
+  (bounded at 20,000 characters) instead of refused, because models do this
+  routinely.
+- A test or a card that matched no transaction says so plainly ("This rule
+  matches none of the N latest transactions") and tells the model that such a
+  rule is usually wrong and to re-check the pattern before asking the user to
+  confirm. The editor's Save shows the same line under the last Test when it
+  matched nothing (it never blocks).
 - A model drafts a rule; it never saves one without the human card. The
   domain logic sits on `TransactionRulesService`, so both surfaces return the
   same shape (`docs/backend/mcp.md`, checklist item 1).
@@ -398,13 +426,43 @@ stays an anonymous wildcard. Example: `*Nazwa odbiorcy: {payee} Rachunek*`.
   is empty.
 - The validator refuses a template that names a capture no leaf of the rule
   defines.
+- From phase 2 on, `{...}` in a `matches` pattern is capture syntax. A
+  pattern saved earlier with literal braces is either refused by validation
+  (it then shows as invalid in the rules list, with its reason) or reads as a
+  capture. Phase 2 ships together with phase 1, so no stored rule needs
+  migrating. A literal brace cannot be written in a `matches` pattern; there
+  is no escape.
+
+Glob traps (every surface: REST, editor, assistant, MCP). Two `matches`
+patterns are refused because they are never what a person meant:
+
+- `LOOKS_LIKE_REGEX`: the pattern holds `|`, `.*`, a backslash, or a bracket
+  class of 1 to 3 characters (`[xy]`, `[łl]`). A glob has no escape, so `^`,
+  `$` and longer bracketed words (`*[PENDING]*`) stay allowed: refusing them
+  would make that literal text impossible to match. The listed characters are
+  matched literally, so a pattern written as a regex never matches what was
+  meant. The hint sends the author to an `any` group of `contains` / `matches`
+  leaves.
+- `PATTERN_WITHOUT_WILDCARD`: the pattern holds no `*` and no `{capture}`, so
+  it equals the whole text, which is what `eq` says. The hint sends the author
+  to `eq` for the whole text, or `contains` / `*text*` for a part.
+
+At most one of the two is reported, the regex first; a malformed `{Capture}`
+is `INVALID_CAPTURE`, not a missing wildcard. Both are authoring checks only:
+they run when a rule is created or updated (REST, the draft preview, the
+assistant and MCP, through `validateRuleDefinition(..., { authoring: true })`)
+and never when a stored rule is loaded, listed, evaluated or run. A stored rule
+such as `matches "NETFLIX.COM"` keeps applying and is not marked invalid;
+creating it anew is refused, and an update that leaves the condition alone does
+not re-run them. A stored rule that names the removed `memo` field is different:
+it is invalid (`UNKNOWN_FIELD`) and the applier skips it.
 
 ### 10.2 Two text actions (X2)
 
 | Action | Parameters | Effect | Refused when |
 |---|---|---|---|
 | `set_payee_from_text` | `template` (1..200), `createIfMissing` (default false), `onlyIfEmpty` (default true) | Renders the template, resolves the name through the existing payee resolution (exact name, then alias, then the unique normalized match), and sets the payee; with `createIfMissing` it creates the payee through the existing find-or-create path | the rendered name is empty; the row is a cross-owner transfer leg |
-| `set_description` | `template` (1..500), `mode` (`replace`, `append`, `prepend`), `onlyIfEmpty` (default false) | Renders the template (`{description}` is the current text) and writes the description within the column's length, `stripHtml` applied | the rendered text is empty in `replace` mode |
+| `set_description` | `template` (1..500), `mode` (`replace`, `append`, `prepend`), `onlyIfEmpty` (default false) | Renders the template (`{description}` is the current text) and writes the description within the column's length, `stripHtml` applied | the rendered text is empty in `replace` mode; the row is a cross-owner transfer leg (a same-owner transfer writes both legs) |
 
 Templates are plain text with `{capture}`, `{payeeText}` and `{description}`
 placeholders; there is no expression language inside a template. The

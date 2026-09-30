@@ -436,6 +436,7 @@ export const manageTransactionRulesOutput = toolOutput({
   truncated: bool.optional(),
   rule: str.optional(),
   matchedCount: num.optional(),
+  conditionMatchedCount: num.optional(),
   scanned: num.optional(),
   skippedCount: num.optional(),
   rows: rows().optional(),

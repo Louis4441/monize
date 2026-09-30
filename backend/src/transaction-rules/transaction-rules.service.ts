@@ -117,6 +117,7 @@ export class TransactionRulesService {
         userId,
         changes.condition ?? rule.condition,
         changes.actions ?? rule.actions,
+        changes.condition !== undefined,
       );
       const patch: QueryDeepPartialEntity<TransactionRule> = {
         ...changes,
@@ -353,9 +354,14 @@ export class TransactionRulesService {
     userId: string,
     condition: unknown,
     actions: unknown,
+    authoring = true,
   ): Promise<RuleDefinition> {
     const candidate = { condition, actions: withActionDefaults(actions) };
-    const shapeErrors = validateRuleDefinition(candidate);
+    // `authoring` adds the glob-trap advice (regex-looking or bare-word
+    // patterns); an update that leaves the condition alone passes false so a
+    // stored rule that predates the advice can still have its name or actions
+    // edited.
+    const shapeErrors = validateRuleDefinition(candidate, { authoring });
     if (shapeErrors.length > 0) throw this.invalidDefinition(shapeErrors);
     const definition = candidate as unknown as RuleDefinition;
     const missing = await checkReferences(m, userId, definition);

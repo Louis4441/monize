@@ -22,17 +22,20 @@ import {
   type EditorLeaf,
 } from './rule-tree';
 
-const leaf = (field: EditorLeaf['field'] = 'memo', extra: Partial<EditorLeaf> = {}): EditorLeaf => ({
+const leaf = (
+  field: EditorLeaf['field'] = 'referenceNumber',
+  extra: Partial<EditorLeaf> = {},
+): EditorLeaf => ({
   ...createLeaf(field),
   ...extra,
 });
 
 function tree(): EditorGroup {
   // root: [a, group(any): [b, c], d]
-  const a = leaf('memo', { value: 'a' });
-  const b = leaf('memo', { value: 'b' });
-  const c = leaf('memo', { value: 'c' });
-  const d = leaf('memo', { value: 'd' });
+  const a = leaf('referenceNumber', { value: 'a' });
+  const b = leaf('referenceNumber', { value: 'b' });
+  const c = leaf('referenceNumber', { value: 'c' });
+  const d = leaf('referenceNumber', { value: 'd' });
   return createGroup('all', [a, createGroup('any', [b, c]), d]);
 }
 
@@ -52,27 +55,27 @@ describe('createLeaf and defaults', () => {
     expect(createLeaf('hasSplits').value).toBe(true);
     expect(createLeaf('tagIds').value).toEqual([]);
     expect(defaultValue('amount', 'between')).toEqual([undefined, undefined]);
-    expect(defaultValue('memo', 'isEmpty')).toBeUndefined();
+    expect(defaultValue('referenceNumber', 'isEmpty')).toBeUndefined();
     expect(defaultValue('amount', 'eq')).toBeUndefined();
-    expect(defaultValue('memo', 'eq')).toBe('');
+    expect(defaultValue('referenceNumber', 'eq')).toBe('');
   });
 });
 
 describe('changing a leaf', () => {
   it('resets the operator and the value when the field changes', () => {
     const before = leaf('amount', { op: 'between', value: [1, 2] });
-    const after = changeLeafField(before, 'memo');
-    expect(after).toMatchObject({ field: 'memo', op: 'eq', value: '', uid: before.uid });
+    const after = changeLeafField(before, 'referenceNumber');
+    expect(after).toMatchObject({ field: 'referenceNumber', op: 'eq', value: '', uid: before.uid });
   });
 
   it('returns the same leaf when the field is unchanged', () => {
-    const before = leaf('memo');
-    expect(changeLeafField(before, 'memo')).toBe(before);
+    const before = leaf('referenceNumber');
+    expect(changeLeafField(before, 'referenceNumber')).toBe(before);
     expect(changeLeafOperator(before, before.op)).toBe(before);
   });
 
   it('keeps the value across operators of the same shape', () => {
-    const before = leaf('memo', { op: 'contains', value: 'coffee' });
+    const before = leaf('referenceNumber', { op: 'contains', value: 'coffee' });
     expect(changeLeafOperator(before, 'startsWith').value).toBe('coffee');
   });
 
@@ -88,7 +91,7 @@ describe('changing a leaf', () => {
     const range = changeLeafOperator(one, 'between');
     expect(range.value).toEqual([5, undefined]);
     expect(changeLeafOperator(range, 'gt').value).toBe(5);
-    expect(changeLeafOperator(leaf('memo', { value: 'x' }), 'isEmpty').value).toBeUndefined();
+    expect(changeLeafOperator(leaf('referenceNumber', { value: 'x' }), 'isEmpty').value).toBeUndefined();
     expect(changeLeafOperator(leaf('payeeId', { value: '' }), 'in').value).toEqual([]);
     expect(changeLeafOperator(leaf('tagIds', { op: 'hasAny', value: ['t'] }), 'hasAll').value).toEqual(['t']);
   });
@@ -156,7 +159,7 @@ describe('immutable edits', () => {
 
   it('adds a child to the group at a path, and only to a group', () => {
     const root = tree();
-    const added = leaf('memo', { value: 'z' });
+    const added = leaf('referenceNumber', { value: 'z' });
     const next = addChild(root, [1], added);
     expect((getNode(next, [1]) as EditorGroup).children).toHaveLength(3);
     expect(valueAt(next, [1, 2])).toBe('z');

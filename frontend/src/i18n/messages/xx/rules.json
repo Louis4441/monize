@@ -129,7 +129,6 @@
       "payeeText": "[XX-Payee text as received-XX]",
       "categoryId": "[XX-Category-XX]",
       "description": "[XX-Description-XX]",
-      "memo": "[XX-Memo-XX]",
       "amount": "[XX-Amount (with sign)-XX]",
       "absAmount": "[XX-Amount (ignoring sign)-XX]",
       "currencyCode": "[XX-Currency-XX]",
@@ -176,7 +175,7 @@
       "currency": "[XX-Choose a currency-XX]",
       "currencies": "[XX-Choose currencies-XX]",
       "types": "[XX-Choose types-XX]",
-      "matchesHint": "[XX-Use * for any text, for example *coffee*. Use {capture} to keep the text at that spot for the actions of this rule, for example {example}. A name is lowercase letters and digits, and a pattern can keep up to {max} texts.-XX]",
+      "matchesHint": "[XX-Use * for any text, for example *coffee*. A pattern without * matches only the whole text. Use {capture} to keep the text at that spot for the actions of this rule, for example {example}. A name is lowercase letters and digits, and a pattern can keep up to {max} texts.-XX]",
       "amount": "[XX-Amount-XX]",
       "from": "[XX-From-XX]",
       "to": "[XX-To-XX]",
@@ -279,6 +278,8 @@
         "TOO_MANY_CAPTURES": "[XX-A pattern can hold at most 5 captures.-XX]",
         "DUPLICATE_CAPTURE": "[XX-Each capture name can be used once in a rule.-XX]",
         "UNKNOWN_CAPTURE": "[XX-The text uses a capture that no condition of this rule defines.-XX]",
+        "LOOKS_LIKE_REGEX": "[XX-Regular expressions are not supported: | \\ and short bracket classes like [xy] are matched as plain characters, so a pattern written as a regex never matches what was meant. To match one of several texts, add a group of “Any of these” and put one condition in it for each text.-XX]",
+        "PATTERN_WITHOUT_WILDCARD": "[XX-Without a * this pattern must equal the whole text. Use the operator “is” for the whole text, “contains” for a part of it, or put * around the text, for example *coffee*.-XX]",
         "REFERENCE_NOT_FOUND": "[XX-An item chosen here no longer exists. Choose another.-XX]",
         "NAME_REQUIRED": "[XX-Enter a name for the rule.-XX]",
         "UNKNOWN": "[XX-This part is not valid.-XX]"
@@ -352,6 +353,8 @@
     "accountsFailed": "[XX-Your accounts could not be loaded, so the filters are unavailable.-XX]",
     "retry": "[XX-Try again-XX]",
     "summary": "[XX-{matched, plural, one {# transaction would change} other {# transactions would change}} out of {scanned, plural, one {# transaction} other {# transactions}} scanned.-XX]",
+    "matchesNone": "[XX-This rule matches none of the transactions examined ({scanned}). Check the conditions before saving. A pattern without * matches only the whole text.-XX]",
+    "noChange": "[XX-{matched} of the {scanned} transactions examined match the rule's conditions, but nothing would change (for example, they already have the value and only-if-empty is on). This is not an error.-XX]",
     "truncated": "[XX-More transactions matched than the limit allows. Only the newest are included. Raise the limit or narrow the dates to include the rest.-XX]",
     "noMatches": {
       "title": "[XX-No transactions would change-XX]",
@@ -380,6 +383,7 @@
     "change": {
       "category": "[XX-Category: {before} → {after}-XX]",
       "payee": "[XX-Payee: {before} → {after}-XX]",
+      "payeeNew": "[XX-Payee: {before} → {name} (new)-XX]",
       "tagsAdded": "[XX-Tags added: {tags}-XX]",
       "tagsRemoved": "[XX-Tags removed: {tags}-XX]",
       "none": "[XX-none-XX]",

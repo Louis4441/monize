@@ -108,7 +108,7 @@ describe('isKnownRuleErrorCode', () => {
 
 describe('draftGaps', () => {
   const draft = (over: Partial<RuleDraft>): RuleDraft => ({ ...emptyDraft(), name: 'Rule', ...over });
-  const leaf = (over: Partial<EditorLeaf>): EditorLeaf => ({ ...createLeaf('memo'), ...over });
+  const leaf = (over: Partial<EditorLeaf>): EditorLeaf => ({ ...createLeaf('referenceNumber'), ...over });
   const tags = { ...createAction('add_tags'), tagIds: ['t'] };
 
   it('is empty for a complete draft', () => {
@@ -129,7 +129,7 @@ describe('draftGaps', () => {
         leaf({ value: '' }),
         leaf({ field: 'tagIds', op: 'hasAny', value: [] }),
         leaf({ field: 'amount', op: 'between', value: [1, undefined] }),
-        leaf({ field: 'memo', op: 'isEmpty', value: undefined }),
+        leaf({ field: 'referenceNumber', op: 'isEmpty', value: undefined }),
         leaf({ field: 'payeeId', op: 'in', value: Array.from({ length: 51 }, () => 'p') }),
       ]),
     ]);
@@ -172,6 +172,47 @@ describe('draftGaps', () => {
     ]);
   });
 
+  describe('the glob-trap advice on an existing rule', () => {
+    const matchesLeaf = (value: string): EditorLeaf => ({
+      ...createLeaf('description'),
+      op: 'matches',
+      value,
+    });
+    const withPattern = (value: string): RuleDraft =>
+      draft({ condition: createGroup('all', [matchesLeaf(value)]), actions: [tags] });
+    const bareWord = [{ path: 'condition.all[0]', code: 'PATTERN_WITHOUT_WILDCARD' }];
+
+    it('blocks a new rule whose pattern has no wildcard', () => {
+      expect(draftGaps(withPattern('NETFLIX.COM'))).toEqual(bareWord);
+      expect(draftGaps(withPattern('NETFLIX.COM'), null)).toEqual(bareWord);
+    });
+
+    it('lets an existing rule with such a pattern be renamed', () => {
+      const loaded = withPattern('NETFLIX.COM');
+      // The editor rebuilds nodes with new uids; only the saved shape counts.
+      const reloaded = { ...withPattern('NETFLIX.COM'), name: 'Renamed' };
+      expect(draftGaps(reloaded, loaded)).toEqual([]);
+      expect(draftGaps({ ...loaded, triggers: ['create'], actions: [tags] }, loaded)).toEqual([]);
+    });
+
+    it('blocks the same rule once its condition is edited', () => {
+      const loaded = withPattern('NETFLIX.COM');
+      expect(draftGaps(withPattern('HBO.COM'), loaded)).toEqual(bareWord);
+      expect(draftGaps(withPattern('a|b'), loaded)).toEqual([
+        { path: 'condition.all[0]', code: 'LOOKS_LIKE_REGEX' },
+      ]);
+    });
+
+    it('still reports the gaps the server refuses whatever the condition', () => {
+      const loaded = withPattern('NETFLIX.COM');
+      expect(draftGaps({ ...loaded, name: '' }, loaded)).toEqual([{ path: 'name', code: 'NAME_REQUIRED' }]);
+    });
+
+    it('reports an empty pattern as a missing value only', () => {
+      expect(draftGaps(withPattern(''))).toEqual([{ path: 'condition.all[0]', code: 'VALUE_REQUIRED' }]);
+    });
+  });
+
   it('refuses a placeholder no pattern of the rule defines, and a malformed one', () => {
     const condition = createGroup('all', [leaf({ field: 'description', op: 'matches', value: '*{payee}*' })]);
     const actions = [
@@ -188,7 +229,7 @@ describe('draftGaps', () => {
   it('refuses the patterns the server refuses, at the leaf', () => {
     const condition = createGroup('all', [
       leaf({ field: 'description', op: 'matches', value: '*{a}*' }),
-      leaf({ field: 'memo', op: 'matches', value: '*{a}*' }),
+      leaf({ field: 'referenceNumber', op: 'matches', value: '*{a}*' }),
       leaf({ field: 'referenceNumber', op: 'matches', value: '{Bad}' }),
       leaf({ field: 'payeeText', op: 'matches', value: '{a1}{a2}{a3}{a4}{a5}{a6}' }),
     ]);

@@ -129,7 +129,6 @@
       "payeeText": "Teks penerima sebagaimana diterima",
       "categoryId": "Kategori",
       "description": "Deskripsi",
-      "memo": "Memo",
       "amount": "Jumlah (dengan tanda)",
       "absAmount": "Jumlah (tanpa tanda)",
       "currencyCode": "Mata uang",
@@ -176,7 +175,7 @@
       "currency": "Pilih mata uang",
       "currencies": "Pilih mata uang-mata uang",
       "types": "Pilih jenis",
-      "matchesHint": "Gunakan * untuk teks apa pun, misalnya *kopi*. Gunakan {capture} untuk menyimpan teks di posisi itu bagi tindakan aturan ini, misalnya {example}. Nama terdiri dari huruf kecil dan angka, dan satu pola dapat menyimpan hingga {max} teks.",
+      "matchesHint": "Gunakan * untuk teks apa pun, misalnya *kopi*. Pola tanpa * hanya cocok dengan seluruh teks. Gunakan {capture} untuk menyimpan teks di posisi itu bagi tindakan aturan ini, misalnya {example}. Nama terdiri dari huruf kecil dan angka, dan satu pola dapat menyimpan hingga {max} teks.",
       "amount": "Jumlah",
       "from": "Dari",
       "to": "Sampai",
@@ -281,7 +280,9 @@
         "INVALID_CAPTURE": "Nama tangkapan memakai huruf kecil dan angka, diawali huruf, dan panjangnya paling banyak 20 karakter.",
         "TOO_MANY_CAPTURES": "Satu pola dapat memuat paling banyak 5 tangkapan.",
         "DUPLICATE_CAPTURE": "Setiap nama tangkapan hanya boleh dipakai satu kali dalam satu aturan.",
-        "UNKNOWN_CAPTURE": "Teks memakai tangkapan yang tidak didefinisikan oleh kondisi mana pun dalam aturan ini."
+        "UNKNOWN_CAPTURE": "Teks memakai tangkapan yang tidak didefinisikan oleh kondisi mana pun dalam aturan ini.",
+        "LOOKS_LIKE_REGEX": "Ekspresi reguler tidak didukung: | \\ dan kelas kurung pendek seperti [xy] dicocokkan sebagai karakter biasa, jadi pola yang ditulis sebagai regex tidak pernah cocok dengan yang dimaksud. Untuk mencocokkan salah satu dari beberapa teks, tambahkan grup “Salah satu dari ini” dan isi dengan satu kondisi untuk tiap teks.",
+        "PATTERN_WITHOUT_WILDCARD": "Tanpa * pola ini harus sama dengan seluruh teks. Gunakan operator “adalah” untuk seluruh teks, “mengandung” untuk sebagiannya, atau beri * di sekitar teks, misalnya *kopi*."
       }
     },
     "run": {
@@ -352,6 +353,8 @@
     "accountsFailed": "Akun Anda tidak dapat dimuat, sehingga filter tidak tersedia.",
     "retry": "Coba lagi",
     "summary": "{matched, plural, other {# transaksi}} akan berubah dari {scanned, plural, other {# transaksi}} yang diperiksa.",
+    "matchesNone": "Aturan ini tidak cocok dengan satu pun transaksi yang diperiksa ({scanned}). Periksa kondisinya sebelum menyimpan. Pola tanpa * hanya cocok dengan seluruh teks.",
+    "noChange": "{matched} dari {scanned} transaksi yang diperiksa cocok dengan kondisi aturan, tetapi tidak ada yang akan berubah (misalnya, nilainya sudah ada dan «hanya jika kosong» aktif). Ini bukan kesalahan.",
     "truncated": "Lebih banyak transaksi yang cocok daripada batas yang diizinkan. Hanya yang terbaru yang disertakan. Naikkan batas atau persempit tanggal untuk menyertakan sisanya.",
     "noMatches": {
       "title": "Tidak ada transaksi yang akan berubah",
@@ -380,6 +383,7 @@
     "change": {
       "category": "Kategori: {before} → {after}",
       "payee": "Penerima: {before} → {after}",
+      "payeeNew": "Penerima: {before} → {name} (baru)",
       "tagsAdded": "Tag ditambahkan: {tags}",
       "tagsRemoved": "Tag dihapus: {tags}",
       "none": "tidak ada",

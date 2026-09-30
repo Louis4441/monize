@@ -214,7 +214,9 @@ function refusal(
     if (facts.type === "TRANSFER") return "row_is_transfer_leg";
   }
   if (
-    (action.type === "set_payee" || action.type === "set_payee_from_text") &&
+    (action.type === "set_payee" ||
+      action.type === "set_payee_from_text" ||
+      action.type === "set_description") &&
     context.crossOwnerTransferLeg === true
   ) {
     return "cross_owner_transfer_leg";
@@ -531,9 +533,28 @@ export function planRuleEffects(
     if (rule.stopProcessing) break;
   }
 
+  // Only the final effect decides which payee is created: a creation a later
+  // rule replaced (an existing payee, or another created name) never happens,
+  // so `payeeCreated` stays only on the entries that planned the final name.
+  const finalKey =
+    state.payeeCreate === null ? null : payeeLookupKey(state.payeeCreate);
+  const finalTrace = trace.map((entry) => {
+    if (!entry.changes.payeeCreated) return entry;
+    const planned = entry.changes.payeeName?.after ?? null;
+    if (
+      finalKey !== null &&
+      planned !== null &&
+      payeeLookupKey(planned) === finalKey
+    ) {
+      return entry;
+    }
+    const { payeeCreated: _planned, ...changes } = entry.changes;
+    return { ...entry, changes };
+  });
+
   return {
     changes: netChanges(initial, state),
-    trace,
+    trace: finalTrace,
     aiReviewRequests,
     ...(lookups.length > 0 ? { payeeLookups: [...new Set(lookups)] } : {}),
   };

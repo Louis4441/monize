@@ -9,7 +9,9 @@ export function makeRule(overrides: Partial<TransactionRule> = {}): TransactionR
     enabled: true,
     position: 0,
     triggers: ['create'],
-    condition: { all: [{ field: 'memo', op: 'contains', value: 'coffee' }] },
+    condition: {
+      all: [{ field: 'referenceNumber', op: 'contains', value: 'coffee' }],
+    },
     actions: [
       { type: 'add_tags', tagIds: ['tag-1'] },
       { type: 'set_payee', payeeId: 'payee-1', onlyIfEmpty: true },
@@ -72,6 +74,7 @@ export function makePreview(overrides: Partial<RuleRunPreview> = {}): RuleRunPre
     ],
     skipped: [],
     scanned: 12,
+    conditionMatchedCount: 1,
     truncated: false,
     fingerprint: 'a'.repeat(64),
     labels: {

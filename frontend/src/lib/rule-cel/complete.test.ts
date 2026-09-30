@@ -35,24 +35,27 @@ describe('complete: fields', () => {
   it('carries the field label as the hint, and replaces the whole word the caret is in', () => {
     const { completion } = at('transaction.pay|eeText == "x"');
     expect(completion?.items[0]).toMatchObject({ label: 'payeeId', hint: 'fields.payeeId' });
-    expect(pick('a && transaction.mem|', 'memo')).toBe('a && transaction.memo|');
+    expect(pick('a && transaction.referenceN|', 'referenceNumber')).toBe('a && transaction.referenceNumber|');
     expect(pick('transaction.acc|ountId == 1', 'accountId')).toBe('transaction.accountId| == 1');
   });
 });
 
 describe('complete: methods and operators', () => {
   it('offers the methods the field allows after transaction.field.', () => {
-    expect(at('transaction.memo.|').labels).toEqual(['contains', 'startsWith', 'matchesGlob']);
+    expect(at('transaction.referenceNumber.|').labels).toEqual(['contains', 'startsWith', 'matchesGlob']);
     expect(at('transaction.amount.|').labels).toEqual(['between']);
     expect(at('transaction.tagIds.|').labels).toEqual(['hasAny', 'hasAll', 'hasNone']);
     expect(at('transaction.categoryId.|').labels).toEqual(['inSubtree']);
     expect(at('transaction.type.|').completion).toBeNull();
-    expect(at('transaction.memo.st|').labels).toEqual(['startsWith']);
+    expect(at('transaction.referenceNumber.st|').labels).toEqual(['startsWith']);
   });
 
   it('inserts the method with its opening parenthesis and explains it by the operator label', () => {
-    expect(pick('transaction.memo.con|', 'contains')).toBe('transaction.memo.contains(|');
-    expect(at('transaction.memo.|').completion?.items[2]).toMatchObject({ insert: 'matchesGlob(', hint: 'operators.matches' });
+    expect(pick('transaction.referenceNumber.con|', 'contains')).toBe('transaction.referenceNumber.contains(|');
+    expect(at('transaction.referenceNumber.|').completion?.items[2]).toMatchObject({
+      insert: 'matchesGlob(',
+      hint: 'operators.matches',
+    });
   });
 
   it('offers the comparisons the field allows after the field and a space', () => {
@@ -60,7 +63,7 @@ describe('complete: methods and operators', () => {
     expect(at('transaction.type |').labels).toEqual(['==', '!=', 'in']);
     expect(at('transaction.accountId |').labels).toEqual(['==', '!=', 'in']);
     expect(at('transaction.hasSplits |').labels).toEqual(['==']);
-    expect(at('transaction.memo |').labels).toEqual(['==']);
+    expect(at('transaction.referenceNumber |').labels).toEqual(['==']);
     expect(at('transaction.tagIds |').completion).toBeNull();
   });
 
@@ -95,8 +98,8 @@ describe('complete: values', () => {
 
   it('offers no value for a number or a text', () => {
     expect(at('transaction.amount > |').completion).toBeNull();
-    expect(at('transaction.memo == |').completion).toBeNull();
-    expect(at('transaction.memo == "ab|').completion).toBeNull();
+    expect(at('transaction.referenceNumber == |').completion).toBeNull();
+    expect(at('transaction.referenceNumber == "ab|').completion).toBeNull();
   });
 
   it('offers the written form of an item after a comparison, never an id', () => {
@@ -140,7 +143,7 @@ describe('complete: names inside a reference', () => {
 
   it('offers nothing for a kind that has no such name, or inside another function', () => {
     expect(at('transaction.accountId == account("zzz|').completion).toBeNull();
-    expect(at('transaction.memo.contains("a|').completion).toBeNull();
+    expect(at('transaction.referenceNumber.contains("a|').completion).toBeNull();
   });
 
   it('yields text that parses once the reference is complete', () => {
@@ -152,8 +155,15 @@ describe('complete: names inside a reference', () => {
 
 describe('complete: where a condition can start', () => {
   it('offers the starting words after && || ( ! and while a word is typed at the start', () => {
-    expect(at('transaction.memo == "a" && |').labels).toEqual(['transaction.', 'isEmpty(', 'all(', 'any(', 'true', 'false']);
-    expect(at('transaction.memo == "a" || tr|').labels).toEqual(['transaction.', 'true']);
+    expect(at('transaction.referenceNumber == "a" && |').labels).toEqual([
+      'transaction.',
+      'isEmpty(',
+      'all(',
+      'any(',
+      'true',
+      'false',
+    ]);
+    expect(at('transaction.referenceNumber == "a" || tr|').labels).toEqual(['transaction.', 'true']);
     expect(at('(|').labels).toContain('transaction.');
     expect(at('! |').labels).toContain('transaction.');
     expect(at('is|').labels).toEqual(['isEmpty(']);
@@ -167,9 +177,9 @@ describe('complete: where a condition can start', () => {
 
   it('offers nothing on empty text, after a complete value, or after a symbol alone', () => {
     expect(at('|').completion).toBeNull();
-    expect(at('transaction.memo == "a" |').completion).toBeNull();
-    expect(at('transaction.memo == "a"|').completion).toBeNull();
-    expect(at('transaction.memo == "a" &&|').completion?.items.length).toBeGreaterThan(0);
+    expect(at('transaction.referenceNumber == "a" |').completion).toBeNull();
+    expect(at('transaction.referenceNumber == "a"|').completion).toBeNull();
+    expect(at('transaction.referenceNumber == "a" &&|').completion?.items.length).toBeGreaterThan(0);
     expect(at('!|').completion).toBeNull();
     expect(at('zzz|').completion).toBeNull();
   });

@@ -70,6 +70,8 @@ export const RULE_VALIDATION_CODES = [
   "TOO_MANY_CAPTURES",
   "DUPLICATE_CAPTURE",
   "UNKNOWN_CAPTURE",
+  "LOOKS_LIKE_REGEX",
+  "PATTERN_WITHOUT_WILDCARD",
 ] as const;
 export type RuleValidationCode = (typeof RULE_VALIDATION_CODES)[number];
 
@@ -121,10 +123,13 @@ function checkKeys(
  * the service's job (see `collectReferencedIds`), inside the write's
  * transaction.
  */
-export function validateRuleDefinition(input: {
-  condition: unknown;
-  actions: unknown;
-}): RuleValidationError[] {
+export function validateRuleDefinition(
+  input: {
+    condition: unknown;
+    actions: unknown;
+  },
+  options: { readonly authoring?: boolean } = {},
+): RuleValidationError[] {
   const errors: RuleValidationError[] = [];
   const push: Sink = (path, code) => errors.push({ path, code });
   const budget: Budget = {
@@ -133,6 +138,7 @@ export function validateRuleDefinition(input: {
     leavesReported: false,
     nodesReported: false,
     captures: new Set<string>(),
+    authoring: options.authoring === true,
   };
   validateNode(input.condition, "condition", 1, budget, push);
   validateActions(input.actions, budget.captures, push);
@@ -146,6 +152,13 @@ interface Budget {
   nodesReported: boolean;
   /** Capture names the `matches` leaves define so far; one name once per rule. */
   captures: Set<string>;
+  /**
+   * True on the write and draft paths only. The glob-trap checks
+   * (`LOOKS_LIKE_REGEX`, `PATTERN_WITHOUT_WILDCARD`) are authoring advice: a
+   * stored rule that would fail them still evaluates, so loading, listing and
+   * running never apply them.
+   */
+  authoring: boolean;
 }
 
 function validateNode(
@@ -237,6 +250,9 @@ function validateLeaf(
     validateScalar(v, spec.kind, spec.enumValues ?? [], p, push);
   if (shape === "scalar") {
     if (checkOne(value, valuePath) && op === "matches") {
+      if (budget.authoring) {
+        validateGlobTraps(value as string, valuePath, push);
+      }
       validateCaptures(value as string, valuePath, budget.captures, push);
     }
   } else if (shape === "list") {
@@ -248,6 +264,33 @@ function validateLeaf(
     if (ok[0] && ok[1] && (value[0] as number) > (value[1] as number)) {
       push(valuePath, "RANGE_ORDER");
     }
+  }
+}
+
+/**
+ * Regex-only syntax that is a literal character in a glob, so a pattern that
+ * uses it never matches what its author meant: `|`, `.*`, a backslash and a
+ * bracket class of 1 to 3 characters (`[xy]`, `[łl]`). A glob has no escape,
+ * so `^`, `$` and longer bracketed words (`*[PENDING]*`) stay allowed: they
+ * are the only way to match that literal text. `+` is too common in text.
+ */
+const REGEX_ONLY_SYNTAX = /[|\\]|\[[^\][]{1,3}\]/;
+
+/**
+ * Two mistakes a person or a model makes with `matches` (design 10.1): writing
+ * a regex, and writing a bare word. A `matches` pattern is a glob answered
+ * against the WHOLE text, so `nagroda` equals only the text "nagroda" (the
+ * `eq` operator says that), and `a|b` equals only the text "a|b". At most one
+ * of the two is reported, the regex first.
+ */
+function validateGlobTraps(pattern: string, path: string, push: Sink): void {
+  // An empty pattern is a missing value, which the editor reports on its own;
+  // it is not "a bare word" and not a regex.
+  if (pattern === "") return;
+  if (REGEX_ONLY_SYNTAX.test(pattern)) return push(path, "LOOKS_LIKE_REGEX");
+  const { tokens, malformed } = parseGlob(pattern);
+  if (malformed.length === 0 && tokens.every((t) => t.kind === "literal")) {
+    push(path, "PATTERN_WITHOUT_WILDCARD");
   }
 }
 

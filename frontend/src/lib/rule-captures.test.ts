@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CAPTURE_NAME,
   MAX_CAPTURES_PER_PATTERN,
+  REGEX_ONLY_SYNTAX,
   RESERVED_CAPTURE_NAMES,
   TEMPLATE_BUILTINS,
   availablePlaceholders,
@@ -28,6 +29,13 @@ describe('the capture syntax against the backend', () => {
     const template = read('rule-template.ts');
     const builtins = /TEMPLATE_BUILTINS: readonly string\[\] = \[([\s\S]*?)\];/.exec(template)?.[1] ?? '';
     expect([...builtins.matchAll(/"(\w+)"/g)].map((m) => m[1])).toEqual([...TEMPLATE_BUILTINS]);
+  });
+
+  it('carries the same regex-only syntax as the backend glob check', () => {
+    const validation = read('rule-validation.ts');
+    expect(/REGEX_ONLY_SYNTAX = (\/.*\/);/.exec(validation)?.[1]).toBe(
+      String(REGEX_ONLY_SYNTAX),
+    );
   });
 
   it('reads the brace bounds the same way', () => {
@@ -101,6 +109,67 @@ describe('checkPattern', () => {
   });
 });
 
+describe('checkPattern: glob traps', () => {
+  it.each([
+    'a|b*',
+    'rycza[lł]t*',
+    'rycza[łl]t',
+    'a[bc]*',
+    'a\\b*',
+    'nagroda|wynag',
+  ])('refuses the regex %s', (pattern) => {
+    expect(checkPattern(pattern, []).codes).toEqual(['LOOKS_LIKE_REGEX']);
+  });
+
+  it.each(['wynag', 'nagroda', 'two words', 'a+b'])(
+    'refuses the bare word %s',
+    (pattern) => {
+      expect(checkPattern(pattern, []).codes).toEqual([
+        'PATTERN_WITHOUT_WILDCARD',
+      ]);
+    },
+  );
+
+  it('accepts a pattern with a wildcard or a capture, and leaves an empty one to the missing-value check', () => {
+    for (const pattern of [
+      '*wynag*',
+      'a*',
+      '*',
+      '{who}',
+      'Order {n}',
+      '',
+      '*[PENDING]*',
+      '^ABC*',
+      '*x$',
+      '*SP. Z O.O.*',
+      '*S.A.*',
+      '*Inc.*',
+      'x.*y',
+    ]) {
+      expect(checkPattern(pattern, []).codes).toEqual([]);
+    }
+  });
+
+  it('reports a malformed capture as such, not as a missing wildcard', () => {
+    expect(checkPattern('{Word}', []).codes).toEqual(['INVALID_CAPTURE']);
+  });
+
+  it('puts the trap on the leaf that scanCaptures reports', () => {
+    const leaf: EditorLeaf = {
+      ...createLeaf('description'),
+      op: 'matches',
+      value: 'wynag',
+    };
+    expect(scanCaptures(createGroup('all', [leaf])).issues).toEqual([
+      {
+        uid: leaf.uid,
+        path: 'condition.all[0]',
+        codes: ['PATTERN_WITHOUT_WILDCARD'],
+      },
+    ]);
+  });
+});
+
 describe('scanCaptures', () => {
   const matches = (value: string, field: EditorLeaf['field'] = 'description'): EditorLeaf => ({
     ...createLeaf(field),
@@ -110,14 +179,14 @@ describe('scanCaptures', () => {
 
   it('collects the names of every matches leaf in the server order, nested groups included', () => {
     const a = matches('*{a}*');
-    const b = matches('{b}{c}', 'memo');
+    const b = matches('{b}{c}', 'referenceNumber');
     const root = createGroup('all', [a, createGroup('any', [b])]);
     expect(scanCaptures(root)).toEqual({ names: ['a', 'b', 'c'], issues: [] });
   });
 
   it('reports the leaf, at the path the server uses, for each refusal', () => {
     const first = matches('{a}');
-    const second = matches('{a}', 'memo');
+    const second = matches('{a}', 'referenceNumber');
     const root = createGroup('all', [first, createGroup('any', [second])]);
     expect(scanCaptures(root).issues).toEqual([
       { uid: second.uid, path: 'condition.all[1].any[0]', codes: ['DUPLICATE_CAPTURE'] },

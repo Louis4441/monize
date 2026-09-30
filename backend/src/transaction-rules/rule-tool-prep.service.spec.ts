@@ -6,6 +6,7 @@ import { RULE_CARD_PREVIEW_ROWS } from "../ai/actions/ai-action.types";
 import { RuleRunPreview } from "./rule-run.types";
 import { TransactionRuleResponseDto } from "./dto/transaction-rule-response.dto";
 import { TransactionRuleToolPrepService } from "./rule-tool-prep.service";
+import { validateRuleDefinition } from "./rule-validation";
 import {
   ACCOUNT_ID,
   CATEGORY_ID,
@@ -59,6 +60,7 @@ function runPreview(rows = 2): RuleRunPreview {
     })),
     skipped: [{ transactionId: "t-x", reason: "reconciled_locked" }],
     scanned: 40,
+    conditionMatchedCount: rows + 1,
     truncated: false,
     fingerprint: "f".repeat(64),
     labels: {
@@ -173,14 +175,22 @@ describe("TransactionRuleToolPrepService", () => {
           { type: "add_tags", tagIds: [TAG_ID] },
         ],
       });
-      expect(runService.previewDraft).toHaveBeenCalledWith(USER_ID, {
-        condition: VALID_CONDITION,
-        actions: [
-          { type: "set_category", categoryId: CATEGORY_ID, onlyIfEmpty: true },
-          { type: "add_tags", tagIds: [TAG_ID] },
-        ],
-        filters: {},
-      });
+      expect(runService.previewDraft).toHaveBeenCalledWith(
+        USER_ID,
+        {
+          condition: VALID_CONDITION,
+          actions: [
+            {
+              type: "set_category",
+              categoryId: CATEGORY_ID,
+              onlyIfEmpty: true,
+            },
+            { type: "add_tags", tagIds: [TAG_ID] },
+          ],
+          filters: {},
+        },
+        { authoring: true },
+      );
       expect(prep.preview.labels).toEqual({
         accounts: { [ACCOUNT_ID]: "Checking" },
         payees: { [PAYEE_ID]: "Netflix" },
@@ -292,6 +302,7 @@ describe("TransactionRuleToolPrepService", () => {
         ok: false,
         message: "The rule definition is not valid",
         errors: [{ path: "condition.all[0].op", code: "OPERATOR_NOT_ALLOWED" }],
+        hints: ["For field accountId op must be one of: eq, neq, in, notIn."],
       });
     });
 
@@ -387,6 +398,88 @@ describe("TransactionRuleToolPrepService", () => {
       });
       expect(runService.previewDraft).toHaveBeenCalledTimes(1);
       expect(prep.preview.test).toBeDefined();
+    });
+
+    describe("a stored rule whose pattern predates the authoring advice", () => {
+      const OLD_CONDITION = {
+        field: "description",
+        op: "matches",
+        value: "NETFLIX.COM",
+      };
+
+      // The stub validates the draft with the option the service passes, as
+      // the real previewDraft does.
+      function withValidatingPreview() {
+        const built = build();
+        built.rulesService.get.mockResolvedValue(
+          storedDto({ condition: OLD_CONDITION as never }),
+        );
+        built.runService.previewDraft.mockImplementation(
+          async (
+            _userId: string,
+            dto: { condition: unknown; actions: unknown },
+            options?: { authoring?: boolean },
+          ) => {
+            const errors = validateRuleDefinition(
+              { condition: dto.condition, actions: dto.actions },
+              { authoring: options?.authoring ?? true },
+            );
+            if (errors.length > 0) {
+              throw new BadRequestException({
+                message: "The rule definition is not valid",
+                errorCode: "INVALID_RULE",
+                errors,
+              });
+            }
+            return runPreview();
+          },
+        );
+        return built;
+      }
+
+      it("builds a card for an update of the actions alone", async () => {
+        const { service, runService } = withValidatingPreview();
+        const prep = await service.prepareUpdate(USER_ID, {
+          ruleId: RULE_ID,
+          actions: [{ type: "add_tags", tagNames: ["Subscriptions"] }],
+        });
+        if (!prep.ok) throw new Error(`expected a preview: ${prep.message}`);
+        expect(prep.preview.rule.condition).toEqual(OLD_CONDITION);
+        expect(runService.previewDraft).toHaveBeenCalledWith(
+          USER_ID,
+          expect.anything(),
+          { authoring: false },
+        );
+      });
+
+      it("refuses an update that changes the condition to such a pattern", async () => {
+        const { service, runService } = withValidatingPreview();
+        const prep = await service.prepareUpdate(USER_ID, {
+          ruleId: RULE_ID,
+          condition: { field: "description", op: "matches", value: "HBO.COM" },
+        });
+        expect(prep).toMatchObject({
+          ok: false,
+          errors: [
+            { path: "condition.value", code: "PATTERN_WITHOUT_WILDCARD" },
+          ],
+        });
+        expect(runService.previewDraft).toHaveBeenCalledWith(
+          USER_ID,
+          expect.anything(),
+          { authoring: true },
+        );
+      });
+
+      it("keeps the advice off when the condition is sent back unchanged", async () => {
+        const { service } = withValidatingPreview();
+        const prep = await service.prepareUpdate(USER_ID, {
+          ruleId: RULE_ID,
+          condition: OLD_CONDITION,
+          actions: [{ type: "add_tags", tagNames: ["Subscriptions"] }],
+        });
+        expect(prep.ok).toBe(true);
+      });
     });
 
     it("does not test a change that leaves condition and actions alone", async () => {
@@ -546,6 +639,7 @@ describe("TransactionRuleToolPrepService", () => {
         expect.objectContaining({
           filters: { accountIds: [ACCOUNT_ID], limit: 20 },
         }),
+        { authoring: true },
       );
       expect(runService.previewRun).not.toHaveBeenCalled();
       expect(rulesService.get).not.toHaveBeenCalled();
@@ -577,8 +671,131 @@ describe("TransactionRuleToolPrepService", () => {
           condition: { field: "payeeId", op: "eq", value: PAYEE_ID },
           actions: VALID_ACTIONS,
         }),
+        { authoring: true },
       );
       expect(prep.preview.rule.name).toBe("Groceries");
+    });
+
+    describe("a stored rule whose pattern predates the authoring advice", () => {
+      const OLD_CONDITION = {
+        field: "description",
+        op: "matches",
+        value: "NETFLIX.COM",
+      };
+
+      // The stub validates the draft with the option the service passes, as
+      // the real previewDraft does.
+      function withValidatingPreview() {
+        const built = build();
+        built.rulesService.get.mockResolvedValue(
+          storedDto({ condition: OLD_CONDITION as never }),
+        );
+        built.runService.previewDraft.mockImplementation(
+          async (
+            _userId: string,
+            dto: { condition: unknown; actions: unknown },
+            options?: { authoring?: boolean },
+          ) => {
+            const errors = validateRuleDefinition(
+              { condition: dto.condition, actions: dto.actions },
+              { authoring: options?.authoring ?? true },
+            );
+            if (errors.length > 0) {
+              throw new BadRequestException({
+                message: "The rule definition is not valid",
+                errorCode: "INVALID_RULE",
+                errors,
+              });
+            }
+            return runPreview();
+          },
+        );
+        return built;
+      }
+
+      it("tests new actions on the unchanged condition", async () => {
+        const { service, runService } = withValidatingPreview();
+        const prep = await service.prepareTest(
+          USER_ID,
+          {
+            ruleId: RULE_ID,
+            actions: [{ type: "add_tags", tagNames: ["Subscriptions"] }],
+          },
+          {},
+        );
+        if (!prep.ok) throw new Error(`expected a result: ${prep.message}`);
+        expect(prep.preview.rule.condition).toEqual(OLD_CONDITION);
+        expect(runService.previewDraft).toHaveBeenCalledWith(
+          USER_ID,
+          expect.anything(),
+          { authoring: false },
+        );
+      });
+
+      it("tests the same condition sent back unchanged", async () => {
+        const { service, runService } = withValidatingPreview();
+        const prep = await service.prepareTest(
+          USER_ID,
+          { ruleId: RULE_ID, condition: OLD_CONDITION },
+          {},
+        );
+        expect(prep.ok).toBe(true);
+        expect(runService.previewDraft).toHaveBeenCalledWith(
+          USER_ID,
+          expect.anything(),
+          { authoring: false },
+        );
+      });
+
+      it("refuses a test that changes the condition to such a pattern", async () => {
+        const { service, runService } = withValidatingPreview();
+        const prep = await service.prepareTest(
+          USER_ID,
+          {
+            ruleId: RULE_ID,
+            condition: {
+              field: "description",
+              op: "matches",
+              value: "HBO.COM",
+            },
+          },
+          {},
+        );
+        expect(prep).toMatchObject({
+          ok: false,
+          errors: [
+            { path: "condition.value", code: "PATTERN_WITHOUT_WILDCARD" },
+          ],
+        });
+        expect(runService.previewDraft).toHaveBeenCalledWith(
+          USER_ID,
+          expect.anything(),
+          { authoring: true },
+        );
+      });
+
+      it("still applies the advice to a draft with no ruleId", async () => {
+        const { service, runService } = withValidatingPreview();
+        const prep = await service.prepareTest(
+          USER_ID,
+          {
+            condition: OLD_CONDITION,
+            actions: [{ type: "add_tags", tagNames: ["Subscriptions"] }],
+          },
+          {},
+        );
+        expect(prep).toMatchObject({
+          ok: false,
+          errors: [
+            { path: "condition.value", code: "PATTERN_WITHOUT_WILDCARD" },
+          ],
+        });
+        expect(runService.previewDraft).toHaveBeenCalledWith(
+          USER_ID,
+          expect.anything(),
+          { authoring: true },
+        );
+      });
     });
   });
 
@@ -596,6 +813,98 @@ describe("TransactionRuleToolPrepService", () => {
       expect(llm.skipped).toEqual([
         { transactionId: "t-x", reason: "reconciled_locked" },
       ]);
+    });
+  });
+
+  describe("a test that matches nothing", () => {
+    const empty = {
+      matchedCount: 0,
+      conditionMatchedCount: 0,
+      scanned: 40,
+      truncated: false,
+      rows: [],
+      skipped: [],
+      skippedCount: 0,
+      aiReviewRequests: 0,
+      labels: { accounts: {}, payees: {}, categories: {}, tags: {}, rules: {} },
+    };
+
+    it("states it plainly for the model, with the advice to re-check", () => {
+      const { service } = build();
+      const llm = service.toLlmTest(empty, empty.labels as never);
+      expect(llm.message).toContain(
+        "This rule matches none of the 40 latest transactions.",
+      );
+      expect(llm.message).toContain("usually wrong");
+      expect(llm.message).toContain("without * equals the whole text");
+    });
+
+    it("says nothing when it matched something, or when nothing was examined", () => {
+      const { service } = build();
+      expect(
+        service.toLlmTest(
+          { ...empty, matchedCount: 1, conditionMatchedCount: 1 },
+          empty.labels as never,
+        ).message,
+      ).toBeUndefined();
+      expect(
+        service.toLlmTest({ ...empty, scanned: 0 }, empty.labels as never)
+          .message,
+      ).toBeUndefined();
+    });
+  });
+
+  describe("a test whose condition matches but changes nothing", () => {
+    const already = {
+      matchedCount: 0,
+      conditionMatchedCount: 7,
+      scanned: 40,
+      truncated: false,
+      rows: [],
+      skipped: [],
+      skippedCount: 0,
+      aiReviewRequests: 0,
+      labels: { accounts: {}, payees: {}, categories: {}, tags: {}, rules: {} },
+    };
+
+    it("is not a zero-match warning: the model is told nothing would change, and that it is not an error", () => {
+      const { service } = build();
+      const llm = service.toLlmTest(already, already.labels as never);
+      expect(llm.conditionMatchedCount).toBe(7);
+      expect(llm.message).toContain(
+        "The condition matches 7 of the 40 latest transactions, but nothing would change",
+      );
+      expect(llm.message).toContain("only-if-empty");
+      expect(llm.message).toContain("not an error");
+      expect(llm.message).not.toContain("matches none");
+      expect(llm.message).not.toContain("usually wrong");
+    });
+
+    it("does not call a request_ai_review-only rule wrong", () => {
+      // An AI-review-only rule has matchedCount 0 by construction; only the
+      // condition count says whether the rule is wrong.
+      const { service } = build();
+      const llm = service.toLlmTest(
+        { ...already, aiReviewRequests: 7 },
+        already.labels as never,
+      );
+      expect(llm.message).not.toContain("matches none");
+    });
+
+    it("still warns when the condition matched nothing, and stays silent when the count is absent", () => {
+      const { service } = build();
+      expect(
+        service.toLlmTest(
+          { ...already, conditionMatchedCount: 0 },
+          already.labels as never,
+        ).message,
+      ).toContain("matches none of the 40");
+      expect(
+        service.toLlmTest(
+          { ...already, conditionMatchedCount: undefined } as never,
+          already.labels as never,
+        ).message,
+      ).toBeUndefined();
     });
   });
 

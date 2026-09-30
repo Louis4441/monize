@@ -112,10 +112,8 @@ function textFact(leaf: RuleConditionLeaf, facts: RuleFacts): string | null {
       return facts.payeeText;
     case "description":
       return facts.description;
-    case "referenceNumber":
-      return facts.referenceNumber;
     default:
-      return facts.memo;
+      return facts.referenceNumber;
   }
 }
 

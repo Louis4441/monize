@@ -52,7 +52,7 @@ describe('parse(print(tree)) is the tree', () => {
   });
 
   it('holds for every shape of group the editor can make', () => {
-    const a = leaf('memo', 'contains', 'a');
+    const a = leaf('referenceNumber', 'contains', 'a');
     const b = leaf('accountId', 'in', ['acc-2']);
     const shapes: EditorGroup[] = [
       group('all'),

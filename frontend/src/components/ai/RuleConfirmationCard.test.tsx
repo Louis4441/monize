@@ -58,7 +58,7 @@ describe('RuleConfirmationCard: create', () => {
         makeRule({
           condition: {
             all: [
-              { any: [{ field: 'payeeId', op: 'eq', value: 'deleted-payee' }, { field: 'memo', op: 'isEmpty' }], not: true },
+              { any: [{ field: 'payeeId', op: 'eq', value: 'deleted-payee' }, { field: 'referenceNumber', op: 'isEmpty' }], not: true },
               { field: 'hasSplits', op: 'eq', value: true },
             ],
           },
@@ -68,7 +68,7 @@ describe('RuleConfirmationCard: create', () => {
     );
     expect(screen.getByText('None of these:')).toBeInTheDocument();
     expect(screen.getByText('Payee is a deleted item')).toBeInTheDocument();
-    expect(screen.getByText('Memo is empty')).toBeInTheDocument();
+    expect(screen.getByText('Reference number is empty')).toBeInTheDocument();
     expect(screen.getByText('Has splits is Yes')).toBeInTheDocument();
     expect(screen.queryByText('Stop processing other rules')).not.toBeInTheDocument();
   });
@@ -108,7 +108,13 @@ describe('RuleConfirmationCard: create', () => {
       makeRuleAction(
         'create_transaction_rule',
         makeRule({
-          test: makeTest({ truncated: true, matchedCount: 2, skippedCount: 0, skipped: [], aiReviewRequests: 0 }),
+          test: makeTest({
+            truncated: true,
+            matchedCount: 2,
+            skippedCount: 0,
+            skipped: [],
+            aiReviewRequests: 0,
+          }),
         }),
       ),
     );
@@ -122,10 +128,68 @@ describe('RuleConfirmationCard: create', () => {
     renderCard(
       makeRuleAction(
         'create_transaction_rule',
-        makeRule({ test: makeTest({ matchedCount: 0, rows: [], skipped: [], skippedCount: 0, aiReviewRequests: 0 }) }),
+        makeRule({
+          test: makeTest({
+            matchedCount: 0,
+            conditionMatchedCount: 0,
+            rows: [],
+            skipped: [],
+            skippedCount: 0,
+            aiReviewRequests: 0,
+          }),
+        }),
       ),
     );
     expect(screen.getByText(/0 transactions would change/)).toBeInTheDocument();
+    // ... and a rule that matches nothing is usually wrong, so the card says that plainly.
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'This rule matches none of the transactions examined (200). Check the conditions before saving. A pattern without * matches only the whole text.',
+    );
+  });
+
+  it('says the condition matches but nothing would change, without the wrong-rule warning', () => {
+    renderCard(
+      makeRuleAction(
+        'create_transaction_rule',
+        makeRule({
+          test: makeTest({
+            matchedCount: 0,
+            conditionMatchedCount: 9,
+            rows: [],
+            skipped: [],
+            skippedCount: 0,
+            aiReviewRequests: 0,
+          }),
+        }),
+      ),
+    );
+    expect(screen.getByRole('status')).toHaveTextContent(
+      "9 of the 200 transactions examined match the rule's conditions, but nothing would change",
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('This is not an error.');
+    expect(screen.queryByText(/matches none of the transactions examined/)).not.toBeInTheDocument();
+  });
+
+  it('does not warn when the rule matches something or nothing was examined', () => {
+    renderCard(action);
+    expect(screen.queryByText(/matches none of the transactions examined/)).not.toBeInTheDocument();
+    renderCard(
+      makeRuleAction(
+        'create_transaction_rule',
+        makeRule({
+          test: makeTest({
+            matchedCount: 0,
+            conditionMatchedCount: 0,
+            scanned: 0,
+            rows: [],
+            skipped: [],
+            skippedCount: 0,
+            aiReviewRequests: 0,
+          }),
+        }),
+      ),
+    );
+    expect(screen.queryByText(/matches none of the transactions examined/)).not.toBeInTheDocument();
   });
 
   it('approves and cancels', () => {
@@ -210,7 +274,11 @@ describe('RuleConfirmationCard: update', () => {
   });
 
   it('shows the updated state', () => {
-    renderCard(makeRuleAction('update_transaction_rule', proposed, { status: 'confirmed' }));
+    renderCard(
+      makeRuleAction('update_transaction_rule', proposed, {
+        status: 'confirmed',
+      }),
+    );
     expect(screen.getByText('Rule updated')).toBeInTheDocument();
   });
 });
@@ -225,14 +293,23 @@ describe('RuleConfirmationCard: delete', () => {
   });
 
   it('shows the deleted state', () => {
-    renderCard(makeRuleAction('delete_transaction_rule', makeRule(), { status: 'confirmed' }));
+    renderCard(
+      makeRuleAction('delete_transaction_rule', makeRule(), {
+        status: 'confirmed',
+      }),
+    );
     expect(screen.getByText('Rule deleted')).toBeInTheDocument();
   });
 });
 
 describe('RuleConfirmationCard: run', () => {
   const run = makeRule({
-    filters: { accountIds: ['acc-1', 'acc-2'], startDate: '2026-01-01', endDate: '2026-01-31', limit: 500 },
+    filters: {
+      accountIds: ['acc-1', 'acc-2'],
+      startDate: '2026-01-01',
+      endDate: '2026-01-31',
+      limit: 500,
+    },
     test: makeTest(),
   });
 
@@ -303,7 +380,10 @@ describe('RuleConfirmationCard: run', () => {
 describe('RuleConfirmationCard: states and unknown values', () => {
   it('shows the error and retries', () => {
     const { onConfirm } = renderCard(
-      makeRuleAction('create_transaction_rule', makeRule(), { status: 'error', errorMessage: 'Rule changed' }),
+      makeRuleAction('create_transaction_rule', makeRule(), {
+        status: 'error',
+        errorMessage: 'Rule changed',
+      }),
     );
     expect(screen.getByText('Rule changed')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
@@ -313,7 +393,9 @@ describe('RuleConfirmationCard: states and unknown values', () => {
   it('shows saving, cancelled and expired', () => {
     const { unmount } = render(
       <RuleConfirmationCard
-        action={makeRuleAction('create_transaction_rule', makeRule(), { status: 'confirming' })}
+        action={makeRuleAction('create_transaction_rule', makeRule(), {
+          status: 'confirming',
+        })}
         onConfirm={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -322,14 +404,20 @@ describe('RuleConfirmationCard: states and unknown values', () => {
     unmount();
     const cancelled = render(
       <RuleConfirmationCard
-        action={makeRuleAction('create_transaction_rule', makeRule(), { status: 'cancelled' })}
+        action={makeRuleAction('create_transaction_rule', makeRule(), {
+          status: 'cancelled',
+        })}
         onConfirm={vi.fn()}
         onCancel={vi.fn()}
       />,
     );
     expect(screen.getByText('Cancelled')).toBeInTheDocument();
     cancelled.unmount();
-    renderCard(makeRuleAction('create_transaction_rule', makeRule(), { status: 'expired' }));
+    renderCard(
+      makeRuleAction('create_transaction_rule', makeRule(), {
+        status: 'expired',
+      }),
+    );
     expect(screen.getByText(/This confirmation expired/)).toBeInTheDocument();
   });
 
@@ -338,7 +426,9 @@ describe('RuleConfirmationCard: states and unknown values', () => {
       makeRuleAction(
         'create_transaction_rule',
         makeRule({
-          condition: { all: [{ field: 'merchantCity', op: 'eq', value: 'x' } as never] },
+          condition: {
+            all: [{ field: 'merchantCity', op: 'eq', value: 'x' } as never],
+          },
           actions: [{ type: 'send_email' } as never],
         }),
       ),

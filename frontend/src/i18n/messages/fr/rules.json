@@ -129,7 +129,6 @@
       "payeeText": "Texte du bénéficiaire tel que reçu",
       "categoryId": "Catégorie",
       "description": "Description",
-      "memo": "Note",
       "amount": "Montant (avec signe)",
       "absAmount": "Montant (sans signe)",
       "currencyCode": "Devise",
@@ -176,7 +175,7 @@
       "currency": "Choisir une devise",
       "currencies": "Choisir des devises",
       "types": "Choisir des types",
-      "matchesHint": "Utilisez * pour n'importe quel texte, par exemple *café*. Utilisez {capture} pour conserver le texte à cet endroit pour les actions de cette règle, par exemple {example}. Un nom se compose de lettres minuscules et de chiffres, et un motif peut conserver jusqu'à {max} textes.",
+      "matchesHint": "Utilisez * pour n'importe quel texte, par exemple *café*. Un motif sans * ne correspond qu'au texte entier. Utilisez {capture} pour conserver le texte à cet endroit pour les actions de cette règle, par exemple {example}. Un nom se compose de lettres minuscules et de chiffres, et un motif peut conserver jusqu'à {max} textes.",
       "amount": "Montant",
       "from": "De",
       "to": "À",
@@ -281,7 +280,9 @@
         "INVALID_CAPTURE": "Un nom de capture utilise des lettres minuscules et des chiffres, commence par une lettre et compte 20 caractères au plus.",
         "TOO_MANY_CAPTURES": "Un motif peut contenir 5 captures au plus.",
         "DUPLICATE_CAPTURE": "Chaque nom de capture ne peut être utilisé qu’une fois dans une règle.",
-        "UNKNOWN_CAPTURE": "Le texte utilise une capture qu’aucune condition de cette règle ne définit."
+        "UNKNOWN_CAPTURE": "Le texte utilise une capture qu’aucune condition de cette règle ne définit.",
+        "LOOKS_LIKE_REGEX": "Les expressions régulières ne sont pas prises en charge : | \\ et les classes courtes entre crochets comme [xy] sont traités comme des caractères ordinaires, donc un motif écrit comme une regex ne correspond jamais à ce qui était voulu. Pour correspondre à l'un de plusieurs textes, ajoutez un groupe « N'importe laquelle de celles-ci » avec une condition pour chaque texte.",
+        "PATTERN_WITHOUT_WILDCARD": "Sans *, ce motif doit être égal à tout le texte. Utilisez l'opérateur « est » pour le texte entier, « contient » pour une partie, ou entourez le texte de *, par exemple *café*."
       }
     },
     "run": {
@@ -352,6 +353,8 @@
     "accountsFailed": "Vos comptes n’ont pas pu être chargés, donc les filtres sont indisponibles.",
     "retry": "Réessayer",
     "summary": "{matched, plural, one {# transaction serait modifiée} other {# transactions seraient modifiées}} sur {scanned, plural, one {# transaction analysée} other {# transactions analysées}}.",
+    "matchesNone": "Cette règle ne correspond à aucune des transactions examinées ({scanned}). Vérifiez les conditions avant d'enregistrer. Un motif sans * ne correspond qu'au texte entier.",
+    "noChange": "{matched} des {scanned} transactions examinées répondent aux conditions de la règle, mais rien ne changerait (par exemple, elles ont déjà la valeur et « seulement si vide » est activé). Ce n'est pas une erreur.",
     "truncated": "Plus de transactions correspondent que la limite ne le permet. Seules les plus récentes sont incluses. Augmentez la limite ou réduisez les dates pour inclure le reste.",
     "noMatches": {
       "title": "Aucune transaction ne serait modifiée",
@@ -380,6 +383,7 @@
     "change": {
       "category": "Catégorie : {before} → {after}",
       "payee": "Bénéficiaire : {before} → {after}",
+      "payeeNew": "Bénéficiaire : {before} → {name} (nouveau)",
       "tagsAdded": "Tags ajoutés : {tags}",
       "tagsRemoved": "Tags retirés : {tags}",
       "none": "aucune",

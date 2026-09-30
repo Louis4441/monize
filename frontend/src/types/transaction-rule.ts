@@ -17,7 +17,6 @@ export type RuleField =
   | 'payeeText'
   | 'categoryId'
   | 'description'
-  | 'memo'
   | 'amount'
   | 'absAmount'
   | 'currencyCode'

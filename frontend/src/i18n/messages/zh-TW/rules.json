@@ -129,7 +129,6 @@
       "payeeText": "收到的收款對象原文",
       "categoryId": "分類",
       "description": "說明",
-      "memo": "備註",
       "amount": "金額（含正負號）",
       "absAmount": "金額（忽略正負號）",
       "currencyCode": "幣別",
@@ -176,7 +175,7 @@
       "currency": "選擇幣別",
       "currencies": "選擇幣別",
       "types": "選擇類型",
-      "matchesHint": "用 * 比對任意文字，例如 *咖啡*。用 {capture} 保留該位置的文字，供此規則的動作使用，例如 {example}。名稱由小寫字母和數字組成，一個模式最多可保留 {max} 段文字。",
+      "matchesHint": "用 * 比對任意文字，例如 *咖啡*。 不含 * 的模式只比對整段文字。用 {capture} 保留該位置的文字，供此規則的動作使用，例如 {example}。名稱由小寫字母和數字組成，一個模式最多可保留 {max} 段文字。",
       "amount": "金額",
       "from": "從",
       "to": "到",
@@ -281,7 +280,9 @@
         "INVALID_CAPTURE": "擷取名稱由小寫字母和數字組成，以字母開頭，最長 20 個字元。",
         "TOO_MANY_CAPTURES": "一個模式最多可包含 5 個擷取。",
         "DUPLICATE_CAPTURE": "每個擷取名稱在一條規則中只能使用一次。",
-        "UNKNOWN_CAPTURE": "文字使用了此規則中沒有任何條件定義的擷取。"
+        "UNKNOWN_CAPTURE": "文字使用了此規則中沒有任何條件定義的擷取。",
+        "LOOKS_LIKE_REGEX": "不支援正規表示式：| \\ 和 [xy] 這類簡短的方括號字元類別會被視為一般字元，因此以正規表示式寫成的模式永遠比對不到原意。若要比對多個文字之一，請新增「符合以下任一項」群組，並為每個文字各放一個條件。",
+        "PATTERN_WITHOUT_WILDCARD": "不含 * 時，此模式必須與整段文字完全相同。整段文字請用「等於」，部分文字請用「包含」，或在文字兩側加上 *，例如 *咖啡*。"
       }
     },
     "run": {
@@ -352,6 +353,8 @@
     "accountsFailed": "無法載入你的帳戶，因此篩選條件無法使用。",
     "retry": "重試",
     "summary": "已檢查 {scanned, plural, other {# 筆交易}}，其中 {matched, plural, other {# 筆交易}}將被變更。",
+    "matchesNone": "此規則與已檢查的所有交易都不相符（{scanned} 筆）。儲存前請檢查條件。不含 * 的模式只比對整段文字。",
+    "noChange": "在檢查的 {scanned} 筆交易中，有 {matched} 筆符合規則條件，但不會有任何變更（例如它們已有該值且開啟了「僅在為空時」）。這不是錯誤。",
     "truncated": "符合的交易多於上限允許的數量。僅包含最新的交易。請提高上限或縮小日期範圍以包含其餘交易。",
     "noMatches": {
       "title": "沒有交易會被變更",
@@ -380,6 +383,7 @@
     "change": {
       "category": "分類：{before} → {after}",
       "payee": "收款對象：{before} → {after}",
+      "payeeNew": "收款對象：{before} → {name}（新增）",
       "tagsAdded": "已新增的標籤：{tags}",
       "tagsRemoved": "已移除的標籤：{tags}",
       "none": "無",

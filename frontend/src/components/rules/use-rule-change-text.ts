@@ -46,7 +46,15 @@ export function useRuleChangeText(): (
           }),
         );
       }
-      if (changes.payeeId) {
+      const creation = changes.payeeCreated === true ? (changes.payeeName?.after ?? null) : null;
+      if (creation) {
+        // One line: the payee row P becomes the payee the rule creates, never "none".
+        const text = (name: string | null) => (name === null || name === '' ? t('none') : name);
+        const before = changes.payeeId
+          ? one(changes.payeeId.before, names.payee)
+          : text(changes.payeeName?.before ?? null);
+        lines.push(t('payeeNew', { before, name: creation }));
+      } else if (changes.payeeId) {
         lines.push(
           t('payee', {
             before: one(changes.payeeId.before, names.payee),
@@ -54,7 +62,7 @@ export function useRuleChangeText(): (
           }),
         );
       }
-      if (changes.payeeName && !changes.payeeId) {
+      if (changes.payeeName && !changes.payeeId && !creation) {
         const text = (name: string | null) => (name === null || name === '' ? t('none') : name);
         lines.push(t('payee', { before: text(changes.payeeName.before), after: text(changes.payeeName.after) }));
       }

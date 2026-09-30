@@ -18,7 +18,7 @@ const U5 = "55555555-5555-4555-8555-555555555555";
 const OK_ACTIONS = [{ type: "add_tags", tagIds: [U1] }];
 
 const check = (condition: unknown, actions: unknown = OK_ACTIONS) =>
-  validateRuleDefinition({ condition, actions });
+  validateRuleDefinition({ condition, actions }, { authoring: true });
 
 const leaf = (field: string, op: string, value?: unknown) =>
   value === undefined ? { field, op } : { field, op, value };
@@ -231,11 +231,11 @@ describe("validateRuleDefinition: error codes", () => {
       [leaf("nope", "eq", 1), OK_ACTIONS],
       [{ all: [] }, [{ type: "zzz" }]],
       [leaf("amount", "contains", "x"), OK_ACTIONS],
-      [leaf("memo", "eq"), OK_ACTIONS],
-      [leaf("memo", "isEmpty", "x"), OK_ACTIONS],
-      [leaf("memo", "eq", 1), OK_ACTIONS],
+      [leaf("referenceNumber", "eq"), OK_ACTIONS],
+      [leaf("referenceNumber", "isEmpty", "x"), OK_ACTIONS],
+      [leaf("referenceNumber", "eq", 1), OK_ACTIONS],
       [leaf("amount", "eq", Infinity), OK_ACTIONS],
-      [leaf("memo", "eq", "a".repeat(501)), OK_ACTIONS],
+      [leaf("referenceNumber", "eq", "a".repeat(501)), OK_ACTIONS],
       [leaf("payeeId", "eq", "x"), OK_ACTIONS],
       [leaf("type", "eq", "x"), OK_ACTIONS],
       [leaf("currencyCode", "eq", "x"), OK_ACTIONS],
@@ -252,9 +252,11 @@ describe("validateRuleDefinition: error codes", () => {
       ],
       [{ all: [] }, []],
       [{ all: [] }, Array(11).fill(OK_ACTIONS[0])],
-      [leaf("memo", "matches", "{Bad}"), OK_ACTIONS],
-      [leaf("memo", "matches", "{a}{b}{c}{d}{e}{f}"), OK_ACTIONS],
-      [leaf("memo", "matches", "{a}x{a}"), OK_ACTIONS],
+      [leaf("referenceNumber", "matches", "a|b*"), OK_ACTIONS],
+      [leaf("referenceNumber", "matches", "nagroda"), OK_ACTIONS],
+      [leaf("referenceNumber", "matches", "{Bad}"), OK_ACTIONS],
+      [leaf("referenceNumber", "matches", "{a}{b}{c}{d}{e}{f}"), OK_ACTIONS],
+      [leaf("referenceNumber", "matches", "{a}x{a}"), OK_ACTIONS],
       [
         { all: [] },
         [
@@ -287,7 +289,7 @@ describe("collectReferencedIds", () => {
               leaf("payeeId", "eq", U3),
               leaf("categoryId", "inSubtree", U4),
               leaf("tagIds", "hasAny", [U5]),
-              leaf("memo", "eq", "not an id"),
+              leaf("referenceNumber", "eq", "not an id"),
               leaf("type", "eq", "EXPENSE"),
             ],
             not: true,

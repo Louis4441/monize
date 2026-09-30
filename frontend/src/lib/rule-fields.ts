@@ -107,7 +107,6 @@ export const RULE_CONDITION_FIELDS: Readonly<Record<RuleField, RuleFieldSpec>> =
   payeeText: { kind: 'text', operators: TEXT_OPERATORS },
   categoryId: { kind: 'categoryId', operators: [...ID_OPERATORS, 'isEmpty', 'inSubtree'] },
   description: { kind: 'text', operators: TEXT_OPERATORS },
-  memo: { kind: 'text', operators: TEXT_OPERATORS },
   amount: { kind: 'money', operators: ['eq', 'lt', 'lte', 'gt', 'gte', 'between'] },
   absAmount: { kind: 'money', operators: ['lt', 'lte', 'gt', 'gte', 'between'] },
   currencyCode: { kind: 'currency', operators: ['eq', 'in'] },
@@ -188,6 +187,8 @@ export const RULE_VALIDATION_CODES = [
   'TOO_MANY_CAPTURES',
   'DUPLICATE_CAPTURE',
   'UNKNOWN_CAPTURE',
+  'LOOKS_LIKE_REGEX',
+  'PATTERN_WITHOUT_WILDCARD',
 ] as const;
 
 /** Every code a card can show: the validation codes plus the reference check's. */

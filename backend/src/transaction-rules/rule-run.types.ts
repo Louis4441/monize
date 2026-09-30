@@ -45,6 +45,12 @@ export interface RuleRunPreview {
   readonly skipped: RuleRunSkippedRow[];
   /** Transactions examined (a same-owner transfer counts once). */
   readonly scanned: number;
+  /**
+   * Scanned transactions whose rule condition matched, whether or not an
+   * action would change anything or the row was skipped. `matched` lists only
+   * the rows that would change, so zero there is not "the rule matches nothing".
+   */
+  readonly conditionMatchedCount: number;
   /** More rows matched the filters than `limit` allowed. */
   readonly truncated: boolean;
   /** Hash of the planned changes and the rule revision; the commit must echo it. */

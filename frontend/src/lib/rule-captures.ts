@@ -24,7 +24,21 @@ export const TEMPLATE_BUILTINS: readonly string[] = ['payeeText', 'description']
 const MAX_BRACE_BODY = 32;
 const NAME_LIKE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-export type CaptureCode = 'INVALID_CAPTURE' | 'TOO_MANY_CAPTURES' | 'DUPLICATE_CAPTURE';
+export type CaptureCode =
+  | 'INVALID_CAPTURE'
+  | 'TOO_MANY_CAPTURES'
+  | 'DUPLICATE_CAPTURE'
+  | 'LOOKS_LIKE_REGEX'
+  | 'PATTERN_WITHOUT_WILDCARD';
+
+/**
+ * Regex-only syntax, a literal character in a glob: a pattern using it never
+ * matches what its author meant (`|`, a backslash, `.*`, a bracket class of 1 to
+ * 3 characters). `^`, `$` and longer bracketed words stay allowed: a glob has no
+ * escape, so they are the only way to write that literal text.
+ * Held equal to the backend's `REGEX_ONLY_SYNTAX` by `rule-captures.test.ts`.
+ */
+export const REGEX_ONLY_SYNTAX = /[|\\]|\[[^\][]{1,3}\]/;
 
 /** The `{...}` body opening at `at`, or null when it does not close within reach. */
 function braceBody(text: string, at: number): { body: string; close: number } | null {
@@ -78,13 +92,20 @@ export interface PatternCheck {
 
 /**
  * The codes the server answers for one pattern, given the names the patterns
- * before it in the rule already defined: `{Word}` and `{}` are refused, so is
- * a sixth capture, a reserved name and a name used twice in the rule.
+ * before it in the rule already defined: a regex and a bare word (no `*`, no
+ * capture) are refused, so are `{Word}` and `{}`, a sixth capture, a reserved
+ * name and a name used twice in the rule.
  */
 export function checkPattern(pattern: string, seen: readonly string[]): PatternCheck {
   const { names, malformed } = parseGlobCaptures(pattern);
-  const known = new Set(seen);
   const codes: CaptureCode[] = [];
+  // An empty pattern is a missing value, which the editor reports on its own.
+  if (pattern !== '') {
+    if (REGEX_ONLY_SYNTAX.test(pattern)) codes.push('LOOKS_LIKE_REGEX');
+    else if (!pattern.includes('*') && names.length === 0 && malformed.length === 0)
+      codes.push('PATTERN_WITHOUT_WILDCARD');
+  }
+  const known = new Set(seen);
   let reserved = false;
   let duplicate = false;
   for (const name of names) {

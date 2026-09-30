@@ -139,7 +139,6 @@ export const RULE_CONDITION_FIELDS = {
     operators: [...ID_OPERATORS, "isEmpty", "inSubtree"],
   },
   description: { kind: "text", operators: TEXT_OPERATORS },
-  memo: { kind: "text", operators: TEXT_OPERATORS },
   amount: {
     kind: "money",
     operators: ["eq", "lt", "lte", "gt", "gte", "between"],
@@ -223,7 +222,6 @@ export interface RuleFacts {
   /** The category itself plus its ancestors; empty when the row has no category. */
   readonly categoryAncestorIds: readonly string[];
   readonly description: string | null;
-  readonly memo: string | null;
   /** Signed, in 1/10000 units of the account currency (a scaled integer). */
   readonly amount: number | null;
   readonly currencyCode: string | null;
