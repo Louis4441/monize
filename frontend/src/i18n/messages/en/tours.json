@@ -45,7 +45,8 @@
     "requirementsLoading": "Checking whether you can take this tour…",
     "requires": {
       "transactionEntry": "Add an account first — this tour walks through recording a transaction.",
-      "securitiesExist": "Add a security first — this tour opens one from your securities list."
+      "securitiesExist": "Add a security first — this tour opens one from your securities list.",
+      "ownerView": "Switch back to your own data first. This tour covers Rules and the AI review inbox, which are not available while you act for someone else."
     },
     "start": "Start",
     "restart": "Retake",
@@ -375,6 +376,53 @@
           "finish": {
             "title": "That's the tag breakdown",
             "body": "Tag transactions with a key:value pair like scope:household wherever you want this view, and revisit this tour anytime from Settings."
+          }
+        }
+      }
+    },
+    "v1_17_0": {
+      "transactionRules": {
+        "title": "Transaction rules",
+        "steps": {
+          "welcome": {
+            "title": "Rules that tidy your transactions",
+            "body": "When a transaction is created or imported and matches the conditions you set, a rule can set its category or payee, add tags, rewrite its description or ask an AI to review it. A rule never changes an amount, an account or a date."
+          },
+          "tools": {
+            "title": "Rules are in the Tools menu",
+            "body": "Open **Tools** to find **Rules**. The next step shows the menu."
+          },
+          "rulesLink": {
+            "title": "Open Rules",
+            "body": "Choose **Rules**. It lists every rule you have and is where you create a new one."
+          },
+          "list": {
+            "title": "Your rules, in order",
+            "body": "Each row is one rule, with a switch to turn it on or off and actions to move it, run it, duplicate it or delete it. Rules are checked from the top down, so the order matters when two of them change the same thing. With no rules yet, this card explains what a rule is."
+          },
+          "create": {
+            "title": "Create a rule",
+            "body": "**Create rule** opens the editor with a blank rule. Nothing is saved until you choose **Save rule**."
+          },
+          "when": {
+            "title": "When: which transactions it looks at",
+            "body": "Choose whether the rule looks at a transaction when it is **created**, when it is **imported**, or both. **Stop processing other rules** skips the rules below this one for any transaction it matches."
+          },
+          "if": {
+            "title": "If: which transactions match",
+            "body": "Build the conditions from fields such as payee, description, amount and category. The **Visual** and **Expression** switch shows the same conditions as cards or as one line of text. In a pattern, * stands for any text and '{name}' keeps the text at that spot so an action can reuse it."
+          },
+          "then": {
+            "title": "Then: what it changes",
+            "body": "Actions run in the order listed. A rule can set the category or payee, add or remove tags, set the description, or ask an AI to review the transaction. There is no action for an amount, an account or a date."
+          },
+          "test": {
+            "title": "Test, run and undo",
+            "body": "**Test rule** tries the draft on your existing transactions and shows what it would change. Nothing is changed. Once a rule is saved, **Run on existing transactions** shows a preview and applies it to what you already have, and you can undo that run from the action history."
+          },
+          "reviews": {
+            "title": "The AI review inbox",
+            "body": "A rule with **Ask for an AI review** does not change the transaction. It puts it here instead. An assistant proposes an edit, and nothing is written until you approve it. You can also dismiss a request. Find it under **AI** as **AI Review Inbox**."
           }
         }
       }

@@ -110,6 +110,21 @@ describe('RuleEditor: a new rule', () => {
     expect(screen.queryByText(/applies to every transaction/)).not.toBeInTheDocument();
   });
 
+  it('anchors the tour on the When, If, Then and Test panels', async () => {
+    await renderEditor();
+    const panels: Array<[string, string]> = [
+      ['rule-editor-when', 'When'],
+      ['rule-editor-if', 'If'],
+      ['rule-editor-then', 'Then'],
+      ['rule-editor-test', 'Test'],
+    ];
+    for (const [anchor, name] of panels) {
+      const found = document.querySelectorAll(`[data-tour-id="${anchor}"]`);
+      expect(found).toHaveLength(1);
+      expect(found[0]).toBe(screen.getByRole('region', { name }));
+    }
+  });
+
   it('asks for the pickers\' lists once, with inactive payees and inactive accounts included', async () => {
     await renderEditor();
     expect(mocks.accounts).toHaveBeenCalledWith(true);

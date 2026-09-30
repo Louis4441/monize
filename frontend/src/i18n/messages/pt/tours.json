@@ -45,7 +45,8 @@
     "requirementsLoading": "A verificar se pode fazer esta visita guiada…",
     "requires": {
       "transactionEntry": "Adicione primeiro uma conta — esta visita mostra como registar uma transação.",
-      "securitiesExist": "Adicione primeiro um título — esta visita abre um a partir da sua lista de títulos."
+      "securitiesExist": "Adicione primeiro um título — esta visita abre um a partir da sua lista de títulos.",
+      "ownerView": "Volte primeiro aos seus próprios dados. Esta visita aborda as Regras e a caixa de revisão de IA, que não estão disponíveis enquanto atua em nome de outra pessoa."
     },
     "start": "Iniciar",
     "restart": "Repetir",
@@ -375,6 +376,53 @@
           "finish": {
             "title": "É assim a repartição por etiqueta",
             "body": "Etiquete transações com um par chave:valor como scope:household onde quiser esta vista, e volte a esta visita guiada quando quiser a partir de Definições."
+          }
+        }
+      }
+    },
+    "v1_17_0": {
+      "transactionRules": {
+        "title": "Regras de transações",
+        "steps": {
+          "welcome": {
+            "title": "Regras que arrumam as suas transações",
+            "body": "Quando uma transação é criada ou importada e cumpre as condições que definiu, uma regra pode definir a sua categoria ou beneficiário, adicionar etiquetas, reescrever a descrição ou pedir a uma IA que a reveja. Uma regra nunca altera um montante, uma conta ou uma data."
+          },
+          "tools": {
+            "title": "As regras estão em Ferramentas",
+            "body": "Abra **Ferramentas** para encontrar **Regras**. O passo seguinte mostra o menu."
+          },
+          "rulesLink": {
+            "title": "Abrir Regras",
+            "body": "Escolha **Regras**. Lista todas as suas regras e é aí que cria uma nova."
+          },
+          "list": {
+            "title": "As suas regras, por ordem",
+            "body": "Cada linha é uma regra, com um interruptor para a ligar ou desligar e ações para a mover, executar, duplicar ou eliminar. As regras são verificadas de cima para baixo, pelo que a ordem conta quando duas alteram o mesmo. Se ainda não tem regras, este cartão explica o que é uma regra."
+          },
+          "create": {
+            "title": "Criar uma regra",
+            "body": "**Criar regra** abre o editor com uma regra em branco. Nada é guardado até escolher **Guardar regra**."
+          },
+          "when": {
+            "title": "Quando: que transações analisa",
+            "body": "Escolha se a regra analisa uma transação quando é **criada**, quando é **importada** ou em ambos os casos. **Parar de processar as outras regras** ignora as regras abaixo desta para qualquer transação que ela reconheça."
+          },
+          "if": {
+            "title": "Se: que transações correspondem",
+            "body": "Monte as condições com campos como beneficiário, descrição, montante e categoria. O seletor **Visual** e **Expressão** mostra as mesmas condições como cartões ou como uma linha de texto. Num padrão, * representa qualquer texto e '{name}' guarda o texto nesse ponto para que uma ação o possa reutilizar."
+          },
+          "then": {
+            "title": "Então: o que altera",
+            "body": "As ações são executadas pela ordem indicada. Uma regra pode definir a categoria ou o beneficiário, adicionar ou remover etiquetas, definir a descrição ou pedir a uma IA que reveja a transação. Não existe nenhuma ação para um montante, uma conta ou uma data."
+          },
+          "test": {
+            "title": "Testar, executar e anular",
+            "body": "**Testar regra** experimenta o rascunho nas suas transações existentes e mostra o que alteraria. Nada é alterado. Depois de guardada a regra, **Executar nas transações existentes** mostra uma pré-visualização e aplica-a ao que já tem, e pode anular essa execução no histórico de ações."
+          },
+          "reviews": {
+            "title": "A caixa de revisão de IA",
+            "body": "Uma regra com **Pedir uma revisão da IA** não altera a transação, coloca-a aqui. Um assistente propõe uma edição e nada é escrito até a aprovar. Também pode dispensar um pedido. Encontra-a em **IA** como **Caixa de revisão de IA**."
           }
         }
       }

@@ -42,6 +42,7 @@ beforeEach(() => {
   requirements.mockReturnValue({
     transactionEntry: true,
     securitiesExist: true,
+    ownerView: true,
   });
   useTourStore.setState({
     active: null,
@@ -103,6 +104,7 @@ describe('TourCatalog', () => {
     requirements.mockReturnValue({
       transactionEntry: true,
       securitiesExist: false,
+      ownerView: true,
     });
     render(<TourCatalog />);
 

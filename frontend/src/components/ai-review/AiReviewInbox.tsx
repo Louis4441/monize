@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { SEGMENTED_GROUP_CLASS, segmentClass } from '@/components/ui/segmented-control';
 import { TABLE_BODY_CLASS, TABLE_CLASS, Th } from '@/components/ui/Table';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 import { useAiReviewInbox } from '@/hooks/useAiReviewInbox';
 import { AI_REVIEW_STATUSES, type AiReviewFilter, type AiReviewItem } from '@/types/ai-review';
 
@@ -86,7 +87,7 @@ export function AiReviewInbox() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" {...tourAnchor(TOUR_ANCHORS.aiReviewInbox)}>
       <div role="group" aria-label={t('filter.label')} className={`${SEGMENTED_GROUP_CLASS} max-w-full flex-wrap`}>
         {FILTERS.map((option) => (
           <button

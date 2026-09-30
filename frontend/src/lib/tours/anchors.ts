@@ -22,6 +22,7 @@ export const TOUR_ANCHORS = {
   navSettings: 'nav-settings',
   navTools: 'nav-tools',
   navToolsMenu: 'nav-tools-menu',
+  navRules: 'nav-rules',
 
   // Dashboard
   dashboardWidgets: 'dashboard-widgets',
@@ -89,6 +90,17 @@ export const TOUR_ANCHORS = {
   notificationChannelMatrix: 'notification-channel-matrix',
   notificationPushDevices: 'notification-push-devices',
   notificationPortfolioAlert: 'notification-portfolio-alert',
+
+  // Transaction rules (the list page, the editor's panels) and the AI review
+  // inbox. Each is on a container that renders in every state of its screen:
+  // the list card holds the spinner, the error, the empty state or the table.
+  rulesList: 'rules-list',
+  rulesCreateButton: 'rules-create-button',
+  ruleEditorWhen: 'rule-editor-when',
+  ruleEditorIf: 'rule-editor-if',
+  ruleEditorThen: 'rule-editor-then',
+  ruleEditorTest: 'rule-editor-test',
+  aiReviewInbox: 'ai-review-inbox',
 } as const;
 
 export type TourAnchorId = (typeof TOUR_ANCHORS)[keyof typeof TOUR_ANCHORS];

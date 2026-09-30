@@ -45,7 +45,8 @@
     "requirementsLoading": "Vérification de votre accès à cette visite…",
     "requires": {
       "transactionEntry": "Ajoutez d'abord un compte : cette visite explique comment enregistrer une transaction.",
-      "securitiesExist": "Ajoutez d'abord un titre : cette visite en ouvre un depuis votre liste de titres."
+      "securitiesExist": "Ajoutez d'abord un titre : cette visite en ouvre un depuis votre liste de titres.",
+      "ownerView": "Revenez d’abord à vos propres données. Cette visite couvre les Règles et la boîte de révision par l’IA, qui ne sont pas disponibles lorsque vous agissez pour le compte de quelqu’un d’autre."
     },
     "start": "Démarrer",
     "restart": "Refaire",
@@ -375,6 +376,53 @@
           "finish": {
             "title": "Voilà pour la répartition par étiquette",
             "body": "Étiquetez vos transactions avec une paire clé:valeur comme scope:household partout où vous voulez cette vue, et revenez à cette visite guidée à tout moment depuis Paramètres."
+          }
+        }
+      }
+    },
+    "v1_17_0": {
+      "transactionRules": {
+        "title": "Règles de transaction",
+        "steps": {
+          "welcome": {
+            "title": "Des règles qui rangent vos transactions",
+            "body": "Lorsqu’une transaction est créée ou importée et répond aux conditions que vous avez fixées, une règle peut définir sa catégorie ou son bénéficiaire, ajouter des étiquettes, réécrire sa description ou demander à une IA de la réviser. Une règle ne modifie jamais un montant, un compte ni une date."
+          },
+          "tools": {
+            "title": "Les règles sont dans Outils",
+            "body": "Ouvrez **Outils** pour trouver **Règles**. L’étape suivante montre le menu."
+          },
+          "rulesLink": {
+            "title": "Ouvrir Règles",
+            "body": "Choisissez **Règles**. Cette page liste toutes vos règles et c’est de là que vous en créez une nouvelle."
+          },
+          "list": {
+            "title": "Vos règles, dans l’ordre",
+            "body": "Chaque ligne est une règle, avec un interrupteur pour l’activer ou la désactiver et des actions pour la déplacer, l’exécuter, la dupliquer ou la supprimer. Les règles sont examinées de haut en bas, l’ordre compte donc quand deux règles modifient la même chose. Tant que vous n’avez aucune règle, cette carte explique ce qu’est une règle."
+          },
+          "create": {
+            "title": "Créer une règle",
+            "body": "**Créer une règle** ouvre l’éditeur avec une règle vide. Rien n’est enregistré tant que vous ne choisissez pas **Enregistrer la règle**."
+          },
+          "when": {
+            "title": "Quand : quelles transactions elle examine",
+            "body": "Choisissez si la règle examine une transaction lorsqu’elle est **créée**, lorsqu’elle est **importée**, ou dans les deux cas. **Arrêter le traitement des autres règles** ignore les règles situées en dessous pour toute transaction qui correspond à celle-ci."
+          },
+          "if": {
+            "title": "Si : quelles transactions correspondent",
+            "body": "Composez les conditions à partir de champs comme le bénéficiaire, la description, le montant et la catégorie. Le sélecteur **Visuel** et **Expression** montre les mêmes conditions sous forme de cartes ou d’une seule ligne de texte. Dans un motif, * représente n’importe quel texte et '{name}' garde le texte à cet endroit pour qu’une action puisse le réutiliser."
+          },
+          "then": {
+            "title": "Alors : ce qui change",
+            "body": "Les actions s’exécutent dans l’ordre indiqué. Une règle peut définir la catégorie ou le bénéficiaire, ajouter ou retirer des étiquettes, définir la description ou demander à une IA de réviser la transaction. Aucune action ne porte sur un montant, un compte ou une date."
+          },
+          "test": {
+            "title": "Tester, exécuter et annuler",
+            "body": "**Tester la règle** essaie le brouillon sur vos transactions existantes et montre ce qu’il modifierait. Rien n’est modifié. Une fois la règle enregistrée, **Exécuter sur les transactions existantes** affiche un aperçu puis l’applique à ce que vous avez déjà, et vous pouvez annuler cette exécution depuis l’historique des actions."
+          },
+          "reviews": {
+            "title": "La boîte de révision par l’IA",
+            "body": "Une règle avec **Demander une révision par l’IA** ne modifie pas la transaction : elle la dépose ici. Un assistant propose une modification, et rien n’est écrit tant que vous ne l’approuvez pas. Vous pouvez aussi écarter une demande. Vous la trouvez sous **IA**, à l’entrée **Boîte de révision par l’IA**."
           }
         }
       }

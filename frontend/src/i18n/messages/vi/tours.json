@@ -45,7 +45,8 @@
     "requirementsLoading": "Đang kiểm tra xem bạn có thể xem hướng dẫn này không…",
     "requires": {
       "transactionEntry": "Hãy thêm một tài khoản trước — hướng dẫn này chỉ cách ghi lại một giao dịch.",
-      "securitiesExist": "Hãy thêm một chứng khoán trước — hướng dẫn này mở một mục từ danh sách chứng khoán của bạn."
+      "securitiesExist": "Hãy thêm một chứng khoán trước — hướng dẫn này mở một mục từ danh sách chứng khoán của bạn.",
+      "ownerView": "Hãy quay lại dữ liệu của chính bạn trước. Phần hướng dẫn này nói về Quy tắc và hộp thư xem xét của AI, những mục không khả dụng khi bạn đang thao tác thay cho người khác."
     },
     "start": "Bắt đầu",
     "restart": "Xem lại",
@@ -375,6 +376,53 @@
           "finish": {
             "title": "Đó là phần phân tách theo thẻ",
             "body": "Hãy gắn thẻ cho giao dịch bằng một cặp khóa:giá trị như scope:household ở bất cứ đâu bạn muốn xem này, và xem lại hướng dẫn này bất cứ lúc nào từ Cài đặt."
+          }
+        }
+      }
+    },
+    "v1_17_0": {
+      "transactionRules": {
+        "title": "Quy tắc giao dịch",
+        "steps": {
+          "welcome": {
+            "title": "Quy tắc giúp bạn sắp xếp giao dịch",
+            "body": "Khi một giao dịch được tạo hoặc nhập và khớp các điều kiện bạn đặt, quy tắc có thể đặt danh mục hoặc người nhận, thêm thẻ nhãn, viết lại mô tả hoặc nhờ AI xem xét giao dịch đó. Quy tắc không bao giờ thay đổi số tiền, tài khoản hay ngày."
+          },
+          "tools": {
+            "title": "Quy tắc nằm trong menu Công cụ",
+            "body": "Mở **Công cụ** để tìm **Quy tắc**. Bước tiếp theo sẽ hiển thị menu."
+          },
+          "rulesLink": {
+            "title": "Mở Quy tắc",
+            "body": "Chọn **Quy tắc**. Trang này liệt kê mọi quy tắc của bạn và bạn tạo quy tắc mới từ đây."
+          },
+          "list": {
+            "title": "Các quy tắc của bạn, theo thứ tự",
+            "body": "Mỗi hàng là một quy tắc, có công tắc để bật hoặc tắt và các thao tác để di chuyển, chạy, nhân đôi hoặc xóa. Quy tắc được kiểm tra từ trên xuống dưới, nên thứ tự quan trọng khi hai quy tắc thay đổi cùng một thứ. Khi chưa có quy tắc nào, thẻ này giải thích quy tắc là gì."
+          },
+          "create": {
+            "title": "Tạo một quy tắc",
+            "body": "**Tạo quy tắc** mở trình chỉnh sửa với một quy tắc trống. Sẽ không có gì được lưu cho đến khi bạn chọn **Lưu quy tắc**."
+          },
+          "when": {
+            "title": "Khi nào: xét những giao dịch nào",
+            "body": "Chọn xem quy tắc xét một giao dịch khi nó được **tạo**, khi nó được **nhập**, hay cả hai. **Dừng xử lý các quy tắc khác** bỏ qua các quy tắc bên dưới đối với mọi giao dịch khớp quy tắc này."
+          },
+          "if": {
+            "title": "Nếu: giao dịch nào khớp",
+            "body": "Tạo điều kiện từ các trường như người nhận, mô tả, số tiền và danh mục. Công tắc **Trực quan** và **Biểu thức** hiển thị cùng các điều kiện đó dưới dạng thẻ hoặc một dòng văn bản. Trong một mẫu, * đại diện cho văn bản bất kỳ và '{name}' giữ lại văn bản tại vị trí đó để một thao tác có thể dùng lại."
+          },
+          "then": {
+            "title": "Thì: thay đổi gì",
+            "body": "Các thao tác chạy theo thứ tự đã liệt kê. Một quy tắc có thể đặt danh mục hoặc người nhận, thêm hoặc bỏ thẻ nhãn, đặt mô tả hoặc nhờ AI xem xét giao dịch. Không có thao tác nào dành cho số tiền, tài khoản hay ngày."
+          },
+          "test": {
+            "title": "Kiểm tra, chạy và hoàn tác",
+            "body": "**Kiểm tra quy tắc** thử bản nháp trên các giao dịch hiện có của bạn và cho thấy điều sẽ thay đổi. Không có gì bị thay đổi. Sau khi quy tắc được lưu, **Chạy trên các giao dịch hiện có** hiển thị bản xem trước và áp dụng cho những gì bạn đã có, và bạn có thể hoàn tác lần chạy đó từ lịch sử thao tác."
+          },
+          "reviews": {
+            "title": "Hộp thư xem xét của AI",
+            "body": "Quy tắc có thao tác **Yêu cầu AI xem xét** không thay đổi giao dịch mà đưa nó vào đây. Một trợ lý đề xuất chỉnh sửa, và không có gì được ghi cho đến khi bạn phê duyệt. Bạn cũng có thể bỏ qua một yêu cầu. Bạn tìm thấy nó trong **AI** với tên **Hộp thư xem xét của AI**."
           }
         }
       }

@@ -45,7 +45,8 @@
     "requirementsLoading": "Memeriksa apakah Anda bisa mengikuti tur ini…",
     "requires": {
       "transactionEntry": "Tambahkan akun terlebih dahulu — tur ini memandu pencatatan transaksi.",
-      "securitiesExist": "Tambahkan sekuritas terlebih dahulu — tur ini membuka salah satunya dari daftar sekuritas Anda."
+      "securitiesExist": "Tambahkan sekuritas terlebih dahulu — tur ini membuka salah satunya dari daftar sekuritas Anda.",
+      "ownerView": "Kembalilah dulu ke data Anda sendiri. Panduan ini membahas Aturan dan kotak masuk peninjauan AI, yang tidak tersedia saat Anda bertindak atas nama orang lain."
     },
     "start": "Mulai",
     "restart": "Ulangi",
@@ -375,6 +376,53 @@
           "finish": {
             "title": "Itulah rincian berdasarkan tag",
             "body": "Beri tag transaksi dengan pasangan kunci:nilai seperti scope:household di mana pun Anda ingin tampilan ini, dan buka kembali tur ini kapan saja dari Pengaturan."
+          }
+        }
+      }
+    },
+    "v1_17_0": {
+      "transactionRules": {
+        "title": "Aturan transaksi",
+        "steps": {
+          "welcome": {
+            "title": "Aturan yang merapikan transaksi Anda",
+            "body": "Saat sebuah transaksi dibuat atau diimpor dan cocok dengan kondisi yang Anda tetapkan, sebuah aturan dapat mengatur kategori atau penerimanya, menambahkan tag, menulis ulang deskripsinya, atau meminta AI meninjaunya. Aturan tidak pernah mengubah jumlah, akun, atau tanggal."
+          },
+          "tools": {
+            "title": "Aturan ada di menu Alat",
+            "body": "Buka **Alat** untuk menemukan **Aturan**. Langkah berikutnya menampilkan menunya."
+          },
+          "rulesLink": {
+            "title": "Buka Aturan",
+            "body": "Pilih **Aturan**. Halaman ini menampilkan semua aturan Anda dan dari sinilah Anda membuat yang baru."
+          },
+          "list": {
+            "title": "Aturan Anda, berurutan",
+            "body": "Setiap baris adalah satu aturan, dengan sakelar untuk menyalakan atau mematikannya dan tindakan untuk memindahkan, menjalankan, menggandakan, atau menghapusnya. Aturan diperiksa dari atas ke bawah, jadi urutan penting saat dua aturan mengubah hal yang sama. Jika belum ada aturan, kartu ini menjelaskan apa itu aturan."
+          },
+          "create": {
+            "title": "Buat aturan",
+            "body": "**Buat aturan** membuka editor dengan aturan kosong. Tidak ada yang disimpan sampai Anda memilih **Simpan aturan**."
+          },
+          "when": {
+            "title": "Kapan: transaksi mana yang diperiksa",
+            "body": "Pilih apakah aturan memeriksa transaksi saat **dibuat**, saat **diimpor**, atau keduanya. **Hentikan pemrosesan aturan lain** melewati aturan di bawahnya untuk setiap transaksi yang cocok dengan aturan ini."
+          },
+          "if": {
+            "title": "Jika: transaksi mana yang cocok",
+            "body": "Susun kondisi dari kolom seperti penerima, deskripsi, jumlah, dan kategori. Sakelar **Visual** dan **Ekspresi** menampilkan kondisi yang sama sebagai kartu atau sebagai satu baris teks. Dalam pola, * berarti teks apa pun dan '{name}' menyimpan teks di posisi itu agar tindakan dapat memakainya lagi."
+          },
+          "then": {
+            "title": "Maka: apa yang berubah",
+            "body": "Tindakan dijalankan sesuai urutan yang tercantum. Aturan dapat mengatur kategori atau penerima, menambah atau menghapus tag, mengatur deskripsi, atau meminta AI meninjau transaksi. Tidak ada tindakan untuk jumlah, akun, atau tanggal."
+          },
+          "test": {
+            "title": "Uji, jalankan, dan urungkan",
+            "body": "**Uji aturan** mencoba draf pada transaksi Anda yang ada dan menunjukkan apa yang akan berubah. Tidak ada yang diubah. Setelah aturan disimpan, **Jalankan pada transaksi yang ada** menampilkan pratinjau dan menerapkannya pada yang sudah Anda miliki, dan Anda dapat mengurungkan proses itu dari riwayat tindakan."
+          },
+          "reviews": {
+            "title": "Kotak masuk peninjauan AI",
+            "body": "Aturan dengan **Minta peninjauan AI** tidak mengubah transaksi, tetapi menaruhnya di sini. Sebuah asisten mengusulkan perubahan, dan tidak ada yang ditulis sampai Anda menyetujuinya. Anda juga dapat menolak permintaan. Temukan di **AI** sebagai **Kotak masuk peninjauan AI**."
           }
         }
       }

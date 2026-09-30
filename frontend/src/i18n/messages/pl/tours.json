@@ -45,7 +45,8 @@
     "requirementsLoading": "Sprawdzanie, czy możesz przejść ten przewodnik…",
     "requires": {
       "transactionEntry": "Najpierw dodaj konto — ten przewodnik pokazuje, jak zapisać transakcję.",
-      "securitiesExist": "Najpierw dodaj papier wartościowy — ten przewodnik otwiera jeden z Twojej listy."
+      "securitiesExist": "Najpierw dodaj papier wartościowy — ten przewodnik otwiera jeden z Twojej listy.",
+      "ownerView": "Najpierw wróć do własnych danych. Ten przewodnik omawia Reguły i skrzynkę przeglądów AI, które nie są dostępne, gdy działasz w imieniu kogoś innego."
     },
     "start": "Rozpocznij",
     "restart": "Powtórz",
@@ -375,6 +376,53 @@
           "finish": {
             "title": "Tak wygląda podział według tagu",
             "body": "Oznaczaj transakcje parą klucz:wartość, na przykład scope:household, wszędzie tam, gdzie chcesz ten widok, i wracaj do tej wycieczki w dowolnym momencie z Ustawień."
+          }
+        }
+      }
+    },
+    "v1_17_0": {
+      "transactionRules": {
+        "title": "Reguły transakcji",
+        "steps": {
+          "welcome": {
+            "title": "Reguły porządkują transakcje za Ciebie",
+            "body": "Gdy transakcja zostaje utworzona lub zaimportowana i pasuje do ustawionych przez Ciebie warunków, reguła może ustawić jej kategorię lub odbiorcę, dodać tagi, przepisać opis albo poprosić AI o przegląd. Reguła nigdy nie zmienia kwoty, konta ani daty."
+          },
+          "tools": {
+            "title": "Reguły są w menu Narzędzia",
+            "body": "Otwórz **Narzędzia**, aby znaleźć **Reguły**. Następny krok pokazuje to menu."
+          },
+          "rulesLink": {
+            "title": "Otwórz Reguły",
+            "body": "Wybierz **Reguły**. Zobaczysz tam wszystkie swoje reguły i stamtąd utworzysz nową."
+          },
+          "list": {
+            "title": "Twoje reguły, po kolei",
+            "body": "Każdy wiersz to jedna reguła z przełącznikiem włączania i wyłączania oraz akcjami: przesuń, uruchom, powiel lub usuń. Reguły są sprawdzane od góry do dołu, więc kolejność ma znaczenie, gdy dwie z nich zmieniają to samo. Gdy nie masz jeszcze żadnej reguły, ta karta wyjaśnia, czym jest reguła."
+          },
+          "create": {
+            "title": "Utwórz regułę",
+            "body": "**Utwórz regułę** otwiera edytor z pustą regułą. Nic nie zostanie zapisane, dopóki nie wybierzesz **Zapisz regułę**."
+          },
+          "when": {
+            "title": "Kiedy: na które transakcje patrzy",
+            "body": "Wybierz, czy reguła ma sprawdzać transakcję, gdy zostaje **utworzona**, gdy zostaje **zaimportowana**, czy w obu przypadkach. **Zatrzymaj przetwarzanie kolejnych reguł** pomija reguły znajdujące się niżej dla każdej transakcji, do której ta reguła pasuje."
+          },
+          "if": {
+            "title": "Jeśli: które transakcje pasują",
+            "body": "Ułóż warunki z pól takich jak odbiorca, opis, kwota i kategoria. Przełącznik **Wizualny** i **Wyrażenie** pokazuje te same warunki jako karty albo jako jedną linię tekstu. We wzorcu * oznacza dowolny tekst, a '{name}' zachowuje tekst z tego miejsca, aby akcja mogła go użyć."
+          },
+          "then": {
+            "title": "Wtedy: co zmienia",
+            "body": "Akcje działają w podanej kolejności. Reguła może ustawić kategorię lub odbiorcę, dodać albo usunąć tagi, ustawić opis albo poprosić AI o przegląd transakcji. Nie ma akcji zmieniającej kwotę, konto ani datę."
+          },
+          "test": {
+            "title": "Testuj, uruchamiaj i cofaj",
+            "body": "**Przetestuj regułę** sprawdza szkic na Twoich istniejących transakcjach i pokazuje, co by zmienił. Nic nie zostaje zmienione. Gdy reguła jest zapisana, **Uruchom na istniejących transakcjach** pokazuje podgląd i stosuje ją do tego, co już masz, a takie uruchomienie możesz cofnąć w historii akcji."
+          },
+          "reviews": {
+            "title": "Skrzynka przeglądów AI",
+            "body": "Reguła z akcją **Poproś o przegląd AI** nie zmienia transakcji, tylko przekazuje ją tutaj. Asystent proponuje zmianę i nic nie zostaje zapisane, dopóki jej nie zatwierdzisz. Możesz też odrzucić zgłoszenie. Skrzynkę znajdziesz w menu **AI** jako **Skrzynka przeglądów AI**."
           }
         }
       }

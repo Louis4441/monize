@@ -102,6 +102,12 @@ describe('AiReviewInbox', () => {
     expect(screen.getByText(/MCP client such as the relay agent/)).toBeInTheDocument();
   });
 
+  it('keeps the tour anchor on the inbox while it is empty', async () => {
+    const { container } = await renderInbox();
+    expect(container.querySelectorAll('[data-tour-id="ai-review-inbox"]')).toHaveLength(1);
+    expect(screen.getByText('No review requests')).toBeInTheDocument();
+  });
+
   it('shows an error, not an empty list, when the load fails, and retries', async () => {
     api.list.mockRejectedValueOnce(new Error('boom'));
     await renderInbox();

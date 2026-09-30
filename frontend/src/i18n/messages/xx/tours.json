@@ -45,7 +45,8 @@
     "requirementsLoading": "[XX-Checking whether you can take this tour…-XX]",
     "requires": {
       "transactionEntry": "[XX-Add an account first — this tour walks through recording a transaction.-XX]",
-      "securitiesExist": "[XX-Add a security first — this tour opens one from your securities list.-XX]"
+      "securitiesExist": "[XX-Add a security first — this tour opens one from your securities list.-XX]",
+      "ownerView": "[XX-Switch back to your own data first. This tour covers Rules and the AI review inbox, which are not available while you act for someone else.-XX]"
     },
     "start": "[XX-Start-XX]",
     "restart": "[XX-Retake-XX]",
@@ -375,6 +376,53 @@
           "finish": {
             "title": "[XX-That's the tag breakdown-XX]",
             "body": "[XX-Tag transactions with a key:value pair like scope:household wherever you want this view, and revisit this tour anytime from Settings.-XX]"
+          }
+        }
+      }
+    },
+    "v1_17_0": {
+      "transactionRules": {
+        "title": "[XX-Transaction rules-XX]",
+        "steps": {
+          "welcome": {
+            "title": "[XX-Rules that tidy your transactions-XX]",
+            "body": "[XX-When a transaction is created or imported and matches the conditions you set, a rule can set its category or payee, add tags, rewrite its description or ask an AI to review it. A rule never changes an amount, an account or a date.-XX]"
+          },
+          "tools": {
+            "title": "[XX-Rules are in the Tools menu-XX]",
+            "body": "[XX-Open **Tools** to find **Rules**. The next step shows the menu.-XX]"
+          },
+          "rulesLink": {
+            "title": "[XX-Open Rules-XX]",
+            "body": "[XX-Choose **Rules**. It lists every rule you have and is where you create a new one.-XX]"
+          },
+          "list": {
+            "title": "[XX-Your rules, in order-XX]",
+            "body": "[XX-Each row is one rule, with a switch to turn it on or off and actions to move it, run it, duplicate it or delete it. Rules are checked from the top down, so the order matters when two of them change the same thing. With no rules yet, this card explains what a rule is.-XX]"
+          },
+          "create": {
+            "title": "[XX-Create a rule-XX]",
+            "body": "[XX-**Create rule** opens the editor with a blank rule. Nothing is saved until you choose **Save rule**.-XX]"
+          },
+          "when": {
+            "title": "[XX-When: which transactions it looks at-XX]",
+            "body": "[XX-Choose whether the rule looks at a transaction when it is **created**, when it is **imported**, or both. **Stop processing other rules** skips the rules below this one for any transaction it matches.-XX]"
+          },
+          "if": {
+            "title": "[XX-If: which transactions match-XX]",
+            "body": "[XX-Build the conditions from fields such as payee, description, amount and category. The **Visual** and **Expression** switch shows the same conditions as cards or as one line of text. In a pattern, * stands for any text and '{name}' keeps the text at that spot so an action can reuse it.-XX]"
+          },
+          "then": {
+            "title": "[XX-Then: what it changes-XX]",
+            "body": "[XX-Actions run in the order listed. A rule can set the category or payee, add or remove tags, set the description, or ask an AI to review the transaction. There is no action for an amount, an account or a date.-XX]"
+          },
+          "test": {
+            "title": "[XX-Test, run and undo-XX]",
+            "body": "[XX-**Test rule** tries the draft on your existing transactions and shows what it would change. Nothing is changed. Once a rule is saved, **Run on existing transactions** shows a preview and applies it to what you already have, and you can undo that run from the action history.-XX]"
+          },
+          "reviews": {
+            "title": "[XX-The AI review inbox-XX]",
+            "body": "[XX-A rule with **Ask for an AI review** does not change the transaction. It puts it here instead. An assistant proposes an edit, and nothing is written until you approve it. You can also dismiss a request. Find it under **AI** as **AI Review Inbox**.-XX]"
           }
         }
       }

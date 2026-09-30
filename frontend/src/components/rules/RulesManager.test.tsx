@@ -74,6 +74,16 @@ describe('RulesManager', () => {
     expect(screen.getByText('2 rules')).toBeInTheDocument();
   });
 
+  it('keeps the tour anchor on the list card in every state, empty included', async () => {
+    const { container, unmount } = await renderManager();
+    expect(container.querySelectorAll('[data-tour-id="rules-list"]')).toHaveLength(1);
+    unmount();
+    api.getAll.mockResolvedValue([]);
+    const empty = await renderManager();
+    expect(empty.container.querySelectorAll('[data-tour-id="rules-list"]')).toHaveLength(1);
+    expect(screen.getByText('No rules yet')).toBeInTheDocument();
+  });
+
   it('shows a spinner while the first load is in flight', async () => {
     let resolve!: (rules: TransactionRule[]) => void;
     api.getAll.mockReturnValue(new Promise((r) => (resolve = r)));

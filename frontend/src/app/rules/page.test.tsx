@@ -21,4 +21,15 @@ describe('RulesPage', () => {
     expect(screen.getByRole('link', { name: 'Create rule' })).toHaveAttribute('href', '/rules/new');
     expect(screen.getByText('No rules yet')).toBeInTheDocument();
   });
+
+  it('anchors the tour on the header Create rule link only, not the empty-state one', async () => {
+    let container!: HTMLElement;
+    await act(async () => {
+      container = render(<RulesPage />).container;
+    });
+    const anchored = container.querySelectorAll('[data-tour-id="rules-create-button"]');
+    expect(anchored).toHaveLength(1);
+    expect(anchored[0]).toHaveTextContent('Create rule');
+    expect(screen.getByRole('link', { name: 'Create your first rule' })).not.toHaveAttribute('data-tour-id');
+  });
 });

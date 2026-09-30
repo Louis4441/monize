@@ -45,7 +45,8 @@
     "requirementsLoading": "Controleren of je deze rondleiding kunt volgen…",
     "requires": {
       "transactionEntry": "Voeg eerst een rekening toe — deze rondleiding laat zien hoe je een transactie vastlegt.",
-      "securitiesExist": "Voeg eerst een waardepapier toe — deze rondleiding opent er een uit je lijst met waardepapieren."
+      "securitiesExist": "Voeg eerst een waardepapier toe — deze rondleiding opent er een uit je lijst met waardepapieren.",
+      "ownerView": "Ga eerst terug naar je eigen gegevens. Deze rondleiding behandelt Regels en het AI-controlepostvak, die niet beschikbaar zijn zolang je namens iemand anders handelt."
     },
     "start": "Starten",
     "restart": "Opnieuw doen",
@@ -375,6 +376,53 @@
           "finish": {
             "title": "Dat is de labeluitsplitsing",
             "body": "Geef transacties overal waar u deze weergave wilt een sleutel:waarde-paar zoals scope:household, en bekijk deze rondleiding voortaan altijd opnieuw via Instellingen."
+          }
+        }
+      }
+    },
+    "v1_17_0": {
+      "transactionRules": {
+        "title": "Transactieregels",
+        "steps": {
+          "welcome": {
+            "title": "Regels die je transacties opruimen",
+            "body": "Wanneer een transactie wordt aangemaakt of geïmporteerd en voldoet aan de voorwaarden die je hebt ingesteld, kan een regel de categorie of begunstigde instellen, labels toevoegen, de omschrijving herschrijven of een AI om een controle vragen. Een regel wijzigt nooit een bedrag, rekening of datum."
+          },
+          "tools": {
+            "title": "Regels vind je onder Hulpmiddelen",
+            "body": "Open **Hulpmiddelen** om **Regels** te vinden. De volgende stap toont het menu."
+          },
+          "rulesLink": {
+            "title": "Open Regels",
+            "body": "Kies **Regels**. Daar staan al je regels en maak je een nieuwe."
+          },
+          "list": {
+            "title": "Je regels, op volgorde",
+            "body": "Elke rij is één regel, met een schakelaar om hem aan of uit te zetten en acties om hem te verplaatsen, uit te voeren, te dupliceren of te verwijderen. Regels worden van boven naar beneden gecontroleerd, dus de volgorde telt als twee regels hetzelfde wijzigen. Heb je nog geen regels, dan legt deze kaart uit wat een regel is."
+          },
+          "create": {
+            "title": "Maak een regel",
+            "body": "**Regel maken** opent de editor met een lege regel. Er wordt niets opgeslagen totdat je **Regel opslaan** kiest."
+          },
+          "when": {
+            "title": "Wanneer: naar welke transacties hij kijkt",
+            "body": "Kies of de regel een transactie bekijkt als die wordt **aangemaakt**, als die wordt **geïmporteerd**, of in beide gevallen. **Verwerking van andere regels stoppen** slaat de regels eronder over voor elke transactie waarop deze regel past."
+          },
+          "if": {
+            "title": "Als: welke transacties passen",
+            "body": "Bouw de voorwaarden op uit velden zoals begunstigde, omschrijving, bedrag en categorie. De schakelaar **Visueel** en **Expressie** toont dezelfde voorwaarden als kaarten of als één regel tekst. In een patroon staat * voor willekeurige tekst en houdt '{name}' de tekst op die plek vast, zodat een actie hem kan hergebruiken."
+          },
+          "then": {
+            "title": "Dan: wat er verandert",
+            "body": "Acties worden uitgevoerd in de getoonde volgorde. Een regel kan de categorie of begunstigde instellen, labels toevoegen of verwijderen, de omschrijving instellen of een AI vragen de transactie te controleren. Er is geen actie voor een bedrag, rekening of datum."
+          },
+          "test": {
+            "title": "Testen, uitvoeren en ongedaan maken",
+            "body": "**Regel testen** probeert het concept uit op je bestaande transacties en toont wat er zou veranderen. Er wordt niets gewijzigd. Is de regel opgeslagen, dan toont **Uitvoeren op bestaande transacties** een voorbeeld en past hij toe op wat je al hebt, en je kunt die uitvoering ongedaan maken via de actiegeschiedenis."
+          },
+          "reviews": {
+            "title": "Het AI-controlepostvak",
+            "body": "Een regel met **AI-controle aanvragen** wijzigt de transactie niet, maar zet hem hier neer. Een assistent stelt een wijziging voor en er wordt niets geschreven totdat jij die goedkeurt. Je kunt een verzoek ook afwijzen. Je vindt het onder **AI** als **AI-controlepostvak**."
           }
         }
       }

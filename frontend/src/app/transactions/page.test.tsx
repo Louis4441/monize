@@ -2623,8 +2623,9 @@ describe('TransactionsPage register sorting', () => {
     render(<TransactionsPage />);
     await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
 
+    const sortAmount = await screen.findByTestId('sort-amount');
     await act(async () => {
-      fireEvent.click(screen.getByTestId('sort-amount'));
+      fireEvent.click(sortAmount);
     });
 
     await waitFor(() => {
@@ -2678,8 +2679,9 @@ describe('TransactionsPage register sorting', () => {
   it('drops back to the date order to reach a deep-linked row', async () => {
     render(<TransactionsPage />);
     await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+    const sortAmount = await screen.findByTestId('sort-amount');
     await act(async () => {
-      fireEvent.click(screen.getByTestId('sort-amount'));
+      fireEvent.click(sortAmount);
     });
     await waitFor(() => {
       expect(screen.getByTestId('sort')).toHaveTextContent('amount:asc');
@@ -2758,8 +2760,9 @@ describe('TransactionsPage register sorting', () => {
     render(<TransactionsPage />);
     await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
 
+    const sortAmount = await screen.findByTestId('sort-amount');
     await act(async () => {
-      fireEvent.click(screen.getByTestId('sort-amount'));
+      fireEvent.click(sortAmount);
     });
 
     await waitFor(() => {
@@ -2847,8 +2850,9 @@ describe('TransactionsPage register sorting', () => {
     // debounce would coalesce a duplicate rather than let it race.
     render(<TransactionsPage />);
     await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+    const sortAmount = await screen.findByTestId('sort-amount');
     await act(async () => {
-      fireEvent.click(screen.getByTestId('sort-amount'));
+      fireEvent.click(sortAmount);
     });
     await waitFor(() => {
       expect(screen.getByTestId('rows-sort')).toHaveTextContent('amount:asc');

@@ -51,6 +51,16 @@ describe('AppHeader Rules entry', () => {
     expect(router.push).toHaveBeenCalledWith('/rules');
   });
 
+  it('anchors the tour on the Rules entry, only while the Tools menu is open', () => {
+    const { container } = render(<AppHeader />);
+    expect(container.querySelector('[data-tour-id="nav-rules"]')).toBeNull();
+    openToolsMenu();
+    const anchored = container.querySelectorAll('[data-tour-id="nav-rules"]');
+    expect(anchored).toHaveLength(1);
+    expect(anchored[0]).toHaveTextContent('Rules');
+    expect(anchored[0].closest('[data-tour-id="nav-tools-menu"]')).not.toBeNull();
+  });
+
   it('does not show Rules to a delegate, even one who manages every tool section', () => {
     mockActingAsUserId = 'owner-1';
     mockDelegateCapabilities = { payees: manage, categories: manage, tags: manage };

@@ -45,7 +45,8 @@
     "requirementsLoading": "Bu turu yapıp yapamayacağınız kontrol ediliyor…",
     "requires": {
       "transactionEntry": "Önce bir hesap ekleyin — bu tur bir işlemin nasıl kaydedildiğini anlatır.",
-      "securitiesExist": "Önce bir menkul kıymet ekleyin — bu tur menkul kıymet listenizden birini açar."
+      "securitiesExist": "Önce bir menkul kıymet ekleyin — bu tur menkul kıymet listenizden birini açar.",
+      "ownerView": "Önce kendi verilerinize dönün. Bu tur, başkası adına işlem yaparken kullanılamayan Kurallar’ı ve yapay zekâ inceleme kutusunu kapsar."
     },
     "start": "Başlat",
     "restart": "Tekrar al",
@@ -375,6 +376,53 @@
           "finish": {
             "title": "İşte etiket ayrımı bu kadar",
             "body": "Bu görünümü istediğiniz her yerde işlemleri scope:household gibi bir anahtar:değer çiftiyle etiketleyin ve bu turu istediğiniz zaman Ayarlar'dan tekrar açın."
+          }
+        }
+      }
+    },
+    "v1_17_0": {
+      "transactionRules": {
+        "title": "İşlem kuralları",
+        "steps": {
+          "welcome": {
+            "title": "İşlemlerinizi düzenleyen kurallar",
+            "body": "Bir işlem oluşturulduğunda veya içe aktarıldığında ve belirlediğiniz koşullara uyduğunda, bir kural kategorisini ya da alacaklısını ayarlayabilir, etiket ekleyebilir, açıklamasını yeniden yazabilir veya bir yapay zekâdan incelemesini isteyebilir. Bir kural hiçbir zaman tutarı, hesabı veya tarihi değiştirmez."
+          },
+          "tools": {
+            "title": "Kurallar Araçlar menüsünde",
+            "body": "**Kurallar**’ı bulmak için **Araçlar**’ı açın. Sonraki adım menüyü gösterir."
+          },
+          "rulesLink": {
+            "title": "Kurallar’ı açın",
+            "body": "**Kurallar**’ı seçin. Tüm kurallarınız burada listelenir ve yenisini buradan oluşturursunuz."
+          },
+          "list": {
+            "title": "Kurallarınız, sırayla",
+            "body": "Her satır bir kuraldır; kuralı açıp kapatan bir anahtar ile taşıma, çalıştırma, çoğaltma ve silme eylemleri vardır. Kurallar yukarıdan aşağıya doğru denetlenir, bu yüzden iki kural aynı şeyi değiştirdiğinde sıra önemlidir. Henüz kuralınız yoksa bu kart kuralın ne olduğunu anlatır."
+          },
+          "create": {
+            "title": "Kural oluşturun",
+            "body": "**Kural oluştur** düzenleyiciyi boş bir kuralla açar. **Kuralı kaydet**’i seçene kadar hiçbir şey kaydedilmez."
+          },
+          "when": {
+            "title": "Ne zaman: hangi işlemlere bakar",
+            "body": "Kuralın bir işleme oluşturulduğunda, içe aktarıldığında veya her iki durumda bakıp bakmayacağını seçin. **Diğer kuralları işlemeyi durdur**, bu kuralın uyduğu her işlem için altındaki kuralları atlar."
+          },
+          "if": {
+            "title": "Eğer: hangi işlemler uyar",
+            "body": "Koşulları alacaklı, açıklama, tutar ve kategori gibi alanlardan oluşturun. **Görsel** ve **İfade** anahtarı aynı koşulları kartlar olarak ya da tek satırlık metin olarak gösterir. Bir desende * herhangi bir metni ifade eder, '{name}' ise o noktadaki metni saklar; böylece bir eylem onu yeniden kullanabilir."
+          },
+          "then": {
+            "title": "O zaman: ne değişir",
+            "body": "Eylemler listelenen sırayla çalışır. Bir kural kategoriyi veya alacaklıyı ayarlayabilir, etiket ekleyip çıkarabilir, açıklamayı belirleyebilir ya da bir yapay zekâdan işlemi incelemesini isteyebilir. Tutar, hesap veya tarih için bir eylem yoktur."
+          },
+          "test": {
+            "title": "Test edin, çalıştırın, geri alın",
+            "body": "**Kuralı test et**, taslağı mevcut işlemlerinizde dener ve neyi değiştireceğini gösterir. Hiçbir şey değişmez. Kural kaydedildikten sonra **Mevcut işlemlerde çalıştır** bir önizleme gösterir ve kuralı elinizdekilere uygular; bu çalıştırmayı eylem geçmişinden geri alabilirsiniz."
+          },
+          "reviews": {
+            "title": "Yapay zekâ inceleme kutusu",
+            "body": "**Yapay zekâ incelemesi iste** eylemi olan bir kural işlemi değiştirmez, onu buraya koyar. Bir asistan değişiklik önerir ve siz onaylayana kadar hiçbir şey yazılmaz. Bir isteği reddedebilirsiniz de. Kutuyu **YZ** altında **Yapay zekâ inceleme kutusu** olarak bulursunuz."
           }
         }
       }

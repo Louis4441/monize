@@ -45,7 +45,8 @@
     "requirementsLoading": "Comprobando si puedes hacer este recorrido…",
     "requires": {
       "transactionEntry": "Añade primero una cuenta: este recorrido explica cómo registrar una transacción.",
-      "securitiesExist": "Añade primero un valor: este recorrido abre uno desde tu lista de valores."
+      "securitiesExist": "Añade primero un valor: este recorrido abre uno desde tu lista de valores.",
+      "ownerView": "Vuelve primero a tus propios datos. Este recorrido trata las Reglas y la bandeja de revisión de IA, que no están disponibles mientras actúas en nombre de otra persona."
     },
     "start": "Iniciar",
     "restart": "Repetir",
@@ -375,6 +376,53 @@
           "finish": {
             "title": "Eso es el desglose por etiqueta",
             "body": "Etiquete las transacciones con un par clave:valor como scope:household donde quiera esta vista, y vuelva a esta guía cuando quiera desde Ajustes."
+          }
+        }
+      }
+    },
+    "v1_17_0": {
+      "transactionRules": {
+        "title": "Reglas de transacciones",
+        "steps": {
+          "welcome": {
+            "title": "Las reglas ordenan tus transacciones",
+            "body": "Cuando se crea o se importa una transacción y cumple las condiciones que has fijado, una regla puede asignar su categoría o beneficiario, añadir etiquetas, reescribir su descripción o pedir a una IA que la revise. Una regla nunca cambia un importe, una cuenta ni una fecha."
+          },
+          "tools": {
+            "title": "Las reglas están en Herramientas",
+            "body": "Abre **Herramientas** para encontrar **Reglas**. El siguiente paso muestra el menú."
+          },
+          "rulesLink": {
+            "title": "Abre Reglas",
+            "body": "Elige **Reglas**. Muestra todas tus reglas y es desde donde creas una nueva."
+          },
+          "list": {
+            "title": "Tus reglas, en orden",
+            "body": "Cada fila es una regla, con un interruptor para activarla o desactivarla y acciones para moverla, ejecutarla, duplicarla o eliminarla. Las reglas se comprueban de arriba abajo, así que el orden importa cuando dos cambian lo mismo. Si todavía no tienes reglas, esta tarjeta explica qué es una regla."
+          },
+          "create": {
+            "title": "Crea una regla",
+            "body": "**Crear regla** abre el editor con una regla en blanco. No se guarda nada hasta que eliges **Guardar regla**."
+          },
+          "when": {
+            "title": "Cuándo: qué transacciones revisa",
+            "body": "Elige si la regla revisa una transacción cuando se **crea**, cuando se **importa** o en ambos casos. **Dejar de procesar otras reglas** omite las reglas siguientes para cualquier transacción que esta cumpla."
+          },
+          "if": {
+            "title": "Si: qué transacciones coinciden",
+            "body": "Arma las condiciones con campos como beneficiario, descripción, importe y categoría. El selector **Visual** y **Expresión** muestra las mismas condiciones como tarjetas o como una línea de texto. En un patrón, * representa cualquier texto y '{name}' conserva el texto de ese lugar para que una acción pueda reutilizarlo."
+          },
+          "then": {
+            "title": "Entonces: qué cambia",
+            "body": "Las acciones se ejecutan en el orden indicado. Una regla puede asignar la categoría o el beneficiario, añadir o quitar etiquetas, establecer la descripción o pedir a una IA que revise la transacción. No hay ninguna acción para un importe, una cuenta ni una fecha."
+          },
+          "test": {
+            "title": "Probar, ejecutar y deshacer",
+            "body": "**Probar regla** prueba el borrador con tus transacciones existentes y muestra qué cambiaría. No se cambia nada. Una vez guardada la regla, **Ejecutar en transacciones existentes** muestra una vista previa y la aplica a lo que ya tienes; esa ejecución se puede deshacer desde el historial de acciones."
+          },
+          "reviews": {
+            "title": "La bandeja de revisión de IA",
+            "body": "Una regla con **Pedir una revisión de IA** no cambia la transacción, sino que la deja aquí. Un asistente propone una edición y no se escribe nada hasta que la apruebas. También puedes descartar una solicitud. La encuentras en **AI** como **Bandeja de revisión de IA**."
           }
         }
       }

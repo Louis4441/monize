@@ -5,6 +5,7 @@ import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { RuleConditionGroup, type RuleTreeEnv } from '@/components/rules/RuleConditionGroup';
 import { RuleExpressionEditor } from '@/components/rules/RuleExpressionEditor';
 import { RuleSection } from '@/components/rules/RuleSection';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 import type { RuleExpressionState } from '@/components/rules/use-rule-expression';
 import { SEGMENTED_GROUP_CLASS, segmentClass } from '@/components/ui/segmented-control';
 import type { EntityIndex } from '@/lib/rule-cel';
@@ -30,7 +31,11 @@ export function RuleIfSection({ expression, env, index, conditionCodes }: RuleIf
   const blocked = mode === 'expression' && error !== null;
 
   return (
-    <RuleSection title={t('sections.if')} description={t('if.description')}>
+    <RuleSection
+      title={t('sections.if')}
+      description={t('if.description')}
+      anchor={tourAnchor(TOUR_ANCHORS.ruleEditorIf)}
+    >
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div role="group" aria-label={t('expression.modeLabel')} className={SEGMENTED_GROUP_CLASS}>
           <button

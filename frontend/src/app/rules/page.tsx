@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 import { CreateRuleLink, RulesManager } from '@/components/rules/RulesManager';
 
 export default function RulesPage() {
@@ -23,7 +24,7 @@ function RulesContent() {
         <PageHeader
           title={t('page.title')}
           subtitle={t('page.subtitle')}
-          actions={<CreateRuleLink label={t('page.createButton')} />}
+          actions={<CreateRuleLink label={t('page.createButton')} anchor={tourAnchor(TOUR_ANCHORS.rulesCreateButton)} />}
         />
         <RulesManager />
       </main>

@@ -46,11 +46,17 @@ export type TourPlacement = 'top' | 'bottom' | 'left' | 'right' | 'auto';
  *   different questions of the same list -- "is there something to record
  *   against" and "is there a Details page to open" -- so tightening either one
  *   later must not silently move the other.
+ * - `ownerView` the reader is looking at their own data, not acting as a
+ *   delegate. The Rules entry in Tools and the AI review inbox are owner-only
+ *   (the header hides the one and the inbox's layout redirects away from the
+ *   other), so a step pointing at either has nothing to show a delegate.
+ *   Answered from the session, never from the network, so it cannot fail.
  */
 export type TourRequirement =
   | 'transactionEntry'
   | 'securitiesExist'
-  | 'accountsExist';
+  | 'accountsExist'
+  | 'ownerView';
 
 export interface TourStep {
   /** i18n leaf: tours.<i18nPrefix>.steps.<id>.{title,body}. */

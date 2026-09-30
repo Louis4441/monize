@@ -11,6 +11,7 @@ vi.mock('@/lib/investments', () => ({
 }));
 
 import { resolveTourRequirements, isTourOfferable } from './requirements';
+import { useAuthStore } from '@/store/authStore';
 import type { TourDefinition } from './types';
 
 function tour(overrides: Partial<TourDefinition> = {}): TourDefinition {
@@ -25,6 +26,7 @@ function tour(overrides: Partial<TourDefinition> = {}): TourDefinition {
 
 describe('resolveTourRequirements', () => {
   beforeEach(() => {
+    useAuthStore.setState({ actingAsUserId: null });
     getAllAccounts.mockReset().mockResolvedValue([]);
     getSecurities.mockReset().mockResolvedValue([]);
   });
@@ -37,6 +39,15 @@ describe('resolveTourRequirements', () => {
       transactionEntry: true,
       accountsExist: true,
       securitiesExist: true,
+      ownerView: true,
+    });
+  });
+
+  it('reports a delegate view as not the owner', async () => {
+    useAuthStore.setState({ actingAsUserId: 'owner-1' });
+
+    await expect(resolveTourRequirements()).resolves.toMatchObject({
+      ownerView: false,
     });
   });
 
@@ -48,6 +59,7 @@ describe('resolveTourRequirements', () => {
       transactionEntry: true,
       accountsExist: true,
       securitiesExist: false,
+      ownerView: true,
     });
   });
 
@@ -121,6 +133,7 @@ describe('resolveTourRequirements', () => {
       transactionEntry: true,
       accountsExist: true,
       securitiesExist: false,
+      ownerView: true,
     });
   });
 
@@ -147,6 +160,7 @@ describe('isTourOfferable', () => {
         transactionEntry: true,
         accountsExist: true,
         securitiesExist: true,
+        ownerView: true,
       }),
     ).toBe(true);
   });
@@ -157,6 +171,7 @@ describe('isTourOfferable', () => {
         transactionEntry: true,
         accountsExist: true,
         securitiesExist: false,
+        ownerView: true,
       }),
     ).toBe(false);
   });
@@ -174,7 +189,26 @@ describe('isTourOfferable', () => {
         transactionEntry: false,
         accountsExist: false,
         securitiesExist: true,
+        ownerView: true,
       }),
     ).toBe(false);
+  });
+
+  it('hides an owner-only tour from a delegate view', () => {
+    const requirements = {
+      transactionEntry: true,
+      accountsExist: true,
+      securitiesExist: true,
+      ownerView: false,
+    };
+    expect(
+      isTourOfferable(tour({ requiresData: 'ownerView' }), requirements),
+    ).toBe(false);
+    expect(
+      isTourOfferable(tour({ requiresData: 'ownerView' }), {
+        ...requirements,
+        ownerView: true,
+      }),
+    ).toBe(true);
   });
 });

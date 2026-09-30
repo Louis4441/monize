@@ -45,7 +45,8 @@
     "requirementsLoading": "Verifica se puoi seguire questo tour…",
     "requires": {
       "transactionEntry": "Aggiungi prima un conto: questo tour mostra come registrare una transazione.",
-      "securitiesExist": "Aggiungi prima un titolo: questo tour ne apre uno dal tuo elenco titoli."
+      "securitiesExist": "Aggiungi prima un titolo: questo tour ne apre uno dal tuo elenco titoli.",
+      "ownerView": "Torna prima ai tuoi dati. Questo percorso tratta le Regole e la posta di revisione IA, che non sono disponibili mentre agisci per conto di qualcun altro."
     },
     "start": "Avvia",
     "restart": "Rivedi",
@@ -375,6 +376,53 @@
           "finish": {
             "title": "Ecco la suddivisione per tag",
             "body": "Assegna alle transazioni una coppia chiave:valore come scope:household ovunque desideri questa vista, e rivedi questo tour in qualsiasi momento da Impostazioni."
+          }
+        }
+      }
+    },
+    "v1_17_0": {
+      "transactionRules": {
+        "title": "Regole per le transazioni",
+        "steps": {
+          "welcome": {
+            "title": "Regole che mettono in ordine le transazioni",
+            "body": "Quando una transazione viene creata o importata e soddisfa le condizioni che hai impostato, una regola può assegnarle la categoria o il beneficiario, aggiungere etichette, riscriverne la descrizione o chiedere a un’IA di rivederla. Una regola non modifica mai un importo, un conto o una data."
+          },
+          "tools": {
+            "title": "Le regole sono in Strumenti",
+            "body": "Apri **Strumenti** per trovare **Regole**. Il passo successivo mostra il menu."
+          },
+          "rulesLink": {
+            "title": "Apri Regole",
+            "body": "Scegli **Regole**. Elenca tutte le tue regole ed è da qui che ne crei una nuova."
+          },
+          "list": {
+            "title": "Le tue regole, in ordine",
+            "body": "Ogni riga è una regola, con un interruttore per attivarla o disattivarla e azioni per spostarla, eseguirla, duplicarla o eliminarla. Le regole vengono controllate dall’alto verso il basso, quindi l’ordine conta quando due regole cambiano la stessa cosa. Se non hai ancora regole, questa scheda spiega cos’è una regola."
+          },
+          "create": {
+            "title": "Crea una regola",
+            "body": "**Crea regola** apre l’editor con una regola vuota. Non viene salvato nulla finché non scegli **Salva regola**."
+          },
+          "when": {
+            "title": "Quando: quali transazioni esamina",
+            "body": "Scegli se la regola esamina una transazione quando viene **creata**, quando viene **importata** o in entrambi i casi. **Interrompi l’elaborazione delle altre regole** salta le regole successive per ogni transazione che questa regola riconosce."
+          },
+          "if": {
+            "title": "Se: quali transazioni corrispondono",
+            "body": "Costruisci le condizioni con campi come beneficiario, descrizione, importo e categoria. Il selettore **Visuale** e **Espressione** mostra le stesse condizioni come schede o come una riga di testo. In un pattern, * sta per qualsiasi testo e '{name}' conserva il testo in quel punto perché un’azione possa riutilizzarlo."
+          },
+          "then": {
+            "title": "Allora: cosa cambia",
+            "body": "Le azioni vengono eseguite nell’ordine indicato. Una regola può impostare la categoria o il beneficiario, aggiungere o rimuovere etichette, impostare la descrizione o chiedere a un’IA di rivedere la transazione. Non esiste alcuna azione per un importo, un conto o una data."
+          },
+          "test": {
+            "title": "Prova, esegui e annulla",
+            "body": "**Prova la regola** prova la bozza sulle tue transazioni esistenti e mostra cosa cambierebbe. Non viene modificato nulla. Dopo il salvataggio, **Esegui sulle transazioni esistenti** mostra un’anteprima e applica la regola a ciò che hai già, e puoi annullare quell’esecuzione dalla cronologia delle azioni."
+          },
+          "reviews": {
+            "title": "La posta di revisione IA",
+            "body": "Una regola con **Richiedi una revisione dell’IA** non modifica la transazione, ma la mette qui. Un assistente propone una modifica e non viene scritto nulla finché non la approvi. Puoi anche scartare una richiesta. La trovi sotto **AI** come **Posta di revisione IA**."
           }
         }
       }
