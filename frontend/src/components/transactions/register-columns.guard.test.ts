@@ -7,7 +7,9 @@ import {
   REGISTER_DESCRIPTION_CELL_FLEX,
   REGISTER_PAYEE_CELL_FLOOR,
   REGISTER_PAYEE_NAME_CAP,
+  REGISTER_PAYEE_PRIORITY_SHARE,
   registerColumnClass,
+  registerPayeeLayout,
   type RegisterColumnId,
 } from './register-columns';
 
@@ -212,29 +214,41 @@ describe('the register column contract', () => {
 
   it('lets the payee outrank Description for width', () => {
     // The payee cap is never a fixed pixel figure -- fixed is what kept the
-    // longest payees truncated at 280px however wide the register grew. Both
-    // halves scale with the register in cqw: a conservative share with a px
-    // floor while nothing can yield, and a wider share once Description is on
-    // screen to yield -- still a bound, because a 255-char payee under
-    // max-w-none would overflow the table and scroll Status out from behind
-    // the sticky Actions. The tier threshold must repeat the low tier's
-    // figure as a literal (Tailwind's scanner only sees complete class
-    // names), so this holds the two copies equal.
-    const shape = REGISTER_PAYEE_NAME_CAP.match(
-      /^sm:max-w-\[max\((\d+)px,(\d+)cqw\)\] @min-\[(\d+)px\]:max-w-\[(\d+)cqw\]$/,
-    );
-    expect(shape, 'a scaling cap with a px floor, widened at a container width').toBeTruthy();
-    const [, floorPx, baseShare, thresholdPx, wideShare] = shape!.map(Number);
-    expect(thresholdPx, 'the cap widens exactly where Description appears').toBe(
-      PRIORITY_MIN_WIDTH_PX.low,
-    );
+    // longest payees truncated at 280px however wide the register grew. It
+    // scales with the register in cqw, with a px floor.
+    const shape = REGISTER_PAYEE_NAME_CAP.match(/^sm:max-w-\[max\((\d+)px,(\d+)cqw\)\]$/);
+    expect(shape, 'a scaling cap with a px floor').toBeTruthy();
+    const [, floorPx] = shape!.map(Number);
     expect(floorPx, 'no register width renders less payee than the old fixed cap did')
       .toBeGreaterThanOrEqual(280);
-    expect(wideShare, 'with Description there to yield, the payee gets more').toBeGreaterThan(
-      baseShare,
+
+    // Description's `w-full` takes every pixel above the other columns'
+    // min-content, so once it is on screen the single-line payee only keeps
+    // what its own min-content claims. The priority share is that claim: the
+    // name's full width (`w-max`) up to everything but a reserve for the rest
+    // of the row, never less than a share. It switches on exactly where
+    // Description appears (the literal must repeat the low tier, since
+    // Tailwind's scanner only sees complete class names). Its minimum sits
+    // above the floor's share or it adds nothing, and below a quarter of the
+    // register, because Description can only yield down to its padding and a
+    // larger claim at 1536px overflows the table and hides Amount again; the
+    // reserve is what keeps the growing part inside the register.
+    const priority = REGISTER_PAYEE_PRIORITY_SHARE.match(
+      /^@min-\[(\d+)px\]:w-max @min-\[(\d+)px\]:max-w-\[max\((\d+)cqw,calc\(100cqw_-_(\d+)px\)\)\]$/,
     );
-    expect(wideShare, 'and still a bound, so a pathological payee cannot hide Status')
-      .toBeLessThan(100);
+    expect(priority, 'full width up to what the row leaves, from a container width').toBeTruthy();
+    const [, widthAt, capAt, share, reservePx] = priority!.map(Number);
+    expect(widthAt, 'the claim starts exactly where Description appears').toBe(
+      PRIORITY_MIN_WIDTH_PX.low,
+    );
+    expect(capAt, 'and is bounded from the same width').toBe(PRIORITY_MIN_WIDTH_PX.low);
+    const floorShare = Number(REGISTER_PAYEE_CELL_FLOOR.match(/(\d+)cqw/)![1]);
+    expect(share, 'the claim gives the payee more than its floor').toBeGreaterThan(floorShare);
+    expect(share, 'and leaves the other columns their room').toBeLessThan(25);
+    expect(
+      PRIORITY_MIN_WIDTH_PX.low - reservePx,
+      'at the tier itself the reserve alone would leave the payee less than the minimum share',
+    ).toBeLessThan((PRIORITY_MIN_WIDTH_PX.low * share) / 100);
 
     const row = withoutComments(
       REGISTER_SOURCES['/src/components/transactions/TransactionRow.tsx'],
@@ -259,6 +273,52 @@ describe('the register column contract', () => {
         'never a hand-written sm:max-w-[...] -- a fixed cap is what kept the ' +
         'longest payee from rendering while Description held the slack.',
     ).toEqual([]);
+  });
+
+  it('lets a long payee wrap or ellipsize, never widen the table', () => {
+    // A nowrap `truncate` name counts its full width (up to the 35cqw cap)
+    // in the column's min-content, so with the Account column showing the
+    // table outgrew its container and Amount scrolled out from behind the
+    // sticky Actions column (issue #1470). Normal wraps: `wrap-anywhere`, not
+    // `break-words`, is what lowers the min-content. Compact and Dense keep
+    // one line inside `minmax(0, max-content)` tracks, whose min-content is 0.
+    const normal = registerPayeeLayout('normal');
+    expect(normal.name.split(' ')).toContain('sm:wrap-anywhere');
+    expect(normal.name.split(' ')).not.toContain('truncate');
+    for (const density of ['compact', 'dense'] as const) {
+      const layout = registerPayeeLayout(density);
+      expect(layout.name).toContain('truncate');
+      expect(layout.container.split(' ')).toContain('sm:grid');
+      expect(layout.container).toContain('sm:auto-cols-[minmax(0,max-content)]');
+      // From the low tier the payee outranks Description instead: a flex row
+      // and a name whose min-content claims its width up to the share.
+      expect(layout.container).toContain(`@min-[${PRIORITY_MIN_WIDTH_PX.low}px]:flex`);
+      expect(layout.name).toContain(REGISTER_PAYEE_PRIORITY_SHARE);
+    }
+    // Normal wraps the name inside whatever width the column gets.
+    expect(normal.name).not.toContain(REGISTER_PAYEE_PRIORITY_SHARE);
+
+    // Below `sm` (phones) every density keeps the original single-line
+    // payee: a plain `truncate` in a flex row, whose min-content holds the
+    // cell open to its phone cap and lets the table scroll to Balance. A
+    // phone payee allowed to shrink to nothing was unreadable at Compact and
+    // Dense. So nothing that lowers the min-content may apply unprefixed.
+    expect(normal.name).toContain('max-sm:truncate');
+    expect(normal.name).not.toMatch(/(^|\s)wrap-anywhere/);
+    for (const density of ['normal', 'compact', 'dense'] as const) {
+      const layout = registerPayeeLayout(density);
+      expect(layout.container.split(' ')).toContain('flex');
+      expect(layout.container).not.toMatch(/(^|\s)(grid|grid-flow-col|auto-cols-\S+)(\s|$)/);
+    }
+
+    // The row takes both halves from the helper, so a hand-written
+    // `truncate` beside the cap cannot quietly come back.
+    const row = withoutComments(
+      REGISTER_SOURCES['/src/components/transactions/TransactionRow.tsx'],
+    );
+    expect(row).toContain('registerPayeeLayout(density)');
+    expect(row).not.toMatch(/truncate \$\{REGISTER_PAYEE_NAME_CAP\}/);
+    expect(row.match(/\$\{payeeLayout\.name\} \$\{REGISTER_PAYEE_NAME_CAP\}/g) ?? []).toHaveLength(2);
   });
 
   it('floors the payee column so Description cannot take what it needs', () => {

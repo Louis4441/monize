@@ -3,6 +3,7 @@ import { fireEvent, screen } from '@testing-library/react';
 import { render } from '@/test/render';
 import { TransactionRow, type TransactionRowProps } from './TransactionRow';
 import { TransactionStatus, type Transaction } from '@/types/transaction';
+import { REGISTER_PAYEE_PRIORITY_SHARE } from './register-columns';
 
 function makeTx(overrides: Partial<Transaction> = {}): Transaction {
   return {
@@ -1075,6 +1076,45 @@ describe('TransactionRow payee brand icon', () => {
     const button = screen.getByText('Coffee Co');
     expect(button.tagName).toBe('BUTTON');
     expect(button.textContent).toBe('Coffee Co');
+  });
+});
+
+describe('TransactionRow long payee names', () => {
+  // A nowrap `truncate` name counts its full width in the column's
+  // min-content, so with the Account column showing it pushed Amount and
+  // Balance behind the sticky Actions column (issue #1470). Normal now wraps
+  // the name; Compact and Dense ellipsize it inside a grid that does not hold
+  // the column open. jsdom does no layout, so what is checkable here is that
+  // each density's classes reach both payee renderings (the filter button and
+  // the plain name).
+  const renderings = [
+    ['the payee button', { onPayeeClick: vi.fn() }],
+    ['the plain payee name', {}],
+  ] as const;
+
+  it.each(renderings)('wraps %s onto more lines at normal density', (_label, props) => {
+    renderRow({ ...props, density: 'normal' });
+    const name = screen.getByText('Coffee Co');
+    expect(name.className).toContain('sm:wrap-anywhere');
+    // Phones keep the original single-line payee.
+    expect(name.className.split(' ')).not.toContain('truncate');
+    expect(name.className).toContain('max-sm:truncate');
+  });
+
+  it.each(
+    (['compact', 'dense'] as const).flatMap((density) =>
+      renderings.map(([label, props]) => [density, label, props] as const),
+    ),
+  )('ellipsizes at %s density on %s without holding the column open', (density, _label, props) => {
+    renderRow({ ...props, density });
+    const name = screen.getByText('Coffee Co');
+    expect(name.className).toContain('truncate');
+    expect(name.className).not.toContain('wrap-anywhere');
+    expect(name.parentElement!.className).toContain('auto-cols-[minmax(0,max-content)]');
+    // ...except from the tier where Description appears, where the payee
+    // holds its width before Description takes the rest.
+    expect(name.className).toContain(REGISTER_PAYEE_PRIORITY_SHARE);
+    expect(name.parentElement!.className).toContain('@min-[1536px]:flex');
   });
 });
 

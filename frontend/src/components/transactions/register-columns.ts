@@ -57,12 +57,17 @@
  *   itself, never scroll a higher-ranked one out of view; and once even a
  *   squeezed Description is not worth having, the low tier removes it and
  *   Ref # together.
- * - **Payee outranks Description for width.** Whenever Description is on
- *   screen the payee name is uncapped (`REGISTER_PAYEE_NAME_CAP`): the
- *   longest payee renders in full and Description gives the width back.
- *   The cap survives only below the low tier, where there is no Description
- *   to yield and an uncapped payee would push Amount and Balance into the
- *   horizontal scroll instead.
+ * - **Payee outranks Description for width.** Description's `w-full` takes
+ *   every pixel above the other columns' min-content, so from the low tier
+ *   (where Description appears) the single-line payee name holds its column
+ *   open to its full width, up to what the rest of the row leaves
+ *   (`REGISTER_PAYEE_PRIORITY_SHARE`), and Description gets what is left.
+ *   Below the low tier there is no Description to yield, and the name is
+ *   bounded by `REGISTER_PAYEE_NAME_CAP`.
+ * - **A long payee wraps or ellipsizes; it never widens the table.** Normal
+ *   wraps the name onto more lines, Compact and Dense cut it to one line with
+ *   an ellipsis (`registerPayeeLayout`). Either way the payee cell stops
+ *   holding the column open, so Amount stays on screen at every density.
  * - **A yielding column takes the leftover, so the columns above it have to
  *   say what they need.** `w-full` does not mean "take what is spare": it is
  *   a claim on 100% of the table, and an auto-layout table settles that claim
@@ -202,17 +207,12 @@ export const REGISTER_DESCRIPTION_CELL_FLEX = 'w-full max-w-0';
  * the longest payees truncated at 280px however wide the register grew. It
  * scales with the register in `cqw` (1cqw = 1% of the @container's width):
  *
- * - Below the low tier nothing can yield, so the cap is conservative --
- *   `max(280px, 35cqw)`: never narrower than the old fixed cap, and growing
- *   with the register so a wider window always shows more of the payee.
- * - From the low tier -- whose 1536px this string must repeat because
- *   Tailwind's scanner only sees complete literal class names (the guard
- *   test holds the two figures equal) -- Description is on screen and yields,
- *   so the cap opens to `60cqw`: any realistic longest payee renders in full
- *   and Description hands the width back. It stays a bound rather than
- *   `max-w-none` because a payee at the column's 255-char maximum would
- *   otherwise overflow the table and scroll Status out from behind the
- *   sticky Actions -- the defect this whole contract exists to prevent.
+ * `max(280px, 35cqw)`: never narrower than the old fixed cap, and growing
+ * with the register so a wider window always shows more of the payee. From
+ * the low tier, Compact and Dense replace it with
+ * `REGISTER_PAYEE_PRIORITY_SHARE` (see `registerPayeeLayout`); at Normal the
+ * name wraps inside whatever width the column gets, so the cap never binds
+ * there.
  *
  * Below `sm` the phone caps on the payee *cell* apply instead (see the cell
  * in TransactionRow).
@@ -241,5 +241,86 @@ export const REGISTER_DESCRIPTION_CELL_FLEX = 'w-full max-w-0';
  */
 export const REGISTER_PAYEE_CELL_FLOOR = 'sm:min-w-[max(240px,16cqw)]';
 
-export const REGISTER_PAYEE_NAME_CAP =
-  'sm:max-w-[max(280px,35cqw)] @min-[1536px]:max-w-[60cqw]';
+export const REGISTER_PAYEE_NAME_CAP = 'sm:max-w-[max(280px,35cqw)]';
+
+/**
+ * How much of the register a single-line (Compact / Dense) payee name may
+ * hold open once Description is on screen: its full width, up to this bound.
+ * It has to be the name's min-content that carries it, because Description's
+ * `w-full` hands Description every pixel above the other columns' min-content
+ * -- with the name's min-content at 0, Payee sat at its floor while
+ * Description took hundreds of pixels beside a truncated payee.
+ *
+ * The bound is everything but a reserve of 1250px for the rest of the row
+ * (date, account, category, ref #, tags, attachments, amount, balance,
+ * status, actions and Description's padding), and never less than 20cqw. A
+ * plain share was not enough: one small enough to fit a 1536px register left
+ * a long payee cut off at 1920px while Description held 500px. It stays a
+ * bound because Description can only yield down to its padding, and a claim
+ * larger than what the other columns leave overflows the table and hides
+ * Amount behind the sticky Actions again (the old 60cqw cap overflowed a
+ * 1536px Compact register by ~110px). Measured in Chromium with the Account
+ * column showing a 38-character account name: no overflow at Compact or Dense
+ * from 1536px up, and Payee wider than Description until the payee renders
+ * in full.
+ *
+ * The 1536px repeats the low tier as a literal because Tailwind's scanner
+ * only sees complete class names; the guard test holds the two equal.
+ */
+export const REGISTER_PAYEE_PRIORITY_SHARE =
+  '@min-[1536px]:w-max @min-[1536px]:max-w-[max(20cqw,calc(100cqw_-_1250px))]';
+
+/**
+ * How a payee name too long for its column gives way, by density -- the
+ * classes for the payee cell's inner row (`container`) and the name itself
+ * (`name`).
+ *
+ * A single-line `truncate` name is not enough on its own: a table column is
+ * never narrower than its cells' min-content, and a nowrap name's min-content
+ * is its whole width up to `REGISTER_PAYEE_NAME_CAP` (35% of the
+ * register). With the Account column showing, that pushed the table past its
+ * container and Amount and Balance scrolled out from behind the sticky
+ * Actions column -- at every density, worst at Normal's wider padding. So:
+ *
+ * - **Normal** wraps the name onto as many lines as it needs. `wrap-anywhere`
+ *   (not `break-words`) is what lowers the min-content to a character, so
+ *   even a payee that is one unbroken token cannot hold the column open;
+ *   ordinary names still break at their spaces.
+ * - **Compact and Dense** keep one line and ellipsize, like the phone caps.
+ *   The row is a grid whose tracks are `minmax(0, max-content)`: under a
+ *   min-content constraint every track sizes to 0, so the cell stops forcing
+ *   the column wide, while the max-content size is still the full name, so
+ *   the column grows to show all of it whenever the register has the room.
+ *   (A `min-w-0` flex item does not do this: Chrome still counts its full
+ *   width in the flex container's min-content.)
+ *
+ *   From the low tier that same property works against the payee, because
+ *   Description's `w-full` takes everything above the min-content and the
+ *   payee sat at its floor. There the row turns back into a flex row and
+ *   the name is `w-max` under `REGISTER_PAYEE_PRIORITY_SHARE`, so its
+ *   min-content is its full width up to that bound: Payee is sized before
+ *   Description is.
+ *
+ * **Below `sm` (phones) none of this applies**: the name is a plain
+ * `truncate` in a flex row, as it was before, so its min-content holds the
+ * payee cell open to the phone cap (`max-w-[100px]` / `max-w-[160px]`) and
+ * the table scrolls to Balance. Letting the phone payee shrink to nothing
+ * made it unreadable at Compact and Dense, and horizontal scrolling is
+ * acceptable on a phone.
+ *
+ * Measured in Chromium with the Account column showing and a 60-character
+ * payee: the table overflowed a 1280px register by 259px at Normal and 115px
+ * at Compact before, 0px at both after.
+ */
+export function registerPayeeLayout(density: 'normal' | 'compact' | 'dense'): {
+  container: string;
+  name: string;
+} {
+  return density === 'normal'
+    ? { container: 'flex items-center gap-2 min-w-0', name: 'max-sm:truncate sm:wrap-anywhere' }
+    : {
+        container:
+          'flex items-center gap-2 min-w-0 sm:grid sm:grid-flow-col sm:auto-cols-[minmax(0,max-content)] @min-[1536px]:flex',
+        name: `truncate ${REGISTER_PAYEE_PRIORITY_SHARE}`,
+      };
+}
