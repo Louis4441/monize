@@ -53,13 +53,13 @@ export const NAV_LINKS: NavLinkDef[] = [
 ];
 
 export const TOOLS_LINKS: NavLinkDef[] = [
-  { href: '/categories', labelKey: 'categories' },
   { href: '/payees', labelKey: 'payees' },
+  { href: '/categories', labelKey: 'categories' },
+  { href: '/securities', labelKey: 'securities' },
+  { href: '/currencies', labelKey: 'currencies' },
   { href: '/institutions', labelKey: 'institutions' },
   { href: '/tags', labelKey: 'tags' },
   { href: '/rules', labelKey: 'rules' },
-  { href: '/securities', labelKey: 'securities' },
-  { href: '/currencies', labelKey: 'currencies' },
   { href: '/import', labelKey: 'import' },
 ];
 
