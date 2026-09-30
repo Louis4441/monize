@@ -3,6 +3,7 @@ import { fireEvent, screen } from '@testing-library/react';
 import { render } from '@/test/render';
 import { TransactionRow, type TransactionRowProps } from './TransactionRow';
 import { TransactionStatus, type Transaction } from '@/types/transaction';
+import { REGISTER_PAYEE_PRIORITY_SHARE } from './register-columns';
 
 function makeTx(overrides: Partial<Transaction> = {}): Transaction {
   return {
@@ -1117,6 +1118,10 @@ describe('TransactionRow long payee names', () => {
     expect(name.className).toContain('truncate');
     expect(name.className).not.toContain('wrap-anywhere');
     expect(name.parentElement!.className).toContain('auto-cols-[minmax(0,max-content)]');
+    // ...except from the tier where Description appears, where the payee
+    // holds its width before Description takes the rest.
+    expect(name.className).toContain(REGISTER_PAYEE_PRIORITY_SHARE);
+    expect(name.parentElement!.className).toContain('@min-[1536px]:flex');
   });
 });
 
