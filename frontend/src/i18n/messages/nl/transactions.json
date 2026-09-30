@@ -169,7 +169,6 @@
     },
     "row": {
       "viewPayeeTitle": "Details van {name} bekijken",
-      "ref": "Ref: {number}",
       "investmentLabel": "Belegging",
       "linkedInvestmentTitle": "Bekijk in Beleggingen",
       "linkedInvestmentBadgeTitle": "Deze transactie is gekoppeld aan een beleggingstransactie",

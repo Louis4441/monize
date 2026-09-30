@@ -169,7 +169,6 @@
     },
     "row": {
       "viewPayeeTitle": "Lihat detail {name}",
-      "ref": "Ref: {number}",
       "investmentLabel": "Investasi",
       "linkedInvestmentTitle": "Lihat di Investasi",
       "linkedInvestmentBadgeTitle": "Transaksi ini ditautkan ke transaksi investasi",

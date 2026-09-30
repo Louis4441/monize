@@ -169,7 +169,6 @@
     },
     "row": {
       "viewPayeeTitle": "{name} ayrıntılarını görüntüle",
-      "ref": "Ref: {number}",
       "investmentLabel": "Yatırım",
       "linkedInvestmentTitle": "Yatırımlarda Görüntüle",
       "linkedInvestmentBadgeTitle": "Bu işlem bir yatırım işlemiyle bağlantılıdır",

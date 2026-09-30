@@ -169,7 +169,6 @@
     },
     "row": {
       "viewPayeeTitle": "檢視 {name} 的詳細資料",
-      "ref": "參考：{number}",
       "investmentLabel": "投資",
       "linkedInvestmentTitle": "在投資中查看",
       "linkedInvestmentBadgeTitle": "此交易已連結至一筆投資交易",

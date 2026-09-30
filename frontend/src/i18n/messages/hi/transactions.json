@@ -169,7 +169,6 @@
     },
     "row": {
       "viewPayeeTitle": "{name} का विवरण देखें",
-      "ref": "संदर्भ: {number}",
       "investmentLabel": "निवेश",
       "linkedInvestmentTitle": "निवेश में देखें",
       "linkedInvestmentBadgeTitle": "यह लेनदेन एक निवेश लेनदेन से जुड़ा हुआ है",
