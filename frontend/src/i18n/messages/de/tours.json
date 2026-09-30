@@ -45,7 +45,8 @@
     "requirementsLoading": "Es wird geprüft, ob Sie diese Tour starten können …",
     "requires": {
       "transactionEntry": "Legen Sie zuerst ein Konto an — diese Tour führt durch das Erfassen einer Transaktion.",
-      "securitiesExist": "Legen Sie zuerst ein Wertpapier an — diese Tour öffnet eines aus Ihrer Wertpapierliste."
+      "securitiesExist": "Legen Sie zuerst ein Wertpapier an — diese Tour öffnet eines aus Ihrer Wertpapierliste.",
+      "ownerView": "Wechseln Sie zuerst zu Ihren eigenen Daten zurück. Diese Führung behandelt Regeln und den KI-Prüfungseingang, die nicht verfügbar sind, solange Sie für jemand anderen handeln."
     },
     "start": "Starten",
     "restart": "Wiederholen",
@@ -375,6 +376,53 @@
           "finish": {
             "title": "Das ist die Tag-Aufschlüsselung",
             "body": "Versehen Sie Buchungen überall dort, wo Sie diese Ansicht möchten, mit einem Schlüssel:Wert-Paar wie scope:household, und rufen Sie diese Tour jederzeit erneut aus den Einstellungen auf."
+          }
+        }
+      }
+    },
+    "v1_17_0": {
+      "transactionRules": {
+        "title": "Transaktionsregeln",
+        "steps": {
+          "welcome": {
+            "title": "Regeln räumen Ihre Transaktionen auf",
+            "body": "Wird eine Transaktion erstellt oder importiert und erfüllt sie Ihre Bedingungen, kann eine Regel ihre Kategorie oder den Zahlungsempfänger setzen, Etiketten hinzufügen, die Beschreibung umschreiben oder eine KI um eine Prüfung bitten. Eine Regel ändert nie einen Betrag, ein Konto oder ein Datum."
+          },
+          "tools": {
+            "title": "Regeln finden Sie unter Tools",
+            "body": "Öffnen Sie **Tools**, um **Regeln** zu finden. Der nächste Schritt zeigt das Menü."
+          },
+          "rulesLink": {
+            "title": "Regeln öffnen",
+            "body": "Wählen Sie **Regeln**. Dort sehen Sie alle Ihre Regeln und legen neue an."
+          },
+          "list": {
+            "title": "Ihre Regeln, der Reihe nach",
+            "body": "Jede Zeile ist eine Regel, mit einem Schalter zum Ein- und Ausschalten und Aktionen zum Verschieben, Ausführen, Duplizieren und Löschen. Die Regeln werden von oben nach unten geprüft, die Reihenfolge zählt also, wenn zwei dasselbe ändern. Ohne Regeln erklärt diese Karte, was eine Regel ist."
+          },
+          "create": {
+            "title": "Regel erstellen",
+            "body": "**Regel erstellen** öffnet den Editor mit einer leeren Regel. Gespeichert wird erst, wenn Sie **Regel speichern** wählen."
+          },
+          "when": {
+            "title": "Wann: welche Transaktionen geprüft werden",
+            "body": "Legen Sie fest, ob die Regel eine Transaktion prüft, wenn sie **erstellt** wird, wenn sie **importiert** wird oder in beiden Fällen. **Weitere Regeln nicht mehr verarbeiten** überspringt die Regeln darunter für jede Transaktion, auf die diese Regel zutrifft."
+          },
+          "if": {
+            "title": "Wenn: welche Transaktionen passen",
+            "body": "Bauen Sie die Bedingungen aus Feldern wie Zahlungsempfänger, Beschreibung, Betrag und Kategorie. Der Schalter **Visuell** und **Ausdruck** zeigt dieselben Bedingungen als Karten oder als eine Textzeile. In einem Muster steht * für beliebigen Text und '{name}' behält den Text an dieser Stelle, damit eine Aktion ihn wiederverwenden kann."
+          },
+          "then": {
+            "title": "Dann: was geändert wird",
+            "body": "Aktionen laufen in der angegebenen Reihenfolge. Eine Regel kann Kategorie oder Zahlungsempfänger setzen, Etiketten hinzufügen oder entfernen, die Beschreibung setzen oder eine KI bitten, die Transaktion zu prüfen. Eine Aktion für Betrag, Konto oder Datum gibt es nicht."
+          },
+          "test": {
+            "title": "Testen, ausführen, rückgängig machen",
+            "body": "**Regel testen** probiert den Entwurf an Ihren bestehenden Transaktionen aus und zeigt, was sich ändern würde. Es wird nichts geändert. Ist die Regel gespeichert, zeigt **Auf bestehende Buchungen anwenden** eine Vorschau und wendet sie auf Vorhandenes an. Einen solchen Lauf können Sie im Aktionsverlauf rückgängig machen."
+          },
+          "reviews": {
+            "title": "Der KI-Prüfungseingang",
+            "body": "Eine Regel mit der Aktion **KI-Prüfung anfordern** ändert die Transaktion nicht, sondern legt sie hier ab. Ein Assistent schlägt eine Änderung vor, und nichts wird geschrieben, bevor Sie zustimmen. Sie können eine Anfrage auch verwerfen. Sie finden ihn im Menü **KI** als **KI-Prüfungseingang**."
           }
         }
       }

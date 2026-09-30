@@ -15,6 +15,7 @@ import { RunRuleDialog } from '@/components/rules/RunRuleDialog';
 import { RulesList, type RuleMoveDirection } from '@/components/rules/RulesList';
 import { useOnAiAction } from '@/hooks/useOnAiAction';
 import { useOnUndoRedo } from '@/hooks/useOnUndoRedo';
+import { TOUR_ANCHORS, tourAnchor, type TourAnchorId } from '@/lib/tours/anchors';
 import { getErrorCode, getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
 import { transactionRulesApi } from '@/lib/transaction-rules-api';
@@ -35,9 +36,16 @@ function isListChanged(error: unknown): boolean {
 
 export const NEW_RULE_HREF = '/rules/new';
 
-export function CreateRuleLink({ label }: { label: string }) {
+export function CreateRuleLink({
+  label,
+  anchor,
+}: {
+  label: string;
+  /** The `tourAnchor(...)` attribute a guided tour points at. */
+  anchor?: { 'data-tour-id': TourAnchorId };
+}) {
   return (
-    <Link href={NEW_RULE_HREF} className={buttonClassName('primary', 'md', 'w-full sm:w-auto')}>
+    <Link href={NEW_RULE_HREF} className={buttonClassName('primary', 'md', 'w-full sm:w-auto')} {...anchor}>
       {label}
     </Link>
   );
@@ -218,7 +226,9 @@ export function RulesManager() {
 
   return (
     <>
-      <Card className="overflow-hidden">{body}</Card>
+      <Card className="overflow-hidden" {...tourAnchor(TOUR_ANCHORS.rulesList)}>
+        {body}
+      </Card>
       {rules !== null && rules.length > 0 && (
         <div className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
           {t('page.totalCount', { count: rules.length })}

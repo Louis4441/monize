@@ -54,6 +54,7 @@ describe('GEM strategy release tour', () => {
       transactionEntry: false,
       accountsExist: false,
       securitiesExist: false,
+      ownerView: true,
     };
     expect(isTourOfferable(tour, nothing)).toBe(true);
     expect(isTourOfferable(tour, null)).toBe(true);

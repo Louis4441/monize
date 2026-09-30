@@ -68,6 +68,12 @@ const NAV_TOUR_ANCHORS: Record<string, { 'data-tour-id': string }> = {
   '/reports': tourAnchor(TOUR_ANCHORS.navReports),
 };
 
+// The Tools menu's own entries a tour points at, keyed by route. Same rule as
+// above: attached here and nowhere else.
+const TOOLS_TOUR_ANCHORS: Record<string, { 'data-tour-id': string }> = {
+  '/rules': tourAnchor(TOUR_ANCHORS.navRules),
+};
+
 export function AppHeader() {
   const t = useTranslations('navigation');
   const router = useRouter();
@@ -478,6 +484,7 @@ export function AppHeader() {
                               return (
                                 <button
                                   key={link.href}
+                                  {...TOOLS_TOUR_ANCHORS[link.href]}
                                   onClick={() => {
                                     router.push(link.href);
                                     setToolsOpen(false);

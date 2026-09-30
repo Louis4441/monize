@@ -10,6 +10,7 @@ import { RuleRunPreviewTable } from '@/components/rules/RuleRunPreviewTable';
 import { RuleSection } from '@/components/rules/RuleSection';
 import type { RuleOption } from '@/components/rules/use-rule-options';
 import { useRuleRunErrorMessage } from '@/components/rules/use-rule-run-error';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 import { createLogger } from '@/lib/logger';
 import { draftToPayload, type RuleDraft } from '@/lib/rule-draft';
 import { NAME_KEY, draftGaps } from '@/lib/rule-errors';
@@ -118,7 +119,7 @@ export function RuleTestPanel({ draft, accountOptions, blocked = false, loaded =
   }, [done, stale, onResult]);
 
   return (
-    <RuleSection title={t('title')} description={t('description')}>
+    <RuleSection title={t('title')} description={t('description')} anchor={tourAnchor(TOUR_ANCHORS.ruleEditorTest)}>
       <RuleRunFilterFields filters={filters} accountOptions={accountOptions} onChange={setFilters} />
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <Button

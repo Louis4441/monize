@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { RuleSection } from '@/components/rules/RuleSection';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import type { RuleTrigger } from '@/types/transaction-rule';
@@ -33,7 +34,11 @@ export function RuleWhenSection({
     onTriggersChange(checked ? [...triggers, trigger] : triggers.filter((x) => x !== trigger));
 
   return (
-    <RuleSection title={t('sections.when')} description={t('when.description')}>
+    <RuleSection
+      title={t('sections.when')}
+      description={t('when.description')}
+      anchor={tourAnchor(TOUR_ANCHORS.ruleEditorWhen)}
+    >
       <div className="space-y-2">
         {(['create', 'import'] as const).map((trigger) => {
           const checked = triggers.includes(trigger);

@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/Input';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import type { RuleLookups } from '@/hooks/useRuleLookups';
 import { getErrorMessage } from '@/lib/errors';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 import { createLogger } from '@/lib/logger';
 import { EntityIndex, buildCatalog } from '@/lib/rule-cel';
 import { scanCaptures } from '@/lib/rule-captures';
@@ -230,7 +231,11 @@ export function RuleEditorBody({ rule, lookups, onSaved, onReload }: RuleEditorB
 
         <RuleIfSection expression={expression} env={env} index={index} conditionCodes={conditionCodes} />
 
-        <RuleSection title={t('sections.then')} description={t('then.description')}>
+        <RuleSection
+          title={t('sections.then')}
+          description={t('then.description')}
+          anchor={tourAnchor(TOUR_ANCHORS.ruleEditorThen)}
+        >
           <div className="space-y-3">
             {draft.actions.length === 0 && (
               <p className="text-sm text-gray-500 dark:text-gray-400">{t('then.empty')}</p>

@@ -1,6 +1,7 @@
 import { accountsApi } from '@/lib/accounts';
 import { investmentsApi } from '@/lib/investments';
 import { hasAccountDetailView } from '@/lib/account-detail-views';
+import { useAuthStore } from '@/store/authStore';
 import type { Account } from '@/types/account';
 import type { TourDefinition, TourRequirement } from './types';
 
@@ -82,7 +83,13 @@ export async function resolveTourRequirements(): Promise<TourRequirementMap> {
       investmentsApi.getSecurities().then((securities) => securities.length > 0),
     ),
   ]);
-  return { ...accountRequirements, securitiesExist };
+  return {
+    ...accountRequirements,
+    securitiesExist,
+    // Read from the session at resolve time; a delegate view is a fact about
+    // who is signed in as whom, not something a lookup can fail to answer.
+    ownerView: !useAuthStore.getState().actingAsUserId,
+  };
 }
 
 /**
