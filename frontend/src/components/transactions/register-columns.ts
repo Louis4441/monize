@@ -301,6 +301,13 @@ export const REGISTER_PAYEE_PRIORITY_SHARE =
  *   min-content is its full width up to that bound: Payee is sized before
  *   Description is.
  *
+ * **Below `sm` (phones) none of this applies**: the name is a plain
+ * `truncate` in a flex row, as it was before, so its min-content holds the
+ * payee cell open to the phone cap (`max-w-[100px]` / `max-w-[160px]`) and
+ * the table scrolls to Balance. Letting the phone payee shrink to nothing
+ * made it unreadable at Compact and Dense, and horizontal scrolling is
+ * acceptable on a phone.
+ *
  * Measured in Chromium with the Account column showing and a 60-character
  * payee: the table overflowed a 1280px register by 259px at Normal and 115px
  * at Compact before, 0px at both after.
@@ -310,10 +317,10 @@ export function registerPayeeLayout(density: 'normal' | 'compact' | 'dense'): {
   name: string;
 } {
   return density === 'normal'
-    ? { container: 'flex items-center gap-2 min-w-0', name: 'wrap-anywhere' }
+    ? { container: 'flex items-center gap-2 min-w-0', name: 'max-sm:truncate sm:wrap-anywhere' }
     : {
         container:
-          'grid grid-flow-col auto-cols-[minmax(0,max-content)] items-center gap-2 @min-[1536px]:flex',
+          'flex items-center gap-2 min-w-0 sm:grid sm:grid-flow-col sm:auto-cols-[minmax(0,max-content)] @min-[1536px]:flex',
         name: `truncate ${REGISTER_PAYEE_PRIORITY_SHARE}`,
       };
 }

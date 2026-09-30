@@ -283,13 +283,13 @@ describe('the register column contract', () => {
     // `break-words`, is what lowers the min-content. Compact and Dense keep
     // one line inside `minmax(0, max-content)` tracks, whose min-content is 0.
     const normal = registerPayeeLayout('normal');
-    expect(normal.name).toContain('wrap-anywhere');
-    expect(normal.name).not.toContain('truncate');
+    expect(normal.name.split(' ')).toContain('sm:wrap-anywhere');
+    expect(normal.name.split(' ')).not.toContain('truncate');
     for (const density of ['compact', 'dense'] as const) {
       const layout = registerPayeeLayout(density);
       expect(layout.name).toContain('truncate');
-      expect(layout.container).toMatch(/\bgrid\b/);
-      expect(layout.container).toContain('auto-cols-[minmax(0,max-content)]');
+      expect(layout.container.split(' ')).toContain('sm:grid');
+      expect(layout.container).toContain('sm:auto-cols-[minmax(0,max-content)]');
       // From the low tier the payee outranks Description instead: a flex row
       // and a name whose min-content claims its width up to the share.
       expect(layout.container).toContain(`@min-[${PRIORITY_MIN_WIDTH_PX.low}px]:flex`);
@@ -297,6 +297,19 @@ describe('the register column contract', () => {
     }
     // Normal wraps the name inside whatever width the column gets.
     expect(normal.name).not.toContain(REGISTER_PAYEE_PRIORITY_SHARE);
+
+    // Below `sm` (phones) every density keeps the original single-line
+    // payee: a plain `truncate` in a flex row, whose min-content holds the
+    // cell open to its phone cap and lets the table scroll to Balance. A
+    // phone payee allowed to shrink to nothing was unreadable at Compact and
+    // Dense. So nothing that lowers the min-content may apply unprefixed.
+    expect(normal.name).toContain('max-sm:truncate');
+    expect(normal.name).not.toMatch(/(^|\s)wrap-anywhere/);
+    for (const density of ['normal', 'compact', 'dense'] as const) {
+      const layout = registerPayeeLayout(density);
+      expect(layout.container.split(' ')).toContain('flex');
+      expect(layout.container).not.toMatch(/(^|\s)(grid|grid-flow-col|auto-cols-\S+)(\s|$)/);
+    }
 
     // The row takes both halves from the helper, so a hand-written
     // `truncate` beside the cap cannot quietly come back.

@@ -1104,8 +1104,10 @@ describe('TransactionRow long payee names', () => {
   it.each(renderings)('wraps %s onto more lines at normal density', (_label, props) => {
     renderRow({ ...props, density: 'normal' });
     const name = screen.getByText('Coffee Co');
-    expect(name.className).toContain('wrap-anywhere');
-    expect(name.className).not.toContain('truncate');
+    expect(name.className).toContain('sm:wrap-anywhere');
+    // Phones keep the original single-line payee.
+    expect(name.className.split(' ')).not.toContain('truncate');
+    expect(name.className).toContain('max-sm:truncate');
   });
 
   it.each(
