@@ -147,7 +147,7 @@ describe('complete: names inside a reference', () => {
   });
 
   it('yields text that parses once the reference is complete', () => {
-    const text = pick('transaction.payeeId == payee("Ama|', 'Amazon (3)').replace('|', '');
+    const text = pick('transaction.payeeId == payee("Ama|', 'Amazon (3)').replaceAll('|', '');
     const result = parseCondition(text, INDEX);
     expect(result.ok).toBe(true);
   });

@@ -47,6 +47,10 @@ export interface ParsedGlob {
  * (so every pattern that never used captures reads exactly as before).
  */
 export function parseGlob(pattern: string): ParsedGlob {
+  // Rules arrive as JSON: refuse a non-string whose `length` would bound the loop.
+  if (typeof pattern !== "string") {
+    return { tokens: [], captureNames: [], malformed: [] };
+  }
   const tokens: GlobToken[] = [];
   const captureNames: string[] = [];
   const malformed: string[] = [];

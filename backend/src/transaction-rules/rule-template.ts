@@ -40,6 +40,10 @@ const isRefName = (body: string): boolean =>
   CAPTURE_NAME.test(body) || body === "payeeText";
 
 export function parseTemplate(template: string): ParsedTemplate {
+  // Rules arrive as JSON: refuse a non-string whose `length` would bound the loop.
+  if (typeof template !== "string") {
+    return { tokens: [], refs: [], malformed: [] };
+  }
   const tokens: TemplateToken[] = [];
   const refs: string[] = [];
   const malformed: string[] = [];
