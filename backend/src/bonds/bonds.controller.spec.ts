@@ -114,27 +114,56 @@ describe("BondsController", () => {
 
     it.each([
       [
-        new BondDataNotFoundError("No terms version stored"),
+        new BondDataNotFoundError(
+          "TERMS_NOT_FOUND",
+          { series: "TOS1029" },
+          "English log text",
+        ),
         NotFoundException,
-        /not available.*No terms version stored/,
+        "No terms version is stored for series TOS1029",
       ],
       [
-        new BondDataInconsistentError("TOS1030 vs TOS1029"),
+        new BondDataInconsistentError(
+          "TERMS_MISMATCH",
+          {
+            series: "TOS1029",
+            version: "1",
+            claimedSeries: "TOS1030",
+            claimedCurrency: "PLN",
+            storedSeries: "TOS1029",
+            storedCurrency: "EUR",
+          },
+          "English log text",
+        ),
         UnprocessableEntityException,
-        /contradicts itself.*TOS1030/,
+        "Terms version 1 of series TOS1029 describe TOS1030 in PLN, but the instrument is TOS1029 in EUR",
       ],
       [
-        new BondEngineError("Quantity must be a positive integer"),
+        new BondEngineError(
+          "QUANTITY_INVALID",
+          { quantity: "0" },
+          "English log text",
+        ),
         BadRequestException,
-        /not valid.*Quantity/,
+        "The quantity must be a positive whole number of bonds: 0",
+      ],
+      [
+        new BondEngineError(
+          "BENCHMARK_NOT_READ",
+          { series: "EDO1036", benchmarkId: "PL_NBP_REFERENCE" },
+          "English log text",
+        ),
+        BadRequestException,
+        "Series EDO1036 does not read the benchmark PL_NBP_REFERENCE",
       ],
     ])(
-      "maps %p to an HTTP error carrying the reason",
+      "maps %p to an HTTP error built from its code and params, never its message",
       async (error, type, message) => {
         valuation.valueSecurity.mockRejectedValue(error);
         const failure = controller.valuationOf(req, SECURITY, "2027-04-15");
         await expect(failure).rejects.toBeInstanceOf(type);
         await expect(failure).rejects.toThrow(message);
+        await expect(failure).rejects.not.toThrow("English log text");
       },
     );
 
@@ -172,7 +201,7 @@ describe("BondsController", () => {
 
     it("maps the data errors like the valuation does", async () => {
       valuation.scenariosOf.mockRejectedValue(
-        new BondDataInconsistentError("x"),
+        new BondDataInconsistentError("TERMS_MISMATCH", {}, "x"),
       );
       await expect(
         controller.scenariosOf(req, SECURITY, "PL_CPI_GUS_YOY", ["0"]),
@@ -191,7 +220,7 @@ describe("BondsController", () => {
 
     it("maps the data errors the same way", async () => {
       prices.recomputeSecurity.mockRejectedValue(
-        new BondDataNotFoundError("No instrument"),
+        new BondDataNotFoundError("INSTRUMENT_NOT_FOUND", {}, "No instrument"),
       );
       await expect(controller.recompute(req, SECURITY)).rejects.toBeInstanceOf(
         NotFoundException,

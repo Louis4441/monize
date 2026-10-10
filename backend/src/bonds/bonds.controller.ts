@@ -24,8 +24,11 @@ import { ParseOptionalCalendarDatePipe } from "../common/pipes/parse-calendar-da
 import { tr } from "../i18n/translate";
 import { BondCatalogService } from "./bond-catalog.service";
 import {
+  BondDataInconsistentCode,
   BondDataInconsistentError,
+  BondDataNotFoundCode,
   BondDataNotFoundError,
+  BondErrorParams,
 } from "./bond-errors";
 import { BondPriceRecompute, BondPriceService } from "./bond-price.service";
 import {
@@ -39,7 +42,7 @@ import {
   ParseBenchmarkIdPipe,
   ParseScenarioValuesPipe,
 } from "./bond-query.pipes";
-import { BondEngineError } from "./engine/bond-engine";
+import { BondEngineError, BondEngineErrorCode } from "./engine/bond-engine";
 
 /**
  * The bond catalog, a linked security's lots valued on a day, and the on-demand
@@ -159,39 +162,65 @@ export class BondsController {
     );
   }
 
-  /** The stored data is missing or contradicts itself, or the input is unusable. */
+  /**
+   * The stored data is missing or contradicts itself, or the input is unusable.
+   * Each error's `code` selects its own `errors.bonds.<code>` message and only
+   * its `params` are interpolated; the English `error.message` is for the logs
+   * and never reaches the client.
+   */
   private async mapBondErrors<T>(run: () => Promise<T>): Promise<T> {
     try {
       return await run();
     } catch (error) {
       if (error instanceof BondDataNotFoundError) {
-        throw new NotFoundException(
-          tr(
-            "errors.bonds.dataNotFound",
-            `The stored bond data needed for this valuation is not available: ${error.message}`,
-            { detail: error.message },
-          ),
-        );
+        throw new NotFoundException(bondErrorMessage(error));
       }
       if (error instanceof BondDataInconsistentError) {
-        throw new UnprocessableEntityException(
-          tr(
-            "errors.bonds.dataInconsistent",
-            `The stored bond data contradicts itself, so no valuation is given: ${error.message}`,
-            { detail: error.message },
-          ),
-        );
+        throw new UnprocessableEntityException(bondErrorMessage(error));
       }
       if (error instanceof BondEngineError) {
-        throw new BadRequestException(
-          tr(
-            "errors.bonds.invalidInput",
-            `The valuation request is not valid: ${error.message}`,
-            { detail: error.message },
-          ),
-        );
+        throw new BadRequestException(bondErrorMessage(error));
       }
       throw error;
     }
   }
+}
+
+type BondErrorCode =
+  BondEngineErrorCode | BondDataNotFoundCode | BondDataInconsistentCode;
+
+/** The English source of each message, with the same `{{ param }}` names as the catalogue. */
+const BOND_ERROR_FALLBACKS: Readonly<
+  Record<BondErrorCode, (p: BondErrorParams) => string>
+> = {
+  QUANTITY_INVALID: (p) =>
+    `The quantity must be a positive whole number of bonds: ${p.quantity}`,
+  DATE_INVALID: (p) =>
+    `The purchase date (${p.purchaseDate}) and the valuation date (${p.asOf}) must be valid YYYY-MM-DD dates`,
+  AS_OF_BEFORE_PURCHASE: (p) =>
+    `The valuation date ${p.asOf} is before the purchase date ${p.purchaseDate}`,
+  BENCHMARK_NOT_READ: (p) =>
+    `Series ${p.series} does not read the benchmark ${p.benchmarkId}`,
+  DECIMAL_INVALID: (p) =>
+    `A stored or supplied value is not a valid decimal: ${p.field} = ${p.value}`,
+  INSTRUMENT_NOT_FOUND: (p) =>
+    `No bond instrument is stored for ${p.country} ${p.issuer} ${p.series}`,
+  INSTRUMENT_ID_NOT_FOUND: (p) =>
+    `No bond instrument is stored with id ${p.id}`,
+  TERMS_NOT_FOUND: (p) => `No terms version is stored for series ${p.series}`,
+  TERMS_VERSION_NOT_FOUND: (p) =>
+    `Terms version ${p.version} is not stored for series ${p.series}`,
+  TERMS_MISMATCH: (p) =>
+    `Terms version ${p.version} of series ${p.series} describe ${p.claimedSeries} in ${p.claimedCurrency}, but the instrument is ${p.storedSeries} in ${p.storedCurrency}`,
+};
+
+function bondErrorMessage(error: {
+  code: BondErrorCode;
+  params: BondErrorParams;
+}): string {
+  return tr(
+    `errors.bonds.${error.code}`,
+    BOND_ERROR_FALLBACKS[error.code](error.params),
+    { ...error.params },
+  );
 }

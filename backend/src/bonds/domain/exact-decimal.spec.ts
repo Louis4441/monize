@@ -76,13 +76,11 @@ describe("ExactDecimal", () => {
       expect(ExactDecimal.of(1n, -2n).denominator).toBe(2n);
     });
 
-    it("compares and picks max and min", () => {
+    it("compares and picks max", () => {
       expect(d("1").cmp(d("2"))).toBe(-1);
       expect(d("2").cmp(d("1"))).toBe(1);
       expect(ExactDecimal.max(d("1"), d("2")).toFixed(0)).toBe("2");
       expect(ExactDecimal.max(d("3"), d("2")).toFixed(0)).toBe("3");
-      expect(ExactDecimal.min(d("1"), d("2")).toFixed(0)).toBe("1");
-      expect(ExactDecimal.min(d("3"), d("2")).toFixed(0)).toBe("2");
     });
   });
 

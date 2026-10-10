@@ -3,9 +3,12 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
-import { withSystemContext } from "@/common/db/with-context";
+import { withSystemContext, withUserContext } from "@/common/db/with-context";
 import { todayInTimezone } from "@/common/date-utils";
-import { FetchSyncService } from "@/common/jobs/fetch-sync.service";
+import {
+  FetchSyncJob,
+  FetchSyncService,
+} from "@/common/jobs/fetch-sync.service";
 import { ProviderHealthService } from "@/provider-health/provider-health.service";
 import { BenchmarkRefreshService } from "@/bonds/benchmark-refresh.service";
 import { BondCatalogService } from "@/bonds/bond-catalog.service";
@@ -18,6 +21,7 @@ import {
 import {
   cleanTables,
   createIntegrationModule,
+  createTestUserDirect,
 } from "../helpers/integration-setup";
 
 const fixture = (name: string) =>
@@ -47,18 +51,19 @@ describe("bond catalog and benchmark refresh (integration)", () => {
   let dataSource: DataSource;
   let catalog: BondCatalogService;
   let refresh: BenchmarkRefreshService;
+  let fetchSync: FetchSyncService;
+  let currencies: CurrenciesService;
 
   beforeAll(async () => {
     module = await createIntegrationModule([]);
     dataSource = module.get(DataSource);
-    catalog = new BondCatalogService(
-      dataSource,
-      new CurrenciesService(dataSource),
-    );
+    currencies = new CurrenciesService(dataSource);
+    fetchSync = new FetchSyncService(dataSource);
+    catalog = new BondCatalogService(dataSource, currencies);
     refresh = new BenchmarkRefreshService(
       dataSource,
       new ProviderHealthService(dataSource),
-      new FetchSyncService(dataSource),
+      fetchSync,
       catalog,
     );
   });
@@ -68,7 +73,11 @@ describe("bond catalog and benchmark refresh (integration)", () => {
   });
 
   beforeEach(async () => {
-    await cleanTables(dataSource, ["bond_instruments", "benchmark_series"]);
+    await cleanTables(dataSource, [
+      "bond_instruments",
+      "benchmark_series",
+      "fetch_sync",
+    ]);
     await dataSource.query(
       `INSERT INTO currencies (code, name, symbol, decimal_places, is_active)
        VALUES ('PLN', 'Zloty', 'z', 2, true)
@@ -189,6 +198,211 @@ describe("bond catalog and benchmark refresh (integration)", () => {
     );
     expect(rows).toEqual([{ v: "0.0350000000" }]);
     expect(await count("benchmark_values")).toBe(10);
+    expect(await coveredThrough("PL_CPI_GUS_YOY")).toBe("2026-08-01");
+  });
+
+  const coveredThrough = async (code: string): Promise<string | null> =>
+    (
+      await dataSource.query(
+        `SELECT TO_CHAR(covered_through, 'YYYY-MM-DD') AS c FROM benchmark_series WHERE code = $1`,
+        [code],
+      )
+    )[0].c;
+
+  it("never moves covered_through back when a later fetch covers less (a file without the newest month)", async () => {
+    await withSystemContext(() =>
+      refresh.refreshAll({ fetch: fakeFetch(fixture("gus-cpi.csv")) }),
+    );
+    expect(await coveredThrough("PL_CPI_GUS_YOY")).toBe("2026-08-01");
+
+    // The publisher's file now lacks the 2026-08 row: the adapter reports
+    // coverage through 2026-07-01, which must not undo what was known.
+    const older = Buffer.from(
+      fixture("gus-cpi.csv")
+        .toString("latin1")
+        .split("\n")
+        .filter((line) => !/;2026;8;/.test(line))
+        .join("\n"),
+      "latin1",
+    );
+    await withSystemContext(() =>
+      refresh.refreshAll({ fetch: fakeFetch(older) }),
+    );
+    expect(await coveredThrough("PL_CPI_GUS_YOY")).toBe("2026-08-01");
+    // And a newer fetch still moves it forward: the rule is "only forward".
+    await dataSource.query(
+      `UPDATE benchmark_series SET covered_through = '2026-07-01' WHERE code = 'PL_CPI_GUS_YOY'`,
+    );
+    await withSystemContext(() =>
+      refresh.refreshAll({ fetch: fakeFetch(fixture("gus-cpi.csv")) }),
+    );
+    expect(await coveredThrough("PL_CPI_GUS_YOY")).toBe("2026-08-01");
+  });
+
+  it("each NBP row records the document it came from", async () => {
+    await withSystemContext(() =>
+      refresh.refreshAll({ fetch: fakeFetch(fixture("gus-cpi.csv")) }),
+    );
+    const rows = await dataSource.query(
+      `SELECT TO_CHAR(observation_date, 'YYYY-MM-DD') AS d, source_url
+         FROM benchmark_values WHERE benchmark_code = 'PL_NBP_REFERENCE' ORDER BY observation_date`,
+    );
+    // The fixture's current table repeats the archive's newest date, and the
+    // current table wins for it.
+    expect(rows[rows.length - 1]).toEqual({
+      d: "2026-03-05",
+      source_url: NBP_CURRENT_URL,
+    });
+    expect(rows[0].source_url).toBe(NBP_ARCHIVE_URL);
+  });
+
+  describe("the boot warm-up (onlyStale)", () => {
+    const counting = (gus: Buffer) => {
+      const calls: string[] = [];
+      const inner = fakeFetch(gus);
+      const wrapped = (async (url: string, init?: RequestInit) => {
+        calls.push(url);
+        return inner(url, init);
+      }) as unknown as typeof fetch;
+      return { calls, wrapped };
+    };
+
+    it("fetches an empty deployment once, then skips every series, the monthly one included", async () => {
+      const first = counting(fixture("gus-cpi.csv"));
+      await withSystemContext(() =>
+        refresh.refreshAll({ fetch: first.wrapped, onlyStale: true }),
+      );
+      expect(first.calls).toEqual(
+        expect.arrayContaining([GUS_CPI_CSV_URL, NBP_ARCHIVE_URL]),
+      );
+      // The GUS series is covered only through 2026-08-01, weeks behind today,
+      // yet it was fetched today: a second boot (a rollout, a restart) is quiet.
+      expect(await coveredThrough("PL_CPI_GUS_YOY")).toBe("2026-08-01");
+
+      const second = counting(fixture("gus-cpi.csv"));
+      await withSystemContext(() =>
+        refresh.refreshAll({ fetch: second.wrapped, onlyStale: true }),
+      );
+      expect(second.calls).toEqual([]);
+    });
+
+    it("fetches a series last fetched before yesterday, and never one the seed merely re-registered", async () => {
+      await withSystemContext(() =>
+        refresh.refreshAll({ fetch: fakeFetch(fixture("gus-cpi.csv")) }),
+      );
+      // Seeding again (every boot does) must not look like a fetch.
+      await dataSource.query(
+        `UPDATE benchmark_series SET updated_at = NOW() - INTERVAL '3 days'`,
+      );
+      await withSystemContext(() => catalog.seed());
+      const stale = counting(fixture("gus-cpi.csv"));
+      await withSystemContext(() =>
+        refresh.refreshAll({ fetch: stale.wrapped, onlyStale: true }),
+      );
+      expect(stale.calls).toEqual(
+        expect.arrayContaining([GUS_CPI_CSV_URL, NBP_ARCHIVE_URL]),
+      );
+    });
+  });
+
+  it("records a run where every series fails as a failure in fetch_sync, and a partial one as a success", async () => {
+    const lease = (fetchImpl: typeof fetch) =>
+      withSystemContext(() =>
+        fetchSync.withLease(FetchSyncJob.BondBenchmarks, 60_000, () =>
+          refresh.refreshAll({ fetch: fetchImpl }),
+        ),
+      );
+    const state = async () =>
+      (
+        await dataSource.query(
+          `SELECT last_success_at, last_error FROM fetch_sync WHERE job = 'bond-benchmarks'`,
+        )
+      )[0];
+    const down = (async () =>
+      new Response("down", { status: 503 })) as unknown as typeof fetch;
+
+    await expect(lease(down)).rejects.toThrow(
+      /Every bond benchmark series failed/,
+    );
+    const failed = await state();
+    expect(failed.last_error).toMatch(/Every bond benchmark series failed/);
+    expect(failed.last_success_at).toBeNull();
+
+    // One source up: the run is a success and clears the error.
+    const half = (async (url: string) =>
+      url.includes("nbp.pl")
+        ? new Response("down", { status: 503 })
+        : new Response(new Uint8Array(fixture("gus-cpi.csv")), {
+            status: 200,
+          })) as unknown as typeof fetch;
+    await expect(lease(half)).resolves.toBe(true);
+    const ok = await state();
+    expect(ok.last_error).toBeNull();
+    expect(ok.last_success_at).not.toBeNull();
+  });
+
+  describe("the currency of an instrument", () => {
+    it("is created on a deployment that has no such currency, owned by no user", async () => {
+      // The only caller of ensureSystemCurrency's insert branch: the beforeEach
+      // pre-inserts PLN, so remove it and seed on a fresh deployment.
+      await dataSource.query(`DELETE FROM currencies WHERE code = 'PLN'`);
+      await withSystemContext(() => catalog.seed());
+      expect(await count("bond_instruments")).toBe(8);
+      expect(
+        await dataSource.query(
+          `SELECT code, created_by_user_id FROM currencies WHERE code = 'PLN'`,
+        ),
+      ).toEqual([{ code: "PLN", created_by_user_id: null }]);
+    });
+
+    it("must exist: an instrument in an unknown currency is refused by the foreign key", async () => {
+      await expect(
+        dataSource.query(
+          `INSERT INTO bond_instruments (issuer_country_code, issuer_code, program_code, series_code, currency_code, marketability)
+           VALUES ('PL', 'PL_MF', 'TOS', 'NOCCY', 'ZZZ', 'RETAIL_REDEEMABLE')`,
+        ),
+      ).rejects.toThrow(/violates foreign key constraint/);
+    });
+
+    it("counts as use: a currency only a bond instrument names is reported in use and survives its creator's removal", async () => {
+      const owner = await createTestUserDirect(dataSource, {
+        email: "bond-ccy@example.com",
+      });
+      // A custom currency its creator holds, referenced by nothing but a
+      // catalog instrument (a seeded series in a currency a user had created).
+      await dataSource.query(
+        `INSERT INTO currencies (code, name, symbol, decimal_places, is_active, created_by_user_id)
+         VALUES ('ZBP', 'Test Zloty', 'zb', 2, true, $1)`,
+        [owner.id],
+      );
+      const inUse = async () =>
+        (
+          await dataSource.query(
+            `SELECT currency_code_in_use_globally('ZBP') AS in_use`,
+          )
+        )[0].in_use;
+      expect(await inUse()).toBe(false);
+
+      await dataSource.query(
+        `INSERT INTO bond_instruments (issuer_country_code, issuer_code, program_code, series_code, currency_code, marketability)
+         VALUES ('PL', 'PL_MF', 'TOS', 'CCYONLY', 'ZBP', 'RETAIL_REDEEMABLE')`,
+      );
+      expect(await inUse()).toBe(true);
+
+      // The creator removing the currency must leave the row (a delete would
+      // abort on the foreign key, and the answer is what stops it trying).
+      await withUserContext(owner.id, () => currencies.remove(owner.id, "ZBP"));
+      expect(
+        await dataSource.query(
+          `SELECT code FROM currencies WHERE code = 'ZBP'`,
+        ),
+      ).toEqual([{ code: "ZBP" }]);
+
+      await dataSource.query(
+        `DELETE FROM bond_instruments WHERE series_code = 'CCYONLY'`,
+      );
+      expect(await inUse()).toBe(false);
+    });
   });
 
   it("a source that fails leaves the other series refreshed", async () => {

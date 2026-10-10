@@ -139,7 +139,10 @@ describe("bondLotsFromTransactions (spec 12.2 truth table)", () => {
         tx("SPLIT", "2026-02-01", "2"),
       ]);
       expect(result.lots).toBeNull();
-      expect(result.refusal).toMatchObject({ code: "SPLIT" });
+      expect(result.refusal).toMatchObject({
+        code: "SPLIT",
+        params: { action: "SPLIT", date: "2026-02-01", quantity: "2" },
+      });
       expect(result.refusal?.detail).toContain("2026-02-01");
     });
 
@@ -150,7 +153,10 @@ describe("bondLotsFromTransactions (spec 12.2 truth table)", () => {
           tx("BUY", "2026-01-10", quantity),
         ]);
         expect(result.lots).toBeNull();
-        expect(result.refusal).toMatchObject({ code: "FRACTIONAL_QUANTITY" });
+        expect(result.refusal).toMatchObject({
+          code: "FRACTIONAL_QUANTITY",
+          params: { action: "BUY", date: "2026-01-10", quantity },
+        });
       },
     );
 
@@ -160,7 +166,10 @@ describe("bondLotsFromTransactions (spec 12.2 truth table)", () => {
         tx("SELL", "2026-02-01", "11"),
       ]);
       expect(result.lots).toBeNull();
-      expect(result.refusal).toMatchObject({ code: "OVER_REMOVAL" });
+      expect(result.refusal).toMatchObject({
+        code: "OVER_REMOVAL",
+        params: { action: "SELL", date: "2026-02-01", quantity: "11" },
+      });
       expect(result.refusal?.detail).toContain("11");
       expect(result.refusal?.detail).toContain("10");
     });
@@ -169,6 +178,18 @@ describe("bondLotsFromTransactions (spec 12.2 truth table)", () => {
       expect(
         bondLotsFromTransactions([tx("SELL", "2026-02-01", "1")]).refusal,
       ).toMatchObject({ code: "OVER_REMOVAL" });
+    });
+
+    it("names the base action of a refined row and its raw quantity", () => {
+      expect(
+        bondLotsFromTransactions([tx("REINVEST_INTEREST", "2026-03-01", "1.5")])
+          .refusal,
+      ).toMatchObject({
+        params: { action: "REINVEST", date: "2026-03-01", quantity: "1.5" },
+      });
+      expect(
+        bondLotsFromTransactions([tx("BUY", "2026-01-10", null)]).refusal,
+      ).toMatchObject({ params: { quantity: null } });
     });
 
     it.each([null, "-5", "abc", "99999999999999999999"])(

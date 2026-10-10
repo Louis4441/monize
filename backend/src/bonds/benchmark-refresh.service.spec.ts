@@ -29,7 +29,8 @@ const result = (code: string, through: string): BenchmarkFetchResult => ({
 
 function build(opts: {
   fetchers?: Record<string, jest.Mock>;
-  covered?: Record<string, string | null>;
+  /** Warsaw date of each series' last successful fetch; null: never fetched. */
+  fetched?: Record<string, string | null>;
   health?: Partial<Record<keyof ProviderHealthService, jest.Mock>>;
 }) {
   const fetchers = opts.fetchers ?? {
@@ -63,9 +64,10 @@ function build(opts: {
   const { manager, dataSource } = createScopedDbMocks();
   const writes: Array<{ sql: string; params: unknown[] }> = [];
   manager.query.mockImplementation(async (sql: string, params: unknown[]) => {
-    if (sql.includes("SELECT TO_CHAR(covered_through")) {
-      const covered = opts.covered?.[params[0] as string];
-      return covered === undefined ? [] : [{ covered_through: covered }];
+    if (sql.includes("AS fetched_on")) {
+      expect(params[1]).toBe("Europe/Warsaw");
+      const fetched = opts.fetched?.[params[0] as string];
+      return fetched === undefined ? [] : [{ fetched_on: fetched }];
     }
     writes.push({ sql, params });
     return [];
@@ -93,7 +95,16 @@ function build(opts: {
     fetchSync as unknown as FetchSyncService,
     catalog as unknown as BondCatalogService,
   );
-  return { service, adapter, fetchers, writes, health, fetchSync, catalog };
+  return {
+    service,
+    adapter,
+    fetchers,
+    writes,
+    health,
+    fetchSync,
+    catalog,
+    manager,
+  };
 }
 
 describe("BenchmarkRefreshService", () => {
@@ -120,6 +131,7 @@ describe("BenchmarkRefreshService", () => {
       ["0.0340"],
       [null],
       "https://example.test/NBP_X",
+      [null],
     ]);
     const coverage = writes.filter((w) =>
       w.sql.includes("UPDATE benchmark_series"),
@@ -250,23 +262,144 @@ describe("BenchmarkRefreshService", () => {
     expect(health.recordFailure).toHaveBeenCalledWith("nbp", boom);
     expect(health.releaseProbe).toHaveBeenCalledWith("nbp");
     expect(health.recordSuccess).not.toHaveBeenCalledWith("nbp");
+    // Routed to the rate-limited health logger, not to an unbounded error line.
+    expect(health.logFailure).toHaveBeenCalledWith(
+      expect.anything(),
+      "nbp",
+      expect.stringContaining("NBP_X"),
+      boom,
+    );
+    expect(logError).not.toHaveBeenCalled();
   });
 
-  it("the warm-up fetches only a series that is empty or older than a day", async () => {
+  it("the warm-up fetches only a series never fetched or last fetched before yesterday", async () => {
+    // Today is 2026-10-10 (Warsaw). Yesterday and today are fresh; the day
+    // before yesterday is stale, whatever the series' own coverage.
+    for (const [fetched, expected] of [
+      ["2026-10-10", false],
+      ["2026-10-09", false],
+      ["2026-10-08", true],
+      ["2026-08-01", true],
+      [null, true],
+    ] as const) {
+      const { service, adapter, fetchers } = build({
+        fetched: { NBP_X: fetched, CPI_X: fetched },
+      });
+      await service.refreshAll({ adapters: [adapter], onlyStale: true });
+      expect([fetched, fetchers.NBP_X.mock.calls.length > 0]).toEqual([
+        fetched,
+        expected,
+      ]);
+      expect([fetched, fetchers.CPI_X.mock.calls.length > 0]).toEqual([
+        fetched,
+        expected,
+      ]);
+    }
+  });
+
+  it("a MONTHLY series fetched today is fresh although its newest month is weeks old", async () => {
+    // CPI_X covers only through 2026-08-01, but it was fetched today.
     const { service, adapter, fetchers } = build({
-      covered: { NBP_X: "2026-10-09", CPI_X: "2026-08-01" },
+      fetched: { NBP_X: "2026-10-10", CPI_X: "2026-10-10" },
     });
     await service.refreshAll({ adapters: [adapter], onlyStale: true });
-    expect(fetchers.NBP_X).not.toHaveBeenCalled();
-    expect(fetchers.CPI_X).toHaveBeenCalled();
+    await service.refreshAll({ adapters: [adapter], onlyStale: true });
+    expect(fetchers.CPI_X).not.toHaveBeenCalled();
+  });
 
-    const none = build({ covered: { NBP_X: null } });
-    await none.service.refreshAll({
-      adapters: [none.adapter],
-      onlyStale: true,
+  it("asks the database for the last fetch, never for covered_through", async () => {
+    const { service, adapter, manager } = build({
+      fetched: { NBP_X: "2026-10-10", CPI_X: "2026-10-10" },
     });
-    expect(none.fetchers.NBP_X).toHaveBeenCalled();
-    expect(none.fetchers.CPI_X).toHaveBeenCalled();
+    await service.refreshAll({ adapters: [adapter], onlyStale: true });
+    const sql = String(
+      manager.query.mock.calls.find(([q]) =>
+        String(q).includes("fetched_on"),
+      )![0],
+    );
+    expect(sql).toMatch(/updated_at AT TIME ZONE/);
+    expect(sql).not.toMatch(/covered_through</);
+  });
+
+  it("records each row's own source URL when an observation names one", async () => {
+    const withUrl = jest.fn(async () => ({
+      observations: [
+        {
+          observationDate: "2026-08-01",
+          value: "0.0340",
+          publishedOn: null,
+          sourceUrl: "https://example.test/current",
+        },
+      ],
+      coveredThrough: "2026-10-10",
+      sourceUrl: "https://example.test/archive",
+    }));
+    const { service, adapter, writes } = build({
+      fetchers: {
+        NBP_X: withUrl,
+        CPI_X: jest.fn(async () => result("CPI_X", "2026-08-01")),
+      },
+    });
+    await service.refreshAll({ adapters: [adapter] });
+    const insert = writes.find(
+      (w) =>
+        w.params[0] === "NBP_X" &&
+        w.sql.includes("INSERT INTO benchmark_values"),
+    )!;
+    expect(insert.sql).toMatch(/COALESCE\(t\.u, \$5::text\)/);
+    expect(insert.params[4]).toBe("https://example.test/archive");
+    expect(insert.params[5]).toEqual(["https://example.test/current"]);
+  });
+
+  it("a run where every attempted series fails throws, so fetch_sync records a failure", async () => {
+    const down = () =>
+      jest.fn(async () => {
+        throw new Error("unparseable");
+      });
+    const { service, adapter } = build({
+      fetchers: { NBP_X: down(), CPI_X: down() },
+    });
+    await expect(service.refreshAll({ adapters: [adapter] })).rejects.toThrow(
+      /Every bond benchmark series failed to refresh \(2 of 2\)/,
+    );
+  });
+
+  it("one series failing is not a failed run, and a run that skipped everything is not one either", async () => {
+    const partial = build({
+      fetchers: {
+        NBP_X: jest.fn(async () => {
+          throw new Error("unparseable");
+        }),
+        CPI_X: jest.fn(async () => result("CPI_X", "2026-08-01")),
+      },
+    });
+    await expect(
+      partial.service.refreshAll({ adapters: [partial.adapter] }),
+    ).resolves.toBeUndefined();
+    const fresh = build({
+      fetched: { NBP_X: "2026-10-10", CPI_X: "2026-10-10" },
+    });
+    await expect(
+      fresh.service.refreshAll({ adapters: [fresh.adapter], onlyStale: true }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("the lease wrapper records a failed run: the cron and the warm-up pass the throw through it", async () => {
+    const { service, fetchSync } = build({});
+    jest
+      .spyOn(service, "refreshAll")
+      .mockRejectedValue(new Error("Every bond benchmark series failed"));
+    fetchSync.withLease.mockImplementation(
+      async (_j: string, _ms: number, fn: () => Promise<void>) => {
+        await fn();
+        return true;
+      },
+    );
+    // The cron never dies on it; withLease (real) has already marked the failure.
+    await expect(service.scheduledRefresh()).resolves.toBeUndefined();
+    expect(Logger.prototype.warn).toHaveBeenCalledWith(
+      expect.stringContaining("Every bond benchmark series failed"),
+    );
   });
 
   it("does not fetch at all when another replica holds the lease", async () => {

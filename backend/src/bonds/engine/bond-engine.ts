@@ -59,20 +59,28 @@ function validate(input: BondEngineInput): void {
   const { quantity, purchaseDate } = input.lot;
   if (!Number.isSafeInteger(quantity) || quantity < 1) {
     throw new BondEngineError(
+      "QUANTITY_INVALID",
+      { quantity: String(quantity) },
       `Quantity must be a positive integer: ${quantity}`,
     );
   }
   if (!isValidYMD(purchaseDate) || !isValidYMD(input.asOf)) {
-    throw new BondEngineError("purchaseDate and asOf must be YYYY-MM-DD dates");
+    throw new BondEngineError(
+      "DATE_INVALID",
+      { purchaseDate: String(purchaseDate), asOf: String(input.asOf) },
+      "purchaseDate and asOf must be YYYY-MM-DD dates",
+    );
   }
   if (compareYMD(input.asOf, purchaseDate) < 0) {
     throw new BondEngineError(
+      "AS_OF_BEFORE_PURCHASE",
+      { asOf: input.asOf, purchaseDate },
       `asOf ${input.asOf} is before the purchase date ${purchaseDate}`,
     );
   }
 }
 
-/** Observations a value needs: every started period when compounding, else the current one. */
+/** Observations a value needs: every started period when compounding, else the period `currentIndex`. */
 function neededMissing(
   compounding: boolean,
   rates: readonly PeriodRate[],
@@ -180,14 +188,20 @@ export function valueBondLot(input: BondEngineInput): BondValuation {
   );
 
   if (matured) {
-    const inputs = inputsFor(compounding, rates, lastPeriod.index);
-    if (inputs) {
-      const perBond = compounding
-        ? maturityValue(terms, inputs.prior, inputs.rate)
-        : nominal;
-      principal = perBond.toFixed(places);
-      gross = lot(perBond);
-      accrued = lot(perBond.sub(nominal));
+    if (!compounding) {
+      // A coupon bond redeems at its nominal whatever the rates were; its last
+      // coupon is a past cash flow, so no rate is needed for the value.
+      principal = nominal.toFixed(places);
+      gross = lot(nominal);
+      accrued = lot(nominal.sub(nominal));
+    } else {
+      const inputs = inputsFor(compounding, rates, lastPeriod.index);
+      if (inputs) {
+        const perBond = maturityValue(terms, inputs.prior, inputs.rate);
+        principal = perBond.toFixed(places);
+        gross = lot(perBond);
+        accrued = lot(perBond.sub(nominal));
+      }
     }
   } else if (current) {
     const inputs = inputsFor(compounding, rates, current.index);
@@ -266,7 +280,9 @@ export function valueBondLot(input: BondEngineInput): BondValuation {
     compounding,
     rates,
     startedCount,
-    current?.index ?? null,
+    // A matured lot reads the last period: a compounding value needs every
+    // rate, and the maturity value of a coupon bond needs its last coupon.
+    matured ? lastPeriod.index : (current?.index ?? null),
   );
 
   const calendarsKnown = [...referencedCalendarIds(terms)].every((id) =>

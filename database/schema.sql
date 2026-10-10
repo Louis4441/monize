@@ -1255,8 +1255,10 @@ CREATE TABLE market_index_sync (
 -- migration 20261010170817_bond_reference_tables.sql). Global reference data with
 -- no owner column: one instrument's terms or one CPI print serves every account,
 -- so these are RLS-exempt (see the marker block at the foot of the RLS section).
--- INV-BOND-001: terms versions and period rates are immutable, enforced by
--- bond_reject_mutation().
+-- INV-BOND-001: terms versions and period rates are immutable against UPDATE and
+-- DELETE, enforced by the row-level trigger bond_reject_mutation(). TRUNCATE fires
+-- no row-level trigger and is not covered (an operator action; the integration
+-- suites reset tables with it).
 CREATE TABLE bond_instruments (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     issuer_country_code CHAR(2) NOT NULL,
@@ -4222,6 +4224,7 @@ AS $$
     UNION ALL SELECT 1 FROM transactions
       WHERE currency_code = p_code OR original_currency_code = p_code
     UNION ALL SELECT 1 FROM securities WHERE currency_code = p_code
+    UNION ALL SELECT 1 FROM bond_instruments WHERE currency_code = p_code
     UNION ALL SELECT 1 FROM scheduled_transactions
       WHERE currency_code = p_code OR original_currency_code = p_code
     UNION ALL SELECT 1 FROM budgets WHERE currency_code = p_code

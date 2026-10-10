@@ -19,6 +19,8 @@ export const CURRENCY_REFERENCE_COLUMNS: Readonly<
   // test compares against every FK in the schema) but never in a user's export.
   exchange_rates: ["from_currency", "to_currency"],
   exchange_rate_coverage: ["from_currency", "to_currency"],
+  // Global reference data with no owner (the bond catalog), never in an export.
+  bond_instruments: ["currency_code"],
   accounts: ["currency_code"],
   transactions: ["currency_code", "original_currency_code"],
   securities: ["currency_code"],

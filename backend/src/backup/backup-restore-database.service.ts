@@ -3,7 +3,12 @@ import { EntityManager } from "typeorm";
 import { resolveCurrencyMetadata } from "../currencies/currency-metadata";
 import { tr } from "../i18n/translate";
 import { boundRestoredNotification } from "./notification-restore-bounds";
+import { BOND_ENGINE_PRICE_SOURCE } from "../bonds/bond-price-source";
 import { BackupData, backupTables } from "./backup-format";
+import {
+  CATALOG_CURRENCY_MATCHED_COLUMNS,
+  CATALOG_REFERENCE_COLUMNS,
+} from "./restore-references";
 import {
   CONFLICT_ARBITER_COLUMNS,
   DEFERRED_FK_COLUMNS,
@@ -504,68 +509,133 @@ export class BackupRestoreDatabaseService {
   }
 
   /**
-   * Write NULL over a security's bond link the target deployment cannot honour.
+   * Write NULL over every reference to catalog data the target deployment cannot
+   * honour, for each entry of `CATALOG_REFERENCE_COLUMNS` (so a column added
+   * there is checked here, not just declared).
    *
-   * `bond_instruments` is reference data seeded per deployment and not part of a
-   * backup, so a link survives a restore only where the same instrument exists
-   * here (its id is derived from the series, so it is the same id on every
-   * deployment). A link to an instrument this catalog lacks -- a series a newer
-   * release seeds, an adapter this build does not install -- is restored
-   * unlinked rather than failing the restore on the foreign key, and a link to
-   * an instrument in another currency than the security is dropped too: that
-   * pair would price the security in the wrong currency (INV-PRICE-001), and
-   * a crafted file is the only way to produce one. Replaces `data.securities`
-   * with new rows; returns how many links were dropped, each counted in the log.
+   * A catalog table (today `bond_instruments`) is reference data seeded per
+   * deployment and not part of a backup, so a reference survives a restore only
+   * where the same row exists here (a bond instrument's id is derived from its
+   * series, so it is the same id on every deployment). A reference to a row this
+   * catalog lacks -- a series a newer release seeds, an adapter this build does
+   * not install -- is restored as NULL rather than failing the restore on the
+   * foreign key. A column in `CATALOG_CURRENCY_MATCHED_COLUMNS` is also dropped
+   * when the referenced row is in another currency than the referencing row: that
+   * pair would price the row in the wrong currency (INV-PRICE-001), and a crafted
+   * file is the only way to produce one.
+   *
+   * A security whose bond link was dropped keeps none of the engine's price rows
+   * from the file: they were computed from an instrument it is no longer linked
+   * to, nothing would ever recompute or remove them, and a security priced by a
+   * stale engine looks like a valid price (INV-BOND-005).
+   *
+   * Replaces `data[table]` with new rows. Returns how many references were
+   * dropped per `table.column`, each also counted in the log; the caller tells
+   * the user (a restore that quietly stops pricing a bond is a surprise).
    */
-  async severUnavailableBondLinks(
+  async severUnavailableCatalogLinks(
     manager: EntityManager,
     data: BackupData,
+    columns: Readonly<
+      Record<string, Readonly<Record<string, string>>>
+    > = CATALOG_REFERENCE_COLUMNS,
+  ): Promise<Record<string, number>> {
+    const counts: Record<string, number> = {};
+    for (const [table, references] of Object.entries(columns)) {
+      for (const [column, referenced] of Object.entries(references)) {
+        if (!/^[a-z_]+$/.test(referenced)) {
+          // The names come from a constant, never from the file; refuse a typo
+          // loudly rather than interpolate it.
+          throw new Error(`Invalid catalog table name "${referenced}"`);
+        }
+        const key = `${table}.${column}`;
+        const rows = (data as unknown as Record<string, unknown>)[table] as
+          Array<Record<string, unknown>> | undefined;
+        if (!rows) continue;
+        const dropped = await this.severOneCatalogColumn(
+          manager,
+          data,
+          table,
+          column,
+          referenced,
+          rows,
+          CATALOG_CURRENCY_MATCHED_COLUMNS.has(key),
+        );
+        if (dropped > 0) counts[key] = dropped;
+      }
+    }
+    return counts;
+  }
+
+  private async severOneCatalogColumn(
+    manager: EntityManager,
+    data: BackupData,
+    table: string,
+    column: string,
+    referenced: string,
+    rows: Array<Record<string, unknown>>,
+    mustMatchCurrency: boolean,
   ): Promise<number> {
-    const securities = data.securities;
-    if (!securities) return 0;
     const wanted = [
       ...new Set(
-        securities
-          .map((row) => row.bond_instrument_id)
+        rows
+          .map((row) => row[column])
           .filter((id): id is string => typeof id === "string"),
       ),
     ];
     if (wanted.length === 0) return 0;
 
-    const found: Array<{ id: string; currency_code: string }> =
+    const found: Array<{ id: string; currency_code?: string }> =
       await manager.query(
-        `SELECT id, currency_code FROM bond_instruments WHERE id = ANY($1::uuid[])`,
+        `SELECT id${mustMatchCurrency ? ", currency_code" : ""} FROM ${referenced} WHERE id = ANY($1::uuid[])`,
         [wanted],
       );
-    const currencyById = new Map(found.map((r) => [r.id, r.currency_code]));
+    const present = new Map(found.map((r) => [r.id, r.currency_code]));
 
     let absent = 0;
     let foreignCurrency = 0;
-    data.securities = securities.map((row) => {
-      const id = row.bond_instrument_id;
+    const severedIds = new Set<string>();
+    const next = rows.map((row) => {
+      const id = row[column];
       if (typeof id !== "string") return row;
-      const currency = currencyById.get(id);
-      if (currency === undefined) {
+      if (!present.has(id)) {
         absent += 1;
-      } else if (currency === row.currency_code) {
+      } else if (!mustMatchCurrency || present.get(id) === row.currency_code) {
         return row;
       } else {
         foreignCurrency += 1;
       }
-      return { ...row, bond_instrument_id: null };
+      if (typeof row.id === "string") severedIds.add(row.id);
+      return { ...row, [column]: null };
     });
+    (data as unknown as Record<string, unknown>)[table] = next;
 
     if (absent > 0) {
       this.logger.warn(
-        `Backup restore: ${absent} security link(s) to a bond instrument this ` +
-          "deployment's catalog does not carry were restored unlinked.",
+        `Backup restore: ${absent} ${table}.${column} reference(s) to ${referenced} this ` +
+          "deployment's catalog does not carry were restored as NULL.",
       );
     }
     if (foreignCurrency > 0) {
       this.logger.warn(
-        `Backup restore: ${foreignCurrency} security link(s) to a bond ` +
-          "instrument in another currency than the security were restored unlinked.",
+        `Backup restore: ${foreignCurrency} ${table}.${column} reference(s) to ${referenced} ` +
+          "in another currency than the row were restored as NULL.",
       );
+    }
+
+    if (table === "securities" && column === "bond_instrument_id") {
+      // The engine's rows for a security that is no longer linked.
+      const prices = data.security_prices;
+      if (severedIds.size > 0 && Array.isArray(prices)) {
+        data.security_prices = prices.filter(
+          (p) =>
+            !(
+              p.source === BOND_ENGINE_PRICE_SOURCE &&
+              typeof p.security_id === "string" &&
+              severedIds.has(p.security_id)
+            ),
+        );
+      }
     }
     return absent + foreignCurrency;
   }

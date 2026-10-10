@@ -37,6 +37,26 @@ describe("Polish business days", () => {
     expect(holidays.size).toBe(14);
   });
 
+  it("lists the statutory holidays of 2027, Easter in March", () => {
+    const holidays = polishHolidays(2027);
+    expect([...holidays].sort()).toEqual([
+      "2027-01-01",
+      "2027-01-06",
+      "2027-03-28",
+      "2027-03-29",
+      "2027-05-01",
+      "2027-05-03",
+      "2027-05-16",
+      "2027-05-27",
+      "2027-08-15",
+      "2027-11-01",
+      "2027-11-11",
+      "2027-12-24",
+      "2027-12-25",
+      "2027-12-26",
+    ]);
+  });
+
   it("applies the 24 December and 6 January start years", () => {
     expect(polishHolidays(2024).has("2024-12-24")).toBe(false);
     expect(polishHolidays(2025).has("2025-12-24")).toBe(true);

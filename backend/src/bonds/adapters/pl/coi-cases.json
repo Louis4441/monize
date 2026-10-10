@@ -44,7 +44,12 @@
         "2": "0.0440"
       },
       "expect": {
-        "earlyRedemptionValue": "98.01"
+        "earlyRedemptionValue": "98.01",
+        "currentPeriod": {
+          "index": 2,
+          "annualRate": "0.0440",
+          "rateSource": "ANNOUNCED"
+        }
       }
     }
   ]

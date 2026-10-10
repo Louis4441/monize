@@ -102,7 +102,11 @@ export class BondCatalogService implements OnApplicationBootstrap {
     });
   }
 
-  /** `covered_through` is never touched: it only moves forward, by the refresh. */
+  /**
+   * `covered_through` is never touched: it only moves forward, by the refresh.
+   * Nor is `updated_at`: the refresh stamps it as the series' last successful
+   * fetch, and the boot warm-up reads it to decide whether to fetch again.
+   */
   private async upsertBenchmarkSeries(
     m: EntityManager,
     adapter: BondAdapter,
@@ -115,8 +119,7 @@ export class BondCatalogService implements OnApplicationBootstrap {
             SET kind = EXCLUDED.kind,
                 publisher = EXCLUDED.publisher,
                 source_url = EXCLUDED.source_url,
-                unit = EXCLUDED.unit,
-                updated_at = NOW()`,
+                unit = EXCLUDED.unit`,
         [
           series.code,
           series.kind,
@@ -172,8 +175,13 @@ export class BondCatalogService implements OnApplicationBootstrap {
         ),
       ],
     );
-    const rows: Array<{ id: string }> = await m.query(
-      `SELECT id FROM bond_instruments
+    const rows: Array<{
+      id: string;
+      program_code: string;
+      currency_code: string;
+      marketability: string;
+    }> = await m.query(
+      `SELECT id, program_code, currency_code, marketability FROM bond_instruments
         WHERE issuer_country_code = $1 AND issuer_code = $2 AND series_code = $3`,
       [
         instrument.issuerCountryCode,
@@ -181,7 +189,27 @@ export class BondCatalogService implements OnApplicationBootstrap {
         instrument.seriesCode,
       ],
     );
-    const instrumentId = rows[0].id;
+    const stored = rows[0];
+    // bond_instruments is insert only: an existing row is never overwritten, so a
+    // catalog entry that describes the series differently is a curation error, not
+    // a correction. Skipped like a content clash, naming the series and the field.
+    const mismatched = (
+      [
+        ["programCode", stored.program_code, instrument.programCode],
+        ["currency", stored.currency_code, instrument.currency],
+        ["marketability", stored.marketability, instrument.marketability],
+      ] as const
+    ).filter(([, was, now]) => was !== now);
+    if (mismatched.length > 0) {
+      for (const [field, was, now] of mismatched) {
+        this.logger.error(
+          `Bond catalog entry version ${entry.termsVersion} of ${named} disagrees with the stored instrument on ${field} ` +
+            `(stored "${was}", entry "${now}"); the instrument row is never overwritten, so the entry is skipped.`,
+        );
+      }
+      return;
+    }
+    const instrumentId = stored.id;
 
     const hash = contentHash(entry.terms);
     const inserted: unknown[] = await m.query(
@@ -204,12 +232,12 @@ export class BondCatalogService implements OnApplicationBootstrap {
       return;
     }
 
-    const stored: Array<{ content_hash: string }> = await m.query(
+    const storedVersion: Array<{ content_hash: string }> = await m.query(
       `SELECT content_hash FROM bond_terms_versions
         WHERE bond_instrument_id = $1 AND version = $2`,
       [instrumentId, entry.termsVersion],
     );
-    if (stored[0]?.content_hash !== hash) {
+    if (storedVersion[0]?.content_hash !== hash) {
       this.logger.error(
         `Terms version ${entry.termsVersion} of ${named} is stored with different content; ` +
           `it is immutable (INV-BOND-001), so the catalog entry is skipped. Publish the correction as a new termsVersion.`,

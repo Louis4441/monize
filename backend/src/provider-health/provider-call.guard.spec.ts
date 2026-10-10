@@ -163,6 +163,9 @@ describe("a response is recorded in one place per client", () => {
     // Frankfurter: two, the same split again. Every call funnels through one
     // `request` method, so the rule lives there once.
     ["currencies/providers/frankfurter-fx.provider.ts", 2],
+    // Bond benchmarks (NBP, GUS): one. Every adapter request goes through the
+    // `gated` door, which records success once the whole body has arrived.
+    ["bonds/benchmark-refresh.service.ts", 1],
   ])("%s records an arrived response in at most %i places", (file, allowed) => {
     const source = readFileSync(join(SRC_ROOT, file), "utf8");
     const occurrences = source.split("recordSuccess(").length - 1;

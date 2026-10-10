@@ -165,7 +165,8 @@ export const RESTORE_REFERENCE_COLUMNS: Readonly<
  * The rule: the value is canonicalised here, and the restore keeps it only when
  * the target deployment's own catalog holds that row (and, for a bond link, in
  * the security's currency); otherwise it is written as NULL and logged
- * (`BackupRestoreDatabaseService.severUnavailableBondLinks`). A restore never
+ * (`BackupRestoreDatabaseService.severUnavailableCatalogLinks`, which iterates this
+ * list, so an entry added here is checked there). A restore never
  * fails because a deployment has not seeded an instrument, and never links a
  * security to a row it cannot vouch for. `restore-references.spec.ts` checks
  * this list against `database/schema.sql`.
@@ -175,6 +176,16 @@ export const CATALOG_REFERENCE_COLUMNS: Readonly<
 > = {
   securities: { bond_instrument_id: "bond_instruments" },
 };
+
+/**
+ * The `table.column` entries above whose referenced row must also be in the
+ * referencing row's own currency, or the reference is dropped: a bond link to an
+ * instrument in another currency would price the security in the wrong currency
+ * (INV-PRICE-001). Both rows carry a `currency_code`.
+ */
+export const CATALOG_CURRENCY_MATCHED_COLUMNS: ReadonlySet<string> = new Set([
+  "securities.bond_instrument_id",
+]);
 
 /**
  * The references a genuine export can carry without the row they name, keyed

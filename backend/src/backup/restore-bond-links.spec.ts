@@ -16,7 +16,7 @@ function setup(catalog: Array<{ id: string; currency_code: string }>) {
 const data = (securities: Record<string, unknown>[]): BackupData =>
   ({ version: 1, exportedAt: "x", securities }) as unknown as BackupData;
 
-describe("BackupRestoreDatabaseService.severUnavailableBondLinks", () => {
+describe("BackupRestoreDatabaseService.severUnavailableCatalogLinks", () => {
   afterEach(() => jest.restoreAllMocks());
 
   it("keeps a link to an instrument the deployment carries, in the security's currency", async () => {
@@ -27,8 +27,8 @@ describe("BackupRestoreDatabaseService.severUnavailableBondLinks", () => {
       { id: "s1", currency_code: "PLN", bond_instrument_id: PRESENT },
     ]);
     await expect(
-      service.severUnavailableBondLinks(manager, backup),
-    ).resolves.toBe(0);
+      service.severUnavailableCatalogLinks(manager, backup),
+    ).resolves.toEqual({});
     expect(backup.securities[0].bond_instrument_id).toBe(PRESENT);
     expect(warn).not.toHaveBeenCalled();
   });
@@ -44,8 +44,8 @@ describe("BackupRestoreDatabaseService.severUnavailableBondLinks", () => {
     ];
     const backup = data(original);
     await expect(
-      service.severUnavailableBondLinks(manager, backup),
-    ).resolves.toBe(1);
+      service.severUnavailableCatalogLinks(manager, backup),
+    ).resolves.toEqual({ "securities.bond_instrument_id": 1 });
     expect(backup.securities.map((r) => r.bond_instrument_id)).toEqual([
       null,
       PRESENT,
@@ -53,7 +53,9 @@ describe("BackupRestoreDatabaseService.severUnavailableBondLinks", () => {
     ]);
     // New rows, not a mutation of the rows the file produced.
     expect(original[0].bond_instrument_id).toBe(ABSENT);
-    expect(warn.mock.calls[0][0]).toMatch(/1 security link.*does not carry/);
+    expect(warn.mock.calls[0][0]).toMatch(
+      /1 securities\.bond_instrument_id reference.*does not carry/,
+    );
   });
 
   it("drops a link whose currency differs from the security's (INV-PRICE-001)", async () => {
@@ -64,15 +66,77 @@ describe("BackupRestoreDatabaseService.severUnavailableBondLinks", () => {
       { id: "s1", currency_code: "USD", bond_instrument_id: PRESENT },
     ]);
     await expect(
-      service.severUnavailableBondLinks(manager, backup),
-    ).resolves.toBe(1);
+      service.severUnavailableCatalogLinks(manager, backup),
+    ).resolves.toEqual({ "securities.bond_instrument_id": 1 });
     expect(backup.securities[0].bond_instrument_id).toBeNull();
     expect(warn.mock.calls[0][0]).toMatch(/another currency/);
   });
 
+  it("drops the engine's price rows of a security it unlinked, and only those", async () => {
+    const { service, manager } = setup([{ id: PRESENT, currency_code: "PLN" }]);
+    const backup = {
+      ...data([
+        { id: "s1", currency_code: "PLN", bond_instrument_id: ABSENT },
+        { id: "s2", currency_code: "PLN", bond_instrument_id: PRESENT },
+      ]),
+      security_prices: [
+        { security_id: "s1", source: "bond_engine" },
+        { security_id: "s1", source: "manual" },
+        { security_id: "s1", source: "buy" },
+        { security_id: "s2", source: "bond_engine" },
+      ],
+    } as unknown as BackupData;
+    await service.severUnavailableCatalogLinks(manager, backup);
+    expect(backup.security_prices).toEqual([
+      { security_id: "s1", source: "manual" },
+      { security_id: "s1", source: "buy" },
+      { security_id: "s2", source: "bond_engine" },
+    ]);
+  });
+
+  it("checks every entry of the catalog list, not only the bond link", async () => {
+    // A second catalog reference, as a future migration might add one: the
+    // existence check applies to it with no further code.
+    const query = jest.fn().mockResolvedValue([{ id: PRESENT }]);
+    const manager = { query } as unknown as EntityManager;
+    jest.spyOn(Logger.prototype, "warn").mockImplementation();
+    const backup = {
+      ...data([]),
+      transactions: [
+        { id: "t1", fund_id: ABSENT },
+        { id: "t2", fund_id: PRESENT },
+      ],
+    } as unknown as BackupData;
+    const counts =
+      await new BackupRestoreDatabaseService().severUnavailableCatalogLinks(
+        manager,
+        backup,
+        { transactions: { fund_id: "fund_catalog" } },
+      );
+    expect(counts).toEqual({ "transactions.fund_id": 1 });
+    expect(query.mock.calls[0][0]).toMatch(/FROM fund_catalog WHERE id = ANY/);
+    expect(query.mock.calls[0][0]).not.toMatch(/currency_code/);
+    expect(
+      (
+        backup as unknown as { transactions: Array<{ fund_id: unknown }> }
+      ).transactions.map((r) => r.fund_id),
+    ).toEqual([null, PRESENT]);
+  });
+
+  it("refuses a catalog table name that is not a plain identifier", async () => {
+    const { service, manager } = setup([]);
+    await expect(
+      service.severUnavailableCatalogLinks(
+        manager,
+        data([{ id: "s1", bond_instrument_id: PRESENT }]),
+        { securities: { bond_instrument_id: "bond_instruments; DROP" } },
+      ),
+    ).rejects.toThrow(/Invalid catalog table name/);
+  });
+
   it("asks the catalog nothing when no security is linked", async () => {
     const { service, manager, query } = setup([]);
-    await service.severUnavailableBondLinks(
+    await service.severUnavailableCatalogLinks(
       manager,
       data([{ id: "s1", currency_code: "PLN" }]),
     );

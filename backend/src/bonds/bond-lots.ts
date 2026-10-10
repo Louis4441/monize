@@ -39,8 +39,25 @@ export type BondLotsRefusalCode =
   /** A share-moving row with no quantity, a negative one, or one too large to count. */
   | "INVALID_QUANTITY";
 
+/** The row that made the lots unknowable, as raw values a client formats itself. */
+export interface BondLotsRefusalParams {
+  /** The base action of the row (`SELL`, not a `SELL`-flavoured variant). */
+  readonly action: string;
+  /** The row's transaction date, YYYY-MM-DD. */
+  readonly date: string;
+  /** The row's quantity as stored (NUMERIC text), null when it has none. */
+  readonly quantity: string | null;
+}
+
 export interface BondLotsRefusal {
   readonly code: BondLotsRefusalCode;
+  /** Which row refused; a client renders its translated message from `code` and this. */
+  readonly params: BondLotsRefusalParams;
+  /**
+   * English text for the logs only. Clients must not display it: compose the
+   * message from `code` and `params` with translations and the user's number
+   * and date formats.
+   */
   readonly detail: string;
 }
 
@@ -91,9 +108,21 @@ function stepOf(row: BondLotTransaction): Step {
   return LOT_EFFECT_BY_BASE_ACTION.get(base) ?? NONE;
 }
 
-const refuse = (code: BondLotsRefusalCode, detail: string): BondLotsResult => ({
+const refuse = (
+  code: BondLotsRefusalCode,
+  row: BondLotTransaction,
+  detail: string,
+): BondLotsResult => ({
   lots: null,
-  refusal: { code, detail },
+  refusal: {
+    code,
+    params: {
+      action: baseInvestmentAction(row.action),
+      date: row.transactionDate,
+      quantity: row.quantity,
+    },
+    detail,
+  },
 });
 
 /**
@@ -121,6 +150,7 @@ export function bondLotsFromTransactions(
     if (step.kind === "split") {
       return refuse(
         "SPLIT",
+        row,
         `A split (${where}) is recorded on this security, and a bond does not split`,
       );
     }
@@ -129,12 +159,14 @@ export function bondLotsFromTransactions(
     if (quantity === "fractional") {
       return refuse(
         "FRACTIONAL_QUANTITY",
+        row,
         `${where} moves ${row.quantity} bonds, which is not a whole number`,
       );
     }
     if (quantity === "invalid") {
       return refuse(
         "INVALID_QUANTITY",
+        row,
         `${where} has no usable quantity (${row.quantity ?? "none"})`,
       );
     }
@@ -156,6 +188,7 @@ export function bondLotsFromTransactions(
     if (removed === null) {
       return refuse(
         "OVER_REMOVAL",
+        row,
         `${where} removes ${quantity} bonds, more than the ${totalOf(open)} held`,
       );
     }

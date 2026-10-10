@@ -114,6 +114,10 @@ describe("SecuritiesService", () => {
       recomputeSecurity: jest
         .fn()
         .mockResolvedValue({ written: 0, deleted: 0 }),
+      clearEnginePrices: jest
+        .fn()
+        .mockResolvedValue({ deleted: 0, accountIds: [] }),
+      publishClearedPrices: jest.fn(),
     };
 
     mockYahooFinanceService = {
@@ -813,6 +817,68 @@ describe("SecuritiesService", () => {
           expect.anything(),
         );
         expect(mockBondPriceService.recomputeSecurity).not.toHaveBeenCalled();
+      });
+
+      it("deletes the engine's rows in the write's transaction on unlinking, then refreshes derived state after the commit", async () => {
+        securitiesRepository.findOne.mockResolvedValue({
+          ...pln,
+          bondInstrumentId: INSTRUMENT,
+        });
+        const order: string[] = [];
+        mockBondPriceService.clearEnginePrices.mockImplementation(
+          async (m: unknown) => {
+            expect(m).toBe(queryRunnerManager);
+            order.push("clear");
+            return { deleted: 3, accountIds: ["acc-1"] };
+          },
+        );
+        queryRunnerManager.save.mockImplementation(async (a, b) => {
+          order.push("save");
+          return b ?? a;
+        });
+        mockBondPriceService.publishClearedPrices.mockImplementation(() => {
+          order.push("publish");
+        });
+
+        await service.update("user-1", "sec-1", { bondInstrumentId: null });
+
+        expect(order).toEqual(["clear", "save", "publish"]);
+        expect(mockBondPriceService.clearEnginePrices).toHaveBeenCalledWith(
+          queryRunnerManager,
+          "user-1",
+          "sec-1",
+        );
+        expect(mockBondPriceService.publishClearedPrices).toHaveBeenCalledWith(
+          "user-1",
+          ["acc-1"],
+        );
+        expect(mockBondPriceService.recomputeSecurity).not.toHaveBeenCalled();
+      });
+
+      it("clears the old instrument's engine rows when the link moves, and prices the new one after the commit", async () => {
+        securitiesRepository.findOne.mockResolvedValue({
+          ...pln,
+          bondInstrumentId: INSTRUMENT,
+        });
+        queryRunnerManager.query.mockResolvedValue([{ currency_code: "PLN" }]);
+        await service.update("user-1", "sec-1", { bondInstrumentId: OTHER });
+        expect(mockBondPriceService.clearEnginePrices).toHaveBeenCalledTimes(1);
+        expect(mockBondPriceService.recomputeSecurity).toHaveBeenCalledWith(
+          "user-1",
+          "sec-1",
+        );
+      });
+
+      it("clears nothing when the link is unchanged", async () => {
+        securitiesRepository.findOne.mockResolvedValue({
+          ...pln,
+          bondInstrumentId: INSTRUMENT,
+        });
+        await service.update("user-1", "sec-1", { name: "Renamed" });
+        expect(mockBondPriceService.clearEnginePrices).not.toHaveBeenCalled();
+        expect(
+          mockBondPriceService.publishClearedPrices,
+        ).not.toHaveBeenCalled();
       });
 
       it("does not check or recompute when an edit leaves the link and the currency alone", async () => {

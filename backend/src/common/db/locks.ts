@@ -97,6 +97,13 @@ export enum LockScope {
    * unique index would refuse the second.
    */
   AiParserDraftRequests = 6,
+  /**
+   * One bond-linked security's engine prices (id = the security's id): a
+   * recompute, and the unlink that deletes the engine's rows, run one after the
+   * other. The recompute reads the link inside the lock, so it prices from the
+   * link as it is now or refuses when there is none (INV-BOND-005).
+   */
+  BondPriceRecompute = 7,
 }
 
 /**

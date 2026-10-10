@@ -16,7 +16,7 @@ export const GUS_CPI_CSV_URL =
 export const GUS_CPI_LANDING_URL =
   "https://stat.gov.pl/obszary-tematyczne/ceny-handel/wskazniki-cen/wskazniki-cen-towarow-i-uslug-konsumpcyjnych-pot-inflacja-/miesieczne-wskazniki-cen-towarow-i-uslug-konsumpcyjnych-od-1982-roku/";
 
-const GUS_ORIGIN = "https://stat.gov.pl";
+const GUS_HOST = "stat.gov.pl";
 const NATION = "Polska";
 const YEAR_ON_YEAR = "Analogiczny miesiąc poprzedniego roku = 100";
 
@@ -94,15 +94,36 @@ export function parseGusCpiCsv(text: string): BenchmarkObservation[] {
   );
 }
 
-/** The href of the monthly CPI file on the landing page, absolute. */
+/** Only the publisher's own host, over TLS: a link anywhere else is not GUS data. */
+function isGusHttps(url: URL): boolean {
+  return (
+    url.protocol === "https:" &&
+    url.port === "" &&
+    url.username === "" &&
+    url.password === "" &&
+    (url.hostname === GUS_HOST || url.hostname.endsWith(`.${GUS_HOST}`))
+  );
+}
+
+/**
+ * The monthly CPI file on the landing page, as an absolute https URL on
+ * stat.gov.pl (or one of its subdomains). The values are written to global
+ * reference data every user's valuation reads, so a link to another host, to
+ * plain http or to a malformed target is ignored rather than followed.
+ */
 export function findCsvLink(html: string): string | null {
   const links = [...html.matchAll(/href="([^"]+\.csv)"/gi)].map((m) => m[1]);
-  const chosen =
-    links.find((href) =>
-      /wskaznikicentowarowiuslugkonsumpcyjnychod1982/i.test(href),
-    ) ?? null;
-  if (!chosen) return null;
-  return chosen.startsWith("http") ? chosen : `${GUS_ORIGIN}${chosen}`;
+  for (const href of links) {
+    if (!/wskaznikicentowarowiuslugkonsumpcyjnychod1982/i.test(href)) continue;
+    let url: URL;
+    try {
+      url = new URL(href, GUS_CPI_LANDING_URL);
+    } catch {
+      continue;
+    }
+    if (isGusHttps(url)) return url.toString();
+  }
+  return null;
 }
 
 export async function fetchGusCpi(

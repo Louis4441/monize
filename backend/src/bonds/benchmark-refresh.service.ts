@@ -27,7 +27,13 @@ import { BondCatalogService } from "./bond-catalog.service";
 export type HttpFetch = typeof globalThis.fetch;
 
 export interface RefreshOptions {
-  /** Skip a series whose `covered_through` is today or yesterday (the boot warm-up). */
+  /**
+   * Skip a series whose last successful fetch was today or yesterday in Warsaw
+   * (the boot warm-up). Freshness is when the series was last fetched
+   * (`benchmark_series.updated_at`, stamped only by a successful store), never
+   * `covered_through`: a MONTHLY series is covered only through its newest
+   * reference month, which is always weeks behind a fetch made today.
+   */
   readonly onlyStale?: boolean;
   /** The network, injectable so a test never leaves the process. */
   readonly fetch?: HttpFetch;
@@ -87,18 +93,27 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
    */
   @Cron("25 6 * * 1-5", { timeZone: "Europe/Warsaw" })
   async scheduledRefresh(): Promise<void> {
-    await withSystemContext(() =>
-      this.fetchSync.withLease(
-        FetchSyncJob.BondBenchmarks,
-        this.FETCH_LEASE_MS,
-        () => this.refreshAll(),
-      ),
-    );
+    try {
+      await withSystemContext(() =>
+        this.fetchSync.withLease(
+          FetchSyncJob.BondBenchmarks,
+          this.FETCH_LEASE_MS,
+          () => this.refreshAll(),
+        ),
+      );
+    } catch (error) {
+      // `withLease` has already recorded the failure in fetch_sync, and each
+      // series logged its own cause; a cron must not die on it.
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Scheduled bond benchmark refresh failed: ${message}`);
+    }
   }
 
   /**
    * Refresh every declared series. One series failing is logged and does not
-   * stop the next. Needs an ambient identity (`withSystemContext`).
+   * stop the next; when every series that was attempted failed the run throws at
+   * the end, so the lease wrapper records it in `fetch_sync` as a failure rather
+   * than a success. Needs an ambient identity (`withSystemContext`).
    */
   async refreshAll(options: RefreshOptions = {}): Promise<void> {
     const adapters = options.adapters ?? INSTALLED_BOND_ADAPTERS;
@@ -108,16 +123,25 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
     await this.catalog.seedBenchmarkSeries(adapters);
     const today = todayInTimezone(WARSAW) as string;
 
+    let attempted = 0;
+    let failed = 0;
     for (const adapter of adapters) {
       for (const series of adapter.benchmarks) {
-        await this.refreshSeries(
+        const outcome = await this.refreshSeries(
           adapter,
           series,
           http,
           today,
           options.onlyStale === true,
         );
+        if (outcome !== "skipped") attempted += 1;
+        if (outcome === "failed") failed += 1;
       }
+    }
+    if (attempted > 0 && failed === attempted) {
+      throw new Error(
+        `Every bond benchmark series failed to refresh (${failed} of ${attempted}); see the log for each cause`,
+      );
     }
   }
 
@@ -127,9 +151,10 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
     http: HttpFetch | undefined,
     today: string,
     onlyStale: boolean,
-  ): Promise<void> {
+  ): Promise<"stored" | "skipped" | "failed"> {
     try {
-      if (onlyStale && !(await this.isStale(series.code, today))) return;
+      if (onlyStale && !(await this.isStale(series.code, today)))
+        return "skipped";
       const result = await adapter.fetchBenchmark(
         series.code,
         this.gated(series.providerId, http),
@@ -138,6 +163,7 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
       this.logger.log(
         `Stored ${result.observations.length} observation(s) for ${series.code}, covered through ${result.coveredThrough}`,
       );
+      return "stored";
     } catch (error) {
       if (isProviderUnavailable(error) || isTransportFailure(error)) {
         // Rate-limited and counted by the breaker; a refused call prints nothing.
@@ -147,26 +173,32 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
           `bond benchmark refresh for ${series.code}`,
           error,
         );
-        return;
+        return "failed";
       }
       this.logger.error(
         `Bond benchmark refresh for ${series.code} failed: ${describeFetchFailure(error)}`,
       );
+      return "failed";
     }
   }
 
+  /**
+   * Never fetched (no coverage yet), or last fetched before yesterday in Warsaw.
+   * `updated_at` is the last successful store; the catalog seed does not touch it.
+   */
   private async isStale(code: string, today: string): Promise<boolean> {
-    const rows: Array<{ covered_through: string | null }> = await withScopedDb(
+    const rows: Array<{ fetched_on: string | null }> = await withScopedDb(
       this.dataSource,
       (m) =>
         m.query(
-          `SELECT TO_CHAR(covered_through, 'YYYY-MM-DD') AS covered_through
+          `SELECT CASE WHEN covered_through IS NULL THEN NULL
+                       ELSE TO_CHAR(updated_at AT TIME ZONE $2, 'YYYY-MM-DD') END AS fetched_on
              FROM benchmark_series WHERE code = $1`,
-          [code],
+          [code, WARSAW],
         ),
     );
-    const covered = rows[0]?.covered_through ?? null;
-    return covered === null || covered < addDaysYMD(today, -1);
+    const fetchedOn = rows[0]?.fetched_on ?? null;
+    return fetchedOn === null || fetchedOn < addDaysYMD(today, -1);
   }
 
   /**
@@ -203,7 +235,9 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
   /**
    * One transaction: the observations, then the coverage. A value is rewritten
    * only when it differs (a publisher's revision corrects a row), and
-   * `covered_through` only moves forward.
+   * `covered_through` only moves forward. Each row cites its own document when
+   * the observation names one, else the result's. `updated_at` is stamped here
+   * only: it is the series' last successful fetch (see `isStale`).
    */
   private async store(
     code: string,
@@ -215,8 +249,8 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
         await m.query(
           `INSERT INTO benchmark_values
              (benchmark_code, observation_date, value, published_on, source_url, retrieved_at)
-           SELECT $1::varchar, t.d, t.v, t.p, $5::text, NOW()
-             FROM unnest($2::date[], $3::numeric[], $4::date[]) AS t(d, v, p)
+           SELECT $1::varchar, t.d, t.v, t.p, COALESCE(t.u, $5::text), NOW()
+             FROM unnest($2::date[], $3::numeric[], $4::date[], $6::text[]) AS t(d, v, p, u)
            ON CONFLICT (benchmark_code, observation_date) DO UPDATE
               SET value = EXCLUDED.value,
                   published_on = EXCLUDED.published_on,
@@ -229,6 +263,7 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
             observations.map((o) => o.value),
             observations.map((o) => o.publishedOn),
             result.sourceUrl,
+            observations.map((o) => o.sourceUrl ?? null),
           ],
         );
       }

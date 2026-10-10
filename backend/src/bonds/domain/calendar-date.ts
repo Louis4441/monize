@@ -1,4 +1,8 @@
-import { addDaysYMD } from "@/common/date-utils";
+import { addDaysYMD, formatMonthKey } from "@/common/date-utils";
+import { addMonthsClamped } from "@/common/recurrence";
+import { isCalendarDate } from "@/common/validators/is-calendar-date.validator";
+
+export { addMonthsClamped };
 
 const YMD_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const MS_PER_DAY = 86_400_000;
@@ -14,17 +18,7 @@ export function daysInMonth(year: number, month: number): number {
 }
 
 export function isValidYMD(value: unknown): value is string {
-  if (typeof value !== "string") return false;
-  const match = YMD_PATTERN.exec(value);
-  if (!match) return false;
-  const [year, month, day] = [
-    Number(match[1]),
-    Number(match[2]),
-    Number(match[3]),
-  ];
-  return (
-    month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth(year, month)
-  );
+  return isCalendarDate(value);
 }
 
 export function parseYMD(value: string): CalendarParts {
@@ -66,23 +60,6 @@ export function addDays(value: string, days: number): string {
   return addDaysYMD(value, days);
 }
 
-/**
- * The date `months` after `anchor`, with the day of month clamped to the target
- * month's length. Always computed from the anchor, never from a previous
- * result, so 31 Jan -> 28 Feb -> 31 Mar rather than drifting to the 28th.
- */
-export function addMonthsClamped(anchor: string, months: number): string {
-  const { year, month, day } = parseYMD(anchor);
-  const index = year * 12 + (month - 1) + months;
-  const targetYear = Math.floor(index / 12);
-  const targetMonth = (index % 12) + 1;
-  return formatYMD(
-    targetYear,
-    targetMonth,
-    Math.min(day, daysInMonth(targetYear, targetMonth)),
-  );
-}
-
 /** Day of week, 0 = Sunday .. 6 = Saturday. */
 export function dayOfWeek(value: string): number {
   return new Date(toUtcMs(value)).getUTCDay();
@@ -97,5 +74,5 @@ export function firstOfMonth(value: string): string {
 export function monthKeyBefore(value: string, months: number): string {
   const { year, month } = parseYMD(value);
   const index = year * 12 + (month - 1) - months;
-  return `${String(Math.floor(index / 12)).padStart(4, "0")}-${String((index % 12) + 1).padStart(2, "0")}`;
+  return formatMonthKey(Math.floor(index / 12), (index % 12) + 1);
 }

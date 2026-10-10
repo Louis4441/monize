@@ -305,7 +305,10 @@ export class BackupRestoreService {
                 // Phase 2a': a security's bond link survives only where this
                 // deployment's catalog holds the instrument; else it is restored
                 // unlinked (the table is reference data, not part of a backup).
-                await this.db.severUnavailableBondLinks(manager, data);
+                const severedCatalogLinks =
+                  await this.db.severUnavailableCatalogLinks(manager, data);
+                const unlinkedBondSecurities =
+                  severedCatalogLinks["securities.bond_instrument_id"] ?? 0;
 
                 // Phase 2b: insert every backed-up table in FK-safe order. The order,
                 // the row-count key and whether user_id is forced live in
@@ -340,18 +343,22 @@ export class BackupRestoreService {
                 await this.db.restoreDeferredFkColumns(manager, data, userId);
 
                 this.logger.log(`Backup restore completed for user ${userId}`);
-                // `skippedAttachments` and `unusableAiProviderKeys` are reported
-                // beside `restored`, never inside it: the client sums `restored`'s
-                // values to show a row total, and neither a count of rows that were
-                // deliberately not written nor a count of rows whose contents did not
-                // survive belongs in that sum. Both are omitted at zero so "no field"
-                // and "nothing to report" are the same answer.
+                // `skippedAttachments`, `unusableAiProviderKeys` and
+                // `unlinkedBondSecurities` are reported beside `restored`, never
+                // inside it: the client sums `restored`'s values to show a row
+                // total, and neither a count of rows that were deliberately not
+                // written, a count of rows whose contents did not survive nor a
+                // count of links dropped belongs in that sum. All are omitted at
+                // zero so "no field" and "nothing to report" are the same answer.
                 return {
                   message: "Backup restored successfully",
                   restored,
                   ...(skippedAttachments > 0 ? { skippedAttachments } : {}),
                   ...(unusableAiProviderKeys > 0
                     ? { unusableAiProviderKeys }
+                    : {}),
+                  ...(unlinkedBondSecurities > 0
+                    ? { unlinkedBondSecurities }
                     : {}),
                 };
               }),

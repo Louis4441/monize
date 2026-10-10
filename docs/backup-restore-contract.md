@@ -193,8 +193,12 @@ before re-authentication -- it is free, and it writes nothing:
   catalog), canonicalised like any other and then kept only where this
   deployment's own catalog holds the row and, for a bond link, in the security's
   currency; otherwise it is written NULL and logged
-  (`BackupRestoreDatabaseService.severUnavailableBondLinks`), so a restore never
-  fails on a series this deployment has not seeded. The instrument id is derived
+  (`BackupRestoreDatabaseService.severUnavailableCatalogLinks`, which iterates
+  `CATALOG_REFERENCE_COLUMNS`), so a restore never fails on a series this
+  deployment has not seeded. The restore says so: the result carries
+  `unlinkedBondSecurities` (omitted at zero, outside `restored`) and the restore
+  dialogue shows it, because the bond engine no longer prices those securities;
+  the file's `bond_engine` price rows of a security it unlinked are not restored. The instrument id is derived
   from the series (`bondInstrumentId`), so it is the same on every deployment.
 
 Every key is then remapped to a fresh id, so the restored graph is closed over

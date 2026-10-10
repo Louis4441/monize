@@ -999,6 +999,14 @@ describe("Backup export/restore round-trip (integration)", () => {
     await insert("LINKED", "PLN");
     await insert("UNKNOWN-SERIES", "PLN");
     await insert("WRONG-CCY", "PLN");
+    // The engine's price rows ride along in the file; one is also a manual price.
+    await dataSource.query(
+      `INSERT INTO security_prices (security_id, price_date, close_price, source)
+       SELECT id, DATE '2026-09-01', 100, 'bond_engine' FROM securities WHERE user_id = $1
+       UNION ALL
+       SELECT id, DATE '2026-09-02', 101, 'manual' FROM securities WHERE user_id = $1 AND symbol = 'UNKNOWN-SERIES'`,
+      [userA.id],
+    );
 
     const { buffer } = await withUserContext(userA.id, () =>
       service.exportToBuffer(userA.id),
@@ -1031,11 +1039,16 @@ describe("Backup export/restore round-trip (integration)", () => {
     );
     const edited = gzipSync(Buffer.from(JSON.stringify(exported)));
 
-    await withUserContext(userB.id, () =>
+    const result = await withUserContext(userB.id, () =>
       service.restoreData(userB.id, {
         compressedData: edited,
         password: PASSWORD,
       }),
+    );
+    // The restore succeeds and says how many bond links it had to drop.
+    expect(result.unlinkedBondSecurities).toBe(2);
+    expect(Object.keys(result.restored)).not.toContain(
+      "unlinkedBondSecurities",
     );
 
     const restored = await dataSource.query(
@@ -1046,6 +1059,19 @@ describe("Backup export/restore round-trip (integration)", () => {
       { symbol: "LINKED", bond_instrument_id: instrumentId },
       { symbol: "UNKNOWN-SERIES", bond_instrument_id: null },
       { symbol: "WRONG-CCY", bond_instrument_id: null },
+    ]);
+
+    // An unlinked security keeps no engine price (nothing would ever refresh or
+    // remove it); its manual price and the linked security's engine price stay.
+    const prices = await dataSource.query(
+      `SELECT s.symbol, p.source FROM security_prices p
+         JOIN securities s ON s.id = p.security_id
+        WHERE s.user_id = $1 ORDER BY s.symbol, p.source`,
+      [userB.id],
+    );
+    expect(prices).toEqual([
+      { symbol: "LINKED", source: "bond_engine" },
+      { symbol: "UNKNOWN-SERIES", source: "manual" },
     ]);
   });
 

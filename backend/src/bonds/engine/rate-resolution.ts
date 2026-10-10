@@ -47,12 +47,15 @@ export interface RateResolution {
 
 type BenchmarkRule = Exclude<RateRule, { type: "FIXED" }>;
 
-function parseDecimal(value: string, what: string): ExactDecimal {
+/** `field` names the stored or supplied value by a technical key, e.g. `announcedRate:2`. */
+function parseDecimal(value: string, field: string): ExactDecimal {
   try {
     return ExactDecimal.parse(value);
   } catch {
     throw new BondEngineError(
-      `${what} is not a decimal string: ${String(value)}`,
+      "DECIMAL_INVALID",
+      { field, value: String(value) },
+      `${field} is not a decimal string: ${String(value)}`,
     );
   }
 }
@@ -147,7 +150,7 @@ function observe(
         value: change
           ? parseDecimal(
               change.value,
-              `${rule.benchmarkId} ${change.effectiveFrom}`,
+              `${rule.benchmarkId}:${change.effectiveFrom}`,
             )
           : null,
         missing,
@@ -162,7 +165,7 @@ function observe(
         value:
           stored === undefined
             ? null
-            : parseDecimal(stored, `${rule.benchmarkId} ${key}`),
+            : parseDecimal(stored, `${rule.benchmarkId}:${key}`),
         missing: { benchmarkId: rule.benchmarkId, observation: key, publisher },
       };
     }
@@ -184,7 +187,7 @@ function projectionAssumption(
   const id = rule.benchmarkId;
   const supplied = input.projection?.get(id);
   if (supplied !== undefined) {
-    const value = parseDecimal(supplied, `Projection assumption for ${id}`);
+    const value = parseDecimal(supplied, `projectionAssumption:${id}`);
     return {
       value,
       entry: {
@@ -211,7 +214,7 @@ function projectionAssumption(
       data.values.get(keys[keys.length - 1])!,
     ];
   }
-  const value = parseDecimal(raw, `${id} ${at}`);
+  const value = parseDecimal(raw, `${id}:${at}`);
   return {
     value,
     entry: {
@@ -276,7 +279,7 @@ export function resolvePeriodRates(
     const announced = input.announcedRates.get(period.index);
     if (announced !== undefined) {
       return known(
-        parseDecimal(announced, `Announced rate ${period.index}`),
+        parseDecimal(announced, `announcedRate:${period.index}`),
         "ANNOUNCED",
       );
     }

@@ -57,6 +57,32 @@ const EXEMPT: ReadonlyMap<string, string> = new Map([
   ],
 ]);
 
+/**
+ * Methods that reach a provider and do not consult the predicate themselves,
+ * each with the reason. Keyed `<file>::<method>`. The first three are the gated
+ * entry points of `SecurityPriceService`: the scan holds their CALLERS to the
+ * predicate (GATED_FETCHES), so the predicate is not repeated inside them. The
+ * last prices no stored security. Shrink-only.
+ */
+const METHOD_EXEMPT: ReadonlyMap<string, string> = new Map([
+  [
+    `${PRICE_SERVICE}::fetchQuoteWithFallback`,
+    "a gated entry point; every caller is scanned for the predicate",
+  ],
+  [
+    `${PRICE_SERVICE}::fetchHistoricalWithFallback`,
+    "a gated entry point; every caller is scanned for the predicate",
+  ],
+  [
+    `${PRICE_SERVICE}::fillPriceWindow`,
+    "a gated entry point; every caller is scanned for the predicate",
+  ],
+  [
+    `${PRICE_SERVICE}::fetchAuthoritativeCurrency`,
+    "reads the currency of a symbol being added, which prices no stored security",
+  ],
+]);
+
 /** Blank comments, keeping line numbers, so prose may name what the code must not. */
 export function stripComments(source: string): string {
   return source
@@ -86,11 +112,34 @@ export function classMethods(source: string): Map<string, string> {
   return methods;
 }
 
-/** Methods that reach a provider through a gated entry point without consulting the predicate. */
-export function ungatedMethods(source: string): string[] {
-  return [...classMethods(stripComments(source))]
-    .filter(([, body]) => GATED_FETCHES.test(body) && !PREDICATE.test(body))
+/**
+ * Methods that reach a provider, through a gated entry point or by a direct
+ * fetch call, without consulting the predicate in the same method. A call in a
+ * method is the unit: a file that consults the predicate once somewhere else does
+ * not excuse a second fetch path. `exempt` names the methods that need not.
+ */
+export function ungatedMethods(
+  source: string,
+  exempt: ReadonlySet<string> = new Set(),
+): string[] {
+  const stripped = stripComments(source);
+  const offenders = [...classMethods(stripped)]
+    .filter(
+      ([name, body]) =>
+        (GATED_FETCHES.test(body) || PROVIDER_CALL.test(body)) &&
+        !PREDICATE.test(body) &&
+        !exempt.has(name),
+    )
     .map(([name]) => name);
+  // A call outside any class member (a top-level function) belongs to no
+  // method above; the file-level predicate is then the only thing to hold it to.
+  const inMember = [...classMethods(stripped).values()].some((body) =>
+    PROVIDER_CALL.test(body),
+  );
+  if (!inMember && PROVIDER_CALL.test(stripped) && !PREDICATE.test(stripped)) {
+    offenders.push("<outside any class member>");
+  }
+  return offenders;
 }
 
 function sourceFiles(dir: string): string[] {
@@ -107,6 +156,13 @@ function sourceFiles(dir: string): string[] {
   }
   return out;
 }
+
+const exemptIn = (rel: string): ReadonlySet<string> =>
+  new Set(
+    [...METHOD_EXEMPT.keys()]
+      .filter((key) => key.startsWith(`${rel}::`))
+      .map((key) => key.split("::")[1]),
+  );
 
 const read = (rel: string) =>
   stripComments(readFileSync(join(SRC_ROOT, rel), "utf8"));
@@ -129,6 +185,7 @@ describe("a bond-linked security is never priced by a quote provider (INV-BOND-0
   it("has no method of SecurityPriceService reaching a provider without consulting it", () => {
     const offenders = ungatedMethods(
       readFileSync(join(SRC_ROOT, PRICE_SERVICE), "utf8"),
+      exemptIn(PRICE_SERVICE),
     );
     expect(offenders.map((name) => `${PRICE_SERVICE}: ${name}()`)).toEqual([]);
   });
@@ -141,19 +198,22 @@ describe("a bond-linked security is never priced by a quote provider (INV-BOND-0
     expect(methods.length).toBeGreaterThanOrEqual(7);
   });
 
-  it("has no other file calling a provider's fetch without consulting it or being exempt", () => {
+  it("has no other file with a method calling a provider without consulting it, or being exempt", () => {
     const offenders: string[] = [];
     for (const file of files) {
       const rel = relOf(file);
       if (rel === PRICE_SERVICE || rel.startsWith("securities/providers/")) {
         continue;
       }
-      const source = stripComments(readFileSync(file, "utf8"));
-      if (!PROVIDER_CALL.test(source)) continue;
-      if (EXEMPT.has(rel) || PREDICATE.test(source)) continue;
-      offenders.push(
-        `${rel} -- call isPricedByQuoteProvider (securities/provider-priced.util.ts) before asking a provider about a security`,
-      );
+      const source = readFileSync(file, "utf8");
+      if (!PROVIDER_CALL.test(stripComments(source)) || EXEMPT.has(rel)) {
+        continue;
+      }
+      for (const method of ungatedMethods(source, exemptIn(rel))) {
+        offenders.push(
+          `${rel}: ${method}() -- call isPricedByQuoteProvider (securities/provider-priced.util.ts) in the method that asks a provider about a security`,
+        );
+      }
     }
     expect(offenders).toEqual([]);
   });
@@ -161,6 +221,15 @@ describe("a bond-linked security is never priced by a quote provider (INV-BOND-0
   it("keeps every exemption pointing at a file that still calls a provider", () => {
     for (const rel of EXEMPT.keys()) {
       expect(PROVIDER_CALL.test(read(rel))).toBe(true);
+    }
+  });
+
+  it("keeps every method exemption pointing at a method that still reaches a provider", () => {
+    for (const key of METHOD_EXEMPT.keys()) {
+      const [rel, name] = key.split("::");
+      const body = classMethods(read(rel)).get(name);
+      expect(body).toBeDefined();
+      expect(GATED_FETCHES.test(body!) || PROVIDER_CALL.test(body!)).toBe(true);
     }
   });
 
@@ -193,6 +262,68 @@ describe("a bond-linked security is never priced by a quote provider (INV-BOND-0
         "}",
       ].join("\n");
       expect(ungatedMethods(source)).toEqual(["refreshNew"]);
+    });
+
+    it("flags a method that calls a provider directly, wrapper or not", () => {
+      const source = [
+        "class S {",
+        "  async latestClose(s) {",
+        "    return provider.fetchQuote(s.symbol, s.exchange);",
+        "  }",
+        "  async series(s) {",
+        "    return this.providers.getByName(s.quoteProvider).fetchHistoricalSeries(s.symbol);",
+        "  }",
+        "  async asked(s) {",
+        "    if (!isPricedByQuoteProvider(s)) return null;",
+        "    return provider.fetchQuote(s.symbol);",
+        "  }",
+        "}",
+      ].join("\n");
+      expect(ungatedMethods(source)).toEqual(["latestClose", "series"]);
+    });
+
+    it("holds a second fetch path in a file that consults the predicate elsewhere", () => {
+      const source = [
+        "class P {",
+        "  async chart(s) {",
+        "    if (!isPricedByQuoteProvider(s)) return [];",
+        "    return yahoo.fetchIntradaySeries(s.symbol);",
+        "  }",
+        "  async another(s) {",
+        "    return yahoo.fetchIntradaySeries(s.symbol);",
+        "  }",
+        "}",
+      ].join("\n");
+      expect(ungatedMethods(source)).toEqual(["another"]);
+    });
+
+    it("lets a named method through, and only that one", () => {
+      const source = [
+        "class S {",
+        "  async fetchAuthoritativeCurrency(sym) {",
+        "    return p.fetchQuote(sym);",
+        "  }",
+        "  async sneaky(s) {",
+        "    return p.fetchQuote(s);",
+        "  }",
+        "}",
+      ].join("\n");
+      expect(
+        ungatedMethods(source, new Set(["fetchAuthoritativeCurrency"])),
+      ).toEqual(["sneaky"]);
+    });
+
+    it("flags a fetch outside any class member unless the file consults the predicate", () => {
+      expect(
+        ungatedMethods(
+          "export async function f(s) { return y.fetchQuote(s); }",
+        ),
+      ).toEqual(["<outside any class member>"]);
+      expect(
+        ungatedMethods(
+          "export async function f(s) { if (!isPricedByQuoteProvider(s)) return null; return y.fetchQuote(s); }",
+        ),
+      ).toEqual([]);
     });
   });
 });

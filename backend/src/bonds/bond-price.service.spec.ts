@@ -99,6 +99,10 @@ function setup(
   );
   manager.query.mockImplementation(async (sql: string, params: unknown[]) => {
     statements.push({ sql, params });
+    if (sql.includes("pg_advisory_xact_lock")) {
+      events.push("lock");
+      return [];
+    }
     if (sql.includes("FROM securities")) {
       return (
         opts.security ?? [
@@ -220,7 +224,11 @@ describe("BondPriceService", () => {
       ];
       expect(dates[dates.length - 1]).toBe("2027-04-15");
       expect(prices[prices.length - 1]).toBe("102.1900000000");
-      expect(money(grossCents(182) * 25n)).toBe("2554.75");
+      // The lot total follows from what the service wrote: its per-bond price
+      // times the 25 bonds (the helper alone proves nothing about the service).
+      const [whole, fraction] = prices[prices.length - 1].split(".");
+      const writtenCents = BigInt(whole) * 100n + BigInt(fraction.slice(0, 2));
+      expect(money(writtenCents * 25n)).toBe("2554.75");
     });
 
     it("averages lots of different dates by quantity, per bond", async () => {
@@ -431,6 +439,7 @@ describe("BondPriceService", () => {
       );
       expect(events).toEqual([
         "begin",
+        "lock",
         "upsert",
         "delete",
         "dirty",
@@ -447,6 +456,60 @@ describe("BondPriceService", () => {
         "acct-2",
         USER,
       );
+    });
+
+    it("takes the per-security recompute lock before it reads the ledger or the link", async () => {
+      const { service, statements } = setup([buy("2026-10-15", "10")]);
+      await service.recomputeSecurity(USER, SECURITY, { today: "2026-10-16" });
+      expect(statements[0].sql).toContain("pg_advisory_xact_lock");
+      // Scope 7 (BondPriceRecompute), keyed by the security.
+      expect(statements[0].params).toEqual([7, SECURITY]);
+      expect(statements[1].sql).toContain("FROM securities");
+    });
+
+    it("clearEnginePrices locks, deletes only the engine's rows, marks the accounts, and publishes after the commit", async () => {
+      const { service, statements, netWorth, events } = setup([], {
+        deleteRows: 3,
+      });
+      const manager = { query: jest.fn() };
+      manager.query.mockImplementation(
+        async (sql: string, params: unknown[]) => {
+          statements.push({ sql, params });
+          if (sql.includes("DELETE FROM security_prices"))
+            return [[{}, {}, {}], 3];
+          return [];
+        },
+      );
+      const cleared = await service.clearEnginePrices(
+        manager as never,
+        USER,
+        SECURITY,
+      );
+      expect(cleared).toEqual({ deleted: 3, accountIds: ["acct-1", "acct-2"] });
+      expect(statements[0].sql).toContain("pg_advisory_xact_lock");
+      const del = statements.find((s) =>
+        s.sql.includes("DELETE FROM security_prices"),
+      )!;
+      expect(del.sql).toMatch(/source = \$3::varchar/);
+      expect(del.params[2]).toBe("bond_engine");
+      expect(events).toEqual(["dirty"]);
+
+      service.publishClearedPrices(USER, cleared.accountIds);
+      expect(invalidatePortfolioSummary).toHaveBeenCalledWith(USER);
+      expect(netWorth.triggerDebouncedRecalc).toHaveBeenCalledTimes(2);
+    });
+
+    it("clearEnginePrices with nothing to delete marks nothing", async () => {
+      const { service } = setup([], { deleteRows: 0 });
+      const manager = {
+        query: jest.fn(async (sql: string) =>
+          sql.includes("DELETE") ? [[], 0] : [],
+        ),
+      };
+      await expect(
+        service.clearEnginePrices(manager as never, USER, SECURITY),
+      ).resolves.toEqual({ deleted: 0, accountIds: [] });
+      expect(markHoldingAccountsDirty).not.toHaveBeenCalled();
     });
 
     it("does nothing downstream when nothing changed", async () => {

@@ -4,7 +4,10 @@ import {
   Column,
   CreateDateColumn,
   Unique,
+  ManyToOne,
+  JoinColumn,
 } from "typeorm";
+import { Currency } from "../../currencies/entities/currency.entity";
 
 /**
  * One sovereign bond series, for any issuer country (the Polish retail bonds
@@ -35,6 +38,13 @@ export class BondInstrument {
 
   @Column({ type: "varchar", length: 3, name: "currency_code" })
   currencyCode: string;
+
+  // Declared so the integration schema, which is built from the entities, carries
+  // the same `REFERENCES currencies(code)` as schema.sql (as exchange-rate.entity.ts
+  // does). Never loaded; the column above is what the code reads.
+  @ManyToOne(() => Currency)
+  @JoinColumn({ name: "currency_code", referencedColumnName: "code" })
+  currency?: Currency;
 
   @Column({ type: "varchar", length: 30 })
   marketability: string;

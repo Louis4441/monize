@@ -238,22 +238,25 @@ describe("BondValuationService", () => {
 
   it("refuses a missing instrument, naming it", async () => {
     const { service } = setup({ instruments: [] });
-    await expect(service.valueLot(request())).rejects.toThrow(
-      new BondDataNotFoundError(
-        "No bond instrument stored for PL PL_MF TOS1029",
-      ),
-    );
+    await expect(service.valueLot(request())).rejects.toMatchObject({
+      code: "INSTRUMENT_NOT_FOUND",
+      params: { country: "PL", issuer: "PL_MF", series: "TOS1029" },
+    });
   });
 
   it("refuses missing terms, and a missing named version", async () => {
     const { service } = setup({ terms: [] });
-    await expect(service.valueLot(request())).rejects.toThrow(
-      "No terms version stored for PL PL_MF TOS1029",
-    );
+    await expect(service.valueLot(request())).rejects.toMatchObject({
+      code: "TERMS_NOT_FOUND",
+      params: { series: "TOS1029" },
+    });
     const named = setup({});
     await expect(
       named.service.valueLot(request({ termsVersion: 7 })),
-    ).rejects.toThrow("No terms version 7 stored for PL PL_MF TOS1029");
+    ).rejects.toMatchObject({
+      code: "TERMS_VERSION_NOT_FOUND",
+      params: { series: "TOS1029", version: "7" },
+    });
   });
 
   it("refuses terms that contradict the instrument row", async () => {
@@ -266,9 +269,17 @@ describe("BondValuationService", () => {
     const wrongCurrency = setup({
       instruments: [{ id: "i1", series_code: "TOS1029", currency_code: "EUR" }],
     });
-    await expect(wrongCurrency.service.valueLot(request())).rejects.toThrow(
-      /describe TOS1029 in PLN, but the instrument row is TOS1029 in EUR/,
-    );
+    await expect(
+      wrongCurrency.service.valueLot(request()),
+    ).rejects.toMatchObject({
+      code: "TERMS_MISMATCH",
+      params: {
+        series: "TOS1029",
+        version: "1",
+        claimedCurrency: "PLN",
+        storedCurrency: "EUR",
+      },
+    });
   });
 
   it("refuses stored terms that do not parse", async () => {
@@ -561,7 +572,10 @@ describe("BondValuationService", () => {
           ["0.05"],
           "2027-10-16",
         ),
-      ).rejects.toThrow(/does not read benchmark PL_NBP_REFERENCE/);
+      ).rejects.toMatchObject({
+        code: "BENCHMARK_NOT_READ",
+        params: { benchmarkId: "PL_NBP_REFERENCE" },
+      });
       await expect(
         edo().service.valueSecurity(
           "user-1",
@@ -569,7 +583,10 @@ describe("BondValuationService", () => {
           "2027-10-16",
           new Map([["PL_NBP_REFERENCE", "0.05"]]),
         ),
-      ).rejects.toThrow(/does not read benchmark PL_NBP_REFERENCE/);
+      ).rejects.toMatchObject({
+        code: "BENCHMARK_NOT_READ",
+        params: { benchmarkId: "PL_NBP_REFERENCE" },
+      });
     });
 
     it("keeps the known periods across scenarios", async () => {

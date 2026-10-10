@@ -771,6 +771,10 @@ export class SecuritiesService {
       security.skipPriceUpdates = false;
     }
 
+    // Accounts whose derived state must be refreshed after the commit because the
+    // engine's price rows were deleted by an unlink (INV-CACHE-001).
+    let clearedEngineAccounts: string[] = [];
+
     // Persist the scalar fields and the tag set together so a security and its
     // classification never drift apart on a partial failure.
     await withScopedDb(this.dataSource, async (m) => {
@@ -789,6 +793,15 @@ export class SecuritiesService {
         );
       }
 
+      // A security no longer linked to the instrument its engine prices came
+      // from (unlinked, or moved to another instrument) loses those rows in the
+      // same transaction; a new link is priced after the commit. Manual,
+      // transaction and provider rows are not the engine's and stay.
+      if (linkChanged) {
+        ({ accountIds: clearedEngineAccounts } =
+          await this.bondPriceService.clearEnginePrices(m, userId, id));
+      }
+
       // The relation is loaded onto `security`; strip it before save so
       // TypeORM does not try to cascade-write the join table itself.
       const { tags: _tags, ...scalars } = security;
@@ -800,8 +813,12 @@ export class SecuritiesService {
 
     const saved = await this.findOne(userId, id);
 
-    // After the commit, never inside it (INV-CACHE-001): a link set or changed
-    // is priced from the engine now rather than at the next daily run.
+    // After the commit, never inside it (INV-CACHE-001): the engine's rows an
+    // unlink deleted change what the portfolio is worth, and a link set or
+    // changed is priced from the engine now rather than at the next daily run.
+    if (clearedEngineAccounts.length > 0) {
+      this.bondPriceService.publishClearedPrices(userId, clearedEngineAccounts);
+    }
     if (
       saved.bondInstrumentId &&
       saved.bondInstrumentId !== beforeData.bondInstrumentId

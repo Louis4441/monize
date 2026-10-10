@@ -386,6 +386,29 @@ describe("valueBondLot: matured lots", () => {
     });
   });
 
+  it("a coupon lot needs no rate to be worth its nominal; the unread last period is named", () => {
+    const v = coi("2030-10-15");
+    expect(v).toMatchObject({
+      principal: "100.00",
+      grossValue: "100.00",
+      accruedInterest: "0.00",
+      earlyRedemptionRefusal: "MATURED",
+      maturityValueKnown: null,
+      knownCashflows: [],
+      valuationComplete: false,
+    });
+    expect(v.missing).toEqual([
+      expect.objectContaining({ benchmarkId: CPI, observation: "2029-08" }),
+    ]);
+  });
+
+  it("a matured coupon lot with its last rate known is complete", () => {
+    const v = coi("2030-10-15", {
+      announcedRates: announced([2, "0.04"], [3, "0.04"], [4, "0.05"]),
+    });
+    expect(v).toMatchObject({ valuationComplete: true, missing: [] });
+  });
+
   it("a compounding lot with unknown rates is null and names them", () => {
     const v = edo("2036-10-01");
     expect(v.grossValue).toBeNull();
@@ -397,6 +420,14 @@ describe("valueBondLot: matured lots", () => {
 describe("valueBondLot: refusals of the input", () => {
   it("refuses asOf before the purchase date", () => {
     expect(() => tos("2026-10-14")).toThrow(BondEngineError);
+    try {
+      tos("2026-10-14");
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: "AS_OF_BEFORE_PURCHASE",
+        params: { asOf: "2026-10-14", purchaseDate: "2026-10-15" },
+      });
+    }
   });
 
   it("values a lot on its purchase date", () => {
@@ -411,6 +442,38 @@ describe("valueBondLot: refusals of the input", () => {
       ).toThrow(BondEngineError);
     },
   );
+
+  it("carries a code and string params, not a sentence to display", () => {
+    const thrown = (run: () => unknown): BondEngineError => {
+      try {
+        run();
+      } catch (error) {
+        return error as BondEngineError;
+      }
+      throw new Error("expected a BondEngineError");
+    };
+    expect(
+      thrown(() =>
+        tos("2027-01-15", { lot: { purchaseDate: "2026-10-15", quantity: 0 } }),
+      ),
+    ).toMatchObject({ code: "QUANTITY_INVALID", params: { quantity: "0" } });
+    expect(
+      thrown(() =>
+        tos("2027-01-15", { lot: { purchaseDate: "x", quantity: 1 } }),
+      ),
+    ).toMatchObject({
+      code: "DATE_INVALID",
+      params: { purchaseDate: "x", asOf: "2027-01-15" },
+    });
+    expect(
+      thrown(() =>
+        edo("2027-10-02", { announcedRates: announced([2, "4.9%"]) }),
+      ),
+    ).toMatchObject({
+      code: "DECIMAL_INVALID",
+      params: { field: "announcedRate:2", value: "4.9%" },
+    });
+  });
 
   it("refuses invalid dates and malformed decimals", () => {
     expect(() => tos("2027-02-30")).toThrow(BondEngineError);

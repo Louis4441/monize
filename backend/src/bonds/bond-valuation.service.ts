@@ -120,6 +120,8 @@ function assertReadsBenchmark(terms: BondTerms, benchmarkId: string): void {
   const rule = terms.rateRule;
   if (rule.type === "FIXED" || rule.benchmarkId !== benchmarkId) {
     throw new BondEngineError(
+      "BENCHMARK_NOT_READ",
+      { series: terms.instrument.seriesCode, benchmarkId },
       `${terms.instrument.seriesCode} does not read benchmark ${benchmarkId}`,
     );
   }
@@ -167,6 +169,8 @@ export class BondValuationService {
     );
     if (rows.length === 0) {
       throw new BondDataNotFoundError(
+        "INSTRUMENT_ID_NOT_FOUND",
+        { id: instrumentId },
         `No bond instrument stored with id ${instrumentId}`,
       );
     }
@@ -344,7 +348,15 @@ export class BondValuationService {
       [request.issuerCountryCode, request.issuerCode, request.seriesCode],
     );
     if (rows.length === 0) {
-      throw new BondDataNotFoundError(`No bond instrument stored for ${named}`);
+      throw new BondDataNotFoundError(
+        "INSTRUMENT_NOT_FOUND",
+        {
+          country: request.issuerCountryCode,
+          issuer: request.issuerCode,
+          series: request.seriesCode,
+        },
+        `No bond instrument stored for ${named}`,
+      );
     }
     return rows[0];
   }
@@ -374,7 +386,18 @@ export class BondValuationService {
         termsVersion === undefined
           ? "terms version"
           : `terms version ${termsVersion}`;
-      throw new BondDataNotFoundError(`No ${which} stored for ${named}`);
+      const message = `No ${which} stored for ${named}`;
+      throw termsVersion === undefined
+        ? new BondDataNotFoundError(
+            "TERMS_NOT_FOUND",
+            { series: instrument.series_code },
+            message,
+          )
+        : new BondDataNotFoundError(
+            "TERMS_VERSION_NOT_FOUND",
+            { series: instrument.series_code, version: String(termsVersion) },
+            message,
+          );
     }
     return {
       version: Number(rows[0].version),
@@ -394,6 +417,15 @@ export class BondValuationService {
       instrument.currency_code !== claimed.currency
     ) {
       throw new BondDataInconsistentError(
+        "TERMS_MISMATCH",
+        {
+          series: instrument.series_code,
+          version: String(version),
+          claimedSeries: claimed.seriesCode,
+          claimedCurrency: claimed.currency,
+          storedSeries: instrument.series_code,
+          storedCurrency: instrument.currency_code,
+        },
         `Terms version ${version} of ${named} describe ${claimed.seriesCode} in ${claimed.currency}, ` +
           `but the instrument row is ${instrument.series_code} in ${instrument.currency_code}`,
       );

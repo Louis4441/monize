@@ -1,3 +1,4 @@
+import { BondErrorParams } from "../bond-errors";
 import { BenchmarkData } from "../domain/benchmark";
 import { BusinessDayCalendar } from "../domain/business-day-calendar";
 import { BondTerms } from "../domain/bond-terms";
@@ -142,8 +143,24 @@ export interface ProjectionAssumption {
   readonly observation: string | null;
 }
 
+export type BondEngineErrorCode =
+  | "QUANTITY_INVALID"
+  | "DATE_INVALID"
+  | "AS_OF_BEFORE_PURCHASE"
+  | "BENCHMARK_NOT_READ"
+  | "DECIMAL_INVALID";
+
+/**
+ * The input or stored data is unusable. `code` and `params` are what a client is
+ * told (translated by the controller); `message` is English for the logs only
+ * and must never reach a user.
+ */
 export class BondEngineError extends Error {
-  constructor(message: string) {
+  constructor(
+    readonly code: BondEngineErrorCode,
+    readonly params: BondErrorParams,
+    message: string,
+  ) {
     super(message);
     this.name = "BondEngineError";
   }

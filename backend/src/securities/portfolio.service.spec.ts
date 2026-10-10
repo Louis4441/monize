@@ -3908,6 +3908,9 @@ describe("PortfolioService", () => {
         ([symbol]: [string]) => symbol,
       );
       expect(asked).toEqual([mockSecurityAAPL.symbol]);
+      // This is the legacy (holdings-table) branch, reached because the default
+      // ledger mock is empty; production values a linked holding on the ledger
+      // path, which the next test pins (its stored close, per day).
     });
 
     it("caches results for 60 seconds keyed by user/range/accounts/currency", async () => {
@@ -5078,6 +5081,70 @@ describe("PortfolioService", () => {
       expect(result.points[4].value).toBe(111541.4543);
       expect(result.points[4].securitiesValue).toBe(111541.4543);
       expect(result.points[1].value).toBe(111396.8957);
+    });
+
+    it("values a bond-linked holding at its stored close on the ledger path and never asks a provider for it (INV-BOND-005)", async () => {
+      const bond = {
+        id: "sec-bond",
+        symbol: "TOS1029",
+        name: "TOS1029",
+        securityType: "BOND",
+        exchange: null,
+        currencyCode: "CAD",
+        isActive: true,
+        bondInstrumentId: "11111111-1111-5111-8111-111111111111",
+      } as unknown as Security;
+      netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+        ledgerOf(
+          [
+            {
+              date: "2026-09-01",
+              quantities: { [xgro.id]: 10, [bond.id]: 100 },
+              closes: { [xgro.id]: 100, [bond.id]: 100 },
+              // The bond's close is the engine's stored price, per day.
+              closeValues: { [xgro.id]: 1000, [bond.id]: 10000 },
+              value: 11000,
+              securitiesValue: 11000,
+            },
+            {
+              date: "2026-09-02",
+              quantities: { [xgro.id]: 10, [bond.id]: 100 },
+              closes: { [xgro.id]: 101, [bond.id]: 100.1 },
+              closeValues: { [xgro.id]: 1010, [bond.id]: 10010 },
+              value: 11020,
+              securitiesValue: 11020,
+            },
+          ],
+          [xgro, bond],
+        ),
+      );
+      seriesBySymbol({
+        "XGRO.TO": [
+          bar("2026-09-01T19:45:00.000Z", 100),
+          bar("2026-09-02T19:45:00.000Z", 102),
+        ],
+      });
+
+      const result = await service.getIntradayValueSeries(userId, {
+        range: "1m",
+      });
+
+      const asked = yahooFinanceService.fetchIntradaySeries.mock.calls.map(
+        ([symbol]: [string]) => symbol,
+      );
+      expect(asked).not.toContain("TOS1029");
+      // Mid-session the bond contributes its stored close beside the live bar:
+      // 10 x 102 + 10010. Dropping a holding that is not fetched would leave 1020.
+      const midSession = result.points.find(
+        (p) => p.timestamp === "2026-09-02T19:45:00.000Z",
+      )!;
+      expect(midSession.value).toBeCloseTo(1020 + 10010, 4);
+      // The session's last point is the daily series' figure, bond included.
+      const close = result.points.find(
+        (p) => p.timestamp === "2026-09-02T20:00:00.000Z",
+      )!;
+      expect(close.value).toBe(11020);
+      expect(close.securitiesValue).toBe(11020);
     });
 
     it("values each day at that day's share count and cash, not today's (a deposit, then a buy)", async () => {

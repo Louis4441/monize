@@ -16,10 +16,13 @@
 --
 -- INV-BOND-001: a terms version and a period rate, once written, are never
 -- changed or removed -- a holding valued today must be reproducible tomorrow.
--- bond_reject_mutation() enforces it in the database, so no code path (the
--- refresh, a restore, a manual statement) can rewrite history. ON DELETE
--- RESTRICT on the foreign keys keeps an instrument or a series from being
--- deleted from under its dependants.
+-- bond_reject_mutation() enforces it in the database as a row-level BEFORE
+-- UPDATE OR DELETE trigger, so no code path (the refresh, a restore, a manual
+-- UPDATE or DELETE) can rewrite history. A row-level trigger does not fire for
+-- TRUNCATE, so TRUNCATE is NOT covered: it is an operator action, and the
+-- integration suites reset every table with TRUNCATE ... CASCADE, which a
+-- statement-level guard would break. ON DELETE RESTRICT on the foreign keys
+-- keeps an instrument or a series from being deleted from under its dependants.
 --
 -- Rates are NUMERIC(20,10): an exchange-rate-like quantity, not money.
 

@@ -24,7 +24,10 @@ interface GoldenFile {
   cases: GoldenCase[];
 }
 
-// Values are copied from spec section 5 (E1 to E16), never from the engine's output.
+// Never from the engine's output. E1 to E16 (TOS, ROR, COI, EDO) are copied from
+// spec section 5; the OTS, DOR, ROS and ROD fixtures were computed independently
+// from their issue letters (nr 94, 96, 100 and 101/2026), and section 5 rows E17
+// to E22 summarize them.
 describe.each([
   tosCases,
   edoCases,

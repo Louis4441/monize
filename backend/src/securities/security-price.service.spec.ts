@@ -3056,6 +3056,8 @@ describe("SecurityPriceService", () => {
           "redeem",
           "transfer_in",
           "transfer_out",
+          // A trade's price on a day outranks the bond engine's row there.
+          "bond_engine",
         ],
       ]);
     });

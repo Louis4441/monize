@@ -73,10 +73,6 @@ export class ExactDecimal {
     return a.cmp(b) >= 0 ? a : b;
   }
 
-  static min(a: ExactDecimal, b: ExactDecimal): ExactDecimal {
-    return a.cmp(b) <= 0 ? a : b;
-  }
-
   add(other: ExactDecimal): ExactDecimal {
     return ExactDecimal.of(
       this.numerator * other.denominator + other.numerator * this.denominator,

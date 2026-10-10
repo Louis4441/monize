@@ -23,6 +23,17 @@ interface Db {
   versions: Map<string, string>;
 }
 
+const tosRow = (over: Row = {}): Row => ({
+  id: "id-TOS1029",
+  issuer_country_code: "PL",
+  issuer_code: "PL_MF",
+  program_code: "TOS",
+  series_code: "TOS1029",
+  currency_code: "PLN",
+  marketability: "RETAIL_REDEEMABLE",
+  ...over,
+});
+
 function setup(adapters: readonly BondAdapter[], seed: Partial<Db> = {}) {
   const db: Db = {
     currencies: ["PLN"],
@@ -40,8 +51,24 @@ function setup(adapters: readonly BondAdapter[], seed: Partial<Db> = {}) {
         ? [{ "?column?": 1 }]
         : [];
     if (sql.includes("INSERT INTO bond_instruments")) {
-      if (!db.instruments.some((i) => i.series_code === params[3])) {
-        db.instruments.push({ id: `id-${params[3]}`, series_code: params[3] });
+      // Keyed like the table's unique constraint, and insert only.
+      if (
+        !db.instruments.some(
+          (i) =>
+            i.issuer_country_code === params[0] &&
+            i.issuer_code === params[1] &&
+            i.series_code === params[3],
+        )
+      ) {
+        db.instruments.push({
+          id: `id-${params[3]}`,
+          issuer_country_code: params[0],
+          issuer_code: params[1],
+          program_code: params[2],
+          series_code: params[3],
+          currency_code: params[4],
+          marketability: params[5],
+        });
       }
       return [];
     }
@@ -57,10 +84,13 @@ function setup(adapters: readonly BondAdapter[], seed: Partial<Db> = {}) {
         },
       ];
     }
-    if (sql.includes("SELECT id FROM bond_instruments")) {
-      return db.instruments
-        .filter((i) => i.series_code === params[2])
-        .map((i) => ({ id: i.id }));
+    if (sql.includes("SELECT id, program_code")) {
+      return db.instruments.filter(
+        (i) =>
+          i.issuer_country_code === params[0] &&
+          i.issuer_code === params[1] &&
+          i.series_code === params[2],
+      );
     }
     if (sql.includes("INSERT INTO bond_terms_versions")) {
       const key = `${params[0]}:${params[1]}`;
@@ -133,6 +163,8 @@ describe("BondCatalogService", () => {
       s.includes("INSERT INTO benchmark_series"),
     )!;
     expect(upsert).not.toMatch(/covered_through/);
+    // updated_at is the series' last successful fetch: the boot warm-up reads it.
+    expect(upsert).not.toMatch(/updated_at/);
   });
 
   it("is a no-op the second time: same hash, nothing logged", async () => {
@@ -161,7 +193,7 @@ describe("BondCatalogService", () => {
 
   it("logs and skips an entry whose stored version has different content", async () => {
     const { service, db } = setup([POLISH_BOND_ADAPTER], {
-      instruments: [{ id: "id-TOS1029", series_code: "TOS1029" }],
+      instruments: [tosRow()],
       versions: new Map([["id-TOS1029:1", "f".repeat(64)]]),
     });
     await service.seed([POLISH_BOND_ADAPTER]);
@@ -171,6 +203,27 @@ describe("BondCatalogService", () => {
       /version 1 of .*TOS1029.*INV-BOND-001/,
     );
     expect(db.versions.size).toBe(8);
+  });
+
+  it("never overwrites a stored instrument whose currency or program differs, and names the series and field", async () => {
+    const { service, db } = setup([POLISH_BOND_ADAPTER], {
+      instruments: [tosRow({ currency_code: "EUR", program_code: "OLD" })],
+    });
+    await service.seed([POLISH_BOND_ADAPTER]);
+    const messages = error.mock.calls.map((c) => String(c[0]));
+    expect(messages).toHaveLength(2);
+    expect(messages[0]).toMatch(
+      /TOS1029.*on programCode \(stored "OLD", entry "TOS"\)/,
+    );
+    expect(messages[1]).toMatch(
+      /TOS1029.*on currency \(stored "EUR", entry "PLN"\)/,
+    );
+    // The row is untouched and no terms version was stored under it.
+    expect(db.instruments.find((i) => i.series_code === "TOS1029")).toEqual(
+      tosRow({ currency_code: "EUR", program_code: "OLD" }),
+    );
+    expect(db.versions.has("id-TOS1029:1")).toBe(false);
+    expect(db.versions.size).toBe(7);
   });
 
   it("logs a bad manifest and carries on with the rest", async () => {

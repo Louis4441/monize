@@ -54,6 +54,7 @@ import {
   monthFetchWindow,
 } from "../common/time-series/history-fill";
 import { daysBetween } from "../common/time-series/price-boundary.util";
+import { BOND_ENGINE_PRICE_SOURCE } from "../bonds/bond-price-source";
 
 export { SecurityLookupResult } from "./providers/quote-provider.interface";
 
@@ -66,6 +67,31 @@ const TRANSACTION_SOURCES = [
   "transfer_in",
   "transfer_out",
 ];
+
+/**
+ * The rows a transaction-derived price may replace: another transaction price,
+ * and a bond-engine row. A transaction price on a day outranks the engine's
+ * accrual whichever was written first (INV-BOND-005); the engine's own upsert
+ * replaces only its own rows, so the two orders end the same.
+ */
+const TRANSACTION_PRICE_REPLACEABLE_SOURCES = [
+  ...TRANSACTION_SOURCES,
+  BOND_ENGINE_PRICE_SOURCE,
+];
+
+/**
+ * A provider write is re-checked against the link at the moment of the write,
+ * not only when the security list was loaded: a refresh or backfill can hold an
+ * unlinked security in memory for minutes while the user links it to a bond
+ * instrument (INV-BOND-005, the engine is a linked security's only automatic
+ * price source). `$1` is the security id in every statement that uses these.
+ */
+const BOND_LINKED_SQL = `SELECT 1 FROM securities bl
+   WHERE bl.id = $1::UUID AND bl.bond_instrument_id IS NOT NULL`;
+
+/** The existing rows a provider may replace: neither a manual nor a bond-engine price. */
+const PROVIDER_MAY_REPLACE_SQL = `security_prices.source IS DISTINCT FROM 'manual'
+         AND security_prices.source IS DISTINCT FROM '${BOND_ENGINE_PRICE_SOURCE}'`;
 
 // Cap simultaneous external quote fetches so a large securities universe does
 // not fire hundreds of concurrent Yahoo/MSN requests and trip rate limits.
@@ -1027,6 +1053,7 @@ export class SecurityPriceService {
                           AND adj.adjusted_close IS NOT NULL
                      ) THEN $6::NUMERIC ELSE NULL END,
                 $7::BIGINT, $8::VARCHAR, $9::TIMESTAMPTZ
+          WHERE NOT EXISTS (${BOND_LINKED_SQL})
          ON CONFLICT (security_id, price_date) DO UPDATE SET
            close_price    = EXCLUDED.close_price,
            adjusted_close = EXCLUDED.adjusted_close,
@@ -1036,7 +1063,7 @@ export class SecurityPriceService {
            volume      = COALESCE(EXCLUDED.volume,      security_prices.volume),
            source      = EXCLUDED.source,
            quoted_at   = COALESCE(EXCLUDED.quoted_at,   security_prices.quoted_at)
-         WHERE security_prices.source IS DISTINCT FROM 'manual'
+         WHERE ${PROVIDER_MAY_REPLACE_SQL}
          RETURNING id`,
         [
           securityId,
@@ -1549,10 +1576,12 @@ export class SecurityPriceService {
     const batchSize = 500;
     for (let i = 0; i < prices.length; i += batchSize) {
       const batch = prices.slice(i, i + batchSize);
+      // Typed so the rows can be a subquery (a bare VALUES list types a
+      // parameter as text), which is what lets the link predicate gate them.
       const values = batch
         .map((_, idx) => {
           const offset = idx * 9;
-          return `($${offset + 1}::UUID, $${offset + 2}::DATE, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9})`;
+          return `($${offset + 1}::UUID, $${offset + 2}::DATE, $${offset + 3}::NUMERIC, $${offset + 4}::NUMERIC, $${offset + 5}::NUMERIC, $${offset + 6}::NUMERIC, $${offset + 7}::NUMERIC, $${offset + 8}::BIGINT, $${offset + 9}::VARCHAR)`;
         })
         .join(", ");
 
@@ -1585,6 +1614,9 @@ export class SecurityPriceService {
       // something it is not. The column's contract already says so -- NULL for
       // rows that are not a struck quote.
       //
+      // A `manual` row is a correction the user typed, and a `bond_engine` row
+      // is a linked security's own price, so the provider overwrites neither;
+      // and a security linked since the list was loaded gets no row at all.
       // A `manual` row is a correction the user typed, so the provider does not
       // get to overwrite it. `refreshAllPricesGlobally` used to be the only
       // place that respected manual entries, which meant a backfill silently
@@ -1592,7 +1624,8 @@ export class SecurityPriceService {
       await withScopedDb(this.dataSource, (m) =>
         m.query(
           `INSERT INTO security_prices (security_id, price_date, open_price, high_price, low_price, close_price, adjusted_close, volume, source)
-         VALUES ${values}
+         SELECT v.* FROM (VALUES ${values}) AS v
+          WHERE NOT EXISTS (${BOND_LINKED_SQL})
          ON CONFLICT (security_id, price_date) DO UPDATE SET
            close_price = EXCLUDED.close_price,
            open_price = EXCLUDED.open_price,
@@ -1602,7 +1635,7 @@ export class SecurityPriceService {
            volume = EXCLUDED.volume,
            source = EXCLUDED.source,
            quoted_at = NULL
-         WHERE security_prices.source IS DISTINCT FROM 'manual'`,
+         WHERE ${PROVIDER_MAY_REPLACE_SQL}`,
           params,
         ),
       );
@@ -2269,7 +2302,8 @@ export class SecurityPriceService {
    * Computes average price from all price-relevant transactions on that date.
    * Never overwrites provider-sourced (yahoo_finance, msn_finance) or manual
    * prices — the ON CONFLICT WHERE clause restricts updates to rows whose
-   * existing source is itself a transaction action.
+   * existing source is itself a transaction action or a bond-engine row (a
+   * trade on a day outranks the engine's accrual, whichever was written first).
    */
   async upsertTransactionPrice(
     securityId: string,
@@ -2335,7 +2369,13 @@ export class SecurityPriceService {
        ON CONFLICT (security_id, price_date)
        DO UPDATE SET close_price = $3, source = $4
        WHERE security_prices.source = ANY($5)`,
-        [securityId, transactionDate, avgPrice, source, TRANSACTION_SOURCES],
+        [
+          securityId,
+          transactionDate,
+          avgPrice,
+          source,
+          TRANSACTION_PRICE_REPLACEABLE_SOURCES,
+        ],
       ),
     );
   }
@@ -2403,7 +2443,7 @@ export class SecurityPriceService {
          ON CONFLICT (security_id, price_date)
          DO UPDATE SET close_price = EXCLUDED.close_price, source = EXCLUDED.source
          WHERE security_prices.source = ANY($${params.length + 1})`,
-          [...params, TRANSACTION_SOURCES],
+          [...params, TRANSACTION_PRICE_REPLACEABLE_SOURCES],
         ),
       );
 
@@ -2446,21 +2486,9 @@ export class SecurityPriceService {
    * investment-transaction edit leaves via its balance write. The security is
    * per-user, so every holder is an account of the same `userId`.
    *
-   * One residual window remains, and it is why this says "recovered from the
-   * data" rather than "crash-durable": both `now()` here and the `accounts`
-   * `updated_at` trigger stamp **transaction-start** time, not the instant of
-   * the write. A concurrent recompute that begins after this transaction starts
-   * but commits its (still-stale) snapshots before it can leave `computed_at`
-   * newer than this marker, and then the sweep's `updated_at > computed_at`
-   * predicate misses the account -- so if the post-commit debounce is also lost
-   * to a crash, that snapshot waits for the next touch of the account instead of
-   * the sweep. The account row lock above serializes this write against such a
-   * recompute of the same account, which is what narrows the window to the
-   * near-impossible; the snapshot self-heals on the account's next change
-   * regardless. Making the marker unconditionally crash-durable would mean
-   * stamping `clock_timestamp()`, which the shared `updated_at` trigger clobbers
-   * back to transaction-start for every table -- out of proportion to a window
-   * this small.
+   * The marker's one residual window, and the account row lock that narrows it
+   * (`lockAccountsForBalanceWrite`, taken inside the helper), are explained on
+   * `markHoldingAccountsDirty` in `holding-accounts-dirty.util.ts`.
    *
    * Returns the affected account ids so the caller can, after commit, schedule
    * the debounced recompute as a latency optimization on top of the marker.

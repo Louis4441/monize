@@ -29,6 +29,11 @@ export interface BenchmarkObservation {
   /** A fraction as an exact decimal string. */
   readonly value: string;
   readonly publishedOn: string | null;
+  /**
+   * The document this observation was read from, when it differs from the
+   * result's `sourceUrl` (a feed assembled from more than one file).
+   */
+  readonly sourceUrl?: string;
 }
 
 export interface BenchmarkFetchResult {

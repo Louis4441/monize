@@ -55,6 +55,28 @@
       "expect": {
         "maturityValueKnown": "162.04"
       }
+    },
+    {
+      "id": "E6-R3",
+      "description": "EDO1036 early, period 3, day 1: base 110.51215 is not rounded (a rounded 110.51 would give 107.52 / 110.52)",
+      "lot": {
+        "purchaseDate": "2026-10-01",
+        "quantity": 1
+      },
+      "asOf": "2028-10-02",
+      "announcedRates": {
+        "2": "0.0490",
+        "3": "0.0490"
+      },
+      "expect": {
+        "grossValue": "110.53",
+        "earlyRedemptionValue": "107.53",
+        "currentPeriod": {
+          "index": 3,
+          "annualRate": "0.0490",
+          "rateSource": "ANNOUNCED"
+        }
+      }
     }
   ]
 }

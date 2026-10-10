@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { DataSource, EntityManager } from "typeorm";
+import { acquireAdvisoryLock, LockScope } from "../common/db/locks";
 import { returnedRows } from "../common/db/query-result";
 import { withScopedDb } from "../common/db/scoped-db";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
@@ -21,11 +22,11 @@ import {
 } from "./bond-valuation.service";
 import { ExactDecimal } from "./domain/exact-decimal";
 
-/**
- * The `security_prices.source` of a row this service writes. The one place the
- * literal is spelled; the upsert and the delete both bind it.
- */
-export const BOND_ENGINE_PRICE_SOURCE = "bond_engine";
+import { BOND_ENGINE_PRICE_SOURCE } from "./bond-price-source";
+
+// The source of a row this service writes: the one place the literal is spelled
+// (bond-price-source.ts); the upsert and the delete both bind it.
+export { BOND_ENGINE_PRICE_SOURCE };
 
 /** `security_prices.close_price` is NUMERIC(24,10). */
 const PRICE_DECIMALS = 10;
@@ -173,6 +174,12 @@ export class BondPriceService {
     const { result, accountIds } = await withScopedDb(
       this.dataSource,
       async (m) => {
+        // First statement: recomputes of one security, and the unlink that
+        // deletes its engine rows, queue here. Everything below reads after the
+        // lock is held (a fresh READ COMMITTED snapshot per statement), so the
+        // link read next is the link as of now: an unlinked security is a 404
+        // and a relinked one is priced from its new instrument.
+        await acquireAdvisoryLock(m, LockScope.BondPriceRecompute, securityId);
         const ledger = await loadBondLedger(m, userId, securityId);
         const reference = await this.valuation.loadReference(
           m,
@@ -199,6 +206,33 @@ export class BondPriceService {
       }
     }
     return result;
+  }
+
+  /**
+   * The security stops being priced by the engine (unlinked, or linked to another
+   * instrument): delete its `bond_engine` rows in the caller's transaction, under
+   * the recompute lock so an in-flight recompute of the old link cannot write
+   * after this. Rows of any other source (manual, transaction, provider) are not
+   * the engine's and stay. Returns the accounts to refresh after the commit.
+   */
+  async clearEnginePrices(
+    m: EntityManager,
+    userId: string,
+    securityId: string,
+  ): Promise<{ deleted: number; accountIds: string[] }> {
+    await acquireAdvisoryLock(m, LockScope.BondPriceRecompute, securityId);
+    const deleted = await this.deleteStalePrices(m, securityId, []);
+    const accountIds =
+      deleted > 0 ? await markHoldingAccountsDirty(m, securityId, userId) : [];
+    return { deleted, accountIds };
+  }
+
+  /** After the commit that cleared a security's engine prices (INV-CACHE-001). */
+  publishClearedPrices(userId: string, accountIds: readonly string[]): void {
+    invalidatePortfolioSummary(userId);
+    for (const accountId of accountIds) {
+      this.netWorthService.triggerDebouncedRecalc(accountId, userId);
+    }
   }
 
   /** The price of every day that has one, ascending. Pure over its inputs. */

@@ -13,6 +13,7 @@ import {
 import { ApiProperty } from "@nestjs/swagger";
 import { User } from "../../users/entities/user.entity";
 import { Tag } from "../../tags/entities/tag.entity";
+import { BondInstrument } from "../../bonds/entities/bond-instrument.entity";
 
 /** NUMERIC(9,4) comes back from pg as a string; keep it a number. */
 const numericTransformer = {
@@ -245,6 +246,17 @@ export class Security {
   })
   @Column({ type: "uuid", nullable: true, name: "bond_instrument_id" })
   bondInstrumentId: string | null;
+
+  // Declared so the integration schema, which is built from the entities, carries
+  // the `fk_securities_bond_instrument ... ON DELETE RESTRICT` of the migration:
+  // an instrument is never deleted from under a security that points at it. Never
+  // loaded; `bondInstrumentId` is what the code reads and writes.
+  @ManyToOne(() => BondInstrument, { onDelete: "RESTRICT", nullable: true })
+  @JoinColumn({
+    name: "bond_instrument_id",
+    foreignKeyConstraintName: "fk_securities_bond_instrument",
+  })
+  bondInstrument?: BondInstrument | null;
 
   @ApiProperty({ description: "User-defined tags classifying this security" })
   @ManyToMany(() => Tag)

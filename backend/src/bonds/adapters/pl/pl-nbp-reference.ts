@@ -144,8 +144,14 @@ export async function fetchNbpReference(
   get: BondFetch,
   today: string,
 ): Promise<BenchmarkFetchResult> {
-  const archive = parseNbpArchive(await download(get, NBP_ARCHIVE_URL));
-  const current = parseNbpCurrent(await download(get, NBP_CURRENT_URL));
+  // Each row records the document it came from: the current table may carry a
+  // decision the archive file does not hold yet.
+  const archive = parseNbpArchive(await download(get, NBP_ARCHIVE_URL)).map(
+    (o) => ({ ...o, sourceUrl: NBP_ARCHIVE_URL }),
+  );
+  const current = parseNbpCurrent(await download(get, NBP_CURRENT_URL)).map(
+    (o) => ({ ...o, sourceUrl: NBP_CURRENT_URL }),
+  );
   return {
     observations: mergeObservations(archive, current),
     coveredThrough: today,

@@ -96,6 +96,20 @@
         "earlyRedemptionValue": "2529.75",
         "quantity": 25
       }
+    },
+    {
+      "id": "E1-R3",
+      "description": "TOS1029 early, period 3, day 1: base N2 rounded to 108.99 (unrounded 108.9936 would give 108.01 / 109.01)",
+      "lot": {
+        "purchaseDate": "2026-10-15",
+        "quantity": 1
+      },
+      "asOf": "2028-10-16",
+      "expect": {
+        "principal": "108.99",
+        "grossValue": "109.00",
+        "earlyRedemptionValue": "108.00"
+      }
     }
   ]
 }

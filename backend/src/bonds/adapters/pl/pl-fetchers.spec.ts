@@ -137,6 +137,67 @@ describe("NBP reference rate parsers", () => {
       /HTTP 503/,
     );
   });
+
+  const currentTable = (date: string, rate: string) =>
+    bytes(
+      `<stopy_procentowe data_publikacji="${date}"><tabela id="stoproc"><pozycja id="ref" oprocentowanie="${rate}" obowiazuje_od="${date}" /></tabela></stopy_procentowe>`,
+    );
+
+  it("adds a decision only the current table holds as the newest observation, citing the current table", async () => {
+    const fetch = routes({
+      [NBP_ARCHIVE_URL]: { status: 200, body: fixture("nbp-archive.xml") },
+      [NBP_CURRENT_URL]: {
+        status: 200,
+        body: currentTable("2026-10-08", "4,00"),
+      },
+    });
+    const result = await fetchNbpReference(fetch, "2026-10-10");
+    expect(result.observations).toHaveLength(6);
+    expect(result.observations[result.observations.length - 1]).toEqual({
+      observationDate: "2026-10-08",
+      value: "0.0400",
+      publishedOn: "2026-10-08",
+      sourceUrl: NBP_CURRENT_URL,
+    });
+    // Every row that came from the archive says so.
+    expect(result.observations[0].sourceUrl).toBe(NBP_ARCHIVE_URL);
+  });
+
+  it("lets the current table's value win on a date both documents carry", async () => {
+    const fetch = routes({
+      [NBP_ARCHIVE_URL]: { status: 200, body: fixture("nbp-archive.xml") },
+      [NBP_CURRENT_URL]: {
+        status: 200,
+        body: currentTable("2026-03-05", "3,50"),
+      },
+    });
+    const result = await fetchNbpReference(fetch, "2026-10-10");
+    expect(result.observations).toHaveLength(5);
+    const row = result.observations.find(
+      (o) => o.observationDate === "2026-03-05",
+    );
+    expect(row?.value).toBe("0.0350");
+    expect(row?.sourceUrl).toBe(NBP_CURRENT_URL);
+  });
+
+  it("refuses a non-200 answer", async () => {
+    const fetch = routes({
+      [NBP_ARCHIVE_URL]: { status: 503, body: new Uint8Array() },
+    });
+    await expect(fetchNbpReference(fetch, "2026-10-10")).rejects.toThrow(
+      /HTTP 503/,
+    );
+  });
+
+  it("refuses when only the current table answers non-200", async () => {
+    const fetch = routes({
+      [NBP_ARCHIVE_URL]: { status: 200, body: fixture("nbp-archive.xml") },
+      [NBP_CURRENT_URL]: { status: 503, body: new Uint8Array() },
+    });
+    await expect(fetchNbpReference(fetch, "2026-10-10")).rejects.toThrow(
+      /HTTP 503/,
+    );
+  });
 });
 
 describe("GUS CPI parser", () => {
@@ -200,12 +261,56 @@ describe("GUS CPI parser", () => {
     expect(findCsvLink(html)).toBe(
       "https://stat.gov.pl/download/gfx/a/miesiecznewskaznikicentowarowiuslugkonsumpcyjnychod1982roku_9.csv",
     );
+    // A relative href without a leading slash resolves against the landing page.
     expect(
       findCsvLink(
-        '<a href="https://cdn.example/miesiecznewskaznikicentowarowiuslugkonsumpcyjnychod1982roku_9.csv">',
+        '<a href="miesiecznewskaznikicentowarowiuslugkonsumpcyjnychod1982roku_9.csv">',
       ),
-    ).toMatch(/^https:\/\/cdn\.example/);
+    ).toMatch(/^https:\/\/stat\.gov\.pl\/obszary-tematyczne\/.*_9\.csv$/);
+    expect(
+      findCsvLink(
+        '<a href="https://dane.stat.gov.pl/a/miesiecznewskaznikicentowarowiuslugkonsumpcyjnychod1982roku_9.csv">',
+      ),
+    ).toBe(
+      "https://dane.stat.gov.pl/a/miesiecznewskaznikicentowarowiuslugkonsumpcyjnychod1982roku_9.csv",
+    );
     expect(findCsvLink("<a href='/x'>")).toBeNull();
+  });
+
+  it("never follows a link off stat.gov.pl, over plain http, or with a look-alike host", () => {
+    const file =
+      "miesiecznewskaznikicentowarowiuslugkonsumpcyjnychod1982roku_9.csv";
+    for (const href of [
+      `https://cdn.example/${file}`,
+      `http://stat.gov.pl/download/${file}`,
+      `//cdn.example/${file}`,
+      `https://stat.gov.pl.evil.example/${file}`,
+      `https://evilstat.gov.pl/${file}`,
+      `https://stat.gov.pl:8443/${file}`,
+      `https://user@stat.gov.pl/${file}`,
+    ]) {
+      expect(findCsvLink(`<a href="${href}">`)).toBeNull();
+    }
+    // A foreign link is skipped; a later link on the publisher's host is used.
+    expect(
+      findCsvLink(
+        `<a href="https://cdn.example/${file}"><a href="/d/${file}">`,
+      ),
+    ).toBe(`https://stat.gov.pl/d/${file}`);
+  });
+
+  it("does not fetch a foreign link found on the landing page", async () => {
+    const file =
+      "miesiecznewskaznikicentowarowiuslugkonsumpcyjnychod1982roku_9.csv";
+    const fetch = routes({
+      [GUS_CPI_CSV_URL]: { status: 404, body: new Uint8Array() },
+      [GUS_CPI_LANDING_URL]: {
+        status: 200,
+        body: bytes(`<a href="http://stat.gov.pl/d/${file}">`),
+      },
+    });
+    await expect(fetchGusCpi(fetch)).rejects.toThrow(/no CSV link/);
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it("fetches the file and covers through the newest month", async () => {

@@ -65,6 +65,15 @@ export interface RestoreResult {
    * it. Omitted when zero.
    */
   unusableAiProviderKeys?: number;
+  /**
+   * Securities restored unlinked from their bond instrument, because this
+   * deployment's catalog does not carry it (or carries it in another currency).
+   * The rows *were* written; what changed is that the bond engine no longer
+   * prices them, so the user has to re-link them (spec 12.1). The engine's price
+   * rows in the file for those securities are not restored. Counted beside
+   * `restored` like the two above, and omitted when zero.
+   */
+  unlinkedBondSecurities?: number;
 }
 
 export class BackupPasswordRequiredError extends BadRequestException {
