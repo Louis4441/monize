@@ -238,5 +238,81 @@
       "title": "[XX-No headlines right now-XX]",
       "description": "[XX-Nothing has been published against this symbol recently. The list refreshes when you come back to it.-XX]"
     }
+  },
+  "bond": {
+    "title": "[XX-Bond valuation-XX]",
+    "loading": "[XX-Loading the bond valuation...-XX]",
+    "loadFailed": "[XX-The bond valuation could not be loaded.-XX]",
+    "unknown": "[XX-Unknown-XX]",
+    "asOf": "[XX-Valued on-XX]",
+    "instrument": "[XX-Series {series} ({issuer}, {program}, {country})-XX]",
+    "noLots": "[XX-No lots are open on this date.-XX]",
+    "totals": {
+      "quantity": "[XX-Bonds held-XX]",
+      "grossValue": "[XX-Gross value-XX]",
+      "earlyRedemptionValue": "[XX-Early redemption value-XX]",
+      "accruedInterest": "[XX-Accrued interest-XX]",
+      "unknownLot": "[XX-At least one lot has no figure, so no total is given.-XX]",
+      "unknownRefusal": "[XX-The lots cannot be worked out, so no total is given.-XX]"
+    },
+    "lots": {
+      "purchaseDate": "[XX-Purchased-XX]",
+      "assumed": "[XX-Assumed-XX]",
+      "assumedTitle": "[XX-The real purchase date is unknown: this lot arrived by a transfer with no linked sending side.-XX]",
+      "quantity": "[XX-Quantity-XX]",
+      "maturity": "[XX-Maturity-XX]",
+      "period": "[XX-Current period-XX]",
+      "periodValue": "[XX-{index}: {start} to {end}-XX]",
+      "rate": "[XX-Rate-XX]",
+      "principal": "[XX-Principal per bond-XX]",
+      "accruedInterest": "[XX-Accrued interest-XX]",
+      "grossValue": "[XX-Gross value-XX]",
+      "earlyRedemption": "[XX-Early redemption-XX]",
+      "nextCashFlow": "[XX-Next cash flow-XX]",
+      "cashFlowValue": "[XX-{type} {amount} on {date}-XX]",
+      "noCashFlow": "[XX-None-XX]",
+      "projected": "[XX-Projected-XX]",
+      "maturityValue": "[XX-Value at maturity-XX]",
+      "maturityKnown": "[XX-Known-XX]",
+      "maturityProjected": "[XX-Projected-XX]"
+    },
+    "rateSource": {
+      "TERMS": "[XX-Terms-XX]",
+      "ANNOUNCED": "[XX-Announced-XX]",
+      "DERIVED": "[XX-Derived-XX]",
+      "PROJECTED": "[XX-Projected-XX]"
+    },
+    "cashFlowType": {
+      "INTEREST": "[XX-Interest-XX]",
+      "PRINCIPAL": "[XX-Principal-XX]"
+    },
+    "earlyRefusal": {
+      "NOT_REDEEMABLE": "[XX-Not redeemable early-XX]",
+      "TOO_EARLY": "[XX-Too early to redeem-XX]",
+      "TOO_LATE": "[XX-Too late to redeem-XX]",
+      "RECORD_DAY": "[XX-Not redeemable on the record day-XX]",
+      "MATURED": "[XX-Matured-XX]",
+      "RATE_UNKNOWN": "[XX-Rate not known yet-XX]",
+      "TERMS_INCOMPLETE": "[XX-Terms incomplete-XX]"
+    },
+    "lotsRefusal": {
+      "SPLIT": "[XX-The lots cannot be derived: a bond does not split.-XX]",
+      "FRACTIONAL_QUANTITY": "[XX-The lots cannot be derived: a quantity is not a whole number of bonds.-XX]",
+      "OVER_REMOVAL": "[XX-The lots cannot be derived: more bonds were removed than were held.-XX]",
+      "INVALID_QUANTITY": "[XX-The lots cannot be derived: a quantity is missing, negative or too large.-XX]"
+    },
+    "assumptions": {
+      "title": "[XX-Projection assumptions-XX]"
+    },
+    "missing": {
+      "title": "[XX-Data still needed-XX]",
+      "item": "[XX-{benchmarkId} {observation} — published by {publisher}-XX]",
+      "itemNoPublisher": "[XX-{benchmarkId} {observation} — publisher not known-XX]"
+    },
+    "recompute": {
+      "button": "[XX-Recalculate prices-XX]",
+      "done": "[XX-Prices recalculated: {written} written, {deleted} removed.-XX]",
+      "failed": "[XX-The prices could not be recalculated.-XX]"
+    }
   }
 }

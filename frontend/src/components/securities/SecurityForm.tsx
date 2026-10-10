@@ -21,6 +21,7 @@ import { SecurityLookupPicker, LookupCandidate } from './SecurityLookupPicker';
 import { AllocationEditor, AllocationRow } from './AllocationEditor';
 import { TagForm } from '@/components/tags/TagForm';
 import { Security, CreateSecurityData } from '@/types/investment';
+import type { BondInstrumentSummary } from '@/types/bond';
 import { Tag } from '@/types/tag';
 import { tagsApi } from '@/lib/tags';
 import { investmentsApi } from '@/lib/investments';
@@ -68,6 +69,8 @@ const buildSecuritySchema = (t: (key: string) => string) => z.object({
   irWebsite: z.string().max(2048).optional(),
   quoteProvider: z.enum(['', 'yahoo', 'msn', 'lse', 'deutsche_boerse']).optional(),
   msnInstrumentId: z.string().max(50).optional(),
+  // A bond catalog instrument id, or '' for "not linked".
+  bondInstrumentId: z.string().optional(),
   priceChartEnabled: z.boolean().optional(),
   skipPriceUpdates: z.boolean().optional(),
   priceAlertPercent: z.string().optional().refine((v) => !v?.trim() || (Number.isFinite(Number(v)) && Number(v) >= 0.1 && Number(v) <= 1000), t('priceAlert.range')),
@@ -161,6 +164,9 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
   // Asset class the user asked to delete from the list, pending confirmation.
   const [assetToDelete, setAssetToDelete] = useState<string | null>(null);
   const [showTagForm, setShowTagForm] = useState(false);
+  // The bond catalog, fetched the first time the type is BOND. Null is "not
+  // loaded (yet, or the request failed)", which is not an empty catalog.
+  const [bondInstruments, setBondInstruments] = useState<BondInstrumentSummary[] | null>(null);
 
   useEffect(() => {
     exchangeRatesApi.getCurrencies().then(setCurrencies).catch(() => {});
@@ -244,6 +250,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       irWebsite: security?.irWebsite || '',
       quoteProvider: security?.quoteProvider || '',
       msnInstrumentId: security?.msnInstrumentId || '',
+      bondInstrumentId: security?.bondInstrumentId || '',
       isFavourite: security?.isFavourite || false,
       priceChartEnabled: security?.priceChartEnabled ?? false,
       skipPriceUpdates: security?.skipPriceUpdates ?? false,
@@ -317,6 +324,58 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
     getValues,
     setValue,
   ]);
+  const isBond = watch('securityType') === 'BOND';
+  const selectedBondId = watch('bondInstrumentId') || '';
+
+  useEffect(() => {
+    if (!isBond) return;
+    let cancelled = false;
+    investmentsApi
+      .listBondInstruments()
+      .then((list) => {
+        if (!cancelled) setBondInstruments(list);
+      })
+      // The picker is optional: without the catalog the select offers only
+      // "Not linked" (and the current link, kept as it is).
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isBond]);
+
+  // A linked security's currency equals its instrument's, so only matching
+  // instruments are offered.
+  const bondOptions = useMemo(() => {
+    const matching = (bondInstruments ?? [])
+      .filter((b) => b.currencyCode === selectedCurrency)
+      .map((b) => ({
+        value: b.id,
+        label: t('form.bondInstrumentOption', {
+          series: b.seriesCode,
+          country: b.issuerCountryCode,
+          program: b.programCode,
+        }),
+      }));
+    const options = [{ value: '', label: t('form.bondInstrumentNone') }, ...matching];
+    // The catalog has not loaded: keep the existing link visible rather than
+    // letting the select blank it.
+    if (bondInstruments === null && selectedBondId) {
+      options.push({ value: selectedBondId, label: t('form.bondInstrumentCurrent') });
+    }
+    return options;
+  }, [bondInstruments, selectedCurrency, selectedBondId, t]);
+
+  // The link that is submitted and shown: a currency change that leaves the
+  // instrument unmatched drops it. With no catalog loaded nothing can be judged,
+  // so the stored link stands.
+  const effectiveBondId =
+    selectedBondId &&
+    (bondInstruments === null ||
+      bondInstruments.some(
+        (b) => b.id === selectedBondId && b.currencyCode === selectedCurrency,
+      ))
+      ? selectedBondId
+      : '';
 
   const isFavourite = watch('isFavourite') ?? false;
   const toggleFavourite = () =>
@@ -518,6 +577,13 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       website: data.website?.trim() ?? '',
       irWebsite: data.irWebsite?.trim() ?? '',
       msnInstrumentId: data.msnInstrumentId?.trim() || undefined,
+      // A BOND sends its link (null unlinks); a type moved away from BOND
+      // unlinks a security that was linked. Otherwise the field is omitted.
+      ...(data.securityType === 'BOND'
+        ? { bondInstrumentId: effectiveBondId || null }
+        : security?.bondInstrumentId
+          ? { bondInstrumentId: null }
+          : {}),
       isFavourite: data.isFavourite ?? false,
       priceChartEnabled: data.priceChartEnabled ?? false,
       // Sent only when the user clicked it (see `skipSwitchTouched`).
@@ -659,6 +725,18 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
           error={errors.currencyCode?.message}
         />
       </div>
+
+      {isBond && (
+        <Select
+          label={t('form.bondInstrumentLabel')}
+          options={bondOptions}
+          value={effectiveBondId}
+          onChange={(e) =>
+            setValue('bondInstrumentId', e.target.value, { shouldDirty: true })
+          }
+          error={errors.bondInstrumentId?.message}
+        />
+      )}
 
       <div>
         <Select

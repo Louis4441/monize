@@ -45,6 +45,7 @@ vi.mock('@/lib/investments', () => ({
       .fn()
       .mockResolvedValue(['United States', 'Canada']),
     getAssetOptions: vi.fn().mockResolvedValue(['Cash', 'Equity']),
+    listBondInstruments: vi.fn().mockResolvedValue([]),
     deleteAssetOption: vi
       .fn()
       .mockResolvedValue({ name: 'Equity', removedFrom: 1 }),
@@ -1132,6 +1133,99 @@ describe('SecurityForm', () => {
 
       expect(investmentsApi.deleteAssetOption).not.toHaveBeenCalled();
       expect(screen.getByDisplayValue('60.00')).toBeInTheDocument();
+    });
+  });
+  describe('bond series', () => {
+    const instruments = [
+      { id: 'b-pln', issuerCountryCode: 'PL', issuerCode: 'PL_MF', programCode: 'PL_MF', seriesCode: 'TOS1029', currencyCode: 'PLN' },
+      { id: 'b-usd', issuerCountryCode: 'US', issuerCode: 'US_TR', programCode: 'US_TR', seriesCode: 'TBOND30', currencyCode: 'USD' },
+    ];
+
+    beforeEach(() => {
+      vi.mocked(investmentsApi.listBondInstruments).mockResolvedValue(instruments);
+    });
+
+    const renderBond = async (overrides: Partial<Security> = {}) => {
+      await act(async () => {
+        render(
+          <SecurityForm
+            security={createSecurity({ securityType: 'BOND', currencyCode: 'PLN', ...overrides })}
+            onSubmit={onSubmit}
+            onCancel={onCancel}
+          />,
+        );
+      });
+    };
+
+    it('shows the series select only for a BOND and does not fetch the catalog otherwise', async () => {
+      await act(async () => {
+        render(<SecurityForm security={createSecurity({ securityType: 'STOCK' })} onSubmit={onSubmit} onCancel={onCancel} />);
+      });
+      expect(screen.queryByLabelText('Bond series (optional)')).not.toBeInTheDocument();
+      expect(investmentsApi.listBondInstruments).not.toHaveBeenCalled();
+
+      await renderBond();
+      expect(await screen.findByLabelText('Bond series (optional)')).toBeInTheDocument();
+    });
+
+    it('offers only instruments in the form currency, plus Not linked', async () => {
+      await renderBond();
+      const select = await screen.findByLabelText('Bond series (optional)');
+      const labels = within(select).getAllByRole('option').map((o) => o.textContent);
+      expect(labels).toEqual(['Not linked', 'TOS1029 (PL, PL_MF)']);
+    });
+
+    it('sends the chosen instrument id on submit', async () => {
+      await renderBond();
+      const select = await screen.findByLabelText('Bond series (optional)');
+      fireEvent.change(select, { target: { value: 'b-pln' } });
+      fireEvent.click(screen.getByText('Update Security'));
+      await waitFor(() =>
+        expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ bondInstrumentId: 'b-pln' })),
+      );
+    });
+
+    it('sends null when the series is left not linked', async () => {
+      await renderBond();
+      await screen.findByLabelText('Bond series (optional)');
+      fireEvent.click(screen.getByText('Update Security'));
+      await waitFor(() =>
+        expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ bondInstrumentId: null })),
+      );
+    });
+
+    it('clears the link when the currency no longer matches the instrument', async () => {
+      await renderBond({ bondInstrumentId: 'b-pln' });
+      const select = (await screen.findByLabelText('Bond series (optional)')) as HTMLSelectElement;
+      await waitFor(() => expect(select.value).toBe('b-pln'));
+      fireEvent.change(screen.getByLabelText('Currency'), { target: { value: 'USD' } });
+      await waitFor(() => expect(select.value).toBe(''));
+      fireEvent.click(screen.getByText('Update Security'));
+      await waitFor(() =>
+        expect(onSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({ currencyCode: 'USD', bondInstrumentId: null }),
+        ),
+      );
+    });
+
+    it('keeps the stored link when the catalog could not be loaded', async () => {
+      vi.mocked(investmentsApi.listBondInstruments).mockRejectedValue(new Error('down'));
+      await renderBond({ bondInstrumentId: 'b-pln' });
+      await screen.findByLabelText('Bond series (optional)');
+      fireEvent.click(screen.getByText('Update Security'));
+      await waitFor(() =>
+        expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ bondInstrumentId: 'b-pln' })),
+      );
+    });
+
+    it('unlinks a linked security whose type is moved away from BOND', async () => {
+      await renderBond({ bondInstrumentId: 'b-pln' });
+      await screen.findByLabelText('Bond series (optional)');
+      fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'STOCK' } });
+      fireEvent.click(screen.getByText('Update Security'));
+      await waitFor(() =>
+        expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ bondInstrumentId: null })),
+      );
     });
   });
 });

@@ -238,5 +238,81 @@
       "title": "No headlines right now",
       "description": "Nothing has been published against this symbol recently. The list refreshes when you come back to it."
     }
+  },
+  "bond": {
+    "title": "Bond valuation",
+    "loading": "Loading the bond valuation...",
+    "loadFailed": "The bond valuation could not be loaded.",
+    "unknown": "Unknown",
+    "asOf": "Valued on",
+    "instrument": "Series {series} ({issuer}, {program}, {country})",
+    "noLots": "No lots are open on this date.",
+    "totals": {
+      "quantity": "Bonds held",
+      "grossValue": "Gross value",
+      "earlyRedemptionValue": "Early redemption value",
+      "accruedInterest": "Accrued interest",
+      "unknownLot": "At least one lot has no figure, so no total is given.",
+      "unknownRefusal": "The lots cannot be worked out, so no total is given."
+    },
+    "lots": {
+      "purchaseDate": "Purchased",
+      "assumed": "Assumed",
+      "assumedTitle": "The real purchase date is unknown: this lot arrived by a transfer with no linked sending side.",
+      "quantity": "Quantity",
+      "maturity": "Maturity",
+      "period": "Current period",
+      "periodValue": "{index}: {start} to {end}",
+      "rate": "Rate",
+      "principal": "Principal per bond",
+      "accruedInterest": "Accrued interest",
+      "grossValue": "Gross value",
+      "earlyRedemption": "Early redemption",
+      "nextCashFlow": "Next cash flow",
+      "cashFlowValue": "{type} {amount} on {date}",
+      "noCashFlow": "None",
+      "projected": "Projected",
+      "maturityValue": "Value at maturity",
+      "maturityKnown": "Known",
+      "maturityProjected": "Projected"
+    },
+    "rateSource": {
+      "TERMS": "Terms",
+      "ANNOUNCED": "Announced",
+      "DERIVED": "Derived",
+      "PROJECTED": "Projected"
+    },
+    "cashFlowType": {
+      "INTEREST": "Interest",
+      "PRINCIPAL": "Principal"
+    },
+    "earlyRefusal": {
+      "NOT_REDEEMABLE": "Not redeemable early",
+      "TOO_EARLY": "Too early to redeem",
+      "TOO_LATE": "Too late to redeem",
+      "RECORD_DAY": "Not redeemable on the record day",
+      "MATURED": "Matured",
+      "RATE_UNKNOWN": "Rate not known yet",
+      "TERMS_INCOMPLETE": "Terms incomplete"
+    },
+    "lotsRefusal": {
+      "SPLIT": "The lots cannot be derived: a bond does not split.",
+      "FRACTIONAL_QUANTITY": "The lots cannot be derived: a quantity is not a whole number of bonds.",
+      "OVER_REMOVAL": "The lots cannot be derived: more bonds were removed than were held.",
+      "INVALID_QUANTITY": "The lots cannot be derived: a quantity is missing, negative or too large."
+    },
+    "assumptions": {
+      "title": "Projection assumptions"
+    },
+    "missing": {
+      "title": "Data still needed",
+      "item": "{benchmarkId} {observation} — published by {publisher}",
+      "itemNoPublisher": "{benchmarkId} {observation} — publisher not known"
+    },
+    "recompute": {
+      "button": "Recalculate prices",
+      "done": "Prices recalculated: {written} written, {deleted} removed.",
+      "failed": "The prices could not be recalculated."
+    }
   }
 }

@@ -196,7 +196,11 @@
       "deleteConfirm": "[XX-Delete-XX]",
       "deleteSuccess": "[XX-Deleted asset class \"{name}\"-XX]",
       "deleteFailed": "[XX-Could not delete asset class \"{name}\"-XX]"
-    }
+    },
+    "bondInstrumentLabel": "[XX-Bond series (optional)-XX]",
+    "bondInstrumentNone": "[XX-Not linked-XX]",
+    "bondInstrumentOption": "[XX-{series} ({country}, {program})-XX]",
+    "bondInstrumentCurrent": "[XX-Linked series-XX]"
   },
   "priceForm": {
     "dateLabel": "[XX-Date-XX]",

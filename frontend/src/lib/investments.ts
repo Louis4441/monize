@@ -38,6 +38,11 @@ import {
   PortfolioTagSummary,
 } from '@/types/investment';
 import { IntradayBreakdown } from '@/types/net-worth';
+import type {
+  BondInstrumentSummary,
+  BondPriceRecompute,
+  SecurityBondValuation,
+} from '@/types/bond';
 import {
   clearAllCache,
   dedupe,
@@ -944,6 +949,41 @@ export const investmentsApi = {
         },
       },
     );
+    return response.data;
+  },
+
+  // The bond catalog, for the security form's series picker. Reference data,
+  // identical for every user, so it is not cached per user here.
+  listBondInstruments: async (): Promise<BondInstrumentSummary[]> => {
+    const response = await apiClient.get<BondInstrumentSummary[]>('/bonds/instruments');
+    return response.data;
+  },
+
+  // The open lots of a bond-linked security valued on `asOf` (the server's
+  // today when omitted). Uncached: a trade or a price write changes it.
+  getSecurityBondValuation: async (
+    securityId: string,
+    asOf?: string,
+  ): Promise<SecurityBondValuation> => {
+    const response = await apiClient.get<SecurityBondValuation>(
+      `/bonds/securities/${securityId}/valuation`,
+      { params: asOf ? { asOf } : undefined },
+    );
+    return response.data;
+  },
+
+  // Write the bond engine's daily prices for a linked security. Drops the
+  // cached investments answers only when a row was actually written or removed:
+  // a recompute that agreed with what is stored changed nothing to re-read.
+  recomputeSecurityBondPrices: async (
+    securityId: string,
+  ): Promise<BondPriceRecompute> => {
+    const response = await apiClient.post<BondPriceRecompute>(
+      `/bonds/securities/${securityId}/recompute`,
+    );
+    if (response.data?.written > 0 || response.data?.deleted > 0) {
+      invalidateCache('investments:');
+    }
     return response.data;
   },
 

@@ -21,6 +21,7 @@ import { SecurityPerformanceCard } from '@/components/securities/detail/Security
 import { SecurityPositionInfoCard } from '@/components/securities/detail/SecurityPositionInfoCard';
 import { SecurityAccountsTable } from '@/components/securities/detail/SecurityAccountsTable';
 import { SecurityBreakdownCard } from '@/components/securities/detail/SecurityBreakdownCard';
+import { SecurityBondCard } from '@/components/securities/detail/SecurityBondCard';
 import { useOnUndoRedo } from '@/hooks/useOnUndoRedo';
 import { useOnAiAction } from '@/hooks/useOnAiAction';
 import { usePriceRefresh } from '@/hooks/usePriceRefresh';
@@ -472,6 +473,13 @@ function SecurityDetailContent() {
                     <SecurityPositionInfoCard detail={detail} />
                   </div>
                 </div>
+
+                {security.bondInstrumentId && (
+                  <SecurityBondCard
+                    security={security}
+                    onPricesChanged={reloadAfterPriceRefresh}
+                  />
+                )}
 
                 <SecurityAccountsTable detail={detail} />
               </TabPanel>
