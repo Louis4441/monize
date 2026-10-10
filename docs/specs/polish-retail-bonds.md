@@ -237,6 +237,14 @@ projection assumption (`cpiYoY`, `nbpReference`). Output:
 ```text
 asOf, seriesCode, termsVersion, quantity
 currentPeriod      { index, start, end, annualRate, rateSource } | null
+rateRule           the terms' rate rule as stated: type, benchmarkId, the
+                   first-period rate, the margin or spread, the benchmark floor
+rateSchedule       one entry per period: { index, start, end, annualRate | null,
+                   rateSource | null, benchmark: { benchmarkId, observation,
+                   value | null, flooredValue | null } | null, addend | null }
+                   -- the observation the rule reads for that period, the
+                   value found (or assumed, when PROJECTED), the value after
+                   the floor, and the margin or spread added to it
 principal          per-bond compounded base at the start of the period | null
 accruedInterest    lot | null: grossValue - faceValue x quantity, i.e. all
                    capitalized interest plus the current accrual for a
@@ -487,3 +495,13 @@ projection assumptions and the `missing` list with the publisher to obtain each
 item from. Percentages and amounts are localized by the reader's number
 format preference. The security form offers the instrument picker when the
 security type is `BOND`.
+
+How the rate is set is shown, not only its value: the rate rule in words (for
+EDO1036: "period 1: 5.35%; then the 12-month CPI published by GUS + 2.00%
+margin, a negative CPI counted as 0"), and a table of every period of the lot
+with its dates, rate and `rateSource`, and, for a benchmark period, the
+observation used (CPI 2027-08 = 3.4%), the floor when it applied, and the
+margin. A projected period says it is projected and names the assumption; a
+period whose observation is missing says which one. A benchmark id is shown
+by a translated name where the catalog has one (`PL_CPI_GUS_YOY`: "CPI, 12
+months (GUS)"), else by the id itself.
