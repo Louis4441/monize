@@ -505,3 +505,59 @@ margin. A projected period says it is projected and names the assumption; a
 period whose observation is missing says which one. A benchmark id is shown
 by a translated name where the catalog has one (`PL_CPI_GUS_YOY`: "CPI, 12
 months (GUS)"), else by the id itself.
+
+### 13.1 Indexation notice
+
+A lot whose rate rule reads a benchmark says so in words before any figure:
+for EDO1036 bought 2026-10-02, "Inflation-indexed: from 2027-10-02 (period 2)
+the rate is the 12-month CPI published by GUS + 2.00% margin, recalculated
+every period". The date is the lot's own period 2 start, because periods are
+anchored on the purchase date.
+
+### 13.2 Interest attribution
+
+Each period's interest per bond is split by the components of its rate, so a
+reader sees what the margin earned and what inflation earned:
+
+```text
+interest_k   = base_k * r_k / F                     (exact; base_k per 2.4)
+fixed_k      = interest_k                           when rateSource is TERMS
+benchmark_k  = base_k * flooredValue_k / F          for a benchmark period
+addend_k     = base_k * addend_k / F                for a benchmark period
+announced_k  = interest_k                           when ANNOUNCED (no split
+                                                    is stated, so none is made)
+```
+
+For a benchmark period `benchmark_k + addend_k = interest_k` exactly. For a
+compounding bond `base_k` already holds earlier interest, so interest earned
+on earlier inflation counts as interest of the period it accrues in, by the
+same split; the attribution is per period and never retroactive. The
+rate schedule entry carries `interest`, `fixedPart`, `benchmarkPart`,
+`addendPart` and `announcedPart` per bond (strings, unrounded to 10 places for
+display; the money figures of section 2.4 keep their own rounding), each
+`null` when the period's rate is unknown. Lot figures are per bond times the
+quantity.
+
+### 13.3 Inflation scenarios
+
+`GET /bonds/securities/:securityId/scenarios?benchmarkId=...&values=a,b,...`
+values the security's lots as of today with every future period of that
+benchmark projected at each given value (at most 6 values, each between -0.5
+and 1.0 as a fraction). Known periods stay known: a scenario never replaces an
+observation or an announced rate. Per scenario it returns the lots' maturity
+value, total interest and its attribution (13.2) summed over the lots, each
+`null` if any lot cannot be valued. The detail view shows a table for the
+presets 0%, 2.5%, 5% and 8% and one value the reader types, and labels every
+scenario figure as a projection under that assumption.
+
+`GET .../valuation` accepts an optional `assume=<benchmarkId>:<value>` with
+the same rule, so the per-period table and the chart can follow the reader's
+chosen scenario.
+
+### 13.4 Chart
+
+A stacked chart over the lot's period ends shows cumulative interest per
+bond (or for the holding) split into fixed (period 1), margin and inflation
+(benchmark) parts; projected periods are drawn distinctly from known ones and
+the legend names the assumption. It reads the rate schedule of 13.2; it never
+recomputes interest in the client.
