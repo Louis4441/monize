@@ -238,5 +238,81 @@
       "title": "Derzeit keine Schlagzeilen",
       "description": "Zu diesem Symbol wurde in letzter Zeit nichts veröffentlicht. Die Liste wird aktualisiert, wenn du zurückkommst."
     }
+  },
+  "bond": {
+    "title": "Anleihebewertung",
+    "loading": "Anleihebewertung wird geladen...",
+    "loadFailed": "Die Anleihebewertung konnte nicht geladen werden.",
+    "unknown": "Unbekannt",
+    "asOf": "Bewertet zum",
+    "instrument": "Serie {series} ({issuer}, {program}, {country})",
+    "noLots": "An diesem Datum sind keine Posten offen.",
+    "totals": {
+      "quantity": "Gehaltene Anleihen",
+      "grossValue": "Bruttowert",
+      "earlyRedemptionValue": "Wert bei vorzeitiger Rückzahlung",
+      "accruedInterest": "Stückzinsen",
+      "unknownLot": "Für mindestens einen Posten liegt kein Wert vor, daher wird keine Summe angegeben.",
+      "unknownRefusal": "Die Posten lassen sich nicht ermitteln, daher wird keine Summe angegeben."
+    },
+    "lots": {
+      "purchaseDate": "Gekauft",
+      "assumed": "Angenommen",
+      "assumedTitle": "Das tatsächliche Kaufdatum ist unbekannt: Dieser Posten kam durch eine Übertragung ohne verknüpfte Senderseite zustande.",
+      "quantity": "Anzahl",
+      "maturity": "Fälligkeit",
+      "period": "Aktuelle Zinsperiode",
+      "periodValue": "{index}: {start} bis {end}",
+      "rate": "Zinssatz",
+      "principal": "Nennwert je Anleihe",
+      "accruedInterest": "Stückzinsen",
+      "grossValue": "Bruttowert",
+      "earlyRedemption": "Vorzeitige Rückzahlung",
+      "nextCashFlow": "Nächste Zahlung",
+      "cashFlowValue": "{type} {amount} am {date}",
+      "noCashFlow": "Keine",
+      "projected": "Prognose",
+      "maturityValue": "Wert bei Fälligkeit",
+      "maturityKnown": "Bekannt",
+      "maturityProjected": "Prognostiziert"
+    },
+    "rateSource": {
+      "TERMS": "Bedingungen",
+      "ANNOUNCED": "Angekündigt",
+      "DERIVED": "Abgeleitet",
+      "PROJECTED": "Prognostiziert"
+    },
+    "cashFlowType": {
+      "INTEREST": "Zinsen",
+      "PRINCIPAL": "Kapital"
+    },
+    "earlyRefusal": {
+      "NOT_REDEEMABLE": "Nicht vorzeitig rückzahlbar",
+      "TOO_EARLY": "Zu früh für eine Rückzahlung",
+      "TOO_LATE": "Zu spät für eine Rückzahlung",
+      "RECORD_DAY": "Am Stichtag nicht rückzahlbar",
+      "MATURED": "Fällig geworden",
+      "RATE_UNKNOWN": "Zinssatz noch nicht bekannt",
+      "TERMS_INCOMPLETE": "Bedingungen unvollständig"
+    },
+    "lotsRefusal": {
+      "SPLIT": "Die Posten lassen sich nicht ableiten: Eine Anleihe wird nicht geteilt.",
+      "FRACTIONAL_QUANTITY": "Die Posten lassen sich nicht ableiten: Eine Menge ist keine ganze Zahl von Anleihen.",
+      "OVER_REMOVAL": "Die Posten lassen sich nicht ableiten: Es wurden mehr Anleihen entfernt als gehalten.",
+      "INVALID_QUANTITY": "Die Posten lassen sich nicht ableiten: Eine Menge fehlt, ist negativ oder zu groß."
+    },
+    "assumptions": {
+      "title": "Annahmen der Prognose"
+    },
+    "missing": {
+      "title": "Noch benötigte Daten",
+      "item": "{benchmarkId} {observation} — veröffentlicht von {publisher}",
+      "itemNoPublisher": "{benchmarkId} {observation} — Herausgeber nicht bekannt"
+    },
+    "recompute": {
+      "button": "Preise neu berechnen",
+      "done": "Preise neu berechnet: {written} geschrieben, {deleted} entfernt.",
+      "failed": "Die Preise konnten nicht neu berechnet werden."
+    }
   }
 }

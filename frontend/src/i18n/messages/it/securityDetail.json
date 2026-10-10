@@ -238,5 +238,81 @@
       "title": "Nessuna notizia al momento",
       "description": "Di recente non è stato pubblicato nulla su questo simbolo. La lista si aggiorna quando ci torni."
     }
+  },
+  "bond": {
+    "title": "Valutazione dell'obbligazione",
+    "loading": "Caricamento della valutazione dell'obbligazione...",
+    "loadFailed": "Impossibile caricare la valutazione dell'obbligazione.",
+    "unknown": "Sconosciuto",
+    "asOf": "Valutata al",
+    "instrument": "Serie {series} ({issuer}, {program}, {country})",
+    "noLots": "Nessun lotto aperto in questa data.",
+    "totals": {
+      "quantity": "Obbligazioni detenute",
+      "grossValue": "Valore lordo",
+      "earlyRedemptionValue": "Valore di rimborso anticipato",
+      "accruedInterest": "Interessi maturati",
+      "unknownLot": "Almeno un lotto non ha un valore, quindi non viene indicato alcun totale.",
+      "unknownRefusal": "Non è possibile determinare i lotti, quindi non viene indicato alcun totale."
+    },
+    "lots": {
+      "purchaseDate": "Acquistato",
+      "assumed": "Presunta",
+      "assumedTitle": "La data di acquisto effettiva è sconosciuta: questo lotto è arrivato tramite un trasferimento senza lato mittente collegato.",
+      "quantity": "Quantità",
+      "maturity": "Scadenza",
+      "period": "Periodo corrente",
+      "periodValue": "{index}: dal {start} al {end}",
+      "rate": "Tasso",
+      "principal": "Capitale per obbligazione",
+      "accruedInterest": "Interessi maturati",
+      "grossValue": "Valore lordo",
+      "earlyRedemption": "Rimborso anticipato",
+      "nextCashFlow": "Prossimo flusso di cassa",
+      "cashFlowValue": "{type} {amount} il {date}",
+      "noCashFlow": "Nessuno",
+      "projected": "Previsto",
+      "maturityValue": "Valore a scadenza",
+      "maturityKnown": "Noto",
+      "maturityProjected": "Previsto"
+    },
+    "rateSource": {
+      "TERMS": "Condizioni",
+      "ANNOUNCED": "Annunciato",
+      "DERIVED": "Derivato",
+      "PROJECTED": "Previsto"
+    },
+    "cashFlowType": {
+      "INTEREST": "Interessi",
+      "PRINCIPAL": "Capitale"
+    },
+    "earlyRefusal": {
+      "NOT_REDEEMABLE": "Non rimborsabile anticipatamente",
+      "TOO_EARLY": "Troppo presto per il rimborso",
+      "TOO_LATE": "Troppo tardi per il rimborso",
+      "RECORD_DAY": "Non rimborsabile nel giorno di registrazione",
+      "MATURED": "Scaduta",
+      "RATE_UNKNOWN": "Tasso non ancora noto",
+      "TERMS_INCOMPLETE": "Condizioni incomplete"
+    },
+    "lotsRefusal": {
+      "SPLIT": "Impossibile derivare i lotti: un'obbligazione non è frazionabile.",
+      "FRACTIONAL_QUANTITY": "Impossibile derivare i lotti: una quantità non è un numero intero di obbligazioni.",
+      "OVER_REMOVAL": "Impossibile derivare i lotti: sono state rimosse più obbligazioni di quelle detenute.",
+      "INVALID_QUANTITY": "Impossibile derivare i lotti: una quantità manca, è negativa o troppo grande."
+    },
+    "assumptions": {
+      "title": "Ipotesi della previsione"
+    },
+    "missing": {
+      "title": "Dati ancora necessari",
+      "item": "{benchmarkId} {observation} — pubblicato da {publisher}",
+      "itemNoPublisher": "{benchmarkId} {observation} — editore non noto"
+    },
+    "recompute": {
+      "button": "Ricalcola i prezzi",
+      "done": "Prezzi ricalcolati: {written} scritti, {deleted} rimossi.",
+      "failed": "Impossibile ricalcolare i prezzi."
+    }
   }
 }

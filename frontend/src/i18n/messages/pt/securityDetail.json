@@ -238,5 +238,81 @@
       "title": "Sem manchetes neste momento",
       "description": "Não foi publicado nada sobre este símbolo recentemente. A lista é atualizada quando voltar aqui."
     }
+  },
+  "bond": {
+    "title": "Avaliação da obrigação",
+    "loading": "A carregar a avaliação da obrigação...",
+    "loadFailed": "Não foi possível carregar a avaliação da obrigação.",
+    "unknown": "Desconhecido",
+    "asOf": "Avaliada em",
+    "instrument": "Série {series} ({issuer}, {program}, {country})",
+    "noLots": "Não há lotes em aberto nesta data.",
+    "totals": {
+      "quantity": "Obrigações detidas",
+      "grossValue": "Valor bruto",
+      "earlyRedemptionValue": "Valor de reembolso antecipado",
+      "accruedInterest": "Juros corridos",
+      "unknownLot": "Pelo menos um lote não tem valor, pelo que não é indicado nenhum total.",
+      "unknownRefusal": "Não é possível apurar os lotes, pelo que não é indicado nenhum total."
+    },
+    "lots": {
+      "purchaseDate": "Comprado",
+      "assumed": "Presumida",
+      "assumedTitle": "A data real de compra é desconhecida: este lote chegou por transferência sem o lado remetente associado.",
+      "quantity": "Quantidade",
+      "maturity": "Vencimento",
+      "period": "Período atual",
+      "periodValue": "{index}: de {start} a {end}",
+      "rate": "Taxa",
+      "principal": "Capital por obrigação",
+      "accruedInterest": "Juros corridos",
+      "grossValue": "Valor bruto",
+      "earlyRedemption": "Reembolso antecipado",
+      "nextCashFlow": "Próximo fluxo de caixa",
+      "cashFlowValue": "{type} {amount} em {date}",
+      "noCashFlow": "Nenhum",
+      "projected": "Projetado",
+      "maturityValue": "Valor no vencimento",
+      "maturityKnown": "Conhecido",
+      "maturityProjected": "Projetado"
+    },
+    "rateSource": {
+      "TERMS": "Condições",
+      "ANNOUNCED": "Anunciada",
+      "DERIVED": "Derivada",
+      "PROJECTED": "Projetada"
+    },
+    "cashFlowType": {
+      "INTEREST": "Juros",
+      "PRINCIPAL": "Capital"
+    },
+    "earlyRefusal": {
+      "NOT_REDEEMABLE": "Não reembolsável antecipadamente",
+      "TOO_EARLY": "Cedo demais para reembolsar",
+      "TOO_LATE": "Tarde demais para reembolsar",
+      "RECORD_DAY": "Não reembolsável na data de registo",
+      "MATURED": "Vencida",
+      "RATE_UNKNOWN": "Taxa ainda desconhecida",
+      "TERMS_INCOMPLETE": "Condições incompletas"
+    },
+    "lotsRefusal": {
+      "SPLIT": "Não é possível apurar os lotes: uma obrigação não se divide.",
+      "FRACTIONAL_QUANTITY": "Não é possível apurar os lotes: uma quantidade não é um número inteiro de obrigações.",
+      "OVER_REMOVAL": "Não é possível apurar os lotes: foram removidas mais obrigações do que as detidas.",
+      "INVALID_QUANTITY": "Não é possível apurar os lotes: falta uma quantidade, é negativa ou é demasiado grande."
+    },
+    "assumptions": {
+      "title": "Pressupostos da projeção"
+    },
+    "missing": {
+      "title": "Dados ainda necessários",
+      "item": "{benchmarkId} {observation} — publicado por {publisher}",
+      "itemNoPublisher": "{benchmarkId} {observation} — publicador desconhecido"
+    },
+    "recompute": {
+      "button": "Recalcular preços",
+      "done": "Preços recalculados: {written} escritos, {deleted} removidos.",
+      "failed": "Não foi possível recalcular os preços."
+    }
   }
 }

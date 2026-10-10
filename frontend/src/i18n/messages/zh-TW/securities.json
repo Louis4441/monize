@@ -196,7 +196,11 @@
       "deleteConfirm": "刪除",
       "deleteSuccess": "已刪除資產類別「{name}」",
       "deleteFailed": "無法刪除資產類別「{name}」"
-    }
+    },
+    "bondInstrumentLabel": "債券系列（選填）",
+    "bondInstrumentNone": "未連結",
+    "bondInstrumentOption": "{series}（{country}，{program}）",
+    "bondInstrumentCurrent": "已連結的系列"
   },
   "priceForm": {
     "dateLabel": "日期",

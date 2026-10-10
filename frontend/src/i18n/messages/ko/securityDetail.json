@@ -238,5 +238,81 @@
       "title": "현재 헤드라인이 없습니다",
       "description": "최근 이 심볼로 게시된 내용이 없습니다. 다시 돌아오면 목록이 갱신됩니다."
     }
+  },
+  "bond": {
+    "title": "채권 평가",
+    "loading": "채권 평가를 불러오는 중...",
+    "loadFailed": "채권 평가를 불러오지 못했습니다.",
+    "unknown": "알 수 없음",
+    "asOf": "평가 기준일",
+    "instrument": "시리즈 {series}({issuer}, {program}, {country})",
+    "noLots": "이 날짜에 열려 있는 로트가 없습니다.",
+    "totals": {
+      "quantity": "보유 채권 수",
+      "grossValue": "총액",
+      "earlyRedemptionValue": "조기 상환액",
+      "accruedInterest": "경과 이자",
+      "unknownLot": "하나 이상의 로트에 수치가 없어 합계를 제공하지 않습니다.",
+      "unknownRefusal": "로트를 산출할 수 없어 합계를 제공하지 않습니다."
+    },
+    "lots": {
+      "purchaseDate": "매수일",
+      "assumed": "가정",
+      "assumedTitle": "실제 매수일을 알 수 없습니다. 이 로트는 연결된 송신 측이 없는 이체로 들어왔습니다.",
+      "quantity": "수량",
+      "maturity": "만기",
+      "period": "현재 기간",
+      "periodValue": "{index}: {start}부터 {end}까지",
+      "rate": "금리",
+      "principal": "채권당 원금",
+      "accruedInterest": "경과 이자",
+      "grossValue": "총액",
+      "earlyRedemption": "조기 상환",
+      "nextCashFlow": "다음 현금흐름",
+      "cashFlowValue": "{date} {type} {amount}",
+      "noCashFlow": "없음",
+      "projected": "예상",
+      "maturityValue": "만기 시 가치",
+      "maturityKnown": "확정",
+      "maturityProjected": "예상"
+    },
+    "rateSource": {
+      "TERMS": "조건",
+      "ANNOUNCED": "발표됨",
+      "DERIVED": "산출됨",
+      "PROJECTED": "예상"
+    },
+    "cashFlowType": {
+      "INTEREST": "이자",
+      "PRINCIPAL": "원금"
+    },
+    "earlyRefusal": {
+      "NOT_REDEEMABLE": "조기 상환 불가",
+      "TOO_EARLY": "상환하기에는 너무 이름",
+      "TOO_LATE": "상환하기에는 너무 늦음",
+      "RECORD_DAY": "기준일에는 상환할 수 없음",
+      "MATURED": "만기 도래",
+      "RATE_UNKNOWN": "금리 미확정",
+      "TERMS_INCOMPLETE": "조건 불완전"
+    },
+    "lotsRefusal": {
+      "SPLIT": "로트를 산출할 수 없습니다. 채권은 분할되지 않습니다.",
+      "FRACTIONAL_QUANTITY": "로트를 산출할 수 없습니다. 수량이 채권의 정수 개수가 아닙니다.",
+      "OVER_REMOVAL": "로트를 산출할 수 없습니다. 보유한 수보다 많은 채권이 제거되었습니다.",
+      "INVALID_QUANTITY": "로트를 산출할 수 없습니다. 수량이 없거나, 음수이거나, 너무 큽니다."
+    },
+    "assumptions": {
+      "title": "예상 가정"
+    },
+    "missing": {
+      "title": "아직 필요한 데이터",
+      "item": "{benchmarkId} {observation} — 발표 기관: {publisher}",
+      "itemNoPublisher": "{benchmarkId} {observation} — 발표 기관을 알 수 없음"
+    },
+    "recompute": {
+      "button": "가격 다시 계산",
+      "done": "가격을 다시 계산했습니다: {written}건 기록, {deleted}건 삭제.",
+      "failed": "가격을 다시 계산하지 못했습니다."
+    }
   }
 }

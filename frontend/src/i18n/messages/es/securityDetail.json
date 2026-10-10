@@ -238,5 +238,81 @@
       "title": "Ahora mismo no hay titulares",
       "description": "No se ha publicado nada sobre este símbolo últimamente. La lista se actualiza cuando vuelves a ella."
     }
+  },
+  "bond": {
+    "title": "Valoración del bono",
+    "loading": "Cargando la valoración del bono...",
+    "loadFailed": "No se pudo cargar la valoración del bono.",
+    "unknown": "Desconocido",
+    "asOf": "Valorado a fecha de",
+    "instrument": "Serie {series} ({issuer}, {program}, {country})",
+    "noLots": "No hay lotes abiertos en esta fecha.",
+    "totals": {
+      "quantity": "Bonos en cartera",
+      "grossValue": "Valor bruto",
+      "earlyRedemptionValue": "Valor de rescate anticipado",
+      "accruedInterest": "Intereses devengados",
+      "unknownLot": "Al menos un lote no tiene cifra, por lo que no se indica ningún total.",
+      "unknownRefusal": "No se pueden determinar los lotes, por lo que no se indica ningún total."
+    },
+    "lots": {
+      "purchaseDate": "Comprado",
+      "assumed": "Supuesta",
+      "assumedTitle": "La fecha real de compra se desconoce: este lote llegó mediante una transferencia sin el lado emisor vinculado.",
+      "quantity": "Cantidad",
+      "maturity": "Vencimiento",
+      "period": "Periodo actual",
+      "periodValue": "{index}: {start} a {end}",
+      "rate": "Tipo",
+      "principal": "Principal por bono",
+      "accruedInterest": "Intereses devengados",
+      "grossValue": "Valor bruto",
+      "earlyRedemption": "Rescate anticipado",
+      "nextCashFlow": "Próximo flujo de caja",
+      "cashFlowValue": "{type} {amount} el {date}",
+      "noCashFlow": "Ninguno",
+      "projected": "Proyectado",
+      "maturityValue": "Valor al vencimiento",
+      "maturityKnown": "Conocido",
+      "maturityProjected": "Proyectado"
+    },
+    "rateSource": {
+      "TERMS": "Condiciones",
+      "ANNOUNCED": "Anunciado",
+      "DERIVED": "Derivado",
+      "PROJECTED": "Proyectado"
+    },
+    "cashFlowType": {
+      "INTEREST": "Intereses",
+      "PRINCIPAL": "Principal"
+    },
+    "earlyRefusal": {
+      "NOT_REDEEMABLE": "No se puede rescatar anticipadamente",
+      "TOO_EARLY": "Demasiado pronto para rescatar",
+      "TOO_LATE": "Demasiado tarde para rescatar",
+      "RECORD_DAY": "No rescatable en la fecha de registro",
+      "MATURED": "Vencido",
+      "RATE_UNKNOWN": "Tipo aún desconocido",
+      "TERMS_INCOMPLETE": "Condiciones incompletas"
+    },
+    "lotsRefusal": {
+      "SPLIT": "No se pueden derivar los lotes: un bono no se divide.",
+      "FRACTIONAL_QUANTITY": "No se pueden derivar los lotes: una cantidad no es un número entero de bonos.",
+      "OVER_REMOVAL": "No se pueden derivar los lotes: se retiraron más bonos de los que se tenían.",
+      "INVALID_QUANTITY": "No se pueden derivar los lotes: falta una cantidad, es negativa o demasiado grande."
+    },
+    "assumptions": {
+      "title": "Supuestos de la proyección"
+    },
+    "missing": {
+      "title": "Datos que aún faltan",
+      "item": "{benchmarkId} {observation} — publicado por {publisher}",
+      "itemNoPublisher": "{benchmarkId} {observation} — se desconoce el publicador"
+    },
+    "recompute": {
+      "button": "Recalcular precios",
+      "done": "Precios recalculados: {written} escritos, {deleted} eliminados.",
+      "failed": "No se pudieron recalcular los precios."
+    }
   }
 }

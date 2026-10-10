@@ -531,7 +531,17 @@
     "dateMustBeYMD": "tanggal harus dalam format YYYY-MM-DD",
     "loanLedgerUnreadable": "Pembayaran pinjaman ini tidak dapat dihitung karena saldo buku besarnya tidak dapat dibaca. Coba lagi."
   },
+  "bonds": {
+    "securityNotLinked": "Sekuritas {{ securityId }} tidak ditemukan atau tidak ditautkan ke instrumen obligasi",
+    "dataNotFound": "Data obligasi tersimpan yang diperlukan untuk valuasi ini tidak tersedia: {{ detail }}",
+    "dataInconsistent": "Data obligasi tersimpan saling bertentangan, sehingga valuasi tidak diberikan: {{ detail }}",
+    "invalidInput": "Permintaan valuasi tidak valid: {{ detail }}"
+  },
   "securities": {
+    "bondPricedByEngine": "Sekuritas ini ditautkan ke instrumen obligasi dan dinilai oleh mesin obligasi, bukan oleh penyedia kuotasi. Gunakan Hitung ulang harga.",
+    "bondInstrumentNotFound": "Instrumen obligasi {{ id }} tidak ada",
+    "bondCurrencyMismatch": "Sekuritas dicatat dalam {{ currency }}, tetapi instrumen obligasi dinilai dalam {{ instrumentCurrency }}. Gunakan mata uang instrumen.",
+    "bondCurrencyLocked": "Sekuritas yang ditautkan ke instrumen obligasi tetap dalam mata uang instrumen ({{ instrumentCurrency }}). Lepaskan tautannya dari obligasi sebelum mengubah mata uangnya.",
     "accountMustBeInvestment": "Akun harus bertipe INVESTMENT",
     "transferPairSameRow": "Dua sisi satu transfer tidak boleh merupakan transaksi yang sama",
     "transferPairNotFound": "Salah satu dari kedua transaksi itu sudah tidak ada",

@@ -196,7 +196,11 @@
       "deleteConfirm": "Xóa",
       "deleteSuccess": "Đã xóa loại tài sản \"{name}\"",
       "deleteFailed": "Không thể xóa loại tài sản \"{name}\""
-    }
+    },
+    "bondInstrumentLabel": "Mã trái phiếu (tùy chọn)",
+    "bondInstrumentNone": "Chưa liên kết",
+    "bondInstrumentOption": "{series} ({country}, {program})",
+    "bondInstrumentCurrent": "Mã đã liên kết"
   },
   "priceForm": {
     "dateLabel": "Ngày",

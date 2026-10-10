@@ -531,7 +531,17 @@
     "dateMustBeYMD": "tarih YYYY-AA-GG biçiminde olmalıdır",
     "loanLedgerUnreadable": "Defter bakiyesi okunamadığı için bu kredi ödemesi hesaplanamadı. Tekrar deneyin."
   },
+  "bonds": {
+    "securityNotLinked": "{{ securityId }} menkul kıymeti bulunamadı veya bir tahvil enstrümanına bağlı değil",
+    "dataNotFound": "Bu değerleme için gereken kayıtlı tahvil verileri mevcut değil: {{ detail }}",
+    "dataInconsistent": "Kayıtlı tahvil verileri birbiriyle çelişiyor, bu nedenle değerleme verilmiyor: {{ detail }}",
+    "invalidInput": "Değerleme isteği geçerli değil: {{ detail }}"
+  },
   "securities": {
+    "bondPricedByEngine": "Bu menkul kıymet bir tahvil enstrümanına bağlıdır ve bir kotasyon sağlayıcısı tarafından değil, tahvil motoru tarafından fiyatlanır. Bunun yerine Fiyatları yeniden hesapla seçeneğini kullanın.",
+    "bondInstrumentNotFound": "{{ id }} tahvil enstrümanı mevcut değil",
+    "bondCurrencyMismatch": "Menkul kıymet {{ currency }} cinsinden kayıtlı, ancak tahvil enstrümanı {{ instrumentCurrency }} cinsinden fiyatlanıyor. Enstrümanın para birimini kullanın.",
+    "bondCurrencyLocked": "Bir tahvil enstrümanına bağlı menkul kıymet, enstrümanın para biriminde ({{ instrumentCurrency }}) kalır. Para birimini değiştirmeden önce tahvil bağlantısını kaldırın.",
     "accountMustBeInvestment": "Hesap YATIRİM türünde olmalıdır",
     "transferPairSameRow": "Bir transferin iki bacağı aynı işlem olamaz",
     "transferPairNotFound": "İki işlemden biri artık mevcut değil",

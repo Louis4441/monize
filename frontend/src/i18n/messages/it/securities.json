@@ -196,7 +196,11 @@
       "deleteConfirm": "Elimina",
       "deleteSuccess": "Classe di attivo «{name}» eliminata",
       "deleteFailed": "Impossibile eliminare la classe di attivo «{name}»"
-    }
+    },
+    "bondInstrumentLabel": "Serie obbligazionaria (facoltativa)",
+    "bondInstrumentNone": "Non collegata",
+    "bondInstrumentOption": "{series} ({country}, {program})",
+    "bondInstrumentCurrent": "Serie collegata"
   },
   "priceForm": {
     "dateLabel": "Data",

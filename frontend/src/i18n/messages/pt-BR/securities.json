@@ -196,7 +196,11 @@
       "deleteConfirm": "Excluir",
       "deleteSuccess": "Classe de ativos \"{name}\" excluída",
       "deleteFailed": "Não foi possível excluir a classe de ativos \"{name}\""
-    }
+    },
+    "bondInstrumentLabel": "Série de títulos (opcional)",
+    "bondInstrumentNone": "Não vinculada",
+    "bondInstrumentOption": "{series} ({country}, {program})",
+    "bondInstrumentCurrent": "Série vinculada"
   },
   "priceForm": {
     "dateLabel": "Data",

@@ -196,7 +196,11 @@
       "deleteConfirm": "削除",
       "deleteSuccess": "資産クラス「{name}」を削除しました",
       "deleteFailed": "資産クラス「{name}」を削除できませんでした"
-    }
+    },
+    "bondInstrumentLabel": "債券シリーズ（任意）",
+    "bondInstrumentNone": "未リンク",
+    "bondInstrumentOption": "{series}（{country}、{program}）",
+    "bondInstrumentCurrent": "リンク済みシリーズ"
   },
   "priceForm": {
     "dateLabel": "日付",

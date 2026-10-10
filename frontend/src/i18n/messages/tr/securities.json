@@ -196,7 +196,11 @@
       "deleteConfirm": "Sil",
       "deleteSuccess": "\"{name}\" varlık sınıfı silindi",
       "deleteFailed": "\"{name}\" varlık sınıfı silinemedi"
-    }
+    },
+    "bondInstrumentLabel": "Tahvil serisi (isteğe bağlı)",
+    "bondInstrumentNone": "Bağlı değil",
+    "bondInstrumentOption": "{series} ({country}, {program})",
+    "bondInstrumentCurrent": "Bağlı seri"
   },
   "priceForm": {
     "dateLabel": "Tarih",

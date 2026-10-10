@@ -196,7 +196,11 @@
       "deleteConfirm": "Видалити",
       "deleteSuccess": "Клас активів «{name}» видалено",
       "deleteFailed": "Не вдалося видалити клас активів «{name}»"
-    }
+    },
+    "bondInstrumentLabel": "Серія облігацій (необов'язково)",
+    "bondInstrumentNone": "Не прив'язана",
+    "bondInstrumentOption": "{series} ({country}, {program})",
+    "bondInstrumentCurrent": "Прив'язана серія"
   },
   "priceForm": {
     "dateLabel": "Дата",

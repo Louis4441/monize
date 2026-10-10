@@ -531,7 +531,17 @@
     "dateMustBeYMD": "date deve estar no formato YYYY-MM-DD",
     "loanLedgerUnreadable": "Não foi possível calcular este pagamento do empréstimo porque não foi possível ler o saldo do seu livro-razão. Tente novamente."
   },
+  "bonds": {
+    "securityNotLinked": "Ativo {{ securityId }} não encontrado ou não vinculado a um instrumento de título",
+    "dataNotFound": "Os dados do título armazenados e necessários para esta avaliação não estão disponíveis: {{ detail }}",
+    "dataInconsistent": "Os dados do título armazenados se contradizem, por isso nenhuma avaliação é fornecida: {{ detail }}",
+    "invalidInput": "A solicitação de avaliação não é válida: {{ detail }}"
+  },
   "securities": {
+    "bondPricedByEngine": "Este ativo está vinculado a um instrumento de título e é precificado pelo motor de títulos, não por um provedor de cotações. Use Recalcular preços.",
+    "bondInstrumentNotFound": "O instrumento de título {{ id }} não existe",
+    "bondCurrencyMismatch": "O ativo está registrado em {{ currency }}, mas o instrumento de título é precificado em {{ instrumentCurrency }}. Use a moeda do instrumento.",
+    "bondCurrencyLocked": "Um ativo vinculado a um instrumento de título permanece na moeda do instrumento ({{ instrumentCurrency }}). Desvincule-o do título antes de alterar a moeda.",
     "accountMustBeInvestment": "A conta deve ser do tipo INVESTMENT",
     "transferPairSameRow": "As duas pernas de uma transferência não podem ser a mesma transação",
     "transferPairNotFound": "Uma das duas transações não existe mais",

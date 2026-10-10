@@ -531,7 +531,17 @@
     "dateMustBeYMD": "date 必須為 YYYY-MM-DD 格式",
     "loanLedgerUnreadable": "無法計算此貸款還款，因為無法讀取其帳簿餘額。請重試。"
   },
+  "bonds": {
+    "securityNotLinked": "找不到證券 {{ securityId }}，或該證券未連結到債券工具",
+    "dataNotFound": "此次估值所需的已儲存債券資料無法取得：{{ detail }}",
+    "dataInconsistent": "已儲存的債券資料互相矛盾，因此不提供估值：{{ detail }}",
+    "invalidInput": "估值請求無效：{{ detail }}"
+  },
   "securities": {
+    "bondPricedByEngine": "此證券已連結到債券工具，由債券引擎而非報價提供者定價。請改用「重新計算價格」。",
+    "bondInstrumentNotFound": "債券工具 {{ id }} 不存在",
+    "bondCurrencyMismatch": "此證券以 {{ currency }} 記錄，但債券工具以 {{ instrumentCurrency }} 定價。請使用該工具的幣別。",
+    "bondCurrencyLocked": "連結到債券工具的證券必須維持工具的幣別（{{ instrumentCurrency }}）。變更幣別之前，請先解除其與債券的連結。",
     "accountMustBeInvestment": "科目類型必須為 INVESTMENT",
     "transferPairSameRow": "一筆轉移的兩筆記錄不能是同一筆交易",
     "transferPairNotFound": "兩筆交易其中之一已不存在",

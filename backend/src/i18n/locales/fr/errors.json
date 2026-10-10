@@ -531,7 +531,17 @@
     "dateMustBeYMD": "La date doit être au format YYYY-MM-DD",
     "loanLedgerUnreadable": "Ce paiement de prêt n'a pas pu être calculé car le solde de son grand livre n'a pas pu être lu. Réessayez."
   },
+  "bonds": {
+    "securityNotLinked": "Titre {{ securityId }} introuvable ou non lié à un instrument obligataire",
+    "dataNotFound": "Les données d'obligation enregistrées nécessaires à cette valorisation ne sont pas disponibles : {{ detail }}",
+    "dataInconsistent": "Les données d'obligation enregistrées se contredisent, aucune valorisation n'est donc fournie : {{ detail }}",
+    "invalidInput": "La demande de valorisation n'est pas valide : {{ detail }}"
+  },
   "securities": {
+    "bondPricedByEngine": "Ce titre est lié à un instrument obligataire et il est valorisé par le moteur d'obligations, et non par un fournisseur de cours. Utilisez plutôt Recalculer les prix.",
+    "bondInstrumentNotFound": "L'instrument obligataire {{ id }} n'existe pas",
+    "bondCurrencyMismatch": "Le titre est enregistré en {{ currency }}, mais l'instrument obligataire est valorisé en {{ instrumentCurrency }}. Utilisez la devise de l'instrument.",
+    "bondCurrencyLocked": "Un titre lié à un instrument obligataire reste dans la devise de l'instrument ({{ instrumentCurrency }}). Dissociez-le de l'obligation avant de changer sa devise.",
     "accountMustBeInvestment": "Le compte doit être de type INVESTMENT",
     "transferPairSameRow": "Les deux volets d'un transfert ne peuvent pas être la même transaction",
     "transferPairNotFound": "L'une des deux transactions n'existe plus",

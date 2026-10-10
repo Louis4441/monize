@@ -196,7 +196,11 @@
       "deleteConfirm": "Hapus",
       "deleteSuccess": "Kelas aset \"{name}\" dihapus",
       "deleteFailed": "Tidak dapat menghapus kelas aset \"{name}\""
-    }
+    },
+    "bondInstrumentLabel": "Seri obligasi (opsional)",
+    "bondInstrumentNone": "Tidak ditautkan",
+    "bondInstrumentOption": "{series} ({country}, {program})",
+    "bondInstrumentCurrent": "Seri yang ditautkan"
   },
   "priceForm": {
     "dateLabel": "Tanggal",

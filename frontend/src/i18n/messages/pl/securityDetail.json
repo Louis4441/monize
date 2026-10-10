@@ -238,5 +238,81 @@
       "title": "Brak nagłówków w tej chwili",
       "description": "Nic nie opublikowano ostatnio pod tym symbolem. Lista odświeży się, gdy tu wrócisz."
     }
+  },
+  "bond": {
+    "title": "Wycena obligacji",
+    "loading": "Wczytywanie wyceny obligacji...",
+    "loadFailed": "Nie udało się wczytać wyceny obligacji.",
+    "unknown": "Nieznane",
+    "asOf": "Wycena na dzień",
+    "instrument": "Seria {series} ({issuer}, {program}, {country})",
+    "noLots": "Na ten dzień nie ma otwartych partii.",
+    "totals": {
+      "quantity": "Posiadane obligacje",
+      "grossValue": "Wartość brutto",
+      "earlyRedemptionValue": "Wartość przedterminowego wykupu",
+      "accruedInterest": "Narosłe odsetki",
+      "unknownLot": "Co najmniej jedna partia nie ma wyniku, dlatego nie podajemy sumy.",
+      "unknownRefusal": "Nie można ustalić partii, dlatego nie podajemy sumy."
+    },
+    "lots": {
+      "purchaseDate": "Data zakupu",
+      "assumed": "Założona",
+      "assumedTitle": "Rzeczywista data zakupu jest nieznana: ta partia pojawiła się w wyniku przelewu bez powiązanej strony wysyłającej.",
+      "quantity": "Liczba",
+      "maturity": "Termin wykupu",
+      "period": "Bieżący okres odsetkowy",
+      "periodValue": "{index}: {start} do {end}",
+      "rate": "Oprocentowanie",
+      "principal": "Kapitał na obligację",
+      "accruedInterest": "Narosłe odsetki",
+      "grossValue": "Wartość brutto",
+      "earlyRedemption": "Przedterminowy wykup",
+      "nextCashFlow": "Następny przepływ",
+      "cashFlowValue": "{type} {amount} dnia {date}",
+      "noCashFlow": "Brak",
+      "projected": "Prognoza",
+      "maturityValue": "Wartość w terminie wykupu",
+      "maturityKnown": "Znana",
+      "maturityProjected": "Prognozowana"
+    },
+    "rateSource": {
+      "TERMS": "Warunki emisji",
+      "ANNOUNCED": "Ogłoszone",
+      "DERIVED": "Wyliczone",
+      "PROJECTED": "Prognozowane"
+    },
+    "cashFlowType": {
+      "INTEREST": "Odsetki",
+      "PRINCIPAL": "Kapitał"
+    },
+    "earlyRefusal": {
+      "NOT_REDEEMABLE": "Brak możliwości przedterminowego wykupu",
+      "TOO_EARLY": "Zbyt wcześnie na wykup",
+      "TOO_LATE": "Zbyt późno na wykup",
+      "RECORD_DAY": "Wykup niemożliwy w dniu ustalenia praw",
+      "MATURED": "Obligacja wykupiona",
+      "RATE_UNKNOWN": "Oprocentowanie jeszcze nieznane",
+      "TERMS_INCOMPLETE": "Niepełne warunki emisji"
+    },
+    "lotsRefusal": {
+      "SPLIT": "Nie można ustalić partii: obligacja nie podlega podziałowi.",
+      "FRACTIONAL_QUANTITY": "Nie można ustalić partii: ilość nie jest całkowitą liczbą obligacji.",
+      "OVER_REMOVAL": "Nie można ustalić partii: usunięto więcej obligacji, niż było w posiadaniu.",
+      "INVALID_QUANTITY": "Nie można ustalić partii: ilość jest nieokreślona, ujemna lub zbyt duża."
+    },
+    "assumptions": {
+      "title": "Założenia prognozy"
+    },
+    "missing": {
+      "title": "Dane, których jeszcze brakuje",
+      "item": "{benchmarkId} {observation} — publikuje: {publisher}",
+      "itemNoPublisher": "{benchmarkId} {observation} — nie wiadomo, kto publikuje"
+    },
+    "recompute": {
+      "button": "Przelicz ceny",
+      "done": "Ceny przeliczone: zapisano {written}, usunięto {deleted}.",
+      "failed": "Nie udało się przeliczyć cen."
+    }
   }
 }

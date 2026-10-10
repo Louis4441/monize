@@ -238,5 +238,81 @@
       "title": "目前沒有標題",
       "description": "最近沒有關於該代碼的內容發布。你再回到這裡時清單會重新整理。"
     }
+  },
+  "bond": {
+    "title": "債券估值",
+    "loading": "正在載入債券估值...",
+    "loadFailed": "無法載入債券估值。",
+    "unknown": "未知",
+    "asOf": "估值日期",
+    "instrument": "系列 {series}（{issuer}，{program}，{country}）",
+    "noLots": "此日期沒有未結批次。",
+    "totals": {
+      "quantity": "持有債券數量",
+      "grossValue": "總價值",
+      "earlyRedemptionValue": "提前贖回價值",
+      "accruedInterest": "應計利息",
+      "unknownLot": "至少有一個批次沒有數據，因此不提供合計。",
+      "unknownRefusal": "無法確定各批次，因此不提供合計。"
+    },
+    "lots": {
+      "purchaseDate": "購買日期",
+      "assumed": "假設",
+      "assumedTitle": "實際購買日期未知：此批次是透過轉帳而來，且沒有連結的轉出方。",
+      "quantity": "數量",
+      "maturity": "到期日",
+      "period": "目前計息期",
+      "periodValue": "{index}：{start} 至 {end}",
+      "rate": "利率",
+      "principal": "每張債券本金",
+      "accruedInterest": "應計利息",
+      "grossValue": "總價值",
+      "earlyRedemption": "提前贖回",
+      "nextCashFlow": "下一筆現金流",
+      "cashFlowValue": "{date} {type} {amount}",
+      "noCashFlow": "無",
+      "projected": "預測",
+      "maturityValue": "到期價值",
+      "maturityKnown": "已知",
+      "maturityProjected": "預測"
+    },
+    "rateSource": {
+      "TERMS": "條款",
+      "ANNOUNCED": "已公布",
+      "DERIVED": "推算",
+      "PROJECTED": "預測"
+    },
+    "cashFlowType": {
+      "INTEREST": "利息",
+      "PRINCIPAL": "本金"
+    },
+    "earlyRefusal": {
+      "NOT_REDEEMABLE": "不可提前贖回",
+      "TOO_EARLY": "贖回為時過早",
+      "TOO_LATE": "贖回為時已晚",
+      "RECORD_DAY": "登記日不可贖回",
+      "MATURED": "已到期",
+      "RATE_UNKNOWN": "利率尚未確定",
+      "TERMS_INCOMPLETE": "條款不完整"
+    },
+    "lotsRefusal": {
+      "SPLIT": "無法推導批次：債券不可拆分。",
+      "FRACTIONAL_QUANTITY": "無法推導批次：某個數量不是整數張債券。",
+      "OVER_REMOVAL": "無法推導批次：移除的債券多於持有的債券。",
+      "INVALID_QUANTITY": "無法推導批次：某個數量缺漏、為負數或過大。"
+    },
+    "assumptions": {
+      "title": "預測假設"
+    },
+    "missing": {
+      "title": "仍需的資料",
+      "item": "{benchmarkId} {observation} — 發布單位：{publisher}",
+      "itemNoPublisher": "{benchmarkId} {observation} — 發布單位未知"
+    },
+    "recompute": {
+      "button": "重新計算價格",
+      "done": "價格已重新計算：寫入 {written} 筆，刪除 {deleted} 筆。",
+      "failed": "無法重新計算價格。"
+    }
   }
 }

@@ -238,5 +238,81 @@
       "title": "Hiện chưa có tiêu đề nào",
       "description": "Gần đây chưa có gì được công bố cho mã này. Danh sách sẽ được làm mới khi bạn quay lại."
     }
+  },
+  "bond": {
+    "title": "Định giá trái phiếu",
+    "loading": "Đang tải định giá trái phiếu...",
+    "loadFailed": "Không thể tải định giá trái phiếu.",
+    "unknown": "Không rõ",
+    "asOf": "Định giá vào ngày",
+    "instrument": "Mã {series} ({issuer}, {program}, {country})",
+    "noLots": "Không có lô nào đang mở vào ngày này.",
+    "totals": {
+      "quantity": "Trái phiếu đang nắm giữ",
+      "grossValue": "Giá trị gộp",
+      "earlyRedemptionValue": "Giá trị khi tất toán sớm",
+      "accruedInterest": "Lãi tích lũy",
+      "unknownLot": "Ít nhất một lô không có số liệu nên không đưa ra tổng.",
+      "unknownRefusal": "Không thể xác định các lô nên không đưa ra tổng."
+    },
+    "lots": {
+      "purchaseDate": "Ngày mua",
+      "assumed": "Giả định",
+      "assumedTitle": "Ngày mua thực tế không rõ: lô này đến qua một lần chuyển khoản không có phía gửi được liên kết.",
+      "quantity": "Số lượng",
+      "maturity": "Đáo hạn",
+      "period": "Kỳ hiện tại",
+      "periodValue": "{index}: {start} đến {end}",
+      "rate": "Lãi suất",
+      "principal": "Mệnh giá mỗi trái phiếu",
+      "accruedInterest": "Lãi tích lũy",
+      "grossValue": "Giá trị gộp",
+      "earlyRedemption": "Tất toán sớm",
+      "nextCashFlow": "Dòng tiền kế tiếp",
+      "cashFlowValue": "{type} {amount} vào {date}",
+      "noCashFlow": "Không có",
+      "projected": "Dự phóng",
+      "maturityValue": "Giá trị khi đáo hạn",
+      "maturityKnown": "Đã biết",
+      "maturityProjected": "Dự phóng"
+    },
+    "rateSource": {
+      "TERMS": "Điều khoản",
+      "ANNOUNCED": "Đã công bố",
+      "DERIVED": "Suy ra",
+      "PROJECTED": "Dự phóng"
+    },
+    "cashFlowType": {
+      "INTEREST": "Lãi",
+      "PRINCIPAL": "Gốc"
+    },
+    "earlyRefusal": {
+      "NOT_REDEEMABLE": "Không thể tất toán sớm",
+      "TOO_EARLY": "Còn quá sớm để tất toán",
+      "TOO_LATE": "Đã quá muộn để tất toán",
+      "RECORD_DAY": "Không thể tất toán vào ngày chốt danh sách",
+      "MATURED": "Đã đáo hạn",
+      "RATE_UNKNOWN": "Chưa biết lãi suất",
+      "TERMS_INCOMPLETE": "Điều khoản chưa đầy đủ"
+    },
+    "lotsRefusal": {
+      "SPLIT": "Không thể suy ra các lô: trái phiếu không được chia nhỏ.",
+      "FRACTIONAL_QUANTITY": "Không thể suy ra các lô: một số lượng không phải là số nguyên trái phiếu.",
+      "OVER_REMOVAL": "Không thể suy ra các lô: số trái phiếu bị trừ nhiều hơn số đang nắm giữ.",
+      "INVALID_QUANTITY": "Không thể suy ra các lô: một số lượng bị thiếu, âm hoặc quá lớn."
+    },
+    "assumptions": {
+      "title": "Giả định của dự phóng"
+    },
+    "missing": {
+      "title": "Dữ liệu còn thiếu",
+      "item": "{benchmarkId} {observation} — do {publisher} công bố",
+      "itemNoPublisher": "{benchmarkId} {observation} — chưa rõ đơn vị công bố"
+    },
+    "recompute": {
+      "button": "Tính lại giá",
+      "done": "Đã tính lại giá: ghi {written}, xóa {deleted}.",
+      "failed": "Không thể tính lại giá."
+    }
   }
 }

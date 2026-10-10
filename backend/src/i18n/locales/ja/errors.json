@@ -531,7 +531,17 @@
     "dateMustBeYMD": "date は YYYY-MM-DD 形式でなければなりません",
     "loanLedgerUnreadable": "元帳の残高を読み取れなかったため、このローン支払いを計算できませんでした。もう一度お試しください。"
   },
+  "bonds": {
+    "securityNotLinked": "証券 {{ securityId }} が見つからないか、債券銘柄にリンクされていません",
+    "dataNotFound": "この評価に必要な保存済みの債券データを利用できません：{{ detail }}",
+    "dataInconsistent": "保存済みの債券データが互いに矛盾しているため、評価は提供されません：{{ detail }}",
+    "invalidInput": "評価リクエストが無効です：{{ detail }}"
+  },
   "securities": {
+    "bondPricedByEngine": "この証券は債券銘柄にリンクされており、価格は相場提供元ではなく債券エンジンが算出します。代わりに「価格を再計算」を使用してください。",
+    "bondInstrumentNotFound": "債券銘柄 {{ id }} は存在しません",
+    "bondCurrencyMismatch": "この証券は {{ currency }} で記録されていますが、債券銘柄は {{ instrumentCurrency }} で評価されます。銘柄の通貨を使用してください。",
+    "bondCurrencyLocked": "債券銘柄にリンクされた証券は、銘柄の通貨（{{ instrumentCurrency }}）のままとなります。通貨を変更する前に、債券とのリンクを解除してください。",
     "accountMustBeInvestment": "口座は INVESTMENT タイプでなければなりません",
     "transferPairSameRow": "1件の振替の2つの明細を同じ取引にはできません",
     "transferPairNotFound": "2件のうち一方の取引がすでに存在しません",

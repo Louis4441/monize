@@ -238,5 +238,81 @@
       "title": "Sem manchetes neste momento",
       "description": "Nada foi publicado sobre este símbolo recentemente. A lista é atualizada quando você voltar."
     }
+  },
+  "bond": {
+    "title": "Avaliação do título",
+    "loading": "Carregando a avaliação do título...",
+    "loadFailed": "Não foi possível carregar a avaliação do título.",
+    "unknown": "Desconhecido",
+    "asOf": "Avaliado em",
+    "instrument": "Série {series} ({issuer}, {program}, {country})",
+    "noLots": "Não há lotes em aberto nesta data.",
+    "totals": {
+      "quantity": "Títulos em carteira",
+      "grossValue": "Valor bruto",
+      "earlyRedemptionValue": "Valor de resgate antecipado",
+      "accruedInterest": "Juros acumulados",
+      "unknownLot": "Pelo menos um lote não tem valor, por isso nenhum total é informado.",
+      "unknownRefusal": "Não é possível apurar os lotes, por isso nenhum total é informado."
+    },
+    "lots": {
+      "purchaseDate": "Comprado",
+      "assumed": "Presumida",
+      "assumedTitle": "A data real de compra é desconhecida: este lote chegou por uma transferência sem o lado remetente vinculado.",
+      "quantity": "Quantidade",
+      "maturity": "Vencimento",
+      "period": "Período atual",
+      "periodValue": "{index}: de {start} a {end}",
+      "rate": "Taxa",
+      "principal": "Principal por título",
+      "accruedInterest": "Juros acumulados",
+      "grossValue": "Valor bruto",
+      "earlyRedemption": "Resgate antecipado",
+      "nextCashFlow": "Próximo fluxo de caixa",
+      "cashFlowValue": "{type} {amount} em {date}",
+      "noCashFlow": "Nenhum",
+      "projected": "Projetado",
+      "maturityValue": "Valor no vencimento",
+      "maturityKnown": "Conhecido",
+      "maturityProjected": "Projetado"
+    },
+    "rateSource": {
+      "TERMS": "Condições",
+      "ANNOUNCED": "Anunciada",
+      "DERIVED": "Derivada",
+      "PROJECTED": "Projetada"
+    },
+    "cashFlowType": {
+      "INTEREST": "Juros",
+      "PRINCIPAL": "Principal"
+    },
+    "earlyRefusal": {
+      "NOT_REDEEMABLE": "Não resgatável antecipadamente",
+      "TOO_EARLY": "Cedo demais para resgatar",
+      "TOO_LATE": "Tarde demais para resgatar",
+      "RECORD_DAY": "Não resgatável na data de corte",
+      "MATURED": "Vencido",
+      "RATE_UNKNOWN": "Taxa ainda desconhecida",
+      "TERMS_INCOMPLETE": "Condições incompletas"
+    },
+    "lotsRefusal": {
+      "SPLIT": "Não é possível apurar os lotes: um título não é desdobrado.",
+      "FRACTIONAL_QUANTITY": "Não é possível apurar os lotes: uma quantidade não é um número inteiro de títulos.",
+      "OVER_REMOVAL": "Não é possível apurar os lotes: foram removidos mais títulos do que os mantidos.",
+      "INVALID_QUANTITY": "Não é possível apurar os lotes: falta uma quantidade, ela é negativa ou grande demais."
+    },
+    "assumptions": {
+      "title": "Premissas da projeção"
+    },
+    "missing": {
+      "title": "Dados ainda necessários",
+      "item": "{benchmarkId} {observation} — publicado por {publisher}",
+      "itemNoPublisher": "{benchmarkId} {observation} — publicador desconhecido"
+    },
+    "recompute": {
+      "button": "Recalcular preços",
+      "done": "Preços recalculados: {written} gravados, {deleted} removidos.",
+      "failed": "Não foi possível recalcular os preços."
+    }
   }
 }

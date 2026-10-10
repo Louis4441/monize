@@ -531,7 +531,17 @@
     "dateMustBeYMD": "la data deve essere nel formato YYYY-MM-DD",
     "loanLedgerUnreadable": "Non è stato possibile calcolare questo pagamento del prestito perché non è stato possibile leggere il saldo del suo registro. Riprova."
   },
+  "bonds": {
+    "securityNotLinked": "Titolo {{ securityId }} non trovato o non collegato a uno strumento obbligazionario",
+    "dataNotFound": "I dati obbligazionari memorizzati necessari per questa valutazione non sono disponibili: {{ detail }}",
+    "dataInconsistent": "I dati obbligazionari memorizzati si contraddicono, quindi non viene fornita alcuna valutazione: {{ detail }}",
+    "invalidInput": "La richiesta di valutazione non è valida: {{ detail }}"
+  },
   "securities": {
+    "bondPricedByEngine": "Questo titolo è collegato a uno strumento obbligazionario ed è valutato dal motore obbligazionario, non da un fornitore di quotazioni. Usa invece Ricalcola i prezzi.",
+    "bondInstrumentNotFound": "Lo strumento obbligazionario {{ id }} non esiste",
+    "bondCurrencyMismatch": "Il titolo è registrato in {{ currency }}, ma lo strumento obbligazionario è valutato in {{ instrumentCurrency }}. Usa la valuta dello strumento.",
+    "bondCurrencyLocked": "Un titolo collegato a uno strumento obbligazionario resta nella valuta dello strumento ({{ instrumentCurrency }}). Scollegalo dall'obbligazione prima di cambiarne la valuta.",
     "accountMustBeInvestment": "Il conto deve essere di tipo INVESTMENT",
     "transferPairSameRow": "Le due gambe di un trasferimento non possono essere la stessa transazione",
     "transferPairNotFound": "Una delle due transazioni non esiste più",

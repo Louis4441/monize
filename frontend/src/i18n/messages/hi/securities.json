@@ -196,7 +196,11 @@
       "deleteConfirm": "हटाएँ",
       "deleteSuccess": "एसेट क्लास \"{name}\" हटाई गई",
       "deleteFailed": "एसेट क्लास \"{name}\" हटाई नहीं जा सकी"
-    }
+    },
+    "bondInstrumentLabel": "बॉन्ड सीरीज़ (वैकल्पिक)",
+    "bondInstrumentNone": "लिंक नहीं है",
+    "bondInstrumentOption": "{series} ({country}, {program})",
+    "bondInstrumentCurrent": "लिंक की गई सीरीज़"
   },
   "priceForm": {
     "dateLabel": "तिथि",

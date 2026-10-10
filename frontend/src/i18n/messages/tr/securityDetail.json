@@ -238,5 +238,81 @@
       "title": "Şu anda başlık yok",
       "description": "Bu sembolle ilgili son zamanlarda bir şey yayımlanmadı. Buraya döndüğünde liste yenilenir."
     }
+  },
+  "bond": {
+    "title": "Tahvil değerlemesi",
+    "loading": "Tahvil değerlemesi yükleniyor...",
+    "loadFailed": "Tahvil değerlemesi yüklenemedi.",
+    "unknown": "Bilinmiyor",
+    "asOf": "Değerleme tarihi",
+    "instrument": "Seri {series} ({issuer}, {program}, {country})",
+    "noLots": "Bu tarihte açık lot yok.",
+    "totals": {
+      "quantity": "Elde tutulan tahviller",
+      "grossValue": "Brüt değer",
+      "earlyRedemptionValue": "Erken itfa değeri",
+      "accruedInterest": "Birikmiş faiz",
+      "unknownLot": "En az bir lotun rakamı yok, bu nedenle toplam verilmiyor.",
+      "unknownRefusal": "Lotlar hesaplanamıyor, bu nedenle toplam verilmiyor."
+    },
+    "lots": {
+      "purchaseDate": "Satın alındı",
+      "assumed": "Varsayılan",
+      "assumedTitle": "Gerçek satın alma tarihi bilinmiyor: bu lot, bağlı bir gönderen tarafı olmayan bir transferle geldi.",
+      "quantity": "Miktar",
+      "maturity": "Vade",
+      "period": "Mevcut dönem",
+      "periodValue": "{index}: {start} - {end}",
+      "rate": "Oran",
+      "principal": "Tahvil başına anapara",
+      "accruedInterest": "Birikmiş faiz",
+      "grossValue": "Brüt değer",
+      "earlyRedemption": "Erken itfa",
+      "nextCashFlow": "Sonraki nakit akışı",
+      "cashFlowValue": "{type} {amount}, {date}",
+      "noCashFlow": "Yok",
+      "projected": "Tahmini",
+      "maturityValue": "Vadedeki değer",
+      "maturityKnown": "Biliniyor",
+      "maturityProjected": "Tahmini"
+    },
+    "rateSource": {
+      "TERMS": "Şartlar",
+      "ANNOUNCED": "Duyuruldu",
+      "DERIVED": "Türetildi",
+      "PROJECTED": "Tahmini"
+    },
+    "cashFlowType": {
+      "INTEREST": "Faiz",
+      "PRINCIPAL": "Anapara"
+    },
+    "earlyRefusal": {
+      "NOT_REDEEMABLE": "Erken itfa edilemez",
+      "TOO_EARLY": "İtfa için çok erken",
+      "TOO_LATE": "İtfa için çok geç",
+      "RECORD_DAY": "Kayıt gününde itfa edilemez",
+      "MATURED": "Vadesi doldu",
+      "RATE_UNKNOWN": "Oran henüz bilinmiyor",
+      "TERMS_INCOMPLETE": "Şartlar eksik"
+    },
+    "lotsRefusal": {
+      "SPLIT": "Lotlar türetilemiyor: bir tahvil bölünmez.",
+      "FRACTIONAL_QUANTITY": "Lotlar türetilemiyor: bir miktar tam sayıda tahvil değil.",
+      "OVER_REMOVAL": "Lotlar türetilemiyor: elde tutulandan fazla tahvil çıkarılmış.",
+      "INVALID_QUANTITY": "Lotlar türetilemiyor: bir miktar eksik, negatif veya çok büyük."
+    },
+    "assumptions": {
+      "title": "Projeksiyon varsayımları"
+    },
+    "missing": {
+      "title": "Hâlâ gereken veriler",
+      "item": "{benchmarkId} {observation} — yayımlayan: {publisher}",
+      "itemNoPublisher": "{benchmarkId} {observation} — yayımlayan bilinmiyor"
+    },
+    "recompute": {
+      "button": "Fiyatları yeniden hesapla",
+      "done": "Fiyatlar yeniden hesaplandı: {written} yazıldı, {deleted} kaldırıldı.",
+      "failed": "Fiyatlar yeniden hesaplanamadı."
+    }
   }
 }

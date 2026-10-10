@@ -531,7 +531,17 @@
     "dateMustBeYMD": "la fecha debe estar en formato YYYY-MM-DD",
     "loanLedgerUnreadable": "No se pudo calcular este pago del préstamo porque no se pudo leer el saldo de su libro mayor. Vuelve a intentarlo."
   },
+  "bonds": {
+    "securityNotLinked": "Valor {{ securityId }} no encontrado o no vinculado a un instrumento de bono",
+    "dataNotFound": "Los datos almacenados del bono necesarios para esta valoración no están disponibles: {{ detail }}",
+    "dataInconsistent": "Los datos almacenados del bono se contradicen entre sí, por lo que no se ofrece ninguna valoración: {{ detail }}",
+    "invalidInput": "La solicitud de valoración no es válida: {{ detail }}"
+  },
   "securities": {
+    "bondPricedByEngine": "Este valor está vinculado a un instrumento de bono y lo valora el motor de bonos, no un proveedor de cotizaciones. Utilice en su lugar Recalcular precios.",
+    "bondInstrumentNotFound": "El instrumento de bono {{ id }} no existe",
+    "bondCurrencyMismatch": "El valor está registrado en {{ currency }}, pero el instrumento de bono se valora en {{ instrumentCurrency }}. Utilice la moneda del instrumento.",
+    "bondCurrencyLocked": "Un valor vinculado a un instrumento de bono permanece en la moneda del instrumento ({{ instrumentCurrency }}). Desvincúlelo del bono antes de cambiar su moneda.",
     "accountMustBeInvestment": "La cuenta debe ser de tipo INVESTMENT",
     "transferPairSameRow": "Las dos partes de una transferencia no pueden ser la misma transacción",
     "transferPairNotFound": "Una de las dos transacciones ya no existe",

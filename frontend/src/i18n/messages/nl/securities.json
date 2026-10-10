@@ -196,7 +196,11 @@
       "deleteConfirm": "Verwijderen",
       "deleteSuccess": "Beleggingscategorie \"{name}\" verwijderd",
       "deleteFailed": "Kan beleggingscategorie \"{name}\" niet verwijderen"
-    }
+    },
+    "bondInstrumentLabel": "Obligatiereeks (optioneel)",
+    "bondInstrumentNone": "Niet gekoppeld",
+    "bondInstrumentOption": "{series} ({country}, {program})",
+    "bondInstrumentCurrent": "Gekoppelde reeks"
   },
   "priceForm": {
     "dateLabel": "Datum",

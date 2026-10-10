@@ -196,7 +196,11 @@
       "deleteConfirm": "Удалить",
       "deleteSuccess": "Класс активов «{name}» удалён",
       "deleteFailed": "Не удалось удалить класс активов «{name}»"
-    }
+    },
+    "bondInstrumentLabel": "Серия облигаций (необязательно)",
+    "bondInstrumentNone": "Не привязана",
+    "bondInstrumentOption": "{series} ({country}, {program})",
+    "bondInstrumentCurrent": "Привязанная серия"
   },
   "priceForm": {
     "dateLabel": "Дата",

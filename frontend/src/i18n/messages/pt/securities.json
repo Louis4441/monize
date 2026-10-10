@@ -196,7 +196,11 @@
       "deleteConfirm": "Eliminar",
       "deleteSuccess": "Classe de ativos «{name}» eliminada",
       "deleteFailed": "Não foi possível eliminar a classe de ativos «{name}»"
-    }
+    },
+    "bondInstrumentLabel": "Série de obrigações (opcional)",
+    "bondInstrumentNone": "Sem ligação",
+    "bondInstrumentOption": "{series} ({country}, {program})",
+    "bondInstrumentCurrent": "Série ligada"
   },
   "priceForm": {
     "dateLabel": "Data",

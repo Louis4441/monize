@@ -531,7 +531,17 @@
     "dateMustBeYMD": "date musi być w formacie YYYY-MM-DD",
     "loanLedgerUnreadable": "Nie można obliczyć tej raty kredytu, ponieważ nie udało się odczytać salda księgi. Spróbuj ponownie."
   },
+  "bonds": {
+    "securityNotLinked": "Nie znaleziono papieru wartościowego {{ securityId }} albo nie jest on powiązany z instrumentem obligacyjnym",
+    "dataNotFound": "Brak zapisanych danych obligacji potrzebnych do tej wyceny: {{ detail }}",
+    "dataInconsistent": "Zapisane dane obligacji są ze sobą sprzeczne, dlatego wycena nie została podana: {{ detail }}",
+    "invalidInput": "Żądanie wyceny jest nieprawidłowe: {{ detail }}"
+  },
   "securities": {
+    "bondPricedByEngine": "Ten papier wartościowy jest powiązany z instrumentem obligacyjnym i jest wyceniany przez silnik obligacji, a nie przez dostawcę notowań. Użyj zamiast tego opcji Przelicz ceny.",
+    "bondInstrumentNotFound": "Instrument obligacyjny {{ id }} nie istnieje",
+    "bondCurrencyMismatch": "Papier wartościowy jest zapisany w walucie {{ currency }}, a instrument obligacyjny jest wyceniany w walucie {{ instrumentCurrency }}. Użyj waluty instrumentu.",
+    "bondCurrencyLocked": "Papier wartościowy powiązany z instrumentem obligacyjnym pozostaje w walucie instrumentu ({{ instrumentCurrency }}). Przed zmianą waluty odłącz go od obligacji.",
     "accountMustBeInvestment": "Konto musi być typu INVESTMENT",
     "transferPairSameRow": "Dwie strony jednego transferu nie mogą być tą samą transakcją",
     "transferPairNotFound": "Jedna z dwóch transakcji już nie istnieje",

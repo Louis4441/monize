@@ -531,7 +531,17 @@
     "dateMustBeYMD": "datum moet in JJJJ-MM-DD-formaat zijn",
     "loanLedgerUnreadable": "Deze leningbetaling kon niet worden berekend omdat het grootboeksaldo niet kon worden gelezen. Probeer het opnieuw."
   },
+  "bonds": {
+    "securityNotLinked": "Effect {{ securityId }} niet gevonden of niet gekoppeld aan een obligatie-instrument",
+    "dataNotFound": "De opgeslagen obligatiegegevens die voor deze waardering nodig zijn, zijn niet beschikbaar: {{ detail }}",
+    "dataInconsistent": "De opgeslagen obligatiegegevens spreken elkaar tegen, dus er wordt geen waardering gegeven: {{ detail }}",
+    "invalidInput": "Het waarderingsverzoek is ongeldig: {{ detail }}"
+  },
   "securities": {
+    "bondPricedByEngine": "Dit effect is gekoppeld aan een obligatie-instrument en wordt gewaardeerd door de obligatie-engine, niet door een koersaanbieder. Gebruik in plaats daarvan Koersen herberekenen.",
+    "bondInstrumentNotFound": "Het obligatie-instrument {{ id }} bestaat niet",
+    "bondCurrencyMismatch": "Het effect is vastgelegd in {{ currency }}, maar het obligatie-instrument wordt gewaardeerd in {{ instrumentCurrency }}. Gebruik de valuta van het instrument.",
+    "bondCurrencyLocked": "Een effect dat aan een obligatie-instrument is gekoppeld, blijft in de valuta van het instrument ({{ instrumentCurrency }}). Ontkoppel het van de obligatie voordat u de valuta wijzigt.",
     "accountMustBeInvestment": "Rekening moet van het type INVESTMENT zijn",
     "transferPairSameRow": "De twee zijden van een overboeking kunnen niet dezelfde transactie zijn",
     "transferPairNotFound": "Een van de twee transacties bestaat niet meer",

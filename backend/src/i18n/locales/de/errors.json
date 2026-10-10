@@ -531,7 +531,17 @@
     "dateMustBeYMD": "Datum muss im Format YYYY-MM-DD sein",
     "loanLedgerUnreadable": "Diese Kreditrate konnte nicht berechnet werden, da ihr Kontosaldo nicht gelesen werden konnte. Bitte erneut versuchen."
   },
+  "bonds": {
+    "securityNotLinked": "Wertpapier {{ securityId }} nicht gefunden oder nicht mit einem Anleiheinstrument verknüpft",
+    "dataNotFound": "Die für diese Bewertung erforderlichen gespeicherten Anleihedaten sind nicht verfügbar: {{ detail }}",
+    "dataInconsistent": "Die gespeicherten Anleihedaten widersprechen sich, daher wird keine Bewertung angegeben: {{ detail }}",
+    "invalidInput": "Die Bewertungsanfrage ist ungültig: {{ detail }}"
+  },
   "securities": {
+    "bondPricedByEngine": "Dieses Wertpapier ist mit einem Anleiheinstrument verknüpft und wird von der Anleihe-Engine bewertet, nicht von einem Kursanbieter. Verwenden Sie stattdessen „Preise neu berechnen“.",
+    "bondInstrumentNotFound": "Das Anleiheinstrument {{ id }} existiert nicht",
+    "bondCurrencyMismatch": "Das Wertpapier ist in {{ currency }} erfasst, das Anleiheinstrument wird aber in {{ instrumentCurrency }} bewertet. Verwenden Sie die Währung des Instruments.",
+    "bondCurrencyLocked": "Ein mit einem Anleiheinstrument verknüpftes Wertpapier bleibt in der Währung des Instruments ({{ instrumentCurrency }}). Lösen Sie die Verknüpfung zur Anleihe, bevor Sie die Währung ändern.",
     "accountMustBeInvestment": "Konto muss vom Typ INVESTMENT sein",
     "transferPairSameRow": "Die beiden Seiten einer Übertragung können nicht dieselbe Transaktion sein",
     "transferPairNotFound": "Eine der beiden Transaktionen existiert nicht mehr",

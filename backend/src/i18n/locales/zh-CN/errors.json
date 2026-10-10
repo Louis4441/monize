@@ -531,7 +531,17 @@
     "dateMustBeYMD": "date 必须为 YYYY-MM-DD 格式",
     "loanLedgerUnreadable": "无法计算此贷款还款，因为无法读取其账簿余额。请重试。"
   },
+  "bonds": {
+    "securityNotLinked": "未找到证券 {{ securityId }}，或该证券未关联到债券工具",
+    "dataNotFound": "本次估值所需的已存储债券数据不可用：{{ detail }}",
+    "dataInconsistent": "已存储的债券数据相互矛盾，因此不提供估值：{{ detail }}",
+    "invalidInput": "估值请求无效：{{ detail }}"
+  },
   "securities": {
+    "bondPricedByEngine": "该证券已关联到债券工具，由债券引擎而非行情提供商定价。请改用“重新计算价格”。",
+    "bondInstrumentNotFound": "债券工具 {{ id }} 不存在",
+    "bondCurrencyMismatch": "该证券以 {{ currency }} 记录，但债券工具以 {{ instrumentCurrency }} 定价。请使用该工具的币种。",
+    "bondCurrencyLocked": "关联到债券工具的证券必须保持工具的币种（{{ instrumentCurrency }}）。更改币种之前，请先取消其与债券的关联。",
     "accountMustBeInvestment": "账户类型必须为 INVESTMENT",
     "transferPairSameRow": "一笔转移的两条记录不能是同一笔交易",
     "transferPairNotFound": "两笔交易中的一笔已不存在",

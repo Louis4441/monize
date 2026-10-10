@@ -196,7 +196,11 @@
       "deleteConfirm": "Löschen",
       "deleteSuccess": "Anlageklasse „{name}“ gelöscht",
       "deleteFailed": "Anlageklasse „{name}“ konnte nicht gelöscht werden"
-    }
+    },
+    "bondInstrumentLabel": "Anleiheserie (optional)",
+    "bondInstrumentNone": "Nicht verknüpft",
+    "bondInstrumentOption": "{series} ({country}, {program})",
+    "bondInstrumentCurrent": "Verknüpfte Serie"
   },
   "priceForm": {
     "dateLabel": "Datum",

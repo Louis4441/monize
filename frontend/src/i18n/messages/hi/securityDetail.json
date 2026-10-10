@@ -238,5 +238,81 @@
       "title": "इस समय कोई शीर्षक नहीं",
       "description": "हाल में इस सिंबल पर कुछ प्रकाशित नहीं हुआ। जब आप यहाँ लौटेंगे तो सूची ताज़ा हो जाएगी।"
     }
+  },
+  "bond": {
+    "title": "बॉन्ड मूल्यांकन",
+    "loading": "बॉन्ड मूल्यांकन लोड हो रहा है...",
+    "loadFailed": "बॉन्ड मूल्यांकन लोड नहीं हो सका।",
+    "unknown": "अज्ञात",
+    "asOf": "मूल्यांकन की तिथि",
+    "instrument": "सीरीज़ {series} ({issuer}, {program}, {country})",
+    "noLots": "इस तिथि पर कोई लॉट खुला नहीं है।",
+    "totals": {
+      "quantity": "धारित बॉन्ड",
+      "grossValue": "सकल मूल्य",
+      "earlyRedemptionValue": "समय-पूर्व मोचन मूल्य",
+      "accruedInterest": "उपार्जित ब्याज",
+      "unknownLot": "कम से कम एक लॉट का कोई आंकड़ा नहीं है, इसलिए कुल नहीं दिया गया है।",
+      "unknownRefusal": "लॉट का निर्धारण नहीं हो सकता, इसलिए कुल नहीं दिया गया है।"
+    },
+    "lots": {
+      "purchaseDate": "खरीदा गया",
+      "assumed": "अनुमानित",
+      "assumedTitle": "वास्तविक खरीद तिथि अज्ञात है: यह लॉट बिना लिंक की गई भेजने वाली ओर के ट्रांसफ़र से आया है।",
+      "quantity": "मात्रा",
+      "maturity": "परिपक्वता",
+      "period": "वर्तमान अवधि",
+      "periodValue": "{index}: {start} से {end} तक",
+      "rate": "दर",
+      "principal": "प्रति बॉन्ड मूलधन",
+      "accruedInterest": "उपार्जित ब्याज",
+      "grossValue": "सकल मूल्य",
+      "earlyRedemption": "समय-पूर्व मोचन",
+      "nextCashFlow": "अगला नकदी प्रवाह",
+      "cashFlowValue": "{date} को {type} {amount}",
+      "noCashFlow": "कोई नहीं",
+      "projected": "अनुमानित",
+      "maturityValue": "परिपक्वता पर मूल्य",
+      "maturityKnown": "ज्ञात",
+      "maturityProjected": "अनुमानित"
+    },
+    "rateSource": {
+      "TERMS": "शर्तें",
+      "ANNOUNCED": "घोषित",
+      "DERIVED": "व्युत्पन्न",
+      "PROJECTED": "अनुमानित"
+    },
+    "cashFlowType": {
+      "INTEREST": "ब्याज",
+      "PRINCIPAL": "मूलधन"
+    },
+    "earlyRefusal": {
+      "NOT_REDEEMABLE": "समय-पूर्व मोचन संभव नहीं",
+      "TOO_EARLY": "मोचन के लिए बहुत जल्दी",
+      "TOO_LATE": "मोचन के लिए बहुत देर",
+      "RECORD_DAY": "रिकॉर्ड तिथि पर मोचन संभव नहीं",
+      "MATURED": "परिपक्व हो चुका",
+      "RATE_UNKNOWN": "दर अभी ज्ञात नहीं",
+      "TERMS_INCOMPLETE": "शर्तें अधूरी"
+    },
+    "lotsRefusal": {
+      "SPLIT": "लॉट निकाले नहीं जा सकते: बॉन्ड का विभाजन नहीं होता।",
+      "FRACTIONAL_QUANTITY": "लॉट निकाले नहीं जा सकते: कोई मात्रा बॉन्ड की पूर्ण संख्या नहीं है।",
+      "OVER_REMOVAL": "लॉट निकाले नहीं जा सकते: धारित से अधिक बॉन्ड हटाए गए हैं।",
+      "INVALID_QUANTITY": "लॉट निकाले नहीं जा सकते: कोई मात्रा गायब, ऋणात्मक या बहुत बड़ी है।"
+    },
+    "assumptions": {
+      "title": "अनुमान की मान्यताएँ"
+    },
+    "missing": {
+      "title": "अभी भी आवश्यक डेटा",
+      "item": "{benchmarkId} {observation} — प्रकाशक: {publisher}",
+      "itemNoPublisher": "{benchmarkId} {observation} — प्रकाशक ज्ञात नहीं"
+    },
+    "recompute": {
+      "button": "कीमतें दोबारा गणना करें",
+      "done": "कीमतों की दोबारा गणना हुई: {written} लिखी गईं, {deleted} हटाई गईं।",
+      "failed": "कीमतों की दोबारा गणना नहीं हो सकी।"
+    }
   }
 }

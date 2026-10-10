@@ -531,7 +531,17 @@
     "dateMustBeYMD": "date는 YYYY-MM-DD 형식이어야 합니다",
     "loanLedgerUnreadable": "원장 잔액을 읽을 수 없어 이 대출 상환액을 계산할 수 없습니다. 다시 시도하세요."
   },
+  "bonds": {
+    "securityNotLinked": "증권 {{ securityId }}을(를) 찾을 수 없거나 채권 종목에 연결되어 있지 않습니다",
+    "dataNotFound": "이 평가에 필요한 저장된 채권 데이터를 사용할 수 없습니다: {{ detail }}",
+    "dataInconsistent": "저장된 채권 데이터가 서로 모순되어 평가를 제공하지 않습니다: {{ detail }}",
+    "invalidInput": "평가 요청이 올바르지 않습니다: {{ detail }}"
+  },
   "securities": {
+    "bondPricedByEngine": "이 증권은 채권 종목에 연결되어 있으며 시세 제공업체가 아닌 채권 엔진이 가격을 산정합니다. 대신 가격 다시 계산을 사용하세요.",
+    "bondInstrumentNotFound": "채권 종목 {{ id }}이(가) 존재하지 않습니다",
+    "bondCurrencyMismatch": "이 증권은 {{ currency }}로 기록되어 있지만 채권 종목은 {{ instrumentCurrency }}로 평가됩니다. 종목의 통화를 사용하세요.",
+    "bondCurrencyLocked": "채권 종목에 연결된 증권은 종목의 통화({{ instrumentCurrency }})를 유지합니다. 통화를 변경하기 전에 채권과의 연결을 해제하세요.",
     "accountMustBeInvestment": "계정은 INVESTMENT 유형이어야 합니다",
     "transferPairSameRow": "한 이체의 두 항목이 동일한 거래일 수는 없습니다",
     "transferPairNotFound": "두 거래 중 하나가 더 이상 존재하지 않습니다",

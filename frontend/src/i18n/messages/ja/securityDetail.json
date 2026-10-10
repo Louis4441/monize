@@ -238,5 +238,81 @@
       "title": "現在、見出しはありません",
       "description": "このシンボルについて最近公開されたものはありません。ここに戻ると一覧が更新されます。"
     }
+  },
+  "bond": {
+    "title": "債券評価",
+    "loading": "債券評価を読み込み中...",
+    "loadFailed": "債券評価を読み込めませんでした。",
+    "unknown": "不明",
+    "asOf": "評価日",
+    "instrument": "シリーズ {series}（{issuer}、{program}、{country}）",
+    "noLots": "この日付に未決済のロットはありません。",
+    "totals": {
+      "quantity": "保有債券数",
+      "grossValue": "総額",
+      "earlyRedemptionValue": "中途償還額",
+      "accruedInterest": "経過利息",
+      "unknownLot": "少なくとも1つのロットに数値がないため、合計は表示しません。",
+      "unknownRefusal": "ロットを算出できないため、合計は表示しません。"
+    },
+    "lots": {
+      "purchaseDate": "購入日",
+      "assumed": "仮定",
+      "assumedTitle": "実際の購入日は不明です。このロットは、送信側がリンクされていない振替で入ってきました。",
+      "quantity": "数量",
+      "maturity": "満期",
+      "period": "現在の期間",
+      "periodValue": "{index}：{start} から {end}",
+      "rate": "利率",
+      "principal": "債券1枚あたりの元本",
+      "accruedInterest": "経過利息",
+      "grossValue": "総額",
+      "earlyRedemption": "中途償還",
+      "nextCashFlow": "次のキャッシュフロー",
+      "cashFlowValue": "{date} に {type} {amount}",
+      "noCashFlow": "なし",
+      "projected": "予測",
+      "maturityValue": "満期時の価値",
+      "maturityKnown": "確定",
+      "maturityProjected": "予測"
+    },
+    "rateSource": {
+      "TERMS": "条件",
+      "ANNOUNCED": "発表済み",
+      "DERIVED": "導出",
+      "PROJECTED": "予測"
+    },
+    "cashFlowType": {
+      "INTEREST": "利息",
+      "PRINCIPAL": "元本"
+    },
+    "earlyRefusal": {
+      "NOT_REDEEMABLE": "中途償還不可",
+      "TOO_EARLY": "償還には早すぎます",
+      "TOO_LATE": "償還には遅すぎます",
+      "RECORD_DAY": "基準日には償還できません",
+      "MATURED": "満期到来",
+      "RATE_UNKNOWN": "利率が未確定",
+      "TERMS_INCOMPLETE": "条件が不完全"
+    },
+    "lotsRefusal": {
+      "SPLIT": "ロットを導出できません。債券は分割できません。",
+      "FRACTIONAL_QUANTITY": "ロットを導出できません。数量が債券の整数枚数ではありません。",
+      "OVER_REMOVAL": "ロットを導出できません。保有数を超える債券が除かれています。",
+      "INVALID_QUANTITY": "ロットを導出できません。数量がない、負の値、または大きすぎます。"
+    },
+    "assumptions": {
+      "title": "予測の前提"
+    },
+    "missing": {
+      "title": "まだ必要なデータ",
+      "item": "{benchmarkId} {observation} — 公表元：{publisher}",
+      "itemNoPublisher": "{benchmarkId} {observation} — 公表元は不明"
+    },
+    "recompute": {
+      "button": "価格を再計算",
+      "done": "価格を再計算しました：書き込み {written} 件、削除 {deleted} 件。",
+      "failed": "価格を再計算できませんでした。"
+    }
   }
 }

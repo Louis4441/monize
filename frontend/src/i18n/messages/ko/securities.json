@@ -196,7 +196,11 @@
       "deleteConfirm": "삭제",
       "deleteSuccess": "자산군 \"{name}\"을(를) 삭제했습니다",
       "deleteFailed": "자산군 \"{name}\"을(를) 삭제하지 못했습니다"
-    }
+    },
+    "bondInstrumentLabel": "채권 시리즈(선택)",
+    "bondInstrumentNone": "연결 안 됨",
+    "bondInstrumentOption": "{series}({country}, {program})",
+    "bondInstrumentCurrent": "연결된 시리즈"
   },
   "priceForm": {
     "dateLabel": "날짜",

@@ -531,7 +531,17 @@
     "dateMustBeYMD": "date phải có định dạng YYYY-MM-DD",
     "loanLedgerUnreadable": "Không thể tính khoản thanh toán vay này vì không thể đọc số dư sổ cái của nó. Vui lòng thử lại."
   },
+  "bonds": {
+    "securityNotLinked": "Không tìm thấy chứng khoán {{ securityId }} hoặc chứng khoán chưa liên kết với công cụ trái phiếu",
+    "dataNotFound": "Không có dữ liệu trái phiếu đã lưu cần cho lần định giá này: {{ detail }}",
+    "dataInconsistent": "Dữ liệu trái phiếu đã lưu mâu thuẫn với nhau nên không đưa ra định giá: {{ detail }}",
+    "invalidInput": "Yêu cầu định giá không hợp lệ: {{ detail }}"
+  },
   "securities": {
+    "bondPricedByEngine": "Chứng khoán này được liên kết với một công cụ trái phiếu và được định giá bởi công cụ tính trái phiếu, không phải bởi nhà cung cấp báo giá. Hãy dùng Tính lại giá thay thế.",
+    "bondInstrumentNotFound": "Công cụ trái phiếu {{ id }} không tồn tại",
+    "bondCurrencyMismatch": "Chứng khoán được ghi bằng {{ currency }}, nhưng công cụ trái phiếu được định giá bằng {{ instrumentCurrency }}. Hãy dùng đơn vị tiền tệ của công cụ.",
+    "bondCurrencyLocked": "Chứng khoán liên kết với một công cụ trái phiếu giữ nguyên đơn vị tiền tệ của công cụ ({{ instrumentCurrency }}). Hãy hủy liên kết với trái phiếu trước khi đổi đơn vị tiền tệ.",
     "accountMustBeInvestment": "Tài khoản phải là loại ĐẦU TƯ",
     "transferPairSameRow": "Hai vế của một giao dịch chuyển không thể là cùng một giao dịch",
     "transferPairNotFound": "Một trong hai giao dịch không còn tồn tại",

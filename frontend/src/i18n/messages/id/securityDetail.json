@@ -238,5 +238,81 @@
       "title": "Belum ada judul berita saat ini",
       "description": "Belum ada yang dipublikasikan untuk simbol ini baru-baru ini. Daftar akan disegarkan saat Anda kembali ke sini."
     }
+  },
+  "bond": {
+    "title": "Valuasi obligasi",
+    "loading": "Memuat valuasi obligasi...",
+    "loadFailed": "Valuasi obligasi tidak dapat dimuat.",
+    "unknown": "Tidak diketahui",
+    "asOf": "Dinilai pada",
+    "instrument": "Seri {series} ({issuer}, {program}, {country})",
+    "noLots": "Tidak ada lot yang terbuka pada tanggal ini.",
+    "totals": {
+      "quantity": "Obligasi yang dimiliki",
+      "grossValue": "Nilai kotor",
+      "earlyRedemptionValue": "Nilai pelunasan dini",
+      "accruedInterest": "Bunga berjalan",
+      "unknownLot": "Setidaknya satu lot tidak memiliki angka, sehingga total tidak ditampilkan.",
+      "unknownRefusal": "Lot tidak dapat dihitung, sehingga total tidak ditampilkan."
+    },
+    "lots": {
+      "purchaseDate": "Dibeli",
+      "assumed": "Diasumsikan",
+      "assumedTitle": "Tanggal pembelian sebenarnya tidak diketahui: lot ini masuk melalui transfer tanpa sisi pengirim yang ditautkan.",
+      "quantity": "Jumlah",
+      "maturity": "Jatuh tempo",
+      "period": "Periode saat ini",
+      "periodValue": "{index}: {start} sampai {end}",
+      "rate": "Suku bunga",
+      "principal": "Pokok per obligasi",
+      "accruedInterest": "Bunga berjalan",
+      "grossValue": "Nilai kotor",
+      "earlyRedemption": "Pelunasan dini",
+      "nextCashFlow": "Arus kas berikutnya",
+      "cashFlowValue": "{type} {amount} pada {date}",
+      "noCashFlow": "Tidak ada",
+      "projected": "Proyeksi",
+      "maturityValue": "Nilai saat jatuh tempo",
+      "maturityKnown": "Diketahui",
+      "maturityProjected": "Proyeksi"
+    },
+    "rateSource": {
+      "TERMS": "Ketentuan",
+      "ANNOUNCED": "Diumumkan",
+      "DERIVED": "Diturunkan",
+      "PROJECTED": "Proyeksi"
+    },
+    "cashFlowType": {
+      "INTEREST": "Bunga",
+      "PRINCIPAL": "Pokok"
+    },
+    "earlyRefusal": {
+      "NOT_REDEEMABLE": "Tidak dapat dilunasi dini",
+      "TOO_EARLY": "Terlalu dini untuk dilunasi",
+      "TOO_LATE": "Terlalu terlambat untuk dilunasi",
+      "RECORD_DAY": "Tidak dapat dilunasi pada tanggal pencatatan",
+      "MATURED": "Jatuh tempo",
+      "RATE_UNKNOWN": "Suku bunga belum diketahui",
+      "TERMS_INCOMPLETE": "Ketentuan tidak lengkap"
+    },
+    "lotsRefusal": {
+      "SPLIT": "Lot tidak dapat diturunkan: obligasi tidak dapat dipecah.",
+      "FRACTIONAL_QUANTITY": "Lot tidak dapat diturunkan: jumlah bukan bilangan bulat obligasi.",
+      "OVER_REMOVAL": "Lot tidak dapat diturunkan: lebih banyak obligasi yang dikurangi daripada yang dimiliki.",
+      "INVALID_QUANTITY": "Lot tidak dapat diturunkan: jumlah hilang, negatif, atau terlalu besar."
+    },
+    "assumptions": {
+      "title": "Asumsi proyeksi"
+    },
+    "missing": {
+      "title": "Data yang masih diperlukan",
+      "item": "{benchmarkId} {observation} — diterbitkan oleh {publisher}",
+      "itemNoPublisher": "{benchmarkId} {observation} — penerbit tidak diketahui"
+    },
+    "recompute": {
+      "button": "Hitung ulang harga",
+      "done": "Harga dihitung ulang: {written} ditulis, {deleted} dihapus.",
+      "failed": "Harga tidak dapat dihitung ulang."
+    }
   }
 }

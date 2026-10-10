@@ -196,7 +196,11 @@
       "deleteConfirm": "删除",
       "deleteSuccess": "已删除资产类别“{name}”",
       "deleteFailed": "无法删除资产类别“{name}”"
-    }
+    },
+    "bondInstrumentLabel": "债券系列（可选）",
+    "bondInstrumentNone": "未关联",
+    "bondInstrumentOption": "{series}（{country}，{program}）",
+    "bondInstrumentCurrent": "已关联的系列"
   },
   "priceForm": {
     "dateLabel": "日期",

@@ -238,5 +238,81 @@
       "title": "Op dit moment geen koppen",
       "description": "Er is recent niets over dit symbool gepubliceerd. De lijst wordt verversd als je terugkomt."
     }
+  },
+  "bond": {
+    "title": "Obligatiewaardering",
+    "loading": "Obligatiewaardering laden...",
+    "loadFailed": "De obligatiewaardering kon niet worden geladen.",
+    "unknown": "Onbekend",
+    "asOf": "Gewaardeerd op",
+    "instrument": "Reeks {series} ({issuer}, {program}, {country})",
+    "noLots": "Op deze datum zijn er geen open partijen.",
+    "totals": {
+      "quantity": "Aangehouden obligaties",
+      "grossValue": "Brutowaarde",
+      "earlyRedemptionValue": "Waarde bij vervroegde aflossing",
+      "accruedInterest": "Opgelopen rente",
+      "unknownLot": "Voor minstens één partij is er geen waarde, dus wordt er geen totaal gegeven.",
+      "unknownRefusal": "De partijen kunnen niet worden bepaald, dus wordt er geen totaal gegeven."
+    },
+    "lots": {
+      "purchaseDate": "Gekocht",
+      "assumed": "Aangenomen",
+      "assumedTitle": "De werkelijke aankoopdatum is onbekend: deze partij is binnengekomen via een overboeking zonder gekoppelde verzendende kant.",
+      "quantity": "Aantal",
+      "maturity": "Einddatum",
+      "period": "Huidige periode",
+      "periodValue": "{index}: {start} tot {end}",
+      "rate": "Rente",
+      "principal": "Hoofdsom per obligatie",
+      "accruedInterest": "Opgelopen rente",
+      "grossValue": "Brutowaarde",
+      "earlyRedemption": "Vervroegde aflossing",
+      "nextCashFlow": "Volgende kasstroom",
+      "cashFlowValue": "{type} {amount} op {date}",
+      "noCashFlow": "Geen",
+      "projected": "Verwacht",
+      "maturityValue": "Waarde op de einddatum",
+      "maturityKnown": "Bekend",
+      "maturityProjected": "Verwacht"
+    },
+    "rateSource": {
+      "TERMS": "Voorwaarden",
+      "ANNOUNCED": "Aangekondigd",
+      "DERIVED": "Afgeleid",
+      "PROJECTED": "Verwacht"
+    },
+    "cashFlowType": {
+      "INTEREST": "Rente",
+      "PRINCIPAL": "Hoofdsom"
+    },
+    "earlyRefusal": {
+      "NOT_REDEEMABLE": "Niet vervroegd aflosbaar",
+      "TOO_EARLY": "Te vroeg om af te lossen",
+      "TOO_LATE": "Te laat om af te lossen",
+      "RECORD_DAY": "Niet aflosbaar op de registratiedatum",
+      "MATURED": "Afgelopen",
+      "RATE_UNKNOWN": "Rente nog niet bekend",
+      "TERMS_INCOMPLETE": "Voorwaarden onvolledig"
+    },
+    "lotsRefusal": {
+      "SPLIT": "De partijen kunnen niet worden afgeleid: een obligatie wordt niet gesplitst.",
+      "FRACTIONAL_QUANTITY": "De partijen kunnen niet worden afgeleid: een aantal is geen geheel aantal obligaties.",
+      "OVER_REMOVAL": "De partijen kunnen niet worden afgeleid: er zijn meer obligaties verwijderd dan er werden aangehouden.",
+      "INVALID_QUANTITY": "De partijen kunnen niet worden afgeleid: een aantal ontbreekt, is negatief of is te groot."
+    },
+    "assumptions": {
+      "title": "Aannames van de prognose"
+    },
+    "missing": {
+      "title": "Nog benodigde gegevens",
+      "item": "{benchmarkId} {observation} — gepubliceerd door {publisher}",
+      "itemNoPublisher": "{benchmarkId} {observation} — uitgever onbekend"
+    },
+    "recompute": {
+      "button": "Koersen herberekenen",
+      "done": "Koersen herberekend: {written} geschreven, {deleted} verwijderd.",
+      "failed": "De koersen konden niet worden herberekend."
+    }
   }
 }
