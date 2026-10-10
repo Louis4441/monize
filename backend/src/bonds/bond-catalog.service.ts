@@ -1,7 +1,14 @@
-import { Injectable, Logger, OnApplicationBootstrap } from "@nestjs/common";
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  OnApplicationBootstrap,
+} from "@nestjs/common";
 import { DataSource, EntityManager } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { withSystemContext } from "../common/db/with-context";
+import { CurrenciesService } from "../currencies/currencies.service";
 import { BondAdapter, CatalogEntry } from "./bond-adapter";
 import { bondInstrumentId } from "./bond-instrument-id";
 import { INSTALLED_BOND_ADAPTERS } from "./bond-adapters";
@@ -23,7 +30,16 @@ import { BondTerms, parseBondTerms } from "./domain/bond-terms";
 export class BondCatalogService implements OnApplicationBootstrap {
   private readonly logger = new Logger(BondCatalogService.name);
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    // Currencies are created on demand in Monize, so a fresh deployment holds
+    // none of an instrument's currencies until something asks for one.
+    @Inject(forwardRef(() => CurrenciesService))
+    private readonly currencies: Pick<
+      CurrenciesService,
+      "ensureSystemCurrency"
+    >,
+  ) {}
 
   async onApplicationBootstrap(): Promise<void> {
     try {
@@ -130,18 +146,9 @@ export class BondCatalogService implements OnApplicationBootstrap {
     const { instrument } = terms;
     const named = `${instrument.issuerCountryCode} ${instrument.issuerCode} ${instrument.seriesCode}`;
 
-    // A missing currency would fail the foreign key and abort the whole
-    // transaction, so it is checked first and the entry skipped.
-    const currency: unknown[] = await m.query(
-      `SELECT 1 FROM currencies WHERE code = $1`,
-      [instrument.currency],
-    );
-    if (currency.length === 0) {
-      this.logger.error(
-        `Bond catalog entry ${named} skipped: currency ${instrument.currency} is not in the currencies table`,
-      );
-      return;
-    }
+    // The currency is created on demand, as for a user's default currency; the
+    // nested withScopedDb joins this transaction.
+    await this.currencies.ensureSystemCurrency(instrument.currency);
 
     // The id is derived from the unique key, not generated: the table is not in
     // the user backup, so a security's link survives a restore onto another

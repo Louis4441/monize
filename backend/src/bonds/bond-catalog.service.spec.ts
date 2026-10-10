@@ -73,8 +73,13 @@ function setup(adapters: readonly BondAdapter[], seed: Partial<Db> = {}) {
     }
     throw new Error(`unexpected query: ${sql}`);
   });
-  const service = new BondCatalogService(dataSource as unknown as DataSource);
-  return { service, db, statements, manager };
+  const ensureSystemCurrency = jest.fn(async (code: string) => {
+    if (!db.currencies.includes(code)) db.currencies.push(code);
+  });
+  const service = new BondCatalogService(dataSource as unknown as DataSource, {
+    ensureSystemCurrency,
+  });
+  return { service, db, statements, manager, ensureSystemCurrency };
 }
 
 describe("BondCatalogService", () => {
@@ -183,11 +188,15 @@ describe("BondCatalogService", () => {
     expect(error.mock.calls[0][0]).toMatch(/Invalid bond terms/);
   });
 
-  it("skips an entry whose currency is not in the currencies table", async () => {
-    const { service, db } = setup([POLISH_BOND_ADAPTER], { currencies: [] });
+  it("creates an instrument's currency on demand on a fresh deployment", async () => {
+    const { service, db, ensureSystemCurrency } = setup([POLISH_BOND_ADAPTER], {
+      currencies: [],
+    });
     await service.seed([POLISH_BOND_ADAPTER]);
-    expect(db.instruments).toHaveLength(0);
-    expect(error).toHaveBeenCalledTimes(8);
+    expect(ensureSystemCurrency).toHaveBeenCalledWith("PLN");
+    expect(db.currencies).toEqual(["PLN"]);
+    expect(db.instruments).toHaveLength(8);
+    expect(error).not.toHaveBeenCalled();
   });
 
   it("lists the catalog ordered by country, issuer and series, in the API's shape", async () => {

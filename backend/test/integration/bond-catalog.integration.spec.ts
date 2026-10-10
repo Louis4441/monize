@@ -1,3 +1,4 @@
+import { CurrenciesService } from "../../src/currencies/currencies.service";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { TestingModule } from "@nestjs/testing";
@@ -50,7 +51,10 @@ describe("bond catalog and benchmark refresh (integration)", () => {
   beforeAll(async () => {
     module = await createIntegrationModule([]);
     dataSource = module.get(DataSource);
-    catalog = new BondCatalogService(dataSource);
+    catalog = new BondCatalogService(
+      dataSource,
+      new CurrenciesService(dataSource),
+    );
     refresh = new BenchmarkRefreshService(
       dataSource,
       new ProviderHealthService(dataSource),

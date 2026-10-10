@@ -1,3 +1,4 @@
+import { CurrenciesModule } from "../currencies/currencies.module";
 import { Module, forwardRef } from "@nestjs/common";
 import { NetWorthModule } from "../net-worth/net-worth.module";
 import { ProviderHealthModule } from "../provider-health/provider-health.module";
@@ -15,6 +16,8 @@ import { BondsController } from "./bonds.controller";
     // prices) and NetWorthModule reaches SecuritiesModule back through
     // CurrenciesModule, so the edge lies on a require cycle: forwardRef.
     forwardRef(() => NetWorthModule),
+    // The catalog seed creates an instrument's currency on demand.
+    forwardRef(() => CurrenciesModule),
   ],
   controllers: [BondsController],
   providers: [
