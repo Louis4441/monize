@@ -301,15 +301,21 @@
       "OVER_REMOVAL": "The lots cannot be derived: more bonds were removed than were held.",
       "INVALID_QUANTITY": "The lots cannot be derived: a quantity is missing, negative or too large."
     },
+    "lotsRefusalDetail": {
+      "SPLIT": "A split ({action} on {date}) is recorded on this security; a bond does not split.",
+      "FRACTIONAL_QUANTITY": "{action} on {date} moves {quantity} bonds, which is not a whole number.",
+      "OVER_REMOVAL": "{action} on {date} removes {quantity} bonds, more than were held.",
+      "INVALID_QUANTITY": "The quantity of {action} on {date} is missing, negative or too large."
+    },
     "assumptions": {
       "title": "Projection assumptions",
-      "latestObservation": "{benchmarkId} assumed at {value} for every later period, the latest published value ({observation})",
-      "supplied": "{benchmarkId} assumed at {value} for every later period"
+      "latestObservation": "{benchmark} assumed at {value} for every later period, the latest published value ({observation})",
+      "supplied": "{benchmark} assumed at {value} for every later period"
     },
     "missing": {
       "title": "Data still needed",
-      "item": "{benchmarkId} {observation} — published by {publisher}",
-      "itemNoPublisher": "{benchmarkId} {observation} — publisher not known"
+      "item": "{benchmark} {observation} — published by {publisher}",
+      "itemNoPublisher": "{benchmark} {observation} — publisher not known"
     },
     "recompute": {
       "button": "Recalculate prices",

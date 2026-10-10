@@ -301,15 +301,21 @@
       "OVER_REMOVAL": "Nie można ustalić partii: usunięto więcej obligacji, niż było w posiadaniu.",
       "INVALID_QUANTITY": "Nie można ustalić partii: ilość jest nieokreślona, ujemna lub zbyt duża."
     },
+    "lotsRefusalDetail": {
+      "SPLIT": "Dla tego papieru zapisano split ({action} w dniu {date}); obligacja się nie dzieli.",
+      "FRACTIONAL_QUANTITY": "{action} w dniu {date} przesuwa {quantity} obligacji, co nie jest liczbą całkowitą.",
+      "OVER_REMOVAL": "{action} w dniu {date} usuwa {quantity} obligacji, więcej niż było w posiadaniu.",
+      "INVALID_QUANTITY": "Ilość w operacji {action} z dnia {date} jest pusta, ujemna lub zbyt duża."
+    },
     "assumptions": {
       "title": "Założenia prognozy",
-      "latestObservation": "Założono {benchmarkId} na poziomie {value} dla wszystkich kolejnych okresów (ostatnia opublikowana wartość: {observation})",
-      "supplied": "Założono {benchmarkId} na poziomie {value} dla wszystkich kolejnych okresów"
+      "latestObservation": "Dla wszystkich kolejnych okresów założono wartość „{benchmark}” na poziomie {value} (ostatnia opublikowana wartość: {observation})",
+      "supplied": "Dla wszystkich kolejnych okresów założono wartość „{benchmark}” na poziomie {value}"
     },
     "missing": {
       "title": "Dane, których jeszcze brakuje",
-      "item": "{benchmarkId} {observation} — publikuje: {publisher}",
-      "itemNoPublisher": "{benchmarkId} {observation} — nie wiadomo, kto publikuje"
+      "item": "{benchmark} {observation} — publikuje: {publisher}",
+      "itemNoPublisher": "{benchmark} {observation} — nie wiadomo, kto publikuje"
     },
     "recompute": {
       "button": "Przelicz ceny",
@@ -322,7 +328,7 @@
         "fixed": "Stałe {rate} przez cały okres",
         "firstThen": "Okres 1: {firstRate}. Następnie {benchmark} + marża {addend}",
         "every": "Każdy okres: {benchmark} + marża {addend}",
-        "floorZero": "Ujemna wartość {benchmark} jest liczona jako 0"
+        "floorZero": "Ujemna wartość wskaźnika „{benchmark}” jest liczona jako 0"
       },
       "lotHeading": "Partia kupiona {date}",
       "range": "{start} do {end}",

@@ -201,7 +201,10 @@
     "bondInstrumentLabel": "Anleiheserie (optional)",
     "bondInstrumentNone": "Nicht verknüpft",
     "bondInstrumentOption": "{series} ({country}, {program})",
-    "bondInstrumentCurrent": "Verknüpfte Serie"
+    "bondInstrumentCurrent": "Verknüpfte Serie",
+    "bondInstrumentLoading": "Anleihenkatalog wird geladen...",
+    "bondInstrumentLoadFailed": "Der Anleihenkatalog konnte nicht geladen werden, daher lässt sich noch keine Serie verknüpfen.",
+    "bondInstrumentRetry": "Erneut versuchen"
   },
   "priceForm": {
     "dateLabel": "Datum",

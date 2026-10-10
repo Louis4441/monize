@@ -201,7 +201,10 @@
     "bondInstrumentLabel": "Série de títulos (opcional)",
     "bondInstrumentNone": "Não vinculada",
     "bondInstrumentOption": "{series} ({country}, {program})",
-    "bondInstrumentCurrent": "Série vinculada"
+    "bondInstrumentCurrent": "Série vinculada",
+    "bondInstrumentLoading": "Carregando o catálogo de títulos...",
+    "bondInstrumentLoadFailed": "Não foi possível carregar o catálogo de títulos, então ainda não é possível vincular uma série.",
+    "bondInstrumentRetry": "Tentar novamente"
   },
   "priceForm": {
     "dateLabel": "Data",

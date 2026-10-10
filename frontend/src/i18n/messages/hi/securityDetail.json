@@ -301,15 +301,21 @@
       "OVER_REMOVAL": "लॉट निकाले नहीं जा सकते: धारित से अधिक बॉन्ड हटाए गए हैं।",
       "INVALID_QUANTITY": "लॉट निकाले नहीं जा सकते: कोई मात्रा गायब, ऋणात्मक या बहुत बड़ी है।"
     },
+    "lotsRefusalDetail": {
+      "SPLIT": "इस सिक्योरिटी पर एक स्प्लिट दर्ज है ({action}, {date}); बॉन्ड का स्प्लिट नहीं होता।",
+      "FRACTIONAL_QUANTITY": "{action} ({date}) {quantity} बॉन्ड हिलाता है, जो पूर्ण संख्या नहीं है।",
+      "OVER_REMOVAL": "{action} ({date}) {quantity} बॉन्ड हटाता है, जो धारित बॉन्ड से अधिक हैं।",
+      "INVALID_QUANTITY": "{action} ({date}) की मात्रा अनुपस्थित, ऋणात्मक या बहुत बड़ी है।"
+    },
     "assumptions": {
       "title": "अनुमान की मान्यताएँ",
-      "latestObservation": "{benchmarkId} को सभी आगामी अवधियों के लिए {value} माना गया है, जो अंतिम प्रकाशित मान है ({observation})",
-      "supplied": "{benchmarkId} को सभी आगामी अवधियों के लिए {value} माना गया है"
+      "latestObservation": "{benchmark} को सभी आगामी अवधियों के लिए {value} माना गया है, जो अंतिम प्रकाशित मान है ({observation})",
+      "supplied": "{benchmark} को सभी आगामी अवधियों के लिए {value} माना गया है"
     },
     "missing": {
       "title": "अभी भी आवश्यक डेटा",
-      "item": "{benchmarkId} {observation} — प्रकाशक: {publisher}",
-      "itemNoPublisher": "{benchmarkId} {observation} — प्रकाशक ज्ञात नहीं"
+      "item": "{benchmark} {observation} — प्रकाशक: {publisher}",
+      "itemNoPublisher": "{benchmark} {observation} — प्रकाशक ज्ञात नहीं"
     },
     "recompute": {
       "button": "कीमतें दोबारा गणना करें",

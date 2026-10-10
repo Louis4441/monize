@@ -201,7 +201,10 @@
     "bondInstrumentLabel": "Obligatiereeks (optioneel)",
     "bondInstrumentNone": "Niet gekoppeld",
     "bondInstrumentOption": "{series} ({country}, {program})",
-    "bondInstrumentCurrent": "Gekoppelde reeks"
+    "bondInstrumentCurrent": "Gekoppelde reeks",
+    "bondInstrumentLoading": "Obligatiecatalogus laden...",
+    "bondInstrumentLoadFailed": "De obligatiecatalogus kon niet worden geladen, dus er kan nog geen serie worden gekoppeld.",
+    "bondInstrumentRetry": "Opnieuw proberen"
   },
   "priceForm": {
     "dateLabel": "Datum",

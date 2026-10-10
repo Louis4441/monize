@@ -59,6 +59,13 @@ export interface RestoreResult {
    * deducted from it. Absent when none.
    */
   unusableAiProviderKeys?: number;
+  /**
+   * Securities restored unlinked from their bond instrument because this
+   * server's catalog does not carry it (or carries it in another currency). The
+   * rows were written, so this stays outside `restored`; the user has to link
+   * them again. Absent when none.
+   */
+  unlinkedBondSecurities?: number;
 }
 
 export type SupportBackupSection =

@@ -264,7 +264,7 @@
       "period": "Текущий период",
       "periodValue": "{index}: с {start} по {end}",
       "rate": "Ставка",
-      "principal": "Номинал на облигацию",
+      "principal": "Базовая сумма на облигацию",
       "accruedInterest": "Накопленный купонный доход",
       "grossValue": "Валовая стоимость",
       "earlyRedemption": "Досрочное погашение",
@@ -301,15 +301,21 @@
       "OVER_REMOVAL": "Не удалось определить лоты: списано больше облигаций, чем было в наличии.",
       "INVALID_QUANTITY": "Не удалось определить лоты: количество отсутствует, отрицательно или слишком велико."
     },
+    "lotsRefusalDetail": {
+      "SPLIT": "По этой бумаге записан сплит ({action}, {date}); облигация не дробится.",
+      "FRACTIONAL_QUANTITY": "{action} от {date} перемещает {quantity} облигаций, что не является целым числом.",
+      "OVER_REMOVAL": "{action} от {date} списывает {quantity} облигаций, больше, чем было.",
+      "INVALID_QUANTITY": "Количество в операции {action} от {date} отсутствует, отрицательно или слишком велико."
+    },
     "assumptions": {
       "title": "Допущения прогноза",
-      "latestObservation": "{benchmarkId} принят на уровне {value} для всех последующих периодов, последнее опубликованное значение ({observation})",
-      "supplied": "{benchmarkId} принят на уровне {value} для всех последующих периодов"
+      "latestObservation": "{benchmark} принят на уровне {value} для всех последующих периодов, последнее опубликованное значение ({observation})",
+      "supplied": "{benchmark} принят на уровне {value} для всех последующих периодов"
     },
     "missing": {
       "title": "Недостающие данные",
-      "item": "{benchmarkId} {observation} — публикует: {publisher}",
-      "itemNoPublisher": "{benchmarkId} {observation} — публикующий источник неизвестен"
+      "item": "{benchmark} {observation} — публикует: {publisher}",
+      "itemNoPublisher": "{benchmark} {observation} — публикующий источник неизвестен"
     },
     "recompute": {
       "button": "Пересчитать цены",

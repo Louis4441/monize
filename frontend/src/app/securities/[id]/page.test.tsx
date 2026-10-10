@@ -68,6 +68,7 @@ const mockGetSecurities = vi.fn();
 const mockGetSecurityDocuments = vi.fn();
 const mockGetSecurityNews = vi.fn();
 const mockRefreshSelectedPrices = vi.fn();
+const mockGetSecurityBondValuation = vi.fn();
 
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
@@ -85,6 +86,10 @@ vi.mock('@/lib/investments', () => ({
     getSecurityDocuments: (...args: unknown[]) =>
       mockGetSecurityDocuments(...args),
     getSecurityNews: (...args: unknown[]) => mockGetSecurityNews(...args),
+    getSecurityBondValuation: (...args: unknown[]) =>
+      mockGetSecurityBondValuation(...args),
+    getSecurityBondScenarios: vi.fn(),
+    recomputeSecurityBondPrices: vi.fn(),
     updateSecurity: vi.fn(),
   },
 }));
@@ -387,6 +392,51 @@ describe('SecurityDetailPage', () => {
       fireEvent.click(screen.getByRole('button', { name: /Securities/ }));
     });
     expect(mockPush).toHaveBeenCalledWith('/securities');
+  });
+
+  describe('bond valuation card', () => {
+    const bondSecurity = {
+      ...security,
+      securityType: 'BOND' as const,
+      currencyCode: 'PLN',
+      bondInstrumentId: 'bond-1',
+    };
+
+    beforeEach(() => {
+      mockGetSecurityBondValuation.mockResolvedValue({
+        securityId: 'sec-1',
+        instrument: {
+          id: 'bond-1',
+          issuerCountryCode: 'PL',
+          issuerCode: 'PL_MF',
+          programCode: 'RETAIL',
+          seriesCode: 'TOS1029',
+          currencyCode: 'PLN',
+        },
+        asOf: '2027-04-15',
+        lots: [],
+        totals: { quantity: 0, grossValue: '0.0000', earlyRedemptionValue: '0.0000', accruedInterest: '0.0000' },
+        refusal: null,
+      });
+    });
+
+    it('shows the card and asks for the valuation when the security is linked to a series', async () => {
+      mockGetSecurityDetail.mockResolvedValue(detailFixture({ security: bondSecurity }));
+      await renderPage();
+      expect(await screen.findByRole('heading', { name: 'Bond valuation' })).toBeInTheDocument();
+      await waitFor(() =>
+        expect(mockGetSecurityBondValuation).toHaveBeenCalledWith('sec-1', expect.any(String), undefined),
+      );
+    });
+
+    it('shows no card and sends no request when the security is not linked', async () => {
+      mockGetSecurityDetail.mockResolvedValue(
+        detailFixture({ security: { ...bondSecurity, bondInstrumentId: null } }),
+      );
+      await renderPage();
+      expect(screen.queryByRole('heading', { name: 'Bond valuation' })).not.toBeInTheDocument();
+      expect(mockGetSecurityBondValuation).not.toHaveBeenCalled();
+    });
   });
 
   describe('summary', () => {

@@ -201,7 +201,10 @@
     "bondInstrumentLabel": "Seria obligacji (opcjonalnie)",
     "bondInstrumentNone": "Brak powiązania",
     "bondInstrumentOption": "{series} ({country}, {program})",
-    "bondInstrumentCurrent": "Powiązana seria"
+    "bondInstrumentCurrent": "Powiązana seria",
+    "bondInstrumentLoading": "Wczytywanie katalogu obligacji...",
+    "bondInstrumentLoadFailed": "Nie udało się wczytać katalogu obligacji, więc nie można jeszcze powiązać serii.",
+    "bondInstrumentRetry": "Ponów"
   },
   "priceForm": {
     "dateLabel": "Data",

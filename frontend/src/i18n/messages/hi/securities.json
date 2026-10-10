@@ -201,7 +201,10 @@
     "bondInstrumentLabel": "बॉन्ड सीरीज़ (वैकल्पिक)",
     "bondInstrumentNone": "लिंक नहीं है",
     "bondInstrumentOption": "{series} ({country}, {program})",
-    "bondInstrumentCurrent": "लिंक की गई सीरीज़"
+    "bondInstrumentCurrent": "लिंक की गई सीरीज़",
+    "bondInstrumentLoading": "बॉन्ड कैटलॉग लोड हो रहा है...",
+    "bondInstrumentLoadFailed": "बॉन्ड कैटलॉग लोड नहीं हो सका, इसलिए अभी कोई सीरीज़ लिंक नहीं की जा सकती।",
+    "bondInstrumentRetry": "पुनः प्रयास करें"
   },
   "priceForm": {
     "dateLabel": "तिथि",

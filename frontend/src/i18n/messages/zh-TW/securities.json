@@ -201,7 +201,10 @@
     "bondInstrumentLabel": "債券系列（選填）",
     "bondInstrumentNone": "未連結",
     "bondInstrumentOption": "{series}（{country}，{program}）",
-    "bondInstrumentCurrent": "已連結的系列"
+    "bondInstrumentCurrent": "已連結的系列",
+    "bondInstrumentLoading": "正在載入債券目錄...",
+    "bondInstrumentLoadFailed": "無法載入債券目錄，因此暫時無法連結系列。",
+    "bondInstrumentRetry": "重試"
   },
   "priceForm": {
     "dateLabel": "日期",

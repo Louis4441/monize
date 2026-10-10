@@ -201,7 +201,10 @@
     "bondInstrumentLabel": "Serie de bonos (opcional)",
     "bondInstrumentNone": "Sin vincular",
     "bondInstrumentOption": "{series} ({country}, {program})",
-    "bondInstrumentCurrent": "Serie vinculada"
+    "bondInstrumentCurrent": "Serie vinculada",
+    "bondInstrumentLoading": "Cargando el catálogo de bonos...",
+    "bondInstrumentLoadFailed": "No se pudo cargar el catálogo de bonos, por lo que aún no se puede vincular una serie.",
+    "bondInstrumentRetry": "Reintentar"
   },
   "priceForm": {
     "dateLabel": "Fecha",

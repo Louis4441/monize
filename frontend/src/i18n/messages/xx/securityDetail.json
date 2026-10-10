@@ -301,15 +301,21 @@
       "OVER_REMOVAL": "[XX-The lots cannot be derived: more bonds were removed than were held.-XX]",
       "INVALID_QUANTITY": "[XX-The lots cannot be derived: a quantity is missing, negative or too large.-XX]"
     },
+    "lotsRefusalDetail": {
+      "SPLIT": "[XX-A split ({action} on {date}) is recorded on this security; a bond does not split.-XX]",
+      "FRACTIONAL_QUANTITY": "[XX-{action} on {date} moves {quantity} bonds, which is not a whole number.-XX]",
+      "OVER_REMOVAL": "[XX-{action} on {date} removes {quantity} bonds, more than were held.-XX]",
+      "INVALID_QUANTITY": "[XX-The quantity of {action} on {date} is missing, negative or too large.-XX]"
+    },
     "assumptions": {
       "title": "[XX-Projection assumptions-XX]",
-      "latestObservation": "[XX-{benchmarkId} assumed at {value} for every later period, the latest published value ({observation})-XX]",
-      "supplied": "[XX-{benchmarkId} assumed at {value} for every later period-XX]"
+      "latestObservation": "[XX-{benchmark} assumed at {value} for every later period, the latest published value ({observation})-XX]",
+      "supplied": "[XX-{benchmark} assumed at {value} for every later period-XX]"
     },
     "missing": {
       "title": "[XX-Data still needed-XX]",
-      "item": "[XX-{benchmarkId} {observation} — published by {publisher}-XX]",
-      "itemNoPublisher": "[XX-{benchmarkId} {observation} — publisher not known-XX]"
+      "item": "[XX-{benchmark} {observation} — published by {publisher}-XX]",
+      "itemNoPublisher": "[XX-{benchmark} {observation} — publisher not known-XX]"
     },
     "recompute": {
       "button": "[XX-Recalculate prices-XX]",

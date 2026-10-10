@@ -24,21 +24,21 @@ const RATE_SOURCE_VARIANT: Record<BondRateSource, BadgeVariant> = {
   PROJECTED: 'amber',
 };
 
-/** The earliest cash flow still to come; a known one wins a tie with a projected one. */
-function nextCashFlow(
+/**
+ * Every cash flow paid on the earliest date still to come, from both lists:
+ * a coupon and the principal of the last period fall on the same day, and a
+ * projected coupon can share a day with a known principal. Interest first.
+ */
+function nextCashFlows(
   known: readonly BondCashFlow[],
   projected: readonly BondCashFlow[],
-): BondCashFlow | null {
-  const first = (flows: readonly BondCashFlow[]) =>
-    flows.reduce<BondCashFlow | null>(
-      (best, flow) => (best === null || flow.date < best.date ? flow : best),
-      null,
-    );
-  const k = first(known);
-  const p = first(projected);
-  if (k === null) return p;
-  if (p === null) return k;
-  return p.date < k.date ? p : k;
+): BondCashFlow[] {
+  const all = [...known, ...projected];
+  if (all.length === 0) return [];
+  const earliest = all.reduce((min, f) => (f.date < min ? f.date : min), all[0].date);
+  return all
+    .filter((f) => f.date === earliest)
+    .sort((a, b) => (a.type === b.type ? 0 : a.type === 'INTEREST' ? -1 : 1));
 }
 
 /**
@@ -86,7 +86,7 @@ export function SecurityBondLotsTable({
           {lots.map((lot, index) => {
             const v = lot.valuation;
             const period = v.currentPeriod;
-            const next = nextCashFlow(v.knownCashflows, v.projectedCashflows);
+            const next = nextCashFlows(v.knownCashflows, v.projectedCashflows);
             return (
               <tr key={`${lot.purchaseDate}-${lot.quantity}-${index}`}>
                 <Td className="whitespace-nowrap">
@@ -150,23 +150,28 @@ export function SecurityBondLotsTable({
                   )}
                 </Td>
                 <Td className="whitespace-nowrap">
-                  {next === null ? (
+                  {next.length === 0 ? (
                     <span className="text-gray-500 dark:text-gray-400">
                       {t('bond.lots.noCashFlow')}
                     </span>
                   ) : (
-                    <span className="inline-flex flex-wrap items-center gap-2">
-                      <span>
-                        {t('bond.lots.cashFlowValue', {
-                          type: t(`bond.cashFlowType.${next.type}`),
-                          amount: formatCurrency(Number(next.amount), currency),
-                          date: formatDate(next.date),
-                        })}
-                      </span>
-                      {next.status === 'PROJECTED' && (
-                        <Badge variant="amber">{t('bond.lots.projected')}</Badge>
-                      )}
-                    </span>
+                    next.map((flow) => (
+                      <div
+                        key={`${flow.type}-${flow.status}-${flow.period}`}
+                        className="flex flex-wrap items-center gap-2"
+                      >
+                        <span>
+                          {t('bond.lots.cashFlowValue', {
+                            type: t(`bond.cashFlowType.${flow.type}`),
+                            amount: formatCurrency(Number(flow.amount), currency),
+                            date: formatDate(flow.date),
+                          })}
+                        </span>
+                        {flow.status === 'PROJECTED' && (
+                          <Badge variant="amber">{t('bond.lots.projected')}</Badge>
+                        )}
+                      </div>
+                    ))
                   )}
                 </Td>
                 <Td align="right" className="whitespace-nowrap">

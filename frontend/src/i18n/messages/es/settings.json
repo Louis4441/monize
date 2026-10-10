@@ -816,6 +816,7 @@
       "totalRecords": "Total de registros",
       "skippedAttachments": "{count, plural, one {# archivo adjunto no se restauró} other {# archivos adjuntos no se restauraron}}: la copia no contenía bytes utilizables para ellos — faltaban o no pasaron su suma de comprobación al exportarla, o el fichero es anterior a las copias autocontenidas. Exporte una copia nueva cuando el almacenamiento de adjuntos esté correcto.",
       "unusableAiProviderKeys": "{count, plural, one {Se restauró # proveedor de IA sin una clave de API utilizable} other {Se restauraron # proveedores de IA sin claves de API utilizables}}: la copia de seguridad se creó antes de que las claves de proveedor viajaran en ella, así que la clave guardada pertenece al servidor que generó el archivo, o este servidor no tiene configurada ninguna clave de cifrado con la que almacenarla. Abre Ajustes → Proveedores de IA e introduce de nuevo la clave de API.",
+      "unlinkedBondSecurities": "{count, plural, one {Se restauró # valor de bono sin vínculo con su instrumento de bono} other {Se restauraron # valores de bono sin vínculo con sus instrumentos de bono}}: el catálogo de bonos de este servidor no incluye la serie (o la incluye en otra moneda), por lo que el motor de bonos ya no los valora y sus precios calculados no se restauraron. Abra cada valor y vuélvalo a vincular a un instrumento de bono.",
       "doneButton": "Listo"
     },
     "storedBackups": {

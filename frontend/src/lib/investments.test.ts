@@ -499,6 +499,76 @@ describe('investmentsApi', () => {
     expect(result.msn.ready).toBe(false);
   });
 
+  describe('bond valuation API', () => {
+    it('getSecurityBondValuation sends no params without a day or an assumption', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: {} });
+      await investmentsApi.getSecurityBondValuation('s-1');
+      expect(apiClient.get).toHaveBeenCalledWith('/bonds/securities/s-1/valuation', {
+        params: undefined,
+      });
+    });
+
+    it('getSecurityBondValuation sends asOf and the assumption as benchmark:value', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: {} });
+      await investmentsApi.getSecurityBondValuation('s-1', '2027-04-15', {
+        benchmarkId: 'PL_CPI_GUS_YOY',
+        value: '0.05',
+      });
+      expect(apiClient.get).toHaveBeenCalledWith('/bonds/securities/s-1/valuation', {
+        params: { asOf: '2027-04-15', assume: 'PL_CPI_GUS_YOY:0.05' },
+      });
+    });
+
+    it('getSecurityBondScenarios sends the benchmark and the comma-joined values', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: {} });
+      await investmentsApi.getSecurityBondScenarios('s-1', 'PL_CPI_GUS_YOY', ['0', '0.05']);
+      expect(apiClient.get).toHaveBeenCalledWith('/bonds/securities/s-1/scenarios', {
+        params: { benchmarkId: 'PL_CPI_GUS_YOY', values: '0,0.05' },
+      });
+    });
+
+    describe('recomputeSecurityBondPrices', () => {
+      const warmPrices = async () => {
+        vi.mocked(apiClient.get).mockResolvedValue({ data: [{ id: 1 }] });
+        await investmentsApi.getSecurityPrices('s-1');
+        await investmentsApi.getSecurityPrices('s-1');
+        // The second read came from the cache.
+        expect(apiClient.get).toHaveBeenCalledTimes(1);
+      };
+
+      it('posts to the recompute endpoint', async () => {
+        vi.mocked(apiClient.post).mockResolvedValue({ data: { written: 0, deleted: 0 } });
+        const result = await investmentsApi.recomputeSecurityBondPrices('s-1');
+        expect(apiClient.post).toHaveBeenCalledWith('/bonds/securities/s-1/recompute');
+        expect(result).toEqual({ written: 0, deleted: 0 });
+      });
+
+      it('drops the cached prices when rows were written', async () => {
+        await warmPrices();
+        vi.mocked(apiClient.post).mockResolvedValue({ data: { written: 3, deleted: 0 } });
+        await investmentsApi.recomputeSecurityBondPrices('s-1');
+        await investmentsApi.getSecurityPrices('s-1');
+        expect(apiClient.get).toHaveBeenCalledTimes(2);
+      });
+
+      it('drops the cached prices when rows were only deleted', async () => {
+        await warmPrices();
+        vi.mocked(apiClient.post).mockResolvedValue({ data: { written: 0, deleted: 2 } });
+        await investmentsApi.recomputeSecurityBondPrices('s-1');
+        await investmentsApi.getSecurityPrices('s-1');
+        expect(apiClient.get).toHaveBeenCalledTimes(2);
+      });
+
+      it('keeps the cache when the recompute changed nothing', async () => {
+        await warmPrices();
+        vi.mocked(apiClient.post).mockResolvedValue({ data: { written: 0, deleted: 0 } });
+        await investmentsApi.recomputeSecurityBondPrices('s-1');
+        await investmentsApi.getSecurityPrices('s-1');
+        expect(apiClient.get).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
   it('getSecurityPrices sends no limit by default, so the server picks it', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
     await investmentsApi.getSecurityPrices('s-1');

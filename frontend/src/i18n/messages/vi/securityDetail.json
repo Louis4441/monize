@@ -264,7 +264,7 @@
       "period": "Kỳ hiện tại",
       "periodValue": "{index}: {start} đến {end}",
       "rate": "Lãi suất",
-      "principal": "Mệnh giá mỗi trái phiếu",
+      "principal": "Gốc mỗi trái phiếu",
       "accruedInterest": "Lãi tích lũy",
       "grossValue": "Giá trị gộp",
       "earlyRedemption": "Tất toán sớm",
@@ -301,15 +301,21 @@
       "OVER_REMOVAL": "Không thể suy ra các lô: số trái phiếu bị trừ nhiều hơn số đang nắm giữ.",
       "INVALID_QUANTITY": "Không thể suy ra các lô: một số lượng bị thiếu, âm hoặc quá lớn."
     },
+    "lotsRefusalDetail": {
+      "SPLIT": "Chứng khoán này có ghi nhận một lần chia tách ({action} ngày {date}); trái phiếu không chia tách.",
+      "FRACTIONAL_QUANTITY": "{action} ngày {date} chuyển {quantity} trái phiếu, đây không phải số nguyên.",
+      "OVER_REMOVAL": "{action} ngày {date} rút {quantity} trái phiếu, nhiều hơn số đang nắm giữ.",
+      "INVALID_QUANTITY": "Số lượng của {action} ngày {date} bị thiếu, âm hoặc quá lớn."
+    },
     "assumptions": {
       "title": "Giả định của dự phóng",
-      "latestObservation": "{benchmarkId} được giả định ở mức {value} cho mọi kỳ tiếp theo, là giá trị được công bố gần nhất ({observation})",
-      "supplied": "{benchmarkId} được giả định ở mức {value} cho mọi kỳ tiếp theo"
+      "latestObservation": "{benchmark} được giả định ở mức {value} cho mọi kỳ tiếp theo, là giá trị được công bố gần nhất ({observation})",
+      "supplied": "{benchmark} được giả định ở mức {value} cho mọi kỳ tiếp theo"
     },
     "missing": {
       "title": "Dữ liệu còn thiếu",
-      "item": "{benchmarkId} {observation} — do {publisher} công bố",
-      "itemNoPublisher": "{benchmarkId} {observation} — chưa rõ đơn vị công bố"
+      "item": "{benchmark} {observation} — do {publisher} công bố",
+      "itemNoPublisher": "{benchmark} {observation} — chưa rõ đơn vị công bố"
     },
     "recompute": {
       "button": "Tính lại giá",

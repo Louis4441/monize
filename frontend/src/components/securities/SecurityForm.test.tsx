@@ -1232,12 +1232,66 @@ describe('SecurityForm', () => {
       );
     });
 
-    it('shows the quote provider select for a BOND that is not linked, and again after unlinking', async () => {
+    it('shows the quote provider select again after a linked BOND is unlinked', async () => {
       await renderBond({ bondInstrumentId: 'b-pln' });
       const select = (await screen.findByLabelText('Bond series (optional)')) as HTMLSelectElement;
       await waitFor(() => expect(screen.queryByLabelText('Quote Provider')).not.toBeInTheDocument());
       fireEvent.change(select, { target: { value: '' } });
       expect(await screen.findByLabelText('Quote Provider')).toBeInTheDocument();
+    });
+
+    it('shows the quote provider and MSN id for an unlinked BOND, and hides them once a series is picked', async () => {
+      await renderBond({ bondInstrumentId: null, quoteProvider: 'msn', msnInstrumentId: 'abc123' });
+      const select = (await screen.findByLabelText('Bond series (optional)')) as HTMLSelectElement;
+      expect(screen.getByLabelText('Quote Provider')).toBeInTheDocument();
+      expect(screen.getByLabelText('MSN Instrument ID (advanced)')).toBeInTheDocument();
+      fireEvent.change(select, { target: { value: 'b-pln' } });
+      await waitFor(() => expect(screen.queryByLabelText('Quote Provider')).not.toBeInTheDocument());
+      expect(screen.queryByLabelText('MSN Instrument ID (advanced)')).not.toBeInTheDocument();
+    });
+
+    it('brings the quote provider back when a currency change drops the link', async () => {
+      await renderBond({ bondInstrumentId: 'b-pln' });
+      const select = (await screen.findByLabelText('Bond series (optional)')) as HTMLSelectElement;
+      await waitFor(() => expect(select.value).toBe('b-pln'));
+      expect(screen.queryByLabelText('Quote Provider')).not.toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText('Currency'), { target: { value: 'USD' } });
+      expect(await screen.findByLabelText('Quote Provider')).toBeInTheDocument();
+    });
+
+    it('says the catalog is loading while the request is pending', async () => {
+      let resolveList!: (list: typeof instruments) => void;
+      vi.mocked(investmentsApi.listBondInstruments).mockReturnValue(
+        new Promise((resolve) => (resolveList = resolve)),
+      );
+      await renderBond();
+      expect(screen.getByText('Loading the bond catalog...')).toBeInTheDocument();
+      await act(async () => {
+        resolveList(instruments);
+      });
+      expect(screen.queryByText('Loading the bond catalog...')).not.toBeInTheDocument();
+    });
+
+    it('says a failed catalog request failed, not that the catalog is empty, and retries', async () => {
+      vi.mocked(investmentsApi.listBondInstruments).mockRejectedValueOnce(new Error('down'));
+      await renderBond();
+      const select = await screen.findByLabelText('Bond series (optional)');
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent('The bond catalog could not be loaded');
+      expect(screen.queryByText('Loading the bond catalog...')).not.toBeInTheDocument();
+      expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['Not linked']);
+
+      await act(async () => {
+        fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }));
+      });
+      await waitFor(() =>
+        expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual([
+          'Not linked',
+          'TOS1029 (PL, PL_MF)',
+        ]),
+      );
+      expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();
+      expect(investmentsApi.listBondInstruments).toHaveBeenCalledTimes(2);
     });
 
     it('unlinks a linked security whose type is moved away from BOND', async () => {

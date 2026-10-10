@@ -201,7 +201,10 @@
     "bondInstrumentLabel": "채권 시리즈(선택)",
     "bondInstrumentNone": "연결 안 됨",
     "bondInstrumentOption": "{series}({country}, {program})",
-    "bondInstrumentCurrent": "연결된 시리즈"
+    "bondInstrumentCurrent": "연결된 시리즈",
+    "bondInstrumentLoading": "채권 카탈로그를 불러오는 중...",
+    "bondInstrumentLoadFailed": "채권 카탈로그를 불러오지 못해 아직 시리즈를 연결할 수 없습니다.",
+    "bondInstrumentRetry": "다시 시도"
   },
   "priceForm": {
     "dateLabel": "날짜",

@@ -264,7 +264,7 @@
       "period": "Поточний період",
       "periodValue": "{index}: з {start} по {end}",
       "rate": "Ставка",
-      "principal": "Номінал на облігацію",
+      "principal": "Базова сума на облігацію",
       "accruedInterest": "Накопичений купонний дохід",
       "grossValue": "Валова вартість",
       "earlyRedemption": "Дострокове погашення",
@@ -301,15 +301,21 @@
       "OVER_REMOVAL": "Не вдалося визначити лоти: списано більше облігацій, ніж було в наявності.",
       "INVALID_QUANTITY": "Не вдалося визначити лоти: кількість відсутня, від'ємна або завелика."
     },
+    "lotsRefusalDetail": {
+      "SPLIT": "Для цього цінного паперу записано спліт ({action}, {date}); облігація не дробиться.",
+      "FRACTIONAL_QUANTITY": "{action} від {date} переміщує {quantity} облігацій, що не є цілим числом.",
+      "OVER_REMOVAL": "{action} від {date} списує {quantity} облігацій, більше, ніж було.",
+      "INVALID_QUANTITY": "Кількість в операції {action} від {date} відсутня, від’ємна або завелика."
+    },
     "assumptions": {
       "title": "Припущення прогнозу",
-      "latestObservation": "{benchmarkId} прийнято на рівні {value} для всіх наступних періодів, останнє опубліковане значення ({observation})",
-      "supplied": "{benchmarkId} прийнято на рівні {value} для всіх наступних періодів"
+      "latestObservation": "{benchmark} прийнято на рівні {value} для всіх наступних періодів, останнє опубліковане значення ({observation})",
+      "supplied": "{benchmark} прийнято на рівні {value} для всіх наступних періодів"
     },
     "missing": {
       "title": "Дані, яких ще бракує",
-      "item": "{benchmarkId} {observation} — публікує: {publisher}",
-      "itemNoPublisher": "{benchmarkId} {observation} — джерело публікації невідоме"
+      "item": "{benchmark} {observation} — публікує: {publisher}",
+      "itemNoPublisher": "{benchmark} {observation} — джерело публікації невідоме"
     },
     "recompute": {
       "button": "Перерахувати ціни",

@@ -301,15 +301,21 @@
       "OVER_REMOVAL": "Não é possível apurar os lotes: foram removidas mais obrigações do que as detidas.",
       "INVALID_QUANTITY": "Não é possível apurar os lotes: falta uma quantidade, é negativa ou é demasiado grande."
     },
+    "lotsRefusalDetail": {
+      "SPLIT": "Está registado um split neste título ({action} em {date}); uma obrigação não se divide.",
+      "FRACTIONAL_QUANTITY": "{action} em {date} movimenta {quantity} obrigações, o que não é um número inteiro.",
+      "OVER_REMOVAL": "{action} em {date} retira {quantity} obrigações, mais do que as detidas.",
+      "INVALID_QUANTITY": "A quantidade de {action} em {date} está em falta, é negativa ou demasiado grande."
+    },
     "assumptions": {
       "title": "Pressupostos da projeção",
-      "latestObservation": "{benchmarkId} assumido em {value} para todos os períodos seguintes, o último valor publicado ({observation})",
-      "supplied": "{benchmarkId} assumido em {value} para todos os períodos seguintes"
+      "latestObservation": "{benchmark} assumido em {value} para todos os períodos seguintes, o último valor publicado ({observation})",
+      "supplied": "{benchmark} assumido em {value} para todos os períodos seguintes"
     },
     "missing": {
       "title": "Dados ainda necessários",
-      "item": "{benchmarkId} {observation} — publicado por {publisher}",
-      "itemNoPublisher": "{benchmarkId} {observation} — publicador desconhecido"
+      "item": "{benchmark} {observation} — publicado por {publisher}",
+      "itemNoPublisher": "{benchmark} {observation} — publicador desconhecido"
     },
     "recompute": {
       "button": "Recalcular preços",

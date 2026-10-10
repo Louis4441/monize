@@ -301,15 +301,21 @@
       "OVER_REMOVAL": "De partijen kunnen niet worden afgeleid: er zijn meer obligaties verwijderd dan er werden aangehouden.",
       "INVALID_QUANTITY": "De partijen kunnen niet worden afgeleid: een aantal ontbreekt, is negatief of is te groot."
     },
+    "lotsRefusalDetail": {
+      "SPLIT": "Op dit effect is een split vastgelegd ({action} op {date}); een obligatie wordt niet gesplitst.",
+      "FRACTIONAL_QUANTITY": "{action} op {date} verplaatst {quantity} obligaties, wat geen geheel getal is.",
+      "OVER_REMOVAL": "{action} op {date} haalt {quantity} obligaties weg, meer dan er waren.",
+      "INVALID_QUANTITY": "De hoeveelheid van {action} op {date} ontbreekt, is negatief of te groot."
+    },
     "assumptions": {
       "title": "Aannames van de prognose",
-      "latestObservation": "{benchmarkId} verondersteld op {value} voor alle latere perioden, de laatst gepubliceerde waarde ({observation})",
-      "supplied": "{benchmarkId} verondersteld op {value} voor alle latere perioden"
+      "latestObservation": "{benchmark} verondersteld op {value} voor alle latere perioden, de laatst gepubliceerde waarde ({observation})",
+      "supplied": "{benchmark} verondersteld op {value} voor alle latere perioden"
     },
     "missing": {
       "title": "Nog benodigde gegevens",
-      "item": "{benchmarkId} {observation} — gepubliceerd door {publisher}",
-      "itemNoPublisher": "{benchmarkId} {observation} — uitgever onbekend"
+      "item": "{benchmark} {observation} — gepubliceerd door {publisher}",
+      "itemNoPublisher": "{benchmark} {observation} — uitgever onbekend"
     },
     "recompute": {
       "button": "Koersen herberekenen",

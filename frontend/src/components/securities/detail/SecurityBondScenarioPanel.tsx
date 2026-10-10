@@ -1,5 +1,9 @@
 'use client';
 
+import {
+  activateOnKey,
+  INTERACTIVE_ROW_FOCUS_CLASS,
+} from '@/components/ui/interactive-row';
 import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/Badge';
@@ -136,13 +140,8 @@ export function SecurityBondScenarioPanel({
                 {...getRowHandlers(scenario)}
                 tabIndex={0}
                 aria-current={isSelected ? 'true' : undefined}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onSelect(scenario.value);
-                  }
-                }}
-                className={`cursor-pointer ${
+                onKeyDown={activateOnKey(() => onSelect(scenario.value))}
+                className={`cursor-pointer ${INTERACTIVE_ROW_FOCUS_CLASS} ${
                   isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                 }`}
               >

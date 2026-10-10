@@ -201,7 +201,10 @@
     "bondInstrumentLabel": "[XX-Bond series (optional)-XX]",
     "bondInstrumentNone": "[XX-Not linked-XX]",
     "bondInstrumentOption": "[XX-{series} ({country}, {program})-XX]",
-    "bondInstrumentCurrent": "[XX-Linked series-XX]"
+    "bondInstrumentCurrent": "[XX-Linked series-XX]",
+    "bondInstrumentLoading": "[XX-Loading the bond catalog...-XX]",
+    "bondInstrumentLoadFailed": "[XX-The bond catalog could not be loaded, so a series cannot be linked yet.-XX]",
+    "bondInstrumentRetry": "[XX-Retry-XX]"
   },
   "priceForm": {
     "dateLabel": "[XX-Date-XX]",

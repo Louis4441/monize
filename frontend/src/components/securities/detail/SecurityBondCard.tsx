@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { DateInput } from '@/components/ui/DateInput';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { useDateFormat } from '@/hooks/useDateFormat';
 import { useReportData } from '@/hooks/useReportData';
 import { useFinancialToday } from '@/hooks/useFinancialToday';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -18,6 +19,7 @@ import type {
   BondMissingObservation,
   SecurityBondValuation,
 } from '@/types/bond';
+import { benchmarkLabel } from './bond-labels';
 import { SecurityBondLotsTable } from './SecurityBondLotsTable';
 import { SecurityBondRateSection } from './SecurityBondRateSection';
 import { SecurityBondScenarioPanel } from './SecurityBondScenarioPanel';
@@ -29,6 +31,21 @@ interface SecurityBondCardProps {
 }
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Investment action enum to its key in `investments.transactionList`. */
+const ACTION_LABEL_KEYS: Record<string, string> = {
+  BUY: 'actionBuy',
+  SELL: 'actionSell',
+  DIVIDEND: 'actionDividend',
+  INTEREST: 'actionInterest',
+  CAPITAL_GAIN: 'actionCapitalGain',
+  SPLIT: 'actionSplit',
+  TRANSFER_IN: 'actionTransferIn',
+  TRANSFER_OUT: 'actionTransferOut',
+  REINVEST: 'actionReinvest',
+  ADD_SHARES: 'actionAddShares',
+  REMOVE_SHARES: 'actionRemoveShares',
+};
 
 /** Each distinct entry once, in first-seen order. */
 function distinct<T>(items: readonly T[], keyOf: (item: T) => string): T[] {
@@ -58,6 +75,8 @@ export function SecurityBondCard({
   const t = useTranslations('securityDetail');
   const { formatCurrency, formatPercentTrimmed, formatShareQuantity } =
     useNumberFormat();
+  const tInv = useTranslations('investments');
+  const { formatDate } = useDateFormat();
   const today = useFinancialToday();
   // '' means "today", so a tab left open across midnight does not pin a day.
   const [pickedAsOf, setPickedAsOf] = useState('');
@@ -136,6 +155,15 @@ export function SecurityBondCard({
         : [],
     [valuation],
   );
+
+  // The action enum is shown by the investment screens' own translated name.
+  const actionLabel = (action: string): string => {
+    const key = ACTION_LABEL_KEYS[action];
+    return key === undefined ? action : tInv(`transactionList.${key}`);
+  };
+  const benchmarkName = (id: string) => benchmarkLabel(t, id);
+  // A step series is keyed by day, a monthly one by YYYY-MM (shown as is).
+  const observationLabel = (key: string) => (YMD.test(key) ? formatDate(key) : key);
 
   const unknownTotal = (reason: string): ReactNode => (
     <>
@@ -236,7 +264,16 @@ export function SecurityBondCard({
             <p className="font-medium">
               {t(`bond.lotsRefusal.${refusal.code}`)}
             </p>
-            <p className="mt-1">{refusal.detail}</p>
+            <p className="mt-1">
+              {t(`bond.lotsRefusalDetail.${refusal.code}`, {
+                action: actionLabel(refusal.params.action),
+                date: formatDate(refusal.params.date),
+                quantity:
+                  refusal.params.quantity === null
+                    ? t('bond.unknown')
+                    : formatShareQuantity(Number(refusal.params.quantity)),
+              })}
+            </p>
           </div>
         )}
 
@@ -262,12 +299,12 @@ export function SecurityBondCard({
                 >
                   {a.basis === 'LATEST_OBSERVATION' && a.observation !== null
                     ? t('bond.assumptions.latestObservation', {
-                        benchmarkId: a.benchmarkId,
+                        benchmark: benchmarkName(a.benchmarkId),
                         value: formatPercentTrimmed(Number(a.value) * 100),
-                        observation: a.observation,
+                        observation: observationLabel(a.observation),
                       })
                     : t('bond.assumptions.supplied', {
-                        benchmarkId: a.benchmarkId,
+                        benchmark: benchmarkName(a.benchmarkId),
                         value: formatPercentTrimmed(Number(a.value) * 100),
                       })}
                 </li>
@@ -286,12 +323,12 @@ export function SecurityBondCard({
                 <li key={`${m.benchmarkId}|${m.observation}|${m.publisher ?? ''}`}>
                   {m.publisher === null
                     ? t('bond.missing.itemNoPublisher', {
-                        benchmarkId: m.benchmarkId,
-                        observation: m.observation,
+                        benchmark: benchmarkName(m.benchmarkId),
+                        observation: observationLabel(m.observation),
                       })
                     : t('bond.missing.item', {
-                        benchmarkId: m.benchmarkId,
-                        observation: m.observation,
+                        benchmark: benchmarkName(m.benchmarkId),
+                        observation: observationLabel(m.observation),
                         publisher: m.publisher,
                       })}
                 </li>

@@ -560,6 +560,14 @@ describe('SecurityList', () => {
     expect(yahooBadge.title).toMatch(/default/i);
   });
 
+  it('names the bond engine, not the inherited provider, for a bond-linked security', () => {
+    const securities = [makeSecurity({ quoteProvider: null, bondInstrumentId: 'b-pln' })];
+    useDensityStore.setState({ densities: { securities: 'normal' } });
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
+    expect(screen.getByText('Bond engine (issue terms)')).toBeInTheDocument();
+    expect(screen.queryByText('Yahoo')).not.toBeInTheDocument();
+  });
+
   it('hides exchange and currency headers in compact density', () => {
     const securities = [makeSecurity()];
 

@@ -201,7 +201,10 @@
     "bondInstrumentLabel": "Серия облигаций (необязательно)",
     "bondInstrumentNone": "Не привязана",
     "bondInstrumentOption": "{series} ({country}, {program})",
-    "bondInstrumentCurrent": "Привязанная серия"
+    "bondInstrumentCurrent": "Привязанная серия",
+    "bondInstrumentLoading": "Загрузка каталога облигаций...",
+    "bondInstrumentLoadFailed": "Не удалось загрузить каталог облигаций, поэтому серию пока нельзя привязать.",
+    "bondInstrumentRetry": "Повторить"
   },
   "priceForm": {
     "dateLabel": "Дата",

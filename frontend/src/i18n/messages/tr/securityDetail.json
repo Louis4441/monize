@@ -301,15 +301,21 @@
       "OVER_REMOVAL": "Lotlar türetilemiyor: elde tutulandan fazla tahvil çıkarılmış.",
       "INVALID_QUANTITY": "Lotlar türetilemiyor: bir miktar eksik, negatif veya çok büyük."
     },
+    "lotsRefusalDetail": {
+      "SPLIT": "Bu menkul kıymette bir bölünme kaydı var ({action}, {date}); tahvil bölünmez.",
+      "FRACTIONAL_QUANTITY": "{date} tarihli {action}, tam sayı olmayan {quantity} tahvili hareket ettiriyor.",
+      "OVER_REMOVAL": "{date} tarihli {action}, eldekinden fazla olan {quantity} tahvili çıkarıyor.",
+      "INVALID_QUANTITY": "{date} tarihli {action} işleminin miktarı eksik, negatif veya çok büyük."
+    },
     "assumptions": {
       "title": "Projeksiyon varsayımları",
-      "latestObservation": "{benchmarkId} sonraki tüm dönemler için {value} olarak varsayılmıştır, son yayımlanan değer ({observation})",
-      "supplied": "{benchmarkId} sonraki tüm dönemler için {value} olarak varsayılmıştır"
+      "latestObservation": "{benchmark} sonraki tüm dönemler için {value} olarak varsayılmıştır, son yayımlanan değer ({observation})",
+      "supplied": "{benchmark} sonraki tüm dönemler için {value} olarak varsayılmıştır"
     },
     "missing": {
       "title": "Hâlâ gereken veriler",
-      "item": "{benchmarkId} {observation} — yayımlayan: {publisher}",
-      "itemNoPublisher": "{benchmarkId} {observation} — yayımlayan bilinmiyor"
+      "item": "{benchmark} {observation} — yayımlayan: {publisher}",
+      "itemNoPublisher": "{benchmark} {observation} — yayımlayan bilinmiyor"
     },
     "recompute": {
       "button": "Fiyatları yeniden hesapla",

@@ -742,6 +742,19 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
               </p>
             )}
 
+            {/* The securities came back, but unlinked from their bond
+                instrument: this server's catalog does not carry the series (or
+                carries it in another currency). The bond engine no longer prices
+                them, so say so and what to do. Outside the record total on
+                purpose: the rows were written. */}
+            {!!restoreResult.unlinkedBondSecurities && (
+              <p className="mt-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
+                {t('restoreResult.unlinkedBondSecurities', {
+                  count: restoreResult.unlinkedBondSecurities,
+                })}
+              </p>
+            )}
+
             <div className="mt-6 flex justify-end">
               <Button onClick={() => setRestoreResult(null)}>
                 {t('restoreResult.doneButton')}

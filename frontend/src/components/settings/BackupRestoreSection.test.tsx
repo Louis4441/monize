@@ -520,6 +520,28 @@ describe('BackupRestoreSection', () => {
       ).toBeInTheDocument();
     });
 
+    it('says when restored securities were left unlinked from their bond instrument', async () => {
+      await restoreWith({
+        message: 'Backup restored successfully',
+        restored: { accounts: 4 },
+        unlinkedBondSecurities: 2,
+      });
+
+      expect(
+        screen.getByText(/2 bond securities were restored unlinked/),
+      ).toBeInTheDocument();
+      // Not part of the record total.
+      expect(screen.queryByText('6')).not.toBeInTheDocument();
+    });
+
+    it('says nothing about bond links when none were dropped', async () => {
+      await restoreWith({
+        message: 'Backup restored successfully',
+        restored: { accounts: 1 },
+      });
+      expect(screen.queryByText(/restored unlinked/)).not.toBeInTheDocument();
+    });
+
     it('says nothing when every provider key came back', async () => {
       await restoreWith({
         message: 'Backup restored successfully',

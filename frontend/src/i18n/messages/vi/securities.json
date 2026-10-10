@@ -201,7 +201,10 @@
     "bondInstrumentLabel": "Mã trái phiếu (tùy chọn)",
     "bondInstrumentNone": "Chưa liên kết",
     "bondInstrumentOption": "{series} ({country}, {program})",
-    "bondInstrumentCurrent": "Mã đã liên kết"
+    "bondInstrumentCurrent": "Mã đã liên kết",
+    "bondInstrumentLoading": "Đang tải danh mục trái phiếu...",
+    "bondInstrumentLoadFailed": "Không thể tải danh mục trái phiếu nên chưa thể liên kết một series.",
+    "bondInstrumentRetry": "Thử lại"
   },
   "priceForm": {
     "dateLabel": "Ngày",

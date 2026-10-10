@@ -201,7 +201,10 @@
     "bondInstrumentLabel": "债券系列（可选）",
     "bondInstrumentNone": "未关联",
     "bondInstrumentOption": "{series}（{country}，{program}）",
-    "bondInstrumentCurrent": "已关联的系列"
+    "bondInstrumentCurrent": "已关联的系列",
+    "bondInstrumentLoading": "正在加载债券目录...",
+    "bondInstrumentLoadFailed": "无法加载债券目录，因此暂时不能关联系列。",
+    "bondInstrumentRetry": "重试"
   },
   "priceForm": {
     "dateLabel": "日期",

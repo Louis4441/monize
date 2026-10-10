@@ -301,15 +301,21 @@
       "OVER_REMOVAL": "無法推導批次：移除的債券多於持有的債券。",
       "INVALID_QUANTITY": "無法推導批次：某個數量缺漏、為負數或過大。"
     },
+    "lotsRefusalDetail": {
+      "SPLIT": "此證券記錄了一次分割（{date} 的 {action}）；債券不可分割。",
+      "FRACTIONAL_QUANTITY": "{date} 的 {action} 涉及 {quantity} 張債券，不是整數。",
+      "OVER_REMOVAL": "{date} 的 {action} 減少 {quantity} 張債券，超過持有數量。",
+      "INVALID_QUANTITY": "{date} 的 {action} 數量缺漏、為負數或過大。"
+    },
     "assumptions": {
       "title": "預測假設",
-      "latestObservation": "所有後續期間均假設 {benchmarkId} 為 {value}(最新公布值:{observation})",
-      "supplied": "所有後續期間均假設 {benchmarkId} 為 {value}"
+      "latestObservation": "所有後續期間均假設 {benchmark} 為 {value}(最新公布值:{observation})",
+      "supplied": "所有後續期間均假設 {benchmark} 為 {value}"
     },
     "missing": {
       "title": "仍需的資料",
-      "item": "{benchmarkId} {observation} — 發布單位：{publisher}",
-      "itemNoPublisher": "{benchmarkId} {observation} — 發布單位未知"
+      "item": "{benchmark} {observation} — 發布單位：{publisher}",
+      "itemNoPublisher": "{benchmark} {observation} — 發布單位未知"
     },
     "recompute": {
       "button": "重新計算價格",

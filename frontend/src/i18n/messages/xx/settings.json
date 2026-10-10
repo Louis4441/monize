@@ -816,6 +816,7 @@
       "totalRecords": "[XX-Total records-XX]",
       "skippedAttachments": "[XX-{count, plural, one {# attachment was not restored} other {# attachments were not restored}}: the backup did not carry usable bytes for them — they were missing or failed their checksum when it was exported, or the file predates self-contained backups. Export a fresh backup once attachment storage is healthy to capture them.-XX]",
       "unusableAiProviderKeys": "[XX-{count, plural, one {# AI provider was restored without a usable API key} other {# AI providers were restored without usable API keys}}: the backup was written before provider keys were included in it, so the stored key belongs to the server that made the file, or this server has no encryption key configured to store one. Open Settings → AI Providers and enter the API key again.-XX]",
+      "unlinkedBondSecurities": "[XX-{count, plural, one {# bond security was restored unlinked from its bond instrument} other {# bond securities were restored unlinked from their bond instruments}}: this server's bond catalog does not carry the series (or carries it in another currency), so the bond engine no longer prices them and their calculated prices were not restored. Open each security and link it to a bond instrument again.-XX]",
       "doneButton": "[XX-Done-XX]"
     },
     "storedBackups": {

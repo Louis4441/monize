@@ -301,15 +301,21 @@
       "OVER_REMOVAL": "无法推导批次：移除的债券多于持有的债券。",
       "INVALID_QUANTITY": "无法推导批次：某个数量缺失、为负数或过大。"
     },
+    "lotsRefusalDetail": {
+      "SPLIT": "此证券记录了一次拆分（{date} 的 {action}）；债券不可拆分。",
+      "FRACTIONAL_QUANTITY": "{date} 的 {action} 涉及 {quantity} 张债券，不是整数。",
+      "OVER_REMOVAL": "{date} 的 {action} 减少 {quantity} 张债券，超过持有数量。",
+      "INVALID_QUANTITY": "{date} 的 {action} 数量缺失、为负数或过大。"
+    },
     "assumptions": {
       "title": "预测假设",
-      "latestObservation": "所有后续期间均假定 {benchmarkId} 为 {value}(最新公布值:{observation})",
-      "supplied": "所有后续期间均假定 {benchmarkId} 为 {value}"
+      "latestObservation": "所有后续期间均假定 {benchmark} 为 {value}(最新公布值:{observation})",
+      "supplied": "所有后续期间均假定 {benchmark} 为 {value}"
     },
     "missing": {
       "title": "仍需的数据",
-      "item": "{benchmarkId} {observation} — 发布方：{publisher}",
-      "itemNoPublisher": "{benchmarkId} {observation} — 发布方未知"
+      "item": "{benchmark} {observation} — 发布方：{publisher}",
+      "itemNoPublisher": "{benchmark} {observation} — 发布方未知"
     },
     "recompute": {
       "button": "重新计算价格",

@@ -301,15 +301,21 @@
       "OVER_REMOVAL": "Impossibile derivare i lotti: sono state rimosse più obbligazioni di quelle detenute.",
       "INVALID_QUANTITY": "Impossibile derivare i lotti: una quantità manca, è negativa o troppo grande."
     },
+    "lotsRefusalDetail": {
+      "SPLIT": "Su questo titolo è registrato uno split ({action} il {date}); un'obbligazione non si divide.",
+      "FRACTIONAL_QUANTITY": "{action} il {date} sposta {quantity} obbligazioni, che non è un numero intero.",
+      "OVER_REMOVAL": "{action} il {date} rimuove {quantity} obbligazioni, più di quelle detenute.",
+      "INVALID_QUANTITY": "La quantità di {action} il {date} manca, è negativa o troppo grande."
+    },
     "assumptions": {
       "title": "Ipotesi della previsione",
-      "latestObservation": "{benchmarkId} ipotizzato al {value} per tutti i periodi successivi, ultimo valore pubblicato ({observation})",
-      "supplied": "{benchmarkId} ipotizzato al {value} per tutti i periodi successivi"
+      "latestObservation": "{benchmark} ipotizzato al {value} per tutti i periodi successivi, ultimo valore pubblicato ({observation})",
+      "supplied": "{benchmark} ipotizzato al {value} per tutti i periodi successivi"
     },
     "missing": {
       "title": "Dati ancora necessari",
-      "item": "{benchmarkId} {observation} — pubblicato da {publisher}",
-      "itemNoPublisher": "{benchmarkId} {observation} — editore non noto"
+      "item": "{benchmark} {observation} — pubblicato da {publisher}",
+      "itemNoPublisher": "{benchmark} {observation} — editore non noto"
     },
     "recompute": {
       "button": "Ricalcola i prezzi",

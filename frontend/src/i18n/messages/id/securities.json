@@ -201,7 +201,10 @@
     "bondInstrumentLabel": "Seri obligasi (opsional)",
     "bondInstrumentNone": "Tidak ditautkan",
     "bondInstrumentOption": "{series} ({country}, {program})",
-    "bondInstrumentCurrent": "Seri yang ditautkan"
+    "bondInstrumentCurrent": "Seri yang ditautkan",
+    "bondInstrumentLoading": "Memuat katalog obligasi...",
+    "bondInstrumentLoadFailed": "Katalog obligasi tidak dapat dimuat, sehingga seri belum dapat ditautkan.",
+    "bondInstrumentRetry": "Coba lagi"
   },
   "priceForm": {
     "dateLabel": "Tanggal",

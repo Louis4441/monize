@@ -163,9 +163,21 @@ export type BondLotsRefusalCode =
   | 'OVER_REMOVAL'
   | 'INVALID_QUANTITY';
 
+/**
+ * The refusal is rendered from `code` and `params` through translated keys.
+ * `detail` is server-composed English for logs and is never shown.
+ */
 export interface BondLotsRefusal {
   code: BondLotsRefusalCode;
   detail: string;
+  params: {
+    /** The transaction action enum of the offending row, e.g. "SELL". */
+    action: string;
+    /** YYYY-MM-DD. */
+    date: string;
+    /** A decimal string, or null when the row has no quantity. */
+    quantity: string | null;
+  };
 }
 
 /** `GET /bonds/securities/:securityId/valuation`. */

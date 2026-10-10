@@ -201,7 +201,10 @@
     "bondInstrumentLabel": "Série d'obligations (facultatif)",
     "bondInstrumentNone": "Non liée",
     "bondInstrumentOption": "{series} ({country}, {program})",
-    "bondInstrumentCurrent": "Série liée"
+    "bondInstrumentCurrent": "Série liée",
+    "bondInstrumentLoading": "Chargement du catalogue des obligations...",
+    "bondInstrumentLoadFailed": "Le catalogue des obligations n'a pas pu être chargé : aucune série ne peut encore être liée.",
+    "bondInstrumentRetry": "Réessayer"
   },
   "priceForm": {
     "dateLabel": "Date",

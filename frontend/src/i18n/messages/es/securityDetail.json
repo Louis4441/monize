@@ -301,15 +301,21 @@
       "OVER_REMOVAL": "No se pueden derivar los lotes: se retiraron más bonos de los que se tenían.",
       "INVALID_QUANTITY": "No se pueden derivar los lotes: falta una cantidad, es negativa o demasiado grande."
     },
+    "lotsRefusalDetail": {
+      "SPLIT": "En este valor consta un split ({action} el {date}); un bono no se divide.",
+      "FRACTIONAL_QUANTITY": "{action} el {date} mueve {quantity} bonos, que no es un número entero.",
+      "OVER_REMOVAL": "{action} el {date} retira {quantity} bonos, más de los que había.",
+      "INVALID_QUANTITY": "La cantidad de {action} el {date} falta, es negativa o demasiado grande."
+    },
     "assumptions": {
       "title": "Supuestos de la proyección",
-      "latestObservation": "Se supone {benchmarkId} en {value} para todos los periodos posteriores, el último valor publicado ({observation})",
-      "supplied": "Se supone {benchmarkId} en {value} para todos los periodos posteriores"
+      "latestObservation": "Se supone {benchmark} en {value} para todos los periodos posteriores, el último valor publicado ({observation})",
+      "supplied": "Se supone {benchmark} en {value} para todos los periodos posteriores"
     },
     "missing": {
       "title": "Datos que aún faltan",
-      "item": "{benchmarkId} {observation} — publicado por {publisher}",
-      "itemNoPublisher": "{benchmarkId} {observation} — se desconoce el publicador"
+      "item": "{benchmark} {observation} — publicado por {publisher}",
+      "itemNoPublisher": "{benchmark} {observation} — se desconoce el publicador"
     },
     "recompute": {
       "button": "Recalcular precios",

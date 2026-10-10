@@ -201,7 +201,10 @@
     "bondInstrumentLabel": "Serie obbligazionaria (facoltativa)",
     "bondInstrumentNone": "Non collegata",
     "bondInstrumentOption": "{series} ({country}, {program})",
-    "bondInstrumentCurrent": "Serie collegata"
+    "bondInstrumentCurrent": "Serie collegata",
+    "bondInstrumentLoading": "Caricamento del catalogo obbligazioni...",
+    "bondInstrumentLoadFailed": "Impossibile caricare il catalogo obbligazioni, quindi non si può ancora collegare una serie.",
+    "bondInstrumentRetry": "Riprova"
   },
   "priceForm": {
     "dateLabel": "Data",

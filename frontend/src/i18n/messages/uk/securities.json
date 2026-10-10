@@ -201,7 +201,10 @@
     "bondInstrumentLabel": "Серія облігацій (необов'язково)",
     "bondInstrumentNone": "Не прив'язана",
     "bondInstrumentOption": "{series} ({country}, {program})",
-    "bondInstrumentCurrent": "Прив'язана серія"
+    "bondInstrumentCurrent": "Прив'язана серія",
+    "bondInstrumentLoading": "Завантаження каталогу облігацій...",
+    "bondInstrumentLoadFailed": "Не вдалося завантажити каталог облігацій, тому серію поки що не можна прив’язати.",
+    "bondInstrumentRetry": "Повторити"
   },
   "priceForm": {
     "dateLabel": "Дата",

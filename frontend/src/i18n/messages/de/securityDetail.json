@@ -264,7 +264,7 @@
       "period": "Aktuelle Zinsperiode",
       "periodValue": "{index}: {start} bis {end}",
       "rate": "Zinssatz",
-      "principal": "Nennwert je Anleihe",
+      "principal": "Kapitalbasis je Anleihe",
       "accruedInterest": "Stückzinsen",
       "grossValue": "Bruttowert",
       "earlyRedemption": "Vorzeitige Rückzahlung",
@@ -301,15 +301,21 @@
       "OVER_REMOVAL": "Die Posten lassen sich nicht ableiten: Es wurden mehr Anleihen entfernt als gehalten.",
       "INVALID_QUANTITY": "Die Posten lassen sich nicht ableiten: Eine Menge fehlt, ist negativ oder zu groß."
     },
+    "lotsRefusalDetail": {
+      "SPLIT": "Für dieses Wertpapier ist ein Split erfasst ({action} am {date}); eine Anleihe wird nicht gesplittet.",
+      "FRACTIONAL_QUANTITY": "{action} am {date} bewegt {quantity} Anleihen, was keine ganze Zahl ist.",
+      "OVER_REMOVAL": "{action} am {date} entnimmt {quantity} Anleihen, mehr als vorhanden waren.",
+      "INVALID_QUANTITY": "Die Menge bei {action} am {date} fehlt, ist negativ oder zu groß."
+    },
     "assumptions": {
       "title": "Annahmen der Prognose",
-      "latestObservation": "{benchmarkId} wird für alle folgenden Perioden mit {value} angenommen, dem zuletzt veröffentlichten Wert ({observation})",
-      "supplied": "{benchmarkId} wird für alle folgenden Perioden mit {value} angenommen"
+      "latestObservation": "{benchmark} wird für alle folgenden Perioden mit {value} angenommen, dem zuletzt veröffentlichten Wert ({observation})",
+      "supplied": "{benchmark} wird für alle folgenden Perioden mit {value} angenommen"
     },
     "missing": {
       "title": "Noch benötigte Daten",
-      "item": "{benchmarkId} {observation} — veröffentlicht von {publisher}",
-      "itemNoPublisher": "{benchmarkId} {observation} — Herausgeber nicht bekannt"
+      "item": "{benchmark} {observation} — veröffentlicht von {publisher}",
+      "itemNoPublisher": "{benchmark} {observation} — Herausgeber nicht bekannt"
     },
     "recompute": {
       "button": "Preise neu berechnen",

@@ -201,7 +201,10 @@
     "bondInstrumentLabel": "債券シリーズ（任意）",
     "bondInstrumentNone": "未リンク",
     "bondInstrumentOption": "{series}（{country}、{program}）",
-    "bondInstrumentCurrent": "リンク済みシリーズ"
+    "bondInstrumentCurrent": "リンク済みシリーズ",
+    "bondInstrumentLoading": "債券カタログを読み込み中...",
+    "bondInstrumentLoadFailed": "債券カタログを読み込めなかったため、シリーズをまだ紐付けできません。",
+    "bondInstrumentRetry": "再試行"
   },
   "priceForm": {
     "dateLabel": "日付",

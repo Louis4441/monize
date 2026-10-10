@@ -301,15 +301,21 @@
       "OVER_REMOVAL": "Lot tidak dapat diturunkan: lebih banyak obligasi yang dikurangi daripada yang dimiliki.",
       "INVALID_QUANTITY": "Lot tidak dapat diturunkan: jumlah hilang, negatif, atau terlalu besar."
     },
+    "lotsRefusalDetail": {
+      "SPLIT": "Sebuah pemecahan ({action} pada {date}) tercatat pada sekuritas ini; obligasi tidak dipecah.",
+      "FRACTIONAL_QUANTITY": "{action} pada {date} memindahkan {quantity} obligasi, yang bukan bilangan bulat.",
+      "OVER_REMOVAL": "{action} pada {date} mengurangi {quantity} obligasi, lebih banyak dari yang dimiliki.",
+      "INVALID_QUANTITY": "Jumlah pada {action} tanggal {date} kosong, negatif, atau terlalu besar."
+    },
     "assumptions": {
       "title": "Asumsi proyeksi",
-      "latestObservation": "{benchmarkId} diasumsikan sebesar {value} untuk semua periode berikutnya, yaitu nilai terbaru yang dipublikasikan ({observation})",
-      "supplied": "{benchmarkId} diasumsikan sebesar {value} untuk semua periode berikutnya"
+      "latestObservation": "{benchmark} diasumsikan sebesar {value} untuk semua periode berikutnya, yaitu nilai terbaru yang dipublikasikan ({observation})",
+      "supplied": "{benchmark} diasumsikan sebesar {value} untuk semua periode berikutnya"
     },
     "missing": {
       "title": "Data yang masih diperlukan",
-      "item": "{benchmarkId} {observation} — diterbitkan oleh {publisher}",
-      "itemNoPublisher": "{benchmarkId} {observation} — penerbit tidak diketahui"
+      "item": "{benchmark} {observation} — diterbitkan oleh {publisher}",
+      "itemNoPublisher": "{benchmark} {observation} — penerbit tidak diketahui"
     },
     "recompute": {
       "button": "Hitung ulang harga",

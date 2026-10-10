@@ -201,7 +201,10 @@
     "bondInstrumentLabel": "Tahvil serisi (isteğe bağlı)",
     "bondInstrumentNone": "Bağlı değil",
     "bondInstrumentOption": "{series} ({country}, {program})",
-    "bondInstrumentCurrent": "Bağlı seri"
+    "bondInstrumentCurrent": "Bağlı seri",
+    "bondInstrumentLoading": "Tahvil kataloğu yükleniyor...",
+    "bondInstrumentLoadFailed": "Tahvil kataloğu yüklenemedi, bu yüzden henüz bir seri bağlanamıyor.",
+    "bondInstrumentRetry": "Yeniden dene"
   },
   "priceForm": {
     "dateLabel": "Tarih",

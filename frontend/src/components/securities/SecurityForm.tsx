@@ -5,7 +5,6 @@ import { useTranslations } from 'next-intl';
 import { useForm } from 'react-hook-form';
 import '@/lib/zodConfig';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -19,9 +18,15 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { SecurityLookupPicker, LookupCandidate } from './SecurityLookupPicker';
 import { AllocationEditor, AllocationRow } from './AllocationEditor';
+import { BondInstrumentSelect, useBondInstrumentPicker } from './BondInstrumentSelect';
+import {
+  LookupProviderSelect,
+  MsnInstrumentIdInput,
+  QuoteProviderSelect,
+  type LookupProviderValue,
+} from './QuoteProviderControls';
 import { TagForm } from '@/components/tags/TagForm';
 import { Security, CreateSecurityData } from '@/types/investment';
-import type { BondInstrumentSummary } from '@/types/bond';
 import { Tag } from '@/types/tag';
 import { tagsApi } from '@/lib/tags';
 import { investmentsApi } from '@/lib/investments';
@@ -33,67 +38,14 @@ import { useFormSubmitRef } from '@/hooks/useFormSubmitRef';
 import { useFormDirtyNotify } from '@/hooks/useFormDirtyNotify';
 import { FormActions } from '@/components/ui/FormActions';
 import { EXCHANGE_OPTIONS, COUNTRY_OPTIONS } from '@/lib/constants';
-
-// Map stored weightings (decimal 0-1) to editor rows (percentage strings).
-const toAllocationRows = (
-  weightings: { name: string; weight: number }[] | null | undefined,
-): AllocationRow[] =>
-  (weightings ?? [])
-    // An "Other" bucket isn't a real slice: don't surface it as a row --
-    // it's folded into the editor's computed (100 - total) "Other" remainder.
-    .filter((w) => (w.name ?? '').trim().toLowerCase() !== 'other')
-    .map((w) => ({
-      name: w.name,
-      weight: String(Math.round(w.weight * 1000000) / 10000),
-    }));
-
-// Editor rows -> API slices: trim names, drop blank/zero rows. Weights stay in
-// percentage units here; the caller converts to the stored decimal 0-1 form.
-const toAllocationSlices = (rows: AllocationRow[]) =>
-  rows
-    .map((row) => ({ name: row.name.trim(), weight: parseFloat(row.weight) }))
-    .filter(
-      (row) => row.name !== '' && Number.isFinite(row.weight) && row.weight > 0,
-    );
+import {
+  buildSecuritySchema,
+  toAllocationRows,
+  toAllocationSlices,
+  type SecurityFormData,
+} from './securityFormModel';
 
 const logger = createLogger('SecurityForm');
-
-const buildSecuritySchema = (t: (key: string) => string) => z.object({
-  symbol: z.string().min(1, t('validation.symbolRequired')).max(20, t('validation.symbolMax')),
-  name: z.string().min(1, t('validation.nameRequired')).max(255, t('validation.nameMax')),
-  securityType: z.string().optional(),
-  exchange: z.string().optional(),
-  currencyCode: z.string().min(1, t('validation.currencyRequired')),
-  description: z.string().max(5000, t('validation.descriptionMax')).optional(),
-  website: z.string().max(2048).optional(),
-  irWebsite: z.string().max(2048).optional(),
-  quoteProvider: z.enum(['', 'yahoo', 'msn', 'lse', 'deutsche_boerse']).optional(),
-  msnInstrumentId: z.string().max(50).optional(),
-  // A bond catalog instrument id, or '' for "not linked".
-  bondInstrumentId: z.string().optional(),
-  priceChartEnabled: z.boolean().optional(),
-  skipPriceUpdates: z.boolean().optional(),
-  priceAlertPercent: z.string().optional().refine((v) => !v?.trim() || (Number.isFinite(Number(v)) && Number(v) >= 0.1 && Number(v) <= 1000), t('priceAlert.range')),
-  isFavourite: z.boolean().optional(),
-});
-
-type SecurityFormData = z.infer<ReturnType<typeof buildSecuritySchema>>;
-
-const quoteProviderOverrideOptions = [
-  { value: '', labelKey: 'form.providers.auto' },
-  { value: 'yahoo', labelKey: 'form.providers.yahoo' },
-  { value: 'msn', labelKey: 'form.providers.msn' },
-  { value: 'lse', labelKey: 'form.providers.lse' },
-  { value: 'deutsche_boerse', labelKey: 'form.providers.deutsche_boerse' },
-];
-
-const lookupProviderOptions = [
-  { value: 'auto', labelKey: 'form.providers.auto' },
-  { value: 'yahoo', labelKey: 'form.providers.yahoo' },
-  { value: 'msn', labelKey: 'form.providers.msn' },
-  { value: 'lse', labelKey: 'form.providers.lse' },
-  { value: 'deutsche_boerse', labelKey: 'form.providers.deutsche_boerse' },
-];
 
 interface SecurityFormProps {
   security?: Security;
@@ -131,9 +83,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [hasLookupResult, setHasLookupResult] = useState(false);
   const [currencies, setCurrencies] = useState<CurrencyInfo[]>([]);
-  const [lookupProvider, setLookupProvider] = useState<
-    'auto' | 'yahoo' | 'msn' | 'lse' | 'deutsche_boerse'
-  >('auto');
+  const [lookupProvider, setLookupProvider] = useState<LookupProviderValue>('auto');
   const [pickerQuery, setPickerQuery] = useState<string>('');
   const [pickerCandidates, setPickerCandidates] = useState<LookupCandidate[]>([]);
   // Bumped by Clear/Revert to remount the exchange combobox, whose internal
@@ -164,9 +114,6 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
   // Asset class the user asked to delete from the list, pending confirmation.
   const [assetToDelete, setAssetToDelete] = useState<string | null>(null);
   const [showTagForm, setShowTagForm] = useState(false);
-  // The bond catalog, fetched the first time the type is BOND. Null is "not
-  // loaded (yet, or the request failed)", which is not an empty catalog.
-  const [bondInstruments, setBondInstruments] = useState<BondInstrumentSummary[] | null>(null);
 
   useEffect(() => {
     exchangeRatesApi.getCurrencies().then(setCurrencies).catch(() => {});
@@ -327,55 +274,8 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
   const isBond = watch('securityType') === 'BOND';
   const selectedBondId = watch('bondInstrumentId') || '';
 
-  useEffect(() => {
-    if (!isBond) return;
-    let cancelled = false;
-    investmentsApi
-      .listBondInstruments()
-      .then((list) => {
-        if (!cancelled) setBondInstruments(list);
-      })
-      // The picker is optional: without the catalog the select offers only
-      // "Not linked" (and the current link, kept as it is).
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [isBond]);
-
-  // A linked security's currency equals its instrument's, so only matching
-  // instruments are offered.
-  const bondOptions = useMemo(() => {
-    const matching = (bondInstruments ?? [])
-      .filter((b) => b.currencyCode === selectedCurrency)
-      .map((b) => ({
-        value: b.id,
-        label: t('form.bondInstrumentOption', {
-          series: b.seriesCode,
-          country: b.issuerCountryCode,
-          program: b.programCode,
-        }),
-      }));
-    const options = [{ value: '', label: t('form.bondInstrumentNone') }, ...matching];
-    // The catalog has not loaded: keep the existing link visible rather than
-    // letting the select blank it.
-    if (bondInstruments === null && selectedBondId) {
-      options.push({ value: selectedBondId, label: t('form.bondInstrumentCurrent') });
-    }
-    return options;
-  }, [bondInstruments, selectedCurrency, selectedBondId, t]);
-
-  // The link that is submitted and shown: a currency change that leaves the
-  // instrument unmatched drops it. With no catalog loaded nothing can be judged,
-  // so the stored link stands.
-  const effectiveBondId =
-    selectedBondId &&
-    (bondInstruments === null ||
-      bondInstruments.some(
-        (b) => b.id === selectedBondId && b.currencyCode === selectedCurrency,
-      ))
-      ? selectedBondId
-      : '';
+  const bondPicker = useBondInstrumentPicker(isBond, selectedCurrency, selectedBondId);
+  const effectiveBondId = bondPicker.effectiveBondId;
 
   // A linked bond is priced from its terms, never by asking a quote provider,
   // so the controls that configure quote fetching are hidden. Their stored
@@ -646,22 +546,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
           />
         </div>
         <div className="flex gap-1.5">
-          <Select
-            aria-label={t('form.lookupProviderAriaLabel')}
-            options={lookupProviderOptions.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
-            value={lookupProvider}
-            onChange={(e) =>
-              setLookupProvider(
-                e.target.value as
-                  | 'auto'
-                  | 'yahoo'
-                  | 'msn'
-                  | 'lse'
-                  | 'deutsche_boerse',
-              )
-            }
-            className="mb-[1px] w-24"
-          />
+          <LookupProviderSelect value={lookupProvider} onChange={setLookupProvider} />
           <Button
             type="button"
             variant="outline"
@@ -732,49 +617,21 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       </div>
 
       {isBond && (
-        <Select
-          label={t('form.bondInstrumentLabel')}
-          options={bondOptions}
-          value={effectiveBondId}
-          onChange={(e) =>
-            setValue('bondInstrumentId', e.target.value, { shouldDirty: true })
-          }
+        <BondInstrumentSelect
+          picker={bondPicker}
+          onChange={(id) => setValue('bondInstrumentId', id, { shouldDirty: true })}
           error={errors.bondInstrumentId?.message}
         />
       )}
 
       {!isLinkedToBond && (
-        <div>
-          <Select
-            label={t('form.quoteProviderLabel')}
-            options={[
-              { value: '', label: t('form.quoteProviderUseDefault', { provider: t(`form.providers.${userDefaultProvider}`) }) },
-              ...quoteProviderOverrideOptions
-                .slice(1)
-                .map((o) => ({ value: o.value, label: t(o.labelKey) })),
-            ]}
-            value={watch('quoteProvider') || ''}
-            onChange={(e) =>
-              setValue(
-                'quoteProvider',
-                e.target.value as 'yahoo' | 'msn' | 'lse' | 'deutsche_boerse' | '',
-                {
-                  shouldDirty: true,
-                },
-              )
-            }
-            error={errors.quoteProvider?.message}
-          />
-          {watch('quoteProvider') === 'msn' && msnReady === false && (
-            <p
-              role="alert"
-              className="text-sm text-red-600 dark:text-red-400 mt-2"
-              data-testid="msn-not-configured-error"
-            >
-              {t('form.msnNotConfigured')}
-            </p>
-          )}
-        </div>
+        <QuoteProviderSelect
+          value={watch('quoteProvider') || ''}
+          onChange={(value) => setValue('quoteProvider', value, { shouldDirty: true })}
+          userDefaultProvider={userDefaultProvider}
+          msnReady={msnReady}
+          error={errors.quoteProvider?.message}
+        />
       )}
 
       <div>
@@ -845,11 +702,9 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       </label>
 
       {!isLinkedToBond && watch('quoteProvider') === 'msn' && (
-        <Input
-          label={t('form.msnIdLabel')}
-          {...register('msnInstrumentId')}
+        <MsnInstrumentIdInput
+          registration={register('msnInstrumentId')}
           error={errors.msnInstrumentId?.message}
-          placeholder={t('form.exchangePlaceholder')}
         />
       )}
 

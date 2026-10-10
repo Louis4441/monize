@@ -264,7 +264,7 @@
       "period": "Période en cours",
       "periodValue": "{index} : du {start} au {end}",
       "rate": "Taux",
-      "principal": "Nominal par obligation",
+      "principal": "Capital par obligation",
       "accruedInterest": "Intérêts courus",
       "grossValue": "Valeur brute",
       "earlyRedemption": "Remboursement anticipé",
@@ -301,15 +301,21 @@
       "OVER_REMOVAL": "Les lots ne peuvent pas être déduits : plus d'obligations ont été retirées qu'il n'en était détenu.",
       "INVALID_QUANTITY": "Les lots ne peuvent pas être déduits : une quantité est manquante, négative ou trop grande."
     },
+    "lotsRefusalDetail": {
+      "SPLIT": "Un fractionnement ({action} le {date}) est enregistré sur ce titre ; une obligation ne se fractionne pas.",
+      "FRACTIONAL_QUANTITY": "{action} le {date} déplace {quantity} obligations, ce qui n'est pas un nombre entier.",
+      "OVER_REMOVAL": "{action} le {date} retire {quantity} obligations, plus que celles détenues.",
+      "INVALID_QUANTITY": "La quantité de {action} le {date} est absente, négative ou trop grande."
+    },
     "assumptions": {
       "title": "Hypothèses de la projection",
-      "latestObservation": "{benchmarkId} supposé à {value} pour toutes les périodes suivantes, dernière valeur publiée ({observation})",
-      "supplied": "{benchmarkId} supposé à {value} pour toutes les périodes suivantes"
+      "latestObservation": "{benchmark} supposé à {value} pour toutes les périodes suivantes, dernière valeur publiée ({observation})",
+      "supplied": "{benchmark} supposé à {value} pour toutes les périodes suivantes"
     },
     "missing": {
       "title": "Données encore nécessaires",
-      "item": "{benchmarkId} {observation} — publié par {publisher}",
-      "itemNoPublisher": "{benchmarkId} {observation} — éditeur inconnu"
+      "item": "{benchmark} {observation} — publié par {publisher}",
+      "itemNoPublisher": "{benchmark} {observation} — éditeur inconnu"
     },
     "recompute": {
       "button": "Recalculer les prix",

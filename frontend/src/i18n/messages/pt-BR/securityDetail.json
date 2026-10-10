@@ -301,15 +301,21 @@
       "OVER_REMOVAL": "Não é possível apurar os lotes: foram removidos mais títulos do que os mantidos.",
       "INVALID_QUANTITY": "Não é possível apurar os lotes: falta uma quantidade, ela é negativa ou grande demais."
     },
+    "lotsRefusalDetail": {
+      "SPLIT": "Há um desdobramento registrado neste título ({action} em {date}); um título de renda fixa não se desdobra.",
+      "FRACTIONAL_QUANTITY": "{action} em {date} movimenta {quantity} títulos, o que não é um número inteiro.",
+      "OVER_REMOVAL": "{action} em {date} retira {quantity} títulos, mais do que os mantidos.",
+      "INVALID_QUANTITY": "A quantidade de {action} em {date} está ausente, é negativa ou grande demais."
+    },
     "assumptions": {
       "title": "Premissas da projeção",
-      "latestObservation": "{benchmarkId} assumido em {value} para todos os períodos seguintes, o último valor publicado ({observation})",
-      "supplied": "{benchmarkId} assumido em {value} para todos os períodos seguintes"
+      "latestObservation": "{benchmark} assumido em {value} para todos os períodos seguintes, o último valor publicado ({observation})",
+      "supplied": "{benchmark} assumido em {value} para todos os períodos seguintes"
     },
     "missing": {
       "title": "Dados ainda necessários",
-      "item": "{benchmarkId} {observation} — publicado por {publisher}",
-      "itemNoPublisher": "{benchmarkId} {observation} — publicador desconhecido"
+      "item": "{benchmark} {observation} — publicado por {publisher}",
+      "itemNoPublisher": "{benchmark} {observation} — publicador desconhecido"
     },
     "recompute": {
       "button": "Recalcular preços",

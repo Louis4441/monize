@@ -301,15 +301,21 @@
       "OVER_REMOVAL": "ロットを導出できません。保有数を超える債券が除かれています。",
       "INVALID_QUANTITY": "ロットを導出できません。数量がない、負の値、または大きすぎます。"
     },
+    "lotsRefusalDetail": {
+      "SPLIT": "この銘柄には分割（{date} の {action}）が記録されていますが、債券は分割されません。",
+      "FRACTIONAL_QUANTITY": "{date} の {action} は {quantity} 枚の債券を動かしますが、整数ではありません。",
+      "OVER_REMOVAL": "{date} の {action} は {quantity} 枚の債券を減らしますが、保有数を超えています。",
+      "INVALID_QUANTITY": "{date} の {action} の数量が未入力、負の値、または大きすぎます。"
+    },
     "assumptions": {
       "title": "予測の前提",
-      "latestObservation": "{benchmarkId} は、以降のすべての期間について {value} と仮定します(直近に公表された値: {observation})",
-      "supplied": "{benchmarkId} は、以降のすべての期間について {value} と仮定します"
+      "latestObservation": "{benchmark} は、以降のすべての期間について {value} と仮定します(直近に公表された値: {observation})",
+      "supplied": "{benchmark} は、以降のすべての期間について {value} と仮定します"
     },
     "missing": {
       "title": "まだ必要なデータ",
-      "item": "{benchmarkId} {observation} — 公表元：{publisher}",
-      "itemNoPublisher": "{benchmarkId} {observation} — 公表元は不明"
+      "item": "{benchmark} {observation} — 公表元：{publisher}",
+      "itemNoPublisher": "{benchmark} {observation} — 公表元は不明"
     },
     "recompute": {
       "button": "価格を再計算",
