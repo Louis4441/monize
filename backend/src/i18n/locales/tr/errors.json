@@ -535,7 +535,10 @@
     "securityNotLinked": "{{ securityId }} menkul kıymeti bulunamadı veya bir tahvil enstrümanına bağlı değil",
     "dataNotFound": "Bu değerleme için gereken kayıtlı tahvil verileri mevcut değil: {{ detail }}",
     "dataInconsistent": "Kayıtlı tahvil verileri birbiriyle çelişiyor, bu nedenle değerleme verilmiyor: {{ detail }}",
-    "invalidInput": "Değerleme isteği geçerli değil: {{ detail }}"
+    "invalidInput": "Değerleme isteği geçerli değil: {{ detail }}",
+    "assumeInvalid": "assume, benchmarkId:değer biçiminde olmalıdır; gösterge kimliği 1 ile 40 arasında büyük harf, rakam veya alt çizgiden oluşmalı ve değer -0.5 ile 1.0 arasında bir ondalık sayı olmalıdır",
+    "benchmarkIdInvalid": "benchmarkId 1 ile 40 arasında büyük harf, rakam veya alt çizgiden oluşmalıdır",
+    "scenarioValuesInvalid": "values, -0.5 ile 1.0 arasında virgülle ayrılmış 1 ila 6 ondalık sayı içermelidir"
   },
   "securities": {
     "bondPricedByEngine": "Bu menkul kıymet bir tahvil enstrümanına bağlıdır ve bir kotasyon sağlayıcısı tarafından değil, tahvil motoru tarafından fiyatlanır. Bunun yerine Fiyatları yeniden hesapla seçeneğini kullanın.",

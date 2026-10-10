@@ -472,4 +472,227 @@ describe("BondValuationService", () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
+
+  describe("scenariosOf and the assumption on valueSecurity", () => {
+    const owned = [
+      {
+        id: "sec-1",
+        user_id: "user-1",
+        symbol: "EDO1036",
+        currency_code: "PLN",
+        bond_instrument_id: "i2",
+      },
+    ];
+    const buy = (date: string, quantity: string) => ({
+      action: "BUY",
+      status: "UNRECONCILED",
+      tx_date: date,
+      quantity,
+      paired_transfer: false,
+    });
+    // Period 2 (CPI 2027-08 = 3.4%) is known on 2027-10-16; periods 3 to 10 are not.
+    const edo = (ledger: Row[] = [buy("2026-10-01", "10")]) =>
+      setup({
+        instruments: edoInstrument,
+        terms: [edoTerms],
+        securities: owned,
+        ledger,
+        series: [{ kind: "MONTHLY", publisher: "GUS", covered_through: null }],
+        values: [{ observation_date: "2027-08-01", value: "0.0340000000" }],
+      });
+
+    it("sums the lots' figures per assumed value from one read of the reference data", async () => {
+      const { service, calls } = edo();
+      const result = await service.scenariosOf(
+        "user-1",
+        "sec-1",
+        "PL_CPI_GUS_YOY",
+        ["0", "0.05"],
+        "2027-10-16",
+      );
+      // Independently computed with python fractions: 10 bonds, r1 = 5.35%,
+      // r2 = 5.4%, then max(0, CPI) + 2%; interest is exact x 10 rounded once,
+      // the maturity value is the per-bond rounded value x 10.
+      expect(result).toMatchObject({
+        securityId: "sec-1",
+        benchmarkId: "PL_CPI_GUS_YOY",
+        asOf: "2027-10-16",
+        refusal: null,
+      });
+      expect(result.scenarios).toEqual([
+        {
+          value: "0",
+          maturityValue: "1301.00",
+          totalInterest: "301.00",
+          fixedInterest: "53.50",
+          benchmarkInterest: "35.82",
+          addendInterest: "211.68",
+          announcedInterest: "0.00",
+        },
+        {
+          value: "0.05",
+          maturityValue: "1907.90",
+          totalInterest: "907.86",
+          fixedInterest: "53.50",
+          benchmarkInterest: "605.44",
+          addendInterest: "248.92",
+          announcedInterest: "0.00",
+        },
+      ]);
+      for (const table of [
+        "bond_instruments",
+        "bond_terms_versions",
+        "bond_period_rates",
+        "benchmark_series",
+        "benchmark_values",
+      ]) {
+        expect(
+          calls.filter((c) => c.sql.includes(`FROM ${table}`)),
+        ).toHaveLength(1);
+      }
+    });
+
+    it("refuses an assumption about a benchmark the instrument does not read", async () => {
+      await expect(
+        edo().service.scenariosOf(
+          "user-1",
+          "sec-1",
+          "PL_NBP_REFERENCE",
+          ["0.05"],
+          "2027-10-16",
+        ),
+      ).rejects.toThrow(/does not read benchmark PL_NBP_REFERENCE/);
+      await expect(
+        edo().service.valueSecurity(
+          "user-1",
+          "sec-1",
+          "2027-10-16",
+          new Map([["PL_NBP_REFERENCE", "0.05"]]),
+        ),
+      ).rejects.toThrow(/does not read benchmark PL_NBP_REFERENCE/);
+    });
+
+    it("keeps the known periods across scenarios", async () => {
+      const { service } = edo();
+      const [low, high] = (
+        await service.scenariosOf(
+          "user-1",
+          "sec-1",
+          "PL_CPI_GUS_YOY",
+          ["0", "0.05"],
+          "2027-10-16",
+        )
+      ).scenarios;
+      expect(high.fixedInterest).toBe(low.fixedInterest);
+      expect(Number(high.maturityValue)).toBeGreaterThan(
+        Number(low.maturityValue),
+      );
+      expect(Number(high.benchmarkInterest)).toBeGreaterThan(
+        Number(low.benchmarkInterest),
+      );
+    });
+
+    it("sums several lots, each rounded at the end of its own sum", async () => {
+      const { service } = edo([
+        buy("2026-10-01", "10"),
+        buy("2026-10-01", "3"),
+      ]);
+      const result = await service.scenariosOf(
+        "user-1",
+        "sec-1",
+        "PL_CPI_GUS_YOY",
+        ["0"],
+        "2027-10-16",
+      );
+      // Equal purchase dates fold into one lot of 13 bonds in the ledger fold,
+      // or into two lots of 10 and 3: both must agree with 13 x per bond.
+      expect(result.scenarios[0].totalInterest).toBe("391.30");
+    });
+
+    it("is null for every figure when a lot cannot be valued, never a partial sum", async () => {
+      // 2027-10-16 without the stored 2027-08 observation: period 2 has started
+      // with no rate, so the lot has no interest figure.
+      const { service } = setup({
+        instruments: edoInstrument,
+        terms: [edoTerms],
+        securities: owned,
+        ledger: [buy("2026-10-01", "10")],
+      });
+      const result = await service.scenariosOf(
+        "user-1",
+        "sec-1",
+        "PL_CPI_GUS_YOY",
+        ["0.02"],
+        "2027-10-16",
+      );
+      expect(result.scenarios[0]).toEqual({
+        value: "0.02",
+        maturityValue: null,
+        totalInterest: null,
+        fixedInterest: null,
+        benchmarkInterest: null,
+        addendInterest: null,
+        announcedInterest: null,
+      });
+    });
+
+    it("names the refusal and nulls the figures when the lots cannot be derived", async () => {
+      const { service } = edo([
+        buy("2026-10-01", "10"),
+        { ...buy("2026-12-01", "2"), action: "SPLIT" },
+      ]);
+      const result = await service.scenariosOf(
+        "user-1",
+        "sec-1",
+        "PL_CPI_GUS_YOY",
+        ["0"],
+        "2027-10-16",
+      );
+      expect(result.refusal).toMatchObject({ code: "SPLIT" });
+      expect(result.scenarios[0].totalInterest).toBeNull();
+    });
+
+    it("answers 404 for another user's or an unlinked security", async () => {
+      const foreign = setup({ securities: [] });
+      await expect(
+        foreign.service.scenariosOf(
+          "user-2",
+          "sec-1",
+          "X",
+          ["0"],
+          "2027-10-16",
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      const unlinked = setup({
+        securities: [{ ...owned[0], bond_instrument_id: null }],
+      });
+      await expect(
+        unlinked.service.scenariosOf(
+          "user-1",
+          "sec-1",
+          "X",
+          ["0"],
+          "2027-10-16",
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("valueSecurity passes the assumption to every lot", async () => {
+      const { service } = edo();
+      const result = await service.valueSecurity(
+        "user-1",
+        "sec-1",
+        "2027-10-16",
+        new Map([["PL_CPI_GUS_YOY", "0.05"]]),
+      );
+      expect(result.lots[0].valuation.projectionAssumptions).toEqual([
+        {
+          benchmarkId: "PL_CPI_GUS_YOY",
+          value: "0.0500",
+          basis: "SUPPLIED",
+          observation: null,
+        },
+      ]);
+    });
+  });
 });

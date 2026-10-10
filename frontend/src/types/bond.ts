@@ -96,6 +96,17 @@ export interface BondRateScheduleEntry {
   rateSource: BondRateSource | null;
   benchmark: BondRateScheduleBenchmark | null;
   addend: string | null;
+  /**
+   * Interest of the period PER BOND (spec 13.2), 10 decimal places, split by the
+   * components of the rate. All five are null when the period's rate, or any
+   * earlier rate of a compounding bond, is unknown; a part that does not apply
+   * is "0". Multiply by the lot quantity for the holding.
+   */
+  interest: string | null;
+  fixedPart: string | null;
+  benchmarkPart: string | null;
+  addendPart: string | null;
+  announcedPart: string | null;
 }
 
 export interface BondValuation {
@@ -171,4 +182,34 @@ export interface SecurityBondValuation {
 export interface BondPriceRecompute {
   written: number;
   deleted: number;
+}
+
+/** One assumed benchmark value and the figures it gives over the open lots (spec 13.3). */
+export interface BondScenario {
+  /** The assumed value as sent, a fraction ("0.05" is 5%). */
+  value: string;
+  /** Each figure is a lot-summed amount, or null when any lot cannot be valued. */
+  maturityValue: string | null;
+  totalInterest: string | null;
+  fixedInterest: string | null;
+  benchmarkInterest: string | null;
+  addendInterest: string | null;
+  announcedInterest: string | null;
+}
+
+/** `GET /bonds/securities/:securityId/scenarios`. */
+export interface SecurityBondScenarios {
+  securityId: string;
+  benchmarkId: string;
+  asOf: string;
+  /** Set when the lots cannot be derived; every figure is then null. */
+  refusal: BondLotsRefusal | null;
+  scenarios: BondScenario[];
+}
+
+/** A benchmark value assumed for the valuation, `assume=<benchmarkId>:<value>`. */
+export interface BondAssumption {
+  benchmarkId: string;
+  /** A fraction string. */
+  value: string;
 }

@@ -341,6 +341,41 @@
         "missing": "{benchmark} {observation}: not published yet"
       }
     },
+    "indexation": {
+      "inflation": "Inflation-indexed: from {date} (period 2) the rate is {benchmark} + {addend}, recalculated every period",
+      "floating": "Floating rate: from {date} (period 2) the rate is {benchmark} + {addend}, recalculated every period"
+    },
+    "interestParts": {
+      "fixed": "Fixed interest (1st period)",
+      "margin": "Interest from margin",
+      "inflation": "Interest from inflation",
+      "benchmark": "Interest from the reference rate",
+      "announced": "Announced interest"
+    },
+    "chart": {
+      "title": "Cumulative interest at each period end",
+      "assumption": "Projection assuming {benchmark} = {value}",
+      "projectedNote": "Lighter bars are projected periods",
+      "stoppedAt": "Interest is not known from period {period}, so the chart stops before it."
+    },
+    "scenarios": {
+      "title": "Inflation scenarios",
+      "titleBenchmark": "Interest rate scenarios",
+      "projection": "Projection",
+      "caption": "Projected maturity value and interest by assumed value",
+      "intro": "Projections, not certainties: every period that has not started is assumed to follow the {benchmark} value in the first column. Known and announced periods do not change. Select a row to see its rate table and chart.",
+      "custom": "Your own {benchmark} (%)",
+      "add": "Add scenario",
+      "useDefault": "Use the default assumption",
+      "selected": "Selected",
+      "loading": "Loading the scenarios...",
+      "loadFailed": "The scenarios could not be loaded.",
+      "columns": {
+        "assumed": "Assumed {benchmark}",
+        "maturityValue": "Maturity value (projection)",
+        "totalInterest": "Total interest (projection)"
+      }
+    },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "CPI, 12 months (GUS)",
       "PL_NBP_REFERENCE": "NBP reference rate"

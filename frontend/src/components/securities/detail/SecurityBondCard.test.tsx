@@ -26,8 +26,28 @@ vi.mock('@/hooks/useFinancialToday', () => ({
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
     getSecurityBondValuation: vi.fn(),
+    getSecurityBondScenarios: vi.fn(),
     recomputeSecurityBondPrices: vi.fn(),
   },
+}));
+vi.mock('recharts', () => ({
+  ResponsiveContainer: ({ children }: any) => <div>{children}</div>,
+  BarChart: ({ children, data }: any) => (
+    <div data-testid="bar-chart" data-points={data.length}>
+      {children}
+    </div>
+  ),
+  Bar: ({ name, fill, children }: any) => (
+    <div data-testid="bar" data-name={name} data-fill={fill}>
+      {children}
+    </div>
+  ),
+  Cell: ({ fillOpacity }: any) => <i data-testid="cell" data-opacity={fillOpacity} />,
+  XAxis: () => null,
+  YAxis: () => null,
+  CartesianGrid: () => null,
+  Tooltip: () => null,
+  Legend: () => null,
 }));
 vi.mock('react-hot-toast', () => ({
   default: { success: vi.fn(), error: vi.fn() },
@@ -117,6 +137,7 @@ function response(
 
 const get = vi.mocked(investmentsApi.getSecurityBondValuation);
 const recompute = vi.mocked(investmentsApi.recomputeSecurityBondPrices);
+const scenarios = vi.mocked(investmentsApi.getSecurityBondScenarios);
 
 async function mount(onPricesChanged?: () => void) {
   await act(async () => {
@@ -129,11 +150,18 @@ describe('SecurityBondCard', () => {
     vi.clearAllMocks();
     get.mockResolvedValue(response());
     recompute.mockResolvedValue({ written: 3, deleted: 0 });
+    scenarios.mockResolvedValue({
+      securityId: 'sec-1',
+      benchmarkId: 'PL_CPI_GUS_YOY',
+      asOf: '2027-04-15',
+      refusal: null,
+      scenarios: [],
+    });
   });
 
   it('asks for the valuation on the financial today and renders totals and lots', async () => {
     await mount();
-    expect(get).toHaveBeenCalledWith('sec-1', '2027-04-15');
+    expect(get).toHaveBeenCalledWith('sec-1', '2027-04-15', undefined);
     expect(screen.getByText('Series TOS1029 (PL_MF, RETAIL, PL)')).toBeInTheDocument();
     const gross = screen.getByText('Gross value', { selector: 'dt' }).nextElementSibling!;
     expect(gross).toHaveTextContent('$1,090.20');
@@ -285,6 +313,11 @@ describe('SecurityBondCard', () => {
       rateSource: null,
       benchmark: null,
       addend: null,
+      interest: null,
+      fixedPart: null,
+      benchmarkPart: null,
+      addendPart: null,
+      announcedPart: null,
       ...over,
     });
     const edoSchedule: BondRateScheduleEntry[] = [
@@ -439,6 +472,264 @@ describe('SecurityBondCard', () => {
       await mount();
       expect(screen.getByText('Lot purchased 10/01/2026')).toBeInTheDocument();
       expect(screen.getByText('Lot purchased 11/05/2026')).toBeInTheDocument();
+    });
+  });
+});
+
+describe('SecurityBondCard: indexation, scenarios and the interest chart (spec 13.1 to 13.4)', () => {
+  const CPI = 'PL_CPI_GUS_YOY';
+  const rule = (over: Partial<BondRateRule> = {}): BondRateRule => ({
+    type: 'INFLATION_PLUS_MARGIN_AS_RATE',
+    benchmarkId: CPI,
+    annualRate: null,
+    firstPeriodRate: '0.0535',
+    addend: '0.0200',
+    benchmarkFloor: '0',
+    ...over,
+  });
+  const period = (
+    index: number,
+    over: Partial<BondRateScheduleEntry> = {},
+  ): BondRateScheduleEntry => ({
+    index,
+    start: `${2025 + index}-10-01`,
+    end: `${2026 + index}-10-01`,
+    annualRate: '0.0540',
+    rateSource: 'DERIVED',
+    benchmark: null,
+    addend: '0.0200',
+    interest: '0',
+    fixedPart: '0',
+    benchmarkPart: '0',
+    addendPart: '0',
+    announcedPart: '0',
+    ...over,
+  });
+  // Per bond, computed independently with python fractions (EDO1036).
+  const schedule: BondRateScheduleEntry[] = [
+    period(1, {
+      rateSource: 'TERMS',
+      addend: null,
+      interest: '5.35',
+      fixedPart: '5.35',
+    }),
+    period(2, { interest: '5.6889', benchmarkPart: '3.5819', addendPart: '2.107' }),
+    period(3, {
+      rateSource: 'PROJECTED',
+      interest: '7.772723',
+      benchmarkPart: '5.551945',
+      addendPart: '2.220778',
+    }),
+    period(4, {
+      annualRate: null,
+      rateSource: null,
+      interest: null,
+      fixedPart: null,
+      benchmarkPart: null,
+      addendPart: null,
+      announcedPart: null,
+    }),
+  ];
+  const assumption = {
+    benchmarkId: CPI,
+    value: '0.0500',
+    basis: 'SUPPLIED' as const,
+    observation: null,
+  };
+  const scenarioRows = [
+    { value: '0', maturityValue: '1301.00', totalInterest: '301.00', fixedInterest: '53.50', benchmarkInterest: '35.82', addendInterest: '211.68', announcedInterest: '0.00' },
+    { value: '0.025', maturityValue: '1500.00', totalInterest: null, fixedInterest: '53.50', benchmarkInterest: null, addendInterest: null, announcedInterest: null },
+    { value: '0.05', maturityValue: '1907.90', totalInterest: '907.86', fixedInterest: '53.50', benchmarkInterest: '605.44', addendInterest: '248.92', announcedInterest: '0.00' },
+    { value: '0.08', maturityValue: '2400.00', totalInterest: '1400.00', fixedInterest: '53.50', benchmarkInterest: '900.00', addendInterest: '300.00', announcedInterest: '0.00' },
+  ];
+
+  function withLots(valuation: Partial<BondValuation>, purchaseDates = ['2026-10-01']) {
+    get.mockResolvedValue(
+      response({
+        lots: purchaseDates.map((purchaseDate) => ({
+          purchaseDate,
+          quantity: 10,
+          purchaseDateAssumed: false,
+          valuation: lotValuation({
+            rateRule: rule(),
+            rateSchedule: schedule,
+            projectionAssumptions: [assumption],
+            ...valuation,
+          }),
+        })),
+      }),
+    );
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    get.mockResolvedValue(response());
+    recompute.mockResolvedValue({ written: 0, deleted: 0 });
+    scenarios.mockResolvedValue({
+      securityId: 'sec-1',
+      benchmarkId: CPI,
+      asOf: '2027-04-15',
+      refusal: null,
+      scenarios: scenarioRows,
+    });
+  });
+
+  describe('indexation notice (13.1)', () => {
+    it("says an inflation bond is indexed, from the lot's own period 2 start", async () => {
+      withLots({}, ['2026-10-01', '2026-11-05']);
+      await mount();
+      const notes = screen.getAllByRole('note');
+      expect(notes).toHaveLength(2);
+      expect(notes[0]).toHaveTextContent(
+        'Inflation-indexed: from 10/01/2027 (period 2) the rate is CPI, 12 months (GUS) + 2%, recalculated every period',
+      );
+    });
+
+    it('uses the floating-rate wording for a reference-rate rule', async () => {
+      withLots({
+        rateRule: rule({ type: 'BENCHMARK_PLUS_SPREAD', benchmarkId: 'PL_NBP_REFERENCE', addend: '0.0050' }),
+      });
+      await mount();
+      expect(screen.getByRole('note')).toHaveTextContent(
+        'Floating rate: from 10/01/2027 (period 2) the rate is NBP reference rate + 0.5%, recalculated every period',
+      );
+    });
+
+    it('says nothing for a fixed rate', async () => {
+      await mount();
+      expect(screen.queryByRole('note')).not.toBeInTheDocument();
+      expect(screen.queryByText('Inflation scenarios')).not.toBeInTheDocument();
+      expect(scenarios).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('scenario panel (13.3)', () => {
+    it('asks once for the four presets, and shows every figure, unknown ones as Unknown', async () => {
+      withLots({});
+      await mount();
+      expect(scenarios).toHaveBeenCalledTimes(1);
+      expect(scenarios).toHaveBeenCalledWith('sec-1', CPI, ['0', '0.025', '0.05', '0.08']);
+      const panel = screen.getByRole('region', { name: 'Inflation scenarios' });
+      expect(within(panel).getByText('Projection')).toBeInTheDocument();
+      const rows = within(panel).getAllByRole('row');
+      expect(rows).toHaveLength(5);
+      expect(within(rows[1]).getByText('0%')).toBeInTheDocument();
+      expect(within(rows[1]).getByText('$1,301.00')).toBeInTheDocument();
+      expect(within(rows[3]).getByText('$907.86')).toBeInTheDocument();
+      // A null is Unknown, never $0.00.
+      expect(within(rows[2]).getAllByText('Unknown')).toHaveLength(3);
+      expect(within(panel).getByText('Maturity value (projection)')).toBeInTheDocument();
+      expect(within(panel).getByText('Interest from margin')).toBeInTheDocument();
+      expect(within(panel).getByText('Interest from inflation')).toBeInTheDocument();
+      expect(within(panel).getByText('Fixed interest (1st period)')).toBeInTheDocument();
+    });
+
+    it('adds the typed value to the one request, as a fraction', async () => {
+      withLots({});
+      await mount();
+      const panel = screen.getByRole('region', { name: 'Inflation scenarios' });
+      fireEvent.change(within(panel).getByLabelText('Your own CPI, 12 months (GUS) (%)'), {
+        target: { value: '3.25' },
+      });
+      await act(async () => {
+        fireEvent.click(within(panel).getByRole('button', { name: 'Add scenario' }));
+      });
+      expect(scenarios).toHaveBeenLastCalledWith('sec-1', CPI, ['0', '0.025', '0.05', '0.08', '0.0325']);
+    });
+
+    it('does not repeat a typed value that is a preset', async () => {
+      withLots({});
+      await mount();
+      const panel = screen.getByRole('region', { name: 'Inflation scenarios' });
+      fireEvent.change(within(panel).getByLabelText('Your own CPI, 12 months (GUS) (%)'), {
+        target: { value: '2.5' },
+      });
+      await act(async () => {
+        fireEvent.click(within(panel).getByRole('button', { name: 'Add scenario' }));
+      });
+      expect(scenarios).toHaveBeenCalledTimes(1);
+    });
+
+    it('clicking a row makes the valuation follow it, and the default can be restored', async () => {
+      withLots({});
+      await mount();
+      expect(get).toHaveBeenLastCalledWith('sec-1', '2027-04-15', undefined);
+      const panel = screen.getByRole('region', { name: 'Inflation scenarios' });
+      await act(async () => {
+        fireEvent.click(within(panel).getAllByRole('row')[3]);
+      });
+      expect(get).toHaveBeenLastCalledWith('sec-1', '2027-04-15', {
+        benchmarkId: CPI,
+        value: '0.05',
+      });
+      // The panel stayed mounted through the reload, and marks the choice.
+      const after = screen.getByRole('region', { name: 'Inflation scenarios' });
+      expect(within(after).getAllByRole('row')[3]).toHaveAttribute('aria-current', 'true');
+      expect(scenarios).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        fireEvent.click(within(after).getByRole('button', { name: 'Use the default assumption' }));
+      });
+      expect(get).toHaveBeenLastCalledWith('sec-1', '2027-04-15', undefined);
+      expect(within(after).queryByRole('button', { name: 'Use the default assumption' })).not.toBeInTheDocument();
+    });
+
+    it('is an error state with a retry when the scenarios cannot be loaded', async () => {
+      withLots({});
+      scenarios.mockRejectedValue(new Error('boom'));
+      await mount();
+      const panel = screen.getByRole('region', { name: 'Inflation scenarios' });
+      expect(within(panel).getByRole('alert')).toHaveTextContent(/scenarios could not be loaded|boom/);
+      expect(within(panel).queryAllByRole('row')).toHaveLength(0);
+    });
+
+    it('names the refusal and shows no invented figures when the lots cannot be derived', async () => {
+      withLots({});
+      scenarios.mockResolvedValue({
+        securityId: 'sec-1',
+        benchmarkId: CPI,
+        asOf: '2027-04-15',
+        refusal: { code: 'SPLIT', detail: 'split' },
+        scenarios: scenarioRows.slice(0, 1).map((r) => ({
+          ...r,
+          maturityValue: null,
+          totalInterest: null,
+          fixedInterest: null,
+          benchmarkInterest: null,
+          addendInterest: null,
+          announcedInterest: null,
+        })),
+      });
+      await mount();
+      const panel = screen.getByRole('region', { name: 'Inflation scenarios' });
+      expect(within(panel).getByText(/a bond does not split/)).toBeInTheDocument();
+      expect(within(panel).getAllByText('Unknown')).toHaveLength(5);
+    });
+  });
+
+  describe('interest chart (13.4)', () => {
+    it('stacks the cumulative parts per period end, lighter when projected, and stops at an unknown period', async () => {
+      withLots({});
+      await mount();
+      expect(screen.getByTestId('bar-chart')).toHaveAttribute('data-points', '3');
+      const bars = screen.getAllByTestId('bar');
+      expect(bars.map((b) => b.getAttribute('data-name'))).toEqual([
+        'Fixed interest (1st period)',
+        'Interest from margin',
+        'Interest from inflation',
+      ]);
+      for (const bar of bars) {
+        expect(bar.getAttribute('data-fill')).toMatch(/^var\(--chart-/);
+        const opacities = within(bar).getAllByTestId('cell').map((c) => c.getAttribute('data-opacity'));
+        expect(opacities).toEqual(['1', '1', '0.45']);
+      }
+      expect(screen.getByText('Projection assuming CPI, 12 months (GUS) = 5%', { exact: false })).toBeInTheDocument();
+      expect(screen.getByText('Interest is not known from period 4, so the chart stops before it.')).toBeInTheDocument();
+    });
+
+    it('draws nothing for a fixed-rate bond without a schedule', async () => {
+      await mount();
+      expect(screen.queryByTestId('bar-chart')).not.toBeInTheDocument();
     });
   });
 });

@@ -341,6 +341,41 @@
         "missing": "{benchmark} {observation} : pas encore publié"
       }
     },
+    "indexation": {
+      "inflation": "Indexée sur l'inflation : à partir du {date} (période 2), le taux est {benchmark} + {addend}, recalculé à chaque période",
+      "floating": "Taux variable : à partir du {date} (période 2), le taux est {benchmark} + {addend}, recalculé à chaque période"
+    },
+    "interestParts": {
+      "fixed": "Intérêts fixes (1re période)",
+      "margin": "Intérêts issus de la marge",
+      "inflation": "Intérêts issus de l'inflation",
+      "benchmark": "Intérêts issus du taux de référence",
+      "announced": "Intérêts annoncés"
+    },
+    "chart": {
+      "title": "Intérêts cumulés à la fin de chaque période",
+      "assumption": "Projection avec {benchmark} = {value}",
+      "projectedNote": "Les barres plus claires sont des périodes projetées",
+      "stoppedAt": "Les intérêts ne sont pas connus à partir de la période {period} : le graphique s'arrête avant."
+    },
+    "scenarios": {
+      "title": "Scénarios d'inflation",
+      "titleBenchmark": "Scénarios de taux d'intérêt",
+      "projection": "Projection",
+      "caption": "Valeur à l'échéance projetée et intérêts selon la valeur supposée",
+      "intro": "Ce sont des projections, pas des certitudes : pour chaque période non commencée, la valeur de {benchmark} de la première colonne est supposée. Les périodes connues et annoncées ne changent pas. Sélectionnez une ligne pour voir son tableau de taux et son graphique.",
+      "custom": "Votre propre valeur de {benchmark} (%)",
+      "add": "Ajouter un scénario",
+      "useDefault": "Utiliser l'hypothèse par défaut",
+      "selected": "Sélectionné",
+      "loading": "Chargement des scénarios...",
+      "loadFailed": "Impossible de charger les scénarios.",
+      "columns": {
+        "assumed": "Hypothèse : {benchmark}",
+        "maturityValue": "Valeur à l'échéance (projection)",
+        "totalInterest": "Intérêts totaux (projection)"
+      }
+    },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "Inflation IPC, 12 mois (GUS)",
       "PL_NBP_REFERENCE": "Taux de référence de la NBP"

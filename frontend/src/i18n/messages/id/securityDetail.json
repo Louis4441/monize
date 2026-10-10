@@ -341,6 +341,41 @@
         "missing": "{benchmark} {observation}: belum dipublikasikan"
       }
     },
+    "indexation": {
+      "inflation": "Terindeks inflasi: mulai {date} (periode 2) suku bunganya adalah {benchmark} + {addend}, dihitung ulang setiap periode",
+      "floating": "Suku bunga mengambang: mulai {date} (periode 2) suku bunganya adalah {benchmark} + {addend}, dihitung ulang setiap periode"
+    },
+    "interestParts": {
+      "fixed": "Bunga tetap (periode 1)",
+      "margin": "Bunga dari margin",
+      "inflation": "Bunga dari inflasi",
+      "benchmark": "Bunga dari suku bunga acuan",
+      "announced": "Bunga yang diumumkan"
+    },
+    "chart": {
+      "title": "Bunga kumulatif pada akhir setiap periode",
+      "assumption": "Proyeksi dengan asumsi {benchmark} = {value}",
+      "projectedNote": "Batang yang lebih terang adalah periode proyeksi",
+      "stoppedAt": "Bunga tidak diketahui sejak periode {period}, sehingga grafik berhenti sebelumnya."
+    },
+    "scenarios": {
+      "title": "Skenario inflasi",
+      "titleBenchmark": "Skenario suku bunga",
+      "projection": "Proyeksi",
+      "caption": "Nilai jatuh tempo proyeksi dan bunga menurut nilai asumsi",
+      "intro": "Ini proyeksi, bukan kepastian: untuk setiap periode yang belum dimulai diasumsikan nilai {benchmark} pada kolom pertama. Periode yang sudah diketahui dan diumumkan tidak berubah. Pilih satu baris untuk melihat tabel suku bunga dan grafiknya.",
+      "custom": "Nilai {benchmark} Anda sendiri (%)",
+      "add": "Tambah skenario",
+      "useDefault": "Gunakan asumsi default",
+      "selected": "Dipilih",
+      "loading": "Memuat skenario...",
+      "loadFailed": "Skenario tidak dapat dimuat.",
+      "columns": {
+        "assumed": "Asumsi: {benchmark}",
+        "maturityValue": "Nilai jatuh tempo (proyeksi)",
+        "totalInterest": "Total bunga (proyeksi)"
+      }
+    },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "IHK, 12 bulan (GUS)",
       "PL_NBP_REFERENCE": "Suku bunga acuan NBP"

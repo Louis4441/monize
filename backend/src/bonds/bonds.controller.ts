@@ -33,6 +33,12 @@ import {
   BondValuationService,
   SecurityValuation,
 } from "./bond-valuation.service";
+import { BondScenarios } from "./bond-scenarios";
+import {
+  ParseAssumePipe,
+  ParseBenchmarkIdPipe,
+  ParseScenarioValuesPipe,
+} from "./bond-query.pipes";
 import { BondEngineError } from "./engine/bond-engine";
 
 /**
@@ -82,9 +88,50 @@ export class BondsController {
     @Request() req,
     @Param("securityId", ParseUUIDPipe) securityId: string,
     @Query("asOf", new ParseOptionalCalendarDatePipe()) asOf?: string,
+    @Query("assume", new ParseAssumePipe())
+    assume?: ReadonlyMap<string, string>,
   ): Promise<SecurityValuation> {
     return this.mapBondErrors(() =>
-      this.valuation.valueSecurity(req.user.id, securityId, asOf ?? todayYMD()),
+      this.valuation.valueSecurity(
+        req.user.id,
+        securityId,
+        asOf ?? todayYMD(),
+        assume,
+      ),
+    );
+  }
+
+  @Get("securities/:securityId/scenarios")
+  @ApiOperation({
+    summary: "Value a bond-linked security under assumed benchmark values",
+    description:
+      "As of today, the open lots valued with every future period of " +
+      "`benchmarkId` projected at each of 1 to 6 `values` (fractions between " +
+      "-0.5 and 1.0, comma-separated). Known periods stay known. Per scenario: " +
+      "the lots' maturity value and total interest with its attribution, each " +
+      "null if any lot cannot be valued.",
+  })
+  @ApiQuery({ name: "benchmarkId", example: "PL_CPI_GUS_YOY" })
+  @ApiQuery({ name: "values", example: "0,0.025,0.05" })
+  @ApiResponse({ status: 200, description: "One entry per assumed value" })
+  @ApiResponse({
+    status: 404,
+    description: "Not the caller's security, or not linked to a bond",
+  })
+  async scenariosOf(
+    @Request() req,
+    @Param("securityId", ParseUUIDPipe) securityId: string,
+    @Query("benchmarkId", new ParseBenchmarkIdPipe()) benchmarkId: string,
+    @Query("values", new ParseScenarioValuesPipe()) values: readonly string[],
+  ): Promise<BondScenarios> {
+    return this.mapBondErrors(() =>
+      this.valuation.scenariosOf(
+        req.user.id,
+        securityId,
+        benchmarkId,
+        values,
+        todayYMD(),
+      ),
     );
   }
 

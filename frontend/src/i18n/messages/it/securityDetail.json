@@ -341,6 +341,41 @@
         "missing": "{benchmark} {observation}: non ancora pubblicato"
       }
     },
+    "indexation": {
+      "inflation": "Indicizzata all'inflazione: dal {date} (periodo 2) il tasso è {benchmark} + {addend}, ricalcolato a ogni periodo",
+      "floating": "Tasso variabile: dal {date} (periodo 2) il tasso è {benchmark} + {addend}, ricalcolato a ogni periodo"
+    },
+    "interestParts": {
+      "fixed": "Interessi fissi (1º periodo)",
+      "margin": "Interessi dal margine",
+      "inflation": "Interessi dall'inflazione",
+      "benchmark": "Interessi dal tasso di riferimento",
+      "announced": "Interessi annunciati"
+    },
+    "chart": {
+      "title": "Interessi cumulati alla fine di ogni periodo",
+      "assumption": "Proiezione ipotizzando {benchmark} = {value}",
+      "projectedNote": "Le barre più chiare sono periodi proiettati",
+      "stoppedAt": "Gli interessi non sono noti dal periodo {period}, quindi il grafico si ferma prima."
+    },
+    "scenarios": {
+      "title": "Scenari di inflazione",
+      "titleBenchmark": "Scenari dei tassi di interesse",
+      "projection": "Proiezione",
+      "caption": "Valore a scadenza proiettato e interessi per valore ipotizzato",
+      "intro": "Sono proiezioni, non certezze: per ogni periodo non ancora iniziato si ipotizza il valore di {benchmark} della prima colonna. I periodi noti e annunciati non cambiano. Seleziona una riga per vedere la sua tabella dei tassi e il grafico.",
+      "custom": "Valore personalizzato di {benchmark} (%)",
+      "add": "Aggiungi scenario",
+      "useDefault": "Usa l'ipotesi predefinita",
+      "selected": "Selezionato",
+      "loading": "Caricamento degli scenari...",
+      "loadFailed": "Impossibile caricare gli scenari.",
+      "columns": {
+        "assumed": "Ipotizzato: {benchmark}",
+        "maturityValue": "Valore a scadenza (proiezione)",
+        "totalInterest": "Interessi totali (proiezione)"
+      }
+    },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "Inflazione IPC, 12 mesi (GUS)",
       "PL_NBP_REFERENCE": "Tasso di riferimento NBP"

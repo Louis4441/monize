@@ -341,6 +341,41 @@
         "missing": "{benchmark} {observation}: nog niet gepubliceerd"
       }
     },
+    "indexation": {
+      "inflation": "Inflatiegekoppeld: vanaf {date} (periode 2) is de rente {benchmark} + {addend}, in elke periode opnieuw berekend",
+      "floating": "Variabele rente: vanaf {date} (periode 2) is de rente {benchmark} + {addend}, in elke periode opnieuw berekend"
+    },
+    "interestParts": {
+      "fixed": "Vaste rente (1e periode)",
+      "margin": "Rente uit de marge",
+      "inflation": "Rente uit inflatie",
+      "benchmark": "Rente uit de referentierente",
+      "announced": "Aangekondigde rente"
+    },
+    "chart": {
+      "title": "Cumulatieve rente aan het einde van elke periode",
+      "assumption": "Projectie bij {benchmark} = {value}",
+      "projectedNote": "Lichtere balken zijn geprojecteerde periodes",
+      "stoppedAt": "De rente is vanaf periode {period} niet bekend, dus de grafiek stopt daarvoor."
+    },
+    "scenarios": {
+      "title": "Inflatiescenario's",
+      "titleBenchmark": "Rentescenario's",
+      "projection": "Projectie",
+      "caption": "Geprojecteerde eindwaarde en rente per aangenomen waarde",
+      "intro": "Projecties, geen zekerheden: voor elke periode die nog niet is begonnen wordt de waarde van {benchmark} uit de eerste kolom aangenomen. Bekende en aangekondigde periodes veranderen niet. Selecteer een rij om de rentetabel en de grafiek te zien.",
+      "custom": "Eigen waarde voor {benchmark} (%)",
+      "add": "Scenario toevoegen",
+      "useDefault": "Standaardaanname gebruiken",
+      "selected": "Geselecteerd",
+      "loading": "Scenario's laden...",
+      "loadFailed": "De scenario's konden niet worden geladen.",
+      "columns": {
+        "assumed": "Aangenomen: {benchmark}",
+        "maturityValue": "Eindwaarde (projectie)",
+        "totalInterest": "Totale rente (projectie)"
+      }
+    },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "CPI, 12 maanden (GUS)",
       "PL_NBP_REFERENCE": "NBP-referentierente"

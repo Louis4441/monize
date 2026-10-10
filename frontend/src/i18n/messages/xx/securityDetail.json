@@ -341,6 +341,41 @@
         "missing": "[XX-{benchmark} {observation}: not published yet-XX]"
       }
     },
+    "indexation": {
+      "inflation": "[XX-Inflation-indexed: from {date} (period 2) the rate is {benchmark} + {addend}, recalculated every period-XX]",
+      "floating": "[XX-Floating rate: from {date} (period 2) the rate is {benchmark} + {addend}, recalculated every period-XX]"
+    },
+    "interestParts": {
+      "fixed": "[XX-Fixed interest (1st period)-XX]",
+      "margin": "[XX-Interest from margin-XX]",
+      "inflation": "[XX-Interest from inflation-XX]",
+      "benchmark": "[XX-Interest from the reference rate-XX]",
+      "announced": "[XX-Announced interest-XX]"
+    },
+    "chart": {
+      "title": "[XX-Cumulative interest at each period end-XX]",
+      "assumption": "[XX-Projection assuming {benchmark} = {value}-XX]",
+      "projectedNote": "[XX-Lighter bars are projected periods-XX]",
+      "stoppedAt": "[XX-Interest is not known from period {period}, so the chart stops before it.-XX]"
+    },
+    "scenarios": {
+      "title": "[XX-Inflation scenarios-XX]",
+      "titleBenchmark": "[XX-Interest rate scenarios-XX]",
+      "projection": "[XX-Projection-XX]",
+      "caption": "[XX-Projected maturity value and interest by assumed value-XX]",
+      "intro": "[XX-Projections, not certainties: every period that has not started is assumed to follow the {benchmark} value in the first column. Known and announced periods do not change. Select a row to see its rate table and chart.-XX]",
+      "custom": "[XX-Your own {benchmark} (%)-XX]",
+      "add": "[XX-Add scenario-XX]",
+      "useDefault": "[XX-Use the default assumption-XX]",
+      "selected": "[XX-Selected-XX]",
+      "loading": "[XX-Loading the scenarios...-XX]",
+      "loadFailed": "[XX-The scenarios could not be loaded.-XX]",
+      "columns": {
+        "assumed": "[XX-Assumed {benchmark}-XX]",
+        "maturityValue": "[XX-Maturity value (projection)-XX]",
+        "totalInterest": "[XX-Total interest (projection)-XX]"
+      }
+    },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "[XX-CPI, 12 months (GUS)-XX]",
       "PL_NBP_REFERENCE": "[XX-NBP reference rate-XX]"

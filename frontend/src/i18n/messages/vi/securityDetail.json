@@ -341,6 +341,41 @@
         "missing": "{benchmark} {observation}: chưa được công bố"
       }
     },
+    "indexation": {
+      "inflation": "Gắn với lạm phát: từ {date} (kỳ 2) lãi suất là {benchmark} + {addend}, được tính lại mỗi kỳ",
+      "floating": "Lãi suất thả nổi: từ {date} (kỳ 2) lãi suất là {benchmark} + {addend}, được tính lại mỗi kỳ"
+    },
+    "interestParts": {
+      "fixed": "Lãi cố định (kỳ 1)",
+      "margin": "Lãi từ biên độ",
+      "inflation": "Lãi từ lạm phát",
+      "benchmark": "Lãi từ lãi suất tham chiếu",
+      "announced": "Lãi đã công bố"
+    },
+    "chart": {
+      "title": "Lãi tích lũy cuối mỗi kỳ",
+      "assumption": "Dự phóng với giả định {benchmark} = {value}",
+      "projectedNote": "Các cột nhạt hơn là các kỳ dự phóng",
+      "stoppedAt": "Lãi chưa được biết từ kỳ {period}, nên biểu đồ dừng trước đó."
+    },
+    "scenarios": {
+      "title": "Kịch bản lạm phát",
+      "titleBenchmark": "Kịch bản lãi suất",
+      "projection": "Dự phóng",
+      "caption": "Giá trị đáo hạn dự phóng và lãi theo giá trị giả định",
+      "intro": "Đây là dự phóng, không phải điều chắc chắn: với mỗi kỳ chưa bắt đầu, giá trị {benchmark} ở cột đầu tiên được giả định. Các kỳ đã biết và đã công bố không thay đổi. Chọn một dòng để xem bảng lãi suất và biểu đồ của nó.",
+      "custom": "Giá trị {benchmark} của riêng bạn (%)",
+      "add": "Thêm kịch bản",
+      "useDefault": "Dùng giả định mặc định",
+      "selected": "Đã chọn",
+      "loading": "Đang tải các kịch bản...",
+      "loadFailed": "Không thể tải các kịch bản.",
+      "columns": {
+        "assumed": "Giả định: {benchmark}",
+        "maturityValue": "Giá trị đáo hạn (dự phóng)",
+        "totalInterest": "Tổng lãi (dự phóng)"
+      }
+    },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "CPI, 12 tháng (GUS)",
       "PL_NBP_REFERENCE": "Lãi suất tham chiếu NBP"

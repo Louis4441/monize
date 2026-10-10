@@ -56,7 +56,7 @@ function accruedFraction(
 }
 
 /** The rate earned over one whole period, r / F. */
-function periodRate(terms: BondTerms, rate: ExactDecimal): ExactDecimal {
+export function periodRate(terms: BondTerms, rate: ExactDecimal): ExactDecimal {
   return rate.div(periodsPerYear(terms));
 }
 

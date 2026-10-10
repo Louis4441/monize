@@ -535,7 +535,10 @@
     "securityNotLinked": "証券 {{ securityId }} が見つからないか、債券銘柄にリンクされていません",
     "dataNotFound": "この評価に必要な保存済みの債券データを利用できません：{{ detail }}",
     "dataInconsistent": "保存済みの債券データが互いに矛盾しているため、評価は提供されません：{{ detail }}",
-    "invalidInput": "評価リクエストが無効です：{{ detail }}"
+    "invalidInput": "評価リクエストが無効です：{{ detail }}",
+    "assumeInvalid": "assume は benchmarkId:値 の形式で、指標 ID は大文字・数字・アンダースコア 1〜40 文字、値は -0.5 から 1.0 の小数にしてください",
+    "benchmarkIdInvalid": "benchmarkId は大文字・数字・アンダースコア 1〜40 文字にしてください",
+    "scenarioValuesInvalid": "values には -0.5 から 1.0 の小数をカンマ区切りで 1〜6 個指定してください"
   },
   "securities": {
     "bondPricedByEngine": "この証券は債券銘柄にリンクされており、価格は相場提供元ではなく債券エンジンが算出します。代わりに「価格を再計算」を使用してください。",

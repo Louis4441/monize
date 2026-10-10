@@ -341,6 +341,41 @@
         "missing": "{benchmark} {observation}: 아직 발표되지 않음"
       }
     },
+    "indexation": {
+      "inflation": "물가연동: {date}부터(2기) 금리는 {benchmark} + {addend}이며 매 기간마다 다시 계산됩니다",
+      "floating": "변동금리: {date}부터(2기) 금리는 {benchmark} + {addend}이며 매 기간마다 다시 계산됩니다"
+    },
+    "interestParts": {
+      "fixed": "고정 이자(1기)",
+      "margin": "마진에서 나온 이자",
+      "inflation": "물가에서 나온 이자",
+      "benchmark": "기준금리에서 나온 이자",
+      "announced": "공표된 이자"
+    },
+    "chart": {
+      "title": "각 기간 말까지의 누적 이자",
+      "assumption": "{benchmark} = {value} 가정 시 전망",
+      "projectedNote": "연한 막대는 예상 기간입니다",
+      "stoppedAt": "{period}기부터 이자를 알 수 없으므로 차트는 그 앞에서 끝납니다."
+    },
+    "scenarios": {
+      "title": "물가 시나리오",
+      "titleBenchmark": "금리 시나리오",
+      "projection": "전망",
+      "caption": "가정값별 예상 만기 가치와 이자",
+      "intro": "확정이 아닌 전망입니다. 아직 시작되지 않은 각 기간에는 첫 번째 열의 {benchmark} 값을 가정합니다. 확정 및 공표된 기간은 바뀌지 않습니다. 행을 선택하면 해당 금리 표와 차트를 볼 수 있습니다.",
+      "custom": "직접 입력한 {benchmark}(%)",
+      "add": "시나리오 추가",
+      "useDefault": "기본 가정 사용",
+      "selected": "선택됨",
+      "loading": "시나리오를 불러오는 중...",
+      "loadFailed": "시나리오를 불러오지 못했습니다.",
+      "columns": {
+        "assumed": "가정: {benchmark}",
+        "maturityValue": "만기 가치(전망)",
+        "totalInterest": "총 이자(전망)"
+      }
+    },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "소비자물가지수, 12개월 (GUS)",
       "PL_NBP_REFERENCE": "NBP 기준금리"

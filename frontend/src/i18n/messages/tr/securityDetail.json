@@ -341,6 +341,41 @@
         "missing": "{benchmark} {observation}: henüz yayımlanmadı"
       }
     },
+    "indexation": {
+      "inflation": "Enflasyona endeksli: {date} tarihinden itibaren (2. dönem) faiz oranı {benchmark} + {addend} olup her dönem yeniden hesaplanır",
+      "floating": "Değişken faiz: {date} tarihinden itibaren (2. dönem) faiz oranı {benchmark} + {addend} olup her dönem yeniden hesaplanır"
+    },
+    "interestParts": {
+      "fixed": "Sabit faiz (1. dönem)",
+      "margin": "Marjdan gelen faiz",
+      "inflation": "Enflasyondan gelen faiz",
+      "benchmark": "Referans orandan gelen faiz",
+      "announced": "Duyurulan faiz"
+    },
+    "chart": {
+      "title": "Her dönem sonunda birikmiş faiz",
+      "assumption": "{benchmark} = {value} varsayımıyla projeksiyon",
+      "projectedNote": "Daha açık renkli çubuklar projeksiyon dönemleridir",
+      "stoppedAt": "Faiz {period}. dönemden itibaren bilinmiyor, bu yüzden grafik ondan önce bitiyor."
+    },
+    "scenarios": {
+      "title": "Enflasyon senaryoları",
+      "titleBenchmark": "Faiz oranı senaryoları",
+      "projection": "Projeksiyon",
+      "caption": "Varsayılan değere göre projeksiyonlu vade değeri ve faiz",
+      "intro": "Bunlar kesinlik değil, projeksiyondur: başlamamış her dönem için ilk sütundaki {benchmark} değeri varsayılır. Bilinen ve duyurulan dönemler değişmez. Oran tablosunu ve grafiği görmek için bir satır seçin.",
+      "custom": "Kendi {benchmark} değeriniz (%)",
+      "add": "Senaryo ekle",
+      "useDefault": "Varsayılan varsayımı kullan",
+      "selected": "Seçili",
+      "loading": "Senaryolar yükleniyor...",
+      "loadFailed": "Senaryolar yüklenemedi.",
+      "columns": {
+        "assumed": "Varsayılan: {benchmark}",
+        "maturityValue": "Vade değeri (projeksiyon)",
+        "totalInterest": "Toplam faiz (projeksiyon)"
+      }
+    },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "TÜFE, 12 ay (GUS)",
       "PL_NBP_REFERENCE": "NBP referans faizi"

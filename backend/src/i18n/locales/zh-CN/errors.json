@@ -535,7 +535,10 @@
     "securityNotLinked": "未找到证券 {{ securityId }}，或该证券未关联到债券工具",
     "dataNotFound": "本次估值所需的已存储债券数据不可用：{{ detail }}",
     "dataInconsistent": "已存储的债券数据相互矛盾，因此不提供估值：{{ detail }}",
-    "invalidInput": "估值请求无效：{{ detail }}"
+    "invalidInput": "估值请求无效：{{ detail }}",
+    "assumeInvalid": "assume 的格式必须为 benchmarkId:值，其中基准 ID 为 1 到 40 个大写字母、数字或下划线，值为介于 -0.5 和 1.0 之间的小数",
+    "benchmarkIdInvalid": "benchmarkId 必须为 1 到 40 个大写字母、数字或下划线",
+    "scenarioValuesInvalid": "values 必须包含 1 到 6 个以逗号分隔、介于 -0.5 和 1.0 之间的小数"
   },
   "securities": {
     "bondPricedByEngine": "该证券已关联到债券工具，由债券引擎而非行情提供商定价。请改用“重新计算价格”。",

@@ -535,7 +535,10 @@
     "securityNotLinked": "Không tìm thấy chứng khoán {{ securityId }} hoặc chứng khoán chưa liên kết với công cụ trái phiếu",
     "dataNotFound": "Không có dữ liệu trái phiếu đã lưu cần cho lần định giá này: {{ detail }}",
     "dataInconsistent": "Dữ liệu trái phiếu đã lưu mâu thuẫn với nhau nên không đưa ra định giá: {{ detail }}",
-    "invalidInput": "Yêu cầu định giá không hợp lệ: {{ detail }}"
+    "invalidInput": "Yêu cầu định giá không hợp lệ: {{ detail }}",
+    "assumeInvalid": "assume phải có dạng benchmarkId:giá trị, với mã chỉ số gồm 1 đến 40 chữ hoa, chữ số hoặc dấu gạch dưới và giá trị thập phân từ -0.5 đến 1.0",
+    "benchmarkIdInvalid": "benchmarkId phải gồm 1 đến 40 chữ hoa, chữ số hoặc dấu gạch dưới",
+    "scenarioValuesInvalid": "values phải chứa từ 1 đến 6 số thập phân cách nhau bằng dấu phẩy, từ -0.5 đến 1.0"
   },
   "securities": {
     "bondPricedByEngine": "Chứng khoán này được liên kết với một công cụ trái phiếu và được định giá bởi công cụ tính trái phiếu, không phải bởi nhà cung cấp báo giá. Hãy dùng Tính lại giá thay thế.",

@@ -13,6 +13,7 @@ import {
   BondDataNotFoundError,
 } from "./bond-errors";
 import { BondPriceService } from "./bond-price.service";
+import { todayYMD } from "../common/date-utils";
 import { BondValuationService } from "./bond-valuation.service";
 import { BondsController } from "./bonds.controller";
 import { BondEngineError } from "./engine/bond-engine";
@@ -24,12 +25,15 @@ const req = { user: { id: USER } };
 describe("BondsController", () => {
   let controller: BondsController;
   let catalog: { listInstruments: jest.Mock };
-  let valuation: { valueSecurity: jest.Mock };
+  let valuation: { valueSecurity: jest.Mock; scenariosOf: jest.Mock };
   let prices: { recomputeSecurity: jest.Mock };
 
   beforeEach(async () => {
     catalog = { listInstruments: jest.fn().mockResolvedValue([]) };
-    valuation = { valueSecurity: jest.fn().mockResolvedValue({ lots: [] }) };
+    valuation = {
+      valueSecurity: jest.fn().mockResolvedValue({ lots: [] }),
+      scenariosOf: jest.fn().mockResolvedValue({ scenarios: [] }),
+    };
     prices = {
       recomputeSecurity: jest
         .fn()
@@ -80,6 +84,18 @@ describe("BondsController", () => {
         USER,
         SECURITY,
         "2027-04-15",
+        undefined,
+      );
+    });
+
+    it("passes the parsed assumption as the projection", async () => {
+      const assume = new Map([["PL_CPI_GUS_YOY", "0.05"]]);
+      await controller.valuationOf(req, SECURITY, "2027-04-15", assume);
+      expect(valuation.valueSecurity).toHaveBeenCalledWith(
+        USER,
+        SECURITY,
+        "2027-04-15",
+        assume,
       );
     });
 
@@ -130,6 +146,40 @@ describe("BondsController", () => {
     });
   });
 
+  describe("GET /bonds/securities/:securityId/scenarios", () => {
+    it("values for the JWT's user, today, with the parsed query", async () => {
+      await controller.scenariosOf(
+        { user: { id: USER }, body: { userId: "attacker" } },
+        SECURITY,
+        "PL_CPI_GUS_YOY",
+        ["0", "0.05"],
+      );
+      expect(valuation.scenariosOf).toHaveBeenCalledWith(
+        USER,
+        SECURITY,
+        "PL_CPI_GUS_YOY",
+        ["0", "0.05"],
+        todayYMD(),
+      );
+    });
+
+    it("lets the 404 of another user's or an unlinked security through", async () => {
+      valuation.scenariosOf.mockRejectedValue(new NotFoundException("no"));
+      await expect(
+        controller.scenariosOf(req, SECURITY, "PL_CPI_GUS_YOY", ["0"]),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("maps the data errors like the valuation does", async () => {
+      valuation.scenariosOf.mockRejectedValue(
+        new BondDataInconsistentError("x"),
+      );
+      await expect(
+        controller.scenariosOf(req, SECURITY, "PL_CPI_GUS_YOY", ["0"]),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    });
+  });
+
   describe("POST /bonds/securities/:securityId/recompute", () => {
     it("recomputes for the JWT's user and returns the counts", async () => {
       await expect(controller.recompute(req, SECURITY)).resolves.toEqual({
@@ -168,6 +218,16 @@ describe("BondsController", () => {
         expect.arrayContaining([
           ["securityId", [ParseUUIDPipe.name]],
           ["asOf", ["ParseOptionalCalendarDatePipe"]],
+        ]),
+      );
+      expect(pipesOf("valuationOf")).toEqual(
+        expect.arrayContaining([["assume", ["ParseAssumePipe"]]]),
+      );
+      expect(pipesOf("scenariosOf")).toEqual(
+        expect.arrayContaining([
+          ["securityId", [ParseUUIDPipe.name]],
+          ["benchmarkId", ["ParseBenchmarkIdPipe"]],
+          ["values", ["ParseScenarioValuesPipe"]],
         ]),
       );
       expect(pipesOf("recompute")).toEqual(

@@ -535,7 +535,10 @@
     "securityNotLinked": "Titre {{ securityId }} introuvable ou non lié à un instrument obligataire",
     "dataNotFound": "Les données d'obligation enregistrées nécessaires à cette valorisation ne sont pas disponibles : {{ detail }}",
     "dataInconsistent": "Les données d'obligation enregistrées se contredisent, aucune valorisation n'est donc fournie : {{ detail }}",
-    "invalidInput": "La demande de valorisation n'est pas valide : {{ detail }}"
+    "invalidInput": "La demande de valorisation n'est pas valide : {{ detail }}",
+    "assumeInvalid": "assume doit avoir la forme benchmarkId:valeur, avec un identifiant d'indice de 1 à 40 majuscules, chiffres ou tirets bas et une valeur décimale comprise entre -0.5 et 1.0",
+    "benchmarkIdInvalid": "benchmarkId doit comporter de 1 à 40 majuscules, chiffres ou tirets bas",
+    "scenarioValuesInvalid": "values doit contenir de 1 à 6 décimaux séparés par des virgules, compris entre -0.5 et 1.0"
   },
   "securities": {
     "bondPricedByEngine": "Ce titre est lié à un instrument obligataire et il est valorisé par le moteur d'obligations, et non par un fournisseur de cours. Utilisez plutôt Recalculer les prix.",

@@ -20,6 +20,7 @@ import {
   RateRuleDescription,
   RateScheduleEntry,
 } from "./bond-engine-types";
+import { attributeInterest } from "./attribution";
 import { PeriodRate, resolvePeriodRates } from "./rate-resolution";
 import {
   proceedsPerBond,
@@ -118,7 +119,10 @@ function describeRule(
   };
 }
 
-function describeSchedule(rates: readonly PeriodRate[]): RateScheduleEntry[] {
+function describeSchedule(
+  terms: BondEngineInput["terms"],
+  rates: readonly PeriodRate[],
+): RateScheduleEntry[] {
   return rates.map((r) => ({
     index: r.period.index,
     start: r.period.start,
@@ -127,6 +131,7 @@ function describeSchedule(rates: readonly PeriodRate[]): RateScheduleEntry[] {
     rateSource: r.source,
     benchmark: r.benchmark,
     addend: r.addend,
+    ...attributeInterest(terms, rates, r.period.index),
   }));
 }
 
@@ -293,7 +298,7 @@ export function valueBondLot(input: BondEngineInput): BondValuation {
           }
         : null,
     rateRule: describeRule(terms.rateRule),
-    rateSchedule: describeSchedule(rates),
+    rateSchedule: describeSchedule(terms, rates),
     principal,
     accruedInterest: accrued,
     grossValue: gross,

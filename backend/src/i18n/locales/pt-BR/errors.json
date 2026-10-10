@@ -535,7 +535,10 @@
     "securityNotLinked": "Ativo {{ securityId }} não encontrado ou não vinculado a um instrumento de título",
     "dataNotFound": "Os dados do título armazenados e necessários para esta avaliação não estão disponíveis: {{ detail }}",
     "dataInconsistent": "Os dados do título armazenados se contradizem, por isso nenhuma avaliação é fornecida: {{ detail }}",
-    "invalidInput": "A solicitação de avaliação não é válida: {{ detail }}"
+    "invalidInput": "A solicitação de avaliação não é válida: {{ detail }}",
+    "assumeInvalid": "assume deve ter a forma benchmarkId:valor, com um identificador de índice de 1 a 40 letras maiúsculas, dígitos ou sublinhados e um valor decimal entre -0.5 e 1.0",
+    "benchmarkIdInvalid": "benchmarkId deve ter de 1 a 40 letras maiúsculas, dígitos ou sublinhados",
+    "scenarioValuesInvalid": "values deve conter de 1 a 6 decimais separados por vírgulas entre -0.5 e 1.0"
   },
   "securities": {
     "bondPricedByEngine": "Este ativo está vinculado a um instrumento de título e é precificado pelo motor de títulos, não por um provedor de cotações. Use Recalcular preços.",

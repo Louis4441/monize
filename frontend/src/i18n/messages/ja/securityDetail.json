@@ -341,6 +341,41 @@
         "missing": "{benchmark} {observation}: 未公表"
       }
     },
+    "indexation": {
+      "inflation": "インフレ連動: {date}（第2期）から、利率は{benchmark} + {addend}となり、期ごとに再計算されます",
+      "floating": "変動金利: {date}（第2期）から、利率は{benchmark} + {addend}となり、期ごとに再計算されます"
+    },
+    "interestParts": {
+      "fixed": "固定利息（第1期）",
+      "margin": "マージンによる利息",
+      "inflation": "インフレによる利息",
+      "benchmark": "基準金利による利息",
+      "announced": "公表済みの利息"
+    },
+    "chart": {
+      "title": "各期末までの累計利息",
+      "assumption": "{benchmark} = {value} と仮定した予測",
+      "projectedNote": "薄い棒は予測の期間です",
+      "stoppedAt": "第{period}期以降の利息は不明なため、グラフはその手前で終わります。"
+    },
+    "scenarios": {
+      "title": "インフレシナリオ",
+      "titleBenchmark": "金利シナリオ",
+      "projection": "予測",
+      "caption": "仮定値ごとの予測満期価額と利息",
+      "intro": "これは確定ではなく予測です。まだ始まっていない各期には、最初の列の{benchmark}の値を仮定します。確定済み・公表済みの期は変わりません。行を選ぶと、その利率表とグラフを表示します。",
+      "custom": "独自の{benchmark}（%）",
+      "add": "シナリオを追加",
+      "useDefault": "既定の仮定を使う",
+      "selected": "選択中",
+      "loading": "シナリオを読み込み中...",
+      "loadFailed": "シナリオを読み込めませんでした。",
+      "columns": {
+        "assumed": "仮定: {benchmark}",
+        "maturityValue": "満期価額（予測）",
+        "totalInterest": "利息合計（予測）"
+      }
+    },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "消費者物価指数 前年比12か月 (GUS)",
       "PL_NBP_REFERENCE": "NBP 基準金利"

@@ -341,6 +341,41 @@
         "missing": "{benchmark} {observation}: ainda não publicado"
       }
     },
+    "indexation": {
+      "inflation": "Indexada à inflação: a partir de {date} (período 2) a taxa é {benchmark} + {addend}, recalculada em cada período",
+      "floating": "Taxa variável: a partir de {date} (período 2) a taxa é {benchmark} + {addend}, recalculada em cada período"
+    },
+    "interestParts": {
+      "fixed": "Juros fixos (1.º período)",
+      "margin": "Juros da margem",
+      "inflation": "Juros da inflação",
+      "benchmark": "Juros da taxa de referência",
+      "announced": "Juros anunciados"
+    },
+    "chart": {
+      "title": "Juros acumulados no fim de cada período",
+      "assumption": "Projeção assumindo {benchmark} = {value}",
+      "projectedNote": "As barras mais claras são períodos projetados",
+      "stoppedAt": "Os juros não são conhecidos a partir do período {period}, por isso o gráfico termina antes."
+    },
+    "scenarios": {
+      "title": "Cenários de inflação",
+      "titleBenchmark": "Cenários de taxa de juro",
+      "projection": "Projeção",
+      "caption": "Valor no vencimento projetado e juros por valor assumido",
+      "intro": "São projeções, não certezas: para cada período que ainda não começou assume-se o valor de {benchmark} da primeira coluna. Os períodos conhecidos e anunciados não mudam. Selecione uma linha para ver a sua tabela de taxas e o gráfico.",
+      "custom": "O seu próprio valor de {benchmark} (%)",
+      "add": "Adicionar cenário",
+      "useDefault": "Usar o pressuposto predefinido",
+      "selected": "Selecionado",
+      "loading": "A carregar os cenários...",
+      "loadFailed": "Não foi possível carregar os cenários.",
+      "columns": {
+        "assumed": "Assumido: {benchmark}",
+        "maturityValue": "Valor no vencimento (projeção)",
+        "totalInterest": "Juros totais (projeção)"
+      }
+    },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "IPC, 12 meses (GUS)",
       "PL_NBP_REFERENCE": "Taxa de referência do NBP"

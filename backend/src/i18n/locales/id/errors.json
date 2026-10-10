@@ -535,7 +535,10 @@
     "securityNotLinked": "Sekuritas {{ securityId }} tidak ditemukan atau tidak ditautkan ke instrumen obligasi",
     "dataNotFound": "Data obligasi tersimpan yang diperlukan untuk valuasi ini tidak tersedia: {{ detail }}",
     "dataInconsistent": "Data obligasi tersimpan saling bertentangan, sehingga valuasi tidak diberikan: {{ detail }}",
-    "invalidInput": "Permintaan valuasi tidak valid: {{ detail }}"
+    "invalidInput": "Permintaan valuasi tidak valid: {{ detail }}",
+    "assumeInvalid": "assume harus berbentuk benchmarkId:nilai, dengan ID acuan 1 sampai 40 huruf kapital, angka, atau garis bawah dan nilai desimal antara -0.5 dan 1.0",
+    "benchmarkIdInvalid": "benchmarkId harus berisi 1 sampai 40 huruf kapital, angka, atau garis bawah",
+    "scenarioValuesInvalid": "values harus berisi 1 sampai 6 bilangan desimal yang dipisahkan koma antara -0.5 dan 1.0"
   },
   "securities": {
     "bondPricedByEngine": "Sekuritas ini ditautkan ke instrumen obligasi dan dinilai oleh mesin obligasi, bukan oleh penyedia kuotasi. Gunakan Hitung ulang harga.",

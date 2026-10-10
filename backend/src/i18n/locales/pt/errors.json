@@ -535,7 +535,10 @@
     "securityNotLinked": "Valor mobiliário {{ securityId }} não encontrado ou não ligado a um instrumento de obrigação",
     "dataNotFound": "Os dados da obrigação guardados e necessários para esta avaliação não estão disponíveis: {{ detail }}",
     "dataInconsistent": "Os dados da obrigação guardados contradizem-se, pelo que não é dada qualquer avaliação: {{ detail }}",
-    "invalidInput": "O pedido de avaliação não é válido: {{ detail }}"
+    "invalidInput": "O pedido de avaliação não é válido: {{ detail }}",
+    "assumeInvalid": "assume deve ter a forma benchmarkId:valor, com um identificador de índice de 1 a 40 letras maiúsculas, dígitos ou sublinhados e um valor decimal entre -0.5 e 1.0",
+    "benchmarkIdInvalid": "benchmarkId deve ter de 1 a 40 letras maiúsculas, dígitos ou sublinhados",
+    "scenarioValuesInvalid": "values deve conter de 1 a 6 decimais separados por vírgulas entre -0.5 e 1.0"
   },
   "securities": {
     "bondPricedByEngine": "Este valor mobiliário está ligado a um instrumento de obrigação e é avaliado pelo motor de obrigações, não por um fornecedor de cotações. Utilize antes Recalcular preços.",

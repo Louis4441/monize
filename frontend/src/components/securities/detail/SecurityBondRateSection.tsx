@@ -5,6 +5,8 @@ import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { TABLE_BODY_CLASS, TABLE_CLASS, Td, Th } from "@/components/ui/Table";
 import { useDateFormat } from "@/hooks/useDateFormat";
 import { useNumberFormat } from "@/hooks/useNumberFormat";
+import { benchmarkLabel } from "./bond-labels";
+import { SecurityBondInterestChart } from "./SecurityBondInterestChart";
 import type {
   BondLotValuation,
   BondRateRule,
@@ -14,6 +16,8 @@ import type {
 
 interface SecurityBondRateSectionProps {
   lots: BondLotValuation[];
+  /** The currency of the holding, for the interest chart. */
+  currency: string;
 }
 
 const RATE_SOURCE_VARIANT: Record<BondRateSource, BadgeVariant> = {
@@ -34,6 +38,7 @@ const YMD = /^\d{4}-\d{2}-\d{2}$/;
  */
 export function SecurityBondRateSection({
   lots,
+  currency,
 }: SecurityBondRateSectionProps) {
   const t = useTranslations("securityDetail");
   const { formatDate } = useDateFormat();
@@ -45,8 +50,7 @@ export function SecurityBondRateSection({
   // Rates are fractions; the formatter takes percent units.
   const pct = (fraction: string) =>
     formatPercentTrimmed(Number(fraction) * 100);
-  const benchmarkName = (id: string) =>
-    t.has(`bond.benchmarks.${id}`) ? t(`bond.benchmarks.${id}`) : id;
+  const benchmarkName = (id: string) => benchmarkLabel(t, id);
   // A step series is keyed by a day, a monthly one by YYYY-MM (shown as stored).
   const observationLabel = (key: string) =>
     YMD.test(key) ? formatDate(key) : key;
@@ -120,6 +124,26 @@ export function SecurityBondRateSection({
     );
   };
 
+  // Spec 13.1: a lot whose rule reads a benchmark says so before any figure. The
+  // date is that lot's own period 2 start (periods anchor on the purchase date).
+  const indexationNotice = (lot: BondLotValuation): string | null => {
+    const r = lot.valuation.rateRule;
+    const second = lot.valuation.rateSchedule[1];
+    if (r.type === "FIXED" || r.benchmarkId === null || r.addend === null)
+      return null;
+    if (!second) return null;
+    return t(
+      r.type === "INFLATION_PLUS_MARGIN_AS_RATE"
+        ? "bond.indexation.inflation"
+        : "bond.indexation.floating",
+      {
+        date: formatDate(second.start),
+        benchmark: benchmarkName(r.benchmarkId),
+        addend: pct(r.addend),
+      },
+    );
+  };
+
   const unknown = (
     <span className="text-gray-500 dark:text-gray-400">
       {t("bond.unknown")}
@@ -138,11 +162,20 @@ export function SecurityBondRateSection({
       </div>
       {lots.map((lot, lotIndex) => {
         const v = lot.valuation;
+        const notice = indexationNotice(lot);
         return (
           <div
             key={`${lot.purchaseDate}-${lot.quantity}-${lotIndex}`}
             className="space-y-1"
           >
+            {notice && (
+              <p
+                role="note"
+                className="rounded-md bg-blue-50 p-2 text-sm text-blue-900 dark:bg-blue-900/20 dark:text-blue-200"
+              >
+                {notice}
+              </p>
+            )}
             {lots.length > 1 && (
               <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
                 {t("bond.rate.lotHeading", {
@@ -213,6 +246,7 @@ export function SecurityBondRateSection({
                 </tbody>
               </table>
             </div>
+            <SecurityBondInterestChart lot={lot} currency={currency} />
           </div>
         );
       })}

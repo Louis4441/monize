@@ -341,6 +341,41 @@
         "missing": "{benchmark} {observation}: aún no publicado"
       }
     },
+    "indexation": {
+      "inflation": "Indexada a la inflación: desde {date} (periodo 2) el tipo es {benchmark} + {addend}, recalculado cada periodo",
+      "floating": "Tipo variable: desde {date} (periodo 2) el tipo es {benchmark} + {addend}, recalculado cada periodo"
+    },
+    "interestParts": {
+      "fixed": "Intereses fijos (1.er periodo)",
+      "margin": "Intereses del margen",
+      "inflation": "Intereses de la inflación",
+      "benchmark": "Intereses del tipo de referencia",
+      "announced": "Intereses anunciados"
+    },
+    "chart": {
+      "title": "Intereses acumulados al final de cada periodo",
+      "assumption": "Proyección suponiendo {benchmark} = {value}",
+      "projectedNote": "Las barras más claras son periodos proyectados",
+      "stoppedAt": "Los intereses no se conocen desde el periodo {period}, por lo que el gráfico se detiene antes."
+    },
+    "scenarios": {
+      "title": "Escenarios de inflación",
+      "titleBenchmark": "Escenarios de tipos de interés",
+      "projection": "Proyección",
+      "caption": "Valor de vencimiento proyectado e intereses según el valor supuesto",
+      "intro": "Son proyecciones, no certezas: para cada periodo que no ha comenzado se supone el valor de {benchmark} de la primera columna. Los periodos conocidos y anunciados no cambian. Seleccione una fila para ver su tabla de tipos y el gráfico.",
+      "custom": "Su propio valor de {benchmark} (%)",
+      "add": "Añadir escenario",
+      "useDefault": "Usar la hipótesis por defecto",
+      "selected": "Seleccionado",
+      "loading": "Cargando los escenarios...",
+      "loadFailed": "No se pudieron cargar los escenarios.",
+      "columns": {
+        "assumed": "Supuesto: {benchmark}",
+        "maturityValue": "Valor de vencimiento (proyección)",
+        "totalInterest": "Intereses totales (proyección)"
+      }
+    },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "IPC, 12 meses (GUS)",
       "PL_NBP_REFERENCE": "Tipo de referencia del NBP"

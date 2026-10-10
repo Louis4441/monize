@@ -691,6 +691,11 @@ describe("valueBondLot: rate rule and rate schedule (spec 2.6)", () => {
       rateSource: "TERMS",
       benchmark: null,
       addend: null,
+      interest: "5.3500000000",
+      fixedPart: "5.3500000000",
+      benchmarkPart: "0.0000000000",
+      addendPart: "0.0000000000",
+      announcedPart: "0.0000000000",
     });
     expect(v.rateSchedule[1]).toMatchObject({
       index: 2,
@@ -746,6 +751,11 @@ describe("valueBondLot: rate rule and rate schedule (spec 2.6)", () => {
         flooredValue: null,
       },
       addend: "0.0200",
+      interest: null,
+      fixedPart: null,
+      benchmarkPart: null,
+      addendPart: null,
+      announcedPart: null,
     });
   });
 
@@ -774,5 +784,88 @@ describe("valueBondLot: rate rule and rate schedule (spec 2.6)", () => {
     expect(second.benchmark?.benchmarkId).toBe(NBP);
     expect(second.benchmark?.observation).toBe("2026-10-19");
     expect(second.benchmark?.value).toBe("0.0425");
+  });
+});
+
+describe("valueBondLot: interest attribution (spec 13.2)", () => {
+  // Expected values computed independently with python fractions.
+  it("EDO: period 2 splits 105.35 x 5.40% into 3.4% inflation and 2% margin", () => {
+    const v = edo("2027-10-02", { benchmarks: cpi(["2027-08", "0.0340"]) });
+    expect(v.rateSchedule[1]).toMatchObject({
+      interest: "5.6889000000",
+      benchmarkPart: "3.5819000000",
+      addendPart: "2.1070000000",
+      fixedPart: "0.0000000000",
+      announcedPart: "0.0000000000",
+    });
+  });
+
+  it("EDO: the compounded base of period 3 holds the earlier interest, projected parts too", () => {
+    const v = edo("2027-10-02", {
+      benchmarks: cpi(["2027-08", "0.0340"]),
+      projection: new Map([[CPI, "0.0500"]]),
+    });
+    expect(v.rateSchedule[2]).toMatchObject({
+      rateSource: "PROJECTED",
+      interest: "7.7727230000",
+      benchmarkPart: "5.5519450000",
+      addendPart: "2.2207780000",
+    });
+  });
+
+  it("EDO: a later period is null while an earlier rate is unknown", () => {
+    const v = edo("2026-10-10", { projection: new Map([[CPI, "0.0300"]]) });
+    const unknownEarlier = edo("2027-10-02", {
+      projection: new Map([[CPI, "0.0300"]]),
+    });
+    expect(v.rateSchedule[2].interest).not.toBeNull();
+    expect(unknownEarlier.rateSchedule[1].interest).toBeNull();
+    expect(unknownEarlier.rateSchedule[2]).toMatchObject({
+      annualRate: "0.0500",
+      interest: null,
+      fixedPart: null,
+      benchmarkPart: null,
+      addendPart: null,
+      announcedPart: null,
+    });
+  });
+
+  it("COI: a coupon period accrues on the nominal 100, the earlier rate is irrelevant", () => {
+    const v = coi("2027-10-16", { benchmarks: cpi(["2027-08", "0.0290"]) });
+    expect(v.rateSchedule[0]).toMatchObject({
+      interest: "4.7500000000",
+      fixedPart: "4.7500000000",
+    });
+    expect(v.rateSchedule[1]).toMatchObject({
+      interest: "4.4000000000",
+      benchmarkPart: "2.9000000000",
+      addendPart: "1.5000000000",
+      fixedPart: "0.0000000000",
+    });
+  });
+
+  it("COI: an unknown earlier period does not make a coupon period unknown", () => {
+    const v = coi("2026-10-16", { projection: new Map([[CPI, "0.0290"]]) });
+    expect(v.rateSchedule[1].interest).toBe("4.4000000000");
+  });
+
+  it("an announced period is attributed whole to the announcement", () => {
+    const v = edo("2027-10-02", { announcedRates: announced([2, "0.0500"]) });
+    expect(v.rateSchedule[1]).toMatchObject({
+      interest: "5.2675000000",
+      announcedPart: "5.2675000000",
+      fixedPart: "0.0000000000",
+      benchmarkPart: "0.0000000000",
+      addendPart: "0.0000000000",
+    });
+  });
+
+  it("a negative CPI attributes 0 to inflation: the floored value is used", () => {
+    const v = edo("2027-10-02", { benchmarks: cpi(["2027-08", "-0.0050"]) });
+    expect(v.rateSchedule[1]).toMatchObject({
+      benchmarkPart: "0.0000000000",
+      addendPart: "2.1070000000",
+      interest: "2.1070000000",
+    });
   });
 });

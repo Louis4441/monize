@@ -535,7 +535,10 @@
     "securityNotLinked": "Wertpapier {{ securityId }} nicht gefunden oder nicht mit einem Anleiheinstrument verknüpft",
     "dataNotFound": "Die für diese Bewertung erforderlichen gespeicherten Anleihedaten sind nicht verfügbar: {{ detail }}",
     "dataInconsistent": "Die gespeicherten Anleihedaten widersprechen sich, daher wird keine Bewertung angegeben: {{ detail }}",
-    "invalidInput": "Die Bewertungsanfrage ist ungültig: {{ detail }}"
+    "invalidInput": "Die Bewertungsanfrage ist ungültig: {{ detail }}",
+    "assumeInvalid": "assume muss die Form benchmarkId:Wert haben, mit einer Benchmark-ID aus 1 bis 40 Großbuchstaben, Ziffern oder Unterstrichen und einem Dezimalwert zwischen -0.5 und 1.0",
+    "benchmarkIdInvalid": "benchmarkId muss aus 1 bis 40 Großbuchstaben, Ziffern oder Unterstrichen bestehen",
+    "scenarioValuesInvalid": "values muss 1 bis 6 durch Kommas getrennte Dezimalwerte zwischen -0.5 und 1.0 enthalten"
   },
   "securities": {
     "bondPricedByEngine": "Dieses Wertpapier ist mit einem Anleiheinstrument verknüpft und wird von der Anleihe-Engine bewertet, nicht von einem Kursanbieter. Verwenden Sie stattdessen „Preise neu berechnen“.",

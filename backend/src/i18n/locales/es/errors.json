@@ -535,7 +535,10 @@
     "securityNotLinked": "Valor {{ securityId }} no encontrado o no vinculado a un instrumento de bono",
     "dataNotFound": "Los datos almacenados del bono necesarios para esta valoración no están disponibles: {{ detail }}",
     "dataInconsistent": "Los datos almacenados del bono se contradicen entre sí, por lo que no se ofrece ninguna valoración: {{ detail }}",
-    "invalidInput": "La solicitud de valoración no es válida: {{ detail }}"
+    "invalidInput": "La solicitud de valoración no es válida: {{ detail }}",
+    "assumeInvalid": "assume debe tener la forma benchmarkId:valor, con un identificador de indicador de 1 a 40 letras mayúsculas, dígitos o guiones bajos y un valor decimal entre -0.5 y 1.0",
+    "benchmarkIdInvalid": "benchmarkId debe tener de 1 a 40 letras mayúsculas, dígitos o guiones bajos",
+    "scenarioValuesInvalid": "values debe contener de 1 a 6 decimales separados por comas entre -0.5 y 1.0"
   },
   "securities": {
     "bondPricedByEngine": "Este valor está vinculado a un instrumento de bono y lo valora el motor de bonos, no un proveedor de cotizaciones. Utilice en su lugar Recalcular precios.",

@@ -76,6 +76,17 @@ export interface RateScheduleEntry {
   readonly rateSource: RateSource | null;
   readonly benchmark: RateScheduleBenchmark | null;
   readonly addend: string | null;
+  /**
+   * Interest of the period per bond (spec 13.2), 10 decimal places, split by the
+   * components of the rate. Each is null when the period's rate, or, for a
+   * compounding bond, any earlier rate is unknown; a part that does not apply
+   * is "0". `benchmarkPart + addendPart` equals `interest` for a benchmark period.
+   */
+  readonly interest: string | null;
+  readonly fixedPart: string | null;
+  readonly benchmarkPart: string | null;
+  readonly addendPart: string | null;
+  readonly announcedPart: string | null;
 }
 
 export interface BondValuation {

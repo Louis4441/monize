@@ -40,7 +40,9 @@ import {
 import { IntradayBreakdown } from '@/types/net-worth';
 import type {
   BondInstrumentSummary,
+  BondAssumption,
   BondPriceRecompute,
+  SecurityBondScenarios,
   SecurityBondValuation,
 } from '@/types/bond';
 import {
@@ -961,13 +963,32 @@ export const investmentsApi = {
 
   // The open lots of a bond-linked security valued on `asOf` (the server's
   // today when omitted). Uncached: a trade or a price write changes it.
+  // `assume` projects every period that has not started at that benchmark value.
   getSecurityBondValuation: async (
     securityId: string,
     asOf?: string,
+    assume?: BondAssumption,
   ): Promise<SecurityBondValuation> => {
+    const params: Record<string, string> = {};
+    if (asOf) params.asOf = asOf;
+    if (assume) params.assume = `${assume.benchmarkId}:${assume.value}`;
     const response = await apiClient.get<SecurityBondValuation>(
       `/bonds/securities/${securityId}/valuation`,
-      { params: asOf ? { asOf } : undefined },
+      { params: Object.keys(params).length > 0 ? params : undefined },
+    );
+    return response.data;
+  },
+
+  // The lots valued today under each assumed value (fractions, 1 to 6) of the
+  // benchmark, in one request. Uncached for the same reason as the valuation.
+  getSecurityBondScenarios: async (
+    securityId: string,
+    benchmarkId: string,
+    values: readonly string[],
+  ): Promise<SecurityBondScenarios> => {
+    const response = await apiClient.get<SecurityBondScenarios>(
+      `/bonds/securities/${securityId}/scenarios`,
+      { params: { benchmarkId, values: values.join(',') } },
     );
     return response.data;
   },

@@ -341,6 +341,41 @@
         "missing": "{benchmark} {observation}: ainda não publicado"
       }
     },
+    "indexation": {
+      "inflation": "Indexada à inflação: a partir de {date} (período 2) a taxa é {benchmark} + {addend}, recalculada a cada período",
+      "floating": "Taxa variável: a partir de {date} (período 2) a taxa é {benchmark} + {addend}, recalculada a cada período"
+    },
+    "interestParts": {
+      "fixed": "Juros fixos (1º período)",
+      "margin": "Juros da margem",
+      "inflation": "Juros da inflação",
+      "benchmark": "Juros da taxa de referência",
+      "announced": "Juros anunciados"
+    },
+    "chart": {
+      "title": "Juros acumulados no fim de cada período",
+      "assumption": "Projeção assumindo {benchmark} = {value}",
+      "projectedNote": "As barras mais claras são períodos projetados",
+      "stoppedAt": "Os juros não são conhecidos a partir do período {period}, por isso o gráfico termina antes."
+    },
+    "scenarios": {
+      "title": "Cenários de inflação",
+      "titleBenchmark": "Cenários de taxa de juros",
+      "projection": "Projeção",
+      "caption": "Valor no vencimento projetado e juros por valor assumido",
+      "intro": "São projeções, não certezas: para cada período que ainda não começou, assume-se o valor de {benchmark} da primeira coluna. Os períodos conhecidos e anunciados não mudam. Selecione uma linha para ver sua tabela de taxas e o gráfico.",
+      "custom": "Seu próprio valor de {benchmark} (%)",
+      "add": "Adicionar cenário",
+      "useDefault": "Usar a premissa padrão",
+      "selected": "Selecionado",
+      "loading": "Carregando os cenários...",
+      "loadFailed": "Não foi possível carregar os cenários.",
+      "columns": {
+        "assumed": "Assumido: {benchmark}",
+        "maturityValue": "Valor no vencimento (projeção)",
+        "totalInterest": "Juros totais (projeção)"
+      }
+    },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "IPCA, 12 meses (GUS)",
       "PL_NBP_REFERENCE": "Taxa de referência do NBP"

@@ -546,7 +546,11 @@ benchmark projected at each given value (at most 6 values, each between -0.5
 and 1.0 as a fraction). Known periods stay known: a scenario never replaces an
 observation or an announced rate. Per scenario it returns the lots' maturity
 value, total interest and its attribution (13.2) summed over the lots, each
-`null` if any lot cannot be valued. The detail view shows a table for the
+`null` if any lot cannot be valued. When the lots cannot be derived (section
+12.2) every figure is `null` and `refusal` names why. An assumption about a
+benchmark the instrument's rate rule does not read is refused with a 400, here
+and on `assume`, because it would return unchanged figures that look like a
+scenario. The detail view shows a table for the
 presets 0%, 2.5%, 5% and 8% and one value the reader types, and labels every
 scenario figure as a projection under that assumption.
 

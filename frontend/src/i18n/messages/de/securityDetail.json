@@ -341,6 +341,41 @@
         "missing": "{benchmark} {observation}: noch nicht veröffentlicht"
       }
     },
+    "indexation": {
+      "inflation": "Inflationsindexiert: ab {date} (Periode 2) beträgt der Zinssatz {benchmark} + {addend} und wird in jeder Periode neu berechnet",
+      "floating": "Variabler Zins: ab {date} (Periode 2) beträgt der Zinssatz {benchmark} + {addend} und wird in jeder Periode neu berechnet"
+    },
+    "interestParts": {
+      "fixed": "Feste Zinsen (1. Periode)",
+      "margin": "Zinsen aus der Marge",
+      "inflation": "Zinsen aus der Inflation",
+      "benchmark": "Zinsen aus dem Referenzzinssatz",
+      "announced": "Angekündigte Zinsen"
+    },
+    "chart": {
+      "title": "Kumulierte Zinsen am Ende jeder Periode",
+      "assumption": "Prognose unter der Annahme {benchmark} = {value}",
+      "projectedNote": "Hellere Balken sind prognostizierte Perioden",
+      "stoppedAt": "Die Zinsen sind ab Periode {period} nicht bekannt, daher endet das Diagramm davor."
+    },
+    "scenarios": {
+      "title": "Inflationsszenarien",
+      "titleBenchmark": "Zinsszenarien",
+      "projection": "Prognose",
+      "caption": "Prognostizierter Rückzahlungswert und Zinsen je angenommenem Wert",
+      "intro": "Prognosen, keine Gewissheiten: Für jede noch nicht begonnene Periode wird der Wert {benchmark} aus der ersten Spalte angenommen. Bekannte und angekündigte Perioden ändern sich nicht. Wählen Sie eine Zeile, um ihre Zinstabelle und das Diagramm zu sehen.",
+      "custom": "Eigener Wert {benchmark} (%)",
+      "add": "Szenario hinzufügen",
+      "useDefault": "Standardannahme verwenden",
+      "selected": "Ausgewählt",
+      "loading": "Szenarien werden geladen...",
+      "loadFailed": "Die Szenarien konnten nicht geladen werden.",
+      "columns": {
+        "assumed": "Angenommen: {benchmark}",
+        "maturityValue": "Rückzahlungswert (Prognose)",
+        "totalInterest": "Zinsen gesamt (Prognose)"
+      }
+    },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "Inflationsrate (VPI), 12 Monate (GUS)",
       "PL_NBP_REFERENCE": "NBP-Referenzzins"

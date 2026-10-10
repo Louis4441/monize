@@ -341,6 +341,41 @@
         "missing": "{benchmark} {observation}: jeszcze nieopublikowane"
       }
     },
+    "indexation": {
+      "inflation": "Obligacja indeksowana inflacją: od {date} (2. okres) oprocentowanie to {benchmark} + {addend}, ustalane na nowo w każdym okresie",
+      "floating": "Oprocentowanie zmienne: od {date} (2. okres) oprocentowanie to {benchmark} + {addend}, ustalane na nowo w każdym okresie"
+    },
+    "interestParts": {
+      "fixed": "Odsetki stałe (1. okres)",
+      "margin": "Odsetki z marży",
+      "inflation": "Odsetki z inflacji",
+      "benchmark": "Odsetki ze stopy referencyjnej",
+      "announced": "Odsetki ogłoszone"
+    },
+    "chart": {
+      "title": "Odsetki narastająco na koniec każdego okresu",
+      "assumption": "Prognoza przy założeniu {benchmark} = {value}",
+      "projectedNote": "Jaśniejsze słupki to okresy prognozowane",
+      "stoppedAt": "Odsetki nie są znane od okresu {period}, dlatego wykres kończy się przed nim."
+    },
+    "scenarios": {
+      "title": "Scenariusze inflacji",
+      "titleBenchmark": "Scenariusze stopy procentowej",
+      "projection": "Prognoza",
+      "caption": "Prognozowana wartość wykupu i odsetki według przyjętej wartości",
+      "intro": "To prognozy, a nie pewniki: dla każdego okresu, który się nie rozpoczął, przyjmuje się wartość {benchmark} z pierwszej kolumny. Okresy znane i ogłoszone się nie zmieniają. Wybierz wiersz, aby zobaczyć tabelę stóp i wykres.",
+      "custom": "Własna wartość: {benchmark} (%)",
+      "add": "Dodaj scenariusz",
+      "useDefault": "Wróć do założenia domyślnego",
+      "selected": "Wybrany",
+      "loading": "Wczytywanie scenariuszy...",
+      "loadFailed": "Nie udało się wczytać scenariuszy.",
+      "columns": {
+        "assumed": "Przyjęte: {benchmark}",
+        "maturityValue": "Wartość wykupu (prognoza)",
+        "totalInterest": "Odsetki łącznie (prognoza)"
+      }
+    },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "Inflacja CPI r/r (GUS)",
       "PL_NBP_REFERENCE": "Stopa referencyjna NBP"

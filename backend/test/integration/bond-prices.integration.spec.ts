@@ -474,4 +474,79 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
       expect(await priceRows(otherSecurity)).toHaveLength(5);
     });
   });
+
+  describe("inflation scenarios (spec 13.3)", () => {
+    let edoSecurityId: string;
+
+    beforeEach(async () => {
+      await dataSource.query(
+        `INSERT INTO benchmark_series (code, kind, publisher, source_url, unit)
+         VALUES ('PL_CPI_GUS_YOY', 'MONTHLY', 'GUS', 'https://example.test/cpi', 'FRACTION')
+         ON CONFLICT (code) DO NOTHING`,
+      );
+      await dataSource.query(
+        `INSERT INTO benchmark_values (benchmark_code, observation_date, value, source_url, retrieved_at)
+         VALUES ('PL_CPI_GUS_YOY', '2027-08-01', 0.0340000000, 'https://example.test/cpi', NOW())
+         ON CONFLICT (benchmark_code, observation_date) DO UPDATE SET value = EXCLUDED.value`,
+      );
+      edoSecurityId = await insertSecurity(
+        "EDO1036",
+        bondInstrumentId("PL", "PL_MF", "EDO1036"),
+      );
+      await ledger("BUY", "2026-10-01", 10, edoSecurityId);
+    });
+
+    const scenarios = (values: string[], owner = userId) =>
+      withUserContext(owner, () =>
+        valuation.scenariosOf(
+          owner,
+          edoSecurityId,
+          "PL_CPI_GUS_YOY",
+          values,
+          "2027-10-16",
+        ),
+      );
+
+    it("a higher assumption raises the maturity value and the inflation interest, and leaves the known periods alone", async () => {
+      const result = await scenarios(["0", "0.05"]);
+      const [low, high] = result.scenarios;
+      // Computed independently with python fractions (10 bonds).
+      expect(low).toEqual({
+        value: "0",
+        maturityValue: "1301.00",
+        totalInterest: "301.00",
+        fixedInterest: "53.50",
+        benchmarkInterest: "35.82",
+        addendInterest: "211.68",
+        announcedInterest: "0.00",
+      });
+      expect(high).toEqual({
+        value: "0.05",
+        maturityValue: "1907.90",
+        totalInterest: "907.86",
+        fixedInterest: "53.50",
+        benchmarkInterest: "605.44",
+        addendInterest: "248.92",
+        announcedInterest: "0.00",
+      });
+    });
+
+    it("the valuation follows the assumption on the same lots", async () => {
+      const v = await withUserContext(userId, () =>
+        valuation.valueSecurity(
+          userId,
+          edoSecurityId,
+          "2027-10-16",
+          new Map([["PL_CPI_GUS_YOY", "0.05"]]),
+        ),
+      );
+      expect(v.lots[0].valuation.maturityValueProjected).toBe("1907.90");
+    });
+
+    it("answers 404 for another user's security", async () => {
+      await expect(scenarios(["0"], otherUserId)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+  });
 });

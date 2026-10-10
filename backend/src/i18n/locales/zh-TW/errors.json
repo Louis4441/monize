@@ -535,7 +535,10 @@
     "securityNotLinked": "找不到證券 {{ securityId }}，或該證券未連結到債券工具",
     "dataNotFound": "此次估值所需的已儲存債券資料無法取得：{{ detail }}",
     "dataInconsistent": "已儲存的債券資料互相矛盾，因此不提供估值：{{ detail }}",
-    "invalidInput": "估值請求無效：{{ detail }}"
+    "invalidInput": "估值請求無效：{{ detail }}",
+    "assumeInvalid": "assume 的格式必須為 benchmarkId:值，其中基準 ID 為 1 到 40 個大寫字母、數字或底線，值為介於 -0.5 和 1.0 之間的小數",
+    "benchmarkIdInvalid": "benchmarkId 必須為 1 到 40 個大寫字母、數字或底線",
+    "scenarioValuesInvalid": "values 必須包含 1 到 6 個以逗號分隔、介於 -0.5 和 1.0 之間的小數"
   },
   "securities": {
     "bondPricedByEngine": "此證券已連結到債券工具，由債券引擎而非報價提供者定價。請改用「重新計算價格」。",

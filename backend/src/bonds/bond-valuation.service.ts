@@ -11,7 +11,12 @@ import {
   BondDataInconsistentError,
   BondDataNotFoundError,
 } from "./bond-errors";
-import { BondValuation, valueBondLot } from "./engine/bond-engine";
+import {
+  BondEngineError,
+  BondValuation,
+  valueBondLot,
+} from "./engine/bond-engine";
+import { BondScenarios, scenarioOf, unknownScenario } from "./bond-scenarios";
 
 export interface ValueLotRequest {
   readonly issuerCountryCode: string;
@@ -107,6 +112,19 @@ function summarize(row: InstrumentRow): BondInstrumentSummary {
  * The bond tables are global reference data, so the caller's identity is only
  * what `withScopedDb` needs, never a filter.
  */
+/**
+ * An assumption about a benchmark the instrument does not read would change
+ * nothing and return figures that look like a scenario; refuse it instead.
+ */
+function assertReadsBenchmark(terms: BondTerms, benchmarkId: string): void {
+  const rule = terms.rateRule;
+  if (rule.type === "FIXED" || rule.benchmarkId !== benchmarkId) {
+    throw new BondEngineError(
+      `${terms.instrument.seriesCode} does not read benchmark ${benchmarkId}`,
+    );
+  }
+}
+
 @Injectable()
 export class BondValuationService {
   constructor(private readonly dataSource: DataSource) {}
@@ -166,6 +184,7 @@ export class BondValuationService {
     userId: string,
     securityId: string,
     asOf: string,
+    projection?: ReadonlyMap<string, string>,
   ): Promise<SecurityValuation> {
     return withScopedDb(this.dataSource, async (m) => {
       const ledger = await loadBondLedger(m, userId, securityId);
@@ -173,6 +192,9 @@ export class BondValuationService {
         m,
         ledger.security.bondInstrumentId,
       );
+      for (const id of projection?.keys() ?? []) {
+        assertReadsBenchmark(reference.terms, id);
+      }
       const { instrument } = reference;
       const folded = bondLotsAsOf(ledger.transactions, asOf);
       if (folded.lots === null) {
@@ -193,7 +215,7 @@ export class BondValuationService {
 
       const lots = folded.lots.map((lot) => ({
         ...lot,
-        valuation: this.valueLotFrom(reference, lot, asOf),
+        valuation: this.valueLotFrom(reference, lot, asOf, projection),
       }));
       const places = reference.terms.rounding.moneyDecimals;
       const sum = (pick: (v: BondValuation) => string | null) =>
@@ -213,6 +235,56 @@ export class BondValuationService {
           accruedInterest: sum((v) => v.accruedInterest),
         },
         refusal: null,
+      };
+    });
+  }
+
+  /**
+   * The security's open lots as of `asOf`, valued once per assumed value of
+   * `benchmarkId` and summed (spec 13.3). Owner-scoped like `valueSecurity`;
+   * the reference data is read once, every scenario is computed in memory.
+   */
+  async scenariosOf(
+    userId: string,
+    securityId: string,
+    benchmarkId: string,
+    values: readonly string[],
+    asOf: string,
+  ): Promise<BondScenarios> {
+    return withScopedDb(this.dataSource, async (m) => {
+      const ledger = await loadBondLedger(m, userId, securityId);
+      const reference = await this.loadReference(
+        m,
+        ledger.security.bondInstrumentId,
+      );
+      assertReadsBenchmark(reference.terms, benchmarkId);
+      const folded = bondLotsAsOf(ledger.transactions, asOf);
+      const base = { securityId, benchmarkId, asOf };
+      if (folded.lots === null) {
+        return {
+          ...base,
+          refusal: folded.refusal,
+          scenarios: values.map(unknownScenario),
+        };
+      }
+      const places = reference.terms.rounding.moneyDecimals;
+      return {
+        ...base,
+        refusal: null,
+        scenarios: values.map((value) =>
+          scenarioOf(
+            value,
+            folded.lots.map((lot) =>
+              this.valueLotFrom(
+                reference,
+                lot,
+                asOf,
+                new Map([[benchmarkId, value]]),
+              ),
+            ),
+            places,
+          ),
+        ),
       };
     });
   }

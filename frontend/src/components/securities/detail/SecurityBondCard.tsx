@@ -14,11 +14,13 @@ import { investmentsApi } from '@/lib/investments';
 import { getErrorMessage } from '@/lib/errors';
 import type { Security } from '@/types/investment';
 import type {
+  BondAssumption,
   BondMissingObservation,
   SecurityBondValuation,
 } from '@/types/bond';
 import { SecurityBondLotsTable } from './SecurityBondLotsTable';
 import { SecurityBondRateSection } from './SecurityBondRateSection';
+import { SecurityBondScenarioPanel } from './SecurityBondScenarioPanel';
 
 interface SecurityBondCardProps {
   security: Security;
@@ -60,13 +62,31 @@ export function SecurityBondCard({
   // '' means "today", so a tab left open across midnight does not pin a day.
   const [pickedAsOf, setPickedAsOf] = useState('');
   const asOf = YMD.test(pickedAsOf) ? pickedAsOf : today;
-  const requestKey = `${security.id}|${asOf}`;
+  // The value the reader picked in the scenario panel; null is the engine's
+  // default assumption (no `assume`). It belongs to one benchmark of one security.
+  const [picked, setPicked] = useState<{
+    securityId: string;
+    benchmarkId: string;
+    value: string;
+  } | null>(null);
+  const assume: BondAssumption | null =
+    picked !== null && picked.securityId === security.id
+      ? { benchmarkId: picked.benchmarkId, value: picked.value }
+      : null;
+  const requestKey = `${security.id}|${asOf}|${
+    assume ? `${assume.benchmarkId}:${assume.value}` : ''
+  }`;
   const [isRecomputing, setIsRecomputing] = useState(false);
 
   const { data, dataKey, isLoading, error, reload } =
     useReportData<SecurityBondValuation>(
-      () => investmentsApi.getSecurityBondValuation(security.id, asOf),
-      [security.id, asOf],
+      () =>
+        investmentsApi.getSecurityBondValuation(
+          security.id,
+          asOf,
+          assume ?? undefined,
+        ),
+      [security.id, asOf, assume?.benchmarkId, assume?.value],
       { requestKey },
     );
 
@@ -228,7 +248,7 @@ export function SecurityBondCard({
         {lots.length > 0 && (
           <SecurityBondLotsTable lots={lots} currency={currency} />
         )}
-        {lots.length > 0 && <SecurityBondRateSection lots={lots} />}
+        {lots.length > 0 && <SecurityBondRateSection lots={lots} currency={currency} />}
 
         {assumptions.length > 0 && (
           <div>
@@ -283,6 +303,16 @@ export function SecurityBondCard({
     );
   };
 
+  // The panel outlives a reload of the valuation it drives, so a click on a
+  // scenario does not unmount the table it was clicked in. What it needs (the
+  // benchmark the rule reads) is read from the newest answer for this security.
+  const rule =
+    data !== null && data.securityId === security.id
+      ? (data.lots[0]?.valuation.rateRule ?? null)
+      : null;
+  const scenarioBenchmark =
+    rule !== null && rule.type !== 'FIXED' ? rule.benchmarkId : null;
+
   return (
     <Card padding="sm" aria-label={t('bond.title')} as="section">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
@@ -308,6 +338,28 @@ export function SecurityBondCard({
         </div>
       </div>
       {renderBody()}
+      {rule !== null && scenarioBenchmark !== null && (
+        <div className="mt-6 border-t border-gray-200 pt-4 dark:border-gray-700">
+          <SecurityBondScenarioPanel
+            securityId={security.id}
+            benchmarkId={scenarioBenchmark}
+            inflation={rule.type === 'INFLATION_PLUS_MARGIN_AS_RATE'}
+            currency={currency}
+            selected={assume ? assume.value : null}
+            onSelect={(value) =>
+              setPicked(
+                value === null
+                  ? null
+                  : {
+                      securityId: security.id,
+                      benchmarkId: scenarioBenchmark,
+                      value,
+                    },
+              )
+            }
+          />
+        </div>
+      )}
     </Card>
   );
 }

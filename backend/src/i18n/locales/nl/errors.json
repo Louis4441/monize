@@ -535,7 +535,10 @@
     "securityNotLinked": "Effect {{ securityId }} niet gevonden of niet gekoppeld aan een obligatie-instrument",
     "dataNotFound": "De opgeslagen obligatiegegevens die voor deze waardering nodig zijn, zijn niet beschikbaar: {{ detail }}",
     "dataInconsistent": "De opgeslagen obligatiegegevens spreken elkaar tegen, dus er wordt geen waardering gegeven: {{ detail }}",
-    "invalidInput": "Het waarderingsverzoek is ongeldig: {{ detail }}"
+    "invalidInput": "Het waarderingsverzoek is ongeldig: {{ detail }}",
+    "assumeInvalid": "assume moet de vorm benchmarkId:waarde hebben, met een benchmark-id van 1 tot 40 hoofdletters, cijfers of underscores en een decimale waarde tussen -0.5 en 1.0",
+    "benchmarkIdInvalid": "benchmarkId moet 1 tot 40 hoofdletters, cijfers of underscores bevatten",
+    "scenarioValuesInvalid": "values moet 1 tot 6 door komma's gescheiden decimalen tussen -0.5 en 1.0 bevatten"
   },
   "securities": {
     "bondPricedByEngine": "Dit effect is gekoppeld aan een obligatie-instrument en wordt gewaardeerd door de obligatie-engine, niet door een koersaanbieder. Gebruik in plaats daarvan Koersen herberekenen.",

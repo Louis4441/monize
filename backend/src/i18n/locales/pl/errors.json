@@ -535,7 +535,10 @@
     "securityNotLinked": "Nie znaleziono papieru wartościowego {{ securityId }} albo nie jest on powiązany z instrumentem obligacyjnym",
     "dataNotFound": "Brak zapisanych danych obligacji potrzebnych do tej wyceny: {{ detail }}",
     "dataInconsistent": "Zapisane dane obligacji są ze sobą sprzeczne, dlatego wycena nie została podana: {{ detail }}",
-    "invalidInput": "Żądanie wyceny jest nieprawidłowe: {{ detail }}"
+    "invalidInput": "Żądanie wyceny jest nieprawidłowe: {{ detail }}",
+    "assumeInvalid": "Parametr assume musi mieć postać benchmarkId:wartość, gdzie identyfikator wskaźnika ma od 1 do 40 wielkich liter, cyfr lub podkreśleń, a wartość jest liczbą dziesiętną od -0.5 do 1.0",
+    "benchmarkIdInvalid": "benchmarkId musi mieć od 1 do 40 wielkich liter, cyfr lub podkreśleń",
+    "scenarioValuesInvalid": "values musi zawierać od 1 do 6 liczb dziesiętnych oddzielonych przecinkami, od -0.5 do 1.0"
   },
   "securities": {
     "bondPricedByEngine": "Ten papier wartościowy jest powiązany z instrumentem obligacyjnym i jest wyceniany przez silnik obligacji, a nie przez dostawcę notowań. Użyj zamiast tego opcji Przelicz ceny.",
