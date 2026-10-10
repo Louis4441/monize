@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { useTranslations } from 'next-intl';
-import { KeyValueList, type KeyValueRow } from '@/components/ui/KeyValueList';
-import { useDateFormat } from '@/hooks/useDateFormat';
-import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { usePreferencesStore } from '@/store/preferencesStore';
+import { useTranslations } from "next-intl";
+import { KeyValueList, type KeyValueRow } from "@/components/ui/KeyValueList";
+import { useDateFormat } from "@/hooks/useDateFormat";
+import { useNumberFormat } from "@/hooks/useNumberFormat";
+import { usePreferencesStore } from "@/store/preferencesStore";
 import {
   inferDistributionPolicy,
   type SecurityPricePoint,
-} from '@/lib/security-detail';
-import type { Security } from '@/types/investment';
+} from "@/lib/security-detail";
+import type { Security } from "@/types/investment";
 
 interface SecurityKeyInformationProps {
   security: Security;
@@ -32,14 +32,14 @@ export function SecurityKeyInformation({
   latestPrice,
   prices,
 }: SecurityKeyInformationProps) {
-  const t = useTranslations('securityDetail');
-  const ts = useTranslations('securities');
+  const t = useTranslations("securityDetail");
+  const ts = useTranslations("securities");
   const { formatDate } = useDateFormat();
   const { formatCurrencyPrecise } = useNumberFormat();
   // A security with no provider of its own inherits the user's default, so the
   // effective provider is the answer here -- never a blank row.
   const defaultQuoteProvider =
-    usePreferencesStore((s) => s.preferences?.defaultQuoteProvider) ?? 'yahoo';
+    usePreferencesStore((s) => s.preferences?.defaultQuoteProvider) ?? "yahoo";
 
   // Whether the fund pays out is not a field anyone stores -- it is read off the
   // price history, where the adjusted close parts from the quoted one on every
@@ -47,49 +47,53 @@ export function SecurityKeyInformation({
   const policy = inferDistributionPolicy(prices);
 
   const rows: KeyValueRow[] = [
-    { key: 'symbol', label: t('keyInfo.symbol'), value: security.symbol },
+    { key: "symbol", label: t("keyInfo.symbol"), value: security.symbol },
     {
       // "Security type", not "asset class": an ETF is a kind of instrument, not
       // an asset class, and the latter term is needed for the percentage
       // breakdown a security can carry (review of discussion #964).
-      key: 'securityType',
-      label: t('keyInfo.securityType'),
+      key: "securityType",
+      label: t("keyInfo.securityType"),
       value: security.securityType
         ? ts(`typeLabels.${security.securityType}` as Parameters<typeof ts>[0])
         : null,
     },
     {
-      key: 'distributions',
-      label: t('keyInfo.distributions'),
+      key: "distributions",
+      label: t("keyInfo.distributions"),
       value:
-        policy === 'unknown' ? null : (
-          <span title={t('keyInfo.distributionsTitle')}>
-            {policy === 'distributing'
-              ? t('keyInfo.distributing')
-              : t('keyInfo.accumulating')}
+        policy === "unknown" ? null : (
+          <span title={t("keyInfo.distributionsTitle")}>
+            {policy === "distributing"
+              ? t("keyInfo.distributing")
+              : t("keyInfo.accumulating")}
           </span>
         ),
     },
-    { key: 'exchange', label: t('keyInfo.exchange'), value: security.exchange },
+    { key: "exchange", label: t("keyInfo.exchange"), value: security.exchange },
     {
-      key: 'currency',
-      label: t('keyInfo.currency'),
+      key: "currency",
+      label: t("keyInfo.currency"),
       value: security.currencyCode,
     },
-    { key: 'sector', label: t('keyInfo.sector'), value: security.sector },
-    { key: 'industry', label: t('keyInfo.industry'), value: security.industry },
+    { key: "sector", label: t("keyInfo.sector"), value: security.sector },
+    { key: "industry", label: t("keyInfo.industry"), value: security.industry },
     {
-      key: 'provider',
-      label: t('keyInfo.provider'),
+      key: "provider",
+      label: t("keyInfo.provider"),
+      // A security linked to a bond instrument is priced by the bond engine from
+      // its issue terms; no quote provider is ever asked for it.
       value: ts(
-        `form.providers.${security.quoteProvider ?? defaultQuoteProvider}` as Parameters<
+        (security.bondInstrumentId
+          ? "form.providers.bond_engine"
+          : `form.providers.${security.quoteProvider ?? defaultQuoteProvider}`) as Parameters<
           typeof ts
         >[0],
       ),
     },
     {
-      key: 'lastPrice',
-      label: t('keyInfo.lastPrice'),
+      key: "lastPrice",
+      label: t("keyInfo.lastPrice"),
       value: latestPrice
         ? `${formatCurrencyPrecise(latestPrice.price, security.currencyCode)} (${formatDate(latestPrice.priceDate)})`
         : null,
@@ -99,7 +103,7 @@ export function SecurityKeyInformation({
   return (
     <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
       <h3 className="mb-3 text-lg font-semibold text-gray-900 dark:text-gray-100">
-        {t('keyInfo.title')}
+        {t("keyInfo.title")}
       </h3>
       <KeyValueList rows={rows} />
     </div>

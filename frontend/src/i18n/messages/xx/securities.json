@@ -146,7 +146,8 @@
       "yahoo": "[XX-Yahoo-XX]",
       "msn": "[XX-MSN-XX]",
       "lse": "[XX-LSE-XX]",
-      "deutsche_boerse": "[XX-Deutsche Börse-XX]"
+      "deutsche_boerse": "[XX-Deutsche Börse-XX]",
+      "bond_engine": "[XX-Bond engine (issue terms)-XX]"
     },
     "types": {
       "select": "[XX-Select type...-XX]",

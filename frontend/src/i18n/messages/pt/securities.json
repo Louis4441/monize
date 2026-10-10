@@ -146,7 +146,8 @@
       "yahoo": "Yahoo",
       "msn": "MSN",
       "lse": "LSE",
-      "deutsche_boerse": "Deutsche Börse"
+      "deutsche_boerse": "Deutsche Börse",
+      "bond_engine": "Motor de obrigações (condições de emissão)"
     },
     "types": {
       "select": "Selecionar tipo...",

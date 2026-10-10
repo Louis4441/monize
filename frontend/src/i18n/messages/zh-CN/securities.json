@@ -146,7 +146,8 @@
       "yahoo": "Yahoo",
       "msn": "MSN",
       "lse": "LSE",
-      "deutsche_boerse": "Deutsche Börse"
+      "deutsche_boerse": "Deutsche Börse",
+      "bond_engine": "债券引擎（发行条款）"
     },
     "types": {
       "select": "选择类型...",

@@ -146,7 +146,8 @@
       "yahoo": "Yahoo",
       "msn": "MSN",
       "lse": "LSE",
-      "deutsche_boerse": "Deutsche Börse"
+      "deutsche_boerse": "Deutsche Börse",
+      "bond_engine": "채권 엔진(발행 조건)"
     },
     "types": {
       "select": "유형 선택...",

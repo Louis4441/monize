@@ -146,7 +146,8 @@
       "yahoo": "Yahoo",
       "msn": "MSN",
       "lse": "LSE",
-      "deutsche_boerse": "Deutsche Börse"
+      "deutsche_boerse": "Deutsche Börse",
+      "bond_engine": "बॉन्ड इंजन (निर्गम शर्तें)"
     },
     "types": {
       "select": "प्रकार चुनें...",
