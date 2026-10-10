@@ -46,6 +46,16 @@ export interface BondMissingObservation {
   publisher: string | null;
 }
 
+/** A benchmark value assumed for every period that has not started. */
+export interface BondProjectionAssumption {
+  benchmarkId: string;
+  /** The assumed value as a fraction, e.g. "0.0290". */
+  value: string;
+  basis: 'SUPPLIED' | 'LATEST_OBSERVATION';
+  /** The YYYY-MM-DD or YYYY-MM the value came from; null when SUPPLIED. */
+  observation: string | null;
+}
+
 export interface BondCurrentPeriod {
   index: number;
   start: string;
@@ -74,7 +84,7 @@ export interface BondValuation {
   projectedCashflows: BondCashFlow[];
   maturityValueKnown: string | null;
   maturityValueProjected: string | null;
-  projectionAssumptions: string[];
+  projectionAssumptions: BondProjectionAssumption[];
   dataCompleteness: {
     termsComplete: boolean;
     referenceDataComplete: boolean;

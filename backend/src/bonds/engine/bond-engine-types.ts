@@ -72,7 +72,7 @@ export interface BondValuation {
   readonly maturityValueKnown: string | null;
   /** Set only when a projected rate is involved; null otherwise. */
   readonly maturityValueProjected: string | null;
-  readonly projectionAssumptions: readonly string[];
+  readonly projectionAssumptions: readonly ProjectionAssumption[];
   readonly dataCompleteness: {
     readonly termsComplete: boolean;
     readonly referenceDataComplete: boolean;
@@ -80,6 +80,19 @@ export interface BondValuation {
   };
   readonly missing: readonly MissingObservation[];
   readonly valuationComplete: boolean;
+}
+
+/**
+ * A benchmark value assumed for every period that has not started. Structured,
+ * never a sentence: the client composes the user-facing text from its catalog.
+ */
+export interface ProjectionAssumption {
+  readonly benchmarkId: string;
+  /** The assumed value as a fraction, e.g. "0.0290". */
+  readonly value: string;
+  readonly basis: "SUPPLIED" | "LATEST_OBSERVATION";
+  /** The YYYY-MM-DD or YYYY-MM the value came from; null when SUPPLIED. */
+  readonly observation: string | null;
 }
 
 export class BondEngineError extends Error {

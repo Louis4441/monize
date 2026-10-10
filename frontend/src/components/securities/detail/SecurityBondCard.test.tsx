@@ -179,7 +179,10 @@ describe('SecurityBondCard', () => {
 
   it('lists assumptions once and the missing data with its publisher', async () => {
     const v = lotValuation({
-      projectionAssumptions: ['WIBOR 6M assumed 5.10%'],
+      projectionAssumptions: [
+        { benchmarkId: 'WIBOR_6M', value: '0.0510', basis: 'SUPPLIED', observation: null },
+        { benchmarkId: 'CPI_YOY', value: '0.0290', basis: 'LATEST_OBSERVATION', observation: '2026-08' },
+      ],
       missing: [
         { benchmarkId: 'CPI_YOY', observation: '2027-02', publisher: 'GUS' },
         { benchmarkId: 'NBP_REF', observation: '2027-03-01', publisher: null },
@@ -195,7 +198,12 @@ describe('SecurityBondCard', () => {
       }),
     );
     await mount();
-    expect(screen.getAllByText('WIBOR 6M assumed 5.10%')).toHaveLength(1);
+    expect(screen.getAllByText('WIBOR_6M assumed at 5.1% for every later period')).toHaveLength(1);
+    expect(
+      screen.getAllByText(
+        'CPI_YOY assumed at 2.9% for every later period, the latest published value (2026-08)',
+      ),
+    ).toHaveLength(1);
     expect(screen.getAllByText('CPI_YOY 2027-02 — published by GUS')).toHaveLength(1);
     expect(screen.getByText('NBP_REF 2027-03-01 — publisher not known')).toBeInTheDocument();
     expect(screen.getAllByText('Projected').length).toBeGreaterThan(0);

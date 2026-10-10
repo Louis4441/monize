@@ -53,7 +53,8 @@ export function SecurityBondCard({
   onPricesChanged,
 }: SecurityBondCardProps) {
   const t = useTranslations('securityDetail');
-  const { formatCurrency, formatShareQuantity } = useNumberFormat();
+  const { formatCurrency, formatPercentTrimmed, formatShareQuantity } =
+    useNumberFormat();
   const today = useFinancialToday();
   // '' means "today", so a tab left open across midnight does not pin a day.
   const [pickedAsOf, setPickedAsOf] = useState('');
@@ -99,7 +100,7 @@ export function SecurityBondCard({
       valuation
         ? distinct(
             valuation.lots.flatMap((l) => l.valuation.projectionAssumptions),
-            (a) => a,
+            (a) => `${a.benchmarkId}|${a.value}|${a.basis}|${a.observation ?? ''}`,
           )
         : [],
     [valuation],
@@ -234,7 +235,20 @@ export function SecurityBondCard({
             </h4>
             <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-gray-600 dark:text-gray-400">
               {assumptions.map((a) => (
-                <li key={a}>{a}</li>
+                <li
+                  key={`${a.benchmarkId}|${a.value}|${a.basis}|${a.observation ?? ''}`}
+                >
+                  {a.basis === 'LATEST_OBSERVATION' && a.observation !== null
+                    ? t('bond.assumptions.latestObservation', {
+                        benchmarkId: a.benchmarkId,
+                        value: formatPercentTrimmed(Number(a.value) * 100),
+                        observation: a.observation,
+                      })
+                    : t('bond.assumptions.supplied', {
+                        benchmarkId: a.benchmarkId,
+                        value: formatPercentTrimmed(Number(a.value) * 100),
+                      })}
+                </li>
               ))}
             </ul>
           </div>

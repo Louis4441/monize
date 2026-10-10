@@ -302,7 +302,9 @@
       "INVALID_QUANTITY": "ロットを導出できません。数量がない、負の値、または大きすぎます。"
     },
     "assumptions": {
-      "title": "予測の前提"
+      "title": "予測の前提",
+      "latestObservation": "{benchmarkId} は、以降のすべての期間について {value} と仮定します(直近に公表された値: {observation})",
+      "supplied": "{benchmarkId} は、以降のすべての期間について {value} と仮定します"
     },
     "missing": {
       "title": "まだ必要なデータ",

@@ -302,7 +302,9 @@
       "INVALID_QUANTITY": "Les lots ne peuvent pas être déduits : une quantité est manquante, négative ou trop grande."
     },
     "assumptions": {
-      "title": "Hypothèses de la projection"
+      "title": "Hypothèses de la projection",
+      "latestObservation": "{benchmarkId} supposé à {value} pour toutes les périodes suivantes, dernière valeur publiée ({observation})",
+      "supplied": "{benchmarkId} supposé à {value} pour toutes les périodes suivantes"
     },
     "missing": {
       "title": "Données encore nécessaires",

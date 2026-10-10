@@ -248,7 +248,8 @@ knownCashflows     [{ date, type: INTEREST | PRINCIPAL, amount, status: KNOWN }]
 projectedCashflows [{ ..., status: PROJECTED }]
 maturityValueKnown     | null
 maturityValueProjected | null
-projectionAssumptions  [strings, each naming the series and the value assumed]
+projectionAssumptions  [{ benchmarkId, value (fraction), basis: SUPPLIED | LATEST_OBSERVATION,
+                        observation (YYYY-MM-DD or YYYY-MM; null when SUPPLIED) }]
 dataCompleteness   { termsComplete, referenceDataComplete, earlyRedemptionTermsComplete }
 missing            [{ series, observation }]  what to obtain, and where
 valuationComplete  all three flags true
@@ -284,9 +285,12 @@ valuationComplete  all three flags true
 | >= 2 | no | no | no | `max(0, assumption) + margin` | `PROJECTED` | projected; `null` if no assumption is given and no observation exists |
 
 The default projection assumption is the newest stored observation of the
-series, and the assumption string names it as the stored fraction
-("PL_CPI_GUS_YOY = 0.0290 (2026-08), assumed for every later period"); a
-percentage a person reads is localized by the surface that shows it.
+series, and the assumption names it as structured data, never a sentence
+(`{ benchmarkId: "PL_CPI_GUS_YOY", value: "0.0290", basis:
+"LATEST_OBSERVATION", observation: "2026-08" }`; a supplied assumption has
+basis `SUPPLIED` and a null observation). The client composes the sentence from
+its translated catalog and formats the percentage by the reader's number
+preference.
 
 ## 5. Numerical examples
 

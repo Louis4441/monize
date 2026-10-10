@@ -302,7 +302,9 @@
       "INVALID_QUANTITY": "Lot tidak dapat diturunkan: jumlah hilang, negatif, atau terlalu besar."
     },
     "assumptions": {
-      "title": "Asumsi proyeksi"
+      "title": "Asumsi proyeksi",
+      "latestObservation": "{benchmarkId} diasumsikan sebesar {value} untuk semua periode berikutnya, yaitu nilai terbaru yang dipublikasikan ({observation})",
+      "supplied": "{benchmarkId} diasumsikan sebesar {value} untuk semua periode berikutnya"
     },
     "missing": {
       "title": "Data yang masih diperlukan",

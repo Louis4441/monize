@@ -302,7 +302,9 @@
       "INVALID_QUANTITY": "Impossibile derivare i lotti: una quantità manca, è negativa o troppo grande."
     },
     "assumptions": {
-      "title": "Ipotesi della previsione"
+      "title": "Ipotesi della previsione",
+      "latestObservation": "{benchmarkId} ipotizzato al {value} per tutti i periodi successivi, ultimo valore pubblicato ({observation})",
+      "supplied": "{benchmarkId} ipotizzato al {value} per tutti i periodi successivi"
     },
     "missing": {
       "title": "Dati ancora necessari",

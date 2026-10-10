@@ -302,7 +302,9 @@
       "INVALID_QUANTITY": "Lotlar türetilemiyor: bir miktar eksik, negatif veya çok büyük."
     },
     "assumptions": {
-      "title": "Projeksiyon varsayımları"
+      "title": "Projeksiyon varsayımları",
+      "latestObservation": "{benchmarkId} sonraki tüm dönemler için {value} olarak varsayılmıştır, son yayımlanan değer ({observation})",
+      "supplied": "{benchmarkId} sonraki tüm dönemler için {value} olarak varsayılmıştır"
     },
     "missing": {
       "title": "Hâlâ gereken veriler",

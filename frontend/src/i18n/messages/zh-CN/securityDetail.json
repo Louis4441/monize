@@ -302,7 +302,9 @@
       "INVALID_QUANTITY": "无法推导批次：某个数量缺失、为负数或过大。"
     },
     "assumptions": {
-      "title": "预测假设"
+      "title": "预测假设",
+      "latestObservation": "所有后续期间均假定 {benchmarkId} 为 {value}(最新公布值:{observation})",
+      "supplied": "所有后续期间均假定 {benchmarkId} 为 {value}"
     },
     "missing": {
       "title": "仍需的数据",

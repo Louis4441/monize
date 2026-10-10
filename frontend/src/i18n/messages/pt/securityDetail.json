@@ -302,7 +302,9 @@
       "INVALID_QUANTITY": "Não é possível apurar os lotes: falta uma quantidade, é negativa ou é demasiado grande."
     },
     "assumptions": {
-      "title": "Pressupostos da projeção"
+      "title": "Pressupostos da projeção",
+      "latestObservation": "{benchmarkId} assumido em {value} para todos os períodos seguintes, o último valor publicado ({observation})",
+      "supplied": "{benchmarkId} assumido em {value} para todos os períodos seguintes"
     },
     "missing": {
       "title": "Dados ainda necessários",

@@ -302,7 +302,9 @@
       "INVALID_QUANTITY": "लॉट निकाले नहीं जा सकते: कोई मात्रा गायब, ऋणात्मक या बहुत बड़ी है।"
     },
     "assumptions": {
-      "title": "अनुमान की मान्यताएँ"
+      "title": "अनुमान की मान्यताएँ",
+      "latestObservation": "{benchmarkId} को सभी आगामी अवधियों के लिए {value} माना गया है, जो अंतिम प्रकाशित मान है ({observation})",
+      "supplied": "{benchmarkId} को सभी आगामी अवधियों के लिए {value} माना गया है"
     },
     "missing": {
       "title": "अभी भी आवश्यक डेटा",

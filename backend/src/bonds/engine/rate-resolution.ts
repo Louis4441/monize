@@ -13,6 +13,7 @@ import {
   BondEngineError,
   BondEngineInput,
   MissingObservation,
+  ProjectionAssumption,
   RateSource,
 } from "./bond-engine-types";
 
@@ -26,7 +27,7 @@ export interface PeriodRate {
 
 export interface RateResolution {
   readonly rates: readonly PeriodRate[];
-  readonly assumptions: readonly string[];
+  readonly assumptions: readonly ProjectionAssumption[];
 }
 
 type BenchmarkRule = Exclude<RateRule, { type: "FIXED" }>;
@@ -156,7 +157,7 @@ function observe(
 
 interface Assumption {
   readonly value: ExactDecimal;
-  readonly text: string;
+  readonly entry: ProjectionAssumption;
 }
 
 /** The supplied assumption, else the newest stored observation, else none. */
@@ -165,13 +166,17 @@ function projectionAssumption(
   input: BondEngineInput,
 ): Assumption | null {
   const id = rule.benchmarkId;
-  const suffix = "assumed for every later period";
   const supplied = input.projection?.get(id);
   if (supplied !== undefined) {
     const value = parseDecimal(supplied, `Projection assumption for ${id}`);
     return {
       value,
-      text: `${id} = ${fraction(value)} (supplied assumption), ${suffix}`,
+      entry: {
+        benchmarkId: id,
+        value: fraction(value),
+        basis: "SUPPLIED",
+        observation: null,
+      },
     };
   }
   const data = input.benchmarks.get(id);
@@ -191,7 +196,15 @@ function projectionAssumption(
     ];
   }
   const value = parseDecimal(raw, `${id} ${at}`);
-  return { value, text: `${id} = ${fraction(value)} (${at}), ${suffix}` };
+  return {
+    value,
+    entry: {
+      benchmarkId: id,
+      value: fraction(value),
+      basis: "LATEST_OBSERVATION",
+      observation: at,
+    },
+  };
 }
 
 /**
@@ -252,6 +265,6 @@ export function resolvePeriodRates(
 
   return {
     rates,
-    assumptions: usedAssumption && assumption ? [assumption.text] : [],
+    assumptions: usedAssumption && assumption ? [assumption.entry] : [],
   };
 }

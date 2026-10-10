@@ -302,7 +302,9 @@
       "INVALID_QUANTITY": "로트를 산출할 수 없습니다. 수량이 없거나, 음수이거나, 너무 큽니다."
     },
     "assumptions": {
-      "title": "예상 가정"
+      "title": "예상 가정",
+      "latestObservation": "{benchmarkId}은(는) 이후 모든 기간에 대해 {value}(으)로 가정합니다(최근 발표된 값: {observation})",
+      "supplied": "{benchmarkId}은(는) 이후 모든 기간에 대해 {value}(으)로 가정합니다"
     },
     "missing": {
       "title": "아직 필요한 데이터",

@@ -302,7 +302,9 @@
       "INVALID_QUANTITY": "Không thể suy ra các lô: một số lượng bị thiếu, âm hoặc quá lớn."
     },
     "assumptions": {
-      "title": "Giả định của dự phóng"
+      "title": "Giả định của dự phóng",
+      "latestObservation": "{benchmarkId} được giả định ở mức {value} cho mọi kỳ tiếp theo, là giá trị được công bố gần nhất ({observation})",
+      "supplied": "{benchmarkId} được giả định ở mức {value} cho mọi kỳ tiếp theo"
     },
     "missing": {
       "title": "Dữ liệu còn thiếu",

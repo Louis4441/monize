@@ -165,7 +165,12 @@ describe("valueBondLot: rate of period k (spec section 4)", () => {
       }),
     ]);
     expect(v.projectionAssumptions).toEqual([
-      "PL_CPI_GUS_YOY = 0.0300 (supplied assumption), assumed for every later period",
+      {
+        benchmarkId: "PL_CPI_GUS_YOY",
+        value: "0.0300",
+        basis: "SUPPLIED",
+        observation: null,
+      },
     ]);
     expect(v.dataCompleteness.referenceDataComplete).toBe(true);
   });
@@ -175,7 +180,12 @@ describe("valueBondLot: rate of period k (spec section 4)", () => {
       benchmarks: cpi(["2026-07", "0.0310"], ["2026-08", "0.0290"]),
     });
     expect(v.projectionAssumptions).toEqual([
-      "PL_CPI_GUS_YOY = 0.0290 (2026-08), assumed for every later period",
+      {
+        benchmarkId: "PL_CPI_GUS_YOY",
+        value: "0.0290",
+        basis: "LATEST_OBSERVATION",
+        observation: "2026-08",
+      },
     ]);
     expect(v.maturityValueProjected).toBe("162.04");
     expect(v.maturityValueKnown).toBeNull();
@@ -314,7 +324,12 @@ describe("valueBondLot: step benchmark with a business-day observation", () => {
       ),
     });
     expect(v.projectionAssumptions).toEqual([
-      "PL_NBP_REFERENCE = 0.0425 (2026-10-01), assumed for every later period",
+      {
+        benchmarkId: "PL_NBP_REFERENCE",
+        value: "0.0425",
+        basis: "LATEST_OBSERVATION",
+        observation: "2026-10-01",
+      },
     ]);
     expect(v.projectedCashflows.length).toBeGreaterThan(0);
     expect(v.knownCashflows.map((c) => c.type)).toEqual([
@@ -327,9 +342,14 @@ describe("valueBondLot: step benchmark with a business-day observation", () => {
     const supplied = ror("2026-11-05", {
       projection: new Map([[NBP, "0.0300"]]),
     });
-    expect(supplied.projectionAssumptions[0]).toContain(
-      "0.0300 (supplied assumption)",
-    );
+    expect(supplied.projectionAssumptions).toEqual([
+      {
+        benchmarkId: NBP,
+        value: "0.0300",
+        basis: "SUPPLIED",
+        observation: null,
+      },
+    ]);
     expect(
       ror("2026-11-05", { benchmarks: nbp("2026-10-10") })
         .projectionAssumptions,

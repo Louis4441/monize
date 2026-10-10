@@ -302,7 +302,9 @@
       "INVALID_QUANTITY": "Die Posten lassen sich nicht ableiten: Eine Menge fehlt, ist negativ oder zu groß."
     },
     "assumptions": {
-      "title": "Annahmen der Prognose"
+      "title": "Annahmen der Prognose",
+      "latestObservation": "{benchmarkId} wird für alle folgenden Perioden mit {value} angenommen, dem zuletzt veröffentlichten Wert ({observation})",
+      "supplied": "{benchmarkId} wird für alle folgenden Perioden mit {value} angenommen"
     },
     "missing": {
       "title": "Noch benötigte Daten",

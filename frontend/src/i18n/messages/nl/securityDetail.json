@@ -302,7 +302,9 @@
       "INVALID_QUANTITY": "De partijen kunnen niet worden afgeleid: een aantal ontbreekt, is negatief of is te groot."
     },
     "assumptions": {
-      "title": "Aannames van de prognose"
+      "title": "Aannames van de prognose",
+      "latestObservation": "{benchmarkId} verondersteld op {value} voor alle latere perioden, de laatst gepubliceerde waarde ({observation})",
+      "supplied": "{benchmarkId} verondersteld op {value} voor alle latere perioden"
     },
     "missing": {
       "title": "Nog benodigde gegevens",

@@ -302,7 +302,9 @@
       "INVALID_QUANTITY": "無法推導批次：某個數量缺漏、為負數或過大。"
     },
     "assumptions": {
-      "title": "預測假設"
+      "title": "預測假設",
+      "latestObservation": "所有後續期間均假設 {benchmarkId} 為 {value}(最新公布值:{observation})",
+      "supplied": "所有後續期間均假設 {benchmarkId} 為 {value}"
     },
     "missing": {
       "title": "仍需的資料",

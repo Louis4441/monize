@@ -302,7 +302,9 @@
       "INVALID_QUANTITY": "Nie można ustalić partii: ilość jest nieokreślona, ujemna lub zbyt duża."
     },
     "assumptions": {
-      "title": "Założenia prognozy"
+      "title": "Założenia prognozy",
+      "latestObservation": "Założono {benchmarkId} na poziomie {value} dla wszystkich kolejnych okresów (ostatnia opublikowana wartość: {observation})",
+      "supplied": "Założono {benchmarkId} na poziomie {value} dla wszystkich kolejnych okresów"
     },
     "missing": {
       "title": "Dane, których jeszcze brakuje",

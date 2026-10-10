@@ -377,6 +377,11 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       ? selectedBondId
       : '';
 
+  // A linked bond is priced from its terms, never by asking a quote provider,
+  // so the controls that configure quote fetching are hidden. Their stored
+  // values stay in the form state and are submitted unchanged.
+  const isLinkedToBond = isBond && effectiveBondId !== '';
+
   const isFavourite = watch('isFavourite') ?? false;
   const toggleFavourite = () =>
     setValue('isFavourite', !isFavourite, { shouldDirty: true });
@@ -738,37 +743,39 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
         />
       )}
 
-      <div>
-        <Select
-          label={t('form.quoteProviderLabel')}
-          options={[
-            { value: '', label: t('form.quoteProviderUseDefault', { provider: t(`form.providers.${userDefaultProvider}`) }) },
-            ...quoteProviderOverrideOptions
-              .slice(1)
-              .map((o) => ({ value: o.value, label: t(o.labelKey) })),
-          ]}
-          value={watch('quoteProvider') || ''}
-          onChange={(e) =>
-            setValue(
-              'quoteProvider',
-              e.target.value as 'yahoo' | 'msn' | 'lse' | 'deutsche_boerse' | '',
-              {
-                shouldDirty: true,
-              },
-            )
-          }
-          error={errors.quoteProvider?.message}
-        />
-        {watch('quoteProvider') === 'msn' && msnReady === false && (
-          <p
-            role="alert"
-            className="text-sm text-red-600 dark:text-red-400 mt-2"
-            data-testid="msn-not-configured-error"
-          >
-            {t('form.msnNotConfigured')}
-          </p>
-        )}
-      </div>
+      {!isLinkedToBond && (
+        <div>
+          <Select
+            label={t('form.quoteProviderLabel')}
+            options={[
+              { value: '', label: t('form.quoteProviderUseDefault', { provider: t(`form.providers.${userDefaultProvider}`) }) },
+              ...quoteProviderOverrideOptions
+                .slice(1)
+                .map((o) => ({ value: o.value, label: t(o.labelKey) })),
+            ]}
+            value={watch('quoteProvider') || ''}
+            onChange={(e) =>
+              setValue(
+                'quoteProvider',
+                e.target.value as 'yahoo' | 'msn' | 'lse' | 'deutsche_boerse' | '',
+                {
+                  shouldDirty: true,
+                },
+              )
+            }
+            error={errors.quoteProvider?.message}
+          />
+          {watch('quoteProvider') === 'msn' && msnReady === false && (
+            <p
+              role="alert"
+              className="text-sm text-red-600 dark:text-red-400 mt-2"
+              data-testid="msn-not-configured-error"
+            >
+              {t('form.msnNotConfigured')}
+            </p>
+          )}
+        </div>
+      )}
 
       <div>
         <label className="flex items-center gap-2 text-sm cursor-pointer w-fit">
@@ -837,7 +844,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
         {t('priceAlert.chartLabel')}
       </label>
 
-      {watch('quoteProvider') === 'msn' && (
+      {!isLinkedToBond && watch('quoteProvider') === 'msn' && (
         <Input
           label={t('form.msnIdLabel')}
           {...register('msnInstrumentId')}

@@ -302,7 +302,9 @@
       "INVALID_QUANTITY": "No se pueden derivar los lotes: falta una cantidad, es negativa o demasiado grande."
     },
     "assumptions": {
-      "title": "Supuestos de la proyección"
+      "title": "Supuestos de la proyección",
+      "latestObservation": "Se supone {benchmarkId} en {value} para todos los periodos posteriores, el último valor publicado ({observation})",
+      "supplied": "Se supone {benchmarkId} en {value} para todos los periodos posteriores"
     },
     "missing": {
       "title": "Datos que aún faltan",

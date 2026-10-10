@@ -302,7 +302,9 @@
       "INVALID_QUANTITY": "The lots cannot be derived: a quantity is missing, negative or too large."
     },
     "assumptions": {
-      "title": "Projection assumptions"
+      "title": "Projection assumptions",
+      "latestObservation": "{benchmarkId} assumed at {value} for every later period, the latest published value ({observation})",
+      "supplied": "{benchmarkId} assumed at {value} for every later period"
     },
     "missing": {
       "title": "Data still needed",

@@ -1218,6 +1218,28 @@ describe('SecurityForm', () => {
       );
     });
 
+    it('hides the quote provider controls for a linked series and submits the stored values unchanged', async () => {
+      await renderBond({ bondInstrumentId: 'b-pln', quoteProvider: 'msn', msnInstrumentId: 'abc123' });
+      const select = (await screen.findByLabelText('Bond series (optional)')) as HTMLSelectElement;
+      await waitFor(() => expect(select.value).toBe('b-pln'));
+      expect(screen.queryByLabelText('Quote Provider')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('MSN Instrument ID (advanced)')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByText('Update Security'));
+      await waitFor(() =>
+        expect(onSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({ bondInstrumentId: 'b-pln', quoteProvider: 'msn', msnInstrumentId: 'abc123' }),
+        ),
+      );
+    });
+
+    it('shows the quote provider select for a BOND that is not linked, and again after unlinking', async () => {
+      await renderBond({ bondInstrumentId: 'b-pln' });
+      const select = (await screen.findByLabelText('Bond series (optional)')) as HTMLSelectElement;
+      await waitFor(() => expect(screen.queryByLabelText('Quote Provider')).not.toBeInTheDocument());
+      fireEvent.change(select, { target: { value: '' } });
+      expect(await screen.findByLabelText('Quote Provider')).toBeInTheDocument();
+    });
+
     it('unlinks a linked security whose type is moved away from BOND', async () => {
       await renderBond({ bondInstrumentId: 'b-pln' });
       await screen.findByLabelText('Bond series (optional)');
