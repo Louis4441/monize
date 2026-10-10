@@ -45,6 +45,39 @@ export interface CashFlow {
   readonly period: number;
 }
 
+/** The terms' rate rule as stated, in plain fields; fractions are strings. */
+export interface RateRuleDescription {
+  readonly type:
+    "FIXED" | "BENCHMARK_PLUS_SPREAD" | "INFLATION_PLUS_MARGIN_AS_RATE";
+  readonly benchmarkId: string | null;
+  /** FIXED only. */
+  readonly annualRate: string | null;
+  readonly firstPeriodRate: string | null;
+  /** The margin or spread. */
+  readonly addend: string | null;
+  readonly benchmarkFloor: string | null;
+}
+
+export interface RateScheduleBenchmark {
+  readonly benchmarkId: string;
+  /** The YYYY-MM-DD or YYYY-MM key the observation rule computed. */
+  readonly observation: string;
+  /** Observed (or assumed, when PROJECTED); null when not published. */
+  readonly value: string | null;
+  /** After the benchmark floor; null when `value` is null. */
+  readonly flooredValue: string | null;
+}
+
+export interface RateScheduleEntry {
+  readonly index: number;
+  readonly start: string;
+  readonly end: string;
+  readonly annualRate: string | null;
+  readonly rateSource: RateSource | null;
+  readonly benchmark: RateScheduleBenchmark | null;
+  readonly addend: string | null;
+}
+
 export interface BondValuation {
   readonly asOf: string;
   readonly seriesCode: string;
@@ -58,6 +91,9 @@ export interface BondValuation {
     readonly annualRate: string;
     readonly rateSource: RateSource;
   } | null;
+  readonly rateRule: RateRuleDescription;
+  /** One entry per period of the lot. */
+  readonly rateSchedule: readonly RateScheduleEntry[];
   /** Per bond: the base of the current period (the nominal for a coupon bond). */
   readonly principal: string | null;
   /** Lot: gross value less nominal (capitalised plus current accrual when compounding). */

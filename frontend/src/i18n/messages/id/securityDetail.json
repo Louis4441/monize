@@ -315,6 +315,35 @@
       "button": "Hitung ulang harga",
       "done": "Harga dihitung ulang: {written} ditulis, {deleted} dihapus.",
       "failed": "Harga tidak dapat dihitung ulang."
+    },
+    "rate": {
+      "title": "Suku bunga",
+      "rule": {
+        "fixed": "Tetap {rate} selama seluruh masa berlaku",
+        "firstThen": "Periode 1: {firstRate}. Setelah itu {benchmark} + {addend}",
+        "every": "Setiap periode: {benchmark} + {addend}",
+        "floorZero": "Nilai {benchmark} yang negatif dihitung sebagai 0"
+      },
+      "lotHeading": "Lot dibeli pada {date}",
+      "range": "{start} sampai {end}",
+      "current": "Saat ini",
+      "columns": {
+        "period": "Periode",
+        "dates": "Tanggal",
+        "rate": "Suku bunga",
+        "source": "Sumber",
+        "how": "Cara penetapan"
+      },
+      "how": {
+        "stated": "Suku bunga yang ditetapkan",
+        "observed": "{benchmark} {observation}: {value} + {addend}",
+        "floored": "(dinaikkan ke {floor})",
+        "missing": "{benchmark} {observation}: belum dipublikasikan"
+      }
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "IHK, 12 bulan (GUS)",
+      "PL_NBP_REFERENCE": "Suku bunga acuan NBP"
     }
   }
 }

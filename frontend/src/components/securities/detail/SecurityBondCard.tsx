@@ -18,6 +18,7 @@ import type {
   SecurityBondValuation,
 } from '@/types/bond';
 import { SecurityBondLotsTable } from './SecurityBondLotsTable';
+import { SecurityBondRateSection } from './SecurityBondRateSection';
 
 interface SecurityBondCardProps {
   security: Security;
@@ -227,6 +228,7 @@ export function SecurityBondCard({
         {lots.length > 0 && (
           <SecurityBondLotsTable lots={lots} currency={currency} />
         )}
+        {lots.length > 0 && <SecurityBondRateSection lots={lots} />}
 
         {assumptions.length > 0 && (
           <div>

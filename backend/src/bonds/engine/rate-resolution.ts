@@ -17,8 +17,23 @@ import {
   RateSource,
 } from "./bond-engine-types";
 
+/** What a benchmark period read: the observation key, the value and the floored value. */
+export interface PeriodBenchmark {
+  readonly benchmarkId: string;
+  /** The YYYY-MM-DD or YYYY-MM key the observation rule computed. */
+  readonly observation: string;
+  /** The observed value, or the assumed one when PROJECTED; null when missing. */
+  readonly value: string | null;
+  /** The value after the benchmark floor; null when `value` is null. */
+  readonly flooredValue: string | null;
+}
+
 export interface PeriodRate {
   readonly period: SchedulePeriod;
+  /** Null for a TERMS or ANNOUNCED period: the stated rate does not read a benchmark. */
+  readonly benchmark: PeriodBenchmark | null;
+  /** The margin or spread as a fraction; null when `benchmark` is null. */
+  readonly addend: string | null;
   readonly rate: ExactDecimal | null;
   readonly source: RateSource | null;
   /** Set when the rate is null and the cause is a missing observation. */
@@ -58,16 +73,13 @@ function addendOf(rule: BenchmarkRule): ExactDecimal {
   }
 }
 
-/** max(floor, benchmark) + addend: the floor keeps a negative benchmark out of the rate. */
-function flooredRate(
-  rule: BenchmarkRule,
-  benchmark: ExactDecimal,
-): ExactDecimal {
+/** max(floor, benchmark): the floor keeps a negative benchmark out of the rate. */
+function floored(rule: BenchmarkRule, benchmark: ExactDecimal): ExactDecimal {
   const floor =
     rule.benchmarkFloor === null
       ? benchmark
       : parseDecimal(rule.benchmarkFloor, "floor");
-  return ExactDecimal.max(floor, benchmark).add(addendOf(rule));
+  return ExactDecimal.max(floor, benchmark);
 }
 
 function newestStep(
@@ -93,6 +105,8 @@ function newestStep(
 
 interface Observation {
   readonly value: ExactDecimal | null;
+  /** The stored value string as read; null when `value` is null. */
+  readonly raw: string | null;
   readonly missing: MissingObservation;
 }
 
@@ -125,10 +139,11 @@ function observe(
         data.coveredThrough === null ||
         compareYMD(day, data.coveredThrough) > 0
       ) {
-        return { value: null, missing };
+        return { value: null, raw: null, missing };
       }
       const change = newestStep(data, day);
       return {
+        raw: change ? change.value : null,
         value: change
           ? parseDecimal(
               change.value,
@@ -143,6 +158,7 @@ function observe(
       const stored =
         data && data.kind === "MONTHLY" ? data.values.get(key) : undefined;
       return {
+        raw: stored === undefined ? null : stored,
         value:
           stored === undefined
             ? null
@@ -224,17 +240,30 @@ export function resolvePeriodRates(
   let usedAssumption = false;
 
   const rates = schedule.map((period): PeriodRate => {
-    const known = (rate: ExactDecimal, source: RateSource): PeriodRate => ({
+    const known = (
+      rate: ExactDecimal,
+      source: RateSource,
+      benchmark: PeriodBenchmark | null = null,
+    ): PeriodRate => ({
       period,
       rate,
       source,
       missing: null,
+      benchmark,
+      addend:
+        benchmark && rule.type !== "FIXED" ? fraction(addendOf(rule)) : null,
     });
-    const unknown = (missing: MissingObservation | null): PeriodRate => ({
+    const unknown = (
+      missing: MissingObservation | null,
+      benchmark: PeriodBenchmark | null = null,
+    ): PeriodRate => ({
       period,
       rate: null,
       source: null,
       missing,
+      benchmark,
+      addend:
+        benchmark && rule.type !== "FIXED" ? fraction(addendOf(rule)) : null,
     });
     if (rule.type === "FIXED")
       return known(parseDecimal(rule.annualRate, "annualRate"), "TERMS");
@@ -253,14 +282,33 @@ export function resolvePeriodRates(
     }
     const observation = observe(rule, period, input);
     if (observation === null) return unknown(null);
+    const key = observation.missing.observation;
     if (observation.value !== null) {
-      return known(flooredRate(rule, observation.value), "DERIVED");
+      const base = floored(rule, observation.value);
+      return known(base.add(addendOf(rule)), "DERIVED", {
+        benchmarkId: rule.benchmarkId,
+        observation: key,
+        value: observation.raw,
+        flooredValue: fraction(base),
+      });
     }
+    const absent: PeriodBenchmark = {
+      benchmarkId: rule.benchmarkId,
+      observation: key,
+      value: null,
+      flooredValue: null,
+    };
     if (compareYMD(period.start, input.asOf) <= 0)
-      return unknown(observation.missing);
-    if (assumption === null) return unknown(null);
+      return unknown(observation.missing, absent);
+    if (assumption === null) return unknown(null, absent);
     usedAssumption = true;
-    return known(flooredRate(rule, assumption.value), "PROJECTED");
+    const base = floored(rule, assumption.value);
+    return known(base.add(addendOf(rule)), "PROJECTED", {
+      benchmarkId: rule.benchmarkId,
+      observation: key,
+      value: fraction(assumption.value),
+      flooredValue: fraction(base),
+    });
   });
 
   return {

@@ -315,6 +315,35 @@
       "button": "Перерахувати ціни",
       "done": "Ціни перераховано: записано {written}, видалено {deleted}.",
       "failed": "Не вдалося перерахувати ціни."
+    },
+    "rate": {
+      "title": "Відсоткова ставка",
+      "rule": {
+        "fixed": "Фіксована {rate} на весь строк",
+        "firstThen": "Період 1: {firstRate}. Далі {benchmark} + {addend}",
+        "every": "Кожен період: {benchmark} + {addend}",
+        "floorZero": "Від’ємне значення {benchmark} вважається за 0"
+      },
+      "lotHeading": "Лот, придбаний {date}",
+      "range": "з {start} по {end}",
+      "current": "Поточний",
+      "columns": {
+        "period": "Період",
+        "dates": "Дати",
+        "rate": "Ставка",
+        "source": "Джерело",
+        "how": "Як визначена"
+      },
+      "how": {
+        "stated": "Ставка за умовами випуску",
+        "observed": "{benchmark} {observation}: {value} + {addend}",
+        "floored": "(підвищено до {floor})",
+        "missing": "{benchmark} {observation}: ще не опубліковано"
+      }
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "Інфляція ІСЦ, 12 місяців (GUS)",
+      "PL_NBP_REFERENCE": "Референтна ставка NBP"
     }
   }
 }

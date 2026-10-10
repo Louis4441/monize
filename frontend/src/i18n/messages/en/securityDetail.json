@@ -315,6 +315,35 @@
       "button": "Recalculate prices",
       "done": "Prices recalculated: {written} written, {deleted} removed.",
       "failed": "The prices could not be recalculated."
+    },
+    "rate": {
+      "title": "Interest rate",
+      "rule": {
+        "fixed": "Fixed {rate} for the whole term",
+        "firstThen": "Period 1: {firstRate}. Then {benchmark} + {addend}",
+        "every": "Every period: {benchmark} + {addend}",
+        "floorZero": "A negative {benchmark} counts as 0"
+      },
+      "lotHeading": "Lot purchased {date}",
+      "range": "{start} to {end}",
+      "current": "Current",
+      "columns": {
+        "period": "Period",
+        "dates": "Dates",
+        "rate": "Rate",
+        "source": "Source",
+        "how": "How it is set"
+      },
+      "how": {
+        "stated": "Stated rate",
+        "observed": "{benchmark} {observation}: {value} + {addend}",
+        "floored": "(floored to {floor})",
+        "missing": "{benchmark} {observation}: not published yet"
+      }
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "CPI, 12 months (GUS)",
+      "PL_NBP_REFERENCE": "NBP reference rate"
     }
   }
 }

@@ -315,6 +315,35 @@
       "button": "Recalcular preços",
       "done": "Preços recalculados: {written} escritos, {deleted} removidos.",
       "failed": "Não foi possível recalcular os preços."
+    },
+    "rate": {
+      "title": "Taxa de juro",
+      "rule": {
+        "fixed": "{rate} fixa durante todo o prazo",
+        "firstThen": "Período 1: {firstRate}. Depois {benchmark} + {addend}",
+        "every": "Cada período: {benchmark} + {addend}",
+        "floorZero": "Um valor negativo de {benchmark} conta como 0"
+      },
+      "lotHeading": "Lote comprado em {date}",
+      "range": "{start} a {end}",
+      "current": "Atual",
+      "columns": {
+        "period": "Período",
+        "dates": "Datas",
+        "rate": "Taxa",
+        "source": "Origem",
+        "how": "Como é definida"
+      },
+      "how": {
+        "stated": "Taxa indicada",
+        "observed": "{benchmark} {observation}: {value} + {addend}",
+        "floored": "(elevado a {floor})",
+        "missing": "{benchmark} {observation}: ainda não publicado"
+      }
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "IPC, 12 meses (GUS)",
+      "PL_NBP_REFERENCE": "Taxa de referência do NBP"
     }
   }
 }

@@ -315,6 +315,35 @@
       "button": "Recalcular precios",
       "done": "Precios recalculados: {written} escritos, {deleted} eliminados.",
       "failed": "No se pudieron recalcular los precios."
+    },
+    "rate": {
+      "title": "Tipo de interés",
+      "rule": {
+        "fixed": "{rate} fijo durante todo el plazo",
+        "firstThen": "Período 1: {firstRate}. Después {benchmark} + {addend}",
+        "every": "Cada período: {benchmark} + {addend}",
+        "floorZero": "Un valor negativo de {benchmark} cuenta como 0"
+      },
+      "lotHeading": "Lote comprado el {date}",
+      "range": "{start} a {end}",
+      "current": "Actual",
+      "columns": {
+        "period": "Período",
+        "dates": "Fechas",
+        "rate": "Tipo",
+        "source": "Origen",
+        "how": "Cómo se fija"
+      },
+      "how": {
+        "stated": "Tipo indicado",
+        "observed": "{benchmark} {observation}: {value} + {addend}",
+        "floored": "(elevado a {floor})",
+        "missing": "{benchmark} {observation}: aún no publicado"
+      }
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "IPC, 12 meses (GUS)",
+      "PL_NBP_REFERENCE": "Tipo de referencia del NBP"
     }
   }
 }

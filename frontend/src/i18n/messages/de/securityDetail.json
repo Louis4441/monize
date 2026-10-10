@@ -315,6 +315,35 @@
       "button": "Preise neu berechnen",
       "done": "Preise neu berechnet: {written} geschrieben, {deleted} entfernt.",
       "failed": "Die Preise konnten nicht neu berechnet werden."
+    },
+    "rate": {
+      "title": "Zinssatz",
+      "rule": {
+        "fixed": "Fest {rate} für die gesamte Laufzeit",
+        "firstThen": "Periode 1: {firstRate}. Danach {benchmark} + {addend}",
+        "every": "Jede Periode: {benchmark} + {addend}",
+        "floorZero": "Ein negativer Wert von {benchmark} zählt als 0"
+      },
+      "lotHeading": "Am {date} gekaufte Position",
+      "range": "{start} bis {end}",
+      "current": "Aktuell",
+      "columns": {
+        "period": "Periode",
+        "dates": "Zeitraum",
+        "rate": "Zinssatz",
+        "source": "Quelle",
+        "how": "Festsetzung"
+      },
+      "how": {
+        "stated": "Angegebener Satz",
+        "observed": "{benchmark} {observation}: {value} + {addend}",
+        "floored": "(auf {floor} angehoben)",
+        "missing": "{benchmark} {observation}: noch nicht veröffentlicht"
+      }
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "Inflationsrate (VPI), 12 Monate (GUS)",
+      "PL_NBP_REFERENCE": "NBP-Referenzzins"
     }
   }
 }

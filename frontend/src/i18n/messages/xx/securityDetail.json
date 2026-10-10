@@ -315,6 +315,35 @@
       "button": "[XX-Recalculate prices-XX]",
       "done": "[XX-Prices recalculated: {written} written, {deleted} removed.-XX]",
       "failed": "[XX-The prices could not be recalculated.-XX]"
+    },
+    "rate": {
+      "title": "[XX-Interest rate-XX]",
+      "rule": {
+        "fixed": "[XX-Fixed {rate} for the whole term-XX]",
+        "firstThen": "[XX-Period 1: {firstRate}. Then {benchmark} + {addend}-XX]",
+        "every": "[XX-Every period: {benchmark} + {addend}-XX]",
+        "floorZero": "[XX-A negative {benchmark} counts as 0-XX]"
+      },
+      "lotHeading": "[XX-Lot purchased {date}-XX]",
+      "range": "[XX-{start} to {end}-XX]",
+      "current": "[XX-Current-XX]",
+      "columns": {
+        "period": "[XX-Period-XX]",
+        "dates": "[XX-Dates-XX]",
+        "rate": "[XX-Rate-XX]",
+        "source": "[XX-Source-XX]",
+        "how": "[XX-How it is set-XX]"
+      },
+      "how": {
+        "stated": "[XX-Stated rate-XX]",
+        "observed": "[XX-{benchmark} {observation}: {value} + {addend}-XX]",
+        "floored": "[XX-(floored to {floor})-XX]",
+        "missing": "[XX-{benchmark} {observation}: not published yet-XX]"
+      }
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "[XX-CPI, 12 months (GUS)-XX]",
+      "PL_NBP_REFERENCE": "[XX-NBP reference rate-XX]"
     }
   }
 }

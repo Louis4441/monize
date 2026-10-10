@@ -315,6 +315,35 @@
       "button": "कीमतें दोबारा गणना करें",
       "done": "कीमतों की दोबारा गणना हुई: {written} लिखी गईं, {deleted} हटाई गईं।",
       "failed": "कीमतों की दोबारा गणना नहीं हो सकी।"
+    },
+    "rate": {
+      "title": "ब्याज दर",
+      "rule": {
+        "fixed": "पूरी अवधि के लिए स्थिर {rate}",
+        "firstThen": "अवधि 1: {firstRate}। उसके बाद {benchmark} + {addend}",
+        "every": "हर अवधि: {benchmark} + {addend}",
+        "floorZero": "{benchmark} का ऋणात्मक मान 0 गिना जाता है"
+      },
+      "lotHeading": "{date} को खरीदा गया लॉट",
+      "range": "{start} से {end}",
+      "current": "वर्तमान",
+      "columns": {
+        "period": "अवधि",
+        "dates": "तिथियां",
+        "rate": "दर",
+        "source": "स्रोत",
+        "how": "कैसे तय हुई"
+      },
+      "how": {
+        "stated": "निर्धारित दर",
+        "observed": "{benchmark} {observation}: {value} + {addend}",
+        "floored": "({floor} तक बढ़ाया गया)",
+        "missing": "{benchmark} {observation}: अभी प्रकाशित नहीं हुआ"
+      }
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "सीपीआई, 12 महीने (GUS)",
+      "PL_NBP_REFERENCE": "एनबीपी संदर्भ दर"
     }
   }
 }

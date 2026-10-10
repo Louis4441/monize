@@ -315,6 +315,35 @@
       "button": "Przelicz ceny",
       "done": "Ceny przeliczone: zapisano {written}, usunięto {deleted}.",
       "failed": "Nie udało się przeliczyć cen."
+    },
+    "rate": {
+      "title": "Oprocentowanie",
+      "rule": {
+        "fixed": "Stałe {rate} przez cały okres",
+        "firstThen": "Okres 1: {firstRate}. Następnie {benchmark} + marża {addend}",
+        "every": "Każdy okres: {benchmark} + marża {addend}",
+        "floorZero": "Ujemna wartość {benchmark} jest liczona jako 0"
+      },
+      "lotHeading": "Partia kupiona {date}",
+      "range": "{start} do {end}",
+      "current": "Bieżący",
+      "columns": {
+        "period": "Okres",
+        "dates": "Daty",
+        "rate": "Oprocentowanie",
+        "source": "Źródło",
+        "how": "Sposób ustalenia"
+      },
+      "how": {
+        "stated": "Stawka podana w warunkach",
+        "observed": "{benchmark} {observation}: {value} + {addend}",
+        "floored": "(przyjęto minimum {floor})",
+        "missing": "{benchmark} {observation}: jeszcze nieopublikowane"
+      }
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "Inflacja CPI r/r (GUS)",
+      "PL_NBP_REFERENCE": "Stopa referencyjna NBP"
     }
   }
 }

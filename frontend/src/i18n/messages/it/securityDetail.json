@@ -315,6 +315,35 @@
       "button": "Ricalcola i prezzi",
       "done": "Prezzi ricalcolati: {written} scritti, {deleted} rimossi.",
       "failed": "Impossibile ricalcolare i prezzi."
+    },
+    "rate": {
+      "title": "Tasso di interesse",
+      "rule": {
+        "fixed": "{rate} fisso per tutta la durata",
+        "firstThen": "Periodo 1: {firstRate}. Poi {benchmark} + {addend}",
+        "every": "Ogni periodo: {benchmark} + {addend}",
+        "floorZero": "Un valore negativo di {benchmark} conta come 0"
+      },
+      "lotHeading": "Lotto acquistato il {date}",
+      "range": "dal {start} al {end}",
+      "current": "Corrente",
+      "columns": {
+        "period": "Periodo",
+        "dates": "Date",
+        "rate": "Tasso",
+        "source": "Fonte",
+        "how": "Come è stabilito"
+      },
+      "how": {
+        "stated": "Tasso indicato",
+        "observed": "{benchmark} {observation}: {value} + {addend}",
+        "floored": "(portato a {floor})",
+        "missing": "{benchmark} {observation}: non ancora pubblicato"
+      }
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "Inflazione IPC, 12 mesi (GUS)",
+      "PL_NBP_REFERENCE": "Tasso di riferimento NBP"
     }
   }
 }

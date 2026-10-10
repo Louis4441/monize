@@ -315,6 +315,35 @@
       "button": "Koersen herberekenen",
       "done": "Koersen herberekend: {written} geschreven, {deleted} verwijderd.",
       "failed": "De koersen konden niet worden herberekend."
+    },
+    "rate": {
+      "title": "Rente",
+      "rule": {
+        "fixed": "Vast {rate} voor de hele looptijd",
+        "firstThen": "Periode 1: {firstRate}. Daarna {benchmark} + {addend}",
+        "every": "Elke periode: {benchmark} + {addend}",
+        "floorZero": "Een negatieve waarde van {benchmark} telt als 0"
+      },
+      "lotHeading": "Lot gekocht op {date}",
+      "range": "{start} tot {end}",
+      "current": "Huidig",
+      "columns": {
+        "period": "Periode",
+        "dates": "Datums",
+        "rate": "Rente",
+        "source": "Bron",
+        "how": "Hoe vastgesteld"
+      },
+      "how": {
+        "stated": "Vermeld tarief",
+        "observed": "{benchmark} {observation}: {value} + {addend}",
+        "floored": "(verhoogd tot {floor})",
+        "missing": "{benchmark} {observation}: nog niet gepubliceerd"
+      }
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "CPI, 12 maanden (GUS)",
+      "PL_NBP_REFERENCE": "NBP-referentierente"
     }
   }
 }

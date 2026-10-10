@@ -65,6 +65,39 @@ export interface BondCurrentPeriod {
   rateSource: BondRateSource;
 }
 
+/** The terms' rate rule as stated; every rate is a fraction string. */
+export interface BondRateRule {
+  type: 'FIXED' | 'BENCHMARK_PLUS_SPREAD' | 'INFLATION_PLUS_MARGIN_AS_RATE';
+  benchmarkId: string | null;
+  /** FIXED only. */
+  annualRate: string | null;
+  firstPeriodRate: string | null;
+  /** The margin or spread. */
+  addend: string | null;
+  benchmarkFloor: string | null;
+}
+
+export interface BondRateScheduleBenchmark {
+  benchmarkId: string;
+  /** The YYYY-MM-DD or YYYY-MM key the observation rule computed. */
+  observation: string;
+  /** Observed (or assumed, when PROJECTED); null when not published. */
+  value: string | null;
+  /** After the benchmark floor; null when `value` is null. */
+  flooredValue: string | null;
+}
+
+/** One period of a lot; `benchmark` is null for a TERMS or ANNOUNCED period. */
+export interface BondRateScheduleEntry {
+  index: number;
+  start: string;
+  end: string;
+  annualRate: string | null;
+  rateSource: BondRateSource | null;
+  benchmark: BondRateScheduleBenchmark | null;
+  addend: string | null;
+}
+
 export interface BondValuation {
   asOf: string;
   seriesCode: string;
@@ -72,6 +105,9 @@ export interface BondValuation {
   quantity: number;
   maturityDate: string;
   currentPeriod: BondCurrentPeriod | null;
+  rateRule: BondRateRule;
+  /** One entry per period of the lot. */
+  rateSchedule: BondRateScheduleEntry[];
   /** Per bond: the base of the current period. */
   principal: string | null;
   /** Lot. */

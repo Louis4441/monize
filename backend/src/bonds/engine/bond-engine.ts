@@ -17,6 +17,8 @@ import {
   CashFlow,
   EarlyRedemptionRefusal,
   MissingObservation,
+  RateRuleDescription,
+  RateScheduleEntry,
 } from "./bond-engine-types";
 import { PeriodRate, resolvePeriodRates } from "./rate-resolution";
 import {
@@ -91,6 +93,41 @@ function neededMissing(
     }
   }
   return missing;
+}
+
+function describeRule(
+  rule: BondEngineInput["terms"]["rateRule"],
+): RateRuleDescription {
+  if (rule.type === "FIXED") {
+    return {
+      type: rule.type,
+      benchmarkId: null,
+      annualRate: rule.annualRate,
+      firstPeriodRate: null,
+      addend: null,
+      benchmarkFloor: null,
+    };
+  }
+  return {
+    type: rule.type,
+    benchmarkId: rule.benchmarkId,
+    annualRate: null,
+    firstPeriodRate: rule.firstPeriodRate,
+    addend: rule.type === "BENCHMARK_PLUS_SPREAD" ? rule.spread : rule.margin,
+    benchmarkFloor: rule.benchmarkFloor,
+  };
+}
+
+function describeSchedule(rates: readonly PeriodRate[]): RateScheduleEntry[] {
+  return rates.map((r) => ({
+    index: r.period.index,
+    start: r.period.start,
+    end: r.period.end,
+    annualRate: r.rate ? r.rate.toTrimmedString(10, 4) : null,
+    rateSource: r.source,
+    benchmark: r.benchmark,
+    addend: r.addend,
+  }));
 }
 
 /**
@@ -255,6 +292,8 @@ export function valueBondLot(input: BondEngineInput): BondValuation {
             rateSource: currentRate.source,
           }
         : null,
+    rateRule: describeRule(terms.rateRule),
+    rateSchedule: describeSchedule(rates),
     principal,
     accruedInterest: accrued,
     grossValue: gross,

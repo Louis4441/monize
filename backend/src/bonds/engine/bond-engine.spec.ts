@@ -649,3 +649,130 @@ describe("valueBondLot: generic primitives", () => {
     expect(v.currentPeriod?.rateSource).toBe("TERMS");
   });
 });
+
+describe("valueBondLot: rate rule and rate schedule (spec 2.6)", () => {
+  it("describes a fixed rate: every period TERMS, no benchmark", () => {
+    const v = tos("2027-04-15");
+    expect(v.rateRule).toEqual({
+      type: "FIXED",
+      benchmarkId: null,
+      annualRate: expect.any(String),
+      firstPeriodRate: null,
+      addend: null,
+      benchmarkFloor: null,
+    });
+    expect(v.rateSchedule.length).toBeGreaterThan(0);
+    for (const entry of v.rateSchedule) {
+      expect(entry).toMatchObject({
+        rateSource: "TERMS",
+        annualRate: v.rateRule.annualRate,
+        benchmark: null,
+        addend: null,
+      });
+    }
+  });
+
+  it("an inflation bond: TERMS first period, DERIVED with the observation, the floor and the margin", () => {
+    const v = edo("2027-10-02", { benchmarks: cpi(["2027-08", "0.0340"]) });
+    expect(v.rateRule).toEqual({
+      type: "INFLATION_PLUS_MARGIN_AS_RATE",
+      benchmarkId: CPI,
+      annualRate: null,
+      firstPeriodRate: "0.0535",
+      addend: "0.0200",
+      benchmarkFloor: "0",
+    });
+    expect(v.rateSchedule).toHaveLength(10);
+    expect(v.rateSchedule[0]).toEqual({
+      index: 1,
+      start: "2026-10-01",
+      end: "2027-10-01",
+      annualRate: "0.0535",
+      rateSource: "TERMS",
+      benchmark: null,
+      addend: null,
+    });
+    expect(v.rateSchedule[1]).toMatchObject({
+      index: 2,
+      start: "2027-10-01",
+      annualRate: "0.0540",
+      rateSource: "DERIVED",
+      benchmark: {
+        benchmarkId: CPI,
+        observation: "2027-08",
+        value: "0.0340",
+        flooredValue: "0.0340",
+      },
+      addend: "0.0200",
+    });
+  });
+
+  it("a negative CPI is floored to 0 and the schedule shows both values", () => {
+    const v = edo("2027-10-02", { benchmarks: cpi(["2027-08", "-0.0050"]) });
+    expect(v.rateSchedule[1]).toMatchObject({
+      annualRate: "0.0200",
+      rateSource: "DERIVED",
+      benchmark: { value: "-0.0050", flooredValue: "0.0000" },
+    });
+  });
+
+  it("a period that has not started carries the assumed value, PROJECTED", () => {
+    const v = edo("2026-10-10", { projection: new Map([[CPI, "0.0300"]]) });
+    expect(v.rateSchedule[2]).toMatchObject({
+      annualRate: "0.0500",
+      rateSource: "PROJECTED",
+      benchmark: {
+        benchmarkId: CPI,
+        observation: "2028-08",
+        value: "0.0300",
+        flooredValue: "0.0300",
+      },
+      addend: "0.0200",
+    });
+  });
+
+  it("a started period without its observation has no rate and says which one", () => {
+    const v = edo("2027-10-02");
+    expect(v.rateSchedule[1]).toEqual({
+      index: 2,
+      start: "2027-10-01",
+      end: "2028-10-01",
+      annualRate: null,
+      rateSource: null,
+      benchmark: {
+        benchmarkId: CPI,
+        observation: "2027-08",
+        value: null,
+        flooredValue: null,
+      },
+      addend: "0.0200",
+    });
+  });
+
+  it("an announced period states its rate and reads no benchmark", () => {
+    const v = edo("2027-10-02", {
+      announcedRates: announced([2, "0.0500"]),
+      benchmarks: cpi(["2027-08", "0.0340"]),
+    });
+    expect(v.rateSchedule[1]).toMatchObject({
+      annualRate: "0.0500",
+      rateSource: "ANNOUNCED",
+      benchmark: null,
+      addend: null,
+    });
+  });
+
+  it("a step benchmark observation is the business-day date key", () => {
+    const v = ror("2026-11-05", {
+      benchmarks: nbp("2026-10-30", ["2026-10-01", "0.0425"]),
+    });
+    expect(v.rateRule).toMatchObject({
+      type: "BENCHMARK_PLUS_SPREAD",
+      benchmarkId: NBP,
+    });
+    const second = v.rateSchedule[1];
+    expect(second.benchmark?.benchmarkId).toBe(NBP);
+    expect(second.benchmark?.observation).toBe("2026-10-19");
+    expect(second.benchmark?.value).toBe("0.0425");
+  });
+});

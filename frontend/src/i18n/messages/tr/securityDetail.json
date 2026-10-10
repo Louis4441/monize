@@ -315,6 +315,35 @@
       "button": "Fiyatları yeniden hesapla",
       "done": "Fiyatlar yeniden hesaplandı: {written} yazıldı, {deleted} kaldırıldı.",
       "failed": "Fiyatlar yeniden hesaplanamadı."
+    },
+    "rate": {
+      "title": "Faiz oranı",
+      "rule": {
+        "fixed": "Tüm vade boyunca sabit {rate}",
+        "firstThen": "Dönem 1: {firstRate}. Sonrasında {benchmark} + {addend}",
+        "every": "Her dönem: {benchmark} + {addend}",
+        "floorZero": "{benchmark} değeri negatifse 0 sayılır"
+      },
+      "lotHeading": "{date} tarihinde alınan lot",
+      "range": "{start} - {end}",
+      "current": "Güncel",
+      "columns": {
+        "period": "Dönem",
+        "dates": "Tarihler",
+        "rate": "Oran",
+        "source": "Kaynak",
+        "how": "Nasıl belirlenir"
+      },
+      "how": {
+        "stated": "Belirtilen oran",
+        "observed": "{benchmark} {observation}: {value} + {addend}",
+        "floored": "({floor} değerine yükseltildi)",
+        "missing": "{benchmark} {observation}: henüz yayımlanmadı"
+      }
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "TÜFE, 12 ay (GUS)",
+      "PL_NBP_REFERENCE": "NBP referans faizi"
     }
   }
 }

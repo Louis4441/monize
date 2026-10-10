@@ -315,6 +315,35 @@
       "button": "Recalculer les prix",
       "done": "Prix recalculés : {written} écrits, {deleted} supprimés.",
       "failed": "Les prix n'ont pas pu être recalculés."
+    },
+    "rate": {
+      "title": "Taux d'intérêt",
+      "rule": {
+        "fixed": "{rate} fixe pendant toute la durée",
+        "firstThen": "Période 1 : {firstRate}. Ensuite {benchmark} + {addend}",
+        "every": "Chaque période : {benchmark} + {addend}",
+        "floorZero": "Une valeur négative de {benchmark} compte pour 0"
+      },
+      "lotHeading": "Lot acheté le {date}",
+      "range": "{start} au {end}",
+      "current": "En cours",
+      "columns": {
+        "period": "Période",
+        "dates": "Dates",
+        "rate": "Taux",
+        "source": "Source",
+        "how": "Mode de calcul"
+      },
+      "how": {
+        "stated": "Taux indiqué",
+        "observed": "{benchmark} {observation} : {value} + {addend}",
+        "floored": "(relevé à {floor})",
+        "missing": "{benchmark} {observation} : pas encore publié"
+      }
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "Inflation IPC, 12 mois (GUS)",
+      "PL_NBP_REFERENCE": "Taux de référence de la NBP"
     }
   }
 }

@@ -315,6 +315,35 @@
       "button": "Tính lại giá",
       "done": "Đã tính lại giá: ghi {written}, xóa {deleted}.",
       "failed": "Không thể tính lại giá."
+    },
+    "rate": {
+      "title": "Lãi suất",
+      "rule": {
+        "fixed": "Cố định {rate} trong toàn bộ kỳ hạn",
+        "firstThen": "Kỳ 1: {firstRate}. Sau đó {benchmark} + {addend}",
+        "every": "Mỗi kỳ: {benchmark} + {addend}",
+        "floorZero": "Giá trị âm của {benchmark} được tính là 0"
+      },
+      "lotHeading": "Lô mua ngày {date}",
+      "range": "{start} đến {end}",
+      "current": "Hiện tại",
+      "columns": {
+        "period": "Kỳ",
+        "dates": "Ngày",
+        "rate": "Lãi suất",
+        "source": "Nguồn",
+        "how": "Cách xác định"
+      },
+      "how": {
+        "stated": "Lãi suất quy định",
+        "observed": "{benchmark} {observation}: {value} + {addend}",
+        "floored": "(nâng lên {floor})",
+        "missing": "{benchmark} {observation}: chưa được công bố"
+      }
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "CPI, 12 tháng (GUS)",
+      "PL_NBP_REFERENCE": "Lãi suất tham chiếu NBP"
     }
   }
 }

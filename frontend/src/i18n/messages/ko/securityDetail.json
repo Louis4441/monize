@@ -315,6 +315,35 @@
       "button": "가격 다시 계산",
       "done": "가격을 다시 계산했습니다: {written}건 기록, {deleted}건 삭제.",
       "failed": "가격을 다시 계산하지 못했습니다."
+    },
+    "rate": {
+      "title": "이자율",
+      "rule": {
+        "fixed": "전체 기간 동안 고정 {rate}",
+        "firstThen": "1회차: {firstRate}. 이후 {benchmark} + {addend}",
+        "every": "매 회차: {benchmark} + {addend}",
+        "floorZero": "{benchmark}가 음수이면 0으로 계산합니다"
+      },
+      "lotHeading": "{date}에 매수한 로트",
+      "range": "{start}부터 {end}까지",
+      "current": "현재",
+      "columns": {
+        "period": "회차",
+        "dates": "기간",
+        "rate": "이자율",
+        "source": "출처",
+        "how": "산정 방식"
+      },
+      "how": {
+        "stated": "약정 이자율",
+        "observed": "{benchmark} {observation}: {value} + {addend}",
+        "floored": "({floor}(으)로 상향)",
+        "missing": "{benchmark} {observation}: 아직 발표되지 않음"
+      }
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "소비자물가지수, 12개월 (GUS)",
+      "PL_NBP_REFERENCE": "NBP 기준금리"
     }
   }
 }

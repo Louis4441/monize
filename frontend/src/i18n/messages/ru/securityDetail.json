@@ -315,6 +315,35 @@
       "button": "Пересчитать цены",
       "done": "Цены пересчитаны: записано {written}, удалено {deleted}.",
       "failed": "Не удалось пересчитать цены."
+    },
+    "rate": {
+      "title": "Процентная ставка",
+      "rule": {
+        "fixed": "Фиксированная {rate} на весь срок",
+        "firstThen": "Период 1: {firstRate}. Затем {benchmark} + {addend}",
+        "every": "Каждый период: {benchmark} + {addend}",
+        "floorZero": "Отрицательное значение {benchmark} считается как 0"
+      },
+      "lotHeading": "Лот, купленный {date}",
+      "range": "с {start} по {end}",
+      "current": "Текущий",
+      "columns": {
+        "period": "Период",
+        "dates": "Даты",
+        "rate": "Ставка",
+        "source": "Источник",
+        "how": "Как определена"
+      },
+      "how": {
+        "stated": "Ставка по условиям выпуска",
+        "observed": "{benchmark} {observation}: {value} + {addend}",
+        "floored": "(повышено до {floor})",
+        "missing": "{benchmark} {observation}: ещё не опубликовано"
+      }
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "Инфляция ИПЦ, 12 месяцев (GUS)",
+      "PL_NBP_REFERENCE": "Ориентировочная ставка NBP"
     }
   }
 }
