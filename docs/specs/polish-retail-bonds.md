@@ -276,8 +276,10 @@ valuationComplete  all three flags true
 
 - **INV-BOND-001 Issue terms and announced rates are immutable.** A stored
   terms version and a stored announced rate are never updated or deleted; a
-  correction is a new terms version. Mechanism: a `BEFORE UPDATE OR DELETE`
-  trigger on both tables that raises.
+  correction is a new terms version. Mechanism: a row-level `BEFORE UPDATE OR
+  DELETE` trigger on both tables that raises. `TRUNCATE` is not covered: it is
+  a table-owner operation no application path issues, and the integration
+  test reset relies on it.
 - **INV-BOND-002 A missing rate is unknown, never substituted.** A period that
   has started and whose rate is neither in the terms, announced, nor derivable
   from the stored observation for its own month or day has no rate. The engine
@@ -363,8 +365,10 @@ formulas to the inputs their descriptions state.
   error whose `params` name the series. No valuation is produced.
 - Errors and refusals reach a client as a code and `params`, never as an
   English sentence; the server maps each code to a translated message. The
-  domain codes are `QUANTITY_INVALID`, `DATE_INVALID`, `AS_OF_BEFORE_PURCHASE`,
-  `BENCHMARK_NOT_READ`, `INSTRUMENT_NOT_FOUND`, `TERMS_NOT_FOUND` and
+  domain codes are `QUANTITY_INVALID`, `DATE_INVALID`, `DECIMAL_INVALID`,
+  `AS_OF_BEFORE_PURCHASE`, `BENCHMARK_NOT_READ`, `INSTRUMENT_NOT_FOUND`,
+  `INSTRUMENT_ID_NOT_FOUND`, `TERMS_NOT_FOUND` (no version stored),
+  `TERMS_VERSION_NOT_FOUND` (the named version is not stored) and
   `TERMS_MISMATCH`. A lots refusal (`BondLotsRefusal`) is
   `{ code, detail, params: { action, date, quantity } }`; `detail` is for the
   log and is never shown.

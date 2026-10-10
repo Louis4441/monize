@@ -3188,9 +3188,12 @@ Statement           A stored bond terms version and a stored announced period
                     rate are never updated or deleted; a correction is a new
                     terms version.
 Source of truth     bond_terms_versions, bond_period_rates
-Enforcement         bond_reject_mutation(), a BEFORE UPDATE OR DELETE trigger on
-                    both tables (migration 20261010170817_bond_reference_tables.sql);
-                    ON DELETE RESTRICT from both to bond_instruments.
+Enforcement         bond_reject_mutation(), a row-level BEFORE UPDATE OR DELETE
+                    trigger on both tables (migration
+                    20261010170817_bond_reference_tables.sql); ON DELETE
+                    RESTRICT from both to bond_instruments. TRUNCATE is not
+                    covered: no application path issues it, and the
+                    integration test reset relies on it.
 Concurrency scope   global (per instrument)
 Retry semantics     A retried insert of the same (instrument, version) or
                     (instrument, period) fails on the primary key; it never
@@ -3304,13 +3307,19 @@ Enforcement         Two mechanisms.
                     write's own transaction before it (SecuritiesService
                     assertBondLink); fk_securities_bond_instrument is
                     ON DELETE RESTRICT.
-Concurrency scope   per security; recomputes of one security are serialized by a
-                    transaction-scoped advisory lock keyed on the security id.
-                    Unlinking deletes that security's bond_engine rows in the
-                    same transaction. A transaction or manual price wins over a
-                    bond_engine row whatever the write order (the upsert WHERE
-                    admits only source = 'bond_engine'), and a provider write
-                    re-checks the link at write time.
+Concurrency scope   per security; recomputes and unlink cleanups of one security
+                    are serialized by a transaction-scoped advisory lock
+                    (LockScope.BondPriceRecompute in common/db/locks.ts, keyed
+                    on the security id), and the recompute reads the link after
+                    taking it. Unlinking deletes that security's bond_engine
+                    rows in the same transaction. A transaction or manual price
+                    wins over a bond_engine row whatever the write order: the
+                    engine upsert's WHERE admits only source = 'bond_engine',
+                    and the transaction-price upsert replaces a bond_engine row
+                    (TRANSACTION_PRICE_REPLACEABLE_SOURCES). A provider write
+                    inserts only WHERE the security has no bond link at write
+                    time, so an in-flight refresh cannot price a just-linked
+                    security.
 Retry semantics     A retried recompute writes nothing it already wrote
                     (written = 0, deleted = 0).
 Crash semantics     Reads, the upsert, the delete and the account updated_at
