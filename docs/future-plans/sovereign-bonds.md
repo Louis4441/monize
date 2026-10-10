@@ -38,8 +38,8 @@ backend/src/bonds/
   engine/          bond-engine.ts: terms + benchmarks + announced rates
                    + lot + asOf -> valuation; dispatches on primitive types only
   adapters/pl/     Polish calendar, benchmark definitions (PL_NBP_REFERENCE,
-                   PL_CPI_GUS_YOY), terms manifests for the four series,
-                   golden fixtures
+                   PL_CPI_GUS_YOY), terms manifests for the eight series
+                   (TOS, ROR, COI, EDO, OTS, DOR, ROS, ROD), golden fixtures
   entities/        BondInstrument, BondTermsVersion, BondPeriodRate,
                    BenchmarkSeries, BenchmarkValue
   bond-valuation.service.ts   withScopedDb read -> engine

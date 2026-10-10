@@ -21,6 +21,14 @@
 All of T1 to T7 and phases 2 to 5 of the plan landed in one PR, WMP/monize#24,
 at the owner's request.
 
+- [x] **Spec 13.1 to 13.4 and the rate schedule.** Indexation notice, per-period
+  rate schedule, interest attribution (`interest`, `fixedPart`,
+  `benchmarkPart`, `addendPart`, `announcedPart`), `GET
+  /bonds/securities/:securityId/scenarios` with `assume=` on the valuation, and
+  the chart. Implemented in this PR; acceptance: the test-matrix rows
+  "Attribution (13.2)", "Scenarios (13.3)" and "Chart (13.4)" of the spec, with
+  the examples E23 to E25.
+
 ## Follow-ups
 
 - [ ] A valuation dated after the newest published observation shows `null`

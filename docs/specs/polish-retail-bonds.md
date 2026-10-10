@@ -1,8 +1,9 @@
-# Polish Retail Treasury Bonds (TOS, ROR, COI, EDO)
+# Polish Retail Treasury Bonds (TOS, ROR, COI, EDO and four more)
 
-Specification for the first implementation of sovereign bond support proposed
+Specification for the implementation of sovereign bond support proposed
 in discussion kenlasko/monize#1650: a small generic bond domain, and the Polish
-retail savings bonds TOS, ROR, COI and EDO as its first products. Written
+retail savings bonds as its first products (TOS, ROR, COI and EDO first;
+OTS, DOR, ROS and ROD later in the same PR). Written
 before the implementation, per `docs/financial-calculation-contract.md`
 section 9. The plan and the task list are
 `docs/future-plans/sovereign-bonds.md` and
@@ -22,24 +23,29 @@ is listed in section 10.
 
 ## 1. Scope
 
-In scope for the first PR:
+In scope for this PR (it carries phases 1 to 5 of the plan):
 
 - the country-agnostic bond domain (section 2.0): instrument, versioned
   terms, rate, observation, principal, capitalization, accrual and
   redemption primitives, holding lot, cash flow, valuation;
 - a calculation engine in exact decimal arithmetic;
 - the Polish adapter: business-day calendar, benchmark definitions and the
-  four terms manifests above;
+  eight terms manifests (TOS1029, ROR1027, COI1030, EDO1036, OTS0127,
+  DOR1028, ROS1032, ROD1038);
 - persistence of instruments, terms versions, announced period rates and
   benchmark series and values in global, country-agnostic tables;
-- a read service that values one holding lot from the stored data.
+- fetchers for the NBP reference rate and the GUS CPI, run at boot and by a
+  lease-guarded cron (section 9), and the seeded instrument catalog;
+- linking a `securities` row to a bond instrument, lots derived from the
+  user's transactions, and a daily `bond_engine` price (section 12);
+- the read API, the detail view and its i18n (section 13).
 
-Out of scope for the first PR (the plan orders them): fetching terms from the
-Ministry of Finance, NBP or GUS; linking a `securities` row to a bond instrument;
-feeding bond values into portfolio valuation; any UI; OTS, DOR, ROS, ROD;
-taxes; the IKE/IKZE fee waiver; other countries, and the primitives they
-need (indexed principal, day-count conventions, market quotes, yields)
-(discussion section 38). Section 2.0 is the rule that keeps them addable.
+Out of scope: a machine-readable source of the Ministry's announced period
+rates (they are filled by hand); a projected value for a future `asOf`;
+taxes; the IKE/IKZE fee waiver; the eligibility check of ROS and ROD; other
+countries, and the primitives they need (indexed principal, day-count
+conventions, market quotes, yields) (discussion section 38). Section 2.0 is
+the rule that keeps them addable.
 
 ## 2. The model
 
@@ -259,7 +265,10 @@ maturityValueProjected | null
 projectionAssumptions  [{ benchmarkId, value (fraction), basis: SUPPLIED | LATEST_OBSERVATION,
                         observation (YYYY-MM-DD or YYYY-MM; null when SUPPLIED) }]
 dataCompleteness   { termsComplete, referenceDataComplete, earlyRedemptionTermsComplete }
-missing            [{ series, observation }]  what to obtain, and where
+missing            [{ benchmarkId, observation (YYYY-MM, or YYYY-MM-DD for a
+                   step series), publisher | null }]  what to obtain, and
+                   where; publisher is null only when the benchmark itself
+                   is absent from the input
 valuationComplete  all three flags true
 ```
 
@@ -269,12 +278,14 @@ valuationComplete  all three flags true
   terms version and a stored announced rate are never updated or deleted; a
   correction is a new terms version. Mechanism: a `BEFORE UPDATE OR DELETE`
   trigger on both tables that raises.
-- **INV-BOND-002 A missing rate is unknown, never substituted.** A period whose
-  rate is neither announced nor derivable from a stored observation has no
-  rate. The engine never uses another month's CPI, the latest NBP rate, 0 or
-  the first-period rate in its place. Values that depend on it are `null` (if
-  the period has started) or `PROJECTED` with a named assumption (if it has
-  not).
+- **INV-BOND-002 A missing rate is unknown, never substituted.** A period that
+  has started and whose rate is neither in the terms, announced, nor derivable
+  from the stored observation for its own month or day has no rate. The engine
+  never uses another month's CPI, the latest NBP rate, 0 or the first-period
+  rate in its place; values that depend on it are `null` and every such `null`
+  is named in `missing` and makes `valuationComplete` false. A period that has
+  not started is `PROJECTED` from a named assumption (supplied, else the
+  newest stored observation, section 4), labelled as such, and never `KNOWN`.
 - **INV-BOND-003 Money is exact until the letter rounds it.** The engine uses
   exact rational arithmetic (no JavaScript `number` on a money or rate path)
   and rounds only at the points section 2.4 names.
@@ -324,10 +335,41 @@ fixtures copy these values, never the implementation's output.
 | E15 | NBP observation day across holidays | period starts in January 2027 (24, 25, 26 Dec are holidays) | 2026-12-16 |
 | E16 | Lot | E2 with quantity 25 | `2529.75` |
 
+The golden fixtures of OTS, DOR, ROS and ROD (`backend/src/bonds/adapters/pl/`
+`ots-cases.json`, `dor-cases.json`, `ros-cases.json`, `rod-cases.json`) are
+not copies of E1 to E16 and were not taken from section 5 or from the
+engine's output: each value was computed independently from the formulas of
+the issue letters (OTS nr 94/2026, DOR nr 96/2026, ROS nr 100/2026, ROD nr
+101/2026) with exact fractions, half-up. The values below are the same
+computation, kept here so a fixture edited to match the engine is visible
+against the letter formula:
+
+| # | Case | Inputs | Expected |
+| --- | --- | --- | --- |
+| E17 | OTS0127 coupon and maturity value | purchase 2026-10-15, r = 2.00%, `F = 4` (letter para 14, 17) | coupon `100 x 0.02 / 4 = 0.50`; `W = 100.50` |
+| E18 | OTS0127 early redemption | d = 2026-12-01, a = 47 (letter para 23 points 3 and 4) | accrued `0.2554` forfeited, proceeds `100.00` |
+| E19 | DOR1028 coupon, period 1 | purchase 2026-10-15, r1 = 4.15%, `F = 12` | `100 x 0.0415 / 12 = 0.3458` -> `0.35` |
+| E20 | ROS1032 maturity | r1 = 5.00%, r2..r6 = 3.40% CPI + 2.00% = 5.40% (hypothetical), no intermediate rounding | `136.58` |
+| E21 | ROD1038 maturity | r1 = 5.60%, r2..r12 = 3.40% CPI + 2.50% = 5.90% (hypothetical) | `198.39` |
+| E22 | Quantity | OTS0127 E18 with quantity 30 | `3000.00` |
+
+The remaining fixture cases (window days 6, 7 and 20 days before maturity,
+the DOR record day, early redemption of ROS and ROD) apply the same letter
+formulas to the inputs their descriptions state.
+
 ## 6. Missing-data policy
 
-- Missing terms version: the read service refuses with a message that names
-  the series. No valuation is produced.
+- Missing terms version: the read service refuses with a `TERMS_NOT_FOUND`
+  error whose `params` name the series. No valuation is produced.
+- Errors and refusals reach a client as a code and `params`, never as an
+  English sentence; the server maps each code to a translated message. The
+  domain codes are `QUANTITY_INVALID`, `DATE_INVALID`, `AS_OF_BEFORE_PURCHASE`,
+  `BENCHMARK_NOT_READ`, `INSTRUMENT_NOT_FOUND`, `TERMS_NOT_FOUND` and
+  `TERMS_MISMATCH`. A lots refusal (`BondLotsRefusal`) is
+  `{ code, detail, params: { action, date, quantity } }`; `detail` is for the
+  log and is never shown.
+- Every `null` figure caused by a missing observation is named in `missing`
+  and makes `valuationComplete` false.
 - A started period without a rate: section 4. `missing` names the series and
   the observation (`PL_CPI_GUS_YOY 2027-08`, or `PL_NBP_REFERENCE on
   2026-10-19`) and the publisher stored with the benchmark series (GUS, NBP).
@@ -335,9 +377,17 @@ fixtures copy these values, never the implementation's output.
   if an older rate exists, because a newer change may not be stored yet.
 - CPI: a reference month with no stored row is unknown. A negative value is
   stored as is and floored at 0 in the rate rule only.
-- `asOf` before the purchase date: refused. `asOf` on or after maturity: the
-  lot is matured, `grossValue` is the maturity value and early redemption is
-  refused.
+- `asOf` before the purchase date: refused (`AS_OF_BEFORE_PURCHASE`).
+  `asOf` on or after maturity: the lot is matured and early redemption is
+  refused (`MATURED`). A matured coupon (non-compounding) lot has
+  `principal = grossValue = faceValue x quantity` and `accruedInterest = 0`; it
+  needs no rate, because its last coupon is a past cash flow paid on the
+  maturity date and is no longer part of the holding's value
+  (`maturityValueKnown` still shows face plus the last coupon, 105.00 for
+  COI1030 period 4 at 5.00%, so a coupon lot's daily price falls from its
+  accrued level to 100.00 on the maturity day, as it does after every coupon).
+  A matured compounding lot has `grossValue = the maturity value` and needs
+  every period's rate.
 
 ## 7. Persistence
 
@@ -358,8 +408,9 @@ through the migration.
 
 Rates are `NUMERIC(20,10)` (an exchange-rate-like quantity, not money); the
 face value is `NUMERIC(20,4)`. All five tables are excluded from the user
-backup: they are reference data a deployment re-fetches. A lot is not stored
-in the first PR; the caller passes it.
+backup: they are reference data a deployment re-fetches. A lot is not
+stored: lots are derived from the user's transactions (section 12.2) and the
+engine takes one as input.
 
 ## 8. Versioning and recomputation
 
@@ -370,9 +421,30 @@ announced rate or observation changes the next read.
 
 ## 9. Concurrency
 
-The first PR has no writer outside tests and migrations. The immutability
-trigger makes a concurrent writer of the same terms version fail, not
-overwrite. Writers (fetchers) arrive in a later PR with their own lease.
+The writers of the reference tables are `BondCatalogService` (seeds
+instruments and terms versions at boot with `ON CONFLICT DO NOTHING`; the
+immutability trigger makes a concurrent writer of the same terms version fail,
+not overwrite) and `BenchmarkRefreshService` (NBP and GUS observations, under
+the `bond-benchmarks` lease of `FetchSyncService`, at boot and by cron).
+Benchmark freshness at boot is decided by the last successful fetch, not by
+`covered_through`, which only records how far the data reaches.
+
+The writer of prices is `BondPriceService` (`FetchSyncJob.BondPrices` lease for
+the daily fan-out):
+
+- recomputes of one security are serialized by a transaction-scoped advisory
+  lock keyed on the security id, so two recomputes never interleave their
+  read, upsert and delete;
+- unlinking a security deletes that security's `bond_engine` rows in the same
+  transaction as the unlink;
+- a transaction-derived or manual price on a day always wins over a
+  `bond_engine` row, whatever the write order (the upsert's `WHERE` admits only
+  `source = 'bond_engine'`, and a `bond_engine` insert never replaces another
+  source);
+- a provider write re-checks the link at write time, inside its own
+  transaction, and drops the price of a security that has become linked;
+- a currency referenced by a bond instrument counts as in use, so the currency
+  in-use check refuses its deletion.
 
 ## 10. Assumptions to confirm
 
@@ -394,8 +466,13 @@ values are shown to a user.
 | Exact arithmetic | unit | parse, add, multiply, divide, half-up at `.xx5`, negative values, refusal of a non-decimal string |
 | Period schedule | unit | ROR annex 3 rows for purchase days 1, 28, 29, 30, 31; leap year; maturity |
 | Business days | unit | E14, E15, Easter-based holidays for 2026 and 2027 |
-| Products | golden | E1 to E16 from a JSON fixture per product |
-| Missing data | unit | each row of section 4; `missing` content; matured lot; `asOf` before purchase |
+| Products | golden | E1 to E16 from a JSON fixture per product; for OTS, DOR, ROS and ROD the fixtures are computed from the letters (section 5, E17 to E22) |
+| Missing data | unit | each row of section 4; `missing` content; matured coupon lot (principal = grossValue = face x quantity, accrued 0, no rate needed) and matured compounding lot (needs every rate); `asOf` before purchase |
+| Error codes | unit | each domain error carries `code` and `params` (section 6), never a sentence; `BondLotsRefusal` has `code`, `detail`, `params` |
+| Attribution (13.2) | unit | TOS 4.40 / 4.5936 / 4.79556; EDO period 2 split (E24); `benchmarkPart + addendPart = interest` for every benchmark period; each part `null` when the period's rate, or an earlier rate of a compounding bond, is unknown |
+| Scenarios (13.3) | unit | E25: values -0.5 and 1.0 accepted (inclusive), 7 values and 1.0001 refused, a foreign benchmark refused with 400; known periods stay known; every figure `null` with a `refusal` when lots cannot be derived |
+| Scenarios (13.3) | integration | route `/scenarios` and `assume=` on valuation, owner-scoped (another user's security answers 404) |
+| Chart (13.4) | unit | cumulative interest ends at the rate schedule's total; projected periods flagged; no interest computed in the client |
 | Window | unit | day 6 and 7 after purchase, 21 and 20 days before maturity, ROR record day |
 | Terms parsing | unit | a valid document per Polish manifest; unknown field, number instead of string, unknown primitive (`UNSUPPORTED_PRIMITIVE`) refused; unknown calendar or benchmark id reported as missing data |
 | Country-agnostic engine | guard | no domain or engine file imports an adapter or names a country or product literal (section 2.0) |
@@ -456,7 +533,8 @@ value of the holding. The early redemption value is shown beside it in the
 detail view (section 13), never instead of it.
 
 A day on which any open lot has no `grossValue` (a started period without a
-rate, INV-BOND-002) gets no price row. The portfolio then carries the last
+rate, INV-BOND-002; a matured compounding lot without every rate) gets no price
+row. The portfolio then carries the last
 priced day, as for any security, and the detail view names what is missing.
 
 Rows are written with `source = 'bond_engine'` by
@@ -538,6 +616,15 @@ display; the money figures of section 2.4 keep their own rounding), each
 `null` when the period's rate is unknown. Lot figures are per bond times the
 quantity.
 
+Numerical examples (computed from the formulas above with exact fractions;
+E23 and E24 are the same computation as the implementation's fixtures and are
+not read from its output):
+
+| # | Case | Inputs | Expected |
+| --- | --- | --- | --- |
+| E23 | TOS1029 attribution | r = 4.40%, bases 100, 104.40, 108.99 | interest `4.40`, `4.5936`, `4.79556` (all `fixedPart`); their sum `13.78916` while `W - N = 13.79` (see below) |
+| E24 | EDO1036 period 2 attribution | base 105.35, CPI 3.4% (floor not applied), margin 2%, so r2 = 5.4% | `interest 5.6889`, `benchmarkPart 3.5819`, `addendPart 2.107`; `3.5819 + 2.107 = 5.6889` per bond |
+
 ### 13.3 Inflation scenarios
 
 `GET /bonds/securities/:securityId/scenarios?benchmarkId=...&values=a,b,...`
@@ -554,11 +641,38 @@ scenario. The detail view shows a table for the
 presets 0%, 2.5%, 5% and 8% and one value the reader types, and labels every
 scenario figure as a projection under that assumption.
 
+The bounds -0.5 and 1.0 are inclusive and so is the limit of 6 values (a 7th
+value, or a value outside the bounds, is refused with a 400).
+
+**Total interest versus maturity value.** `totalInterest` is the exact sum of
+the periods' interest per bond (13.2) times the quantity, rounded once per lot.
+`maturityValue` is the per-bond maturity value rounded as section 2.4 says
+(each period for TOS, the result for EDO), times the quantity. The two answer
+different questions, so `maturityValue - face` and `totalInterest` differ by
+cents (E23: 13.79 against 13.78916); the difference is the letter's rounding
+and is disclosed, not reconciled. The chart (13.4) ends at `totalInterest`, not
+at the maturity value shown beside it.
+
+Example E25 (EDO1036, 10 bonds bought 2026-10-01, valued 2027-10-16, period 2
+CPI 3.4% known, r2 = 5.4%, r1 = 5.35%; every later period projected at the
+scenario value `v`, margin 2%, floor 0):
+
+| Scenario `v` | `maturityValue` | `totalInterest` | fixed | benchmark | addend |
+| --- | --- | --- | --- | --- | --- |
+| 0 | `1301.00` | `301.00` | `53.50` | `35.82` | `211.68` |
+| 0.05 | `1907.90` | `907.86` | `53.50` | `605.44` | `248.92` |
+
+For `v = 0.05`, `maturityValue - face = 907.90` against `totalInterest =
+907.86`: per-bond rounding of the maturity value against exact interest. The
+known period 2 stays at 3.4% in both scenarios.
+
 `GET .../valuation` accepts an optional `assume=<benchmarkId>:<value>` with
 the same rule, so the per-period table and the chart can follow the reader's
 chosen scenario.
 
 ### 13.4 Chart
+
+Sections 13.1 to 13.4 and the rate schedule are implemented in this PR.
 
 A stacked chart over the lot's period ends shows cumulative interest per
 bond (or for the holding) split into fixed (period 1), margin and inflation

@@ -3205,24 +3205,31 @@ Status              enforced
 ### INV-BOND-002 -- a missing rate is unknown, never substituted
 
 ```text
-Statement           A period whose rate is neither in the terms, announced, nor
-                    derivable from a stored benchmark observation has no rate.
-                    Nothing substitutes another month's observation, the latest
-                    value, 0 or the first-period rate.
+Statement           A period that has started and whose rate is neither in the
+                    terms, announced, nor derivable from the stored observation
+                    for its own month or day has no rate. Nothing substitutes
+                    another month's observation, the latest value, 0 or the
+                    first-period rate. A period that has not started is
+                    PROJECTED from a named assumption (supplied, else the
+                    newest stored observation), labelled as such, never KNOWN.
 Source of truth     benchmark_values, benchmark_series.covered_through,
                     bond_period_rates
 Enforcement         resolvePeriodRates (backend/src/bonds/engine/rate-resolution.ts):
                     a started period without a rate yields null values, a
                     `missing` entry naming the benchmark, the observation and
-                    its publisher, and referenceDataComplete = false; a future
-                    period is PROJECTED only with a named assumption.
+                    its publisher, and referenceDataComplete = false (every
+                    such null also makes valuationComplete false); a future
+                    period is PROJECTED from a named assumption, structured as
+                    { benchmarkId, value, basis, observation }.
 Concurrency scope   --
 Retry semantics     -- (computed on read)
 Crash semantics     -- (nothing stored)
 Failure response    null with the missing observation named
 Required tests      bond-engine.spec.ts truth-table rows (spec section 4) and the
                     STEP coverage rule.
-Status              enforced (engine); no surface reads it yet
+Status              enforced (engine, read by bond-valuation.service.ts and by
+                    the bond_engine price sync in bond-price.service.ts, which
+                    writes no price for a day whose lots lack a gross value)
 ```
 
 ### INV-BOND-003 -- money is exact until the issue document rounds it
@@ -3297,10 +3304,13 @@ Enforcement         Two mechanisms.
                     write's own transaction before it (SecuritiesService
                     assertBondLink); fk_securities_bond_instrument is
                     ON DELETE RESTRICT.
-Concurrency scope   per security; two recomputes write the same pure function of
-                    the ledger and converge (the conditional upsert is
-                    idempotent); the last commit wins and the next run repairs
-                    a stale one.
+Concurrency scope   per security; recomputes of one security are serialized by a
+                    transaction-scoped advisory lock keyed on the security id.
+                    Unlinking deletes that security's bond_engine rows in the
+                    same transaction. A transaction or manual price wins over a
+                    bond_engine row whatever the write order (the upsert WHERE
+                    admits only source = 'bond_engine'), and a provider write
+                    re-checks the link at write time.
 Retry semantics     A retried recompute writes nothing it already wrote
                     (written = 0, deleted = 0).
 Crash semantics     Reads, the upsert, the delete and the account updated_at
