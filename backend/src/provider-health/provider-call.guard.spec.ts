@@ -37,6 +37,10 @@ const GUARDED_DIRS = [
   "payees/lookup/google-places",
   "bank-sync/providers/enable-banking",
   "currencies",
+  // NBP and GUS: the bond benchmark refresh makes every request in `gated`
+  // (`bonds/benchmark-refresh.service.ts`); the adapters receive that gated
+  // function and never call the network themselves.
+  "bonds",
 ];
 
 /** A bare global `fetch(` or a raw `https.get(` -- an outbound request. */
@@ -75,6 +79,7 @@ describe("outbound provider calls are answerable to the breaker", () => {
     );
     expect(callers.map((file) => file.path).sort()).toEqual([
       "bank-sync/providers/enable-banking/enable-banking.client.ts",
+      "bonds/benchmark-refresh.service.ts",
       "currencies/providers/frankfurter-fx.provider.ts",
       "payees/lookup/google-places/google-places.client.ts",
       "securities/deutsche-boerse-finance.service.ts",
