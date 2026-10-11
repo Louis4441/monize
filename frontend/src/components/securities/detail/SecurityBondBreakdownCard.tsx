@@ -26,6 +26,11 @@ import { rateRuleLines } from './bond-labels';
 
 interface SecurityBondBreakdownCardProps {
   security: Security;
+  /**
+   * Bumped by the page each time a price refresh completes (whatever its
+   * outcome): the bond data the refresh fetched is re-read once, in place.
+   */
+  refreshVersion?: number;
 }
 
 const TABS = ['series', 'maturity'] as const;
@@ -46,6 +51,7 @@ type BondTab = (typeof TABS)[number];
  */
 export function SecurityBondBreakdownCard({
   security,
+  refreshVersion = 0,
 }: SecurityBondBreakdownCardProps) {
   const t = useTranslations('securityDetail');
   const tBonds = useTranslations('bonds');
@@ -58,7 +64,7 @@ export function SecurityBondBreakdownCard({
   const requestKey = `${security.id}|${today}`;
   const valuationRequest = useReportData<SecurityBondValuation>(
     () => investmentsApi.getSecurityBondValuation(security.id, today),
-    [security.id, today],
+    [security.id, today, refreshVersion],
     { requestKey },
   );
   const valuation =
@@ -69,7 +75,7 @@ export function SecurityBondBreakdownCard({
   const countryCode = valuation?.program.issuerCountryCode ?? BOND_OFFER_COUNTRY;
   const offer = useReportData<BondOffer>(
     () => investmentsApi.getBondOffer(countryCode),
-    [countryCode],
+    [countryCode, refreshVersion],
   );
 
   const held = useMemo(

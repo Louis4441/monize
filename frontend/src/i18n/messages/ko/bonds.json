@@ -84,5 +84,12 @@
     },
     "none": "없음",
     "held": "보유 중"
+  },
+  "refreshProgress": {
+    "label": "채권 데이터 새로 고침 중",
+    "offer": "현재 제안을 확인하는 중…",
+    "series": "시리즈 가져오는 중 {done}/{total}: {seriesCode}",
+    "historyComplete": "이력이 완전합니다",
+    "starting": "시작하는 중…"
   }
 }

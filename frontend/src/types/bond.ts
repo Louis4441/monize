@@ -441,3 +441,21 @@ export interface BondHistory {
   /** Ordered by program code; one entry when `programCode` was asked for. */
   programs: BondHistoryProgram[];
 }
+
+/**
+ * `GET /bonds/programs/:programId/refresh-progress`: how far the synchronous
+ * fetch of a bond kind's offer and history series has got. Every field is null
+ * before a refresh has run.
+ */
+export interface BondRefreshProgress {
+  /** ISO timestamp the server began the fetch; null when none has run. */
+  startedAt: string | null;
+  phase: 'offer' | 'series' | 'done' | null;
+  /** Series fetched so far. */
+  done: number;
+  /** Series to fetch in total; 0 when the history is already complete. */
+  total: number;
+  /** The series being fetched now; null outside the series phase. */
+  seriesCode: string | null;
+  finishedAt: string | null;
+}

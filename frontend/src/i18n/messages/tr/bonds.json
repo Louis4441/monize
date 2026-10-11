@@ -84,5 +84,12 @@
     },
     "none": "Yok",
     "held": "Elde"
+  },
+  "refreshProgress": {
+    "label": "Tahvil verileri yenileniyor",
+    "offer": "Güncel teklif kontrol ediliyor…",
+    "series": "Seri {done}/{total} getiriliyor: {seriesCode}",
+    "historyComplete": "Geçmiş eksiksiz",
+    "starting": "Başlatılıyor…"
   }
 }

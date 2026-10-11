@@ -84,5 +84,12 @@
     },
     "none": "Keine",
     "held": "Gehalten"
+  },
+  "refreshProgress": {
+    "label": "Anleihedaten werden aktualisiert",
+    "offer": "Das aktuelle Angebot wird geprüft…",
+    "series": "Serie {done} von {total} wird abgerufen: {seriesCode}",
+    "historyComplete": "Der Verlauf ist vollständig",
+    "starting": "Wird gestartet…"
   }
 }

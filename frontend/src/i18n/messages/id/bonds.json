@@ -84,5 +84,12 @@
     },
     "none": "Tidak ada",
     "held": "Dimiliki"
+  },
+  "refreshProgress": {
+    "label": "Memperbarui data obligasi",
+    "offer": "Memeriksa penawaran saat ini…",
+    "series": "Mengambil seri {done} dari {total}: {seriesCode}",
+    "historyComplete": "Riwayat sudah lengkap",
+    "starting": "Memulai…"
   }
 }

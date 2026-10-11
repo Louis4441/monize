@@ -42,6 +42,8 @@ interface BondHistoryBodyProps {
    * dot and highlighted in the table.
    */
   heldSeries?: readonly string[];
+  /** Bumped by the page when a price refresh completes: re-reads in place. */
+  refreshVersion?: number;
 }
 
 /**
@@ -49,7 +51,7 @@ interface BondHistoryBodyProps {
  * every stored series. Used by the page of a program-linked security, with the
  * product fixed and the series held marked.
  */
-export function BondHistoryBody({ program, currency, heldSeries = [] }: BondHistoryBodyProps) {
+export function BondHistoryBody({ program, currency, heldSeries = [], refreshVersion = 0 }: BondHistoryBodyProps) {
   const t = useTranslations('bonds');
   const tSec = useTranslations('securityDetail');
   const { formatDate } = useDateFormat();
@@ -60,7 +62,7 @@ export function BondHistoryBody({ program, currency, heldSeries = [] }: BondHist
   const requestKey = `${BOND_OFFER_COUNTRY}|${program}`;
   const history = useReportData<BondHistory>(
     () => investmentsApi.getBondHistory(BOND_OFFER_COUNTRY, program),
-    [requestKey],
+    [requestKey, refreshVersion],
     { requestKey },
   );
   // The payload belongs to the product it was asked for.

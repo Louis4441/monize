@@ -84,5 +84,12 @@
     },
     "none": "Nenhuma",
     "held": "Em carteira"
+  },
+  "refreshProgress": {
+    "label": "A atualizar os dados da obrigação",
+    "offer": "A verificar a oferta atual…",
+    "series": "A obter a série {done} de {total}: {seriesCode}",
+    "historyComplete": "O histórico está completo",
+    "starting": "A iniciar…"
   }
 }

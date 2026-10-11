@@ -84,5 +84,12 @@
     },
     "none": "Немає",
     "held": "У портфелі"
+  },
+  "refreshProgress": {
+    "label": "Оновлення даних облігації",
+    "offer": "Перевірка поточної пропозиції…",
+    "series": "Завантаження серії {done} з {total}: {seriesCode}",
+    "historyComplete": "Історія повна",
+    "starting": "Запуск…"
   }
 }

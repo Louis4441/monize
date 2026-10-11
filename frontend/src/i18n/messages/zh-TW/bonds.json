@@ -84,5 +84,12 @@
     },
     "none": "無",
     "held": "已持有"
+  },
+  "refreshProgress": {
+    "label": "正在重新整理債券資料",
+    "offer": "正在檢查目前的發售…",
+    "series": "正在取得系列 {done}/{total}：{seriesCode}",
+    "historyComplete": "歷史資料已完整",
+    "starting": "正在開始…"
   }
 }

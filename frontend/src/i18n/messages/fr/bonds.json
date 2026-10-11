@@ -84,5 +84,12 @@
     },
     "none": "Aucun",
     "held": "Détenue"
+  },
+  "refreshProgress": {
+    "label": "Actualisation des données de l'obligation",
+    "offer": "Vérification de l'offre actuelle…",
+    "series": "Récupération de la série {done} sur {total} : {seriesCode}",
+    "historyComplete": "L'historique est complet",
+    "starting": "Démarrage…"
   }
 }

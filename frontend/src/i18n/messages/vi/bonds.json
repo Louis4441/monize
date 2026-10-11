@@ -84,5 +84,12 @@
     },
     "none": "Không có",
     "held": "Đang nắm giữ"
+  },
+  "refreshProgress": {
+    "label": "Đang làm mới dữ liệu trái phiếu",
+    "offer": "Đang kiểm tra đợt phát hành hiện tại…",
+    "series": "Đang tải loạt {done}/{total}: {seriesCode}",
+    "historyComplete": "Lịch sử đã đầy đủ",
+    "starting": "Đang bắt đầu…"
   }
 }

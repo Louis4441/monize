@@ -541,6 +541,13 @@ describe('investmentsApi', () => {
       expect(apiClient.get).toHaveBeenCalledWith('/bonds/programs');
     });
 
+    it('getBondRefreshProgress reads the program progress', async () => {
+      const progress = { startedAt: '2026-01-01T00:00:00Z', phase: 'series', done: 2, total: 8, seriesCode: 'EDO0136', finishedAt: null };
+      vi.mocked(apiClient.get).mockResolvedValue({ data: progress });
+      await expect(investmentsApi.getBondRefreshProgress('p-1')).resolves.toEqual(progress);
+      expect(apiClient.get).toHaveBeenCalledWith('/bonds/programs/p-1/refresh-progress');
+    });
+
     describe('a link change drops the cached prices', () => {
       const warm = async () => {
         vi.mocked(apiClient.get).mockResolvedValue({ data: [{ id: 1 }] });

@@ -22,6 +22,11 @@ interface SecurityKeyInformationProps {
   latestPrice: { price: number; priceDate: string } | null;
   /** Full price history, for reading the distribution behaviour off it. */
   prices: readonly SecurityPricePoint[];
+  /**
+   * Bumped by the page each time a price refresh completes (whatever its
+   * outcome): the bond data the refresh fetched is re-read once, in place.
+   */
+  refreshVersion?: number;
 }
 
 /**
@@ -36,6 +41,7 @@ export function SecurityKeyInformation({
   security,
   latestPrice,
   prices,
+  refreshVersion = 0,
 }: SecurityKeyInformationProps) {
   const t = useTranslations("securityDetail");
   const ts = useTranslations("securities");
@@ -70,7 +76,7 @@ export function SecurityKeyInformation({
     return () => {
       cancelled = true;
     };
-  }, [bondProgramId]);
+  }, [bondProgramId, refreshVersion]);
   const infoUrl = bondProgramId
     ? (catalog?.find((p) => p.id === bondProgramId)?.infoUrl ?? null)
     : null;

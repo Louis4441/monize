@@ -48,6 +48,7 @@ import type {
   BondHistory,
   BondOffer,
   BondPriceRecompute,
+  BondRefreshProgress,
   SecurityBondScenarios,
   SecurityBondValuation,
 } from '@/types/bond';
@@ -1090,6 +1091,15 @@ export const investmentsApi = {
           ...(asOf ? { asOf } : {}),
         },
       },
+    );
+    return response.data;
+  },
+
+  // How far the server's synchronous fetch for a bond program has got. Polled
+  // while a Refresh runs, so it is never cached.
+  getBondRefreshProgress: async (programId: string): Promise<BondRefreshProgress> => {
+    const response = await apiClient.get<BondRefreshProgress>(
+      `/bonds/programs/${programId}/refresh-progress`,
     );
     return response.data;
   },

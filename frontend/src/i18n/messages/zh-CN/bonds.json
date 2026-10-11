@@ -84,5 +84,12 @@
     },
     "none": "无",
     "held": "已持有"
+  },
+  "refreshProgress": {
+    "label": "正在刷新债券数据",
+    "offer": "正在检查当前发售…",
+    "series": "正在获取系列 {done}/{total}：{seriesCode}",
+    "historyComplete": "历史数据已完整",
+    "starting": "正在开始…"
   }
 }

@@ -84,5 +84,12 @@
     },
     "none": "Nenhum",
     "held": "Em carteira"
+  },
+  "refreshProgress": {
+    "label": "Atualizando os dados do título",
+    "offer": "Verificando a oferta atual…",
+    "series": "Buscando a série {done} de {total}: {seriesCode}",
+    "historyComplete": "O histórico está completo",
+    "starting": "Iniciando…"
   }
 }

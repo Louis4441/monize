@@ -179,6 +179,11 @@ vi.mock('@/components/securities/SecurityList', () => ({
   SecurityHoldings: {},
 }));
 
+vi.mock('@/components/securities/BondRefreshProgress', () => ({
+  BondRefreshProgress: ({ programId, active }: { programId: string | null; active: boolean }) =>
+    active ? <div data-testid="bond-progress">{programId}</div> : null,
+}));
+
 vi.mock('@/components/ui/Modal', () => ({
   Modal: ({ children, isOpen }: any) => isOpen ? <div data-testid="modal">{children}</div> : null,
 }));
@@ -657,6 +662,25 @@ describe('SecuritiesPage', () => {
       form.payload = { symbol: 'EDO', name: 'EDO', currencyCode: 'PLN', bondProgramId: 'p1', bondAutoFetch: true };
       await submitNew();
       await waitFor(() => expect(mockRefreshSelectedPrices).toHaveBeenCalledWith(['bond1']));
+    });
+
+    it('shows the progress bar for the program while that refresh runs, and hides it after', async () => {
+      mockCreateSecurity.mockResolvedValue({ id: 'bond1', symbol: 'EDO' });
+      let finish!: (v: unknown) => void;
+      mockRefreshSelectedPrices.mockReturnValueOnce(new Promise((r) => { finish = r; }));
+      form.payload = { symbol: 'EDO', name: 'EDO', currencyCode: 'PLN', bondProgramId: 'p1', bondAutoFetch: true };
+      await submitNew();
+      await waitFor(() => expect(screen.getByTestId('bond-progress')).toHaveTextContent('p1'));
+      await act(async () => { finish({ updated: 1, failed: 0, results: [], lastUpdated: null }); });
+      await waitFor(() => expect(screen.queryByTestId('bond-progress')).not.toBeInTheDocument());
+    });
+
+    it('shows no progress bar when no bond refresh was triggered', async () => {
+      mockCreateSecurity.mockResolvedValue({ id: 'bond1', symbol: 'EDO' });
+      form.payload = { symbol: 'EDO', name: 'EDO', currencyCode: 'PLN', bondProgramId: 'p1', bondAutoFetch: false };
+      await submitNew();
+      await waitFor(() => expect(mockCreateSecurity).toHaveBeenCalled());
+      expect(screen.queryByTestId('bond-progress')).not.toBeInTheDocument();
     });
 
     it('does not refresh when auto-fetch is off', async () => {

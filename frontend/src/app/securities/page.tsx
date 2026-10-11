@@ -22,6 +22,7 @@ import { CARD_CLASS } from '@/components/ui/Card';
 import { SecurityList, type SecurityHoldings, type SecurityTransactions, type SecuritySortField, type SortDirection } from '@/components/securities/SecurityList';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { usePriceRefresh } from '@/hooks/usePriceRefresh';
+import { BondRefreshProgress } from '@/components/securities/BondRefreshProgress';
 import { RefreshPricesButton } from '@/components/investments/RefreshPricesButton';
 import { securityPositionValue, compareSecurityValues } from '@/lib/security-value';
 import { createLogger } from '@/lib/logger';
@@ -66,6 +67,8 @@ function SecuritiesContent() {
   const [sortField, setSortField] = useLocalStorage<SecuritySortField>('monize-securities-sort-field', 'symbol');
   const [sortDirection, setSortDirection] = useLocalStorage<SortDirection>('monize-securities-sort-dir', 'asc');
   const [lastPriceUpdate, setLastPriceUpdate] = useState<string | null>(null);
+  // The program whose post-save refresh is running; null hides the progress bar.
+  const [bondRefreshProgramId, setBondRefreshProgramId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -196,7 +199,12 @@ function SecuritiesContent() {
       }
       close();
       loadData();
-      if (refreshId) void triggerManualRefresh([refreshId]);
+      if (refreshId && data.bondProgramId) {
+        setBondRefreshProgramId(data.bondProgramId);
+        void triggerManualRefresh([refreshId]).finally(() => setBondRefreshProgramId(null));
+      } else if (refreshId) {
+        void triggerManualRefresh([refreshId]);
+      }
     } catch (error) {
       toast.error(getErrorMessage(error, editingSecurity ? t('page.toasts.updateFailed') : t('page.toasts.createFailed')));
       throw error;
@@ -360,6 +368,10 @@ function SecuritiesContent() {
           subtitle={t('page.subtitle')}
           helpUrl="https://github.com/kenlasko/monize/wiki/Investments"
           actions={<Button onClick={handleCreateNew}>{t('page.newSecurity')}</Button>}
+        />
+        <BondRefreshProgress
+          programId={bondRefreshProgramId}
+          active={bondRefreshProgramId !== null}
         />
         {/* Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">

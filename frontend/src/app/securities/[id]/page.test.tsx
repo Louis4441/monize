@@ -69,6 +69,10 @@ const mockGetSecurityDocuments = vi.fn();
 const mockGetSecurityNews = vi.fn();
 const mockRefreshSelectedPrices = vi.fn();
 const mockGetSecurityBondValuation = vi.fn();
+const mockGetBondOffer = vi.fn();
+const mockListBondPrograms = vi.fn();
+const mockGetBondHistory = vi.fn();
+const mockGetBondRefreshProgress = vi.fn();
 
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
@@ -89,9 +93,10 @@ vi.mock('@/lib/investments', () => ({
     getSecurityBondValuation: (...args: unknown[]) =>
       mockGetSecurityBondValuation(...args),
     getSecurityBondScenarios: vi.fn(),
-    getBondOffer: () => Promise.resolve({ countryCode: 'PL', today: '2027-04-15', series: [] }),
-    listBondPrograms: () => Promise.resolve([]),
-    getBondHistory: () => Promise.resolve({ countryCode: 'PL', programs: [] }),
+    getBondOffer: (...args: unknown[]) => mockGetBondOffer(...args),
+    listBondPrograms: (...args: unknown[]) => mockListBondPrograms(...args),
+    getBondHistory: (...args: unknown[]) => mockGetBondHistory(...args),
+    getBondRefreshProgress: (...args: unknown[]) => mockGetBondRefreshProgress(...args),
     recomputeSecurityBondPrices: vi.fn(),
     updateSecurity: vi.fn(),
   },
@@ -236,6 +241,12 @@ describe('SecurityDetailPage', () => {
       accounts: [],
       transactions: [],
       currentQuantityAll: 100,
+    });
+    mockGetBondOffer.mockResolvedValue({ countryCode: 'PL', today: '2027-04-15', series: [] });
+    mockListBondPrograms.mockResolvedValue([]);
+    mockGetBondHistory.mockResolvedValue({ countryCode: 'PL', programs: [] });
+    mockGetBondRefreshProgress.mockResolvedValue({
+      startedAt: null, phase: null, done: 0, total: 0, seriesCode: null, finishedAt: null,
     });
     mockRefreshSelectedPrices.mockResolvedValue({
       totalSecurities: 1,
@@ -440,6 +451,112 @@ describe('SecurityDetailPage', () => {
       await renderPage();
       expect(screen.queryByRole('heading', { name: 'Your series' })).not.toBeInTheDocument();
       expect(mockGetSecurityBondValuation).not.toHaveBeenCalled();
+    });
+
+    describe('refresh', () => {
+      const deferRefresh = () => {
+        let resolve!: (v: unknown) => void;
+        mockRefreshSelectedPrices.mockReturnValue(
+          new Promise((r) => {
+            resolve = r;
+          }),
+        );
+        return () =>
+          resolve({ totalSecurities: 1, updated: 1, failed: 0, skipped: 0, results: [], lastUpdated: null });
+      };
+
+      it('shows the progress bar only while the bond refresh runs', async () => {
+        mockGetSecurityDetail.mockResolvedValue(detailFixture({ security: bondSecurity }));
+        const finish = deferRefresh();
+        await renderPage();
+        expect(screen.queryByText('Starting…')).not.toBeInTheDocument();
+
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        });
+        expect(screen.getByText('Starting…')).toBeInTheDocument();
+
+        await act(async () => {
+          finish();
+        });
+        await waitFor(() => expect(screen.queryByText('Starting…')).not.toBeInTheDocument());
+      });
+
+      it('shows no progress bar when a security without a program refreshes', async () => {
+        const finish = deferRefresh();
+        await renderPage();
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        });
+        expect(screen.queryByText('Starting…')).not.toBeInTheDocument();
+        await act(async () => {
+          finish();
+        });
+      });
+
+      it('re-reads every bond section once when the refresh completes', async () => {
+        mockGetSecurityDetail.mockResolvedValue(detailFixture({ security: bondSecurity }));
+        const finish = deferRefresh();
+        await renderPage();
+        await screen.findByRole('heading', { name: 'Your series' });
+        await waitFor(() => {
+          expect(mockListBondPrograms).toHaveBeenCalled();
+          expect(mockGetBondHistory).toHaveBeenCalled();
+          expect(mockGetBondOffer).toHaveBeenCalled();
+        });
+        const before = {
+          valuation: mockGetSecurityBondValuation.mock.calls.length,
+          offer: mockGetBondOffer.mock.calls.length,
+          programs: mockListBondPrograms.mock.calls.length,
+          history: mockGetBondHistory.mock.calls.length,
+          documents: mockGetSecurityDocuments.mock.calls.length,
+        };
+
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        });
+        // Nothing is re-read while the refresh is still running.
+        expect(mockGetSecurityBondValuation).toHaveBeenCalledTimes(before.valuation);
+        await act(async () => {
+          finish();
+        });
+
+        await waitFor(() => {
+          expect(mockGetSecurityBondValuation).toHaveBeenCalledTimes(before.valuation * 2);
+          expect(mockGetBondOffer.mock.calls.length).toBeGreaterThanOrEqual(before.offer * 2);
+          expect(mockListBondPrograms).toHaveBeenCalledTimes(before.programs * 2);
+          expect(mockGetBondHistory).toHaveBeenCalledTimes(before.history * 2);
+        });
+        // Once per completed refresh: nothing keeps re-reading afterwards.
+        const settled = mockGetBondOffer.mock.calls.length;
+        await act(async () => {});
+        expect(mockGetBondOffer).toHaveBeenCalledTimes(settled);
+        expect(mockGetSecurityBondValuation).toHaveBeenCalledTimes(before.valuation * 2);
+        // The reader's own documents are not bond data and are not re-read.
+        expect(mockGetSecurityDocuments).toHaveBeenCalledTimes(before.documents);
+      });
+
+      it('re-reads the bond sections after a refresh that failed too', async () => {
+        mockGetSecurityDetail.mockResolvedValue(detailFixture({ security: bondSecurity }));
+        let reject!: (e: unknown) => void;
+        mockRefreshSelectedPrices.mockReturnValue(
+          new Promise((_r, rej) => {
+            reject = rej;
+          }),
+        );
+        await renderPage();
+        await screen.findByRole('heading', { name: 'Your series' });
+        const before = mockGetSecurityBondValuation.mock.calls.length;
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        });
+        await act(async () => {
+          reject(new Error('boom'));
+        });
+        await waitFor(() =>
+          expect(mockGetSecurityBondValuation).toHaveBeenCalledTimes(before * 2),
+        );
+      });
     });
   });
 

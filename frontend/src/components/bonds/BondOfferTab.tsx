@@ -35,6 +35,8 @@ import type { BondOffer, OfferSeries } from '@/types/bond';
 interface BondOfferTabProps {
   /** Only the series of this program are listed; every program when omitted. */
   programCode?: string;
+  /** Bumped by the page when a price refresh completes: re-reads in place. */
+  refreshVersion?: number;
 }
 
 interface LatestObservation {
@@ -58,7 +60,7 @@ const ASSUMPTION_DEBOUNCE_MS = 500;
  * assumption wears the "Projected" badge; one the engine cannot value is
  * unknown, with the reason beside it, never a zero.
  */
-export function BondOfferTab({ programCode }: BondOfferTabProps) {
+export function BondOfferTab({ programCode, refreshVersion = 0 }: BondOfferTabProps) {
   const t = useTranslations('bonds');
   const tSec = useTranslations('securityDetail');
   const { formatDate, formatMonth } = useDateFormat();
@@ -85,7 +87,7 @@ export function BondOfferTab({ programCode }: BondOfferTabProps) {
 
   const { data, dataKey, isLoading, error, reload } = useReportData<BondOffer>(
     () => investmentsApi.getBondOffer(BOND_OFFER_COUNTRY, sent),
-    [requestKey],
+    [requestKey, refreshVersion],
     { requestKey },
   );
 

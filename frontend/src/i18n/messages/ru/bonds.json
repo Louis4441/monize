@@ -84,5 +84,12 @@
     },
     "none": "Нет",
     "held": "В портфеле"
+  },
+  "refreshProgress": {
+    "label": "Обновление данных облигации",
+    "offer": "Проверка текущего предложения…",
+    "series": "Загрузка серии {done} из {total}: {seriesCode}",
+    "historyComplete": "История полная",
+    "starting": "Запуск…"
   }
 }

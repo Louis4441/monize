@@ -20,6 +20,11 @@ import type {
 } from "@/types/bond";
 
 interface SecurityIssueLettersProps {
+  /**
+   * Bumped by the page each time a price refresh completes (whatever its
+   * outcome): the bond data the refresh fetched is re-read once, in place.
+   */
+  refreshVersion?: number;
   security: Security;
   className?: string;
 }
@@ -46,6 +51,7 @@ interface LetterRow {
 export function SecurityIssueLetters({
   security,
   className,
+  refreshVersion = 0,
 }: SecurityIssueLettersProps) {
   const t = useTranslations("securityDetail");
   const today = useFinancialToday();
@@ -53,7 +59,7 @@ export function SecurityIssueLetters({
   const requestKey = `${security.id}|${today}`;
   const valuationRequest = useReportData<SecurityBondValuation>(
     () => investmentsApi.getSecurityBondValuation(security.id, today),
-    [security.id, today],
+    [security.id, today, refreshVersion],
     { requestKey },
   );
   const valuation =
@@ -65,7 +71,7 @@ export function SecurityIssueLetters({
     valuation?.program.issuerCountryCode ?? BOND_OFFER_COUNTRY;
   const offerRequest = useReportData<BondOffer>(
     () => investmentsApi.getBondOffer(countryCode),
-    [countryCode],
+    [countryCode, refreshVersion],
   );
   const offer = offerRequest.data;
 

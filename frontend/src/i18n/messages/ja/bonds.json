@@ -84,5 +84,12 @@
     },
     "none": "なし",
     "held": "保有中"
+  },
+  "refreshProgress": {
+    "label": "債券データを更新中",
+    "offer": "現在のオファーを確認しています…",
+    "series": "シリーズを取得中 {done}/{total}: {seriesCode}",
+    "historyComplete": "履歴は完全です",
+    "starting": "開始しています…"
   }
 }

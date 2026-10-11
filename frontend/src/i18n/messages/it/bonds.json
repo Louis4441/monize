@@ -84,5 +84,12 @@
     },
     "none": "Nessuno",
     "held": "Posseduta"
+  },
+  "refreshProgress": {
+    "label": "Aggiornamento dei dati dell'obbligazione",
+    "offer": "Verifica dell'offerta attuale…",
+    "series": "Recupero della serie {done} di {total}: {seriesCode}",
+    "historyComplete": "Lo storico è completo",
+    "starting": "Avvio…"
   }
 }

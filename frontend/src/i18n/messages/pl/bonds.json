@@ -84,5 +84,12 @@
     },
     "none": "Brak",
     "held": "Posiadana"
+  },
+  "refreshProgress": {
+    "label": "Odświeżanie danych obligacji",
+    "offer": "Sprawdzanie bieżącej oferty…",
+    "series": "Pobieranie serii {done} z {total}: {seriesCode}",
+    "historyComplete": "Historia jest kompletna",
+    "starting": "Rozpoczynanie…"
   }
 }

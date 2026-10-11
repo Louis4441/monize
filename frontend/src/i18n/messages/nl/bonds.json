@@ -84,5 +84,12 @@
     },
     "none": "Geen",
     "held": "In bezit"
+  },
+  "refreshProgress": {
+    "label": "Obligatiegegevens worden vernieuwd",
+    "offer": "Het huidige aanbod wordt gecontroleerd…",
+    "series": "Reeks {done} van {total} wordt opgehaald: {seriesCode}",
+    "historyComplete": "De historie is compleet",
+    "starting": "Starten…"
   }
 }

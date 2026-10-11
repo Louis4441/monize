@@ -84,5 +84,12 @@
     },
     "none": "[XX-None-XX]",
     "held": "[XX-Held-XX]"
+  },
+  "refreshProgress": {
+    "label": "[XX-Refreshing bond data-XX]",
+    "offer": "[XX-Checking the current offer…-XX]",
+    "series": "[XX-Fetching series {done} of {total}: {seriesCode}-XX]",
+    "historyComplete": "[XX-History is complete-XX]",
+    "starting": "[XX-Starting…-XX]"
   }
 }

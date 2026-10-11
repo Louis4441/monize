@@ -84,5 +84,12 @@
     },
     "none": "Ninguno",
     "held": "En cartera"
+  },
+  "refreshProgress": {
+    "label": "Actualizando los datos del bono",
+    "offer": "Comprobando la oferta actual…",
+    "series": "Obteniendo la serie {done} de {total}: {seriesCode}",
+    "historyComplete": "El historial está completo",
+    "starting": "Iniciando…"
   }
 }

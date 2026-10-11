@@ -32,6 +32,11 @@ interface SecurityBondCardProps {
   security: Security;
   /** Called after a recompute wrote or removed prices, so the page re-reads its quote. */
   onPricesChanged?: () => void | Promise<void>;
+  /**
+   * Bumped by the page each time a price refresh completes (whatever its
+   * outcome): the bond data the refresh fetched is re-read once, in place.
+   */
+  refreshVersion?: number;
 }
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
@@ -78,6 +83,7 @@ function distinct<T>(items: readonly T[], keyOf: (item: T) => string): T[] {
 export function SecurityBondCard({
   security,
   onPricesChanged,
+  refreshVersion = 0,
 }: SecurityBondCardProps) {
   const t = useTranslations('securityDetail');
   const tBonds = useTranslations('bonds');
@@ -112,7 +118,7 @@ export function SecurityBondCard({
           asOf,
           assume ?? undefined,
         ),
-      [security.id, asOf, assume?.benchmarkId, assume?.value],
+      [security.id, asOf, assume?.benchmarkId, assume?.value, refreshVersion],
       { requestKey },
     );
 
@@ -487,12 +493,16 @@ export function SecurityBondCard({
             countryCode={latest.program.issuerCountryCode}
             held={latestHeld}
             autoFetch={latest.autoFetch}
+            refreshVersion={refreshVersion}
           />
           <Card padding="sm" aria-label={t('bond.onSale.title')} as="section">
             <h3 className="mb-3 text-lg font-semibold text-gray-900 dark:text-gray-100">
               {t('bond.onSale.title')}
             </h3>
-            <BondOfferTab programCode={latest.program.programCode} />
+            <BondOfferTab
+              programCode={latest.program.programCode}
+              refreshVersion={refreshVersion}
+            />
           </Card>
           <Card
             padding="sm"
@@ -510,6 +520,7 @@ export function SecurityBondCard({
               program={latest.program.programCode}
               currency={latest.program.currency}
               heldSeries={latestHeld.map((h) => h.seriesCode)}
+              refreshVersion={refreshVersion}
             />
           </Card>
         </>

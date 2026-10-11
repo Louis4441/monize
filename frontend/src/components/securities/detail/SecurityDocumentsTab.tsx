@@ -27,6 +27,11 @@ import type {
 
 interface SecurityDocumentsTabProps {
   security: Security;
+  /**
+   * Bumped by the page each time a price refresh completes (whatever its
+   * outcome): the bond data the refresh fetched is re-read once, in place.
+   */
+  refreshVersion?: number;
 }
 
 const TH =
@@ -46,7 +51,7 @@ const TD = 'px-3 py-2 text-sm';
  * Links only for now. Uploading a file needs the attachments module widened
  * beyond transactions, which is its own change.
  */
-export function SecurityDocumentsTab({ security }: SecurityDocumentsTabProps) {
+export function SecurityDocumentsTab({ security, refreshVersion = 0 }: SecurityDocumentsTabProps) {
   const t = useTranslations('securityDetail');
   const { formatDate } = useDateFormat();
 
@@ -168,7 +173,11 @@ export function SecurityDocumentsTab({ security }: SecurityDocumentsTabProps) {
     <>
       {/* Above the reader's own documents; a plain security has no such section. */}
       {security.bondProgramId && (
-        <SecurityIssueLetters security={security} className="mb-6" />
+        <SecurityIssueLetters
+          security={security}
+          className="mb-6"
+          refreshVersion={refreshVersion}
+        />
       )}
     <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
       <div className="mb-4 flex items-center justify-between gap-3">

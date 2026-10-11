@@ -24,6 +24,8 @@ interface SecurityBondProgramCardProps {
   held: HeldSeries[];
   /** The switch as the server last reported it. */
   autoFetch: boolean;
+  /** Bumped by the page when a price refresh completes: re-reads in place. */
+  refreshVersion?: number;
 }
 
 /**
@@ -41,6 +43,7 @@ export function SecurityBondProgramCard({
   countryCode = BOND_OFFER_COUNTRY,
   held,
   autoFetch,
+  refreshVersion = 0,
 }: SecurityBondProgramCardProps) {
   const t = useTranslations('securityDetail');
   const tBonds = useTranslations('bonds');
@@ -51,7 +54,7 @@ export function SecurityBondProgramCard({
   // the held series to answer, never an empty program.
   const offer = useReportData<BondOffer>(
     () => investmentsApi.getBondOffer(countryCode),
-    [countryCode],
+    [countryCode, refreshVersion],
   );
   const facts = programFacts(offer.data?.series ?? [], held, programCode);
 

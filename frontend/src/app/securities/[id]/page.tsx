@@ -26,6 +26,7 @@ import { SecurityBondCard } from '@/components/securities/detail/SecurityBondCar
 import { useOnUndoRedo } from '@/hooks/useOnUndoRedo';
 import { useOnAiAction } from '@/hooks/useOnAiAction';
 import { usePriceRefresh } from '@/hooks/usePriceRefresh';
+import { BondRefreshProgress } from '@/components/securities/BondRefreshProgress';
 import { investmentsApi } from '@/lib/investments';
 import { getErrorMessage } from '@/lib/errors';
 import { SECURITY_PRICE_HISTORY_LIMIT } from '@/lib/constants';
@@ -223,6 +224,17 @@ function SecurityDetailContent() {
     triggerManualRefresh: refreshPrices,
   } = usePriceRefresh({ onRefreshComplete: reloadAfterPriceRefresh });
 
+  // One signal for every bond section that loads its own data: bumped when a
+  // price refresh settles (success, failure or nothing to do), so each re-reads
+  // the series, offer and catalog the refresh may have changed, in place and
+  // without remounting (which would reset the as-of date, scenario and tab).
+  const [bondDataVersion, setBondDataVersion] = useState(0);
+  const [wasRefreshingPrice, setWasRefreshingPrice] = useState(false);
+  if (wasRefreshingPrice !== isRefreshingPrice) {
+    setWasRefreshingPrice(isRefreshingPrice);
+    if (!isRefreshingPrice) setBondDataVersion((v) => v + 1);
+  }
+
   const handleRefreshPrice = useCallback(() => {
     void refreshPrices([securityId]);
   }, [refreshPrices, securityId]);
@@ -374,6 +386,11 @@ function SecurityDetailContent() {
           onSelectSecurity={(id) => router.push(`/securities/${id}`)}
         />
 
+        <BondRefreshProgress
+          programId={security.bondProgramId ?? null}
+          active={isRefreshingPrice && !!security.bondProgramId}
+        />
+
         <div className="space-y-6">
           {/* Zero-filled cards would claim a position that is not there, so a
               closed or never-held security gets its own panel instead. The tour
@@ -431,9 +448,13 @@ function SecurityDetailContent() {
                     : null
                 }
                 prices={priceSeries}
+                refreshVersion={bondDataVersion}
               />
               {security.bondProgramId ? (
-                <SecurityBondBreakdownCard security={security} />
+                <SecurityBondBreakdownCard
+                  security={security}
+                  refreshVersion={bondDataVersion}
+                />
               ) : (
                 <SecurityBreakdownCard security={security} />
               )}
@@ -483,6 +504,7 @@ function SecurityDetailContent() {
                   <SecurityBondCard
                     security={security}
                     onPricesChanged={reloadAfterPriceRefresh}
+                    refreshVersion={bondDataVersion}
                   />
                 )}
 
@@ -526,7 +548,10 @@ function SecurityDetailContent() {
                 keepMounted
                 className="mt-6"
               >
-                <SecurityDocumentsTab security={security} />
+                <SecurityDocumentsTab
+                  security={security}
+                  refreshVersion={bondDataVersion}
+                />
               </TabPanel>
 
               <TabPanel
