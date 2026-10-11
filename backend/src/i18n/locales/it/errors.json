@@ -731,7 +731,8 @@
     "strategyNotFound": "Strategia non trovata"
   },
   "maintenance": {
-    "inProgress": "Un'altra operazione sta sostituendo i dati di questo account. Attendi che termini e riprova."
+    "inProgress": "Un'altra operazione sta sostituendo i dati di questo account. Attendi che termini e riprova.",
+    "inProgressRetryAfter": "Un'altra operazione sta sostituendo i dati di questo account. Terminerà o scadrà entro {{minutes}} min; riprova allora."
   },
   "payeeLookup": {
     "operatorManaged": "Google Places è configurato dall'amministrazione di questo server. Qui è possibile modificare solo l'impostazione di attivazione.",

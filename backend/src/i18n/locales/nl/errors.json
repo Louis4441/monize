@@ -731,7 +731,8 @@
     "strategyNotFound": "Strategie niet gevonden"
   },
   "maintenance": {
-    "inProgress": "Een andere bewerking vervangt momenteel de gegevens van dit account. Wacht tot deze klaar is en probeer het opnieuw."
+    "inProgress": "Een andere bewerking vervangt momenteel de gegevens van dit account. Wacht tot deze klaar is en probeer het opnieuw.",
+    "inProgressRetryAfter": "Een andere bewerking vervangt momenteel de gegevens van dit account. Deze is binnen {{minutes}} min voltooid of verloopt; probeer het daarna opnieuw."
   },
   "payeeLookup": {
     "operatorManaged": "Google Places wordt ingesteld door de beheerder van deze server. Alleen de aan/uit-instelling kan hier worden gewijzigd.",

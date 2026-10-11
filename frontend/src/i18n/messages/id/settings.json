@@ -781,6 +781,7 @@
         "pleaseEnterPassword": "Silakan masukkan kata sandi Anda untuk mengonfirmasi",
         "encryptedNeedsPassword": "Cadangan ini dienkripsi. Masukkan kata sandi yang digunakan saat membuatnya di kolom \"Kata sandi cadangan\", lalu coba lagi.",
         "failed": "Gagal memulihkan cadangan",
+        "interrupted": "Pemulihan terputus sebelum server merespons. Pemulihan berlaku seluruhnya atau tidak sama sekali, jadi data Anda sudah dipulihkan sepenuhnya atau tidak berubah. Muat ulang halaman untuk memeriksanya sebelum mencoba lagi.",
         "reauthRedirect": "Anda akan diarahkan ke penyedia identitas untuk memastikan ini benar Anda. Pilih kembali berkas cadangan setelah Anda kembali."
       },
       "selectedFile": "Dipilih: {filename}"

@@ -781,6 +781,7 @@
         "pleaseEnterPassword": "Inserisci la tua password per confermare",
         "encryptedNeedsPassword": "Questo backup è cifrato. Inserisci la password con cui è stato creato nel campo \"Password backup\" e riprova.",
         "failed": "Impossibile ripristinare il backup",
+        "interrupted": "Il ripristino è stato interrotto prima che il server rispondesse. Un ripristino avviene per intero o per niente, quindi i tuoi dati sono completamente ripristinati oppure invariati. Ricarica la pagina per verificarlo prima di riprovare.",
         "reauthRedirect": "Ti portiamo al tuo provider di identità per confermare la tua identità. Al ritorno, seleziona di nuovo il file di backup."
       },
       "selectedFile": "Selezionato: {filename}"
