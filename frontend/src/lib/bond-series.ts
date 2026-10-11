@@ -143,6 +143,8 @@ export interface ProgramFacts {
   lengthMonths: number | null;
   /** Null when the source does not say (a held lot carries no capitalization). */
   capitalization: 'NONE' | 'COMPOUND_AT_PERIOD_END' | null;
+  /** Months in one interest period; null when the source does not say (a held lot carries none). */
+  periodMonths: number | null;
   /** True when the terms allow no early redemption (maturity only). */
   redeemableAtMaturityOnly: boolean;
   /** Early redemption fee per bond, a decimal string; null when there is none. */
@@ -178,6 +180,7 @@ export function programFacts(
       rateRule: onSale.rateRule,
       lengthMonths: onSale.periodMonths * onSale.periodCount,
       capitalization: onSale.capitalization,
+      periodMonths: onSale.periodMonths,
       redeemableAtMaturityOnly: onSale.redemption === null,
       fee: fee?.type === 'FIXED_FEE_PER_UNIT' ? fee.amount : null,
       floor: onSale.redemption?.proceedsFloor?.appliesTo ?? null,
@@ -194,6 +197,7 @@ export function programFacts(
     rateRule: newest.latestLot.valuation.rateRule,
     lengthMonths: monthsBetween(newest.latestLot.purchaseDate, newest.maturityDate),
     capitalization: null,
+    periodMonths: null,
     redeemableAtMaturityOnly: newest.series !== null && redemption === null,
     fee: fee?.type === 'FIXED_FEE_PER_UNIT' ? fee.amount : null,
     floor: redemption?.proceedsFloor?.appliesTo ?? null,

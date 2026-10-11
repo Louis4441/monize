@@ -165,7 +165,23 @@
     "sectorEmpty": "Chưa lưu cơ cấu theo ngành. Monize lấy phần này từ nhà cung cấp cho quỹ và ETF.",
     "countryEmpty": "Chưa lưu cơ cấu theo quốc gia. Bạn có thể nhập khi sửa chứng khoán.",
     "assetClassEmpty": "Chưa lưu cơ cấu theo loại tài sản.",
-    "remainder": "{percent} chưa phân loại"
+    "remainder": "{percent} chưa phân loại",
+    "bond": {
+      "seriesTab": "Series",
+      "maturityTab": "Đáo hạn",
+      "empty": "Bạn chưa nắm giữ series nào của loại trái phiếu này.",
+      "someUnknown": "Một số giá trị chưa xác định, nên không hiển thị tỷ trọng.",
+      "issuerCountry": "Quốc gia phát hành",
+      "rate": "Lãi suất",
+      "interest": "Tiền lãi",
+      "term": "Thời hạn đến khi đáo hạn",
+      "interestValue": "{capitalization}, kỳ: {period}",
+      "rateType": {
+        "FIXED": "Cố định",
+        "BENCHMARK_PLUS_SPREAD": "Thả nổi (chuẩn + biên độ)",
+        "INFLATION_PLUS_MARGIN_AS_RATE": "Gắn với lạm phát (chuẩn + biên)"
+      }
+    }
   },
   "documents": {
     "title": "Tài liệu",

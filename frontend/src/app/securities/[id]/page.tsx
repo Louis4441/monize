@@ -20,6 +20,7 @@ import { SecurityAboutCard } from '@/components/securities/detail/SecurityAboutC
 import { SecurityPerformanceCard } from '@/components/securities/detail/SecurityPerformanceCard';
 import { SecurityPositionInfoCard } from '@/components/securities/detail/SecurityPositionInfoCard';
 import { SecurityAccountsTable } from '@/components/securities/detail/SecurityAccountsTable';
+import { SecurityBondBreakdownCard } from '@/components/securities/detail/SecurityBondBreakdownCard';
 import { SecurityBreakdownCard } from '@/components/securities/detail/SecurityBreakdownCard';
 import { SecurityBondCard } from '@/components/securities/detail/SecurityBondCard';
 import { useOnUndoRedo } from '@/hooks/useOnUndoRedo';
@@ -431,7 +432,11 @@ function SecurityDetailContent() {
                 }
                 prices={priceSeries}
               />
-              <SecurityBreakdownCard security={security} />
+              {security.bondProgramId ? (
+                <SecurityBondBreakdownCard security={security} />
+              ) : (
+                <SecurityBreakdownCard security={security} />
+              )}
             </div>
           </div>
 

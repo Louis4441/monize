@@ -165,7 +165,23 @@
     "sectorEmpty": "Nenhuma composição setorial armazenada. O Monize a preenche pelo fornecedor para fundos e ETFs.",
     "countryEmpty": "Nenhuma composição por país armazenada. Você pode informá-la ao editar o ativo.",
     "assetClassEmpty": "Nenhuma composição por classe de ativos armazenada ainda.",
-    "remainder": "{percent} não classificado"
+    "remainder": "{percent} não classificado",
+    "bond": {
+      "seriesTab": "Séries",
+      "maturityTab": "Vencimento",
+      "empty": "Você ainda não tem nenhuma série deste tipo de título.",
+      "someUnknown": "Alguns valores são desconhecidos, então as participações não são exibidas.",
+      "issuerCountry": "País do emissor",
+      "rate": "Taxa de juros",
+      "interest": "Juros",
+      "term": "Prazo até o vencimento",
+      "interestValue": "{capitalization}, período: {period}",
+      "rateType": {
+        "FIXED": "Fixa",
+        "BENCHMARK_PLUS_SPREAD": "Variável (referência + spread)",
+        "INFLATION_PLUS_MARGIN_AS_RATE": "Indexada à inflação (referência + margem)"
+      }
+    }
   },
   "documents": {
     "title": "Documentos",

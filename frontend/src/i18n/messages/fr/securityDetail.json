@@ -165,7 +165,23 @@
     "sectorEmpty": "Aucune répartition sectorielle enregistrée. Monize la renseigne depuis le fournisseur pour les fonds et les ETF.",
     "countryEmpty": "Aucune répartition par pays enregistrée. Vous pouvez la saisir en modifiant le titre.",
     "assetClassEmpty": "Aucune répartition par classe d'actifs enregistrée pour l'instant.",
-    "remainder": "{percent} non classé"
+    "remainder": "{percent} non classé",
+    "bond": {
+      "seriesTab": "Séries",
+      "maturityTab": "Échéance",
+      "empty": "Vous ne détenez encore aucune série de ce type d'obligation.",
+      "someUnknown": "Certaines valeurs sont inconnues, les parts ne sont donc pas affichées.",
+      "issuerCountry": "Pays de l'émetteur",
+      "rate": "Taux d'intérêt",
+      "interest": "Intérêts",
+      "term": "Durée jusqu'à l'échéance",
+      "interestValue": "{capitalization}, période : {period}",
+      "rateType": {
+        "FIXED": "Fixe",
+        "BENCHMARK_PLUS_SPREAD": "Variable (référence + écart)",
+        "INFLATION_PLUS_MARGIN_AS_RATE": "Indexé sur l'inflation (référence + marge)"
+      }
+    }
   },
   "documents": {
     "title": "Documents",

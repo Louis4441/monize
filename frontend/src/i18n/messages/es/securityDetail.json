@@ -165,7 +165,23 @@
     "sectorEmpty": "No hay desglose por sectores guardado. Monize lo rellena desde el proveedor para fondos y ETF.",
     "countryEmpty": "No hay desglose por países guardado. Puedes introducirlo al editar el valor.",
     "assetClassEmpty": "Todavía no hay desglose por clase de activo guardado.",
-    "remainder": "{percent} sin clasificar"
+    "remainder": "{percent} sin clasificar",
+    "bond": {
+      "seriesTab": "Series",
+      "maturityTab": "Vencimiento",
+      "empty": "Aún no tienes ninguna serie de este tipo de bono.",
+      "someUnknown": "Algunos valores son desconocidos, por lo que no se muestran porcentajes.",
+      "issuerCountry": "País del emisor",
+      "rate": "Tipo de interés",
+      "interest": "Intereses",
+      "term": "Plazo hasta el vencimiento",
+      "interestValue": "{capitalization}, periodo: {period}",
+      "rateType": {
+        "FIXED": "Fijo",
+        "BENCHMARK_PLUS_SPREAD": "Variable (referencia + diferencial)",
+        "INFLATION_PLUS_MARGIN_AS_RATE": "Indexado a la inflación (referencia + margen)"
+      }
+    }
   },
   "documents": {
     "title": "Documentos",

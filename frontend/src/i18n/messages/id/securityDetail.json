@@ -165,7 +165,23 @@
     "sectorEmpty": "Rincian sektor tidak tersimpan. Monize mengisinya dari penyedia untuk reksa dana dan ETF.",
     "countryEmpty": "Rincian negara tidak tersimpan. Anda dapat memasukkannya saat mengubah efek.",
     "assetClassEmpty": "Rincian kelas aset belum tersimpan.",
-    "remainder": "{percent} tidak terklasifikasi"
+    "remainder": "{percent} tidak terklasifikasi",
+    "bond": {
+      "seriesTab": "Seri",
+      "maturityTab": "Jatuh tempo",
+      "empty": "Anda belum memiliki seri obligasi jenis ini.",
+      "someUnknown": "Beberapa nilai tidak diketahui, sehingga persentase tidak ditampilkan.",
+      "issuerCountry": "Negara penerbit",
+      "rate": "Suku bunga",
+      "interest": "Bunga",
+      "term": "Jangka waktu hingga jatuh tempo",
+      "interestValue": "{capitalization}, periode: {period}",
+      "rateType": {
+        "FIXED": "Tetap",
+        "BENCHMARK_PLUS_SPREAD": "Mengambang (acuan + selisih)",
+        "INFLATION_PLUS_MARGIN_AS_RATE": "Terindeks inflasi (acuan + margin)"
+      }
+    }
   },
   "documents": {
     "title": "Dokumen",

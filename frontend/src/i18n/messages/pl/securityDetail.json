@@ -165,7 +165,23 @@
     "sectorEmpty": "Nie zapisano podziału na sektory. Monize uzupełnia go od dostawcy dla funduszy i ETF-ów.",
     "countryEmpty": "Nie zapisano podziału na kraje. Możesz go wpisać przy edycji papieru wartościowego.",
     "assetClassEmpty": "Nie zapisano jeszcze podziału na klasy aktywów.",
-    "remainder": "{percent} niesklasyfikowane"
+    "remainder": "{percent} niesklasyfikowane",
+    "bond": {
+      "seriesTab": "Serie",
+      "maturityTab": "Wykup",
+      "empty": "Nie masz jeszcze żadnej serii tego rodzaju obligacji.",
+      "someUnknown": "Część wartości jest nieznana, więc udziały nie są pokazane.",
+      "issuerCountry": "Kraj emitenta",
+      "rate": "Oprocentowanie",
+      "interest": "Odsetki",
+      "term": "Okres do wykupu",
+      "interestValue": "{capitalization}, okres: {period}",
+      "rateType": {
+        "FIXED": "Stałe",
+        "BENCHMARK_PLUS_SPREAD": "Zmienne (wskaźnik + marża)",
+        "INFLATION_PLUS_MARGIN_AS_RATE": "Indeksowane inflacją (wskaźnik + marża)"
+      }
+    }
   },
   "documents": {
     "title": "Dokumenty",

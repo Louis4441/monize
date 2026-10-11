@@ -165,7 +165,23 @@
     "sectorEmpty": "Sektör dağılımı kayıtlı değil. Monize bunu fonlar ve ETF'ler için sağlayıcıdan doldurur.",
     "countryEmpty": "Ülke dağılımı kayıtlı değil. Menkul kıymeti düzenlerken girebilirsin.",
     "assetClassEmpty": "Varlık sınıfı dağılımı henüz kayıtlı değil.",
-    "remainder": "{percent} sınıflandırılmamış"
+    "remainder": "{percent} sınıflandırılmamış",
+    "bond": {
+      "seriesTab": "Seriler",
+      "maturityTab": "Vade",
+      "empty": "Bu tahvil türünün henüz hiçbir serisine sahip değilsiniz.",
+      "someUnknown": "Bazı değerler bilinmiyor, bu nedenle paylar gösterilmiyor.",
+      "issuerCountry": "İhraççı ülke",
+      "rate": "Faiz oranı",
+      "interest": "Faiz",
+      "term": "Vadeye kalan süre",
+      "interestValue": "{capitalization}, dönem: {period}",
+      "rateType": {
+        "FIXED": "Sabit",
+        "BENCHMARK_PLUS_SPREAD": "Değişken (gösterge + marj)",
+        "INFLATION_PLUS_MARGIN_AS_RATE": "Enflasyona endeksli (gösterge + marj)"
+      }
+    }
   },
   "documents": {
     "title": "Belgeler",

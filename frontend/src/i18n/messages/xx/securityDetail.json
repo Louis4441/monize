@@ -165,7 +165,23 @@
     "sectorEmpty": "[XX-No sector breakdown is stored. Monize fills this in from the provider for funds and ETFs.-XX]",
     "countryEmpty": "[XX-No country breakdown is stored. You can enter one when editing the security.-XX]",
     "assetClassEmpty": "[XX-No asset class breakdown is stored yet.-XX]",
-    "remainder": "[XX-{percent} unclassified-XX]"
+    "remainder": "[XX-{percent} unclassified-XX]",
+    "bond": {
+      "seriesTab": "[XX-Series-XX]",
+      "maturityTab": "[XX-Maturity-XX]",
+      "empty": "[XX-You hold no series of this bond kind yet.-XX]",
+      "someUnknown": "[XX-Some values are unknown, so no shares are shown.-XX]",
+      "issuerCountry": "[XX-Issuer country-XX]",
+      "rate": "[XX-Interest rate-XX]",
+      "interest": "[XX-Interest-XX]",
+      "term": "[XX-Term to maturity-XX]",
+      "interestValue": "[XX-{capitalization}, period: {period}-XX]",
+      "rateType": {
+        "FIXED": "[XX-Fixed-XX]",
+        "BENCHMARK_PLUS_SPREAD": "[XX-Floating (benchmark + spread)-XX]",
+        "INFLATION_PLUS_MARGIN_AS_RATE": "[XX-Inflation-indexed (benchmark + margin)-XX]"
+      }
+    }
   },
   "documents": {
     "title": "[XX-Documents-XX]",

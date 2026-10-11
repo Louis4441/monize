@@ -165,7 +165,23 @@
     "sectorEmpty": "Non è memorizzata alcuna composizione settoriale. Monize la compila dal fornitore per fondi ed ETF.",
     "countryEmpty": "Non è memorizzata alcuna composizione per paese. Puoi inserirla modificando il titolo.",
     "assetClassEmpty": "Non è ancora memorizzata alcuna composizione per classe di attivo.",
-    "remainder": "{percent} non classificato"
+    "remainder": "{percent} non classificato",
+    "bond": {
+      "seriesTab": "Serie",
+      "maturityTab": "Scadenza",
+      "empty": "Non possiedi ancora nessuna serie di questo tipo di obbligazione.",
+      "someUnknown": "Alcuni valori sono sconosciuti, quindi le quote non vengono mostrate.",
+      "issuerCountry": "Paese dell'emittente",
+      "rate": "Tasso di interesse",
+      "interest": "Interessi",
+      "term": "Durata fino alla scadenza",
+      "interestValue": "{capitalization}, periodo: {period}",
+      "rateType": {
+        "FIXED": "Fisso",
+        "BENCHMARK_PLUS_SPREAD": "Variabile (parametro + spread)",
+        "INFLATION_PLUS_MARGIN_AS_RATE": "Indicizzato all'inflazione (parametro + margine)"
+      }
+    }
   },
   "documents": {
     "title": "Documenti",

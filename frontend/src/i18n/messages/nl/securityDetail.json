@@ -165,7 +165,23 @@
     "sectorEmpty": "Er is geen sectoropbouw opgeslagen. Monize vult die voor fondsen en ETF's aan via de aanbieder.",
     "countryEmpty": "Er is geen landenopbouw opgeslagen. Je kunt die invoeren bij het bewerken van het effect.",
     "assetClassEmpty": "Er is nog geen opbouw naar beleggingscategorie opgeslagen.",
-    "remainder": "{percent} niet ingedeeld"
+    "remainder": "{percent} niet ingedeeld",
+    "bond": {
+      "seriesTab": "Series",
+      "maturityTab": "Looptijd",
+      "empty": "U bezit nog geen serie van dit obligatietype.",
+      "someUnknown": "Sommige waarden zijn onbekend, daarom worden er geen aandelen getoond.",
+      "issuerCountry": "Land van de uitgever",
+      "rate": "Rentevoet",
+      "interest": "Rente",
+      "term": "Looptijd tot einde",
+      "interestValue": "{capitalization}, periode: {period}",
+      "rateType": {
+        "FIXED": "Vast",
+        "BENCHMARK_PLUS_SPREAD": "Variabel (referentie + opslag)",
+        "INFLATION_PLUS_MARGIN_AS_RATE": "Inflatiegekoppeld (referentie + marge)"
+      }
+    }
   },
   "documents": {
     "title": "Documenten",

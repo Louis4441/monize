@@ -165,7 +165,23 @@
     "sectorEmpty": "セクター構成は保存されていません。Monize はファンドと ETF について提供元から取り込みます。",
     "countryEmpty": "国別構成は保存されていません。銘柄を編集するときに入力できます。",
     "assetClassEmpty": "資産クラス構成はまだ保存されていません。",
-    "remainder": "{percent} は未分類"
+    "remainder": "{percent} は未分類",
+    "bond": {
+      "seriesTab": "シリーズ",
+      "maturityTab": "満期",
+      "empty": "この種類の債券のシリーズをまだ保有していません。",
+      "someUnknown": "一部の値が不明なため、割合は表示されません。",
+      "issuerCountry": "発行国",
+      "rate": "金利",
+      "interest": "利息",
+      "term": "満期までの期間",
+      "interestValue": "{capitalization}、期間: {period}",
+      "rateType": {
+        "FIXED": "固定",
+        "BENCHMARK_PLUS_SPREAD": "変動(基準 + スプレッド)",
+        "INFLATION_PLUS_MARGIN_AS_RATE": "物価連動(基準 + マージン)"
+      }
+    }
   },
   "documents": {
     "title": "資料",

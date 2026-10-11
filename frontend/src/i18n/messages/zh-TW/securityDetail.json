@@ -165,7 +165,23 @@
     "sectorEmpty": "未儲存類股組成。對於基金與 ETF，Monize 會從資料來源補齊。",
     "countryEmpty": "未儲存國家組成。你可以在編輯該證券時輸入。",
     "assetClassEmpty": "尚未儲存資產類別組成。",
-    "remainder": "{percent} 未分类"
+    "remainder": "{percent} 未分类",
+    "bond": {
+      "seriesTab": "系列",
+      "maturityTab": "到期",
+      "empty": "您尚未持有此類債券的任何系列。",
+      "someUnknown": "部分數值未知,因此不顯示占比。",
+      "issuerCountry": "發行國家",
+      "rate": "利率",
+      "interest": "利息",
+      "term": "距到期期間",
+      "interestValue": "{capitalization},期間:{period}",
+      "rateType": {
+        "FIXED": "固定",
+        "BENCHMARK_PLUS_SPREAD": "浮動(基準 + 利差)",
+        "INFLATION_PLUS_MARGIN_AS_RATE": "通膨連動(基準 + 加碼)"
+      }
+    }
   },
   "documents": {
     "title": "文件",

@@ -165,7 +165,23 @@
     "sectorEmpty": "Es ist keine Sektoraufteilung gespeichert. Monize füllt sie für Fonds und ETFs beim Anbieter ab.",
     "countryEmpty": "Es ist keine Länderaufteilung gespeichert. Du kannst sie beim Bearbeiten des Wertpapiers eintragen.",
     "assetClassEmpty": "Es ist noch keine Aufteilung nach Anlageklassen gespeichert.",
-    "remainder": "{percent} nicht zugeordnet"
+    "remainder": "{percent} nicht zugeordnet",
+    "bond": {
+      "seriesTab": "Serien",
+      "maturityTab": "Fälligkeit",
+      "empty": "Sie halten noch keine Serie dieser Anleiheart.",
+      "someUnknown": "Einige Werte sind unbekannt, daher werden keine Anteile angezeigt.",
+      "issuerCountry": "Land des Emittenten",
+      "rate": "Zinssatz",
+      "interest": "Zinsen",
+      "term": "Laufzeit bis zur Fälligkeit",
+      "interestValue": "{capitalization}, Periode: {period}",
+      "rateType": {
+        "FIXED": "Fest",
+        "BENCHMARK_PLUS_SPREAD": "Variabel (Referenzwert + Aufschlag)",
+        "INFLATION_PLUS_MARGIN_AS_RATE": "Inflationsindexiert (Referenzwert + Marge)"
+      }
+    }
   },
   "documents": {
     "title": "Dokumente",
