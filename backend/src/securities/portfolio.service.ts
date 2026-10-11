@@ -825,23 +825,13 @@ export class PortfolioService {
   }
 
   /**
-   * The valuation itself. Phase timings are logged at debug level so an
-   * operator can see which of the three expensive phases (live FX priming,
-   * holdings valuation, since-inception result) a slow summary is spending its
-   * seconds in, without a profiler or a code change.
+   * The valuation itself.
    */
   private async computePortfolioSummary(
     userId: string,
     defaultCurrency: string,
     accountIds?: string[],
   ): Promise<PortfolioSummary> {
-    const phaseStart = Date.now();
-    let mark = phaseStart;
-    const phase = (name: string): void => {
-      const now = Date.now();
-      this.logger.debug(`Portfolio summary phase ${name}: ${now - mark}ms`);
-      mark = now;
-    };
     const rateCache: FxRateCache = new Map();
 
     // Get investment accounts
@@ -861,7 +851,6 @@ export class PortfolioService {
       categorised.holdingsAccountIds,
       defaultCurrency,
     );
-    phase("liveFxPriming");
 
     // Compute effective cash balances excluding future-dated transactions
     const cashAndStandaloneIds = [
@@ -898,7 +887,6 @@ export class PortfolioService {
         rateCache,
         (ids) => this.getLatestPrices(ids),
       );
-    phase("holdingsValuation");
 
     // Group holdings by account
     const holdingsByAccount =
@@ -981,7 +969,6 @@ export class PortfolioService {
         displayCurrency: defaultCurrency,
         fetchMissing: false,
       });
-    phase("sinceInceptionResult");
     const timeWeightedReturn = investedSinceInception.investmentReturnPercent;
     const timeWeightedReturnReasons = investedSinceInception.investedReasons;
     // The window's baseline, so the caption can name what "since" means. A
@@ -1050,7 +1037,7 @@ export class PortfolioService {
       ]),
     ].sort();
 
-    const summary: PortfolioSummary = {
+    return {
       totalCashValue,
       totalHoldingsValue: holdingsResult.totalHoldingsValue,
       totalCostBasis: holdingsResult.totalCostBasis,
@@ -1075,10 +1062,6 @@ export class PortfolioService {
       holdingsByAccount,
       allocation,
     };
-    this.logger.debug(
-      `Portfolio summary computed in ${Date.now() - phaseStart}ms`,
-    );
-    return summary;
   }
 
   /**
