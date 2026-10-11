@@ -55,6 +55,9 @@ import { NetWorthService } from "../../net-worth/net-worth.service";
 import { BudgetReportsService } from "../../budgets/budget-reports.service";
 import { PortfolioService } from "../../securities/portfolio.service";
 import { SecuritiesService } from "../../securities/securities.service";
+import { SeriesFetchError } from "../../bonds/bond-adapter";
+import { seriesErrorMessage } from "../../bonds/bond-series-errors";
+import { BondSeriesService } from "../../bonds/bond-series.service";
 import {
   SecurityToolPrepService,
   ManageCreateSecurityRow,
@@ -212,6 +215,10 @@ export class ToolExecutorService {
     // through a forwardRef (`src/module-graph.spec.ts`).
     @Inject(forwardRef(() => EmailReceiptParserToolsService))
     private readonly receiptParsers: EmailReceiptParserToolsService,
+    // `fetch_bond_series`: reference data from the official source. AiModule
+    // reaches BondsModule through a forwardRef (`src/module-graph.spec.ts`).
+    @Inject(forwardRef(() => BondSeriesService))
+    private readonly bondSeries: BondSeriesService,
   ) {}
 
   async execute(
@@ -294,6 +301,9 @@ export class ToolExecutorService {
           break;
         case "lookup_securities":
           result = await this.lookupSecuritiesAction(userId, validatedInput);
+          break;
+        case "fetch_bond_series":
+          result = await this.fetchBondSeriesAction(validatedInput);
           break;
         case "manage_investment_transactions":
           result = await this.manageInvestmentTransactions(
@@ -1901,6 +1911,41 @@ export class ToolExecutorService {
         },
       ],
     };
+  }
+
+  /**
+   * Reads one bond series from its official source into the catalog. Writes only
+   * reference data (INV-BOND-006), so there is no card: the tool result says
+   * whether it was stored. A refusal is the translated message, never a retry.
+   */
+  private async fetchBondSeriesAction(
+    input: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const countryCode = input.countryCode as string;
+    const seriesCode = input.seriesCode as string;
+    try {
+      const data = await this.bondSeries.fetchSeries(countryCode, seriesCode);
+      return {
+        data,
+        summary: data.created
+          ? `Stored bond series ${data.seriesCode} from the official source.`
+          : `Bond series ${data.seriesCode} was already in the catalog; nothing was fetched.`,
+        sources: [
+          {
+            type: "bond_series",
+            description: `Bond series ${data.seriesCode} (${data.termsProvider})`,
+          },
+        ],
+      };
+    } catch (err) {
+      if (err instanceof SeriesFetchError) {
+        return this.toolError(seriesErrorMessage(err));
+      }
+      return this.toolErrorFromException(
+        err,
+        "Could not fetch the bond series.",
+      );
+    }
   }
 
   private toInvestmentCreateRow(

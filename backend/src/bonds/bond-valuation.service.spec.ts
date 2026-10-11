@@ -305,6 +305,7 @@ describe("BondValuationService", () => {
           id: "i1",
           seriesCode: "TOS1029",
           currencyCode: "PLN",
+          termsProvider: "PL_MF",
         },
       });
 
@@ -391,6 +392,13 @@ describe("BondValuationService", () => {
       expect(result.instrument).toMatchObject({
         id: "i1",
         seriesCode: "TOS1029",
+        termsProvider: "PL_MF",
+      });
+      // The document the terms were read from, from the stored terms' `source`.
+      expect(result.termsSource).toEqual({
+        provider: "PL_MF",
+        url: "https://www.obligacjeskarbowe.pl/media_files/c15a26ae-de6e-4b89-a137-cb16687a7b0a.pdf",
+        document: "List emisyjny nr 97/2026",
       });
       expect(result.refusal).toBeNull();
       expect(
@@ -456,6 +464,8 @@ describe("BondValuationService", () => {
         "2027-04-15",
       );
       expect(result.lots).toEqual([]);
+      // A refusal still says where the terms came from.
+      expect(result.termsSource.provider).toBe("PL_MF");
       expect(result.refusal).toMatchObject({ code: "SPLIT" });
       expect(result.totals).toEqual({
         quantity: null,

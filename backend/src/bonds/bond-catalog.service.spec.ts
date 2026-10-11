@@ -72,7 +72,7 @@ function setup(adapters: readonly BondAdapter[], seed: Partial<Db> = {}) {
       }
       return [];
     }
-    if (sql.includes("ORDER BY issuer_country_code")) {
+    if (sql.includes("ORDER BY i.issuer_country_code")) {
       return [
         {
           id: "i-1",
@@ -81,6 +81,7 @@ function setup(adapters: readonly BondAdapter[], seed: Partial<Db> = {}) {
           program_code: "TOS",
           series_code: "TOS1029",
           currency_code: "PLN",
+          terms_provider: "curated",
         },
       ];
     }
@@ -295,11 +296,88 @@ describe("BondCatalogService", () => {
         programCode: "TOS",
         seriesCode: "TOS1029",
         currencyCode: "PLN",
+        termsProvider: "curated",
       },
     ]);
     expect(statements[0]).toMatch(
-      /ORDER BY issuer_country_code, issuer_code, series_code/,
+      /ORDER BY i\.issuer_country_code, i\.issuer_code, i\.series_code/,
     );
+    // The origin of the newest terms version rides with every instrument.
+    expect(statements[0]).toContain("terms->'source'->>'provider'");
+  });
+
+  it("finds a stored series by country and series code, compared without case, and only with version 1 stored", async () => {
+    const { service, manager } = setup([POLISH_BOND_ADAPTER]);
+    await expect(
+      service.findStoredSeries(manager as never, "PL", "tos1029"),
+    ).resolves.toMatchObject({ id: "i-1", termsProvider: "curated" });
+    const [sql, params] = manager.query.mock.calls[0];
+    expect(sql).toContain("UPPER(i.series_code) = UPPER($2)");
+    expect(sql).toContain("v.version = 1");
+    expect(params).toEqual(["PL", "tos1029"]);
+  });
+
+  it("finds one instrument by id, or null", async () => {
+    const { service, manager } = setup([POLISH_BOND_ADAPTER]);
+    await expect(
+      service.findSummary(manager as never, "i-1"),
+    ).resolves.toMatchObject({ seriesCode: "TOS1029" });
+    manager.query.mockResolvedValueOnce([]);
+    await expect(
+      service.findSummary(manager as never, "nope"),
+    ).resolves.toBeNull();
+  });
+
+  describe("storeEntry reports what it did and logs nothing", () => {
+    const entry = POLISH_BOND_ADAPTER.catalog[0];
+
+    it("inserts a new instrument and version", async () => {
+      const { service, manager, db } = setup([POLISH_BOND_ADAPTER]);
+      const outcome = await service.storeEntry(manager as never, entry);
+      expect(outcome).toMatchObject({ kind: "inserted" });
+      expect(db.versions.size).toBe(1);
+      expect(error).not.toHaveBeenCalled();
+    });
+
+    it("is unchanged when the same content is stored, and writes no version", async () => {
+      const { service, manager, db } = setup([POLISH_BOND_ADAPTER]);
+      await service.storeEntry(manager as never, entry);
+      const again = await service.storeEntry(manager as never, entry);
+      expect(again).toMatchObject({ kind: "unchanged" });
+      expect(db.versions.size).toBe(1);
+    });
+
+    it("is a conflict when version 1 is stored with different content", async () => {
+      const { service, manager, db } = setup([POLISH_BOND_ADAPTER]);
+      await service.storeEntry(manager as never, entry);
+      const [key] = [...db.versions.keys()];
+      db.versions.set(key, "another-hash");
+      await expect(
+        service.storeEntry(manager as never, entry),
+      ).resolves.toMatchObject({ kind: "conflict" });
+    });
+
+    it("reports an instrument row that disagrees with the entry", async () => {
+      const { service, manager, db } = setup([POLISH_BOND_ADAPTER]);
+      await service.storeEntry(manager as never, entry);
+      db.instruments[0].program_code = "OTHER";
+      const outcome = await service.storeEntry(manager as never, entry);
+      expect(outcome).toMatchObject({
+        kind: "instrument-mismatch",
+        fields: [["programCode", "OTHER", expect.any(String)]],
+      });
+    });
+
+    it("reports terms the strict parser refuses", async () => {
+      const { service, manager } = setup([POLISH_BOND_ADAPTER]);
+      await expect(
+        service.storeEntry(manager as never, {
+          termsVersion: 1,
+          publishedAt: null,
+          terms: { schemaVersion: 1 },
+        }),
+      ).resolves.toMatchObject({ kind: "invalid" });
+    });
   });
 
   it("seeds the series alone for the refresh", async () => {

@@ -9,7 +9,9 @@
  * for every user, the same fan-out shape. Frankfurter is the first exchange
  * rate provider on the chain: the daily refresh asks it once per base
  * currency for every pair in use, and a gap fill once per window. NBP and GUS
- * publish the benchmark series (reference rate, CPI) that bond valuations read.
+ * publish the benchmark series (reference rate, CPI) that bond valuations read;
+ * obligacjeskarbowe.pl publishes the Polish retail bond series terms that a
+ * series fetch reads.
  *
  * The id is what goes in `provider_health.provider` and must stay stable -- it
  * is the primary key of the durable notification state, so renaming one starts
@@ -26,6 +28,7 @@ export const TRACKED_PROVIDERS = {
   frankfurter: "Frankfurter",
   nbp: "Narodowy Bank Polski",
   gus: "Główny Urząd Statystyczny",
+  obligacjeskarbowe: "Obligacje skarbowe (obligacjeskarbowe.pl)",
 } as const;
 
 export type TrackedProviderId = keyof typeof TRACKED_PROVIDERS;

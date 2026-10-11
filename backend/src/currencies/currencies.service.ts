@@ -245,7 +245,7 @@ export class CurrenciesService implements OnApplicationBootstrap {
    * offering it to anyone: a deployment's users did not choose it, so it is
    * created inactive (`findAll` lists only what a user has activated or what is
    * active globally) and stays selectable by code through `create`. Used only
-   * by the bond catalog seed; an existing row, active or not, is left as is.
+   * by the bond catalog (its seed and a series fetch); an existing row, active or not, is left as is.
    */
   async ensureCatalogCurrency(code: string): Promise<void> {
     await this.insertSystemCurrencyIfMissing(code, false);

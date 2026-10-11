@@ -100,7 +100,11 @@ export type SeriesFetchErrorCode =
   | "SOURCE_UNAVAILABLE"
   | "SOURCE_FORMAT_CHANGED"
   | "SOURCE_INCONSISTENT"
-  | "TEMPLATE_NOT_VALIDATED";
+  | "TEMPLATE_NOT_VALIDATED"
+  // Raised by the service, never an adapter: the country has no fetch, or the
+  // stored version 1 of the series differs from what was read.
+  | "SERIES_FETCH_UNSUPPORTED"
+  | "SERIES_TERMS_CONFLICT";
 
 /**
  * A refused series fetch or manual entry. `params` carries short machine values
@@ -142,4 +146,14 @@ export interface BondAdapter {
   fetchSeries?(seriesCode: string, fetch: BondFetch): Promise<FetchedSeries>;
   /** The same entry built from an administrator's values on the same template. */
   manualSeries?(seriesCode: string, values: ManualSeriesValues): CatalogEntry;
+  /**
+   * The outbound provider `fetchSeries` and `currentSeries` are gated and
+   * reported under. Present whenever either is.
+   */
+  readonly seriesProviderId?: TrackedProviderId;
+  /**
+   * The series codes the market's official source lists as on sale now, for the
+   * daily check that stores the ones the catalog lacks.
+   */
+  currentSeries?(fetch: BondFetch): Promise<string[]>;
 }

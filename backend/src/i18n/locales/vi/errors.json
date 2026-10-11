@@ -549,7 +549,15 @@
     "TERMS_MISMATCH": "Phiên bản điều khoản {{ version }} của series {{ series }} mô tả {{ claimedSeries }} bằng {{ claimedCurrency }}, nhưng công cụ là {{ storedSeries }} bằng {{ storedCurrency }}",
     "assumeInvalid": "assume phải có dạng benchmarkId:giá trị, với mã chỉ số gồm 1 đến 40 chữ hoa, chữ số hoặc dấu gạch dưới và giá trị thập phân từ -0.5 đến 1.0",
     "benchmarkIdInvalid": "benchmarkId phải gồm 1 đến 40 chữ hoa, chữ số hoặc dấu gạch dưới",
-    "scenarioValuesInvalid": "values phải chứa từ 1 đến 6 số thập phân cách nhau bằng dấu phẩy, từ -0.5 đến 1.0"
+    "scenarioValuesInvalid": "values phải chứa từ 1 đến 6 số thập phân cách nhau bằng dấu phẩy, từ -0.5 đến 1.0",
+    "SERIES_CODE_INVALID": "\"{{ series }}\" không phải là mã series hợp lệ",
+    "SERIES_FETCH_UNSUPPORTED": "Không thể lấy series từ nguồn chính thức cho {{ country }}",
+    "SERIES_NOT_PUBLISHED": "Series {{ series }} chưa được công bố trên nguồn chính thức",
+    "SOURCE_UNAVAILABLE": "Hiện không thể đọc nguồn chính thức của series {{ series }}; hãy thử lại sau",
+    "SOURCE_FORMAT_CHANGED": "Điều khoản của series {{ series }} không có {{ field }} dùng được: nguồn chính thức có thể đã đổi định dạng, hoặc giá trị không được chấp nhận",
+    "SOURCE_INCONSISTENT": "Các giá trị của series {{ series }} mâu thuẫn hoặc nằm ngoài giới hạn ở {{ field }} ({{ detail }})",
+    "TEMPLATE_NOT_VALIDATED": "Series {{ series }} đã được bán trước khi mẫu {{ product }} được xác thực ({{ validFrom }}); cần một mục được biên soạn",
+    "SERIES_TERMS_CONFLICT": "Series {{ series }} đã được lưu với điều khoản khác; điều khoản đã lưu không bao giờ bị thay thế"
   },
   "securities": {
     "bondPricedByEngine": "Chứng khoán này được liên kết với một công cụ trái phiếu và được định giá bởi công cụ tính trái phiếu, không phải bởi nhà cung cấp báo giá. Hãy dùng Tính lại giá thay thế.",

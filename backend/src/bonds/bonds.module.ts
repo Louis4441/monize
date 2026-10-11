@@ -5,8 +5,10 @@ import { ProviderHealthModule } from "../provider-health/provider-health.module"
 import { BenchmarkRefreshService } from "./benchmark-refresh.service";
 import { BondCatalogService } from "./bond-catalog.service";
 import { BondPriceService } from "./bond-price.service";
+import { BondSeriesService } from "./bond-series.service";
 import { BondValuationService } from "./bond-valuation.service";
 import { BondsController } from "./bonds.controller";
+import { SeriesHttp } from "./series-http";
 
 @Module({
   imports: [
@@ -25,7 +27,9 @@ import { BondsController } from "./bonds.controller";
     BondCatalogService,
     BenchmarkRefreshService,
     BondPriceService,
+    SeriesHttp,
+    BondSeriesService,
   ],
-  exports: [BondValuationService, BondPriceService],
+  exports: [BondValuationService, BondPriceService, BondSeriesService],
 })
 export class BondsModule {}

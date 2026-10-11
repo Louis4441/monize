@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
   NotFoundException,
@@ -12,6 +13,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import { Throttle } from "@nestjs/throttler";
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -19,8 +21,11 @@ import {
   ApiResponse,
   ApiTags,
 } from "@nestjs/swagger";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { RolesGuard } from "../auth/guards/roles.guard";
 import { todayYMD } from "../common/date-utils";
 import { tr } from "../i18n/translate";
+import { SeriesFetchError } from "./bond-adapter";
 import { BondCatalogService } from "./bond-catalog.service";
 import {
   BondDataInconsistentCode,
@@ -30,6 +35,8 @@ import {
   BondErrorParams,
 } from "./bond-errors";
 import { BondPriceRecompute, BondPriceService } from "./bond-price.service";
+import { seriesHttpException } from "./bond-series-errors";
+import { BondSeriesResult, BondSeriesService } from "./bond-series.service";
 import {
   BondInstrumentSummary,
   BondValuationService,
@@ -42,6 +49,8 @@ import {
   ParseBenchmarkIdPipe,
   ParseScenarioValuesPipe,
 } from "./bond-query.pipes";
+import { EnterBondSeriesDto } from "./dto/enter-bond-series.dto";
+import { FetchBondSeriesDto } from "./dto/fetch-bond-series.dto";
 import { BondEngineError, BondEngineErrorCode } from "./engine/bond-engine";
 
 /**
@@ -58,6 +67,7 @@ export class BondsController {
     private readonly catalog: BondCatalogService,
     private readonly valuation: BondValuationService,
     private readonly prices: BondPriceService,
+    private readonly series: BondSeriesService,
   ) {}
 
   @Get("instruments")
@@ -70,6 +80,71 @@ export class BondsController {
   @ApiResponse({ status: 200, description: "Bond instruments" })
   listInstruments(): Promise<BondInstrumentSummary[]> {
     return this.catalog.listInstruments();
+  }
+
+  @Post("instruments/fetch")
+  @Throttle({ default: { ttl: 60_000, limit: 10 } }) // L2: 10 fetches per minute per user; each reads the issuer's site
+  @ApiOperation({
+    summary: "Fetch a bond series from its official source",
+    description:
+      "Takes only a country and a series code. The terms are read from the " +
+      "issuer's own source, cross-checked and stored as an immutable terms " +
+      "version; the caller never supplies a rate, a margin, a fee or a date. " +
+      "A series already stored is returned with `created: false` and nothing " +
+      "is fetched.",
+  })
+  @ApiResponse({
+    status: 201,
+    description: "The instrument, and whether this call stored it",
+  })
+  @ApiResponse({ status: 404, description: "The series is not published" })
+  @ApiResponse({ status: 409, description: "Stored with different terms" })
+  @ApiResponse({
+    status: 503,
+    description: "The official source is unavailable",
+  })
+  fetchSeries(@Body() dto: FetchBondSeriesDto): Promise<BondSeriesResult> {
+    return this.mapSeriesErrors(
+      () => this.series.fetchSeries(dto.countryCode, dto.seriesCode),
+      false,
+    );
+  }
+
+  @Post("instruments/manual")
+  @UseGuards(RolesGuard)
+  @Roles("admin")
+  @ApiOperation({
+    summary: "Enter a bond series by hand (admin only)",
+    description:
+      "For a series whose official source cannot be read: the per-series " +
+      "values go on the adapter's product template, through the same bounds " +
+      "and strict parser as a fetched series. The stored source is `manual`.",
+  })
+  @ApiResponse({
+    status: 201,
+    description: "The instrument, and whether this call stored it",
+  })
+  @ApiResponse({ status: 403, description: "Not an administrator" })
+  @ApiResponse({ status: 409, description: "Stored with different terms" })
+  @ApiResponse({ status: 422, description: "A value is out of bounds" })
+  enterSeries(@Body() dto: EnterBondSeriesDto): Promise<BondSeriesResult> {
+    return this.mapSeriesErrors(
+      () =>
+        this.series.enterManually(dto.countryCode, dto.seriesCode, {
+          firstPeriodRate: dto.values.firstPeriodRate,
+          addend: dto.values.addend ? dto.values.addend : null,
+          fee: dto.values.fee ? dto.values.fee : null,
+          saleWindow: {
+            from: dto.values.saleWindow.from,
+            to: dto.values.saleWindow.to,
+          },
+          letter: {
+            number: dto.values.letter.number,
+            date: dto.values.letter.date,
+          },
+        }),
+      true,
+    );
   }
 
   @Get("securities/:securityId/valuation")
@@ -163,6 +238,25 @@ export class BondsController {
     return this.mapBondErrors(() =>
       this.prices.recomputeSecurity(req.user.id, securityId),
     );
+  }
+
+  /**
+   * A refused series request becomes the HTTP error its code names, with the
+   * message translated into the caller's language (`errors.bonds.<code>`);
+   * anything else is not a refusal and passes through.
+   */
+  private async mapSeriesErrors<T>(
+    run: () => Promise<T>,
+    manual: boolean,
+  ): Promise<T> {
+    try {
+      return await run();
+    } catch (error) {
+      if (error instanceof SeriesFetchError) {
+        throw seriesHttpException(error, manual);
+      }
+      throw error;
+    }
   }
 
   /**

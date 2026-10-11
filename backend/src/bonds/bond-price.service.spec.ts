@@ -45,6 +45,7 @@ const TOS: BondReferenceData = {
     programCode: "TOS",
     seriesCode: "TOS1029",
     currencyCode: "PLN",
+    termsProvider: "curated",
   },
   termsVersion: 1,
   terms: manifest("tos1029"),

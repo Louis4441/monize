@@ -549,7 +549,15 @@
     "TERMS_MISMATCH": "Terms version {{ version }} of series {{ series }} describe {{ claimedSeries }} in {{ claimedCurrency }}, but the instrument is {{ storedSeries }} in {{ storedCurrency }}",
     "assumeInvalid": "assume must be benchmarkId:value, with a benchmark id of 1 to 40 capital letters, digits or underscores and a decimal value between -0.5 and 1.0",
     "benchmarkIdInvalid": "benchmarkId must be 1 to 40 capital letters, digits or underscores",
-    "scenarioValuesInvalid": "values must be 1 to 6 comma-separated decimals between -0.5 and 1.0"
+    "scenarioValuesInvalid": "values must be 1 to 6 comma-separated decimals between -0.5 and 1.0",
+    "SERIES_CODE_INVALID": "\"{{ series }}\" is not a valid series code",
+    "SERIES_FETCH_UNSUPPORTED": "Series cannot be fetched from an official source for {{ country }}",
+    "SERIES_NOT_PUBLISHED": "Series {{ series }} is not published on the official source",
+    "SOURCE_UNAVAILABLE": "The official source for series {{ series }} could not be read right now; try again later",
+    "SOURCE_FORMAT_CHANGED": "The terms of series {{ series }} have no usable {{ field }}: the official source may have changed its format, or the value is not acceptable",
+    "SOURCE_INCONSISTENT": "The values of series {{ series }} are inconsistent or out of bounds on {{ field }} ({{ detail }})",
+    "TEMPLATE_NOT_VALIDATED": "Series {{ series }} was sold before the {{ product }} template was validated ({{ validFrom }}); it needs a curated entry",
+    "SERIES_TERMS_CONFLICT": "Series {{ series }} is already stored with different terms; stored terms are never replaced"
   },
   "securities": {
     "bondPricedByEngine": "This security is linked to a bond instrument and is priced by the bond engine, not by a quote provider. Use Recalculate prices instead.",

@@ -549,7 +549,15 @@
     "TERMS_MISMATCH": "系列 {{ series }} 的条款版本 {{ version }} 描述的是以 {{ claimedCurrency }} 计价的 {{ claimedSeries }}，但该工具是以 {{ storedCurrency }} 计价的 {{ storedSeries }}",
     "assumeInvalid": "assume 的格式必须为 benchmarkId:值，其中基准 ID 为 1 到 40 个大写字母、数字或下划线，值为介于 -0.5 和 1.0 之间的小数",
     "benchmarkIdInvalid": "benchmarkId 必须为 1 到 40 个大写字母、数字或下划线",
-    "scenarioValuesInvalid": "values 必须包含 1 到 6 个以逗号分隔、介于 -0.5 和 1.0 之间的小数"
+    "scenarioValuesInvalid": "values 必须包含 1 到 6 个以逗号分隔、介于 -0.5 和 1.0 之间的小数",
+    "SERIES_CODE_INVALID": "“{{ series }}”不是有效的系列代码",
+    "SERIES_FETCH_UNSUPPORTED": "无法从官方来源获取 {{ country }} 的系列",
+    "SERIES_NOT_PUBLISHED": "系列 {{ series }} 未在官方来源发布",
+    "SOURCE_UNAVAILABLE": "目前无法读取系列 {{ series }} 的官方来源，请稍后重试",
+    "SOURCE_FORMAT_CHANGED": "系列 {{ series }} 的条款没有可用的 {{ field }}：官方来源可能已更改格式，或该值不可接受",
+    "SOURCE_INCONSISTENT": "系列 {{ series }} 的值不一致，或 {{ field }} 超出范围（{{ detail }}）",
+    "TEMPLATE_NOT_VALIDATED": "系列 {{ series }} 在 {{ product }} 模板通过验证之前（{{ validFrom }}）发售，需要人工整理的条目",
+    "SERIES_TERMS_CONFLICT": "系列 {{ series }} 已以不同的条款存储；已存储的条款永远不会被替换"
   },
   "securities": {
     "bondPricedByEngine": "该证券已关联到债券工具，由债券引擎而非行情提供商定价。请改用“重新计算价格”。",

@@ -51,6 +51,12 @@ export interface BondInstrumentSummary {
   readonly programCode: string;
   readonly seriesCode: string;
   readonly currencyCode: string;
+  /**
+   * `source.provider` of the newest terms version: the publisher a curated
+   * manifest names, the official host a fetch read, or `manual` for an
+   * administrator's entry (INV-BOND-006).
+   */
+  readonly termsProvider: string;
 }
 
 /**
@@ -101,6 +107,13 @@ export interface BenchmarkCoverage {
   readonly lastFetchedAt: string | null;
 }
 
+/** Where a terms version came from: the provider, the document's address and its name. */
+export interface BondTermsSource {
+  readonly provider: string;
+  readonly url: string;
+  readonly document: string;
+}
+
 export interface SecurityValuation {
   readonly securityId: string;
   readonly instrument: BondInstrumentSummary;
@@ -109,11 +122,16 @@ export interface SecurityValuation {
   readonly benchmarkCoverage: readonly BenchmarkCoverage[];
   /** The terms' redemption policy; null when the bond is redeemable at maturity only. */
   readonly redemptionTerms: Redemption | null;
+  /** The document the terms were read from (INV-BOND-006). */
+  readonly termsSource: BondTermsSource;
   readonly totals: SecurityValuationTotals;
   readonly refusal: BondLotsRefusal | null;
 }
 
-function summarize(row: InstrumentRow): BondInstrumentSummary {
+function summarize(
+  row: InstrumentRow,
+  termsProvider: string,
+): BondInstrumentSummary {
   return {
     id: row.id,
     issuerCountryCode: row.issuer_country_code,
@@ -121,6 +139,7 @@ function summarize(row: InstrumentRow): BondInstrumentSummary {
     programCode: row.program_code,
     seriesCode: row.series_code,
     currencyCode: row.currency_code,
+    termsProvider,
   };
 }
 
@@ -234,6 +253,7 @@ export class BondValuationService {
           lots: [],
           benchmarkCoverage,
           redemptionTerms,
+          termsSource: reference.terms.source,
           totals: {
             quantity: null,
             grossValue: null,
@@ -261,6 +281,7 @@ export class BondValuationService {
         lots,
         benchmarkCoverage,
         redemptionTerms,
+        termsSource: reference.terms.source,
         totals: {
           quantity: lots.reduce((n, l) => n + l.quantity, 0),
           grossValue: sum((v) => v.grossValue),
@@ -357,7 +378,7 @@ export class BondValuationService {
     const announcedRates = await this.loadAnnouncedRates(m, instrument.id);
     const benchmarks = await this.loadBenchmarks(m, terms);
     return {
-      instrument: summarize(instrument),
+      instrument: summarize(instrument, terms.source.provider),
       termsVersion: version,
       terms,
       announcedRates,

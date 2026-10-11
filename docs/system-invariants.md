@@ -106,6 +106,7 @@ implied.
 | INV-BOND-003 | Bond money is exact until the issue document rounds it | enforced |
 | INV-BOND-004 | Known and projected bond values never mix | enforced |
 | INV-BOND-005 | A linked security's automatic price comes only from the bond engine; the engine replaces every non-manual row and never a manual one | enforced |
+| INV-BOND-006 | Bond terms enter the catalog only from a curated manifest, an adapter's fetch of its official source, or an administrator's manual entry on the adapter's template; a person who is not an administrator supplies only a country and a series code | enforced |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
 | INV-OCCURRENCE-003 | Every surface reports the effective occurrence: its current amount and currency, its direction, on the date it falls | enforced |
@@ -3444,6 +3445,106 @@ Required tests      bond-prices.integration.spec.ts (real PostgreSQL: a manual
                     action-history undo spec, provider-priced.guard.spec.ts,
                     backup specs (support backup drops the link; restore
                     names and recomputes).
+Status              enforced
+```
+
+### INV-BOND-006 -- terms enter the catalog from a manifest, the official source or an administrator, never from a user's numbers
+
+```text
+Statement           A bond terms version is stored only from one of three
+                    origins: an adapter's curated manifest, the adapter's fetch
+                    of its official source, or an administrator's manual entry
+                    built on the adapter's product template. A request from a
+                    person who is not an administrator carries only a country
+                    and a series code, never a rate, a margin, a fee or a date.
+                    Every stored version names its origin in source.provider
+                    (the publisher a curated manifest names, the official host
+                    the fetch read, or manual). Terms are inserted like a
+                    curated version (INV-BOND-001): a series already stored is
+                    returned and nothing is fetched or written, and a read
+                    whose content differs from the stored version 1 is refused
+                    and logged, never stored over it. A refused fetch leaves no
+                    row.
+Source of truth     bond_terms_versions.terms ->> 'source' (provider, url,
+                    document) and bond_terms_versions.source_url; the series
+                    code and country on bond_instruments
+Enforcement         Three mechanisms.
+                    1. The entry points take no terms from a person.
+                       FetchBondSeriesDto (backend/src/bonds/dto/) has exactly
+                       two bounded fields under whitelist and
+                       forbidNonWhitelisted, so POST /bonds/instruments/fetch
+                       (throttled to 10 a minute per user), the fetch_bond_series
+                       AI and MCP tool (the same two fields in
+                       fetchBondSeriesSchema) and the daily cron
+                       (BondSeriesService.scheduledCurrentOffer, which takes the
+                       codes from the adapter's own listing of the offer) cannot
+                       carry a value. Values enter only through POST
+                       /bonds/instruments/manual behind RolesGuard with
+                       Roles("admin"), and the MCP tool
+                       enter_bond_series_manually, which refuses a caller that
+                       BondSeriesService.isAdministrator does not find with the
+                       admin role, validates the values before asking, and
+                       confirms with the user before it stores. Both build the
+                       entry through the adapter's manualSeries: the same
+                       template, bounds and strict parseBondTerms as a fetch.
+                    2. Every check runs before the write. The adapter reads its
+                       host only (getFromIssuer refuses another host, a final
+                       url elsewhere, a status other than 200 and an oversized
+                       body), SeriesHttp makes the request with
+                       redirect: "manual", a 30 s timeout and a 5 MB streaming
+                       cap behind the obligacjeskarbowe circuit breaker, and the
+                       series page and the issue letter are cross-checked field
+                       by field before the template is filled and parsed. A
+                       refusal is a SeriesFetchError thrown before
+                       BondSeriesService opens the write transaction.
+                    3. One store path. BondSeriesService.store runs
+                       BondCatalogService.storeEntry (the seed's own insert)
+                       in one withScopedDb transaction whose first statement is
+                       pg_advisory_xact_lock(LockScope.BondSeriesFetch, 8,
+                       keyed on the deterministic instrument id). storeEntry
+                       reads inside the lock: the instrument row and version 1
+                       are inserted ON CONFLICT DO NOTHING, and a stored
+                       version is compared by content_hash. A differing hash,
+                       or an instrument row that disagrees, throws
+                       SERIES_TERMS_CONFLICT inside the transaction, which rolls
+                       back. The immutability trigger of INV-BOND-001 is the
+                       last backstop.
+                    Not enforced: the content of a curated manifest beyond the
+                    strict parser (it is reviewed code), and the truth of an
+                    administrator's manual values within the adapter's bounds
+                    (the role is the control; the card says the terms were
+                    entered by hand).
+Concurrency scope   per instrument (the advisory lock); the network read is
+                    outside it
+Retry semantics     A repeat of a stored series answers created: false and
+                    fetches nothing. Two concurrent first fetches of one series
+                    queue on the lock: the first inserts, the second finds the
+                    same content hash and writes nothing. A differing repeat is
+                    a conflict, retried never.
+Crash semantics     One transaction; a crash leaves no instrument or version
+                    row. The cron's lease (fetch_sync job bond-series) is a
+                    cost control: the store is idempotent however many replicas
+                    run.
+Failure response    SeriesFetchError codes, each with errors.bonds.<code> in
+                    every locale: SERIES_CODE_INVALID and
+                    SERIES_FETCH_UNSUPPORTED 400, SERIES_NOT_PUBLISHED 404,
+                    SOURCE_UNAVAILABLE 503, SOURCE_FORMAT_CHANGED 502 (422 for
+                    a manual entry), SOURCE_INCONSISTENT and
+                    TEMPLATE_NOT_VALIDATED 422, SERIES_TERMS_CONFLICT 409.
+Required tests      bond-series-fetch.integration.spec.ts (real PostgreSQL, a
+                    fake BondFetch over the saved fixtures, never the network: a
+                    fetch inserts one instrument and version 1; a repeat writes
+                    nothing; a differing repeat is SERIES_TERMS_CONFLICT; a
+                    refused fetch leaves no row; two concurrent fetches insert
+                    once; a manual entry is stored with provider manual and an
+                    out-of-bounds one leaves no row);
+                    bond-series.service.spec.ts, series-http.spec.ts,
+                    bonds.controller.spec.ts (DTO bounds, throttle, admin
+                    guard, error mapping), the fetch_bond_series and
+                    enter_bond_series_manually tool specs,
+                    provider-call.guard.spec.ts (the fetch goes through the
+                    breaker) and country-agnostic.guard.spec.ts (the service
+                    names no country).
 Status              enforced
 ```
 

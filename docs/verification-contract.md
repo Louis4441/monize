@@ -123,6 +123,7 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-BOND-003 exact bond money | **required** | required | -- | -- | -- | -- | -- | -- |
 | INV-BOND-004 known vs projected | **required** | -- | -- | -- | -- | -- | -- | -- |
 | INV-BOND-005 bond-engine-only prices | required | **required** | **required** | -- | -- | -- | -- | -- |
+| INV-BOND-006 terms only from a manifest, the official source or an administrator | **required** | required | **required** | **required** | -- | -- | -- | -- |
 | INV-OCCURRENCE-001 one effect | supporting | -- | required | required | **required** | required | -- | required |
 | INV-OCCURRENCE-002 override price | required | -- | -- | -- | -- | -- | -- | required |
 | INV-OCCURRENCE-003 one effective occurrence | **required** | **required** | -- | -- | -- | -- | optional | optional |

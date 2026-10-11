@@ -549,7 +549,15 @@
     "TERMS_MISMATCH": "Die Konditionenversion {{ version }} der Serie {{ series }} beschreibt {{ claimedSeries }} in {{ claimedCurrency }}, das Instrument ist aber {{ storedSeries }} in {{ storedCurrency }}",
     "assumeInvalid": "assume muss die Form benchmarkId:Wert haben, mit einer Benchmark-ID aus 1 bis 40 Großbuchstaben, Ziffern oder Unterstrichen und einem Dezimalwert zwischen -0.5 und 1.0",
     "benchmarkIdInvalid": "benchmarkId muss aus 1 bis 40 Großbuchstaben, Ziffern oder Unterstrichen bestehen",
-    "scenarioValuesInvalid": "values muss 1 bis 6 durch Kommas getrennte Dezimalwerte zwischen -0.5 und 1.0 enthalten"
+    "scenarioValuesInvalid": "values muss 1 bis 6 durch Kommas getrennte Dezimalwerte zwischen -0.5 und 1.0 enthalten",
+    "SERIES_CODE_INVALID": "„{{ series }}“ ist kein gültiger Seriencode",
+    "SERIES_FETCH_UNSUPPORTED": "Für {{ country }} kann eine Serie nicht aus einer offiziellen Quelle abgerufen werden",
+    "SERIES_NOT_PUBLISHED": "Die Serie {{ series }} ist in der offiziellen Quelle nicht veröffentlicht",
+    "SOURCE_UNAVAILABLE": "Die offizielle Quelle der Serie {{ series }} kann derzeit nicht gelesen werden; bitte später erneut versuchen",
+    "SOURCE_FORMAT_CHANGED": "Die Bedingungen der Serie {{ series }} enthalten kein verwendbares Feld {{ field }}: Die offizielle Quelle hat möglicherweise ihr Format geändert, oder der Wert ist nicht zulässig",
+    "SOURCE_INCONSISTENT": "Die Werte der Serie {{ series }} sind widersprüchlich oder liegen im Feld {{ field }} außerhalb der Grenzen ({{ detail }})",
+    "TEMPLATE_NOT_VALIDATED": "Die Serie {{ series }} wurde verkauft, bevor die Vorlage {{ product }} geprüft wurde ({{ validFrom }}); sie benötigt einen kuratierten Eintrag",
+    "SERIES_TERMS_CONFLICT": "Die Serie {{ series }} ist bereits mit anderen Bedingungen gespeichert; gespeicherte Bedingungen werden nie ersetzt"
   },
   "securities": {
     "bondPricedByEngine": "Dieses Wertpapier ist mit einem Anleiheinstrument verknüpft und wird von der Anleihe-Engine bewertet, nicht von einem Kursanbieter. Verwenden Sie stattdessen „Preise neu berechnen“.",

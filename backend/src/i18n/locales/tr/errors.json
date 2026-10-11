@@ -549,7 +549,15 @@
     "TERMS_MISMATCH": "{{ series }} serisinin {{ version }} koşul sürümü {{ claimedCurrency }} cinsinden {{ claimedSeries }} tanımlıyor, ancak enstrüman {{ storedCurrency }} cinsinden {{ storedSeries }}",
     "assumeInvalid": "assume, benchmarkId:değer biçiminde olmalıdır; gösterge kimliği 1 ile 40 arasında büyük harf, rakam veya alt çizgiden oluşmalı ve değer -0.5 ile 1.0 arasında bir ondalık sayı olmalıdır",
     "benchmarkIdInvalid": "benchmarkId 1 ile 40 arasında büyük harf, rakam veya alt çizgiden oluşmalıdır",
-    "scenarioValuesInvalid": "values, -0.5 ile 1.0 arasında virgülle ayrılmış 1 ila 6 ondalık sayı içermelidir"
+    "scenarioValuesInvalid": "values, -0.5 ile 1.0 arasında virgülle ayrılmış 1 ila 6 ondalık sayı içermelidir",
+    "SERIES_CODE_INVALID": "\"{{ series }}\" geçerli bir seri kodu değil",
+    "SERIES_FETCH_UNSUPPORTED": "{{ country }} için bir seri resmi kaynaktan alınamaz",
+    "SERIES_NOT_PUBLISHED": "{{ series }} serisi resmi kaynakta yayımlanmamış",
+    "SOURCE_UNAVAILABLE": "{{ series }} serisinin resmi kaynağı şu anda okunamıyor; lütfen daha sonra tekrar deneyin",
+    "SOURCE_FORMAT_CHANGED": "{{ series }} serisinin koşullarında kullanılabilir bir {{ field }} yok: resmi kaynak biçimini değiştirmiş olabilir ya da değer kabul edilebilir değil",
+    "SOURCE_INCONSISTENT": "{{ series }} serisinin değerleri tutarsız veya {{ field }} alanında sınırların dışında ({{ detail }})",
+    "TEMPLATE_NOT_VALIDATED": "{{ series }} serisi, {{ product }} şablonu doğrulanmadan önce satıldı ({{ validFrom }}); derlenmiş bir kayıt gerektirir",
+    "SERIES_TERMS_CONFLICT": "{{ series }} serisi zaten farklı koşullarla kayıtlı; kayıtlı koşullar asla değiştirilmez"
   },
   "securities": {
     "bondPricedByEngine": "Bu menkul kıymet bir tahvil enstrümanına bağlıdır ve bir kotasyon sağlayıcısı tarafından değil, tahvil motoru tarafından fiyatlanır. Bunun yerine Fiyatları yeniden hesapla seçeneğini kullanın.",

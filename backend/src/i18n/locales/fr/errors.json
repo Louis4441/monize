@@ -549,7 +549,15 @@
     "TERMS_MISMATCH": "La version {{ version }} des conditions de la série {{ series }} décrit {{ claimedSeries }} en {{ claimedCurrency }}, mais l'instrument est {{ storedSeries }} en {{ storedCurrency }}",
     "assumeInvalid": "assume doit avoir la forme benchmarkId:valeur, avec un identifiant d'indice de 1 à 40 majuscules, chiffres ou tirets bas et une valeur décimale comprise entre -0.5 et 1.0",
     "benchmarkIdInvalid": "benchmarkId doit comporter de 1 à 40 majuscules, chiffres ou tirets bas",
-    "scenarioValuesInvalid": "values doit contenir de 1 à 6 décimaux séparés par des virgules, compris entre -0.5 et 1.0"
+    "scenarioValuesInvalid": "values doit contenir de 1 à 6 décimaux séparés par des virgules, compris entre -0.5 et 1.0",
+    "SERIES_CODE_INVALID": "« {{ series }} » n'est pas un code de série valide",
+    "SERIES_FETCH_UNSUPPORTED": "Une série ne peut pas être récupérée depuis une source officielle pour {{ country }}",
+    "SERIES_NOT_PUBLISHED": "La série {{ series }} n'est pas publiée sur la source officielle",
+    "SOURCE_UNAVAILABLE": "La source officielle de la série {{ series }} ne peut pas être lue pour le moment ; réessayez plus tard",
+    "SOURCE_FORMAT_CHANGED": "Les conditions de la série {{ series }} n'ont pas de {{ field }} utilisable : la source officielle a peut-être changé de format, ou la valeur n'est pas acceptable",
+    "SOURCE_INCONSISTENT": "Les valeurs de la série {{ series }} sont incohérentes ou hors limites pour {{ field }} ({{ detail }})",
+    "TEMPLATE_NOT_VALIDATED": "La série {{ series }} a été vendue avant la validation du modèle {{ product }} ({{ validFrom }}) ; elle nécessite une entrée curatée",
+    "SERIES_TERMS_CONFLICT": "La série {{ series }} est déjà enregistrée avec des conditions différentes ; les conditions enregistrées ne sont jamais remplacées"
   },
   "securities": {
     "bondPricedByEngine": "Ce titre est lié à un instrument obligataire et il est valorisé par le moteur d'obligations, et non par un fournisseur de cours. Utilisez plutôt Recalculer les prix.",

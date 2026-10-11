@@ -549,7 +549,15 @@
     "TERMS_MISMATCH": "Voorwaardenversie {{ version }} van serie {{ series }} beschrijft {{ claimedSeries }} in {{ claimedCurrency }}, maar het instrument is {{ storedSeries }} in {{ storedCurrency }}",
     "assumeInvalid": "assume moet de vorm benchmarkId:waarde hebben, met een benchmark-id van 1 tot 40 hoofdletters, cijfers of underscores en een decimale waarde tussen -0.5 en 1.0",
     "benchmarkIdInvalid": "benchmarkId moet 1 tot 40 hoofdletters, cijfers of underscores bevatten",
-    "scenarioValuesInvalid": "values moet 1 tot 6 door komma's gescheiden decimalen tussen -0.5 en 1.0 bevatten"
+    "scenarioValuesInvalid": "values moet 1 tot 6 door komma's gescheiden decimalen tussen -0.5 en 1.0 bevatten",
+    "SERIES_CODE_INVALID": "\"{{ series }}\" is geen geldige seriecode",
+    "SERIES_FETCH_UNSUPPORTED": "Voor {{ country }} kan een serie niet uit een officiële bron worden opgehaald",
+    "SERIES_NOT_PUBLISHED": "Serie {{ series }} is niet gepubliceerd in de officiële bron",
+    "SOURCE_UNAVAILABLE": "De officiële bron van serie {{ series }} kan nu niet worden gelezen; probeer het later opnieuw",
+    "SOURCE_FORMAT_CHANGED": "De voorwaarden van serie {{ series }} hebben geen bruikbaar veld {{ field }}: de officiële bron heeft mogelijk het formaat gewijzigd, of de waarde is niet aanvaardbaar",
+    "SOURCE_INCONSISTENT": "De waarden van serie {{ series }} zijn inconsistent of buiten de grenzen bij {{ field }} ({{ detail }})",
+    "TEMPLATE_NOT_VALIDATED": "Serie {{ series }} is verkocht voordat het sjabloon {{ product }} was gevalideerd ({{ validFrom }}); er is een samengestelde invoer nodig",
+    "SERIES_TERMS_CONFLICT": "Serie {{ series }} is al opgeslagen met andere voorwaarden; opgeslagen voorwaarden worden nooit vervangen"
   },
   "securities": {
     "bondPricedByEngine": "Dit effect is gekoppeld aan een obligatie-instrument en wordt gewaardeerd door de obligatie-engine, niet door een koersaanbieder. Gebruik in plaats daarvan Koersen herberekenen.",

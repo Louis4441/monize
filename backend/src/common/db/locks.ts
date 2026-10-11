@@ -104,6 +104,13 @@ export enum LockScope {
    * link as it is now or refuses when there is none (INV-BOND-005).
    */
   BondPriceRecompute = 7,
+  /**
+   * One bond instrument's first terms version (id = the deterministic
+   * instrument id): two fetches or manual entries of the same series queue here,
+   * so the second finds the row the first committed and writes nothing
+   * (INV-BOND-001, INV-BOND-006).
+   */
+  BondSeriesFetch = 8,
 }
 
 /**

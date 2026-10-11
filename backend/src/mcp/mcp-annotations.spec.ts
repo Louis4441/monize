@@ -13,6 +13,10 @@ const WRITE_TOOLS = new Set([
   // Reads stored emails and saves a DRAFT parser (it reads no mail until the
   // user approves it); never the ledger, so a write tool that is not destructive.
   "email_receipt_parsers",
+  // Reference data from the issuer's official source (or an administrator's
+  // hand); never the user's ledger, so a write tool that is not destructive.
+  "fetch_bond_series",
+  "enter_bond_series_manually",
 ]);
 // Write tools whose repeated calls converge to the same state.
 const IDEMPOTENT_WRITES = new Set<string>([]);
@@ -27,7 +31,7 @@ const DESTRUCTIVE_TOOLS = new Set([
   "manage_transaction_rules",
 ]);
 
-const EXPECTED_TOOL_COUNT = 23;
+const EXPECTED_TOOL_COUNT = 25;
 
 describe("MCP tool spec compliance", () => {
   const configs = collectToolConfigs();

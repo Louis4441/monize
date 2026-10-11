@@ -1267,4 +1267,23 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
       required: ["operation"],
     },
   },
+  {
+    name: "fetch_bond_series",
+    description:
+      "Add a bond series that the catalog lacks by reading its terms from the issuer's official source. Takes ONLY a country code and a series code (e.g. countryCode 'PL', seriesCode 'EDO1036'); never supply or guess a rate, margin, fee or date -- the terms come from the source and are cross-checked. Returns the catalog instrument and created=true when this call stored it, created=false when it was already in the catalog. Use it when the user wants to link a bond security to a series that is not in the catalog. An error names why (not published, source unavailable, the source disagrees with itself, or stored with different terms); relay it and do not retry in a loop.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        countryCode: {
+          type: "string",
+          description: "Two-letter country code of the issuer.",
+        },
+        seriesCode: {
+          type: "string",
+          description: "The series code as the issuer prints it.",
+        },
+      },
+      required: ["countryCode", "seriesCode"],
+    },
+  },
 ];

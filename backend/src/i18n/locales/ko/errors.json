@@ -549,7 +549,15 @@
     "TERMS_MISMATCH": "시리즈 {{ series }}의 조건 버전 {{ version }}은(는) {{ claimedCurrency }} 통화의 {{ claimedSeries }}을(를) 설명하지만, 종목은 {{ storedCurrency }} 통화의 {{ storedSeries }}입니다",
     "assumeInvalid": "assume는 benchmarkId:값 형식이어야 하며, 지표 ID는 대문자·숫자·밑줄 1~40자, 값은 -0.5에서 1.0 사이의 소수여야 합니다",
     "benchmarkIdInvalid": "benchmarkId는 대문자·숫자·밑줄 1~40자여야 합니다",
-    "scenarioValuesInvalid": "values는 -0.5에서 1.0 사이의 소수를 쉼표로 구분해 1~6개 입력해야 합니다"
+    "scenarioValuesInvalid": "values는 -0.5에서 1.0 사이의 소수를 쉼표로 구분해 1~6개 입력해야 합니다",
+    "SERIES_CODE_INVALID": "\"{{ series }}\"은(는) 올바른 시리즈 코드가 아닙니다",
+    "SERIES_FETCH_UNSUPPORTED": "{{ country }}의 시리즈는 공식 출처에서 가져올 수 없습니다",
+    "SERIES_NOT_PUBLISHED": "시리즈 {{ series }}은(는) 공식 출처에 게시되지 않았습니다",
+    "SOURCE_UNAVAILABLE": "지금은 시리즈 {{ series }}의 공식 출처를 읽을 수 없습니다. 나중에 다시 시도하세요",
+    "SOURCE_FORMAT_CHANGED": "시리즈 {{ series }}의 조건에 사용할 수 있는 {{ field }}이(가) 없습니다. 공식 출처의 형식이 바뀌었거나 값이 허용되지 않습니다",
+    "SOURCE_INCONSISTENT": "시리즈 {{ series }}의 값이 서로 맞지 않거나 {{ field }}이(가) 범위를 벗어났습니다 ({{ detail }})",
+    "TEMPLATE_NOT_VALIDATED": "시리즈 {{ series }}은(는) {{ product }} 템플릿이 검증되기 전({{ validFrom }})에 판매되었으므로 큐레이션된 항목이 필요합니다",
+    "SERIES_TERMS_CONFLICT": "시리즈 {{ series }}은(는) 이미 다른 조건으로 저장되어 있습니다. 저장된 조건은 절대 대체되지 않습니다"
   },
   "securities": {
     "bondPricedByEngine": "이 증권은 채권 종목에 연결되어 있으며 시세 제공업체가 아닌 채권 엔진이 가격을 산정합니다. 대신 가격 다시 계산을 사용하세요.",

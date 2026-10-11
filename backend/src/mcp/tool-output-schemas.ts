@@ -491,6 +491,22 @@ export const emailReceiptParsersOutput = toolOutput({
 });
 
 // ---------------------------------------------------------------------------
+// bond-series.tool.ts
+// ---------------------------------------------------------------------------
+
+/**
+ * `fetch_bond_series` and `enter_bond_series_manually`: the catalog instrument
+ * and whether this call stored it. `termsProvider` says where the terms came
+ * from (the official host, or `manual`).
+ */
+export const bondSeriesOutput = toolOutput({
+  id: str,
+  seriesCode: str,
+  created: bool,
+  termsProvider: str,
+});
+
+// ---------------------------------------------------------------------------
 // relay.tool.ts
 // ---------------------------------------------------------------------------
 

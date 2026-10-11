@@ -39,7 +39,8 @@ const GUARDED_DIRS = [
   "currencies",
   // NBP and GUS: the bond benchmark refresh makes every request in `gated`
   // (`bonds/benchmark-refresh.service.ts`); the adapters receive that gated
-  // function and never call the network themselves.
+  // function and never call the network themselves. The series fetch
+  // (obligacjeskarbowe.pl) makes its requests in `bonds/series-http.ts`.
   "bonds",
 ];
 
@@ -80,6 +81,7 @@ describe("outbound provider calls are answerable to the breaker", () => {
     expect(callers.map((file) => file.path).sort()).toEqual([
       "bank-sync/providers/enable-banking/enable-banking.client.ts",
       "bonds/benchmark-refresh.service.ts",
+      "bonds/series-http.ts",
       "currencies/providers/frankfurter-fx.provider.ts",
       "payees/lookup/google-places/google-places.client.ts",
       "securities/deutsche-boerse-finance.service.ts",
@@ -166,6 +168,9 @@ describe("a response is recorded in one place per client", () => {
     // Bond benchmarks (NBP, GUS): one. Every adapter request goes through the
     // `gated` door, which records success once the whole body has arrived.
     ["bonds/benchmark-refresh.service.ts", 1],
+    // Bond series fetch (obligacjeskarbowe.pl): one, in `SeriesHttp.gated`, the
+    // door every series request goes through.
+    ["bonds/series-http.ts", 1],
   ])("%s records an arrived response in at most %i places", (file, allowed) => {
     const source = readFileSync(join(SRC_ROOT, file), "utf8");
     const occurrences = source.split("recordSuccess(").length - 1;

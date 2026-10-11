@@ -81,6 +81,46 @@ export class BondCatalogService implements OnApplicationBootstrap {
 
   /** The catalog for the link picker, ordered by country, issuer and series. */
   async listInstruments(): Promise<BondInstrumentSummary[]> {
+    return withScopedDb(this.dataSource, (m) => this.selectSummaries(m));
+  }
+
+  /**
+   * The stored instrument of a country's series that already has terms version
+   * 1, or null. The series code is compared case-insensitively (a request's
+   * spelling is not the catalog's); the issuer is not known to the caller, so a
+   * country with two issuers of one series code answers the first by issuer.
+   */
+  async findStoredSeries(
+    m: EntityManager,
+    countryCode: string,
+    seriesCode: string,
+  ): Promise<BondInstrumentSummary | null> {
+    const rows = await this.selectSummaries(
+      m,
+      `WHERE i.issuer_country_code = $1 AND UPPER(i.series_code) = UPPER($2)
+         AND EXISTS (SELECT 1 FROM bond_terms_versions v
+                      WHERE v.bond_instrument_id = i.id AND v.version = 1)`,
+      [countryCode, seriesCode],
+    );
+    return rows[0] ?? null;
+  }
+
+  /** One instrument by id, as the API names it, or null. */
+  async findSummary(
+    m: EntityManager,
+    instrumentId: string,
+  ): Promise<BondInstrumentSummary | null> {
+    const rows = await this.selectSummaries(m, "WHERE i.id = $1", [
+      instrumentId,
+    ]);
+    return rows[0] ?? null;
+  }
+
+  private async selectSummaries(
+    m: EntityManager,
+    where = "",
+    params: unknown[] = [],
+  ): Promise<BondInstrumentSummary[]> {
     const rows: Array<{
       id: string;
       issuer_country_code: string;
@@ -88,12 +128,17 @@ export class BondCatalogService implements OnApplicationBootstrap {
       program_code: string;
       series_code: string;
       currency_code: string;
-    }> = await withScopedDb(this.dataSource, (m) =>
-      m.query(
-        `SELECT id, issuer_country_code, issuer_code, program_code, series_code, currency_code
-           FROM bond_instruments
-          ORDER BY issuer_country_code, issuer_code, series_code`,
-      ),
+      terms_provider: string;
+    }> = await m.query(
+      `SELECT i.id, i.issuer_country_code, i.issuer_code, i.program_code, i.series_code, i.currency_code,
+              COALESCE((SELECT v.terms->'source'->>'provider'
+                          FROM bond_terms_versions v
+                         WHERE v.bond_instrument_id = i.id
+                         ORDER BY v.version DESC LIMIT 1), '') AS terms_provider
+         FROM bond_instruments i
+         ${where}
+        ORDER BY i.issuer_country_code, i.issuer_code, i.series_code`,
+      params,
     );
     return rows.map((r) => ({
       id: r.id,
@@ -102,6 +147,7 @@ export class BondCatalogService implements OnApplicationBootstrap {
       programCode: r.program_code,
       seriesCode: r.series_code,
       currencyCode: r.currency_code,
+      termsProvider: r.terms_provider,
     }));
   }
 
@@ -149,15 +195,55 @@ export class BondCatalogService implements OnApplicationBootstrap {
     adapter: BondAdapter,
     entry: CatalogEntry,
   ): Promise<void> {
+    const outcome = await this.storeEntry(m, entry);
+    switch (outcome.kind) {
+      case "invalid":
+        this.logger.error(
+          `Bond catalog (${adapter.countryCode}) entry version ${entry.termsVersion} skipped: ${outcome.message}`,
+        );
+        return;
+      case "instrument-mismatch":
+        for (const [field, was, now] of outcome.fields) {
+          this.logger.error(
+            `Bond catalog entry version ${entry.termsVersion} of ${outcome.named} disagrees with the stored instrument on ${field} ` +
+              `(stored "${was}", entry "${now}"); the instrument row is never overwritten, so the entry is skipped.`,
+          );
+        }
+        return;
+      case "inserted":
+        this.logger.log(
+          `Stored terms version ${entry.termsVersion} of ${outcome.named}`,
+        );
+        return;
+      case "conflict":
+        this.logger.error(
+          `Terms version ${entry.termsVersion} of ${outcome.named} is stored with different content; ` +
+            `it is immutable (INV-BOND-001), so the catalog entry is skipped. Publish the correction as a new termsVersion.`,
+        );
+        return;
+      case "unchanged":
+        return;
+    }
+  }
+
+  /**
+   * Stores one catalog entry on the caller's transaction: the instrument row
+   * (created once, never overwritten) and the terms version (inserted once,
+   * never rewritten). The seed and a series fetch both come here, so a fetched
+   * version is stored exactly like a curated one (INV-BOND-001, INV-BOND-006).
+   * Reports what happened and logs nothing: the seed logs and skips, a fetch
+   * refuses.
+   */
+  async storeEntry(
+    m: EntityManager,
+    entry: CatalogEntry,
+  ): Promise<StoreOutcome> {
     let terms: BondTerms;
     try {
       terms = parseBondTerms(entry.terms);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(
-        `Bond catalog (${adapter.countryCode}) entry version ${entry.termsVersion} skipped: ${message}`,
-      );
-      return;
+      return { kind: "invalid", message };
     }
     const { instrument } = terms;
     const named = `${instrument.issuerCountryCode} ${instrument.issuerCode} ${instrument.seriesCode}`;
@@ -206,7 +292,7 @@ export class BondCatalogService implements OnApplicationBootstrap {
     const stored = rows[0];
     // bond_instruments is insert only: an existing row is never overwritten, so a
     // catalog entry that describes the series differently is a curation error, not
-    // a correction. Skipped like a content clash, naming the series and the field.
+    // a correction. Reported naming the series and the field.
     const mismatched = (
       [
         ["programCode", stored.program_code, instrument.programCode],
@@ -215,13 +301,12 @@ export class BondCatalogService implements OnApplicationBootstrap {
       ] as const
     ).filter(([, was, now]) => was !== now);
     if (mismatched.length > 0) {
-      for (const [field, was, now] of mismatched) {
-        this.logger.error(
-          `Bond catalog entry version ${entry.termsVersion} of ${named} disagrees with the stored instrument on ${field} ` +
-            `(stored "${was}", entry "${now}"); the instrument row is never overwritten, so the entry is skipped.`,
-        );
-      }
-      return;
+      return {
+        kind: "instrument-mismatch",
+        named,
+        instrumentId: stored.id,
+        fields: mismatched,
+      };
     }
     const instrumentId = stored.id;
 
@@ -242,8 +327,7 @@ export class BondCatalogService implements OnApplicationBootstrap {
       ],
     );
     if (inserted.length > 0) {
-      this.logger.log(`Stored terms version ${entry.termsVersion} of ${named}`);
-      return;
+      return { kind: "inserted", named, instrumentId };
     }
 
     const storedVersion: Array<{ content_hash: string }> = await m.query(
@@ -251,11 +335,21 @@ export class BondCatalogService implements OnApplicationBootstrap {
         WHERE bond_instrument_id = $1 AND version = $2`,
       [instrumentId, entry.termsVersion],
     );
-    if (storedVersion[0]?.content_hash !== hash) {
-      this.logger.error(
-        `Terms version ${entry.termsVersion} of ${named} is stored with different content; ` +
-          `it is immutable (INV-BOND-001), so the catalog entry is skipped. Publish the correction as a new termsVersion.`,
-      );
-    }
+    return storedVersion[0]?.content_hash !== hash
+      ? { kind: "conflict", named, instrumentId }
+      : { kind: "unchanged", named, instrumentId };
   }
 }
+
+/** What `BondCatalogService.storeEntry` did with one entry. */
+export type StoreOutcome =
+  | { kind: "invalid"; message: string }
+  | {
+      kind: "instrument-mismatch";
+      named: string;
+      instrumentId: string;
+      fields: ReadonlyArray<readonly [string, string, string]>;
+    }
+  | { kind: "inserted"; named: string; instrumentId: string }
+  | { kind: "unchanged"; named: string; instrumentId: string }
+  | { kind: "conflict"; named: string; instrumentId: string };

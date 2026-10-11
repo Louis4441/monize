@@ -549,7 +549,15 @@
     "TERMS_MISMATCH": "シリーズ {{ series }} の条件バージョン {{ version }} は {{ claimedCurrency }} 建ての {{ claimedSeries }} を記述していますが、銘柄は {{ storedCurrency }} 建ての {{ storedSeries }} です",
     "assumeInvalid": "assume は benchmarkId:値 の形式で、指標 ID は大文字・数字・アンダースコア 1〜40 文字、値は -0.5 から 1.0 の小数にしてください",
     "benchmarkIdInvalid": "benchmarkId は大文字・数字・アンダースコア 1〜40 文字にしてください",
-    "scenarioValuesInvalid": "values には -0.5 から 1.0 の小数をカンマ区切りで 1〜6 個指定してください"
+    "scenarioValuesInvalid": "values には -0.5 から 1.0 の小数をカンマ区切りで 1〜6 個指定してください",
+    "SERIES_CODE_INVALID": "「{{ series }}」は有効なシリーズコードではありません",
+    "SERIES_FETCH_UNSUPPORTED": "{{ country }} のシリーズは公式ソースから取得できません",
+    "SERIES_NOT_PUBLISHED": "シリーズ {{ series }} は公式ソースで公開されていません",
+    "SOURCE_UNAVAILABLE": "シリーズ {{ series }} の公式ソースを現在読み取れません。しばらくしてからもう一度お試しください",
+    "SOURCE_FORMAT_CHANGED": "シリーズ {{ series }} の条件に使用可能な {{ field }} がありません。公式ソースの形式が変更された可能性があるか、値が受け入れられません",
+    "SOURCE_INCONSISTENT": "シリーズ {{ series }} の値が矛盾しているか、{{ field }} が範囲外です ({{ detail }})",
+    "TEMPLATE_NOT_VALIDATED": "シリーズ {{ series }} は {{ product }} テンプレートの検証前 ({{ validFrom }}) に販売されたため、キュレーション済みのエントリが必要です",
+    "SERIES_TERMS_CONFLICT": "シリーズ {{ series }} は既に異なる条件で保存されています。保存済みの条件が置き換えられることはありません"
   },
   "securities": {
     "bondPricedByEngine": "この証券は債券銘柄にリンクされており、価格は相場提供元ではなく債券エンジンが算出します。代わりに「価格を再計算」を使用してください。",

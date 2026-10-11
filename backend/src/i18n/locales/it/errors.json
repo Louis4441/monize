@@ -549,7 +549,15 @@
     "TERMS_MISMATCH": "La versione {{ version }} delle condizioni della serie {{ series }} descrive {{ claimedSeries }} in {{ claimedCurrency }}, ma lo strumento è {{ storedSeries }} in {{ storedCurrency }}",
     "assumeInvalid": "assume deve avere la forma benchmarkId:valore, con un identificativo di indice di 1-40 lettere maiuscole, cifre o trattini bassi e un valore decimale compreso tra -0.5 e 1.0",
     "benchmarkIdInvalid": "benchmarkId deve contenere da 1 a 40 lettere maiuscole, cifre o trattini bassi",
-    "scenarioValuesInvalid": "values deve contenere da 1 a 6 decimali separati da virgole, compresi tra -0.5 e 1.0"
+    "scenarioValuesInvalid": "values deve contenere da 1 a 6 decimali separati da virgole, compresi tra -0.5 e 1.0",
+    "SERIES_CODE_INVALID": "«{{ series }}» non è un codice serie valido",
+    "SERIES_FETCH_UNSUPPORTED": "Per {{ country }} non è possibile recuperare una serie da una fonte ufficiale",
+    "SERIES_NOT_PUBLISHED": "La serie {{ series }} non è pubblicata sulla fonte ufficiale",
+    "SOURCE_UNAVAILABLE": "Al momento non è possibile leggere la fonte ufficiale della serie {{ series }}; riprova più tardi",
+    "SOURCE_FORMAT_CHANGED": "Le condizioni della serie {{ series }} non hanno un {{ field }} utilizzabile: la fonte ufficiale potrebbe aver cambiato formato, oppure il valore non è accettabile",
+    "SOURCE_INCONSISTENT": "I valori della serie {{ series }} sono incoerenti o fuori limite per {{ field }} ({{ detail }})",
+    "TEMPLATE_NOT_VALIDATED": "La serie {{ series }} è stata venduta prima che il modello {{ product }} fosse convalidato ({{ validFrom }}); richiede una voce curata",
+    "SERIES_TERMS_CONFLICT": "La serie {{ series }} è già memorizzata con condizioni diverse; le condizioni memorizzate non vengono mai sostituite"
   },
   "securities": {
     "bondPricedByEngine": "Questo titolo è collegato a uno strumento obbligazionario ed è valutato dal motore obbligazionario, non da un fornitore di quotazioni. Usa invece Ricalcola i prezzi.",

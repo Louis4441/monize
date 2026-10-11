@@ -231,6 +231,12 @@ const WITH_CONTEXT_ALLOWLIST = [
   // securities, then each user's own withUserContext for the writes (one user's
   // failure does not stop the others; docs/specs/polish-retail-bonds.md 12.4).
   "src/bonds/bond-price.service.ts",
+  // The daily check of the issuer's current offer: a cron with no request
+  // behind it, so a system context around the whole lease call. It stores
+  // global reference data with no owner (bond instruments and terms versions),
+  // like the catalog seed above; the user-facing fetch reaches the same store
+  // under the caller's own identity (docs/specs/bond-series-fetch.md 5.1).
+  "src/bonds/bond-series.service.ts",
   "src/securities/securities.controller.ts",
   "src/securities/security-price.service.ts",
   // GEM recommendation-change cron: a deployment-wide fan-out (system context

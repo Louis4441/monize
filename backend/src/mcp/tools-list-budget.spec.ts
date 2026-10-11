@@ -77,6 +77,12 @@ import { McpServerService } from "./mcp-server.service";
 // about). Total 59,420 -> 62,040 = the new tool plus a 14-byte margin; NO
 // existing cap moved, and `ai_review_requests` did not grow to describe the new
 // request kind (its claim result carries that guidance).
+//
+// Added, as a reviewed decision (bond series fetch, docs/specs/bond-series-fetch.md
+// section 5): `fetch_bond_series` (998 bytes: a country and a series code, the
+// instrument and `created` back) and the administrator's
+// `enter_bond_series_manually` (1,685 bytes: the per-series values of a template).
+// Total 62,040 -> 63,050 (63,046 measured, a 4-byte margin); no existing cap moved.
 const TOOL_BYTE_BUDGET: Record<string, number> = {
   list_accounts: 2500,
   list_transactions: 3550,
@@ -98,12 +104,14 @@ const TOOL_BYTE_BUDGET: Record<string, number> = {
   manage_transaction_rules: 4910,
   ai_review_requests: 3050,
   email_receipt_parsers: 2620,
+  fetch_bond_series: 1000,
+  enter_bond_series_manually: 1690,
   get_next_prompt: 1400,
   post_response: 1050,
   report_progress: 1250,
 };
 
-const TOTAL_BYTE_BUDGET = 62_040;
+const TOTAL_BYTE_BUDGET = 63_050;
 const INSTRUCTIONS_BYTE_BUDGET = 2_600;
 
 /**
@@ -133,6 +141,8 @@ const EXPECTED_TOOL_ORDER = [
   "manage_transaction_rules",
   "ai_review_requests",
   "email_receipt_parsers",
+  "fetch_bond_series",
+  "enter_bond_series_manually",
   "get_next_prompt",
   "post_response",
   "report_progress",
@@ -344,6 +354,7 @@ describe("tools/list payload budget", () => {
     // provider doubles are enough to read them back off the server.
     const noopProvider = { register: () => {} } as any;
     const service = new McpServerService(
+      noopProvider,
       noopProvider,
       noopProvider,
       noopProvider,
