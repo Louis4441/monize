@@ -94,10 +94,16 @@ a size cap (HTML 2 MB, PDF 5 MB), and runs through `ProviderHealthService`
 | series code | "Seria:" | the list of series the letter issues | equal to the request |
 | first-period rate | "Oprocentowanie:" first percentage | "W pierwszym okresie odsetkowym stopa procentowa wynosi X% w skali roku" (FIXED: the only rate) | page = letter; 0 < rate <= 0.25 |
 | margin or spread | "marża X%" / "NBP+X%" | the margin in the letter | page = letter; 0 <= value <= 0.05 (FIXED: none) |
-| sale window | "Sprzedaż: dd.mm.yyyy - dd.mm.yyyy" | "oferowane do sprzedaży w dniach od ... do ..." | page = letter; inside the sale month of 4.1 |
+| sale window | "Sprzedaż: dd.mm.yyyy - dd.mm.yyyy" | "oferowane do sprzedaży w dniach od ... do ..." | the letter's window is stored; the page's lies inside it (the EDO0734 page says 30.07.2024, its letter 31.07.2024); inside the sale month of 4.1 |
 | early redemption fee | none | "nie wyższą niż X zł" or "w wysokości X zł" | 0 <= fee <= 10; OTS has none |
 | letter number and date | none | "LIST EMISYJNY nr N/YYYY", "z dnia ..." | present; date before the sale window |
 | face value | "Cena sprzedaży" 100,00 zł | "Nominał jednej obligacji wynosi 100 zł" | both 100 |
+
+A live run on 2026-10-11 fetched 64 series (the eight products sold in
+2024-01, 2024-07, 2025-01, 2025-07, 2026-01, 2026-06, 2026-09 and 2026-10):
+all passed, the October 2026 ones equal to the curated manifests. The letters
+show the fee is a per-series value: TOS 0.70 to 1.00, COI and ROS 0.70 to 2.00,
+EDO and ROD 2.00 to 3.00 from January 2025, with the same wording.
 
 Any field that cannot be parsed is `SOURCE_FORMAT_CHANGED` with the field's
 name; any disagreement is `SOURCE_INCONSISTENT` with the field and both

@@ -352,12 +352,17 @@ describe("fetchSeries: page and letter must agree", () => {
       { field: "margin", page: "0.0210", letter: "0.0200" },
     ],
     [
-      "the sale window",
-      (page) => ({ page: page.replace("31.10.2026", "30.10.2026") }),
+      "a page sale window reaching outside the letter's",
+      (_page, letter) => ({
+        letter: letter.replace(
+          "od 1 do 31 października",
+          "od 1 do 30 października",
+        ),
+      }),
       {
         field: "saleWindow",
-        page: "2026-10-01/2026-10-30",
-        letter: "2026-10-01/2026-10-31",
+        page: "2026-10-01/2026-10-31",
+        letter: "2026-10-01/2026-10-30",
       },
     ],
     [
@@ -386,6 +391,19 @@ describe("fetchSeries: page and letter must agree", () => {
       expect(error.params).toEqual(params);
     },
   );
+
+  it("stores the letter's sale window when the page states a day short (EDO0734, July 2024)", async () => {
+    const page = pageFixture("EDO1036").replace("31.10.2026", "30.10.2026");
+    const { entry } = await fetchSeries(
+      "EDO1036",
+      serve("EDO1036", { page }),
+      now,
+    );
+    expect((entry.terms as { saleWindow: unknown }).saleWindow).toEqual({
+      from: "2026-10-01",
+      to: "2026-10-31",
+    });
+  });
 
   it("refuses a spread that differs between page and letter", async () => {
     const page = pageFixture("DOR1028").replace("NBP+0,15%", "NBP+0,25%");

@@ -66,8 +66,12 @@ function crossCheck(
       letter.addend ?? "none",
     );
   }
+  // The letter is the legal act and its sale window is the one stored. The page
+  // is a summary that has been seen a day short (EDO0734: page 30.07.2024,
+  // letter and the other July 2024 pages 31.07.2024), so it must only lie
+  // inside the letter's window; a page window reaching outside it is a misread.
   const { from, to } = page.saleWindow;
-  if (from !== letter.saleWindow.from || to !== letter.saleWindow.to) {
+  if (from < letter.saleWindow.from || to > letter.saleWindow.to || from > to) {
     throw disagree(
       "saleWindow",
       `${from}/${to}`,
