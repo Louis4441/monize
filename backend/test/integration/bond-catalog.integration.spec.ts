@@ -4,6 +4,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
+import { withScopedDb } from "@/common/db/scoped-db";
 import { withSystemContext, withUserContext } from "@/common/db/with-context";
 import { todayInTimezone } from "@/common/date-utils";
 import {
@@ -14,7 +15,11 @@ import { ProviderHealthService } from "@/provider-health/provider-health.service
 import { BenchmarkRefreshService } from "@/bonds/benchmark-refresh.service";
 import { BondCatalogService } from "@/bonds/bond-catalog.service";
 import { POLISH_BOND_ADAPTER } from "@/bonds/adapters/pl/index";
-import { GUS_CPI_CSV_URL } from "@/bonds/adapters/pl/pl-gus-cpi";
+import { FIXTURE_CATALOG } from "@/bonds/adapters/pl/pl-test-input";
+import {
+  GUS_CPI_CSV_URL,
+  GUS_CPI_LANDING_URL,
+} from "@/bonds/adapters/pl/pl-gus-cpi";
 import {
   NBP_ARCHIVE_URL,
   NBP_CURRENT_URL,
@@ -26,6 +31,7 @@ import {
   deleteBondInstrumentBypassingImmutability,
   deleteBondProgramBypassingImmutability,
   insertBondProgram,
+  storeFixtureSeries,
 } from "../helpers/integration-setup";
 
 // The GUS fixture's newest month is 2026-08, and a feed more than three months
@@ -54,7 +60,7 @@ function fakeFetch(gus: Buffer): typeof fetch {
 }
 
 /**
- * The catalog seed and the benchmark refresh against a real PostgreSQL:
+ * The program seed and the benchmark refresh against a real PostgreSQL:
  * idempotent upserts, the numeric and date handling, and a publisher's
  * correction updating a stored value are properties a mocked manager cannot show.
  */
@@ -103,13 +109,29 @@ describe("bond catalog and benchmark refresh (integration)", () => {
       (await dataSource.query(`SELECT COUNT(*)::int AS n FROM ${table}`))[0].n,
     );
 
-  it("seeds eight instruments, eight terms versions and two series, idempotently", async () => {
+  it("seeds the eight programs and nothing else, idempotently: no series, no terms, no benchmark row", async () => {
     await withSystemContext(() => catalog.seed());
     await withSystemContext(() => catalog.seed());
+    expect(await count("bond_programs")).toBe(8);
+    expect(await count("bond_instruments")).toBe(0);
+    expect(await count("bond_terms_versions")).toBe(0);
+    expect(await count("benchmark_series")).toBe(0);
+    expect(
+      await dataSource.query(
+        `SELECT DISTINCT issuer_country_code, issuer_code, currency_code FROM bond_programs`,
+      ),
+    ).toEqual([
+      { issuer_country_code: "PL", issuer_code: "PL_MF", currency_code: "PLN" },
+    ]);
+  });
+
+  it("a stored series points at the program the seed created, and stores terms with a content hash", async () => {
+    await withSystemContext(() => catalog.seed());
+    await storeFixtureSeries(dataSource, catalog);
     expect(await count("bond_instruments")).toBe(8);
     expect(await count("bond_terms_versions")).toBe(8);
     expect(await count("benchmark_series")).toBe(2);
-    // One program per product, each series pointing at its own.
+    // The programs are the seed's: storing the series added none.
     expect(await count("bond_programs")).toBe(8);
     expect(
       await dataSource.query(
@@ -127,34 +149,29 @@ describe("bond catalog and benchmark refresh (integration)", () => {
     expect(hashes).toEqual([{ n: 64 }]);
   });
 
-  it("does not move covered_through when the series are seeded again", async () => {
-    await withSystemContext(() => catalog.seed());
+  it("does not move covered_through when the benchmark rows are seeded again", async () => {
+    await storeFixtureSeries(dataSource, catalog);
     await dataSource.query(
       `UPDATE benchmark_series SET covered_through = '2026-10-01' WHERE code = 'PL_NBP_REFERENCE'`,
     );
     await withSystemContext(() => catalog.seed());
+    await storeFixtureSeries(dataSource, catalog);
     const rows = await dataSource.query(
       `SELECT TO_CHAR(covered_through, 'YYYY-MM-DD') AS c FROM benchmark_series WHERE code = 'PL_NBP_REFERENCE'`,
     );
     expect(rows[0].c).toBe("2026-10-01");
   });
 
-  it("stores the other entries when one entry's SQL fails (a series code longer than its column)", async () => {
+  it("stores the other programs when one program's SQL fails (a program code longer than its column)", async () => {
     const errorSpy = jest.spyOn(Logger.prototype, "error").mockImplementation();
     try {
-      const [first, ...rest] = POLISH_BOND_ADAPTER.catalog;
-      const doc = (e: { terms: unknown }) => e.terms as Record<string, any>;
-      const tooLong = {
-        ...first,
-        terms: {
-          ...doc(first),
-          instrument: { ...doc(first).instrument, seriesCode: "X".repeat(41) },
-        },
+      const [first, ...rest] = POLISH_BOND_ADAPTER.programs;
+      const adapter = {
+        ...POLISH_BOND_ADAPTER,
+        programs: [{ ...first, programCode: "X".repeat(41) }, ...rest],
       };
-      const adapter = { ...POLISH_BOND_ADAPTER, catalog: [tooLong, ...rest] };
       await withSystemContext(() => catalog.seed([adapter]));
-      expect(await count("bond_instruments")).toBe(rest.length);
-      expect(await count("bond_terms_versions")).toBe(rest.length);
+      expect(await count("bond_programs")).toBe(rest.length);
       expect(
         errorSpy.mock.calls.some((c) =>
           /could not be stored and was skipped/.test(String(c[0])),
@@ -166,36 +183,104 @@ describe("bond catalog and benchmark refresh (integration)", () => {
   });
 
   it("refuses to rewrite a stored terms version with different content", async () => {
-    await withSystemContext(() => catalog.seed());
+    await storeFixtureSeries(dataSource, catalog);
     const before = await dataSource.query(
       `SELECT content_hash FROM bond_terms_versions ORDER BY content_hash`,
     );
-    const changed = {
-      ...POLISH_BOND_ADAPTER,
-      catalog: POLISH_BOND_ADAPTER.catalog.map((e, i) =>
-        i === 0
-          ? {
-              ...e,
-              terms: {
-                ...(e.terms as object),
-                source: {
-                  provider: "PL_MF",
-                  url: "https://example.test/x",
-                  document: "changed",
-                },
-              },
-            }
-          : e,
+    const first = FIXTURE_CATALOG[0];
+    const outcome = await withSystemContext(() =>
+      withScopedDb(dataSource, (m) =>
+        catalog.storeEntry(m, {
+          ...first,
+          terms: {
+            ...(first.terms as object),
+            source: {
+              provider: "PL_MF",
+              url: "https://example.test/x",
+              document: "changed",
+            },
+          },
+        }),
       ),
-    };
-    await withSystemContext(() => catalog.seed([changed]));
+    );
+    expect(outcome.kind).toBe("conflict");
     const after = await dataSource.query(
       `SELECT content_hash FROM bond_terms_versions ORDER BY content_hash`,
     );
     expect(after).toEqual(before);
   });
 
+  it("fetches nothing, and creates no benchmark row, while no series is stored", async () => {
+    const calls: string[] = [];
+    const inner = fakeFetch(fixture("gus-cpi.csv"));
+    const wrapped = (async (url: string, init?: RequestInit) => {
+      calls.push(url);
+      return inner(url, init);
+    }) as unknown as typeof fetch;
+    await withSystemContext(() => catalog.seed());
+    await withSystemContext(() => refresh.refreshAll({ fetch: wrapped }));
+    await withSystemContext(() =>
+      refresh.refreshAll({ fetch: wrapped, onlyStale: true }),
+    );
+    expect(calls).toEqual([]);
+    expect(await count("benchmark_series")).toBe(0);
+    expect(await count("benchmark_values")).toBe(0);
+  });
+
+  describe("the first refresh of a benchmark a stored series reads", () => {
+    const instrumentId = async (seriesCode: string): Promise<string> =>
+      (
+        await dataSource.query(
+          `SELECT id FROM bond_instruments WHERE series_code = $1`,
+          [seriesCode],
+        )
+      )[0].id;
+    const urlsOf = () => {
+      const calls: string[] = [];
+      const inner = fakeFetch(fixture("gus-cpi.csv"));
+      const wrapped = (async (url: string, init?: RequestInit) => {
+        calls.push(url);
+        return inner(url, init);
+      }) as unknown as typeof fetch;
+      return { calls, wrapped };
+    };
+
+    it("a fixed-rate series reads none: nothing is fetched", async () => {
+      await storeFixtureSeries(dataSource, catalog, ["OTS0127"]);
+      const { calls, wrapped } = urlsOf();
+      await refresh.refreshNeverFetched([await instrumentId("OTS0127")], {
+        fetch: wrapped,
+      });
+      expect(calls).toEqual([]);
+    });
+
+    it("a series that reads GUS fetches GUS and only GUS, then is not fetched again", async () => {
+      await storeFixtureSeries(dataSource, catalog, ["EDO1036"]);
+      const id = await instrumentId("EDO1036");
+      const first = urlsOf();
+      await refresh.refreshNeverFetched([id], { fetch: first.wrapped });
+      // GUS: the landing page names the CSV, then the CSV itself.
+      expect(first.calls).toEqual([GUS_CPI_LANDING_URL, GUS_CPI_CSV_URL]);
+      expect(await coveredThrough("PL_CPI_GUS_YOY")).toBe("2026-08-01");
+      expect(await count("benchmark_values")).toBeGreaterThan(0);
+
+      // Covered now, so a second series reading it does not refetch.
+      const second = urlsOf();
+      await refresh.refreshNeverFetched([id], { fetch: second.wrapped });
+      expect(second.calls).toEqual([]);
+    });
+
+    it("the cron's refresh reads only the benchmarks of stored series", async () => {
+      await storeFixtureSeries(dataSource, catalog, ["EDO1036"]);
+      const { calls, wrapped } = urlsOf();
+      await withSystemContext(() => refresh.refreshAll({ fetch: wrapped }));
+      expect(calls).toEqual([GUS_CPI_LANDING_URL, GUS_CPI_CSV_URL]);
+      expect(await coveredThrough("PL_NBP_REFERENCE")).toBeNull();
+    });
+  });
+
   it("fetches both series, stores exact values and covers them", async () => {
+    await storeFixtureSeries(dataSource, catalog);
     const gus = fixture("gus-cpi.csv");
     await withSystemContext(() =>
       refresh.refreshAll({ fetch: fakeFetch(gus) }),
@@ -231,6 +316,7 @@ describe("bond catalog and benchmark refresh (integration)", () => {
   });
 
   it("applies a publisher's correction to a stored value and leaves coverage alone", async () => {
+    await storeFixtureSeries(dataSource, catalog);
     await withSystemContext(() =>
       refresh.refreshAll({ fetch: fakeFetch(fixture("gus-cpi.csv")) }),
     );
@@ -261,6 +347,7 @@ describe("bond catalog and benchmark refresh (integration)", () => {
     )[0].c;
 
   it("never moves covered_through back when a later fetch covers less (a file without the newest month)", async () => {
+    await storeFixtureSeries(dataSource, catalog);
     await withSystemContext(() =>
       refresh.refreshAll({ fetch: fakeFetch(fixture("gus-cpi.csv")) }),
     );
@@ -291,6 +378,7 @@ describe("bond catalog and benchmark refresh (integration)", () => {
   });
 
   it("each NBP row records the document it came from", async () => {
+    await storeFixtureSeries(dataSource, catalog);
     await withSystemContext(() =>
       refresh.refreshAll({ fetch: fakeFetch(fixture("gus-cpi.csv")) }),
     );
@@ -317,6 +405,8 @@ describe("bond catalog and benchmark refresh (integration)", () => {
       }) as unknown as typeof fetch;
       return { calls, wrapped };
     };
+
+    beforeEach(() => storeFixtureSeries(dataSource, catalog));
 
     it("fetches an empty deployment once, then skips every series, the monthly one included", async () => {
       const first = counting(fixture("gus-cpi.csv"));
@@ -345,7 +435,7 @@ describe("bond catalog and benchmark refresh (integration)", () => {
       await dataSource.query(
         `UPDATE benchmark_series SET updated_at = '2026-10-01T10:00:00Z'`,
       );
-      await withSystemContext(() => catalog.seed());
+      await storeFixtureSeries(dataSource, catalog);
       const stale = counting(fixture("gus-cpi.csv"));
       await withSystemContext(() =>
         refresh.refreshAll({ fetch: stale.wrapped, onlyStale: true }),
@@ -357,6 +447,7 @@ describe("bond catalog and benchmark refresh (integration)", () => {
   });
 
   it("records a run where every series fails as a failure in fetch_sync, and a partial one as a success", async () => {
+    await storeFixtureSeries(dataSource, catalog);
     const lease = (fetchImpl: typeof fetch) =>
       withSystemContext(() =>
         fetchSync.withLease(FetchSyncJob.BondBenchmarks, 60_000, () =>
@@ -398,7 +489,7 @@ describe("bond catalog and benchmark refresh (integration)", () => {
       // pre-inserts PLN, so remove it and seed on a fresh deployment.
       await dataSource.query(`DELETE FROM currencies WHERE code = 'PLN'`);
       await withSystemContext(() => catalog.seed());
-      expect(await count("bond_instruments")).toBe(8);
+      expect(await count("bond_programs")).toBe(8);
       expect(
         await dataSource.query(
           `SELECT code, created_by_user_id FROM currencies WHERE code = 'PLN'`,
@@ -500,6 +591,9 @@ describe("bond catalog and benchmark refresh (integration)", () => {
   });
 
   it("a source that fails leaves the other series refreshed", async () => {
+    // A stored series of each benchmark, so the refresh has something to read
+    // (INV-BOND-008: nothing is fetched for a benchmark no stored series reads).
+    await storeFixtureSeries(dataSource, catalog, ["EDO1036", "ROR1027"]);
     const failing = (async (url: string) => {
       if (url.includes("nbp.pl")) return new Response("down", { status: 503 });
       return new Response(new Uint8Array(fixture("gus-cpi.csv")), {

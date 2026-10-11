@@ -410,13 +410,23 @@ describe("Polish adapter contract", () => {
     ]);
   });
 
-  it("catalogs the eight series at terms version 1", () => {
-    expect(POLISH_BOND_ADAPTER.catalog).toHaveLength(8);
+  it("declares the eight programs and no series", () => {
     expect(
-      POLISH_BOND_ADAPTER.catalog.every(
-        (e) => e.termsVersion === 1 && e.publishedAt === "2026-09-21",
-      ),
-    ).toBe(true);
+      POLISH_BOND_ADAPTER.programs.map((p) => [
+        p.issuerCountryCode,
+        p.issuerCode,
+        p.programCode,
+        p.currency,
+      ]),
+    ).toEqual(
+      ["OTS", "ROR", "DOR", "TOS", "COI", "ROS", "EDO", "ROD"].map((code) => [
+        "PL",
+        "PL_MF",
+        code,
+        "PLN",
+      ]),
+    );
+    expect(POLISH_BOND_ADAPTER).not.toHaveProperty("catalog");
   });
 
   it("routes each series to its fetcher and refuses an unknown one", async () => {

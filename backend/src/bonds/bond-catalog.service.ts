@@ -10,7 +10,11 @@ import { DataSource, EntityManager } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { withSystemContext } from "../common/db/with-context";
 import { CurrenciesService } from "../currencies/currencies.service";
-import { BondAdapter, CatalogEntry } from "./bond-adapter";
+import {
+  BondAdapter,
+  BondProgramDefinition,
+  CatalogEntry,
+} from "./bond-adapter";
 import { bondInstrumentId, bondProgramId } from "./bond-instrument-id";
 import { INSTALLED_BOND_ADAPTERS } from "./bond-adapters";
 import { BondInstrumentSummary } from "./bond-valuation.service";
@@ -30,14 +34,17 @@ export interface BondProgramSummary {
 }
 
 /**
- * Seeds the curated reference data of every installed adapter: benchmark series
- * metadata and the bond instruments with their terms versions.
+ * Seeds the programs of every installed adapter (the product, e.g. EDO) so the
+ * security form can offer them, and stores a series' terms version when a fetch
+ * or an entry hands one over (`storeEntry`). No series is seeded and nothing is
+ * fetched at boot (spec bond-program-securities.md 2.6): a series exists because
+ * a person asked for it.
  *
  * Global reference data with no owner, so a system context at boot. Every
  * statement is idempotent (`ON CONFLICT`), so N replicas booting together
  * converge on the same rows. A terms version already stored is never rewritten
- * (INV-BOND-001): a catalog entry whose content differs from the stored one is
- * logged and skipped, and a correction is published as a new `termsVersion`.
+ * (INV-BOND-001): an entry whose content differs from the stored one is refused,
+ * and a correction is published as a new `termsVersion`.
  */
 @Injectable()
 export class BondCatalogService implements OnApplicationBootstrap {
@@ -65,31 +72,75 @@ export class BondCatalogService implements OnApplicationBootstrap {
     }
   }
 
-  /** Needs an ambient identity (`withSystemContext`), like any database access. */
+  /**
+   * The adapters' programs, in their currencies (created inactive). No series
+   * and no benchmark row: those follow a stored series. Needs an ambient
+   * identity (`withSystemContext`), like any database access.
+   */
   async seed(
     adapters: readonly BondAdapter[] = INSTALLED_BOND_ADAPTERS,
   ): Promise<void> {
     for (const adapter of adapters) {
-      await withScopedDb(this.dataSource, (m) =>
-        this.upsertBenchmarkSeries(m, adapter),
-      );
-      for (const entry of adapter.catalog) {
-        // One transaction per entry: a statement that fails (a value the schema
-        // refuses) aborts PostgreSQL's transaction, so a shared one would lose
-        // every entry before it as well as every entry after it.
+      for (const program of adapter.programs) {
+        // One transaction per program: a statement that fails (a value the
+        // schema refuses) aborts PostgreSQL's transaction, so a shared one would
+        // lose every program after it.
         try {
-          await withScopedDb(this.dataSource, (m) =>
-            this.seedEntry(m, adapter, entry),
-          );
+          await withScopedDb(this.dataSource, async (m) => {
+            // The currency is created on demand but inactive: reference data
+            // for the catalog, not a currency any user chose.
+            await this.currencies.ensureCatalogCurrency(program.currency);
+            const stored = await this.ensureProgram(m, program);
+            if (stored.currency_code !== program.currency) {
+              this.logger.error(
+                `Bond program ${program.issuerCountryCode} ${program.issuerCode} ${program.programCode} is stored in ${stored.currency_code}, ` +
+                  `the adapter declares ${program.currency}; the program row is never overwritten.`,
+              );
+            }
+          });
         } catch (error) {
           const message =
             error instanceof Error ? error.message : String(error);
           this.logger.error(
-            `Bond catalog (${adapter.countryCode}) entry version ${entry.termsVersion} could not be stored and was skipped: ${message}`,
+            `Bond program ${adapter.countryCode} ${program.programCode} could not be stored and was skipped: ${message}`,
           );
         }
       }
     }
+  }
+
+  /**
+   * The program row, created once and never overwritten, with its stored id and
+   * currency. A program stored in another currency than a series is a curation
+   * error (the security link compares one currency); the caller compares.
+   */
+  private async ensureProgram(
+    m: EntityManager,
+    program: BondProgramDefinition,
+  ): Promise<{ id: string; currency_code: string }> {
+    await m.query(
+      `INSERT INTO bond_programs
+         (id, issuer_country_code, issuer_code, program_code, currency_code)
+       VALUES ($1::uuid, $2, $3, $4, $5)
+       ON CONFLICT (issuer_country_code, issuer_code, program_code) DO NOTHING`,
+      [
+        bondProgramId(
+          program.issuerCountryCode,
+          program.issuerCode,
+          program.programCode,
+        ),
+        program.issuerCountryCode,
+        program.issuerCode,
+        program.programCode,
+        program.currency,
+      ],
+    );
+    const rows: Array<{ id: string; currency_code: string }> = await m.query(
+      `SELECT id, currency_code FROM bond_programs
+        WHERE issuer_country_code = $1 AND issuer_code = $2 AND program_code = $3`,
+      [program.issuerCountryCode, program.issuerCode, program.programCode],
+    );
+    return rows[0];
   }
 
   /**
@@ -232,13 +283,20 @@ export class BondCatalogService implements OnApplicationBootstrap {
     }));
   }
 
-  /** The series rows alone, for a refresh that must not depend on boot order. */
+  /**
+   * The benchmark series rows of the adapters, for a refresh that must not
+   * depend on boot order, and for a stored series so the valuation names the
+   * publisher of an observation it lacks. `only` restricts it to the codes a
+   * stored series reads; absent, every definition. Joins the ambient
+   * transaction.
+   */
   async seedBenchmarkSeries(
     adapters: readonly BondAdapter[] = INSTALLED_BOND_ADAPTERS,
+    only?: ReadonlySet<string>,
   ): Promise<void> {
     await withScopedDb(this.dataSource, async (m) => {
       for (const adapter of adapters)
-        await this.upsertBenchmarkSeries(m, adapter);
+        await this.upsertBenchmarkSeries(m, adapter, only);
     });
   }
 
@@ -250,8 +308,10 @@ export class BondCatalogService implements OnApplicationBootstrap {
   private async upsertBenchmarkSeries(
     m: EntityManager,
     adapter: BondAdapter,
+    only?: ReadonlySet<string>,
   ): Promise<void> {
     for (const series of adapter.benchmarks) {
+      if (only && !only.has(series.code)) continue;
       await m.query(
         `INSERT INTO benchmark_series (code, kind, publisher, source_url, unit)
          VALUES ($1, $2, $3, $4, $5)
@@ -271,49 +331,12 @@ export class BondCatalogService implements OnApplicationBootstrap {
     }
   }
 
-  private async seedEntry(
-    m: EntityManager,
-    adapter: BondAdapter,
-    entry: CatalogEntry,
-  ): Promise<void> {
-    const outcome = await this.storeEntry(m, entry);
-    switch (outcome.kind) {
-      case "invalid":
-        this.logger.error(
-          `Bond catalog (${adapter.countryCode}) entry version ${entry.termsVersion} skipped: ${outcome.message}`,
-        );
-        return;
-      case "instrument-mismatch":
-        for (const [field, was, now] of outcome.fields) {
-          this.logger.error(
-            `Bond catalog entry version ${entry.termsVersion} of ${outcome.named} disagrees with the stored instrument on ${field} ` +
-              `(stored "${was}", entry "${now}"); the instrument row is never overwritten, so the entry is skipped.`,
-          );
-        }
-        return;
-      case "inserted":
-        this.logger.log(
-          `Stored terms version ${entry.termsVersion} of ${outcome.named}`,
-        );
-        return;
-      case "conflict":
-        this.logger.error(
-          `Terms version ${entry.termsVersion} of ${outcome.named} is stored with different content; ` +
-            `it is immutable (INV-BOND-001), so the catalog entry is skipped. Publish the correction as a new termsVersion.`,
-        );
-        return;
-      case "unchanged":
-        return;
-    }
-  }
-
   /**
-   * Stores one catalog entry on the caller's transaction: the instrument row
-   * (created once, never overwritten) and the terms version (inserted once,
-   * never rewritten). The seed and a series fetch both come here, so a fetched
-   * version is stored exactly like a curated one (INV-BOND-001, INV-BOND-006).
-   * Reports what happened and logs nothing: the seed logs and skips, a fetch
-   * refuses.
+   * Stores one terms entry on the caller's transaction: the program and
+   * instrument rows (created once, never overwritten) and the terms version
+   * (inserted once, never rewritten). A fetched and an entered series both come
+   * here (INV-BOND-001, INV-BOND-006). Reports what happened and logs nothing:
+   * the caller refuses.
    */
   async storeEntry(
     m: EntityManager,
@@ -338,35 +361,12 @@ export class BondCatalogService implements OnApplicationBootstrap {
     // bond-program-securities.md 2.1): created once, never overwritten, with the
     // program's currency. A program stored in another currency than this series
     // is a curation error (the security link compares one currency), refused.
-    const programId = bondProgramId(
-      instrument.issuerCountryCode,
-      instrument.issuerCode,
-      instrument.programCode,
-    );
-    await m.query(
-      `INSERT INTO bond_programs
-         (id, issuer_country_code, issuer_code, program_code, currency_code)
-       VALUES ($1::uuid, $2, $3, $4, $5)
-       ON CONFLICT (issuer_country_code, issuer_code, program_code) DO NOTHING`,
-      [
-        programId,
-        instrument.issuerCountryCode,
-        instrument.issuerCode,
-        instrument.programCode,
-        instrument.currency,
-      ],
-    );
-    const programRows: Array<{ id: string; currency_code: string }> =
-      await m.query(
-        `SELECT id, currency_code FROM bond_programs
-          WHERE issuer_country_code = $1 AND issuer_code = $2 AND program_code = $3`,
-        [
-          instrument.issuerCountryCode,
-          instrument.issuerCode,
-          instrument.programCode,
-        ],
-      );
-    const program = programRows[0];
+    const program = await this.ensureProgram(m, {
+      issuerCountryCode: instrument.issuerCountryCode,
+      issuerCode: instrument.issuerCode,
+      programCode: instrument.programCode,
+      currency: instrument.currency,
+    });
     if (program.currency_code !== instrument.currency) {
       return {
         kind: "instrument-mismatch",

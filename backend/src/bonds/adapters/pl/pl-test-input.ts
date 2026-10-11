@@ -1,16 +1,17 @@
+import { CatalogEntry } from "../../bond-adapter";
 import { BenchmarkData } from "../../domain/benchmark";
 import { BondTerms, parseBondTerms } from "../../domain/bond-terms";
 import { EMPTY_CALENDAR_REGISTRY } from "../../domain/calendar-registry";
 import { BondEngineInput } from "../../engine/bond-engine-types";
 import { registerPolishCalendars } from ".";
-import coi from "./manifests/coi1030.terms.json";
-import dor from "./manifests/dor1028.terms.json";
-import edo from "./manifests/edo1036.terms.json";
-import ots from "./manifests/ots0127.terms.json";
-import rod from "./manifests/rod1038.terms.json";
-import ror from "./manifests/ror1027.terms.json";
-import ros from "./manifests/ros1032.terms.json";
-import tos from "./manifests/tos1029.terms.json";
+import coi from "./fixtures/series/coi1030.terms.json";
+import dor from "./fixtures/series/dor1028.terms.json";
+import edo from "./fixtures/series/edo1036.terms.json";
+import ots from "./fixtures/series/ots0127.terms.json";
+import rod from "./fixtures/series/rod1038.terms.json";
+import ror from "./fixtures/series/ror1027.terms.json";
+import ros from "./fixtures/series/ros1032.terms.json";
+import tos from "./fixtures/series/tos1029.terms.json";
 import edo0423 from "./fixtures/edo0423.terms.json";
 import edo0524 from "./fixtures/edo0524.terms.json";
 import ror0623 from "./fixtures/ror0623.terms.json";
@@ -28,7 +29,7 @@ export type ManifestName =
 /**
  * Terms of historical series rebuilt from their own issue letters, for the
  * golden cases that reproduce the Ministry's published examples. They are not
- * in the catalog and `ManifestName` does not list them.
+ * among `ManifestName`'s series.
  */
 export type FixtureName = "ror0623" | "edo0524" | "edo0423";
 
@@ -48,6 +49,26 @@ const DOCUMENTS: Record<ManifestName, unknown> = {
   rod1038: rod,
   ots0127: ots,
 };
+
+/**
+ * The curated October 2026 series as stored terms entries (version 1, the date
+ * of their issue letters): what a person's fetch would have stored. Test
+ * fixtures only; the adapter ships templates, never a series.
+ */
+export const FIXTURE_CATALOG: readonly CatalogEntry[] = [
+  "ots0127",
+  "tos1029",
+  "ror1027",
+  "dor1028",
+  "coi1030",
+  "edo1036",
+  "ros1032",
+  "rod1038",
+].map((name) => ({
+  termsVersion: 1,
+  publishedAt: "2026-09-21",
+  terms: DOCUMENTS[name as ManifestName],
+}));
 
 export function manifest(name: ManifestName): BondTerms {
   return parseBondTerms(DOCUMENTS[name]);

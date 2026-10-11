@@ -40,8 +40,9 @@ backend/src/bonds/
   engine/          bond-engine.ts: terms + benchmarks + announced rates
                    + lot + asOf -> valuation; dispatches on primitive types only
   adapters/pl/     Polish calendar, benchmark definitions (PL_NBP_REFERENCE,
-                   PL_CPI_GUS_YOY), terms manifests for the eight series
-                   (TOS, ROR, COI, EDO, OTS, DOR, ROS, ROD), golden fixtures
+                   PL_CPI_GUS_YOY), product templates for the eight products
+                   (TOS, ROR, COI, EDO, OTS, DOR, ROS, ROD; no series is
+                   seeded), golden fixtures
   entities/        BondInstrument, BondTermsVersion, BondPeriodRate,
                    BenchmarkSeries, BenchmarkValue
   bond-valuation.service.ts   withScopedDb read -> engine
@@ -54,7 +55,7 @@ holds that. A product is a terms document, not code.
 ## Adding a country
 
 1. `adapters/<cc>/`: its business-day calendar, its benchmark definitions,
-   terms manifests, golden tests from an officially published example.
+   product templates, golden tests from an officially published example.
 2. Map each local product to existing primitives. Only when an instrument
    has a new economic construction, add one primitive: a union member in the
    terms types, a parser case, one engine case, its tests.

@@ -123,8 +123,9 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-BOND-003 exact bond money | **required** | required | -- | -- | -- | -- | -- | -- |
 | INV-BOND-004 known vs projected | **required** | -- | -- | -- | -- | -- | -- | -- |
 | INV-BOND-005 bond-engine-only prices | required | **required** | **required** | -- | -- | -- | -- | -- |
-| INV-BOND-006 terms only from a manifest, the official source or an administrator | **required** | required | **required** | **required** | -- | -- | -- | -- |
+| INV-BOND-006 terms only from the official source or an administrator | **required** | required | **required** | **required** | -- | -- | -- | -- |
 | INV-BOND-007 a program-linked security's rows name a series (dated acquisitions inferred, transfers and grants explicit, removals checked at write time, imports may store NULL) | **required** | **required** | **required** | **required** | -- | -- | -- | -- |
+| INV-BOND-008 no country's bond data is fetched or stored without a person's action | **required** | **required** | **required** | -- | -- | -- | -- | -- |
 | INV-OCCURRENCE-001 one effect | supporting | -- | required | required | **required** | required | -- | required |
 | INV-OCCURRENCE-002 override price | required | -- | -- | -- | -- | -- | -- | required |
 | INV-OCCURRENCE-003 one effective occurrence | **required** | **required** | -- | -- | -- | -- | optional | optional |

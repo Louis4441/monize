@@ -534,10 +534,12 @@ stop the other. The write is one transaction per series: the observations
 DISTINCT FROM EXCLUDED.value`, so a revision corrects a row and a repeat
 converges) then `covered_through = GREATEST(...)`, which only moves forward. The
 lease `bond-benchmarks` stops N replicas fetching at once and is not what keeps
-the data correct. `BondCatalogService` seeds the curated terms with
-`ON CONFLICT DO NOTHING`; a stored terms version is never rewritten (INV-BOND-001),
-so a catalog entry whose content differs from the stored one is logged and
-skipped, and a correction is a new `termsVersion`.
+the data correct. `BondCatalogService` seeds the adapters' programs with
+`ON CONFLICT DO NOTHING` and stores a fetched or entered series the same way; a
+stored terms version is never rewritten (INV-BOND-001), so an entry whose
+content differs from the stored one is refused as a conflict, and a correction
+is a new `termsVersion`. The refresh fetches only benchmarks a stored series
+reads, and once after a series is stored for a benchmark never fetched.
 
 ### Bank sync
 

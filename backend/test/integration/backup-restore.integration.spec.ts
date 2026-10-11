@@ -13,7 +13,6 @@ import { BondPriceService } from "@/bonds/bond-price.service";
 import { BondValuationService } from "@/bonds/bond-valuation.service";
 import { FetchSyncService } from "@/common/jobs/fetch-sync.service";
 import { BondCatalogService } from "@/bonds/bond-catalog.service";
-import { POLISH_BOND_ADAPTER } from "@/bonds/adapters/pl/index";
 import { bondInstrumentId, bondProgramId } from "@/bonds/bond-instrument-id";
 import { BackupExportService } from "@/backup/backup-export.service";
 import { BackupRestoreService } from "@/backup/backup-restore.service";
@@ -28,9 +27,10 @@ import { UserMaintenanceService } from "@/common/jobs/user-maintenance.service";
 import {
   attachmentStorageProviders,
   createTestUserDirect,
+  storeFixtureSeries,
 } from "../helpers/integration-setup";
 import { applyRlsPolicies } from "../helpers/rls-setup";
-import { withSystemContext, withUserContext } from "@/common/db/with-context";
+import { withUserContext } from "@/common/db/with-context";
 
 /**
  * Full backup -> restore round-trip against a real PostgreSQL database.
@@ -1158,11 +1158,12 @@ describe("Backup export/restore round-trip (integration)", () => {
       `INSERT INTO currencies (code, name, symbol, decimal_places, is_active)
        VALUES ('PLN', 'Zloty', 'zl', 2, true) ON CONFLICT (code) DO NOTHING`,
     );
-    // The same catalog the deployment seeds: instrument, terms and benchmark series.
-    await withSystemContext(() =>
+    // The series a person had fetched: instruments, terms and benchmark series.
+    await storeFixtureSeries(
+      dataSource,
       new BondCatalogService(dataSource, {
         ensureCatalogCurrency: async () => undefined,
-      }).seed([POLISH_BOND_ADAPTER]),
+      }),
     );
     const [{ id: accountId }] = await dataSource.query(
       `INSERT INTO accounts (user_id, account_type, account_sub_type, name,

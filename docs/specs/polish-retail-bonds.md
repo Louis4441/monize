@@ -30,20 +30,26 @@ In scope for this PR (it carries phases 1 to 5 of the plan):
   redemption primitives, holding lot, cash flow, valuation;
 - a calculation engine in exact decimal arithmetic;
 - the Polish adapter: business-day calendar, benchmark definitions and the
-  eight terms manifests (TOS1029, ROR1027, COI1030, EDO1036, OTS0127,
-  DOR1028, ROS1032, ROD1038);
+  eight product templates (TOS, ROR, COI, EDO, OTS, DOR, ROS, ROD), data under
+  `backend/src/bonds/adapters/pl/templates/`; the adapter ships no series
+  (spec `bond-program-securities.md` 2.6). The October 2026 series (TOS1029,
+  ROR1027, COI1030, EDO1036, OTS0127, DOR1028, ROS1032, ROD1038) are the terms
+  documents under `backend/src/bonds/adapters/pl/fixtures/series/`, the
+  golden and unit-test fixtures, and enter a deployment only through a fetch
+  or a manual entry;
 - persistence of instruments, terms versions, announced period rates and
   benchmark series and values in global, country-agnostic tables;
 - fetchers for the NBP reference rate and the GUS CPI, run at boot and by a
-  lease-guarded cron (section 9), and the seeded instrument catalog;
+  lease-guarded cron (section 9), for the benchmarks a stored series reads
+  only, and the boot seed of the adapters' programs (no series);
 - linking a `securities` row to a bond instrument, lots derived from the
   user's transactions, and a daily `bond_engine` price (section 12);
 - the read API, the detail view and its i18n (section 13).
 
 Out of scope: a machine-readable source of the Ministry's announced period
-rates (they are filled by hand); a terms fetcher (the manifests are curated by
-hand from the issue letters, and adding a series is one manifest file and one
-catalog entry, no code); a projected value for a future `asOf`;
+rates (they are filled by hand); a curated series catalog (a series is fetched
+from the issuer's source or entered by an administrator on the product
+template, `bond-series-fetch.md`); a projected value for a future `asOf`;
 taxes; the IKE/IKZE fee waiver; the eligibility check of ROS and ROD; other
 countries, and the primitives they need (indexed principal, day-count
 conventions, market quotes, yields) (discussion section 38). Section 2.0 is
@@ -57,11 +63,11 @@ The engine is one deterministic cash-flow engine for every country. It is
 composed of financial **primitives** (rate rule, observation rule, principal
 rule, capitalization, accrual, redemption policy, penalty, rounding), and it
 never branches on a country, an issuer, a program or a product code. A
-country is an **adapter**: data (terms manifests, benchmark definitions) and
+country is an **adapter**: data (product templates, benchmark definitions) and
 a business-day calendar, registered by id. The Polish products in this
 specification are four terms documents built only from primitives.
 
-Adding a country is: a calendar, benchmark definitions, terms manifests and
+Adding a country is: a calendar, benchmark definitions, product templates and
 golden tests. A new primitive (a new union member and one engine case) is
 added only when an instrument has a new economic construction, for example
 an inflation-indexed principal (`INDEX_RATIO`, US TIPS) or a day-count
@@ -488,15 +494,22 @@ announced rate or observation changes the next read.
 ## 9. Concurrency
 
 The writers of the reference tables are `BondCatalogService` (seeds
-instruments and terms versions at boot with `INSERT ... ON CONFLICT
-(bond_instrument_id, version) DO NOTHING`, each catalog entry in its own
-transaction, so a concurrent writer of the same version inserts nothing and
-raises nothing, and a stored version whose `content_hash` differs from the
-manifest's is logged and skipped; the trigger refuses any UPDATE or DELETE of a
+the adapters' programs at boot, no series and no network, each in its own
+transaction with `INSERT ... ON CONFLICT DO NOTHING`; and stores a fetched or
+entered series' terms versions with `INSERT ... ON CONFLICT
+(bond_instrument_id, version) DO NOTHING`, so a concurrent writer of the same
+version inserts nothing and raises nothing, and a stored version whose
+`content_hash` differs from the entry's is refused as a conflict; the trigger refuses any UPDATE or DELETE of a
 stored row but never fires on an insert; a currency the seed has to create is
 created inactive, through a `CurrenciesService` method only the seed uses, so
 it is not offered to users) and `BenchmarkRefreshService` (NBP and GUS observations, under
-the `bond-benchmarks` lease of `FetchSyncService`, at boot and by cron).
+the `bond-benchmarks` lease of `FetchSyncService`, at boot and by cron, only for
+the benchmarks the newest terms version of a stored series reads, and once
+after a series is stored for a benchmark it reads that was never fetched; the
+`benchmark_series` row of a benchmark a series reads is stored with the series,
+in the same transaction, so a valuation names the publisher of an observation it
+lacks before the first fetch lands; with no stored series nothing is
+fetched, spec `bond-program-securities.md` 2.6).
 Benchmark freshness at boot is decided by the last successful fetch, not by
 `covered_through`, which only records how far the data reaches.
 
@@ -576,7 +589,7 @@ Evidence collected on 2026-10-11 (supporting, not a confirmation):
 | Window | unit | day 6 and 7 after purchase, 21 and 20 days before maturity, ROR record day |
 | Terms parsing | unit | a valid document per Polish manifest; unknown field, number instead of string, unknown primitive (`UNSUPPORTED_PRIMITIVE`) refused; unknown calendar or benchmark id reported as missing data |
 | Country-agnostic engine | guard | no domain or engine file imports an adapter or names a country or product literal (section 2.0) |
-| Immutability | integration | update and delete of a terms version, of an announced rate and of an instrument raise; a repeated seed with a differing manifest changes nothing |
+| Immutability | integration | update and delete of a terms version, of an announced rate and of an instrument raise; a stored version stored again with differing content is a conflict and changes nothing |
 | Sale window, lot status, UNKNOWN flows | unit | a lot outside `saleWindow` is REFUSED with every figure null; MATURED and OPEN `currentPeriod` shape; UNKNOWN cash flow with `amount` null; `projectionMissing` |
 | Future `asOf` | unit, integration | valuation and scenarios refuse `asOf` after today (`AS_OF_IN_FUTURE`) |
 | Fetchers | unit | GUS link discovery and fallback; a feed older than 3 months refused; NBP `covered_through` when the archive cannot prove coverage; failures recorded through `ProviderHealthService` |
@@ -619,8 +632,9 @@ security is never refreshed from a quote provider: the bond engine is its only
 automatic price source (spec section 1 of the discussion: Yahoo and MSN are not
 a source of retail bond terms or values).
 
-`bond_instruments` is reference data excluded from the user backup and seeded
-per deployment from the adapters' catalogs, so an instrument's id is
+`bond_programs` is seeded per deployment from the adapters' programs and
+`bond_instruments` is reference data excluded from the user backup, stored per
+deployment by a fetch or an entry, so an instrument's id is
 deterministic: a UUIDv5 of `issuerCountryCode|issuerCode|seriesCode`. A
 restored link therefore points at the same instrument on any deployment
 whose catalog has it; a restore onto a deployment without it restores the

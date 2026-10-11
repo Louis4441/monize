@@ -94,7 +94,21 @@ One security holds a whole bond program (EDO), so each share-moving transaction 
 
 ## A bond program is followed on request, not by default
 
-The daily series cron and the backfill fetch only the programs at least one security has switched `bond_auto_fetch` on for (off by default); otherwise a series enters the catalog by the curated seed, by a fetch from the purchase form, or by `POST /bonds/offer/fetch { countryCode }` (a user's "fetch the current offer now", two a minute). `GET /bonds/programs` lists the catalog's programs for the picker. `docs/specs/bond-program-securities.md` sections 2.5 and 4.
+The daily series cron and the backfill fetch only the programs at least one security has switched `bond_auto_fetch` on for (off by default); otherwise a series enters the catalog by a fetch from the purchase form, an administrator's entry, or by `POST /bonds/offer/fetch { countryCode }` (a user's "fetch the current offer now", two a minute). `GET /bonds/programs` lists the catalog's programs for the picker. Nothing country-specific acts without a person: an adapter ships product templates (`backend/src/bonds/adapters/pl/templates/`, no per-series value) and its programs, never a series; the boot seed stores programs only; the benchmark refresh (NBP, GUS) runs, at boot and on its cron, only for benchmarks a stored series reads, and once after a series is stored for a benchmark never fetched, so a deployment where nobody adds a Polish bond sends no request to the issuer, NBP or GUS (`docs/specs/bond-program-securities.md` section 2.6). `docs/specs/bond-program-securities.md` sections 2.5 and 4.
+
+## No country's bonds act without a person (INV-BOND-008)
+
+A deployment holds the bonds its people chose and nothing else: a person in Poland follows Polish bonds, a person in Canada Canadian ones, and neither pays for the other's traffic or data. So no bond data is fetched or stored by default, for any country, now or in an adapter added later.
+
+What a country adapter may ship: its business-day calendar, its benchmark definitions, its product templates (structure only: schedule, accrual, principal and rate rule types, observation, capitalization, redemption policy shape, rounding) and its programs. What it must never ship or trigger by itself: a series (series code, first-period rate, margin or spread, fee amount, sale window, source), a stored terms version, a benchmark observation.
+
+When data is fetched or stored, and only then:
+
+- a person fetches a series (the purchase form, `POST /bonds/instruments/fetch`, the AI and MCP tool), fetches the current offer (`POST /bonds/offer/fetch`), or an administrator enters one by hand;
+- the daily series cron and its backfill, for the programs a person switched `bond_auto_fetch` on for, and no other;
+- the benchmark refresh, at boot and on its cron, for the benchmarks a stored series reads, and once after a series is stored for a benchmark never fetched.
+
+The boot seed stores programs only, so the form can offer them; it makes no network call. Adding a country: implement the adapter to this rule and add it to `INSTALLED_BOND_ADAPTERS`; `backend/src/bonds/no-automatic-bonds.guard.spec.ts` and `backend/test/integration/no-automatic-bonds.integration.spec.ts` iterate the installed adapters, so the new one is checked without editing them. They fail when the boot seed stores a series or calls a fetch, when a cron fetches with no stored series and no program switched on, when a template carries a per-series value, or when the adapter type regains a series catalog.
 
 ## A bond series is fetched from its issuer's own source, and a person supplies only its code
 

@@ -25,6 +25,7 @@ import {
   deleteBondInstrumentBypassingImmutability,
   deleteBondProgramBypassingImmutability,
   insertBondProgram,
+  storeFixtureSeries,
 } from "../helpers/integration-setup";
 
 /**
@@ -103,7 +104,7 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
        VALUES ('PLN', 'Zloty', 'zl', 2, true), ('USD', 'US Dollar', '$', 2, true)
        ON CONFLICT (code) DO NOTHING`,
     );
-    await withSystemContext(() => catalog.seed());
+    await storeFixtureSeries(dataSource, catalog);
 
     userId = (await createTestUserDirect(dataSource)).id;
     otherUserId = (await createTestUserDirect(dataSource)).id;
@@ -163,7 +164,7 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
     );
   }
 
-  it("seeds each instrument under its deterministic id", async () => {
+  it("stores each instrument under its deterministic id", async () => {
     const rows = await dataSource.query(
       `SELECT id FROM bond_instruments WHERE series_code = 'TOS1029'`,
     );

@@ -1,5 +1,8 @@
-import { POLISH_BOND_ADAPTER } from "./adapters/pl";
-import { manifestDocument, polishCalendars } from "./adapters/pl/pl-test-input";
+import {
+  FIXTURE_CATALOG,
+  manifestDocument,
+  polishCalendars,
+} from "./adapters/pl/pl-test-input";
 import { CatalogEntry } from "./bond-adapter";
 import { BenchmarkData } from "./domain/benchmark";
 import { BondTerms, parseBondTerms } from "./domain/bond-terms";
@@ -36,7 +39,7 @@ function laterSeries(): CatalogEntry[] {
   }));
 }
 
-const BASELINE: readonly CatalogEntry[] = POLISH_BOND_ADAPTER.catalog;
+const BASELINE: readonly CatalogEntry[] = FIXTURE_CATALOG;
 const EXTENDED: readonly CatalogEntry[] = [...BASELINE, ...laterSeries()];
 
 function termsOf(

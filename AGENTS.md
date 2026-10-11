@@ -61,6 +61,7 @@ Mirrors `.github/workflows/ci.yml`. While developing run `npm run test:changed` 
 
 - **`database/schema.sql` changes in the same commit as every migration.** New migrations are `YYYYMMDDHHMMSS_description.sql`; the checklist is in `database/CLAUDE.md`.
 - **A guard test is met by fixing the code.** Baselines, allowlists and grandfather lists are shrink-only. If a guard fires and you believe it is wrong, stop and report what it names.
+- **No bonds by default:** a country acts only after a person adds its bond (INV-BOND-008).
 - No emojis anywhere, including commit messages and PR bodies. No `console.log`; the NestJS `Logger`. Immutability always. Many small files (200-400 lines typical, 800 max), organized by feature.
 - **Security, do not regress:** parameterized SQL only; controllers under `AuthGuard('jwt')`; `userId` from the JWT, never from the request; `ParseUUIDPipe` on `:id`; DTOs with `whitelist` + `forbidNonWhitelisted` and bounded fields; `escapeHtml()` on every user value in an email template; secrets encrypted (AES-256-GCM) and never returned to the client.
 

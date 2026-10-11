@@ -38,6 +38,11 @@ export interface RefreshOptions {
   /** The network, injectable so a test never leaves the process. */
   readonly fetch?: HttpFetch;
   readonly adapters?: readonly BondAdapter[];
+  /**
+   * Only these benchmark codes (those among the ones a stored series reads); the
+   * refresh that follows a stored series passes the ones never fetched.
+   */
+  readonly only?: ReadonlySet<string>;
 }
 
 const FETCH_TIMEOUT_MS = 30_000;
@@ -46,7 +51,10 @@ const PERSISTENT_FAILURE_DAYS = 3;
 
 /**
  * Keeps the benchmark series (NBP reference rate, GUS CPI, whatever an adapter
- * declares) current. Global reference data, so one fetch serves every user.
+ * declares) current, but only the ones a stored series reads (spec
+ * bond-program-securities.md 2.6): with no stored series nothing is fetched, and
+ * a series stored later refreshes a benchmark it reads that was never fetched
+ * (`refreshNeverFetched`). Global reference data, so one fetch serves every user.
  *
  * Cost control, not correctness: the upserts converge however many replicas run,
  * so the lease (`bond-benchmarks`) only stops N replicas asking the same
@@ -67,7 +75,7 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
   ) {}
 
   /**
-   * Warm up a deployment whose series are empty or stale, under the same lease
+   * Warm up the benchmarks of stored series that are empty or stale, under the same lease
    * as the cron so a rollout of N pods fetches once. A failure is a warning, not
    * a reason to stop the application.
    */
@@ -112,7 +120,73 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
   }
 
   /**
-   * Refresh every declared series. One series failing is logged and does not
+   * After a series is stored and committed (INV-CACHE-001 order: the caller
+   * recomputes prices after this): refreshes the benchmarks the given
+   * instruments' newest terms read that were never fetched (no row, or
+   * `covered_through` NULL), under the cron's lease and breaker. Never throws: the
+   * series is stored, and the boot warm-up and the cron repair a refresh that
+   * failed or lost the lease. Seeds its own system context.
+   */
+  async refreshNeverFetched(
+    instrumentIds: readonly string[],
+    options: Pick<RefreshOptions, "fetch" | "adapters"> = {},
+  ): Promise<void> {
+    if (instrumentIds.length === 0) return;
+    try {
+      await withSystemContext(async () => {
+        const codes = await this.benchmarksRead(instrumentIds, true);
+        if (codes.size === 0) return;
+        await this.fetchSync.withLease(
+          FetchSyncJob.BondBenchmarks,
+          this.FETCH_LEASE_MS,
+          () => this.refreshAll({ ...options, only: codes }),
+        );
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Bond benchmark refresh after a stored series failed: ${message}`,
+      );
+    }
+  }
+
+  /**
+   * The benchmarks the newest terms version of a stored series reads: of every
+   * series, or of `instrumentIds` only, and with `unfetchedOnly` just the ones
+   * without coverage. One query, reference tables only; needs an ambient
+   * identity.
+   */
+  private async benchmarksRead(
+    instrumentIds?: readonly string[],
+    unfetchedOnly = false,
+  ): Promise<Set<string>> {
+    const rows: Array<{ code: string }> = await withScopedDb(
+      this.dataSource,
+      (m) =>
+        m.query(
+          `SELECT DISTINCT v.terms -> 'rateRule' ->> 'benchmarkId' AS code
+             FROM bond_instruments i
+             JOIN LATERAL (
+               SELECT t.terms
+                 FROM bond_terms_versions t
+                WHERE t.bond_instrument_id = i.id
+                ORDER BY t.version DESC
+                LIMIT 1
+             ) v ON TRUE
+            WHERE v.terms -> 'rateRule' ->> 'benchmarkId' IS NOT NULL
+              AND ($1::uuid[] IS NULL OR i.id = ANY($1::uuid[]))
+              AND (NOT $2::boolean OR NOT EXISTS (
+                    SELECT 1 FROM benchmark_series b
+                     WHERE b.code = v.terms -> 'rateRule' ->> 'benchmarkId'
+                       AND b.covered_through IS NOT NULL))`,
+          [instrumentIds ? [...instrumentIds] : null, unfetchedOnly],
+        ),
+    );
+    return new Set(rows.map((r) => r.code));
+  }
+
+  /**
+   * Refresh the series a stored series reads. One series failing is logged and does not
    * stop the next; when every series that was attempted failed the run throws at
    * the end, so the lease wrapper records it in `fetch_sync` as a failure rather
    * than a success. Needs an ambient identity (`withSystemContext`).
@@ -120,9 +194,15 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
   async refreshAll(options: RefreshOptions = {}): Promise<void> {
     const adapters = options.adapters ?? INSTALLED_BOND_ADAPTERS;
     const http: HttpFetch | undefined = options.fetch;
+    // Only what a stored series reads: with none, nothing is fetched.
+    const read = await this.benchmarksRead();
+    const needed = options.only
+      ? new Set([...read].filter((code) => options.only?.has(code)))
+      : read;
+    if (needed.size === 0) return;
     // The series rows must exist before a value can reference one, whichever
-    // service booted first.
-    await this.catalog.seedBenchmarkSeries(adapters);
+    // service stored the series.
+    await this.catalog.seedBenchmarkSeries(adapters, needed);
 
     let attempted = 0;
     let failed = 0;
@@ -130,6 +210,7 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
       // Each adapter's own calendar day decides freshness and the outage window.
       const today = todayInTimezone(adapter.timezone) as string;
       for (const series of adapter.benchmarks) {
+        if (!needed.has(series.code)) continue;
         const outcome = await this.refreshSeries(
           adapter,
           series,

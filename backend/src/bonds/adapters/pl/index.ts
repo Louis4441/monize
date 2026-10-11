@@ -3,18 +3,10 @@ import {
   BenchmarkFetchError,
   BondAdapter,
   BondFetch,
-  CatalogEntry,
+  BondProgramDefinition,
 } from "../../bond-adapter";
 import { registerCalendar } from "../../domain/calendar-registry";
 import type { CalendarRegistry } from "../../domain/calendar-registry";
-import coi from "./manifests/coi1030.terms.json";
-import edo from "./manifests/edo1036.terms.json";
-import ror from "./manifests/ror1027.terms.json";
-import tos from "./manifests/tos1029.terms.json";
-import ots from "./manifests/ots0127.terms.json";
-import dor from "./manifests/dor1028.terms.json";
-import ros from "./manifests/ros1032.terms.json";
-import rod from "./manifests/rod1038.terms.json";
 import { fetchGusCpi, GUS_CPI_LANDING_URL } from "./pl-gus-cpi";
 import { fetchNbpReference, NBP_ARCHIVE_URL } from "./pl-nbp-reference";
 import { PL_CPI_GUS_YOY, PL_NBP_REFERENCE } from "./pl-benchmarks";
@@ -24,6 +16,7 @@ import { parseSeriesCode } from "./series/series-code";
 import { fetchCurrentSeries } from "./series/current-offer";
 import { fetchSeries } from "./series/fetch-series";
 import { manualSeries } from "./series/manual-series";
+import { SERIES_TEMPLATES } from "./series/templates";
 
 export { plBenchmarks } from "./pl-benchmarks";
 export { plCalendar } from "./pl-calendar";
@@ -37,20 +30,15 @@ export function registerPolishCalendars(
   return registerCalendar(registry, plCalendar);
 }
 
-/**
- * Each series carries the date of its own issue letter. Adding a series is one
- * import plus one entry here.
- */
-const catalog: readonly CatalogEntry[] = [
-  { terms: ots, publishedAt: "2026-09-21" },
-  { terms: tos, publishedAt: "2026-09-21" },
-  { terms: ror, publishedAt: "2026-09-21" },
-  { terms: dor, publishedAt: "2026-09-21" },
-  { terms: coi, publishedAt: "2026-09-21" },
-  { terms: edo, publishedAt: "2026-09-21" },
-  { terms: ros, publishedAt: "2026-09-21" },
-  { terms: rod, publishedAt: "2026-09-21" },
-].map(({ terms, publishedAt }) => ({ termsVersion: 1, publishedAt, terms }));
+/** One program per product template: the structure is the template's, the series are a person's. */
+const programs: readonly BondProgramDefinition[] = Object.values(
+  SERIES_TEMPLATES,
+).map(({ structure: { instrument } }) => ({
+  issuerCountryCode: instrument.issuerCountryCode as string,
+  issuerCode: instrument.issuerCode as string,
+  programCode: instrument.programCode as string,
+  currency: instrument.currency as string,
+}));
 
 export const POLISH_BOND_ADAPTER: BondAdapter = {
   countryCode: "PL",
@@ -74,7 +62,7 @@ export const POLISH_BOND_ADAPTER: BondAdapter = {
       providerId: "gus",
     },
   ],
-  catalog,
+  programs,
   fetchSeries: (seriesCode: string, fetch: BondFetch) =>
     fetchSeries(seriesCode, fetch),
   manualSeries,

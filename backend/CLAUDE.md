@@ -84,6 +84,8 @@ Each module holds `{feature}.module.ts`, controller, service, their specs, `enti
 | Writing a row to `exchange_rates` | `canonicalRateRow` (`src/currencies/canonical-rate.util.ts`), which stores each pair in one orientation | a second inverted row beside it, or the orientation a provider or an imported file happened to record |
 | A read a person is waiting on, short of rate history | `fetchMissing: false` where the window is the whole history | an inline provider backfill behind a summary card |
 
+**No country's bonds act without a person (INV-BOND-008).** An adapter ships product templates and programs, never a series; nothing at boot, in a cron or on a read fetches or stores a series or a benchmark until a person adds a bond, fetches a series or switches auto-fetch on. `no-automatic-bonds.guard.spec.ts` runs over every installed adapter; `docs/backend/securities-and-providers.md`.
+
 **A cron or bootstrap body seeds its own identity** -- `withSystemContext` for the fan-out, `withUserContext(userId)` per user, `withDelegateContext` when the two ids must differ -- and a per-user loop isolates each user, pre-checks included. A job lease is database access too, so the wrapper goes around the whole `FetchSyncService.withLease` call, never around only its body. `docs/backend/cron-and-background-work.md`.
 
 **A read about somebody else needs somebody else's identity.** Under RLS a query keyed on another person returns zero rows from the caller's scope with no error. Decide whose row it is before writing the query; `docs/backend/database-access-and-tenancy.md` has the three answers.

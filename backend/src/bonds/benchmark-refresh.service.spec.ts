@@ -39,6 +39,8 @@ function build(opts: {
     new_value: string;
   }>;
   health?: Partial<Record<keyof ProviderHealthService, jest.Mock>>;
+  /** The benchmarks a stored series reads (the one-query answer); default both. */
+  read?: string[];
 }) {
   const fetchers = opts.fetchers ?? {
     NBP_X: jest.fn(async () => result("NBP_X", "2026-10-10")),
@@ -48,7 +50,7 @@ function build(opts: {
     countryCode: "PL",
     timezone: "Europe/Warsaw",
     registerCalendars: (r) => r,
-    catalog: [],
+    programs: [],
     benchmarks: [
       {
         code: "NBP_X",
@@ -71,7 +73,12 @@ function build(opts: {
   };
   const { manager, dataSource } = createScopedDbMocks();
   const writes: Array<{ sql: string; params: unknown[] }> = [];
+  const reads: Array<{ sql: string; params: unknown[] }> = [];
   manager.query.mockImplementation(async (sql: string, params: unknown[]) => {
+    if (sql.includes("FROM bond_instruments i")) {
+      reads.push({ sql, params });
+      return (opts.read ?? ["NBP_X", "CPI_X"]).map((code) => ({ code }));
+    }
     if (sql.includes("AS fetched_on")) {
       expect(params[1]).toBe("Europe/Warsaw");
       const fetched = opts.fetched?.[params[0] as string];
@@ -112,6 +119,7 @@ function build(opts: {
     adapter,
     fetchers,
     writes,
+    reads,
     health,
     fetchSync,
     catalog,
@@ -128,10 +136,13 @@ describe("BenchmarkRefreshService", () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
-  it("seeds the series, fetches each, stores the values and moves coverage forward", async () => {
+  it("seeds the series rows, fetches each benchmark a stored series reads, stores the values and moves coverage forward", async () => {
     const { service, adapter, writes, catalog } = build({});
     await service.refreshAll({ adapters: [adapter] });
-    expect(catalog.seedBenchmarkSeries).toHaveBeenCalledWith([adapter]);
+    expect(catalog.seedBenchmarkSeries).toHaveBeenCalledWith(
+      [adapter],
+      new Set(["NBP_X", "CPI_X"]),
+    );
     const inserts = writes.filter((w) =>
       w.sql.includes("INSERT INTO benchmark_values"),
     );
@@ -153,6 +164,99 @@ describe("BenchmarkRefreshService", () => {
       ["CPI_X", "2026-08-01"],
     ]);
     expect(coverage[0].sql).toMatch(/GREATEST\(COALESCE\(covered_through/);
+  });
+
+  it("fetches nothing, seeds nothing and writes nothing while no stored series reads a benchmark", async () => {
+    const { service, adapter, fetchers, catalog, writes, health } = build({
+      read: [],
+    });
+    await expect(
+      service.refreshAll({ adapters: [adapter] }),
+    ).resolves.toBeUndefined();
+    await service.refreshAll({ adapters: [adapter], onlyStale: true });
+    expect(fetchers.NBP_X).not.toHaveBeenCalled();
+    expect(fetchers.CPI_X).not.toHaveBeenCalled();
+    expect(catalog.seedBenchmarkSeries).not.toHaveBeenCalled();
+    expect(writes).toEqual([]);
+    expect(health.assertAvailable).not.toHaveBeenCalled();
+  });
+
+  it("fetches only the benchmarks a stored series reads", async () => {
+    const { service, adapter, fetchers, catalog, reads } = build({
+      read: ["CPI_X"],
+    });
+    await service.refreshAll({ adapters: [adapter] });
+    expect(fetchers.NBP_X).not.toHaveBeenCalled();
+    expect(fetchers.CPI_X).toHaveBeenCalledTimes(1);
+    expect(catalog.seedBenchmarkSeries).toHaveBeenCalledWith(
+      [adapter],
+      new Set(["CPI_X"]),
+    );
+    // One query, over the newest terms version of each stored series, reference tables only.
+    expect(reads).toHaveLength(1);
+    expect(reads[0].sql).toMatch(/ORDER BY t\.version DESC\s+LIMIT 1/);
+    expect(reads[0].sql).toMatch(/'benchmarkId'/);
+    expect(reads[0].sql).not.toMatch(/securities|users|accounts/);
+    expect(reads[0].params).toEqual([null, false]);
+  });
+
+  describe("refreshNeverFetched, after a series is stored", () => {
+    it("refreshes the never-fetched benchmark of the stored series under the lease, and no other", async () => {
+      const { service, fetchSync, reads } = build({ read: ["CPI_X"] });
+      const refresh = jest.spyOn(service, "refreshAll").mockResolvedValue();
+      await service.refreshNeverFetched(["inst-1"]);
+      expect(reads[0].params).toEqual([["inst-1"], true]);
+      expect(reads[0].sql).toMatch(/covered_through IS NOT NULL/);
+      expect(fetchSync.withLease).toHaveBeenCalledWith(
+        "bond-benchmarks",
+        600000,
+        expect.any(Function),
+      );
+      expect(refresh).toHaveBeenCalledWith({ only: new Set(["CPI_X"]) });
+      await service.refreshNeverFetched(["inst-1"], { fetch: jest.fn() });
+      expect(refresh).toHaveBeenLastCalledWith({
+        fetch: expect.any(Function),
+        only: new Set(["CPI_X"]),
+      });
+    });
+
+    it("the refresh it runs is limited to those codes, even when other stored series read more", async () => {
+      const { service, adapter, fetchers, catalog } = build({});
+      await service.refreshAll({
+        adapters: [adapter],
+        only: new Set(["CPI_X"]),
+      });
+      expect(fetchers.NBP_X).not.toHaveBeenCalled();
+      expect(fetchers.CPI_X).toHaveBeenCalledTimes(1);
+      expect(catalog.seedBenchmarkSeries).toHaveBeenCalledWith(
+        [adapter],
+        new Set(["CPI_X"]),
+      );
+    });
+
+    it("does nothing when every benchmark of the stored series has been fetched, or no series was stored", async () => {
+      const { service, fetchSync, reads } = build({ read: [] });
+      await service.refreshNeverFetched(["inst-1"]);
+      expect(reads).toHaveLength(1);
+      expect(fetchSync.withLease).not.toHaveBeenCalled();
+      await service.refreshNeverFetched([]);
+      expect(reads).toHaveLength(1);
+    });
+
+    it("never throws: a failed refresh or a lost lease leaves the repair to the cron", async () => {
+      const { service, fetchSync } = build({ read: ["CPI_X"] });
+      fetchSync.withLease.mockRejectedValueOnce(new Error("lease table gone"));
+      await expect(
+        service.refreshNeverFetched(["inst-1"]),
+      ).resolves.toBeUndefined();
+      expect(Logger.prototype.warn).toHaveBeenCalledWith(
+        expect.stringContaining("lease table gone"),
+      );
+      fetchSync.withLease.mockResolvedValueOnce(false);
+      await expect(
+        service.refreshNeverFetched(["inst-1"]),
+      ).resolves.toBeUndefined();
+    });
   });
 
   it("skips the write of values when a source returns none, but still records coverage", async () => {
@@ -196,6 +300,8 @@ describe("BenchmarkRefreshService", () => {
       fetchBenchmark: usFetch,
     };
     manager.query.mockImplementation(async (sql: string, params: unknown[]) => {
+      if (sql.includes("FROM bond_instruments i"))
+        return ["NBP_X", "CPI_X", "US_X"].map((code) => ({ code }));
       if (sql.includes("AS fetched_on")) {
         seen.push([params[0] as string, params[1]]);
         return [{ fetched_on: "2026-10-08" }];

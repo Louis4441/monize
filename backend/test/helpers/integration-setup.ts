@@ -5,7 +5,12 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { ConfigModule } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { DataSource } from "typeorm";
+import { POLISH_BOND_ADAPTER } from "@/bonds/adapters/pl/index";
+import { FIXTURE_CATALOG } from "@/bonds/adapters/pl/pl-test-input";
+import type { BondCatalogService } from "@/bonds/bond-catalog.service";
 import { bondProgramId } from "@/bonds/bond-instrument-id";
+import { withScopedDb } from "@/common/db/scoped-db";
+import { withSystemContext } from "@/common/db/with-context";
 import { User } from "@/users/entities/user.entity";
 import { NetWorthService } from "@/net-worth/net-worth.service";
 import { ScheduledTransactionsModule } from "@/scheduled-transactions/scheduled-transactions.module";
@@ -289,6 +294,36 @@ export async function deleteBondInstrumentBypassingImmutability(
       `ALTER TABLE bond_instruments ENABLE TRIGGER trg_bond_instruments_immutable`,
     );
   }
+}
+
+/**
+ * Stores the curated October 2026 series (the unit tests' fixture terms, which
+ * the adapter no longer ships: spec bond-program-securities.md 2.6) through the
+ * catalog's `storeEntry`, as a fetch would, with the benchmark rows they read.
+ * `seriesCodes` limits it to those series; absent, all eight. The program's
+ * currency must exist or is created inactive by the catalog.
+ */
+export async function storeFixtureSeries(
+  dataSource: DataSource,
+  catalog: BondCatalogService,
+  seriesCodes?: readonly string[],
+): Promise<void> {
+  await withSystemContext(() =>
+    withScopedDb(dataSource, async (m) => {
+      for (const entry of FIXTURE_CATALOG) {
+        const code = (entry.terms as { instrument: { seriesCode: string } })
+          .instrument.seriesCode;
+        if (seriesCodes && !seriesCodes.includes(code)) continue;
+        const outcome = await catalog.storeEntry(m, entry);
+        if (outcome.kind !== "inserted" && outcome.kind !== "unchanged") {
+          throw new Error(
+            `Fixture series ${code} was not stored: ${outcome.kind}`,
+          );
+        }
+      }
+      await catalog.seedBenchmarkSeries([POLISH_BOND_ADAPTER]);
+    }),
+  );
 }
 
 /**

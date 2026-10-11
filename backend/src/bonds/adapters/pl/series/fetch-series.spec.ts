@@ -1,13 +1,13 @@
 import { SeriesFetchError } from "../../../bond-adapter";
 import { POLISH_BOND_ADAPTER } from "..";
-import coi from "../manifests/coi1030.terms.json";
-import dor from "../manifests/dor1028.terms.json";
-import edo from "../manifests/edo1036.terms.json";
-import ots from "../manifests/ots0127.terms.json";
-import rod from "../manifests/rod1038.terms.json";
-import ror from "../manifests/ror1027.terms.json";
-import ros from "../manifests/ros1032.terms.json";
-import tos from "../manifests/tos1029.terms.json";
+import coi from "../fixtures/series/coi1030.terms.json";
+import dor from "../fixtures/series/dor1028.terms.json";
+import edo from "../fixtures/series/edo1036.terms.json";
+import ots from "../fixtures/series/ots0127.terms.json";
+import rod from "../fixtures/series/rod1038.terms.json";
+import ror from "../fixtures/series/ror1027.terms.json";
+import ros from "../fixtures/series/ros1032.terms.json";
+import tos from "../fixtures/series/tos1029.terms.json";
 import {
   fakeFetch,
   fakePdfText,

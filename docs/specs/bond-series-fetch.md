@@ -26,14 +26,14 @@ eight Polish products; parsing an arbitrary prospectus (discussion section 38).
 
 ## 2. Invariants
 
-- **INV-BOND-006.** Terms enter the catalog only from an adapter's curated
-  manifest, from the adapter's fetch of its official source, or from an
-  administrator's manual entry built on the adapter's product template. A
+- **INV-BOND-006.** Terms enter the catalog only from the adapter's fetch of
+  its official source or from an administrator's manual entry built on the
+  adapter's product template (an adapter ships no series, INV-BOND-008). A
   request from a person who is not an administrator carries only a country and
   a series code. Every stored version names its origin in `source.provider`
-  (`curated`, the official host, or `manual`).
-- **INV-BOND-001 holds unchanged.** A fetched version is inserted like a
-  curated one: the same tables, the same immutability trigger, the same
+  (the official host, or `manual`).
+- **INV-BOND-001 holds unchanged.** A fetched version is inserted once and
+  never changed: the same tables, the same immutability trigger, the same
   deterministic instrument id. A second fetch of a stored series writes
   nothing. A fetch whose content differs from the stored version 1 is refused
   and logged; it never replaces it.
@@ -101,7 +101,7 @@ a size cap (HTML 2 MB, PDF 5 MB), and runs through `ProviderHealthService`
 
 A live run on 2026-10-11 fetched 64 series (the eight products sold in
 2024-01, 2024-07, 2025-01, 2025-07, 2026-01, 2026-06, 2026-09 and 2026-10):
-all passed, the October 2026 ones equal to the curated manifests. The letters
+all passed, the October 2026 ones equal to the terms fixtures under `backend/src/bonds/adapters/pl/fixtures/series/`. The letters
 show the fee is a per-series value: TOS 0.70 to 1.00, COI and ROS 0.70 to 2.00,
 EDO and ROD 2.00 to 3.00 from the September 2024 series, with the same wording;
 the margins of COI, ROS, EDO and ROD rose and the DOR spread fell from June
@@ -116,19 +116,19 @@ values. Neither writes anything.
 
 The structure of each product (schedule, accrual, principal rule, rate rule
 type and observation, capitalization, redemption window, blackouts, floor,
-rounding) is a template in the adapter, taken from the curated October 2026
-manifests. The fetched values fill the template; the result goes through the
+rounding) is a template in the adapter (data under `backend/src/bonds/adapters/pl/templates/`,
+no per-series value), taken from the October 2026 letters. The fetched values fill the template; the result goes through the
 strict terms parser (`parseBondTerms`). A template carries the earliest sale
 month whose letter was checked to have the same structure (`validFrom`); an
 older series is refused with `TEMPLATE_NOT_VALIDATED`, and its route is a new
-template or a curated manifest.
+template.
 
 ### 4.5 Stored version
 
 `termsVersion` 1, `publishedAt` = the letter's date, `source` =
 `{ provider: "obligacjeskarbowe.pl", url: <series page>, document: "List
 emisyjny nr N/YYYY" }`, `retrieved_at` = the fetch time. Inserted through the
-catalog's per-entry transaction (the same path as the seed). Two concurrent
+catalog's per-entry transaction (the path every stored series takes). Two concurrent
 fetches of one series are serialized by an advisory lock keyed on the
 instrument id; the second finds the row and writes nothing.
 
@@ -180,7 +180,7 @@ message in every locale.
 | Cross-checks | unit | rate, margin, sale window disagreement each refused with both values |
 | PDF | unit | one saved letter PDF read by `pdfjs-dist` gives the expected text markers |
 | Host | unit | a letter link to another host, a redirect off host, a non-PDF link refused |
-| Equivalence | unit | fetching EDO1036, ROR1027 and TOS1029 from saved sources gives terms equal to the curated manifests (except `source`) |
+| Equivalence | unit | fetching EDO1036, ROR1027 and TOS1029 from saved sources gives terms equal to the terms fixtures (except `source`) |
 | Write | integration | fetch inserts one instrument and version 1; a repeat writes nothing; a differing repeat is `SERIES_TERMS_CONFLICT`; a refused fetch leaves no row; two concurrent fetches insert once |
 | Manual | integration | non-administrator refused (403); administrator entry stored with `provider: manual`; out-of-bounds values refused |
 | Tools | unit | AI and MCP tool call the service; MCP manual tool requires the administrator role |

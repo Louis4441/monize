@@ -19,6 +19,8 @@ import {
   BondFetch,
   ManualSeriesValues,
 } from "@/bonds/bond-adapter";
+import { FIXTURE_CATALOG } from "@/bonds/adapters/pl/pl-test-input";
+import { BenchmarkRefreshService } from "@/bonds/benchmark-refresh.service";
 import { BondCatalogService } from "@/bonds/bond-catalog.service";
 import { bondInstrumentId } from "@/bonds/bond-instrument-id";
 import { BondPriceService } from "../../src/bonds/bond-price.service";
@@ -72,6 +74,11 @@ describe("bond series fetch (integration, INV-BOND-006)", () => {
   /** The adapter, fetching through `door` whatever `SeriesHttp` is asked. */
   const adapter: BondAdapter = POLISH_BOND_ADAPTER;
 
+  /** The first-fetch refresh is the benchmark service's own test; here it is observed. */
+  const benchmarks = {
+    refreshNeverFetched: jest.fn(async () => undefined),
+  } as unknown as BenchmarkRefreshService;
+
   const build = (): BondSeriesService =>
     new BondSeriesService(
       dataSource,
@@ -82,6 +89,7 @@ describe("bond series fetch (integration, INV-BOND-006)", () => {
       {
         recomputeLinkedSecuritiesOfSeries: async () => undefined,
       } as unknown as BondPriceService,
+      benchmarks,
     );
 
   /** A request as a signed-in user makes it. */
@@ -97,7 +105,7 @@ describe("bond series fetch (integration, INV-BOND-006)", () => {
     asUser(id, () => service.enterManually("PL", CODE, values, { adapters }));
 
   const curatedEdo = () =>
-    adapter.catalog.find(
+    FIXTURE_CATALOG.find(
       (e) =>
         (e.terms as { instrument: { seriesCode: string } }).instrument
           .seriesCode === CODE,
@@ -147,7 +155,11 @@ describe("bond series fetch (integration, INV-BOND-006)", () => {
     (extractPdfText as jest.Mock).mockImplementation(async (b: Uint8Array) =>
       fakePdfText(b),
     );
-    await cleanTables(dataSource, ["bond_programs", "bond_instruments"]);
+    await cleanTables(dataSource, [
+      "bond_programs",
+      "bond_instruments",
+      "benchmark_series",
+    ]);
     await dataSource.query(
       `INSERT INTO currencies (code, name, symbol, decimal_places, is_active)
        VALUES ('PLN', 'Zloty', 'z', 2, true)
@@ -185,6 +197,23 @@ describe("bond series fetch (integration, INV-BOND-006)", () => {
       expect(stored[0].content_hash).toHaveLength(64);
     });
 
+    it("a fetch stores the benchmark row the series reads with it, and dispatches its first refresh after the commit", async () => {
+      expect(await count("benchmark_series")).toBe(0);
+      await fetchAs(userId);
+      // Only the benchmark EDO reads, so a valuation names its publisher
+      // before the first fetch lands; the fetch itself is the refresh's.
+      expect(
+        await dataSource.query(
+          `SELECT code, publisher, covered_through FROM benchmark_series`,
+        ),
+      ).toEqual([
+        { code: "PL_CPI_GUS_YOY", publisher: "GUS", covered_through: null },
+      ]);
+      expect(benchmarks.refreshNeverFetched).toHaveBeenCalledWith([
+        INSTRUMENT_ID,
+      ]);
+    });
+
     it("a repeat fetches nothing and writes nothing", async () => {
       await fetchAs(userId);
       const before = await versions();
@@ -200,7 +229,7 @@ describe("bond series fetch (integration, INV-BOND-006)", () => {
       expect(await versions()).toEqual(before);
     });
 
-    it("a series stored by the curated seed is answered without a fetch", async () => {
+    it("a series stored already (a fixture version) is answered without a fetch", async () => {
       await withUserContext(userId, () =>
         withScopedDb(dataSource, (m) => catalog.storeEntry(m, curatedEdo())),
       );

@@ -15,6 +15,8 @@ import {
   seriesRoutes,
 } from "@/bonds/adapters/pl/series/fixture-helpers";
 import { extractPdfText } from "@/bonds/adapters/pl/series/pdf-text";
+import { FIXTURE_CATALOG } from "@/bonds/adapters/pl/pl-test-input";
+import { BenchmarkRefreshService } from "@/bonds/benchmark-refresh.service";
 import { BondAdapter, BondFetch } from "@/bonds/bond-adapter";
 import { BondCatalogService } from "@/bonds/bond-catalog.service";
 import { BondOfferService } from "@/bonds/bond-offer.service";
@@ -27,6 +29,7 @@ import {
   cleanTables,
   createIntegrationModule,
   createTestUserDirect,
+  storeFixtureSeries,
 } from "../helpers/integration-setup";
 
 // The letter is read as text: the fake PDF is the magic plus the saved letter
@@ -114,7 +117,8 @@ describe("bond offer, history and backfill (integration)", () => {
       "benchmark_series",
       "fetch_sync",
     ]);
-    await withSystemContext(() => catalog.seed([POLISH_BOND_ADAPTER]));
+    // The adapter ships no series: the October 2026 ones are stored as a fetch would.
+    await storeFixtureSeries(dataSource, catalog);
     await dataSource.query(
       `INSERT INTO benchmark_values (benchmark_code, observation_date, value, source_url, retrieved_at)
        VALUES ('${CPI}', '2026-08-01', 0.0290000000, 'https://example.test/cpi', NOW())`,
@@ -222,7 +226,7 @@ describe("bond offer, history and backfill (integration)", () => {
 
   describe("History", () => {
     const earlierEdo = async () => {
-      const october = POLISH_BOND_ADAPTER.catalog.find(
+      const october = FIXTURE_CATALOG.find(
         (e) =>
           (e.terms as { instrument: { seriesCode: string } }).instrument
             .seriesCode === "EDO1036",
@@ -321,6 +325,9 @@ describe("bond offer, history and backfill (integration)", () => {
         {
           recomputeLinkedSecuritiesOfSeries: async () => undefined,
         } as unknown as BondPriceService,
+        {
+          refreshNeverFetched: async () => undefined,
+        } as unknown as BenchmarkRefreshService,
       );
     const adapterFor = (...codes: string[]): BondAdapter => ({
       ...POLISH_BOND_ADAPTER,

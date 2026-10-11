@@ -106,8 +106,9 @@ implied.
 | INV-BOND-003 | Bond money is exact until the issue document rounds it | enforced |
 | INV-BOND-004 | Known and projected bond values never mix | enforced |
 | INV-BOND-005 | A linked security's automatic price comes only from the bond engine; the engine replaces every non-manual row and never a manual one | enforced |
-| INV-BOND-006 | Bond terms enter the catalog only from a curated manifest, an adapter's fetch of its official source, or an administrator's manual entry on the adapter's template; a person who is not an administrator supplies only a country and a series code | enforced |
+| INV-BOND-006 | Bond terms enter the catalog only from an adapter's fetch of its official source or an administrator's manual entry on the adapter's template; a person who is not an administrator supplies only a country and a series code | enforced |
 | INV-BOND-007 | A program-linked security's acquisitions with a date of their own are inferred, TRANSFER_IN and ADD_SHARES name their series, a removal the account cannot cover is refused at write time, and an import may store NULL which the lots name | enforced |
+| INV-BOND-008 | No country's bond data (series, terms version, benchmark observation) is fetched or stored without a person's action | enforced |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
 | INV-OCCURRENCE-003 | Every surface reports the effective occurrence: its current amount and currency, its direction, on the date it falls | enforced |
@@ -3475,19 +3476,19 @@ Required tests      bond-prices.integration.spec.ts (real PostgreSQL: a manual
 Status              enforced
 ```
 
-### INV-BOND-006 -- terms enter the catalog from a manifest, the official source or an administrator, never from a user's numbers
+### INV-BOND-006 -- terms enter the catalog from the official source or an administrator, never from a user's numbers
 
 ```text
-Statement           A bond terms version is stored only from one of three
-                    origins: an adapter's curated manifest, the adapter's fetch
-                    of its official source, or an administrator's manual entry
-                    built on the adapter's product template. A request from a
+Statement           A bond terms version is stored only from one of two
+                    origins: the adapter's fetch of its official source, or an
+                    administrator's manual entry built on the adapter's product
+                    template (an adapter ships no series of its own,
+                    INV-BOND-008). A request from a
                     person who is not an administrator carries only a country
                     and a series code, never a rate, a margin, a fee or a date.
                     Every stored version names its origin in source.provider
-                    (the publisher a curated manifest names, the official host
-                    the fetch read, or manual). Terms are inserted like a
-                    curated version (INV-BOND-001): a series already stored is
+                    (the official host the fetch read, or manual). Terms are
+                    inserted once and never changed (INV-BOND-001): a series already stored is
                     returned and nothing is fetched or written, and a read
                     whose content differs from the stored version 1 is refused
                     and logged, never stored over it. A refused fetch leaves no
@@ -3541,8 +3542,8 @@ Enforcement         Three mechanisms.
                        SERIES_TERMS_CONFLICT inside the transaction, which rolls
                        back. The immutability trigger of INV-BOND-001 is the
                        last backstop.
-                    Not enforced: the content of a curated manifest beyond the
-                    strict parser (it is reviewed code), and the truth of an
+                    Not enforced: the content of an adapter's product template
+                    beyond the strict parser (it is reviewed code), and the truth of an
                     administrator's manual values within the adapter's bounds
                     (the role is the control; the card says the terms were
                     entered by hand).
@@ -3577,6 +3578,32 @@ Required tests      bond-series-fetch.integration.spec.ts (real PostgreSQL, a
                     provider-call.guard.spec.ts (the fetch goes through the
                     breaker) and country-agnostic.guard.spec.ts (the service
                     names no country).
+Status              enforced
+```
+
+### INV-BOND-008 -- no country's bond data is fetched or stored without a person's action
+
+```text
+Statement           No series, terms version or benchmark observation of any
+                    country is fetched or stored unless a person asked for it:
+                    a series fetch or manual entry, the current-offer fetch, a
+                    program switched to auto-fetch (bond_auto_fetch), or a
+                    stored series that reads the benchmark. An adapter ships
+                    product templates and programs only; the boot seed stores
+                    programs and makes no network call.
+Why                 A deployment follows the bonds its people chose (Polish
+                    bonds for a person in Poland, Canadian ones for a person in
+                    Canada); default fetching would send every deployment's
+                    traffic to every country's issuer and statistics office and
+                    fill its catalog with data nobody holds.
+Mechanism           The BondAdapter type carries no series catalog; the boot
+                    seed stores programs only; the series cron and backfill
+                    read the auto-fetch programs first; the benchmark refresh
+                    reads the benchmarks of stored series first.
+Enforcement         backend/src/bonds/no-automatic-bonds.guard.spec.ts (every
+                    installed adapter: boot, crons, templates, type) and
+                    backend/test/integration/no-automatic-bonds.integration.spec.ts
+                    (real database, a fetch that throws if called).
 Status              enforced
 ```
 

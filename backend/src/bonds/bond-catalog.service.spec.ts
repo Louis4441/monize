@@ -2,6 +2,7 @@ import { Logger } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import { POLISH_BOND_ADAPTER } from "./adapters/pl";
+import { FIXTURE_CATALOG } from "./adapters/pl/pl-test-input";
 import { BondAdapter } from "./bond-adapter";
 import { BondCatalogService } from "./bond-catalog.service";
 import { bondInstrumentId, bondProgramId } from "./bond-instrument-id";
@@ -23,17 +24,6 @@ interface Db {
   /** key "<instrumentId>:<version>" -> content hash */
   versions: Map<string, string>;
 }
-
-const tosRow = (over: Row = {}): Row => ({
-  id: "id-TOS1029",
-  issuer_country_code: "PL",
-  issuer_code: "PL_MF",
-  program_code: "TOS",
-  series_code: "TOS1029",
-  currency_code: "PLN",
-  marketability: "RETAIL_REDEEMABLE",
-  ...over,
-});
 
 function setup(adapters: readonly BondAdapter[], seed: Partial<Db> = {}) {
   const db: Db = {
@@ -158,31 +148,104 @@ describe("BondCatalogService", () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
-  it("seeds series metadata, four instruments and four terms versions in one transaction", async () => {
-    const { service, db, manager } = setup([POLISH_BOND_ADAPTER]);
+  it("seeds the eight programs and nothing else: no series, no terms, no benchmark row", async () => {
+    const { service, db, statements } = setup([POLISH_BOND_ADAPTER]);
     await service.seed([POLISH_BOND_ADAPTER]);
-    expect(db.instruments.map((i) => i.series_code).sort()).toEqual([
-      "COI1030",
-      "DOR1028",
-      "EDO1036",
-      "OTS0127",
-      "ROD1038",
-      "ROR1027",
-      "ROS1032",
-      "TOS1029",
+    expect(db.programs.map((p) => p.program_code).sort()).toEqual([
+      "COI",
+      "DOR",
+      "EDO",
+      "OTS",
+      "ROD",
+      "ROR",
+      "ROS",
+      "TOS",
     ]);
-    expect(db.versions.size).toBe(8);
+    for (const program of db.programs) {
+      expect(program).toMatchObject({
+        id: bondProgramId("PL", "PL_MF", program.program_code as string),
+        issuer_country_code: "PL",
+        issuer_code: "PL_MF",
+        currency_code: "PLN",
+      });
+    }
+    expect(db.instruments).toHaveLength(0);
+    expect(db.versions.size).toBe(0);
     expect(
-      manager.query.mock.calls.filter(([s]) =>
-        String(s).includes("INSERT INTO benchmark_series"),
+      statements.filter(
+        (s) =>
+          s.includes("benchmark_series") ||
+          s.includes("bond_instruments") ||
+          s.includes("bond_terms_versions"),
       ),
-    ).toHaveLength(2);
+    ).toEqual([]);
     expect(error).not.toHaveBeenCalled();
   });
 
-  it("inserts each instrument under its deterministic id, so a link survives a restore elsewhere", async () => {
-    const { service, manager } = setup([POLISH_BOND_ADAPTER]);
+  it("is a no-op the second time: no second program, nothing logged", async () => {
+    const { service, db } = setup([POLISH_BOND_ADAPTER]);
     await service.seed([POLISH_BOND_ADAPTER]);
+    const before = JSON.stringify(db.programs);
+    await service.seed([POLISH_BOND_ADAPTER]);
+    expect(JSON.stringify(db.programs)).toBe(before);
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it("never overwrites a stored program whose currency differs, and logs it", async () => {
+    const { service, db } = setup([POLISH_BOND_ADAPTER], {
+      programs: [
+        {
+          id: bondProgramId("PL", "PL_MF", "TOS"),
+          issuer_country_code: "PL",
+          issuer_code: "PL_MF",
+          program_code: "TOS",
+          currency_code: "EUR",
+        },
+      ],
+    });
+    await service.seed([POLISH_BOND_ADAPTER]);
+    expect(db.programs.find((p) => p.program_code === "TOS")).toMatchObject({
+      currency_code: "EUR",
+    });
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(error.mock.calls[0][0]).toMatch(/TOS is stored in EUR.*PLN/);
+    expect(db.programs).toHaveLength(8);
+  });
+
+  it("stores each program in its own transaction, so one program's SQL failure does not lose the others", async () => {
+    const { service, db, manager, dataSource } = setup([POLISH_BOND_ADAPTER]);
+    const base = manager.query.getMockImplementation()!;
+    manager.query.mockImplementation(async (sql: string, params: unknown[]) => {
+      if (sql.includes("INSERT INTO bond_programs") && params[3] === "ROR") {
+        throw new Error("value too long for type character varying(40)");
+      }
+      return base(sql, params);
+    });
+    await service.seed([POLISH_BOND_ADAPTER]);
+    expect(db.programs).toHaveLength(7);
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(error.mock.calls[0][0]).toMatch(
+      /ROR could not be stored and was skipped: value too long/,
+    );
+    expect(dataSource.transaction).toHaveBeenCalledTimes(8);
+  });
+
+  it("creates the program's currency on demand on a fresh deployment", async () => {
+    const { service, db, ensureCatalogCurrency } = setup(
+      [POLISH_BOND_ADAPTER],
+      { currencies: [] },
+    );
+    await service.seed([POLISH_BOND_ADAPTER]);
+    expect(ensureCatalogCurrency).toHaveBeenCalledWith("PLN");
+    expect(db.currencies).toEqual(["PLN"]);
+    expect(db.programs).toHaveLength(8);
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it("inserts each stored series under its deterministic id, so a link survives a restore elsewhere", async () => {
+    const { service, manager, db } = setup([POLISH_BOND_ADAPTER]);
+    for (const entry of FIXTURE_CATALOG)
+      await service.storeEntry(manager as never, entry);
     const inserts = manager.query.mock.calls.filter(([s]) =>
       String(s).includes("INSERT INTO bond_instruments"),
     );
@@ -190,130 +253,26 @@ describe("BondCatalogService", () => {
     for (const [sql, params] of inserts) {
       expect(String(sql)).toMatch(/\(id, issuer_country_code/);
       expect(params[6]).toBe(bondInstrumentId(params[0], params[1], params[3]));
+      expect(params[7]).toBe(bondProgramId(params[0], params[1], params[2]));
     }
     expect(new Set(inserts.map(([, p]) => p[6])).size).toBe(8);
-  });
-
-  it("never writes covered_through when seeding a series", async () => {
-    const { service, statements } = setup([POLISH_BOND_ADAPTER]);
-    await service.seed([POLISH_BOND_ADAPTER]);
-    const upsert = statements.find((s) =>
-      s.includes("INSERT INTO benchmark_series"),
-    )!;
-    expect(upsert).not.toMatch(/covered_through/);
-    // updated_at is the series' last successful fetch: the boot warm-up reads it.
-    expect(upsert).not.toMatch(/updated_at/);
-  });
-
-  it("is a no-op the second time: same hash, nothing logged", async () => {
-    const { service, db } = setup([POLISH_BOND_ADAPTER]);
-    await service.seed([POLISH_BOND_ADAPTER]);
-    const before = new Map(db.versions);
-    await service.seed([POLISH_BOND_ADAPTER]);
-    expect(db.versions).toEqual(before);
-    expect(db.instruments).toHaveLength(8);
+    expect(db.versions.size).toBe(8);
     expect(error).not.toHaveBeenCalled();
   });
 
   it("stores the content hash of the canonical terms", async () => {
-    const { service, db } = setup([POLISH_BOND_ADAPTER]);
-    await service.seed([POLISH_BOND_ADAPTER]);
+    const { service, manager, db } = setup([POLISH_BOND_ADAPTER]);
+    for (const entry of FIXTURE_CATALOG)
+      await service.storeEntry(manager as never, entry);
     expect(db.versions.get("id-TOS1029:1")).toBe(
       contentHash(
-        POLISH_BOND_ADAPTER.catalog.find(
+        FIXTURE_CATALOG.find(
           (e) =>
             (e.terms as { instrument: { seriesCode: string } }).instrument
               .seriesCode === "TOS1029",
         )!.terms,
       ),
     );
-  });
-
-  it("logs and skips an entry whose stored version has different content", async () => {
-    const { service, db } = setup([POLISH_BOND_ADAPTER], {
-      instruments: [tosRow()],
-      versions: new Map([["id-TOS1029:1", "f".repeat(64)]]),
-    });
-    await service.seed([POLISH_BOND_ADAPTER]);
-    expect(db.versions.get("id-TOS1029:1")).toBe("f".repeat(64));
-    expect(error).toHaveBeenCalledTimes(1);
-    expect(error.mock.calls[0][0]).toMatch(
-      /version 1 of .*TOS1029.*INV-BOND-001/,
-    );
-    expect(db.versions.size).toBe(8);
-  });
-
-  it("never overwrites a stored instrument whose currency or program differs, and names the series and field", async () => {
-    const { service, db } = setup([POLISH_BOND_ADAPTER], {
-      instruments: [tosRow({ currency_code: "EUR", program_code: "OLD" })],
-    });
-    await service.seed([POLISH_BOND_ADAPTER]);
-    const messages = error.mock.calls.map((c) => String(c[0]));
-    expect(messages).toHaveLength(2);
-    expect(messages[0]).toMatch(
-      /TOS1029.*on programCode \(stored "OLD", entry "TOS"\)/,
-    );
-    expect(messages[1]).toMatch(
-      /TOS1029.*on currency \(stored "EUR", entry "PLN"\)/,
-    );
-    // The row is untouched and no terms version was stored under it.
-    expect(db.instruments.find((i) => i.series_code === "TOS1029")).toEqual(
-      tosRow({ currency_code: "EUR", program_code: "OLD" }),
-    );
-    expect(db.versions.has("id-TOS1029:1")).toBe(false);
-    expect(db.versions.size).toBe(7);
-  });
-
-  it("logs a bad manifest and carries on with the rest", async () => {
-    const broken: BondAdapter = {
-      ...POLISH_BOND_ADAPTER,
-      catalog: [
-        { termsVersion: 1, publishedAt: null, terms: { schemaVersion: 1 } },
-        ...POLISH_BOND_ADAPTER.catalog,
-      ],
-    };
-    const { service, db } = setup([broken]);
-    await service.seed([broken]);
-    expect(db.versions.size).toBe(8);
-    expect(error).toHaveBeenCalledTimes(1);
-    expect(error.mock.calls[0][0]).toMatch(/Invalid bond terms/);
-  });
-
-  it("stores each entry in its own transaction, so one entry's SQL failure does not lose the others", async () => {
-    const { service, db, manager, dataSource } = setup([POLISH_BOND_ADAPTER]);
-    const base = manager.query.getMockImplementation()!;
-    manager.query.mockImplementation(async (sql: string, params: unknown[]) => {
-      if (
-        sql.includes("INSERT INTO bond_instruments") &&
-        params[3] === "ROR1027"
-      ) {
-        throw new Error("value too long for type character varying(40)");
-      }
-      return base(sql, params);
-    });
-    await service.seed([POLISH_BOND_ADAPTER]);
-    expect(db.instruments).toHaveLength(7);
-    expect(db.versions.size).toBe(7);
-    expect(error).toHaveBeenCalledTimes(1);
-    expect(error.mock.calls[0][0]).toMatch(
-      /could not be stored and was skipped: value too long/,
-    );
-    // One for the series, one per entry.
-    expect(dataSource.transaction).toHaveBeenCalledTimes(1 + 8);
-  });
-
-  it("creates an instrument's currency on demand on a fresh deployment", async () => {
-    const { service, db, ensureCatalogCurrency } = setup(
-      [POLISH_BOND_ADAPTER],
-      {
-        currencies: [],
-      },
-    );
-    await service.seed([POLISH_BOND_ADAPTER]);
-    expect(ensureCatalogCurrency).toHaveBeenCalledWith("PLN");
-    expect(db.currencies).toEqual(["PLN"]);
-    expect(db.instruments).toHaveLength(8);
-    expect(error).not.toHaveBeenCalled();
   });
 
   it("lists the catalog ordered by country, issuer and series, in the API's shape", async () => {
@@ -430,7 +389,7 @@ describe("BondCatalogService", () => {
   });
 
   describe("storeEntry reports what it did and logs nothing", () => {
-    const entry = POLISH_BOND_ADAPTER.catalog[0];
+    const entry = FIXTURE_CATALOG[0];
 
     it("inserts a new instrument and version", async () => {
       const { service, manager, db } = setup([POLISH_BOND_ADAPTER]);
@@ -469,31 +428,10 @@ describe("BondCatalogService", () => {
       });
     });
 
-    it("stores the program under its deterministic id before its first instrument, once per program", async () => {
+    it("stores the program under its deterministic id before its instrument, once per program", async () => {
       const { service, manager, db } = setup([POLISH_BOND_ADAPTER]);
-      await service.seed([POLISH_BOND_ADAPTER]);
+      await service.storeEntry(manager as never, entry);
       const calls = manager.query.mock.calls.map(([sql]) => String(sql));
-      expect(db.programs.map((p) => p.program_code).sort()).toEqual([
-        "COI",
-        "DOR",
-        "EDO",
-        "OTS",
-        "ROD",
-        "ROR",
-        "ROS",
-        "TOS",
-      ]);
-      for (const program of db.programs) {
-        expect(program.id).toBe(
-          bondProgramId(
-            program.issuer_country_code as string,
-            program.issuer_code as string,
-            program.program_code as string,
-          ),
-        );
-        expect(program.currency_code).toBe("PLN");
-      }
-      // The program statement comes before the instrument's, in the same transaction.
       const firstProgram = calls.findIndex((c) =>
         c.includes("INSERT INTO bond_programs"),
       );
@@ -502,17 +440,16 @@ describe("BondCatalogService", () => {
       );
       expect(firstProgram).toBeGreaterThan(-1);
       expect(firstProgram).toBeLessThan(firstInstrument);
-      // Every instrument row names its program.
-      const instrumentInserts = manager.query.mock.calls.filter(([sql]) =>
-        String(sql).includes("INSERT INTO bond_instruments"),
+      expect(db.programs).toHaveLength(1);
+      expect(db.programs[0].id).toBe(
+        bondProgramId(
+          db.programs[0].issuer_country_code as string,
+          db.programs[0].issuer_code as string,
+          db.programs[0].program_code as string,
+        ),
       );
-      for (const [, params] of instrumentInserts) {
-        expect(params[7]).toBe(bondProgramId(params[0], params[1], params[2]));
-      }
-      // A second series of a stored program inserts no second program.
-      const before = db.programs.length;
-      await service.seed([POLISH_BOND_ADAPTER]);
-      expect(db.programs).toHaveLength(before);
+      await service.storeEntry(manager as never, entry);
+      expect(db.programs).toHaveLength(1);
     });
 
     it("refuses a series whose currency differs from its stored program's, writing no instrument", async () => {
@@ -540,11 +477,28 @@ describe("BondCatalogService", () => {
     });
   });
 
-  it("seeds the series alone for the refresh", async () => {
+  it("seeds the benchmark rows alone, and only the codes asked for", async () => {
     const { service, db, statements } = setup([POLISH_BOND_ADAPTER]);
     await service.seedBenchmarkSeries([POLISH_BOND_ADAPTER]);
     expect(db.instruments).toHaveLength(0);
     expect(statements).toHaveLength(2);
+    statements.length = 0;
+    await service.seedBenchmarkSeries(
+      [POLISH_BOND_ADAPTER],
+      new Set(["PL_CPI_GUS_YOY"]),
+    );
+    expect(statements).toHaveLength(1);
+  });
+
+  it("never writes covered_through or updated_at when seeding a benchmark row", async () => {
+    const { service, statements } = setup([POLISH_BOND_ADAPTER]);
+    await service.seedBenchmarkSeries([POLISH_BOND_ADAPTER]);
+    const upsert = statements.find((s) =>
+      s.includes("INSERT INTO benchmark_series"),
+    )!;
+    expect(upsert).not.toMatch(/covered_through/);
+    // updated_at is the series' last successful fetch: the boot warm-up reads it.
+    expect(upsert).not.toMatch(/updated_at/);
   });
 
   it("seeds at bootstrap under a system context, and never crashes the boot", async () => {

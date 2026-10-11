@@ -9,13 +9,14 @@ import {
 import { ProviderHealthService } from "../provider-health/provider-health.service";
 import { ProviderUnavailableError } from "../provider-health/provider-unavailable.error";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
-import { POLISH_BOND_ADAPTER } from "./adapters/pl";
+import { FIXTURE_CATALOG } from "./adapters/pl/pl-test-input";
 import {
   BondAdapter,
   CatalogEntry,
   ManualSeriesValues,
   SeriesFetchError,
 } from "./bond-adapter";
+import { BenchmarkRefreshService } from "./benchmark-refresh.service";
 import { BondCatalogService, StoreOutcome } from "./bond-catalog.service";
 import { bondInstrumentId } from "./bond-instrument-id";
 import { BondPriceService } from "./bond-price.service";
@@ -38,7 +39,7 @@ jest.mock("../common/db/locks", () => ({
 }));
 
 /** Any parsed catalog entry: the service stores whatever the adapter built. */
-const ENTRY: CatalogEntry = POLISH_BOND_ADAPTER.catalog[0];
+const ENTRY: CatalogEntry = FIXTURE_CATALOG[0];
 const INSTRUMENT_ID = bondInstrumentId("PL", "PL_MF", "OTS0127");
 const SUMMARY = {
   id: INSTRUMENT_ID,
@@ -72,7 +73,7 @@ function adapterOf(over: Partial<BondAdapter> = {}): BondAdapter {
     timezone: "Europe/Warsaw",
     registerCalendars: (r) => r,
     benchmarks: [],
-    catalog: [],
+    programs: [],
     fetchBenchmark: jest.fn(),
     seriesProviderId: "obligacjeskarbowe",
     fetchSeries: jest.fn(async () => ({ entry: ENTRY, sources: [] })),
@@ -93,6 +94,7 @@ function build() {
       async (..._args: unknown[]) => new Set<string>(),
     ),
     findSummary: jest.fn(async () => SUMMARY as typeof SUMMARY | null),
+    seedBenchmarkSeries: jest.fn(async (..._args: unknown[]) => undefined),
     storeEntry: jest.fn(async (): Promise<StoreOutcome> => ({
       kind: "inserted",
       named: "PL PL_MF OTS0127",
@@ -122,6 +124,7 @@ function build() {
   };
   manager.query.mockResolvedValue([]);
   const prices = { recomputeLinkedSecuritiesOfSeries: jest.fn() };
+  const benchmarks = { refreshNeverFetched: jest.fn() };
   const service = new BondSeriesService(
     dataSource as unknown as DataSource,
     catalog as unknown as BondCatalogService,
@@ -129,10 +132,12 @@ function build() {
     health as unknown as ProviderHealthService,
     fetchSync as unknown as FetchSyncService,
     prices as unknown as BondPriceService,
+    benchmarks as unknown as BenchmarkRefreshService,
   );
   return {
     service,
     prices,
+    benchmarks,
     catalog,
     http,
     health,
@@ -177,6 +182,66 @@ describe("BondSeriesService: recompute after a series is stored", () => {
       INSTRUMENT_ID,
     ]);
     expect(order).toEqual(["lock", "store", "recompute"]);
+  });
+
+  it("refreshes a never-fetched benchmark of the stored series after the commit, before the recompute", async () => {
+    const { service, prices, benchmarks, order } = build();
+    benchmarks.refreshNeverFetched.mockImplementation(async () => {
+      order.push("benchmarks");
+    });
+    prices.recomputeLinkedSecuritiesOfSeries.mockImplementation(async () => {
+      order.push("recompute");
+    });
+    await service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] });
+    expect(benchmarks.refreshNeverFetched).toHaveBeenCalledWith([
+      INSTRUMENT_ID,
+    ]);
+    expect(order).toEqual(["lock", "store", "benchmarks", "recompute"]);
+  });
+
+  it("dispatches no benchmark refresh for a series that was already stored or refused", async () => {
+    const { service, catalog, benchmarks } = build();
+    catalog.findStoredSeries.mockResolvedValue(SUMMARY);
+    await service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] });
+    catalog.findStoredSeries.mockResolvedValue(null);
+    catalog.storeEntry.mockResolvedValue({
+      kind: "conflict",
+      named: "PL PL_MF OTS0127",
+    } as never);
+    await expect(
+      service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] }),
+    ).rejects.toBeInstanceOf(SeriesFetchError);
+    expect(benchmarks.refreshNeverFetched).toHaveBeenLastCalledWith([]);
+    expect(benchmarks.refreshNeverFetched).toHaveBeenCalledTimes(1);
+  });
+
+  it("dispatches once for a whole pass, with every series it stored", async () => {
+    const { service, benchmarks } = build();
+    const adapter = adapterOf({
+      currentSeries: jest.fn(async () => ["EDO1036", "ROR1027", "TOS1029"]),
+    });
+    await service.fetchCurrentOffer({ adapters: [adapter] });
+    expect(benchmarks.refreshNeverFetched).toHaveBeenCalledTimes(1);
+  });
+
+  it("stores the benchmark row a stored series reads in the store's transaction, and none for a fixed rate", async () => {
+    const { service, catalog } = build();
+    const edo = FIXTURE_CATALOG.find(
+      (e) =>
+        (e.terms as { instrument: { seriesCode: string } }).instrument
+          .seriesCode === "EDO1036",
+    )!;
+    const adapter = adapterOf({
+      fetchSeries: jest.fn(async () => ({ entry: edo, sources: [] })),
+    });
+    await service.fetchSeries("PL", "edo1036", { adapters: [adapter] });
+    expect(catalog.seedBenchmarkSeries).toHaveBeenCalledWith(
+      [adapter],
+      new Set(["PL_CPI_GUS_YOY"]),
+    );
+    catalog.seedBenchmarkSeries.mockClear();
+    await service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] });
+    expect(catalog.seedBenchmarkSeries).not.toHaveBeenCalled();
   });
 
   it("recomputes nothing for a series that was already stored", async () => {

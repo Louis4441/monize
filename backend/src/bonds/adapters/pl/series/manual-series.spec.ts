@@ -1,7 +1,7 @@
 import { ManualSeriesValues, SeriesFetchError } from "../../../bond-adapter";
-import edo from "../manifests/edo1036.terms.json";
-import ots from "../manifests/ots0127.terms.json";
-import tos from "../manifests/tos1029.terms.json";
+import edo from "../fixtures/series/edo1036.terms.json";
+import ots from "../fixtures/series/ots0127.terms.json";
+import tos from "../fixtures/series/tos1029.terms.json";
 import { POLISH_BOND_ADAPTER } from "..";
 import { manualSeries } from "./manual-series";
 

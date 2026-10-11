@@ -13,7 +13,7 @@ import { BondCatalogService } from "@/bonds/bond-catalog.service";
 import { BondHoldingsService } from "@/bonds/bond-holdings.service";
 import { bondInstrumentId, bondProgramId } from "@/bonds/bond-instrument-id";
 import { BondValuationService } from "@/bonds/bond-valuation.service";
-import { withSystemContext, withUserContext } from "@/common/db/with-context";
+import { withUserContext } from "@/common/db/with-context";
 import { InvestmentAction } from "@/securities/entities/investment-transaction.entity";
 import { InvestmentTransactionsService } from "@/securities/investment-transactions.service";
 import { SecuritiesModule } from "@/securities/securities.module";
@@ -22,6 +22,7 @@ import {
   cleanTables,
   createIntegrationModule,
   createTestUserDirect,
+  storeFixtureSeries,
 } from "../helpers/integration-setup";
 
 /**
@@ -95,7 +96,7 @@ describe("a program-linked security's series on write (integration, INV-BOND-007
        VALUES ('PLN', 'Zloty', 'zl', 2, true)
        ON CONFLICT (code) DO NOTHING`,
     );
-    await withSystemContext(() => catalog.seed());
+    await storeFixtureSeries(dataSource, catalog);
 
     // The second series of the program, sold in November.
     const november = manifestDocument("edo1036");

@@ -14,13 +14,24 @@ export interface BenchmarkSeriesDefinition {
 }
 
 /**
- * One curated terms document. A correction is a new `termsVersion`, never an
+ * A program (product) an adapter's templates cover, e.g. EDO. The boot seed
+ * stores these rows only, so the security form can offer them; no series.
+ */
+export interface BondProgramDefinition {
+  readonly issuerCountryCode: string;
+  readonly issuerCode: string;
+  readonly programCode: string;
+  readonly currency: string;
+}
+
+/**
+ * One terms document of a series (fetched or entered). A correction is a new `termsVersion`, never an
  * edit of an existing entry (INV-BOND-001).
  */
 export interface CatalogEntry {
   readonly termsVersion: number;
   readonly publishedAt: string | null;
-  /** The raw manifest JSON; the catalog service parses and validates it. */
+  /** The raw terms JSON; the catalog service parses and validates it. */
   readonly terms: unknown;
 }
 
@@ -127,7 +138,7 @@ export class SeriesFetchError extends Error {
   }
 }
 
-/** Everything one country contributes: calendars, benchmarks, curated terms. */
+/** Everything one country contributes: calendars, benchmarks, programs, series sources. */
 export interface BondAdapter {
   readonly countryCode: string;
   /**
@@ -137,7 +148,8 @@ export interface BondAdapter {
   readonly timezone: string;
   registerCalendars(registry: CalendarRegistry): CalendarRegistry;
   readonly benchmarks: readonly BenchmarkSeriesDefinition[];
-  readonly catalog: readonly CatalogEntry[];
+  /** The programs the adapter's product templates cover; no series (spec bond-program-securities.md 2.6). */
+  readonly programs: readonly BondProgramDefinition[];
   fetchBenchmark(code: string, fetch: BondFetch): Promise<BenchmarkFetchResult>;
   /**
    * Reads one series' terms from the market's official source. Absent when the

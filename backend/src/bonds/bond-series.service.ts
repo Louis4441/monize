@@ -22,11 +22,16 @@ import {
   SeriesFetchError,
 } from "./bond-adapter";
 import { INSTALLED_BOND_ADAPTERS } from "./bond-adapters";
+import { BenchmarkRefreshService } from "./benchmark-refresh.service";
 import { BondCatalogService } from "./bond-catalog.service";
 import { BondPriceService } from "./bond-price.service";
 import { bondInstrumentId } from "./bond-instrument-id";
 import { BondInstrumentSummary } from "./bond-valuation.service";
-import { BondTermsError, parseBondTerms } from "./domain/bond-terms";
+import {
+  BondTermsError,
+  benchmarkFieldsOf,
+  parseBondTerms,
+} from "./domain/bond-terms";
 import { HttpFetch, SeriesHttp } from "./series-http";
 
 /** The catalog's answer to a series request: the instrument, and whether this call stored it. */
@@ -139,6 +144,7 @@ export class BondSeriesService {
     private readonly health: ProviderHealthService,
     private readonly fetchSync: FetchSyncService,
     private readonly prices: BondPriceService,
+    private readonly benchmarks: BenchmarkRefreshService,
   ) {}
 
   /**
@@ -157,16 +163,18 @@ export class BondSeriesService {
   }
 
   /**
-   * The engine prices of the securities of the program of every series this
-   * call stored are recomputed once the store has committed (INV-CACHE-001): a
-   * row recorded before its series existed resolves to a lot only now.
+   * Once the store has committed (INV-CACHE-001): a benchmark the stored series
+   * read that was never fetched is refreshed first (spec
+   * bond-program-securities.md 2.6), then the engine prices of the securities of
+   * the program of every series this call stored are recomputed, so a row
+   * recorded before its series existed resolves to a lot, with its observations.
    */
   private async afterStored(
     results: ReadonlyArray<Pick<BondSeriesResult, "id" | "created">>,
   ): Promise<void> {
-    await this.prices.recomputeLinkedSecuritiesOfSeries(
-      results.filter((r) => r.created).map((r) => r.id),
-    );
+    const ids = results.filter((r) => r.created).map((r) => r.id);
+    await this.benchmarks.refreshNeverFetched(ids);
+    await this.prices.recomputeLinkedSecuritiesOfSeries(ids);
   }
 
   /** `fetchSeries` without the recompute: a pass that stores many series recomputes once. */
@@ -198,7 +206,7 @@ export class BondSeriesService {
     } catch (error) {
       throw this.named(error, country, series);
     }
-    return this.store(entry, country, series);
+    return this.store(entry, country, series, adapter);
   }
 
   /**
@@ -222,7 +230,7 @@ export class BondSeriesService {
     } catch (error) {
       throw this.named(error, country, series);
     }
-    const result = await this.store(entry, country, series);
+    const result = await this.store(entry, country, series, adapter);
     await this.afterStored([result]);
     return result;
   }
@@ -518,10 +526,14 @@ export class BondSeriesService {
     entry: CatalogEntry,
     country: string,
     series: string,
+    adapter: BondAdapter,
   ): Promise<BondSeriesResult> {
     let instrumentId: string;
+    let benchmarkCode: string | null;
     try {
-      const { instrument } = parseBondTerms(entry.terms);
+      const terms = parseBondTerms(entry.terms);
+      const { instrument } = terms;
+      benchmarkCode = benchmarkFieldsOf(terms.rateRule)?.benchmarkId ?? null;
       instrumentId = bondInstrumentId(
         instrument.issuerCountryCode,
         instrument.issuerCode,
@@ -575,6 +587,15 @@ export class BondSeriesService {
           }
           if (outcome.kind === "inserted") {
             this.logger.log(`Stored terms version 1 of ${outcome.named}`);
+          }
+          // The series row of the benchmark it reads, in the same transaction,
+          // so a valuation names the publisher of an observation it lacks even
+          // before the first fetch lands; the fetch itself follows the commit.
+          if (benchmarkCode !== null) {
+            await this.catalog.seedBenchmarkSeries(
+              [adapter],
+              new Set([benchmarkCode]),
+            );
           }
           return { ...summary, created: outcome.kind === "inserted" };
         }
