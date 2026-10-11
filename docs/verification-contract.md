@@ -469,8 +469,10 @@ anonymous Docker Hub pull from a shared runner IP is rate-limited, and the login
 that avoids it needs `DOCKERHUB_*` secrets a fork's repository does not have, so
 the job fails before its own step runs (the schema-drift job did, with "Username
 and password required"). `backend/src/common/ci-images.guard.spec.ts` scans the
-workflows, `docker-compose.e2e.yml` and `scripts/*.sh`. A Dockerfile's `FROM` is
-outside it: the image build logs in for those.
+workflows, `docker-compose.e2e.yml`, `scripts/*.sh` and every `FROM` in a
+tracked Dockerfile (CI builds those images for the E2E, Lighthouse and ZAP jobs),
+and fails a workflow that still reads `DOCKERHUB_*` secrets: no job needs that
+login.
 
 - `TZ=UTC npm run test:unit` matches CI. Some tests read `new Date()` and count
   completed periods against fixtures; under another offset they land on the wrong
