@@ -225,7 +225,8 @@ vi.mock('@/components/layout/PageLayout', () => ({
   PageLayout: ({ children }: { children: React.ReactNode }) => <div data-testid="page-layout">{children}</div>,
 }));
 
-vi.mock('@/components/ui/Button', () => ({
+vi.mock('@/components/ui/Button', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/components/ui/Button')>()),
   Button: ({ children, onClick, disabled, ...rest }: any) => (
     <button onClick={onClick} disabled={disabled} {...rest}>{children}</button>
   ),
@@ -422,6 +423,12 @@ describe('InvestmentsPage', () => {
         expect(screen.getByText('Investments')).toBeInTheDocument();
         expect(screen.getByText('Track your investment portfolio')).toBeInTheDocument();
       });
+    });
+
+    it('links to the Treasury bonds page from the header', async () => {
+      await renderPage();
+      const link = await screen.findByRole('link', { name: 'Treasury bonds' });
+      expect(link).toHaveAttribute('href', '/investments/bonds');
     });
 
     it('renders within page layout', async () => {

@@ -70,6 +70,14 @@ describe('BondInstrumentSelect series fetch', () => {
     list.mockResolvedValue([pln, usd]);
   });
 
+  it('links to the bonds on sale in a new tab, so the form is not given up', async () => {
+    await mount();
+    const link = screen.getByRole('link', { name: 'See bonds on sale' });
+    expect(link).toHaveAttribute('href', '/investments/bonds');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
   it('offers the fetch only for a code-like search that the catalog does not hold', async () => {
     await mount();
     expect(screen.queryByRole('button', { name: /Fetch/ })).not.toBeInTheDocument();

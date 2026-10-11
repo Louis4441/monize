@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -184,6 +185,7 @@ export function BondInstrumentSelect({
   error,
 }: BondInstrumentSelectProps) {
   const t = useTranslations('securities');
+  const tBonds = useTranslations('bonds');
   const [search, setSearch] = useState('');
   const [fetching, setFetching] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -226,6 +228,15 @@ export function BondInstrumentSelect({
         onChange={(e) => onChange(e.target.value)}
         error={error}
       />
+      {/* A new tab: the form being filled in is not given up for the offer. */}
+      <Link
+        href="/investments/bonds"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-1 inline-block text-sm text-blue-600 hover:underline dark:text-blue-400"
+      >
+        {tBonds('entry.seeOnSale')}
+      </Link>
       <Input
         label={t('form.bondFetchSearchLabel')}
         placeholder={t('form.bondFetchSearchPlaceholder')}

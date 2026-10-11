@@ -42,6 +42,8 @@ import type {
   BondInstrumentSummary,
   FetchBondSeriesResult,
   BondAssumption,
+  BondHistory,
+  BondOffer,
   BondPriceRecompute,
   SecurityBondScenarios,
   SecurityBondValuation,
@@ -977,6 +979,34 @@ export const investmentsApi = {
       '/bonds/instruments/fetch',
       { countryCode, seriesCode },
     );
+    return response.data;
+  },
+
+  // The series on sale today with what 100 of face value is worth at maturity.
+  // Reference data plus the engine, identical for every user. `assume` replaces
+  // the latest observation of a benchmark for every period that has not started
+  // (`<benchmarkId>:<fraction>`), so it is part of the request, not a cache key.
+  getBondOffer: async (
+    countryCode: string,
+    assume?: BondAssumption[],
+  ): Promise<BondOffer> => {
+    const params: Record<string, string> = { countryCode };
+    if (assume && assume.length > 0) {
+      params.assume = assume.map((a) => `${a.benchmarkId}:${a.value}`).join(',');
+    }
+    const response = await apiClient.get<BondOffer>('/bonds/offer', { params });
+    return response.data;
+  },
+
+  // How the terms of a program (or of every program) changed from one sale
+  // month to the next, with the months the catalog does not hold.
+  getBondHistory: async (
+    countryCode: string,
+    programCode?: string,
+  ): Promise<BondHistory> => {
+    const params: Record<string, string> = { countryCode };
+    if (programCode) params.programCode = programCode;
+    const response = await apiClient.get<BondHistory>('/bonds/history', { params });
     return response.data;
   },
 

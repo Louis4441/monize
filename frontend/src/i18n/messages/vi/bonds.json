@@ -1,0 +1,103 @@
+{
+  "page": {
+    "title": "Trái phiếu chính phủ",
+    "subtitle": "Các trái phiếu đang bán hôm nay và điều kiện của từng sản phẩm đã thay đổi thế nào qua các tháng phát hành",
+    "tabsLabel": "Các chế độ xem trái phiếu chính phủ",
+    "tabs": {
+      "onSale": "Đang bán",
+      "history": "Lịch sử"
+    }
+  },
+  "entry": {
+    "button": "Trái phiếu chính phủ",
+    "compare": "So sánh với đợt chào bán hiện tại",
+    "history": "Lịch sử điều kiện của {program}",
+    "seeOnSale": "Xem trái phiếu đang bán"
+  },
+  "offer": {
+    "loading": "Đang tải các trái phiếu đang bán...",
+    "loadFailed": "Không thể tải các trái phiếu đang bán.",
+    "retry": "Thử lại",
+    "empty": "Hôm nay không có đợt phát hành nào đang bán.",
+    "asOf": "Đang bán vào ngày {date}. Mọi số liệu áp dụng cho một trái phiếu mua hôm nay và giữ đến đáo hạn.",
+    "comparisonNote": "Lợi suất quy năm là số liệu để so sánh các sản phẩm có kỳ hạn khác nhau, không phải cam kết về khoản bạn sẽ kiếm được.",
+    "couponsNote": "Coupon không tái đầu tư: với trái phiếu trả coupon, giá trị đáo hạn cộng tất cả coupon đã trả.",
+    "projected": "Dự phóng",
+    "projectedTitle": "Số liệu này dựa trên một giá trị tham chiếu giả định, không chỉ dựa trên lãi suất đã công bố.",
+    "assumptions": {
+      "title": "Giả định",
+      "intro": "Các kỳ chưa bắt đầu được định giá theo các giá trị tham chiếu này. Hãy đổi một giá trị để xem tác động lên từng dòng.",
+      "label": "{benchmark} (%)",
+      "latest": "Giá trị công bố gần nhất: {value} ({observation})",
+      "reset": "Dùng các giá trị công bố gần nhất",
+      "updating": "Đang cập nhật số liệu..."
+    },
+    "columns": {
+      "series": "Đợt phát hành",
+      "saleWindow": "Đang bán",
+      "length": "Kỳ hạn",
+      "firstPeriodRate": "Kỳ đầu",
+      "rule": "Lãi suất",
+      "capitalization": "Tiền lãi",
+      "redemption": "Mua lại trước hạn",
+      "maturityValue": "Giá trị đáo hạn",
+      "totalReturn": "Tổng lợi suất",
+      "annualizedReturn": "Lợi suất quy năm",
+      "terms": "Điều kiện",
+      "action": "Thao tác"
+    },
+    "saleWindowValue": "Từ {from} đến {to}",
+    "lengthValue": "{months, plural, other {# tháng}}",
+    "rule": {
+      "fixed": "Cố định {rate} mỗi năm",
+      "benchmark": "{benchmark} + {addend}",
+      "floor": "Mức sàn của chỉ số {floor}"
+    },
+    "capitalization": {
+      "NONE": "Trả mỗi kỳ",
+      "COMPOUND_AT_PERIOD_END": "Nhập gốc vào cuối mỗi kỳ"
+    },
+    "redemption": {
+      "none": "Chỉ khi đáo hạn",
+      "onDemand": "Theo yêu cầu",
+      "fee": "Phí {amount} mỗi trái phiếu",
+      "forfeit": "Tiền lãi tích lũy trong kỳ bị mất"
+    },
+    "couponsNotReinvested": "Coupon không tái đầu tư",
+    "add": "Thêm vào danh mục của tôi",
+    "addAria": "Thêm {series} vào danh mục của tôi"
+  },
+  "history": {
+    "product": "Sản phẩm",
+    "loading": "Đang tải lịch sử...",
+    "loadFailed": "Không thể tải lịch sử.",
+    "retry": "Thử lại",
+    "noProducts": "Danh mục chưa có sản phẩm trái phiếu nào.",
+    "empty": "Chưa lưu đợt phát hành nào của sản phẩm này.",
+    "coverage": "Danh mục bao gồm từ {from} đến {to}.",
+    "rateChartTitle": "Lãi suất kỳ đầu và biên lãi theo tháng phát hành",
+    "feeChartTitle": "Phí mua lại trước hạn theo tháng phát hành",
+    "rate": "Lãi suất kỳ đầu (trái phiếu lãi suất cố định: lãi suất năm)",
+    "addend": "Biên lãi hoặc chênh lệch",
+    "fee": "Phí mua lại trước hạn",
+    "gapsNote": "Tháng không có đợt phát hành đã lưu là một quãng đứt trên đường, không bao giờ là giá trị suy ra từ các tháng lân cận.",
+    "missingTitle": "Các tháng còn thiếu trong danh mục ({count})",
+    "noMissing": "Không thiếu tháng nào giữa đợt phát hành đã lưu đầu tiên và cuối cùng.",
+    "tableTitle": "Tất cả các đợt phát hành đã lưu",
+    "columns": {
+      "series": "Đợt phát hành",
+      "saleWindow": "Đang bán",
+      "rate": "Lãi suất kỳ đầu hoặc lãi suất năm",
+      "addend": "Biên lãi hoặc chênh lệch",
+      "fee": "Phí mua lại trước hạn",
+      "floor": "Mức sàn của số tiền nhận lại",
+      "version": "Phiên bản điều kiện",
+      "source": "Nguồn"
+    },
+    "floor": {
+      "ALL_PERIODS": "Mọi kỳ",
+      "FIRST_PERIOD": "Chỉ kỳ đầu"
+    },
+    "none": "Không có"
+  }
+}

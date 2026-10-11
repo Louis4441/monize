@@ -197,7 +197,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       irWebsite: security?.irWebsite || '',
       quoteProvider: security?.quoteProvider || '',
       msnInstrumentId: security?.msnInstrumentId || '',
-      bondInstrumentId: security?.bondInstrumentId || '',
+      bondInstrumentId: security?.bondInstrumentId || defaults?.bondInstrumentId || '',
       isFavourite: security?.isFavourite || false,
       priceChartEnabled: security?.priceChartEnabled ?? false,
       skipPriceUpdates: security?.skipPriceUpdates ?? false,

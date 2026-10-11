@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
@@ -74,6 +75,7 @@ export function SecurityBondCard({
   onPricesChanged,
 }: SecurityBondCardProps) {
   const t = useTranslations('securityDetail');
+  const tBonds = useTranslations('bonds');
   const { formatCurrency, formatPercentTrimmed, formatShareQuantity } =
     useNumberFormat();
   const tInv = useTranslations('investments');
@@ -291,6 +293,23 @@ export function SecurityBondCard({
               )}
             </p>
           ))}
+
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          <Link
+            href="/investments/bonds"
+            className="text-blue-600 hover:underline dark:text-blue-400"
+          >
+            {tBonds('entry.compare')}
+          </Link>
+          <Link
+            href={`/investments/bonds?tab=history&program=${encodeURIComponent(instrument.programCode)}`}
+            className="text-blue-600 hover:underline dark:text-blue-400"
+          >
+            {tBonds('entry.history', {
+              program: programLabel(t, instrument.programCode),
+            })}
+          </Link>
+        </p>
 
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-4">
           <div>

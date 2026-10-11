@@ -1,0 +1,103 @@
+{
+  "page": {
+    "title": "国债",
+    "subtitle": "今天在售的债券，以及每个产品的条款在不同发售月份之间的变化",
+    "tabsLabel": "国债视图",
+    "tabs": {
+      "onSale": "在售",
+      "history": "历史"
+    }
+  },
+  "entry": {
+    "button": "国债",
+    "compare": "与当前在售产品比较",
+    "history": "{program}条款历史",
+    "seeOnSale": "查看在售债券"
+  },
+  "offer": {
+    "loading": "正在加载在售债券...",
+    "loadFailed": "无法加载在售债券。",
+    "retry": "重试",
+    "empty": "今天没有在售的系列。",
+    "asOf": "截至 {date} 的在售情况。所有数字均指今天购买并持有至到期的一张债券。",
+    "comparisonNote": "年化收益率是用于比较不同期限产品的参考数字，并非收益承诺。",
+    "couponsNote": "息票不再投资：对于支付息票的债券，到期价值包含已支付的全部息票。",
+    "projected": "预测",
+    "projectedTitle": "该数字依据假设的基准值，而不仅是已公布的利率。",
+    "assumptions": {
+      "title": "假设",
+      "intro": "尚未开始的期间按这些基准值估值。修改其中一项，可查看它对每一行的影响。",
+      "label": "{benchmark}（%）",
+      "latest": "最近公布的值：{value}（{observation}）",
+      "reset": "使用最近公布的值",
+      "updating": "正在更新数字..."
+    },
+    "columns": {
+      "series": "系列",
+      "saleWindow": "在售",
+      "length": "期限",
+      "firstPeriodRate": "首期",
+      "rule": "利率",
+      "capitalization": "利息",
+      "redemption": "提前赎回",
+      "maturityValue": "到期价值",
+      "totalReturn": "总回报",
+      "annualizedReturn": "年化回报",
+      "terms": "条款",
+      "action": "操作"
+    },
+    "saleWindowValue": "{from}至{to}",
+    "lengthValue": "{months, plural, other {#个月}}",
+    "rule": {
+      "fixed": "固定年利率 {rate}",
+      "benchmark": "{benchmark} + {addend}",
+      "floor": "基准下限 {floor}"
+    },
+    "capitalization": {
+      "NONE": "每期支付",
+      "COMPOUND_AT_PERIOD_END": "每期期末计入本金"
+    },
+    "redemption": {
+      "none": "仅到期赎回",
+      "onDemand": "可随时申请",
+      "fee": "每张债券手续费 {amount}",
+      "forfeit": "当期已累计的利息将被扣除"
+    },
+    "couponsNotReinvested": "息票不再投资",
+    "add": "添加到我的投资组合",
+    "addAria": "将 {series} 添加到我的投资组合"
+  },
+  "history": {
+    "product": "产品",
+    "loading": "正在加载历史...",
+    "loadFailed": "无法加载历史。",
+    "retry": "重试",
+    "noProducts": "目录中还没有债券产品。",
+    "empty": "此产品尚未保存任何系列。",
+    "coverage": "目录涵盖 {from} 至 {to}。",
+    "rateChartTitle": "按发售月份的首期利率和利差",
+    "feeChartTitle": "按发售月份的提前赎回手续费",
+    "rate": "首期利率（固定利率债券：年利率）",
+    "addend": "利差或点差",
+    "fee": "提前赎回手续费",
+    "gapsNote": "没有已保存系列的月份在线上显示为断点，绝不用相邻月份推算出一个值。",
+    "missingTitle": "目录中缺失的月份（{count}）",
+    "noMissing": "在已保存的第一个和最后一个系列之间没有缺失的月份。",
+    "tableTitle": "所有已保存的系列",
+    "columns": {
+      "series": "系列",
+      "saleWindow": "在售",
+      "rate": "首期利率或年利率",
+      "addend": "利差或点差",
+      "fee": "提前赎回手续费",
+      "floor": "赎回金额下限",
+      "version": "条款版本",
+      "source": "来源"
+    },
+    "floor": {
+      "ALL_PERIODS": "每一期",
+      "FIRST_PERIOD": "仅首期"
+    },
+    "none": "无"
+  }
+}

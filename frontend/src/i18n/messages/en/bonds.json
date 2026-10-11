@@ -1,0 +1,103 @@
+{
+  "page": {
+    "title": "Treasury bonds",
+    "subtitle": "The bonds on sale today, and how the terms of each product changed from one sale month to the next",
+    "tabsLabel": "Treasury bonds views",
+    "tabs": {
+      "onSale": "On sale",
+      "history": "History"
+    }
+  },
+  "entry": {
+    "button": "Treasury bonds",
+    "compare": "Compare with the current offer",
+    "history": "History of {program} terms",
+    "seeOnSale": "See bonds on sale"
+  },
+  "offer": {
+    "loading": "Loading the bonds on sale...",
+    "loadFailed": "The bonds on sale could not be loaded.",
+    "retry": "Try again",
+    "empty": "No series is on sale today.",
+    "asOf": "On sale on {date}. Every figure is for one bond bought today and held to maturity.",
+    "comparisonNote": "The annualized return is a comparison figure for products of different lengths, not a promise of what you will earn.",
+    "couponsNote": "Coupons not reinvested: for a bond that pays coupons, the maturity value adds every coupon paid.",
+    "projected": "Projected",
+    "projectedTitle": "This figure rests on an assumed benchmark value, not on published rates only.",
+    "assumptions": {
+      "title": "Assumptions",
+      "intro": "Periods that have not started are valued at these benchmark values. Change one to see what it does to every row.",
+      "label": "{benchmark} (%)",
+      "latest": "Latest published value: {value} ({observation})",
+      "reset": "Use the latest published values",
+      "updating": "Updating the figures..."
+    },
+    "columns": {
+      "series": "Series",
+      "saleWindow": "On sale",
+      "length": "Length",
+      "firstPeriodRate": "First period",
+      "rule": "Rate",
+      "capitalization": "Interest",
+      "redemption": "Early redemption",
+      "maturityValue": "Maturity value",
+      "totalReturn": "Total return",
+      "annualizedReturn": "Annualized return",
+      "terms": "Terms",
+      "action": "Action"
+    },
+    "saleWindowValue": "{from} to {to}",
+    "lengthValue": "{months, plural, one {# month} other {# months}}",
+    "rule": {
+      "fixed": "Fixed {rate} a year",
+      "benchmark": "{benchmark} + {addend}",
+      "floor": "Benchmark floor {floor}"
+    },
+    "capitalization": {
+      "NONE": "Paid out each period",
+      "COMPOUND_AT_PERIOD_END": "Compounded at each period end"
+    },
+    "redemption": {
+      "none": "At maturity only",
+      "onDemand": "On demand",
+      "fee": "Fee {amount} per bond",
+      "forfeit": "Interest accrued in the period is forfeited"
+    },
+    "couponsNotReinvested": "Coupons not reinvested",
+    "add": "Add to my portfolio",
+    "addAria": "Add {series} to my portfolio"
+  },
+  "history": {
+    "product": "Product",
+    "loading": "Loading the history...",
+    "loadFailed": "The history could not be loaded.",
+    "retry": "Try again",
+    "noProducts": "The catalog holds no bond product yet.",
+    "empty": "No series of this product is stored yet.",
+    "coverage": "The catalog covers {from} to {to}.",
+    "rateChartTitle": "First-period rate and margin by sale month",
+    "feeChartTitle": "Early redemption fee by sale month",
+    "rate": "First-period rate (fixed bonds: annual rate)",
+    "addend": "Margin or spread",
+    "fee": "Early redemption fee",
+    "gapsNote": "A month with no stored series is a gap in the line, never a value drawn from its neighbours.",
+    "missingTitle": "Months missing from the catalog ({count})",
+    "noMissing": "No month is missing between the first and the last stored series.",
+    "tableTitle": "Every stored series",
+    "columns": {
+      "series": "Series",
+      "saleWindow": "On sale",
+      "rate": "First-period or annual rate",
+      "addend": "Margin or spread",
+      "fee": "Early redemption fee",
+      "floor": "Proceeds floor",
+      "version": "Terms version",
+      "source": "Source"
+    },
+    "floor": {
+      "ALL_PERIODS": "Every period",
+      "FIRST_PERIOD": "First period only"
+    },
+    "none": "None"
+  }
+}

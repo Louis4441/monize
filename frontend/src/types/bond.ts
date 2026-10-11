@@ -309,3 +309,78 @@ export interface BondAssumption {
   /** A fraction string. */
   value: string;
 }
+
+/** The valuation of one bond bought today and held to maturity (spec `bond-offer-and-history.md` 2). */
+export interface BondOfferProjection {
+  /** Per bond, plus every coupon of a coupon bond (cash received, not reinvested); null when it cannot be valued. */
+  maturityValue: string | null;
+  /** A fraction: (cash received - face value) / face value; null when unknown. */
+  totalReturn: string | null;
+  /** The yearly rate as a fraction, a comparison figure; null when unknown. */
+  annualizedReturn: string | null;
+  /** True when any period's rate is assumed. */
+  projected: boolean;
+  assumptions: BondProjectionAssumption[];
+  projectionMissing: BondProjectionMissing[];
+}
+
+/** One series that can be bought today (`GET /bonds/offer`). */
+export interface OfferSeries {
+  instrumentId: string;
+  issuerCountryCode: string;
+  issuerCode: string;
+  programCode: string;
+  seriesCode: string;
+  currency: string;
+  saleWindow: { from: string; to: string };
+  periodMonths: number;
+  periodCount: number;
+  rateRule: BondRateRule;
+  capitalization: 'NONE' | 'COMPOUND_AT_PERIOD_END';
+  redemption: BondRedemptionTerms | null;
+  termsSource: BondTermsSource;
+  projection: BondOfferProjection;
+}
+
+export interface BondOffer {
+  countryCode: string;
+  /** The financial today the offer was read for, YYYY-MM-DD. */
+  today: string;
+  series: OfferSeries[];
+}
+
+/** One stored series of a program (`GET /bonds/history`). Rates and the fee are decimal strings. */
+export interface HistorySeries {
+  seriesCode: string;
+  /** Null when the stored terms carry no sale window. */
+  saleWindow: { from: string; to: string } | null;
+  /** A fixed-rate series sets `annualRate` and leaves this and `addend` null. */
+  firstPeriodRate: string | null;
+  annualRate: string | null;
+  addend: string | null;
+  fee: string | null;
+  proceedsFloor: 'ALL_PERIODS' | 'FIRST_PERIOD' | null;
+  termsVersion: number;
+  termsSource: BondTermsSource;
+}
+
+export interface BondHistoryCoverage {
+  /** YYYY-MM */
+  from: string | null;
+  to: string | null;
+  /** YYYY-MM each */
+  missingMonths: string[];
+}
+
+export interface BondHistoryProgram {
+  programCode: string;
+  /** Ordered by the start of the sale window. */
+  series: HistorySeries[];
+  coverage: BondHistoryCoverage;
+}
+
+export interface BondHistory {
+  countryCode: string;
+  /** Ordered by program code; one entry when `programCode` was asked for. */
+  programs: BondHistoryProgram[];
+}

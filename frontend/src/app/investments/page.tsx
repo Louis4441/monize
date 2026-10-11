@@ -3,9 +3,11 @@
 import { useEffect, useCallback, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Modal } from '@/components/ui/Modal';
+import { buttonClassName } from '@/components/ui/Button';
 import { UnsavedChangesDialog } from '@/components/ui/UnsavedChangesDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { MultiSelect } from '@/components/ui/MultiSelect';
@@ -65,6 +67,7 @@ export default function InvestmentsPage() {
 
 function InvestmentsContent() {
   const t = useTranslations('investments');
+  const tBonds = useTranslations('bonds');
   const tc = useTranslations('common');
   // The cash register below is the shared transactions list, so its pager
   // counts "transactions" out of that list's own catalog rather than a second
@@ -236,6 +239,12 @@ function InvestmentsContent() {
                     lastPriceUpdate={data.lastPriceUpdate}
                   />
                 </div>
+                <Link
+                  href="/investments/bonds"
+                  className={buttonClassName('outline', 'md', 'w-full whitespace-nowrap sm:w-auto')}
+                >
+                  {tBonds('entry.button')}
+                </Link>
                 <NewTransactionButton
                   onNewInvestment={handleNewInvestmentTransaction}
                   onNewCash={handleNewCashTransaction}

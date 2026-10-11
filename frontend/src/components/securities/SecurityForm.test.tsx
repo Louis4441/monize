@@ -1169,6 +1169,32 @@ describe('SecurityForm', () => {
       expect(await screen.findByLabelText('Bond series (optional)')).toBeInTheDocument();
     });
 
+    it('opens a new security on the series a caller preselected, and submits its link', async () => {
+      await act(async () => {
+        render(
+          <SecurityForm
+            defaults={{
+              symbol: 'TOS1029',
+              name: 'TOS1029',
+              securityType: 'BOND',
+              currencyCode: 'PLN',
+              bondInstrumentId: 'b-pln',
+            }}
+            onSubmit={onSubmit}
+            onCancel={onCancel}
+          />,
+        );
+      });
+      const select = (await screen.findByLabelText('Bond series (optional)')) as HTMLSelectElement;
+      await waitFor(() => expect(select.value).toBe('b-pln'));
+      fireEvent.click(screen.getByText('Create Security'));
+      await waitFor(() =>
+        expect(onSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({ securityType: 'BOND', currencyCode: 'PLN', bondInstrumentId: 'b-pln' }),
+        ),
+      );
+    });
+
     it('offers only instruments in the form currency, plus Not linked', async () => {
       await renderBond();
       const select = await screen.findByLabelText('Bond series (optional)');
