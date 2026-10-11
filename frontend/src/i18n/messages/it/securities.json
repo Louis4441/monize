@@ -199,7 +199,7 @@
       "deleteFailed": "Impossibile eliminare la classe di attivo «{name}»"
     },
     "bondFetchAction": "Recupera {code} dalla fonte ufficiale",
-    "bondFetching": "Recupero di {code} in corso...",
+    "bondFetching": "Recupero di {code} dall'emittente e dei relativi tassi di riferimento. Può richiedere fino a un minuto.",
     "bondFetchFailed": "Impossibile recuperare la serie.",
     "bondCurrencyLocked": "Questo titolo è collegato a un programma obbligazionario in {linkedCurrency}. Reimposta la valuta su {linkedCurrency} oppure scollega prima il programma (scollegare rimuove i suoi prezzi calcolati).",
     "bondProgramLabel": "Programma obbligazionario (facoltativo)",

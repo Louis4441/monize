@@ -199,7 +199,7 @@
       "deleteFailed": "[XX-Could not delete asset class \"{name}\"-XX]"
     },
     "bondFetchAction": "[XX-Fetch {code} from the official source-XX]",
-    "bondFetching": "[XX-Fetching {code}...-XX]",
+    "bondFetching": "[XX-Fetching {code} from the issuer and its reference rates. This can take up to a minute.-XX]",
     "bondFetchFailed": "[XX-The series could not be fetched.-XX]",
     "bondCurrencyLocked": "[XX-This security is linked to a bond program in {linkedCurrency}. Set the currency back to {linkedCurrency}, or unlink the program first (unlinking removes its calculated prices).-XX]",
     "bondProgramLabel": "[XX-Bond program (optional)-XX]",

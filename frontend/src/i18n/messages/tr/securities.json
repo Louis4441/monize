@@ -199,7 +199,7 @@
       "deleteFailed": "\"{name}\" varlık sınıfı silinemedi"
     },
     "bondFetchAction": "{code} serisini resmi kaynaktan getir",
-    "bondFetching": "{code} getiriliyor...",
+    "bondFetching": "{code} ihraççıdan ve referans oranlarıyla birlikte getiriliyor. Bu işlem bir dakikaya kadar sürebilir.",
     "bondFetchFailed": "Seri getirilemedi.",
     "bondCurrencyLocked": "Bu menkul kıymet {linkedCurrency} cinsinden bir tahvil programına bağlı. Para birimini tekrar {linkedCurrency} yapın veya önce program bağlantısını kaldırın (bağlantıyı kaldırmak hesaplanan fiyatları siler).",
     "bondProgramLabel": "Tahvil programı (isteğe bağlı)",

@@ -199,7 +199,7 @@
       "deleteFailed": "Không thể xóa loại tài sản \"{name}\""
     },
     "bondFetchAction": "Lấy {code} từ nguồn chính thức",
-    "bondFetching": "Đang lấy {code}...",
+    "bondFetching": "Đang lấy {code} từ tổ chức phát hành cùng các lãi suất tham chiếu. Việc này có thể mất tới một phút.",
     "bondFetchFailed": "Không thể lấy chuỗi này.",
     "bondCurrencyLocked": "Chứng khoán này được liên kết với một chương trình trái phiếu bằng {linkedCurrency}. Hãy đặt lại tiền tệ là {linkedCurrency} hoặc hủy liên kết chương trình trước (hủy liên kết sẽ xóa giá đã tính).",
     "bondProgramLabel": "Chương trình trái phiếu (tùy chọn)",

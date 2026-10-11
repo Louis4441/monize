@@ -199,7 +199,7 @@
       "deleteFailed": "Não foi possível excluir a classe de ativos \"{name}\""
     },
     "bondFetchAction": "Obter {code} da fonte oficial",
-    "bondFetching": "Obtendo {code}...",
+    "bondFetching": "Obtendo {code} do emissor e suas taxas de referência. Isso pode levar até um minuto.",
     "bondFetchFailed": "Não foi possível obter a série.",
     "bondCurrencyLocked": "Este ativo está vinculado a um programa de títulos em {linkedCurrency}. Volte a moeda para {linkedCurrency} ou desvincule antes o programa (desvincular remove seus preços calculados).",
     "bondProgramLabel": "Programa de títulos (opcional)",

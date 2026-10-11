@@ -219,6 +219,33 @@ describe('InvestmentTransactionForm: the series of a bond program', () => {
       expect(sent().bondInstrumentId).toBe('i-1136');
     });
 
+    it('shows a spinner with the status while the series is fetched, and removes it after', async () => {
+      let resolveFetch: (v: any) => void = () => {};
+      api.fetchBondSeries.mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+      await openForm({ defaultDate: '2026-11-05' });
+      await pickSecurity('sec-edo');
+      const select = await seriesSelect();
+      const fetchLabel = 'Fetch EDO1136 from the official source';
+      await waitFor(() => expect(optionLabels(select)).toContain(fetchLabel));
+      await act(async () => {
+        fireEvent.change(select, { target: { value: within(select).getByText(fetchLabel).getAttribute('value') } });
+      });
+      const status = await screen.findByText(/Fetching EDO1136 from the issuer and its reference rates/);
+      const wrapper = status.closest('[role="status"]') as HTMLElement;
+      expect(wrapper).toHaveAttribute('aria-busy', 'true');
+      expect(wrapper.querySelector('.animate-spin')).not.toBeNull();
+      expect(select).toBeDisabled();
+      api.listBondInstruments.mockResolvedValue([...instruments, inst('i-1136', 'EDO1136')]);
+      api.getBondSeriesOnSale.mockResolvedValue({ instrumentId: 'i-1136', seriesCode: 'EDO1136' });
+      await act(async () => {
+        resolveFetch({ ...inst('i-1136', 'EDO1136'), created: true });
+      });
+      await waitFor(() =>
+        expect(screen.queryByText(/Fetching EDO1136 from the issuer/)).not.toBeInTheDocument(),
+      );
+      expect(select).not.toBeDisabled();
+    });
+
     it('says why a fetch failed, inline, and keeps the choice open', async () => {
       api.fetchBondSeries.mockRejectedValue({ response: { data: { message: 'Series EDO1136 is not published yet' } } });
       await openForm({ defaultDate: '2026-11-05' });

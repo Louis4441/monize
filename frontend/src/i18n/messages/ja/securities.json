@@ -199,7 +199,7 @@
       "deleteFailed": "資産クラス「{name}」を削除できませんでした"
     },
     "bondFetchAction": "公式ソースから {code} を取得",
-    "bondFetching": "{code} を取得しています...",
+    "bondFetching": "{code} を発行体から参照レートとともに取得しています。最大 1 分かかることがあります。",
     "bondFetchFailed": "シリーズを取得できませんでした。",
     "bondCurrencyLocked": "この銘柄は{linkedCurrency}の債券プログラムにリンクされています。通貨を{linkedCurrency}に戻すか、先にプログラムのリンクを解除してください(解除すると計算済みの価格が削除されます)。",
     "bondProgramLabel": "債券プログラム（任意）",

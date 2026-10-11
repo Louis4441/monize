@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Select } from '@/components/ui/Select';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { baseInvestmentAction } from '@/lib/investment-actions';
@@ -410,9 +411,13 @@ export function BondSeriesSelect({ series, value, onChange, error }: BondSeriesS
         error={error}
       />
       {fetching && series.fetchCode !== null && (
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400" role="status">
-          {tSec('form.bondFetching', { code: series.fetchCode })}
-        </p>
+        <div className="mt-1 text-sm" role="status" aria-busy="true">
+          <LoadingSpinner
+            size="sm"
+            fullContainer={false}
+            text={tSec('form.bondFetching', { code: series.fetchCode })}
+          />
+        </div>
       )}
       {fetchError !== null && (
         <p role="alert" className="mt-1 text-sm text-red-600 dark:text-red-400">

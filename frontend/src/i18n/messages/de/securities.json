@@ -199,7 +199,7 @@
       "deleteFailed": "Anlageklasse „{name}“ konnte nicht gelöscht werden"
     },
     "bondFetchAction": "{code} aus der offiziellen Quelle abrufen",
-    "bondFetching": "{code} wird abgerufen...",
+    "bondFetching": "{code} wird beim Emittenten samt Referenzzinsen abgerufen. Das kann bis zu einer Minute dauern.",
     "bondFetchFailed": "Die Serie konnte nicht abgerufen werden.",
     "bondCurrencyLocked": "Dieses Wertpapier ist mit einem Anleiheprogramm in {linkedCurrency} verknüpft. Setzen Sie die Währung wieder auf {linkedCurrency} oder lösen Sie zuerst die Verknüpfung des Programms (dabei werden die berechneten Kurse entfernt).",
     "bondProgramLabel": "Anleiheprogramm (optional)",

@@ -199,7 +199,7 @@
       "deleteFailed": "無法刪除資產類別「{name}」"
     },
     "bondFetchAction": "從官方來源取得 {code}",
-    "bondFetching": "正在取得 {code}...",
+    "bondFetching": "正在從發行機構取得 {code} 及其參考利率。這最多可能需要一分鐘。",
     "bondFetchFailed": "無法取得該系列。",
     "bondCurrencyLocked": "此證券已連結至 {linkedCurrency} 的債券專案。請將幣別改回 {linkedCurrency},或先取消連結該專案(取消連結會刪除其計算價格)。",
     "bondProgramLabel": "債券專案（選填）",

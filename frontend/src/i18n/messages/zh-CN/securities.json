@@ -199,7 +199,7 @@
       "deleteFailed": "无法删除资产类别“{name}”"
     },
     "bondFetchAction": "从官方来源获取 {code}",
-    "bondFetching": "正在获取 {code}...",
+    "bondFetching": "正在从发行方获取 {code} 及其参考利率。这最多可能需要一分钟。",
     "bondFetchFailed": "无法获取该系列。",
     "bondCurrencyLocked": "此证券已关联到 {linkedCurrency} 的债券项目。请将币种改回 {linkedCurrency},或先取消关联该项目(取消关联会删除其计算价格)。",
     "bondProgramLabel": "债券项目（可选）",

@@ -199,7 +199,7 @@
       "deleteFailed": "Nie udało się usunąć klasy aktywów „{name}”"
     },
     "bondFetchAction": "Pobierz {code} z oficjalnego źródła",
-    "bondFetching": "Pobieranie {code}...",
+    "bondFetching": "Pobieranie {code} od emitenta wraz z kursami referencyjnymi. To może potrwać do minuty.",
     "bondFetchFailed": "Nie udało się pobrać serii.",
     "bondCurrencyLocked": "Ten papier wartościowy jest powiązany z programem obligacji w walucie {linkedCurrency}. Przywróć walutę {linkedCurrency} albo najpierw odepnij program (odpięcie usuwa wyliczone ceny).",
     "bondProgramLabel": "Program obligacji (opcjonalnie)",
