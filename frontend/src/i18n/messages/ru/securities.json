@@ -205,6 +205,11 @@
     "bondInstrumentLoading": "Загрузка каталога облигаций...",
     "bondInstrumentLoadFailed": "Не удалось загрузить каталог облигаций, поэтому серию пока нельзя привязать.",
     "bondInstrumentRetry": "Повторить",
+    "bondFetchSearchLabel": "Найти серию по коду",
+    "bondFetchSearchPlaceholder": "напр., EDO1136",
+    "bondFetchAction": "Получить {code} из официального источника",
+    "bondFetching": "Получение {code}...",
+    "bondFetchFailed": "Не удалось получить серию.",
     "bondCurrencyLocked": "Эта бумага связана с серией облигаций в валюте {linkedCurrency}. Верните валюту {linkedCurrency} или сначала отвяжите серию (при отвязке расчётные цены удаляются).",
     "bondNoSeriesInCurrency": "Серий облигаций в валюте {currency} нет. Каталог предлагает серии в валютах: {currencies}; выберите одну из них, чтобы привязать серию."
   },

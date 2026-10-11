@@ -205,6 +205,11 @@
     "bondInstrumentLoading": "Tahvil kataloğu yükleniyor...",
     "bondInstrumentLoadFailed": "Tahvil kataloğu yüklenemedi, bu yüzden henüz bir seri bağlanamıyor.",
     "bondInstrumentRetry": "Yeniden dene",
+    "bondFetchSearchLabel": "Seriyi koduyla bul",
+    "bondFetchSearchPlaceholder": "örn. EDO1136",
+    "bondFetchAction": "{code} serisini resmi kaynaktan getir",
+    "bondFetching": "{code} getiriliyor...",
+    "bondFetchFailed": "Seri getirilemedi.",
     "bondCurrencyLocked": "Bu menkul kıymet {linkedCurrency} cinsinden bir tahvil serisine bağlı. Para birimini tekrar {linkedCurrency} yapın veya önce seri bağlantısını kaldırın (bağlantıyı kaldırmak hesaplanan fiyatları siler).",
     "bondNoSeriesInCurrency": "{currency} cinsinden tahvil serisi yok. Katalog şu para birimlerinde seri sunuyor: {currencies}; bir seri bağlamak için bunlardan birini seçin."
   },

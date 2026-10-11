@@ -205,6 +205,11 @@
     "bondInstrumentLoading": "Đang tải danh mục trái phiếu...",
     "bondInstrumentLoadFailed": "Không thể tải danh mục trái phiếu nên chưa thể liên kết một series.",
     "bondInstrumentRetry": "Thử lại",
+    "bondFetchSearchLabel": "Tìm chuỗi theo mã",
+    "bondFetchSearchPlaceholder": "ví dụ: EDO1136",
+    "bondFetchAction": "Lấy {code} từ nguồn chính thức",
+    "bondFetching": "Đang lấy {code}...",
+    "bondFetchFailed": "Không thể lấy chuỗi này.",
     "bondCurrencyLocked": "Chứng khoán này được liên kết với một chuỗi trái phiếu bằng {linkedCurrency}. Hãy đặt lại tiền tệ là {linkedCurrency} hoặc hủy liên kết chuỗi trước (hủy liên kết sẽ xóa giá đã tính).",
     "bondNoSeriesInCurrency": "Không có chuỗi trái phiếu nào bằng {currency}. Danh mục cung cấp chuỗi bằng {currencies}; hãy chọn một trong các loại tiền đó để liên kết chuỗi."
   },

@@ -205,6 +205,11 @@
     "bondInstrumentLoading": "債券カタログを読み込み中...",
     "bondInstrumentLoadFailed": "債券カタログを読み込めなかったため、シリーズをまだ紐付けできません。",
     "bondInstrumentRetry": "再試行",
+    "bondFetchSearchLabel": "コードでシリーズを検索",
+    "bondFetchSearchPlaceholder": "例: EDO1136",
+    "bondFetchAction": "公式ソースから {code} を取得",
+    "bondFetching": "{code} を取得しています...",
+    "bondFetchFailed": "シリーズを取得できませんでした。",
     "bondCurrencyLocked": "この銘柄は{linkedCurrency}の債券シリーズにリンクされています。通貨を{linkedCurrency}に戻すか、先にシリーズのリンクを解除してください(解除すると計算済みの価格が削除されます)。",
     "bondNoSeriesInCurrency": "{currency}の債券シリーズはありません。カタログには{currencies}のシリーズがあります。シリーズをリンクするには、いずれかの通貨に設定してください。"
   },

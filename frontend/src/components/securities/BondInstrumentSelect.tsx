@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { getErrorMessage } from '@/lib/errors';
 import { investmentsApi } from '@/lib/investments';
 import type { BondInstrumentSummary } from '@/types/bond';
 import { programLabel } from './detail/bond-labels';
@@ -27,6 +29,16 @@ export interface BondInstrumentPicker {
   noSeriesInCurrency: boolean;
   /** The currencies the catalog does offer, sorted. */
   catalogCurrencies: string[];
+  /**
+   * The one catalog country issuing in the form's currency, the country a
+   * series fetch is addressed to; null when the catalog is not loaded or the
+   * currency maps to none or several countries.
+   */
+  fetchCountryCode: string | null;
+  /** True when the loaded catalog holds this series code (any currency). */
+  hasSeries: (seriesCode: string) => boolean;
+  /** Adds a just-fetched instrument to the list and re-reads the catalog. */
+  addInstrument: (instrument: BondInstrumentSummary) => void;
 }
 
 /**
@@ -113,9 +125,31 @@ export function useBondInstrumentPicker(
     ...new Set((instruments ?? []).map((b) => b.currencyCode)),
   ].sort();
 
+  const countriesInCurrency = [
+    ...new Set(
+      (instruments ?? [])
+        .filter((b) => b.currencyCode === currency)
+        .map((b) => b.issuerCountryCode),
+    ),
+  ];
+
   return {
     options,
     effectiveBondId,
+    fetchCountryCode: countriesInCurrency.length === 1 ? countriesInCurrency[0] : null,
+    hasSeries: (seriesCode) =>
+      (instruments ?? []).some(
+        (b) => b.seriesCode.toUpperCase() === seriesCode.toUpperCase(),
+      ),
+    addInstrument: (instrument) => {
+      // Shown at once, then the catalog is re-read so it is the server's list.
+      setInstruments((list) =>
+        list === null || list.some((b) => b.id === instrument.id)
+          ? list
+          : [...list, instrument],
+      );
+      setAttempt((n) => n + 1);
+    },
     mismatchedLinkCurrency: keptMismatch ? keptMismatch.currencyCode : null,
     noSeriesInCurrency:
       instruments !== null &&
@@ -130,6 +164,9 @@ export function useBondInstrumentPicker(
     },
   };
 }
+
+/** A bond series code: three letters (the product) and four digits (month and year), e.g. EDO1136. */
+const SERIES_CODE = /^[A-Za-z]{3}\d{4}$/;
 
 interface BondInstrumentSelectProps {
   picker: BondInstrumentPicker;
@@ -147,6 +184,39 @@ export function BondInstrumentSelect({
   error,
 }: BondInstrumentSelectProps) {
   const t = useTranslations('securities');
+  const [search, setSearch] = useState('');
+  const [fetching, setFetching] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  // Set synchronously, so two clicks in one tick cannot both send.
+  const inFlight = useRef(false);
+
+  const code = search.trim().toUpperCase();
+  const canFetch =
+    SERIES_CODE.test(code) &&
+    picker.fetchCountryCode !== null &&
+    !picker.hasSeries(code);
+
+  const handleFetch = async () => {
+    if (inFlight.current || picker.fetchCountryCode === null) return;
+    inFlight.current = true;
+    setFetching(true);
+    setFetchError(null);
+    try {
+      const result = await investmentsApi.fetchBondSeries(
+        picker.fetchCountryCode,
+        code,
+      );
+      picker.addInstrument(result);
+      onChange(result.id);
+      setSearch('');
+    } catch (err) {
+      setFetchError(getErrorMessage(err, t('form.bondFetchFailed')));
+    } finally {
+      inFlight.current = false;
+      setFetching(false);
+    }
+  };
+
   return (
     <div>
       <Select
@@ -156,6 +226,37 @@ export function BondInstrumentSelect({
         onChange={(e) => onChange(e.target.value)}
         error={error}
       />
+      <Input
+        label={t('form.bondFetchSearchLabel')}
+        placeholder={t('form.bondFetchSearchPlaceholder')}
+        value={search}
+        maxLength={7}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          setFetchError(null);
+        }}
+      />
+      {(canFetch || fetching) && (
+        <div className="mt-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleFetch}
+            disabled={fetching}
+            isLoading={fetching}
+          >
+            {fetching
+              ? t('form.bondFetching', { code })
+              : t('form.bondFetchAction', { code })}
+          </Button>
+        </div>
+      )}
+      {fetchError !== null && (
+        <p role="alert" className="mt-1 text-sm text-red-600 dark:text-red-400">
+          {fetchError}
+        </p>
+      )}
       {picker.isLoading && (
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400" role="status">
           {t('form.bondInstrumentLoading')}

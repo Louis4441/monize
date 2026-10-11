@@ -246,6 +246,8 @@
     "unknown": "未知",
     "asOf": "估值日期",
     "instrument": "系列 {series}（{issuer}，{program}，{country}）",
+    "termsSource": "条款：{document}",
+    "termsManual": "由管理员手动录入的条款",
     "noLots": "该日期没有未平仓批次。",
     "totals": {
       "quantity": "持有债券数量",

@@ -205,6 +205,11 @@
     "bondInstrumentLoading": "正在載入債券目錄...",
     "bondInstrumentLoadFailed": "無法載入債券目錄，因此暫時無法連結系列。",
     "bondInstrumentRetry": "重試",
+    "bondFetchSearchLabel": "依代碼尋找系列",
+    "bondFetchSearchPlaceholder": "例如 EDO1136",
+    "bondFetchAction": "從官方來源取得 {code}",
+    "bondFetching": "正在取得 {code}...",
+    "bondFetchFailed": "無法取得該系列。",
     "bondCurrencyLocked": "此證券已連結至 {linkedCurrency} 的債券系列。請將幣別改回 {linkedCurrency},或先取消連結該系列(取消連結會刪除其計算價格)。",
     "bondNoSeriesInCurrency": "沒有 {currency} 的債券系列。目錄提供 {currencies} 的系列;請將幣別設為其中之一以連結系列。"
   },

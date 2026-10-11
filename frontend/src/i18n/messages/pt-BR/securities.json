@@ -205,6 +205,11 @@
     "bondInstrumentLoading": "Carregando o catálogo de títulos...",
     "bondInstrumentLoadFailed": "Não foi possível carregar o catálogo de títulos, então ainda não é possível vincular uma série.",
     "bondInstrumentRetry": "Tentar novamente",
+    "bondFetchSearchLabel": "Buscar uma série pelo código",
+    "bondFetchSearchPlaceholder": "p. ex. EDO1136",
+    "bondFetchAction": "Obter {code} da fonte oficial",
+    "bondFetching": "Obtendo {code}...",
+    "bondFetchFailed": "Não foi possível obter a série.",
     "bondCurrencyLocked": "Este ativo está vinculado a uma série de títulos em {linkedCurrency}. Volte a moeda para {linkedCurrency} ou desvincule antes a série (desvincular remove seus preços calculados).",
     "bondNoSeriesInCurrency": "Não existem séries de títulos em {currency}. O catálogo oferece séries em {currencies}; defina uma dessas moedas para vincular uma série."
   },

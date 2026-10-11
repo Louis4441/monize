@@ -269,6 +269,28 @@ export function SecurityBondCard({
             country: instrument.issuerCountryCode,
           })}
         </p>
+        {valuation.termsSource &&
+          (valuation.termsSource.provider === 'manual' ? (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t('bond.termsManual')}
+            </p>
+          ) : (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {/* Only an http(s) address is made a link. */}
+              {/^https?:\/\//i.test(valuation.termsSource.url) ? (
+                <a
+                  href={valuation.termsSource.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  {t('bond.termsSource', { document: valuation.termsSource.document })}
+                </a>
+              ) : (
+                t('bond.termsSource', { document: valuation.termsSource.document })
+              )}
+            </p>
+          ))}
 
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-4">
           <div>

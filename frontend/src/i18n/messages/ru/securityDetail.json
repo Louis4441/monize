@@ -246,6 +246,8 @@
     "unknown": "Неизвестно",
     "asOf": "Оценка на дату",
     "instrument": "Серия {series} ({issuer}, {program}, {country})",
+    "termsSource": "Условия: {document}",
+    "termsManual": "Условия введены вручную администратором",
     "noLots": "На эту дату нет открытых лотов.",
     "totals": {
       "quantity": "Облигаций в наличии",

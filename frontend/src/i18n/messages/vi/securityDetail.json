@@ -246,6 +246,8 @@
     "unknown": "Không rõ",
     "asOf": "Định giá vào ngày",
     "instrument": "Mã {series} ({issuer}, {program}, {country})",
+    "termsSource": "Điều khoản: {document}",
+    "termsManual": "Điều khoản do quản trị viên nhập thủ công",
     "noLots": "Không có lô nào đang mở vào ngày này.",
     "totals": {
       "quantity": "Trái phiếu đang nắm giữ",

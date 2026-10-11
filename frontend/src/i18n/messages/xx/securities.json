@@ -205,6 +205,11 @@
     "bondInstrumentLoading": "[XX-Loading the bond catalog...-XX]",
     "bondInstrumentLoadFailed": "[XX-The bond catalog could not be loaded, so a series cannot be linked yet.-XX]",
     "bondInstrumentRetry": "[XX-Retry-XX]",
+    "bondFetchSearchLabel": "[XX-Find a series by code-XX]",
+    "bondFetchSearchPlaceholder": "[XX-e.g. EDO1136-XX]",
+    "bondFetchAction": "[XX-Fetch {code} from the official source-XX]",
+    "bondFetching": "[XX-Fetching {code}...-XX]",
+    "bondFetchFailed": "[XX-The series could not be fetched.-XX]",
     "bondCurrencyLocked": "[XX-This security is linked to a bond series in {linkedCurrency}. Set the currency back to {linkedCurrency}, or unlink the series first (unlinking removes its calculated prices).-XX]",
     "bondNoSeriesInCurrency": "[XX-No bond series exist in {currency}. The catalog offers series in {currencies}; set the currency to one of them to link a series.-XX]"
   },

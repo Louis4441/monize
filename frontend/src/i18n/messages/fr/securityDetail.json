@@ -246,6 +246,8 @@
     "unknown": "Inconnu",
     "asOf": "Valorisée au",
     "instrument": "Série {series} ({issuer}, {program}, {country})",
+    "termsSource": "Conditions : {document}",
+    "termsManual": "Conditions saisies manuellement par un administrateur",
     "noLots": "Aucun lot n'est ouvert à cette date.",
     "totals": {
       "quantity": "Obligations détenues",

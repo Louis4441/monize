@@ -40,6 +40,7 @@ import {
 import { IntradayBreakdown } from '@/types/net-worth';
 import type {
   BondInstrumentSummary,
+  FetchBondSeriesResult,
   BondAssumption,
   BondPriceRecompute,
   SecurityBondScenarios,
@@ -963,6 +964,19 @@ export const investmentsApi = {
   // identical for every user, so it is not cached per user here.
   listBondInstruments: async (): Promise<BondInstrumentSummary[]> => {
     const response = await apiClient.get<BondInstrumentSummary[]>('/bonds/instruments');
+    return response.data;
+  },
+
+  // Reads a series from the official source into the catalog (or finds it
+  // already stored). Reference data, so no per-user cache to invalidate.
+  fetchBondSeries: async (
+    countryCode: string,
+    seriesCode: string,
+  ): Promise<FetchBondSeriesResult> => {
+    const response = await apiClient.post<FetchBondSeriesResult>(
+      '/bonds/instruments/fetch',
+      { countryCode, seriesCode },
+    );
     return response.data;
   },
 

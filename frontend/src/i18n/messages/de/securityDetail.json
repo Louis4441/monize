@@ -246,6 +246,8 @@
     "unknown": "Unbekannt",
     "asOf": "Bewertet zum",
     "instrument": "Serie {series} ({issuer}, {program}, {country})",
+    "termsSource": "Bedingungen: {document}",
+    "termsManual": "Bedingungen von einem Administrator manuell erfasst",
     "noLots": "An diesem Datum sind keine Posten offen.",
     "totals": {
       "quantity": "Gehaltene Anleihen",

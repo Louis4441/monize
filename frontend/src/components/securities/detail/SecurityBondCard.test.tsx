@@ -131,6 +131,7 @@ function response(
       programCode: 'RETAIL',
       seriesCode: 'TOS1029',
       currencyCode: 'PLN',
+      termsProvider: 'curated',
     },
     asOf: '2027-04-15',
     lots: [
@@ -184,6 +185,48 @@ describe('SecurityBondCard', () => {
     expect(within(row).getByText('$1,085.20')).toBeInTheDocument();
     expect(within(row).getByText('Interest $45.00 on 12/31/2027')).toBeInTheDocument();
     expect(within(row).getByText(/Known\s+\$1,200\.00/)).toBeInTheDocument();
+  });
+
+  it('links the terms document when the terms were read from the official source', async () => {
+    get.mockResolvedValue(
+      response({
+        termsSource: {
+          provider: 'obligacjeskarbowe.pl',
+          url: 'https://www.obligacjeskarbowe.pl/oferta/edo1136',
+          document: 'List emisyjny nr 5/2026',
+        },
+      }),
+    );
+    await mount();
+    const link = screen.getByRole('link', { name: 'Terms: List emisyjny nr 5/2026' });
+    expect(link).toHaveAttribute('href', 'https://www.obligacjeskarbowe.pl/oferta/edo1136');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('does not make a non-http terms address a link', async () => {
+    get.mockResolvedValue(
+      response({
+        termsSource: { provider: 'obligacjeskarbowe.pl', url: 'javascript:alert(1)', document: 'Doc' },
+      }),
+    );
+    await mount();
+    expect(screen.getByText('Terms: Doc')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Terms/ })).not.toBeInTheDocument();
+  });
+
+  it('notes hand-entered terms without a link', async () => {
+    get.mockResolvedValue(
+      response({ termsSource: { provider: 'manual', url: '', document: 'x' } }),
+    );
+    await mount();
+    expect(screen.getByText('Terms entered by hand by an administrator')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Terms/ })).not.toBeInTheDocument();
+  });
+
+  it('shows no terms source for an older payload without one', async () => {
+    await mount();
+    expect(screen.queryByText(/^Terms/)).not.toBeInTheDocument();
   });
 
   it('renders a null total as unknown with its reason, never as zero', async () => {
@@ -1229,6 +1272,7 @@ describe('SecurityBondCard: indexation, scenarios and the interest chart (spec 1
             programCode: 'RETAIL',
             seriesCode: 'S1',
             currencyCode: 'PLN',
+            termsProvider: 'curated',
           },
         }),
       );

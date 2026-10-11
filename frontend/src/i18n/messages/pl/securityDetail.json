@@ -246,6 +246,8 @@
     "unknown": "Nieznane",
     "asOf": "Wycena na dzień",
     "instrument": "Seria {series} ({issuer}, {program}, {country})",
+    "termsSource": "Warunki: {document}",
+    "termsManual": "Warunki wprowadzone ręcznie przez administratora",
     "noLots": "Na ten dzień nie ma otwartych partii.",
     "totals": {
       "quantity": "Posiadane obligacje",

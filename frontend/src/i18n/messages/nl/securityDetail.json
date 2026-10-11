@@ -246,6 +246,8 @@
     "unknown": "Onbekend",
     "asOf": "Gewaardeerd op",
     "instrument": "Reeks {series} ({issuer}, {program}, {country})",
+    "termsSource": "Voorwaarden: {document}",
+    "termsManual": "Voorwaarden handmatig ingevoerd door een beheerder",
     "noLots": "Op deze datum zijn er geen open partijen.",
     "totals": {
       "quantity": "Aangehouden obligaties",

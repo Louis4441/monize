@@ -246,6 +246,8 @@
     "unknown": "Desconhecido",
     "asOf": "Avaliada em",
     "instrument": "Série {series} ({issuer}, {program}, {country})",
+    "termsSource": "Condições: {document}",
+    "termsManual": "Condições introduzidas manualmente por um administrador",
     "noLots": "Não há lotes em aberto nesta data.",
     "totals": {
       "quantity": "Obrigações detidas",

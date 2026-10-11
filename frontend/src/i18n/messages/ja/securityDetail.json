@@ -246,6 +246,8 @@
     "unknown": "不明",
     "asOf": "評価日",
     "instrument": "シリーズ {series}（{issuer}、{program}、{country}）",
+    "termsSource": "条件: {document}",
+    "termsManual": "管理者が手動で入力した条件",
     "noLots": "この日付に未決済のロットはありません。",
     "totals": {
       "quantity": "保有債券数",

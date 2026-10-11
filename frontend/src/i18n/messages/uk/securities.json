@@ -205,6 +205,11 @@
     "bondInstrumentLoading": "Завантаження каталогу облігацій...",
     "bondInstrumentLoadFailed": "Не вдалося завантажити каталог облігацій, тому серію поки що не можна прив’язати.",
     "bondInstrumentRetry": "Повторити",
+    "bondFetchSearchLabel": "Знайти серію за кодом",
+    "bondFetchSearchPlaceholder": "напр., EDO1136",
+    "bondFetchAction": "Отримати {code} з офіційного джерела",
+    "bondFetching": "Отримання {code}...",
+    "bondFetchFailed": "Не вдалося отримати серію.",
     "bondCurrencyLocked": "Цей цінний папір пов'язано із серією облігацій у валюті {linkedCurrency}. Поверніть валюту {linkedCurrency} або спершу від'єднайте серію (від'єднання видаляє розрахункові ціни).",
     "bondNoSeriesInCurrency": "Серій облігацій у валюті {currency} немає. Каталог пропонує серії у валютах: {currencies}; виберіть одну з них, щоб прив'язати серію."
   },

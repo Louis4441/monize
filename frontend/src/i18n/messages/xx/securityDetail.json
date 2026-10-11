@@ -246,6 +246,8 @@
     "unknown": "[XX-Unknown-XX]",
     "asOf": "[XX-Valued on-XX]",
     "instrument": "[XX-Series {series} ({issuer}, {program}, {country})-XX]",
+    "termsSource": "[XX-Terms: {document}-XX]",
+    "termsManual": "[XX-Terms entered by hand by an administrator-XX]",
     "noLots": "[XX-No lots are open on this date.-XX]",
     "totals": {
       "quantity": "[XX-Bonds held-XX]",

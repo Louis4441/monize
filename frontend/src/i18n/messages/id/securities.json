@@ -205,6 +205,11 @@
     "bondInstrumentLoading": "Memuat katalog obligasi...",
     "bondInstrumentLoadFailed": "Katalog obligasi tidak dapat dimuat, sehingga seri belum dapat ditautkan.",
     "bondInstrumentRetry": "Coba lagi",
+    "bondFetchSearchLabel": "Cari seri berdasarkan kode",
+    "bondFetchSearchPlaceholder": "mis. EDO1136",
+    "bondFetchAction": "Ambil {code} dari sumber resmi",
+    "bondFetching": "Mengambil {code}...",
+    "bondFetchFailed": "Seri tidak dapat diambil.",
     "bondCurrencyLocked": "Sekuritas ini ditautkan ke seri obligasi dalam {linkedCurrency}. Kembalikan mata uang ke {linkedCurrency} atau lepas tautan seri terlebih dahulu (melepas tautan menghapus harga yang dihitung).",
     "bondNoSeriesInCurrency": "Tidak ada seri obligasi dalam {currency}. Katalog menawarkan seri dalam {currencies}; atur mata uang ke salah satunya untuk menautkan seri."
   },

@@ -246,6 +246,8 @@
     "unknown": "Tidak diketahui",
     "asOf": "Dinilai pada",
     "instrument": "Seri {series} ({issuer}, {program}, {country})",
+    "termsSource": "Ketentuan: {document}",
+    "termsManual": "Ketentuan dimasukkan secara manual oleh administrator",
     "noLots": "Tidak ada lot yang terbuka pada tanggal ini.",
     "totals": {
       "quantity": "Obligasi yang dimiliki",

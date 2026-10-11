@@ -246,6 +246,8 @@
     "unknown": "Desconocido",
     "asOf": "Valorado a fecha de",
     "instrument": "Serie {series} ({issuer}, {program}, {country})",
+    "termsSource": "Condiciones: {document}",
+    "termsManual": "Condiciones introducidas manualmente por un administrador",
     "noLots": "No hay lotes abiertos en esta fecha.",
     "totals": {
       "quantity": "Bonos en cartera",

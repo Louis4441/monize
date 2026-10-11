@@ -246,6 +246,8 @@
     "unknown": "अज्ञात",
     "asOf": "मूल्यांकन की तिथि",
     "instrument": "सीरीज़ {series} ({issuer}, {program}, {country})",
+    "termsSource": "शर्तें: {document}",
+    "termsManual": "शर्तें व्यवस्थापक द्वारा हाथ से दर्ज की गईं",
     "noLots": "इस तिथि पर कोई लॉट खुला नहीं है।",
     "totals": {
       "quantity": "धारित बॉन्ड",

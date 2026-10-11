@@ -205,6 +205,11 @@
     "bondInstrumentLoading": "채권 카탈로그를 불러오는 중...",
     "bondInstrumentLoadFailed": "채권 카탈로그를 불러오지 못해 아직 시리즈를 연결할 수 없습니다.",
     "bondInstrumentRetry": "다시 시도",
+    "bondFetchSearchLabel": "코드로 시리즈 찾기",
+    "bondFetchSearchPlaceholder": "예: EDO1136",
+    "bondFetchAction": "공식 출처에서 {code} 가져오기",
+    "bondFetching": "{code} 가져오는 중...",
+    "bondFetchFailed": "시리즈를 가져오지 못했습니다.",
     "bondCurrencyLocked": "이 종목은 {linkedCurrency} 채권 시리즈에 연결되어 있습니다. 통화를 {linkedCurrency}(으)로 되돌리거나 먼저 시리즈 연결을 해제하세요(해제하면 계산된 가격이 삭제됩니다).",
     "bondNoSeriesInCurrency": "{currency} 채권 시리즈가 없습니다. 카탈로그에는 {currencies} 시리즈가 있습니다. 시리즈를 연결하려면 그중 한 통화로 설정하세요."
   },

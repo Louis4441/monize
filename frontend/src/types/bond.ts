@@ -16,6 +16,26 @@ export interface BondInstrumentSummary {
   programCode: string;
   seriesCode: string;
   currencyCode: string;
+  /** Where the terms came from: "curated", "obligacjeskarbowe.pl" or "manual". */
+  termsProvider: string;
+}
+
+/** `POST /bonds/instruments/fetch` body. */
+export interface FetchBondSeriesRequest {
+  countryCode: string;
+  seriesCode: string;
+}
+
+/** `POST /bonds/instruments/fetch` response; `created` is false when it was already stored. */
+export interface FetchBondSeriesResult extends BondInstrumentSummary {
+  created: boolean;
+}
+
+/** The document the stored terms were read from. */
+export interface BondTermsSource {
+  provider: string;
+  url: string;
+  document: string;
 }
 
 export type BondRateSource = 'TERMS' | 'ANNOUNCED' | 'DERIVED' | 'PROJECTED';
@@ -250,6 +270,8 @@ export interface SecurityBondValuation {
   benchmarkCoverage?: BondBenchmarkCoverage[];
   /** Null for a bond redeemable at maturity only. */
   redemptionTerms: BondRedemptionTerms | null;
+  /** Absent in an older payload. */
+  termsSource?: BondTermsSource;
 }
 
 /** `POST /bonds/securities/:securityId/recompute`. */

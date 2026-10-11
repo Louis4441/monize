@@ -1138,8 +1138,8 @@ describe('SecurityForm', () => {
   });
   describe('bond series', () => {
     const instruments = [
-      { id: 'b-pln', issuerCountryCode: 'PL', issuerCode: 'PL_MF', programCode: 'PL_MF', seriesCode: 'TOS1029', currencyCode: 'PLN' },
-      { id: 'b-usd', issuerCountryCode: 'US', issuerCode: 'US_TR', programCode: 'US_TR', seriesCode: 'TBOND30', currencyCode: 'USD' },
+      { id: 'b-pln', issuerCountryCode: 'PL', issuerCode: 'PL_MF', programCode: 'PL_MF', seriesCode: 'TOS1029', currencyCode: 'PLN', termsProvider: 'curated' },
+      { id: 'b-usd', issuerCountryCode: 'US', issuerCode: 'US_TR', programCode: 'US_TR', seriesCode: 'TBOND30', currencyCode: 'USD', termsProvider: 'curated' },
     ];
 
     beforeEach(() => {
