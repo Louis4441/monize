@@ -4,7 +4,7 @@ import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import { POLISH_BOND_ADAPTER } from "./adapters/pl";
 import { BondAdapter } from "./bond-adapter";
 import { BondCatalogService } from "./bond-catalog.service";
-import { bondInstrumentId } from "./bond-instrument-id";
+import { bondInstrumentId, bondProgramId } from "./bond-instrument-id";
 import { contentHash } from "./canonical-json";
 
 jest.mock("../common/db/scoped-db", () =>
@@ -18,6 +18,7 @@ type Row = Record<string, unknown>;
 
 interface Db {
   currencies: string[];
+  programs: Row[];
   instruments: Row[];
   /** key "<instrumentId>:<version>" -> content hash */
   versions: Map<string, string>;
@@ -37,6 +38,7 @@ const tosRow = (over: Row = {}): Row => ({
 function setup(adapters: readonly BondAdapter[], seed: Partial<Db> = {}) {
   const db: Db = {
     currencies: ["PLN"],
+    programs: [],
     instruments: [],
     versions: new Map(),
     ...seed,
@@ -50,6 +52,34 @@ function setup(adapters: readonly BondAdapter[], seed: Partial<Db> = {}) {
       return db.currencies.includes(params[0] as string)
         ? [{ "?column?": 1 }]
         : [];
+    if (sql.includes("INSERT INTO bond_programs")) {
+      // Keyed like the table's unique constraint, and insert only.
+      if (
+        !db.programs.some(
+          (p) =>
+            p.issuer_country_code === params[1] &&
+            p.issuer_code === params[2] &&
+            p.program_code === params[3],
+        )
+      ) {
+        db.programs.push({
+          id: params[0],
+          issuer_country_code: params[1],
+          issuer_code: params[2],
+          program_code: params[3],
+          currency_code: params[4],
+        });
+      }
+      return [];
+    }
+    if (sql.includes("FROM bond_programs")) {
+      return db.programs.filter(
+        (p) =>
+          p.issuer_country_code === params[0] &&
+          p.issuer_code === params[1] &&
+          p.program_code === params[2],
+      );
+    }
     if (sql.includes("INSERT INTO bond_instruments")) {
       // Keyed like the table's unique constraint, and insert only.
       if (
@@ -345,6 +375,60 @@ describe("BondCatalogService", () => {
     ).resolves.toBeNull();
   });
 
+  it("lists the programs with their series count and newest series", async () => {
+    const { manager, dataSource } = createScopedDbMocks();
+    manager.query.mockResolvedValue([
+      {
+        id: "p-edo",
+        issuer_country_code: "PL",
+        issuer_code: "PL_MF",
+        program_code: "EDO",
+        currency_code: "PLN",
+        series_count: "3",
+        newest_series_code: "EDO1036",
+      },
+      {
+        id: "p-new",
+        issuer_country_code: "PL",
+        issuer_code: "PL_MF",
+        program_code: "ZZZ",
+        currency_code: "PLN",
+        series_count: 0,
+        newest_series_code: null,
+      },
+    ]);
+    const service = new BondCatalogService(
+      dataSource as unknown as DataSource,
+      {
+        ensureCatalogCurrency: jest.fn(),
+      },
+    );
+    await expect(service.listPrograms()).resolves.toEqual([
+      {
+        id: "p-edo",
+        issuerCountryCode: "PL",
+        issuerCode: "PL_MF",
+        programCode: "EDO",
+        currency: "PLN",
+        seriesCount: 3,
+        newestSeriesCode: "EDO1036",
+      },
+      {
+        id: "p-new",
+        issuerCountryCode: "PL",
+        issuerCode: "PL_MF",
+        programCode: "ZZZ",
+        currency: "PLN",
+        seriesCount: 0,
+        newestSeriesCode: null,
+      },
+    ]);
+    // Ordered by country, issuer and program code, the newest sale window first.
+    expect(String(manager.query.mock.calls[0][0])).toMatch(
+      /ORDER BY p\.issuer_country_code, p\.issuer_code, p\.program_code/,
+    );
+  });
+
   describe("storeEntry reports what it did and logs nothing", () => {
     const entry = POLISH_BOND_ADAPTER.catalog[0];
 
@@ -383,6 +467,65 @@ describe("BondCatalogService", () => {
         kind: "instrument-mismatch",
         fields: [["programCode", "OTHER", expect.any(String)]],
       });
+    });
+
+    it("stores the program under its deterministic id before its first instrument, once per program", async () => {
+      const { service, manager, db } = setup([POLISH_BOND_ADAPTER]);
+      await service.seed([POLISH_BOND_ADAPTER]);
+      const calls = manager.query.mock.calls.map(([sql]) => String(sql));
+      expect(db.programs.map((p) => p.program_code).sort()).toEqual([
+        "COI",
+        "DOR",
+        "EDO",
+        "OTS",
+        "ROD",
+        "ROR",
+        "ROS",
+        "TOS",
+      ]);
+      for (const program of db.programs) {
+        expect(program.id).toBe(
+          bondProgramId(
+            program.issuer_country_code as string,
+            program.issuer_code as string,
+            program.program_code as string,
+          ),
+        );
+        expect(program.currency_code).toBe("PLN");
+      }
+      // The program statement comes before the instrument's, in the same transaction.
+      const firstProgram = calls.findIndex((c) =>
+        c.includes("INSERT INTO bond_programs"),
+      );
+      const firstInstrument = calls.findIndex((c) =>
+        c.includes("INSERT INTO bond_instruments"),
+      );
+      expect(firstProgram).toBeGreaterThan(-1);
+      expect(firstProgram).toBeLessThan(firstInstrument);
+      // Every instrument row names its program.
+      const instrumentInserts = manager.query.mock.calls.filter(([sql]) =>
+        String(sql).includes("INSERT INTO bond_instruments"),
+      );
+      for (const [, params] of instrumentInserts) {
+        expect(params[7]).toBe(bondProgramId(params[0], params[1], params[2]));
+      }
+      // A second series of a stored program inserts no second program.
+      const before = db.programs.length;
+      await service.seed([POLISH_BOND_ADAPTER]);
+      expect(db.programs).toHaveLength(before);
+    });
+
+    it("refuses a series whose currency differs from its stored program's, writing no instrument", async () => {
+      const { service, manager, db } = setup([POLISH_BOND_ADAPTER]);
+      await service.storeEntry(manager as never, entry);
+      db.programs[0].currency_code = "EUR";
+      db.instruments.length = 0;
+      const outcome = await service.storeEntry(manager as never, entry);
+      expect(outcome).toMatchObject({
+        kind: "instrument-mismatch",
+        fields: [["programCurrency", "EUR", "PLN"]],
+      });
+      expect(db.instruments).toHaveLength(0);
     });
 
     it("reports terms the strict parser refuses", async () => {

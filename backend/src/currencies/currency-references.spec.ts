@@ -182,6 +182,7 @@ describe("currency global liveness", () => {
         ]).sort(),
       ).toEqual([
         "bond_instruments",
+        "bond_programs",
         "exchange_rate_coverage",
         "exchange_rates",
       ]);
@@ -189,6 +190,7 @@ describe("currency global liveness", () => {
         "exchange_rates",
         "exchange_rate_coverage",
         "bond_instruments",
+        "bond_programs",
       ]) {
         expect(perUserDataBody).not.toMatch(
           new RegExp(`FROM\\s+${table}\\b`, "i"),

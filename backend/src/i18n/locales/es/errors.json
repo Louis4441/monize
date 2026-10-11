@@ -559,11 +559,14 @@
     "TEMPLATE_NOT_VALIDATED": "La serie {{ series }} se vendió antes de que se validara la plantilla {{ product }} ({{ validFrom }}); necesita una entrada curada",
     "SERIES_TERMS_CONFLICT": "La serie {{ series }} ya está almacenada con condiciones distintas; las condiciones almacenadas nunca se sustituyen",
     "countryCodeInvalid": "countryCode debe ser un código de país de dos letras",
-    "programCodeInvalid": "programCode debe tener de 1 a 12 letras mayúsculas o dígitos"
+    "programCodeInvalid": "programCode debe tener de 1 a 12 letras mayúsculas o dígitos",
+    "SERIES_NOT_IN_PROGRAM": "La serie {{ series }} no pertenece al programa de bonos de este valor ({{ program }})",
+    "SERIES_NOT_DETERMINED": "No se pudo determinar la serie de esta compra de {{ program }} del {{ date }}: ninguna serie almacenada del programa estaba a la venta ese día. Obtenga la serie de la fuente oficial y elíjala para la transacción.",
+    "SERIES_NOT_ALLOWED": "Una serie de bonos solo puede indicarse en una transacción que mueve unidades de un valor vinculado a un programa de bonos"
   },
   "securities": {
     "bondPricedByEngine": "Este valor está vinculado a un instrumento de bono y lo valora el motor de bonos, no un proveedor de cotizaciones. Utilice en su lugar Recalcular precios.",
-    "bondInstrumentNotFound": "El instrumento de bono {{ id }} no existe",
+    "bondProgramNotFound": "El programa de bonos {{ id }} no existe",
     "bondCurrencyMismatch": "El valor está registrado en {{ currency }}, pero el instrumento de bono se valora en {{ instrumentCurrency }}. Utilice la moneda del instrumento.",
     "bondCurrencyLocked": "Un valor vinculado a un instrumento de bono permanece en la moneda del instrumento ({{ instrumentCurrency }}). Desvincúlelo del bono antes de cambiar su moneda.",
     "accountMustBeInvestment": "La cuenta debe ser de tipo INVESTMENT",

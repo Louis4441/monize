@@ -332,6 +332,8 @@ describe("AiActionBuilderService", () => {
       cashCurrency: "USD",
       cashAmount: -2001,
       description: null,
+      bondInstrumentId: null,
+      bondSeriesCode: null,
     };
 
     const action = builder.buildCreateInvestmentTransaction("u1", preview);
@@ -400,6 +402,52 @@ describe("AiActionBuilderService", () => {
     expect(signing.sign).toHaveBeenCalledWith(action.descriptor);
   });
 
+  it("carries the resolved series into the signed descriptor and its code onto the card (INV-BOND-007)", () => {
+    const preview: CreateInvestmentTransactionPreview = {
+      accountId: "acc1",
+      accountName: "Brokerage",
+      accountCurrency: "PLN",
+      action: InvestmentAction.BUY,
+      transactionDate: "2026-10-15",
+      securityId: "s1",
+      symbol: "EDO",
+      securityName: "EDO",
+      securityCurrency: "PLN",
+      fundingAccountId: null,
+      quantity: 10,
+      price: 100,
+      commission: 0,
+      accruedInterest: 0,
+      exchangeRate: 1,
+      totalAmount: 1000,
+      cashAccountName: "Cash",
+      cashCurrency: "PLN",
+      cashAmount: -1000,
+      description: null,
+      bondInstrumentId: "11111111-1111-5111-8111-111111111111",
+      bondSeriesCode: "EDO1036",
+    };
+    const single = builder.buildCreateInvestmentTransaction("u1", preview);
+    expect(single.descriptor).toMatchObject({
+      bondInstrumentId: "11111111-1111-5111-8111-111111111111",
+    });
+    expect(single.preview).toMatchObject({ bondSeriesCode: "EDO1036" });
+    const bulk = builder.buildCreateInvestmentTransactions("u1", [preview], []);
+    expect(
+      (bulk.descriptor as { rows: Array<{ bondInstrumentId: string }> }).rows[0]
+        .bondInstrumentId,
+    ).toBe("11111111-1111-5111-8111-111111111111");
+    const update = builder.buildUpdateInvestmentTransaction("u1", {
+      ...preview,
+      transactionId: "it1",
+    });
+    expect(update.descriptor).toMatchObject({
+      bondInstrumentId: "11111111-1111-5111-8111-111111111111",
+    });
+    // The series is covered by the signature: it is part of what is signed.
+    expect(signing.sign).toHaveBeenCalledWith(single.descriptor);
+  });
+
   it("builds a bulk create_investment_transactions action", () => {
     const ok: CreateInvestmentTransactionPreview = {
       accountId: "acc1",
@@ -422,6 +470,8 @@ describe("AiActionBuilderService", () => {
       cashCurrency: "USD",
       cashAmount: -2001,
       description: null,
+      bondInstrumentId: null,
+      bondSeriesCode: null,
     };
 
     const action = builder.buildCreateInvestmentTransactions(
@@ -688,6 +738,8 @@ describe("AiActionBuilderService", () => {
       cashCurrency: "USD",
       cashAmount: 1049,
       description: null,
+      bondInstrumentId: null,
+      bondSeriesCode: null,
     };
 
     const action = builder.buildUpdateInvestmentTransaction("u1", preview);

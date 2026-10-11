@@ -143,7 +143,7 @@ describe("bond series fetch (integration, INV-BOND-006)", () => {
     (extractPdfText as jest.Mock).mockImplementation(async (b: Uint8Array) =>
       fakePdfText(b),
     );
-    await cleanTables(dataSource, ["bond_instruments"]);
+    await cleanTables(dataSource, ["bond_programs", "bond_instruments"]);
     await dataSource.query(
       `INSERT INTO currencies (code, name, symbol, decimal_places, is_active)
        VALUES ('PLN', 'Zloty', 'z', 2, true)
@@ -167,6 +167,8 @@ describe("bond series fetch (integration, INV-BOND-006)", () => {
       });
 
       expect(await count("bond_instruments")).toBe(1);
+      // The program is stored with its first series, in the same transaction.
+      expect(await count("bond_programs")).toBe(1);
       const stored = await versions();
       expect(stored).toHaveLength(1);
       expect(stored[0]).toMatchObject({
@@ -248,6 +250,7 @@ describe("bond series fetch (integration, INV-BOND-006)", () => {
       expect(error.code).toBe("SOURCE_INCONSISTENT");
       expect(error.params).toMatchObject({ field: "firstPeriodRate" });
       expect(await count("bond_instruments")).toBe(0);
+      expect(await count("bond_programs")).toBe(0);
       expect(await count("bond_terms_versions")).toBe(0);
     });
 

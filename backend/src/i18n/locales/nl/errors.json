@@ -559,11 +559,14 @@
     "TEMPLATE_NOT_VALIDATED": "Serie {{ series }} is verkocht voordat het sjabloon {{ product }} was gevalideerd ({{ validFrom }}); er is een samengestelde invoer nodig",
     "SERIES_TERMS_CONFLICT": "Serie {{ series }} is al opgeslagen met andere voorwaarden; opgeslagen voorwaarden worden nooit vervangen",
     "countryCodeInvalid": "countryCode moet een landcode van twee letters zijn",
-    "programCodeInvalid": "programCode moet uit 1 tot 12 hoofdletters of cijfers bestaan"
+    "programCodeInvalid": "programCode moet uit 1 tot 12 hoofdletters of cijfers bestaan",
+    "SERIES_NOT_IN_PROGRAM": "Serie {{ series }} hoort niet bij het obligatieprogramma van dit effect ({{ program }})",
+    "SERIES_NOT_DETERMINED": "De serie van deze {{ program }}-aankoop op {{ date }} kon niet worden bepaald: geen enkele opgeslagen serie van het programma was die dag te koop. Haal de serie op uit de officiële bron en kies hem voor de transactie.",
+    "SERIES_NOT_ALLOWED": "Een obligatieserie kan alleen worden opgegeven bij een transactie die stukken verplaatst van een effect dat aan een obligatieprogramma is gekoppeld"
   },
   "securities": {
     "bondPricedByEngine": "Dit effect is gekoppeld aan een obligatie-instrument en wordt gewaardeerd door de obligatie-engine, niet door een koersaanbieder. Gebruik in plaats daarvan Koersen herberekenen.",
-    "bondInstrumentNotFound": "Het obligatie-instrument {{ id }} bestaat niet",
+    "bondProgramNotFound": "Het obligatieprogramma {{ id }} bestaat niet",
     "bondCurrencyMismatch": "Het effect is vastgelegd in {{ currency }}, maar het obligatie-instrument wordt gewaardeerd in {{ instrumentCurrency }}. Gebruik de valuta van het instrument.",
     "bondCurrencyLocked": "Een effect dat aan een obligatie-instrument is gekoppeld, blijft in de valuta van het instrument ({{ instrumentCurrency }}). Ontkoppel het van de obligatie voordat u de valuta wijzigt.",
     "accountMustBeInvestment": "Rekening moet van het type INVESTMENT zijn",

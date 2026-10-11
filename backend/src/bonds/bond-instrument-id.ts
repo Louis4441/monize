@@ -48,3 +48,26 @@ export function bondInstrumentId(
     BOND_INSTRUMENT_NAMESPACE,
   );
 }
+
+/**
+ * The namespace of every bond program id. Fixed for ever, like the instrument
+ * namespace: changing it would orphan each security's link.
+ */
+export const BOND_PROGRAM_NAMESPACE = "7e4d9a10-3c2b-4b6f-8d15-a0c9e2f6b384";
+
+/**
+ * The id of a catalog program (the product, e.g. EDO), derived from the unique
+ * key `(issuer_country_code, issuer_code, program_code)` for the reason
+ * `bondInstrumentId` is: `bond_programs` is seeded per deployment and a
+ * security's link must survive a restore onto another one.
+ */
+export function bondProgramId(
+  issuerCountryCode: string,
+  issuerCode: string,
+  programCode: string,
+): string {
+  return uuidV5(
+    `${issuerCountryCode}|${issuerCode}|${programCode}`,
+    BOND_PROGRAM_NAMESPACE,
+  );
+}

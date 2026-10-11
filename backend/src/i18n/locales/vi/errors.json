@@ -559,11 +559,14 @@
     "TEMPLATE_NOT_VALIDATED": "Series {{ series }} đã được bán trước khi mẫu {{ product }} được xác thực ({{ validFrom }}); cần một mục được biên soạn",
     "SERIES_TERMS_CONFLICT": "Series {{ series }} đã được lưu với điều khoản khác; điều khoản đã lưu không bao giờ bị thay thế",
     "countryCodeInvalid": "countryCode phải là mã quốc gia gồm hai chữ cái",
-    "programCodeInvalid": "programCode phải gồm 1 đến 12 chữ in hoa hoặc chữ số"
+    "programCodeInvalid": "programCode phải gồm 1 đến 12 chữ in hoa hoặc chữ số",
+    "SERIES_NOT_IN_PROGRAM": "Chuỗi {{ series }} không thuộc chương trình trái phiếu của chứng khoán này ({{ program }})",
+    "SERIES_NOT_DETERMINED": "Không thể xác định chuỗi của giao dịch mua {{ program }} ngày {{ date }}: không có chuỗi nào đã lưu của chương trình được bán vào ngày đó. Hãy lấy chuỗi từ nguồn chính thức và chọn nó cho giao dịch.",
+    "SERIES_NOT_ALLOWED": "Chỉ có thể nêu chuỗi trái phiếu cho giao dịch làm thay đổi số lượng của chứng khoán được liên kết với một chương trình trái phiếu"
   },
   "securities": {
     "bondPricedByEngine": "Chứng khoán này được liên kết với một công cụ trái phiếu và được định giá bởi công cụ tính trái phiếu, không phải bởi nhà cung cấp báo giá. Hãy dùng Tính lại giá thay thế.",
-    "bondInstrumentNotFound": "Công cụ trái phiếu {{ id }} không tồn tại",
+    "bondProgramNotFound": "Chương trình trái phiếu {{ id }} không tồn tại",
     "bondCurrencyMismatch": "Chứng khoán được ghi bằng {{ currency }}, nhưng công cụ trái phiếu được định giá bằng {{ instrumentCurrency }}. Hãy dùng đơn vị tiền tệ của công cụ.",
     "bondCurrencyLocked": "Chứng khoán liên kết với một công cụ trái phiếu giữ nguyên đơn vị tiền tệ của công cụ ({{ instrumentCurrency }}). Hãy hủy liên kết với trái phiếu trước khi đổi đơn vị tiền tệ.",
     "accountMustBeInvestment": "Tài khoản phải là loại ĐẦU TƯ",

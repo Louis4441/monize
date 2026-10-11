@@ -437,6 +437,9 @@ describe("BondSeriesService", () => {
   describe("the daily check of the current offer", () => {
     it("runs under a system context around the whole lease, in the bond series lease", async () => {
       const { service, fetchSync } = build();
+      jest
+        .spyOn(service, "autoFetchPrograms")
+        .mockResolvedValue(new Set(["PL|OTS"]));
       jest.spyOn(service, "fetchCurrentOffer").mockResolvedValue({
         listed: 0,
         stored: 0,
@@ -457,6 +460,52 @@ describe("BondSeriesService", () => {
       expect(service.fetchCurrentOffer).toHaveBeenCalledTimes(1);
     });
 
+    it("fetches only the programs a security has switched auto-fetch on for, in the offer and the backfill", async () => {
+      const { service } = build();
+      const programs = new Set(["PL|OTS", "PL|EDO"]);
+      jest.spyOn(service, "autoFetchPrograms").mockResolvedValue(programs);
+      const offer = jest.spyOn(service, "fetchCurrentOffer").mockResolvedValue({
+        listed: 0,
+        stored: 0,
+        alreadyStored: 0,
+        failed: 0,
+      });
+      const backfill = jest
+        .spyOn(service, "backfillHistory")
+        .mockResolvedValue(NO_BACKFILL);
+      await service.scheduledCurrentOffer();
+      expect(offer).toHaveBeenCalledWith({ programs });
+      expect(backfill).toHaveBeenCalledWith({ programs });
+    });
+
+    it("fetches nothing at all while no security has auto-fetch switched on (off by default)", async () => {
+      const { service, fetchSync } = build();
+      // The query answers no program.
+      const offer = jest.spyOn(service, "fetchCurrentOffer");
+      const backfill = jest.spyOn(service, "backfillHistory");
+      await service.scheduledCurrentOffer();
+      expect(fetchSync.withLease).toHaveBeenCalledTimes(1);
+      expect(offer).not.toHaveBeenCalled();
+      expect(backfill).not.toHaveBeenCalled();
+    });
+
+    it("reads the programs in one query that selects program columns only, never a user's data", async () => {
+      const { service, manager } = build();
+      manager.query.mockResolvedValue([
+        { issuer_country_code: "PL", program_code: "EDO" },
+        { issuer_country_code: "PL", program_code: "COI" },
+      ]);
+      await expect(service.autoFetchPrograms()).resolves.toEqual(
+        new Set(["PL|EDO", "PL|COI"]),
+      );
+      expect(manager.query).toHaveBeenCalledTimes(1);
+      const sql = String(manager.query.mock.calls[0][0]);
+      expect(sql).toMatch(/FROM bond_programs p/);
+      expect(sql).toMatch(/s\.bond_auto_fetch/);
+      expect(sql).not.toMatch(/user_id|symbol|securities s\b.*SELECT/);
+      expect(sql.split("SELECT")[1]).not.toMatch(/s\./);
+    });
+
     it("does nothing when another replica holds the lease", async () => {
       const { service, fetchSync } = build();
       fetchSync.withLease.mockResolvedValue(false);
@@ -467,6 +516,9 @@ describe("BondSeriesService", () => {
 
     it("runs the backfill after the offer, and still after an offer that failed, then records that failure", async () => {
       const { service, fetchSync } = build();
+      jest
+        .spyOn(service, "autoFetchPrograms")
+        .mockResolvedValue(new Set(["PL|OTS"]));
       const order: string[] = [];
       jest.spyOn(service, "fetchCurrentOffer").mockImplementation(async () => {
         order.push("offer");
@@ -487,6 +539,9 @@ describe("BondSeriesService", () => {
 
     it("holds the lease long enough for the backfill of about 270 series at 3 s each", async () => {
       const { service, fetchSync } = build();
+      jest
+        .spyOn(service, "autoFetchPrograms")
+        .mockResolvedValue(new Set(["PL|OTS"]));
       jest.spyOn(service, "fetchCurrentOffer").mockResolvedValue({
         listed: 0,
         stored: 0,
@@ -621,6 +676,104 @@ describe("BondSeriesService", () => {
         alreadyStored: 0,
         failed: 0,
       });
+    });
+  });
+
+  describe("program scope (auto-fetch, spec 2.5)", () => {
+    const programAdapter = (codes: string[]) =>
+      adapterOf({
+        currentSeries: jest.fn(async () => codes),
+        backfillCodes: jest.fn(() => codes),
+        programOf: (code: string) => code.slice(0, 3),
+      });
+
+    it("fetches only the series of the programs in scope", async () => {
+      const { service } = build();
+      const adapter = programAdapter(["EDO1036", "ROR1027", "COI1030"]);
+      const run = await service.fetchCurrentOffer({
+        adapters: [adapter],
+        programs: new Set(["PL|EDO", "PL|COI"]),
+      });
+      expect(run.listed).toBe(2);
+      const fetched = (adapter.fetchSeries as jest.Mock).mock.calls.map(
+        (c) => c[0],
+      );
+      expect(fetched).toEqual(["EDO1036", "COI1030"]);
+    });
+
+    it("leaves an adapter that cannot name a series' program out of scope", async () => {
+      const { service } = build();
+      const adapter = adapterOf({
+        currentSeries: jest.fn(async () => ["EDO1036"]),
+      });
+      const run = await service.fetchCurrentOffer({
+        adapters: [adapter],
+        programs: new Set(["PL|EDO"]),
+      });
+      expect(run.listed).toBe(0);
+      expect(adapter.fetchSeries).not.toHaveBeenCalled();
+    });
+
+    it("backfills only the programs in scope", async () => {
+      const { service } = build();
+      const adapter = programAdapter(["EDO1036", "ROR1027"]);
+      const run = await service.backfillHistory({
+        adapters: [adapter],
+        programs: new Set(["PL|ROR"]),
+        sleep: async () => undefined,
+        today: "2026-10-11",
+      });
+      expect(run.candidates).toBe(1);
+      expect(
+        (adapter.fetchSeries as jest.Mock).mock.calls.map((c) => c[0]),
+      ).toEqual(["ROR1027"]);
+    });
+
+    it("with no program filter every series is in scope (an explicit request)", async () => {
+      const { service } = build();
+      const adapter = programAdapter(["EDO1036", "ROR1027"]);
+      const run = await service.fetchCurrentOffer({ adapters: [adapter] });
+      expect(run.listed).toBe(2);
+    });
+  });
+
+  describe("fetchOfferOf (the user's fetch of the current offer now)", () => {
+    it("fetches every series of the country's offer the catalog lacks and counts them", async () => {
+      const { service, catalog } = build();
+      const adapter = adapterOf({
+        currentSeries: jest.fn(async () => ["EDO1036", "ROR1027", "TOS1029"]),
+      });
+      catalog.findStoredSeries.mockImplementation(async (_m, _c, code) =>
+        (code as unknown as string) === "ROR1027" ? SUMMARY : null,
+      );
+      await expect(
+        service.fetchOfferOf("pl", { adapters: [adapter] }),
+      ).resolves.toEqual({
+        listed: 3,
+        stored: 2,
+        alreadyStored: 1,
+        failed: 0,
+      });
+    });
+
+    it("refuses a country with no official source", async () => {
+      const { service } = build();
+      const error = await refusal(
+        service.fetchOfferOf("DE", { adapters: [adapterOf()] }),
+      );
+      expect(error.code).toBe("SERIES_FETCH_UNSUPPORTED");
+    });
+
+    it("reports a source that cannot be read as failed instead of throwing", async () => {
+      const { service } = build();
+      const adapter = adapterOf({
+        currentSeries: jest.fn(async () => {
+          throw new SeriesFetchError("SOURCE_UNAVAILABLE");
+        }),
+      });
+      await expect(
+        service.fetchOfferOf("PL", { adapters: [adapter] }),
+      ).resolves.toEqual({ listed: 0, stored: 0, alreadyStored: 0, failed: 1 });
     });
   });
 

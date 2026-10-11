@@ -76,6 +76,14 @@ export interface RestoreResult {
    * re-link; `count` is the full number.
    */
   unlinkedBondSecurities?: { count: number; symbols: string[] };
+  /**
+   * Investment transactions restored without the bond series they named,
+   * because this deployment's catalog does not carry it. The rows *were*
+   * written; their lots are read from the transaction date instead of the
+   * stored series, and the series can be chosen again on the transaction.
+   * Counted beside `restored`, omitted when zero.
+   */
+  unlinkedBondSeries?: { count: number };
 }
 
 /** The most symbols a restore result names for its unlinked bond securities. */

@@ -559,11 +559,14 @@
     "TEMPLATE_NOT_VALIDATED": "Seria {{ series }} została sprzedana przed zweryfikowaniem szablonu {{ product }} ({{ validFrom }}); wymaga wpisu z katalogu kuratorowanego",
     "SERIES_TERMS_CONFLICT": "Seria {{ series }} jest już zapisana z innymi warunkami; zapisane warunki nigdy nie są zastępowane",
     "countryCodeInvalid": "countryCode musi być dwuliterowym kodem kraju",
-    "programCodeInvalid": "programCode musi mieć od 1 do 12 wielkich liter lub cyfr"
+    "programCodeInvalid": "programCode musi mieć od 1 do 12 wielkich liter lub cyfr",
+    "SERIES_NOT_IN_PROGRAM": "Seria {{ series }} nie należy do programu obligacji tego papieru wartościowego ({{ program }})",
+    "SERIES_NOT_DETERMINED": "Nie można ustalić serii tego zakupu {{ program }} z dnia {{ date }}: żadna pojedyncza zapisana seria programu nie była wtedy w sprzedaży. Pobierz serię z oficjalnego źródła i wybierz ją dla transakcji.",
+    "SERIES_NOT_ALLOWED": "Serię obligacji można podać tylko dla transakcji zmieniającej liczbę jednostek papieru powiązanego z programem obligacji"
   },
   "securities": {
     "bondPricedByEngine": "Ten papier wartościowy jest powiązany z instrumentem obligacyjnym i jest wyceniany przez silnik obligacji, a nie przez dostawcę notowań. Użyj zamiast tego opcji Przelicz ceny.",
-    "bondInstrumentNotFound": "Instrument obligacyjny {{ id }} nie istnieje",
+    "bondProgramNotFound": "Program obligacji {{ id }} nie istnieje",
     "bondCurrencyMismatch": "Papier wartościowy jest zapisany w walucie {{ currency }}, a instrument obligacyjny jest wyceniany w walucie {{ instrumentCurrency }}. Użyj waluty instrumentu.",
     "bondCurrencyLocked": "Papier wartościowy powiązany z instrumentem obligacyjnym pozostaje w walucie instrumentu ({{ instrumentCurrency }}). Przed zmianą waluty odłącz go od obligacji.",
     "accountMustBeInvestment": "Konto musi być typu INVESTMENT",

@@ -650,7 +650,7 @@ describe("SecuritiesController", () => {
     });
 
     it("recomputes a bond-linked security's engine prices instead of asking a quote provider (R24)", async () => {
-      const linked = { ...mockSecurity, id: "bond-1", bondInstrumentId: "i-1" };
+      const linked = { ...mockSecurity, id: "bond-1", bondProgramId: "i-1" };
       securitiesService.findOne.mockImplementation(
         async (_u: string, id: string) =>
           id === "bond-1" ? linked : { ...mockSecurity, id },
@@ -689,7 +689,7 @@ describe("SecuritiesController", () => {
     });
 
     it("a selection of only linked securities never reaches a provider and is not '0 updated'", async () => {
-      const linked = { ...mockSecurity, id: "bond-1", bondInstrumentId: "i-1" };
+      const linked = { ...mockSecurity, id: "bond-1", bondProgramId: "i-1" };
       securitiesService.findOne.mockResolvedValue(linked);
       securitiesService.recomputeLinkedPrices.mockResolvedValue({
         results: [{ symbol: "EDO1036", success: true }],

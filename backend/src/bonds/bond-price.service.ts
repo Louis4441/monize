@@ -61,7 +61,9 @@ export interface RecomputeOptions {
  * For each calendar day from the first transaction to today, the unit price is
  * the sum of the open lots' gross values (the lots open ON that day, folded from
  * the ledger up to it) divided by the sum of their quantities, with exact
- * arithmetic, rounded half-up to the column's ten places. A day on which any
+ * arithmetic, rounded half-up to the column's ten places. The lots of every
+ * series the security holds are in the blend, each valued by its own series'
+ * terms (`docs/specs/bond-program-securities.md` 2.4). A day on which any
  * open lot has no gross value (a started period without a rate, INV-BOND-002)
  * gets no row, and neither does a day with no open lots or with lots that are
  * unknowable (a split, a fractional or over-removed quantity).
@@ -130,7 +132,7 @@ export class BondPriceService {
       (m) =>
         m.query(
           `SELECT id, user_id FROM securities
-            WHERE bond_instrument_id IS NOT NULL
+            WHERE bond_program_id IS NOT NULL
             ORDER BY user_id, id`,
         ),
     );
@@ -193,12 +195,18 @@ export class BondPriceService {
         // and a relinked one is priced from its new instrument.
         await acquireAdvisoryLock(m, LockScope.BondPriceRecompute, securityId);
         const ledger = await loadBondLedger(m, userId, securityId);
-        const reference = await this.valuation.loadReference(
+        // The reference data of every series the ledger names, once each: the
+        // price is the blend over the lots of all of them.
+        const references = await this.valuation.loadReferences(
           m,
-          ledger.security.bondInstrumentId,
+          new Set(
+            ledger.transactions
+              .map((t) => t.instrumentId)
+              .filter((id): id is string => typeof id === "string"),
+          ),
         );
         const today = options.today ?? (await this.financialToday(m, userId));
-        const prices = this.dailyPrices(ledger.transactions, reference, today);
+        const prices = this.dailyPrices(ledger.transactions, references, today);
 
         const written = await this.upsertPrices(m, securityId, prices);
         const deleted = await this.deleteStalePrices(m, securityId, prices);
@@ -242,7 +250,7 @@ export class BondPriceService {
           m.query(
             `SELECT id FROM securities
               WHERE id = ANY($1::uuid[]) AND user_id = $2
-                AND bond_instrument_id IS NOT NULL`,
+                AND bond_program_id IS NOT NULL`,
             [ids, userId],
           ),
       );
@@ -318,7 +326,7 @@ export class BondPriceService {
    */
   private dailyPrices(
     transactions: Parameters<typeof bondLotsAsOf>[0],
-    reference: BondReferenceData,
+    references: ReadonlyMap<string, BondReferenceData>,
     today: string,
   ): Array<{ date: string; price: string }> {
     const dated = transactions.filter((t) => t.status !== "VOID");
@@ -338,7 +346,8 @@ export class BondPriceService {
     }
 
     // Each distinct lot and the days it is open on.
-    const lotKey = (lot: BondLot) => `${lot.purchaseDate}|${lot.quantity}`;
+    const lotKey = (lot: BondLot) =>
+      `${lot.instrumentId ?? ""}|${lot.purchaseDate}|${lot.quantity}`;
     const daysOf = new Map<string, { lot: BondLot; days: string[] }>();
     for (const { day, lots: open } of openOn) {
       for (const lot of new Set(open.map(lotKey))) {
@@ -356,6 +365,15 @@ export class BondPriceService {
     // window): either way the day has no price.
     const grossOf = new Map<string, Map<string, string | null>>();
     for (const [key, { lot, days }] of daysOf) {
+      const reference = lot.instrumentId
+        ? references.get(lot.instrumentId)
+        : undefined;
+      // A lot whose series has no reference data cannot be valued, and a day
+      // holding it gets no price.
+      if (!reference) {
+        grossOf.set(key, new Map());
+        continue;
+      }
       const series = grossValueSeries({
         terms: reference.terms,
         termsVersion: reference.termsVersion,

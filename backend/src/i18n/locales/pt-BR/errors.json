@@ -559,11 +559,14 @@
     "TEMPLATE_NOT_VALIDATED": "A série {{ series }} foi vendida antes de o modelo {{ product }} ser validado ({{ validFrom }}); ela precisa de uma entrada curada",
     "SERIES_TERMS_CONFLICT": "A série {{ series }} já está armazenada com condições diferentes; as condições armazenadas nunca são substituídas",
     "countryCodeInvalid": "countryCode deve ser um código de país de duas letras",
-    "programCodeInvalid": "programCode deve ter de 1 a 12 letras maiúsculas ou dígitos"
+    "programCodeInvalid": "programCode deve ter de 1 a 12 letras maiúsculas ou dígitos",
+    "SERIES_NOT_IN_PROGRAM": "A série {{ series }} não pertence ao programa de títulos deste ativo ({{ program }})",
+    "SERIES_NOT_DETERMINED": "Não foi possível determinar a série desta compra de {{ program }} em {{ date }}: nenhuma série armazenada do programa estava à venda nesse dia. Busque a série na fonte oficial e escolha-a para a transação.",
+    "SERIES_NOT_ALLOWED": "Uma série de títulos só pode ser informada em uma transação que movimenta unidades de um ativo vinculado a um programa de títulos"
   },
   "securities": {
     "bondPricedByEngine": "Este ativo está vinculado a um instrumento de título e é precificado pelo motor de títulos, não por um provedor de cotações. Use Recalcular preços.",
-    "bondInstrumentNotFound": "O instrumento de título {{ id }} não existe",
+    "bondProgramNotFound": "O programa de títulos {{ id }} não existe",
     "bondCurrencyMismatch": "O ativo está registrado em {{ currency }}, mas o instrumento de título é precificado em {{ instrumentCurrency }}. Use a moeda do instrumento.",
     "bondCurrencyLocked": "Um ativo vinculado a um instrumento de título permanece na moeda do instrumento ({{ instrumentCurrency }}). Desvincule-o do título antes de alterar a moeda.",
     "accountMustBeInvestment": "A conta deve ser do tipo INVESTMENT",

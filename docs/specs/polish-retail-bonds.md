@@ -590,6 +590,13 @@ Evidence collected on 2026-10-11 (supporting, not a confirmation):
 
 ### 12.1 Link
 
+> Superseded before it shipped by `docs/specs/bond-program-securities.md`: a
+> security links to a bond **program** (`securities.bond_program_id`,
+> `bond_auto_fetch`) and each share-moving transaction names its **series**
+> (`investment_transactions.bond_instrument_id`, INV-BOND-007). The rules of this
+> section (the checks, the canonical id, the undo, the restore) hold with the
+> program in place of the instrument.
+
 A user's `securities` row may point at one bond instrument through a nullable
 `securities.bond_instrument_id` (`ON DELETE RESTRICT`). The link is checked in
 the write's own transaction (`assertBondLink`, shared by the update, the
@@ -624,6 +631,9 @@ security of the user is recomputed. The support backup always writes the link as
 `NULL`.
 
 ### 12.2 Lots
+
+> A lot also carries the series of its transaction, and a removal may name one
+> (`docs/specs/bond-program-securities.md` sections 2.3 and 2.4).
 
 The lots of a linked security are derived from the user's investment
 transactions on it, **per account**, in register order, `VOID` rows excluded:

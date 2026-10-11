@@ -650,11 +650,11 @@ export class SecuritiesController {
     }
     // A security linked to a bond instrument has no quote provider: its refresh
     // is the engine's recompute, not "0 updated".
-    const linked = owned.filter((s) => s.bondInstrumentId);
+    const linked = owned.filter((s) => s.bondProgramId);
     const providerIds =
       linked.length === 0
         ? dto.securityIds
-        : owned.filter((s) => !s.bondInstrumentId).map((s) => s.id);
+        : owned.filter((s) => !s.bondProgramId).map((s) => s.id);
     const providerResult =
       providerIds.length > 0
         ? await this.securityPriceService.refreshPricesForSecurities(

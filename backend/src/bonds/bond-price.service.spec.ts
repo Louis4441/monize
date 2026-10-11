@@ -4,6 +4,7 @@ import { FetchSyncJob } from "../common/jobs/fetch-sync.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import { manifest, manifestDocument } from "./adapters/pl/pl-test-input";
 import { parseBondTerms } from "./domain/bond-terms";
+import { ExactDecimal } from "./domain/exact-decimal";
 import {
   BOND_ENGINE_PRICE_SOURCE,
   BondPriceService,
@@ -35,6 +36,7 @@ import { invalidatePortfolioSummary } from "../securities/portfolio-summary-memo
 const USER = "user-1";
 const SECURITY = "sec-1";
 const INSTRUMENT = "11111111-1111-5111-8111-111111111111";
+const PROGRAM = "33333333-3333-5333-8333-333333333333";
 
 /** TOS1029: 100.00 face, 4.40 % for the first 12-month period, per-bond value rounded to cents. */
 const TOS: BondReferenceData = {
@@ -80,6 +82,8 @@ interface Tx {
   account?: string;
   /** The other leg's account when this row is a paired transfer leg. */
   counterpart?: string;
+  /** The series the row stores (the one instrument by default); null for none. */
+  series?: string | null;
 }
 
 function setup(
@@ -89,7 +93,11 @@ function setup(
     deleteRows?: number;
     security?: unknown[];
     reference?: BondReferenceData;
+    /** Reference data per series id, for a ledger of several series. */
+    references?: Record<string, BondReferenceData>;
     timezone?: string | null;
+    /** The series ids the sale-window inference of a row with none finds. */
+    onSale?: string[];
   } = {},
 ) {
   const { manager, dataSource } = createScopedDbMocks();
@@ -109,6 +117,9 @@ function setup(
       events.push("lock");
       return [];
     }
+    if (sql.includes("saleWindow")) {
+      return (opts.onSale ?? []).map((id) => ({ id }));
+    }
     if (sql.includes("FROM user_preferences")) {
       return opts.timezone === undefined
         ? []
@@ -122,7 +133,8 @@ function setup(
             user_id: USER,
             symbol: "TOS1029",
             currency_code: "PLN",
-            bond_instrument_id: INSTRUMENT,
+            bond_program_id: PROGRAM,
+            bond_auto_fetch: false,
           },
         ]
       );
@@ -135,6 +147,7 @@ function setup(
         quantity: t.quantity,
         account_id: t.account ?? "acct-1",
         counterpart_account_id: t.counterpart ?? null,
+        bond_instrument_id: t.series === undefined ? INSTRUMENT : t.series,
       }));
     }
     if (sql.includes("INSERT INTO security_prices")) {
@@ -157,9 +170,10 @@ function setup(
   const valuation = new BondValuationService(
     dataSource as unknown as DataSource,
   );
-  jest
-    .spyOn(valuation, "loadReference")
-    .mockResolvedValue(opts.reference ?? TOS);
+  jest.spyOn(valuation, "loadReference").mockImplementation(async (_m, id) => {
+    const reference = opts.references?.[id] ?? opts.reference ?? TOS;
+    return reference;
+  });
   const netWorth = {
     triggerDebouncedRecalc: jest.fn(() => events.push("recalc")),
   };
@@ -441,6 +455,89 @@ describe("BondPriceService", () => {
       expect(elapsed).toBeLessThan(1000);
     });
 
+    it("blends the lots of two series by quantity, each valued by its own series' terms", async () => {
+      const OTHER = "44444444-4444-5444-8444-444444444444";
+      const ROR: BondReferenceData = {
+        ...TOS,
+        instrument: {
+          ...TOS.instrument,
+          id: OTHER,
+          programCode: "ROR",
+          seriesCode: "ROR1027",
+        },
+        terms: manifest("ror1027"),
+      };
+      const references = { [INSTRUMENT]: TOS, [OTHER]: ROR };
+      const day = { today: "2026-10-20" };
+      const priceOf = async (rows: Tx[]) => {
+        const { service, call } = setup(rows, { references });
+        await service.recomputeSecurity(USER, SECURITY, day);
+        const [, dates, prices] = call("INSERT INTO security_prices")!.params;
+        return new Map(
+          (dates as string[]).map((d, i) => [d, (prices as string[])[i]]),
+        );
+      };
+      const tosOnly = await priceOf([buy("2026-10-15", "10")]);
+      const rorOnly = await priceOf([
+        { ...buy("2026-10-15", "5"), series: OTHER },
+      ]);
+      const mixed = await priceOf([
+        buy("2026-10-15", "10"),
+        { ...buy("2026-10-15", "5"), series: OTHER },
+      ]);
+      for (const [d, blended] of mixed) {
+        const expected = ExactDecimal.parse(tosOnly.get(d) as string)
+          .mul(ExactDecimal.fromInt(10))
+          .add(
+            ExactDecimal.parse(rorOnly.get(d) as string).mul(
+              ExactDecimal.fromInt(5),
+            ),
+          )
+          .div(ExactDecimal.fromInt(15));
+        // Each single-series price is rounded to ten places, so the blend of
+        // the rounded prices agrees with the blend of the exact values to 1e-9.
+        expect(
+          Math.abs(Number(blended) - Number(expected.toFixed(10))),
+        ).toBeLessThan(1e-9);
+      }
+      expect(mixed.size).toBe(6);
+      // A blend, not either series' own price (the two series differ).
+      expect(mixed.get("2026-10-20")).not.toBe(tosOnly.get("2026-10-20"));
+      expect(mixed.get("2026-10-20")).not.toBe(rorOnly.get("2026-10-20"));
+    });
+
+    it("loads the reference data of each series once however many days it prices", async () => {
+      const OTHER = "44444444-4444-5444-8444-444444444444";
+      const { service, valuation } = setup(
+        [buy("2026-10-15", "10"), { ...buy("2026-11-01", "5"), series: OTHER }],
+        { references: { [INSTRUMENT]: TOS, [OTHER]: TOS } },
+      );
+      await service.recomputeSecurity(USER, SECURITY, { today: "2027-04-15" });
+      expect(valuation.loadReference).toHaveBeenCalledTimes(2);
+    });
+
+    it("gives no price when an acquisition has no series and none was on sale, and removes the engine's stale days", async () => {
+      const { service, call } = setup(
+        [{ ...buy("2026-10-15", "10"), series: null }],
+        { deleteRows: 2 },
+      );
+      await expect(
+        service.recomputeSecurity(USER, SECURITY, { today: "2026-10-20" }),
+      ).resolves.toEqual({ written: 0, deleted: 2 });
+      expect(call("INSERT INTO security_prices")).toBeUndefined();
+      expect(call("DELETE FROM security_prices")!.params[1]).toEqual([]);
+    });
+
+    it("prices a legacy acquisition from the series the date puts on sale", async () => {
+      const { service, call } = setup(
+        [{ ...buy("2026-10-15", "10"), series: null }],
+        { onSale: [INSTRUMENT] },
+      );
+      await service.recomputeSecurity(USER, SECURITY, { today: "2026-10-16" });
+      const [, dates] = call("INSERT INTO security_prices")!.params;
+      expect(dates).toEqual(["2026-10-15", "2026-10-16"]);
+    });
+
     it("loads the reference data once however many days it prices", async () => {
       const { service, valuation } = setup([buy("2026-10-15", "10")]);
       await service.recomputeSecurity(USER, SECURITY, { today: "2027-04-15" });
@@ -548,7 +645,7 @@ describe("BondPriceService", () => {
             user_id: USER,
             symbol: "X",
             currency_code: "PLN",
-            bond_instrument_id: null,
+            bond_program_id: null,
           },
         ],
       });
@@ -690,7 +787,7 @@ describe("BondPriceService", () => {
       ).resolves.toBeUndefined();
 
       const lookup = call("FROM securities")!;
-      expect(lookup.sql).toMatch(/bond_instrument_id IS NOT NULL/);
+      expect(lookup.sql).toMatch(/bond_program_id IS NOT NULL/);
       expect(lookup.sql).toMatch(/user_id = \$2/);
       expect(lookup.params).toEqual([["s-1", "s-3"], USER]);
       // One failing security does not stop the next.
@@ -721,7 +818,7 @@ describe("BondPriceService", () => {
       const result = await service.recomputeAll();
 
       expect(manager.query).toHaveBeenCalledWith(
-        expect.stringContaining("WHERE bond_instrument_id IS NOT NULL"),
+        expect.stringContaining("WHERE bond_program_id IS NOT NULL"),
       );
       expect(
         (withUserContext as jest.Mock).mock.calls.map((c) => c[0]),

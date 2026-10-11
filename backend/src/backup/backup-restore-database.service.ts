@@ -3,7 +3,7 @@ import { EntityManager } from "typeorm";
 import { resolveCurrencyMetadata } from "../currencies/currency-metadata";
 import { tr } from "../i18n/translate";
 import { boundRestoredNotification } from "./notification-restore-bounds";
-import { withoutEnginePrices } from "./restore-engine-prices";
+import { dropSeveredBondData } from "./restore-engine-prices";
 import {
   BackupData,
   backupTables,
@@ -636,12 +636,10 @@ export class BackupRestoreDatabaseService {
       );
     }
 
-    if (table === "securities" && column === "bond_instrument_id") {
-      // The engine's rows for a security that is no longer linked.
-      data.security_prices = withoutEnginePrices(
-        data.security_prices,
-        new Set(severedRows.map((row) => row.id)),
-      );
+    if (table === "securities" && column === "bond_program_id") {
+      // The engine's rows and the series of rows of a security that is no
+      // longer linked (INV-BOND-005, INV-BOND-007).
+      dropSeveredBondData(data, new Set(severedRows.map((row) => row.id)));
     }
     return { count: absent + foreignCurrency, rows: severedRows };
   }

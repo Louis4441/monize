@@ -1,5 +1,6 @@
 import { statusFromQifFlags } from "./qif-status.util";
 import { Injectable, Logger } from "@nestjs/common";
+import { resolveTransactionSeries } from "../bonds/bond-series-resolver";
 import { Account, AccountSubType } from "../accounts/entities/account.entity";
 import { Security } from "../securities/entities/security.entity";
 import {
@@ -216,6 +217,19 @@ export class ImportInvestmentProcessorService {
     investmentTx.userId = ctx.userId;
     investmentTx.accountId = ctx.accountId;
     investmentTx.securityId = securityId;
+    // INV-BOND-007: a program-linked security's share-moving row names its
+    // series, inferred from the date (a file carries none); a row that cannot be
+    // resolved fails alone (its savepoint is rolled back) before it is written.
+    investmentTx.bondInstrumentId = await resolveTransactionSeries(
+      ctx.manager,
+      ctx.userId,
+      {
+        securityId,
+        action,
+        transactionDate: qifTx.date,
+        requested: false,
+      },
+    );
     investmentTx.action = action;
     investmentTx.transactionDate = qifTx.date;
     investmentTx.quantity = quantity || null;

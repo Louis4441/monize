@@ -108,6 +108,7 @@ describe("bond offer, history and backfill (integration)", () => {
       fakePdfText(b),
     );
     await cleanTables(dataSource, [
+      "bond_programs",
       "bond_instruments",
       "benchmark_series",
       "fetch_sync",
@@ -332,7 +333,7 @@ describe("bond offer, history and backfill (integration)", () => {
 
     beforeEach(async () => {
       // The backfill must store what it fetches, so start from an empty catalog.
-      await cleanTables(dataSource, ["bond_instruments"]);
+      await cleanTables(dataSource, ["bond_programs", "bond_instruments"]);
     });
 
     it("a rerun after a complete run fetches nothing", async () => {

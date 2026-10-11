@@ -5,6 +5,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { ConfigModule } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { DataSource } from "typeorm";
+import { bondProgramId } from "@/bonds/bond-instrument-id";
 import { User } from "@/users/entities/user.entity";
 import { NetWorthService } from "@/net-worth/net-worth.service";
 import { ScheduledTransactionsModule } from "@/scheduled-transactions/scheduled-transactions.module";
@@ -286,6 +287,51 @@ export async function deleteBondInstrumentBypassingImmutability(
   } finally {
     await dataSource.query(
       `ALTER TABLE bond_instruments ENABLE TRIGGER trg_bond_instruments_immutable`,
+    );
+  }
+}
+
+/**
+ * Inserts a bond program (the product a series belongs to) under its
+ * deterministic id and returns the id, for a test that inserts a bond
+ * instrument by hand: `bond_instruments.bond_program_id` is NOT NULL. A program
+ * already there is left as it is (`bond_programs` is insert only). The currency
+ * must exist.
+ */
+export async function insertBondProgram(
+  dataSource: DataSource,
+  programCode = "EDO",
+  currencyCode = "PLN",
+  issuerCountryCode = "PL",
+  issuerCode = "PL_MF",
+): Promise<string> {
+  const id = bondProgramId(issuerCountryCode, issuerCode, programCode);
+  await dataSource.query(
+    `INSERT INTO bond_programs (id, issuer_country_code, issuer_code, program_code, currency_code)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (issuer_country_code, issuer_code, program_code) DO NOTHING`,
+    [id, issuerCountryCode, issuerCode, programCode, currencyCode],
+  );
+  return id;
+}
+
+/**
+ * Runs a DELETE on `bond_programs` with its immutability trigger disabled, as
+ * `deleteBondInstrumentBypassingImmutability` does for instruments.
+ */
+export async function deleteBondProgramBypassingImmutability(
+  dataSource: DataSource,
+  deleteSql: string,
+  params: unknown[],
+): Promise<void> {
+  await dataSource.query(
+    `ALTER TABLE bond_programs DISABLE TRIGGER trg_bond_programs_immutable`,
+  );
+  try {
+    await dataSource.query(deleteSql, params);
+  } finally {
+    await dataSource.query(
+      `ALTER TABLE bond_programs ENABLE TRIGGER trg_bond_programs_immutable`,
     );
   }
 }

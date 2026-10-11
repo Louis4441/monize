@@ -6,6 +6,7 @@ export class UpdateSecurityDto extends PartialType(
   OmitType(CreateSecurityDto, [
     "priceChartEnabled",
     "skipPriceUpdates",
+    "bondAutoFetch",
   ] as const),
 ) {
   // PartialType normally treats null as absent; this NOT NULL opt-in must reject it.
@@ -19,4 +20,10 @@ export class UpdateSecurityDto extends PartialType(
   @ValidateIf((_object, value) => value !== undefined)
   @IsBoolean()
   skipPriceUpdates?: boolean;
+
+  // Same: the column is NOT NULL, so null is refused rather than reaching it.
+  @ApiProperty({ required: false })
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsBoolean()
+  bondAutoFetch?: boolean;
 }

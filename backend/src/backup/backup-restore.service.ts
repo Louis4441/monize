@@ -55,6 +55,7 @@ import { keyBearingExportTables } from "./export-table-queries";
 import { BackupAttachmentTransferService } from "./backup-attachment-transfer.service";
 import { BackupRestoreDatabaseService } from "./backup-restore-database.service";
 import { BondPriceService } from "../bonds/bond-price.service";
+import { clearForeignSeriesOfUser } from "../bonds/bond-series-resolver";
 import { invalidatePortfolioSummary } from "../securities/portfolio-summary-memo";
 
 const gunzipAsync = promisify(gunzip);
@@ -97,7 +98,7 @@ export class BackupRestoreService {
         (m) =>
           m.query(
             `SELECT id FROM securities
-              WHERE user_id = $1 AND bond_instrument_id IS NOT NULL
+              WHERE user_id = $1 AND bond_program_id IS NOT NULL
               ORDER BY id`,
             [userId],
           ),
@@ -348,9 +349,15 @@ export class BackupRestoreService {
                 const { counts: severedCatalogLinks, severed } =
                   await this.db.severUnavailableCatalogLinks(manager, data);
                 const unlinkedCount =
-                  severedCatalogLinks["securities.bond_instrument_id"] ?? 0;
+                  severedCatalogLinks["securities.bond_program_id"] ?? 0;
+                // Transactions whose series this deployment's catalog lacks are
+                // restored without one (their lots are inferred from the date).
+                const unlinkedSeriesCount =
+                  severedCatalogLinks[
+                    "investment_transactions.bond_instrument_id"
+                  ] ?? 0;
                 const unlinkedSymbols = (
-                  severed["securities.bond_instrument_id"] ?? []
+                  severed["securities.bond_program_id"] ?? []
                 )
                   .map((row) => row.symbol)
                   .filter((symbol): symbol is string => symbol !== null)
@@ -388,6 +395,10 @@ export class BackupRestoreService {
                 // to avoid circular/forward reference violations.
                 await this.db.restoreDeferredFkColumns(manager, data, userId);
 
+                // INV-BOND-007: whatever the file said, a row keeps a series
+                // only of its own security's program.
+                await clearForeignSeriesOfUser(manager, userId);
+
                 this.logger.log(`Backup restore completed for user ${userId}`);
                 // `skippedAttachments`, `unusableAiProviderKeys` and
                 // `unlinkedBondSecurities` are reported beside `restored`, never
@@ -410,6 +421,9 @@ export class BackupRestoreService {
                           symbols: unlinkedSymbols,
                         },
                       }
+                    : {}),
+                  ...(unlinkedSeriesCount > 0
+                    ? { unlinkedBondSeries: { count: unlinkedSeriesCount } }
                     : {}),
                 };
               }),

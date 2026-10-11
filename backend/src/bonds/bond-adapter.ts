@@ -164,6 +164,12 @@ export interface BondAdapter {
    */
   backfillCodes?(today: string): string[];
   /**
+   * The program (product) code a series code belongs to (`EDO` for `EDO1036`),
+   * or null when it is not a code of this adapter. Lets the daily check fetch
+   * only the programs a person has switched auto-fetch on for.
+   */
+  programOf?(seriesCode: string): string | null;
+  /**
    * The earliest sale month (`YYYY-MM`) the adapter's templates are validated
    * for, the lower bound of its series history.
    */

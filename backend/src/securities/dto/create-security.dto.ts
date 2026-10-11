@@ -229,9 +229,9 @@ export class CreateSecurityDto {
 
   @ApiProperty({
     description:
-      "The bond instrument (GET /bonds/instruments) to link this security to; " +
+      "The bond program (GET /bonds/programs) to link this security to; " +
       "null unlinks. A linked security is priced by the bond engine only, and " +
-      "its currency must equal the instrument's.",
+      "its currency must equal the program's.",
     required: false,
     nullable: true,
     format: "uuid",
@@ -244,7 +244,18 @@ export class CreateSecurityDto {
   @IsOptional()
   @ValidateIf((_o, value) => value !== null && value !== undefined)
   @IsUUID()
-  bondInstrumentId?: string | null;
+  bondProgramId?: string | null;
+
+  @ApiProperty({
+    description:
+      "Fetch every new series of the linked program automatically (the daily series job). Off by default.",
+    required: false,
+  })
+  // Not nullable: the column is NOT NULL, so null is refused here rather than
+  // reaching the database.
+  @ValidateIf((_o, value) => value !== undefined)
+  @IsBoolean()
+  bondAutoFetch?: boolean;
 
   @ApiProperty({
     description:

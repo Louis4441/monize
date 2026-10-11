@@ -559,11 +559,14 @@
     "TEMPLATE_NOT_VALIDATED": "Seri {{ series }} dijual sebelum templat {{ product }} divalidasi ({{ validFrom }}); seri ini memerlukan entri kurasi",
     "SERIES_TERMS_CONFLICT": "Seri {{ series }} sudah tersimpan dengan ketentuan yang berbeda; ketentuan yang tersimpan tidak pernah diganti",
     "countryCodeInvalid": "countryCode harus berupa kode negara dua huruf",
-    "programCodeInvalid": "programCode harus terdiri dari 1 hingga 12 huruf kapital atau angka"
+    "programCodeInvalid": "programCode harus terdiri dari 1 hingga 12 huruf kapital atau angka",
+    "SERIES_NOT_IN_PROGRAM": "Seri {{ series }} bukan bagian dari program obligasi sekuritas ini ({{ program }})",
+    "SERIES_NOT_DETERMINED": "Seri pembelian {{ program }} pada {{ date }} tidak dapat ditentukan: tidak ada satu pun seri program yang tersimpan yang dijual pada hari itu. Ambil seri dari sumber resmi dan pilih untuk transaksi ini.",
+    "SERIES_NOT_ALLOWED": "Seri obligasi hanya dapat disebutkan untuk transaksi yang mengubah jumlah unit sekuritas yang terhubung ke program obligasi"
   },
   "securities": {
     "bondPricedByEngine": "Sekuritas ini ditautkan ke instrumen obligasi dan dinilai oleh mesin obligasi, bukan oleh penyedia kuotasi. Gunakan Hitung ulang harga.",
-    "bondInstrumentNotFound": "Instrumen obligasi {{ id }} tidak ada",
+    "bondProgramNotFound": "Program obligasi {{ id }} tidak ada",
     "bondCurrencyMismatch": "Sekuritas dicatat dalam {{ currency }}, tetapi instrumen obligasi dinilai dalam {{ instrumentCurrency }}. Gunakan mata uang instrumen.",
     "bondCurrencyLocked": "Sekuritas yang ditautkan ke instrumen obligasi tetap dalam mata uang instrumen ({{ instrumentCurrency }}). Lepaskan tautannya dari obligasi sebelum mengubah mata uangnya.",
     "accountMustBeInvestment": "Akun harus bertipe INVESTMENT",

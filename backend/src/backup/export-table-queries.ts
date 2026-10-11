@@ -111,6 +111,7 @@ export const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   "auto_backup_policy",
   "exchange_rates", // global shared reference data, not per-user
   "exchange_rate_coverage", // provider coverage bookkeeping for the above
+  "bond_programs", // global bond reference data, refetched by the deployment
   "bond_instruments", // global bond reference data, refetched by the deployment
   "bond_terms_versions", // global bond reference data, refetched by the deployment
   "bond_period_rates", // global bond reference data, refetched by the deployment

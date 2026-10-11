@@ -360,6 +360,8 @@ export interface CreateInvestmentTransactionDescriptor extends BaseDescriptor {
   /** Resolved at preview time so confirm persists the rate the user approved. */
   exchangeRate: number;
   description: string | null;
+  /** The bond series resolved at preview time (INV-BOND-007); null for a non-bond. */
+  bondInstrumentId: string | null;
 }
 
 /**
@@ -401,6 +403,7 @@ export interface InvestmentTransactionRowDescriptor {
   commission: number;
   exchangeRate: number;
   description: string | null;
+  bondInstrumentId: string | null;
 }
 
 export interface CreateInvestmentTransactionsDescriptor extends BaseDescriptor {
@@ -471,6 +474,7 @@ export interface UpdateInvestmentTransactionDescriptor extends BaseDescriptor {
   commission: number;
   exchangeRate: number;
   description: string | null;
+  bondInstrumentId: string | null;
 }
 
 /** Delete an existing investment transaction. */
@@ -597,6 +601,7 @@ export interface BatchUpdateInvestmentTransactionRow {
   accruedInterest: number;
   exchangeRate: number;
   description: string | null;
+  bondInstrumentId: string | null;
 }
 
 /** One investment-transaction deletion inside a `batch_actions` envelope. */
@@ -940,6 +945,8 @@ export interface AiActionPreview {
   cashAccountName?: string | null;
   cashCurrency?: string | null;
   cashAmount?: number | null;
+  /** The bond series a program-linked security's row acts on (e.g. EDO1036). */
+  bondSeriesCode?: string | null;
   // create_security display fields (symbol/securityName/securityCurrency above
   // are reused for the ticker, full name, and currency).
   securityType?: string | null;
@@ -1015,6 +1022,8 @@ export interface AiActionPreviewRow {
   cashAccountName?: string | null;
   cashCurrency?: string | null;
   cashAmount?: number | null;
+  /** The bond series a program-linked security's row acts on (e.g. EDO1036). */
+  bondSeriesCode?: string | null;
   // Transfer-row display fields (batch_actions with operation: "create_transfer").
   // The "from" leg reuses accountName/amount/currencyCode.
   fromAccountName?: string;

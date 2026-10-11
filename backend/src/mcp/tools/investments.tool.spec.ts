@@ -1152,6 +1152,57 @@ describe("McpInvestmentsTools", () => {
       expect(parsed.count).toBe(1);
     });
 
+    it("forwards the series code to the prep and the resolved series to the write (INV-BOND-007)", async () => {
+      ctx.setUser({ userId: "u1", scopes: "write" });
+      investmentTransactionsService.prepareCreateInvestmentSingle.mockResolvedValue(
+        {
+          ...createPreview,
+          bondInstrumentId: "11111111-1111-5111-8111-111111111111",
+          bondSeriesCode: "EDO1036",
+        },
+      );
+      investmentTransactionsService.create.mockResolvedValue({
+        id: "inv-1",
+        transactionDate: "2026-01-15",
+      });
+
+      await handlers["manage_investment_transactions"](
+        {
+          operation: "create",
+          items: [{ ...createArgs.items[0], bondSeriesCode: "EDO1036" }],
+        },
+        ctx,
+      );
+
+      expect(
+        investmentTransactionsService.prepareCreateInvestmentSingle,
+      ).toHaveBeenCalledWith(
+        "u1",
+        expect.objectContaining({ bondSeriesCode: "EDO1036" }),
+      );
+      expect(investmentTransactionsService.create).toHaveBeenCalledWith(
+        "u1",
+        expect.objectContaining({
+          bondInstrumentId: "11111111-1111-5111-8111-111111111111",
+        }),
+      );
+    });
+
+    it("sends no series for a row that is not a bond", async () => {
+      ctx.setUser({ userId: "u1", scopes: "write" });
+      investmentTransactionsService.prepareCreateInvestmentSingle.mockResolvedValue(
+        createPreview,
+      );
+      investmentTransactionsService.create.mockResolvedValue({
+        id: "inv-1",
+        transactionDate: "2026-01-15",
+      });
+      await handlers["manage_investment_transactions"](createArgs, ctx);
+      expect(
+        investmentTransactionsService.create.mock.calls[0][1].bondInstrumentId,
+      ).toBeUndefined();
+    });
+
     it("forwards an explicit exchangeRate to the create prep (issue #744)", async () => {
       ctx.setUser({ userId: "u1", scopes: "write" });
       investmentTransactionsService.prepareCreateInvestmentSingle.mockResolvedValue(

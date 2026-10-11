@@ -167,6 +167,7 @@ export function investmentPreviewRow(
     cashCurrency: preview.cashCurrency,
     cashAmount: preview.cashAmount,
     description: preview.description,
+    bondSeriesCode: preview.bondSeriesCode,
   };
 }
 
@@ -526,6 +527,7 @@ export class AiActionBuilderService {
       commission: preview.commission,
       exchangeRate: preview.exchangeRate,
       description: preview.description,
+      bondInstrumentId: preview.bondInstrumentId,
     };
     return {
       actionId,
@@ -548,6 +550,7 @@ export class AiActionBuilderService {
         cashCurrency: preview.cashCurrency,
         cashAmount: preview.cashAmount,
         description: preview.description,
+        bondSeriesCode: preview.bondSeriesCode,
       },
     };
   }
@@ -670,6 +673,7 @@ export class AiActionBuilderService {
       commission: preview.commission,
       exchangeRate: preview.exchangeRate,
       description: preview.description,
+      bondInstrumentId: preview.bondInstrumentId,
     };
     return {
       actionId,
@@ -692,6 +696,7 @@ export class AiActionBuilderService {
         cashCurrency: preview.cashCurrency,
         cashAmount: preview.cashAmount,
         description: preview.description,
+        bondSeriesCode: preview.bondSeriesCode,
       },
     };
   }
@@ -796,6 +801,7 @@ export class AiActionBuilderService {
         commission: preview.commission,
         exchangeRate: preview.exchangeRate,
         description: preview.description,
+        bondInstrumentId: preview.bondInstrumentId,
       })),
     };
     return {

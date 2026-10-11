@@ -22,3 +22,38 @@ export function withoutEnginePrices(
       ),
   );
 }
+
+/**
+ * The file's investment transactions without the bond series of the given
+ * securities, which are restored unlinked: a security that is not
+ * program-linked never has one (INV-BOND-007).
+ */
+export function withoutBondSeries(
+  rows: BackupData["investment_transactions"],
+  securityIds: ReadonlySet<string>,
+): BackupData["investment_transactions"] {
+  if (securityIds.size === 0 || !Array.isArray(rows)) return rows;
+  return rows.map((row) =>
+    typeof row.security_id === "string" &&
+    securityIds.has(row.security_id) &&
+    row.bond_instrument_id != null
+      ? { ...row, bond_instrument_id: null }
+      : row,
+  );
+}
+
+/**
+ * What a restore must not keep of securities it restored unlinked from their
+ * bond program: their engine price rows and the series of their transactions.
+ * Replaces the two lists on `data`.
+ */
+export function dropSeveredBondData(
+  data: BackupData,
+  securityIds: ReadonlySet<string>,
+): void {
+  data.security_prices = withoutEnginePrices(data.security_prices, securityIds);
+  data.investment_transactions = withoutBondSeries(
+    data.investment_transactions,
+    securityIds,
+  );
+}

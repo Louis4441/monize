@@ -85,6 +85,7 @@ interface ManageInvItem {
   accruedInterest?: number;
   exchangeRate?: number;
   description?: string;
+  bondSeriesCode?: string;
   // update / delete
   transactionId?: string;
 }
@@ -531,7 +532,7 @@ export class McpInvestmentsTools {
                 .max(100)
                 .optional()
                 .describe(
-                  "The security, by ticker or name. Required to create anything that moves shares.",
+                  "Ticker or name. Required for anything that moves shares.",
                 ),
               action: z
                 .nativeEnum(InvestmentAction)
@@ -552,18 +553,23 @@ export class McpInvestmentsTools {
               accruedInterest: numberArg(z.number().min(0).max(999999999999))
                 .optional()
                 .describe(
-                  "REDEEM: accrued interest paid out with it. Booked as a linked INTEREST row inside the same cash movement, so never record it separately.",
+                  "REDEEM: accrued interest paid with it; booked as a linked INTEREST row in the same cash movement, never separately.",
                 ),
               exchangeRate: numberArg(z.number().min(0).max(999999999999))
                 .optional()
                 .describe(
-                  "Rate from the security's currency into the settlement account's. Supply the broker's own rate to make the cash posting exact; omit for same-currency, or to use the date's rate.",
+                  "Security-to-settlement currency rate. Give the broker's own for an exact cash posting; omit to use the date's rate.",
                 ),
               description: z
                 .string()
                 .max(TRANSACTION_NOTE_MAX_LENGTH)
                 .optional()
                 .describe("Description or memo."),
+              bondSeriesCode: z
+                .string()
+                .max(40)
+                .optional()
+                .describe("Bond series code, e.g. EDO1036."),
               transactionId: uuidString()
                 .optional()
                 .describe("update/delete: the row's id."),
@@ -636,6 +642,7 @@ export class McpInvestmentsTools {
       fundingAccountName: item.fundingAccountName,
       exchangeRate: item.exchangeRate,
       description: item.description,
+      bondSeriesCode: item.bondSeriesCode,
     };
   }
 
@@ -651,6 +658,7 @@ export class McpInvestmentsTools {
       accruedInterest: item.accruedInterest,
       exchangeRate: item.exchangeRate,
       description: item.description,
+      bondSeriesCode: item.bondSeriesCode,
     };
   }
 
@@ -704,6 +712,7 @@ export class McpInvestmentsTools {
         commission: preview.commission,
         exchangeRate: preview.exchangeRate,
         description: preview.description ?? undefined,
+        bondInstrumentId: preview.bondInstrumentId ?? undefined,
       });
       await this.writeLimiter.record(userId, "create_investment_transaction");
       return toolResult({ id: tx.id, date: tx.transactionDate, count: 1 });
@@ -769,6 +778,7 @@ export class McpInvestmentsTools {
         commission: preview.commission,
         exchangeRate: preview.exchangeRate,
         description: preview.description ?? undefined,
+        bondInstrumentId: preview.bondInstrumentId ?? undefined,
       })),
     );
     const skipped = [...bulk.skipped];
@@ -840,6 +850,7 @@ export class McpInvestmentsTools {
           commission: preview.commission,
           exchangeRate: preview.exchangeRate,
           description: preview.description ?? undefined,
+          bondInstrumentId: preview.bondInstrumentId ?? undefined,
         },
       );
       await this.writeLimiter.record(userId, "update_investment_transaction");
@@ -924,6 +935,7 @@ export class McpInvestmentsTools {
           commission: row.commission,
           exchangeRate: row.exchangeRate,
           description: row.description ?? undefined,
+          bondInstrumentId: row.bondInstrumentId ?? undefined,
         },
       );
       ids.push(tx.id);
@@ -1115,6 +1127,7 @@ export class McpInvestmentsTools {
           commission: d.commission,
           exchangeRate: d.exchangeRate,
           description: d.description ?? undefined,
+          bondInstrumentId: d.bondInstrumentId ?? undefined,
         });
         await this.writeLimiter.record(userId, "create_investment_transaction");
         return tx.id;
@@ -1133,6 +1146,7 @@ export class McpInvestmentsTools {
             commission: d.commission,
             exchangeRate: d.exchangeRate,
             description: d.description ?? undefined,
+            bondInstrumentId: d.bondInstrumentId ?? undefined,
           },
         );
         await this.writeLimiter.record(userId, "update_investment_transaction");

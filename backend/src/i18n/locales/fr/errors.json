@@ -559,11 +559,14 @@
     "TEMPLATE_NOT_VALIDATED": "La série {{ series }} a été vendue avant la validation du modèle {{ product }} ({{ validFrom }}) ; elle nécessite une entrée curatée",
     "SERIES_TERMS_CONFLICT": "La série {{ series }} est déjà enregistrée avec des conditions différentes ; les conditions enregistrées ne sont jamais remplacées",
     "countryCodeInvalid": "countryCode doit être un code pays à deux lettres",
-    "programCodeInvalid": "programCode doit comporter de 1 à 12 lettres majuscules ou chiffres"
+    "programCodeInvalid": "programCode doit comporter de 1 à 12 lettres majuscules ou chiffres",
+    "SERIES_NOT_IN_PROGRAM": "La série {{ series }} n'appartient pas au programme d'obligations de ce titre ({{ program }})",
+    "SERIES_NOT_DETERMINED": "La série de cet achat {{ program }} du {{ date }} n'a pas pu être déterminée : aucune série enregistrée du programme n'était en vente ce jour-là. Récupérez la série depuis la source officielle et choisissez-la pour la transaction.",
+    "SERIES_NOT_ALLOWED": "Une série d'obligations ne peut être indiquée que pour une transaction qui déplace des unités d'un titre lié à un programme d'obligations"
   },
   "securities": {
     "bondPricedByEngine": "Ce titre est lié à un instrument obligataire et il est valorisé par le moteur d'obligations, et non par un fournisseur de cours. Utilisez plutôt Recalculer les prix.",
-    "bondInstrumentNotFound": "L'instrument obligataire {{ id }} n'existe pas",
+    "bondProgramNotFound": "Le programme d'obligations {{ id }} n'existe pas",
     "bondCurrencyMismatch": "Le titre est enregistré en {{ currency }}, mais l'instrument obligataire est valorisé en {{ instrumentCurrency }}. Utilisez la devise de l'instrument.",
     "bondCurrencyLocked": "Un titre lié à un instrument obligataire reste dans la devise de l'instrument ({{ instrumentCurrency }}). Dissociez-le de l'obligation avant de changer sa devise.",
     "accountMustBeInvestment": "Le compte doit être de type INVESTMENT",

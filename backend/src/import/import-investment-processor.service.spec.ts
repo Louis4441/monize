@@ -138,6 +138,72 @@ describe("ImportInvestmentProcessorService", () => {
       expect(firstSaveArg.totalAmount).toBe(1509.99);
     });
 
+    describe("the bond series of a program-linked security (INV-BOND-007)", () => {
+      const SERIES = "11111111-1111-5111-8111-111111111111";
+      const buy = {
+        action: "Buy",
+        security: "EDO",
+        quantity: 10,
+        price: 100,
+        commission: 0,
+        date: "2026-10-15",
+      };
+      const linked = (
+        ctx: ImportContext,
+        opts: { linked?: boolean; onSale: string[] },
+      ) =>
+        managerOf(ctx).query.mockImplementation(async (sql: string) => {
+          if (sql.includes("s.bond_program_id AS id")) {
+            return [
+              opts.linked === false
+                ? { id: null, program_code: null }
+                : { id: "prog-1", program_code: "EDO" },
+            ];
+          }
+          if (sql.includes("saleWindow")) {
+            return opts.onSale.map((id) => ({ id }));
+          }
+          return [[], 1];
+        });
+      const makeCtx = () =>
+        makeContext({ securityMap: new Map([["EDO", "sec-1"]]) });
+
+      it("stores the series the date puts on sale on an imported purchase", async () => {
+        const ctx = makeCtx();
+        linked(ctx, { onSale: [SERIES] });
+        await service.processTransaction(ctx, buy);
+        expect(managerOf(ctx).save.mock.calls[0][0].bondInstrumentId).toBe(
+          SERIES,
+        );
+      });
+
+      it("fails the row, writing nothing, when no series covers the date", async () => {
+        const ctx = makeCtx();
+        linked(ctx, { onSale: [] });
+        await expect(service.processTransaction(ctx, buy)).rejects.toThrow(
+          /2026-10-15/,
+        );
+        expect(managerOf(ctx).save).not.toHaveBeenCalled();
+        expect(ctx.importResult.imported).toBe(0);
+      });
+
+      it("leaves a sale without a series, and an unlinked security's rows without one", async () => {
+        const sale = makeCtx();
+        linked(sale, { onSale: [SERIES] });
+        await service.processTransaction(sale, { ...buy, action: "Sell" });
+        expect(
+          managerOf(sale).save.mock.calls[0][0].bondInstrumentId,
+        ).toBeNull();
+
+        const unlinked = makeCtx();
+        linked(unlinked, { linked: false, onSale: [SERIES] });
+        await service.processTransaction(unlinked, buy);
+        expect(
+          managerOf(unlinked).save.mock.calls[0][0].bondInstrumentId,
+        ).toBeNull();
+      });
+    });
+
     describe("foreign-security cash posting (P5-003 / P5-009 in the import path)", () => {
       // `totalAmount` on an imported row is in the SECURITY's currency. It used
       // to be written straight onto the cash transaction with `exchangeRate: 1`,

@@ -86,7 +86,7 @@ const TRANSACTION_PRICE_REPLACEABLE_SOURCES = [...TRANSACTION_SOURCES];
  * price source). `$1` is the security id in every statement that uses these.
  */
 const BOND_LINKED_SQL = `SELECT 1 FROM securities bl
-   WHERE bl.id = $1::UUID AND bl.bond_instrument_id IS NOT NULL`;
+   WHERE bl.id = $1::UUID AND bl.bond_program_id IS NOT NULL`;
 
 /** The existing rows a provider may replace: neither a manual nor a bond-engine price. */
 const PROVIDER_MAY_REPLACE_SQL = `security_prices.source IS DISTINCT FROM 'manual'
@@ -223,7 +223,7 @@ function orderProvidersByDefault(
  */
 function isRefreshEligible(s: {
   skipPriceUpdates: boolean;
-  bondInstrumentId?: string | null;
+  bondProgramId?: string | null;
 }): boolean {
   if (!isPricedByQuoteProvider(s)) return false;
   return !s.skipPriceUpdates;

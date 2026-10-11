@@ -182,7 +182,7 @@ describe("SecuritiesService", () => {
       return security
         ? [
             {
-              bond_instrument_id: security.bondInstrumentId ?? null,
+              bond_program_id: security.bondProgramId ?? null,
               security_type: security.securityType ?? null,
               currency_code: security.currencyCode,
             },
@@ -466,13 +466,13 @@ describe("SecuritiesService", () => {
 
   describe("create", () => {
     describe("bond link (spec 12.1)", () => {
-      const INSTRUMENT = "11111111-1111-5111-8111-111111111111";
+      const PROGRAM = "11111111-1111-5111-8111-111111111111";
       const bond = {
         symbol: "TOS1029",
         name: "TOS 3y",
         securityType: "BOND",
         currencyCode: "PLN",
-        bondInstrumentId: INSTRUMENT,
+        bondProgramId: PROGRAM,
       };
 
       it("checks the instrument in the write's transaction, before the save, then recomputes after it", async () => {
@@ -495,8 +495,8 @@ describe("SecuritiesService", () => {
         await service.create("user-1", bond);
 
         expect(queryRunnerManager.query).toHaveBeenCalledWith(
-          expect.stringContaining("FROM bond_instruments"),
-          [INSTRUMENT],
+          expect.stringContaining("FROM bond_programs"),
+          [PROGRAM],
         );
         expect(order).toEqual(["check", "save", "recompute"]);
         expect(mockBondPriceService.recomputeSecurity).toHaveBeenCalledWith(
@@ -534,7 +534,7 @@ describe("SecuritiesService", () => {
           currencyCode: "USD",
         });
         expect(queryRunnerManager.query).not.toHaveBeenCalledWith(
-          expect.stringContaining("bond_instruments"),
+          expect.stringContaining("bond_programs"),
           expect.anything(),
         );
         expect(mockBondPriceService.recomputeSecurity).not.toHaveBeenCalled();
@@ -547,7 +547,7 @@ describe("SecuritiesService", () => {
           new Error("catalog empty"),
         );
         await expect(service.create("user-1", bond)).resolves.toMatchObject({
-          bondInstrumentId: INSTRUMENT,
+          bondProgramId: PROGRAM,
         });
       });
     });
@@ -761,7 +761,7 @@ describe("SecuritiesService", () => {
 
   describe("update", () => {
     describe("bond link (spec 12.1)", () => {
-      const INSTRUMENT = "11111111-1111-5111-8111-111111111111";
+      const PROGRAM = "11111111-1111-5111-8111-111111111111";
       const OTHER = "22222222-2222-5222-8222-222222222222";
       const pln = {
         ...mockSecurity,
@@ -776,7 +776,8 @@ describe("SecuritiesService", () => {
       const serve = (security: Record<string, unknown>) => {
         securitiesRepository.findOne.mockResolvedValue({ ...security });
         const snapshot = {
-          bond_instrument_id: security.bondInstrumentId ?? null,
+          bond_program_id: security.bondProgramId ?? null,
+          bond_auto_fetch: security.bondAutoFetch ?? false,
           security_type: security.securityType ?? null,
           currency_code: security.currencyCode,
         };
@@ -793,7 +794,7 @@ describe("SecuritiesService", () => {
         queryRunnerManager.query.mockImplementation(
           queryWith(async (sql: string) => {
             opts.onQuery?.(sql);
-            if (/FROM bond_instruments/.test(sql))
+            if (/FROM bond_programs/.test(sql))
               return opts.instrumentCurrency === null
                 ? []
                 : [{ currency_code: opts.instrumentCurrency ?? "PLN" }];
@@ -807,7 +808,7 @@ describe("SecuritiesService", () => {
         serve({ ...pln });
         const order: string[] = [];
         world({
-          onQuery: (sql) => /bond_instruments/.test(sql) && order.push("check"),
+          onQuery: (sql) => /bond_programs/.test(sql) && order.push("check"),
         });
         queryRunnerManager.save.mockImplementation(async (a, b) => {
           order.push("save");
@@ -819,7 +820,7 @@ describe("SecuritiesService", () => {
         });
 
         await service.update("user-1", "sec-1", {
-          bondInstrumentId: INSTRUMENT,
+          bondProgramId: PROGRAM,
         });
 
         expect(order).toEqual(["check", "save", "recompute"]);
@@ -833,14 +834,14 @@ describe("SecuritiesService", () => {
         serve({ ...pln });
         world({ instrumentCurrency: null });
         await expect(
-          service.update("user-1", "sec-1", { bondInstrumentId: INSTRUMENT }),
+          service.update("user-1", "sec-1", { bondProgramId: PROGRAM }),
         ).rejects.toThrow(BadRequestException);
 
         // A fresh row per request, as the database would return one.
         serve({ ...pln });
         world({ instrumentCurrency: "EUR" });
         await expect(
-          service.update("user-1", "sec-1", { bondInstrumentId: INSTRUMENT }),
+          service.update("user-1", "sec-1", { bondProgramId: PROGRAM }),
         ).rejects.toThrow(/recorded in PLN.*priced in EUR/);
 
         expect(queryRunnerManager.save).not.toHaveBeenCalled();
@@ -850,7 +851,7 @@ describe("SecuritiesService", () => {
       it("refuses a currency change of a security that stays linked", async () => {
         serve({
           ...pln,
-          bondInstrumentId: INSTRUMENT,
+          bondProgramId: PROGRAM,
         });
         world();
 
@@ -863,17 +864,17 @@ describe("SecuritiesService", () => {
       it("allows a currency change together with unlinking, and checks nothing", async () => {
         serve({
           ...pln,
-          bondInstrumentId: INSTRUMENT,
+          bondProgramId: PROGRAM,
         });
 
         const result = await service.update("user-1", "sec-1", {
           currencyCode: "USD",
-          bondInstrumentId: null,
+          bondProgramId: null,
         });
 
-        expect(result.bondInstrumentId).toBeNull();
+        expect(result.bondProgramId).toBeNull();
         expect(queryRunnerManager.query).not.toHaveBeenCalledWith(
-          expect.stringContaining("bond_instruments"),
+          expect.stringContaining("bond_programs"),
           expect.anything(),
         );
         expect(mockBondPriceService.recomputeSecurity).not.toHaveBeenCalled();
@@ -882,7 +883,7 @@ describe("SecuritiesService", () => {
       it("deletes the engine's rows in the write's transaction on unlinking, then refreshes derived state after the commit", async () => {
         serve({
           ...pln,
-          bondInstrumentId: INSTRUMENT,
+          bondProgramId: PROGRAM,
         });
         const order: string[] = [];
         mockBondPriceService.clearEnginePrices.mockImplementation(
@@ -900,7 +901,7 @@ describe("SecuritiesService", () => {
           order.push("publish");
         });
 
-        await service.update("user-1", "sec-1", { bondInstrumentId: null });
+        await service.update("user-1", "sec-1", { bondProgramId: null });
 
         expect(order).toEqual(["clear", "save", "publish"]);
         expect(mockBondPriceService.clearEnginePrices).toHaveBeenCalledWith(
@@ -918,10 +919,10 @@ describe("SecuritiesService", () => {
       it("clears the old instrument's engine rows when the link moves, and prices the new one after the commit", async () => {
         serve({
           ...pln,
-          bondInstrumentId: INSTRUMENT,
+          bondProgramId: PROGRAM,
         });
         world();
-        await service.update("user-1", "sec-1", { bondInstrumentId: OTHER });
+        await service.update("user-1", "sec-1", { bondProgramId: OTHER });
         expect(mockBondPriceService.clearEnginePrices).toHaveBeenCalledTimes(1);
         expect(mockBondPriceService.recomputeSecurity).toHaveBeenCalledWith(
           "user-1",
@@ -932,7 +933,7 @@ describe("SecuritiesService", () => {
       it("clears nothing when the link is unchanged", async () => {
         serve({
           ...pln,
-          bondInstrumentId: INSTRUMENT,
+          bondProgramId: PROGRAM,
         });
         await service.update("user-1", "sec-1", { name: "Renamed" });
         expect(mockBondPriceService.clearEnginePrices).not.toHaveBeenCalled();
@@ -944,11 +945,11 @@ describe("SecuritiesService", () => {
       it("does not check or recompute when an edit leaves the link, the currency and the type alone", async () => {
         serve({
           ...pln,
-          bondInstrumentId: INSTRUMENT,
+          bondProgramId: PROGRAM,
         });
         await service.update("user-1", "sec-1", { name: "Renamed" });
         expect(queryRunnerManager.query).not.toHaveBeenCalledWith(
-          expect.stringContaining("bond_instruments"),
+          expect.stringContaining("bond_programs"),
           expect.anything(),
         );
         expect(mockBondPriceService.recomputeSecurity).not.toHaveBeenCalled();
@@ -957,11 +958,110 @@ describe("SecuritiesService", () => {
       it("recomputes when the link moves to another instrument", async () => {
         serve({
           ...pln,
-          bondInstrumentId: INSTRUMENT,
+          bondProgramId: PROGRAM,
         });
         world();
-        await service.update("user-1", "sec-1", { bondInstrumentId: OTHER });
+        await service.update("user-1", "sec-1", { bondProgramId: OTHER });
         expect(mockBondPriceService.recomputeSecurity).toHaveBeenCalledTimes(1);
+      });
+
+      describe("the series of the rows follow the link (INV-BOND-007)", () => {
+        const clears = () =>
+          queryRunnerManager.query.mock.calls.filter(([q]) =>
+            /UPDATE investment_transactions/.test(String(q)),
+          );
+
+        it("clears the series outside the new program in the link's own transaction, before the save", async () => {
+          serve({ ...pln, bondProgramId: PROGRAM });
+          world();
+          const order: string[] = [];
+          queryRunnerManager.query.mockImplementation(
+            queryWith(async (sql: string) => {
+              if (/UPDATE investment_transactions/.test(sql))
+                order.push("clear");
+              if (/FROM bond_programs/.test(sql))
+                return [{ currency_code: "PLN" }];
+              return [];
+            }),
+          );
+          queryRunnerManager.save.mockImplementation(async (a, b) => {
+            order.push("save");
+            return b ?? a;
+          });
+          await service.update("user-1", "sec-1", { bondProgramId: OTHER });
+          expect(order).toEqual(["clear", "save"]);
+          expect(clears()[0][1]).toEqual(["sec-1", "user-1", OTHER]);
+        });
+
+        it("clears every series of a security that is unlinked", async () => {
+          serve({ ...pln, bondProgramId: PROGRAM });
+          world();
+          await service.update("user-1", "sec-1", { bondProgramId: null });
+          expect(clears()).toHaveLength(1);
+          expect(clears()[0][1]).toEqual(["sec-1", "user-1", null]);
+        });
+
+        it("clears nothing while the link is unchanged", async () => {
+          serve({ ...pln, bondProgramId: PROGRAM });
+          world();
+          await service.update("user-1", "sec-1", { name: "Renamed" });
+          expect(clears()).toHaveLength(0);
+        });
+
+        it("does not touch the rows when the link is refused", async () => {
+          serve({ ...pln });
+          world({ instrumentCurrency: "EUR" });
+          await expect(
+            service.update("user-1", "sec-1", { bondProgramId: PROGRAM }),
+          ).rejects.toThrow(BadRequestException);
+          expect(clears()).toHaveLength(0);
+        });
+      });
+
+      describe("auto-fetch of the program's new series (spec 2.5)", () => {
+        it("is saved with the update and kept when the request does not mention it", async () => {
+          serve({ ...pln, bondProgramId: PROGRAM });
+          world();
+          await service.update("user-1", "sec-1", { bondAutoFetch: true });
+          expect(queryRunnerManager.save.mock.calls[0][1].bondAutoFetch).toBe(
+            true,
+          );
+
+          queryRunnerManager.save.mockClear();
+          serve({ ...pln, bondProgramId: PROGRAM, bondAutoFetch: true });
+          await service.update("user-1", "sec-1", { name: "Renamed" });
+          expect(queryRunnerManager.save.mock.calls[0][1].bondAutoFetch).toBe(
+            true,
+          );
+        });
+
+        it("is switched off by an unlink and cannot be on for an unlinked security", async () => {
+          serve({ ...pln, bondProgramId: PROGRAM, bondAutoFetch: true });
+          world();
+          await service.update("user-1", "sec-1", { bondProgramId: null });
+          expect(queryRunnerManager.save.mock.calls[0][1].bondAutoFetch).toBe(
+            false,
+          );
+
+          queryRunnerManager.save.mockClear();
+          serve({ ...pln });
+          await service.update("user-1", "sec-1", { bondAutoFetch: true });
+          expect(queryRunnerManager.save.mock.calls[0][1].bondAutoFetch).toBe(
+            false,
+          );
+        });
+
+        it("is recorded in the snapshot an undo restores", async () => {
+          serve({ ...pln, bondProgramId: PROGRAM, bondAutoFetch: true });
+          world();
+          await service.update("user-1", "sec-1", { bondAutoFetch: false });
+          expect(mockActionHistoryService.record).toHaveBeenCalledWith(
+            "user-1",
+            expect.objectContaining({
+              beforeData: expect.objectContaining({ bondAutoFetch: true }),
+            }),
+          );
+        });
       });
 
       describe("only a BOND is linked (R8)", () => {
@@ -972,7 +1072,7 @@ describe("SecuritiesService", () => {
           });
           world();
           await expect(
-            service.update("user-1", "sec-1", { bondInstrumentId: INSTRUMENT }),
+            service.update("user-1", "sec-1", { bondProgramId: PROGRAM }),
           ).rejects.toThrow(/Only a security of type Bond/);
           expect(queryRunnerManager.save).not.toHaveBeenCalled();
         });
@@ -985,7 +1085,7 @@ describe("SecuritiesService", () => {
           world();
           await service.update("user-1", "sec-1", {
             securityType: "BOND",
-            bondInstrumentId: INSTRUMENT,
+            bondProgramId: PROGRAM,
           });
           expect(queryRunnerManager.save).toHaveBeenCalled();
         });
@@ -993,7 +1093,7 @@ describe("SecuritiesService", () => {
         it("refuses changing the type of a linked security away from BOND", async () => {
           serve({
             ...pln,
-            bondInstrumentId: INSTRUMENT,
+            bondProgramId: PROGRAM,
           });
           world();
           await expect(
@@ -1006,11 +1106,11 @@ describe("SecuritiesService", () => {
         it("allows changing the type away from BOND when the same request unlinks", async () => {
           serve({
             ...pln,
-            bondInstrumentId: INSTRUMENT,
+            bondProgramId: PROGRAM,
           });
           await service.update("user-1", "sec-1", {
             securityType: "ETF",
-            bondInstrumentId: null,
+            bondProgramId: null,
           });
           expect(queryRunnerManager.save).toHaveBeenCalled();
           expect(mockBondPriceService.clearEnginePrices).toHaveBeenCalled();
@@ -1022,7 +1122,7 @@ describe("SecuritiesService", () => {
           serve({ ...pln });
           world({ notBonds: true });
           await expect(
-            service.update("user-1", "sec-1", { bondInstrumentId: INSTRUMENT }),
+            service.update("user-1", "sec-1", { bondProgramId: PROGRAM }),
           ).rejects.toThrow(/not numbers of bonds/);
           expect(queryRunnerManager.save).not.toHaveBeenCalled();
           expect(mockBondPriceService.recomputeSecurity).not.toHaveBeenCalled();
@@ -1037,7 +1137,7 @@ describe("SecuritiesService", () => {
             },
           });
           await service.update("user-1", "sec-1", {
-            bondInstrumentId: INSTRUMENT,
+            bondProgramId: PROGRAM,
           });
           expect(sql).toMatch(/faceValue/);
           expect(sql).toMatch(/ORDER BY version DESC/);
@@ -1050,7 +1150,7 @@ describe("SecuritiesService", () => {
         it("is not read when the link is unchanged (a rename of a linked bond)", async () => {
           serve({
             ...pln,
-            bondInstrumentId: INSTRUMENT,
+            bondProgramId: PROGRAM,
           });
           world({ notBonds: true });
           await service.update("user-1", "sec-1", { name: "Renamed" });
@@ -1062,28 +1162,28 @@ describe("SecuritiesService", () => {
         it("is no change: nothing is cleared, nothing recomputed, the stored id stays canonical", async () => {
           serve({
             ...pln,
-            bondInstrumentId: INSTRUMENT,
+            bondProgramId: PROGRAM,
           });
           world();
           await service.update("user-1", "sec-1", {
-            bondInstrumentId: INSTRUMENT.toUpperCase(),
+            bondProgramId: PROGRAM.toUpperCase(),
           });
           expect(mockBondPriceService.clearEnginePrices).not.toHaveBeenCalled();
           expect(mockBondPriceService.recomputeSecurity).not.toHaveBeenCalled();
-          expect(
-            queryRunnerManager.save.mock.calls[0][1].bondInstrumentId,
-          ).toBe(INSTRUMENT);
+          expect(queryRunnerManager.save.mock.calls[0][1].bondProgramId).toBe(
+            PROGRAM,
+          );
         });
 
         it("a new link in capitals is stored in lower case", async () => {
           serve({ ...pln });
           world();
           await service.update("user-1", "sec-1", {
-            bondInstrumentId: INSTRUMENT.toUpperCase(),
+            bondProgramId: PROGRAM.toUpperCase(),
           });
-          expect(
-            queryRunnerManager.save.mock.calls[0][1].bondInstrumentId,
-          ).toBe(INSTRUMENT);
+          expect(queryRunnerManager.save.mock.calls[0][1].bondProgramId).toBe(
+            PROGRAM,
+          );
         });
       });
 
@@ -1093,7 +1193,7 @@ describe("SecuritiesService", () => {
           const sqls: string[] = [];
           world({ onQuery: (q) => sqls.push(q) });
           await service.update("user-1", "sec-1", {
-            bondInstrumentId: INSTRUMENT,
+            bondProgramId: PROGRAM,
           });
           const lock = queryRunnerManager.query.mock.calls.find(([q]) =>
             /FOR UPDATE/.test(q),
@@ -1118,15 +1218,15 @@ describe("SecuritiesService", () => {
           serve({ ...pln });
           lockedRowOf = async () => [
             {
-              bond_instrument_id: INSTRUMENT,
+              bond_program_id: PROGRAM,
               security_type: "BOND",
               currency_code: "PLN",
             },
           ];
           await service.update("user-1", "sec-1", { name: "Renamed" });
-          expect(
-            queryRunnerManager.save.mock.calls[0][1].bondInstrumentId,
-          ).toBe(INSTRUMENT);
+          expect(queryRunnerManager.save.mock.calls[0][1].bondProgramId).toBe(
+            PROGRAM,
+          );
           expect(mockBondPriceService.clearEnginePrices).not.toHaveBeenCalled();
           expect(mockBondPriceService.recomputeSecurity).not.toHaveBeenCalled();
         });
@@ -1135,12 +1235,12 @@ describe("SecuritiesService", () => {
           serve({ ...pln });
           lockedRowOf = async () => [
             {
-              bond_instrument_id: INSTRUMENT,
+              bond_program_id: PROGRAM,
               security_type: "BOND",
               currency_code: "PLN",
             },
           ];
-          await service.update("user-1", "sec-1", { bondInstrumentId: null });
+          await service.update("user-1", "sec-1", { bondProgramId: null });
           expect(mockBondPriceService.clearEnginePrices).toHaveBeenCalledTimes(
             1,
           );
@@ -2344,16 +2444,16 @@ describe("SecuritiesService", () => {
     });
 
     describe("previewUpdateSecurity of a bond-linked security (R18)", () => {
-      const INSTRUMENT = "11111111-1111-5111-8111-111111111111";
+      const PROGRAM = "11111111-1111-5111-8111-111111111111";
       const linked = {
         ...sec,
         securityType: "BOND",
         currencyCode: "PLN",
-        bondInstrumentId: INSTRUMENT,
+        bondProgramId: PROGRAM,
       };
       const catalog = (currency: string | null) =>
         queryRunnerManager.query.mockImplementation(async (sql: string) =>
-          /FROM bond_instruments/.test(sql)
+          /FROM bond_programs/.test(sql)
             ? currency === null
               ? []
               : [{ currency_code: currency }]
@@ -2766,7 +2866,7 @@ describe("SecuritiesService", () => {
       queryRunnerManager.query.mockResolvedValue([{ id: "s1" }, { id: "s2" }]);
       await service.recomputeBondPricesOfAccounts("user-1", ["acc-1"]);
       const [sql, params] = queryRunnerManager.query.mock.calls[0];
-      expect(sql).toMatch(/s\.bond_instrument_id IS NOT NULL/);
+      expect(sql).toMatch(/s\.bond_program_id IS NOT NULL/);
       expect(sql).toMatch(/s\.user_id = \$1/);
       expect(params).toEqual(["user-1", ["acc-1"]]);
       expect(
@@ -2807,10 +2907,66 @@ describe("SecuritiesService", () => {
           name: "X",
           securityType: "ETF",
           currencyCode: "PLN",
-          bondInstrumentId: "11111111-1111-5111-8111-111111111111",
+          bondProgramId: "11111111-1111-5111-8111-111111111111",
         }),
       ).rejects.toThrow(/Only a security of type Bond/);
       expect(queryRunnerManager.save).not.toHaveBeenCalled();
+    });
+
+    describe("create links to a program and takes the auto-fetch switch", () => {
+      const PROGRAM = "11111111-1111-5111-8111-111111111111";
+      const bond = {
+        symbol: "EDO",
+        name: "EDO",
+        securityType: "BOND",
+        currencyCode: "PLN",
+      };
+      beforeEach(() => {
+        queryRunnerManager.findOne.mockResolvedValue(null);
+        queryRunnerManager.query.mockResolvedValue([{ currency_code: "PLN" }]);
+        queryRunnerManager.save.mockImplementation(async (a, b) => b ?? a);
+      });
+
+      it("stores the program id lower-cased, with auto-fetch as asked, after the program check", async () => {
+        await service.create("user-1", {
+          ...bond,
+          bondProgramId: PROGRAM.toUpperCase(),
+          bondAutoFetch: true,
+        });
+        expect(queryRunnerManager.create.mock.calls[0][1]).toMatchObject({
+          bondProgramId: PROGRAM,
+          bondAutoFetch: true,
+        });
+        expect(queryRunnerManager.query).toHaveBeenCalledWith(
+          expect.stringContaining("FROM bond_programs"),
+          [PROGRAM],
+        );
+      });
+
+      it("refuses a program that does not exist, writing nothing", async () => {
+        queryRunnerManager.query.mockResolvedValue([]);
+        await expect(
+          service.create("user-1", { ...bond, bondProgramId: PROGRAM }),
+        ).rejects.toThrow(/does not exist/);
+        expect(queryRunnerManager.save).not.toHaveBeenCalled();
+      });
+
+      it("refuses a program in another currency", async () => {
+        await expect(
+          service.create("user-1", {
+            ...bond,
+            currencyCode: "EUR",
+            bondProgramId: PROGRAM,
+          }),
+        ).rejects.toThrow(/recorded in EUR.*priced in PLN/);
+      });
+
+      it("keeps auto-fetch off for a security that is not linked, whatever was sent", async () => {
+        await service.create("user-1", { ...bond, bondAutoFetch: true });
+        expect(queryRunnerManager.create.mock.calls[0][1]).toMatchObject({
+          bondAutoFetch: false,
+        });
+      });
     });
   });
 });

@@ -4,10 +4,12 @@
 -- A bond instrument's terms, a published period rate, an NBP reference rate or a
 -- CPI print has no owner: one published series serves every account and every
 -- country's instrument, exactly as an exchange rate or a market index close does.
--- These five tables are global reference data with no owner column, RLS-exempt
+-- These six tables are global reference data with no owner column, RLS-exempt
 -- rather than policied (see the exemption block at the foot of database/schema.sql
 -- and docs/row-level-security-contract.md). No rows are seeded here.
 --
+--   bond_programs          one row per program (the product, e.g. EDO), keyed (issuer country, issuer, program); insert only
+--                          (docs/specs/bond-program-securities.md section 2.1)
 --   bond_instruments       one row per series, keyed (issuer country, issuer, series); insert only
 --   bond_terms_versions    the instrument terms as published, versioned, with a content hash; immutable
 --   bond_period_rates      the rate of each interest period; immutable
@@ -26,11 +28,22 @@
 --
 -- Rates are NUMERIC(20,10): an exchange-rate-like quantity, not money.
 
+CREATE TABLE IF NOT EXISTS bond_programs (
+    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    issuer_country_code CHAR(2) NOT NULL,
+    issuer_code         VARCHAR(40) NOT NULL,
+    program_code        VARCHAR(40) NOT NULL,
+    currency_code       VARCHAR(3) NOT NULL REFERENCES currencies(code),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (issuer_country_code, issuer_code, program_code)
+);
+
 CREATE TABLE IF NOT EXISTS bond_instruments (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     issuer_country_code CHAR(2) NOT NULL,
     issuer_code         VARCHAR(40) NOT NULL,
     program_code        VARCHAR(40) NOT NULL,
+    bond_program_id     UUID NOT NULL REFERENCES bond_programs(id) ON DELETE RESTRICT,
     series_code         VARCHAR(40) NOT NULL,
     currency_code       VARCHAR(3) NOT NULL REFERENCES currencies(code),
     marketability       VARCHAR(30) NOT NULL,
@@ -101,6 +114,8 @@ CREATE TRIGGER trg_bond_period_rates_immutable
     BEFORE UPDATE OR DELETE ON bond_period_rates
     FOR EACH ROW EXECUTE FUNCTION bond_reject_mutation();
 
+COMMENT ON TABLE bond_programs IS
+  'Sovereign bond programs (the product a person holds, e.g. EDO), any issuer country. Global reference data with no owner column; insert only.';
 COMMENT ON TABLE bond_instruments IS
   'Sovereign bond series, any issuer country. Global reference data with no owner column; insert only.';
 COMMENT ON TABLE bond_terms_versions IS

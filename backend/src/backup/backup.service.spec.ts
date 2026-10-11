@@ -1847,7 +1847,7 @@ describe("BackupService", () => {
         ).restoreService.bondPrices;
         const base = mockQueryRunner.query.getMockImplementation()!;
         mockQueryRunner.query.mockImplementation((sql: string, params) =>
-          String(sql).includes("bond_instrument_id IS NOT NULL")
+          String(sql).includes("bond_program_id IS NOT NULL")
             ? Promise.resolve([{ id: "sec-1" }, { id: "sec-2" }])
             : base(sql, params),
         );
@@ -1860,6 +1860,72 @@ describe("BackupService", () => {
           userId,
           "sec-2",
         );
+      });
+
+      it("keeps only the series of the user's own program after the restore, in the restore's transaction (INV-BOND-007)", async () => {
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        await service.restoreData(userId, makeInput({ password: "test" }));
+        const calls = mockQueryRunner.query.mock.calls.map(([sql]: [string]) =>
+          String(sql),
+        );
+        const clear = calls.findIndex((sql) =>
+          /UPDATE investment_transactions t\s+SET bond_instrument_id = NULL/.test(
+            sql,
+          ),
+        );
+        expect(clear).toBeGreaterThan(-1);
+        expect(mockQueryRunner.query.mock.calls[clear][1]).toEqual([userId]);
+        // After every table was inserted, before the transaction ends.
+        const lastInsert = calls.reduce(
+          (last, sql, i) => (/^\s*INSERT INTO/.test(sql) ? i : last),
+          -1,
+        );
+        expect(clear).toBeGreaterThan(lastInsert);
+      });
+
+      it("reports the transactions restored without a series this catalog lacks, beside restored", async () => {
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        const ABSENT = "22222222-2222-5222-8222-222222222222";
+        const base = mockQueryRunner.query.getMockImplementation()!;
+        mockQueryRunner.query.mockImplementation((sql: string, params) =>
+          String(sql).includes("FROM bond_instruments WHERE id = ANY")
+            ? Promise.resolve([])
+            : base(sql, params),
+        );
+        const result = await service.restoreData(
+          userId,
+          makeInput({
+            password: "test",
+            data: {
+              ...validBackupData,
+              accounts: [
+                {
+                  id: "44444444-4444-4444-8444-444444444444",
+                  user_id: userId,
+                  name: "Brokerage",
+                  account_type: "INVESTMENT",
+                  currency_code: "PLN",
+                },
+              ],
+              investment_transactions: [
+                {
+                  id: "33333333-3333-4333-8333-333333333333",
+                  user_id: userId,
+                  account_id: "44444444-4444-4444-8444-444444444444",
+                  action: "BUY",
+                  transaction_date: "2026-10-15",
+                  total_amount: 1,
+                  bond_instrument_id: ABSENT,
+                },
+              ],
+            } as never,
+          }),
+        );
+        expect(result).toMatchObject({ unlinkedBondSeries: { count: 1 } });
+        // Beside `restored`, never inside it.
+        expect(JSON.stringify(result.restored)).not.toContain("unlinkedBond");
       });
 
       it.each(["notifications", "budget_alerts"])(

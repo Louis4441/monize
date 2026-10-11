@@ -94,6 +94,7 @@ describe("AiActionSigningService", () => {
       commission: 0,
       exchangeRate: 1,
       description: null,
+      bondInstrumentId: null,
     });
     const bulk: CreateInvestmentTransactionsDescriptor = {
       type: "create_investment_transactions",

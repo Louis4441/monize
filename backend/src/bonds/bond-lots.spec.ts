@@ -35,6 +35,7 @@ describe("bondLotsFromTransactions (spec 12.2 truth table)", () => {
           {
             purchaseDate: "2026-10-15",
             quantity: 25,
+            instrumentId: null,
             purchaseDateAssumed: false,
           },
         ]);
@@ -54,6 +55,7 @@ describe("bondLotsFromTransactions (spec 12.2 truth table)", () => {
         {
           purchaseDate: "2026-01-10",
           quantity: 10,
+          instrumentId: null,
           purchaseDateAssumed: false,
         },
       ]);
@@ -61,7 +63,12 @@ describe("bondLotsFromTransactions (spec 12.2 truth table)", () => {
 
     it("an unlinked TRANSFER_IN is a lot dated the transfer, flagged assumed", () => {
       expect(lots([tx("TRANSFER_IN", "2026-03-01", "7")])).toEqual([
-        { purchaseDate: "2026-03-01", quantity: 7, purchaseDateAssumed: true },
+        {
+          purchaseDate: "2026-03-01",
+          quantity: 7,
+          instrumentId: null,
+          purchaseDateAssumed: true,
+        },
       ]);
     });
 
@@ -72,7 +79,12 @@ describe("bondLotsFromTransactions (spec 12.2 truth table)", () => {
           tx("TRANSFER_OUT", "2026-02-01", "4"),
         ]),
       ).toEqual([
-        { purchaseDate: "2026-01-10", quantity: 6, purchaseDateAssumed: false },
+        {
+          purchaseDate: "2026-01-10",
+          quantity: 6,
+          instrumentId: null,
+          purchaseDateAssumed: false,
+        },
       ]);
     });
   });
@@ -210,6 +222,7 @@ describe("bondLotsFromTransactions (spec 12.2 truth table)", () => {
           {
             purchaseDate: "2026-02-10",
             quantity: 3,
+            instrumentId: null,
             purchaseDateAssumed: false,
           },
         ]);
@@ -218,7 +231,12 @@ describe("bondLotsFromTransactions (spec 12.2 truth table)", () => {
 
     it("an exact removal closes the lot", () => {
       expect(lots([...buys, tx("SELL", "2026-03-01", "10")])).toEqual([
-        { purchaseDate: "2026-02-10", quantity: 5, purchaseDateAssumed: false },
+        {
+          purchaseDate: "2026-02-10",
+          quantity: 5,
+          instrumentId: null,
+          purchaseDateAssumed: false,
+        },
       ]);
     });
 
@@ -235,7 +253,12 @@ describe("bondLotsFromTransactions (spec 12.2 truth table)", () => {
         tx("SELL", "2026-03-01", "99", { status: "VOID" }),
       ]),
     ).toEqual([
-      { purchaseDate: "2026-02-10", quantity: 5, purchaseDateAssumed: false },
+      {
+        purchaseDate: "2026-02-10",
+        quantity: 5,
+        instrumentId: null,
+        purchaseDateAssumed: false,
+      },
     ]);
   });
 
@@ -358,12 +381,18 @@ describe("bondLotsFromTransactions (spec 12.2 truth table)", () => {
         {
           purchaseDate: "2026-01-10",
           quantity: 10,
+          instrumentId: null,
           purchaseDateAssumed: false,
         },
       ]);
       expect(bondLotsAsOf(rows, "2026-02-10").lots).toHaveLength(2);
       expect(bondLotsAsOf(rows, "2026-03-01").lots).toEqual([
-        { purchaseDate: "2026-02-10", quantity: 3, purchaseDateAssumed: false },
+        {
+          purchaseDate: "2026-02-10",
+          quantity: 3,
+          instrumentId: null,
+          purchaseDateAssumed: false,
+        },
       ]);
     });
 
@@ -372,6 +401,167 @@ describe("bondLotsFromTransactions (spec 12.2 truth table)", () => {
       expect(bondLotsAsOf(rows, "2026-04-01").refusal).toMatchObject({
         code: "SPLIT",
       });
+    });
+  });
+
+  describe("series (docs/specs/bond-program-securities.md 2.3 and 2.4)", () => {
+    const edo = "series-edo";
+    const cOi = "series-coi";
+    const acquire = (date: string, quantity: string, series: string | null) =>
+      tx("BUY", date, quantity, { accountId: "a1", instrumentId: series });
+    const take = (
+      action: string,
+      date: string,
+      quantity: string,
+      series?: string | null,
+      over: Partial<BondLotTransaction> = {},
+    ) =>
+      tx(action, date, quantity, {
+        accountId: "a1",
+        instrumentId: series,
+        ...over,
+      });
+
+    it("keeps two series of one account as separate lots, each with its series", () => {
+      expect(
+        lots([
+          acquire("2026-01-10", "10", edo),
+          acquire("2026-02-10", "5", cOi),
+        ]).map((l) => [l.instrumentId, l.purchaseDate, l.quantity]),
+      ).toEqual([
+        [edo, "2026-01-10", 10],
+        [cOi, "2026-02-10", 5],
+      ]);
+    });
+
+    it("a removal that names a series leaves that series' oldest lots first and the others alone", () => {
+      expect(
+        lots([
+          acquire("2026-01-10", "10", edo),
+          acquire("2026-02-10", "5", cOi),
+          acquire("2026-03-10", "4", edo),
+          take("SELL", "2026-04-01", "12", edo),
+        ]).map((l) => [l.instrumentId, l.purchaseDate, l.quantity]),
+      ).toEqual([
+        [cOi, "2026-02-10", 5],
+        [edo, "2026-03-10", 2],
+      ]);
+    });
+
+    it("a removal that names none leaves the account's lots first-in first-out across series", () => {
+      expect(
+        lots([
+          acquire("2026-01-10", "10", edo),
+          acquire("2026-02-10", "5", cOi),
+          acquire("2026-03-10", "4", edo),
+          take("SELL", "2026-04-01", "12"),
+        ]).map((l) => [l.instrumentId, l.purchaseDate, l.quantity]),
+      ).toEqual([
+        [cOi, "2026-02-10", 3],
+        [edo, "2026-03-10", 4],
+      ]);
+    });
+
+    it("refuses a removal larger than the series it names, though the account holds enough overall", () => {
+      const result = bondLotsFromTransactions([
+        acquire("2026-01-10", "10", edo),
+        acquire("2026-02-10", "5", cOi),
+        take("SELL", "2026-04-01", "6", cOi),
+      ]);
+      expect(result.lots).toBeNull();
+      expect(result.refusal).toMatchObject({
+        code: "REMOVAL_EXCEEDS_SERIES",
+        params: { action: "SELL", date: "2026-04-01", quantity: "6" },
+      });
+      // Without naming the series the same removal is fine.
+      expect(
+        bondLotsFromTransactions([
+          acquire("2026-01-10", "10", edo),
+          acquire("2026-02-10", "5", cOi),
+          take("SELL", "2026-04-01", "6"),
+        ]).refusal,
+      ).toBeNull();
+    });
+
+    it("a removal larger than the whole account is still OVER_REMOVAL", () => {
+      expect(
+        bondLotsFromTransactions([
+          acquire("2026-01-10", "10", edo),
+          take("SELL", "2026-04-01", "11"),
+        ]).refusal,
+      ).toMatchObject({ code: "OVER_REMOVAL" });
+    });
+
+    it("a paired transfer moves lots with their series and purchase dates", () => {
+      const moved = lots([
+        acquire("2026-01-10", "10", edo),
+        acquire("2026-02-10", "5", cOi),
+        take("TRANSFER_OUT", "2026-03-01", "12", undefined, {
+          pairedTransfer: true,
+          counterpartAccountId: "a2",
+        }),
+        tx("TRANSFER_IN", "2026-03-01", "12", {
+          accountId: "a2",
+          pairedTransfer: true,
+        }),
+      ]);
+      expect(
+        moved.map((l) => [
+          l.accountId,
+          l.instrumentId,
+          l.purchaseDate,
+          l.quantity,
+        ]),
+      ).toEqual([
+        // Oldest purchase first across accounts.
+        ["a2", edo, "2026-01-10", 10],
+        ["a1", cOi, "2026-02-10", 3],
+        ["a2", cOi, "2026-02-10", 2],
+      ]);
+    });
+
+    it("a transfer that names a series moves only that series", () => {
+      const moved = lots([
+        acquire("2026-01-10", "10", edo),
+        acquire("2026-02-10", "5", cOi),
+        take("TRANSFER_OUT", "2026-03-01", "5", cOi, {
+          pairedTransfer: true,
+          counterpartAccountId: "a2",
+        }),
+      ]);
+      expect(
+        moved.map((l) => [l.accountId, l.instrumentId, l.quantity]),
+      ).toEqual([
+        ["a1", edo, 10],
+        ["a2", cOi, 5],
+      ]);
+    });
+
+    it("an unlinked TRANSFER_IN is an acquisition of the series it names", () => {
+      expect(
+        lots([
+          tx("TRANSFER_IN", "2026-03-01", "7", {
+            accountId: "a1",
+            instrumentId: edo,
+          }),
+        ]).map((l) => [l.instrumentId, l.purchaseDateAssumed]),
+      ).toEqual([[edo, true]]);
+    });
+
+    it("an acquisition of a program-linked security with no series is SERIES_NOT_DETERMINED", () => {
+      expect(
+        bondLotsFromTransactions([acquire("2026-01-10", "10", null)]).refusal,
+      ).toMatchObject({
+        code: "SERIES_NOT_DETERMINED",
+        params: { action: "BUY", date: "2026-01-10" },
+      });
+      // A removal with none is fine: it names no series by design.
+      expect(
+        bondLotsFromTransactions([
+          acquire("2026-01-10", "10", edo),
+          take("SELL", "2026-02-01", "3", null),
+        ]).refusal,
+      ).toBeNull();
     });
   });
 });

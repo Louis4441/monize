@@ -10,11 +10,23 @@ import { withScopedDb } from "../common/db/scoped-db";
 import { withSystemContext } from "../common/db/with-context";
 import { CurrenciesService } from "../currencies/currencies.service";
 import { BondAdapter, CatalogEntry } from "./bond-adapter";
-import { bondInstrumentId } from "./bond-instrument-id";
+import { bondInstrumentId, bondProgramId } from "./bond-instrument-id";
 import { INSTALLED_BOND_ADAPTERS } from "./bond-adapters";
 import { BondInstrumentSummary } from "./bond-valuation.service";
 import { contentHash } from "./canonical-json";
 import { BondTerms, parseBondTerms } from "./domain/bond-terms";
+
+/** A catalog program (the product, e.g. EDO) as the API names it. */
+export interface BondProgramSummary {
+  readonly id: string;
+  readonly issuerCountryCode: string;
+  readonly issuerCode: string;
+  readonly programCode: string;
+  readonly currency: string;
+  readonly seriesCount: number;
+  /** The series most recently on sale (newest sale window); null when the program has none. */
+  readonly newestSeriesCode: string | null;
+}
 
 /**
  * Seeds the curated reference data of every installed adapter: benchmark series
@@ -77,6 +89,51 @@ export class BondCatalogService implements OnApplicationBootstrap {
         }
       }
     }
+  }
+
+  /**
+   * The catalog's programs for the program picker, ordered by country, issuer
+   * and program code, each with its series count and its newest series (the
+   * newest sale window's start, then the series code).
+   */
+  async listPrograms(): Promise<BondProgramSummary[]> {
+    const rows: Array<{
+      id: string;
+      issuer_country_code: string;
+      issuer_code: string;
+      program_code: string;
+      currency_code: string;
+      series_count: number | string;
+      newest_series_code: string | null;
+    }> = await withScopedDb(this.dataSource, (m) =>
+      m.query(
+        `SELECT p.id, p.issuer_country_code, p.issuer_code, p.program_code, p.currency_code,
+                (SELECT COUNT(*) FROM bond_instruments i WHERE i.bond_program_id = p.id) AS series_count,
+                (SELECT i.series_code
+                   FROM bond_instruments i
+                   LEFT JOIN LATERAL (
+                     SELECT v.terms -> 'saleWindow' ->> 'from' AS sale_from
+                       FROM bond_terms_versions v
+                      WHERE v.bond_instrument_id = i.id
+                      ORDER BY v.version DESC
+                      LIMIT 1
+                   ) tv ON TRUE
+                  WHERE i.bond_program_id = p.id
+                  ORDER BY tv.sale_from DESC NULLS LAST, i.series_code DESC
+                  LIMIT 1) AS newest_series_code
+           FROM bond_programs p
+          ORDER BY p.issuer_country_code, p.issuer_code, p.program_code`,
+      ),
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      issuerCountryCode: r.issuer_country_code,
+      issuerCode: r.issuer_code,
+      programCode: r.program_code,
+      currency: r.currency_code,
+      seriesCount: Number(r.series_count),
+      newestSeriesCode: r.newest_series_code,
+    }));
   }
 
   /** The catalog for the link picker, ordered by country, issuer and series. */
@@ -276,13 +333,61 @@ export class BondCatalogService implements OnApplicationBootstrap {
     // this transaction.
     await this.currencies.ensureCatalogCurrency(instrument.currency);
 
+    // The program row first, in the same transaction as its instrument (spec
+    // bond-program-securities.md 2.1): created once, never overwritten, with the
+    // program's currency. A program stored in another currency than this series
+    // is a curation error (the security link compares one currency), refused.
+    const programId = bondProgramId(
+      instrument.issuerCountryCode,
+      instrument.issuerCode,
+      instrument.programCode,
+    );
+    await m.query(
+      `INSERT INTO bond_programs
+         (id, issuer_country_code, issuer_code, program_code, currency_code)
+       VALUES ($1::uuid, $2, $3, $4, $5)
+       ON CONFLICT (issuer_country_code, issuer_code, program_code) DO NOTHING`,
+      [
+        programId,
+        instrument.issuerCountryCode,
+        instrument.issuerCode,
+        instrument.programCode,
+        instrument.currency,
+      ],
+    );
+    const programRows: Array<{ id: string; currency_code: string }> =
+      await m.query(
+        `SELECT id, currency_code FROM bond_programs
+          WHERE issuer_country_code = $1 AND issuer_code = $2 AND program_code = $3`,
+        [
+          instrument.issuerCountryCode,
+          instrument.issuerCode,
+          instrument.programCode,
+        ],
+      );
+    const program = programRows[0];
+    if (program.currency_code !== instrument.currency) {
+      return {
+        kind: "instrument-mismatch",
+        named,
+        instrumentId: bondInstrumentId(
+          instrument.issuerCountryCode,
+          instrument.issuerCode,
+          instrument.seriesCode,
+        ),
+        fields: [
+          ["programCurrency", program.currency_code, instrument.currency],
+        ],
+      };
+    }
+
     // The id is derived from the unique key, not generated: the table is not in
     // the user backup, so a security's link survives a restore onto another
     // deployment only if the same series has the same id there.
     await m.query(
       `INSERT INTO bond_instruments
-         (id, issuer_country_code, issuer_code, program_code, series_code, currency_code, marketability)
-       VALUES ($7::uuid, $1, $2, $3, $4, $5, $6)
+         (id, issuer_country_code, issuer_code, program_code, bond_program_id, series_code, currency_code, marketability)
+       VALUES ($7::uuid, $1, $2, $3, $8::uuid, $4, $5, $6)
        ON CONFLICT (issuer_country_code, issuer_code, series_code) DO NOTHING`,
       [
         instrument.issuerCountryCode,
@@ -296,6 +401,7 @@ export class BondCatalogService implements OnApplicationBootstrap {
           instrument.issuerCode,
           instrument.seriesCode,
         ),
+        program.id,
       ],
     );
     const rows: Array<{

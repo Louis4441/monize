@@ -539,6 +539,7 @@ const manageInvestmentItemSchema = z
     exchangeRate: nonNegativeAmountSchema.optional(),
     description: z.string().max(TRANSACTION_NOTE_MAX_LENGTH).optional(),
     transactionId: z.string().uuid().optional(),
+    bondSeriesCode: z.string().trim().min(1).max(40).optional(),
   })
   .passthrough();
 
@@ -589,13 +590,14 @@ export const manageInvestmentTransactionsSchema = z
           item.price !== undefined ||
           item.commission !== undefined ||
           item.accruedInterest !== undefined ||
+          item.bondSeriesCode !== undefined ||
           item.description !== undefined;
         if (!hasChange) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: path("transactionId"),
             message:
-              "Provide at least one field to change (action, date, security, quantity, price, commission, accrued interest, or description).",
+              "Provide at least one field to change (action, date, security, quantity, price, commission, accrued interest, bond series, or description).",
           });
         }
       } else {

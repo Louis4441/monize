@@ -66,7 +66,17 @@ interface Doubles {
   query: jest.Mock;
 }
 
-function doubles(existingSecurities: { id: string; symbol: string }[] = []) {
+/** The statements that back-patch the transfer links. */
+const linkUpdates = (query: jest.Mock) =>
+  query.mock.calls.filter(([sql]) =>
+    String(sql).includes("UPDATE investment_transactions"),
+  );
+
+function doubles(
+  existingSecurities: { id: string; symbol: string }[] = [],
+  /** Securities the user has linked to a bond program, and the series on sale. */
+  bond: { linked: string[]; onSale: string[] } = { linked: [], onSale: [] },
+) {
   const securities = {
     find: jest.fn().mockResolvedValue(existingSecurities),
     insert: jest.fn().mockResolvedValue(undefined),
@@ -77,7 +87,16 @@ function doubles(existingSecurities: { id: string; symbol: string }[] = []) {
   const transactions = {
     insert: jest.fn().mockResolvedValue(undefined),
   } as unknown as Record<string, jest.Mock>;
-  const query = jest.fn().mockResolvedValue([[], 0]);
+  const query = jest.fn(async (sql: string) => {
+    if (sql.includes("bond_program_id IS NOT NULL")) {
+      return bond.linked.map((id) => ({ id }));
+    }
+    if (sql.includes("s.bond_program_id AS id")) {
+      return [{ id: "program-1", program_code: "EDO" }];
+    }
+    if (sql.includes("saleWindow")) return bond.onSale.map((id) => ({ id }));
+    return [[], 0];
+  });
 
   const manager = {
     getRepository: jest.fn((entity: { name?: string }) => {
@@ -294,9 +313,8 @@ describe("writeInvestments", () => {
       ],
     });
 
-    expect(query).toHaveBeenCalledTimes(1);
-    expect(query.mock.calls[0][0]).toContain("UPDATE investment_transactions");
-    expect(query.mock.calls[0][1]).toHaveLength(4);
+    expect(linkUpdates(query)).toHaveLength(1);
+    expect(linkUpdates(query)[0][1]).toHaveLength(4);
   });
 
   it("leaves a link alone when its partner was not inserted", async () => {
@@ -311,7 +329,61 @@ describe("writeInvestments", () => {
       ],
     });
 
-    expect(query).not.toHaveBeenCalled();
+    expect(linkUpdates(query)).toHaveLength(0);
+  });
+
+  describe("a security linked to a bond program (INV-BOND-007)", () => {
+    const linkedId = "ssssssss-0000-0000-0000-000000000001";
+
+    it("stores the series the date puts on sale on an acquisition of a linked security", async () => {
+      const { manager, investments } = doubles([], {
+        linked: [linkedId],
+        onSale: ["series-1"],
+      });
+      await writeInvestments(manager, "user-1", {
+        ...baseInput,
+        transactions: [investment()],
+      });
+      expect(investments.insert).toHaveBeenCalledWith([
+        expect.objectContaining({ bondInstrumentId: "series-1" }),
+      ]);
+    });
+
+    it("leaves a removal without a series, and an unlinked security's rows without one", async () => {
+      const linked = doubles([], { linked: [linkedId], onSale: ["series-1"] });
+      await writeInvestments(linked.manager, "user-1", {
+        ...baseInput,
+        transactions: [
+          investment({ action: InvestmentAction.SELL, cashAmount: 1009.99 }),
+        ],
+      });
+      expect(linked.investments.insert).toHaveBeenCalledWith([
+        expect.objectContaining({ bondInstrumentId: null }),
+      ]);
+      const unlinked = doubles();
+      await writeInvestments(unlinked.manager, "user-1", {
+        ...baseInput,
+        transactions: [investment()],
+      });
+      expect(unlinked.investments.insert).toHaveBeenCalledWith([
+        expect.objectContaining({ bondInstrumentId: null }),
+      ]);
+    });
+
+    it("refuses the import, before the row is written, when no series was on sale that day", async () => {
+      const { manager, investments, transactions } = doubles([], {
+        linked: [linkedId],
+        onSale: [],
+      });
+      await expect(
+        writeInvestments(manager, "user-1", {
+          ...baseInput,
+          transactions: [investment()],
+        }),
+      ).rejects.toThrow(/could not be determined/);
+      expect(investments.insert).not.toHaveBeenCalled();
+      expect(transactions.insert).not.toHaveBeenCalled();
+    });
   });
 
   it("skips rows whose account was not created", async () => {

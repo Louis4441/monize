@@ -2,7 +2,7 @@ import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
 import { BondCatalogService } from "@/bonds/bond-catalog.service";
-import { bondInstrumentId } from "@/bonds/bond-instrument-id";
+import { bondInstrumentId, bondProgramId } from "@/bonds/bond-instrument-id";
 import { BondPriceService } from "@/bonds/bond-price.service";
 import { BondValuationService } from "@/bonds/bond-valuation.service";
 import { acquireAdvisoryLock, LockScope } from "@/common/db/locks";
@@ -23,6 +23,8 @@ import {
   createIntegrationModule,
   createTestUserDirect,
   deleteBondInstrumentBypassingImmutability,
+  deleteBondProgramBypassingImmutability,
+  insertBondProgram,
 } from "../helpers/integration-setup";
 
 /**
@@ -52,6 +54,9 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
   let accountId: string;
   let securityId: string;
   const TOS_ID = bondInstrumentId("PL", "PL_MF", "TOS1029");
+  const TOS_PROGRAM = bondProgramId("PL", "PL_MF", "TOS");
+  const EDO_ID = bondInstrumentId("PL", "PL_MF", "EDO1036");
+  const EDO_PROGRAM = bondProgramId("PL", "PL_MF", "EDO");
   const realFetch = global.fetch;
 
   /** Per-bond gross value `a` days into a 365-day period, in cents. */
@@ -88,6 +93,7 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
       "investment_transactions",
       "securities",
       "accounts",
+      "bond_programs",
       "bond_instruments",
       "benchmark_series",
       "users",
@@ -111,19 +117,19 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
     );
     accountId = accounts[0].id;
 
-    securityId = await insertSecurity("TOS1029", TOS_ID);
+    securityId = await insertSecurity("TOS1029", TOS_PROGRAM);
   });
 
   async function insertSecurity(
     symbol: string,
-    bondId: string | null,
+    programId: string | null,
     owner = userId,
   ): Promise<string> {
     const rows = await dataSource.query(
-      `INSERT INTO securities (user_id, symbol, name, security_type, currency_code, bond_instrument_id)
+      `INSERT INTO securities (user_id, symbol, name, security_type, currency_code, bond_program_id)
        VALUES ($1, $2, $2, 'BOND', 'PLN', $3)
        RETURNING id`,
-      [owner, symbol, bondId],
+      [owner, symbol, programId],
     );
     return rows[0].id;
   }
@@ -133,12 +139,14 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
     date: string,
     quantity: number,
     id = securityId,
+    /** The series the row names; none for a security that is not linked yet. */
+    series: string | null = TOS_ID,
   ): Promise<void> {
     await dataSource.query(
       `INSERT INTO investment_transactions
-         (user_id, account_id, security_id, action, transaction_date, quantity, price, total_amount, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 100, $7, 'UNRECONCILED')`,
-      [userId, accountId, id, action, date, quantity, quantity * 100],
+         (user_id, account_id, security_id, bond_instrument_id, action, transaction_date, quantity, price, total_amount, status)
+       VALUES ($1, $2, $3, $8, $4, $5, $6, 100, $7, 'UNRECONCILED')`,
+      [userId, accountId, id, action, date, quantity, quantity * 100, series],
     );
   }
 
@@ -459,14 +467,14 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
     it("refuses a missing instrument and a currency mismatch before writing, then prices the link after commit", async () => {
       const plain = await insertSecurity("LINKME", null);
       // Inside the series' sale window (October 2026).
-      await ledger("BUY", "2026-10-05", 10, plain);
+      await ledger("BUY", "2026-10-05", 10, plain, null);
 
       const update = (dto: Parameters<SecuritiesService["update"]>[2]) =>
         withUserContext(userId, () => securities.update(userId, plain, dto));
 
       await expect(
         update({
-          bondInstrumentId: "99999999-9999-5999-8999-999999999999",
+          bondProgramId: "99999999-9999-5999-8999-999999999999",
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
 
@@ -474,26 +482,26 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
         `UPDATE securities SET currency_code = 'USD' WHERE id = $1`,
         [plain],
       );
-      await expect(update({ bondInstrumentId: TOS_ID })).rejects.toThrow(
+      await expect(update({ bondProgramId: TOS_PROGRAM })).rejects.toThrow(
         /recorded in USD.*priced in PLN/,
       );
       expect(await priceRows(plain)).toEqual([]);
       expect(
         (
           await dataSource.query(
-            `SELECT bond_instrument_id FROM securities WHERE id = $1`,
+            `SELECT bond_program_id FROM securities WHERE id = $1`,
             [plain],
           )
-        )[0].bond_instrument_id,
+        )[0].bond_program_id,
       ).toBeNull();
 
       // Currency and link together, in the instrument's currency: committed,
       // then priced up to today (the request recomputes after its commit).
       const linked = await update({
         currencyCode: "PLN",
-        bondInstrumentId: TOS_ID,
+        bondProgramId: TOS_PROGRAM,
       });
-      expect(linked.bondInstrumentId).toBe(TOS_ID);
+      expect(linked.bondProgramId).toBe(TOS_PROGRAM);
       const rows = await priceRows(plain);
       expect(rows.length).toBeGreaterThanOrEqual(2);
       expect(rows[0]).toMatchObject({ d: "2026-10-05", source: "bond_engine" });
@@ -505,25 +513,49 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
       );
     });
 
-    it("refuses deleting a catalog instrument that a security points at, by fk_securities_bond_instrument and nothing else (ON DELETE RESTRICT)", async () => {
-      // An instrument with no terms version and no period rate, so no other
-      // foreign key can be what refuses the delete.
-      const bare = await dataSource.query(
-        `INSERT INTO bond_instruments (issuer_country_code, issuer_code, program_code, series_code, currency_code, marketability)
-         VALUES ('PL', 'PL_MF', 'TOS', 'BARE0000', 'PLN', 'RETAIL_REDEEMABLE') RETURNING id`,
+    it("refuses deleting a catalog program that a security points at, by fk_securities_bond_program and nothing else (ON DELETE RESTRICT)", async () => {
+      // A program with no series, so no other foreign key can be what refuses.
+      const bare = await insertBondProgram(dataSource, "BARE");
+      await insertSecurity("BARE", bare);
+      await expect(
+        deleteBondProgramBypassingImmutability(
+          dataSource,
+          `DELETE FROM bond_programs WHERE id = $1`,
+          [bare],
+        ),
+      ).rejects.toThrow(/"fk_securities_bond_program"/);
+
+      // Unlinked, the same row deletes: the constraint is the only guard.
+      await dataSource.query(
+        `UPDATE securities SET bond_program_id = NULL WHERE bond_program_id = $1`,
+        [bare],
       );
-      await insertSecurity("BARE", bare[0].id);
+      await deleteBondProgramBypassingImmutability(
+        dataSource,
+        `DELETE FROM bond_programs WHERE id = $1`,
+        [bare],
+      );
+    });
+
+    it("refuses deleting a series that a transaction names, by fk_investment_transactions_bond_instrument and nothing else (ON DELETE RESTRICT)", async () => {
+      // A series with no terms version and no period rate, in a program no
+      // security links to, so no other foreign key can be what refuses.
+      const program = await insertBondProgram(dataSource, "BARE2");
+      const bare = await dataSource.query(
+        `INSERT INTO bond_instruments (issuer_country_code, issuer_code, program_code, bond_program_id, series_code, currency_code, marketability)
+         VALUES ('PL', 'PL_MF', 'BARE2', $1, 'BARE0000', 'PLN', 'RETAIL_REDEEMABLE') RETURNING id`,
+        [program],
+      );
+      await ledger("BUY", "2026-10-15", 10, securityId, bare[0].id);
       await expect(
         deleteBondInstrumentBypassingImmutability(
           dataSource,
           `DELETE FROM bond_instruments WHERE id = $1`,
           [bare[0].id],
         ),
-      ).rejects.toThrow(/"fk_securities_bond_instrument"/);
-
-      // Unlinked, the same row deletes: the constraint is the only guard.
+      ).rejects.toThrow(/"fk_investment_transactions_bond_instrument"/);
       await dataSource.query(
-        `UPDATE securities SET bond_instrument_id = NULL WHERE bond_instrument_id = $1`,
+        `UPDATE investment_transactions SET bond_instrument_id = NULL WHERE bond_instrument_id = $1`,
         [bare[0].id],
       );
       await deleteBondInstrumentBypassingImmutability(
@@ -546,7 +578,7 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
       ).toContain("bond_engine");
 
       await withUserContext(userId, () =>
-        securities.update(userId, securityId, { bondInstrumentId: null }),
+        securities.update(userId, securityId, { bondProgramId: null }),
       );
 
       // The trade's row of the 16th was the engine's day, replaced by the
@@ -570,7 +602,7 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
 
       await withUserContext(userId, () =>
         securities.update(userId, securityId, {
-          bondInstrumentId: bondInstrumentId("PL", "PL_MF", "ROS1032"),
+          bondProgramId: bondProgramId("PL", "PL_MF", "ROS"),
         }),
       );
 
@@ -603,7 +635,7 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
         withScopedDb(dataSource, async (m) => {
           await prices.clearEnginePrices(m, userId, securityId);
           await m.query(
-            `UPDATE securities SET bond_instrument_id = NULL WHERE id = $1`,
+            `UPDATE securities SET bond_program_id = NULL WHERE id = $1`,
             [securityId],
           );
           locked();
@@ -655,7 +687,7 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
       await lockHeld;
 
       // A different security's recompute is not held up.
-      const other = await insertSecurity("TOS-OTHER", TOS_ID);
+      const other = await insertSecurity("TOS-OTHER", TOS_PROGRAM);
       await ledger("BUY", "2026-10-15", 3, other);
       await expect(recompute("2026-10-17", other)).resolves.toEqual({
         written: 3,
@@ -963,7 +995,11 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
          VALUES ($1, 'INVESTMENT', 'INVESTMENT_BROKERAGE', 'B2', 'PLN', 0, 0) RETURNING id`,
         [otherUserId],
       );
-      const otherSecurity = await insertSecurity("TOS-B", TOS_ID, otherUserId);
+      const otherSecurity = await insertSecurity(
+        "TOS-B",
+        TOS_PROGRAM,
+        otherUserId,
+      );
       await dataSource.query(
         `INSERT INTO investment_transactions
            (user_id, account_id, security_id, action, transaction_date, quantity, price, total_amount, status)
@@ -982,13 +1018,15 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
 
     it("one security failing for real leaves the others' prices written", async () => {
       await ledger("BUY", "2026-10-15", 10);
-      // An instrument with no terms version: valuing a security linked to it
+      // A series with no terms version: valuing a security whose rows name it
       // fails inside the transaction, as stored reference data gone wrong would.
+      const brokenProgram = await insertBondProgram(dataSource, "BROKENP");
       const bare = await dataSource.query(
-        `INSERT INTO bond_instruments (issuer_country_code, issuer_code, program_code, series_code, currency_code, marketability)
-         VALUES ('PL', 'PL_MF', 'TOS', 'BROKEN00', 'PLN', 'RETAIL_REDEEMABLE') RETURNING id`,
+        `INSERT INTO bond_instruments (issuer_country_code, issuer_code, program_code, bond_program_id, series_code, currency_code, marketability)
+         VALUES ('PL', 'PL_MF', 'BROKENP', $1, 'BROKEN00', 'PLN', 'RETAIL_REDEEMABLE') RETURNING id`,
+        [brokenProgram],
       );
-      const broken = await insertSecurity("BROKEN", bare[0].id, otherUserId);
+      const broken = await insertSecurity("BROKEN", brokenProgram, otherUserId);
       const otherAccount = await dataSource.query(
         `INSERT INTO accounts (user_id, account_type, account_sub_type, name, currency_code, current_balance, opening_balance)
          VALUES ($1, 'INVESTMENT', 'INVESTMENT_BROKERAGE', 'B3', 'PLN', 0, 0) RETURNING id`,
@@ -996,9 +1034,9 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
       );
       await dataSource.query(
         `INSERT INTO investment_transactions
-           (user_id, account_id, security_id, action, transaction_date, quantity, price, total_amount, status)
-         VALUES ($1, $2, $3, 'BUY', '2026-10-16', 4, 100, 400, 'UNRECONCILED')`,
-        [otherUserId, otherAccount[0].id, broken],
+           (user_id, account_id, security_id, bond_instrument_id, action, transaction_date, quantity, price, total_amount, status)
+         VALUES ($1, $2, $3, $4, 'BUY', '2026-10-16', 4, 100, 400, 'UNRECONCILED')`,
+        [otherUserId, otherAccount[0].id, broken, bare[0].id],
       );
 
       const result = await withSystemContext(() =>
@@ -1025,11 +1063,8 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
          VALUES ('PL_CPI_GUS_YOY', '2027-08-01', 0.0340000000, 'https://example.test/cpi', NOW())
          ON CONFLICT (benchmark_code, observation_date) DO UPDATE SET value = EXCLUDED.value`,
       );
-      edoSecurityId = await insertSecurity(
-        "EDO1036",
-        bondInstrumentId("PL", "PL_MF", "EDO1036"),
-      );
-      await ledger("BUY", "2026-10-01", 10, edoSecurityId);
+      edoSecurityId = await insertSecurity("EDO1036", EDO_PROGRAM);
+      await ledger("BUY", "2026-10-01", 10, edoSecurityId, EDO_ID);
     });
 
     const scenarios = (values: string[], owner = userId) =>
@@ -1201,7 +1236,7 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
         `UPDATE securities SET security_type = 'ETF' WHERE id = $1`,
         [etf],
       );
-      await expect(update({ bondInstrumentId: TOS_ID }, etf)).rejects.toThrow(
+      await expect(update({ bondProgramId: TOS_PROGRAM }, etf)).rejects.toThrow(
         /Only a security of type Bond/,
       );
 
@@ -1213,7 +1248,7 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
       );
       expect(await priceRows()).toEqual(before);
 
-      await update({ securityType: "ETF", bondInstrumentId: null });
+      await update({ securityType: "ETF", bondProgramId: null });
       expect(await priceRows()).toEqual([]);
     });
 
@@ -1227,7 +1262,7 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
         [userId, accountId, legacy],
       );
       await expect(
-        update({ bondInstrumentId: TOS_ID }, legacy),
+        update({ bondProgramId: TOS_PROGRAM }, legacy),
       ).rejects.toThrow(/not numbers of bonds/);
       expect(await priceRows(legacy)).toEqual([]);
 
@@ -1240,8 +1275,8 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
         [userId, accountId, proper],
       );
       await expect(
-        update({ bondInstrumentId: TOS_ID }, proper),
-      ).resolves.toMatchObject({ bondInstrumentId: TOS_ID });
+        update({ bondProgramId: TOS_PROGRAM }, proper),
+      ).resolves.toMatchObject({ bondProgramId: TOS_PROGRAM });
     });
 
     it("R16: the same instrument in capitals is no change: the engine's rows are neither deleted nor rewritten", async () => {
@@ -1249,16 +1284,16 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
       await recompute("2026-10-08");
       const before = await priceRows();
 
-      const result = await update({ bondInstrumentId: TOS_ID.toUpperCase() });
+      const result = await update({ bondProgramId: TOS_PROGRAM.toUpperCase() });
 
-      expect(result.bondInstrumentId).toBe(TOS_ID);
+      expect(result.bondProgramId).toBe(TOS_PROGRAM);
       expect(await priceRows()).toEqual(before);
     });
 
     it("R32: an update that read the security unlinked, while a concurrent link committed, neither puts the stale link back nor drops the link's prices", async () => {
       await ledger("BUY", "2026-10-05", 10);
       const plain = await insertSecurity("STALE", null);
-      await ledger("BUY", "2026-10-05", 10, plain);
+      await ledger("BUY", "2026-10-05", 10, plain, null);
 
       // Request B is in flight with a snapshot that saw the security unlinked...
       let release!: () => void;
@@ -1274,17 +1309,17 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
       const rename = update({ name: "Renamed" }, plain);
       // ...request A links and is priced after its commit.
       await new Promise((r) => setTimeout(r, 100));
-      await update({ bondInstrumentId: TOS_ID }, plain);
+      await update({ bondProgramId: TOS_PROGRAM }, plain);
       expect((await priceRows(plain)).length).toBeGreaterThan(0);
       release();
       await rename;
       spy.mockRestore();
 
       const row = await dataSource.query(
-        `SELECT name, bond_instrument_id FROM securities WHERE id = $1`,
+        `SELECT name, bond_program_id FROM securities WHERE id = $1`,
         [plain],
       );
-      expect(row[0]).toEqual({ name: "Renamed", bond_instrument_id: TOS_ID });
+      expect(row[0]).toEqual({ name: "Renamed", bond_program_id: TOS_PROGRAM });
       expect((await priceRows(plain)).length).toBeGreaterThan(0);
     });
   });
@@ -1296,11 +1331,11 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
         `UPDATE securities SET currency_code = 'USD' WHERE id = $1`,
         [usd],
       );
-      await ledger("BUY", "2026-10-05", 10, usd);
+      await ledger("BUY", "2026-10-05", 10, usd, null);
       await withUserContext(userId, () =>
         securities.update(userId, usd, {
           currencyCode: "PLN",
-          bondInstrumentId: TOS_ID,
+          bondProgramId: TOS_PROGRAM,
         }),
       );
       await settlePendingHistoryWrites();
@@ -1309,16 +1344,16 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
       await withUserContext(userId, () => history.undo(userId));
 
       const row = await dataSource.query(
-        `SELECT currency_code, bond_instrument_id FROM securities WHERE id = $1`,
+        `SELECT currency_code, bond_program_id FROM securities WHERE id = $1`,
         [usd],
       );
       expect(row[0]).toEqual({
         currency_code: "USD",
-        bond_instrument_id: null,
+        bond_program_id: null,
       });
       expect(await priceRows(usd)).toEqual([]);
       const mismatched = await dataSource.query(
-        `SELECT 1 FROM securities s JOIN bond_instruments b ON b.id = s.bond_instrument_id
+        `SELECT 1 FROM securities s JOIN bond_programs b ON b.id = s.bond_program_id
           WHERE s.currency_code <> b.currency_code`,
       );
       expect(mismatched).toEqual([]);
@@ -1340,7 +1375,7 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
           action: "update",
           beforeData: {
             id: securityId,
-            bondInstrumentId: TOS_ID,
+            bondProgramId: TOS_PROGRAM,
             currencyCode: "USD",
             securityType: "BOND",
           },

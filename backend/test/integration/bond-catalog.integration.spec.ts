@@ -24,6 +24,8 @@ import {
   createIntegrationModule,
   createTestUserDirect,
   deleteBondInstrumentBypassingImmutability,
+  deleteBondProgramBypassingImmutability,
+  insertBondProgram,
 } from "../helpers/integration-setup";
 
 // The GUS fixture's newest month is 2026-08, and a feed more than three months
@@ -84,6 +86,7 @@ describe("bond catalog and benchmark refresh (integration)", () => {
 
   beforeEach(async () => {
     await cleanTables(dataSource, [
+      "bond_programs",
       "bond_instruments",
       "benchmark_series",
       "fetch_sync",
@@ -106,6 +109,18 @@ describe("bond catalog and benchmark refresh (integration)", () => {
     expect(await count("bond_instruments")).toBe(8);
     expect(await count("bond_terms_versions")).toBe(8);
     expect(await count("benchmark_series")).toBe(2);
+    // One program per product, each series pointing at its own.
+    expect(await count("bond_programs")).toBe(8);
+    expect(
+      await dataSource.query(
+        `SELECT COUNT(*)::int AS n FROM bond_instruments i
+           JOIN bond_programs p ON p.id = i.bond_program_id
+          WHERE p.program_code = i.program_code
+            AND p.issuer_country_code = i.issuer_country_code
+            AND p.issuer_code = i.issuer_code
+            AND p.currency_code = i.currency_code`,
+      ),
+    ).toEqual([{ n: 8 }]);
     const hashes = await dataSource.query(
       `SELECT DISTINCT length(content_hash) AS n FROM bond_terms_versions`,
     );
@@ -422,8 +437,9 @@ describe("bond catalog and benchmark refresh (integration)", () => {
     it("must exist: an instrument in an unknown currency is refused by the foreign key", async () => {
       await expect(
         dataSource.query(
-          `INSERT INTO bond_instruments (issuer_country_code, issuer_code, program_code, series_code, currency_code, marketability)
-           VALUES ('PL', 'PL_MF', 'TOS', 'NOCCY', 'ZZZ', 'RETAIL_REDEEMABLE')`,
+          `INSERT INTO bond_instruments (issuer_country_code, issuer_code, program_code, bond_program_id, series_code, currency_code, marketability)
+           VALUES ('PL', 'PL_MF', 'TOS', $1, 'NOCCY', 'ZZZ', 'RETAIL_REDEEMABLE')`,
+          [await insertBondProgram(dataSource, "TOS")],
         ),
       ).rejects.toThrow(/violates foreign key constraint/);
     });
@@ -447,9 +463,21 @@ describe("bond catalog and benchmark refresh (integration)", () => {
         )[0].in_use;
       expect(await inUse()).toBe(false);
 
+      // A program in the custom currency alone also counts as use.
+      const zbpProgram = await insertBondProgram(dataSource, "ZBPONLY", "ZBP");
+      expect(await inUse()).toBe(true);
+      await deleteBondProgramBypassingImmutability(
+        dataSource,
+        `DELETE FROM bond_programs WHERE id = $1`,
+        [zbpProgram],
+      );
+      expect(await inUse()).toBe(false);
+
+      // An instrument in it, under a program in another currency.
       await dataSource.query(
-        `INSERT INTO bond_instruments (issuer_country_code, issuer_code, program_code, series_code, currency_code, marketability)
-         VALUES ('PL', 'PL_MF', 'TOS', 'CCYONLY', 'ZBP', 'RETAIL_REDEEMABLE')`,
+        `INSERT INTO bond_instruments (issuer_country_code, issuer_code, program_code, bond_program_id, series_code, currency_code, marketability)
+         VALUES ('PL', 'PL_MF', 'TOS', $1, 'CCYONLY', 'ZBP', 'RETAIL_REDEEMABLE')`,
+        [await insertBondProgram(dataSource, "TOS")],
       );
       expect(await inUse()).toBe(true);
 

@@ -189,10 +189,11 @@ before re-authentication -- it is free, and it writes nothing:
   one-way to a row the file cannot vouch for -- and `accounts.institution_id`
   from a backup older than the institution export;
 - a reference to reference data the backup never carries is a catalog reference
-  (`CATALOG_REFERENCE_COLUMNS`: `securities.bond_instrument_id` -> the bond
-  catalog), canonicalised like any other and then kept only where this
-  deployment's own catalog holds the row and, for a bond link, in the security's
-  currency; otherwise it is written NULL and logged
+  (`CATALOG_REFERENCE_COLUMNS`: `securities.bond_program_id` -> the bond
+  programs and `investment_transactions.bond_instrument_id` -> the bond series),
+  canonicalised like any other and then kept only where this deployment's own
+  catalog holds the row and, for a program link, in the security's currency;
+  otherwise it is written NULL and logged
   (`BackupRestoreDatabaseService.severUnavailableCatalogLinks`, which iterates
   `CATALOG_REFERENCE_COLUMNS`), so a restore never fails on a series this
   deployment has not seeded. The restore says so: the result carries
@@ -200,8 +201,15 @@ before re-authentication -- it is free, and it writes nothing:
   `restored`; `symbols` names at most `MAX_UNLINKED_BOND_SYMBOLS` = 50 of them,
   `count` is the full number) and the restore dialogue lists them, because the
   bond engine no longer prices those securities; the file's `bond_engine` price
-  rows of a security it unlinked are not restored. The instrument id is derived
-  from the series (`bondInstrumentId`), so it is the same on every deployment.
+  rows of a security it unlinked are not restored. A transaction whose series
+  the catalog lacks is restored without it and counted in
+  `unlinkedBondSeries: { count }` (omitted at zero, outside `restored`); its lot
+  is then read from the transaction date, as a row written before the link is.
+  The series of the rows of a security restored unlinked are dropped with the
+  link, and after the inserts `clearForeignSeriesOfUser` nulls any series that is
+  not of its own security's program, whatever the file said (INV-BOND-007). The
+  program id and the series id are derived from their codes (`bondProgramId`,
+  `bondInstrumentId`), so each is the same on every deployment.
   The file's `bond_engine` price rows of a security whose link survived came from
   another deployment's catalog and engine, so after the restore commits
   `BackupRestoreService` calls `BondPriceService.recomputeSecurity` for every

@@ -559,11 +559,14 @@
     "TEMPLATE_NOT_VALIDATED": "{{ series }} serisi, {{ product }} şablonu doğrulanmadan önce satıldı ({{ validFrom }}); derlenmiş bir kayıt gerektirir",
     "SERIES_TERMS_CONFLICT": "{{ series }} serisi zaten farklı koşullarla kayıtlı; kayıtlı koşullar asla değiştirilmez",
     "countryCodeInvalid": "countryCode iki harfli bir ülke kodu olmalıdır",
-    "programCodeInvalid": "programCode 1 ile 12 arasında büyük harf veya rakamdan oluşmalıdır"
+    "programCodeInvalid": "programCode 1 ile 12 arasında büyük harf veya rakamdan oluşmalıdır",
+    "SERIES_NOT_IN_PROGRAM": "{{ series }} serisi bu menkul kıymetin tahvil programına ({{ program }}) ait değil",
+    "SERIES_NOT_DETERMINED": "{{ date }} tarihli bu {{ program }} alımının serisi belirlenemedi: o gün programın kayıtlı tek bir serisi satışta değildi. Seriyi resmi kaynaktan alın ve işlem için seçin.",
+    "SERIES_NOT_ALLOWED": "Bir tahvil serisi yalnızca bir tahvil programına bağlı menkul kıymetin adedini değiştiren işlemler için belirtilebilir"
   },
   "securities": {
     "bondPricedByEngine": "Bu menkul kıymet bir tahvil enstrümanına bağlıdır ve bir kotasyon sağlayıcısı tarafından değil, tahvil motoru tarafından fiyatlanır. Bunun yerine Fiyatları yeniden hesapla seçeneğini kullanın.",
-    "bondInstrumentNotFound": "{{ id }} tahvil enstrümanı mevcut değil",
+    "bondProgramNotFound": "{{ id }} tahvil programı mevcut değil",
     "bondCurrencyMismatch": "Menkul kıymet {{ currency }} cinsinden kayıtlı, ancak tahvil enstrümanı {{ instrumentCurrency }} cinsinden fiyatlanıyor. Enstrümanın para birimini kullanın.",
     "bondCurrencyLocked": "Bir tahvil enstrümanına bağlı menkul kıymet, enstrümanın para biriminde ({{ instrumentCurrency }}) kalır. Para birimini değiştirmeden önce tahvil bağlantısını kaldırın.",
     "accountMustBeInvestment": "Hesap YATIRİM türünde olmalıdır",

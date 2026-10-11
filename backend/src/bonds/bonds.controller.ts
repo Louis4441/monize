@@ -26,7 +26,7 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { todayYMD } from "../common/date-utils";
 import { tr } from "../i18n/translate";
 import { SeriesFetchError } from "./bond-adapter";
-import { BondCatalogService } from "./bond-catalog.service";
+import { BondCatalogService, BondProgramSummary } from "./bond-catalog.service";
 import {
   BondDataInconsistentCode,
   BondDataInconsistentError,
@@ -36,7 +36,11 @@ import {
 } from "./bond-errors";
 import { BondPriceRecompute, BondPriceService } from "./bond-price.service";
 import { seriesHttpException } from "./bond-series-errors";
-import { BondSeriesResult, BondSeriesService } from "./bond-series.service";
+import {
+  BondSeriesResult,
+  BondSeriesService,
+  CurrentOfferRun,
+} from "./bond-series.service";
 import {
   BondInstrumentSummary,
   BondValuationService,
@@ -53,6 +57,7 @@ import {
   ParseScenarioValuesPipe,
 } from "./bond-query.pipes";
 import { EnterBondSeriesDto } from "./dto/enter-bond-series.dto";
+import { FetchBondOfferDto } from "./dto/fetch-bond-offer.dto";
 import { FetchBondSeriesDto } from "./dto/fetch-bond-series.dto";
 import { BondEngineError, BondEngineErrorCode } from "./engine/bond-engine";
 
@@ -73,6 +78,20 @@ export class BondsController {
     private readonly series: BondSeriesService,
     private readonly offers: BondOfferService,
   ) {}
+
+  @Get("programs")
+  @ApiOperation({
+    summary: "List the bond programs a security can be linked to",
+    description:
+      "The deployment's catalog of programs (the product a person holds, of " +
+      "which each issue is a series; global reference data), ordered by issuer country, issuer and " +
+      "program code, each with its series count and its newest series, for " +
+      "the program picker.",
+  })
+  @ApiResponse({ status: 200, description: "Bond programs" })
+  listPrograms(): Promise<BondProgramSummary[]> {
+    return this.catalog.listPrograms();
+  }
 
   @Get("instruments")
   @ApiOperation({
@@ -154,6 +173,31 @@ export class BondsController {
     );
   }
 
+  @Post("offer/fetch")
+  @Throttle({ default: { ttl: 60_000, limit: 2 } }) // 2 a minute per user; each reads the issuer's site once per series of the offer
+  @ApiOperation({
+    summary: "Fetch the current offer of a country now",
+    description:
+      "Takes only a country. Every series of its current offer that is not " +
+      "stored is read from the official source and stored as an immutable " +
+      "terms version; one that cannot be read is counted in `failed` and the " +
+      "next is tried. A series already stored is not fetched.",
+  })
+  @ApiResponse({
+    status: 201,
+    description: "How many series were listed, stored, already stored, failed",
+  })
+  @ApiResponse({
+    status: 400,
+    description: "The country has no official source to fetch from",
+  })
+  fetchOffer(@Body() dto: FetchBondOfferDto): Promise<CurrentOfferRun> {
+    return this.mapSeriesErrors(
+      () => this.series.fetchOfferOf(dto.countryCode),
+      false,
+    );
+  }
+
   @Post("instruments/fetch")
   @Throttle({ default: { ttl: 60_000, limit: 10 } }) // L2: 10 fetches per minute per user; each reads the issuer's site
   @ApiOperation({
@@ -223,8 +267,9 @@ export class BondsController {
   @ApiOperation({
     summary: "Value the lots of a bond-linked security on a day",
     description:
-      "The open lots on `asOf` (default today), each with its valuation, and " +
-      "the lot totals. A total is null unless every lot has the figure. " +
+      "The open lots on `asOf` (default today), each with its series and its " +
+      "valuation by that series' terms, the series held, the program and the " +
+      "lot totals. A total is null unless every lot has the figure. " +
       "`refusal` names why the lots cannot be derived (a split, a fractional " +
       "quantity, a removal larger than the lots held).",
   })

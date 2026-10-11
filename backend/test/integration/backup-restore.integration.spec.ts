@@ -14,7 +14,7 @@ import { BondValuationService } from "@/bonds/bond-valuation.service";
 import { FetchSyncService } from "@/common/jobs/fetch-sync.service";
 import { BondCatalogService } from "@/bonds/bond-catalog.service";
 import { POLISH_BOND_ADAPTER } from "@/bonds/adapters/pl/index";
-import { bondInstrumentId } from "@/bonds/bond-instrument-id";
+import { bondInstrumentId, bondProgramId } from "@/bonds/bond-instrument-id";
 import { BackupExportService } from "@/backup/backup-export.service";
 import { BackupRestoreService } from "@/backup/backup-restore.service";
 import { BackupAttachmentTransferService } from "@/backup/backup-attachment-transfer.service";
@@ -979,11 +979,12 @@ describe("Backup export/restore round-trip (integration)", () => {
     ]);
   });
 
-  it("keeps a security's bond link where this deployment's catalog has the instrument and restores it unlinked elsewhere", async () => {
-    // bond_instruments is reference data a backup does not carry, so the link
-    // survives only where the target's catalog holds the same instrument (its
-    // id is derived from the series, hence the same on every deployment), and a
-    // restore never fails on the foreign key for one it lacks.
+  it("keeps a security's bond link where this deployment's catalog has the program and restores it unlinked elsewhere, with the series of its transactions", async () => {
+    // bond_programs and bond_instruments are reference data a backup does not
+    // carry, so a link survives only where the target's catalog holds the same
+    // program or series (their ids are derived from the codes, hence the same
+    // on every deployment), and a restore never fails on the foreign key for
+    // one it lacks.
     const userA = await createTestUserDirect(dataSource, {
       email: "bond-a@example.com",
     });
@@ -994,21 +995,48 @@ describe("Backup export/restore round-trip (integration)", () => {
       `INSERT INTO currencies (code, name, symbol, decimal_places, is_active)
        VALUES ('PLN', 'Zloty', 'zl', 2, true) ON CONFLICT (code) DO NOTHING`,
     );
+    const programId = bondProgramId("PL", "PL_MF", "TOS");
     const instrumentId = bondInstrumentId("PL", "PL_MF", "TOS1029");
     await dataSource.query(
-      `INSERT INTO bond_instruments (id, issuer_country_code, issuer_code, program_code, series_code, currency_code, marketability)
-       VALUES ($1, 'PL', 'PL_MF', 'TOS', 'TOS1029', 'PLN', 'RETAIL_REDEEMABLE')`,
-      [instrumentId],
+      `INSERT INTO bond_programs (id, issuer_country_code, issuer_code, program_code, currency_code)
+       VALUES ($1, 'PL', 'PL_MF', 'TOS', 'PLN') ON CONFLICT DO NOTHING`,
+      [programId],
+    );
+    await dataSource.query(
+      `INSERT INTO bond_instruments (id, issuer_country_code, issuer_code, program_code, bond_program_id, series_code, currency_code, marketability)
+       VALUES ($1, 'PL', 'PL_MF', 'TOS', $2, 'TOS1029', 'PLN', 'RETAIL_REDEEMABLE')`,
+      [instrumentId, programId],
     );
     const insert = (symbol: string, currency: string) =>
       dataSource.query(
-        `INSERT INTO securities (user_id, symbol, name, security_type, currency_code, bond_instrument_id)
+        `INSERT INTO securities (user_id, symbol, name, security_type, currency_code, bond_program_id)
          VALUES ($1, $2, $2, 'BOND', $3, $4)`,
-        [userA.id, symbol, currency, instrumentId],
+        [userA.id, symbol, currency, programId],
       );
     await insert("LINKED", "PLN");
     await insert("UNKNOWN-SERIES", "PLN");
     await insert("WRONG-CCY", "PLN");
+    // The series of each transaction rides along: LINKED's purchase names a
+    // series this catalog holds and one it does not; the others name the series
+    // of a program they are restored unlinked from.
+    const [{ id: brokerage }] = await dataSource.query(
+      `INSERT INTO accounts (user_id, account_type, account_sub_type, name,
+                             currency_code, current_balance, opening_balance)
+       VALUES ($1, 'INVESTMENT', 'INVESTMENT_BROKERAGE', 'Brokerage', 'PLN', 0, 0)
+       RETURNING id`,
+      [userA.id],
+    );
+    const trade = (symbol: string, date: string) =>
+      dataSource.query(
+        `INSERT INTO investment_transactions
+           (user_id, account_id, security_id, bond_instrument_id, action, transaction_date, quantity, price, total_amount, status)
+         SELECT $1, $2, id, $4, 'BUY', $5::date, 10, 100, 1000, 'UNRECONCILED'
+           FROM securities WHERE user_id = $1 AND symbol = $3`,
+        [userA.id, brokerage, symbol, instrumentId, date],
+      );
+    await trade("LINKED", "2026-10-05");
+    await trade("LINKED", "2026-10-06");
+    await trade("UNKNOWN-SERIES", "2026-10-05");
     // The engine's price rows ride along in the file; one is also a manual price.
     await dataSource.query(
       `INSERT INTO security_prices (security_id, price_date, close_price, source)
@@ -1024,25 +1052,34 @@ describe("Backup export/restore round-trip (integration)", () => {
     const exported = JSON.parse(gunzipSync(buffer).toString("utf-8"));
     expect(
       exported.securities.map(
-        (r: { symbol: string; bond_instrument_id: string }) => [
+        (r: { symbol: string; bond_program_id: string }) => [
           r.symbol,
-          r.bond_instrument_id,
+          r.bond_program_id,
         ],
       ),
     ).toEqual(
       expect.arrayContaining([
-        ["LINKED", instrumentId],
-        ["UNKNOWN-SERIES", instrumentId],
+        ["LINKED", programId],
+        ["UNKNOWN-SERIES", programId],
       ]),
     );
 
-    // The file as another deployment's export would read: one series this
-    // catalog has never seeded, and one pair a crafted file could hold.
+    // The file as another deployment's export would read: one program and one
+    // series this catalog has never seeded, and one pair a crafted file could hold.
     const absent = randomUUID();
     for (const row of exported.securities) {
-      if (row.symbol === "UNKNOWN-SERIES") row.bond_instrument_id = absent;
+      if (row.symbol === "UNKNOWN-SERIES") row.bond_program_id = absent;
       if (row.symbol === "WRONG-CCY") row.currency_code = "USD";
     }
+    const linkedId = exported.securities.find(
+      (r: { symbol: string }) => r.symbol === "LINKED",
+    ).id;
+    const absentSeries = randomUUID();
+    const linkedTrades = exported.investment_transactions.filter(
+      (r: { security_id: string }) => r.security_id === linkedId,
+    );
+    expect(linkedTrades).toHaveLength(2);
+    linkedTrades[1].bond_instrument_id = absentSeries;
     await dataSource.query(
       `INSERT INTO currencies (code, name, symbol, decimal_places, is_active)
        VALUES ('USD', 'US Dollar', '$', 2, true) ON CONFLICT (code) DO NOTHING`,
@@ -1061,18 +1098,39 @@ describe("Backup export/restore round-trip (integration)", () => {
       "UNKNOWN-SERIES",
       "WRONG-CCY",
     ]);
+    // One of LINKED's purchases named a series this catalog lacks.
+    expect(result.unlinkedBondSeries?.count).toBe(1);
     expect(Object.keys(result.restored)).not.toContain(
       "unlinkedBondSecurities",
     );
+    expect(Object.keys(result.restored)).not.toContain("unlinkedBondSeries");
 
     const restored = await dataSource.query(
-      `SELECT symbol, bond_instrument_id FROM securities WHERE user_id = $1 ORDER BY symbol`,
+      `SELECT symbol, bond_program_id, bond_auto_fetch FROM securities WHERE user_id = $1 ORDER BY symbol`,
       [userB.id],
     );
     expect(restored).toEqual([
-      { symbol: "LINKED", bond_instrument_id: instrumentId },
-      { symbol: "UNKNOWN-SERIES", bond_instrument_id: null },
-      { symbol: "WRONG-CCY", bond_instrument_id: null },
+      { symbol: "LINKED", bond_program_id: programId, bond_auto_fetch: false },
+      {
+        symbol: "UNKNOWN-SERIES",
+        bond_program_id: null,
+        bond_auto_fetch: false,
+      },
+      { symbol: "WRONG-CCY", bond_program_id: null, bond_auto_fetch: false },
+    ]);
+    // A transaction keeps the series only of its own security's program: the
+    // catalog's series survives for LINKED, the missing one and every series of
+    // an unlinked security are NULL (INV-BOND-007).
+    const series = await dataSource.query(
+      `SELECT s.symbol, TO_CHAR(t.transaction_date, 'YYYY-MM-DD') AS d, t.bond_instrument_id
+         FROM investment_transactions t JOIN securities s ON s.id = t.security_id
+        WHERE t.user_id = $1 ORDER BY s.symbol, t.transaction_date`,
+      [userB.id],
+    );
+    expect(series).toEqual([
+      { symbol: "LINKED", d: "2026-10-05", bond_instrument_id: instrumentId },
+      { symbol: "LINKED", d: "2026-10-06", bond_instrument_id: null },
+      { symbol: "UNKNOWN-SERIES", d: "2026-10-05", bond_instrument_id: null },
     ]);
 
     // An unlinked security keeps no engine price (nothing would ever refresh or
@@ -1114,15 +1172,20 @@ describe("Backup export/restore round-trip (integration)", () => {
       [userA.id],
     );
     const [{ id: securityId }] = await dataSource.query(
-      `INSERT INTO securities (user_id, symbol, name, security_type, currency_code, bond_instrument_id)
+      `INSERT INTO securities (user_id, symbol, name, security_type, currency_code, bond_program_id)
        VALUES ($1, 'TOS1029', 'TOS1029', 'BOND', 'PLN', $2) RETURNING id`,
-      [userA.id, bondInstrumentId("PL", "PL_MF", "TOS1029")],
+      [userA.id, bondProgramId("PL", "PL_MF", "TOS")],
     );
     await dataSource.query(
       `INSERT INTO investment_transactions
-         (user_id, account_id, security_id, action, transaction_date, quantity, price, total_amount, status)
-       VALUES ($1, $2, $3, 'BUY', '2026-10-05', 10, 100, 1000, 'UNRECONCILED')`,
-      [userA.id, accountId, securityId],
+         (user_id, account_id, security_id, bond_instrument_id, action, transaction_date, quantity, price, total_amount, status)
+       VALUES ($1, $2, $3, $4, 'BUY', '2026-10-05', 10, 100, 1000, 'UNRECONCILED')`,
+      [
+        userA.id,
+        accountId,
+        securityId,
+        bondInstrumentId("PL", "PL_MF", "TOS1029"),
+      ],
     );
     // A price another deployment's engine wrote, nowhere near what this one computes.
     await dataSource.query(

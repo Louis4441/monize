@@ -24,6 +24,7 @@ import {
   SecurityPriceService,
 } from "./security-price.service";
 import { BondPriceService } from "../bonds/bond-price.service";
+import { clearForeignSeries } from "../bonds/bond-series-resolver";
 import {
   BondLinkProblem,
   findBondLinkProblem,
@@ -188,7 +189,7 @@ export class SecuritiesService {
   private async assertBondLink(
     m: EntityManager,
     link: {
-      bondInstrumentId: string;
+      bondProgramId: string;
       currencyCode: string;
       securityType: string | null | undefined;
     },
@@ -203,7 +204,7 @@ export class SecuritiesService {
         m,
         legacyQuantities.userId,
         legacyQuantities.securityId,
-        link.bondInstrumentId,
+        link.bondProgramId,
       ))
     ) {
       throw new BadRequestException(
@@ -217,16 +218,16 @@ export class SecuritiesService {
 
   private throwBondLinkProblem(
     problem: BondLinkProblem,
-    link: { bondInstrumentId: string; currencyCode: string },
+    link: { bondProgramId: string; currencyCode: string },
     currencyChanged: boolean,
   ): never {
     switch (problem.code) {
-      case "INSTRUMENT_NOT_FOUND":
+      case "PROGRAM_NOT_FOUND":
         throw new BadRequestException(
           tr(
-            "errors.securities.bondInstrumentNotFound",
-            `Bond instrument ${link.bondInstrumentId} does not exist`,
-            { id: link.bondInstrumentId },
+            "errors.securities.bondProgramNotFound",
+            `Bond program ${link.bondProgramId} does not exist`,
+            { id: link.bondProgramId },
           ),
         );
       case "NOT_BOND_TYPE":
@@ -309,7 +310,7 @@ export class SecuritiesService {
           `SELECT DISTINCT s.id
              FROM securities s
              JOIN investment_transactions t ON t.security_id = s.id
-            WHERE s.user_id = $1 AND s.bond_instrument_id IS NOT NULL
+            WHERE s.user_id = $1 AND s.bond_program_id IS NOT NULL
               AND t.account_id = ANY($2::uuid[])`,
           [userId, accountIds],
         ),
@@ -643,13 +644,13 @@ export class SecuritiesService {
         );
       }
 
-      if (securityData.bondInstrumentId) {
-        securityData.bondInstrumentId =
-          securityData.bondInstrumentId.toLowerCase();
+      if (!securityData.bondProgramId) securityData.bondAutoFetch = false;
+      if (securityData.bondProgramId) {
+        securityData.bondProgramId = securityData.bondProgramId.toLowerCase();
         await this.assertBondLink(
           m,
           {
-            bondInstrumentId: securityData.bondInstrumentId,
+            bondProgramId: securityData.bondProgramId,
             currencyCode: securityData.currencyCode,
             securityType: securityData.securityType,
           },
@@ -680,7 +681,7 @@ export class SecuritiesService {
       );
     });
 
-    if (saved.bondInstrumentId) {
+    if (saved.bondProgramId) {
       await this.recomputeBondPrices(userId, saved.id);
     }
 
@@ -873,9 +874,11 @@ export class SecuritiesService {
     if (updateSecurityDto.msnInstrumentId !== undefined)
       security.msnInstrumentId = updateSecurityDto.msnInstrumentId ?? null;
     // One canonical spelling: the same instrument in capitals is not a change.
-    if (updateSecurityDto.bondInstrumentId !== undefined)
-      security.bondInstrumentId =
-        updateSecurityDto.bondInstrumentId?.toLowerCase() ?? null;
+    if (updateSecurityDto.bondProgramId !== undefined)
+      security.bondProgramId =
+        updateSecurityDto.bondProgramId?.toLowerCase() ?? null;
+    if (updateSecurityDto.bondAutoFetch !== undefined)
+      security.bondAutoFetch = updateSecurityDto.bondAutoFetch;
     if (updateSecurityDto.countryWeightings !== undefined)
       security.countryWeightings = this.normalizeAllocationWeightings(
         updateSecurityDto.countryWeightings,
@@ -915,7 +918,7 @@ export class SecuritiesService {
       // engine's rows under the recompute lock (`clearEnginePrices`): that
       // advisory lock is taken first, before the row lock below, the order every
       // writer uses (`common/db/locks.ts`); it is re-entrant for the cleanup.
-      if (updateSecurityDto.bondInstrumentId !== undefined) {
+      if (updateSecurityDto.bondProgramId !== undefined) {
         await acquireAdvisoryLock(m, LockScope.BondPriceRecompute, id);
       }
       // The link is read from the row under a lock, not from the read above: a
@@ -923,11 +926,12 @@ export class SecuritiesService {
       // the link changes (and whether engine rows must go) is decided on the
       // truth, and this write cannot put a stale link back.
       const locked: Array<{
-        bond_instrument_id: string | null;
+        bond_program_id: string | null;
+        bond_auto_fetch: boolean;
         security_type: string | null;
         currency_code: string;
       }> = await m.query(
-        `SELECT bond_instrument_id, security_type, currency_code
+        `SELECT bond_program_id, bond_auto_fetch, security_type, currency_code
            FROM securities
           WHERE id = $1 AND user_id = $2
           FOR UPDATE`,
@@ -943,18 +947,24 @@ export class SecuritiesService {
         );
       }
       const current = locked[0];
-      if (updateSecurityDto.bondInstrumentId === undefined) {
-        security.bondInstrumentId = current.bond_instrument_id;
+      if (updateSecurityDto.bondProgramId === undefined) {
+        security.bondProgramId = current.bond_program_id;
       }
+      if (updateSecurityDto.bondAutoFetch === undefined) {
+        security.bondAutoFetch = current.bond_auto_fetch;
+      }
+      // The switch only means something on a linked security.
+      if (!security.bondProgramId) security.bondAutoFetch = false;
       if (updateSecurityDto.securityType === undefined) {
         security.securityType = current.security_type;
       }
       if (updateSecurityDto.currencyCode === undefined) {
         security.currencyCode = current.currency_code;
       }
-      beforeData.bondInstrumentId = current.bond_instrument_id;
+      beforeData.bondProgramId = current.bond_program_id;
+      beforeData.bondAutoFetch = current.bond_auto_fetch;
 
-      linkChanged = security.bondInstrumentId !== current.bond_instrument_id;
+      linkChanged = security.bondProgramId !== current.bond_program_id;
       const currencyChanged = security.currencyCode !== current.currency_code;
       const typeChanged = security.securityType !== current.security_type;
 
@@ -963,13 +973,13 @@ export class SecuritiesService {
       // security that stays linked: the engine prices in the instrument's
       // currency, and only a BOND is linked.
       if (
-        security.bondInstrumentId &&
+        security.bondProgramId &&
         (linkChanged || currencyChanged || typeChanged)
       ) {
         await this.assertBondLink(
           m,
           {
-            bondInstrumentId: security.bondInstrumentId,
+            bondProgramId: security.bondProgramId,
             currencyCode: security.currencyCode,
             securityType: security.securityType,
           },
@@ -985,6 +995,9 @@ export class SecuritiesService {
       if (linkChanged) {
         ({ accountIds: clearedEngineAccounts } =
           await this.bondPriceService.clearEnginePrices(m, userId, id));
+        // INV-BOND-007: a row names a series of the security's own program, and
+        // an unlinked security's rows name none.
+        await clearForeignSeries(m, userId, id, security.bondProgramId);
       }
 
       // The relation is loaded onto `security`; strip it before save so
@@ -1004,7 +1017,7 @@ export class SecuritiesService {
     if (clearedEngineAccounts.length > 0) {
       this.bondPriceService.publishClearedPrices(userId, clearedEngineAccounts);
     }
-    if (linkChanged && saved.bondInstrumentId) {
+    if (linkChanged && saved.bondProgramId) {
       await this.recomputeBondPrices(userId, id);
     }
 
@@ -1402,16 +1415,16 @@ export class SecuritiesService {
     // (`update`); the preview runs the same validation so the person is not
     // asked to confirm what cannot be done.
     if (
-      security.bondInstrumentId &&
+      security.bondProgramId &&
       (currencyCode !== security.currencyCode ||
         securityType !== (security.securityType ?? null))
     ) {
-      const linkedTo = security.bondInstrumentId;
+      const linkedTo = security.bondProgramId;
       await withScopedDb(this.dataSource, (m) =>
         this.assertBondLink(
           m,
           {
-            bondInstrumentId: linkedTo,
+            bondProgramId: linkedTo,
             currencyCode,
             securityType,
           },

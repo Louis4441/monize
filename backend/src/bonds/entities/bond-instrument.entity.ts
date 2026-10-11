@@ -8,6 +8,7 @@ import {
   JoinColumn,
 } from "typeorm";
 import { Currency } from "../../currencies/entities/currency.entity";
+import { BondProgram } from "./bond-program.entity";
 
 /**
  * One sovereign bond series, for any issuer country (the Polish retail bonds
@@ -32,6 +33,16 @@ export class BondInstrument {
 
   @Column({ type: "varchar", length: 40, name: "program_code" })
   programCode: string;
+
+  @Column({ type: "uuid", name: "bond_program_id" })
+  bondProgramId: string;
+
+  // Declared so the integration schema, built from the entities, carries the
+  // same `REFERENCES bond_programs(id) ON DELETE RESTRICT` as schema.sql. Never
+  // loaded; the column above is what the code reads.
+  @ManyToOne(() => BondProgram, { onDelete: "RESTRICT" })
+  @JoinColumn({ name: "bond_program_id" })
+  program?: BondProgram;
 
   @Column({ type: "varchar", length: 40, name: "series_code" })
   seriesCode: string;

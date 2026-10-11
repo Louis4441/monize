@@ -559,11 +559,14 @@
     "TEMPLATE_NOT_VALIDATED": "[XX-Series {{ series }} was sold before the {{ product }} template was validated ({{ validFrom }}); it needs a curated entry-XX]",
     "SERIES_TERMS_CONFLICT": "[XX-Series {{ series }} is already stored with different terms; stored terms are never replaced-XX]",
     "countryCodeInvalid": "[XX-countryCode must be a two-letter country code-XX]",
-    "programCodeInvalid": "[XX-programCode must be 1 to 12 capital letters or digits-XX]"
+    "programCodeInvalid": "[XX-programCode must be 1 to 12 capital letters or digits-XX]",
+    "SERIES_NOT_IN_PROGRAM": "[XX-Series {{ series }} does not belong to the bond program of this security ({{ program }})-XX]",
+    "SERIES_NOT_DETERMINED": "[XX-The series of this {{ program }} purchase on {{ date }} could not be determined: no single stored series of the program was on sale that day. Fetch the series from the official source and choose it for the transaction.-XX]",
+    "SERIES_NOT_ALLOWED": "[XX-A bond series can only be named for a share-moving transaction of a security linked to a bond program-XX]"
   },
   "securities": {
     "bondPricedByEngine": "[XX-This security is linked to a bond instrument and is priced by the bond engine, not by a quote provider. Use Recalculate prices instead.-XX]",
-    "bondInstrumentNotFound": "[XX-Bond instrument {{ id }} does not exist-XX]",
+    "bondProgramNotFound": "[XX-Bond program {{ id }} does not exist-XX]",
     "bondCurrencyMismatch": "[XX-The security is recorded in {{ currency }} but the bond instrument is priced in {{ instrumentCurrency }}. Use the instrument's currency.-XX]",
     "bondCurrencyLocked": "[XX-A security linked to a bond instrument stays in the instrument's currency ({{ instrumentCurrency }}). Unlink it from the bond before changing its currency.-XX]",
     "accountMustBeInvestment": "[XX-Account must be of type INVESTMENT-XX]",

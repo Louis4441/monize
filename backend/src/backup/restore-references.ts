@@ -174,17 +174,19 @@ export const RESTORE_REFERENCE_COLUMNS: Readonly<
 export const CATALOG_REFERENCE_COLUMNS: Readonly<
   Record<string, Readonly<Record<string, string>>>
 > = {
-  securities: { bond_instrument_id: "bond_instruments" },
+  securities: { bond_program_id: "bond_programs" },
+  investment_transactions: { bond_instrument_id: "bond_instruments" },
 };
 
 /**
  * The `table.column` entries above whose referenced row must also be in the
- * referencing row's own currency, or the reference is dropped: a bond link to an
- * instrument in another currency would price the security in the wrong currency
- * (INV-PRICE-001). Both rows carry a `currency_code`.
+ * referencing row's own currency, or the reference is dropped: a bond link to a
+ * program in another currency would price the security in the wrong currency
+ * (INV-PRICE-001). Both rows carry a `currency_code`. A transaction's series has
+ * no currency of its own to compare (its security's program is).
  */
 export const CATALOG_CURRENCY_MATCHED_COLUMNS: ReadonlySet<string> = new Set([
-  "securities.bond_instrument_id",
+  "securities.bond_program_id",
 ]);
 
 /**

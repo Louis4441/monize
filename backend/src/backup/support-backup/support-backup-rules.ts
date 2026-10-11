@@ -456,11 +456,12 @@ export const RULES: Record<string, TableRules> = {
     ir_website: drop,
     msn_instrument_id: drop, // would identify a masked ticker
     historical_backfill_attempted_at: keep,
-    // The id is derived from the series, so keeping it would name the bond the
+    // The id is derived from the program, so keeping it would name the bond the
     // masked symbol hides, and the copy's quantities are scaled by a fractional
     // multiplier, which the bond engine refuses. The copy is not valued by the
     // engine; any bond_engine price rows it carries stay as static prices.
-    bond_instrument_id: drop,
+    bond_program_id: drop,
+    bond_auto_fetch: keep, // a flag, like is_favourite: it re-identifies nobody
     created_at: keep,
     updated_at: keep,
   },
@@ -520,6 +521,9 @@ export const RULES: Record<string, TableRules> = {
     // support backup that dropped it could not reproduce a VOID row's
     // exclusion from holdings and balances.
     status: keep,
+    // Derived from the series code, so keeping it would name the bond the masked
+    // symbol hides (the same reason securities.bond_program_id is dropped).
+    bond_instrument_id: drop,
     created_at: keep,
     updated_at: keep,
   },

@@ -29,11 +29,23 @@ export interface BondLotTransaction {
   readonly accountId?: string | null;
   /** For a paired transfer leg: the account of the other leg. */
   readonly counterpartAccountId?: string | null;
+  /**
+   * The series (bond instrument id) the row acts on
+   * (`docs/specs/bond-program-securities.md` 2.3). An acquisition names the
+   * series its lot belongs to: `null` is a program-linked row with no stored
+   * series, which makes the lots unknown (`SERIES_NOT_DETERMINED`); `undefined`
+   * is a caller with no series to tell apart. A removal's series is optional:
+   * given, the quantity leaves that series' lots, absent it leaves the
+   * account's lots first-in first-out across series.
+   */
+  readonly instrumentId?: string | null;
 }
 
 export interface BondLot {
   /** The account that holds the lot; absent for the unnamed account. */
   readonly accountId?: string | null;
+  /** The series the lot belongs to; null for a caller with no series to tell apart. */
+  readonly instrumentId: string | null;
   readonly purchaseDate: string;
   /** A whole number of bonds. */
   readonly quantity: number;
@@ -48,6 +60,10 @@ export type BondLotsRefusalCode =
   | "FRACTIONAL_QUANTITY"
   /** A removal larger than the lots its account holds at that point. */
   | "OVER_REMOVAL"
+  /** A removal that names a series, larger than the lots of that series its account holds. */
+  | "REMOVAL_EXCEEDS_SERIES"
+  /** An acquisition of a program-linked security with no stored series. */
+  | "SERIES_NOT_DETERMINED"
   /** A share-moving row with no quantity, a negative one, or one too large to count. */
   | "INVALID_QUANTITY";
 
@@ -201,10 +217,18 @@ export function bondLotsFromTransactions(
     const account = accountKey(row.accountId);
 
     if (step.kind === "add") {
+      if (row.instrumentId === null) {
+        return refuse(
+          "SERIES_NOT_DETERMINED",
+          row,
+          `${where} names no bond series and none could be determined from its date`,
+        );
+      }
       byAccount.set(account, [
         ...heldIn(account),
         {
           accountId: row.accountId ?? undefined,
+          instrumentId: row.instrumentId ?? null,
           purchaseDate: row.transactionDate,
           quantity,
           purchaseDateAssumed: step.assumed,
@@ -213,15 +237,29 @@ export function bondLotsFromTransactions(
       continue;
     }
 
-    const taken = takeFifo(heldIn(account), quantity);
+    const series = row.instrumentId ?? null;
+    const held = heldIn(account);
+    const inSeries = (lot: BondLot) =>
+      series === null || lot.instrumentId === series;
+    const candidates = held.filter(inSeries);
+    const taken = takeFifo(candidates, quantity);
     if (taken === null) {
-      return refuse(
-        "OVER_REMOVAL",
-        row,
-        `${where} removes ${quantity} bonds, more than the ${totalOf(heldIn(account))} held in its account`,
-      );
+      return series === null
+        ? refuse(
+            "OVER_REMOVAL",
+            row,
+            `${where} removes ${quantity} bonds, more than the ${totalOf(held)} held in its account`,
+          )
+        : refuse(
+            "REMOVAL_EXCEEDS_SERIES",
+            row,
+            `${where} removes ${quantity} bonds of series ${series}, more than the ${totalOf(candidates)} of it held in its account`,
+          );
     }
-    byAccount.set(account, taken.rest);
+    byAccount.set(account, [
+      ...held.filter((lot) => !inSeries(lot)),
+      ...taken.rest,
+    ]);
 
     if (step.kind === "move") {
       const destination = accountKey(step.toAccount);

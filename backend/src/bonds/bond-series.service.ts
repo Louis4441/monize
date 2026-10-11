@@ -37,6 +37,36 @@ export interface SeriesRequestOptions {
   /** The network, injectable so a test never leaves the process. */
   readonly fetch?: HttpFetch;
   readonly adapters?: readonly BondAdapter[];
+  /**
+   * Only the programs named (`programKey`): the daily check fetches the
+   * programs some security has switched auto-fetch on for. Absent, every
+   * series is in scope (an explicit request). A series whose adapter cannot
+   * name its program is out of scope when this is set.
+   */
+  readonly programs?: ReadonlySet<string>;
+}
+
+/** The key of a program in `SeriesRequestOptions.programs`. */
+export function programKey(countryCode: string, programCode: string): string {
+  return `${countryCode.toUpperCase()}|${programCode.toUpperCase()}`;
+}
+
+/** The codes of `adapter` that `options.programs` puts in scope. */
+function inScope(
+  adapter: BondAdapter,
+  codes: readonly string[],
+  options: SeriesRequestOptions,
+): string[] {
+  const { programs } = options;
+  if (programs === undefined) return [...codes];
+  const programOf = adapter.programOf;
+  if (!programOf) return [];
+  return codes.filter((code) => {
+    const program = programOf.call(adapter, code);
+    return (
+      program !== null && programs.has(programKey(adapter.countryCode, program))
+    );
+  });
 }
 
 /** What one daily check of the current offer did, in series. */
@@ -222,15 +252,24 @@ export class BondSeriesService {
           FetchSyncJob.BondSeries,
           SERIES_LEASE_MS,
           async () => {
+            // Only the programs a security has switched auto-fetch on for
+            // (docs/specs/bond-program-securities.md 2.5); none, nothing to do.
+            const programs = await this.autoFetchPrograms();
+            if (programs.size === 0) {
+              this.logger.log(
+                "Bond series check skipped: no security has auto-fetch switched on",
+              );
+              return;
+            }
             // The backfill follows even when the offer failed, so the failure
             // still reaches the lease record, after the history had its turn.
             let offerFailure: unknown = null;
             try {
-              await this.fetchCurrentOffer();
+              await this.fetchCurrentOffer({ programs });
             } catch (error) {
               offerFailure = error;
             }
-            await this.backfillHistory();
+            await this.backfillHistory({ programs });
             if (offerFailure !== null) throw offerFailure;
           },
         ),
@@ -244,6 +283,29 @@ export class BondSeriesService {
   }
 
   /**
+   * The programs at least one security has switched auto-fetch on for, as
+   * `programKey`s. One query in the cron's system context that reads program
+   * columns only: never anything of the user's but the flag that selects the
+   * program. Needs an ambient identity (`withSystemContext`).
+   */
+  async autoFetchPrograms(): Promise<Set<string>> {
+    const rows: Array<{
+      issuer_country_code: string;
+      program_code: string;
+    }> = await withScopedDb(this.dataSource, (m) =>
+      m.query(
+        `SELECT DISTINCT p.issuer_country_code, p.program_code
+           FROM bond_programs p
+          WHERE EXISTS (SELECT 1 FROM securities s
+                         WHERE s.bond_program_id = p.id AND s.bond_auto_fetch)`,
+      ),
+    );
+    return new Set(
+      rows.map((r) => programKey(r.issuer_country_code, r.program_code)),
+    );
+  }
+
+  /**
    * Every series each adapter lists as on sale and the catalog lacks. A series
    * already stored is not fetched; one failing is logged and does not stop the
    * next. Throws at the end when everything attempted failed, so the lease
@@ -252,6 +314,42 @@ export class BondSeriesService {
    */
   async fetchCurrentOffer(
     options: SeriesRequestOptions = {},
+  ): Promise<CurrentOfferRun> {
+    const run = await this.runCurrentOffer(options);
+    if (run.failed > 0 && run.stored + run.alreadyStored === 0) {
+      throw new Error(
+        `Every bond series check failed (${run.failed}); see the log for each cause`,
+      );
+    }
+    return run;
+  }
+
+  /**
+   * The user-initiated "fetch the current offer now" of one country: every
+   * series of its current offer that is not stored is fetched and stored
+   * (`POST /bonds/offer/fetch`). A country with no fetch is refused
+   * (`SERIES_FETCH_UNSUPPORTED`); a source that cannot be read is counted in
+   * `failed` rather than thrown, so the caller learns what was and was not
+   * stored. Needs an ambient identity.
+   */
+  async fetchOfferOf(
+    countryCode: string,
+    options: SeriesRequestOptions = {},
+  ): Promise<CurrentOfferRun> {
+    const country = countryCode.toUpperCase();
+    const adapters = (options.adapters ?? INSTALLED_BOND_ADAPTERS).filter(
+      (a) =>
+        a.countryCode === country &&
+        a.currentSeries &&
+        a.fetchSeries &&
+        a.seriesProviderId,
+    );
+    if (adapters.length === 0) throw this.unsupported(country, "");
+    return this.runCurrentOffer({ ...options, adapters });
+  }
+
+  private async runCurrentOffer(
+    options: SeriesRequestOptions,
   ): Promise<CurrentOfferRun> {
     let listed = 0;
     let stored = 0;
@@ -275,8 +373,9 @@ export class BondSeriesService {
         );
         continue;
       }
-      listed += codes.length;
-      for (const code of codes) {
+      const inScopeCodes = inScope(adapter, codes, options);
+      listed += inScopeCodes.length;
+      for (const code of inScopeCodes) {
         try {
           const result = await this.fetchSeries(adapter.countryCode, code, {
             ...options,
@@ -297,11 +396,6 @@ export class BondSeriesService {
     this.logger.log(
       `Bond series check: ${listed} listed, ${stored} stored, ${alreadyStored} already stored, ${failed} failed`,
     );
-    if (failed > 0 && stored + alreadyStored === 0) {
-      throw new Error(
-        `Every bond series check failed (${failed}); see the log for each cause`,
-      );
-    }
     return { listed, stored, alreadyStored, failed };
   }
 
@@ -331,7 +425,7 @@ export class BondSeriesService {
         options.today ??
         todayInTimezone(adapter.timezone) ??
         (todayInTimezone("UTC") as string);
-      const codes = adapter.backfillCodes(today);
+      const codes = inScope(adapter, adapter.backfillCodes(today), options);
       const held = await withScopedDb(this.dataSource, (m) =>
         this.catalog.storedSeriesCodes(m, adapter.countryCode, codes),
       );

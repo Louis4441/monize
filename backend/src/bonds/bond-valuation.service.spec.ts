@@ -20,7 +20,14 @@ type Row = Record<string, unknown>;
 
 interface Store {
   instruments: Row[];
-  /** Newest first, like the query's ORDER BY. */
+  /** `bond_programs` rows (the program of the linked security). */
+  programs: Row[];
+  /** The ids the sale-window inference of a legacy row finds. */
+  onSale: Row[];
+  /**
+   * Newest first, like the query's ORDER BY. A row naming `instrumentId` belongs
+   * to that series only; one without is every series' terms.
+   */
   terms: Row[];
   rates: Row[];
   series: Row[];
@@ -33,7 +40,24 @@ interface Store {
 
 function setup(store: Partial<Store>) {
   const data: Store = {
-    instruments: [{ id: "i1", series_code: "TOS1029", currency_code: "PLN" }],
+    instruments: [
+      {
+        id: "i1",
+        series_code: "TOS1029",
+        program_code: "TOS",
+        currency_code: "PLN",
+      },
+    ],
+    programs: [
+      {
+        id: "p1",
+        program_code: "TOS",
+        issuer_country_code: "PL",
+        issuer_code: "PL_MF",
+        currency_code: "PLN",
+      },
+    ],
+    onSale: [{ id: "i1" }],
     terms: [{ version: 1, terms: manifestDocument("tos1029") }],
     rates: [],
     series: [],
@@ -46,14 +70,22 @@ function setup(store: Partial<Store>) {
   const calls: Array<{ sql: string; params: unknown[] }> = [];
   manager.query.mockImplementation(async (sql: string, params: unknown[]) => {
     calls.push({ sql, params });
+    if (sql.includes("FROM bond_programs")) return data.programs;
+    if (sql.includes("saleWindow")) return data.onSale;
     if (sql.includes("FROM bond_instruments")) {
-      // By id (the link) or by key (the request); the rows are the same.
-      return data.instruments;
+      // By id (a series of a lot) or by key (the request).
+      return sql.includes("WHERE id = $1")
+        ? data.instruments.filter((i) => i.id === params[0])
+        : data.instruments;
     }
     if (sql.includes("FROM bond_terms_versions")) {
       const wanted = sql.includes("version = $2") ? params[1] : undefined;
       return data.terms
-        .filter((t) => wanted === undefined || t.version === wanted)
+        .filter(
+          (t) =>
+            (t.instrumentId === undefined || t.instrumentId === params[0]) &&
+            (wanted === undefined || t.version === wanted),
+        )
         .slice(0, 1);
     }
     if (sql.includes("FROM bond_period_rates")) return data.rates;
@@ -78,7 +110,12 @@ const request = (over: Partial<ValueLotRequest> = {}): ValueLotRequest => ({
 
 const edoTerms = { version: 1, terms: manifestDocument("edo1036") };
 const edoInstrument = [
-  { id: "i2", series_code: "EDO1036", currency_code: "PLN" },
+  {
+    id: "i2",
+    series_code: "EDO1036",
+    program_code: "EDO",
+    currency_code: "PLN",
+  },
 ];
 const edoRequest = (over: Partial<ValueLotRequest> = {}) =>
   request({
@@ -358,15 +395,22 @@ describe("BondValuationService", () => {
         user_id: "user-1",
         symbol: "TOS1029",
         currency_code: "PLN",
-        bond_instrument_id: "i1",
+        bond_program_id: "p1",
+        bond_auto_fetch: false,
       },
     ];
-    const buy = (date: string, quantity: string) => ({
+    const buy = (
+      date: string,
+      quantity: string,
+      series: string | null = "i1",
+    ) => ({
       action: "BUY",
       status: "UNRECONCILED",
       tx_date: date,
       quantity,
-      paired_transfer: false,
+      account_id: "acc-1",
+      counterpart_account_id: null,
+      bond_instrument_id: series,
     });
 
     it("values every lot open on asOf and totals them exactly", async () => {
@@ -389,13 +433,23 @@ describe("BondValuationService", () => {
       expect(
         calls.find((c) => c.sql.includes("FROM securities"))?.params,
       ).toEqual(["sec-1", "user-1"]);
-      expect(result.instrument).toMatchObject({
-        id: "i1",
-        seriesCode: "TOS1029",
-        termsProvider: "PL_MF",
+      expect(result.program).toEqual({
+        id: "p1",
+        programCode: "TOS",
+        issuerCountryCode: "PL",
+        issuerCode: "PL_MF",
+        currency: "PLN",
       });
+      expect(result.autoFetch).toBe(false);
+      expect(result.series).toHaveLength(1);
+      expect(result.series[0]).toMatchObject({
+        instrumentId: "i1",
+        seriesCode: "TOS1029",
+        programCode: "TOS",
+      });
+      expect(result.lots.every((l) => l.instrumentId === "i1")).toBe(true);
       // The document the terms were read from, from the stored terms' `source`.
-      expect(result.termsSource).toEqual({
+      expect(result.series[0].termsSource).toEqual({
         provider: "PL_MF",
         url: "https://www.obligacjeskarbowe.pl/media_files/c15a26ae-de6e-4b89-a137-cb16687a7b0a.pdf",
         document: "List emisyjny nr 97/2026",
@@ -465,7 +519,7 @@ describe("BondValuationService", () => {
       );
       expect(result.lots).toEqual([]);
       // A refusal still says where the terms came from.
-      expect(result.termsSource.provider).toBe("PL_MF");
+      expect(result.series[0].termsSource.provider).toBe("PL_MF");
       expect(result.refusal).toMatchObject({ code: "SPLIT" });
       expect(result.totals).toEqual({
         quantity: null,
@@ -486,7 +540,7 @@ describe("BondValuationService", () => {
         foreign.service.valueSecurity("user-2", "sec-1", "2027-04-15"),
       ).rejects.toBeInstanceOf(NotFoundException);
       const unlinked = setup({
-        securities: [{ ...owned[0], bond_instrument_id: null }],
+        securities: [{ ...owned[0], bond_program_id: null }],
       });
       await expect(
         unlinked.service.valueSecurity("user-1", "sec-1", "2027-04-15"),
@@ -501,15 +555,22 @@ describe("BondValuationService", () => {
         user_id: "user-1",
         symbol: "EDO1036",
         currency_code: "PLN",
-        bond_instrument_id: "i2",
+        bond_program_id: "p1",
+        bond_auto_fetch: false,
       },
     ];
-    const buy = (date: string, quantity: string) => ({
+    const buy = (
+      date: string,
+      quantity: string,
+      series: string | null = "i2",
+    ) => ({
       action: "BUY",
       status: "UNRECONCILED",
       tx_date: date,
       quantity,
-      paired_transfer: false,
+      account_id: "acc-1",
+      counterpart_account_id: null,
+      bond_instrument_id: series,
     });
     // Period 2 (CPI 2027-08 = 3.4%) is known on 2027-10-16; periods 3 to 10 are not.
     const edo = (ledger: Row[] = [buy("2026-10-01", "10")]) =>
@@ -691,7 +752,7 @@ describe("BondValuationService", () => {
         ),
       ).rejects.toBeInstanceOf(NotFoundException);
       const unlinked = setup({
-        securities: [{ ...owned[0], bond_instrument_id: null }],
+        securities: [{ ...owned[0], bond_program_id: null }],
       });
       await expect(
         unlinked.service.scenariosOf(
@@ -737,7 +798,7 @@ describe("BondValuationService", () => {
     it("has no coverage entry for a fixed-rate series", async () => {
       const { service } = setup({
         securities: owned,
-        ledger: [buy("2026-10-01", "10")],
+        ledger: [buy("2026-10-01", "10", "i1")],
       });
       const result = await service.valueSecurity(
         "user-1",
@@ -750,7 +811,7 @@ describe("BondValuationService", () => {
     it("carries the next payment, rate reset and capitalization of each lot to the response", async () => {
       const { service } = setup({
         securities: owned,
-        ledger: [buy("2026-10-15", "25.00000000")],
+        ledger: [buy("2026-10-15", "25.00000000", "i1")],
       });
       const result = await service.valueSecurity(
         "user-1",
@@ -768,20 +829,20 @@ describe("BondValuationService", () => {
       expect(v).toHaveProperty("nextCapitalization");
     });
 
-    it("passes the terms' redemption policy through at the top level, and null for a maturity-only bond", async () => {
+    it("passes each series' redemption policy through, and null for a maturity-only bond", async () => {
       const onDemand = setup({
         securities: owned,
-        ledger: [buy("2026-10-15", "25")],
+        ledger: [buy("2026-10-15", "25", "i1")],
       });
       const result = await onDemand.service.valueSecurity(
         "user-1",
         "sec-1",
         "2027-04-15",
       );
-      expect(result.redemptionTerms).toEqual(
+      expect(result.series[0].redemptionTerms).toEqual(
         manifestDocument("tos1029").redemption,
       );
-      expect(result.redemptionTerms).toMatchObject({
+      expect(result.series[0].redemptionTerms).toMatchObject({
         type: "ON_DEMAND",
         penalties: [{ type: "FIXED_FEE_PER_UNIT", amount: "1.00" }],
       });
@@ -791,17 +852,17 @@ describe("BondValuationService", () => {
       const only = setup({
         terms: [{ version: 1, terms: maturityOnly }],
         securities: owned,
-        ledger: [buy("2026-10-15", "25")],
+        ledger: [buy("2026-10-15", "25", "i1")],
       });
       expect(
         (await only.service.valueSecurity("user-1", "sec-1", "2027-04-15"))
-          .redemptionTerms,
+          .series[0].redemptionTerms,
       ).toBeNull();
 
       // A refusal still names the policy: it belongs to the instrument.
       const refused = setup({
         securities: owned,
-        ledger: [{ ...buy("2026-10-15", "25"), action: "SPLIT" }],
+        ledger: [{ ...buy("2026-10-15", "25", "i1"), action: "SPLIT" }],
       });
       const r = await refused.service.valueSecurity(
         "user-1",
@@ -809,7 +870,7 @@ describe("BondValuationService", () => {
         "2027-04-15",
       );
       expect(r.refusal).not.toBeNull();
-      expect(r.redemptionTerms).toMatchObject({ type: "ON_DEMAND" });
+      expect(r.series[0].redemptionTerms).toMatchObject({ type: "ON_DEMAND" });
     });
 
     it("valueSecurity passes the assumption to every lot", async () => {
@@ -828,6 +889,216 @@ describe("BondValuationService", () => {
           observation: null,
         },
       ]);
+    });
+  });
+
+  describe("one security holding two series of a program", () => {
+    const tos = manifestDocument("tos1029");
+    const securityRow = [
+      {
+        id: "sec-1",
+        user_id: "user-1",
+        symbol: "BONDS",
+        currency_code: "PLN",
+        bond_program_id: "p1",
+        bond_auto_fetch: true,
+      },
+    ];
+    const row = (
+      date: string,
+      quantity: string,
+      series: string | null,
+      over: Row = {},
+    ) => ({
+      action: "BUY",
+      status: "UNRECONCILED",
+      tx_date: date,
+      quantity,
+      account_id: "acc-1",
+      counterpart_account_id: null,
+      bond_instrument_id: series,
+      ...over,
+    });
+    const both = (ledger: Row[], over: Partial<Store> = {}) =>
+      setup({
+        instruments: [
+          ...edoInstrument,
+          ...[
+            {
+              id: "i1",
+              series_code: "TOS1029",
+              program_code: "TOS",
+              currency_code: "PLN",
+            },
+          ],
+        ],
+        terms: [
+          { instrumentId: "i2", version: 1, terms: edoTerms.terms },
+          { instrumentId: "i1", version: 1, terms: tos },
+        ],
+        securities: securityRow,
+        ledger,
+        series: [{ kind: "MONTHLY", publisher: "GUS", covered_through: null }],
+        values: [{ observation_date: "2027-08-01", value: "0.0340000000" }],
+        ...over,
+      });
+    const only = (series: "i1" | "i2", date: string, quantity: string) =>
+      setup({
+        instruments:
+          series === "i1"
+            ? [
+                {
+                  id: "i1",
+                  series_code: "TOS1029",
+                  program_code: "TOS",
+                  currency_code: "PLN",
+                },
+              ]
+            : edoInstrument,
+        terms: [{ version: 1, terms: series === "i1" ? tos : edoTerms.terms }],
+        securities: securityRow,
+        ledger: [row(date, quantity, series)],
+        series: [{ kind: "MONTHLY", publisher: "GUS", covered_through: null }],
+        values: [{ observation_date: "2027-08-01", value: "0.0340000000" }],
+      });
+
+    it("values each lot by its own series' terms and totals them, with a series list of the held ones", async () => {
+      const mixed = both([
+        row("2026-10-15", "25", "i1"),
+        row("2026-10-01", "10", "i2"),
+      ]);
+      const result = await mixed.service.valueSecurity(
+        "user-1",
+        "sec-1",
+        "2027-04-15",
+      );
+      const tosOnly = await only(
+        "i1",
+        "2026-10-15",
+        "25",
+      ).service.valueSecurity("user-1", "sec-1", "2027-04-15");
+      const edoOnly = await only(
+        "i2",
+        "2026-10-01",
+        "10",
+      ).service.valueSecurity("user-1", "sec-1", "2027-04-15");
+
+      expect(result.autoFetch).toBe(true);
+      const byId = new Map(result.lots.map((l) => [l.instrumentId, l]));
+      expect(byId.get("i1")?.valuation).toEqual(tosOnly.lots[0].valuation);
+      expect(byId.get("i2")?.valuation).toEqual(edoOnly.lots[0].valuation);
+      expect(byId.get("i1")?.valuation.seriesCode).toBe("TOS1029");
+      expect(byId.get("i2")?.valuation.seriesCode).toBe("EDO1036");
+      expect(result.totals.quantity).toBe(35);
+      expect(result.totals.grossValue).toBe(
+        (
+          Number(tosOnly.totals.grossValue) + Number(edoOnly.totals.grossValue)
+        ).toFixed(2),
+      );
+      expect(result.series.map((x) => x.seriesCode)).toEqual([
+        "EDO1036",
+        "TOS1029",
+      ]);
+      expect(result.series.map((x) => x.instrumentId)).toEqual(["i2", "i1"]);
+      // One coverage entry, for the one benchmark any held series reads.
+      expect(result.benchmarkCoverage.map((c) => c.benchmarkId)).toEqual([
+        "PL_CPI_GUS_YOY",
+      ]);
+      // The reference data of each series is read once.
+      for (const table of ["bond_terms_versions", "bond_period_rates"]) {
+        expect(
+          mixed.calls.filter((c) => c.sql.includes(`FROM ${table}`)),
+        ).toHaveLength(2);
+      }
+    });
+
+    it("applies an assumption to the series that read the benchmark and leaves the other unchanged", async () => {
+      const mixed = both([
+        row("2026-10-15", "25", "i1"),
+        row("2026-10-01", "10", "i2"),
+      ]);
+      const [low, high] = (
+        await mixed.service.scenariosOf(
+          "user-1",
+          "sec-1",
+          "PL_CPI_GUS_YOY",
+          ["0", "0.05"],
+          "2027-10-16",
+        )
+      ).scenarios;
+      const edoOnly = await both([
+        row("2026-10-01", "10", "i2"),
+      ]).service.scenariosOf(
+        "user-1",
+        "sec-1",
+        "PL_CPI_GUS_YOY",
+        ["0", "0.05"],
+        "2027-10-16",
+      );
+      // The fixed-rate series adds the same interest in every scenario ...
+      const addedLow =
+        Number(low.totalInterest) - Number(edoOnly.scenarios[0].totalInterest);
+      const addedHigh =
+        Number(high.totalInterest) - Number(edoOnly.scenarios[1].totalInterest);
+      expect(addedLow).toBeGreaterThan(0);
+      expect(addedHigh).toBeCloseTo(addedLow, 2);
+      // ... and the indexed one still moves with the assumption.
+      expect(Number(high.totalInterest)).toBeGreaterThan(
+        Number(low.totalInterest),
+      );
+    });
+
+    it("refuses an assumption only when none of the held series reads the benchmark", async () => {
+      await expect(
+        both([
+          row("2026-10-15", "25", "i1"),
+          row("2026-10-01", "10", "i2"),
+        ]).service.scenariosOf(
+          "user-1",
+          "sec-1",
+          "PL_NBP_REFERENCE",
+          ["0.05"],
+          "2027-10-16",
+        ),
+      ).rejects.toMatchObject({ code: "BENCHMARK_NOT_READ" });
+    });
+
+    it("refuses the lots with SERIES_NOT_DETERMINED for a legacy acquisition no series covers, and infers one that is covered", async () => {
+      const uncovered = both([row("2026-10-15", "25", null)], { onSale: [] });
+      const refused = await uncovered.service.valueSecurity(
+        "user-1",
+        "sec-1",
+        "2027-04-15",
+      );
+      expect(refused.refusal).toMatchObject({
+        code: "SERIES_NOT_DETERMINED",
+        params: { action: "BUY", date: "2026-10-15" },
+      });
+      expect(refused.lots).toEqual([]);
+      expect(refused.totals.grossValue).toBeNull();
+
+      const covered = both([row("2026-10-15", "25", null)], {
+        onSale: [{ id: "i1" }],
+      });
+      const inferred = await covered.service.valueSecurity(
+        "user-1",
+        "sec-1",
+        "2027-04-15",
+      );
+      expect(inferred.refusal).toBeNull();
+      expect(inferred.lots.map((l) => l.instrumentId)).toEqual(["i1"]);
+    });
+
+    it("keeps the lots of a removal by series: selling EDO leaves TOS", async () => {
+      const result = await both([
+        row("2026-10-15", "25", "i1"),
+        row("2026-10-01", "10", "i2"),
+        row("2027-01-10", "10", "i2", { action: "SELL" }),
+      ]).service.valueSecurity("user-1", "sec-1", "2027-04-15");
+      expect(result.lots.map((l) => [l.instrumentId, l.quantity])).toEqual([
+        ["i1", 25],
+      ]);
+      expect(result.series.map((x) => x.seriesCode)).toEqual(["TOS1029"]);
     });
   });
 });

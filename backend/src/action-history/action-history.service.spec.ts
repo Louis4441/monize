@@ -1408,6 +1408,145 @@ describe("ActionHistoryService", () => {
       );
     });
 
+    describe("the bond series of a restored row (INV-BOND-007)", () => {
+      const PROGRAM = "33333333-3333-5333-8333-333333333333";
+      const SERIES = "11111111-1111-5111-8111-111111111111";
+      /** The resolver's statements; everything else answers nothing. */
+      const bondWorld = (opts: {
+        linked?: boolean;
+        inProgram?: string[];
+        onSale?: string[];
+      }) =>
+        mockQueryRunner.query.mockImplementation(
+          async (sql: string, params: unknown[] = []) => {
+            const text = String(sql);
+            if (text.includes("s.bond_program_id AS id")) {
+              return [
+                opts.linked === false
+                  ? { id: null, program_code: null }
+                  : { id: PROGRAM, program_code: "EDO" },
+              ];
+            }
+            if (text.includes("id = $1::uuid AND bond_program_id")) {
+              return (opts.inProgram ?? []).includes(String(params[0]))
+                ? [{ "?column?": 1 }]
+                : [];
+            }
+            if (text.includes("saleWindow")) {
+              return (opts.onSale ?? []).map((id) => ({ id }));
+            }
+            return [];
+          },
+        );
+      const deleted = (before: Record<string, unknown>) => ({
+        ...mockAction,
+        entityType: "investment_transaction",
+        action: "delete",
+        entityId: "inv-1",
+        beforeData: {
+          id: "inv-1",
+          accountId: "acc-1",
+          securityId: "sec-1",
+          action: "BUY",
+          transactionDate: "2026-10-15",
+          quantity: 10,
+          price: 100,
+          commission: 0,
+          totalAmount: 1000,
+          ...before,
+        },
+        afterData: null,
+      });
+      const insert = () =>
+        mockQueryRunner.query.mock.calls.find(
+          (call: any[]) =>
+            typeof call[0] === "string" &&
+            call[0].includes("INSERT INTO investment_transactions"),
+        );
+
+      it("reinserts a deleted row with the series its snapshot carried", async () => {
+        bondWorld({ inProgram: [SERIES] });
+        mockRepository.findOne.mockResolvedValue(
+          deleted({ bondInstrumentId: SERIES }),
+        );
+        mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
+        await service.undo(userId);
+        expect(insert()![0]).toContain("bond_instrument_id");
+        // The sixteenth parameter, after created_at.
+        expect((insert()![1] as unknown[])[15]).toBe(SERIES);
+      });
+
+      it("infers the series of a legacy snapshot that carries none, from the date", async () => {
+        bondWorld({ onSale: [SERIES] });
+        mockRepository.findOne.mockResolvedValue(deleted({}));
+        mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
+        await service.undo(userId);
+        expect((insert()![1] as unknown[])[15]).toBe(SERIES);
+      });
+
+      it("refuses the undo, writing nothing, when no series can be resolved for the restored purchase", async () => {
+        bondWorld({ onSale: [] });
+        mockRepository.findOne.mockResolvedValue(deleted({}));
+        mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
+        await expect(service.undo(userId)).rejects.toThrow(
+          /could not be determined/,
+        );
+        expect(insert()).toBeUndefined();
+      });
+
+      it("restores a security that is no longer linked without the series", async () => {
+        bondWorld({ linked: false, inProgram: [SERIES] });
+        mockRepository.findOne.mockResolvedValue(
+          deleted({ bondInstrumentId: SERIES }),
+        );
+        mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
+        await service.undo(userId);
+        expect((insert()![1] as unknown[])[15]).toBeNull();
+      });
+
+      it("restores both legs of a transfer update with their series", async () => {
+        bondWorld({ inProgram: [SERIES] });
+        mockRepository.findOne.mockResolvedValue({
+          ...mockAction,
+          entityType: "investment_transaction",
+          action: "update",
+          entityId: "inv-out",
+          beforeData: {
+            id: "inv-out",
+            accountId: "acc-1",
+            securityId: "sec-1",
+            action: "TRANSFER_OUT",
+            transactionDate: "2026-11-01",
+            quantity: 100,
+            bondInstrumentId: SERIES,
+            linkedTransferLeg: {
+              id: "inv-in",
+              accountId: "acc-2",
+              securityId: "sec-1",
+              action: "TRANSFER_IN",
+              transactionDate: "2026-11-01",
+              quantity: 100,
+              bondInstrumentId: SERIES,
+            },
+          },
+          afterData: { id: "inv-out", accountId: "acc-1" },
+        });
+        mockQueryRunner.manager.findOne.mockResolvedValue({
+          id: "inv-out",
+          accountId: "acc-1",
+        });
+        mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
+        await service.undo(userId);
+        const restored = mockQueryRunner.manager.update.mock.calls.filter(
+          (c: any[]) => c[2] && "bondInstrumentId" in c[2],
+        );
+        expect(restored.map((c: any[]) => c[2].bondInstrumentId)).toEqual([
+          SERIES,
+          SERIES,
+        ]);
+      });
+    });
+
     it("should not undo a regular (non-transfer) investment update", async () => {
       const invAction = {
         ...mockAction,
@@ -1985,22 +2124,62 @@ describe("ActionHistoryService", () => {
       ) =>
         mockQueryRunner.query.mockImplementation(async (sql: string) => {
           if (/FROM securities/.test(sql)) return [current];
-          if (/FROM bond_instruments/.test(sql))
+          if (/FROM bond_programs/.test(sql))
             return instrumentCurrency === null
               ? []
               : [{ currency_code: instrumentCurrency }];
           return [];
         });
 
+      it("clears the series the rows name when the restored link differs (INV-BOND-007)", async () => {
+        answer({
+          bond_program_id: INSTRUMENT,
+          security_type: "BOND",
+          currency_code: "PLN",
+        });
+        mockRepository.findOne.mockResolvedValue(
+          edit({ bondProgramId: null, securityType: "BOND" }),
+        );
+        mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
+        await service.undo(userId);
+        const clear = mockQueryRunner.query.mock.calls.find(
+          (c: any[]) =>
+            typeof c[0] === "string" &&
+            c[0].includes("UPDATE investment_transactions"),
+        );
+        expect(clear).toBeDefined();
+        expect(clear![1]).toEqual(["sec-1", userId, null]);
+      });
+
+      it("clears nothing when the restored link is the one the security has", async () => {
+        answer({
+          bond_program_id: INSTRUMENT,
+          security_type: "BOND",
+          currency_code: "PLN",
+        });
+        mockRepository.findOne.mockResolvedValue(
+          edit({ bondProgramId: INSTRUMENT, securityType: "BOND" }),
+        );
+        mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
+        await service.undo(userId);
+        expect(
+          mockQueryRunner.query.mock.calls.some(
+            (c: any[]) =>
+              typeof c[0] === "string" &&
+              c[0].includes("UPDATE investment_transactions"),
+          ),
+        ).toBe(false);
+      });
+
       it("restores the link with the currency, deletes the engine's prices of the old link, and prices nothing for an unlink", async () => {
         answer({
-          bond_instrument_id: INSTRUMENT,
+          bond_program_id: INSTRUMENT,
           security_type: "BOND",
           currency_code: "PLN",
         });
         mockRepository.findOne.mockResolvedValue(
           edit({
-            bondInstrumentId: null,
+            bondProgramId: null,
             currencyCode: "USD",
             securityType: "BOND",
           }),
@@ -2018,7 +2197,7 @@ describe("ActionHistoryService", () => {
           expect.any(Function),
           "sec-1",
           expect.objectContaining({
-            bondInstrumentId: null,
+            bondProgramId: null,
             currencyCode: "USD",
           }),
         );
@@ -2030,13 +2209,13 @@ describe("ActionHistoryService", () => {
 
       it("re-links through the same validation and recomputes after the commit", async () => {
         answer({
-          bond_instrument_id: null,
+          bond_program_id: null,
           security_type: "BOND",
           currency_code: "PLN",
         });
         mockRepository.findOne.mockResolvedValue(
           edit({
-            bondInstrumentId: INSTRUMENT,
+            bondProgramId: INSTRUMENT,
             currencyCode: "PLN",
             securityType: "BOND",
           }),
@@ -2060,7 +2239,7 @@ describe("ActionHistoryService", () => {
         async (_why, instrumentCurrency, securityType, link) => {
           answer(
             {
-              bond_instrument_id: null,
+              bond_program_id: null,
               security_type: "BOND",
               currency_code: "PLN",
             },
@@ -2068,7 +2247,7 @@ describe("ActionHistoryService", () => {
           );
           mockRepository.findOne.mockResolvedValue(
             edit({
-              bondInstrumentId: link,
+              bondProgramId: link,
               currencyCode: "PLN",
               securityType,
             }),
@@ -2084,12 +2263,12 @@ describe("ActionHistoryService", () => {
 
       it("refuses restoring only the currency while the link stays to an instrument in another currency", async () => {
         answer({
-          bond_instrument_id: INSTRUMENT,
+          bond_program_id: INSTRUMENT,
           security_type: "BOND",
           currency_code: "PLN",
         });
         mockRepository.findOne.mockResolvedValue(
-          edit({ currencyCode: "USD", bondInstrumentId: INSTRUMENT }),
+          edit({ currencyCode: "USD", bondProgramId: INSTRUMENT }),
         );
 
         await expect(service.undo(userId)).rejects.toThrow(ConflictException);
@@ -2098,13 +2277,13 @@ describe("ActionHistoryService", () => {
 
       it("does not clear or recompute when the link is the same in another spelling", async () => {
         answer({
-          bond_instrument_id: INSTRUMENT,
+          bond_program_id: INSTRUMENT,
           security_type: "BOND",
           currency_code: "PLN",
         });
         mockRepository.findOne.mockResolvedValue(
           edit({
-            bondInstrumentId: INSTRUMENT.toUpperCase(),
+            bondProgramId: INSTRUMENT.toUpperCase(),
             currencyCode: "PLN",
             securityType: "BOND",
           }),
@@ -2119,15 +2298,15 @@ describe("ActionHistoryService", () => {
 
       it("redo applies the edit's own snapshot through the same guard", async () => {
         answer({
-          bond_instrument_id: null,
+          bond_program_id: null,
           security_type: "BOND",
           currency_code: "USD",
         });
         mockRepository.findOne.mockResolvedValue({
           ...edit(
-            { bondInstrumentId: null, currencyCode: "USD" },
+            { bondProgramId: null, currencyCode: "USD" },
             {
-              bondInstrumentId: INSTRUMENT,
+              bondProgramId: INSTRUMENT,
               currencyCode: "PLN",
               securityType: "BOND",
             },

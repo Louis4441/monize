@@ -484,6 +484,38 @@ describe("tool-input-schemas", () => {
       expect(result.success).toBe(true);
     });
 
+    it("accepts a bond series code on create, bounded, and as the only field of an update", () => {
+      expect(
+        manageInvestmentTransactionsSchema.safeParse({
+          operation: "create",
+          items: [{ ...createItem, bondSeriesCode: "EDO1036" }],
+        }).success,
+      ).toBe(true);
+      expect(
+        manageInvestmentTransactionsSchema.safeParse({
+          operation: "create",
+          items: [{ ...createItem, bondSeriesCode: "X".repeat(41) }],
+        }).success,
+      ).toBe(false);
+      expect(
+        manageInvestmentTransactionsSchema.safeParse({
+          operation: "create",
+          items: [{ ...createItem, bondSeriesCode: "  " }],
+        }).success,
+      ).toBe(false);
+      expect(
+        manageInvestmentTransactionsSchema.safeParse({
+          operation: "update",
+          items: [
+            {
+              transactionId: "11111111-1111-4111-8111-111111111111",
+              bondSeriesCode: "EDO1036",
+            },
+          ],
+        }).success,
+      ).toBe(true);
+    });
+
     it("accepts a minimal cash-only create (INTEREST)", () => {
       const result = manageInvestmentTransactionsSchema.safeParse({
         operation: "create",

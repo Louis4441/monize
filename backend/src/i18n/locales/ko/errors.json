@@ -559,11 +559,14 @@
     "TEMPLATE_NOT_VALIDATED": "시리즈 {{ series }}은(는) {{ product }} 템플릿이 검증되기 전({{ validFrom }})에 판매되었으므로 큐레이션된 항목이 필요합니다",
     "SERIES_TERMS_CONFLICT": "시리즈 {{ series }}은(는) 이미 다른 조건으로 저장되어 있습니다. 저장된 조건은 절대 대체되지 않습니다",
     "countryCodeInvalid": "countryCode는 두 글자 국가 코드여야 합니다",
-    "programCodeInvalid": "programCode는 1~12자의 대문자 또는 숫자여야 합니다"
+    "programCodeInvalid": "programCode는 1~12자의 대문자 또는 숫자여야 합니다",
+    "SERIES_NOT_IN_PROGRAM": "{{ series }} 시리즈는 이 증권의 채권 프로그램({{ program }})에 속하지 않습니다",
+    "SERIES_NOT_DETERMINED": "{{ date }}의 {{ program }} 매수 시리즈를 확인할 수 없습니다. 그날 판매 중이던 저장된 시리즈가 하나로 정해지지 않습니다. 공식 출처에서 시리즈를 가져와 거래에 선택하세요.",
+    "SERIES_NOT_ALLOWED": "채권 시리즈는 채권 프로그램에 연결된 증권의 수량이 변동하는 거래에만 지정할 수 있습니다"
   },
   "securities": {
     "bondPricedByEngine": "이 증권은 채권 종목에 연결되어 있으며 시세 제공업체가 아닌 채권 엔진이 가격을 산정합니다. 대신 가격 다시 계산을 사용하세요.",
-    "bondInstrumentNotFound": "채권 종목 {{ id }}이(가) 존재하지 않습니다",
+    "bondProgramNotFound": "채권 프로그램 {{ id }}이(가) 존재하지 않습니다",
     "bondCurrencyMismatch": "이 증권은 {{ currency }}로 기록되어 있지만 채권 종목은 {{ instrumentCurrency }}로 평가됩니다. 종목의 통화를 사용하세요.",
     "bondCurrencyLocked": "채권 종목에 연결된 증권은 종목의 통화({{ instrumentCurrency }})를 유지합니다. 통화를 변경하기 전에 채권과의 연결을 해제하세요.",
     "accountMustBeInvestment": "계정은 INVESTMENT 유형이어야 합니다",

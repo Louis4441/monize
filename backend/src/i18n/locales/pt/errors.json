@@ -559,11 +559,14 @@
     "TEMPLATE_NOT_VALIDATED": "A série {{ series }} foi vendida antes de o modelo {{ product }} ser validado ({{ validFrom }}); precisa de uma entrada curada",
     "SERIES_TERMS_CONFLICT": "A série {{ series }} já está armazenada com condições diferentes; as condições armazenadas nunca são substituídas",
     "countryCodeInvalid": "countryCode deve ser um código de país de duas letras",
-    "programCodeInvalid": "programCode deve ter de 1 a 12 letras maiúsculas ou dígitos"
+    "programCodeInvalid": "programCode deve ter de 1 a 12 letras maiúsculas ou dígitos",
+    "SERIES_NOT_IN_PROGRAM": "A série {{ series }} não pertence ao programa de obrigações deste título ({{ program }})",
+    "SERIES_NOT_DETERMINED": "Não foi possível determinar a série desta compra de {{ program }} em {{ date }}: nenhuma série guardada do programa estava à venda nesse dia. Obtenha a série da fonte oficial e escolha-a para a transação.",
+    "SERIES_NOT_ALLOWED": "Uma série de obrigações só pode ser indicada numa transação que movimenta unidades de um título associado a um programa de obrigações"
   },
   "securities": {
     "bondPricedByEngine": "Este valor mobiliário está ligado a um instrumento de obrigação e é avaliado pelo motor de obrigações, não por um fornecedor de cotações. Utilize antes Recalcular preços.",
-    "bondInstrumentNotFound": "O instrumento de obrigação {{ id }} não existe",
+    "bondProgramNotFound": "O programa de obrigações {{ id }} não existe",
     "bondCurrencyMismatch": "O valor mobiliário está registado em {{ currency }}, mas o instrumento de obrigação é avaliado em {{ instrumentCurrency }}. Utilize a moeda do instrumento.",
     "bondCurrencyLocked": "Um valor mobiliário ligado a um instrumento de obrigação mantém-se na moeda do instrumento ({{ instrumentCurrency }}). Desligue-o da obrigação antes de alterar a moeda.",
     "accountMustBeInvestment": "A conta deve ser do tipo INVESTMENT",

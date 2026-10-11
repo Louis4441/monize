@@ -1,7 +1,7 @@
--- bond_instruments.currency_code references currencies(code) (migration
--- 20261010170817_bond_reference_tables.sql), so the global liveness gate has to
+-- bond_programs.currency_code and bond_instruments.currency_code reference
+-- currencies(code) (migration 20261010170817_bond_reference_tables.sql), so the global liveness gate has to
 -- consult it: without this branch a custom currency (PLN on an install that
--- created it itself) that only a bond instrument still names is reported as
+-- created it itself) that only a bond program or instrument still names is reported as
 -- free, the currency delete or the backup restore's cleanup runs, and the
 -- foreign key aborts the whole transaction. `CREATE OR REPLACE` is idempotent;
 -- the body matches `database/schema.sql`, and `currency-references.spec.ts`
@@ -24,6 +24,7 @@ AS $$
     UNION ALL SELECT 1 FROM transactions
       WHERE currency_code = p_code OR original_currency_code = p_code
     UNION ALL SELECT 1 FROM securities WHERE currency_code = p_code
+    UNION ALL SELECT 1 FROM bond_programs WHERE currency_code = p_code
     UNION ALL SELECT 1 FROM bond_instruments WHERE currency_code = p_code
     UNION ALL SELECT 1 FROM scheduled_transactions
       WHERE currency_code = p_code OR original_currency_code = p_code

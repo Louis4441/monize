@@ -4167,7 +4167,7 @@ describe("SecurityPriceService", () => {
     const linked = {
       ...mockSecurity,
       symbol: "TOS1029",
-      bondInstrumentId: "11111111-1111-5111-8111-111111111111",
+      bondProgramId: "11111111-1111-5111-8111-111111111111",
       // The strongest opt-in a user can give a provider: an explicit override.
       quoteProvider: "yahoo",
       skipPriceUpdates: false,
@@ -4235,7 +4235,7 @@ describe("SecurityPriceService", () => {
 
     it("leaves an unlinked security with the same override eligible", async () => {
       securitiesRepository.find.mockResolvedValue([
-        { ...mockSecurity, bondInstrumentId: null, quoteProvider: "yahoo" },
+        { ...mockSecurity, bondProgramId: null, quoteProvider: "yahoo" },
       ]);
       global.fetch = jest
         .fn()

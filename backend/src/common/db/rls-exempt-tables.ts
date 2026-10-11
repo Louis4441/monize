@@ -30,6 +30,8 @@ export const RLS_EXEMPT_TABLES: Readonly<Record<string, string>> = {
     "Global reference data with no owner column; one published benchmark observation serves every account, same story as exchange_rates.",
   bond_instruments:
     "Global reference data with no owner column; one bond instrument serves every account, whatever the issuer country.",
+  bond_programs:
+    "Global reference data with no owner column; one bond program (the product, e.g. EDO) serves every account and every security that links to it, insert only (INV-BOND-001).",
   bond_period_rates:
     "Global reference data with no owner column; one instrument's published period rate serves every account, immutable (INV-BOND-001).",
   bond_terms_versions:

@@ -1963,6 +1963,7 @@ export class ToolExecutorService {
       fundingAccountName: item.fundingAccountName as string | undefined,
       exchangeRate: item.exchangeRate as number | undefined,
       description: item.description as string | undefined,
+      bondSeriesCode: item.bondSeriesCode as string | undefined,
     };
   }
 
@@ -1980,6 +1981,7 @@ export class ToolExecutorService {
       accruedInterest: item.accruedInterest as number | undefined,
       exchangeRate: item.exchangeRate as number | undefined,
       description: item.description as string | undefined,
+      bondSeriesCode: item.bondSeriesCode as string | undefined,
     };
   }
 
@@ -2108,6 +2110,7 @@ export class ToolExecutorService {
               price: row.price,
               commission: row.commission,
               description: row.description,
+              bondSeriesCode: row.bondSeriesCode,
             },
           );
         const pendingAction =
@@ -2144,6 +2147,7 @@ export class ToolExecutorService {
                 price: row.price,
                 commission: row.commission,
                 description: row.description,
+                bondSeriesCode: row.bondSeriesCode,
               },
             );
           pendingActions.push(

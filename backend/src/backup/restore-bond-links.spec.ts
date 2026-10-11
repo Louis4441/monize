@@ -24,12 +24,12 @@ describe("BackupRestoreDatabaseService.severUnavailableCatalogLinks", () => {
       { id: PRESENT, currency_code: "PLN" },
     ]);
     const backup = data([
-      { id: "s1", currency_code: "PLN", bond_instrument_id: PRESENT },
+      { id: "s1", currency_code: "PLN", bond_program_id: PRESENT },
     ]);
     await expect(
       service.severUnavailableCatalogLinks(manager, backup),
     ).resolves.toEqual({ counts: {}, severed: {} });
-    expect(backup.securities[0].bond_instrument_id).toBe(PRESENT);
+    expect(backup.securities[0].bond_program_id).toBe(PRESENT);
     expect(warn).not.toHaveBeenCalled();
   });
 
@@ -42,29 +42,29 @@ describe("BackupRestoreDatabaseService.severUnavailableCatalogLinks", () => {
         id: "s1",
         symbol: "EDO0136",
         currency_code: "PLN",
-        bond_instrument_id: ABSENT,
+        bond_program_id: ABSENT,
       },
-      { id: "s2", currency_code: "PLN", bond_instrument_id: PRESENT },
-      { id: "s3", currency_code: "USD", bond_instrument_id: null },
+      { id: "s2", currency_code: "PLN", bond_program_id: PRESENT },
+      { id: "s3", currency_code: "USD", bond_program_id: null },
     ];
     const backup = data(original);
     await expect(
       service.severUnavailableCatalogLinks(manager, backup),
     ).resolves.toEqual({
-      counts: { "securities.bond_instrument_id": 1 },
+      counts: { "securities.bond_program_id": 1 },
       severed: {
-        "securities.bond_instrument_id": [{ id: "s1", symbol: "EDO0136" }],
+        "securities.bond_program_id": [{ id: "s1", symbol: "EDO0136" }],
       },
     });
-    expect(backup.securities.map((r) => r.bond_instrument_id)).toEqual([
+    expect(backup.securities.map((r) => r.bond_program_id)).toEqual([
       null,
       PRESENT,
       null,
     ]);
     // New rows, not a mutation of the rows the file produced.
-    expect(original[0].bond_instrument_id).toBe(ABSENT);
+    expect(original[0].bond_program_id).toBe(ABSENT);
     expect(warn.mock.calls[0][0]).toMatch(
-      /1 securities\.bond_instrument_id reference.*does not carry/,
+      /1 securities\.bond_program_id reference.*does not carry/,
     );
   });
 
@@ -73,14 +73,14 @@ describe("BackupRestoreDatabaseService.severUnavailableCatalogLinks", () => {
       { id: PRESENT, currency_code: "PLN" },
     ]);
     const backup = data([
-      { id: "s1", currency_code: "USD", bond_instrument_id: PRESENT },
+      { id: "s1", currency_code: "USD", bond_program_id: PRESENT },
     ]);
     await expect(
       service.severUnavailableCatalogLinks(manager, backup),
     ).resolves.toMatchObject({
-      counts: { "securities.bond_instrument_id": 1 },
+      counts: { "securities.bond_program_id": 1 },
     });
-    expect(backup.securities[0].bond_instrument_id).toBeNull();
+    expect(backup.securities[0].bond_program_id).toBeNull();
     expect(warn.mock.calls[0][0]).toMatch(/another currency/);
   });
 
@@ -88,8 +88,8 @@ describe("BackupRestoreDatabaseService.severUnavailableCatalogLinks", () => {
     const { service, manager } = setup([{ id: PRESENT, currency_code: "PLN" }]);
     const backup = {
       ...data([
-        { id: "s1", currency_code: "PLN", bond_instrument_id: ABSENT },
-        { id: "s2", currency_code: "PLN", bond_instrument_id: PRESENT },
+        { id: "s1", currency_code: "PLN", bond_program_id: ABSENT },
+        { id: "s2", currency_code: "PLN", bond_program_id: PRESENT },
       ]),
       security_prices: [
         { security_id: "s1", source: "bond_engine" },
@@ -140,8 +140,8 @@ describe("BackupRestoreDatabaseService.severUnavailableCatalogLinks", () => {
     await expect(
       service.severUnavailableCatalogLinks(
         manager,
-        data([{ id: "s1", bond_instrument_id: PRESENT }]),
-        { securities: { bond_instrument_id: "bond_instruments; DROP" } },
+        data([{ id: "s1", bond_program_id: PRESENT }]),
+        { securities: { bond_program_id: "bond_programs; DROP" } },
       ),
     ).rejects.toThrow(/Invalid catalog table name/);
   });
@@ -153,5 +153,73 @@ describe("BackupRestoreDatabaseService.severUnavailableCatalogLinks", () => {
       data([{ id: "s1", currency_code: "PLN" }]),
     );
     expect(query).not.toHaveBeenCalled();
+  });
+
+  it("restores a transaction's series this catalog lacks as NULL, keeps one it carries, and reports the count", async () => {
+    // One query per catalog column: securities (programs), then transactions
+    // (instruments). The mock answers the first with no securities to ask about.
+    const query = jest.fn().mockResolvedValue([{ id: PRESENT }]);
+    const manager = { query } as unknown as EntityManager;
+    const warn = jest.spyOn(Logger.prototype, "warn").mockImplementation();
+    const backup = {
+      ...data([]),
+      investment_transactions: [
+        { id: "t1", bond_instrument_id: ABSENT },
+        { id: "t2", bond_instrument_id: PRESENT },
+        { id: "t3", bond_instrument_id: null },
+      ],
+    } as unknown as BackupData;
+    const result =
+      await new BackupRestoreDatabaseService().severUnavailableCatalogLinks(
+        manager,
+        backup,
+      );
+    expect(result.counts).toEqual({
+      "investment_transactions.bond_instrument_id": 1,
+    });
+    expect(
+      (
+        backup as unknown as {
+          investment_transactions: Array<{ bond_instrument_id: unknown }>;
+        }
+      ).investment_transactions.map((r) => r.bond_instrument_id),
+    ).toEqual([null, PRESENT, null]);
+    expect(query.mock.calls[0][0]).toMatch(
+      /FROM bond_instruments WHERE id = ANY/,
+    );
+    expect(query.mock.calls[0][0]).not.toMatch(/currency_code/);
+    expect(warn.mock.calls[0][0]).toMatch(
+      /1 investment_transactions\.bond_instrument_id reference/,
+    );
+  });
+
+  it("drops the series of the transactions of a security it unlinked, and only those", async () => {
+    const { service, manager } = setup([{ id: PRESENT, currency_code: "PLN" }]);
+    const backup = {
+      ...data([
+        { id: "s1", currency_code: "PLN", bond_program_id: ABSENT },
+        { id: "s2", currency_code: "PLN", bond_program_id: PRESENT },
+      ]),
+      investment_transactions: [
+        { id: "t1", security_id: "s1", bond_instrument_id: PRESENT },
+        { id: "t2", security_id: "s2", bond_instrument_id: PRESENT },
+        { id: "t3", security_id: "s1", bond_instrument_id: null },
+      ],
+    } as unknown as BackupData;
+    await service.severUnavailableCatalogLinks(manager, backup);
+    expect(
+      (
+        backup as unknown as {
+          investment_transactions: Array<{
+            id: string;
+            bond_instrument_id: unknown;
+          }>;
+        }
+      ).investment_transactions.map((r) => [r.id, r.bond_instrument_id]),
+    ).toEqual([
+      ["t1", null],
+      ["t2", PRESENT],
+      ["t3", null],
+    ]);
   });
 });

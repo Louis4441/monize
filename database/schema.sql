@@ -952,7 +952,8 @@ CREATE TABLE securities (
     market_timezone VARCHAR(64),     -- IANA zone the instrument trades in, from the provider (e.g. America/New_York)
     market_open_time TIME,           -- start of the regular session, in market_timezone local time
     market_close_time TIME,          -- end of the regular session, in market_timezone local time
-    bond_instrument_id UUID,         -- linked bond instrument (FK fk_securities_bond_instrument, added below); a linked security is priced by the bond engine only
+    bond_program_id UUID,            -- linked bond program (FK fk_securities_bond_program, added below); a linked security is priced by the bond engine only
+    bond_auto_fetch BOOLEAN NOT NULL DEFAULT false, -- fetch every new series of the linked program automatically (daily series cron)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, symbol),
@@ -964,7 +965,7 @@ CREATE INDEX idx_securities_user_id ON securities(user_id);
 CREATE INDEX idx_securities_symbol ON securities(symbol);
 CREATE INDEX idx_securities_exchange ON securities(exchange);
 CREATE INDEX idx_securities_user_favourite ON securities(user_id, is_favourite);
-CREATE INDEX idx_securities_bond_instrument ON securities(bond_instrument_id) WHERE bond_instrument_id IS NOT NULL;
+CREATE INDEX idx_securities_bond_program ON securities(bond_program_id) WHERE bond_program_id IS NOT NULL;
 
 -- Security Tags (many-to-many) -- reuses the shared tags pool, mirrors transaction_tags
 CREATE TABLE security_tags (
@@ -1259,11 +1260,22 @@ CREATE TABLE market_index_sync (
 -- DELETE, enforced by the row-level trigger bond_reject_mutation(). TRUNCATE fires
 -- no row-level trigger and is not covered (an operator action; the integration
 -- suites reset tables with it).
+CREATE TABLE bond_programs (
+    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    issuer_country_code CHAR(2) NOT NULL,
+    issuer_code         VARCHAR(40) NOT NULL,
+    program_code        VARCHAR(40) NOT NULL,
+    currency_code       VARCHAR(3) NOT NULL REFERENCES currencies(code),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (issuer_country_code, issuer_code, program_code)
+);
+
 CREATE TABLE bond_instruments (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     issuer_country_code CHAR(2) NOT NULL,
     issuer_code         VARCHAR(40) NOT NULL,
     program_code        VARCHAR(40) NOT NULL,
+    bond_program_id     UUID NOT NULL REFERENCES bond_programs(id) ON DELETE RESTRICT,
     series_code         VARCHAR(40) NOT NULL,
     currency_code       VARCHAR(3) NOT NULL REFERENCES currencies(code),
     marketability       VARCHAR(30) NOT NULL,
@@ -1314,12 +1326,13 @@ CREATE TABLE benchmark_values (
     PRIMARY KEY (benchmark_code, observation_date)
 );
 
--- A security's link to a bond instrument. Declared here because securities is
--- created before the bond tables. RESTRICT: an instrument is never deleted from
--- under a security that points at it.
+-- A security's link to a bond program. Declared here because securities is
+-- created before the bond tables (a transaction's link to a series follows
+-- investment_transactions below). RESTRICT: a program or a series is never deleted from
+-- under a row that points at it.
 ALTER TABLE securities
-    ADD CONSTRAINT fk_securities_bond_instrument
-    FOREIGN KEY (bond_instrument_id) REFERENCES bond_instruments(id) ON DELETE RESTRICT;
+    ADD CONSTRAINT fk_securities_bond_program
+    FOREIGN KEY (bond_program_id) REFERENCES bond_programs(id) ON DELETE RESTRICT;
 
 CREATE OR REPLACE FUNCTION bond_reject_mutation() RETURNS TRIGGER
 LANGUAGE plpgsql AS $$
@@ -1330,6 +1343,10 @@ BEGIN
       USING ERRCODE = 'raise_exception';
 END;
 $$;
+
+CREATE TRIGGER trg_bond_programs_immutable
+    BEFORE UPDATE OR DELETE ON bond_programs
+    FOR EACH ROW EXECUTE FUNCTION bond_reject_mutation();
 
 CREATE TRIGGER trg_bond_instruments_immutable
     BEFORE UPDATE OR DELETE ON bond_instruments
@@ -1465,6 +1482,7 @@ CREATE TABLE investment_transactions (
     exchange_rate NUMERIC(20, 10) NOT NULL DEFAULT 1,
     description TEXT,
     status VARCHAR(20) NOT NULL DEFAULT 'UNRECONCILED', -- 'UNRECONCILED', 'CLEARED', 'RECONCILED', 'VOID'
+    bond_instrument_id UUID, -- the bond series a share-moving row of a program-linked security acts on (FK added with the bond tables below)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -1477,6 +1495,12 @@ CREATE INDEX idx_investment_transactions_date ON investment_transactions(transac
 CREATE INDEX idx_investment_transactions_transaction ON investment_transactions(transaction_id);
 CREATE INDEX idx_investment_transactions_split_id ON investment_transactions(transaction_split_id);
 CREATE INDEX idx_investment_transactions_linked ON investment_transactions(linked_transaction_id);
+CREATE INDEX idx_investment_transactions_bond_instrument ON investment_transactions(bond_instrument_id) WHERE bond_instrument_id IS NOT NULL;
+-- A share-moving row's series (bond-program-securities.md 2.3); RESTRICT keeps a
+-- series from being deleted from under a row that names it.
+ALTER TABLE investment_transactions
+    ADD CONSTRAINT fk_investment_transactions_bond_instrument
+    FOREIGN KEY (bond_instrument_id) REFERENCES bond_instruments(id) ON DELETE RESTRICT;
 
 -- User Preferences
 CREATE TABLE user_preferences (
@@ -4109,6 +4133,7 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- rls-exempt: benchmark_values
 -- rls-exempt: bond_instruments
 -- rls-exempt: bond_period_rates
+-- rls-exempt: bond_programs
 -- rls-exempt: bond_terms_versions
 -- rls-exempt: currencies
 -- rls-exempt: exchange_rate_coverage
@@ -4228,6 +4253,7 @@ AS $$
     UNION ALL SELECT 1 FROM transactions
       WHERE currency_code = p_code OR original_currency_code = p_code
     UNION ALL SELECT 1 FROM securities WHERE currency_code = p_code
+    UNION ALL SELECT 1 FROM bond_programs WHERE currency_code = p_code
     UNION ALL SELECT 1 FROM bond_instruments WHERE currency_code = p_code
     UNION ALL SELECT 1 FROM scheduled_transactions
       WHERE currency_code = p_code OR original_currency_code = p_code

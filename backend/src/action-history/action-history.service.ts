@@ -9,6 +9,10 @@ import { ModuleRef } from "@nestjs/core";
 import { DataSource, EntityManager } from "typeorm";
 import { Cron } from "@nestjs/schedule";
 import { BondPriceService } from "../bonds/bond-price.service";
+import {
+  clearForeignSeries,
+  resolveTransactionSeries,
+} from "../bonds/bond-series-resolver";
 import { findBondLinkProblem } from "../securities/bond-link.util";
 import { ActionHistory } from "./entities/action-history.entity";
 import {
@@ -244,7 +248,8 @@ const ALLOWED_COLUMNS: Record<string, Set<string>> = {
     "currency_code",
     "is_active",
     "skip_price_updates",
-    "bond_instrument_id",
+    "bond_program_id",
+    "bond_auto_fetch",
     "sector",
     "industry",
     "sector_weightings",
@@ -265,6 +270,7 @@ const ALLOWED_COLUMNS: Record<string, Set<string>> = {
     "price",
     "commission",
     "total_amount",
+    "bond_instrument_id",
     "description",
     "created_at",
     "updated_at",
@@ -1147,12 +1153,27 @@ export class ActionHistoryService {
       });
       if (current) accountIds.add(current.accountId);
 
+      // INV-BOND-007: the restored row carries a series of its security's
+      // program or none, resolved like any write before anything is written.
+      const bondInstrumentId = await resolveTransactionSeries(
+        manager,
+        action.userId,
+        {
+          securityId: legBefore.securityId,
+          action: legBefore.action,
+          transactionDate: legBefore.transactionDate,
+          bondInstrumentId: legBefore.bondInstrumentId,
+          requested: false,
+          pairedTransfer: true,
+        },
+      );
       await manager.update(
         InvestmentTransaction,
         { id: legBefore.id, userId: action.userId },
         {
           accountId: legBefore.accountId,
           securityId: legBefore.securityId ?? null,
+          bondInstrumentId,
           action: legBefore.action,
           transactionDate: legBefore.transactionDate,
           quantity: legBefore.quantity ?? 0,
@@ -1289,6 +1310,7 @@ export class ActionHistoryService {
       action.userId,
       before,
       restoredTransactionId,
+      linkedLeg !== undefined,
     );
 
     // Restore the paired transfer leg and the mutual link between the two legs.
@@ -1299,6 +1321,7 @@ export class ActionHistoryService {
         action.userId,
         linkedLeg,
         null,
+        true,
       );
       await manager.update(InvestmentTransaction, before.id, {
         linkedTransactionId: linkedLeg.id,
@@ -1321,7 +1344,17 @@ export class ActionHistoryService {
     userId: string,
     data: Record<string, any>,
     transactionId: string | null,
+    pairedTransfer = false,
   ): Promise<void> {
+    // INV-BOND-007: resolved like any write, before the row goes back.
+    const bondInstrumentId = await resolveTransactionSeries(manager, userId, {
+      securityId: data.securityId,
+      action: data.action,
+      transactionDate: data.transactionDate,
+      bondInstrumentId: data.bondInstrumentId,
+      requested: false,
+      pairedTransfer,
+    });
     // linked_transaction_id is intentionally not set here; for a transfer it is
     // restored by the caller once both legs exist, and for a single leg the
     // original delete already nulled the survivor's pointer.
@@ -1332,8 +1365,9 @@ export class ActionHistoryService {
     // undeleting a foreign-currency transaction doesn't reset its rate to 1.
     await manager.query(
       `INSERT INTO investment_transactions (id, user_id, account_id, transaction_id, security_id,
-        funding_account_id, action, transaction_date, quantity, price, commission, total_amount, exchange_rate, description, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        funding_account_id, action, transaction_date, quantity, price, commission, total_amount, exchange_rate, description, created_at,
+        bond_instrument_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        ON CONFLICT (id) DO NOTHING`,
       [
         data.id,
@@ -1351,6 +1385,7 @@ export class ActionHistoryService {
         data.exchangeRate ?? 1,
         data.description ?? null,
         data.createdAt ?? new Date(),
+        bondInstrumentId,
       ],
     );
   }
@@ -1533,7 +1568,7 @@ export class ActionHistoryService {
 
     if (action.action === "delete") {
       // Re-inserting a deleted security: its recorded link is checked as is.
-      const link = lower(target.bondInstrumentId) as string | null;
+      const link = lower(target.bondProgramId) as string | null;
       if (!link) return NOTHING_AFTER_COMMIT;
       await this.assertRestorableLink(manager, link, target);
       return {
@@ -1545,7 +1580,7 @@ export class ActionHistoryService {
     // A snapshot that names none of the three fields a link depends on cannot
     // change whether the link is valid.
     if (
-      !["bondInstrumentId", "securityType", "currencyCode"].some(
+      !["bondProgramId", "securityType", "currencyCode"].some(
         (k) => k in target,
       )
     ) {
@@ -1555,7 +1590,7 @@ export class ActionHistoryService {
     // A restored link may delete the engine's rows under the recompute lock
     // (`clearEnginePrices`): that advisory lock comes before the row lock, the
     // order every writer uses (`common/db/locks.ts`).
-    if ("bondInstrumentId" in target) {
+    if ("bondProgramId" in target) {
       await acquireAdvisoryLock(
         manager,
         LockScope.BondPriceRecompute,
@@ -1563,11 +1598,11 @@ export class ActionHistoryService {
       );
     }
     const rows: Array<{
-      bond_instrument_id: string | null;
+      bond_program_id: string | null;
       security_type: string | null;
       currency_code: string;
     }> = await manager.query(
-      `SELECT bond_instrument_id, security_type, currency_code
+      `SELECT bond_program_id, security_type, currency_code
          FROM securities
         WHERE id = $1 AND user_id = $2
         FOR UPDATE`,
@@ -1577,9 +1612,9 @@ export class ActionHistoryService {
     if (!current) return NOTHING_AFTER_COMMIT;
 
     const has = (key: string) => key in target && target[key] !== undefined;
-    const link = has("bondInstrumentId")
-      ? (lower(target.bondInstrumentId) as string | null)
-      : (lower(current.bond_instrument_id) as string | null);
+    const link = has("bondProgramId")
+      ? (lower(target.bondProgramId) as string | null)
+      : (lower(current.bond_program_id) as string | null);
     const securityType = has("securityType")
       ? (target.securityType ?? null)
       : current.security_type;
@@ -1587,7 +1622,7 @@ export class ActionHistoryService {
       ? target.currencyCode
       : current.currency_code;
     const linkChanged =
-      link !== (lower(current.bond_instrument_id) as string | null);
+      link !== (lower(current.bond_program_id) as string | null);
 
     if (
       link &&
@@ -1607,6 +1642,8 @@ export class ActionHistoryService {
       action.userId,
       action.entityId,
     );
+    // INV-BOND-007: the restored link owns the series its rows name.
+    await clearForeignSeries(manager, action.userId, action.entityId, link);
     return {
       settledScheduleIds: [],
       bondClearedAccountIds: accountIds,
@@ -1616,11 +1653,11 @@ export class ActionHistoryService {
 
   private async assertRestorableLink(
     manager: EntityManager,
-    bondInstrumentId: string,
+    bondProgramId: string,
     state: Record<string, any>,
   ): Promise<void> {
     const problem = await findBondLinkProblem(manager, {
-      bondInstrumentId,
+      bondProgramId,
       currencyCode: state.currencyCode,
       securityType: state.securityType,
     });

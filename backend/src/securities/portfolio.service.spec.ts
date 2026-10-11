@@ -2289,7 +2289,7 @@ describe("PortfolioService", () => {
             ...mockSecurityVFV,
             id: "sec-bond",
             symbol: "EDO1036",
-            bondInstrumentId: "11111111-1111-5111-8111-111111111111",
+            bondProgramId: "11111111-1111-5111-8111-111111111111",
           },
         };
         holdingsRepository.find.mockResolvedValue([
@@ -3950,7 +3950,7 @@ describe("PortfolioService", () => {
           ...mockHoldingVFV,
           security: {
             ...mockSecurityVFV,
-            bondInstrumentId: "11111111-1111-5111-8111-111111111111",
+            bondProgramId: "11111111-1111-5111-8111-111111111111",
           } as any,
         },
       ]);
@@ -5149,7 +5149,7 @@ describe("PortfolioService", () => {
         exchange: null,
         currencyCode: "CAD",
         isActive: true,
-        bondInstrumentId: "11111111-1111-5111-8111-111111111111",
+        bondProgramId: "11111111-1111-5111-8111-111111111111",
       } as unknown as Security;
       netWorthService.getDailyInvestmentPositions.mockResolvedValue(
         ledgerOf(

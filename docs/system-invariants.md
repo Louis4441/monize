@@ -107,6 +107,7 @@ implied.
 | INV-BOND-004 | Known and projected bond values never mix | enforced |
 | INV-BOND-005 | A linked security's automatic price comes only from the bond engine; the engine replaces every non-manual row and never a manual one | enforced |
 | INV-BOND-006 | Bond terms enter the catalog only from a curated manifest, an adapter's fetch of its official source, or an administrator's manual entry on the adapter's template; a person who is not an administrator supplies only a country and a series code | enforced |
+| INV-BOND-007 | Every share-moving row of a program-linked security names a series of that program; an acquisition's series is resolved and stored by the server, never trusted from a client without the program check | enforced |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
 | INV-OCCURRENCE-003 | Every surface reports the effective occurrence: its current amount and currency, its direction, on the date it falls | enforced |
@@ -3186,15 +3187,21 @@ section 2.0); these invariants hold for every adapter.
 
 ```text
 Statement           A stored bond terms version, a stored announced period
-                    rate and a stored bond instrument are never updated or
-                    deleted; a correction is a new terms version.
-Source of truth     bond_terms_versions, bond_period_rates, bond_instruments
+                    rate, a stored bond instrument (series) and a stored bond
+                    program are never updated or deleted; a correction is a
+                    new terms version.
+Source of truth     bond_terms_versions, bond_period_rates, bond_instruments,
+                    bond_programs
 Enforcement         bond_reject_mutation(), a row-level BEFORE UPDATE OR DELETE
-                    trigger on all three tables (the first two: migration
-                    20261010170817_bond_reference_tables.sql; bond_instruments:
-                    migration 20261011090000_bond_instruments_immutable.sql paired with database/schema.sql);
-                    ON DELETE RESTRICT from the first two to bond_instruments
-                    and from securities.bond_instrument_id. TRUNCATE is not
+                    trigger on all four tables (the first two: migration
+                    20261010170817_bond_reference_tables.sql; bond_instruments
+                    and bond_programs: migration
+                    20261011090000_bond_instruments_immutable.sql paired with database/schema.sql);
+                    ON DELETE RESTRICT from the first two to bond_instruments,
+                    from bond_instruments to bond_programs, from
+                    securities.bond_program_id to bond_programs and from
+                    investment_transactions.bond_instrument_id to
+                    bond_instruments. TRUNCATE is not
                     covered: no application path issues it, and the
                     integration test reset relies on it.
                     The seed (BondCatalogService) is not refused by the
@@ -3218,7 +3225,7 @@ Crash semantics     Single-row inserts; nothing partial to recover. A seed
 Failure response    refuse an UPDATE or DELETE (the statement raises); a
                     differing seed manifest is logged and skipped
 Required tests      bond-reference-tables.integration.spec.ts: update and delete
-                    of all three tables raise and leave the row unchanged;
+                    of all four tables raise and leave the row unchanged;
                     a seed repeated with a differing manifest leaves the stored
                     version unchanged and inserts no second one; bond-catalog
                     spec: one failing entry does not roll back the others.
@@ -3309,10 +3316,13 @@ Status              enforced
 ### INV-BOND-005 -- a linked security's automatic price is the bond engine's; it replaces every non-manual row and never a manual one
 
 ```text
-Statement           A security linked to a bond instrument
-                    (securities.bond_instrument_id, allowed only on a security
+Statement           A security linked to a bond program
+                    (securities.bond_program_id, allowed only on a security
                     of type BOND) is priced automatically by the bond engine
-                    and by no quote provider. For a linked security the engine
+                    and by no quote provider; the engine's unit price is
+                    blended over the lots of every series the security holds,
+                    each lot valued by its own series' terms
+                    (docs/specs/bond-program-securities.md section 2.4). For a linked security the engine
                     row replaces every non-manual row on its days (provider
                     rows and transaction-derived rows: a transaction price is
                     one lot's trade price, not the holding's value); a
@@ -3323,7 +3333,7 @@ Statement           A security linked to a bond instrument
                     value), and a manual price written over an engine row does
                     not inherit the engine's adjusted_close. An unchanged day
                     is not rewritten.
-Source of truth     securities.bond_instrument_id; security_prices.source
+Source of truth     securities.bond_program_id; security_prices.source
 Enforcement         Three mechanisms.
                     1. One predicate, isPricedByQuoteProvider
                        (backend/src/securities/provider-priced.util.ts), read by
@@ -3353,7 +3363,7 @@ Enforcement         Three mechanisms.
                     3. The link and its edits, all in the write's own
                        transaction (SecuritiesService assertBondLink, shared
                        by update, the AI/MCP update_security preview and the
-                       undo of a security edit): the instrument must exist, be
+                       undo of a security edit): the program must exist, be
                        priced in the security's currency (INV-PRICE-001) and
                        the security's type must be BOND (code
                        LINK_REQUIRES_BOND_TYPE; changing the type of a linked
@@ -3361,16 +3371,21 @@ Enforcement         Three mechanisms.
                        request unlinks it); the link is refused (code
                        LINK_QUANTITY_NOT_BONDS) when the security has
                        share-moving transactions whose price is not within
-                       [0.5, 2] x face value per bond, because the quantity is
-                       then not a number of bonds; bondInstrumentId is
-                       canonicalized to lowercase before comparing and storing;
+                       [0.5, 2] x the face value of the row's own series
+                       (its stored series, or the one on sale on its date)
+                       per bond, because the quantity is then not a number of
+                       bonds; bondProgramId is canonicalized to lowercase
+                       before comparing and storing; a link that changes
+                       (unlink, another program) also clears, in the same
+                       transaction, the series its transactions name outside
+                       the new program (INV-BOND-007);
                        linkChanged is decided inside the update transaction from
                        the row locked FOR UPDATE. Undo and redo snapshots carry
-                       bond_instrument_id and are applied through the same
+                       bond_program_id and are applied through the same
                        validation and the same engine-price cleanup and
                        post-commit recompute; a restored state that fails them
                        is refused (code UNDO_LINK_INVALID).
-                       fk_securities_bond_instrument is ON DELETE RESTRICT.
+                       fk_securities_bond_program is ON DELETE RESTRICT.
 Concurrency scope   per security; recomputes and unlink cleanups of one security
                     are serialized by a transaction-scoped advisory lock
                     (LockScope.BondPriceRecompute in common/db/locks.ts, keyed
@@ -3395,13 +3410,21 @@ Concurrency scope   per security; recomputes and unlink cleanups of one security
                     exact because a period that has started on a day has the
                     same rate or the same "missing" whether resolved then or
                     now), so a recompute costs O(days + lots x periods).
-Lots                Lots are derived per account (spec section 12.2): a
-                    removal takes first-in first-out from the lots of the row's
-                    own account; a paired TRANSFER_OUT/TRANSFER_IN moves the
-                    quantity FIFO from the source account's lots to the
-                    destination account keeping purchase dates; an unpaired leg
-                    is a removal / a new dated lot as before. The security's
-                    price is the blend over all accounts. A lot whose purchase
+Lots                Lots are derived per account and per series (spec section
+                    12.2 and bond-program-securities.md 2.3): an acquisition's
+                    lot carries the series its row names; a removal that names
+                    a series takes first-in first-out from that series' lots of
+                    the row's own account (REMOVAL_EXCEEDS_SERIES when it holds
+                    less), one that names none takes first-in first-out across
+                    the account's series; a paired TRANSFER_OUT/TRANSFER_IN
+                    moves the quantity FIFO from the source account's lots to
+                    the destination account keeping purchase dates and series;
+                    an unpaired leg is a removal / a new dated lot as before. A
+                    row without a stored series (written before the link) is
+                    read as a write would resolve it, from its date, and when
+                    that is not determined the lots are unknown
+                    (SERIES_NOT_DETERMINED). The security's price is the blend
+                    over all accounts and all series. A lot whose purchase
                     date is outside terms.saleWindow gets no valuation:
                     status REFUSED, refusal PURCHASE_OUTSIDE_SALE_WINDOW, every
                     figure null, valuationComplete false (a null saleWindow is
@@ -3420,10 +3443,13 @@ Failure response    refuse a link the instrument cannot honour (400, nothing
                     valuation names why. A valuation or scenarios request with
                     asOf after today is refused (code AS_OF_IN_FUTURE; a future
                     projection is the scenarios' job, with assumptions).
-                    A support backup stores bond_instrument_id as NULL. A user
-                    restore whose catalog lacks the instrument restores the
-                    link as NULL and reports unlinkedBondSecurities
-                    { count, symbols } (symbols capped at 50).
+                    A support backup stores bond_program_id and the
+                    transactions' bond_instrument_id as NULL. A user restore
+                    whose catalog lacks the program restores the link as NULL
+                    and reports unlinkedBondSecurities { count, symbols }
+                    (symbols capped at 50); a transaction whose series the
+                    catalog lacks is restored without it and counted in
+                    unlinkedBondSeries { count }.
                     Surfaces that rank or date market moves (Top Movers and the
                     daily-change boards, the global "last price update" marker)
                     exclude bond-linked securities and bond_engine rows; the
@@ -3439,7 +3465,8 @@ Required tests      bond-prices.integration.spec.ts (real PostgreSQL: a manual
                     security answers 404; a transaction write, a bulk, AI, MCP
                     and import write each dispatch the recompute);
                     bond-price.service.spec.ts (including the 10-year EDO lot
-                    series bound), bond-lots.spec.ts (per-account FIFO and the
+                    series bound and the blend over two series),
+                    bond-lots.spec.ts (per-account and per-series FIFO and the
                     paired transfer), securities.service.spec.ts (link
                     refusals: type, quantity, currency, uppercase UUID, undo),
                     action-history undo spec, provider-priced.guard.spec.ts,
@@ -3473,11 +3500,16 @@ Enforcement         Three mechanisms.
                        FetchBondSeriesDto (backend/src/bonds/dto/) has exactly
                        two bounded fields under whitelist and
                        forbidNonWhitelisted, so POST /bonds/instruments/fetch
-                       (throttled to 10 a minute per user), the fetch_bond_series
+                       (throttled to 10 a minute per user), POST /bonds/offer/fetch
+                       (FetchBondOfferDto: a country alone, throttled to 2 a
+                       minute per user; it fetches the codes the adapter's own
+                       listing names), the fetch_bond_series
                        AI and MCP tool (the same two fields in
                        fetchBondSeriesSchema) and the daily cron
                        (BondSeriesService.scheduledCurrentOffer, which takes the
-                       codes from the adapter's own listing of the offer) cannot
+                       codes from the adapter's own listing of the offer, only
+                       for the programs a security has switched auto-fetch on
+                       for) cannot
                        carry a value. Values enter only through POST
                        /bonds/instruments/manual behind RolesGuard with
                        Roles("admin"), and the MCP tool
@@ -3545,6 +3577,97 @@ Required tests      bond-series-fetch.integration.spec.ts (real PostgreSQL, a
                     provider-call.guard.spec.ts (the fetch goes through the
                     breaker) and country-agnostic.guard.spec.ts (the service
                     names no country).
+Status              enforced
+```
+
+### INV-BOND-007 -- every share-moving row of a program-linked security names a series of that program
+
+```text
+Statement           A security linked to a bond program
+                    (securities.bond_program_id) holds the program's series
+                    (the product, e.g. one security for all of EDO). Every
+                    share-moving row of such a security (BUY, REINVEST,
+                    ADD_SHARES, an unpaired TRANSFER_IN as an acquisition;
+                    SELL, REDEEM, REMOVE_SHARES, an unpaired TRANSFER_OUT as a
+                    removal) stores the series it acts on in
+                    investment_transactions.bond_instrument_id, and that
+                    series belongs to the security's program. An acquisition's
+                    series is the one named or, when none is, the program's
+                    series whose newest terms version's saleWindow contains
+                    the transaction date; the server resolves and stores it,
+                    and a series a client names is checked against the
+                    program, never trusted. A removal's series is optional
+                    (absent: first-in first-out across series). A security
+                    that is not program-linked never has the column set.
+                    Refusals (SERIES_NOT_IN_PROGRAM, SERIES_NOT_DETERMINED,
+                    SERIES_NOT_ALLOWED) run in the write's own transaction
+                    before anything is written.
+Source of truth     investment_transactions.bond_instrument_id;
+                    bond_instruments.bond_program_id;
+                    securities.bond_program_id
+Enforcement         One resolver, resolveTransactionSeries
+                    (backend/src/bonds/bond-series-resolver.ts), called by
+                    every path that writes the column, inside its transaction
+                    and before the first write: InvestmentTransactionsService
+                    create (also reached by bulk, the AI action executor, the
+                    MCP tools and the scheduled-transaction post), update,
+                    updateLinkedTransfer, transferSecurity and
+                    createEmbeddedForSplit; the QIF/OFX import processor; the
+                    Money import writer (writeInvestments); the undo and redo
+                    of an investment transaction (ActionHistoryService
+                    undoInvestmentUpdate and reinsertInvestmentTransaction);
+                    and the AI and MCP previews through
+                    previewCreateInvestmentTransaction, so a card never shows
+                    what the commit would refuse. Both tool adapters accept
+                    bondSeriesCode (a code such as EDO1036, resolved within
+                    the program) and carry the resolved id in the signed
+                    descriptor. A form resends the stored series on every
+                    save, so on update only a value that differs from the
+                    stored one is a request; a stored series the row can no
+                    longer carry is dropped, not refused. The link follows the
+                    rows: clearForeignSeries (securities update and the undo of
+                    a link change) clears the series outside the new program in
+                    the link's transaction, and clearForeignSeriesOfUser does
+                    the same after a restore, whatever the file said. A row
+                    written before the link, or by a path that predates the
+                    column, is read by loadBondLedger as a write would resolve
+                    it (the same seriesOnSaleSql), never guessed when two series
+                    were on sale. Not enforced by the database: a CHECK cannot
+                    compare a row's series program with its security's program
+                    across tables; the ON DELETE RESTRICT foreign keys keep the
+                    named series and program in the catalog.
+Concurrency scope   per row; the security's link is read without a lock, so a
+                    link changed concurrently with a trade is repaired by
+                    clearForeignSeries at the link's commit and by the lots'
+                    inference of a row without a series
+Retry semantics     The resolution is a function of the row, the program and
+                    the stored terms: repeating a write resolves the same
+                    series.
+Crash semantics     The series is a column of the row; nothing partial to
+                    recover.
+Failure response    400 with errors.bonds.SERIES_NOT_IN_PROGRAM (names the
+                    series and the program), SERIES_NOT_DETERMINED (names the
+                    date and the program, says to fetch the series) or
+                    SERIES_NOT_ALLOWED, in every locale; nothing written. A
+                    bulk or import row that is refused is skipped or fails
+                    alone with the same message; the Money import is refused as
+                    a whole before anything is kept.
+Required tests      bond-series-resolver.spec.ts (every branch: inferred,
+                    named, foreign program, none on sale, two on sale, a code
+                    reference, removal, unlinked, cash action, stored series
+                    kept or dropped, clearing); investment-transactions
+                    .service.spec.ts ("the bond series of a share-moving row":
+                    create, update, transferSecurity, an embedded split and
+                    the preview, each refusing before a write);
+                    import-investment-processor.service.spec.ts,
+                    write-investments.spec.ts, action-history.service.spec.ts
+                    (undo and redo), the AI and MCP tool specs (the series
+                    reaches the descriptor and the commit), bond-lots.spec.ts
+                    (per-series lots), bond-valuation.service.spec.ts (two
+                    series), bond-prices.integration.spec.ts and
+                    bond-valuation.integration.spec.ts (real PostgreSQL),
+                    backup-restore.integration.spec.ts (the series follow the
+                    program).
 Status              enforced
 ```
 

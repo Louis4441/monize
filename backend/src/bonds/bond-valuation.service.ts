@@ -76,6 +76,9 @@ export interface BondReferenceData {
 
 /** One open lot of a linked security, valued at the requested day. */
 export interface SecurityLotValuation {
+  /** The series (bond instrument id) the lot belongs to. */
+  readonly instrumentId: string | null;
+  readonly accountId?: string | null;
   readonly purchaseDate: string;
   readonly quantity: number;
   readonly purchaseDateAssumed: boolean;
@@ -114,16 +117,39 @@ export interface BondTermsSource {
   readonly document: string;
 }
 
-export interface SecurityValuation {
-  readonly securityId: string;
-  readonly instrument: BondInstrumentSummary;
-  readonly asOf: string;
-  readonly lots: readonly SecurityLotValuation[];
-  readonly benchmarkCoverage: readonly BenchmarkCoverage[];
+/** The program a security is linked to, as the valuation names it. */
+export interface BondProgramRef {
+  readonly id: string;
+  readonly programCode: string;
+  readonly issuerCountryCode: string;
+  readonly issuerCode: string;
+  readonly currency: string;
+}
+
+/**
+ * One series the security holds: its terms' redemption policy and the document
+ * they were read from (INV-BOND-006). Per series, because the series of one
+ * program have terms of their own.
+ */
+export interface SecuritySeriesInfo {
+  readonly instrumentId: string;
+  readonly seriesCode: string;
+  readonly programCode: string;
+  readonly termsSource: BondTermsSource;
   /** The terms' redemption policy; null when the bond is redeemable at maturity only. */
   readonly redemptionTerms: Redemption | null;
-  /** The document the terms were read from (INV-BOND-006). */
-  readonly termsSource: BondTermsSource;
+}
+
+export interface SecurityValuation {
+  readonly securityId: string;
+  readonly program: BondProgramRef;
+  /** The security's switch: fetch every new series of the program automatically. */
+  readonly autoFetch: boolean;
+  readonly asOf: string;
+  readonly lots: readonly SecurityLotValuation[];
+  /** The series of the open lots (of the whole ledger when the lots are unknown), ordered by series code. */
+  readonly series: readonly SecuritySeriesInfo[];
+  readonly benchmarkCoverage: readonly BenchmarkCoverage[];
   readonly totals: SecurityValuationTotals;
   readonly refusal: BondLotsRefusal | null;
 }
@@ -152,18 +178,34 @@ function summarize(
  * what `withScopedDb` needs, never a filter.
  */
 /**
- * An assumption about a benchmark the instrument does not read would change
- * nothing and return figures that look like a scenario; refuse it instead.
+ * An assumption about a benchmark that none of the held series reads would
+ * change nothing and return figures that look like a scenario; refuse it
+ * instead. With no series held there is nothing to refuse.
  */
-function assertReadsBenchmark(terms: BondTerms, benchmarkId: string): void {
-  const fields = benchmarkFieldsOf(terms.rateRule);
-  if (fields === null || fields.benchmarkId !== benchmarkId) {
-    throw new BondEngineError(
-      "BENCHMARK_NOT_READ",
-      { series: terms.instrument.seriesCode, benchmarkId },
-      `${terms.instrument.seriesCode} does not read benchmark ${benchmarkId}`,
-    );
+function assertSomeSeriesReadsBenchmark(
+  references: ReadonlyMap<string, BondReferenceData>,
+  benchmarkId: string,
+  programCode: string,
+): void {
+  if (references.size === 0) return;
+  for (const { terms } of references.values()) {
+    if (benchmarkFieldsOf(terms.rateRule)?.benchmarkId === benchmarkId) return;
   }
+  throw new BondEngineError(
+    "BENCHMARK_NOT_READ",
+    { series: programCode, benchmarkId },
+    `${programCode} does not read benchmark ${benchmarkId}`,
+  );
+}
+
+/** The most decimals any of the series rounds money to (a total is exact to that). */
+function placesOf(references: readonly BondReferenceData[]): number {
+  return references.length === 0
+    ? 2
+    : references.reduce(
+        (n, r) => Math.max(n, r.terms.rounding.moneyDecimals),
+        0,
+      );
 }
 
 @Injectable()
@@ -218,10 +260,27 @@ export class BondValuationService {
   }
 
   /**
-   * The lots a user's linked security holds on `asOf`, each valued at `asOf`,
-   * with their totals (spec 12.5). Owner-scoped: another user's security and an
-   * unlinked one are the same 404. One transaction; the reference data is read
-   * once however many lots there are.
+   * The reference data of every series named, each loaded once, in the order
+   * given. One query after another on the caller's transaction.
+   */
+  async loadReferences(
+    m: EntityManager,
+    instrumentIds: Iterable<string>,
+  ): Promise<Map<string, BondReferenceData>> {
+    const references = new Map<string, BondReferenceData>();
+    for (const id of instrumentIds) {
+      if (!references.has(id))
+        references.set(id, await this.loadReference(m, id));
+    }
+    return references;
+  }
+
+  /**
+   * The lots a user's program-linked security holds on `asOf`, each valued at
+   * `asOf` by its own series' terms, with their totals (spec 12.5 and
+   * `bond-program-securities.md` 2.4). Owner-scoped: another user's security and
+   * an unlinked one are the same 404. One transaction; the reference data of
+   * each series is read once however many lots there are.
    */
   async valueSecurity(
     userId: string,
@@ -231,29 +290,54 @@ export class BondValuationService {
   ): Promise<SecurityValuation> {
     return withScopedDb(this.dataSource, async (m) => {
       const ledger = await loadBondLedger(m, userId, securityId);
-      const reference = await this.loadReference(
-        m,
-        ledger.security.bondInstrumentId,
-      );
-      for (const id of projection?.keys() ?? []) {
-        assertReadsBenchmark(reference.terms, id);
-      }
-      const { instrument } = reference;
-      const benchmarkCoverage = await this.loadCoverage(m, reference.terms);
-      const redemptionTerms =
-        reference.terms.redemption.type === "ON_DEMAND"
-          ? reference.terms.redemption
-          : null;
+      const program = await this.loadProgram(m, ledger.security.bondProgramId);
+      const base = {
+        securityId,
+        program,
+        autoFetch: ledger.security.bondAutoFetch,
+        asOf,
+      };
       const folded = bondLotsAsOf(ledger.transactions, asOf);
+      const heldIds = this.seriesIdsOf(
+        folded.lots === null ? ledger.transactions : folded.lots,
+      );
+      const references = await this.loadReferences(m, heldIds);
+      for (const id of projection?.keys() ?? []) {
+        assertSomeSeriesReadsBenchmark(references, id, program.programCode);
+      }
+      const held = [...references.values()].sort((a, b) =>
+        a.instrument.seriesCode < b.instrument.seriesCode ? -1 : 1,
+      );
+      const benchmarkCoverage: BenchmarkCoverage[] = [];
+      for (const reference of held) {
+        for (const coverage of await this.loadCoverage(m, reference.terms)) {
+          if (
+            !benchmarkCoverage.some(
+              (c) => c.benchmarkId === coverage.benchmarkId,
+            )
+          ) {
+            benchmarkCoverage.push(coverage);
+          }
+        }
+      }
+      // Per series, a refusal included: where a series' terms came from and
+      // what it redeems at belong to the series, not to the derived lots.
+      const series = held.map((reference) => ({
+        instrumentId: reference.instrument.id,
+        seriesCode: reference.instrument.seriesCode,
+        programCode: reference.instrument.programCode,
+        termsSource: reference.terms.source,
+        redemptionTerms:
+          reference.terms.redemption.type === "ON_DEMAND"
+            ? reference.terms.redemption
+            : null,
+      }));
       if (folded.lots === null) {
         return {
-          securityId,
-          instrument,
-          asOf,
+          ...base,
           lots: [],
+          series,
           benchmarkCoverage,
-          redemptionTerms,
-          termsSource: reference.terms.source,
           totals: {
             quantity: null,
             grossValue: null,
@@ -266,22 +350,24 @@ export class BondValuationService {
 
       const lots = folded.lots.map((lot) => ({
         ...lot,
-        valuation: this.valueLotFrom(reference, lot, asOf, projection),
+        valuation: this.valueLotFrom(
+          this.referenceOf(references, lot),
+          lot,
+          asOf,
+          projection,
+        ),
       }));
-      const places = reference.terms.rounding.moneyDecimals;
+      const places = placesOf(held);
       const sum = (pick: (v: BondValuation) => string | null) =>
         sumKnown(
           lots.map((l) => pick(l.valuation)),
           places,
         );
       return {
-        securityId,
-        instrument,
-        asOf,
+        ...base,
         lots,
+        series,
         benchmarkCoverage,
-        redemptionTerms,
-        termsSource: reference.terms.source,
         totals: {
           quantity: lots.reduce((n, l) => n + l.quantity, 0),
           grossValue: sum((v) => v.grossValue),
@@ -295,8 +381,11 @@ export class BondValuationService {
 
   /**
    * The security's open lots as of `asOf`, valued once per assumed value of
-   * `benchmarkId` and summed (spec 13.3). Owner-scoped like `valueSecurity`;
-   * the reference data is read once, every scenario is computed in memory.
+   * `benchmarkId` and summed (spec 13.3). Owner-scoped like `valueSecurity`; the
+   * reference data of each series is read once, every scenario is computed in
+   * memory. A series that does not read the benchmark is valued unchanged in
+   * every scenario; the request is refused only when none of the held series
+   * reads it.
    */
   async scenariosOf(
     userId: string,
@@ -307,12 +396,19 @@ export class BondValuationService {
   ): Promise<BondScenarios> {
     return withScopedDb(this.dataSource, async (m) => {
       const ledger = await loadBondLedger(m, userId, securityId);
-      const reference = await this.loadReference(
-        m,
-        ledger.security.bondInstrumentId,
-      );
-      assertReadsBenchmark(reference.terms, benchmarkId);
+      const program = await this.loadProgram(m, ledger.security.bondProgramId);
       const folded = bondLotsAsOf(ledger.transactions, asOf);
+      const references = await this.loadReferences(
+        m,
+        this.seriesIdsOf(
+          folded.lots === null ? ledger.transactions : folded.lots,
+        ),
+      );
+      assertSomeSeriesReadsBenchmark(
+        references,
+        benchmarkId,
+        program.programCode,
+      );
       const base = { securityId, benchmarkId, asOf };
       if (folded.lots === null) {
         return {
@@ -321,26 +417,95 @@ export class BondValuationService {
           scenarios: values.map(unknownScenario),
         };
       }
-      const places = reference.terms.rounding.moneyDecimals;
+      const places = placesOf([...references.values()]);
       return {
         ...base,
         refusal: null,
         scenarios: values.map((value) =>
           scenarioOf(
             value,
-            folded.lots.map((lot) =>
-              this.valueLotFrom(
+            folded.lots.map((lot) => {
+              const reference = this.referenceOf(references, lot);
+              // Only a series that reads the benchmark takes the assumption;
+              // the others are what they are.
+              const reads =
+                benchmarkFieldsOf(reference.terms.rateRule)?.benchmarkId ===
+                benchmarkId;
+              return this.valueLotFrom(
                 reference,
                 lot,
                 asOf,
-                new Map([[benchmarkId, value]]),
-              ),
-            ),
+                reads ? new Map([[benchmarkId, value]]) : undefined,
+              );
+            }),
             places,
           ),
         ),
       };
     });
+  }
+
+  /** The distinct series ids rows or lots name, in first-appearance order. */
+  private seriesIdsOf(
+    rows: ReadonlyArray<{ readonly instrumentId?: string | null }>,
+  ): string[] {
+    return [
+      ...new Set(
+        rows
+          .map((r) => r.instrumentId)
+          .filter((id): id is string => typeof id === "string"),
+      ),
+    ];
+  }
+
+  /** The reference data of a lot's series; a lot with none cannot be valued. */
+  private referenceOf(
+    references: ReadonlyMap<string, BondReferenceData>,
+    lot: { readonly instrumentId: string | null },
+  ): BondReferenceData {
+    const reference = lot.instrumentId
+      ? references.get(lot.instrumentId)
+      : null;
+    if (!reference) {
+      throw new BondDataNotFoundError(
+        "INSTRUMENT_ID_NOT_FOUND",
+        { id: lot.instrumentId ?? "" },
+        `No bond series is named for a lot (${lot.instrumentId ?? "none"})`,
+      );
+    }
+    return reference;
+  }
+
+  private async loadProgram(
+    m: EntityManager,
+    programId: string,
+  ): Promise<BondProgramRef> {
+    const rows: Array<{
+      id: string;
+      program_code: string;
+      issuer_country_code: string;
+      issuer_code: string;
+      currency_code: string;
+    }> = await m.query(
+      `SELECT id, program_code, issuer_country_code, issuer_code, currency_code
+         FROM bond_programs
+        WHERE id = $1`,
+      [programId],
+    );
+    if (rows.length === 0) {
+      throw new BondDataNotFoundError(
+        "INSTRUMENT_ID_NOT_FOUND",
+        { id: programId },
+        `No bond program stored with id ${programId}`,
+      );
+    }
+    return {
+      id: rows[0].id,
+      programCode: rows[0].program_code,
+      issuerCountryCode: rows[0].issuer_country_code,
+      issuerCode: rows[0].issuer_code,
+      currency: rows[0].currency_code,
+    };
   }
 
   /** One lot at one date, from reference data already loaded. Pure. */

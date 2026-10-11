@@ -20,6 +20,7 @@ import { fetchNbpReference, NBP_ARCHIVE_URL } from "./pl-nbp-reference";
 import { PL_CPI_GUS_YOY, PL_NBP_REFERENCE } from "./pl-benchmarks";
 import { plCalendar } from "./pl-calendar";
 import { backfillCodes, SERIES_VALID_FROM } from "./series/backfill-codes";
+import { parseSeriesCode } from "./series/series-code";
 import { fetchCurrentSeries } from "./series/current-offer";
 import { fetchSeries } from "./series/fetch-series";
 import { manualSeries } from "./series/manual-series";
@@ -80,6 +81,13 @@ export const POLISH_BOND_ADAPTER: BondAdapter = {
   seriesProviderId: "obligacjeskarbowe",
   currentSeries: fetchCurrentSeries,
   backfillCodes,
+  programOf: (seriesCode: string) => {
+    try {
+      return parseSeriesCode(seriesCode).product;
+    } catch {
+      return null;
+    }
+  },
   seriesValidFrom: SERIES_VALID_FROM,
   async fetchBenchmark(code: string, fetch: BondFetch) {
     switch (code) {

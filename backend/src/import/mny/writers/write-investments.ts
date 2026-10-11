@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { resolveTransactionSeries } from "../../../bonds/bond-series-resolver";
 import { EntityManager } from "typeorm";
 import { Security } from "../../../securities/entities/security.entity";
 import { InvestmentTransaction } from "../../../securities/entities/investment-transaction.entity";
@@ -188,6 +189,19 @@ export async function writeInvestments(
     input.accountIdByKey.has(transaction.accountKey),
   );
 
+  // INV-BOND-007: a row of a security that is linked to a bond program names its
+  // series. Only a security the user already had (reused by symbol) can be
+  // linked; its rows are resolved like any write, and a row whose series cannot
+  // be determined refuses the import before anything of it is kept.
+  const linkedSecurityIds = new Set(
+    (
+      (await manager.query(
+        `SELECT id FROM securities WHERE user_id = $1 AND bond_program_id IS NOT NULL`,
+        [userId],
+      )) as Array<{ id: string }>
+    ).map((row) => row.id),
+  );
+
   let processed = 0;
   let cashTransactionsCreated = 0;
 
@@ -282,6 +296,18 @@ export async function writeInvestments(
         });
       }
 
+      const securityId =
+        input.securityIdByHandle.get(transaction.securityHandle) ?? null;
+      const bondInstrumentId =
+        securityId !== null && linkedSecurityIds.has(securityId)
+          ? await resolveTransactionSeries(manager, userId, {
+              securityId,
+              action: transaction.action,
+              transactionDate: transaction.transactionDate,
+              requested: false,
+            })
+          : null;
+
       investmentRows.push({
         id: transaction.id,
         userId,
@@ -289,8 +315,8 @@ export async function writeInvestments(
         transactionId: newCashTransactionId ?? adoptedCashTransactionId,
         transactionSplitId,
         fundingAccountId,
-        securityId:
-          input.securityIdByHandle.get(transaction.securityHandle) ?? null,
+        securityId,
+        bondInstrumentId,
         action: transaction.action,
         transactionDate: transaction.transactionDate,
         quantity: transaction.quantity,

@@ -559,11 +559,14 @@
     "TEMPLATE_NOT_VALIDATED": "La serie {{ series }} è stata venduta prima che il modello {{ product }} fosse convalidato ({{ validFrom }}); richiede una voce curata",
     "SERIES_TERMS_CONFLICT": "La serie {{ series }} è già memorizzata con condizioni diverse; le condizioni memorizzate non vengono mai sostituite",
     "countryCodeInvalid": "countryCode deve essere un codice paese di due lettere",
-    "programCodeInvalid": "programCode deve contenere da 1 a 12 lettere maiuscole o cifre"
+    "programCodeInvalid": "programCode deve contenere da 1 a 12 lettere maiuscole o cifre",
+    "SERIES_NOT_IN_PROGRAM": "La serie {{ series }} non appartiene al programma obbligazionario di questo titolo ({{ program }})",
+    "SERIES_NOT_DETERMINED": "Non è stato possibile determinare la serie di questo acquisto {{ program }} del {{ date }}: nessuna singola serie memorizzata del programma era in vendita quel giorno. Recupera la serie dalla fonte ufficiale e sceglila per la transazione.",
+    "SERIES_NOT_ALLOWED": "Una serie obbligazionaria può essere indicata solo per una transazione che sposta quote di un titolo collegato a un programma obbligazionario"
   },
   "securities": {
     "bondPricedByEngine": "Questo titolo è collegato a uno strumento obbligazionario ed è valutato dal motore obbligazionario, non da un fornitore di quotazioni. Usa invece Ricalcola i prezzi.",
-    "bondInstrumentNotFound": "Lo strumento obbligazionario {{ id }} non esiste",
+    "bondProgramNotFound": "Il programma obbligazionario {{ id }} non esiste",
     "bondCurrencyMismatch": "Il titolo è registrato in {{ currency }}, ma lo strumento obbligazionario è valutato in {{ instrumentCurrency }}. Usa la valuta dello strumento.",
     "bondCurrencyLocked": "Un titolo collegato a uno strumento obbligazionario resta nella valuta dello strumento ({{ instrumentCurrency }}). Scollegalo dall'obbligazione prima di cambiarne la valuta.",
     "accountMustBeInvestment": "Il conto deve essere di tipo INVESTMENT",

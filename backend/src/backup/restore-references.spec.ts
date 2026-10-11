@@ -307,11 +307,11 @@ describe("resolveRestoreReferences", () => {
     const INSTRUMENT = "9f2c7a10-1234-5a6b-8c7d-0e1f2a3b4c5d";
     const data = backup({
       securities: [
-        { id: SECURITY, user_id: "u", bond_instrument_id: INSTRUMENT },
+        { id: SECURITY, user_id: "u", bond_program_id: INSTRUMENT },
         {
           id: SECURITY.replace(/3/g, "4"),
           user_id: "u",
-          bond_instrument_id: INSTRUMENT.toUpperCase(),
+          bond_program_id: INSTRUMENT.toUpperCase(),
         },
       ],
     });
@@ -319,7 +319,7 @@ describe("resolveRestoreReferences", () => {
     expect(severed).toEqual([]);
     expect(
       (resolved.securities as Record<string, unknown>[]).map(
-        (r) => r.bond_instrument_id,
+        (r) => r.bond_program_id,
       ),
     ).toEqual([INSTRUMENT, INSTRUMENT]);
   });
@@ -327,11 +327,11 @@ describe("resolveRestoreReferences", () => {
   it("refuses a catalog reference that is not a UUID", () => {
     const data = backup({
       securities: [
-        { id: SECURITY, user_id: "u", bond_instrument_id: "not-a-uuid" },
+        { id: SECURITY, user_id: "u", bond_program_id: "not-a-uuid" },
       ],
     });
     expect(refusal(() => resolveRestoreReferences(data))).toContain(
-      "securities.bond_instrument_id",
+      "securities.bond_program_id",
     );
   });
 

@@ -559,11 +559,14 @@
     "TEMPLATE_NOT_VALIDATED": "系列 {{ series }} 在 {{ product }} 範本通過驗證之前（{{ validFrom }}）發售，需要人工整理的項目",
     "SERIES_TERMS_CONFLICT": "系列 {{ series }} 已以不同的條款儲存；已儲存的條款永遠不會被取代",
     "countryCodeInvalid": "countryCode 必須是兩個字母的國家代碼",
-    "programCodeInvalid": "programCode 必須是 1 到 12 個大寫字母或數字"
+    "programCodeInvalid": "programCode 必須是 1 到 12 個大寫字母或數字",
+    "SERIES_NOT_IN_PROGRAM": "系列 {{ series }} 不屬於此證券的債券計畫（{{ program }}）",
+    "SERIES_NOT_DETERMINED": "無法確定 {{ date }} 這筆 {{ program }} 買入所屬的系列：當天沒有唯一一個已儲存的在售系列。請從官方來源取得該系列，並為這筆交易選擇它。",
+    "SERIES_NOT_ALLOWED": "只有在與債券計畫連結的證券發生數量變動的交易中才能指定債券系列"
   },
   "securities": {
     "bondPricedByEngine": "此證券已連結到債券工具，由債券引擎而非報價提供者定價。請改用「重新計算價格」。",
-    "bondInstrumentNotFound": "債券工具 {{ id }} 不存在",
+    "bondProgramNotFound": "債券計畫 {{ id }} 不存在",
     "bondCurrencyMismatch": "此證券以 {{ currency }} 記錄，但債券工具以 {{ instrumentCurrency }} 定價。請使用該工具的幣別。",
     "bondCurrencyLocked": "連結到債券工具的證券必須維持工具的幣別（{{ instrumentCurrency }}）。變更幣別之前，請先解除其與債券的連結。",
     "accountMustBeInvestment": "科目類型必須為 INVESTMENT",

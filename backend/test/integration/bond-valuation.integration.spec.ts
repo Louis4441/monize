@@ -10,6 +10,7 @@ import {
   cleanTables,
   createIntegrationModule,
   createTestUserDirect,
+  insertBondProgram,
 } from "../helpers/integration-setup";
 
 /**
@@ -34,7 +35,11 @@ describe("BondValuationService (integration)", () => {
   });
 
   beforeEach(async () => {
-    await cleanTables(dataSource, ["bond_instruments", "benchmark_series"]);
+    await cleanTables(dataSource, [
+      "bond_programs",
+      "bond_instruments",
+      "benchmark_series",
+    ]);
     await dataSource.query(
       `INSERT INTO currencies (code, name, symbol, decimal_places, is_active)
        VALUES ('PLN', 'Zloty', 'z', 2, true)
@@ -48,10 +53,10 @@ describe("BondValuationService (integration)", () => {
     series: string,
   ): Promise<string> {
     const rows: Array<{ id: string }> = await dataSource.query(
-      `INSERT INTO bond_instruments (issuer_country_code, issuer_code, program_code, series_code, currency_code, marketability)
-       VALUES ('PL', 'PL_MF', $1, $2, 'PLN', 'RETAIL_REDEEMABLE')
+      `INSERT INTO bond_instruments (issuer_country_code, issuer_code, program_code, bond_program_id, series_code, currency_code, marketability)
+       VALUES ('PL', 'PL_MF', $1, $3, $2, 'PLN', 'RETAIL_REDEEMABLE')
        RETURNING id`,
-      [program, series],
+      [program, series, await insertBondProgram(dataSource, program)],
     );
     await dataSource.query(
       `INSERT INTO bond_terms_versions (bond_instrument_id, version, terms, content_hash, source_url, retrieved_at)
@@ -103,8 +108,9 @@ describe("BondValuationService (integration)", () => {
 
   it("loads the newest terms version, whatever order the versions were written in, and a named one on request", async () => {
     const tos = await dataSource.query(
-      `INSERT INTO bond_instruments (issuer_country_code, issuer_code, program_code, series_code, currency_code, marketability)
-       VALUES ('PL', 'PL_MF', 'TOS', 'TOS1029', 'PLN', 'RETAIL_REDEEMABLE') RETURNING id`,
+      `INSERT INTO bond_instruments (issuer_country_code, issuer_code, program_code, bond_program_id, series_code, currency_code, marketability)
+       VALUES ('PL', 'PL_MF', 'TOS', $1, 'TOS1029', 'PLN', 'RETAIL_REDEEMABLE') RETURNING id`,
+      [await insertBondProgram(dataSource, "TOS")],
     );
     const doc = (rate: string) => {
       const d = manifestDocument("tos1029");
@@ -265,23 +271,30 @@ describe("BondValuationService (integration)", () => {
       [userId],
     );
     const security = await dataSource.query(
-      `INSERT INTO securities (user_id, symbol, name, security_type, currency_code, bond_instrument_id)
+      `INSERT INTO securities (user_id, symbol, name, security_type, currency_code, bond_program_id)
        VALUES ($1, 'TOS1029', 'TOS1029', 'BOND', 'PLN', $2)
        RETURNING id`,
-      [userId, instrumentId],
+      [userId, await insertBondProgram(dataSource, "TOS")],
     );
     await dataSource.query(
       `INSERT INTO investment_transactions
-         (user_id, account_id, security_id, action, transaction_date, quantity, price, total_amount, status)
-       VALUES ($1, $2, $3, 'BUY', '2026-10-15', 25, 100, 2500, 'UNRECONCILED')`,
-      [userId, account[0].id, security[0].id],
+         (user_id, account_id, security_id, bond_instrument_id, action, transaction_date, quantity, price, total_amount, status)
+       VALUES ($1, $2, $3, $4, 'BUY', '2026-10-15', 25, 100, 2500, 'UNRECONCILED')`,
+      [userId, account[0].id, security[0].id, instrumentId],
     );
 
     const result = await withUserContext(userId, () =>
       service.valueSecurity(userId, security[0].id, "2027-04-15"),
     );
 
-    expect(result.redemptionTerms).toEqual({
+    expect(result.series).toHaveLength(1);
+    expect(result.series[0]).toMatchObject({
+      instrumentId,
+      seriesCode: "TOS1029",
+      programCode: "TOS",
+    });
+    expect(result.lots[0].instrumentId).toBe(instrumentId);
+    expect(result.series[0].redemptionTerms).toEqual({
       type: "ON_DEMAND",
       earliestDaysAfterPurchase: 7,
       latestDaysBeforeMaturity: 20,
@@ -302,5 +315,100 @@ describe("BondValuationService (integration)", () => {
     ]);
     expect(v.nextRateReset).toBeNull();
     expect(v.nextCapitalization).toBe("2027-10-15");
+  });
+
+  it("values the lots of two series of one program by their own terms, and a removal by series leaves the other", async () => {
+    await cleanTables(dataSource, [
+      "holdings",
+      "investment_transactions",
+      "securities",
+      "accounts",
+      "users",
+    ]);
+    // Two series under one program, as a person who buys every month holds them.
+    const first = await seed("tos1029", "TOS", "TOS1029");
+    const second = await seed("ror1027", "TOS", "ROR1027");
+    const userId = (await createTestUserDirect(dataSource)).id;
+    const account = await dataSource.query(
+      `INSERT INTO accounts (user_id, account_type, account_sub_type, name,
+                             currency_code, current_balance, opening_balance)
+       VALUES ($1, 'INVESTMENT', 'INVESTMENT_BROKERAGE', 'Brokerage', 'PLN', 0, 0)
+       RETURNING id`,
+      [userId],
+    );
+    const security = await dataSource.query(
+      `INSERT INTO securities (user_id, symbol, name, security_type, currency_code, bond_program_id, bond_auto_fetch)
+       VALUES ($1, 'TOS', 'TOS', 'BOND', 'PLN', $2, true)
+       RETURNING id`,
+      [userId, await insertBondProgram(dataSource, "TOS")],
+    );
+    const row = (
+      series: string | null,
+      action: string,
+      date: string,
+      quantity: number,
+    ) =>
+      dataSource.query(
+        `INSERT INTO investment_transactions
+           (user_id, account_id, security_id, bond_instrument_id, action, transaction_date, quantity, price, total_amount, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 100, $8, 'UNRECONCILED')`,
+        [
+          userId,
+          account[0].id,
+          security[0].id,
+          series,
+          action,
+          date,
+          quantity,
+          quantity * 100,
+        ],
+      );
+    await row(first, "BUY", "2026-10-15", 25);
+    await row(second, "BUY", "2026-10-15", 10);
+
+    const both = await withUserContext(userId, () =>
+      service.valueSecurity(userId, security[0].id, "2027-04-15"),
+    );
+    expect(both.autoFetch).toBe(true);
+    expect(both.refusal).toBeNull();
+    expect(
+      both.lots.map((l) => [
+        l.instrumentId,
+        l.valuation.seriesCode,
+        l.quantity,
+      ]),
+    ).toEqual(
+      expect.arrayContaining([
+        [first, "TOS1029", 25],
+        [second, "ROR1027", 10],
+      ]),
+    );
+    expect(both.series.map((x) => x.seriesCode)).toEqual([
+      "ROR1027",
+      "TOS1029",
+    ]);
+    expect(both.totals.quantity).toBe(35);
+    // Each lot is the value its own series' terms give: TOS1029's is the 25 x
+    // 102.19 the single-series test above establishes.
+    const tosLot = both.lots.find((l) => l.instrumentId === first)!;
+    expect(tosLot.valuation.grossValue).toBe("2554.75");
+
+    // A sale that names ROR1027 leaves the TOS1029 lot alone.
+    await row(second, "SELL", "2027-01-10", 10);
+    const after = await withUserContext(userId, () =>
+      service.valueSecurity(userId, security[0].id, "2027-04-15"),
+    );
+    expect(after.lots.map((l) => [l.instrumentId, l.quantity])).toEqual([
+      [first, 25],
+    ]);
+
+    // A sale larger than the series it names is refused though the account
+    // holds enough overall.
+    await row(second, "SELL", "2027-02-10", 1);
+    const over = await withUserContext(userId, () =>
+      service.valueSecurity(userId, security[0].id, "2027-04-15"),
+    );
+    expect(over.refusal).toMatchObject({ code: "REMOVAL_EXCEEDS_SERIES" });
+    expect(over.lots).toEqual([]);
   });
 });

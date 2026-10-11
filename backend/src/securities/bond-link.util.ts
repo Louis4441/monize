@@ -1,16 +1,19 @@
 import { EntityManager } from "typeorm";
+import { seriesOnSaleSql } from "../bonds/bond-series-resolver";
 
 /**
- * Why a security cannot be linked to a bond instrument (the engine prices a
- * linked security and nothing else does). One definition for the write that
- * links (`SecuritiesService.update`/`create`), the preview of the AI assistant
- * and MCP `update_security`, and the undo of a security edit, so the three
- * cannot disagree about what a valid link is.
+ * Why a security cannot be linked to a bond program (the engine prices a linked
+ * security and nothing else does). One definition for the write that links
+ * (`SecuritiesService.update`/`create`), the preview of the AI assistant and MCP
+ * `update_security`, and the undo of a security edit, so the three cannot
+ * disagree about what a valid link is
+ * (`docs/specs/bond-program-securities.md` section 2.2).
  */
 export type BondLinkProblem =
-  | { readonly code: "INSTRUMENT_NOT_FOUND" }
+  | { readonly code: "PROGRAM_NOT_FOUND" }
   /** Only a security of type BOND can be linked. */
   | { readonly code: "NOT_BOND_TYPE" }
+  /** `instrumentCurrency` is the program's currency (the name predates programs). */
   | { readonly code: "CURRENCY_MISMATCH"; readonly instrumentCurrency: string };
 
 /** The security type a link requires. */
@@ -18,30 +21,30 @@ export const BOND_SECURITY_TYPE = "BOND";
 
 /**
  * The first problem with linking a security of this type and currency to the
- * instrument, or null when the link is valid: the instrument exists, the
- * security is of type BOND, and it is recorded in the instrument's currency
- * (INV-PRICE-001 -- a stored price is in the currency the security is recorded
- * in, and the engine prices in the instrument's).
+ * program, or null when the link is valid: the program exists, the security is
+ * of type BOND, and it is recorded in the program's currency (INV-PRICE-001 -- a
+ * stored price is in the currency the security is recorded in, and the engine
+ * prices in the program's).
  */
 export async function findBondLinkProblem(
   m: EntityManager,
   link: {
-    readonly bondInstrumentId: string;
+    readonly bondProgramId: string;
     readonly currencyCode: string;
     readonly securityType: string | null | undefined;
   },
 ): Promise<BondLinkProblem | null> {
   const rows: Array<{ currency_code: string }> = await m.query(
-    `SELECT currency_code FROM bond_instruments WHERE id = $1`,
-    [link.bondInstrumentId],
+    `SELECT currency_code FROM bond_programs WHERE id = $1`,
+    [link.bondProgramId],
   );
-  if (rows.length === 0) return { code: "INSTRUMENT_NOT_FOUND" };
+  if (rows.length === 0) return { code: "PROGRAM_NOT_FOUND" };
   if (link.securityType !== BOND_SECURITY_TYPE)
     return { code: "NOT_BOND_TYPE" };
-  const instrumentCurrency = rows[0].currency_code;
-  return instrumentCurrency === link.currencyCode
+  const programCurrency = rows[0].currency_code;
+  return programCurrency === link.currencyCode
     ? null
-    : { code: "CURRENCY_MISMATCH", instrumentCurrency };
+    : { code: "CURRENCY_MISMATCH", instrumentCurrency: programCurrency };
 }
 
 /**
@@ -52,10 +55,14 @@ export const BOND_UNIT_PRICE_BAND = { min: "0.5", max: "2" } as const;
 
 /**
  * True when the security has a trade whose per-unit price is not within
- * [0.5, 2] x the instrument's face value, which means its quantities are not
- * numbers of bonds (a legacy security recording currency units, or one unit per
- * package): the lot derivation reads a quantity as a count of bonds, so the
- * link would publish a figure off by a factor of the face value. Rows with no
+ * [0.5, 2] x the face value of its own series, which means its quantities are
+ * not numbers of bonds (a legacy security recording currency units, or one unit
+ * per package): the lot derivation reads a quantity as a count of bonds, so the
+ * link would publish a figure off by a factor of the face value. A row's series
+ * is its stored one, or, for a row written before the security was linked, the
+ * series of the program on sale on its date (`seriesOnSaleSql`, the
+ * inference a write applies); a row whose series cannot be determined says
+ * nothing here (the lots refuse it with SERIES_NOT_DETERMINED). Rows with no
  * price (ADD_SHARES, a transfer) say nothing and are not read; VOID rows
  * recorded nothing.
  */
@@ -63,15 +70,19 @@ export async function hasQuantitiesThatAreNotBonds(
   m: EntityManager,
   userId: string,
   securityId: string,
-  bondInstrumentId: string,
+  bondProgramId: string,
 ): Promise<boolean> {
   const rows: unknown[] = await m.query(
     `SELECT 1
        FROM investment_transactions t
-       CROSS JOIN (
+       JOIN bond_instruments i
+         ON i.bond_program_id = $3
+        AND (t.bond_instrument_id = i.id
+             OR (t.bond_instrument_id IS NULL AND i.id IN (${seriesOnSaleSql("$3", "TO_CHAR(t.transaction_date, 'YYYY-MM-DD')")})))
+       CROSS JOIN LATERAL (
          SELECT (terms -> 'instrument' ->> 'faceValue')::numeric AS face
            FROM bond_terms_versions
-          WHERE bond_instrument_id = $3
+          WHERE bond_instrument_id = i.id
           ORDER BY version DESC
           LIMIT 1
        ) f
@@ -84,7 +95,7 @@ export async function hasQuantitiesThatAreNotBonds(
         AND (t.price < f.face * ${BOND_UNIT_PRICE_BAND.min}::numeric
              OR t.price > f.face * ${BOND_UNIT_PRICE_BAND.max}::numeric)
       LIMIT 1`,
-    [securityId, userId, bondInstrumentId],
+    [securityId, userId, bondProgramId],
   );
   return rows.length > 0;
 }
