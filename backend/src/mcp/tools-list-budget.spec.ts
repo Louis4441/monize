@@ -83,6 +83,7 @@ import { McpServerService } from "./mcp-server.service";
 // instrument and `created` back) and the administrator's
 // `enter_bond_series_manually` (1,685 bytes: the per-series values of a template).
 // Total 62,040 -> 63,050 (63,046 measured, a 4-byte margin); no existing cap moved.
+// Approved by the owner on 2026-10-11 (WMP/monize#24).
 const TOOL_BYTE_BUDGET: Record<string, number> = {
   list_accounts: 2500,
   list_transactions: 3550,
