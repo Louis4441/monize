@@ -74,7 +74,8 @@
     "sector": "Settore",
     "industry": "Industria",
     "provider": "Fornitore",
-    "lastPrice": "Ultimo prezzo"
+    "lastPrice": "Ultimo prezzo",
+    "bondDescription": "Descrizione dell'obbligazione"
   },
   "tabs": {
     "ariaLabel": "Sezioni del titolo",
@@ -241,6 +242,16 @@
       "deleted": "Documento eliminato",
       "saveFailed": "Impossibile salvare il documento",
       "deleteFailed": "Impossibile eliminare il documento"
+    },
+    "issueLetters": {
+      "title": "Lettere di emissione",
+      "loadFailed": "Impossibile caricare le lettere di emissione.",
+      "empty": "Non è ancora memorizzata alcuna lettera di emissione per questo tipo di obbligazione.",
+      "held": "Detenuta",
+      "onSale": "In vendita",
+      "noLetter": "Nessuna lettera registrata per questa serie",
+      "open": "PDF ufficiale",
+      "openNamed": "Apri la lettera di emissione della serie {series}"
     }
   },
   "news": {

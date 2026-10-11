@@ -90,6 +90,7 @@ vi.mock('@/lib/investments', () => ({
       mockGetSecurityBondValuation(...args),
     getSecurityBondScenarios: vi.fn(),
     getBondOffer: () => Promise.resolve({ countryCode: 'PL', today: '2027-04-15', series: [] }),
+    listBondPrograms: () => Promise.resolve([]),
     getBondHistory: () => Promise.resolve({ countryCode: 'PL', programs: [] }),
     recomputeSecurityBondPrices: vi.fn(),
     updateSecurity: vi.fn(),

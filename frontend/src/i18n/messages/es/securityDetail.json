@@ -74,7 +74,8 @@
     "sector": "Sector",
     "industry": "Industria",
     "provider": "Proveedor",
-    "lastPrice": "Último precio"
+    "lastPrice": "Último precio",
+    "bondDescription": "Descripción del bono"
   },
   "tabs": {
     "ariaLabel": "Secciones del valor",
@@ -241,6 +242,16 @@
       "deleted": "Documento eliminado",
       "saveFailed": "No se pudo guardar el documento",
       "deleteFailed": "No se pudo eliminar el documento"
+    },
+    "issueLetters": {
+      "title": "Cartas de emisión",
+      "loadFailed": "No se pudieron cargar las cartas de emisión.",
+      "empty": "Todavía no hay ninguna carta de emisión guardada para este tipo de bono.",
+      "held": "En cartera",
+      "onSale": "A la venta",
+      "noLetter": "Sin carta registrada para esta serie",
+      "open": "PDF oficial",
+      "openNamed": "Abrir la carta de emisión de la serie {series}"
     }
   },
   "news": {

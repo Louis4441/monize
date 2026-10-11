@@ -74,7 +74,8 @@
     "sector": "Sector",
     "industry": "Bedrijfstak",
     "provider": "Aanbieder",
-    "lastPrice": "Laatste koers"
+    "lastPrice": "Laatste koers",
+    "bondDescription": "Obligatiebeschrijving"
   },
   "tabs": {
     "ariaLabel": "Onderdelen van het effect",
@@ -241,6 +242,16 @@
       "deleted": "Document verwijderd",
       "saveFailed": "Het document kon niet worden opgeslagen",
       "deleteFailed": "Het document kon niet worden verwijderd"
+    },
+    "issueLetters": {
+      "title": "Uitgifteberichten",
+      "loadFailed": "De uitgifteberichten konden niet worden geladen.",
+      "empty": "Voor dit type obligatie is nog geen uitgiftebericht opgeslagen.",
+      "held": "In bezit",
+      "onSale": "In de verkoop",
+      "noLetter": "Geen bericht vastgelegd voor deze serie",
+      "open": "Officiële pdf",
+      "openNamed": "Uitgiftebericht van serie {series} openen"
     }
   },
   "news": {

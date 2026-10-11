@@ -74,7 +74,8 @@
     "sector": "Setor",
     "industry": "Indústria",
     "provider": "Fornecedor",
-    "lastPrice": "Última cotação"
+    "lastPrice": "Última cotação",
+    "bondDescription": "Descrição da obrigação"
   },
   "tabs": {
     "ariaLabel": "Secções do título",
@@ -241,6 +242,16 @@
       "deleted": "Documento eliminado",
       "saveFailed": "Não foi possível guardar o documento",
       "deleteFailed": "Não foi possível eliminar o documento"
+    },
+    "issueLetters": {
+      "title": "Cartas de emissão",
+      "loadFailed": "Não foi possível carregar as cartas de emissão.",
+      "empty": "Ainda não há nenhuma carta de emissão guardada para este tipo de obrigação.",
+      "held": "Detida",
+      "onSale": "À venda",
+      "noLetter": "Nenhuma carta registada para esta série",
+      "open": "PDF oficial",
+      "openNamed": "Abrir a carta de emissão da série {series}"
     }
   },
   "news": {

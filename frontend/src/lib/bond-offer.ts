@@ -174,3 +174,8 @@ export function buildHistoryPoints(
 export function isHttpUrl(url: string): boolean {
   return /^https?:\/\//i.test(url);
 }
+
+/** True for an https address only; a plain http one is not made a link where this is used. */
+export function isHttpsUrl(url: string): boolean {
+  return /^https:\/\//i.test(url);
+}

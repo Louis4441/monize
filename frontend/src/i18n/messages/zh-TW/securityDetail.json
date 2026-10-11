@@ -74,7 +74,8 @@
     "sector": "類股",
     "industry": "產業",
     "provider": "資料來源",
-    "lastPrice": "最新價格"
+    "lastPrice": "最新價格",
+    "bondDescription": "債券說明"
   },
   "tabs": {
     "ariaLabel": "證券各區塊",
@@ -241,6 +242,16 @@
       "deleted": "已刪除文件",
       "saveFailed": "無法儲存該文件",
       "deleteFailed": "無法刪除該文件"
+    },
+    "issueLetters": {
+      "title": "發行函",
+      "loadFailed": "無法載入發行函。",
+      "empty": "此債券種類尚未儲存任何發行函。",
+      "held": "持有中",
+      "onSale": "發售中",
+      "noLetter": "此系列未記錄發行函",
+      "open": "官方PDF",
+      "openNamed": "開啟系列 {series} 的發行函"
     }
   },
   "news": {

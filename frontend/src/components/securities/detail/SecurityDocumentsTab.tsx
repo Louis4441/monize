@@ -18,6 +18,7 @@ import { investmentsApi } from '@/lib/investments';
 import { getErrorMessage } from '@/lib/errors';
 import { documentHost } from '@/lib/security-detail';
 import { SecurityDocumentForm } from './SecurityDocumentForm';
+import { SecurityIssueLetters } from './SecurityIssueLetters';
 import type {
   CreateSecurityDocumentData,
   Security,
@@ -164,6 +165,11 @@ export function SecurityDocumentsTab({ security }: SecurityDocumentsTabProps) {
   }
 
   return (
+    <>
+      {/* Above the reader's own documents; a plain security has no such section. */}
+      {security.bondProgramId && (
+        <SecurityIssueLetters security={security} className="mb-6" />
+      )}
     <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -326,5 +332,6 @@ export function SecurityDocumentsTab({ security }: SecurityDocumentsTabProps) {
         onCancel={() => setDeleting(undefined)}
       />
     </div>
+    </>
   );
 }

@@ -74,7 +74,8 @@
     "sector": "Ngành",
     "industry": "Phân ngành",
     "provider": "Nhà cung cấp",
-    "lastPrice": "Giá gần nhất"
+    "lastPrice": "Giá gần nhất",
+    "bondDescription": "Mô tả trái phiếu"
   },
   "tabs": {
     "ariaLabel": "Các phần của chứng khoán",
@@ -241,6 +242,16 @@
       "deleted": "Đã xoá tài liệu",
       "saveFailed": "Không thể lưu tài liệu",
       "deleteFailed": "Không thể xoá tài liệu"
+    },
+    "issueLetters": {
+      "title": "Thư phát hành",
+      "loadFailed": "Không thể tải thư phát hành.",
+      "empty": "Chưa có thư phát hành nào được lưu cho loại trái phiếu này.",
+      "held": "Đang nắm giữ",
+      "onSale": "Đang bán",
+      "noLetter": "Chưa ghi nhận thư cho series này",
+      "open": "PDF chính thức",
+      "openNamed": "Mở thư phát hành của series {series}"
     }
   },
   "news": {

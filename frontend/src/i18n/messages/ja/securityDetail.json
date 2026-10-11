@@ -74,7 +74,8 @@
     "sector": "セクター",
     "industry": "業種",
     "provider": "提供元",
-    "lastPrice": "最終価格"
+    "lastPrice": "最終価格",
+    "bondDescription": "債券の説明"
   },
   "tabs": {
     "ariaLabel": "銘柄のセクション",
@@ -241,6 +242,16 @@
       "deleted": "資料を削除しました",
       "saveFailed": "資料を保存できませんでした",
       "deleteFailed": "資料を削除できませんでした"
+    },
+    "issueLetters": {
+      "title": "発行書簡",
+      "loadFailed": "発行書簡を読み込めませんでした。",
+      "empty": "この債券の種類には、まだ発行書簡が保存されていません。",
+      "held": "保有中",
+      "onSale": "販売中",
+      "noLetter": "このシリーズの書簡は記録されていません",
+      "open": "公式PDF",
+      "openNamed": "シリーズ {series} の発行書簡を開く"
     }
   },
   "news": {

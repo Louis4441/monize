@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen } from "@testing-library/react";
 import { render } from "@/test/render";
+import { act } from "@testing-library/react";
 import { SecurityKeyInformation } from "./SecurityKeyInformation";
 import type { Security } from "@/types/investment";
 import type { SecurityPricePoint } from "@/lib/security-detail";
@@ -14,6 +15,13 @@ const preferences = {
 vi.mock("@/store/preferencesStore", () => ({
   usePreferencesStore: (selector: (state: unknown) => unknown) =>
     selector({ preferences: preferences.current }),
+}));
+
+const mockListBondPrograms = vi.fn();
+vi.mock("@/lib/investments", () => ({
+  investmentsApi: {
+    listBondPrograms: (...args: unknown[]) => mockListBondPrograms(...args),
+  },
 }));
 
 function security(overrides: Partial<Security> = {}): Security {
@@ -57,9 +65,28 @@ const noAdjustedSeries: SecurityPricePoint[] = [
   { date: "2025-01-01", close: 120 },
 ];
 
+async function renderAsync(ui: React.ReactElement) {
+  await act(async () => {
+    render(ui);
+  });
+}
+
+const program = (infoUrl?: string | null) => ({
+  id: "b-1",
+  issuerCountryCode: "PL",
+  issuerCode: "MF",
+  programCode: "EDO",
+  currency: "PLN",
+  seriesCount: 1,
+  newestSeriesCode: "EDO1036",
+  ...(infoUrl === undefined ? {} : { infoUrl }),
+});
+
 describe("SecurityKeyInformation", () => {
   beforeEach(() => {
     preferences.current = { defaultQuoteProvider: "msn" };
+    mockListBondPrograms.mockReset();
+    mockListBondPrograms.mockResolvedValue([]);
   });
 
   it("drops the rows a thinly-filled security has no value for", () => {
@@ -121,8 +148,8 @@ describe("SecurityKeyInformation", () => {
     expect(screen.getByText("MSN")).toBeInTheDocument();
   });
 
-  it("names the bond engine for a security linked to a bond program", () => {
-    render(
+  it("names the bond engine for a security linked to a bond program", async () => {
+    await renderAsync(
       <SecurityKeyInformation
         security={security({ quoteProvider: "yahoo", bondProgramId: "b-1" })}
         latestPrice={null}
@@ -159,5 +186,60 @@ describe("SecurityKeyInformation", () => {
     expect(screen.getByText("Last price")).toBeInTheDocument();
     expect(screen.getByText(/123\.45/)).toBeInTheDocument();
     expect(screen.getByText(/2026/)).toBeInTheDocument();
+  });
+
+  describe("the bond description link", () => {
+    const linked = security({ bondProgramId: "b-1" });
+
+    it("links the issuer's page in a new tab and names its host", async () => {
+      mockListBondPrograms.mockResolvedValue([
+        program("https://www.obligacjeskarbowe.pl/oferta/obligacje-10-letnie-edo/"),
+      ]);
+      await renderAsync(
+        <SecurityKeyInformation security={linked} latestPrice={null} prices={[]} />,
+      );
+
+      expect(screen.getByText("Bond description")).toBeInTheDocument();
+      const link = screen.getByRole("link", { name: "obligacjeskarbowe.pl" });
+      expect(link).toHaveAttribute(
+        "href",
+        "https://www.obligacjeskarbowe.pl/oferta/obligacje-10-letnie-edo/",
+      );
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    });
+
+    it.each([
+      ["null", null],
+      ["absent", undefined],
+      ["not https", "http://www.obligacjeskarbowe.pl/"],
+      ["not a web address", "javascript:alert(1)"],
+    ])("is hidden when the address is %s", async (_name, infoUrl) => {
+      mockListBondPrograms.mockResolvedValue([program(infoUrl)]);
+      await renderAsync(
+        <SecurityKeyInformation security={linked} latestPrice={null} prices={[]} />,
+      );
+
+      expect(screen.queryByText("Bond description")).not.toBeInTheDocument();
+      expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    });
+
+    it("is hidden when the catalog cannot be read", async () => {
+      mockListBondPrograms.mockRejectedValue(new Error("boom"));
+      await renderAsync(
+        <SecurityKeyInformation security={linked} latestPrice={null} prices={[]} />,
+      );
+
+      expect(screen.queryByText("Bond description")).not.toBeInTheDocument();
+    });
+
+    it("never asks for the catalog, nor shows the row, for a security that is not a bond", async () => {
+      await renderAsync(
+        <SecurityKeyInformation security={security()} latestPrice={null} prices={[]} />,
+      );
+
+      expect(mockListBondPrograms).not.toHaveBeenCalled();
+      expect(screen.queryByText("Bond description")).not.toBeInTheDocument();
+    });
   });
 });

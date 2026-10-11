@@ -1,14 +1,19 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { KeyValueList, type KeyValueRow } from "@/components/ui/KeyValueList";
 import { useDateFormat } from "@/hooks/useDateFormat";
 import { useNumberFormat } from "@/hooks/useNumberFormat";
+import { isHttpsUrl } from "@/lib/bond-offer";
+import { investmentsApi } from "@/lib/investments";
 import { usePreferencesStore } from "@/store/preferencesStore";
 import {
+  documentHost,
   inferDistributionPolicy,
   type SecurityPricePoint,
 } from "@/lib/security-detail";
+import type { BondProgramSummary } from "@/types/bond";
 import type { Security } from "@/types/investment";
 
 interface SecurityKeyInformationProps {
@@ -45,6 +50,30 @@ export function SecurityKeyInformation({
   // price history, where the adjusted close parts from the quoted one on every
   // distribution. `unknown` drops the row rather than guessing.
   const policy = inferDistributionPolicy(prices);
+
+  // The issuer's page for a bond kind comes from the program catalog. Only a
+  // linked bond asks; a failed read just leaves the row out, since the link is
+  // a convenience and nothing is said to be missing.
+  const bondProgramId = security.bondProgramId ?? null;
+  const [catalog, setCatalog] = useState<BondProgramSummary[] | null>(null);
+  useEffect(() => {
+    if (!bondProgramId) return;
+    let cancelled = false;
+    investmentsApi
+      .listBondPrograms()
+      .then((list) => {
+        if (!cancelled) setCatalog(list);
+      })
+      .catch(() => {
+        // Left out on purpose; see above.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [bondProgramId]);
+  const infoUrl = bondProgramId
+    ? (catalog?.find((p) => p.id === bondProgramId)?.infoUrl ?? null)
+    : null;
 
   const rows: KeyValueRow[] = [
     { key: "symbol", label: t("keyInfo.symbol"), value: security.symbol },
@@ -90,6 +119,22 @@ export function SecurityKeyInformation({
           typeof ts
         >[0],
       ),
+    },
+    {
+      key: "bondDescription",
+      label: t("keyInfo.bondDescription"),
+      // Only an https address becomes a link; the host says where it goes.
+      value:
+        infoUrl !== null && isHttpsUrl(infoUrl) ? (
+          <a
+            href={infoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:underline focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-blue-400"
+          >
+            {documentHost(infoUrl)}
+          </a>
+        ) : null,
     },
     {
       key: "lastPrice",

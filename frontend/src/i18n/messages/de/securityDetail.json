@@ -74,7 +74,8 @@
     "sector": "Sektor",
     "industry": "Branche",
     "provider": "Anbieter",
-    "lastPrice": "Letzter Kurs"
+    "lastPrice": "Letzter Kurs",
+    "bondDescription": "Anleihebeschreibung"
   },
   "tabs": {
     "ariaLabel": "Wertpapier-Abschnitte",
@@ -241,6 +242,16 @@
       "deleted": "Dokument gelöscht",
       "saveFailed": "Das Dokument konnte nicht gespeichert werden",
       "deleteFailed": "Das Dokument konnte nicht gelöscht werden"
+    },
+    "issueLetters": {
+      "title": "Emissionsschreiben",
+      "loadFailed": "Die Emissionsschreiben konnten nicht geladen werden.",
+      "empty": "Für diese Anleiheart ist noch kein Emissionsschreiben gespeichert.",
+      "held": "Gehalten",
+      "onSale": "Im Verkauf",
+      "noLetter": "Kein Schreiben für diese Serie erfasst",
+      "open": "Offizielles PDF",
+      "openNamed": "Emissionsschreiben der Serie {series} öffnen"
     }
   },
   "news": {

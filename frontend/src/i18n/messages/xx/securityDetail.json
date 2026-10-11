@@ -74,7 +74,8 @@
     "sector": "[XX-Sector-XX]",
     "industry": "[XX-Industry-XX]",
     "provider": "[XX-Provider-XX]",
-    "lastPrice": "[XX-Last price-XX]"
+    "lastPrice": "[XX-Last price-XX]",
+    "bondDescription": "[XX-Bond description-XX]"
   },
   "tabs": {
     "ariaLabel": "[XX-Security sections-XX]",
@@ -241,6 +242,16 @@
       "deleted": "[XX-Document deleted-XX]",
       "saveFailed": "[XX-Could not save the document-XX]",
       "deleteFailed": "[XX-Could not delete the document-XX]"
+    },
+    "issueLetters": {
+      "title": "[XX-Issue letters-XX]",
+      "loadFailed": "[XX-The issue letters could not be loaded.-XX]",
+      "empty": "[XX-No issue letter is stored for this bond kind yet.-XX]",
+      "held": "[XX-Held-XX]",
+      "onSale": "[XX-On sale-XX]",
+      "noLetter": "[XX-No letter recorded for this series-XX]",
+      "open": "[XX-Official PDF-XX]",
+      "openNamed": "[XX-Open the issue letter for {series}-XX]"
     }
   },
   "news": {

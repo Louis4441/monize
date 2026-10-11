@@ -74,7 +74,8 @@
     "sector": "섹터",
     "industry": "산업",
     "provider": "제공처",
-    "lastPrice": "최종 가격"
+    "lastPrice": "최종 가격",
+    "bondDescription": "채권 설명"
   },
   "tabs": {
     "ariaLabel": "종목 섹션",
@@ -241,6 +242,16 @@
       "deleted": "문서를 삭제했습니다",
       "saveFailed": "문서를 저장할 수 없습니다",
       "deleteFailed": "문서를 삭제할 수 없습니다"
+    },
+    "issueLetters": {
+      "title": "발행 서한",
+      "loadFailed": "발행 서한을 불러오지 못했습니다.",
+      "empty": "이 채권 종류에 저장된 발행 서한이 아직 없습니다.",
+      "held": "보유 중",
+      "onSale": "판매 중",
+      "noLetter": "이 시리즈에 기록된 서한이 없습니다",
+      "open": "공식 PDF",
+      "openNamed": "{series} 시리즈의 발행 서한 열기"
     }
   },
   "news": {

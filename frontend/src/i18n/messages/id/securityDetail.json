@@ -74,7 +74,8 @@
     "sector": "Sektor",
     "industry": "Industri",
     "provider": "Penyedia",
-    "lastPrice": "Harga terakhir"
+    "lastPrice": "Harga terakhir",
+    "bondDescription": "Deskripsi obligasi"
   },
   "tabs": {
     "ariaLabel": "Bagian efek",
@@ -241,6 +242,16 @@
       "deleted": "Dokumen dihapus",
       "saveFailed": "Dokumen tidak dapat disimpan",
       "deleteFailed": "Dokumen tidak dapat dihapus"
+    },
+    "issueLetters": {
+      "title": "Surat penerbitan",
+      "loadFailed": "Surat penerbitan tidak dapat dimuat.",
+      "empty": "Belum ada surat penerbitan yang tersimpan untuk jenis obligasi ini.",
+      "held": "Dimiliki",
+      "onSale": "Dijual",
+      "noLetter": "Tidak ada surat yang tercatat untuk seri ini",
+      "open": "PDF resmi",
+      "openNamed": "Buka surat penerbitan seri {series}"
     }
   },
   "news": {

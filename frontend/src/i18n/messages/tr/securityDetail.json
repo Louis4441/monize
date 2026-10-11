@@ -74,7 +74,8 @@
     "sector": "Sektör",
     "industry": "Endüstri",
     "provider": "Sağlayıcı",
-    "lastPrice": "Son fiyat"
+    "lastPrice": "Son fiyat",
+    "bondDescription": "Tahvil açıklaması"
   },
   "tabs": {
     "ariaLabel": "Menkul kıymet bölümleri",
@@ -241,6 +242,16 @@
       "deleted": "Belge silindi",
       "saveFailed": "Belge kaydedilemedi",
       "deleteFailed": "Belge silinemedi"
+    },
+    "issueLetters": {
+      "title": "İhraç mektupları",
+      "loadFailed": "İhraç mektupları yüklenemedi.",
+      "empty": "Bu tahvil türü için henüz kayıtlı bir ihraç mektubu yok.",
+      "held": "Elde tutulan",
+      "onSale": "Satışta",
+      "noLetter": "Bu seri için kayıtlı mektup yok",
+      "open": "Resmî PDF",
+      "openNamed": "{series} serisinin ihraç mektubunu aç"
     }
   },
   "news": {

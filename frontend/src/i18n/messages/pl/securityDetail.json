@@ -74,7 +74,8 @@
     "sector": "Sektor",
     "industry": "Branża",
     "provider": "Dostawca",
-    "lastPrice": "Ostatnia cena"
+    "lastPrice": "Ostatnia cena",
+    "bondDescription": "Opis obligacji"
   },
   "tabs": {
     "ariaLabel": "Sekcje papieru wartościowego",
@@ -241,6 +242,16 @@
       "deleted": "Dokument usunięty",
       "saveFailed": "Nie udało się zapisać dokumentu",
       "deleteFailed": "Nie udało się usunąć dokumentu"
+    },
+    "issueLetters": {
+      "title": "Listy emisyjne",
+      "loadFailed": "Nie udało się wczytać listów emisyjnych.",
+      "empty": "Dla tego rodzaju obligacji nie zapisano jeszcze żadnego listu emisyjnego.",
+      "held": "Posiadana",
+      "onSale": "W sprzedaży",
+      "noLetter": "Brak zapisanego listu dla tej serii",
+      "open": "Oficjalny PDF",
+      "openNamed": "Otwórz list emisyjny serii {series}"
     }
   },
   "news": {

@@ -74,7 +74,8 @@
     "sector": "板块",
     "industry": "行业",
     "provider": "数据源",
-    "lastPrice": "最新价格"
+    "lastPrice": "最新价格",
+    "bondDescription": "债券说明"
   },
   "tabs": {
     "ariaLabel": "证券各部分",
@@ -241,6 +242,16 @@
       "deleted": "已删除文档",
       "saveFailed": "无法保存该文档",
       "deleteFailed": "无法删除该文档"
+    },
+    "issueLetters": {
+      "title": "发行函",
+      "loadFailed": "无法加载发行函。",
+      "empty": "此债券种类尚未保存任何发行函。",
+      "held": "已持有",
+      "onSale": "在售",
+      "noLetter": "此系列未记录发行函",
+      "open": "官方PDF",
+      "openNamed": "打开系列 {series} 的发行函"
     }
   },
   "news": {
