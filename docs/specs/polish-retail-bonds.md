@@ -511,6 +511,24 @@ Each one is to be checked against a rate table or an early redemption
 statement published by the Ministry or an issuing agent before the product
 values are shown to a user.
 
+Evidence collected on 2026-10-11 (supporting, not a confirmation):
+
+- 1: the issue letters give one product rounded to two decimals
+  (`W = N·(1+r1)·…·(1+rk)`), so the compounded base is not rounded per year;
+  they name no rounding mode. krbob/edo-calculator rounds half-up at the end;
+  31 CFR 359.55 states half-up for US savings bonds.
+- 2: the letters take the CPI "announced by GUS in the month preceding the
+  first month of the period"; GUS announces month X in X+1, so M-2.
+  krbob/edo-calculator and Kaligula0/Finance-Quote-module-Obligacje-Skarbowe
+  use M-2.
+- 3: the letters say "not earlier than after seven calendar days from the sale
+  date". Under Civil Code art. 111 §2 the sale day is not counted, which reads
+  as a first request on `purchaseDate + 8`. No published dated example was
+  found; still open.
+- 4: the letters refer to statutory days off; 24 December is one from 2025
+  (Dz.U. 2024 poz. 1965). QuantLib's Polish settlement calendar does not have
+  it yet.
+
 ## 11. Test matrix
 
 | Area | Kind | Cases |

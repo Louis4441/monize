@@ -61,6 +61,29 @@ holds that. A product is a terms document, not code.
 3. A fetcher (definition provider) per country normalizes official terms and
    benchmark data into the same tables; it never computes a valuation.
 
+## Second-country example: United States Series I savings bonds
+
+A check of the design against a second retail inflation bond. The rules below
+come from 31 CFR part 359 and TreasuryDirect, read on 2026-10-11; confirm them
+again before you implement.
+
+| Rule | Source | Existing primitive | New primitive needed |
+| --- | --- | --- | --- |
+| Composite rate `{(F/2) + I + I·(F/2)} × 2`, F the fixed rate, I the semiannual inflation rate; the regulation's example rounds it to 4 decimals (2.57%) | [31 CFR 359.14](https://www.law.cornell.edu/cfr/text/31/359.14) | none: `INFLATION_PLUS_MARGIN_AS_RATE` adds, it does not compound the two parts | a rate rule `FIXED_PLUS_INFLATION_COMPOSITE` with its own rounding |
+| A negative composite rate counts as zero | [31 CFR 359.39](https://www.law.cornell.edu/cfr/text/31/359.39) | the rate floor of the Polish CPI rules | none, if the floor applies to the composite |
+| The inflation rate resets every 6 months, from CPI-U; which months are compared is not yet confirmed | [TreasuryDirect](https://www.treasurydirect.gov/savings-bonds/i-bonds/), [31 CFR 359.15](https://www.law.cornell.edu/cfr/text/31/359.15) | `MONTHLY_VALUE_MONTHS_BEFORE_START` reads one value; I is a change between two index values | an observation rule that reads two index months and returns their change |
+| Interest is earned monthly (full calendar months only) and compounded semiannually: `FV = PV·(1 + CR/2)^(m/6)` | [31 CFR 359.39](https://www.law.cornell.edu/cfr/text/31/359.39) | `COMPOUND_AT_PERIOD_END` with 6-month periods | an accrual step of whole months (the Polish bonds accrue daily) |
+| The value of a 25 USD unit is rounded to the cent, half-up (25.044 to 25.04, 25.045 to 25.05); a larger bond is a multiple of that value | [31 CFR 359.55](https://www.law.cornell.edu/cfr/text/31/359.55), [appendix A](https://www.law.cornell.edu/cfr/text/31/appendix-A_to_part_359) | `rounding` half-up per bond; the bond is the 25 USD unit | none |
+| Redemption no earlier than 12 months after purchase | TreasuryDirect | `earliestDaysAfterPurchase` counts days | a minimum holding period in months |
+| Before 5 years, the last 3 months of interest are lost | TreasuryDirect | `FORFEIT_ACCRUED_SINCE_LAST_PAYMENT` forfeits a period's accrual, not 3 months | a penalty `FORFEIT_LAST_N_MONTHS_INTEREST` with an end date for the penalty (discussion section 39 names `FORFEIT_N_DAYS_INTEREST`) |
+| Business days and holidays do not affect the value | 31 CFR 359.39 (whole months) | a calendar is optional | none |
+
+So a US adapter needs about four new primitives (a composite rate rule, a
+two-month index observation, a whole-month accrual step, and a month-based
+holding period and penalty). None of them changes the Polish rules, so the
+engine design holds: a new mechanism is one new union member with its parser
+case, engine case and tests.
+
 ## Phases
 
 | PR | Content | Observable result |
