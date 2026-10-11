@@ -285,16 +285,9 @@ jobs:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
           persist-credentials: false
-      - name: Log in to Docker Hub
-        # Authenticated pulls are counted per account instead of per shared
-        # runner IP. A fork's pull_request gets no secrets, so it skips this
-        # and pulls anonymously as before.
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
+      # No Docker Hub login: verify-schema.sh pulls Postgres from the ECR Public
+      # mirror of the official image, which has no anonymous pull limit, so the
+      # job also runs where DOCKERHUB_* secrets are not set (a fork's own PR).
       - name: Verify schema.sql matches migrations state
         run: scripts/verify-schema.sh
 

@@ -461,6 +461,17 @@ unfixed code first and confirm it fails for the right reason.
 CI runs in UTC with one Playwright worker; a local run does neither, and both
 differences produce failures that look like regressions and are not.
 
+A container image CI pulls (a workflow's `image:`, the compose file CI runs,
+a script's `*_IMAGE=` default) comes from the ECR Public mirror of the Docker
+Official Images, `public.ecr.aws/docker/library/<name>:<tag>` (the same content
+and digests as Docker Hub), or from `ghcr.io`, never from Docker Hub: an
+anonymous Docker Hub pull from a shared runner IP is rate-limited, and the login
+that avoids it needs `DOCKERHUB_*` secrets a fork's repository does not have, so
+the job fails before its own step runs (the schema-drift job did, with "Username
+and password required"). `backend/src/common/ci-images.guard.spec.ts` scans the
+workflows, `docker-compose.e2e.yml` and `scripts/*.sh`. A Dockerfile's `FROM` is
+outside it: the image build logs in for those.
+
 - `TZ=UTC npm run test:unit` matches CI. Some tests read `new Date()` and count
   completed periods against fixtures; under another offset they land on the wrong
   side of a boundary. `insights-aggregator.service.spec.ts` and
