@@ -86,6 +86,11 @@ export type Redemption =
   | { readonly type: "MATURITY_ONLY" }
   | {
       readonly type: "ON_DEMAND";
+      /**
+       * The issuer's number of calendar days that must fully elapse after the
+       * sale before a request. The sale day is not counted, so the period ends
+       * with purchaseDate + N and the first request is on purchaseDate + N + 1.
+       */
       readonly earliestDaysAfterPurchase: number;
       readonly latestDaysBeforeMaturity: number;
       readonly blackouts: readonly Blackout[];

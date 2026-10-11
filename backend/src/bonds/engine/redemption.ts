@@ -25,10 +25,13 @@ export function windowRefusal(
     case "MATURITY_ONLY":
       return "NOT_REDEEMABLE";
     case "ON_DEMAND": {
+      // A period of N days that must fully elapse, the sale day not counted
+      // (Civil Code art. 111 par. 2): it ends with purchaseDate + N, so the
+      // first request is on purchaseDate + N + 1.
       if (
         compareYMD(
           asOf,
-          addDays(purchaseDate, redemption.earliestDaysAfterPurchase),
+          addDays(purchaseDate, redemption.earliestDaysAfterPurchase + 1),
         ) < 0
       ) {
         return "TOO_EARLY";

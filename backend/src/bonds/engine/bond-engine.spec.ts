@@ -528,7 +528,7 @@ describe("valueBondLot: refusals of the input", () => {
 });
 
 describe("valueBondLot: early redemption window", () => {
-  it("opens 7 days after purchase", () => {
+  it("opens on the 8th day after purchase (the sale day is not counted)", () => {
     const day6 = tos("2026-10-21");
     expect(day6).toMatchObject({
       earlyRedemptionValue: null,
@@ -536,6 +536,10 @@ describe("valueBondLot: early redemption window", () => {
     });
     expect(day6.grossValue).not.toBeNull();
     expect(tos("2026-10-22")).toMatchObject({
+      earlyRedemptionValue: null,
+      earlyRedemptionRefusal: "TOO_EARLY",
+    });
+    expect(tos("2026-10-23")).toMatchObject({
       earlyRedemptionValue: "100.00",
       earlyRedemptionRefusal: null,
     });

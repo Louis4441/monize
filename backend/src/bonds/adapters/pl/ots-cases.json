@@ -80,13 +80,26 @@
       }
     },
     {
-      "id": "OTS-T1",
-      "description": "OTS0127 day 7 after purchase is allowed",
+      "id": "OTS-T0b",
+      "description": "OTS0127 day 7 after purchase is still too early (the sale day is not counted)",
       "lot": {
         "purchaseDate": "2026-10-15",
         "quantity": 1
       },
       "asOf": "2026-10-22",
+      "expect": {
+        "earlyRedemptionValue": null,
+        "earlyRedemptionRefusal": "TOO_EARLY"
+      }
+    },
+    {
+      "id": "OTS-T1",
+      "description": "OTS0127 day 8 after purchase is allowed",
+      "lot": {
+        "purchaseDate": "2026-10-15",
+        "quantity": 1
+      },
+      "asOf": "2026-10-23",
       "expect": {
         "earlyRedemptionValue": "100.00",
         "earlyRedemptionRefusal": null

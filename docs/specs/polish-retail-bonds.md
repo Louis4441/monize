@@ -245,7 +245,8 @@ the face value.
 
 ### 2.5 Early redemption window
 
-A request is possible from 7 calendar days after the purchase date to 20
+A request is possible from the 8th day after the purchase date
+(`purchaseDate + 8`; the sale day is not counted, Civil Code art. 111 par. 2) to 20
 calendar days before maturity (para 21 / 23 / 25). ROR and COI also exclude
 the record day (the 5th business day before a coupon date). Outside the
 window `earlyRedemptionValue` is `null` and `earlyRedemptionRefusal` names the
@@ -539,8 +540,10 @@ the daily fan-out):
 1. Rounding mode is half-up (section 2.4).
 2. The CPI used for a period starting in month M is the final figure for
    M - 2 (section 2.2).
-3. "After seven calendar days" allows a request on `purchaseDate + 7`
-   (section 2.5).
+3. "After seven calendar days" allows a request on `purchaseDate + 8`
+   (section 2.5). Decided 2026-10-11: `purchaseDate + N + 1`, the sale day not
+   counted (Civil Code art. 111 par. 2); `earliestDaysAfterPurchase` keeps the
+   letter's N.
 4. Polish statutory holidays include 24 December from 2025 on.
 
 Each one is to be checked against a rate table or an early redemption
@@ -567,7 +570,7 @@ Evidence collected on 2026-10-11 (supporting, not a confirmation):
 - 3: the letters say "not earlier than after seven calendar days from the sale
   date". Under Civil Code art. 111 §2 the sale day is not counted, which reads
   as a first request on `purchaseDate + 8`. No published dated example was
-  found; still open.
+  found; decided by the owner on 2026-10-11 in favour of the Civil Code reading.
 - 4: the letters refer to statutory days off; 24 December is one from 2025
   (Dz.U. 2024 poz. 1965). QuantLib's Polish settlement calendar does not have
   it yet.
@@ -586,7 +589,7 @@ Evidence collected on 2026-10-11 (supporting, not a confirmation):
 | Scenarios (13.3) | unit | E25: values -0.5 and 1.0 accepted (inclusive), 7 values and 1.0001 refused, a foreign benchmark refused with 400; known periods stay known; every figure `null` with a `refusal` when lots cannot be derived |
 | Scenarios (13.3) | integration | route `/scenarios` and `assume=` on valuation, owner-scoped (another user's security answers 404) |
 | Chart (13.4) | unit | cumulative interest ends at the rate schedule's total; projected periods flagged; no interest computed in the client |
-| Window | unit | day 6 and 7 after purchase, 21 and 20 days before maturity, ROR record day |
+| Window | unit | day 7 and 8 after purchase, 21 and 20 days before maturity, ROR record day |
 | Terms parsing | unit | a valid document per Polish manifest; unknown field, number instead of string, unknown primitive (`UNSUPPORTED_PRIMITIVE`) refused; unknown calendar or benchmark id reported as missing data |
 | Country-agnostic engine | guard | no domain or engine file imports an adapter or names a country or product literal (section 2.0) |
 | Immutability | integration | update and delete of a terms version, of an announced rate and of an instrument raise; a stored version stored again with differing content is a conflict and changes nothing |
