@@ -42,23 +42,47 @@ version is rebuilt (demo only).
 `investment_transactions.bond_instrument_id` (nullable, `ON DELETE RESTRICT`):
 the series a share-moving row of a program-linked security acts on.
 
-- **Acquisition** (`BUY`, `REINVEST`, `ADD_SHARES`, an unpaired
-  `TRANSFER_IN`): the series is the one given, or, when none is given, the
-  program's series whose stored `saleWindow` contains the transaction date
-  (exactly one exists for a Polish program). The server stores the resolved id.
-  A given series must belong to the security's program (`SERIES_NOT_IN_PROGRAM`);
-  no stored series covering the date is `SERIES_NOT_DETERMINED` with the date
-  and program, and the message says to fetch the series. Both refusals run in
-  the write's own transaction, before anything is written.
+- **Acquisition with a purchase date of its own** (`BUY`, `REINVEST`): the
+  series is the one given, or, when none is given, the program's series whose
+  stored `saleWindow` contains the transaction date (exactly one exists for a
+  Polish program). The server stores the resolved id.
+- **Acquisition without one** (`ADD_SHARES`, an unpaired `TRANSFER_IN`): the
+  date is the transfer's or the grant's, not a purchase date, so the series is
+  never inferred from it. It must be named (`SERIES_REQUIRED`).
+- A given series must belong to the security's program
+  (`SERIES_NOT_IN_PROGRAM`); no stored series covering the date of a BUY or
+  REINVEST is `SERIES_NOT_DETERMINED` with the date and program, and the
+  message says to fetch the series. These refusals run in the write's own
+  transaction, before anything is written.
 - **Removal** (`SELL`, `REDEEM`, `REMOVE_SHARES`, an unpaired `TRANSFER_OUT`):
   the series is optional. Given, the quantity leaves that series' lots of the
   row's account first-in first-out; absent, it leaves the account's lots
-  first-in first-out across series. A given series the account does not hold
-  enough of makes the lots unknown (`REMOVAL_EXCEEDS_SERIES`), as an
-  over-removal does today.
+  first-in first-out across series. A removal the account does not cover (of the
+  named series: `REMOVAL_EXCEEDS_SERIES`; at all: `OVER_REMOVAL`) is refused
+  at write time: after the mutation, in the write's transaction, the lots are
+  derived over the security's whole ledger and the write is rolled back when the
+  derivation is refused now and was derivable before the write, or the refusal
+  names a written row. A refusal that already existed about another row does
+  not block an unrelated edit (`BondWriteGuard`).
+- **An edit keeps what it does not change.** A form resends every field, so on
+  update the series is resolved only when a different one is requested or the
+  action, date or security changed; otherwise the stored value, NULL included,
+  stays. Undo and redo put the snapshot's series back exactly, never inferred
+  (a series outside the security's current program is stored as NULL). A split
+  parent's edit recreates its embedded investment rows: a recreated row that
+  names no series keeps its predecessor's, matched on security, action,
+  quantity and date because a split stores no position among its siblings.
+- **Imports** (QIF/OFX, Money) name no series. A BUY or REINVEST takes the
+  series on sale on its date; any other acquisition, or one with none on sale,
+  is stored with NULL and counted (`bondRowsWithoutSeries` in the result, absent
+  when zero), and the lots refuse with `SERIES_NOT_DETERMINED` naming the row
+  rather than the import dropping it. A removal the file leaves uncovered
+  refuses the import as a whole (the guard runs once per file, which is not in
+  date order). The program of a security is looked up once per import run.
 - **Paired transfers** move lots with their series and purchase dates.
 - Every write path sets it the same way: the UI service, bulk, AI action, MCP,
-  import, undo/redo (the snapshot carries the column).
+  import, undo/redo (the snapshot carries the column), and every one runs the
+  write guard.
 
 A security that is not program-linked never has the column set (refused).
 
@@ -77,10 +101,43 @@ reads it; a series that does not read it is unchanged.
 page and in the form. The daily series cron fetches the current offer and runs
 the backfill only for the programs that at least one security has switched
 on (read in the cron's system context; it reads program ids, never anything
-else of the user). Without it, a series enters the catalog by the curated
-seed, by a fetch from the purchase form, or by the "fetch the current offer
+else of the user). Without it, a series enters the catalog by a fetch from
+the purchase form, or by the "fetch the current offer
 now" action of the bonds view (user-initiated, throttled like the series
 fetch).
+
+The cron's filter is by design: the owner asked for an opt-in, so a program
+nobody switched on is never fetched in the background. Without any opt-in the
+offer and history views show only the series already stored, and the purchase
+form offers the fetch when no stored series covers the date.
+
+After any series is stored (a fetch, the offer fetch, the cron, the backfill,
+an administrator's entry) the engine prices of the securities linked to its
+program are recomputed after the commit (INV-CACHE-001), because a BUY or
+REINVEST recorded before the series existed is read as the series on sale on
+its date and only now resolves to a lot.
+
+### 2.6 Nothing country-specific without a user
+
+Requested by the owner on 2026-10-11: not every deployment wants Polish bonds,
+so none acts on them until a person does.
+
+- An adapter carries **product templates**, not series: the structure of each
+  product (schedule, accrual, principal rule, rate rule type and observation,
+  capitalization, redemption window, blackouts, floor, rounding), without any
+  per-series value (first-period rate, margin or spread, fee, sale window,
+  series code, source). The curated October 2026 manifests move to test
+  fixtures; the series fetch and the manual entry fill a template.
+- The boot seed stores the adapters' **programs** only (no series, no network),
+  so the security form can offer them. A program's currency is created
+  inactive, as before.
+- The benchmark refresh (NBP, GUS) runs, at boot and on its cron, only for the
+  benchmarks a **stored series** reads; with no stored Polish series nothing is
+  fetched. When a series is stored and a benchmark it reads has never been
+  fetched, that benchmark is refreshed after the commit, so the first valuation
+  has its observations.
+- A deployment where nobody adds a Polish bond therefore sends no request to
+  obligacjeskarbowe.pl, NBP or GUS.
 
 ## 3. Views
 
@@ -135,14 +192,33 @@ For a program-linked security, from top:
 - `POST /bonds/offer/fetch` `{ countryCode }`: fetch every series of the current
   offer that is not stored (throttled, 2 a minute per user).
 - Security DTOs: `bondProgramId` and `bondAutoFetch` replace `bondInstrumentId`.
+- `GET /bonds/securities/:securityId/series-on-sale?date=YYYY-MM-DD` answers
+  `{ instrumentId, seriesCode }`, or the JSON literal `null` when no single stored
+  series was on sale that day: the series the server would infer for a BUY or
+  REINVEST on that date (the same `seriesOnSaleSql` as the write). 404 for
+  another user's or an unlinked security.
+- `GET /bonds/securities/:securityId/series-holdings?accountId=<uuid>&date=YYYY-MM-DD[&excludeTransactionId=<uuid>]`
+  answers `{ holdings: [{ instrumentId, seriesCode, quantity }] }`: the series
+  `accountId` holds on that date (the lot derivation over the rows up to and
+  including it, without `excludeTransactionId`, the row being edited), oldest lot
+  first, quantity above zero only. Lots that cannot be derived are a 422 whose
+  `errorCode` is the refusal code. 404 as above.
+- Error codes of a transaction write: `SERIES_NOT_IN_PROGRAM`,
+  `SERIES_NOT_DETERMINED`, `SERIES_NOT_ALLOWED`, `SERIES_REQUIRED`,
+  `REMOVAL_EXCEEDS_SERIES`, `OVER_REMOVAL` (400, `errorCode`, translated under
+  `errors.bonds`).
+- The import result carries `bondRowsWithoutSeries` when above zero.
 
 ## 5. Invariants
 
 - INV-BOND-005 unchanged in meaning (engine price per security, now blended
   over series).
-- INV-BOND-007 (new): every share-moving row of a program-linked security
-  names a series of that program; an acquisition's series is resolved and
-  stored by the server, never trusted from a client without the program check.
+- INV-BOND-007 (refined): every share-moving row of a program-linked security
+  names a series of that program, or the ledger says which does not. A BUY or
+  REINVEST is inferred from its date; `TRANSFER_IN` (unpaired) and `ADD_SHARES`
+  name the series; a removal is checked at write time; an import may store NULL
+  and the lots name such a row. The server resolves and stores the series, never
+  trusted from a client without the program check.
 
 ## 6. Test matrix
 
@@ -150,7 +226,8 @@ For a program-linked security, from top:
 | --- | --- | --- |
 | Migration | schema | `verify-schema.sh` no-op; programs and both columns present; FKs RESTRICT; immutability trigger on programs |
 | Link | unit, integration | program link checks (exists, BOND, currency, price range across series); auto-fetch default false |
-| Series on write | unit, integration | acquisition inferred from the date, explicit accepted, foreign program refused, no series refused before writing; removal with and without series; every entry point (UI service, bulk, AI, MCP, import, undo) |
+| Series on write | unit, integration | BUY/REINVEST inferred from the date, explicit accepted, foreign program refused, no series refused before writing; ADD_SHARES and unpaired TRANSFER_IN refused without one; removal with and without series, refused when uncovered (rolled back); an edit keeps the stored series; undo restores it exactly; a split parent edit keeps the embedded rows' series; every entry point (UI service, bulk, AI, MCP, import, undo) |
+| Series endpoints | unit, integration | series-on-sale (found, none, foreign security 404); series-holdings (per account, date, excluded row, refused 422) |
 | Lots | unit | two series in one account; removal by series; FIFO across series; paired transfer keeps series; over-removal of a series |
 | Valuation, prices | unit, integration | two series valued by their own terms; blend; scenarios per series; recompute after a write |
 | Auto-fetch | unit | cron fetches only programs switched on; off by default |

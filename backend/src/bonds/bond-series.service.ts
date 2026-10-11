@@ -23,6 +23,7 @@ import {
 } from "./bond-adapter";
 import { INSTALLED_BOND_ADAPTERS } from "./bond-adapters";
 import { BondCatalogService } from "./bond-catalog.service";
+import { BondPriceService } from "./bond-price.service";
 import { bondInstrumentId } from "./bond-instrument-id";
 import { BondInstrumentSummary } from "./bond-valuation.service";
 import { BondTermsError, parseBondTerms } from "./domain/bond-terms";
@@ -137,6 +138,7 @@ export class BondSeriesService {
     private readonly http: SeriesHttp,
     private readonly health: ProviderHealthService,
     private readonly fetchSync: FetchSyncService,
+    private readonly prices: BondPriceService,
   ) {}
 
   /**
@@ -145,6 +147,30 @@ export class BondSeriesService {
    * fetch, stored. Needs an ambient identity, like any database access.
    */
   async fetchSeries(
+    countryCode: string,
+    seriesCode: string,
+    options: SeriesRequestOptions = {},
+  ): Promise<BondSeriesResult> {
+    const result = await this.fetchAndStore(countryCode, seriesCode, options);
+    await this.afterStored([result]);
+    return result;
+  }
+
+  /**
+   * The engine prices of the securities of the program of every series this
+   * call stored are recomputed once the store has committed (INV-CACHE-001): a
+   * row recorded before its series existed resolves to a lot only now.
+   */
+  private async afterStored(
+    results: ReadonlyArray<Pick<BondSeriesResult, "id" | "created">>,
+  ): Promise<void> {
+    await this.prices.recomputeLinkedSecuritiesOfSeries(
+      results.filter((r) => r.created).map((r) => r.id),
+    );
+  }
+
+  /** `fetchSeries` without the recompute: a pass that stores many series recomputes once. */
+  private async fetchAndStore(
     countryCode: string,
     seriesCode: string,
     options: SeriesRequestOptions = {},
@@ -196,7 +222,9 @@ export class BondSeriesService {
     } catch (error) {
       throw this.named(error, country, series);
     }
-    return this.store(entry, country, series);
+    const result = await this.store(entry, country, series);
+    await this.afterStored([result]);
+    return result;
   }
 
   /**
@@ -355,6 +383,7 @@ export class BondSeriesService {
     let stored = 0;
     let alreadyStored = 0;
     let failed = 0;
+    const storedNow: BondSeriesResult[] = [];
     for (const adapter of options.adapters ?? INSTALLED_BOND_ADAPTERS) {
       const providerId = adapter.seriesProviderId;
       if (!adapter.currentSeries || !adapter.fetchSeries || !providerId)
@@ -377,10 +406,11 @@ export class BondSeriesService {
       listed += inScopeCodes.length;
       for (const code of inScopeCodes) {
         try {
-          const result = await this.fetchSeries(adapter.countryCode, code, {
+          const result = await this.fetchAndStore(adapter.countryCode, code, {
             ...options,
             adapters: [adapter],
           });
+          storedNow.push(result);
           if (result.created) stored += 1;
           else alreadyStored += 1;
         } catch (error) {
@@ -393,6 +423,7 @@ export class BondSeriesService {
         }
       }
     }
+    await this.afterStored(storedNow);
     this.logger.log(
       `Bond series check: ${listed} listed, ${stored} stored, ${alreadyStored} already stored, ${failed} failed`,
     );
@@ -417,6 +448,7 @@ export class BondSeriesService {
     let notPublished = 0;
     let failed = 0;
     let stoppedEarly = false;
+    const storedNow: BondSeriesResult[] = [];
     for (const adapter of options.adapters ?? INSTALLED_BOND_ADAPTERS) {
       const providerId = adapter.seriesProviderId;
       if (!adapter.backfillCodes || !adapter.fetchSeries || !providerId)
@@ -437,10 +469,11 @@ export class BondSeriesService {
         // just spoken to the same host.
         await sleep(BACKFILL_GAP_MS);
         try {
-          const result = await this.fetchSeries(adapter.countryCode, code, {
+          const result = await this.fetchAndStore(adapter.countryCode, code, {
             ...options,
             adapters: [adapter],
           });
+          storedNow.push(result);
           if (result.created) stored += 1;
           else alreadyStored += 1;
         } catch (error) {
@@ -460,6 +493,7 @@ export class BondSeriesService {
         }
       }
     }
+    await this.afterStored(storedNow);
     this.logger.log(
       `Bond series backfill: ${candidates} candidates, ${alreadyStored} already stored, ${stored} stored, ` +
         `${notPublished} not published, ${failed} failed${stoppedEarly ? ", stopped on an unavailable source" : ""}`,

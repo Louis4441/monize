@@ -562,7 +562,11 @@
     "programCodeInvalid": "programCode deve contenere da 1 a 12 lettere maiuscole o cifre",
     "SERIES_NOT_IN_PROGRAM": "La serie {{ series }} non appartiene al programma obbligazionario di questo titolo ({{ program }})",
     "SERIES_NOT_DETERMINED": "Non è stato possibile determinare la serie di questo acquisto {{ program }} del {{ date }}: nessuna singola serie memorizzata del programma era in vendita quel giorno. Recupera la serie dalla fonte ufficiale e sceglila per la transazione.",
-    "SERIES_NOT_ALLOWED": "Una serie obbligazionaria può essere indicata solo per una transazione che sposta quote di un titolo collegato a un programma obbligazionario"
+    "SERIES_NOT_ALLOWED": "Una serie obbligazionaria può essere indicata solo per una transazione che sposta quote di un titolo collegato a un programma obbligazionario",
+    "REMOVAL_EXCEEDS_SERIES": "Un prelievo di {{ quantity }} obbligazioni il {{ date }} indica una serie di cui il conto detiene meno in quella data. Scegli una serie che il conto detiene, oppure lascia vuota la serie per prelevare prima le obbligazioni più vecchie.",
+    "OVER_REMOVAL": "Un prelievo di {{ quantity }} obbligazioni il {{ date }} supera il numero di obbligazioni che il conto detiene in quella data.",
+    "SERIES_REQUIRED": "Indica la serie obbligazionaria di queste quote: {{ action }} non ha una data di acquisto propria da cui ricavarla.",
+    "lotsRefused": "I lotti obbligazionari di questo titolo non possono essere determinati ({{ code }}: {{ action }} il {{ date }}). Correggi o elimina quella transazione."
   },
   "securities": {
     "bondPricedByEngine": "Questo titolo è collegato a uno strumento obbligazionario ed è valutato dal motore obbligazionario, non da un fornitore di quotazioni. Usa invece Ricalcola i prezzi.",

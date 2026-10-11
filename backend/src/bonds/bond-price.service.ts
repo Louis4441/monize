@@ -275,6 +275,55 @@ export class BondPriceService {
   }
 
   /**
+   * After the commit of a series that was stored (a fetch, the current offer, the
+   * backfill, an administrator's entry): the engine prices of every security,
+   * of every user, linked to a program of these series are recomputed, because a
+   * BUY or REINVEST recorded before the series existed is read as the series on
+   * sale on its date and its lot only now resolves (INV-CACHE-001: after the
+   * commit, never inside it). Reads the securities across users in a system
+   * context (ids and owners only) and recomputes each under its owner's. A
+   * failure is logged and never thrown: the series is stored, and the daily job
+   * and the recompute route repair a price.
+   */
+  async recomputeLinkedSecuritiesOfSeries(
+    instrumentIds: readonly string[],
+  ): Promise<void> {
+    const ids = [...new Set(instrumentIds)];
+    if (ids.length === 0) return;
+    try {
+      const linked: Array<{ id: string; user_id: string }> =
+        await withSystemContext(() =>
+          withScopedDb(this.dataSource, (m) =>
+            m.query(
+              `SELECT s.id, s.user_id
+                 FROM securities s
+                WHERE s.bond_program_id IN (
+                        SELECT bond_program_id FROM bond_instruments
+                         WHERE id = ANY($1::uuid[]))
+                ORDER BY s.user_id, s.id`,
+              [ids],
+            ),
+          ),
+        );
+      const byUser = new Map<string, string[]>();
+      for (const row of linked) {
+        byUser.set(row.user_id, [...(byUser.get(row.user_id) ?? []), row.id]);
+      }
+      for (const [userId, securityIds] of byUser) {
+        await withUserContext(userId, () =>
+          this.recomputeLinkedSecurities(userId, securityIds),
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Bond price recompute after a stored series failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  /**
    * The security stops being priced by the engine (unlinked, or linked to another
    * instrument): delete its `bond_engine` rows in the caller's transaction, under
    * the recompute lock so an in-flight recompute of the old link cannot write
@@ -380,7 +429,11 @@ export class BondPriceService {
         announcedRates: reference.announcedRates,
         benchmarks: reference.benchmarks,
         calendars: BOND_CALENDARS,
-        lot: { purchaseDate: lot.purchaseDate, quantity: lot.quantity },
+        lot: {
+          purchaseDate: lot.purchaseDate,
+          quantity: lot.quantity,
+          purchaseDateAssumed: lot.purchaseDateAssumed,
+        },
         days,
       });
       grossOf.set(

@@ -1,11 +1,17 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { BadRequestException } from "@nestjs/common";
 import { EntityManager } from "typeorm";
 import {
   clearForeignSeries,
   clearForeignSeriesOfUser,
   findSeriesOfProgram,
+  infersSeriesFromDate,
   inferSeriesForDate,
+  programOfSecurity,
+  resolveImportedSeries,
   resolveTransactionSeries,
+  restoredSeries,
   seriesCodeOf,
   seriesOnSaleSql,
   seriesRoleOf,
@@ -410,5 +416,242 @@ describe("clearing the series a link change leaves behind (INV-BOND-007)", () =>
       /JOIN bond_instruments i ON i\.bond_program_id = s\.bond_program_id/,
     );
     expect(params).toEqual([USER]);
+  });
+});
+
+describe("an acquisition with no purchase date of its own (INV-BOND-007)", () => {
+  it.each(["ADD_SHARES", "TRANSFER_IN"])(
+    "%s must name its series (SERIES_REQUIRED), and is never inferred from its date",
+    async (action) => {
+      const { manager, query } = fakeManager({ onSale: [EDO] });
+      await expect(
+        resolveTransactionSeries(manager, USER, write({ action })),
+      ).rejects.toMatchObject({ response: { errorCode: "SERIES_REQUIRED" } });
+      // The date was never even asked about.
+      expect(query.mock.calls.some(([sql]) => sql.includes("saleWindow"))).toBe(
+        false,
+      );
+    },
+  );
+
+  it("accepts a series it names, and refuses one of another program", async () => {
+    const { manager } = fakeManager();
+    await expect(
+      resolveTransactionSeries(
+        manager,
+        USER,
+        write({ action: "ADD_SHARES", bondInstrumentId: COI }),
+      ),
+    ).resolves.toBe(COI);
+    await expect(
+      resolveTransactionSeries(
+        manager,
+        USER,
+        write({
+          action: "ADD_SHARES",
+          bondInstrumentId: "99999999-9999-5999-8999-999999999999",
+        }),
+      ),
+    ).rejects.toMatchObject({
+      response: { errorCode: "SERIES_NOT_IN_PROGRAM" },
+    });
+  });
+
+  it("an unpaired TRANSFER_IN is one of them; the in-leg of a pair names none", async () => {
+    const { manager } = fakeManager();
+    await expect(
+      resolveTransactionSeries(
+        manager,
+        USER,
+        write({ action: "TRANSFER_IN", pairedTransfer: true }),
+      ),
+    ).resolves.toBeNull();
+  });
+
+  it("only BUY and REINVEST (and their refinements) are inferred from the date", () => {
+    expect(
+      ["BUY", "REINVEST", "REINVEST_INTEREST"].every(infersSeriesFromDate),
+    ).toBe(true);
+    expect(
+      ["ADD_SHARES", "TRANSFER_IN", "SELL", "DIVIDEND"].some(
+        infersSeriesFromDate,
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("keepStored: an edit that changes nothing the series depends on", () => {
+  it("returns the stored value as it is, NULL included, without a query, for every acquisition", async () => {
+    const { manager, query } = fakeManager({ onSale: [] });
+    for (const action of ["BUY", "ADD_SHARES", "TRANSFER_IN", "SELL"]) {
+      await expect(
+        resolveTransactionSeries(
+          manager,
+          USER,
+          write({
+            action,
+            keepStored: true,
+            requested: false,
+            bondInstrumentId: null,
+          }),
+        ),
+      ).resolves.toBeNull();
+    }
+    await expect(
+      resolveTransactionSeries(
+        manager,
+        USER,
+        write({
+          keepStored: true,
+          requested: false,
+          // Not in the program any more: kept, neither refused nor re-resolved.
+          bondInstrumentId: "99999999-9999-5999-8999-999999999999",
+        }),
+      ),
+    ).resolves.toBe("99999999-9999-5999-8999-999999999999");
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("is not a way to name a series by code: a code is still a request", async () => {
+    const { manager } = fakeManager();
+    await expect(
+      resolveTransactionSeries(
+        manager,
+        USER,
+        write({
+          keepStored: true,
+          requested: false,
+          bondSeriesReference: "coi1030",
+        }),
+      ),
+    ).resolves.toBe(COI);
+  });
+});
+
+describe("restoredSeries (undo and redo put the snapshot's series back exactly)", () => {
+  it("returns the snapshot's series when the security's program holds it, and never infers", async () => {
+    const query = jest.fn(async (..._args: unknown[]) => [{ "?column?": 1 }]);
+    const manager = { query } as unknown as EntityManager;
+    await expect(restoredSeries(manager, USER, SECURITY, EDO)).resolves.toBe(
+      EDO,
+    );
+    expect(query.mock.calls[0][1]).toEqual([SECURITY, USER, EDO]);
+    expect(String(query.mock.calls[0][0])).not.toContain("saleWindow");
+  });
+
+  it("stores NULL for a series outside the program, an unlinked security, a missing series or a value that is not an id", async () => {
+    const none = { query: jest.fn(async () => []) } as unknown as EntityManager;
+    await expect(restoredSeries(none, USER, SECURITY, EDO)).resolves.toBeNull();
+    for (const [security, series] of [
+      [null, EDO],
+      [SECURITY, null],
+      [SECURITY, undefined],
+      [SECURITY, "EDO1036; DROP TABLE"],
+      [SECURITY, 7],
+    ] as const) {
+      const query = jest.fn(async () => [{ "?column?": 1 }]);
+      await expect(
+        restoredSeries(
+          { query } as unknown as EntityManager,
+          USER,
+          security,
+          series,
+        ),
+      ).resolves.toBeNull();
+      expect(query).not.toHaveBeenCalled();
+    }
+  });
+});
+
+describe("resolveImportedSeries (a file names no series)", () => {
+  const row = (over: Record<string, unknown> = {}) => ({
+    securityId: SECURITY,
+    action: "BUY",
+    transactionDate: "2026-10-15",
+    ...over,
+  });
+
+  it("takes the series on sale for a BUY or REINVEST, and reports none unresolved", async () => {
+    const { manager } = fakeManager();
+    await expect(
+      resolveImportedSeries(manager, USER, row(), new Map()),
+    ).resolves.toEqual({ id: EDO, unresolved: false });
+  });
+
+  it("stores NULL and reports the row when none was on sale, instead of refusing", async () => {
+    const { manager } = fakeManager({ onSale: [] });
+    await expect(
+      resolveImportedSeries(manager, USER, row(), new Map()),
+    ).resolves.toEqual({ id: null, unresolved: true });
+  });
+
+  it("never infers an ADD_SHARES or an unpaired TRANSFER_IN; a paired leg, a removal and a cash action are not unresolved", async () => {
+    const { manager } = fakeManager();
+    const cache = new Map();
+    for (const action of ["ADD_SHARES", "TRANSFER_IN"]) {
+      await expect(
+        resolveImportedSeries(manager, USER, row({ action }), cache),
+      ).resolves.toEqual({ id: null, unresolved: true });
+    }
+    for (const over of [
+      { action: "TRANSFER_IN", pairedTransfer: true },
+      { action: "SELL" },
+      { action: "DIVIDEND" },
+    ]) {
+      await expect(
+        resolveImportedSeries(manager, USER, row(over), cache),
+      ).resolves.toEqual({ id: null, unresolved: false });
+    }
+  });
+
+  it("an unlinked security, or a row with no security, is never unresolved", async () => {
+    const { manager } = fakeManager({ program: null });
+    await expect(
+      resolveImportedSeries(manager, USER, row(), new Map()),
+    ).resolves.toEqual({ id: null, unresolved: false });
+    await expect(
+      resolveImportedSeries(
+        manager,
+        USER,
+        row({ securityId: null }),
+        new Map(),
+      ),
+    ).resolves.toEqual({ id: null, unresolved: false });
+  });
+
+  it("looks the program up once per security however many rows follow", async () => {
+    const { manager, query } = fakeManager();
+    const cache = new Map();
+    for (let i = 0; i < 5; i++) {
+      await resolveImportedSeries(manager, USER, row(), cache);
+    }
+    expect(
+      query.mock.calls.filter(([sql]) =>
+        sql.includes("s.bond_program_id AS id"),
+      ),
+    ).toHaveLength(1);
+  });
+});
+
+describe("programOfSecurity", () => {
+  it("memoizes a security that is not linked as well as one that is", async () => {
+    const { manager, query } = fakeManager({ program: null });
+    const cache = new Map();
+    await expect(
+      programOfSecurity(manager, USER, SECURITY, cache),
+    ).resolves.toBeNull();
+    await programOfSecurity(manager, USER, SECURITY, cache);
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the UUID check (one definition)", () => {
+  it("uses the shared UUID_REGEX, not a private pattern", () => {
+    const source = readFileSync(
+      join(__dirname, "bond-series-resolver.ts"),
+      "utf8",
+    );
+    expect(source).toContain("UUID_REGEX");
+    expect(source).not.toMatch(/UUID_PATTERN|\[0-9a-f\]\{8\}/);
   });
 });

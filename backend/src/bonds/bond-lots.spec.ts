@@ -565,3 +565,32 @@ describe("bondLotsFromTransactions (spec 12.2 truth table)", () => {
     });
   });
 });
+
+describe("a refusal names the row that caused it (the write guard compares it with the row it wrote)", () => {
+  it("carries the row's id when the caller supplied ids, and none when it did not", () => {
+    const withIds = bondLotsFromTransactions([
+      {
+        id: "s1",
+        action: "SELL",
+        status: "UNRECONCILED",
+        transactionDate: "2026-02-01",
+        quantity: "3",
+        pairedTransfer: false,
+      },
+    ]);
+    expect(withIds.refusal).toMatchObject({
+      code: "OVER_REMOVAL",
+      rowId: "s1",
+    });
+    const withoutIds = bondLotsFromTransactions([
+      {
+        action: "SELL",
+        status: "UNRECONCILED",
+        transactionDate: "2026-02-01",
+        quantity: "3",
+        pairedTransfer: false,
+      },
+    ]);
+    expect(withoutIds.refusal).not.toHaveProperty("rowId");
+  });
+});

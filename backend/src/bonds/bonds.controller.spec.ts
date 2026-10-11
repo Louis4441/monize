@@ -24,6 +24,7 @@ import {
   BondDataInconsistentError,
   BondDataNotFoundError,
 } from "./bond-errors";
+import { BondHoldingsService } from "./bond-holdings.service";
 import { BondPriceService } from "./bond-price.service";
 import { todayYMD } from "../common/date-utils";
 import { BondOfferService } from "./bond-offer.service";
@@ -54,6 +55,7 @@ describe("BondsController", () => {
     fetchOfferOf: jest.Mock;
   };
   let offers: { offer: jest.Mock; history: jest.Mock };
+  let holdings: { seriesOnSale: jest.Mock; seriesHoldings: jest.Mock };
 
   beforeEach(async () => {
     catalog = {
@@ -83,6 +85,10 @@ describe("BondsController", () => {
       offer: jest.fn().mockResolvedValue({ series: [] }),
       history: jest.fn().mockResolvedValue({ programs: [] }),
     };
+    holdings = {
+      seriesOnSale: jest.fn().mockResolvedValue(null),
+      seriesHoldings: jest.fn().mockResolvedValue({ holdings: [] }),
+    };
     const moduleRef = await Test.createTestingModule({
       controllers: [BondsController],
       providers: [
@@ -91,6 +97,7 @@ describe("BondsController", () => {
         { provide: BondValuationService, useValue: valuation },
         { provide: BondPriceService, useValue: prices },
         { provide: BondOfferService, useValue: offers },
+        { provide: BondHoldingsService, useValue: holdings },
       ],
     }).compile();
     controller = moduleRef.get(BondsController);
@@ -435,6 +442,99 @@ describe("BondsController", () => {
       );
       expect(pipesOf("recompute")).toEqual(
         expect.arrayContaining([["securityId", [ParseUUIDPipe.name]]]),
+      );
+    });
+  });
+
+  describe("the series endpoints of the transaction form", () => {
+    const ACCOUNT = "33333333-3333-4333-8333-333333333333";
+    const EXCLUDED = "44444444-4444-4444-8444-444444444444";
+    const pipesOf = (method: keyof BondsController) => {
+      const args = Reflect.getMetadata(
+        "__routeArguments__",
+        BondsController,
+        method as string,
+      ) as Record<string, { data: string; pipes: unknown[] }>;
+      return Object.values(args).map((a) => [
+        a.data,
+        a.pipes.map((p) =>
+          typeof p === "function" ? p.name : (p as object).constructor.name,
+        ),
+      ]);
+    };
+
+    it("GET series-on-sale answers the series as JSON, and the JSON literal null when none, for the JWT's user", async () => {
+      const res = { json: jest.fn() };
+      const found = { instrumentId: "i1", seriesCode: "EDO1036" };
+      holdings.seriesOnSale.mockResolvedValueOnce(found);
+      await controller.seriesOnSale(req, SECURITY, "2026-10-15", res as never);
+      expect(holdings.seriesOnSale).toHaveBeenCalledWith(
+        USER,
+        SECURITY,
+        "2026-10-15",
+      );
+      expect(res.json).toHaveBeenLastCalledWith(found);
+
+      holdings.seriesOnSale.mockResolvedValueOnce(null);
+      await controller.seriesOnSale(req, SECURITY, "2026-10-15", res as never);
+      expect(res.json).toHaveBeenLastCalledWith(null);
+    });
+
+    it("GET series-on-sale lets another user's or an unlinked security's 404 through", async () => {
+      holdings.seriesOnSale.mockRejectedValue(new NotFoundException("no"));
+      await expect(
+        controller.seriesOnSale(req, SECURITY, "2026-10-15", {
+          json: jest.fn(),
+        } as never),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("GET series-holdings passes the account, the date and the excluded row, and answers { holdings }", async () => {
+      const body = {
+        holdings: [{ instrumentId: "i1", seriesCode: "EDO1036", quantity: 4 }],
+      };
+      holdings.seriesHoldings.mockResolvedValue(body);
+      await expect(
+        controller.seriesHoldings(
+          req,
+          SECURITY,
+          ACCOUNT,
+          "2026-10-15",
+          EXCLUDED,
+        ),
+      ).resolves.toEqual(body);
+      expect(holdings.seriesHoldings).toHaveBeenCalledWith(
+        USER,
+        SECURITY,
+        ACCOUNT,
+        "2026-10-15",
+        EXCLUDED,
+      );
+    });
+
+    it("GET series-holdings lets the 422 of lots that cannot be derived through", async () => {
+      holdings.seriesHoldings.mockRejectedValue(
+        new UnprocessableEntityException({ errorCode: "OVER_REMOVAL" }),
+      );
+      await expect(
+        controller.seriesHoldings(req, SECURITY, ACCOUNT, "2026-10-15"),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    });
+
+    it("validates every parameter with a pipe", () => {
+      expect(pipesOf("seriesOnSale")).toEqual(
+        expect.arrayContaining([
+          ["securityId", [ParseUUIDPipe.name]],
+          ["date", ["ParseCalendarDatePipe"]],
+        ]),
+      );
+      expect(pipesOf("seriesHoldings")).toEqual(
+        expect.arrayContaining([
+          ["securityId", [ParseUUIDPipe.name]],
+          ["accountId", [ParseUUIDPipe.name]],
+          ["date", ["ParseCalendarDatePipe"]],
+          ["excludeTransactionId", [ParseUUIDPipe.name]],
+        ]),
       );
     });
   });

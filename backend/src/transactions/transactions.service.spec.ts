@@ -6598,7 +6598,7 @@ describe("TransactionsService", () => {
         // the locked row) and the touched-accounts set for the post-commit
         // net-worth fan-out. Neither is what this test pins down, but the status
         // is another committed-parent field so it is asserted precisely.
-        { parentStatus: TransactionStatus.UNRECONCILED },
+        { parentStatus: TransactionStatus.UNRECONCILED, carriedSeries: [] },
         expect.any(Set),
       );
     });

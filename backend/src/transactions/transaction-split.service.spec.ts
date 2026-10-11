@@ -1955,8 +1955,9 @@ describe("TransactionSplitService", () => {
         // The merged call also passes the parent's status option and the
         // touched-accounts set for the post-commit net-worth fan-out. This
         // fixture carries no status, so the option is { parentStatus: undefined };
-        // the set is incidental to what this test pins down.
-        { parentStatus: undefined },
+        // the set is incidental to what this test pins down. `carriedSeries` is
+        // the parent's embedded rows, read before the rebuild (none here).
+        { parentStatus: undefined, carriedSeries: [] },
         expect.any(Set),
       );
     });
@@ -2604,6 +2605,130 @@ describe("TransactionSplitService", () => {
 
       const investmentService = (service as any).investmentTransactionsService;
       expect(investmentService.createEmbeddedForSplit).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("the bond series of recreated embedded rows (INV-BOND-007)", () => {
+    const investment = (quantity: number, securityId = "sec-1") => ({
+      action: "BUY" as any,
+      securityId,
+      quantity,
+      price: 100,
+      commission: 0,
+    });
+
+    it("reads the parent's embedded rows before they are torn down and hands them to createSplits", async () => {
+      const transaction = { ...mockTransaction } as Transaction;
+      lockParent(transaction);
+      splitsRepository.find.mockResolvedValue([]);
+      mockQueryRunner.manager.query.mockImplementation((sql: string) =>
+        Promise.resolve(
+          typeof sql === "string" &&
+            sql.includes(
+              "JOIN transaction_splits ts ON ts.id = it.transaction_split_id",
+            )
+            ? [
+                {
+                  security_id: "sec-1",
+                  action: "BUY",
+                  quantity: "30.00000000",
+                  tx_date: "2026-03-20",
+                  bond_instrument_id: null,
+                },
+              ]
+            : [],
+        ),
+      );
+      const createSplits = jest.spyOn(service, "createSplits");
+      const deleteSideEffects = jest.spyOn(service, "deleteSplitSideEffects");
+
+      await service.updateSplits(
+        transaction,
+        [
+          { amount: -60, categoryId: "cat-1" },
+          { amount: -40, categoryId: "cat-2" },
+        ],
+        "user-1",
+      );
+
+      expect(createSplits.mock.calls[0][7]).toEqual({
+        parentStatus: undefined,
+        carriedSeries: [
+          {
+            securityId: "sec-1",
+            action: "BUY",
+            quantity: 30,
+            transactionDate: "2026-03-20",
+            bondInstrumentId: null,
+          },
+        ],
+      });
+      const readOrder = mockQueryRunner.manager.query.mock.calls.findIndex(
+        ([sql]: [string]) => String(sql).includes("it.transaction_split_id"),
+      );
+      expect(readOrder).toBeGreaterThanOrEqual(0);
+      expect(
+        mockQueryRunner.manager.query.mock.invocationCallOrder[readOrder],
+      ).toBeLessThan(deleteSideEffects.mock.invocationCallOrder[0]);
+    });
+
+    it("gives each recreated row the series of the row it replaces: same security, action, quantity and date, each predecessor once, NULL included", async () => {
+      accountsService.findOne.mockResolvedValueOnce({
+        id: "account-1",
+        accountSubType: "INVESTMENT_CASH",
+        linkedAccountId: "brokerage-1",
+      });
+      const carriedSeries = [
+        {
+          securityId: "sec-1",
+          action: "BUY",
+          quantity: 30,
+          transactionDate: "2026-05-09",
+          bondInstrumentId: "series-A",
+        },
+        {
+          securityId: "sec-1",
+          action: "BUY",
+          quantity: 30,
+          transactionDate: "2026-05-09",
+          bondInstrumentId: null,
+        },
+        {
+          // Another date: not the same split.
+          securityId: "sec-2",
+          action: "BUY",
+          quantity: 20,
+          transactionDate: "2026-01-01",
+          bondInstrumentId: "series-B",
+        },
+      ];
+
+      await service.createSplits(
+        "tx-1",
+        [
+          { amount: -3000, investment: investment(30) },
+          { amount: -3000, investment: investment(30) },
+          { amount: -2000, investment: investment(20, "sec-2") },
+          { amount: -3000, investment: investment(30) },
+        ],
+        "user-1",
+        "account-1",
+        new Date("2026-05-09"),
+        undefined,
+        undefined,
+        { carriedSeries },
+      );
+
+      const investmentService = (service as any).investmentTransactionsService;
+      const handed = investmentService.createEmbeddedForSplit.mock.calls.map(
+        (call: unknown[]) => call[9],
+      );
+      expect(handed).toEqual([
+        expect.objectContaining({ bondInstrumentId: "series-A" }),
+        expect.objectContaining({ bondInstrumentId: null }),
+        null,
+        null,
+      ]);
     });
   });
 

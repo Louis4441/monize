@@ -21,6 +21,7 @@ import {
 } from "@/bonds/bond-adapter";
 import { BondCatalogService } from "@/bonds/bond-catalog.service";
 import { bondInstrumentId } from "@/bonds/bond-instrument-id";
+import { BondPriceService } from "../../src/bonds/bond-price.service";
 import { BondSeriesService } from "@/bonds/bond-series.service";
 import { BondsController } from "@/bonds/bonds.controller";
 import { SeriesHttp } from "@/bonds/series-http";
@@ -78,6 +79,9 @@ describe("bond series fetch (integration, INV-BOND-006)", () => {
       { gated: () => door } as unknown as SeriesHttp,
       new ProviderHealthService(dataSource),
       new FetchSyncService(dataSource),
+      {
+        recomputeLinkedSecuritiesOfSeries: async () => undefined,
+      } as unknown as BondPriceService,
     );
 
   /** A request as a signed-in user makes it. */

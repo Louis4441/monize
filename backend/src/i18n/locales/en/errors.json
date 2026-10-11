@@ -562,7 +562,11 @@
     "programCodeInvalid": "programCode must be 1 to 12 capital letters or digits",
     "SERIES_NOT_IN_PROGRAM": "Series {{ series }} does not belong to the bond program of this security ({{ program }})",
     "SERIES_NOT_DETERMINED": "The series of this {{ program }} purchase on {{ date }} could not be determined: no single stored series of the program was on sale that day. Fetch the series from the official source and choose it for the transaction.",
-    "SERIES_NOT_ALLOWED": "A bond series can only be named for a share-moving transaction of a security linked to a bond program"
+    "SERIES_NOT_ALLOWED": "A bond series can only be named for a share-moving transaction of a security linked to a bond program",
+    "REMOVAL_EXCEEDS_SERIES": "A removal of {{ quantity }} bonds on {{ date }} names a series of which the account holds fewer on that date. Choose a series the account holds, or leave the series empty to take the oldest bonds first.",
+    "OVER_REMOVAL": "A removal of {{ quantity }} bonds on {{ date }} is larger than the number of bonds the account holds on that date.",
+    "SERIES_REQUIRED": "Name the bond series of these shares: {{ action }} has no purchase date of its own to infer it from.",
+    "lotsRefused": "The bond lots of this security cannot be derived ({{ code }}: {{ action }} on {{ date }}). Correct or remove that transaction."
   },
   "securities": {
     "bondPricedByEngine": "This security is linked to a bond instrument and is priced by the bond engine, not by a quote provider. Use Recalculate prices instead.",

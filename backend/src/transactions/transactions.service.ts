@@ -1,3 +1,4 @@
+import { readEmbeddedSeriesCarry } from "../bonds/embedded-series-carry";
 import {
   Injectable,
   NotFoundException,
@@ -2671,6 +2672,10 @@ export class TransactionsService {
             updateData.amount ?? locked.amount,
           );
 
+          // Read before the embedded rows are torn down: the recreated rows keep
+          // the bond series of the rows they replace (INV-BOND-007).
+          const carriedSeries = await readEmbeddedSeriesCarry(m, userId, id);
+
           // Both the delete of the old counterparts and the create of the new
           // ones touch accounts the parent never named; route them into the
           // set this method already invalidates after commit (recheck RR5-002).
@@ -2705,6 +2710,7 @@ export class TransactionsService {
               parentStatus:
                 (updateData.status as TransactionStatus | undefined) ??
                 ((locked.status ?? undefined) as TransactionStatus | undefined),
+              carriedSeries,
             },
             counterpartAccountIds,
           );

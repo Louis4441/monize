@@ -1411,15 +1411,39 @@ describe("ActionHistoryService", () => {
     describe("the bond series of a restored row (INV-BOND-007)", () => {
       const PROGRAM = "33333333-3333-5333-8333-333333333333";
       const SERIES = "11111111-1111-5111-8111-111111111111";
-      /** The resolver's statements; everything else answers nothing. */
+      /**
+       * The statements of the restore and of the write guard's ledger reads;
+       * everything else answers nothing. `ledgers` are the successive answers of
+       * the ledger read (before the write, after it); the last repeats.
+       */
       const bondWorld = (opts: {
         linked?: boolean;
         inProgram?: string[];
         onSale?: string[];
-      }) =>
-        mockQueryRunner.query.mockImplementation(
+        ledgers?: Array<Array<Record<string, unknown>>>;
+      }) => {
+        let ledgerReads = 0;
+        return mockQueryRunner.query.mockImplementation(
           async (sql: string, params: unknown[] = []) => {
             const text = String(sql);
+            if (text.includes("bond_auto_fetch")) {
+              return [
+                {
+                  id: "sec-1",
+                  user_id: userId,
+                  symbol: "EDO",
+                  currency_code: "PLN",
+                  bond_program_id: opts.linked === false ? null : PROGRAM,
+                  bond_auto_fetch: false,
+                },
+              ];
+            }
+            if (text.includes("counterpart_account_id")) {
+              const all = opts.ledgers ?? [[]];
+              const rows = all[Math.min(ledgerReads, all.length - 1)];
+              ledgerReads += 1;
+              return rows;
+            }
             if (text.includes("s.bond_program_id AS id")) {
               return [
                 opts.linked === false
@@ -1427,8 +1451,10 @@ describe("ActionHistoryService", () => {
                   : { id: PROGRAM, program_code: "EDO" },
               ];
             }
-            if (text.includes("id = $1::uuid AND bond_program_id")) {
-              return (opts.inProgram ?? []).includes(String(params[0]))
+            // restoredSeries: the snapshot's series, when it is in the program.
+            if (text.includes("JOIN bond_instruments i ON")) {
+              return opts.linked !== false &&
+                (opts.inProgram ?? []).includes(String(params[2]))
                 ? [{ "?column?": 1 }]
                 : [];
             }
@@ -1438,6 +1464,7 @@ describe("ActionHistoryService", () => {
             return [];
           },
         );
+      };
       const deleted = (before: Record<string, unknown>) => ({
         ...mockAction,
         entityType: "investment_transaction",
@@ -1476,22 +1503,86 @@ describe("ActionHistoryService", () => {
         expect((insert()![1] as unknown[])[15]).toBe(SERIES);
       });
 
-      it("infers the series of a legacy snapshot that carries none, from the date", async () => {
+      it("restores a snapshot that carries no series with NULL, never inferring one from the date", async () => {
         bondWorld({ onSale: [SERIES] });
         mockRepository.findOne.mockResolvedValue(deleted({}));
         mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
         await service.undo(userId);
-        expect((insert()![1] as unknown[])[15]).toBe(SERIES);
+        expect((insert()![1] as unknown[])[15]).toBeNull();
       });
 
-      it("refuses the undo, writing nothing, when no series can be resolved for the restored purchase", async () => {
+      it("never refuses an undo with SERIES_NOT_DETERMINED, even when no series covers the restored purchase's date", async () => {
         bondWorld({ onSale: [] });
         mockRepository.findOne.mockResolvedValue(deleted({}));
         mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
-        await expect(service.undo(userId)).rejects.toThrow(
-          /could not be determined/,
+        await expect(service.undo(userId)).resolves.toBeDefined();
+        expect((insert()![1] as unknown[])[15]).toBeNull();
+      });
+
+      it("restores a series the security's current program does not hold as NULL, for the ledger to report", async () => {
+        bondWorld({ inProgram: [] });
+        mockRepository.findOne.mockResolvedValue(
+          deleted({ bondInstrumentId: SERIES }),
         );
-        expect(insert()).toBeUndefined();
+        mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
+        await service.undo(userId);
+        expect((insert()![1] as unknown[])[15]).toBeNull();
+      });
+
+      it("refuses the undo of a delete after which a removal is not covered (OVER_REMOVAL), and does not reinsert past it", async () => {
+        const sell = {
+          id: "inv-1",
+          action: "SELL",
+          status: "UNRECONCILED",
+          tx_date: "2026-10-15",
+          quantity: "10",
+          account_id: "acc-1",
+          bond_instrument_id: null,
+          counterpart_account_id: null,
+        };
+        bondWorld({ ledgers: [[], [sell]] });
+        mockRepository.findOne.mockResolvedValue(deleted({ action: "SELL" }));
+        mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
+        await expect(service.undo(userId)).rejects.toMatchObject({
+          response: { errorCode: "OVER_REMOVAL" },
+        });
+      });
+
+      it("refuses the undo of a create (a delete) that leaves a later removal uncovered (REMOVAL_EXCEEDS_SERIES)", async () => {
+        const row = (over: Record<string, unknown>) => ({
+          id: "inv-1",
+          action: "BUY",
+          status: "UNRECONCILED",
+          tx_date: "2026-01-10",
+          quantity: "10",
+          account_id: "acc-1",
+          bond_instrument_id: SERIES,
+          counterpart_account_id: null,
+          ...over,
+        });
+        const sell = row({
+          id: "s1",
+          action: "SELL",
+          tx_date: "2026-02-01",
+          quantity: "8",
+        });
+        bondWorld({ ledgers: [[row({}), sell], [sell]] });
+        mockRepository.findOne.mockResolvedValue({
+          ...mockAction,
+          entityType: "investment_transaction",
+          action: "create",
+          entityId: "inv-1",
+        });
+        mockQueryRunner.manager.findOne.mockResolvedValue({
+          id: "inv-1",
+          accountId: "acc-1",
+          securityId: "sec-1",
+          linkedTransactionId: null,
+          transactionId: null,
+        });
+        await expect(service.undo(userId)).rejects.toMatchObject({
+          response: { errorCode: "REMOVAL_EXCEEDS_SERIES" },
+        });
       });
 
       it("restores a security that is no longer linked without the series", async () => {

@@ -8,6 +8,12 @@ import { ExactDecimal } from "./domain/exact-decimal";
  * exactly and never through a JavaScript number.
  */
 export interface BondLotTransaction {
+  /**
+   * The row's id, when the caller has one: a refusal then names the row that
+   * caused it (`BondLotsRefusal.rowId`), which the write guard compares with the
+   * row it has just written.
+   */
+  readonly id?: string;
   readonly action: string;
   readonly status: string;
   /** YYYY-MM-DD. */
@@ -32,8 +38,9 @@ export interface BondLotTransaction {
   /**
    * The series (bond instrument id) the row acts on
    * (`docs/specs/bond-program-securities.md` 2.3). An acquisition names the
-   * series its lot belongs to: `null` is a program-linked row with no stored
-   * series, which makes the lots unknown (`SERIES_NOT_DETERMINED`); `undefined`
+   * series its lot belongs to: `null` is a program-linked row with no series
+   * (none stored and, for a BUY or REINVEST, none inferable from its date), which
+   * makes the lots unknown (`SERIES_NOT_DETERMINED`); `undefined`
    * is a caller with no series to tell apart. A removal's series is optional:
    * given, the quantity leaves that series' lots, absent it leaves the
    * account's lots first-in first-out across series.
@@ -79,6 +86,8 @@ export interface BondLotsRefusalParams {
 
 export interface BondLotsRefusal {
   readonly code: BondLotsRefusalCode;
+  /** The id of the row that refused, when the caller supplied ids. */
+  readonly rowId?: string;
   /** Which row refused; a client renders its translated message from `code` and this. */
   readonly params: BondLotsRefusalParams;
   /**
@@ -153,6 +162,7 @@ const refuse = (
   lots: null,
   refusal: {
     code,
+    ...(row.id !== undefined ? { rowId: row.id } : {}),
     params: {
       action: baseInvestmentAction(row.action),
       date: row.transactionDate,

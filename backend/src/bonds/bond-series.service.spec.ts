@@ -18,6 +18,7 @@ import {
 } from "./bond-adapter";
 import { BondCatalogService, StoreOutcome } from "./bond-catalog.service";
 import { bondInstrumentId } from "./bond-instrument-id";
+import { BondPriceService } from "./bond-price.service";
 import {
   BACKFILL_GAP_MS,
   BackfillRun,
@@ -120,15 +121,18 @@ function build() {
     ),
   };
   manager.query.mockResolvedValue([]);
+  const prices = { recomputeLinkedSecuritiesOfSeries: jest.fn() };
   const service = new BondSeriesService(
     dataSource as unknown as DataSource,
     catalog as unknown as BondCatalogService,
     http as unknown as SeriesHttp,
     health as unknown as ProviderHealthService,
     fetchSync as unknown as FetchSyncService,
+    prices as unknown as BondPriceService,
   );
   return {
     service,
+    prices,
     catalog,
     http,
     health,
@@ -149,6 +153,103 @@ const refusal = async (
   }
   throw new Error("expected a refusal");
 };
+
+/**
+ * A series stored after a row was written changes how a BUY or REINVEST without
+ * one is read (INV-BOND-007): the engine prices of the program's securities are
+ * recomputed after the commit (INV-CACHE-001), once per pass.
+ */
+describe("BondSeriesService: recompute after a series is stored", () => {
+  beforeEach(() => {
+    jest.spyOn(Logger.prototype, "error").mockImplementation();
+    jest.spyOn(Logger.prototype, "warn").mockImplementation();
+    jest.spyOn(Logger.prototype, "log").mockImplementation();
+  });
+  afterEach(() => jest.clearAllMocks());
+
+  it("recomputes the program's securities after a fetch that stored a series, and only after the store committed", async () => {
+    const { service, prices, order } = build();
+    prices.recomputeLinkedSecuritiesOfSeries.mockImplementation(async () => {
+      order.push("recompute");
+    });
+    await service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] });
+    expect(prices.recomputeLinkedSecuritiesOfSeries).toHaveBeenCalledWith([
+      INSTRUMENT_ID,
+    ]);
+    expect(order).toEqual(["lock", "store", "recompute"]);
+  });
+
+  it("recomputes nothing for a series that was already stored", async () => {
+    const { service, catalog, prices } = build();
+    catalog.findStoredSeries.mockResolvedValue(SUMMARY);
+    await service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] });
+    catalog.findStoredSeries.mockResolvedValue(null);
+    catalog.storeEntry.mockResolvedValue({
+      kind: "unchanged",
+      named: "PL PL_MF OTS0127",
+      instrumentId: INSTRUMENT_ID,
+    });
+    await service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] });
+    expect(prices.recomputeLinkedSecuritiesOfSeries).toHaveBeenLastCalledWith(
+      [],
+    );
+  });
+
+  it("recomputes nothing when the store is refused", async () => {
+    const { service, catalog, prices } = build();
+    catalog.storeEntry.mockResolvedValue({
+      kind: "conflict",
+      named: "PL PL_MF OTS0127",
+    } as never);
+    await expect(
+      service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] }),
+    ).rejects.toBeInstanceOf(SeriesFetchError);
+    expect(prices.recomputeLinkedSecuritiesOfSeries).not.toHaveBeenCalled();
+  });
+
+  it("recomputes after an administrator's manual entry", async () => {
+    const { service, prices } = build();
+    await service.enterManually("PL", "ots0127", VALUES, {
+      adapters: [adapterOf()],
+    });
+    expect(prices.recomputeLinkedSecuritiesOfSeries).toHaveBeenCalledWith([
+      INSTRUMENT_ID,
+    ]);
+  });
+
+  it("recomputes once for a whole pass of the current offer, not once per series", async () => {
+    const { service, prices } = build();
+    const adapter = adapterOf({
+      currentSeries: jest.fn(async () => ["EDO1036", "ROR1027", "TOS1029"]),
+    });
+    await service.fetchCurrentOffer({ adapters: [adapter] });
+    expect(prices.recomputeLinkedSecuritiesOfSeries).toHaveBeenCalledTimes(1);
+    expect(
+      prices.recomputeLinkedSecuritiesOfSeries.mock.calls[0][0],
+    ).toHaveLength(3);
+  });
+
+  it("recomputes once for a whole backfill, and for the user's fetch of the offer", async () => {
+    const { service, prices } = build();
+    const adapter = adapterOf({
+      backfillCodes: jest.fn(() => ["ROR0125", "DOR0126"]),
+      currentSeries: jest.fn(async () => ["EDO1036"]),
+    });
+    await service.backfillHistory({
+      adapters: [adapter],
+      sleep: jest.fn(async () => undefined),
+      today: "2026-10-11",
+    });
+    expect(prices.recomputeLinkedSecuritiesOfSeries).toHaveBeenCalledTimes(1);
+    expect(
+      prices.recomputeLinkedSecuritiesOfSeries.mock.calls[0][0],
+    ).toHaveLength(2);
+
+    prices.recomputeLinkedSecuritiesOfSeries.mockClear();
+    await service.fetchOfferOf("PL", { adapters: [adapter] });
+    expect(prices.recomputeLinkedSecuritiesOfSeries).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("BondSeriesService", () => {
   let logError: jest.SpyInstance;

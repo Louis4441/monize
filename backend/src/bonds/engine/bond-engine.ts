@@ -210,6 +210,7 @@ function saleWindowRefusal(input: LotInput): BondValuationRefusal | null {
   const { purchaseDate } = input.lot;
   if (
     window === null ||
+    input.lot.purchaseDateAssumed === true ||
     (compareYMD(purchaseDate, window.from) >= 0 &&
       compareYMD(purchaseDate, window.to) <= 0)
   ) {

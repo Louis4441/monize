@@ -18,6 +18,7 @@ import { extractPdfText } from "@/bonds/adapters/pl/series/pdf-text";
 import { BondAdapter, BondFetch } from "@/bonds/bond-adapter";
 import { BondCatalogService } from "@/bonds/bond-catalog.service";
 import { BondOfferService } from "@/bonds/bond-offer.service";
+import { BondPriceService } from "../../src/bonds/bond-price.service";
 import { BondSeriesService } from "@/bonds/bond-series.service";
 import { BondValuationService } from "@/bonds/bond-valuation.service";
 import { ExactDecimal } from "@/bonds/domain/exact-decimal";
@@ -317,6 +318,9 @@ describe("bond offer, history and backfill (integration)", () => {
         { gated: () => door } as unknown as SeriesHttp,
         new ProviderHealthService(dataSource),
         new FetchSyncService(dataSource),
+        {
+          recomputeLinkedSecuritiesOfSeries: async () => undefined,
+        } as unknown as BondPriceService,
       );
     const adapterFor = (...codes: string[]): BondAdapter => ({
       ...POLISH_BOND_ADAPTER,

@@ -36,7 +36,15 @@ export interface BondEngineInput {
   readonly benchmarks: ReadonlyMap<string, BenchmarkData>;
   /** Calendars by id (a `CalendarRegistry.asMap()`); an unknown id makes the terms incomplete. */
   readonly calendars: ReadonlyMap<string, BusinessDayCalendar>;
-  readonly lot: { readonly purchaseDate: string; readonly quantity: number };
+  readonly lot: {
+    readonly purchaseDate: string;
+    readonly quantity: number;
+    /**
+     * True when the purchase date is a stand-in (an unpaired transfer in): the
+     * real purchase was inside the sale window, so the window is not checked.
+     */
+    readonly purchaseDateAssumed?: boolean;
+  };
   readonly asOf: string;
   /** Benchmark value assumed for periods that have not started and have no data. */
   readonly projection?: ReadonlyMap<string, string>;

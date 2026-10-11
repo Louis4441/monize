@@ -75,8 +75,14 @@ const linkUpdates = (query: jest.Mock) =>
 function doubles(
   existingSecurities: { id: string; symbol: string }[] = [],
   /** Securities the user has linked to a bond program, and the series on sale. */
-  bond: { linked: string[]; onSale: string[] } = { linked: [], onSale: [] },
+  bond: {
+    linked: string[];
+    onSale: string[];
+    /** Successive answers of the ledger read (before the write, after it); the last repeats. */
+    ledgers?: Array<Array<Record<string, unknown>>>;
+  } = { linked: [], onSale: [] },
 ) {
+  let ledgerReads = 0;
   const securities = {
     find: jest.fn().mockResolvedValue(existingSecurities),
     insert: jest.fn().mockResolvedValue(undefined),
@@ -88,6 +94,24 @@ function doubles(
     insert: jest.fn().mockResolvedValue(undefined),
   } as unknown as Record<string, jest.Mock>;
   const query = jest.fn(async (sql: string) => {
+    if (sql.includes("bond_auto_fetch")) {
+      return [
+        {
+          id: "ssssssss-0000-0000-0000-000000000001",
+          user_id: "user-1",
+          symbol: "EDO",
+          currency_code: "PLN",
+          bond_program_id: "program-1",
+          bond_auto_fetch: false,
+        },
+      ];
+    }
+    if (sql.includes("counterpart_account_id")) {
+      const all = bond.ledgers ?? [[]];
+      const rows = all[Math.min(ledgerReads, all.length - 1)];
+      ledgerReads += 1;
+      return rows;
+    }
     if (sql.includes("bond_program_id IS NOT NULL")) {
       return bond.linked.map((id) => ({ id }));
     }
@@ -370,19 +394,135 @@ describe("writeInvestments", () => {
       ]);
     });
 
-    it("refuses the import, before the row is written, when no series was on sale that day", async () => {
-      const { manager, investments, transactions } = doubles([], {
+    it("stores NULL for an acquisition with no series on sale that day, and counts it, instead of refusing the import", async () => {
+      const { manager, investments } = doubles([], {
         linked: [linkedId],
         onSale: [],
       });
+      const result = await writeInvestments(manager, "user-1", {
+        ...baseInput,
+        transactions: [investment()],
+      });
+      expect(investments.insert).toHaveBeenCalledWith([
+        expect.objectContaining({ bondInstrumentId: null }),
+      ]);
+      expect(result.bondRowsWithoutSeries).toBe(1);
+      expect(result.investmentTransactionsCreated).toBe(1);
+    });
+
+    it("never infers the series of an ADD_SHARES or an unpaired TRANSFER_IN from its date: NULL, counted", async () => {
+      const { manager, investments } = doubles([], {
+        linked: [linkedId],
+        onSale: ["series-1"],
+      });
+      const result = await writeInvestments(manager, "user-1", {
+        ...baseInput,
+        transactions: [
+          investment({ action: InvestmentAction.ADD_SHARES, cashAmount: 0 }),
+          investment({
+            id: "22222222-2222-2222-2222-222222222222",
+            handle: 2,
+            action: InvestmentAction.TRANSFER_IN,
+            cashAmount: 0,
+            // The partner is not part of this import: an unpaired leg.
+            linkedInvestmentId: "99999999-9999-9999-9999-999999999999",
+          }),
+        ],
+      });
+      expect(investments.insert).toHaveBeenCalledWith([
+        expect.objectContaining({ bondInstrumentId: null }),
+        expect.objectContaining({ bondInstrumentId: null }),
+      ]);
+      expect(result.bondRowsWithoutSeries).toBe(2);
+    });
+
+    it("leaves the two legs of a paired transfer without a series and does not count them", async () => {
+      const { manager, investments } = doubles([], {
+        linked: [linkedId],
+        onSale: ["series-1"],
+      });
+      const inId = "11111111-1111-1111-1111-111111111111";
+      const outId = "33333333-3333-3333-3333-333333333333";
+      const result = await writeInvestments(manager, "user-1", {
+        ...baseInput,
+        transactions: [
+          investment({
+            id: inId,
+            action: InvestmentAction.TRANSFER_IN,
+            cashAmount: 0,
+            cashAccountKey: null,
+            linkedInvestmentId: outId,
+          }),
+          investment({
+            id: outId,
+            handle: 2,
+            action: InvestmentAction.TRANSFER_OUT,
+            cashAmount: 0,
+            cashAccountKey: null,
+            linkedInvestmentId: inId,
+          }),
+        ],
+      });
+      expect(investments.insert).toHaveBeenCalledWith([
+        expect.objectContaining({ bondInstrumentId: null }),
+        expect.objectContaining({ bondInstrumentId: null }),
+      ]);
+      expect(result.bondRowsWithoutSeries).toBe(0);
+    });
+
+    it("looks the security's program up once per run, not once per row", async () => {
+      const { manager, query } = doubles([], {
+        linked: [linkedId],
+        onSale: ["series-1"],
+      });
+      await writeInvestments(manager, "user-1", {
+        ...baseInput,
+        transactions: [
+          investment(),
+          investment({ id: "22222222-2222-2222-2222-222222222222", handle: 2 }),
+          investment({ id: "33333333-3333-3333-3333-333333333333", handle: 3 }),
+        ],
+      });
+      const programLookups = query.mock.calls.filter(([sql]) =>
+        String(sql).includes("s.bond_program_id AS id"),
+      );
+      expect(programLookups).toHaveLength(1);
+    });
+
+    it("refuses the import as a whole when a removal is not covered by the lots after it (OVER_REMOVAL), and not one that already was", async () => {
+      const sell = {
+        id: "sell-1",
+        action: "SELL",
+        status: "CLEARED",
+        tx_date: "2026-02-01",
+        quantity: "9",
+        account_id: "aaaaaaaa-0000-0000-0000-000000000010",
+        bond_instrument_id: null,
+        counterpart_account_id: null,
+      };
+      const first = doubles([], {
+        linked: [linkedId],
+        onSale: ["series-1"],
+        ledgers: [[], [sell]],
+      });
       await expect(
-        writeInvestments(manager, "user-1", {
+        writeInvestments(first.manager, "user-1", {
           ...baseInput,
           transactions: [investment()],
         }),
-      ).rejects.toThrow(/could not be determined/);
-      expect(investments.insert).not.toHaveBeenCalled();
-      expect(transactions.insert).not.toHaveBeenCalled();
+      ).rejects.toMatchObject({ response: { errorCode: "OVER_REMOVAL" } });
+
+      const already = doubles([], {
+        linked: [linkedId],
+        onSale: ["series-1"],
+        ledgers: [[sell], [sell]],
+      });
+      await expect(
+        writeInvestments(already.manager, "user-1", {
+          ...baseInput,
+          transactions: [investment()],
+        }),
+      ).resolves.toBeDefined();
     });
   });
 

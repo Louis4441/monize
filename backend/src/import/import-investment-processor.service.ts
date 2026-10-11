@@ -1,6 +1,6 @@
 import { statusFromQifFlags } from "./qif-status.util";
 import { Injectable, Logger } from "@nestjs/common";
-import { resolveTransactionSeries } from "../bonds/bond-series-resolver";
+import { resolveImportedSeries } from "../bonds/bond-series-resolver";
 import { Account, AccountSubType } from "../accounts/entities/account.entity";
 import { Security } from "../securities/entities/security.entity";
 import {
@@ -11,7 +11,11 @@ import {
   Transaction,
   TransactionStatus,
 } from "../transactions/entities/transaction.entity";
-import { ImportContext, updateAccountBalance } from "./import-context";
+import {
+  ImportContext,
+  bondStateOf,
+  updateAccountBalance,
+} from "./import-context";
 import { roundMoney, roundToDecimals } from "../common/round.util";
 import { resolveFxRateOrNull } from "../common/fx-entry.util";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
@@ -217,19 +221,22 @@ export class ImportInvestmentProcessorService {
     investmentTx.userId = ctx.userId;
     investmentTx.accountId = ctx.accountId;
     investmentTx.securityId = securityId;
-    // INV-BOND-007: a program-linked security's share-moving row names its
-    // series, inferred from the date (a file carries none); a row that cannot be
-    // resolved fails alone (its savepoint is rolled back) before it is written.
-    investmentTx.bondInstrumentId = await resolveTransactionSeries(
+    // INV-BOND-007: a program-linked security's BUY or REINVEST takes the series
+    // on sale on its date (a file carries none); any other acquisition, or one
+    // with no series on sale that day, is stored with NULL and counted, and the
+    // lots report it (SERIES_NOT_DETERMINED) instead of the row failing. The
+    // program is looked up once per security per run, and the guard refuses the
+    // file after which a removal is not covered by the lots (checked once at the
+    // end of the block, because a file is not in date order).
+    const bond = bondStateOf(ctx);
+    if (securityId) await bond.guard.track([securityId]);
+    const series = await resolveImportedSeries(
       ctx.manager,
       ctx.userId,
-      {
-        securityId,
-        action,
-        transactionDate: qifTx.date,
-        requested: false,
-      },
+      { securityId, action, transactionDate: qifTx.date },
+      bond.programCache,
     );
+    investmentTx.bondInstrumentId = series.id;
     investmentTx.action = action;
     investmentTx.transactionDate = qifTx.date;
     investmentTx.quantity = quantity || null;
@@ -240,6 +247,10 @@ export class ImportInvestmentProcessorService {
     investmentTx.status = status;
 
     await ctx.manager.save(investmentTx);
+    if (series.unresolved) {
+      ctx.importResult.bondRowsWithoutSeries =
+        (ctx.importResult.bondRowsWithoutSeries ?? 0) + 1;
+    }
 
     // Handle cash transaction
     await this.processCashTransaction(

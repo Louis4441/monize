@@ -55,16 +55,17 @@ export const BOND_UNIT_PRICE_BAND = { min: "0.5", max: "2" } as const;
 
 /**
  * True when the security has a trade whose per-unit price is not within
- * [0.5, 2] x the face value of its own series, which means its quantities are
- * not numbers of bonds (a legacy security recording currency units, or one unit
- * per package): the lot derivation reads a quantity as a count of bonds, so the
- * link would publish a figure off by a factor of the face value. A row's series
- * is its stored one, or, for a row written before the security was linked, the
- * series of the program on sale on its date (`seriesOnSaleSql`, the
- * inference a write applies); a row whose series cannot be determined says
- * nothing here (the lots refuse it with SERIES_NOT_DETERMINED). Rows with no
- * price (ADD_SHARES, a transfer) say nothing and are not read; VOID rows
- * recorded nothing.
+ * [0.5, 2] x the face value of the series it will be read as, which means its
+ * quantities are not numbers of bonds (a legacy security recording currency
+ * units, or one unit per package): the lot derivation reads a quantity as a
+ * count of bonds, so the link would publish a figure off by a factor of the face
+ * value. A row is read as its stored series when that is in the NEW program;
+ * otherwise (no stored series, or one of another program, which the link
+ * clears) as the series of the new program on sale on its date
+ * (`seriesOnSaleSql`, the inference a write applies), and when none is on sale
+ * that day as the program's newest series (the greatest sale window start): a
+ * row is never skipped for lack of a series. Rows with no price (ADD_SHARES, a
+ * transfer) say nothing and are not read; VOID rows recorded nothing.
  */
 export async function hasQuantitiesThatAreNotBonds(
   m: EntityManager,
@@ -72,26 +73,63 @@ export async function hasQuantitiesThatAreNotBonds(
   securityId: string,
   bondProgramId: string,
 ): Promise<boolean> {
+  const onSale = seriesOnSaleSql(
+    "$3",
+    "TO_CHAR(t.transaction_date, 'YYYY-MM-DD')",
+  );
   const rows: unknown[] = await m.query(
     `SELECT 1
-       FROM investment_transactions t
-       JOIN bond_instruments i
-         ON i.bond_program_id = $3
-        AND (t.bond_instrument_id = i.id
-             OR (t.bond_instrument_id IS NULL AND i.id IN (${seriesOnSaleSql("$3", "TO_CHAR(t.transaction_date, 'YYYY-MM-DD')")})))
-       CROSS JOIN LATERAL (
-         SELECT (terms -> 'instrument' ->> 'faceValue')::numeric AS face
-           FROM bond_terms_versions
-          WHERE bond_instrument_id = i.id
-          ORDER BY version DESC
-          LIMIT 1
-       ) f
-      WHERE t.security_id = $1 AND t.user_id = $2
-        AND t.status != 'VOID'
-        AND t.action IN ('BUY', 'SELL', 'REINVEST', 'REINVEST_INTEREST',
-                         'REINVEST_CAPITAL_GAIN_SHORT', 'REINVEST_CAPITAL_GAIN_LONG')
-        AND t.price IS NOT NULL AND t.price > 0
-        AND f.face IS NOT NULL AND f.face > 0
+       FROM (
+         SELECT t.*
+           FROM investment_transactions t
+          WHERE t.security_id = $1 AND t.user_id = $2
+            AND t.status != 'VOID'
+            AND t.action IN ('BUY', 'SELL', 'REINVEST', 'REINVEST_INTEREST',
+                             'REINVEST_CAPITAL_GAIN_SHORT', 'REINVEST_CAPITAL_GAIN_LONG')
+            AND t.price IS NOT NULL AND t.price > 0
+       ) t
+      CROSS JOIN LATERAL (
+        SELECT i.id
+          FROM bond_instruments i
+         WHERE i.bond_program_id = $3::uuid
+           AND (
+             i.id = t.bond_instrument_id
+             OR (
+               NOT EXISTS (SELECT 1 FROM bond_instruments o
+                            WHERE o.id = t.bond_instrument_id
+                              AND o.bond_program_id = $3::uuid)
+               AND (
+                 i.id IN (${onSale})
+                 OR (
+                   NOT EXISTS (${onSale})
+                   AND i.id = (
+                     SELECT n.id
+                       FROM bond_instruments n
+                      CROSS JOIN LATERAL (
+                        SELECT v.terms
+                          FROM bond_terms_versions v
+                         WHERE v.bond_instrument_id = n.id
+                         ORDER BY v.version DESC
+                         LIMIT 1
+                      ) nv
+                      WHERE n.bond_program_id = $3::uuid
+                      ORDER BY (nv.terms -> 'saleWindow' ->> 'from') DESC NULLS LAST,
+                               n.series_code DESC
+                      LIMIT 1
+                   )
+                 )
+               )
+             )
+           )
+      ) r
+      CROSS JOIN LATERAL (
+        SELECT (terms -> 'instrument' ->> 'faceValue')::numeric AS face
+          FROM bond_terms_versions
+         WHERE bond_instrument_id = r.id
+         ORDER BY version DESC
+         LIMIT 1
+      ) f
+      WHERE f.face IS NOT NULL AND f.face > 0
         AND (t.price < f.face * ${BOND_UNIT_PRICE_BAND.min}::numeric
              OR t.price > f.face * ${BOND_UNIT_PRICE_BAND.max}::numeric)
       LIMIT 1`,

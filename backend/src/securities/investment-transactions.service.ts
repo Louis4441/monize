@@ -7,6 +7,7 @@ import {
   Inject,
   forwardRef,
 } from "@nestjs/common";
+import { beginBondWriteGuard } from "../bonds/bond-write-guard";
 import {
   resolveTransactionSeries,
   seriesCodeOf,
@@ -409,6 +410,40 @@ export interface DeleteInvestmentTransactionPreview {
   commission: number;
   totalAmount: number;
   description: string | null;
+}
+
+/**
+ * Whether an edit leaves the bond series of a row alone: it names none that
+ * differs from the stored one (a form resends the stored value on every save)
+ * and changes nothing the series depends on -- the security, the action, the
+ * date. Then the stored value is kept as it is, NULL included, and never
+ * inferred or refused (INV-BOND-007).
+ */
+function keepsStoredSeries(
+  stored: {
+    securityId: string | null;
+    action: string;
+    transactionDate: string;
+    bondInstrumentId: string | null;
+  },
+  dto: {
+    securityId?: string | null;
+    action?: string;
+    transactionDate?: string;
+    bondInstrumentId?: string | null;
+  },
+): boolean {
+  const same = (a: string | null | undefined, b: string | null | undefined) =>
+    (a ?? null)?.toLowerCase() === (b ?? null)?.toLowerCase();
+  return (
+    (dto.bondInstrumentId === undefined ||
+      same(dto.bondInstrumentId, stored.bondInstrumentId)) &&
+    (dto.securityId === undefined || same(dto.securityId, stored.securityId)) &&
+    (dto.action === undefined || dto.action === stored.action) &&
+    (dto.transactionDate === undefined ||
+      String(dto.transactionDate).slice(0, 10) ===
+        String(stored.transactionDate).slice(0, 10))
+  );
 }
 
 @Injectable()
@@ -1160,8 +1195,16 @@ export class InvestmentTransactionsService {
       // keeps this path in the one order every holdings writer uses.
       await lockHoldingScope(manager, [createDto.accountId]);
 
+      // A removal the account cannot cover (OVER_REMOVAL,
+      // REMOVAL_EXCEEDS_SERIES) is refused after the mutation, in this
+      // transaction, so nothing commits (INV-BOND-007).
+      const bondGuard = await beginBondWriteGuard(manager, userId, [
+        createDto.securityId,
+      ]);
+
       // The series of a program-linked security (INV-BOND-007): given and
-      // checked, or inferred from the date; refused before anything is written.
+      // checked, inferred from the date of a BUY or REINVEST, required of the
+      // other acquisitions; refused before anything is written.
       const bondInstrumentId = await resolveTransactionSeries(manager, userId, {
         securityId: createDto.securityId,
         action: createDto.action,
@@ -1234,6 +1277,8 @@ export class InvestmentTransactionsService {
           [saved.securityId],
         );
       }
+
+      await bondGuard.verify([saved.id]);
 
       return saved.id;
     });
@@ -2104,6 +2149,9 @@ export class InvestmentTransactionsService {
 
         // Optional for a transfer (it moves lots, keeping their series); named,
         // it must belong to the security's program and both legs carry it.
+        const bondGuard = await beginBondWriteGuard(manager, userId, [
+          dto.securityId,
+        ]);
         const bondInstrumentId = await resolveTransactionSeries(
           manager,
           userId,
@@ -2194,6 +2242,8 @@ export class InvestmentTransactionsService {
           [dto.fromAccountId, dto.toAccountId],
           [dto.securityId],
         );
+
+        await bondGuard.verify([outId, inId]);
 
         return { outId, inId };
       },
@@ -2380,6 +2430,13 @@ export class InvestmentTransactionsService {
      * holdings, for the same reason its transfer counterparts are created VOID.
      */
     parentStatus?: TransactionStatus,
+    /**
+     * The series the same split's embedded row carried before the parent was
+     * edited (`takeCarriedSeries`), NULL included. Used when `dto` names none:
+     * a parent-only edit rebuilds the embedded rows, and must not ask for a
+     * series the row never needed to be re-inferred for (INV-BOND-007).
+     */
+    carriedSeries?: { readonly bondInstrumentId: string | null } | null,
   ): Promise<InvestmentTransaction> {
     // First database statement this method makes; the rebuild at the end takes
     // the same re-entrant lock. It is *not* the first statement of the caller's
@@ -2490,12 +2547,19 @@ export class InvestmentTransactionsService {
       }
     }
 
+    const bondGuard = await beginBondWriteGuard(manager, userId, [
+      dto.securityId,
+    ]);
+    const carried = !dto.bondInstrumentId ? (carriedSeries ?? null) : null;
     const bondInstrumentId = await resolveTransactionSeries(manager, userId, {
       securityId: dto.securityId,
       action: dto.action,
       transactionDate: parentTransactionDate,
-      bondInstrumentId: dto.bondInstrumentId,
+      bondInstrumentId: carried
+        ? carried.bondInstrumentId
+        : dto.bondInstrumentId,
       requested: true,
+      keepStored: carried !== null,
     });
 
     const investmentTransaction = manager.create(InvestmentTransaction, {
@@ -2543,6 +2607,8 @@ export class InvestmentTransactionsService {
         [saved.securityId],
       );
     }
+
+    await bondGuard.verify([saved.id]);
 
     return saved;
   }
@@ -3496,10 +3562,16 @@ export class InvestmentTransactionsService {
     }
 
     await withScopedDb(this.dataSource, async (manager) => {
+      const bondGuard = await beginBondWriteGuard(manager, userId, [
+        editedLeg.securityId,
+        updateDto.securityId,
+      ]);
       // The series both legs carry (INV-BOND-007), refused before the reversal
       // writes anything; only a value that differs from the stored one is a
-      // request (a form resends it on every save).
+      // request (a form resends it on every save), and an edit that changes
+      // neither the security, the date nor the series keeps the stored value.
       const bondInstrumentId = await resolveTransactionSeries(manager, userId, {
+        keepStored: keepsStoredSeries(editedLeg, updateDto),
         securityId:
           updateDto.securityId !== undefined
             ? updateDto.securityId
@@ -3677,6 +3749,8 @@ export class InvestmentTransactionsService {
         Array.from(affectedAccountIds),
         manager,
       );
+
+      await bondGuard.verify([editedLeg.id, linkedLeg.id]);
     });
 
     for (const accId of affectedAccountIds) {
@@ -3823,6 +3897,15 @@ export class InvestmentTransactionsService {
         }
       }
 
+      // Voiding an acquisition (or restoring a removal) can leave a removal
+      // uncovered: refused after the mutation, in this transaction
+      // (INV-BOND-007).
+      const bondGuard = await beginBondWriteGuard(
+        manager,
+        userId,
+        legs.map((leg) => leg.securityId),
+      );
+
       const affectedAccountIds = new Set<string>();
       const securityIds = new Set<string>();
       const scopes = new Map<string, HoldingScope>();
@@ -3906,6 +3989,8 @@ export class InvestmentTransactionsService {
         Array.from(affectedAccountIds),
         securityIds.size > 0 ? Array.from(securityIds) : undefined,
       );
+
+      await bondGuard.verify(legs.map((leg) => leg.id));
 
       return {
         affectedAccountIds,
@@ -4105,12 +4190,20 @@ export class InvestmentTransactionsService {
         [accountId, updateDto.accountId].filter((id): id is string => !!id),
       );
 
+      const bondGuard = await beginBondWriteGuard(manager, userId, [
+        oldSecurityId,
+        updateDto.securityId,
+      ]);
+
       // The series the row will carry (INV-BOND-007), resolved against the row
       // as it will be and refused before the reversal writes anything. A form
       // resends the stored series on every save, so only a value that differs
-      // from the stored one is a request; the stored one is kept, and dropped
+      // from the stored one is a request; an edit that changes neither the
+      // series, the security, the action nor the date keeps the stored value
+      // as it is (NULL included); otherwise the stored one is kept, and dropped
       // when the row can no longer carry it (relinked, unlinked, a cash action).
       const bondInstrumentId = await resolveTransactionSeries(manager, userId, {
+        keepStored: keepsStoredSeries(transaction, updateDto),
         securityId:
           updateDto.securityId !== undefined
             ? updateDto.securityId
@@ -4426,6 +4519,8 @@ export class InvestmentTransactionsService {
         affectedSecurityIds.length > 0 ? affectedSecurityIds : undefined,
       );
 
+      await bondGuard.verify([saved.id]);
+
       return saved.id;
     });
 
@@ -4609,6 +4704,15 @@ export class InvestmentTransactionsService {
       // (`common/db/locks.ts`); the reversals below row-lock `accounts`.
       await lockHoldingScope(manager, affectedAccountIds);
 
+      // Deleting an acquisition can leave a later removal uncovered: refused
+      // after the mutation, in this transaction, so nothing commits
+      // (INV-BOND-007).
+      const bondGuard = await beginBondWriteGuard(
+        manager,
+        userId,
+        affectedSecurityIds,
+      );
+
       // Break the mutual link before deleting so neither row's FK points at a
       // row that is about to disappear.
       for (const leg of legsToRemove) {
@@ -4645,6 +4749,8 @@ export class InvestmentTransactionsService {
         affectedAccountIds,
         affectedSecurityIds.length > 0 ? affectedSecurityIds : undefined,
       );
+
+      await bondGuard.verify();
     });
 
     if (transaction.action === InvestmentAction.SPLIT) {

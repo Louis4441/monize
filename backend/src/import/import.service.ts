@@ -498,6 +498,11 @@ export class ImportService {
               );
             }
           }
+
+          // An investment file after which a removal of a bond-program security
+          // is not covered by the lots is refused as a whole (INV-BOND-007); the
+          // rows are not in date order, so it is checked once, here.
+          await ctx.bond?.guard.verify();
         }
 
         await this.rebuildImportedHoldings(manager, userId, affectedAccountIds);
@@ -1425,6 +1430,9 @@ export class ImportService {
             );
           }
         }
+
+        // See the multi-account import: checked once, after the whole file.
+        await ctx.bond?.guard.verify();
 
         await this.rebuildImportedHoldings(manager, userId, affectedAccountIds);
       });

@@ -107,7 +107,7 @@ implied.
 | INV-BOND-004 | Known and projected bond values never mix | enforced |
 | INV-BOND-005 | A linked security's automatic price comes only from the bond engine; the engine replaces every non-manual row and never a manual one | enforced |
 | INV-BOND-006 | Bond terms enter the catalog only from a curated manifest, an adapter's fetch of its official source, or an administrator's manual entry on the adapter's template; a person who is not an administrator supplies only a country and a series code | enforced |
-| INV-BOND-007 | Every share-moving row of a program-linked security names a series of that program; an acquisition's series is resolved and stored by the server, never trusted from a client without the program check | enforced |
+| INV-BOND-007 | A program-linked security's acquisitions with a date of their own are inferred, TRANSFER_IN and ADD_SHARES name their series, a removal the account cannot cover is refused at write time, and an import may store NULL which the lots name | enforced |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
 | INV-OCCURRENCE-003 | Every surface reports the effective occurrence: its current amount and currency, its direction, on the date it falls | enforced |
@@ -3580,26 +3580,41 @@ Required tests      bond-series-fetch.integration.spec.ts (real PostgreSQL, a
 Status              enforced
 ```
 
-### INV-BOND-007 -- every share-moving row of a program-linked security names a series of that program
+### INV-BOND-007 -- a program-linked security's rows name a series of its program, or the ledger says which does not
 
 ```text
 Statement           A security linked to a bond program
                     (securities.bond_program_id) holds the program's series
                     (the product, e.g. one security for all of EDO). Every
-                    share-moving row of such a security (BUY, REINVEST,
-                    ADD_SHARES, an unpaired TRANSFER_IN as an acquisition;
-                    SELL, REDEEM, REMOVE_SHARES, an unpaired TRANSFER_OUT as a
-                    removal) stores the series it acts on in
-                    investment_transactions.bond_instrument_id, and that
-                    series belongs to the security's program. An acquisition's
-                    series is the one named or, when none is, the program's
-                    series whose newest terms version's saleWindow contains
-                    the transaction date; the server resolves and stores it,
-                    and a series a client names is checked against the
-                    program, never trusted. A removal's series is optional
-                    (absent: first-in first-out across series). A security
-                    that is not program-linked never has the column set.
-                    Refusals (SERIES_NOT_IN_PROGRAM, SERIES_NOT_DETERMINED,
+                    share-moving row of such a security stores the series it
+                    acts on in investment_transactions.bond_instrument_id, and
+                    that series belongs to the security's program.
+                    - A BUY or REINVEST has a purchase date of its own: its
+                      series is the one named or, when none is, the program's
+                      series whose newest terms version's saleWindow contains
+                      the transaction date; the server resolves and stores it,
+                      and a series a client names is checked against the
+                      program, never trusted.
+                    - ADD_SHARES and an unpaired TRANSFER_IN have no purchase
+                      date of their own (the date is the transfer's or the
+                      grant's): they name the series explicitly
+                      (SERIES_REQUIRED), never inferred. A paired transfer
+                      moves the source's lots with their series.
+                    - A removal (SELL, REDEEM, REMOVE_SHARES, an unpaired
+                      TRANSFER_OUT) may name a series (absent: first-in
+                      first-out across series). It is checked at write time:
+                      a write after which the account does not hold enough
+                      (of the named series, REMOVAL_EXCEEDS_SERIES; at all,
+                      OVER_REMOVAL) is refused and nothing commits.
+                    - A file import (QIF/OFX, Money) names no series: a BUY or
+                      REINVEST takes the series on sale on its date, any other
+                      acquisition, or one with none on sale, is stored with
+                      NULL and counted (bondRowsWithoutSeries); the lots then
+                      refuse with SERIES_NOT_DETERMINED, naming the row,
+                      instead of the import dropping it.
+                    A security that is not program-linked never has the column
+                    set. The series-naming refusals (SERIES_NOT_IN_PROGRAM,
+                    SERIES_NOT_DETERMINED, SERIES_REQUIRED,
                     SERIES_NOT_ALLOWED) run in the write's own transaction
                     before anything is written.
 Source of truth     investment_transactions.bond_instrument_id;
@@ -3612,30 +3627,52 @@ Enforcement         One resolver, resolveTransactionSeries
                     create (also reached by bulk, the AI action executor, the
                     MCP tools and the scheduled-transaction post), update,
                     updateLinkedTransfer, transferSecurity and
-                    createEmbeddedForSplit; the QIF/OFX import processor; the
-                    Money import writer (writeInvestments); the undo and redo
-                    of an investment transaction (ActionHistoryService
-                    undoInvestmentUpdate and reinsertInvestmentTransaction);
-                    and the AI and MCP previews through
+                    createEmbeddedForSplit; and the AI and MCP previews through
                     previewCreateInvestmentTransaction, so a card never shows
-                    what the commit would refuse. Both tool adapters accept
-                    bondSeriesCode (a code such as EDO1036, resolved within
-                    the program) and carry the resolved id in the signed
-                    descriptor. A form resends the stored series on every
-                    save, so on update only a value that differs from the
-                    stored one is a request; a stored series the row can no
-                    longer carry is dropped, not refused. The link follows the
-                    rows: clearForeignSeries (securities update and the undo of
-                    a link change) clears the series outside the new program in
-                    the link's transaction, and clearForeignSeriesOfUser does
-                    the same after a restore, whatever the file said. A row
-                    written before the link, or by a path that predates the
-                    column, is read by loadBondLedger as a write would resolve
-                    it (the same seriesOnSaleSql), never guessed when two series
-                    were on sale. Not enforced by the database: a CHECK cannot
-                    compare a row's series program with its security's program
-                    across tables; the ON DELETE RESTRICT foreign keys keep the
-                    named series and program in the catalog.
+                    what the commit would refuse. The file imports use
+                    resolveImportedSeries (the program looked up once per
+                    security per run); undo and redo use restoredSeries, which
+                    puts the snapshot's series back exactly, never inferred (a
+                    series outside the security's current program is stored as
+                    NULL). A form resends the stored series on every save, so on
+                    update only a series that differs from the stored one is a
+                    request, and an edit that changes neither the series, the
+                    security, the action nor the date keeps the stored value,
+                    NULL included (keepStored). A split parent's edit recreates
+                    its embedded rows: a recreated row that names no series
+                    keeps its predecessor's (readEmbeddedSeriesCarry,
+                    takeCarriedSeries; matched on security, action, quantity and
+                    date, since a split stores no position). The write guard
+                    (BondWriteGuard, bond-write-guard.ts) runs in the same
+                    transaction, after the mutation, in create, update,
+                    updateLinkedTransfer, transferSecurity,
+                    createEmbeddedForSplit, remove (so bulk, AI and MCP
+                    deletes), updateStatus (void), undo and redo, and once per file in
+                    the imports: it derives the lots over the security's whole
+                    ledger (bondLotsFromTransactions over loadBondLedger, the
+                    derivation the valuation reads) and throws when OVER_REMOVAL
+                    or REMOVAL_EXCEEDS_SERIES refuses it now and it was
+                    derivable before the write, or the refusal names a written
+                    row; a refusal that already existed about another row does
+                    not block an unrelated edit. GET
+                    /bonds/securities/:id/series-on-sale and /series-holdings
+                    answer the form with the same code (seriesOnSaleSql, the
+                    lot derivation). The link follows the rows:
+                    clearForeignSeries (securities update and the undo of a link
+                    change) clears the series outside the new program in the
+                    link's transaction, hasQuantitiesThatAreNotBonds reads a
+                    row of another program as the series it will be read as
+                    under the new one, and clearForeignSeriesOfUser does the
+                    same after a restore, whatever the file said. A BUY or
+                    REINVEST written before the link, or by a path that
+                    predates the column, is read by loadBondLedger as a write
+                    would resolve it (the same seriesOnSaleSql), never guessed
+                    when two series were on sale; an ADD_SHARES or unpaired
+                    TRANSFER_IN without a series is never inferred. Not enforced
+                    by the database: a CHECK cannot compare a row's series
+                    program with its security's program across tables; the ON
+                    DELETE RESTRICT foreign keys keep the named series and
+                    program in the catalog.
 Concurrency scope   per row; the security's link is read without a lock, so a
                     link changed concurrently with a trade is repaired by
                     clearForeignSeries at the link's commit and by the lots'
@@ -3644,27 +3681,41 @@ Retry semantics     The resolution is a function of the row, the program and
                     the stored terms: repeating a write resolves the same
                     series.
 Crash semantics     The series is a column of the row; nothing partial to
-                    recover.
+                    recover. A series stored after a row was written (a fetch,
+                    the offer, the cron, the backfill) changes how a BUY or
+                    REINVEST without one is read: the engine prices of the
+                    program's securities are recomputed after that commit
+                    (BondPriceService.recomputeLinkedSecuritiesOfSeries,
+                    INV-CACHE-001).
 Failure response    400 with errors.bonds.SERIES_NOT_IN_PROGRAM (names the
                     series and the program), SERIES_NOT_DETERMINED (names the
-                    date and the program, says to fetch the series) or
-                    SERIES_NOT_ALLOWED, in every locale; nothing written. A
-                    bulk or import row that is refused is skipped or fails
-                    alone with the same message; the Money import is refused as
-                    a whole before anything is kept.
+                    date and the program, says to fetch the series),
+                    SERIES_REQUIRED, SERIES_NOT_ALLOWED, REMOVAL_EXCEEDS_SERIES
+                    or OVER_REMOVAL (errorCode is the code, the message names
+                    the removal's date and quantity), in every locale; nothing
+                    written. A bulk row that is refused is skipped with the same
+                    message; an import is refused as a whole before anything is
+                    kept when a removal is not covered. A read of lots that
+                    cannot be derived (series-holdings) is 422 with the
+                    refusal code as errorCode.
 Required tests      bond-series-resolver.spec.ts (every branch: inferred,
                     named, foreign program, none on sale, two on sale, a code
                     reference, removal, unlinked, cash action, stored series
-                    kept or dropped, clearing); investment-transactions
+                    kept or dropped, keepStored, SERIES_REQUIRED, restored
+                    series, imported series, clearing);
+                    bond-write-guard.spec.ts; investment-transactions
                     .service.spec.ts ("the bond series of a share-moving row":
                     create, update, transferSecurity, an embedded split and
                     the preview, each refusing before a write);
+                    embedded-series-carry.spec.ts;
                     import-investment-processor.service.spec.ts,
                     write-investments.spec.ts, action-history.service.spec.ts
                     (undo and redo), the AI and MCP tool specs (the series
                     reaches the descriptor and the commit), bond-lots.spec.ts
-                    (per-series lots), bond-valuation.service.spec.ts (two
-                    series), bond-prices.integration.spec.ts and
+                    (per-series lots), bond-holdings.service.spec.ts,
+                    bond-valuation.service.spec.ts (two series),
+                    bond-series-write.integration.spec.ts,
+                    bond-prices.integration.spec.ts and
                     bond-valuation.integration.spec.ts (real PostgreSQL),
                     backup-restore.integration.spec.ts (the series follow the
                     program).

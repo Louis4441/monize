@@ -1,4 +1,9 @@
 import {
+  EmbeddedSeriesCarry,
+  readEmbeddedSeriesCarry,
+  takeCarriedSeries,
+} from "../bonds/embedded-series-carry";
+import {
   Injectable,
   BadRequestException,
   NotFoundException,
@@ -265,7 +270,15 @@ export class TransactionSplitService {
      * balance -- this used to be unknown here, so a void split still credited
      * the target account and left an ACTIVE counterpart leg behind it.
      */
-    options?: { parentStatus?: TransactionStatus },
+    options?: {
+      parentStatus?: TransactionStatus;
+      /**
+       * The embedded investment rows this parent had before an edit rebuilt
+       * them (`readEmbeddedSeriesCarry`): a recreated row that names no bond
+       * series keeps its predecessor's (INV-BOND-007).
+       */
+      carriedSeries?: readonly EmbeddedSeriesCarry[];
+    },
     /**
      * Every account this touched besides the parent's, so the caller can
      * invalidate their balance-derived state after commit. A transfer child
@@ -302,7 +315,10 @@ export class TransactionSplitService {
     transactionDate?: Date,
     parentPayeeName?: string | null,
     parentPayeeId?: string | null,
-    options?: { parentStatus?: TransactionStatus },
+    options?: {
+      parentStatus?: TransactionStatus;
+      carriedSeries?: readonly EmbeddedSeriesCarry[];
+    },
     affectedAccountIds?: Set<string>,
   ): Promise<TransactionSplit[]> {
     if (userId) {
@@ -520,6 +536,7 @@ export class TransactionSplitService {
       savedSplits[index] = savedSplit;
     }
 
+    const carriedPool = [...(options?.carriedSeries ?? [])];
     for (const { split, index } of investmentSplits) {
       const splitEntity = m.create(TransactionSplit, {
         transactionId,
@@ -545,6 +562,12 @@ export class TransactionSplitService {
         // A VOID parent's embedded investment row is created VOID (no
         // holdings), for the same reason its transfer counterparts are.
         options?.parentStatus,
+        takeCarriedSeries(carriedPool, {
+          securityId: split.investment!.securityId,
+          action: split.investment!.action,
+          quantity: split.investment!.quantity,
+          transactionDate: parentDateStr,
+        }),
       );
 
       savedSplits[index] = savedSplit;
@@ -909,6 +932,14 @@ export class TransactionSplitService {
 
       this.validateSplits(splits, parent.amount);
 
+      // Read before the embedded rows are torn down: the recreated rows keep
+      // the bond series of the rows they replace.
+      const carriedSeries = await readEmbeddedSeriesCarry(
+        m,
+        userId,
+        transaction.id,
+      );
+
       for (const acc of await this.deleteSplitSideEffects(
         transaction.id,
         userId,
@@ -941,7 +972,7 @@ export class TransactionSplitService {
         // reachable from `PUT /transactions/:id/splits`, the AI action and the
         // MCP tool -- deleted the VOID legs and recreated them active, so the
         // target account was credited money the source still showed as not sent.
-        { parentStatus: transaction.status },
+        { parentStatus: transaction.status, carriedSeries },
         affectedAccountIds,
       );
 

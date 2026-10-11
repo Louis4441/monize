@@ -940,13 +940,14 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
       account: string,
       action: string,
       status = "UNRECONCILED",
+      series: string | null = null,
     ): Promise<string> =>
       (
         await dataSource.query(
           `INSERT INTO investment_transactions
-             (user_id, account_id, security_id, action, transaction_date, quantity, price, total_amount, status)
-           VALUES ($1, $2, $3, $4, '2026-11-01', 10, 100, 1000, $5) RETURNING id`,
-          [userId, account, securityId, action, status],
+             (user_id, account_id, security_id, bond_instrument_id, action, transaction_date, quantity, price, total_amount, status)
+           VALUES ($1, $2, $3, $6, $4, '2026-11-01', 10, 100, 1000, $5) RETURNING id`,
+          [userId, account, securityId, action, status, series],
         )
       )[0].id;
 
@@ -979,10 +980,22 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
 
     it("an unlinked pair is not paired, and the lot restarts at the transfer", async () => {
       await leg(accountId, "TRANSFER_OUT");
-      await leg(otherAccount, "TRANSFER_IN");
+      // An unpaired TRANSFER_IN names its series: the transfer date is not a
+      // purchase date to infer one from (INV-BOND-007).
+      await leg(otherAccount, "TRANSFER_IN", "UNRECONCILED", TOS_ID);
       await recompute("2026-11-05");
       // Not the original lot's accrual: a lot dated the transfer day, 4 days in.
-      expect((await priceOn("2026-11-05"))?.p).not.toBe(cents(grossCents(21)));
+      const priced = await priceOn("2026-11-05");
+      expect(priced).toBeDefined();
+      expect(priced?.p).not.toBe(cents(grossCents(21)));
+      expect(priced?.p).toBe(cents(grossCents(4)));
+    });
+
+    it("an unpaired TRANSFER_IN without a series makes the lots unknown, never inferred from the transfer date", async () => {
+      await leg(accountId, "TRANSFER_OUT");
+      await leg(otherAccount, "TRANSFER_IN");
+      await recompute("2026-11-05");
+      expect(await priceOn("2026-11-05")).toBeUndefined();
     });
 
     it("a leg that is VOID is not a partner: the other leg stands alone", async () => {

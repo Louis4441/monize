@@ -562,7 +562,11 @@
     "programCodeInvalid": "programCode harus terdiri dari 1 hingga 12 huruf kapital atau angka",
     "SERIES_NOT_IN_PROGRAM": "Seri {{ series }} bukan bagian dari program obligasi sekuritas ini ({{ program }})",
     "SERIES_NOT_DETERMINED": "Seri pembelian {{ program }} pada {{ date }} tidak dapat ditentukan: tidak ada satu pun seri program yang tersimpan yang dijual pada hari itu. Ambil seri dari sumber resmi dan pilih untuk transaksi ini.",
-    "SERIES_NOT_ALLOWED": "Seri obligasi hanya dapat disebutkan untuk transaksi yang mengubah jumlah unit sekuritas yang terhubung ke program obligasi"
+    "SERIES_NOT_ALLOWED": "Seri obligasi hanya dapat disebutkan untuk transaksi yang mengubah jumlah unit sekuritas yang terhubung ke program obligasi",
+    "REMOVAL_EXCEEDS_SERIES": "Penarikan {{ quantity }} obligasi pada {{ date }} menyebut seri yang jumlahnya lebih sedikit di rekening pada tanggal itu. Pilih seri yang dimiliki rekening, atau biarkan seri kosong untuk menarik obligasi tertua terlebih dahulu.",
+    "OVER_REMOVAL": "Penarikan {{ quantity }} obligasi pada {{ date }} lebih besar daripada jumlah obligasi yang dimiliki rekening pada tanggal itu.",
+    "SERIES_REQUIRED": "Sebutkan seri obligasi untuk saham ini: {{ action }} tidak memiliki tanggal pembelian sendiri untuk menyimpulkan seri.",
+    "lotsRefused": "Lot obligasi sekuritas ini tidak dapat ditentukan ({{ code }}: {{ action }} pada {{ date }}). Perbaiki atau hapus transaksi tersebut."
   },
   "securities": {
     "bondPricedByEngine": "Sekuritas ini ditautkan ke instrumen obligasi dan dinilai oleh mesin obligasi, bukan oleh penyedia kuotasi. Gunakan Hitung ulang harga.",

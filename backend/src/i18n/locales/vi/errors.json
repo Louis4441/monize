@@ -562,7 +562,11 @@
     "programCodeInvalid": "programCode phải gồm 1 đến 12 chữ in hoa hoặc chữ số",
     "SERIES_NOT_IN_PROGRAM": "Chuỗi {{ series }} không thuộc chương trình trái phiếu của chứng khoán này ({{ program }})",
     "SERIES_NOT_DETERMINED": "Không thể xác định chuỗi của giao dịch mua {{ program }} ngày {{ date }}: không có chuỗi nào đã lưu của chương trình được bán vào ngày đó. Hãy lấy chuỗi từ nguồn chính thức và chọn nó cho giao dịch.",
-    "SERIES_NOT_ALLOWED": "Chỉ có thể nêu chuỗi trái phiếu cho giao dịch làm thay đổi số lượng của chứng khoán được liên kết với một chương trình trái phiếu"
+    "SERIES_NOT_ALLOWED": "Chỉ có thể nêu chuỗi trái phiếu cho giao dịch làm thay đổi số lượng của chứng khoán được liên kết với một chương trình trái phiếu",
+    "REMOVAL_EXCEEDS_SERIES": "Việc rút {{ quantity }} trái phiếu vào ngày {{ date }} nêu một series mà tài khoản nắm giữ ít hơn vào ngày đó. Hãy chọn series mà tài khoản đang nắm giữ, hoặc để trống series để rút các trái phiếu cũ nhất trước.",
+    "OVER_REMOVAL": "Việc rút {{ quantity }} trái phiếu vào ngày {{ date }} lớn hơn số trái phiếu mà tài khoản nắm giữ vào ngày đó.",
+    "SERIES_REQUIRED": "Hãy nêu series trái phiếu của các cổ phần này: {{ action }} không có ngày mua riêng để suy ra series.",
+    "lotsRefused": "Không thể xác định các lô trái phiếu của chứng khoán này ({{ code }}: {{ action }} vào ngày {{ date }}). Hãy sửa hoặc xóa giao dịch đó."
   },
   "securities": {
     "bondPricedByEngine": "Chứng khoán này được liên kết với một công cụ trái phiếu và được định giá bởi công cụ tính trái phiếu, không phải bởi nhà cung cấp báo giá. Hãy dùng Tính lại giá thay thế.",

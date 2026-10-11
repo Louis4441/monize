@@ -342,6 +342,7 @@ describe("MnyImportService", () => {
       investmentTransactionsCreated: 3,
       cashTransactionsCreated: 2,
       linksApplied: 1,
+      bondRowsWithoutSeries: 0,
       affectedAccountIds: new Set(["account-1"]),
       brokerageAccountIds: new Set(["account-1"]),
     });
@@ -1116,6 +1117,7 @@ describe("MnyImportService", () => {
         investmentTransactionsCreated: 0,
         cashTransactionsCreated: 0,
         linksApplied: 0,
+        bondRowsWithoutSeries: 0,
         affectedAccountIds: new Set<string>(),
         brokerageAccountIds: new Set<string>(),
       });

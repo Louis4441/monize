@@ -11,8 +11,9 @@ import { Cron } from "@nestjs/schedule";
 import { BondPriceService } from "../bonds/bond-price.service";
 import {
   clearForeignSeries,
-  resolveTransactionSeries,
+  restoredSeries,
 } from "../bonds/bond-series-resolver";
+import { beginBondWriteGuard } from "../bonds/bond-write-guard";
 import { findBondLinkProblem } from "../securities/bond-link.util";
 import { ActionHistory } from "./entities/action-history.entity";
 import {
@@ -1144,28 +1145,40 @@ export class ActionHistoryService {
       );
     }
 
+    // The legs as they are now, read before either is rewritten: their current
+    // accounts join the holdings rebuild, their current securities the bond
+    // guard's before-state.
+    const legs = [before, linkedBefore];
+    const currentLegs = new Map<string, InvestmentTransaction | null>();
+    for (const legBefore of legs) {
+      currentLegs.set(
+        legBefore.id,
+        await manager.findOne(InvestmentTransaction, {
+          where: { id: legBefore.id, userId: action.userId },
+        }),
+      );
+    }
+    const bondGuard = await beginBondWriteGuard(manager, action.userId, [
+      ...legs.map((leg) => leg.securityId),
+      ...[...currentLegs.values()].map((leg) => leg?.securityId),
+    ]);
+
     const accountIds = new Set<string>();
-    for (const legBefore of [before, linkedBefore]) {
+    for (const legBefore of legs) {
       // Capture the leg's current (post-edit) account before we overwrite it so
       // holdings are rebuilt for both the old and the new account.
-      const current = await manager.findOne(InvestmentTransaction, {
-        where: { id: legBefore.id, userId: action.userId },
-      });
+      const current = currentLegs.get(legBefore.id);
       if (current) accountIds.add(current.accountId);
 
-      // INV-BOND-007: the restored row carries a series of its security's
-      // program or none, resolved like any write before anything is written.
-      const bondInstrumentId = await resolveTransactionSeries(
+      // INV-BOND-007: the snapshot's series goes back exactly as it was, never
+      // inferred (an undo must not fail for a series the row already had, or
+      // never had). One that names a series outside the security's current
+      // program is stored as NULL and the ledger reports the row.
+      const bondInstrumentId = await restoredSeries(
         manager,
         action.userId,
-        {
-          securityId: legBefore.securityId,
-          action: legBefore.action,
-          transactionDate: legBefore.transactionDate,
-          bondInstrumentId: legBefore.bondInstrumentId,
-          requested: false,
-          pairedTransfer: true,
-        },
+        legBefore.securityId,
+        legBefore.bondInstrumentId,
       );
       await manager.update(
         InvestmentTransaction,
@@ -1191,6 +1204,10 @@ export class ActionHistoryService {
     for (const accountId of accountIds) {
       await this.rebuildHoldings(action.userId, accountId, manager);
     }
+
+    // A restore that leaves a removal the account cannot cover is refused here,
+    // and the transaction of the undo rolls back with it.
+    await bondGuard.verify(legs.map((leg) => leg.id));
   }
 
   private async undoInvestmentCreate(
@@ -1214,6 +1231,14 @@ export class ActionHistoryService {
 
     const legs = linkedTx ? [invTx, linkedTx] : [invTx];
     const accountIds = new Set<string>();
+
+    // Undoing a create deletes the rows: refused when that leaves a removal of
+    // a program-linked security uncovered (INV-BOND-007).
+    const bondGuard = await beginBondWriteGuard(
+      manager,
+      action.userId,
+      legs.map((leg) => leg.securityId),
+    );
 
     for (const leg of legs) {
       accountIds.add(leg.accountId);
@@ -1257,6 +1282,8 @@ export class ActionHistoryService {
     for (const accountId of accountIds) {
       await this.rebuildHoldings(action.userId, accountId, manager);
     }
+
+    await bondGuard.verify();
   }
 
   private async undoInvestmentDelete(
@@ -1274,6 +1301,11 @@ export class ActionHistoryService {
       : raw;
     const linkedLeg = before.linkedTransferLeg as
       Record<string, any> | undefined;
+
+    const bondGuard = await beginBondWriteGuard(manager, action.userId, [
+      before.securityId,
+      linkedLeg?.securityId,
+    ]);
 
     // Re-insert linked cash transaction first (investment_transactions.transaction_id references it)
     if (before.linkedCashTransaction) {
@@ -1310,7 +1342,6 @@ export class ActionHistoryService {
       action.userId,
       before,
       restoredTransactionId,
-      linkedLeg !== undefined,
     );
 
     // Restore the paired transfer leg and the mutual link between the two legs.
@@ -1321,7 +1352,6 @@ export class ActionHistoryService {
         action.userId,
         linkedLeg,
         null,
-        true,
       );
       await manager.update(InvestmentTransaction, before.id, {
         linkedTransactionId: linkedLeg.id,
@@ -1337,6 +1367,8 @@ export class ActionHistoryService {
     for (const accountId of accountIds) {
       await this.rebuildHoldings(action.userId, accountId, manager);
     }
+
+    await bondGuard.verify(linkedLeg ? [before.id, linkedLeg.id] : [before.id]);
   }
 
   private async reinsertInvestmentTransaction(
@@ -1344,17 +1376,15 @@ export class ActionHistoryService {
     userId: string,
     data: Record<string, any>,
     transactionId: string | null,
-    pairedTransfer = false,
   ): Promise<void> {
-    // INV-BOND-007: resolved like any write, before the row goes back.
-    const bondInstrumentId = await resolveTransactionSeries(manager, userId, {
-      securityId: data.securityId,
-      action: data.action,
-      transactionDate: data.transactionDate,
-      bondInstrumentId: data.bondInstrumentId,
-      requested: false,
-      pairedTransfer,
-    });
+    // INV-BOND-007: the snapshot's series goes back as it was, never inferred;
+    // one outside the security's current program is stored as NULL.
+    const bondInstrumentId = await restoredSeries(
+      manager,
+      userId,
+      data.securityId,
+      data.bondInstrumentId,
+    );
     // linked_transaction_id is intentionally not set here; for a transfer it is
     // restored by the caller once both legs exist, and for a single leg the
     // original delete already nulled the survivor's pointer.

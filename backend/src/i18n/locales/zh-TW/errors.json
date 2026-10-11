@@ -562,7 +562,11 @@
     "programCodeInvalid": "programCode 必須是 1 到 12 個大寫字母或數字",
     "SERIES_NOT_IN_PROGRAM": "系列 {{ series }} 不屬於此證券的債券計畫（{{ program }}）",
     "SERIES_NOT_DETERMINED": "無法確定 {{ date }} 這筆 {{ program }} 買入所屬的系列：當天沒有唯一一個已儲存的在售系列。請從官方來源取得該系列，並為這筆交易選擇它。",
-    "SERIES_NOT_ALLOWED": "只有在與債券計畫連結的證券發生數量變動的交易中才能指定債券系列"
+    "SERIES_NOT_ALLOWED": "只有在與債券計畫連結的證券發生數量變動的交易中才能指定債券系列",
+    "REMOVAL_EXCEEDS_SERIES": "{{ date }} 提領 {{ quantity }} 張債券所指定的系列，該帳戶當天持有的數量不足。請選擇帳戶持有的系列，或將系列留空以先提領最早的債券。",
+    "OVER_REMOVAL": "{{ date }} 提領 {{ quantity }} 張債券，超過該帳戶當天持有的債券數量。",
+    "SERIES_REQUIRED": "請指定這些股份的債券系列：{{ action }} 沒有可用來推斷系列的自身購買日期。",
+    "lotsRefused": "無法確定此證券的債券批次（{{ code }}：{{ date }} 的 {{ action }}）。請更正或刪除該交易。"
   },
   "securities": {
     "bondPricedByEngine": "此證券已連結到債券工具，由債券引擎而非報價提供者定價。請改用「重新計算價格」。",

@@ -802,6 +802,53 @@ describe("BondPriceService", () => {
     });
   });
 
+  describe("recomputeLinkedSecuritiesOfSeries (after a series is stored, INV-CACHE-001)", () => {
+    const rows = [
+      { id: "s-a1", user_id: "u-a" },
+      { id: "s-a2", user_id: "u-a" },
+      { id: "s-b1", user_id: "u-b" },
+    ];
+
+    it("finds the securities of the stored series' programs across users in a system context, then recomputes each user's under that user's identity", async () => {
+      const { service, manager } = setupForJob(rows);
+      const recompute = jest
+        .spyOn(service, "recomputeLinkedSecurities")
+        .mockResolvedValue(undefined);
+
+      await service.recomputeLinkedSecuritiesOfSeries([INSTRUMENT, INSTRUMENT]);
+
+      expect(withSystemContext).toHaveBeenCalledTimes(1);
+      const [sql, params] = manager.query.mock.calls[0];
+      expect(sql).toMatch(
+        /bond_program_id IN \(\s*SELECT bond_program_id FROM bond_instruments/,
+      );
+      expect(params).toEqual([[INSTRUMENT]]);
+      expect(
+        (withUserContext as jest.Mock).mock.calls.map((c) => c[0]),
+      ).toEqual(["u-a", "u-b"]);
+      expect(recompute.mock.calls).toEqual([
+        ["u-a", ["s-a1", "s-a2"]],
+        ["u-b", ["s-b1"]],
+      ]);
+    });
+
+    it("does nothing for no series", async () => {
+      const { service, manager } = setupForJob(rows);
+      await service.recomputeLinkedSecuritiesOfSeries([]);
+      expect(manager.query).not.toHaveBeenCalled();
+    });
+
+    it("logs and never throws: the series is stored, and the daily job repairs a price", async () => {
+      const { service, manager } = setupForJob(rows);
+      manager.query.mockRejectedValue(new Error("db down"));
+      const warn = jest.spyOn(Logger.prototype, "warn").mockImplementation();
+      await expect(
+        service.recomputeLinkedSecuritiesOfSeries([INSTRUMENT]),
+      ).resolves.toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("db down"));
+    });
+  });
+
   describe("the daily job", () => {
     const linkedRows = [
       { id: "s-a1", user_id: "u-a" },

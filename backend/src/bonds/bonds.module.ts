@@ -4,6 +4,7 @@ import { NetWorthModule } from "../net-worth/net-worth.module";
 import { ProviderHealthModule } from "../provider-health/provider-health.module";
 import { BenchmarkRefreshService } from "./benchmark-refresh.service";
 import { BondCatalogService } from "./bond-catalog.service";
+import { BondHoldingsService } from "./bond-holdings.service";
 import { BondOfferService } from "./bond-offer.service";
 import { BondPriceService } from "./bond-price.service";
 import { BondSeriesService } from "./bond-series.service";
@@ -31,6 +32,7 @@ import { SeriesHttp } from "./series-http";
     SeriesHttp,
     BondSeriesService,
     BondOfferService,
+    BondHoldingsService,
   ],
   exports: [BondValuationService, BondPriceService, BondSeriesService],
 })

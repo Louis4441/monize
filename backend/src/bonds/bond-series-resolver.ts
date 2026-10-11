@@ -1,5 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import { EntityManager } from "typeorm";
+import { UUID_REGEX } from "../common/query-param-utils";
 import { tr } from "../i18n/translate";
 import { baseInvestmentAction } from "../securities/investment-replay.util";
 import { InvestmentAction } from "../securities/entities/investment-transaction.entity";
@@ -47,6 +48,18 @@ export function seriesRoleOf(
 }
 
 /**
+ * An acquisition with a purchase date of its own (BUY, REINVEST): its series is
+ * inferred from that date when none is named. ADD_SHARES and an unpaired
+ * TRANSFER_IN carry the transfer or grant date, not a purchase date, so they
+ * must name their series (`SERIES_REQUIRED`) and are never inferred
+ * (INV-BOND-007).
+ */
+export function infersSeriesFromDate(action: string): boolean {
+  const base = baseInvestmentAction(action);
+  return base === InvestmentAction.BUY || base === InvestmentAction.REINVEST;
+}
+
+/**
  * SQL selecting the ids of a program's series on sale on a date: the series
  * whose NEWEST terms version's `saleWindow` contains it. `program` and `date`
  * are SQL expressions (a placeholder or a column), `date` a YYYY-MM-DD text:
@@ -85,9 +98,6 @@ export async function inferSeriesForDate(
   return rows.length === 1 ? rows[0].id : null;
 }
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /**
  * A series named by a UUID or by its code (`EDO1036`, case-insensitive) within
  * the program: the id, or null when the program has no such series. For the AI
@@ -98,7 +108,7 @@ export async function findSeriesOfProgram(
   bondProgramId: string,
   reference: string,
 ): Promise<string | null> {
-  const rows: Array<{ id: string }> = UUID_PATTERN.test(reference)
+  const rows: Array<{ id: string }> = UUID_REGEX.test(reference)
     ? await m.query(
         `SELECT id FROM bond_instruments WHERE id = $1::uuid AND bond_program_id = $2::uuid`,
         [reference.toLowerCase(), bondProgramId],
@@ -112,7 +122,10 @@ export async function findSeriesOfProgram(
 }
 
 export type BondSeriesProblemCode =
-  "SERIES_NOT_IN_PROGRAM" | "SERIES_NOT_DETERMINED" | "SERIES_NOT_ALLOWED";
+  | "SERIES_NOT_IN_PROGRAM"
+  | "SERIES_NOT_DETERMINED"
+  | "SERIES_NOT_ALLOWED"
+  | "SERIES_REQUIRED";
 
 const FALLBACKS: Readonly<
   Record<BondSeriesProblemCode, (p: Record<string, string>) => string>
@@ -123,6 +136,8 @@ const FALLBACKS: Readonly<
     `The series of this ${p.program} purchase on ${p.date} could not be determined: no single stored series of the program was on sale that day. Fetch the series from the official source and choose it for the transaction.`,
   SERIES_NOT_ALLOWED: () =>
     "A bond series can only be named for a share-moving transaction of a security linked to a bond program",
+  SERIES_REQUIRED: (p) =>
+    `Name the bond series of these shares: ${p.action} has no purchase date of its own to infer it from.`,
 };
 
 function refuse(
@@ -158,6 +173,55 @@ export interface SeriesWrite {
   readonly bondSeriesReference?: string | null;
   /** The other leg of a transfer exists. */
   readonly pairedTransfer?: boolean;
+  /**
+   * The write changes nothing the series depends on (the security, the action
+   * and the date are the stored ones) and names no series: the stored value,
+   * `bondInstrumentId` (NULL included), is kept as it is -- never inferred and
+   * never refused. A form resends every field, so an edit of the description of
+   * a legacy row must not be the write that asks for a series.
+   */
+  readonly keepStored?: boolean;
+  /**
+   * Per-run memo of the security's program (an import writes thousands of rows
+   * of one security): the lookup runs once per security, not once per row.
+   */
+  readonly programCache?: BondProgramCache;
+}
+
+/** The bond program a security is linked to, with its code for messages. */
+export interface BondProgramRef {
+  readonly id: string;
+  readonly programCode: string;
+}
+
+/** A memo of `programOfSecurity` answers for one run (one import, one request). */
+export type BondProgramCache = Map<string, BondProgramRef | null>;
+
+/**
+ * The program the user's security is linked to, or null (not linked, or not the
+ * caller's: ownership is in the predicate, `user_id` comes from the JWT). With a
+ * cache the lookup runs once per security.
+ */
+export async function programOfSecurity(
+  m: EntityManager,
+  userId: string,
+  securityId: string,
+  cache?: BondProgramCache,
+): Promise<BondProgramRef | null> {
+  if (cache?.has(securityId)) return cache.get(securityId) ?? null;
+  const rows: Array<{ id: string | null; program_code: string | null }> =
+    await m.query(
+      `SELECT s.bond_program_id AS id, p.program_code
+         FROM securities s
+         LEFT JOIN bond_programs p ON p.id = s.bond_program_id
+        WHERE s.id = $1 AND s.user_id = $2`,
+      [securityId, userId],
+    );
+  const program = rows[0]?.id
+    ? { id: rows[0].id, programCode: rows[0].program_code ?? "" }
+    : null;
+  cache?.set(securityId, program);
+  return program;
 }
 
 /**
@@ -169,8 +233,11 @@ export interface SeriesWrite {
  *   series; naming one is refused (`SERIES_NOT_ALLOWED`).
  * - A named series must belong to the security's program
  *   (`SERIES_NOT_IN_PROGRAM`).
- * - An acquisition with none named takes the program's series on sale on the
+ * - A BUY or REINVEST with none named takes the program's series on sale on the
  *   transaction date; none, or more than one, is `SERIES_NOT_DETERMINED`.
+ * - ADD_SHARES and an unpaired TRANSFER_IN with none named are
+ *   `SERIES_REQUIRED`: they have no purchase date to infer from.
+ * - `keepStored`: the stored value is returned as it is (see `SeriesWrite`).
  * - A removal with none named stays without one (first-in first-out across
  *   series).
  */
@@ -179,6 +246,9 @@ export async function resolveTransactionSeries(
   userId: string,
   write: SeriesWrite,
 ): Promise<string | null> {
+  if (write.keepStored && !write.bondSeriesReference?.trim()) {
+    return write.bondInstrumentId ? write.bondInstrumentId.toLowerCase() : null;
+  }
   const role = seriesRoleOf(write.action, write.pairedTransfer ?? false);
   const reference = write.bondSeriesReference?.trim() || null;
   let named = write.bondInstrumentId
@@ -186,21 +256,9 @@ export async function resolveTransactionSeries(
     : null;
   const requested = write.requested || reference !== null;
 
-  let program: { id: string; programCode: string } | null = null;
-  if (write.securityId) {
-    // Ownership is in the predicate: user_id comes from the JWT.
-    const rows: Array<{ id: string | null; program_code: string | null }> =
-      await m.query(
-        `SELECT s.bond_program_id AS id, p.program_code
-           FROM securities s
-           LEFT JOIN bond_programs p ON p.id = s.bond_program_id
-          WHERE s.id = $1 AND s.user_id = $2`,
-        [write.securityId, userId],
-      );
-    if (rows[0]?.id) {
-      program = { id: rows[0].id, programCode: rows[0].program_code ?? "" };
-    }
-  }
+  const program = write.securityId
+    ? await programOfSecurity(m, userId, write.securityId, write.programCache)
+    : null;
 
   if (program === null || role === "none") {
     if ((named !== null || reference !== null) && requested) {
@@ -237,12 +295,86 @@ export async function resolveTransactionSeries(
 
   if (role === "removal") return null;
 
+  // An acquisition with no purchase date of its own (ADD_SHARES, an unpaired
+  // TRANSFER_IN) is never inferred from the date it was recorded on.
+  if (!infersSeriesFromDate(write.action)) {
+    refuse("SERIES_REQUIRED", { action: baseInvestmentAction(write.action) });
+  }
+
   const date = String(write.transactionDate).slice(0, 10);
   const inferred = await inferSeriesForDate(m, program.id, date);
   if (inferred === null) {
     refuse("SERIES_NOT_DETERMINED", { date, program: program.programCode });
   }
   return inferred;
+}
+
+/**
+ * The series an undo or redo puts back on a row: the snapshot's own, exactly,
+ * and never an inference. A snapshot series that is not in the security's
+ * current program (relinked or unlinked since, or not a UUID) is stored as NULL
+ * and the ledger reports the row (INV-BOND-007).
+ */
+export async function restoredSeries(
+  m: EntityManager,
+  userId: string,
+  securityId: string | null | undefined,
+  snapshotSeries: unknown,
+): Promise<string | null> {
+  if (
+    !securityId ||
+    typeof snapshotSeries !== "string" ||
+    !UUID_REGEX.test(snapshotSeries)
+  ) {
+    return null;
+  }
+  const rows: unknown[] = await m.query(
+    `SELECT 1
+       FROM securities s
+       JOIN bond_instruments i ON i.bond_program_id = s.bond_program_id
+      WHERE s.id = $1 AND s.user_id = $2 AND i.id = $3::uuid`,
+    [securityId, userId, snapshotSeries.toLowerCase()],
+  );
+  return rows.length > 0 ? snapshotSeries.toLowerCase() : null;
+}
+
+/**
+ * The series of a row a file import writes: a file names none, so a BUY or
+ * REINVEST takes the program's series on sale on its date, and every other
+ * acquisition (ADD_SHARES, an unpaired TRANSFER_IN) or one with no stored
+ * series on sale that day stores NULL, which the lot derivation reports with
+ * `SERIES_NOT_DETERMINED` instead of the import refusing or dropping the row.
+ * `unresolved` says the row is such an acquisition, for the import's count.
+ * The program is looked up once per security per run (`cache`).
+ */
+export async function resolveImportedSeries(
+  m: EntityManager,
+  userId: string,
+  row: {
+    readonly securityId: string | null | undefined;
+    readonly action: string;
+    readonly transactionDate: string;
+    readonly pairedTransfer?: boolean;
+  },
+  cache: BondProgramCache,
+): Promise<{ id: string | null; unresolved: boolean }> {
+  const program = row.securityId
+    ? await programOfSecurity(m, userId, row.securityId, cache)
+    : null;
+  if (
+    program === null ||
+    seriesRoleOf(row.action, row.pairedTransfer ?? false) !== "acquisition"
+  ) {
+    return { id: null, unresolved: false };
+  }
+  const id = infersSeriesFromDate(row.action)
+    ? await inferSeriesForDate(
+        m,
+        program.id,
+        String(row.transactionDate).slice(0, 10),
+      )
+    : null;
+  return { id, unresolved: id === null };
 }
 
 /**

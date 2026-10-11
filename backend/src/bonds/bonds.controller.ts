@@ -9,10 +9,12 @@ import {
   Post,
   Query,
   Request,
+  Res,
   UnprocessableEntityException,
   UseGuards,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import type { Response } from "express";
 import { Throttle } from "@nestjs/throttler";
 import {
   ApiBearerAuth,
@@ -24,6 +26,7 @@ import {
 import { Roles } from "../auth/decorators/roles.decorator";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { todayYMD } from "../common/date-utils";
+import { ParseCalendarDatePipe } from "../common/pipes/parse-calendar-date.pipe";
 import { tr } from "../i18n/translate";
 import { SeriesFetchError } from "./bond-adapter";
 import { BondCatalogService, BondProgramSummary } from "./bond-catalog.service";
@@ -34,6 +37,7 @@ import {
   BondDataNotFoundError,
   BondErrorParams,
 } from "./bond-errors";
+import { BondHoldingsService, SeriesHolding } from "./bond-holdings.service";
 import { BondPriceRecompute, BondPriceService } from "./bond-price.service";
 import { seriesHttpException } from "./bond-series-errors";
 import {
@@ -77,6 +81,7 @@ export class BondsController {
     private readonly prices: BondPriceService,
     private readonly series: BondSeriesService,
     private readonly offers: BondOfferService,
+    private readonly holdings: BondHoldingsService,
   ) {}
 
   @Get("programs")
@@ -328,6 +333,77 @@ export class BondsController {
         benchmarkId,
         values,
         asOf ?? todayYMD(),
+      ),
+    );
+  }
+
+  @Get("securities/:securityId/series-on-sale")
+  @ApiOperation({
+    summary: "The series a purchase of this security on a date would be given",
+    description:
+      "The series the server would store for a BUY or REINVEST on `date` when " +
+      "none is named: the one series of the security's program whose newest " +
+      "terms' sale window contains the date (the same query the write runs). " +
+      "The body is `{ instrumentId, seriesCode }`, or `null` when no single " +
+      "stored series was on sale that day (the form then offers the fetch).",
+  })
+  @ApiQuery({ name: "date", example: "2027-04-15" })
+  @ApiResponse({ status: 200, description: "The series, or null" })
+  @ApiResponse({ status: 400, description: "date is not a calendar date" })
+  @ApiResponse({
+    status: 404,
+    description: "Not the caller's security, or not linked to a bond program",
+  })
+  async seriesOnSale(
+    @Request() req,
+    @Param("securityId", ParseUUIDPipe) securityId: string,
+    @Query("date", new ParseCalendarDatePipe()) date: string,
+    // `@Res()`: a handler's `null` is sent as an empty body by Nest; the
+    // contract is the JSON literal `null`.
+    @Res() res: Response,
+  ): Promise<void> {
+    const series = await this.mapBondErrors(() =>
+      this.holdings.seriesOnSale(req.user.id, securityId, date),
+    );
+    res.json(series);
+    return;
+  }
+
+  @Get("securities/:securityId/series-holdings")
+  @ApiOperation({
+    summary: "The series an account holds of this security on a date",
+    description:
+      "The open lots of `accountId` on `date` (the rows up to and including the " +
+      "day, in replay order, without `excludeTransactionId`, the row being " +
+      "edited), summed per series, oldest lot first, quantity above zero only: " +
+      "`{ holdings: [{ instrumentId, seriesCode, quantity }] }`. A ledger whose " +
+      "lots cannot be derived answers 422 with the refusal code as `errorCode`.",
+  })
+  @ApiQuery({ name: "accountId" })
+  @ApiQuery({ name: "date", example: "2027-04-15" })
+  @ApiQuery({ name: "excludeTransactionId", required: false })
+  @ApiResponse({ status: 200, description: "The series held" })
+  @ApiResponse({ status: 400, description: "A parameter is invalid" })
+  @ApiResponse({
+    status: 404,
+    description: "Not the caller's security, or not linked to a bond program",
+  })
+  @ApiResponse({ status: 422, description: "The lots cannot be derived" })
+  seriesHoldings(
+    @Request() req,
+    @Param("securityId", ParseUUIDPipe) securityId: string,
+    @Query("accountId", new ParseUUIDPipe()) accountId: string,
+    @Query("date", new ParseCalendarDatePipe()) date: string,
+    @Query("excludeTransactionId", new ParseUUIDPipe({ optional: true }))
+    excludeTransactionId?: string,
+  ): Promise<{ holdings: SeriesHolding[] }> {
+    return this.mapBondErrors(() =>
+      this.holdings.seriesHoldings(
+        req.user.id,
+        securityId,
+        accountId,
+        date,
+        excludeTransactionId,
       ),
     );
   }

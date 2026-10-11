@@ -4,6 +4,22 @@ import { applyAccountBalanceDelta } from "../accounts/accounts.service";
 import { roundMoney } from "../common/round.util";
 import { TransactionRule } from "../transaction-rules/transaction-rule.entity";
 import { ImportResultDto } from "./dto/import.dto";
+import { BondProgramCache } from "../bonds/bond-series-resolver";
+import {
+  BondWriteGuard,
+  createBondWriteGuard,
+} from "../bonds/bond-write-guard";
+
+/**
+ * What an import run remembers about program-linked securities
+ * (`docs/specs/bond-program-securities.md` 2.3): the program of each security
+ * (looked up once per run, not per row) and the write guard that refuses an
+ * import after which a removal is not covered by the lots.
+ */
+export interface ImportBondState {
+  readonly programCache: BondProgramCache;
+  readonly guard: BondWriteGuard;
+}
 
 export interface ImportContext {
   manager: EntityManager;
@@ -34,6 +50,20 @@ export interface ImportContext {
    * the import service (design 6.3). Absent or empty means no rule runs.
    */
   importRules?: readonly TransactionRule[];
+  /** Created by the investment processor on its first row (see `ImportBondState`). */
+  bond?: ImportBondState;
+}
+
+/** The run's bond state, created on first use (a file with no bond security never pays for it). */
+export function bondStateOf(ctx: ImportContext): ImportBondState {
+  if (!ctx.bond) {
+    const programCache: BondProgramCache = new Map();
+    ctx.bond = {
+      programCache,
+      guard: createBondWriteGuard(ctx.manager, ctx.userId, programCache),
+    };
+  }
+  return ctx.bond;
 }
 
 /**

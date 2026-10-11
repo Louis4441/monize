@@ -365,6 +365,12 @@ export class ImportResultDto {
 
   @ApiPropertyOptional({
     description:
+      "Number of imported share acquisitions of a bond-program security stored without a series (the file names none and none was on sale on the date, or the action has no purchase date): the bond lots report such a row until its series is chosen. Absent when zero.",
+  })
+  bondRowsWithoutSeries?: number;
+
+  @ApiPropertyOptional({
+    description:
       "Number of Quicken merged split transfers that were automatically removed during import",
   })
   mergedTransfersDeleted?: number;

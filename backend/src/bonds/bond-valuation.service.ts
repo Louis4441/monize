@@ -511,7 +511,11 @@ export class BondValuationService {
   /** One lot at one date, from reference data already loaded. Pure. */
   valueLotFrom(
     reference: BondReferenceData,
-    lot: { readonly purchaseDate: string; readonly quantity: number },
+    lot: {
+      readonly purchaseDate: string;
+      readonly quantity: number;
+      readonly purchaseDateAssumed?: boolean;
+    },
     asOf: string,
     projection?: ReadonlyMap<string, string>,
   ): BondValuation {
@@ -521,7 +525,11 @@ export class BondValuationService {
       announcedRates: reference.announcedRates,
       benchmarks: reference.benchmarks,
       calendars: BOND_CALENDARS,
-      lot,
+      lot: {
+        purchaseDate: lot.purchaseDate,
+        quantity: lot.quantity,
+        purchaseDateAssumed: lot.purchaseDateAssumed,
+      },
       asOf,
       projection,
     });

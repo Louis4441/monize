@@ -562,7 +562,11 @@
     "programCodeInvalid": "programCode deve ter de 1 a 12 letras maiúsculas ou dígitos",
     "SERIES_NOT_IN_PROGRAM": "A série {{ series }} não pertence ao programa de títulos deste ativo ({{ program }})",
     "SERIES_NOT_DETERMINED": "Não foi possível determinar a série desta compra de {{ program }} em {{ date }}: nenhuma série armazenada do programa estava à venda nesse dia. Busque a série na fonte oficial e escolha-a para a transação.",
-    "SERIES_NOT_ALLOWED": "Uma série de títulos só pode ser informada em uma transação que movimenta unidades de um ativo vinculado a um programa de títulos"
+    "SERIES_NOT_ALLOWED": "Uma série de títulos só pode ser informada em uma transação que movimenta unidades de um ativo vinculado a um programa de títulos",
+    "REMOVAL_EXCEEDS_SERIES": "Uma retirada de {{ quantity }} títulos em {{ date }} indica uma série da qual a conta possui menos nessa data. Escolha uma série que a conta possui, ou deixe a série vazia para retirar primeiro os títulos mais antigos.",
+    "OVER_REMOVAL": "Uma retirada de {{ quantity }} títulos em {{ date }} é maior que o número de títulos que a conta possui nessa data.",
+    "SERIES_REQUIRED": "Informe a série de títulos destas cotas: {{ action }} não tem data de compra própria da qual deduzi-la.",
+    "lotsRefused": "Os lotes de títulos deste ativo não podem ser determinados ({{ code }}: {{ action }} em {{ date }}). Corrija ou exclua essa transação."
   },
   "securities": {
     "bondPricedByEngine": "Este ativo está vinculado a um instrumento de título e é precificado pelo motor de títulos, não por um provedor de cotações. Use Recalcular preços.",

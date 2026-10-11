@@ -562,7 +562,11 @@
     "programCodeInvalid": "programCode doit comporter de 1 à 12 lettres majuscules ou chiffres",
     "SERIES_NOT_IN_PROGRAM": "La série {{ series }} n'appartient pas au programme d'obligations de ce titre ({{ program }})",
     "SERIES_NOT_DETERMINED": "La série de cet achat {{ program }} du {{ date }} n'a pas pu être déterminée : aucune série enregistrée du programme n'était en vente ce jour-là. Récupérez la série depuis la source officielle et choisissez-la pour la transaction.",
-    "SERIES_NOT_ALLOWED": "Une série d'obligations ne peut être indiquée que pour une transaction qui déplace des unités d'un titre lié à un programme d'obligations"
+    "SERIES_NOT_ALLOWED": "Une série d'obligations ne peut être indiquée que pour une transaction qui déplace des unités d'un titre lié à un programme d'obligations",
+    "REMOVAL_EXCEEDS_SERIES": "Un retrait de {{ quantity }} obligations le {{ date }} désigne une série dont le compte détient moins ce jour-là. Choisissez une série que le compte détient, ou laissez la série vide pour retirer d'abord les obligations les plus anciennes.",
+    "OVER_REMOVAL": "Un retrait de {{ quantity }} obligations le {{ date }} dépasse le nombre d'obligations que le compte détient ce jour-là.",
+    "SERIES_REQUIRED": "Indiquez la série d'obligations de ces titres : {{ action }} n'a pas de date d'achat propre dont la déduire.",
+    "lotsRefused": "Les lots d'obligations de ce titre ne peuvent pas être déterminés ({{ code }} : {{ action }} le {{ date }}). Corrigez ou supprimez cette transaction."
   },
   "securities": {
     "bondPricedByEngine": "Ce titre est lié à un instrument obligataire et il est valorisé par le moteur d'obligations, et non par un fournisseur de cours. Utilisez plutôt Recalculer les prix.",

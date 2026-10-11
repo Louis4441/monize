@@ -562,7 +562,11 @@
     "programCodeInvalid": "programCode debe tener de 1 a 12 letras mayúsculas o dígitos",
     "SERIES_NOT_IN_PROGRAM": "La serie {{ series }} no pertenece al programa de bonos de este valor ({{ program }})",
     "SERIES_NOT_DETERMINED": "No se pudo determinar la serie de esta compra de {{ program }} del {{ date }}: ninguna serie almacenada del programa estaba a la venta ese día. Obtenga la serie de la fuente oficial y elíjala para la transacción.",
-    "SERIES_NOT_ALLOWED": "Una serie de bonos solo puede indicarse en una transacción que mueve unidades de un valor vinculado a un programa de bonos"
+    "SERIES_NOT_ALLOWED": "Una serie de bonos solo puede indicarse en una transacción que mueve unidades de un valor vinculado a un programa de bonos",
+    "REMOVAL_EXCEEDS_SERIES": "Una retirada de {{ quantity }} bonos el {{ date }} indica una serie de la que la cuenta tiene menos ese día. Elija una serie que la cuenta posea, o deje la serie vacía para retirar primero los bonos más antiguos.",
+    "OVER_REMOVAL": "Una retirada de {{ quantity }} bonos el {{ date }} es mayor que el número de bonos que la cuenta posee ese día.",
+    "SERIES_REQUIRED": "Indique la serie de bonos de estas acciones: {{ action }} no tiene fecha de compra propia de la que deducirla.",
+    "lotsRefused": "No se pueden determinar los lotes de bonos de este valor ({{ code }}: {{ action }} el {{ date }}). Corrija o elimine esa transacción."
   },
   "securities": {
     "bondPricedByEngine": "Este valor está vinculado a un instrumento de bono y lo valora el motor de bonos, no un proveedor de cotizaciones. Utilice en su lugar Recalcular precios.",

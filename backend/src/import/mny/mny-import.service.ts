@@ -363,6 +363,9 @@ export class MnyImportService {
       transfersLinked: parsed.transactions.transfersLinked,
       securitiesCreated: written.securitiesCreated,
       investmentTransactionsCreated: written.investmentTransactionsCreated,
+      ...(written.bondRowsWithoutSeries > 0
+        ? { bondRowsWithoutSeries: written.bondRowsWithoutSeries }
+        : {}),
       pricesImported: written.pricesImported,
       exchangeRatesImported: written.exchangeRatesImported,
       billsCreated: written.billsCreated,
@@ -436,6 +439,7 @@ export class MnyImportService {
     splitsCreated: number;
     securitiesCreated: number;
     investmentTransactionsCreated: number;
+    bondRowsWithoutSeries: number;
     billsCreated: number;
     pricesImported: number;
     exchangeRatesImported: number;
@@ -647,6 +651,7 @@ export class MnyImportService {
         securitiesCreated: securities.created,
         investmentTransactionsCreated:
           investments.investmentTransactionsCreated,
+        bondRowsWithoutSeries: investments.bondRowsWithoutSeries,
         billsCreated: bills.created,
         pricesImported,
         exchangeRatesImported,
