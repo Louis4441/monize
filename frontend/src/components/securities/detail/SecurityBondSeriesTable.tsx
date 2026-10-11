@@ -138,7 +138,7 @@ export function SecurityBondSeriesTable({
   const columnCount = 9;
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto scrollbar-slim">
       <table className={TABLE_CLASS}>
         <thead>
           <tr>
@@ -185,7 +185,7 @@ export function SecurityBondSeriesTable({
                   <Td align="right" className="whitespace-nowrap">
                     {formatShareQuantity(s.quantity)}
                   </Td>
-                  <Td className="whitespace-nowrap">{purchased(s)}</Td>
+                  <Td>{purchased(s)}</Td>
                   <Td align="right" className="whitespace-nowrap">
                     {money(s.grossValue)}
                   </Td>
@@ -195,8 +195,8 @@ export function SecurityBondSeriesTable({
                   <Td align="right" className="whitespace-nowrap">
                     {money(s.earlyRedemptionValue)}
                   </Td>
-                  <Td className="whitespace-nowrap">{renderRate(s)}</Td>
-                  <Td className="whitespace-nowrap">
+                  <Td>{renderRate(s)}</Td>
+                  <Td>
                     {s.nextRateReset === null ? (
                       <span className="text-gray-500 dark:text-gray-400">
                         {t('bond.lots.noCashFlow')}

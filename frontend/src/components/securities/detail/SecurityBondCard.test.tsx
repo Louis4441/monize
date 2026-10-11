@@ -57,10 +57,21 @@ vi.mock('recharts', () => ({
   YAxis: ({ tickFormatter }: any) =>
     tickFormatter ? <span data-testid="y-tick">{tickFormatter(100, 0)}</span> : null,
   CartesianGrid: () => null,
-  Tooltip: () => null,
+  // Only a render-function tooltip is drawn (the history charts); recharts hands
+  // it the hovered point, which this stands in for.
+  Tooltip: ({ content }: any) =>
+    typeof content === 'function' ? (
+      <div data-testid="chart-tooltip">
+        {content({
+          active: true,
+          label: '2026-10',
+          payload: [{ name: 'Series', value: 4.4, color: '#123456' }],
+        })}
+      </div>
+    ) : null,
   Legend: () => null,
   LineChart: ({ children }: any) => <div data-testid="line-chart">{children}</div>,
-  Line: () => null,
+  Line: ({ name }: any) => <i data-testid="line" data-name={name} />,
   ReferenceDot: ({ x, y }: any) => <i data-testid="held-dot" data-x={x} data-y={y} />,
 }));
 vi.mock('react-hot-toast', () => ({
@@ -1604,6 +1615,55 @@ describe('SecurityBondCard: a program-linked security (spec bond-program-securit
     const other = rows.find((r) => within(r).queryByText('TOS0000') !== null) as HTMLElement;
     expect(other).not.toHaveAttribute('aria-current');
     expect(within(other).queryByText('Held')).not.toBeInTheDocument();
+  });
+
+  it('draws the history tooltips with the shared dark-mode-aware panel', async () => {
+    await mountCollapsed();
+    const history = screen.getByRole('region', { name: 'History of RETAIL terms' });
+    await within(history).findByText('Every stored series');
+    const tooltips = within(history).getAllByTestId('chart-tooltip');
+    // The rate chart and the fee chart.
+    expect(tooltips).toHaveLength(2);
+    for (const tooltip of tooltips) {
+      const panel = tooltip.firstElementChild as HTMLElement;
+      expect(panel).toHaveClass('bg-white', 'dark:bg-gray-800', 'dark:border-gray-700');
+      expect(within(panel).getByText('Oct 2026', { exact: false })).toBeInTheDocument();
+    }
+  });
+
+  it('names the rate line briefly and explains fixed-rate bonds in the chart note', async () => {
+    await mountCollapsed();
+    const history = screen.getByRole('region', { name: 'History of RETAIL terms' });
+    await within(history).findByText('Every stored series');
+    const names = within(history)
+      .getAllByTestId('line')
+      .map((l) => l.getAttribute('data-name'));
+    expect(names).toContain('First-period rate');
+    expect(names.join('|')).not.toContain('fixed bonds');
+    expect(
+      within(history).getByText('For fixed-rate bonds the line shows the annual rate.'),
+    ).toBeInTheDocument();
+  });
+
+  it('lets the text columns of the bond tables wrap and keeps the scrollbar themed', async () => {
+    getOffer.mockResolvedValue(offerOf([offerSeries()]));
+    await mountCollapsed();
+    const onSale = screen.getByRole('region', { name: 'On sale now' });
+    const history = screen.getByRole('region', { name: 'History of RETAIL terms' });
+    await within(history).findByText('Every stored series');
+    for (const region of [onSale, history]) {
+      const table = within(region).getByRole('table');
+      expect(table.parentElement).toHaveClass('overflow-x-auto', 'scrollbar-slim');
+      const cells = within(table).getAllByRole('cell');
+      // The rule, capitalization and redemption text, and the sale window,
+      // are free to wrap; only a figure holds to one line.
+      const wrapping = cells.filter((c) => !c.className.includes('whitespace-nowrap'));
+      expect(wrapping.length).toBeGreaterThan(0);
+    }
+    const sale = within(onSale).getAllByRole('cell')[1];
+    expect(sale).not.toHaveClass('whitespace-nowrap');
+    const yourSeries = screen.getAllByRole('table')[0];
+    expect(yourSeries.parentElement).toHaveClass('overflow-x-auto', 'scrollbar-slim');
   });
 
   describe('the auto-fetch switch', () => {

@@ -44,7 +44,7 @@ export function SecurityBondLotsTable({
     value === null ? unknown : formatCurrency(Number(value), currency);
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto scrollbar-slim">
       <table className={TABLE_CLASS}>
         <thead>
           <tr>

@@ -113,7 +113,7 @@ export function SecurityBondScenarioPanel({
     ) ?? false;
 
   const renderTable = (scenarios: SecurityBondScenarios) => (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto scrollbar-slim">
       <table className={TABLE_CLASS}>
         <caption className="sr-only">{t('bond.scenarios.caption')}</caption>
         <thead>

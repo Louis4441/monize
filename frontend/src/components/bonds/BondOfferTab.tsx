@@ -323,7 +323,7 @@ export function BondOfferTab({ onAdd, programCode, allowFetch = false }: BondOff
       return <EmptyState title={t('offer.empty')} />;
     }
     return (
-      <div className="overflow-x-auto" aria-busy={isPending || isLoading}>
+      <div className="overflow-x-auto scrollbar-slim" aria-busy={isPending || isLoading}>
         <table className={`${TABLE_CLASS} ${isPending ? 'opacity-60' : ''}`}>
           <thead>
             <tr>
@@ -369,13 +369,13 @@ export function BondOfferTab({ onAdd, programCode, allowFetch = false }: BondOff
           <tbody className={TABLE_BODY_CLASS}>
             {rows.map((series) => (
               <tr key={series.instrumentId}>
-                <Td className="whitespace-nowrap font-medium">
+                <Td className="font-medium">
                   {series.seriesCode}
                   <span className="block text-xs font-normal text-gray-500 dark:text-gray-400">
                     {programLabel(tSec, series.programCode)}
                   </span>
                 </Td>
-                <Td className="whitespace-nowrap">
+                <Td>
                   {t('offer.saleWindowValue', {
                     from: formatDate(series.saleWindow.from),
                     to: formatDate(series.saleWindow.to),
@@ -393,7 +393,7 @@ export function BondOfferTab({ onAdd, programCode, allowFetch = false }: BondOff
                     formatCurrency(Number(v), series.currency),
                   )}
                   {series.capitalization === 'NONE' && series.periodCount > 1 && (
-                    <span className="block text-xs text-gray-500 dark:text-gray-400">
+                    <span className="block whitespace-normal text-xs text-gray-500 dark:text-gray-400">
                       {t('offer.couponsNotReinvested')}
                     </span>
                   )}
@@ -408,7 +408,7 @@ export function BondOfferTab({ onAdd, programCode, allowFetch = false }: BondOff
                     formatPercentTrimmed(Number(v) * 100),
                   )}
                 </Td>
-                <Td className="whitespace-nowrap">
+                <Td>
                   {isHttpUrl(series.termsSource.url) ? (
                     <a
                       href={series.termsSource.url}

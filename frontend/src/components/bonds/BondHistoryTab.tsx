@@ -13,6 +13,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { ChartTooltip, type ChartTooltipEntry } from '@/components/reports/ChartTooltip';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -153,6 +154,9 @@ export function BondHistoryBody({ program, currency, heldSeries = [] }: BondHist
           <figcaption className="text-sm font-semibold text-gray-900 dark:text-gray-100">
             {t('history.rateChartTitle')}
           </figcaption>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {t('history.rateChartNote')}
+          </p>
           <div role="img" aria-label={t('history.rateChartTitle')} className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <LineChart data={points} margin={{ left: 0, right: 8, top: 5, bottom: 0 }}>
@@ -170,10 +174,14 @@ export function BondHistoryBody({ program, currency, heldSeries = [] }: BondHist
                   domain={['auto', 'auto']}
                 />
                 <Tooltip
-                  labelFormatter={(m) => formatChartMonth(String(m))}
-                  formatter={(v) =>
-                    typeof v === 'number' ? formatPercentTrimmed(v) : tSec('bond.unknown')
-                  }
+                  content={({ active, payload, label }) => (
+                    <ChartTooltip
+                      active={active}
+                      payload={payload as readonly ChartTooltipEntry[] | undefined}
+                      label={formatChartMonth(String(label))}
+                      formatValue={(v) => formatPercentTrimmed(v)}
+                    />
+                  )}
                 />
                 <Legend />
                 {points
@@ -235,10 +243,14 @@ export function BondHistoryBody({ program, currency, heldSeries = [] }: BondHist
                     domain={[0, 'auto']}
                   />
                   <Tooltip
-                    labelFormatter={(m) => formatChartMonth(String(m))}
-                    formatter={(v) =>
-                      typeof v === 'number' ? feeText(v) : tSec('bond.unknown')
-                    }
+                    content={({ active, payload, label }) => (
+                      <ChartTooltip
+                        active={active}
+                        payload={payload as readonly ChartTooltipEntry[] | undefined}
+                        label={formatChartMonth(String(label))}
+                        formatValue={feeText}
+                      />
+                    )}
                   />
                   <Line
                     type="stepAfter"
@@ -277,7 +289,7 @@ export function BondHistoryBody({ program, currency, heldSeries = [] }: BondHist
           <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
             {t('history.tableTitle')}
           </h3>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto scrollbar-slim">
             <table className={TABLE_CLASS}>
               <thead>
                 <tr>
@@ -308,7 +320,7 @@ export function BondHistoryBody({ program, currency, heldSeries = [] }: BondHist
                         </Badge>
                       )}
                     </Td>
-                    <Td className="whitespace-nowrap">
+                    <Td>
                       {s.saleWindow === null
                         ? tSec('bond.unknown')
                         : t('offer.saleWindowValue', {
@@ -331,7 +343,7 @@ export function BondHistoryBody({ program, currency, heldSeries = [] }: BondHist
                         : t(`history.floor.${s.proceedsFloor}`)}
                     </Td>
                     <Td align="right">{s.termsVersion}</Td>
-                    <Td className="whitespace-nowrap">
+                    <Td>
                       {isHttpUrl(s.termsSource.url) ? (
                         <a
                           href={s.termsSource.url}

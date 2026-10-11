@@ -13,6 +13,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
 import { CHART_SERIES, chartColors } from '@/lib/chart-colors';
 import { buildBondInterestSeries } from '@/lib/bond-interest-series';
 import { useDateFormat } from '@/hooks/useDateFormat';
@@ -59,7 +60,7 @@ function InterestTooltip({
   if (!active || !payload || payload.length === 0) return null;
   const projected = payload[0].payload?.projected === true;
   return (
-    <div className="rounded-md border border-gray-200 bg-white p-2 text-xs shadow dark:border-gray-700 dark:bg-gray-800">
+    <ChartTooltipPanel>
       <p className="font-medium text-gray-900 dark:text-gray-100">
         {label}
         {projected ? ` (${projectedLabel})` : ''}
@@ -69,7 +70,7 @@ function InterestTooltip({
           {row.name}: {formatMoney(row.value ?? 0)}
         </p>
       ))}
-    </div>
+    </ChartTooltipPanel>
   );
 }
 
