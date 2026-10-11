@@ -274,7 +274,10 @@
       "projected": "Proyeksi",
       "maturityValue": "Nilai saat jatuh tempo",
       "maturityKnown": "Diketahui",
-      "maturityProjected": "Proyeksi"
+      "maturityProjected": "Proyeksi",
+      "matured": "Jatuh tempo",
+      "refused": "Belum dinilai",
+      "amountUnknown": "Jumlah tidak diketahui"
     },
     "rateSource": {
       "TERMS": "Ketentuan",
@@ -356,7 +359,8 @@
       "margin": "Bunga dari margin",
       "inflation": "Bunga dari inflasi",
       "benchmark": "Bunga dari suku bunga acuan",
-      "announced": "Bunga yang diumumkan"
+      "announced": "Bunga yang diumumkan",
+      "fixedTerm": "Bunga dengan suku bunga tetap"
     },
     "chart": {
       "title": "Bunga kumulatif pada akhir setiap periode",
@@ -380,11 +384,34 @@
         "assumed": "Asumsi: {benchmark}",
         "maturityValue": "Nilai jatuh tempo (proyeksi)",
         "totalInterest": "Total bunga (proyeksi)"
-      }
+      },
+      "asOfNote": "Dinilai pada {date}, tanggal yang dipilih di atas: angka mencakup obligasi yang dimiliki pada hari itu."
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "IHK, 12 bulan (GUS)",
       "PL_NBP_REFERENCE": "Suku bunga acuan NBP"
+    },
+    "valuationRefusal": {
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "Seri ini hanya dapat dibeli dari {from} sampai {to}. Lot ini dibeli pada {purchaseDate}, sehingga tidak dinilai."
+    },
+    "partial": {
+      "title": "Penilaian ini belum lengkap, jadi baca angkanya sebagai angka sebagian.",
+      "terms": "Ketentuan obligasi belum lengkap (misalnya kalender belum terpasang).",
+      "reference": "Data referensi belum ada; lihat daftar data yang masih diperlukan di bawah.",
+      "earlyRedemption": "Ketentuan pelunasan dini belum lengkap, sehingga nilai pelunasan dini mungkin tidak tersedia.",
+      "other": "Setidaknya satu lot belum dapat dinilai sepenuhnya (misalnya suku bunga belum diketahui)."
+    },
+    "projectionMissing": {
+      "title": "Periode berikutnya tidak dapat diproyeksikan",
+      "item": "{benchmark}: belum ada nilai yang dipublikasikan dan belum ada asumsi yang ditetapkan, sehingga periode berikutnya tidak dapat diproyeksikan (dipublikasikan oleh {publisher})",
+      "itemNoPublisher": "{benchmark}: belum ada nilai yang dipublikasikan dan belum ada asumsi yang ditetapkan, sehingga periode berikutnya tidak dapat diproyeksikan (penerbit tidak diketahui)"
+    },
+    "coverage": {
+      "asOf": "Data {benchmark} per {date}",
+      "none": "Belum ada data {benchmark} yang tersimpan"
+    },
+    "issuers": {
+      "PL_MF": "Kementerian Keuangan (PL)"
     }
   }
 }

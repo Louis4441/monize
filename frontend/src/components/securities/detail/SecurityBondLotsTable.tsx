@@ -33,6 +33,8 @@ function nextCashFlows(
   known: readonly BondCashFlow[],
   projected: readonly BondCashFlow[],
 ): BondCashFlow[] {
+  // An UNKNOWN flow (the rate is not known yet) is a flow too: it is the next
+  // one even though its amount is not, and is never skipped for a later known one.
   const all = [...known, ...projected];
   if (all.length === 0) return [];
   const earliest = all.reduce((min, f) => (f.date < min ? f.date : min), all[0].date);
@@ -86,6 +88,34 @@ export function SecurityBondLotsTable({
           {lots.map((lot, index) => {
             const v = lot.valuation;
             const period = v.currentPeriod;
+            const refusalText =
+              v.status === 'REFUSED' && v.refusal !== null
+                ? t(`bond.valuationRefusal.${v.refusal.code}`, {
+                    from: formatDate(v.refusal.params.from),
+                    to: formatDate(v.refusal.params.to),
+                    purchaseDate: formatDate(v.refusal.params.purchaseDate),
+                  })
+                : null;
+            // A matured or refused lot has no current period; an open lot with a
+            // period whose rate is not known still shows the period.
+            const noPeriod = (
+              <span className="text-gray-500 dark:text-gray-400">
+                {v.status === 'MATURED' ? (
+                  t('bond.lots.matured')
+                ) : v.status === 'REFUSED' ? (
+                  <>
+                    {t('bond.lots.refused')}
+                    {refusalText !== null && (
+                      <span className="block whitespace-normal text-xs">
+                        {refusalText}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  t('bond.unknown')
+                )}
+              </span>
+            );
             const next = nextCashFlows(v.knownCashflows, v.projectedCashflows);
             return (
               <tr key={`${lot.purchaseDate}-${lot.quantity}-${index}`}>
@@ -107,7 +137,7 @@ export function SecurityBondLotsTable({
                 <Td className="whitespace-nowrap">{formatDate(v.maturityDate)}</Td>
                 <Td className="whitespace-nowrap">
                   {period === null
-                    ? unknown
+                    ? noPeriod
                     : t('bond.lots.periodValue', {
                         index: period.index,
                         start: formatDate(period.start),
@@ -116,6 +146,8 @@ export function SecurityBondLotsTable({
                 </Td>
                 <Td className="whitespace-nowrap">
                   {period === null ? (
+                    v.status === 'OPEN' ? unknown : noPeriod
+                  ) : period.annualRate === null ? (
                     unknown
                   ) : (
                     <span className="inline-flex flex-wrap items-center gap-2">
@@ -123,9 +155,11 @@ export function SecurityBondLotsTable({
                       <span>
                         {formatPercentTrimmed(Number(period.annualRate) * 100)}
                       </span>
-                      <Badge variant={RATE_SOURCE_VARIANT[period.rateSource]}>
-                        {t(`bond.rateSource.${period.rateSource}`)}
-                      </Badge>
+                      {period.rateSource !== null && (
+                        <Badge variant={RATE_SOURCE_VARIANT[period.rateSource]}>
+                          {t(`bond.rateSource.${period.rateSource}`)}
+                        </Badge>
+                      )}
                     </span>
                   )}
                 </Td>
@@ -163,12 +197,19 @@ export function SecurityBondLotsTable({
                         <span>
                           {t('bond.lots.cashFlowValue', {
                             type: t(`bond.cashFlowType.${flow.type}`),
-                            amount: formatCurrency(Number(flow.amount), currency),
+                            // Null is an unknown amount, never a zero.
+                            amount:
+                              flow.amount === null
+                                ? t('bond.unknown')
+                                : formatCurrency(Number(flow.amount), currency),
                             date: formatDate(flow.date),
                           })}
                         </span>
                         {flow.status === 'PROJECTED' && (
                           <Badge variant="amber">{t('bond.lots.projected')}</Badge>
+                        )}
+                        {flow.status === 'UNKNOWN' && (
+                          <Badge variant="amber">{t('bond.lots.amountUnknown')}</Badge>
                         )}
                       </div>
                     ))

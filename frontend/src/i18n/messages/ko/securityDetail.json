@@ -274,7 +274,10 @@
       "projected": "예상",
       "maturityValue": "만기 시 가치",
       "maturityKnown": "확정",
-      "maturityProjected": "예상"
+      "maturityProjected": "예상",
+      "matured": "만기 도래",
+      "refused": "평가 안 됨",
+      "amountUnknown": "금액 알 수 없음"
     },
     "rateSource": {
       "TERMS": "조건",
@@ -356,7 +359,8 @@
       "margin": "마진에서 나온 이자",
       "inflation": "물가에서 나온 이자",
       "benchmark": "기준금리에서 나온 이자",
-      "announced": "공표된 이자"
+      "announced": "공표된 이자",
+      "fixedTerm": "고정금리 이자"
     },
     "chart": {
       "title": "각 기간 말까지의 누적 이자",
@@ -380,11 +384,34 @@
         "assumed": "가정: {benchmark}",
         "maturityValue": "만기 가치(전망)",
         "totalInterest": "총 이자(전망)"
-      }
+      },
+      "asOfNote": "위에서 선택한 {date} 기준으로 평가했습니다. 수치는 그날 보유한 채권을 대상으로 합니다."
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "소비자물가지수, 12개월 (GUS)",
       "PL_NBP_REFERENCE": "NBP 기준금리"
+    },
+    "valuationRefusal": {
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "이 시리즈는 {from}부터 {to}까지만 매수할 수 있습니다. 이 로트는 {purchaseDate}에 매수되어 평가되지 않습니다."
+    },
+    "partial": {
+      "title": "이 평가는 불완전하므로 수치를 일부 값으로 보세요.",
+      "terms": "채권 조건이 불완전합니다(예: 달력이 설치되지 않음).",
+      "reference": "참조 데이터가 없습니다. 아직 필요한 데이터 목록은 아래를 참고하세요.",
+      "earlyRedemption": "조기 상환 조건이 불완전하여 조기 상환 가치가 없을 수 있습니다.",
+      "other": "하나 이상의 로트를 아직 완전히 평가할 수 없습니다(예: 금리를 알 수 없음)."
+    },
+    "projectionMissing": {
+      "title": "이후 기간은 예측할 수 없습니다",
+      "item": "{benchmark}: 공표된 값이 없고 가정도 설정되지 않아 이후 기간을 예측할 수 없습니다(공표 기관: {publisher})",
+      "itemNoPublisher": "{benchmark}: 공표된 값이 없고 가정도 설정되지 않아 이후 기간을 예측할 수 없습니다(공표 기관 알 수 없음)"
+    },
+    "coverage": {
+      "asOf": "{benchmark} 데이터({date} 기준)",
+      "none": "저장된 {benchmark} 데이터가 아직 없습니다"
+    },
+    "issuers": {
+      "PL_MF": "재무부(PL)"
     }
   }
 }

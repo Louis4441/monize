@@ -274,7 +274,10 @@
       "projected": "Tahmini",
       "maturityValue": "Vadedeki değer",
       "maturityKnown": "Biliniyor",
-      "maturityProjected": "Tahmini"
+      "maturityProjected": "Tahmini",
+      "matured": "Vadesi doldu",
+      "refused": "Değerlenmedi",
+      "amountUnknown": "Tutar bilinmiyor"
     },
     "rateSource": {
       "TERMS": "Şartlar",
@@ -356,7 +359,8 @@
       "margin": "Marjdan gelen faiz",
       "inflation": "Enflasyondan gelen faiz",
       "benchmark": "Referans orandan gelen faiz",
-      "announced": "Duyurulan faiz"
+      "announced": "Duyurulan faiz",
+      "fixedTerm": "Sabit oranlı faiz"
     },
     "chart": {
       "title": "Her dönem sonunda birikmiş faiz",
@@ -380,11 +384,34 @@
         "assumed": "Varsayılan: {benchmark}",
         "maturityValue": "Vade değeri (projeksiyon)",
         "totalInterest": "Toplam faiz (projeksiyon)"
-      }
+      },
+      "asOfNote": "Yukarıda seçilen {date} tarihi itibarıyla değerlendi: rakamlar o gün elde tutulan tahvilleri kapsar."
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "TÜFE, 12 ay (GUS)",
       "PL_NBP_REFERENCE": "NBP referans faizi"
+    },
+    "valuationRefusal": {
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "Bu seri yalnızca {from} ile {to} arasında satın alınabilir. Bu lot {purchaseDate} tarihinde alındığı için değerlenmez."
+    },
+    "partial": {
+      "title": "Bu değerleme eksik; rakamları kısmi olarak değerlendirin.",
+      "terms": "Tahvilin koşulları eksik (örneğin bir takvim yüklü değil).",
+      "reference": "Referans veriler eksik; hâlâ gereken verilerin listesi için aşağıya bakın.",
+      "earlyRedemption": "Erken itfa koşulları eksik, bu nedenle erken itfa değerleri eksik olabilir.",
+      "other": "En az bir lot henüz tam olarak değerlenemiyor (örneğin bir oran bilinmiyor)."
+    },
+    "projectionMissing": {
+      "title": "Sonraki dönemler tahmin edilemiyor",
+      "item": "{benchmark}: yayımlanmış bir değer yok ve bir varsayım belirlenmemiş, bu nedenle sonraki dönemler tahmin edilemiyor (yayımlayan: {publisher})",
+      "itemNoPublisher": "{benchmark}: yayımlanmış bir değer yok ve bir varsayım belirlenmemiş, bu nedenle sonraki dönemler tahmin edilemiyor (yayımlayan bilinmiyor)"
+    },
+    "coverage": {
+      "asOf": "{benchmark} verileri {date} itibarıyla",
+      "none": "Henüz kayıtlı {benchmark} verisi yok"
+    },
+    "issuers": {
+      "PL_MF": "Maliye Bakanlığı (PL)"
     }
   }
 }

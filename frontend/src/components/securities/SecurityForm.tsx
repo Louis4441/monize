@@ -274,7 +274,12 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
   const isBond = watch('securityType') === 'BOND';
   const selectedBondId = watch('bondInstrumentId') || '';
 
-  const bondPicker = useBondInstrumentPicker(isBond, selectedCurrency, selectedBondId);
+  const bondPicker = useBondInstrumentPicker(
+    isBond,
+    selectedCurrency,
+    selectedBondId,
+    security?.bondInstrumentId || '',
+  );
   const effectiveBondId = bondPicker.effectiveBondId;
 
   // A linked bond is priced from its terms, never by asking a quote provider,
@@ -464,6 +469,18 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       return;
     }
 
+    // A linked security keeps its series' currency: changing it would unlink
+    // the security and delete its engine prices, so it is refused here.
+    if (isBond && bondPicker.mismatchedLinkCurrency !== null) {
+      toast.error(
+        t('form.bondCurrencyLocked', {
+          linkedCurrency: bondPicker.mismatchedLinkCurrency,
+        }),
+      );
+      return;
+    }
+
+    const storedBondId = security?.bondInstrumentId || null;
     const cleanedData: CreateSecurityData = {
       symbol: data.symbol.toUpperCase().trim(),
       name: data.name.trim(),
@@ -482,10 +499,13 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       website: data.website?.trim() ?? '',
       irWebsite: data.irWebsite?.trim() ?? '',
       msnInstrumentId: data.msnInstrumentId?.trim() || undefined,
-      // A BOND sends its link (null unlinks); a type moved away from BOND
-      // unlinks a security that was linked. Otherwise the field is omitted.
+      // The link is sent only when it changed (null unlinks), so a save that
+      // leaves it alone is accepted by a server that predates the field. A type
+      // moved away from BOND unlinks a security that was linked.
       ...(data.securityType === 'BOND'
-        ? { bondInstrumentId: effectiveBondId || null }
+        ? (effectiveBondId || null) !== storedBondId
+          ? { bondInstrumentId: effectiveBondId || null }
+          : {}
         : security?.bondInstrumentId
           ? { bondInstrumentId: null }
           : {}),
@@ -619,6 +639,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       {isBond && (
         <BondInstrumentSelect
           picker={bondPicker}
+          currency={selectedCurrency}
           onChange={(id) => setValue('bondInstrumentId', id, { shouldDirty: true })}
           error={errors.bondInstrumentId?.message}
         />

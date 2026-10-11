@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import apiClient from './api';
 import { investmentsApi } from './investments';
 import { scheduledTransactionsApi } from './scheduled-transactions';
-import { invalidateCache } from './apiCache';
+import { clearAllCache, invalidateCache } from './apiCache';
 import { API_MAX_PAGE_LIMIT } from './api-page-limits';
 
 vi.mock('./api', () => ({
@@ -524,6 +524,51 @@ describe('investmentsApi', () => {
       await investmentsApi.getSecurityBondScenarios('s-1', 'PL_CPI_GUS_YOY', ['0', '0.05']);
       expect(apiClient.get).toHaveBeenCalledWith('/bonds/securities/s-1/scenarios', {
         params: { benchmarkId: 'PL_CPI_GUS_YOY', values: '0,0.05' },
+      });
+    });
+
+    it('getSecurityBondScenarios sends the card date when given', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: {} });
+      await investmentsApi.getSecurityBondScenarios('s-1', 'PL_CPI_GUS_YOY', ['0'], '2027-02-01');
+      expect(apiClient.get).toHaveBeenCalledWith('/bonds/securities/s-1/scenarios', {
+        params: { benchmarkId: 'PL_CPI_GUS_YOY', values: '0', asOf: '2027-02-01' },
+      });
+    });
+
+    describe('a link change drops the cached prices', () => {
+      const warm = async () => {
+        vi.mocked(apiClient.get).mockResolvedValue({ data: [{ id: 1 }] });
+        await investmentsApi.getSecurityPrices('s-1');
+        await investmentsApi.getSecurityPrices('s-1');
+        expect(apiClient.get).toHaveBeenCalledTimes(1);
+      };
+
+      it('updateSecurity with a bondInstrumentId (link or null) invalidates', async () => {
+        for (const bondInstrumentId of ['bond-1', null]) {
+          vi.clearAllMocks();
+          clearAllCache();
+          await warm();
+          vi.mocked(apiClient.patch).mockResolvedValue({ data: {} });
+          await investmentsApi.updateSecurity('s-1', { bondInstrumentId } as any);
+          await investmentsApi.getSecurityPrices('s-1');
+          expect(apiClient.get).toHaveBeenCalledTimes(2);
+        }
+      });
+
+      it('updateSecurity without a bondInstrumentId keeps the cache', async () => {
+        await warm();
+        vi.mocked(apiClient.patch).mockResolvedValue({ data: {} });
+        await investmentsApi.updateSecurity('s-1', { name: 'x' } as any);
+        await investmentsApi.getSecurityPrices('s-1');
+        expect(apiClient.get).toHaveBeenCalledTimes(1);
+      });
+
+      it('createSecurity with a link invalidates', async () => {
+        await warm();
+        vi.mocked(apiClient.post).mockResolvedValue({ data: {} });
+        await investmentsApi.createSecurity({ symbol: 'X', bondInstrumentId: 'bond-1' } as any);
+        await investmentsApi.getSecurityPrices('s-1');
+        expect(apiClient.get).toHaveBeenCalledTimes(2);
       });
     });
 

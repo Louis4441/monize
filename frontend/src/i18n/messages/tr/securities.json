@@ -204,7 +204,9 @@
     "bondInstrumentCurrent": "Bağlı seri",
     "bondInstrumentLoading": "Tahvil kataloğu yükleniyor...",
     "bondInstrumentLoadFailed": "Tahvil kataloğu yüklenemedi, bu yüzden henüz bir seri bağlanamıyor.",
-    "bondInstrumentRetry": "Yeniden dene"
+    "bondInstrumentRetry": "Yeniden dene",
+    "bondCurrencyLocked": "Bu menkul kıymet {linkedCurrency} cinsinden bir tahvil serisine bağlı. Para birimini tekrar {linkedCurrency} yapın veya önce seri bağlantısını kaldırın (bağlantıyı kaldırmak hesaplanan fiyatları siler).",
+    "bondNoSeriesInCurrency": "{currency} cinsinden tahvil serisi yok. Katalog şu para birimlerinde seri sunuyor: {currencies}; bir seri bağlamak için bunlardan birini seçin."
   },
   "priceForm": {
     "dateLabel": "Tarih",

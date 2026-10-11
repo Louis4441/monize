@@ -297,15 +297,22 @@ const PROVIDER_BADGE_CLASS: Record<string, string> = {
  * never been priced has no source to state and shows "-".
  */
 export function SecurityPriceSourceBadge({ security }: { security: Security }) {
+  const t = useTranslations('securities');
   if (!security.lastPriceSource) {
     return <span className="text-sm text-gray-400 dark:text-gray-500">-</span>;
   }
+  // The bond engine's accrual rows have a translated name; the rest are
+  // provider names and short codes that read the same in every language.
+  const label =
+    security.lastPriceSource === 'bond_engine'
+      ? t('form.providers.bond_engine')
+      : formatPriceSource(security.lastPriceSource);
   return (
     <span
       className={`inline-flex items-center rounded text-xs font-medium px-2 py-0.5 ${priceSourceBadgeClass(security.lastPriceSource)}`}
-      title={security.lastPriceSource}
+      title={security.lastPriceSource === 'bond_engine' ? label : security.lastPriceSource}
     >
-      {formatPriceSource(security.lastPriceSource)}
+      {label}
     </span>
   );
 }

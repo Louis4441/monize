@@ -204,7 +204,9 @@
     "bondInstrumentCurrent": "Mã đã liên kết",
     "bondInstrumentLoading": "Đang tải danh mục trái phiếu...",
     "bondInstrumentLoadFailed": "Không thể tải danh mục trái phiếu nên chưa thể liên kết một series.",
-    "bondInstrumentRetry": "Thử lại"
+    "bondInstrumentRetry": "Thử lại",
+    "bondCurrencyLocked": "Chứng khoán này được liên kết với một chuỗi trái phiếu bằng {linkedCurrency}. Hãy đặt lại tiền tệ là {linkedCurrency} hoặc hủy liên kết chuỗi trước (hủy liên kết sẽ xóa giá đã tính).",
+    "bondNoSeriesInCurrency": "Không có chuỗi trái phiếu nào bằng {currency}. Danh mục cung cấp chuỗi bằng {currencies}; hãy chọn một trong các loại tiền đó để liên kết chuỗi."
   },
   "priceForm": {
     "dateLabel": "Ngày",

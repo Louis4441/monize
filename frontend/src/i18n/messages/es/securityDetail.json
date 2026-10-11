@@ -274,7 +274,10 @@
       "projected": "Proyectado",
       "maturityValue": "Valor al vencimiento",
       "maturityKnown": "Conocido",
-      "maturityProjected": "Proyectado"
+      "maturityProjected": "Proyectado",
+      "matured": "Vencido",
+      "refused": "Sin valorar",
+      "amountUnknown": "Importe desconocido"
     },
     "rateSource": {
       "TERMS": "Condiciones",
@@ -356,7 +359,8 @@
       "margin": "Intereses del margen",
       "inflation": "Intereses de la inflación",
       "benchmark": "Intereses del tipo de referencia",
-      "announced": "Intereses anunciados"
+      "announced": "Intereses anunciados",
+      "fixedTerm": "Intereses a tipo fijo"
     },
     "chart": {
       "title": "Intereses acumulados al final de cada periodo",
@@ -380,11 +384,34 @@
         "assumed": "Supuesto: {benchmark}",
         "maturityValue": "Valor de vencimiento (proyección)",
         "totalInterest": "Intereses totales (proyección)"
-      }
+      },
+      "asOfNote": "Valorado a {date}, la fecha elegida arriba: las cifras corresponden a los bonos mantenidos ese día."
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "IPC, 12 meses (GUS)",
       "PL_NBP_REFERENCE": "Tipo de referencia del NBP"
+    },
+    "valuationRefusal": {
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "Esta serie solo puede comprarse del {from} al {to}. Este lote se compró el {purchaseDate}, por lo que no se valora."
+    },
+    "partial": {
+      "title": "Esta valoración está incompleta; interprete las cifras como parciales.",
+      "terms": "Las condiciones del bono están incompletas (por ejemplo, no hay un calendario instalado).",
+      "reference": "Faltan datos de referencia; consulte abajo la lista de datos que aún se necesitan.",
+      "earlyRedemption": "Las condiciones de reembolso anticipado están incompletas, por lo que pueden faltar los valores de reembolso anticipado.",
+      "other": "Al menos un lote todavía no puede valorarse por completo (por ejemplo, no se conoce un tipo)."
+    },
+    "projectionMissing": {
+      "title": "No se pueden proyectar los periodos posteriores",
+      "item": "{benchmark}: no hay ningún valor publicado ni ninguna hipótesis definida, por lo que no se pueden proyectar los periodos posteriores (publicado por {publisher})",
+      "itemNoPublisher": "{benchmark}: no hay ningún valor publicado ni ninguna hipótesis definida, por lo que no se pueden proyectar los periodos posteriores (se desconoce el editor)"
+    },
+    "coverage": {
+      "asOf": "Datos de {benchmark} a fecha de {date}",
+      "none": "Aún no hay datos de {benchmark} guardados"
+    },
+    "issuers": {
+      "PL_MF": "Ministerio de Finanzas (PL)"
     }
   }
 }

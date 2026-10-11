@@ -204,7 +204,9 @@
     "bondInstrumentCurrent": "已关联的系列",
     "bondInstrumentLoading": "正在加载债券目录...",
     "bondInstrumentLoadFailed": "无法加载债券目录，因此暂时不能关联系列。",
-    "bondInstrumentRetry": "重试"
+    "bondInstrumentRetry": "重试",
+    "bondCurrencyLocked": "此证券已关联到 {linkedCurrency} 的债券系列。请将币种改回 {linkedCurrency},或先取消关联该系列(取消关联会删除其计算价格)。",
+    "bondNoSeriesInCurrency": "没有 {currency} 的债券系列。目录提供 {currencies} 的系列;请将币种设为其中之一以关联系列。"
   },
   "priceForm": {
     "dateLabel": "日期",

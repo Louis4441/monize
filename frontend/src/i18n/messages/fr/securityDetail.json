@@ -274,7 +274,10 @@
       "projected": "Projeté",
       "maturityValue": "Valeur à l'échéance",
       "maturityKnown": "Connue",
-      "maturityProjected": "Projetée"
+      "maturityProjected": "Projetée",
+      "matured": "Échue",
+      "refused": "Non valorisée",
+      "amountUnknown": "Montant inconnu"
     },
     "rateSource": {
       "TERMS": "Conditions",
@@ -356,7 +359,8 @@
       "margin": "Intérêts issus de la marge",
       "inflation": "Intérêts issus de l'inflation",
       "benchmark": "Intérêts issus du taux de référence",
-      "announced": "Intérêts annoncés"
+      "announced": "Intérêts annoncés",
+      "fixedTerm": "Intérêts au taux fixe"
     },
     "chart": {
       "title": "Intérêts cumulés à la fin de chaque période",
@@ -380,11 +384,34 @@
         "assumed": "Hypothèse : {benchmark}",
         "maturityValue": "Valeur à l'échéance (projection)",
         "totalInterest": "Intérêts totaux (projection)"
-      }
+      },
+      "asOfNote": "Valorisé au {date}, la date choisie ci-dessus : les chiffres portent sur les obligations détenues ce jour-là."
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "Inflation IPC, 12 mois (GUS)",
       "PL_NBP_REFERENCE": "Taux de référence de la NBP"
+    },
+    "valuationRefusal": {
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "Cette série ne peut être achetée que du {from} au {to}. Ce lot a été acheté le {purchaseDate} ; il n'est donc pas valorisé."
+    },
+    "partial": {
+      "title": "Cette valorisation est incomplète : lisez les chiffres comme partiels.",
+      "terms": "Les conditions de l'obligation sont incomplètes (par exemple, un calendrier n'est pas installé).",
+      "reference": "Des données de référence manquent ; voir ci-dessous la liste des données encore nécessaires.",
+      "earlyRedemption": "Les conditions de remboursement anticipé sont incomplètes ; les valeurs de remboursement anticipé peuvent donc manquer.",
+      "other": "Au moins un lot ne peut pas encore être valorisé complètement (par exemple, un taux n'est pas connu)."
+    },
+    "projectionMissing": {
+      "title": "Les périodes suivantes ne peuvent pas être projetées",
+      "item": "{benchmark} : aucune valeur n'est publiée et aucune hypothèse n'est définie ; les périodes suivantes ne peuvent donc pas être projetées (publié par {publisher})",
+      "itemNoPublisher": "{benchmark} : aucune valeur n'est publiée et aucune hypothèse n'est définie ; les périodes suivantes ne peuvent donc pas être projetées (éditeur inconnu)"
+    },
+    "coverage": {
+      "asOf": "Données {benchmark} au {date}",
+      "none": "Aucune donnée {benchmark} n'est encore enregistrée"
+    },
+    "issuers": {
+      "PL_MF": "Ministère des Finances (PL)"
     }
   }
 }

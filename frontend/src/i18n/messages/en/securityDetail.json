@@ -274,7 +274,10 @@
       "projected": "Projected",
       "maturityValue": "Value at maturity",
       "maturityKnown": "Known",
-      "maturityProjected": "Projected"
+      "maturityProjected": "Projected",
+      "matured": "Matured",
+      "refused": "Not valued",
+      "amountUnknown": "Amount unknown"
     },
     "rateSource": {
       "TERMS": "Terms",
@@ -356,7 +359,8 @@
       "margin": "Interest from margin",
       "inflation": "Interest from inflation",
       "benchmark": "Interest from the reference rate",
-      "announced": "Announced interest"
+      "announced": "Announced interest",
+      "fixedTerm": "Fixed-rate interest"
     },
     "chart": {
       "title": "Cumulative interest at each period end",
@@ -380,11 +384,34 @@
         "assumed": "Assumed {benchmark}",
         "maturityValue": "Maturity value (projection)",
         "totalInterest": "Total interest (projection)"
-      }
+      },
+      "asOfNote": "Valued on {date}, the date chosen above: the figures cover the bonds held on that day."
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "CPI, 12 months (GUS)",
       "PL_NBP_REFERENCE": "NBP reference rate"
+    },
+    "valuationRefusal": {
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "This series can only be bought from {from} to {to}. This lot was bought on {purchaseDate}, so it is not valued."
+    },
+    "partial": {
+      "title": "This valuation is incomplete, so read the figures as partial.",
+      "terms": "The terms of the bond are incomplete (for example a calendar is not installed).",
+      "reference": "Reference data is missing; see the list of data still needed below.",
+      "earlyRedemption": "The early redemption terms are incomplete, so early redemption values may be missing.",
+      "other": "At least one lot cannot be fully valued yet (for example a rate is not known)."
+    },
+    "projectionMissing": {
+      "title": "Later periods cannot be projected",
+      "item": "{benchmark}: no value is published and no assumption is set, so later periods cannot be projected (published by {publisher})",
+      "itemNoPublisher": "{benchmark}: no value is published and no assumption is set, so later periods cannot be projected (publisher not known)"
+    },
+    "coverage": {
+      "asOf": "{benchmark} data as of {date}",
+      "none": "No {benchmark} data is stored yet"
+    },
+    "issuers": {
+      "PL_MF": "Ministry of Finance (PL)"
     }
   }
 }

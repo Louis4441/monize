@@ -524,14 +524,26 @@ describe('BackupRestoreSection', () => {
       await restoreWith({
         message: 'Backup restored successfully',
         restored: { accounts: 4 },
-        unlinkedBondSecurities: 2,
+        unlinkedBondSecurities: { count: 2, symbols: ['EDO0936', 'TOS1029'] },
       });
 
       expect(
         screen.getByText(/2 bond securities were restored unlinked/),
       ).toBeInTheDocument();
+      // Each one is named, so the reader knows which to relink; nothing is hidden.
+      expect(screen.getByText('Affected securities: EDO0936, TOS1029.')).toBeInTheDocument();
+      expect(screen.queryByText(/and \d+ more/)).not.toBeInTheDocument();
       // Not part of the record total.
       expect(screen.queryByText('6')).not.toBeInTheDocument();
+    });
+
+    it('says how many symbols are not listed when the server capped the list', async () => {
+      await restoreWith({
+        message: 'Backup restored successfully',
+        restored: { accounts: 4 },
+        unlinkedBondSecurities: { count: 53, symbols: ['A', 'B', 'C'] },
+      });
+      expect(screen.getByText(/Affected securities: A, B, C\./)).toHaveTextContent('and 50 more');
     });
 
     it('says nothing about bond links when none were dropped', async () => {

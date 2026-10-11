@@ -817,7 +817,9 @@
       "skippedAttachments": "{count, plural, one {# anexo não foi restaurado} other {# anexos não foram restaurados}}: o backup não continha bytes utilizáveis para eles — faltavam ou falharam a soma de verificação na exportação, ou o ficheiro é anterior aos backups autossuficientes. Exporte um backup novo quando o armazenamento de anexos estiver saudável.",
       "unusableAiProviderKeys": "{count, plural, one {# fornecedor de IA foi restaurado sem uma chave de API utilizável} other {# fornecedores de IA foram restaurados sem chaves de API utilizáveis}}: a cópia de segurança foi criada antes de as chaves dos fornecedores seguirem nela, por isso a chave guardada pertence ao servidor que gerou o ficheiro, ou este servidor não tem qualquer chave de cifra configurada para a guardar. Abra Definições → Fornecedores de IA e introduza novamente a chave de API.",
       "unlinkedBondSecurities": "{count, plural, one {# título de obrigação foi restaurado sem ligação ao seu instrumento de obrigação} other {# títulos de obrigação foram restaurados sem ligação aos seus instrumentos de obrigação}}: o catálogo de obrigações deste servidor não inclui a série (ou inclui-a noutra moeda), pelo que o motor de obrigações já não os avalia e os seus preços calculados não foram restaurados. Abra cada título e ligue-o novamente a um instrumento de obrigação.",
-      "doneButton": "Concluído"
+      "doneButton": "Concluído",
+      "unlinkedBondSecuritiesList": "Títulos afetados: {symbols}.",
+      "unlinkedBondSecuritiesMore": "e mais {count}"
     },
     "storedBackups": {
       "heading": "Cópias de segurança automáticas",

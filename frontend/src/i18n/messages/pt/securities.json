@@ -204,7 +204,9 @@
     "bondInstrumentCurrent": "Série ligada",
     "bondInstrumentLoading": "A carregar o catálogo de obrigações...",
     "bondInstrumentLoadFailed": "Não foi possível carregar o catálogo de obrigações, por isso ainda não é possível associar uma série.",
-    "bondInstrumentRetry": "Tentar novamente"
+    "bondInstrumentRetry": "Tentar novamente",
+    "bondCurrencyLocked": "Este título está associado a uma série de obrigações em {linkedCurrency}. Volte a definir a moeda como {linkedCurrency} ou desassocie primeiro a série (desassociar remove os seus preços calculados).",
+    "bondNoSeriesInCurrency": "Não existem séries de obrigações em {currency}. O catálogo oferece séries em {currencies}; defina uma dessas moedas para associar uma série."
   },
   "priceForm": {
     "dateLabel": "Data",

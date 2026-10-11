@@ -274,7 +274,10 @@
       "projected": "Previsto",
       "maturityValue": "Valore a scadenza",
       "maturityKnown": "Noto",
-      "maturityProjected": "Previsto"
+      "maturityProjected": "Previsto",
+      "matured": "Scaduta",
+      "refused": "Non valutata",
+      "amountUnknown": "Importo sconosciuto"
     },
     "rateSource": {
       "TERMS": "Condizioni",
@@ -356,7 +359,8 @@
       "margin": "Interessi dal margine",
       "inflation": "Interessi dall'inflazione",
       "benchmark": "Interessi dal tasso di riferimento",
-      "announced": "Interessi annunciati"
+      "announced": "Interessi annunciati",
+      "fixedTerm": "Interessi a tasso fisso"
     },
     "chart": {
       "title": "Interessi cumulati alla fine di ogni periodo",
@@ -380,11 +384,34 @@
         "assumed": "Ipotizzato: {benchmark}",
         "maturityValue": "Valore a scadenza (proiezione)",
         "totalInterest": "Interessi totali (proiezione)"
-      }
+      },
+      "asOfNote": "Valutato al {date}, la data scelta sopra: le cifre riguardano le obbligazioni detenute in quel giorno."
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "Inflazione IPC, 12 mesi (GUS)",
       "PL_NBP_REFERENCE": "Tasso di riferimento NBP"
+    },
+    "valuationRefusal": {
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "Questa serie può essere acquistata solo dal {from} al {to}. Questo lotto è stato acquistato il {purchaseDate}, quindi non viene valutato."
+    },
+    "partial": {
+      "title": "Questa valutazione è incompleta: leggi le cifre come parziali.",
+      "terms": "Le condizioni dell'obbligazione sono incomplete (ad esempio, un calendario non è installato).",
+      "reference": "Mancano dati di riferimento; vedi sotto l'elenco dei dati ancora necessari.",
+      "earlyRedemption": "Le condizioni di rimborso anticipato sono incomplete, quindi i valori di rimborso anticipato potrebbero mancare.",
+      "other": "Almeno un lotto non può ancora essere valutato per intero (ad esempio, un tasso non è noto)."
+    },
+    "projectionMissing": {
+      "title": "I periodi successivi non possono essere proiettati",
+      "item": "{benchmark}: non è pubblicato alcun valore e non è impostata alcuna ipotesi, quindi i periodi successivi non possono essere proiettati (pubblicato da {publisher})",
+      "itemNoPublisher": "{benchmark}: non è pubblicato alcun valore e non è impostata alcuna ipotesi, quindi i periodi successivi non possono essere proiettati (editore sconosciuto)"
+    },
+    "coverage": {
+      "asOf": "Dati {benchmark} al {date}",
+      "none": "Nessun dato {benchmark} è ancora memorizzato"
+    },
+    "issuers": {
+      "PL_MF": "Ministero delle Finanze (PL)"
     }
   }
 }

@@ -274,7 +274,10 @@
       "projected": "Projetado",
       "maturityValue": "Valor no vencimento",
       "maturityKnown": "Conhecido",
-      "maturityProjected": "Projetado"
+      "maturityProjected": "Projetado",
+      "matured": "Vencido",
+      "refused": "Sem avaliação",
+      "amountUnknown": "Valor desconhecido"
     },
     "rateSource": {
       "TERMS": "Condições",
@@ -356,7 +359,8 @@
       "margin": "Juros da margem",
       "inflation": "Juros da inflação",
       "benchmark": "Juros da taxa de referência",
-      "announced": "Juros anunciados"
+      "announced": "Juros anunciados",
+      "fixedTerm": "Juros de taxa fixa"
     },
     "chart": {
       "title": "Juros acumulados no fim de cada período",
@@ -380,11 +384,34 @@
         "assumed": "Assumido: {benchmark}",
         "maturityValue": "Valor no vencimento (projeção)",
         "totalInterest": "Juros totais (projeção)"
-      }
+      },
+      "asOfNote": "Avaliado em {date}, a data escolhida acima: os valores se referem aos títulos mantidos nesse dia."
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "IPCA, 12 meses (GUS)",
       "PL_NBP_REFERENCE": "Taxa de referência do NBP"
+    },
+    "valuationRefusal": {
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "Esta série só pode ser comprada de {from} a {to}. Este lote foi comprado em {purchaseDate}, portanto não é avaliado."
+    },
+    "partial": {
+      "title": "Esta avaliação está incompleta; leia os valores como parciais.",
+      "terms": "As condições do título estão incompletas (por exemplo, um calendário não está instalado).",
+      "reference": "Faltam dados de referência; veja abaixo a lista de dados ainda necessários.",
+      "earlyRedemption": "As condições de resgate antecipado estão incompletas, então os valores de resgate antecipado podem estar ausentes.",
+      "other": "Pelo menos um lote ainda não pode ser avaliado por completo (por exemplo, uma taxa não é conhecida)."
+    },
+    "projectionMissing": {
+      "title": "Não é possível projetar os períodos seguintes",
+      "item": "{benchmark}: não há nenhum valor publicado nem premissa definida, portanto não é possível projetar os períodos seguintes (publicado por {publisher})",
+      "itemNoPublisher": "{benchmark}: não há nenhum valor publicado nem premissa definida, portanto não é possível projetar os períodos seguintes (publicador desconhecido)"
+    },
+    "coverage": {
+      "asOf": "Dados de {benchmark} em {date}",
+      "none": "Ainda não há dados de {benchmark} salvos"
+    },
+    "issuers": {
+      "PL_MF": "Ministério das Finanças (PL)"
     }
   }
 }

@@ -906,6 +906,14 @@ describe('SecurityList', () => {
       expect(yahooEls.length).toBeGreaterThanOrEqual(1);
     });
 
+    it('renders a translated label, not the raw id, for the bond engine source', () => {
+      const securities = [makeSecurity({ lastPriceSource: 'bond_engine', quoteProvider: 'yahoo' })];
+      useDensityStore.setState({ densities: { securities: 'normal' } });
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
+      expect(screen.getByText('Bond engine (issue terms)')).toBeInTheDocument();
+      expect(screen.queryByText('bond_engine')).not.toBeInTheDocument();
+    });
+
     it('renders MSN price source badge', () => {
       const securities = [makeSecurity({ lastPriceSource: 'msn_finance', quoteProvider: 'yahoo' })];
       useDensityStore.setState({ densities: { securities: 'normal' } });

@@ -63,9 +63,10 @@ export interface RestoreResult {
    * Securities restored unlinked from their bond instrument because this
    * server's catalog does not carry it (or carries it in another currency). The
    * rows were written, so this stays outside `restored`; the user has to link
-   * them again. Absent when none.
+   * them again. `symbols` is capped by the server (50), so it can be shorter
+   * than `count`. Absent when none.
    */
-  unlinkedBondSecurities?: number;
+  unlinkedBondSecurities?: { count: number; symbols: string[] };
 }
 
 export type SupportBackupSection =

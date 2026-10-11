@@ -274,7 +274,10 @@
       "projected": "Dự phóng",
       "maturityValue": "Giá trị khi đáo hạn",
       "maturityKnown": "Đã biết",
-      "maturityProjected": "Dự phóng"
+      "maturityProjected": "Dự phóng",
+      "matured": "Đã đáo hạn",
+      "refused": "Chưa định giá",
+      "amountUnknown": "Số tiền chưa rõ"
     },
     "rateSource": {
       "TERMS": "Điều khoản",
@@ -356,7 +359,8 @@
       "margin": "Lãi từ biên độ",
       "inflation": "Lãi từ lạm phát",
       "benchmark": "Lãi từ lãi suất tham chiếu",
-      "announced": "Lãi đã công bố"
+      "announced": "Lãi đã công bố",
+      "fixedTerm": "Lãi theo lãi suất cố định"
     },
     "chart": {
       "title": "Lãi tích lũy cuối mỗi kỳ",
@@ -380,11 +384,34 @@
         "assumed": "Giả định: {benchmark}",
         "maturityValue": "Giá trị đáo hạn (dự phóng)",
         "totalInterest": "Tổng lãi (dự phóng)"
-      }
+      },
+      "asOfNote": "Định giá tại ngày {date}, ngày được chọn ở trên: các con số là của trái phiếu nắm giữ vào ngày đó."
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "CPI, 12 tháng (GUS)",
       "PL_NBP_REFERENCE": "Lãi suất tham chiếu NBP"
+    },
+    "valuationRefusal": {
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "Chuỗi này chỉ có thể mua từ {from} đến {to}. Lô này được mua vào {purchaseDate} nên không được định giá."
+    },
+    "partial": {
+      "title": "Định giá này chưa đầy đủ, vì vậy hãy hiểu các con số là một phần.",
+      "terms": "Điều khoản của trái phiếu chưa đầy đủ (ví dụ chưa cài lịch).",
+      "reference": "Thiếu dữ liệu tham chiếu; xem danh sách dữ liệu còn cần bên dưới.",
+      "earlyRedemption": "Điều khoản mua lại sớm chưa đầy đủ nên có thể thiếu giá trị mua lại sớm.",
+      "other": "Ít nhất một lô chưa thể định giá đầy đủ (ví dụ chưa biết lãi suất)."
+    },
+    "projectionMissing": {
+      "title": "Không thể dự phóng các kỳ sau",
+      "item": "{benchmark}: chưa có giá trị nào được công bố và chưa đặt giả định nào, nên không thể dự phóng các kỳ sau (do {publisher} công bố)",
+      "itemNoPublisher": "{benchmark}: chưa có giá trị nào được công bố và chưa đặt giả định nào, nên không thể dự phóng các kỳ sau (chưa rõ đơn vị công bố)"
+    },
+    "coverage": {
+      "asOf": "Dữ liệu {benchmark} tính đến {date}",
+      "none": "Chưa lưu dữ liệu {benchmark} nào"
+    },
+    "issuers": {
+      "PL_MF": "Bộ Tài chính (PL)"
     }
   }
 }

@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { NumericInput } from '@/components/ui/NumericInput';
 import { TABLE_BODY_CLASS, TABLE_CLASS, Td, Th } from '@/components/ui/Table';
-import { useFinancialToday } from '@/hooks/useFinancialToday';
+import { useDateFormat } from '@/hooks/useDateFormat';
 import { useLongPress } from '@/hooks/useLongPress';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useReportData } from '@/hooks/useReportData';
@@ -33,6 +33,8 @@ interface SecurityBondScenarioPanelProps {
   /** True when the rule reads a price index, so the wording says inflation. */
   inflation: boolean;
   currency: string;
+  /** The card's valuation date: the scenarios value the lots held on this day. */
+  asOf: string;
   /** The value the valuation currently assumes (a fraction), or null for the default. */
   selected: string | null;
   /** A scenario row was chosen; null returns to the engine's default assumption. */
@@ -59,12 +61,13 @@ export function SecurityBondScenarioPanel({
   benchmarkId,
   inflation,
   currency,
+  asOf,
   selected,
   onSelect,
 }: SecurityBondScenarioPanelProps) {
   const t = useTranslations('securityDetail');
   const { formatCurrency, formatPercentTrimmed } = useNumberFormat();
-  const today = useFinancialToday();
+  const { formatDate } = useDateFormat();
   const [draft, setDraft] = useState<number | undefined>(undefined);
   const [custom, setCustom] = useState<string | null>(null);
 
@@ -76,12 +79,12 @@ export function SecurityBondScenarioPanel({
     [custom],
   );
   const valuesKey = values.join(',');
-  const requestKey = `${securityId}|${benchmarkId}|${valuesKey}|${today}`;
+  const requestKey = `${securityId}|${benchmarkId}|${valuesKey}|${asOf}`;
   const { data, dataKey, isLoading, error, reload } =
     useReportData<SecurityBondScenarios>(
       () =>
-        investmentsApi.getSecurityBondScenarios(securityId, benchmarkId, values),
-      [securityId, benchmarkId, valuesKey, today],
+        investmentsApi.getSecurityBondScenarios(securityId, benchmarkId, values, asOf),
+      [securityId, benchmarkId, valuesKey, asOf],
       { requestKey },
     );
   // Figures belong to the request that produced them.
@@ -218,6 +221,9 @@ export function SecurityBondScenarioPanel({
       </div>
       <p className="text-sm text-gray-600 dark:text-gray-400">
         {t('bond.scenarios.intro', { benchmark })}
+      </p>
+      <p className="text-sm text-gray-600 dark:text-gray-400">
+        {t('bond.scenarios.asOfNote', { date: formatDate(result?.asOf ?? asOf) })}
       </p>
       <div className="flex flex-wrap items-end gap-2">
         <div className="w-full sm:w-56">

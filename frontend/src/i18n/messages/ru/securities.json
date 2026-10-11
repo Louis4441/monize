@@ -204,7 +204,9 @@
     "bondInstrumentCurrent": "Привязанная серия",
     "bondInstrumentLoading": "Загрузка каталога облигаций...",
     "bondInstrumentLoadFailed": "Не удалось загрузить каталог облигаций, поэтому серию пока нельзя привязать.",
-    "bondInstrumentRetry": "Повторить"
+    "bondInstrumentRetry": "Повторить",
+    "bondCurrencyLocked": "Эта бумага связана с серией облигаций в валюте {linkedCurrency}. Верните валюту {linkedCurrency} или сначала отвяжите серию (при отвязке расчётные цены удаляются).",
+    "bondNoSeriesInCurrency": "Серий облигаций в валюте {currency} нет. Каталог предлагает серии в валютах: {currencies}; выберите одну из них, чтобы привязать серию."
   },
   "priceForm": {
     "dateLabel": "Дата",

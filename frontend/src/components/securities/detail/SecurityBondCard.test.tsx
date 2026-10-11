@@ -17,6 +17,9 @@ vi.mock('@/hooks/useNumberFormat', async () => {
     useNumberFormat: () => ({
       ...numberFormatMockDefaults(),
       defaultCurrency: 'PLN',
+      // Like the real hook: the code when given, the default currency otherwise.
+      formatCurrencyAxis: (value: number, code?: unknown) =>
+        `${typeof code === 'string' ? code : 'DEFAULT'} ${value}`,
     }),
   };
 });
@@ -44,7 +47,8 @@ vi.mock('recharts', () => ({
   ),
   Cell: ({ fillOpacity }: any) => <i data-testid="cell" data-opacity={fillOpacity} />,
   XAxis: () => null,
-  YAxis: () => null,
+  YAxis: ({ tickFormatter }: any) =>
+    tickFormatter ? <span data-testid="y-tick">{tickFormatter(100, 0)}</span> : null,
   CartesianGrid: () => null,
   Tooltip: () => null,
   Legend: () => null,
@@ -64,6 +68,8 @@ const security = {
 function lotValuation(overrides: Partial<BondValuation> = {}): BondValuation {
   return {
     asOf: '2027-04-15',
+    status: 'OPEN',
+    refusal: null,
     seriesCode: 'TOS1029',
     termsVersion: 1,
     quantity: 10,
@@ -102,6 +108,7 @@ function lotValuation(overrides: Partial<BondValuation> = {}): BondValuation {
       earlyRedemptionTermsComplete: true,
     },
     missing: [],
+    projectionMissing: [],
     valuationComplete: true,
     ...overrides,
   };
@@ -162,7 +169,7 @@ describe('SecurityBondCard', () => {
   it('asks for the valuation on the financial today and renders totals and lots', async () => {
     await mount();
     expect(get).toHaveBeenCalledWith('sec-1', '2027-04-15', undefined);
-    expect(screen.getByText('Series TOS1029 (PL_MF, RETAIL, PL)')).toBeInTheDocument();
+    expect(screen.getByText('Series TOS1029 (Ministry of Finance (PL), RETAIL, PL)')).toBeInTheDocument();
     const gross = screen.getByText('Gross value', { selector: 'dt' }).nextElementSibling!;
     expect(gross).toHaveTextContent('$1,090.20');
     const row = screen.getAllByRole('row')[1];
@@ -388,9 +395,9 @@ describe('SecurityBondCard', () => {
       let resolveSecond!: (value: SecurityBondValuation) => void;
       get.mockReturnValueOnce(new Promise((resolve) => (resolveSecond = resolve)));
       await act(async () => {
-        changeDate('06/30/2027');
+        changeDate('03/30/2027');
       });
-      expect(get).toHaveBeenLastCalledWith('sec-1', '2027-06-30', undefined);
+      expect(get).toHaveBeenLastCalledWith('sec-1', '2027-03-30', undefined);
       // Day A's figures are not shown under day B's label while B is pending.
       expect(screen.getByText('Loading the bond valuation...')).toBeInTheDocument();
       expect(screen.queryByText('$1,090.20')).not.toBeInTheDocument();
@@ -399,7 +406,7 @@ describe('SecurityBondCard', () => {
       await act(async () => {
         resolveSecond(
           response({
-            asOf: '2027-06-30',
+            asOf: '2027-03-30',
             totals: { quantity: 10, grossValue: '1111.1100', earlyRedemptionValue: null, accruedInterest: '1.00' },
           }),
         );
@@ -410,9 +417,9 @@ describe('SecurityBondCard', () => {
     it('falls back to the financial today when the date is cleared', async () => {
       await mount();
       await act(async () => {
-        changeDate('06/30/2027');
+        changeDate('03/30/2027');
       });
-      expect(get).toHaveBeenLastCalledWith('sec-1', '2027-06-30', undefined);
+      expect(get).toHaveBeenLastCalledWith('sec-1', '2027-03-30', undefined);
       await act(async () => {
         changeDate('');
       });
@@ -454,10 +461,10 @@ describe('SecurityBondCard', () => {
 
     it('shows the earlier known flow when a projected one comes later', async () => {
       const cells = await mountLot({
-        knownCashflows: [flow({ date: '2027-06-30', type: 'INTEREST', amount: '45.00' })],
+        knownCashflows: [flow({ date: '2027-03-30', type: 'INTEREST', amount: '45.00' })],
         projectedCashflows: [flow({ date: '2027-12-31', type: 'INTEREST', amount: '12.00', status: 'PROJECTED' })],
       });
-      expect(cells[9]).toHaveTextContent('Interest $45.00 on 06/30/2027');
+      expect(cells[9]).toHaveTextContent('Interest $45.00 on 03/30/2027');
       expect(within(cells[9]).queryByText('Projected')).not.toBeInTheDocument();
     });
 
@@ -834,7 +841,7 @@ describe('SecurityBondCard: indexation, scenarios and the interest chart (spec 1
       withLots({});
       await mount();
       expect(scenarios).toHaveBeenCalledTimes(1);
-      expect(scenarios).toHaveBeenCalledWith('sec-1', CPI, ['0', '0.025', '0.05', '0.08']);
+      expect(scenarios).toHaveBeenCalledWith('sec-1', CPI, ['0', '0.025', '0.05', '0.08'], '2027-04-15');
       const panel = screen.getByRole('region', { name: 'Inflation scenarios' });
       expect(within(panel).getByText('Projection')).toBeInTheDocument();
       const rows = within(panel).getAllByRole('row');
@@ -860,7 +867,7 @@ describe('SecurityBondCard: indexation, scenarios and the interest chart (spec 1
       await act(async () => {
         fireEvent.click(within(panel).getByRole('button', { name: 'Add scenario' }));
       });
-      expect(scenarios).toHaveBeenLastCalledWith('sec-1', CPI, ['0', '0.025', '0.05', '0.08', '0.0325']);
+      expect(scenarios).toHaveBeenLastCalledWith('sec-1', CPI, ['0', '0.025', '0.05', '0.08', '0.0325'], '2027-04-15');
     });
 
     it('does not repeat a typed value that is a preset', async () => {
@@ -956,6 +963,230 @@ describe('SecurityBondCard: indexation, scenarios and the interest chart (spec 1
     it('draws nothing for a fixed-rate bond without a schedule', async () => {
       await mount();
       expect(screen.queryByTestId('bar-chart')).not.toBeInTheDocument();
+    });
+  });
+  describe('audit fixes', () => {
+    const cashFlow = (over: Partial<BondValuation['knownCashflows'][number]>) => ({
+      date: '2027-07-05',
+      type: 'INTEREST' as const,
+      amount: '5.00',
+      status: 'KNOWN' as const,
+      period: 1,
+      ...over,
+    });
+
+    it('shows an UNKNOWN cash flow as the next one, with an unknown amount and no number', async () => {
+      withLots({
+        rateSchedule: [],
+        rateRule: rule({ type: 'FIXED', benchmarkId: null }),
+        knownCashflows: [cashFlow({ date: '2027-10-15', type: 'PRINCIPAL', amount: '1000.00' })],
+        projectedCashflows: [
+          cashFlow({ date: '2027-01-15', amount: null, status: 'UNKNOWN', period: 3 }),
+          cashFlow({ date: '2027-02-15', amount: '3.80', status: 'PROJECTED', period: 4 }),
+        ],
+      });
+      await mount();
+      const next = within(screen.getAllByRole('row')[1]).getAllByRole('cell')[9];
+      expect(next).toHaveTextContent('Interest Unknown on 01/15/2027');
+      expect(within(next).getByText('Amount unknown')).toBeInTheDocument();
+      expect(next).not.toHaveTextContent('$0.00');
+      expect(next).not.toHaveTextContent('3.80');
+    });
+
+    it('lists a benchmark nothing can be projected from, with its publisher', async () => {
+      withLots({
+        projectionAssumptions: [],
+        projectionMissing: [
+          { benchmarkId: CPI, publisher: 'GUS' },
+          { benchmarkId: 'PL_NBP_REFERENCE', publisher: null },
+        ],
+      });
+      await mount();
+      expect(screen.getByText('Later periods cannot be projected')).toBeInTheDocument();
+      expect(
+        screen.getByText(/CPI, 12 months \(GUS\): no value is published.*\(published by GUS\)/),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/NBP reference rate: no value is published.*publisher not known/)).toBeInTheDocument();
+    });
+
+    it('draws the chart axis in the bond currency, not the default one', async () => {
+      withLots({});
+      await mount();
+      const ticks = screen.getAllByTestId('y-tick');
+      expect(ticks[0]).toHaveTextContent('PLN 100');
+      expect(ticks[0]).not.toHaveTextContent('DEFAULT');
+    });
+
+    it('labels a fixed-rate bond fixed-rate interest for the whole term, without margin or benchmark bars', async () => {
+      withLots({
+        rateRule: rule({ type: 'FIXED', benchmarkId: null, annualRate: '0.0440', firstPeriodRate: null, addend: null }),
+        rateSchedule: [
+          period(1, { rateSource: 'TERMS', addend: null, interest: '4.4', fixedPart: '4.4' }),
+          period(2, { rateSource: 'TERMS', addend: null, interest: '4.4', fixedPart: '4.4' }),
+          period(3, { rateSource: 'TERMS', addend: null, interest: '4.4', fixedPart: '4.4' }),
+        ],
+        projectionAssumptions: [],
+      });
+      await mount();
+      expect(screen.getAllByTestId('bar').map((b) => b.getAttribute('data-name'))).toEqual(['Fixed-rate interest']);
+      expect(screen.queryByText(/1st period/)).not.toBeInTheDocument();
+    });
+
+    it('shows Matured, not Unknown, for a matured lot and keeps the period of an open lot with an unknown rate', async () => {
+      get.mockResolvedValue(
+        response({
+          lots: [
+            {
+              purchaseDate: '2020-10-05',
+              quantity: 10,
+              purchaseDateAssumed: false,
+              valuation: lotValuation({
+                status: 'MATURED',
+                currentPeriod: null,
+                earlyRedemptionValue: null,
+                earlyRedemptionRefusal: 'MATURED',
+              }),
+            },
+            {
+              purchaseDate: '2026-10-05',
+              quantity: 5,
+              purchaseDateAssumed: false,
+              valuation: lotValuation({
+                currentPeriod: {
+                  index: 3,
+                  start: '2027-01-01',
+                  end: '2027-12-31',
+                  annualRate: null,
+                  rateSource: null,
+                },
+              }),
+            },
+          ],
+        }),
+      );
+      await mount();
+      const matured = within(screen.getAllByRole('row')[1]).getAllByRole('cell');
+      expect(matured[3]).toHaveTextContent('Matured');
+      expect(matured[4]).toHaveTextContent('Matured');
+      expect(matured[3]).not.toHaveTextContent('Unknown');
+      const open = within(screen.getAllByRole('row')[2]).getAllByRole('cell');
+      expect(open[3]).toHaveTextContent('3: 12/31/2027'.slice(0, 2));
+      expect(open[3]).toHaveTextContent('01/01/2027');
+      expect(open[4]).toHaveTextContent('Unknown');
+    });
+
+    it('shows the refusal reason of a lot bought outside the sale window instead of Unknown', async () => {
+      get.mockResolvedValue(
+        response({
+          lots: [
+            {
+              purchaseDate: '2026-12-05',
+              quantity: 10,
+              purchaseDateAssumed: false,
+              valuation: lotValuation({
+                status: 'REFUSED',
+                currentPeriod: null,
+                refusal: {
+                  code: 'PURCHASE_OUTSIDE_SALE_WINDOW',
+                  params: { from: '2026-10-01', to: '2026-10-31', purchaseDate: '2026-12-05' },
+                },
+                grossValue: null,
+                valuationComplete: false,
+              }),
+            },
+          ],
+        }),
+      );
+      await mount();
+      const cell = within(screen.getAllByRole('row')[1]).getAllByRole('cell')[3];
+      expect(cell).toHaveTextContent('Not valued');
+      expect(cell).toHaveTextContent('can only be bought from 10/01/2026 to 10/31/2026');
+      expect(cell).toHaveTextContent('bought on 12/05/2026');
+    });
+
+    it('shows a partial-data notice naming the cause when valuationComplete is false', async () => {
+      withLots({
+        valuationComplete: false,
+        dataCompleteness: {
+          termsComplete: false,
+          referenceDataComplete: true,
+          earlyRedemptionTermsComplete: true,
+        },
+        missing: [],
+      });
+      await mount();
+      const note = screen.getByText('This valuation is incomplete', { exact: false }).closest('[role="note"]') as HTMLElement;
+      expect(note).toHaveTextContent('This valuation is incomplete');
+      expect(note).toHaveTextContent('The terms of the bond are incomplete');
+      expect(note).not.toHaveTextContent('Reference data is missing');
+    });
+
+    it('shows no partial notice for a complete valuation or an absent flag', async () => {
+      withLots({ valuationComplete: true });
+      await mount();
+      expect(screen.queryByText('This valuation is incomplete', { exact: false })).not.toBeInTheDocument();
+    });
+
+    it('says how fresh each benchmark is', async () => {
+      get.mockResolvedValue(
+        response({
+          benchmarkCoverage: [
+            { benchmarkId: CPI, coveredThrough: '2027-03-31', lastFetchedAt: '2027-04-10T06:00:00Z' },
+            { benchmarkId: 'PL_NBP_REFERENCE', coveredThrough: null, lastFetchedAt: null },
+          ],
+        }),
+      );
+      await mount();
+      expect(screen.getByText('CPI, 12 months (GUS) data as of 03/31/2027')).toBeInTheDocument();
+      expect(screen.getByText('No NBP reference rate data is stored yet')).toBeInTheDocument();
+    });
+
+    it('translates a known issuer and falls back to the code for an unknown one', async () => {
+      get.mockResolvedValue(
+        response({
+          instrument: {
+            id: 'bond-1',
+            issuerCountryCode: 'XX',
+            issuerCode: 'XX_ISSUER',
+            programCode: 'RETAIL',
+            seriesCode: 'S1',
+            currencyCode: 'PLN',
+          },
+        }),
+      );
+      await mount();
+      expect(screen.getByText('Series S1 (XX_ISSUER, RETAIL, XX)')).toBeInTheDocument();
+    });
+
+    it('does not let the picker choose a day after today and never requests one', async () => {
+      await mount();
+      const input = screen.getByLabelText('Valued on');
+      expect(input).toHaveAttribute('max', '2027-04-15');
+      await act(async () => {
+        fireEvent.change(input, { target: { value: '12/31/2030' } });
+        fireEvent.blur(input);
+      });
+      expect(get).not.toHaveBeenCalledWith('sec-1', '2030-12-31', undefined);
+    });
+
+    it('values the scenarios on the card date and says so', async () => {
+      withLots({});
+      await mount();
+      const input = screen.getByLabelText('Valued on');
+      scenarios.mockResolvedValue({
+        securityId: 'sec-1',
+        benchmarkId: CPI,
+        asOf: '2027-02-01',
+        refusal: null,
+        scenarios: scenarioRows,
+      });
+      await act(async () => {
+        fireEvent.change(input, { target: { value: '02/01/2027' } });
+        fireEvent.blur(input);
+      });
+      expect(scenarios).toHaveBeenLastCalledWith('sec-1', CPI, ['0', '0.025', '0.05', '0.08'], '2027-02-01');
+      const panel = screen.getByRole('region', { name: 'Inflation scenarios' });
+      expect(within(panel).getByText(/Valued on 02\/01\/2027/)).toBeInTheDocument();
     });
   });
 });

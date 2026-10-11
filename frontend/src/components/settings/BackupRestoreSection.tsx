@@ -747,12 +747,33 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
                 carries it in another currency). The bond engine no longer prices
                 them, so say so and what to do. Outside the record total on
                 purpose: the rows were written. */}
-            {!!restoreResult.unlinkedBondSecurities && (
-              <p className="mt-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
-                {t('restoreResult.unlinkedBondSecurities', {
-                  count: restoreResult.unlinkedBondSecurities,
-                })}
-              </p>
+            {!!restoreResult.unlinkedBondSecurities?.count && (
+              <div className="mt-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
+                <p>
+                  {t('restoreResult.unlinkedBondSecurities', {
+                    count: restoreResult.unlinkedBondSecurities.count,
+                  })}
+                </p>
+                {restoreResult.unlinkedBondSecurities.symbols.length > 0 && (
+                  <p className="mt-2">
+                    {t('restoreResult.unlinkedBondSecuritiesList', {
+                      symbols:
+                        restoreResult.unlinkedBondSecurities.symbols.join(', '),
+                    })}
+                    {restoreResult.unlinkedBondSecurities.count >
+                      restoreResult.unlinkedBondSecurities.symbols.length && (
+                      <>
+                        {' '}
+                        {t('restoreResult.unlinkedBondSecuritiesMore', {
+                          count:
+                            restoreResult.unlinkedBondSecurities.count -
+                            restoreResult.unlinkedBondSecurities.symbols.length,
+                        })}
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
             )}
 
             <div className="mt-6 flex justify-end">

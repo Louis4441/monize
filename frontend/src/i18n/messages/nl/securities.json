@@ -204,7 +204,9 @@
     "bondInstrumentCurrent": "Gekoppelde reeks",
     "bondInstrumentLoading": "Obligatiecatalogus laden...",
     "bondInstrumentLoadFailed": "De obligatiecatalogus kon niet worden geladen, dus er kan nog geen serie worden gekoppeld.",
-    "bondInstrumentRetry": "Opnieuw proberen"
+    "bondInstrumentRetry": "Opnieuw proberen",
+    "bondCurrencyLocked": "Dit effect is gekoppeld aan een obligatieserie in {linkedCurrency}. Zet de valuta terug op {linkedCurrency} of ontkoppel eerst de serie (ontkoppelen verwijdert de berekende koersen).",
+    "bondNoSeriesInCurrency": "Er zijn geen obligatieseries in {currency}. De catalogus biedt series in {currencies}; stel een van die valuta in om een serie te koppelen."
   },
   "priceForm": {
     "dateLabel": "Datum",

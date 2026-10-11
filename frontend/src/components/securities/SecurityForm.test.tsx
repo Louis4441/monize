@@ -4,6 +4,7 @@ import { SecurityForm } from './SecurityForm';
 import { Security } from '@/types/investment';
 import { investmentsApi } from '@/lib/investments';
 import { exchangeRatesApi } from '@/lib/exchange-rates';
+import toast from 'react-hot-toast';
 
 vi.mock('@/hooks/useNumberFormat', async () => {
   const { numberFormatMockDefaults } = await import('@/test/number-format-mock');
@@ -1185,21 +1186,54 @@ describe('SecurityForm', () => {
       );
     });
 
-    it('sends null when the series is left not linked', async () => {
+    it('omits bondInstrumentId when an unlinked BOND is saved without a link change (rolling deploy)', async () => {
       await renderBond();
       await screen.findByLabelText('Bond series (optional)');
+      fireEvent.click(screen.getByText('Update Security'));
+      await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+      expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('bondInstrumentId');
+    });
+
+    it('omits bondInstrumentId when a linked BOND is saved with its link unchanged', async () => {
+      await renderBond({ bondInstrumentId: 'b-pln' });
+      const select = (await screen.findByLabelText('Bond series (optional)')) as HTMLSelectElement;
+      await waitFor(() => expect(select.value).toBe('b-pln'));
+      fireEvent.click(screen.getByText('Update Security'));
+      await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+      expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('bondInstrumentId');
+    });
+
+    it('sends null when a linked series is deliberately unlinked', async () => {
+      await renderBond({ bondInstrumentId: 'b-pln' });
+      const select = (await screen.findByLabelText('Bond series (optional)')) as HTMLSelectElement;
+      await waitFor(() => expect(select.value).toBe('b-pln'));
+      fireEvent.change(select, { target: { value: '' } });
       fireEvent.click(screen.getByText('Update Security'));
       await waitFor(() =>
         expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ bondInstrumentId: null })),
       );
     });
 
-    it('clears the link when the currency no longer matches the instrument', async () => {
+    it('blocks a currency change of a linked security with an explanation instead of silently unlinking', async () => {
       await renderBond({ bondInstrumentId: 'b-pln' });
       const select = (await screen.findByLabelText('Bond series (optional)')) as HTMLSelectElement;
       await waitFor(() => expect(select.value).toBe('b-pln'));
       fireEvent.change(screen.getByLabelText('Currency'), { target: { value: 'USD' } });
-      await waitFor(() => expect(select.value).toBe(''));
+      // The link is kept, never dropped by the currency change.
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('linked to a bond series in PLN'));
+      expect(select.value).toBe('b-pln');
+      const errorSpy = vi.spyOn(toast, 'error').mockImplementation(() => '');
+      fireEvent.click(screen.getByText('Update Security'));
+      await waitFor(() => expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('linked to a bond series in PLN')));
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it('lets the currency change once the series is unlinked on purpose', async () => {
+      await renderBond({ bondInstrumentId: 'b-pln' });
+      const select = (await screen.findByLabelText('Bond series (optional)')) as HTMLSelectElement;
+      await waitFor(() => expect(select.value).toBe('b-pln'));
+      fireEvent.change(screen.getByLabelText('Currency'), { target: { value: 'USD' } });
+      fireEvent.change(select, { target: { value: '' } });
       fireEvent.click(screen.getByText('Update Security'));
       await waitFor(() =>
         expect(onSubmit).toHaveBeenCalledWith(
@@ -1208,14 +1242,36 @@ describe('SecurityForm', () => {
       );
     });
 
+    it('drops a series picked in this edit when the currency then changes (nothing stored to lose)', async () => {
+      await renderBond();
+      const select = (await screen.findByLabelText('Bond series (optional)')) as HTMLSelectElement;
+      fireEvent.change(select, { target: { value: 'b-pln' } });
+      fireEvent.change(screen.getByLabelText('Currency'), { target: { value: 'USD' } });
+      await waitFor(() => expect(select.value).toBe(''));
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('says no series exist in the form currency and names the currencies that have one', async () => {
+      await renderBond({ currencyCode: 'EUR' });
+      await screen.findByLabelText('Bond series (optional)');
+      expect(await screen.findByText(/No bond series exist in EUR/)).toHaveTextContent(
+        'offers series in PLN, USD',
+      );
+    });
+
+    it('shows no empty-state hint while a series exists in the form currency', async () => {
+      await renderBond();
+      await screen.findByLabelText('Bond series (optional)');
+      expect(screen.queryByText(/No bond series exist/)).not.toBeInTheDocument();
+    });
+
     it('keeps the stored link when the catalog could not be loaded', async () => {
       vi.mocked(investmentsApi.listBondInstruments).mockRejectedValue(new Error('down'));
       await renderBond({ bondInstrumentId: 'b-pln' });
       await screen.findByLabelText('Bond series (optional)');
       fireEvent.click(screen.getByText('Update Security'));
-      await waitFor(() =>
-        expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ bondInstrumentId: 'b-pln' })),
-      );
+      await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+      expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('bondInstrumentId');
     });
 
     it('hides the quote provider controls for a linked series and submits the stored values unchanged', async () => {
@@ -1227,9 +1283,10 @@ describe('SecurityForm', () => {
       fireEvent.click(screen.getByText('Update Security'));
       await waitFor(() =>
         expect(onSubmit).toHaveBeenCalledWith(
-          expect.objectContaining({ bondInstrumentId: 'b-pln', quoteProvider: 'msn', msnInstrumentId: 'abc123' }),
+          expect.objectContaining({ quoteProvider: 'msn', msnInstrumentId: 'abc123' }),
         ),
       );
+      expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('bondInstrumentId');
     });
 
     it('shows the quote provider select again after a linked BOND is unlinked', async () => {
@@ -1250,13 +1307,13 @@ describe('SecurityForm', () => {
       expect(screen.queryByLabelText('MSN Instrument ID (advanced)')).not.toBeInTheDocument();
     });
 
-    it('brings the quote provider back when a currency change drops the link', async () => {
+    it('keeps the quote provider hidden after a currency change because the link is kept', async () => {
       await renderBond({ bondInstrumentId: 'b-pln' });
       const select = (await screen.findByLabelText('Bond series (optional)')) as HTMLSelectElement;
       await waitFor(() => expect(select.value).toBe('b-pln'));
-      expect(screen.queryByLabelText('Quote Provider')).not.toBeInTheDocument();
       fireEvent.change(screen.getByLabelText('Currency'), { target: { value: 'USD' } });
-      expect(await screen.findByLabelText('Quote Provider')).toBeInTheDocument();
+      await screen.findByRole('alert');
+      expect(screen.queryByLabelText('Quote Provider')).not.toBeInTheDocument();
     });
 
     it('says the catalog is loading while the request is pending', async () => {

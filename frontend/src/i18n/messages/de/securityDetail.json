@@ -274,7 +274,10 @@
       "projected": "Prognose",
       "maturityValue": "Wert bei Fälligkeit",
       "maturityKnown": "Bekannt",
-      "maturityProjected": "Prognostiziert"
+      "maturityProjected": "Prognostiziert",
+      "matured": "Fällig geworden",
+      "refused": "Nicht bewertet",
+      "amountUnknown": "Betrag unbekannt"
     },
     "rateSource": {
       "TERMS": "Bedingungen",
@@ -356,7 +359,8 @@
       "margin": "Zinsen aus der Marge",
       "inflation": "Zinsen aus der Inflation",
       "benchmark": "Zinsen aus dem Referenzzinssatz",
-      "announced": "Angekündigte Zinsen"
+      "announced": "Angekündigte Zinsen",
+      "fixedTerm": "Zinsen aus dem festen Zinssatz"
     },
     "chart": {
       "title": "Kumulierte Zinsen am Ende jeder Periode",
@@ -380,11 +384,34 @@
         "assumed": "Angenommen: {benchmark}",
         "maturityValue": "Rückzahlungswert (Prognose)",
         "totalInterest": "Zinsen gesamt (Prognose)"
-      }
+      },
+      "asOfNote": "Bewertet zum {date}, dem oben gewählten Datum: Die Zahlen beziehen sich auf die an diesem Tag gehaltenen Anleihen."
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "Inflationsrate (VPI), 12 Monate (GUS)",
       "PL_NBP_REFERENCE": "NBP-Referenzzins"
+    },
+    "valuationRefusal": {
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "Diese Serie kann nur vom {from} bis zum {to} gekauft werden. Dieses Los wurde am {purchaseDate} gekauft und wird deshalb nicht bewertet."
+    },
+    "partial": {
+      "title": "Diese Bewertung ist unvollständig; lesen Sie die Zahlen als Teilwerte.",
+      "terms": "Die Bedingungen der Anleihe sind unvollständig (zum Beispiel ist ein Kalender nicht installiert).",
+      "reference": "Referenzdaten fehlen; siehe die Liste der noch benötigten Daten unten.",
+      "earlyRedemption": "Die Bedingungen der vorzeitigen Rückgabe sind unvollständig, daher können Werte für die vorzeitige Rückgabe fehlen.",
+      "other": "Mindestens ein Los kann noch nicht vollständig bewertet werden (zum Beispiel ist ein Zinssatz nicht bekannt)."
+    },
+    "projectionMissing": {
+      "title": "Spätere Perioden können nicht prognostiziert werden",
+      "item": "{benchmark}: Es ist kein Wert veröffentlicht und keine Annahme festgelegt, daher können spätere Perioden nicht prognostiziert werden (veröffentlicht von {publisher})",
+      "itemNoPublisher": "{benchmark}: Es ist kein Wert veröffentlicht und keine Annahme festgelegt, daher können spätere Perioden nicht prognostiziert werden (Herausgeber unbekannt)"
+    },
+    "coverage": {
+      "asOf": "{benchmark}-Daten, Stand {date}",
+      "none": "Es sind noch keine {benchmark}-Daten gespeichert"
+    },
+    "issuers": {
+      "PL_MF": "Finanzministerium (PL)"
     }
   }
 }

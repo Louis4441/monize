@@ -204,7 +204,9 @@
     "bondInstrumentCurrent": "Verknüpfte Serie",
     "bondInstrumentLoading": "Anleihenkatalog wird geladen...",
     "bondInstrumentLoadFailed": "Der Anleihenkatalog konnte nicht geladen werden, daher lässt sich noch keine Serie verknüpfen.",
-    "bondInstrumentRetry": "Erneut versuchen"
+    "bondInstrumentRetry": "Erneut versuchen",
+    "bondCurrencyLocked": "Dieses Wertpapier ist mit einer Anleiheserie in {linkedCurrency} verknüpft. Setzen Sie die Währung wieder auf {linkedCurrency} oder lösen Sie zuerst die Verknüpfung (dabei werden die berechneten Kurse entfernt).",
+    "bondNoSeriesInCurrency": "Es gibt keine Anleiheserien in {currency}. Der Katalog bietet Serien in {currencies}; wählen Sie eine dieser Währungen, um eine Serie zu verknüpfen."
   },
   "priceForm": {
     "dateLabel": "Datum",

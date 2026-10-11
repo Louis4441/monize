@@ -17,9 +17,10 @@ import type { Security } from '@/types/investment';
 import type {
   BondAssumption,
   BondMissingObservation,
+  BondProjectionMissing,
   SecurityBondValuation,
 } from '@/types/bond';
-import { benchmarkLabel } from './bond-labels';
+import { benchmarkLabel, issuerLabel, programLabel } from './bond-labels';
 import { SecurityBondLotsTable } from './SecurityBondLotsTable';
 import { SecurityBondRateSection } from './SecurityBondRateSection';
 import { SecurityBondScenarioPanel } from './SecurityBondScenarioPanel';
@@ -156,6 +157,55 @@ export function SecurityBondCard({
     [valuation],
   );
 
+  // A benchmark no future period can be projected from, each once.
+  const projectionMissing = useMemo<BondProjectionMissing[]>(
+    () =>
+      valuation
+        ? distinct(
+            valuation.lots.flatMap((l) => l.valuation.projectionMissing ?? []),
+            (m) => `${m.benchmarkId}|${m.publisher ?? ''}`,
+          )
+        : [],
+    [valuation],
+  );
+  // `=== false` only: an absent flag is no information. Each cause is named.
+  const incompleteLots = useMemo(
+    () =>
+      valuation
+        ? valuation.lots.filter((l) => l.valuation.valuationComplete === false)
+        : [],
+    [valuation],
+  );
+
+  // Each cause once. A lot that is incomplete for a reason no flag names (a
+  // refused purchase, a rate not known yet) is reported as "other".
+  const partialCauses = useMemo(() => {
+    const causes: Array<'terms' | 'reference' | 'earlyRedemption' | 'other'> = [];
+    const has = (pick: (l: (typeof incompleteLots)[number]) => boolean) =>
+      incompleteLots.some(pick);
+    if (has((l) => l.valuation.dataCompleteness?.termsComplete === false)) {
+      causes.push('terms');
+    }
+    if (has((l) => l.valuation.dataCompleteness?.referenceDataComplete === false)) {
+      causes.push('reference');
+    }
+    if (
+      has((l) => l.valuation.dataCompleteness?.earlyRedemptionTermsComplete === false)
+    ) {
+      causes.push('earlyRedemption');
+    }
+    const unexplained = (l: (typeof incompleteLots)[number]) => {
+      const c = l.valuation.dataCompleteness;
+      return (
+        c?.termsComplete !== false &&
+        c?.referenceDataComplete !== false &&
+        c?.earlyRedemptionTermsComplete !== false
+      );
+    };
+    if (has(unexplained)) causes.push('other');
+    return causes;
+  }, [incompleteLots]);
+
   // The action enum is shown by the investment screens' own translated name.
   const actionLabel = (action: string): string => {
     const key = ACTION_LABEL_KEYS[action];
@@ -199,6 +249,7 @@ export function SecurityBondCard({
     }
 
     const { totals, refusal, lots, instrument } = valuation;
+    const coverage = valuation.benchmarkCoverage ?? [];
     const totalReason = refusal
       ? t('bond.totals.unknownRefusal')
       : t('bond.totals.unknownLot');
@@ -213,8 +264,8 @@ export function SecurityBondCard({
         <p className="text-sm text-gray-600 dark:text-gray-400">
           {t('bond.instrument', {
             series: instrument.seriesCode,
-            issuer: instrument.issuerCode,
-            program: instrument.programCode,
+            issuer: issuerLabel(t, instrument.issuerCode),
+            program: programLabel(t, instrument.programCode),
             country: instrument.issuerCountryCode,
           })}
         </p>
@@ -255,6 +306,20 @@ export function SecurityBondCard({
             </dd>
           </div>
         </dl>
+
+        {incompleteLots.length > 0 && (
+          <div
+            role="note"
+            className="rounded-md bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-900/20 dark:text-amber-200"
+          >
+            <p className="font-medium">{t('bond.partial.title')}</p>
+            <ul className="mt-1 list-disc space-y-1 pl-5">
+              {partialCauses.map((cause) => (
+                <li key={cause}>{t(`bond.partial.${cause}`)}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {refusal && (
           <div
@@ -313,6 +378,28 @@ export function SecurityBondCard({
           </div>
         )}
 
+        {projectionMissing.length > 0 && (
+          <div>
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {t('bond.projectionMissing.title')}
+            </h4>
+            <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-gray-600 dark:text-gray-400">
+              {projectionMissing.map((m) => (
+                <li key={`${m.benchmarkId}|${m.publisher ?? ''}`}>
+                  {m.publisher === null
+                    ? t('bond.projectionMissing.itemNoPublisher', {
+                        benchmark: benchmarkName(m.benchmarkId),
+                      })
+                    : t('bond.projectionMissing.item', {
+                        benchmark: benchmarkName(m.benchmarkId),
+                        publisher: m.publisher,
+                      })}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {missing.length > 0 && (
           <div>
             <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
@@ -335,6 +422,23 @@ export function SecurityBondCard({
               ))}
             </ul>
           </div>
+        )}
+
+        {coverage.length > 0 && (
+          <ul className="space-y-0.5 text-xs text-gray-500 dark:text-gray-400">
+            {coverage.map((c) => (
+              <li key={c.benchmarkId}>
+                {c.coveredThrough === null
+                  ? t('bond.coverage.none', {
+                      benchmark: benchmarkName(c.benchmarkId),
+                    })
+                  : t('bond.coverage.asOf', {
+                      benchmark: benchmarkName(c.benchmarkId),
+                      date: formatDate(c.coveredThrough),
+                    })}
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     );
@@ -361,7 +465,12 @@ export function SecurityBondCard({
             <DateInput
               label={t('bond.asOf')}
               value={asOf}
-              onDateChange={(date) => setPickedAsOf(date)}
+              max={today}
+              // The valuation refuses a day after today; a later date is
+              // brought back to today rather than sent.
+              onDateChange={(date) =>
+                setPickedAsOf(YMD.test(date) && date > today ? today : date)
+              }
             />
           </div>
           <Button
@@ -382,6 +491,7 @@ export function SecurityBondCard({
             benchmarkId={scenarioBenchmark}
             inflation={rule.type === 'INFLATION_PLUS_MARGIN_AS_RATE'}
             currency={currency}
+            asOf={asOf}
             selected={assume ? assume.value : null}
             onSelect={(value) =>
               setPicked(

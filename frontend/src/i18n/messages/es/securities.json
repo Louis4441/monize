@@ -204,7 +204,9 @@
     "bondInstrumentCurrent": "Serie vinculada",
     "bondInstrumentLoading": "Cargando el catálogo de bonos...",
     "bondInstrumentLoadFailed": "No se pudo cargar el catálogo de bonos, por lo que aún no se puede vincular una serie.",
-    "bondInstrumentRetry": "Reintentar"
+    "bondInstrumentRetry": "Reintentar",
+    "bondCurrencyLocked": "Este valor está vinculado a una serie de bonos en {linkedCurrency}. Vuelva a poner la moneda en {linkedCurrency} o desvincule antes la serie (al desvincular se eliminan sus precios calculados).",
+    "bondNoSeriesInCurrency": "No hay series de bonos en {currency}. El catálogo ofrece series en {currencies}; elija una de esas monedas para vincular una serie."
   },
   "priceForm": {
     "dateLabel": "Fecha",

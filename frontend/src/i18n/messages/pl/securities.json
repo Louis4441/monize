@@ -204,7 +204,9 @@
     "bondInstrumentCurrent": "Powiązana seria",
     "bondInstrumentLoading": "Wczytywanie katalogu obligacji...",
     "bondInstrumentLoadFailed": "Nie udało się wczytać katalogu obligacji, więc nie można jeszcze powiązać serii.",
-    "bondInstrumentRetry": "Ponów"
+    "bondInstrumentRetry": "Ponów",
+    "bondCurrencyLocked": "Ten papier wartościowy jest powiązany z serią obligacji w walucie {linkedCurrency}. Przywróć walutę {linkedCurrency} albo najpierw odepnij serię (odpięcie usuwa wyliczone ceny).",
+    "bondNoSeriesInCurrency": "Nie ma serii obligacji w walucie {currency}. Katalog zawiera serie w walutach: {currencies}; ustaw jedną z nich, aby powiązać serię."
   },
   "priceForm": {
     "dateLabel": "Data",

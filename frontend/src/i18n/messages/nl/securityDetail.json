@@ -274,7 +274,10 @@
       "projected": "Verwacht",
       "maturityValue": "Waarde op de einddatum",
       "maturityKnown": "Bekend",
-      "maturityProjected": "Verwacht"
+      "maturityProjected": "Verwacht",
+      "matured": "Vervallen",
+      "refused": "Niet gewaardeerd",
+      "amountUnknown": "Bedrag onbekend"
     },
     "rateSource": {
       "TERMS": "Voorwaarden",
@@ -356,7 +359,8 @@
       "margin": "Rente uit de marge",
       "inflation": "Rente uit inflatie",
       "benchmark": "Rente uit de referentierente",
-      "announced": "Aangekondigde rente"
+      "announced": "Aangekondigde rente",
+      "fixedTerm": "Rente tegen vaste rentevoet"
     },
     "chart": {
       "title": "Cumulatieve rente aan het einde van elke periode",
@@ -380,11 +384,34 @@
         "assumed": "Aangenomen: {benchmark}",
         "maturityValue": "Eindwaarde (projectie)",
         "totalInterest": "Totale rente (projectie)"
-      }
+      },
+      "asOfNote": "Gewaardeerd op {date}, de hierboven gekozen datum: de bedragen betreffen de obligaties die op die dag werden aangehouden."
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "CPI, 12 maanden (GUS)",
       "PL_NBP_REFERENCE": "NBP-referentierente"
+    },
+    "valuationRefusal": {
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "Deze serie kan alleen worden gekocht van {from} tot {to}. Deze partij is gekocht op {purchaseDate} en wordt daarom niet gewaardeerd."
+    },
+    "partial": {
+      "title": "Deze waardering is onvolledig; lees de bedragen als gedeeltelijk.",
+      "terms": "De voorwaarden van de obligatie zijn onvolledig (bijvoorbeeld een kalender is niet geïnstalleerd).",
+      "reference": "Referentiegegevens ontbreken; zie hieronder de lijst met nog benodigde gegevens.",
+      "earlyRedemption": "De voorwaarden voor vervroegde aflossing zijn onvolledig, dus waarden voor vervroegde aflossing kunnen ontbreken.",
+      "other": "Minstens één partij kan nog niet volledig worden gewaardeerd (bijvoorbeeld een rente is niet bekend)."
+    },
+    "projectionMissing": {
+      "title": "Latere perioden kunnen niet worden geprojecteerd",
+      "item": "{benchmark}: er is geen waarde gepubliceerd en geen aanname ingesteld, dus latere perioden kunnen niet worden geprojecteerd (gepubliceerd door {publisher})",
+      "itemNoPublisher": "{benchmark}: er is geen waarde gepubliceerd en geen aanname ingesteld, dus latere perioden kunnen niet worden geprojecteerd (uitgever onbekend)"
+    },
+    "coverage": {
+      "asOf": "{benchmark}-gegevens per {date}",
+      "none": "Er zijn nog geen {benchmark}-gegevens opgeslagen"
+    },
+    "issuers": {
+      "PL_MF": "Ministerie van Financiën (PL)"
     }
   }
 }

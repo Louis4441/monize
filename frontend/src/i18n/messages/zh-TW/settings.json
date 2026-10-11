@@ -817,7 +817,9 @@
       "skippedAttachments": "{count, plural, other {# 個附件未被還原}}：備份中沒有可用的位元組——匯出時它們缺失或未通過總和檢查，或該檔案早於自包含備份。請在附件儲存恢復正常後重新匯出備份。",
       "unusableAiProviderKeys": "{count, plural, other {# 個 AI 提供者在還原後沒有可用的 API 金鑰}}：此備份建立於提供者金鑰隨備份一同保存之前，因此儲存的金鑰屬於產生該檔案的伺服器，或者本伺服器沒有設定用來保存金鑰的加密金鑰。請開啟「設定 → AI 提供者」並重新輸入 API 金鑰。",
       "unlinkedBondSecurities": "{count, plural, other {# 個債券證券在還原後未連結其債券商品}}：此伺服器的債券目錄不包含該系列（或其幣別不同），因此債券引擎不再為它們定價，其計算出的價格也未被還原。請開啟每個證券，重新將其連結到債券商品。",
-      "doneButton": "完成"
+      "doneButton": "完成",
+      "unlinkedBondSecuritiesList": "受影響的證券:{symbols}。",
+      "unlinkedBondSecuritiesMore": "以及另外 {count} 個"
     },
     "storedBackups": {
       "heading": "自動備份",

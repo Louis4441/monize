@@ -817,7 +817,9 @@
       "skippedAttachments": "{count, plural, other {첨부 파일 #개가 복원되지 않았습니다}}: 백업에 사용 가능한 바이트가 없었습니다. 내보낼 때 누락되었거나 체크섬에 실패했거나, 파일이 자체 포함 백업 이전에 만들어진 것입니다. 첨부 파일 저장소가 정상화된 뒤 새 백업을 내보내세요.",
       "unusableAiProviderKeys": "{count, plural, other {AI 제공자 #개가 사용할 수 있는 API 키 없이 복원되었습니다}}: 이 백업은 제공자 키가 함께 담기기 전에 만들어졌으므로 저장된 키는 파일을 만든 서버의 것이거나, 이 서버에 키를 저장할 암호화 키가 설정되어 있지 않습니다. 설정 → AI 제공자를 열고 API 키를 다시 입력하세요.",
       "unlinkedBondSecurities": "{count, plural, other {채권 종목 #개가 채권 상품과 연결되지 않은 상태로 복원되었습니다}}: 이 서버의 채권 카탈로그에 해당 시리즈가 없거나 다른 통화로 등록되어 있어 채권 엔진이 더 이상 가격을 산정하지 않으며, 계산된 가격도 복원되지 않았습니다. 각 종목을 열어 채권 상품에 다시 연결하세요.",
-      "doneButton": "완료"
+      "doneButton": "완료",
+      "unlinkedBondSecuritiesList": "영향받은 종목: {symbols}.",
+      "unlinkedBondSecuritiesMore": "외 {count}개"
     },
     "storedBackups": {
       "heading": "자동 백업",

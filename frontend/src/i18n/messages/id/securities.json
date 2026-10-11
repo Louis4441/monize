@@ -204,7 +204,9 @@
     "bondInstrumentCurrent": "Seri yang ditautkan",
     "bondInstrumentLoading": "Memuat katalog obligasi...",
     "bondInstrumentLoadFailed": "Katalog obligasi tidak dapat dimuat, sehingga seri belum dapat ditautkan.",
-    "bondInstrumentRetry": "Coba lagi"
+    "bondInstrumentRetry": "Coba lagi",
+    "bondCurrencyLocked": "Sekuritas ini ditautkan ke seri obligasi dalam {linkedCurrency}. Kembalikan mata uang ke {linkedCurrency} atau lepas tautan seri terlebih dahulu (melepas tautan menghapus harga yang dihitung).",
+    "bondNoSeriesInCurrency": "Tidak ada seri obligasi dalam {currency}. Katalog menawarkan seri dalam {currencies}; atur mata uang ke salah satunya untuk menautkan seri."
   },
   "priceForm": {
     "dateLabel": "Tanggal",

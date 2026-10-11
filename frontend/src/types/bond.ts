@@ -32,9 +32,9 @@ export type BondEarlyRedemptionRefusal =
 export interface BondCashFlow {
   date: string;
   type: 'INTEREST' | 'PRINCIPAL';
-  /** The whole lot. */
-  amount: string;
-  status: 'KNOWN' | 'PROJECTED';
+  /** The whole lot; null only when `status` is UNKNOWN (the rate is not known yet). */
+  amount: string | null;
+  status: 'KNOWN' | 'PROJECTED' | 'UNKNOWN';
   period: number;
 }
 
@@ -60,9 +60,9 @@ export interface BondCurrentPeriod {
   index: number;
   start: string;
   end: string;
-  /** A fraction: "0.0440" is 4.40%. */
-  annualRate: string;
-  rateSource: BondRateSource;
+  /** A fraction: "0.0440" is 4.40%; null when the period's rate is not known. */
+  annualRate: string | null;
+  rateSource: BondRateSource | null;
 }
 
 /** The terms' rate rule as stated; every rate is a fraction string. */
@@ -109,8 +109,24 @@ export interface BondRateScheduleEntry {
   announcedPart: string | null;
 }
 
+export type BondLotStatus = 'OPEN' | 'MATURED' | 'REFUSED';
+
+/** Why a lot has no valuation; rendered from `code` and `params`. */
+export interface BondValuationRefusal {
+  code: 'PURCHASE_OUTSIDE_SALE_WINDOW';
+  params: { from: string; to: string; purchaseDate: string };
+}
+
+/** A benchmark with neither an observation nor an assumption to project from. */
+export interface BondProjectionMissing {
+  benchmarkId: string;
+  publisher: string | null;
+}
+
 export interface BondValuation {
   asOf: string;
+  status: BondLotStatus;
+  refusal: BondValuationRefusal | null;
   seriesCode: string;
   termsVersion: number;
   quantity: number;
@@ -138,6 +154,8 @@ export interface BondValuation {
     earlyRedemptionTermsComplete: boolean;
   };
   missing: BondMissingObservation[];
+  /** Benchmarks no future period can be projected from. */
+  projectionMissing: BondProjectionMissing[];
   valuationComplete: boolean;
 }
 
@@ -180,6 +198,14 @@ export interface BondLotsRefusal {
   };
 }
 
+/** How fresh a benchmark's stored data is. */
+export interface BondBenchmarkCoverage {
+  benchmarkId: string;
+  /** YYYY-MM-DD, or null when nothing is stored. */
+  coveredThrough: string | null;
+  lastFetchedAt: string | null;
+}
+
 /** `GET /bonds/securities/:securityId/valuation`. */
 export interface SecurityBondValuation {
   securityId: string;
@@ -188,6 +214,7 @@ export interface SecurityBondValuation {
   lots: BondLotValuation[];
   totals: BondValuationTotals;
   refusal: BondLotsRefusal | null;
+  benchmarkCoverage?: BondBenchmarkCoverage[];
 }
 
 /** `POST /bonds/securities/:securityId/recompute`. */

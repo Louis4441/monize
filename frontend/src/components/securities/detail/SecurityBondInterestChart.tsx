@@ -101,8 +101,11 @@ export function SecurityBondInterestChart({
 
   if (data.length === 0 && series.unknownFromPeriod === null) return null;
 
+  // A FIXED rule pays its one rate for the whole term; only a benchmark rule
+  // has a first period whose rate the terms state, and margin / benchmark parts.
+  const isFixedRule = valuation.rateRule.type === 'FIXED';
   const names: Record<(typeof SERIES)[number]['key'], string> = {
-    fixed: t('bond.interestParts.fixed'),
+    fixed: t(isFixedRule ? 'bond.interestParts.fixedTerm' : 'bond.interestParts.fixed'),
     margin: t('bond.interestParts.margin'),
     inflation: t(
       valuation.rateRule.type === 'INFLATION_PLUS_MARGIN_AS_RATE'
@@ -139,7 +142,10 @@ export function SecurityBondInterestChart({
             <BarChart data={data}>
               <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-              <YAxis tickFormatter={formatCurrencyAxis} />
+              {/* The bond's own currency, not the reader's default. */}
+              <YAxis
+                tickFormatter={(v: number) => formatCurrencyAxis(v, currency)}
+              />
               <Tooltip
                 content={
                   <InterestTooltip
@@ -149,7 +155,11 @@ export function SecurityBondInterestChart({
                 }
               />
               <Legend />
-              {SERIES.filter((s) => s.key !== 'announced' || series.hasAnnounced).map(
+              {SERIES.filter((s) =>
+                s.key === 'announced'
+                  ? series.hasAnnounced
+                  : s.key === 'fixed' || !isFixedRule,
+              ).map(
                 (s) => (
                   <Bar
                     key={s.key}

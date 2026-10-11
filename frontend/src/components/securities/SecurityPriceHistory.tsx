@@ -512,7 +512,9 @@ export function SecurityPriceHistory({
                               </td>
                               <td className="px-3 py-2 whitespace-nowrap">
                               <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getSourceColor(price.source)}`}>
-                              {getSourceLabel(price.source)}
+                              {price.source === 'bond_engine'
+                                ? t('form.providers.bond_engine')
+                                : getSourceLabel(price.source)}
                               </span>
                               </td>
                               <td className="px-3 py-2 text-right whitespace-nowrap hidden sm:table-cell">

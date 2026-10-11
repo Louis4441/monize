@@ -204,7 +204,9 @@
     "bondInstrumentCurrent": "Serie collegata",
     "bondInstrumentLoading": "Caricamento del catalogo obbligazioni...",
     "bondInstrumentLoadFailed": "Impossibile caricare il catalogo obbligazioni, quindi non si può ancora collegare una serie.",
-    "bondInstrumentRetry": "Riprova"
+    "bondInstrumentRetry": "Riprova",
+    "bondCurrencyLocked": "Questo titolo è collegato a una serie di obbligazioni in {linkedCurrency}. Reimposta la valuta su {linkedCurrency} oppure scollega prima la serie (scollegare rimuove i suoi prezzi calcolati).",
+    "bondNoSeriesInCurrency": "Non esistono serie di obbligazioni in {currency}. Il catalogo offre serie in {currencies}; imposta una di queste valute per collegare una serie."
   },
   "priceForm": {
     "dateLabel": "Data",
