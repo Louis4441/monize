@@ -129,12 +129,13 @@ of the program's history, newest sale month first, at the backfill's pace (3 s
 before each request): about 30-40 s under the button's spinner, never work in
 the background. A few refreshes, or the daily check while auto-fetch is on,
 complete the history; once it is complete a refresh asks for nothing more. The
-refresh has no throttle of its own, so the service bounds it: one pass per
-program at a time per process, and the offer page read at most once per
-`PROGRAM_OFFER_COOLDOWN_MS` (10 minutes), and a series the source refused (not
-published, or failed) left out of later bounded passes for
-`BACKFILL_REFUSAL_TTL_MS` (24 hours), so a refresh repeated in a loop never
-asks for the same code again and the next pass moves on to other months.
+refresh has no throttle of its own, so the service bounds it in a row every
+replica sees: a pass takes the program's lease in `fetch_sync`
+(`bond-program-refresh:<country>|<program>`) for `PROGRAM_REFRESH_INTERVAL_MS`
+(90 s) and never hands it back, so one program is refreshed at most once per
+interval however often, and on however many replicas, a person presses
+Refresh. A refresh inside the interval fetches nothing and still recomputes
+prices.
 
 ### 2.6 Nothing country-specific without a user
 

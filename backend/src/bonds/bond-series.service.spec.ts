@@ -22,8 +22,7 @@ import { bondInstrumentId } from "./bond-instrument-id";
 import { BondPriceService } from "./bond-price.service";
 import {
   BACKFILL_GAP_MS,
-  PROGRAM_OFFER_COOLDOWN_MS,
-  BACKFILL_REFUSAL_TTL_MS,
+  PROGRAM_REFRESH_INTERVAL_MS,
   BackfillRun,
   BondSeriesService,
 } from "./bond-series.service";
@@ -124,6 +123,8 @@ function build() {
         return true;
       },
     ),
+    claim: jest.fn(async (): Promise<string | null> => "lease-token"),
+    markSuccess: jest.fn(async () => undefined),
   };
   manager.query.mockResolvedValue([]);
   const prices = { recomputeLinkedSecuritiesOfSeries: jest.fn() };
@@ -962,64 +963,47 @@ describe("BondSeriesService", () => {
       ).toEqual(["EDO1036", "EDO1035"]);
     });
 
-    it("checks one program at most once per cooldown window", async () => {
-      const { service } = build();
+    it("refreshes one program at most once per interval, through a lease every replica sees", async () => {
+      const { service, fetchSync } = build();
       const adapter = adapterOf({
         currentSeries: jest.fn(async () => ["EDO1036"]),
         programOf: (code: string) => code.slice(0, 3),
       });
-      const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000);
-      try {
-        await service.fetchProgramOffer("PL", "EDO", { adapters: [adapter] });
-        now.mockReturnValue(1_000_000 + PROGRAM_OFFER_COOLDOWN_MS - 1);
-        await expect(
-          service.fetchProgramOffer("PL", "EDO", { adapters: [adapter] }),
-        ).resolves.toMatchObject({
-          listed: 0,
-          stored: 0,
-          alreadyStored: 0,
-          failed: 0,
-        });
-        expect(adapter.currentSeries).toHaveBeenCalledTimes(1);
-        // Another program is not held by EDO's window.
-        await service.fetchProgramOffer("PL", "ROR", { adapters: [adapter] });
-        expect(adapter.currentSeries).toHaveBeenCalledTimes(2);
-        now.mockReturnValue(1_000_000 + PROGRAM_OFFER_COOLDOWN_MS);
-        await service.fetchProgramOffer("PL", "EDO", { adapters: [adapter] });
-        expect(adapter.currentSeries).toHaveBeenCalledTimes(3);
-      } finally {
-        now.mockRestore();
-      }
+      await service.fetchProgramOffer("pl", "edo", { adapters: [adapter] });
+      expect(fetchSync.claim).toHaveBeenCalledWith(
+        "bond-program-refresh:PL|EDO",
+        PROGRAM_REFRESH_INTERVAL_MS,
+      );
+      // Held to its expiry, never handed back: the lease is the interval.
+      expect(fetchSync.markSuccess).toHaveBeenCalledWith(
+        "bond-program-refresh:PL|EDO",
+        "lease-token",
+      );
+      expect(adapter.currentSeries).toHaveBeenCalledTimes(1);
+
+      // Another replica, or the same reader pressing Refresh again, inside
+      // the interval: the claim is lost and nothing is fetched.
+      fetchSync.claim.mockResolvedValueOnce(null);
+      await expect(
+        service.fetchProgramOffer("PL", "EDO", { adapters: [adapter] }),
+      ).resolves.toMatchObject({ listed: 0, history: null });
+      expect(adapter.currentSeries).toHaveBeenCalledTimes(1);
     });
 
-    it("adds a bounded piece of the program's history, and runs one pass per program at a time", async () => {
+    it("adds a bounded piece of the program's history", async () => {
       const { service, catalog } = build();
       catalog.storedSeriesCodes.mockResolvedValue(new Set<string>());
-      let release: () => void = () => undefined;
-      const gate = new Promise<void>((resolve) => {
-        release = resolve;
-      });
       const adapter = adapterOf({
-        currentSeries: jest.fn(async () => {
-          await gate;
-          return [];
-        }),
+        currentSeries: jest.fn(async () => []),
         backfillCodes: jest.fn(() => ["EDO0124", "EDO0224", "ROR0224"]),
         programOf: (code: string) => code.slice(0, 3),
       });
-      const options = {
+      const run = await service.fetchProgramOffer("PL", "EDO", {
         adapters: [adapter],
         sleep: jest.fn(async () => undefined),
         today: "2026-10-11",
         limit: 1,
-      };
-      const first = service.fetchProgramOffer("PL", "EDO", options);
-      // A second refresh of the same program while the first runs does nothing.
-      await expect(
-        service.fetchProgramOffer("PL", "EDO", options),
-      ).resolves.toMatchObject({ listed: 0, history: null });
-      release();
-      const run = await first;
+      });
       expect(
         (adapter.fetchSeries as jest.Mock).mock.calls.map((c) => c[0]),
       ).toEqual(["EDO0224"]);
@@ -1039,39 +1023,6 @@ describe("BondSeriesService", () => {
     const codes = ["OTS0424", "ROR0125", "DOR0126", "TOS0127"];
     const withCodes = (over: Partial<BondAdapter> = {}) =>
       adapterOf({ backfillCodes: jest.fn(() => codes), ...over });
-
-    it("leaves a refused series out of later bounded passes for a day", async () => {
-      const { service, catalog } = build();
-      catalog.storedSeriesCodes.mockResolvedValue(new Set<string>());
-      const adapter = withCodes({
-        fetchSeries: jest.fn(async () => {
-          throw new SeriesFetchError("SERIES_NOT_PUBLISHED");
-        }),
-      });
-      const options = {
-        adapters: [adapter],
-        sleep: jest.fn(async () => undefined),
-        today: "2026-10-11",
-        limit: 1,
-      };
-      await service.backfillHistory(options);
-      await service.backfillHistory(options);
-      // The second pass moves on instead of asking for TOS0127 again.
-      expect(
-        (adapter.fetchSeries as jest.Mock).mock.calls.map((c) => c[0]),
-      ).toEqual(["TOS0127", "DOR0126"]);
-      const now = jest
-        .spyOn(Date, "now")
-        .mockReturnValue(Date.now() + BACKFILL_REFUSAL_TTL_MS + 1);
-      try {
-        await service.backfillHistory(options);
-        expect((adapter.fetchSeries as jest.Mock).mock.calls[2][0]).toBe(
-          "TOS0127",
-        );
-      } finally {
-        now.mockRestore();
-      }
-    });
 
     it("asks for at most `limit` series, newest first, and reports the rest", async () => {
       const { service, catalog } = build();

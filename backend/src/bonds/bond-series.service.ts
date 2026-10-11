@@ -10,6 +10,7 @@ import {
   isTransportFailure,
 } from "../common/http/fetch-failure.util";
 import {
+  bondProgramRefreshJob,
   FetchSyncJob,
   FetchSyncService,
 } from "../common/jobs/fetch-sync.service";
@@ -112,8 +113,12 @@ export interface BackfillOptions extends SeriesRequestOptions {
   readonly limit?: number;
 }
 
-/** The least time between two checks of one program's offer by a price refresh. */
-export const PROGRAM_OFFER_COOLDOWN_MS = 10 * 60_000;
+/**
+ * The least time between two refreshes of one program's data, across every
+ * replica: the lease `fetchProgramOffer` takes in `fetch_sync` and does not hand
+ * back. Longer than one pass (about 30-40 s), so passes never overlap.
+ */
+export const PROGRAM_REFRESH_INTERVAL_MS = 90_000;
 
 /**
  * How many missing series of a program's history one price refresh asks for:
@@ -121,13 +126,6 @@ export const PROGRAM_OFFER_COOLDOWN_MS = 10 * 60_000;
  * few refreshes (or the daily check) fill the rest.
  */
 export const PROGRAM_BACKFILL_CHUNK = 8;
-
-/**
- * How long a bounded pass leaves out a series the source refused (not
- * published, or failed): a refresh repeated in a loop must not ask for the same
- * code again, and the bounded pass moves on to the next months instead.
- */
-export const BACKFILL_REFUSAL_TTL_MS = 24 * 60 * 60_000;
 
 /** The least time between two requests to the issuer's site by the backfill. */
 export const BACKFILL_GAP_MS = 3000;
@@ -422,11 +420,12 @@ export class BondSeriesService {
    * work in the background; the daily check fills it too while auto-fetch is on.
    *
    * The price refresh has no throttle of its own, so the requests are bounded
-   * here: one pass per program at a time per process (a refresh during one
-   * answers an empty run), the offer page read at most once per
-   * `PROGRAM_OFFER_COOLDOWN_MS` (a new month's series goes on sale once a
-   * month), and the history asks only for what is missing, at the backfill's
-   * own pace.
+   * here, in a row every replica sees: a pass takes the program's lease in
+   * `fetch_sync` for `PROGRAM_REFRESH_INTERVAL_MS` and never hands it back, so
+   * one program is refreshed at most once per interval however often, and on
+   * however many replicas, a person presses Refresh; a refresh inside the
+   * interval answers an empty run. The history asks only for what is missing,
+   * at the backfill's own pace.
    */
   async fetchProgramOffer(
     countryCode: string,
@@ -436,42 +435,22 @@ export class BondSeriesService {
     const country = countryCode.toUpperCase();
     const key = programKey(country, programCode);
     const idle = { listed: 0, stored: 0, alreadyStored: 0, failed: 0 };
-    // One pass per program at a time in this process: a second refresh while
-    // one runs does nothing rather than doubling the requests.
-    if (this.programPasses.has(key)) return { ...idle, history: null };
-    this.programPasses.add(key);
-    try {
-      const programs = new Set([key]);
-      const now = Date.now();
-      const last = this.programOfferChecks.get(key);
-      let offer: CurrentOfferRun = idle;
-      if (last === undefined || now - last >= PROGRAM_OFFER_COOLDOWN_MS) {
-        // Recorded before the fetch, so a failing source is held by the window.
-        this.programOfferChecks.set(key, now);
-        offer = await this.fetchOfferOf(country, { ...options, programs });
-      }
-      // Then a bounded piece of the program's history. Paced by the backfill's
-      // own gap and asking only for what is missing, so once the history is
-      // complete a refresh costs no request here at all.
-      const history = await this.backfillHistory({
-        ...options,
-        programs,
-        limit: options.limit ?? PROGRAM_BACKFILL_CHUNK,
-      });
-      return { ...offer, history };
-    } finally {
-      this.programPasses.delete(key);
-    }
+    const job = bondProgramRefreshJob(key);
+    const lease = await this.fetchSync.claim(job, PROGRAM_REFRESH_INTERVAL_MS);
+    if (lease === null) return { ...idle, history: null };
+    const programs = new Set([key]);
+    const offer = await this.fetchOfferOf(country, { ...options, programs });
+    // Then a bounded piece of the program's history. Paced by the backfill's
+    // own gap and asking only for what is missing, so once the history is
+    // complete a refresh costs no request here at all.
+    const history = await this.backfillHistory({
+      ...options,
+      programs,
+      limit: options.limit ?? PROGRAM_BACKFILL_CHUNK,
+    });
+    await this.fetchSync.markSuccess(job, lease);
+    return { ...offer, history };
   }
-
-  /** When each program's offer was last checked by `fetchProgramOffer`. */
-  private readonly programOfferChecks = new Map<string, number>();
-
-  /** The programs `fetchProgramOffer` is working on now. */
-  private readonly programPasses = new Set<string>();
-
-  /** Series codes a backfill request was refused for, until when to skip them. */
-  private readonly refusedCodes = new Map<string, number>();
 
   private async runCurrentOffer(
     options: SeriesRequestOptions,
@@ -560,14 +539,7 @@ export class BondSeriesService {
       const held = await withScopedDb(this.dataSource, (m) =>
         this.catalog.storedSeriesCodes(m, adapter.countryCode, codes),
       );
-      const now = Date.now();
-      const allMissing = codes.filter(
-        (code) =>
-          !held.has(code.toUpperCase()) &&
-          // A bounded pass leaves out what the source refused recently.
-          (options.limit === undefined ||
-            (this.refusedCodes.get(code.toUpperCase()) ?? 0) <= now),
-      );
+      const allMissing = codes.filter((code) => !held.has(code.toUpperCase()));
       candidates += codes.length;
       alreadyStored += codes.length - allMissing.length;
       // `backfillCodes` lists oldest first; a bounded pass takes the newest.
@@ -600,10 +572,6 @@ export class BondSeriesService {
             error,
           );
           const refusal = error instanceof SeriesFetchError ? error.code : null;
-          this.refusedCodes.set(
-            code.toUpperCase(),
-            Date.now() + BACKFILL_REFUSAL_TTL_MS,
-          );
           if (refusal === "SOURCE_UNAVAILABLE") {
             failed += 1;
             stoppedEarly = true;

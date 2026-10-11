@@ -28,7 +28,20 @@ export const FetchSyncJob = {
   BondSeries: "bond-series",
 } as const;
 
-export type FetchSyncJob = (typeof FetchSyncJob)[keyof typeof FetchSyncJob];
+/**
+ * The lease of one bond program's refresh (`BondSeriesService.fetchProgramOffer`),
+ * one row per program: a person's Refresh, not a cron, so the job is the
+ * program, and the key is built here so a typo stays a compile error.
+ */
+export function bondProgramRefreshJob(
+  programKey: string,
+): `bond-program-refresh:${string}` {
+  return `bond-program-refresh:${programKey}`;
+}
+
+export type FetchSyncJob =
+  | (typeof FetchSyncJob)[keyof typeof FetchSyncJob]
+  | ReturnType<typeof bondProgramRefreshJob>;
 
 /**
  * One replica per tick does the work.
