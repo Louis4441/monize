@@ -70,14 +70,17 @@ function BondHistoryBody({ program, currency }: BondHistoryBodyProps) {
     { requestKey },
   );
   // The payload belongs to the product it was asked for.
-  const answer =
-    history.data !== null && history.dataKey === requestKey
-      ? (history.data.programs.find((p) => p.programCode === program) ?? {
-          programCode: program,
-          series: [],
-          coverage: { from: null, to: null, missingMonths: [] },
-        })
-      : null;
+  const answer = useMemo(
+    () =>
+      history.data !== null && history.dataKey === requestKey
+        ? (history.data.programs.find((p) => p.programCode === program) ?? {
+            programCode: program,
+            series: [],
+            coverage: { from: null, to: null, missingMonths: [] },
+          })
+        : null,
+    [history.data, history.dataKey, requestKey, program],
+  );
 
   const points = useMemo(
     () => (answer === null ? [] : buildHistoryPoints(answer.series, answer.coverage)),
