@@ -1,3 +1,4 @@
+import { SeriesFetchError } from "../bonds/bond-adapter";
 import {
   BadRequestException,
   ConflictException,
@@ -38,6 +39,7 @@ describe("SecuritiesService", () => {
   let mockActionHistoryService: Record<string, jest.Mock>;
   let mockYahooFinanceService: Record<string, jest.Mock>;
   let mockBondPriceService: Record<string, jest.Mock>;
+  let mockBondSeriesService: { fetchProgramOffer: jest.Mock };
   let queryRunnerManager: Record<string, jest.Mock>;
   let scopedRepository: Record<string, any>;
   let scopedManager: Record<string, jest.Mock>;
@@ -130,6 +132,15 @@ describe("SecuritiesService", () => {
       publishClearedPrices: jest.fn(),
     };
 
+    mockBondSeriesService = {
+      fetchProgramOffer: jest.fn().mockResolvedValue({
+        listed: 1,
+        stored: 1,
+        alreadyStored: 0,
+        failed: 0,
+      }),
+    };
+
     mockYahooFinanceService = {
       fetchSecurityProfileDescription: jest.fn(),
       fetchSecurityProfile: jest.fn().mockResolvedValue(null),
@@ -199,6 +210,7 @@ describe("SecuritiesService", () => {
       mockActionHistoryService as never,
       dataSource as never,
       mockBondPriceService as never,
+      mockBondSeriesService as never,
     );
   });
 
@@ -2895,6 +2907,88 @@ describe("SecuritiesService", () => {
           { symbol: "EDO1036", success: true },
           { symbol: "TOS1029", success: false, error: "no rates" },
         ],
+      });
+    });
+
+    describe("recomputeLinkedPrices fetches the program's offer first", () => {
+      const selection = [
+        { id: "s1", symbol: "EDO1036" },
+        { id: "s2", symbol: "EDO1035" },
+      ];
+      const programRows = (country = "PL") => [
+        { id: "s1", issuer_country_code: country, program_code: "EDO" },
+        { id: "s2", issuer_country_code: country, program_code: "EDO" },
+      ];
+
+      it("fetches once per program, before the recompute", async () => {
+        queryRunnerManager.query.mockImplementation(
+          queryWith(async () => programRows()),
+        );
+        const order: string[] = [];
+        mockBondSeriesService.fetchProgramOffer.mockImplementation(async () => {
+          order.push("fetch");
+          return { listed: 1, stored: 1, alreadyStored: 0, failed: 0 };
+        });
+        mockBondPriceService.recomputeSecurity.mockImplementation(async () => {
+          order.push("recompute");
+          return { written: 1, deleted: 0 };
+        });
+        const result = await service.recomputeLinkedPrices("user-1", selection);
+        expect(mockBondSeriesService.fetchProgramOffer).toHaveBeenCalledTimes(
+          1,
+        );
+        expect(mockBondSeriesService.fetchProgramOffer).toHaveBeenCalledWith(
+          "PL",
+          "EDO",
+        );
+        expect(order).toEqual(["fetch", "recompute", "recompute"]);
+        expect(result.updated).toBe(2);
+        expect(result.failed).toBe(0);
+      });
+
+      it("a failed fetch still recomputes and is reported on the row", async () => {
+        queryRunnerManager.query.mockImplementation(
+          queryWith(async () => programRows()),
+        );
+        mockBondSeriesService.fetchProgramOffer.mockRejectedValue(
+          new Error("source down"),
+        );
+        const result = await service.recomputeLinkedPrices("user-1", selection);
+        expect(mockBondPriceService.recomputeSecurity).toHaveBeenCalledTimes(2);
+        expect(result.updated).toBe(0);
+        expect(result.failed).toBe(2);
+        expect(result.results[0]).toMatchObject({
+          symbol: "EDO1036",
+          success: false,
+          error: expect.stringContaining("source down"),
+        });
+      });
+
+      it("an offer where everything failed is reported, a country with no fetch is not", async () => {
+        queryRunnerManager.query.mockImplementation(
+          queryWith(async () => programRows()),
+        );
+        mockBondSeriesService.fetchProgramOffer.mockResolvedValue({
+          listed: 2,
+          stored: 0,
+          alreadyStored: 0,
+          failed: 2,
+        });
+        const failedRun = await service.recomputeLinkedPrices(
+          "user-1",
+          selection,
+        );
+        expect(failedRun.failed).toBe(2);
+
+        mockBondSeriesService.fetchProgramOffer.mockRejectedValue(
+          new SeriesFetchError("SERIES_FETCH_UNSUPPORTED", { country: "DE" }),
+        );
+        const skipped = await service.recomputeLinkedPrices(
+          "user-1",
+          selection,
+        );
+        expect(skipped).toMatchObject({ updated: 2, failed: 0 });
+        expect(mockBondPriceService.recomputeSecurity).toHaveBeenCalled();
       });
     });
 

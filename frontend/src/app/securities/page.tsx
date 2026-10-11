@@ -180,15 +180,25 @@ function SecuritiesContent() {
 
   const handleFormSubmit = async (data: CreateSecurityData) => {
     try {
+      // A linked bond with auto-fetch on gets its data through the list's own
+      // Refresh: the server fetches the program's current offer, then recomputes.
+      let refreshId: string | null = null;
       if (editingSecurity) {
         await investmentsApi.updateSecurity(editingSecurity.id, data);
         toast.success(t('page.toasts.updated'));
+        // A value difference, not a field being present: the form resends both.
+        const wasOn = !!editingSecurity.bondProgramId && editingSecurity.bondAutoFetch === true;
+        const isOn = !!data.bondProgramId && data.bondAutoFetch === true;
+        const programChanged = data.bondProgramId !== editingSecurity.bondProgramId;
+        if (isOn && (!wasOn || programChanged)) refreshId = editingSecurity.id;
       } else {
-        await investmentsApi.createSecurity(data);
+        const created = await investmentsApi.createSecurity(data);
         toast.success(t('page.toasts.created'));
+        if (data.bondProgramId && data.bondAutoFetch === true) refreshId = created.id;
       }
       close();
       loadData();
+      if (refreshId) void triggerManualRefresh([refreshId]);
     } catch (error) {
       toast.error(getErrorMessage(error, editingSecurity ? t('page.toasts.updateFailed') : t('page.toasts.createFailed')));
       throw error;

@@ -384,6 +384,26 @@ export class BondSeriesService {
     return this.runCurrentOffer({ ...options, adapters });
   }
 
+  /**
+   * "Refresh" of a security linked to a program (`recomputeLinkedPrices`): the
+   * current offer of one program only, fetched and stored like `fetchOfferOf`
+   * (series already stored are not fetched; the benchmark refresh and the price
+   * recompute follow synchronously). A country with no fetch is refused
+   * (`SERIES_FETCH_UNSUPPORTED`); a source that cannot be read is counted in
+   * `failed`. A person's action (INV-BOND-008). Needs an ambient identity.
+   */
+  async fetchProgramOffer(
+    countryCode: string,
+    programCode: string,
+    options: SeriesRequestOptions = {},
+  ): Promise<CurrentOfferRun> {
+    const country = countryCode.toUpperCase();
+    return this.fetchOfferOf(country, {
+      ...options,
+      programs: new Set([programKey(country, programCode)]),
+    });
+  }
+
   private async runCurrentOffer(
     options: SeriesRequestOptions,
   ): Promise<CurrentOfferRun> {

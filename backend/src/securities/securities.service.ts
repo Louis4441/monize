@@ -24,6 +24,8 @@ import {
   SecurityPriceService,
 } from "./security-price.service";
 import { BondPriceService } from "../bonds/bond-price.service";
+import { BondSeriesService } from "../bonds/bond-series.service";
+import { SeriesFetchError } from "../bonds/bond-adapter";
 import { clearForeignSeries } from "../bonds/bond-series-resolver";
 import {
   BondLinkProblem,
@@ -174,6 +176,8 @@ export class SecuritiesService {
     // this module (see bonds.module.ts).
     @Inject(forwardRef(() => BondPriceService))
     private bondPriceService: BondPriceService,
+    @Inject(forwardRef(() => BondSeriesService))
+    private bondSeriesService: BondSeriesService,
   ) {}
 
   /**
@@ -322,11 +326,15 @@ export class SecuritiesService {
   }
 
   /**
-   * "Refresh price" of securities linked to a bond instrument: no quote provider
-   * prices them, so the refresh is the engine's recompute (the same one
+   * "Refresh price" of securities linked to a bond program: no quote provider
+   * prices them, so the refresh first fetches the current offer of each distinct
+   * program (a person's action, INV-BOND-008; a country with no fetch is skipped
+   * silently), then runs the engine's recompute (the same one
    * `POST /bonds/securities/:id/recompute` runs), reported in the refresh
-   * summary's own shape instead of as "0 updated". A failure is a failed row
-   * with its message, not a thrown error: the rest of the selection still runs.
+   * summary's own shape instead of as "0 updated". A failure of either step is a
+   * failed row with its message, not a thrown error: the recompute and the rest
+   * of the selection still run. A row counts once, as updated only when both
+   * steps succeeded.
    */
   async recomputeLinkedPrices(
     userId: string,
@@ -336,14 +344,25 @@ export class SecuritiesService {
     updated: number;
     failed: number;
   }> {
+    const fetchErrors = await this.fetchOffersOfPrograms(userId, securities);
     const results: PriceUpdateResult[] = [];
     let updated = 0;
     let failed = 0;
     for (const security of securities) {
+      const fetchError = fetchErrors.get(security.id);
       try {
         await this.bondPriceService.recomputeSecurity(userId, security.id);
-        results.push({ symbol: security.symbol, success: true });
-        updated += 1;
+        if (fetchError === undefined) {
+          results.push({ symbol: security.symbol, success: true });
+          updated += 1;
+        } else {
+          failed += 1;
+          results.push({
+            symbol: security.symbol,
+            success: false,
+            error: fetchError,
+          });
+        }
       } catch (error) {
         failed += 1;
         results.push({
@@ -354,6 +373,73 @@ export class SecuritiesService {
       }
     }
     return { results, updated, failed };
+  }
+
+  /**
+   * The current offer of each distinct (country, program) of these securities,
+   * fetched once. Returns the message of a failed fetch by security id; a
+   * program whose country has no fetch (`SERIES_FETCH_UNSUPPORTED`) is a bond
+   * kept the old way and is skipped without a word. Never throws.
+   */
+  private async fetchOffersOfPrograms(
+    userId: string,
+    securities: ReadonlyArray<{ id: string }>,
+  ): Promise<Map<string, string>> {
+    const errors = new Map<string, string>();
+    if (securities.length === 0) return errors;
+    const rows: Array<{
+      id: string;
+      issuer_country_code: string;
+      program_code: string;
+    }> = await withScopedDb(this.dataSource, (m) =>
+      m.query(
+        `SELECT s.id, p.issuer_country_code, p.program_code
+           FROM securities s
+           JOIN bond_programs p ON p.id = s.bond_program_id
+          WHERE s.user_id = $1 AND s.id = ANY($2::uuid[])`,
+        [userId, securities.map((s) => s.id)],
+      ),
+    );
+    const byProgram = new Map<
+      string,
+      { country: string; program: string; ids: string[] }
+    >();
+    for (const row of rows) {
+      const key = `${row.issuer_country_code}|${row.program_code}`;
+      const entry = byProgram.get(key) ?? {
+        country: row.issuer_country_code,
+        program: row.program_code,
+        ids: [],
+      };
+      entry.ids.push(row.id);
+      byProgram.set(key, entry);
+    }
+    for (const { country, program, ids } of byProgram.values()) {
+      let message: string | null = null;
+      try {
+        const run = await this.bondSeriesService.fetchProgramOffer(
+          country,
+          program,
+        );
+        if (run.failed > 0 && run.stored + run.alreadyStored === 0) {
+          message = `The current ${program} offer could not be fetched`;
+        }
+      } catch (error) {
+        if (
+          error instanceof SeriesFetchError &&
+          error.code === "SERIES_FETCH_UNSUPPORTED"
+        ) {
+          continue;
+        }
+        message = `The current ${program} offer could not be fetched: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
+      }
+      if (message === null) continue;
+      this.logger.warn(message);
+      for (const id of ids) errors.set(id, message);
+    }
+    return errors;
   }
 
   /**

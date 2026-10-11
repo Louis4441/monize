@@ -117,6 +117,15 @@ program are recomputed after the commit (INV-CACHE-001), because a BUY or
 REINVEST recorded before the series existed is read as the series on sale on
 its date and only now resolves to a lot.
 
+The "Refresh" of a linked security (the list's or the detail page's, through
+`POST /securities/prices/refresh/selected`, and the refresh the list starts
+after a security is created or edited with auto-fetch on) fetches the current
+offer of its program first (`BondSeriesService.fetchProgramOffer`: only that
+program's series on sale now that are not stored), once per distinct program,
+and then recomputes the engine prices. It is a person's action under
+INV-BOND-008. A country with no fetch is skipped silently; a failed fetch does
+not stop the recompute and is reported as that security's failed row.
+
 ### 2.6 Nothing country-specific without a user
 
 Requested by the owner on 2026-10-11: not every deployment wants Polish bonds,

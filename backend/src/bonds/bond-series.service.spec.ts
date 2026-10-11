@@ -943,6 +943,31 @@ describe("BondSeriesService", () => {
     });
   });
 
+  describe("fetchProgramOffer (the refresh of a linked security)", () => {
+    it("fetches only the codes of the program on sale now", async () => {
+      const { service } = build();
+      const adapter = adapterOf({
+        currentSeries: jest.fn(async () => ["EDO1036", "ROR1027", "EDO1035"]),
+        programOf: (code: string) => code.slice(0, 3),
+      });
+      const run = await service.fetchProgramOffer("pl", "edo", {
+        adapters: [adapter],
+      });
+      expect(run.listed).toBe(2);
+      expect(
+        (adapter.fetchSeries as jest.Mock).mock.calls.map((c) => c[0]),
+      ).toEqual(["EDO1036", "EDO1035"]);
+    });
+
+    it("refuses a country with no official source", async () => {
+      const { service } = build();
+      const error = await refusal(
+        service.fetchProgramOffer("DE", "EDO", { adapters: [adapterOf()] }),
+      );
+      expect(error.code).toBe("SERIES_FETCH_UNSUPPORTED");
+    });
+  });
+
   describe("backfillHistory", () => {
     const codes = ["OTS0424", "ROR0125", "DOR0126", "TOS0127"];
     const withCodes = (over: Partial<BondAdapter> = {}) =>
