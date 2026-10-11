@@ -16,14 +16,16 @@ const step = (id: string) => tour.steps.find((s) => s.id === id);
 const HUB_ROUTE = '/email-receipts?tab=profiles';
 
 describe('email receipts tour', () => {
-  it('is an evergreen tour registered under a stable id', () => {
+  it('is registered under a stable id and offered from the 1.18 What\'s New', () => {
     expect(tour.id).toBe('email-receipts/basics');
     expect(tour.area).toBe('transactions');
     expect(tour.i18nPrefix).toBe('emailReceipts.basics');
-    expect(tour.version).toBeUndefined();
+    expect(tour.version).toBe('1.18');
     expect(ALL_TOURS).toContain(tour);
     expect(getTourById(tour.id)).toBe(tour);
+    expect(getReleaseTours('1.18.0').map((t) => t.id)).toContain(tour.id);
     expect(getReleaseTours('1.17.0').map((t) => t.id)).not.toContain(tour.id);
+    expect(getReleaseTours('1.19.0').map((t) => t.id)).not.toContain(tour.id);
   });
 
   it('walks the purpose, the AI requirement, the provider, the hub, then the inbox', () => {

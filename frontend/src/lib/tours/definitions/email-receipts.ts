@@ -1,11 +1,19 @@
 import { TOUR_ANCHORS } from '../anchors';
 import type { TourDefinition } from '../types';
 
+/** Minor line this tour is offered under in What's New; matched against major.minor. */
+export const EMAIL_RECEIPTS_MINOR = '1.18';
+
 /**
  * Email receipts: why Monize reads order-confirmation emails, why in practice
  * an AI provider is required (the per-shop profiles are written by an AI), and
- * where the pieces live. An evergreen tour: no `version`, so it is offered from
- * Settings > Tours and never from What's New.
+ * where the pieces live. Offered from the 1.18 What's New digest, where the
+ * feature arrived, and, like every tour, from Settings > Tours afterwards.
+ *
+ * Its id keeps the `email-receipts/basics` shape (ids are never renamed, and
+ * the tour shipped under it), so unlike a `release-*` id the saved progress
+ * carries no version stamp. Completing it once therefore also counts after 1.19
+ * -- the tour is not re-offered with a new release.
  *
  * The order is the order a reader needs it: the purpose, the AI requirement,
  * the AI provider settings, the hub's tabs, the two blocks of the Profiles tab,
@@ -35,6 +43,7 @@ import type { TourDefinition } from '../types';
 export const EMAIL_RECEIPTS_TOUR: TourDefinition = {
   id: 'email-receipts/basics',
   area: 'transactions',
+  version: EMAIL_RECEIPTS_MINOR,
   i18nPrefix: 'emailReceipts.basics',
   requiresData: 'ownerView',
   steps: [
