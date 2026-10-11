@@ -731,7 +731,8 @@
     "strategyNotFound": "Không tìm thấy chiến lược"
   },
   "maintenance": {
-    "inProgress": "Mot tac vu khac dang thay the du lieu cua tai khoan nay. Hay doi hoan tat roi thu lai."
+    "inProgress": "Mot tac vu khac dang thay the du lieu cua tai khoan nay. Hay doi hoan tat roi thu lai.",
+    "inProgressRetryAfter": "Một thao tác khác đang thay thế dữ liệu của tài khoản này. Thao tác đó sẽ hoàn tất hoặc hết hạn trong vòng {{minutes}} phút; hãy thử lại sau đó."
   },
   "payeeLookup": {
     "operatorManaged": "Google Places do quản trị viên máy chủ này thiết lập. Tại đây chỉ có thể thay đổi cài đặt bật/tắt.",

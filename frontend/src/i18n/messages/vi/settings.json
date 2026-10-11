@@ -781,6 +781,7 @@
         "pleaseEnterPassword": "Vui lòng nhập mật khẩu để xác nhận",
         "encryptedNeedsPassword": "Sao lưu này được mã hóa. Nhập mật khẩu đã được tạo cùng với nó vào trường \"Mật khẩu sao lưu\", sau đó thử lại.",
         "failed": "Không thể khôi phục sao lưu",
+        "interrupted": "Quá trình khôi phục bị gián đoạn trước khi máy chủ phản hồi. Khôi phục được áp dụng toàn bộ hoặc không áp dụng gì, nên dữ liệu của bạn hoặc đã được khôi phục hoàn toàn hoặc không thay đổi. Hãy tải lại trang để kiểm tra trước khi thử lại.",
         "reauthRedirect": "Bạn sẽ được chuyển đến nhà cung cấp danh tính để xác nhận đúng là bạn. Khi trở lại, hãy chọn lại tệp sao lưu."
       },
       "selectedFile": "Đã chọn: {filename}"

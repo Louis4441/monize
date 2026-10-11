@@ -731,7 +731,8 @@
     "strategyNotFound": "Strateji bulunamadı"
   },
   "maintenance": {
-    "inProgress": "Baska bir islem su anda bu hesabin verilerini degistiriyor. Tamamlanmasini bekleyip yeniden deneyin."
+    "inProgress": "Baska bir islem su anda bu hesabin verilerini degistiriyor. Tamamlanmasini bekleyip yeniden deneyin.",
+    "inProgressRetryAfter": "Başka bir işlem şu anda bu hesabın verilerini değiştiriyor. {{minutes}} dk içinde tamamlanacak veya zaman aşımına uğrayacak; ardından tekrar deneyin."
   },
   "payeeLookup": {
     "operatorManaged": "Google Places bu sunucunun yöneticisi tarafından yapılandırılır. Burada yalnızca açma/kapama ayarı değiştirilebilir.",

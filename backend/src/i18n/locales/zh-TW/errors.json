@@ -731,7 +731,8 @@
     "strategyNotFound": "找不到策略"
   },
   "maintenance": {
-    "inProgress": "另一項作業正在取代此帳戶的資料。請等待完成後再試一次。"
+    "inProgress": "另一項作業正在取代此帳戶的資料。請等待完成後再試一次。",
+    "inProgressRetryAfter": "另一項操作正在取代此帳戶的資料。它將在 {{minutes}} 分鐘內完成或逾時，請屆時再試一次。"
   },
   "payeeLookup": {
     "operatorManaged": "Google Places 由本伺服器的管理員設定。此處僅能變更開啟或關閉設定。",

@@ -781,6 +781,7 @@
         "pleaseEnterPassword": "Ingresa tu contraseña para confirmar",
         "encryptedNeedsPassword": "Esta copia de seguridad está cifrada. Ingresa la contraseña con la que fue creada en el campo \"Contraseña de copia de seguridad\" y vuelve a intentarlo.",
         "failed": "Error al restaurar la copia de seguridad",
+        "interrupted": "La restauración se interrumpió antes de que respondiera el servidor. Una restauración se aplica por completo o no se aplica, así que tus datos están totalmente restaurados o sin cambios. Recarga la página para comprobarlo antes de volver a intentarlo.",
         "reauthRedirect": "Te llevamos a tu proveedor de identidad para confirmar que eres tú. Vuelve a elegir el archivo de copia de seguridad cuando regreses."
       },
       "selectedFile": "Seleccionado: {filename}"
