@@ -104,6 +104,9 @@ export interface BackfillOptions extends SeriesRequestOptions {
   readonly today?: string;
 }
 
+/** The least time between two checks of one program's offer by a price refresh. */
+export const PROGRAM_OFFER_COOLDOWN_MS = 10 * 60_000;
+
 /** The least time between two requests to the issuer's site by the backfill. */
 export const BACKFILL_GAP_MS = 3000;
 
@@ -391,6 +394,12 @@ export class BondSeriesService {
    * recompute follow synchronously). A country with no fetch is refused
    * (`SERIES_FETCH_UNSUPPORTED`); a source that cannot be read is counted in
    * `failed`. A person's action (INV-BOND-008). Needs an ambient identity.
+   *
+   * The price refresh has no throttle of its own, and every check reads the
+   * issuer's offer page, so one program is checked at most once per
+   * `PROGRAM_OFFER_COOLDOWN_MS` per process; a refresh inside that window
+   * fetches nothing and answers an empty run. A new month's series goes on sale
+   * once a month, so the window costs a reader nothing.
    */
   async fetchProgramOffer(
     countryCode: string,
@@ -398,11 +407,20 @@ export class BondSeriesService {
     options: SeriesRequestOptions = {},
   ): Promise<CurrentOfferRun> {
     const country = countryCode.toUpperCase();
-    return this.fetchOfferOf(country, {
-      ...options,
-      programs: new Set([programKey(country, programCode)]),
-    });
+    const key = programKey(country, programCode);
+    const now = Date.now();
+    const last = this.programOfferChecks.get(key);
+    if (last !== undefined && now - last < PROGRAM_OFFER_COOLDOWN_MS) {
+      return { listed: 0, stored: 0, alreadyStored: 0, failed: 0 };
+    }
+    // Recorded before the fetch, so concurrent refreshes and a failing source
+    // are held by the same window.
+    this.programOfferChecks.set(key, now);
+    return this.fetchOfferOf(country, { ...options, programs: new Set([key]) });
   }
+
+  /** When each program's offer was last checked by `fetchProgramOffer`. */
+  private readonly programOfferChecks = new Map<string, number>();
 
   private async runCurrentOffer(
     options: SeriesRequestOptions,

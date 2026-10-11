@@ -22,6 +22,7 @@ import { bondInstrumentId } from "./bond-instrument-id";
 import { BondPriceService } from "./bond-price.service";
 import {
   BACKFILL_GAP_MS,
+  PROGRAM_OFFER_COOLDOWN_MS,
   BackfillRun,
   BondSeriesService,
 } from "./bond-series.service";
@@ -957,6 +958,36 @@ describe("BondSeriesService", () => {
       expect(
         (adapter.fetchSeries as jest.Mock).mock.calls.map((c) => c[0]),
       ).toEqual(["EDO1036", "EDO1035"]);
+    });
+
+    it("checks one program at most once per cooldown window", async () => {
+      const { service } = build();
+      const adapter = adapterOf({
+        currentSeries: jest.fn(async () => ["EDO1036"]),
+        programOf: (code: string) => code.slice(0, 3),
+      });
+      const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+      try {
+        await service.fetchProgramOffer("PL", "EDO", { adapters: [adapter] });
+        now.mockReturnValue(1_000_000 + PROGRAM_OFFER_COOLDOWN_MS - 1);
+        await expect(
+          service.fetchProgramOffer("PL", "EDO", { adapters: [adapter] }),
+        ).resolves.toEqual({
+          listed: 0,
+          stored: 0,
+          alreadyStored: 0,
+          failed: 0,
+        });
+        expect(adapter.currentSeries).toHaveBeenCalledTimes(1);
+        // Another program is not held by EDO's window.
+        await service.fetchProgramOffer("PL", "ROR", { adapters: [adapter] });
+        expect(adapter.currentSeries).toHaveBeenCalledTimes(2);
+        now.mockReturnValue(1_000_000 + PROGRAM_OFFER_COOLDOWN_MS);
+        await service.fetchProgramOffer("PL", "EDO", { adapters: [adapter] });
+        expect(adapter.currentSeries).toHaveBeenCalledTimes(3);
+      } finally {
+        now.mockRestore();
+      }
     });
 
     it("refuses a country with no official source", async () => {
