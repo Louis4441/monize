@@ -425,10 +425,10 @@ describe('InvestmentsPage', () => {
       });
     });
 
-    it('links to the Treasury bonds page from the header', async () => {
+    it('no longer links to the Treasury bonds page (it lives under Securities)', async () => {
       await renderPage();
-      const link = await screen.findByRole('link', { name: 'Treasury bonds' });
-      expect(link).toHaveAttribute('href', '/investments/bonds');
+      await screen.findByText('Investments');
+      expect(screen.queryByRole('link', { name: 'Treasury bonds' })).not.toBeInTheDocument();
     });
 
     it('renders within page layout', async () => {

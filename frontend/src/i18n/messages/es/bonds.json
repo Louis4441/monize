@@ -65,7 +65,12 @@
     },
     "couponsNotReinvested": "Cupones no reinvertidos",
     "add": "Añadir a mi cartera",
-    "addAria": "Añadir {series} a mi cartera"
+    "addAria": "Añadir {series} a mi cartera",
+    "fetchNow": "Obtener ahora la oferta actual",
+    "fetching": "Obteniendo la oferta actual...",
+    "fetchDone": "Oferta obtenida: {listed} series listadas, {stored} guardadas ahora, {alreadyStored} ya guardadas, {failed} con error.",
+    "fetchFailed": "No se pudo obtener la oferta actual.",
+    "addFailed": "No se pudo localizar el programa de bonos. Inténtelo de nuevo."
   },
   "history": {
     "product": "Producto",
@@ -98,6 +103,7 @@
       "ALL_PERIODS": "Todos los periodos",
       "FIRST_PERIOD": "Solo el primer periodo"
     },
-    "none": "Ninguno"
+    "none": "Ninguno",
+    "held": "En cartera"
   }
 }

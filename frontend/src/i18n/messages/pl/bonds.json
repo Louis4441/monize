@@ -65,7 +65,12 @@
     },
     "couponsNotReinvested": "Kupony bez reinwestycji",
     "add": "Dodaj do mojego portfela",
-    "addAria": "Dodaj {series} do mojego portfela"
+    "addAria": "Dodaj {series} do mojego portfela",
+    "fetchNow": "Pobierz bieżącą ofertę teraz",
+    "fetching": "Pobieranie bieżącej oferty...",
+    "fetchDone": "Oferta pobrana: serii na liście {listed}, nowo zapisanych {stored}, już zapisanych {alreadyStored}, nieudanych {failed}.",
+    "fetchFailed": "Nie udało się pobrać bieżącej oferty.",
+    "addFailed": "Nie udało się znaleźć programu obligacji. Spróbuj ponownie."
   },
   "history": {
     "product": "Produkt",
@@ -98,6 +103,7 @@
       "ALL_PERIODS": "W każdym okresie",
       "FIRST_PERIOD": "Tylko w pierwszym okresie"
     },
-    "none": "Brak"
+    "none": "Brak",
+    "held": "Posiadana"
   }
 }

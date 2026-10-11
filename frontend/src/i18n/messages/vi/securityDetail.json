@@ -240,12 +240,10 @@
     }
   },
   "bond": {
-    "title": "Định giá trái phiếu",
     "loading": "Đang tải định giá trái phiếu...",
     "loadFailed": "Không thể tải định giá trái phiếu.",
     "unknown": "Không rõ",
     "asOf": "Định giá vào ngày",
-    "instrument": "Mã {series} ({issuer}, {program}, {country})",
     "termsSource": "Điều khoản: {document}",
     "termsManual": "Điều khoản do quản trị viên nhập thủ công",
     "noLots": "Không có lô nào đang mở vào ngày này.",
@@ -304,13 +302,17 @@
       "SPLIT": "Không thể suy ra các lô: trái phiếu không được chia nhỏ.",
       "FRACTIONAL_QUANTITY": "Không thể suy ra các lô: một số lượng không phải là số nguyên trái phiếu.",
       "OVER_REMOVAL": "Không thể suy ra các lô: số trái phiếu bị trừ nhiều hơn số đang nắm giữ.",
-      "INVALID_QUANTITY": "Không thể suy ra các lô: một số lượng bị thiếu, âm hoặc quá lớn."
+      "INVALID_QUANTITY": "Không thể suy ra các lô: một số lượng bị thiếu, âm hoặc quá lớn.",
+      "REMOVAL_EXCEEDS_SERIES": "Không thể xác định các lô: số trái phiếu của một sê-ri bị rút nhiều hơn số đang nắm giữ.",
+      "SERIES_NOT_DETERMINED": "Không thể xác định các lô: không rõ sê-ri của một giao dịch mua."
     },
     "lotsRefusalDetail": {
       "SPLIT": "Chứng khoán này có ghi nhận một lần chia tách ({action} ngày {date}); trái phiếu không chia tách.",
       "FRACTIONAL_QUANTITY": "{action} ngày {date} chuyển {quantity} trái phiếu, đây không phải số nguyên.",
       "OVER_REMOVAL": "{action} ngày {date} rút {quantity} trái phiếu, nhiều hơn số đang nắm giữ.",
-      "INVALID_QUANTITY": "Số lượng của {action} ngày {date} bị thiếu, âm hoặc quá lớn."
+      "INVALID_QUANTITY": "Số lượng của {action} ngày {date} bị thiếu, âm hoặc quá lớn.",
+      "REMOVAL_EXCEEDS_SERIES": "{action} ngày {date} rút {quantity} trái phiếu của sê-ri, nhiều hơn số có trong sê-ri đó.",
+      "SERIES_NOT_DETERMINED": "{action} ngày {date} không nêu sê-ri và hôm đó không có sê-ri nào đã lưu của chương trình được bán. Hãy tải sê-ri và chọn trong giao dịch."
     },
     "assumptions": {
       "title": "Giả định của dự phóng",
@@ -423,6 +425,35 @@
       "forfeitAccrued": "Khi mua lại trước hạn, tiền lãi đã phát sinh trong kỳ hiện tại sẽ bị mất.",
       "floorAllPeriods": "Phí không bao giờ làm số tiền nhận được thấp hơn mệnh giá, ở bất kỳ kỳ nào.",
       "floorFirstPeriod": "Chỉ trong kỳ đầu tiên, phí không thể làm số tiền nhận được thấp hơn mệnh giá; các kỳ sau không có mức sàn này."
+    },
+    "programs": {
+      "OTS": "OTS: trái phiếu tiết kiệm 3 tháng lãi suất cố định",
+      "ROR": "ROR: trái phiếu tiết kiệm 1 năm lãi suất thả nổi",
+      "DOR": "DOR: trái phiếu tiết kiệm 2 năm lãi suất thả nổi",
+      "TOS": "TOS: trái phiếu tiết kiệm 3 năm lãi suất cố định",
+      "COI": "COI: trái phiếu tiết kiệm 4 năm gắn với lạm phát",
+      "EDO": "EDO: trái phiếu tiết kiệm 10 năm gắn với lạm phát",
+      "ROS": "ROS: trái phiếu tiết kiệm gia đình 6 năm gắn với lạm phát",
+      "ROD": "ROD: trái phiếu tiết kiệm gia đình 12 năm gắn với lạm phát"
+    },
+    "series": {
+      "title": "Các đợt phát hành của bạn",
+      "column": "Đợt phát hành",
+      "nextRateChange": "Lần đổi lãi suất tiếp theo",
+      "total": "Tổng của chương trình",
+      "purchasedRange": "{from} đến {to}",
+      "expand": "Hiện chi tiết của {series}",
+      "collapse": "Ẩn chi tiết của {series}",
+      "partial": "Một phần"
+    },
+    "program": {
+      "title": "Chương trình",
+      "newest": "Điều khoản của đợt phát hành mới nhất, {series}.",
+      "noTerms": "Chưa biết điều khoản: bạn không nắm giữ đợt phát hành nào của chương trình này và không có đợt nào đang bán.",
+      "autoFetchFailed": "Không thể lưu thiết lập."
+    },
+    "onSale": {
+      "title": "Đang bán ngay bây giờ"
     }
   }
 }

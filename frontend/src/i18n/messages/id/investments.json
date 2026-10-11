@@ -296,7 +296,15 @@
     "toastSaveFailed": "Gagal menyimpan transaksi",
     "exchangeRateUnresolved": "Tidak ada kurs {from} ke {to}. Masukkan satu, atau total terkonversi, sebelum menyimpan.",
     "toastExchangeRateRequired": "Masukkan nilai tukar sebelum menyimpan perdagangan lintas mata uang.",
-    "notAvailable": "Tidak tersedia"
+    "notAvailable": "Tidak tersedia",
+    "bondSeries": {
+      "label": "Seri obligasi",
+      "fromDate": "Ditentukan dari tanggal",
+      "oldestFirst": "Yang terlama lebih dulu",
+      "loading": "Memuat seri...",
+      "loadFailed": "Seri tidak dapat dimuat.",
+      "retry": "Coba lagi"
+    }
   },
   "newTransactionButton": {
     "label": "+ Transaksi Baru",

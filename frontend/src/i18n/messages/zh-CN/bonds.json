@@ -65,7 +65,12 @@
     },
     "couponsNotReinvested": "息票不再投资",
     "add": "添加到我的投资组合",
-    "addAria": "将 {series} 添加到我的投资组合"
+    "addAria": "将 {series} 添加到我的投资组合",
+    "fetchNow": "立即获取当前发售",
+    "fetching": "正在获取当前发售...",
+    "fetchDone": "已获取发售:列出 {listed} 个系列,新保存 {stored} 个,已存在 {alreadyStored} 个,失败 {failed} 个。",
+    "fetchFailed": "无法获取当前发售。",
+    "addFailed": "无法找到该债券项目。请重试。"
   },
   "history": {
     "product": "产品",
@@ -98,6 +103,7 @@
       "ALL_PERIODS": "每一期",
       "FIRST_PERIOD": "仅首期"
     },
-    "none": "无"
+    "none": "无",
+    "held": "已持有"
   }
 }

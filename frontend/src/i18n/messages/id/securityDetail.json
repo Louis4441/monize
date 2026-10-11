@@ -240,12 +240,10 @@
     }
   },
   "bond": {
-    "title": "Valuasi obligasi",
     "loading": "Memuat valuasi obligasi...",
     "loadFailed": "Valuasi obligasi tidak dapat dimuat.",
     "unknown": "Tidak diketahui",
     "asOf": "Dinilai pada",
-    "instrument": "Seri {series} ({issuer}, {program}, {country})",
     "termsSource": "Ketentuan: {document}",
     "termsManual": "Ketentuan dimasukkan secara manual oleh administrator",
     "noLots": "Tidak ada lot yang terbuka pada tanggal ini.",
@@ -304,13 +302,17 @@
       "SPLIT": "Lot tidak dapat diturunkan: obligasi tidak dapat dipecah.",
       "FRACTIONAL_QUANTITY": "Lot tidak dapat diturunkan: jumlah bukan bilangan bulat obligasi.",
       "OVER_REMOVAL": "Lot tidak dapat diturunkan: lebih banyak obligasi yang dikurangi daripada yang dimiliki.",
-      "INVALID_QUANTITY": "Lot tidak dapat diturunkan: jumlah hilang, negatif, atau terlalu besar."
+      "INVALID_QUANTITY": "Lot tidak dapat diturunkan: jumlah hilang, negatif, atau terlalu besar.",
+      "REMOVAL_EXCEEDS_SERIES": "Lot tidak dapat ditentukan: obligasi dari satu seri yang dikeluarkan lebih banyak daripada yang dimiliki.",
+      "SERIES_NOT_DETERMINED": "Lot tidak dapat ditentukan: seri pembelian tidak diketahui."
     },
     "lotsRefusalDetail": {
       "SPLIT": "Sebuah pemecahan ({action} pada {date}) tercatat pada sekuritas ini; obligasi tidak dipecah.",
       "FRACTIONAL_QUANTITY": "{action} pada {date} memindahkan {quantity} obligasi, yang bukan bilangan bulat.",
       "OVER_REMOVAL": "{action} pada {date} mengurangi {quantity} obligasi, lebih banyak dari yang dimiliki.",
-      "INVALID_QUANTITY": "Jumlah pada {action} tanggal {date} kosong, negatif, atau terlalu besar."
+      "INVALID_QUANTITY": "Jumlah pada {action} tanggal {date} kosong, negatif, atau terlalu besar.",
+      "REMOVAL_EXCEEDS_SERIES": "{action} pada {date} mengeluarkan {quantity} obligasi dari serinya, lebih banyak dari yang dimiliki di seri itu.",
+      "SERIES_NOT_DETERMINED": "{action} pada {date} tidak menyebut seri, dan pada hari itu tidak ada seri program tersimpan yang dijual. Ambil seri tersebut dan pilih dalam transaksi."
     },
     "assumptions": {
       "title": "Asumsi proyeksi",
@@ -423,6 +425,35 @@
       "forfeitAccrued": "Pada penebusan lebih awal, bunga yang berjalan pada periode saat ini hangus.",
       "floorAllPeriods": "Biaya tidak pernah menurunkan hasil penebusan di bawah nilai nominal, pada periode mana pun.",
       "floorFirstPeriod": "Hanya pada periode pertama biaya tidak dapat menurunkan hasil penebusan di bawah nilai nominal; periode berikutnya tidak memiliki batas bawah tersebut."
+    },
+    "programs": {
+      "OTS": "OTS: obligasi tabungan 3 bulan dengan suku bunga tetap",
+      "ROR": "ROR: obligasi tabungan 1 tahun dengan suku bunga mengambang",
+      "DOR": "DOR: obligasi tabungan 2 tahun dengan suku bunga mengambang",
+      "TOS": "TOS: obligasi tabungan 3 tahun dengan suku bunga tetap",
+      "COI": "COI: obligasi tabungan 4 tahun yang terindeks inflasi",
+      "EDO": "EDO: obligasi tabungan 10 tahun yang terindeks inflasi",
+      "ROS": "ROS: obligasi tabungan keluarga 6 tahun yang terindeks inflasi",
+      "ROD": "ROD: obligasi tabungan keluarga 12 tahun yang terindeks inflasi"
+    },
+    "series": {
+      "title": "Seri Anda",
+      "column": "Seri",
+      "nextRateChange": "Perubahan suku bunga berikutnya",
+      "total": "Total program",
+      "purchasedRange": "{from} sampai {to}",
+      "expand": "Tampilkan detail {series}",
+      "collapse": "Sembunyikan detail {series}",
+      "partial": "Sebagian"
+    },
+    "program": {
+      "title": "Program",
+      "newest": "Ketentuan seri terbaru, {series}.",
+      "noTerms": "Ketentuan belum diketahui: Anda tidak memiliki seri program ini dan tidak ada yang sedang dijual.",
+      "autoFetchFailed": "Pengaturan tidak dapat disimpan."
+    },
+    "onSale": {
+      "title": "Sedang dijual sekarang"
     }
   }
 }

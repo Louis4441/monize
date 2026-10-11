@@ -2,17 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@/test/render';
 import BondsPage from './page';
 import { investmentsApi } from '@/lib/investments';
+import toast from 'react-hot-toast';
 import type {
   BondHistory,
   BondInstrumentSummary,
   BondOffer,
+  BondProgramSummary,
   OfferSeries,
 } from '@/types/bond';
+import type { Security } from '@/types/investment';
 
-const nav = vi.hoisted(() => ({ params: new URLSearchParams() }));
+const nav = vi.hoisted(() => ({ params: new URLSearchParams(), push: vi.fn() }));
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
-  usePathname: () => '/investments/bonds',
+  useRouter: () => ({ push: nav.push, replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
+  usePathname: () => '/securities/bonds',
   useSearchParams: () => nav.params,
 }));
 vi.mock('@/components/auth/ProtectedRoute', () => ({
@@ -55,6 +58,9 @@ vi.mock('@/lib/investments', () => ({
     getBondOffer: vi.fn(),
     getBondHistory: vi.fn(),
     listBondInstruments: vi.fn(),
+    listBondPrograms: vi.fn(),
+    getSecurities: vi.fn(),
+    fetchBondOffer: vi.fn(),
     createSecurity: vi.fn(),
   },
 }));
@@ -167,6 +173,11 @@ const history: BondHistory = {
   ],
 };
 
+const programs: BondProgramSummary[] = [
+  { id: 'p-edo', issuerCountryCode: 'PL', issuerCode: 'PL_MF', programCode: 'EDO', currency: 'PLN', seriesCount: 12, newestSeriesCode: 'EDO1036' },
+  { id: 'p-ots', issuerCountryCode: 'PL', issuerCode: 'PL_MF', programCode: 'OTS', currency: 'PLN', seriesCount: 4, newestSeriesCode: 'OTS0127' },
+];
+
 const rowCodes = () =>
   screen
     .getAllByRole('row')
@@ -185,6 +196,8 @@ beforeEach(() => {
   api.getBondOffer.mockResolvedValue(offer);
   api.getBondHistory.mockResolvedValue(history);
   api.listBondInstruments.mockResolvedValue(instruments);
+  api.listBondPrograms.mockResolvedValue(programs);
+  api.getSecurities.mockResolvedValue([]);
 });
 
 describe('Treasury bonds page, On sale tab', () => {
@@ -285,7 +298,7 @@ describe('Treasury bonds page, On sale tab', () => {
     expect(await screen.findByText(/EDO1036/)).toBeInTheDocument();
   });
 
-  it('opens the security form with the series, its currency and type BOND', async () => {
+  it('opens the security form with the series\' program, its currency and type BOND', async () => {
     await renderPage();
     await screen.findByText(/EDO1036/);
     expect(screen.queryByTestId('security-form')).not.toBeInTheDocument();
@@ -294,11 +307,101 @@ describe('Treasury bonds page, On sale tab', () => {
     });
     const form = await screen.findByTestId('security-form');
     expect(JSON.parse(form.getAttribute('data-defaults')!)).toEqual({
-      symbol: 'OTS0127',
-      name: 'OTS0127',
+      symbol: 'OTS',
+      name: 'OTS: 3-month fixed-rate savings bonds',
       securityType: 'BOND',
       currencyCode: 'PLN',
-      bondInstrumentId: 'i-ots',
+      bondProgramId: 'p-ots',
+    });
+    expect(nav.push).not.toHaveBeenCalled();
+  });
+
+  it('goes to the security the reader already holds for the program instead of creating a second', async () => {
+    api.getSecurities.mockResolvedValue([
+      { id: 'sec-other', bondProgramId: 'p-ots' } as Security,
+      { id: 'sec-edo', bondProgramId: 'p-edo' } as Security,
+    ]);
+    await renderPage();
+    await screen.findByText(/EDO1036/);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add EDO1036 to my portfolio' }));
+    });
+    expect(nav.push).toHaveBeenCalledWith('/securities/sec-edo');
+    expect(screen.queryByTestId('security-form')).not.toBeInTheDocument();
+  });
+
+  it('says so when the program cannot be looked up, and opens nothing', async () => {
+    api.listBondPrograms.mockResolvedValue([]);
+    await renderPage();
+    await screen.findByText(/EDO1036/);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add EDO1036 to my portfolio' }));
+    });
+    expect(toast.error).toHaveBeenCalledWith('The bond program could not be looked up. Try again.');
+    expect(screen.queryByTestId('security-form')).not.toBeInTheDocument();
+    expect(nav.push).not.toHaveBeenCalled();
+  });
+
+  describe('fetch the current offer now', () => {
+    const fetchButton = () => screen.findByRole('button', { name: 'Fetch the current offer now' });
+
+    it('reads the offer, reloads it and tells what happened', async () => {
+      api.fetchBondOffer.mockResolvedValue({ listed: 5, stored: 2, alreadyStored: 3, failed: 0 });
+      await renderPage();
+      await screen.findByText(/EDO1036/);
+      expect(api.getBondOffer).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        fireEvent.click(await fetchButton());
+      });
+      expect(api.fetchBondOffer).toHaveBeenCalledWith('PL');
+      expect(toast.success).toHaveBeenCalledWith(
+        'Offer fetched: 5 series listed, 2 newly stored, 3 already stored, 0 failed.',
+      );
+      await waitFor(() => expect(api.getBondOffer).toHaveBeenCalledTimes(2));
+    });
+
+    it('says the throttle\'s own message when the server answers 429, and does not reload', async () => {
+      api.fetchBondOffer.mockRejectedValue({
+        response: { status: 429, data: { message: 'Too many requests, try again in a minute' } },
+      });
+      await renderPage();
+      await screen.findByText(/EDO1036/);
+      await act(async () => {
+        fireEvent.click(await fetchButton());
+      });
+      expect(toast.error).toHaveBeenCalledWith('Too many requests, try again in a minute');
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(api.getBondOffer).toHaveBeenCalledTimes(1);
+      // The button is usable again.
+      expect(await fetchButton()).toBeEnabled();
+    });
+
+    it('does not send twice while one fetch is in flight', async () => {
+      let resolve!: (v: { listed: number; stored: number; alreadyStored: number; failed: number }) => void;
+      api.fetchBondOffer.mockReturnValue(new Promise((r) => (resolve = r)));
+      await renderPage();
+      await screen.findByText(/EDO1036/);
+      const button = await fetchButton();
+      await act(async () => {
+        fireEvent.click(button);
+        fireEvent.click(button);
+      });
+      expect(api.fetchBondOffer).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('button', { name: 'Fetching the current offer...' })).toBeDisabled();
+      await act(async () => {
+        resolve({ listed: 1, stored: 0, alreadyStored: 1, failed: 0 });
+      });
+    });
+
+    it('is on the On sale tab only', async () => {
+      await renderPage();
+      await fetchButton();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('tab', { name: 'History' }));
+      });
+      expect(
+        screen.getByRole('button', { name: 'Fetch the current offer now', hidden: true }),
+      ).not.toBeVisible();
     });
   });
 });

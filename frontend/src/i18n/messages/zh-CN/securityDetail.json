@@ -240,12 +240,10 @@
     }
   },
   "bond": {
-    "title": "债券估值",
     "loading": "正在加载债券估值...",
     "loadFailed": "无法加载债券估值。",
     "unknown": "未知",
     "asOf": "估值日期",
-    "instrument": "系列 {series}（{issuer}，{program}，{country}）",
     "termsSource": "条款：{document}",
     "termsManual": "由管理员手动录入的条款",
     "noLots": "该日期没有未平仓批次。",
@@ -304,13 +302,17 @@
       "SPLIT": "无法推导批次：债券不可拆分。",
       "FRACTIONAL_QUANTITY": "无法推导批次：某个数量不是整数张债券。",
       "OVER_REMOVAL": "无法推导批次：移除的债券多于持有的债券。",
-      "INVALID_QUANTITY": "无法推导批次：某个数量缺失、为负数或过大。"
+      "INVALID_QUANTITY": "无法推导批次：某个数量缺失、为负数或过大。",
+      "REMOVAL_EXCEEDS_SERIES": "无法确定批次:某一系列取出的债券多于持有数量。",
+      "SERIES_NOT_DETERMINED": "无法确定批次:某笔购买的系列未知。"
     },
     "lotsRefusalDetail": {
       "SPLIT": "此证券记录了一次拆分（{date} 的 {action}）；债券不可拆分。",
       "FRACTIONAL_QUANTITY": "{date} 的 {action} 涉及 {quantity} 张债券，不是整数。",
       "OVER_REMOVAL": "{date} 的 {action} 减少 {quantity} 张债券，超过持有数量。",
-      "INVALID_QUANTITY": "{date} 的 {action} 数量缺失、为负数或过大。"
+      "INVALID_QUANTITY": "{date} 的 {action} 数量缺失、为负数或过大。",
+      "REMOVAL_EXCEEDS_SERIES": "{date} 的 {action} 取出其系列的 {quantity} 份债券,超过该系列的持有数量。",
+      "SERIES_NOT_DETERMINED": "{date} 的 {action} 未指定系列,且当天没有该计划的已存系列在售。请获取该系列并在交易中选择。"
     },
     "assumptions": {
       "title": "预测假设",
@@ -423,6 +425,35 @@
       "forfeitAccrued": "提前赎回时,当期已累计的利息将被没收。",
       "floorAllPeriods": "在任何期间,该费用都不会使赎回所得低于面值。",
       "floorFirstPeriod": "仅在第一个期间,该费用不会使赎回所得低于面值;之后的期间没有这一下限。"
+    },
+    "programs": {
+      "OTS": "OTS: 3 个月固定利率储蓄债券",
+      "ROR": "ROR: 1 年期浮动利率储蓄债券",
+      "DOR": "DOR: 2 年期浮动利率储蓄债券",
+      "TOS": "TOS: 3 年期固定利率储蓄债券",
+      "COI": "COI: 4 年期通胀指数储蓄债券",
+      "EDO": "EDO: 10 年期通胀指数储蓄债券",
+      "ROS": "ROS: 6 年期通胀指数家庭储蓄债券",
+      "ROD": "ROD: 12 年期通胀指数家庭储蓄债券"
+    },
+    "series": {
+      "title": "您的系列",
+      "column": "系列",
+      "nextRateChange": "下次利率变更",
+      "total": "项目合计",
+      "purchasedRange": "{from} 至 {to}",
+      "expand": "显示 {series} 的详情",
+      "collapse": "隐藏 {series} 的详情",
+      "partial": "部分"
+    },
+    "program": {
+      "title": "债券项目",
+      "newest": "最新系列 {series} 的条款。",
+      "noTerms": "条款尚不明确:您没有此项目的任何系列,也没有在售的系列。",
+      "autoFetchFailed": "无法保存该设置。"
+    },
+    "onSale": {
+      "title": "当前在售"
     }
   }
 }

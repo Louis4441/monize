@@ -474,7 +474,7 @@ function SecurityDetailContent() {
                   </div>
                 </div>
 
-                {security.bondInstrumentId && (
+                {security.bondProgramId && (
                   <SecurityBondCard
                     security={security}
                     onPricesChanged={reloadAfterPriceRefresh}

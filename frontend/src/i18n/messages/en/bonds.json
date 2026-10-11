@@ -65,7 +65,12 @@
     },
     "couponsNotReinvested": "Coupons not reinvested",
     "add": "Add to my portfolio",
-    "addAria": "Add {series} to my portfolio"
+    "addAria": "Add {series} to my portfolio",
+    "fetchNow": "Fetch the current offer now",
+    "fetching": "Fetching the current offer...",
+    "fetchDone": "Offer fetched: {listed} series listed, {stored} newly stored, {alreadyStored} already stored, {failed} failed.",
+    "fetchFailed": "The current offer could not be fetched.",
+    "addFailed": "The bond program could not be looked up. Try again."
   },
   "history": {
     "product": "Product",
@@ -98,6 +103,7 @@
       "ALL_PERIODS": "Every period",
       "FIRST_PERIOD": "First period only"
     },
-    "none": "None"
+    "none": "None",
+    "held": "Held"
   }
 }

@@ -65,7 +65,12 @@
     },
     "couponsNotReinvested": "Cedole non reinvestite",
     "add": "Aggiungi al mio portafoglio",
-    "addAria": "Aggiungi {series} al mio portafoglio"
+    "addAria": "Aggiungi {series} al mio portafoglio",
+    "fetchNow": "Recupera ora l'offerta attuale",
+    "fetching": "Recupero dell'offerta attuale...",
+    "fetchDone": "Offerta recuperata: {listed} serie elencate, {stored} salvate ora, {alreadyStored} già salvate, {failed} non riuscite.",
+    "fetchFailed": "Impossibile recuperare l'offerta attuale.",
+    "addFailed": "Impossibile trovare il programma obbligazionario. Riprova."
   },
   "history": {
     "product": "Prodotto",
@@ -98,6 +103,7 @@
       "ALL_PERIODS": "Ogni periodo",
       "FIRST_PERIOD": "Solo il primo periodo"
     },
-    "none": "Nessuno"
+    "none": "Nessuno",
+    "held": "Posseduta"
   }
 }

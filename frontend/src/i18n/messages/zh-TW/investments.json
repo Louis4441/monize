@@ -296,7 +296,15 @@
     "toastSaveFailed": "儲存交易失敗",
     "exchangeRateUnresolved": "沒有 {from} 兌 {to} 的匯率。請在儲存前輸入匯率或換算後的總額。",
     "toastExchangeRateRequired": "在儲存跨貨幣交易前請輸入匯率。",
-    "notAvailable": "無法使用"
+    "notAvailable": "無法使用",
+    "bondSeries": {
+      "label": "債券系列",
+      "fromDate": "依日期決定",
+      "oldestFirst": "最早的優先",
+      "loading": "正在載入系列...",
+      "loadFailed": "無法載入系列。",
+      "retry": "重試"
+    }
   },
   "newTransactionButton": {
     "label": "+ 新增交易",

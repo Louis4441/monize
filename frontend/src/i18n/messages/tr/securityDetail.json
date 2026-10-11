@@ -240,12 +240,10 @@
     }
   },
   "bond": {
-    "title": "Tahvil değerlemesi",
     "loading": "Tahvil değerlemesi yükleniyor...",
     "loadFailed": "Tahvil değerlemesi yüklenemedi.",
     "unknown": "Bilinmiyor",
     "asOf": "Değerleme tarihi",
-    "instrument": "Seri {series} ({issuer}, {program}, {country})",
     "termsSource": "Koşullar: {document}",
     "termsManual": "Koşullar bir yönetici tarafından elle girildi",
     "noLots": "Bu tarihte açık lot yok.",
@@ -304,13 +302,17 @@
       "SPLIT": "Lotlar türetilemiyor: bir tahvil bölünmez.",
       "FRACTIONAL_QUANTITY": "Lotlar türetilemiyor: bir miktar tam sayıda tahvil değil.",
       "OVER_REMOVAL": "Lotlar türetilemiyor: elde tutulandan fazla tahvil çıkarılmış.",
-      "INVALID_QUANTITY": "Lotlar türetilemiyor: bir miktar eksik, negatif veya çok büyük."
+      "INVALID_QUANTITY": "Lotlar türetilemiyor: bir miktar eksik, negatif veya çok büyük.",
+      "REMOVAL_EXCEEDS_SERIES": "Lotlar belirlenemiyor: bir seriden elde tutulandan fazla tahvil çıkarıldı.",
+      "SERIES_NOT_DETERMINED": "Lotlar belirlenemiyor: bir alımın serisi bilinmiyor."
     },
     "lotsRefusalDetail": {
       "SPLIT": "Bu menkul kıymette bir bölünme kaydı var ({action}, {date}); tahvil bölünmez.",
       "FRACTIONAL_QUANTITY": "{date} tarihli {action}, tam sayı olmayan {quantity} tahvili hareket ettiriyor.",
       "OVER_REMOVAL": "{date} tarihli {action}, eldekinden fazla olan {quantity} tahvili çıkarıyor.",
-      "INVALID_QUANTITY": "{date} tarihli {action} işleminin miktarı eksik, negatif veya çok büyük."
+      "INVALID_QUANTITY": "{date} tarihli {action} işleminin miktarı eksik, negatif veya çok büyük.",
+      "REMOVAL_EXCEEDS_SERIES": "{date} tarihli {action}, serisinden {quantity} tahvil çıkarıyor; bu, o seride tutulandan fazla.",
+      "SERIES_NOT_DETERMINED": "{date} tarihli {action} seri belirtmiyor ve o gün programın kayıtlı hiçbir serisi satışta değildi. Seriyi indirip işlemde seçin."
     },
     "assumptions": {
       "title": "Projeksiyon varsayımları",
@@ -423,6 +425,35 @@
       "forfeitAccrued": "Erken itfada, içinde bulunulan dönemde işleyen faiz ödenmez.",
       "floorAllPeriods": "Ücret, hiçbir dönemde itfa tutarını nominal değerin altına düşürmez.",
       "floorFirstPeriod": "Ücret, itfa tutarını yalnızca ilk dönemde nominal değerin altına düşüremez; sonraki dönemlerde böyle bir alt sınır yoktur."
+    },
+    "programs": {
+      "OTS": "OTS: 3 aylık sabit faizli tasarruf tahvilleri",
+      "ROR": "ROR: 1 yıllık değişken faizli tasarruf tahvilleri",
+      "DOR": "DOR: 2 yıllık değişken faizli tasarruf tahvilleri",
+      "TOS": "TOS: 3 yıllık sabit faizli tasarruf tahvilleri",
+      "COI": "COI: 4 yıllık enflasyona endeksli tasarruf tahvilleri",
+      "EDO": "EDO: 10 yıllık enflasyona endeksli tasarruf tahvilleri",
+      "ROS": "ROS: 6 yıllık enflasyona endeksli aile tasarruf tahvilleri",
+      "ROD": "ROD: 12 yıllık enflasyona endeksli aile tasarruf tahvilleri"
+    },
+    "series": {
+      "title": "Serileriniz",
+      "column": "Seri",
+      "nextRateChange": "Sonraki faiz değişikliği",
+      "total": "Program toplamı",
+      "purchasedRange": "{from} - {to}",
+      "expand": "{series} ayrıntılarını göster",
+      "collapse": "{series} ayrıntılarını gizle",
+      "partial": "Kısmi"
+    },
+    "program": {
+      "title": "Program",
+      "newest": "En yeni serinin koşulları, {series}.",
+      "noTerms": "Koşullar henüz bilinmiyor: bu programın hiçbir serisine sahip değilsiniz ve hiçbiri satışta değil.",
+      "autoFetchFailed": "Ayar kaydedilemedi."
+    },
+    "onSale": {
+      "title": "Şimdi satışta"
     }
   }
 }

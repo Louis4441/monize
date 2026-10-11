@@ -259,7 +259,7 @@ export function SecurityProviderBadge({
   const t = useTranslations('securities');
   // A bond-linked security is priced from its issue terms; no quote provider
   // is ever asked, so neither an override nor the inherited default is shown.
-  if (security.bondInstrumentId) {
+  if (security.bondProgramId) {
     return (
       <span
         className="inline-flex items-center rounded text-xs font-medium px-2 py-0.5 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"

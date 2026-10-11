@@ -65,7 +65,12 @@
     },
     "couponsNotReinvested": "Cupons não reinvestidos",
     "add": "Adicionar à minha carteira",
-    "addAria": "Adicionar {series} à minha carteira"
+    "addAria": "Adicionar {series} à minha carteira",
+    "fetchNow": "Obter agora a oferta atual",
+    "fetching": "Obtendo a oferta atual...",
+    "fetchDone": "Oferta obtida: {listed} séries listadas, {stored} salvas agora, {alreadyStored} já salvas, {failed} com falha.",
+    "fetchFailed": "Não foi possível obter a oferta atual.",
+    "addFailed": "Não foi possível localizar o programa de títulos. Tente novamente."
   },
   "history": {
     "product": "Produto",
@@ -98,6 +103,7 @@
       "ALL_PERIODS": "Todos os períodos",
       "FIRST_PERIOD": "Somente o primeiro período"
     },
-    "none": "Nenhum"
+    "none": "Nenhum",
+    "held": "Em carteira"
   }
 }

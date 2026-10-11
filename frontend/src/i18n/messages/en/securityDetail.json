@@ -240,12 +240,10 @@
     }
   },
   "bond": {
-    "title": "Bond valuation",
     "loading": "Loading the bond valuation...",
     "loadFailed": "The bond valuation could not be loaded.",
     "unknown": "Unknown",
     "asOf": "Valued on",
-    "instrument": "Series {series} ({issuer}, {program}, {country})",
     "termsSource": "Terms: {document}",
     "termsManual": "Terms entered by hand by an administrator",
     "noLots": "No lots are open on this date.",
@@ -304,13 +302,17 @@
       "SPLIT": "The lots cannot be derived: a bond does not split.",
       "FRACTIONAL_QUANTITY": "The lots cannot be derived: a quantity is not a whole number of bonds.",
       "OVER_REMOVAL": "The lots cannot be derived: more bonds were removed than were held.",
-      "INVALID_QUANTITY": "The lots cannot be derived: a quantity is missing, negative or too large."
+      "INVALID_QUANTITY": "The lots cannot be derived: a quantity is missing, negative or too large.",
+      "REMOVAL_EXCEEDS_SERIES": "The lots cannot be derived: more bonds of one series were removed than were held.",
+      "SERIES_NOT_DETERMINED": "The lots cannot be derived: the series of a purchase is not known."
     },
     "lotsRefusalDetail": {
       "SPLIT": "A split ({action} on {date}) is recorded on this security; a bond does not split.",
       "FRACTIONAL_QUANTITY": "{action} on {date} moves {quantity} bonds, which is not a whole number.",
       "OVER_REMOVAL": "{action} on {date} removes {quantity} bonds, more than were held.",
-      "INVALID_QUANTITY": "The quantity of {action} on {date} is missing, negative or too large."
+      "INVALID_QUANTITY": "The quantity of {action} on {date} is missing, negative or too large.",
+      "REMOVAL_EXCEEDS_SERIES": "{action} on {date} removes {quantity} bonds of its series, more than were held in that series.",
+      "SERIES_NOT_DETERMINED": "{action} on {date} names no series, and no stored series of the program was on sale that day. Fetch the series and choose it in the transaction."
     },
     "assumptions": {
       "title": "Projection assumptions",
@@ -423,6 +425,35 @@
       "forfeitAccrued": "On early redemption, the interest accrued in the current period is forfeited.",
       "floorAllPeriods": "In every period, the fee never reduces the proceeds below the face value.",
       "floorFirstPeriod": "In the first period only, the fee cannot reduce the proceeds below the face value; from the second period the full fee is deducted."
+    },
+    "programs": {
+      "OTS": "OTS: 3-month fixed-rate savings bonds",
+      "ROR": "ROR: 1-year floating-rate savings bonds",
+      "DOR": "DOR: 2-year floating-rate savings bonds",
+      "TOS": "TOS: 3-year fixed-rate savings bonds",
+      "COI": "COI: 4-year inflation-indexed savings bonds",
+      "EDO": "EDO: 10-year inflation-indexed savings bonds",
+      "ROS": "ROS: 6-year inflation-indexed family savings bonds",
+      "ROD": "ROD: 12-year inflation-indexed family savings bonds"
+    },
+    "series": {
+      "title": "Your series",
+      "column": "Series",
+      "nextRateChange": "Next rate change",
+      "total": "Program total",
+      "purchasedRange": "{from} to {to}",
+      "expand": "Show details of {series}",
+      "collapse": "Hide details of {series}",
+      "partial": "Partial"
+    },
+    "program": {
+      "title": "The program",
+      "newest": "Terms of the newest series, {series}.",
+      "noTerms": "The terms are not known yet: you hold no series of this program and none is on sale.",
+      "autoFetchFailed": "The setting could not be saved."
+    },
+    "onSale": {
+      "title": "On sale now"
     }
   }
 }

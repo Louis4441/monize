@@ -65,7 +65,12 @@
     },
     "couponsNotReinvested": "Coupons non réinvestis",
     "add": "Ajouter à mon portefeuille",
-    "addAria": "Ajouter {series} à mon portefeuille"
+    "addAria": "Ajouter {series} à mon portefeuille",
+    "fetchNow": "Récupérer l'offre actuelle maintenant",
+    "fetching": "Récupération de l'offre actuelle...",
+    "fetchDone": "Offre récupérée : {listed} séries listées, {stored} nouvellement enregistrées, {alreadyStored} déjà enregistrées, {failed} en échec.",
+    "fetchFailed": "L'offre actuelle n'a pas pu être récupérée.",
+    "addFailed": "Le programme d'obligations n'a pas pu être retrouvé. Réessayez."
   },
   "history": {
     "product": "Produit",
@@ -98,6 +103,7 @@
       "ALL_PERIODS": "Toutes les périodes",
       "FIRST_PERIOD": "Première période seulement"
     },
-    "none": "Aucun"
+    "none": "Aucun",
+    "held": "Détenue"
   }
 }

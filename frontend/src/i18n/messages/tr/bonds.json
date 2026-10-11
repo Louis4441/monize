@@ -65,7 +65,12 @@
     },
     "couponsNotReinvested": "Kuponlar yeniden yatırılmaz",
     "add": "Portföyüme ekle",
-    "addAria": "{series} serisini portföyüme ekle"
+    "addAria": "{series} serisini portföyüme ekle",
+    "fetchNow": "Güncel teklifi şimdi getir",
+    "fetching": "Güncel teklif getiriliyor...",
+    "fetchDone": "Teklif getirildi: {listed} seri listelendi, {stored} yeni kaydedildi, {alreadyStored} zaten kayıtlı, {failed} başarısız.",
+    "fetchFailed": "Güncel teklif getirilemedi.",
+    "addFailed": "Tahvil programı bulunamadı. Tekrar deneyin."
   },
   "history": {
     "product": "Ürün",
@@ -98,6 +103,7 @@
       "ALL_PERIODS": "Her dönem",
       "FIRST_PERIOD": "Yalnızca ilk dönem"
     },
-    "none": "Yok"
+    "none": "Yok",
+    "held": "Elde"
   }
 }

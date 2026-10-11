@@ -296,7 +296,15 @@
     "toastSaveFailed": "Opslaan van transactie mislukt",
     "exchangeRateUnresolved": "Geen koers van {from} naar {to} beschikbaar. Voer er een in, of het omgerekende totaal, voordat u opslaat.",
     "toastExchangeRateRequired": "Voer een wisselkoers in voordat u een transactie tussen valuta's opslaat.",
-    "notAvailable": "Niet beschikbaar"
+    "notAvailable": "Niet beschikbaar",
+    "bondSeries": {
+      "label": "Obligatieserie",
+      "fromDate": "Bepaald op basis van de datum",
+      "oldestFirst": "Oudste eerst",
+      "loading": "Series laden...",
+      "loadFailed": "De series konden niet worden geladen.",
+      "retry": "Opnieuw proberen"
+    }
   },
   "newTransactionButton": {
     "label": "+ Nieuwe transactie",

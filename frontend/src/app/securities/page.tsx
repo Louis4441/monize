@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
-import { Button } from '@/components/ui/Button';
+import { Button, buttonClassName } from '@/components/ui/Button';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -45,6 +46,7 @@ export default function SecuritiesPage() {
 
 function SecuritiesContent() {
   const t = useTranslations('securities');
+  const tBonds = useTranslations('bonds');
   const router = useRouter();
   const [allSecurities, setAllSecurities] = useState<Security[]>([]);
   const [holdings, setHoldings] = useState<SecurityHoldings>({});
@@ -349,7 +351,17 @@ function SecuritiesContent() {
           title={t('page.title')}
           subtitle={t('page.subtitle')}
           helpUrl="https://github.com/kenlasko/monize/wiki/Investments"
-          actions={<Button onClick={handleCreateNew}>{t('page.newSecurity')}</Button>}
+          actions={
+            <>
+              <Link
+                href="/securities/bonds"
+                className={buttonClassName('outline', 'md', 'w-full whitespace-nowrap sm:w-auto')}
+              >
+                {tBonds('entry.button')}
+              </Link>
+              <Button onClick={handleCreateNew}>{t('page.newSecurity')}</Button>
+            </>
+          }
         />
         {/* Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">

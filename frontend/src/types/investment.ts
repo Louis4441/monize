@@ -57,13 +57,15 @@ export interface Security {
   quoteProvider: QuoteProviderName | null;
   msnInstrumentId: string | null;
   /**
-   * The bond instrument (`GET /bonds/instruments`) this security is linked to,
-   * or null. A linked security is priced by the bond engine only; its currency
-   * equals the instrument's. Optional for the rolling-deploy reason `lastPrice`
+   * The bond program (`GET /bonds/programs`) this security is linked to, or
+   * null. A linked security is priced by the bond engine only; its currency
+   * equals the program's. Optional for the rolling-deploy reason `lastPrice`
    * is: a backend that predates the column sends nothing, and absent means
    * "not linked" to every reader.
    */
-  bondInstrumentId?: string | null;
+  bondProgramId?: string | null;
+  /** Fetch every new series of the linked program automatically; absent means off. */
+  bondAutoFetch?: boolean;
   /**
    * Where and when the instrument trades, as reported by the provider. The
    * session times are local to `marketTimezone` ("HH:mm:ss"). All three are
@@ -454,6 +456,9 @@ export interface InvestmentTransaction {
   status: TransactionStatus;
   // Set on security-transfer legs; points at the paired TRANSFER_IN/OUT leg.
   linkedTransactionId: string | null;
+  // The series (`GET /bonds/instruments` id) a share-moving row of a
+  // program-linked security acts on; null when the row names none.
+  bondInstrumentId?: string | null;
   // Set when this row is embedded inside a split transaction. The parent
   // split transaction owns the row's status; the form disables the status
   // field and the backend refuses a direct change.
@@ -729,6 +734,12 @@ export interface CreateInvestmentTransactionData {
   /** REDEEM only. Recorded as a linked INTEREST transaction, not a second cash entry. */
   accruedInterest?: number;
   exchangeRate?: number;
+  /**
+   * The bond series a share-moving row of a program-linked security acts on.
+   * Null (or omitted) lets the server infer it from the date (an acquisition)
+   * or take the oldest lots first (a removal).
+   */
+  bondInstrumentId?: string | null;
   description?: string;
   status?: TransactionStatus;
 }
@@ -821,8 +832,10 @@ export interface CreateSecurityData {
   tagIds?: string[];
   quoteProvider?: QuoteProviderName | null;
   msnInstrumentId?: string;
-  /** A bond instrument id, or null to unlink; the currency must match the instrument's. */
-  bondInstrumentId?: string | null;
+  /** A bond program id, or null to unlink; the currency must match the program's. */
+  bondProgramId?: string | null;
+  /** Fetch every new series of the linked program automatically. */
+  bondAutoFetch?: boolean;
   isFavourite?: boolean;
   priceAlertPercent?: number | null;
   priceChartEnabled?: boolean;

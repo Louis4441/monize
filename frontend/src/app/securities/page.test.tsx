@@ -357,6 +357,12 @@ describe('SecuritiesPage', () => {
     });
   });
 
+  it('links to the Treasury bonds view from the header', async () => {
+    render(<SecuritiesPage />);
+    const link = await screen.findByRole('link', { name: 'Treasury bonds' });
+    expect(link).toHaveAttribute('href', '/securities/bonds');
+  });
+
   it('opens form modal when + New Security is clicked', async () => {
     render(<SecuritiesPage />);
     await waitFor(() => {

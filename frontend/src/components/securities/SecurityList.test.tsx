@@ -561,7 +561,7 @@ describe('SecurityList', () => {
   });
 
   it('names the bond engine, not the inherited provider, for a bond-linked security', () => {
-    const securities = [makeSecurity({ quoteProvider: null, bondInstrumentId: 'b-pln' })];
+    const securities = [makeSecurity({ quoteProvider: null, bondProgramId: 'p-edo' })];
     useDensityStore.setState({ densities: { securities: 'normal' } });
     render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     expect(screen.getByText('Bond engine (issue terms)')).toBeInTheDocument();

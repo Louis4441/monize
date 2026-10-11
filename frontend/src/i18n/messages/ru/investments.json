@@ -296,7 +296,15 @@
     "toastSaveFailed": "Не удалось сохранить проводку",
     "exchangeRateUnresolved": "Нет курса {from} к {to}. Перед сохранением введите курс или конвертированную итоговую сумму.",
     "toastExchangeRateRequired": "Введите курс обмена перед сохранением сделки между валютами.",
-    "notAvailable": "Недоступно"
+    "notAvailable": "Недоступно",
+    "bondSeries": {
+      "label": "Серия облигаций",
+      "fromDate": "Определяется по дате",
+      "oldestFirst": "Сначала самые старые",
+      "loading": "Загрузка серий...",
+      "loadFailed": "Не удалось загрузить серии.",
+      "retry": "Повторить"
+    }
   },
   "newTransactionButton": {
     "label": "+ Новая проводка",

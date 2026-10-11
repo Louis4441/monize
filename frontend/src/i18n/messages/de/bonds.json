@@ -65,7 +65,12 @@
     },
     "couponsNotReinvested": "Kupons nicht wiederangelegt",
     "add": "Zu meinem Portfolio hinzufügen",
-    "addAria": "{series} zu meinem Portfolio hinzufügen"
+    "addAria": "{series} zu meinem Portfolio hinzufügen",
+    "fetchNow": "Aktuelles Angebot jetzt abrufen",
+    "fetching": "Aktuelles Angebot wird abgerufen...",
+    "fetchDone": "Angebot abgerufen: {listed} Serien gelistet, {stored} neu gespeichert, {alreadyStored} bereits gespeichert, {failed} fehlgeschlagen.",
+    "fetchFailed": "Das aktuelle Angebot konnte nicht abgerufen werden.",
+    "addFailed": "Das Anleiheprogramm konnte nicht gefunden werden. Bitte versuchen Sie es erneut."
   },
   "history": {
     "product": "Produkt",
@@ -98,6 +103,7 @@
       "ALL_PERIODS": "Jede Periode",
       "FIRST_PERIOD": "Nur erste Periode"
     },
-    "none": "Keine"
+    "none": "Keine",
+    "held": "Gehalten"
   }
 }

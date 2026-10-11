@@ -296,7 +296,15 @@
     "toastSaveFailed": "Falha ao guardar a transação",
     "exchangeRateUnresolved": "Não há taxa de {from} para {to} disponível. Introduza uma, ou o total convertido, antes de guardar.",
     "toastExchangeRateRequired": "Introduza uma taxa de câmbio antes de guardar uma operação entre moedas.",
-    "notAvailable": "Não disponível"
+    "notAvailable": "Não disponível",
+    "bondSeries": {
+      "label": "Série de obrigações",
+      "fromDate": "Determinada a partir da data",
+      "oldestFirst": "As mais antigas primeiro",
+      "loading": "A carregar as séries...",
+      "loadFailed": "Não foi possível carregar as séries.",
+      "retry": "Tentar novamente"
+    }
   },
   "newTransactionButton": {
     "label": "+ Nova Transação",

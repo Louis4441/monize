@@ -20,6 +20,30 @@ export interface BondInstrumentSummary {
   termsProvider: string;
 }
 
+/** One program of the catalog (`GET /bonds/programs`): the product a security is linked to, e.g. EDO. */
+export interface BondProgramSummary {
+  id: string;
+  issuerCountryCode: string;
+  issuerCode: string;
+  programCode: string;
+  currency: string;
+  /** How many series of the program the catalog stores. */
+  seriesCount: number;
+  /** The newest stored series' code; null when the program has no series. */
+  newestSeriesCode: string | null;
+}
+
+/** `POST /bonds/offer/fetch` response: what reading the current offer did. */
+export interface FetchBondOfferResult {
+  /** Series the official source lists for sale now. */
+  listed: number;
+  /** Listed series that were not stored and now are. */
+  stored: number;
+  alreadyStored: number;
+  /** Listed series that could not be read. */
+  failed: number;
+}
+
 /** `POST /bonds/instruments/fetch` body. */
 export interface FetchBondSeriesRequest {
   countryCode: string;
@@ -189,6 +213,8 @@ export interface BondValuation {
 }
 
 export interface BondLotValuation {
+  /** The series (`GET /bonds/instruments` id) the lot belongs to. */
+  instrumentId: string;
   purchaseDate: string;
   quantity: number;
   /** A transfer in with no linked leg: the real purchase date is unknown. */
@@ -208,7 +234,9 @@ export type BondLotsRefusalCode =
   | 'SPLIT'
   | 'FRACTIONAL_QUANTITY'
   | 'OVER_REMOVAL'
-  | 'INVALID_QUANTITY';
+  | 'INVALID_QUANTITY'
+  | 'REMOVAL_EXCEEDS_SERIES'
+  | 'SERIES_NOT_DETERMINED';
 
 /**
  * The refusal is rendered from `code` and `params` through translated keys.
@@ -259,19 +287,40 @@ export interface BondRedemptionTerms {
   } | null;
 }
 
+/** The reference data of one series a security's lots name. */
+export interface SecurityBondSeries {
+  instrumentId: string;
+  seriesCode: string;
+  programCode: string;
+  /** Absent in an older payload. */
+  termsSource?: BondTermsSource;
+  /** Null for a series redeemable at maturity only. */
+  redemptionTerms: BondRedemptionTerms | null;
+}
+
+/** The program a security is linked to, as the valuation names it. */
+export interface SecurityBondProgram {
+  id: string;
+  programCode: string;
+  issuerCountryCode: string;
+  issuerCode: string;
+  currency: string;
+}
+
 /** `GET /bonds/securities/:securityId/valuation`. */
 export interface SecurityBondValuation {
   securityId: string;
-  instrument: BondInstrumentSummary;
+  program: SecurityBondProgram;
+  /** Whether new series of the program are fetched automatically. */
+  autoFetch: boolean;
   asOf: string;
+  /** Each lot names its series by `instrumentId`. */
   lots: BondLotValuation[];
+  /** One entry per series the lots name. */
+  series: SecurityBondSeries[];
   totals: BondValuationTotals;
   refusal: BondLotsRefusal | null;
   benchmarkCoverage?: BondBenchmarkCoverage[];
-  /** Null for a bond redeemable at maturity only. */
-  redemptionTerms: BondRedemptionTerms | null;
-  /** Absent in an older payload. */
-  termsSource?: BondTermsSource;
 }
 
 /** `POST /bonds/securities/:securityId/recompute`. */

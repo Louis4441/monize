@@ -240,12 +240,10 @@
     }
   },
   "bond": {
-    "title": "Valutazione dell'obbligazione",
     "loading": "Caricamento della valutazione dell'obbligazione...",
     "loadFailed": "Impossibile caricare la valutazione dell'obbligazione.",
     "unknown": "Sconosciuto",
     "asOf": "Valutata al",
-    "instrument": "Serie {series} ({issuer}, {program}, {country})",
     "termsSource": "Condizioni: {document}",
     "termsManual": "Condizioni inserite manualmente da un amministratore",
     "noLots": "Nessun lotto aperto in questa data.",
@@ -304,13 +302,17 @@
       "SPLIT": "Impossibile derivare i lotti: un'obbligazione non è frazionabile.",
       "FRACTIONAL_QUANTITY": "Impossibile derivare i lotti: una quantità non è un numero intero di obbligazioni.",
       "OVER_REMOVAL": "Impossibile derivare i lotti: sono state rimosse più obbligazioni di quelle detenute.",
-      "INVALID_QUANTITY": "Impossibile derivare i lotti: una quantità manca, è negativa o troppo grande."
+      "INVALID_QUANTITY": "Impossibile derivare i lotti: una quantità manca, è negativa o troppo grande.",
+      "REMOVAL_EXCEEDS_SERIES": "Impossibile ricavare i lotti: sono state rimosse più obbligazioni di una serie di quante ne fossero detenute.",
+      "SERIES_NOT_DETERMINED": "Impossibile ricavare i lotti: la serie di un acquisto è sconosciuta."
     },
     "lotsRefusalDetail": {
       "SPLIT": "Su questo titolo è registrato uno split ({action} il {date}); un'obbligazione non si divide.",
       "FRACTIONAL_QUANTITY": "{action} il {date} sposta {quantity} obbligazioni, che non è un numero intero.",
       "OVER_REMOVAL": "{action} il {date} rimuove {quantity} obbligazioni, più di quelle detenute.",
-      "INVALID_QUANTITY": "La quantità di {action} il {date} manca, è negativa o troppo grande."
+      "INVALID_QUANTITY": "La quantità di {action} il {date} manca, è negativa o troppo grande.",
+      "REMOVAL_EXCEEDS_SERIES": "{action} del {date} rimuove {quantity} obbligazioni della sua serie, più di quante ce ne fossero.",
+      "SERIES_NOT_DETERMINED": "{action} del {date} non indica una serie e quel giorno non era in vendita alcuna serie salvata del programma. Recupera la serie e sceglila nella transazione."
     },
     "assumptions": {
       "title": "Ipotesi della previsione",
@@ -423,6 +425,35 @@
       "forfeitAccrued": "In caso di rimborso anticipato, gli interessi maturati nel periodo corrente vengono persi.",
       "floorAllPeriods": "La commissione non riduce mai il rimborso al di sotto del valore nominale, in nessun periodo.",
       "floorFirstPeriod": "Solo nel primo periodo la commissione non può ridurre il rimborso al di sotto del valore nominale; nei periodi successivi non c'è questo minimo."
+    },
+    "programs": {
+      "OTS": "OTS: obbligazioni di risparmio a 3 mesi a tasso fisso",
+      "ROR": "ROR: obbligazioni di risparmio a 1 anno a tasso variabile",
+      "DOR": "DOR: obbligazioni di risparmio a 2 anni a tasso variabile",
+      "TOS": "TOS: obbligazioni di risparmio a 3 anni a tasso fisso",
+      "COI": "COI: obbligazioni di risparmio a 4 anni indicizzate all'inflazione",
+      "EDO": "EDO: obbligazioni di risparmio a 10 anni indicizzate all'inflazione",
+      "ROS": "ROS: obbligazioni di risparmio familiari a 6 anni indicizzate all'inflazione",
+      "ROD": "ROD: obbligazioni di risparmio familiari a 12 anni indicizzate all'inflazione"
+    },
+    "series": {
+      "title": "Le tue serie",
+      "column": "Serie",
+      "nextRateChange": "Prossima revisione del tasso",
+      "total": "Totale del programma",
+      "purchasedRange": "dal {from} al {to}",
+      "expand": "Mostra i dettagli di {series}",
+      "collapse": "Nascondi i dettagli di {series}",
+      "partial": "Parziale"
+    },
+    "program": {
+      "title": "Il programma",
+      "newest": "Condizioni della serie più recente, {series}.",
+      "noTerms": "Le condizioni non sono ancora note: non possiedi alcuna serie di questo programma e nessuna è in vendita.",
+      "autoFetchFailed": "Impossibile salvare l'impostazione."
+    },
+    "onSale": {
+      "title": "In vendita ora"
     }
   }
 }

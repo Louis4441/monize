@@ -81,10 +81,10 @@ export function SecurityKeyInformation({
     {
       key: "provider",
       label: t("keyInfo.provider"),
-      // A security linked to a bond instrument is priced by the bond engine from
+      // A security linked to a bond program is priced by the bond engine from
       // its issue terms; no quote provider is ever asked for it.
       value: ts(
-        (security.bondInstrumentId
+        (security.bondProgramId
           ? "form.providers.bond_engine"
           : `form.providers.${security.quoteProvider ?? defaultQuoteProvider}`) as Parameters<
           typeof ts

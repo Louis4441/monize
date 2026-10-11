@@ -329,7 +329,15 @@
     "toastSaveFailed": "[XX-Failed to save transaction-XX]",
     "exchangeRateUnresolved": "[XX-No {from} to {to} rate is available. Enter one, or the converted total, before saving.-XX]",
     "toastExchangeRateRequired": "[XX-Enter an exchange rate before saving a cross-currency trade.-XX]",
-    "notAvailable": "[XX-Not available-XX]"
+    "notAvailable": "[XX-Not available-XX]",
+    "bondSeries": {
+      "label": "[XX-Bond series-XX]",
+      "fromDate": "[XX-Determined from the date-XX]",
+      "oldestFirst": "[XX-Oldest first-XX]",
+      "loading": "[XX-Loading the series...-XX]",
+      "loadFailed": "[XX-The series could not be loaded.-XX]",
+      "retry": "[XX-Retry-XX]"
+    }
   },
   "newTransactionButton": {
     "label": "[XX-+ New Transaction-XX]",

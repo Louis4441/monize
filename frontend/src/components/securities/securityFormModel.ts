@@ -34,8 +34,10 @@ export const buildSecuritySchema = (t: (key: string) => string) => z.object({
   irWebsite: z.string().max(2048).optional(),
   quoteProvider: z.enum(['', 'yahoo', 'msn', 'lse', 'deutsche_boerse']).optional(),
   msnInstrumentId: z.string().max(50).optional(),
-  // A bond catalog instrument id, or '' for "not linked".
-  bondInstrumentId: z.string().optional(),
+  // A bond catalog program id, or '' for "not linked".
+  bondProgramId: z.string().optional(),
+  // Fetch every new series of the linked program automatically.
+  bondAutoFetch: z.boolean().optional(),
   priceChartEnabled: z.boolean().optional(),
   skipPriceUpdates: z.boolean().optional(),
   priceAlertPercent: z.string().optional().refine((v) => !v?.trim() || (Number.isFinite(Number(v)) && Number(v) >= 0.1 && Number(v) <= 1000), t('priceAlert.range')),

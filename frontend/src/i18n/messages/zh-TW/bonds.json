@@ -65,7 +65,12 @@
     },
     "couponsNotReinvested": "票息不再投資",
     "add": "新增至我的投資組合",
-    "addAria": "將 {series} 新增至我的投資組合"
+    "addAria": "將 {series} 新增至我的投資組合",
+    "fetchNow": "立即取得目前發售",
+    "fetching": "正在取得目前發售...",
+    "fetchDone": "已取得發售:列出 {listed} 個系列,新儲存 {stored} 個,已存在 {alreadyStored} 個,失敗 {failed} 個。",
+    "fetchFailed": "無法取得目前發售。",
+    "addFailed": "無法找到該債券專案。請重試。"
   },
   "history": {
     "product": "產品",
@@ -98,6 +103,7 @@
       "ALL_PERIODS": "每一期",
       "FIRST_PERIOD": "僅首期"
     },
-    "none": "無"
+    "none": "無",
+    "held": "已持有"
   }
 }

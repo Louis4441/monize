@@ -240,12 +240,10 @@
     }
   },
   "bond": {
-    "title": "Obligatiewaardering",
     "loading": "Obligatiewaardering laden...",
     "loadFailed": "De obligatiewaardering kon niet worden geladen.",
     "unknown": "Onbekend",
     "asOf": "Gewaardeerd op",
-    "instrument": "Reeks {series} ({issuer}, {program}, {country})",
     "termsSource": "Voorwaarden: {document}",
     "termsManual": "Voorwaarden handmatig ingevoerd door een beheerder",
     "noLots": "Op deze datum zijn er geen open partijen.",
@@ -304,13 +302,17 @@
       "SPLIT": "De partijen kunnen niet worden afgeleid: een obligatie wordt niet gesplitst.",
       "FRACTIONAL_QUANTITY": "De partijen kunnen niet worden afgeleid: een aantal is geen geheel aantal obligaties.",
       "OVER_REMOVAL": "De partijen kunnen niet worden afgeleid: er zijn meer obligaties verwijderd dan er werden aangehouden.",
-      "INVALID_QUANTITY": "De partijen kunnen niet worden afgeleid: een aantal ontbreekt, is negatief of is te groot."
+      "INVALID_QUANTITY": "De partijen kunnen niet worden afgeleid: een aantal ontbreekt, is negatief of is te groot.",
+      "REMOVAL_EXCEEDS_SERIES": "De loten kunnen niet worden bepaald: van één serie zijn meer obligaties verwijderd dan aangehouden.",
+      "SERIES_NOT_DETERMINED": "De loten kunnen niet worden bepaald: de serie van een aankoop is onbekend."
     },
     "lotsRefusalDetail": {
       "SPLIT": "Op dit effect is een split vastgelegd ({action} op {date}); een obligatie wordt niet gesplitst.",
       "FRACTIONAL_QUANTITY": "{action} op {date} verplaatst {quantity} obligaties, wat geen geheel getal is.",
       "OVER_REMOVAL": "{action} op {date} haalt {quantity} obligaties weg, meer dan er waren.",
-      "INVALID_QUANTITY": "De hoeveelheid van {action} op {date} ontbreekt, is negatief of te groot."
+      "INVALID_QUANTITY": "De hoeveelheid van {action} op {date} ontbreekt, is negatief of te groot.",
+      "REMOVAL_EXCEEDS_SERIES": "{action} op {date} verwijdert {quantity} obligaties van zijn serie, meer dan in die serie werden aangehouden.",
+      "SERIES_NOT_DETERMINED": "{action} op {date} noemt geen serie en op die dag was geen opgeslagen serie van het programma te koop. Haal de serie op en kies die in de transactie."
     },
     "assumptions": {
       "title": "Aannames van de prognose",
@@ -423,6 +425,35 @@
       "forfeitAccrued": "Bij vroegtijdige aflossing vervalt de rente die in de lopende periode is opgebouwd.",
       "floorAllPeriods": "De kosten brengen de opbrengst in geen enkele periode onder de nominale waarde.",
       "floorFirstPeriod": "Alleen in de eerste periode brengen de kosten de opbrengst niet onder de nominale waarde; in latere periodes geldt die ondergrens niet."
+    },
+    "programs": {
+      "OTS": "OTS: spaarobligaties van 3 maanden met vaste rente",
+      "ROR": "ROR: spaarobligaties van 1 jaar met variabele rente",
+      "DOR": "DOR: spaarobligaties van 2 jaar met variabele rente",
+      "TOS": "TOS: spaarobligaties van 3 jaar met vaste rente",
+      "COI": "COI: inflatiegekoppelde spaarobligaties van 4 jaar",
+      "EDO": "EDO: inflatiegekoppelde spaarobligaties van 10 jaar",
+      "ROS": "ROS: inflatiegekoppelde gezinsspaarobligaties van 6 jaar",
+      "ROD": "ROD: inflatiegekoppelde gezinsspaarobligaties van 12 jaar"
+    },
+    "series": {
+      "title": "Uw series",
+      "column": "Serie",
+      "nextRateChange": "Volgende renteaanpassing",
+      "total": "Totaal van het programma",
+      "purchasedRange": "{from} tot {to}",
+      "expand": "Details van {series} tonen",
+      "collapse": "Details van {series} verbergen",
+      "partial": "Gedeeltelijk"
+    },
+    "program": {
+      "title": "Het programma",
+      "newest": "Voorwaarden van de nieuwste serie, {series}.",
+      "noTerms": "De voorwaarden zijn nog niet bekend: u bezit geen serie van dit programma en er is er geen te koop.",
+      "autoFetchFailed": "De instelling kon niet worden opgeslagen."
+    },
+    "onSale": {
+      "title": "Nu te koop"
     }
   }
 }

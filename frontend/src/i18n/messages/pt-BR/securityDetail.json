@@ -240,12 +240,10 @@
     }
   },
   "bond": {
-    "title": "Avaliação do título",
     "loading": "Carregando a avaliação do título...",
     "loadFailed": "Não foi possível carregar a avaliação do título.",
     "unknown": "Desconhecido",
     "asOf": "Avaliado em",
-    "instrument": "Série {series} ({issuer}, {program}, {country})",
     "termsSource": "Condições: {document}",
     "termsManual": "Condições inseridas manualmente por um administrador",
     "noLots": "Não há lotes em aberto nesta data.",
@@ -304,13 +302,17 @@
       "SPLIT": "Não é possível apurar os lotes: um título não é desdobrado.",
       "FRACTIONAL_QUANTITY": "Não é possível apurar os lotes: uma quantidade não é um número inteiro de títulos.",
       "OVER_REMOVAL": "Não é possível apurar os lotes: foram removidos mais títulos do que os mantidos.",
-      "INVALID_QUANTITY": "Não é possível apurar os lotes: falta uma quantidade, ela é negativa ou grande demais."
+      "INVALID_QUANTITY": "Não é possível apurar os lotes: falta uma quantidade, ela é negativa ou grande demais.",
+      "REMOVAL_EXCEEDS_SERIES": "Não é possível determinar os lotes: foram retirados mais títulos de uma série do que os mantidos.",
+      "SERIES_NOT_DETERMINED": "Não é possível determinar os lotes: a série de uma compra é desconhecida."
     },
     "lotsRefusalDetail": {
       "SPLIT": "Há um desdobramento registrado neste título ({action} em {date}); um título de renda fixa não se desdobra.",
       "FRACTIONAL_QUANTITY": "{action} em {date} movimenta {quantity} títulos, o que não é um número inteiro.",
       "OVER_REMOVAL": "{action} em {date} retira {quantity} títulos, mais do que os mantidos.",
-      "INVALID_QUANTITY": "A quantidade de {action} em {date} está ausente, é negativa ou grande demais."
+      "INVALID_QUANTITY": "A quantidade de {action} em {date} está ausente, é negativa ou grande demais.",
+      "REMOVAL_EXCEEDS_SERIES": "{action} em {date} retira {quantity} títulos da sua série, mais do que os mantidos nessa série.",
+      "SERIES_NOT_DETERMINED": "{action} em {date} não indica série e nesse dia nenhuma série salva do programa estava à venda. Busque a série e escolha-a na transação."
     },
     "assumptions": {
       "title": "Premissas da projeção",
@@ -423,6 +425,35 @@
       "forfeitAccrued": "No resgate antecipado, os juros acumulados no período atual são perdidos.",
       "floorAllPeriods": "A taxa nunca reduz o valor recebido abaixo do valor de face, em nenhum período.",
       "floorFirstPeriod": "Só no primeiro período a taxa não pode reduzir o valor recebido abaixo do valor de face; nos períodos seguintes não existe esse piso."
+    },
+    "programs": {
+      "OTS": "OTS: títulos de poupança de 3 meses com taxa fixa",
+      "ROR": "ROR: títulos de poupança de 1 ano com taxa variável",
+      "DOR": "DOR: títulos de poupança de 2 anos com taxa variável",
+      "TOS": "TOS: títulos de poupança de 3 anos com taxa fixa",
+      "COI": "COI: títulos de poupança de 4 anos indexados à inflação",
+      "EDO": "EDO: títulos de poupança de 10 anos indexados à inflação",
+      "ROS": "ROS: títulos de poupança familiares de 6 anos indexados à inflação",
+      "ROD": "ROD: títulos de poupança familiares de 12 anos indexados à inflação"
+    },
+    "series": {
+      "title": "Suas séries",
+      "column": "Série",
+      "nextRateChange": "Próximo reajuste da taxa",
+      "total": "Total do programa",
+      "purchasedRange": "de {from} a {to}",
+      "expand": "Mostrar os detalhes de {series}",
+      "collapse": "Ocultar os detalhes de {series}",
+      "partial": "Parcial"
+    },
+    "program": {
+      "title": "O programa",
+      "newest": "Condições da série mais recente, {series}.",
+      "noTerms": "As condições ainda não são conhecidas: você não tem nenhuma série deste programa e nenhuma está à venda.",
+      "autoFetchFailed": "Não foi possível salvar a configuração."
+    },
+    "onSale": {
+      "title": "À venda agora"
     }
   }
 }

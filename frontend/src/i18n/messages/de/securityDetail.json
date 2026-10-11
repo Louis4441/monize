@@ -240,12 +240,10 @@
     }
   },
   "bond": {
-    "title": "Anleihebewertung",
     "loading": "Anleihebewertung wird geladen...",
     "loadFailed": "Die Anleihebewertung konnte nicht geladen werden.",
     "unknown": "Unbekannt",
     "asOf": "Bewertet zum",
-    "instrument": "Serie {series} ({issuer}, {program}, {country})",
     "termsSource": "Bedingungen: {document}",
     "termsManual": "Bedingungen von einem Administrator manuell erfasst",
     "noLots": "An diesem Datum sind keine Posten offen.",
@@ -304,13 +302,17 @@
       "SPLIT": "Die Posten lassen sich nicht ableiten: Eine Anleihe wird nicht geteilt.",
       "FRACTIONAL_QUANTITY": "Die Posten lassen sich nicht ableiten: Eine Menge ist keine ganze Zahl von Anleihen.",
       "OVER_REMOVAL": "Die Posten lassen sich nicht ableiten: Es wurden mehr Anleihen entfernt als gehalten.",
-      "INVALID_QUANTITY": "Die Posten lassen sich nicht ableiten: Eine Menge fehlt, ist negativ oder zu groß."
+      "INVALID_QUANTITY": "Die Posten lassen sich nicht ableiten: Eine Menge fehlt, ist negativ oder zu groß.",
+      "REMOVAL_EXCEEDS_SERIES": "Die Lose lassen sich nicht ermitteln: Von einer Serie wurden mehr Anleihen entnommen als gehalten.",
+      "SERIES_NOT_DETERMINED": "Die Lose lassen sich nicht ermitteln: Die Serie eines Kaufs ist unbekannt."
     },
     "lotsRefusalDetail": {
       "SPLIT": "Für dieses Wertpapier ist ein Split erfasst ({action} am {date}); eine Anleihe wird nicht gesplittet.",
       "FRACTIONAL_QUANTITY": "{action} am {date} bewegt {quantity} Anleihen, was keine ganze Zahl ist.",
       "OVER_REMOVAL": "{action} am {date} entnimmt {quantity} Anleihen, mehr als vorhanden waren.",
-      "INVALID_QUANTITY": "Die Menge bei {action} am {date} fehlt, ist negativ oder zu groß."
+      "INVALID_QUANTITY": "Die Menge bei {action} am {date} fehlt, ist negativ oder zu groß.",
+      "REMOVAL_EXCEEDS_SERIES": "{action} am {date} entnimmt {quantity} Anleihen seiner Serie, mehr als in dieser Serie gehalten wurden.",
+      "SERIES_NOT_DETERMINED": "{action} am {date} nennt keine Serie, und an diesem Tag war keine gespeicherte Serie des Programms im Verkauf. Rufen Sie die Serie ab und wählen Sie sie in der Buchung."
     },
     "assumptions": {
       "title": "Annahmen der Prognose",
@@ -423,6 +425,35 @@
       "forfeitAccrued": "Bei vorzeitiger Rückgabe verfallen die im laufenden Zeitraum aufgelaufenen Zinsen.",
       "floorAllPeriods": "Die Gebühr senkt den Erlös in keinem Zeitraum unter den Nennwert.",
       "floorFirstPeriod": "Nur im ersten Zeitraum senkt die Gebühr den Erlös nicht unter den Nennwert; in späteren Zeiträumen gibt es diese Untergrenze nicht."
+    },
+    "programs": {
+      "OTS": "OTS: 3-monatige festverzinsliche Sparanleihen",
+      "ROR": "ROR: 1-jährige variabel verzinste Sparanleihen",
+      "DOR": "DOR: 2-jährige variabel verzinste Sparanleihen",
+      "TOS": "TOS: 3-jährige festverzinsliche Sparanleihen",
+      "COI": "COI: 4-jährige inflationsindexierte Sparanleihen",
+      "EDO": "EDO: 10-jährige inflationsindexierte Sparanleihen",
+      "ROS": "ROS: 6-jährige inflationsindexierte Familien-Sparanleihen",
+      "ROD": "ROD: 12-jährige inflationsindexierte Familien-Sparanleihen"
+    },
+    "series": {
+      "title": "Ihre Serien",
+      "column": "Serie",
+      "nextRateChange": "Nächste Zinsanpassung",
+      "total": "Summe des Programms",
+      "purchasedRange": "{from} bis {to}",
+      "expand": "Details zu {series} anzeigen",
+      "collapse": "Details zu {series} ausblenden",
+      "partial": "Teilweise"
+    },
+    "program": {
+      "title": "Das Programm",
+      "newest": "Konditionen der neuesten Serie, {series}.",
+      "noTerms": "Die Konditionen sind noch nicht bekannt: Sie halten keine Serie dieses Programms und keine ist im Verkauf.",
+      "autoFetchFailed": "Die Einstellung konnte nicht gespeichert werden."
+    },
+    "onSale": {
+      "title": "Jetzt im Verkauf"
     }
   }
 }

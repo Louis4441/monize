@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
@@ -10,6 +10,7 @@ import { PageLayout } from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { BondHistoryTab } from '@/components/bonds/BondHistoryTab';
 import { BondOfferTab } from '@/components/bonds/BondOfferTab';
+import { programLabel } from '@/components/securities/detail/bond-labels';
 import { Modal } from '@/components/ui/Modal';
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
 import { UnsavedChangesDialog } from '@/components/ui/UnsavedChangesDialog';
@@ -17,7 +18,7 @@ import { useFormModal } from '@/hooks/useFormModal';
 import { getErrorMessage } from '@/lib/errors';
 import { investmentsApi } from '@/lib/investments';
 import type { CreateSecurityData } from '@/types/investment';
-import type { OfferSeries } from '@/types/bond';
+import type { BondProgramSummary, OfferSeries } from '@/types/bond';
 
 const SecurityForm = dynamic(
   () => import('@/components/securities/SecurityForm').then((m) => m.SecurityForm),
@@ -42,9 +43,12 @@ export default function BondsPage() {
 function BondsContent() {
   const t = useTranslations('bonds');
   const tSec = useTranslations('securities');
+  const tDetail = useTranslations('securityDetail');
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<TabKey>(() => tabFromQuery(searchParams.get('tab')));
-  const [adding, setAdding] = useState<OfferSeries | null>(null);
+  const [adding, setAdding] = useState<BondProgramSummary | null>(null);
+  const [isResolving, setIsResolving] = useState(false);
   const {
     showForm,
     openCreate,
@@ -60,12 +64,40 @@ function BondsContent() {
     { key: 'history', label: t('page.tabs.history') },
   ];
 
-  // The existing security creation flow, opened with the series chosen: the
-  // type, the currency and the catalog link are the series', and the form still
-  // lets the reader edit every one of them.
-  const handleAdd = (series: OfferSeries) => {
-    setAdding(series);
-    openCreate();
+  // A security is a program, not a series: "Add to my portfolio" on a series
+  // means its program. When the reader already holds a security for it, that
+  // security is the answer (a purchase is recorded there, naming the series);
+  // otherwise the creation flow opens with the program chosen, and the form
+  // still lets the reader edit every field it filled in.
+  const handleAdd = async (series: OfferSeries) => {
+    if (isResolving) return;
+    setIsResolving(true);
+    try {
+      const [programs, securities] = await Promise.all([
+        investmentsApi.listBondPrograms(),
+        investmentsApi.getSecurities(),
+      ]);
+      const program = programs.find(
+        (p) =>
+          p.issuerCountryCode === series.issuerCountryCode &&
+          p.programCode === series.programCode,
+      );
+      if (program === undefined) {
+        toast.error(t('offer.addFailed'));
+        return;
+      }
+      const existing = securities.find((s) => s.bondProgramId === program.id);
+      if (existing !== undefined) {
+        router.push(`/securities/${existing.id}`);
+        return;
+      }
+      setAdding(program);
+      openCreate();
+    } catch (error) {
+      toast.error(getErrorMessage(error, t('offer.addFailed')));
+    } finally {
+      setIsResolving(false);
+    }
   };
 
   const handleSubmit = async (data: CreateSecurityData) => {
@@ -92,7 +124,7 @@ function BondsContent() {
           className="mb-4"
         />
         <TabPanel idPrefix="bonds" tabKey="onSale" isActive={tab === 'onSale'} keepMounted>
-          <BondOfferTab onAdd={handleAdd} />
+          <BondOfferTab onAdd={handleAdd} allowFetch />
         </TabPanel>
         <TabPanel idPrefix="bonds" tabKey="history" isActive={tab === 'history'} keepMounted>
           <BondHistoryTab initialProgram={searchParams.get('program')} />
@@ -111,11 +143,11 @@ function BondsContent() {
               adding === null
                 ? undefined
                 : {
-                    symbol: adding.seriesCode,
-                    name: adding.seriesCode,
+                    symbol: adding.programCode,
+                    name: programLabel(tDetail, adding.programCode),
                     securityType: 'BOND',
                     currencyCode: adding.currency,
-                    bondInstrumentId: adding.instrumentId,
+                    bondProgramId: adding.id,
                   }
             }
             onSubmit={handleSubmit}

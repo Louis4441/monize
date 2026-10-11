@@ -14,6 +14,12 @@ import { NumericInput } from '@/components/ui/NumericInput';
 import { Select } from '@/components/ui/Select';
 import { Modal } from '@/components/ui/Modal';
 import { SecurityForm } from '@/components/securities/SecurityForm';
+import {
+  BOND_SERIES_ERROR_CODES,
+  BondSeriesSelect,
+  bondSeriesKind,
+  useBondSeriesOptions,
+} from './BondSeriesSelect';
 import { investmentsApi } from '@/lib/investments';
 import {
   LAST_INVESTMENT_TRANSACTION_DATE_KEY,
@@ -35,7 +41,7 @@ import {
   roundFxRate,
   FX_RATE_DISPLAY_DECIMALS,
 } from '@/lib/format';
-import { getErrorMessage } from '@/lib/errors';
+import { getErrorCode, getErrorMessage } from '@/lib/errors';
 import {
   baseInvestmentAction,
   redemptionTotalWithInterest,
@@ -74,6 +80,10 @@ export const buildInvestmentTransactionSchema = (t: (key: string) => string) => 
   ]),
   transactionDate: z.string().min(1, t('validation.dateRequired')),
   securityId: z.string().optional(),
+  // The bond series of a share-moving row of a program-linked security.
+  // Undefined is "not chosen" (an acquisition is prefilled from the date); ''
+  // is the reader's "determine it" / "oldest first".
+  bondInstrumentId: z.string().optional(),
   fundingAccountId: z.string().optional(),
   // Destination account for a TRANSFER (the source is `accountId`).
   destinationAccountId: z.string().optional(),
@@ -258,6 +268,8 @@ function InvestmentTransactionFormFields({
   const [securities, setSecurities] = useState<Security[]>([]);
   const [securitiesLoaded, setSecuritiesLoaded] = useState(false);
   const [showSecurityModal, setShowSecurityModal] = useState(false);
+  // The server's refusal about the bond series, said under the series select.
+  const [bondSeriesError, setBondSeriesError] = useState<string | null>(null);
   // Holding state replayed up to the SPLIT's transaction date, used for the
   // "Before" line in the holding preview. Null means "no holding history at
   // that date" (don't render the preview).
@@ -324,6 +336,7 @@ function InvestmentTransactionFormFields({
           action: transaction.action,
           transactionDate: transaction.transactionDate,
           securityId: transaction.securityId || transaction.security?.id || '',
+          bondInstrumentId: transaction.bondInstrumentId ?? '',
           fundingAccountId: transaction.fundingAccountId || '',
           // The destination account for a transfer leg is resolved from the
           // paired (linked) leg once it loads; start empty so the field is
@@ -394,6 +407,7 @@ function InvestmentTransactionFormFields({
   // editing one (to validate the available quantity).
   const transferActive = isTransfer || isTransferEditing;
   const watchedSecurityId = watch('securityId');
+  const watchedBondInstrumentId = watch('bondInstrumentId');
   const watchedDestinationAccountId = watch('destinationAccountId');
   const watchedFundingAccountId = watch('fundingAccountId');
   const watchedQuantity = Number(watch('quantity')) || 0;
@@ -453,6 +467,29 @@ function InvestmentTransactionFormFields({
     }
     return accountCurrency;
   }, [watchedSecurityId, securities, accountCurrency]);
+  // A program-linked security's share-moving row names the series it acts on.
+  const bondSeries = useBondSeriesOptions(
+    securities.find((s) => s.id === watchedSecurityId),
+    bondSeriesKind(watchedAction),
+    watchedTransactionDate,
+  );
+  // The reader's pick; until there is one an acquisition shows the series on
+  // sale on its date, and a removal "oldest first" ('' for both when none).
+  const bondSeriesValue =
+    watchedBondInstrumentId ?? (bondSeries?.kind === 'acquire' ? bondSeries.suggestedId : '');
+  const originalSecurityId = transaction?.securityId || transaction?.security?.id;
+  const bondSeriesKindNow = bondSeries?.kind ?? null;
+  // A series belongs to one security and one direction: another security, or a
+  // switch between buying and selling, starts the choice again.
+  useEffect(() => {
+    setValue(
+      'bondInstrumentId',
+      transaction && watchedSecurityId === originalSecurityId
+        ? (transaction.bondInstrumentId ?? '')
+        : undefined,
+      { shouldDirty: false },
+    );
+  }, [watchedSecurityId, bondSeriesKindNow, originalSecurityId, transaction, setValue]);
   const currencySymbol = getCurrencySymbol(transactionCurrency);
   const cashCurrencySymbol = getCurrencySymbol(cashCurrency);
 
@@ -850,6 +887,7 @@ function InvestmentTransactionFormFields({
 
   const onSubmit = async (data: InvestmentTransactionFormData) => {
     setIsLoading(true);
+    setBondSeriesError(null);
     try {
       if (data.action === 'TRANSFER') {
         const quantity = Number(data.quantity) || 0;
@@ -1045,6 +1083,9 @@ function InvestmentTransactionFormFields({
           postsCash && data.exchangeRate && data.exchangeRate > 0
             ? data.exchangeRate
             : undefined,
+        // Null lets the server infer the series (an acquisition) or take the
+        // oldest lots first (a removal); only a program-linked security has one.
+        bondInstrumentId: bondSeries ? bondSeriesValue || null : undefined,
         description: data.description,
         status: data.status,
       };
@@ -1063,7 +1104,12 @@ function InvestmentTransactionFormFields({
         finishAfterCreate(data.accountId);
       }
     } catch (error) {
-      toast.error(getErrorMessage(error, t('transactionForm.toastSaveFailed')));
+      const message = getErrorMessage(error, t('transactionForm.toastSaveFailed'));
+      const code = getErrorCode(error);
+      if (bondSeries && code && (BOND_SERIES_ERROR_CODES as readonly string[]).includes(code)) {
+        setBondSeriesError(message);
+      }
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -1254,6 +1300,19 @@ function InvestmentTransactionFormFields({
             </button>
           )}
         </div>
+      )}
+
+      {/* The series a share-moving row of a bond program acts on */}
+      {bondSeries && !transferMode && (
+        <BondSeriesSelect
+          series={bondSeries}
+          value={bondSeriesValue}
+          onChange={(id) => {
+            setBondSeriesError(null);
+            setValue('bondInstrumentId', id, { shouldDirty: true });
+          }}
+          error={bondSeriesError ?? undefined}
+        />
       )}
 
       {/* Quantity and Price - for buy/sell/reinvest */}

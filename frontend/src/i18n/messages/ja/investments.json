@@ -296,7 +296,15 @@
     "toastSaveFailed": "取引の保存に失敗しました",
     "exchangeRateUnresolved": "{from} から {to} へのレートがありません。保存する前にレートか換算後の合計を入力してください。",
     "toastExchangeRateRequired": "通貨をまたぐ取引を保存する前に為替レートを入力してください。",
-    "notAvailable": "利用不可"
+    "notAvailable": "利用不可",
+    "bondSeries": {
+      "label": "債券シリーズ",
+      "fromDate": "日付から自動判定",
+      "oldestFirst": "古いものから",
+      "loading": "シリーズを読み込み中...",
+      "loadFailed": "シリーズを読み込めませんでした。",
+      "retry": "再試行"
+    }
   },
   "newTransactionButton": {
     "label": "+ 新規取引",

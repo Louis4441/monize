@@ -240,12 +240,10 @@
     }
   },
   "bond": {
-    "title": "Wycena obligacji",
     "loading": "Wczytywanie wyceny obligacji...",
     "loadFailed": "Nie udało się wczytać wyceny obligacji.",
     "unknown": "Nieznane",
     "asOf": "Wycena na dzień",
-    "instrument": "Seria {series} ({issuer}, {program}, {country})",
     "termsSource": "Warunki: {document}",
     "termsManual": "Warunki wprowadzone ręcznie przez administratora",
     "noLots": "Na ten dzień nie ma otwartych partii.",
@@ -304,13 +302,17 @@
       "SPLIT": "Nie można ustalić partii: obligacja nie podlega podziałowi.",
       "FRACTIONAL_QUANTITY": "Nie można ustalić partii: ilość nie jest całkowitą liczbą obligacji.",
       "OVER_REMOVAL": "Nie można ustalić partii: usunięto więcej obligacji, niż było w posiadaniu.",
-      "INVALID_QUANTITY": "Nie można ustalić partii: ilość jest nieokreślona, ujemna lub zbyt duża."
+      "INVALID_QUANTITY": "Nie można ustalić partii: ilość jest nieokreślona, ujemna lub zbyt duża.",
+      "REMOVAL_EXCEEDS_SERIES": "Nie można wyznaczyć partii: wycofano więcej obligacji jednej serii, niż było jej w posiadaniu.",
+      "SERIES_NOT_DETERMINED": "Nie można wyznaczyć partii: seria zakupu jest nieznana."
     },
     "lotsRefusalDetail": {
       "SPLIT": "Dla tego papieru zapisano split ({action} w dniu {date}); obligacja się nie dzieli.",
       "FRACTIONAL_QUANTITY": "{action} w dniu {date} przesuwa {quantity} obligacji, co nie jest liczbą całkowitą.",
       "OVER_REMOVAL": "{action} w dniu {date} usuwa {quantity} obligacji, więcej niż było w posiadaniu.",
-      "INVALID_QUANTITY": "Ilość w operacji {action} z dnia {date} jest pusta, ujemna lub zbyt duża."
+      "INVALID_QUANTITY": "Ilość w operacji {action} z dnia {date} jest pusta, ujemna lub zbyt duża.",
+      "REMOVAL_EXCEEDS_SERIES": "{action} z {date} wycofuje {quantity} obligacji swojej serii, więcej niż było w tej serii.",
+      "SERIES_NOT_DETERMINED": "{action} z {date} nie wskazuje serii, a tego dnia nie była w sprzedaży żadna zapisana seria tego rodzaju. Pobierz serię i wybierz ją w transakcji."
     },
     "assumptions": {
       "title": "Założenia prognozy",
@@ -423,6 +425,35 @@
       "forfeitAccrued": "Przy przedterminowym wykupie odsetki naliczone w bieżącym okresie odsetkowym przepadają.",
       "floorAllPeriods": "W każdym okresie opłata nie obniży kwoty wykupu poniżej wartości nominalnej.",
       "floorFirstPeriod": "Tylko w pierwszym okresie opłata nie obniży kwoty wykupu poniżej wartości nominalnej; od drugiego okresu potrącana jest pełna opłata."
+    },
+    "programs": {
+      "OTS": "OTS: 3-miesięczne oszczędnościowe obligacje stałoprocentowe",
+      "ROR": "ROR: roczne oszczędnościowe obligacje zmiennoprocentowe",
+      "DOR": "DOR: 2-letnie oszczędnościowe obligacje zmiennoprocentowe",
+      "TOS": "TOS: 3-letnie oszczędnościowe obligacje stałoprocentowe",
+      "COI": "COI: 4-letnie oszczędnościowe obligacje indeksowane inflacją",
+      "EDO": "EDO: 10-letnie oszczędnościowe obligacje indeksowane inflacją",
+      "ROS": "ROS: 6-letnie rodzinne oszczędnościowe obligacje indeksowane inflacją",
+      "ROD": "ROD: 12-letnie rodzinne oszczędnościowe obligacje indeksowane inflacją"
+    },
+    "series": {
+      "title": "Twoje serie",
+      "column": "Seria",
+      "nextRateChange": "Następna zmiana oprocentowania",
+      "total": "Razem w programie",
+      "purchasedRange": "od {from} do {to}",
+      "expand": "Pokaż szczegóły serii {series}",
+      "collapse": "Ukryj szczegóły serii {series}",
+      "partial": "Częściowo"
+    },
+    "program": {
+      "title": "Program",
+      "newest": "Warunki najnowszej serii, {series}.",
+      "noTerms": "Warunki nie są jeszcze znane: nie masz żadnej serii tego programu i żadna nie jest w sprzedaży.",
+      "autoFetchFailed": "Nie udało się zapisać ustawienia."
+    },
+    "onSale": {
+      "title": "Teraz w sprzedaży"
     }
   }
 }

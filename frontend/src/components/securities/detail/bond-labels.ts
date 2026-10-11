@@ -1,7 +1,14 @@
+import type { BondRateRule } from '@/types/bond';
+
 /** The subset of next-intl's translator the label helpers need. */
 interface Translator {
   (key: string): string;
   has: (key: string) => boolean;
+}
+
+/** A translator that also takes message arguments. */
+interface ArgTranslator extends Translator {
+  (key: string, values: Record<string, string | number>): string;
 }
 
 /** A benchmark by its translated name where the catalog has one, else by its id. */
@@ -23,4 +30,38 @@ export function programLabel(t: Translator, programCode: string): string {
   return t.has(`bond.programs.${programCode}`)
     ? t(`bond.programs.${programCode}`)
     : programCode;
+}
+
+/**
+ * How a rate rule reads, in words, one line per sentence. `pct` formats a
+ * fraction string as a percentage (the caller owns the number format); a rule
+ * with a missing figure says nothing rather than a guess.
+ */
+export function rateRuleLines(
+  t: ArgTranslator,
+  rule: BondRateRule,
+  pct: (fraction: string) => string,
+): string[] {
+  if (rule.type === 'FIXED') {
+    return rule.annualRate === null
+      ? []
+      : [t('bond.rate.rule.fixed', { rate: pct(rule.annualRate) })];
+  }
+  if (rule.benchmarkId === null || rule.addend === null) return [];
+  const benchmark = benchmarkLabel(t, rule.benchmarkId);
+  const addend = pct(rule.addend);
+  const lines =
+    rule.firstPeriodRate === null
+      ? [t('bond.rate.rule.every', { benchmark, addend })]
+      : [
+          t('bond.rate.rule.firstThen', {
+            firstRate: pct(rule.firstPeriodRate),
+            benchmark,
+            addend,
+          }),
+        ];
+  if (rule.benchmarkFloor !== null && Number(rule.benchmarkFloor) === 0) {
+    lines.push(t('bond.rate.rule.floorZero', { benchmark }));
+  }
+  return lines;
 }

@@ -240,12 +240,10 @@
     }
   },
   "bond": {
-    "title": "債券估值",
     "loading": "正在載入債券估值...",
     "loadFailed": "無法載入債券估值。",
     "unknown": "未知",
     "asOf": "估值日期",
-    "instrument": "系列 {series}（{issuer}，{program}，{country}）",
     "termsSource": "條款：{document}",
     "termsManual": "由管理員手動輸入的條款",
     "noLots": "此日期沒有未結批次。",
@@ -304,13 +302,17 @@
       "SPLIT": "無法推導批次：債券不可拆分。",
       "FRACTIONAL_QUANTITY": "無法推導批次：某個數量不是整數張債券。",
       "OVER_REMOVAL": "無法推導批次：移除的債券多於持有的債券。",
-      "INVALID_QUANTITY": "無法推導批次：某個數量缺漏、為負數或過大。"
+      "INVALID_QUANTITY": "無法推導批次：某個數量缺漏、為負數或過大。",
+      "REMOVAL_EXCEEDS_SERIES": "無法確定批次:某一系列取出的債券多於持有數量。",
+      "SERIES_NOT_DETERMINED": "無法確定批次:某筆購買的系列未知。"
     },
     "lotsRefusalDetail": {
       "SPLIT": "此證券記錄了一次分割（{date} 的 {action}）；債券不可分割。",
       "FRACTIONAL_QUANTITY": "{date} 的 {action} 涉及 {quantity} 張債券，不是整數。",
       "OVER_REMOVAL": "{date} 的 {action} 減少 {quantity} 張債券，超過持有數量。",
-      "INVALID_QUANTITY": "{date} 的 {action} 數量缺漏、為負數或過大。"
+      "INVALID_QUANTITY": "{date} 的 {action} 數量缺漏、為負數或過大。",
+      "REMOVAL_EXCEEDS_SERIES": "{date} 的 {action} 取出其系列的 {quantity} 份債券,超過該系列的持有數量。",
+      "SERIES_NOT_DETERMINED": "{date} 的 {action} 未指定系列,且當天沒有該計畫的已存系列在售。請取得該系列並在交易中選擇。"
     },
     "assumptions": {
       "title": "預測假設",
@@ -423,6 +425,35 @@
       "forfeitAccrued": "提前贖回時,當期已累計的利息將被沒收。",
       "floorAllPeriods": "在任何期間,該費用都不會使贖回所得低於面值。",
       "floorFirstPeriod": "僅在第一個期間,該費用不會使贖回所得低於面值;之後的期間沒有這項下限。"
+    },
+    "programs": {
+      "OTS": "OTS: 3 個月固定利率儲蓄債券",
+      "ROR": "ROR: 1 年期浮動利率儲蓄債券",
+      "DOR": "DOR: 2 年期浮動利率儲蓄債券",
+      "TOS": "TOS: 3 年期固定利率儲蓄債券",
+      "COI": "COI: 4 年期通膨指數儲蓄債券",
+      "EDO": "EDO: 10 年期通膨指數儲蓄債券",
+      "ROS": "ROS: 6 年期通膨指數家庭儲蓄債券",
+      "ROD": "ROD: 12 年期通膨指數家庭儲蓄債券"
+    },
+    "series": {
+      "title": "您的系列",
+      "column": "系列",
+      "nextRateChange": "下次利率變更",
+      "total": "專案合計",
+      "purchasedRange": "{from} 至 {to}",
+      "expand": "顯示 {series} 的詳情",
+      "collapse": "隱藏 {series} 的詳情",
+      "partial": "部分"
+    },
+    "program": {
+      "title": "債券專案",
+      "newest": "最新系列 {series} 的條款。",
+      "noTerms": "條款尚不明確:您沒有此專案的任何系列,也沒有在售的系列。",
+      "autoFetchFailed": "無法儲存該設定。"
+    },
+    "onSale": {
+      "title": "目前在售"
     }
   }
 }

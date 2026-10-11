@@ -240,12 +240,10 @@
     }
   },
   "bond": {
-    "title": "Avaliação da obrigação",
     "loading": "A carregar a avaliação da obrigação...",
     "loadFailed": "Não foi possível carregar a avaliação da obrigação.",
     "unknown": "Desconhecido",
     "asOf": "Avaliada em",
-    "instrument": "Série {series} ({issuer}, {program}, {country})",
     "termsSource": "Condições: {document}",
     "termsManual": "Condições introduzidas manualmente por um administrador",
     "noLots": "Não há lotes em aberto nesta data.",
@@ -304,13 +302,17 @@
       "SPLIT": "Não é possível apurar os lotes: uma obrigação não se divide.",
       "FRACTIONAL_QUANTITY": "Não é possível apurar os lotes: uma quantidade não é um número inteiro de obrigações.",
       "OVER_REMOVAL": "Não é possível apurar os lotes: foram removidas mais obrigações do que as detidas.",
-      "INVALID_QUANTITY": "Não é possível apurar os lotes: falta uma quantidade, é negativa ou é demasiado grande."
+      "INVALID_QUANTITY": "Não é possível apurar os lotes: falta uma quantidade, é negativa ou é demasiado grande.",
+      "REMOVAL_EXCEEDS_SERIES": "Não é possível determinar os lotes: foram retiradas mais obrigações de uma série do que as detidas.",
+      "SERIES_NOT_DETERMINED": "Não é possível determinar os lotes: a série de uma compra é desconhecida."
     },
     "lotsRefusalDetail": {
       "SPLIT": "Está registado um split neste título ({action} em {date}); uma obrigação não se divide.",
       "FRACTIONAL_QUANTITY": "{action} em {date} movimenta {quantity} obrigações, o que não é um número inteiro.",
       "OVER_REMOVAL": "{action} em {date} retira {quantity} obrigações, mais do que as detidas.",
-      "INVALID_QUANTITY": "A quantidade de {action} em {date} está em falta, é negativa ou demasiado grande."
+      "INVALID_QUANTITY": "A quantidade de {action} em {date} está em falta, é negativa ou demasiado grande.",
+      "REMOVAL_EXCEEDS_SERIES": "{action} em {date} retira {quantity} obrigações da sua série, mais do que as detidas nessa série.",
+      "SERIES_NOT_DETERMINED": "{action} em {date} não indica série e nesse dia não estava à venda nenhuma série guardada do programa. Obtenha a série e escolha-a na transação."
     },
     "assumptions": {
       "title": "Pressupostos da projeção",
@@ -423,6 +425,35 @@
       "forfeitAccrued": "No reembolso antecipado, perdem-se os juros acumulados no período atual.",
       "floorAllPeriods": "A comissão nunca reduz o montante recebido abaixo do valor nominal, em nenhum período.",
       "floorFirstPeriod": "Só no primeiro período a comissão não pode reduzir o montante recebido abaixo do valor nominal; nos períodos seguintes não existe esse mínimo."
+    },
+    "programs": {
+      "OTS": "OTS: obrigações de poupança a 3 meses com taxa fixa",
+      "ROR": "ROR: obrigações de poupança a 1 ano com taxa variável",
+      "DOR": "DOR: obrigações de poupança a 2 anos com taxa variável",
+      "TOS": "TOS: obrigações de poupança a 3 anos com taxa fixa",
+      "COI": "COI: obrigações de poupança a 4 anos indexadas à inflação",
+      "EDO": "EDO: obrigações de poupança a 10 anos indexadas à inflação",
+      "ROS": "ROS: obrigações de poupança familiares a 6 anos indexadas à inflação",
+      "ROD": "ROD: obrigações de poupança familiares a 12 anos indexadas à inflação"
+    },
+    "series": {
+      "title": "As suas séries",
+      "column": "Série",
+      "nextRateChange": "Próxima alteração da taxa",
+      "total": "Total do programa",
+      "purchasedRange": "de {from} a {to}",
+      "expand": "Mostrar os detalhes de {series}",
+      "collapse": "Ocultar os detalhes de {series}",
+      "partial": "Parcial"
+    },
+    "program": {
+      "title": "O programa",
+      "newest": "Condições da série mais recente, {series}.",
+      "noTerms": "As condições ainda não são conhecidas: não tem nenhuma série deste programa e nenhuma está à venda.",
+      "autoFetchFailed": "Não foi possível guardar a definição."
+    },
+    "onSale": {
+      "title": "À venda agora"
     }
   }
 }

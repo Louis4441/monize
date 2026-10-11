@@ -7,11 +7,13 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceDot,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -53,9 +55,19 @@ interface BondHistoryBodyProps {
   program: string;
   /** The currency the product issues in; null when the catalog does not say. */
   currency: string | null;
+  /**
+   * Series codes the reader holds: marked on the rate chart with a reference
+   * dot and highlighted in the table.
+   */
+  heldSeries?: readonly string[];
 }
 
-function BondHistoryBody({ program, currency }: BondHistoryBodyProps) {
+/**
+ * One product's history: charts, the months the catalog lacks and the table of
+ * every stored series. Used by the history tab and, with the product fixed and
+ * the series held marked, by the page of a program-linked security.
+ */
+export function BondHistoryBody({ program, currency, heldSeries = [] }: BondHistoryBodyProps) {
   const t = useTranslations('bonds');
   const tSec = useTranslations('securityDetail');
   const { formatDate } = useDateFormat();
@@ -164,6 +176,20 @@ function BondHistoryBody({ program, currency }: BondHistoryBodyProps) {
                   }
                 />
                 <Legend />
+                {points
+                  .filter((p) => p.rate !== null && heldSeries.includes(p.seriesCode ?? ''))
+                  .map((p) => (
+                    <ReferenceDot
+                      key={p.month}
+                      x={p.month}
+                      y={p.rate as number}
+                      r={7}
+                      fill={chartColors.warning}
+                      stroke={chartColors.surface}
+                      strokeWidth={2}
+                      ifOverflow="extendDomain"
+                    />
+                  ))}
                 <Line
                   type="monotone"
                   dataKey="rate"
@@ -266,9 +292,22 @@ function BondHistoryBody({ program, currency }: BondHistoryBodyProps) {
                 </tr>
               </thead>
               <tbody className={TABLE_BODY_CLASS}>
-                {answer.series.map((s) => (
-                  <tr key={s.seriesCode}>
-                    <Td className="whitespace-nowrap font-medium">{s.seriesCode}</Td>
+                {answer.series.map((s) => {
+                  const held = heldSeries.includes(s.seriesCode);
+                  return (
+                  <tr
+                    key={s.seriesCode}
+                    aria-current={held ? 'true' : undefined}
+                    className={held ? 'bg-blue-50 dark:bg-blue-900/20' : undefined}
+                  >
+                    <Td className="whitespace-nowrap font-medium">
+                      {s.seriesCode}
+                      {held && (
+                        <Badge variant="blue" className="ml-2">
+                          {t('history.held')}
+                        </Badge>
+                      )}
+                    </Td>
                     <Td className="whitespace-nowrap">
                       {s.saleWindow === null
                         ? tSec('bond.unknown')
@@ -307,7 +346,8 @@ function BondHistoryBody({ program, currency }: BondHistoryBodyProps) {
                       )}
                     </Td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

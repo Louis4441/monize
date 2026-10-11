@@ -296,7 +296,15 @@
     "toastSaveFailed": "İşlem kaydedilemedi",
     "exchangeRateUnresolved": "{from} → {to} kuru yok. Kaydetmeden önce bir kur veya çevrilmiş toplamı girin.",
     "toastExchangeRateRequired": "Para birimleri arası bir işlemi kaydetmeden önce bir döviz kuru girin.",
-    "notAvailable": "Mevcut değil"
+    "notAvailable": "Mevcut değil",
+    "bondSeries": {
+      "label": "Tahvil serisi",
+      "fromDate": "Tarihe göre belirlenir",
+      "oldestFirst": "Önce en eskiler",
+      "loading": "Seriler yükleniyor...",
+      "loadFailed": "Seriler yüklenemedi.",
+      "retry": "Yeniden dene"
+    }
   },
   "newTransactionButton": {
     "label": "+ Yeni İşlem",

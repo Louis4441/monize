@@ -65,7 +65,12 @@
     },
     "couponsNotReinvested": "クーポン再投資なし",
     "add": "ポートフォリオに追加",
-    "addAria": "{series}をポートフォリオに追加"
+    "addAria": "{series}をポートフォリオに追加",
+    "fetchNow": "現在のオファーを今すぐ取得",
+    "fetching": "現在のオファーを取得中...",
+    "fetchDone": "オファーを取得しました: 掲載{listed}シリーズ、新規保存{stored}、保存済み{alreadyStored}、失敗{failed}。",
+    "fetchFailed": "現在のオファーを取得できませんでした。",
+    "addFailed": "債券プログラムを確認できませんでした。もう一度お試しください。"
   },
   "history": {
     "product": "商品",
@@ -98,6 +103,7 @@
       "ALL_PERIODS": "すべての期間",
       "FIRST_PERIOD": "最初の期間のみ"
     },
-    "none": "なし"
+    "none": "なし",
+    "held": "保有中"
   }
 }

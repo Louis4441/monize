@@ -5,12 +5,11 @@ import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { TABLE_BODY_CLASS, TABLE_CLASS, Td, Th } from "@/components/ui/Table";
 import { useDateFormat } from "@/hooks/useDateFormat";
 import { useNumberFormat } from "@/hooks/useNumberFormat";
-import { benchmarkLabel } from "./bond-labels";
+import { benchmarkLabel, rateRuleLines } from "./bond-labels";
 import { SecurityBondInterestChart } from "./SecurityBondInterestChart";
 import type {
   BondLotValuation,
   BondRedemptionTerms,
-  BondRateRule,
   BondRateScheduleEntry,
   BondRateSource,
 } from "@/types/bond";
@@ -34,8 +33,8 @@ const YMD = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * How the rate is set, in words, and the rate of every period of each lot
- * (spec 13). The rule is read from the first lot: every lot of one security
- * shares the instrument's terms. The schedule differs per lot (its periods
+ * (spec 13). The rule is read from the first lot: every lot of one series
+ * shares the series' terms. The schedule differs per lot (its periods
  * start on the purchase date), so each lot has its own table under a heading
  * when there are several.
  */
@@ -58,31 +57,6 @@ export function SecurityBondRateSection({
   // A step series is keyed by a day, a monthly one by YYYY-MM (shown as stored).
   const observationLabel = (key: string) =>
     YMD.test(key) ? formatDate(key) : key;
-
-  const ruleLines = (r: BondRateRule): string[] => {
-    if (r.type === "FIXED") {
-      return r.annualRate === null
-        ? []
-        : [t("bond.rate.rule.fixed", { rate: pct(r.annualRate) })];
-    }
-    if (r.benchmarkId === null || r.addend === null) return [];
-    const benchmark = benchmarkName(r.benchmarkId);
-    const addend = pct(r.addend);
-    const lines =
-      r.firstPeriodRate === null
-        ? [t("bond.rate.rule.every", { benchmark, addend })]
-        : [
-            t("bond.rate.rule.firstThen", {
-              firstRate: pct(r.firstPeriodRate),
-              benchmark,
-              addend,
-            }),
-          ];
-    if (r.benchmarkFloor !== null && Number(r.benchmarkFloor) === 0) {
-      lines.push(t("bond.rate.rule.floorZero", { benchmark }));
-    }
-    return lines;
-  };
 
   const how = (entry: BondRateScheduleEntry) => {
     const b = entry.benchmark;
@@ -185,7 +159,7 @@ export function SecurityBondRateSection({
         {t("bond.rate.title")}
       </h4>
       <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
-        {ruleLines(rule).map((line) => (
+        {rateRuleLines(t, rule, pct).map((line) => (
           <p key={line}>{line}</p>
         ))}
       </div>

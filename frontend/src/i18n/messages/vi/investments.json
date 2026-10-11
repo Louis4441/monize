@@ -296,7 +296,15 @@
     "toastSaveFailed": "Lưu giao dịch thất bại",
     "exchangeRateUnresolved": "Không có tỷ giá {from} sang {to}. Nhập tỷ giá, hoặc tổng đã quy đổi, trước khi lưu.",
     "toastExchangeRateRequired": "Nhập tỷ giá trước khi lưu một giao dịch giữa hai loại tiền tệ.",
-    "notAvailable": "Không có sẵn"
+    "notAvailable": "Không có sẵn",
+    "bondSeries": {
+      "label": "Đợt phát hành trái phiếu",
+      "fromDate": "Xác định theo ngày",
+      "oldestFirst": "Cũ nhất trước",
+      "loading": "Đang tải các đợt phát hành...",
+      "loadFailed": "Không thể tải các đợt phát hành.",
+      "retry": "Thử lại"
+    }
   },
   "newTransactionButton": {
     "label": "+ Giao dịch mới",

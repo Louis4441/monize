@@ -296,7 +296,15 @@
     "toastSaveFailed": "거래 저장에 실패했습니다",
     "exchangeRateUnresolved": "{from}→{to} 환율이 없습니다. 저장하기 전에 환율 또는 환산된 합계를 입력하세요.",
     "toastExchangeRateRequired": "통화 간 거래를 저장하기 전에 환율을 입력하세요.",
-    "notAvailable": "사용 불가"
+    "notAvailable": "사용 불가",
+    "bondSeries": {
+      "label": "채권 시리즈",
+      "fromDate": "날짜로 결정",
+      "oldestFirst": "오래된 것부터",
+      "loading": "시리즈를 불러오는 중...",
+      "loadFailed": "시리즈를 불러오지 못했습니다.",
+      "retry": "다시 시도"
+    }
   },
   "newTransactionButton": {
     "label": "+ 새 거래",

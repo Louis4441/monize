@@ -65,7 +65,12 @@
     },
     "couponsNotReinvested": "Kupon tidak diinvestasikan kembali",
     "add": "Tambahkan ke portofolio saya",
-    "addAria": "Tambahkan {series} ke portofolio saya"
+    "addAria": "Tambahkan {series} ke portofolio saya",
+    "fetchNow": "Ambil penawaran saat ini sekarang",
+    "fetching": "Mengambil penawaran saat ini...",
+    "fetchDone": "Penawaran diambil: {listed} seri terdaftar, {stored} baru disimpan, {alreadyStored} sudah tersimpan, {failed} gagal.",
+    "fetchFailed": "Penawaran saat ini tidak dapat diambil.",
+    "addFailed": "Program obligasi tidak dapat ditemukan. Coba lagi."
   },
   "history": {
     "product": "Produk",
@@ -98,6 +103,7 @@
       "ALL_PERIODS": "Setiap periode",
       "FIRST_PERIOD": "Hanya periode pertama"
     },
-    "none": "Tidak ada"
+    "none": "Tidak ada",
+    "held": "Dimiliki"
   }
 }

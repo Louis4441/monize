@@ -240,12 +240,10 @@
     }
   },
   "bond": {
-    "title": "Valoración del bono",
     "loading": "Cargando la valoración del bono...",
     "loadFailed": "No se pudo cargar la valoración del bono.",
     "unknown": "Desconocido",
     "asOf": "Valorado a fecha de",
-    "instrument": "Serie {series} ({issuer}, {program}, {country})",
     "termsSource": "Condiciones: {document}",
     "termsManual": "Condiciones introducidas manualmente por un administrador",
     "noLots": "No hay lotes abiertos en esta fecha.",
@@ -304,13 +302,17 @@
       "SPLIT": "No se pueden derivar los lotes: un bono no se divide.",
       "FRACTIONAL_QUANTITY": "No se pueden derivar los lotes: una cantidad no es un número entero de bonos.",
       "OVER_REMOVAL": "No se pueden derivar los lotes: se retiraron más bonos de los que se tenían.",
-      "INVALID_QUANTITY": "No se pueden derivar los lotes: falta una cantidad, es negativa o demasiado grande."
+      "INVALID_QUANTITY": "No se pueden derivar los lotes: falta una cantidad, es negativa o demasiado grande.",
+      "REMOVAL_EXCEEDS_SERIES": "No se pueden derivar los lotes: se retiraron más bonos de una serie de los que se tenían.",
+      "SERIES_NOT_DETERMINED": "No se pueden derivar los lotes: se desconoce la serie de una compra."
     },
     "lotsRefusalDetail": {
       "SPLIT": "En este valor consta un split ({action} el {date}); un bono no se divide.",
       "FRACTIONAL_QUANTITY": "{action} el {date} mueve {quantity} bonos, que no es un número entero.",
       "OVER_REMOVAL": "{action} el {date} retira {quantity} bonos, más de los que había.",
-      "INVALID_QUANTITY": "La cantidad de {action} el {date} falta, es negativa o demasiado grande."
+      "INVALID_QUANTITY": "La cantidad de {action} el {date} falta, es negativa o demasiado grande.",
+      "REMOVAL_EXCEEDS_SERIES": "{action} del {date} retira {quantity} bonos de su serie, más de los que había en esa serie.",
+      "SERIES_NOT_DETERMINED": "{action} del {date} no indica serie y ese día no estaba a la venta ninguna serie guardada del programa. Obtén la serie y elígela en la transacción."
     },
     "assumptions": {
       "title": "Supuestos de la proyección",
@@ -423,6 +425,35 @@
       "forfeitAccrued": "En un reembolso anticipado se pierden los intereses devengados en el período actual.",
       "floorAllPeriods": "La comisión nunca reduce el importe recibido por debajo del valor nominal, en ningún período.",
       "floorFirstPeriod": "Solo en el primer período la comisión no puede reducir el importe recibido por debajo del valor nominal; en los siguientes no hay ese mínimo."
+    },
+    "programs": {
+      "OTS": "OTS: bonos de ahorro a 3 meses con tipo fijo",
+      "ROR": "ROR: bonos de ahorro a 1 año con tipo variable",
+      "DOR": "DOR: bonos de ahorro a 2 años con tipo variable",
+      "TOS": "TOS: bonos de ahorro a 3 años con tipo fijo",
+      "COI": "COI: bonos de ahorro a 4 años indexados a la inflación",
+      "EDO": "EDO: bonos de ahorro a 10 años indexados a la inflación",
+      "ROS": "ROS: bonos de ahorro familiares a 6 años indexados a la inflación",
+      "ROD": "ROD: bonos de ahorro familiares a 12 años indexados a la inflación"
+    },
+    "series": {
+      "title": "Sus series",
+      "column": "Serie",
+      "nextRateChange": "Próximo cambio de tipo",
+      "total": "Total del programa",
+      "purchasedRange": "{from} a {to}",
+      "expand": "Mostrar los detalles de {series}",
+      "collapse": "Ocultar los detalles de {series}",
+      "partial": "Parcial"
+    },
+    "program": {
+      "title": "El programa",
+      "newest": "Condiciones de la serie más reciente, {series}.",
+      "noTerms": "Las condiciones aún no se conocen: no tiene ninguna serie de este programa y ninguna está a la venta.",
+      "autoFetchFailed": "No se pudo guardar el ajuste."
+    },
+    "onSale": {
+      "title": "A la venta ahora"
     }
   }
 }

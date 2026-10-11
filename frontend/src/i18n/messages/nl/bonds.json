@@ -65,7 +65,12 @@
     },
     "couponsNotReinvested": "Coupons niet herbelegd",
     "add": "Toevoegen aan mijn portefeuille",
-    "addAria": "{series} toevoegen aan mijn portefeuille"
+    "addAria": "{series} toevoegen aan mijn portefeuille",
+    "fetchNow": "Huidig aanbod nu ophalen",
+    "fetching": "Huidig aanbod wordt opgehaald...",
+    "fetchDone": "Aanbod opgehaald: {listed} series vermeld, {stored} nieuw opgeslagen, {alreadyStored} al opgeslagen, {failed} mislukt.",
+    "fetchFailed": "Het huidige aanbod kon niet worden opgehaald.",
+    "addFailed": "Het obligatieprogramma kon niet worden gevonden. Probeer het opnieuw."
   },
   "history": {
     "product": "Product",
@@ -98,6 +103,7 @@
       "ALL_PERIODS": "Elke periode",
       "FIRST_PERIOD": "Alleen de eerste periode"
     },
-    "none": "Geen"
+    "none": "Geen",
+    "held": "In bezit"
   }
 }

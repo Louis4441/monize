@@ -65,7 +65,12 @@
     },
     "couponsNotReinvested": "Coupon không tái đầu tư",
     "add": "Thêm vào danh mục của tôi",
-    "addAria": "Thêm {series} vào danh mục của tôi"
+    "addAria": "Thêm {series} vào danh mục của tôi",
+    "fetchNow": "Lấy ngay danh sách chào bán hiện tại",
+    "fetching": "Đang lấy danh sách chào bán hiện tại...",
+    "fetchDone": "Đã lấy danh sách chào bán: {listed} đợt phát hành được liệt kê, {stored} đợt mới lưu, {alreadyStored} đợt đã có, {failed} đợt lỗi.",
+    "fetchFailed": "Không thể lấy danh sách chào bán hiện tại.",
+    "addFailed": "Không thể tìm thấy chương trình trái phiếu. Hãy thử lại."
   },
   "history": {
     "product": "Sản phẩm",
@@ -98,6 +103,7 @@
       "ALL_PERIODS": "Mọi kỳ",
       "FIRST_PERIOD": "Chỉ kỳ đầu"
     },
-    "none": "Không có"
+    "none": "Không có",
+    "held": "Đang nắm giữ"
   }
 }

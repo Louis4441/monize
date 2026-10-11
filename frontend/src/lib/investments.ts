@@ -40,6 +40,8 @@ import {
 import { IntradayBreakdown } from '@/types/net-worth';
 import type {
   BondInstrumentSummary,
+  BondProgramSummary,
+  FetchBondOfferResult,
   FetchBondSeriesResult,
   BondAssumption,
   BondHistory,
@@ -637,8 +639,8 @@ export const investmentsApi = {
   // Create security
   createSecurity: async (data: CreateSecurityData): Promise<Security> => {
     const response = await apiClient.post<Security>('/securities', data);
-    // A link to a bond instrument makes the server write engine prices.
-    if (data.bondInstrumentId !== undefined) invalidateCache('investments:');
+    // A link to a bond program makes the server write engine prices.
+    if (data.bondProgramId !== undefined) invalidateCache('investments:');
     return response.data;
   },
 
@@ -657,9 +659,9 @@ export const investmentsApi = {
     // an un-invalidated branch here later. One semantic helper shared with the
     // account-update and rate-refresh paths.
     invalidateScheduledFxReadModel();
-    // Linking or unlinking a bond instrument writes or deletes the engine's
+    // Linking or unlinking a bond program writes or deletes the engine's
     // prices on the server, so every cached price read is stale.
-    if (data.bondInstrumentId !== undefined) invalidateCache('investments:');
+    if (data.bondProgramId !== undefined) invalidateCache('investments:');
     return response.data;
   },
 
@@ -962,8 +964,24 @@ export const investmentsApi = {
     return response.data;
   },
 
-  // The bond catalog, for the security form's series picker. Reference data,
-  // identical for every user, so it is not cached per user here.
+  // The catalog's programs, for the security form's program picker. Reference
+  // data, identical for every user, so it is not cached per user here.
+  listBondPrograms: async (): Promise<BondProgramSummary[]> => {
+    const response = await apiClient.get<BondProgramSummary[]>('/bonds/programs');
+    return response.data;
+  },
+
+  // Reads every series of the country's current offer that is not stored yet
+  // (user-initiated, throttled server-side: a 429 carries its own message).
+  fetchBondOffer: async (countryCode: string): Promise<FetchBondOfferResult> => {
+    const response = await apiClient.post<FetchBondOfferResult>('/bonds/offer/fetch', {
+      countryCode,
+    });
+    return response.data;
+  },
+
+  // The bond catalog's series, for the transaction form's series picker.
+  // Reference data, identical for every user, so it is not cached per user here.
   listBondInstruments: async (): Promise<BondInstrumentSummary[]> => {
     const response = await apiClient.get<BondInstrumentSummary[]>('/bonds/instruments');
     return response.data;

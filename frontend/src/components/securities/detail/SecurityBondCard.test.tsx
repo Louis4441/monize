@@ -4,7 +4,11 @@ import { render } from '@/test/render';
 import { SecurityBondCard } from './SecurityBondCard';
 import { investmentsApi } from '@/lib/investments';
 import type { Security } from '@/types/investment';
+import toast from 'react-hot-toast';
 import type {
+  BondHistory,
+  BondOffer,
+  OfferSeries,
   BondRateRule,
   BondRateScheduleEntry,
   BondValuation,
@@ -31,6 +35,9 @@ vi.mock('@/lib/investments', () => ({
     getSecurityBondValuation: vi.fn(),
     getSecurityBondScenarios: vi.fn(),
     recomputeSecurityBondPrices: vi.fn(),
+    getBondOffer: vi.fn(),
+    getBondHistory: vi.fn(),
+    updateSecurity: vi.fn(),
   },
 }));
 vi.mock('recharts', () => ({
@@ -52,6 +59,9 @@ vi.mock('recharts', () => ({
   CartesianGrid: () => null,
   Tooltip: () => null,
   Legend: () => null,
+  LineChart: ({ children }: any) => <div data-testid="line-chart">{children}</div>,
+  Line: () => null,
+  ReferenceDot: ({ x, y }: any) => <i data-testid="held-dot" data-x={x} data-y={y} />,
 }));
 vi.mock('react-hot-toast', () => ({
   default: { success: vi.fn(), error: vi.fn() },
@@ -62,7 +72,8 @@ const security = {
   symbol: 'TOS1029',
   name: 'TOS1029',
   currencyCode: 'PLN',
-  bondInstrumentId: 'bond-1',
+  bondProgramId: 'prog-1',
+  bondAutoFetch: false,
 } as Security;
 
 function lotValuation(overrides: Partial<BondValuation> = {}): BondValuation {
@@ -124,18 +135,20 @@ function response(
 ): SecurityBondValuation {
   return {
     securityId: 'sec-1',
-    instrument: {
-      id: 'bond-1',
+    program: {
+      id: 'prog-1',
+      programCode: 'RETAIL',
       issuerCountryCode: 'PL',
       issuerCode: 'PL_MF',
-      programCode: 'RETAIL',
-      seriesCode: 'TOS1029',
-      currencyCode: 'PLN',
-      termsProvider: 'curated',
+      currency: 'PLN',
     },
+    autoFetch: false,
+    series: [
+      { instrumentId: 'bond-1', seriesCode: 'TOS1029', programCode: 'RETAIL', redemptionTerms: null },
+    ],
     asOf: '2027-04-15',
     lots: [
-      { purchaseDate: '2026-10-05', quantity: 10, purchaseDateAssumed: false, valuation: lotValuation() },
+      { instrumentId: 'bond-1', purchaseDate: '2026-10-05', quantity: 10, purchaseDateAssumed: false, valuation: lotValuation() },
     ],
     totals: {
       quantity: 10,
@@ -144,19 +157,61 @@ function response(
       accruedInterest: '55.2000',
     },
     refusal: null,
-    redemptionTerms: null,
     ...overrides,
   };
+}
+
+/** The one series of the default response, with fields overridden. */
+function oneSeries(
+  over: Partial<SecurityBondValuation['series'][number]> = {},
+): SecurityBondValuation['series'] {
+  return [
+    { instrumentId: 'bond-1', seriesCode: 'TOS1029', programCode: 'RETAIL', redemptionTerms: null, ...over },
+  ];
 }
 
 const get = vi.mocked(investmentsApi.getSecurityBondValuation);
 const recompute = vi.mocked(investmentsApi.recomputeSecurityBondPrices);
 const scenarios = vi.mocked(investmentsApi.getSecurityBondScenarios);
+const getOffer = vi.mocked(investmentsApi.getBondOffer);
+const getHistory = vi.mocked(investmentsApi.getBondHistory);
 
-async function mount(onPricesChanged?: () => void) {
+/** The program total under the series rows: the cell of a column. */
+const TOTAL_COLUMN = { quantity: 1, gross: 3, accrued: 4, early: 5 } as const;
+function totalCell(column: keyof typeof TOTAL_COLUMN): HTMLElement {
+  const row = screen.getByText('Program total').closest('tr') as HTMLElement;
+  return within(row).getAllByRole('cell')[TOTAL_COLUMN[column]];
+}
+
+/** The per-lot table of an opened series (the one with the principal column). */
+function lotRows(): HTMLElement[] {
+  // The series table holds the lots table in its opened row: take the inner one.
+  const table = screen
+    .getAllByRole('table')
+    .find(
+      (t) => t.querySelector('table') === null && within(t).queryByText('Principal per bond') !== null,
+    ) as HTMLElement;
+  return within(table).getAllByRole('row');
+}
+
+/** Opens every series row, so the per-lot detail the older cases read is on screen. */
+async function expandAll() {
+  for (const button of screen.queryAllByRole('button', { name: /^Show details of / })) {
+    await act(async () => {
+      fireEvent.click(button);
+    });
+  }
+}
+
+async function mountCollapsed(onPricesChanged?: () => void) {
   await act(async () => {
     render(<SecurityBondCard security={security} onPricesChanged={onPricesChanged} />);
   });
+}
+
+async function mount(onPricesChanged?: () => void) {
+  await mountCollapsed(onPricesChanged);
+  await expandAll();
 }
 
 describe('SecurityBondCard', () => {
@@ -164,6 +219,8 @@ describe('SecurityBondCard', () => {
     vi.clearAllMocks();
     get.mockResolvedValue(response());
     recompute.mockResolvedValue({ written: 3, deleted: 0 });
+    getOffer.mockResolvedValue({ countryCode: 'PL', today: '2027-04-15', series: [] });
+    getHistory.mockResolvedValue({ countryCode: 'PL', programs: [] });
     scenarios.mockResolvedValue({
       securityId: 'sec-1',
       benchmarkId: 'PL_CPI_GUS_YOY',
@@ -176,10 +233,9 @@ describe('SecurityBondCard', () => {
   it('asks for the valuation on the financial today and renders totals and lots', async () => {
     await mount();
     expect(get).toHaveBeenCalledWith('sec-1', '2027-04-15', undefined);
-    expect(screen.getByText('Series TOS1029 (Ministry of Finance (PL), RETAIL, PL)')).toBeInTheDocument();
-    const gross = screen.getByText('Gross value', { selector: 'dt' }).nextElementSibling!;
+    const gross = totalCell('gross');
     expect(gross).toHaveTextContent('$1,090.20');
-    const row = screen.getAllByRole('row')[1];
+    const row = lotRows()[1];
     expect(within(row).getByText('4.4%')).toBeInTheDocument();
     expect(within(row).getByText('Announced')).toBeInTheDocument();
     expect(within(row).getByText('$1,085.20')).toBeInTheDocument();
@@ -191,22 +247,24 @@ describe('SecurityBondCard', () => {
     await mount();
     expect(screen.getByRole('link', { name: 'Compare with the current offer' })).toHaveAttribute(
       'href',
-      '/investments/bonds',
+      '/securities/bonds',
     );
     expect(screen.getByRole('link', { name: 'History of RETAIL terms' })).toHaveAttribute(
       'href',
-      '/investments/bonds?tab=history&program=RETAIL',
+      '/securities/bonds?tab=history&program=RETAIL',
     );
   });
 
   it('links the terms document when the terms were read from the official source', async () => {
     get.mockResolvedValue(
       response({
-        termsSource: {
-          provider: 'obligacjeskarbowe.pl',
-          url: 'https://www.obligacjeskarbowe.pl/oferta/edo1136',
-          document: 'List emisyjny nr 5/2026',
-        },
+        series: oneSeries({
+          termsSource: {
+            provider: 'obligacjeskarbowe.pl',
+            url: 'https://www.obligacjeskarbowe.pl/oferta/edo1136',
+            document: 'List emisyjny nr 5/2026',
+          },
+        }),
       }),
     );
     await mount();
@@ -219,7 +277,9 @@ describe('SecurityBondCard', () => {
   it('does not make a non-http terms address a link', async () => {
     get.mockResolvedValue(
       response({
-        termsSource: { provider: 'obligacjeskarbowe.pl', url: 'javascript:alert(1)', document: 'Doc' },
+        series: oneSeries({
+          termsSource: { provider: 'obligacjeskarbowe.pl', url: 'javascript:alert(1)', document: 'Doc' },
+        }),
       }),
     );
     await mount();
@@ -229,7 +289,7 @@ describe('SecurityBondCard', () => {
 
   it('notes hand-entered terms without a link', async () => {
     get.mockResolvedValue(
-      response({ termsSource: { provider: 'manual', url: '', document: 'x' } }),
+      response({ series: oneSeries({ termsSource: { provider: 'manual', url: '', document: 'x' } }) }),
     );
     await mount();
     expect(screen.getByText('Terms entered by hand by an administrator')).toBeInTheDocument();
@@ -238,7 +298,7 @@ describe('SecurityBondCard', () => {
 
   it('shows no terms source for an older payload without one', async () => {
     await mount();
-    expect(screen.queryByText(/^Terms/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Terms: /)).not.toBeInTheDocument();
   });
 
   it('renders a null total as unknown with its reason, never as zero', async () => {
@@ -247,7 +307,7 @@ describe('SecurityBondCard', () => {
         totals: { quantity: 10, grossValue: null, earlyRedemptionValue: null, accruedInterest: '55.2000' },
         lots: [
           {
-            purchaseDate: '2026-10-05',
+            instrumentId: 'bond-1', purchaseDate: '2026-10-05',
             quantity: 10,
             purchaseDateAssumed: true,
             // The period is known, so only the two money cells can read Unknown.
@@ -262,12 +322,12 @@ describe('SecurityBondCard', () => {
       }),
     );
     await mount();
-    const gross = screen.getByText('Gross value', { selector: 'dt' }).nextElementSibling!;
+    const gross = totalCell('gross');
     expect(gross).toHaveTextContent('Unknown');
     expect(gross).toHaveTextContent('At least one lot has no figure');
     expect(gross).not.toHaveTextContent('$0.00');
     expect(screen.getByText('Assumed')).toBeInTheDocument();
-    const row = screen.getAllByRole('row')[1];
+    const row = lotRows()[1];
     const cells = within(row).getAllByRole('cell');
     // Columns: purchase, quantity, maturity, period, rate, principal, accrued, gross, early, next, maturity value.
     expect(cells[5]).toHaveTextContent('Unknown');
@@ -281,7 +341,7 @@ describe('SecurityBondCard', () => {
       response({
         lots: [
           {
-            purchaseDate: '2027-04-10',
+            instrumentId: 'bond-1', purchaseDate: '2027-04-10',
             quantity: 10,
             purchaseDateAssumed: false,
             valuation: lotValuation({
@@ -311,8 +371,8 @@ describe('SecurityBondCard', () => {
     get.mockResolvedValue(
       response({
         lots: [
-          { purchaseDate: '2026-10-05', quantity: 5, purchaseDateAssumed: false, valuation: v },
-          { purchaseDate: '2026-11-05', quantity: 5, purchaseDateAssumed: false, valuation: v },
+          { instrumentId: 'bond-1', purchaseDate: '2026-10-05', quantity: 5, purchaseDateAssumed: false, valuation: v },
+          { instrumentId: 'bond-1', purchaseDate: '2026-11-05', quantity: 5, purchaseDateAssumed: false, valuation: v },
         ],
       }),
     );
@@ -335,7 +395,7 @@ describe('SecurityBondCard', () => {
       response({
         lots: [
           {
-            purchaseDate: '2026-10-05',
+            instrumentId: 'bond-1', purchaseDate: '2026-10-05',
             quantity: 5,
             purchaseDateAssumed: false,
             valuation: lotValuation({
@@ -379,7 +439,7 @@ describe('SecurityBondCard', () => {
     // Composed on the client from code and params: translated action, the reader's date.
     expect(screen.getByText('Sell on 01/05/2027 removes 12 bonds, more than were held.')).toBeInTheDocument();
     expect(screen.queryByText(/English server text/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Show details of / })).not.toBeInTheDocument();
     expect(screen.getAllByText('Unknown').length).toBe(4);
   });
 
@@ -416,7 +476,7 @@ describe('SecurityBondCard', () => {
     get.mockRejectedValue(new Error('boom'));
     await mount();
     expect(screen.getByRole('alert')).toHaveTextContent('boom');
-    expect(screen.queryByText('Gross value', { selector: 'dt' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Program total')).not.toBeInTheDocument();
     expect(screen.queryByText('$0.00')).not.toBeInTheDocument();
   });
 
@@ -452,7 +512,7 @@ describe('SecurityBondCard', () => {
 
     it('refetches for the picked day and hides the previous day while it loads', async () => {
       await mount();
-      expect(screen.getByText('Gross value', { selector: 'dt' }).nextElementSibling).toHaveTextContent('$1,090.20');
+      expect(totalCell('gross')).toHaveTextContent('$1,090.20');
       let resolveSecond!: (value: SecurityBondValuation) => void;
       get.mockReturnValueOnce(new Promise((resolve) => (resolveSecond = resolve)));
       await act(async () => {
@@ -462,7 +522,7 @@ describe('SecurityBondCard', () => {
       // Day A's figures are not shown under day B's label while B is pending.
       expect(screen.getByText('Loading the bond valuation...')).toBeInTheDocument();
       expect(screen.queryByText('$1,090.20')).not.toBeInTheDocument();
-      expect(screen.queryByText('Gross value', { selector: 'dt' })).not.toBeInTheDocument();
+      expect(screen.queryByText('Program total')).not.toBeInTheDocument();
 
       await act(async () => {
         resolveSecond(
@@ -472,7 +532,7 @@ describe('SecurityBondCard', () => {
           }),
         );
       });
-      expect(screen.getByText('Gross value', { selector: 'dt' }).nextElementSibling).toHaveTextContent('$1,111.11');
+      expect(totalCell('gross')).toHaveTextContent('$1,111.11');
     });
 
     it('falls back to the financial today when the date is cleared', async () => {
@@ -497,12 +557,12 @@ describe('SecurityBondCard', () => {
       get.mockResolvedValue(
         response({
           lots: [
-            { purchaseDate: '2026-10-05', quantity: 10, purchaseDateAssumed: false, valuation: lotValuation(valuation) },
+            { instrumentId: 'bond-1', purchaseDate: '2026-10-05', quantity: 10, purchaseDateAssumed: false, valuation: lotValuation(valuation) },
           ],
         }),
       );
       await mount();
-      return within(screen.getAllByRole('row')[1]).getAllByRole('cell');
+      return within(lotRows()[1]).getAllByRole('cell');
     };
 
     it('shows the engine\'s next payment, not a date derived from the cash flow lists', async () => {
@@ -580,16 +640,16 @@ describe('SecurityBondCard', () => {
       );
       await mount();
       expect(screen.getByText('No lots are open on this date.')).toBeInTheDocument();
-      expect(screen.queryByRole('table')).not.toBeInTheDocument();
-      expect(screen.getByText('Gross value', { selector: 'dt' }).nextElementSibling).toHaveTextContent('$0.00');
-      expect(screen.getByText('Gross value', { selector: 'dt' }).nextElementSibling).not.toHaveTextContent('Unknown');
+      expect(screen.queryByRole('button', { name: /^Show details of / })).not.toBeInTheDocument();
+      expect(totalCell('gross')).toHaveTextContent('$0.00');
+      expect(totalCell('gross')).not.toHaveTextContent('Unknown');
     });
   });
 
   describe('early redemption terms and the next rate reset and capitalization', () => {
     const terms = (
-      over: Partial<NonNullable<SecurityBondValuation['redemptionTerms']>> = {},
-    ): NonNullable<SecurityBondValuation['redemptionTerms']> => ({
+      over: Partial<NonNullable<SecurityBondValuation['series'][number]['redemptionTerms']>> = {},
+    ): NonNullable<SecurityBondValuation['series'][number]['redemptionTerms']> => ({
       type: 'ON_DEMAND',
       earliestDaysAfterPurchase: 7,
       latestDaysBeforeMaturity: 20,
@@ -599,33 +659,38 @@ describe('SecurityBondCard', () => {
       ...over,
     });
     const mountTerms = async (
-      redemptionTerms: SecurityBondValuation['redemptionTerms'],
+      redemptionTerms: SecurityBondValuation['series'][number]['redemptionTerms'],
       valuation: Partial<BondValuation> = {},
     ) => {
       get.mockResolvedValue(
         response({
-          redemptionTerms,
+          series: oneSeries({ redemptionTerms }),
           lots: [
-            { purchaseDate: '2026-10-05', quantity: 10, purchaseDateAssumed: false, valuation: lotValuation(valuation) },
+            { instrumentId: 'bond-1', purchaseDate: '2026-10-05', quantity: 10, purchaseDateAssumed: false, valuation: lotValuation(valuation) },
           ],
         }),
       );
       await mount();
     };
 
+    // The terms are also summarized under "The program"; these cases read the
+    // series' own block, inside its opened row.
+    const seriesTerms = () =>
+      within(screen.getByText('Early redemption terms').parentElement as HTMLElement);
+
     it('shows the fixed fee per bond in the bond currency and the face value floor in every period', async () => {
       await mountTerms(terms());
       expect(screen.getByText('Early redemption terms')).toBeInTheDocument();
-      expect(screen.getByText('Early redemption fee: $3.00 per bond.')).toBeInTheDocument();
+      expect(seriesTerms().getByText('Early redemption fee: $3.00 per bond.')).toBeInTheDocument();
       expect(
-        screen.getByText('In every period, the fee never reduces the proceeds below the face value.'),
+        seriesTerms().getByText('In every period, the fee never reduces the proceeds below the face value.'),
       ).toBeInTheDocument();
     });
 
     it('says the floor holds in the first period only', async () => {
       await mountTerms(terms({ proceedsFloor: { type: 'FACE_VALUE', appliesTo: 'FIRST_PERIOD' } }));
-      expect(screen.getByText(/In the first period only/)).toBeInTheDocument();
-      expect(screen.queryByText(/In every period/)).not.toBeInTheDocument();
+      expect(seriesTerms().getByText(/In the first period only/)).toBeInTheDocument();
+      expect(seriesTerms().queryByText(/In every period/)).not.toBeInTheDocument();
     });
 
     it('says the accrued interest is forfeited, and shows no floor line without a floor', async () => {
@@ -633,12 +698,12 @@ describe('SecurityBondCard', () => {
         terms({ penalties: [{ type: 'FORFEIT_ACCRUED_SINCE_LAST_PAYMENT' }], proceedsFloor: null }),
       );
       expect(
-        screen.getByText(
+        seriesTerms().getByText(
           'On early redemption, the interest accrued in the current period is forfeited.',
         ),
       ).toBeInTheDocument();
-      expect(screen.queryByText(/face value/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Early redemption fee/)).not.toBeInTheDocument();
+      expect(seriesTerms().queryByText(/face value/)).not.toBeInTheDocument();
+      expect(seriesTerms().queryByText(/Early redemption fee/)).not.toBeInTheDocument();
     });
 
     it('shows no redemption terms for a bond redeemable at maturity only', async () => {
@@ -720,7 +785,7 @@ describe('SecurityBondCard', () => {
       get.mockResolvedValue(
         response({
           lots: [
-            { purchaseDate: '2026-10-01', quantity: 10, purchaseDateAssumed: false, valuation: lotValuation(valuation) },
+            { instrumentId: 'bond-1', purchaseDate: '2026-10-01', quantity: 10, purchaseDateAssumed: false, valuation: lotValuation(valuation) },
           ],
         }),
       );
@@ -829,8 +894,8 @@ describe('SecurityBondCard', () => {
       get.mockResolvedValue(
         response({
           lots: [
-            { purchaseDate: '2026-10-01', quantity: 5, purchaseDateAssumed: false, valuation: lotValuation() },
-            { purchaseDate: '2026-11-05', quantity: 5, purchaseDateAssumed: false, valuation: lotValuation() },
+            { instrumentId: 'bond-1', purchaseDate: '2026-10-01', quantity: 5, purchaseDateAssumed: false, valuation: lotValuation() },
+            { instrumentId: 'bond-1', purchaseDate: '2026-11-05', quantity: 5, purchaseDateAssumed: false, valuation: lotValuation() },
           ],
         }),
       );
@@ -912,6 +977,7 @@ describe('SecurityBondCard: indexation, scenarios and the interest chart (spec 1
     get.mockResolvedValue(
       response({
         lots: purchaseDates.map((purchaseDate) => ({
+          instrumentId: 'bond-1',
           purchaseDate,
           quantity: 10,
           purchaseDateAssumed: false,
@@ -1119,7 +1185,7 @@ describe('SecurityBondCard: indexation, scenarios and the interest chart (spec 1
         nextPayment: [cashFlow({ date: '2027-01-15', amount: null, status: 'UNKNOWN', period: 3 })],
       });
       await mount();
-      const next = within(screen.getAllByRole('row')[1]).getAllByRole('cell')[9];
+      const next = within(lotRows()[1]).getAllByRole('cell')[9];
       expect(next).toHaveTextContent('Interest Unknown on 01/15/2027');
       expect(within(next).getByText('Amount unknown')).toBeInTheDocument();
       expect(next).not.toHaveTextContent('$0.00');
@@ -1170,7 +1236,7 @@ describe('SecurityBondCard: indexation, scenarios and the interest chart (spec 1
         response({
           lots: [
             {
-              purchaseDate: '2020-10-05',
+              instrumentId: 'bond-1', purchaseDate: '2020-10-05',
               quantity: 10,
               purchaseDateAssumed: false,
               valuation: lotValuation({
@@ -1181,7 +1247,7 @@ describe('SecurityBondCard: indexation, scenarios and the interest chart (spec 1
               }),
             },
             {
-              purchaseDate: '2026-10-05',
+              instrumentId: 'bond-1', purchaseDate: '2026-10-05',
               quantity: 5,
               purchaseDateAssumed: false,
               valuation: lotValuation({
@@ -1198,11 +1264,11 @@ describe('SecurityBondCard: indexation, scenarios and the interest chart (spec 1
         }),
       );
       await mount();
-      const matured = within(screen.getAllByRole('row')[1]).getAllByRole('cell');
+      const matured = within(lotRows()[1]).getAllByRole('cell');
       expect(matured[3]).toHaveTextContent('Matured');
       expect(matured[4]).toHaveTextContent('Matured');
       expect(matured[3]).not.toHaveTextContent('Unknown');
-      const open = within(screen.getAllByRole('row')[2]).getAllByRole('cell');
+      const open = within(lotRows()[2]).getAllByRole('cell');
       expect(open[3]).toHaveTextContent('3: 12/31/2027'.slice(0, 2));
       expect(open[3]).toHaveTextContent('01/01/2027');
       expect(open[4]).toHaveTextContent('Unknown');
@@ -1213,7 +1279,7 @@ describe('SecurityBondCard: indexation, scenarios and the interest chart (spec 1
         response({
           lots: [
             {
-              purchaseDate: '2026-12-05',
+              instrumentId: 'bond-1', purchaseDate: '2026-12-05',
               quantity: 10,
               purchaseDateAssumed: false,
               valuation: lotValuation({
@@ -1231,7 +1297,7 @@ describe('SecurityBondCard: indexation, scenarios and the interest chart (spec 1
         }),
       );
       await mount();
-      const cell = within(screen.getAllByRole('row')[1]).getAllByRole('cell')[3];
+      const cell = within(lotRows()[1]).getAllByRole('cell')[3];
       expect(cell).toHaveTextContent('Not valued');
       expect(cell).toHaveTextContent('can only be bought from 10/01/2026 to 10/31/2026');
       expect(cell).toHaveTextContent('bought on 12/05/2026');
@@ -1274,24 +1340,6 @@ describe('SecurityBondCard: indexation, scenarios and the interest chart (spec 1
       expect(screen.getByText('No NBP reference rate data is stored yet')).toBeInTheDocument();
     });
 
-    it('translates a known issuer and falls back to the code for an unknown one', async () => {
-      get.mockResolvedValue(
-        response({
-          instrument: {
-            id: 'bond-1',
-            issuerCountryCode: 'XX',
-            issuerCode: 'XX_ISSUER',
-            programCode: 'RETAIL',
-            seriesCode: 'S1',
-            currencyCode: 'PLN',
-            termsProvider: 'curated',
-          },
-        }),
-      );
-      await mount();
-      expect(screen.getByText('Series S1 (XX_ISSUER, RETAIL, XX)')).toBeInTheDocument();
-    });
-
     it('does not let the picker choose a day after today and never requests one', async () => {
       await mount();
       const input = screen.getByLabelText('Valued on');
@@ -1321,6 +1369,278 @@ describe('SecurityBondCard: indexation, scenarios and the interest chart (spec 1
       expect(scenarios).toHaveBeenLastCalledWith('sec-1', CPI, ['0', '0.025', '0.05', '0.08'], '2027-02-01');
       const panel = screen.getByRole('region', { name: 'Inflation scenarios' });
       expect(within(panel).getByText(/Valued on 02\/01\/2027/)).toBeInTheDocument();
+    });
+  });
+});
+
+describe('SecurityBondCard: a program-linked security (spec bond-program-securities 3.4)', () => {
+  const termsSource = { provider: 'curated', url: '', document: 'Terms 5/2026' };
+  const lot = (instrumentId: string, seriesCode: string, purchaseDate: string, quantity: number, over: Partial<BondValuation> = {}) => ({
+    instrumentId,
+    purchaseDate,
+    quantity,
+    purchaseDateAssumed: false,
+    valuation: lotValuation({
+      seriesCode,
+      quantity,
+      grossValue: String(quantity * 100),
+      accruedInterest: String(quantity),
+      earlyRedemptionValue: String(quantity * 99),
+      maturityDate: seriesCode === 'TOS1029' ? '2029-10-01' : '2030-11-01',
+      nextRateReset: seriesCode === 'TOS1029' ? '2027-10-05' : null,
+      ...over,
+    }),
+  });
+  const twoSeries = () =>
+    response({
+      lots: [
+        lot('bond-1', 'TOS1029', '2026-10-05', 10),
+        lot('bond-2', 'TOS1130', '2026-11-02', 5),
+        lot('bond-2', 'TOS1130', '2026-11-20', 3),
+      ],
+      series: [
+        { instrumentId: 'bond-1', seriesCode: 'TOS1029', programCode: 'RETAIL', termsSource, redemptionTerms: null },
+        { instrumentId: 'bond-2', seriesCode: 'TOS1130', programCode: 'RETAIL', termsSource, redemptionTerms: null },
+      ],
+      totals: { quantity: 18, grossValue: '1800.0000', earlyRedemptionValue: '1782.0000', accruedInterest: '18.0000' },
+    });
+
+  const offerSeries = (over: Partial<OfferSeries> = {}): OfferSeries => ({
+    instrumentId: 'offer-1',
+    issuerCountryCode: 'PL',
+    issuerCode: 'PL_MF',
+    programCode: 'RETAIL',
+    seriesCode: 'TOS0430',
+    currency: 'PLN',
+    saleWindow: { from: '2027-04-01', to: '2027-04-30' },
+    periodMonths: 12,
+    periodCount: 3,
+    rateRule: { type: 'FIXED', benchmarkId: null, annualRate: '0.0500', firstPeriodRate: null, addend: null, benchmarkFloor: null },
+    capitalization: 'NONE',
+    redemption: {
+      type: 'ON_DEMAND',
+      earliestDaysAfterPurchase: 7,
+      latestDaysBeforeMaturity: 20,
+      blackouts: [],
+      penalties: [{ type: 'FIXED_FEE_PER_UNIT', amount: '2.00' }],
+      proceedsFloor: { type: 'FACE_VALUE', appliesTo: 'FIRST_PERIOD' },
+    },
+    termsSource,
+    projection: {
+      maturityValue: '115.0000',
+      totalReturn: '0.1500',
+      annualizedReturn: '0.0480',
+      projected: false,
+      assumptions: [],
+      projectionMissing: [],
+    },
+    ...over,
+  });
+  const offerOf = (series: OfferSeries[]): BondOffer => ({ countryCode: 'PL', today: '2027-04-15', series });
+
+  const historyOf = (): BondHistory => ({
+    countryCode: 'PL',
+    programs: [
+      {
+        programCode: 'RETAIL',
+        coverage: { from: '2026-10', to: '2026-12', missingMonths: ['2026-12'] },
+        series: ['TOS1029:2026-10-01', 'TOS1130:2026-11-01', 'TOS0000:2026-09-01'].map((x) => {
+          const [seriesCode, from] = x.split(':');
+          return {
+            seriesCode,
+            saleWindow: { from, to: from },
+            firstPeriodRate: '0.0440',
+            annualRate: null,
+            addend: null,
+            fee: '3.00',
+            proceedsFloor: 'ALL_PERIODS' as const,
+            termsVersion: 1,
+            termsSource,
+          };
+        }),
+      },
+    ],
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    get.mockResolvedValue(twoSeries());
+    getOffer.mockResolvedValue(offerOf([]));
+    getHistory.mockResolvedValue(historyOf());
+    scenarios.mockResolvedValue({
+      securityId: 'sec-1',
+      benchmarkId: 'PL_CPI_GUS_YOY',
+      asOf: '2027-04-15',
+      refusal: null,
+      scenarios: [],
+    });
+  });
+
+  it('lays the sections out in the order: your series, the program, on sale now, history', async () => {
+    await mountCollapsed();
+    const sections = ['Your series', 'The program', 'On sale now', 'History of RETAIL terms'];
+    const headings = screen
+      .getAllByRole('heading', { level: 3 })
+      .map((h) => h.textContent ?? '')
+      .filter((text) => sections.includes(text));
+    expect(headings).toEqual([
+      'Your series',
+      'The program',
+      'On sale now',
+      'History of RETAIL terms',
+    ]);
+  });
+
+  it('groups the lots into one row per series, with the series figures and the program total', async () => {
+    await mountCollapsed();
+    const rows = within(screen.getAllByRole('table')[0]).getAllByRole('row');
+    // header, two series, program total
+    expect(rows).toHaveLength(4);
+    const first = within(rows[1]).getAllByRole('cell');
+    expect(first[0]).toHaveTextContent('TOS1029');
+    expect(first[1]).toHaveTextContent('10');
+    expect(first[2]).toHaveTextContent('10/05/2026');
+    expect(first[3]).toHaveTextContent('$1,000.00');
+    expect(first[8]).toHaveTextContent('10/01/2029');
+    expect(first[7]).toHaveTextContent('10/05/2027');
+    const second = within(rows[2]).getAllByRole('cell');
+    expect(second[0]).toHaveTextContent('TOS1130');
+    // Two lots of one series: their quantities add, their dates are a range.
+    expect(second[1]).toHaveTextContent('8');
+    expect(second[2]).toHaveTextContent('11/02/2026 to 11/20/2026');
+    expect(second[3]).toHaveTextContent('$800.00');
+    expect(second[4]).toHaveTextContent('$8.00');
+    expect(second[5]).toHaveTextContent('$792.00');
+    // The totals are the server's, not re-added here.
+    expect(totalCell('quantity')).toHaveTextContent('18');
+    expect(totalCell('gross')).toHaveTextContent('$1,800.00');
+  });
+
+  it('opens a series onto the detail of its own lots only', async () => {
+    await mountCollapsed();
+    expect(screen.queryByText('Principal per bond')).not.toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Show details of TOS1130' }));
+    });
+    expect(screen.getByRole('button', { name: 'Hide details of TOS1130' })).toHaveAttribute('aria-expanded', 'true');
+    // Two lots of TOS1130 are in the lots table, none of TOS1029.
+    expect(lotRows()).toHaveLength(3);
+    expect(
+      within(screen.getByRole('region', { name: 'Your series' })).getByText('Terms: Terms 5/2026'),
+    ).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Hide details of TOS1130' }));
+    });
+    expect(screen.queryByText('Principal per bond')).not.toBeInTheDocument();
+  });
+
+  it('keeps a figure unknown for a series when one of its lots has none', async () => {
+    get.mockResolvedValue(
+      response({
+        lots: [lot('bond-1', 'TOS1029', '2026-10-05', 10), lot('bond-1', 'TOS1029', '2026-10-20', 2, { grossValue: null })],
+        totals: { quantity: 12, grossValue: null, earlyRedemptionValue: '1188.0000', accruedInterest: '12.0000' },
+      }),
+    );
+    await mountCollapsed();
+    const row = within(within(screen.getAllByRole('table')[0]).getAllByRole('row')[1]).getAllByRole('cell');
+    expect(row[3]).toHaveTextContent('Unknown');
+    expect(row[3]).not.toHaveTextContent('$');
+    expect(totalCell('gross')).toHaveTextContent('Unknown');
+  });
+
+  it('describes the program from the newest series on sale: rule, length, fee and floor', async () => {
+    getOffer.mockResolvedValue(
+      offerOf([
+        offerSeries({ seriesCode: 'TOS0330', saleWindow: { from: '2027-03-01', to: '2027-03-31' } }),
+        offerSeries(),
+        offerSeries({ instrumentId: 'other', programCode: 'OTHER', seriesCode: 'OTH0430' }),
+      ]),
+    );
+    await mountCollapsed();
+    const program = screen.getByRole('region', { name: 'The program' });
+    expect(within(program).getByText('Terms of the newest series, TOS0430.')).toBeInTheDocument();
+    expect(within(program).getByText('Fixed 5% for the whole term')).toBeInTheDocument();
+    expect(within(program).getByText('36 months')).toBeInTheDocument();
+    expect(within(program).getByText('Paid out each period')).toBeInTheDocument();
+    expect(within(program).getByText('Early redemption fee: $2.00 per bond.')).toBeInTheDocument();
+    expect(within(program).getByText(/In the first period only/)).toBeInTheDocument();
+  });
+
+  it('falls back to the series held when nothing is on sale', async () => {
+    await mountCollapsed();
+    const program = screen.getByRole('region', { name: 'The program' });
+    // The newest held series is the one bought last.
+    expect(within(program).getByText('Terms of the newest series, TOS1130.')).toBeInTheDocument();
+    expect(within(program).getByText('Fixed 4.4% for the whole term')).toBeInTheDocument();
+  });
+
+  it('lists only the series on sale of this program, with nothing to add', async () => {
+    getOffer.mockResolvedValue(
+      offerOf([
+        offerSeries(),
+        offerSeries({ instrumentId: 'other', programCode: 'OTHER', seriesCode: 'OTH0430' }),
+      ]),
+    );
+    await mountCollapsed();
+    const onSale = screen.getByRole('region', { name: 'On sale now' });
+    expect(within(onSale).getByText('TOS0430')).toBeInTheDocument();
+    expect(within(onSale).queryByText('OTH0430')).not.toBeInTheDocument();
+    expect(within(onSale).queryByRole('button', { name: /Add / })).not.toBeInTheDocument();
+    expect(within(onSale).queryByRole('button', { name: 'Fetch the current offer now' })).not.toBeInTheDocument();
+  });
+
+  it('marks the series held on the history chart and highlights them in its table', async () => {
+    await mountCollapsed();
+    const history = screen.getByRole('region', { name: 'History of RETAIL terms' });
+    await within(history).findByText('Every stored series');
+    const dots = within(history).getAllByTestId('held-dot');
+    expect(dots.map((d) => d.getAttribute('data-x')).sort()).toEqual(['2026-10', '2026-11']);
+    const rows = within(history).getAllByRole('row');
+    const held = rows.filter((r) => r.getAttribute('aria-current') === 'true');
+    expect(held.map((r) => within(r).getAllByRole('cell')[0].textContent)).toEqual([
+      'TOS1029Held',
+      'TOS1130Held',
+    ]);
+    const other = rows.find((r) => within(r).queryByText('TOS0000') !== null) as HTMLElement;
+    expect(other).not.toHaveAttribute('aria-current');
+    expect(within(other).queryByText('Held')).not.toBeInTheDocument();
+  });
+
+  describe('the auto-fetch switch', () => {
+    const update = vi.mocked(investmentsApi.updateSecurity);
+    const switchEl = () => screen.getByRole('switch', { name: 'Fetch new series of this program automatically' });
+
+    it('starts as the server reports it', async () => {
+      get.mockResolvedValue({ ...twoSeries(), autoFetch: true });
+      await mountCollapsed();
+      expect(switchEl()).toHaveAttribute('aria-checked', 'true');
+    });
+
+    it('saves through the security update, moving at once', async () => {
+      let resolveSave!: (v: Security) => void;
+      update.mockReturnValue(new Promise((r) => (resolveSave = r)));
+      await mountCollapsed();
+      expect(switchEl()).toHaveAttribute('aria-checked', 'false');
+      await act(async () => {
+        fireEvent.click(switchEl());
+      });
+      expect(update).toHaveBeenCalledWith('sec-1', { bondAutoFetch: true });
+      // Optimistic: on before the server answered.
+      expect(switchEl()).toHaveAttribute('aria-checked', 'true');
+      await act(async () => {
+        resolveSave({ ...security, bondAutoFetch: true });
+      });
+      expect(switchEl()).toHaveAttribute('aria-checked', 'true');
+    });
+
+    it('goes back and says why when the save fails', async () => {
+      update.mockRejectedValue({ response: { data: { message: 'Not allowed for this security' } } });
+      await mountCollapsed();
+      await act(async () => {
+        fireEvent.click(switchEl());
+      });
+      expect(switchEl()).toHaveAttribute('aria-checked', 'false');
+      expect(toast.error).toHaveBeenCalledWith('Not allowed for this security');
     });
   });
 });

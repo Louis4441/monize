@@ -535,6 +535,19 @@ describe('investmentsApi', () => {
       });
     });
 
+    it('listBondPrograms reads the catalog programs', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [{ id: 'p-1', programCode: 'EDO' }] });
+      await expect(investmentsApi.listBondPrograms()).resolves.toEqual([{ id: 'p-1', programCode: 'EDO' }]);
+      expect(apiClient.get).toHaveBeenCalledWith('/bonds/programs');
+    });
+
+    it('fetchBondOffer posts the country and returns the counts', async () => {
+      const counts = { listed: 5, stored: 2, alreadyStored: 3, failed: 0 };
+      vi.mocked(apiClient.post).mockResolvedValue({ data: counts });
+      await expect(investmentsApi.fetchBondOffer('PL')).resolves.toEqual(counts);
+      expect(apiClient.post).toHaveBeenCalledWith('/bonds/offer/fetch', { countryCode: 'PL' });
+    });
+
     describe('a link change drops the cached prices', () => {
       const warm = async () => {
         vi.mocked(apiClient.get).mockResolvedValue({ data: [{ id: 1 }] });
@@ -543,22 +556,22 @@ describe('investmentsApi', () => {
         expect(apiClient.get).toHaveBeenCalledTimes(1);
       };
 
-      it('updateSecurity with a bondInstrumentId (link or null) invalidates', async () => {
-        for (const bondInstrumentId of ['bond-1', null]) {
+      it('updateSecurity with a bondProgramId (link or null) invalidates', async () => {
+        for (const bondProgramId of ['prog-1', null]) {
           vi.clearAllMocks();
           clearAllCache();
           await warm();
           vi.mocked(apiClient.patch).mockResolvedValue({ data: {} });
-          await investmentsApi.updateSecurity('s-1', { bondInstrumentId } as any);
+          await investmentsApi.updateSecurity('s-1', { bondProgramId } as any);
           await investmentsApi.getSecurityPrices('s-1');
           expect(apiClient.get).toHaveBeenCalledTimes(2);
         }
       });
 
-      it('updateSecurity without a bondInstrumentId keeps the cache', async () => {
+      it('updateSecurity without a bondProgramId (the auto-fetch switch alone) keeps the cache', async () => {
         await warm();
         vi.mocked(apiClient.patch).mockResolvedValue({ data: {} });
-        await investmentsApi.updateSecurity('s-1', { name: 'x' } as any);
+        await investmentsApi.updateSecurity('s-1', { name: 'x', bondAutoFetch: true } as any);
         await investmentsApi.getSecurityPrices('s-1');
         expect(apiClient.get).toHaveBeenCalledTimes(1);
       });
@@ -566,7 +579,7 @@ describe('investmentsApi', () => {
       it('createSecurity with a link invalidates', async () => {
         await warm();
         vi.mocked(apiClient.post).mockResolvedValue({ data: {} });
-        await investmentsApi.createSecurity({ symbol: 'X', bondInstrumentId: 'bond-1' } as any);
+        await investmentsApi.createSecurity({ symbol: 'X', bondProgramId: 'prog-1' } as any);
         await investmentsApi.getSecurityPrices('s-1');
         expect(apiClient.get).toHaveBeenCalledTimes(2);
       });

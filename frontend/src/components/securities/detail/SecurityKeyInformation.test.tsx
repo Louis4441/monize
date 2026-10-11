@@ -121,10 +121,10 @@ describe("SecurityKeyInformation", () => {
     expect(screen.getByText("MSN")).toBeInTheDocument();
   });
 
-  it("names the bond engine for a security linked to a bond instrument", () => {
+  it("names the bond engine for a security linked to a bond program", () => {
     render(
       <SecurityKeyInformation
-        security={security({ quoteProvider: "yahoo", bondInstrumentId: "b-1" })}
+        security={security({ quoteProvider: "yahoo", bondProgramId: "b-1" })}
         latestPrice={null}
         prices={[]}
       />,

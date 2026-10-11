@@ -1,17 +1,20 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { BondHistoryBody } from '@/components/bonds/BondHistoryTab';
+import { BondOfferTab } from '@/components/bonds/BondOfferTab';
 import { DateInput } from '@/components/ui/DateInput';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useReportData } from '@/hooks/useReportData';
 import { useFinancialToday } from '@/hooks/useFinancialToday';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { groupLotsBySeries } from '@/lib/bond-series';
 import { investmentsApi } from '@/lib/investments';
 import { getErrorMessage } from '@/lib/errors';
 import type { Security } from '@/types/investment';
@@ -21,10 +24,10 @@ import type {
   BondProjectionMissing,
   SecurityBondValuation,
 } from '@/types/bond';
-import { benchmarkLabel, issuerLabel, programLabel } from './bond-labels';
-import { SecurityBondLotsTable } from './SecurityBondLotsTable';
-import { SecurityBondRateSection } from './SecurityBondRateSection';
+import { benchmarkLabel, programLabel } from './bond-labels';
+import { SecurityBondProgramCard } from './SecurityBondProgramCard';
 import { SecurityBondScenarioPanel } from './SecurityBondScenarioPanel';
+import { SecurityBondSeriesTable } from './SecurityBondSeriesTable';
 
 interface SecurityBondCardProps {
   security: Security;
@@ -63,8 +66,11 @@ function distinct<T>(items: readonly T[], keyOf: (item: T) => string): T[] {
 }
 
 /**
- * A bond-linked security's lots valued on a day (spec 13). Shown only for a
- * security with a `bondInstrumentId`; the page decides that.
+ * The page of a program-linked security (spec `bond-program-securities.md`
+ * 3.4), from the top: "Your series" (its lots valued on a day, one row per
+ * series held), "The program", "On sale now" for the program, and the
+ * program's "History" with the series held marked. Shown only for a security
+ * with a `bondProgramId`; the page decides that.
  *
  * The payload is kept with the request key that produced it (security and
  * day): while a different key is loading, the previous figures are not shown,
@@ -76,8 +82,7 @@ export function SecurityBondCard({
 }: SecurityBondCardProps) {
   const t = useTranslations('securityDetail');
   const tBonds = useTranslations('bonds');
-  const { formatCurrency, formatPercentTrimmed, formatShareQuantity } =
-    useNumberFormat();
+  const { formatPercentTrimmed, formatShareQuantity } = useNumberFormat();
   const tInv = useTranslations('investments');
   const { formatDate } = useDateFormat();
   const today = useFinancialToday();
@@ -137,6 +142,20 @@ export function SecurityBondCard({
       setIsRecomputing(false);
     }
   };
+
+  // The newest answer for this security, whatever day it was asked for.
+  const latest = data !== null && data.securityId === security.id ? data : null;
+  // The lots grouped by the series they belong to; each row is one series.
+  const heldSeries = useMemo(
+    () => (valuation ? groupLotsBySeries(valuation) : []),
+    [valuation],
+  );
+  // The program survives a reload of the valuation (another day, a retry), so
+  // the sections under "Your series" do not blink away with it.
+  const latestHeld = useMemo(
+    () => (latest ? groupLotsBySeries(latest) : []),
+    [latest],
+  );
 
   const assumptions = useMemo(
     () =>
@@ -217,17 +236,6 @@ export function SecurityBondCard({
   // A step series is keyed by day, a monthly one by YYYY-MM (shown as is).
   const observationLabel = (key: string) => (YMD.test(key) ? formatDate(key) : key);
 
-  const unknownTotal = (reason: string): ReactNode => (
-    <>
-      <span className="text-gray-500 dark:text-gray-400">
-        {t('bond.unknown')}
-      </span>
-      <span className="block text-xs font-normal text-gray-500 dark:text-gray-400">
-        {reason}
-      </span>
-    </>
-  );
-
   const renderBody = () => {
     // A failed latest request is shown as one, whatever an earlier answer was.
     if (error) {
@@ -250,103 +258,30 @@ export function SecurityBondCard({
       );
     }
 
-    const { totals, refusal, lots, instrument } = valuation;
+    const { totals, refusal, lots, program } = valuation;
     const coverage = valuation.benchmarkCoverage ?? [];
     const totalReason = refusal
       ? t('bond.totals.unknownRefusal')
       : t('bond.totals.unknownLot');
-    const total = (value: string | null): ReactNode =>
-      value === null
-        ? unknownTotal(totalReason)
-        : formatCurrency(Number(value), currency);
 
     return (
       <div className="space-y-4" aria-busy={isLoading}>
-        {/* Figures only mean something with the instrument they belong to. */}
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          {t('bond.instrument', {
-            series: instrument.seriesCode,
-            issuer: issuerLabel(t, instrument.issuerCode),
-            program: programLabel(t, instrument.programCode),
-            country: instrument.issuerCountryCode,
-          })}
-        </p>
-        {valuation.termsSource &&
-          (valuation.termsSource.provider === 'manual' ? (
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {t('bond.termsManual')}
-            </p>
-          ) : (
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {/* Only an http(s) address is made a link. */}
-              {/^https?:\/\//i.test(valuation.termsSource.url) ? (
-                <a
-                  href={valuation.termsSource.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline dark:text-blue-400"
-                >
-                  {t('bond.termsSource', { document: valuation.termsSource.document })}
-                </a>
-              ) : (
-                t('bond.termsSource', { document: valuation.termsSource.document })
-              )}
-            </p>
-          ))}
-
         <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
           <Link
-            href="/investments/bonds"
+            href="/securities/bonds"
             className="text-blue-600 hover:underline dark:text-blue-400"
           >
             {tBonds('entry.compare')}
           </Link>
           <Link
-            href={`/investments/bonds?tab=history&program=${encodeURIComponent(instrument.programCode)}`}
+            href={`/securities/bonds?tab=history&program=${encodeURIComponent(program.programCode)}`}
             className="text-blue-600 hover:underline dark:text-blue-400"
           >
             {tBonds('entry.history', {
-              program: programLabel(t, instrument.programCode),
+              program: programLabel(t, program.programCode),
             })}
           </Link>
         </p>
-
-        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-          <div>
-            <dt className="text-xs text-gray-500 dark:text-gray-400">
-              {t('bond.totals.quantity')}
-            </dt>
-            <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {totals.quantity === null
-                ? unknownTotal(totalReason)
-                : formatShareQuantity(totals.quantity)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-gray-500 dark:text-gray-400">
-              {t('bond.totals.grossValue')}
-            </dt>
-            <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {total(totals.grossValue)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-gray-500 dark:text-gray-400">
-              {t('bond.totals.earlyRedemptionValue')}
-            </dt>
-            <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {total(totals.earlyRedemptionValue)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-gray-500 dark:text-gray-400">
-              {t('bond.totals.accruedInterest')}
-            </dt>
-            <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {total(totals.accruedInterest)}
-            </dd>
-          </div>
-        </dl>
 
         {incompleteLots.length > 0 && (
           <div
@@ -388,16 +323,12 @@ export function SecurityBondCard({
             {t('bond.noLots')}
           </p>
         )}
-        {lots.length > 0 && (
-          <SecurityBondLotsTable lots={lots} currency={currency} />
-        )}
-        {lots.length > 0 && (
-          <SecurityBondRateSection
-            lots={lots}
-            currency={currency}
-            redemptionTerms={valuation.redemptionTerms ?? null}
-          />
-        )}
+        <SecurityBondSeriesTable
+          series={heldSeries}
+          totals={totals}
+          currency={currency}
+          unknownReason={totalReason}
+        />
 
         {assumptions.length > 0 && (
           <div>
@@ -494,18 +425,24 @@ export function SecurityBondCard({
   // The panel outlives a reload of the valuation it drives, so a click on a
   // scenario does not unmount the table it was clicked in. What it needs (the
   // benchmark the rule reads) is read from the newest answer for this security.
+  // One benchmark drives the scenarios of the whole security: the first rule
+  // among its lots that reads one (a series that does not read it is unchanged).
   const rule =
-    data !== null && data.securityId === security.id
-      ? (data.lots[0]?.valuation.rateRule ?? null)
-      : null;
+    latest === null
+      ? null
+      : (latest.lots
+          .map((l) => l.valuation.rateRule)
+          .find((r) => r.type !== 'FIXED') ??
+        latest.lots[0]?.valuation.rateRule ??
+        null);
   const scenarioBenchmark =
     rule !== null && rule.type !== 'FIXED' ? rule.benchmarkId : null;
 
-  return (
-    <Card padding="sm" aria-label={t('bond.title')} as="section">
+  const seriesCard = (
+    <Card padding="sm" aria-label={t('bond.series.title')} as="section">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          {t('bond.title')}
+          {t('bond.series.title')}
         </h3>
         <div className="flex flex-wrap items-end gap-3">
           <div className="w-full sm:w-44">
@@ -555,5 +492,46 @@ export function SecurityBondCard({
         </div>
       )}
     </Card>
+  );
+
+  return (
+    <div className="space-y-6">
+      {seriesCard}
+      {latest !== null && (
+        <>
+          <SecurityBondProgramCard
+            security={security}
+            programCode={latest.program.programCode}
+            countryCode={latest.program.issuerCountryCode}
+            held={latestHeld}
+            autoFetch={latest.autoFetch}
+          />
+          <Card padding="sm" aria-label={t('bond.onSale.title')} as="section">
+            <h3 className="mb-3 text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {t('bond.onSale.title')}
+            </h3>
+            <BondOfferTab programCode={latest.program.programCode} />
+          </Card>
+          <Card
+            padding="sm"
+            aria-label={tBonds('entry.history', {
+              program: programLabel(t, latest.program.programCode),
+            })}
+            as="section"
+          >
+            <h3 className="mb-3 text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {tBonds('entry.history', {
+                program: programLabel(t, latest.program.programCode),
+              })}
+            </h3>
+            <BondHistoryBody
+              program={latest.program.programCode}
+              currency={latest.program.currency}
+              heldSeries={latestHeld.map((h) => h.seriesCode)}
+            />
+          </Card>
+        </>
+      )}
+    </div>
   );
 }

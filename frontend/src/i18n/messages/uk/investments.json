@@ -296,7 +296,15 @@
     "toastSaveFailed": "Не вдалося зберегти транзакцію",
     "exchangeRateUnresolved": "Немає курсу {from} до {to}. Перед збереженням введіть курс або конвертовану підсумкову суму.",
     "toastExchangeRateRequired": "Введіть курс обміну перед збереженням угоди між валютами.",
-    "notAvailable": "Недоступно"
+    "notAvailable": "Недоступно",
+    "bondSeries": {
+      "label": "Серія облігацій",
+      "fromDate": "Визначається за датою",
+      "oldestFirst": "Спочатку найстаріші",
+      "loading": "Завантаження серій...",
+      "loadFailed": "Не вдалося завантажити серії.",
+      "retry": "Повторити"
+    }
   },
   "newTransactionButton": {
     "label": "+ Нова транзакція",

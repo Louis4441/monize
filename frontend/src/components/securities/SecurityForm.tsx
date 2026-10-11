@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { NumericInput } from '@/components/ui/NumericInput';
 import { Select } from '@/components/ui/Select';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { Combobox } from '@/components/ui/Combobox';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { Modal } from '@/components/ui/Modal';
@@ -18,7 +19,8 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { SecurityLookupPicker, LookupCandidate } from './SecurityLookupPicker';
 import { AllocationEditor, AllocationRow } from './AllocationEditor';
-import { BondInstrumentSelect, useBondInstrumentPicker } from './BondInstrumentSelect';
+import { BondProgramSelect, useBondProgramPicker } from './BondProgramSelect';
+import { programLabel } from './detail/bond-labels';
 import {
   LookupProviderSelect,
   MsnInstrumentIdInput,
@@ -76,6 +78,7 @@ const securityTypeOptions = [
 
 export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyChange, submitRef }: SecurityFormProps) {
   const t = useTranslations('securities');
+  const tDetail = useTranslations('securityDetail');
   const { defaultCurrency } = useNumberFormat();
   const rawPreferredExchanges = usePreferencesStore((s) => s.preferences?.preferredExchanges);
   const preferredExchanges = useMemo(() => rawPreferredExchanges || [], [rawPreferredExchanges]);
@@ -197,7 +200,8 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       irWebsite: security?.irWebsite || '',
       quoteProvider: security?.quoteProvider || '',
       msnInstrumentId: security?.msnInstrumentId || '',
-      bondInstrumentId: security?.bondInstrumentId || defaults?.bondInstrumentId || '',
+      bondProgramId: security?.bondProgramId || defaults?.bondProgramId || '',
+      bondAutoFetch: security?.bondAutoFetch ?? defaults?.bondAutoFetch ?? false,
       isFavourite: security?.isFavourite || false,
       priceChartEnabled: security?.priceChartEnabled ?? false,
       skipPriceUpdates: security?.skipPriceUpdates ?? false,
@@ -272,20 +276,28 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
     setValue,
   ]);
   const isBond = watch('securityType') === 'BOND';
-  const selectedBondId = watch('bondInstrumentId') || '';
+  const selectedBondProgramId = watch('bondProgramId') || '';
+  const bondAutoFetch = watch('bondAutoFetch') ?? false;
 
-  const bondPicker = useBondInstrumentPicker(
-    isBond,
-    selectedCurrency,
-    selectedBondId,
-    security?.bondInstrumentId || '',
-  );
-  const effectiveBondId = bondPicker.effectiveBondId;
+  const bondPicker = useBondProgramPicker(isBond, selectedCurrency, selectedBondProgramId);
+  const effectiveBondProgramId = bondPicker.effectiveProgramId;
+
+  // Choosing a program fills what the program determines: the symbol (its
+  // code), the name (its translated name) and the currency. Each stays editable.
+  const handleBondProgramChange = (programId: string) => {
+    setValue('bondProgramId', programId, { shouldDirty: true });
+    const program = bondPicker.programs.find((p) => p.id === programId);
+    if (program === undefined) return;
+    const fill = { shouldDirty: true, shouldValidate: true };
+    setValue('symbol', program.programCode, fill);
+    setValue('name', programLabel(tDetail, program.programCode), fill);
+    setValue('currencyCode', program.currency, fill);
+  };
 
   // A linked bond is priced from its terms, never by asking a quote provider,
   // so the controls that configure quote fetching are hidden. Their stored
   // values stay in the form state and are submitted unchanged.
-  const isLinkedToBond = isBond && effectiveBondId !== '';
+  const isLinkedToBond = isBond && effectiveBondProgramId !== '';
 
   const isFavourite = watch('isFavourite') ?? false;
   const toggleFavourite = () =>
@@ -399,6 +411,8 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
         description: '',
         quoteProvider: '',
         msnInstrumentId: '',
+        bondProgramId: '',
+        bondAutoFetch: false,
         isFavourite: false,
         priceChartEnabled: false,
         skipPriceUpdates: false,
@@ -469,7 +483,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       return;
     }
 
-    // A linked security keeps its series' currency: changing it would unlink
+    // A linked security keeps its program's currency: changing it would unlink
     // the security and delete its engine prices, so it is refused here.
     if (isBond && bondPicker.mismatchedLinkCurrency !== null) {
       toast.error(
@@ -480,7 +494,8 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       return;
     }
 
-    const storedBondId = security?.bondInstrumentId || null;
+    const storedBondProgramId = security?.bondProgramId || null;
+    const storedAutoFetch = security?.bondAutoFetch ?? false;
     const cleanedData: CreateSecurityData = {
       symbol: data.symbol.toUpperCase().trim(),
       name: data.name.trim(),
@@ -503,11 +518,20 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       // leaves it alone is accepted by a server that predates the field. A type
       // moved away from BOND unlinks a security that was linked.
       ...(data.securityType === 'BOND'
-        ? (effectiveBondId || null) !== storedBondId
-          ? { bondInstrumentId: effectiveBondId || null }
+        ? (effectiveBondProgramId || null) !== storedBondProgramId
+          ? { bondProgramId: effectiveBondProgramId || null }
           : {}
-        : security?.bondInstrumentId
-          ? { bondInstrumentId: null }
+        : security?.bondProgramId
+          ? { bondProgramId: null }
+          : {}),
+      // The switch belongs to a linked security: sent when it changed, and
+      // turned off when the link goes away.
+      ...(data.securityType === 'BOND' && effectiveBondProgramId !== ''
+        ? (data.bondAutoFetch ?? false) !== storedAutoFetch
+          ? { bondAutoFetch: data.bondAutoFetch ?? false }
+          : {}
+        : storedAutoFetch
+          ? { bondAutoFetch: false }
           : {}),
       isFavourite: data.isFavourite ?? false,
       priceChartEnabled: data.priceChartEnabled ?? false,
@@ -637,12 +661,29 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       </div>
 
       {isBond && (
-        <BondInstrumentSelect
+        <BondProgramSelect
           picker={bondPicker}
-          currency={selectedCurrency}
-          onChange={(id) => setValue('bondInstrumentId', id, { shouldDirty: true })}
-          error={errors.bondInstrumentId?.message}
+          onChange={handleBondProgramChange}
+          error={errors.bondProgramId?.message}
         />
+      )}
+
+      {isLinkedToBond && (
+        <div>
+          <label className="flex w-fit cursor-pointer items-center gap-2">
+            <ToggleSwitch
+              checked={bondAutoFetch}
+              onChange={(next) => setValue('bondAutoFetch', next, { shouldDirty: true })}
+              label={t('form.bondAutoFetchLabel')}
+            />
+            <span className="text-sm text-gray-900 dark:text-gray-100">
+              {t('form.bondAutoFetchLabel')}
+            </span>
+          </label>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {t('form.bondAutoFetchHelp')}
+          </p>
+        </div>
       )}
 
       {!isLinkedToBond && (

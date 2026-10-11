@@ -296,7 +296,15 @@
     "toastSaveFailed": "Buchung konnte nicht gespeichert werden",
     "exchangeRateUnresolved": "Kein Kurs für {from} zu {to} verfügbar. Geben Sie vor dem Speichern einen Kurs oder den umgerechneten Gesamtbetrag ein.",
     "toastExchangeRateRequired": "Geben Sie einen Wechselkurs ein, bevor Sie einen währungsübergreifenden Handel speichern.",
-    "notAvailable": "Nicht verfügbar"
+    "notAvailable": "Nicht verfügbar",
+    "bondSeries": {
+      "label": "Anleiheserie",
+      "fromDate": "Aus dem Datum ermittelt",
+      "oldestFirst": "Älteste zuerst",
+      "loading": "Serien werden geladen...",
+      "loadFailed": "Die Serien konnten nicht geladen werden.",
+      "retry": "Erneut versuchen"
+    }
   },
   "newTransactionButton": {
     "label": "+ Neue Buchung",
