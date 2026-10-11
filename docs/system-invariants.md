@@ -3501,10 +3501,10 @@ Enforcement         Three mechanisms.
                        FetchBondSeriesDto (backend/src/bonds/dto/) has exactly
                        two bounded fields under whitelist and
                        forbidNonWhitelisted, so POST /bonds/instruments/fetch
-                       (throttled to 10 a minute per user), POST /bonds/offer/fetch
-                       (FetchBondOfferDto: a country alone, throttled to 2 a
-                       minute per user; it fetches the codes the adapter's own
-                       listing names), the fetch_bond_series
+                       (throttled to 10 a minute per user), the Refresh of a
+                       linked security (no input but the security; it fetches
+                       the codes the adapter's own listing names, bounded per
+                       program), the fetch_bond_series
                        AI and MCP tool (the same two fields in
                        fetchBondSeriesSchema) and the daily cron
                        (BondSeriesService.scheduledCurrentOffer, which takes the

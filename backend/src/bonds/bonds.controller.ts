@@ -40,11 +40,7 @@ import {
 import { BondHoldingsService, SeriesHolding } from "./bond-holdings.service";
 import { BondPriceRecompute, BondPriceService } from "./bond-price.service";
 import { seriesHttpException } from "./bond-series-errors";
-import {
-  BondSeriesResult,
-  BondSeriesService,
-  CurrentOfferRun,
-} from "./bond-series.service";
+import { BondSeriesResult, BondSeriesService } from "./bond-series.service";
 import {
   BondInstrumentSummary,
   BondValuationService,
@@ -61,7 +57,6 @@ import {
   ParseScenarioValuesPipe,
 } from "./bond-query.pipes";
 import { EnterBondSeriesDto } from "./dto/enter-bond-series.dto";
-import { FetchBondOfferDto } from "./dto/fetch-bond-offer.dto";
 import { FetchBondSeriesDto } from "./dto/fetch-bond-series.dto";
 import { BondEngineError, BondEngineErrorCode } from "./engine/bond-engine";
 
@@ -175,31 +170,6 @@ export class BondsController {
   ): Promise<BondHistory> {
     return this.mapBondErrors(() =>
       this.offers.history(countryCode, programCode),
-    );
-  }
-
-  @Post("offer/fetch")
-  @Throttle({ default: { ttl: 60_000, limit: 2 } }) // 2 a minute per user; each reads the issuer's site once per series of the offer
-  @ApiOperation({
-    summary: "Fetch the current offer of a country now",
-    description:
-      "Takes only a country. Every series of its current offer that is not " +
-      "stored is read from the official source and stored as an immutable " +
-      "terms version; one that cannot be read is counted in `failed` and the " +
-      "next is tried. A series already stored is not fetched.",
-  })
-  @ApiResponse({
-    status: 201,
-    description: "How many series were listed, stored, already stored, failed",
-  })
-  @ApiResponse({
-    status: 400,
-    description: "The country has no official source to fetch from",
-  })
-  fetchOffer(@Body() dto: FetchBondOfferDto): Promise<CurrentOfferRun> {
-    return this.mapSeriesErrors(
-      () => this.series.fetchOfferOf(dto.countryCode),
-      false,
     );
   }
 

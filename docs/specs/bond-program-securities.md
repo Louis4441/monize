@@ -207,8 +207,6 @@ For a program-linked security, from top:
   (`series: [{ instrumentId, seriesCode, termsSource, redemptionTerms }]`).
 - Investment transaction DTOs gain optional `bondInstrumentId` (UUID,
   `ParseUUIDPipe` semantics); responses carry it.
-- `POST /bonds/offer/fetch` `{ countryCode }`: fetch every series of the current
-  offer that is not stored (throttled, 2 a minute per user).
 - Security DTOs: `bondProgramId` and `bondAutoFetch` replace `bondInstrumentId`.
 - `GET /bonds/securities/:securityId/series-on-sale?date=YYYY-MM-DD` answers
   `{ instrumentId, seriesCode }`, or the JSON literal `null` when no single stored

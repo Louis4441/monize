@@ -17,7 +17,6 @@ import { BondCatalogService } from "./bond-catalog.service";
 import { SERIES_ERROR_FALLBACKS } from "./bond-series-errors";
 import { BondSeriesService } from "./bond-series.service";
 import { EnterBondSeriesDto } from "./dto/enter-bond-series.dto";
-import { FetchBondOfferDto } from "./dto/fetch-bond-offer.dto";
 import { FetchBondSeriesDto } from "./dto/fetch-bond-series.dto";
 import { ROLES_KEY, RolesGuard } from "../auth/guards/roles.guard";
 import {
@@ -52,7 +51,6 @@ describe("BondsController", () => {
   let series: {
     fetchSeries: jest.Mock;
     enterManually: jest.Mock;
-    fetchOfferOf: jest.Mock;
   };
   let offers: { offer: jest.Mock; history: jest.Mock };
   let holdings: { seriesOnSale: jest.Mock; seriesHoldings: jest.Mock };
@@ -74,12 +72,6 @@ describe("BondsController", () => {
     series = {
       fetchSeries: jest.fn().mockResolvedValue({ id: "i1", created: true }),
       enterManually: jest.fn().mockResolvedValue({ id: "i1", created: true }),
-      fetchOfferOf: jest.fn().mockResolvedValue({
-        listed: 3,
-        stored: 2,
-        alreadyStored: 1,
-        failed: 0,
-      }),
     };
     offers = {
       offer: jest.fn().mockResolvedValue({ series: [] }),
@@ -142,52 +134,6 @@ describe("BondsController", () => {
       ];
       catalog.listPrograms.mockResolvedValue(list);
       await expect(controller.listPrograms()).resolves.toEqual(list);
-    });
-  });
-
-  describe("POST /bonds/offer/fetch", () => {
-    const dto = { countryCode: "PL" };
-
-    it("hands only the country to the service and returns its counts", async () => {
-      await expect(controller.fetchOffer(dto)).resolves.toEqual({
-        listed: 3,
-        stored: 2,
-        alreadyStored: 1,
-        failed: 0,
-      });
-      expect(series.fetchOfferOf).toHaveBeenCalledWith("PL");
-    });
-
-    it("is throttled to 2 requests a minute", () => {
-      const handler = BondsController.prototype.fetchOffer;
-      expect(Reflect.getMetadata("THROTTLER:LIMITdefault", handler)).toBe(2);
-      expect(Reflect.getMetadata("THROTTLER:TTLdefault", handler)).toBe(60_000);
-    });
-
-    it("needs no role beyond the JWT", () => {
-      expect(
-        Reflect.getMetadata("__guards__", BondsController.prototype.fetchOffer),
-      ).toBeUndefined();
-    });
-
-    it("maps a country with no official source to its HTTP error", async () => {
-      series.fetchOfferOf.mockRejectedValue(
-        new SeriesFetchError("SERIES_FETCH_UNSUPPORTED", { country: "DE" }),
-      );
-      await expect(controller.fetchOffer(dto)).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
-    });
-
-    it("validates the country like the series fetch does", async () => {
-      const ok = await validate(plainToInstance(FetchBondOfferDto, dto));
-      expect(ok).toHaveLength(0);
-      for (const countryCode of ["pl", "POL", "", "P1", 5, undefined]) {
-        const errors = await validate(
-          plainToInstance(FetchBondOfferDto, { countryCode }),
-        );
-        expect(errors).not.toHaveLength(0);
-      }
     });
   });
 

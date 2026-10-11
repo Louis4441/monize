@@ -388,7 +388,7 @@ export class BondSeriesService {
   /**
    * The user-initiated "fetch the current offer now" of one country: every
    * series of its current offer that is not stored is fetched and stored
-   * (`POST /bonds/offer/fetch`). A country with no fetch is refused
+   * (today through `fetchProgramOffer`, one program). A country with no fetch is refused
    * (`SERIES_FETCH_UNSUPPORTED`); a source that cannot be read is counted in
    * `failed` rather than thrown, so the caller learns what was and was not
    * stored. Needs an ambient identity.

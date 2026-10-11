@@ -94,7 +94,7 @@ One security holds a whole bond program (EDO), so each share-moving transaction 
 
 ## A bond program is followed on request, not by default
 
-The daily series cron and the backfill fetch only the programs at least one security has switched `bond_auto_fetch` on for (off by default); otherwise a series enters the catalog by a fetch from the purchase form, an administrator's entry, or by `POST /bonds/offer/fetch { countryCode }` (a user-initiated fetch of the current offer, two a minute; no frontend control calls it). `GET /bonds/programs` lists the catalog's programs for the picker. Nothing country-specific acts without a person: an adapter ships product templates (`backend/src/bonds/adapters/pl/templates/`, no per-series value) and its programs, never a series; the boot seed stores programs only; the benchmark refresh (NBP, GUS) runs, at boot and on its cron, only for benchmarks a stored series reads, and once after a series is stored for a benchmark never fetched, so a deployment where nobody adds a Polish bond sends no request to the issuer, NBP or GUS (`docs/specs/bond-program-securities.md` section 2.6). `docs/specs/bond-program-securities.md` sections 2.5 and 4.
+The daily series cron and the backfill fetch only the programs at least one security has switched `bond_auto_fetch` on for (off by default); otherwise a series enters the catalog by a fetch from the purchase form, an administrator's entry, or by the Refresh of a linked security, which fetches its program's current offer and a piece of its history (`BondSeriesService.fetchProgramOffer`). `GET /bonds/programs` lists the catalog's programs for the picker. Nothing country-specific acts without a person: an adapter ships product templates (`backend/src/bonds/adapters/pl/templates/`, no per-series value) and its programs, never a series; the boot seed stores programs only; the benchmark refresh (NBP, GUS) runs, at boot and on its cron, only for benchmarks a stored series reads, and once after a series is stored for a benchmark never fetched, so a deployment where nobody adds a Polish bond sends no request to the issuer, NBP or GUS (`docs/specs/bond-program-securities.md` section 2.6). `docs/specs/bond-program-securities.md` sections 2.5 and 4.
 
 ## No country's bonds act without a person (INV-BOND-008)
 
@@ -104,7 +104,7 @@ What a country adapter may ship: its business-day calendar, its benchmark defini
 
 When data is fetched or stored, and only then:
 
-- a person fetches a series (the purchase form, `POST /bonds/instruments/fetch`, the AI and MCP tool), fetches the current offer (`POST /bonds/offer/fetch`), or an administrator enters one by hand;
+- a person fetches a series (the purchase form, `POST /bonds/instruments/fetch`, the AI and MCP tool), refreshes a linked security (its program's current offer), or an administrator enters one by hand;
 - the daily series cron and its backfill, for the programs a person switched `bond_auto_fetch` on for, and no other;
 - the benchmark refresh, at boot and on its cron, for the benchmarks a stored series reads, and once after a series is stored for a benchmark never fetched.
 
