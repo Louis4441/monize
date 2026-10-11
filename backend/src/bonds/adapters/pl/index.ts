@@ -19,6 +19,8 @@ import { fetchGusCpi, GUS_CPI_LANDING_URL } from "./pl-gus-cpi";
 import { fetchNbpReference, NBP_ARCHIVE_URL } from "./pl-nbp-reference";
 import { PL_CPI_GUS_YOY, PL_NBP_REFERENCE } from "./pl-benchmarks";
 import { plCalendar } from "./pl-calendar";
+import { fetchSeries } from "./series/fetch-series";
+import { manualSeries } from "./series/manual-series";
 
 export { plBenchmarks } from "./pl-benchmarks";
 export { plCalendar } from "./pl-calendar";
@@ -70,6 +72,9 @@ export const POLISH_BOND_ADAPTER: BondAdapter = {
     },
   ],
   catalog,
+  fetchSeries: (seriesCode: string, fetch: BondFetch) =>
+    fetchSeries(seriesCode, fetch),
+  manualSeries,
   async fetchBenchmark(code: string, fetch: BondFetch) {
     switch (code) {
       case PL_NBP_REFERENCE:
