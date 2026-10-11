@@ -23,6 +23,7 @@ import { BondPriceService } from "./bond-price.service";
 import {
   BACKFILL_GAP_MS,
   PROGRAM_REFRESH_INTERVAL_MS,
+  BACKFILL_ATTEMPT_INTERVAL_MS,
   BackfillRun,
   BondSeriesService,
 } from "./bond-series.service";
@@ -123,8 +124,12 @@ function build() {
         return true;
       },
     ),
-    claim: jest.fn(async (): Promise<string | null> => "lease-token"),
+    claim: jest.fn(
+      async (_job: string, _ms: number): Promise<string | null> =>
+        "lease-token",
+    ),
     markSuccess: jest.fn(async () => undefined),
+    release: jest.fn(async () => undefined),
   };
   manager.query.mockResolvedValue([]);
   const prices = { recomputeLinkedSecuritiesOfSeries: jest.fn() };
@@ -974,11 +979,10 @@ describe("BondSeriesService", () => {
         "bond-program-refresh:PL|EDO",
         PROGRAM_REFRESH_INTERVAL_MS,
       );
-      // Held to its expiry, never handed back: the lease is the interval.
-      expect(fetchSync.markSuccess).toHaveBeenCalledWith(
-        "bond-program-refresh:PL|EDO",
-        "lease-token",
-      );
+      // Held to its expiry, never handed back: the lease is the interval, and
+      // markSuccess would release it.
+      expect(fetchSync.markSuccess).not.toHaveBeenCalled();
+      expect(fetchSync.release).not.toHaveBeenCalled();
       expect(adapter.currentSeries).toHaveBeenCalledTimes(1);
 
       // Another replica, or the same reader pressing Refresh again, inside
@@ -1023,6 +1027,40 @@ describe("BondSeriesService", () => {
     const codes = ["OTS0424", "ROR0125", "DOR0126", "TOS0127"];
     const withCodes = (over: Partial<BondAdapter> = {}) =>
       adapterOf({ backfillCodes: jest.fn(() => codes), ...over });
+
+    it("skips a series asked for recently on any replica, and takes the next", async () => {
+      const { service, catalog, fetchSync } = build();
+      catalog.storedSeriesCodes.mockResolvedValue(new Set<string>());
+      fetchSync.claim.mockImplementation(async (job: string) =>
+        job === "bond-series-attempt:PL|TOS0127" ? null : "lease-token",
+      );
+      const adapter = withCodes();
+      const run = await service.backfillHistory({
+        adapters: [adapter],
+        sleep: jest.fn(async () => undefined),
+        today: "2026-10-11",
+        limit: 1,
+      });
+      expect(
+        (adapter.fetchSeries as jest.Mock).mock.calls.map((c) => c[0]),
+      ).toEqual(["DOR0126"]);
+      expect(fetchSync.claim).toHaveBeenCalledWith(
+        "bond-series-attempt:PL|DOR0126",
+        BACKFILL_ATTEMPT_INTERVAL_MS,
+      );
+      expect(run.remaining).toBe(3);
+    });
+
+    it("leaves the unbounded daily pass free of attempt leases", async () => {
+      const { service, catalog, fetchSync } = build();
+      catalog.storedSeriesCodes.mockResolvedValue(new Set<string>());
+      await service.backfillHistory({
+        adapters: [withCodes()],
+        sleep: jest.fn(async () => undefined),
+        today: "2026-10-11",
+      });
+      expect(fetchSync.claim).not.toHaveBeenCalled();
+    });
 
     it("asks for at most `limit` series, newest first, and reports the rest", async () => {
       const { service, catalog } = build();

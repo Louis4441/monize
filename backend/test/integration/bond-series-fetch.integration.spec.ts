@@ -365,6 +365,71 @@ describe("bond series fetch (integration, INV-BOND-006)", () => {
     });
   });
 
+  describe("Refresh of a program (fetchProgramOffer)", () => {
+    beforeEach(async () => {
+      await dataSource.query(
+        `DELETE FROM fetch_sync WHERE job LIKE 'bond-program-refresh:%' OR job LIKE 'bond-series-attempt:%'`,
+      );
+    });
+
+    it("refreshes a program at most once per interval, even after a pass that finished", async () => {
+      const offerAdapter: BondAdapter = {
+        ...adapter,
+        currentSeries: jest.fn(async () => [CODE]),
+        backfillCodes: () => [],
+      };
+      const first = await asUser(userId, () =>
+        service.fetchProgramOffer("PL", "EDO", { adapters: [offerAdapter] }),
+      );
+      expect(first.history).not.toBeNull();
+      expect(await count("bond_instruments")).toBe(1);
+
+      // A second Refresh, by another reader, after the first pass is done: the
+      // lease in fetch_sync still holds, so nothing is asked for.
+      const second = await asUser(otherId, () =>
+        service.fetchProgramOffer("PL", "EDO", { adapters: [offerAdapter] }),
+      );
+      expect(second).toMatchObject({ listed: 0, history: null });
+      expect(offerAdapter.currentSeries).toHaveBeenCalledTimes(1);
+
+      const [row] = await dataSource.query(
+        `SELECT lease_until > CURRENT_TIMESTAMP AS held FROM fetch_sync WHERE job = $1`,
+        ["bond-program-refresh:PL|EDO"],
+      );
+      expect(row.held).toBe(true);
+    });
+
+    it("asks for a refused series once a day, whichever pass comes next", async () => {
+      door = fakeFetch({});
+      service = build();
+      const historyAdapter: BondAdapter = {
+        ...adapter,
+        backfillCodes: () => [CODE],
+      };
+      const options = {
+        adapters: [historyAdapter],
+        sleep: async () => undefined,
+        today: "2026-10-11",
+        limit: 8,
+      };
+      const first = await asUser(userId, () =>
+        service.backfillHistory(options),
+      );
+      expect(first.notPublished + first.failed).toBe(1);
+      const asked = door.mock.calls.length;
+
+      const second = await asUser(otherId, () =>
+        service.backfillHistory(options),
+      );
+      expect(second).toMatchObject({
+        notPublished: 0,
+        failed: 0,
+        remaining: 1,
+      });
+      expect(door.mock.calls.length).toBe(asked);
+    });
+  });
+
   describe("Manual", () => {
     const guardAllows = async (id: string): Promise<boolean> => {
       // The role the JWT strategy would put on the request: the user's own row.

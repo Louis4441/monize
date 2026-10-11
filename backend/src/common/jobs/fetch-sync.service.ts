@@ -39,9 +39,23 @@ export function bondProgramRefreshJob(
   return `bond-program-refresh:${programKey}`;
 }
 
+/**
+ * The lease of one attempt to fetch one bond series in a bounded history pass,
+ * one row per series: held for a day, it is the negative cache every replica
+ * reads, so a series the source refused is not asked for again by the next
+ * Refresh.
+ */
+export function bondSeriesAttemptJob(
+  countryCode: string,
+  seriesCode: string,
+): `bond-series-attempt:${string}` {
+  return `bond-series-attempt:${countryCode.toUpperCase()}|${seriesCode.toUpperCase()}`;
+}
+
 export type FetchSyncJob =
   | (typeof FetchSyncJob)[keyof typeof FetchSyncJob]
-  | ReturnType<typeof bondProgramRefreshJob>;
+  | ReturnType<typeof bondProgramRefreshJob>
+  | ReturnType<typeof bondSeriesAttemptJob>;
 
 /**
  * One replica per tick does the work.

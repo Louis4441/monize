@@ -11,6 +11,7 @@ import {
 } from "../common/http/fetch-failure.util";
 import {
   bondProgramRefreshJob,
+  bondSeriesAttemptJob,
   FetchSyncJob,
   FetchSyncService,
 } from "../common/jobs/fetch-sync.service";
@@ -96,7 +97,10 @@ export interface BackfillRun {
   readonly failed: number;
   /** An adapter's pass stopped on `SOURCE_UNAVAILABLE`; the next run resumes. */
   readonly stoppedEarly: boolean;
-  /** Missing series this pass did not ask for (its `limit`); the next one does. */
+  /**
+   * Missing series this pass did not ask for: past its `limit`, or asked for
+   * within `BACKFILL_ATTEMPT_INTERVAL_MS`; a later pass does.
+   */
   readonly remaining: number;
 }
 
@@ -119,6 +123,14 @@ export interface BackfillOptions extends SeriesRequestOptions {
  * back. Longer than one pass (about 30-40 s), so passes never overlap.
  */
 export const PROGRAM_REFRESH_INTERVAL_MS = 90_000;
+
+/**
+ * How long a bounded pass leaves a series alone after asking for it once: the
+ * attempt's lease in `fetch_sync`, so a series the source refused (not
+ * published that month, or failed) is not asked for again by the next Refresh
+ * on any replica, and the next pass moves on to other months.
+ */
+export const BACKFILL_ATTEMPT_INTERVAL_MS = 24 * 60 * 60_000;
 
 /**
  * How many missing series of a program's history one price refresh asks for:
@@ -448,7 +460,8 @@ export class BondSeriesService {
       programs,
       limit: options.limit ?? PROGRAM_BACKFILL_CHUNK,
     });
-    await this.fetchSync.markSuccess(job, lease);
+    // The lease is never handed back (no `release`, no `markSuccess`, which
+    // releases too): its expiry is the interval.
     return { ...offer, history };
   }
 
@@ -543,17 +556,26 @@ export class BondSeriesService {
       candidates += codes.length;
       alreadyStored += codes.length - allMissing.length;
       // `backfillCodes` lists oldest first; a bounded pass takes the newest.
-      const budget =
-        options.limit === undefined
-          ? allMissing.length
-          : Math.max(0, options.limit - attempted);
-      const missing =
-        options.limit === undefined
-          ? allMissing
-          : [...allMissing].reverse().slice(0, budget);
-      remaining += allMissing.length - missing.length;
-      attempted += missing.length;
-      for (const code of missing) {
+      const ordered =
+        options.limit === undefined ? allMissing : [...allMissing].reverse();
+      for (const code of ordered) {
+        if (options.limit !== undefined) {
+          if (attempted >= options.limit) {
+            remaining += 1;
+            continue;
+          }
+          // One attempt per series per BACKFILL_ATTEMPT_INTERVAL_MS, in a row
+          // every replica sees; a lost claim is a series asked for recently.
+          const claimed = await this.fetchSync.claim(
+            bondSeriesAttemptJob(adapter.countryCode, code),
+            BACKFILL_ATTEMPT_INTERVAL_MS,
+          );
+          if (claimed === null) {
+            remaining += 1;
+            continue;
+          }
+          attempted += 1;
+        }
         // Before every request, the first included: the current-offer pass has
         // just spoken to the same host.
         await sleep(BACKFILL_GAP_MS);

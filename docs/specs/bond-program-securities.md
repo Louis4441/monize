@@ -135,7 +135,11 @@ replica sees: a pass takes the program's lease in `fetch_sync`
 (90 s) and never hands it back, so one program is refreshed at most once per
 interval however often, and on however many replicas, a person presses
 Refresh. A refresh inside the interval fetches nothing and still recomputes
-prices.
+prices. Each series a bounded pass asks for takes its own lease
+(`bond-series-attempt:<country>|<code>`) for `BACKFILL_ATTEMPT_INTERVAL_MS`
+(24 hours), so a series the source refused is asked for at most once a day on
+any replica, and the next pass moves on to other months. The unbounded daily
+pass takes no attempt lease.
 
 ### 2.6 Nothing country-specific without a user
 
