@@ -9,7 +9,6 @@
     }
   },
   "entry": {
-    "button": "Obligacje skarbowe",
     "compare": "Porównaj z aktualną ofertą",
     "history": "Historia warunków {program}",
     "seeOnSale": "Zobacz obligacje w sprzedaży"
@@ -70,7 +69,7 @@
     "fetching": "Pobieranie bieżącej oferty...",
     "fetchDone": "Oferta pobrana: serii na liście {listed}, nowo zapisanych {stored}, już zapisanych {alreadyStored}, nieudanych {failed}.",
     "fetchFailed": "Nie udało się pobrać bieżącej oferty.",
-    "addFailed": "Nie udało się znaleźć programu obligacji. Spróbuj ponownie."
+    "addFailed": "Nie udało się znaleźć rodzaju obligacji. Spróbuj ponownie."
   },
   "history": {
     "product": "Produkt",

@@ -9,7 +9,6 @@
     }
   },
   "entry": {
-    "button": "Obligasi pemerintah",
     "compare": "Bandingkan dengan penawaran saat ini",
     "history": "Riwayat ketentuan {program}",
     "seeOnSale": "Lihat obligasi yang sedang dijual"
@@ -70,7 +69,7 @@
     "fetching": "Mengambil penawaran saat ini...",
     "fetchDone": "Penawaran diambil: {listed} seri terdaftar, {stored} baru disimpan, {alreadyStored} sudah tersimpan, {failed} gagal.",
     "fetchFailed": "Penawaran saat ini tidak dapat diambil.",
-    "addFailed": "Program obligasi tidak dapat ditemukan. Coba lagi."
+    "addFailed": "Jenis obligasi tidak dapat ditemukan. Coba lagi."
   },
   "history": {
     "product": "Produk",

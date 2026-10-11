@@ -362,10 +362,12 @@ describe('SecuritiesPage', () => {
     });
   });
 
-  it('links to the Treasury bonds view from the header', async () => {
+  it('has no Treasury bonds button in the header', async () => {
     render(<SecuritiesPage />);
-    const link = await screen.findByRole('link', { name: 'Treasury bonds' });
-    expect(link).toHaveAttribute('href', '/securities/bonds');
+    await waitFor(() => {
+      expect(screen.getByText('+ New Security')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('link', { name: 'Treasury bonds' })).not.toBeInTheDocument();
   });
 
   it('opens form modal when + New Security is clicked', async () => {

@@ -337,7 +337,7 @@ describe('Treasury bonds page, On sale tab', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Add EDO1036 to my portfolio' }));
     });
-    expect(toast.error).toHaveBeenCalledWith('The bond program could not be looked up. Try again.');
+    expect(toast.error).toHaveBeenCalledWith('The bond kind could not be looked up. Try again.');
     expect(screen.queryByTestId('security-form')).not.toBeInTheDocument();
     expect(nav.push).not.toHaveBeenCalled();
   });

@@ -312,7 +312,7 @@
       "OVER_REMOVAL": "{action} em {date} retira {quantity} obrigações, mais do que as detidas.",
       "INVALID_QUANTITY": "A quantidade de {action} em {date} está em falta, é negativa ou demasiado grande.",
       "REMOVAL_EXCEEDS_SERIES": "{action} em {date} retira {quantity} obrigações da sua série, mais do que as detidas nessa série.",
-      "SERIES_NOT_DETERMINED": "{action} em {date} não indica série e nesse dia não estava à venda nenhuma série guardada do programa. Obtenha a série e escolha-a na transação."
+      "SERIES_NOT_DETERMINED": "{action} em {date} não indica série e nesse dia não estava à venda nenhuma série guardada do tipo de obrigação. Obtenha a série e escolha-a na transação."
     },
     "assumptions": {
       "title": "Pressupostos da projeção",
@@ -440,16 +440,16 @@
       "title": "As suas séries",
       "column": "Série",
       "nextRateChange": "Próxima alteração da taxa",
-      "total": "Total do programa",
+      "total": "Total do tipo de obrigação",
       "purchasedRange": "de {from} a {to}",
       "expand": "Mostrar os detalhes de {series}",
       "collapse": "Ocultar os detalhes de {series}",
       "partial": "Parcial"
     },
     "program": {
-      "title": "O programa",
+      "title": "O tipo de obrigação",
       "newest": "Condições da série mais recente, {series}.",
-      "noTerms": "As condições ainda não são conhecidas: não tem nenhuma série deste programa e nenhuma está à venda.",
+      "noTerms": "As condições ainda não são conhecidas: não tem nenhuma série deste tipo de obrigação e nenhuma está à venda.",
       "autoFetchFailed": "Não foi possível guardar a definição."
     },
     "onSale": {

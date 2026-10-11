@@ -312,7 +312,7 @@
       "OVER_REMOVAL": "{date} の {action} は {quantity} 枚の債券を減らしますが、保有数を超えています。",
       "INVALID_QUANTITY": "{date} の {action} の数量が未入力、負の値、または大きすぎます。",
       "REMOVAL_EXCEEDS_SERIES": "{date} の {action} はそのシリーズの債券を {quantity} 口払い出しますが、そのシリーズの保有数を超えています。",
-      "SERIES_NOT_DETERMINED": "{date} の {action} はシリーズを指定しておらず、その日に販売中だったプログラムの保存済みシリーズもありません。シリーズを取得し、取引で選択してください。"
+      "SERIES_NOT_DETERMINED": "{date} の {action} はシリーズを指定しておらず、その日に販売中だった債券の種類の保存済みシリーズもありません。シリーズを取得し、取引で選択してください。"
     },
     "assumptions": {
       "title": "予測の前提",
@@ -440,16 +440,16 @@
       "title": "保有シリーズ",
       "column": "シリーズ",
       "nextRateChange": "次回の金利変更",
-      "total": "プログラム合計",
+      "total": "債券の種類の合計",
       "purchasedRange": "{from}～{to}",
       "expand": "{series}の詳細を表示",
       "collapse": "{series}の詳細を隠す",
       "partial": "一部"
     },
     "program": {
-      "title": "プログラム",
+      "title": "債券の種類",
       "newest": "最新シリーズ{series}の条件。",
-      "noTerms": "条件はまだ分かっていません。このプログラムのシリーズを保有しておらず、販売中のシリーズもありません。",
+      "noTerms": "条件はまだ分かっていません。この債券の種類のシリーズを保有しておらず、販売中のシリーズもありません。",
       "autoFetchFailed": "設定を保存できませんでした。"
     },
     "onSale": {

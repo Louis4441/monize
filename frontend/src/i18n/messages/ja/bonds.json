@@ -9,7 +9,6 @@
     }
   },
   "entry": {
-    "button": "国債",
     "compare": "現在の販売内容と比較",
     "history": "{program}の条件の履歴",
     "seeOnSale": "販売中の債券を見る"
@@ -70,7 +69,7 @@
     "fetching": "現在のオファーを取得中...",
     "fetchDone": "オファーを取得しました: 掲載{listed}シリーズ、新規保存{stored}、保存済み{alreadyStored}、失敗{failed}。",
     "fetchFailed": "現在のオファーを取得できませんでした。",
-    "addFailed": "債券プログラムを確認できませんでした。もう一度お試しください。"
+    "addFailed": "債券の種類を見つけられませんでした。もう一度お試しください。"
   },
   "history": {
     "product": "商品",

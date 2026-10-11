@@ -147,7 +147,7 @@
       "msn": "MSN",
       "lse": "LSE",
       "deutsche_boerse": "Deutsche Börse",
-      "bond_engine": "Bộ máy trái phiếu (điều kiện phát hành)"
+      "bond_engine": "Bộ máy trái phiếu"
     },
     "types": {
       "select": "Chọn loại...",
@@ -201,16 +201,19 @@
     "bondFetchAction": "Lấy {code} từ nguồn chính thức",
     "bondFetching": "Đang lấy {code} từ tổ chức phát hành cùng các lãi suất tham chiếu. Việc này có thể mất tới một phút.",
     "bondFetchFailed": "Không thể lấy chuỗi này.",
-    "bondCurrencyLocked": "Chứng khoán này được liên kết với một chương trình trái phiếu bằng {linkedCurrency}. Hãy đặt lại tiền tệ là {linkedCurrency} hoặc hủy liên kết chương trình trước (hủy liên kết sẽ xóa giá đã tính).",
-    "bondProgramLabel": "Chương trình trái phiếu (tùy chọn)",
+    "bondCurrencyLocked": "Chứng khoán này được liên kết với một loại trái phiếu bằng {linkedCurrency}. Hãy đặt lại tiền tệ là {linkedCurrency} hoặc hủy liên kết loại trái phiếu trước (hủy liên kết sẽ xóa giá đã tính).",
+    "bondProgramLabel": "Loại trái phiếu (tùy chọn)",
     "bondProgramNone": "Chưa liên kết",
-    "bondProgramCurrent": "Chương trình đã liên kết",
-    "bondProgramLoading": "Đang tải các chương trình trái phiếu...",
-    "bondProgramLoadFailed": "Không thể tải các chương trình trái phiếu nên chưa thể liên kết chương trình.",
+    "bondProgramCurrent": "Loại trái phiếu đã liên kết",
+    "bondProgramLoading": "Đang tải các loại trái phiếu...",
+    "bondProgramLoadFailed": "Không thể tải các loại trái phiếu nên chưa thể liên kết loại trái phiếu.",
     "bondProgramRetry": "Thử lại",
-    "bondNoPrograms": "Danh mục trái phiếu chưa có chương trình nào.",
-    "bondAutoFetchLabel": "Tự động lấy các đợt phát hành mới của chương trình này",
-    "bondAutoFetchHelp": "Khi bật, Monize đọc các đợt phát hành mới của chương trình này từ nguồn chính thức mỗi ngày, nên bạn có thể ghi nhận giao dịch mua mà không cần lấy đợt phát hành trước."
+    "bondNoPrograms": "Danh mục trái phiếu chưa có loại trái phiếu nào.",
+    "bondAutoFetchLabel": "Tự động lấy các đợt phát hành mới của loại trái phiếu này",
+    "bondAutoFetchHelp": "Khi bật, Monize đọc các đợt phát hành mới của loại trái phiếu này từ nguồn chính thức mỗi ngày, nên bạn có thể ghi nhận giao dịch mua mà không cần lấy đợt phát hành trước.",
+    "bondCountryLabel": "Quốc gia",
+    "bondCountryOther": "Khác",
+    "bondCountryOtherInfo": "Có thể yêu cầu hỗ trợ trái phiếu của các quốc gia khác trên <link>GitHub của dự án</link>."
   },
   "priceForm": {
     "dateLabel": "Ngày",

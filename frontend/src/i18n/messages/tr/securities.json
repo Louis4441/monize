@@ -147,7 +147,7 @@
       "msn": "MSN",
       "lse": "LSE",
       "deutsche_boerse": "Deutsche Börse",
-      "bond_engine": "Tahvil motoru (ihraç koşulları)"
+      "bond_engine": "Tahvil motoru"
     },
     "types": {
       "select": "Tür seçin...",
@@ -201,16 +201,19 @@
     "bondFetchAction": "{code} serisini resmi kaynaktan getir",
     "bondFetching": "{code} ihraççıdan ve referans oranlarıyla birlikte getiriliyor. Bu işlem bir dakikaya kadar sürebilir.",
     "bondFetchFailed": "Seri getirilemedi.",
-    "bondCurrencyLocked": "Bu menkul kıymet {linkedCurrency} cinsinden bir tahvil programına bağlı. Para birimini tekrar {linkedCurrency} yapın veya önce program bağlantısını kaldırın (bağlantıyı kaldırmak hesaplanan fiyatları siler).",
-    "bondProgramLabel": "Tahvil programı (isteğe bağlı)",
+    "bondCurrencyLocked": "Bu menkul kıymet {linkedCurrency} cinsinden bir tahvil türüne bağlı. Para birimini tekrar {linkedCurrency} yapın veya önce tahvil türünün bağlantısını kaldırın (bağlantıyı kaldırmak hesaplanan fiyatları siler).",
+    "bondProgramLabel": "Tahvil türü (isteğe bağlı)",
     "bondProgramNone": "Bağlı değil",
-    "bondProgramCurrent": "Bağlı program",
-    "bondProgramLoading": "Tahvil programları yükleniyor...",
-    "bondProgramLoadFailed": "Tahvil programları yüklenemedi, bu yüzden henüz bir program bağlanamıyor.",
+    "bondProgramCurrent": "Bağlı tahvil türü",
+    "bondProgramLoading": "Tahvil türleri yükleniyor...",
+    "bondProgramLoadFailed": "Tahvil türleri yüklenemedi, bu yüzden henüz bir tahvil türü bağlanamıyor.",
     "bondProgramRetry": "Yeniden dene",
-    "bondNoPrograms": "Tahvil kataloğunda henüz hiç program yok.",
-    "bondAutoFetchLabel": "Bu programın yeni serilerini otomatik getir",
-    "bondAutoFetchHelp": "Açıkken Monize her gün bu programın yeni serilerini resmi kaynaktan okur; böylece seriyi önceden getirmeden bir alımı kaydedebilirsiniz."
+    "bondNoPrograms": "Tahvil kataloğunda henüz hiç tahvil türü yok.",
+    "bondAutoFetchLabel": "Bu tahvil türünün yeni serilerini otomatik getir",
+    "bondAutoFetchHelp": "Açıkken Monize her gün bu tahvil türünün yeni serilerini resmi kaynaktan okur; böylece seriyi önceden getirmeden bir alımı kaydedebilirsiniz.",
+    "bondCountryLabel": "Ülke",
+    "bondCountryOther": "Diğer",
+    "bondCountryOtherInfo": "Diğer ülkelerin tahvilleri için destek, projenin <link>GitHub</link> sayfasından talep edilebilir."
   },
   "priceForm": {
     "dateLabel": "Tarih",

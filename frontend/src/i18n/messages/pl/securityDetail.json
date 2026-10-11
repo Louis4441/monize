@@ -312,7 +312,7 @@
       "OVER_REMOVAL": "{action} w dniu {date} usuwa {quantity} obligacji, więcej niż było w posiadaniu.",
       "INVALID_QUANTITY": "Ilość w operacji {action} z dnia {date} jest pusta, ujemna lub zbyt duża.",
       "REMOVAL_EXCEEDS_SERIES": "{action} z {date} wycofuje {quantity} obligacji swojej serii, więcej niż było w tej serii.",
-      "SERIES_NOT_DETERMINED": "{action} z {date} nie wskazuje serii, a tego dnia nie była w sprzedaży żadna zapisana seria tego rodzaju. Pobierz serię i wybierz ją w transakcji."
+      "SERIES_NOT_DETERMINED": "{action} z {date} nie wskazuje serii, a tego dnia nie była w sprzedaży żadna zapisana seria tego rodzaju obligacji. Pobierz serię i wybierz ją w transakcji."
     },
     "assumptions": {
       "title": "Założenia prognozy",
@@ -440,16 +440,16 @@
       "title": "Twoje serie",
       "column": "Seria",
       "nextRateChange": "Następna zmiana oprocentowania",
-      "total": "Razem w programie",
+      "total": "Razem dla rodzaju obligacji",
       "purchasedRange": "od {from} do {to}",
       "expand": "Pokaż szczegóły serii {series}",
       "collapse": "Ukryj szczegóły serii {series}",
       "partial": "Częściowo"
     },
     "program": {
-      "title": "Program",
+      "title": "Rodzaj obligacji",
       "newest": "Warunki najnowszej serii, {series}.",
-      "noTerms": "Warunki nie są jeszcze znane: nie masz żadnej serii tego programu i żadna nie jest w sprzedaży.",
+      "noTerms": "Warunki nie są jeszcze znane: nie masz żadnej serii tego rodzaju obligacji i żadna nie jest w sprzedaży.",
       "autoFetchFailed": "Nie udało się zapisać ustawienia."
     },
     "onSale": {

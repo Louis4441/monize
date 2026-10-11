@@ -9,7 +9,6 @@
     }
   },
   "entry": {
-    "button": "Devlet tahvilleri",
     "compare": "Güncel teklifle karşılaştır",
     "history": "{program} koşullarının geçmişi",
     "seeOnSale": "Satıştaki tahvillere bak"
@@ -70,7 +69,7 @@
     "fetching": "Güncel teklif getiriliyor...",
     "fetchDone": "Teklif getirildi: {listed} seri listelendi, {stored} yeni kaydedildi, {alreadyStored} zaten kayıtlı, {failed} başarısız.",
     "fetchFailed": "Güncel teklif getirilemedi.",
-    "addFailed": "Tahvil programı bulunamadı. Tekrar deneyin."
+    "addFailed": "Tahvil türü bulunamadı. Tekrar deneyin."
   },
   "history": {
     "product": "Ürün",

@@ -9,7 +9,6 @@
     }
   },
   "entry": {
-    "button": "Staatsobligaties",
     "compare": "Vergelijken met het huidige aanbod",
     "history": "Geschiedenis van de voorwaarden van {program}",
     "seeOnSale": "Obligaties te koop bekijken"
@@ -70,7 +69,7 @@
     "fetching": "Huidig aanbod wordt opgehaald...",
     "fetchDone": "Aanbod opgehaald: {listed} series vermeld, {stored} nieuw opgeslagen, {alreadyStored} al opgeslagen, {failed} mislukt.",
     "fetchFailed": "Het huidige aanbod kon niet worden opgehaald.",
-    "addFailed": "Het obligatieprogramma kon niet worden gevonden. Probeer het opnieuw."
+    "addFailed": "De obligatiesoort kon niet worden gevonden. Probeer het opnieuw."
   },
   "history": {
     "product": "Product",

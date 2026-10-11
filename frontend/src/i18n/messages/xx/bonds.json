@@ -9,7 +9,6 @@
     }
   },
   "entry": {
-    "button": "[XX-Treasury bonds-XX]",
     "compare": "[XX-Compare with the current offer-XX]",
     "history": "[XX-History of {program} terms-XX]",
     "seeOnSale": "[XX-See bonds on sale-XX]"
@@ -70,7 +69,7 @@
     "fetching": "[XX-Fetching the current offer...-XX]",
     "fetchDone": "[XX-Offer fetched: {listed} series listed, {stored} newly stored, {alreadyStored} already stored, {failed} failed.-XX]",
     "fetchFailed": "[XX-The current offer could not be fetched.-XX]",
-    "addFailed": "[XX-The bond program could not be looked up. Try again.-XX]"
+    "addFailed": "[XX-The bond kind could not be looked up. Try again.-XX]"
   },
   "history": {
     "product": "[XX-Product-XX]",

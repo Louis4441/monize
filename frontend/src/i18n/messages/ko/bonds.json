@@ -9,7 +9,6 @@
     }
   },
   "entry": {
-    "button": "국채",
     "compare": "현재 판매 내용과 비교",
     "history": "{program} 조건 이력",
     "seeOnSale": "판매 중인 채권 보기"
@@ -70,7 +69,7 @@
     "fetching": "현재 오퍼를 가져오는 중...",
     "fetchDone": "오퍼를 가져왔습니다: 목록 {listed}개 시리즈, 새로 저장 {stored}개, 이미 저장됨 {alreadyStored}개, 실패 {failed}개.",
     "fetchFailed": "현재 오퍼를 가져오지 못했습니다.",
-    "addFailed": "채권 프로그램을 찾지 못했습니다. 다시 시도하세요."
+    "addFailed": "채권 종류를 찾지 못했습니다. 다시 시도하세요."
   },
   "history": {
     "product": "상품",

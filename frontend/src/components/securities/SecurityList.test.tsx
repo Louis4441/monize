@@ -564,7 +564,7 @@ describe('SecurityList', () => {
     const securities = [makeSecurity({ quoteProvider: null, bondProgramId: 'p-edo' })];
     useDensityStore.setState({ densities: { securities: 'normal' } });
     render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
-    expect(screen.getByText('Bond engine (issue terms)')).toBeInTheDocument();
+    expect(screen.getByText('Bond engine')).toBeInTheDocument();
     expect(screen.queryByText('Yahoo')).not.toBeInTheDocument();
   });
 
@@ -910,7 +910,7 @@ describe('SecurityList', () => {
       const securities = [makeSecurity({ lastPriceSource: 'bond_engine', quoteProvider: 'yahoo' })];
       useDensityStore.setState({ densities: { securities: 'normal' } });
       render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
-      expect(screen.getByText('Bond engine (issue terms)')).toBeInTheDocument();
+      expect(screen.getByText('Bond engine')).toBeInTheDocument();
       expect(screen.queryByText('bond_engine')).not.toBeInTheDocument();
     });
 

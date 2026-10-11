@@ -312,7 +312,7 @@
       "OVER_REMOVAL": "{action} em {date} retira {quantity} títulos, mais do que os mantidos.",
       "INVALID_QUANTITY": "A quantidade de {action} em {date} está ausente, é negativa ou grande demais.",
       "REMOVAL_EXCEEDS_SERIES": "{action} em {date} retira {quantity} títulos da sua série, mais do que os mantidos nessa série.",
-      "SERIES_NOT_DETERMINED": "{action} em {date} não indica série e nesse dia nenhuma série salva do programa estava à venda. Busque a série e escolha-a na transação."
+      "SERIES_NOT_DETERMINED": "{action} em {date} não indica série e nesse dia nenhuma série salva do tipo de título estava à venda. Busque a série e escolha-a na transação."
     },
     "assumptions": {
       "title": "Premissas da projeção",
@@ -440,16 +440,16 @@
       "title": "Suas séries",
       "column": "Série",
       "nextRateChange": "Próximo reajuste da taxa",
-      "total": "Total do programa",
+      "total": "Total do tipo de título",
       "purchasedRange": "de {from} a {to}",
       "expand": "Mostrar os detalhes de {series}",
       "collapse": "Ocultar os detalhes de {series}",
       "partial": "Parcial"
     },
     "program": {
-      "title": "O programa",
+      "title": "O tipo de título",
       "newest": "Condições da série mais recente, {series}.",
-      "noTerms": "As condições ainda não são conhecidas: você não tem nenhuma série deste programa e nenhuma está à venda.",
+      "noTerms": "As condições ainda não são conhecidas: você não tem nenhuma série deste tipo de título e nenhuma está à venda.",
       "autoFetchFailed": "Não foi possível salvar a configuração."
     },
     "onSale": {

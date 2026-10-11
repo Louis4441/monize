@@ -147,7 +147,7 @@
       "msn": "MSN",
       "lse": "LSE",
       "deutsche_boerse": "Deutsche Börse",
-      "bond_engine": "Motor de obrigações (condições de emissão)"
+      "bond_engine": "Motor de obrigações"
     },
     "types": {
       "select": "Selecionar tipo...",
@@ -201,16 +201,19 @@
     "bondFetchAction": "Obter {code} da fonte oficial",
     "bondFetching": "A obter {code} junto do emitente e as respetivas taxas de referência. Isto pode demorar até um minuto.",
     "bondFetchFailed": "Não foi possível obter a série.",
-    "bondCurrencyLocked": "Este título está associado a um programa de obrigações em {linkedCurrency}. Volte a definir a moeda como {linkedCurrency} ou desassocie primeiro o programa (desassociar remove os seus preços calculados).",
-    "bondProgramLabel": "Programa de obrigações (opcional)",
+    "bondCurrencyLocked": "Este título está associado a um tipo de obrigação em {linkedCurrency}. Volte a definir a moeda como {linkedCurrency} ou desassocie primeiro o tipo de obrigação (desassociar remove os seus preços calculados).",
+    "bondProgramLabel": "Tipo de obrigação (opcional)",
     "bondProgramNone": "Sem ligação",
-    "bondProgramCurrent": "Programa associado",
-    "bondProgramLoading": "A carregar os programas de obrigações...",
-    "bondProgramLoadFailed": "Não foi possível carregar os programas de obrigações, por isso ainda não é possível associar um programa.",
+    "bondProgramCurrent": "Tipo de obrigação associado",
+    "bondProgramLoading": "A carregar os tipos de obrigações...",
+    "bondProgramLoadFailed": "Não foi possível carregar os tipos de obrigações, por isso ainda não é possível associar um tipo de obrigação.",
     "bondProgramRetry": "Tentar novamente",
-    "bondNoPrograms": "O catálogo de obrigações ainda não tem nenhum programa.",
-    "bondAutoFetchLabel": "Obter automaticamente as novas séries deste programa",
-    "bondAutoFetchHelp": "Quando ativado, o Monize lê todos os dias as novas séries deste programa a partir da fonte oficial, para que possa registar uma compra sem obter primeiro a série."
+    "bondNoPrograms": "O catálogo de obrigações ainda não tem nenhum tipo de obrigação.",
+    "bondAutoFetchLabel": "Obter automaticamente as novas séries deste tipo de obrigação",
+    "bondAutoFetchHelp": "Quando ativado, o Monize lê todos os dias as novas séries deste tipo de obrigação a partir da fonte oficial, para que possa registar uma compra sem obter primeiro a série.",
+    "bondCountryLabel": "País",
+    "bondCountryOther": "Outro",
+    "bondCountryOtherInfo": "O suporte para obrigações de outros países pode ser pedido no <link>GitHub do projeto</link>."
   },
   "priceForm": {
     "dateLabel": "Data",

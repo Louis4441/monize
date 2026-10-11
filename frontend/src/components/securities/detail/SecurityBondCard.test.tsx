@@ -179,7 +179,7 @@ const getHistory = vi.mocked(investmentsApi.getBondHistory);
 /** The program total under the series rows: the cell of a column. */
 const TOTAL_COLUMN = { quantity: 1, gross: 3, accrued: 4, early: 5 } as const;
 function totalCell(column: keyof typeof TOTAL_COLUMN): HTMLElement {
-  const row = screen.getByText('Program total').closest('tr') as HTMLElement;
+  const row = screen.getByText('Bond kind total').closest('tr') as HTMLElement;
   return within(row).getAllByRole('cell')[TOTAL_COLUMN[column]];
 }
 
@@ -476,7 +476,7 @@ describe('SecurityBondCard', () => {
     get.mockRejectedValue(new Error('boom'));
     await mount();
     expect(screen.getByRole('alert')).toHaveTextContent('boom');
-    expect(screen.queryByText('Program total')).not.toBeInTheDocument();
+    expect(screen.queryByText('Bond kind total')).not.toBeInTheDocument();
     expect(screen.queryByText('$0.00')).not.toBeInTheDocument();
   });
 
@@ -522,7 +522,7 @@ describe('SecurityBondCard', () => {
       // Day A's figures are not shown under day B's label while B is pending.
       expect(screen.getByText('Loading the bond valuation...')).toBeInTheDocument();
       expect(screen.queryByText('$1,090.20')).not.toBeInTheDocument();
-      expect(screen.queryByText('Program total')).not.toBeInTheDocument();
+      expect(screen.queryByText('Bond kind total')).not.toBeInTheDocument();
 
       await act(async () => {
         resolveSecond(
@@ -1478,14 +1478,14 @@ describe('SecurityBondCard: a program-linked security (spec bond-program-securit
 
   it('lays the sections out in the order: your series, the program, on sale now, history', async () => {
     await mountCollapsed();
-    const sections = ['Your series', 'The program', 'On sale now', 'History of RETAIL terms'];
+    const sections = ['Your series', 'The bond kind', 'On sale now', 'History of RETAIL terms'];
     const headings = screen
       .getAllByRole('heading', { level: 3 })
       .map((h) => h.textContent ?? '')
       .filter((text) => sections.includes(text));
     expect(headings).toEqual([
       'Your series',
-      'The program',
+      'The bond kind',
       'On sale now',
       'History of RETAIL terms',
     ]);
@@ -1557,7 +1557,7 @@ describe('SecurityBondCard: a program-linked security (spec bond-program-securit
       ]),
     );
     await mountCollapsed();
-    const program = screen.getByRole('region', { name: 'The program' });
+    const program = screen.getByRole('region', { name: 'The bond kind' });
     expect(within(program).getByText('Terms of the newest series, TOS0430.')).toBeInTheDocument();
     expect(within(program).getByText('Fixed 5% for the whole term')).toBeInTheDocument();
     expect(within(program).getByText('36 months')).toBeInTheDocument();
@@ -1568,7 +1568,7 @@ describe('SecurityBondCard: a program-linked security (spec bond-program-securit
 
   it('falls back to the series held when nothing is on sale', async () => {
     await mountCollapsed();
-    const program = screen.getByRole('region', { name: 'The program' });
+    const program = screen.getByRole('region', { name: 'The bond kind' });
     // The newest held series is the one bought last.
     expect(within(program).getByText('Terms of the newest series, TOS1130.')).toBeInTheDocument();
     expect(within(program).getByText('Fixed 4.4% for the whole term')).toBeInTheDocument();
@@ -1608,7 +1608,7 @@ describe('SecurityBondCard: a program-linked security (spec bond-program-securit
 
   describe('the auto-fetch switch', () => {
     const update = vi.mocked(investmentsApi.updateSecurity);
-    const switchEl = () => screen.getByRole('switch', { name: 'Fetch new series of this program automatically' });
+    const switchEl = () => screen.getByRole('switch', { name: 'Fetch new series of this bond kind automatically' });
 
     it('starts as the server reports it', async () => {
       get.mockResolvedValue({ ...twoSeries(), autoFetch: true });

@@ -312,7 +312,7 @@
       "OVER_REMOVAL": "{action} op {date} haalt {quantity} obligaties weg, meer dan er waren.",
       "INVALID_QUANTITY": "De hoeveelheid van {action} op {date} ontbreekt, is negatief of te groot.",
       "REMOVAL_EXCEEDS_SERIES": "{action} op {date} verwijdert {quantity} obligaties van zijn serie, meer dan in die serie werden aangehouden.",
-      "SERIES_NOT_DETERMINED": "{action} op {date} noemt geen serie en op die dag was geen opgeslagen serie van het programma te koop. Haal de serie op en kies die in de transactie."
+      "SERIES_NOT_DETERMINED": "{action} op {date} noemt geen serie en op die dag was geen opgeslagen serie van de obligatiesoort te koop. Haal de serie op en kies die in de transactie."
     },
     "assumptions": {
       "title": "Aannames van de prognose",
@@ -440,16 +440,16 @@
       "title": "Uw series",
       "column": "Serie",
       "nextRateChange": "Volgende renteaanpassing",
-      "total": "Totaal van het programma",
+      "total": "Totaal van de obligatiesoort",
       "purchasedRange": "{from} tot {to}",
       "expand": "Details van {series} tonen",
       "collapse": "Details van {series} verbergen",
       "partial": "Gedeeltelijk"
     },
     "program": {
-      "title": "Het programma",
+      "title": "De obligatiesoort",
       "newest": "Voorwaarden van de nieuwste serie, {series}.",
-      "noTerms": "De voorwaarden zijn nog niet bekend: u bezit geen serie van dit programma en er is er geen te koop.",
+      "noTerms": "De voorwaarden zijn nog niet bekend: u bezit geen serie van deze obligatiesoort en er is er geen te koop.",
       "autoFetchFailed": "De instelling kon niet worden opgeslagen."
     },
     "onSale": {

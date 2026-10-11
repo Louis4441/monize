@@ -312,7 +312,7 @@
       "OVER_REMOVAL": "{action} on {date} removes {quantity} bonds, more than were held.",
       "INVALID_QUANTITY": "The quantity of {action} on {date} is missing, negative or too large.",
       "REMOVAL_EXCEEDS_SERIES": "{action} on {date} removes {quantity} bonds of its series, more than were held in that series.",
-      "SERIES_NOT_DETERMINED": "{action} on {date} names no series, and no stored series of the program was on sale that day. Fetch the series and choose it in the transaction."
+      "SERIES_NOT_DETERMINED": "{action} on {date} names no series, and no stored series of the bond kind was on sale that day. Fetch the series and choose it in the transaction."
     },
     "assumptions": {
       "title": "Projection assumptions",
@@ -440,16 +440,16 @@
       "title": "Your series",
       "column": "Series",
       "nextRateChange": "Next rate change",
-      "total": "Program total",
+      "total": "Bond kind total",
       "purchasedRange": "{from} to {to}",
       "expand": "Show details of {series}",
       "collapse": "Hide details of {series}",
       "partial": "Partial"
     },
     "program": {
-      "title": "The program",
+      "title": "The bond kind",
       "newest": "Terms of the newest series, {series}.",
-      "noTerms": "The terms are not known yet: you hold no series of this program and none is on sale.",
+      "noTerms": "The terms are not known yet: you hold no series of this bond kind and none is on sale.",
       "autoFetchFailed": "The setting could not be saved."
     },
     "onSale": {

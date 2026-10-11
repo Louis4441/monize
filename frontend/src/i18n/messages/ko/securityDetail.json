@@ -312,7 +312,7 @@
       "OVER_REMOVAL": "{date} {action}이(가) 채권 {quantity}장을 제거하며, 보유 수량보다 많습니다.",
       "INVALID_QUANTITY": "{date} {action}의 수량이 없거나 음수이거나 너무 큽니다.",
       "REMOVAL_EXCEEDS_SERIES": "{date}의 {action}은(는) 해당 시리즈의 채권 {quantity}개를 인출하며, 이는 그 시리즈의 보유량보다 많습니다.",
-      "SERIES_NOT_DETERMINED": "{date}의 {action}에 시리즈가 없고, 그날 판매 중이던 프로그램의 저장된 시리즈도 없습니다. 시리즈를 가져와 거래에서 선택하세요."
+      "SERIES_NOT_DETERMINED": "{date}의 {action}에 시리즈가 없고, 그날 판매 중이던 채권 종류의 저장된 시리즈도 없습니다. 시리즈를 가져와 거래에서 선택하세요."
     },
     "assumptions": {
       "title": "예상 가정",
@@ -440,16 +440,16 @@
       "title": "내 시리즈",
       "column": "시리즈",
       "nextRateChange": "다음 금리 변경",
-      "total": "프로그램 합계",
+      "total": "채권 종류 합계",
       "purchasedRange": "{from} ~ {to}",
       "expand": "{series} 세부 정보 보기",
       "collapse": "{series} 세부 정보 숨기기",
       "partial": "일부"
     },
     "program": {
-      "title": "프로그램",
+      "title": "채권 종류",
       "newest": "가장 최근 시리즈 {series}의 조건입니다.",
-      "noTerms": "조건을 아직 알 수 없습니다. 이 프로그램의 시리즈를 보유하고 있지 않고 판매 중인 시리즈도 없습니다.",
+      "noTerms": "조건을 아직 알 수 없습니다. 이 채권 종류의 시리즈를 보유하고 있지 않고 판매 중인 시리즈도 없습니다.",
       "autoFetchFailed": "설정을 저장하지 못했습니다."
     },
     "onSale": {

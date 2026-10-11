@@ -312,7 +312,7 @@
       "OVER_REMOVAL": "{action} le {date} retire {quantity} obligations, plus que celles détenues.",
       "INVALID_QUANTITY": "La quantité de {action} le {date} est absente, négative ou trop grande.",
       "REMOVAL_EXCEEDS_SERIES": "{action} du {date} retire {quantity} obligations de sa série, plus que la série n'en comptait.",
-      "SERIES_NOT_DETERMINED": "{action} du {date} n'indique aucune série et aucune série enregistrée du programme n'était en vente ce jour-là. Récupérez la série et choisissez-la dans l'opération."
+      "SERIES_NOT_DETERMINED": "{action} du {date} n'indique aucune série et aucune série enregistrée du type d'obligation n'était en vente ce jour-là. Récupérez la série et choisissez-la dans l'opération."
     },
     "assumptions": {
       "title": "Hypothèses de la projection",
@@ -440,16 +440,16 @@
       "title": "Vos séries",
       "column": "Série",
       "nextRateChange": "Prochaine révision du taux",
-      "total": "Total du programme",
+      "total": "Total du type d'obligation",
       "purchasedRange": "{from} au {to}",
       "expand": "Afficher les détails de {series}",
       "collapse": "Masquer les détails de {series}",
       "partial": "Partielle"
     },
     "program": {
-      "title": "Le programme",
+      "title": "Le type d'obligation",
       "newest": "Conditions de la série la plus récente, {series}.",
-      "noTerms": "Les conditions ne sont pas encore connues : vous ne détenez aucune série de ce programme et aucune n'est en vente.",
+      "noTerms": "Les conditions ne sont pas encore connues : vous ne détenez aucune série de ce type d'obligation et aucune n'est en vente.",
       "autoFetchFailed": "Le réglage n'a pas pu être enregistré."
     },
     "onSale": {

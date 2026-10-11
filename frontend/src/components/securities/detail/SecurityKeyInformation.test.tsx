@@ -130,7 +130,7 @@ describe("SecurityKeyInformation", () => {
       />,
     );
 
-    expect(screen.getByText("Bond engine (issue terms)")).toBeInTheDocument();
+    expect(screen.getByText("Bond engine")).toBeInTheDocument();
     expect(screen.queryByText("Yahoo")).not.toBeInTheDocument();
   });
 

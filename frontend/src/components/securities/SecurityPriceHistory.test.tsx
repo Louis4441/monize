@@ -284,7 +284,7 @@ describe('SecurityPriceHistory', () => {
       { id: 30, securityId: 'sec-1', priceDate: '2025-06-10', openPrice: null, highPrice: null, lowPrice: null, closePrice: 1, volume: null, source: 'bond_engine', createdAt: 'x' },
     ]);
     await renderExpanded();
-    expect(screen.getByText('Bond engine (issue terms)')).toBeInTheDocument();
+    expect(screen.getByText('Bond engine')).toBeInTheDocument();
     expect(screen.queryByText('bond_engine')).not.toBeInTheDocument();
   });
 

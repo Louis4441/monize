@@ -9,7 +9,6 @@
     }
   },
   "entry": {
-    "button": "Obrigações do Tesouro",
     "compare": "Comparar com a oferta atual",
     "history": "Histórico das condições de {program}",
     "seeOnSale": "Ver obrigações à venda"
@@ -70,7 +69,7 @@
     "fetching": "A obter a oferta atual...",
     "fetchDone": "Oferta obtida: {listed} séries listadas, {stored} guardadas agora, {alreadyStored} já guardadas, {failed} com falha.",
     "fetchFailed": "Não foi possível obter a oferta atual.",
-    "addFailed": "Não foi possível localizar o programa de obrigações. Tente novamente."
+    "addFailed": "Não foi possível encontrar o tipo de obrigação. Tente novamente."
   },
   "history": {
     "product": "Produto",

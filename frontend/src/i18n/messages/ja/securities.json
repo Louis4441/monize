@@ -147,7 +147,7 @@
       "msn": "MSN",
       "lse": "LSE",
       "deutsche_boerse": "Deutsche Börse",
-      "bond_engine": "債券エンジン（発行条件）"
+      "bond_engine": "債券エンジン"
     },
     "types": {
       "select": "種類を選択...",
@@ -201,16 +201,19 @@
     "bondFetchAction": "公式ソースから {code} を取得",
     "bondFetching": "{code} を発行体から参照レートとともに取得しています。最大 1 分かかることがあります。",
     "bondFetchFailed": "シリーズを取得できませんでした。",
-    "bondCurrencyLocked": "この銘柄は{linkedCurrency}の債券プログラムにリンクされています。通貨を{linkedCurrency}に戻すか、先にプログラムのリンクを解除してください(解除すると計算済みの価格が削除されます)。",
-    "bondProgramLabel": "債券プログラム（任意）",
+    "bondCurrencyLocked": "この銘柄は{linkedCurrency}の債券の種類にリンクされています。通貨を{linkedCurrency}に戻すか、先に債券の種類のリンクを解除してください(解除すると計算済みの価格が削除されます)。",
+    "bondProgramLabel": "債券の種類（任意）",
     "bondProgramNone": "未リンク",
-    "bondProgramCurrent": "リンク済みのプログラム",
-    "bondProgramLoading": "債券プログラムを読み込み中...",
-    "bondProgramLoadFailed": "債券プログラムを読み込めなかったため、プログラムをまだリンクできません。",
+    "bondProgramCurrent": "リンク済みの債券の種類",
+    "bondProgramLoading": "債券の種類を読み込み中...",
+    "bondProgramLoadFailed": "債券の種類を読み込めなかったため、債券の種類をまだリンクできません。",
     "bondProgramRetry": "再試行",
-    "bondNoPrograms": "債券カタログにはまだプログラムがありません。",
-    "bondAutoFetchLabel": "このプログラムの新しいシリーズを自動で取得する",
-    "bondAutoFetchHelp": "オンにすると、Monize は毎日、このプログラムの新しいシリーズを公式ソースから読み取ります。シリーズを先に取得しなくても購入を記録できます。"
+    "bondNoPrograms": "債券カタログにはまだ債券の種類がありません。",
+    "bondAutoFetchLabel": "この債券の種類の新しいシリーズを自動で取得する",
+    "bondAutoFetchHelp": "オンにすると、Monize は毎日、この債券の種類の新しいシリーズを公式ソースから読み取ります。シリーズを先に取得しなくても購入を記録できます。",
+    "bondCountryLabel": "国",
+    "bondCountryOther": "その他",
+    "bondCountryOtherInfo": "他の国の債券への対応は、プロジェクトの<link>GitHub</link>でリクエストできます。"
   },
   "priceForm": {
     "dateLabel": "日付",

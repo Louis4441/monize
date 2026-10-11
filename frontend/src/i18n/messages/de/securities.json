@@ -147,7 +147,7 @@
       "msn": "MSN",
       "lse": "LSE",
       "deutsche_boerse": "Deutsche Börse",
-      "bond_engine": "Anleihen-Engine (Emissionsbedingungen)"
+      "bond_engine": "Anleihen-Engine"
     },
     "types": {
       "select": "Typ auswählen...",
@@ -201,16 +201,19 @@
     "bondFetchAction": "{code} aus der offiziellen Quelle abrufen",
     "bondFetching": "{code} wird beim Emittenten samt Referenzzinsen abgerufen. Das kann bis zu einer Minute dauern.",
     "bondFetchFailed": "Die Serie konnte nicht abgerufen werden.",
-    "bondCurrencyLocked": "Dieses Wertpapier ist mit einem Anleiheprogramm in {linkedCurrency} verknüpft. Setzen Sie die Währung wieder auf {linkedCurrency} oder lösen Sie zuerst die Verknüpfung des Programms (dabei werden die berechneten Kurse entfernt).",
-    "bondProgramLabel": "Anleiheprogramm (optional)",
+    "bondCurrencyLocked": "Dieses Wertpapier ist mit einer Anleiheart in {linkedCurrency} verknüpft. Setzen Sie die Währung wieder auf {linkedCurrency} oder lösen Sie zuerst die Verknüpfung der Anleiheart (dabei werden die berechneten Kurse entfernt).",
+    "bondProgramLabel": "Anleiheart (optional)",
     "bondProgramNone": "Nicht verknüpft",
-    "bondProgramCurrent": "Verknüpftes Programm",
-    "bondProgramLoading": "Anleiheprogramme werden geladen...",
-    "bondProgramLoadFailed": "Die Anleiheprogramme konnten nicht geladen werden, daher lässt sich noch kein Programm verknüpfen.",
+    "bondProgramCurrent": "Verknüpfte Anleiheart",
+    "bondProgramLoading": "Anleihearten werden geladen...",
+    "bondProgramLoadFailed": "Die Anleihearten konnten nicht geladen werden, daher lässt sich noch keine Anleiheart verknüpfen.",
     "bondProgramRetry": "Erneut versuchen",
-    "bondNoPrograms": "Der Anleihenkatalog enthält noch kein Programm.",
-    "bondAutoFetchLabel": "Neue Serien dieses Programms automatisch abrufen",
-    "bondAutoFetchHelp": "Wenn aktiviert, liest Monize jeden Tag neue Serien dieses Programms aus der offiziellen Quelle, sodass Sie einen Kauf erfassen können, ohne die Serie zuvor abzurufen."
+    "bondNoPrograms": "Der Anleihenkatalog enthält noch keine Anleiheart.",
+    "bondAutoFetchLabel": "Neue Serien dieser Anleiheart automatisch abrufen",
+    "bondAutoFetchHelp": "Wenn aktiviert, liest Monize jeden Tag neue Serien dieser Anleiheart aus der offiziellen Quelle, sodass Sie einen Kauf erfassen können, ohne die Serie zuvor abzurufen.",
+    "bondCountryLabel": "Land",
+    "bondCountryOther": "Andere",
+    "bondCountryOtherInfo": "Die Unterstützung für Anleihen anderer Länder kann auf dem <link>GitHub des Projekts</link> angefragt werden."
   },
   "priceForm": {
     "dateLabel": "Datum",

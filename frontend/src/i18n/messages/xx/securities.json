@@ -147,7 +147,7 @@
       "msn": "[XX-MSN-XX]",
       "lse": "[XX-LSE-XX]",
       "deutsche_boerse": "[XX-Deutsche Börse-XX]",
-      "bond_engine": "[XX-Bond engine (issue terms)-XX]"
+      "bond_engine": "[XX-Bond engine-XX]"
     },
     "types": {
       "select": "[XX-Select type...-XX]",
@@ -201,16 +201,19 @@
     "bondFetchAction": "[XX-Fetch {code} from the official source-XX]",
     "bondFetching": "[XX-Fetching {code} from the issuer and its reference rates. This can take up to a minute.-XX]",
     "bondFetchFailed": "[XX-The series could not be fetched.-XX]",
-    "bondCurrencyLocked": "[XX-This security is linked to a bond program in {linkedCurrency}. Set the currency back to {linkedCurrency}, or unlink the program first (unlinking removes its calculated prices).-XX]",
-    "bondProgramLabel": "[XX-Bond program (optional)-XX]",
+    "bondCurrencyLocked": "[XX-This security is linked to a bond kind in {linkedCurrency}. Set the currency back to {linkedCurrency}, or unlink the bond kind first (unlinking removes its calculated prices).-XX]",
+    "bondProgramLabel": "[XX-Bond kind (optional)-XX]",
     "bondProgramNone": "[XX-Not linked-XX]",
-    "bondProgramCurrent": "[XX-Linked program-XX]",
-    "bondProgramLoading": "[XX-Loading the bond programs...-XX]",
-    "bondProgramLoadFailed": "[XX-The bond programs could not be loaded, so a program cannot be linked yet.-XX]",
+    "bondProgramCurrent": "[XX-Linked bond kind-XX]",
+    "bondProgramLoading": "[XX-Loading the bond kinds...-XX]",
+    "bondProgramLoadFailed": "[XX-The bond kinds could not be loaded, so a bond kind cannot be linked yet.-XX]",
     "bondProgramRetry": "[XX-Retry-XX]",
-    "bondNoPrograms": "[XX-The bond catalog holds no program yet.-XX]",
-    "bondAutoFetchLabel": "[XX-Fetch new series of this program automatically-XX]",
-    "bondAutoFetchHelp": "[XX-When on, Monize reads each new series of this program from the official source every day, so you can record a purchase without fetching the series first.-XX]"
+    "bondNoPrograms": "[XX-The bond catalog holds no bond kind yet.-XX]",
+    "bondAutoFetchLabel": "[XX-Fetch new series of this bond kind automatically-XX]",
+    "bondAutoFetchHelp": "[XX-When on, Monize reads each new series of this bond kind from the official source every day, so you can record a purchase without fetching the series first.-XX]",
+    "bondCountryLabel": "[XX-Country-XX]",
+    "bondCountryOther": "[XX-Other-XX]",
+    "bondCountryOtherInfo": "[XX-Support for bonds of other countries can be requested on the project's <link>GitHub</link>.-XX]"
   },
   "priceForm": {
     "dateLabel": "[XX-Date-XX]",

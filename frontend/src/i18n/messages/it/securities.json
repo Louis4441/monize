@@ -147,7 +147,7 @@
       "msn": "MSN",
       "lse": "LSE",
       "deutsche_boerse": "Deutsche Börse",
-      "bond_engine": "Motore obbligazionario (condizioni di emissione)"
+      "bond_engine": "Motore obbligazionario"
     },
     "types": {
       "select": "Seleziona tipo...",
@@ -201,16 +201,19 @@
     "bondFetchAction": "Recupera {code} dalla fonte ufficiale",
     "bondFetching": "Recupero di {code} dall'emittente e dei relativi tassi di riferimento. Può richiedere fino a un minuto.",
     "bondFetchFailed": "Impossibile recuperare la serie.",
-    "bondCurrencyLocked": "Questo titolo è collegato a un programma obbligazionario in {linkedCurrency}. Reimposta la valuta su {linkedCurrency} oppure scollega prima il programma (scollegare rimuove i suoi prezzi calcolati).",
-    "bondProgramLabel": "Programma obbligazionario (facoltativo)",
+    "bondCurrencyLocked": "Questo titolo è collegato a un tipo di obbligazione in {linkedCurrency}. Reimposta la valuta su {linkedCurrency} oppure scollega prima il tipo di obbligazione (scollegare rimuove i suoi prezzi calcolati).",
+    "bondProgramLabel": "Tipo di obbligazione (facoltativo)",
     "bondProgramNone": "Non collegata",
-    "bondProgramCurrent": "Programma collegato",
-    "bondProgramLoading": "Caricamento dei programmi obbligazionari...",
-    "bondProgramLoadFailed": "Impossibile caricare i programmi obbligazionari, quindi non si può ancora collegare un programma.",
+    "bondProgramCurrent": "Tipo di obbligazione collegato",
+    "bondProgramLoading": "Caricamento dei tipi di obbligazione...",
+    "bondProgramLoadFailed": "Impossibile caricare i tipi di obbligazione, quindi non si può ancora collegare un tipo di obbligazione.",
     "bondProgramRetry": "Riprova",
-    "bondNoPrograms": "Il catalogo obbligazioni non contiene ancora alcun programma.",
-    "bondAutoFetchLabel": "Recupera automaticamente le nuove serie di questo programma",
-    "bondAutoFetchHelp": "Se attivo, Monize legge ogni giorno dalla fonte ufficiale le nuove serie di questo programma, così puoi registrare un acquisto senza recuperare prima la serie."
+    "bondNoPrograms": "Il catalogo obbligazioni non contiene ancora alcun tipo di obbligazione.",
+    "bondAutoFetchLabel": "Recupera automaticamente le nuove serie di questo tipo di obbligazione",
+    "bondAutoFetchHelp": "Se attivo, Monize legge ogni giorno dalla fonte ufficiale le nuove serie di questo tipo di obbligazione, così puoi registrare un acquisto senza recuperare prima la serie.",
+    "bondCountryLabel": "Paese",
+    "bondCountryOther": "Altro",
+    "bondCountryOtherInfo": "Il supporto per le obbligazioni di altri Paesi può essere richiesto sul <link>GitHub del progetto</link>."
   },
   "priceForm": {
     "dateLabel": "Data",

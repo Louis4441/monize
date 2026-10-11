@@ -312,7 +312,7 @@
       "OVER_REMOVAL": "{action} el {date} retira {quantity} bonos, más de los que había.",
       "INVALID_QUANTITY": "La cantidad de {action} el {date} falta, es negativa o demasiado grande.",
       "REMOVAL_EXCEEDS_SERIES": "{action} del {date} retira {quantity} bonos de su serie, más de los que había en esa serie.",
-      "SERIES_NOT_DETERMINED": "{action} del {date} no indica serie y ese día no estaba a la venta ninguna serie guardada del programa. Obtén la serie y elígela en la transacción."
+      "SERIES_NOT_DETERMINED": "{action} del {date} no indica serie y ese día no estaba a la venta ninguna serie guardada del tipo de bono. Obtén la serie y elígela en la transacción."
     },
     "assumptions": {
       "title": "Supuestos de la proyección",
@@ -440,16 +440,16 @@
       "title": "Sus series",
       "column": "Serie",
       "nextRateChange": "Próximo cambio de tipo",
-      "total": "Total del programa",
+      "total": "Total del tipo de bono",
       "purchasedRange": "{from} a {to}",
       "expand": "Mostrar los detalles de {series}",
       "collapse": "Ocultar los detalles de {series}",
       "partial": "Parcial"
     },
     "program": {
-      "title": "El programa",
+      "title": "El tipo de bono",
       "newest": "Condiciones de la serie más reciente, {series}.",
-      "noTerms": "Las condiciones aún no se conocen: no tiene ninguna serie de este programa y ninguna está a la venta.",
+      "noTerms": "Las condiciones aún no se conocen: no tiene ninguna serie de este tipo de bono y ninguna está a la venta.",
       "autoFetchFailed": "No se pudo guardar el ajuste."
     },
     "onSale": {

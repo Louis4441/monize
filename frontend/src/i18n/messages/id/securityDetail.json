@@ -312,7 +312,7 @@
       "OVER_REMOVAL": "{action} pada {date} mengurangi {quantity} obligasi, lebih banyak dari yang dimiliki.",
       "INVALID_QUANTITY": "Jumlah pada {action} tanggal {date} kosong, negatif, atau terlalu besar.",
       "REMOVAL_EXCEEDS_SERIES": "{action} pada {date} mengeluarkan {quantity} obligasi dari serinya, lebih banyak dari yang dimiliki di seri itu.",
-      "SERIES_NOT_DETERMINED": "{action} pada {date} tidak menyebut seri, dan pada hari itu tidak ada seri program tersimpan yang dijual. Ambil seri tersebut dan pilih dalam transaksi."
+      "SERIES_NOT_DETERMINED": "{action} pada {date} tidak menyebut seri, dan pada hari itu tidak ada seri jenis obligasi tersimpan yang dijual. Ambil seri tersebut dan pilih dalam transaksi."
     },
     "assumptions": {
       "title": "Asumsi proyeksi",
@@ -440,16 +440,16 @@
       "title": "Seri Anda",
       "column": "Seri",
       "nextRateChange": "Perubahan suku bunga berikutnya",
-      "total": "Total program",
+      "total": "Total jenis obligasi",
       "purchasedRange": "{from} sampai {to}",
       "expand": "Tampilkan detail {series}",
       "collapse": "Sembunyikan detail {series}",
       "partial": "Sebagian"
     },
     "program": {
-      "title": "Program",
+      "title": "Jenis obligasi",
       "newest": "Ketentuan seri terbaru, {series}.",
-      "noTerms": "Ketentuan belum diketahui: Anda tidak memiliki seri program ini dan tidak ada yang sedang dijual.",
+      "noTerms": "Ketentuan belum diketahui: Anda tidak memiliki seri jenis obligasi ini dan tidak ada yang sedang dijual.",
       "autoFetchFailed": "Pengaturan tidak dapat disimpan."
     },
     "onSale": {

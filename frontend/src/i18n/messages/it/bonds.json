@@ -9,7 +9,6 @@
     }
   },
   "entry": {
-    "button": "Titoli di Stato",
     "compare": "Confronta con l'offerta attuale",
     "history": "Storico delle condizioni di {program}",
     "seeOnSale": "Vedi le obbligazioni in vendita"
@@ -70,7 +69,7 @@
     "fetching": "Recupero dell'offerta attuale...",
     "fetchDone": "Offerta recuperata: {listed} serie elencate, {stored} salvate ora, {alreadyStored} già salvate, {failed} non riuscite.",
     "fetchFailed": "Impossibile recuperare l'offerta attuale.",
-    "addFailed": "Impossibile trovare il programma obbligazionario. Riprova."
+    "addFailed": "Impossibile trovare il tipo di obbligazione. Riprova."
   },
   "history": {
     "product": "Prodotto",

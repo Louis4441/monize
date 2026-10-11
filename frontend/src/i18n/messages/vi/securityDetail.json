@@ -312,7 +312,7 @@
       "OVER_REMOVAL": "{action} ngày {date} rút {quantity} trái phiếu, nhiều hơn số đang nắm giữ.",
       "INVALID_QUANTITY": "Số lượng của {action} ngày {date} bị thiếu, âm hoặc quá lớn.",
       "REMOVAL_EXCEEDS_SERIES": "{action} ngày {date} rút {quantity} trái phiếu của sê-ri, nhiều hơn số có trong sê-ri đó.",
-      "SERIES_NOT_DETERMINED": "{action} ngày {date} không nêu sê-ri và hôm đó không có sê-ri nào đã lưu của chương trình được bán. Hãy tải sê-ri và chọn trong giao dịch."
+      "SERIES_NOT_DETERMINED": "{action} ngày {date} không nêu sê-ri và hôm đó không có sê-ri nào đã lưu của loại trái phiếu được bán. Hãy tải sê-ri và chọn trong giao dịch."
     },
     "assumptions": {
       "title": "Giả định của dự phóng",
@@ -440,16 +440,16 @@
       "title": "Các đợt phát hành của bạn",
       "column": "Đợt phát hành",
       "nextRateChange": "Lần đổi lãi suất tiếp theo",
-      "total": "Tổng của chương trình",
+      "total": "Tổng của loại trái phiếu",
       "purchasedRange": "{from} đến {to}",
       "expand": "Hiện chi tiết của {series}",
       "collapse": "Ẩn chi tiết của {series}",
       "partial": "Một phần"
     },
     "program": {
-      "title": "Chương trình",
+      "title": "Loại trái phiếu",
       "newest": "Điều khoản của đợt phát hành mới nhất, {series}.",
-      "noTerms": "Chưa biết điều khoản: bạn không nắm giữ đợt phát hành nào của chương trình này và không có đợt nào đang bán.",
+      "noTerms": "Chưa biết điều khoản: bạn không nắm giữ đợt phát hành nào của loại trái phiếu này và không có đợt nào đang bán.",
       "autoFetchFailed": "Không thể lưu thiết lập."
     },
     "onSale": {

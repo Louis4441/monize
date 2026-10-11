@@ -9,7 +9,6 @@
     }
   },
   "entry": {
-    "button": "Staatsanleihen",
     "compare": "Mit dem aktuellen Angebot vergleichen",
     "history": "Verlauf der Bedingungen für {program}",
     "seeOnSale": "Anleihen im Verkauf ansehen"
@@ -70,7 +69,7 @@
     "fetching": "Aktuelles Angebot wird abgerufen...",
     "fetchDone": "Angebot abgerufen: {listed} Serien gelistet, {stored} neu gespeichert, {alreadyStored} bereits gespeichert, {failed} fehlgeschlagen.",
     "fetchFailed": "Das aktuelle Angebot konnte nicht abgerufen werden.",
-    "addFailed": "Das Anleiheprogramm konnte nicht gefunden werden. Bitte versuchen Sie es erneut."
+    "addFailed": "Die Anleiheart konnte nicht gefunden werden. Bitte versuchen Sie es erneut."
   },
   "history": {
     "product": "Produkt",

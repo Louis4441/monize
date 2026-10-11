@@ -312,7 +312,7 @@
       "OVER_REMOVAL": "{date} 的 {action} 減少 {quantity} 張債券，超過持有數量。",
       "INVALID_QUANTITY": "{date} 的 {action} 數量缺漏、為負數或過大。",
       "REMOVAL_EXCEEDS_SERIES": "{date} 的 {action} 取出其系列的 {quantity} 份債券,超過該系列的持有數量。",
-      "SERIES_NOT_DETERMINED": "{date} 的 {action} 未指定系列,且當天沒有該計畫的已存系列在售。請取得該系列並在交易中選擇。"
+      "SERIES_NOT_DETERMINED": "{date} 的 {action} 未指定系列,且當天沒有該債券種類的已存系列在售。請取得該系列並在交易中選擇。"
     },
     "assumptions": {
       "title": "預測假設",
@@ -440,16 +440,16 @@
       "title": "您的系列",
       "column": "系列",
       "nextRateChange": "下次利率變更",
-      "total": "專案合計",
+      "total": "債券種類合計",
       "purchasedRange": "{from} 至 {to}",
       "expand": "顯示 {series} 的詳情",
       "collapse": "隱藏 {series} 的詳情",
       "partial": "部分"
     },
     "program": {
-      "title": "債券專案",
+      "title": "債券種類",
       "newest": "最新系列 {series} 的條款。",
-      "noTerms": "條款尚不明確:您沒有此專案的任何系列,也沒有在售的系列。",
+      "noTerms": "條款尚不明確:您沒有此債券種類的任何系列,也沒有在售的系列。",
       "autoFetchFailed": "無法儲存該設定。"
     },
     "onSale": {

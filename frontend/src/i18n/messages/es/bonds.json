@@ -9,7 +9,6 @@
     }
   },
   "entry": {
-    "button": "Bonos del Tesoro",
     "compare": "Comparar con la oferta actual",
     "history": "Historial de condiciones de {program}",
     "seeOnSale": "Ver bonos a la venta"
@@ -70,7 +69,7 @@
     "fetching": "Obteniendo la oferta actual...",
     "fetchDone": "Oferta obtenida: {listed} series listadas, {stored} guardadas ahora, {alreadyStored} ya guardadas, {failed} con error.",
     "fetchFailed": "No se pudo obtener la oferta actual.",
-    "addFailed": "No se pudo localizar el programa de bonos. Inténtelo de nuevo."
+    "addFailed": "No se pudo encontrar el tipo de bono. Inténtelo de nuevo."
   },
   "history": {
     "product": "Producto",

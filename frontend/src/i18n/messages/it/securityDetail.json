@@ -312,7 +312,7 @@
       "OVER_REMOVAL": "{action} il {date} rimuove {quantity} obbligazioni, più di quelle detenute.",
       "INVALID_QUANTITY": "La quantità di {action} il {date} manca, è negativa o troppo grande.",
       "REMOVAL_EXCEEDS_SERIES": "{action} del {date} rimuove {quantity} obbligazioni della sua serie, più di quante ce ne fossero.",
-      "SERIES_NOT_DETERMINED": "{action} del {date} non indica una serie e quel giorno non era in vendita alcuna serie salvata del programma. Recupera la serie e sceglila nella transazione."
+      "SERIES_NOT_DETERMINED": "{action} del {date} non indica una serie e quel giorno non era in vendita alcuna serie salvata del tipo di obbligazione. Recupera la serie e sceglila nella transazione."
     },
     "assumptions": {
       "title": "Ipotesi della previsione",
@@ -440,16 +440,16 @@
       "title": "Le tue serie",
       "column": "Serie",
       "nextRateChange": "Prossima revisione del tasso",
-      "total": "Totale del programma",
+      "total": "Totale del tipo di obbligazione",
       "purchasedRange": "dal {from} al {to}",
       "expand": "Mostra i dettagli di {series}",
       "collapse": "Nascondi i dettagli di {series}",
       "partial": "Parziale"
     },
     "program": {
-      "title": "Il programma",
+      "title": "Il tipo di obbligazione",
       "newest": "Condizioni della serie più recente, {series}.",
-      "noTerms": "Le condizioni non sono ancora note: non possiedi alcuna serie di questo programma e nessuna è in vendita.",
+      "noTerms": "Le condizioni non sono ancora note: non possiedi alcuna serie di questo tipo di obbligazione e nessuna è in vendita.",
       "autoFetchFailed": "Impossibile salvare l'impostazione."
     },
     "onSale": {

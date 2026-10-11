@@ -312,7 +312,7 @@
       "OVER_REMOVAL": "{action} am {date} entnimmt {quantity} Anleihen, mehr als vorhanden waren.",
       "INVALID_QUANTITY": "Die Menge bei {action} am {date} fehlt, ist negativ oder zu groß.",
       "REMOVAL_EXCEEDS_SERIES": "{action} am {date} entnimmt {quantity} Anleihen seiner Serie, mehr als in dieser Serie gehalten wurden.",
-      "SERIES_NOT_DETERMINED": "{action} am {date} nennt keine Serie, und an diesem Tag war keine gespeicherte Serie des Programms im Verkauf. Rufen Sie die Serie ab und wählen Sie sie in der Buchung."
+      "SERIES_NOT_DETERMINED": "{action} am {date} nennt keine Serie, und an diesem Tag war keine gespeicherte Serie der Anleiheart im Verkauf. Rufen Sie die Serie ab und wählen Sie sie in der Buchung."
     },
     "assumptions": {
       "title": "Annahmen der Prognose",
@@ -440,16 +440,16 @@
       "title": "Ihre Serien",
       "column": "Serie",
       "nextRateChange": "Nächste Zinsanpassung",
-      "total": "Summe des Programms",
+      "total": "Summe der Anleiheart",
       "purchasedRange": "{from} bis {to}",
       "expand": "Details zu {series} anzeigen",
       "collapse": "Details zu {series} ausblenden",
       "partial": "Teilweise"
     },
     "program": {
-      "title": "Das Programm",
+      "title": "Die Anleiheart",
       "newest": "Konditionen der neuesten Serie, {series}.",
-      "noTerms": "Die Konditionen sind noch nicht bekannt: Sie halten keine Serie dieses Programms und keine ist im Verkauf.",
+      "noTerms": "Die Konditionen sind noch nicht bekannt: Sie halten keine Serie dieser Anleiheart und keine ist im Verkauf.",
       "autoFetchFailed": "Die Einstellung konnte nicht gespeichert werden."
     },
     "onSale": {

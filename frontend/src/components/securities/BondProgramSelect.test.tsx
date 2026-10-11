@@ -44,7 +44,7 @@ describe('BondProgramSelect', () => {
 
   it('labels each program by its translated name', async () => {
     await mount();
-    const select = screen.getByLabelText('Bond program (optional)');
+    const select = screen.getByLabelText('Bond kind (optional)');
     expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual([
       'Not linked',
       'EDO: 10-year inflation-indexed savings bonds',
@@ -61,13 +61,13 @@ describe('BondProgramSelect', () => {
     await mount({ selected: 'p-edo' });
     expect(screen.getByTestId('effective')).toHaveTextContent('p-edo');
     expect(
-      within(screen.getByLabelText('Bond program (optional)')).getAllByRole('option').map((o) => o.textContent),
-    ).toEqual(['Not linked', 'Linked program']);
+      within(screen.getByLabelText('Bond kind (optional)')).getAllByRole('option').map((o) => o.textContent),
+    ).toEqual(['Not linked', 'Linked bond kind']);
   });
 
   it('reports the program\'s currency when the form\'s currency is another', async () => {
     await mount({ selected: 'p-edo', currency: 'USD' });
     expect(screen.getByTestId('mismatch')).toHaveTextContent('PLN');
-    expect(screen.getByRole('alert')).toHaveTextContent('linked to a bond program in PLN');
+    expect(screen.getByRole('alert')).toHaveTextContent('linked to a bond kind in PLN');
   });
 });

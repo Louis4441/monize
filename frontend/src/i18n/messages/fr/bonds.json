@@ -9,7 +9,6 @@
     }
   },
   "entry": {
-    "button": "Obligations d'État",
     "compare": "Comparer avec l'offre actuelle",
     "history": "Historique des conditions {program}",
     "seeOnSale": "Voir les obligations en vente"
@@ -70,7 +69,7 @@
     "fetching": "Récupération de l'offre actuelle...",
     "fetchDone": "Offre récupérée : {listed} séries listées, {stored} nouvellement enregistrées, {alreadyStored} déjà enregistrées, {failed} en échec.",
     "fetchFailed": "L'offre actuelle n'a pas pu être récupérée.",
-    "addFailed": "Le programme d'obligations n'a pas pu être retrouvé. Réessayez."
+    "addFailed": "Le type d'obligation n'a pas pu être trouvé. Réessayez."
   },
   "history": {
     "product": "Produit",

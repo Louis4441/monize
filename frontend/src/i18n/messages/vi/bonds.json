@@ -9,7 +9,6 @@
     }
   },
   "entry": {
-    "button": "Trái phiếu chính phủ",
     "compare": "So sánh với đợt chào bán hiện tại",
     "history": "Lịch sử điều kiện của {program}",
     "seeOnSale": "Xem trái phiếu đang bán"
@@ -70,7 +69,7 @@
     "fetching": "Đang lấy danh sách chào bán hiện tại...",
     "fetchDone": "Đã lấy danh sách chào bán: {listed} đợt phát hành được liệt kê, {stored} đợt mới lưu, {alreadyStored} đợt đã có, {failed} đợt lỗi.",
     "fetchFailed": "Không thể lấy danh sách chào bán hiện tại.",
-    "addFailed": "Không thể tìm thấy chương trình trái phiếu. Hãy thử lại."
+    "addFailed": "Không thể tìm thấy loại trái phiếu. Hãy thử lại."
   },
   "history": {
     "product": "Sản phẩm",

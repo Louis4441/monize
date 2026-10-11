@@ -312,7 +312,7 @@
       "OVER_REMOVAL": "{date} 的 {action} 减少 {quantity} 张债券，超过持有数量。",
       "INVALID_QUANTITY": "{date} 的 {action} 数量缺失、为负数或过大。",
       "REMOVAL_EXCEEDS_SERIES": "{date} 的 {action} 取出其系列的 {quantity} 份债券,超过该系列的持有数量。",
-      "SERIES_NOT_DETERMINED": "{date} 的 {action} 未指定系列,且当天没有该计划的已存系列在售。请获取该系列并在交易中选择。"
+      "SERIES_NOT_DETERMINED": "{date} 的 {action} 未指定系列,且当天没有该债券种类的已存系列在售。请获取该系列并在交易中选择。"
     },
     "assumptions": {
       "title": "预测假设",
@@ -440,16 +440,16 @@
       "title": "您的系列",
       "column": "系列",
       "nextRateChange": "下次利率变更",
-      "total": "项目合计",
+      "total": "债券种类合计",
       "purchasedRange": "{from} 至 {to}",
       "expand": "显示 {series} 的详情",
       "collapse": "隐藏 {series} 的详情",
       "partial": "部分"
     },
     "program": {
-      "title": "债券项目",
+      "title": "债券种类",
       "newest": "最新系列 {series} 的条款。",
-      "noTerms": "条款尚不明确:您没有此项目的任何系列,也没有在售的系列。",
+      "noTerms": "条款尚不明确:您没有此债券种类的任何系列,也没有在售的系列。",
       "autoFetchFailed": "无法保存该设置。"
     },
     "onSale": {

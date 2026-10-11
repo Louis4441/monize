@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
@@ -9,8 +9,19 @@ import { investmentsApi } from '@/lib/investments';
 import type { BondProgramSummary } from '@/types/bond';
 import { programLabel } from './detail/bond-labels';
 
+/** The country name in the reader's language; the bare code where the runtime cannot name it. */
+export function bondCountryName(code: string, locale: string): string {
+  try {
+    return new Intl.DisplayNames([locale], { type: 'region' }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
 export interface BondProgramPicker {
   options: Array<{ value: string; label: string }>;
+  /** The options narrowed to one issuer country (null: every program). */
+  optionsFor: (countryCode: string | null) => Array<{ value: string; label: string }>;
   /** The loaded catalog; empty until it has loaded. */
   programs: BondProgramSummary[];
   /** The link that is submitted and shown ('' is "not linked"). */
@@ -73,21 +84,25 @@ export function useBondProgramPicker(
     };
   }, [isBond, attempt]);
 
-  const options = useMemo(() => {
-    const sorted = [...(programs ?? [])].sort((a, b) =>
-      a.programCode.localeCompare(b.programCode),
-    );
-    const all = [
-      { value: '', label: t('form.bondProgramNone') },
-      ...sorted.map((p) => ({ value: p.id, label: programLabel(tDetail, p.programCode) })),
-    ];
-    // The catalog has not loaded: keep the existing link visible rather than
-    // letting the select blank it.
-    if (programs === null && selectedProgramId) {
-      all.push({ value: selectedProgramId, label: t('form.bondProgramCurrent') });
-    }
-    return all;
-  }, [programs, selectedProgramId, t, tDetail]);
+  const optionsFor = useCallback(
+    (countryCode: string | null) => {
+      const sorted = [...(programs ?? [])]
+        .filter((p) => countryCode === null || p.issuerCountryCode === countryCode)
+        .sort((a, b) => a.programCode.localeCompare(b.programCode));
+      const all = [
+        { value: '', label: t('form.bondProgramNone') },
+        ...sorted.map((p) => ({ value: p.id, label: programLabel(tDetail, p.programCode) })),
+      ];
+      // The catalog has not loaded: keep the existing link visible rather than
+      // letting the select blank it.
+      if (programs === null && selectedProgramId) {
+        all.push({ value: selectedProgramId, label: t('form.bondProgramCurrent') });
+      }
+      return all;
+    },
+    [programs, selectedProgramId, t, tDetail],
+  );
+  const options = useMemo(() => optionsFor(null), [optionsFor]);
 
   const program =
     programs === null || !selectedProgramId
@@ -98,6 +113,7 @@ export function useBondProgramPicker(
 
   return {
     options,
+    optionsFor,
     programs: programs ?? [],
     effectiveProgramId,
     program,
@@ -117,11 +133,13 @@ interface BondProgramSelectProps {
   picker: BondProgramPicker;
   /** The id of the program the reader chose; '' is "not linked". */
   onChange: (programId: string) => void;
+  /** Offer only the programs of this issuer country. */
+  countryCode?: string;
   error?: string;
 }
 
 /** The bond program select, with a loading hint and a retryable failure. */
-export function BondProgramSelect({ picker, onChange, error }: BondProgramSelectProps) {
+export function BondProgramSelect({ picker, onChange, countryCode, error }: BondProgramSelectProps) {
   const t = useTranslations('securities');
   const tBonds = useTranslations('bonds');
 
@@ -129,7 +147,7 @@ export function BondProgramSelect({ picker, onChange, error }: BondProgramSelect
     <div>
       <Select
         label={t('form.bondProgramLabel')}
-        options={picker.options}
+        options={picker.optionsFor(countryCode ?? null)}
         value={picker.effectiveProgramId}
         onChange={(e) => onChange(e.target.value)}
         error={error}

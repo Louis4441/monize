@@ -312,7 +312,7 @@
       "OVER_REMOVAL": "{date} tarihli {action}, eldekinden fazla olan {quantity} tahvili çıkarıyor.",
       "INVALID_QUANTITY": "{date} tarihli {action} işleminin miktarı eksik, negatif veya çok büyük.",
       "REMOVAL_EXCEEDS_SERIES": "{date} tarihli {action}, serisinden {quantity} tahvil çıkarıyor; bu, o seride tutulandan fazla.",
-      "SERIES_NOT_DETERMINED": "{date} tarihli {action} seri belirtmiyor ve o gün programın kayıtlı hiçbir serisi satışta değildi. Seriyi indirip işlemde seçin."
+      "SERIES_NOT_DETERMINED": "{date} tarihli {action} seri belirtmiyor ve o gün tahvil türünün kayıtlı hiçbir serisi satışta değildi. Seriyi indirip işlemde seçin."
     },
     "assumptions": {
       "title": "Projeksiyon varsayımları",
@@ -440,16 +440,16 @@
       "title": "Serileriniz",
       "column": "Seri",
       "nextRateChange": "Sonraki faiz değişikliği",
-      "total": "Program toplamı",
+      "total": "Tahvil türü toplamı",
       "purchasedRange": "{from} - {to}",
       "expand": "{series} ayrıntılarını göster",
       "collapse": "{series} ayrıntılarını gizle",
       "partial": "Kısmi"
     },
     "program": {
-      "title": "Program",
+      "title": "Tahvil türü",
       "newest": "En yeni serinin koşulları, {series}.",
-      "noTerms": "Koşullar henüz bilinmiyor: bu programın hiçbir serisine sahip değilsiniz ve hiçbiri satışta değil.",
+      "noTerms": "Koşullar henüz bilinmiyor: bu tahvil türünün hiçbir serisine sahip değilsiniz ve hiçbiri satışta değil.",
       "autoFetchFailed": "Ayar kaydedilemedi."
     },
     "onSale": {

@@ -147,7 +147,7 @@
       "msn": "MSN",
       "lse": "LSE",
       "deutsche_boerse": "Deutsche Börse",
-      "bond_engine": "Obligatie-engine (uitgiftevoorwaarden)"
+      "bond_engine": "Obligatie-engine"
     },
     "types": {
       "select": "Selecteer type...",
@@ -201,16 +201,19 @@
     "bondFetchAction": "{code} ophalen bij de officiële bron",
     "bondFetching": "{code} wordt opgehaald bij de uitgever, samen met de referentierentes. Dit kan tot een minuut duren.",
     "bondFetchFailed": "De reeks kon niet worden opgehaald.",
-    "bondCurrencyLocked": "Dit effect is gekoppeld aan een obligatieprogramma in {linkedCurrency}. Zet de valuta terug op {linkedCurrency} of ontkoppel eerst het programma (ontkoppelen verwijdert de berekende koersen).",
-    "bondProgramLabel": "Obligatieprogramma (optioneel)",
+    "bondCurrencyLocked": "Dit effect is gekoppeld aan een obligatiesoort in {linkedCurrency}. Zet de valuta terug op {linkedCurrency} of ontkoppel eerst de obligatiesoort (ontkoppelen verwijdert de berekende koersen).",
+    "bondProgramLabel": "Obligatiesoort (optioneel)",
     "bondProgramNone": "Niet gekoppeld",
-    "bondProgramCurrent": "Gekoppeld programma",
-    "bondProgramLoading": "Obligatieprogramma's laden...",
-    "bondProgramLoadFailed": "De obligatieprogramma's konden niet worden geladen, dus er kan nog geen programma worden gekoppeld.",
+    "bondProgramCurrent": "Gekoppelde obligatiesoort",
+    "bondProgramLoading": "Obligatiesoorten laden...",
+    "bondProgramLoadFailed": "De obligatiesoorten konden niet worden geladen, dus er kan nog geen obligatiesoort worden gekoppeld.",
     "bondProgramRetry": "Opnieuw proberen",
-    "bondNoPrograms": "De obligatiecatalogus bevat nog geen programma.",
-    "bondAutoFetchLabel": "Nieuwe series van dit programma automatisch ophalen",
-    "bondAutoFetchHelp": "Indien ingeschakeld leest Monize elke dag nieuwe series van dit programma uit de officiële bron, zodat u een aankoop kunt vastleggen zonder de serie eerst op te halen."
+    "bondNoPrograms": "De obligatiecatalogus bevat nog geen obligatiesoort.",
+    "bondAutoFetchLabel": "Nieuwe series van deze obligatiesoort automatisch ophalen",
+    "bondAutoFetchHelp": "Indien ingeschakeld leest Monize elke dag nieuwe series van deze obligatiesoort uit de officiële bron, zodat u een aankoop kunt vastleggen zonder de serie eerst op te halen.",
+    "bondCountryLabel": "Land",
+    "bondCountryOther": "Overig",
+    "bondCountryOtherInfo": "Ondersteuning voor obligaties van andere landen kan worden aangevraagd op de <link>GitHub van het project</link>."
   },
   "priceForm": {
     "dateLabel": "Datum",
