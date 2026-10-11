@@ -103,7 +103,10 @@ A live run on 2026-10-11 fetched 64 series (the eight products sold in
 2024-01, 2024-07, 2025-01, 2025-07, 2026-01, 2026-06, 2026-09 and 2026-10):
 all passed, the October 2026 ones equal to the curated manifests. The letters
 show the fee is a per-series value: TOS 0.70 to 1.00, COI and ROS 0.70 to 2.00,
-EDO and ROD 2.00 to 3.00 from January 2025, with the same wording.
+EDO and ROD 2.00 to 3.00 from the September 2024 series, with the same wording;
+the margins of COI, ROS, EDO and ROD rose and the DOR spread fell from June
+2024. The backfill of all 272 series from 2024-01 to 2026-10 then completed;
+two letters (ROS1030, ROD1036) write the fee without grosze ("2 zł").
 
 Any field that cannot be parsed is `SOURCE_FORMAT_CHANGED` with the field's
 name; any disagreement is `SOURCE_INCONSISTENT` with the field and both
