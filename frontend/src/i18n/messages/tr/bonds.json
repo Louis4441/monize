@@ -68,6 +68,8 @@
     "missingTitle": "Katalogda eksik aylar ({count})",
     "noMissing": "Kayıtlı ilk ve son seri arasında eksik ay yok.",
     "tableTitle": "Kayıtlı tüm seriler",
+    "groupCount": "{count} seri",
+    "unknownYear": "Satış tarihi bilinmiyor",
     "columns": {
       "series": "Seri",
       "saleWindow": "Satışta",

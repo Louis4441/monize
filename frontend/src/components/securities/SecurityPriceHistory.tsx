@@ -26,6 +26,7 @@ import {
   defaultOpenPriceGroups,
   priceDecimals,
 } from '@/lib/security-detail';
+import { GroupToggleButton } from '@/components/ui/GroupToggleButton';
 import { SecurityPriceForm } from './SecurityPriceForm';
 
 interface SecurityPriceHistoryProps {
@@ -412,23 +413,12 @@ export function SecurityPriceHistory({
                 key={year.key}
                 className="rounded-lg border border-gray-200 dark:border-gray-700"
               >
-                <button
-                  type="button"
-                  onClick={() => toggleGroup(year.key)}
-                  aria-expanded={yearOpen}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-700/50"
-                >
-                  <ChevronRightIcon
-                    className={`h-4 w-4 flex-shrink-0 text-gray-400 transition-transform ${yearOpen ? 'rotate-90' : ''}`}
-                    aria-hidden="true"
-                  />
-                  <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    {year.key}
-                  </span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {t('priceHistory.groupCount', { count: year.count })}
-                  </span>
-                </button>
+                <GroupToggleButton
+                  open={yearOpen}
+                  onToggle={() => toggleGroup(year.key)}
+                  label={year.key}
+                  detail={t('priceHistory.groupCount', { count: year.count })}
+                />
 
                 {yearOpen && (
                   <div className="space-y-1 border-t border-gray-200 px-2 pb-2 pt-1 dark:border-gray-700">

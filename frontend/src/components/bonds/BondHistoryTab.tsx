@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   CartesianGrid,
@@ -14,13 +14,11 @@ import {
   YAxis,
 } from 'recharts';
 import { ChartTooltip, type ChartTooltipEntry } from '@/components/reports/ChartTooltip';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { TABLE_BODY_CLASS, TABLE_CLASS, Td, Th } from '@/components/ui/Table';
+import { BondHistorySeriesTable } from './BondHistorySeriesTable';
 import { useChartMonthFormat } from '@/hooks/useChartMonthFormat';
-import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useReportData } from '@/hooks/useReportData';
 import { CHART_SERIES, chartColors } from '@/lib/chart-colors';
@@ -29,7 +27,6 @@ import { investmentsApi } from '@/lib/investments';
 import {
   BOND_OFFER_COUNTRY,
   buildHistoryPoints,
-  isHttpUrl,
 } from '@/lib/bond-offer';
 import type { BondHistory } from '@/types/bond';
 
@@ -53,8 +50,6 @@ interface BondHistoryBodyProps {
  */
 export function BondHistoryBody({ program, currency, heldSeries = [], refreshVersion = 0 }: BondHistoryBodyProps) {
   const t = useTranslations('bonds');
-  const tSec = useTranslations('securityDetail');
-  const { formatDate } = useDateFormat();
   const formatChartMonth = useChartMonthFormat();
   const { formatCurrency, formatCurrencyAxis, formatNumber, formatPercentTrimmed } =
     useNumberFormat();
@@ -83,11 +78,6 @@ export function BondHistoryBody({ program, currency, heldSeries = [], refreshVer
     [answer],
   );
 
-  const unknown = (
-    <span className="text-gray-500 dark:text-gray-400">{tSec('bond.unknown')}</span>
-  );
-  const rate = (fraction: string | null): ReactNode =>
-    fraction === null ? unknown : formatPercentTrimmed(Number(fraction) * 100);
   const feeText = (amount: number) =>
     currency === null ? formatNumber(amount) : formatCurrency(amount, currency);
   const feeAxis = (amount: number) =>
@@ -272,80 +262,11 @@ export function BondHistoryBody({ program, currency, heldSeries = [], refreshVer
           <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
             {t('history.tableTitle')}
           </h3>
-          <div className="overflow-x-auto scrollbar-slim">
-            <table className={TABLE_CLASS}>
-              <thead>
-                <tr>
-                  <Th>{t('history.columns.series')}</Th>
-                  <Th>{t('history.columns.saleWindow')}</Th>
-                  <Th align="right">{t('history.columns.rate')}</Th>
-                  <Th align="right">{t('history.columns.addend')}</Th>
-                  <Th align="right">{t('history.columns.fee')}</Th>
-                  <Th>{t('history.columns.floor')}</Th>
-                  <Th align="right">{t('history.columns.version')}</Th>
-                  <Th>{t('history.columns.source')}</Th>
-                </tr>
-              </thead>
-              <tbody className={TABLE_BODY_CLASS}>
-                {answer.series.map((s) => {
-                  const held = heldSeries.includes(s.seriesCode);
-                  return (
-                  <tr
-                    key={s.seriesCode}
-                    aria-current={held ? 'true' : undefined}
-                    className={held ? 'bg-blue-50 dark:bg-blue-900/20' : undefined}
-                  >
-                    <Td className="whitespace-nowrap font-medium">
-                      {s.seriesCode}
-                      {held && (
-                        <Badge variant="blue" className="ml-2">
-                          {t('history.held')}
-                        </Badge>
-                      )}
-                    </Td>
-                    <Td>
-                      {s.saleWindow === null
-                        ? tSec('bond.unknown')
-                        : t('offer.saleWindowValue', {
-                            from: formatDate(s.saleWindow.from),
-                            to: formatDate(s.saleWindow.to),
-                          })}
-                    </Td>
-                    <Td align="right" className="whitespace-nowrap">
-                      {rate(s.firstPeriodRate ?? s.annualRate)}
-                    </Td>
-                    <Td align="right" className="whitespace-nowrap">
-                      {s.addend === null ? t('history.none') : rate(s.addend)}
-                    </Td>
-                    <Td align="right" className="whitespace-nowrap">
-                      {s.fee === null ? t('history.none') : feeText(Number(s.fee))}
-                    </Td>
-                    <Td>
-                      {s.proceedsFloor === null
-                        ? t('history.none')
-                        : t(`history.floor.${s.proceedsFloor}`)}
-                    </Td>
-                    <Td align="right">{s.termsVersion}</Td>
-                    <Td>
-                      {isHttpUrl(s.termsSource.url) ? (
-                        <a
-                          href={s.termsSource.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline dark:text-blue-400"
-                        >
-                          {tSec('bond.termsSource', { document: s.termsSource.document })}
-                        </a>
-                      ) : (
-                        tSec('bond.termsSource', { document: s.termsSource.document })
-                      )}
-                    </Td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <BondHistorySeriesTable
+            series={answer.series}
+            currency={currency}
+            heldSeries={heldSeries}
+          />
         </div>
       </div>
     );

@@ -68,6 +68,8 @@
     "missingTitle": "カタログにない月（{count}）",
     "noMissing": "保存された最初と最後のシリーズの間に欠けている月はありません。",
     "tableTitle": "保存されたすべてのシリーズ",
+    "groupCount": "シリーズ {count} 件",
+    "unknownYear": "販売日不明",
     "columns": {
       "series": "シリーズ",
       "saleWindow": "販売中",

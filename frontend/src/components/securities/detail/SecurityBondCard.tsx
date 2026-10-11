@@ -5,7 +5,6 @@ import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { BondHistoryBody } from '@/components/bonds/BondHistoryTab';
 import { BondOfferTab } from '@/components/bonds/BondOfferTab';
 import { DateInput } from '@/components/ui/DateInput';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -23,7 +22,7 @@ import type {
   BondProjectionMissing,
   SecurityBondValuation,
 } from '@/types/bond';
-import { benchmarkLabel, programLabel } from './bond-labels';
+import { benchmarkLabel } from './bond-labels';
 import { SecurityBondProgramCard } from './SecurityBondProgramCard';
 import { SecurityBondScenarioPanel } from './SecurityBondScenarioPanel';
 import { SecurityBondSeriesTable } from './SecurityBondSeriesTable';
@@ -72,9 +71,9 @@ function distinct<T>(items: readonly T[], keyOf: (item: T) => string): T[] {
 /**
  * The page of a program-linked security (spec `bond-program-securities.md`
  * 3.4), from the top: "Your series" (its lots valued on a day, one row per
- * series held), "The program", "On sale now" for the program, and the
- * program's "History" with the series held marked. Shown only for a security
- * with a `bondProgramId`; the page decides that.
+ * series held), "The program" and "On sale now" for the program (the terms
+ * history has its own tab). Shown only for a security with a `bondProgramId`;
+ * the page decides that.
  *
  * The payload is kept with the request key that produced it (security and
  * day): while a different key is loading, the previous figures are not shown,
@@ -86,7 +85,6 @@ export function SecurityBondCard({
   refreshVersion = 0,
 }: SecurityBondCardProps) {
   const t = useTranslations('securityDetail');
-  const tBonds = useTranslations('bonds');
   const { formatPercentTrimmed, formatShareQuantity } = useNumberFormat();
   const tInv = useTranslations('investments');
   const { formatDate } = useDateFormat();
@@ -501,25 +499,6 @@ export function SecurityBondCard({
             </h3>
             <BondOfferTab
               programCode={latest.program.programCode}
-              refreshVersion={refreshVersion}
-            />
-          </Card>
-          <Card
-            padding="sm"
-            aria-label={tBonds('entry.history', {
-              program: programLabel(t, latest.program.programCode),
-            })}
-            as="section"
-          >
-            <h3 className="mb-3 text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {tBonds('entry.history', {
-                program: programLabel(t, latest.program.programCode),
-              })}
-            </h3>
-            <BondHistoryBody
-              program={latest.program.programCode}
-              currency={latest.program.currency}
-              heldSeries={latestHeld.map((h) => h.seriesCode)}
               refreshVersion={refreshVersion}
             />
           </Card>

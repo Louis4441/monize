@@ -68,6 +68,8 @@
     "missingTitle": "कैटलॉग में अनुपस्थित माह ({count})",
     "noMissing": "सहेजी गई पहली और आख़िरी सीरीज़ के बीच कोई माह अनुपस्थित नहीं है।",
     "tableTitle": "सहेजी गई सभी सीरीज़",
+    "groupCount": "{count} सीरीज़",
+    "unknownYear": "बिक्री की तारीख अज्ञात",
     "columns": {
       "series": "सीरीज़",
       "saleWindow": "बिक्री पर",

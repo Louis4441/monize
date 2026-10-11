@@ -453,6 +453,99 @@ describe('SecurityDetailPage', () => {
       expect(mockGetSecurityBondValuation).not.toHaveBeenCalled();
     });
 
+    describe('terms history tab', () => {
+      const bondHistory = {
+        countryCode: 'PL',
+        programs: [
+          {
+            programCode: 'RETAIL',
+            coverage: { from: '2026-10', to: '2026-10', missingMonths: [] },
+            series: [
+              {
+                seriesCode: 'TOS1029',
+                saleWindow: { from: '2026-10-01', to: '2026-10-31' },
+                firstPeriodRate: '0.0440',
+                annualRate: null,
+                addend: null,
+                fee: '3.00',
+                proceedsFloor: null,
+                termsVersion: 1,
+                termsSource: { document: 'Terms', url: null },
+              },
+            ],
+          },
+        ],
+      };
+
+      beforeEach(() => {
+        mockGetSecurityDetail.mockResolvedValue(detailFixture({ security: bondSecurity }));
+        mockGetBondHistory.mockResolvedValue(bondHistory);
+      });
+
+      it('replaces Price history with Terms history for a bond', async () => {
+        await renderPage();
+        expect(screen.getByRole('tab', { name: 'Terms history' })).toBeInTheDocument();
+        expect(screen.queryByRole('tab', { name: 'Price history' })).not.toBeInTheDocument();
+      });
+
+      it('keeps Price history and offers no Terms history for another security', async () => {
+        mockGetSecurityDetail.mockResolvedValue(detailFixture({ security }));
+        await renderPage();
+        expect(screen.getByRole('tab', { name: 'Price history' })).toBeInTheDocument();
+        expect(screen.queryByRole('tab', { name: 'Terms history' })).not.toBeInTheDocument();
+      });
+
+      it('no longer renders the terms history on the Overview', async () => {
+        await renderPage();
+        await screen.findByRole('heading', { name: 'Your series' });
+        expect(screen.queryByText('Every stored series')).not.toBeInTheDocument();
+        expect(screen.queryByRole('region', { name: 'History of RETAIL terms' })).not.toBeInTheDocument();
+        expect(mockGetBondHistory).not.toHaveBeenCalled();
+      });
+
+      it('shows the terms history under its tab', async () => {
+        await renderPage();
+        await act(async () => {
+          fireEvent.click(screen.getByRole('tab', { name: 'Terms history' }));
+        });
+        expect(await screen.findByText('Every stored series')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /2026/, expanded: true })).toBeInTheDocument();
+        expect(screen.getByText('TOS1029')).toBeInTheDocument();
+      });
+
+      it('falls back to Overview for a stale ?tab=prices link on a bond', async () => {
+        searchParams.current = new URLSearchParams('tab=prices');
+        await renderPage();
+        expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+      });
+
+      it('falls back to Overview for ?tab=terms on a security without a program', async () => {
+        mockGetSecurityDetail.mockResolvedValue(detailFixture({ security }));
+        searchParams.current = new URLSearchParams('tab=terms');
+        await renderPage();
+        expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+      });
+
+      it('re-reads the tab after a refresh completes', async () => {
+        let resolve!: (v: unknown) => void;
+        mockRefreshSelectedPrices.mockReturnValue(new Promise((r) => (resolve = r)));
+        await renderPage();
+        await act(async () => {
+          fireEvent.click(screen.getByRole('tab', { name: 'Terms history' }));
+        });
+        await screen.findByText('Every stored series');
+        const before = mockGetBondHistory.mock.calls.length;
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+        });
+        expect(mockGetBondHistory).toHaveBeenCalledTimes(before);
+        await act(async () => {
+          resolve({ totalSecurities: 1, updated: 1, failed: 0, skipped: 0, results: [], lastUpdated: null });
+        });
+        await waitFor(() => expect(mockGetBondHistory.mock.calls.length).toBeGreaterThan(before));
+      });
+    });
+
     describe('refresh', () => {
       const deferRefresh = () => {
         let resolve!: (v: unknown) => void;
@@ -501,14 +594,12 @@ describe('SecurityDetailPage', () => {
         await screen.findByRole('heading', { name: 'Your series' });
         await waitFor(() => {
           expect(mockListBondPrograms).toHaveBeenCalled();
-          expect(mockGetBondHistory).toHaveBeenCalled();
           expect(mockGetBondOffer).toHaveBeenCalled();
         });
         const before = {
           valuation: mockGetSecurityBondValuation.mock.calls.length,
           offer: mockGetBondOffer.mock.calls.length,
           programs: mockListBondPrograms.mock.calls.length,
-          history: mockGetBondHistory.mock.calls.length,
           documents: mockGetSecurityDocuments.mock.calls.length,
         };
 
@@ -525,7 +616,6 @@ describe('SecurityDetailPage', () => {
           expect(mockGetSecurityBondValuation).toHaveBeenCalledTimes(before.valuation * 2);
           expect(mockGetBondOffer.mock.calls.length).toBeGreaterThanOrEqual(before.offer * 2);
           expect(mockListBondPrograms).toHaveBeenCalledTimes(before.programs * 2);
-          expect(mockGetBondHistory).toHaveBeenCalledTimes(before.history * 2);
         });
         // Once per completed refresh: nothing keeps re-reading afterwards.
         const settled = mockGetBondOffer.mock.calls.length;

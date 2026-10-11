@@ -68,6 +68,8 @@
     "missingTitle": "Im Katalog fehlende Monate ({count})",
     "noMissing": "Zwischen der ersten und der letzten gespeicherten Serie fehlt kein Monat.",
     "tableTitle": "Alle gespeicherten Serien",
+    "groupCount": "{count} Serie(n)",
+    "unknownYear": "Verkaufsdatum unbekannt",
     "columns": {
       "series": "Serie",
       "saleWindow": "Im Verkauf",

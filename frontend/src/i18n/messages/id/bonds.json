@@ -68,6 +68,8 @@
     "missingTitle": "Bulan yang tidak ada di katalog ({count})",
     "noMissing": "Tidak ada bulan yang hilang antara seri tersimpan pertama dan terakhir.",
     "tableTitle": "Semua seri yang tersimpan",
+    "groupCount": "{count} seri",
+    "unknownYear": "Tanggal penjualan tidak diketahui",
     "columns": {
       "series": "Seri",
       "saleWindow": "Dijual",

@@ -6,7 +6,6 @@ import { investmentsApi } from '@/lib/investments';
 import type { Security } from '@/types/investment';
 import toast from 'react-hot-toast';
 import type {
-  BondHistory,
   BondOffer,
   OfferSeries,
   BondRateRule,
@@ -1437,35 +1436,10 @@ describe('SecurityBondCard: a program-linked security (spec bond-program-securit
   });
   const offerOf = (series: OfferSeries[]): BondOffer => ({ countryCode: 'PL', today: '2027-04-15', series });
 
-  const historyOf = (): BondHistory => ({
-    countryCode: 'PL',
-    programs: [
-      {
-        programCode: 'RETAIL',
-        coverage: { from: '2026-10', to: '2026-12', missingMonths: ['2026-12'] },
-        series: ['TOS1029:2026-10-01', 'TOS1130:2026-11-01', 'TOS0000:2026-09-01'].map((x) => {
-          const [seriesCode, from] = x.split(':');
-          return {
-            seriesCode,
-            saleWindow: { from, to: from },
-            firstPeriodRate: '0.0440',
-            annualRate: null,
-            addend: null,
-            fee: '3.00',
-            proceedsFloor: 'ALL_PERIODS' as const,
-            termsVersion: 1,
-            termsSource,
-          };
-        }),
-      },
-    ],
-  });
-
   beforeEach(() => {
     vi.clearAllMocks();
     get.mockResolvedValue(twoSeries());
     getOffer.mockResolvedValue(offerOf([]));
-    getHistory.mockResolvedValue(historyOf());
     scenarios.mockResolvedValue({
       securityId: 'sec-1',
       benchmarkId: 'PL_CPI_GUS_YOY',
@@ -1475,7 +1449,7 @@ describe('SecurityBondCard: a program-linked security (spec bond-program-securit
     });
   });
 
-  it('lays the sections out in the order: your series, the program, on sale now, history', async () => {
+  it('lays the sections out in the order: your series, the program, on sale now (the terms history has its own tab)', async () => {
     await mountCollapsed();
     const sections = ['Your series', 'The bond kind', 'On sale now', 'History of RETAIL terms'];
     const headings = screen
@@ -1486,8 +1460,8 @@ describe('SecurityBondCard: a program-linked security (spec bond-program-securit
       'Your series',
       'The bond kind',
       'On sale now',
-      'History of RETAIL terms',
     ]);
+    expect(getHistory).not.toHaveBeenCalled();
   });
 
   it('groups the lots into one row per series, with the series figures and the program total', async () => {
@@ -1588,66 +1562,17 @@ describe('SecurityBondCard: a program-linked security (spec bond-program-securit
     expect(within(onSale).queryByRole('button', { name: 'Fetch the current offer now' })).not.toBeInTheDocument();
   });
 
-  it('marks the series held on the history chart and highlights them in its table', async () => {
-    await mountCollapsed();
-    const history = screen.getByRole('region', { name: 'History of RETAIL terms' });
-    await within(history).findByText('Every stored series');
-    const dots = within(history).getAllByTestId('held-dot');
-    expect(dots.map((d) => d.getAttribute('data-x')).sort()).toEqual(['2026-10', '2026-11']);
-    const rows = within(history).getAllByRole('row');
-    const held = rows.filter((r) => r.getAttribute('aria-current') === 'true');
-    expect(held.map((r) => within(r).getAllByRole('cell')[0].textContent)).toEqual([
-      'TOS1029Held',
-      'TOS1130Held',
-    ]);
-    const other = rows.find((r) => within(r).queryByText('TOS0000') !== null) as HTMLElement;
-    expect(other).not.toHaveAttribute('aria-current');
-    expect(within(other).queryByText('Held')).not.toBeInTheDocument();
-  });
-
-  it('draws the history tooltips with the shared dark-mode-aware panel', async () => {
-    await mountCollapsed();
-    const history = screen.getByRole('region', { name: 'History of RETAIL terms' });
-    await within(history).findByText('Every stored series');
-    const tooltips = within(history).getAllByTestId('chart-tooltip');
-    // The rate chart and the fee chart.
-    expect(tooltips).toHaveLength(2);
-    for (const tooltip of tooltips) {
-      const panel = tooltip.firstElementChild as HTMLElement;
-      expect(panel).toHaveClass('bg-white', 'dark:bg-gray-800', 'dark:border-gray-700');
-      expect(within(panel).getByText('Oct 2026', { exact: false })).toBeInTheDocument();
-    }
-  });
-
-  it('names the rate line briefly and explains fixed-rate bonds in the chart note', async () => {
-    await mountCollapsed();
-    const history = screen.getByRole('region', { name: 'History of RETAIL terms' });
-    await within(history).findByText('Every stored series');
-    const names = within(history)
-      .getAllByTestId('line')
-      .map((l) => l.getAttribute('data-name'));
-    expect(names).toContain('First-period rate');
-    expect(names.join('|')).not.toContain('fixed bonds');
-    expect(
-      within(history).getByText('For fixed-rate bonds the line shows the annual rate.'),
-    ).toBeInTheDocument();
-  });
-
   it('lets the text columns of the bond tables wrap and keeps the scrollbar themed', async () => {
     getOffer.mockResolvedValue(offerOf([offerSeries()]));
     await mountCollapsed();
     const onSale = screen.getByRole('region', { name: 'On sale now' });
-    const history = screen.getByRole('region', { name: 'History of RETAIL terms' });
-    await within(history).findByText('Every stored series');
-    for (const region of [onSale, history]) {
-      const table = within(region).getByRole('table');
-      expect(table.parentElement).toHaveClass('overflow-x-auto', 'scrollbar-slim');
-      const cells = within(table).getAllByRole('cell');
-      // The rule, capitalization and redemption text, and the sale window,
-      // are free to wrap; only a figure holds to one line.
-      const wrapping = cells.filter((c) => !c.className.includes('whitespace-nowrap'));
-      expect(wrapping.length).toBeGreaterThan(0);
-    }
+    const table = within(onSale).getByRole('table');
+    expect(table.parentElement).toHaveClass('overflow-x-auto', 'scrollbar-slim');
+    const cells = within(table).getAllByRole('cell');
+    // The rule, capitalization and redemption text, and the sale window,
+    // are free to wrap; only a figure holds to one line.
+    const wrapping = cells.filter((c) => !c.className.includes('whitespace-nowrap'));
+    expect(wrapping.length).toBeGreaterThan(0);
     const sale = within(onSale).getAllByRole('cell')[1];
     expect(sale).not.toHaveClass('whitespace-nowrap');
     const yourSeries = screen.getAllByRole('table')[0];

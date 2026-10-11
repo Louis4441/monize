@@ -68,6 +68,8 @@
     "missingTitle": "Meses que faltan en el catálogo ({count})",
     "noMissing": "No falta ningún mes entre la primera y la última serie guardada.",
     "tableTitle": "Todas las series guardadas",
+    "groupCount": "{count} serie(s)",
+    "unknownYear": "Fecha de venta desconocida",
     "columns": {
       "series": "Serie",
       "saleWindow": "A la venta",

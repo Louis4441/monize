@@ -68,6 +68,8 @@
     "missingTitle": "[XX-Months missing from the catalog ({count})-XX]",
     "noMissing": "[XX-No month is missing between the first and the last stored series.-XX]",
     "tableTitle": "[XX-Every stored series-XX]",
+    "groupCount": "[XX-{count} series-XX]",
+    "unknownYear": "[XX-Sale date unknown-XX]",
     "columns": {
       "series": "[XX-Series-XX]",
       "saleWindow": "[XX-On sale-XX]",

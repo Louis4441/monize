@@ -68,6 +68,8 @@
     "missingTitle": "目录中缺失的月份（{count}）",
     "noMissing": "在已保存的第一个和最后一个系列之间没有缺失的月份。",
     "tableTitle": "所有已保存的系列",
+    "groupCount": "{count} 个系列",
+    "unknownYear": "销售日期未知",
     "columns": {
       "series": "系列",
       "saleWindow": "在售",

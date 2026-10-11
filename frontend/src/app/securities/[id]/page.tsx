@@ -69,6 +69,14 @@ const SecurityPriceHistory = dynamic(
   { ssr: false },
 );
 
+const SecurityBondTermsTab = dynamic(
+  () =>
+    import('@/components/securities/detail/SecurityBondTermsTab').then((m) => ({
+      default: m.SecurityBondTermsTab,
+    })),
+  { ssr: false },
+);
+
 const SecurityDocumentsTab = dynamic(
   () =>
     import('@/components/securities/detail/SecurityDocumentsTab').then((m) => ({
@@ -89,10 +97,20 @@ const TAB_KEYS = [
   'overview',
   'transactions',
   'prices',
+  'terms',
   'documents',
   'news',
 ] as const;
 type TabKey = (typeof TAB_KEYS)[number];
+
+/**
+ * A program-linked security has no price history to show (its prices are
+ * derived) and gets the terms history in its place; every other security has
+ * the reverse. A tab the security does not have falls back to Overview.
+ */
+function tabKeysFor(isBond: boolean): readonly TabKey[] {
+  return TAB_KEYS.filter((key) => key !== (isBond ? 'prices' : 'terms'));
+}
 
 /** `?tab=` if it names a real tab, so a link can point at one. */
 function tabFromQuery(value: string | null): TabKey {
@@ -368,7 +386,11 @@ function SecurityDetailContent() {
   }
 
   const { security } = detail;
-  const tabs = TAB_KEYS.map((key) => ({ key, label: t(`tabs.${key}`) }));
+  const isBond = !!security.bondProgramId;
+  const tabKeys = tabKeysFor(isBond);
+  const tabs = tabKeys.map((key) => ({ key, label: t(`tabs.${key}`) }));
+  // A stale `?tab=prices` on a bond (or `?tab=terms` elsewhere) shows Overview.
+  const activeTab: TabKey = tabKeys.includes(tab) ? tab : 'overview';
 
   return (
     <PageLayout>
@@ -465,7 +487,7 @@ function SecurityDetailContent() {
             <div {...tourAnchor(TOUR_ANCHORS.securityDetailTabs)}>
               <Tabs
                 tabs={tabs}
-                value={tab}
+                value={activeTab}
                 onChange={setTab}
                 idPrefix="securityDetail"
                 ariaLabel={t('tabs.ariaLabel')}
@@ -481,7 +503,7 @@ function SecurityDetailContent() {
               <TabPanel
                 idPrefix="securityDetail"
                 tabKey="overview"
-                isActive={tab === 'overview'}
+                isActive={activeTab === 'overview'}
                 className="mt-6 space-y-6"
               >
                 {/* One height across the row: the three cards hold different
@@ -514,7 +536,7 @@ function SecurityDetailContent() {
               <TabPanel
                 idPrefix="securityDetail"
                 tabKey="transactions"
-                isActive={tab === 'transactions'}
+                isActive={activeTab === 'transactions'}
                 // Holds its own fetched rows: unmounting would refetch and replay
                 // the loading state on every return to the tab.
                 keepMounted
@@ -525,25 +547,40 @@ function SecurityDetailContent() {
                 </div>
               </TabPanel>
 
-              <TabPanel
-                idPrefix="securityDetail"
-                tabKey="prices"
-                isActive={tab === 'prices'}
-                keepMounted
-                className="mt-6"
-              >
-                <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
-                  <SecurityPriceHistory
+              {isBond ? (
+                <TabPanel
+                  idPrefix="securityDetail"
+                  tabKey="terms"
+                  isActive={activeTab === 'terms'}
+                  keepMounted
+                  className="mt-6"
+                >
+                  <SecurityBondTermsTab
                     security={security}
-                    onPricesChanged={reloadAfterPriceRefresh}
+                    refreshVersion={bondDataVersion}
                   />
-                </div>
-              </TabPanel>
+                </TabPanel>
+              ) : (
+                <TabPanel
+                  idPrefix="securityDetail"
+                  tabKey="prices"
+                  isActive={activeTab === 'prices'}
+                  keepMounted
+                  className="mt-6"
+                >
+                  <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
+                    <SecurityPriceHistory
+                      security={security}
+                      onPricesChanged={reloadAfterPriceRefresh}
+                    />
+                  </div>
+                </TabPanel>
+              )}
 
               <TabPanel
                 idPrefix="securityDetail"
                 tabKey="documents"
-                isActive={tab === 'documents'}
+                isActive={activeTab === 'documents'}
                 // Loads its own list, so it keeps it between visits.
                 keepMounted
                 className="mt-6"
@@ -557,7 +594,7 @@ function SecurityDetailContent() {
               <TabPanel
                 idPrefix="securityDetail"
                 tabKey="news"
-                isActive={tab === 'news'}
+                isActive={activeTab === 'news'}
                 keepMounted
                 className="mt-6"
               >

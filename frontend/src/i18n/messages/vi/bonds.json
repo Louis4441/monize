@@ -68,6 +68,8 @@
     "missingTitle": "Các tháng còn thiếu trong danh mục ({count})",
     "noMissing": "Không thiếu tháng nào giữa đợt phát hành đã lưu đầu tiên và cuối cùng.",
     "tableTitle": "Tất cả các đợt phát hành đã lưu",
+    "groupCount": "{count} đợt phát hành",
+    "unknownYear": "Chưa rõ ngày bán",
     "columns": {
       "series": "Đợt phát hành",
       "saleWindow": "Đang bán",

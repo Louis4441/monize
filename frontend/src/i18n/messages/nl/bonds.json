@@ -68,6 +68,8 @@
     "missingTitle": "Ontbrekende maanden in de catalogus ({count})",
     "noMissing": "Tussen de eerste en de laatste opgeslagen serie ontbreekt geen enkele maand.",
     "tableTitle": "Alle opgeslagen series",
+    "groupCount": "{count} serie(s)",
+    "unknownYear": "Verkoopdatum onbekend",
     "columns": {
       "series": "Serie",
       "saleWindow": "Te koop",
