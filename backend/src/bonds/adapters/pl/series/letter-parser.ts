@@ -134,8 +134,8 @@ export function parseLetter(raw: string): ParsedLetter {
   }
 
   const feeMatch =
-    /nie wyższą niż (\d{1,3},\d{2}) zł/i.exec(text) ??
-    /przedterminowego wykupu[^.;]{0,160}?pomniejszana[^.;]{0,160}?w wysokości (\d{1,3},\d{2}) zł/i.exec(
+    /nie wyższą niż (\d{1,3}(?:,\d{2})?) zł/i.exec(text) ??
+    /przedterminowego wykupu[^.;]{0,160}?pomniejszana[^.;]{0,160}?w wysokości (\d{1,3}(?:,\d{2})?) zł/i.exec(
       text,
     );
   const fee = feeMatch ? plnToDecimal(feeMatch[1]) : null;

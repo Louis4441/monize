@@ -136,6 +136,14 @@ describe("parseLetter (saved letters)", () => {
     });
   });
 
+  it('reads a fee written without grosze (ROS1030, ROD1036: "nie wyższą niż 2 zł")', () => {
+    const text = letterFixture("EDO1036").replace(
+      "nie wyższą niż 3,00 zł",
+      "nie wyższą niż 3 zł",
+    );
+    expect(parseLetter(text).fee).toBe("3.00");
+  });
+
   it("finds a fee written as an amount instead of a cap", () => {
     const text = letterFixture("EDO1036").replace(
       "o kwotę narosłych odsetek, ale nie wyższą niż 3,00 zł",
