@@ -1,5 +1,5 @@
 import { BondFetch, SeriesFetchError } from "../../../bond-adapter";
-import { ParsedSeriesCode, PRODUCT_SLUGS } from "./series-code";
+import { ParsedSeriesCode, PolishProduct, PRODUCT_SLUGS } from "./series-code";
 
 /** The issuer's own site: the only host the series fetch talks to. */
 export const SERIES_HOST = "www.obligacjeskarbowe.pl";
@@ -9,6 +9,14 @@ export const SERIES_PROVIDER = "obligacjeskarbowe.pl";
 export const FETCH_TIMEOUT_MS = 30_000;
 export const MAX_PAGE_BYTES = 2 * 1024 * 1024;
 export const MAX_PDF_BYTES = 5 * 1024 * 1024;
+
+/**
+ * The product's page on the issuer's site; it redirects to the series on sale
+ * now, so it describes the product as currently offered.
+ */
+export function productPageUrl(product: PolishProduct): string {
+  return `https://${SERIES_HOST}/oferta-obligacji/${PRODUCT_SLUGS[product]}/`;
+}
 
 export function seriesPageUrl(code: ParsedSeriesCode): string {
   return `https://${SERIES_HOST}/oferta-obligacji/${PRODUCT_SLUGS[code.product]}/${code.code.toLowerCase()}/`;

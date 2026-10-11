@@ -12,7 +12,8 @@ import { fetchNbpReference, NBP_ARCHIVE_URL } from "./pl-nbp-reference";
 import { PL_CPI_GUS_YOY, PL_NBP_REFERENCE } from "./pl-benchmarks";
 import { plCalendar } from "./pl-calendar";
 import { backfillCodes, SERIES_VALID_FROM } from "./series/backfill-codes";
-import { parseSeriesCode } from "./series/series-code";
+import { parseSeriesCode, PolishProduct } from "./series/series-code";
+import { productPageUrl } from "./series/series-source";
 import { fetchCurrentSeries } from "./series/current-offer";
 import { fetchSeries } from "./series/fetch-series";
 import { manualSeries } from "./series/manual-series";
@@ -38,6 +39,7 @@ const programs: readonly BondProgramDefinition[] = Object.values(
   issuerCode: instrument.issuerCode as string,
   programCode: instrument.programCode as string,
   currency: instrument.currency as string,
+  infoUrl: productPageUrl(instrument.programCode as PolishProduct),
 }));
 
 export const POLISH_BOND_ADAPTER: BondAdapter = {

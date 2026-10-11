@@ -22,6 +22,11 @@ export interface BondProgramDefinition {
   readonly issuerCode: string;
   readonly programCode: string;
   readonly currency: string;
+  /**
+   * The issuer's own page describing the product, for a reader to follow; an
+   * https address on the issuer's site, or absent when the adapter has none.
+   */
+  readonly infoUrl?: string;
 }
 
 /**

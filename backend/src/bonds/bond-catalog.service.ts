@@ -31,6 +31,8 @@ export interface BondProgramSummary {
   readonly seriesCount: number;
   /** The series most recently on sale (newest sale window); null when the program has none. */
   readonly newestSeriesCode: string | null;
+  /** The issuer's page describing the product (the adapter's `infoUrl`); null when none. */
+  readonly infoUrl: string | null;
 }
 
 /**
@@ -185,6 +187,12 @@ export class BondCatalogService implements OnApplicationBootstrap {
       currency: r.currency_code,
       seriesCount: Number(r.series_count),
       newestSeriesCode: r.newest_series_code,
+      infoUrl: infoUrlOf(
+        INSTALLED_BOND_ADAPTERS,
+        r.issuer_country_code,
+        r.issuer_code,
+        r.program_code,
+      ),
     }));
   }
 
@@ -497,4 +505,25 @@ function sameContentHash(
   const a = Buffer.from(stored, "utf8");
   const b = Buffer.from(computed, "utf8");
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** The `infoUrl` an installed adapter gives a program, or null. */
+function infoUrlOf(
+  adapters: readonly BondAdapter[],
+  country: string,
+  issuer: string,
+  program: string,
+): string | null {
+  for (const adapter of adapters) {
+    for (const p of adapter.programs) {
+      if (
+        p.issuerCountryCode === country &&
+        p.issuerCode === issuer &&
+        p.programCode === program
+      ) {
+        return p.infoUrl ?? null;
+      }
+    }
+  }
+  return null;
 }

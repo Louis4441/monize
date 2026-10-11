@@ -31,6 +31,8 @@ export interface BondProgramSummary {
   seriesCount: number;
   /** The newest stored series' code; null when the program has no series. */
   newestSeriesCode: string | null;
+  /** The issuer's page describing the bond kind; null when the adapter has none. */
+  infoUrl?: string | null;
 }
 
 /** `POST /bonds/offer/fetch` response: what reading the current offer did. */

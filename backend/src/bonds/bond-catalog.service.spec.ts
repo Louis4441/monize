@@ -371,6 +371,9 @@ describe("BondCatalogService", () => {
         currency: "PLN",
         seriesCount: 3,
         newestSeriesCode: "EDO1036",
+        // The installed adapter's product page, which redirects to the series on sale.
+        infoUrl:
+          "https://www.obligacjeskarbowe.pl/oferta-obligacji/obligacje-10-letnie-edo/",
       },
       {
         id: "p-new",
@@ -380,6 +383,8 @@ describe("BondCatalogService", () => {
         currency: "PLN",
         seriesCount: 0,
         newestSeriesCode: null,
+        // No installed adapter defines ZZZ.
+        infoUrl: null,
       },
     ]);
     // Ordered by country, issuer and program code, the newest sale window first.
