@@ -544,6 +544,7 @@
     "DECIMAL_INVALID": "Un valor almacenado o proporcionado no es un decimal válido: {{ field }} = {{ value }}",
     "INSTRUMENT_NOT_FOUND": "No hay ningún instrumento de bono almacenado para {{ country }} {{ issuer }} {{ series }}",
     "INSTRUMENT_ID_NOT_FOUND": "No hay ningún instrumento de bono almacenado con el id {{ id }}",
+    "PROGRAM_NOT_FOUND": "No hay ningún programa de bonos almacenado con el id {{ id }}",
     "TERMS_NOT_FOUND": "No hay ninguna versión de condiciones almacenada para la serie {{ series }}",
     "TERMS_VERSION_NOT_FOUND": "La versión de condiciones {{ version }} no está almacenada para la serie {{ series }}",
     "TERMS_MISMATCH": "La versión de condiciones {{ version }} de la serie {{ series }} describe {{ claimedSeries }} en {{ claimedCurrency }}, pero el instrumento es {{ storedSeries }} en {{ storedCurrency }}",

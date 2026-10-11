@@ -544,6 +544,7 @@
     "DECIMAL_INVALID": "Zapisana lub podana wartość nie jest poprawną liczbą dziesiętną: {{ field }} = {{ value }}",
     "INSTRUMENT_NOT_FOUND": "Brak zapisanego instrumentu obligacyjnego dla {{ country }} {{ issuer }} {{ series }}",
     "INSTRUMENT_ID_NOT_FOUND": "Brak zapisanego instrumentu obligacyjnego o identyfikatorze {{ id }}",
+    "PROGRAM_NOT_FOUND": "Brak zapisanego programu obligacji o identyfikatorze {{ id }}",
     "TERMS_NOT_FOUND": "Brak zapisanej wersji warunków dla serii {{ series }}",
     "TERMS_VERSION_NOT_FOUND": "Wersja warunków {{ version }} nie jest zapisana dla serii {{ series }}",
     "TERMS_MISMATCH": "Wersja warunków {{ version }} serii {{ series }} opisuje {{ claimedSeries }} w walucie {{ claimedCurrency }}, ale instrument to {{ storedSeries }} w walucie {{ storedCurrency }}",

@@ -544,6 +544,7 @@
     "DECIMAL_INVALID": "सहेजा गया या दिया गया मान मान्य दशमलव संख्या नहीं है: {{ field }} = {{ value }}",
     "INSTRUMENT_NOT_FOUND": "{{ country }} {{ issuer }} {{ series }} के लिए कोई बॉन्ड इंस्ट्रूमेंट सहेजा नहीं गया है",
     "INSTRUMENT_ID_NOT_FOUND": "आईडी {{ id }} वाला कोई बॉन्ड इंस्ट्रूमेंट सहेजा नहीं गया है",
+    "PROGRAM_NOT_FOUND": "आईडी {{ id }} वाला कोई बॉन्ड कार्यक्रम संग्रहीत नहीं है",
     "TERMS_NOT_FOUND": "सीरीज़ {{ series }} के लिए कोई शर्तों का संस्करण सहेजा नहीं गया है",
     "TERMS_VERSION_NOT_FOUND": "शर्तों का संस्करण {{ version }} सीरीज़ {{ series }} के लिए सहेजा नहीं गया है",
     "TERMS_MISMATCH": "सीरीज़ {{ series }} के शर्तों के संस्करण {{ version }} में {{ claimedCurrency }} में {{ claimedSeries }} का वर्णन है, लेकिन इंस्ट्रूमेंट {{ storedCurrency }} में {{ storedSeries }} है",

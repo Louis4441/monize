@@ -1401,7 +1401,8 @@ CREATE TABLE fetch_sync (
     lease_until TIMESTAMPTZ,
     lease_token UUID,
     last_success_at TIMESTAMPTZ,
-    last_error TEXT
+    last_error TEXT,
+    progress JSONB
 );
 
 -- Outbound market-data provider availability, and what has already been said

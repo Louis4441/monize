@@ -544,6 +544,7 @@
     "DECIMAL_INVALID": "Kayıtlı veya girilen bir değer geçerli bir ondalık sayı değil: {{ field }} = {{ value }}",
     "INSTRUMENT_NOT_FOUND": "{{ country }} {{ issuer }} {{ series }} için kayıtlı tahvil enstrümanı yok",
     "INSTRUMENT_ID_NOT_FOUND": "{{ id }} kimliğine sahip kayıtlı tahvil enstrümanı yok",
+    "PROGRAM_NOT_FOUND": "{{ id }} kimliğine sahip kayıtlı bir tahvil programı yok",
     "TERMS_NOT_FOUND": "{{ series }} serisi için kayıtlı bir koşul sürümü yok",
     "TERMS_VERSION_NOT_FOUND": "{{ version }} koşul sürümü {{ series }} serisi için kayıtlı değil",
     "TERMS_MISMATCH": "{{ series }} serisinin {{ version }} koşul sürümü {{ claimedCurrency }} cinsinden {{ claimedSeries }} tanımlıyor, ancak enstrüman {{ storedCurrency }} cinsinden {{ storedSeries }}",

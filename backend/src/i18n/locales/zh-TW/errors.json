@@ -544,6 +544,7 @@
     "DECIMAL_INVALID": "已儲存或提供的值不是有效的小數：{{ field }} = {{ value }}",
     "INSTRUMENT_NOT_FOUND": "未儲存 {{ country }} {{ issuer }} {{ series }} 的債券工具",
     "INSTRUMENT_ID_NOT_FOUND": "未儲存 ID 為 {{ id }} 的債券工具",
+    "PROGRAM_NOT_FOUND": "未儲存 ID 為 {{ id }} 的債券計畫",
     "TERMS_NOT_FOUND": "未儲存系列 {{ series }} 的條款版本",
     "TERMS_VERSION_NOT_FOUND": "系列 {{ series }} 未儲存條款版本 {{ version }}",
     "TERMS_MISMATCH": "系列 {{ series }} 的條款版本 {{ version }} 描述的是以 {{ claimedCurrency }} 計價的 {{ claimedSeries }}，但該工具是以 {{ storedCurrency }} 計價的 {{ storedSeries }}",

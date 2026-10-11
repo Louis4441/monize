@@ -544,6 +544,7 @@
     "DECIMAL_INVALID": "A stored or supplied value is not a valid decimal: {{ field }} = {{ value }}",
     "INSTRUMENT_NOT_FOUND": "No bond instrument is stored for {{ country }} {{ issuer }} {{ series }}",
     "INSTRUMENT_ID_NOT_FOUND": "No bond instrument is stored with id {{ id }}",
+    "PROGRAM_NOT_FOUND": "No bond program is stored with id {{ id }}",
     "TERMS_NOT_FOUND": "No terms version is stored for series {{ series }}",
     "TERMS_VERSION_NOT_FOUND": "Terms version {{ version }} is not stored for series {{ series }}",
     "TERMS_MISMATCH": "Terms version {{ version }} of series {{ series }} describe {{ claimedSeries }} in {{ claimedCurrency }}, but the instrument is {{ storedSeries }} in {{ storedCurrency }}",

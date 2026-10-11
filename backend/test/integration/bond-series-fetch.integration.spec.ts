@@ -399,6 +399,42 @@ describe("bond series fetch (integration, INV-BOND-006)", () => {
       expect(row.held).toBe(true);
     });
 
+    it("leaves the program's progress done in fetch_sync, and the read answers it", async () => {
+      const offerAdapter: BondAdapter = {
+        ...adapter,
+        currentSeries: jest.fn(async () => [CODE]),
+        backfillCodes: () => [],
+      };
+      await asUser(userId, () =>
+        service.fetchProgramOffer("PL", "EDO", { adapters: [offerAdapter] }),
+      );
+      const [row] = await dataSource.query(
+        `SELECT progress FROM fetch_sync WHERE job = $1`,
+        ["bond-program-refresh:PL|EDO"],
+      );
+      expect(row.progress).toMatchObject({
+        phase: "done",
+        done: 0,
+        total: 0,
+        seriesCode: null,
+      });
+      expect(typeof row.progress.startedAt).toBe("string");
+      expect(typeof row.progress.finishedAt).toBe("string");
+
+      const [program] = await dataSource.query(
+        `SELECT id FROM bond_programs WHERE program_code = 'EDO'`,
+      );
+      const read = await asUser(otherId, () =>
+        service.readRefreshProgress(program.id),
+      );
+      expect(read).toEqual(row.progress);
+      await expect(
+        asUser(otherId, () =>
+          service.readRefreshProgress("00000000-0000-4000-8000-000000000000"),
+        ),
+      ).rejects.toMatchObject({ code: "PROGRAM_NOT_FOUND" });
+    });
+
     it("asks for a refused series once a day, whichever pass comes next", async () => {
       door = fakeFetch({});
       service = build();

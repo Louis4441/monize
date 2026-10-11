@@ -51,6 +51,7 @@ describe("BondsController", () => {
   let series: {
     fetchSeries: jest.Mock;
     enterManually: jest.Mock;
+    readRefreshProgress: jest.Mock;
   };
   let offers: { offer: jest.Mock; history: jest.Mock };
   let holdings: { seriesOnSale: jest.Mock; seriesHoldings: jest.Mock };
@@ -72,6 +73,7 @@ describe("BondsController", () => {
     series = {
       fetchSeries: jest.fn().mockResolvedValue({ id: "i1", created: true }),
       enterManually: jest.fn().mockResolvedValue({ id: "i1", created: true }),
+      readRefreshProgress: jest.fn(),
     };
     offers = {
       offer: jest.fn().mockResolvedValue({ series: [] }),
@@ -134,6 +136,75 @@ describe("BondsController", () => {
       ];
       catalog.listPrograms.mockResolvedValue(list);
       await expect(controller.listPrograms()).resolves.toEqual(list);
+    });
+  });
+
+  describe("GET /bonds/programs/:programId/refresh-progress", () => {
+    const PROGRAM = "33333333-3333-4333-8333-333333333333";
+    const empty = {
+      startedAt: null,
+      phase: null,
+      done: 0,
+      total: 0,
+      seriesCode: null,
+      finishedAt: null,
+    };
+
+    it("is routed, takes the id through ParseUUIDPipe and is throttled for polling", () => {
+      const proto = BondsController.prototype;
+      expect(Reflect.getMetadata("path", proto.refreshProgress)).toBe(
+        "programs/:programId/refresh-progress",
+      );
+      const args = Reflect.getMetadata(
+        "__routeArguments__",
+        BondsController,
+        "refreshProgress",
+      ) as Record<string, { data: string; pipes: unknown[] }>;
+      expect(
+        Object.values(args).map((a) => [
+          a.data,
+          a.pipes.map((p) => (p as { name: string }).name),
+        ]),
+      ).toEqual([["programId", [ParseUUIDPipe.name]]]);
+      // 1.5 s polling for about 40 s is under 30 reads a minute.
+      expect(
+        Reflect.getMetadata("THROTTLER:LIMITdefault", proto.refreshProgress),
+      ).toBeGreaterThanOrEqual(60);
+    });
+
+    it("returns the service's progress, and the empty shape for a program never refreshed", async () => {
+      const progress = {
+        startedAt: "2026-10-11T10:00:00.000Z",
+        phase: "series",
+        done: 3,
+        total: 8,
+        seriesCode: "EDO0124",
+        finishedAt: null,
+      };
+      series.readRefreshProgress.mockResolvedValueOnce(progress);
+      await expect(controller.refreshProgress(PROGRAM)).resolves.toEqual(
+        progress,
+      );
+      expect(series.readRefreshProgress).toHaveBeenCalledWith(PROGRAM);
+      series.readRefreshProgress.mockResolvedValueOnce(empty);
+      await expect(controller.refreshProgress(PROGRAM)).resolves.toEqual(empty);
+    });
+
+    it("answers 404 for an unknown program, with the translated message", async () => {
+      series.readRefreshProgress.mockRejectedValue(
+        new BondDataNotFoundError(
+          "PROGRAM_NOT_FOUND",
+          { id: PROGRAM },
+          "English log text",
+        ),
+      );
+      (tr as jest.Mock).mockClear();
+      await expect(controller.refreshProgress(PROGRAM)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect((tr as jest.Mock).mock.calls[0][0]).toBe(
+        "errors.bonds.PROGRAM_NOT_FOUND",
+      );
     });
   });
 

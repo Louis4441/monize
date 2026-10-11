@@ -544,6 +544,7 @@
     "DECIMAL_INVALID": "已存储或提供的值不是有效的小数：{{ field }} = {{ value }}",
     "INSTRUMENT_NOT_FOUND": "未存储 {{ country }} {{ issuer }} {{ series }} 的债券工具",
     "INSTRUMENT_ID_NOT_FOUND": "未存储 ID 为 {{ id }} 的债券工具",
+    "PROGRAM_NOT_FOUND": "未存储 ID 为 {{ id }} 的债券计划",
     "TERMS_NOT_FOUND": "未存储系列 {{ series }} 的条款版本",
     "TERMS_VERSION_NOT_FOUND": "系列 {{ series }} 未存储条款版本 {{ version }}",
     "TERMS_MISMATCH": "系列 {{ series }} 的条款版本 {{ version }} 描述的是以 {{ claimedCurrency }} 计价的 {{ claimedSeries }}，但该工具是以 {{ storedCurrency }} 计价的 {{ storedSeries }}",

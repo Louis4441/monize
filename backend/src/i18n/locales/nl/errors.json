@@ -544,6 +544,7 @@
     "DECIMAL_INVALID": "Een opgeslagen of opgegeven waarde is geen geldig decimaal getal: {{ field }} = {{ value }}",
     "INSTRUMENT_NOT_FOUND": "Er is geen obligatie-instrument opgeslagen voor {{ country }} {{ issuer }} {{ series }}",
     "INSTRUMENT_ID_NOT_FOUND": "Er is geen obligatie-instrument opgeslagen met id {{ id }}",
+    "PROGRAM_NOT_FOUND": "Er is geen obligatieprogramma opgeslagen met id {{ id }}",
     "TERMS_NOT_FOUND": "Er is geen voorwaardenversie opgeslagen voor serie {{ series }}",
     "TERMS_VERSION_NOT_FOUND": "Voorwaardenversie {{ version }} is niet opgeslagen voor serie {{ series }}",
     "TERMS_MISMATCH": "Voorwaardenversie {{ version }} van serie {{ series }} beschrijft {{ claimedSeries }} in {{ claimedCurrency }}, maar het instrument is {{ storedSeries }} in {{ storedCurrency }}",

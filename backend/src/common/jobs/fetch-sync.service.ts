@@ -52,6 +52,18 @@ export function bondSeriesAttemptJob(
   return `bond-series-attempt:${countryCode.toUpperCase()}|${seriesCode.toUpperCase()}`;
 }
 
+/** What a long job reports in `fetch_sync.progress`. */
+export interface FetchProgress {
+  /** ISO timestamp the run began. */
+  readonly startedAt: string;
+  readonly phase: "offer" | "series" | "done";
+  readonly done: number;
+  readonly total: number;
+  readonly seriesCode: string | null;
+  /** ISO timestamp the run ended; null while it runs. */
+  readonly finishedAt: string | null;
+}
+
 export type FetchSyncJob =
   | (typeof FetchSyncJob)[keyof typeof FetchSyncJob]
   | ReturnType<typeof bondProgramRefreshJob>
@@ -180,6 +192,38 @@ export class FetchSyncService {
         [job, leaseToken, error.slice(0, 2000)],
       ),
     );
+  }
+
+  /**
+   * What the holder of `job`'s lease reports while it works (`fetch_sync.progress`),
+   * for a person polling a long run.
+   *
+   * Conditional on the token, like `release`: a holder that lost its lease
+   * writes nothing. One statement outside any other transaction, and the lease
+   * is untouched.
+   */
+  async reportProgress(
+    job: FetchSyncJob,
+    leaseToken: string,
+    progress: FetchProgress,
+  ): Promise<void> {
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        `UPDATE fetch_sync
+            SET progress = $3::jsonb
+          WHERE job = $1 AND lease_token = $2::uuid`,
+        [job, leaseToken, JSON.stringify(progress)],
+      ),
+    );
+  }
+
+  /** The progress last reported for `job`, or `null` when none was. */
+  async readProgress(job: FetchSyncJob): Promise<FetchProgress | null> {
+    const rows = await withScopedDb(this.dataSource, (manager) =>
+      manager.query(`SELECT progress FROM fetch_sync WHERE job = $1`, [job]),
+    );
+    const [row] = returnedRows<{ progress: FetchProgress | null }>(rows);
+    return row?.progress ?? null;
   }
 
   /**

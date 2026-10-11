@@ -544,6 +544,7 @@
     "DECIMAL_INVALID": "Một giá trị đã lưu hoặc được cung cấp không phải số thập phân hợp lệ: {{ field }} = {{ value }}",
     "INSTRUMENT_NOT_FOUND": "Chưa lưu công cụ trái phiếu nào cho {{ country }} {{ issuer }} {{ series }}",
     "INSTRUMENT_ID_NOT_FOUND": "Chưa lưu công cụ trái phiếu nào có id {{ id }}",
+    "PROGRAM_NOT_FOUND": "Chưa lưu chương trình trái phiếu nào có id {{ id }}",
     "TERMS_NOT_FOUND": "Chưa lưu phiên bản điều khoản nào cho series {{ series }}",
     "TERMS_VERSION_NOT_FOUND": "Phiên bản điều khoản {{ version }} chưa được lưu cho series {{ series }}",
     "TERMS_MISMATCH": "Phiên bản điều khoản {{ version }} của series {{ series }} mô tả {{ claimedSeries }} bằng {{ claimedCurrency }}, nhưng công cụ là {{ storedSeries }} bằng {{ storedCurrency }}",

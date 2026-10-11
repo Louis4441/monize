@@ -7,6 +7,7 @@ export type BondErrorParams = Readonly<Record<string, string>>;
 export type BondDataNotFoundCode =
   | "INSTRUMENT_NOT_FOUND"
   | "INSTRUMENT_ID_NOT_FOUND"
+  | "PROGRAM_NOT_FOUND"
   | "TERMS_NOT_FOUND"
   | "TERMS_VERSION_NOT_FOUND";
 

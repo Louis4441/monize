@@ -12,6 +12,7 @@ import {
 import {
   bondProgramRefreshJob,
   bondSeriesAttemptJob,
+  FetchProgress,
   FetchSyncJob,
   FetchSyncService,
 } from "../common/jobs/fetch-sync.service";
@@ -34,6 +35,7 @@ import {
   benchmarkFieldsOf,
   parseBondTerms,
 } from "./domain/bond-terms";
+import { BondDataNotFoundError } from "./bond-errors";
 import { HttpFetch, SeriesHttp } from "./series-http";
 
 /** The catalog's answer to a series request: the instrument, and whether this call stored it. */
@@ -77,6 +79,16 @@ function inScope(
   });
 }
 
+/** What a person polling a program's refresh reads; all empty when none ran. */
+export interface RefreshProgress {
+  readonly startedAt: string | null;
+  readonly phase: "offer" | "series" | "done" | null;
+  readonly done: number;
+  readonly total: number;
+  readonly seriesCode: string | null;
+  readonly finishedAt: string | null;
+}
+
 /** What one daily check of the current offer did, in series. */
 export interface CurrentOfferRun {
   readonly listed: number;
@@ -115,6 +127,18 @@ export interface BackfillOptions extends SeriesRequestOptions {
    * first; the rest is `remaining`. Absent, every missing series, oldest first.
    */
   readonly limit?: number;
+  /**
+   * Told how far the pass is, for a person watching a refresh: once per adapter
+   * with the planned `total` (series the pass will try: at most `limit`, at
+   * most the missing ones, before any attempt lease is claimed, so `done` may
+   * stop short of it) and `done` as it stands, then after every attempt
+   * (stored, refused or failed) with `done` one higher and that series' code.
+   */
+  readonly onProgress?: (progress: {
+    done: number;
+    total: number;
+    seriesCode: string | null;
+  }) => Promise<void>;
 }
 
 /**
@@ -427,6 +451,11 @@ export class BondSeriesService {
    * (`SERIES_FETCH_UNSUPPORTED`); a source that cannot be read is counted in
    * `failed`. A person's action (INV-BOND-008). Needs an ambient identity.
    *
+   * Progress is written to the program's `fetch_sync` row while it runs
+   * (`FetchSyncService.reportProgress`: offer, then series with the code of
+   * each attempt, then done, also when the pass throws) for
+   * `readRefreshProgress`; a failed write is logged and never fails the refresh.
+   *
    * Then up to `PROGRAM_BACKFILL_CHUNK` missing series of the program's history
    * are fetched, newest first (`history`), so a few refreshes fill it without
    * work in the background; the daily check fills it too while auto-fetch is on.
@@ -451,18 +480,101 @@ export class BondSeriesService {
     const lease = await this.fetchSync.claim(job, PROGRAM_REFRESH_INTERVAL_MS);
     if (lease === null) return { ...idle, history: null };
     const programs = new Set([key]);
-    const offer = await this.fetchOfferOf(country, { ...options, programs });
-    // Then a bounded piece of the program's history. Paced by the backfill's
-    // own gap and asking only for what is missing, so once the history is
-    // complete a refresh costs no request here at all.
-    const history = await this.backfillHistory({
-      ...options,
-      programs,
-      limit: options.limit ?? PROGRAM_BACKFILL_CHUNK,
-    });
-    // The lease is never handed back (no `release`, no `markSuccess`, which
-    // releases too): its expiry is the interval.
-    return { ...offer, history };
+    // What a person polling the refresh reads (`fetch_sync.progress`). A write
+    // that fails is a log line: the refresh itself must go on.
+    const startedAt = new Date().toISOString();
+    let last: FetchProgress = {
+      startedAt,
+      phase: "offer",
+      done: 0,
+      total: 0,
+      seriesCode: null,
+      finishedAt: null,
+    };
+    const report = async (next: FetchProgress): Promise<void> => {
+      last = next;
+      try {
+        await this.fetchSync.reportProgress(job, lease, next);
+      } catch (error) {
+        this.logger.warn(
+          `Progress of ${job} could not be recorded: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    };
+    await report(last);
+    try {
+      const offer = await this.fetchOfferOf(country, { ...options, programs });
+      await report({ ...last, phase: "series" });
+      // Then a bounded piece of the program's history. Paced by the backfill's
+      // own gap and asking only for what is missing, so once the history is
+      // complete a refresh costs no request here at all.
+      const history = await this.backfillHistory({
+        ...options,
+        programs,
+        limit: options.limit ?? PROGRAM_BACKFILL_CHUNK,
+        onProgress: async (p) => {
+          await report({ ...last, phase: "series", ...p });
+          await options.onProgress?.(p);
+        },
+      });
+      // The lease is never handed back (no `release`, no `markSuccess`, which
+      // releases too): its expiry is the interval.
+      return { ...offer, history };
+    } finally {
+      await report({
+        ...last,
+        phase: "done",
+        finishedAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  /**
+   * The progress of the program's refresh, from its `fetch_sync` row
+   * (`fetchProgramOffer` writes it). Global reference data, read under the
+   * caller's identity. An unknown program is `PROGRAM_NOT_FOUND`; a program
+   * never refreshed answers the empty shape.
+   */
+  async readRefreshProgress(programId: string): Promise<RefreshProgress> {
+    const rows: Array<{ issuer_country_code: string; program_code: string }> =
+      await withScopedDb(this.dataSource, (m) =>
+        m.query(
+          `SELECT issuer_country_code, program_code FROM bond_programs WHERE id = $1::uuid`,
+          [programId],
+        ),
+      );
+    if (rows.length === 0) {
+      throw new BondDataNotFoundError(
+        "PROGRAM_NOT_FOUND",
+        { id: programId },
+        `No bond program is stored with id ${programId}`,
+      );
+    }
+    const progress = await this.fetchSync.readProgress(
+      bondProgramRefreshJob(
+        programKey(rows[0].issuer_country_code, rows[0].program_code),
+      ),
+    );
+    if (!progress) {
+      return {
+        startedAt: null,
+        phase: null,
+        done: 0,
+        total: 0,
+        seriesCode: null,
+        finishedAt: null,
+      };
+    }
+    return {
+      startedAt: progress.startedAt ?? null,
+      phase: progress.phase ?? null,
+      done: progress.done ?? 0,
+      total: progress.total ?? 0,
+      seriesCode: progress.seriesCode ?? null,
+      finishedAt: progress.finishedAt ?? null,
+    };
   }
 
   private async runCurrentOffer(
@@ -539,6 +651,8 @@ export class BondSeriesService {
     let stoppedEarly = false;
     let remaining = 0;
     let attempted = 0;
+    let plannedTotal = 0;
+    let progressDone = 0;
     const storedNow: BondSeriesResult[] = [];
     for (const adapter of options.adapters ?? INSTALLED_BOND_ADAPTERS) {
       const providerId = adapter.seriesProviderId;
@@ -558,6 +672,15 @@ export class BondSeriesService {
       // `backfillCodes` lists oldest first; a bounded pass takes the newest.
       const ordered =
         options.limit === undefined ? allMissing : [...allMissing].reverse();
+      plannedTotal += allMissing.length;
+      if (options.limit !== undefined) {
+        plannedTotal = Math.min(plannedTotal, options.limit);
+      }
+      await options.onProgress?.({
+        done: progressDone,
+        total: plannedTotal,
+        seriesCode: null,
+      });
       for (const code of ordered) {
         if (options.limit !== undefined) {
           if (attempted >= options.limit) {
@@ -601,6 +724,13 @@ export class BondSeriesService {
           }
           if (refusal === "SERIES_NOT_PUBLISHED") notPublished += 1;
           else failed += 1;
+        } finally {
+          progressDone += 1;
+          await options.onProgress?.({
+            done: progressDone,
+            total: plannedTotal,
+            seriesCode: code,
+          });
         }
       }
     }

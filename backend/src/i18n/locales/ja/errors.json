@@ -544,6 +544,7 @@
     "DECIMAL_INVALID": "保存済みまたは指定された値が有効な小数ではありません: {{ field }} = {{ value }}",
     "INSTRUMENT_NOT_FOUND": "{{ country }} {{ issuer }} {{ series }} の債券銘柄は保存されていません",
     "INSTRUMENT_ID_NOT_FOUND": "ID {{ id }} の債券銘柄は保存されていません",
+    "PROGRAM_NOT_FOUND": "ID {{ id }} の債券プログラムは保存されていません",
     "TERMS_NOT_FOUND": "シリーズ {{ series }} の条件バージョンが保存されていません",
     "TERMS_VERSION_NOT_FOUND": "条件バージョン {{ version }} はシリーズ {{ series }} に保存されていません",
     "TERMS_MISMATCH": "シリーズ {{ series }} の条件バージョン {{ version }} は {{ claimedCurrency }} 建ての {{ claimedSeries }} を記述していますが、銘柄は {{ storedCurrency }} 建ての {{ storedSeries }} です",

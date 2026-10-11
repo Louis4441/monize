@@ -141,6 +141,21 @@ prices. Each series a bounded pass asks for takes its own lease
 any replica, and the next pass moves on to other months. The unbounded daily
 pass takes no attempt lease.
 
+While the refresh runs it reports its progress in the same `fetch_sync` row
+(`progress JSONB`, written by `FetchSyncService.reportProgress` only under the
+lease token, so a holder that lost its lease writes nothing, and outside any
+store transaction): `{ startedAt, phase: "offer" | "series" | "done", done,
+total, seriesCode, finishedAt }`. `phase` is `offer` during the current-offer
+check, `series` during the history pass (`total` is the planned count, at most
+the chunk and at most the series missing, read before any attempt lease is
+claimed, so `done` can stop short of it when another replica asked for a series
+meanwhile; `done` counts each attempt, stored, refused or failed, and
+`seriesCode` is the last one) and `done` at the end, also when the pass threw.
+A failed progress write is logged and never fails the refresh.
+`GET /bonds/programs/:programId/refresh-progress` returns that object (404 for
+an unknown program; all fields empty, `phase` null, `done` and `total` 0, when
+the program was never refreshed) for the client to poll.
+
 ### 2.6 Nothing country-specific without a user
 
 Requested by the owner on 2026-10-11: not every deployment wants Polish bonds,

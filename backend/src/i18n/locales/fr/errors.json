@@ -544,6 +544,7 @@
     "DECIMAL_INVALID": "Une valeur enregistrée ou fournie n'est pas un décimal valide : {{ field }} = {{ value }}",
     "INSTRUMENT_NOT_FOUND": "Aucun instrument obligataire n'est enregistré pour {{ country }} {{ issuer }} {{ series }}",
     "INSTRUMENT_ID_NOT_FOUND": "Aucun instrument obligataire n'est enregistré avec l'identifiant {{ id }}",
+    "PROGRAM_NOT_FOUND": "Aucun programme d'obligations n'est enregistré avec l'identifiant {{ id }}",
     "TERMS_NOT_FOUND": "Aucune version des conditions n'est enregistrée pour la série {{ series }}",
     "TERMS_VERSION_NOT_FOUND": "La version {{ version }} des conditions n'est pas enregistrée pour la série {{ series }}",
     "TERMS_MISMATCH": "La version {{ version }} des conditions de la série {{ series }} décrit {{ claimedSeries }} en {{ claimedCurrency }}, mais l'instrument est {{ storedSeries }} en {{ storedCurrency }}",

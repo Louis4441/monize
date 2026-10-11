@@ -40,7 +40,11 @@ import {
 import { BondHoldingsService, SeriesHolding } from "./bond-holdings.service";
 import { BondPriceRecompute, BondPriceService } from "./bond-price.service";
 import { seriesHttpException } from "./bond-series-errors";
-import { BondSeriesResult, BondSeriesService } from "./bond-series.service";
+import {
+  BondSeriesResult,
+  BondSeriesService,
+  RefreshProgress,
+} from "./bond-series.service";
 import {
   BondInstrumentSummary,
   BondValuationService,
@@ -91,6 +95,26 @@ export class BondsController {
   @ApiResponse({ status: 200, description: "Bond programs" })
   listPrograms(): Promise<BondProgramSummary[]> {
     return this.catalog.listPrograms();
+  }
+
+  @Get("programs/:programId/refresh-progress")
+  // A refresh takes about 40 s and the client polls every 1.5 s, so well under
+  // 60 reads a run; the endpoint reads one row and fetches nothing.
+  @Throttle({ default: { ttl: 60_000, limit: 120 } })
+  @ApiOperation({
+    summary: "How far a bond program's refresh has got",
+    description:
+      "Read from the program's job row, written by whichever replica runs the " +
+      "refresh: `phase` offer, series (`done` of `total` history series tried, " +
+      "`seriesCode` the last one) or done (`finishedAt` set). All empty (phase " +
+      "null) when the program was never refreshed. Global reference data.",
+  })
+  @ApiResponse({ status: 200, description: "The refresh's progress" })
+  @ApiResponse({ status: 404, description: "No such bond program" })
+  refreshProgress(
+    @Param("programId", ParseUUIDPipe) programId: string,
+  ): Promise<RefreshProgress> {
+    return this.mapBondErrors(() => this.series.readRefreshProgress(programId));
   }
 
   @Get("instruments")
@@ -467,6 +491,7 @@ export const BOND_ERROR_FALLBACKS: Readonly<
     `No bond instrument is stored for ${p.country} ${p.issuer} ${p.series}`,
   INSTRUMENT_ID_NOT_FOUND: (p) =>
     `No bond instrument is stored with id ${p.id}`,
+  PROGRAM_NOT_FOUND: (p) => `No bond program is stored with id ${p.id}`,
   TERMS_NOT_FOUND: (p) => `No terms version is stored for series ${p.series}`,
   TERMS_VERSION_NOT_FOUND: (p) =>
     `Terms version ${p.version} is not stored for series ${p.series}`,

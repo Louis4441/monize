@@ -544,6 +544,7 @@
     "DECIMAL_INVALID": "Nilai yang tersimpan atau diberikan bukan desimal yang valid: {{ field }} = {{ value }}",
     "INSTRUMENT_NOT_FOUND": "Tidak ada instrumen obligasi yang tersimpan untuk {{ country }} {{ issuer }} {{ series }}",
     "INSTRUMENT_ID_NOT_FOUND": "Tidak ada instrumen obligasi yang tersimpan dengan id {{ id }}",
+    "PROGRAM_NOT_FOUND": "Tidak ada program obligasi yang tersimpan dengan id {{ id }}",
     "TERMS_NOT_FOUND": "Tidak ada versi ketentuan yang tersimpan untuk seri {{ series }}",
     "TERMS_VERSION_NOT_FOUND": "Versi ketentuan {{ version }} tidak tersimpan untuk seri {{ series }}",
     "TERMS_MISMATCH": "Versi ketentuan {{ version }} dari seri {{ series }} menjelaskan {{ claimedSeries }} dalam {{ claimedCurrency }}, tetapi instrumennya adalah {{ storedSeries }} dalam {{ storedCurrency }}",

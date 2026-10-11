@@ -544,6 +544,7 @@
     "DECIMAL_INVALID": "Ein gespeicherter oder angegebener Wert ist keine gültige Dezimalzahl: {{ field }} = {{ value }}",
     "INSTRUMENT_NOT_FOUND": "Für {{ country }} {{ issuer }} {{ series }} ist kein Anleiheinstrument gespeichert",
     "INSTRUMENT_ID_NOT_FOUND": "Es ist kein Anleiheinstrument mit der ID {{ id }} gespeichert",
+    "PROGRAM_NOT_FOUND": "Es ist kein Anleiheprogramm mit der ID {{ id }} gespeichert",
     "TERMS_NOT_FOUND": "Für die Serie {{ series }} ist keine Konditionenversion gespeichert",
     "TERMS_VERSION_NOT_FOUND": "Die Konditionenversion {{ version }} ist für die Serie {{ series }} nicht gespeichert",
     "TERMS_MISMATCH": "Die Konditionenversion {{ version }} der Serie {{ series }} beschreibt {{ claimedSeries }} in {{ claimedCurrency }}, das Instrument ist aber {{ storedSeries }} in {{ storedCurrency }}",

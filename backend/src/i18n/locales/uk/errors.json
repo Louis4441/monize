@@ -544,6 +544,7 @@
     "DECIMAL_INVALID": "Збережене або передане значення не є коректним десятковим числом: {{ field }} = {{ value }}",
     "INSTRUMENT_NOT_FOUND": "Для {{ country }} {{ issuer }} {{ series }} не збережено облігаційного інструмента",
     "INSTRUMENT_ID_NOT_FOUND": "Облігаційного інструмента з ідентифікатором {{ id }} не збережено",
+    "PROGRAM_NOT_FOUND": "Програму облігацій з ідентифікатором {{ id }} не збережено",
     "TERMS_NOT_FOUND": "Для серії {{ series }} не збережено версії умов",
     "TERMS_VERSION_NOT_FOUND": "Версію умов {{ version }} не збережено для серії {{ series }}",
     "TERMS_MISMATCH": "Версія умов {{ version }} серії {{ series }} описує {{ claimedSeries }} у валюті {{ claimedCurrency }}, але інструмент — {{ storedSeries }} у валюті {{ storedCurrency }}",

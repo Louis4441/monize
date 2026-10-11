@@ -130,6 +130,8 @@ function build() {
     ),
     markSuccess: jest.fn(async () => undefined),
     release: jest.fn(async () => undefined),
+    reportProgress: jest.fn(async (..._args: unknown[]) => undefined),
+    readProgress: jest.fn(async (_job: string): Promise<unknown> => null),
   };
   manager.query.mockResolvedValue([]);
   const prices = { recomputeLinkedSecuritiesOfSeries: jest.fn() };
@@ -1014,12 +1016,143 @@ describe("BondSeriesService", () => {
       expect(run.history).toMatchObject({ candidates: 2, remaining: 1 });
     });
 
+    describe("progress", () => {
+      const programAdapter = (over: Partial<BondAdapter> = {}) =>
+        adapterOf({
+          currentSeries: jest.fn(async () => []),
+          backfillCodes: jest.fn(() => ["EDO0124", "EDO0224", "EDO0324"]),
+          programOf: (code: string) => code.slice(0, 3),
+          ...over,
+        });
+      const run = (
+        service: BondSeriesService,
+        adapter: BondAdapter,
+        limit = 2,
+      ) =>
+        service.fetchProgramOffer("PL", "EDO", {
+          adapters: [adapter],
+          sleep: jest.fn(async () => undefined),
+          today: "2026-10-11",
+          limit,
+        });
+      const written = (fetchSync: {
+        reportProgress: jest.Mock;
+      }): Array<Record<string, unknown>> =>
+        fetchSync.reportProgress.mock.calls.map((c) => c[2]);
+
+      it("reports offer, then each series attempt, then done, under the lease token", async () => {
+        const { service, catalog, fetchSync } = build();
+        catalog.storedSeriesCodes.mockResolvedValue(new Set<string>());
+        const adapter = programAdapter();
+        (adapter.fetchSeries as jest.Mock)
+          .mockResolvedValueOnce(undefined)
+          .mockRejectedValueOnce(new SeriesFetchError("SERIES_NOT_PUBLISHED"));
+        await run(service, adapter);
+
+        for (const call of fetchSync.reportProgress.mock.calls) {
+          expect(call[0]).toBe("bond-program-refresh:PL|EDO");
+          expect(call[1]).toBe("lease-token");
+        }
+        const steps = written(fetchSync);
+        expect(
+          steps.map((p) => [p.phase, p.done, p.total, p.seriesCode]),
+        ).toEqual([
+          ["offer", 0, 0, null],
+          ["series", 0, 0, null],
+          ["series", 0, 2, null],
+          ["series", 1, 2, "EDO0324"],
+          ["series", 2, 2, "EDO0224"],
+          ["done", 2, 2, "EDO0224"],
+        ]);
+        expect(steps[0].finishedAt).toBeNull();
+        expect(steps[4].finishedAt).toBeNull();
+        expect(typeof steps[5].finishedAt).toBe("string");
+        expect(new Set(steps.map((p) => p.startedAt)).size).toBe(1);
+      });
+
+      it("writes done when the pass throws", async () => {
+        const { service, catalog, fetchSync } = build();
+        catalog.storedSeriesCodes.mockRejectedValue(new Error("db gone"));
+        await expect(run(service, programAdapter())).rejects.toThrow("db gone");
+        const steps = written(fetchSync);
+        expect(steps[steps.length - 1]).toMatchObject({ phase: "done" });
+        expect(steps[steps.length - 1].finishedAt).not.toBeNull();
+      });
+
+      it("does not write for a lost claim", async () => {
+        const { service, fetchSync } = build();
+        fetchSync.claim.mockResolvedValueOnce(null);
+        await run(service, programAdapter());
+        expect(fetchSync.reportProgress).not.toHaveBeenCalled();
+      });
+
+      it("a failing progress write does not fail the refresh", async () => {
+        const { service, catalog, fetchSync } = build();
+        catalog.storedSeriesCodes.mockResolvedValue(new Set<string>());
+        fetchSync.reportProgress.mockRejectedValue(new Error("write failed"));
+        const adapter = programAdapter();
+        const result = await run(service, adapter);
+        expect(adapter.fetchSeries).toHaveBeenCalledTimes(2);
+        expect(result.history).toMatchObject({ remaining: 1 });
+      });
+    });
+
     it("refuses a country with no official source", async () => {
       const { service } = build();
       const error = await refusal(
         service.fetchProgramOffer("DE", "EDO", { adapters: [adapterOf()] }),
       );
       expect(error.code).toBe("SERIES_FETCH_UNSUPPORTED");
+    });
+  });
+
+  describe("readRefreshProgress", () => {
+    const PROGRAM = "33333333-3333-4333-8333-333333333333";
+
+    it("refuses an unknown program", async () => {
+      const { service, fetchSync, manager } = build();
+      manager.query.mockResolvedValue([]);
+      await expect(service.readRefreshProgress(PROGRAM)).rejects.toMatchObject({
+        code: "PROGRAM_NOT_FOUND",
+      });
+      expect(fetchSync.readProgress).not.toHaveBeenCalled();
+    });
+
+    it("reads the row of the program's refresh job", async () => {
+      const { service, fetchSync, manager } = build();
+      manager.query.mockResolvedValue([
+        { issuer_country_code: "PL", program_code: "EDO" },
+      ]);
+      const progress = {
+        startedAt: "2026-10-11T10:00:00.000Z",
+        phase: "done",
+        done: 8,
+        total: 8,
+        seriesCode: "EDO0124",
+        finishedAt: "2026-10-11T10:00:40.000Z",
+      };
+      fetchSync.readProgress.mockResolvedValue(progress);
+      await expect(service.readRefreshProgress(PROGRAM)).resolves.toEqual(
+        progress,
+      );
+      expect(fetchSync.readProgress).toHaveBeenCalledWith(
+        "bond-program-refresh:PL|EDO",
+      );
+    });
+
+    it("answers the empty shape without a report", async () => {
+      const { service, manager } = build();
+      manager.query.mockResolvedValue([
+        { issuer_country_code: "PL", program_code: "EDO" },
+      ]);
+      await expect(service.readRefreshProgress(PROGRAM)).resolves.toEqual({
+        startedAt: null,
+        phase: null,
+        done: 0,
+        total: 0,
+        seriesCode: null,
+        finishedAt: null,
+      });
     });
   });
 

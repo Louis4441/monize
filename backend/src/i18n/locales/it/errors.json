@@ -544,6 +544,7 @@
     "DECIMAL_INVALID": "Un valore salvato o fornito non è un decimale valido: {{ field }} = {{ value }}",
     "INSTRUMENT_NOT_FOUND": "Nessuno strumento obbligazionario è salvato per {{ country }} {{ issuer }} {{ series }}",
     "INSTRUMENT_ID_NOT_FOUND": "Nessuno strumento obbligazionario è salvato con l'id {{ id }}",
+    "PROGRAM_NOT_FOUND": "Nessun programma di obbligazioni è memorizzato con l'id {{ id }}",
     "TERMS_NOT_FOUND": "Nessuna versione delle condizioni è salvata per la serie {{ series }}",
     "TERMS_VERSION_NOT_FOUND": "La versione {{ version }} delle condizioni non è salvata per la serie {{ series }}",
     "TERMS_MISMATCH": "La versione {{ version }} delle condizioni della serie {{ series }} descrive {{ claimedSeries }} in {{ claimedCurrency }}, ma lo strumento è {{ storedSeries }} in {{ storedCurrency }}",
