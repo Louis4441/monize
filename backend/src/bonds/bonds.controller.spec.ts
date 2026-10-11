@@ -15,8 +15,16 @@ import {
 import { BondPriceService } from "./bond-price.service";
 import { todayYMD } from "../common/date-utils";
 import { BondValuationService } from "./bond-valuation.service";
-import { BondsController } from "./bonds.controller";
+import { BOND_ERROR_FALLBACKS, BondsController } from "./bonds.controller";
+import { tr } from "../i18n/translate";
+import enErrors from "../i18n/locales/en/errors.json";
 import { BondEngineError } from "./engine/bond-engine";
+
+// Passes the fallback through, as the real `tr` does without a request context,
+// and records the key it was asked for.
+jest.mock("../i18n/translate", () => ({
+  tr: jest.fn((_key: string, fallback: string) => fallback),
+}));
 
 const USER = "11111111-1111-4111-8111-111111111111";
 const SECURITY = "22222222-2222-4222-8222-222222222222";
@@ -175,6 +183,27 @@ describe("BondsController", () => {
     });
   });
 
+  describe("error message keys", () => {
+    const codes = Object.keys(BOND_ERROR_FALLBACKS);
+
+    it.each(codes)(
+      "%s selects errors.bonds.%s, which the English catalogue carries",
+      async (code) => {
+        (tr as jest.Mock).mockClear();
+        valuation.valueSecurity.mockRejectedValue(
+          new BondEngineError(code as never, {}, "English log text"),
+        );
+        await expect(
+          controller.valuationOf(req, SECURITY, "2027-04-15"),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect((tr as jest.Mock).mock.calls[0][0]).toBe(`errors.bonds.${code}`);
+        expect((enErrors.bonds as Record<string, string>)[code]).toEqual(
+          expect.any(String),
+        );
+      },
+    );
+  });
+
   describe("GET /bonds/securities/:securityId/scenarios", () => {
     it("values for the JWT's user, today, with the parsed query", async () => {
       await controller.scenariosOf(
@@ -190,6 +219,17 @@ describe("BondsController", () => {
         ["0", "0.05"],
         todayYMD(),
       );
+    });
+
+    it("values as of the asOf the card asks for", async () => {
+      await controller.scenariosOf(
+        req,
+        SECURITY,
+        "PL_CPI_GUS_YOY",
+        ["0"],
+        "2027-03-01",
+      );
+      expect(valuation.scenariosOf.mock.calls[0][4]).toBe("2027-03-01");
     });
 
     it("lets the 404 of another user's or an unlinked security through", async () => {
@@ -229,7 +269,7 @@ describe("BondsController", () => {
   });
 
   describe("route parameters", () => {
-    it("takes the security id through ParseUUIDPipe and asOf through the calendar-date pipe", () => {
+    it("takes the security id through ParseUUIDPipe and asOf through the no-future date pipe", () => {
       const pipesOf = (method: keyof BondsController) => {
         const args = Reflect.getMetadata(
           "__routeArguments__",
@@ -246,7 +286,7 @@ describe("BondsController", () => {
       expect(pipesOf("valuationOf")).toEqual(
         expect.arrayContaining([
           ["securityId", [ParseUUIDPipe.name]],
-          ["asOf", ["ParseOptionalCalendarDatePipe"]],
+          ["asOf", ["ParseBondAsOfPipe"]],
         ]),
       );
       expect(pipesOf("valuationOf")).toEqual(
@@ -257,6 +297,7 @@ describe("BondsController", () => {
           ["securityId", [ParseUUIDPipe.name]],
           ["benchmarkId", ["ParseBenchmarkIdPipe"]],
           ["values", ["ParseScenarioValuesPipe"]],
+          ["asOf", ["ParseBondAsOfPipe"]],
         ]),
       );
       expect(pipesOf("recompute")).toEqual(

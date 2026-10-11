@@ -48,9 +48,13 @@ export function daysBetween(from: string, to: string): number {
   return Math.round((toUtcMs(to) - toUtcMs(from)) / MS_PER_DAY);
 }
 
+/**
+ * Orders two dates that are already known to be valid `YYYY-MM-DD` strings: the
+ * form sorts as text, so this is a plain comparison. It does not validate (the
+ * hot path of a price series compares thousands of times); validate once at the
+ * boundary with `isValidYMD` or `parseYMD`.
+ */
 export function compareYMD(a: string, b: string): -1 | 0 | 1 {
-  parseYMD(a);
-  parseYMD(b);
   if (a === b) return 0;
   return a < b ? -1 : 1;
 }

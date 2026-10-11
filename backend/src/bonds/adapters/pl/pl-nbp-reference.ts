@@ -136,9 +136,16 @@ async function download(get: BondFetch, url: string): Promise<string> {
 }
 
 /**
- * The reference rate history. The NBP feed is authoritative for every day up to
- * today, so `coveredThrough` is the fetch date: a later decision shows up in the
- * current table, and a day with no newer change is genuinely unchanged.
+ * The reference rate history. When both documents agree the feed is
+ * authoritative for every day up to today, so `coveredThrough` is the fetch
+ * date: a later decision shows up in the current table, and a day with no newer
+ * change is genuinely unchanged.
+ *
+ * When the current table holds a decision the archive does not, the archive is
+ * behind and nothing here proves it has not missed a decision before that one
+ * as well (the current table carries only the newest). Coverage is then the
+ * archive's newest date: the days after it are unknown, not derived from a rate
+ * that may have been replaced, until the archive catches up.
  */
 export async function fetchNbpReference(
   get: BondFetch,
@@ -152,9 +159,18 @@ export async function fetchNbpReference(
   const current = parseNbpCurrent(await download(get, NBP_CURRENT_URL)).map(
     (o) => ({ ...o, sourceUrl: NBP_CURRENT_URL }),
   );
+  const archiveDates = new Set(archive.map((o) => o.observationDate));
+  const archiveNewest = archive.reduce(
+    (newest, o) => (o.observationDate > newest ? o.observationDate : newest),
+    "",
+  );
+  const archiveBehind = current.some(
+    (o) =>
+      !archiveDates.has(o.observationDate) && o.observationDate > archiveNewest,
+  );
   return {
     observations: mergeObservations(archive, current),
-    coveredThrough: today,
+    coveredThrough: archiveBehind ? archiveNewest : today,
     sourceUrl: NBP_ARCHIVE_URL,
   };
 }

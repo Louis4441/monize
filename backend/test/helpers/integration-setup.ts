@@ -267,6 +267,30 @@ export async function cleanTables(
 }
 
 /**
+ * Runs a DELETE on `bond_instruments` with its immutability trigger disabled,
+ * for a test that has to prove another guard (a foreign key) or tidy a row it
+ * created. The trigger is always re-enabled, whether or not the DELETE fails.
+ * Sequential suites only: DISABLE TRIGGER takes a table lock and the setting is
+ * visible to every connection while it lasts.
+ */
+export async function deleteBondInstrumentBypassingImmutability(
+  dataSource: DataSource,
+  deleteSql: string,
+  params: unknown[],
+): Promise<void> {
+  await dataSource.query(
+    `ALTER TABLE bond_instruments DISABLE TRIGGER trg_bond_instruments_immutable`,
+  );
+  try {
+    await dataSource.query(deleteSql, params);
+  } finally {
+    await dataSource.query(
+      `ALTER TABLE bond_instruments ENABLE TRIGGER trg_bond_instruments_immutable`,
+    );
+  }
+}
+
+/**
  * Inserts a user directly via DataSource, bypassing AuthModule.
  * Returns the saved User entity with a generated UUID.
  */

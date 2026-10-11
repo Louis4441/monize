@@ -16,6 +16,7 @@ import { AccountsController } from "@/accounts/accounts.controller";
 import { CalendarModule } from "@/calendar/calendar.module";
 import { CalendarDayNotesController } from "@/calendar/calendar-day-notes.controller";
 import { AccountDelegateGuard } from "@/delegation/guards/account-delegate.guard";
+import { BondPriceService } from "@/bonds/bond-price.service";
 import { BackupService } from "@/backup/backup.service";
 import { BackupExportService } from "@/backup/backup-export.service";
 import { BackupRestoreService } from "@/backup/backup-restore.service";
@@ -410,6 +411,11 @@ describe("Calendar day notes survive a backup round trip", () => {
         BackupService,
         BackupExportService,
         BackupRestoreService,
+        // The restore's bond price recompute is not under test here.
+        {
+          provide: BondPriceService,
+          useValue: { recomputeSecurity: async () => ({}) },
+        },
         BackupAttachmentTransferService,
         BackupRestoreDatabaseService,
         NetWorthService,

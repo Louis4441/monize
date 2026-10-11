@@ -14,6 +14,19 @@ export type EarlyRedemptionRefusal =
   | "RATE_UNKNOWN"
   | "TERMS_INCOMPLETE";
 
+/** OPEN: before maturity; MATURED: on or after it; REFUSED: no valuation is possible (see `refusal`). */
+export type BondLotStatus = "OPEN" | "MATURED" | "REFUSED";
+
+/** A lot the terms do not allow to value at all; every figure of the valuation is then null. */
+export interface BondValuationRefusal {
+  readonly code: "PURCHASE_OUTSIDE_SALE_WINDOW";
+  readonly params: {
+    readonly from: string;
+    readonly to: string;
+    readonly purchaseDate: string;
+  };
+}
+
 export interface BondEngineInput {
   readonly terms: BondTerms;
   readonly termsVersion: number;
@@ -40,9 +53,13 @@ export interface MissingObservation {
 export interface CashFlow {
   readonly date: string;
   readonly type: "INTEREST" | "PRINCIPAL";
-  /** The whole lot, 2 decimals. */
-  readonly amount: string;
-  readonly status: "KNOWN" | "PROJECTED";
+  /** The whole lot, 2 decimals; null only when `status` is UNKNOWN. */
+  readonly amount: string | null;
+  /**
+   * UNKNOWN: the flow will happen but a rate it depends on is neither stored nor
+   * assumable, so its amount cannot be worked out. Never dropped.
+   */
+  readonly status: "KNOWN" | "PROJECTED" | "UNKNOWN";
   readonly period: number;
 }
 
@@ -96,12 +113,19 @@ export interface BondValuation {
   readonly termsVersion: number;
   readonly quantity: number;
   readonly maturityDate: string;
+  readonly status: BondLotStatus;
+  /** Set only when `status` is REFUSED. */
+  readonly refusal: BondValuationRefusal | null;
+  /**
+   * Present for every OPEN lot (null once matured or refused); `annualRate` and
+   * `rateSource` are null while the rate of the period is unknown.
+   */
   readonly currentPeriod: {
     readonly index: number;
     readonly start: string;
     readonly end: string;
-    readonly annualRate: string;
-    readonly rateSource: RateSource;
+    readonly annualRate: string | null;
+    readonly rateSource: RateSource | null;
   } | null;
   readonly rateRule: RateRuleDescription;
   /** One entry per period of the lot. */
@@ -116,11 +140,17 @@ export interface BondValuation {
   readonly earlyRedemptionRefusal: EarlyRedemptionRefusal | null;
   /** Cash flows after `asOf`, every rate they depend on known. */
   readonly knownCashflows: readonly CashFlow[];
+  /** Cash flows after `asOf` that are not known: PROJECTED, and UNKNOWN with a null amount. */
   readonly projectedCashflows: readonly CashFlow[];
   readonly maturityValueKnown: string | null;
   /** Set only when a projected rate is involved; null otherwise. */
   readonly maturityValueProjected: string | null;
   readonly projectionAssumptions: readonly ProjectionAssumption[];
+  /** Benchmarks a future period needs for which there is neither a stored observation nor an assumption. */
+  readonly projectionMissing: readonly {
+    readonly benchmarkId: string;
+    readonly publisher: string | null;
+  }[];
   readonly dataCompleteness: {
     readonly termsComplete: boolean;
     readonly referenceDataComplete: boolean;

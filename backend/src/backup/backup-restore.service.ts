@@ -44,6 +44,7 @@ import {
   BackupData,
   BackupPasswordRequiredError,
   backupTables,
+  MAX_UNLINKED_BOND_SYMBOLS,
   parseArtifactCompleteness,
   renameLegacyTableKeys,
   RestoreBackupInput,
@@ -53,6 +54,7 @@ import { restoreAiProviderKey } from "./ai-provider-key-transport";
 import { keyBearingExportTables } from "./export-table-queries";
 import { BackupAttachmentTransferService } from "./backup-attachment-transfer.service";
 import { BackupRestoreDatabaseService } from "./backup-restore-database.service";
+import { BondPriceService } from "../bonds/bond-price.service";
 import { invalidatePortfolioSummary } from "../securities/portfolio-summary-memo";
 
 const gunzipAsync = promisify(gunzip);
@@ -80,7 +82,45 @@ export class BackupRestoreService {
     private readonly attachments: BackupAttachmentTransferService,
     private readonly db: BackupRestoreDatabaseService,
     private readonly maintenance: UserMaintenanceService,
+    private readonly bondPrices: BondPriceService,
   ) {}
+
+  /**
+   * After the restore commits: recompute the engine prices of every bond-linked
+   * security the user now has. Best effort and logged, because the restore has
+   * committed and the daily job repairs a failure.
+   */
+  private async recomputeLinkedBondPrices(userId: string): Promise<void> {
+    try {
+      const linked: Array<{ id: string }> = await withScopedDb(
+        this.dataSource,
+        (m) =>
+          m.query(
+            `SELECT id FROM securities
+              WHERE user_id = $1 AND bond_instrument_id IS NOT NULL
+              ORDER BY id`,
+            [userId],
+          ),
+      );
+      for (const { id } of linked) {
+        try {
+          await this.bondPrices.recomputeSecurity(userId, id);
+        } catch (error) {
+          this.logger.warn(
+            `Bond price recompute after restore failed for security ${id}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Bond price recompute after restore failed for user ${userId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
 
   /**
    * Ceiling on a restore's decompressed payload (see backup-limits.ts).
@@ -305,10 +345,16 @@ export class BackupRestoreService {
                 // Phase 2a': a security's bond link survives only where this
                 // deployment's catalog holds the instrument; else it is restored
                 // unlinked (the table is reference data, not part of a backup).
-                const severedCatalogLinks =
+                const { counts: severedCatalogLinks, severed } =
                   await this.db.severUnavailableCatalogLinks(manager, data);
-                const unlinkedBondSecurities =
+                const unlinkedCount =
                   severedCatalogLinks["securities.bond_instrument_id"] ?? 0;
+                const unlinkedSymbols = (
+                  severed["securities.bond_instrument_id"] ?? []
+                )
+                  .map((row) => row.symbol)
+                  .filter((symbol): symbol is string => symbol !== null)
+                  .slice(0, MAX_UNLINKED_BOND_SYMBOLS);
 
                 // Phase 2b: insert every backed-up table in FK-safe order. The order,
                 // the row-count key and whether user_id is forced live in
@@ -357,8 +403,13 @@ export class BackupRestoreService {
                   ...(unusableAiProviderKeys > 0
                     ? { unusableAiProviderKeys }
                     : {}),
-                  ...(unlinkedBondSecurities > 0
-                    ? { unlinkedBondSecurities }
+                  ...(unlinkedCount > 0
+                    ? {
+                        unlinkedBondSecurities: {
+                          count: unlinkedCount,
+                          symbols: unlinkedSymbols,
+                        },
+                      }
                     : {}),
                 };
               }),
@@ -374,6 +425,10 @@ export class BackupRestoreService {
             // A restore replaces the accounts, holdings and prices the memoized
             // portfolio valuation was computed from.
             invalidatePortfolioSummary(userId);
+            // The file's bond_engine price rows were computed by another
+            // deployment's catalog and engine; price every linked security
+            // here from this one rather than trusting them until the cron.
+            await this.recomputeLinkedBondPrices(userId);
             return result;
           })
           .catch(async (error) => {

@@ -21,7 +21,9 @@ interface LedgerRow {
   status: string;
   tx_date: string;
   quantity: string | null;
-  paired_transfer: boolean;
+  account_id: string;
+  /** The account of the other leg when this row is a paired transfer leg. */
+  counterpart_account_id: string | null;
 }
 
 /**
@@ -34,11 +36,12 @@ interface LedgerRow {
  *
  * A reader of effects: VOID rows recorded nothing and are not read (the lot
  * derivation excludes them too, for a caller that passes raw rows). The
- * transactions are read across every account, in `INVESTMENT_REPLAY_ORDER_SQL`
- * (the order every ledger replay uses), with `quantity` as text so the lot
- * derivation can read it exactly. A transfer leg is `pairedTransfer` when the
- * other leg of the same security is linked to it and is not VOID (the link is
- * stored on one or both legs).
+ * transactions are read across every account, each with its `account_id`, in
+ * `INVESTMENT_REPLAY_ORDER_SQL` (the order every ledger replay uses), with
+ * `quantity` as text so the lot derivation can read it exactly. A transfer leg
+ * is `pairedTransfer` when the other leg of the same security is linked to it
+ * and is not VOID (the link is stored on one or both legs); it then names the
+ * other leg's account, which is where the lots it moves arrive.
  */
 export async function loadBondLedger(
   m: EntityManager,
@@ -73,15 +76,16 @@ export async function loadBondLedger(
             t.status,
             TO_CHAR(t.transaction_date, 'YYYY-MM-DD') AS tx_date,
             t.quantity::text AS quantity,
-            EXISTS (
-              SELECT 1 FROM investment_transactions p
-               WHERE p.user_id = t.user_id
-                 AND p.security_id = t.security_id
-                 AND p.status != 'VOID'
-                 AND p.action IN ('TRANSFER_IN', 'TRANSFER_OUT')
-                 AND p.action <> t.action
-                 AND (p.id = t.linked_transaction_id OR p.linked_transaction_id = t.id)
-            ) AS paired_transfer
+            t.account_id,
+            (SELECT p.account_id FROM investment_transactions p
+              WHERE p.user_id = t.user_id
+                AND p.security_id = t.security_id
+                AND p.status != 'VOID'
+                AND p.action IN ('TRANSFER_IN', 'TRANSFER_OUT')
+                AND p.action <> t.action
+                AND (p.id = t.linked_transaction_id OR p.linked_transaction_id = t.id)
+              ORDER BY p.id
+              LIMIT 1) AS counterpart_account_id
        FROM investment_transactions t
       WHERE t.security_id = $1 AND t.user_id = $2
         AND t.status != 'VOID'
@@ -102,7 +106,9 @@ export async function loadBondLedger(
       status: r.status,
       transactionDate: r.tx_date,
       quantity: r.quantity,
-      pairedTransfer: r.paired_transfer === true,
+      pairedTransfer: r.counterpart_account_id !== null,
+      accountId: r.account_id,
+      counterpartAccountId: r.counterpart_account_id,
     })),
   };
 }

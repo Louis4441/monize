@@ -35,6 +35,10 @@ describe("support backup rules registry", () => {
     }
   });
 
+  it("drops the bond link: it names the masked series and the copy's scaled quantities are not whole bonds", () => {
+    expect(RULES.securities.bond_instrument_id?.t).toBe("drop");
+  });
+
   it("keeps the structural columns a restored GEM signal is read by", () => {
     // RULES is an allowlist, so an unclassified column is dropped -- and for
     // these two that is not a safe default but a change of meaning. A signal

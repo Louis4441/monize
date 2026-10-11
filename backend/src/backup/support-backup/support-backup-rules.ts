@@ -456,9 +456,11 @@ export const RULES: Record<string, TableRules> = {
     ir_website: drop,
     msn_instrument_id: drop, // would identify a masked ticker
     historical_backfill_attempted_at: keep,
-    // A foreign key to the public bond catalog (an id derived from the series).
-    // Kept so a support copy values the holding as the original did.
-    bond_instrument_id: keep,
+    // The id is derived from the series, so keeping it would name the bond the
+    // masked symbol hides, and the copy's quantities are scaled by a fractional
+    // multiplier, which the bond engine refuses. The copy is not valued by the
+    // engine; any bond_engine price rows it carries stay as static prices.
+    bond_instrument_id: drop,
     created_at: keep,
     updated_at: keep,
   },

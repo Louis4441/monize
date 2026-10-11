@@ -7,9 +7,10 @@ import {
 import { ExactDecimal } from "../../domain/exact-decimal";
 
 /**
- * GUS publishes the table as a numbered file; the suffix (`_8`) is bumped when
- * the file is replaced, so the old URL then answers 404. The landing page always
- * links the current file, and is the fallback.
+ * GUS publishes the table as a numbered file whose suffix (`_8`) is bumped when
+ * the file is replaced; the old URL may keep answering with the old data. The
+ * landing page always links the current file, so it is read first and this
+ * constant is only the fallback.
  */
 export const GUS_CPI_CSV_URL =
   "https://stat.gov.pl/download/gfx/portalinformacyjny/pl/defaultstronaopisowa/4741/1/1/miesiecznewskaznikicentowarowiuslugkonsumpcyjnychod1982roku_8.csv";
@@ -126,24 +127,44 @@ export function findCsvLink(html: string): string | null {
   return null;
 }
 
+/** A file whose newest observation is older than this many months is a stale feed. */
+export const GUS_MAX_STALE_MONTHS = 3;
+
+/** `today` minus whole calendar months, as YYYY-MM-DD (the day clamped to the month's end). */
+function monthsBefore(today: string, months: number): string {
+  const [y, m, d] = today.split("-").map(Number);
+  const target = new Date(Date.UTC(y, m - 1 - months, 1));
+  const lastDay = new Date(
+    Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  target.setUTCDate(Math.min(d, lastDay));
+  return target.toISOString().slice(0, 10);
+}
+
+/**
+ * The CPI file the landing page links now, or null when the page cannot be read
+ * or links none. Always asked first: GUS replaces the numbered file without
+ * retiring the old URL, which keeps answering 200 with the old data.
+ */
+async function discoverCsvLink(get: BondFetch): Promise<string | null> {
+  const page = await get(GUS_CPI_LANDING_URL);
+  if (page.status !== 200) return null;
+  return findCsvLink(new TextDecoder("utf-8").decode(page.body));
+}
+
+/**
+ * Year-on-year CPI from GUS. The file is found on the landing page every time;
+ * `GUS_CPI_CSV_URL` is only the fallback for a page that cannot be read. A file
+ * whose newest observation is more than `GUS_MAX_STALE_MONTHS` months before
+ * `today` is a failure, not a success: storing it would stamp the series as
+ * freshly fetched while every later month is missing.
+ */
 export async function fetchGusCpi(
   get: BondFetch,
+  today: string,
 ): Promise<BenchmarkFetchResult> {
-  let url = GUS_CPI_CSV_URL;
-  let response = await get(url);
-  if (response.status === 404) {
-    const page = await get(GUS_CPI_LANDING_URL);
-    if (page.status !== 200) {
-      throw new BenchmarkFetchError(
-        `GUS CPI file answered 404 and the landing page HTTP ${page.status}`,
-      );
-    }
-    const link = findCsvLink(new TextDecoder("utf-8").decode(page.body));
-    if (!link)
-      throw new BenchmarkFetchError("GUS CPI: no CSV link on the landing page");
-    url = link;
-    response = await get(url);
-  }
+  const url = (await discoverCsvLink(get)) ?? GUS_CPI_CSV_URL;
+  const response = await get(url);
   if (response.status !== 200) {
     throw new BenchmarkFetchError(
       `GUS CPI ${url} answered HTTP ${response.status}`,
@@ -152,9 +173,12 @@ export async function fetchGusCpi(
   const observations = parseGusCpiCsv(
     new TextDecoder("windows-1250").decode(response.body),
   );
-  return {
-    observations,
-    coveredThrough: observations[observations.length - 1].observationDate,
-    sourceUrl: url,
-  };
+  const newest = observations[observations.length - 1].observationDate;
+  const oldestAcceptable = monthsBefore(today, GUS_MAX_STALE_MONTHS);
+  if (newest < oldestAcceptable) {
+    throw new BenchmarkFetchError(
+      `GUS CPI ${url}: the newest observation is ${newest}, older than ${GUS_MAX_STALE_MONTHS} months before ${today}; the feed is stale`,
+    );
+  }
+  return { observations, coveredThrough: newest, sourceUrl: url };
 }

@@ -77,6 +77,129 @@ describe("bondLotsFromTransactions (spec 12.2 truth table)", () => {
     });
   });
 
+  describe("lots are held per account (R6)", () => {
+    const IKE = "acct-ike";
+    const PLAIN = "acct-plain";
+    const at = (account: string) => ({ accountId: account });
+    const open = (rows: BondLotTransaction[]) =>
+      lots(rows).map((l) => [l.accountId, l.purchaseDate, l.quantity]);
+
+    it("a removal takes from the lots of its own account, not the oldest of another", () => {
+      // The audit's case: IKE lot A (older), plain lot B; the plain account sells.
+      expect(
+        open([
+          tx("BUY", "2026-10-01", "10", at(IKE)),
+          tx("BUY", "2026-10-31", "10", at(PLAIN)),
+          tx("SELL", "2027-04-01", "10", at(PLAIN)),
+        ]),
+      ).toEqual([[IKE, "2026-10-01", 10]]);
+    });
+
+    it("FIFO within the account: its oldest lot goes first", () => {
+      expect(
+        open([
+          tx("BUY", "2026-01-01", "5", at(IKE)),
+          tx("BUY", "2026-02-01", "5", at(PLAIN)),
+          tx("BUY", "2026-03-01", "5", at(IKE)),
+          tx("SELL", "2026-04-01", "6", at(IKE)),
+        ]),
+      ).toEqual([
+        [PLAIN, "2026-02-01", 5],
+        [IKE, "2026-03-01", 4],
+      ]);
+    });
+
+    it("a removal larger than its account holds is OVER_REMOVAL even when another account holds enough", () => {
+      const result = bondLotsFromTransactions([
+        tx("BUY", "2026-01-01", "10", at(IKE)),
+        tx("BUY", "2026-01-02", "10", at(PLAIN)),
+        tx("SELL", "2026-02-01", "11", at(PLAIN)),
+      ]);
+      expect(result.lots).toBeNull();
+      expect(result.refusal?.code).toBe("OVER_REMOVAL");
+    });
+
+    it("a paired transfer moves the lots FIFO to the destination, keeping their purchase dates", () => {
+      expect(
+        open([
+          tx("BUY", "2026-01-10", "4", at(IKE)),
+          tx("BUY", "2026-02-10", "6", at(IKE)),
+          tx("TRANSFER_OUT", "2026-03-01", "7", {
+            ...at(IKE),
+            pairedTransfer: true,
+            counterpartAccountId: PLAIN,
+          }),
+          tx("TRANSFER_IN", "2026-03-01", "7", {
+            ...at(PLAIN),
+            pairedTransfer: true,
+            counterpartAccountId: IKE,
+          }),
+        ]).sort(),
+      ).toEqual(
+        [
+          [IKE, "2026-02-10", 3],
+          [PLAIN, "2026-01-10", 4],
+          [PLAIN, "2026-02-10", 3],
+        ].sort(),
+      );
+    });
+
+    it("a later sale in the destination takes the oldest moved lot first, even if it arrived after a newer one", () => {
+      expect(
+        open([
+          tx("BUY", "2026-05-01", "5", at(PLAIN)),
+          tx("BUY", "2026-01-10", "5", at(IKE)),
+          tx("TRANSFER_OUT", "2026-06-01", "5", {
+            ...at(IKE),
+            pairedTransfer: true,
+            counterpartAccountId: PLAIN,
+          }),
+          tx("TRANSFER_IN", "2026-06-01", "5", {
+            ...at(PLAIN),
+            pairedTransfer: true,
+            counterpartAccountId: IKE,
+          }),
+          tx("SELL", "2026-07-01", "5", at(PLAIN)),
+        ]),
+      ).toEqual([[PLAIN, "2026-05-01", 5]]);
+    });
+
+    it("moving more than the source holds is OVER_REMOVAL", () => {
+      const result = bondLotsFromTransactions([
+        tx("BUY", "2026-01-10", "4", at(IKE)),
+        tx("TRANSFER_OUT", "2026-03-01", "5", {
+          ...at(IKE),
+          pairedTransfer: true,
+          counterpartAccountId: PLAIN,
+        }),
+      ]);
+      expect(result.refusal?.code).toBe("OVER_REMOVAL");
+    });
+
+    it("an unpaired TRANSFER_OUT removes from its account; an unpaired TRANSFER_IN adds an assumed lot there", () => {
+      expect(
+        open([
+          tx("BUY", "2026-01-10", "5", at(IKE)),
+          tx("TRANSFER_OUT", "2026-02-01", "2", at(IKE)),
+          tx("TRANSFER_IN", "2026-03-01", "3", at(PLAIN)),
+        ]),
+      ).toEqual([
+        [IKE, "2026-01-10", 3],
+        [PLAIN, "2026-03-01", 3],
+      ]);
+    });
+
+    it("rows with no account share one unnamed account (the old pooled behaviour)", () => {
+      expect(
+        open([
+          tx("BUY", "2026-01-10", "5"),
+          tx("BUY", "2026-02-10", "5"),
+          tx("SELL", "2026-03-01", "6"),
+        ]),
+      ).toEqual([[undefined, "2026-02-10", 4]]);
+    });
+  });
+
   describe("removals are first-in first-out", () => {
     const buys = [tx("BUY", "2026-01-10", "10"), tx("BUY", "2026-02-10", "5")];
 

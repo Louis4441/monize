@@ -20,7 +20,6 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { todayYMD } from "../common/date-utils";
-import { ParseOptionalCalendarDatePipe } from "../common/pipes/parse-calendar-date.pipe";
 import { tr } from "../i18n/translate";
 import { BondCatalogService } from "./bond-catalog.service";
 import {
@@ -39,6 +38,7 @@ import {
 import { BondScenarios } from "./bond-scenarios";
 import {
   ParseAssumePipe,
+  ParseBondAsOfPipe,
   ParseBenchmarkIdPipe,
   ParseScenarioValuesPipe,
 } from "./bond-query.pipes";
@@ -90,7 +90,7 @@ export class BondsController {
   async valuationOf(
     @Request() req,
     @Param("securityId", ParseUUIDPipe) securityId: string,
-    @Query("asOf", new ParseOptionalCalendarDatePipe()) asOf?: string,
+    @Query("asOf", new ParseBondAsOfPipe()) asOf?: string,
     @Query("assume", new ParseAssumePipe())
     assume?: ReadonlyMap<string, string>,
   ): Promise<SecurityValuation> {
@@ -108,7 +108,7 @@ export class BondsController {
   @ApiOperation({
     summary: "Value a bond-linked security under assumed benchmark values",
     description:
-      "As of today, the open lots valued with every future period of " +
+      "As of `asOf` (default today, never later), the open lots valued with every future period of " +
       "`benchmarkId` projected at each of 1 to 6 `values` (fractions between " +
       "-0.5 and 1.0, comma-separated). Known periods stay known. Per scenario: " +
       "the lots' maturity value and total interest with its attribution, each " +
@@ -116,6 +116,7 @@ export class BondsController {
   })
   @ApiQuery({ name: "benchmarkId", example: "PL_CPI_GUS_YOY" })
   @ApiQuery({ name: "values", example: "0,0.025,0.05" })
+  @ApiQuery({ name: "asOf", required: false, example: "2027-04-15" })
   @ApiResponse({ status: 200, description: "One entry per assumed value" })
   @ApiResponse({
     status: 404,
@@ -126,6 +127,7 @@ export class BondsController {
     @Param("securityId", ParseUUIDPipe) securityId: string,
     @Query("benchmarkId", new ParseBenchmarkIdPipe()) benchmarkId: string,
     @Query("values", new ParseScenarioValuesPipe()) values: readonly string[],
+    @Query("asOf", new ParseBondAsOfPipe()) asOf?: string,
   ): Promise<BondScenarios> {
     return this.mapBondErrors(() =>
       this.valuation.scenariosOf(
@@ -133,7 +135,7 @@ export class BondsController {
         securityId,
         benchmarkId,
         values,
-        todayYMD(),
+        asOf ?? todayYMD(),
       ),
     );
   }
@@ -143,7 +145,8 @@ export class BondsController {
     summary: "Recompute the engine prices of a bond-linked security",
     description:
       "Writes the daily prices from the first transaction to today. A manual " +
-      "or transaction-derived price on a day is never overwritten.",
+      "price on a day is never overwritten; provider and transaction-derived " +
+      "prices of the linked security are replaced by the engine's.",
   })
   @ApiResponse({
     status: 201,
@@ -190,7 +193,7 @@ type BondErrorCode =
   BondEngineErrorCode | BondDataNotFoundCode | BondDataInconsistentCode;
 
 /** The English source of each message, with the same `{{ param }}` names as the catalogue. */
-const BOND_ERROR_FALLBACKS: Readonly<
+export const BOND_ERROR_FALLBACKS: Readonly<
   Record<BondErrorCode, (p: BondErrorParams) => string>
 > = {
   QUANTITY_INVALID: (p) =>

@@ -15,13 +15,25 @@ export interface BondLotTransaction {
   readonly quantity: string | null;
   /**
    * For a TRANSFER_IN or TRANSFER_OUT: the other leg of the same security is
-   * linked and not VOID. The pair moves a lot between the user's accounts and
-   * keeps its purchase date, so neither leg changes the lots.
+   * linked and not VOID. The pair moves the quantity first-in first-out from the
+   * source account's lots to the destination account, keeping each lot's
+   * purchase date (the TRANSFER_OUT leg does the move, the TRANSFER_IN leg adds
+   * nothing of its own).
    */
   readonly pairedTransfer: boolean;
+  /**
+   * The account the row is recorded in. Lots are held per account: a removal
+   * takes from the lots of this account only. A row without one belongs to the
+   * single unnamed account (a caller that has no accounts to tell apart).
+   */
+  readonly accountId?: string | null;
+  /** For a paired transfer leg: the account of the other leg. */
+  readonly counterpartAccountId?: string | null;
 }
 
 export interface BondLot {
+  /** The account that holds the lot; absent for the unnamed account. */
+  readonly accountId?: string | null;
   readonly purchaseDate: string;
   /** A whole number of bonds. */
   readonly quantity: number;
@@ -34,7 +46,7 @@ export type BondLotsRefusalCode =
   | "SPLIT"
   /** A share-moving row whose quantity is not a whole number of bonds. */
   | "FRACTIONAL_QUANTITY"
-  /** A removal larger than the lots open at that point. */
+  /** A removal larger than the lots its account holds at that point. */
   | "OVER_REMOVAL"
   /** A share-moving row with no quantity, a negative one, or one too large to count. */
   | "INVALID_QUANTITY";
@@ -69,6 +81,8 @@ export type BondLotsResult =
 type Step =
   | { readonly kind: "add"; readonly assumed: boolean }
   | { readonly kind: "remove" }
+  /** A paired TRANSFER_OUT: the removed lots arrive in the other leg's account. */
+  | { readonly kind: "move"; readonly toAccount: string }
   | { readonly kind: "split" }
   | { readonly kind: "none" };
 
@@ -98,12 +112,19 @@ const NONE: Step = { kind: "none" };
 function stepOf(row: BondLotTransaction): Step {
   const base = baseInvestmentAction(row.action);
   if (base === InvestmentAction.TRANSFER_IN) {
-    // A linked leg moves a lot between accounts and keeps its purchase date; an
-    // unlinked one is shares that arrived with no known purchase.
+    // A linked leg arrives with the lots its TRANSFER_OUT moved, which keep
+    // their purchase dates; an unlinked one is shares that arrived with no known
+    // purchase.
     return row.pairedTransfer ? NONE : { kind: "add", assumed: true };
   }
   if (base === InvestmentAction.TRANSFER_OUT) {
-    return row.pairedTransfer ? NONE : { kind: "remove" };
+    if (!row.pairedTransfer) return { kind: "remove" };
+    // The pair is read at its outgoing leg, which names the destination. A pair
+    // whose other account is unknown moves nothing between accounts.
+    return row.counterpartAccountId === undefined ||
+      row.counterpartAccountId === null
+      ? NONE
+      : { kind: "move", toAccount: row.counterpartAccountId };
   }
   return LOT_EFFECT_BY_BASE_ACTION.get(base) ?? NONE;
 }
@@ -131,7 +152,9 @@ const refuse = (
  *
  * `rows` must be in register order (`INVESTMENT_REPLAY_ORDER_SQL`); this is a
  * pure fold of them, so the lots on a past day are the fold of the rows dated up
- * to it. VOID rows are excluded. A removal takes quantity first-in first-out.
+ * to it. VOID rows are excluded. Lots are held per account: a removal takes
+ * quantity first-in first-out from the lots of the row's own account, and a
+ * paired transfer moves it between accounts keeping the purchase dates.
  * Anything that makes the lots unknowable -- a split, a quantity that is not a
  * whole number of bonds, a removal larger than the open lots -- refuses with the
  * reason and the date of the row, and returns no lots: nothing is guessed.
@@ -139,7 +162,10 @@ const refuse = (
 export function bondLotsFromTransactions(
   rows: readonly BondLotTransaction[],
 ): BondLotsResult {
-  let open: BondLot[] = [];
+  // Lots per account, in the order the accounts first appear.
+  const byAccount = new Map<string, BondLot[]>();
+  const heldIn = (account: string): readonly BondLot[] =>
+    byAccount.get(account) ?? [];
 
   for (const row of rows) {
     if (row.status === "VOID") continue;
@@ -172,29 +198,45 @@ export function bondLotsFromTransactions(
     }
     if (quantity === 0) continue;
 
+    const account = accountKey(row.accountId);
+
     if (step.kind === "add") {
-      open = [
-        ...open,
+      byAccount.set(account, [
+        ...heldIn(account),
         {
+          accountId: row.accountId ?? undefined,
           purchaseDate: row.transactionDate,
           quantity,
           purchaseDateAssumed: step.assumed,
         },
-      ];
+      ]);
       continue;
     }
 
-    const removed = removeFifo(open, quantity);
-    if (removed === null) {
+    const taken = takeFifo(heldIn(account), quantity);
+    if (taken === null) {
       return refuse(
         "OVER_REMOVAL",
         row,
-        `${where} removes ${quantity} bonds, more than the ${totalOf(open)} held`,
+        `${where} removes ${quantity} bonds, more than the ${totalOf(heldIn(account))} held in its account`,
       );
     }
-    open = removed;
+    byAccount.set(account, taken.rest);
+
+    if (step.kind === "move") {
+      const destination = accountKey(step.toAccount);
+      byAccount.set(destination, [
+        ...heldIn(destination),
+        ...taken.removed.map((lot) => ({ ...lot, accountId: step.toAccount })),
+      ]);
+    }
   }
 
+  // Oldest first across accounts; the sort is stable, so equal dates keep the
+  // order the accounts first appeared in.
+  const open = [...byAccount.values()]
+    .flat()
+    .sort((a, b) => compareDates(a.purchaseDate, b.purchaseDate));
   return { lots: open, refusal: null };
 }
 
@@ -233,23 +275,39 @@ function totalOf(lots: readonly BondLot[]): number {
   return lots.reduce((sum, lot) => sum + lot.quantity, 0);
 }
 
-/** Oldest lots first; null when `quantity` exceeds what is open. */
-function removeFifo(
+const accountKey = (accountId: string | null | undefined): string =>
+  accountId ?? "";
+
+const compareDates = (a: string, b: string): number =>
+  a < b ? -1 : a > b ? 1 : 0;
+
+/**
+ * Oldest lots first (by purchase date, then the order they arrived in); null
+ * when `quantity` exceeds what is open. Returns what is left and the portions
+ * taken, which keep their purchase dates (a transfer carries them along).
+ */
+function takeFifo(
   lots: readonly BondLot[],
   quantity: number,
-): BondLot[] | null {
+): { rest: BondLot[]; removed: BondLot[] } | null {
   if (quantity > totalOf(lots)) return null;
   const rest: BondLot[] = [];
+  const removed: BondLot[] = [];
   let remaining = quantity;
-  for (const lot of lots) {
+  const oldestFirst = [...lots].sort((a, b) =>
+    compareDates(a.purchaseDate, b.purchaseDate),
+  );
+  for (const lot of oldestFirst) {
     if (remaining === 0) {
       rest.push(lot);
     } else if (lot.quantity <= remaining) {
       remaining -= lot.quantity;
+      removed.push(lot);
     } else {
       rest.push({ ...lot, quantity: lot.quantity - remaining });
+      removed.push({ ...lot, quantity: remaining });
       remaining = 0;
     }
   }
-  return rest;
+  return { rest, removed };
 }

@@ -15,7 +15,7 @@ import {
   ValidateIf,
   ValidateNested,
 } from "class-validator";
-import { Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import { SanitizeHtml } from "../../common/decorators/sanitize-html.decorator";
 import { IsCurrencyCode } from "../../common/validators/is-currency-code.validator";
 import {
@@ -236,6 +236,11 @@ export class CreateSecurityDto {
     nullable: true,
     format: "uuid",
   })
+  // One canonical spelling (lower case) before anything compares or stores the
+  // id: the same instrument in capitals is not a different link.
+  @Transform(({ value }) =>
+    typeof value === "string" ? value.toLowerCase() : value,
+  )
   @IsOptional()
   @ValidateIf((_o, value) => value !== null && value !== undefined)
   @IsUUID()

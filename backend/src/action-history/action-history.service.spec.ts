@@ -9,6 +9,7 @@ import {
 import { ActionHistory } from "./entities/action-history.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
+import { BondPriceService } from "../bonds/bond-price.service";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -19,6 +20,11 @@ describe("ActionHistoryService", () => {
   let mockRepository: Record<string, jest.Mock>;
   let mockQueryRunner: Record<string, any>;
   let mockDataSource: Record<string, any>;
+  let bondPrices: {
+    clearEnginePrices: jest.Mock;
+    publishClearedPrices: jest.Mock;
+    recomputeLinkedSecurities: jest.Mock;
+  };
 
   const userId = "user-1";
   const mockAction: Partial<ActionHistory> = {
@@ -95,6 +101,14 @@ describe("ActionHistoryService", () => {
     };
     mockDataSource = scoped.dataSource;
 
+    bondPrices = {
+      clearEnginePrices: jest
+        .fn()
+        .mockResolvedValue({ deleted: 2, accountIds: ["acct-1"] }),
+      publishClearedPrices: jest.fn(),
+      recomputeLinkedSecurities: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ActionHistoryService,
@@ -102,6 +116,7 @@ describe("ActionHistoryService", () => {
           provide: DataSource,
           useValue: mockDataSource,
         },
+        { provide: BondPriceService, useValue: bondPrices },
       ],
     }).compile();
 
@@ -1952,6 +1967,215 @@ describe("ActionHistoryService", () => {
         expect.objectContaining({ symbol: "AAPL", name: "Apple Inc." }),
       );
     });
+
+    describe("a security edit that touches the bond link (R4)", () => {
+      const INSTRUMENT = "11111111-1111-5111-8111-111111111111";
+      const edit = (before: Record<string, unknown>, after = {}) => ({
+        ...mockAction,
+        entityType: "security",
+        action: "update",
+        entityId: "sec-1",
+        beforeData: { id: "sec-1", userId, symbol: "EDO1036", ...before },
+        afterData: { id: "sec-1", symbol: "EDO1036", ...after },
+      });
+      /** The security row as it is now (locked) and the instrument's currency. */
+      const answer = (
+        current: Record<string, unknown>,
+        instrumentCurrency: string | null = "PLN",
+      ) =>
+        mockQueryRunner.query.mockImplementation(async (sql: string) => {
+          if (/FROM securities/.test(sql)) return [current];
+          if (/FROM bond_instruments/.test(sql))
+            return instrumentCurrency === null
+              ? []
+              : [{ currency_code: instrumentCurrency }];
+          return [];
+        });
+
+      it("restores the link with the currency, deletes the engine's prices of the old link, and prices nothing for an unlink", async () => {
+        answer({
+          bond_instrument_id: INSTRUMENT,
+          security_type: "BOND",
+          currency_code: "PLN",
+        });
+        mockRepository.findOne.mockResolvedValue(
+          edit({
+            bondInstrumentId: null,
+            currencyCode: "USD",
+            securityType: "BOND",
+          }),
+        );
+        mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
+
+        await service.undo(userId);
+
+        expect(bondPrices.clearEnginePrices).toHaveBeenCalledWith(
+          mockQueryRunner.manager,
+          userId,
+          "sec-1",
+        );
+        expect(mockQueryRunner.manager.update).toHaveBeenCalledWith(
+          expect.any(Function),
+          "sec-1",
+          expect.objectContaining({
+            bondInstrumentId: null,
+            currencyCode: "USD",
+          }),
+        );
+        expect(bondPrices.publishClearedPrices).toHaveBeenCalledWith(userId, [
+          "acct-1",
+        ]);
+        expect(bondPrices.recomputeLinkedSecurities).not.toHaveBeenCalled();
+      });
+
+      it("re-links through the same validation and recomputes after the commit", async () => {
+        answer({
+          bond_instrument_id: null,
+          security_type: "BOND",
+          currency_code: "PLN",
+        });
+        mockRepository.findOne.mockResolvedValue(
+          edit({
+            bondInstrumentId: INSTRUMENT,
+            currencyCode: "PLN",
+            securityType: "BOND",
+          }),
+        );
+        mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
+
+        await service.undo(userId);
+
+        expect(bondPrices.recomputeLinkedSecurities).toHaveBeenCalledWith(
+          userId,
+          ["sec-1"],
+        );
+      });
+
+      it.each([
+        ["the instrument is in another currency", "EUR", "BOND", INSTRUMENT],
+        ["the instrument no longer exists", null, "BOND", INSTRUMENT],
+        ["the security is no longer a BOND", "PLN", "ETF", INSTRUMENT],
+      ])(
+        "refuses with UNDO_LINK_INVALID and writes nothing when %s",
+        async (_why, instrumentCurrency, securityType, link) => {
+          answer(
+            {
+              bond_instrument_id: null,
+              security_type: "BOND",
+              currency_code: "PLN",
+            },
+            instrumentCurrency,
+          );
+          mockRepository.findOne.mockResolvedValue(
+            edit({
+              bondInstrumentId: link,
+              currencyCode: "PLN",
+              securityType,
+            }),
+          );
+
+          await expect(service.undo(userId)).rejects.toThrow(ConflictException);
+
+          expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
+          expect(bondPrices.clearEnginePrices).not.toHaveBeenCalled();
+          expect(bondPrices.recomputeLinkedSecurities).not.toHaveBeenCalled();
+        },
+      );
+
+      it("refuses restoring only the currency while the link stays to an instrument in another currency", async () => {
+        answer({
+          bond_instrument_id: INSTRUMENT,
+          security_type: "BOND",
+          currency_code: "PLN",
+        });
+        mockRepository.findOne.mockResolvedValue(
+          edit({ currencyCode: "USD", bondInstrumentId: INSTRUMENT }),
+        );
+
+        await expect(service.undo(userId)).rejects.toThrow(ConflictException);
+        expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
+      });
+
+      it("does not clear or recompute when the link is the same in another spelling", async () => {
+        answer({
+          bond_instrument_id: INSTRUMENT,
+          security_type: "BOND",
+          currency_code: "PLN",
+        });
+        mockRepository.findOne.mockResolvedValue(
+          edit({
+            bondInstrumentId: INSTRUMENT.toUpperCase(),
+            currencyCode: "PLN",
+            securityType: "BOND",
+          }),
+        );
+        mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
+
+        await service.undo(userId);
+
+        expect(bondPrices.clearEnginePrices).not.toHaveBeenCalled();
+        expect(bondPrices.recomputeLinkedSecurities).not.toHaveBeenCalled();
+      });
+
+      it("redo applies the edit's own snapshot through the same guard", async () => {
+        answer({
+          bond_instrument_id: null,
+          security_type: "BOND",
+          currency_code: "USD",
+        });
+        mockRepository.findOne.mockResolvedValue({
+          ...edit(
+            { bondInstrumentId: null, currencyCode: "USD" },
+            {
+              bondInstrumentId: INSTRUMENT,
+              currencyCode: "PLN",
+              securityType: "BOND",
+            },
+          ),
+          isUndone: true,
+        });
+        mockQueryRunner.manager.update.mockResolvedValue({ affected: 1 });
+
+        await service.redo(userId);
+
+        expect(bondPrices.recomputeLinkedSecurities).toHaveBeenCalledWith(
+          userId,
+          ["sec-1"],
+        );
+      });
+    });
+
+    it.each([
+      ["undo", false],
+      ["redo", true],
+    ])(
+      "%s of an investment transaction recomputes the engine prices of its securities after the commit",
+      async (which, isUndone) => {
+        mockRepository.findOne.mockResolvedValue({
+          ...mockAction,
+          entityType: "investment_transaction",
+          action: "update",
+          entityId: "itx-1",
+          isUndone,
+          beforeData: {
+            id: "itx-1",
+            securityId: "sec-1",
+            linkedTransferLeg: { securityId: "sec-2" },
+          },
+          afterData: { id: "itx-1", securityId: "sec-1" },
+        });
+        jest
+          .spyOn(service as any, "undoInvestmentTransaction")
+          .mockResolvedValue(undefined);
+
+        await (which === "undo" ? service.undo(userId) : service.redo(userId));
+
+        expect(bondPrices.recomputeLinkedSecurities).toHaveBeenCalledWith(
+          userId,
+          ["sec-1", "sec-2"],
+        );
+      },
+    );
 
     it("should undo budget delete", async () => {
       const action = {

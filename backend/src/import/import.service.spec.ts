@@ -27,6 +27,7 @@ import {
 import { Holding } from "../securities/entities/holding.entity";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { SecurityPriceService } from "../securities/security-price.service";
+import { SecuritiesService } from "../securities/securities.service";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { HoldingsService } from "../securities/holdings.service";
 import { ImportEntityCreatorService } from "./import-entity-creator.service";
@@ -328,6 +329,14 @@ describe("ImportService", () => {
         { provide: DataSource, useValue: mockDataSource },
         { provide: NetWorthService, useValue: mockNetWorthService },
         { provide: SecurityPriceService, useValue: mockSecurityPriceService },
+        {
+          provide: SecuritiesService,
+          useValue: {
+            recomputeBondPricesOfAccounts: jest
+              .fn()
+              .mockResolvedValue(undefined),
+          },
+        },
         { provide: ExchangeRateService, useValue: mockExchangeRateService },
         { provide: HoldingsService, useValue: mockHoldingsService },
         ImportPostProcessingService,

@@ -106,7 +106,11 @@ describe("valueBondLot: rate of period k (spec section 4)", () => {
     const wrongMonth = coi("2027-10-16", {
       benchmarks: cpi(["2027-07", "0.0300"], ["2027-09", "0.0300"]),
     });
-    expect(wrongMonth.currentPeriod).toBeNull();
+    expect(wrongMonth.currentPeriod).toMatchObject({
+      index: 2,
+      annualRate: null,
+      rateSource: null,
+    });
     expect(wrongMonth.missing).toEqual([
       { benchmarkId: CPI, observation: "2027-08", publisher: "GUS" },
     ]);
@@ -115,7 +119,14 @@ describe("valueBondLot: rate of period k (spec section 4)", () => {
   it("a started period without a rate makes every dependent value null", () => {
     const v = coi("2027-10-16");
     expect(v).toMatchObject({
-      currentPeriod: null,
+      status: "OPEN",
+      currentPeriod: {
+        index: 2,
+        start: "2027-10-15",
+        end: "2028-10-15",
+        annualRate: null,
+        rateSource: null,
+      },
       principal: null,
       accruedInterest: null,
       grossValue: null,
@@ -142,14 +153,17 @@ describe("valueBondLot: rate of period k (spec section 4)", () => {
     ]);
   });
 
-  it("a coupon bond needs only the current period", () => {
+  it("a coupon bond's value needs only the current period, but a completed period without a rate is named", () => {
     const v = coi("2028-10-20", { announcedRates: announced([3, "0.0300"]) });
     expect(v.grossValue).toBe("100.04");
     expect(v.currentPeriod).toMatchObject({
       index: 3,
       rateSource: "ANNOUNCED",
     });
-    expect(v.missing).toEqual([]);
+    expect(v.missing).toEqual([
+      { benchmarkId: CPI, observation: "2027-08", publisher: null },
+    ]);
+    expect(v.valuationComplete).toBe(false);
   });
 
   it("projects a period that has not started from a supplied assumption", () => {
@@ -198,7 +212,17 @@ describe("valueBondLot: rate of period k (spec section 4)", () => {
       maturityValueProjected: null,
       projectionAssumptions: [],
       knownCashflows: [],
-      projectedCashflows: [],
+      projectedCashflows: [
+        {
+          date: "2036-10-01",
+          type: "PRINCIPAL",
+          amount: null,
+          status: "UNKNOWN",
+          period: 10,
+        },
+      ],
+      projectionMissing: [{ benchmarkId: CPI, publisher: null }],
+      valuationComplete: true,
     });
     expect(
       edo("2026-10-10", { benchmarks: cpi() }).projectionAssumptions,
@@ -271,7 +295,10 @@ describe("valueBondLot: step benchmark with a business-day observation", () => {
     const v = ror(asOf, {
       benchmarks: nbp("2026-10-18", ["2026-09-01", "0.0450"]),
     });
-    expect(v.currentPeriod).toBeNull();
+    expect(v.currentPeriod).toMatchObject({
+      annualRate: null,
+      rateSource: null,
+    });
     expect(v.missing).toEqual([
       { benchmarkId: NBP, observation: "2026-10-19", publisher: "NBP" },
     ]);
@@ -280,11 +307,11 @@ describe("valueBondLot: step benchmark with a business-day observation", () => {
   it("is unknown without coverage or without a change on or before the day", () => {
     expect(
       ror(asOf, { benchmarks: nbp(null, ["2026-09-01", "0.0450"]) })
-        .currentPeriod,
+        .currentPeriod?.annualRate,
     ).toBeNull();
     expect(
       ror(asOf, { benchmarks: nbp("2026-12-01", ["2026-10-20", "0.0450"]) })
-        .currentPeriod,
+        .currentPeriod?.annualRate,
     ).toBeNull();
   });
 
@@ -300,7 +327,7 @@ describe("valueBondLot: step benchmark with a business-day observation", () => {
       ],
     ]);
     expect(
-      coi("2027-10-16", { benchmarks: wrongCpi }).currentPeriod,
+      coi("2027-10-16", { benchmarks: wrongCpi }).currentPeriod?.annualRate,
     ).toBeNull();
   });
 
@@ -386,7 +413,7 @@ describe("valueBondLot: matured lots", () => {
     });
   });
 
-  it("a coupon lot needs no rate to be worth its nominal; the unread last period is named", () => {
+  it("a coupon lot needs no rate to be worth its nominal; completed periods without a rate are named", () => {
     const v = coi("2030-10-15");
     expect(v).toMatchObject({
       principal: "100.00",
@@ -397,8 +424,10 @@ describe("valueBondLot: matured lots", () => {
       knownCashflows: [],
       valuationComplete: false,
     });
-    expect(v.missing).toEqual([
-      expect.objectContaining({ benchmarkId: CPI, observation: "2029-08" }),
+    expect(v.missing.map((m) => m.observation)).toEqual([
+      "2027-08",
+      "2028-08",
+      "2029-08",
     ]);
   });
 
@@ -622,7 +651,10 @@ describe("valueBondLot: early redemption window", () => {
 describe("valueBondLot: unknown calendars are incomplete terms, never guessed", () => {
   it("an observation calendar that is not supplied leaves the rate unknown", () => {
     const v = ror("2026-12-05", { calendars: new Map() });
-    expect(v.currentPeriod).toBeNull();
+    expect(v.currentPeriod).toMatchObject({
+      annualRate: null,
+      rateSource: null,
+    });
     expect(v.missing).toEqual([]);
     expect(v.dataCompleteness.termsComplete).toBe(false);
     expect(v.valuationComplete).toBe(false);

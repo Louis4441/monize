@@ -77,7 +77,7 @@ export const POLISH_BOND_ADAPTER: BondAdapter = {
           todayInTimezone("Europe/Warsaw") as string,
         );
       case PL_CPI_GUS_YOY:
-        return fetchGusCpi(fetch);
+        return fetchGusCpi(fetch, todayInTimezone("Europe/Warsaw") as string);
       default:
         throw new BenchmarkFetchError(
           `The Polish adapter has no benchmark ${code}`,

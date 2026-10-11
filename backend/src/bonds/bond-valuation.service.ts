@@ -84,11 +84,24 @@ export interface SecurityValuationTotals {
   readonly accruedInterest: string | null;
 }
 
+/**
+ * How fresh a benchmark series the instrument reads is: the day its stored
+ * observations are known to cover (null when no fetch has established one) and
+ * when the series was last stored. Lets a reader tell "not published yet" from
+ * "the feed has stalled".
+ */
+export interface BenchmarkCoverage {
+  readonly benchmarkId: string;
+  readonly coveredThrough: string | null;
+  readonly lastFetchedAt: string | null;
+}
+
 export interface SecurityValuation {
   readonly securityId: string;
   readonly instrument: BondInstrumentSummary;
   readonly asOf: string;
   readonly lots: readonly SecurityLotValuation[];
+  readonly benchmarkCoverage: readonly BenchmarkCoverage[];
   readonly totals: SecurityValuationTotals;
   readonly refusal: BondLotsRefusal | null;
 }
@@ -200,6 +213,7 @@ export class BondValuationService {
         assertReadsBenchmark(reference.terms, id);
       }
       const { instrument } = reference;
+      const benchmarkCoverage = await this.loadCoverage(m, reference.terms);
       const folded = bondLotsAsOf(ledger.transactions, asOf);
       if (folded.lots === null) {
         return {
@@ -207,6 +221,7 @@ export class BondValuationService {
           instrument,
           asOf,
           lots: [],
+          benchmarkCoverage,
           totals: {
             quantity: null,
             grossValue: null,
@@ -232,6 +247,7 @@ export class BondValuationService {
         instrument,
         asOf,
         lots,
+        benchmarkCoverage,
         totals: {
           quantity: lots.reduce((n, l) => n + l.quantity, 0),
           grossValue: sum((v) => v.grossValue),
@@ -444,6 +460,36 @@ export class BondValuationService {
         [instrumentId],
       );
     return new Map(rows.map((r) => [Number(r.period_number), r.annual_rate]));
+  }
+
+  /** The coverage of the series the rate rule reads; none for a fixed rate. */
+  private async loadCoverage(
+    m: EntityManager,
+    terms: BondTerms,
+  ): Promise<BenchmarkCoverage[]> {
+    if (terms.rateRule.type === "FIXED") return [];
+    const code = terms.rateRule.benchmarkId;
+    const rows: Array<{
+      covered_through: string | null;
+      updated_at: Date | string | null;
+    }> = await m.query(
+      `SELECT TO_CHAR(covered_through, 'YYYY-MM-DD') AS covered_through,
+              updated_at
+         FROM benchmark_series
+        WHERE code = $1`,
+      [code],
+    );
+    if (rows.length === 0) {
+      return [{ benchmarkId: code, coveredThrough: null, lastFetchedAt: null }];
+    }
+    const updated = rows[0].updated_at;
+    return [
+      {
+        benchmarkId: code,
+        coveredThrough: rows[0].covered_through,
+        lastFetchedAt: !updated ? null : new Date(updated).toISOString(),
+      },
+    ];
   }
 
   /** The series the rate rule reads; absent from the map when no row is stored. */

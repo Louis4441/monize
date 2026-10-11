@@ -264,6 +264,7 @@ describe("InvestmentTransactionsService", () => {
     };
 
     securitiesService = {
+      recomputeBondPricesAfterWrite: jest.fn().mockResolvedValue(undefined),
       findOne: jest.fn().mockResolvedValue(mockSecurity),
       resolveBySymbolOrName: jest
         .fn()
@@ -463,6 +464,31 @@ describe("InvestmentTransactionsService", () => {
       );
       expect(investmentTransactionsRepository.save).toHaveBeenCalled();
       expect(result).toEqual(mockBuyTransaction);
+    });
+
+    it("recomputes the bond-engine prices of its security after the commit (R7)", async () => {
+      await service.create(userId, createBuyDto);
+      expect(
+        securitiesService.recomputeBondPricesAfterWrite,
+      ).toHaveBeenCalledWith(userId, [securityId]);
+      // After the write: the holdings were rebuilt first.
+      expect(
+        holdingsService.rebuildScopesFromTransactions.mock
+          .invocationCallOrder[0],
+      ).toBeLessThan(
+        securitiesService.recomputeBondPricesAfterWrite.mock
+          .invocationCallOrder[0],
+      );
+    });
+
+    it("does not recompute for a VOID row, which recorded nothing", async () => {
+      await service.create(userId, {
+        ...createBuyDto,
+        status: TransactionStatus.VOID,
+      });
+      expect(
+        securitiesService.recomputeBondPricesAfterWrite,
+      ).not.toHaveBeenCalled();
     });
 
     it("updates holdings for a BUY transaction at the commission-inclusive unit cost", async () => {
@@ -1951,6 +1977,27 @@ describe("InvestmentTransactionsService", () => {
       });
     });
 
+    it("recomputes the bond-engine prices of the old and the new security after the edit (R7)", async () => {
+      const existingTx = { ...mockBuyTransaction };
+      investmentTransactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(createMockQueryBuilder(existingTx))
+        .mockReturnValueOnce(
+          createMockQueryBuilder({ ...existingTx, quantity: 20 }),
+        );
+      transactionRepository.findOne.mockResolvedValue({
+        id: cashTransactionId,
+        userId,
+        accountId: cashAccountId,
+        amount: -1509.99,
+      });
+
+      await service.update(userId, transactionId, { quantity: 20 });
+
+      expect(
+        securitiesService.recomputeBondPricesAfterWrite,
+      ).toHaveBeenCalledWith(userId, [securityId, securityId]);
+    });
+
     it("updates transaction fields and re-applies effects", async () => {
       // findOne returns existing BUY transaction
       const existingTx = { ...mockBuyTransaction };
@@ -2609,6 +2656,20 @@ describe("InvestmentTransactionsService", () => {
       });
     });
 
+    it("recomputes the bond-engine prices of its security after the delete (R7)", async () => {
+      const mockQB = createMockQueryBuilder({ ...mockBuyTransaction });
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        mockQB,
+      );
+      transactionRepository.findOne.mockResolvedValue(null);
+
+      await service.remove(userId, transactionId);
+
+      expect(
+        securitiesService.recomputeBondPricesAfterWrite,
+      ).toHaveBeenCalledWith(userId, [securityId]);
+    });
+
     it("reverses effects and deletes the transaction", async () => {
       const tx = { ...mockBuyTransaction, transactionId: cashTransactionId };
       const mockQB = createMockQueryBuilder(tx);
@@ -3095,6 +3156,16 @@ describe("InvestmentTransactionsService", () => {
      * from create/update/remove, so two concurrent writers of one account
      * deadlock (40P01).
      */
+    it("recomputes the bond-engine prices of the security whose row crossed the VOID boundary (R7)", async () => {
+      stageLocks([invLockRow()], [cashLockRow()]);
+
+      await service.updateStatus(userId, transactionId, TransactionStatus.VOID);
+
+      expect(
+        securitiesService.recomputeBondPricesAfterWrite,
+      ).toHaveBeenCalledWith(userId, [securityId]);
+    });
+
     it("takes the holdings advisory lock before its first row lock", async () => {
       stageLocks([invLockRow()], [cashLockRow()]);
 
@@ -4215,6 +4286,13 @@ describe("InvestmentTransactionsService", () => {
         holdingsDeleted: 5,
         accountsReset: 2,
       });
+      // No lots are left on any linked bond: its engine rows go (R7).
+      expect(
+        securitiesService.recomputeBondPricesAfterWrite,
+      ).toHaveBeenCalledWith(userId, [
+        mockBuyTransaction.securityId,
+        mockSellTransaction.securityId,
+      ]);
     });
 
     it("handles zero transactions gracefully", async () => {
@@ -6468,6 +6546,13 @@ describe("InvestmentTransactionsService", () => {
       expect(result).toHaveProperty("transferIn");
     });
 
+    it("recomputes the bond-engine prices of the security after the transfer (R7)", async () => {
+      await service.transferSecurity(userId, transferDto);
+      expect(
+        securitiesService.recomputeBondPricesAfterWrite,
+      ).toHaveBeenCalledWith(userId, [securityId]);
+    });
+
     it("does not create any cash transaction", async () => {
       await service.transferSecurity(userId, transferDto);
       expect(transactionRepository.create).not.toHaveBeenCalled();
@@ -7678,6 +7763,26 @@ describe("InvestmentTransactionsService", () => {
       expect(createSpy).toHaveBeenCalledTimes(2);
       expect(result.created.map((t) => t.id)).toEqual(["inv-1", "inv-2"]);
       expect(result.skipped).toEqual([]);
+    });
+
+    it("recomputes the bond-engine prices once per security after the whole batch, not once per row (R7)", async () => {
+      const createSpy = jest
+        .spyOn(service, "create")
+        .mockResolvedValueOnce({ id: "inv-1", securityId: "s1" } as never)
+        .mockResolvedValueOnce({ id: "inv-2", securityId: "s1" } as never)
+        .mockResolvedValueOnce({ id: "inv-3", securityId: "s2" } as never);
+
+      await service.createBulk(userId, [dto(), dto(), dto()]);
+
+      for (const call of createSpy.mock.calls) {
+        expect(call[2]).toEqual({ deferBondRecompute: true });
+      }
+      expect(
+        securitiesService.recomputeBondPricesAfterWrite,
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        securitiesService.recomputeBondPricesAfterWrite,
+      ).toHaveBeenCalledWith(userId, ["s1", "s1", "s2"]);
     });
 
     it("isolates a failing row into skipped without aborting the rest", async () => {

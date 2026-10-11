@@ -28,7 +28,7 @@ describe("BackupRestoreDatabaseService.severUnavailableCatalogLinks", () => {
     ]);
     await expect(
       service.severUnavailableCatalogLinks(manager, backup),
-    ).resolves.toEqual({});
+    ).resolves.toEqual({ counts: {}, severed: {} });
     expect(backup.securities[0].bond_instrument_id).toBe(PRESENT);
     expect(warn).not.toHaveBeenCalled();
   });
@@ -38,14 +38,24 @@ describe("BackupRestoreDatabaseService.severUnavailableCatalogLinks", () => {
       { id: PRESENT, currency_code: "PLN" },
     ]);
     const original = [
-      { id: "s1", currency_code: "PLN", bond_instrument_id: ABSENT },
+      {
+        id: "s1",
+        symbol: "EDO0136",
+        currency_code: "PLN",
+        bond_instrument_id: ABSENT,
+      },
       { id: "s2", currency_code: "PLN", bond_instrument_id: PRESENT },
       { id: "s3", currency_code: "USD", bond_instrument_id: null },
     ];
     const backup = data(original);
     await expect(
       service.severUnavailableCatalogLinks(manager, backup),
-    ).resolves.toEqual({ "securities.bond_instrument_id": 1 });
+    ).resolves.toEqual({
+      counts: { "securities.bond_instrument_id": 1 },
+      severed: {
+        "securities.bond_instrument_id": [{ id: "s1", symbol: "EDO0136" }],
+      },
+    });
     expect(backup.securities.map((r) => r.bond_instrument_id)).toEqual([
       null,
       PRESENT,
@@ -67,7 +77,9 @@ describe("BackupRestoreDatabaseService.severUnavailableCatalogLinks", () => {
     ]);
     await expect(
       service.severUnavailableCatalogLinks(manager, backup),
-    ).resolves.toEqual({ "securities.bond_instrument_id": 1 });
+    ).resolves.toMatchObject({
+      counts: { "securities.bond_instrument_id": 1 },
+    });
     expect(backup.securities[0].bond_instrument_id).toBeNull();
     expect(warn.mock.calls[0][0]).toMatch(/another currency/);
   });
@@ -107,7 +119,7 @@ describe("BackupRestoreDatabaseService.severUnavailableCatalogLinks", () => {
         { id: "t2", fund_id: PRESENT },
       ],
     } as unknown as BackupData;
-    const counts =
+    const { counts } =
       await new BackupRestoreDatabaseService().severUnavailableCatalogLinks(
         manager,
         backup,

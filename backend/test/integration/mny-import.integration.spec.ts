@@ -13,6 +13,7 @@ import { UserPreference } from "@/users/entities/user-preference.entity";
 import { UsersService } from "@/users/users.service";
 import { CurrenciesService } from "@/currencies/currencies.service";
 import { NetWorthService } from "@/net-worth/net-worth.service";
+import { SecuritiesService } from "@/securities/securities.service";
 import { SecurityPriceService } from "@/securities/security-price.service";
 import { ExchangeRateService } from "@/currencies/exchange-rate.service";
 import { Security } from "@/securities/entities/security.entity";
@@ -179,6 +180,11 @@ describe("mny writers (integration)", () => {
             backfillHistoricalPrices: async () => undefined,
             backfillTransactionPrices: async () => undefined,
           },
+        },
+        {
+          // Stubbed: the bond-price recompute is not what these cases read.
+          provide: SecuritiesService,
+          useValue: { recomputeBondPricesOfAccounts: async () => undefined },
         },
         {
           provide: ExchangeRateService,

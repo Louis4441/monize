@@ -1,3 +1,4 @@
+import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 import { CreateSecurityDto } from "./create-security.dto";
 import { UpdateSecurityDto } from "./update-security.dto";
@@ -27,5 +28,24 @@ describe.each([CreateSecurityDto, UpdateSecurityDto])(
         expect(await errors(value)).toHaveLength(1);
       },
     );
+  },
+);
+
+describe.each([CreateSecurityDto, UpdateSecurityDto])(
+  "bond instrument link spelling in %p",
+  (Dto) => {
+    it("is canonicalized to lower case, so the same instrument is never a different link", () => {
+      const dto = plainToInstance(Dto, {
+        bondInstrumentId: UUID.toUpperCase(),
+      });
+      expect(dto.bondInstrumentId).toBe(UUID);
+    });
+
+    it("leaves null (unlink) and an absent id alone", () => {
+      expect(
+        plainToInstance(Dto, { bondInstrumentId: null }).bondInstrumentId,
+      ).toBeNull();
+      expect(plainToInstance(Dto, {}).bondInstrumentId).toBeUndefined();
+    });
   },
 );

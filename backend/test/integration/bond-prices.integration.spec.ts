@@ -9,6 +9,12 @@ import { acquireAdvisoryLock, LockScope } from "@/common/db/locks";
 import { withScopedDb } from "@/common/db/scoped-db";
 import { withSystemContext, withUserContext } from "@/common/db/with-context";
 import { todayYMD } from "@/common/date-utils";
+import {
+  ActionHistoryService,
+  settlePendingHistoryWrites,
+} from "@/action-history/action-history.service";
+import { InvestmentAction } from "@/securities/entities/investment-transaction.entity";
+import { InvestmentTransactionsService } from "@/securities/investment-transactions.service";
 import { SecuritiesModule } from "@/securities/securities.module";
 import { SecuritiesService } from "@/securities/securities.service";
 import { SecurityPriceService } from "@/securities/security-price.service";
@@ -16,6 +22,7 @@ import {
   cleanTables,
   createIntegrationModule,
   createTestUserDirect,
+  deleteBondInstrumentBypassingImmutability,
 } from "../helpers/integration-setup";
 
 /**
@@ -37,6 +44,8 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
   let securities: SecuritiesService;
   let priceService: SecurityPriceService;
   let catalog: BondCatalogService;
+  let investments: InvestmentTransactionsService;
+  let history: ActionHistoryService;
 
   let userId: string;
   let otherUserId: string;
@@ -62,6 +71,8 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
     securities = module.get(SecuritiesService);
     priceService = module.get(SecurityPriceService);
     catalog = module.get(BondCatalogService);
+    investments = module.get(InvestmentTransactionsService);
+    history = module.get(ActionHistoryService);
   });
 
   afterAll(async () => {
@@ -192,13 +203,14 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
       ]);
     });
 
-    it("never overwrites a manual or a transaction-derived price, and does not count them", async () => {
+    it("replaces every non-manual row of its days (a provider's, a trade's) with NULL adjusted_close, never a manual one, and counts only what it wrote (R3)", async () => {
       await ledger("BUY", "2026-10-15", 25);
       await dataSource.query(
-        `INSERT INTO security_prices (security_id, price_date, close_price, source)
-         VALUES ($1, '2026-10-20', 999, 'manual'),
-                ($1, '2026-10-21', 888, 'buy'),
-                ($1, '2026-10-22', 777, 'yahoo_finance')`,
+        `INSERT INTO security_prices (security_id, price_date, close_price, adjusted_close, source)
+         VALUES ($1, '2026-10-20', 999, NULL, 'manual'),
+                ($1, '2026-10-21', 888, NULL, 'buy'),
+                ($1, '2026-10-22', 777, 777, 'yahoo_finance'),
+                ($1, '2026-10-23', 666, NULL, NULL)`,
         [securityId],
       );
 
@@ -207,21 +219,71 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
       const byDate = new Map(
         (await priceRows()).map((r: { d: string }) => [r.d, r]),
       );
+      // The user's own price always wins.
       expect(byDate.get("2026-10-20")).toMatchObject({
         p: "999.0000000000",
         source: "manual",
       });
+      // A trade price is one lot's price and a provider's quote is not the
+      // holding's value: the engine's value is the security's price.
       expect(byDate.get("2026-10-21")).toMatchObject({
-        p: "888.0000000000",
-        source: "buy",
+        p: cents(grossCents(6)),
+        source: "bond_engine",
       });
       expect(byDate.get("2026-10-22")).toMatchObject({
-        p: "777.0000000000",
-        source: "yahoo_finance",
+        p: cents(grossCents(7)),
+        source: "bond_engine",
       });
-      // 11 days, three of them taken by other sources.
-      expect(result).toEqual({ written: 8, deleted: 0 });
-      expect(byDate.get("2026-10-23")).toMatchObject({ source: "bond_engine" });
+      // A legacy row with no source is not a manual price: NULL <> 'manual'
+      // is NULL in SQL, so the predicate must be IS DISTINCT FROM.
+      expect(byDate.get("2026-10-23")).toMatchObject({
+        p: cents(grossCents(8)),
+        source: "bond_engine",
+      });
+      const adjusted = await dataSource.query(
+        `SELECT adjusted_close FROM security_prices WHERE security_id = $1 AND source = 'bond_engine'`,
+        [securityId],
+      );
+      expect(
+        adjusted.every(
+          (r: { adjusted_close: unknown }) => r.adjusted_close === null,
+        ),
+      ).toBe(true);
+      // 11 days, one of them the user's.
+      expect(result).toEqual({ written: 10, deleted: 0 });
+    });
+
+    it("a manual price written over an engine row keeps no adjusted close of the engine's (R3)", async () => {
+      await ledger("BUY", "2026-10-15", 10);
+      await recompute("2026-10-17");
+      // A row from before the engine stored NULL (adjusted_close = close).
+      await dataSource.query(
+        `UPDATE security_prices SET adjusted_close = close_price WHERE security_id = $1 AND price_date = '2026-10-16'`,
+        [securityId],
+      );
+
+      await withUserContext(userId, () =>
+        priceService.createManualPrice(
+          securityId,
+          { priceDate: "2026-10-16", closePrice: 123 },
+          userId,
+        ),
+      );
+
+      const rows = await dataSource.query(
+        `SELECT source, close_price::text AS p, adjusted_close FROM security_prices
+          WHERE security_id = $1 AND price_date = '2026-10-16'`,
+        [securityId],
+      );
+      expect(rows).toEqual([
+        { source: "manual", p: "123.0000000000", adjusted_close: null },
+      ]);
+
+      // The engine does not take it back.
+      await recompute("2026-10-17");
+      expect(
+        (await priceRows()).find((r: { d: string }) => r.d === "2026-10-16"),
+      ).toMatchObject({ source: "manual", p: "123.0000000000" });
     });
 
     it("does not rewrite a day whose price is unchanged, and corrects one that differs", async () => {
@@ -396,7 +458,8 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
   describe("linking through the security API (C)", () => {
     it("refuses a missing instrument and a currency mismatch before writing, then prices the link after commit", async () => {
       const plain = await insertSecurity("LINKME", null);
-      await ledger("BUY", "2026-01-05", 10, plain);
+      // Inside the series' sale window (October 2026).
+      await ledger("BUY", "2026-10-05", 10, plain);
 
       const update = (dto: Parameters<SecuritiesService["update"]>[2]) =>
         withUserContext(userId, () => securities.update(userId, plain, dto));
@@ -432,8 +495,8 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
       });
       expect(linked.bondInstrumentId).toBe(TOS_ID);
       const rows = await priceRows(plain);
-      expect(rows.length).toBeGreaterThan(200);
-      expect(rows[0]).toMatchObject({ d: "2026-01-05", source: "bond_engine" });
+      expect(rows.length).toBeGreaterThanOrEqual(2);
+      expect(rows[0]).toMatchObject({ d: "2026-10-05", source: "bond_engine" });
       expect(rows[rows.length - 1].d).toBe(todayYMD());
 
       // A currency change of a linked security is refused; unlinking first is the way.
@@ -451,9 +514,11 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
       );
       await insertSecurity("BARE", bare[0].id);
       await expect(
-        dataSource.query(`DELETE FROM bond_instruments WHERE id = $1`, [
-          bare[0].id,
-        ]),
+        deleteBondInstrumentBypassingImmutability(
+          dataSource,
+          `DELETE FROM bond_instruments WHERE id = $1`,
+          [bare[0].id],
+        ),
       ).rejects.toThrow(/"fk_securities_bond_instrument"/);
 
       // Unlinked, the same row deletes: the constraint is the only guard.
@@ -461,12 +526,14 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
         `UPDATE securities SET bond_instrument_id = NULL WHERE bond_instrument_id = $1`,
         [bare[0].id],
       );
-      await dataSource.query(`DELETE FROM bond_instruments WHERE id = $1`, [
-        bare[0].id,
-      ]);
+      await deleteBondInstrumentBypassingImmutability(
+        dataSource,
+        `DELETE FROM bond_instruments WHERE id = $1`,
+        [bare[0].id],
+      );
     });
 
-    it("unlinking deletes the engine's rows in the same transaction and leaves every other source", async () => {
+    it("unlinking deletes the engine's rows in the same transaction and leaves the user's own prices and the other sources on days the engine did not price", async () => {
       await ledger("BUY", "2026-10-15", 10);
       await dataSource.query(
         `INSERT INTO security_prices (security_id, price_date, close_price, source)
@@ -482,8 +549,9 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
         securities.update(userId, securityId, { bondInstrumentId: null }),
       );
 
+      // The trade's row of the 16th was the engine's day, replaced by the
+      // engine's value; only the user's own price is left.
       expect(await priceRows()).toEqual([
-        expect.objectContaining({ d: "2026-10-16", source: "buy" }),
         expect.objectContaining({ d: "2026-10-17", source: "manual" }),
       ]);
       // Nothing re-creates them: the security is no longer the engine's, and an
@@ -491,7 +559,7 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
       await expect(recompute("2026-10-20")).rejects.toBeInstanceOf(
         NotFoundException,
       );
-      expect(await priceRows()).toHaveLength(2);
+      expect(await priceRows()).toHaveLength(1);
     });
 
     it("moving the link to another instrument replaces the old instrument's prices with the new one's", async () => {
@@ -614,10 +682,11 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
         [userId, accountId, securityId],
       );
 
-    it("a trade recorded after the engine priced the day replaces the engine's row, and the engine does not take it back", async () => {
+    it("a trade recorded after the engine priced the day does not replace the engine's row: a trade is one lot's price, not the holding's value", async () => {
       await ledger("BUY", "2026-10-15", 10);
       await recompute("2026-10-22");
-      expect((await priceRows())[5]).toMatchObject({
+      const engineRow = (await priceRows())[5];
+      expect(engineRow).toMatchObject({
         d: "2026-10-20",
         source: "bond_engine",
       });
@@ -626,36 +695,35 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
       await withUserContext(userId, () =>
         priceService.upsertTransactionPrice(securityId, "2026-10-20"),
       );
-      expect((await priceRows())[5]).toMatchObject({
-        d: "2026-10-20",
-        p: "100.5000000000",
-        source: "buy",
-      });
+      expect((await priceRows())[5]).toEqual(engineRow);
 
-      // The next recompute leaves the trade's price alone.
-      await recompute("2026-10-22");
-      expect((await priceRows())[5]).toMatchObject({
-        d: "2026-10-20",
-        p: "100.5000000000",
-        source: "buy",
+      // The new purchase changes the lots from the 20th, so the next recompute
+      // reprices those days -- and the 20th stays the engine's, not the trade's.
+      await expect(recompute("2026-10-22")).resolves.toMatchObject({
+        written: 3,
       });
+      const after = (await priceRows())[5];
+      expect(after).toMatchObject({ d: "2026-10-20", source: "bond_engine" });
+      expect(after.p).not.toBe("100.5000000000");
     });
 
-    it("a trade recorded before the engine runs keeps its row (the other order ends the same)", async () => {
+    it("a trade recorded before the engine runs is replaced by the engine's row (the other order ends the same)", async () => {
       await ledger("BUY", "2026-10-15", 10);
       await buyOn20th();
       await withUserContext(userId, () =>
         priceService.upsertTransactionPrice(securityId, "2026-10-20"),
       );
+      expect(await priceRows()).toEqual([
+        expect.objectContaining({ d: "2026-10-20", source: "buy" }),
+      ]);
       await recompute("2026-10-22");
       expect((await priceRows())[5]).toMatchObject({
         d: "2026-10-20",
-        p: "100.5000000000",
-        source: "buy",
+        source: "bond_engine",
       });
     });
 
-    it("the bulk transaction-price backfill replaces an engine row too, and never a manual one", async () => {
+    it("the bulk transaction-price backfill replaces neither an engine row nor a manual one", async () => {
       await ledger("BUY", "2026-10-15", 10);
       await recompute("2026-10-22");
       await dataSource.query(
@@ -666,8 +734,8 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
       const byDate = new Map(
         (await priceRows()).map((r: { d: string }) => [r.d, r]),
       );
-      // The BUY's own day: the trade's price over the engine's row.
-      expect(byDate.get("2026-10-15")).toMatchObject({ source: "buy" });
+      // The BUY's own day keeps the engine's value over the trade's price.
+      expect(byDate.get("2026-10-15")).toMatchObject({ source: "bond_engine" });
       expect(byDate.get("2026-10-16")).toMatchObject({ source: "manual" });
       expect(byDate.get("2026-10-17")).toMatchObject({ source: "bond_engine" });
     });
@@ -730,6 +798,59 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
         ),
       ).resolves.toMatchObject({ source: "bond_engine" });
       expect(await priceRows()).toEqual(before);
+    });
+
+    // Each layer is pinned on its own (a removal of either must fail here):
+    // the link re-check at the write, and the source guard on the row replaced.
+    it("a provider bar on a day the engine has no row for (before the purchase) creates no row for a linked security, in a history write and in a quote write", async () => {
+      await ledger("BUY", "2026-10-15", 10);
+      await recompute("2026-10-17");
+      const before = await priceRows();
+
+      await withUserContext(userId, () =>
+        writers().bulkUpsertPrices(
+          { id: securityId, userId },
+          [{ ...bars[0], date: new Date("2026-10-14T00:00:00.000Z") }],
+          "yahoo_finance",
+        ),
+      );
+      // The quote write has nothing to return for a linked security.
+      await expect(
+        withUserContext(userId, () =>
+          writers().savePriceData({ id: securityId, userId }, "2026-10-14", {
+            symbol: "TOS1029",
+            regularMarketPrice: 77,
+          }),
+        ),
+      ).rejects.toThrow(/Failed to persist price/);
+
+      expect(await priceRows()).toEqual(before);
+    });
+
+    it("a provider never replaces a bond_engine row even where the link check sees no link (a link committed after the statement's snapshot)", async () => {
+      const racing = await insertSecurity("RACING", null);
+      await dataSource.query(
+        `INSERT INTO security_prices (security_id, price_date, close_price, source)
+         VALUES ($1, '2026-10-16', 100.01, 'bond_engine')`,
+        [racing],
+      );
+      const before = await priceRows(racing);
+
+      await withUserContext(userId, () =>
+        writers().bulkUpsertPrices(
+          { id: racing, userId },
+          [bars[0]],
+          "yahoo_finance",
+        ),
+      );
+      await withUserContext(userId, () =>
+        writers().savePriceData({ id: racing, userId }, "2026-10-16", {
+          symbol: "RACING",
+          regularMarketPrice: 77,
+        }),
+      );
+
+      expect(await priceRows(racing)).toEqual(before);
     });
 
     it("an unlinked security still gets its provider rows, and a manual price is still protected", async () => {
@@ -961,6 +1082,316 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
     it("answers 404 for another user's security", async () => {
       await expect(scenarios(["0"], otherUserId)).rejects.toBeInstanceOf(
         NotFoundException,
+      );
+    });
+  });
+
+  describe("lots per account (R6)", () => {
+    it("a sale in one account leaves the other account's older lot priced, and the price blends every account", async () => {
+      const second = (
+        await dataSource.query(
+          `INSERT INTO accounts (user_id, account_type, account_sub_type, name, currency_code, current_balance, opening_balance)
+           VALUES ($1, 'INVESTMENT', 'INVESTMENT_BROKERAGE', 'Second', 'PLN', 0, 0) RETURNING id`,
+          [userId],
+        )
+      )[0].id;
+      const insertIn = (
+        account: string,
+        action: string,
+        date: string,
+        quantity: number,
+      ) =>
+        dataSource.query(
+          `INSERT INTO investment_transactions
+             (user_id, account_id, security_id, action, transaction_date, quantity, price, total_amount, status)
+           VALUES ($1, $2, $3, $4, $5, $6, 100, $7, 'UNRECONCILED')`,
+          [userId, account, securityId, action, date, quantity, quantity * 100],
+        );
+      await insertIn(accountId, "BUY", "2026-10-01", 10); // the older lot
+      await insertIn(second, "BUY", "2026-10-20", 10);
+      await insertIn(second, "SELL", "2026-10-25", 10);
+
+      await recompute("2026-10-26");
+
+      const byDate = new Map<string, { p: string }>(
+        (await priceRows()).map((r: { d: string; p: string }) => [r.d, r]),
+      );
+      // Blend of both lots on the 20th: 19 days into lot 1 (100.23 per bond),
+      // 0 into lot 2 (100.00): (100.23 x 10 + 100.00 x 10) / 20 = 100.115.
+      expect(grossCents(19)).toBe(10023n);
+      expect(byDate.get("2026-10-20")!.p).toBe("100.1150000000");
+      // After the sale in the second account, the older lot of the first is left.
+      expect(byDate.get("2026-10-26")!.p).toBe(cents(grossCents(25)));
+    });
+  });
+
+  describe("a ledger write on a linked security reprices it after the commit (R7)", () => {
+    const buyDto = (over: Record<string, unknown> = {}) => ({
+      accountId,
+      securityId,
+      action: InvestmentAction.BUY,
+      transactionDate: "2026-10-05",
+      quantity: 10,
+      price: 100,
+      commission: 0,
+      ...over,
+    });
+
+    it("create, void, un-void and delete each leave the engine's rows in step with the ledger", async () => {
+      expect(await priceRows()).toEqual([]);
+
+      const row = await withUserContext(userId, () =>
+        investments.create(userId, buyDto()),
+      );
+      const created = await priceRows();
+      expect(created.length).toBeGreaterThan(1);
+      expect(created[0]).toMatchObject({
+        d: "2026-10-05",
+        source: "bond_engine",
+      });
+
+      await withUserContext(userId, () =>
+        investments.updateStatus(userId, row.id, "VOID" as never),
+      );
+      expect(await priceRows()).toEqual([]);
+
+      await withUserContext(userId, () =>
+        investments.updateStatus(userId, row.id, "UNRECONCILED" as never),
+      );
+      expect((await priceRows()).length).toBe(created.length);
+
+      await withUserContext(userId, () => investments.remove(userId, row.id));
+      expect(await priceRows()).toEqual([]);
+    });
+
+    it("an edit of the date moves the first priced day; a bulk batch reprices once per security", async () => {
+      const row = await withUserContext(userId, () =>
+        investments.create(userId, buyDto()),
+      );
+      await withUserContext(userId, () =>
+        investments.update(userId, row.id, { transactionDate: "2026-10-08" }),
+      );
+      expect((await priceRows())[0]).toMatchObject({ d: "2026-10-08" });
+
+      const spy = jest.spyOn(prices, "recomputeSecurity");
+      try {
+        await withUserContext(userId, () =>
+          investments.createBulk(userId, [
+            buyDto({ transactionDate: "2026-10-02" }),
+            buyDto({ transactionDate: "2026-10-03" }),
+          ]),
+        );
+        expect(spy).toHaveBeenCalledTimes(1);
+      } finally {
+        spy.mockRestore();
+      }
+      expect((await priceRows())[0]).toMatchObject({ d: "2026-10-02" });
+    });
+  });
+
+  describe("the link rules of the security API (R8, R15, R16, R32)", () => {
+    const update = (
+      dto: Parameters<SecuritiesService["update"]>[2],
+      id = securityId,
+    ) => withUserContext(userId, () => securities.update(userId, id, dto));
+
+    it("R8: only a BOND is linked; a linked security cannot leave BOND unless it unlinks in the same request", async () => {
+      const etf = await insertSecurity("ETFX", null);
+      await dataSource.query(
+        `UPDATE securities SET security_type = 'ETF' WHERE id = $1`,
+        [etf],
+      );
+      await expect(update({ bondInstrumentId: TOS_ID }, etf)).rejects.toThrow(
+        /Only a security of type Bond/,
+      );
+
+      await ledger("BUY", "2026-10-05", 10);
+      await recompute("2026-10-08");
+      const before = await priceRows();
+      await expect(update({ securityType: "ETF" })).rejects.toThrow(
+        /Only a security of type Bond/,
+      );
+      expect(await priceRows()).toEqual(before);
+
+      await update({ securityType: "ETF", bondInstrumentId: null });
+      expect(await priceRows()).toEqual([]);
+    });
+
+    it("R15: a security whose trades are not priced per bond is not linked", async () => {
+      const legacy = await insertSecurity("LEGACY", null);
+      // 1000 units at 1.00 (currency units): the quantity is not a number of bonds.
+      await dataSource.query(
+        `INSERT INTO investment_transactions
+           (user_id, account_id, security_id, action, transaction_date, quantity, price, total_amount, status)
+         VALUES ($1, $2, $3, 'BUY', '2026-10-05', 1000, 1.00, 1000, 'UNRECONCILED')`,
+        [userId, accountId, legacy],
+      );
+      await expect(
+        update({ bondInstrumentId: TOS_ID }, legacy),
+      ).rejects.toThrow(/not numbers of bonds/);
+      expect(await priceRows(legacy)).toEqual([]);
+
+      // The exchange price of a bond (99.90 per 100 face) is within the band.
+      const proper = await insertSecurity("PROPER", null);
+      await dataSource.query(
+        `INSERT INTO investment_transactions
+           (user_id, account_id, security_id, action, transaction_date, quantity, price, total_amount, status)
+         VALUES ($1, $2, $3, 'BUY', '2026-10-05', 10, 99.90, 999, 'UNRECONCILED')`,
+        [userId, accountId, proper],
+      );
+      await expect(
+        update({ bondInstrumentId: TOS_ID }, proper),
+      ).resolves.toMatchObject({ bondInstrumentId: TOS_ID });
+    });
+
+    it("R16: the same instrument in capitals is no change: the engine's rows are neither deleted nor rewritten", async () => {
+      await ledger("BUY", "2026-10-05", 10);
+      await recompute("2026-10-08");
+      const before = await priceRows();
+
+      const result = await update({ bondInstrumentId: TOS_ID.toUpperCase() });
+
+      expect(result.bondInstrumentId).toBe(TOS_ID);
+      expect(await priceRows()).toEqual(before);
+    });
+
+    it("R32: an update that read the security unlinked, while a concurrent link committed, neither puts the stale link back nor drops the link's prices", async () => {
+      await ledger("BUY", "2026-10-05", 10);
+      const plain = await insertSecurity("STALE", null);
+      await ledger("BUY", "2026-10-05", 10, plain);
+
+      // Request B is in flight with a snapshot that saw the security unlinked...
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      const original = securities.findOne.bind(securities);
+      const spy = jest
+        .spyOn(securities, "findOne")
+        .mockImplementationOnce(async (u: string, id: string) => {
+          const stale = await original(u, id);
+          await gate;
+          return stale;
+        });
+      const rename = update({ name: "Renamed" }, plain);
+      // ...request A links and is priced after its commit.
+      await new Promise((r) => setTimeout(r, 100));
+      await update({ bondInstrumentId: TOS_ID }, plain);
+      expect((await priceRows(plain)).length).toBeGreaterThan(0);
+      release();
+      await rename;
+      spy.mockRestore();
+
+      const row = await dataSource.query(
+        `SELECT name, bond_instrument_id FROM securities WHERE id = $1`,
+        [plain],
+      );
+      expect(row[0]).toEqual({ name: "Renamed", bond_instrument_id: TOS_ID });
+      expect((await priceRows(plain)).length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("undo of a security edit restores the link under the same rules (R4)", () => {
+    it("undoing a currency-and-link edit restores both, deletes the engine's rows, and leaves no linked security in another currency", async () => {
+      const usd = await insertSecurity("USDBOND", null);
+      await dataSource.query(
+        `UPDATE securities SET currency_code = 'USD' WHERE id = $1`,
+        [usd],
+      );
+      await ledger("BUY", "2026-10-05", 10, usd);
+      await withUserContext(userId, () =>
+        securities.update(userId, usd, {
+          currencyCode: "PLN",
+          bondInstrumentId: TOS_ID,
+        }),
+      );
+      await settlePendingHistoryWrites();
+      expect((await priceRows(usd)).length).toBeGreaterThan(0);
+
+      await withUserContext(userId, () => history.undo(userId));
+
+      const row = await dataSource.query(
+        `SELECT currency_code, bond_instrument_id FROM securities WHERE id = $1`,
+        [usd],
+      );
+      expect(row[0]).toEqual({
+        currency_code: "USD",
+        bond_instrument_id: null,
+      });
+      expect(await priceRows(usd)).toEqual([]);
+      const mismatched = await dataSource.query(
+        `SELECT 1 FROM securities s JOIN bond_instruments b ON b.id = s.bond_instrument_id
+          WHERE s.currency_code <> b.currency_code`,
+      );
+      expect(mismatched).toEqual([]);
+
+      // Redo applies the edit again, through the same guard, and prices it.
+      await withUserContext(userId, () => history.redo(userId));
+      expect((await priceRows(usd)).length).toBeGreaterThan(0);
+    });
+
+    it("an undo whose restored state is not a valid link is refused with a code and writes nothing", async () => {
+      await ledger("BUY", "2026-10-05", 10);
+      await recompute("2026-10-08");
+      const before = await priceRows();
+      // A recorded state that names the link but not its currency.
+      await withUserContext(userId, () =>
+        history.record(userId, {
+          entityType: "security",
+          entityId: securityId,
+          action: "update",
+          beforeData: {
+            id: securityId,
+            bondInstrumentId: TOS_ID,
+            currencyCode: "USD",
+            securityType: "BOND",
+          },
+          afterData: { id: securityId },
+          description: "Updated security",
+        }),
+      );
+
+      await expect(
+        withUserContext(userId, () => history.undo(userId)),
+      ).rejects.toThrow(/cannot be undone because the bond link/);
+      expect(await priceRows()).toEqual(before);
+      const row = await dataSource.query(
+        `SELECT currency_code FROM securities WHERE id = $1`,
+        [securityId],
+      );
+      expect(row[0].currency_code).toBe("PLN");
+    });
+  });
+
+  describe("one definition of today (R17)", () => {
+    it("without an explicit day, the last day priced is the date in the timezone of the user's preferences", async () => {
+      await ledger("BUY", "2026-10-05", 10);
+      await dataSource.query(
+        `INSERT INTO user_preferences (user_id, timezone) VALUES ($1, 'Pacific/Kiritimati')
+         ON CONFLICT (user_id) DO UPDATE SET timezone = EXCLUDED.timezone`,
+        [userId],
+      );
+      await withUserContext(userId, () =>
+        prices.recomputeSecurity(userId, securityId),
+      );
+      const east = (await priceRows()).map((r: { d: string }) => r.d);
+
+      await dataSource.query(
+        `UPDATE user_preferences SET timezone = 'Pacific/Pago_Pago' WHERE user_id = $1`,
+        [userId],
+      );
+      await withUserContext(userId, () =>
+        prices.recomputeSecurity(userId, securityId),
+      );
+      const west = (await priceRows()).map((r: { d: string }) => r.d);
+
+      // +14h and -11h are always a day apart or the same day, never the server's
+      // own date for both: the rows follow the preference (and the cron, which
+      // passes no day either, ends on the same one for this user).
+      const last = (rows: string[]) => rows[rows.length - 1];
+      expect(last(east) >= last(west)).toBe(true);
+      expect(last(west)).toBe(
+        new Intl.DateTimeFormat("en-CA", {
+          timeZone: "Pacific/Pago_Pago",
+        }).format(new Date()),
       );
     });
   });

@@ -373,7 +373,7 @@ describe("BondValuationService", () => {
         securities: owned,
         ledger: [
           buy("2026-10-15", "25.00000000"),
-          buy("2026-11-15", "10.00000000"),
+          buy("2026-10-20", "10.00000000"),
           // After asOf: not open on that day, so neither listed nor totalled.
           buy("2027-05-01", "99.00000000"),
         ],
@@ -403,14 +403,14 @@ describe("BondValuationService", () => {
       ).toEqual([
         // 182 days in: 102.19 per bond.
         ["2026-10-15", 25, false, "2554.75"],
-        // 151 days in: 101.82 per bond.
-        ["2026-11-15", 10, false, "1018.20"],
+        // 177 days in: 102.13 per bond.
+        ["2026-10-20", 10, false, "1021.30"],
       ]);
       expect(result.totals).toMatchObject({
         quantity: 35,
-        grossValue: "3572.95",
+        grossValue: "3576.05",
       });
-      expect(result.totals.accruedInterest).toBe("72.95");
+      expect(result.totals.accruedInterest).toBe("76.05");
     });
 
     it("makes a total null unless every lot has the figure: a subtotal is not a total", async () => {
@@ -418,12 +418,12 @@ describe("BondValuationService", () => {
         securities: owned,
         // Bought 3 days ago, so early redemption is outside its window, while
         // the older lot is inside it.
-        ledger: [buy("2026-10-15", "25"), buy("2027-04-12", "10")],
+        ledger: [buy("2026-10-02", "25"), buy("2026-10-30", "10")],
       });
       const result = await service.valueSecurity(
         "user-1",
         "sec-1",
-        "2027-04-15",
+        "2026-11-02",
       );
       expect(result.lots[0].valuation.earlyRedemptionValue).not.toBeNull();
       expect(result.lots[1].valuation.earlyRedemptionValue).toBeNull();
@@ -692,6 +692,49 @@ describe("BondValuationService", () => {
           "2027-10-16",
         ),
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("states each benchmark's coverage date and last fetch on the security valuation", async () => {
+      const { service } = setup({
+        instruments: edoInstrument,
+        terms: [edoTerms],
+        securities: owned,
+        ledger: [buy("2026-10-01", "10")],
+        series: [
+          {
+            kind: "MONTHLY",
+            publisher: "GUS",
+            covered_through: "2027-08-01",
+            updated_at: new Date("2027-10-10T04:00:00.000Z"),
+          },
+        ],
+        values: [{ observation_date: "2027-08-01", value: "0.0340000000" }],
+      });
+      const result = await service.valueSecurity(
+        "user-1",
+        "sec-1",
+        "2027-10-16",
+      );
+      expect(result.benchmarkCoverage).toEqual([
+        {
+          benchmarkId: "PL_CPI_GUS_YOY",
+          coveredThrough: "2027-08-01",
+          lastFetchedAt: "2027-10-10T04:00:00.000Z",
+        },
+      ]);
+    });
+
+    it("has no coverage entry for a fixed-rate series", async () => {
+      const { service } = setup({
+        securities: owned,
+        ledger: [buy("2026-10-01", "10")],
+      });
+      const result = await service.valueSecurity(
+        "user-1",
+        "sec-1",
+        "2027-04-15",
+      );
+      expect(result.benchmarkCoverage).toEqual([]);
     });
 
     it("valueSecurity passes the assumption to every lot", async () => {

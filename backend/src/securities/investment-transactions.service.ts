@@ -1063,6 +1063,7 @@ export class InvestmentTransactionsService {
   async create(
     userId: string,
     createDto: CreateInvestmentTransactionDto,
+    options: { deferBondRecompute?: boolean } = {},
   ): Promise<InvestmentTransaction> {
     const account = await this.accountsService.findOne(
       userId,
@@ -1247,6 +1248,15 @@ export class InvestmentTransactionsService {
         );
     }
 
+    // A trade on a bond-linked security changes its lots: the engine's prices
+    // are recomputed now that the write has committed (a bulk caller recomputes
+    // once per security at the end).
+    if (!options.deferBondRecompute && createDto.status !== "VOID") {
+      await this.securitiesService.recomputeBondPricesAfterWrite(userId, [
+        createDto.securityId,
+      ]);
+    }
+
     const result = await this.findOne(userId, savedId);
 
     // Capture linked cash transaction for redo support
@@ -1295,7 +1305,9 @@ export class InvestmentTransactionsService {
     const skipped: BulkCreateSkip[] = [];
     for (let index = 0; index < dtos.length; index++) {
       try {
-        created.push(await this.create(userId, dtos[index]));
+        created.push(
+          await this.create(userId, dtos[index], { deferBondRecompute: true }),
+        );
       } catch (error) {
         skipped.push({ index, reason: bulkSkipReason(error) });
         this.logger.warn(
@@ -1305,6 +1317,11 @@ export class InvestmentTransactionsService {
         );
       }
     }
+    // Once per security, after the whole batch has committed.
+    await this.securitiesService.recomputeBondPricesAfterWrite(
+      userId,
+      created.map((row) => row.securityId),
+    );
     return { created, skipped };
   }
 
@@ -2119,6 +2136,10 @@ export class InvestmentTransactionsService {
           `Failed to update transaction-derived price: ${err.message}`,
         ),
       );
+
+    await this.securitiesService.recomputeBondPricesAfterWrite(userId, [
+      dto.securityId,
+    ]);
 
     const [transferOut, transferIn] = await Promise.all([
       this.findOne(userId, outId),
@@ -3648,7 +3669,11 @@ export class InvestmentTransactionsService {
       }
 
       if (locked.status === newStatus) {
-        return { affectedAccountIds: new Set<string>(), splitTouched: false };
+        return {
+          affectedAccountIds: new Set<string>(),
+          splitTouched: false,
+          securityIds: [] as string[],
+        };
       }
 
       // The parent split transaction owns an embedded row's status; see
@@ -3669,7 +3694,11 @@ export class InvestmentTransactionsService {
         // Purely presentational: only crossing the VOID boundary moves money
         // or shares.
         await manager.update(InvestmentTransaction, id, { status: newStatus });
-        return { affectedAccountIds: new Set<string>(), splitTouched: false };
+        return {
+          affectedAccountIds: new Set<string>(),
+          splitTouched: false,
+          securityIds: [] as string[],
+        };
       }
 
       // Crossing. A linked transfer leg is the same movement of shares, so it
@@ -3773,7 +3802,11 @@ export class InvestmentTransactionsService {
         securityIds.size > 0 ? Array.from(securityIds) : undefined,
       );
 
-      return { affectedAccountIds, splitTouched };
+      return {
+        affectedAccountIds,
+        splitTouched,
+        securityIds: Array.from(securityIds),
+      };
     });
 
     // SPLIT mutations compound on holding state, so a boundary crossing on one
@@ -3791,6 +3824,12 @@ export class InvestmentTransactionsService {
     for (const accountId of outcome.affectedAccountIds) {
       this.triggerRecalcWithCashAccount(accountId, userId);
     }
+
+    // A VOID crossing changes which rows count, hence the lots of a linked bond.
+    await this.securitiesService.recomputeBondPricesAfterWrite(
+      userId,
+      outcome.securityIds,
+    );
 
     return this.findOne(userId, id);
   }
@@ -3827,12 +3866,18 @@ export class InvestmentTransactionsService {
           ),
         );
       }
-      return this.updateLinkedTransfer(
+      const updatedLeg = await this.updateLinkedTransfer(
         userId,
         transaction,
         linkedLeg,
         updateDto,
       );
+      // A pair edit moves the quantity, the date or the accounts of both legs.
+      await this.securitiesService.recomputeBondPricesAfterWrite(userId, [
+        transaction.securityId,
+        updatedLeg.securityId,
+      ]);
+      return updatedLeg;
     }
 
     // The companion is materialized from its redemption's accrued interest, so
@@ -4309,6 +4354,12 @@ export class InvestmentTransactionsService {
         );
     }
 
+    // The lots of the old and of the new security both changed.
+    await this.securitiesService.recomputeBondPricesAfterWrite(userId, [
+      oldSecurityId,
+      newSecurityId,
+    ]);
+
     const result = await this.findOne(userId, savedId);
 
     this.actionHistoryService.record(userId, {
@@ -4503,6 +4554,10 @@ export class InvestmentTransactionsService {
           ),
         );
     }
+
+    await this.securitiesService.recomputeBondPricesAfterWrite(userId, [
+      transaction.securityId,
+    ]);
 
     this.actionHistoryService.record(userId, {
       entityType: "investment_transaction",
@@ -4781,7 +4836,8 @@ export class InvestmentTransactionsService {
     holdingsDeleted: number;
     accountsReset: number;
   }> {
-    return withScopedDb(this.dataSource, async (manager) => {
+    let deletedSecurityIds: Array<string | null> = [];
+    const outcome = await withScopedDb(this.dataSource, async (manager) => {
       // includes VOID rows: records read -- every row is being deleted, and
       // the per-row balance reversal below already reverses only what each
       // cash leg actually contributed.
@@ -4789,6 +4845,7 @@ export class InvestmentTransactionsService {
         where: { userId },
       });
       const transactionsDeleted = transactions.length;
+      deletedSecurityIds = transactions.map((t) => t.securityId);
 
       // Delete linked cash transactions and reverse their balance effects
       const linkedCashTxIds = transactions
@@ -4845,5 +4902,11 @@ export class InvestmentTransactionsService {
         accountsReset,
       };
     });
+    // No lots are left on any linked bond: its engine rows go.
+    await this.securitiesService.recomputeBondPricesAfterWrite(
+      userId,
+      deletedSecurityIds,
+    );
+    return outcome;
   }
 }

@@ -1,6 +1,8 @@
 import { BadRequestException } from "@nestjs/common";
+import { todayYMD } from "../common/date-utils";
 import {
   ParseAssumePipe,
+  ParseBondAsOfPipe,
   ParseBenchmarkIdPipe,
   ParseScenarioValuesPipe,
 } from "./bond-query.pipes";
@@ -88,5 +90,33 @@ describe("ParseScenarioValuesPipe", () => {
     ["0", "1"],
   ])("refuses %p", (value) => {
     expect(() => pipe.transform(value)).toThrow(BadRequestException);
+  });
+});
+
+describe("ParseBondAsOfPipe", () => {
+  const pipe = new ParseBondAsOfPipe();
+
+  const addDays = (ymd: string, days: number): string => {
+    const d = new Date(`${ymd}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+
+  it("is no date when absent, and accepts today and earlier days", () => {
+    expect(pipe.transform(undefined)).toBeUndefined();
+    expect(pipe.transform(todayYMD())).toBe(todayYMD());
+    expect(pipe.transform("2020-01-31")).toBe("2020-01-31");
+  });
+
+  it("refuses tomorrow with a 400 naming the date, in the message of AS_OF_IN_FUTURE", () => {
+    const tomorrow = addDays(todayYMD(), 1);
+    expect(() => pipe.transform(tomorrow)).toThrow(BadRequestException);
+    expect(() => pipe.transform(tomorrow)).toThrow(
+      `The valuation date ${tomorrow} is after today`,
+    );
+  });
+
+  it("refuses a date that is not a calendar date", () => {
+    expect(() => pipe.transform("2026-02-30")).toThrow(BadRequestException);
   });
 });

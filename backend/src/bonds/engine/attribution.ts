@@ -1,6 +1,6 @@
 import { ExactDecimal } from "../domain/exact-decimal";
 import { BondTerms } from "../domain/bond-terms";
-import { baseAt, compounds, periodRate } from "./accrual";
+import { baseAt, compounds, couponOf, periodRate } from "./accrual";
 import { RateScheduleEntry } from "./bond-engine-types";
 import { PeriodRate } from "./rate-resolution";
 
@@ -22,10 +22,15 @@ const text = (value: ExactDecimal) => value.toFixed(PLACES);
 
 /**
  * Period `k`'s interest per bond, split by the components of its rate (spec
- * 13.2), computed exactly from the base of the period (`baseAt`, so the terms'
- * base rounding applies) and the rate over one period, r / F. A bond that
- * compounds needs every earlier rate for its base: with one unknown, every
- * figure is null. Nothing is rounded to money here; the parts are for display.
+ * 13.2). A coupon bond's interest is the coupon as paid (rounded per bond, the
+ * figure `couponOf` pays); a compounding bond's is the exact accrual from the
+ * base of the period (`baseAt`, so the terms' base rounding applies) and the
+ * rate over one period, r / F. A bond that compounds needs every earlier rate
+ * for its base: with one unknown, every figure is null.
+ *
+ * The parts are split exactly, each at 10 decimal places, and the rounding
+ * residual of a period goes to the addend part, so that the parts of a period
+ * always sum to its interest (`benchmarkPart + addendPart = interest`).
  */
 export function attributeInterest(
   terms: BondTerms,
@@ -42,7 +47,8 @@ export function attributeInterest(
     }
   }
   const base = baseAt(terms, prior);
-  const interest = base.mul(periodRate(terms, current.rate));
+  const interest =
+    couponOf(terms, current.rate) ?? base.mul(periodRate(terms, current.rate));
   const zero = text(ExactDecimal.ZERO);
   const none = {
     fixedPart: zero,
@@ -62,16 +68,18 @@ export function attributeInterest(
       const { benchmark, addend } = current;
       if (benchmark === null || benchmark.flooredValue === null || !addend)
         return { ...whole, fixedPart: text(interest) };
-      return {
-        ...whole,
-        benchmarkPart: text(
+      const benchmarkPart = ExactDecimal.parse(
+        text(
           base.mul(
             periodRate(terms, ExactDecimal.parse(benchmark.flooredValue)),
           ),
         ),
-        addendPart: text(
-          base.mul(periodRate(terms, ExactDecimal.parse(addend))),
-        ),
+      );
+      const total = ExactDecimal.parse(whole.interest);
+      return {
+        ...whole,
+        benchmarkPart: text(benchmarkPart),
+        addendPart: text(total.sub(benchmarkPart)),
       };
     }
   }

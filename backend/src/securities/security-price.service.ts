@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { tr } from "../i18n/translate";
-import { In, DataSource, EntityManager } from "typeorm";
+import { In, DataSource, EntityManager, Not } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { returnedRows } from "../common/db/query-result";
 import { Cron } from "@nestjs/schedule";
@@ -70,14 +70,13 @@ const TRANSACTION_SOURCES = [
 
 /**
  * The rows a transaction-derived price may replace: another transaction price,
- * and a bond-engine row. A transaction price on a day outranks the engine's
- * accrual whichever was written first (INV-BOND-005); the engine's own upsert
- * replaces only its own rows, so the two orders end the same.
+ * and nothing else. A bond-engine row is not among them (INV-BOND-005): a
+ * transaction price is one lot's trade price, not the holding's value, so for a
+ * linked security the engine's row replaces a transaction-derived one and never
+ * the reverse; the engine's own upsert replaces every non-manual row, so the
+ * two orders end the same.
  */
-const TRANSACTION_PRICE_REPLACEABLE_SOURCES = [
-  ...TRANSACTION_SOURCES,
-  BOND_ENGINE_PRICE_SOURCE,
-];
+const TRANSACTION_PRICE_REPLACEABLE_SOURCES = [...TRANSACTION_SOURCES];
 
 /**
  * A provider write is re-checked against the link at the moment of the write,
@@ -1288,10 +1287,15 @@ export class SecurityPriceService {
     return null;
   }
 
+  /**
+   * When a quote provider last wrote a price. A bond-engine row is written every
+   * day by accrual, whatever the providers are doing, so it does not move this
+   * marker: an outage of the quote providers must stay visible.
+   */
   async getLastUpdateTime(): Promise<Date | null> {
     const latest = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(SecurityPrice).findOne({
-        where: {},
+        where: { source: Not(BOND_ENGINE_PRICE_SOURCE) },
         order: { createdAt: "DESC" },
       }),
     );
@@ -2301,9 +2305,10 @@ export class SecurityPriceService {
    * Upsert a transaction-derived price for a security on a given date.
    * Computes average price from all price-relevant transactions on that date.
    * Never overwrites provider-sourced (yahoo_finance, msn_finance) or manual
-   * prices — the ON CONFLICT WHERE clause restricts updates to rows whose
-   * existing source is itself a transaction action or a bond-engine row (a
-   * trade on a day outranks the engine's accrual, whichever was written first).
+   * prices or bond-engine prices — the ON CONFLICT WHERE clause restricts
+   * updates to rows whose existing source is itself a transaction action (the
+   * engine's value of a linked security replaces a trade price of its day, never
+   * the reverse).
    */
   async upsertTransactionPrice(
     securityId: string,
@@ -2545,6 +2550,10 @@ export class SecurityPriceService {
            high_price  = COALESCE(EXCLUDED.high_price,  security_prices.high_price),
            low_price   = COALESCE(EXCLUDED.low_price,   security_prices.low_price),
            volume      = COALESCE(EXCLUDED.volume,      security_prices.volume),
+           -- A manual close written over the engine's row must not carry the
+           -- engine's adjusted close along: its own input has none.
+           adjusted_close = CASE WHEN security_prices.source = '${BOND_ENGINE_PRICE_SOURCE}'
+                                 THEN NULL ELSE security_prices.adjusted_close END,
            source      = 'manual'
          RETURNING id`,
           [
@@ -2605,6 +2614,8 @@ export class SecurityPriceService {
     if (dto.lowPrice !== undefined) price.lowPrice = dto.lowPrice;
     if (dto.volume !== undefined) price.volume = dto.volume;
     if (dto.priceDate !== undefined) price.priceDate = dto.priceDate;
+    // A manual correction of the engine's row keeps no adjusted close of its own.
+    if (price.source === BOND_ENGINE_PRICE_SOURCE) price.adjustedClose = null;
     price.source = "manual";
 
     const { saved, accountIds } = await withScopedDb(

@@ -2276,6 +2276,63 @@ describe("PortfolioService", () => {
       });
     });
 
+    describe("a bond linked to the engine is not a market mover (R13)", () => {
+      it("is left off the board, so its daily accrual row does not push every equity off the newest session", async () => {
+        accountsRepository.find.mockResolvedValue([
+          mockBrokerageAccount,
+          mockCashAccount,
+        ]);
+        const bondHolding = {
+          ...mockHoldingVFV,
+          securityId: "sec-bond",
+          security: {
+            ...mockSecurityVFV,
+            id: "sec-bond",
+            symbol: "EDO1036",
+            bondInstrumentId: "11111111-1111-5111-8111-111111111111",
+          },
+        };
+        holdingsRepository.find.mockResolvedValue([
+          mockHoldingAAPL,
+          bondHolding,
+        ]);
+        securityPriceRepository.query.mockResolvedValue([
+          // AAPL's newest close is Friday's session; the engine wrote Monday.
+          {
+            security_id: "sec-1",
+            close_price: "180",
+            price_date: "2026-02-06",
+            rn: "1",
+          },
+          {
+            security_id: "sec-1",
+            close_price: "175",
+            price_date: "2026-02-05",
+            rn: "2",
+          },
+          {
+            security_id: "sec-bond",
+            close_price: "100.05",
+            price_date: "2026-02-09",
+            rn: "1",
+          },
+          {
+            security_id: "sec-bond",
+            close_price: "100.04",
+            price_date: "2026-02-08",
+            rn: "2",
+          },
+        ]);
+
+        const board = await service.getTopMovers(userId);
+
+        expect(board.map((m) => m.symbol)).not.toContain("EDO1036");
+        // The bond's rows are not even asked for.
+        const asked = securityPriceRepository.query.mock.calls[0][1][0];
+        expect(asked).toEqual(["sec-1"]);
+      });
+    });
+
     describe("when a security has only one price point", () => {
       it("skips securities without two price points", async () => {
         accountsRepository.find.mockResolvedValue([

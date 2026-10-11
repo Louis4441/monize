@@ -9,6 +9,11 @@ import {
   BackupPasswordRequiredError,
   RESTORABLE_TABLES,
 } from "@/backup/backup.service";
+import { BondPriceService } from "@/bonds/bond-price.service";
+import { BondValuationService } from "@/bonds/bond-valuation.service";
+import { FetchSyncService } from "@/common/jobs/fetch-sync.service";
+import { BondCatalogService } from "@/bonds/bond-catalog.service";
+import { POLISH_BOND_ADAPTER } from "@/bonds/adapters/pl/index";
 import { bondInstrumentId } from "@/bonds/bond-instrument-id";
 import { BackupExportService } from "@/backup/backup-export.service";
 import { BackupRestoreService } from "@/backup/backup-restore.service";
@@ -25,7 +30,7 @@ import {
   createTestUserDirect,
 } from "../helpers/integration-setup";
 import { applyRlsPolicies } from "../helpers/rls-setup";
-import { withUserContext } from "@/common/db/with-context";
+import { withSystemContext, withUserContext } from "@/common/db/with-context";
 
 /**
  * Full backup -> restore round-trip against a real PostgreSQL database.
@@ -101,6 +106,11 @@ describe("Backup export/restore round-trip (integration)", () => {
         // reinstate a pre-#1242 derived snapshot and that the lazy rebuild
         // (ensurePopulated) recomputes it under the corrected algorithm.
         NetWorthService,
+        // Real: the restore recomputes the engine prices of a restored bond link
+        // (R33), and the case below proves the engine's price replaces the file's.
+        BondPriceService,
+        BondValuationService,
+        FetchSyncService,
         // The REAL re-authentication service, not a double: it is the thing that
         // refuses a restore without a valid artifact, and a mock here would let a
         // future change remove that check with this suite still green. Local-auth
@@ -1045,8 +1055,12 @@ describe("Backup export/restore round-trip (integration)", () => {
         password: PASSWORD,
       }),
     );
-    // The restore succeeds and says how many bond links it had to drop.
-    expect(result.unlinkedBondSecurities).toBe(2);
+    // The restore succeeds and says how many bond links it had to drop, and which.
+    expect(result.unlinkedBondSecurities?.count).toBe(2);
+    expect([...(result.unlinkedBondSecurities?.symbols ?? [])].sort()).toEqual([
+      "UNKNOWN-SERIES",
+      "WRONG-CCY",
+    ]);
     expect(Object.keys(result.restored)).not.toContain(
       "unlinkedBondSecurities",
     );
@@ -1073,6 +1087,74 @@ describe("Backup export/restore round-trip (integration)", () => {
       { symbol: "LINKED", source: "bond_engine" },
       { symbol: "UNKNOWN-SERIES", source: "manual" },
     ]);
+  });
+
+  it("recomputes the engine prices of a security whose bond link survived, replacing the file's rows (R33)", async () => {
+    const userA = await createTestUserDirect(dataSource, {
+      email: "bond-recompute-a@example.com",
+    });
+    const userB = await createTestUserDirect(dataSource, {
+      email: "bond-recompute-b@example.com",
+    });
+    await dataSource.query(
+      `INSERT INTO currencies (code, name, symbol, decimal_places, is_active)
+       VALUES ('PLN', 'Zloty', 'zl', 2, true) ON CONFLICT (code) DO NOTHING`,
+    );
+    // The same catalog the deployment seeds: instrument, terms and benchmark series.
+    await withSystemContext(() =>
+      new BondCatalogService(dataSource, {
+        ensureCatalogCurrency: async () => undefined,
+      }).seed([POLISH_BOND_ADAPTER]),
+    );
+    const [{ id: accountId }] = await dataSource.query(
+      `INSERT INTO accounts (user_id, account_type, account_sub_type, name,
+                             currency_code, current_balance, opening_balance)
+       VALUES ($1, 'INVESTMENT', 'INVESTMENT_BROKERAGE', 'Brokerage', 'PLN', 0, 0)
+       RETURNING id`,
+      [userA.id],
+    );
+    const [{ id: securityId }] = await dataSource.query(
+      `INSERT INTO securities (user_id, symbol, name, security_type, currency_code, bond_instrument_id)
+       VALUES ($1, 'TOS1029', 'TOS1029', 'BOND', 'PLN', $2) RETURNING id`,
+      [userA.id, bondInstrumentId("PL", "PL_MF", "TOS1029")],
+    );
+    await dataSource.query(
+      `INSERT INTO investment_transactions
+         (user_id, account_id, security_id, action, transaction_date, quantity, price, total_amount, status)
+       VALUES ($1, $2, $3, 'BUY', '2026-10-05', 10, 100, 1000, 'UNRECONCILED')`,
+      [userA.id, accountId, securityId],
+    );
+    // A price another deployment's engine wrote, nowhere near what this one computes.
+    await dataSource.query(
+      `INSERT INTO security_prices (security_id, price_date, close_price, source)
+       VALUES ($1, DATE '2026-10-06', 123.45, 'bond_engine')`,
+      [securityId],
+    );
+
+    const { buffer } = await withUserContext(userA.id, () =>
+      service.exportToBuffer(userA.id),
+    );
+    const result = await withUserContext(userB.id, () =>
+      service.restoreData(userB.id, {
+        compressedData: buffer,
+        password: PASSWORD,
+      }),
+    );
+    expect(result.unlinkedBondSecurities).toBeUndefined();
+
+    const rows: Array<{ d: string; p: number; source: string }> =
+      await dataSource.query(
+        `SELECT TO_CHAR(p.price_date, 'YYYY-MM-DD') AS d, p.close_price::float AS p, p.source
+           FROM security_prices p JOIN securities s ON s.id = p.security_id
+          WHERE s.user_id = $1 ORDER BY p.price_date`,
+        [userB.id],
+      );
+    const sixth = rows.find((r) => r.d === "2026-10-06");
+    expect(sixth?.source).toBe("bond_engine");
+    expect(sixth!.p).toBeGreaterThan(100);
+    expect(sixth!.p).toBeLessThan(101);
+    // Priced from the purchase day, not only on the file's one day.
+    expect(rows.some((r) => r.d === "2026-10-05")).toBe(true);
   });
 
   it("round-trips a rule's settlement claim with its references remapped", async () => {

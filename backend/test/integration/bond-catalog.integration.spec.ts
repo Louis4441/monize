@@ -1,4 +1,5 @@
 import { CurrenciesService } from "../../src/currencies/currencies.service";
+import { Logger } from "@nestjs/common";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { TestingModule } from "@nestjs/testing";
@@ -22,7 +23,16 @@ import {
   cleanTables,
   createIntegrationModule,
   createTestUserDirect,
+  deleteBondInstrumentBypassingImmutability,
 } from "../helpers/integration-setup";
+
+// The GUS fixture's newest month is 2026-08, and a feed more than three months
+// behind today is refused as stale. A fixed Warsaw date keeps the fixture
+// "current" whenever the suite runs; the database's own NOW() is untouched.
+jest.mock("@/common/date-utils", () => ({
+  ...jest.requireActual("@/common/date-utils"),
+  todayInTimezone: jest.fn(() => "2026-10-10"),
+}));
 
 const fixture = (name: string) =>
   readFileSync(join(__dirname, "../../src/bonds/adapters/pl/fixtures", name));
@@ -112,6 +122,32 @@ describe("bond catalog and benchmark refresh (integration)", () => {
       `SELECT TO_CHAR(covered_through, 'YYYY-MM-DD') AS c FROM benchmark_series WHERE code = 'PL_NBP_REFERENCE'`,
     );
     expect(rows[0].c).toBe("2026-10-01");
+  });
+
+  it("stores the other entries when one entry's SQL fails (a series code longer than its column)", async () => {
+    const errorSpy = jest.spyOn(Logger.prototype, "error").mockImplementation();
+    try {
+      const [first, ...rest] = POLISH_BOND_ADAPTER.catalog;
+      const doc = (e: { terms: unknown }) => e.terms as Record<string, any>;
+      const tooLong = {
+        ...first,
+        terms: {
+          ...doc(first),
+          instrument: { ...doc(first).instrument, seriesCode: "X".repeat(41) },
+        },
+      };
+      const adapter = { ...POLISH_BOND_ADAPTER, catalog: [tooLong, ...rest] };
+      await withSystemContext(() => catalog.seed([adapter]));
+      expect(await count("bond_instruments")).toBe(rest.length);
+      expect(await count("bond_terms_versions")).toBe(rest.length);
+      expect(
+        errorSpy.mock.calls.some((c) =>
+          /could not be stored and was skipped/.test(String(c[0])),
+        ),
+      ).toBe(true);
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it("refuses to rewrite a stored terms version with different content", async () => {
@@ -292,7 +328,7 @@ describe("bond catalog and benchmark refresh (integration)", () => {
       );
       // Seeding again (every boot does) must not look like a fetch.
       await dataSource.query(
-        `UPDATE benchmark_series SET updated_at = NOW() - INTERVAL '3 days'`,
+        `UPDATE benchmark_series SET updated_at = '2026-10-01T10:00:00Z'`,
       );
       await withSystemContext(() => catalog.seed());
       const stale = counting(fixture("gus-cpi.csv"));
@@ -355,6 +391,34 @@ describe("bond catalog and benchmark refresh (integration)", () => {
       ).toEqual([{ code: "PLN", created_by_user_id: null }]);
     });
 
+    it("is created inactive, so no user is offered it, while an existing active currency stays active", async () => {
+      const user = await createTestUserDirect(dataSource, {
+        email: "bond-ccy-list@example.com",
+      });
+      await dataSource.query(`DELETE FROM currencies WHERE code = 'PLN'`);
+      await withSystemContext(() => catalog.seed());
+      expect(
+        await dataSource.query(
+          `SELECT is_active FROM currencies WHERE code = 'PLN'`,
+        ),
+      ).toEqual([{ is_active: false }]);
+      const offered = await withUserContext(user.id, () =>
+        currencies.findAll(user.id),
+      );
+      expect(offered.map((c) => c.code)).not.toContain("PLN");
+
+      // An already-active PLN (the beforeEach row) is left alone by the seed.
+      await dataSource.query(
+        `UPDATE currencies SET is_active = true WHERE code = 'PLN'`,
+      );
+      await withSystemContext(() => catalog.seed());
+      expect(
+        await dataSource.query(
+          `SELECT is_active FROM currencies WHERE code = 'PLN'`,
+        ),
+      ).toEqual([{ is_active: true }]);
+    });
+
     it("must exist: an instrument in an unknown currency is refused by the foreign key", async () => {
       await expect(
         dataSource.query(
@@ -398,8 +462,10 @@ describe("bond catalog and benchmark refresh (integration)", () => {
         ),
       ).toEqual([{ code: "ZBP" }]);
 
-      await dataSource.query(
+      await deleteBondInstrumentBypassingImmutability(
+        dataSource,
         `DELETE FROM bond_instruments WHERE series_code = 'CCYONLY'`,
+        [],
       );
       expect(await inUse()).toBe(false);
     });

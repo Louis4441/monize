@@ -77,6 +77,29 @@
           "rateSource": "ANNOUNCED"
         }
       }
+    },
+    {
+      "id": "EDO-SW1",
+      "description": "EDO1036 bought after the sale window closed (2026-10-31): refused, no figure",
+      "lot": {
+        "purchaseDate": "2026-11-02",
+        "quantity": 1
+      },
+      "asOf": "2026-11-02",
+      "expect": {
+        "status": "REFUSED",
+        "refusal": {
+          "code": "PURCHASE_OUTSIDE_SALE_WINDOW",
+          "params": {
+            "from": "2026-10-01",
+            "to": "2026-10-31",
+            "purchaseDate": "2026-11-02"
+          }
+        },
+        "grossValue": null,
+        "principal": null,
+        "valuationComplete": false
+      }
     }
   ]
 }

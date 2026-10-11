@@ -10,6 +10,7 @@ import {
 } from "@nestjs/common";
 import { tr } from "../i18n/translate";
 import { DataSource, EntityManager, In } from "typeorm";
+import { acquireAdvisoryLock, LockScope } from "../common/db/locks";
 import { withScopedDb } from "../common/db/scoped-db";
 import { Security } from "./entities/security.entity";
 import { SecurityTag } from "./entities/security-tag.entity";
@@ -18,8 +19,16 @@ import { InvestmentTransaction } from "./entities/investment-transaction.entity"
 import { Tag } from "../tags/entities/tag.entity";
 import { CreateSecurityDto } from "./dto/create-security.dto";
 import { UpdateSecurityDto } from "./dto/update-security.dto";
-import { SecurityPriceService } from "./security-price.service";
+import {
+  PriceUpdateResult,
+  SecurityPriceService,
+} from "./security-price.service";
 import { BondPriceService } from "../bonds/bond-price.service";
+import {
+  BondLinkProblem,
+  findBondLinkProblem,
+  hasQuantitiesThatAreNotBonds,
+} from "./bond-link.util";
 import { YahooFinanceService } from "./yahoo-finance.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { SecurityLookupResult } from "./providers/quote-provider.interface";
@@ -167,53 +176,89 @@ export class SecuritiesService {
   ) {}
 
   /**
-   * Refuse a bond link the instrument cannot honour, inside the write's own
-   * transaction and before the write: the instrument must exist and be priced in
-   * the security's resulting currency (INV-PRICE-001 -- a stored price is in the
-   * currency the security is recorded in, and the engine prices in the
-   * instrument's). `currencyChanged` picks the message for a currency change of
-   * a security that stays linked.
+   * Refuse a bond link that is not valid, inside the write's own transaction and
+   * before the write: the instrument must exist, the security must be of type
+   * BOND, and it must be priced in the security's resulting currency
+   * (`findBondLinkProblem`, the one definition the AI/MCP preview and the undo of
+   * a security edit share). `currencyChanged` picks the message for a currency
+   * change of a security that stays linked. `legacyQuantities`, given for a link
+   * that is being set, also refuses a security whose trades price a unit far
+   * from the face value per bond: its quantities are not numbers of bonds.
    */
   private async assertBondLink(
     m: EntityManager,
-    bondInstrumentId: string,
-    currencyCode: string,
+    link: {
+      bondInstrumentId: string;
+      currencyCode: string;
+      securityType: string | null | undefined;
+    },
     currencyChanged: boolean,
+    legacyQuantities?: { userId: string; securityId: string },
   ): Promise<void> {
-    const rows: Array<{ currency_code: string }> = await m.query(
-      `SELECT currency_code FROM bond_instruments WHERE id = $1`,
-      [bondInstrumentId],
-    );
-    if (rows.length === 0) {
+    const problem = await findBondLinkProblem(m, link);
+    if (problem) this.throwBondLinkProblem(problem, link, currencyChanged);
+    if (
+      legacyQuantities &&
+      (await hasQuantitiesThatAreNotBonds(
+        m,
+        legacyQuantities.userId,
+        legacyQuantities.securityId,
+        link.bondInstrumentId,
+      ))
+    ) {
       throw new BadRequestException(
         tr(
-          "errors.securities.bondInstrumentNotFound",
-          `Bond instrument ${bondInstrumentId} does not exist`,
-          { id: bondInstrumentId },
+          "errors.bonds.LINK_QUANTITY_NOT_BONDS",
+          "The quantities of this security are not numbers of bonds (a price is far from the face value per bond), so it cannot be linked to a bond instrument",
         ),
       );
     }
-    const instrumentCurrency = rows[0].currency_code;
-    if (instrumentCurrency === currencyCode) return;
-    throw new BadRequestException(
-      currencyChanged
-        ? tr(
-            "errors.securities.bondCurrencyLocked",
-            `A security linked to a bond instrument stays in the instrument's currency (${instrumentCurrency}). Unlink it from the bond before changing its currency.`,
-            { instrumentCurrency },
-          )
-        : tr(
-            "errors.securities.bondCurrencyMismatch",
-            `The security is recorded in ${currencyCode} but the bond instrument is priced in ${instrumentCurrency}. Use the instrument's currency.`,
-            { currency: currencyCode, instrumentCurrency },
+  }
+
+  private throwBondLinkProblem(
+    problem: BondLinkProblem,
+    link: { bondInstrumentId: string; currencyCode: string },
+    currencyChanged: boolean,
+  ): never {
+    switch (problem.code) {
+      case "INSTRUMENT_NOT_FOUND":
+        throw new BadRequestException(
+          tr(
+            "errors.securities.bondInstrumentNotFound",
+            `Bond instrument ${link.bondInstrumentId} does not exist`,
+            { id: link.bondInstrumentId },
           ),
-    );
+        );
+      case "NOT_BOND_TYPE":
+        throw new BadRequestException(
+          tr(
+            "errors.bonds.LINK_REQUIRES_BOND_TYPE",
+            "Only a security of type Bond can be linked to a bond instrument",
+          ),
+        );
+      case "CURRENCY_MISMATCH": {
+        const { instrumentCurrency } = problem;
+        throw new BadRequestException(
+          currencyChanged
+            ? tr(
+                "errors.securities.bondCurrencyLocked",
+                `A security linked to a bond instrument stays in the instrument's currency (${instrumentCurrency}). Unlink it from the bond before changing its currency.`,
+                { instrumentCurrency },
+              )
+            : tr(
+                "errors.securities.bondCurrencyMismatch",
+                `The security is recorded in ${link.currencyCode} but the bond instrument is priced in ${instrumentCurrency}. Use the instrument's currency.`,
+                { currency: link.currencyCode, instrumentCurrency },
+              ),
+        );
+      }
+    }
   }
 
   /**
-   * After the commit that set or changed a link: price the security from the
-   * engine (spec 12.4). The security is already saved, so a failure here is
-   * logged, not thrown -- the daily job and `POST /bonds/securities/:id/recompute`
+   * After a commit that set or changed a link or the lots: price the security
+   * from the engine (spec 12.4). The write is already committed, so a failure
+   * here is logged, not thrown -- the daily job and `POST /bonds/securities/:id/recompute`
    * repair it, and a 500 would tell the caller the link was not made.
    */
   private async recomputeBondPrices(
@@ -224,11 +269,90 @@ export class SecuritiesService {
       await this.bondPriceService.recomputeSecurity(userId, securityId);
     } catch (error) {
       this.logger.warn(
-        `Bond price recompute after linking security ${securityId} failed: ${
+        `Bond price recompute of security ${securityId} failed: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
     }
+  }
+
+  /**
+   * After the commit of an investment transaction write (create, edit, void,
+   * delete, transfer, bulk, an import, an undo): recompute the engine prices of
+   * those of the securities that are linked to a bond instrument -- the lots
+   * changed, so the rows the engine wrote are stale (INV-BOND-005). Every entry
+   * point (the UI, bulk, the AI assistant, MCP, import) reaches the write through
+   * `InvestmentTransactionsService`, which calls this. The write is already
+   * committed, so a failure is logged by `BondPriceService`, not thrown: the
+   * daily job and `POST /bonds/securities/:id/recompute` repair it.
+   */
+  async recomputeBondPricesAfterWrite(
+    userId: string,
+    securityIds: ReadonlyArray<string | null | undefined>,
+  ): Promise<void> {
+    await this.bondPriceService.recomputeLinkedSecurities(userId, securityIds);
+  }
+
+  /**
+   * `recomputeBondPricesAfterWrite` for every bond-linked security with a trade in
+   * one of these accounts (an import touches securities by account, not by id).
+   */
+  async recomputeBondPricesOfAccounts(
+    userId: string,
+    accountIds: readonly string[],
+  ): Promise<void> {
+    if (accountIds.length === 0) return;
+    const rows: Array<{ id: string }> = await withScopedDb(
+      this.dataSource,
+      (m) =>
+        m.query(
+          `SELECT DISTINCT s.id
+             FROM securities s
+             JOIN investment_transactions t ON t.security_id = s.id
+            WHERE s.user_id = $1 AND s.bond_instrument_id IS NOT NULL
+              AND t.account_id = ANY($2::uuid[])`,
+          [userId, accountIds],
+        ),
+    );
+    await this.recomputeBondPricesAfterWrite(
+      userId,
+      rows.map((row) => row.id),
+    );
+  }
+
+  /**
+   * "Refresh price" of securities linked to a bond instrument: no quote provider
+   * prices them, so the refresh is the engine's recompute (the same one
+   * `POST /bonds/securities/:id/recompute` runs), reported in the refresh
+   * summary's own shape instead of as "0 updated". A failure is a failed row
+   * with its message, not a thrown error: the rest of the selection still runs.
+   */
+  async recomputeLinkedPrices(
+    userId: string,
+    securities: ReadonlyArray<{ id: string; symbol: string }>,
+  ): Promise<{
+    results: PriceUpdateResult[];
+    updated: number;
+    failed: number;
+  }> {
+    const results: PriceUpdateResult[] = [];
+    let updated = 0;
+    let failed = 0;
+    for (const security of securities) {
+      try {
+        await this.bondPriceService.recomputeSecurity(userId, security.id);
+        results.push({ symbol: security.symbol, success: true });
+        updated += 1;
+      } catch (error) {
+        failed += 1;
+        results.push({
+          symbol: security.symbol,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    return { results, updated, failed };
   }
 
   /**
@@ -520,10 +644,15 @@ export class SecuritiesService {
       }
 
       if (securityData.bondInstrumentId) {
+        securityData.bondInstrumentId =
+          securityData.bondInstrumentId.toLowerCase();
         await this.assertBondLink(
           m,
-          securityData.bondInstrumentId,
-          securityData.currencyCode,
+          {
+            bondInstrumentId: securityData.bondInstrumentId,
+            currencyCode: securityData.currencyCode,
+            securityType: securityData.securityType,
+          },
           false,
         );
       }
@@ -743,8 +872,10 @@ export class SecuritiesService {
       security.quoteProvider = updateSecurityDto.quoteProvider ?? null;
     if (updateSecurityDto.msnInstrumentId !== undefined)
       security.msnInstrumentId = updateSecurityDto.msnInstrumentId ?? null;
+    // One canonical spelling: the same instrument in capitals is not a change.
     if (updateSecurityDto.bondInstrumentId !== undefined)
-      security.bondInstrumentId = updateSecurityDto.bondInstrumentId;
+      security.bondInstrumentId =
+        updateSecurityDto.bondInstrumentId?.toLowerCase() ?? null;
     if (updateSecurityDto.countryWeightings !== undefined)
       security.countryWeightings = this.normalizeAllocationWeightings(
         updateSecurityDto.countryWeightings,
@@ -774,22 +905,76 @@ export class SecuritiesService {
     // Accounts whose derived state must be refreshed after the commit because the
     // engine's price rows were deleted by an unlink (INV-CACHE-001).
     let clearedEngineAccounts: string[] = [];
+    // Decided inside the transaction, from the row as locked there.
+    let linkChanged = false;
 
     // Persist the scalar fields and the tag set together so a security and its
     // classification never drift apart on a partial failure.
     await withScopedDb(this.dataSource, async (m) => {
+      // A request that names a link may change it, and a change deletes the
+      // engine's rows under the recompute lock (`clearEnginePrices`): that
+      // advisory lock is taken first, before the row lock below, the order every
+      // writer uses (`common/db/locks.ts`); it is re-entrant for the cleanup.
+      if (updateSecurityDto.bondInstrumentId !== undefined) {
+        await acquireAdvisoryLock(m, LockScope.BondPriceRecompute, id);
+      }
+      // The link is read from the row under a lock, not from the read above: a
+      // concurrent link or unlink commits before this one proceeds, so whether
+      // the link changes (and whether engine rows must go) is decided on the
+      // truth, and this write cannot put a stale link back.
+      const locked: Array<{
+        bond_instrument_id: string | null;
+        security_type: string | null;
+        currency_code: string;
+      }> = await m.query(
+        `SELECT bond_instrument_id, security_type, currency_code
+           FROM securities
+          WHERE id = $1 AND user_id = $2
+          FOR UPDATE`,
+        [id, userId],
+      );
+      if (locked.length === 0) {
+        throw new NotFoundException(
+          tr(
+            "errors.securities.notFoundBySecurityId",
+            `Security ${id} not found`,
+            { securityId: id },
+          ),
+        );
+      }
+      const current = locked[0];
+      if (updateSecurityDto.bondInstrumentId === undefined) {
+        security.bondInstrumentId = current.bond_instrument_id;
+      }
+      if (updateSecurityDto.securityType === undefined) {
+        security.securityType = current.security_type;
+      }
+      if (updateSecurityDto.currencyCode === undefined) {
+        security.currencyCode = current.currency_code;
+      }
+      beforeData.bondInstrumentId = current.bond_instrument_id;
+
+      linkChanged = security.bondInstrumentId !== current.bond_instrument_id;
+      const currencyChanged = security.currencyCode !== current.currency_code;
+      const typeChanged = security.securityType !== current.security_type;
+
       // A link the instrument cannot honour is refused here, in the write's own
-      // transaction and before it. Also on a currency change of a security that
-      // stays linked: the engine prices in the instrument's currency.
-      const linkChanged =
-        security.bondInstrumentId !== beforeData.bondInstrumentId;
-      const currencyChanged = security.currencyCode !== beforeData.currencyCode;
-      if (security.bondInstrumentId && (linkChanged || currencyChanged)) {
+      // transaction and before it. Also on a currency or type change of a
+      // security that stays linked: the engine prices in the instrument's
+      // currency, and only a BOND is linked.
+      if (
+        security.bondInstrumentId &&
+        (linkChanged || currencyChanged || typeChanged)
+      ) {
         await this.assertBondLink(
           m,
-          security.bondInstrumentId,
-          security.currencyCode,
+          {
+            bondInstrumentId: security.bondInstrumentId,
+            currencyCode: security.currencyCode,
+            securityType: security.securityType,
+          },
           !linkChanged,
+          linkChanged ? { userId, securityId: id } : undefined,
         );
       }
 
@@ -819,10 +1004,7 @@ export class SecuritiesService {
     if (clearedEngineAccounts.length > 0) {
       this.bondPriceService.publishClearedPrices(userId, clearedEngineAccounts);
     }
-    if (
-      saved.bondInstrumentId &&
-      saved.bondInstrumentId !== beforeData.bondInstrumentId
-    ) {
+    if (linkChanged && saved.bondInstrumentId) {
       await this.recomputeBondPrices(userId, id);
     }
 
@@ -877,18 +1059,26 @@ export class SecuritiesService {
       );
     }
 
-    security.isActive = false;
-    return withScopedDb(this.dataSource, (m) =>
-      m.getRepository(Security).save(security),
-    );
+    // A targeted UPDATE, not a save of the row read above: a full save would
+    // write back every column of a stale read, e.g. a bond link changed in
+    // between (INV-BOND-005).
+    return withScopedDb(this.dataSource, async (m) => {
+      const repo = m.getRepository(Security);
+      await repo.update({ id: security.id, userId }, { isActive: false });
+      return repo.findOneOrFail({ where: { id: security.id, userId } });
+    });
   }
 
   async activate(userId: string, id: string): Promise<Security> {
     const security = await this.findOne(userId, id);
-    security.isActive = true;
-    return withScopedDb(this.dataSource, (m) =>
-      m.getRepository(Security).save(security),
-    );
+    // A targeted UPDATE, not a save of the row read above: a full save would
+    // write back every column of a stale read, e.g. a bond link changed in
+    // between (INV-BOND-005).
+    return withScopedDb(this.dataSource, async (m) => {
+      const repo = m.getRepository(Security);
+      await repo.update({ id: security.id, userId }, { isActive: true });
+      return repo.findOneOrFail({ where: { id: security.id, userId } });
+    });
   }
 
   async remove(userId: string, id: string): Promise<void> {
@@ -1202,19 +1392,44 @@ export class SecuritiesService {
     },
   ): Promise<UpdateSecurityPreview> {
     const security = await this.resolveSecurityForManage(userId, input.query);
+    const securityType =
+      input.securityType !== undefined
+        ? input.securityType
+        : (security.securityType ?? null);
+    const currencyCode = input.currencyCode ?? security.currencyCode;
+
+    // The commit refuses a currency or type change that breaks a bond link
+    // (`update`); the preview runs the same validation so the person is not
+    // asked to confirm what cannot be done.
+    if (
+      security.bondInstrumentId &&
+      (currencyCode !== security.currencyCode ||
+        securityType !== (security.securityType ?? null))
+    ) {
+      const linkedTo = security.bondInstrumentId;
+      await withScopedDb(this.dataSource, (m) =>
+        this.assertBondLink(
+          m,
+          {
+            bondInstrumentId: linkedTo,
+            currencyCode,
+            securityType,
+          },
+          currencyCode !== security.currencyCode,
+        ),
+      );
+    }
+
     return {
       securityId: security.id,
       symbol: security.symbol,
       name: security.name,
-      securityType:
-        input.securityType !== undefined
-          ? input.securityType
-          : (security.securityType ?? null),
+      securityType,
       exchange:
         input.exchange !== undefined
           ? input.exchange
           : (security.exchange ?? null),
-      currencyCode: input.currencyCode ?? security.currencyCode,
+      currencyCode,
       isFavourite: input.isFavourite ?? security.isFavourite,
       countryWeightings:
         input.countryWeightings !== undefined

@@ -3,8 +3,13 @@ import { EntityManager } from "typeorm";
 import { resolveCurrencyMetadata } from "../currencies/currency-metadata";
 import { tr } from "../i18n/translate";
 import { boundRestoredNotification } from "./notification-restore-bounds";
-import { BOND_ENGINE_PRICE_SOURCE } from "../bonds/bond-price-source";
-import { BackupData, backupTables } from "./backup-format";
+import { withoutEnginePrices } from "./restore-engine-prices";
+import {
+  BackupData,
+  backupTables,
+  SeveredCatalogLinks,
+  SeveredRow,
+} from "./backup-format";
 import {
   CATALOG_CURRENCY_MATCHED_COLUMNS,
   CATALOG_REFERENCE_COLUMNS,
@@ -530,8 +535,8 @@ export class BackupRestoreDatabaseService {
    * stale engine looks like a valid price (INV-BOND-005).
    *
    * Replaces `data[table]` with new rows. Returns how many references were
-   * dropped per `table.column`, each also counted in the log; the caller tells
-   * the user (a restore that quietly stops pricing a bond is a surprise).
+   * dropped per `table.column`, each also in the log, and which rows lost one;
+   * the caller tells the user (a quietly unpriced bond is a surprise).
    */
   async severUnavailableCatalogLinks(
     manager: EntityManager,
@@ -539,8 +544,9 @@ export class BackupRestoreDatabaseService {
     columns: Readonly<
       Record<string, Readonly<Record<string, string>>>
     > = CATALOG_REFERENCE_COLUMNS,
-  ): Promise<Record<string, number>> {
+  ): Promise<SeveredCatalogLinks> {
     const counts: Record<string, number> = {};
+    const severed: Record<string, SeveredRow[]> = {};
     for (const [table, references] of Object.entries(columns)) {
       for (const [column, referenced] of Object.entries(references)) {
         if (!/^[a-z_]+$/.test(referenced)) {
@@ -552,19 +558,23 @@ export class BackupRestoreDatabaseService {
         const rows = (data as unknown as Record<string, unknown>)[table] as
           Array<Record<string, unknown>> | undefined;
         if (!rows) continue;
-        const dropped = await this.severOneCatalogColumn(
-          manager,
-          data,
-          table,
-          column,
-          referenced,
-          rows,
-          CATALOG_CURRENCY_MATCHED_COLUMNS.has(key),
-        );
-        if (dropped > 0) counts[key] = dropped;
+        const { count: dropped, rows: severedRows } =
+          await this.severOneCatalogColumn(
+            manager,
+            data,
+            table,
+            column,
+            referenced,
+            rows,
+            CATALOG_CURRENCY_MATCHED_COLUMNS.has(key),
+          );
+        if (dropped > 0) {
+          counts[key] = dropped;
+          severed[key] = severedRows;
+        }
       }
     }
-    return counts;
+    return { counts, severed };
   }
 
   private async severOneCatalogColumn(
@@ -575,7 +585,7 @@ export class BackupRestoreDatabaseService {
     referenced: string,
     rows: Array<Record<string, unknown>>,
     mustMatchCurrency: boolean,
-  ): Promise<number> {
+  ): Promise<{ count: number; rows: SeveredRow[] }> {
     const wanted = [
       ...new Set(
         rows
@@ -583,7 +593,7 @@ export class BackupRestoreDatabaseService {
           .filter((id): id is string => typeof id === "string"),
       ),
     ];
-    if (wanted.length === 0) return 0;
+    if (wanted.length === 0) return { count: 0, rows: [] };
 
     const found: Array<{ id: string; currency_code?: string }> =
       await manager.query(
@@ -594,7 +604,7 @@ export class BackupRestoreDatabaseService {
 
     let absent = 0;
     let foreignCurrency = 0;
-    const severedIds = new Set<string>();
+    const severedRows: SeveredRow[] = [];
     const next = rows.map((row) => {
       const id = row[column];
       if (typeof id !== "string") return row;
@@ -605,7 +615,10 @@ export class BackupRestoreDatabaseService {
       } else {
         foreignCurrency += 1;
       }
-      if (typeof row.id === "string") severedIds.add(row.id);
+      if (typeof row.id === "string") {
+        const symbol = typeof row.symbol === "string" ? row.symbol : null;
+        severedRows.push({ id: row.id, symbol });
+      }
       return { ...row, [column]: null };
     });
     (data as unknown as Record<string, unknown>)[table] = next;
@@ -625,19 +638,12 @@ export class BackupRestoreDatabaseService {
 
     if (table === "securities" && column === "bond_instrument_id") {
       // The engine's rows for a security that is no longer linked.
-      const prices = data.security_prices;
-      if (severedIds.size > 0 && Array.isArray(prices)) {
-        data.security_prices = prices.filter(
-          (p) =>
-            !(
-              p.source === BOND_ENGINE_PRICE_SOURCE &&
-              typeof p.security_id === "string" &&
-              severedIds.has(p.security_id)
-            ),
-        );
-      }
+      data.security_prices = withoutEnginePrices(
+        data.security_prices,
+        new Set(severedRows.map((row) => row.id)),
+      );
     }
-    return absent + foreignCurrency;
+    return { count: absent + foreignCurrency, rows: severedRows };
   }
 
   async insertRows(

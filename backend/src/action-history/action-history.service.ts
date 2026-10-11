@@ -5,8 +5,11 @@ import {
   Logger,
 } from "@nestjs/common";
 import { tr } from "../i18n/translate";
+import { ModuleRef } from "@nestjs/core";
 import { DataSource, EntityManager } from "typeorm";
 import { Cron } from "@nestjs/schedule";
+import { BondPriceService } from "../bonds/bond-price.service";
+import { findBondLinkProblem } from "../securities/bond-link.util";
 import { ActionHistory } from "./entities/action-history.entity";
 import {
   RULE_RUN_ENTITY_TYPE,
@@ -35,6 +38,7 @@ import { Security } from "../securities/entities/security.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
 import { Budget } from "../budgets/entities/budget.entity";
 import { CustomReport } from "../reports/entities/custom-report.entity";
+import { acquireAdvisoryLock, LockScope } from "../common/db/locks";
 import { withSystemContext } from "../common/db/with-context";
 import { withScopedDb } from "../common/db/scoped-db";
 import { repriceSettledLoanTemplates } from "../loan-installments/reprice-template";
@@ -104,6 +108,18 @@ export interface UndoRedoResult {
  */
 interface UndoAfterCommit {
   readonly settledScheduleIds: readonly string[];
+  /**
+   * Accounts whose derived state changed because the undo deleted a security's
+   * bond-engine prices (its link was restored to something else); published
+   * after the commit (INV-CACHE-001).
+   */
+  readonly bondClearedAccountIds?: readonly string[];
+  /**
+   * Securities whose bond-engine prices are recomputed after the commit: a
+   * restored link, or a ledger row an undo or redo created, changed or removed
+   * (a security that is not linked is ignored).
+   */
+  readonly bondRecomputeSecurityIds?: readonly string[];
 }
 
 const NOTHING_AFTER_COMMIT: UndoAfterCommit = { settledScheduleIds: [] };
@@ -228,6 +244,7 @@ const ALLOWED_COLUMNS: Record<string, Set<string>> = {
     "currency_code",
     "is_active",
     "skip_price_updates",
+    "bond_instrument_id",
     "sector",
     "industry",
     "sector_weightings",
@@ -340,7 +357,16 @@ function trackHistoryWrite<T>(work: Promise<T>): Promise<T> {
 export class ActionHistoryService {
   private readonly logger = new Logger(ActionHistoryService.name);
 
-  constructor(private dataSource: DataSource) {}
+  constructor(
+    private dataSource: DataSource,
+    // Resolved lazily (`bondPrices`): the bond layer reaches this module back
+    // through the securities module, so a constructor edge would be a cycle.
+    private moduleRef: ModuleRef,
+  ) {}
+
+  private bondPrices(): BondPriceService {
+    return this.moduleRef.get(BondPriceService, { strict: false });
+  }
 
   /**
    * Record an undo entry. Callers do not await this -- see `pendingHistoryWrites`
@@ -488,6 +514,7 @@ export class ActionHistoryService {
       this.dataSource,
       afterCommit.settledScheduleIds,
     );
+    await this.publishBondEffects(userId, afterCommit);
 
     return { action, description: `Undone: ${action.description}` };
   }
@@ -506,14 +533,16 @@ export class ActionHistoryService {
       );
     }
 
-    await withScopedDb(this.dataSource, async (manager) => {
-      await this.executeRedo(action, manager);
+    const afterCommit = await withScopedDb(this.dataSource, async (manager) => {
+      const effects = await this.executeRedo(action, manager);
       await manager.update(ActionHistory, action.id, {
         isUndone: false,
       });
+      return effects;
     });
 
     invalidatePortfolioSummary(userId);
+    await this.publishBondEffects(userId, afterCommit);
 
     return { action, description: `Redone: ${action.description}` };
   }
@@ -549,12 +578,18 @@ export class ActionHistoryService {
           "scheduled_transactions",
         );
         break;
-      case "security":
+      case "security": {
+        const bond = await this.guardSecurityLinkRestore(action, manager);
         await this.undoSimpleEntity(action, manager, Security, "securities");
-        break;
+        return { ...NOTHING_AFTER_COMMIT, ...bond };
+      }
       case "investment_transaction":
         await this.undoInvestmentTransaction(action, manager);
-        break;
+        // The ledger the engine reads changed: a linked security is repriced.
+        return {
+          ...NOTHING_AFTER_COMMIT,
+          bondRecomputeSecurityIds: this.investmentSecurityIds(action),
+        };
       case "budget":
         await this.undoSimpleEntity(action, manager, Budget, "budgets");
         break;
@@ -592,7 +627,7 @@ export class ActionHistoryService {
   private async executeRedo(
     action: ActionHistory,
     manager: EntityManager,
-  ): Promise<void> {
+  ): Promise<UndoAfterCommit> {
     // A run that restructured rows cannot be replayed from its snapshot.
     if (action.entityType === RULE_RUN_ENTITY_TYPE) {
       assertRuleRunRedoable(action);
@@ -611,7 +646,7 @@ export class ActionHistoryService {
       afterData: action.beforeData,
       action: this.invertAction(action.action),
     };
-    await this.executeUndo(invertedAction, manager);
+    return this.executeUndo(invertedAction, manager);
   }
 
   private invertAction(action: string): string {
@@ -1456,6 +1491,167 @@ export class ActionHistoryService {
 
     for (const accountId of accountIds) {
       await this.recalculateBalance(action.userId, accountId, manager);
+    }
+  }
+
+  // --- Bond links and the engine's prices ---
+
+  /**
+   * The securities an investment-transaction entry touched, from its snapshots
+   * (the row, and the other leg of a transfer).
+   */
+  private investmentSecurityIds(action: ActionHistory): string[] {
+    const ids = new Set<string>();
+    for (const snapshot of [action.beforeData, action.afterData]) {
+      if (!snapshot) continue;
+      for (const row of [snapshot, snapshot.linkedTransferLeg]) {
+        const id = (row as Record<string, unknown> | undefined)?.securityId;
+        if (typeof id === "string") ids.add(id);
+      }
+    }
+    return [...ids];
+  }
+
+  /**
+   * Before an undo or redo of a security edit (or of its deletion) writes the
+   * recorded state back, the bond link in that state is held to the rules of a
+   * normal edit: the instrument exists, the security is of type BOND and in the
+   * instrument's currency (`findBondLinkProblem`, the check `SecuritiesService`
+   * runs). A state that is no longer valid refuses the undo with a code and
+   * writes nothing. A link that changes also deletes the engine's prices of the
+   * old one, inside this transaction under the recompute lock; the new link is
+   * priced after the commit.
+   */
+  private async guardSecurityLinkRestore(
+    action: ActionHistory,
+    manager: EntityManager,
+  ): Promise<UndoAfterCommit> {
+    const target = action.beforeData as Record<string, any> | null;
+    if (!target || !action.entityId) return NOTHING_AFTER_COMMIT;
+    const lower = (v: unknown) =>
+      typeof v === "string" ? v.toLowerCase() : (v ?? null);
+
+    if (action.action === "delete") {
+      // Re-inserting a deleted security: its recorded link is checked as is.
+      const link = lower(target.bondInstrumentId) as string | null;
+      if (!link) return NOTHING_AFTER_COMMIT;
+      await this.assertRestorableLink(manager, link, target);
+      return {
+        settledScheduleIds: [],
+        bondRecomputeSecurityIds: [action.entityId],
+      };
+    }
+    if (action.action !== "update") return NOTHING_AFTER_COMMIT;
+    // A snapshot that names none of the three fields a link depends on cannot
+    // change whether the link is valid.
+    if (
+      !["bondInstrumentId", "securityType", "currencyCode"].some(
+        (k) => k in target,
+      )
+    ) {
+      return NOTHING_AFTER_COMMIT;
+    }
+
+    // A restored link may delete the engine's rows under the recompute lock
+    // (`clearEnginePrices`): that advisory lock comes before the row lock, the
+    // order every writer uses (`common/db/locks.ts`).
+    if ("bondInstrumentId" in target) {
+      await acquireAdvisoryLock(
+        manager,
+        LockScope.BondPriceRecompute,
+        action.entityId,
+      );
+    }
+    const rows: Array<{
+      bond_instrument_id: string | null;
+      security_type: string | null;
+      currency_code: string;
+    }> = await manager.query(
+      `SELECT bond_instrument_id, security_type, currency_code
+         FROM securities
+        WHERE id = $1 AND user_id = $2
+        FOR UPDATE`,
+      [action.entityId, action.userId],
+    );
+    const current = rows[0];
+    if (!current) return NOTHING_AFTER_COMMIT;
+
+    const has = (key: string) => key in target && target[key] !== undefined;
+    const link = has("bondInstrumentId")
+      ? (lower(target.bondInstrumentId) as string | null)
+      : (lower(current.bond_instrument_id) as string | null);
+    const securityType = has("securityType")
+      ? (target.securityType ?? null)
+      : current.security_type;
+    const currencyCode = has("currencyCode")
+      ? target.currencyCode
+      : current.currency_code;
+    const linkChanged =
+      link !== (lower(current.bond_instrument_id) as string | null);
+
+    if (
+      link &&
+      (linkChanged ||
+        securityType !== current.security_type ||
+        currencyCode !== current.currency_code)
+    ) {
+      await this.assertRestorableLink(manager, link, {
+        securityType,
+        currencyCode,
+      });
+    }
+    if (!linkChanged) return NOTHING_AFTER_COMMIT;
+
+    const { accountIds } = await this.bondPrices().clearEnginePrices(
+      manager,
+      action.userId,
+      action.entityId,
+    );
+    return {
+      settledScheduleIds: [],
+      bondClearedAccountIds: accountIds,
+      bondRecomputeSecurityIds: link ? [action.entityId] : [],
+    };
+  }
+
+  private async assertRestorableLink(
+    manager: EntityManager,
+    bondInstrumentId: string,
+    state: Record<string, any>,
+  ): Promise<void> {
+    const problem = await findBondLinkProblem(manager, {
+      bondInstrumentId,
+      currencyCode: state.currencyCode,
+      securityType: state.securityType,
+    });
+    if (problem) {
+      throw new ConflictException(
+        tr(
+          "errors.bonds.UNDO_LINK_INVALID",
+          "This change cannot be undone because the bond link it would restore is no longer valid",
+        ),
+      );
+    }
+  }
+
+  /** After the commit of an undo or redo (INV-CACHE-001): never inside it. */
+  private async publishBondEffects(
+    userId: string,
+    effects: UndoAfterCommit,
+  ): Promise<void> {
+    const cleared = effects.bondClearedAccountIds ?? [];
+    const ids = effects.bondRecomputeSecurityIds ?? [];
+    if (cleared.length === 0 && ids.length === 0) return;
+    try {
+      const bond = this.bondPrices();
+      if (cleared.length > 0) bond.publishClearedPrices(userId, cleared);
+      if (ids.length > 0) await bond.recomputeLinkedSecurities(userId, ids);
+    } catch (error) {
+      this.logger.warn(
+        `Bond price recompute after an undo failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
   }
 

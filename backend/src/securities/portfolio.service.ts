@@ -1253,7 +1253,11 @@ export class PortfolioService {
         // a transaction-to-transaction delta, not a daily market move. The
         // date-gap check below misses this when two transactions land on
         // adjacent days, so filter on the flag that marks the security itself.
-        h.security?.skipPriceUpdates !== true,
+        h.security?.skipPriceUpdates !== true &&
+        // A bond linked to the engine is valued by accrual, every calendar day:
+        // that is not a market move, and its row dated today would otherwise
+        // decide which session the board shows and push every equity off it.
+        isPricedByQuoteProvider(h.security ?? {}),
     );
     if (activeHoldings.length === 0) return [];
 

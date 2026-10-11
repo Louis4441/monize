@@ -25,6 +25,7 @@ import { EncryptionModule } from "../common/encryption/encryption.module";
 import { AttachmentsModule } from "../attachments/attachments.module";
 import { SystemAlertsModule } from "../system-alerts/system-alerts.module";
 import { NotificationsModule } from "../notifications/notifications.module";
+import { BondsModule } from "../bonds/bonds.module";
 
 @Module({
   imports: [
@@ -39,6 +40,8 @@ import { NotificationsModule } from "../notifications/notifications.module";
     // reachable from NotificationsModule imports this module back, so it cannot
     // lie on a require cycle (`src/module-graph.spec.ts`).
     NotificationsModule,
+    // BackupRestoreService recomputes the engine prices of a restored bond link.
+    BondsModule,
   ],
   controllers: [
     BackupController,

@@ -3,6 +3,7 @@ import { DataSource } from "typeorm";
 import {
   createIntegrationModule,
   cleanTables,
+  deleteBondInstrumentBypassingImmutability,
 } from "../helpers/integration-setup";
 
 /**
@@ -122,11 +123,40 @@ describe("bond reference tables (integration)", () => {
     ).rejects.toThrow(/duplicate key/);
   });
 
-  it("refuses to delete an instrument that still has terms (ON DELETE RESTRICT)", async () => {
+  it("refuses UPDATE of a bond instrument, leaving the row as written", async () => {
+    await expect(
+      dataSource.query(
+        `UPDATE bond_instruments SET currency_code = 'EUR' WHERE id = $1`,
+        [instrumentId],
+      ),
+    ).rejects.toThrow(/immutable/);
+    const rows: Array<{ currency_code: string }> = await dataSource.query(
+      `SELECT currency_code FROM bond_instruments WHERE id = $1`,
+      [instrumentId],
+    );
+    expect(rows[0].currency_code).toBe("PLN");
+  });
+
+  it("refuses DELETE of a bond instrument", async () => {
     await expect(
       dataSource.query(`DELETE FROM bond_instruments WHERE id = $1`, [
         instrumentId,
       ]),
+    ).rejects.toThrow(/immutable/);
+    expect(
+      await dataSource.query(`SELECT 1 FROM bond_instruments WHERE id = $1`, [
+        instrumentId,
+      ]),
+    ).toHaveLength(1);
+  });
+
+  it("refuses to delete an instrument that still has terms (ON DELETE RESTRICT), once the immutability trigger is out of the way", async () => {
+    await expect(
+      deleteBondInstrumentBypassingImmutability(
+        dataSource,
+        `DELETE FROM bond_instruments WHERE id = $1`,
+        [instrumentId],
+      ),
     ).rejects.toThrow(/foreign key|violates/);
   });
 

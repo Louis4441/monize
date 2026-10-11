@@ -71,9 +71,26 @@ export interface RestoreResult {
    * The rows *were* written; what changed is that the bond engine no longer
    * prices them, so the user has to re-link them (spec 12.1). The engine's price
    * rows in the file for those securities are not restored. Counted beside
-   * `restored` like the two above, and omitted when zero.
+   * `restored` like the two above, and omitted when zero. `symbols` names them
+   * (at most {@link MAX_UNLINKED_BOND_SYMBOLS}) so the user knows which to
+   * re-link; `count` is the full number.
    */
-  unlinkedBondSecurities?: number;
+  unlinkedBondSecurities?: { count: number; symbols: string[] };
+}
+
+/** The most symbols a restore result names for its unlinked bond securities. */
+export const MAX_UNLINKED_BOND_SYMBOLS = 50;
+
+/** A row whose catalog reference a restore dropped. */
+export interface SeveredRow {
+  id: string;
+  symbol: string | null;
+}
+
+/** What `severUnavailableCatalogLinks` dropped, per `table.column`. */
+export interface SeveredCatalogLinks {
+  counts: Record<string, number>;
+  severed: Record<string, SeveredRow[]>;
 }
 
 export class BackupPasswordRequiredError extends BadRequestException {

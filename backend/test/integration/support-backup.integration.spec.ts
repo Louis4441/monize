@@ -3,6 +3,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { ConfigModule } from "@nestjs/config";
 import { DataSource } from "typeorm";
 import { randomUUID } from "crypto";
+import { BondPriceService } from "@/bonds/bond-price.service";
 import { BackupService } from "@/backup/backup.service";
 import { BackupExportService } from "@/backup/backup-export.service";
 import { BackupRestoreService } from "@/backup/backup-restore.service";
@@ -57,6 +58,11 @@ describe("Support backup (integration)", () => {
         // wiring is the thing under test.
         BackupExportService,
         BackupRestoreService,
+        // The restore's bond price recompute is not under test here.
+        {
+          provide: BondPriceService,
+          useValue: { recomputeSecurity: async () => ({}) },
+        },
         BackupAttachmentTransferService,
         BackupRestoreDatabaseService,
         // Real, not doubles: the restore takes a maintenance lease against the

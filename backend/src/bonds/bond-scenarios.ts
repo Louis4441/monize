@@ -57,7 +57,14 @@ function overLots(
   return total.toFixed(places);
 }
 
-/** The figures of one scenario from the lots valued under it. */
+/**
+ * The figures of one scenario from the lots valued under it (spec 13.3).
+ *
+ * Each part of the interest is the per-bond sum over the periods (a coupon bond's
+ * periods are the coupons as paid, rounded per bond; a compounding bond's are the
+ * exact accrual) times the quantity, rounded once per lot. `totalInterest` is the
+ * sum of the four rounded parts, so the parts always add up to it.
+ */
 export function scenarioOf(
   value: string,
   lots: readonly BondValuation[],
@@ -70,17 +77,35 @@ export function scenarioOf(
         ? null
         : perBond.mul(ExactDecimal.fromInt(lot.quantity));
     });
+  const fixedInterest = interest((e) => e.fixedPart);
+  const benchmarkInterest = interest((e) => e.benchmarkPart);
+  const addendInterest = interest((e) => e.addendPart);
+  const announcedInterest = interest((e) => e.announcedPart);
+  const parts = [
+    fixedInterest,
+    benchmarkInterest,
+    addendInterest,
+    announcedInterest,
+  ];
+  const totalInterest = parts.some((part) => part === null)
+    ? null
+    : parts
+        .reduce(
+          (sum, part) => sum.add(ExactDecimal.parse(part as string)),
+          ExactDecimal.ZERO,
+        )
+        .toFixed(places);
   return {
     value,
     maturityValue: overLots(lots, places, (lot) => {
       const maturity = lot.maturityValueKnown ?? lot.maturityValueProjected;
       return maturity === null ? null : ExactDecimal.parse(maturity);
     }),
-    totalInterest: interest((e) => e.interest),
-    fixedInterest: interest((e) => e.fixedPart),
-    benchmarkInterest: interest((e) => e.benchmarkPart),
-    addendInterest: interest((e) => e.addendPart),
-    announcedInterest: interest((e) => e.announcedPart),
+    totalInterest,
+    fixedInterest,
+    benchmarkInterest,
+    addendInterest,
+    announcedInterest,
   };
 }
 

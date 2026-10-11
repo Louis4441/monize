@@ -1331,6 +1331,10 @@ BEGIN
 END;
 $$;
 
+CREATE TRIGGER trg_bond_instruments_immutable
+    BEFORE UPDATE OR DELETE ON bond_instruments
+    FOR EACH ROW EXECUTE FUNCTION bond_reject_mutation();
+
 CREATE TRIGGER trg_bond_terms_versions_immutable
     BEFORE UPDATE OR DELETE ON bond_terms_versions
     FOR EACH ROW EXECUTE FUNCTION bond_reject_mutation();

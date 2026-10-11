@@ -78,6 +78,8 @@ function build(opts: {
     recordFailure: jest.fn(() => true),
     releaseProbe: jest.fn(),
     logFailure: jest.fn(),
+    recordDataFailure: jest.fn(),
+    recordDataRecovered: jest.fn(),
     ...opts.health,
   };
   const fetchSync = {
@@ -362,6 +364,43 @@ describe("BenchmarkRefreshService", () => {
     await expect(service.refreshAll({ adapters: [adapter] })).rejects.toThrow(
       /Every bond benchmark series failed to refresh \(2 of 2\)/,
     );
+  });
+
+  it("reports a series that has not been stored for more than 3 days to the health service, and a recent one not", async () => {
+    const failing = () =>
+      jest.fn(async () => {
+        throw new Error("GUS CPI: the feed is stale");
+      });
+    // Today is 2026-10-10 in Warsaw.
+    const { service, adapter, health } = build({
+      fetchers: { NBP_X: failing(), CPI_X: failing() },
+      fetched: { NBP_X: "2026-10-08", CPI_X: "2026-10-06" },
+    });
+    await expect(service.refreshAll({ adapters: [adapter] })).rejects.toThrow();
+    expect(health.recordDataFailure).toHaveBeenCalledTimes(1);
+    expect(health.recordDataFailure).toHaveBeenCalledWith(
+      "gus",
+      expect.stringMatching(/CPI_X: .*stale.*last stored 2026-10-06/),
+    );
+    expect(health.recordDataRecovered).not.toHaveBeenCalled();
+  });
+
+  it("reports a series that was never stored, and clears the report when a store succeeds", async () => {
+    const never = build({
+      fetchers: {
+        NBP_X: jest.fn(async () => {
+          throw new Error("unparseable");
+        }),
+        CPI_X: jest.fn(async () => result("CPI_X", "2026-08-01")),
+      },
+    });
+    await never.service.refreshAll({ adapters: [never.adapter] });
+    expect(never.health.recordDataFailure).toHaveBeenCalledWith(
+      "nbp",
+      expect.stringContaining("never stored"),
+    );
+    expect(never.health.recordDataRecovered).toHaveBeenCalledWith("gus");
+    expect(never.health.recordDataRecovered).not.toHaveBeenCalledWith("nbp");
   });
 
   it("one series failing is not a failed run, and a run that skipped everything is not one either", async () => {

@@ -1,5 +1,6 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { gemConfigFingerprint } from "../strategies/gem-signal.service";
+import { BondPriceService } from "../bonds/bond-price.service";
 import { DataSource } from "typeorm";
 import {
   UnauthorizedException,
@@ -711,6 +712,10 @@ describe("BackupService", () => {
         // survived (P2-005).
         OidcReauthService,
         userMaintenanceProvider(maintenance),
+        {
+          provide: BondPriceService,
+          useValue: { recomputeSecurity: jest.fn().mockResolvedValue({}) },
+        },
         // Two ciphers, deliberately: `EncryptionService` still owns the
         // provider API keys the export carries, while the stored backup password
         // moved to `EncryptionService` (whose key does not depend on optional
@@ -1830,6 +1835,31 @@ describe("BackupService", () => {
         await expect(
           service.restoreData(userId, makeInput({ oidcIdToken: artifact })),
         ).resolves.toHaveProperty("message", "Backup restored successfully");
+      });
+
+      it("recomputes the engine prices of every bond-linked security after the commit", async () => {
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        const bondPrices = (
+          service as unknown as {
+            restoreService: { bondPrices: { recomputeSecurity: jest.Mock } };
+          }
+        ).restoreService.bondPrices;
+        const base = mockQueryRunner.query.getMockImplementation()!;
+        mockQueryRunner.query.mockImplementation((sql: string, params) =>
+          String(sql).includes("bond_instrument_id IS NOT NULL")
+            ? Promise.resolve([{ id: "sec-1" }, { id: "sec-2" }])
+            : base(sql, params),
+        );
+        await service.restoreData(userId, makeInput({ password: "test" }));
+        expect(bondPrices.recomputeSecurity).toHaveBeenCalledWith(
+          userId,
+          "sec-1",
+        );
+        expect(bondPrices.recomputeSecurity).toHaveBeenCalledWith(
+          userId,
+          "sec-2",
+        );
       });
 
       it.each(["notifications", "budget_alerts"])(
@@ -5214,7 +5244,10 @@ describe("BackupService", () => {
       // The user lookup runs under the caller's plain context; the restore
       // transaction itself carries the flag.
       expect(flagsSeen[0]).toBeUndefined();
-      expect(flagsSeen[flagsSeen.length - 1]).toBe(true);
+      expect(flagsSeen).toContain(true);
+      // The post-commit bond price lookup is a later transaction that must not
+      // inherit the flag.
+      expect(flagsSeen[flagsSeen.length - 1]).toBeUndefined();
 
       const allCalls = mockQueryRunner.query.mock.calls.map(
         (call: unknown[]) => call[0] as string,

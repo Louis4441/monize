@@ -2,7 +2,8 @@ import { Logger, NotFoundException } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { FetchSyncJob } from "../common/jobs/fetch-sync.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
-import { manifest } from "./adapters/pl/pl-test-input";
+import { manifest, manifestDocument } from "./adapters/pl/pl-test-input";
+import { parseBondTerms } from "./domain/bond-terms";
 import {
   BOND_ENGINE_PRICE_SOURCE,
   BondPriceService,
@@ -11,6 +12,7 @@ import {
   BondReferenceData,
   BondValuationService,
 } from "./bond-valuation.service";
+import * as engine from "./engine/bond-engine";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -74,7 +76,9 @@ interface Tx {
   status?: string;
   date: string;
   quantity: string | null;
-  paired?: boolean;
+  account?: string;
+  /** The other leg's account when this row is a paired transfer leg. */
+  counterpart?: string;
 }
 
 function setup(
@@ -84,6 +88,7 @@ function setup(
     deleteRows?: number;
     security?: unknown[];
     reference?: BondReferenceData;
+    timezone?: string | null;
   } = {},
 ) {
   const { manager, dataSource } = createScopedDbMocks();
@@ -102,6 +107,11 @@ function setup(
     if (sql.includes("pg_advisory_xact_lock")) {
       events.push("lock");
       return [];
+    }
+    if (sql.includes("FROM user_preferences")) {
+      return opts.timezone === undefined
+        ? []
+        : [{ timezone: opts.timezone, last_client_timezone: null }];
     }
     if (sql.includes("FROM securities")) {
       return (
@@ -122,7 +132,8 @@ function setup(
         status: t.status ?? "UNRECONCILED",
         tx_date: t.date,
         quantity: t.quantity,
-        paired_transfer: t.paired ?? false,
+        account_id: t.account ?? "acct-1",
+        counterpart_account_id: t.counterpart ?? null,
       }));
     }
     if (sql.includes("INSERT INTO security_prices")) {
@@ -232,11 +243,12 @@ describe("BondPriceService", () => {
     });
 
     it("averages lots of different dates by quantity, per bond", async () => {
+      // Both purchases lie in the series' sale window (October 2026).
       const { service, call } = setup([
-        buy("2026-10-15", "10"),
-        buy("2026-11-15", "30"),
+        buy("2026-10-10", "10"),
+        buy("2026-10-31", "30"),
       ]);
-      await service.recomputeSecurity(USER, SECURITY, { today: "2026-11-15" });
+      await service.recomputeSecurity(USER, SECURITY, { today: "2026-10-31" });
 
       const [, dates, prices] = call("INSERT INTO security_prices")!.params as [
         string,
@@ -244,16 +256,81 @@ describe("BondPriceService", () => {
         string[],
       ];
       const at = (d: string) => prices[dates.indexOf(d)];
-      // Before the second purchase: the first lot alone, 30 days in.
-      expect(at("2026-11-14")).toBe(price([{ a: 30, qty: 10n }]));
-      // On it: 31 days into lot 1, 0 into lot 2, weighted 10 : 30.
-      expect(at("2026-11-15")).toBe(
+      // Before the second purchase: the first lot alone, 20 days in.
+      expect(at("2026-10-30")).toBe(price([{ a: 20, qty: 10n }]));
+      // On it: 21 days into lot 1, 0 into lot 2, weighted 10 : 30.
+      expect(at("2026-10-31")).toBe(
         price([
-          { a: 31, qty: 10n },
+          { a: 21, qty: 10n },
           { a: 0, qty: 30n },
         ]),
       );
-      expect(at("2026-11-15")).toBe("100.0925000000");
+      expect(at("2026-10-31")).toBe("100.0625000000");
+    });
+
+    it("blends the lots of every account into the one price of the security", async () => {
+      const { service, call } = setup([
+        { ...buy("2026-10-10", "10"), account: "acct-ike" },
+        { ...buy("2026-10-31", "30"), account: "acct-plain" },
+      ]);
+      await service.recomputeSecurity(USER, SECURITY, { today: "2026-10-31" });
+      const [, dates, prices] = call("INSERT INTO security_prices")!.params as [
+        string,
+        string[],
+        string[],
+      ];
+      expect(prices[dates.indexOf("2026-10-31")]).toBe(
+        price([
+          { a: 21, qty: 10n },
+          { a: 0, qty: 30n },
+        ]),
+      );
+    });
+
+    it("a sale in one account leaves the other account's lot priced, FIFO within the account (R6)", async () => {
+      const { service, call } = setup([
+        { ...buy("2026-10-10", "10"), account: "acct-ike" },
+        { ...buy("2026-10-20", "10"), account: "acct-plain" },
+        {
+          action: "SELL",
+          date: "2026-10-25",
+          quantity: "10",
+          account: "acct-plain",
+        },
+      ]);
+      await service.recomputeSecurity(USER, SECURITY, { today: "2026-10-26" });
+      const [, dates, prices] = call("INSERT INTO security_prices")!.params as [
+        string,
+        string[],
+        string[],
+      ];
+      // The older IKE lot is what is left (16 days in), not the plain account's.
+      expect(prices[dates.indexOf("2026-10-26")]).toBe(
+        price([{ a: 16, qty: 10n }]),
+      );
+    });
+
+    it("gives no price on a day a lot is outside the sale window (REFUSED), as for any unknown", async () => {
+      const { service, call } = setup([
+        buy("2026-10-10", "10"),
+        buy("2026-11-05", "10"),
+      ]);
+      await service.recomputeSecurity(USER, SECURITY, { today: "2026-11-06" });
+      const [, dates] = call("INSERT INTO security_prices")!.params as [
+        string,
+        string[],
+      ];
+      expect(dates).toContain("2026-11-04");
+      expect(dates).not.toContain("2026-11-05");
+      expect(dates).not.toContain("2026-11-06");
+    });
+
+    it("resolves each distinct lot's schedule once, not once per day (R1)", async () => {
+      const { service } = setup([buy("2026-10-10", "10")]);
+      const spy = jest.spyOn(engine, "grossValueSeries");
+      await service.recomputeSecurity(USER, SECURITY, { today: "2027-10-10" });
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy.mock.calls[0][0].days).toHaveLength(366);
     });
 
     it("prices a past day on the lots held that day, not on what is left today", async () => {
@@ -292,20 +369,19 @@ describe("BondPriceService", () => {
     });
 
     it("skips a day on which any open lot has no gross value, never pricing it from the others", async () => {
-      const { service, valuation, call } = setup([
+      const { service, call } = setup([
         buy("2026-10-15", "10"),
         buy("2026-10-16", "30"),
       ]);
-      const real = valuation.valueLotFrom.bind(valuation);
-      jest
-        .spyOn(valuation, "valueLotFrom")
-        .mockImplementation((reference, lot, asOf, projection) => {
-          const valuation = real(reference, lot, asOf, projection);
+      const real = engine.grossValueSeries;
+      jest.spyOn(engine, "grossValueSeries").mockImplementation((input) =>
+        real(input).map((point) =>
           // The second lot has no rate on the 18th (a started period, INV-BOND-002).
-          return lot.purchaseDate === "2026-10-16" && asOf === "2026-10-18"
-            ? { ...valuation, grossValue: null }
-            : valuation;
-        });
+          input.lot.purchaseDate === "2026-10-16" && point.asOf === "2026-10-18"
+            ? { ...point, grossValue: null }
+            : point,
+        ),
+      );
 
       await service.recomputeSecurity(USER, SECURITY, { today: "2026-10-19" });
 
@@ -330,6 +406,40 @@ describe("BondPriceService", () => {
       expect(result).toEqual({ written: 0, deleted: 0 });
     });
 
+    it("recomputes a 10-year EDO lot bought 10 years ago in well under a second (R1)", async () => {
+      // The sale window is lifted so a lot can be that old; every CPI month is known.
+      const document = manifestDocument("edo1036");
+      document.saleWindow = null;
+      const terms = parseBondTerms(document);
+      const values = new Map<string, string>();
+      for (let y = 2015; y <= 2027; y++)
+        for (let m = 1; m <= 12; m++)
+          values.set(`${y}-${String(m).padStart(2, "0")}`, "0.034");
+      const benchmarkId = (terms.rateRule as { benchmarkId: string })
+        .benchmarkId;
+      const reference: BondReferenceData = {
+        ...TOS,
+        terms,
+        benchmarks: new Map([
+          [benchmarkId, { kind: "MONTHLY", publisher: "GUS", values }],
+        ]),
+      };
+      const { service, call } = setup([buy("2016-10-03", "10")], {
+        reference,
+      });
+
+      const started = Date.now();
+      await service.recomputeSecurity(USER, SECURITY, { today: "2026-10-10" });
+      const elapsed = Date.now() - started;
+
+      const [, dates] = call("INSERT INTO security_prices")!.params as [
+        string,
+        string[],
+      ];
+      expect(dates.length).toBeGreaterThan(3600);
+      expect(elapsed).toBeLessThan(1000);
+    });
+
     it("loads the reference data once however many days it prices", async () => {
       const { service, valuation } = setup([buy("2026-10-15", "10")]);
       await service.recomputeSecurity(USER, SECURITY, { today: "2027-04-15" });
@@ -342,7 +452,7 @@ describe("BondPriceService", () => {
   });
 
   describe("recomputeSecurity: what is written", () => {
-    it("upserts only over a bond_engine row whose close differs, binding the one source constant", async () => {
+    it("replaces every non-manual row of its days, never a manual one, and stores adjusted_close NULL (R3)", async () => {
       const { service, call } = setup([buy("2026-10-15", "10")]);
       await service.recomputeSecurity(USER, SECURITY, { today: "2026-10-16" });
 
@@ -352,13 +462,47 @@ describe("BondPriceService", () => {
         /ON CONFLICT \(security_id, price_date\) DO UPDATE/,
       );
       expect(upsert.sql).toMatch(
-        /WHERE security_prices\.source = \$4::varchar/,
+        /WHERE security_prices\.source IS DISTINCT FROM \$5::varchar/,
       );
+      // An unchanged day is not rewritten: close, source or adjusted differs.
       expect(upsert.sql).toMatch(
         /security_prices\.close_price IS DISTINCT FROM EXCLUDED\.close_price/,
       );
+      expect(upsert.sql).toMatch(
+        /security_prices\.source IS DISTINCT FROM EXCLUDED\.source/,
+      );
+      expect(upsert.sql).toMatch(/security_prices\.adjusted_close IS NOT NULL/);
+      // The engine's row carries no adjusted close, inserted or on conflict.
+      expect(upsert.sql).toMatch(/t\.p, NULL, \$4::varchar/);
+      expect(upsert.sql).toMatch(/adjusted_close = NULL/);
+      expect(upsert.sql).toMatch(/source = EXCLUDED\.source/);
       expect(upsert.params[3]).toBe("bond_engine");
+      expect(upsert.params[4]).toBe("manual");
       expect(upsert.params[0]).toBe(SECURITY);
+    });
+
+    it("uses the user's financial today when none is given: the timezone of the preferences, not the request's", async () => {
+      jest.useFakeTimers({ now: new Date("2027-01-16T06:00:00Z") });
+      try {
+        // 22:00 on the 15th in Los Angeles, already the 16th in Warsaw.
+        const la = setup([buy("2026-10-20", "10")], {
+          timezone: "America/Los_Angeles",
+        });
+        await la.service.recomputeSecurity(USER, SECURITY);
+        const laDates = la.call("INSERT INTO security_prices")!
+          .params[1] as string[];
+        expect(laDates[laDates.length - 1]).toBe("2027-01-15");
+
+        const pl = setup([buy("2026-10-20", "10")], {
+          timezone: "Europe/Warsaw",
+        });
+        await pl.service.recomputeSecurity(USER, SECURITY);
+        const plDates = pl.call("INSERT INTO security_prices")!
+          .params[1] as string[];
+        expect(plDates[plDates.length - 1]).toBe("2027-01-16");
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it("deletes bond_engine rows of the days that no longer have a price, and only those", async () => {
@@ -529,6 +673,37 @@ describe("BondPriceService", () => {
     });
   });
 
+  describe("recomputeLinkedSecurities (after a ledger write)", () => {
+    it("recomputes only the linked securities of the user among the ids, each once, and never throws", async () => {
+      const { service, call } = setup([], {
+        security: [{ id: "s-1" }, { id: "s-3" }],
+      });
+      const recompute = jest
+        .spyOn(service, "recomputeSecurity")
+        .mockRejectedValueOnce(new Error("no rates"))
+        .mockResolvedValue({ written: 1, deleted: 0 });
+      const warn = jest.spyOn(Logger.prototype, "warn").mockImplementation();
+
+      await expect(
+        service.recomputeLinkedSecurities(USER, ["s-1", null, "s-1", "s-3"]),
+      ).resolves.toBeUndefined();
+
+      const lookup = call("FROM securities")!;
+      expect(lookup.sql).toMatch(/bond_instrument_id IS NOT NULL/);
+      expect(lookup.sql).toMatch(/user_id = \$2/);
+      expect(lookup.params).toEqual([["s-1", "s-3"], USER]);
+      // One failing security does not stop the next.
+      expect(recompute.mock.calls.map((c) => c[1])).toEqual(["s-1", "s-3"]);
+      expect(warn).toHaveBeenCalled();
+    });
+
+    it("does nothing for no ids", async () => {
+      const { service, statements } = setup([]);
+      await service.recomputeLinkedSecurities(USER, [null, undefined]);
+      expect(statements).toEqual([]);
+    });
+  });
+
   describe("the daily job", () => {
     const linkedRows = [
       { id: "s-a1", user_id: "u-a" },
@@ -556,6 +731,11 @@ describe("BondPriceService", () => {
         ["u-b", "s-b1"],
       ]);
       expect(result).toEqual({ securities: 3, failed: 0 });
+      // No server-wide day is passed: each recompute resolves its own user's
+      // financial today, the definition a request recompute uses (R17).
+      for (const call of recompute.mock.calls) {
+        expect(call[2]).toEqual({});
+      }
     });
 
     it("isolates a failing security: logged, and the rest still run", async () => {

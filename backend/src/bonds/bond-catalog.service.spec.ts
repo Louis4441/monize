@@ -103,13 +103,20 @@ function setup(adapters: readonly BondAdapter[], seed: Partial<Db> = {}) {
     }
     throw new Error(`unexpected query: ${sql}`);
   });
-  const ensureSystemCurrency = jest.fn(async (code: string) => {
+  const ensureCatalogCurrency = jest.fn(async (code: string) => {
     if (!db.currencies.includes(code)) db.currencies.push(code);
   });
   const service = new BondCatalogService(dataSource as unknown as DataSource, {
-    ensureSystemCurrency,
+    ensureCatalogCurrency,
   });
-  return { service, db, statements, manager, ensureSystemCurrency };
+  return {
+    service,
+    db,
+    statements,
+    manager,
+    dataSource,
+    ensureCatalogCurrency,
+  };
 }
 
 describe("BondCatalogService", () => {
@@ -241,12 +248,38 @@ describe("BondCatalogService", () => {
     expect(error.mock.calls[0][0]).toMatch(/Invalid bond terms/);
   });
 
-  it("creates an instrument's currency on demand on a fresh deployment", async () => {
-    const { service, db, ensureSystemCurrency } = setup([POLISH_BOND_ADAPTER], {
-      currencies: [],
+  it("stores each entry in its own transaction, so one entry's SQL failure does not lose the others", async () => {
+    const { service, db, manager, dataSource } = setup([POLISH_BOND_ADAPTER]);
+    const base = manager.query.getMockImplementation()!;
+    manager.query.mockImplementation(async (sql: string, params: unknown[]) => {
+      if (
+        sql.includes("INSERT INTO bond_instruments") &&
+        params[3] === "ROR1027"
+      ) {
+        throw new Error("value too long for type character varying(40)");
+      }
+      return base(sql, params);
     });
     await service.seed([POLISH_BOND_ADAPTER]);
-    expect(ensureSystemCurrency).toHaveBeenCalledWith("PLN");
+    expect(db.instruments).toHaveLength(7);
+    expect(db.versions.size).toBe(7);
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(error.mock.calls[0][0]).toMatch(
+      /could not be stored and was skipped: value too long/,
+    );
+    // One for the series, one per entry.
+    expect(dataSource.transaction).toHaveBeenCalledTimes(1 + 8);
+  });
+
+  it("creates an instrument's currency on demand on a fresh deployment", async () => {
+    const { service, db, ensureCatalogCurrency } = setup(
+      [POLISH_BOND_ADAPTER],
+      {
+        currencies: [],
+      },
+    );
+    await service.seed([POLISH_BOND_ADAPTER]);
+    expect(ensureCatalogCurrency).toHaveBeenCalledWith("PLN");
     expect(db.currencies).toEqual(["PLN"]);
     expect(db.instruments).toHaveLength(8);
     expect(error).not.toHaveBeenCalled();

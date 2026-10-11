@@ -153,6 +153,9 @@ describe("NBP reference rate parsers", () => {
     });
     const result = await fetchNbpReference(fetch, "2026-10-10");
     expect(result.observations).toHaveLength(6);
+    // The archive ends at 2026-03-05: it may be missing a decision between that
+    // and 2026-10-08, so nothing after its newest date is covered.
+    expect(result.coveredThrough).toBe("2026-03-05");
     expect(result.observations[result.observations.length - 1]).toEqual({
       observationDate: "2026-10-08",
       value: "0.0400",
@@ -161,6 +164,18 @@ describe("NBP reference rate parsers", () => {
     });
     // Every row that came from the archive says so.
     expect(result.observations[0].sourceUrl).toBe(NBP_ARCHIVE_URL);
+  });
+
+  it("does not claim coverage up to today when the archive is a decision behind (archive ends at A, current table holds C)", async () => {
+    const fetch = routes({
+      [NBP_ARCHIVE_URL]: { status: 200, body: fixture("nbp-archive.xml") },
+      [NBP_CURRENT_URL]: {
+        status: 200,
+        body: currentTable("2026-07-09", "3,25"),
+      },
+    });
+    const result = await fetchNbpReference(fetch, "2026-10-10");
+    expect(result.coveredThrough).toBe("2026-03-05");
   });
 
   it("lets the current table's value win on a date both documents carry", async () => {
@@ -173,6 +188,8 @@ describe("NBP reference rate parsers", () => {
     });
     const result = await fetchNbpReference(fetch, "2026-10-10");
     expect(result.observations).toHaveLength(5);
+    // The archive carries the current table's date: nothing can be missing.
+    expect(result.coveredThrough).toBe("2026-10-10");
     const row = result.observations.find(
       (o) => o.observationDate === "2026-03-05",
     );
@@ -299,64 +316,84 @@ describe("GUS CPI parser", () => {
     ).toBe(`https://stat.gov.pl/d/${file}`);
   });
 
-  it("does not fetch a foreign link found on the landing page", async () => {
-    const file =
-      "miesiecznewskaznikicentowarowiuslugkonsumpcyjnychod1982roku_9.csv";
-    const fetch = routes({
-      [GUS_CPI_CSV_URL]: { status: 404, body: new Uint8Array() },
-      [GUS_CPI_LANDING_URL]: {
-        status: 200,
-        body: bytes(`<a href="http://stat.gov.pl/d/${file}">`),
-      },
-    });
-    await expect(fetchGusCpi(fetch)).rejects.toThrow(/no CSV link/);
-    expect(fetch).toHaveBeenCalledTimes(2);
+  const NEXT_FILE =
+    "https://stat.gov.pl/download/gfx/a/miesiecznewskaznikicentowarowiuslugkonsumpcyjnychod1982roku_9.csv";
+  const landingLinking = (href: string) => ({
+    [GUS_CPI_LANDING_URL]: {
+      status: 200,
+      body: bytes(`<a href="${href}">`),
+    },
   });
+  // The fixture's newest month is 2026-08.
+  const TODAY = "2026-10-11";
 
-  it("fetches the file and covers through the newest month", async () => {
+  it("does not use a foreign link found on the landing page, and falls back to the constant", async () => {
     const fetch = routes({
+      ...landingLinking(
+        "http://stat.gov.pl/d/miesiecznewskaznikicentowarowiuslugkonsumpcyjnychod1982roku_9.csv",
+      ),
       [GUS_CPI_CSV_URL]: { status: 200, body: fixture("gus-cpi.csv") },
     });
-    const result = await fetchGusCpi(fetch);
-    expect(result.coveredThrough).toBe("2026-08-01");
+    const result = await fetchGusCpi(fetch, TODAY);
     expect(result.sourceUrl).toBe(GUS_CPI_CSV_URL);
   });
 
-  it("falls back to the landing page when the numbered file is gone", async () => {
-    const next =
-      "https://stat.gov.pl/download/gfx/a/miesiecznewskaznikicentowarowiuslugkonsumpcyjnychod1982roku_9.csv";
+  it("falls back to the constant URL when the landing page cannot be read", async () => {
     const fetch = routes({
-      [GUS_CPI_CSV_URL]: { status: 404, body: new Uint8Array() },
-      [GUS_CPI_LANDING_URL]: {
-        status: 200,
-        body: bytes(
-          `<a href="/download/gfx/a/miesiecznewskaznikicentowarowiuslugkonsumpcyjnychod1982roku_9.csv">`,
-        ),
-      },
-      [next]: { status: 200, body: fixture("gus-cpi.csv") },
+      [GUS_CPI_LANDING_URL]: { status: 503, body: new Uint8Array() },
+      [GUS_CPI_CSV_URL]: { status: 200, body: fixture("gus-cpi.csv") },
     });
-    const result = await fetchGusCpi(fetch);
-    expect(result.sourceUrl).toBe(next);
+    const result = await fetchGusCpi(fetch, TODAY);
+    expect(result.sourceUrl).toBe(GUS_CPI_CSV_URL);
   });
 
-  it("fails clearly when the fallback cannot help", async () => {
-    const gone = { status: 404, body: new Uint8Array() };
-    await expect(
-      fetchGusCpi(
-        routes({ [GUS_CPI_CSV_URL]: gone, [GUS_CPI_LANDING_URL]: gone }),
+  it("covers through the newest month of the file the landing page links", async () => {
+    const fetch = routes({
+      ...landingLinking(
+        "/download/gfx/a/miesiecznewskaznikicentowarowiuslugkonsumpcyjnychod1982roku_9.csv",
       ),
-    ).rejects.toThrow(/landing page HTTP 404/);
+      [NEXT_FILE]: { status: 200, body: fixture("gus-cpi.csv") },
+    });
+    const result = await fetchGusCpi(fetch, TODAY);
+    expect(result.coveredThrough).toBe("2026-08-01");
+    expect(result.sourceUrl).toBe(NEXT_FILE);
+  });
+
+  it("prefers the linked file even while the old numbered file still answers 200", async () => {
+    const fetch = routes({
+      ...landingLinking(
+        "/download/gfx/a/miesiecznewskaznikicentowarowiuslugkonsumpcyjnychod1982roku_9.csv",
+      ),
+      [NEXT_FILE]: { status: 200, body: fixture("gus-cpi.csv") },
+      [GUS_CPI_CSV_URL]: { status: 200, body: bytes("stale") },
+    });
+    const result = await fetchGusCpi(fetch, TODAY);
+    expect(result.sourceUrl).toBe(NEXT_FILE);
+    expect(fetch).not.toHaveBeenCalledWith(GUS_CPI_CSV_URL);
+  });
+
+  it("refuses a file whose newest observation is more than 3 months old", async () => {
+    const fetch = routes({
+      [GUS_CPI_LANDING_URL]: { status: 404, body: new Uint8Array() },
+      [GUS_CPI_CSV_URL]: { status: 200, body: fixture("gus-cpi.csv") },
+    });
+    // 2026-08-01 is exactly 3 months before 2026-11-01: still acceptable.
+    await expect(fetchGusCpi(fetch, "2026-11-01")).resolves.toMatchObject({
+      coveredThrough: "2026-08-01",
+    });
+    await expect(fetchGusCpi(fetch, "2026-11-02")).rejects.toThrow(
+      /newest observation is 2026-08-01.*stale/,
+    );
+  });
+
+  it("fails clearly when the file cannot be read", async () => {
     await expect(
       fetchGusCpi(
         routes({
-          [GUS_CPI_CSV_URL]: gone,
           [GUS_CPI_LANDING_URL]: { status: 200, body: bytes("<html></html>") },
+          [GUS_CPI_CSV_URL]: { status: 500, body: new Uint8Array() },
         }),
-      ),
-    ).rejects.toThrow(/no CSV link/);
-    await expect(
-      fetchGusCpi(
-        routes({ [GUS_CPI_CSV_URL]: { status: 500, body: new Uint8Array() } }),
+        TODAY,
       ),
     ).rejects.toThrow(/HTTP 500/);
   });
@@ -383,9 +420,26 @@ describe("Polish adapter contract", () => {
   });
 
   it("routes each series to its fetcher and refuses an unknown one", async () => {
+    // Only the clock is faked: the CPI file's freshness is judged against today.
+    jest.useFakeTimers({
+      now: new Date("2026-10-11T08:00:00Z"),
+      doNotFake: [
+        "nextTick",
+        "setImmediate",
+        "clearImmediate",
+        "setInterval",
+        "clearInterval",
+        "setTimeout",
+        "clearTimeout",
+        "queueMicrotask",
+        "performance",
+        "hrtime",
+      ],
+    });
     const fetch = routes({
       [NBP_ARCHIVE_URL]: { status: 200, body: fixture("nbp-archive.xml") },
       [NBP_CURRENT_URL]: { status: 200, body: fixture("nbp-current.xml") },
+      [GUS_CPI_LANDING_URL]: { status: 404, body: new Uint8Array() },
       [GUS_CPI_CSV_URL]: { status: 200, body: fixture("gus-cpi.csv") },
     });
     expect(
@@ -399,5 +453,6 @@ describe("Polish adapter contract", () => {
     await expect(
       POLISH_BOND_ADAPTER.fetchBenchmark("X", fetch),
     ).rejects.toThrow(/no benchmark X/);
+    jest.useRealTimers();
   });
 });

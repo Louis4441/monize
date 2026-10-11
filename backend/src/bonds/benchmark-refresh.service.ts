@@ -42,6 +42,8 @@ export interface RefreshOptions {
 
 const FETCH_TIMEOUT_MS = 30_000;
 const WARSAW = "Europe/Warsaw";
+/** Days without a successful store after which a failing series is reported as an outage. */
+const PERSISTENT_FAILURE_DAYS = 3;
 
 /**
  * Keeps the benchmark series (NBP reference rate, GUS CPI, whatever an adapter
@@ -160,6 +162,7 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
         this.gated(series.providerId, http),
       );
       await this.store(series.code, result);
+      this.health.recordDataRecovered(series.providerId);
       this.logger.log(
         `Stored ${result.observations.length} observation(s) for ${series.code}, covered through ${result.coveredThrough}`,
       );
@@ -173,12 +176,47 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
           `bond benchmark refresh for ${series.code}`,
           error,
         );
-        return "failed";
+      } else {
+        this.logger.error(
+          `Bond benchmark refresh for ${series.code} failed: ${describeFetchFailure(error)}`,
+        );
       }
-      this.logger.error(
-        `Bond benchmark refresh for ${series.code} failed: ${describeFetchFailure(error)}`,
-      );
+      await this.reportPersistentFailure(series, today, error);
       return "failed";
+    }
+  }
+
+  /**
+   * A run is refreshed once a day, so the breaker (five transport failures in
+   * five minutes) never opens on it, and a stale or reformatted file is not a
+   * transport failure at all. A series that has not been stored for
+   * `PERSISTENT_FAILURE_DAYS` is therefore reported to `ProviderHealthService`
+   * itself, which is what the outage alert sweep reads. Never throws: reporting
+   * must not turn one failed series into a failed run.
+   */
+  private async reportPersistentFailure(
+    series: BenchmarkSeriesDefinition,
+    today: string,
+    error: unknown,
+  ): Promise<void> {
+    try {
+      const fetchedOn = await this.lastFetchedOn(series.code);
+      if (
+        fetchedOn === null ||
+        fetchedOn < addDaysYMD(today, -PERSISTENT_FAILURE_DAYS)
+      ) {
+        this.health.recordDataFailure(
+          series.providerId,
+          `${series.code}: ${describeFetchFailure(error)}` +
+            (fetchedOn === null
+              ? " (never stored)"
+              : ` (last stored ${fetchedOn})`),
+        );
+      }
+    } catch (reportError) {
+      this.logger.warn(
+        `Could not report the failure of ${series.code}: ${describeFetchFailure(reportError)}`,
+      );
     }
   }
 
@@ -187,6 +225,12 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
    * `updated_at` is the last successful store; the catalog seed does not touch it.
    */
   private async isStale(code: string, today: string): Promise<boolean> {
+    const fetchedOn = await this.lastFetchedOn(code);
+    return fetchedOn === null || fetchedOn < addDaysYMD(today, -1);
+  }
+
+  /** The Warsaw date of the last successful store, or null when never fetched. */
+  private async lastFetchedOn(code: string): Promise<string | null> {
     const rows: Array<{ fetched_on: string | null }> = await withScopedDb(
       this.dataSource,
       (m) =>
@@ -197,8 +241,7 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
           [code, WARSAW],
         ),
     );
-    const fetchedOn = rows[0]?.fetched_on ?? null;
-    return fetchedOn === null || fetchedOn < addDaysYMD(today, -1);
+    return rows[0]?.fetched_on ?? null;
   }
 
   /**

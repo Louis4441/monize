@@ -1,3 +1,4 @@
+import { Not } from "typeorm";
 import { Logger, NotFoundException } from "@nestjs/common";
 import {
   SecurityPriceService,
@@ -632,7 +633,9 @@ describe("SecurityPriceService", () => {
 
       expect(result).toEqual(createdAt);
       expect(securityPriceRepository.findOne).toHaveBeenCalledWith({
-        where: {},
+        // A bond-engine row is written every day by accrual: it is not a quote
+        // provider's write, and counting it would hide a provider outage.
+        where: { source: Not("bond_engine") },
         order: { createdAt: "DESC" },
       });
     });
@@ -3056,8 +3059,8 @@ describe("SecurityPriceService", () => {
           "redeem",
           "transfer_in",
           "transfer_out",
-          // A trade's price on a day outranks the bond engine's row there.
-          "bond_engine",
+          // Not "bond_engine": a trade price is one lot's price, not the
+          // holding's value, so it never replaces the engine's row (R3).
         ],
       ]);
     });
@@ -3354,6 +3357,20 @@ describe("SecurityPriceService", () => {
       });
     });
 
+    it("a manual price written over a bond-engine row takes no adjusted close from it (R3)", async () => {
+      await service.createManualPrice(
+        "sec-1",
+        { priceDate: "2025-06-01", closePrice: 101.5 },
+        "user-1",
+      );
+      // The conflict branch sets the adjusted close from the manual entry's own
+      // input (it has none) when the row it replaces is the engine's; any other
+      // row keeps the adjusted close it had.
+      expect(priceUpsertSql()).toMatch(
+        /adjusted_close = CASE WHEN security_prices\.source = 'bond_engine'\s+THEN NULL ELSE security_prices\.adjusted_close END/,
+      );
+    });
+
     // Issue #1242 invalidation: a manual price changes an accepted close, so
     // every account holding the security has a stale monthly snapshot. The
     // create recomputes them through the shared debounced net-worth path.
@@ -3474,6 +3491,34 @@ describe("SecurityPriceService", () => {
           closePrice: 200.0,
           source: "manual",
         }),
+      );
+    });
+
+    it("editing a bond-engine row makes it manual and drops the engine's adjusted close", async () => {
+      securityPriceRepository.findOne.mockResolvedValue({
+        ...mockPriceEntry,
+        source: "bond_engine",
+        adjustedClose: 99.5,
+      });
+      await service.updatePrice("sec-1", 1, { closePrice: 200.0 }, "user-1");
+      expect(securityPriceRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: "manual",
+          closePrice: 200.0,
+          adjustedClose: null,
+        }),
+      );
+    });
+
+    it("editing a provider row keeps its adjusted close", async () => {
+      securityPriceRepository.findOne.mockResolvedValue({
+        ...mockPriceEntry,
+        source: "yahoo_finance",
+        adjustedClose: 99.5,
+      });
+      await service.updatePrice("sec-1", 1, { closePrice: 200.0 }, "user-1");
+      expect(securityPriceRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ source: "manual", adjustedClose: 99.5 }),
       );
     });
 

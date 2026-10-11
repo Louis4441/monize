@@ -37,7 +37,7 @@ export class BondCatalogService implements OnApplicationBootstrap {
     @Inject(forwardRef(() => CurrenciesService))
     private readonly currencies: Pick<
       CurrenciesService,
-      "ensureSystemCurrency"
+      "ensureCatalogCurrency"
     >,
   ) {}
 
@@ -56,14 +56,27 @@ export class BondCatalogService implements OnApplicationBootstrap {
   async seed(
     adapters: readonly BondAdapter[] = INSTALLED_BOND_ADAPTERS,
   ): Promise<void> {
-    await withScopedDb(this.dataSource, async (m) => {
-      for (const adapter of adapters) {
-        await this.upsertBenchmarkSeries(m, adapter);
-        for (const entry of adapter.catalog) {
-          await this.seedEntry(m, adapter, entry);
+    for (const adapter of adapters) {
+      await withScopedDb(this.dataSource, (m) =>
+        this.upsertBenchmarkSeries(m, adapter),
+      );
+      for (const entry of adapter.catalog) {
+        // One transaction per entry: a statement that fails (a value the schema
+        // refuses) aborts PostgreSQL's transaction, so a shared one would lose
+        // every entry before it as well as every entry after it.
+        try {
+          await withScopedDb(this.dataSource, (m) =>
+            this.seedEntry(m, adapter, entry),
+          );
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          this.logger.error(
+            `Bond catalog (${adapter.countryCode}) entry version ${entry.termsVersion} could not be stored and was skipped: ${message}`,
+          );
         }
       }
-    });
+    }
   }
 
   /** The catalog for the link picker, ordered by country, issuer and series. */
@@ -149,9 +162,10 @@ export class BondCatalogService implements OnApplicationBootstrap {
     const { instrument } = terms;
     const named = `${instrument.issuerCountryCode} ${instrument.issuerCode} ${instrument.seriesCode}`;
 
-    // The currency is created on demand, as for a user's default currency; the
-    // nested withScopedDb joins this transaction.
-    await this.currencies.ensureSystemCurrency(instrument.currency);
+    // The currency is created on demand but inactive: it is reference data for
+    // the catalog, not a currency any user chose. The nested withScopedDb joins
+    // this transaction.
+    await this.currencies.ensureCatalogCurrency(instrument.currency);
 
     // The id is derived from the unique key, not generated: the table is not in
     // the user backup, so a security's link survives a restore onto another

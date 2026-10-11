@@ -5,7 +5,8 @@ import { acquireAdvisoryLock, LockScope } from "../common/db/locks";
 import { returnedRows } from "../common/db/query-result";
 import { withScopedDb } from "../common/db/scoped-db";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
-import { todayYMD } from "../common/date-utils";
+import { todayInTimezone } from "../common/date-utils";
+import { getEffectiveTimezoneOfUser } from "../common/users-by-timezone.util";
 import {
   FetchSyncJob,
   FetchSyncService,
@@ -15,18 +16,23 @@ import { enumerateDaysYMD } from "../net-worth/series-dates.util";
 import { markHoldingAccountsDirty } from "../securities/holding-accounts-dirty.util";
 import { invalidatePortfolioSummary } from "../securities/portfolio-summary-memo";
 import { loadBondLedger } from "./bond-ledger";
+import { BOND_CALENDARS } from "./bond-adapters";
 import { BondLot, bondLotsAsOf } from "./bond-lots";
 import {
   BondReferenceData,
   BondValuationService,
 } from "./bond-valuation.service";
 import { ExactDecimal } from "./domain/exact-decimal";
+import { grossValueSeries } from "./engine/bond-engine";
 
 import { BOND_ENGINE_PRICE_SOURCE } from "./bond-price-source";
 
 // The source of a row this service writes: the one place the literal is spelled
 // (bond-price-source.ts); the upsert and the delete both bind it.
 export { BOND_ENGINE_PRICE_SOURCE };
+
+/** The `security_prices.source` of a price the user typed; the engine never replaces it. */
+const MANUAL_PRICE_SOURCE = "manual";
 
 /** `security_prices.close_price` is NUMERIC(24,10). */
 const PRICE_DECIMALS = 10;
@@ -39,7 +45,12 @@ export interface BondPriceRecompute {
 }
 
 export interface RecomputeOptions {
-  /** The last day priced (YYYY-MM-DD); today when omitted. A clock a test can set. */
+  /**
+   * The last day priced (YYYY-MM-DD). When omitted: the user's financial today,
+   * the calendar date in the timezone the user's preferences name -- the one
+   * definition the request and the daily job share (a request's own header
+   * would otherwise make the two disagree about the last day).
+   */
   readonly today?: string;
 }
 
@@ -55,10 +66,13 @@ export interface RecomputeOptions {
  * gets no row, and neither does a day with no open lots or with lots that are
  * unknowable (a split, a fractional or over-removed quantity).
  *
- * A manual price or a transaction-derived price on the same day is never
- * overwritten: the upsert's `WHERE` admits only a `bond_engine` row, and an
- * unchanged day is not rewritten (INV-BOND-005). Rows of days that no longer get
- * a price are deleted. Reads and writes share one transaction; the derived state
+ * Precedence (INV-BOND-005): a transaction-derived price is one lot's trade
+ * price, not the holding's value, so the engine's row replaces every non-manual
+ * row of its days (a provider row, a transaction-derived row); a manual price is
+ * never replaced, and a transaction-derived price never replaces an engine row.
+ * An unchanged day is not rewritten. An engine row stores `adjusted_close` NULL:
+ * a coupon is recorded as INTEREST income, so the close is the value. Rows of
+ * days that no longer get a price are deleted. Reads and writes share one transaction; the derived state
  * (portfolio memo, net-worth snapshots) is invalidated after it commits, never
  * inside it (INV-CACHE-001).
  */
@@ -169,8 +183,6 @@ export class BondPriceService {
     securityId: string,
     options: RecomputeOptions = {},
   ): Promise<BondPriceRecompute> {
-    const today = options.today ?? todayYMD();
-
     const { result, accountIds } = await withScopedDb(
       this.dataSource,
       async (m) => {
@@ -185,6 +197,7 @@ export class BondPriceService {
           m,
           ledger.security.bondInstrumentId,
         );
+        const today = options.today ?? (await this.financialToday(m, userId));
         const prices = this.dailyPrices(ledger.transactions, reference, today);
 
         const written = await this.upsertPrices(m, securityId, prices);
@@ -206,6 +219,51 @@ export class BondPriceService {
       }
     }
     return result;
+  }
+
+  /**
+   * After the commit of a write that changed lots (an investment transaction
+   * created, edited, voided, deleted or transferred; an import; an undo): the
+   * engine prices of those of these securities that are linked are recomputed,
+   * each in its own transaction. The write is already committed, so a failure is
+   * logged and never thrown -- the daily job and the recompute route repair it.
+   * Ids that are not this user's, or not linked, are ignored.
+   */
+  async recomputeLinkedSecurities(
+    userId: string,
+    securityIds: ReadonlyArray<string | null | undefined>,
+  ): Promise<void> {
+    const ids = [...new Set(securityIds.filter((id): id is string => !!id))];
+    if (ids.length === 0) return;
+    try {
+      const linked: Array<{ id: string }> = await withScopedDb(
+        this.dataSource,
+        (m) =>
+          m.query(
+            `SELECT id FROM securities
+              WHERE id = ANY($1::uuid[]) AND user_id = $2
+                AND bond_instrument_id IS NOT NULL`,
+            [ids, userId],
+          ),
+      );
+      for (const { id } of linked) {
+        try {
+          await this.recomputeSecurity(userId, id);
+        } catch (error) {
+          this.logger.warn(
+            `Bond price recompute of security ${id} failed: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Bond price recompute after a ledger write failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   /**
@@ -235,7 +293,29 @@ export class BondPriceService {
     }
   }
 
-  /** The price of every day that has one, ascending. Pure over its inputs. */
+  /**
+   * The user's financial today (R17): the date in the timezone the user's
+   * preferences name, the same rule the daily jobs bucket users by
+   * (`getUsersByEffectiveTimezone`). Read on the transaction, so a request and
+   * the cron end on the same day for one user.
+   */
+  private async financialToday(
+    m: EntityManager,
+    userId: string,
+  ): Promise<string> {
+    const timezone = await getEffectiveTimezoneOfUser(m, userId);
+    return (todayInTimezone(timezone) ?? todayInTimezone("UTC")) as string;
+  }
+
+  /**
+   * The price of every day that has one, ascending. Pure over its inputs.
+   *
+   * Cost is O(days + lots x periods), not a rate resolution per day: the lots
+   * open on each day are folded from the ledger (only on a transaction date),
+   * each distinct lot (purchase date and quantity) is valued over all the days
+   * it is open in ONE `grossValueSeries` call, which resolves its schedule and
+   * period rates once, and the days are then summed from those figures.
+   */
   private dailyPrices(
     transactions: Parameters<typeof bondLotsAsOf>[0],
     reference: BondReferenceData,
@@ -246,17 +326,62 @@ export class BondPriceService {
     // Register order puts the earliest date first.
     const first = dated[0].transactionDate;
 
-    const prices: Array<{ date: string; price: string }> = [];
+    // The open lots of every day that has any. Lots change only on a
+    // transaction date (the first day is one), so the fold is redone only there
+    // and carried over the days between.
+    const openOn: Array<{ day: string; lots: readonly BondLot[] }> = [];
     let lots: readonly BondLot[] | null = null;
-    // Lots change only on a transaction date (the first day is one), so the
-    // fold is redone only there and carried over the days between.
     const changeDates = new Set(dated.map((t) => t.transactionDate));
-
     for (const day of enumerateDaysYMD(first, today)) {
       if (changeDates.has(day)) lots = bondLotsAsOf(transactions, day).lots;
-      if (lots === null || lots.length === 0) continue;
+      if (lots !== null && lots.length > 0) openOn.push({ day, lots });
+    }
 
-      const price = this.unitPrice(reference, lots, day);
+    // Each distinct lot and the days it is open on.
+    const lotKey = (lot: BondLot) => `${lot.purchaseDate}|${lot.quantity}`;
+    const daysOf = new Map<string, { lot: BondLot; days: string[] }>();
+    for (const { day, lots: open } of openOn) {
+      for (const lot of new Set(open.map(lotKey))) {
+        const entry = daysOf.get(lot) ?? {
+          lot: open.find((l) => lotKey(l) === lot) as BondLot,
+          days: [],
+        };
+        entry.days.push(day);
+        daysOf.set(lot, entry);
+      }
+    }
+
+    // Gross value per distinct lot and day; absent when the lot has none that
+    // day (a started period without a rate) or is REFUSED (outside the sale
+    // window): either way the day has no price.
+    const grossOf = new Map<string, Map<string, string | null>>();
+    for (const [key, { lot, days }] of daysOf) {
+      const series = grossValueSeries({
+        terms: reference.terms,
+        termsVersion: reference.termsVersion,
+        announcedRates: reference.announcedRates,
+        benchmarks: reference.benchmarks,
+        calendars: BOND_CALENDARS,
+        lot: { purchaseDate: lot.purchaseDate, quantity: lot.quantity },
+        days,
+      });
+      grossOf.set(
+        key,
+        new Map(
+          series.map((point) => [
+            point.asOf,
+            point.status === "REFUSED" ? null : point.grossValue,
+          ]),
+        ),
+      );
+    }
+
+    const prices: Array<{ date: string; price: string }> = [];
+    for (const { day, lots: open } of openOn) {
+      const price = this.unitPrice(
+        open,
+        (lot) => (grossOf.get(lotKey(lot)) ?? new Map()).get(day) ?? null,
+      );
       if (price !== null) prices.push({ date: day, price });
     }
     return prices;
@@ -264,14 +389,13 @@ export class BondPriceService {
 
   /** Gross value of the open lots per bond, or null when any lot has none. */
   private unitPrice(
-    reference: BondReferenceData,
     lots: readonly BondLot[],
-    day: string,
+    grossOf: (lot: BondLot) => string | null,
   ): string | null {
     let total = ExactDecimal.ZERO;
     let quantity = 0;
     for (const lot of lots) {
-      const { grossValue } = this.valuation.valueLotFrom(reference, lot, day);
+      const grossValue = grossOf(lot);
       if (grossValue === null) return null;
       total = total.add(ExactDecimal.parse(grossValue));
       quantity += lot.quantity;
@@ -280,9 +404,11 @@ export class BondPriceService {
   }
 
   /**
-   * One statement. The `WHERE` is the whole rule: only a `bond_engine` row is
-   * ever replaced, so a manual or transaction-derived price on the day wins, and
-   * only when the close differs, so an unchanged day is not rewritten.
+   * One statement. The `WHERE` is the whole rule: every row except a `manual`
+   * one is replaced (a provider row, a transaction-derived row, the engine's own
+   * earlier value), and only when something differs, so an unchanged day is not
+   * rewritten. A transaction price is one lot's trade price, not the holding's
+   * value; a manual price is the user's correction and always wins.
    */
   private async upsertPrices(
     m: EntityManager,
@@ -291,23 +417,27 @@ export class BondPriceService {
   ): Promise<number> {
     if (prices.length === 0) return 0;
     const rows: unknown = await m.query(
-      // adjusted_close = close: an engine value has no split or distribution to
-      // adjust for, and a series that holds any adjusted row reads only those.
+      // adjusted_close NULL: coupons are recorded as INTEREST income, so the
+      // close is the value and there is nothing to adjust for. A conflicting row
+      // gets NULL too, so a provider's adjusted close does not outlive its close.
       `INSERT INTO security_prices (security_id, price_date, close_price, adjusted_close, source)
-       SELECT $1::uuid, t.d, t.p, t.p, $4::varchar
+       SELECT $1::uuid, t.d, t.p, NULL, $4::varchar
          FROM unnest($2::date[], $3::numeric[]) AS t(d, p)
        ON CONFLICT (security_id, price_date) DO UPDATE
           SET close_price = EXCLUDED.close_price,
-              adjusted_close = EXCLUDED.adjusted_close
-        WHERE security_prices.source = $4::varchar
+              adjusted_close = NULL,
+              source = EXCLUDED.source
+        WHERE security_prices.source IS DISTINCT FROM $5::varchar
           AND (security_prices.close_price IS DISTINCT FROM EXCLUDED.close_price
-               OR security_prices.adjusted_close IS DISTINCT FROM EXCLUDED.adjusted_close)
+               OR security_prices.source IS DISTINCT FROM EXCLUDED.source
+               OR security_prices.adjusted_close IS NOT NULL)
        RETURNING id`,
       [
         securityId,
         prices.map((p) => p.date),
         prices.map((p) => p.price),
         BOND_ENGINE_PRICE_SOURCE,
+        MANUAL_PRICE_SOURCE,
       ],
     );
     return returnedRows<{ id: number }>(rows).length;

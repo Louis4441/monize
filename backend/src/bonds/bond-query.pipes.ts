@@ -1,4 +1,6 @@
 import { BadRequestException, Injectable, PipeTransform } from "@nestjs/common";
+import { todayYMD } from "../common/date-utils";
+import { ParseOptionalCalendarDatePipe } from "../common/pipes/parse-calendar-date.pipe";
 import { tr } from "../i18n/translate";
 import { ExactDecimal } from "./domain/exact-decimal";
 
@@ -84,5 +86,34 @@ export class ParseScenarioValuesPipe implements PipeTransform<
         "values must be 1 to 6 comma-separated decimals between -0.5 and 1.0",
       ),
     );
+  }
+}
+
+/**
+ * `asOf` of the valuation and scenarios routes: a real calendar date, not after
+ * the caller's today (the request timezone's, as `todayYMD` answers); absent is
+ * today. A later date would ask for observations nobody has published, and a
+ * projection is the scenarios' job, not a valuation's. ISO dates compare as text.
+ */
+@Injectable()
+export class ParseBondAsOfPipe implements PipeTransform<
+  unknown,
+  string | undefined
+> {
+  private readonly date = new ParseOptionalCalendarDatePipe();
+
+  transform(value: unknown): string | undefined {
+    const asOf = this.date.transform(value);
+    const today = todayYMD();
+    if (asOf !== undefined && asOf > today) {
+      throw new BadRequestException(
+        tr(
+          "errors.bonds.AS_OF_IN_FUTURE",
+          `The valuation date ${asOf} is after today (${today}); a bond is valued as of today or an earlier day`,
+          { asOf, today },
+        ),
+      );
+    }
+    return asOf;
   }
 }

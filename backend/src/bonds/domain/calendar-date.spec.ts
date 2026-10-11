@@ -41,6 +41,8 @@ describe("calendar-date", () => {
     expect(compareYMD("2026-01-01", "2026-01-02")).toBe(-1);
     expect(compareYMD("2026-01-02", "2026-01-01")).toBe(1);
     expect(compareYMD("2026-01-01", "2026-01-01")).toBe(0);
+    expect(compareYMD("2025-12-31", "2026-01-01")).toBe(-1);
+    expect(compareYMD("2026-10-09", "2026-09-30")).toBe(1);
   });
 
   it("adds days across month and year ends", () => {
