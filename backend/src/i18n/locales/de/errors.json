@@ -557,7 +557,9 @@
     "SOURCE_FORMAT_CHANGED": "Die Bedingungen der Serie {{ series }} enthalten kein verwendbares Feld {{ field }}: Die offizielle Quelle hat möglicherweise ihr Format geändert, oder der Wert ist nicht zulässig",
     "SOURCE_INCONSISTENT": "Die Werte der Serie {{ series }} sind widersprüchlich oder liegen im Feld {{ field }} außerhalb der Grenzen ({{ detail }})",
     "TEMPLATE_NOT_VALIDATED": "Die Serie {{ series }} wurde verkauft, bevor die Vorlage {{ product }} geprüft wurde ({{ validFrom }}); sie benötigt einen kuratierten Eintrag",
-    "SERIES_TERMS_CONFLICT": "Die Serie {{ series }} ist bereits mit anderen Bedingungen gespeichert; gespeicherte Bedingungen werden nie ersetzt"
+    "SERIES_TERMS_CONFLICT": "Die Serie {{ series }} ist bereits mit anderen Bedingungen gespeichert; gespeicherte Bedingungen werden nie ersetzt",
+    "countryCodeInvalid": "countryCode muss ein zweistelliger Ländercode sein",
+    "programCodeInvalid": "programCode muss aus 1 bis 12 Großbuchstaben oder Ziffern bestehen"
   },
   "securities": {
     "bondPricedByEngine": "Dieses Wertpapier ist mit einem Anleiheinstrument verknüpft und wird von der Anleihe-Engine bewertet, nicht von einem Kursanbieter. Verwenden Sie stattdessen „Preise neu berechnen“.",

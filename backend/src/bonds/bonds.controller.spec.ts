@@ -25,6 +25,7 @@ import {
 } from "./bond-errors";
 import { BondPriceService } from "./bond-price.service";
 import { todayYMD } from "../common/date-utils";
+import { BondOfferService } from "./bond-offer.service";
 import { BondValuationService } from "./bond-valuation.service";
 import { BOND_ERROR_FALLBACKS, BondsController } from "./bonds.controller";
 import { tr } from "../i18n/translate";
@@ -47,6 +48,7 @@ describe("BondsController", () => {
   let valuation: { valueSecurity: jest.Mock; scenariosOf: jest.Mock };
   let prices: { recomputeSecurity: jest.Mock };
   let series: { fetchSeries: jest.Mock; enterManually: jest.Mock };
+  let offers: { offer: jest.Mock; history: jest.Mock };
 
   beforeEach(async () => {
     catalog = { listInstruments: jest.fn().mockResolvedValue([]) };
@@ -63,6 +65,10 @@ describe("BondsController", () => {
       fetchSeries: jest.fn().mockResolvedValue({ id: "i1", created: true }),
       enterManually: jest.fn().mockResolvedValue({ id: "i1", created: true }),
     };
+    offers = {
+      offer: jest.fn().mockResolvedValue({ series: [] }),
+      history: jest.fn().mockResolvedValue({ programs: [] }),
+    };
     const moduleRef = await Test.createTestingModule({
       controllers: [BondsController],
       providers: [
@@ -70,6 +76,7 @@ describe("BondsController", () => {
         { provide: BondCatalogService, useValue: catalog },
         { provide: BondValuationService, useValue: valuation },
         { provide: BondPriceService, useValue: prices },
+        { provide: BondOfferService, useValue: offers },
       ],
     }).compile();
     controller = moduleRef.get(BondsController);
@@ -220,6 +227,36 @@ describe("BondsController", () => {
         );
       },
     );
+  });
+
+  describe("GET /bonds/offer", () => {
+    it("reads the offer for the JWT's user, never one the request names, with the parsed assumption", async () => {
+      const assume = new Map([["PL_CPI_GUS_YOY", "0.05"]]);
+      await controller.offer(
+        { user: { id: USER }, body: { userId: "attacker" } },
+        "PL",
+        assume,
+      );
+      expect(offers.offer).toHaveBeenCalledWith(USER, "PL", assume);
+    });
+
+    it("lets a stored-data refusal become its HTTP error", async () => {
+      offers.offer.mockRejectedValue(
+        new BondEngineError("DECIMAL_INVALID", { field: "x", value: "y" }, "x"),
+      );
+      await expect(controller.offer(req, "PL")).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+  });
+
+  describe("GET /bonds/history", () => {
+    it("reads the history of a country, one program when named", async () => {
+      await controller.history("PL", "EDO");
+      expect(offers.history).toHaveBeenCalledWith("PL", "EDO");
+      await controller.history("PL");
+      expect(offers.history).toHaveBeenLastCalledWith("PL", undefined);
+    });
   });
 
   describe("GET /bonds/securities/:securityId/scenarios", () => {

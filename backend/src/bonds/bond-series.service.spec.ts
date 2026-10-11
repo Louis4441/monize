@@ -18,7 +18,11 @@ import {
 } from "./bond-adapter";
 import { BondCatalogService, StoreOutcome } from "./bond-catalog.service";
 import { bondInstrumentId } from "./bond-instrument-id";
-import { BondSeriesService } from "./bond-series.service";
+import {
+  BACKFILL_GAP_MS,
+  BackfillRun,
+  BondSeriesService,
+} from "./bond-series.service";
 import { SeriesHttp } from "./series-http";
 
 jest.mock("../common/db/scoped-db", () =>
@@ -52,6 +56,14 @@ const VALUES: ManualSeriesValues = {
   letter: { number: "12/2026", date: "2026-09-21" },
 };
 const gatedDoor = jest.fn();
+const NO_BACKFILL: BackfillRun = {
+  candidates: 0,
+  alreadyStored: 0,
+  stored: 0,
+  notPublished: 0,
+  failed: 0,
+  stoppedEarly: false,
+};
 
 function adapterOf(over: Partial<BondAdapter> = {}): BondAdapter {
   return {
@@ -75,6 +87,9 @@ function build() {
   const catalog = {
     findStoredSeries: jest.fn(
       async (..._args: unknown[]) => null as typeof SUMMARY | null,
+    ),
+    storedSeriesCodes: jest.fn(
+      async (..._args: unknown[]) => new Set<string>(),
     ),
     findSummary: jest.fn(async () => SUMMARY as typeof SUMMARY | null),
     storeEntry: jest.fn(async (): Promise<StoreOutcome> => ({
@@ -428,7 +443,11 @@ describe("BondSeriesService", () => {
         alreadyStored: 0,
         failed: 0,
       });
+      const backfill = jest
+        .spyOn(service, "backfillHistory")
+        .mockResolvedValue(NO_BACKFILL);
       await service.scheduledCurrentOffer();
+      expect(backfill).toHaveBeenCalledTimes(1);
       expect(withSystemContext).toHaveBeenCalledTimes(1);
       expect(fetchSync.withLease).toHaveBeenCalledWith(
         FetchSyncJob.BondSeries,
@@ -444,6 +463,40 @@ describe("BondSeriesService", () => {
       const run = jest.spyOn(service, "fetchCurrentOffer");
       await service.scheduledCurrentOffer();
       expect(run).not.toHaveBeenCalled();
+    });
+
+    it("runs the backfill after the offer, and still after an offer that failed, then records that failure", async () => {
+      const { service, fetchSync } = build();
+      const order: string[] = [];
+      jest.spyOn(service, "fetchCurrentOffer").mockImplementation(async () => {
+        order.push("offer");
+        throw new Error("every series failed");
+      });
+      jest.spyOn(service, "backfillHistory").mockImplementation(async () => {
+        order.push("backfill");
+        return NO_BACKFILL;
+      });
+      await service.scheduledCurrentOffer();
+      expect(order).toEqual(["offer", "backfill"]);
+      // The lease wrapper saw the offer's failure (and the cron logged it).
+      expect(logWarn).toHaveBeenCalledWith(
+        expect.stringContaining("every series failed"),
+      );
+      expect(fetchSync.withLease).toHaveBeenCalledTimes(1);
+    });
+
+    it("holds the lease long enough for the backfill of about 270 series at 3 s each", async () => {
+      const { service, fetchSync } = build();
+      jest.spyOn(service, "fetchCurrentOffer").mockResolvedValue({
+        listed: 0,
+        stored: 0,
+        alreadyStored: 0,
+        failed: 0,
+      });
+      jest.spyOn(service, "backfillHistory").mockResolvedValue(NO_BACKFILL);
+      await service.scheduledCurrentOffer();
+      const [, ttl] = fetchSync.withLease.mock.calls[0];
+      expect(ttl).toBeGreaterThanOrEqual(270 * BACKFILL_GAP_MS * 2);
     });
 
     it("never dies on a failed run", async () => {
@@ -568,6 +621,158 @@ describe("BondSeriesService", () => {
         alreadyStored: 0,
         failed: 0,
       });
+    });
+  });
+
+  describe("backfillHistory", () => {
+    const codes = ["OTS0424", "ROR0125", "DOR0126", "TOS0127"];
+    const withCodes = (over: Partial<BondAdapter> = {}) =>
+      adapterOf({ backfillCodes: jest.fn(() => codes), ...over });
+
+    it("asks the adapter for its codes and the catalog, once, which are stored, and fetches only the rest", async () => {
+      const { service, catalog } = build();
+      const adapter = withCodes();
+      catalog.storedSeriesCodes.mockResolvedValue(
+        new Set(["OTS0424", "TOS0127"]),
+      );
+      const sleep = jest.fn(async () => undefined);
+      const run = await service.backfillHistory({
+        adapters: [adapter],
+        sleep,
+        today: "2026-10-11",
+      });
+      expect(adapter.backfillCodes).toHaveBeenCalledWith("2026-10-11");
+      expect(catalog.storedSeriesCodes).toHaveBeenCalledTimes(1);
+      expect(catalog.storedSeriesCodes).toHaveBeenCalledWith(
+        expect.anything(),
+        "PL",
+        codes,
+      );
+      // Only the two that are not stored are fetched.
+      expect(adapter.fetchSeries).toHaveBeenCalledTimes(2);
+      expect(adapter.fetchSeries).toHaveBeenNthCalledWith(
+        1,
+        "ROR0125",
+        gatedDoor,
+      );
+      expect(adapter.fetchSeries).toHaveBeenNthCalledWith(
+        2,
+        "DOR0126",
+        gatedDoor,
+      );
+      expect(run).toEqual({
+        candidates: 4,
+        alreadyStored: 2,
+        stored: 2,
+        notPublished: 0,
+        failed: 0,
+        stoppedEarly: false,
+      });
+    });
+
+    it("waits 3 seconds before each request and never when everything is stored", async () => {
+      const { service, catalog } = build();
+      const events: string[] = [];
+      const adapter = withCodes({
+        fetchSeries: jest.fn(async (code: string) => {
+          events.push(`fetch ${code}`);
+          return { entry: ENTRY, sources: [] };
+        }),
+      });
+      const sleep = jest.fn(async (ms: number) => {
+        events.push(`sleep ${ms}`);
+      });
+      await service.backfillHistory({
+        adapters: [adapter],
+        sleep,
+        today: "2026-10-11",
+      });
+      expect(BACKFILL_GAP_MS).toBe(3000);
+      expect(events).toEqual([
+        "sleep 3000",
+        "fetch OTS0424",
+        "sleep 3000",
+        "fetch ROR0125",
+        "sleep 3000",
+        "fetch DOR0126",
+        "sleep 3000",
+        "fetch TOS0127",
+      ]);
+
+      catalog.storedSeriesCodes.mockResolvedValue(new Set(codes));
+      sleep.mockClear();
+      const rerun = await service.backfillHistory({
+        adapters: [adapter],
+        sleep,
+        today: "2026-10-11",
+      });
+      expect(sleep).not.toHaveBeenCalled();
+      expect(rerun).toMatchObject({ stored: 0, alreadyStored: 4 });
+    });
+
+    it("stops on the first SOURCE_UNAVAILABLE and asks for nothing more", async () => {
+      const { service } = build();
+      const fetchSeries = jest
+        .fn()
+        .mockResolvedValueOnce({ entry: ENTRY, sources: [] })
+        .mockRejectedValueOnce(new SeriesFetchError("SOURCE_UNAVAILABLE"));
+      const sleep = jest.fn(async () => undefined);
+      const run = await service.backfillHistory({
+        adapters: [withCodes({ fetchSeries })],
+        sleep,
+        today: "2026-10-11",
+      });
+      expect(fetchSeries).toHaveBeenCalledTimes(2);
+      expect(sleep).toHaveBeenCalledTimes(2);
+      expect(run).toMatchObject({ stored: 1, failed: 1, stoppedEarly: true });
+      expect(logLog).toHaveBeenCalledWith(
+        expect.stringContaining("stopped on an unavailable source"),
+      );
+    });
+
+    it("goes on after a series the source does not publish, and after any other refusal, logging each", async () => {
+      const { service } = build();
+      const fetchSeries = jest
+        .fn()
+        .mockRejectedValueOnce(new SeriesFetchError("SERIES_NOT_PUBLISHED"))
+        .mockRejectedValueOnce(new SeriesFetchError("SOURCE_INCONSISTENT"))
+        .mockRejectedValueOnce(new Error("boom"))
+        .mockResolvedValueOnce({ entry: ENTRY, sources: [] });
+      const run = await service.backfillHistory({
+        adapters: [withCodes({ fetchSeries })],
+        sleep: async () => undefined,
+        today: "2026-10-11",
+      });
+      expect(fetchSeries).toHaveBeenCalledTimes(4);
+      expect(run).toEqual({
+        candidates: 4,
+        alreadyStored: 0,
+        stored: 1,
+        notPublished: 1,
+        failed: 2,
+        stoppedEarly: false,
+      });
+      expect(logWarn).toHaveBeenCalledTimes(3);
+    });
+
+    it("skips an adapter without a backfill, and takes the adapter's own today by default", async () => {
+      const { service, catalog } = build();
+      const plain = adapterOf();
+      const run = await service.backfillHistory({
+        adapters: [plain],
+        sleep: async () => undefined,
+      });
+      expect(run.candidates).toBe(0);
+      expect(catalog.storedSeriesCodes).not.toHaveBeenCalled();
+
+      const adapter = withCodes();
+      await service.backfillHistory({
+        adapters: [adapter],
+        sleep: async () => undefined,
+      });
+      expect(adapter.backfillCodes).toHaveBeenCalledWith(
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      );
     });
   });
 });

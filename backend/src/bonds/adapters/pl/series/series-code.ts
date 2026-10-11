@@ -86,3 +86,18 @@ export function parseSeriesCode(raw: unknown): ParsedSeriesCode {
     },
   };
 }
+
+/**
+ * The code of the series of `product` sold in `saleMonth` (`YYYY-MM`): the
+ * maturity month and year are the sale month plus the product's tenor. The
+ * inverse of `parseSeriesCode`.
+ */
+export function seriesCodeFor(
+  product: PolishProduct,
+  saleMonth: string,
+): string {
+  const [year, month] = saleMonth.split("-").map((part) => parseInt(part, 10));
+  const maturityIndex = year * 12 + (month - 1) + PRODUCT_TENOR_MONTHS[product];
+  const maturityYear = Math.floor(maturityIndex / 12);
+  return `${product}${pad((maturityIndex % 12) + 1)}${pad(maturityYear % 100)}`;
+}

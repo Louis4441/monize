@@ -557,7 +557,9 @@
     "SOURCE_FORMAT_CHANGED": "Điều khoản của series {{ series }} không có {{ field }} dùng được: nguồn chính thức có thể đã đổi định dạng, hoặc giá trị không được chấp nhận",
     "SOURCE_INCONSISTENT": "Các giá trị của series {{ series }} mâu thuẫn hoặc nằm ngoài giới hạn ở {{ field }} ({{ detail }})",
     "TEMPLATE_NOT_VALIDATED": "Series {{ series }} đã được bán trước khi mẫu {{ product }} được xác thực ({{ validFrom }}); cần một mục được biên soạn",
-    "SERIES_TERMS_CONFLICT": "Series {{ series }} đã được lưu với điều khoản khác; điều khoản đã lưu không bao giờ bị thay thế"
+    "SERIES_TERMS_CONFLICT": "Series {{ series }} đã được lưu với điều khoản khác; điều khoản đã lưu không bao giờ bị thay thế",
+    "countryCodeInvalid": "countryCode phải là mã quốc gia gồm hai chữ cái",
+    "programCodeInvalid": "programCode phải gồm 1 đến 12 chữ in hoa hoặc chữ số"
   },
   "securities": {
     "bondPricedByEngine": "Chứng khoán này được liên kết với một công cụ trái phiếu và được định giá bởi công cụ tính trái phiếu, không phải bởi nhà cung cấp báo giá. Hãy dùng Tính lại giá thay thế.",

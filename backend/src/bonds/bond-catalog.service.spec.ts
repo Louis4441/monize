@@ -317,6 +317,23 @@ describe("BondCatalogService", () => {
     expect(params).toEqual(["PL", "tos1029"]);
   });
 
+  it("answers which of many series codes are stored with version 1, in one query", async () => {
+    const { service, manager } = setup([POLISH_BOND_ADAPTER]);
+    manager.query.mockResolvedValueOnce([{ series_code: "TOS1029" }]);
+    await expect(
+      service.storedSeriesCodes(manager as never, "PL", ["tos1029", "EDO1036"]),
+    ).resolves.toEqual(new Set(["TOS1029"]));
+    expect(manager.query).toHaveBeenCalledTimes(1);
+    const [sql, params] = manager.query.mock.calls[0];
+    expect(sql).toContain("v.version = 1");
+    expect(params).toEqual(["PL", ["TOS1029", "EDO1036"]]);
+    manager.query.mockClear();
+    await expect(
+      service.storedSeriesCodes(manager as never, "PL", []),
+    ).resolves.toEqual(new Set());
+    expect(manager.query).not.toHaveBeenCalled();
+  });
+
   it("finds one instrument by id, or null", async () => {
     const { service, manager } = setup([POLISH_BOND_ADAPTER]);
     await expect(

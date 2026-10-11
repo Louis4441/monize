@@ -43,10 +43,13 @@ import {
   SecurityValuation,
 } from "./bond-valuation.service";
 import { BondScenarios } from "./bond-scenarios";
+import { BondHistory, BondOffer, BondOfferService } from "./bond-offer.service";
 import {
   ParseAssumePipe,
   ParseBondAsOfPipe,
+  ParseBondCountryCodePipe,
   ParseBenchmarkIdPipe,
+  ParseOptionalProgramCodePipe,
   ParseScenarioValuesPipe,
 } from "./bond-query.pipes";
 import { EnterBondSeriesDto } from "./dto/enter-bond-series.dto";
@@ -68,6 +71,7 @@ export class BondsController {
     private readonly valuation: BondValuationService,
     private readonly prices: BondPriceService,
     private readonly series: BondSeriesService,
+    private readonly offers: BondOfferService,
   ) {}
 
   @Get("instruments")
@@ -80,6 +84,74 @@ export class BondsController {
   @ApiResponse({ status: 200, description: "Bond instruments" })
   listInstruments(): Promise<BondInstrumentSummary[]> {
     return this.catalog.listInstruments();
+  }
+
+  @Get("offer")
+  @ApiOperation({
+    summary: "The bonds on sale today, side by side",
+    description:
+      "Every stored series of the country whose newest terms version's sale " +
+      "window contains the caller's financial today, with its terms and the " +
+      "projection of one bond bought today and held to maturity: the cash " +
+      "received (coupons not reinvested), the total return and the " +
+      "annualized return (a comparison figure). `assume=<benchmarkId>:<fraction>` " +
+      "replaces the benchmark for future periods of the series that read it; " +
+      "known periods stay known. A figure is null when the engine cannot value " +
+      "the bond, and `projectionMissing` says why. Reads stored reference data " +
+      "only; nothing is fetched.",
+  })
+  @ApiQuery({ name: "countryCode", example: "<ISO 3166-1 alpha-2 code>" })
+  @ApiQuery({
+    name: "assume",
+    required: false,
+    example: "<benchmark series code>:0.025",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "The series on sale and their projections",
+  })
+  @ApiResponse({ status: 400, description: "countryCode or assume is invalid" })
+  offer(
+    @Request() req,
+    @Query("countryCode", new ParseBondCountryCodePipe()) countryCode: string,
+    @Query("assume", new ParseAssumePipe())
+    assume?: ReadonlyMap<string, string>,
+  ): Promise<BondOffer> {
+    return this.mapBondErrors(() =>
+      this.offers.offer(req.user.id, countryCode, assume),
+    );
+  }
+
+  @Get("history")
+  @ApiOperation({
+    summary:
+      "How the terms of each product changed from one sale month to the next",
+    description:
+      "Every stored series of the country, by program (one program when " +
+      "`programCode` is given), ordered by the start of the sale window: " +
+      "first-period rate or annual rate, margin or spread, early redemption " +
+      "fee, proceeds floor, terms version and source. `coverage` names the " +
+      "months between the first and the last stored one that no stored series " +
+      "was sold in. Reads stored reference data only; nothing is fetched.",
+  })
+  @ApiQuery({ name: "countryCode", example: "<ISO 3166-1 alpha-2 code>" })
+  @ApiQuery({ name: "programCode", required: false, example: "<program code>" })
+  @ApiResponse({
+    status: 200,
+    description: "The programs, their series and coverage",
+  })
+  @ApiResponse({
+    status: 400,
+    description: "countryCode or programCode is invalid",
+  })
+  history(
+    @Query("countryCode", new ParseBondCountryCodePipe()) countryCode: string,
+    @Query("programCode", new ParseOptionalProgramCodePipe())
+    programCode?: string,
+  ): Promise<BondHistory> {
+    return this.mapBondErrors(() =>
+      this.offers.history(countryCode, programCode),
+    );
   }
 
   @Post("instruments/fetch")

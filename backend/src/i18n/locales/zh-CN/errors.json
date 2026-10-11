@@ -557,7 +557,9 @@
     "SOURCE_FORMAT_CHANGED": "系列 {{ series }} 的条款没有可用的 {{ field }}：官方来源可能已更改格式，或该值不可接受",
     "SOURCE_INCONSISTENT": "系列 {{ series }} 的值不一致，或 {{ field }} 超出范围（{{ detail }}）",
     "TEMPLATE_NOT_VALIDATED": "系列 {{ series }} 在 {{ product }} 模板通过验证之前（{{ validFrom }}）发售，需要人工整理的条目",
-    "SERIES_TERMS_CONFLICT": "系列 {{ series }} 已以不同的条款存储；已存储的条款永远不会被替换"
+    "SERIES_TERMS_CONFLICT": "系列 {{ series }} 已以不同的条款存储；已存储的条款永远不会被替换",
+    "countryCodeInvalid": "countryCode 必须是两个字母的国家代码",
+    "programCodeInvalid": "programCode 必须是 1 到 12 个大写字母或数字"
   },
   "securities": {
     "bondPricedByEngine": "该证券已关联到债券工具，由债券引擎而非行情提供商定价。请改用“重新计算价格”。",

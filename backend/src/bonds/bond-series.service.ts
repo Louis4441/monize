@@ -4,6 +4,7 @@ import { DataSource } from "typeorm";
 import { acquireAdvisoryLock, LockScope } from "../common/db/locks";
 import { withScopedDb } from "../common/db/scoped-db";
 import { withSystemContext } from "../common/db/with-context";
+import { todayInTimezone } from "../common/date-utils";
 import {
   describeFetchFailure,
   isTransportFailure,
@@ -46,8 +47,42 @@ export interface CurrentOfferRun {
   readonly failed: number;
 }
 
-/** Longer than a page and a letter for each of a month's series, far shorter than a day. */
-const OFFER_LEASE_MS = 15 * 60 * 1000;
+/** What one pass of the history backfill did, in series. */
+export interface BackfillRun {
+  /** Every code the adapters offered to try. */
+  readonly candidates: number;
+  /** Already in the catalog, so not asked for. */
+  readonly alreadyStored: number;
+  readonly stored: number;
+  /** Refused as `SERIES_NOT_PUBLISHED`: a product not sold that month. */
+  readonly notPublished: number;
+  readonly failed: number;
+  /** An adapter's pass stopped on `SOURCE_UNAVAILABLE`; the next run resumes. */
+  readonly stoppedEarly: boolean;
+}
+
+export interface BackfillOptions extends SeriesRequestOptions {
+  /** Waits between two requests; injectable so a test does not wait. */
+  readonly sleep?: (ms: number) => Promise<void>;
+  /** The adapters' day, YYYY-MM-DD; their own timezone's today when omitted. */
+  readonly today?: string;
+}
+
+/** The least time between two requests to the issuer's site by the backfill. */
+export const BACKFILL_GAP_MS = 3000;
+
+/**
+ * The current-offer check (a page and a letter for each of a month's series)
+ * and then the backfill of about 270 series: each is a gap of 3 s plus two
+ * requests of a second or a few, so about half an hour; 90 minutes leaves room
+ * for a slow source and is still far shorter than a day. A lease that ran out
+ * mid-pass would let a second replica start one beside it, which only repeats
+ * requests (every store is idempotent), so the figure is a cost control.
+ */
+const SERIES_LEASE_MS = 90 * 60 * 1000;
+
+const defaultSleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Gets a series that the catalog lacks from its market's official source, or
@@ -172,7 +207,8 @@ export class BondSeriesService {
   /**
    * Daily, after the price recompute (06:45): a new month's series go on sale
    * on the first, and storing them without anyone asking means the picker finds
-   * them. Cross-user work with no request behind it, so it seeds its own system
+   * them; then the one-off history backfill (`backfillHistory`) fills what the
+   * offer pass does not reach. Cross-user work with no request behind it, so it seeds its own system
    * context around the whole lease call; the lease is a cost control, because
    * the store is idempotent however many replicas run
    * (`docs/backend/cron-and-background-work.md`).
@@ -184,9 +220,18 @@ export class BondSeriesService {
       await withSystemContext(() =>
         this.fetchSync.withLease(
           FetchSyncJob.BondSeries,
-          OFFER_LEASE_MS,
+          SERIES_LEASE_MS,
           async () => {
-            await this.fetchCurrentOffer();
+            // The backfill follows even when the offer failed, so the failure
+            // still reaches the lease record, after the history had its turn.
+            let offerFailure: unknown = null;
+            try {
+              await this.fetchCurrentOffer();
+            } catch (error) {
+              offerFailure = error;
+            }
+            await this.backfillHistory();
+            if (offerFailure !== null) throw offerFailure;
           },
         ),
       );
@@ -258,6 +303,81 @@ export class BondSeriesService {
       );
     }
     return { listed, stored, alreadyStored, failed };
+  }
+
+  /**
+   * The history backfill (`docs/specs/bond-offer-and-history.md` section 4):
+   * every series code each adapter offers (`backfillCodes`) that the catalog
+   * lacks, asked for one at a time with `BACKFILL_GAP_MS` before each request.
+   * Only series that are not stored are asked for, so a rerun is idempotent and
+   * a run that stopped resumes where it stopped. `SOURCE_UNAVAILABLE` ends that
+   * adapter's pass (the source is down; the next daily run resumes); a series
+   * the source does not publish, or any other refusal, is logged and the pass
+   * goes on. Needs an ambient identity (`withSystemContext`).
+   */
+  async backfillHistory(options: BackfillOptions = {}): Promise<BackfillRun> {
+    const sleep = options.sleep ?? defaultSleep;
+    let candidates = 0;
+    let alreadyStored = 0;
+    let stored = 0;
+    let notPublished = 0;
+    let failed = 0;
+    let stoppedEarly = false;
+    for (const adapter of options.adapters ?? INSTALLED_BOND_ADAPTERS) {
+      const providerId = adapter.seriesProviderId;
+      if (!adapter.backfillCodes || !adapter.fetchSeries || !providerId)
+        continue;
+      const today =
+        options.today ??
+        todayInTimezone(adapter.timezone) ??
+        (todayInTimezone("UTC") as string);
+      const codes = adapter.backfillCodes(today);
+      const held = await withScopedDb(this.dataSource, (m) =>
+        this.catalog.storedSeriesCodes(m, adapter.countryCode, codes),
+      );
+      const missing = codes.filter((code) => !held.has(code.toUpperCase()));
+      candidates += codes.length;
+      alreadyStored += codes.length - missing.length;
+      for (const code of missing) {
+        // Before every request, the first included: the current-offer pass has
+        // just spoken to the same host.
+        await sleep(BACKFILL_GAP_MS);
+        try {
+          const result = await this.fetchSeries(adapter.countryCode, code, {
+            ...options,
+            adapters: [adapter],
+          });
+          if (result.created) stored += 1;
+          else alreadyStored += 1;
+        } catch (error) {
+          this.logRefusal(
+            `${adapter.countryCode} series ${code} (backfill)`,
+            providerId,
+            error,
+          );
+          const refusal = error instanceof SeriesFetchError ? error.code : null;
+          if (refusal === "SOURCE_UNAVAILABLE") {
+            failed += 1;
+            stoppedEarly = true;
+            break;
+          }
+          if (refusal === "SERIES_NOT_PUBLISHED") notPublished += 1;
+          else failed += 1;
+        }
+      }
+    }
+    this.logger.log(
+      `Bond series backfill: ${candidates} candidates, ${alreadyStored} already stored, ${stored} stored, ` +
+        `${notPublished} not published, ${failed} failed${stoppedEarly ? ", stopped on an unavailable source" : ""}`,
+    );
+    return {
+      candidates,
+      alreadyStored,
+      stored,
+      notPublished,
+      failed,
+      stoppedEarly,
+    };
   }
 
   /**

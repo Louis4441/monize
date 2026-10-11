@@ -4,6 +4,8 @@ import {
   ParseAssumePipe,
   ParseBondAsOfPipe,
   ParseBenchmarkIdPipe,
+  ParseBondCountryCodePipe,
+  ParseOptionalProgramCodePipe,
   ParseScenarioValuesPipe,
 } from "./bond-query.pipes";
 
@@ -119,4 +121,40 @@ describe("ParseBondAsOfPipe", () => {
   it("refuses a date that is not a calendar date", () => {
     expect(() => pipe.transform("2026-02-30")).toThrow(BadRequestException);
   });
+});
+
+describe("ParseBondCountryCodePipe", () => {
+  const pipe = new ParseBondCountryCodePipe();
+
+  it("accepts two letters and upper-cases them", () => {
+    expect(pipe.transform("PL")).toBe("PL");
+    expect(pipe.transform("pl")).toBe("PL");
+  });
+
+  it.each([undefined, "", "P", "POL", "P1", ["PL", "DE"], 42, null, "PL "])(
+    "refuses %p with a 400",
+    (value) => {
+      expect(() => pipe.transform(value)).toThrow(BadRequestException);
+    },
+  );
+});
+
+describe("ParseOptionalProgramCodePipe", () => {
+  const pipe = new ParseOptionalProgramCodePipe();
+
+  it("is every program when absent or empty", () => {
+    expect(pipe.transform(undefined)).toBeUndefined();
+    expect(pipe.transform("")).toBeUndefined();
+  });
+
+  it.each(["EDO", "A", "ABC123456789"])("accepts %s", (value) => {
+    expect(pipe.transform(value)).toBe(value);
+  });
+
+  it.each(["edo", "ABC1234567890", "E-O", ["EDO", "COI"], 7, "EDO'; --"])(
+    "refuses %p with a 400",
+    (value) => {
+      expect(() => pipe.transform(value)).toThrow(BadRequestException);
+    },
+  );
 });

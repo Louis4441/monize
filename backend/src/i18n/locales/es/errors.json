@@ -557,7 +557,9 @@
     "SOURCE_FORMAT_CHANGED": "Las condiciones de la serie {{ series }} no tienen un {{ field }} utilizable: la fuente oficial puede haber cambiado de formato, o el valor no es aceptable",
     "SOURCE_INCONSISTENT": "Los valores de la serie {{ series }} son incoherentes o están fuera de los límites en {{ field }} ({{ detail }})",
     "TEMPLATE_NOT_VALIDATED": "La serie {{ series }} se vendió antes de que se validara la plantilla {{ product }} ({{ validFrom }}); necesita una entrada curada",
-    "SERIES_TERMS_CONFLICT": "La serie {{ series }} ya está almacenada con condiciones distintas; las condiciones almacenadas nunca se sustituyen"
+    "SERIES_TERMS_CONFLICT": "La serie {{ series }} ya está almacenada con condiciones distintas; las condiciones almacenadas nunca se sustituyen",
+    "countryCodeInvalid": "countryCode debe ser un código de país de dos letras",
+    "programCodeInvalid": "programCode debe tener de 1 a 12 letras mayúsculas o dígitos"
   },
   "securities": {
     "bondPricedByEngine": "Este valor está vinculado a un instrumento de bono y lo valora el motor de bonos, no un proveedor de cotizaciones. Utilice en su lugar Recalcular precios.",

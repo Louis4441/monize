@@ -105,6 +105,29 @@ export class BondCatalogService implements OnApplicationBootstrap {
     return rows[0] ?? null;
   }
 
+  /**
+   * Which of `seriesCodes` the country already holds with terms version 1, in
+   * upper case, in one query. The backfill asks this once instead of once per
+   * candidate.
+   */
+  async storedSeriesCodes(
+    m: EntityManager,
+    countryCode: string,
+    seriesCodes: readonly string[],
+  ): Promise<Set<string>> {
+    if (seriesCodes.length === 0) return new Set();
+    const rows: Array<{ series_code: string }> = await m.query(
+      `SELECT UPPER(i.series_code) AS series_code
+         FROM bond_instruments i
+        WHERE i.issuer_country_code = $1
+          AND UPPER(i.series_code) = ANY($2::text[])
+          AND EXISTS (SELECT 1 FROM bond_terms_versions v
+                       WHERE v.bond_instrument_id = i.id AND v.version = 1)`,
+      [countryCode, seriesCodes.map((code) => code.toUpperCase())],
+    );
+    return new Set(rows.map((row) => row.series_code));
+  }
+
   /** One instrument by id, as the API names it, or null. */
   async findSummary(
     m: EntityManager,

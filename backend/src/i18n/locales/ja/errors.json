@@ -557,7 +557,9 @@
     "SOURCE_FORMAT_CHANGED": "シリーズ {{ series }} の条件に使用可能な {{ field }} がありません。公式ソースの形式が変更された可能性があるか、値が受け入れられません",
     "SOURCE_INCONSISTENT": "シリーズ {{ series }} の値が矛盾しているか、{{ field }} が範囲外です ({{ detail }})",
     "TEMPLATE_NOT_VALIDATED": "シリーズ {{ series }} は {{ product }} テンプレートの検証前 ({{ validFrom }}) に販売されたため、キュレーション済みのエントリが必要です",
-    "SERIES_TERMS_CONFLICT": "シリーズ {{ series }} は既に異なる条件で保存されています。保存済みの条件が置き換えられることはありません"
+    "SERIES_TERMS_CONFLICT": "シリーズ {{ series }} は既に異なる条件で保存されています。保存済みの条件が置き換えられることはありません",
+    "countryCodeInvalid": "countryCode は2文字の国コードである必要があります",
+    "programCodeInvalid": "programCode は1〜12文字の大文字または数字である必要があります"
   },
   "securities": {
     "bondPricedByEngine": "この証券は債券銘柄にリンクされており、価格は相場提供元ではなく債券エンジンが算出します。代わりに「価格を再計算」を使用してください。",

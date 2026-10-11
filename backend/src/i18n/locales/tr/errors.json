@@ -557,7 +557,9 @@
     "SOURCE_FORMAT_CHANGED": "{{ series }} serisinin koşullarında kullanılabilir bir {{ field }} yok: resmi kaynak biçimini değiştirmiş olabilir ya da değer kabul edilebilir değil",
     "SOURCE_INCONSISTENT": "{{ series }} serisinin değerleri tutarsız veya {{ field }} alanında sınırların dışında ({{ detail }})",
     "TEMPLATE_NOT_VALIDATED": "{{ series }} serisi, {{ product }} şablonu doğrulanmadan önce satıldı ({{ validFrom }}); derlenmiş bir kayıt gerektirir",
-    "SERIES_TERMS_CONFLICT": "{{ series }} serisi zaten farklı koşullarla kayıtlı; kayıtlı koşullar asla değiştirilmez"
+    "SERIES_TERMS_CONFLICT": "{{ series }} serisi zaten farklı koşullarla kayıtlı; kayıtlı koşullar asla değiştirilmez",
+    "countryCodeInvalid": "countryCode iki harfli bir ülke kodu olmalıdır",
+    "programCodeInvalid": "programCode 1 ile 12 arasında büyük harf veya rakamdan oluşmalıdır"
   },
   "securities": {
     "bondPricedByEngine": "Bu menkul kıymet bir tahvil enstrümanına bağlıdır ve bir kotasyon sağlayıcısı tarafından değil, tahvil motoru tarafından fiyatlanır. Bunun yerine Fiyatları yeniden hesapla seçeneğini kullanın.",

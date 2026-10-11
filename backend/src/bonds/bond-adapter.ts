@@ -156,4 +156,16 @@ export interface BondAdapter {
    * daily check that stores the ones the catalog lacks.
    */
   currentSeries?(fetch: BondFetch): Promise<string[]>;
+  /**
+   * Every series code the adapter's product templates cover, from the earliest
+   * sale month they are validated for up to the month of `today` (YYYY-MM-DD,
+   * the market's own day), oldest sale month first: the candidates of the
+   * one-off backfill. Most are stored already; the caller asks the catalog.
+   */
+  backfillCodes?(today: string): string[];
+  /**
+   * The earliest sale month (`YYYY-MM`) the adapter's templates are validated
+   * for, the lower bound of its series history.
+   */
+  readonly seriesValidFrom?: string;
 }

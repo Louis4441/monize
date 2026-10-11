@@ -557,7 +557,9 @@
     "SOURCE_FORMAT_CHANGED": "De voorwaarden van serie {{ series }} hebben geen bruikbaar veld {{ field }}: de officiële bron heeft mogelijk het formaat gewijzigd, of de waarde is niet aanvaardbaar",
     "SOURCE_INCONSISTENT": "De waarden van serie {{ series }} zijn inconsistent of buiten de grenzen bij {{ field }} ({{ detail }})",
     "TEMPLATE_NOT_VALIDATED": "Serie {{ series }} is verkocht voordat het sjabloon {{ product }} was gevalideerd ({{ validFrom }}); er is een samengestelde invoer nodig",
-    "SERIES_TERMS_CONFLICT": "Serie {{ series }} is al opgeslagen met andere voorwaarden; opgeslagen voorwaarden worden nooit vervangen"
+    "SERIES_TERMS_CONFLICT": "Serie {{ series }} is al opgeslagen met andere voorwaarden; opgeslagen voorwaarden worden nooit vervangen",
+    "countryCodeInvalid": "countryCode moet een landcode van twee letters zijn",
+    "programCodeInvalid": "programCode moet uit 1 tot 12 hoofdletters of cijfers bestaan"
   },
   "securities": {
     "bondPricedByEngine": "Dit effect is gekoppeld aan een obligatie-instrument en wordt gewaardeerd door de obligatie-engine, niet door een koersaanbieder. Gebruik in plaats daarvan Koersen herberekenen.",

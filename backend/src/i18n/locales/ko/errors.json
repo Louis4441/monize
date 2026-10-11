@@ -557,7 +557,9 @@
     "SOURCE_FORMAT_CHANGED": "시리즈 {{ series }}의 조건에 사용할 수 있는 {{ field }}이(가) 없습니다. 공식 출처의 형식이 바뀌었거나 값이 허용되지 않습니다",
     "SOURCE_INCONSISTENT": "시리즈 {{ series }}의 값이 서로 맞지 않거나 {{ field }}이(가) 범위를 벗어났습니다 ({{ detail }})",
     "TEMPLATE_NOT_VALIDATED": "시리즈 {{ series }}은(는) {{ product }} 템플릿이 검증되기 전({{ validFrom }})에 판매되었으므로 큐레이션된 항목이 필요합니다",
-    "SERIES_TERMS_CONFLICT": "시리즈 {{ series }}은(는) 이미 다른 조건으로 저장되어 있습니다. 저장된 조건은 절대 대체되지 않습니다"
+    "SERIES_TERMS_CONFLICT": "시리즈 {{ series }}은(는) 이미 다른 조건으로 저장되어 있습니다. 저장된 조건은 절대 대체되지 않습니다",
+    "countryCodeInvalid": "countryCode는 두 글자 국가 코드여야 합니다",
+    "programCodeInvalid": "programCode는 1~12자의 대문자 또는 숫자여야 합니다"
   },
   "securities": {
     "bondPricedByEngine": "이 증권은 채권 종목에 연결되어 있으며 시세 제공업체가 아닌 채권 엔진이 가격을 산정합니다. 대신 가격 다시 계산을 사용하세요.",

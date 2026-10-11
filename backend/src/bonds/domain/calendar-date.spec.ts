@@ -8,6 +8,7 @@ import {
   firstOfMonth,
   isValidYMD,
   monthKeyBefore,
+  enumerateMonthKeys,
   parseYMD,
 } from "./calendar-date";
 
@@ -72,5 +73,16 @@ describe("calendar-date", () => {
     expect(monthKeyBefore("2027-10-15", 2)).toBe("2027-08");
     expect(monthKeyBefore("2027-01-15", 2)).toBe("2026-11");
     expect(monthKeyBefore("2027-03-15", 2)).toBe("2027-01");
+  });
+
+  it("lists the months between two month keys, inclusive", () => {
+    expect(enumerateMonthKeys("2025-11", "2026-02")).toEqual([
+      "2025-11",
+      "2025-12",
+      "2026-01",
+      "2026-02",
+    ]);
+    expect(enumerateMonthKeys("2026-10", "2026-10")).toEqual(["2026-10"]);
+    expect(enumerateMonthKeys("2026-10", "2026-09")).toEqual([]);
   });
 });

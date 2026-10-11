@@ -80,3 +80,15 @@ export function monthKeyBefore(value: string, months: number): string {
   const index = year * 12 + (month - 1) - months;
   return formatMonthKey(Math.floor(index / 12), (index % 12) + 1);
 }
+
+/** Every `YYYY-MM` from `from` to `to` inclusive, oldest first; empty when `to` is before `from`. */
+export function enumerateMonthKeys(from: string, to: string): string[] {
+  const start = parseYMD(`${from}-01`);
+  const end = parseYMD(`${to}-01`);
+  const last = end.year * 12 + (end.month - 1);
+  const keys: string[] = [];
+  for (let i = start.year * 12 + (start.month - 1); i <= last; i += 1) {
+    keys.push(formatMonthKey(Math.floor(i / 12), (i % 12) + 1));
+  }
+  return keys;
+}

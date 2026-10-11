@@ -117,3 +117,47 @@ export class ParseBondAsOfPipe implements PipeTransform<
     return asOf;
   }
 }
+
+/**
+ * `countryCode` of the offer and history routes: two letters, upper-cased. The
+ * type is checked before the text, so a repeated key (an array) is refused
+ * rather than coerced.
+ */
+@Injectable()
+export class ParseBondCountryCodePipe implements PipeTransform<
+  unknown,
+  string
+> {
+  transform(value: unknown): string {
+    if (typeof value === "string") {
+      const upper = value.toUpperCase();
+      if (/^[A-Z]{2}$/.test(upper)) return upper;
+    }
+    throw new BadRequestException(
+      tr(
+        "errors.bonds.countryCodeInvalid",
+        "countryCode must be a two-letter country code",
+      ),
+    );
+  }
+}
+
+/** `programCode` of the history route: 1 to 12 capital letters or digits; absent is every program. */
+@Injectable()
+export class ParseOptionalProgramCodePipe implements PipeTransform<
+  unknown,
+  string | undefined
+> {
+  transform(value: unknown): string | undefined {
+    if (value === undefined || value === "") return undefined;
+    if (typeof value === "string" && /^[A-Z0-9]{1,12}$/.test(value)) {
+      return value;
+    }
+    throw new BadRequestException(
+      tr(
+        "errors.bonds.programCodeInvalid",
+        "programCode must be 1 to 12 capital letters or digits",
+      ),
+    );
+  }
+}

@@ -557,7 +557,9 @@
     "SOURCE_FORMAT_CHANGED": "系列 {{ series }} 的條款沒有可用的 {{ field }}：官方來源可能已變更格式，或該值不可接受",
     "SOURCE_INCONSISTENT": "系列 {{ series }} 的值不一致，或 {{ field }} 超出範圍（{{ detail }}）",
     "TEMPLATE_NOT_VALIDATED": "系列 {{ series }} 在 {{ product }} 範本通過驗證之前（{{ validFrom }}）發售，需要人工整理的項目",
-    "SERIES_TERMS_CONFLICT": "系列 {{ series }} 已以不同的條款儲存；已儲存的條款永遠不會被取代"
+    "SERIES_TERMS_CONFLICT": "系列 {{ series }} 已以不同的條款儲存；已儲存的條款永遠不會被取代",
+    "countryCodeInvalid": "countryCode 必須是兩個字母的國家代碼",
+    "programCodeInvalid": "programCode 必須是 1 到 12 個大寫字母或數字"
   },
   "securities": {
     "bondPricedByEngine": "此證券已連結到債券工具，由債券引擎而非報價提供者定價。請改用「重新計算價格」。",
