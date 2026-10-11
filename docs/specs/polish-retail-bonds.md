@@ -41,7 +41,9 @@ In scope for this PR (it carries phases 1 to 5 of the plan):
 - the read API, the detail view and its i18n (section 13).
 
 Out of scope: a machine-readable source of the Ministry's announced period
-rates (they are filled by hand); a projected value for a future `asOf`;
+rates (they are filled by hand); a terms fetcher (the manifests are curated by
+hand from the issue letters, and adding a series is one manifest file and one
+catalog entry, no code); a projected value for a future `asOf`;
 taxes; the IKE/IKZE fee waiver; the eligibility check of ROS and ROD; other
 countries, and the primitives they need (indexed principal, day-count
 conventions, market quotes, yields) (discussion section 38). Section 2.0 is
@@ -106,9 +108,19 @@ redemption      { type: MATURITY_ONLY }
                             | { type: FORFEIT_ACCRUED_SINCE_LAST_PAYMENT }],
                   proceedsFloor: { type: FACE_VALUE,
                                    appliesTo: ALL_PERIODS | FIRST_PERIOD } | null }
-rounding        { moneyDecimals: 2, mode: HALF_UP }
+rounding        { moneyDecimals: 0..4, mode: HALF_UP | HALF_EVEN | DOWN }
+                -- every Polish manifest uses 2 and HALF_UP
 source          { provider, url, document }
 ```
+
+Extension points the engine already dispatches on (each a switch with
+`assertNever`, so a new member fails to compile until it has its case):
+`schedule.anchor`, `principalRule` (the principal is read through
+`principalAt(terms, { date })`, the place an index ratio or an amortization
+schedule will be passed), `accrual.type` (read through
+`yearFraction(terms, period, from, to)`), `rateRule.type`,
+`capitalization.type`, the penalties and `rounding.mode`. The rate's reset
+frequency is the schedule's `periodMonths`: every period gets its own rate.
 
 Every rate and amount is a decimal string, never a JSON number. Rates are
 fractions (`"0.0440"` for 4.40%).
@@ -275,6 +287,13 @@ projectedCashflows [{ ..., status: PROJECTED }]
                    UNKNOWN
 maturityValueKnown     | null
 maturityValueProjected | null
+nextPayment        every cash flow, from both lists and UNKNOWN included, dated
+                   on the earliest date after asOf; [] for a matured or
+                   refused lot
+nextRateReset      start of the next period when the rule reads a benchmark
+                   and a next period exists, else null
+nextCapitalization end of the current period when the bond compounds and the
+                   period is not the last, else null
 projectionAssumptions  [{ benchmarkId, value (fraction), basis: SUPPLIED | LATEST_OBSERVATION,
                         observation (YYYY-MM-DD or YYYY-MM; null when SUPPLIED) }]
 dataCompleteness   { termsComplete, referenceDataComplete, earlyRedemptionTermsComplete }
@@ -287,6 +306,10 @@ projectionMissing  [{ benchmarkId, publisher | null }]  a benchmark a future
                    observation nor a supplied assumption
 valuationComplete  all three flags true, and the lot is not REFUSED
 ```
+
+An early redemption is a figure (`earlyRedemptionValue`), not a cash-flow
+type: a redemption that happened is the user's `SELL` or `REDEEM`
+transaction, which the lots read (12.2).
 
 A completed period with a missing observation is named in `missing`; a future
 period without any basis is named in `projectionMissing`. The security-level
@@ -607,6 +630,12 @@ transactions on it, **per account**, in register order, `VOID` rows excluded:
 | `SPLIT` | lots unknown (a bond does not split); valuation refused with the reason |
 | cash-only actions | none |
 
+A lot is `{ accountId, purchaseDate, quantity, purchaseDateAssumed }`. The
+holding fields of discussion section 13 that a lot does not carry are not
+needed for retail bonds: the cost stays on the transactions (the existing
+cost-basis code reads it), and a retail bond is bought at par on the day of
+sale, so there is no separate settlement date and no accrued interest paid.
+
 A lot quantity that is not a whole number of bonds, or a removal larger than
 the open lots of its account, makes the lots unknown; the reason is named, nothing is
 guessed.
@@ -673,8 +702,10 @@ definition of today, the user's financial today.
 - `GET /bonds/instruments`: the catalog (id, issuer country, issuer, program,
   series, currency), for the link picker.
 - `GET /bonds/securities/:securityId/valuation?asOf=YYYY-MM-DD`: the lots and
-  one `BondValuation` per lot (section 2.6), plus the lot totals and
-  `benchmarkCoverage`, for the detail view. `asOf` after today is refused
+  one `BondValuation` per lot (section 2.6), plus the lot totals,
+  `benchmarkCoverage` and `redemptionTerms` (the terms' redemption policy:
+  window, penalties and proceeds floor, or null for `MATURITY_ONLY`), for the
+  detail view. `asOf` after today is refused
   (`AS_OF_IN_FUTURE`). Owner-scoped by RLS; another user's security answers 404.
 
 Market surfaces do not read the engine's rows as market moves: Top Movers and
@@ -687,7 +718,8 @@ listed, `bond_engine` has a translated label.
 For a linked security the security page shows, per lot and in total: series,
 purchase date, maturity, current period and its rate with `rateSource`,
 principal, accrued interest, gross value, early redemption value or the
-refusal reason, next cash flow, known and projected maturity value, the
+refusal reason, the early redemption fee from `redemptionTerms`, the next
+payment (`nextPayment`), the next rate reset and the next capitalization date, known and projected maturity value, the
 projection assumptions and the `missing` list with the publisher to obtain each
 item from. Percentages and amounts are localized by the reader's number
 format preference. A lot shows its status: "Matured" for a matured lot and the

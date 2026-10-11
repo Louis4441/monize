@@ -61,6 +61,32 @@ holds that. A product is a terms document, not code.
 3. A fetcher (definition provider) per country normalizes official terms and
    benchmark data into the same tables; it never computes a valuation.
 
+## Global readiness (checked against the global research note)
+
+A check on 2026-10-11 compared the engine with the owner's global research
+note (21 countries). Seams added in this PR, each Polish result unchanged:
+rounding decimals 0 to 4 and modes `HALF_UP`, `HALF_EVEN`, `DOWN`; a switch on
+`schedule.anchor`; `principalAt(terms, { date })` instead of a constant
+nominal; `yearFraction(terms, period, from, to)` for every accrual; an
+exhaustive switch on every rate-rule type; each adapter's own timezone for
+"today" and freshness; a logged trace of every benchmark correction; the
+country-agnostic guard over the shared bond services.
+
+Still a change, not an addition, when the first country that needs it comes:
+
+| Mechanism | Countries (research note section) | What changes |
+| --- | --- | --- |
+| Holding a nominal amount (1,000 EUR, 0.01 EUR steps) instead of whole bonds, coupon rounded on the holding | marketable bonds of most countries (3.1-3.21) | `lot.quantity` becomes an exact decimal; a `rounding.basis` (`PER_UNIT` now, `PER_HOLDING`); the lot fold accepts fractions |
+| Coupon dates anchored on the series, irregular first coupon, accrued interest paid at purchase | marketable coupon bonds (3.1-3.21) | a new `schedule.anchor` (`ISSUE_DATE`) with explicit coupon dates; the lot carries the accrued interest paid |
+| Day-based tenors (91, 182, 364 days), discount issue | bills in most countries | a day-tenor schedule and a `ZERO_COUPON_DISCOUNT` rate rule with an issue price |
+| Indexed principal (TIPS, OATi, BTP Italia, linkers, JGBi) | 3.1-3.6, 3.9-3.11, 3.15-3.17 | a `principalRule` case reading an index ratio through `principalAt`; benchmark unit `INDEX_LEVEL` (the `unit` column is free text, no migration) |
+| Amortizing or annuity principal, gold-linked principal | 3.7, 3.15-3.18 | outstanding principal per period and `PRINCIPAL` flows per period |
+| Rate compounded from daily fixings in arrears (SOFR, SONIA, Selic, RUONIA) | 3.2, 3.4, 3.15-3.17 | a rate rule that returns a period's accrual factor from many fixings; a `DAILY` benchmark kind (the `benchmark_series.kind` CHECK widened by migration) |
+| Business-day exponential accrual (BUS/252) | 3.15 | an `accrual.type` case in `yearFraction` with a compounding form |
+| Revised index values (HICP flash and final, IPCA) | euro area, Brazil | benchmark values keyed by vintage, and a rule choosing the vintage for a valuation day |
+| Market price beside the engine value | marketable bonds | the engine-only price rule (INV-BOND-005) becomes per `marketability`: a market quote wins for a marketable bond and the engine supplies accrued interest |
+| ISIN, CUSIP and local identifiers | all | an additive `bond_instrument_identifiers` table |
+
 ## Second-country example: United States Series I savings bonds
 
 A check of the design against a second retail inflation bond. The rules below
@@ -92,7 +118,7 @@ case, engine case and tests.
 | 2 | Fetchers: NBP reference rate history (NBP API), GUS CPI, Ministry announced rates; a lease-guarded cron; provider health | stored observations for the open series; `missing` empties once fetched |
 | 3 | Link a security to a bond instrument; lots from BUY transactions; bond value in portfolio valuation, with `valuationComplete` carried | a TOS holding shows its value in the portfolio |
 | 4 | UI: bond detail (period, rate, accrued, early redemption, known vs projected); i18n | the detail view of discussion section 42 |
-| 5 | OTS, DOR, ROS, ROD; older series terms | each product with its golden fixture |
+| 5 | OTS, DOR, ROS, ROD (older series terms: a follow-up) | each product with its golden fixture |
 | 6+ | Further countries in the order of the research note (simple marketable bonds, then indexed principal, floating, special retail); identifiers (ISIN, local series); market quote basis (percent of par, clean/dirty) | each country an adapter with golden tests; new primitives only where needed |
 
 ## What to run

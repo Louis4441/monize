@@ -49,6 +49,10 @@ at the owner's request.
   table or an early redemption statement.
 - [ ] Ministry announced period rates have no machine-readable source yet; the
   table is filled by hand or by a later fetcher.
+- [ ] Terms of older series still held (EDO, COI, ROS, ROD issued before
+  October 2026, ROR and DOR of the last 24 months): one manifest and one
+  catalog entry each, from its issue letter, with a golden case. No code
+  change is needed.
 - [ ] The next countries, in the order of the plan's phase 6+. The United
   States Series I savings bond is worked through in the plan's
   "Second-country example" section: four new primitives, no change to the
