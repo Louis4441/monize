@@ -117,6 +117,55 @@ describe("ExactDecimal", () => {
     });
   });
 
+  describe("round", () => {
+    it.each([
+      // value, HALF_UP, HALF_EVEN, DOWN (2 decimals)
+      ["1.005", "1.01", "1.00", "1.00"],
+      ["1.015", "1.02", "1.02", "1.01"],
+      ["1.025", "1.03", "1.02", "1.02"],
+      ["1.0051", "1.01", "1.01", "1.00"],
+      ["1.0049", "1.00", "1.00", "1.00"],
+      ["-1.005", "-1.01", "-1.00", "-1.00"],
+      ["-1.015", "-1.02", "-1.02", "-1.01"],
+      ["-1.025", "-1.03", "-1.02", "-1.02"],
+      ["-1.0051", "-1.01", "-1.01", "-1.00"],
+      ["-0.004", "0.00", "0.00", "0.00"],
+    ] as const)("%s", (value, halfUp, halfEven, down) => {
+      expect(d(value).round(2, "HALF_UP").toFixed(2)).toBe(halfUp);
+      expect(d(value).round(2, "HALF_EVEN").toFixed(2)).toBe(halfEven);
+      expect(d(value).round(2, "DOWN").toFixed(2)).toBe(down);
+    });
+
+    it("rounds ties at zero and other decimals", () => {
+      expect(d("0.5").round(0, "HALF_EVEN").toFixed(0)).toBe("0");
+      expect(d("1.5").round(0, "HALF_EVEN").toFixed(0)).toBe("2");
+      expect(d("2.5").round(0, "HALF_EVEN").toFixed(0)).toBe("2");
+      expect(d("-2.5").round(0, "HALF_EVEN").toFixed(0)).toBe("-2");
+      expect(d("-2.5").round(0, "HALF_UP").toFixed(0)).toBe("-3");
+      expect(d("2.9").round(0, "DOWN").toFixed(0)).toBe("2");
+      expect(d("-2.9").round(0, "DOWN").toFixed(0)).toBe("-2");
+      expect(d("0.12345").round(4, "HALF_EVEN").toFixed(4)).toBe("0.1234");
+      expect(d("0.12355").round(4, "HALF_EVEN").toFixed(4)).toBe("0.1236");
+    });
+
+    it("rounds an exact fraction, not a decimal approximation", () => {
+      const third = ExactDecimal.of(1n, 3n);
+      expect(third.round(2, "DOWN").toFixed(2)).toBe("0.33");
+      expect(ExactDecimal.of(2n, 3n).round(2, "DOWN").toFixed(2)).toBe("0.66");
+      expect(ExactDecimal.of(2n, 3n).round(2, "HALF_EVEN").toFixed(2)).toBe(
+        "0.67",
+      );
+    });
+
+    it("roundHalfUp is round(.., HALF_UP) and invalid places are refused", () => {
+      expect(
+        d("1.005").roundHalfUp(2).cmp(d("1.005").round(2, "HALF_UP")),
+      ).toBe(0);
+      expect(() => d("1").round(-1, "DOWN")).toThrow(RangeError);
+      expect(() => d("1").round(1.5, "HALF_EVEN")).toThrow(RangeError);
+    });
+  });
+
   describe("toTrimmedString", () => {
     it("trims zeros down to the minimum places", () => {
       expect(d("0.0440").toTrimmedString(10, 4)).toBe("0.0440");

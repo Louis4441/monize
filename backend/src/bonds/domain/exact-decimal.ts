@@ -1,4 +1,9 @@
+import { assertNever } from "./assert-never";
+
 const DECIMAL_PATTERN = /^-?\d+(\.\d+)?$/;
+
+/** How a value is brought to a number of decimals: ties away from zero, ties to even, or toward zero. */
+export type RoundingMode = "HALF_UP" | "HALF_EVEN" | "DOWN";
 
 function abs(n: bigint): bigint {
   return n < 0n ? -n : n;
@@ -126,12 +131,24 @@ export class ExactDecimal {
    * half-up is assumption 1 of the spec.
    */
   roundHalfUp(places: number): ExactDecimal {
-    return ExactDecimal.of(this.scaledHalfUp(places), 10n ** BigInt(places));
+    return this.round(places, "HALF_UP");
+  }
+
+  /**
+   * Round to `decimals` places by `mode`, on the exact value: HALF_UP ties away
+   * from zero, HALF_EVEN ties to the even last digit (banker's rounding), DOWN
+   * toward zero (truncation).
+   */
+  round(decimals: number, mode: RoundingMode): ExactDecimal {
+    return ExactDecimal.of(
+      this.scaledBy(decimals, mode),
+      10n ** BigInt(decimals),
+    );
   }
 
   /** Round half-up, then format with exactly `places` decimals. */
   toFixed(places: number): string {
-    const scaled = this.scaledHalfUp(places);
+    const scaled = this.scaledBy(places, "HALF_UP");
     const digits = abs(scaled)
       .toString()
       .padStart(places + 1, "0");
@@ -141,15 +158,33 @@ export class ExactDecimal {
     return places === 0 ? `${sign}${whole}` : `${sign}${whole}.${fraction}`;
   }
 
-  /** The value times 10^places as a signed integer, ties away from zero. */
-  private scaledHalfUp(places: number): bigint {
+  /** The value times 10^places as a signed integer, rounded by `mode`. */
+  private scaledBy(places: number, mode: RoundingMode): bigint {
     if (!Number.isInteger(places) || places < 0) {
       throw new RangeError(`ExactDecimal: invalid places: ${places}`);
     }
-    const scale = 10n ** BigInt(places);
-    const magnitude =
-      (2n * abs(this.numerator) * scale + this.denominator) /
-      (2n * this.denominator);
+    const scaled = abs(this.numerator) * 10n ** BigInt(places);
+    const quotient = scaled / this.denominator;
+    const twiceRemainder = 2n * (scaled % this.denominator);
+    let magnitude: bigint;
+    switch (mode) {
+      case "DOWN":
+        magnitude = quotient;
+        break;
+      case "HALF_UP":
+        magnitude =
+          twiceRemainder >= this.denominator ? quotient + 1n : quotient;
+        break;
+      case "HALF_EVEN":
+        magnitude =
+          twiceRemainder > this.denominator ||
+          (twiceRemainder === this.denominator && quotient % 2n === 1n)
+            ? quotient + 1n
+            : quotient;
+        break;
+      default:
+        return assertNever(mode);
+    }
     return this.isNegative() ? -magnitude : magnitude;
   }
 

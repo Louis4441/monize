@@ -53,7 +53,7 @@ export interface MissingObservation {
 export interface CashFlow {
   readonly date: string;
   readonly type: "INTEREST" | "PRINCIPAL";
-  /** The whole lot, 2 decimals; null only when `status` is UNKNOWN. */
+  /** The whole lot, in the terms' money decimals; null only when `status` is UNKNOWN. */
   readonly amount: string | null;
   /**
    * UNKNOWN: the flow will happen but a rate it depends on is neither stored nor
@@ -138,6 +138,15 @@ export interface BondValuation {
   readonly grossValue: string | null;
   readonly earlyRedemptionValue: string | null;
   readonly earlyRedemptionRefusal: EarlyRedemptionRefusal | null;
+  /**
+   * Every cash flow (known, projected and UNKNOWN) dated on the earliest date
+   * after `asOf`, for the lot; empty when matured or refused.
+   */
+  readonly nextPayment: readonly CashFlow[];
+  /** Start of the next period when the rate reads a benchmark and one exists; null otherwise. */
+  readonly nextRateReset: string | null;
+  /** End of the current period when the bond compounds and it is not the last; null otherwise. */
+  readonly nextCapitalization: string | null;
   /** Cash flows after `asOf`, every rate they depend on known. */
   readonly knownCashflows: readonly CashFlow[];
   /** Cash flows after `asOf` that are not known: PROJECTED, and UNKNOWN with a null amount. */

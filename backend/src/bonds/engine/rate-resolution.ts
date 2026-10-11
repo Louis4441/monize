@@ -1,7 +1,12 @@
 import { assertNever } from "../domain/assert-never";
 import { BenchmarkData } from "../domain/benchmark";
 import { nthBusinessDayBefore } from "../domain/business-day-calendar";
-import { ObservationRule, RateRule } from "../domain/bond-terms";
+import {
+  BenchmarkRule,
+  ObservationRule,
+  RateRule,
+  benchmarkRuleOf,
+} from "../domain/bond-terms";
 import {
   compareYMD,
   firstOfMonth,
@@ -40,8 +45,6 @@ export interface PeriodRate {
   /** Set when the rate is null and the cause is a missing observation. */
   readonly missing: MissingObservation | null;
 }
-
-type BenchmarkRule = Exclude<RateRule, { type: "FIXED" }>;
 
 /** `field` names the stored or supplied value by a technical key, e.g. `announcedRate:2`. */
 function parseDecimal(value: string, field: string): ExactDecimal {
@@ -284,12 +287,13 @@ export function planPeriodRates(
 ): RatePlan {
   assertStoredDates(input);
   const rule = input.terms.rateRule;
-  const assumption =
-    rule.type === "FIXED" ? null : projectionAssumption(rule, input);
-  const publisher =
-    rule.type === "FIXED"
-      ? null
-      : (input.benchmarks.get(rule.benchmarkId)?.publisher ?? null);
+  const benchmarkRule = benchmarkRuleOf(rule);
+  const assumption = benchmarkRule
+    ? projectionAssumption(benchmarkRule, input)
+    : null;
+  const publisher = benchmarkRule
+    ? (input.benchmarks.get(benchmarkRule.benchmarkId)?.publisher ?? null)
+    : null;
 
   const planned = schedule.map((period): PlannedRate => {
     const final = (rate: PeriodRate): PlannedRate => ({ kind: "final", rate });
@@ -305,60 +309,69 @@ export function planPeriodRates(
         missing: null,
         benchmark,
         addend:
-          benchmark && rule.type !== "FIXED" ? fraction(addendOf(rule)) : null,
+          benchmark && benchmarkRule ? fraction(addendOf(benchmarkRule)) : null,
       });
-    if (rule.type === "FIXED")
-      return known(parseDecimal(rule.annualRate, "annualRate"), "TERMS");
-    if (period.index === 1 && rule.firstPeriodRate !== null) {
-      return known(
-        parseDecimal(rule.firstPeriodRate, "firstPeriodRate"),
-        "TERMS",
-      );
-    }
-    const announced = input.announcedRates.get(period.index);
-    if (announced !== undefined) {
-      return known(
-        parseDecimal(announced, `announcedRate:${period.index}`),
-        "ANNOUNCED",
-      );
-    }
-    const observation = observe(rule, period, input);
-    const absent = (key: string): PeriodBenchmark => ({
-      benchmarkId: rule.benchmarkId,
-      observation: key,
-      value: null,
-      flooredValue: null,
-    });
-    if (observation === null) {
-      // A calendar the observation needs is unknown: the terms are incomplete.
-      return final({
-        period,
-        rate: null,
-        source: null,
-        missing: null,
-        benchmark: null,
-        addend: null,
-      });
-    }
-    const key = observation.missing.observation;
-    if (observation.value !== null) {
-      const base = floored(rule, observation.value);
-      return known(base.add(addendOf(rule)), "DERIVED", {
+    const benchmarkPeriod = (rule: BenchmarkRule): PlannedRate => {
+      if (period.index === 1 && rule.firstPeriodRate !== null) {
+        return known(
+          parseDecimal(rule.firstPeriodRate, "firstPeriodRate"),
+          "TERMS",
+        );
+      }
+      const announced = input.announcedRates.get(period.index);
+      if (announced !== undefined) {
+        return known(
+          parseDecimal(announced, `announcedRate:${period.index}`),
+          "ANNOUNCED",
+        );
+      }
+      const observation = observe(rule, period, input);
+      const absent = (key: string): PeriodBenchmark => ({
         benchmarkId: rule.benchmarkId,
         observation: key,
-        value: observation.raw,
-        flooredValue: fraction(base),
+        value: null,
+        flooredValue: null,
       });
-    }
-    return {
-      kind: "pending",
-      pending: {
-        period,
-        missing: observation.missing,
-        absent: absent(key),
-        key,
-      },
+      if (observation === null) {
+        // A calendar the observation needs is unknown: the terms are incomplete.
+        return final({
+          period,
+          rate: null,
+          source: null,
+          missing: null,
+          benchmark: null,
+          addend: null,
+        });
+      }
+      const key = observation.missing.observation;
+      if (observation.value !== null) {
+        const base = floored(rule, observation.value);
+        return known(base.add(addendOf(rule)), "DERIVED", {
+          benchmarkId: rule.benchmarkId,
+          observation: key,
+          value: observation.raw,
+          flooredValue: fraction(base),
+        });
+      }
+      return {
+        kind: "pending",
+        pending: {
+          period,
+          missing: observation.missing,
+          absent: absent(key),
+          key,
+        },
+      };
     };
+    switch (rule.type) {
+      case "FIXED":
+        return known(parseDecimal(rule.annualRate, "annualRate"), "TERMS");
+      case "BENCHMARK_PLUS_SPREAD":
+      case "INFLATION_PLUS_MARGIN_AS_RATE":
+        return benchmarkPeriod(rule);
+      default:
+        return assertNever(rule);
+    }
   });
   return { rule, planned, assumption, publisher };
 }
@@ -384,12 +397,13 @@ export function ratesWithStarted(
   started: number,
 ): RateResolution {
   const { rule, assumption } = plan;
+  const benchmarkRule = benchmarkRuleOf(rule);
   let usedAssumption = false;
   let projectionNeeded = false;
   const rates = plan.planned.map((entry): PeriodRate => {
     if (entry.kind === "final") return entry.rate;
     const { period, missing, absent, key } = entry.pending;
-    const addend = rule.type === "FIXED" ? null : fraction(addendOf(rule));
+    const addend = benchmarkRule ? fraction(addendOf(benchmarkRule)) : null;
     if (period.index <= started) {
       return {
         period,
@@ -400,7 +414,7 @@ export function ratesWithStarted(
         addend,
       };
     }
-    if (assumption === null || rule.type === "FIXED") {
+    if (assumption === null || benchmarkRule === null) {
       projectionNeeded = true;
       return {
         period,
@@ -412,15 +426,15 @@ export function ratesWithStarted(
       };
     }
     usedAssumption = true;
-    const base = floored(rule, assumption.value);
+    const base = floored(benchmarkRule, assumption.value);
     return {
       period,
-      rate: base.add(addendOf(rule)),
+      rate: base.add(addendOf(benchmarkRule)),
       source: "PROJECTED",
       missing: null,
       addend,
       benchmark: {
-        benchmarkId: rule.benchmarkId,
+        benchmarkId: benchmarkRule.benchmarkId,
         observation: key,
         value: fraction(assumption.value),
         flooredValue: fraction(base),
@@ -431,8 +445,13 @@ export function ratesWithStarted(
     rates,
     assumptions: usedAssumption && assumption ? [assumption.entry] : [],
     projectionMissing:
-      projectionNeeded && rule.type !== "FIXED"
-        ? [{ benchmarkId: rule.benchmarkId, publisher: plan.publisher }]
+      projectionNeeded && benchmarkRule
+        ? [
+            {
+              benchmarkId: benchmarkRule.benchmarkId,
+              publisher: plan.publisher,
+            },
+          ]
         : [],
   };
 }

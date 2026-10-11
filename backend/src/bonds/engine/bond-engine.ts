@@ -1,4 +1,6 @@
-import { compareYMD, daysBetween, isValidYMD } from "../domain/calendar-date";
+import { assertNever } from "../domain/assert-never";
+import { benchmarkFieldsOf } from "../domain/bond-terms";
+import { compareYMD, isValidYMD } from "../domain/calendar-date";
 import { ExactDecimal } from "../domain/exact-decimal";
 import { buildSchedule, SchedulePeriod } from "../domain/period-schedule";
 import {
@@ -6,7 +8,8 @@ import {
   compounds,
   couponOf,
   maturityValue,
-  nominalOf,
+  principalAt,
+  PricedPeriod,
   roundMoney,
   valueAt,
 } from "./accrual";
@@ -40,8 +43,8 @@ import {
 export * from "./bond-engine-types";
 
 interface RateInputs {
-  readonly prior: readonly ExactDecimal[];
-  readonly rate: ExactDecimal;
+  readonly prior: readonly PricedPeriod[];
+  readonly current: PricedPeriod;
 }
 
 /**
@@ -53,15 +56,16 @@ function inputsFor(
   rates: readonly PeriodRate[],
   k: number,
 ): RateInputs | null {
-  const current = rates[k - 1].rate;
-  if (current === null) return null;
-  if (!compounding) return { prior: [], rate: current };
-  const prior: ExactDecimal[] = [];
+  const entry = rates[k - 1];
+  if (entry.rate === null) return null;
+  const current = { period: entry.period, rate: entry.rate };
+  if (!compounding) return { prior: [], current };
+  const prior: PricedPeriod[] = [];
   for (const earlier of rates.slice(0, k - 1)) {
     if (earlier.rate === null) return null;
-    prior.push(earlier.rate);
+    prior.push({ period: earlier.period, rate: earlier.rate });
   }
-  return { prior, rate: current };
+  return { prior, current };
 }
 
 type LotInput = Omit<BondEngineInput, "asOf">;
@@ -123,27 +127,40 @@ function neededMissing(
   return missing;
 }
 
-function describeRule(
-  rule: BondEngineInput["terms"]["rateRule"],
+function benchmarkDescription(
+  rule: Exclude<BondEngineInput["terms"]["rateRule"], { type: "FIXED" }>,
+  addend: string,
 ): RateRuleDescription {
-  if (rule.type === "FIXED") {
-    return {
-      type: rule.type,
-      benchmarkId: null,
-      annualRate: rule.annualRate,
-      firstPeriodRate: null,
-      addend: null,
-      benchmarkFloor: null,
-    };
-  }
   return {
     type: rule.type,
     benchmarkId: rule.benchmarkId,
     annualRate: null,
     firstPeriodRate: rule.firstPeriodRate,
-    addend: rule.type === "BENCHMARK_PLUS_SPREAD" ? rule.spread : rule.margin,
+    addend,
     benchmarkFloor: rule.benchmarkFloor,
   };
+}
+
+function describeRule(
+  rule: BondEngineInput["terms"]["rateRule"],
+): RateRuleDescription {
+  switch (rule.type) {
+    case "FIXED":
+      return {
+        type: rule.type,
+        benchmarkId: null,
+        annualRate: rule.annualRate,
+        firstPeriodRate: null,
+        addend: null,
+        benchmarkFloor: null,
+      };
+    case "BENCHMARK_PLUS_SPREAD":
+      return benchmarkDescription(rule, rule.spread);
+    case "INFLATION_PLUS_MARGIN_AS_RATE":
+      return benchmarkDescription(rule, rule.margin);
+    default:
+      return assertNever(rule);
+  }
 }
 
 function describeSchedule(
@@ -181,7 +198,6 @@ interface PreparedLot {
   readonly schedule: readonly SchedulePeriod[];
   readonly lastPeriod: SchedulePeriod;
   readonly maturity: string;
-  readonly nominal: ExactDecimal;
   readonly places: number;
   readonly quantity: ExactDecimal;
   readonly plan: RatePlan;
@@ -205,13 +221,24 @@ function saleWindowRefusal(input: LotInput): BondValuationRefusal | null {
   };
 }
 
+/** The periods of the lot from the terms' schedule anchor. */
+function scheduleOf(input: LotInput): readonly SchedulePeriod[] {
+  const { schedule } = input.terms;
+  switch (schedule.anchor) {
+    case "LOT_PURCHASE_DATE":
+      return buildSchedule(
+        input.lot.purchaseDate,
+        schedule.periodCount,
+        schedule.periodMonths,
+      );
+    default:
+      return assertNever(schedule.anchor);
+  }
+}
+
 function prepare(input: LotInput): PreparedLot {
   const { terms } = input;
-  const schedule = buildSchedule(
-    input.lot.purchaseDate,
-    terms.schedule.periodCount,
-    terms.schedule.periodMonths,
-  );
+  const schedule = scheduleOf(input);
   const lastPeriod = schedule[schedule.length - 1];
   return {
     input,
@@ -219,7 +246,6 @@ function prepare(input: LotInput): PreparedLot {
     schedule,
     lastPeriod,
     maturity: lastPeriod.end,
-    nominal: nominalOf(terms),
     places: terms.rounding.moneyDecimals,
     quantity: ExactDecimal.fromInt(input.lot.quantity),
     plan: planPeriodRates(input, schedule),
@@ -239,7 +265,7 @@ function resolvedFor(p: PreparedLot, started: number): Resolved {
     ...resolution,
     rateSchedule: describeSchedule(terms, rates),
     maturityPerBond: maturityInputs
-      ? maturityValue(terms, maturityInputs.prior, maturityInputs.rate)
+      ? maturityValue(terms, maturityInputs.prior, maturityInputs.current)
       : null,
     maturityProjected: p.compounding
       ? rates.some((r) => r.source === "PROJECTED")
@@ -267,7 +293,7 @@ function figuresOn(p: PreparedLot, asOf: string): DayFigures {
   const { terms, calendars } = p.input;
   const started = startedPeriods(p.schedule, asOf);
   const { rates } = resolvedFor(p, started);
-  const { compounding, nominal, places, lastPeriod } = p;
+  const { compounding, places, lastPeriod } = p;
   const lot = (perBond: ExactDecimal) =>
     perBond.mul(p.quantity).toFixed(places);
 
@@ -293,13 +319,15 @@ function figuresOn(p: PreparedLot, asOf: string): DayFigures {
     if (!compounding) {
       // A coupon bond redeems at its nominal whatever the rates were; its last
       // coupon is a past cash flow, so no rate is needed for the value.
+      const nominal = principalAt(terms, { date: p.maturity });
       principal = nominal.toFixed(places);
       gross = lot(nominal);
       accrued = lot(nominal.sub(nominal));
     } else {
       const inputs = inputsFor(compounding, rates, lastPeriod.index);
       if (inputs) {
-        const perBond = maturityValue(terms, inputs.prior, inputs.rate);
+        const perBond = maturityValue(terms, inputs.prior, inputs.current);
+        const nominal = principalAt(terms, { date: p.maturity });
         principal = perBond.toFixed(places);
         gross = lot(perBond);
         accrued = lot(perBond.sub(nominal));
@@ -308,29 +336,15 @@ function figuresOn(p: PreparedLot, asOf: string): DayFigures {
   } else if (current) {
     const inputs = inputsFor(compounding, rates, current.index);
     if (inputs) {
-      const accruedDays = daysBetween(current.start, asOf);
-      const value = valueAt(
-        terms,
-        inputs.prior,
-        inputs.rate,
-        accruedDays,
-        current.days,
-      );
+      const value = valueAt(terms, inputs.prior, inputs.current, asOf);
+      const base = baseAt(terms, inputs.prior, { date: current.start });
+      const nominal = principalAt(terms, { date: asOf });
       const grossBond = roundMoney(terms, value);
-      principal = roundMoney(terms, baseAt(terms, inputs.prior)).toFixed(
-        places,
-      );
+      principal = roundMoney(terms, base).toFixed(places);
       gross = lot(grossBond);
       accrued = lot(grossBond.sub(nominal));
       if (refusal === null)
-        early = lot(
-          proceedsPerBond(
-            terms,
-            value,
-            baseAt(terms, inputs.prior),
-            current.index,
-          ),
-        );
+        early = lot(proceedsPerBond(terms, value, base, current.index, asOf));
     } else if (refusal === null) {
       refusal = "RATE_UNKNOWN";
     }
@@ -371,6 +385,9 @@ function refusedValuation(
     grossValue: null,
     earlyRedemptionValue: null,
     earlyRedemptionRefusal: null,
+    nextPayment: [],
+    nextRateReset: null,
+    nextCapitalization: null,
     knownCashflows: [],
     projectedCashflows: [],
     maturityValueKnown: null,
@@ -389,6 +406,27 @@ function refusedValuation(
   };
 }
 
+/** Every cash flow dated on the earliest date among `cashflows`, which are all after asOf. */
+function nextPaymentOf(cashflows: readonly CashFlow[]): CashFlow[] {
+  if (cashflows.length === 0) return [];
+  const next = cashflows.reduce(
+    (earliest, c) => (compareYMD(c.date, earliest) < 0 ? c.date : earliest),
+    cashflows[0].date,
+  );
+  return cashflows.filter((c) => c.date === next);
+}
+
+/** The next period's start when the rate reads a benchmark and a next period exists. */
+function nextRateResetOf(
+  p: PreparedLot,
+  current: SchedulePeriod | null,
+): string | null {
+  if (current === null || benchmarkFieldsOf(p.input.terms.rateRule) === null)
+    return null;
+  const next = p.schedule[current.index];
+  return next === undefined ? null : next.start;
+}
+
 /** The whole valuation of an already validated day of a prepared lot. */
 function valueOn(p: PreparedLot, asOf: string): BondValuation {
   if (p.saleRefusal) return refusedValuation(p, asOf, p.saleRefusal);
@@ -397,7 +435,7 @@ function valueOn(p: PreparedLot, asOf: string): BondValuation {
   const { matured, current, started } = figures;
   const resolved = resolvedFor(p, started);
   const { rates, maturityPerBond, maturityProjected } = resolved;
-  const { compounding, nominal, lastPeriod } = p;
+  const { compounding, lastPeriod } = p;
   const lot = (perBond: ExactDecimal) =>
     perBond.mul(p.quantity).toFixed(p.places);
   const currentRate = current ? rates[current.index - 1] : null;
@@ -419,12 +457,23 @@ function valueOn(p: PreparedLot, asOf: string): BondValuation {
     for (const period of p.schedule) {
       if (compareYMD(period.end, asOf) <= 0) continue;
       const rate = rates[period.index - 1];
-      const coupon = rate.rate === null ? null : couponOf(terms, rate.rate);
+      const coupon =
+        rate.rate === null
+          ? null
+          : couponOf(terms, { period, rate: rate.rate });
       cashflows.push(
         flow(period, "INTEREST", coupon, rate.source === "PROJECTED"),
       );
     }
-    if (!matured) cashflows.push(flow(lastPeriod, "PRINCIPAL", nominal, false));
+    if (!matured)
+      cashflows.push(
+        flow(
+          lastPeriod,
+          "PRINCIPAL",
+          principalAt(terms, { date: lastPeriod.end }),
+          false,
+        ),
+      );
   } else if (!matured) {
     cashflows.push(
       flow(lastPeriod, "PRINCIPAL", maturityPerBond, maturityProjected),
@@ -470,6 +519,12 @@ function valueOn(p: PreparedLot, asOf: string): BondValuation {
     grossValue: figures.gross,
     earlyRedemptionValue: figures.early,
     earlyRedemptionRefusal: figures.refusal,
+    nextPayment: nextPaymentOf(cashflows),
+    nextRateReset: nextRateResetOf(p, current),
+    nextCapitalization:
+      compounding && current && current.index < lastPeriod.index
+        ? current.end
+        : null,
     knownCashflows: cashflows.filter((c) => c.status === "KNOWN"),
     projectedCashflows: cashflows.filter((c) => c.status !== "KNOWN"),
     maturityValueKnown:
@@ -527,7 +582,7 @@ export function valueBondLotSeries(
 export interface GrossValuePoint {
   readonly asOf: string;
   readonly status: BondLotStatus;
-  /** The lot's gross value, 2 decimals; null when it cannot be worked out or the lot is REFUSED. */
+  /** The lot's gross value, in the terms' money decimals; null when it cannot be worked out or the lot is REFUSED. */
   readonly grossValue: string | null;
 }
 

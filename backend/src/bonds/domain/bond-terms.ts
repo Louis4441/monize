@@ -1,5 +1,6 @@
 import { isValidYMD } from "./calendar-date";
-import { ExactDecimal } from "./exact-decimal";
+import { assertNever } from "./assert-never";
+import { ExactDecimal, RoundingMode } from "./exact-decimal";
 
 export type StepObservation = {
   readonly type: "STEP_VALUE_ON_NTH_BUSINESS_DAY_BEFORE_START_MONTH";
@@ -14,7 +15,7 @@ export type MonthlyObservation = {
 
 export type ObservationRule = StepObservation | MonthlyObservation;
 
-interface BenchmarkRuleFields {
+export interface BenchmarkRuleFields {
   readonly benchmarkId: string;
   /** Null: period 1 is derived like every other period. */
   readonly firstPeriodRate: string | null;
@@ -32,6 +33,26 @@ export type RateRule =
       readonly type: "INFLATION_PLUS_MARGIN_AS_RATE";
       readonly margin: string;
     } & BenchmarkRuleFields);
+
+export type BenchmarkRule = Exclude<RateRule, { readonly type: "FIXED" }>;
+
+/** The rule when it reads a benchmark, null for a fixed rate; exhaustive over the rule types. */
+export function benchmarkRuleOf(rule: RateRule): BenchmarkRule | null {
+  switch (rule.type) {
+    case "FIXED":
+      return null;
+    case "BENCHMARK_PLUS_SPREAD":
+    case "INFLATION_PLUS_MARGIN_AS_RATE":
+      return rule;
+    default:
+      return assertNever(rule);
+  }
+}
+
+/** The benchmark fields of a rule that reads a benchmark, null for a fixed rate. */
+export function benchmarkFieldsOf(rule: RateRule): BenchmarkRuleFields | null {
+  return benchmarkRuleOf(rule);
+}
 
 export type Capitalization =
   | { readonly type: "NONE" }
@@ -96,7 +117,10 @@ export interface BondTerms {
   readonly rateRule: RateRule;
   readonly capitalization: Capitalization;
   readonly redemption: Redemption;
-  readonly rounding: { readonly moneyDecimals: 2; readonly mode: "HALF_UP" };
+  readonly rounding: {
+    readonly moneyDecimals: 0 | 1 | 2 | 3 | 4;
+    readonly mode: RoundingMode;
+  };
   readonly source: {
     readonly provider: string;
     readonly url: string;
@@ -196,6 +220,29 @@ function integer(value: unknown, path: string, min: number): number {
     throw new BondTermsError(path, `must be an integer >= ${min}`);
   }
   return value as number;
+}
+
+function moneyDecimals(value: unknown, path: string): 0 | 1 | 2 | 3 | 4 {
+  if (value !== 0 && value !== 1 && value !== 2 && value !== 3 && value !== 4) {
+    throw new BondTermsError(path, "must be an integer from 0 to 4");
+  }
+  return value;
+}
+
+/** An unknown mode is an unsupported primitive, like an unknown `type`. */
+function roundingMode(value: unknown, path: string): RoundingMode {
+  if (typeof value !== "string") {
+    throw new BondTermsError(path, "must be a string");
+  }
+  const known: readonly RoundingMode[] = ["HALF_UP", "HALF_EVEN", "DOWN"];
+  if (!known.includes(value as RoundingMode)) {
+    throw new BondTermsError(
+      path,
+      `unsupported rounding mode ${JSON.stringify(value)}; supported: ${known.join(", ")}`,
+      "UNSUPPORTED_PRIMITIVE",
+    );
+  }
+  return value as RoundingMode;
 }
 
 /** A non-negative decimal string; a JSON number is refused (INV-BOND-003). */
@@ -477,12 +524,11 @@ export function parseBondTerms(json: unknown): BondTerms {
     ),
     redemption: parseRedemption(t.redemption, "terms.redemption"),
     rounding: {
-      moneyDecimals: exact(
+      moneyDecimals: moneyDecimals(
         rounding.moneyDecimals,
         "terms.rounding.moneyDecimals",
-        2,
       ),
-      mode: exact(rounding.mode, "terms.rounding.mode", "HALF_UP"),
+      mode: roundingMode(rounding.mode, "terms.rounding.mode"),
     },
     source: {
       provider: text(source.provider, "terms.source.provider"),

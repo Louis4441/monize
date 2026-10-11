@@ -3,11 +3,11 @@ import {
   BusinessDayCalendar,
   nthBusinessDayBefore,
 } from "../domain/business-day-calendar";
-import { BondTerms } from "../domain/bond-terms";
+import { BondTerms, benchmarkFieldsOf } from "../domain/bond-terms";
 import { addDays, compareYMD } from "../domain/calendar-date";
 import { ExactDecimal } from "../domain/exact-decimal";
 import { SchedulePeriod } from "../domain/period-schedule";
-import { roundMoney, nominalOf } from "./accrual";
+import { roundMoney, principalAt } from "./accrual";
 import { EarlyRedemptionRefusal } from "./bond-engine-types";
 
 /** Why a request on `asOf` is refused by the window rules, or null when it is allowed. */
@@ -75,6 +75,7 @@ export function proceedsPerBond(
   valueBeforePenalty: ExactDecimal,
   periodBase: ExactDecimal,
   periodIndex: number,
+  asOf: string,
 ): ExactDecimal {
   const redemption = terms.redemption;
   if (redemption.type !== "ON_DEMAND")
@@ -95,7 +96,7 @@ export function proceedsPerBond(
   switch (floor.type) {
     case "FACE_VALUE":
       return floor.appliesTo === "ALL_PERIODS" || periodIndex === 1
-        ? ExactDecimal.max(net, nominalOf(terms))
+        ? ExactDecimal.max(net, principalAt(terms, { date: asOf }))
         : net;
     default:
       return assertNever(floor.type);
@@ -105,13 +106,11 @@ export function proceedsPerBond(
 /** Every calendar id the terms refer to. */
 export function referencedCalendarIds(terms: BondTerms): ReadonlySet<string> {
   const ids = new Set<string>([terms.schedule.calendarId]);
-  const rule = terms.rateRule;
+  const observation = benchmarkFieldsOf(terms.rateRule)?.observation;
   if (
-    rule.type !== "FIXED" &&
-    rule.observation.type ===
-      "STEP_VALUE_ON_NTH_BUSINESS_DAY_BEFORE_START_MONTH"
+    observation?.type === "STEP_VALUE_ON_NTH_BUSINESS_DAY_BEFORE_START_MONTH"
   ) {
-    ids.add(rule.observation.calendarId);
+    ids.add(observation.calendarId);
   }
   if (terms.redemption.type === "ON_DEMAND") {
     terms.redemption.blackouts.forEach((b) => ids.add(b.calendarId));

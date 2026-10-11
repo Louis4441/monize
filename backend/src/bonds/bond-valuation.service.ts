@@ -5,7 +5,11 @@ import { loadBondLedger } from "./bond-ledger";
 import { BondLotsRefusal, bondLotsAsOf } from "./bond-lots";
 import { BenchmarkData } from "./domain/benchmark";
 import { ExactDecimal } from "./domain/exact-decimal";
-import { BondTerms, parseBondTerms } from "./domain/bond-terms";
+import {
+  benchmarkFieldsOf,
+  BondTerms,
+  parseBondTerms,
+} from "./domain/bond-terms";
 import { BOND_CALENDARS } from "./bond-adapters";
 import {
   BondDataInconsistentError,
@@ -130,8 +134,8 @@ function summarize(row: InstrumentRow): BondInstrumentSummary {
  * nothing and return figures that look like a scenario; refuse it instead.
  */
 function assertReadsBenchmark(terms: BondTerms, benchmarkId: string): void {
-  const rule = terms.rateRule;
-  if (rule.type === "FIXED" || rule.benchmarkId !== benchmarkId) {
+  const fields = benchmarkFieldsOf(terms.rateRule);
+  if (fields === null || fields.benchmarkId !== benchmarkId) {
     throw new BondEngineError(
       "BENCHMARK_NOT_READ",
       { series: terms.instrument.seriesCode, benchmarkId },
@@ -467,8 +471,9 @@ export class BondValuationService {
     m: EntityManager,
     terms: BondTerms,
   ): Promise<BenchmarkCoverage[]> {
-    if (terms.rateRule.type === "FIXED") return [];
-    const code = terms.rateRule.benchmarkId;
+    const fields = benchmarkFieldsOf(terms.rateRule);
+    if (fields === null) return [];
+    const code = fields.benchmarkId;
     const rows: Array<{
       covered_through: string | null;
       updated_at: Date | string | null;
@@ -498,8 +503,9 @@ export class BondValuationService {
     terms: BondTerms,
   ): Promise<ReadonlyMap<string, BenchmarkData>> {
     const benchmarks = new Map<string, BenchmarkData>();
-    if (terms.rateRule.type === "FIXED") return benchmarks;
-    const code = terms.rateRule.benchmarkId;
+    const fields = benchmarkFieldsOf(terms.rateRule);
+    if (fields === null) return benchmarks;
+    const code = fields.benchmarkId;
 
     const series: Array<{
       kind: "STEP" | "MONTHLY";

@@ -346,15 +346,43 @@ describe("parseBondTerms", () => {
     expect(refusalOf((d) => (d.schedule.calendarId = "")).field).toBe(
       "terms.schedule.calendarId",
     );
-    expect(refusalOf((d) => (d.rounding.mode = "DOWN")).field).toBe(
-      "terms.rounding.mode",
-    );
-    expect(refusalOf((d) => (d.rounding.moneyDecimals = 4)).field).toBe(
+    expect(refusalOf((d) => (d.rounding.moneyDecimals = 5)).field).toBe(
       "terms.rounding.moneyDecimals",
     );
+    expect(refusalOf((d) => (d.rounding.moneyDecimals = 2.5)).field).toBe(
+      "terms.rounding.moneyDecimals",
+    );
+    expect(refusalOf((d) => (d.rounding.moneyDecimals = "2")).field).toBe(
+      "terms.rounding.moneyDecimals",
+    );
+    expect(refusalOf((d) => (d.rounding.moneyDecimals = -1)).code).toBe(
+      "INVALID",
+    );
+    expect(refusalOf((d) => (d.rounding.mode = 1)).code).toBe("INVALID");
     expect(refusalOf((d) => (d.source.url = "")).field).toBe(
       "terms.source.url",
     );
+  });
+
+  it("accepts moneyDecimals 0..4 and the three rounding modes", () => {
+    for (const moneyDecimals of [0, 1, 2, 3, 4]) {
+      const terms = parseBondTerms(
+        mutated("ror1027", (d) => (d.rounding.moneyDecimals = moneyDecimals)),
+      );
+      expect(terms.rounding.moneyDecimals).toBe(moneyDecimals);
+    }
+    for (const mode of ["HALF_UP", "HALF_EVEN", "DOWN"]) {
+      const terms = parseBondTerms(
+        mutated("ror1027", (d) => (d.rounding.mode = mode)),
+      );
+      expect(terms.rounding.mode).toBe(mode);
+    }
+  });
+
+  it("an unknown rounding mode is an unsupported primitive", () => {
+    const error = refusalOf((d) => (d.rounding.mode = "UP"));
+    expect(error.field).toBe("terms.rounding.mode");
+    expect(error.code).toBe("UNSUPPORTED_PRIMITIVE");
   });
 
   it("refuses bad redemption values", () => {
