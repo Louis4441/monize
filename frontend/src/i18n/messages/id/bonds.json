@@ -1,17 +1,6 @@
 {
-  "page": {
-    "title": "Obligasi pemerintah",
-    "subtitle": "Obligasi yang dijual hari ini dan bagaimana ketentuan tiap produk berubah dari satu bulan penjualan ke bulan berikutnya",
-    "tabsLabel": "Tampilan obligasi pemerintah",
-    "tabs": {
-      "onSale": "Sedang dijual",
-      "history": "Riwayat"
-    }
-  },
   "entry": {
-    "compare": "Bandingkan dengan penawaran saat ini",
-    "history": "Riwayat ketentuan {program}",
-    "seeOnSale": "Lihat obligasi yang sedang dijual"
+    "history": "Riwayat ketentuan {program}"
   },
   "offer": {
     "loading": "Memuat obligasi yang sedang dijual...",
@@ -42,8 +31,7 @@
       "maturityValue": "Nilai jatuh tempo",
       "totalReturn": "Total imbal hasil",
       "annualizedReturn": "Imbal hasil tahunan",
-      "terms": "Ketentuan",
-      "action": "Tindakan"
+      "terms": "Ketentuan"
     },
     "saleWindowValue": "{from} sampai {to}",
     "lengthValue": "{months, plural, other {# bulan}}",
@@ -62,21 +50,12 @@
       "fee": "Biaya {amount} per obligasi",
       "forfeit": "Bunga yang berjalan dalam periode hangus"
     },
-    "couponsNotReinvested": "Kupon tidak diinvestasikan kembali",
-    "add": "Tambahkan ke portofolio saya",
-    "addAria": "Tambahkan {series} ke portofolio saya",
-    "fetchNow": "Ambil penawaran saat ini sekarang",
-    "fetching": "Mengambil penawaran saat ini...",
-    "fetchDone": "Penawaran diambil: {listed} seri terdaftar, {stored} baru disimpan, {alreadyStored} sudah tersimpan, {failed} gagal.",
-    "fetchFailed": "Penawaran saat ini tidak dapat diambil.",
-    "addFailed": "Jenis obligasi tidak dapat ditemukan. Coba lagi."
+    "couponsNotReinvested": "Kupon tidak diinvestasikan kembali"
   },
   "history": {
-    "product": "Produk",
     "loading": "Memuat riwayat...",
     "loadFailed": "Riwayat tidak dapat dimuat.",
     "retry": "Coba lagi",
-    "noProducts": "Katalog belum memuat produk obligasi apa pun.",
     "empty": "Belum ada seri produk ini yang tersimpan.",
     "coverage": "Katalog mencakup {from} sampai {to}.",
     "rateChartTitle": "Suku bunga periode pertama dan margin menurut bulan penjualan",

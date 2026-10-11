@@ -254,18 +254,6 @@ describe('SecurityBondCard', () => {
     expect(within(row).getByText(/Known\s+\$1,200\.00/)).toBeInTheDocument();
   });
 
-  it('links to the current offer and to the history of the instrument\'s program', async () => {
-    await mount();
-    expect(screen.getByRole('link', { name: 'Compare with the current offer' })).toHaveAttribute(
-      'href',
-      '/securities/bonds',
-    );
-    expect(screen.getByRole('link', { name: 'History of RETAIL terms' })).toHaveAttribute(
-      'href',
-      '/securities/bonds?tab=history&program=RETAIL',
-    );
-  });
-
   it('links the terms document when the terms were read from the official source', async () => {
     get.mockResolvedValue(
       response({

@@ -1,17 +1,6 @@
 {
-  "page": {
-    "title": "Obligacje skarbowe",
-    "subtitle": "Obligacje w sprzedaży dziś i zmiany warunków każdego produktu z miesiąca na miesiąc sprzedaży",
-    "tabsLabel": "Widoki obligacji skarbowych",
-    "tabs": {
-      "onSale": "W sprzedaży",
-      "history": "Historia"
-    }
-  },
   "entry": {
-    "compare": "Porównaj z aktualną ofertą",
-    "history": "Historia warunków {program}",
-    "seeOnSale": "Zobacz obligacje w sprzedaży"
+    "history": "Historia warunków {program}"
   },
   "offer": {
     "loading": "Wczytywanie obligacji w sprzedaży...",
@@ -42,8 +31,7 @@
       "maturityValue": "Wartość w terminie wykupu",
       "totalReturn": "Zwrot łączny",
       "annualizedReturn": "Zwrot w skali roku",
-      "terms": "Warunki",
-      "action": "Akcja"
+      "terms": "Warunki"
     },
     "saleWindowValue": "{from} do {to}",
     "lengthValue": "{months, plural, one {# miesiąc} few {# miesiące} many {# miesięcy} other {# miesiąca}}",
@@ -62,21 +50,12 @@
       "fee": "Opłata {amount} za obligację",
       "forfeit": "Odsetki naliczone w okresie przepadają"
     },
-    "couponsNotReinvested": "Kupony bez reinwestycji",
-    "add": "Dodaj do mojego portfela",
-    "addAria": "Dodaj {series} do mojego portfela",
-    "fetchNow": "Pobierz bieżącą ofertę teraz",
-    "fetching": "Pobieranie bieżącej oferty...",
-    "fetchDone": "Oferta pobrana: serii na liście {listed}, nowo zapisanych {stored}, już zapisanych {alreadyStored}, nieudanych {failed}.",
-    "fetchFailed": "Nie udało się pobrać bieżącej oferty.",
-    "addFailed": "Nie udało się znaleźć rodzaju obligacji. Spróbuj ponownie."
+    "couponsNotReinvested": "Kupony bez reinwestycji"
   },
   "history": {
-    "product": "Produkt",
     "loading": "Wczytywanie historii...",
     "loadFailed": "Nie udało się wczytać historii.",
     "retry": "Spróbuj ponownie",
-    "noProducts": "Katalog nie zawiera jeszcze żadnego produktu obligacyjnego.",
     "empty": "Żadna seria tego produktu nie jest jeszcze zapisana.",
     "coverage": "Katalog obejmuje okres od {from} do {to}.",
     "rateChartTitle": "Oprocentowanie pierwszego okresu i marża według miesiąca sprzedaży",

@@ -43,7 +43,6 @@ import type {
   BondProgramSummary,
   BondSeriesHoldings,
   BondSeriesOnSale,
-  FetchBondOfferResult,
   FetchBondSeriesResult,
   BondAssumption,
   BondHistory,
@@ -970,15 +969,6 @@ export const investmentsApi = {
   // data, identical for every user, so it is not cached per user here.
   listBondPrograms: async (): Promise<BondProgramSummary[]> => {
     const response = await apiClient.get<BondProgramSummary[]>('/bonds/programs');
-    return response.data;
-  },
-
-  // Reads every series of the country's current offer that is not stored yet
-  // (user-initiated, throttled server-side: a 429 carries its own message).
-  fetchBondOffer: async (countryCode: string): Promise<FetchBondOfferResult> => {
-    const response = await apiClient.post<FetchBondOfferResult>('/bonds/offer/fetch', {
-      countryCode,
-    });
     return response.data;
   },
 

@@ -102,9 +102,7 @@ page and in the form. The daily series cron fetches the current offer and runs
 the backfill only for the programs that at least one security has switched
 on (read in the cron's system context; it reads program ids, never anything
 else of the user). Without it, a series enters the catalog by a fetch from
-the purchase form, or by the "fetch the current offer
-now" action of the bonds view (user-initiated, throttled like the series
-fetch).
+the purchase form, or through the security's Refresh (user-initiated).
 
 The cron's filter is by design: the owner asked for an opt-in, so a program
 nobody switched on is never fetched in the background. Without any opt-in the
@@ -164,10 +162,9 @@ so none acts on them until a person does.
 
 ### 3.1 Treasury bonds view
 
-Moves from `/investments/bonds` to `/securities/bonds`, reached from the
-Securities page header ("Treasury bonds"); the Investments header button is
-removed and its links point to the new route. It gains the "fetch the current
-offer now" action.
+Removed as a page: the on-sale and history views live on the bond security's
+detail page (3.4), and the data comes through the security's Refresh. There is
+no `/securities/bonds` route and no "fetch the current offer now" button.
 
 ### 3.2 Security form
 

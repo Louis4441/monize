@@ -1,17 +1,6 @@
 {
-  "page": {
-    "title": "Obrigações do Tesouro",
-    "subtitle": "As obrigações à venda hoje e como mudaram as condições de cada produto de um mês de venda para o seguinte",
-    "tabsLabel": "Vistas das obrigações do Tesouro",
-    "tabs": {
-      "onSale": "À venda",
-      "history": "Histórico"
-    }
-  },
   "entry": {
-    "compare": "Comparar com a oferta atual",
-    "history": "Histórico das condições de {program}",
-    "seeOnSale": "Ver obrigações à venda"
+    "history": "Histórico das condições de {program}"
   },
   "offer": {
     "loading": "A carregar as obrigações à venda...",
@@ -42,8 +31,7 @@
       "maturityValue": "Valor no vencimento",
       "totalReturn": "Rendibilidade total",
       "annualizedReturn": "Rendibilidade anualizada",
-      "terms": "Condições",
-      "action": "Ação"
+      "terms": "Condições"
     },
     "saleWindowValue": "De {from} a {to}",
     "lengthValue": "{months, plural, one {# mês} other {# meses}}",
@@ -62,21 +50,12 @@
       "fee": "Comissão de {amount} por obrigação",
       "forfeit": "Os juros acumulados no período perdem-se"
     },
-    "couponsNotReinvested": "Cupões não reinvestidos",
-    "add": "Adicionar à minha carteira",
-    "addAria": "Adicionar {series} à minha carteira",
-    "fetchNow": "Obter agora a oferta atual",
-    "fetching": "A obter a oferta atual...",
-    "fetchDone": "Oferta obtida: {listed} séries listadas, {stored} guardadas agora, {alreadyStored} já guardadas, {failed} com falha.",
-    "fetchFailed": "Não foi possível obter a oferta atual.",
-    "addFailed": "Não foi possível encontrar o tipo de obrigação. Tente novamente."
+    "couponsNotReinvested": "Cupões não reinvestidos"
   },
   "history": {
-    "product": "Produto",
     "loading": "A carregar o histórico...",
     "loadFailed": "Não foi possível carregar o histórico.",
     "retry": "Tentar novamente",
-    "noProducts": "O catálogo ainda não contém nenhum produto de obrigações.",
     "empty": "Ainda não há nenhuma série deste produto guardada.",
     "coverage": "O catálogo abrange de {from} a {to}.",
     "rateChartTitle": "Taxa do primeiro período e margem por mês de venda",

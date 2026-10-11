@@ -1,8 +1,7 @@
 'use client';
 
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
-import toast from 'react-hot-toast';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -34,15 +33,8 @@ import {
 import type { BondOffer, OfferSeries } from '@/types/bond';
 
 interface BondOfferTabProps {
-  /**
-   * The reader chose "Add to my portfolio" on a series. Without it the table
-   * has no action column (a security's own page offers nothing to add).
-   */
-  onAdd?: (series: OfferSeries) => void;
   /** Only the series of this program are listed; every program when omitted. */
   programCode?: string;
-  /** Offer the "Fetch the current offer now" action. */
-  allowFetch?: boolean;
 }
 
 interface LatestObservation {
@@ -66,7 +58,7 @@ const ASSUMPTION_DEBOUNCE_MS = 500;
  * assumption wears the "Projected" badge; one the engine cannot value is
  * unknown, with the reason beside it, never a zero.
  */
-export function BondOfferTab({ onAdd, programCode, allowFetch = false }: BondOfferTabProps) {
+export function BondOfferTab({ programCode }: BondOfferTabProps) {
   const t = useTranslations('bonds');
   const tSec = useTranslations('securityDetail');
   const { formatDate, formatMonth } = useDateFormat();
@@ -82,9 +74,6 @@ export function BondOfferTab({ onAdd, programCode, allowFetch = false }: BondOff
   // The latest published value of each benchmark, kept from the answers that
   // carried it: once the reader supplies a value the response no longer says so.
   const [latest, setLatest] = useState<Record<string, LatestObservation>>({});
-  const [isFetching, setIsFetching] = useState(false);
-  // Set synchronously, so two clicks in one tick cannot both send.
-  const fetchInFlight = useRef(false);
 
   const sentTyped = useDebouncedValue(typed, ASSUMPTION_DEBOUNCE_MS);
   const sent = useMemo(() => buildAssumptions(sentTyped), [sentTyped]);
@@ -144,25 +133,6 @@ export function BondOfferTab({ onAdd, programCode, allowFetch = false }: BondOff
     [offer, sort, programCode],
   );
   const hasCoupons = rows.some((s) => s.capitalization === 'NONE' && s.periodCount > 1);
-
-  // Reads the series of the current offer that are not stored yet, then shows
-  // the offer again. A refusal (the throttle's 429 included) is the server's
-  // own message, said as it is.
-  const handleFetchOffer = async () => {
-    if (fetchInFlight.current) return;
-    fetchInFlight.current = true;
-    setIsFetching(true);
-    try {
-      const result = await investmentsApi.fetchBondOffer(BOND_OFFER_COUNTRY);
-      toast.success(t('offer.fetchDone', { ...result }));
-      reload();
-    } catch (err) {
-      toast.error(getErrorMessage(err, t('offer.fetchFailed')));
-    } finally {
-      fetchInFlight.current = false;
-      setIsFetching(false);
-    }
-  };
 
   const handleSort = (field: OfferSortField) =>
     setSort((prev) =>
@@ -363,7 +333,6 @@ export function BondOfferTab({ onAdd, programCode, allowFetch = false }: BondOff
                 {t('offer.columns.annualizedReturn')}
               </SortableHeader>
               <Th>{t('offer.columns.terms')}</Th>
-              {onAdd && <Th>{t('offer.columns.action')}</Th>}
             </tr>
           </thead>
           <tbody className={TABLE_BODY_CLASS}>
@@ -422,19 +391,6 @@ export function BondOfferTab({ onAdd, programCode, allowFetch = false }: BondOff
                     tSec('bond.termsSource', { document: series.termsSource.document })
                   )}
                 </Td>
-                {onAdd && (
-                  <Td>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="whitespace-nowrap"
-                      aria-label={t('offer.addAria', { series: series.seriesCode })}
-                      onClick={() => onAdd(series)}
-                    >
-                      {t('offer.add')}
-                    </Button>
-                  </Td>
-                )}
               </tr>
             ))}
           </tbody>
@@ -465,22 +421,9 @@ export function BondOfferTab({ onAdd, programCode, allowFetch = false }: BondOff
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          {t('offer.asOf', { date: formatDate(data.today) })}
-        </p>
-        {allowFetch && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleFetchOffer}
-            disabled={isFetching}
-            isLoading={isFetching}
-          >
-            {isFetching ? t('offer.fetching') : t('offer.fetchNow')}
-          </Button>
-        )}
-      </div>
+      <p className="text-sm text-gray-600 dark:text-gray-400">
+        {t('offer.asOf', { date: formatDate(data.today) })}
+      </p>
       {renderAssumptions()}
       {/* A failed re-query is said to be one; the rows below are not its answer. */}
       {error && (

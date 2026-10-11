@@ -34,14 +34,6 @@ describe('BondProgramSelect', () => {
     list.mockResolvedValue([edo]);
   });
 
-  it('links to the bonds on sale in a new tab, so the form is not given up', async () => {
-    await mount();
-    const link = screen.getByRole('link', { name: 'See bonds on sale' });
-    expect(link).toHaveAttribute('href', '/securities/bonds');
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
-  });
-
   it('labels each program by its translated name', async () => {
     await mount();
     const select = screen.getByLabelText('Bond kind (optional)');

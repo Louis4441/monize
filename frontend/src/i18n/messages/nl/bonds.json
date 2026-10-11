@@ -1,17 +1,6 @@
 {
-  "page": {
-    "title": "Staatsobligaties",
-    "subtitle": "De obligaties die vandaag te koop zijn en hoe de voorwaarden van elk product van de ene verkoopmaand op de andere veranderden",
-    "tabsLabel": "Weergaven van staatsobligaties",
-    "tabs": {
-      "onSale": "Te koop",
-      "history": "Geschiedenis"
-    }
-  },
   "entry": {
-    "compare": "Vergelijken met het huidige aanbod",
-    "history": "Geschiedenis van de voorwaarden van {program}",
-    "seeOnSale": "Obligaties te koop bekijken"
+    "history": "Geschiedenis van de voorwaarden van {program}"
   },
   "offer": {
     "loading": "De obligaties die te koop zijn worden geladen...",
@@ -42,8 +31,7 @@
       "maturityValue": "Waarde bij einddatum",
       "totalReturn": "Totaal rendement",
       "annualizedReturn": "Geannualiseerd rendement",
-      "terms": "Voorwaarden",
-      "action": "Actie"
+      "terms": "Voorwaarden"
     },
     "saleWindowValue": "{from} tot {to}",
     "lengthValue": "{months, plural, one {# maand} other {# maanden}}",
@@ -62,21 +50,12 @@
       "fee": "Kosten van {amount} per obligatie",
       "forfeit": "In de periode opgebouwde rente vervalt"
     },
-    "couponsNotReinvested": "Coupons niet herbelegd",
-    "add": "Toevoegen aan mijn portefeuille",
-    "addAria": "{series} toevoegen aan mijn portefeuille",
-    "fetchNow": "Huidig aanbod nu ophalen",
-    "fetching": "Huidig aanbod wordt opgehaald...",
-    "fetchDone": "Aanbod opgehaald: {listed} series vermeld, {stored} nieuw opgeslagen, {alreadyStored} al opgeslagen, {failed} mislukt.",
-    "fetchFailed": "Het huidige aanbod kon niet worden opgehaald.",
-    "addFailed": "De obligatiesoort kon niet worden gevonden. Probeer het opnieuw."
+    "couponsNotReinvested": "Coupons niet herbelegd"
   },
   "history": {
-    "product": "Product",
     "loading": "De geschiedenis wordt geladen...",
     "loadFailed": "De geschiedenis kon niet worden geladen.",
     "retry": "Opnieuw proberen",
-    "noProducts": "De catalogus bevat nog geen obligatieproduct.",
     "empty": "Van dit product is nog geen serie opgeslagen.",
     "coverage": "De catalogus omvat {from} tot {to}.",
     "rateChartTitle": "Rente van de eerste periode en marge per verkoopmaand",

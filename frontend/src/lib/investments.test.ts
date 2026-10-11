@@ -541,13 +541,6 @@ describe('investmentsApi', () => {
       expect(apiClient.get).toHaveBeenCalledWith('/bonds/programs');
     });
 
-    it('fetchBondOffer posts the country and returns the counts', async () => {
-      const counts = { listed: 5, stored: 2, alreadyStored: 3, failed: 0 };
-      vi.mocked(apiClient.post).mockResolvedValue({ data: counts });
-      await expect(investmentsApi.fetchBondOffer('PL')).resolves.toEqual(counts);
-      expect(apiClient.post).toHaveBeenCalledWith('/bonds/offer/fetch', { countryCode: 'PL' });
-    });
-
     describe('a link change drops the cached prices', () => {
       const warm = async () => {
         vi.mocked(apiClient.get).mockResolvedValue({ data: [{ id: 1 }] });

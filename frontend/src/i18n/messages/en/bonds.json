@@ -1,17 +1,6 @@
 {
-  "page": {
-    "title": "Treasury bonds",
-    "subtitle": "The bonds on sale today, and how the terms of each product changed from one sale month to the next",
-    "tabsLabel": "Treasury bonds views",
-    "tabs": {
-      "onSale": "On sale",
-      "history": "History"
-    }
-  },
   "entry": {
-    "compare": "Compare with the current offer",
-    "history": "History of {program} terms",
-    "seeOnSale": "See bonds on sale"
+    "history": "History of {program} terms"
   },
   "offer": {
     "loading": "Loading the bonds on sale...",
@@ -42,8 +31,7 @@
       "maturityValue": "Maturity value",
       "totalReturn": "Total return",
       "annualizedReturn": "Annualized return",
-      "terms": "Terms",
-      "action": "Action"
+      "terms": "Terms"
     },
     "saleWindowValue": "{from} to {to}",
     "lengthValue": "{months, plural, one {# month} other {# months}}",
@@ -62,21 +50,12 @@
       "fee": "Fee {amount} per bond",
       "forfeit": "Interest accrued in the period is forfeited"
     },
-    "couponsNotReinvested": "Coupons not reinvested",
-    "add": "Add to my portfolio",
-    "addAria": "Add {series} to my portfolio",
-    "fetchNow": "Fetch the current offer now",
-    "fetching": "Fetching the current offer...",
-    "fetchDone": "Offer fetched: {listed} series listed, {stored} newly stored, {alreadyStored} already stored, {failed} failed.",
-    "fetchFailed": "The current offer could not be fetched.",
-    "addFailed": "The bond kind could not be looked up. Try again."
+    "couponsNotReinvested": "Coupons not reinvested"
   },
   "history": {
-    "product": "Product",
     "loading": "Loading the history...",
     "loadFailed": "The history could not be loaded.",
     "retry": "Try again",
-    "noProducts": "The catalog holds no bond product yet.",
     "empty": "No series of this product is stored yet.",
     "coverage": "The catalog covers {from} to {to}.",
     "rateChartTitle": "First-period rate and margin by sale month",

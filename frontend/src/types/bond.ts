@@ -35,17 +35,6 @@ export interface BondProgramSummary {
   infoUrl?: string | null;
 }
 
-/** `POST /bonds/offer/fetch` response: what reading the current offer did. */
-export interface FetchBondOfferResult {
-  /** Series the official source lists for sale now. */
-  listed: number;
-  /** Listed series that were not stored and now are. */
-  stored: number;
-  alreadyStored: number;
-  /** Listed series that could not be read. */
-  failed: number;
-}
-
 /** `POST /bonds/instruments/fetch` body. */
 export interface FetchBondSeriesRequest {
   countryCode: string;

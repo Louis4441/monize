@@ -1,17 +1,6 @@
 {
-  "page": {
-    "title": "国債",
-    "subtitle": "本日販売中の債券と、各商品の条件が販売月ごとにどう変わったか",
-    "tabsLabel": "国債の表示",
-    "tabs": {
-      "onSale": "販売中",
-      "history": "履歴"
-    }
-  },
   "entry": {
-    "compare": "現在の販売内容と比較",
-    "history": "{program}の条件の履歴",
-    "seeOnSale": "販売中の債券を見る"
+    "history": "{program}の条件の履歴"
   },
   "offer": {
     "loading": "販売中の債券を読み込み中...",
@@ -42,8 +31,7 @@
       "maturityValue": "満期時の価値",
       "totalReturn": "総リターン",
       "annualizedReturn": "年換算リターン",
-      "terms": "条件",
-      "action": "操作"
+      "terms": "条件"
     },
     "saleWindowValue": "{from}から{to}まで",
     "lengthValue": "{months, plural, other {#か月}}",
@@ -62,21 +50,12 @@
       "fee": "1枚あたり手数料 {amount}",
       "forfeit": "期間中に発生した利息は失われます"
     },
-    "couponsNotReinvested": "クーポン再投資なし",
-    "add": "ポートフォリオに追加",
-    "addAria": "{series}をポートフォリオに追加",
-    "fetchNow": "現在のオファーを今すぐ取得",
-    "fetching": "現在のオファーを取得中...",
-    "fetchDone": "オファーを取得しました: 掲載{listed}シリーズ、新規保存{stored}、保存済み{alreadyStored}、失敗{failed}。",
-    "fetchFailed": "現在のオファーを取得できませんでした。",
-    "addFailed": "債券の種類を見つけられませんでした。もう一度お試しください。"
+    "couponsNotReinvested": "クーポン再投資なし"
   },
   "history": {
-    "product": "商品",
     "loading": "履歴を読み込み中...",
     "loadFailed": "履歴を読み込めませんでした。",
     "retry": "再試行",
-    "noProducts": "カタログにはまだ債券商品がありません。",
     "empty": "この商品のシリーズはまだ保存されていません。",
     "coverage": "カタログの対象期間は{from}から{to}までです。",
     "rateChartTitle": "販売月ごとの最初の期間の金利とマージン",

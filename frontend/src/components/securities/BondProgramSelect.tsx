@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
@@ -141,7 +140,6 @@ interface BondProgramSelectProps {
 /** The bond program select, with a loading hint and a retryable failure. */
 export function BondProgramSelect({ picker, onChange, countryCode, error }: BondProgramSelectProps) {
   const t = useTranslations('securities');
-  const tBonds = useTranslations('bonds');
 
   return (
     <div>
@@ -152,15 +150,6 @@ export function BondProgramSelect({ picker, onChange, countryCode, error }: Bond
         onChange={(e) => onChange(e.target.value)}
         error={error}
       />
-      {/* A new tab: the form being filled in is not given up for the offer. */}
-      <Link
-        href="/securities/bonds"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-1 inline-block text-sm text-blue-600 hover:underline dark:text-blue-400"
-      >
-        {tBonds('entry.seeOnSale')}
-      </Link>
       {picker.isLoading && (
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400" role="status">
           {t('form.bondProgramLoading')}

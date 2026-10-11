@@ -1,17 +1,6 @@
 {
-  "page": {
-    "title": "Titoli di Stato",
-    "subtitle": "Le obbligazioni in vendita oggi e come sono cambiate le condizioni di ogni prodotto da un mese di vendita al successivo",
-    "tabsLabel": "Viste dei titoli di Stato",
-    "tabs": {
-      "onSale": "In vendita",
-      "history": "Storico"
-    }
-  },
   "entry": {
-    "compare": "Confronta con l'offerta attuale",
-    "history": "Storico delle condizioni di {program}",
-    "seeOnSale": "Vedi le obbligazioni in vendita"
+    "history": "Storico delle condizioni di {program}"
   },
   "offer": {
     "loading": "Caricamento delle obbligazioni in vendita...",
@@ -42,8 +31,7 @@
       "maturityValue": "Valore a scadenza",
       "totalReturn": "Rendimento totale",
       "annualizedReturn": "Rendimento annualizzato",
-      "terms": "Condizioni",
-      "action": "Azione"
+      "terms": "Condizioni"
     },
     "saleWindowValue": "Dal {from} al {to}",
     "lengthValue": "{months, plural, one {# mese} other {# mesi}}",
@@ -62,21 +50,12 @@
       "fee": "Commissione di {amount} per obbligazione",
       "forfeit": "Gli interessi maturati nel periodo vengono persi"
     },
-    "couponsNotReinvested": "Cedole non reinvestite",
-    "add": "Aggiungi al mio portafoglio",
-    "addAria": "Aggiungi {series} al mio portafoglio",
-    "fetchNow": "Recupera ora l'offerta attuale",
-    "fetching": "Recupero dell'offerta attuale...",
-    "fetchDone": "Offerta recuperata: {listed} serie elencate, {stored} salvate ora, {alreadyStored} già salvate, {failed} non riuscite.",
-    "fetchFailed": "Impossibile recuperare l'offerta attuale.",
-    "addFailed": "Impossibile trovare il tipo di obbligazione. Riprova."
+    "couponsNotReinvested": "Cedole non reinvestite"
   },
   "history": {
-    "product": "Prodotto",
     "loading": "Caricamento dello storico...",
     "loadFailed": "Impossibile caricare lo storico.",
     "retry": "Riprova",
-    "noProducts": "Il catalogo non contiene ancora alcun prodotto obbligazionario.",
     "empty": "Non è ancora salvata alcuna serie di questo prodotto.",
     "coverage": "Il catalogo copre da {from} a {to}.",
     "rateChartTitle": "Tasso del primo periodo e margine per mese di vendita",

@@ -1,17 +1,6 @@
 {
-  "page": {
-    "title": "Trái phiếu chính phủ",
-    "subtitle": "Các trái phiếu đang bán hôm nay và điều kiện của từng sản phẩm đã thay đổi thế nào qua các tháng phát hành",
-    "tabsLabel": "Các chế độ xem trái phiếu chính phủ",
-    "tabs": {
-      "onSale": "Đang bán",
-      "history": "Lịch sử"
-    }
-  },
   "entry": {
-    "compare": "So sánh với đợt chào bán hiện tại",
-    "history": "Lịch sử điều kiện của {program}",
-    "seeOnSale": "Xem trái phiếu đang bán"
+    "history": "Lịch sử điều kiện của {program}"
   },
   "offer": {
     "loading": "Đang tải các trái phiếu đang bán...",
@@ -42,8 +31,7 @@
       "maturityValue": "Giá trị đáo hạn",
       "totalReturn": "Tổng lợi suất",
       "annualizedReturn": "Lợi suất quy năm",
-      "terms": "Điều kiện",
-      "action": "Thao tác"
+      "terms": "Điều kiện"
     },
     "saleWindowValue": "Từ {from} đến {to}",
     "lengthValue": "{months, plural, other {# tháng}}",
@@ -62,21 +50,12 @@
       "fee": "Phí {amount} mỗi trái phiếu",
       "forfeit": "Tiền lãi tích lũy trong kỳ bị mất"
     },
-    "couponsNotReinvested": "Coupon không tái đầu tư",
-    "add": "Thêm vào danh mục của tôi",
-    "addAria": "Thêm {series} vào danh mục của tôi",
-    "fetchNow": "Lấy ngay danh sách chào bán hiện tại",
-    "fetching": "Đang lấy danh sách chào bán hiện tại...",
-    "fetchDone": "Đã lấy danh sách chào bán: {listed} đợt phát hành được liệt kê, {stored} đợt mới lưu, {alreadyStored} đợt đã có, {failed} đợt lỗi.",
-    "fetchFailed": "Không thể lấy danh sách chào bán hiện tại.",
-    "addFailed": "Không thể tìm thấy loại trái phiếu. Hãy thử lại."
+    "couponsNotReinvested": "Coupon không tái đầu tư"
   },
   "history": {
-    "product": "Sản phẩm",
     "loading": "Đang tải lịch sử...",
     "loadFailed": "Không thể tải lịch sử.",
     "retry": "Thử lại",
-    "noProducts": "Danh mục chưa có sản phẩm trái phiếu nào.",
     "empty": "Chưa lưu đợt phát hành nào của sản phẩm này.",
     "coverage": "Danh mục bao gồm từ {from} đến {to}.",
     "rateChartTitle": "Lãi suất kỳ đầu và biên lãi theo tháng phát hành",

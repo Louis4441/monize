@@ -1,17 +1,6 @@
 {
-  "page": {
-    "title": "Títulos do Tesouro",
-    "subtitle": "Os títulos à venda hoje e como as condições de cada produto mudaram de um mês de venda para o seguinte",
-    "tabsLabel": "Visões dos títulos do Tesouro",
-    "tabs": {
-      "onSale": "À venda",
-      "history": "Histórico"
-    }
-  },
   "entry": {
-    "compare": "Comparar com a oferta atual",
-    "history": "Histórico das condições de {program}",
-    "seeOnSale": "Ver títulos à venda"
+    "history": "Histórico das condições de {program}"
   },
   "offer": {
     "loading": "Carregando os títulos à venda...",
@@ -42,8 +31,7 @@
       "maturityValue": "Valor no vencimento",
       "totalReturn": "Rentabilidade total",
       "annualizedReturn": "Rentabilidade anualizada",
-      "terms": "Condições",
-      "action": "Ação"
+      "terms": "Condições"
     },
     "saleWindowValue": "De {from} a {to}",
     "lengthValue": "{months, plural, one {# mês} other {# meses}}",
@@ -62,21 +50,12 @@
       "fee": "Taxa de {amount} por título",
       "forfeit": "Os juros acumulados no período são perdidos"
     },
-    "couponsNotReinvested": "Cupons não reinvestidos",
-    "add": "Adicionar à minha carteira",
-    "addAria": "Adicionar {series} à minha carteira",
-    "fetchNow": "Obter agora a oferta atual",
-    "fetching": "Obtendo a oferta atual...",
-    "fetchDone": "Oferta obtida: {listed} séries listadas, {stored} salvas agora, {alreadyStored} já salvas, {failed} com falha.",
-    "fetchFailed": "Não foi possível obter a oferta atual.",
-    "addFailed": "Não foi possível encontrar o tipo de título. Tente novamente."
+    "couponsNotReinvested": "Cupons não reinvestidos"
   },
   "history": {
-    "product": "Produto",
     "loading": "Carregando o histórico...",
     "loadFailed": "Não foi possível carregar o histórico.",
     "retry": "Tentar novamente",
-    "noProducts": "O catálogo ainda não tem nenhum produto de títulos.",
     "empty": "Ainda não há nenhuma série deste produto salva.",
     "coverage": "O catálogo abrange de {from} a {to}.",
     "rateChartTitle": "Taxa do primeiro período e margem por mês de venda",

@@ -1,17 +1,6 @@
 {
-  "page": {
-    "title": "Bonos del Tesoro",
-    "subtitle": "Los bonos a la venta hoy y cómo han cambiado las condiciones de cada producto de un mes de venta al siguiente",
-    "tabsLabel": "Vistas de los bonos del Tesoro",
-    "tabs": {
-      "onSale": "A la venta",
-      "history": "Historial"
-    }
-  },
   "entry": {
-    "compare": "Comparar con la oferta actual",
-    "history": "Historial de condiciones de {program}",
-    "seeOnSale": "Ver bonos a la venta"
+    "history": "Historial de condiciones de {program}"
   },
   "offer": {
     "loading": "Cargando los bonos a la venta...",
@@ -42,8 +31,7 @@
       "maturityValue": "Valor al vencimiento",
       "totalReturn": "Rentabilidad total",
       "annualizedReturn": "Rentabilidad anualizada",
-      "terms": "Condiciones",
-      "action": "Acción"
+      "terms": "Condiciones"
     },
     "saleWindowValue": "{from} a {to}",
     "lengthValue": "{months, plural, one {# mes} other {# meses}}",
@@ -62,21 +50,12 @@
       "fee": "Comisión de {amount} por bono",
       "forfeit": "Se pierden los intereses devengados en el periodo"
     },
-    "couponsNotReinvested": "Cupones no reinvertidos",
-    "add": "Añadir a mi cartera",
-    "addAria": "Añadir {series} a mi cartera",
-    "fetchNow": "Obtener ahora la oferta actual",
-    "fetching": "Obteniendo la oferta actual...",
-    "fetchDone": "Oferta obtenida: {listed} series listadas, {stored} guardadas ahora, {alreadyStored} ya guardadas, {failed} con error.",
-    "fetchFailed": "No se pudo obtener la oferta actual.",
-    "addFailed": "No se pudo encontrar el tipo de bono. Inténtelo de nuevo."
+    "couponsNotReinvested": "Cupones no reinvertidos"
   },
   "history": {
-    "product": "Producto",
     "loading": "Cargando el historial...",
     "loadFailed": "No se pudo cargar el historial.",
     "retry": "Reintentar",
-    "noProducts": "El catálogo aún no contiene ningún producto de bonos.",
     "empty": "Aún no hay guardada ninguna serie de este producto.",
     "coverage": "El catálogo abarca de {from} a {to}.",
     "rateChartTitle": "Tipo del primer periodo y margen por mes de venta",

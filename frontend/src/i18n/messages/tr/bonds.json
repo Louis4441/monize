@@ -1,17 +1,6 @@
 {
-  "page": {
-    "title": "Devlet tahvilleri",
-    "subtitle": "Bugün satışta olan tahviller ve her ürünün koşullarının bir satış ayından diğerine nasıl değiştiği",
-    "tabsLabel": "Devlet tahvili görünümleri",
-    "tabs": {
-      "onSale": "Satışta",
-      "history": "Geçmiş"
-    }
-  },
   "entry": {
-    "compare": "Güncel teklifle karşılaştır",
-    "history": "{program} koşullarının geçmişi",
-    "seeOnSale": "Satıştaki tahvillere bak"
+    "history": "{program} koşullarının geçmişi"
   },
   "offer": {
     "loading": "Satıştaki tahviller yükleniyor...",
@@ -42,8 +31,7 @@
       "maturityValue": "Vade değeri",
       "totalReturn": "Toplam getiri",
       "annualizedReturn": "Yıllıklandırılmış getiri",
-      "terms": "Koşullar",
-      "action": "İşlem"
+      "terms": "Koşullar"
     },
     "saleWindowValue": "{from} ile {to} arası",
     "lengthValue": "{months, plural, one {# ay} other {# ay}}",
@@ -62,21 +50,12 @@
       "fee": "Tahvil başına {amount} ücret",
       "forfeit": "Dönem içinde birikmiş faiz kaybedilir"
     },
-    "couponsNotReinvested": "Kuponlar yeniden yatırılmaz",
-    "add": "Portföyüme ekle",
-    "addAria": "{series} serisini portföyüme ekle",
-    "fetchNow": "Güncel teklifi şimdi getir",
-    "fetching": "Güncel teklif getiriliyor...",
-    "fetchDone": "Teklif getirildi: {listed} seri listelendi, {stored} yeni kaydedildi, {alreadyStored} zaten kayıtlı, {failed} başarısız.",
-    "fetchFailed": "Güncel teklif getirilemedi.",
-    "addFailed": "Tahvil türü bulunamadı. Tekrar deneyin."
+    "couponsNotReinvested": "Kuponlar yeniden yatırılmaz"
   },
   "history": {
-    "product": "Ürün",
     "loading": "Geçmiş yükleniyor...",
     "loadFailed": "Geçmiş yüklenemedi.",
     "retry": "Tekrar dene",
-    "noProducts": "Katalogda henüz hiç tahvil ürünü yok.",
     "empty": "Bu ürünün henüz kayıtlı bir serisi yok.",
     "coverage": "Katalog {from} ile {to} arasını kapsar.",
     "rateChartTitle": "Satış ayına göre ilk dönem oranı ve marj",

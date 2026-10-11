@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
@@ -258,7 +257,7 @@ export function SecurityBondCard({
       );
     }
 
-    const { totals, refusal, lots, program } = valuation;
+    const { totals, refusal, lots } = valuation;
     const coverage = valuation.benchmarkCoverage ?? [];
     const totalReason = refusal
       ? t('bond.totals.unknownRefusal')
@@ -266,23 +265,6 @@ export function SecurityBondCard({
 
     return (
       <div className="space-y-4" aria-busy={isLoading}>
-        <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          <Link
-            href="/securities/bonds"
-            className="text-blue-600 hover:underline dark:text-blue-400"
-          >
-            {tBonds('entry.compare')}
-          </Link>
-          <Link
-            href={`/securities/bonds?tab=history&program=${encodeURIComponent(program.programCode)}`}
-            className="text-blue-600 hover:underline dark:text-blue-400"
-          >
-            {tBonds('entry.history', {
-              program: programLabel(t, program.programCode),
-            })}
-          </Link>
-        </p>
-
         {incompleteLots.length > 0 && (
           <div
             role="note"

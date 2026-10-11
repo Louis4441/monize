@@ -1,17 +1,6 @@
 {
-  "page": {
-    "title": "Staatsanleihen",
-    "subtitle": "Die heute zum Verkauf stehenden Anleihen und wie sich die Bedingungen jedes Produkts von einem Verkaufsmonat zum nächsten geändert haben",
-    "tabsLabel": "Ansichten der Staatsanleihen",
-    "tabs": {
-      "onSale": "Im Verkauf",
-      "history": "Verlauf"
-    }
-  },
   "entry": {
-    "compare": "Mit dem aktuellen Angebot vergleichen",
-    "history": "Verlauf der Bedingungen für {program}",
-    "seeOnSale": "Anleihen im Verkauf ansehen"
+    "history": "Verlauf der Bedingungen für {program}"
   },
   "offer": {
     "loading": "Anleihen im Verkauf werden geladen...",
@@ -42,8 +31,7 @@
       "maturityValue": "Fälligkeitswert",
       "totalReturn": "Gesamtrendite",
       "annualizedReturn": "Annualisierte Rendite",
-      "terms": "Bedingungen",
-      "action": "Aktion"
+      "terms": "Bedingungen"
     },
     "saleWindowValue": "{from} bis {to}",
     "lengthValue": "{months, plural, one {# Monat} other {# Monate}}",
@@ -62,21 +50,12 @@
       "fee": "Gebühr {amount} pro Anleihe",
       "forfeit": "In der Periode aufgelaufene Zinsen verfallen"
     },
-    "couponsNotReinvested": "Kupons nicht wiederangelegt",
-    "add": "Zu meinem Portfolio hinzufügen",
-    "addAria": "{series} zu meinem Portfolio hinzufügen",
-    "fetchNow": "Aktuelles Angebot jetzt abrufen",
-    "fetching": "Aktuelles Angebot wird abgerufen...",
-    "fetchDone": "Angebot abgerufen: {listed} Serien gelistet, {stored} neu gespeichert, {alreadyStored} bereits gespeichert, {failed} fehlgeschlagen.",
-    "fetchFailed": "Das aktuelle Angebot konnte nicht abgerufen werden.",
-    "addFailed": "Die Anleiheart konnte nicht gefunden werden. Bitte versuchen Sie es erneut."
+    "couponsNotReinvested": "Kupons nicht wiederangelegt"
   },
   "history": {
-    "product": "Produkt",
     "loading": "Verlauf wird geladen...",
     "loadFailed": "Der Verlauf konnte nicht geladen werden.",
     "retry": "Erneut versuchen",
-    "noProducts": "Der Katalog enthält noch kein Anleiheprodukt.",
     "empty": "Von diesem Produkt ist noch keine Serie gespeichert.",
     "coverage": "Der Katalog umfasst {from} bis {to}.",
     "rateChartTitle": "Zinssatz der ersten Periode und Marge nach Verkaufsmonat",

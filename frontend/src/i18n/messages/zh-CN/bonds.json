@@ -1,17 +1,6 @@
 {
-  "page": {
-    "title": "国债",
-    "subtitle": "今天在售的债券，以及每个产品的条款在不同发售月份之间的变化",
-    "tabsLabel": "国债视图",
-    "tabs": {
-      "onSale": "在售",
-      "history": "历史"
-    }
-  },
   "entry": {
-    "compare": "与当前在售产品比较",
-    "history": "{program}条款历史",
-    "seeOnSale": "查看在售债券"
+    "history": "{program}条款历史"
   },
   "offer": {
     "loading": "正在加载在售债券...",
@@ -42,8 +31,7 @@
       "maturityValue": "到期价值",
       "totalReturn": "总回报",
       "annualizedReturn": "年化回报",
-      "terms": "条款",
-      "action": "操作"
+      "terms": "条款"
     },
     "saleWindowValue": "{from}至{to}",
     "lengthValue": "{months, plural, other {#个月}}",
@@ -62,21 +50,12 @@
       "fee": "每张债券手续费 {amount}",
       "forfeit": "当期已累计的利息将被扣除"
     },
-    "couponsNotReinvested": "息票不再投资",
-    "add": "添加到我的投资组合",
-    "addAria": "将 {series} 添加到我的投资组合",
-    "fetchNow": "立即获取当前发售",
-    "fetching": "正在获取当前发售...",
-    "fetchDone": "已获取发售:列出 {listed} 个系列,新保存 {stored} 个,已存在 {alreadyStored} 个,失败 {failed} 个。",
-    "fetchFailed": "无法获取当前发售。",
-    "addFailed": "找不到该债券种类。请重试。"
+    "couponsNotReinvested": "息票不再投资"
   },
   "history": {
-    "product": "产品",
     "loading": "正在加载历史...",
     "loadFailed": "无法加载历史。",
     "retry": "重试",
-    "noProducts": "目录中还没有债券产品。",
     "empty": "此产品尚未保存任何系列。",
     "coverage": "目录涵盖 {from} 至 {to}。",
     "rateChartTitle": "按发售月份的首期利率和利差",

@@ -1,17 +1,6 @@
 {
-  "page": {
-    "title": "國債",
-    "subtitle": "今天在售的債券，以及每個產品的條款在不同發售月份之間的變化",
-    "tabsLabel": "國債檢視",
-    "tabs": {
-      "onSale": "在售",
-      "history": "歷史"
-    }
-  },
   "entry": {
-    "compare": "與目前在售產品比較",
-    "history": "{program}條款歷史",
-    "seeOnSale": "查看在售債券"
+    "history": "{program}條款歷史"
   },
   "offer": {
     "loading": "正在載入在售債券...",
@@ -42,8 +31,7 @@
       "maturityValue": "到期價值",
       "totalReturn": "總報酬",
       "annualizedReturn": "年化報酬",
-      "terms": "條款",
-      "action": "操作"
+      "terms": "條款"
     },
     "saleWindowValue": "{from}至{to}",
     "lengthValue": "{months, plural, other {#個月}}",
@@ -62,21 +50,12 @@
       "fee": "每張債券手續費 {amount}",
       "forfeit": "當期已累計的利息將被扣除"
     },
-    "couponsNotReinvested": "票息不再投資",
-    "add": "新增至我的投資組合",
-    "addAria": "將 {series} 新增至我的投資組合",
-    "fetchNow": "立即取得目前發售",
-    "fetching": "正在取得目前發售...",
-    "fetchDone": "已取得發售:列出 {listed} 個系列,新儲存 {stored} 個,已存在 {alreadyStored} 個,失敗 {failed} 個。",
-    "fetchFailed": "無法取得目前發售。",
-    "addFailed": "找不到該債券種類。請重試。"
+    "couponsNotReinvested": "票息不再投資"
   },
   "history": {
-    "product": "產品",
     "loading": "正在載入歷史...",
     "loadFailed": "無法載入歷史。",
     "retry": "重試",
-    "noProducts": "目錄中尚無債券產品。",
     "empty": "此產品尚未儲存任何系列。",
     "coverage": "目錄涵蓋 {from} 至 {to}。",
     "rateChartTitle": "依發售月份的首期利率與利差",

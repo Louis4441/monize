@@ -90,15 +90,18 @@ next run; there are few of them, so no table records them (no migration).
 
 ## 5. Views
 
-Under Investments, a page "Treasury bonds" with two tabs.
+There is no standalone page. Both views live on the detail page of a
+program-linked bond security (`bond-program-securities.md` 3.4), fixed to that
+security's bond kind, and the data they read reaches the catalog through the
+security's Refresh (the cron and the purchase form's fetch fill it as well);
+there is no "fetch the current offer now" action.
 
-- **On sale**: one row per series with the section 2 columns; assumption
+- **On sale** ("On sale now"): one row per series with the section 2 columns; assumption
   inputs for each benchmark the rows read (CPI, reference rate), prefilled
   with the latest observation and its month; sorting by annualized return,
   length or first-period rate; a "projected" badge on any figure that rests on
-  an assumption; the letter link; an action "add to my portfolio" that opens
-  the security form with the series selected.
-- **History**: a product selector; a line chart per sale month of the
+  an assumption; the letter link. Only the series of the security's own program are listed.
+- **History** (the program's terms, the series held marked): a line chart per sale month of the
   first-period rate and the margin or spread (percent), and a step chart of the
   fee; a table below with every series; missing months shown as gaps and
   listed.

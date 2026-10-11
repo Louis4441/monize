@@ -1,17 +1,6 @@
 {
-  "page": {
-    "title": "국채",
-    "subtitle": "오늘 판매 중인 채권과 각 상품의 조건이 판매 월마다 어떻게 바뀌었는지",
-    "tabsLabel": "국채 보기",
-    "tabs": {
-      "onSale": "판매 중",
-      "history": "이력"
-    }
-  },
   "entry": {
-    "compare": "현재 판매 내용과 비교",
-    "history": "{program} 조건 이력",
-    "seeOnSale": "판매 중인 채권 보기"
+    "history": "{program} 조건 이력"
   },
   "offer": {
     "loading": "판매 중인 채권을 불러오는 중...",
@@ -42,8 +31,7 @@
       "maturityValue": "만기 가치",
       "totalReturn": "총 수익률",
       "annualizedReturn": "연환산 수익률",
-      "terms": "조건",
-      "action": "작업"
+      "terms": "조건"
     },
     "saleWindowValue": "{from}부터 {to}까지",
     "lengthValue": "{months, plural, other {#개월}}",
@@ -62,21 +50,12 @@
       "fee": "채권당 수수료 {amount}",
       "forfeit": "해당 기간에 발생한 이자는 소멸됩니다"
     },
-    "couponsNotReinvested": "쿠폰 재투자 없음",
-    "add": "내 포트폴리오에 추가",
-    "addAria": "{series}을(를) 내 포트폴리오에 추가",
-    "fetchNow": "현재 오퍼 지금 가져오기",
-    "fetching": "현재 오퍼를 가져오는 중...",
-    "fetchDone": "오퍼를 가져왔습니다: 목록 {listed}개 시리즈, 새로 저장 {stored}개, 이미 저장됨 {alreadyStored}개, 실패 {failed}개.",
-    "fetchFailed": "현재 오퍼를 가져오지 못했습니다.",
-    "addFailed": "채권 종류를 찾지 못했습니다. 다시 시도하세요."
+    "couponsNotReinvested": "쿠폰 재투자 없음"
   },
   "history": {
-    "product": "상품",
     "loading": "이력을 불러오는 중...",
     "loadFailed": "이력을 불러오지 못했습니다.",
     "retry": "다시 시도",
-    "noProducts": "카탈로그에 아직 채권 상품이 없습니다.",
     "empty": "이 상품의 시리즈가 아직 저장되지 않았습니다.",
     "coverage": "카탈로그는 {from}부터 {to}까지를 포함합니다.",
     "rateChartTitle": "판매 월별 첫 기간 금리와 마진",

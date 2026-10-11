@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   CartesianGrid,
@@ -18,9 +18,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { Select } from '@/components/ui/Select';
 import { TABLE_BODY_CLASS, TABLE_CLASS, Td, Th } from '@/components/ui/Table';
-import { programLabel } from '@/components/securities/detail/bond-labels';
 import { useChartMonthFormat } from '@/hooks/useChartMonthFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -33,24 +31,7 @@ import {
   buildHistoryPoints,
   isHttpUrl,
 } from '@/lib/bond-offer';
-import type { BondHistory, BondInstrumentSummary } from '@/types/bond';
-
-interface BondHistoryTabProps {
-  /** The product a link asked for (`?program=`); used when the catalog holds it. */
-  initialProgram: string | null;
-}
-
-/** The catalog's products for the country, sorted, and the currency each issues in. */
-function productsOf(instruments: readonly BondInstrumentSummary[]) {
-  const currencies = new Map<string, string>();
-  for (const i of instruments) {
-    if (i.issuerCountryCode !== BOND_OFFER_COUNTRY) continue;
-    if (!currencies.has(i.programCode)) currencies.set(i.programCode, i.currencyCode);
-  }
-  return [...currencies.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([programCode, currencyCode]) => ({ programCode, currencyCode }));
-}
+import type { BondHistory } from '@/types/bond';
 
 interface BondHistoryBodyProps {
   program: string;
@@ -65,8 +46,8 @@ interface BondHistoryBodyProps {
 
 /**
  * One product's history: charts, the months the catalog lacks and the table of
- * every stored series. Used by the history tab and, with the product fixed and
- * the series held marked, by the page of a program-linked security.
+ * every stored series. Used by the page of a program-linked security, with the
+ * product fixed and the series held marked.
  */
 export function BondHistoryBody({ program, currency, heldSeries = [] }: BondHistoryBodyProps) {
   const t = useTranslations('bonds');
@@ -369,76 +350,4 @@ export function BondHistoryBody({ program, currency, heldSeries = [] }: BondHist
   };
 
   return renderBody();
-}
-
-/**
- * How the terms of one product changed from one sale month to the next (spec
- * `bond-offer-and-history.md` 3 and 5): a line chart of the first-period (or
- * annual) rate and the margin, a step chart of the early redemption fee, the
- * months the catalog lacks, and a table of every stored series.
- *
- * A month with no stored series is a null point, so the line breaks there
- * rather than running across it, and the month is listed under the chart. The
- * payload is kept with the product it answers; a failed request is said to be
- * one, never drawn as an empty history.
- */
-export function BondHistoryTab({ initialProgram }: BondHistoryTabProps) {
-  const t = useTranslations('bonds');
-  const tSec = useTranslations('securityDetail');
-  const [picked, setPicked] = useState<string | null>(null);
-  const catalog = useReportData<BondInstrumentSummary[]>(
-    () => investmentsApi.listBondInstruments(),
-    [],
-  );
-  const products = useMemo(
-    () => (catalog.data === null ? [] : productsOf(catalog.data)),
-    [catalog.data],
-  );
-  const program =
-    [picked, initialProgram].find(
-      (p): p is string => p !== null && products.some((x) => x.programCode === p),
-    ) ??
-    products[0]?.programCode ??
-    null;
-  const currency = products.find((p) => p.programCode === program)?.currencyCode ?? null;
-
-  if (catalog.error && catalog.data === null) {
-    return (
-      <div role="alert" className="space-y-3">
-        <p className="text-sm text-red-600 dark:text-red-400">
-          {getErrorMessage(catalog.error, t('history.loadFailed'))}
-        </p>
-        <Button variant="outline" size="sm" onClick={catalog.reload}>
-          {t('history.retry')}
-        </Button>
-      </div>
-    );
-  }
-  if (catalog.data === null) {
-    return (
-      <div className="flex justify-center py-8">
-        <LoadingSpinner text={t('history.loading')} />
-      </div>
-    );
-  }
-  if (program === null) {
-    return <EmptyState title={t('history.noProducts')} />;
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="w-full sm:w-64">
-        <Select
-          label={t('history.product')}
-          value={program}
-          onChange={(e) => setPicked(e.target.value)}
-          options={products.map((p) => ({
-            value: p.programCode,
-            label: programLabel(tSec, p.programCode),
-          }))}
-        />
-      </div>
-      <BondHistoryBody key={program} program={program} currency={currency} />
-    </div>
-  );
 }
