@@ -781,6 +781,7 @@
         "pleaseEnterPassword": "Veuillez saisir votre mot de passe pour confirmer",
         "encryptedNeedsPassword": "Cette sauvegarde est chiffrée. Saisissez le mot de passe utilisé lors de sa création dans le champ \"Mot de passe de sauvegarde\", puis réessayez.",
         "failed": "Échec de la restauration de la sauvegarde",
+        "interrupted": "La restauration a été interrompue avant la réponse du serveur. Une restauration s'applique entièrement ou pas du tout : vos données sont donc soit entièrement restaurées, soit inchangées. Rechargez la page pour le vérifier avant de réessayer.",
         "reauthRedirect": "Vous allez être redirigé vers votre fournisseur d'identité pour confirmer votre identité. Sélectionnez à nouveau le fichier de sauvegarde à votre retour."
       },
       "selectedFile": "Sélectionné : {filename}"

@@ -8,9 +8,9 @@ a report anchored on today disagrees with a bill anchored on its due date.
 Registered as INV-LOAN-006 in `docs/system-invariants.md`.
 
 Sections 7 and 8 (the dated payment and the occurrence projection, issue
-#1637) are specified ahead of the code: they are built by the tasks of
+#1637) are built by the tasks of
 `docs/future-plans/dated-loan-payment-tasks.md` and registered as INV-LOAN-009,
-`unenforced` until that list's acceptance task.
+`enforced` from that list's acceptance task (#1644).
 
 Read `docs/financial-calculation-contract.md` sections 1, 7 and 8, and
 `docs/specs/account-balances-as-of.md`, before changing anything here.
@@ -92,18 +92,21 @@ The one pricing path is `backend/src/loan-installments/price-installment.ts`:
 template's managed lines (`identifyLoanTemplate`), and the pure
 `priceInstallment` prices them (the method principal, the interest, the
 waterfall). `ScheduledTransactionLoanService.resolveInstallment` delegates to
-the core for the three consumers below and keeps the posting path's defaults;
-the template rewrite they share is `rewriteLoanTemplate`
-(`backend/src/loan-installments/reprice-template.ts`). The core reads two
+the core for the first three consumers below and keeps the posting path's
+defaults; the template rewrite they share is `rewriteLoanTemplate`
+(`backend/src/loan-installments/reprice-template.ts`), whose two halves
+`planLoanTemplateRewrite` and `applyLoanTemplateRewrite` the rate-change
+sync calls apart, so its preview and its write read one plan (section 7.5).
+The core reads two
 dated inputs from `loan_rate_changes`, through one function each:
 `datedAnnualRate`, the rate at `d` (section 1), and, from B1 of
 `docs/future-plans/dated-loan-payment-tasks.md`, `datedPaymentAmount` beside
 it, the annuity payment at `d` (section 7.1). `resolveInstallmentCore`
 calls both with the one `asOfDate` the consumer prices at, so a consumer that
-prices through it dates both inputs or neither. The fourth consumer,
-the settlement, calls the pure tail with its own facts
-(`planLoanSettlement`, `docs/specs/loan-installment-settlement.md`). Each
-one answered differently is a reported drift:
+prices through it dates both inputs or neither. The settlement calls the
+pure tail with its own facts (`planLoanSettlement`,
+`docs/specs/loan-installment-settlement.md`). Each one answered differently
+is a reported drift:
 
 | Consumer | Boundary `d` | When |
 | --- | --- | --- |
@@ -111,6 +114,7 @@ one answered differently is a reported drift:
 | `resolvePostingAllocation` | the occurrence's own due date | inside the posting transaction, under the parent lock, immediately before the financial write |
 | `getLoanProjectionAnchor` | the schedule's `next_due_date` | on demand, for the amortization report's projection (`buildLoanProjectionInput`'s `anchor`) |
 | `planLoanSettlement` (`backend/src/loan-installments/plan-loan-settlement.ts`, `docs/specs/loan-installment-settlement.md`) | the matched slot's due date, with the debt less the settlements planned earlier in the same rule pass | when a `settle_loan_installment` rule matches a bank row, inside the create's, import's or run's transaction, under the schedule row and `lockAccountsForBalanceWrite(source, loan)` |
+| `LoanRateChangesService.buildScheduledUpdate` (purpose `sync`, section 7.5) | the schedule's `next_due_date` | after a rate change is created, edited or deleted, for the preview; inside `applyScheduledPaymentSync`'s transaction, under the schedule row lock, for the write the user confirmed |
 
 Which schedule is "the loan's payment" is the account's own statement --
 `accounts.scheduled_transaction_id`, written by the two paths that set a loan
@@ -256,7 +260,7 @@ enumerated by `frontend/src/lib/loan-projection-anchor.guard.test.ts` rather
 than left to an optional argument nobody has to think about.
 
 The **payment** is deliberately outside this: a rate change reaches the
-schedule's installment through `LoanRateChangesService.syncScheduledTransaction`,
+schedule's installment through `LoanRateChangesService.applyScheduledPaymentSync`,
 which asks the user first, so a declined sync leaves the bill at the old
 payment by their decision. Interest is unaffected -- it is debt x rate. From
 B1 of the dated-payment plan a declined sync holds the old payment only until
@@ -484,7 +488,7 @@ to (decision 5). No rate-change path writes it (7.5).
 | `posting` | `templateAmount`: the bill shown, re-divided at the posting boundary (section 3) | unchanged |
 | `settlement` | `total(D, E)` at the matched slot; null refuses `loan_not_configured`, missing `payment` | unchanged: already dated (settlement decision 12) |
 | `reconfigure` | `accounts.payment_amount` when positive, else `templateAmount` | unchanged (7.6, item 3) |
-| the rate-change sync (B2, 7.5) | `total(D, E)` exactly at `D` = the template's `next_due_date`; `templateAmount` when `payment(D)` is null | the payment in force today, priced at `max(effectiveDate, next_due_date)` with its own arithmetic |
+| `sync` (the rate-change sync, 7.5) | `total(D, E)` exactly at `D` = the template's `next_due_date`; `templateAmount` when `payment(D)` is null; a rate nothing records declines rather than pricing 0 % | before B2: the payment in force today, priced at `max(effectiveDate, next_due_date)` with its own arithmetic |
 
 The sync takes the dated payment exactly, not the `max`, because it exists to
 correct a template the timeline no longer agrees with: a template left at a
@@ -583,11 +587,14 @@ Decision 3 of issue #1637.
 
 - **Priced at the template's own due date, never at the effective date.**
   The preview and the apply price through `resolveInstallmentCore` at
-  `D` = the template's `next_due_date`, with the payment of 7.2's last row.
-  Mechanism: one function computes the plan, and the apply calls it and writes
-  what it returned, so the preview and the commit cannot price two dates. A
-  change dated after `D` does not move the payment at `D`, which stays the
-  timeline's figure for `D`.
+  `D` = the template's `next_due_date`, with the payment of 7.2's `sync` row.
+  Mechanism: one function computes the plan
+  (`LoanRateChangesService.buildScheduledUpdate`, over
+  `planLoanTemplateRewrite` with purpose `sync`), and the apply calls it in
+  the transaction that writes what it returned (`applyLoanTemplateRewrite`),
+  so the preview and the commit cannot price two dates. A change dated after
+  `D` does not move the payment at `D`, which stays the timeline's figure for
+  `D`.
 - **The figure at `D` is the timeline's, exactly.** It replaces whatever the
   template holds, a payment the user raised on the template included (the
   third row below): that is the price of repairing Scenario 2, where the
@@ -596,34 +603,50 @@ Decision 3 of issue #1637.
   payment with no `max`). The preview shows the current and the proposed figure side by side,
   so the user sees the raise go before confirming, and declining keeps it.
 - **Applied through `rewriteLoanTemplate`, never `ScheduledTransactionsService.update`.**
-  `rewriteLoanTemplate` writes the template's parent and its managed lines and
-  nothing on the account, so the sync does not write `accounts.payment_amount`
-  (decision 5). The schedule update writes that column when a template amount
-  is edited, which is how Scenario 2 overwrote it; B2's spec asserts the
-  account row is not saved by the apply, and a source-scanning case in B2
-  fails a call of `ScheduledTransactionsService.update` from the rate-change
-  service.
+  `applyLoanTemplateRewrite` writes the template's parent and its managed
+  lines and nothing on the account, so the sync does not write
+  `accounts.payment_amount` (decision 5). The schedule update writes that
+  column when a template amount is edited, which is how Scenario 2 overwrote
+  it; `loan-rate-changes.service.spec.ts` asserts the account row is not
+  saved on any path, and its source-scanning case fails any reference to
+  `ScheduledTransactionsService` from the rate-change module, whose Nest
+  module no longer imports the scheduled-transactions one.
 - **Create, update and delete all ask.** Each returns its
   `scheduledPaymentPreview` and applies nothing; the existing
   `POST /accounts/:accountId/rate-changes/apply-scheduled-payment` applies
   after the user confirms, recomputing through the same function. The
-  mortgage rate update (`PATCH /accounts/:id/mortgage-rate`) prices and
-  writes the template by the same rule.
-- **The preview names the due date.** `ScheduledPaymentPreview` gains
+  mortgage rate update (`PATCH /accounts/:id/mortgage-rate`), which no UI
+  confirms, calls that same apply at once after recording the change.
+- **The preview names the due date.** `ScheduledPaymentPreview` carries
   `dueDate` (`D`, the installment the proposed figures are for) and
-  `nextPaymentChange: { dueDate, paymentAmount } | null`: the first slot after
-  `D` at which `newly` holds (7.3), and `total` there. Null when no row stating
-  a payment is dated after `D`. The search is bounded: only rows dated after
-  `D` can make a later slot `newly`, and each maps to the first slot on or
-  after its date.
+  `upcomingPaymentChanges: { dueDate, paymentAmount }[]`: every slot after
+  `D` at which `newly` holds (7.3), in date order, each with `total` there.
+  Empty when no row stating a payment is dated after `D`. Listing every one,
+  not only the first, is what lets a confirmation shown after a second
+  later change name that change: with only the first, adding a second
+  change repeated the first one's date and payment. The search is bounded:
+  only rows dated after `D` can make a later slot `newly`, each maps to the
+  first slot on or after its date, and rows that map to one slot name it
+  once, at the latest row's payment (`upcomingPaymentChangesAfter`,
+  `backend/src/loan-installments/upcoming-payment-changes.ts`).
 
-| Sync case | Template written (at `D`) | `nextPaymentChange` |
+| Sync case | Template written (at `D`) | `upcomingPaymentChanges` |
 | --- | --- | --- |
 | Timeline A added, nothing posted, `D` = 2023-02-03 | 584.59 = 416.67 + 167.92 | 2023-05-03, 560.00 |
 | Timeline A edited (Scenario 2: the template held 560.00) | 584.59 = 416.67 + 167.92 | 2023-05-03, 560.00 |
 | Timeline A added with the A7 template (600.00, 2023-02-03 posted 584.59, 2023-03-03 posted 600.00), `D` = 2023-04-03 | 584.59 = 415.20 + 169.39 on 99,648.05: the raise is replaced (current 600.00 shown beside it) | 2023-05-03, 560.00 |
-| Timeline A, `D` = 2023-06-03 (2023-02-03 to 2023-05-03 posted per table 5.2) | 560.00 = 372.40 + 187.60 | null |
-| Timeline A deleted, `D` = 2023-02-03 | 584.59 = 416.67 + 167.92 (the `initial` row) | null |
+| Timeline A, `D` = 2023-06-03 (2023-02-03 to 2023-05-03 posted per table 5.2) | 560.00 = 372.40 + 187.60 | none |
+| Timeline A deleted, `D` = 2023-02-03 | 584.59 = 416.67 + 167.92 (the `initial` row) | none |
+| Timeline A plus a second change (4.0 %, 575.00, 2023-08-10) added, nothing posted, `D` = 2023-02-03 | 584.59 = 416.67 + 167.92 | 2023-05-03, 560.00; 2023-09-03, 575.00 |
+
+Asserted by: every row, Scenario 2's edit and the account row untouched on
+every path by `backend/src/loan-rate-changes/loan-rate-changes.service.spec.ts`
+("the scheduled-payment sync (spec 7.5)"); the `sync` purpose's rules by
+`backend/src/loan-installments/price-installment.spec.ts` ('purpose "sync"');
+`upcomingPaymentChanges` by `backend/src/loan-installments/upcoming-payment-changes.spec.ts`;
+the same on a real ledger, timeline and schedule by
+`backend/test/integration/dated-loan-payment.integration.spec.ts` ("the
+rate-change sync at the template's own due date").
 
 ### 7.6 Known gaps
 
@@ -687,29 +710,52 @@ LoanOccurrence {
   annualRate:     number | null      // the rate at dueDate (section 1)
   debtBefore:     number | null      // the folded debt at dueDate (8.2)
   complete:       boolean            // every figure above is known
+  missing:        LoanOccurrenceMissing | null   // why not, null exactly when complete (8.4)
 }
+
+LoanOccurrenceMissing =
+  | { kind: "rate", date }                      // no rate recorded at that date
+  | { kind: "cadence", frequency }              // a cadence the pricing cannot count
+  | { kind: "override-lines", overrideId }      // lines the identification does not recognise
+  | { kind: "override-on-settled-debt", overrideId }  // 8.3
+  | { kind: "earlier-occurrence", originalDate }      // the slot whose figure is unknown
 ```
 
 `not-a-loan`: the schedule is not the template shape this core prices (no
 transfer into a loan-like account); `declined`: it is, and
-`identifyLoanTemplate` or `missingMethodTerms` declines it. In both the
+`identifyLoanTemplate` or `missingMethodTerms` declines it, or it is a
+foreign-currency schedule (`original_currency_code` and `original_amount`
+set), whose converted amounts `post()` posts without re-pricing. In each the
 client shows what the posting will move, which for those shapes is the
 snapshot `ScheduledOccurrenceService` already answers.
 
+The answer is the loan's dated debt and rate, which the transfer mask does
+not hide, so a delegate needs READ on every account the schedule touches,
+the loan included (`@DelegateReadsEveryScheduledAccount`), not only on the
+paying account an ordinary scheduled read gates.
+
 ### 8.2 The fold
 
-Occurrences are `expandOccurrenceSlots` (`backend/src/common/scheduled-occurrences.ts`)
+The reported occurrences are `expandOccurrenceSlots` (`backend/src/common/scheduled-occurrences.ts`)
 from `next_due_date`, with the schedule's overrides, `maxOccurrences = count`,
 ordered by `dueDate`; the schedule's `end_date` and `occurrences_remaining`
-bound it as they bound every consumer. With `debtLedger(x)` from
-`datedLoanDebts` (one statement for every date, `backend/src/accounts/dated-loan-debt.util.ts`):
+bound it as they bound every consumer. The fold walks them in SLOT order,
+k = 1 the cursor: `post()` claims only the cursor, so slots post in that
+order whatever date an override moves one to, and `rewriteLoanTemplate`
+advances the template in it. It walks every slot from the cursor through the
+last reported one (`loanProjectionOccurrences`, a second read of the same
+expander), so a slot an override moved past the `count`-th date still
+carries the chain; only the first `count` by `dueDate` are answered. With
+`debtLedger(x)` from `datedLoanDebts` (one statement for every date,
+`backend/src/accounts/dated-loan-debt.util.ts`):
 
 ```text
 debtAt(x)        = debtLedger(x) - sum(principal + extraPrincipal)
-                   over the occurrences projected earlier whose dueDate <= x
+                   over the earlier slots whose dueDate <= x
 chain(1)         = the template's amount (the cursor's bill as stored)
 chain(k), k >= 2 = the advancement (purpose template, 7.3) at originalDate(k)
-                   with templateAmount = chain(k-1), on debtAt(originalDate(k))
+                   with templateAmount = chain(k-1), on debtAt(originalDate(k)),
+                   prev(D) = originalDate(k-1)
 bill(k)          = the override's amount when occurrence k has one (8.3),
                    else chain(k)
 lines(k)         = priceInstallment, purpose posting, with templateAmount =
@@ -725,10 +771,18 @@ so its principal is what the ledger will hold. With no ledger row after
 `next_due_date` this is `datedLoanDebt(next_due_date)` less the booked
 principal so far.
 
-An occurrence whose `debtAt(dueDate) <= 0.01` is the payoff `post()` writes no
-money for (section 3): it is listed with `amount`, `principal`, `interest` and
-`extraPrincipal` 0.00, and the projection ends after it, as the recalculation
-deactivates the schedule.
+The advancement before slot k reads the debt first, as `rewriteLoanTemplate`
+does: when `debtAt(originalDate(k)) <= 0.01` the recalculation deactivates
+the schedule, slot k never posts, and the projection ends before it. A line
+of credit is the exception there too: its schedule stays active and its
+template unchanged, and the projection goes on, so a draw recorded for a
+later date is billed again.
+
+An occurrence whose `debtAt(dueDate) <= 0.01` and which states no override
+amount is the payoff `post()` writes no money for (section 3): it is listed
+with `amount`, `principal`, `interest` and `extraPrincipal` 0.00. Zero needs
+no rate, but `annualRate` is a figure of the row: with no rate at the date
+the row is `complete: false` with `missing` naming it, and the fold goes on.
 
 ### 8.3 An override
 
@@ -741,6 +795,12 @@ deactivates the schedule.
   `lines(k)` at its `dueDate` (7.6, item 4).
 - An override without an amount (a date move, a description): the bill is
   the template chain's, divided at the override's `dueDate`.
+- An override with an amount on a debt settled by its `dueDate`: `post()`
+  checks the payoff only for a bill priced from the template, so the amount
+  posts. With its own lines they stand as above; without, no division of it
+  is priced on a settled debt, so the occurrence's `amount` is the override's
+  and its lines are null, `missing` is `override-on-settled-debt`, and every
+  later occurrence is unknown.
 - An override never enters the template chain: `chain(k+1)` follows from
   `chain(k)`, because the advancement after an overridden posting
   (`rewriteLoanTemplate`) reads the stored template's amount, which an
@@ -753,8 +813,8 @@ deactivates the schedule.
 | Missing | Response |
 | --- | --- |
 | The ledger cannot be read (`datedLoanDebts` answers null) | the read fails: 503 with `errors.scheduled.loanLedgerUnreadable` (the message the posting path already refuses with), never a guessed figure |
-| No rate at an occurrence's `dueDate` or slot (`datedAnnualRate` null) | that occurrence and every later one `complete: false` with `amount`, `principal`, `interest` and `extraPrincipal` null; that occurrence still carries its `debtBefore`, the later ones null |
-| An unknown cadence (`periodsPerYearForStoredFrequency` null) | every occurrence as for a missing rate |
+| No rate at an occurrence's `dueDate` or slot (`datedAnnualRate` null) | that occurrence and every later one `complete: false` with `amount`, `principal`, `interest` and `extraPrincipal` null; that occurrence still carries its `debtBefore` and `missing` `rate` with the date, the later ones a null `debtBefore` and `missing` `earlier-occurrence` naming its slot |
+| An unknown cadence (`periodsPerYearForStoredFrequency` null) | every occurrence as for a missing rate, each with `missing` `cadence` |
 | No dated payment for an annuity (`payment(D)` null) | none: the advancement keeps the template's amount (7.2), as it does today |
 | The schedule is not found for the user | 404 |
 
@@ -792,3 +852,65 @@ Timeline A with the Scenario 2 template (560.00 at 2023-02-03, no resync):
 the first occurrence is 560.00 = 416.67 + 143.33, what posting it would book,
 and the second is 584.59 = 416.07 + 168.52 on 99,856.67 (A13). The projection
 shows the defect rather than hiding it; the resync is the repair.
+
+Asserted by `backend/src/loan-installments/project-loan-occurrences.spec.ts`
+(every table above, the override of 8.3 with its own lines and with lines
+the identification does not recognise, each row of 8.4 with its `missing`,
+the payoff at the cursor and with no rate, the end at a settled slot, an
+override amount on a settled debt, a line of credit drawn on again, a cursor
+moved past the next slot and past the reported rows, the declines) and
+`backend/src/scheduled-transactions/scheduled-transaction-loan.service.spec.ts`
+("projectLoanOccurrences": the one ledger statement over both dates of every
+occurrence, the first occurrence equal to `resolvePostingAllocation` on the
+same ledger, `not-a-loan`, `declined` for a shape and for a foreign-currency
+schedule, a cursor moved past the count, the 404 and the 503). The delegate
+gate is `scheduled-transactions.controller.spec.ts` and
+`account-delegate.guard.spec.ts`. The count bound
+of 8.5 is `backend/src/scheduled-transactions/dto/loan-occurrences-query.dto.spec.ts`.
+
+### 8.7 The occurrence contract (F3)
+
+Issue #1645. `ScheduledOccurrenceService.expand`
+(`backend/src/scheduled-transactions/scheduled-occurrence.service.ts`) answers
+every server surface's "what does THIS occurrence cost" (INV-OCCURRENCE-003):
+`GET /scheduled-transactions/occurrences` (the transactions calendar, the
+Upcoming Bills report), the balance forecast, budgets, bill reminders, the
+assistant and MCP. For a loan bill, "what it would post today" for an
+occurrence after the next is defined as what posting it would move once the
+slots before it have posted: the projection's `amount` (8.2), signed as the
+template is.
+
+| Occurrence | `amount` |
+| --- | --- |
+| The cursor (`originalDate` = `next_due_date`) | the effective amount, as for any schedule: what posting it today moves |
+| A later slot due on or before today + `LOAN_OCCURRENCE_HORIZON_DAYS` (366: through the same date next year) | the projection's `amount`, the template's sign; `directionAmount` the same |
+| Such a slot whose projected `amount` is null (8.4), or every such slot when the ledger cannot be read | `null`, `complete: false`, `directionAmount` the template's: no rate moves a loan payment's direction |
+| A slot after the one by which the debt is settled (the projection ends, 8.2) | not listed: the advancement deactivates the schedule before it posts |
+| A slot due after the horizon | the effective amount (the template's), as before this section |
+| A schedule the projection answers `not-a-loan` or `declined` | the effective amount |
+
+The projection's `amount` with lines unknown (`override-lines`,
+`override-on-settled-debt`) is a known amount: the occurrence is
+`complete: true`, because the occurrence contract carries no lines.
+
+Only a schedule with a transfer line, an occurrence after the cursor and an
+occurrence inside the horizon is projected, so a surface listing one row per
+schedule (`maxOccurrences: 1`) reads nothing more. The projection is asked
+from the cursor whatever the window's lower bound, for every occurrence through
+the latest one the expansion prices; all the expansion's loan schedules are
+projected in one transaction (`projectLoanOccurrencesMany`), which answers
+`null` for a loan whose ledger cannot be read rather than failing every
+schedule's read (8.4's 503 is the single read's).
+
+The client surfaces that print a later occurrence's amount read the server's
+occurrences: the transactions calendar (`useCalendarMonthData`) and the
+Upcoming Bills report. The Bills calendar grid (`ScheduledCalendarGrid`) labels
+a chip with the schedule's name and the Upcoming Bills widget lists each
+schedule's next occurrence only, so neither prints a later occurrence's amount.
+
+Asserted by `scheduled-occurrence.service.spec.ts` ("loan bill occurrences
+after the next": Timeline A's five occurrences, the cursor kept, the window
+starting later, the horizon, an unknown occurrence, the unreadable ledger, the
+two statuses left alone, the settled end, no read for a next-only listing or a
+schedule with no transfer line) and `scheduled-transaction-loan.service.spec.ts`
+("projectLoanOccurrencesMany").

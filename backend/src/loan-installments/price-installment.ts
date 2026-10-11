@@ -89,15 +89,24 @@ export interface LoanTemplateSplits {
  * LINEAR and INTEREST_ONLY derive the installment from the method, as the
  * template purpose does.
  *
+ * `sync` is the rate-change sync (spec 7.5, `LoanRateChangesService
+ * .buildScheduledUpdate`): a template rewrite at the template's own
+ * `next_due_date` that takes the payment dated there exactly, a raised
+ * template included, because it exists to correct a template the timeline no
+ * longer agrees with. It grows the extra line back toward the account's
+ * configured extra as every template rewrite does, and declines a rate
+ * nothing records rather than pricing 0 %: it is an offer the user confirms,
+ * never a posting path's default.
+ *
  * The annuity payment every purpose but `reconfigure` prices from is dated
  * at `asOfDate` (INV-LOAN-009, spec section 7.2): `template` takes it exactly
  * when it newly applies to the installment (7.3) and otherwise grows the
- * template toward it; `settlement` takes it exactly; `posting` keeps the
- * bill shown. `reconfigure` alone targets `accounts.payment_amount`, the
- * column a method change re-levels in the same transaction (7.6, item 3).
+ * template toward it; `settlement` and `sync` take it exactly; `posting`
+ * keeps the bill shown. `reconfigure` alone targets `accounts.payment_amount`,
+ * the column a method change re-levels in the same transaction (7.6, item 3).
  */
 export type InstallmentPurpose =
-  "template" | "posting" | "reconfigure" | "settlement";
+  "template" | "posting" | "reconfigure" | "settlement" | "sync";
 
 /** One resolved installment: what the next posting of this template should move. */
 export type ResolvedInstallment =
@@ -309,8 +318,12 @@ async function readRateTimeline(
   });
 }
 
-/** The pure half of `datedAnnualRate`, over rows already read. */
-function annualRateOn(
+/**
+ * The pure half of `datedAnnualRate`, over rows already read: the one rule
+ * for every consumer that holds the timeline itself (the projection reads it
+ * once per request and asks for a rate at each occurrence's two dates).
+ */
+export function annualRateOn(
   rows: readonly RateTimelineRow[],
   loanAccount: Pick<Account, "interestRate">,
   asOfDate: string,
@@ -468,6 +481,32 @@ export function periodicRateFor(
     : interestRate / 100 / periodsPerYear;
 }
 
+/**
+ * What the pure tail answers: an installment, or a shape it declines. The
+ * ledger and debt outcomes of `ResolvedInstallment` belong to the core, which
+ * reads the ledger; the tail is handed a debt and never reports one.
+ */
+export type PricedInstallment = Extract<
+  ResolvedInstallment,
+  { kind: "ok" | "declined" }
+>;
+
+/**
+ * Why a LINEAR or INTEREST_ONLY mortgage cannot be priced at any date: the
+ * terms its method derives the installment from that the account lacks (spec
+ * section 8 of `docs/specs/mortgage-types.md`), or null when nothing is
+ * missing. Dated facts play no part, so a consumer pricing many dates (the
+ * occurrence projection) asks once.
+ */
+export function methodTermsDecline(loanAccount: Account): string | null {
+  if (isAnnuity(loanAccount)) return null;
+  const mortgageType = mortgageTypeOf(loanAccount);
+  const missing = missingMethodTerms(mortgageType, loanAccount);
+  return missing.length > 0
+    ? `the ${mortgageType} mortgage ${loanAccount.id} has no ${missing.join(", ")}`
+    : null;
+}
+
 /** The facts the pure tail prices from; every one dated at `asOfDate`. */
 export interface PriceInstallmentInput {
   /** The ledger debt through `asOfDate`, positive and not yet retired. */
@@ -481,7 +520,7 @@ export interface PriceInstallmentInput {
   templateAmount: number;
   /**
    * The annuity payment dated at `asOfDate` (`datedAnnuityPayment`), null
-   * when nothing states one. Read by the `template` and `settlement`
+   * when nothing states one. Read by the `template`, `settlement` and `sync`
    * purposes; ignored by `posting` (the bill shown), by `reconfigure` (the
    * account column) and by a derived method (LINEAR, INTEREST_ONLY).
    */
@@ -512,7 +551,7 @@ export interface PriceInstallmentInput {
  */
 export function priceInstallment(
   input: PriceInstallmentInput,
-): ResolvedInstallment {
+): PricedInstallment {
   const {
     debt,
     annualRate,
@@ -526,7 +565,6 @@ export function priceInstallment(
     purpose,
   } = input;
   const { extraPrincipalSplit } = template;
-  const loanAccountId = loanAccount.id;
 
   // The amortization method decides the principal (INV-LOAN-007). Only a
   // mortgage has one; every other loan-like account is an annuity.
@@ -534,19 +572,13 @@ export function priceInstallment(
     loanAccount.accountType === AccountType.MORTGAGE
       ? mortgageTypeOf(loanAccount)
       : null;
-  const method = mortgageType ? amortizationMethodFor(mortgageType) : null;
   // A LINEAR or INTEREST_ONLY mortgage without its terms has no `N`, no
   // calendar or no principal to divide (spec section 8): decline, so the
   // persisted amounts post as for any shape this module cannot account for,
   // rather than price a guess.
-  if (mortgageType && method !== "ANNUITY") {
-    const missing = missingMethodTerms(mortgageType, loanAccount);
-    if (missing.length > 0) {
-      return {
-        kind: "declined",
-        reason: `the ${mortgageType} mortgage ${loanAccountId} has no ${missing.join(", ")}`,
-      };
-    }
+  const missingTerms = methodTermsDecline(loanAccount);
+  if (missingTerms !== null) {
+    return { kind: "declined", reason: missingTerms };
   }
 
   // What the template holds is what was just posted -- including any clamp
@@ -603,9 +635,10 @@ export function priceInstallment(
   // template advancement may grow back toward it, and it steps into it
   // exactly, down as well as up, when the stating row newly applies to this
   // installment (7.3); a posting re-divides the bill it was shown (see
-  // `InstallmentPurpose`); a settlement takes it exactly; a reconfigure
-  // alone targets `accounts.payment_amount`, which the method change
-  // re-levels. With no dated payment the template's amount stands.
+  // `InstallmentPurpose`); a settlement and the rate-change sync take it
+  // exactly (7.5); a reconfigure alone targets `accounts.payment_amount`,
+  // which the method change re-levels. With no dated payment the template's
+  // amount stands.
   const datedTotal =
     datedPayment === null
       ? null
@@ -627,7 +660,7 @@ export function priceInstallment(
           : templateAmount
         : datedTotal === null
           ? templateAmount
-          : purpose === "settlement" || newlyApplies
+          : purpose === "settlement" || purpose === "sync" || newlyApplies
             ? datedTotal
             : Math.max(templateAmount, datedTotal);
   const basePaymentAmount = paymentAmount - extraPrincipalAmount;
@@ -703,10 +736,13 @@ export interface ResolveInstallmentInput {
  * A rate nothing records is 0 % for the template, posting and reconfigure
  * purposes, the posting path's historical default
  * (`docs/specs/loan-installment-settlement.md` section 15 item 5); a
- * settlement declines, naming the rate (decision 16), and declines an
- * annuity nothing states a payment for, naming the payment (spec 7.2). Both
- * come from one read of the timeline, taken only once the shape and the debt
- * have passed, because a retired or unmanaged template needs neither.
+ * settlement declines, naming the rate (decision 16), and so does the
+ * rate-change sync, an offer that must not price a template at 0 %. A
+ * settlement also declines an annuity nothing states a payment for, naming
+ * the payment (spec 7.2); the sync keeps the template's amount there (7.5).
+ * Both inputs come from one read of the timeline, taken only once the shape
+ * and the debt have passed, because a retired or unmanaged template needs
+ * neither.
  */
 export async function resolveInstallmentCore(
   m: EntityManager,
@@ -747,7 +783,10 @@ export async function resolveInstallmentCore(
   // installment are read from the same rows at the same date.
   const timeline = await readRateTimeline(m, loanAccountId);
   const recordedRate = annualRateOn(timeline, loanAccount, asOfDate);
-  if (recordedRate === null && purpose === "settlement") {
+  if (
+    recordedRate === null &&
+    (purpose === "settlement" || purpose === "sync")
+  ) {
     return {
       kind: "declined",
       reason: `no interest rate is recorded for loan account ${loanAccountId} on ${asOfDate}`,
@@ -801,7 +840,7 @@ export async function resolveInstallmentCore(
 }
 
 /** Whether the account's installment is an annuity: every loan-like account but a LINEAR or INTEREST_ONLY mortgage. */
-function isAnnuity(loanAccount: Account): boolean {
+export function isAnnuity(loanAccount: Account): boolean {
   return (
     loanAccount.accountType !== AccountType.MORTGAGE ||
     amortizationMethodFor(mortgageTypeOf(loanAccount)) === "ANNUITY"

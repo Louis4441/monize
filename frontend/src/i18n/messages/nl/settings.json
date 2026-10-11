@@ -781,6 +781,7 @@
         "pleaseEnterPassword": "Voer jouw wachtwoord in om te bevestigen",
         "encryptedNeedsPassword": "Deze back-up is versleuteld. Voer het wachtwoord waarmee deze is aangemaakt in het veld \"Back-upwachtwoord\" in en probeer het opnieuw.",
         "failed": "Terugzetten van back-up mislukt",
+        "interrupted": "Het herstel werd onderbroken voordat de server antwoordde. Een herstel wordt volledig of helemaal niet uitgevoerd, dus uw gegevens zijn volledig hersteld of ongewijzigd. Laad de pagina opnieuw om te zien welke van de twee, voordat u het opnieuw probeert.",
         "reauthRedirect": "Je gaat naar je identiteitsprovider om te bevestigen dat jij het bent. Kies het back-upbestand opnieuw wanneer je terugkomt."
       },
       "selectedFile": "Geselecteerd: {filename}"

@@ -14,10 +14,11 @@ sections 5.1 to 5.3, 7 and 8, and
 plan says what to edit, in what order, and what to run, and defers to the spec
 on every number and every refusal.
 
-Status: **approved**, decisions agreed in the planning session and recorded on
-the tracking issue #1637. Each task is a sub-issue (#1638 to #1645), one PR
-each; Q, the acceptance task, closes the feature. F3 is filed for later and is
-not in the approved scope.
+Status: **done** (B1 to B3, F1, F2, and Q, the acceptance task, all merged);
+decisions agreed in the planning session and recorded on the tracking issue
+#1637. Each task was a sub-issue (#1638 to #1644), one PR each. F3 (#1645),
+filed for later, was approved afterwards and prices a loan bill's later
+occurrences on the occurrence contract (spec 8.7).
 
 ## 1. Goal
 
@@ -79,7 +80,7 @@ ones that decide the shape of the work:
 | 2 | B2, B3 | The sync at the template's due date, asking on every change; the projection read | Editing or deleting a rate change no longer rewrites the bill until the user confirms; the preview carries two new fields; a new read nothing calls yet |
 | 3 | F1, F2 | The confirmation on edit and delete; the priced occurrence picker and override editor | The dialogs show the due date and per-occurrence amounts |
 | 4 | Q | Every locale, INV-LOAN-009 enforced, release note, dev data resynced | none |
-| later | F3 | Bills calendar and Upcoming Bills priced per loan occurrence | not approved |
+| later | F3 | Loan occurrences after the next priced by `ScheduledOccurrenceService`, one year ahead | Every server surface and the occurrence read show a later loan occurrence at its projected amount (spec 8.7) |
 
 B2 changes the response of `PATCH` and `DELETE /accounts/:accountId/rate-changes/:id`
 (a preview, nothing applied) before F1 shows it: between the two merges an
@@ -124,4 +125,4 @@ written the user did not see); F1 follows B2 directly.
 | A skipped slot misses the step into a lower payment | Named as a known gap (spec 7.6 item 1); the projection shows it, and re-running the sync repairs it |
 | Edit and delete stop applying until F1 ships | F1 follows B2; the interim is "not yet applied", never a wrong write (section 4) |
 | Templates written by the old sync stay wrong | Q resyncs the dev data; the release note tells users to confirm a sync (decision 6) |
-| The projection and the posting disagree | Both price through `priceInstallment` with the posting purpose for the lines; B3 asserts the first occurrence against `ScheduledOccurrenceService` and the lines against `resolvePostingAllocation` on the same ledger |
+| The projection and the posting disagree | Both price through `priceInstallment` with the posting purpose for the lines; B3 asserts the first occurrence's total and lines against `resolvePostingAllocation` on the same ledger, and its total against the stored template, which is what `ScheduledOccurrenceService` answers for a same-currency base occurrence |

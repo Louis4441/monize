@@ -34,12 +34,12 @@ Every task is safe to merge in any order that respects its dependencies: nothing
 |----|-------|------|-----------|--------------|--------|----|
 | S1 | #1638 | Spec sections and plan pair; INV-LOAN-009 registered `unenforced` | -- | none | [x] | the PR closing #1638 |
 | B1 | #1639 | Dated payment in the pricing core and the template advancement | S1 | neutral | [x] | the PR closing #1639 |
-| B2 | #1640 | Rate-change sync prices the template's own due date; confirm on create, update, delete; no `payment_amount` write | B1 | neutral | [ ] | |
-| B3 | #1641 | Loan occurrence projection read | B1 | inert | [ ] | |
-| F1 | #1642 | Rate-change dialogs: confirm on edit and delete, preview names the due date | B2 | inert | [ ] | |
-| F2 | #1643 | Occurrence picker and override editor priced per occurrence | B3 | inert | [ ] | |
-| Q | #1644 | Acceptance: INV-LOAN-009 enforced, locales, release note, dev data resync | B2, F1, F2 | none | [ ] | |
-| F3 | #1645 | (Later, not approved) Bills calendar and Upcoming Bills priced per loan occurrence | B3 | inert | [ ] | |
+| B2 | #1640 | Rate-change sync prices the template's own due date; confirm on create, update, delete; no `payment_amount` write | B1 | neutral | [x] | the PR closing #1640 |
+| B3 | #1641 | Loan occurrence projection read | B1 | inert | [x] | the PR closing #1641 |
+| F1 | #1642 | Rate-change dialogs: confirm on edit and delete, preview names the due date | B2 | inert | [x] | the PR closing #1642 |
+| F2 | #1643 | Occurrence picker and override editor priced per occurrence | B3 | inert | [x] | the PR closing #1643 |
+| Q | #1644 | Acceptance: INV-LOAN-009 enforced, locales, release note, dev data resync | B2, F1, F2 | none | [x] | the PR closing #1644 |
+| F3 | #1645 | Loan occurrences after the next priced on the occurrence contract (`ScheduledOccurrenceService`), one year ahead | B3 | neutral | [x] | the PR closing #1645 |
 
 **Why B1 is neutral:** an annuity template whose timeline states a payment for a later installment steps into it at that installment (spec 7.3), down as well as up; every other template advances exactly as before, and posting is unchanged.
 
@@ -72,7 +72,7 @@ Every task is safe to merge in any order that respects its dependencies: nothing
 
 - One plan function prices the template at its own `next_due_date` through `resolveInstallmentCore` with the payment of spec 7.2's sync row; the preview returns it and `applyScheduledPaymentSync` writes it through `rewriteLoanTemplate` (spec 7.5). `buildScheduledUpdate`'s own arithmetic and its `max(effectiveDate, next_due_date)` go.
 - `update` and `remove` return `scheduledPaymentPreview` and apply nothing, as `create` with `deferScheduledSync` does today; `create` loses the immediate-apply path. The mortgage rate update prices the template by the same function.
-- `ScheduledPaymentPreview` gains `dueDate` and `nextPaymentChange` (spec 7.5).
+- `ScheduledPaymentPreview` gains `dueDate` and the later payment changes, now `upcomingPaymentChanges` (spec 7.5).
 - No rate-change path calls `ScheduledTransactionsService.update`: a source-scanning case in the service's spec fails such a call, and the apply's unit case asserts the account row is not saved.
 - Acceptance: every row of spec table 7.5, the raised-template row included; Scenario 2 of #1637 (edit to 560.00) leaves the template at 584.59 and `accounts.payment_amount` unchanged; delete returns a preview and writes nothing until applied.
 - Doc line: the "Until B2" clauses of `docs/specs/mortgage-types.md` 5.3 and 5.6 removed.
@@ -90,7 +90,7 @@ Every task is safe to merge in any order that respects its dependencies: nothing
 
 **Files:** `frontend/src/components/accounts/loan-detail/useLoanRateEditing.ts`, `frontend/src/components/accounts/loan-detail/LoanRateControls.tsx`, `frontend/src/components/accounts/loan-detail/RateHistorySidebar.tsx`, `frontend/src/lib/loan-rate-changes.ts`, `frontend/src/types/loan-rate-change.ts`, `frontend/src/i18n/messages/en/accounts.json`, their tests.
 
-- The confirmation already shown after a create is shown after an edit and a delete; it names the installment the proposed figures are for (`dueDate`) and, when `nextPaymentChange` is present, the due date from which the bill becomes that amount.
+- The confirmation already shown after a create is shown after an edit and a delete; it names the installment the proposed figures are for (`dueDate`) and, for each entry of `upcomingPaymentChanges`, the due date from which the bill becomes that amount.
 - After the apply, the scheduled-transaction caches are invalidated (INV-CACHE-001), as the create path's apply does.
 - Grep `e2e/` for any accessible name the dialogs change.
 
@@ -107,6 +107,20 @@ Every task is safe to merge in any order that respects its dependencies: nothing
 
 - Dev data: confirm a sync on the affected dev accounts (BBTest, AAMortgage) and record the before and after template in the PR.
 
-### F3 -- (Later, not approved) Bills calendar and Upcoming Bills
+### F3 -- Loan occurrences after the next on the occurrence contract
 
-Filed without `approved-to-build`; no work until it is approved.
+Approved on #1645 with two answers: through `ScheduledOccurrenceService`, so
+every server surface (forecasts, budgets, reminders, AI, MCP, and
+`GET /scheduled-transactions/occurrences` for the transactions calendar and the
+Upcoming Bills report) gets the loan-aware amount; and one year ahead.
+
+**Files:** `backend/src/scheduled-transactions/scheduled-occurrence.service.ts`,
+`backend/src/scheduled-transactions/scheduled-transaction-loan.service.ts`
+(`projectLoanOccurrencesMany`), their specs, the specs that build the
+occurrence service, spec section 8.7.
+
+- Neutral, not inert: every surface reading a loan bill's later occurrences
+  changes from the template to the projection (spec 8.7's table).
+- The Bills calendar grid and the Upcoming Bills widget print no later
+  occurrence's amount (a chip is the schedule's name; the widget lists the next
+  occurrence), so neither changes.

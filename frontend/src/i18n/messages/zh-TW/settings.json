@@ -781,6 +781,7 @@
         "pleaseEnterPassword": "請輸入您的密碼以確認",
         "encryptedNeedsPassword": "此備份已加密。請在「備份密碼」欄位輸入建立時使用的密碼後再試。",
         "failed": "還原備份失敗",
+        "interrupted": "還原在伺服器回應之前遭到中斷。還原要麼全部生效，要麼完全不生效，因此您的資料要麼已完全還原，要麼維持不變。請先重新載入頁面確認，再重試。",
         "reauthRedirect": "正在前往身分提供者以確認你的身分。返回後請重新選擇備份檔案。"
       },
       "selectedFile": "已選取：{filename}"

@@ -781,6 +781,7 @@
         "pleaseEnterPassword": "Please enter your password to confirm",
         "encryptedNeedsPassword": "This backup is encrypted. Enter the password it was created with in the \"Backup password\" field, then try again.",
         "failed": "Failed to restore backup",
+        "interrupted": "The restore was interrupted before the server replied. A restore is all-or-nothing, so your data is either fully restored or unchanged. Reload the page to see which before trying again.",
         "reauthRedirect": "Taking you to your identity provider to confirm it is you. Choose the backup file again when you return."
       },
       "selectedFile": "Selected: {filename}"

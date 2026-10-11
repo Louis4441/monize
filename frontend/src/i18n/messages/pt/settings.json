@@ -781,6 +781,7 @@
         "pleaseEnterPassword": "Por favor introduza a sua palavra-passe para confirmar",
         "encryptedNeedsPassword": "Esta cópia de segurança está encriptada. Introduza a palavra-passe com que foi criada no campo \"Palavra-passe da cópia de segurança\" e tente novamente.",
         "failed": "Falha ao restaurar a cópia de segurança",
+        "interrupted": "O restauro foi interrompido antes de o servidor responder. Um restauro é aplicado na totalidade ou não é aplicado, por isso os seus dados estão totalmente restaurados ou inalterados. Recarregue a página para verificar antes de tentar novamente.",
         "reauthRedirect": "Vamos levá-lo ao seu provedor de identidade para confirmar que é você. Ao regressar, escolha novamente o ficheiro da cópia de segurança."
       },
       "selectedFile": "Selecionado: {filename}"

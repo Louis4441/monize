@@ -5,9 +5,10 @@ import { findRepoRoot, gitListFiles, requireRepoRoot } from "./repo-tree.util";
 
 /**
  * CI pulls third-party container images from a registry without an anonymous
- * pull limit: the ECR Public mirror of the Docker Official Images
- * (`public.ecr.aws/docker/library/...`, the same content and digests as Docker
- * Hub) or GitHub's own registry (`ghcr.io`). A Docker Hub pull from a shared
+ * pull limit: Google's mirror of the Docker Official Images
+ * (`mirror.gcr.io/library/...`, the same content and digests as Docker Hub) or
+ * GitHub's own registry (`ghcr.io`). Not the ECR Public mirror: its anonymous
+ * data limit per source IP is exhausted by GitHub's shared runners. A Docker Hub pull from a shared
  * runner IP is rate-limited, and a login needs DOCKERHUB_* secrets a fork does
  * not have, so a Docker Hub image turns a job red for reasons no change caused.
  * `docs/verification-contract.md` section 7.
@@ -22,7 +23,7 @@ import { findRepoRoot, gitListFiles, requireRepoRoot } from "./repo-tree.util";
  */
 
 const ALLOWED = [
-  /^public\.ecr\.aws\//,
+  /^mirror\.gcr\.io\//,
   /^ghcr\.io\//,
   /^\$\{\{.*\}\}/,
   /^[a-z0-9._-]+:local$/,
@@ -66,7 +67,7 @@ describe("disallowedImages", () => {
   it("refuses a Docker Hub base image in a Dockerfile, not an earlier stage", () => {
     const text = [
       "FROM node:24-alpine AS development",
-      "FROM public.ecr.aws/docker/library/node:24-slim AS builder",
+      "FROM mirror.gcr.io/library/node:24-slim AS builder",
       "FROM builder AS production",
       "FROM --platform=$BUILDPLATFORM $BASE",
     ].join("\n");
@@ -82,6 +83,12 @@ describe("disallowedImages", () => {
     expect(
       disallowedImages("ci.yml", "    image: docker.io/library/nginx:1\n"),
     ).toEqual([{ line: 1, image: "docker.io/library/nginx:1" }]);
+    expect(
+      disallowedImages(
+        "ci.yml",
+        "    image: public.ecr.aws/docker/library/nginx:1\n",
+      ),
+    ).toEqual([{ line: 1, image: "public.ecr.aws/docker/library/nginx:1" }]);
   });
 
   it("refuses a Docker Hub default in a script", () => {
@@ -93,9 +100,9 @@ describe("disallowedImages", () => {
     ]);
   });
 
-  it("accepts the ECR Public mirror, ghcr.io, an expression and a local build", () => {
+  it("accepts mirror.gcr.io, ghcr.io, an expression and a local build", () => {
     const text = [
-      "image: public.ecr.aws/docker/library/postgres:16-alpine@sha256:abc",
+      "image: mirror.gcr.io/library/postgres:16-alpine@sha256:abc",
       "image: ghcr.io/owner/app",
       "image: ${{ matrix.image }}@${{ steps.build.outputs.digest }}",
       "image: monize-e2e-backend:local",
@@ -105,7 +112,7 @@ describe("disallowedImages", () => {
     expect(
       disallowedImages(
         "v.sh",
-        'PG_IMAGE="${PG_IMAGE:-public.ecr.aws/docker/library/postgres:16}"',
+        'PG_IMAGE="${PG_IMAGE:-mirror.gcr.io/library/postgres:16}"',
       ),
     ).toEqual([]);
   });
@@ -115,7 +122,7 @@ const REPO_ROOT = findRepoRoot(__dirname);
 const describeTree = REPO_ROOT || process.env.CI ? describe : describe.skip;
 
 describeTree("CI pulls no image from Docker Hub", () => {
-  it("every image CI pulls comes from public.ecr.aws or ghcr.io", () => {
+  it("every image CI pulls comes from mirror.gcr.io or ghcr.io", () => {
     const root = requireRepoRoot(REPO_ROOT);
     const files = gitListFiles(root).filter(
       (path) =>
@@ -143,7 +150,7 @@ describeTree("CI pulls no image from Docker Hub", () => {
       throw new Error(
         `CI pulls these images from Docker Hub (rate-limited, needs a login a fork lacks):\n  ${offenders.join(
           "\n  ",
-        )}\nUse the ECR Public mirror of the official image, public.ecr.aws/docker/library/<name>:<tag> (same digests), or ghcr.io. docs/verification-contract.md section 7.`,
+        )}\nUse Google's mirror of the official image, mirror.gcr.io/library/<name>:<tag> (same digests), or ghcr.io. docs/verification-contract.md section 7.`,
       );
     }
   });

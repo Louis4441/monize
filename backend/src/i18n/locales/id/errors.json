@@ -731,7 +731,8 @@
     "strategyNotFound": "Strategi tidak ditemukan"
   },
   "maintenance": {
-    "inProgress": "Operasi lain sedang menggantikan data akun ini. Tunggu hingga selesai lalu coba lagi."
+    "inProgress": "Operasi lain sedang menggantikan data akun ini. Tunggu hingga selesai lalu coba lagi.",
+    "inProgressRetryAfter": "Operasi lain sedang mengganti data akun ini. Operasi itu akan selesai atau kedaluwarsa dalam {{minutes}} mnt; coba lagi setelahnya."
   },
   "payeeLookup": {
     "operatorManaged": "Google Places dikonfigurasi oleh administrator server ini. Hanya pengaturan aktif/nonaktif yang dapat diubah di sini.",

@@ -781,6 +781,7 @@
         "pleaseEnterPassword": "Por favor digite sua senha para confirmar",
         "encryptedNeedsPassword": "Este backup está criptografado. Digite a senha com que foi criado no campo \"Senha do backup\" e tente novamente.",
         "failed": "Falha ao restaurar o backup",
+        "interrupted": "A restauração foi interrompida antes de o servidor responder. Uma restauração é aplicada por completo ou não é aplicada, então seus dados estão totalmente restaurados ou inalterados. Recarregue a página para verificar antes de tentar novamente.",
         "reauthRedirect": "Vamos levar você ao seu provedor de identidade para confirmar que é você. Ao voltar, escolha o arquivo de backup novamente."
       },
       "selectedFile": "Selecionado: {filename}"

@@ -781,6 +781,7 @@
         "pleaseEnterPassword": "Wpisz hasło, aby potwierdzić",
         "encryptedNeedsPassword": "Ta kopia zapasowa jest zaszyfrowana. Wpisz hasło, którym ją utworzono, w polu \"Hasło kopii zapasowej\" i spróbuj ponownie.",
         "failed": "Nie udało się przywrócić kopii zapasowej",
+        "interrupted": "Przywracanie zostało przerwane, zanim serwer odpowiedział. Przywracanie wykonuje się w całości albo wcale, więc Twoje dane są w pełni przywrócone lub niezmienione. Przed ponowną próbą odśwież stronę, aby to sprawdzić.",
         "reauthRedirect": "Przenosimy Cię do dostawcy tożsamości, aby potwierdzić Twoją tożsamość. Po powrocie wybierz plik kopii zapasowej ponownie."
       },
       "selectedFile": "Wybrano: {filename}"

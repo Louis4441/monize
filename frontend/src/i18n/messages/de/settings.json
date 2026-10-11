@@ -781,6 +781,7 @@
         "pleaseEnterPassword": "Bitte geben Sie Ihr Passwort zur Bestätigung ein",
         "encryptedNeedsPassword": "Dieses Backup ist verschlüsselt. Geben Sie das Passwort, mit dem es erstellt wurde, im Feld \"Backup-Passwort\" ein und versuchen Sie es erneut.",
         "failed": "Backup konnte nicht wiederhergestellt werden",
+        "interrupted": "Die Wiederherstellung wurde unterbrochen, bevor der Server geantwortet hat. Eine Wiederherstellung erfolgt ganz oder gar nicht, Ihre Daten sind also entweder vollständig wiederhergestellt oder unverändert. Laden Sie die Seite neu, um zu prüfen, welcher Fall vorliegt, bevor Sie es erneut versuchen.",
         "reauthRedirect": "Sie werden zu Ihrem Identitätsanbieter weitergeleitet, um Ihre Identität zu bestätigen. Wählen Sie die Backup-Datei nach Ihrer Rückkehr erneut aus."
       },
       "selectedFile": "Ausgewählt: {filename}"

@@ -31,6 +31,22 @@ function isBackupPasswordRequired(error: unknown): boolean {
   return data?.code === BACKUP_PASSWORD_REQUIRED_CODE;
 }
 
+/**
+ * True when the restore request ended without the backend answering it: the
+ * connection dropped, the client timed out, or a proxy found the backend gone
+ * (a restart mid-restore). Unlike a refusal, nothing here says whether the
+ * restore committed, so the message has to say how to find out. A gateway
+ * status that carries the backend's own `message` is an answer -- the restore
+ * queue refuses with a 503 -- and keeps its message.
+ */
+function isRestoreInterrupted(error: unknown): boolean {
+  if (!isAxiosError(error)) return false;
+  if (!error.response) return true;
+  const { status, data } = error.response;
+  const answered = typeof (data as { message?: unknown } | undefined)?.message === 'string';
+  return !answered && (status === 502 || status === 503 || status === 504);
+}
+
 interface BackupRestoreSectionProps {
   user: User;
 }
@@ -292,6 +308,8 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
     } catch (error) {
       if (isBackupPasswordRequired(error)) {
         toast.error(t('restore.toasts.encryptedNeedsPassword'));
+      } else if (isRestoreInterrupted(error)) {
+        toast.error(t('restore.toasts.interrupted'), { duration: 12000 });
       } else {
         toast.error(getErrorMessage(error, t('restore.toasts.failed')));
       }

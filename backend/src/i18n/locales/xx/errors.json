@@ -731,7 +731,8 @@
     "strategyNotFound": "[XX-Strategy not found-XX]"
   },
   "maintenance": {
-    "inProgress": "[XX-Another operation is currently replacing this account's data. Wait for it to finish and try again.-XX]"
+    "inProgress": "[XX-Another operation is currently replacing this account's data. Wait for it to finish and try again.-XX]",
+    "inProgressRetryAfter": "[XX-Another operation is currently replacing this account's data. It will finish or time out within {{minutes}} min; try again then.-XX]"
   },
   "payeeLookup": {
     "operatorManaged": "[XX-Google Places is configured by this server's administrator. Only the on/off setting can be changed here.-XX]",
