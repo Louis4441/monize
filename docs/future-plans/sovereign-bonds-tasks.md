@@ -5,7 +5,7 @@
 ## Rules for every task
 
 - **The spec is the authority on every number.** A fixture copies spec section 5, never the implementation's output. If code and spec disagree, change the spec first, in its own commit, with the reason.
-- **Invariants:** INV-BOND-001 to INV-BOND-004. Name the ones the task touches in the PR.
+- **Invariants:** INV-BOND-001 to INV-BOND-005. Name the ones the task touches in the PR.
 - **Definition of done:** the "Required before you push" list in `AGENTS.md` for each layer the task touches.
 
 ## PR 1: foundation and four products
@@ -28,6 +28,17 @@ at the owner's request.
   the chart. Implemented in this PR; acceptance: the test-matrix rows
   "Attribution (13.2)", "Scenarios (13.3)" and "Chart (13.4)" of the spec, with
   the examples E23 to E25.
+
+## Audit fixes (WMP/monize#24)
+
+- [x] Decisions R1 to R38 of the audit are reflected in spec sections 2.6, 6,
+  7, 9, 12 and 13 and in INV-BOND-001, -002 and -005: engine series API,
+  `saleWindow` refusal, reversed price precedence for a linked security, lots
+  per account, link validation and undo, UNKNOWN cash flows and
+  `projectionMissing`, scenario rounding rule, future `asOf` refusal, market
+  surface exclusion, GUS/NBP freshness, `bond_instruments` immutability,
+  inactive catalog currencies, per-entry seed transactions, support backup and
+  restore handling.
 
 ## Follow-ups
 

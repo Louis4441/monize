@@ -242,7 +242,16 @@ projection assumption (`cpiYoY`, `nbpReference`). Output:
 
 ```text
 asOf, seriesCode, termsVersion, quantity
-currentPeriod      { index, start, end, annualRate, rateSource } | null
+status             OPEN | MATURED | REFUSED
+refusal            { code: PURCHASE_OUTSIDE_SALE_WINDOW,
+                     params: { from, to, purchaseDate } } | null
+                   -- a lot bought outside terms.saleWindow (null = no
+                   restriction) is REFUSED: every figure below is null and
+                   valuationComplete is false
+currentPeriod      { index, start, end, annualRate | null, rateSource | null }
+                   -- always present for an OPEN lot; annualRate and rateSource
+                   are null while the period's rate is unknown; null for a
+                   MATURED or REFUSED lot
 rateRule           the terms' rate rule as stated: type, benchmarkId, the
                    first-period rate, the margin or spread, the benchmark floor
 rateSchedule       one entry per period: { index, start, end, annualRate | null,
@@ -260,6 +269,10 @@ grossValue         lot, principal + accrued interest, no fee | null
 earlyRedemptionValue  lot | null, earlyRedemptionRefusal
 knownCashflows     [{ date, type: INTEREST | PRINCIPAL, amount, status: KNOWN }]
 projectedCashflows [{ ..., status: PROJECTED }]
+                   -- a future flow whose amount cannot be computed is
+                   emitted with status UNKNOWN and amount null (in the
+                   projected list), never dropped; amount is null only for
+                   UNKNOWN
 maturityValueKnown     | null
 maturityValueProjected | null
 projectionAssumptions  [{ benchmarkId, value (fraction), basis: SUPPLIED | LATEST_OBSERVATION,
@@ -269,15 +282,27 @@ missing            [{ benchmarkId, observation (YYYY-MM, or YYYY-MM-DD for a
                    step series), publisher | null }]  what to obtain, and
                    where; publisher is null only when the benchmark itself
                    is absent from the input
-valuationComplete  all three flags true
+projectionMissing  [{ benchmarkId, publisher | null }]  a benchmark a future
+                   period needs for which there is neither a stored
+                   observation nor a supplied assumption
+valuationComplete  all three flags true, and the lot is not REFUSED
 ```
+
+A completed period with a missing observation is named in `missing`; a future
+period without any basis is named in `projectionMissing`. The security-level
+response also carries `benchmarkCoverage: [{ benchmarkId, coveredThrough |
+null, lastFetchedAt | null }]` (top level, not per lot), so the card can say
+how fresh the reference data is. `asOf` after today is refused with
+`AS_OF_IN_FUTURE` (here and on the scenarios endpoint; the date picker's
+maximum is today); a future projection is the job of the scenarios (13.3).
 
 ## 3. Invariants
 
 - **INV-BOND-001 Issue terms and announced rates are immutable.** A stored
   terms version and a stored announced rate are never updated or deleted; a
   correction is a new terms version. Mechanism: a row-level `BEFORE UPDATE OR
-  DELETE` trigger on both tables that raises. `TRUNCATE` is not covered: it is
+  DELETE` trigger on the terms, the rates and the instruments that raises (the
+  seed's `INSERT ... ON CONFLICT DO NOTHING` never reaches it). `TRUNCATE` is not covered: it is
   a table-owner operation no application path issues, and the integration
   test reset relies on it.
 - **INV-BOND-002 A missing rate is unknown, never substituted.** A period that
@@ -368,8 +393,11 @@ formulas to the inputs their descriptions state.
   domain codes are `QUANTITY_INVALID`, `DATE_INVALID`, `DECIMAL_INVALID`,
   `AS_OF_BEFORE_PURCHASE`, `BENCHMARK_NOT_READ`, `INSTRUMENT_NOT_FOUND`,
   `INSTRUMENT_ID_NOT_FOUND`, `TERMS_NOT_FOUND` (no version stored),
-  `TERMS_VERSION_NOT_FOUND` (the named version is not stored) and
-  `TERMS_MISMATCH`. A lots refusal (`BondLotsRefusal`) is
+  `TERMS_VERSION_NOT_FOUND` (the named version is not stored),
+  `TERMS_MISMATCH`, `AS_OF_IN_FUTURE`, `PURCHASE_OUTSIDE_SALE_WINDOW` (a lot
+  refusal, not an error), and the link and undo codes
+  `LINK_REQUIRES_BOND_TYPE`, `LINK_QUANTITY_NOT_BONDS` and
+  `UNDO_LINK_INVALID` (section 12.1). A lots refusal (`BondLotsRefusal`) is
   `{ code, detail, params: { action, date, quantity } }`; `detail` is for the
   log and is never shown.
 - Every `null` figure caused by a missing observation is named in `missing`
@@ -379,6 +407,17 @@ formulas to the inputs their descriptions state.
   2026-10-19`) and the publisher stored with the benchmark series (GUS, NBP).
 - Coverage of a `STEP` benchmark (NBP): a day after the series' `covered_through` date is unknown, even
   if an older rate exists, because a newer change may not be stored yet.
+  The fetcher sets `covered_through` to the effective date of the NBP current
+  table only when that date is proven; when the current table's effective date
+  is not in the archive and the archive's newest change is older than the
+  previous current-table date allows (it cannot prove that no decision is
+  missing), `covered_through` is the archive's newest date, so later days are
+  unknown, not silently derived.
+- Freshness of the GUS CPI: the fetcher discovers the CSV link from the GUS
+  landing page first and uses its constant URL only as a fallback; a file whose
+  newest observation is older than 3 months is refused as a stale feed and is
+  a failure. Persistent failures of either fetcher are recorded through
+  `ProviderHealthService`, so the existing outage alerts fire.
 - CPI: a reference month with no stored row is unknown. A negative value is
   stored as is and floored at 0 in the rate rule only.
 - `asOf` before the purchase date: refused (`AS_OF_BEFORE_PURCHASE`).
@@ -400,7 +439,7 @@ Global reference data with no owner (RLS bucket: exempt, same rationale as
 
 | Table | Key | Mutability |
 | --- | --- | --- |
-| `bond_instruments` | `id`; unique `(issuer_country_code, issuer_code, series_code)` | insert only |
+| `bond_instruments` | `id`; unique `(issuer_country_code, issuer_code, series_code)` | insert only; `bond_reject_mutation()` also refuses UPDATE and DELETE (INV-BOND-001) |
 | `bond_terms_versions` | `(bond_instrument_id, version)`, with `content_hash` | immutable (INV-BOND-001) |
 | `bond_period_rates` | `(bond_instrument_id, period_number)` | immutable (INV-BOND-001) |
 | `benchmark_series` | `code`; `kind` `STEP` or `MONTHLY`, `publisher`, `unit`, `covered_through` | insert; `covered_through` moves forward |
@@ -412,7 +451,7 @@ through the migration.
 
 Rates are `NUMERIC(20,10)` (an exchange-rate-like quantity, not money); the
 face value is `NUMERIC(20,4)`. All five tables are excluded from the user
-backup: they are reference data a deployment re-fetches. A lot is not
+backup, and `securities.bond_instrument_id` is `NULL` in the support backup: they are reference data a deployment re-fetches. A lot is not
 stored: lots are derived from the user's transactions (section 12.2) and the
 engine takes one as input.
 
@@ -426,9 +465,14 @@ announced rate or observation changes the next read.
 ## 9. Concurrency
 
 The writers of the reference tables are `BondCatalogService` (seeds
-instruments and terms versions at boot with `ON CONFLICT DO NOTHING`; the
-immutability trigger makes a concurrent writer of the same terms version fail,
-not overwrite) and `BenchmarkRefreshService` (NBP and GUS observations, under
+instruments and terms versions at boot with `INSERT ... ON CONFLICT
+(bond_instrument_id, version) DO NOTHING`, each catalog entry in its own
+transaction, so a concurrent writer of the same version inserts nothing and
+raises nothing, and a stored version whose `content_hash` differs from the
+manifest's is logged and skipped; the trigger refuses any UPDATE or DELETE of a
+stored row but never fires on an insert; a currency the seed has to create is
+created inactive, through a `CurrenciesService` method only the seed uses, so
+it is not offered to users) and `BenchmarkRefreshService` (NBP and GUS observations, under
 the `bond-benchmarks` lease of `FetchSyncService`, at boot and by cron).
 Benchmark freshness at boot is decided by the last successful fetch, not by
 `covered_through`, which only records how far the data reaches.
@@ -441,10 +485,14 @@ the daily fan-out):
   read, upsert and delete;
 - unlinking a security deletes that security's `bond_engine` rows in the same
   transaction as the unlink;
-- a transaction-derived or manual price on a day always wins over a
-  `bond_engine` row, whatever the write order (the upsert's `WHERE` admits only
-  `source = 'bond_engine'`, and a `bond_engine` insert never replaces another
-  source);
+- for a linked security the engine row replaces every non-manual row on its
+  days and a manual price always wins, whatever the write order (the engine
+  upsert's `WHERE` never admits `source = 'manual'`; a transaction-derived price
+  never replaces a `bond_engine` row; engine rows store `adjusted_close`
+  `NULL`, and a manual price written over one does not inherit it; section
+  12.3);
+- creating, editing, voiding or deleting an investment transaction of a linked
+  security, and a restore, dispatch the recompute after the commit;
 - a provider write re-checks the link at write time, inside its own
   transaction, and drops the price of a security that has become linked;
 - a currency referenced by a bond instrument counts as in use, so the currency
@@ -480,7 +528,14 @@ values are shown to a user.
 | Window | unit | day 6 and 7 after purchase, 21 and 20 days before maturity, ROR record day |
 | Terms parsing | unit | a valid document per Polish manifest; unknown field, number instead of string, unknown primitive (`UNSUPPORTED_PRIMITIVE`) refused; unknown calendar or benchmark id reported as missing data |
 | Country-agnostic engine | guard | no domain or engine file imports an adapter or names a country or product literal (section 2.0) |
-| Immutability | integration | update and delete of a terms version and of an announced rate raise |
+| Immutability | integration | update and delete of a terms version, of an announced rate and of an instrument raise; a repeated seed with a differing manifest changes nothing |
+| Sale window, lot status, UNKNOWN flows | unit | a lot outside `saleWindow` is REFUSED with every figure null; MATURED and OPEN `currentPeriod` shape; UNKNOWN cash flow with `amount` null; `projectionMissing` |
+| Future `asOf` | unit, integration | valuation and scenarios refuse `asOf` after today (`AS_OF_IN_FUTURE`) |
+| Fetchers | unit | GUS link discovery and fallback; a feed older than 3 months refused; NBP `covered_through` when the archive cannot prove coverage; failures recorded through `ProviderHealthService` |
+| Price precedence | integration | section 12.3 |
+| Lots per account | unit | FIFO per account; paired transfer keeps purchase dates |
+| Link validation | unit, integration | BOND type only; unit-quantity check; lowercase UUID; undo; update_security preview |
+| Restore, support backup | integration | support backup drops the link; restore reports `{ count, symbols }` and recomputes |
 | Read service | integration | loads the newest version, applies announced over derived, names the version |
 
 ## 12. Portfolio integration (phase 3)
@@ -488,9 +543,23 @@ values are shown to a user.
 ### 12.1 Link
 
 A user's `securities` row may point at one bond instrument through a nullable
-`securities.bond_instrument_id` (`ON DELETE RESTRICT`). The link is refused
-unless the security's currency equals the instrument's currency (INV-PRICE-001:
-a stored price is in the currency the security is recorded in). A linked
+`securities.bond_instrument_id` (`ON DELETE RESTRICT`). The link is checked in
+the write's own transaction (`assertBondLink`, shared by the update, the
+AI/MCP `update_security` preview and the undo of a security edit) and refused
+unless: the instrument exists; the security's currency equals the instrument's
+currency (INV-PRICE-001: a stored price is in the currency the security is
+recorded in; the form blocks a currency change of a linked security instead of
+silently unlinking it); the security type is `BOND` (`LINK_REQUIRES_BOND_TYPE`;
+changing the type of a linked security away from `BOND` is refused unless the
+same request unlinks it); and every share-moving transaction of the security
+has a price within [0.5, 2] x face value per bond, because otherwise the
+quantity is not a number of bonds (`LINK_QUANTITY_NOT_BONDS`). The id is
+canonicalized to lowercase before it is compared or stored, and whether the link
+changed is decided inside the transaction from the row locked `FOR UPDATE`. An
+undo or redo snapshot carries `bond_instrument_id` and is applied through the
+same checks; a restored state that fails them is refused
+(`UNDO_LINK_INVALID`). The security form sends `bondInstrumentId` only when the
+link changed. The client drops its cached valuation after a link or unlink. A linked
 security is never refreshed from a quote provider: the bond engine is its only
 automatic price source (spec section 1 of the discussion: Yahoo and MSN are not
 a source of retail bond terms or values).
@@ -500,25 +569,28 @@ per deployment from the adapters' catalogs, so an instrument's id is
 deterministic: a UUIDv5 of `issuerCountryCode|issuerCode|seriesCode`. A
 restored link therefore points at the same instrument on any deployment
 whose catalog has it; a restore onto a deployment without it restores the
-link as `NULL` and says so, rather than failing the restore.
+link as `NULL` and says so (`unlinkedBondSecurities: { count, symbols }`,
+symbols capped at 50, omitted when zero; the UI lists them and says how to
+relink), rather than failing the restore. After a restore commits, every linked
+security of the user is recomputed. The support backup always writes the link as
+`NULL`.
 
 ### 12.2 Lots
 
 The lots of a linked security are derived from the user's investment
-transactions on it, across all accounts, in register order, `VOID` rows
-excluded:
+transactions on it, **per account**, in register order, `VOID` rows excluded:
 
 | Action (base) | Effect |
 | --- | --- |
 | `BUY`, `REINVEST`, `ADD_SHARES` | a new lot dated `transaction_date` |
-| `TRANSFER_IN` with a linked `TRANSFER_OUT` of the same security | none (the pair moves a lot between the user's accounts and keeps its purchase date) |
+| `TRANSFER_IN` with a linked `TRANSFER_OUT` of the same security | none new: the pair moves the quantity first-in first-out from the source account's lots to the destination account, keeping the purchase dates |
 | `TRANSFER_IN` without a linked leg | a new lot dated `transaction_date`, flagged `purchaseDateAssumed` |
-| `SELL`, `REDEEM`, `REMOVE_SHARES`, unlinked `TRANSFER_OUT` | removes quantity first-in first-out |
+| `SELL`, `REDEEM`, `REMOVE_SHARES`, unlinked `TRANSFER_OUT` | removes quantity first-in first-out from the lots of the row's own account |
 | `SPLIT` | lots unknown (a bond does not split); valuation refused with the reason |
 | cash-only actions | none |
 
 A lot quantity that is not a whole number of bonds, or a removal larger than
-the open lots, makes the lots unknown; the reason is named, nothing is
+the open lots of its account, makes the lots unknown; the reason is named, nothing is
 guessed.
 
 ### 12.3 Daily price
@@ -531,7 +603,12 @@ price(D) = sum over lots open on D of grossValue(lot, asOf = D) / sum of their q
 ```
 
 rounded half-up to 10 decimals (`security_prices.close_price` is
-`NUMERIC(24,10)`), computed with `ExactDecimal`. `grossValue` is principal
+`NUMERIC(24,10)`), computed with `ExactDecimal`; the blend is over the lots of
+all accounts. A lot bought outside `terms.saleWindow` is refused (section 2.6)
+and has no `grossValue`, so its days get no price row. The series is valued from
+one resolution of each lot's schedule and period rates (a period that started on
+`D` has the same rate or the same "missing" whether resolved on `D` or today),
+so a recompute costs O(days + lots x periods), not a resolution per day. `grossValue` is principal
 plus accrued interest, before the early redemption fee and tax: the economic
 value of the holding. The early redemption value is shown beside it in the
 detail view (section 13), never instead of it.
@@ -541,31 +618,51 @@ rate, INV-BOND-002; a matured compounding lot without every rate) gets no price
 row. The portfolio then carries the last
 priced day, as for any security, and the detail view names what is missing.
 
-Rows are written with `source = 'bond_engine'` by
-`INSERT ... ON CONFLICT (security_id, price_date) DO UPDATE ... WHERE
-security_prices.source = 'bond_engine' AND close_price IS DISTINCT FROM
-EXCLUDED.close_price`: a manual price or a transaction-derived price on the
-same day is never overwritten, and an unchanged day is not rewritten. A bond
-engine row for a day that no longer has a price (lots changed) is deleted.
+**Price precedence for a linked security.** A transaction-derived price is one
+lot's trade price, not the holding's value. Rows are written with `source =
+'bond_engine'` and `adjusted_close` `NULL` (coupons are recorded as `INTEREST`
+income; the close is the value) by `INSERT ... ON CONFLICT (security_id,
+price_date) DO UPDATE ... WHERE security_prices.source IS DISTINCT FROM 'manual' AND (the
+close or the source differs)`: the engine row replaces every non-manual row
+(provider and transaction-derived) on its days, a manual price is never
+overwritten, and an unchanged day is not rewritten. A transaction-derived price
+never replaces a `bond_engine` row (the replaceable-source list of the
+transaction-price upsert excludes it for a linked security), and a manual price
+written over an engine row takes its own `adjusted_close`, not the engine's. A
+bond engine row for a day that no longer has a price (lots changed) is deleted;
+the delete touches only `bond_engine` rows.
 
 ### 12.4 When prices are written
 
 - after a link is set or changed (the request recomputes that security);
+- after an investment transaction of a linked security is created, edited,
+  voided or deleted, on every entry point (UI service, bulk, AI action, MCP,
+  import);
+- after a restore commits, for every linked security of the user;
+- on the per-security "refresh price" of a linked security, which recomputes
+  the engine prices instead of calling a provider;
 - daily, after the benchmark refresh, for every linked security of every user
   (system fan-out, then each user in its own context; one user's failure does
   not stop the others);
 - on demand through `POST /bonds/securities/:securityId/recompute`.
 
 The recompute runs after the commit of the change that triggered it, never
-inside it (INV-CACHE-001).
+inside it (INV-CACHE-001). The request recompute and the cron use one
+definition of today, the user's financial today.
 
 ### 12.5 Read API
 
 - `GET /bonds/instruments`: the catalog (id, issuer country, issuer, program,
   series, currency), for the link picker.
 - `GET /bonds/securities/:securityId/valuation?asOf=YYYY-MM-DD`: the lots and
-  one `BondValuation` per lot (section 2.6), plus the lot totals, for the
-  detail view. Owner-scoped by RLS; another user's security answers 404.
+  one `BondValuation` per lot (section 2.6), plus the lot totals and
+  `benchmarkCoverage`, for the detail view. `asOf` after today is refused
+  (`AS_OF_IN_FUTURE`). Owner-scoped by RLS; another user's security answers 404.
+
+Market surfaces do not read the engine's rows as market moves: Top Movers and
+the daily-change boards, and the global "last price update" marker, exclude
+bond-linked securities and `bond_engine` rows. Wherever price sources are
+listed, `bond_engine` has a translated label.
 
 ## 13. Detail view (phase 4)
 
@@ -575,8 +672,16 @@ principal, accrued interest, gross value, early redemption value or the
 refusal reason, next cash flow, known and projected maturity value, the
 projection assumptions and the `missing` list with the publisher to obtain each
 item from. Percentages and amounts are localized by the reader's number
-format preference. The security form offers the instrument picker when the
-security type is `BOND`.
+format preference. A lot shows its status: "Matured" for a matured lot and the
+translated refusal reason for a refused one, never "Unknown"; a period whose
+rate is unknown shows the missing observation. The card shows a partial-data
+notice when `valuationComplete === false` and names the `dataCompleteness`
+causes. The card says how fresh the reference data is from
+`benchmarkCoverage`. The issuer and program are shown by translated labels
+(`PL_MF`: Ministry of Finance (PL)), falling back to the code. The security
+form offers the instrument picker when the security type is `BOND`; with no
+instrument in the security's currency the picker says no series exists in that
+currency. The date picker's maximum is today.
 
 How the rate is set is shown, not only its value: the rate rule in words (for
 EDO1036: "period 1: 5.35%; then the 12-month CPI published by GUS + 2.00%
@@ -610,7 +715,8 @@ announced_k  = interest_k                           when ANNOUNCED (no split
                                                     is stated, so none is made)
 ```
 
-For a benchmark period `benchmark_k + addend_k = interest_k` exactly. For a
+For a benchmark period `benchmark_k + addend_k = interest_k` exactly, in the figures the scenarios
+return (rounding rule: 13.3). For a
 compounding bond `base_k` already holds earlier interest, so interest earned
 on earlier inflation counts as interest of the period it accrues in, by the
 same split; the attribution is per period and never retroactive. The
@@ -619,6 +725,9 @@ rate schedule entry carries `interest`, `fixedPart`, `benchmarkPart`,
 display; the money figures of section 2.4 keep their own rounding), each
 `null` when the period's rate is unknown. Lot figures are per bond times the
 quantity.
+
+A fixed-rate rule's interest is labelled "Fixed-rate interest"; "(1st period)"
+is added only to the first period of a benchmark rule.
 
 Numerical examples (computed from the formulas above with exact fractions;
 E23 and E24 are the same computation as the implementation's fixtures and are
@@ -631,8 +740,10 @@ not read from its output):
 
 ### 13.3 Inflation scenarios
 
-`GET /bonds/securities/:securityId/scenarios?benchmarkId=...&values=a,b,...`
-values the security's lots as of today with every future period of that
+`GET /bonds/securities/:securityId/scenarios?benchmarkId=...&values=a,b,...[&asOf=YYYY-MM-DD]`
+values the security's lots as of `asOf` (default today; the same bounds as the
+valuation, so a future `asOf` is refused with `AS_OF_IN_FUTURE`; the panel uses
+the card's date and states it) with every future period of that
 benchmark projected at each given value (at most 6 values, each between -0.5
 and 1.0 as a fraction). Known periods stay known: a scenario never replaces an
 observation or an announced rate. Per scenario it returns the lots' maturity
@@ -648,14 +759,25 @@ scenario figure as a projection under that assumption.
 The bounds -0.5 and 1.0 are inclusive and so is the limit of 6 values (a 7th
 value, or a value outside the bounds, is refused with a 400).
 
-**Total interest versus maturity value.** `totalInterest` is the exact sum of
-the periods' interest per bond (13.2) times the quantity, rounded once per lot.
-`maturityValue` is the per-bond maturity value rounded as section 2.4 says
-(each period for TOS, the result for EDO), times the quantity. The two answer
-different questions, so `maturityValue - face` and `totalInterest` differ by
-cents (E23: 13.79 against 13.78916); the difference is the letter's rounding
-and is disclosed, not reconciled. The chart (13.4) ends at `totalInterest`, not
-at the maturity value shown beside it.
+**Rounding rule of the scenario figures.** Interest per period per bond is: for
+a coupon period (capitalization `NONE`), the coupon as paid, rounded per bond
+as section 2.4 says; for a compounding period, the exact accrual. The parts
+(13.2) of a period are split exactly, and the rounding residual of a period is
+assigned to the addend part, so the parts sum to the period's interest. A lot's
+figures are the per-bond sum times the quantity, rounded once per lot, for every
+figure; `totalInterest` is the sum of the rounded parts. The chart (13.4) ends
+at `totalInterest`.
+
+**Total interest versus maturity value.** For a compounding bond,
+`maturityValue` is the per-bond maturity value rounded as section 2.4 says (each
+period for TOS, the result for EDO) times the quantity, and `maturityValue - face`
+and `totalInterest` differ by cents (E23: 13.79 against 13.78916), the letter's
+rounding, disclosed, not reconciled. For a coupon bond (COI, ROR, DOR, OTS) the
+two are not close: `maturityValue` is the final payment only, face plus the last
+coupon, because the earlier coupons were paid out; `maturityValue - face` is the
+last coupon, while `totalInterest` is every coupon (COI1030 x10, v = 0.025:
+`maturityValue` 1040.00, `totalInterest` 167.50). The panel captions the
+`maturityValue` column of a coupon bond as the final payment at maturity.
 
 Example E25 (EDO1036, 10 bonds bought 2026-10-01, valued 2027-10-16, period 2
 CPI 3.4% known, r2 = 5.4%, r1 = 5.35%; every later period projected at the

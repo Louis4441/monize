@@ -196,10 +196,17 @@ before re-authentication -- it is free, and it writes nothing:
   (`BackupRestoreDatabaseService.severUnavailableCatalogLinks`, which iterates
   `CATALOG_REFERENCE_COLUMNS`), so a restore never fails on a series this
   deployment has not seeded. The restore says so: the result carries
-  `unlinkedBondSecurities` (omitted at zero, outside `restored`) and the restore
-  dialogue shows it, because the bond engine no longer prices those securities;
-  the file's `bond_engine` price rows of a security it unlinked are not restored. The instrument id is derived
+  `unlinkedBondSecurities: { count, symbols }` (omitted at zero, outside
+  `restored`; `symbols` names at most `MAX_UNLINKED_BOND_SYMBOLS` = 50 of them,
+  `count` is the full number) and the restore dialogue lists them, because the
+  bond engine no longer prices those securities; the file's `bond_engine` price
+  rows of a security it unlinked are not restored. The instrument id is derived
   from the series (`bondInstrumentId`), so it is the same on every deployment.
+  The file's `bond_engine` price rows of a security whose link survived came from
+  another deployment's catalog and engine, so after the restore commits
+  `BackupRestoreService` calls `BondPriceService.recomputeSecurity` for every
+  bond-linked security of the user (best effort, logged; the daily job repairs a
+  failure) and the engine's own prices replace the file's.
 
 Every key is then remapped to a fresh id, so the restored graph is closed over
 rows this restore inserted. A UUID nested in a JSONB or array value

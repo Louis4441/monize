@@ -21,7 +21,9 @@ primitive (spec section 2.0).
   type over `BigInt`; no new dependency.
 - The bond tables are global reference data (RLS exempt), like
   `exchange_rates`.
-- `securities` stays generic: no bond columns on it (discussion section 23).
+- `securities` stays generic: one nullable `bond_instrument_id` link and no other bond column (discussion section 23); the link is allowed only on a `BOND` security.
+- A linked security's automatic price is the engine's: the engine row replaces
+  every non-manual row and a manual price always wins (spec section 12.3).
 - The UI language never selects bond logic: a Polish-language user may hold US
   TIPS. The instrument's issuer country, program and series decide it.
 - The global research note (attached to the discussion) lists the 21

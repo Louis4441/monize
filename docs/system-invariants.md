@@ -101,11 +101,11 @@ implied.
 | INV-LOAN-009 | An annuity installment's payment is the one stated for its own due date | enforced |
 | INV-LOAN-010 | A loan's interest category and its managed payment template's interest line change together | enforced |
 | INV-LOAN-HISTORY-001 | Historical loan interest counted as paid is ledger-backed | partial |
-| INV-BOND-001 | A bond's published terms and period rates are immutable | enforced |
+| INV-BOND-001 | A bond's published terms, period rates and instruments are immutable | enforced |
 | INV-BOND-002 | A missing bond rate is unknown, never substituted | enforced |
 | INV-BOND-003 | Bond money is exact until the issue document rounds it | enforced |
 | INV-BOND-004 | Known and projected bond values never mix | enforced |
-| INV-BOND-005 | A linked security's automatic price comes only from the bond engine, and a bond_engine row never overwrites a manual or transaction price | enforced |
+| INV-BOND-005 | A linked security's automatic price comes only from the bond engine; the engine replaces every non-manual row and never a manual one | enforced |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
 | INV-OCCURRENCE-003 | Every surface reports the effective occurrence: its current amount and currency, its direction, on the date it falls | enforced |
@@ -3181,27 +3181,46 @@ documented in `docs/frontend/financial-figures.md`).
 The bond engine is country-agnostic (`docs/specs/polish-retail-bonds.md`
 section 2.0); these invariants hold for every adapter.
 
-### INV-BOND-001 -- published terms and period rates are immutable
+### INV-BOND-001 -- published terms, period rates and instruments are immutable
 
 ```text
-Statement           A stored bond terms version and a stored announced period
-                    rate are never updated or deleted; a correction is a new
-                    terms version.
-Source of truth     bond_terms_versions, bond_period_rates
+Statement           A stored bond terms version, a stored announced period
+                    rate and a stored bond instrument are never updated or
+                    deleted; a correction is a new terms version.
+Source of truth     bond_terms_versions, bond_period_rates, bond_instruments
 Enforcement         bond_reject_mutation(), a row-level BEFORE UPDATE OR DELETE
-                    trigger on both tables (migration
-                    20261010170817_bond_reference_tables.sql); ON DELETE
-                    RESTRICT from both to bond_instruments. TRUNCATE is not
+                    trigger on all three tables (the first two: migration
+                    20261010170817_bond_reference_tables.sql; bond_instruments:
+                    migration 20261011090000_bond_instruments_immutable.sql paired with database/schema.sql);
+                    ON DELETE RESTRICT from the first two to bond_instruments
+                    and from securities.bond_instrument_id. TRUNCATE is not
                     covered: no application path issues it, and the
                     integration test reset relies on it.
+                    The seed (BondCatalogService) is not refused by the
+                    trigger, it never reaches it: it inserts with INSERT ...
+                    ON CONFLICT (bond_instrument_id, version) DO NOTHING (and
+                    the equivalent on the instrument key), so the trigger,
+                    which fires only on UPDATE and DELETE, never sees a
+                    second writer.
+                    A catalog entry's seed runs in its own transaction, so one
+                    entry's SQL failure rolls back that entry only.
 Concurrency scope   global (per instrument)
-Retry semantics     A retried insert of the same (instrument, version) or
-                    (instrument, period) fails on the primary key; it never
-                    overwrites.
-Crash semantics     Single-row inserts; nothing partial to recover.
-Failure response    refuse (the statement raises)
+Retry semantics     A retried or concurrent insert of the same (instrument,
+                    version) or (instrument, period) inserts nothing and
+                    raises nothing (ON CONFLICT DO NOTHING on the primary key
+                    makes the second writer a no-op; it never overwrites). The
+                    seed then compares the stored content_hash with the
+                    manifest's and logs a differing one and skips it: a
+                    changed manifest is not applied until it is a new version.
+Crash semantics     Single-row inserts; nothing partial to recover. A seed
+                    failure of one entry loses that entry's transaction only.
+Failure response    refuse an UPDATE or DELETE (the statement raises); a
+                    differing seed manifest is logged and skipped
 Required tests      bond-reference-tables.integration.spec.ts: update and delete
-                    of both tables raise and leave the row unchanged.
+                    of all three tables raise and leave the row unchanged;
+                    a seed repeated with a differing manifest leaves the stored
+                    version unchanged and inserts no second one; bond-catalog
+                    spec: one failing entry does not roll back the others.
 Status              enforced
 ```
 
@@ -3227,9 +3246,19 @@ Enforcement         resolvePeriodRates (backend/src/bonds/engine/rate-resolution
 Concurrency scope   --
 Retry semantics     -- (computed on read)
 Crash semantics     -- (nothing stored)
-Failure response    null with the missing observation named
-Required tests      bond-engine.spec.ts truth-table rows (spec section 4) and the
-                    STEP coverage rule.
+Failure response    null with the missing observation named; a future cash
+                    flow whose amount is unknown is emitted with status UNKNOWN
+                    and amount null, never dropped; a benchmark with neither an
+                    observation nor an assumption is listed in
+                    projectionMissing { benchmarkId, publisher | null }. A
+                    STEP benchmark (NBP) whose archive cannot prove that no
+                    decision is missing is covered only up to the archive's
+                    newest date (coveredThrough); a later day is unknown, not
+                    derived from an older rate. Each benchmark's coveredThrough
+                    and lastFetchedAt are returned as benchmarkCoverage.
+Required tests      bond-engine.spec.ts truth-table rows (spec section 4), the
+                    STEP coverage rule, the UNKNOWN cash flow and
+                    projectionMissing cases, and the NBP coverage cases.
 Status              enforced (engine, read by bond-valuation.service.ts and by
                     the bond_engine price sync in bond-price.service.ts, which
                     writes no price for a day whose lots lack a gross value)
@@ -3266,7 +3295,8 @@ Statement           A bond cash flow or maturity value is KNOWN only when every
 Source of truth     the resolved period rates of one valuation
 Enforcement         valueBondLot (backend/src/bonds/engine/bond-engine.ts):
                     maturityValueKnown is null while any rate it needs is
-                    projected; each cash flow carries its status.
+                    projected; each cash flow carries its status (KNOWN,
+                    PROJECTED, or UNKNOWN with amount null).
 Concurrency scope   --
 Retry semantics     --
 Crash semantics     --
@@ -3275,17 +3305,25 @@ Required tests      bond-engine.spec.ts known/projected cases.
 Status              enforced
 ```
 
-### INV-BOND-005 -- a linked security's automatic price is the bond engine's, and it overwrites nobody
+### INV-BOND-005 -- a linked security's automatic price is the bond engine's; it replaces every non-manual row and never a manual one
 
 ```text
 Statement           A security linked to a bond instrument
-                    (securities.bond_instrument_id) is priced automatically
-                    by the bond engine and by no quote provider; and a
-                    bond_engine price row never replaces a manual or a
-                    transaction-derived price on the same day, nor is an
-                    unchanged day rewritten.
+                    (securities.bond_instrument_id, allowed only on a security
+                    of type BOND) is priced automatically by the bond engine
+                    and by no quote provider. For a linked security the engine
+                    row replaces every non-manual row on its days (provider
+                    rows and transaction-derived rows: a transaction price is
+                    one lot's trade price, not the holding's value); a
+                    transaction-derived price never replaces a bond_engine
+                    row; a manual price always wins and the engine never
+                    replaces it. An engine row stores adjusted_close NULL
+                    (coupons are recorded as INTEREST income, the close is the
+                    value), and a manual price written over an engine row does
+                    not inherit the engine's adjusted_close. An unchanged day
+                    is not rewritten.
 Source of truth     securities.bond_instrument_id; security_prices.source
-Enforcement         Two mechanisms.
+Enforcement         Three mechanisms.
                     1. One predicate, isPricedByQuoteProvider
                        (backend/src/securities/provider-priced.util.ts), read by
                        every path that asks a provider about a security:
@@ -3294,32 +3332,79 @@ Enforcement         Two mechanisms.
                        on-demand fill), fetchAndStoreRange (every backfill, even
                        a forced one), backfillSecurityHoldingPeriod and the
                        intraday chart. provider-priced.guard.spec.ts fails when
-                       a method that reaches a provider stops consulting it.
+                       a method that reaches a provider stops consulting it. The
+                       per-security "refresh price" of a linked security
+                       recomputes the engine prices instead of reporting
+                       0 updated.
                     2. BondPriceService.upsertPrices
                        (backend/src/bonds/bond-price.service.ts): one
                        INSERT ... ON CONFLICT (security_id, price_date) DO UPDATE
-                       whose WHERE admits only source = 'bond_engine' AND a
-                       close that differs; the same constant
+                       whose WHERE admits every source except 'manual' AND a
+                       close or source that differs, and writes
+                       adjusted_close NULL; the same constant
                        BOND_ENGINE_PRICE_SOURCE is bound by the delete of days
-                       that no longer get a price.
-                    The link itself: the instrument must exist and be priced in
-                    the security's currency (INV-PRICE-001), checked in the
-                    write's own transaction before it (SecuritiesService
-                    assertBondLink); fk_securities_bond_instrument is
-                    ON DELETE RESTRICT.
+                       that no longer get a price (it deletes only
+                       bond_engine rows). The transaction-price upsert's
+                       replaceable-source list (TRANSACTION_PRICE_REPLACEABLE_SOURCES)
+                       does not contain bond_engine for a linked security, and
+                       the manual-price write sets adjusted_close from its own
+                       input, never from the row it replaces.
+                    3. The link and its edits, all in the write's own
+                       transaction (SecuritiesService assertBondLink, shared
+                       by update, the AI/MCP update_security preview and the
+                       undo of a security edit): the instrument must exist, be
+                       priced in the security's currency (INV-PRICE-001) and
+                       the security's type must be BOND (code
+                       LINK_REQUIRES_BOND_TYPE; changing the type of a linked
+                       security away from BOND is refused unless the same
+                       request unlinks it); the link is refused (code
+                       LINK_QUANTITY_NOT_BONDS) when the security has
+                       share-moving transactions whose price is not within
+                       [0.5, 2] x face value per bond, because the quantity is
+                       then not a number of bonds; bondInstrumentId is
+                       canonicalized to lowercase before comparing and storing;
+                       linkChanged is decided inside the update transaction from
+                       the row locked FOR UPDATE. Undo and redo snapshots carry
+                       bond_instrument_id and are applied through the same
+                       validation and the same engine-price cleanup and
+                       post-commit recompute; a restored state that fails them
+                       is refused (code UNDO_LINK_INVALID).
+                       fk_securities_bond_instrument is ON DELETE RESTRICT.
 Concurrency scope   per security; recomputes and unlink cleanups of one security
                     are serialized by a transaction-scoped advisory lock
                     (LockScope.BondPriceRecompute in common/db/locks.ts, keyed
-                    on the security id), and the recompute reads the link after
-                    taking it. Unlinking deletes that security's bond_engine
-                    rows in the same transaction. A transaction or manual price
-                    wins over a bond_engine row whatever the write order: the
-                    engine upsert's WHERE admits only source = 'bond_engine',
-                    and the transaction-price upsert replaces a bond_engine row
-                    (TRANSACTION_PRICE_REPLACEABLE_SOURCES). A provider write
-                    inserts only WHERE the security has no bond link at write
-                    time, so an in-flight refresh cannot price a just-linked
-                    security.
+                    on the security id; first statement of the transaction,
+                    before the account locks of lockAccountsForBalanceWrite),
+                    and the recompute reads the link after taking it. Unlinking
+                    deletes that security's bond_engine rows in the same
+                    transaction. A manual price wins over a bond_engine row
+                    whatever the write order: the engine upsert's WHERE never
+                    admits source = 'manual', and the manual write replaces the
+                    engine row. A provider write inserts only WHERE the
+                    security has no bond link at write time, so an in-flight
+                    refresh cannot price a just-linked security.
+                    Every creation, edit, void or delete of an investment
+                    transaction of a linked security (UI service, bulk, AI
+                    action, MCP, import) dispatches that security's recompute
+                    after the commit, as does a restore (every linked security
+                    of the restoring user). The request recompute and the cron
+                    use one definition of "today", the user's financial today.
+                    A series of days is valued from one resolution of each
+                    lot's schedule and period rates (the engine's series API,
+                    exact because a period that has started on a day has the
+                    same rate or the same "missing" whether resolved then or
+                    now), so a recompute costs O(days + lots x periods).
+Lots                Lots are derived per account (spec section 12.2): a
+                    removal takes first-in first-out from the lots of the row's
+                    own account; a paired TRANSFER_OUT/TRANSFER_IN moves the
+                    quantity FIFO from the source account's lots to the
+                    destination account keeping purchase dates; an unpaired leg
+                    is a removal / a new dated lot as before. The security's
+                    price is the blend over all accounts. A lot whose purchase
+                    date is outside terms.saleWindow gets no valuation:
+                    status REFUSED, refusal PURCHASE_OUTSIDE_SALE_WINDOW, every
+                    figure null, valuationComplete false (a null saleWindow is
+                    no restriction), and its day gets no price row.
 Retry semantics     A retried recompute writes nothing it already wrote
                     (written = 0, deleted = 0).
 Crash semantics     Reads, the upsert, the delete and the account updated_at
@@ -3331,15 +3416,34 @@ Failure response    refuse a link the instrument cannot honour (400, nothing
                     written); a day whose lots have no gross value gets no row
                     (INV-BOND-002); lots that cannot be derived (a split, a
                     fractional or over-removed quantity) price nothing and the
-                    valuation names why.
-Required tests      bond-prices.integration.spec.ts (real PostgreSQL: a manual,
-                    a transaction and a provider price on a day survive; an
-                    unchanged day is not rewritten; stale rows are deleted; every
-                    refresh path skips a linked security with an explicit provider
-                    override; another user's security answers 404);
-                    bond-price.service.spec.ts, bond-lots.spec.ts,
-                    securities.service.spec.ts (link refusals),
-                    provider-priced.guard.spec.ts.
+                    valuation names why. A valuation or scenarios request with
+                    asOf after today is refused (code AS_OF_IN_FUTURE; a future
+                    projection is the scenarios' job, with assumptions).
+                    A support backup stores bond_instrument_id as NULL. A user
+                    restore whose catalog lacks the instrument restores the
+                    link as NULL and reports unlinkedBondSecurities
+                    { count, symbols } (symbols capped at 50).
+                    Surfaces that rank or date market moves (Top Movers and the
+                    daily-change boards, the global "last price update" marker)
+                    exclude bond-linked securities and bond_engine rows; the
+                    price source bond_engine is shown by a translated label.
+Required tests      bond-prices.integration.spec.ts (real PostgreSQL: a manual
+                    price survives; a provider and a transaction-derived price
+                    on a linked security's day are replaced by the engine row
+                    and a transaction price never replaces an engine row; an
+                    engine row has adjusted_close NULL and a manual write over
+                    one does not inherit it; an unchanged day is not rewritten;
+                    stale rows are deleted; every refresh path skips a linked
+                    security with an explicit provider override; another user's
+                    security answers 404; a transaction write, a bulk, AI, MCP
+                    and import write each dispatch the recompute);
+                    bond-price.service.spec.ts (including the 10-year EDO lot
+                    series bound), bond-lots.spec.ts (per-account FIFO and the
+                    paired transfer), securities.service.spec.ts (link
+                    refusals: type, quantity, currency, uppercase UUID, undo),
+                    action-history undo spec, provider-priced.guard.spec.ts,
+                    backup specs (support backup drops the link; restore
+                    names and recomputes).
 Status              enforced
 ```
 
