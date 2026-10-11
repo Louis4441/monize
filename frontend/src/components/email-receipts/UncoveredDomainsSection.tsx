@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { emailReceiptsApi } from '@/lib/email-receipts-api';
 import { createLogger } from '@/lib/logger';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 import type { UncoveredDomain } from '@/types/email-receipts';
 
 const logger = createLogger('UncoveredDomains');
@@ -55,8 +56,11 @@ export function UncoveredDomainsSection({ onSelect, refreshKey = 0, disabled = f
     [domains],
   );
 
+  // The tour spotlights the block only when it holds domains; an empty, loading or failed block gets the tour's centered stand-in instead.
+  const hasDomains = !failed && domains !== null && domains.length > 0;
+
   return (
-    <section aria-labelledby="email-receipts-uncovered-heading" className="mb-6 space-y-2 rounded-lg border-2 border-blue-500 bg-blue-50/60 p-4 dark:border-blue-400 dark:bg-blue-900/20">
+    <section {...(hasDomains ? tourAnchor(TOUR_ANCHORS.emailReceiptsUncovered) : {})} aria-labelledby="email-receipts-uncovered-heading" className="mb-6 space-y-2 rounded-lg border-2 border-blue-500 bg-blue-50/60 p-4 dark:border-blue-400 dark:bg-blue-900/20">
       <h2 id="email-receipts-uncovered-heading" className="text-xl font-bold text-blue-900 dark:text-blue-100">
         {t('heading')}
       </h2>

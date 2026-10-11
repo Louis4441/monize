@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act, within } from '@/test/render';
 import { UncoveredDomainsSection } from './UncoveredDomainsSection';
+import { TOUR_ANCHORS, tourAnchorSelector } from '@/lib/tours/anchors';
 
 const api = vi.hoisted(() => ({ listUncovered: vi.fn() }));
 vi.mock('@/lib/email-receipts-api', () => ({ emailReceiptsApi: { receipts: { listUncovered: api.listUncovered } } }));
@@ -43,5 +44,33 @@ describe('UncoveredDomainsSection', () => {
     api.listUncovered.mockResolvedValue([entry('allegro.pl')]);
     await renderSection();
     expect(screen.queryByText('Waiting for AI')).not.toBeInTheDocument();
+  });
+
+  describe('email receipts tour anchor', () => {
+    const anchor = () => document.querySelector(tourAnchorSelector(TOUR_ANCHORS.emailReceiptsUncovered));
+
+    it('is present when the block lists a domain', async () => {
+      api.listUncovered.mockResolvedValue([entry('allegro.pl')]);
+      await renderSection();
+      expect(anchor()).toBeInTheDocument();
+    });
+
+    it('is absent while loading', async () => {
+      api.listUncovered.mockReturnValue(new Promise(() => {}));
+      await renderSection();
+      expect(anchor()).not.toBeInTheDocument();
+    });
+
+    it('is absent when no domain is uncovered', async () => {
+      api.listUncovered.mockResolvedValue([]);
+      await renderSection();
+      expect(anchor()).not.toBeInTheDocument();
+    });
+
+    it('is absent when the read failed', async () => {
+      api.listUncovered.mockRejectedValue(new Error('boom'));
+      await renderSection();
+      expect(anchor()).not.toBeInTheDocument();
+    });
   });
 });
