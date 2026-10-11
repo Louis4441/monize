@@ -5,6 +5,7 @@ import {
   Logger,
   OnApplicationBootstrap,
 } from "@nestjs/common";
+import { timingSafeEqual } from "crypto";
 import { DataSource, EntityManager } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { withSystemContext } from "../common/db/with-context";
@@ -464,9 +465,9 @@ export class BondCatalogService implements OnApplicationBootstrap {
         WHERE bond_instrument_id = $1 AND version = $2`,
       [instrumentId, entry.termsVersion],
     );
-    return storedVersion[0]?.content_hash !== hash
-      ? { kind: "conflict", named, instrumentId }
-      : { kind: "unchanged", named, instrumentId };
+    return sameContentHash(storedVersion[0]?.content_hash, hash)
+      ? { kind: "unchanged", named, instrumentId }
+      : { kind: "conflict", named, instrumentId };
   }
 }
 
@@ -482,3 +483,18 @@ export type StoreOutcome =
   | { kind: "inserted"; named: string; instrumentId: string }
   | { kind: "unchanged"; named: string; instrumentId: string }
   | { kind: "conflict"; named: string; instrumentId: string };
+
+/**
+ * Two content hashes (hex SHA-256) compared in constant time. The hash is not a
+ * secret, but one comparison everywhere keeps the security scan's timing rule
+ * quiet without an exception list.
+ */
+function sameContentHash(
+  stored: string | undefined,
+  computed: string,
+): boolean {
+  if (stored === undefined) return false;
+  const a = Buffer.from(stored, "utf8");
+  const b = Buffer.from(computed, "utf8");
+  return a.length === b.length && timingSafeEqual(a, b);
+}

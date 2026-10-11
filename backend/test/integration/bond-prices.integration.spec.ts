@@ -349,6 +349,14 @@ describe("bond engine prices (integration, INV-BOND-005)", () => {
         `UPDATE accounts SET updated_at = NOW() - INTERVAL '1 day' WHERE id = $1`,
         [accountId],
       );
+      // A recompute dispatched in the background by an earlier write may already
+      // have priced these days, leaving the one below nothing to write and so
+      // no reason to move the marker. With the engine rows gone, any recompute
+      // that runs after the read below has rows to write and must move it.
+      await dataSource.query(
+        `DELETE FROM security_prices WHERE security_id = $1 AND source = 'bond_engine'`,
+        [securityId],
+      );
       const before = await dataSource.query(
         `SELECT updated_at FROM accounts WHERE id = $1`,
         [accountId],
