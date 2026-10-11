@@ -544,6 +544,13 @@ Evidence collected on 2026-10-11 (supporting, not a confirmation):
   first month of the period"; GUS announces month X in X+1, so M-2.
   krbob/edo-calculator and Kaligula0/Finance-Quote-module-Obligacje-Skarbowe
   use M-2.
+- 1 and 2, official confirmation: with the real GUS CPI of month M-2 and
+  half-up rounding of the per-bond result only, the engine reproduces the
+  Ministry's interest table of EDO0524 (47.10, 50.28, 64.28, 72.83) and the
+  stated maturity value of EDO0423 (147.05), and the dated examples on the ROR
+  and EDO product pages (golden files `edo0524-cases.json`,
+  `edo0423-cases.json`, `ror0623-cases.json`). Both assumptions are taken as
+  confirmed.
 - 3: the letters say "not earlier than after seven calendar days from the sale
   date". Under Civil Code art. 111 §2 the sale day is not counted, which reads
   as a first request on `purchaseDate + 8`. No published dated example was
