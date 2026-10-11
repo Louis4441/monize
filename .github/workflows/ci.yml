@@ -109,10 +109,11 @@ jobs:
       postgres:
         # Pinned by digest to satisfy zizmor's unpinned-images audit. Refresh
         # alongside production postgres bumps so CI matches what we ship.
-        # Pulled from the ECR Public mirror of the official image (same digest):
+        # Pulled from Google's mirror of the Docker Hub official image (same
+        # digest):
         # a service container starts before any login step can run, and an
         # anonymous Docker Hub pull from a shared runner IP is rate-limited.
-        image: public.ecr.aws/docker/library/postgres:16-alpine@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229
+        image: mirror.gcr.io/library/postgres:16-alpine@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229
         env:
           POSTGRES_DB: monize_test
           POSTGRES_USER: monize_test
@@ -285,8 +286,8 @@ jobs:
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
           persist-credentials: false
-      # No Docker Hub login: verify-schema.sh pulls Postgres from the ECR Public
-      # mirror of the official image, which has no anonymous pull limit, so the
+      # No Docker Hub login: verify-schema.sh pulls Postgres from mirror.gcr.io,
+      # Google's mirror of the official image, with no anonymous pull limit, so the
       # job also runs where DOCKERHUB_* secrets are not set (a fork's own PR).
       - name: Verify schema.sql matches migrations state
         run: scripts/verify-schema.sh
@@ -1491,14 +1492,14 @@ jobs:
         with:
           node-version: 24
 
-      # No Docker Hub login: the images come from the ECR Public mirror of the
-      # official images (Dockerfiles, docker-compose.e2e.yml).
+      # No Docker Hub login: the images come from mirror.gcr.io, Google's mirror
+      # of the official images (Dockerfiles, docker-compose.e2e.yml).
       - name: Build application images
         run: docker compose -f docker-compose.e2e.yml build
 
       - name: Pull third-party images
-        # ECR Public throttles anonymous pulls per IP; compose would pull them in
-        # parallel and fail on the first 429 (scripts/pull-ci-images.sh).
+        # One image at a time with a back-off: compose pulls in parallel and fails
+        # the job on the first 429 (scripts/pull-ci-images.sh).
         run: scripts/pull-ci-images.sh -f docker-compose.e2e.yml
 
       - name: Start application stack

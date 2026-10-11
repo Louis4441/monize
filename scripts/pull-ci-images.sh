@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Pull the third-party images a compose stack needs, one at a time, with retries.
 #
-# ECR Public throttles anonymous pulls per source IP and answers
-# "toomanyrequests: Rate exceeded"; `docker compose up` pulls every missing
-# image in parallel and fails the job on the first 429. Pulling first, in
+# A registry can throttle anonymous pulls per source IP ("toomanyrequests");
+# `docker compose up` pulls every missing image in parallel and fails the job
+# on the first 429. Pulling first, in
 # sequence and with a back-off, leaves `up` nothing to pull.
 # docs/verification-contract.md section 7.
 #
