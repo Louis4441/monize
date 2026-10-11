@@ -977,6 +977,72 @@ describe('BackupRestoreSection', () => {
     });
   });
 
+  describe('restore: interrupted before the server replied', () => {
+    const INTERRUPTED =
+      'The restore was interrupted before the server replied. A restore is all-or-nothing, so your data is either fully restored or unchanged. Reload the page to see which before trying again.';
+
+    function axiosFailure(response?: { status: number; data: unknown }) {
+      const err = new Error('request failed') as Error & {
+        isAxiosError: boolean;
+        response?: { status: number; data: unknown };
+      };
+      err.isAxiosError = true;
+      err.response = response;
+      return err;
+    }
+
+    async function submitRestoreRejectedWith(error: Error) {
+      (backupApi.restoreBackup as ReturnType<typeof vi.fn>).mockRejectedValue(error);
+      await renderSection(localUser);
+      fireEvent.click(screen.getByText('Restore from Backup...'));
+      await act(async () => {
+        fireEvent.change(
+          screen.getByLabelText('Select backup file') as HTMLInputElement,
+          { target: { files: [new File(['{}'], 'b.json.gz')] } },
+        );
+      });
+      fireEvent.change(screen.getByPlaceholderText('Enter your password'), {
+        target: { value: 'pw' },
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByText('Confirm Restore'));
+      });
+    }
+
+    it('says the outcome is unknown when the backend went away mid-restore', async () => {
+      // What the large-upload proxy answers when the backend restarts under it.
+      await submitRestoreRejectedWith(
+        axiosFailure({ status: 502, data: { error: 'Backend unavailable' } }),
+      );
+
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(INTERRUPTED, { duration: 12000 }),
+      );
+    });
+
+    it('says the outcome is unknown when no response arrived at all', async () => {
+      await submitRestoreRejectedWith(axiosFailure());
+
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(INTERRUPTED, { duration: 12000 }),
+      );
+    });
+
+    it("keeps the backend's own message on a 503 the restore queue answered", async () => {
+      // The queue refuses with a 503 and a message before anything is written;
+      // calling that an interruption would send the user to check for a restore
+      // that never started.
+      await submitRestoreRejectedWith(
+        axiosFailure({ status: 503, data: { message: 'Restore queue is full' } }),
+      );
+
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith('Failed to restore backup'),
+      );
+      expect(toast.error).not.toHaveBeenCalledWith(INTERRUPTED, expect.anything());
+    });
+  });
+
   describe('OIDC restore', () => {
     it('passes the OIDC token instead of a password', async () => {
       (backupApi.restoreBackup as ReturnType<typeof vi.fn>).mockResolvedValue({
