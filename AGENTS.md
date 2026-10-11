@@ -53,6 +53,7 @@ Mirrors `.github/workflows/ci.yml`. While developing run `npm run test:changed` 
 - An env var, a documented path or a Helm default: the two `scripts/check-*.mjs` above.
 - A control an E2E spec drives was renamed or removed: grep `e2e/` for its accessible name; no unit suite loads those specs.
 - **Stage new files first.** The guards that walk the tree with `git ls-files` cannot see an untracked file (`git add -N` is enough); green before staging and red in CI is not a flake.
+- CI pulls images from `public.ecr.aws` or `ghcr.io`, never Docker Hub (`ci-images.guard.spec.ts`).
 - CI runs in UTC with one worker. The backend's database-backed suites rebuild one shared `monize_test` and never run in parallel with anything, including each other. `docs/verification-contract.md` section 7 explains the rest.
 - The pre-commit hook (husky + lint-staged) runs `eslint --max-warnings=0 --fix` and prettier on staged files, which is stricter than CI's `lint`: a warning blocks the commit.
 
