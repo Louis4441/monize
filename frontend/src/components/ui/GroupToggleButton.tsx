@@ -1,6 +1,7 @@
 'use client';
 
 import { ChevronRightIcon } from '@heroicons/react/20/solid';
+import { HOVER_ROW_ON_CARD } from '@/components/ui/Card';
 
 interface GroupToggleButtonProps {
   open: boolean;
@@ -27,7 +28,7 @@ export function GroupToggleButton({
       type="button"
       onClick={onToggle}
       aria-expanded={open}
-      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-700/50"
+      className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${HOVER_ROW_ON_CARD}`}
     >
       <ChevronRightIcon
         className={`h-4 w-4 flex-shrink-0 text-gray-400 transition-transform motion-reduce:transition-none ${open ? 'rotate-90' : ''}`}
