@@ -14,7 +14,9 @@ import { existsSync } from "node:fs";
  *    empty, so no zero-discovery flag is needed (REL-001).
  *
  * The `dot` reporter prints one character per test and the full message of each
- * failure; `--silent` drops console output. Coverage is off: a threshold means
+ * failure; `--silent=true` drops console output (spelled with its value: a
+ * bare `--silent` takes the next argument, a file path, as its value and
+ * Vitest refuses the run). Coverage is off: a threshold means
  * nothing over a subset. The base is `origin/main`; set `TEST_CHANGED_BASE` to
  * change it.
  */
@@ -71,7 +73,7 @@ console.log(
 
 const result = spawnSync(
   "npx",
-  ["vitest", "related", "--run", "--reporter=dot", "--silent", ...files],
+  ["vitest", "related", "--run", "--reporter=dot", "--silent=true", ...files],
   { stdio: "inherit" },
 );
 process.exit(result.status ?? 1);

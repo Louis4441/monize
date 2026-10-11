@@ -12,7 +12,8 @@ those suites race each other -- `pg_type_typname_nsp_index` conflicts, or a
 "connection terminated" reported by whichever spec was innocent. The root Jest
 config in `package.json` therefore pins `roots: ["<rootDir>/src"]`: a bare
 `jest` (and `test:watch`, `test:debug`) discovers unit specs only. Integration
-specs are owned by `test/jest-e2e.json`, which pins `maxWorkers: 1`, and
+specs are owned by `test/jest-integration.json`, which finds
+`test/integration/*.spec.ts` only and pins `maxWorkers: 1`, and
 `npm test` runs `test:unit` then `test:integration` (through
 `backend/scripts/test-chain.mjs`) so the default command runs everything without ever
 running the two in parallel. That makes `npm test` require a reachable
@@ -28,7 +29,12 @@ sees them, and the filtered run silently becomes a full one. Filtered runs go
 through `npm run test:unit -- <args>` or `npm run test:integration -- <args>`.
 
 **Discovery lives in a config, not in a script.** `--testPathPatterns` and `-t`
-may narrow what a config found; `--roots`, `--rootDir`, `--testRegex`,
+may narrow what a config found, and only when the script carries none of its
+own: Jest ORs every path pattern it is given, so a script-level
+`--testPathPatterns` for the whole directory made
+`npm run test:integration -- <file>` run every suite. That is why
+`test:integration` selects `test/jest-integration.json` instead, and the guard
+refuses a `--testPathPatterns` on it. `--roots`, `--rootDir`, `--testRegex`,
 `--testMatch`, `--testPathIgnorePatterns`, `--projects` and `--preset` redefine
 it, and the guard rejects any script that passes one -- `jest --roots ./src
 ./test` would sweep the database-backed suites back into the parallel run with

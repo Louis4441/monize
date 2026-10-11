@@ -347,9 +347,9 @@ exits non-zero and fails the job, and
 any tracked surface that can start a runner -- manifest, runner config,
 workflow, shell script or Dockerfile -- in every spelling the runners accept. What is still owed is the weaker guard against a regex that matches *some*
 suites but silently drops a class: that guard asserts every tracked suite under
-`backend/test/integration/` is discoverable by `test/jest-e2e.json`, but nothing
-asserts what the runner executed, and the CLI `--testPathPatterns` filter is
-outside its model.
+`backend/test/integration/` is discoverable by `test/jest-integration.json`, the
+config `test:integration` selects (no CLI path filter is left outside the
+model), but nothing asserts what the runner executed.
 `docs/release-integrity.md` REL-001 and REL-002 cover the history and the
 consequence, which is a verification one, not merely CI hygiene.
 
@@ -488,7 +488,7 @@ a time, with a back-off, never compose's parallel pull.
   commands above, in that order, never concurrently. The integration suites share
   one `monize_test` and rebuild its schema (`synchronize` + `dropSchema`), so a
   second Jest worker is a race rather than a speedup: the parallel config pins
-  `roots: ["<rootDir>/src"]` and `test/jest-e2e.json` pins `maxWorkers: 1`, both
+  `roots: ["<rootDir>/src"]` and `test/jest-integration.json` pins `maxWorkers: 1`, both
   asserted by `backend/src/common/jest-config.guard.spec.ts`. The default command
   therefore needs a reachable PostgreSQL; `npm run test:unit` is the offline path.
 - `npm run test:changed` (backend and frontend) is the loop for an agent or a
