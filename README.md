@@ -120,7 +120,7 @@ Highlights of the recent releases. Every version has full notes in [`docs/releas
 - Share into the app: with Monize installed as a PWA (Android and desktop Chromium), share a receipt photo, a PDF or a statement export (CSV, OFX, QFX, QIF) to it from another app and land on a review screen that offers to attach it to a new transaction, open the import wizard or send it to the AI Assistant. Nothing is imported or attached until you choose it, and shared files are kept on the device for an hour
 
 ### Transaction Rules and Tags
-- Transaction rules (Tools > Rules): when a transaction is created or imported and it matches your conditions (account, payee, category, text, amount, day of month, tags and more), add or remove tags, set the category, payee or description, or queue it for an AI review. A visual editor, a test on existing transactions before you save, a run on existing transactions with undo, and a history of every change a rule made.
+- Transaction rules (Tools > Rules): when a transaction is created or imported and it matches your conditions (account, payee, category, text, amount, day of month, tags and more), add or remove tags, set the category, payee or description, or queue it for an AI review. A visual editor, a test on existing transactions before you save, a run on existing transactions with undo, and a history of every change a rule made
 - More rule actions: split a row into parts with amounts read from its text, convert it to a transfer, or settle a loan installment. A date condition, and an active window outside which a rule never applies
 - An AI review inbox for the transactions a rule queued and for the email receipt proposals
 - Transaction tags with colours and icons for flexible cross-category labelling
