@@ -23,6 +23,7 @@ import { BondPriceService } from "./bond-price.service";
 import {
   BACKFILL_GAP_MS,
   PROGRAM_OFFER_COOLDOWN_MS,
+  BACKFILL_REFUSAL_TTL_MS,
   BackfillRun,
   BondSeriesService,
 } from "./bond-series.service";
@@ -1038,6 +1039,39 @@ describe("BondSeriesService", () => {
     const codes = ["OTS0424", "ROR0125", "DOR0126", "TOS0127"];
     const withCodes = (over: Partial<BondAdapter> = {}) =>
       adapterOf({ backfillCodes: jest.fn(() => codes), ...over });
+
+    it("leaves a refused series out of later bounded passes for a day", async () => {
+      const { service, catalog } = build();
+      catalog.storedSeriesCodes.mockResolvedValue(new Set<string>());
+      const adapter = withCodes({
+        fetchSeries: jest.fn(async () => {
+          throw new SeriesFetchError("SERIES_NOT_PUBLISHED");
+        }),
+      });
+      const options = {
+        adapters: [adapter],
+        sleep: jest.fn(async () => undefined),
+        today: "2026-10-11",
+        limit: 1,
+      };
+      await service.backfillHistory(options);
+      await service.backfillHistory(options);
+      // The second pass moves on instead of asking for TOS0127 again.
+      expect(
+        (adapter.fetchSeries as jest.Mock).mock.calls.map((c) => c[0]),
+      ).toEqual(["TOS0127", "DOR0126"]);
+      const now = jest
+        .spyOn(Date, "now")
+        .mockReturnValue(Date.now() + BACKFILL_REFUSAL_TTL_MS + 1);
+      try {
+        await service.backfillHistory(options);
+        expect((adapter.fetchSeries as jest.Mock).mock.calls[2][0]).toBe(
+          "TOS0127",
+        );
+      } finally {
+        now.mockRestore();
+      }
+    });
 
     it("asks for at most `limit` series, newest first, and reports the rest", async () => {
       const { service, catalog } = build();

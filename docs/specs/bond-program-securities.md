@@ -133,7 +133,10 @@ the background. A few refreshes, or the daily check while auto-fetch is on,
 complete the history; once it is complete a refresh asks for nothing more. The
 refresh has no throttle of its own, so the service bounds it: one pass per
 program at a time per process, and the offer page read at most once per
-`PROGRAM_OFFER_COOLDOWN_MS` (10 minutes).
+`PROGRAM_OFFER_COOLDOWN_MS` (10 minutes), and a series the source refused (not
+published, or failed) left out of later bounded passes for
+`BACKFILL_REFUSAL_TTL_MS` (24 hours), so a refresh repeated in a loop never
+asks for the same code again and the next pass moves on to other months.
 
 ### 2.6 Nothing country-specific without a user
 

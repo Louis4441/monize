@@ -122,6 +122,13 @@ export const PROGRAM_OFFER_COOLDOWN_MS = 10 * 60_000;
  */
 export const PROGRAM_BACKFILL_CHUNK = 8;
 
+/**
+ * How long a bounded pass leaves out a series the source refused (not
+ * published, or failed): a refresh repeated in a loop must not ask for the same
+ * code again, and the bounded pass moves on to the next months instead.
+ */
+export const BACKFILL_REFUSAL_TTL_MS = 24 * 60 * 60_000;
+
 /** The least time between two requests to the issuer's site by the backfill. */
 export const BACKFILL_GAP_MS = 3000;
 
@@ -463,6 +470,9 @@ export class BondSeriesService {
   /** The programs `fetchProgramOffer` is working on now. */
   private readonly programPasses = new Set<string>();
 
+  /** Series codes a backfill request was refused for, until when to skip them. */
+  private readonly refusedCodes = new Map<string, number>();
+
   private async runCurrentOffer(
     options: SeriesRequestOptions,
   ): Promise<CurrentOfferRun> {
@@ -550,7 +560,14 @@ export class BondSeriesService {
       const held = await withScopedDb(this.dataSource, (m) =>
         this.catalog.storedSeriesCodes(m, adapter.countryCode, codes),
       );
-      const allMissing = codes.filter((code) => !held.has(code.toUpperCase()));
+      const now = Date.now();
+      const allMissing = codes.filter(
+        (code) =>
+          !held.has(code.toUpperCase()) &&
+          // A bounded pass leaves out what the source refused recently.
+          (options.limit === undefined ||
+            (this.refusedCodes.get(code.toUpperCase()) ?? 0) <= now),
+      );
       candidates += codes.length;
       alreadyStored += codes.length - allMissing.length;
       // `backfillCodes` lists oldest first; a bounded pass takes the newest.
@@ -583,6 +600,10 @@ export class BondSeriesService {
             error,
           );
           const refusal = error instanceof SeriesFetchError ? error.code : null;
+          this.refusedCodes.set(
+            code.toUpperCase(),
+            Date.now() + BACKFILL_REFUSAL_TTL_MS,
+          );
           if (refusal === "SOURCE_UNAVAILABLE") {
             failed += 1;
             stoppedEarly = true;
