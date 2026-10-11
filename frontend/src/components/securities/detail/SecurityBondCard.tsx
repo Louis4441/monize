@@ -350,7 +350,13 @@ export function SecurityBondCard({
         {lots.length > 0 && (
           <SecurityBondLotsTable lots={lots} currency={currency} />
         )}
-        {lots.length > 0 && <SecurityBondRateSection lots={lots} currency={currency} />}
+        {lots.length > 0 && (
+          <SecurityBondRateSection
+            lots={lots}
+            currency={currency}
+            redemptionTerms={valuation.redemptionTerms ?? null}
+          />
+        )}
 
         {assumptions.length > 0 && (
           <div>

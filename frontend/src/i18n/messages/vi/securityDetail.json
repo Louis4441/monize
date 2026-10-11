@@ -348,7 +348,9 @@
         "observed": "{benchmark} {observation}: {value} + {addend}",
         "floored": "(nâng lên {floor})",
         "missing": "{benchmark} {observation}: chưa được công bố"
-      }
+      },
+      "nextRateReset": "Lần điều chỉnh lãi suất tiếp theo: {date}",
+      "nextCapitalization": "Lần nhập lãi vào gốc tiếp theo: {date}"
     },
     "indexation": {
       "inflation": "Gắn với lạm phát: từ {date} (kỳ 2) lãi suất là {benchmark} + {addend}, được tính lại mỗi kỳ",
@@ -412,6 +414,13 @@
     },
     "issuers": {
       "PL_MF": "Bộ Tài chính (PL)"
+    },
+    "redemption": {
+      "title": "Điều kiện mua lại trước hạn",
+      "fixedFee": "Phí mua lại trước hạn: {amount} mỗi trái phiếu.",
+      "forfeitAccrued": "Khi mua lại trước hạn, tiền lãi đã phát sinh trong kỳ hiện tại sẽ bị mất.",
+      "floorAllPeriods": "Phí không bao giờ làm số tiền nhận được thấp hơn mệnh giá, ở bất kỳ kỳ nào.",
+      "floorFirstPeriod": "Chỉ trong kỳ đầu tiên, phí không thể làm số tiền nhận được thấp hơn mệnh giá; các kỳ sau không có mức sàn này."
     }
   }
 }

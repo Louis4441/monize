@@ -348,7 +348,9 @@
         "observed": "{benchmark} {observation}: {value} + {addend}",
         "floored": "(elevado a {floor})",
         "missing": "{benchmark} {observation}: aún no publicado"
-      }
+      },
+      "nextRateReset": "Próximo cambio de tipo de interés: {date}",
+      "nextCapitalization": "Próxima capitalización: {date}"
     },
     "indexation": {
       "inflation": "Indexada a la inflación: desde {date} (periodo 2) el tipo es {benchmark} + {addend}, recalculado cada periodo",
@@ -412,6 +414,13 @@
     },
     "issuers": {
       "PL_MF": "Ministerio de Finanzas (PL)"
+    },
+    "redemption": {
+      "title": "Condiciones del reembolso anticipado",
+      "fixedFee": "Comisión por reembolso anticipado: {amount} por bono.",
+      "forfeitAccrued": "En un reembolso anticipado se pierden los intereses devengados en el período actual.",
+      "floorAllPeriods": "La comisión nunca reduce el importe recibido por debajo del valor nominal, en ningún período.",
+      "floorFirstPeriod": "Solo en el primer período la comisión no puede reducir el importe recibido por debajo del valor nominal; en los siguientes no hay ese mínimo."
     }
   }
 }

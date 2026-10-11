@@ -348,7 +348,9 @@
         "observed": "{benchmark} {observation}: {value} + {addend}",
         "floored": "(floored to {floor})",
         "missing": "{benchmark} {observation}: not published yet"
-      }
+      },
+      "nextRateReset": "Next rate reset: {date}",
+      "nextCapitalization": "Next capitalization: {date}"
     },
     "indexation": {
       "inflation": "Inflation-indexed: from {date} (period 2) the rate is {benchmark} + {addend}, recalculated every period",
@@ -412,6 +414,13 @@
     },
     "issuers": {
       "PL_MF": "Ministry of Finance (PL)"
+    },
+    "redemption": {
+      "title": "Early redemption terms",
+      "fixedFee": "Early redemption fee: {amount} per bond.",
+      "forfeitAccrued": "On early redemption, the interest accrued in the current period is forfeited.",
+      "floorAllPeriods": "In every period, the fee never reduces the proceeds below the face value.",
+      "floorFirstPeriod": "In the first period only, the fee cannot reduce the proceeds below the face value; from the second period the full fee is deducted."
     }
   }
 }

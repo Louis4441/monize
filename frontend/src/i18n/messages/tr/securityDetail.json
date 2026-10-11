@@ -348,7 +348,9 @@
         "observed": "{benchmark} {observation}: {value} + {addend}",
         "floored": "({floor} değerine yükseltildi)",
         "missing": "{benchmark} {observation}: henüz yayımlanmadı"
-      }
+      },
+      "nextRateReset": "Sonraki faiz oranı yenileme tarihi: {date}",
+      "nextCapitalization": "Sonraki anaparaya ekleme (kapitalizasyon) tarihi: {date}"
     },
     "indexation": {
       "inflation": "Enflasyona endeksli: {date} tarihinden itibaren (2. dönem) faiz oranı {benchmark} + {addend} olup her dönem yeniden hesaplanır",
@@ -412,6 +414,13 @@
     },
     "issuers": {
       "PL_MF": "Maliye Bakanlığı (PL)"
+    },
+    "redemption": {
+      "title": "Erken itfa koşulları",
+      "fixedFee": "Erken itfa ücreti: tahvil başına {amount}.",
+      "forfeitAccrued": "Erken itfada, içinde bulunulan dönemde işleyen faiz ödenmez.",
+      "floorAllPeriods": "Ücret, hiçbir dönemde itfa tutarını nominal değerin altına düşürmez.",
+      "floorFirstPeriod": "Ücret, itfa tutarını yalnızca ilk dönemde nominal değerin altına düşüremez; sonraki dönemlerde böyle bir alt sınır yoktur."
     }
   }
 }

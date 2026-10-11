@@ -6,11 +6,7 @@ import { Badge, type BadgeVariant } from '@/components/ui/Badge';
 import { TABLE_BODY_CLASS, TABLE_CLASS, Td, Th } from '@/components/ui/Table';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
-import type {
-  BondCashFlow,
-  BondLotValuation,
-  BondRateSource,
-} from '@/types/bond';
+import type { BondLotValuation, BondRateSource } from '@/types/bond';
 
 interface SecurityBondLotsTableProps {
   lots: BondLotValuation[];
@@ -23,25 +19,6 @@ const RATE_SOURCE_VARIANT: Record<BondRateSource, BadgeVariant> = {
   DERIVED: 'gray',
   PROJECTED: 'amber',
 };
-
-/**
- * Every cash flow paid on the earliest date still to come, from both lists:
- * a coupon and the principal of the last period fall on the same day, and a
- * projected coupon can share a day with a known principal. Interest first.
- */
-function nextCashFlows(
-  known: readonly BondCashFlow[],
-  projected: readonly BondCashFlow[],
-): BondCashFlow[] {
-  // An UNKNOWN flow (the rate is not known yet) is a flow too: it is the next
-  // one even though its amount is not, and is never skipped for a later known one.
-  const all = [...known, ...projected];
-  if (all.length === 0) return [];
-  const earliest = all.reduce((min, f) => (f.date < min ? f.date : min), all[0].date);
-  return all
-    .filter((f) => f.date === earliest)
-    .sort((a, b) => (a.type === b.type ? 0 : a.type === 'INTEREST' ? -1 : 1));
-}
 
 /**
  * One row per open lot, per spec section 13. A figure the server could not work
@@ -116,7 +93,9 @@ export function SecurityBondLotsTable({
                 )}
               </span>
             );
-            const next = nextCashFlows(v.knownCashflows, v.projectedCashflows);
+            // The engine names every flow on the earliest date to come, an UNKNOWN
+            // one included; the amount of such a flow is unknown, never a zero.
+            const next = v.nextPayment;
             return (
               <tr key={`${lot.purchaseDate}-${lot.quantity}-${index}`}>
                 <Td className="whitespace-nowrap">

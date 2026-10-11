@@ -348,7 +348,9 @@
         "observed": "{benchmark} {observation}: {value} + {addend}",
         "floored": "(przyjęto minimum {floor})",
         "missing": "{benchmark} {observation}: jeszcze nieopublikowane"
-      }
+      },
+      "nextRateReset": "Następna zmiana oprocentowania: {date}",
+      "nextCapitalization": "Następna kapitalizacja odsetek: {date}"
     },
     "indexation": {
       "inflation": "Obligacja indeksowana inflacją: od {date} (2. okres) oprocentowanie to {benchmark} + {addend}, ustalane na nowo w każdym okresie",
@@ -412,6 +414,13 @@
     },
     "issuers": {
       "PL_MF": "Ministerstwo Finansów (PL)"
+    },
+    "redemption": {
+      "title": "Warunki przedterminowego wykupu",
+      "fixedFee": "Opłata za przedterminowy wykup: {amount} za obligację.",
+      "forfeitAccrued": "Przy przedterminowym wykupie odsetki naliczone w bieżącym okresie odsetkowym przepadają.",
+      "floorAllPeriods": "W każdym okresie opłata nie obniży kwoty wykupu poniżej wartości nominalnej.",
+      "floorFirstPeriod": "Tylko w pierwszym okresie opłata nie obniży kwoty wykupu poniżej wartości nominalnej; od drugiego okresu potrącana jest pełna opłata."
     }
   }
 }

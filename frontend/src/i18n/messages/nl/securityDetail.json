@@ -348,7 +348,9 @@
         "observed": "{benchmark} {observation}: {value} + {addend}",
         "floored": "(verhoogd tot {floor})",
         "missing": "{benchmark} {observation}: nog niet gepubliceerd"
-      }
+      },
+      "nextRateReset": "Volgende renteaanpassing: {date}",
+      "nextCapitalization": "Volgende kapitalisatie: {date}"
     },
     "indexation": {
       "inflation": "Inflatiegekoppeld: vanaf {date} (periode 2) is de rente {benchmark} + {addend}, in elke periode opnieuw berekend",
@@ -412,6 +414,13 @@
     },
     "issuers": {
       "PL_MF": "Ministerie van Financiën (PL)"
+    },
+    "redemption": {
+      "title": "Voorwaarden voor vroegtijdige aflossing",
+      "fixedFee": "Kosten voor vroegtijdige aflossing: {amount} per obligatie.",
+      "forfeitAccrued": "Bij vroegtijdige aflossing vervalt de rente die in de lopende periode is opgebouwd.",
+      "floorAllPeriods": "De kosten brengen de opbrengst in geen enkele periode onder de nominale waarde.",
+      "floorFirstPeriod": "Alleen in de eerste periode brengen de kosten de opbrengst niet onder de nominale waarde; in latere periodes geldt die ondergrens niet."
     }
   }
 }

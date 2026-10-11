@@ -348,7 +348,9 @@
         "observed": "{benchmark} {observation}：{value} + {addend}",
         "floored": "（調高至 {floor}）",
         "missing": "{benchmark} {observation}：尚未公布"
-      }
+      },
+      "nextRateReset": "下次利率重設日:{date}",
+      "nextCapitalization": "下次利息資本化日:{date}"
     },
     "indexation": {
       "inflation": "與通膨連動：自 {date}（第 2 期）起，利率為 {benchmark} + {addend}，每期重新計算",
@@ -412,6 +414,13 @@
     },
     "issuers": {
       "PL_MF": "財政部(PL)"
+    },
+    "redemption": {
+      "title": "提前贖回條款",
+      "fixedFee": "提前贖回費用:每張債券 {amount}。",
+      "forfeitAccrued": "提前贖回時,當期已累計的利息將被沒收。",
+      "floorAllPeriods": "在任何期間,該費用都不會使贖回所得低於面值。",
+      "floorFirstPeriod": "僅在第一個期間,該費用不會使贖回所得低於面值;之後的期間沒有這項下限。"
     }
   }
 }

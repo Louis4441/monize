@@ -348,7 +348,9 @@
         "observed": "{benchmark} {observation}: {value} + {addend}",
         "floored": "(elevado a {floor})",
         "missing": "{benchmark} {observation}: ainda não publicado"
-      }
+      },
+      "nextRateReset": "Próximo reajuste da taxa: {date}",
+      "nextCapitalization": "Próxima capitalização: {date}"
     },
     "indexation": {
       "inflation": "Indexada à inflação: a partir de {date} (período 2) a taxa é {benchmark} + {addend}, recalculada a cada período",
@@ -412,6 +414,13 @@
     },
     "issuers": {
       "PL_MF": "Ministério das Finanças (PL)"
+    },
+    "redemption": {
+      "title": "Condições do resgate antecipado",
+      "fixedFee": "Taxa de resgate antecipado: {amount} por título.",
+      "forfeitAccrued": "No resgate antecipado, os juros acumulados no período atual são perdidos.",
+      "floorAllPeriods": "A taxa nunca reduz o valor recebido abaixo do valor de face, em nenhum período.",
+      "floorFirstPeriod": "Só no primeiro período a taxa não pode reduzir o valor recebido abaixo do valor de face; nos períodos seguintes não existe esse piso."
     }
   }
 }

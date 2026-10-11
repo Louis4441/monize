@@ -348,7 +348,9 @@
         "observed": "{benchmark} {observation} : {value} + {addend}",
         "floored": "(relevé à {floor})",
         "missing": "{benchmark} {observation} : pas encore publié"
-      }
+      },
+      "nextRateReset": "Prochaine révision du taux : {date}",
+      "nextCapitalization": "Prochaine capitalisation : {date}"
     },
     "indexation": {
       "inflation": "Indexée sur l'inflation : à partir du {date} (période 2), le taux est {benchmark} + {addend}, recalculé à chaque période",
@@ -412,6 +414,13 @@
     },
     "issuers": {
       "PL_MF": "Ministère des Finances (PL)"
+    },
+    "redemption": {
+      "title": "Conditions du remboursement anticipé",
+      "fixedFee": "Frais de remboursement anticipé : {amount} par obligation.",
+      "forfeitAccrued": "En cas de remboursement anticipé, les intérêts courus de la période en cours sont perdus.",
+      "floorAllPeriods": "Les frais ne ramènent jamais le produit sous la valeur nominale, quelle que soit la période.",
+      "floorFirstPeriod": "Seule la première période est protégée : les frais n'y ramènent pas le produit sous la valeur nominale, mais les périodes suivantes n'ont pas ce plancher."
     }
   }
 }

@@ -348,7 +348,9 @@
         "observed": "{benchmark} {observation}: {value} + {addend}",
         "floored": "({floor} तक बढ़ाया गया)",
         "missing": "{benchmark} {observation}: अभी प्रकाशित नहीं हुआ"
-      }
+      },
+      "nextRateReset": "अगला ब्याज दर रीसेट: {date}",
+      "nextCapitalization": "अगला पूंजीकरण: {date}"
     },
     "indexation": {
       "inflation": "मुद्रास्फीति-सूचकांकित: {date} से (अवधि 2) दर {benchmark} + {addend} है, जिसे हर अवधि में फिर से निकाला जाता है",
@@ -412,6 +414,13 @@
     },
     "issuers": {
       "PL_MF": "वित्त मंत्रालय (PL)"
+    },
+    "redemption": {
+      "title": "समयपूर्व मोचन की शर्तें",
+      "fixedFee": "समयपूर्व मोचन शुल्क: प्रति बॉन्ड {amount}।",
+      "forfeitAccrued": "समयपूर्व मोचन पर चालू अवधि में अर्जित ब्याज जब्त हो जाता है।",
+      "floorAllPeriods": "शुल्क किसी भी अवधि में प्राप्ति को अंकित मूल्य से नीचे नहीं ले जाता।",
+      "floorFirstPeriod": "केवल पहली अवधि में शुल्क प्राप्ति को अंकित मूल्य से नीचे नहीं ले जा सकता; बाद की अवधियों में ऐसी न्यूनतम सीमा नहीं है।"
     }
   }
 }

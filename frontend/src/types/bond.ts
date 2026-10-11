@@ -157,6 +157,15 @@ export interface BondValuation {
   /** Benchmarks no future period can be projected from. */
   projectionMissing: BondProjectionMissing[];
   valuationComplete: boolean;
+  /**
+   * Every cash flow on the earliest date after `asOf`, UNKNOWN ones included,
+   * interest first; empty when the lot is matured or refused.
+   */
+  nextPayment: BondCashFlow[];
+  /** Start of the next period when the rate reads a benchmark and one exists; null otherwise. */
+  nextRateReset: string | null;
+  /** End of the current period when the bond compounds and it is not the last; null otherwise. */
+  nextCapitalization: string | null;
 }
 
 export interface BondLotValuation {
@@ -206,6 +215,30 @@ export interface BondBenchmarkCoverage {
   lastFetchedAt: string | null;
 }
 
+export type BondRedemptionPenalty =
+  | { type: 'FIXED_FEE_PER_UNIT'; /** Per bond, a decimal string. */ amount: string }
+  | { type: 'FORFEIT_ACCRUED_SINCE_LAST_PAYMENT' };
+
+export interface BondRedemptionBlackout {
+  type: 'RECORD_DAY_BEFORE_COUPON';
+  businessDays: number;
+  calendarId: string;
+}
+
+/** The terms' redemption policy; `GET .../valuation` sends null for a maturity-only bond. */
+export interface BondRedemptionTerms {
+  type: 'ON_DEMAND';
+  earliestDaysAfterPurchase: number;
+  latestDaysBeforeMaturity: number;
+  blackouts: BondRedemptionBlackout[];
+  penalties: BondRedemptionPenalty[];
+  /** Null when the proceeds are not floored. */
+  proceedsFloor: {
+    type: 'FACE_VALUE';
+    appliesTo: 'ALL_PERIODS' | 'FIRST_PERIOD';
+  } | null;
+}
+
 /** `GET /bonds/securities/:securityId/valuation`. */
 export interface SecurityBondValuation {
   securityId: string;
@@ -215,6 +248,8 @@ export interface SecurityBondValuation {
   totals: BondValuationTotals;
   refusal: BondLotsRefusal | null;
   benchmarkCoverage?: BondBenchmarkCoverage[];
+  /** Null for a bond redeemable at maturity only. */
+  redemptionTerms: BondRedemptionTerms | null;
 }
 
 /** `POST /bonds/securities/:securityId/recompute`. */

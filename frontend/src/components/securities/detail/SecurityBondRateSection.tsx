@@ -9,6 +9,7 @@ import { benchmarkLabel } from "./bond-labels";
 import { SecurityBondInterestChart } from "./SecurityBondInterestChart";
 import type {
   BondLotValuation,
+  BondRedemptionTerms,
   BondRateRule,
   BondRateScheduleEntry,
   BondRateSource,
@@ -18,6 +19,8 @@ interface SecurityBondRateSectionProps {
   lots: BondLotValuation[];
   /** The currency of the holding, for the interest chart. */
   currency: string;
+  /** The terms' redemption policy; null for a bond redeemable at maturity only. */
+  redemptionTerms: BondRedemptionTerms | null;
 }
 
 const RATE_SOURCE_VARIANT: Record<BondRateSource, BadgeVariant> = {
@@ -39,10 +42,11 @@ const YMD = /^\d{4}-\d{2}-\d{2}$/;
 export function SecurityBondRateSection({
   lots,
   currency,
+  redemptionTerms,
 }: SecurityBondRateSectionProps) {
   const t = useTranslations("securityDetail");
   const { formatDate } = useDateFormat();
-  const { formatPercentTrimmed } = useNumberFormat();
+  const { formatCurrency, formatPercentTrimmed } = useNumberFormat();
 
   if (lots.length === 0) return null;
   const rule = lots[0].valuation.rateRule;
@@ -144,6 +148,31 @@ export function SecurityBondRateSection({
     );
   };
 
+  // What an early redemption costs, in words: each penalty of the terms, and
+  // whether the face value floors the proceeds in every period or the first only.
+  const redemptionLines = (r: BondRedemptionTerms | null): string[] => {
+    if (r === null) return [];
+    const lines = r.penalties.map((penalty) =>
+      penalty.type === "FIXED_FEE_PER_UNIT"
+        ? t("bond.redemption.fixedFee", {
+            // A decimal string is converted only at the formatting boundary.
+            amount: formatCurrency(Number(penalty.amount), currency),
+          })
+        : t("bond.redemption.forfeitAccrued"),
+    );
+    if (r.proceedsFloor !== null) {
+      lines.push(
+        t(
+          r.proceedsFloor.appliesTo === "ALL_PERIODS"
+            ? "bond.redemption.floorAllPeriods"
+            : "bond.redemption.floorFirstPeriod",
+        ),
+      );
+    }
+    return lines;
+  };
+  const redemption = redemptionLines(redemptionTerms);
+
   const unknown = (
     <span className="text-gray-500 dark:text-gray-400">
       {t("bond.unknown")}
@@ -160,6 +189,16 @@ export function SecurityBondRateSection({
           <p key={line}>{line}</p>
         ))}
       </div>
+      {redemption.length > 0 && (
+        <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+          <p className="font-medium text-gray-900 dark:text-gray-100">
+            {t("bond.redemption.title")}
+          </p>
+          {redemption.map((line) => (
+            <p key={line}>{line}</p>
+          ))}
+        </div>
+      )}
       {lots.map((lot, lotIndex) => {
         const v = lot.valuation;
         const notice = indexationNotice(lot);
@@ -182,6 +221,24 @@ export function SecurityBondRateSection({
                   date: formatDate(lot.purchaseDate),
                 })}
               </p>
+            )}
+            {(v.nextRateReset !== null || v.nextCapitalization !== null) && (
+              <div className="space-y-0.5 text-sm text-gray-600 dark:text-gray-400">
+                {v.nextRateReset !== null && (
+                  <p>
+                    {t("bond.rate.nextRateReset", {
+                      date: formatDate(v.nextRateReset),
+                    })}
+                  </p>
+                )}
+                {v.nextCapitalization !== null && (
+                  <p>
+                    {t("bond.rate.nextCapitalization", {
+                      date: formatDate(v.nextCapitalization),
+                    })}
+                  </p>
+                )}
+              </div>
             )}
             <div className="overflow-x-auto">
               <table className={TABLE_CLASS}>

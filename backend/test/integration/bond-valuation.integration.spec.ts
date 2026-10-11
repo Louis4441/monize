@@ -1,6 +1,6 @@
 import { TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
-import { withSystemContext } from "@/common/db/with-context";
+import { withSystemContext, withUserContext } from "@/common/db/with-context";
 import { BondValuationService } from "@/bonds/bond-valuation.service";
 import {
   ManifestName,
@@ -9,6 +9,7 @@ import {
 import {
   cleanTables,
   createIntegrationModule,
+  createTestUserDirect,
 } from "../helpers/integration-setup";
 
 /**
@@ -244,5 +245,62 @@ describe("BondValuationService (integration)", () => {
     await expect(
       value("TOS1029", "2026-10-15", "2027-04-15", 9),
     ).rejects.toThrow(/No terms version 9 stored/);
+  });
+
+  it("carries the redemption policy and the next payment, rate reset and capitalization to the security valuation", async () => {
+    await cleanTables(dataSource, [
+      "holdings",
+      "investment_transactions",
+      "securities",
+      "accounts",
+      "users",
+    ]);
+    const instrumentId = await seed("tos1029", "TOS", "TOS1029");
+    const userId = (await createTestUserDirect(dataSource)).id;
+    const account = await dataSource.query(
+      `INSERT INTO accounts (user_id, account_type, account_sub_type, name,
+                             currency_code, current_balance, opening_balance)
+       VALUES ($1, 'INVESTMENT', 'INVESTMENT_BROKERAGE', 'Brokerage', 'PLN', 0, 0)
+       RETURNING id`,
+      [userId],
+    );
+    const security = await dataSource.query(
+      `INSERT INTO securities (user_id, symbol, name, security_type, currency_code, bond_instrument_id)
+       VALUES ($1, 'TOS1029', 'TOS1029', 'BOND', 'PLN', $2)
+       RETURNING id`,
+      [userId, instrumentId],
+    );
+    await dataSource.query(
+      `INSERT INTO investment_transactions
+         (user_id, account_id, security_id, action, transaction_date, quantity, price, total_amount, status)
+       VALUES ($1, $2, $3, 'BUY', '2026-10-15', 25, 100, 2500, 'UNRECONCILED')`,
+      [userId, account[0].id, security[0].id],
+    );
+
+    const result = await withUserContext(userId, () =>
+      service.valueSecurity(userId, security[0].id, "2027-04-15"),
+    );
+
+    expect(result.redemptionTerms).toEqual({
+      type: "ON_DEMAND",
+      earliestDaysAfterPurchase: 7,
+      latestDaysBeforeMaturity: 20,
+      blackouts: [],
+      penalties: [{ type: "FIXED_FEE_PER_UNIT", amount: "1.00" }],
+      proceedsFloor: { type: "FACE_VALUE", appliesTo: "ALL_PERIODS" },
+    });
+    const v = result.lots[0].valuation;
+    // Three 12-month periods: the next payment is the principal and last
+    // interest at maturity; a fixed rate has no reset; the bond compounds at
+    // the end of the current period.
+    expect(v.nextPayment).toEqual([
+      expect.objectContaining({
+        date: "2029-10-15",
+        type: "PRINCIPAL",
+        status: "KNOWN",
+      }),
+    ]);
+    expect(v.nextRateReset).toBeNull();
+    expect(v.nextCapitalization).toBe("2027-10-15");
   });
 });

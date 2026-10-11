@@ -348,7 +348,9 @@
         "observed": "{benchmark} {observation}: {value} + {addend}",
         "floored": "({floor}(으)로 상향)",
         "missing": "{benchmark} {observation}: 아직 발표되지 않음"
-      }
+      },
+      "nextRateReset": "다음 금리 재설정일: {date}",
+      "nextCapitalization": "다음 원금 가산일: {date}"
     },
     "indexation": {
       "inflation": "물가연동: {date}부터(2기) 금리는 {benchmark} + {addend}이며 매 기간마다 다시 계산됩니다",
@@ -412,6 +414,13 @@
     },
     "issuers": {
       "PL_MF": "재무부(PL)"
+    },
+    "redemption": {
+      "title": "중도 환매 조건",
+      "fixedFee": "중도 환매 수수료: 채권당 {amount}.",
+      "forfeitAccrued": "중도 환매 시 현재 기간에 발생한 이자는 지급되지 않습니다.",
+      "floorAllPeriods": "수수료로 인해 환매금이 어느 기간에도 액면가 아래로 내려가지 않습니다.",
+      "floorFirstPeriod": "수수료로 인해 환매금이 액면가 아래로 내려가지 않는 것은 첫 번째 기간뿐이며, 이후 기간에는 이러한 하한이 없습니다."
     }
   }
 }

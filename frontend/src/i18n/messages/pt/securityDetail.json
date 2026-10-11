@@ -348,7 +348,9 @@
         "observed": "{benchmark} {observation}: {value} + {addend}",
         "floored": "(elevado a {floor})",
         "missing": "{benchmark} {observation}: ainda não publicado"
-      }
+      },
+      "nextRateReset": "Próxima revisão da taxa: {date}",
+      "nextCapitalization": "Próxima capitalização: {date}"
     },
     "indexation": {
       "inflation": "Indexada à inflação: a partir de {date} (período 2) a taxa é {benchmark} + {addend}, recalculada em cada período",
@@ -412,6 +414,13 @@
     },
     "issuers": {
       "PL_MF": "Ministério das Finanças (PL)"
+    },
+    "redemption": {
+      "title": "Condições do reembolso antecipado",
+      "fixedFee": "Comissão de reembolso antecipado: {amount} por obrigação.",
+      "forfeitAccrued": "No reembolso antecipado, perdem-se os juros acumulados no período atual.",
+      "floorAllPeriods": "A comissão nunca reduz o montante recebido abaixo do valor nominal, em nenhum período.",
+      "floorFirstPeriod": "Só no primeiro período a comissão não pode reduzir o montante recebido abaixo do valor nominal; nos períodos seguintes não existe esse mínimo."
     }
   }
 }

@@ -348,7 +348,9 @@
         "observed": "[XX-{benchmark} {observation}: {value} + {addend}-XX]",
         "floored": "[XX-(floored to {floor})-XX]",
         "missing": "[XX-{benchmark} {observation}: not published yet-XX]"
-      }
+      },
+      "nextRateReset": "[XX-Next rate reset: {date}-XX]",
+      "nextCapitalization": "[XX-Next capitalization: {date}-XX]"
     },
     "indexation": {
       "inflation": "[XX-Inflation-indexed: from {date} (period 2) the rate is {benchmark} + {addend}, recalculated every period-XX]",
@@ -412,6 +414,13 @@
     },
     "issuers": {
       "PL_MF": "[XX-Ministry of Finance (PL)-XX]"
+    },
+    "redemption": {
+      "title": "[XX-Early redemption terms-XX]",
+      "fixedFee": "[XX-Early redemption fee: {amount} per bond.-XX]",
+      "forfeitAccrued": "[XX-On early redemption, the interest accrued in the current period is forfeited.-XX]",
+      "floorAllPeriods": "[XX-In every period, the fee never reduces the proceeds below the face value.-XX]",
+      "floorFirstPeriod": "[XX-In the first period only, the fee cannot reduce the proceeds below the face value; from the second period the full fee is deducted.-XX]"
     }
   }
 }

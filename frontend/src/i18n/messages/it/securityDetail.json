@@ -348,7 +348,9 @@
         "observed": "{benchmark} {observation}: {value} + {addend}",
         "floored": "(portato a {floor})",
         "missing": "{benchmark} {observation}: non ancora pubblicato"
-      }
+      },
+      "nextRateReset": "Prossima revisione del tasso: {date}",
+      "nextCapitalization": "Prossima capitalizzazione: {date}"
     },
     "indexation": {
       "inflation": "Indicizzata all'inflazione: dal {date} (periodo 2) il tasso è {benchmark} + {addend}, ricalcolato a ogni periodo",
@@ -412,6 +414,13 @@
     },
     "issuers": {
       "PL_MF": "Ministero delle Finanze (PL)"
+    },
+    "redemption": {
+      "title": "Condizioni del rimborso anticipato",
+      "fixedFee": "Commissione di rimborso anticipato: {amount} per obbligazione.",
+      "forfeitAccrued": "In caso di rimborso anticipato, gli interessi maturati nel periodo corrente vengono persi.",
+      "floorAllPeriods": "La commissione non riduce mai il rimborso al di sotto del valore nominale, in nessun periodo.",
+      "floorFirstPeriod": "Solo nel primo periodo la commissione non può ridurre il rimborso al di sotto del valore nominale; nei periodi successivi non c'è questo minimo."
     }
   }
 }

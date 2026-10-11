@@ -348,7 +348,9 @@
         "observed": "{benchmark} {observation}: {value} + {addend}",
         "floored": "({floor} に引き上げ)",
         "missing": "{benchmark} {observation}: 未公表"
-      }
+      },
+      "nextRateReset": "次回の金利改定日: {date}",
+      "nextCapitalization": "次回の元加日: {date}"
     },
     "indexation": {
       "inflation": "インフレ連動: {date}（第2期）から、利率は{benchmark} + {addend}となり、期ごとに再計算されます",
@@ -412,6 +414,13 @@
     },
     "issuers": {
       "PL_MF": "財務省(PL)"
+    },
+    "redemption": {
+      "title": "中途換金の条件",
+      "fixedFee": "中途換金手数料: 1枚あたり{amount}。",
+      "forfeitAccrued": "中途換金の場合、当期に発生した利子は支払われません。",
+      "floorAllPeriods": "手数料により、どの期間でも換金額が額面を下回ることはありません。",
+      "floorFirstPeriod": "手数料により換金額が額面を下回らないのは第1期のみで、第2期以降にはこの下限はありません。"
     }
   }
 }

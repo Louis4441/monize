@@ -737,6 +737,71 @@ describe("BondValuationService", () => {
       expect(result.benchmarkCoverage).toEqual([]);
     });
 
+    it("carries the next payment, rate reset and capitalization of each lot to the response", async () => {
+      const { service } = setup({
+        securities: owned,
+        ledger: [buy("2026-10-15", "25.00000000")],
+      });
+      const result = await service.valueSecurity(
+        "user-1",
+        "sec-1",
+        "2027-04-15",
+      );
+      const v = result.lots[0].valuation;
+      expect(v.nextPayment).toEqual(
+        [...v.knownCashflows, ...v.projectedCashflows].filter(
+          (f) => f.date === v.nextPayment[0].date,
+        ),
+      );
+      expect(v.nextPayment.length).toBeGreaterThan(0);
+      expect(v).toHaveProperty("nextRateReset");
+      expect(v).toHaveProperty("nextCapitalization");
+    });
+
+    it("passes the terms' redemption policy through at the top level, and null for a maturity-only bond", async () => {
+      const onDemand = setup({
+        securities: owned,
+        ledger: [buy("2026-10-15", "25")],
+      });
+      const result = await onDemand.service.valueSecurity(
+        "user-1",
+        "sec-1",
+        "2027-04-15",
+      );
+      expect(result.redemptionTerms).toEqual(
+        manifestDocument("tos1029").redemption,
+      );
+      expect(result.redemptionTerms).toMatchObject({
+        type: "ON_DEMAND",
+        penalties: [{ type: "FIXED_FEE_PER_UNIT", amount: "1.00" }],
+      });
+
+      const maturityOnly = manifestDocument("tos1029");
+      maturityOnly.redemption = { type: "MATURITY_ONLY" };
+      const only = setup({
+        terms: [{ version: 1, terms: maturityOnly }],
+        securities: owned,
+        ledger: [buy("2026-10-15", "25")],
+      });
+      expect(
+        (await only.service.valueSecurity("user-1", "sec-1", "2027-04-15"))
+          .redemptionTerms,
+      ).toBeNull();
+
+      // A refusal still names the policy: it belongs to the instrument.
+      const refused = setup({
+        securities: owned,
+        ledger: [{ ...buy("2026-10-15", "25"), action: "SPLIT" }],
+      });
+      const r = await refused.service.valueSecurity(
+        "user-1",
+        "sec-1",
+        "2027-04-15",
+      );
+      expect(r.refusal).not.toBeNull();
+      expect(r.redemptionTerms).toMatchObject({ type: "ON_DEMAND" });
+    });
+
     it("valueSecurity passes the assumption to every lot", async () => {
       const { service } = edo();
       const result = await service.valueSecurity(

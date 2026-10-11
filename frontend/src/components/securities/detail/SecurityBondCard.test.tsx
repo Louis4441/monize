@@ -99,6 +99,11 @@ function lotValuation(overrides: Partial<BondValuation> = {}): BondValuation {
       { date: '2027-12-31', type: 'INTEREST', amount: '45.00', status: 'KNOWN', period: 2 },
     ],
     projectedCashflows: [],
+    nextPayment: [
+      { date: '2027-12-31', type: 'INTEREST', amount: '45.00', status: 'KNOWN', period: 2 },
+    ],
+    nextRateReset: null,
+    nextCapitalization: null,
     maturityValueKnown: '1200.0000',
     maturityValueProjected: null,
     projectionAssumptions: [],
@@ -138,6 +143,7 @@ function response(
       accruedInterest: '55.2000',
     },
     refusal: null,
+    redemptionTerms: null,
     ...overrides,
   };
 }
@@ -444,35 +450,30 @@ describe('SecurityBondCard', () => {
       return within(screen.getAllByRole('row')[1]).getAllByRole('cell');
     };
 
-    it('shows the earliest flow, a projected one before the known one, with the Projected badge', async () => {
+    it('shows the engine\'s next payment, not a date derived from the cash flow lists', async () => {
       const cells = await mountLot({
-        knownCashflows: [
-          flow({ date: '2027-12-31', type: 'INTEREST', amount: '45.00' }),
-          flow({ date: '2028-12-31', type: 'INTEREST', amount: '46.00' }),
-        ],
+        knownCashflows: [flow({ date: '2027-12-31', type: 'INTEREST', amount: '45.00' })],
         projectedCashflows: [flow({ date: '2027-09-30', type: 'INTEREST', amount: '12.00', status: 'PROJECTED' })],
+        nextPayment: [flow({ date: '2027-03-30', type: 'INTEREST', amount: '7.00' })],
       });
-      const next = cells[9];
-      expect(next).toHaveTextContent('Interest $12.00 on 09/30/2027');
-      expect(within(next).getByText('Projected')).toBeInTheDocument();
-      expect(next).not.toHaveTextContent('12/31/2027');
-      expect(next).not.toHaveTextContent('2028');
+      expect(cells[9]).toHaveTextContent('Interest $7.00 on 03/30/2027');
+      expect(cells[9]).not.toHaveTextContent('09/30/2027');
+      expect(cells[9]).not.toHaveTextContent('12/31/2027');
     });
 
-    it('shows the earlier known flow when a projected one comes later', async () => {
+    it('shows a projected next payment with the Projected badge', async () => {
       const cells = await mountLot({
-        knownCashflows: [flow({ date: '2027-03-30', type: 'INTEREST', amount: '45.00' })],
-        projectedCashflows: [flow({ date: '2027-12-31', type: 'INTEREST', amount: '12.00', status: 'PROJECTED' })],
+        nextPayment: [flow({ date: '2027-09-30', type: 'INTEREST', amount: '12.00', status: 'PROJECTED' })],
       });
-      expect(cells[9]).toHaveTextContent('Interest $45.00 on 03/30/2027');
-      expect(within(cells[9]).queryByText('Projected')).not.toBeInTheDocument();
+      expect(cells[9]).toHaveTextContent('Interest $12.00 on 09/30/2027');
+      expect(within(cells[9]).getByText('Projected')).toBeInTheDocument();
     });
 
     it('shows the coupon and the principal paid on the same day, each labelled', async () => {
       const cells = await mountLot({
-        knownCashflows: [
-          flow({ date: '2027-07-05', type: 'PRINCIPAL', amount: '1000.00' }),
+        nextPayment: [
           flow({ date: '2027-07-05', type: 'INTEREST', amount: '5.00' }),
+          flow({ date: '2027-07-05', type: 'PRINCIPAL', amount: '1000.00' }),
         ],
       });
       const lines = Array.from(cells[9].children).map((c) => c.textContent);
@@ -481,8 +482,10 @@ describe('SecurityBondCard', () => {
 
     it('keeps a projected coupon visible beside a known principal on the same day', async () => {
       const cells = await mountLot({
-        knownCashflows: [flow({ date: '2027-07-05', type: 'PRINCIPAL', amount: '1000.00' })],
-        projectedCashflows: [flow({ date: '2027-07-05', type: 'INTEREST', amount: '5.00', status: 'PROJECTED' })],
+        nextPayment: [
+          flow({ date: '2027-07-05', type: 'INTEREST', amount: '5.00', status: 'PROJECTED' }),
+          flow({ date: '2027-07-05', type: 'PRINCIPAL', amount: '1000.00' }),
+        ],
       });
       expect(cells[9]).toHaveTextContent('Interest $5.00 on 07/05/2027');
       expect(cells[9]).toHaveTextContent('Principal $1,000.00 on 07/05/2027');
@@ -505,6 +508,7 @@ describe('SecurityBondCard', () => {
       const cells = await mountLot({
         knownCashflows: [],
         projectedCashflows: [],
+        nextPayment: [],
         earlyRedemptionValue: null,
         earlyRedemptionRefusal: 'MATURED',
       });
@@ -524,6 +528,79 @@ describe('SecurityBondCard', () => {
       expect(screen.queryByRole('table')).not.toBeInTheDocument();
       expect(screen.getByText('Gross value', { selector: 'dt' }).nextElementSibling).toHaveTextContent('$0.00');
       expect(screen.getByText('Gross value', { selector: 'dt' }).nextElementSibling).not.toHaveTextContent('Unknown');
+    });
+  });
+
+  describe('early redemption terms and the next rate reset and capitalization', () => {
+    const terms = (
+      over: Partial<NonNullable<SecurityBondValuation['redemptionTerms']>> = {},
+    ): NonNullable<SecurityBondValuation['redemptionTerms']> => ({
+      type: 'ON_DEMAND',
+      earliestDaysAfterPurchase: 7,
+      latestDaysBeforeMaturity: 20,
+      blackouts: [],
+      penalties: [{ type: 'FIXED_FEE_PER_UNIT', amount: '3.00' }],
+      proceedsFloor: { type: 'FACE_VALUE', appliesTo: 'ALL_PERIODS' },
+      ...over,
+    });
+    const mountTerms = async (
+      redemptionTerms: SecurityBondValuation['redemptionTerms'],
+      valuation: Partial<BondValuation> = {},
+    ) => {
+      get.mockResolvedValue(
+        response({
+          redemptionTerms,
+          lots: [
+            { purchaseDate: '2026-10-05', quantity: 10, purchaseDateAssumed: false, valuation: lotValuation(valuation) },
+          ],
+        }),
+      );
+      await mount();
+    };
+
+    it('shows the fixed fee per bond in the bond currency and the face value floor in every period', async () => {
+      await mountTerms(terms());
+      expect(screen.getByText('Early redemption terms')).toBeInTheDocument();
+      expect(screen.getByText('Early redemption fee: $3.00 per bond.')).toBeInTheDocument();
+      expect(
+        screen.getByText('In every period, the fee never reduces the proceeds below the face value.'),
+      ).toBeInTheDocument();
+    });
+
+    it('says the floor holds in the first period only', async () => {
+      await mountTerms(terms({ proceedsFloor: { type: 'FACE_VALUE', appliesTo: 'FIRST_PERIOD' } }));
+      expect(screen.getByText(/In the first period only/)).toBeInTheDocument();
+      expect(screen.queryByText(/In every period/)).not.toBeInTheDocument();
+    });
+
+    it('says the accrued interest is forfeited, and shows no floor line without a floor', async () => {
+      await mountTerms(
+        terms({ penalties: [{ type: 'FORFEIT_ACCRUED_SINCE_LAST_PAYMENT' }], proceedsFloor: null }),
+      );
+      expect(
+        screen.getByText(
+          'On early redemption, the interest accrued in the current period is forfeited.',
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/face value/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Early redemption fee/)).not.toBeInTheDocument();
+    });
+
+    it('shows no redemption terms for a bond redeemable at maturity only', async () => {
+      await mountTerms(null);
+      expect(screen.queryByText('Early redemption terms')).not.toBeInTheDocument();
+    });
+
+    it('shows the next rate reset and capitalization dates of a lot, and hides a null one', async () => {
+      await mountTerms(null, { nextRateReset: '2028-10-01', nextCapitalization: '2027-12-31' });
+      expect(screen.getByText('Next rate reset: 10/01/2028')).toBeInTheDocument();
+      expect(screen.getByText('Next capitalization: 12/31/2027')).toBeInTheDocument();
+    });
+
+    it('hides the rows when the dates are null', async () => {
+      await mountTerms(null, { nextRateReset: null, nextCapitalization: '2027-12-31' });
+      expect(screen.queryByText(/Next rate reset/)).not.toBeInTheDocument();
+      expect(screen.getByText(/Next capitalization/)).toBeInTheDocument();
     });
   });
 
@@ -984,6 +1061,7 @@ describe('SecurityBondCard: indexation, scenarios and the interest chart (spec 1
           cashFlow({ date: '2027-01-15', amount: null, status: 'UNKNOWN', period: 3 }),
           cashFlow({ date: '2027-02-15', amount: '3.80', status: 'PROJECTED', period: 4 }),
         ],
+        nextPayment: [cashFlow({ date: '2027-01-15', amount: null, status: 'UNKNOWN', period: 3 })],
       });
       await mount();
       const next = within(screen.getAllByRole('row')[1]).getAllByRole('cell')[9];

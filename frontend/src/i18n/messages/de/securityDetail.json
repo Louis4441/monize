@@ -348,7 +348,9 @@
         "observed": "{benchmark} {observation}: {value} + {addend}",
         "floored": "(auf {floor} angehoben)",
         "missing": "{benchmark} {observation}: noch nicht veröffentlicht"
-      }
+      },
+      "nextRateReset": "Nächste Zinsanpassung: {date}",
+      "nextCapitalization": "Nächste Kapitalisierung: {date}"
     },
     "indexation": {
       "inflation": "Inflationsindexiert: ab {date} (Periode 2) beträgt der Zinssatz {benchmark} + {addend} und wird in jeder Periode neu berechnet",
@@ -412,6 +414,13 @@
     },
     "issuers": {
       "PL_MF": "Finanzministerium (PL)"
+    },
+    "redemption": {
+      "title": "Bedingungen der vorzeitigen Rückgabe",
+      "fixedFee": "Gebühr für die vorzeitige Rückgabe: {amount} pro Anleihe.",
+      "forfeitAccrued": "Bei vorzeitiger Rückgabe verfallen die im laufenden Zeitraum aufgelaufenen Zinsen.",
+      "floorAllPeriods": "Die Gebühr senkt den Erlös in keinem Zeitraum unter den Nennwert.",
+      "floorFirstPeriod": "Nur im ersten Zeitraum senkt die Gebühr den Erlös nicht unter den Nennwert; in späteren Zeiträumen gibt es diese Untergrenze nicht."
     }
   }
 }

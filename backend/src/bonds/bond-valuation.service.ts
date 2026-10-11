@@ -9,6 +9,7 @@ import {
   benchmarkFieldsOf,
   BondTerms,
   parseBondTerms,
+  Redemption,
 } from "./domain/bond-terms";
 import { BOND_CALENDARS } from "./bond-adapters";
 import {
@@ -106,6 +107,8 @@ export interface SecurityValuation {
   readonly asOf: string;
   readonly lots: readonly SecurityLotValuation[];
   readonly benchmarkCoverage: readonly BenchmarkCoverage[];
+  /** The terms' redemption policy; null when the bond is redeemable at maturity only. */
+  readonly redemptionTerms: Redemption | null;
   readonly totals: SecurityValuationTotals;
   readonly refusal: BondLotsRefusal | null;
 }
@@ -218,6 +221,10 @@ export class BondValuationService {
       }
       const { instrument } = reference;
       const benchmarkCoverage = await this.loadCoverage(m, reference.terms);
+      const redemptionTerms =
+        reference.terms.redemption.type === "ON_DEMAND"
+          ? reference.terms.redemption
+          : null;
       const folded = bondLotsAsOf(ledger.transactions, asOf);
       if (folded.lots === null) {
         return {
@@ -226,6 +233,7 @@ export class BondValuationService {
           asOf,
           lots: [],
           benchmarkCoverage,
+          redemptionTerms,
           totals: {
             quantity: null,
             grossValue: null,
@@ -252,6 +260,7 @@ export class BondValuationService {
         asOf,
         lots,
         benchmarkCoverage,
+        redemptionTerms,
         totals: {
           quantity: lots.reduce((n, l) => n + l.quantity, 0),
           grossValue: sum((v) => v.grossValue),

@@ -348,7 +348,9 @@
         "observed": "{benchmark} {observation}：{value} + {addend}",
         "floored": "（上调至 {floor}）",
         "missing": "{benchmark} {observation}：尚未公布"
-      }
+      },
+      "nextRateReset": "下次利率重置日:{date}",
+      "nextCapitalization": "下次计息资本化日:{date}"
     },
     "indexation": {
       "inflation": "与通胀挂钩：自 {date}（第 2 期）起，利率为 {benchmark} + {addend}，每期重新计算",
@@ -412,6 +414,13 @@
     },
     "issuers": {
       "PL_MF": "财政部(PL)"
+    },
+    "redemption": {
+      "title": "提前赎回条款",
+      "fixedFee": "提前赎回费用:每份债券 {amount}。",
+      "forfeitAccrued": "提前赎回时,当期已累计的利息将被没收。",
+      "floorAllPeriods": "在任何期间,该费用都不会使赎回所得低于面值。",
+      "floorFirstPeriod": "仅在第一个期间,该费用不会使赎回所得低于面值;之后的期间没有这一下限。"
     }
   }
 }

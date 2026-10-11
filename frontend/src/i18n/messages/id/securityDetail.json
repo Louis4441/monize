@@ -348,7 +348,9 @@
         "observed": "{benchmark} {observation}: {value} + {addend}",
         "floored": "(dinaikkan ke {floor})",
         "missing": "{benchmark} {observation}: belum dipublikasikan"
-      }
+      },
+      "nextRateReset": "Penyesuaian suku bunga berikutnya: {date}",
+      "nextCapitalization": "Kapitalisasi berikutnya: {date}"
     },
     "indexation": {
       "inflation": "Terindeks inflasi: mulai {date} (periode 2) suku bunganya adalah {benchmark} + {addend}, dihitung ulang setiap periode",
@@ -412,6 +414,13 @@
     },
     "issuers": {
       "PL_MF": "Kementerian Keuangan (PL)"
+    },
+    "redemption": {
+      "title": "Ketentuan penebusan lebih awal",
+      "fixedFee": "Biaya penebusan lebih awal: {amount} per obligasi.",
+      "forfeitAccrued": "Pada penebusan lebih awal, bunga yang berjalan pada periode saat ini hangus.",
+      "floorAllPeriods": "Biaya tidak pernah menurunkan hasil penebusan di bawah nilai nominal, pada periode mana pun.",
+      "floorFirstPeriod": "Hanya pada periode pertama biaya tidak dapat menurunkan hasil penebusan di bawah nilai nominal; periode berikutnya tidak memiliki batas bawah tersebut."
     }
   }
 }
