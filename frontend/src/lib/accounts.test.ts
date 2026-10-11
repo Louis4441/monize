@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import apiClient from './api';
 import { accountsApi } from './accounts';
 import { scheduledTransactionsApi } from './scheduled-transactions';
-import { invalidateCache } from './apiCache';
+import { getCached, invalidateCache, setCache } from './apiCache';
 
 vi.mock('./api', () => ({
   default: {
@@ -122,6 +122,27 @@ describe('accountsApi', () => {
     vi.mocked(apiClient.delete).mockResolvedValue({});
     await accountsApi.delete('acc-1');
     expect(apiClient.delete).toHaveBeenCalledWith('/accounts/acc-1');
+  });
+
+  // The Investments page lists accounts from `investments:accounts`, so a write
+  // that changes the account list must drop it too; otherwise a just-created
+  // investment pair is missing from that page's selector for up to 30 seconds.
+  it.each([
+    ['create', () => accountsApi.create({ name: 'Checking' } as any)],
+    ['createInvestmentPair', () => accountsApi.createInvestmentPair({ name: 'Investment' } as any)],
+    ['update', () => accountsApi.update('acc-1', { name: 'Renamed' } as any)],
+    ['close', () => accountsApi.close('acc-1')],
+    ['reopen', () => accountsApi.reopen('acc-1')],
+    ['delete', () => accountsApi.delete('acc-1')],
+  ])('%s drops the cached investment account list', async (_name, write) => {
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { id: 'acc-1' } });
+    vi.mocked(apiClient.patch).mockResolvedValue({ data: { id: 'acc-1' } });
+    vi.mocked(apiClient.delete).mockResolvedValue({});
+    setCache('investments:accounts', [{ id: 'old' }]);
+    setCache('accounts:all:false', [{ id: 'old' }]);
+    await write();
+    expect(getCached('investments:accounts')).toBeUndefined();
+    expect(getCached('accounts:all:false')).toBeUndefined();
   });
 
   it('canDelete fetches /accounts/:id/can-delete', async () => {

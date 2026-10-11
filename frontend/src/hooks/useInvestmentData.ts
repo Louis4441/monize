@@ -133,12 +133,21 @@ export function useInvestmentData() {
   // pattern; this generalises that behaviour to the rest of the page.
   const hasLoadedRef = useRef(false);
 
+  // A response belongs to the request that produced it. An older selection's
+  // slower answer must not overwrite the current one (e.g. a remembered
+  // selection fetched on mount, then superseded by ?accountId=).
+  const summarySeqRef = useRef(0);
+  const transactionsSeqRef = useRef(0);
+  const cashSeqRef = useRef(0);
+
   const loadAllPortfolioData = useCallback(async (
     accountIds: string[],
     page: number = 1,
     filters: TransactionFilters = {},
   ) => {
     if (!hasLoadedRef.current) setIsLoading(true);
+    const summarySeq = ++summarySeqRef.current;
+    const txSeq = ++transactionsSeqRef.current;
     try {
       const ids = accountIds.length > 0 ? accountIds : undefined;
       const [summaryData, txResponse] = await Promise.all([
@@ -153,14 +162,22 @@ export function useInvestmentData() {
           endDate: filters.endDate,
         }),
       ]);
-      setPortfolioSummary(summaryData);
-      setTransactions(txResponse.data || []);
-      setPagination(txResponse.pagination);
+      if (summarySeqRef.current === summarySeq) {
+        setPortfolioSummary(summaryData);
+      }
+      if (transactionsSeqRef.current === txSeq) {
+        setTransactions(txResponse.data || []);
+        setPagination(txResponse.pagination);
+      }
     } catch (error) {
       logger.error('Failed to load portfolio data:', error);
-      setPortfolioSummary(null);
-      setTransactions([]);
-      setPagination(null);
+      if (summarySeqRef.current === summarySeq) {
+        setPortfolioSummary(null);
+      }
+      if (transactionsSeqRef.current === txSeq) {
+        setTransactions([]);
+        setPagination(null);
+      }
     } finally {
       if (!hasLoadedRef.current) setIsLoading(false);
       hasLoadedRef.current = true;
@@ -188,12 +205,15 @@ export function useInvestmentData() {
   });
 
   const loadPortfolioSummary = useCallback(async (accountIds: string[]) => {
+    const seq = ++summarySeqRef.current;
     try {
       const ids = accountIds.length > 0 ? accountIds : undefined;
       const summaryData = await investmentsApi.getPortfolioSummary(ids);
+      if (summarySeqRef.current !== seq) return;
       setPortfolioSummary(summaryData);
     } catch (error) {
       logger.error('Failed to load portfolio summary:', error);
+      if (summarySeqRef.current !== seq) return;
       setPortfolioSummary(null);
     }
   }, []);
@@ -203,6 +223,7 @@ export function useInvestmentData() {
     page: number = 1,
     filters: TransactionFilters = {},
   ) => {
+    const seq = ++transactionsSeqRef.current;
     try {
       const ids = accountIds.length > 0 ? accountIds : undefined;
       const txResponse = await investmentsApi.getTransactions({
@@ -214,10 +235,12 @@ export function useInvestmentData() {
         startDate: filters.startDate,
         endDate: filters.endDate,
       });
+      if (transactionsSeqRef.current !== seq) return;
       setTransactions(txResponse.data || []);
       setPagination(txResponse.pagination);
     } catch (error) {
       logger.error('Failed to load transactions:', error);
+      if (transactionsSeqRef.current !== seq) return;
       setTransactions([]);
       setPagination(null);
     } finally {
@@ -243,9 +266,12 @@ export function useInvestmentData() {
     page: number = 1,
     filters: { payeeIds?: string[]; categoryIds?: string[]; startDate?: string; endDate?: string } = {},
   ) => {
+    const seq = ++cashSeqRef.current;
     if (accountIds.length === 0) {
       setCashTransactions([]);
       setCashPagination(null);
+      // A superseded request no longer clears the flag it set.
+      setCashTransactionsLoading(false);
       return;
     }
     setCashTransactionsLoading(true);
@@ -259,6 +285,7 @@ export function useInvestmentData() {
         startDate: filters.startDate || undefined,
         endDate: filters.endDate || undefined,
       });
+      if (cashSeqRef.current !== seq) return;
       setCashTransactions(response.data || []);
       setCashStartingBalance(response.startingBalance);
       setCashPagination(response.pagination ? {
@@ -268,10 +295,11 @@ export function useInvestmentData() {
       } : null);
     } catch (error) {
       logger.error('Failed to load cash transactions:', error);
+      if (cashSeqRef.current !== seq) return;
       setCashTransactions([]);
       setCashPagination(null);
     } finally {
-      setCashTransactionsLoading(false);
+      if (cashSeqRef.current === seq) setCashTransactionsLoading(false);
     }
   }, []);
 
