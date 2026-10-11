@@ -95,6 +95,8 @@ export interface BackfillRun {
   readonly failed: number;
   /** An adapter's pass stopped on `SOURCE_UNAVAILABLE`; the next run resumes. */
   readonly stoppedEarly: boolean;
+  /** Missing series this pass did not ask for (its `limit`); the next one does. */
+  readonly remaining: number;
 }
 
 export interface BackfillOptions extends SeriesRequestOptions {
@@ -102,10 +104,23 @@ export interface BackfillOptions extends SeriesRequestOptions {
   readonly sleep?: (ms: number) => Promise<void>;
   /** The adapters' day, YYYY-MM-DD; their own timezone's today when omitted. */
   readonly today?: string;
+  /**
+   * At most this many series are asked for, newest sale month first, so a pass
+   * a person waits on stays short and fills the months they most likely hold
+   * first; the rest is `remaining`. Absent, every missing series, oldest first.
+   */
+  readonly limit?: number;
 }
 
 /** The least time between two checks of one program's offer by a price refresh. */
 export const PROGRAM_OFFER_COOLDOWN_MS = 10 * 60_000;
+
+/**
+ * How many missing series of a program's history one price refresh asks for:
+ * each is a 3 s gap and two requests, so about 30-40 s with a spinner, and a
+ * few refreshes (or the daily check) fill the rest.
+ */
+export const PROGRAM_BACKFILL_CHUNK = 8;
 
 /** The least time between two requests to the issuer's site by the backfill. */
 export const BACKFILL_GAP_MS = 3000;
@@ -395,32 +410,58 @@ export class BondSeriesService {
    * (`SERIES_FETCH_UNSUPPORTED`); a source that cannot be read is counted in
    * `failed`. A person's action (INV-BOND-008). Needs an ambient identity.
    *
-   * The price refresh has no throttle of its own, and every check reads the
-   * issuer's offer page, so one program is checked at most once per
-   * `PROGRAM_OFFER_COOLDOWN_MS` per process; a refresh inside that window
-   * fetches nothing and answers an empty run. A new month's series goes on sale
-   * once a month, so the window costs a reader nothing.
+   * Then up to `PROGRAM_BACKFILL_CHUNK` missing series of the program's history
+   * are fetched, newest first (`history`), so a few refreshes fill it without
+   * work in the background; the daily check fills it too while auto-fetch is on.
+   *
+   * The price refresh has no throttle of its own, so the requests are bounded
+   * here: one pass per program at a time per process (a refresh during one
+   * answers an empty run), the offer page read at most once per
+   * `PROGRAM_OFFER_COOLDOWN_MS` (a new month's series goes on sale once a
+   * month), and the history asks only for what is missing, at the backfill's
+   * own pace.
    */
   async fetchProgramOffer(
     countryCode: string,
     programCode: string,
-    options: SeriesRequestOptions = {},
-  ): Promise<CurrentOfferRun> {
+    options: BackfillOptions = {},
+  ): Promise<CurrentOfferRun & { readonly history: BackfillRun | null }> {
     const country = countryCode.toUpperCase();
     const key = programKey(country, programCode);
-    const now = Date.now();
-    const last = this.programOfferChecks.get(key);
-    if (last !== undefined && now - last < PROGRAM_OFFER_COOLDOWN_MS) {
-      return { listed: 0, stored: 0, alreadyStored: 0, failed: 0 };
+    const idle = { listed: 0, stored: 0, alreadyStored: 0, failed: 0 };
+    // One pass per program at a time in this process: a second refresh while
+    // one runs does nothing rather than doubling the requests.
+    if (this.programPasses.has(key)) return { ...idle, history: null };
+    this.programPasses.add(key);
+    try {
+      const programs = new Set([key]);
+      const now = Date.now();
+      const last = this.programOfferChecks.get(key);
+      let offer: CurrentOfferRun = idle;
+      if (last === undefined || now - last >= PROGRAM_OFFER_COOLDOWN_MS) {
+        // Recorded before the fetch, so a failing source is held by the window.
+        this.programOfferChecks.set(key, now);
+        offer = await this.fetchOfferOf(country, { ...options, programs });
+      }
+      // Then a bounded piece of the program's history. Paced by the backfill's
+      // own gap and asking only for what is missing, so once the history is
+      // complete a refresh costs no request here at all.
+      const history = await this.backfillHistory({
+        ...options,
+        programs,
+        limit: options.limit ?? PROGRAM_BACKFILL_CHUNK,
+      });
+      return { ...offer, history };
+    } finally {
+      this.programPasses.delete(key);
     }
-    // Recorded before the fetch, so concurrent refreshes and a failing source
-    // are held by the same window.
-    this.programOfferChecks.set(key, now);
-    return this.fetchOfferOf(country, { ...options, programs: new Set([key]) });
   }
 
   /** When each program's offer was last checked by `fetchProgramOffer`. */
   private readonly programOfferChecks = new Map<string, number>();
+
+  /** The programs `fetchProgramOffer` is working on now. */
+  private readonly programPasses = new Set<string>();
 
   private async runCurrentOffer(
     options: SeriesRequestOptions,
@@ -494,6 +535,8 @@ export class BondSeriesService {
     let notPublished = 0;
     let failed = 0;
     let stoppedEarly = false;
+    let remaining = 0;
+    let attempted = 0;
     const storedNow: BondSeriesResult[] = [];
     for (const adapter of options.adapters ?? INSTALLED_BOND_ADAPTERS) {
       const providerId = adapter.seriesProviderId;
@@ -507,9 +550,20 @@ export class BondSeriesService {
       const held = await withScopedDb(this.dataSource, (m) =>
         this.catalog.storedSeriesCodes(m, adapter.countryCode, codes),
       );
-      const missing = codes.filter((code) => !held.has(code.toUpperCase()));
+      const allMissing = codes.filter((code) => !held.has(code.toUpperCase()));
       candidates += codes.length;
-      alreadyStored += codes.length - missing.length;
+      alreadyStored += codes.length - allMissing.length;
+      // `backfillCodes` lists oldest first; a bounded pass takes the newest.
+      const budget =
+        options.limit === undefined
+          ? allMissing.length
+          : Math.max(0, options.limit - attempted);
+      const missing =
+        options.limit === undefined
+          ? allMissing
+          : [...allMissing].reverse().slice(0, budget);
+      remaining += allMissing.length - missing.length;
+      attempted += missing.length;
       for (const code of missing) {
         // Before every request, the first included: the current-offer pass has
         // just spoken to the same host.
@@ -542,7 +596,8 @@ export class BondSeriesService {
     await this.afterStored(storedNow);
     this.logger.log(
       `Bond series backfill: ${candidates} candidates, ${alreadyStored} already stored, ${stored} stored, ` +
-        `${notPublished} not published, ${failed} failed${stoppedEarly ? ", stopped on an unavailable source" : ""}`,
+        `${notPublished} not published, ${failed} failed, ${remaining} left for a later pass` +
+        `${stoppedEarly ? ", stopped on an unavailable source" : ""}`,
     );
     return {
       candidates,
@@ -551,6 +606,7 @@ export class BondSeriesService {
       notPublished,
       failed,
       stoppedEarly,
+      remaining,
     };
   }
 

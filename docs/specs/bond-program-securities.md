@@ -126,6 +126,15 @@ and then recomputes the engine prices. It is a person's action under
 INV-BOND-008. A country with no fetch is skipped silently; a failed fetch does
 not stop the recompute and is reported as that security's failed row.
 
+The same refresh then fetches up to `PROGRAM_BACKFILL_CHUNK` (8) missing series
+of the program's history, newest sale month first, at the backfill's pace (3 s
+before each request): about 30-40 s under the button's spinner, never work in
+the background. A few refreshes, or the daily check while auto-fetch is on,
+complete the history; once it is complete a refresh asks for nothing more. The
+refresh has no throttle of its own, so the service bounds it: one pass per
+program at a time per process, and the offer page read at most once per
+`PROGRAM_OFFER_COOLDOWN_MS` (10 minutes).
+
 ### 2.6 Nothing country-specific without a user
 
 Requested by the owner on 2026-10-11: not every deployment wants Polish bonds,

@@ -66,6 +66,7 @@ const NO_BACKFILL: BackfillRun = {
   notPublished: 0,
   failed: 0,
   stoppedEarly: false,
+  remaining: 0,
 };
 
 function adapterOf(over: Partial<BondAdapter> = {}): BondAdapter {
@@ -972,7 +973,7 @@ describe("BondSeriesService", () => {
         now.mockReturnValue(1_000_000 + PROGRAM_OFFER_COOLDOWN_MS - 1);
         await expect(
           service.fetchProgramOffer("PL", "EDO", { adapters: [adapter] }),
-        ).resolves.toEqual({
+        ).resolves.toMatchObject({
           listed: 0,
           stored: 0,
           alreadyStored: 0,
@@ -990,6 +991,40 @@ describe("BondSeriesService", () => {
       }
     });
 
+    it("adds a bounded piece of the program's history, and runs one pass per program at a time", async () => {
+      const { service, catalog } = build();
+      catalog.storedSeriesCodes.mockResolvedValue(new Set<string>());
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const adapter = adapterOf({
+        currentSeries: jest.fn(async () => {
+          await gate;
+          return [];
+        }),
+        backfillCodes: jest.fn(() => ["EDO0124", "EDO0224", "ROR0224"]),
+        programOf: (code: string) => code.slice(0, 3),
+      });
+      const options = {
+        adapters: [adapter],
+        sleep: jest.fn(async () => undefined),
+        today: "2026-10-11",
+        limit: 1,
+      };
+      const first = service.fetchProgramOffer("PL", "EDO", options);
+      // A second refresh of the same program while the first runs does nothing.
+      await expect(
+        service.fetchProgramOffer("PL", "EDO", options),
+      ).resolves.toMatchObject({ listed: 0, history: null });
+      release();
+      const run = await first;
+      expect(
+        (adapter.fetchSeries as jest.Mock).mock.calls.map((c) => c[0]),
+      ).toEqual(["EDO0224"]);
+      expect(run.history).toMatchObject({ candidates: 2, remaining: 1 });
+    });
+
     it("refuses a country with no official source", async () => {
       const { service } = build();
       const error = await refusal(
@@ -1003,6 +1038,22 @@ describe("BondSeriesService", () => {
     const codes = ["OTS0424", "ROR0125", "DOR0126", "TOS0127"];
     const withCodes = (over: Partial<BondAdapter> = {}) =>
       adapterOf({ backfillCodes: jest.fn(() => codes), ...over });
+
+    it("asks for at most `limit` series, newest first, and reports the rest", async () => {
+      const { service, catalog } = build();
+      const adapter = withCodes();
+      catalog.storedSeriesCodes.mockResolvedValue(new Set(["OTS0424"]));
+      const run = await service.backfillHistory({
+        adapters: [adapter],
+        sleep: jest.fn(async () => undefined),
+        today: "2026-10-11",
+        limit: 2,
+      });
+      expect(
+        (adapter.fetchSeries as jest.Mock).mock.calls.map((c) => c[0]),
+      ).toEqual(["TOS0127", "DOR0126"]);
+      expect(run).toMatchObject({ alreadyStored: 1, remaining: 1 });
+    });
 
     it("asks the adapter for its codes and the catalog, once, which are stored, and fetches only the rest", async () => {
       const { service, catalog } = build();
@@ -1042,6 +1093,7 @@ describe("BondSeriesService", () => {
         notPublished: 0,
         failed: 0,
         stoppedEarly: false,
+        remaining: 0,
       });
     });
 
@@ -1126,6 +1178,7 @@ describe("BondSeriesService", () => {
         notPublished: 1,
         failed: 2,
         stoppedEarly: false,
+        remaining: 0,
       });
       expect(logWarn).toHaveBeenCalledTimes(3);
     });
