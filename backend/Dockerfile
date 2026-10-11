@@ -1,5 +1,5 @@
 # Development stage
-FROM node:24-alpine AS development
+FROM public.ecr.aws/docker/library/node:24-alpine AS development
 
 WORKDIR /app
 
@@ -22,7 +22,7 @@ EXPOSE 3000
 CMD ["npm", "run", "start:dev"]
 
 # Builder stage (uses slim/glibc to avoid Alpine musl stalling under QEMU arm64 emulation)
-FROM node:24-slim AS builder
+FROM public.ecr.aws/docker/library/node:24-slim AS builder
 
 WORKDIR /app
 
@@ -41,7 +41,7 @@ COPY docs/release-notes ./release-notes
 RUN npm run build
 
 # Production deps stage (uses slim/glibc to avoid Alpine musl SIGILL under QEMU)
-FROM node:24-slim AS deps
+FROM public.ecr.aws/docker/library/node:24-slim AS deps
 
 WORKDIR /app
 
@@ -52,7 +52,7 @@ COPY backend/package*.json ./
 RUN npm ci --omit=dev --libc=musl && npm cache clean --force
 
 # Production stage
-FROM node:24-alpine AS production
+FROM public.ecr.aws/docker/library/node:24-alpine AS production
 ARG GIT_SHA
 ARG BUILD_DATE
 ARG VERSION

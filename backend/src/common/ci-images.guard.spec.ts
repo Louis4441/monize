@@ -13,10 +13,12 @@ import { findRepoRoot, gitListFiles, requireRepoRoot } from "./repo-tree.util";
  * `docs/verification-contract.md` section 7.
  *
  * Scanned: every `image:` in `.github/workflows/*.yml` and in the compose file
- * CI runs (`docker-compose.e2e.yml`), and every `*_IMAGE=` default in
- * `scripts/*.sh`. Allowed: the two registries above, a GitHub expression
- * (`${{ ... }}`), and an image CI builds itself (a `:local` tag). Not scanned:
- * a Dockerfile's `FROM`, which the image build authenticates for.
+ * CI runs (`docker-compose.e2e.yml`), every `*_IMAGE=` default in
+ * `scripts/*.sh`, and every `FROM` in a tracked Dockerfile (CI builds them for
+ * the E2E, Lighthouse and ZAP jobs). Allowed: the two registries above, a
+ * GitHub expression (`${{ ... }}`), an image CI builds itself (a `:local` tag),
+ * a build argument (`$VAR`) and an earlier stage of the same Dockerfile. No
+ * workflow logs in with DOCKERHUB_* secrets: nothing needs it.
  */
 
 const ALLOWED = [
@@ -33,11 +35,20 @@ export function disallowedImages(
   const found: Array<{ line: number; image: string }> = [];
   const lines = text.split("\n");
   const shell = file.endsWith(".sh");
+  const dockerfile = /(^|\/)Dockerfile[^/]*$/.test(file);
+  const stages = new Set<string>();
   for (const [index, raw] of lines.entries()) {
     const line = raw.trim();
     if (line.startsWith("#")) continue;
     let image: string | null = null;
-    if (shell) {
+    if (dockerfile) {
+      const m = /^FROM\s+(?:--\S+\s+)*(\S+)(?:\s+AS\s+(\S+))?/i.exec(line);
+      if (m) {
+        image =
+          stages.has(m[1].toLowerCase()) || m[1].startsWith("$") ? null : m[1];
+        if (m[2]) stages.add(m[2].toLowerCase());
+      }
+    } else if (shell) {
       const m = /^[A-Z_]*IMAGE="(?:\$\{[A-Z_]+:-)?([^"}]+)\}?"/.exec(line);
       image = m ? m[1] : null;
     } else {
@@ -52,6 +63,18 @@ export function disallowedImages(
 }
 
 describe("disallowedImages", () => {
+  it("refuses a Docker Hub base image in a Dockerfile, not an earlier stage", () => {
+    const text = [
+      "FROM node:24-alpine AS development",
+      "FROM public.ecr.aws/docker/library/node:24-slim AS builder",
+      "FROM builder AS production",
+      "FROM --platform=$BUILDPLATFORM $BASE",
+    ].join("\n");
+    expect(disallowedImages("backend/Dockerfile", text)).toEqual([
+      { line: 1, image: "node:24-alpine" },
+    ]);
+  });
+
   it("refuses a Docker Hub image in a workflow or compose file", () => {
     expect(
       disallowedImages("ci.yml", "    image: postgres:16-alpine\n"),
@@ -98,13 +121,16 @@ describeTree("CI pulls no image from Docker Hub", () => {
       (path) =>
         /^\.github\/workflows\/[^/]+\.ya?ml$/.test(path) ||
         path === "docker-compose.e2e.yml" ||
-        /^scripts\/[^/]+\.sh$/.test(path),
+        /^scripts\/[^/]+\.sh$/.test(path) ||
+        /(^|\/)Dockerfile[^/]*$/.test(path),
     );
     expect(files).toEqual(
       expect.arrayContaining([
         ".github/workflows/ci.yml",
         "docker-compose.e2e.yml",
         "scripts/verify-schema.sh",
+        "backend/Dockerfile",
+        "frontend/Dockerfile",
       ]),
     );
 
@@ -120,5 +146,15 @@ describeTree("CI pulls no image from Docker Hub", () => {
         )}\nUse the ECR Public mirror of the official image, public.ecr.aws/docker/library/<name>:<tag> (same digests), or ghcr.io. docs/verification-contract.md section 7.`,
       );
     }
+  });
+
+  it("no workflow logs in to Docker Hub", () => {
+    const root = requireRepoRoot(REPO_ROOT);
+    const logins = gitListFiles(root)
+      .filter((path) => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(path))
+      .filter((path) =>
+        /secrets\.DOCKERHUB_/.test(readFileSync(join(root, path), "utf8")),
+      );
+    expect(logins).toEqual([]);
   });
 });
