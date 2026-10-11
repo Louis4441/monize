@@ -546,6 +546,28 @@ describe('BackupRestoreSection', () => {
       expect(screen.getByText(/Affected securities: A, B, C\./)).toHaveTextContent('and 50 more');
     });
 
+    it('says how many bond transactions lost their series and what to do', async () => {
+      await restoreWith({
+        message: 'Backup restored successfully',
+        restored: { accounts: 4 },
+        unlinkedBondSeries: { count: 7 },
+      });
+      expect(
+        screen.getByText(/7 bond transactions lost their series/),
+      ).toHaveTextContent('fetch the series to restore them');
+      // Not part of the record total.
+      expect(screen.queryByText('11')).not.toBeInTheDocument();
+    });
+
+    it('says nothing about lost series when none were', async () => {
+      await restoreWith({
+        message: 'Backup restored successfully',
+        restored: { accounts: 1 },
+        unlinkedBondSeries: { count: 0 },
+      });
+      expect(screen.queryByText(/lost their series/)).not.toBeInTheDocument();
+    });
+
     it('says nothing about bond links when none were dropped', async () => {
       await restoreWith({
         message: 'Backup restored successfully',

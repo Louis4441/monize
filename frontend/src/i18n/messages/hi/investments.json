@@ -303,7 +303,15 @@
       "oldestFirst": "सबसे पुरानी पहले",
       "loading": "सीरीज़ लोड हो रही हैं...",
       "loadFailed": "सीरीज़ लोड नहीं हो सकीं।",
-      "retry": "पुनः प्रयास करें"
+      "retry": "पुनः प्रयास करें",
+      "fromDateCode": "तारीख से: {code}",
+      "noneOnSale": "इस तारीख पर बिक्री के लिए कोई सीरीज़ नहीं है",
+      "choose": "सीरीज़ चुनें",
+      "required": "इन शेयरों की सीरीज़ चुनें।",
+      "heldOption": "{code} ({quantity} धारित)",
+      "noLongerHeld": "{code} (इस तारीख पर अब धारित नहीं)",
+      "noLongerHeldUnknown": "सहेजी गई सीरीज़ (इस तारीख पर अब धारित नहीं)",
+      "storedSeries": "सहेजी गई सीरीज़"
     }
   },
   "newTransactionButton": {

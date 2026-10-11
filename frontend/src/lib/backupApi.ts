@@ -67,6 +67,12 @@ export interface RestoreResult {
    * than `count`. Absent when none.
    */
   unlinkedBondSecurities?: { count: number; symbols: string[] };
+  /**
+   * Bond transactions restored without their series because this server's
+   * catalog does not carry it. The rows were written, so this stays outside
+   * `restored`; the series is read from the date where possible. Absent when none.
+   */
+  unlinkedBondSeries?: { count: number };
 }
 
 export type SupportBackupSection =

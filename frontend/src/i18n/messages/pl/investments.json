@@ -303,7 +303,15 @@
       "oldestFirst": "Najstarsze najpierw",
       "loading": "Wczytywanie serii...",
       "loadFailed": "Nie udało się wczytać serii.",
-      "retry": "Ponów"
+      "retry": "Ponów",
+      "fromDateCode": "Z daty: {code}",
+      "noneOnSale": "Brak serii w sprzedaży w tym dniu",
+      "choose": "Wybierz serię",
+      "required": "Wybierz serię tych papierów.",
+      "heldOption": "{code} (posiadane: {quantity})",
+      "noLongerHeld": "{code} (nie jest już posiadana w tym dniu)",
+      "noLongerHeldUnknown": "Zapisana seria (nie jest już posiadana w tym dniu)",
+      "storedSeries": "Zapisana seria"
     }
   },
   "newTransactionButton": {

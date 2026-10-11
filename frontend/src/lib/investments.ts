@@ -41,6 +41,8 @@ import { IntradayBreakdown } from '@/types/net-worth';
 import type {
   BondInstrumentSummary,
   BondProgramSummary,
+  BondSeriesHoldings,
+  BondSeriesOnSale,
   FetchBondOfferResult,
   FetchBondSeriesResult,
   BondAssumption,
@@ -1042,6 +1044,41 @@ export const investmentsApi = {
     const response = await apiClient.get<SecurityBondValuation>(
       `/bonds/securities/${securityId}/valuation`,
       { params: Object.keys(params).length > 0 ? params : undefined },
+    );
+    return response.data;
+  },
+
+  // The series the server would infer for a BUY/REINVEST of the security on
+  // `date`; null when no stored series was on sale. Uncached: a fetch changes it.
+  getBondSeriesOnSale: async (
+    securityId: string,
+    date: string,
+  ): Promise<BondSeriesOnSale | null> => {
+    const response = await apiClient.get<BondSeriesOnSale | null>(
+      `/bonds/securities/${securityId}/series-on-sale`,
+      { params: { date } },
+    );
+    return response.data ?? null;
+  },
+
+  // The series (and quantities) the account holds of the security on `date`,
+  // for a removal's series picker. `excludeTransactionId` leaves the row being
+  // edited out. A 422 carries the lots refusal code. Uncached: a trade changes it.
+  getBondSeriesHoldings: async (
+    securityId: string,
+    accountId: string,
+    date: string,
+    excludeTransactionId?: string,
+  ): Promise<BondSeriesHoldings> => {
+    const response = await apiClient.get<BondSeriesHoldings>(
+      `/bonds/securities/${securityId}/series-holdings`,
+      {
+        params: {
+          accountId,
+          date,
+          ...(excludeTransactionId ? { excludeTransactionId } : {}),
+        },
+      },
     );
     return response.data;
   },

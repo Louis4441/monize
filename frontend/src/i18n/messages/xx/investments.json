@@ -336,7 +336,15 @@
       "oldestFirst": "[XX-Oldest first-XX]",
       "loading": "[XX-Loading the series...-XX]",
       "loadFailed": "[XX-The series could not be loaded.-XX]",
-      "retry": "[XX-Retry-XX]"
+      "retry": "[XX-Retry-XX]",
+      "fromDateCode": "[XX-From the date: {code}-XX]",
+      "noneOnSale": "[XX-No series on sale on this date-XX]",
+      "choose": "[XX-Choose a series-XX]",
+      "required": "[XX-Choose the series of these shares.-XX]",
+      "heldOption": "[XX-{code} ({quantity} held)-XX]",
+      "noLongerHeld": "[XX-{code} (no longer held on this date)-XX]",
+      "noLongerHeldUnknown": "[XX-Stored series (no longer held on this date)-XX]",
+      "storedSeries": "[XX-Stored series-XX]"
     }
   },
   "newTransactionButton": {

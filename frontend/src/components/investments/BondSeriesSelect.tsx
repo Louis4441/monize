@@ -4,27 +4,41 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
+import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { baseInvestmentAction } from '@/lib/investment-actions';
 import { expectedSeriesCode, programSeries } from '@/lib/bond-series';
-import { getErrorMessage } from '@/lib/errors';
+import { getErrorCode, getErrorMessage } from '@/lib/errors';
 import { investmentsApi } from '@/lib/investments';
 import type { InvestmentAction, Security } from '@/types/investment';
-import type { BondInstrumentSummary, BondProgramSummary } from '@/types/bond';
+import type {
+  BondInstrumentSummary,
+  BondLotsRefusalCode,
+  BondProgramSummary,
+  BondSeriesHolding,
+  BondSeriesOnSale,
+} from '@/types/bond';
 
-/** An acquisition names the series bought; a removal names the series it leaves. */
-export type BondSeriesKind = 'acquire' | 'remove';
+/**
+ * What a share-moving row says about its series. An acquisition (BUY, REINVEST)
+ * may leave the series to the server, which infers it from the date; a transfer
+ * in or an added holding must name it; a removal names the series it leaves, or
+ * takes the oldest lots first.
+ */
+export type BondSeriesKind = 'acquire' | 'select' | 'remove';
 
 /**
  * Whether an action moves shares of a program-linked security, and which way
- * (spec `bond-program-securities.md` 2.3). A combined TRANSFER and the legs of
- * a posted transfer move lots with their series, so they name none.
+ * (spec `bond-program-securities.md` 2.3). A combined TRANSFER and the TRANSFER_OUT
+ * leg of a posted transfer move lots with their series, so they name none.
  */
 export function bondSeriesKind(action: InvestmentAction): BondSeriesKind | null {
   switch (baseInvestmentAction(action)) {
     case 'BUY':
     case 'REINVEST':
-    case 'ADD_SHARES':
       return 'acquire';
+    case 'ADD_SHARES':
+    case 'TRANSFER_IN':
+      return 'select';
     case 'SELL':
     case 'REMOVE_SHARES':
       return 'remove';
@@ -36,37 +50,67 @@ export function bondSeriesKind(action: InvestmentAction): BondSeriesKind | null 
 /** The select's value for "fetch the expected series", never a series id. */
 const FETCH_VALUE = '__fetch__';
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 /** The errors the server raises about the series of a share-moving row. */
 export const BOND_SERIES_ERROR_CODES = [
   'SERIES_NOT_IN_PROGRAM',
   'SERIES_NOT_DETERMINED',
+  'SERIES_REQUIRED',
   'REMOVAL_EXCEEDS_SERIES',
+  'OVER_REMOVAL',
 ] as const;
 
-interface AcquisitionData {
+const LOTS_REFUSAL_CODES: readonly string[] = [
+  'SPLIT',
+  'FRACTIONAL_QUANTITY',
+  'OVER_REMOVAL',
+  'INVALID_QUANTITY',
+  'REMOVAL_EXCEEDS_SERIES',
+  'SERIES_NOT_DETERMINED',
+] satisfies BondLotsRefusalCode[];
+
+interface CatalogData {
   key: string;
   program: BondProgramSummary | null;
   instruments: BondInstrumentSummary[];
 }
 
+interface OnSaleData {
+  key: string;
+  onSale: BondSeriesOnSale | null;
+}
+
 interface RemovalData {
   key: string;
-  series: Array<{ instrumentId: string; seriesCode: string }>;
+  holdings: BondSeriesHolding[];
+  /** The lots refusal code when the endpoint answered 422; the holdings are then empty. */
+  refusal: BondLotsRefusalCode | null;
+  /** The code of the row's stored series, when it could be told. */
+  storedCode: string | null;
+}
+
+export interface BondSeriesLookup {
+  /** The form's date, YYYY-MM-DD; a lookup waits for a calendar date. */
+  date: string;
+  /** The account the removal leaves; a removal lists nothing without one. */
+  accountId?: string;
+  /** The row being edited: its own lots are not counted as held. */
+  excludeTransactionId?: string;
+  /** The series the edited row stores, passed only while its kind is the stored one. */
+  storedInstrumentId?: string | null;
 }
 
 export interface BondSeriesOptions {
   kind: BondSeriesKind;
   options: Array<{ value: string; label: string }>;
-  /**
-   * The series that prefills an acquisition: the one stored for the date. '' when
-   * none is stored (the server then infers it, or refuses and says so).
-   */
-  suggestedId: string;
   isLoading: boolean;
   /** The lists could not be read; that is not "no series". */
   loadFailed: boolean;
+  /** A removal's lots cannot be derived: the reason, translated; only "Oldest first" is offered. */
+  refusal: string | null;
   retry: () => void;
-  /** The series to offer to fetch: the date's code, when it is not stored. */
+  /** The series to offer to fetch: the date's code, when no stored series is on sale. */
   fetchCode: string | null;
   /** The issuing country the fetch is addressed to. */
   fetchCountryCode: string | null;
@@ -77,131 +121,223 @@ export interface BondSeriesOptions {
 /**
  * The series a share-moving row of a program-linked security can name.
  *
- * An acquisition lists the program's stored series (in the program's currency)
- * and expects the one whose code the date gives; a removal lists the series
- * the security's lots are in. Each answer is kept with the key that produced it
- * so a lookup for another security or date is never shown as this one's, and a
- * failed read is a failure, never an empty list. Returns null when the
- * security is not program-linked or the action names no series.
+ * An acquisition asks the server which series the date infers (and labels the
+ * default option with it); a transfer in lists every stored series of the
+ * program; a removal lists the series the account holds on the date, with their
+ * quantities. Each answer is kept with the key that produced it so a lookup for
+ * another security, account or date is never shown as this one's, and a failed
+ * read is a failure, never an empty list. Returns null when the security is not
+ * program-linked or the action names no series.
  */
 export function useBondSeriesOptions(
   security: Security | null | undefined,
   kind: BondSeriesKind | null,
-  date: string,
+  lookup: BondSeriesLookup,
 ): BondSeriesOptions | null {
   const t = useTranslations('investments');
   const tSec = useTranslations('securities');
+  const tDetail = useTranslations('securityDetail');
+  const { formatShareQuantity } = useNumberFormat();
   const programId = security?.bondProgramId ?? null;
   const securityId = security?.id ?? null;
   const active = programId !== null && securityId !== null && kind !== null;
+  const { date, accountId, excludeTransactionId, storedInstrumentId } = lookup;
+  const validDate = DATE_RE.test(date);
 
-  const [acquisition, setAcquisition] = useState<AcquisitionData | null>(null);
+  const [catalog, setCatalog] = useState<CatalogData | null>(null);
+  const [onSaleData, setOnSaleData] = useState<OnSaleData | null>(null);
   const [removal, setRemoval] = useState<RemovalData | null>(null);
-  const [failedKey, setFailedKey] = useState<string | null>(null);
+  const [catalogFailedKey, setCatalogFailedKey] = useState<string | null>(null);
+  const [removalFailedKey, setRemovalFailedKey] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
-  // One request per (kind, security, program): the date only picks from the list.
-  const key = `${kind}|${securityId}|${programId}`;
+  const needsCatalog = kind === 'acquire' || kind === 'select';
+  // One catalog read per (security, program): the date only picks from it.
+  const catalogKey = `${securityId}|${programId}`;
+  // One request per (security, date); a fetched series re-asks.
+  const onSaleKey = `${securityId}|${date}|${attempt}`;
+  const removalKey = `${securityId}|${accountId ?? ''}|${date}|${excludeTransactionId ?? ''}|${storedInstrumentId ?? ''}`;
+  const catalogActive = active && needsCatalog;
+  const onSaleActive = active && kind === 'acquire' && validDate;
+  const removalActive = active && kind === 'remove' && validDate && !!accountId;
 
   useEffect(() => {
-    if (!active) return;
+    if (!catalogActive) return;
     let cancelled = false;
-    const failed = () => {
-      if (!cancelled) setFailedKey(key);
-    };
-    if (kind === 'acquire') {
-      Promise.all([investmentsApi.listBondPrograms(), investmentsApi.listBondInstruments()])
-        .then(([programs, instruments]) => {
-          if (cancelled) return;
-          const program = programs.find((p) => p.id === programId) ?? null;
-          setAcquisition({
-            key,
-            program,
-            instruments:
-              program === null
-                ? []
-                : programSeries(
-                    instruments,
-                    program.programCode,
-                    program.currency,
-                    program.issuerCountryCode,
-                  ),
-          });
-          setFailedKey(null);
-        })
-        .catch(failed);
-    } else {
-      investmentsApi
-        .getSecurityBondValuation(securityId as string)
-        .then((valuation) => {
-          if (cancelled) return;
-          const seen = new Map<string, string>();
-          for (const lot of valuation.lots) {
-            if (!seen.has(lot.instrumentId)) {
-              seen.set(lot.instrumentId, lot.valuation.seriesCode);
-            }
-          }
-          setRemoval({
-            key,
-            series: [...seen.entries()]
-              .map(([instrumentId, seriesCode]) => ({ instrumentId, seriesCode }))
-              .sort((a, b) => a.seriesCode.localeCompare(b.seriesCode)),
-          });
-          setFailedKey(null);
-        })
-        .catch(failed);
-    }
+    Promise.all([investmentsApi.listBondPrograms(), investmentsApi.listBondInstruments()])
+      .then(([programs, instruments]) => {
+        if (cancelled) return;
+        const program = programs.find((p) => p.id === programId) ?? null;
+        setCatalog({
+          key: catalogKey,
+          program,
+          instruments:
+            program === null
+              ? []
+              : programSeries(
+                  instruments,
+                  program.programCode,
+                  program.currency,
+                  program.issuerCountryCode,
+                ),
+        });
+        setCatalogFailedKey(null);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogFailedKey(catalogKey);
+      });
     return () => {
       cancelled = true;
     };
-  }, [active, kind, key, securityId, programId, attempt]);
+  }, [catalogActive, catalogKey, programId, attempt]);
 
-  const acq = acquisition?.key === key ? acquisition : null;
-  const rem = removal?.key === key ? removal : null;
+  useEffect(() => {
+    if (!onSaleActive) return;
+    let cancelled = false;
+    investmentsApi
+      .getBondSeriesOnSale(securityId as string, date)
+      .then((onSale) => {
+        if (cancelled) return;
+        setOnSaleData({ key: onSaleKey, onSale });
+      })
+      .catch(() => {
+        // The default option then keeps its generic label ("Determined from the
+        // date"): the server still infers the series on submit and says if it cannot.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [onSaleActive, onSaleKey, securityId, date]);
+
+  useEffect(() => {
+    if (!removalActive) return;
+    let cancelled = false;
+    const storedCodeOf = async (): Promise<string | null> => {
+      if (!storedInstrumentId) return null;
+      try {
+        const all = await investmentsApi.listBondInstruments();
+        return all.find((i) => i.id === storedInstrumentId)?.seriesCode ?? null;
+      } catch {
+        return null;
+      }
+    };
+    investmentsApi
+      .getBondSeriesHoldings(securityId as string, accountId as string, date, excludeTransactionId)
+      .then(async (result) => {
+        const held = result.holdings;
+        const stored =
+          storedInstrumentId && !held.some((h) => h.instrumentId === storedInstrumentId)
+            ? await storedCodeOf()
+            : null;
+        if (cancelled) return;
+        setRemoval({ key: removalKey, holdings: held, refusal: null, storedCode: stored });
+        setRemovalFailedKey(null);
+      })
+      .catch(async (err: unknown) => {
+        const code = getErrorCode(err);
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 422 && code !== undefined && LOTS_REFUSAL_CODES.includes(code)) {
+          const stored = await storedCodeOf();
+          if (cancelled) return;
+          setRemoval({
+            key: removalKey,
+            holdings: [],
+            refusal: code as BondLotsRefusalCode,
+            storedCode: stored,
+          });
+          setRemovalFailedKey(null);
+          return;
+        }
+        if (!cancelled) setRemovalFailedKey(removalKey);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [removalActive, removalKey, securityId, accountId, date, excludeTransactionId, storedInstrumentId, attempt]);
+
+  const cat = catalog?.key === catalogKey ? catalog : null;
+  const onSale = onSaleData?.key === onSaleKey ? onSaleData : null;
+  const rem = removal?.key === removalKey ? removal : null;
+  // Only to propose which code to fetch; the value sent is never derived from it.
   const expected =
-    acq?.program != null ? expectedSeriesCode(acq.program.programCode, date) : null;
-  const storedExpected =
-    expected === null
-      ? undefined
-      : acq?.instruments.find((i) => i.seriesCode === expected);
+    kind === 'acquire' && cat?.program != null && validDate
+      ? expectedSeriesCode(cat.program.programCode, date)
+      : null;
+  const expectedStored =
+    expected === null ? undefined : cat?.instruments.find((i) => i.seriesCode === expected);
+  const noneOnSale = onSale !== null && onSale.onSale === null;
+  const fetchCode = noneOnSale && expected !== null && expectedStored === undefined ? expected : null;
 
   const options = useMemo(() => {
     if (kind === 'remove') {
-      return [
-        { value: '', label: t('transactionForm.bondSeries.oldestFirst') },
-        ...(rem?.series ?? []).map((s) => ({ value: s.instrumentId, label: s.seriesCode })),
-      ];
+      const list = [{ value: '', label: t('transactionForm.bondSeries.oldestFirst') }];
+      for (const h of rem?.holdings ?? []) {
+        list.push({
+          value: h.instrumentId,
+          label: t('transactionForm.bondSeries.heldOption', {
+            code: h.seriesCode,
+            quantity: formatShareQuantity(h.quantity),
+          }),
+        });
+      }
+      if (rem !== null && storedInstrumentId && !list.some((o) => o.value === storedInstrumentId)) {
+        // The stored value stays visible, and is never mislabelled as held.
+        list.push({
+          value: storedInstrumentId,
+          label:
+            rem.refusal !== null
+              ? (rem.storedCode ?? t('transactionForm.bondSeries.storedSeries'))
+              : rem.storedCode !== null
+                ? t('transactionForm.bondSeries.noLongerHeld', { code: rem.storedCode })
+                : t('transactionForm.bondSeries.noLongerHeldUnknown'),
+        });
+      }
+      return list;
     }
-    const list = [
-      { value: '', label: t('transactionForm.bondSeries.fromDate') },
-      ...(acq?.instruments ?? []).map((i) => ({ value: i.id, label: i.seriesCode })),
-    ];
-    if (expected !== null && storedExpected === undefined && acq?.program != null) {
+    const stored = (cat?.instruments ?? []).map((i) => ({ value: i.id, label: i.seriesCode }));
+    if (kind === 'select') {
+      return [{ value: '', label: t('transactionForm.bondSeries.choose') }, ...stored];
+    }
+    const defaultLabel =
+      onSale === null
+        ? t('transactionForm.bondSeries.fromDate')
+        : onSale.onSale === null
+          ? t('transactionForm.bondSeries.noneOnSale')
+          : t('transactionForm.bondSeries.fromDateCode', { code: onSale.onSale.seriesCode });
+    const list = [{ value: '', label: defaultLabel }, ...stored];
+    if (fetchCode !== null) {
       list.push({
         value: FETCH_VALUE,
-        label: tSec('form.bondFetchAction', { code: expected }),
+        label: tSec('form.bondFetchAction', { code: fetchCode }),
       });
     }
     return list;
-  }, [kind, rem, acq, expected, storedExpected, t, tSec]);
+  }, [kind, rem, cat, onSale, fetchCode, storedInstrumentId, formatShareQuantity, t, tSec]);
 
   if (!active) return null;
-  const loaded = kind === 'acquire' ? acq !== null : rem !== null;
+  const catalogLoading = needsCatalog && cat === null && catalogFailedKey !== catalogKey;
+  const catalogFailed = needsCatalog && cat === null && catalogFailedKey === catalogKey;
+  const removalLoading =
+    kind === 'remove' && removalActive && rem === null && removalFailedKey !== removalKey;
+  const removalFailed =
+    kind === 'remove' && removalActive && rem === null && removalFailedKey === removalKey;
   return {
     kind,
     options,
-    suggestedId: storedExpected?.id ?? '',
-    isLoading: !loaded && failedKey !== key,
-    loadFailed: !loaded && failedKey === key,
+    isLoading: catalogLoading || removalLoading,
+    loadFailed: catalogFailed || removalFailed,
+    refusal: rem?.refusal != null ? tDetail(`bond.lotsRefusal.${rem.refusal}`) : null,
     retry: () => {
-      setFailedKey(null);
+      setCatalogFailedKey(null);
+      setRemovalFailedKey(null);
       setAttempt((n) => n + 1);
     },
-    fetchCode: storedExpected === undefined ? expected : null,
-    fetchCountryCode: acq?.program?.issuerCountryCode ?? null,
+    fetchCode,
+    fetchCountryCode: cat?.program?.issuerCountryCode ?? null,
     addInstrument: (instrument) => {
-      // Shown at once, then the catalog is re-read so it is the server's list.
-      setAcquisition((current) =>
+      // Shown at once, then the catalog and the date's series are re-read so
+      // they are the server's.
+      setCatalog((current) =>
         current === null || current.instruments.some((i) => i.id === instrument.id)
           ? current
           : {
@@ -218,7 +354,7 @@ export function useBondSeriesOptions(
 
 interface BondSeriesSelectProps {
   series: BondSeriesOptions;
-  /** The series shown and sent: the reader's pick, else the date's suggestion. */
+  /** The series shown and sent: the reader's pick; '' is the default (the server's choice). */
   value: string;
   onChange: (bondInstrumentId: string) => void;
   /** The server's refusal about the series, said where the reader picks it. */
@@ -281,6 +417,11 @@ export function BondSeriesSelect({ series, value, onChange, error }: BondSeriesS
       {fetchError !== null && (
         <p role="alert" className="mt-1 text-sm text-red-600 dark:text-red-400">
           {fetchError}
+        </p>
+      )}
+      {series.refusal !== null && (
+        <p role="alert" className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+          {series.refusal}
         </p>
       )}
       {series.isLoading && (

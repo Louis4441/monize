@@ -36,7 +36,8 @@ vi.mock('@/lib/investments', () => ({
     listBondPrograms: vi.fn(),
     listBondInstruments: vi.fn(),
     fetchBondSeries: vi.fn(),
-    getSecurityBondValuation: vi.fn(),
+    getBondSeriesOnSale: vi.fn(),
+    getBondSeriesHoldings: vi.fn(),
   },
 }));
 vi.mock('@/lib/logger', () => ({
@@ -78,12 +79,10 @@ const inst = (id: string, seriesCode: string, programCode = 'EDO') => ({
 });
 const instruments = [inst('i-0936', 'EDO0936'), inst('i-1036', 'EDO1036'), inst('i-tos', 'TOS1029', 'TOS')];
 
-const lot = (instrumentId: string, seriesCode: string) => ({
+const held = (instrumentId: string, seriesCode: string, quantity: number) => ({
   instrumentId,
-  purchaseDate: '2026-09-01',
-  quantity: 5,
-  purchaseDateAssumed: false,
-  valuation: { seriesCode },
+  seriesCode,
+  quantity,
 });
 
 const optionLabels = (select: HTMLElement) =>
@@ -123,60 +122,83 @@ beforeEach(() => {
   api.getSecurities.mockResolvedValue(securities.map((s) => ({ ...s })) as any);
   api.listBondPrograms.mockResolvedValue(programs);
   api.listBondInstruments.mockResolvedValue(instruments);
-  api.getSecurityBondValuation.mockResolvedValue({ lots: [lot('i-1036', 'EDO1036'), lot('i-0936', 'EDO0936'), lot('i-1036', 'EDO1036')] } as any);
+  // The series the server infers: EDO1036 for October 2026, none for November.
+  api.getBondSeriesOnSale.mockImplementation(async (securityId: string, date: string) => {
+    if (date === '2026-11-05') return null;
+    return securityId === 'sec-tos'
+      ? { instrumentId: 'i-tos', seriesCode: 'TOS1029' }
+      : { instrumentId: 'i-1036', seriesCode: 'EDO1036' };
+  });
+  api.getBondSeriesHoldings.mockResolvedValue({
+    holdings: [held('i-0936', 'EDO0936', 5), held('i-1036', 'EDO1036', 25)],
+  });
   api.createTransaction.mockResolvedValue({} as any);
   api.updateTransaction.mockResolvedValue({} as any);
 });
 
 describe('InvestmentTransactionForm: the series of a bond program', () => {
   describe('an acquisition', () => {
-    it('lists the program\'s stored series and prefills the one on sale on the transaction date', async () => {
+    it('defaults to the series the server infers for the date, labelled with it, and sends null', async () => {
       await openForm();
       await pickSecurity('sec-edo');
       const select = await seriesSelect();
-      await waitFor(() => expect(select.value).toBe('i-1036'));
-      // Only this program's series, plus the date's inference.
-      expect(optionLabels(select)).toEqual(['Determined from the date', 'EDO0936', 'EDO1036']);
+      await waitFor(() => expect(optionLabels(select)).toEqual(['From the date: EDO1036', 'EDO0936', 'EDO1036']));
+      expect(api.getBondSeriesOnSale).toHaveBeenCalledWith('sec-edo', '2026-10-12');
+      // The client no longer prefills the series: the default is the server's inference.
+      expect(select.value).toBe('');
       await submit();
       await waitFor(() => expect(api.createTransaction).toHaveBeenCalled());
-      expect(sent().bondInstrumentId).toBe('i-1036');
+      expect(sent()).toHaveProperty('bondInstrumentId', null);
       expect(sent().securityId).toBe('sec-edo');
     });
 
-    it('sends the series the reader picked instead of the prefilled one', async () => {
+    it('asks again, and relabels the default, when the date changes', async () => {
       await openForm();
       await pickSecurity('sec-edo');
       const select = await seriesSelect();
-      await waitFor(() => expect(select.value).toBe('i-1036'));
+      await waitFor(() => expect(optionLabels(select)[0]).toBe('From the date: EDO1036'));
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-05' } });
+      });
+      await waitFor(() => expect(api.getBondSeriesOnSale).toHaveBeenCalledWith('sec-edo', '2026-11-05'));
+      await waitFor(() => expect(optionLabels(select)[0]).toBe('No series on sale on this date'));
+    });
+
+    it('sends the series the reader picked', async () => {
+      await openForm();
+      await pickSecurity('sec-edo');
+      const select = await seriesSelect();
+      await waitFor(() => expect(optionLabels(select)[0]).toBe('From the date: EDO1036'));
       fireEvent.change(select, { target: { value: 'i-0936' } });
       await submit();
       await waitFor(() => expect(api.createTransaction).toHaveBeenCalled());
       expect(sent().bondInstrumentId).toBe('i-0936');
     });
 
-    it('sends null when the reader leaves the series to the server', async () => {
+    it('sends null again when the reader returns to the default', async () => {
       await openForm();
       await pickSecurity('sec-edo');
       const select = await seriesSelect();
-      await waitFor(() => expect(select.value).toBe('i-1036'));
+      await waitFor(() => expect(optionLabels(select)[0]).toBe('From the date: EDO1036'));
+      fireEvent.change(select, { target: { value: 'i-0936' } });
       fireEvent.change(select, { target: { value: '' } });
       await submit();
       await waitFor(() => expect(api.createTransaction).toHaveBeenCalled());
       expect(sent()).toHaveProperty('bondInstrumentId', null);
     });
 
-    it('prefills nothing, and sends null, when no stored series is the date\'s', async () => {
+    it('says no series is on sale, and sends null, when the server infers none', async () => {
       await openForm({ defaultDate: '2026-11-05' });
       await pickSecurity('sec-edo');
       const select = await seriesSelect();
-      await waitFor(() => expect(optionLabels(select)).toContain('EDO0936'));
+      await waitFor(() => expect(optionLabels(select)).toContain('No series on sale on this date'));
       expect(select.value).toBe('');
       await submit();
       await waitFor(() => expect(api.createTransaction).toHaveBeenCalled());
       expect(sent().bondInstrumentId).toBeNull();
     });
 
-    it('offers to fetch the date\'s series when it is missing, then selects and sends it', async () => {
+    it('offers to fetch the date\'s series when none is on sale, then selects and sends it', async () => {
       api.fetchBondSeries.mockResolvedValue({ ...inst('i-1136', 'EDO1136'), created: true } as any);
       await openForm({ defaultDate: '2026-11-05' });
       await pickSecurity('sec-edo');
@@ -184,6 +206,7 @@ describe('InvestmentTransactionForm: the series of a bond program', () => {
       const fetchLabel = 'Fetch EDO1136 from the official source';
       await waitFor(() => expect(optionLabels(select)).toContain(fetchLabel));
       api.listBondInstruments.mockResolvedValue([...instruments, inst('i-1136', 'EDO1136')]);
+      api.getBondSeriesOnSale.mockResolvedValue({ instrumentId: 'i-1136', seriesCode: 'EDO1136' });
       await act(async () => {
         fireEvent.change(select, { target: { value: within(select).getByText(fetchLabel).getAttribute('value') } });
       });
@@ -218,7 +241,20 @@ describe('InvestmentTransactionForm: the series of a bond program', () => {
       await pickSecurity('sec-edo');
       const select = await seriesSelect();
       await waitFor(() => expect(optionLabels(select)).toContain('ZZZ0136'));
+      await waitFor(() => expect(optionLabels(select)).toContain('No series on sale on this date'));
       expect(optionLabels(select).some((l) => /Fetch/.test(l ?? ''))).toBe(false);
+    });
+
+    it('keeps the generic default when the date\'s series could not be read, and sends null', async () => {
+      api.getBondSeriesOnSale.mockRejectedValue(new Error('down'));
+      await openForm();
+      await pickSecurity('sec-edo');
+      const select = await seriesSelect();
+      await waitFor(() => expect(optionLabels(select)).toContain('EDO0936'));
+      expect(optionLabels(select)[0]).toBe('Determined from the date');
+      await submit();
+      await waitFor(() => expect(api.createTransaction).toHaveBeenCalled());
+      expect(sent().bondInstrumentId).toBeNull();
     });
 
     it('says a failed lookup failed, and retries', async () => {
@@ -231,7 +267,7 @@ describe('InvestmentTransactionForm: the series of a bond program', () => {
         fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }));
       });
       const select = await seriesSelect();
-      await waitFor(() => expect(select.value).toBe('i-1036'));
+      await waitFor(() => expect(optionLabels(select)).toContain('EDO1036'));
       expect(screen.queryByText('The series could not be loaded.')).not.toBeInTheDocument();
     });
 
@@ -239,24 +275,66 @@ describe('InvestmentTransactionForm: the series of a bond program', () => {
       await openForm();
       await pickSecurity('sec-edo');
       const select = await seriesSelect();
-      await waitFor(() => expect(select.value).toBe('i-1036'));
+      await waitFor(() => expect(optionLabels(select)[0]).toBe('From the date: EDO1036'));
       fireEvent.change(select, { target: { value: 'i-0936' } });
       await pickSecurity('sec-tos');
-      await waitFor(() => expect(optionLabels(screen.getByLabelText('Bond series'))).toEqual(['Determined from the date', 'TOS1029']));
+      await waitFor(() => expect(optionLabels(screen.getByLabelText('Bond series'))).toEqual(['From the date: TOS1029', 'TOS1029']));
       await submit();
       await waitFor(() => expect(api.createTransaction).toHaveBeenCalled());
       expect(sent().securityId).toBe('sec-tos');
-      expect(sent().bondInstrumentId).not.toBe('i-0936');
+      expect(sent().bondInstrumentId).toBeNull();
+    });
+  });
+
+  describe('adding shares', () => {
+    it('lists every stored series with no default, and does not ask the server for the date\'s', async () => {
+      await openForm();
+      await pickSecurity('sec-edo', 'ADD_SHARES');
+      const select = await seriesSelect();
+      await waitFor(() => expect(optionLabels(select)).toEqual(['Choose a series', 'EDO0936', 'EDO1036']));
+      expect(select.value).toBe('');
+      expect(api.getBondSeriesOnSale).not.toHaveBeenCalled();
+    });
+
+    it('blocks the submit until a series is chosen, then sends it', async () => {
+      await openForm();
+      await pickSecurity('sec-edo', 'ADD_SHARES');
+      const select = await seriesSelect();
+      await waitFor(() => expect(optionLabels(select)).toContain('EDO1036'));
+      await submit();
+      expect(api.createTransaction).not.toHaveBeenCalled();
+      expect(await screen.findByText('Choose the series of these shares.')).toBeInTheDocument();
+      fireEvent.change(select, { target: { value: 'i-0936' } });
+      expect(screen.queryByText('Choose the series of these shares.')).not.toBeInTheDocument();
+      await submit();
+      await waitFor(() => expect(api.createTransaction).toHaveBeenCalled());
+      expect(sent().action).toBe('ADD_SHARES');
+      expect(sent().bondInstrumentId).toBe('i-0936');
+    });
+
+    it('says the server\'s SERIES_REQUIRED refusal under the select', async () => {
+      api.createTransaction.mockRejectedValue({
+        response: { status: 400, data: { message: 'Name the series of the shares.', errorCode: 'SERIES_REQUIRED' } },
+      });
+      await openForm();
+      await pickSecurity('sec-edo', 'ADD_SHARES');
+      const select = await seriesSelect();
+      await waitFor(() => expect(optionLabels(select)).toContain('EDO1036'));
+      fireEvent.change(select, { target: { value: 'i-1036' } });
+      await submit();
+      expect(await screen.findByText('Name the series of the shares.')).toBeInTheDocument();
     });
   });
 
   describe('a removal', () => {
-    it('lists the series of the security\'s lots with Oldest first as the default, and sends null', async () => {
+    it('lists the series the account holds on the date, with quantities, Oldest first as the default, and sends null', async () => {
       await openForm();
       await pickSecurity('sec-edo', 'SELL');
       const select = await seriesSelect();
-      await waitFor(() => expect(optionLabels(select)).toEqual(['Oldest first', 'EDO0936', 'EDO1036']));
-      expect(api.getSecurityBondValuation).toHaveBeenCalledWith('sec-edo');
+      await waitFor(() =>
+        expect(optionLabels(select)).toEqual(['Oldest first', 'EDO0936 (5 held)', 'EDO1036 (25 held)']),
+      );
+      expect(api.getBondSeriesHoldings).toHaveBeenCalledWith('sec-edo', 'a1', '2026-10-12', undefined);
       expect(select.value).toBe('');
       await submit();
       await waitFor(() => expect(api.createTransaction).toHaveBeenCalled());
@@ -268,7 +346,7 @@ describe('InvestmentTransactionForm: the series of a bond program', () => {
       await openForm();
       await pickSecurity('sec-edo', 'SELL');
       const select = await seriesSelect();
-      await waitFor(() => expect(optionLabels(select)).toContain('EDO0936'));
+      await waitFor(() => expect(optionLabels(select)).toContain('EDO0936 (5 held)'));
       expect(optionLabels(select).some((l) => /Fetch/.test(l ?? ''))).toBe(false);
       fireEvent.change(select, { target: { value: 'i-0936' } });
       await submit();
@@ -276,13 +354,53 @@ describe('InvestmentTransactionForm: the series of a bond program', () => {
       expect(sent().bondInstrumentId).toBe('i-0936');
     });
 
-    it('names no series for a redemption of a bond with no lots open, and says the list is only oldest first', async () => {
-      api.getSecurityBondValuation.mockResolvedValue({ lots: [] } as any);
+    it('also lists holdings for removing shares', async () => {
+      await openForm();
+      await pickSecurity('sec-edo', 'REMOVE_SHARES');
+      const select = await seriesSelect();
+      await waitFor(() => expect(optionLabels(select)).toContain('EDO1036 (25 held)'));
+    });
+
+    it('asks again when the date or the account changes', async () => {
+      await openForm();
+      await pickSecurity('sec-edo', 'SELL');
+      await seriesSelect();
+      await waitFor(() => expect(api.getBondSeriesHoldings).toHaveBeenCalledTimes(1));
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-05' } });
+      });
+      await waitFor(() =>
+        expect(api.getBondSeriesHoldings).toHaveBeenLastCalledWith('sec-edo', 'a1', '2026-11-05', undefined),
+      );
+    });
+
+    it('names no series for a redemption of a bond with nothing held, and says the list is only oldest first', async () => {
+      api.getBondSeriesHoldings.mockResolvedValue({ holdings: [] });
       await openForm();
       await pickSecurity('sec-edo', 'REDEEM');
       const select = await seriesSelect();
-      await waitFor(() => expect(api.getSecurityBondValuation).toHaveBeenCalled());
+      await waitFor(() => expect(api.getBondSeriesHoldings).toHaveBeenCalled());
       expect(optionLabels(select)).toEqual(['Oldest first']);
+    });
+
+    it('says why the lots cannot be derived when the endpoint answers 422, and offers only Oldest first', async () => {
+      api.getBondSeriesHoldings.mockRejectedValue({
+        response: { status: 422, data: { message: 'x', errorCode: 'OVER_REMOVAL' } },
+      });
+      await openForm();
+      await pickSecurity('sec-edo', 'SELL');
+      const select = await seriesSelect();
+      expect(await screen.findByText('The lots cannot be derived: more bonds were removed than were held.')).toBeInTheDocument();
+      expect(optionLabels(select)).toEqual(['Oldest first']);
+      // A refusal is not a failed read: there is nothing to retry.
+      expect(screen.queryByText('The series could not be loaded.')).not.toBeInTheDocument();
+    });
+
+    it('says a failed read failed, not "no series held"', async () => {
+      api.getBondSeriesHoldings.mockRejectedValue(new Error('down'));
+      await openForm();
+      await pickSecurity('sec-edo', 'SELL');
+      expect(await screen.findByText('The series could not be loaded.')).toBeInTheDocument();
     });
   });
 
@@ -318,12 +436,22 @@ describe('InvestmentTransactionForm: the series of a bond program', () => {
       expect(toast.error).toHaveBeenCalledWith('No stored series of EDO covers 2026-11-05. Fetch the series first.');
     });
 
+    it('says an OVER_REMOVAL under the select of a removal', async () => {
+      refuse('OVER_REMOVAL', 'Selling 30 would remove more than are held.');
+      await openForm();
+      await pickSecurity('sec-edo', 'SELL');
+      const select = await seriesSelect();
+      await waitFor(() => expect(optionLabels(select)).toContain('EDO1036 (25 held)'));
+      await submit();
+      expect(await screen.findByText('Selling 30 would remove more than are held.')).toBeInTheDocument();
+    });
+
     it('is cleared when the reader picks a series again', async () => {
       refuse('SERIES_NOT_IN_PROGRAM', 'That series is not a series of EDO.');
       await openForm();
       await pickSecurity('sec-edo');
       const select = await seriesSelect();
-      await waitFor(() => expect(select.value).toBe('i-1036'));
+      await waitFor(() => expect(optionLabels(select)).toContain('EDO1036'));
       await submit();
       expect(await screen.findByText('That series is not a series of EDO.')).toBeInTheDocument();
       fireEvent.change(select, { target: { value: 'i-0936' } });
@@ -366,6 +494,60 @@ describe('InvestmentTransactionForm: the series of a bond program', () => {
       });
       await waitFor(() => expect(api.updateTransaction).toHaveBeenCalled());
       expect(api.updateTransaction.mock.calls[0][1]).toMatchObject({ bondInstrumentId: 'i-0936' });
+    });
+
+    it('resets the series to the default when a buy becomes a sale, instead of sending the buy\'s series', async () => {
+      await openForm({ transaction: row, defaultDate: undefined });
+      const select = await seriesSelect();
+      await waitFor(() => expect(select.value).toBe('i-0936'));
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Transaction Type'), { target: { value: 'SELL' } });
+      });
+      await waitFor(() => expect(optionLabels(select)).toContain('EDO1036 (25 held)'));
+      expect(select.value).toBe('');
+      await act(async () => {
+        fireEvent.click(screen.getByText('Update Transaction'));
+      });
+      await waitFor(() => expect(api.updateTransaction).toHaveBeenCalled());
+      expect(api.updateTransaction.mock.calls[0][1]).toHaveProperty('bondInstrumentId', null);
+    });
+
+    it('restores the stored series when the action returns to the stored kind', async () => {
+      await openForm({ transaction: row, defaultDate: undefined });
+      const select = await seriesSelect();
+      await waitFor(() => expect(select.value).toBe('i-0936'));
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Transaction Type'), { target: { value: 'SELL' } });
+      });
+      await waitFor(() => expect(select.value).toBe(''));
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Transaction Type'), { target: { value: 'BUY' } });
+      });
+      await waitFor(() => expect(select.value).toBe('i-0936'));
+    });
+
+    const sale = { ...row, action: 'SELL' as const, bondInstrumentId: 'i-0936' };
+
+    it('excludes the row from the holdings, and keeps its stored series visible when it is no longer held', async () => {
+      api.getBondSeriesHoldings.mockResolvedValue({ holdings: [held('i-1036', 'EDO1036', 25)] });
+      await openForm({ transaction: sale, defaultDate: undefined });
+      const select = await seriesSelect();
+      await waitFor(() =>
+        expect(optionLabels(select)).toEqual([
+          'Oldest first',
+          'EDO1036 (25 held)',
+          'EDO0936 (no longer held on this date)',
+        ]),
+      );
+      expect(api.getBondSeriesHoldings).toHaveBeenCalledWith('sec-edo', 'a1', '2026-11-05', 't1');
+      expect(select.value).toBe('i-0936');
+    });
+
+    it('shows a stored series that is held under its plain held label', async () => {
+      await openForm({ transaction: sale, defaultDate: undefined });
+      const select = await seriesSelect();
+      await waitFor(() => expect(optionLabels(select)).toEqual(['Oldest first', 'EDO0936 (5 held)', 'EDO1036 (25 held)']));
+      expect(select.value).toBe('i-0936');
     });
   });
 });

@@ -303,7 +303,15 @@
       "oldestFirst": "Älteste zuerst",
       "loading": "Serien werden geladen...",
       "loadFailed": "Die Serien konnten nicht geladen werden.",
-      "retry": "Erneut versuchen"
+      "retry": "Erneut versuchen",
+      "fromDateCode": "Aus dem Datum: {code}",
+      "noneOnSale": "Keine Serie an diesem Datum im Verkauf",
+      "choose": "Serie wählen",
+      "required": "Wähle die Serie dieser Anteile.",
+      "heldOption": "{code} ({quantity} gehalten)",
+      "noLongerHeld": "{code} (an diesem Datum nicht mehr gehalten)",
+      "noLongerHeldUnknown": "Gespeicherte Serie (an diesem Datum nicht mehr gehalten)",
+      "storedSeries": "Gespeicherte Serie"
     }
   },
   "newTransactionButton": {

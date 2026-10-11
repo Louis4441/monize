@@ -303,7 +303,15 @@
       "oldestFirst": "Сначала самые старые",
       "loading": "Загрузка серий...",
       "loadFailed": "Не удалось загрузить серии.",
-      "retry": "Повторить"
+      "retry": "Повторить",
+      "fromDateCode": "По дате: {code}",
+      "noneOnSale": "На эту дату нет серии в продаже",
+      "choose": "Выберите серию",
+      "required": "Выберите серию этих бумаг.",
+      "heldOption": "{code} (в наличии: {quantity})",
+      "noLongerHeld": "{code} (на эту дату уже не числится)",
+      "noLongerHeldUnknown": "Сохранённая серия (на эту дату уже не числится)",
+      "storedSeries": "Сохранённая серия"
     }
   },
   "newTransactionButton": {

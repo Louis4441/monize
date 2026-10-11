@@ -323,6 +323,23 @@ export interface SecurityBondValuation {
   benchmarkCoverage?: BondBenchmarkCoverage[];
 }
 
+/** `GET /bonds/securities/:securityId/series-on-sale`: the series the server infers for a BUY/REINVEST on the date; null when none is stored. */
+export interface BondSeriesOnSale {
+  instrumentId: string;
+  seriesCode: string;
+}
+
+/** One series an account holds on a date (`GET /bonds/securities/:securityId/series-holdings`). */
+export interface BondSeriesHolding {
+  instrumentId: string;
+  seriesCode: string;
+  quantity: number;
+}
+
+export interface BondSeriesHoldings {
+  holdings: BondSeriesHolding[];
+}
+
 /** `POST /bonds/securities/:securityId/recompute`. */
 export interface BondPriceRecompute {
   written: number;

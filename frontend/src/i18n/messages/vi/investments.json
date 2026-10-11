@@ -303,7 +303,15 @@
       "oldestFirst": "Cũ nhất trước",
       "loading": "Đang tải các đợt phát hành...",
       "loadFailed": "Không thể tải các đợt phát hành.",
-      "retry": "Thử lại"
+      "retry": "Thử lại",
+      "fromDateCode": "Theo ngày: {code}",
+      "noneOnSale": "Không có series nào được bán vào ngày này",
+      "choose": "Chọn một series",
+      "required": "Chọn series của các chứng khoán này.",
+      "heldOption": "{code} (đang nắm giữ {quantity})",
+      "noLongerHeld": "{code} (không còn nắm giữ vào ngày này)",
+      "noLongerHeldUnknown": "Series đã lưu (không còn nắm giữ vào ngày này)",
+      "storedSeries": "Series đã lưu"
     }
   },
   "newTransactionButton": {

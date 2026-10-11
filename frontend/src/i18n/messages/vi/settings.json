@@ -817,6 +817,7 @@
       "skippedAttachments": "{count, plural, other {# tệp đính kèm không được phục hồi}}: bản sao lưu không mang theo byte dùng được cho chúng — khi xuất, chúng bị thiếu hoặc không qua được kiểm tra tổng, hoặc tệp có trước các bản sao lưu tự chứa. Hãy xuất bản sao lưu mới khi bộ lưu trữ tệp đính kèm đã ổn.",
       "unusableAiProviderKeys": "{count, plural, other {# nhà cung cấp AI đã được khôi phục mà không có khóa API dùng được}}: bản sao lưu này được tạo trước khi khóa của nhà cung cấp đi kèm trong đó, nên khóa đã lưu thuộc về máy chủ tạo ra tệp, hoặc máy chủ này chưa cấu hình khóa mã hóa để lưu khóa đó. Hãy mở Cài đặt → Nhà cung cấp AI và nhập lại khóa API.",
       "unlinkedBondSecurities": "{count, plural, other {# chứng khoán trái phiếu đã được khôi phục mà không liên kết với công cụ trái phiếu của nó}}: danh mục trái phiếu của máy chủ này không có chuỗi này (hoặc có nhưng bằng đơn vị tiền tệ khác), nên công cụ tính trái phiếu không còn định giá chúng và giá đã tính của chúng không được khôi phục. Hãy mở từng chứng khoán và liên kết lại với một công cụ trái phiếu.",
+      "unlinkedBondSeries": "{count, plural, other {# giao dịch trái phiếu đã mất series}} vì danh mục của bản triển khai này không có series đó; series sẽ được đọc từ ngày nếu có thể, hãy tải series để khôi phục.",
       "doneButton": "Xong",
       "unlinkedBondSecuritiesList": "Chứng khoán bị ảnh hưởng: {symbols}.",
       "unlinkedBondSecuritiesMore": "và {count} mã nữa"

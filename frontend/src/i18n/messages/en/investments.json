@@ -336,7 +336,15 @@
       "oldestFirst": "Oldest first",
       "loading": "Loading the series...",
       "loadFailed": "The series could not be loaded.",
-      "retry": "Retry"
+      "retry": "Retry",
+      "fromDateCode": "From the date: {code}",
+      "noneOnSale": "No series on sale on this date",
+      "choose": "Choose a series",
+      "required": "Choose the series of these shares.",
+      "heldOption": "{code} ({quantity} held)",
+      "noLongerHeld": "{code} (no longer held on this date)",
+      "noLongerHeldUnknown": "Stored series (no longer held on this date)",
+      "storedSeries": "Stored series"
     }
   },
   "newTransactionButton": {

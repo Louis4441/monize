@@ -303,7 +303,15 @@
       "oldestFirst": "오래된 것부터",
       "loading": "시리즈를 불러오는 중...",
       "loadFailed": "시리즈를 불러오지 못했습니다.",
-      "retry": "다시 시도"
+      "retry": "다시 시도",
+      "fromDateCode": "날짜 기준: {code}",
+      "noneOnSale": "이 날짜에 판매 중인 시리즈가 없습니다",
+      "choose": "시리즈 선택",
+      "required": "이 주식의 시리즈를 선택하세요.",
+      "heldOption": "{code} (보유 {quantity})",
+      "noLongerHeld": "{code} (이 날짜에는 더 이상 보유하지 않음)",
+      "noLongerHeldUnknown": "저장된 시리즈 (이 날짜에는 더 이상 보유하지 않음)",
+      "storedSeries": "저장된 시리즈"
     }
   },
   "newTransactionButton": {

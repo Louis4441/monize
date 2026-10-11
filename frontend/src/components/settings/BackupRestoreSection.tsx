@@ -776,6 +776,17 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
               </div>
             )}
 
+            {/* Bond transactions that lost their series: the catalog lacks it. */}
+            {!!restoreResult.unlinkedBondSeries?.count && (
+              <div className="mt-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
+                <p>
+                  {t('restoreResult.unlinkedBondSeries', {
+                    count: restoreResult.unlinkedBondSeries.count,
+                  })}
+                </p>
+              </div>
+            )}
+
             <div className="mt-6 flex justify-end">
               <Button onClick={() => setRestoreResult(null)}>
                 {t('restoreResult.doneButton')}

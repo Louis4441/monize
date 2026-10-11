@@ -303,7 +303,15 @@
       "oldestFirst": "As mais antigas primeiro",
       "loading": "A carregar as séries...",
       "loadFailed": "Não foi possível carregar as séries.",
-      "retry": "Tentar novamente"
+      "retry": "Tentar novamente",
+      "fromDateCode": "Da data: {code}",
+      "noneOnSale": "Nenhuma série à venda nesta data",
+      "choose": "Escolha uma série",
+      "required": "Escolha a série destes títulos.",
+      "heldOption": "{code} ({quantity} detidos)",
+      "noLongerHeld": "{code} (já não detida nesta data)",
+      "noLongerHeldUnknown": "Série guardada (já não detida nesta data)",
+      "storedSeries": "Série guardada"
     }
   },
   "newTransactionButton": {

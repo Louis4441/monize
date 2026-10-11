@@ -303,7 +303,15 @@
       "oldestFirst": "Önce en eskiler",
       "loading": "Seriler yükleniyor...",
       "loadFailed": "Seriler yüklenemedi.",
-      "retry": "Yeniden dene"
+      "retry": "Yeniden dene",
+      "fromDateCode": "Tarihten: {code}",
+      "noneOnSale": "Bu tarihte satışta seri yok",
+      "choose": "Bir seri seçin",
+      "required": "Bu payların serisini seçin.",
+      "heldOption": "{code} ({quantity} eldeki)",
+      "noLongerHeld": "{code} (bu tarihte artık elde değil)",
+      "noLongerHeldUnknown": "Kayıtlı seri (bu tarihte artık elde değil)",
+      "storedSeries": "Kayıtlı seri"
     }
   },
   "newTransactionButton": {

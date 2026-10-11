@@ -303,7 +303,15 @@
       "oldestFirst": "Yang terlama lebih dulu",
       "loading": "Memuat seri...",
       "loadFailed": "Seri tidak dapat dimuat.",
-      "retry": "Coba lagi"
+      "retry": "Coba lagi",
+      "fromDateCode": "Dari tanggal: {code}",
+      "noneOnSale": "Tidak ada seri yang dijual pada tanggal ini",
+      "choose": "Pilih seri",
+      "required": "Pilih seri dari saham ini.",
+      "heldOption": "{code} ({quantity} dimiliki)",
+      "noLongerHeld": "{code} (tidak lagi dimiliki pada tanggal ini)",
+      "noLongerHeldUnknown": "Seri tersimpan (tidak lagi dimiliki pada tanggal ini)",
+      "storedSeries": "Seri tersimpan"
     }
   },
   "newTransactionButton": {

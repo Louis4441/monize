@@ -303,7 +303,15 @@
       "oldestFirst": "最早的优先",
       "loading": "正在加载系列...",
       "loadFailed": "无法加载系列。",
-      "retry": "重试"
+      "retry": "重试",
+      "fromDateCode": "按日期:{code}",
+      "noneOnSale": "该日期没有在售系列",
+      "choose": "选择系列",
+      "required": "请选择这些份额的系列。",
+      "heldOption": "{code}(持有 {quantity})",
+      "noLongerHeld": "{code}(在此日期已不再持有)",
+      "noLongerHeldUnknown": "已保存的系列(在此日期已不再持有)",
+      "storedSeries": "已保存的系列"
     }
   },
   "newTransactionButton": {

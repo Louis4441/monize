@@ -303,7 +303,15 @@
       "oldestFirst": "Спочатку найстаріші",
       "loading": "Завантаження серій...",
       "loadFailed": "Не вдалося завантажити серії.",
-      "retry": "Повторити"
+      "retry": "Повторити",
+      "fromDateCode": "За датою: {code}",
+      "noneOnSale": "На цю дату немає серії в продажу",
+      "choose": "Виберіть серію",
+      "required": "Виберіть серію цих паперів.",
+      "heldOption": "{code} (в наявності: {quantity})",
+      "noLongerHeld": "{code} (на цю дату вже не числиться)",
+      "noLongerHeldUnknown": "Збережена серія (на цю дату вже не числиться)",
+      "storedSeries": "Збережена серія"
     }
   },
   "newTransactionButton": {

@@ -284,14 +284,25 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
 
   // Choosing a program fills what the program determines: the symbol (its
   // code), the name (its translated name) and the currency. Each stays editable.
+  // Only a new security, or an empty field, is filled: an existing security's
+  // symbol and name are its identity on every row that names it, and its
+  // currency is left for the currency-mismatch handling to explain.
   const handleBondProgramChange = (programId: string) => {
     setValue('bondProgramId', programId, { shouldDirty: true });
     const program = bondPicker.programs.find((p) => p.id === programId);
     if (program === undefined) return;
     const fill = { shouldDirty: true, shouldValidate: true };
-    setValue('symbol', program.programCode, fill);
-    setValue('name', programLabel(tDetail, program.programCode), fill);
-    setValue('currencyCode', program.currency, fill);
+    const current = getValues();
+    const editing = !!security;
+    if (!editing || !current.symbol?.trim()) {
+      setValue('symbol', program.programCode, fill);
+    }
+    if (!editing || !current.name?.trim()) {
+      setValue('name', programLabel(tDetail, program.programCode), fill);
+    }
+    if (!editing) {
+      setValue('currencyCode', program.currency, fill);
+    }
   };
 
   // A linked bond is priced from its terms, never by asking a quote provider,

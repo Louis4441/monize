@@ -467,29 +467,41 @@ function InvestmentTransactionFormFields({
     }
     return accountCurrency;
   }, [watchedSecurityId, securities, accountCurrency]);
+  const originalSecurityId = transaction?.securityId || transaction?.security?.id;
+  const bondKindNow = bondSeriesKind(watchedAction);
+  const storedBondKind = transaction ? bondSeriesKind(transaction.action) : null;
+  // The edited row's own series counts only while the form is still on the row's
+  // security and the kind of action it was saved as.
+  const storedBondInstrumentId =
+    transaction && watchedSecurityId === originalSecurityId && bondKindNow === storedBondKind
+      ? (transaction.bondInstrumentId ?? null)
+      : null;
   // A program-linked security's share-moving row names the series it acts on.
   const bondSeries = useBondSeriesOptions(
     securities.find((s) => s.id === watchedSecurityId),
-    bondSeriesKind(watchedAction),
-    watchedTransactionDate,
+    bondKindNow,
+    {
+      date: watchedTransactionDate,
+      accountId: watchedAccountId,
+      excludeTransactionId: transaction?.id,
+      storedInstrumentId: storedBondInstrumentId,
+    },
   );
-  // The reader's pick; until there is one an acquisition shows the series on
-  // sale on its date, and a removal "oldest first" ('' for both when none).
-  const bondSeriesValue =
-    watchedBondInstrumentId ?? (bondSeries?.kind === 'acquire' ? bondSeries.suggestedId : '');
-  const originalSecurityId = transaction?.securityId || transaction?.security?.id;
-  const bondSeriesKindNow = bondSeries?.kind ?? null;
+  // The reader's pick; '' is the default of the kind: the series the server
+  // infers from the date (an acquisition) or the oldest lots (a removal).
+  const bondSeriesValue = watchedBondInstrumentId ?? '';
   // A series belongs to one security and one direction: another security, or a
-  // switch between buying and selling, starts the choice again.
+  // switch between acquiring, removing and transferring in, starts the choice
+  // again -- even when editing, where only the row's own kind restores its value.
   useEffect(() => {
     setValue(
       'bondInstrumentId',
-      transaction && watchedSecurityId === originalSecurityId
+      transaction && watchedSecurityId === originalSecurityId && bondKindNow === storedBondKind
         ? (transaction.bondInstrumentId ?? '')
         : undefined,
       { shouldDirty: false },
     );
-  }, [watchedSecurityId, bondSeriesKindNow, originalSecurityId, transaction, setValue]);
+  }, [watchedSecurityId, bondKindNow, storedBondKind, originalSecurityId, transaction, setValue]);
   const currencySymbol = getCurrencySymbol(transactionCurrency);
   const cashCurrencySymbol = getCurrencySymbol(cashCurrency);
 
@@ -1015,6 +1027,13 @@ function InvestmentTransactionFormFields({
       }
 
       const action = data.action as InvestmentAction;
+      // A transfer in or an added holding names its series: the server has no
+      // date to infer it from, so the form does not send it without one.
+      if (bondSeries?.kind === 'select' && !bondSeriesValue) {
+        setBondSeriesError(t('transactionForm.bondSeries.required'));
+        setIsLoading(false);
+        return;
+      }
       const postsCash = actionIn(action, cashPostingActions);
       const isSplit = action === 'SPLIT';
       // For splits the new/old-shares inputs are the source of truth; the
@@ -1083,8 +1102,9 @@ function InvestmentTransactionFormFields({
           postsCash && data.exchangeRate && data.exchangeRate > 0
             ? data.exchangeRate
             : undefined,
-        // Null lets the server infer the series (an acquisition) or take the
-        // oldest lots first (a removal); only a program-linked security has one.
+        // Null lets the server infer the series from the date (an acquisition)
+        // or take the oldest lots first (a removal); only a program-linked
+        // security has one. A pick is sent as the series id it is.
         bondInstrumentId: bondSeries ? bondSeriesValue || null : undefined,
         description: data.description,
         status: data.status,

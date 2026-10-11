@@ -303,7 +303,15 @@
       "oldestFirst": "Oudste eerst",
       "loading": "Series laden...",
       "loadFailed": "De series konden niet worden geladen.",
-      "retry": "Opnieuw proberen"
+      "retry": "Opnieuw proberen",
+      "fromDateCode": "Op basis van de datum: {code}",
+      "noneOnSale": "Geen serie te koop op deze datum",
+      "choose": "Kies een serie",
+      "required": "Kies de serie van deze stukken.",
+      "heldOption": "{code} ({quantity} aangehouden)",
+      "noLongerHeld": "{code} (op deze datum niet meer aangehouden)",
+      "noLongerHeldUnknown": "Opgeslagen serie (op deze datum niet meer aangehouden)",
+      "storedSeries": "Opgeslagen serie"
     }
   },
   "newTransactionButton": {

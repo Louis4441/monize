@@ -1220,6 +1220,26 @@ describe('SecurityForm', () => {
       expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('bondAutoFetch');
     });
 
+    it('keeps the symbol, name and currency of an existing security when another program is picked', async () => {
+      await renderBond({ symbol: 'MYBOND', name: 'My bonds', currencyCode: 'USD' });
+      const select = await programSelect();
+      await waitFor(() => expect(within(select).getAllByRole('option')).toHaveLength(4));
+      fireEvent.change(select, { target: { value: 'p-edo' } });
+      await waitFor(() => expect(select.value).toBe('p-edo'));
+      expect((screen.getByLabelText('Symbol') as HTMLInputElement).value).toBe('MYBOND');
+      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('My bonds');
+      expect((screen.getByLabelText('Currency') as HTMLSelectElement).value).toBe('USD');
+    });
+
+    it('fills an empty symbol and name of an existing security from the program', async () => {
+      await renderBond({ symbol: '', name: '' });
+      const select = await programSelect();
+      await waitFor(() => expect(within(select).getAllByRole('option')).toHaveLength(4));
+      fireEvent.change(select, { target: { value: 'p-edo' } });
+      await waitFor(() => expect((screen.getByLabelText('Symbol') as HTMLInputElement).value).toBe('EDO'));
+      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe(EDO_NAME);
+    });
+
     it('opens a new security on the program a caller preselected', async () => {
       await act(async () => {
         render(

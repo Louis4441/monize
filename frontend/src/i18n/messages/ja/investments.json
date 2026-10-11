@@ -303,7 +303,15 @@
       "oldestFirst": "古いものから",
       "loading": "シリーズを読み込み中...",
       "loadFailed": "シリーズを読み込めませんでした。",
-      "retry": "再試行"
+      "retry": "再試行",
+      "fromDateCode": "日付から: {code}",
+      "noneOnSale": "この日付に販売中のシリーズはありません",
+      "choose": "シリーズを選択",
+      "required": "これらの株数のシリーズを選択してください。",
+      "heldOption": "{code}(保有 {quantity})",
+      "noLongerHeld": "{code}(この日付ではすでに保有していません)",
+      "noLongerHeldUnknown": "保存済みのシリーズ(この日付ではすでに保有していません)",
+      "storedSeries": "保存済みのシリーズ"
     }
   },
   "newTransactionButton": {
