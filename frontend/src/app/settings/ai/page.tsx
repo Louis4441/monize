@@ -11,6 +11,7 @@ import { ProviderList } from '@/components/settings/ai/ProviderList';
 import { UsageDashboard } from '@/components/settings/ai/UsageDashboard';
 import { AiBubbleToggle } from '@/components/settings/ai/AiBubbleToggle';
 import { aiApi } from '@/lib/ai';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 import { getErrorMessage } from '@/lib/errors';
 import type { AiProviderConfig, AiUsageSummary, AiStatus } from '@/types/ai';
 import Link from 'next/link';
@@ -109,15 +110,17 @@ function AiSettingsContent() {
           aiConfigured={status?.configured ?? false}
         />
 
-        <ProviderList
-          configs={configs}
-          encryptionAvailable={status?.encryptionAvailable ?? false}
-          onConfigsChanged={loadData}
-          hasSystemDefault={status?.hasSystemDefault}
-          systemDefaultProvider={status?.systemDefaultProvider}
-          systemDefaultModel={status?.systemDefaultModel}
-          disabled={isDemoMode}
-        />
+        <div {...tourAnchor(TOUR_ANCHORS.aiProviderList)}>
+          <ProviderList
+            configs={configs}
+            encryptionAvailable={status?.encryptionAvailable ?? false}
+            onConfigsChanged={loadData}
+            hasSystemDefault={status?.hasSystemDefault}
+            systemDefaultProvider={status?.systemDefaultProvider}
+            systemDefaultModel={status?.systemDefaultModel}
+            disabled={isDemoMode}
+          />
+        </div>
 
         {usage && (
           <UsageDashboard

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@/test/render';
 import { EmailReceiptsHub, tabFromSearch } from './EmailReceiptsHub';
+import { TOUR_ANCHORS, tourAnchorSelector } from '@/lib/tours/anchors';
 
 const nav = vi.hoisted(() => ({ search: '', replace: vi.fn() }));
 vi.mock('next/navigation', () => ({
@@ -76,6 +77,12 @@ describe('EmailReceiptsHub', () => {
   ])('opens the tab a link names (%s)', async (search, testId) => {
     await renderHub(search);
     expect(screen.getByTestId(testId)).toBeInTheDocument();
+  });
+
+  it('marks the tab bar as the email receipts tour anchor', async () => {
+    await renderHub('tab=profiles');
+    const anchor = document.querySelector(tourAnchorSelector(TOUR_ANCHORS.emailReceiptsTabs));
+    expect(anchor).toContainElement(screen.getByRole('tab', { name: 'Profiles' }));
   });
 
   it('orders the tabs overview, mailbox, profiles, emails', async () => {

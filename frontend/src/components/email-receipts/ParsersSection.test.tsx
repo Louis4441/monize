@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { render, screen, fireEvent, act, within } from '@/test/render';
 import { ParsersSection } from './ParsersSection';
 import { makeParser } from './email-receipts-fixtures';
+import { TOUR_ANCHORS, tourAnchorSelector } from '@/lib/tours/anchors';
 
 const api = vi.hoisted(() => ({
   list: vi.fn(),
@@ -318,6 +319,26 @@ describe('ParsersSection', () => {
     api.list.mockResolvedValue([]);
     await renderSection();
     expect(screen.getByText('No profiles yet')).toBeInTheDocument();
+  });
+
+  it('anchors the email receipts tour on the list only once it holds a profile', async () => {
+    const anchor = () => document.querySelector(tourAnchorSelector(TOUR_ANCHORS.emailReceiptsProfiles));
+    await renderSection();
+    expect(anchor()).toBeInTheDocument();
+    expect(anchor()).toContainElement(screen.getByRole('row', { name: /Allegro parser/ }));
+  });
+
+  it('does not anchor the tour on an empty list', async () => {
+    const anchor = () => document.querySelector(tourAnchorSelector(TOUR_ANCHORS.emailReceiptsProfiles));
+    api.list.mockResolvedValue([]);
+    await renderSection();
+    expect(anchor()).not.toBeInTheDocument();
+  });
+
+  it('does not anchor the tour on a list that failed to load', async () => {
+    api.list.mockRejectedValue(new Error('boom'));
+    await renderSection();
+    expect(document.querySelector(tourAnchorSelector(TOUR_ANCHORS.emailReceiptsProfiles))).not.toBeInTheDocument();
   });
 
   it('shows a failed load as an error with a retry, never as an empty list', async () => {

@@ -24,6 +24,7 @@ import { emailReceiptsApi } from '@/lib/email-receipts-api';
 import { processableForDomains } from '@/lib/email-receipts-format';
 import { getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 import type { EmailReceiptParser } from '@/types/email-receipts';
 
 const logger = createLogger('EmailReceiptParsers');
@@ -315,7 +316,9 @@ export function ParsersSection({ wizardDomain = null, onWizardDomainChange }: Pa
           <ProcessStatus state={processState} onCancel={cancelProcess} onDismiss={dismissProcess} />
         </div>
       )}
-      <Card className="overflow-hidden">{body}</Card>
+      <Card className="overflow-hidden" {...(parsers !== null && parsers.length > 0 ? tourAnchor(TOUR_ANCHORS.emailReceiptsProfiles) : {})}>
+        {body}
+      </Card>
 
       {editor.kind !== 'closed' && (
         <ParserEditorDialog

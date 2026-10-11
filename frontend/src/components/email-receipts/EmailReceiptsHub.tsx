@@ -9,6 +9,7 @@ import { ParsersSection } from '@/components/email-receipts/ParsersSection';
 import { TabPanel, Tabs } from '@/components/ui/Tabs';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { normalizeDomainFilter } from '@/lib/email-receipts-format';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 
 export const EMAIL_RECEIPTS_TABS = ['overview', 'mailbox', 'profiles', 'emails'] as const;
 export type EmailReceiptsTab = (typeof EMAIL_RECEIPTS_TABS)[number];
@@ -76,6 +77,7 @@ export function EmailReceiptsHub() {
         onChange={selectTab}
         idPrefix={ID_PREFIX}
         ariaLabel={t('tabs.ariaLabel')}
+        anchorProps={tourAnchor(TOUR_ANCHORS.emailReceiptsTabs)}
       />
       <div className="pt-4">
         <TabPanel idPrefix={ID_PREFIX} tabKey="overview" isActive={tab === 'overview'}>
