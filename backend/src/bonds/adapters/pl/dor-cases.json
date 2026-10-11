@@ -9,7 +9,15 @@
         "quantity": 1
       },
       "asOf": "2026-11-05",
-      "expect": {},
+      "expect": {
+        "accruedInterest": "0.06",
+        "grossValue": "100.06",
+        "currentPeriod": {
+          "index": 1,
+          "annualRate": "0.0415",
+          "rateSource": "TERMS"
+        }
+      },
       "knownCashflows": [
         {
           "date": "2026-11-30",
@@ -29,7 +37,13 @@
       },
       "asOf": "2026-11-15",
       "expect": {
-        "earlyRedemptionValue": "100.00"
+        "earlyRedemptionValue": "100.00",
+        "accruedInterest": "0.17",
+        "currentPeriod": {
+          "index": 1,
+          "annualRate": "0.0415",
+          "rateSource": "TERMS"
+        }
       }
     },
     {
@@ -71,7 +85,8 @@
           "index": 2,
           "annualRate": "0.0400",
           "rateSource": "ANNOUNCED"
-        }
+        },
+        "accruedInterest": "0.11"
       }
     },
     {
@@ -196,6 +211,72 @@
           "period": 24
         }
       ]
+    },
+    {
+      "id": "DOR-DER-1",
+      "description": "DOR1028 period 2 derived from NBP: 3.50% in force on 2026-10-19 + 0.15% spread = 3.65%; period 3 reads 2026-11-17: 3.00% + 0.15% = 3.15% (hypothetical NBP path)",
+      "lot": {
+        "purchaseDate": "2026-10-31",
+        "quantity": 1
+      },
+      "asOf": "2026-12-10",
+      "hypothetical": true,
+      "benchmarks": {
+        "PL_NBP_REFERENCE": {
+          "kind": "STEP",
+          "publisher": "NBP",
+          "hypothetical": true,
+          "coveredThrough": "2026-12-31",
+          "source": "2026-03-05 3.75% is the rate NBP published (static.nbp.pl stopy_procentowe.xml, fetched 2026-10-11); the changes of 2026-10-15 and 2026-10-20 are hypothetical: the first lies before the 2026-10-19 observation day, the second after it and must be ignored",
+          "changes": [
+            {
+              "effectiveFrom": "2026-03-05",
+              "value": "0.0375"
+            },
+            {
+              "effectiveFrom": "2026-10-15",
+              "value": "0.0350"
+            },
+            {
+              "effectiveFrom": "2026-10-20",
+              "value": "0.0300"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "accruedInterest": "0.10",
+        "earlyRedemptionValue": "99.40",
+        "currentPeriod": {
+          "index": 2,
+          "annualRate": "0.0365",
+          "rateSource": "DERIVED"
+        }
+      },
+      "expectedRates": {
+        "2": {
+          "annualRate": "0.0365",
+          "rateSource": "DERIVED",
+          "addend": "0.0015",
+          "benchmark": {
+            "benchmarkId": "PL_NBP_REFERENCE",
+            "observation": "2026-10-19",
+            "value": "0.0350",
+            "flooredValue": "0.0350"
+          }
+        },
+        "3": {
+          "annualRate": "0.0315",
+          "rateSource": "DERIVED",
+          "addend": "0.0015",
+          "benchmark": {
+            "benchmarkId": "PL_NBP_REFERENCE",
+            "observation": "2026-11-17",
+            "value": "0.0300",
+            "flooredValue": "0.0300"
+          }
+        }
+      }
     }
   ]
 }

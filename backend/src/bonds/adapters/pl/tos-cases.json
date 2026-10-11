@@ -110,6 +110,44 @@
         "grossValue": "109.00",
         "earlyRedemptionValue": "108.00"
       }
+    },
+    {
+      "id": "TOS-A1",
+      "description": "TOS1029 period 1, a = 182, ACT = 365: accrued 2.19, rate 4.40% from the terms",
+      "lot": {
+        "purchaseDate": "2026-10-15",
+        "quantity": 1
+      },
+      "asOf": "2027-04-15",
+      "expect": {
+        "accruedInterest": "2.19",
+        "grossValue": "102.19",
+        "earlyRedemptionValue": "101.19",
+        "currentPeriod": {
+          "index": 1,
+          "annualRate": "0.0440",
+          "rateSource": "TERMS"
+        }
+      }
+    },
+    {
+      "id": "TOS-A2",
+      "description": "TOS1029 period 2, a = 92, ACT = 366 on N1 = 104.40: accrued 5.55 (grossValue 105.55)",
+      "lot": {
+        "purchaseDate": "2026-10-15",
+        "quantity": 1
+      },
+      "asOf": "2028-01-15",
+      "expect": {
+        "accruedInterest": "5.55",
+        "grossValue": "105.55",
+        "earlyRedemptionValue": "104.55",
+        "currentPeriod": {
+          "index": 2,
+          "annualRate": "0.0440",
+          "rateSource": "TERMS"
+        }
+      }
     }
   ]
 }

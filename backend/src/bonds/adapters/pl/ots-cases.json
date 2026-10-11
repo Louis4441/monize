@@ -9,7 +9,15 @@
         "quantity": 1
       },
       "asOf": "2026-10-20",
-      "expect": {},
+      "expect": {
+        "accruedInterest": "0.03",
+        "grossValue": "100.03",
+        "currentPeriod": {
+          "index": 1,
+          "annualRate": "0.0200",
+          "rateSource": "TERMS"
+        }
+      },
       "knownCashflows": [
         {
           "date": "2027-01-15",
@@ -108,6 +116,25 @@
       "expect": {
         "earlyRedemptionValue": null,
         "earlyRedemptionRefusal": "TOO_LATE"
+      }
+    },
+    {
+      "id": "OTS-A1",
+      "description": "OTS0127 a = 47, D = 92, F = 4: accrued 0.26 (0.2554), shown although an early redemption forfeits it",
+      "lot": {
+        "purchaseDate": "2026-10-15",
+        "quantity": 1
+      },
+      "asOf": "2026-12-01",
+      "expect": {
+        "accruedInterest": "0.26",
+        "grossValue": "100.26",
+        "earlyRedemptionValue": "100.00",
+        "currentPeriod": {
+          "index": 1,
+          "annualRate": "0.0200",
+          "rateSource": "TERMS"
+        }
       }
     }
   ]

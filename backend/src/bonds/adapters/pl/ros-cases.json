@@ -94,6 +94,45 @@
       "expect": {
         "maturityValueKnown": "129.47"
       }
+    },
+    {
+      "id": "ROS-A1",
+      "description": "ROS1032 period 1, a = 182, ACT = 365: accrued 2.49, rate 5.00% from the terms",
+      "lot": {
+        "purchaseDate": "2026-10-15",
+        "quantity": 1
+      },
+      "asOf": "2027-04-15",
+      "expect": {
+        "accruedInterest": "2.49",
+        "grossValue": "102.49",
+        "currentPeriod": {
+          "index": 1,
+          "annualRate": "0.0500",
+          "rateSource": "TERMS"
+        }
+      }
+    },
+    {
+      "id": "ROS-A2",
+      "description": "ROS1032 period 2, a = 183, ACT = 366 on the base 105.00: accrued 7.52 (r2 = 4.80% hypothetical)",
+      "lot": {
+        "purchaseDate": "2026-10-15",
+        "quantity": 1
+      },
+      "asOf": "2028-04-15",
+      "announcedRates": {
+        "2": "0.0480"
+      },
+      "expect": {
+        "accruedInterest": "7.52",
+        "grossValue": "107.52",
+        "currentPeriod": {
+          "index": 2,
+          "annualRate": "0.0480",
+          "rateSource": "ANNOUNCED"
+        }
+      }
     }
   ]
 }

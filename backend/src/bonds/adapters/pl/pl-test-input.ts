@@ -11,6 +11,9 @@ import rod from "./manifests/rod1038.terms.json";
 import ror from "./manifests/ror1027.terms.json";
 import ros from "./manifests/ros1032.terms.json";
 import tos from "./manifests/tos1029.terms.json";
+import edo0423 from "./fixtures/edo0423.terms.json";
+import edo0524 from "./fixtures/edo0524.terms.json";
+import ror0623 from "./fixtures/ror0623.terms.json";
 
 export type ManifestName =
   | "tos1029"
@@ -21,6 +24,19 @@ export type ManifestName =
   | "ros1032"
   | "rod1038"
   | "ots0127";
+
+/**
+ * Terms of historical series rebuilt from their own issue letters, for the
+ * golden cases that reproduce the Ministry's published examples. They are not
+ * in the catalog and `ManifestName` does not list them.
+ */
+export type FixtureName = "ror0623" | "edo0524" | "edo0423";
+
+const FIXTURE_DOCUMENTS: Record<FixtureName, unknown> = {
+  ror0623,
+  edo0524,
+  edo0423,
+};
 
 const DOCUMENTS: Record<ManifestName, unknown> = {
   tos1029: tos,
@@ -58,6 +74,20 @@ export function lotInput(
     calendars: polishCalendars,
     lot: { purchaseDate, quantity: 1 },
     asOf,
+    ...overrides,
+  };
+}
+
+/** `lotInput` over the terms of a historical fixture series (never a catalog series). */
+export function fixtureLotInput(
+  name: FixtureName,
+  purchaseDate: string,
+  asOf: string,
+  overrides: Partial<BondEngineInput> = {},
+): BondEngineInput {
+  return {
+    ...lotInput("ror1027", purchaseDate, asOf, overrides),
+    terms: parseBondTerms(FIXTURE_DOCUMENTS[name]),
     ...overrides,
   };
 }
