@@ -41,6 +41,11 @@ jobs:
         # to users). Scanning the production image reflects what is deployed.
         run: docker compose -f docker-compose.e2e.yml -f docker-compose.zap.yml build
 
+      - name: Pull third-party images
+        # ECR Public throttles anonymous pulls per IP; compose would pull them in
+        # parallel and fail on the first 429 (scripts/pull-ci-images.sh).
+        run: scripts/pull-ci-images.sh -f docker-compose.e2e.yml -f docker-compose.zap.yml
+
       - name: Start application stack
         run: docker compose -f docker-compose.e2e.yml -f docker-compose.zap.yml up -d --wait --wait-timeout 600
 

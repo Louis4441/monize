@@ -44,6 +44,11 @@ jobs:
       - name: Build application images
         run: docker compose -f docker-compose.e2e.yml build
 
+      - name: Pull third-party images
+        # ECR Public throttles anonymous pulls per IP; compose would pull them in
+        # parallel and fail on the first 429 (scripts/pull-ci-images.sh).
+        run: scripts/pull-ci-images.sh -f docker-compose.e2e.yml
+
       - name: Start application stack
         run: docker compose -f docker-compose.e2e.yml up -d --wait --wait-timeout 600
 

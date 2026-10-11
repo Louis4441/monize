@@ -472,7 +472,10 @@ and password required"). `backend/src/common/ci-images.guard.spec.ts` scans the
 workflows, `docker-compose.e2e.yml`, `scripts/*.sh` and every `FROM` in a
 tracked Dockerfile (CI builds those images for the E2E, Lighthouse and ZAP jobs),
 and fails a workflow that still reads `DOCKERHUB_*` secrets: no job needs that
-login.
+login. `.hadolint.yaml` trusts the same two registries. ECR Public
+throttles anonymous pulls per IP ("toomanyrequests: Rate exceeded"), so a job
+that starts a compose stack runs `scripts/pull-ci-images.sh` first: one image at
+a time, with a back-off, never compose's parallel pull.
 
 - `TZ=UTC npm run test:unit` matches CI. Some tests read `new Date()` and count
   completed periods against fixtures; under another offset they land on the wrong
