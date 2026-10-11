@@ -23,6 +23,8 @@ import { plCalendar } from "./pl-calendar";
 export { plBenchmarks } from "./pl-benchmarks";
 export { plCalendar } from "./pl-calendar";
 
+const PL_TIMEZONE = "Europe/Warsaw";
+
 /** The registry plus the Polish calendar, for the caller to pass to the engine. */
 export function registerPolishCalendars(
   registry: CalendarRegistry,
@@ -30,25 +32,24 @@ export function registerPolishCalendars(
   return registerCalendar(registry, plCalendar);
 }
 
-const ISSUE_LETTERS_PUBLISHED = "2026-09-21";
-
+/**
+ * Each series carries the date of its own issue letter. Adding a series is one
+ * import plus one entry here.
+ */
 const catalog: readonly CatalogEntry[] = [
-  ots,
-  tos,
-  ror,
-  dor,
-  coi,
-  edo,
-  ros,
-  rod,
-].map((terms) => ({
-  termsVersion: 1,
-  publishedAt: ISSUE_LETTERS_PUBLISHED,
-  terms,
-}));
+  { terms: ots, publishedAt: "2026-09-21" },
+  { terms: tos, publishedAt: "2026-09-21" },
+  { terms: ror, publishedAt: "2026-09-21" },
+  { terms: dor, publishedAt: "2026-09-21" },
+  { terms: coi, publishedAt: "2026-09-21" },
+  { terms: edo, publishedAt: "2026-09-21" },
+  { terms: ros, publishedAt: "2026-09-21" },
+  { terms: rod, publishedAt: "2026-09-21" },
+].map(({ terms, publishedAt }) => ({ termsVersion: 1, publishedAt, terms }));
 
 export const POLISH_BOND_ADAPTER: BondAdapter = {
   countryCode: "PL",
+  timezone: PL_TIMEZONE,
   registerCalendars: registerPolishCalendars,
   benchmarks: [
     {
@@ -72,12 +73,9 @@ export const POLISH_BOND_ADAPTER: BondAdapter = {
   async fetchBenchmark(code: string, fetch: BondFetch) {
     switch (code) {
       case PL_NBP_REFERENCE:
-        return fetchNbpReference(
-          fetch,
-          todayInTimezone("Europe/Warsaw") as string,
-        );
+        return fetchNbpReference(fetch, todayInTimezone(PL_TIMEZONE) as string);
       case PL_CPI_GUS_YOY:
-        return fetchGusCpi(fetch, todayInTimezone("Europe/Warsaw") as string);
+        return fetchGusCpi(fetch, todayInTimezone(PL_TIMEZONE) as string);
       default:
         throw new BenchmarkFetchError(
           `The Polish adapter has no benchmark ${code}`,

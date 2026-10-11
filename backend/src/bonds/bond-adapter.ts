@@ -62,6 +62,11 @@ export class BenchmarkFetchError extends Error {
 /** Everything one country contributes: calendars, benchmarks, curated terms. */
 export interface BondAdapter {
   readonly countryCode: string;
+  /**
+   * IANA zone of the market's publishers. The adapter's own calendar day decides
+   * whether one of its series is fresh (`BenchmarkRefreshService`).
+   */
+  readonly timezone: string;
   registerCalendars(registry: CalendarRegistry): CalendarRegistry;
   readonly benchmarks: readonly BenchmarkSeriesDefinition[];
   readonly catalog: readonly CatalogEntry[];

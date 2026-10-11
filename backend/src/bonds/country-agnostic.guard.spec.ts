@@ -10,6 +10,12 @@ import { join, relative } from "path";
 const BONDS_ROOT = join(__dirname);
 const GUARDED = ["domain", "engine"];
 /**
+ * The shared services directly under `src/bonds/` (refresh, catalog, pricing,
+ * valuation, controller) serve every country, so they are scanned for the same
+ * literals; only `adapters/` may name a market.
+ */
+const SHARED_SCANNED_FOR_LITERALS = true;
+/**
  * Country, currency, publisher and product literals. `_` and digits count as
  * separators (`PL_CPI_GUS_YOY`, `"EDO1036"`, `TOS1029`), so a token is bounded
  * by non-letters; a lowercase token is only a literal when a digit or `_` follows
@@ -43,6 +49,23 @@ function stripComments(source: string): string {
     );
 }
 
+function sharedServiceFiles(): string[] {
+  return readdirSync(BONDS_ROOT, { withFileTypes: true })
+    .filter(
+      (e) =>
+        e.isFile() && e.name.endsWith(".ts") && !e.name.endsWith(".spec.ts"),
+    )
+    .map((e) => join(BONDS_ROOT, e.name));
+}
+
+/** What the literal rule scans: domain/, engine/ and the shared services. */
+function literalFiles(): string[] {
+  return [
+    ...guardedFiles(),
+    ...(SHARED_SCANNED_FOR_LITERALS ? sharedServiceFiles() : []),
+  ];
+}
+
 function guardedFiles(): string[] {
   const out: string[] = [];
   const walk = (dir: string) => {
@@ -60,9 +83,10 @@ function guardedFiles(): string[] {
 function offenders(
   pattern: RegExp,
   exempt: (file: string) => boolean = () => false,
+  files: string[] = guardedFiles(),
 ): string[] {
   const found: string[] = [];
-  for (const file of guardedFiles().filter((f) => !exempt(f))) {
+  for (const file of files.filter((f) => !exempt(f))) {
     stripComments(readFileSync(file, "utf8"))
       .split("\n")
       .forEach((line, i) => {
@@ -78,6 +102,15 @@ describe("bonds domain and engine are country-agnostic", () => {
     expect(guardedFiles().length).toBeGreaterThan(5);
   });
 
+  it("scans the shared services directly under bonds/, never adapters/ or specs", () => {
+    const shared = sharedServiceFiles().map((f) => relative(BONDS_ROOT, f));
+    expect(shared).toContain("benchmark-refresh.service.ts");
+    expect(shared).toContain("bond-catalog.service.ts");
+    expect(shared.some((f) => f.includes("/") || f.endsWith(".spec.ts"))).toBe(
+      false,
+    );
+  });
+
   it("imports nothing from an adapter", () => {
     const found = offenders(ADAPTER_IMPORT);
     if (found.length) {
@@ -88,10 +121,10 @@ describe("bonds domain and engine are country-agnostic", () => {
   });
 
   it("names no country, currency, issuer, program or product", () => {
-    const found = offenders(FORBIDDEN);
+    const found = offenders(FORBIDDEN, () => false, literalFiles());
     if (found.length) {
       throw new Error(
-        `country or product literal in domain/ or engine/:\n${found.join("\n")}\n${HOW_TO_FIX}`,
+        `country or product literal in domain/, engine/ or a shared bonds/ service:\n${found.join("\n")}\n${HOW_TO_FIX}`,
       );
     }
   });

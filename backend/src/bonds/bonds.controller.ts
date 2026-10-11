@@ -114,7 +114,7 @@ export class BondsController {
       "the lots' maturity value and total interest with its attribution, each " +
       "null if any lot cannot be valued.",
   })
-  @ApiQuery({ name: "benchmarkId", example: "PL_CPI_GUS_YOY" })
+  @ApiQuery({ name: "benchmarkId", example: "<benchmark series code>" })
   @ApiQuery({ name: "values", example: "0,0.025,0.05" })
   @ApiQuery({ name: "asOf", required: false, example: "2027-04-15" })
   @ApiResponse({ status: 200, description: "One entry per assumed value" })

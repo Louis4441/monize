@@ -5,6 +5,7 @@ import { ProviderHealthService } from "../provider-health/provider-health.servic
 import { ProviderUnavailableError } from "../provider-health/provider-unavailable.error";
 import { FetchSyncService } from "../common/jobs/fetch-sync.service";
 import { BondAdapter, BenchmarkFetchResult } from "./bond-adapter";
+import { todayInTimezone } from "../common/date-utils";
 import { BenchmarkRefreshService } from "./benchmark-refresh.service";
 import { BondCatalogService } from "./bond-catalog.service";
 
@@ -31,6 +32,12 @@ function build(opts: {
   fetchers?: Record<string, jest.Mock>;
   /** Warsaw date of each series' last successful fetch; null: never fetched. */
   fetched?: Record<string, string | null>;
+  /** What the correction-trace statement returns (rows that replaced a value). */
+  corrections?: Array<{
+    observation_date: string;
+    old_value: string;
+    new_value: string;
+  }>;
   health?: Partial<Record<keyof ProviderHealthService, jest.Mock>>;
 }) {
   const fetchers = opts.fetchers ?? {
@@ -39,6 +46,7 @@ function build(opts: {
   };
   const adapter: BondAdapter = {
     countryCode: "PL",
+    timezone: "Europe/Warsaw",
     registerCalendars: (r) => r,
     catalog: [],
     benchmarks: [
@@ -70,7 +78,9 @@ function build(opts: {
       return fetched === undefined ? [] : [{ fetched_on: fetched }];
     }
     writes.push({ sql, params });
-    return [];
+    return sql.includes("INSERT INTO benchmark_values")
+      ? (opts.corrections ?? [])
+      : [];
   });
   const health = {
     assertAvailable: jest.fn(() => "open-gate"),
@@ -163,6 +173,77 @@ describe("BenchmarkRefreshService", () => {
     expect(
       writes.filter((w) => w.sql.includes("UPDATE benchmark_series")),
     ).toHaveLength(2);
+  });
+
+  it("computes each adapter's today in its own timezone", async () => {
+    const zones: Record<string, string> = {
+      "Europe/Warsaw": "2026-10-10",
+      "America/New_York": "2026-10-09",
+    };
+    (todayInTimezone as jest.Mock).mockImplementation(
+      (tz: string) => zones[tz],
+    );
+    const seen: Array<[string, unknown]> = [];
+    const { service, adapter, manager } = build({
+      fetched: { NBP_X: "2026-10-09", CPI_X: "2026-10-09", US_X: "2026-10-09" },
+    });
+    const usFetch = jest.fn(async () => result("US_X", "2026-10-09"));
+    const us: BondAdapter = {
+      ...adapter,
+      countryCode: "US",
+      timezone: "America/New_York",
+      benchmarks: [{ ...adapter.benchmarks[0], code: "US_X" }],
+      fetchBenchmark: usFetch,
+    };
+    manager.query.mockImplementation(async (sql: string, params: unknown[]) => {
+      if (sql.includes("AS fetched_on")) {
+        seen.push([params[0] as string, params[1]]);
+        return [{ fetched_on: "2026-10-08" }];
+      }
+      return [];
+    });
+    await service.refreshAll({ adapters: [adapter, us], onlyStale: true });
+    // Warsaw's today is 10-10, so 10-08 is stale there; New York's today is
+    // 10-09, so 10-08 is still yesterday and fresh.
+    expect(todayInTimezone).toHaveBeenCalledWith("America/New_York");
+    expect(seen).toEqual([
+      ["NBP_X", "Europe/Warsaw"],
+      ["CPI_X", "Europe/Warsaw"],
+      ["US_X", "America/New_York"],
+    ]);
+    expect(usFetch).not.toHaveBeenCalled();
+    (todayInTimezone as jest.Mock).mockImplementation(() => "2026-10-10");
+  });
+
+  it("logs a correction with the old and the new value, and nothing for an unchanged value", async () => {
+    const warn = jest.spyOn(Logger.prototype, "warn");
+    const changed = build({
+      corrections: [
+        {
+          observation_date: "2026-08-01",
+          old_value: "0.0340000000",
+          new_value: "0.0350000000",
+        },
+      ],
+    });
+    await changed.service.refreshAll({ adapters: [changed.adapter] });
+    const messages = warn.mock.calls.map((c) => String(c[0]));
+    expect(messages.filter((m) => /correction/.test(m))).toHaveLength(2);
+    expect(messages[0]).toMatch(
+      /NBP_X.*2026-08-01.*0\.0340000000.*0\.0350000000/,
+    );
+    const insert = changed.writes.find((w) =>
+      w.sql.includes("INSERT INTO benchmark_values"),
+    )!;
+    expect(insert.sql).toMatch(/WITH incoming AS/);
+    expect(insert.sql).toMatch(/IS DISTINCT FROM EXCLUDED\.value/);
+
+    warn.mockClear();
+    const same = build({});
+    await same.service.refreshAll({ adapters: [same.adapter] });
+    expect(
+      warn.mock.calls.filter((c) => /correction/.test(String(c[0]))),
+    ).toEqual([]);
   });
 
   it("one series failing does not stop the other, and a plain failure is logged as an error", async () => {

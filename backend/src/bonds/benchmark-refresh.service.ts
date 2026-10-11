@@ -28,7 +28,7 @@ export type HttpFetch = typeof globalThis.fetch;
 
 export interface RefreshOptions {
   /**
-   * Skip a series whose last successful fetch was today or yesterday in Warsaw
+   * Skip a series whose last successful fetch was today or yesterday in its adapter's timezone
    * (the boot warm-up). Freshness is when the series was last fetched
    * (`benchmark_series.updated_at`, stamped only by a successful store), never
    * `covered_through`: a MONTHLY series is covered only through its newest
@@ -41,7 +41,6 @@ export interface RefreshOptions {
 }
 
 const FETCH_TIMEOUT_MS = 30_000;
-const WARSAW = "Europe/Warsaw";
 /** Days without a successful store after which a failing series is reported as an outage. */
 const PERSISTENT_FAILURE_DAYS = 3;
 
@@ -86,6 +85,7 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
   }
 
   /**
+   * The trigger time is shared; each adapter's own day decides freshness.
    * Weekday morning in Warsaw: GUS publishes mid-month and NBP announces after
    * its policy meetings, both during the working day before.
    *
@@ -123,11 +123,12 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
     // The series rows must exist before a value can reference one, whichever
     // service booted first.
     await this.catalog.seedBenchmarkSeries(adapters);
-    const today = todayInTimezone(WARSAW) as string;
 
     let attempted = 0;
     let failed = 0;
     for (const adapter of adapters) {
+      // Each adapter's own calendar day decides freshness and the outage window.
+      const today = todayInTimezone(adapter.timezone) as string;
       for (const series of adapter.benchmarks) {
         const outcome = await this.refreshSeries(
           adapter,
@@ -155,7 +156,10 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
     onlyStale: boolean,
   ): Promise<"stored" | "skipped" | "failed"> {
     try {
-      if (onlyStale && !(await this.isStale(series.code, today)))
+      if (
+        onlyStale &&
+        !(await this.isStale(series.code, today, adapter.timezone))
+      )
         return "skipped";
       const result = await adapter.fetchBenchmark(
         series.code,
@@ -181,7 +185,12 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
           `Bond benchmark refresh for ${series.code} failed: ${describeFetchFailure(error)}`,
         );
       }
-      await this.reportPersistentFailure(series, today, error);
+      await this.reportPersistentFailure(
+        series,
+        today,
+        adapter.timezone,
+        error,
+      );
       return "failed";
     }
   }
@@ -197,10 +206,11 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
   private async reportPersistentFailure(
     series: BenchmarkSeriesDefinition,
     today: string,
+    timezone: string,
     error: unknown,
   ): Promise<void> {
     try {
-      const fetchedOn = await this.lastFetchedOn(series.code);
+      const fetchedOn = await this.lastFetchedOn(series.code, timezone);
       if (
         fetchedOn === null ||
         fetchedOn < addDaysYMD(today, -PERSISTENT_FAILURE_DAYS)
@@ -221,16 +231,23 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
   }
 
   /**
-   * Never fetched (no coverage yet), or last fetched before yesterday in Warsaw.
+   * Never fetched (no coverage yet), or last fetched before yesterday in the adapter's timezone.
    * `updated_at` is the last successful store; the catalog seed does not touch it.
    */
-  private async isStale(code: string, today: string): Promise<boolean> {
-    const fetchedOn = await this.lastFetchedOn(code);
+  private async isStale(
+    code: string,
+    today: string,
+    timezone: string,
+  ): Promise<boolean> {
+    const fetchedOn = await this.lastFetchedOn(code, timezone);
     return fetchedOn === null || fetchedOn < addDaysYMD(today, -1);
   }
 
-  /** The Warsaw date of the last successful store, or null when never fetched. */
-  private async lastFetchedOn(code: string): Promise<string | null> {
+  /** The date, in `timezone`, of the last successful store, or null when never fetched. */
+  private async lastFetchedOn(
+    code: string,
+    timezone: string,
+  ): Promise<string | null> {
     const rows: Array<{ fetched_on: string | null }> = await withScopedDb(
       this.dataSource,
       (m) =>
@@ -238,7 +255,7 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
           `SELECT CASE WHEN covered_through IS NULL THEN NULL
                        ELSE TO_CHAR(updated_at AT TIME ZONE $2, 'YYYY-MM-DD') END AS fetched_on
              FROM benchmark_series WHERE code = $1`,
-          [code, WARSAW],
+          [code, timezone],
         ),
     );
     return rows[0]?.fetched_on ?? null;
@@ -289,17 +306,39 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
     const { observations } = result;
     await withScopedDb(this.dataSource, async (m) => {
       if (observations.length > 0) {
-        await m.query(
-          `INSERT INTO benchmark_values
-             (benchmark_code, observation_date, value, published_on, source_url, retrieved_at)
-           SELECT $1::varchar, t.d, t.v, t.p, COALESCE(t.u, $5::text), NOW()
-             FROM unnest($2::date[], $3::numeric[], $4::date[], $6::text[]) AS t(d, v, p, u)
-           ON CONFLICT (benchmark_code, observation_date) DO UPDATE
-              SET value = EXCLUDED.value,
-                  published_on = EXCLUDED.published_on,
-                  source_url = EXCLUDED.source_url,
-                  retrieved_at = EXCLUDED.retrieved_at
-            WHERE benchmark_values.value IS DISTINCT FROM EXCLUDED.value`,
+        // `old` reads the rows as they were before this statement's upsert (a
+        // data-modifying CTE shares the statement snapshot), so a correction
+        // reports the value it replaced. A newly inserted row has no old side.
+        const corrections: Array<{
+          observation_date: string;
+          old_value: string;
+          new_value: string;
+        }> = await m.query(
+          `WITH incoming AS (
+             SELECT t.d, t.v, t.p, COALESCE(t.u, $5::text) AS u
+               FROM unnest($2::date[], $3::numeric[], $4::date[], $6::text[]) AS t(d, v, p, u)
+           ), old AS (
+             SELECT bv.observation_date, bv.value
+               FROM benchmark_values bv
+               JOIN incoming i ON i.d = bv.observation_date
+              WHERE bv.benchmark_code = $1::varchar
+           ), upserted AS (
+             INSERT INTO benchmark_values
+               (benchmark_code, observation_date, value, published_on, source_url, retrieved_at)
+             SELECT $1::varchar, i.d, i.v, i.p, i.u, NOW() FROM incoming i
+             ON CONFLICT (benchmark_code, observation_date) DO UPDATE
+                SET value = EXCLUDED.value,
+                    published_on = EXCLUDED.published_on,
+                    source_url = EXCLUDED.source_url,
+                    retrieved_at = EXCLUDED.retrieved_at
+              WHERE benchmark_values.value IS DISTINCT FROM EXCLUDED.value
+             RETURNING observation_date, value
+           )
+           SELECT TO_CHAR(u.observation_date, 'YYYY-MM-DD') AS observation_date,
+                  o.value::text AS old_value,
+                  u.value::text AS new_value
+             FROM upserted u
+             JOIN old o ON o.observation_date = u.observation_date`,
           [
             code,
             observations.map((o) => o.observationDate),
@@ -309,6 +348,11 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
             observations.map((o) => o.sourceUrl ?? null),
           ],
         );
+        for (const c of corrections ?? []) {
+          this.logger.warn(
+            `Bond benchmark correction: series ${code}, observation ${c.observation_date}, value ${c.old_value} replaced by ${c.new_value}`,
+          );
+        }
       }
       await m.query(
         `UPDATE benchmark_series
