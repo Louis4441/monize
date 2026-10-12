@@ -38,6 +38,9 @@
     "scheduleRecurring": "[XX-Make recurring-XX]",
     "more": "[XX-More actions-XX]"
   },
+  "columns": {
+    "saveFailed": "[XX-Couldn't save column settings. Please try again.-XX]"
+  },
   "loading": "[XX-Loading...-XX]",
   "pagination": {
     "showing": "[XX-Showing-XX]",

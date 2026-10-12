@@ -38,6 +38,9 @@
     "scheduleRecurring": "Ustaw jako cykliczne",
     "more": "Więcej akcji"
   },
+  "columns": {
+    "saveFailed": "Nie udało się zapisać ustawień kolumn. Spróbuj ponownie."
+  },
   "loading": "Wczytywanie...",
   "pagination": {
     "showing": "Wyświetlanie",

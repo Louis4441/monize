@@ -38,6 +38,9 @@
     "scheduleRecurring": "Terugkerend maken",
     "more": "Meer acties"
   },
+  "columns": {
+    "saveFailed": "Kon de kolominstellingen niet opslaan. Probeer het opnieuw."
+  },
   "loading": "Laden...",
   "pagination": {
     "showing": "Weergeven",
