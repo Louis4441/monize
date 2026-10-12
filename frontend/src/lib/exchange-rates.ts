@@ -14,6 +14,32 @@ export interface ExchangeRate {
   source: string;
 }
 
+/**
+ * The exchange rate providers a deployment can name in `FX_PROVIDERS`, mirrored
+ * from the backend's `FX_PROVIDER_NAMES`
+ * (`backend/src/currencies/providers/fx-provider.interface.ts`) and held to it
+ * by a contract test. The labels are this client's translations, keyed by name.
+ */
+export const FX_PROVIDER_NAMES = ['frankfurter', 'yahoo'] as const;
+
+export type FxProviderName = (typeof FX_PROVIDER_NAMES)[number];
+
+export function isFxProviderName(name: string): name is FxProviderName {
+  return (FX_PROVIDER_NAMES as readonly string[]).includes(name);
+}
+
+/** One configured provider: `name` identifies it, `source` is the slug its rows carry. */
+export interface FxProviderDescription {
+  name: string;
+  source: string;
+}
+
+/** `providers` is in the order the server asks them. */
+export interface ExchangeRateStatus {
+  lastUpdated: string | null;
+  providers: FxProviderDescription[];
+}
+
 export interface CurrencyInfo {
   code: string;
   name: string;
@@ -199,6 +225,11 @@ export const exchangeRatesApi = {
       { code },
     );
     invalidateCache('exchange-rates:');
+    return response.data;
+  },
+
+  getRateStatus: async (): Promise<ExchangeRateStatus> => {
+    const response = await apiClient.get<ExchangeRateStatus>('/currencies/exchange-rates/status');
     return response.data;
   },
 

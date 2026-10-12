@@ -13,7 +13,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import { CARD_CLASS } from '@/components/ui/Card';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import dynamic from 'next/dynamic';
-import { exchangeRatesApi, CurrencyInfo, CreateCurrencyData, CurrencyUsage } from '@/lib/exchange-rates';
+import { exchangeRatesApi, CurrencyInfo, CreateCurrencyData, CurrencyUsage, FxProviderDescription, isFxProviderName } from '@/lib/exchange-rates';
 const CurrencyForm = dynamic(() => import('@/components/currencies/CurrencyForm').then(m => m.CurrencyForm), { ssr: false });
 import { CurrencyList, type CurrencySortField, type SortDirection } from '@/components/currencies/CurrencyList';
 import { RateHistoryCoverage } from '@/components/currencies/RateHistoryCoverage';
@@ -53,7 +53,33 @@ function CurrenciesContent() {
   const [sortField, setSortField] = useLocalStorage<CurrencySortField>('monize-currencies-sort-field', 'code');
   const [sortDirection, setSortDirection] = useLocalStorage<SortDirection>('monize-currencies-sort-dir', 'asc');
 
+  // The configured FX providers in the order the server asks them; empty until
+  // the status answers, and left empty if it does not (the line is omitted).
+  const [fxProviders, setFxProviders] = useState<FxProviderDescription[]>([]);
+
   const { defaultCurrency, getRate, refresh: refreshRates } = useExchangeRates();
+
+  useEffect(() => {
+    let cancelled = false;
+    exchangeRatesApi
+      .getRateStatus()
+      .then((status) => {
+        if (!cancelled) setFxProviders(status?.providers ?? []);
+      })
+      .catch((error) => logger.error(error));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // A name this client has no label for still shows, as the server's token.
+  const fxProviderLine = fxProviders.length
+    ? t('page.providers.line', {
+        providers: fxProviders
+          .map((p) => (isFxProviderName(p.name) ? t(`page.providers.names.${p.name}`) : p.name))
+          .join(t('page.providers.separator')),
+      })
+    : null;
 
   // Always fetch all currencies so summary cards show correct totals
   const loadData = useCallback(async () => {
@@ -137,7 +163,10 @@ function CurrenciesContent() {
       const summary = await exchangeRatesApi.refreshRates();
       const updated = summary?.updated ?? 0;
       const failed = summary?.failed ?? 0;
-      if (failed > 0) {
+      if (updated === 0 && failed > 0) {
+        // Every pair failed: nothing was refreshed, so this is not a success.
+        toast.error(t('page.toasts.ratesAllFailed'));
+      } else if (failed > 0) {
         toast.success(t('page.toasts.ratesRefreshedWithFailed', { updated, failed }));
       } else {
         toast.success(t('page.toasts.ratesRefreshed', { updated }));
@@ -244,6 +273,12 @@ function CurrenciesContent() {
             </div>
           }
         />
+
+        {fxProviderLine && (
+          <p data-testid="fx-provider-line" className="-mt-4 mb-6 text-sm text-gray-500 dark:text-gray-400">
+            {fxProviderLine}
+          </p>
+        )}
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-6">
