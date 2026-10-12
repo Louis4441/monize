@@ -74,7 +74,7 @@ implied.
 | INV-FX-002 | A row that carries its own exchange rate is converted at that rate on every surface | enforced |
 | INV-FX-003 | A currency pair is stored in one orientation | partial |
 | INV-FX-004 | A user-supplied rate never replaces a global exchange-rate observation | enforced |
-| INV-FX-005 | A provider-written rate names its provider, every provider question goes through the chain, and an outage is never remembered as an empty answer | unenforced |
+| INV-FX-005 | A provider-written rate names its provider, every provider question goes through the chain, and an outage is never remembered as an empty answer | partial |
 | INV-TRADE-001 | The executed total is the fact; the per-share price is derived from it | enforced |
 | INV-PRICE-001 | A stored price is in the currency the security is recorded in | partial |
 | INV-PORTRESULT-001 | A period change is not a return: value change, external flows and investment result are three figures | enforced |
@@ -850,10 +850,10 @@ Enforcement         The 1:1 half is enforced. Consumers return null on an absent
                     Yahoo rounds it to four decimals, so a quote below 1 is
                     checked against its inverse symbol and one below
                     MIN_PRECISE_QUOTED_RATE either way is not stored
-                    (currencies/quoted-rate.util.ts chooseFxQuote, through
-                    ExchangeRateService.fetchFxQuote for refreshAllRates and
-                    getLiveRate; quoted-rate.util.spec.ts and
-                    exchange-rate.service.spec.ts).
+                    (currencies/quoted-rate.util.ts chooseFxQuote, inside the
+                    Yahoo adapter currencies/providers/yahoo-fx.provider.ts for
+                    the refresh's and the live rate's quotes alike;
+                    quoted-rate.util.spec.ts and yahoo-fx.provider.spec.ts).
                     The mislabelling half is NOT enforced on the built-in report
                     path: see Known gap below.
 Known gap           **An unconverted amount still reaches a report under the
@@ -1094,29 +1094,35 @@ Statement           Every exchange_rates row a provider writes carries that
 Source of truth     FX_PROVIDERS (the configured order, parsed against
                     FX_PROVIDER_NAMES) and FxRateProvider.source (the slug each
                     adapter writes).
-Enforcement         None yet. ExchangeRateService builds Yahoo symbols itself
-                    and hard-codes 'yahoo_finance' in upsertCanonicalRate and
-                    persistRateSeries; fillRateWindow keeps "answered nothing"
-                    apart from "did not answer" across its direct and reverse
-                    symbols, but there is no second provider to keep it apart
-                    from. Planned:
-                    backend/src/currencies/providers/fx-provider-chain.ts asks
-                    the providers in order and gates every call on carries;
-                    ExchangeRateService takes the source from the chain's
-                    answer; fx-provider-source.guard.spec.ts fails on a quoted
-                    source slug under backend/src/currencies/ outside the
-                    providers directory and on an import of
+Enforcement         backend/src/currencies/providers/fx-provider-chain.ts asks
+                    the providers in FX_PROVIDERS order and gates every call on
+                    carries. ExchangeRateService asks the chain for every rate
+                    question (the refresh per base, the backfill and
+                    fillRateWindow per window, getRateForDate's provider step,
+                    getLiveRate) and writes the source the chain attached to
+                    each observation, dated by the observation, through
+                    canonicalRateRow; fx-provider-source.guard.spec.ts fails on
+                    a quoted source slug under backend/src/currencies/ outside
+                    the providers directory and on an import of
                     yahoo-finance.service there outside the Yahoo adapter.
-Test                Planned: the section 5 truth table of
+                    Still outside the chain: the currency lookup and
+                    verification in currencies/currencies.service.ts reach
+                    Yahoo with their own fetch calls (task B5), and only one
+                    provider exists to keep apart from another until the
+                    Frankfurter adapter ships (task B3).
+Test                The section 5 truth table of
                     docs/future-plans/exchange-rate-providers.md as named cases
                     in fx-provider-chain.spec.ts (in particular: first provider
-                    did not answer, second answered empty -> answered false),
-                    and fx-provider-source.guard.spec.ts.
-Status              unenforced -- registered ahead of the build; the plan is
-                    docs/future-plans/exchange-rate-providers.md with its task
-                    list docs/future-plans/exchange-rate-providers-tasks.md.
-                    Task Q moves this entry to enforced once the guard and the
-                    chain cases are on main.
+                    did not answer, second answered empty -> answered false);
+                    exchange-rate.service.spec.ts with the chain faked (the
+                    source and the date taken from the observation, the three
+                    refresh reports kept apart, an unanswered window never
+                    remembered); fx-provider-source.guard.spec.ts.
+Status              partial -- the chain, the service on it and the source
+                    guard are on main (tasks B1 and B2 of
+                    docs/future-plans/exchange-rate-providers-tasks.md); the
+                    currency lookup is outside the chain until B5. Task Q moves
+                    this entry to enforced.
 ```
 
 ### INV-TRADE-001 -- the executed total is the fact, the price is derived

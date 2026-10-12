@@ -1,15 +1,13 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
 import { ExchangeRateService } from "./exchange-rate.service";
-import { ProviderHealthService } from "../provider-health/provider-health.service";
-import { createTestProviderHealth } from "../test-helpers/provider-health-testing";
 import { ExchangeRate } from "./entities/exchange-rate.entity";
 import { addDaysYMD, todayYMD } from "../common/date-utils";
 import { Currency } from "./entities/currency.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
-import { YahooFinanceService } from "../securities/yahoo-finance.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import { roundFxRate } from "../common/fx-entry.util";
+import { FX_MAX_RATE_AGE_DAYS } from "../common/time-series/fx-rate-resolver";
 import {
   getRequestContext,
   requestContextStorage,
@@ -20,6 +18,13 @@ import {
   type FetchSyncMock,
 } from "../test-helpers/job-claim-testing";
 import { FetchSyncJob } from "../common/jobs/fetch-sync.service";
+import {
+  FxChainObservation,
+  FxDailySeriesResult,
+  FxLatestResult,
+  FxProviderChain,
+} from "./providers/fx-provider-chain";
+import { FxObservation } from "./providers/fx-provider.interface";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -34,22 +39,114 @@ jest.mock("../common/date-utils", () => ({
   todayYMD: jest.fn(() => "2026-08-18"),
 }));
 
+/** The slug the Yahoo adapter writes; the chain copies it onto each observation. */
+const YAHOO_SOURCE = "yahoo_finance";
+
+/**
+ * The chain behind a typed double. The three members the service reaches are
+ * typed from the real class, so a fake answer `tsc` accepts is a shape the
+ * chain can produce (`docs/backend/testing.md`); the builders below produce
+ * them in the orientations and with the sources the adapters hand back.
+ */
+type ChainDouble = jest.Mocked<
+  Pick<FxProviderChain, "latest" | "dailySeries" | "live">
+>;
+
+const observation = (
+  from: string,
+  to: string,
+  date: string,
+  rate: number,
+  source: string = YAHOO_SOURCE,
+): FxChainObservation => ({ from, to, date, rate, source });
+
+/**
+ * A `latest` answer as the chain shapes it: each observation keyed by the quote
+ * it answers for `base`, whichever orientation it came back in.
+ */
+const latestAnswer = (
+  base: string,
+  found: FxChainObservation[],
+  rest: Partial<Pick<FxLatestResult, "unanswered" | "uncarried">> = {},
+): FxLatestResult => ({
+  found: new Map(found.map((o) => [o.from === base ? o.to : o.from, o])),
+  unanswered: rest.unanswered ?? [],
+  uncarried: rest.uncarried ?? [],
+});
+
+/** Nothing answered for any quote: every quote is an outage, none is absent. */
+const nobodyAnswered = (
+  _base: string,
+  quotes: readonly string[],
+): FxLatestResult => ({
+  found: new Map(),
+  unanswered: [...quotes],
+  uncarried: [],
+});
+
+/** A `dailySeries` answer: points under one source, `answered` per the chain. */
+const seriesAnswer = (
+  points: FxObservation[],
+  options: { answered?: boolean; source?: string } = {},
+): FxDailySeriesResult => ({
+  points,
+  answered: options.answered ?? true,
+  source: points.length > 0 ? (options.source ?? YAHOO_SOURCE) : null,
+});
+
+/** Every carrying provider answered, and none had anything in the window. */
+const EMPTY_WINDOW: FxDailySeriesResult = {
+  points: [],
+  answered: true,
+  source: null,
+};
+
+/** A carrying provider did not answer and nothing was found: not an answer. */
+const NO_ANSWER: FxDailySeriesResult = {
+  points: [],
+  answered: false,
+  source: null,
+};
+
+const point = (
+  from: string,
+  to: string,
+  date: string,
+  rate: number,
+): FxObservation => ({ from, to, date, rate });
+
+/** One observation per weekday in `[start, end]`, the shape of a daily series. */
+const weekdayPoints = (
+  from: string,
+  to: string,
+  start: string,
+  end: string,
+  rate: number,
+): FxObservation[] => {
+  const points: FxObservation[] = [];
+  for (let day = start; day <= end; day = addDaysYMD(day, 1)) {
+    const weekday = new Date(`${day}T00:00:00Z`).getUTCDay();
+    if (weekday !== 0 && weekday !== 6) points.push(point(from, to, day, rate));
+  }
+  return points;
+};
+
 describe("ExchangeRateService", () => {
   let service: ExchangeRateService;
   let fetchSync: FetchSyncMock;
-  let health: ProviderHealthService;
+  let chain: ChainDouble;
   let exchangeRateRepository: Record<string, jest.Mock>;
   /** Rows the single-rate upsert wrote, in order, as the service supplied them. */
   let upsertedRates: Array<{
     fromCurrency: string;
     toCurrency: string;
+    rateDate: string;
     rate: number;
     source: string;
   }>;
   let currencyRepository: Record<string, jest.Mock>;
   let userPreferenceRepository: Record<string, jest.Mock>;
   let dataSource: Record<string, jest.Mock>;
-  let yahooFinanceService: Record<string, jest.Mock>;
 
   const mockExchangeRate: ExchangeRate = {
     id: 1,
@@ -57,7 +154,7 @@ describe("ExchangeRateService", () => {
     toCurrency: "CAD",
     rate: 1.365,
     rateDate: new Date("2026-02-10"),
-    source: "yahoo_finance",
+    source: YAHOO_SOURCE,
     fromCurrencyRef: null as any,
     toCurrencyRef: null as any,
     createdAt: new Date("2026-02-10T12:00:00Z"),
@@ -85,10 +182,45 @@ describe("ExchangeRateService", () => {
     ...overrides,
   });
 
+  /** The bulk upserts' parameter lists, read back as rows. */
+  type InsertedRow = {
+    from: string;
+    to: string;
+    date: string;
+    rate: number;
+    source: string;
+  };
+  const bulkInsertedRows = (): InsertedRow[] => {
+    const rows: InsertedRow[] = [];
+    for (const call of dataSource.query.mock.calls as Array<
+      [string, unknown[] | undefined]
+    >) {
+      const [sql, params] = call;
+      if (
+        typeof sql !== "string" ||
+        !sql.includes("INSERT INTO exchange_rates") ||
+        sql.includes("RETURNING id") ||
+        !Array.isArray(params)
+      ) {
+        continue;
+      }
+      for (let i = 0; i < params.length; i += 5) {
+        rows.push({
+          from: params[i] as string,
+          to: params[i + 1] as string,
+          date: params[i + 2] as string,
+          rate: params[i + 3] as number,
+          source: params[i + 4] as string,
+        });
+      }
+    }
+    return rows;
+  };
+
   /**
    * Answer `manager.query` by statement instead of with one blanket value.
    *
-   * The single-rate save is now `INSERT ... ON CONFLICT DO UPDATE RETURNING id`,
+   * The single-rate save is `INSERT ... ON CONFLICT DO UPDATE RETURNING id`,
    * so a test that also needs the currency-list query cannot use one
    * `mockResolvedValue` for both. This records what the upsert wrote -- which is
    * what the assertions are about -- and answers the currency list from
@@ -102,18 +234,20 @@ describe("ExchangeRateService", () => {
           sql.includes("INSERT INTO exchange_rates") &&
           sql.includes("RETURNING id")
         ) {
-          const [fromCurrency, toCurrency, , rate] = params as [
+          const [fromCurrency, toCurrency, rateDate, rate, source] = params as [
             string,
             string,
-            Date,
+            string,
             number,
+            string,
           ];
           const id = upsertedRates.length + 1;
           upsertedRates.push({
             fromCurrency,
             toCurrency,
+            rateDate,
             rate,
-            source: "yahoo_finance",
+            source,
           });
           return [{ id }];
         }
@@ -132,21 +266,10 @@ describe("ExchangeRateService", () => {
     );
   }
 
-  /**
-   * Answer `fetchQuote` per symbol, the way the provider does: a symbol absent
-   * from `prices` returns null, as `YahooFinanceService.fetchQuote` does for a
-   * failed or unknown quote.
-   */
-  function quoteBySymbol(prices: Record<string, number>): void {
-    yahooFinanceService.fetchQuote.mockImplementation(async (symbol: string) =>
-      symbol in prices ? { regularMarketPrice: prices[symbol] } : null,
-    );
-  }
-
   beforeEach(async () => {
-    // The single-rate save is now one `INSERT ... ON CONFLICT DO UPDATE
-    // RETURNING id` through the manager, so the spec records the statement and
-    // hands back the row it wrote. `findOne` still answers the by-id read-back.
+    // The single-rate save is one `INSERT ... ON CONFLICT DO UPDATE RETURNING
+    // id` through the manager, so the spec records the statement and hands back
+    // the row it wrote. `findOne` still answers the by-id read-back.
     upsertedRates = [];
     exchangeRateRepository = {
       findOne: jest.fn(),
@@ -166,9 +289,8 @@ describe("ExchangeRateService", () => {
       findOne: jest.fn(),
     };
 
-    // Raw SQL now runs on the scoped transaction's EntityManager; alias the
-    // spec's `dataSource.query` to it so the existing assertions still watch
-    // the same statements.
+    // Raw SQL runs on the scoped transaction's EntityManager; alias the spec's
+    // `dataSource.query` to it so the assertions watch the same statements.
     const scoped = createScopedDbMocks([
       [ExchangeRate, exchangeRateRepository],
       [Currency, currencyRepository],
@@ -177,22 +299,30 @@ describe("ExchangeRateService", () => {
     scoped.dataSource.query = scoped.manager.query;
     dataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
 
-    yahooFinanceService = {
-      fetchQuote: jest.fn(),
-      fetchHistorical: jest.fn(),
-      fetchHistoricalWindow: jest.fn(),
+    // The chain's default is silence: nothing answered, which no path may read
+    // as a rate or remember as an empty window. Each case says what answered.
+    chain = {
+      latest: jest.fn(async (base: string, quotes: readonly string[]) =>
+        nobodyAnswered(base, quotes),
+      ),
+      dailySeries: jest.fn(
+        async (_from: string, _to: string, _start: string, _end: string) =>
+          NO_ANSWER,
+      ),
+      live: jest.fn(
+        async (
+          _from: string,
+          _to: string,
+        ): Promise<FxChainObservation | null> => null,
+      ),
     };
 
-    health = createTestProviderHealth();
     fetchSync = createFetchSyncMock();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ExchangeRateService,
         { provide: DataSource, useValue: dataSource },
-        { provide: YahooFinanceService, useValue: yahooFinanceService },
-        // The real breaker, so a spec that drives the provider to failure sees
-        // what production sees.
-        { provide: ProviderHealthService, useValue: health },
+        { provide: FxProviderChain, useValue: chain },
         fetchSyncProvider(fetchSync),
       ],
     }).compile();
@@ -303,6 +433,7 @@ describe("ExchangeRateService", () => {
       expect(result.updated).toBe(0);
       expect(result.failed).toBe(0);
       expect(result.results).toEqual([]);
+      expect(chain.latest).not.toHaveBeenCalled();
     });
 
     it("returns empty summary when no currencies are in use", async () => {
@@ -314,66 +445,57 @@ describe("ExchangeRateService", () => {
       expect(result.updated).toBe(0);
     });
 
-    it("builds correct pairs from 3 currencies and fetches rates", async () => {
-      dataSource.query.mockResolvedValue([
-        { code: "USD" },
-        { code: "CAD" },
-        { code: "EUR" },
-      ]);
-
+    /**
+     * One chain question per base, carrying every quote stored against it: the
+     * canonical pairs grouped by their first code, bases in sequence. A provider
+     * that publishes a whole base at once answers each group in one call; one
+     * that quotes pair by pair fans out inside its adapter.
+     */
+    it("asks the chain once per base with every quote stored against it, bases in sequence", async () => {
+      // The query's order is not the chain's: the codes are sorted first, so
+      // the grouping is the same on every replica.
       routeRateQueries(["USD", "CAD", "EUR"]);
-      yahooFinanceService.fetchQuote.mockResolvedValue({
-        regularMarketPrice: 1.365,
-      });
+      chain.latest.mockImplementation(async (base, quotes) =>
+        latestAnswer(
+          base,
+          quotes.map((quote) => observation(base, quote, "2026-08-18", 1.5)),
+        ),
+      );
 
       const result = await service.refreshAllRates();
 
-      // 3 currencies -> 3 pairs: USD/CAD, USD/EUR, CAD/EUR
+      expect(chain.latest.mock.calls).toEqual([
+        ["CAD", ["EUR", "USD"]],
+        ["EUR", ["USD"]],
+      ]);
+      const [first, second] = chain.latest.mock.invocationCallOrder;
+      expect(first).toBeLessThan(second);
+      // 3 currencies -> 3 pairs: CAD/EUR, CAD/USD, EUR/USD
       expect(result.totalPairs).toBe(3);
       expect(result.updated).toBe(3);
       expect(result.failed).toBe(0);
-      expect(result.results).toHaveLength(3);
-      expect(yahooFinanceService.fetchQuote).toHaveBeenCalledTimes(3);
+      expect(result.results.map((r) => r.pair)).toEqual([
+        "CAD/EUR",
+        "CAD/USD",
+        "EUR/USD",
+      ]);
     });
 
-    it("handles failed Yahoo API calls gracefully", async () => {
-      dataSource.query.mockResolvedValue([{ code: "USD" }, { code: "CAD" }]);
-
-      // fetchQuote returns null when Yahoo API fails
-      yahooFinanceService.fetchQuote.mockResolvedValue(null);
+    it("builds correct number of pairs from 4 currencies", async () => {
+      routeRateQueries(["USD", "CAD", "EUR", "GBP"]);
+      chain.latest.mockImplementation(async (base, quotes) =>
+        latestAnswer(
+          base,
+          quotes.map((quote) => observation(base, quote, "2026-08-18", 1.0)),
+        ),
+      );
 
       const result = await service.refreshAllRates();
 
-      expect(result.totalPairs).toBe(1);
-      expect(result.updated).toBe(0);
-      expect(result.failed).toBe(1);
-      expect(result.results[0].success).toBe(false);
-      expect(result.results[0].error).toBe("No rate data available");
-    });
-
-    it("handles fetch network errors gracefully", async () => {
-      dataSource.query.mockResolvedValue([{ code: "USD" }, { code: "CAD" }]);
-
-      // fetchQuote returns null when network error occurs (YahooFinanceService catches internally)
-      yahooFinanceService.fetchQuote.mockResolvedValue(null);
-
-      const result = await service.refreshAllRates();
-
-      expect(result.totalPairs).toBe(1);
-      expect(result.failed).toBe(1);
-      expect(result.updated).toBe(0);
-    });
-
-    it("handles missing rate data in Yahoo response", async () => {
-      dataSource.query.mockResolvedValue([{ code: "USD" }, { code: "CAD" }]);
-
-      // fetchQuote returns result without regularMarketPrice
-      yahooFinanceService.fetchQuote.mockResolvedValue({});
-
-      const result = await service.refreshAllRates();
-
-      expect(result.failed).toBe(1);
-      expect(result.updated).toBe(0);
+      // 4 currencies -> C(4,2) = 6 pairs, over 3 bases
+      expect(result.totalPairs).toBe(6);
+      expect(result.updated).toBe(6);
+      expect(chain.latest).toHaveBeenCalledTimes(3);
     });
 
     it("upserts one canonical row rather than reading first and then writing", async () => {
@@ -383,10 +505,11 @@ describe("ExchangeRateService", () => {
       // `UNIQUE(from_currency, to_currency, rate_date)` and reported a pair it
       // had in fact fetched as failed.
       routeRateQueries(["USD", "CAD"]);
-
-      yahooFinanceService.fetchQuote.mockResolvedValue({
-        regularMarketPrice: 1.4,
-      });
+      // The Yahoo adapter answers USD->CAD for the CAD base: its direct symbol
+      // quotes below 1, so it asked the reverse one and that carried the digits.
+      chain.latest.mockResolvedValue(
+        latestAnswer("CAD", [observation("USD", "CAD", "2026-08-18", 1.4)]),
+      );
 
       const result = await service.refreshAllRates();
 
@@ -403,7 +526,7 @@ describe("ExchangeRateService", () => {
       expect(upserts[0][0]).toContain(
         "ON CONFLICT (from_currency, to_currency, rate_date) DO UPDATE",
       );
-      // The fetch asked for USD->CAD; the pair is stored as CAD->USD, so the
+      // The provider answered USD->CAD; the pair is stored as CAD->USD, so the
       // rate is inverted at the rate column's ten decimal places, not at money
       // precision: rounding it to four (0.7143) inverts back to 1.39997, which a
       // statement quoting six decimals reconciles against by cents.
@@ -412,20 +535,87 @@ describe("ExchangeRateService", () => {
         fromCurrency: "CAD",
         toCurrency: "USD",
         rate: roundFxRate(1 / 1.4),
-        source: "yahoo_finance",
+        source: YAHOO_SOURCE,
       });
       expect(upsertedRates[0].rate).not.toBe(0.7143);
       expect(roundFxRate(1 / upsertedRates[0].rate)).toBeCloseTo(1.4, 6);
     });
 
-    it("stores a fetch that is already canonical as it stands", async () => {
-      // CAD sorts before USD, so a CAD->USD quote needs no inversion and the
-      // stored rate is the fetched number itself.
-      // The inverse is asked too, because a quote below 1 is the side of the
-      // pair the provider's rounding costs digits; here it does not answer.
+    it("stores an observation that is already canonical as it stands", async () => {
+      // CAD sorts before USD, so a CAD->USD observation needs no inversion and
+      // the stored rate is the provider's number itself.
       routeRateQueries(["CAD", "USD"]);
+      chain.latest.mockResolvedValue(
+        latestAnswer("CAD", [observation("CAD", "USD", "2026-08-18", 0.72)]),
+      );
 
-      quoteBySymbol({ "CADUSD=X": 0.72 });
+      const result = await service.refreshAllRates();
+
+      expect(upsertedRates).toEqual([
+        {
+          fromCurrency: "CAD",
+          toCurrency: "USD",
+          rateDate: "2026-08-18",
+          rate: 0.72,
+          source: YAHOO_SOURCE,
+        },
+      ]);
+      expect(result.results[0]).toEqual({
+        pair: "CAD/USD",
+        success: true,
+        rate: 0.72,
+      });
+    });
+
+    /**
+     * The reverse symbol on the refresh: the chain answers in whichever
+     * orientation the provider quoted -- the Yahoo adapter asks the reverse
+     * symbol when the direct one has no quote or quotes below 1 -- and the
+     * refresh stores one canonical row from it and reports the rate it was
+     * asked for, reciprocated at the rate column's precision
+     * (`docs/specs/exchange-rate-canonical-orientation.md` section 10).
+     */
+    it("stores one canonical row from an observation answered the other way round and reports the rate as asked", async () => {
+      routeRateQueries(["SGD", "VND"]);
+      // `SGDVND=X` quotes 0.00005 and loses its digits; the adapter answered
+      // from `VNDSGD=X`... in the orientation that carried them.
+      chain.latest.mockResolvedValue(
+        latestAnswer("SGD", [observation("VND", "SGD", "2026-08-18", 20278.5)]),
+      );
+
+      const result = await service.refreshAllRates();
+
+      expect(result.updated).toBe(1);
+      expect(upsertedRates).toEqual([
+        {
+          fromCurrency: "SGD",
+          toCurrency: "VND",
+          rateDate: "2026-08-18",
+          rate: roundFxRate(1 / 20278.5),
+          source: YAHOO_SOURCE,
+        },
+      ]);
+      expect(result.results[0]).toEqual({
+        pair: "SGD/VND",
+        success: true,
+        rate: roundFxRate(1 / 20278.5),
+      });
+    });
+
+    /**
+     * Plan decision 5: the provider dates the observation. A reference rate
+     * published for Friday is Friday's row whichever day the refresh runs, and
+     * the row carries the slug of the provider that published it, not a name
+     * this service knows (INV-FX-005).
+     */
+    it("dates the row by the observation and attributes it to the answering provider", async () => {
+      routeRateQueries(["CAD", "USD"]);
+      // Today is the fixture's 2026-08-18; the observation is Friday's.
+      chain.latest.mockResolvedValue(
+        latestAnswer("CAD", [
+          observation("USD", "CAD", "2026-08-14", 1.4253, "frankfurter"),
+        ]),
+      );
 
       await service.refreshAllRates();
 
@@ -433,127 +623,166 @@ describe("ExchangeRateService", () => {
         {
           fromCurrency: "CAD",
           toCurrency: "USD",
-          rate: 0.72,
-          source: "yahoo_finance",
+          rateDate: "2026-08-14",
+          rate: roundFxRate(1 / 1.4253),
+          source: "frankfurter",
         },
+      ]);
+      // The date crosses the driver as the calendar string the provider gave,
+      // never as a `Date` rendered in the process time zone.
+      const [, params] = dataSource.query.mock.calls.find((call: unknown[]) =>
+        String(call[0]).includes("RETURNING id"),
+      ) as [string, unknown[]];
+      expect(params).toEqual([
+        "CAD",
+        "USD",
+        "2026-08-14",
+        expect.any(Number),
+        "frankfurter",
       ]);
     });
 
-    describe("a latest quote rounded to four decimals (issue #1604)", () => {
-      // Yahoo rounds `regularMarketPrice` to four decimals for every currency
-      // pair. IDR/SGD closes at 0.00007156 and is quoted 0.0001 -- a 200 with a
-      // figure 40% high, which the refresh used to store. SGD/IDR keeps the
-      // digits.
-      it("stores the inverse quote when the direct one has lost its digits", async () => {
-        routeRateQueries(["IDR", "SGD"]);
-        quoteBySymbol({ "IDRSGD=X": 0.0001, "SGDIDR=X": 13973.23 });
+    it("passes each observation's own source through when one refresh draws on two providers", async () => {
+      routeRateQueries(["CAD", "EUR", "USD"]);
+      chain.latest.mockImplementation(async (base, quotes) =>
+        latestAnswer(
+          base,
+          quotes.map((quote) =>
+            observation(
+              base,
+              quote,
+              "2026-08-18",
+              2,
+              quote === "USD" ? YAHOO_SOURCE : "frankfurter",
+            ),
+          ),
+        ),
+      );
 
-        const result = await service.refreshAllRates();
+      await service.refreshAllRates();
 
-        expect(result.updated).toBe(1);
-        expect(yahooFinanceService.fetchQuote).toHaveBeenNthCalledWith(
-          1,
-          "IDRSGD=X",
-        );
-        expect(yahooFinanceService.fetchQuote).toHaveBeenNthCalledWith(
-          2,
-          "SGDIDR=X",
-        );
-        // One canonical row (IDR sorts first), at the inverse's precision.
-        expect(upsertedRates).toEqual([
-          {
-            fromCurrency: "IDR",
-            toCurrency: "SGD",
-            rate: roundFxRate(1 / 13973.23),
-            source: "yahoo_finance",
-          },
-        ]);
-        expect(upsertedRates[0].rate).not.toBe(0.0001);
-        expect(result.results[0]).toEqual({
-          pair: "IDR/SGD",
-          success: true,
-          rate: roundFxRate(1 / 13973.23),
-        });
+      expect(
+        upsertedRates.map((row) => [
+          row.fromCurrency,
+          row.toCurrency,
+          row.source,
+        ]),
+      ).toEqual([
+        ["CAD", "EUR", "frankfurter"],
+        ["CAD", "USD", YAHOO_SOURCE],
+        ["EUR", "USD", YAHOO_SOURCE],
+      ]);
+    });
+
+    /**
+     * Three reports, kept apart (INV-FX-005): an outage, a quote the provider
+     * has no rate for, and a pair no configured provider carries have three
+     * different repairs, and nothing is stored for any of them.
+     */
+    it("reports a quote no provider answered as an outage, not as missing data", async () => {
+      routeRateQueries(["CAD", "USD"]);
+      chain.latest.mockResolvedValue(
+        latestAnswer("CAD", [], { unanswered: ["USD"] }),
+      );
+
+      const result = await service.refreshAllRates();
+
+      expect(result.totalPairs).toBe(1);
+      expect(result.updated).toBe(0);
+      expect(result.failed).toBe(1);
+      expect(result.results[0]).toEqual({
+        pair: "CAD/USD",
+        success: false,
+        error: "No provider answered",
       });
+      expect(upsertedRates).toEqual([]);
+    });
 
-      it("refuses a pair quoted too coarsely in both directions", async () => {
-        // The same placeholder-sized figure both ways cannot be a rate and its
-        // reciprocal; nothing is stored, and the pair is reported by name.
-        routeRateQueries(["IDR", "SGD"]);
-        quoteBySymbol({ "IDRSGD=X": 0.01, "SGDIDR=X": 0.01 });
+    it("reports a quote answered without a rate as no rate data", async () => {
+      // Every carrying provider answered the base and none had this quote:
+      // Yahoo's 200 without a price, or a pair quoted too coarsely either way.
+      routeRateQueries(["CAD", "USD"]);
+      chain.latest.mockResolvedValue(latestAnswer("CAD", []));
 
-        const result = await service.refreshAllRates();
+      const result = await service.refreshAllRates();
 
-        expect(result.updated).toBe(0);
-        expect(result.failed).toBe(1);
-        expect(upsertedRates).toEqual([]);
-        expect(result.results[0]).toMatchObject({
-          pair: "IDR/SGD",
+      expect(result.failed).toBe(1);
+      expect(result.updated).toBe(0);
+      expect(result.results[0]).toEqual({
+        pair: "CAD/USD",
+        success: false,
+        error: "No rate data available",
+      });
+    });
+
+    it("names a pair no configured provider carries", async () => {
+      routeRateQueries(["TWD", "USD"]);
+      chain.latest.mockResolvedValue(
+        latestAnswer("TWD", [], { uncarried: ["USD"] }),
+      );
+
+      const result = await service.refreshAllRates();
+
+      expect(result.failed).toBe(1);
+      expect(result.results[0]).toEqual({
+        pair: "TWD/USD",
+        success: false,
+        error: "No configured provider carries TWD/USD",
+      });
+    });
+
+    it("keeps the three reports apart within one base", async () => {
+      routeRateQueries(["CAD", "EUR", "TWD", "USD"]);
+      chain.latest.mockImplementation(async (base) =>
+        base === "CAD"
+          ? latestAnswer(
+              "CAD",
+              [observation("CAD", "EUR", "2026-08-18", 0.62)],
+              { unanswered: ["USD"], uncarried: ["TWD"] },
+            )
+          : latestAnswer(base, []),
+      );
+
+      const result = await service.refreshAllRates();
+
+      expect(result.totalPairs).toBe(6);
+      expect(result.updated).toBe(1);
+      expect(result.failed).toBe(5);
+      expect(result.results.slice(0, 3)).toEqual([
+        { pair: "CAD/EUR", success: true, rate: 0.62 },
+        {
+          pair: "CAD/TWD",
           success: false,
-        });
-        expect(result.results[0].error).toContain("IDR/SGD");
-        expect(result.results[0].error).toContain("too coarsely");
-      });
+          error: "No configured provider carries CAD/TWD",
+        },
+        { pair: "CAD/USD", success: false, error: "No provider answered" },
+      ]);
+    });
 
-      it("refuses a coarse quote whose inverse did not answer", async () => {
-        routeRateQueries(["VND", "SGD"]);
-        quoteBySymbol({ "VNDSGD=X": 0.0001 });
+    it("refuses an observation that cannot be a rate and reports the pair failed", async () => {
+      // `saveRate`'s own guard: a non-positive rate is absent, not a rate, and
+      // is refused before the write rather than stored as a rate nothing may
+      // use. No adapter produces one; the chain's type permits it.
+      routeRateQueries(["CAD", "USD"]);
+      chain.latest.mockResolvedValue(
+        latestAnswer("CAD", [observation("CAD", "USD", "2026-08-18", 0)]),
+      );
 
-        const result = await service.refreshAllRates();
+      const result = await service.refreshAllRates();
 
-        expect(result.failed).toBe(1);
-        expect(upsertedRates).toEqual([]);
-      });
-
-      it("asks the inverse when the direct quote is zero", async () => {
-        // VND/SGD is quoted 0.0 outright.
-        routeRateQueries(["VND", "SGD"]);
-        quoteBySymbol({ "VNDSGD=X": 0, "SGDVND=X": 20278.5 });
-
-        const result = await service.refreshAllRates();
-
-        expect(result.updated).toBe(1);
-        expect(upsertedRates).toEqual([
-          {
-            fromCurrency: "SGD",
-            toCurrency: "VND",
-            rate: 20278.5,
-            source: "yahoo_finance",
-          },
-        ]);
-      });
-
-      it("asks the inverse when the direct quote failed", async () => {
-        routeRateQueries(["USD", "CAD"]);
-        quoteBySymbol({ "CADUSD=X": 0.7143 });
-
-        const result = await service.refreshAllRates();
-
-        expect(result.updated).toBe(1);
-        expect(upsertedRates[0]).toMatchObject({
-          fromCurrency: "CAD",
-          toCurrency: "USD",
-          rate: 0.7143,
-        });
-        expect(result.results[0].rate).toBe(roundFxRate(1 / 0.7143));
-      });
-
-      it("takes a quote of 1 or more without asking the inverse", async () => {
-        routeRateQueries(["USD", "CAD"]);
-        quoteBySymbol({ "USDCAD=X": 1.4, "CADUSD=X": 0.7143 });
-
-        await service.refreshAllRates();
-
-        expect(yahooFinanceService.fetchQuote).toHaveBeenCalledTimes(1);
-        expect(yahooFinanceService.fetchQuote).toHaveBeenCalledWith("USDCAD=X");
-      });
+      expect(result.failed).toBe(1);
+      expect(result.results[0].success).toBe(false);
+      expect(result.results[0].error).toContain(
+        "Refusing to store exchange rate CAD/USD at 0 for 2026-08-18",
+      );
+      expect(upsertedRates).toEqual([]);
     });
 
     it("handles a rate write failure gracefully", async () => {
       routeRateQueries(["USD", "CAD"]);
-      yahooFinanceService.fetchQuote.mockResolvedValue({
-        regularMarketPrice: 1.365,
-      });
+      chain.latest.mockResolvedValue(
+        latestAnswer("CAD", [observation("CAD", "USD", "2026-08-18", 0.7)]),
+      );
       // The upsert itself fails: one pair is reported failed and the sweep
       // carries on.
       dataSource.query.mockImplementation(async (sql: string) => {
@@ -577,21 +806,25 @@ describe("ExchangeRateService", () => {
       expect(result.results[0].error).toBe("DB write failed");
     });
 
-    it("builds correct number of pairs from 4 currencies", async () => {
-      routeRateQueries(["USD", "CAD", "EUR", "GBP"]);
-      yahooFinanceService.fetchQuote.mockResolvedValue({
-        regularMarketPrice: 1.0,
-      });
+    it("reports an upsert that returned no row as a fault rather than synthesising an entity", async () => {
+      routeRateQueries(["CAD", "USD"]);
+      chain.latest.mockResolvedValue(
+        latestAnswer("CAD", [observation("CAD", "USD", "2026-08-18", 0.7)]),
+      );
+      exchangeRateRepository.findOne.mockResolvedValue(null);
 
       const result = await service.refreshAllRates();
 
-      // 4 currencies -> C(4,2) = 6 pairs
-      expect(result.totalPairs).toBe(6);
-      expect(result.updated).toBe(6);
+      expect(result.failed).toBe(1);
+      expect(result.results[0].error).toBe(
+        "Failed to persist exchange rate CAD/USD for 2026-08-18",
+      );
     });
   });
 
   describe("backfillHistoricalRates", () => {
+    const TODAY = "2026-08-18";
+
     it("uses user default currency from preferences", async () => {
       userPreferenceRepository.findOne.mockResolvedValue({
         userId: "user-1",
@@ -655,7 +888,7 @@ describe("ExchangeRateService", () => {
         "(from_currency = $2 AND to_currency = $1)",
       );
       expect(result.results[0].ratesLoaded).toBe(0);
-      expect(yahooFinanceService.fetchHistorical).not.toHaveBeenCalled();
+      expect(chain.dailySeries).not.toHaveBeenCalled();
     });
 
     it("returns empty summary when no pairs need backfill", async () => {
@@ -706,12 +939,16 @@ describe("ExchangeRateService", () => {
       expect(result.results[0].ratesLoaded).toBe(0);
     });
 
-    it("fetches and stores historical rates from Yahoo Finance", async () => {
+    /**
+     * One question to the chain over the span the user's data covers: from
+     * the earliest transaction through today, in one window. The whole-history
+     * download and the date filter over it are gone with it.
+     */
+    it("asks the chain for the span from the earliest use through today and stores what it answers", async () => {
       userPreferenceRepository.findOne.mockResolvedValue({
         userId: "user-1",
         defaultCurrency: "USD",
       });
-
       dataSource.query
         .mockResolvedValueOnce([
           { currency_code: "CAD", earliest: "2025-06-01" },
@@ -719,97 +956,85 @@ describe("ExchangeRateService", () => {
         .mockResolvedValueOnce([]) // securityCurrencyRows
         .mockResolvedValueOnce([{ count: 0 }]) // no existing rates
         .mockResolvedValueOnce(undefined); // bulk upsert INSERT
-
-      yahooFinanceService.fetchHistorical.mockResolvedValue([
-        {
-          date: new Date("2025-06-01"),
-          open: null,
-          high: null,
-          low: null,
-          close: 1.365,
-          volume: null,
-        },
-        {
-          date: new Date("2025-06-02"),
-          open: null,
-          high: null,
-          low: null,
-          close: 1.37,
-          volume: null,
-        },
-      ]);
+      chain.dailySeries.mockResolvedValue(
+        seriesAnswer([
+          point("CAD", "USD", "2025-06-02", 0.7326),
+          point("CAD", "USD", "2025-06-03", 0.7299),
+        ]),
+      );
 
       const result = await service.backfillHistoricalRates("user-1");
 
+      expect(chain.dailySeries).toHaveBeenCalledTimes(1);
+      expect(chain.dailySeries).toHaveBeenCalledWith(
+        "CAD",
+        "USD",
+        "2025-06-01",
+        TODAY,
+      );
       expect(result.totalPairs).toBe(1);
       expect(result.successful).toBe(1);
       expect(result.totalRatesLoaded).toBe(2);
-      expect(result.results[0].pair).toBe("CAD/USD");
-      expect(result.results[0].ratesLoaded).toBe(2);
+      expect(result.results[0]).toEqual({
+        pair: "CAD/USD",
+        success: true,
+        ratesLoaded: 2,
+      });
+      expect(bulkInsertedRows()).toEqual([
+        {
+          from: "CAD",
+          to: "USD",
+          date: "2025-06-02",
+          rate: 0.7326,
+          source: YAHOO_SOURCE,
+        },
+        {
+          from: "CAD",
+          to: "USD",
+          date: "2025-06-03",
+          rate: 0.7299,
+          source: YAHOO_SOURCE,
+        },
+      ]);
     });
 
-    it("filters historical rates by cutoff date", async () => {
+    it("merges security and account currency rows picking the earliest date", async () => {
       userPreferenceRepository.findOne.mockResolvedValue({
         userId: "user-1",
         defaultCurrency: "USD",
       });
 
+      // Same currency from both account and security, different earliest dates
       dataSource.query
         .mockResolvedValueOnce([
-          { currency_code: "EUR", earliest: "2025-06-15" },
-        ])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ count: 0 }])
-        .mockResolvedValueOnce(undefined); // bulk upsert
-
-      yahooFinanceService.fetchHistorical.mockResolvedValue([
-        {
-          date: new Date("2025-06-01"),
-          open: null,
-          high: null,
-          low: null,
-          close: 1.1,
-          volume: null,
-        }, // before cutoff
-        {
-          date: new Date("2025-06-15"),
-          open: null,
-          high: null,
-          low: null,
-          close: 1.2,
-          volume: null,
-        }, // on cutoff
-        {
-          date: new Date("2025-06-20"),
-          open: null,
-          high: null,
-          low: null,
-          close: 1.3,
-          volume: null,
-        }, // after cutoff
-      ]);
+          { currency_code: "EUR", earliest: "2025-06-01" },
+        ]) // account
+        .mockResolvedValueOnce([
+          { currency_code: "EUR", earliest: "2025-03-01" },
+        ]) // security (earlier)
+        .mockResolvedValueOnce([{ count: 0 }]);
+      chain.dailySeries.mockResolvedValue(
+        seriesAnswer([point("EUR", "USD", "2025-03-03", 1.08)]),
+      );
 
       const result = await service.backfillHistoricalRates("user-1");
 
-      expect(result.successful).toBe(1);
-      // Only ts2 and ts3 should pass the filter (>= cutoff)
-      expect(result.results[0].ratesLoaded).toBe(2);
+      // Should only have 1 pair (EUR->USD) not 2, over the earlier span.
+      expect(result.totalPairs).toBe(1);
+      expect(chain.dailySeries).toHaveBeenCalledTimes(1);
+      expect(chain.dailySeries).toHaveBeenCalledWith(
+        "EUR",
+        "USD",
+        "2025-03-01",
+        TODAY,
+      );
     });
 
-    it("deduplicates rates with the same date", async () => {
+    it("writes one row per day, the last point for a day winning, whichever orientation each came in", async () => {
       userPreferenceRepository.findOne.mockResolvedValue({
         userId: "user-1",
         defaultCurrency: "USD",
       });
-
-      // YahooFinanceService already normalizes dates to midnight, so two entries with same date
-      const date1 = new Date("2025-07-01");
-      date1.setHours(0, 0, 0, 0);
-      const date2 = new Date("2025-07-01");
-      date2.setHours(0, 0, 0, 0);
-      const date3 = new Date("2025-07-02");
-      date3.setHours(0, 0, 0, 0);
-
       dataSource.query
         .mockResolvedValueOnce([
           { currency_code: "GBP", earliest: "2025-07-01" },
@@ -817,116 +1042,90 @@ describe("ExchangeRateService", () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{ count: 0 }])
         .mockResolvedValueOnce(undefined); // bulk upsert
-
-      yahooFinanceService.fetchHistorical.mockResolvedValue([
-        {
-          date: date1,
-          open: null,
-          high: null,
-          low: null,
-          close: 1.25,
-          volume: null,
-        },
-        {
-          date: date2,
-          open: null,
-          high: null,
-          low: null,
-          close: 1.26,
-          volume: null,
-        },
-        {
-          date: date3,
-          open: null,
-          high: null,
-          low: null,
-          close: 1.27,
-          volume: null,
-        },
-      ]);
+      chain.dailySeries.mockResolvedValue(
+        seriesAnswer([
+          point("GBP", "USD", "2025-07-01", 1.25),
+          // The same day again, the other way round: one row, this value.
+          point("USD", "GBP", "2025-07-01", 0.8),
+          point("GBP", "USD", "2025-07-02", 1.27),
+        ]),
+      );
 
       const result = await service.backfillHistoricalRates("user-1");
 
-      // date1 and date2 are the same date, so one is deduped
       expect(result.results[0].ratesLoaded).toBe(2);
-    });
-
-    it("handles null/NaN close values in Yahoo response", async () => {
-      userPreferenceRepository.findOne.mockResolvedValue({
-        userId: "user-1",
-        defaultCurrency: "USD",
-      });
-
-      dataSource.query
-        .mockResolvedValueOnce([
-          { currency_code: "JPY", earliest: "2025-08-01" },
-        ])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ count: 0 }])
-        .mockResolvedValueOnce(undefined); // bulk upsert
-
-      // YahooFinanceService.fetchHistorical already filters null/NaN, so only valid entries returned
-      yahooFinanceService.fetchHistorical.mockResolvedValue([
+      expect(bulkInsertedRows()).toEqual([
         {
-          date: new Date("2025-08-03"),
-          open: null,
-          high: null,
-          low: null,
-          close: 150.5,
-          volume: null,
+          from: "GBP",
+          to: "USD",
+          date: "2025-07-01",
+          rate: roundFxRate(1 / 0.8),
+          source: YAHOO_SOURCE,
+        },
+        {
+          from: "GBP",
+          to: "USD",
+          date: "2025-07-02",
+          rate: 1.27,
+          source: YAHOO_SOURCE,
         },
       ]);
-
-      const result = await service.backfillHistoricalRates("user-1");
-
-      // Only the rate with value 150.5 should be included
-      expect(result.results[0].ratesLoaded).toBe(1);
     });
 
-    it("handles Yahoo API failure for historical rates", async () => {
+    /**
+     * Two reports, kept apart (INV-FX-005): a window the providers answered
+     * with nothing has no history to load, and a window a carrying provider
+     * never answered is an outage the next startup retries. Neither is a rate.
+     */
+    it("reports a window the providers answered as empty as no historical data", async () => {
       userPreferenceRepository.findOne.mockResolvedValue({
         userId: "user-1",
         defaultCurrency: "USD",
       });
-
       dataSource.query
         .mockResolvedValueOnce([
           { currency_code: "CAD", earliest: "2025-01-01" },
         ])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{ count: 0 }]);
-
-      // YahooFinanceService returns null on API failure
-      yahooFinanceService.fetchHistorical.mockResolvedValue(null);
+      chain.dailySeries.mockResolvedValue(EMPTY_WINDOW);
 
       const result = await service.backfillHistoricalRates("user-1");
 
       expect(result.totalPairs).toBe(1);
       expect(result.failed).toBe(1);
       expect(result.successful).toBe(0);
-      expect(result.results[0].error).toBe("No historical data available");
+      expect(result.results[0]).toEqual({
+        pair: "CAD/USD",
+        success: false,
+        ratesLoaded: 0,
+        error: "No historical data available",
+      });
+      expect(bulkInsertedRows()).toEqual([]);
     });
 
-    it("handles fetch network error for historical rates", async () => {
+    it("reports a window no carrying provider answered as an outage, not as missing history", async () => {
       userPreferenceRepository.findOne.mockResolvedValue({
         userId: "user-1",
         defaultCurrency: "USD",
       });
-
       dataSource.query
         .mockResolvedValueOnce([
           { currency_code: "CAD", earliest: "2025-01-01" },
         ])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{ count: 0 }]);
-
-      // YahooFinanceService returns null on network error
-      yahooFinanceService.fetchHistorical.mockResolvedValue(null);
+      chain.dailySeries.mockResolvedValue(NO_ANSWER);
 
       const result = await service.backfillHistoricalRates("user-1");
 
       expect(result.failed).toBe(1);
-      expect(result.results[0].error).toBe("No historical data available");
+      expect(result.results[0]).toEqual({
+        pair: "CAD/USD",
+        success: false,
+        ratesLoaded: 0,
+        error: "A provider did not answer",
+      });
     });
 
     it("handles database error during bulk upsert", async () => {
@@ -942,17 +1141,9 @@ describe("ExchangeRateService", () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{ count: 0 }])
         .mockRejectedValueOnce(new Error("Constraint violation"));
-
-      yahooFinanceService.fetchHistorical.mockResolvedValue([
-        {
-          date: new Date("2025-09-01"),
-          open: null,
-          high: null,
-          low: null,
-          close: 0.92,
-          volume: null,
-        },
-      ]);
+      chain.dailySeries.mockResolvedValue(
+        seriesAnswer([point("CHF", "USD", "2025-09-01", 1.25)]),
+      );
 
       const result = await service.backfillHistoricalRates("user-1");
 
@@ -977,89 +1168,6 @@ describe("ExchangeRateService", () => {
         expect.stringContaining("AND a.id = ANY($2::UUID[])"),
         ["USD", ["acc-1", "acc-2"]],
       );
-    });
-
-    it("returns success with 0 ratesLoaded when all filtered rates are before cutoff", async () => {
-      userPreferenceRepository.findOne.mockResolvedValue({
-        userId: "user-1",
-        defaultCurrency: "USD",
-      });
-
-      dataSource.query
-        .mockResolvedValueOnce([
-          { currency_code: "MXN", earliest: "2026-01-01" },
-        ])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ count: 0 }]);
-
-      // Earliest transaction is 2026-01-01, but rates are all from 2025
-      yahooFinanceService.fetchHistorical.mockResolvedValue([
-        {
-          date: new Date("2025-01-01"),
-          open: null,
-          high: null,
-          low: null,
-          close: 17.0,
-          volume: null,
-        },
-        {
-          date: new Date("2025-06-01"),
-          open: null,
-          high: null,
-          low: null,
-          close: 17.5,
-          volume: null,
-        },
-      ]);
-
-      const result = await service.backfillHistoricalRates("user-1");
-
-      expect(result.successful).toBe(1);
-      expect(result.results[0].ratesLoaded).toBe(0);
-    });
-
-    it("merges security and account currency rows picking the earliest date", async () => {
-      userPreferenceRepository.findOne.mockResolvedValue({
-        userId: "user-1",
-        defaultCurrency: "USD",
-      });
-
-      // Same currency from both account and security, different earliest dates
-      dataSource.query
-        .mockResolvedValueOnce([
-          { currency_code: "EUR", earliest: "2025-06-01" },
-        ]) // account
-        .mockResolvedValueOnce([
-          { currency_code: "EUR", earliest: "2025-03-01" },
-        ]) // security (earlier)
-        .mockResolvedValueOnce([{ count: 5 }]); // existing rates
-
-      const result = await service.backfillHistoricalRates("user-1");
-
-      // Should only have 1 pair (EUR->USD) not 2
-      expect(result.totalPairs).toBe(1);
-    });
-
-    it("handles missing timestamp or indicators in Yahoo response", async () => {
-      userPreferenceRepository.findOne.mockResolvedValue({
-        userId: "user-1",
-        defaultCurrency: "USD",
-      });
-
-      dataSource.query
-        .mockResolvedValueOnce([
-          { currency_code: "SEK", earliest: "2025-01-01" },
-        ])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ count: 0 }]);
-
-      // YahooFinanceService returns null when response has no timestamp/indicators
-      yahooFinanceService.fetchHistorical.mockResolvedValue(null);
-
-      const result = await service.backfillHistoricalRates("user-1");
-
-      expect(result.failed).toBe(1);
-      expect(result.results[0].error).toBe("No historical data available");
     });
   });
 
@@ -1199,12 +1307,18 @@ describe("ExchangeRateService", () => {
   });
 
   describe("getRateForDate", () => {
+    /** The window step 2 asks for around a target: the age bound back, a week on. */
+    const windowAround = (target: string): [string, string] => [
+      addDaysYMD(target, -FX_MAX_RATE_AGE_DAYS),
+      addDaysYMD(target, 7),
+    ];
+
     it("returns 1 for the same currency without any lookup", async () => {
       const result = await service.getRateForDate("USD", "USD", "2026-06-08");
 
       expect(result).toBe(1);
       expect(exchangeRateRepository.find).not.toHaveBeenCalled();
-      expect(yahooFinanceService.fetchHistoricalWindow).not.toHaveBeenCalled();
+      expect(chain.dailySeries).not.toHaveBeenCalled();
     });
 
     it("returns the closest stored rate on or before the target date", async () => {
@@ -1223,7 +1337,7 @@ describe("ExchangeRateService", () => {
       expect(call.where[0].fromCurrency).toBe("USD");
       expect(call.where[1].fromCurrency).toBe("CAD");
       // No provider fetch needed when the span covers the target.
-      expect(yahooFinanceService.fetchHistoricalWindow).not.toHaveBeenCalled();
+      expect(chain.dailySeries).not.toHaveBeenCalled();
     });
 
     /**
@@ -1234,23 +1348,14 @@ describe("ExchangeRateService", () => {
      */
     it("reads only the span the age policy admits, so an ancient row neither answers nor blocks the fetch", async () => {
       exchangeRateRepository.find.mockResolvedValue([]);
-      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue([
-        {
-          date: new Date("2026-06-05"),
-          close: 1.4,
-          open: null,
-          high: null,
-          low: null,
-          volume: null,
-        },
-      ]);
+      chain.dailySeries.mockResolvedValue(
+        seriesAnswer([point("USD", "CAD", "2026-06-05", 1.4)]),
+      );
 
       const result = await service.getRateForDate("USD", "CAD", "2026-06-08");
 
       expect(result).toBe(1.4);
-      expect(yahooFinanceService.fetchHistoricalWindow).toHaveBeenCalledTimes(
-        1,
-      );
+      expect(chain.dailySeries).toHaveBeenCalledTimes(1);
       const [floor, ceiling] = spanBounds(
         exchangeRateRepository.find.mock.calls[0][0],
       );
@@ -1267,74 +1372,42 @@ describe("ExchangeRateService", () => {
       const result = await service.getRateForDate("USD", "CAD", "2026-06-08");
 
       expect(result).toBe(1.25);
-      expect(yahooFinanceService.fetchHistoricalWindow).not.toHaveBeenCalled();
+      expect(chain.dailySeries).not.toHaveBeenCalled();
     });
 
-    it("fetches a bounded Yahoo window around the date when none is stored", async () => {
+    it("fetches a bounded window around the date through the chain when none is stored", async () => {
       exchangeRateRepository.find.mockResolvedValue([]);
-      exchangeRateRepository.save.mockImplementation((data) => data);
       // Daily series straddling the target 2026-06-08 (a weekend in this set):
       // the closest day on or before is 2026-06-05.
-      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue([
-        {
-          date: new Date("2026-06-05"),
-          close: 4.25,
-          open: null,
-          high: null,
-          low: null,
-          volume: null,
-        },
-        {
-          date: new Date("2026-06-09"),
-          close: 4.3,
-          open: null,
-          high: null,
-          low: null,
-          volume: null,
-        },
-      ]);
+      chain.dailySeries.mockResolvedValue(
+        seriesAnswer([
+          point("EUR", "PLN", "2026-06-05", 4.25),
+          point("EUR", "PLN", "2026-06-09", 4.3),
+        ]),
+      );
 
       const result = await service.getRateForDate("EUR", "PLN", "2026-06-08");
 
       expect(result).toBe(4.25);
-      // A bounded window is fetched (not the full "max" history).
-      expect(yahooFinanceService.fetchHistorical).not.toHaveBeenCalled();
-      expect(yahooFinanceService.fetchHistoricalWindow).toHaveBeenCalledTimes(
-        1,
-      );
-      const [sym, , fromDate, toDate] =
-        yahooFinanceService.fetchHistoricalWindow.mock.calls[0];
-      expect(sym).toBe("EURPLN=X");
-      // Window brackets the target date, and is wide enough to be worth
-      // storing: one call has to cover a run of nearby dates or a user
-      // stepping the date field hits the provider's rate limit.
-      const target = new Date("2026-06-08T00:00:00.000Z").getTime();
-      expect((fromDate as Date).getTime()).toBeLessThan(
-        target - 30 * 86_400_000,
-      );
-      expect((toDate as Date).getTime()).toBeGreaterThanOrEqual(target);
+      // A bounded window is asked for (not the whole history), as calendar
+      // dates: the age bound back, so the fetch covers exactly what the bound
+      // would accept, and a week on. One call has to cover a run of nearby
+      // dates or a user stepping the date field hits the provider's rate limit.
+      expect(chain.dailySeries).toHaveBeenCalledTimes(1);
+      const [start, end] = windowAround("2026-06-08");
+      expect(chain.dailySeries).toHaveBeenCalledWith("EUR", "PLN", start, end);
+      expect(start).toBe("2026-04-24");
+      expect(end).toBe("2026-06-15");
     });
 
     it("stores every day in the fetched window, not just the day asked for", async () => {
       exchangeRateRepository.find.mockResolvedValue([]);
-      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue([
-        {
-          date: new Date("2026-06-05"),
-          close: 4.25,
-          open: null,
-          high: null,
-          low: null,
-          volume: null,
-        },
-        {
-          date: new Date("2026-06-09"),
-          close: 4.3,
-          open: null,
-          high: null,
-          low: null,
-          volume: null,
-        },
-      ]);
+      chain.dailySeries.mockResolvedValue(
+        seriesAnswer([
+          point("EUR", "PLN", "2026-06-05", 4.25),
+          point("EUR", "PLN", "2026-06-09", 4.3),
+        ]),
+      );
 
       await service.getRateForDate("EUR", "PLN", "2026-06-08");
 
@@ -1345,38 +1418,103 @@ describe("ExchangeRateService", () => {
         String(call[0]).includes("INSERT INTO exchange_rates"),
       );
       expect(insert).toBeDefined();
-      const params = insert[1] as unknown[];
-      expect(params).toHaveLength(2 * 4); // 2 days x 4 columns, one row each
+      expect(insert[1]).toHaveLength(2 * 5); // 2 days x 5 columns, one row each
 
-      // Read the flat parameter list back as (from, to, date, rate) rows.
-      const rows: Array<[string, string, Date, number]> = [];
-      for (let i = 0; i < params.length; i += 4) {
-        rows.push(params.slice(i, i + 4) as [string, string, Date, number]);
-      }
-      const rowFor = (from: string, to: string, day: string) =>
-        rows.find(
-          (r) =>
-            r[0] === from &&
-            r[1] === to &&
-            r[2].toISOString().slice(0, 10) === day,
-        );
-
-      // EUR sorts before PLN, so the fetched orientation is the stored one.
-      expect(rowFor("EUR", "PLN", "2026-06-05")?.[3]).toBe(4.25);
-      expect(rowFor("EUR", "PLN", "2026-06-09")?.[3]).toBe(4.3);
-      // And the inverse rows are gone: a PLN->EUR lookup is still a database
-      // read, resolved from these rows by `resolveFxRate`.
-      expect(rowFor("PLN", "EUR", "2026-06-05")).toBeUndefined();
-      expect(rowFor("PLN", "EUR", "2026-06-09")).toBeUndefined();
+      // EUR sorts before PLN, so the fetched orientation is the stored one,
+      // and every row carries the answering provider's source.
+      expect(bulkInsertedRows()).toEqual([
+        {
+          from: "EUR",
+          to: "PLN",
+          date: "2026-06-05",
+          rate: 4.25,
+          source: YAHOO_SOURCE,
+        },
+        {
+          from: "EUR",
+          to: "PLN",
+          date: "2026-06-09",
+          rate: 4.3,
+          source: YAHOO_SOURCE,
+        },
+      ]);
     });
 
-    it("returns null when neither a stored rate nor a Yahoo window is available", async () => {
+    /**
+     * The chain answers in whichever orientation the provider quoted (the Yahoo
+     * adapter's reverse symbol, or a provider that publishes the pair the other
+     * way), and the lookup resolves it as it resolves a stored row held the
+     * other way: through `resolveFxRate`, inverted at the rate column's
+     * precision. The direct-only window this step used to fetch answered
+     * nothing for such a pair.
+     */
+    it("resolves a window answered in the reverse orientation and stores it canonical", async () => {
       exchangeRateRepository.find.mockResolvedValue([]);
-      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue(null);
+      chain.dailySeries.mockResolvedValue(
+        seriesAnswer([
+          point("CAD", "USD", "2026-06-04", 0.8),
+          point("CAD", "USD", "2026-06-05", 0.75),
+        ]),
+      );
+
+      const result = await service.getRateForDate("USD", "CAD", "2026-06-08");
+
+      // Inverted by the resolver, as a stored reverse row is.
+      expect(result).toBeCloseTo(1 / 0.75, 9);
+      expect(bulkInsertedRows()).toEqual([
+        {
+          from: "CAD",
+          to: "USD",
+          date: "2026-06-04",
+          rate: 0.8,
+          source: YAHOO_SOURCE,
+        },
+        {
+          from: "CAD",
+          to: "USD",
+          date: "2026-06-05",
+          rate: 0.75,
+          source: YAHOO_SOURCE,
+        },
+      ]);
+    });
+
+    it("still answers from the fetched window when persisting it fails", async () => {
+      exchangeRateRepository.find.mockResolvedValue([]);
+      chain.dailySeries.mockResolvedValue(
+        seriesAnswer([point("EUR", "PLN", "2026-06-05", 4.25)]),
+      );
+      dataSource.query.mockImplementation(async (sql: string) => {
+        if (String(sql).includes("INSERT INTO exchange_rates")) {
+          throw new Error("DB write failed");
+        }
+        return [];
+      });
+
+      const result = await service.getRateForDate("EUR", "PLN", "2026-06-08");
+
+      // The rate the provider gave is still the rate for the date; only the
+      // next lookup pays for the fetch again.
+      expect(result).toBe(4.25);
+    });
+
+    it("returns null when neither a stored rate nor a provider window is available", async () => {
+      exchangeRateRepository.find.mockResolvedValue([]);
+      chain.dailySeries.mockResolvedValue(NO_ANSWER);
 
       const result = await service.getRateForDate("EUR", "PLN", "2026-06-08");
 
       expect(result).toBeNull();
+      expect(bulkInsertedRows()).toEqual([]);
+    });
+
+    it("returns null when the providers answer the window as empty", async () => {
+      exchangeRateRepository.find.mockResolvedValue([]);
+      chain.dailySeries.mockResolvedValue(EMPTY_WINDOW);
+
+      expect(
+        await service.getRateForDate("EUR", "PLN", "2026-06-08"),
+      ).toBeNull();
     });
 
     it("stays inside the database when the caller asks it to", async () => {
@@ -1387,7 +1525,7 @@ describe("ExchangeRateService", () => {
       });
 
       expect(result).toBeNull();
-      expect(yahooFinanceService.fetchHistoricalWindow).not.toHaveBeenCalled();
+      expect(chain.dailySeries).not.toHaveBeenCalled();
     });
 
     it("clamps a future date to today rather than hunting for a rate that cannot exist", async () => {
@@ -1408,7 +1546,7 @@ describe("ExchangeRateService", () => {
       );
       expect(ceiling).toBe(today);
       // No historical window: a future window contains nothing to choose from.
-      expect(yahooFinanceService.fetchHistoricalWindow).not.toHaveBeenCalled();
+      expect(chain.dailySeries).not.toHaveBeenCalled();
     });
 
     it("carries the last trading day forward across a weekend", async () => {
@@ -1420,7 +1558,7 @@ describe("ExchangeRateService", () => {
       const result = await service.getRateForDate("USD", "CAD", "2026-06-06");
 
       expect(result).toBe(1.365);
-      expect(yahooFinanceService.fetchHistoricalWindow).not.toHaveBeenCalled();
+      expect(chain.dailySeries).not.toHaveBeenCalled();
     });
 
     /**
@@ -1430,35 +1568,19 @@ describe("ExchangeRateService", () => {
      */
     it("refuses a fetched window whose every bar is dated after the target", async () => {
       exchangeRateRepository.find.mockResolvedValue([]);
-      exchangeRateRepository.save.mockImplementation((data) => data);
-      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue([
-        {
-          date: new Date("2026-06-20"),
-          close: 4.4,
-          open: null,
-          high: null,
-          low: null,
-          volume: null,
-        },
-        {
-          date: new Date("2026-06-10"),
-          close: 4.3,
-          open: null,
-          high: null,
-          low: null,
-          volume: null,
-        },
-      ]);
+      chain.dailySeries.mockResolvedValue(
+        seriesAnswer([
+          point("EUR", "PLN", "2026-06-20", 4.4),
+          point("EUR", "PLN", "2026-06-10", 4.3),
+        ]),
+      );
 
       const result = await service.getRateForDate("EUR", "PLN", "2026-06-08");
 
       expect(result).toBeNull();
       // The bars are still persisted: a neighbouring date they DO cover is
       // then a database read rather than a second provider call.
-      const insert = dataSource.query.mock.calls.find((call: any[]) =>
-        String(call[0]).includes("INSERT INTO exchange_rates"),
-      );
-      expect(insert).toBeDefined();
+      expect(bulkInsertedRows()).toHaveLength(2);
     });
 
     /**
@@ -1469,7 +1591,7 @@ describe("ExchangeRateService", () => {
      */
     it("is null, not a rate from years away, when nothing covers the date", async () => {
       exchangeRateRepository.find.mockResolvedValue([]);
-      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue(null);
+      chain.dailySeries.mockResolvedValue(NO_ANSWER);
 
       const result = await service.getRateForDate("USD", "CAD", "2019-01-01");
 
@@ -1555,7 +1677,6 @@ describe("ExchangeRateService", () => {
       exchangeRateRepository.find.mockResolvedValue([
         storedRow("CAD", "USD", 1.365, "2026-06-05"),
       ]);
-      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue(null);
 
       // Only CAD->USD is stored (at 1.365); USD->CAD is derived from it.
       const result = await service.convertOnDate(
@@ -1575,7 +1696,6 @@ describe("ExchangeRateService", () => {
 
     it("returns null -- never 1, never the input -- when no rate exists either way", async () => {
       exchangeRateRepository.find.mockResolvedValue([]);
-      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue(null);
 
       const result = await service.convertOnDate(
         100,
@@ -1591,7 +1711,6 @@ describe("ExchangeRateService", () => {
       exchangeRateRepository.find.mockResolvedValue([
         storedRow("USD", "CAD", 0, "2026-06-05"),
       ]);
-      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue(null);
 
       const result = await service.convertOnDate(
         100,
@@ -1780,46 +1899,33 @@ describe("ExchangeRateService", () => {
       const result = await service.getLiveRate("USD", "USD");
 
       expect(result).toBe(1);
-      expect(yahooFinanceService.fetchQuote).not.toHaveBeenCalled();
-      expect(exchangeRateRepository.findOne).not.toHaveBeenCalled();
+      expect(chain.live).not.toHaveBeenCalled();
+      expect(exchangeRateRepository.find).not.toHaveBeenCalled();
     });
 
-    it("returns the live direct quote when available", async () => {
-      yahooFinanceService.fetchQuote.mockResolvedValue({
-        regularMarketPrice: 1.372,
-      });
+    it("returns the chain's live observation when there is one", async () => {
+      chain.live.mockResolvedValue(
+        observation("USD", "CAD", "2026-08-18", 1.372),
+      );
 
       const result = await service.getLiveRate("USD", "CAD");
 
       expect(result).toBe(1.372);
-      expect(yahooFinanceService.fetchQuote).toHaveBeenCalledWith("USDCAD=X");
+      expect(chain.live).toHaveBeenCalledWith("USD", "CAD");
       // Does not touch the stored daily snapshot when a live quote exists
-      expect(exchangeRateRepository.findOne).not.toHaveBeenCalled();
+      expect(exchangeRateRepository.find).not.toHaveBeenCalled();
     });
 
-    it("inverts the reverse live quote when the direct pair is unavailable", async () => {
-      yahooFinanceService.fetchQuote
-        .mockResolvedValueOnce({ regularMarketPrice: null }) // direct USDCAD=X
-        .mockResolvedValueOnce({ regularMarketPrice: 0.5 }); // reverse CADUSD=X
-
-      const result = await service.getLiveRate("USD", "CAD");
-
-      expect(result).toBe(2);
-      expect(yahooFinanceService.fetchQuote).toHaveBeenNthCalledWith(
-        1,
-        "USDCAD=X",
+    /**
+     * The adapter decides which symbol carries the digits (`JPYUSD=X` is quoted
+     * 0.0063 against a close of 0.006336; `USDJPY=X` keeps them) and answers in
+     * that orientation; the live rate reciprocates it at the rate column's
+     * precision, never money's.
+     */
+    it("reciprocates a live observation answered in the reverse orientation", async () => {
+      chain.live.mockResolvedValue(
+        observation("USD", "JPY", "2026-08-18", 157.93),
       );
-      expect(yahooFinanceService.fetchQuote).toHaveBeenNthCalledWith(
-        2,
-        "CADUSD=X",
-      );
-      expect(exchangeRateRepository.findOne).not.toHaveBeenCalled();
-    });
-
-    it("prefers the inverse live quote when the direct one is rounded below 1", async () => {
-      // JPYUSD=X is quoted 0.0063 against a close of 0.006336: half a percent
-      // off on every yen holding. USDJPY=X carries the digits.
-      quoteBySymbol({ "JPYUSD=X": 0.0063, "USDJPY=X": 157.93 });
 
       const result = await service.getLiveRate("JPY", "USD");
 
@@ -1827,21 +1933,8 @@ describe("ExchangeRateService", () => {
       expect(exchangeRateRepository.find).not.toHaveBeenCalled();
     });
 
-    it("falls back to the stored rate when the only live quote is too coarse", async () => {
-      quoteBySymbol({ "JPYUSD=X": 0.0063 });
-      exchangeRateRepository.find.mockResolvedValue([
-        storedRow("JPY", "USD", 0.006336, "2026-08-15"),
-      ]);
-
-      const result = await service.getLiveRate("JPY", "USD");
-
-      expect(result).toBe(0.006336);
-    });
-
-    it("falls back to a recent stored rate when no live quote is available", async () => {
-      yahooFinanceService.fetchQuote.mockResolvedValue({
-        regularMarketPrice: null,
-      });
+    it("falls back to a recent stored rate when the chain has no live observation", async () => {
+      chain.live.mockResolvedValue(null);
       exchangeRateRepository.find.mockResolvedValue([
         storedRow("USD", "CAD", 1.365, "2026-08-15"),
       ]);
@@ -1860,9 +1953,7 @@ describe("ExchangeRateService", () => {
     });
 
     it("falls back to a recent stored rate when the live fetch throws", async () => {
-      yahooFinanceService.fetchQuote.mockRejectedValue(
-        new Error("rate limited"),
-      );
+      chain.live.mockRejectedValue(new Error("rate limited"));
       exchangeRateRepository.find.mockResolvedValue([
         storedRow("USD", "CAD", 1.365, "2026-08-15"),
       ]);
@@ -1881,9 +1972,7 @@ describe("ExchangeRateService", () => {
      * rate quoted as "right now" is a price: past the age bound it is unknown.
      */
     it("refuses a stored rate older than the age bound instead of quoting it as live", async () => {
-      yahooFinanceService.fetchQuote.mockResolvedValue({
-        regularMarketPrice: null,
-      });
+      chain.live.mockResolvedValue(null);
       // 276 days before the fixture's today: outside FX_MAX_RATE_AGE_DAYS.
       exchangeRateRepository.find.mockResolvedValue([
         storedRow("USD", "CAD", 1.2, "2025-11-15"),
@@ -1895,9 +1984,7 @@ describe("ExchangeRateService", () => {
     });
 
     it("returns null when neither a live quote nor a stored rate exists", async () => {
-      yahooFinanceService.fetchQuote.mockResolvedValue({
-        regularMarketPrice: null,
-      });
+      chain.live.mockResolvedValue(null);
       exchangeRateRepository.find.mockResolvedValue([]);
 
       const result = await service.getLiveRate("USD", "XYZ");
@@ -2058,11 +2145,11 @@ describe("ExchangeRateService", () => {
     // provider bill, and the upserts underneath converge either way.
     it("makes no provider call when another replica holds the lease", async () => {
       fetchSync.withLease.mockImplementation(async () => false);
-      dataSource.query.mockResolvedValue([{ code: "USD" }]);
+      dataSource.query.mockResolvedValue([{ code: "USD" }, { code: "CAD" }]);
 
       await service.scheduledRateRefresh();
 
-      expect(yahooFinanceService.fetchQuote).not.toHaveBeenCalled();
+      expect(chain.latest).not.toHaveBeenCalled();
     });
 
     it("keeps the lease shorter than the daily interval", async () => {
@@ -2077,88 +2164,214 @@ describe("ExchangeRateService", () => {
       expect(leaseMs).toBeGreaterThan(0);
     });
   });
+
+  /**
+   * The one window door, public so `ExchangeRateHistoryService` asks the chain
+   * exactly the question the on-demand fill asks. Its `{ stored, answered }` is
+   * what reaches the user-facing gap fill (`docs/specs/fx-history-gap-fill.md`).
+   */
+  describe("fillRateWindow", () => {
+    it("persists what the chain answered under its source and reports the window answered", async () => {
+      const points = weekdayPoints(
+        "USD",
+        "CAD",
+        "2024-01-01",
+        "2024-01-12",
+        1.33,
+      );
+      chain.dailySeries.mockResolvedValue(seriesAnswer(points));
+
+      const result = await service.fillRateWindow(
+        "USD",
+        "CAD",
+        "2024-01-01",
+        "2024-01-12",
+      );
+
+      expect(chain.dailySeries).toHaveBeenCalledWith(
+        "USD",
+        "CAD",
+        "2024-01-01",
+        "2024-01-12",
+      );
+      expect(result).toEqual({ stored: points.length, answered: true });
+      const rows = bulkInsertedRows();
+      expect(rows).toHaveLength(points.length);
+      // Asked for USD->CAD, stored as the canonical CAD->USD, every row under
+      // the answering provider's slug.
+      for (const row of rows) {
+        expect(row).toMatchObject({
+          from: "CAD",
+          to: "USD",
+          rate: roundFxRate(1 / 1.33),
+          source: YAHOO_SOURCE,
+        });
+      }
+    });
+
+    it("writes the source the chain named, whichever provider that was", async () => {
+      chain.dailySeries.mockResolvedValue(
+        seriesAnswer([point("USD", "CAD", "2001-03-01", 1.5509)], {
+          source: "frankfurter",
+        }),
+      );
+
+      await service.fillRateWindow("USD", "CAD", "2001-03-01", "2001-03-31");
+
+      expect(bulkInsertedRows()).toEqual([
+        {
+          from: "CAD",
+          to: "USD",
+          date: "2001-03-01",
+          rate: roundFxRate(1 / 1.5509),
+          source: "frankfurter",
+        },
+      ]);
+    });
+
+    it("orients each point from its own orientation when a window came back in both", async () => {
+      // The Yahoo adapter merges its direct and reverse symbols densest first,
+      // so one answer carries both orientations; each lands on the same rows.
+      chain.dailySeries.mockResolvedValue(
+        seriesAnswer([
+          point("SGD", "VND", "2017-08-17", 17_000),
+          point("SGD", "VND", "2017-08-18", 17_010),
+          point("VND", "SGD", "2017-08-19", 0.00005),
+        ]),
+      );
+
+      const result = await service.fillRateWindow(
+        "VND",
+        "SGD",
+        "2017-08-17",
+        "2017-08-19",
+      );
+
+      expect(result).toEqual({ stored: 3, answered: true });
+      expect(bulkInsertedRows()).toEqual([
+        {
+          from: "SGD",
+          to: "VND",
+          date: "2017-08-17",
+          rate: 17_000,
+          source: YAHOO_SOURCE,
+        },
+        {
+          from: "SGD",
+          to: "VND",
+          date: "2017-08-18",
+          rate: 17_010,
+          source: YAHOO_SOURCE,
+        },
+        {
+          from: "SGD",
+          to: "VND",
+          date: "2017-08-19",
+          rate: roundFxRate(1 / 0.00005),
+          source: YAHOO_SOURCE,
+        },
+      ]);
+    });
+
+    it("skips a point whose rate is not a positive number", async () => {
+      chain.dailySeries.mockResolvedValue(
+        seriesAnswer([
+          point("USD", "CAD", "2024-01-02", 1.33),
+          point("USD", "CAD", "2024-01-03", 0),
+          point("USD", "CAD", "2024-01-04", Number.NaN),
+        ]),
+      );
+
+      const result = await service.fillRateWindow(
+        "USD",
+        "CAD",
+        "2024-01-01",
+        "2024-01-05",
+      );
+
+      expect(result.stored).toBe(1);
+      expect(bulkInsertedRows().map((row) => row.date)).toEqual(["2024-01-02"]);
+    });
+
+    it("reports a window answered as empty: nothing stored, answered", async () => {
+      chain.dailySeries.mockResolvedValue(EMPTY_WINDOW);
+
+      const result = await service.fillRateWindow(
+        "USD",
+        "CAD",
+        "2000-01-01",
+        "2000-01-31",
+      );
+
+      expect(result).toEqual({ stored: 0, answered: true });
+      expect(bulkInsertedRows()).toEqual([]);
+    });
+
+    it("reports a window no carrying provider answered: nothing stored, not answered", async () => {
+      chain.dailySeries.mockResolvedValue(NO_ANSWER);
+
+      const result = await service.fillRateWindow(
+        "USD",
+        "CAD",
+        "2000-01-01",
+        "2000-01-31",
+      );
+
+      expect(result).toEqual({ stored: 0, answered: false });
+      expect(bulkInsertedRows()).toEqual([]);
+    });
+
+    it("lets a persist failure reach the caller", async () => {
+      chain.dailySeries.mockResolvedValue(
+        seriesAnswer([point("USD", "CAD", "2024-01-02", 1.33)]),
+      );
+      dataSource.query.mockRejectedValue(new Error("Constraint violation"));
+
+      await expect(
+        service.fillRateWindow("USD", "CAD", "2024-01-01", "2024-01-05"),
+      ).rejects.toThrow("Constraint violation");
+    });
+  });
+
   /**
    * On-demand historical fill, for the pairs a point-in-time report cannot
    * convert (issue: "Total unavailable" on the Account Balances report as the
    * date moves back through years the daily refresh never covered).
    */
   describe("ensureRatesForDate", () => {
-    /** Every row the bulk upsert wrote, flattened out of its parameter list. */
-    let inserted: Array<{
-      from: string;
-      to: string;
-      date: string;
-      rate: number;
-    }>;
-
-    const ymd = (date: Date): string => date.toISOString().slice(0, 10);
-
-    /** One bar per weekday in `[start, end]`, the shape of a daily FX series. */
-    const weekdayBars = (start: string, end: string, close: number) => {
-      const bars: Array<{ date: Date; close: number }> = [];
-      for (
-        let day = new Date(`${start}T00:00:00Z`);
-        ymd(day) <= end;
-        day = new Date(day.getTime() + 86_400_000)
-      ) {
-        if (day.getUTCDay() !== 0 && day.getUTCDay() !== 6) {
-          bars.push({ date: day, close });
-        }
-      }
-      return bars;
-    };
-
-    beforeEach(() => {
-      inserted = [];
-      dataSource.query.mockImplementation(
-        async (sql: string, params?: unknown[]) => {
-          if (
-            typeof sql === "string" &&
-            sql.includes("INSERT INTO exchange_rates") &&
-            Array.isArray(params)
-          ) {
-            for (let i = 0; i < params.length; i += 4) {
-              inserted.push({
-                from: params[i] as string,
-                to: params[i + 1] as string,
-                date: ymd(params[i + 2] as Date),
-                rate: params[i + 3] as number,
-              });
-            }
-          }
-          return [];
-        },
-      );
-    });
-
     // One provider call returns the whole daily series for whatever period it is
     // asked for and costs the same either way, so the unit is a calendar month --
     // plus the lead `closeAt` may reach back over, without which the first days
     // of the month would have nothing to carry forward from.
     it("fetches the whole month, with the boundary lead the lookup needs", async () => {
-      const bars = weekdayBars("2017-07-18", "2017-08-31", 1.27);
-      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue(bars);
+      const points = weekdayPoints(
+        "USD",
+        "CAD",
+        "2017-07-18",
+        "2017-08-31",
+        1.27,
+      );
+      chain.dailySeries.mockResolvedValue(seriesAnswer(points));
 
       const loaded = await service.ensureRatesForDate(
         [{ from: "USD", to: "CAD" }],
         "2017-08-18",
       );
 
-      expect(loaded).toBe(bars.length);
-      expect(yahooFinanceService.fetchHistoricalWindow).toHaveBeenCalledTimes(
-        1,
+      expect(loaded).toBe(points.length);
+      expect(chain.dailySeries).toHaveBeenCalledTimes(1);
+      expect(chain.dailySeries).toHaveBeenCalledWith(
+        "USD",
+        "CAD",
+        "2017-07-18",
+        "2017-08-31",
       );
-      const [symbol, , start, end] =
-        yahooFinanceService.fetchHistoricalWindow.mock.calls[0];
-      expect(symbol).toBe("USDCAD=X");
-      expect(ymd(start)).toBe("2017-07-18");
-      expect(ymd(end)).toBe("2017-08-31");
     });
 
     it("persists one canonical row from the one call", async () => {
-      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue([
-        { date: new Date("2017-08-17T00:00:00Z"), close: 1.25 },
-      ]);
+      chain.dailySeries.mockResolvedValue(
+        seriesAnswer([point("USD", "CAD", "2017-08-17", 1.25)]),
+      );
 
       await service.ensureRatesForDate(
         [{ from: "USD", to: "CAD" }],
@@ -2166,16 +2379,24 @@ describe("ExchangeRateService", () => {
       );
 
       // Asked for USD->CAD at 1.25, stored as the canonical CAD->USD at 0.8.
-      expect(inserted).toEqual([
-        { from: "CAD", to: "USD", date: "2017-08-17", rate: 0.8 },
+      expect(bulkInsertedRows()).toEqual([
+        {
+          from: "CAD",
+          to: "USD",
+          date: "2017-08-17",
+          rate: 0.8,
+          source: YAHOO_SOURCE,
+        },
       ]);
     });
 
-    // One fetch writes both directions, so USD->CAD and CAD->USD are one unit of
-    // work -- fetching each would be the same request twice.
+    // One fetch lands on the pair's one set of rows, so USD->CAD and CAD->USD
+    // are one unit of work -- fetching each would be the same request twice.
     it("asks once for a pair named in both directions", async () => {
-      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue(
-        weekdayBars("2017-07-18", "2017-08-31", 1.25),
+      chain.dailySeries.mockResolvedValue(
+        seriesAnswer(
+          weekdayPoints("USD", "CAD", "2017-07-18", "2017-08-31", 1.25),
+        ),
       );
 
       await service.ensureRatesForDate(
@@ -2186,9 +2407,7 @@ describe("ExchangeRateService", () => {
         "2017-08-18",
       );
 
-      expect(yahooFinanceService.fetchHistoricalWindow).toHaveBeenCalledTimes(
-        1,
-      );
+      expect(chain.dailySeries).toHaveBeenCalledTimes(1);
     });
 
     it("ignores a pair whose two sides are the same currency", async () => {
@@ -2198,17 +2417,14 @@ describe("ExchangeRateService", () => {
       );
 
       expect(loaded).toBe(0);
-      expect(yahooFinanceService.fetchHistoricalWindow).not.toHaveBeenCalled();
+      expect(chain.dailySeries).not.toHaveBeenCalled();
     });
 
-    // Yahoo carries some pairs under one orientation only, and either symbol
-    // lands on the same stored row -- so `CADUSD=X` answers a USD->CAD question.
-    it("falls back to the reverse symbol when the direct one has nothing", async () => {
-      yahooFinanceService.fetchHistoricalWindow.mockImplementation(
-        async (symbol: string) =>
-          symbol === "CADUSD=X"
-            ? [{ date: new Date("2017-08-17T00:00:00Z"), close: 0.8 }]
-            : null,
+    // A window answered the other way round lands on the same rows: the chain
+    // answers in whichever orientation the provider carried the pair.
+    it("stores a window answered in the reverse orientation on the pair's rows", async () => {
+      chain.dailySeries.mockResolvedValue(
+        seriesAnswer([point("CAD", "USD", "2017-08-17", 0.8)]),
       );
 
       const loaded = await service.ensureRatesForDate(
@@ -2217,105 +2433,32 @@ describe("ExchangeRateService", () => {
       );
 
       expect(loaded).toBe(1);
-      // The reverse symbol answered with CAD->USD, which is already the stored
-      // orientation, so it is written as it came back.
-      expect(inserted).toEqual([
-        { from: "CAD", to: "USD", date: "2017-08-17", rate: 0.8 },
+      // CAD->USD is already the stored orientation, so it is written as it came.
+      expect(bulkInsertedRows()).toEqual([
+        {
+          from: "CAD",
+          to: "USD",
+          date: "2017-08-17",
+          rate: 0.8,
+          source: YAHOO_SOURCE,
+        },
       ]);
-    });
-
-    // A symbol that answered is not necessarily a daily series: `VNDSGD=X`
-    // returned one bar for a month while `SGDVND=X` carried every weekday.
-    it("asks the reverse symbol when the direct one is sparse, and keeps the denser answer", async () => {
-      const reverseBars = weekdayBars("2017-07-18", "2017-08-31", 17_000);
-      yahooFinanceService.fetchHistoricalWindow.mockImplementation(
-        async (symbol: string) =>
-          symbol === "VNDSGD=X"
-            ? [
-                // A day the reverse also carries, and one it does not.
-                { date: new Date("2017-08-17T00:00:00Z"), close: 0.00005 },
-                { date: new Date("2017-08-19T00:00:00Z"), close: 0.00005 },
-              ]
-            : reverseBars,
-      );
-
-      const loaded = await service.ensureRatesForDate(
-        [{ from: "VND", to: "SGD" }],
-        "2017-08-18",
-      );
-
-      expect(
-        yahooFinanceService.fetchHistoricalWindow.mock.calls.map((c) => c[0]),
-      ).toEqual(["VNDSGD=X", "SGDVND=X"]);
-      // Every reverse day, plus the one day only the direct symbol had.
-      expect(loaded).toBe(reverseBars.length + 1);
-      expect(inserted).toHaveLength(reverseBars.length + 1);
-      // One row per day: the shared day is written from the denser series only.
-      const aug17 = inserted.filter((row) => row.date === "2017-08-17");
-      expect(aug17).toEqual([
-        { from: "SGD", to: "VND", date: "2017-08-17", rate: 17_000 },
-      ]);
-      expect(inserted).toContainEqual({
-        from: "SGD",
-        to: "VND",
-        date: "2017-08-19",
-        rate: roundFxRate(1 / 0.00005),
-      });
-    });
-
-    it("keeps a sparse direct series when the reverse symbol has nothing", async () => {
-      yahooFinanceService.fetchHistoricalWindow.mockImplementation(
-        async (symbol: string) =>
-          symbol === "USDCAD=X"
-            ? [{ date: new Date("2017-08-17T00:00:00Z"), close: 1.25 }]
-            : null,
-      );
-
-      const loaded = await service.ensureRatesForDate(
-        [{ from: "USD", to: "CAD" }],
-        "2017-08-18",
-      );
-
-      expect(yahooFinanceService.fetchHistoricalWindow).toHaveBeenCalledTimes(
-        2,
-      );
-      expect(loaded).toBe(1);
-      expect(inserted).toEqual([
-        { from: "CAD", to: "USD", date: "2017-08-17", rate: 0.8 },
-      ]);
-    });
-
-    it("does not ask the reverse symbol when the direct one is daily", async () => {
-      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue(
-        weekdayBars("2017-07-18", "2017-08-31", 1.25),
-      );
-
-      await service.ensureRatesForDate(
-        [{ from: "USD", to: "CAD" }],
-        "2017-08-18",
-      );
-
-      expect(
-        yahooFinanceService.fetchHistoricalWindow.mock.calls.map((c) => c[0]),
-      ).toEqual(["USDCAD=X"]);
     });
 
     // The one case the fetch can never satisfy is the one that would otherwise
     // repeat on every page load: a date before the pair's history begins.
-    it("does not ask again for a pair-month the provider had nothing for", async () => {
-      // `[]`, not `null`: an answered-empty window is what may be remembered.
-      // `null` means no answer -- a failure, or a call the breaker refused --
-      // and remembering that leaves every foreign-currency total in the report
-      // null for half an hour after the provider came back.
-      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue([]);
+    it("does not ask again for a pair-month the providers had nothing for", async () => {
+      // Answered and empty, not unanswered: only an answered-empty window may be
+      // remembered. No answer -- a failure, or a call the breaker refused --
+      // remembered here leaves every foreign-currency total in the report null
+      // for half an hour after the provider came back.
+      chain.dailySeries.mockResolvedValue(EMPTY_WINDOW);
 
       await service.ensureRatesForDate(
         [{ from: "USD", to: "CAD" }],
         "2017-08-18",
       );
-      const afterFirst =
-        yahooFinanceService.fetchHistoricalWindow.mock.calls.length;
-      expect(afterFirst).toBeGreaterThan(0);
+      expect(chain.dailySeries).toHaveBeenCalledTimes(1);
 
       const loaded = await service.ensureRatesForDate(
         [{ from: "CAD", to: "USD" }],
@@ -2323,59 +2466,51 @@ describe("ExchangeRateService", () => {
       );
 
       expect(loaded).toBe(0);
-      expect(yahooFinanceService.fetchHistoricalWindow).toHaveBeenCalledTimes(
-        afterFirst,
-      );
+      expect(chain.dailySeries).toHaveBeenCalledTimes(1);
     });
 
     it("does ask again for a different month", async () => {
-      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue(null);
+      chain.dailySeries.mockResolvedValue(EMPTY_WINDOW);
 
       await service.ensureRatesForDate(
         [{ from: "USD", to: "CAD" }],
         "2017-08-18",
       );
-      const afterFirst =
-        yahooFinanceService.fetchHistoricalWindow.mock.calls.length;
 
       await service.ensureRatesForDate(
         [{ from: "USD", to: "CAD" }],
         "2017-09-18",
       );
 
-      expect(
-        yahooFinanceService.fetchHistoricalWindow.mock.calls.length,
-      ).toBeGreaterThan(afterFirst);
+      expect(chain.dailySeries).toHaveBeenCalledTimes(2);
     });
 
     // The market has not been to the end of this month yet, so nothing asks it.
     it("clamps the window at today", async () => {
-      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue([
-        { date: new Date("2026-08-17T00:00:00Z"), close: 1.4 },
-      ]);
+      chain.dailySeries.mockResolvedValue(
+        seriesAnswer([point("USD", "CAD", "2026-08-17", 1.4)]),
+      );
 
       await service.ensureRatesForDate(
         [{ from: "USD", to: "CAD" }],
         "2026-08-18",
       );
 
-      const [, , start, end] =
-        yahooFinanceService.fetchHistoricalWindow.mock.calls[0];
-      expect(ymd(start)).toBe("2026-07-18");
-      expect(ymd(end)).toBe("2026-08-18");
+      expect(chain.dailySeries).toHaveBeenCalledWith(
+        "USD",
+        "CAD",
+        "2026-07-18",
+        "2026-08-18",
+      );
     });
 
     // Best-effort by construction: this runs inside a read the database could
     // answer for every other pair.
-    it("lets the other pairs through when one provider call fails", async () => {
-      yahooFinanceService.fetchHistoricalWindow.mockImplementation(
-        async (symbol: string) => {
-          if (symbol.startsWith("USD")) throw new Error("rate limited");
-          if (symbol === "EURCAD=X")
-            return [{ date: new Date("2017-08-17T00:00:00Z"), close: 1.47 }];
-          return null;
-        },
-      );
+    it("lets the other pairs through when one chain call fails", async () => {
+      chain.dailySeries.mockImplementation(async (from: string) => {
+        if (from === "USD") throw new Error("rate limited");
+        return seriesAnswer([point("EUR", "CAD", "2017-08-17", 1.47)]);
+      });
 
       const loaded = await service.ensureRatesForDate(
         [
@@ -2387,11 +2522,12 @@ describe("ExchangeRateService", () => {
 
       expect(loaded).toBe(1);
       // Fetched as EUR->CAD, stored as the canonical CAD->EUR.
-      expect(inserted).toContainEqual({
+      expect(bulkInsertedRows()).toContainEqual({
         from: "CAD",
         to: "EUR",
         date: "2017-08-17",
         rate: roundFxRate(1 / 1.47),
+        source: YAHOO_SOURCE,
       });
     });
 
@@ -2399,86 +2535,53 @@ describe("ExchangeRateService", () => {
       const loaded = await service.ensureRatesForDate([], "2017-08-18");
 
       expect(loaded).toBe(0);
-      expect(yahooFinanceService.fetchHistoricalWindow).not.toHaveBeenCalled();
+      expect(chain.dailySeries).not.toHaveBeenCalled();
       expect(dataSource.query).not.toHaveBeenCalled();
     });
   });
-  describe("ensureRatesForDate and the empty-window memory", () => {
-    const dnsFailure = () =>
-      Object.assign(new TypeError("fetch failed"), {
-        cause: Object.assign(new Error("getaddrinfo EAI_AGAIN"), {
-          code: "EAI_AGAIN",
-        }),
-      });
 
-    it("does not remember a window the provider never answered", async () => {
+  /**
+   * An empty answer is not a refusal, anywhere it gets cached
+   * (`docs/specs/provider-outage-alerts.md`): the chain reports whether the
+   * window was answered, and only an answered window may be remembered.
+   */
+  describe("ensureRatesForDate and the empty-window memory", () => {
+    it("does not remember a window no carrying provider answered", async () => {
       // A refusal and a transport failure both persist zero rates, and this
       // memory holds for 30 minutes: remembering one leaves every
       // foreign-currency total in the report null long after a two-minute
-      // outage ended.
-      yahooFinanceService.fetchHistoricalWindow.mockImplementation(async () => {
-        health.recordFailure("yahoo_finance", dnsFailure());
-        return null;
-      });
+      // outage ended. The chain reports such a window as not answered, whether
+      // it was one symbol of one provider or every provider that fell silent
+      // (section 5 of `docs/future-plans/exchange-rate-providers.md`).
+      chain.dailySeries.mockResolvedValue(NO_ANSWER);
 
       await service.ensureRatesForDate(
         [{ from: "USD", to: "CAD" }],
         "2026-03-15",
       );
-      const callsAfterFirst =
-        yahooFinanceService.fetchHistoricalWindow.mock.calls.length;
+      expect(chain.dailySeries).toHaveBeenCalledTimes(1);
 
       await service.ensureRatesForDate(
         [{ from: "USD", to: "CAD" }],
         "2026-03-16",
       );
-      expect(
-        yahooFinanceService.fetchHistoricalWindow.mock.calls.length,
-      ).toBeGreaterThan(callsAfterFirst);
+      expect(chain.dailySeries).toHaveBeenCalledTimes(2);
     });
 
-    it("does not remember a pair only one direction answered for", async () => {
-      // `USDCAD=X` answering "no bars" says nothing about `CADUSD=X`, and this
-      // memory holds for 30 minutes: half-knowledge is what used to be cached.
-      let call = 0;
-      yahooFinanceService.fetchHistoricalWindow.mockImplementation(() => {
-        call++;
-        return Promise.resolve(call === 1 ? [] : null);
-      });
+    it("still remembers a window the providers answered as empty", async () => {
+      chain.dailySeries.mockResolvedValue(EMPTY_WINDOW);
 
       await service.ensureRatesForDate(
         [{ from: "USD", to: "CAD" }],
         "2026-03-15",
       );
-      const callsAfterFirst =
-        yahooFinanceService.fetchHistoricalWindow.mock.calls.length;
+      expect(chain.dailySeries).toHaveBeenCalledTimes(1);
 
       await service.ensureRatesForDate(
         [{ from: "USD", to: "CAD" }],
         "2026-03-16",
       );
-      expect(
-        yahooFinanceService.fetchHistoricalWindow.mock.calls.length,
-      ).toBeGreaterThan(callsAfterFirst);
-    });
-
-    it("still remembers a window the provider answered as empty", async () => {
-      yahooFinanceService.fetchHistoricalWindow.mockResolvedValue([]);
-
-      await service.ensureRatesForDate(
-        [{ from: "USD", to: "CAD" }],
-        "2026-03-15",
-      );
-      const callsAfterFirst =
-        yahooFinanceService.fetchHistoricalWindow.mock.calls.length;
-
-      await service.ensureRatesForDate(
-        [{ from: "USD", to: "CAD" }],
-        "2026-03-16",
-      );
-      expect(yahooFinanceService.fetchHistoricalWindow.mock.calls.length).toBe(
-        callsAfterFirst,
-      );
+      expect(chain.dailySeries).toHaveBeenCalledTimes(1);
     });
   });
 });
