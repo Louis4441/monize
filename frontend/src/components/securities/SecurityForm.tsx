@@ -756,36 +756,37 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
             className="uppercase"
           />
         </div>
-        <div className="flex gap-1.5">
-          {!hideExchange && (
+        {/* A bond of a listed country is filled from its kind, never looked up. */}
+        {!hideExchange && (
+          <div className="flex gap-1.5">
             <LookupProviderSelect value={lookupProvider} onChange={setLookupProvider} />
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleLookup}
-            disabled={isLookingUp}
-            className="mb-[1px] relative"
-          >
-            <span className={isLookingUp ? 'invisible' : ''}>{t('form.lookupButton')}</span>
-            {isLookingUp && (
-              <span className="absolute inset-0 flex items-center justify-center">
-                <LoadingSpinner size="sm" fullContainer={false} />
-              </span>
-            )}
-          </Button>
-          {hasLookupResult && (
             <Button
               type="button"
-              variant="ghost"
-              onClick={handleClear}
-              className="mb-[1px] text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              title={security ? t('form.revertTitle') : t('form.clearTitle')}
+              variant="outline"
+              onClick={handleLookup}
+              disabled={isLookingUp}
+              className="mb-[1px] relative"
             >
-              {security ? t('form.revertButton') : t('form.clearButton')}
+              <span className={isLookingUp ? 'invisible' : ''}>{t('form.lookupButton')}</span>
+              {isLookingUp && (
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <LoadingSpinner size="sm" fullContainer={false} />
+                </span>
+              )}
             </Button>
-          )}
-        </div>
+            {hasLookupResult && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={handleClear}
+                className="mb-[1px] text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                title={security ? t('form.revertTitle') : t('form.clearTitle')}
+              >
+                {security ? t('form.revertButton') : t('form.clearButton')}
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       <Input

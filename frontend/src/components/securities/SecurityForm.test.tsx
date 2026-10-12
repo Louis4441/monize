@@ -1456,11 +1456,13 @@ describe('SecurityForm', () => {
       expect(screen.getByLabelText('MSN Instrument ID (advanced)')).toBeInTheDocument();
       expect(screen.getByLabelText('Currency')).toBeInTheDocument();
       expect(screen.getByLabelText('Lookup provider')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Lookup' })).toBeInTheDocument();
       await pickPoland();
       await waitFor(() => expect(screen.queryByLabelText('Quote Provider')).not.toBeInTheDocument());
       expect(screen.queryByLabelText('MSN Instrument ID (advanced)')).not.toBeInTheDocument();
       expect(screen.queryByLabelText('Currency')).not.toBeInTheDocument();
       expect(screen.queryByLabelText('Lookup provider')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Lookup' })).not.toBeInTheDocument();
     });
 
     it('says the catalog is loading while the request is pending', async () => {
