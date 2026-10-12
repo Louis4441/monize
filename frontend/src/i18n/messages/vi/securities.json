@@ -202,7 +202,7 @@
     "bondFetching": "Đang lấy {code} từ tổ chức phát hành cùng các lãi suất tham chiếu. Việc này có thể mất tới một phút.",
     "bondFetchFailed": "Không thể lấy chuỗi này.",
     "bondCurrencyLocked": "Chứng khoán này được liên kết với một loại trái phiếu bằng {linkedCurrency}. Hãy đặt lại tiền tệ là {linkedCurrency} hoặc hủy liên kết loại trái phiếu trước (hủy liên kết sẽ xóa giá đã tính).",
-    "bondProgramLabel": "Loại trái phiếu (tùy chọn)",
+    "bondProgramLabel": "Loại trái phiếu",
     "bondProgramNone": "Chưa liên kết",
     "bondProgramCurrent": "Loại trái phiếu đã liên kết",
     "bondProgramLoading": "Đang tải các loại trái phiếu...",
@@ -359,6 +359,7 @@
     "nameRequired": "Tên là bắt buộc",
     "nameMax": "Tên phải có tối đa 255 ký tự",
     "currencyRequired": "Tiền tệ là bắt buộc",
+    "bondProgramRequired": "Loại trái phiếu là bắt buộc",
     "descriptionMax": "Mô tả không được vượt quá 5000 ký tự"
   },
   "priceValidation": {

@@ -202,7 +202,7 @@
     "bondFetching": "A obter {code} junto do emitente e as respetivas taxas de referência. Isto pode demorar até um minuto.",
     "bondFetchFailed": "Não foi possível obter a série.",
     "bondCurrencyLocked": "Este título está associado a um tipo de obrigação em {linkedCurrency}. Volte a definir a moeda como {linkedCurrency} ou desassocie primeiro o tipo de obrigação (desassociar remove os seus preços calculados).",
-    "bondProgramLabel": "Tipo de obrigação (opcional)",
+    "bondProgramLabel": "Tipo de obrigação",
     "bondProgramNone": "Sem ligação",
     "bondProgramCurrent": "Tipo de obrigação associado",
     "bondProgramLoading": "A carregar os tipos de obrigações...",
@@ -359,6 +359,7 @@
     "nameRequired": "O nome é obrigatório",
     "nameMax": "O nome não pode ter mais de 255 caracteres",
     "currencyRequired": "A moeda é obrigatória",
+    "bondProgramRequired": "O tipo de obrigação é obrigatório",
     "descriptionMax": "A descrição não pode exceder 5000 caracteres"
   },
   "priceValidation": {

@@ -202,7 +202,7 @@
     "bondFetching": "Obtendo {code} do emissor e suas taxas de referência. Isso pode levar até um minuto.",
     "bondFetchFailed": "Não foi possível obter a série.",
     "bondCurrencyLocked": "Este ativo está vinculado a um tipo de título em {linkedCurrency}. Volte a moeda para {linkedCurrency} ou desvincule antes o tipo de título (desvincular remove seus preços calculados).",
-    "bondProgramLabel": "Tipo de título (opcional)",
+    "bondProgramLabel": "Tipo de título",
     "bondProgramNone": "Não vinculada",
     "bondProgramCurrent": "Tipo de título vinculado",
     "bondProgramLoading": "Carregando os tipos de título...",
@@ -359,6 +359,7 @@
     "nameRequired": "O nome é obrigatório",
     "nameMax": "O nome não pode ter mais de 255 caracteres",
     "currencyRequired": "A moeda é obrigatória",
+    "bondProgramRequired": "O tipo de título é obrigatório",
     "descriptionMax": "A descrição não pode exceder 5000 caracteres"
   },
   "priceValidation": {

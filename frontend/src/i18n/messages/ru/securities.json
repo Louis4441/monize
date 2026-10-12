@@ -202,7 +202,7 @@
     "bondFetching": "Получение {code} от эмитента и его референсных ставок. Это может занять до минуты.",
     "bondFetchFailed": "Не удалось получить серию.",
     "bondCurrencyLocked": "Эта бумага связана с видом облигаций в валюте {linkedCurrency}. Верните валюту {linkedCurrency} или сначала отвяжите вид облигаций (при отвязке расчётные цены удаляются).",
-    "bondProgramLabel": "Вид облигаций (необязательно)",
+    "bondProgramLabel": "Вид облигаций",
     "bondProgramNone": "Не привязана",
     "bondProgramCurrent": "Привязанный вид облигаций",
     "bondProgramLoading": "Загрузка видов облигаций...",
@@ -359,6 +359,7 @@
     "nameRequired": "Имя обязательно",
     "nameMax": "Имя должно содержать не более 255 символов",
     "currencyRequired": "Валюта обязательна",
+    "bondProgramRequired": "Вид облигаций обязателен",
     "descriptionMax": "Описание не должно превышать 5000 символов"
   },
   "priceValidation": {

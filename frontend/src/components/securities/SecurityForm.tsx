@@ -194,9 +194,22 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
     getValues,
     watch,
     reset,
+    clearErrors,
     formState: { errors, isSubmitting, isDirty, defaultValues },
   } = useForm<SecurityFormData>({
-    resolver: zodResolver(buildSecuritySchema(t)),
+    // The schema plus one rule it cannot hold: the country is not a form value,
+    // so a listed country without a bond kind is refused here, as a required field.
+    resolver: async (values, context, options) => {
+      const result = await zodResolver(buildSecuritySchema(t))(values, context, options);
+      if (!bondKindMissing) return result;
+      return {
+        values: {},
+        errors: {
+          ...result.errors,
+          bondProgramId: { type: 'required', message: t('validation.bondProgramRequired') },
+        },
+      };
+    },
     defaultValues: {
       symbol: security?.symbol || defaults?.symbol || '',
       name: security?.name || defaults?.name || '',
@@ -290,27 +303,25 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
   const bondPicker = useBondProgramPicker(isBond, selectedCurrency, selectedBondProgramId);
   const effectiveBondProgramId = bondPicker.effectiveProgramId;
 
-  // Choosing a program fills what the program determines: the symbol (its
-  // code), the name (its translated name) and the currency. Each stays editable.
-  // Only a new security, or an empty field, is filled: an existing security's
-  // symbol and name are its identity on every row that names it, and its
-  // currency is left for the currency-mismatch handling to explain.
+  // Choosing a kind is a person's choice of product, so it fills everything the
+  // program determines: symbol (its code), name (its translated name), currency
+  // and the issuer's page, and it empties the exchange. Each stays editable.
+  // Only a change made here fills; opening a linked security does not.
   const handleBondProgramChange = (programId: string) => {
+    // Emptying the kind keeps the country: it follows the link only until chosen.
+    if (programId === '' && bondCountry !== '') setBondCountryChoice(bondCountry);
     setValue('bondProgramId', programId, { shouldDirty: true });
+    // The resolver still holds the previous render's choice, so the required
+    // error is cleared here rather than by revalidating.
+    if (programId !== '') clearErrors('bondProgramId');
     const program = bondPicker.programs.find((p) => p.id === programId);
     if (program === undefined) return;
     const fill = { shouldDirty: true, shouldValidate: true };
-    const current = getValues();
-    const editing = !!security;
-    if (!editing || !current.symbol?.trim()) {
-      setValue('symbol', program.programCode, fill);
-    }
-    if (!editing || !current.name?.trim()) {
-      setValue('name', programLabel(tDetail, program.programCode), fill);
-    }
-    if (!editing) {
-      setValue('currencyCode', program.currency, fill);
-    }
+    setValue('symbol', program.programCode, fill);
+    setValue('name', programLabel(tDetail, program.programCode), fill);
+    setValue('currencyCode', program.currency, fill);
+    setValue('exchange', '', { shouldDirty: true });
+    if (program.infoUrl) setValue('website', program.infoUrl, { shouldDirty: true });
   };
 
   // A linked bond is priced from its terms, never by asking a quote provider,
@@ -326,6 +337,18 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
   const isOtherBondCountry = isBond && bondCountry === BOND_COUNTRY_OTHER;
   // A bond of a supported country is found by its program, not an exchange.
   const hideExchange = isBond && bondCountry !== BOND_COUNTRY_OTHER;
+  // The engine prices a listed country's bond, and its program fixes the
+  // currency, so the quote provider and currency controls are not offered. The
+  // currency stays visible only when a stored link disagrees with it, which the
+  // reader must be able to repair.
+  const hideCurrency = hideExchange && bondPicker.mismatchedLinkCurrency === null;
+  // A listed country needs a bond kind; the resolver reads this at submit.
+  const bondKindMissing = hideExchange && effectiveBondProgramId === '';
+
+  // Type, Country (Bond), Exchange and Currency, less what the country hides.
+  const firstRowCount = 1 + (isBond ? 1 : 0) + (hideExchange ? 0 : 1) + (hideCurrency ? 0 : 1);
+  const firstRowColumns =
+    firstRowCount === 4 ? 'sm:grid-cols-2 lg:grid-cols-4' : firstRowCount === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2';
 
   const bondCountryOptions = useMemo(() => {
     const codes = [...new Set(bondPicker.programs.map((p) => p.issuerCountryCode))];
@@ -631,7 +654,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       }}
     />
     <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
-      <div className={`grid grid-cols-1 gap-4 ${hideExchange ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
+      <div className={`grid grid-cols-1 gap-4 ${firstRowColumns}`}>
         <Select
           label={t('form.typeLabel')}
           options={securityTypeOptions.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
@@ -639,6 +662,15 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
           onChange={(e) => setValue('securityType', e.target.value, { shouldDirty: true })}
           error={errors.securityType?.message}
         />
+
+        {isBond && (
+          <Select
+            label={t('form.bondCountryLabel')}
+            options={bondCountryOptions}
+            value={bondCountry}
+            onChange={(e) => handleBondCountryChange(e.target.value)}
+          />
+        )}
 
         {!hideExchange && (
         <Combobox
@@ -656,16 +688,62 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
         />
         )}
 
-        <Select
-          label={t('form.currencyLabel')}
-          options={currencyOptions}
-          value={selectedCurrency || ''}
-          onChange={(e) =>
-            setValue('currencyCode', e.target.value, { shouldDirty: true })
-          }
-          error={errors.currencyCode?.message}
-        />
+        {!hideCurrency && (
+          <Select
+            label={t('form.currencyLabel')}
+            options={currencyOptions}
+            value={selectedCurrency || ''}
+            onChange={(e) =>
+              setValue('currencyCode', e.target.value, { shouldDirty: true })
+            }
+            error={errors.currencyCode?.message}
+          />
+        )}
       </div>
+
+      {isOtherBondCountry && (
+        <p className="-mt-2 text-sm text-gray-500 dark:text-gray-400">
+          {t.rich('form.bondCountryOtherInfo', {
+            link: (chunks) => (
+              <a
+                href={BOND_REQUEST_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline dark:text-blue-400"
+              >
+                {chunks}
+              </a>
+            ),
+          })}
+        </p>
+      )}
+
+      {isBond && !isOtherBondCountry && (
+        <BondProgramSelect
+          picker={bondPicker}
+          onChange={handleBondProgramChange}
+          countryCode={bondCountry || undefined}
+          error={errors.bondProgramId?.message}
+        />
+      )}
+
+      {isLinkedToBond && (
+        <div>
+          <label className="flex w-fit cursor-pointer items-center gap-2">
+            <ToggleSwitch
+              checked={bondAutoFetch}
+              onChange={(next) => setValue('bondAutoFetch', next, { shouldDirty: true })}
+              label={t('form.bondAutoFetchLabel')}
+            />
+            <span className="text-sm text-gray-900 dark:text-gray-100">
+              {t('form.bondAutoFetchLabel')}
+            </span>
+          </label>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {t('form.bondAutoFetchHelp')}
+          </p>
+        </div>
+      )}
 
       {/* Symbol + Lookup / Clear buttons */}
       <div className="flex gap-2 items-end">
@@ -679,7 +757,9 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
           />
         </div>
         <div className="flex gap-1.5">
-          <LookupProviderSelect value={lookupProvider} onChange={setLookupProvider} />
+          {!hideExchange && (
+            <LookupProviderSelect value={lookupProvider} onChange={setLookupProvider} />
+          )}
           <Button
             type="button"
             variant="outline"
@@ -715,61 +795,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
         placeholder={t('form.namePlaceholder')}
       />
 
-      {isBond && (
-        <div>
-          <Select
-            label={t('form.bondCountryLabel')}
-            options={bondCountryOptions}
-            value={bondCountry}
-            onChange={(e) => handleBondCountryChange(e.target.value)}
-          />
-          {isOtherBondCountry && (
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {t.rich('form.bondCountryOtherInfo', {
-                link: (chunks) => (
-                  <a
-                    href={BOND_REQUEST_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline dark:text-blue-400"
-                  >
-                    {chunks}
-                  </a>
-                ),
-              })}
-            </p>
-          )}
-        </div>
-      )}
-
-      {isBond && !isOtherBondCountry && (
-        <BondProgramSelect
-          picker={bondPicker}
-          onChange={handleBondProgramChange}
-          countryCode={bondCountry || undefined}
-          error={errors.bondProgramId?.message}
-        />
-      )}
-
-      {isLinkedToBond && (
-        <div>
-          <label className="flex w-fit cursor-pointer items-center gap-2">
-            <ToggleSwitch
-              checked={bondAutoFetch}
-              onChange={(next) => setValue('bondAutoFetch', next, { shouldDirty: true })}
-              label={t('form.bondAutoFetchLabel')}
-            />
-            <span className="text-sm text-gray-900 dark:text-gray-100">
-              {t('form.bondAutoFetchLabel')}
-            </span>
-          </label>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {t('form.bondAutoFetchHelp')}
-          </p>
-        </div>
-      )}
-
-      {!isLinkedToBond && (
+      {!hideExchange && (
         <QuoteProviderSelect
           value={watch('quoteProvider') || ''}
           onChange={(value) => setValue('quoteProvider', value, { shouldDirty: true })}
@@ -846,7 +872,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
         {t('priceAlert.chartLabel')}
       </label>
 
-      {!isLinkedToBond && watch('quoteProvider') === 'msn' && (
+      {!hideExchange && watch('quoteProvider') === 'msn' && (
         <MsnInstrumentIdInput
           registration={register('msnInstrumentId')}
           error={errors.msnInstrumentId?.message}

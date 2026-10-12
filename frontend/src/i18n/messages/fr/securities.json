@@ -202,7 +202,7 @@
     "bondFetching": "Récupération de {code} auprès de l'émetteur et de ses taux de référence. Cela peut prendre jusqu'à une minute.",
     "bondFetchFailed": "La série n'a pas pu être récupérée.",
     "bondCurrencyLocked": "Ce titre est lié à un type d'obligation en {linkedCurrency}. Remettez la devise sur {linkedCurrency} ou détachez d'abord le type d'obligation (le détachement supprime ses cours calculés).",
-    "bondProgramLabel": "Type d'obligation (facultatif)",
+    "bondProgramLabel": "Type d'obligation",
     "bondProgramNone": "Non liée",
     "bondProgramCurrent": "Type d'obligation lié",
     "bondProgramLoading": "Chargement des types d'obligations...",
@@ -359,6 +359,7 @@
     "nameRequired": "Le nom est requis",
     "nameMax": "Le nom doit comporter 255 caractères ou moins",
     "currencyRequired": "La devise est requise",
+    "bondProgramRequired": "Le type d'obligation est requis",
     "descriptionMax": "La description ne doit pas dépasser 5000 caractères"
   },
   "priceValidation": {

@@ -202,7 +202,7 @@
     "bondFetching": "발행자로부터 {code} 및 기준 금리를 가져오는 중입니다. 최대 1분 정도 걸릴 수 있습니다.",
     "bondFetchFailed": "시리즈를 가져오지 못했습니다.",
     "bondCurrencyLocked": "이 종목은 {linkedCurrency} 채권 종류에 연결되어 있습니다. 통화를 {linkedCurrency}(으)로 되돌리거나 먼저 채권 종류 연결을 해제하세요(해제하면 계산된 가격이 삭제됩니다).",
-    "bondProgramLabel": "채권 종류(선택)",
+    "bondProgramLabel": "채권 종류",
     "bondProgramNone": "연결 안 됨",
     "bondProgramCurrent": "연결된 채권 종류",
     "bondProgramLoading": "채권 종류를 불러오는 중...",
@@ -359,6 +359,7 @@
     "nameRequired": "이름은 필수입니다",
     "nameMax": "이름은 255자 이하여야 합니다",
     "currencyRequired": "통화는 필수입니다",
+    "bondProgramRequired": "채권 종류는 필수입니다",
     "descriptionMax": "설명은 5000자 이하여야 합니다"
   },
   "priceValidation": {

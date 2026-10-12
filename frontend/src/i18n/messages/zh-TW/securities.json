@@ -202,7 +202,7 @@
     "bondFetching": "正在從發行機構取得 {code} 及其參考利率。這最多可能需要一分鐘。",
     "bondFetchFailed": "無法取得該系列。",
     "bondCurrencyLocked": "此證券已連結至 {linkedCurrency} 的債券種類。請將幣別改回 {linkedCurrency},或先取消連結該債券種類(取消連結會刪除其計算價格)。",
-    "bondProgramLabel": "債券種類（選填）",
+    "bondProgramLabel": "債券種類",
     "bondProgramNone": "未連結",
     "bondProgramCurrent": "已連結的債券種類",
     "bondProgramLoading": "正在載入債券種類...",
@@ -359,6 +359,7 @@
     "nameRequired": "名稱為必填",
     "nameMax": "名稱不得超過 255 個字元",
     "currencyRequired": "貨幣為必填",
+    "bondProgramRequired": "債券種類為必填",
     "descriptionMax": "描述不能超過5000個字元"
   },
   "priceValidation": {

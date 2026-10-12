@@ -202,7 +202,7 @@
     "bondFetching": "[XX-Fetching {code} from the issuer and its reference rates. This can take up to a minute.-XX]",
     "bondFetchFailed": "[XX-The series could not be fetched.-XX]",
     "bondCurrencyLocked": "[XX-This security is linked to a bond kind in {linkedCurrency}. Set the currency back to {linkedCurrency}, or unlink the bond kind first (unlinking removes its calculated prices).-XX]",
-    "bondProgramLabel": "[XX-Bond kind (optional)-XX]",
+    "bondProgramLabel": "[XX-Bond kind-XX]",
     "bondProgramNone": "[XX-Not linked-XX]",
     "bondProgramCurrent": "[XX-Linked bond kind-XX]",
     "bondProgramLoading": "[XX-Loading the bond kinds...-XX]",
@@ -359,6 +359,7 @@
     "nameRequired": "[XX-Name is required-XX]",
     "nameMax": "[XX-Name must be 255 characters or less-XX]",
     "currencyRequired": "[XX-Currency is required-XX]",
+    "bondProgramRequired": "[XX-Bond kind is required-XX]",
     "descriptionMax": "[XX-Description must be 5000 characters or fewer-XX]"
   },
   "priceValidation": {

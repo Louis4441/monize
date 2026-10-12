@@ -202,7 +202,7 @@
     "bondFetching": "{code} ihraççıdan ve referans oranlarıyla birlikte getiriliyor. Bu işlem bir dakikaya kadar sürebilir.",
     "bondFetchFailed": "Seri getirilemedi.",
     "bondCurrencyLocked": "Bu menkul kıymet {linkedCurrency} cinsinden bir tahvil türüne bağlı. Para birimini tekrar {linkedCurrency} yapın veya önce tahvil türünün bağlantısını kaldırın (bağlantıyı kaldırmak hesaplanan fiyatları siler).",
-    "bondProgramLabel": "Tahvil türü (isteğe bağlı)",
+    "bondProgramLabel": "Tahvil türü",
     "bondProgramNone": "Bağlı değil",
     "bondProgramCurrent": "Bağlı tahvil türü",
     "bondProgramLoading": "Tahvil türleri yükleniyor...",
@@ -359,6 +359,7 @@
     "nameRequired": "Ad zorunludur",
     "nameMax": "Ad 255 karakter veya daha az olmalıdır",
     "currencyRequired": "Para birimi zorunludur",
+    "bondProgramRequired": "Tahvil türü zorunludur",
     "descriptionMax": "Açıklama en fazla 5000 karakter olabilir"
   },
   "priceValidation": {

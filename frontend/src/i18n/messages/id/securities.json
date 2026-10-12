@@ -202,7 +202,7 @@
     "bondFetching": "Mengambil {code} dari penerbit beserta suku bunga acuannya. Ini bisa memakan waktu hingga satu menit.",
     "bondFetchFailed": "Seri tidak dapat diambil.",
     "bondCurrencyLocked": "Sekuritas ini ditautkan ke jenis obligasi dalam {linkedCurrency}. Kembalikan mata uang ke {linkedCurrency} atau lepas tautan jenis obligasi terlebih dahulu (melepas tautan menghapus harga yang dihitung).",
-    "bondProgramLabel": "Jenis obligasi (opsional)",
+    "bondProgramLabel": "Jenis obligasi",
     "bondProgramNone": "Tidak ditautkan",
     "bondProgramCurrent": "Jenis obligasi tertaut",
     "bondProgramLoading": "Memuat jenis obligasi...",
@@ -359,6 +359,7 @@
     "nameRequired": "Nama wajib diisi",
     "nameMax": "Nama harus 255 karakter atau kurang",
     "currencyRequired": "Mata uang wajib diisi",
+    "bondProgramRequired": "Jenis obligasi wajib diisi",
     "descriptionMax": "Keterangan tidak boleh lebih dari 5000 karakter"
   },
   "priceValidation": {

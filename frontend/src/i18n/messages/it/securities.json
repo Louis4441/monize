@@ -202,7 +202,7 @@
     "bondFetching": "Recupero di {code} dall'emittente e dei relativi tassi di riferimento. Può richiedere fino a un minuto.",
     "bondFetchFailed": "Impossibile recuperare la serie.",
     "bondCurrencyLocked": "Questo titolo è collegato a un tipo di obbligazione in {linkedCurrency}. Reimposta la valuta su {linkedCurrency} oppure scollega prima il tipo di obbligazione (scollegare rimuove i suoi prezzi calcolati).",
-    "bondProgramLabel": "Tipo di obbligazione (facoltativo)",
+    "bondProgramLabel": "Tipo di obbligazione",
     "bondProgramNone": "Non collegata",
     "bondProgramCurrent": "Tipo di obbligazione collegato",
     "bondProgramLoading": "Caricamento dei tipi di obbligazione...",
@@ -359,6 +359,7 @@
     "nameRequired": "Il nome è obbligatorio",
     "nameMax": "Il nome deve avere al massimo 255 caratteri",
     "currencyRequired": "La valuta è obbligatoria",
+    "bondProgramRequired": "Il tipo di obbligazione è obbligatorio",
     "descriptionMax": "La descrizione non può superare i 5000 caratteri"
   },
   "priceValidation": {

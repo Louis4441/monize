@@ -1138,12 +1138,12 @@ describe('SecurityForm', () => {
   });
   describe('bond program', () => {
     const programs = [
-      { id: 'p-edo', issuerCountryCode: 'PL', issuerCode: 'PL_MF', programCode: 'EDO', currency: 'PLN', seriesCount: 12, newestSeriesCode: 'EDO1036' },
+      { id: 'p-edo', issuerCountryCode: 'PL', issuerCode: 'PL_MF', programCode: 'EDO', currency: 'PLN', seriesCount: 12, newestSeriesCode: 'EDO1036', infoUrl: 'https://example.test/edo' },
       { id: 'p-tos', issuerCountryCode: 'PL', issuerCode: 'PL_MF', programCode: 'TOS', currency: 'PLN', seriesCount: 3, newestSeriesCode: 'TOS1029' },
       { id: 'p-usd', issuerCountryCode: 'US', issuerCode: 'US_TR', programCode: 'TBOND', currency: 'USD', seriesCount: 1, newestSeriesCode: null },
     ];
     const EDO_NAME = 'EDO: 10-year inflation-indexed savings bonds';
-    const LABEL = 'Bond kind (optional)';
+    const LABEL = 'Bond kind';
 
     beforeEach(() => {
       vi.mocked(investmentsApi.listBondPrograms).mockResolvedValue(programs);
@@ -1218,7 +1218,9 @@ describe('SecurityForm', () => {
       fireEvent.change(select, { target: { value: 'p-edo' } });
       await waitFor(() => expect((screen.getByLabelText('Symbol') as HTMLInputElement).value).toBe('EDO'));
       expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe(EDO_NAME);
-      expect((screen.getByLabelText('Currency') as HTMLSelectElement).value).toBe('PLN');
+      expect((screen.getByLabelText('Website') as HTMLInputElement).value).toBe('https://example.test/edo');
+      // The currency comes from the program and is not offered.
+      expect(screen.queryByLabelText('Currency')).not.toBeInTheDocument();
       fireEvent.click(screen.getByText('Create Security'));
       await waitFor(() =>
         expect(onSubmit).toHaveBeenCalledWith(
@@ -1228,6 +1230,7 @@ describe('SecurityForm', () => {
             securityType: 'BOND',
             currencyCode: 'PLN',
             bondProgramId: 'p-edo',
+            quoteProvider: null,
           }),
         ),
       );
@@ -1235,16 +1238,35 @@ describe('SecurityForm', () => {
       expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('bondAutoFetch');
     });
 
-    it('keeps the symbol, name and currency of an existing security when another program is picked', async () => {
-      await renderBond({ symbol: 'MYBOND', name: 'My bonds', currencyCode: 'USD' });
+    it('refills every field of an existing security when the person picks another kind', async () => {
+      await renderBond({ symbol: 'MYBOND', name: 'My bonds', currencyCode: 'USD', exchange: 'NYSE', website: 'https://old.test' });
       await pickPoland();
       const select = await programSelect();
       await waitFor(() => expect(within(select).getAllByRole('option')).toHaveLength(3));
       fireEvent.change(select, { target: { value: 'p-edo' } });
+      await waitFor(() => expect((screen.getByLabelText('Symbol') as HTMLInputElement).value).toBe('EDO'));
+      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe(EDO_NAME);
+      expect((screen.getByLabelText('Website') as HTMLInputElement).value).toBe('https://example.test/edo');
+      fireEvent.change(select, { target: { value: 'p-tos' } });
+      await waitFor(() => expect((screen.getByLabelText('Symbol') as HTMLInputElement).value).toBe('TOS'));
+      // TOS has no infoUrl: the website is left as it was.
+      expect((screen.getByLabelText('Website') as HTMLInputElement).value).toBe('https://example.test/edo');
+      fireEvent.click(screen.getByText('Update Security'));
+      await waitFor(() =>
+        expect(onSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({ symbol: 'TOS', currencyCode: 'PLN', bondProgramId: 'p-tos' }),
+        ),
+      );
+      expect(onSubmit.mock.calls[0][0].exchange).toBeUndefined();
+    });
+
+    it('does not overwrite the stored fields when an existing linked security is opened', async () => {
+      await renderBond({ symbol: 'MYBOND', name: 'My bonds', bondProgramId: 'p-edo', website: 'https://old.test' });
+      const select = await programSelect();
       await waitFor(() => expect(select.value).toBe('p-edo'));
       expect((screen.getByLabelText('Symbol') as HTMLInputElement).value).toBe('MYBOND');
       expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('My bonds');
-      expect((screen.getByLabelText('Currency') as HTMLSelectElement).value).toBe('USD');
+      expect((screen.getByLabelText('Website') as HTMLInputElement).value).toBe('https://old.test');
     });
 
     it('fills an empty symbol and name of an existing security from the program', async () => {
@@ -1316,25 +1338,41 @@ describe('SecurityForm', () => {
       expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('bondAutoFetch');
     });
 
-    it('sends null when a linked program is deliberately unlinked, and turns the switch off with it', async () => {
+    it('refuses a listed country left without a bond kind, with the required error', async () => {
       await renderBond({ bondProgramId: 'p-edo', bondAutoFetch: true });
       const select = await programSelect();
       await waitFor(() => expect(select.value).toBe('p-edo'));
       fireEvent.change(select, { target: { value: '' } });
       fireEvent.click(screen.getByText('Update Security'));
-      await waitFor(() =>
-        expect(onSubmit).toHaveBeenCalledWith(
-          expect.objectContaining({ bondProgramId: null, bondAutoFetch: false }),
-        ),
-      );
+      expect(await screen.findByText('Bond kind is required')).toBeInTheDocument();
+      expect(onSubmit).not.toHaveBeenCalled();
+      // The country stays: emptying the kind does not turn it into Other.
+      expect((screen.getByLabelText('Country') as HTMLSelectElement).value).toBe('PL');
     });
 
-    it('blocks a currency change of a linked security with an explanation instead of silently unlinking', async () => {
-      await renderBond({ bondProgramId: 'p-edo' });
+    it('requires a kind for a new Bond of a listed country, and clears the error once one is picked', async () => {
+      await act(async () => {
+        render(<SecurityForm onSubmit={onSubmit} onCancel={onCancel} />);
+      });
+      fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'BOND' } });
+      await pickPoland();
+      const select = await programSelect();
+      await waitFor(() => expect(within(select).getAllByRole('option')).toHaveLength(3));
+      fireEvent.click(screen.getByText('Create Security'));
+      expect(await screen.findByText('Bond kind is required')).toBeInTheDocument();
+      expect(onSubmit).not.toHaveBeenCalled();
+      fireEvent.change(select, { target: { value: 'p-edo' } });
+      await waitFor(() => expect(screen.queryByText('Bond kind is required')).not.toBeInTheDocument());
+      fireEvent.click(screen.getByText('Create Security'));
+      await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    });
+
+    it('blocks a stored currency that disagrees with the linked program, and keeps Currency visible to repair it', async () => {
+      await renderBond({ bondProgramId: 'p-edo', currencyCode: 'USD' });
       const select = await programSelect();
       await waitFor(() => expect(select.value).toBe('p-edo'));
-      fireEvent.change(screen.getByLabelText('Currency'), { target: { value: 'USD' } });
-      // The link is kept, never dropped by the currency change.
+      expect(screen.getByLabelText('Currency')).toBeInTheDocument();
+      // The link is kept, never dropped.
       await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('linked to a bond kind in PLN'));
       expect(select.value).toBe('p-edo');
       const errorSpy = vi.spyOn(toast, 'error').mockImplementation(() => '');
@@ -1343,12 +1381,13 @@ describe('SecurityForm', () => {
       expect(onSubmit).not.toHaveBeenCalled();
     });
 
-    it('lets the currency change once the program is unlinked on purpose', async () => {
+    it('lets the currency change once the person moves the country to Other', async () => {
       await renderBond({ bondProgramId: 'p-edo' });
       const select = await programSelect();
       await waitFor(() => expect(select.value).toBe('p-edo'));
-      fireEvent.change(screen.getByLabelText('Currency'), { target: { value: 'USD' } });
-      fireEvent.change(select, { target: { value: '' } });
+      expect(screen.queryByLabelText('Currency')).not.toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText('Country'), { target: { value: 'OTHER' } });
+      fireEvent.change(await screen.findByLabelText('Currency'), { target: { value: 'USD' } });
       fireEvent.click(screen.getByText('Update Security'));
       await waitFor(() =>
         expect(onSubmit).toHaveBeenCalledWith(
@@ -1357,15 +1396,17 @@ describe('SecurityForm', () => {
       );
     });
 
-    it('flags, and does not drop, a program picked in this edit when the currency then changes', async () => {
-      await renderBond();
+    it('takes the currency from the program picked in an edit, so no mismatch is reported', async () => {
+      await renderBond({ currencyCode: 'USD' });
       await pickPoland();
       const select = await programSelect();
       await waitFor(() => expect(within(select).getAllByRole('option')).toHaveLength(3));
       fireEvent.change(select, { target: { value: 'p-edo' } });
-      fireEvent.change(screen.getByLabelText('Currency'), { target: { value: 'USD' } });
-      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('linked to a bond kind in PLN'));
-      expect(select.value).toBe('p-edo');
+      await waitFor(() => expect(select.value).toBe('p-edo'));
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Currency')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByText('Update Security'));
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ currencyCode: 'PLN' })));
     });
 
     it('offers only Other when the catalog holds no program, and no program select', async () => {
@@ -1400,24 +1441,26 @@ describe('SecurityForm', () => {
       expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('bondProgramId');
     });
 
-    it('shows the quote provider select again after a linked BOND is unlinked', async () => {
+    it('shows the quote provider select again after a linked BOND is moved to the country Other', async () => {
       await renderBond({ bondProgramId: 'p-edo' });
-      const select = await programSelect();
+      await programSelect();
       await waitFor(() => expect(screen.queryByLabelText('Quote Provider')).not.toBeInTheDocument());
-      fireEvent.change(select, { target: { value: '' } });
+      fireEvent.change(screen.getByLabelText('Country'), { target: { value: 'OTHER' } });
       expect(await screen.findByLabelText('Quote Provider')).toBeInTheDocument();
     });
 
-    it('shows the quote provider and MSN id for an unlinked BOND, and hides them once a program is picked', async () => {
+    it('shows the quote provider controls and Currency for the country Other, and hides them for a listed country', async () => {
       await renderBond({ bondProgramId: null, quoteProvider: 'msn', msnInstrumentId: 'abc123' });
-      await pickPoland();
-      const select = await programSelect();
-      await waitFor(() => expect(within(select).getAllByRole('option')).toHaveLength(3));
+      await screen.findByLabelText('Country');
       expect(screen.getByLabelText('Quote Provider')).toBeInTheDocument();
       expect(screen.getByLabelText('MSN Instrument ID (advanced)')).toBeInTheDocument();
-      fireEvent.change(select, { target: { value: 'p-edo' } });
+      expect(screen.getByLabelText('Currency')).toBeInTheDocument();
+      expect(screen.getByLabelText('Lookup provider')).toBeInTheDocument();
+      await pickPoland();
       await waitFor(() => expect(screen.queryByLabelText('Quote Provider')).not.toBeInTheDocument());
       expect(screen.queryByLabelText('MSN Instrument ID (advanced)')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Currency')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Lookup provider')).not.toBeInTheDocument();
     });
 
     it('says the catalog is loading while the request is pending', async () => {
@@ -1527,6 +1570,27 @@ describe('SecurityForm', () => {
       expect(before(symbol, name)).toBe(true);
     });
 
+    it('puts Country right after Type for a Bond, and the required Bond kind directly below', async () => {
+      await renderNew();
+      fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'BOND' } });
+      const country = await screen.findByLabelText('Country');
+      const type = screen.getByLabelText('Type');
+      expect(type.parentElement?.parentElement).toBe(country.parentElement?.parentElement);
+      expect(type.parentElement?.nextElementSibling).toBe(country.parentElement);
+      fireEvent.change(country, { target: { value: 'PL' } });
+      const kind = await screen.findByLabelText('Bond kind');
+      expect(before(country, kind)).toBe(true);
+      expect(before(kind, screen.getByLabelText('Symbol'))).toBe(true);
+    });
+
+    it('does not require a bond kind for the country Other', async () => {
+      await renderNew({ defaults: { symbol: 'MYB', name: 'My bond', securityType: 'BOND', currencyCode: 'USD' } });
+      await screen.findByLabelText('Country');
+      expect(screen.queryByText('Bond kind is required')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByText('Create Security'));
+      await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    });
+
     it('shows Country only for a Bond', async () => {
       await renderNew();
       expect(screen.queryByLabelText('Country')).not.toBeInTheDocument();
@@ -1550,7 +1614,7 @@ describe('SecurityForm', () => {
       expect(link).toHaveAttribute('target', '_blank');
       expect(link).toHaveAttribute('rel', 'noopener noreferrer');
       expect(screen.getByText('Exchange')).toBeInTheDocument();
-      expect(screen.queryByLabelText('Bond kind (optional)')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Bond kind')).not.toBeInTheDocument();
       expect(screen.queryByRole('switch')).not.toBeInTheDocument();
     });
 
@@ -1560,7 +1624,7 @@ describe('SecurityForm', () => {
       const country = await screen.findByLabelText('Country');
       await waitFor(() => expect(within(country).getByRole('option', { name: 'Poland' })).toBeInTheDocument());
       fireEvent.change(country, { target: { value: 'PL' } });
-      const select = (await screen.findByLabelText('Bond kind (optional)')) as HTMLSelectElement;
+      const select = (await screen.findByLabelText('Bond kind')) as HTMLSelectElement;
       expect(screen.queryByText('Exchange')).not.toBeInTheDocument();
       expect(screen.queryByRole('link', { name: 'GitHub' })).not.toBeInTheDocument();
       await waitFor(() => expect(within(select).getAllByRole('option')).toHaveLength(3));
@@ -1595,7 +1659,7 @@ describe('SecurityForm', () => {
       });
       const country = (await screen.findByLabelText('Country')) as HTMLSelectElement;
       await waitFor(() => expect(country.value).toBe('PL'));
-      expect((screen.getByLabelText('Bond kind (optional)') as HTMLSelectElement).value).toBe('p-edo');
+      expect((screen.getByLabelText('Bond kind') as HTMLSelectElement).value).toBe('p-edo');
       expect(screen.queryByText('Exchange')).not.toBeInTheDocument();
     });
 
@@ -1612,9 +1676,9 @@ describe('SecurityForm', () => {
       const country = (await screen.findByLabelText('Country')) as HTMLSelectElement;
       await waitFor(() => expect(country.value).toBe('PL'));
       fireEvent.change(country, { target: { value: 'OTHER' } });
-      expect(screen.queryByLabelText('Bond kind (optional)')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Bond kind')).not.toBeInTheDocument();
       fireEvent.change(country, { target: { value: 'PL' } });
-      expect((await screen.findByLabelText('Bond kind (optional)') as HTMLSelectElement).value).toBe('');
+      expect((await screen.findByLabelText('Bond kind') as HTMLSelectElement).value).toBe('');
       expect(screen.queryByRole('switch')).not.toBeInTheDocument();
     });
   });

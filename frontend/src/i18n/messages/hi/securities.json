@@ -202,7 +202,7 @@
     "bondFetching": "जारीकर्ता से {code} और उसकी संदर्भ दरें प्राप्त की जा रही हैं। इसमें एक मिनट तक लग सकता है।",
     "bondFetchFailed": "सीरीज़ प्राप्त नहीं की जा सकी।",
     "bondCurrencyLocked": "यह प्रतिभूति {linkedCurrency} में एक बॉन्ड प्रकार से जुड़ी है। मुद्रा को वापस {linkedCurrency} करें, या पहले बॉन्ड प्रकार का लिंक हटाएँ (लिंक हटाने पर उसकी गणना की गई कीमतें हट जाती हैं)।",
-    "bondProgramLabel": "बॉन्ड प्रकार (वैकल्पिक)",
+    "bondProgramLabel": "बॉन्ड प्रकार",
     "bondProgramNone": "लिंक नहीं है",
     "bondProgramCurrent": "लिंक किया गया बॉन्ड प्रकार",
     "bondProgramLoading": "बॉन्ड प्रकार लोड हो रहे हैं...",
@@ -359,6 +359,7 @@
     "nameRequired": "नाम आवश्यक है",
     "nameMax": "नाम 255 अक्षरों या उससे कम होना चाहिए",
     "currencyRequired": "मुद्रा आवश्यक है",
+    "bondProgramRequired": "बॉन्ड प्रकार आवश्यक है",
     "descriptionMax": "विवरण 5000 अक्षरों से अधिक नहीं होना चाहिए"
   },
   "priceValidation": {

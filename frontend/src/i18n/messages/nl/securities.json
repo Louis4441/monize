@@ -202,7 +202,7 @@
     "bondFetching": "{code} wordt opgehaald bij de uitgever, samen met de referentierentes. Dit kan tot een minuut duren.",
     "bondFetchFailed": "De reeks kon niet worden opgehaald.",
     "bondCurrencyLocked": "Dit effect is gekoppeld aan een obligatiesoort in {linkedCurrency}. Zet de valuta terug op {linkedCurrency} of ontkoppel eerst de obligatiesoort (ontkoppelen verwijdert de berekende koersen).",
-    "bondProgramLabel": "Obligatiesoort (optioneel)",
+    "bondProgramLabel": "Obligatiesoort",
     "bondProgramNone": "Niet gekoppeld",
     "bondProgramCurrent": "Gekoppelde obligatiesoort",
     "bondProgramLoading": "Obligatiesoorten laden...",
@@ -359,6 +359,7 @@
     "nameRequired": "Naam is verplicht",
     "nameMax": "Naam mag maximaal 255 tekens bevatten",
     "currencyRequired": "Valuta is verplicht",
+    "bondProgramRequired": "Obligatiesoort is verplicht",
     "descriptionMax": "De omschrijving mag maximaal 5000 tekens bevatten"
   },
   "priceValidation": {

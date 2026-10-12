@@ -202,7 +202,7 @@
     "bondFetching": "Pobieranie {code} od emitenta wraz z kursami referencyjnymi. To może potrwać do minuty.",
     "bondFetchFailed": "Nie udało się pobrać serii.",
     "bondCurrencyLocked": "Ten papier wartościowy jest powiązany z rodzajem obligacji w walucie {linkedCurrency}. Przywróć walutę {linkedCurrency} albo najpierw odepnij rodzaj obligacji (odpięcie usuwa wyliczone ceny).",
-    "bondProgramLabel": "Rodzaj obligacji (opcjonalnie)",
+    "bondProgramLabel": "Rodzaj obligacji",
     "bondProgramNone": "Brak powiązania",
     "bondProgramCurrent": "Powiązany rodzaj obligacji",
     "bondProgramLoading": "Wczytywanie rodzajów obligacji...",
@@ -359,6 +359,7 @@
     "nameRequired": "Nazwa jest wymagana",
     "nameMax": "Nazwa może mieć maksymalnie 255 znaków",
     "currencyRequired": "Waluta jest wymagana",
+    "bondProgramRequired": "Rodzaj obligacji jest wymagany",
     "descriptionMax": "Opis może mieć maksymalnie 5000 znaków"
   },
   "priceValidation": {
