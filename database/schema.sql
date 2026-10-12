@@ -116,6 +116,10 @@ CREATE TABLE exchange_rate_coverage (
     -- The earliest date any fill has planned over, which is what makes the
     -- pointer above safe when a reader imports older data. Moves back only.
     probed_from DATE,
+    -- The provider chain that wrote the row: ordered source slugs joined with
+    -- commas. A row written under another chain (or NULL) reads as never
+    -- probed, and the next write replaces its dates rather than merging them.
+    providers VARCHAR(200),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_exchange_rate_coverage_pair UNIQUE (from_currency, to_currency),
