@@ -53,6 +53,8 @@ A reader can hide the register's inessential columns (description, ref #, tags, 
 
 A failed save reverts the set and shows the shared error toast (`useHiddenColumns.test.tsx`); the write is `useWidgetConfig`'s pattern, field for field.
 
+**The holdings table** (`GroupedHoldingsList`, on the Investments page and the investment detail view) follows the same rules for `HIDEABLE_COLUMNS.investmentHoldings`, the seven figure columns; Symbol is structural. The Columns menu sits at the right of the title and summary block, the headers do not sort so `useColumnHeaderActions` takes no `onHeaderClick`, and the holding, cash and account-total rows all gate their figure cells. The account-total label's `colSpan` is 1 plus the visible count of Shares, Avg Cost and Price. The phone card's placement is never a literal in the component: `holdingsPhonePlacement(hidden)` (`lib/holdings-phone-grid.ts`) packs the visible figures so no line has a gap and an empty line does not exist, every class it can return is a whole literal in that file so Tailwind generates it, and its test pins the all-visible output to the classes the rows carried before columns could be hidden.
+
 ## Row density is remembered per view, by one store -- `useDensityPreference(view)`
 
 Each surface keeps its own level, but exactly one store holds them all. Read it with `useDensityPreference(view)` (`@/store/densityStore`), which returns `density`, `setDensity` and `cycleDensity` bound to that view; pass the level *down* to rows and `RowActions` as a prop, never accept a change callback back up. `DensityView` is a union, so a mistyped view is a compile error. (It was thirteen drifting stores before issue #1193; `densityStore.ts` migrates all twelve legacy keys.)

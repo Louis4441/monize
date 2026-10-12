@@ -12,11 +12,12 @@ interface UseColumnHeaderActionsOptions<C extends string> {
   /** Hide the column (`useHiddenColumns(...).hide`). */
   onHide: (id: C) => void;
   /**
-   * A plain click or tap on the header: the sort it always did. Required, since
-   * a header given these handlers drops its own `onClick`, so without it a
-   * hideable header would sort from the keyboard and never from a click.
+   * A plain click or tap on the header: the sort it always did. A sortable
+   * header given these handlers drops its own `onClick`, so it must pass this
+   * or it would sort from the keyboard and never from a click; a table whose
+   * headers do not sort (the holdings table) omits it.
    */
-  onHeaderClick: (id: C) => void;
+  onHeaderClick?: (id: C) => void;
 }
 
 export interface UseColumnHeaderActionsResult {
@@ -37,8 +38,9 @@ export interface UseColumnHeaderActionsResult {
  * sheet's subtitle names.
  *
  * The handlers are `useLongPress`'s, so a quick click still reaches
- * `onHeaderClick` and the click that trails a long-press does not; a header
- * takes them through `SortableHeader`'s `pressHandlers`.
+ * `onHeaderClick` (when given) and the click that trails a long-press does
+ * not; a sortable header takes them through `SortableHeader`'s
+ * `pressHandlers`, a plain `<th>` spreads them.
  */
 export function useColumnHeaderActions<C extends string>({
   columns,
@@ -55,7 +57,7 @@ export function useColumnHeaderActions<C extends string>({
 
   const { getRowHandlers } = useLongPress<C>({
     onLongPress: (id) => setTarget(byId.get(id) ?? null),
-    onClick: (id) => onHeaderClick(id),
+    onClick: (id) => onHeaderClick?.(id),
   });
 
   const headerHandlers = useCallback(

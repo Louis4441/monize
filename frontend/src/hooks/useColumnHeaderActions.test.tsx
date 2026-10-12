@@ -123,4 +123,31 @@ describe('useColumnHeaderActions', () => {
     fireEvent.click(header('Date'));
     expect(onHeaderClick).toHaveBeenCalledExactlyOnceWith('date');
   });
+
+  it('takes no click handler for headers that do not sort, and a plain click does nothing', () => {
+    // The holdings table's headers do not sort: a plain click must neither
+    // throw nor open the sheet, while a right-click still does.
+    function Plain() {
+      const { headerHandlers, sheet } = useColumnHeaderActions<Col>({ columns: COLUMNS, onHide: vi.fn() });
+      return (
+        <>
+          <table>
+            <thead>
+              <tr>
+                <th {...headerHandlers('status')}>Status</th>
+              </tr>
+            </thead>
+          </table>
+          {sheet}
+        </>
+      );
+    }
+    render(<Plain />);
+
+    fireEvent.click(screen.getByRole('columnheader', { name: 'Status' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    fireEvent.contextMenu(screen.getByRole('columnheader', { name: 'Status' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
 });
