@@ -243,7 +243,7 @@ test.describe('Hideable columns', () => {
     authedPage: page,
     api,
   }) => {
-    const account = await createAccount(api, { name: `Hide Columns ${uniqueId()}` });
+    const account = await createAccount(api, { name: `Hideable Register ${uniqueId()}` });
     await createTransaction(api, {
       accountId: account.id,
       payeeName: `Hideable Row ${uniqueId()}`,
@@ -254,7 +254,7 @@ test.describe('Hideable columns', () => {
     const statusHeader = page.getByRole('columnheader', { name: /^status$/i });
     await expect(statusHeader).toBeVisible();
 
-    await page.getByRole('button', { name: /columns/i }).click();
+    await page.getByRole('button', { name: /^columns\b/i }).click();
     const menu = page.getByRole('menu', { name: /show or hide columns/i });
     // The checkbox's own click handler only starts the PATCH that persists
     // the choice (useHiddenColumns.hide); it does not await it. Waiting on
@@ -270,7 +270,7 @@ test.describe('Hideable columns', () => {
     await page.reload();
     await expect(statusHeader).toHaveCount(0);
 
-    await page.getByRole('button', { name: /columns/i }).click();
+    await page.getByRole('button', { name: /^columns\b/i }).click();
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('/users/preferences') && r.ok()),
       menu.getByRole('menuitemcheckbox', { name: /^status$/i }).click(),
