@@ -28,6 +28,24 @@ describe("resolveFxProviders", () => {
     }
   });
 
+  it("the default is Yahoo alone: a deployment that sets nothing never calls Frankfurter", () => {
+    // Decision 2 of the plan: the default moves to `frankfurter,yahoo` in its
+    // own release (task R1), not in the PR that adds the adapter.
+    expect(DEFAULT_FX_PROVIDERS).toEqual(["yahoo"]);
+  });
+
+  it("accepts frankfurter and keeps the order the operator wrote", () => {
+    expect(resolveFxProviders("frankfurter,yahoo")).toEqual([
+      "frankfurter",
+      "yahoo",
+    ]);
+    expect(resolveFxProviders("yahoo, Frankfurter")).toEqual([
+      "yahoo",
+      "frankfurter",
+    ]);
+    expect(resolveFxProviders("frankfurter")).toEqual(["frankfurter"]);
+  });
+
   it("trims and lower-cases each token", () => {
     expect(resolveFxProviders(" Yahoo ")).toEqual(["yahoo"]);
     expect(resolveFxProviders("YAHOO")).toEqual(["yahoo"]);

@@ -7,7 +7,7 @@
  * test. Adding a provider means one adapter file, one entry here and one line
  * in `.env.example` (`docs/future-plans/exchange-rate-providers.md`, section 4).
  */
-export const FX_PROVIDER_NAMES = ["yahoo"] as const;
+export const FX_PROVIDER_NAMES = ["frankfurter", "yahoo"] as const;
 
 export type FxProviderName = (typeof FX_PROVIDER_NAMES)[number];
 

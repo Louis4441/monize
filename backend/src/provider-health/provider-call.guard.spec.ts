@@ -18,16 +18,22 @@ const SRC_ROOT = join(__dirname, "..");
  * bank sync makes one call per linked bank account for every user, against one
  * third-party host.
  *
- * Still scoped deliberately. The FX, AI, favicon, release-check and
- * breach-check callers have the same shape and are named in
- * `docs/specs/provider-outage-alerts.md` as the next adopters; widening this
- * scan before they adopt would only be a failing test nobody can fix in one
- * change.
+ * `currencies/providers` joined with the Frankfurter adapter: the daily rate
+ * refresh asks it once per base currency for every pair in use, and a gap
+ * fill once per window, against one host. The Yahoo adapter beside it reaches
+ * Yahoo through `YahooFinanceService`, which is already under this scan.
+ *
+ * Still scoped deliberately. The currency lookup in `currencies/`, the AI,
+ * favicon, release-check and breach-check callers have the same shape and are
+ * named in `docs/specs/provider-outage-alerts.md` as the next adopters;
+ * widening this scan before they adopt would only be a failing test nobody can
+ * fix in one change.
  */
 const GUARDED_DIRS = [
   "securities",
   "payees/lookup/google-places",
   "bank-sync/providers/enable-banking",
+  "currencies/providers",
 ];
 
 /** A bare global `fetch(` or a raw `https.get(` -- an outbound request. */
@@ -66,6 +72,7 @@ describe("outbound provider calls are answerable to the breaker", () => {
     );
     expect(callers.map((file) => file.path).sort()).toEqual([
       "bank-sync/providers/enable-banking/enable-banking.client.ts",
+      "currencies/providers/frankfurter-fx.provider.ts",
       "payees/lookup/google-places/google-places.client.ts",
       "securities/deutsche-boerse-finance.service.ts",
       "securities/lse-finance.service.ts",
@@ -145,6 +152,9 @@ describe("a response is recorded in one place per client", () => {
     // Enable Banking: two, the same split as Google Places. Every call funnels
     // through one `request` method, so the rule lives there once.
     ["bank-sync/providers/enable-banking/enable-banking.client.ts", 2],
+    // Frankfurter: two, the same split again. Every call funnels through one
+    // `request` method, so the rule lives there once.
+    ["currencies/providers/frankfurter-fx.provider.ts", 2],
   ])("%s records an arrived response in at most %i places", (file, allowed) => {
     const source = readFileSync(join(SRC_ROOT, file), "utf8");
     const occurrences = source.split("recordSuccess(").length - 1;

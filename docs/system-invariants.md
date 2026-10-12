@@ -1107,9 +1107,11 @@ Enforcement         backend/src/currencies/providers/fx-provider-chain.ts asks
                     yahoo-finance.service there outside the Yahoo adapter.
                     Still outside the chain: the currency lookup and
                     verification in currencies/currencies.service.ts reach
-                    Yahoo with their own fetch calls (task B5), and only one
-                    provider exists to keep apart from another until the
-                    Frankfurter adapter ships (task B3).
+                    Yahoo with their own fetch calls (task B5). The Frankfurter
+                    adapter (currencies/providers/frankfurter-fx.provider.ts)
+                    exists and answers null only for a non-answer, but nothing
+                    asks it until an operator names it in FX_PROVIDERS (the
+                    default changes at task R1).
 Test                The section 5 truth table of
                     docs/future-plans/exchange-rate-providers.md as named cases
                     in fx-provider-chain.spec.ts (in particular: first provider

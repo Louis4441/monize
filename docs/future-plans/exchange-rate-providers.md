@@ -250,7 +250,10 @@ Cloudflare. No rate-limit header; the project states no request cap.
 - A date range of any length answers daily: 773 rows for 2020 to 2022, 2,560
   for 2010 to 2019, in one response. `GAP_WINDOW_MAX_DAYS` stays, for Yahoo.
 - History begins 1999-01-04. Asking before it answers from that date; a window
-  wholly before it answers `rates: {}`, which is "answered, nothing".
+  wholly before it was recorded here as answering `rates: {}`, but on
+  2026-10-12 it answered 404 `{"message":"not found"}` (B3's dated fixture).
+  Both are "answered, nothing" to the adapter, so a 404 is not only the
+  uncarried-symbol case below.
 - A symbol the instance does not carry is silently dropped from `rates`; a
   base it does not carry, or a request whose every symbol is unknown, is a
   404 `{"message":"not found"}`. `carries` keeps both cases from being asked.
