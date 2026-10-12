@@ -54,7 +54,16 @@ describe("BulkCreateTransactionsDto", () => {
   it("rejects a row carrying neither a transaction nor a transfer", async () => {
     const errors = await validate(buildDto({ items: [{}] }), PIPE_OPTIONS);
 
-    expect(constraintNames(errors)).toContain("isDefined");
+    expect(constraintNames(errors)).toContain("eachItemHasOneKind");
+  });
+
+  it("rejects a row carrying both, so the request fails before any row is written", async () => {
+    const errors = await validate(
+      buildDto({ items: [{ transaction }, { transaction, transfer }] }),
+      PIPE_OPTIONS,
+    );
+
+    expect(constraintNames(errors)).toContain("eachItemHasOneKind");
   });
 
   it("rejects a row whose transfer is null and which has no transaction", async () => {
@@ -63,7 +72,7 @@ describe("BulkCreateTransactionsDto", () => {
       PIPE_OPTIONS,
     );
 
-    expect(constraintNames(errors)).toContain("isDefined");
+    expect(constraintNames(errors)).toContain("eachItemHasOneKind");
   });
 
   it("validates the nested row exactly as the single-row route does", async () => {

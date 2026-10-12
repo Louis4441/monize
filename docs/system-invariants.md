@@ -63,7 +63,7 @@ implied.
 | INV-BANKSYNC-002 | A bank sync provider private key never leaves the server | enforced |
 | INV-BANKSYNC-003 | A synced row is written in the Monize account's currency or not at all | enforced |
 | INV-BANKSYNC-004 | Nothing imports a bank account awaiting its first preview except the confirmed single-account sync | enforced |
-| INV-API-001 | An API create carrying an `externalId` produces at most one row per account and key | enforced |
+| INV-API-001 | An API create carrying an `externalId` produces at most one row per account and key | partial |
 | INV-BALANCE-001 | `current_balance` equals opening balance plus included ledger rows | enforced |
 | INV-HOLDING-001 | A holding equals a deterministic replay of the investment ledger | enforced |
 | INV-HOLDING-002 | Every view replays the ledger the same way | enforced |
@@ -407,14 +407,18 @@ Statement           For one account, a create (POST /transactions, POST
                     one transaction row holding that key, however often and
                     however concurrently it is sent. A repeat returns the row
                     that holds the key and writes nothing, moves no balance and
-                    records no history.
+                    records no history, for as long as that row still holds
+                    the key in that account (see Status).
 Source of truth     transactions(account_id, external_id)
 Enforcement         Partial unique index idx_transactions_account_external_id
                     on (account_id, external_id) WHERE external_id IS NOT NULL.
                     The lookup before the insert is advisory; a create whose
                     insert the index refuses catches the violation by the
                     index's name (isExternalIdConflict) and answers with the
-                    committed row. A transfer keeps the key on its source leg.
+                    committed row. A transfer keeps the key on its source leg,
+                    and a retry from the caller's own source account is
+                    answered before the transfer is validated or its rate
+                    resolved (findOwnTransferByExternalId).
 Concurrency scope   account
 Retry semantics     Safe to repeat whole: a create, a transfer or a bulk batch
                     sent again returns the committed rows as existing. The key
@@ -426,19 +430,27 @@ Crash semantics     Each create is one withScopedDb transaction: before commit
                     retry finds it. A bulk batch commits row by row, so a crash
                     mid-batch leaves the rows before it committed and a resend
                     finishes the rest.
-Failure response    the existing row, answered as a create (201); 409 when a
-                    transfer's key is held by a row that is not a transfer to
-                    the same destination; 409 when an edit moves a keyed row
-                    into an account that already holds its key.
+Failure response    the existing row with 200 (201 for a new one; a bulk row
+                    says existing); 409 when a transfer's key is held by a row
+                    that is not a transfer to the same destination; 409 when an
+                    edit moves a keyed row into an account that already holds
+                    its key.
 Required tests      Integration against real PostgreSQL: the index refuses a
                     second row by name, two concurrent creates end as one row
                     and one balance movement, a resent batch duplicates nothing
                     (backend/test/integration/transaction-external-id.integration.spec.ts);
                     unit: the lookup, the race path and the transfer refusals
                     (backend/src/transactions/transactions.service.spec.ts).
-Status              enforced -- an undo of a delete restores the row without
-                    its key (the undo snapshot is an explicit column list), so
-                    a later create with that key makes a second row.
+Status              partial -- the index holds one row per account and key,
+                    but two paths take a key away from the account it was
+                    created in, and a retry there then makes a second row:
+                    an undo of a delete restores the row without its key (the
+                    undo snapshot is an explicit column list), and an edit
+                    that moves a keyed row to another account takes the key
+                    with it. A plain create also answers with whatever row
+                    holds the key, a transfer leg included, because a
+                    convert_to_transfer rule makes the row a plain create
+                    wrote into one.
 ```
 
 ## Ledger and derived values

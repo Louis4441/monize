@@ -688,8 +688,7 @@
     "transferRateUnavailable": "{{ from }} -> {{ to }} için döviz kuru belirlenemedi. Transferin doğru kaydedilmesi için bir exchangeRate veya hedef tutar girin.",
     "transferAmountsMustAgreeOnZero": "Bir transfer her iki tarafta sıfırdan farklı bir tutar taşımalı veya her iki tarafta sıfır olmalıdır",
     "transferImpliedRateInvalid": "Hedef tutar, kaynak tutara göre kullanılamaz bir döviz kuru anlamına geliyor",
-    "externalIdNotThisTransfer": "Bu externalId, kaynak hesapta bu hedef hesaba yapılan bir transfer olmayan bir işlem tarafından zaten kullanılıyor",
-    "bulkItemBothKinds": "Toplu oluşturmadaki bir satır ya bir işlem ya da bir transfer içerir, ikisini birden değil"
+    "externalIdNotThisTransfer": "Bu externalId, kaynak hesapta bu hedef hesaba yapılan bir transfer olmayan bir işlem tarafından zaten kullanılıyor"
   },
   "users": {
     "userNotFound": "Kullanıcı bulunamadı",

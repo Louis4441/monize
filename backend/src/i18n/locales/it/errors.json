@@ -688,8 +688,7 @@
     "transferRateUnavailable": "Non è stato possibile determinare un tasso di cambio per {{ from }} -> {{ to }}. Fornisci un exchangeRate o un importo di destinazione affinché il trasferimento venga registrato correttamente.",
     "transferAmountsMustAgreeOnZero": "Un trasferimento deve spostare un importo diverso da zero su entrambi i lati, oppure zero su entrambi",
     "transferImpliedRateInvalid": "L'importo di destinazione implica un tasso di cambio inutilizzabile rispetto all'importo di origine",
-    "externalIdNotThisTransfer": "Questo externalId è già usato nel conto di origine da una transazione che non è un trasferimento verso questo conto di destinazione",
-    "bulkItemBothKinds": "Una riga di una creazione in blocco contiene una transazione o un trasferimento, non entrambi"
+    "externalIdNotThisTransfer": "Questo externalId è già usato nel conto di origine da una transazione che non è un trasferimento verso questo conto di destinazione"
   },
   "users": {
     "userNotFound": "Utente non trovato",

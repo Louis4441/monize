@@ -250,21 +250,48 @@ describe("TransactionBulkCreateService", () => {
     expect(result.results[2].status).toBe("created");
   });
 
-  it("refuses a row carrying both a transaction and a transfer without writing it", async () => {
-    const result = await run([
-      { transaction: txDto(), transfer: transferDto() },
-    ]);
+  it("forwards a refusal's structured errors list, as the single-row route does", async () => {
+    const problems = [{ path: "actions[0]", code: "invalid" }];
+    transactionsService.createWithOutcome.mockRejectedValueOnce(
+      new BadRequestException({ message: "Rule invalid", errors: problems }),
+    );
 
-    expect(result.results[0]).toMatchObject({
-      index: 0,
-      kind: "transfer",
-      status: "failed",
-      error: { statusCode: 400 },
+    const result = await run([{ transaction: txDto() }]);
+
+    expect(result.results[0].error).toEqual({
+      statusCode: 400,
+      message: "Rule invalid",
+      errors: problems,
     });
-    expect(transactionsService.createWithOutcome).not.toHaveBeenCalled();
-    expect(
-      transactionsService.createTransferWithOutcome,
-    ).not.toHaveBeenCalled();
+  });
+
+  it("answers a row-level-security refusal with 403, as the global filter does", async () => {
+    const originalMode = process.env.RLS_MODE;
+    process.env.RLS_MODE = "enforce";
+    try {
+      transactionsService.createWithOutcome.mockRejectedValueOnce(
+        new QueryFailedError(
+          "INSERT",
+          [],
+          Object.assign(
+            new Error(
+              'new row violates row-level security policy for table "transactions"',
+            ),
+            { code: "42501" },
+          ),
+        ),
+      );
+
+      const result = await run([{ transaction: txDto() }]);
+
+      expect(result.results[0].error).toEqual({
+        statusCode: 403,
+        message: "Access denied",
+      });
+    } finally {
+      if (originalMode === undefined) delete process.env.RLS_MODE;
+      else process.env.RLS_MODE = originalMode;
+    }
   });
 
   it("maps a database refusal as the global filter does, and hides an unexpected error's detail", async () => {

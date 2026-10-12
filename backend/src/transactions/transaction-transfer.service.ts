@@ -54,9 +54,15 @@ export interface WrittenTransfer {
   /**
    * Set when the request's `externalId` already named a transfer from the
    * source account to the destination: nothing was written, and the ids are
-   * that transfer's legs (`transaction-external-id.ts`).
+   * that transfer's legs, owned by these users (`transaction-external-id.ts`).
    */
-  existing?: true;
+  existing?: ExistingTransferOwners;
+}
+
+/** Who owns each leg of a transfer found under its `externalId`. */
+export interface ExistingTransferOwners {
+  fromOwnerId: string;
+  toOwnerId: string;
 }
 
 /**
@@ -513,6 +519,11 @@ export class TransactionTransferService {
     findOne: (userId: string, id: string) => Promise<Transaction>,
     actor?: TransferActor,
   ): Promise<TransferResult> {
+    const own = await this.findOwnTransferByExternalId(
+      userId,
+      createTransferDto,
+    );
+    if (own) return this.readTransfer(own, findOne);
     const prepared = await this.prepareTransfer(
       userId,
       createTransferDto,
@@ -520,7 +531,10 @@ export class TransactionTransferService {
     );
     const written = await this.writeTransferLegs(prepared);
     if (written.existing) {
-      return this.readTransfer(prepared, written, findOne);
+      return this.readTransfer(
+        { ...written, existing: written.existing },
+        findOne,
+      );
     }
     return this.completeTransfer(
       prepared,
@@ -536,14 +550,42 @@ export class TransactionTransferService {
    * tag or record in the history: those ran when the transfer was created.
    */
   async readTransfer(
-    prepared: PreparedTransfer,
-    written: WrittenTransfer,
+    written: WrittenTransfer & { existing: ExistingTransferOwners },
     findOne: (userId: string, id: string) => Promise<Transaction>,
   ): Promise<TransferResult> {
     return {
-      fromTransaction: await findOne(prepared.fromOwnerId, written.savedFromId),
-      toTransaction: await findOne(prepared.toOwnerId, written.savedToId),
+      fromTransaction: await findOne(
+        written.existing.fromOwnerId,
+        written.savedFromId,
+      ),
+      toTransaction: await findOne(
+        written.existing.toOwnerId,
+        written.savedToId,
+      ),
     };
+  }
+
+  /**
+   * The transfer the caller's OWN source leg already holds under
+   * `dto.externalId`, looked up before `prepareTransfer`: a retry of a
+   * committed transfer is answered from the ledger, not re-validated, so it
+   * cannot fail on a rate the provider no longer serves or a precondition that
+   * has since changed, and it asks the provider nothing.
+   *
+   * Only the caller's own rows, under the caller's identity: what it finds is
+   * the caller's own data, so answering before authorization reveals nothing.
+   * A key on a source leg somebody else owns (a cross-owner transfer) is
+   * found inside the write, after authorization (`writeTransferLegs`).
+   */
+  async findOwnTransferByExternalId(
+    userId: string,
+    dto: CreateTransferDto,
+  ): Promise<(WrittenTransfer & { existing: ExistingTransferOwners }) | null> {
+    const externalId = dto.externalId;
+    if (!externalId) return null;
+    return withScopedDb(this.dataSource, (m) =>
+      this.findTransferByExternalId(m, dto, externalId, userId),
+    );
   }
 
   /**
@@ -556,9 +598,14 @@ export class TransactionTransferService {
     m: EntityManager,
     dto: CreateTransferDto,
     externalId: string,
-  ): Promise<WrittenTransfer | null> {
+    ownerId?: string,
+  ): Promise<(WrittenTransfer & { existing: ExistingTransferOwners }) | null> {
     const row = await m.getRepository(Transaction).findOne({
-      where: { accountId: dto.fromAccountId, externalId },
+      where: {
+        accountId: dto.fromAccountId,
+        externalId,
+        ...(ownerId ? { userId: ownerId } : {}),
+      },
       relations: { linkedTransaction: true },
     });
     if (!row) return null;
@@ -571,7 +618,11 @@ export class TransactionTransferService {
         ),
       );
     }
-    return { savedFromId: row.id, savedToId: linked.id, existing: true };
+    return {
+      savedFromId: row.id,
+      savedToId: linked.id,
+      existing: { fromOwnerId: row.userId, toOwnerId: linked.userId },
+    };
   }
 
   /**

@@ -3491,6 +3491,19 @@ export class TransactionsService {
     createTransferDto: CreateTransferDto,
     actor?: TransferActor,
   ): Promise<{ transfer: TransferResult; created: boolean }> {
+    const findOne = this.findOne.bind(this);
+    // A retry of a transfer from the caller's own account is answered before
+    // any validation or rate resolution; see findOwnTransferByExternalId.
+    const own = await this.transferService.findOwnTransferByExternalId(
+      userId,
+      createTransferDto,
+    );
+    if (own) {
+      return {
+        transfer: await this.transferService.readTransfer(own, findOne),
+        created: false,
+      };
+    }
     const prepared = await this.prepareTransfer(
       userId,
       createTransferDto,
@@ -3500,9 +3513,8 @@ export class TransactionsService {
     if (written.existing) {
       return {
         transfer: await this.transferService.readTransfer(
-          prepared,
-          written,
-          this.findOne.bind(this),
+          { ...written, existing: written.existing },
+          findOne,
         ),
         created: false,
       };

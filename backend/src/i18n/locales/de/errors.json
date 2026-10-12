@@ -688,8 +688,7 @@
     "transferRateUnavailable": "Für {{ from }} -> {{ to }} konnte kein Wechselkurs ermittelt werden. Geben Sie einen exchangeRate oder einen Zielbetrag an, damit die Übertragung korrekt gebucht wird.",
     "transferAmountsMustAgreeOnZero": "Eine Übertragung muss auf beiden Seiten einen Betrag ungleich null bewegen oder auf beiden Seiten null",
     "transferImpliedRateInvalid": "Der Zielbetrag ergibt im Verhältnis zum Ausgangsbetrag einen unbrauchbaren Wechselkurs",
-    "externalIdNotThisTransfer": "Diese externalId wird im Quellkonto bereits von einer Buchung verwendet, die keine Überweisung auf dieses Zielkonto ist",
-    "bulkItemBothKinds": "Eine Zeile einer Sammelanlage enthält entweder eine Buchung oder eine Überweisung, nicht beides"
+    "externalIdNotThisTransfer": "Diese externalId wird im Quellkonto bereits von einer Buchung verwendet, die keine Überweisung auf dieses Zielkonto ist"
   },
   "users": {
     "userNotFound": "Benutzer nicht gefunden",

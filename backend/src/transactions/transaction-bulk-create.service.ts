@@ -1,14 +1,10 @@
+import { Injectable, Logger } from "@nestjs/common";
 import {
-  BadRequestException,
-  HttpException,
-  HttpStatus,
-  Injectable,
-  Logger,
-} from "@nestjs/common";
-import { QueryFailedError } from "typeorm";
+  httpErrorBody,
+  HttpErrorBody,
+} from "../common/filters/http-error-body";
 import { orderByDateStable } from "../common/date-order.util";
 import { CrossOwnerAccessService } from "../delegation/cross-owner-access.service";
-import { tr } from "../i18n/translate";
 import {
   BulkCreateItemDto,
   BulkCreateTransactionsDto,
@@ -20,12 +16,11 @@ import { TransferActor } from "./transaction-transfer.service";
 
 export type BulkCreateRowStatus = "created" | "existing" | "failed";
 
-/** Why a row was not created: what `POST /transactions` would have answered. */
-export interface BulkCreateRowError {
-  statusCode: number;
-  message: string | string[];
-  errorCode?: string;
-}
+/**
+ * Why a row was not created: what its single-row route would have answered,
+ * through the mapping `GlobalExceptionFilter` uses.
+ */
+export type BulkCreateRowError = HttpErrorBody;
 
 export interface BulkCreateRowResult {
   /** The row's position in the request's `items`, 0-based. */
@@ -109,16 +104,9 @@ export class TransactionBulkCreateService {
     item: BulkCreateItemDto,
     index: number,
   ): Promise<BulkCreateRowResult> {
+    // Exactly one of the two, which validation guaranteed (EachItemHasOneKind).
     const kind = item.transfer ? "transfer" : "transaction";
     try {
-      if (item.transaction && item.transfer) {
-        throw new BadRequestException(
-          tr(
-            "errors.transactions.bulkItemBothKinds",
-            "A bulk row carries either a transaction or a transfer, not both",
-          ),
-        );
-      }
       if (item.transfer) {
         const { transfer, created } =
           await this.transactionsService.createTransferWithOutcome(
@@ -145,7 +133,12 @@ export class TransactionBulkCreateService {
         id: transaction.id,
       };
     } catch (error) {
-      return { index, kind, status: "failed", error: this.rowError(error) };
+      return {
+        index,
+        kind,
+        status: "failed",
+        error: httpErrorBody(error, this.logger),
+      };
     }
   }
 
@@ -168,56 +161,5 @@ export class TransactionBulkCreateService {
           actorIsNotOwner: false,
         })
       : this.jointRegister.createWithOutcome(actor.realUserId, dto);
-  }
-
-  /**
-   * The status and message the single-row route would have answered with,
-   * mapped as `GlobalExceptionFilter` maps them. Anything that is not a
-   * client error is logged and reported without its detail.
-   */
-  private rowError(error: unknown): BulkCreateRowError {
-    if (error instanceof HttpException) {
-      const response = error.getResponse();
-      if (typeof response === "object" && response !== null) {
-        const body = response as Record<string, unknown>;
-        return {
-          statusCode: error.getStatus(),
-          message: (body.message as string | string[]) || error.message,
-          ...(typeof body.errorCode === "string"
-            ? { errorCode: body.errorCode }
-            : {}),
-        };
-      }
-      return { statusCode: error.getStatus(), message: error.message };
-    }
-    if (error instanceof QueryFailedError) {
-      const code = (error.driverError as { code?: string } | undefined)?.code;
-      if (code === "23505") {
-        return {
-          statusCode: HttpStatus.CONFLICT,
-          message: tr(
-            "errors.http.duplicateRecord",
-            "A record with this value already exists",
-          ),
-        };
-      }
-      if (code === "23503") {
-        return {
-          statusCode: HttpStatus.BAD_REQUEST,
-          message: tr(
-            "errors.http.referencedRecord",
-            "Referenced record does not exist or cannot be removed",
-          ),
-        };
-      }
-    }
-    this.logger.error(
-      "Bulk create row failed",
-      error instanceof Error ? error.stack : String(error),
-    );
-    return {
-      statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-      message: tr("errors.http.internal", "Internal server error"),
-    };
   }
 }

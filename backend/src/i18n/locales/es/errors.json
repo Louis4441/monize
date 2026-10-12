@@ -688,8 +688,7 @@
     "transferRateUnavailable": "No se pudo determinar un tipo de cambio para {{ from }} -> {{ to }}. Indique un exchangeRate o un importe de destino para que la transferencia se registre correctamente.",
     "transferAmountsMustAgreeOnZero": "Una transferencia debe mover un importe distinto de cero en ambos lados, o cero en ambos",
     "transferImpliedRateInvalid": "El importe de destino implica un tipo de cambio inutilizable frente al importe de origen",
-    "externalIdNotThisTransfer": "Este externalId ya lo usa en la cuenta de origen una transacción que no es una transferencia a esta cuenta de destino",
-    "bulkItemBothKinds": "Una fila de una creación masiva contiene una transacción o una transferencia, no ambas"
+    "externalIdNotThisTransfer": "Este externalId ya lo usa en la cuenta de origen una transacción que no es una transferencia a esta cuenta de destino"
   },
   "users": {
     "userNotFound": "Usuario no encontrado",

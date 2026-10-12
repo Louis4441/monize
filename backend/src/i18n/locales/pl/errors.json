@@ -688,8 +688,7 @@
     "transferRateUnavailable": "Nie udało się ustalić kursu wymiany dla {{ from }} -> {{ to }}. Podaj exchangeRate lub kwotę docelową, aby przelew został zaksięgowany poprawnie.",
     "transferAmountsMustAgreeOnZero": "Przelew musi przenosić kwotę różną od zera po obu stronach albo zero po obu stronach",
     "transferImpliedRateInvalid": "Kwota docelowa daje nieprawidłowy kurs wymiany w stosunku do kwoty źródłowej",
-    "externalIdNotThisTransfer": "Ten externalId jest już używany na koncie źródłowym przez transakcję, która nie jest przelewem na to konto docelowe",
-    "bulkItemBothKinds": "Wiersz tworzenia zbiorczego zawiera transakcję albo przelew, nie oba naraz"
+    "externalIdNotThisTransfer": "Ten externalId jest już używany na koncie źródłowym przez transakcję, która nie jest przelewem na to konto docelowe"
   },
   "users": {
     "userNotFound": "Nie znaleziono użytkownika",

@@ -14,7 +14,10 @@ import {
   ParseUUIDPipe,
   ParseBoolPipe,
   BadRequestException,
+  HttpStatus,
+  Res,
 } from "@nestjs/common";
+import type { Response } from "express";
 import {
   ApiTags,
   ApiOperation,
@@ -233,6 +236,11 @@ export class TransactionsController {
   @Post()
   @ApiOperation({ summary: "Create a new transaction" })
   @ApiResponse({ status: 201, description: "Transaction created successfully" })
+  @ApiResponse({
+    status: 200,
+    description:
+      "The externalId was already used in the account: the existing transaction, unchanged",
+  })
   @ApiResponse({ status: 400, description: "Bad request" })
   @ApiResponse({ status: 401, description: "Unauthorized" })
   @AllowDelegate()
@@ -242,27 +250,33 @@ export class TransactionsController {
   async create(
     @Request() req,
     @Body() createTransactionDto: CreateTransactionDto,
+    @Res({ passthrough: true }) res: Response,
   ) {
     // Own context targeting an account the caller does not own: the joint
     // register path (authorizes the joint grant, then writes as the owner).
-    if (
+    const outcome =
       !req.user.isActing &&
       !(await this.crossOwnerAccess.isAccountOwnedBy(
         createTransactionDto.accountId,
         req.user.id,
       ))
-    ) {
-      return this.jointRegister.create(
-        req.user.realUserId ?? req.user.id,
-        createTransactionDto,
-      );
-    }
-    // An acting delegate writes as the owner but is not the owner: the owner's
-    // structural rules would land in accounts the delegate guard never checked
-    // (no moving money via an account the delegate cannot access).
-    return this.transactionsService.create(req.user.id, createTransactionDto, {
-      actorIsNotOwner: req.user.isActing === true,
-    });
+        ? await this.jointRegister.createWithOutcome(
+            req.user.realUserId ?? req.user.id,
+            createTransactionDto,
+          )
+        : // An acting delegate writes as the owner but is not the owner: the
+          // owner's structural rules would land in accounts the delegate guard
+          // never checked (no moving money via an account the delegate cannot
+          // access).
+          await this.transactionsService.createWithOutcome(
+            req.user.id,
+            createTransactionDto,
+            { actorIsNotOwner: req.user.isActing === true },
+          );
+    // A repeated externalId created nothing: say so with the status, so a
+    // single-row client can tell a retry's answer from a new row.
+    if (!outcome.created) res.status(HttpStatus.OK);
+    return outcome.transaction;
   }
 
   @Get()
@@ -385,7 +399,7 @@ export class TransactionsController {
     name: "externalId",
     required: false,
     description:
-      "Only the transaction created with this externalId (exact match). Combine with accountIds to name the account, since a key is unique per account; a row in an investment brokerage account also needs includeInvestmentBrokerage=true.",
+      "Only the transaction created with this externalId (exact match, non-empty). Combine with accountIds to name the account, since a key is unique per account; a row in an investment brokerage account also needs includeInvestmentBrokerage=true.",
   })
   @ApiResponse({
     status: 200,
@@ -470,8 +484,16 @@ export class TransactionsController {
     const searchStr = assertStringParam(search, "search");
     const sanitizedSearch = searchStr ? searchStr.slice(0, 200) : undefined;
     // An exact match, so never trimmed or truncated: a key longer than any
-    // stored one simply matches nothing.
+    // stored one simply matches nothing. An empty one is refused, as a create
+    // refuses it, rather than read as a filter no row can satisfy.
     const externalIdFilter = assertStringParam(externalId, "externalId");
+    if (externalIdFilter === "") {
+      throw new BadRequestException(
+        tr("errors.params.isRequired", 'A value for "externalId" is required', {
+          param: "externalId",
+        }),
+      );
+    }
 
     const parsedAmountFrom =
       amountFrom !== undefined ? parseFloat(amountFrom) : undefined;
@@ -1381,6 +1403,11 @@ export class TransactionsController {
   @ApiOperation({ summary: "Create a transfer between two accounts" })
   @ApiResponse({ status: 201, description: "Transfer created successfully" })
   @ApiResponse({
+    status: 200,
+    description:
+      "The externalId was already used in the source account by this transfer: the existing transfer, unchanged",
+  })
+  @ApiResponse({
     status: 400,
     description: "Bad request - invalid transfer data",
   })
@@ -1389,12 +1416,18 @@ export class TransactionsController {
   @AllowDelegate()
   @DelegatedTransferBody()
   @DelegateRequires("create")
-  createTransfer(@Request() req, @Body() createTransferDto: CreateTransferDto) {
-    return this.transactionsService.createTransfer(
+  async createTransfer(
+    @Request() req,
+    @Body() createTransferDto: CreateTransferDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const outcome = await this.transactionsService.createTransferWithOutcome(
       req.user.id,
       createTransferDto,
       transferActorFrom(req),
     );
+    if (!outcome.created) res.status(HttpStatus.OK);
+    return outcome.transfer;
   }
 
   @Post("bulk")

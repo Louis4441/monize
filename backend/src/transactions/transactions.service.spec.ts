@@ -8287,11 +8287,18 @@ describe("TransactionsService", () => {
           transfer: { fromTransaction: fromLeg, toTransaction: toLeg },
           created: false,
         });
+        // Answered from the caller's own rows before the transfer is
+        // prepared: no account read, no rate resolution, no write.
         expect(transactionsRepository.findOne).toHaveBeenCalledWith(
           expect.objectContaining({
-            where: { accountId: "account-1", externalId: "bank-xfer-1" },
+            where: {
+              accountId: "account-1",
+              externalId: "bank-xfer-1",
+              userId: "user-1",
+            },
           }),
         );
+        expect(accountsService.findOne).not.toHaveBeenCalled();
         expect(transactionsRepository.save).not.toHaveBeenCalled();
         expect(accountsService.updateBalance).not.toHaveBeenCalled();
         expect(netWorthService.triggerDebouncedRecalc).not.toHaveBeenCalled();
@@ -8352,11 +8359,33 @@ describe("TransactionsService", () => {
         ).rejects.toThrow(ConflictException);
       });
 
-      it("answers with the winner when a concurrent transfer took the key first", async () => {
+      it("finds the key inside the write when the early lookup missed it", async () => {
+        // A key on a source leg the caller does not own (a cross-owner
+        // transfer) is invisible to the early lookup; the in-write lookup,
+        // after authorization, answers it.
         let lookups = 0;
         answerLookups(
           () =>
             lookups++ === 0 ? null : { ...fromLeg, linkedTransaction: toLeg },
+          { "tx-from": fromLeg, "tx-to": toLeg },
+        );
+
+        const outcome = await service.createTransferWithOutcome(
+          "user-1",
+          transferDto as any,
+        );
+
+        expect(outcome.created).toBe(false);
+        expect(accountsService.findOne).toHaveBeenCalled();
+        expect(transactionsRepository.save).not.toHaveBeenCalled();
+      });
+
+      it("answers with the winner when a concurrent transfer took the key first", async () => {
+        // Both lookups (before the prepare, and inside the write) missed it.
+        let lookups = 0;
+        answerLookups(
+          () =>
+            lookups++ < 2 ? null : { ...fromLeg, linkedTransaction: toLeg },
           { "tx-from": fromLeg, "tx-to": toLeg },
         );
         transactionsRepository.save.mockRejectedValueOnce(

@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
+import type { Response } from "express";
 import { TransactionsController } from "./transactions.controller";
 import { TransactionsService } from "./transactions.service";
 import { DelegateTransferMaskInterceptor } from "../delegation/interceptors/delegate-transfer-mask.interceptor";
@@ -15,6 +16,11 @@ describe("TransactionsController", () => {
   let mockDelegationService: Record<string, jest.Mock>;
   let mockBulkCreate: Record<string, jest.Mock>;
   const mockReq = { user: { id: "user-1" } };
+  /** The passthrough response a create handler may set a status on. */
+  const mockRes = () =>
+    ({ status: jest.fn() }) as never as Response & {
+      status: jest.Mock;
+    };
 
   // Valid UUIDs for testing
   const uuid1 = "00000000-0000-0000-0000-000000000001";
@@ -25,7 +31,8 @@ describe("TransactionsController", () => {
 
   beforeEach(async () => {
     mockService = {
-      create: jest.fn(),
+      createWithOutcome: jest.fn(),
+      createTransferWithOutcome: jest.fn(),
       findAll: jest.fn(),
       findOne: jest.fn(),
       update: jest.fn(),
@@ -40,7 +47,6 @@ describe("TransactionsController", () => {
       updateSplits: jest.fn(),
       addSplit: jest.fn(),
       removeSplit: jest.fn(),
-      createTransfer: jest.fn(),
       getLinkedTransaction: jest.fn(),
       removeTransfer: jest.fn(),
       updateTransfer: jest.fn(),
@@ -67,7 +73,7 @@ describe("TransactionsController", () => {
       // Own rows by default, so existing own-context tests take the
       // ordinary owner-scoped paths untouched.
       ownsRow: jest.fn().mockResolvedValue(true),
-      create: jest.fn(),
+      createWithOutcome: jest.fn(),
       update: jest.fn(),
       remove: jest.fn(),
       markCleared: jest.fn(),
@@ -124,22 +130,50 @@ describe("TransactionsController", () => {
   });
 
   describe("create()", () => {
-    it("delegates to service.create with userId and dto", async () => {
+    it("delegates to service.createWithOutcome with userId and dto", async () => {
       const dto = { accountId: uuid1, amount: -50 };
       const expected = { id: "tx-1", accountId: uuid1, amount: -50 };
-      mockService.create.mockResolvedValue(expected);
+      mockService.createWithOutcome.mockResolvedValue({
+        transaction: expected,
+        created: true,
+      });
 
-      const result = await controller.create(mockReq, dto as any);
+      const result = await controller.create(mockReq, dto as any, mockRes());
 
       expect(result).toEqual(expected);
-      expect(mockService.create).toHaveBeenCalledWith("user-1", dto, {
-        actorIsNotOwner: false,
+      expect(mockService.createWithOutcome).toHaveBeenCalledWith(
+        "user-1",
+        dto,
+        { actorIsNotOwner: false },
+      );
+    });
+
+    it("leaves the status at 201 for a new row and answers 200 for a repeated externalId", async () => {
+      const dto = { accountId: uuid1, amount: -50, externalId: "bank-1" };
+      const fresh = mockRes();
+      mockService.createWithOutcome.mockResolvedValueOnce({
+        transaction: { id: "tx-1" },
+        created: true,
       });
+      await controller.create(mockReq, dto as any, fresh);
+      expect(fresh.status).not.toHaveBeenCalled();
+
+      const repeated = mockRes();
+      mockService.createWithOutcome.mockResolvedValueOnce({
+        transaction: { id: "tx-1" },
+        created: false,
+      });
+      const result = await controller.create(mockReq, dto as any, repeated);
+      expect(result).toEqual({ id: "tx-1" });
+      expect(repeated.status).toHaveBeenCalledWith(200);
     });
 
     it("tells the service the actor is not the owner when a delegate is acting", async () => {
       const dto = { accountId: uuid1, amount: -50 };
-      mockService.create.mockResolvedValue({ id: "tx-1" });
+      mockService.createWithOutcome.mockResolvedValue({
+        transaction: { id: "tx-1" },
+        created: true,
+      });
 
       await controller.create(
         {
@@ -151,11 +185,14 @@ describe("TransactionsController", () => {
           },
         },
         dto as any,
+        mockRes(),
       );
 
-      expect(mockService.create).toHaveBeenCalledWith("owner-1", dto, {
-        actorIsNotOwner: true,
-      });
+      expect(mockService.createWithOutcome).toHaveBeenCalledWith(
+        "owner-1",
+        dto,
+        { actorIsNotOwner: true },
+      );
       expect(mockCrossOwnerAccess.isAccountOwnedBy).not.toHaveBeenCalled();
     });
   });
@@ -163,17 +200,24 @@ describe("TransactionsController", () => {
   describe("joint register branching (own context)", () => {
     it("routes create for a foreign account through the joint path", async () => {
       mockCrossOwnerAccess.isAccountOwnedBy.mockResolvedValue(false);
-      mockJointRegister.create.mockResolvedValue({ id: "tx-9" });
+      mockJointRegister.createWithOutcome.mockResolvedValue({
+        transaction: { id: "tx-9" },
+        created: true,
+      });
       const dto = { accountId: uuid1, amount: -5 } as never;
 
       const result = await controller.create(
         { user: { id: "user-1", realUserId: "user-1" } },
         dto,
+        mockRes(),
       );
 
       expect(result).toEqual({ id: "tx-9" });
-      expect(mockJointRegister.create).toHaveBeenCalledWith("user-1", dto);
-      expect(mockService.create).not.toHaveBeenCalled();
+      expect(mockJointRegister.createWithOutcome).toHaveBeenCalledWith(
+        "user-1",
+        dto,
+      );
+      expect(mockService.createWithOutcome).not.toHaveBeenCalled();
     });
 
     it("routes update/remove/clear for an unowned row through the joint path", async () => {
@@ -545,6 +589,13 @@ describe("TransactionsController", () => {
       const calls = mockService.findAll.mock.calls as unknown[][];
       const lastCall = calls[calls.length - 1];
       expect(lastCall[lastCall.length - 1]).toBe(" bank-row-1 ");
+    });
+
+    it("rejects an empty externalId rather than matching nothing", async () => {
+      await expect(findAllWithExternalId("")).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockService.findAll).not.toHaveBeenCalled();
     });
 
     it("rejects a repeated externalId key", async () => {
@@ -1125,22 +1176,45 @@ describe("TransactionsController", () => {
   });
 
   describe("createTransfer()", () => {
-    it("delegates to service.createTransfer with userId and dto", async () => {
-      const dto = {
-        fromAccountId: uuid1,
-        toAccountId: uuid2,
-        amount: 500,
-      };
-      const expected = { id: "tx-1", linkedTransactionId: "tx-2" };
-      mockService.createTransfer.mockResolvedValue(expected);
+    const dto = {
+      fromAccountId: uuid1,
+      toAccountId: uuid2,
+      amount: 500,
+    };
+    const transfer = {
+      fromTransaction: { id: "tx-1" },
+      toTransaction: { id: "tx-2" },
+    };
 
-      const result = await controller.createTransfer(mockReq, dto as any);
-
-      expect(result).toEqual(expected);
-      expect(mockService.createTransfer).toHaveBeenCalledWith("user-1", dto, {
-        effectiveUserId: "user-1",
-        realUserId: "user-1",
+    it("delegates to service.createTransferWithOutcome with userId and dto", async () => {
+      mockService.createTransferWithOutcome.mockResolvedValue({
+        transfer,
+        created: true,
       });
+      const res = mockRes();
+
+      const result = await controller.createTransfer(mockReq, dto as any, res);
+
+      expect(result).toEqual(transfer);
+      expect(res.status).not.toHaveBeenCalled();
+      expect(mockService.createTransferWithOutcome).toHaveBeenCalledWith(
+        "user-1",
+        dto,
+        { effectiveUserId: "user-1", realUserId: "user-1" },
+      );
+    });
+
+    it("answers 200 when the externalId named an existing transfer", async () => {
+      mockService.createTransferWithOutcome.mockResolvedValue({
+        transfer,
+        created: false,
+      });
+      const res = mockRes();
+
+      const result = await controller.createTransfer(mockReq, dto as any, res);
+
+      expect(result).toEqual(transfer);
+      expect(res.status).toHaveBeenCalledWith(200);
     });
   });
 

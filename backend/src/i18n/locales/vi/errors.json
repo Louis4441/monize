@@ -688,8 +688,7 @@
     "transferRateUnavailable": "Không thể xác định tỷ giá cho {{ from }} -> {{ to }}. Hãy cung cấp exchangeRate hoặc số tiền đích để giao dịch chuyển khoản được ghi nhận chính xác.",
     "transferAmountsMustAgreeOnZero": "Giao dịch chuyển tiền phải di chuyển một số tiền khác không ở cả hai bên, hoặc bằng không ở cả hai bên",
     "transferImpliedRateInvalid": "Số tiền đích ngụ ý một tỷ giá không thể sử dụng so với số tiền nguồn",
-    "externalIdNotThisTransfer": "externalId này đã được dùng trong tài khoản nguồn bởi một giao dịch không phải là chuyển khoản đến tài khoản đích này",
-    "bulkItemBothKinds": "Một dòng tạo hàng loạt chứa một giao dịch hoặc một chuyển khoản, không phải cả hai"
+    "externalIdNotThisTransfer": "externalId này đã được dùng trong tài khoản nguồn bởi một giao dịch không phải là chuyển khoản đến tài khoản đích này"
   },
   "users": {
     "userNotFound": "Không tìm thấy người dùng",
