@@ -256,7 +256,14 @@ test.describe('Hideable columns', () => {
 
     await page.getByRole('button', { name: /columns/i }).click();
     const menu = page.getByRole('menu', { name: /show or hide columns/i });
-    await menu.getByRole('menuitemcheckbox', { name: /^status$/i }).click();
+    // The checkbox's own click handler only starts the PATCH that persists
+    // the choice (useHiddenColumns.hide); it does not await it. Waiting on
+    // the response, not just the optimistic DOM update, is what the reload
+    // below actually proves.
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/users/preferences') && r.ok()),
+      menu.getByRole('menuitemcheckbox', { name: /^status$/i }).click(),
+    ]);
 
     await expect(statusHeader).toHaveCount(0);
 
@@ -264,7 +271,10 @@ test.describe('Hideable columns', () => {
     await expect(statusHeader).toHaveCount(0);
 
     await page.getByRole('button', { name: /columns/i }).click();
-    await menu.getByRole('menuitemcheckbox', { name: /^status$/i }).click();
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/users/preferences') && r.ok()),
+      menu.getByRole('menuitemcheckbox', { name: /^status$/i }).click(),
+    ]);
 
     await expect(statusHeader).toBeVisible();
   });
