@@ -1392,6 +1392,7 @@ CREATE TABLE user_preferences (
     favourite_report_ids TEXT[] DEFAULT '{}',
     dashboard_widgets TEXT[] DEFAULT '{}', -- ordered visible dashboard widget ids; empty = default layout
     dashboard_widget_config JSONB NOT NULL DEFAULT '{}', -- per-widget settings (timeframe, accounts, chart type), keyed by widget id
+    hidden_table_columns JSONB NOT NULL DEFAULT '{}', -- hidden column ids, keyed by table kind: transactions, investmentHoldings, investmentRegister
     show_created_at BOOLEAN DEFAULT false,
     time_format VARCHAR(10) DEFAULT '24h',
     preferred_exchanges TEXT[] DEFAULT '{}',
