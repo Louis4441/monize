@@ -802,6 +802,43 @@ describe("SecuritiesService", () => {
         expect(saved.skipPriceUpdates).toBe(true);
       });
 
+      it("backfills prices when updates are turned back on", async () => {
+        securitiesRepository.findOne
+          .mockResolvedValueOnce({ ...mockSecurity, skipPriceUpdates: true })
+          .mockResolvedValueOnce({ ...mockSecurity, skipPriceUpdates: false });
+
+        await service.update("user-1", "sec-1", { skipPriceUpdates: false });
+
+        expect(mockSecurityPriceService.backfillSecurity).toHaveBeenCalledWith(
+          expect.objectContaining({ id: mockSecurity.id }),
+        );
+      });
+
+      it.each([
+        [false, false],
+        [false, true],
+        [true, true],
+      ])(
+        "does not backfill when the flag goes %s -> %s",
+        async (before, after) => {
+          securitiesRepository.findOne
+            .mockResolvedValueOnce({
+              ...mockSecurity,
+              skipPriceUpdates: before,
+            })
+            .mockResolvedValueOnce({
+              ...mockSecurity,
+              skipPriceUpdates: after,
+            });
+
+          await service.update("user-1", "sec-1", { skipPriceUpdates: after });
+
+          expect(
+            mockSecurityPriceService.backfillSecurity,
+          ).not.toHaveBeenCalled();
+        },
+      );
+
       it("lets an explicit choice win over a newly picked provider", async () => {
         securitiesRepository.findOne.mockResolvedValue({
           ...mockSecurity,

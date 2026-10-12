@@ -709,6 +709,16 @@ export class SecuritiesService {
       descriptionParams: { symbol: saved.symbol },
     });
 
+    // Updates were just turned back on: fetch history now, as create does,
+    // rather than leave the security unpriced until the next scheduled run.
+    if (beforeData.skipPriceUpdates && !saved.skipPriceUpdates) {
+      this.securityPriceService.backfillSecurity(saved).catch((err) => {
+        this.logger.warn(
+          `Background price backfill failed for ${saved.symbol}: ${err.message}`,
+        );
+      });
+    }
+
     return saved;
   }
 

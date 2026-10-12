@@ -17,7 +17,8 @@ describe.each([CreateSecurityDto, UpdateSecurityDto])(
       },
     );
 
-    // The column is NOT NULL, so null is refused rather than read as "no change".
+    // The entity treats the field as non-nullable, so null is refused rather
+    // than read as "no change".
     it.each([null, "true", 1])("rejects non-booleans %s", async (value) => {
       expect(await errorsFor(value)).toHaveLength(1);
     });
