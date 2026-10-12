@@ -295,6 +295,11 @@ export class UsersService {
       patch.dashboardWidgetConfig =
         dto.dashboardWidgetConfig as UserPreference["dashboardWidgetConfig"];
     }
+    if (dto.hiddenTableColumns !== undefined) {
+      // A JSONB map, cast for the same reason as dashboardWidgetConfig above.
+      patch.hiddenTableColumns =
+        dto.hiddenTableColumns as UserPreference["hiddenTableColumns"];
+    }
     if (dto.showCreatedAt !== undefined) {
       patch.showCreatedAt = dto.showCreatedAt;
     }

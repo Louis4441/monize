@@ -851,6 +851,35 @@ describe("UsersService", () => {
       });
     });
 
+    it("updates hiddenTableColumns", async () => {
+      preferencesRow.seed(mockPreferences);
+
+      await service.updatePreferences("user-1", {
+        hiddenTableColumns: {
+          transactions: ["refNumber", "attachments"],
+          investmentRegister: ["status"],
+        },
+      });
+
+      const savedData = preferencesRow.row()!;
+      expect(savedData.hiddenTableColumns).toEqual({
+        transactions: ["refNumber", "attachments"],
+        investmentRegister: ["status"],
+      });
+    });
+
+    it("leaves hiddenTableColumns untouched when not provided", async () => {
+      preferencesRow.seed({
+        ...mockPreferences,
+        hiddenTableColumns: { transactions: ["tags"] },
+      });
+
+      await service.updatePreferences("user-1", { timeFormat: "24h" });
+
+      const savedData = preferencesRow.row()!;
+      expect(savedData.hiddenTableColumns).toEqual({ transactions: ["tags"] });
+    });
+
     it("updates preferredExchanges", async () => {
       preferencesRow.seed(mockPreferences);
 
