@@ -82,6 +82,17 @@ const ALL_TRANSACTION_STATUSES = new Set<string>(
   Object.values(TransactionStatus),
 );
 
+/** The `search` parameter's Swagger text, one for every endpoint that takes it. */
+const SEARCH_PARAM_DESCRIPTION =
+  "Search text, at most 200 characters and 12 terms. A bare word matches " +
+  "description, payee, category, amount, reference number, split memo and " +
+  'tag; words are ANDed, "quotes" make a phrase and -word excludes. ' +
+  "field:text is contains, field:=text exact, * a wildcard, over payee, " +
+  "memo, cat, tag, account, ref, amount, date, status " +
+  "(cleared|reconciled|unreconciled|void), is (transfer|split|uncategorized) " +
+  "and has (attachment|ref|memo|tag). #10 is reference exactly 10; amounts " +
+  "and dates take >, >=, <, <= and a..b (date:2026-03 is that month).";
+
 /**
  * The `search` query value: refused when not a string (a repeated key arrives
  * as an array) and cut at the parser's length cap, on every endpoint that
@@ -354,8 +365,7 @@ export class TransactionsController {
   @ApiQuery({
     name: "search",
     required: false,
-    description:
-      "Search text matched against description, payee, category, subcategory, amount, reference number, split memo, and tag",
+    description: SEARCH_PARAM_DESCRIPTION,
   })
   @ApiQuery({
     name: "amountFrom",
@@ -642,8 +652,7 @@ export class TransactionsController {
   @ApiQuery({
     name: "search",
     required: false,
-    description:
-      "Search text matched against description, payee, category, subcategory, amount, reference number, split memo, and tag",
+    description: SEARCH_PARAM_DESCRIPTION,
   })
   @ApiQuery({
     name: "amountFrom",
@@ -770,7 +779,7 @@ export class TransactionsController {
   @ApiQuery({
     name: "search",
     required: false,
-    description: "Search text (same fields as the summary endpoint)",
+    description: SEARCH_PARAM_DESCRIPTION,
   })
   @ApiQuery({
     name: "amountFrom",
@@ -903,7 +912,11 @@ export class TransactionsController {
   @ApiQuery({ name: "categoryIds", required: false })
   @ApiQuery({ name: "payeeIds", required: false })
   @ApiQuery({ name: "tagIds", required: false })
-  @ApiQuery({ name: "search", required: false })
+  @ApiQuery({
+    name: "search",
+    required: false,
+    description: SEARCH_PARAM_DESCRIPTION,
+  })
   @ApiQuery({ name: "amountFrom", required: false })
   @ApiQuery({ name: "amountTo", required: false })
   @ApiQuery({ name: "limit", required: false })
@@ -1110,8 +1123,7 @@ export class TransactionsController {
   @ApiQuery({
     name: "search",
     required: false,
-    description:
-      "Search text matched against description, payee, category, subcategory, amount, reference number, split memo, and tag",
+    description: SEARCH_PARAM_DESCRIPTION,
   })
   @ApiQuery({
     name: "amountFrom",

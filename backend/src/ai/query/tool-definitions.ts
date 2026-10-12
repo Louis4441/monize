@@ -17,6 +17,7 @@ import {
   MAX_RULE_RUN_LIMIT,
   MAX_RULE_TOOL_LIST_LIMIT,
 } from "../../transaction-rules/transaction-rules.limits";
+import { SEARCH_SYNTAX_SUMMARY } from "../../transactions/transaction-search-query.util";
 
 export { RULE_LANGUAGE_GUIDE };
 
@@ -30,7 +31,7 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
       properties: {
         searchText: {
           type: "string",
-          description: "Search payee names or transaction descriptions.",
+          description: SEARCH_SYNTAX_SUMMARY,
         },
         startDate: {
           type: "string",

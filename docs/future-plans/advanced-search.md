@@ -245,7 +245,9 @@ AND-ed bracketed terms with parameters named `${paramPrefix}${i}...`, and
 returns the `ParsedSearch` for the echo.
 
 **Wire, `GET /transactions` only.** A new optional field on the paginated
-response, present exactly when a non-blank `search` was sent:
+response, present exactly when a non-blank `search` was sent and the
+service built the page (a delegate with no visible accounts gets the
+controller's empty page, with no echo):
 
 ```ts
 searchInterpretation?: {

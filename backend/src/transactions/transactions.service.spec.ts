@@ -3500,13 +3500,53 @@ describe("TransactionsService", () => {
       );
     });
 
+    it("echoes how the search was read beside the rows", async () => {
+      const mockQb = createMockQueryBuilder();
+      mockQb.getManyAndCount.mockResolvedValue([[], 0]);
+      transactionsRepository.createQueryBuilder.mockReturnValue(mockQb);
+      investmentTxRepository.find.mockResolvedValue([]);
+
+      const result = await service.findAll(
+        "user-1",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        1,
+        50,
+        false,
+        "#10 status:pending",
+      );
+
+      expect(result.searchInterpretation).toEqual({
+        terms: [
+          {
+            field: "ref",
+            op: "exact",
+            value: "10",
+            negated: false,
+            raw: "#10",
+          },
+          {
+            field: "any",
+            op: "contains",
+            value: "status:pending",
+            negated: false,
+            raw: "status:pending",
+            ignored: "malformed",
+          },
+        ],
+      });
+    });
+
     it("ignores empty/whitespace-only search", async () => {
       const mockQb = createMockQueryBuilder();
       mockQb.getManyAndCount.mockResolvedValue([[], 0]);
       transactionsRepository.createQueryBuilder.mockReturnValue(mockQb);
       investmentTxRepository.find.mockResolvedValue([]);
 
-      await service.findAll(
+      const result = await service.findAll(
         "user-1",
         undefined,
         undefined,
@@ -3518,6 +3558,9 @@ describe("TransactionsService", () => {
         false,
         "   ",
       );
+
+      // No search was sent, so there is nothing to echo.
+      expect(result).not.toHaveProperty("searchInterpretation");
 
       // search ILIKE should not be called for whitespace-only
       const searchCalls = mockQb.andWhere.mock.calls.filter(

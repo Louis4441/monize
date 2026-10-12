@@ -22,6 +22,18 @@ import {
  */
 
 export const MAX_SEARCH_LENGTH = 200;
+
+/**
+ * The syntax for a model: the `searchText` description of `list_transactions`
+ * in both the assistant and the MCP server, written once so the two cannot
+ * drift. Terse on purpose: it rides in the MCP `tools/list` byte budget and
+ * the 300-character field cap (`tools-list-budget.spec.ts`), and the field
+ * list is ordered so it never reads as the `sortBy` enum copied out.
+ */
+export const SEARCH_SYNTAX_SUMMARY =
+  'Words ANDed; "phrase"; -x excludes; f:x contains, f:=x exact, * wildcard. ' +
+  "f: payee memo account tag amount cat date status ref is has. " +
+  "#10=ref:=10; amount:>5; date:2026-03";
 export const MAX_SEARCH_TERMS = 12;
 
 export type SearchField =

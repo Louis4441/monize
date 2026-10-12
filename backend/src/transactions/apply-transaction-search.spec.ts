@@ -6,7 +6,9 @@ import {
   applyTransactionSearch,
   loadSearchFormats,
   resolveTransactionSearch,
+  searchInterpretation,
 } from "./apply-transaction-search";
+import { parseTransactionSearch } from "./transaction-search-query.util";
 
 function managerWith(
   prefs: Pick<UserPreference, "numberFormat" | "dateFormat"> | null,
@@ -113,5 +115,57 @@ describe("applyTransactionSearch", () => {
     const parsed = await applyTransactionSearch(m, qb, "ref:", options);
     expect(parsed?.terms[0].ignored).toBe("empty");
     expect(andWhere).not.toHaveBeenCalled();
+  });
+});
+
+describe("searchInterpretation", () => {
+  it("echoes every term as read, without the builder-internal reading", () => {
+    const parsed = parseTransactionSearch(
+      "costco -cat:gas #10 date:2026-03 amount:>abc ref:",
+      { numberFormat: "en-US", dateFormat: "YYYY-MM-DD" },
+    );
+    expect(searchInterpretation(parsed)).toEqual({
+      terms: [
+        {
+          field: "any",
+          op: "contains",
+          value: "costco",
+          negated: false,
+          raw: "costco",
+        },
+        {
+          field: "cat",
+          op: "contains",
+          value: "gas",
+          negated: true,
+          raw: "-cat:gas",
+        },
+        { field: "ref", op: "exact", value: "10", negated: false, raw: "#10" },
+        {
+          field: "date",
+          op: "between",
+          value: "2026-03-01",
+          valueTo: "2026-03-31",
+          negated: false,
+          raw: "date:2026-03",
+        },
+        {
+          field: "any",
+          op: "contains",
+          value: "amount:>abc",
+          negated: false,
+          raw: "amount:>abc",
+          ignored: "malformed",
+        },
+        {
+          field: "ref",
+          op: "contains",
+          value: "",
+          negated: false,
+          raw: "ref:",
+          ignored: "empty",
+        },
+      ],
+    });
   });
 });
