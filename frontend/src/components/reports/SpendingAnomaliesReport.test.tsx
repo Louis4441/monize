@@ -188,7 +188,7 @@ describe("SpendingAnomaliesReport", () => {
       expect(screen.getByText("Large purchase")).toBeInTheDocument();
     });
     fireEvent.click(screen.getByText("Large purchase"));
-    expect(mockPush).toHaveBeenCalledWith("/transactions?search=Store%20X");
+    expect(mockPush).toHaveBeenCalledWith("/transactions?search=payee%3A%3D%22Store%20X%22");
   });
 
   it("changes the sensitivity threshold and refetches", async () => {

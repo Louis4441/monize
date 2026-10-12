@@ -10,6 +10,7 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
+import { quoteSearchValue } from '@/lib/search-query';
 
 export function SpendingAnomaliesReport() {
   const t = useTranslations('reports');
@@ -24,7 +25,9 @@ export function SpendingAnomaliesReport() {
 
   const handleTransactionClick = (anomaly: SpendingAnomaly) => {
     if (anomaly.transactionId && anomaly.payeeName) {
-      router.push(`/transactions?search=${encodeURIComponent(anomaly.payeeName)}`);
+      router.push(
+        `/transactions?search=${encodeURIComponent(quoteSearchValue('payee', anomaly.payeeName))}`,
+      );
     }
   };
 

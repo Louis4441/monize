@@ -440,7 +440,7 @@ describe("UncategorizedTransactionsReport", () => {
     });
     fireEvent.click(screen.getByText("Store A"));
     expect(mockPush).toHaveBeenCalledWith(
-      "/transactions?categoryIds=uncategorized&accountIds=acc-1&search=Store+A"
+      "/transactions?categoryIds=uncategorized&accountIds=acc-1&search=payee%3A%3D%22Store+A%22"
     );
   });
 
@@ -478,7 +478,7 @@ describe("UncategorizedTransactionsReport", () => {
     expect(row).toHaveAttribute("tabindex", "0");
 
     const expected =
-      "/transactions?categoryIds=uncategorized&accountIds=acc-1&search=Store+A";
+      "/transactions?categoryIds=uncategorized&accountIds=acc-1&search=payee%3A%3D%22Store+A%22";
     fireEvent.keyDown(row, { key: "Enter" });
     expect(mockPush).toHaveBeenCalledWith(expected);
 
@@ -519,7 +519,7 @@ describe("UncategorizedTransactionsReport", () => {
     });
     fireEvent.click(screen.getByText("Wire transfer"));
     expect(mockPush).toHaveBeenCalledWith(
-      "/transactions?categoryIds=uncategorized&accountIds=acc-1&search=Wire+transfer"
+      "/transactions?categoryIds=uncategorized&accountIds=acc-1&search=memo%3A%22Wire+transfer%22"
     );
   });
 
