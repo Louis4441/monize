@@ -13,7 +13,9 @@ import {
   Matches,
   IsIn,
 } from "class-validator";
+import { Transform } from "class-transformer";
 import { IsDashboardWidgetConfig } from "../validators/is-dashboard-widget-config.validator";
+import { IsHiddenTableColumns } from "../validators/is-hidden-table-columns.validator";
 import { IsNumberLocale } from "../../common/validators/is-number-locale.validator";
 import {
   QUOTE_PROVIDER_NAMES,
@@ -238,6 +240,24 @@ export class UpdatePreferencesDto {
   @IsObject()
   @IsDashboardWidgetConfig()
   dashboardWidgetConfig?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    description:
+      "Hidden column ids keyed by table kind (transactions, investmentHoldings, investmentRegister); an unknown kind, an unknown id or a duplicate is refused",
+    example: {
+      transactions: ["refNumber", "attachments"],
+      investmentHoldings: [],
+      investmentRegister: ["status"],
+    },
+  })
+  // The raw body value: class-transformer silently skips a `__proto__` key
+  // when it copies a plain object, which would store `{}` in place of
+  // refusing the payload.
+  @Transform(({ obj, key }) => obj[key])
+  @IsOptional()
+  @IsObject()
+  @IsHiddenTableColumns()
+  hiddenTableColumns?: Record<string, string[]>;
 
   @ApiPropertyOptional({
     description: "Show the Created At field in transaction forms",
