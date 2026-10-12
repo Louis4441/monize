@@ -30,15 +30,15 @@ B1 is the only migration: an expand-only column with a default, safe under a rol
 
 | ID | Issue | Task | Depends on | Deploy class | Status | PR |
 | --- | --- | --- | --- | --- | --- | --- |
-| B1 | #1701 | Migration, `schema.sql`, entity column, support-backup rule | -- | inert | [ ] | |
-| F1 | #1702 | `lib/hidden-columns.ts`, the frontend types, the hook; nothing mounted | B1 | none | [ ] | |
-| B2 | #1703 | Backend id constant, validator, DTO field, service block, contract spec against F1's file | B1, F1 | inert | [ ] | |
-| F2 | #1704 | The menu, the header sheet hook, the `hide` glyph, `SortableHeader.pressHandlers`, the shared toolbar-button class, `common.columns.*` strings; nothing mounted | F1 | none | [ ] | |
-| F3 | #1705 | The register: headers, cells, `colCount`, chip strip, the phone card, the sort fallback, the guard cases, the doc section | B2, F2 | neutral | [ ] | |
-| F4 | #1706 | The holdings table: headers, three row kinds, the account-total `colSpan`, the phone-grid helper | B2, F2 | neutral | [ ] | |
-| F5 | #1707 | The brokerage register: headers, cells, `colCount`, the empty row, the card body | B2, F2 | neutral | [ ] | |
-| F6 | #1708 | E2E: hide through the menu, reload, restore | F3 | none | [ ] | |
-| Q | #1709 | Acceptance: every locale, release note, tracker closed, plan status | F3, F4, F5, F6 | none | [ ] | |
+| B1 | #1701 | Migration, `schema.sql`, entity column, support-backup rule | -- | inert | [x] | #1712 |
+| F1 | #1702 | `lib/hidden-columns.ts`, the frontend types, the hook; nothing mounted | B1 | none | [x] | #1715 |
+| B2 | #1703 | Backend id constant, validator, DTO field, service block, contract spec against F1's file | B1, F1 | inert | [x] | #1717 |
+| F2 | #1704 | The menu, the header sheet hook, the `hide` glyph, `SortableHeader.pressHandlers`, the shared toolbar-button class, `common.columns.*` strings; nothing mounted | F1 | none | [x] | #1720 |
+| F3 | #1705 | The register: headers, cells, `colCount`, chip strip, the phone card, the sort fallback, the guard cases, the doc section | B2, F2 | neutral | [x] | #1721 |
+| F4 | #1706 | The holdings table: headers, three row kinds, the account-total `colSpan`, the phone-grid helper | B2, F2 | neutral | [x] | #1724 |
+| F5 | #1707 | The brokerage register: headers, cells, `colCount`, the empty row, the card body | B2, F2 | neutral | [x] | #1725 |
+| F6 | #1708 | E2E: hide through the menu, reload, restore | F3 | none | [x] | #1726 |
+| Q | #1709 | Acceptance: every locale, release note, tracker closed, plan status | F3, F4, F5, F6 | none | [x] | (this PR) |
 
 **Why B2 waits for F1:** the contract spec reads `frontend/src/lib/hidden-columns.ts` by path and the parity it pins is the point of the task; filed against a missing file it would only prove the file is missing.
 

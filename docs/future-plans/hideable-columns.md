@@ -7,9 +7,10 @@ widened here to the two Investments tables, which hard-code their columns
 today. The task list is
 [`hideable-columns-tasks.md`](./hideable-columns-tasks.md).
 
-Status: **approved-to-build**; decisions agreed in the planning session of
-2026-10-12 and recorded on the tracking issue #1700. Each task is a sub-issue
-(#1701 to #1709), one PR each.
+Status: **done**; decisions agreed in the planning session of 2026-10-12 and
+recorded on the tracking issue #1700. Each task was a sub-issue (#1701 to
+#1709), one PR each; the task table in
+[`hideable-columns-tasks.md`](./hideable-columns-tasks.md) carries every PR.
 
 ## 1. Goal
 
@@ -300,11 +301,13 @@ every table as today.
 
 ## 14. Open questions
 
-The sub-issues implement the recorded decision for each; the maintainer may
-reverse one on the sub-issue before it is dispatched.
+Each was decided as recorded in the plan and implemented unchanged; no
+sub-issue reversed one.
 
-1. Refuse or drop an unknown id on write (decision 6): refuse.
-2. A remembered sort on a hidden column (decision 8): fall back to date.
+1. Refuse or drop an unknown id on write (decision 6): refuse, implemented
+   by `IsHiddenTableColumns` in B2 (#1703).
+2. A remembered sort on a hidden column (decision 8): fall back to date,
+   implemented in `resolveRegisterSort` by F3 (#1705).
 3. Whether the holdings menu belongs in the heading block or in a new
    toolbar strip: the heading block, since the table has no pager and the
-   toolbar convention is for lists that page.
+   toolbar convention is for lists that page; implemented by F4 (#1706).
