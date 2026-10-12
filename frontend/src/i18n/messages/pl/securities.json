@@ -119,6 +119,8 @@
     "currencyLabel": "Waluta",
     "currencyNotConfigured": "{code} — brak w Twoich walutach",
     "quoteProviderLabel": "Dostawca notowań",
+    "skipPriceUpdatesLabel": "Wyłącz automatyczne aktualizacje cen",
+    "skipPriceUpdatesHelp": "Monize nie będzie pobierać cen dla tego papieru wartościowego. Użyj tej opcji dla papieru, którego żaden dostawca nie wycenia; ceny wprowadzone samodzielnie nadal się liczą. Wybranie innego dostawcy notowań lub identyfikatora instrumentu MSN ponownie włącza aktualizacje.",
     "msnIdLabel": "Identyfikator instrumentu MSN (zaawansowane)",
     "lookupProviderAriaLabel": "Dostawca wyszukiwania",
     "lookupButton": "Wyszukaj",

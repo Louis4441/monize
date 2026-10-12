@@ -119,6 +119,8 @@
     "currencyLabel": "Valuta",
     "currencyNotConfigured": "{code} — niet in uw valuta's",
     "quoteProviderLabel": "Koersprovider",
+    "skipPriceUpdatesLabel": "Automatische koersupdates uitschakelen",
+    "skipPriceUpdatesHelp": "Monize haalt geen koersen op voor dit effect. Gebruik dit voor een effect dat geen enkele aanbieder kan noteren; koersen die u zelf invoert tellen nog steeds mee. Een andere koersaanbieder of MSN-instrument-ID kiezen zet de updates weer aan.",
     "msnIdLabel": "MSN-instrument-ID (geavanceerd)",
     "lookupProviderAriaLabel": "Provider opzoeken",
     "lookupButton": "Opzoeken",

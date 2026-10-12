@@ -119,6 +119,8 @@
     "currencyLabel": "Divisa",
     "currencyNotConfigured": "{code} — no está en tus divisas",
     "quoteProviderLabel": "Proveedor de cotizaciones",
+    "skipPriceUpdatesLabel": "Desactivar las actualizaciones automáticas de precios",
+    "skipPriceUpdatesHelp": "Monize no obtendrá precios para este valor. Úselo para un valor que ningún proveedor pueda cotizar; los precios que introduzca usted mismo siguen contando. Elegir otro proveedor de cotizaciones u otro ID de instrumento de MSN vuelve a activar las actualizaciones.",
     "msnIdLabel": "ID de instrumento MSN (avanzado)",
     "lookupProviderAriaLabel": "Buscar proveedor",
     "lookupButton": "Buscar",

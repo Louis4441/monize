@@ -119,6 +119,8 @@
     "currencyLabel": "통화",
     "currencyNotConfigured": "{code} — 등록한 통화에 없음",
     "quoteProviderLabel": "시세 제공자",
+    "skipPriceUpdatesLabel": "자동 가격 업데이트 끄기",
+    "skipPriceUpdatesHelp": "Monize가 이 증권의 가격을 가져오지 않습니다. 어떤 제공업체도 가격을 제공할 수 없는 증권에 사용하세요. 직접 입력한 가격은 계속 반영됩니다. 다른 시세 제공업체나 MSN 상품 ID를 선택하면 업데이트가 다시 켜집니다.",
     "msnIdLabel": "MSN 금융 상품 ID (고급)",
     "lookupProviderAriaLabel": "제공자 조회",
     "lookupButton": "조회",

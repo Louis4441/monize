@@ -119,6 +119,8 @@
     "currencyLabel": "通貨",
     "currencyNotConfigured": "{code} — 登録した通貨にありません",
     "quoteProviderLabel": "株価プロバイダー",
+    "skipPriceUpdatesLabel": "価格の自動更新を無効にする",
+    "skipPriceUpdatesHelp": "Monize はこの銘柄の価格を取得しません。どのプロバイダーも価格を提供できない銘柄に使用してください。自分で入力した価格は引き続き反映されます。別の相場プロバイダーまたは MSN 銘柄 ID を選択すると、更新が再び有効になります。",
     "msnIdLabel": "MSN 銘柄 ID（上級者向け）",
     "lookupProviderAriaLabel": "プロバイダーを検索",
     "lookupButton": "検索",

@@ -119,6 +119,8 @@
     "currencyLabel": "Moeda",
     "currencyNotConfigured": "{code} — não está nas suas moedas",
     "quoteProviderLabel": "Fornecedor de Cotações",
+    "skipPriceUpdatesLabel": "Desativar as atualizações automáticas de preços",
+    "skipPriceUpdatesHelp": "O Monize não irá obter preços para este título. Utilize esta opção para um título que nenhum fornecedor consiga cotar; os preços que introduzir continuam a contar. Escolher outro fornecedor de cotações ou outro ID de instrumento MSN volta a ativar as atualizações.",
     "msnIdLabel": "ID de Instrumento MSN (avançado)",
     "lookupProviderAriaLabel": "Pesquisar fornecedor",
     "lookupButton": "Pesquisar",
