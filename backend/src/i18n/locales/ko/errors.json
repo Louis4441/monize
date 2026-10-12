@@ -687,7 +687,9 @@
     "transferSameCurrencyRateMustBeOne": "{{ currency }} 계좌 간 이체에는 1 이외의 환율을 지정할 수 없습니다",
     "transferRateUnavailable": "{{ from }} -> {{ to }}의 환율을 확인할 수 없습니다. 이체가 올바르게 기록되도록 exchangeRate 또는 대상 금액을 입력하세요.",
     "transferAmountsMustAgreeOnZero": "이체는 양쪽 모두에서 0이 아닌 금액을 이동해야 하거나 양쪽 모두 0이어야 합니다",
-    "transferImpliedRateInvalid": "대상 금액이 출금 금액에 대해 사용할 수 없는 환율을 의미합니다"
+    "transferImpliedRateInvalid": "대상 금액이 출금 금액에 대해 사용할 수 없는 환율을 의미합니다",
+    "externalIdNotThisTransfer": "이 externalId는 출금 계정에서 이 입금 계정으로의 이체가 아닌 거래가 이미 사용하고 있습니다",
+    "bulkItemBothKinds": "일괄 생성의 각 행에는 거래 또는 이체 중 하나만 들어갈 수 있으며 둘 다 넣을 수 없습니다"
   },
   "users": {
     "userNotFound": "사용자를 찾을 수 없습니다",
