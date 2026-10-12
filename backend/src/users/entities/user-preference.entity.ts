@@ -96,6 +96,18 @@ export class UserPreference {
   })
   dashboardWidgetConfig: Record<string, any>;
 
+  // Hidden column ids per table kind (transactions, investmentHoldings,
+  // investmentRegister). Empty object = no columns hidden anywhere. Typed as
+  // Record<string, any> (matching the other jsonb columns on
+  // relation-reachable entities, e.g. action-history) so TypeORM's DeepPartial
+  // stays satisfiable where UserPreference is reached through the User relation.
+  @Column({
+    name: "hidden_table_columns",
+    type: "jsonb",
+    default: {},
+  })
+  hiddenTableColumns: Record<string, any>;
+
   @Column({ name: "show_created_at", default: false })
   showCreatedAt: boolean;
 

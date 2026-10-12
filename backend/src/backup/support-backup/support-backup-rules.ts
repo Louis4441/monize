@@ -97,6 +97,7 @@ export const RULES: Record<string, TableRules> = {
     favourite_report_ids: keep,
     dashboard_widgets: keep,
     dashboard_widget_config: keep,
+    hidden_table_columns: keep,
     show_created_at: keep,
     time_format: keep,
     preferred_exchanges: keep,
