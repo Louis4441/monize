@@ -1,22 +1,22 @@
 # Spec: bonds on sale and the history of their terms
 
-Status: requested by the owner on 2026-10-11 (WMP/monize#24), to be built in
-the same PR as `polish-retail-bonds.md` and `bond-series-fetch.md`.
+Status: requested by the owner on 2026-10-11 (WMP/monize#24), built with
+`polish-retail-bonds.md` and `bond-series-fetch.md`.
 
 ## 1. Goal
 
 Two read-only views over the bond catalog:
 
 1. **On sale**: every series that can be bought today, side by side, with its
-   terms and with what 100 of face value is worth at maturity under stated
+   terms and with what one bond bought today is worth at maturity under stated
    assumptions, so a reader can compare products of different lengths.
 2. **History**: for each product, how the per-series terms (first-period rate,
    margin or spread, early redemption fee) changed from one sale month to the
    next.
 
 Both read only stored reference data and the engine; neither writes, and
-neither fetches from a provider on the request path (the catalog is filled by
-the daily offer cron and the backfill of section 4).
+neither fetches from a provider on the request path (the catalog is filled as
+section 4 says).
 
 ## 2. On sale
 
@@ -28,6 +28,8 @@ today) lies inside its stored `saleWindow`. Per series, newest terms version:
 instrumentId, issuerCountryCode, issuerCode, programCode, seriesCode, currency
 saleWindow       { from, to }
 periodMonths, periodCount            length = periodMonths x periodCount
+                                     (an ISSUE_DATE schedule: the whole months
+                                     from issue to maturity, at least 1, x 1)
 rateRule         the description of polish-retail-bonds.md 2.6 (type,
                  benchmarkId, first-period rate or annual rate, addend, floor)
 capitalization   NONE | COMPOUND_AT_PERIOD_END
@@ -38,7 +40,7 @@ projection       the valuation of one bond bought today, held to maturity:
                        (the total cash received, not reinvested)
   totalReturn          (cash received - face value) / face value | null
   annualizedReturn     the yearly rate r with (1 + r)^years = cash / face,
-                       years = periodMonths x periodCount / 12, to 4 places
+                       years = length in months / 12, to 4 places
                        | null
   projected            true when any period's rate is assumed
   assumptions          [{ benchmarkId, value, basis: SUPPLIED | LATEST_OBSERVATION }]
@@ -76,35 +78,49 @@ a line across them.
 
 ## 4. Backfill
 
-A one-off backfill, run by the offer cron, fills the catalog from the earliest
-month the adapter's templates are validated for (Poland: `2024-01`) to the
-current month: for each product and sale month it derives the series code
-(`bond-series-fetch.md` 4.1) and fetches every series that is not stored.
-It runs under the same `FetchSyncService` lease as the offer cron, at most one
-request every 3 seconds, stops for the day on the first
-`SOURCE_UNAVAILABLE`, and resumes the next day where it stopped (it only ever
-asks for series that are not stored, so a rerun is idempotent). A series the
-source does not publish (`SERIES_NOT_PUBLISHED`, a product not sold that
-month) is shown by the history as a missing month and asked for again on the
-next run; there are few of them, so no table records them (no migration).
+The history is filled by `BondSeriesService.backfillHistory`: from the earliest
+month the adapter's templates are validated for (`seriesValidFrom`; Poland:
+`2024-01`) to the current month, for each product and sale month it takes the
+adapter's series code (`backfillCodes`, `bond-series-fetch.md` 4.1) and fetches
+every series that is not stored, with `BACKFILL_GAP_MS` (3 seconds) before each
+request. It only ever asks for series that are not stored, so a rerun is
+idempotent. Two callers:
+
+- the daily series cron (`docs/cron-jobs.md`), unbounded and oldest month first,
+  only for the programs a security has switched `bond_auto_fetch` on for, under
+  the `bond-series` `FetchSyncService` lease; on `SOURCE_UNAVAILABLE` it ends
+  that adapter's pass and the next day's run resumes;
+- a linked security's Refresh (`fetchProgramOffer`,
+  `bond-program-securities.md` 2.5): at most `PROGRAM_BACKFILL_CHUNK` (8)
+  missing series of the program, newest month first, each taking a
+  `bond-series-attempt:<country>|<code>` lease for `BACKFILL_ATTEMPT_INTERVAL_MS`
+  (24 hours).
+
+A series the source does not publish (`SERIES_NOT_PUBLISHED`, a product not sold
+that month) is shown by the history as a missing month. The cron asks for it
+again on its next run; a Refresh asks again only after the attempt lease has
+expired. No table records them: the attempt lease is a `fetch_sync` row.
 
 ## 5. Views
 
 There is no standalone page. Both views live on the detail page of a
 program-linked bond security (`bond-program-securities.md` 3.4), fixed to that
 security's bond kind, and the data they read reaches the catalog through the
-security's Refresh (the cron and the purchase form's fetch fill it as well);
-there is no "fetch the current offer now" action.
+security's Refresh (the cron for an auto-fetch program and the purchase form's
+fetch fill it as well); there is no "fetch the current offer now" action.
 
-- **On sale** ("On sale now"): one row per series with the section 2 columns; assumption
-  inputs for each benchmark the rows read (CPI, reference rate), prefilled
-  with the latest observation and its month; sorting by annualized return,
-  length or first-period rate; a "projected" badge on any figure that rests on
-  an assumption; the letter link. Only the series of the security's own program are listed.
-- **History** (the program's terms, the series held marked): a line chart per sale month of the
-  first-period rate and the margin or spread (percent), and a step chart of the
-  fee; a table below with every series; missing months shown as gaps and
-  listed.
+- **On sale** ("On sale now", a card on the Overview tab, `BondOfferTab`): one
+  row per series with the section 2 columns; assumption inputs for each
+  benchmark the rows read (CPI, reference rate), prefilled with the latest
+  observation and its month; sorting by annualized return, length or
+  first-period rate; a "projected" badge on any figure that rests on an
+  assumption; the link to the terms' source document. Only the series of the
+  security's own program are listed.
+- **History** (the "Terms history" tab, in place of "Price history";
+  `BondHistoryBody`): a line chart per sale month of the first-period rate and
+  the margin or spread (percent) with the series held marked, and a step chart
+  of the fee; the months the catalog lacks listed and shown as gaps; below, a
+  table of every series grouped by year, the series held highlighted.
 
 Every figure is localized by the reader's number preference; every string is
 translated in every locale.

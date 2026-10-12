@@ -92,7 +92,8 @@ what the holder receives.
 - API: `GET /bonds/securities/:securityId/redemption-split?date=&quantity=&bondInstrumentId=&accountId=[&excludeTransactionId=]`
   for the caller's bond-linked security (another user's or an unlinked one is
   404). `accountId` is required, as for `series-holdings`: lots are held per
-  account. `quantity` is a positive whole number. The lots redeemed are the ones
+  account. `quantity` is a positive whole number (`ParseBondQuantityPipe`, at
+  most `MAX_REDEMPTION_QUANTITY`). The lots redeemed are the ones
   the removal resolves to: the ledger rows up to `date` (without
   `excludeTransactionId`, the row being edited) are folded by
   `bondLotsFromTransactions` with and without a REDEEM of that series appended,
@@ -102,9 +103,12 @@ what the holder receives.
   figure is null when any portion's is unknown; `refusal` is the first
   portion's). The answer is
   `{ date, quantity, principal, grossInterest, deduction, interest, principalReturned, payout, refusal }`,
-  decimal strings or null. A quantity above what the account holds of the series
-  is 400 with `errorCode` `REMOVAL_EXCEEDS_SERIES` (the write's refusal), a ledger
-  whose lots cannot be derived is 422.
+  decimal strings or null; `refusal` is a window refusal (`NOT_REDEEMABLE`,
+  `TOO_EARLY`, `TOO_LATE`, `RECORD_DAY`, `TERMS_INCOMPLETE`), `RATE_UNKNOWN` or
+  `PURCHASE_OUTSIDE_SALE_WINDOW`, never `MATURED` (a matured lot pays the maturity
+  split). A quantity above what the account holds of the series is 400 with
+  `errorCode` `REMOVAL_EXCEEDS_SERIES` (the write's refusal), a ledger whose
+  lots cannot be derived before the removal is 422.
 - Form: on `REDEEM` of a bond-linked security, once series, date and quantity are
   set, the form asks the endpoint (debounced, an answer to an earlier request is
   dropped), fills `price` (`principalReturned / quantity`) and `accruedInterest`
@@ -116,7 +120,9 @@ what the holder receives.
 
 ## 3. Discount instruments in the engine
 
-A new rate rule and schedule, for any adapter (none installed uses them yet):
+A rate rule and a schedule for discount instruments, for any adapter (none
+installed uses them yet; `docs/backend/bond-adapters.md` section 7 maps US
+Treasury bills onto them):
 
 - `rateRule: { type: "ZERO_COUPON_DISCOUNT" }`, the series terms carrying
   `instrument.issuePrice` (per face value, exact decimal) next to `faceValue`.
@@ -141,15 +147,15 @@ A new rate rule and schedule, for any adapter (none installed uses them yet):
 | EDO early, interest below the fee | accrued 1.50, fee 3.00, floor face | 100.00 | 1.50 | 1.50 | 0.00 | 100.00 | 100.00 |
 | COI early, period 2 | accrued 1.20, flat fee 2.00, no floor | 100.00 | 1.20 | 2.00 | 0.00 | 99.20 | 99.20 |
 
-The last row is the per-bond rounding of section 2 at work: an issuer that
-prices a unit to six decimals and rounds only the holding (as Treasury
+The "240 units" row is the per-bond rounding of section 2 at work: an issuer
+that prices a unit to six decimals and rounds only the holding (as Treasury
 auctions do) is modelled as one unit of the whole face value, or with
 `moneyDecimals` the issuer uses; that choice belongs to the adapter that
 defines such a series, not to the engine.
 
 ## 4. Invariants
 
-- INV-BOND-009 (new): a bond-linked redemption's split satisfies
+- INV-BOND-009: a bond-linked redemption's split satisfies
   `payout = principalReturned + interest`, `interest >= 0`, and
   `principalReturned <= principal`; at maturity `deduction = 0`. Enforced by the
   engine's unit and golden tests.

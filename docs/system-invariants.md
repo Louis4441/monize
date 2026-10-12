@@ -101,7 +101,7 @@ implied.
 | INV-LOAN-009 | An annuity installment's payment is the one stated for its own due date | enforced |
 | INV-LOAN-010 | A loan's interest category and its managed payment template's interest line change together | enforced |
 | INV-LOAN-HISTORY-001 | Historical loan interest counted as paid is ledger-backed | partial |
-| INV-BOND-001 | A bond's published terms, period rates and instruments are immutable | enforced |
+| INV-BOND-001 | A bond's published terms, period rates, instruments and programs are immutable | enforced |
 | INV-BOND-002 | A missing bond rate is unknown, never substituted | enforced |
 | INV-BOND-003 | Bond money is exact until the issue document rounds it | enforced |
 | INV-BOND-004 | Known and projected bond values never mix | enforced |
@@ -3185,7 +3185,7 @@ documented in `docs/frontend/financial-figures.md`).
 The bond engine is country-agnostic (`docs/specs/polish-retail-bonds.md`
 section 2.0); these invariants hold for every adapter.
 
-### INV-BOND-001 -- published terms, period rates and instruments are immutable
+### INV-BOND-001 -- published terms, period rates, instruments and programs are immutable
 
 ```text
 Statement           A stored bond terms version, a stored announced period
@@ -3206,31 +3206,37 @@ Enforcement         bond_reject_mutation(), a row-level BEFORE UPDATE OR DELETE
                     bond_instruments. TRUNCATE is not
                     covered: no application path issues it, and the
                     integration test reset relies on it.
-                    The seed (BondCatalogService) is not refused by the
-                    trigger, it never reaches it: it inserts with INSERT ...
-                    ON CONFLICT (bond_instrument_id, version) DO NOTHING (and
-                    the equivalent on the instrument key), so the trigger,
-                    which fires only on UPDATE and DELETE, never sees a
-                    second writer.
-                    A catalog entry's seed runs in its own transaction, so one
-                    entry's SQL failure rolls back that entry only.
+                    The catalog's writers (BondCatalogService: the boot seed
+                    of the programs, and storeEntry for a series) are not
+                    refused by the trigger, they never reach it: they insert
+                    with INSERT ... ON CONFLICT (bond_instrument_id, version)
+                    DO NOTHING (and the equivalent on the instrument and
+                    program keys), so the trigger, which fires only on UPDATE
+                    and DELETE, never sees a second writer.
+                    A series is stored in its own transaction
+                    (BondSeriesService.store) and the seed stores each program
+                    in its own, so one failing statement rolls back that one
+                    only.
 Concurrency scope   global (per instrument)
 Retry semantics     A retried or concurrent insert of the same (instrument,
                     version) or (instrument, period) inserts nothing and
                     raises nothing (ON CONFLICT DO NOTHING on the primary key
-                    makes the second writer a no-op; it never overwrites). The
-                    seed then compares the stored content_hash with the
-                    manifest's and logs a differing one and skips it: a
-                    changed manifest is not applied until it is a new version.
-Crash semantics     Single-row inserts; nothing partial to recover. A seed
-                    failure of one entry loses that entry's transaction only.
-Failure response    refuse an UPDATE or DELETE (the statement raises); a
-                    differing seed manifest is logged and skipped
+                    makes the second writer a no-op; it never overwrites).
+                    storeEntry then compares the stored content_hash with the
+                    entry's: the same hash is unchanged, a differing one is a
+                    conflict (SERIES_TERMS_CONFLICT) and nothing is written:
+                    changed terms are not applied until they are a new version.
+Crash semantics     Single-row inserts; nothing partial to recover. A failure
+                    of one series' or program's transaction loses that one
+                    only.
+Failure response    refuse an UPDATE or DELETE (the statement raises); an entry
+                    whose content differs from the stored version is refused
+                    as a conflict and logged
 Required tests      bond-reference-tables.integration.spec.ts: update and delete
                     of all four tables raise and leave the row unchanged;
-                    a seed repeated with a differing manifest leaves the stored
-                    version unchanged and inserts no second one; bond-catalog
-                    spec: one failing entry does not roll back the others.
+                    bond-catalog.service.spec.ts: a version stored again with
+                    differing content is a conflict and inserts no second one;
+                    one failing program does not roll back the others.
 Status              enforced
 ```
 
@@ -3346,9 +3352,10 @@ Enforcement         Three mechanisms.
                        a forced one), backfillSecurityHoldingPeriod and the
                        intraday chart. provider-priced.guard.spec.ts fails when
                        a method that reaches a provider stops consulting it. The
-                       per-security "refresh price" of a linked security
-                       recomputes the engine prices instead of reporting
-                       0 updated.
+                       "refresh price" of a linked security first fetches its
+                       program's current offer and a bounded piece of its
+                       history (INV-BOND-008), then recomputes the engine
+                       prices instead of reporting 0 updated.
                     2. BondPriceService.upsertPrices
                        (backend/src/bonds/bond-price.service.ts): one
                        INSERT ... ON CONFLICT (security_id, price_date) DO UPDATE
@@ -3371,9 +3378,11 @@ Enforcement         Three mechanisms.
                        LINK_REQUIRES_BOND_TYPE; changing the type of a linked
                        security away from BOND is refused unless the same
                        request unlinks it); the link is refused (code
-                       LINK_QUANTITY_NOT_BONDS) when the security has
-                       share-moving transactions whose price is not within
-                       [0.5, 2] x the face value of the row's own series
+                       LINK_QUANTITY_NOT_BONDS) when the link is being set
+                       and the security has priced trades (BUY, SELL,
+                       REINVEST and its variants, not void) whose price is
+                       not within [0.5, 2] x the face value of the row's own
+                       series
                        (its stored series, or the one on sale on its date)
                        per bond, because the quantity is then not a number of
                        bonds; bondProgramId is canonicalized to lowercase
@@ -3504,8 +3513,8 @@ Enforcement         Three mechanisms.
                        forbidNonWhitelisted, so POST /bonds/instruments/fetch
                        (throttled to 10 a minute per user), the Refresh of a
                        linked security (no input but the security; it fetches
-                       the codes the adapter's own listing names, bounded per
-                       program), the fetch_bond_series
+                       the codes the adapter's own listing and series-code
+                       grammar name, bounded per program), the fetch_bond_series
                        AI and MCP tool (the same two fields in
                        fetchBondSeriesSchema) and the daily cron
                        (BondSeriesService.scheduledCurrentOffer, which takes the
@@ -3532,7 +3541,7 @@ Enforcement         Three mechanisms.
                        refusal is a SeriesFetchError thrown before
                        BondSeriesService opens the write transaction.
                     3. One store path. BondSeriesService.store runs
-                       BondCatalogService.storeEntry (the seed's own insert)
+                       BondCatalogService.storeEntry
                        in one withScopedDb transaction whose first statement is
                        pg_advisory_xact_lock(LockScope.BondSeriesFetch, 8,
                        keyed on the deterministic instrument id). storeEntry
@@ -3784,8 +3793,16 @@ Required tests      backend/src/bonds/engine/redemption-split.spec.ts (the
                     backend/src/bonds/adapters/pl/redemption-split.golden.spec.ts
                     (the maturity value of EDO0423 stated by the Ministry, early
                     redemptions of EDO and COI worked by hand from the letters).
-                    The endpoint and the form that use the split are owed their
-                    own entries when they ship.
+                    The endpoint (GET /bonds/securities/:id/redemption-split,
+                    BondHoldingsService.redemptionSplit), which splits the lots
+                    the write guard's own derivation removes, is covered by
+                    bond-holdings.service.spec.ts, bonds.controller.spec.ts and
+                    bond-series-write.integration.spec.ts (first in first out
+                    across two purchase dates, a quantity above the series held
+                    refused, the row being edited not counted, another user's
+                    security 404); the form that fills the price and the accrued
+                    interest from it by
+                    InvestmentTransactionForm.bondRedemption.test.tsx.
 Status              enforced
 ```
 

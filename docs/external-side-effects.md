@@ -541,6 +541,12 @@ content differs from the stored one is refused as a conflict, and a correction
 is a new `termsVersion`. The refresh fetches only benchmarks a stored series
 reads, and once after a series is stored for a benchmark never fetched.
 
+A series read from its issuer (`BondSeriesService`, through `SeriesHttp.gated`:
+the `obligacjeskarbowe` breaker, no redirect followed, a 30 s timeout, a 5 MB
+cap) is fetched, cross-checked and parsed before the one write transaction that
+stores it, so a refused or failed read leaves no row, and there is nothing at the
+issuer to undo.
+
 ### Bank sync
 
 A bank sync reads from the provider and writes only to PostgreSQL, so the

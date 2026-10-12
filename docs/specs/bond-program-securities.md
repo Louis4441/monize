@@ -22,8 +22,11 @@ fetch every new series of the program automatically.
 `bond_instruments`): `id` (UUIDv5 of `issuerCountryCode|issuerCode|programCode`,
 deterministic like the instrument id), `issuer_country_code`, `issuer_code`,
 `program_code`, `currency_code`. `bond_instruments.bond_program_id` references
-it (NOT NULL). The catalog seed and a series fetch insert the program in the
-same transaction as its first instrument (`INSERT ... ON CONFLICT DO NOTHING`).
+it (NOT NULL). The boot seed inserts each installed adapter's programs, and no
+series (`INSERT ... ON CONFLICT DO NOTHING`, one transaction per program); a
+series store inserts the program, when it is not there, in the same transaction
+as the series' instrument. The program's `infoUrl` (the issuer's page for the
+product) is the adapter's (`BondProgramDefinition`), not a column.
 
 ### 2.2 Security
 
@@ -31,11 +34,10 @@ same transaction as its first instrument (`INSERT ... ON CONFLICT DO NOTHING`).
 `securities.bond_instrument_id`. `securities.bond_auto_fetch BOOLEAN NOT NULL
 DEFAULT false`. The link is checked in the write's transaction exactly as the
 series link was (`assertBondLink`): the program exists, the security's type is
-`BOND`, its currency equals the program's currency, and every share-moving
-transaction's price is within [0.5, 2] x the face value of its series. The
-unmerged migrations of this PR are rewritten in place (no release carried
-`bond_instrument_id` on `securities`); a database that applied the earlier
-version is rebuilt (demo only).
+`BOND`, its currency equals the program's currency, and, when the link is
+being set, every priced trade of the security (`BUY`, `SELL`, `REINVEST` and its
+variants, not void) is within [0.5, 2] x the face value of the series it is
+read as (`LINK_QUANTITY_NOT_BONDS`, `BOND_UNIT_PRICE_BAND`).
 
 ### 2.3 Transaction series
 
@@ -43,9 +45,10 @@ version is rebuilt (demo only).
 the series a share-moving row of a program-linked security acts on.
 
 - **Acquisition with a purchase date of its own** (`BUY`, `REINVEST`): the
-  series is the one given, or, when none is given, the program's series whose
-  stored `saleWindow` contains the transaction date (exactly one exists for a
-  Polish program). The server stores the resolved id.
+  series is the one given, or, when none is given, the program's one series
+  whose newest terms' `saleWindow` contains the transaction date
+  (`inferSeriesForDate`; none, or more than one, is not inferred). The server
+  stores the resolved id.
 - **Acquisition without one** (`ADD_SHARES`, an unpaired `TRANSFER_IN`): the
   date is the transfer's or the grant's, not a purchase date, so the series is
   never inferred from it. It must be named (`SERIES_REQUIRED`).
@@ -117,7 +120,8 @@ its date and only now resolves to a lot.
 
 The "Refresh" of a linked security (the list's or the detail page's, through
 `POST /securities/prices/refresh/selected`, and the refresh the list starts
-after a security is created or edited with auto-fetch on) fetches the current
+after a security is created with auto-fetch on, or edited so that auto-fetch is
+switched on or its program changed with it on) fetches the current
 offer of its program first (`BondSeriesService.fetchProgramOffer`: only that
 program's series on sale now that are not stored), once per distinct program,
 and then recomputes the engine prices. It is a person's action under
@@ -165,11 +169,12 @@ so none acts on them until a person does.
   product (schedule, accrual, principal rule, rate rule type and observation,
   capitalization, redemption window, blackouts, floor, rounding), without any
   per-series value (first-period rate, margin or spread, fee, sale window,
-  series code, source). The curated October 2026 manifests move to test
-  fixtures; the series fetch and the manual entry fill a template.
+  series code, source). The October 2026 series are test fixtures
+  (`backend/src/bonds/adapters/pl/fixtures/series/`); the series fetch and the
+  manual entry fill a template.
 - The boot seed stores the adapters' **programs** only (no series, no network),
   so the security form can offer them. A program's currency is created
-  inactive, as before.
+  inactive.
 - The benchmark refresh (NBP, GUS) runs, at boot and on its cron, only for the
   benchmarks a **stored series** reads; with no stored Polish series nothing is
   fetched. When a series is stored and a benchmark it reads has never been
@@ -182,16 +187,21 @@ so none acts on them until a person does.
 
 ### 3.1 Treasury bonds view
 
-Removed as a page: the on-sale and history views live on the bond security's
-detail page (3.4), and the data comes through the security's Refresh. There is
-no `/securities/bonds` route and no "fetch the current offer now" button.
+There is no standalone bonds page: the on-sale and history views live on the
+bond security's detail page (3.4), and the data comes through the security's
+Refresh. There is no `/securities/bonds` route and no "fetch the current offer
+now" button.
 
 ### 3.2 Security form
 
-Type `BOND` shows a program picker (the catalog's programs, by translated
-name, e.g. "EDO: 10-year inflation-indexed savings bonds") instead of the
-series picker. Choosing it fills symbol (`EDO`), name and currency, and shows
-the auto-fetch switch.
+Type `BOND` shows a Country select (the countries of the catalog's programs, and
+"Other"). A country shows the bond-kind picker for that country (the catalog's
+programs, by translated name, e.g. "EDO: 10-year inflation-indexed savings
+bonds"); choosing one fills symbol (`EDO`), name and currency of a new security
+and shows the auto-fetch switch. "Other" is a bond no program supports: it
+works as a plain security (no link, a quote provider) and says where support for
+another country can be requested. The wording on screen is "bond kind" for a
+program.
 
 ### 3.3 Transaction form
 
@@ -204,24 +214,33 @@ default.
 
 ### 3.4 Security page
 
-For a program-linked security, from top:
+For a program-linked security (`frontend/src/app/securities/[id]/page.tsx`,
+detail in `polish-retail-bonds.md` section 13):
 
-1. **Your series** (most prominent): one row per held series with quantity,
-   purchase dates, current value, accrued interest, early redemption value,
-   current rate and next rate change, and its maturity; totals for the
-   program. A row expands to the existing per-lot detail (rate schedule,
-   indexation notice, interest chart, scenarios).
-2. **The program**: rate rule in words, length, capitalization, current fee
-   and floor, the auto-fetch switch.
-3. **On sale now** for this program (from `GET /bonds/offer`), with the
-   comparison figures.
-4. **History** of the program's terms (from `GET /bonds/history`), the series
-   held marked on the chart and highlighted in the table.
+- **Overview**, from the top: **Your series** (most prominent: one row per held
+  series with quantity, purchase dates, current value, accrued interest, early
+  redemption value, current rate, next rate change and maturity, and the total
+  row; a row expands to the per-lot detail, rate schedule with its indexation
+  notice and interest chart; the scenario panel sits under the table);
+  **The bond kind** (rate rule in words, length, capitalization, fee and floor
+  of the newest series, the auto-fetch switch); **On sale now** for this
+  program (from `GET /bonds/offer`), with the comparison figures.
+- The **Terms history** tab, in place of Price history: the program's terms
+  from `GET /bonds/history`, the series held marked on the chart and
+  highlighted in the table.
+- The **Breakdown** card, in place of the sector, country and asset-class
+  splits: the holding by series and by maturity year, and the kind's issuer
+  country, rate, interest and term.
+- **Key information** links the issuer's page for the product (`infoUrl`);
+  **Documents** lists the issue letters of the series held and on sale.
+- **Refresh** shows a progress bar from
+  `GET /bonds/programs/:programId/refresh-progress` while it runs.
 
 ## 4. API changes
 
 - `GET /bonds/programs`: the catalog's programs (id, country, issuer, program
-  code, currency, series count, newest series).
+  code, currency, series count, newest series, `infoUrl`: the issuer's https
+  page for the product from the adapter, or null).
 - Valuation response: each lot carries `instrumentId` and `seriesCode`;
   `termsSource` and `redemptionTerms` move per series
   (`series: [{ instrumentId, seriesCode, termsSource, redemptionTerms }]`).
@@ -244,6 +263,9 @@ For a program-linked security, from top:
   `REMOVAL_EXCEEDS_SERIES`, `OVER_REMOVAL` (400, `errorCode`, translated under
   `errors.bonds`).
 - The import result carries `bondRowsWithoutSeries` when above zero.
+- `GET /bonds/securities/:securityId/redemption-split` answers what redeeming
+  bonds of a series pays, split into principal and interest
+  (`bond-redemption-interest.md` 2.2).
 
 ## 5. Invariants
 
@@ -267,4 +289,4 @@ For a program-linked security, from top:
 | Lots | unit | two series in one account; removal by series; FIFO across series; paired transfer keeps series; over-removal of a series |
 | Valuation, prices | unit, integration | two series valued by their own terms; blend; scenarios per series; recompute after a write |
 | Auto-fetch | unit | cron fetches only programs switched on; off by default |
-| Views | unit | program picker; series picker prefill and fetch; security page order and highlight; route move |
+| Views | unit | Country select and program picker; series picker prefill and fetch; security page cards, tabs and highlight; no standalone route |

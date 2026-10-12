@@ -509,6 +509,20 @@ changed for the report is that a loser no longer reaches `closePeriod` at all,
 and the residual case -- two processes on one replica during a rollout -- raises
 a named `NoOpenPeriodError` the cron counts as a skip rather than as a failure.
 
+The bond Refresh (`bonds/bond-series.service.ts` `fetchProgramOffer`, reached by
+a linked security's Refresh) claims `fetch_sync` rows through
+`FetchSyncService.claim` as a rate limit, never as the record that anything
+happened: `bond-program-refresh:<country>|<program>` for
+`PROGRAM_REFRESH_INTERVAL_MS` (90 s) and, for each history series it asks for,
+`bond-series-attempt:<country>|<code>` for `BACKFILL_ATTEMPT_INTERVAL_MS`
+(24 h). Neither lease is handed back: its expiry is the interval, so one
+program is refreshed at most once per interval and a series the source refused
+is asked for at most once a day, on any replica. A lost claim answers an empty
+run, never an error. The writes underneath are idempotent (the series store
+above), so the claim bounds cost to the issuer's site and is not what keeps the
+catalog correct; its progress (`fetch_sync.progress`) is written only under the
+lease token (`FetchSyncService.reportProgress`).
+
 ### Gaps
 
 Each row is a place where the rules above are not currently met. A row leaves

@@ -10,6 +10,7 @@
 | `database-access-and-tenancy.md` | writing a query that decides ownership, authorization, identity or which row counts |
 | `transactions-and-money.md` | touching a transaction write, an export, a loan or category derivation, or the Money import |
 | `securities-and-providers.md` | touching prices, `src/securities/`, or any `fetch` to a third party |
+| `bond-adapters.md` | adding a country's bonds, a new bond product or an engine primitive in `src/bonds/` |
 | `ai-and-payees.md` | touching `src/ai/`, `src/payees/lookup/`, a tool description or a search filter |
 | `notifications-and-push.md` | producing a notification, touching `src/push/` or `src/notification-center/`, or composing an email or push body |
 | `backup.md` | changing anything under `src/backup/` |

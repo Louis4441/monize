@@ -1,6 +1,6 @@
 # Sovereign Bonds: Plan
 
-> Spec: [`docs/specs/polish-retail-bonds.md`](../specs/polish-retail-bonds.md). Task list: [`sovereign-bonds-tasks.md`](./sovereign-bonds-tasks.md). Origin: discussion kenlasko/monize#1650.
+> Spec: [`docs/specs/polish-retail-bonds.md`](../specs/polish-retail-bonds.md). Task list: [`sovereign-bonds-tasks.md`](./sovereign-bonds-tasks.md). Adding a country: [`docs/backend/bond-adapters.md`](../backend/bond-adapters.md). Origin: discussion kenlasko/monize#1650.
 
 ## Goal
 
@@ -21,7 +21,7 @@ primitive (spec section 2.0).
   type over `BigInt`; no new dependency.
 - The bond tables are global reference data (RLS exempt), like
   `exchange_rates`.
-- `securities` stays generic: one nullable `bond_instrument_id` link and no other bond column (discussion section 23); the link is allowed only on a `BOND` security.
+- `securities` stays generic: a nullable `bond_program_id` link (the product, e.g. EDO) and the `bond_auto_fetch` switch (discussion section 23), and `investment_transactions.bond_instrument_id` names the series a share-moving row acts on; the link is allowed only on a `BOND` security (`docs/specs/bond-program-securities.md`).
 - A linked security's automatic price is the engine's: the engine row replaces
   every non-manual row and a manual price always wins (spec section 12.3).
 - The UI language never selects bond logic: a Polish-language user may hold US
@@ -38,14 +38,22 @@ backend/src/bonds/
                    business-day calendar interface and registry,
                    bond-terms (primitive unions + strict parser), benchmarks
   engine/          bond-engine.ts: terms + benchmarks + announced rates
-                   + lot + asOf -> valuation; dispatches on primitive types only
+                   + lot + asOf -> valuation (valueBondLot) and redemption
+                   split (redemptionSplit); dispatches on primitive types only
   adapters/pl/     Polish calendar, benchmark definitions (PL_NBP_REFERENCE,
-                   PL_CPI_GUS_YOY), product templates for the eight products
-                   (TOS, ROR, COI, EDO, OTS, DOR, ROS, ROD; no series is
-                   seeded), golden fixtures
-  entities/        BondInstrument, BondTermsVersion, BondPeriodRate,
-                   BenchmarkSeries, BenchmarkValue
-  bond-valuation.service.ts   withScopedDb read -> engine
+                   PL_CPI_GUS_YOY) and fetchers, product templates for the
+                   eight products (TOS, ROR, COI, EDO, OTS, DOR, ROS, ROD; no
+                   series is seeded), the series fetch (series/), golden cases
+  entities/        BondProgram, BondInstrument, BondTermsVersion,
+                   BondPeriodRate, BenchmarkSeries, BenchmarkValue
+  bond-adapter.ts, bond-adapters.ts   the adapter contract and the installed list
+  bond-catalog.service.ts       seeds programs; stores a series' terms version
+  bond-series.service.ts        series fetch, manual entry, daily offer check,
+                                backfill, the Refresh of a linked security
+  benchmark-refresh.service.ts  NBP and GUS observations
+  bond-valuation.service.ts     withScopedDb read -> engine
+  bond-price.service.ts         the daily engine price of a linked security
+  bond-offer.service.ts, bond-holdings.service.ts, bonds.controller.ts,
   bonds.module.ts
 ```
 
@@ -54,32 +62,38 @@ holds that. A product is a terms document, not code.
 
 ## Adding a country
 
+The guide is [`docs/backend/bond-adapters.md`](../backend/bond-adapters.md). In
+short:
+
 1. `adapters/<cc>/`: its business-day calendar, its benchmark definitions,
    product templates, golden tests from an officially published example.
 2. Map each local product to existing primitives. Only when an instrument
    has a new economic construction, add one primitive: a union member in the
    terms types, a parser case, one engine case, its tests.
 3. A fetcher (definition provider) per country normalizes official terms and
-   benchmark data into the same tables; it never computes a valuation.
+   benchmark data into the same tables; it never computes a valuation, and
+   nothing it does runs without a person's action (INV-BOND-008).
 
 ## Global readiness (checked against the global research note)
 
 A check on 2026-10-11 compared the engine with the owner's global research
-note (21 countries). Seams added in this PR, each Polish result unchanged:
+note (21 countries). Seams in place, each Polish result unchanged:
 rounding decimals 0 to 4 and modes `HALF_UP`, `HALF_EVEN`, `DOWN`; a switch on
 `schedule.anchor`; `principalAt(terms, { date })` instead of a constant
 nominal; `yearFraction(terms, period, from, to)` for every accrual; an
 exhaustive switch on every rate-rule type; each adapter's own timezone for
 "today" and freshness; a logged trace of every benchmark correction; the
-country-agnostic guard over the shared bond services.
+country-agnostic guard over the shared bond services; a discount instrument
+(`ZERO_COUPON_DISCOUNT`, an `instrument.issuePrice` and an `ISSUE_DATE`
+schedule of one period) and the split of a redemption into principal and
+interest (`docs/specs/bond-redemption-interest.md`).
 
 Still a change, not an addition, when the first country that needs it comes:
 
 | Mechanism | Countries (research note section) | What changes |
 | --- | --- | --- |
 | Holding a nominal amount (1,000 EUR, 0.01 EUR steps) instead of whole bonds, coupon rounded on the holding | marketable bonds of most countries (3.1-3.21) | `lot.quantity` becomes an exact decimal; a `rounding.basis` (`PER_UNIT` now, `PER_HOLDING`); the lot fold accepts fractions |
-| Coupon dates anchored on the series, irregular first coupon, accrued interest paid at purchase | marketable coupon bonds (3.1-3.21) | a new `schedule.anchor` (`ISSUE_DATE`) with explicit coupon dates; the lot carries the accrued interest paid |
-| Day-based tenors (91, 182, 364 days), discount issue | bills in most countries | a day-tenor schedule and a `ZERO_COUPON_DISCOUNT` rate rule with an issue price |
+| Coupon dates anchored on the series, irregular first coupon, accrued interest paid at purchase | marketable coupon bonds (3.1-3.21) | the `ISSUE_DATE` anchor exists for one issue-to-maturity period only; explicit coupon dates are a new schedule shape; the lot carries the accrued interest paid |
 | Indexed principal (TIPS, OATi, BTP Italia, linkers, JGBi) | 3.1-3.6, 3.9-3.11, 3.15-3.17 | a `principalRule` case reading an index ratio through `principalAt`; benchmark unit `INDEX_LEVEL` (the `unit` column is free text, no migration) |
 | Amortizing or annuity principal, gold-linked principal | 3.7, 3.15-3.18 | outstanding principal per period and `PRINCIPAL` flows per period |
 | Rate compounded from daily fixings in arrears (SOFR, SONIA, Selic, RUONIA) | 3.2, 3.4, 3.15-3.17 | a rate rule that returns a period's accrual factor from many fixings; a `DAILY` benchmark kind (the `benchmark_series.kind` CHECK widened by migration) |
@@ -92,7 +106,10 @@ Still a change, not an addition, when the first country that needs it comes:
 
 A check of the design against a second retail inflation bond. The rules below
 come from 31 CFR part 359 and TreasuryDirect, read on 2026-10-11; confirm them
-again before you implement.
+again before you implement. The worked mapping of the United States products
+(Treasury bills, I bonds, EE bonds), with each fact checked against a
+TreasuryDirect page, is `docs/backend/bond-adapters.md` section 7; it supersedes
+the list of new primitives at the end of this section.
 
 | Rule | Source | Existing primitive | New primitive needed |
 | --- | --- | --- | --- |
@@ -102,14 +119,14 @@ again before you implement.
 | Interest is earned monthly (full calendar months only) and compounded semiannually: `FV = PV·(1 + CR/2)^(m/6)` | [31 CFR 359.39](https://www.law.cornell.edu/cfr/text/31/359.39) | `COMPOUND_AT_PERIOD_END` with 6-month periods | an accrual step of whole months (the Polish bonds accrue daily) |
 | The value of a 25 USD unit is rounded to the cent, half-up (25.044 to 25.04, 25.045 to 25.05); a larger bond is a multiple of that value | [31 CFR 359.55](https://www.law.cornell.edu/cfr/text/31/359.55), [appendix A](https://www.law.cornell.edu/cfr/text/31/appendix-A_to_part_359) | `rounding` half-up per bond; the bond is the 25 USD unit | none |
 | Redemption no earlier than 12 months after purchase | TreasuryDirect | `earliestDaysAfterPurchase` counts days | a minimum holding period in months |
-| Before 5 years, the last 3 months of interest are lost | TreasuryDirect | `FORFEIT_ACCRUED_SINCE_LAST_PAYMENT` forfeits a period's accrual, not 3 months | a penalty `FORFEIT_LAST_N_MONTHS_INTEREST` with an end date for the penalty (discussion section 39 names `FORFEIT_N_DAYS_INTEREST`) |
+| Before 5 years, the last 3 months of interest are lost | TreasuryDirect | `FORFEIT_ACCRUED_SINCE_LAST_PAYMENT` forfeits a period's accrual, not 3 months | a penalty `FORFEIT_N_MONTHS_INTEREST` with an end to the penalty (discussion section 39 names `FORFEIT_N_DAYS_INTEREST`) |
 | Business days and holidays do not affect the value | 31 CFR 359.39 (whole months) | a calendar is optional | none |
 
-So a US adapter needs about four new primitives (a composite rate rule, a
-two-month index observation, a whole-month accrual step, and a month-based
-holding period and penalty). None of them changes the Polish rules, so the
-engine design holds: a new mechanism is one new union member with its parser
-case, engine case and tests.
+So a US adapter needs a handful of new primitives (a composite rate rule, an
+index observation, a whole-month accrual step, and a month-based holding period
+and penalty; EE bonds also a guaranteed value at a date). None of them changes
+the Polish rules, so the engine design holds: a new mechanism is one new union
+member with its parser case, engine case and tests.
 
 ## Phases
 
@@ -117,7 +134,7 @@ case, engine case and tests.
 | --- | --- | --- |
 | 1 | Spec, plan, domain, engine, TOS/ROR/COI/EDO, migration with the five tables, read service | golden tests E1 to E16 pass; the immutability trigger refuses an update |
 | 2 | Fetchers: NBP reference rate history (NBP API), GUS CPI, Ministry announced rates; a lease-guarded cron; provider health | stored observations for the open series; `missing` empties once fetched |
-| 3 | Link a security to a bond instrument; lots from BUY transactions; bond value in portfolio valuation, with `valuationComplete` carried | a TOS holding shows its value in the portfolio |
+| 3 | Link a security to a bond program; lots from its transactions (each names its series); bond value in portfolio valuation, with `valuationComplete` carried | a TOS holding shows its value in the portfolio |
 | 4 | UI: bond detail (period, rate, accrued, early redemption, known vs projected); i18n | the detail view of discussion section 42 |
 | 5 | OTS, DOR, ROS, ROD (older series terms: a follow-up) | each product with its golden fixture |
 | 6+ | Further countries in the order of the research note (simple marketable bonds, then indexed principal, floating, special retail); identifiers (ISIN, local series); market quote basis (percent of par, clean/dirty) | each country an adapter with golden tests; new primitives only where needed |

@@ -2,12 +2,12 @@
 
 Specification for the implementation of sovereign bond support proposed
 in discussion kenlasko/monize#1650: a small generic bond domain, and the Polish
-retail savings bonds as its first products (TOS, ROR, COI and EDO first;
-OTS, DOR, ROS and ROD later in the same PR). Written
-before the implementation, per `docs/financial-calculation-contract.md`
-section 9. The plan and the task list are
-`docs/future-plans/sovereign-bonds.md` and
-`docs/future-plans/sovereign-bonds-tasks.md`.
+retail savings bonds as its first products (TOS, ROR, COI, EDO, OTS, DOR, ROS
+and ROD). Written before the implementation, per
+`docs/financial-calculation-contract.md` section 9. The plan and the task list
+are `docs/future-plans/sovereign-bonds.md` and
+`docs/future-plans/sovereign-bonds-tasks.md`; how to add another country is
+`docs/backend/bond-adapters.md`.
 
 Every product rule below is taken from the issue letters (*listy emisyjne*) of
 the Minister of Finance for the October 2026 series, and each rule names its
@@ -23,7 +23,7 @@ is listed in section 10.
 
 ## 1. Scope
 
-In scope for this PR (it carries phases 1 to 5 of the plan):
+In scope (phases 1 to 5 of the plan):
 
 - the country-agnostic bond domain (section 2.0): instrument, versioned
   terms, rate, observation, principal, capitalization, accrual and
@@ -37,13 +37,14 @@ In scope for this PR (it carries phases 1 to 5 of the plan):
   documents under `backend/src/bonds/adapters/pl/fixtures/series/`, the
   golden and unit-test fixtures, and enter a deployment only through a fetch
   or a manual entry;
-- persistence of instruments, terms versions, announced period rates and
-  benchmark series and values in global, country-agnostic tables;
+- persistence of programs, instruments, terms versions, announced period rates
+  and benchmark series and values in global, country-agnostic tables;
 - fetchers for the NBP reference rate and the GUS CPI, run at boot and by a
   lease-guarded cron (section 9), for the benchmarks a stored series reads
   only, and the boot seed of the adapters' programs (no series);
-- linking a `securities` row to a bond instrument, lots derived from the
-  user's transactions, and a daily `bond_engine` price (section 12);
+- linking a `securities` row to a bond program (`bond-program-securities.md`),
+  lots derived from the user's transactions (each names its series), and a daily
+  `bond_engine` price (section 12);
 - the read API, the detail view and its i18n (section 13).
 
 Out of scope: a machine-readable source of the Ministry's announced period
@@ -63,22 +64,27 @@ The engine is one deterministic cash-flow engine for every country. It is
 composed of financial **primitives** (rate rule, observation rule, principal
 rule, capitalization, accrual, redemption policy, penalty, rounding), and it
 never branches on a country, an issuer, a program or a product code. A
-country is an **adapter**: data (product templates, benchmark definitions) and
-a business-day calendar, registered by id. The Polish products in this
-specification are four terms documents built only from primitives.
+country is an **adapter** (`BondAdapter`, `backend/src/bonds/bond-adapter.ts`):
+data (product templates, benchmark definitions) and a business-day calendar,
+registered by id. The Polish products in this specification are terms
+documents built only from primitives.
 
 Adding a country is: a calendar, benchmark definitions, product templates and
-golden tests. A new primitive (a new union member and one engine case) is
-added only when an instrument has a new economic construction, for example
-an inflation-indexed principal (`INDEX_RATIO`, US TIPS) or a day-count
-convention (`ACT/365F`, `BUS/252`). The research note behind this rule is
-the global sovereign bond study attached to discussion kenlasko/monize#1650,
-sections 4 to 6, 11 and 19.
+golden tests (`docs/backend/bond-adapters.md`). A new primitive (a new union
+member and one engine case) is added only when an instrument has a new
+economic construction, for example an inflation-indexed principal
+(`INDEX_RATIO`, US TIPS) or a day-count convention (`ACT/365F`, `BUS/252`).
+The research note behind this rule is the global sovereign bond study attached
+to discussion kenlasko/monize#1650, sections 4 to 6, 11 and 19.
 
 Two rules make this checkable:
 
-- A source-scanning guard fails when a file of the domain or the engine
-  imports an adapter or names a country or product literal.
+- A source-scanning guard (`country-agnostic.guard.spec.ts`) fails when a file
+  of the domain or the engine imports an adapter, when a file of the domain,
+  the engine or a shared service directly under `backend/src/bonds/` names a
+  country, currency, publisher or product literal, and when the domain or the
+  engine does number arithmetic (`Number(`, `parseFloat(`, `Math.`) outside the
+  calendar-date module.
 - The terms parser refuses an unknown primitive with `UNSUPPORTED_PRIMITIVE`
   and the path of the field. An unknown calendar or benchmark id is not a
   parse error: the valuation reports it as missing data.
@@ -95,14 +101,17 @@ The terms document (`schemaVersion` 1):
 
 ```text
 instrument      { issuerCountryCode, issuerCode, programCode, seriesCode,
-                  currency, marketability: RETAIL_REDEEMABLE, faceValue }
+                  currency, marketability: RETAIL_REDEEMABLE, faceValue,
+                  issuePrice? }   -- issuePrice only with ZERO_COUPON_DISCOUNT
 saleWindow      { from, to } | null
 schedule        { anchor: LOT_PURCHASE_DATE, periodMonths, periodCount,
                   rollDay: ANCHOR_DAY_CLAMPED, calendarId }
+              | { anchor: ISSUE_DATE, issueDate, maturityDate,
+                  periodCount: 1, calendarId }   -- ZERO_COUPON_DISCOUNT only
 accrual         { type: ACTUAL_DAYS_IN_PERIOD }
 principalRule   { type: FIXED_NOMINAL }
 rateRule        FIXED | BENCHMARK_PLUS_SPREAD | INFLATION_PLUS_MARGIN_AS_RATE
-                (see 2.2)
+                | ZERO_COUPON_DISCOUNT   (see 2.2)
 capitalization  { type: NONE } | { type: COMPOUND_AT_PERIOD_END,
                                    baseRounding: PER_PERIOD | NONE }
 redemption      { type: MATURITY_ONLY }
@@ -119,9 +128,9 @@ rounding        { moneyDecimals: 0..4, mode: HALF_UP | HALF_EVEN | DOWN }
 source          { provider, url, document }
 ```
 
-Extension points the engine already dispatches on (each a switch with
-`assertNever`, so a new member fails to compile until it has its case):
-`schedule.anchor`, `principalRule` (the principal is read through
+Extension points the engine dispatches on (each a switch with `assertNever`,
+so a new member fails to compile until it has its case): `schedule.anchor`,
+`principalRule` (the principal is read through
 `principalAt(terms, { date })`, the place an index ratio or an amortization
 schedule will be passed), `accrual.type` (read through
 `yearFraction(terms, period, from, to)`), `rateRule.type`,
@@ -143,12 +152,17 @@ The four Polish series in this vocabulary:
 | `proceedsFloor.appliesTo` | `ALL_PERIODS` | `FIRST_PERIOD` | `FIRST_PERIOD` | `ALL_PERIODS` |
 | blackouts | none | record day, 5 | record day, 5 | none |
 
-`FORFEIT_ACCRUED_SINCE_LAST_PAYMENT` was added for OTS: its letter (para 23,
+`FORFEIT_ACCRUED_SINCE_LAST_PAYMENT` is OTS's penalty: its letter (para 23,
 points 3 and 4) pays the face value on early redemption and "no interest is
 due". The penalty is the interest accrued since the period start, so the
-proceeds are the period's base. This is the first primitive a product needed
-after the engine was written; it changed the terms union, the parser and one
-engine case, and nothing country-specific.
+proceeds are the period's base.
+
+The parser (`parseBondTerms`) also holds the cross-primitive rules that are not
+a product's: only a `ZERO_COUPON_DISCOUNT` instrument has an `issuePrice` (above
+zero and below the face value), an `ISSUE_DATE` schedule (issue date before the
+maturity date) and, then, capitalization `NONE` and redemption `MATURITY_ONLY`;
+a record-day blackout needs capitalization `NONE`. No Polish product is a
+discount instrument (`bond-redemption-interest.md` section 3).
 
 The other Polish series on sale in October 2026 use the same vocabulary:
 
@@ -180,6 +194,7 @@ annex 2 and EDO annex 3 (`F = 1`, `D = ACT`). A full-period coupon is
 | `FIXED` | TOS | `annualRate` for every period (TOS letter, para 14) |
 | `BENCHMARK_PLUS_SPREAD` | ROR | k = 1: `firstPeriodRate`; k >= 2: `max(0, NBP) + spread` (ROR letter, para 15, 16, annex 1) |
 | `INFLATION_PLUS_MARGIN_AS_RATE` | COI, EDO | k = 1: `firstPeriodRate`; k >= 2: `max(0, CPI) + margin` (COI letter, para 15 to 17; EDO letter, para 15 to 17, annex 1) |
+| `ZERO_COUPON_DISCOUNT` | none installed | no rate: the value rises from `issuePrice` to `faceValue` over the one `ISSUE_DATE` period (`bond-redemption-interest.md` section 3) |
 
 Observation rules (generic primitive, then the Polish use of it):
 
@@ -240,27 +255,32 @@ and COI, the fee is capped at the accrued interest; the floor of 100 is that
 cap. From period 2, ROR and COI deduct the full fee, so the value can be below
 the face value.
 
-`compoundBaseRounding` is `PER_PERIOD` for TOS (annex 2 rounds `N_{k-1}`) and
-`NONE` for EDO (annex 3 rounds only the result).
+`capitalization.baseRounding` is `PER_PERIOD` for TOS (annex 2 rounds `N_{k-1}`)
+and `NONE` for EDO (annex 3 rounds only the result).
 
 ### 2.5 Early redemption window
 
-A request is possible from the 8th day after the purchase date
-(`purchaseDate + 8`; the sale day is not counted, Civil Code art. 111 par. 2) to 20
-calendar days before maturity (para 21 / 23 / 25). ROR and COI also exclude
-the record day (the 5th business day before a coupon date). Outside the
-window `earlyRedemptionValue` is `null` and `earlyRedemptionRefusal` names the
-rule. The engine values the request as if `d` were the calculation day; the
-five-business-day settlement lag (para 26) is out of scope.
+`redemption.earliestDaysAfterPurchase` is the issuer's number N of calendar
+days that must fully elapse after the sale ("after seven calendar days", N = 7
+in every Polish template). The sale day is not counted (Civil Code art. 111
+par. 2), so the period ends with `purchaseDate + N` and the first request is on
+`purchaseDate + N + 1`, the 8th day after the purchase for the Polish products.
+The last request is 20 calendar days before maturity
+(`latestDaysBeforeMaturity`, para 21 / 23 / 25). ROR and COI also exclude the
+record day (the 5th business day before a coupon date). Outside the window
+`earlyRedemptionValue` is `null` and `earlyRedemptionRefusal` names the rule
+(`TOO_EARLY`, `TOO_LATE`, `RECORD_DAY`, `NOT_REDEEMABLE`, `MATURED`). The engine
+values the request as if `d` were the calculation day; the five-business-day
+settlement lag (para 26) is out of scope.
 
 ### 2.6 Valuation of a lot
 
 Input: the issue, its terms version, the announced rates, the reference
 observations, the lot (`purchaseDate`, `quantity`), `asOf`, and an optional
-projection assumption (`cpiYoY`, `nbpReference`). Output:
+projection assumption (a fraction per benchmark id, `projection`). Output:
 
 ```text
-asOf, seriesCode, termsVersion, quantity
+asOf, seriesCode, termsVersion, quantity, maturityDate
 status             OPEN | MATURED | REFUSED
 refusal            { code: PURCHASE_OUTSIDE_SALE_WINDOW,
                      params: { from, to, purchaseDate } } | null
@@ -331,8 +351,8 @@ maximum is today); a future projection is the job of the scenarios (13.3).
 - **INV-BOND-001 Issue terms and announced rates are immutable.** A stored
   terms version and a stored announced rate are never updated or deleted; a
   correction is a new terms version. Mechanism: a row-level `BEFORE UPDATE OR
-  DELETE` trigger on the terms, the rates and the instruments that raises (the
-  seed's `INSERT ... ON CONFLICT DO NOTHING` never reaches it). `TRUNCATE` is not covered: it is
+  DELETE` trigger on the terms, the rates, the instruments and the programs that
+  raises (an `INSERT ... ON CONFLICT DO NOTHING` never reaches it). `TRUNCATE` is not covered: it is
   a table-owner operation no application path issues, and the integration
   test reset relies on it.
 - **INV-BOND-002 A missing rate is unknown, never substituted.** A period that
@@ -349,6 +369,9 @@ maximum is today); a future projection is the job of the scenarios (13.3).
 - **INV-BOND-004 Known and projected never mix.** A cash flow is `KNOWN` only
   when every rate it depends on is `TERMS`, `ANNOUNCED` or `DERIVED`.
   `maturityValueKnown` is `null` while any period rate is projected.
+
+INV-BOND-005 to INV-BOND-009 (price, catalog entry, series of a transaction,
+nothing without a person, redemption split) are in `docs/system-invariants.md`.
 
 ## 4. Truth table: rate of period k
 
@@ -424,7 +447,8 @@ formulas to the inputs their descriptions state.
   `AS_OF_BEFORE_PURCHASE`, `BENCHMARK_NOT_READ`, `INSTRUMENT_NOT_FOUND`,
   `INSTRUMENT_ID_NOT_FOUND`, `TERMS_NOT_FOUND` (no version stored),
   `TERMS_VERSION_NOT_FOUND` (the named version is not stored),
-  `TERMS_MISMATCH`, `AS_OF_IN_FUTURE`, `PURCHASE_OUTSIDE_SALE_WINDOW` (a lot
+  `TERMS_MISMATCH`, `PROGRAM_NOT_FOUND`, `AS_OF_IN_FUTURE`,
+  `PURCHASE_OUTSIDE_SALE_WINDOW` (a lot
   refusal, not an error), and the link and undo codes
   `LINK_REQUIRES_BOND_TYPE`, `LINK_QUANTITY_NOT_BONDS` and
   `UNDO_LINK_INVALID` (section 12.1). A lots refusal (`BondLotsRefusal`) is
@@ -469,7 +493,8 @@ Global reference data with no owner (RLS bucket: exempt, same rationale as
 
 | Table | Key | Mutability |
 | --- | --- | --- |
-| `bond_instruments` | `id`; unique `(issuer_country_code, issuer_code, series_code)` | insert only; `bond_reject_mutation()` also refuses UPDATE and DELETE (INV-BOND-001) |
+| `bond_programs` | `id` (UUIDv5 of `issuerCountryCode\|issuerCode\|programCode`); unique `(issuer_country_code, issuer_code, program_code)` | insert only; `bond_reject_mutation()` refuses UPDATE and DELETE (INV-BOND-001) |
+| `bond_instruments` | `id` (UUIDv5 of `issuerCountryCode\|issuerCode\|seriesCode`); unique `(issuer_country_code, issuer_code, series_code)`; `bond_program_id` NOT NULL | insert only; `bond_reject_mutation()` also refuses UPDATE and DELETE (INV-BOND-001) |
 | `bond_terms_versions` | `(bond_instrument_id, version)`, with `content_hash` | immutable (INV-BOND-001) |
 | `bond_period_rates` | `(bond_instrument_id, period_number)` | immutable (INV-BOND-001) |
 | `benchmark_series` | `code`; `kind` `STEP` or `MONTHLY`, `publisher`, `unit`, `covered_through` | insert; `covered_through` moves forward |
@@ -480,8 +505,10 @@ a row in the same tables. The Polish data enters through the adapter, never
 through the migration.
 
 Rates are `NUMERIC(20,10)` (an exchange-rate-like quantity, not money); the
-face value is `NUMERIC(20,4)`. All five tables are excluded from the user
-backup, and `securities.bond_instrument_id` is `NULL` in the support backup: they are reference data a deployment re-fetches. A lot is not
+face value is a decimal string in the terms document. All six tables are
+excluded from the user backup: they are reference data a deployment re-fetches.
+`securities.bond_program_id` and `investment_transactions.bond_instrument_id`
+are `NULL` in the support backup (`docs/support-backup.md`). A lot is not
 stored: lots are derived from the user's transactions (section 12.2) and the
 engine takes one as input.
 
@@ -502,8 +529,9 @@ entered series' terms versions with `INSERT ... ON CONFLICT
 version inserts nothing and raises nothing, and a stored version whose
 `content_hash` differs from the entry's is refused as a conflict; the trigger refuses any UPDATE or DELETE of a
 stored row but never fires on an insert; a currency the seed has to create is
-created inactive, through a `CurrenciesService` method only the seed uses, so
-it is not offered to users) and `BenchmarkRefreshService` (NBP and GUS observations, under
+created inactive, through a `CurrenciesService` method only the catalog uses
+(`ensureCatalogCurrency`, called by the seed and by a series store), so it is
+not offered to users) and `BenchmarkRefreshService` (NBP and GUS observations, under
 the `bond-benchmarks` lease of `FetchSyncService`, at boot and by cron, only for
 the benchmarks the newest terms version of a stored series reads, and once
 after a series is stored for a benchmark it reads that was never fetched; the
@@ -542,8 +570,8 @@ the daily fan-out):
    M - 2 (section 2.2).
 3. "After seven calendar days" allows a request on `purchaseDate + 8`
    (section 2.5). Decided 2026-10-11: `purchaseDate + N + 1`, the sale day not
-   counted (Civil Code art. 111 par. 2); `earliestDaysAfterPurchase` keeps the
-   letter's N.
+   counted (Civil Code art. 111 par. 2); `earliestDaysAfterPurchase` is the
+   letter's N (7).
 4. Polish statutory holidays include 24 December from 2025 on.
 
 Each one is to be checked against a rate table or an early redemption
@@ -606,46 +634,47 @@ Evidence collected on 2026-10-11 (supporting, not a confirmation):
 
 ### 12.1 Link
 
-> Superseded before it shipped by `docs/specs/bond-program-securities.md`: a
-> security links to a bond **program** (`securities.bond_program_id`,
+> A security links to a bond **program** (`securities.bond_program_id`,
 > `bond_auto_fetch`) and each share-moving transaction names its **series**
-> (`investment_transactions.bond_instrument_id`, INV-BOND-007). The rules of this
-> section (the checks, the canonical id, the undo, the restore) hold with the
-> program in place of the instrument.
+> (`investment_transactions.bond_instrument_id`, INV-BOND-007):
+> `docs/specs/bond-program-securities.md`.
 
-A user's `securities` row may point at one bond instrument through a nullable
-`securities.bond_instrument_id` (`ON DELETE RESTRICT`). The link is checked in
+A user's `securities` row may point at one bond program through a nullable
+`securities.bond_program_id` (`ON DELETE RESTRICT`). The link is checked in
 the write's own transaction (`assertBondLink`, shared by the update, the
 AI/MCP `update_security` preview and the undo of a security edit) and refused
-unless: the instrument exists; the security's currency equals the instrument's
+unless: the program exists; the security's currency equals the program's
 currency (INV-PRICE-001: a stored price is in the currency the security is
 recorded in; the form blocks a currency change of a linked security instead of
 silently unlinking it); the security type is `BOND` (`LINK_REQUIRES_BOND_TYPE`;
 changing the type of a linked security away from `BOND` is refused unless the
-same request unlinks it); and every share-moving transaction of the security
-has a price within [0.5, 2] x face value per bond, because otherwise the
-quantity is not a number of bonds (`LINK_QUANTITY_NOT_BONDS`). The id is
-canonicalized to lowercase before it is compared or stored, and whether the link
-changed is decided inside the transaction from the row locked `FOR UPDATE`. An
-undo or redo snapshot carries `bond_instrument_id` and is applied through the
-same checks; a restored state that fails them is refused
-(`UNDO_LINK_INVALID`). The security form sends `bondInstrumentId` only when the
-link changed. The client drops its cached valuation after a link or unlink. A linked
-security is never refreshed from a quote provider: the bond engine is its only
-automatic price source (spec section 1 of the discussion: Yahoo and MSN are not
-a source of retail bond terms or values).
+same request unlinks it); and, when the link is being set, every priced trade of
+the security (`BUY`, `SELL`, `REINVEST` and its variants, not void) has a price
+within [0.5, 2] x the face value of the series it is read as
+(`BOND_UNIT_PRICE_BAND`), because otherwise the quantity is not a number of
+bonds (`LINK_QUANTITY_NOT_BONDS`). The id is canonicalized to lowercase before
+it is compared or stored, and whether the link changed is decided inside the
+transaction from the row locked `FOR UPDATE`. An undo or redo snapshot carries
+`bond_program_id` and is applied through the same checks; a restored state that
+fails them is refused (`UNDO_LINK_INVALID`). The security form sends
+`bondProgramId` only when the link changed. A linked security is never
+refreshed from a quote provider: the bond engine is its only automatic price
+source (spec section 1 of the discussion: Yahoo and MSN are not a source of
+retail bond terms or values).
 
 `bond_programs` is seeded per deployment from the adapters' programs and
 `bond_instruments` is reference data excluded from the user backup, stored per
-deployment by a fetch or an entry, so an instrument's id is
-deterministic: a UUIDv5 of `issuerCountryCode|issuerCode|seriesCode`. A
-restored link therefore points at the same instrument on any deployment
-whose catalog has it; a restore onto a deployment without it restores the
-link as `NULL` and says so (`unlinkedBondSecurities: { count, symbols }`,
-symbols capped at 50, omitted when zero; the UI lists them and says how to
-relink), rather than failing the restore. After a restore commits, every linked
-security of the user is recomputed. The support backup always writes the link as
-`NULL`.
+deployment by a fetch or an entry, so the ids are deterministic: a UUIDv5 of
+`issuerCountryCode|issuerCode|programCode` for a program and of
+`issuerCountryCode|issuerCode|seriesCode` for an instrument. A restored link
+therefore points at the same program on any deployment whose catalog has it; a
+restore onto a deployment without it restores the link as `NULL` and says so
+(`unlinkedBondSecurities: { count, symbols }`, symbols capped at 50, omitted
+when zero; the UI lists them and says how to relink), rather than failing the
+restore. A transaction whose series the catalog lacks is restored without it
+and counted in `unlinkedBondSeries: { count }`. After a restore commits, every
+linked security of the user is recomputed. The support backup always writes the
+link and the series as `NULL`.
 
 ### 12.2 Lots
 
@@ -664,8 +693,8 @@ transactions on it, **per account**, in register order, `VOID` rows excluded:
 | `SPLIT` | lots unknown (a bond does not split); valuation refused with the reason |
 | cash-only actions | none |
 
-A lot is `{ accountId, purchaseDate, quantity, purchaseDateAssumed }`. The
-holding fields of discussion section 13 that a lot does not carry are not
+A lot is `{ accountId, instrumentId, purchaseDate, quantity, purchaseDateAssumed }`.
+The holding fields of discussion section 13 that a lot does not carry are not
 needed for retail bonds: the cost stays on the transactions (the existing
 cost-basis code reads it), and a retail bond is bought at par on the day of
 sale, so there is no separate settlement date and no accrued interest paid.
@@ -720,8 +749,12 @@ the delete touches only `bond_engine` rows.
   voided or deleted, on every entry point (UI service, bulk, AI action, MCP,
   import);
 - after a restore commits, for every linked security of the user;
-- on the per-security "refresh price" of a linked security, which recomputes
-  the engine prices instead of calling a provider;
+- on the "refresh price" of a linked security, which first fetches its
+  program's current offer and a bounded piece of its history
+  (`BondSeriesService.fetchProgramOffer`, `bond-program-securities.md` 2.5) and
+  then recomputes the engine prices instead of calling a provider;
+- after a series is stored (a fetch, the offer, the cron, the backfill, an
+  administrator's entry), for the securities of its program;
 - daily, after the benchmark refresh, for every linked security of every user
   (system fan-out, then each user in its own context; one user's failure does
   not stop the others);
@@ -733,14 +766,37 @@ definition of today, the user's financial today.
 
 ### 12.5 Read API
 
-- `GET /bonds/instruments`: the catalog (id, issuer country, issuer, program,
-  series, currency), for the link picker.
-- `GET /bonds/securities/:securityId/valuation?asOf=YYYY-MM-DD`: the lots and
-  one `BondValuation` per lot (section 2.6), plus the lot totals,
-  `benchmarkCoverage` and `redemptionTerms` (the terms' redemption policy:
-  window, penalties and proceeds floor, or null for `MATURITY_ONLY`), for the
-  detail view. `asOf` after today is refused
-  (`AS_OF_IN_FUTURE`). Owner-scoped by RLS; another user's security answers 404.
+Every route is under `AuthGuard('jwt')` (`backend/src/bonds/bonds.controller.ts`);
+the security routes are owner-scoped and another user's security, or one not
+linked to a bond program, answers 404. The catalog routes are global reference
+data.
+
+| Route | Answers | Spec |
+| --- | --- | --- |
+| `GET /bonds/programs` | the catalog's programs: `id`, `issuerCountryCode`, `issuerCode`, `programCode`, `currency`, `seriesCount`, `newestSeriesCode`, `infoUrl` (the issuer's page for the product, from the adapter; null when none) | `bond-program-securities.md` 4 |
+| `GET /bonds/programs/:programId/refresh-progress` | `{ startedAt, phase: offer\|series\|done\|null, done, total, seriesCode, finishedAt }` of the program's Refresh; 404 for an unknown program | `bond-program-securities.md` 2.5 |
+| `GET /bonds/instruments` | the catalog's series (`id`, issuer country, issuer, program, series, `currencyCode`, `termsProvider`) | here |
+| `GET /bonds/offer?countryCode=&assume=` | the series on sale, with projections | `bond-offer-and-history.md` 2 |
+| `GET /bonds/history?countryCode=&programCode=` | the program's terms by sale month | `bond-offer-and-history.md` 3 |
+| `POST /bonds/instruments/fetch` | fetch a series by country and code | `bond-series-fetch.md` 5.1 |
+| `POST /bonds/instruments/manual` | an administrator's entry | `bond-series-fetch.md` 5.2 |
+| `GET /bonds/securities/:securityId/valuation?asOf=&assume=` | see below | here |
+| `GET /bonds/securities/:securityId/scenarios?benchmarkId=&values=&asOf=` | inflation scenarios | 13.3 |
+| `GET /bonds/securities/:securityId/series-on-sale?date=` | the series a purchase on a date is given, or `null` | `bond-program-securities.md` 4 |
+| `GET /bonds/securities/:securityId/series-holdings?accountId=&date=[&excludeTransactionId=]` | the series an account holds | `bond-program-securities.md` 4 |
+| `GET /bonds/securities/:securityId/redemption-split?date=&quantity=&bondInstrumentId=&accountId=[&excludeTransactionId=]` | what redeeming pays, split into principal and interest | `bond-redemption-interest.md` 2.2 |
+| `POST /bonds/securities/:securityId/recompute` | recompute the engine prices; `{ written, deleted }` | 12.4 |
+
+The valuation answers `{ securityId, program, autoFetch, asOf, lots, series,
+benchmarkCoverage, totals, refusal }`: one `BondValuation` per lot (section
+2.6) with the lot's `instrumentId`, `accountId`, `purchaseDate`, `quantity` and
+`purchaseDateAssumed`; `series` is one `{ instrumentId, seriesCode,
+programCode, termsSource, redemptionTerms }` per series held
+(`redemptionTerms` is the terms' redemption policy: window, penalties and
+proceeds floor, or null for `MATURITY_ONLY`); `totals` are `quantity`,
+`grossValue`, `earlyRedemptionValue` and `accruedInterest`, each null unless
+every lot has the figure; `refusal` names why the lots cannot be derived.
+`asOf` after today is refused (`AS_OF_IN_FUTURE`).
 
 Market surfaces do not read the engine's rows as market moves: Top Movers and
 the daily-change boards, and the global "last price update" marker, exclude
@@ -749,23 +805,53 @@ listed, `bond_engine` has a translated label.
 
 ## 13. Detail view (phase 4)
 
-For a linked security the security page shows, per lot and in total: series,
-purchase date, maturity, current period and its rate with `rateSource`,
-principal, accrued interest, gross value, early redemption value or the
-refusal reason, the early redemption fee from `redemptionTerms`, the next
-payment (`nextPayment`), the next rate reset and the next capitalization date, known and projected maturity value, the
-projection assumptions and the `missing` list with the publisher to obtain each
-item from. Percentages and amounts are localized by the reader's number
-format preference. A lot shows its status: "Matured" for a matured lot and the
-translated refusal reason for a refused one, never "Unknown"; a period whose
-rate is unknown shows the missing observation. The card shows a partial-data
-notice when `valuationComplete === false` and names the `dataCompleteness`
-causes. The card says how fresh the reference data is from
-`benchmarkCoverage`. The issuer and program are shown by translated labels
-(`PL_MF`: Ministry of Finance (PL)), falling back to the code. The security
-form offers the instrument picker when the security type is `BOND`; with no
-instrument in the security's currency the picker says no series exists in that
-currency. The date picker's maximum is today.
+There is no standalone bonds page. The views live on the detail page of a
+program-linked security (`frontend/src/app/securities/[id]/page.tsx`):
+
+- **Overview, "Your series"** (`SecurityBondCard`): one row per series held
+  (series, quantity, purchase dates, gross value, accrued interest, early
+  redemption value, current rate, next rate change, maturity) and a total row;
+  a row expands to its lots (purchase date, status, current period, rate with
+  `rateSource`, principal, the next payment, known and projected maturity
+  value) and to the rate schedule with its indexation notice, the early
+  redemption fee from `redemptionTerms`, the next rate reset and capitalization
+  dates and the interest chart. The card has an as-of date (its maximum is
+  today), a "Recalculate prices" button (`POST .../recompute`) and the scenario
+  panel (13.3). Below the table: the projection assumptions, the
+  `missing` list with the publisher to obtain each item from, the benchmarks no
+  future period can be projected from, and how fresh the reference data is from
+  `benchmarkCoverage`. A partial-data notice names the `dataCompleteness`
+  causes when `valuationComplete === false`. A lot shows its status: "Matured"
+  for a matured lot and the translated refusal reason for a refused one, never
+  "Unknown"; a period whose rate is unknown shows the missing observation.
+- **Overview, "The bond kind"** (`SecurityBondProgramCard`): the rate rule in
+  words, length, capitalization and early redemption fee and floor, read from
+  the newest series of the program, and the auto-fetch switch.
+- **Overview, "On sale now"** (`BondOfferTab`): `bond-offer-and-history.md` 5.
+- **"Terms history" tab** (`SecurityBondTermsTab`, in place of "Price history"
+  for a bond-linked security): `bond-offer-and-history.md` 5.
+- **Breakdown card** (beside Key information, in place of the sector, country
+  and asset-class splits): the holding by series and by maturity year, and what
+  the kind is (issuer country, interest rate, interest, term to maturity).
+  Shares are drawn only when every value is known.
+- **Key information**: the issuer's page for the product, from the program's
+  `infoUrl`, shown as a link by its host when it is an https address.
+- **Documents tab, "Issue letters"** (`SecurityIssueLetters`): one row per
+  series held, then the series on sale not held, each with the document its
+  stored terms were read from and a link to it (or "entered by hand").
+- **Refresh progress** (`BondRefreshProgress`): a progress bar polling
+  `GET /bonds/programs/:programId/refresh-progress` while the security's
+  Refresh runs.
+
+Percentages and amounts are localized by the reader's number format
+preference. The issuer, program and benchmark are shown by translated labels
+(`securityDetail.bond.issuers`, `.programs`, `.benchmarks`: `PL_MF` is "Ministry
+of Finance (PL)"), falling back to the code. The security form
+(`SecurityForm`) shows a Country select for a `BOND` security (the countries of
+the catalog's programs, and "Other": a bond no program supports, which works
+as a plain security with a quote provider), then the bond-kind picker for that
+country; choosing a bond kind fills the symbol, name and currency of a new
+security and shows the auto-fetch switch.
 
 How the rate is set is shown, not only its value: the rate rule in words (for
 EDO1036: "period 1: 5.35%; then the 12-month CPI published by GUS + 2.00%
@@ -881,8 +967,6 @@ the same rule, so the per-period table and the chart can follow the reader's
 chosen scenario.
 
 ### 13.4 Chart
-
-Sections 13.1 to 13.4 and the rate schedule are implemented in this PR.
 
 A stacked chart over the lot's period ends shows cumulative interest per
 bond (or for the holding) split into fixed (period 1), margin and inflation

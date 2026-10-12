@@ -1,7 +1,7 @@
 # Spec: fetching a bond series from its official source
 
-Status: approved by the owner on 2026-10-11 (WMP/monize#24), to be built in the
-same PR as `polish-retail-bonds.md`. Design discussion kenlasko/monize#1650,
+Status: approved by the owner on 2026-10-11 (WMP/monize#24), built with
+`polish-retail-bonds.md`. Design discussion kenlasko/monize#1650,
 sections 5, 19, 21, 25, 35 and 37.
 
 ## 1. Goal
@@ -18,8 +18,9 @@ cannot be extracted), an administrator may enter the per-series values by
 hand. The structure of the product still comes from the adapter's template.
 
 In scope: the adapter contract, the Polish implementation, the API, the AI
-assistant and MCP tool, the security form's picker, a daily check of the
-current offer, the manual path for an administrator.
+assistant and MCP tool, the purchase form's series picker, the Refresh of a
+linked security, a daily check of the current offer for the programs a person
+follows, the manual path for an administrator.
 
 Out of scope: any country but Poland; a series whose product is not one of the
 eight Polish products; parsing an arbitrary prospectus (discussion section 38).
@@ -43,11 +44,17 @@ eight Polish products; parsing an arbitrary prospectus (discussion section 38).
 
 ## 3. Adapter contract
 
-`BondAdapter` gains an optional member:
+`BondAdapter` (`backend/src/bonds/bond-adapter.ts`) has these optional members
+for series (every member is described in `docs/backend/bond-adapters.md`):
 
 ```text
 fetchSeries?(seriesCode: string, fetch: BondFetch): Promise<FetchedSeries>
 manualSeries?(seriesCode: string, values: ManualSeriesValues): CatalogEntry
+seriesProviderId?   the TrackedProviderId the fetches are gated and reported under
+currentSeries?(fetch: BondFetch): Promise<string[]>   the codes on sale now
+backfillCodes?(today: string): string[]               every code from seriesValidFrom
+programOf?(seriesCode: string): string | null          the program of a code
+seriesValidFrom?    the earliest sale month (YYYY-MM) the templates are validated for
 
 FetchedSeries   { entry: CatalogEntry, sources: SourceRef[] }
 SourceRef       { provider, url, retrievedAt }          (discussion section 37)
@@ -58,7 +65,8 @@ ManualSeriesValues  the per-series values of the adapter's template, as
 An adapter without `fetchSeries` answers `SERIES_FETCH_UNSUPPORTED`. The
 adapter alone knows the host, the page layout, the document format and the
 product templates; the service knows none of them (the country-agnostic guard
-covers the service).
+covers the service). The request a person can make carries only a country (two
+upper-case letters) and a series code (letters and digits, at most 16).
 
 ## 4. Polish implementation
 
@@ -141,16 +149,21 @@ instrument id; the second finds the row and writes nothing.
   `BondInstrumentSummary` (`created: true | false`). Errors are translated
   `errors.bonds.<code>`.
 - The AI assistant and the MCP server share one tool, `fetch_bond_series`,
-  implemented on the service (both adapters wired in the same PR). It writes
-  only reference data from the official source, so it needs no confirmation
-  beyond the tool call.
-- The security form's picker: when the typed series is not in the catalog, it
-  offers "Fetch from the official source"; on success the list refreshes and
-  the new series is selected.
+  implemented on the service. It writes only reference data from the official
+  source, so it needs no confirmation beyond the tool call.
+- The purchase form's series picker (`BondSeriesSelect`): when no stored series
+  was on sale on the transaction date, it offers "Fetch {code} from the official
+  source" for the code it expects for that date; on success the list refreshes
+  and the new series is selected.
+- The Refresh of a linked security fetches its program's current offer and a
+  bounded piece of its history (`BondSeriesService.fetchProgramOffer`,
+  `bond-program-securities.md` 2.5).
 - A daily cron reads the current offer ("Sprawdź, co jest aktualnie w
-  sprzedaży") and fetches every listed series that is not stored, under a
-  `FetchSyncService` lease, so a new month's series exist without anyone
-  asking.
+  sprzedaży", the adapter's `currentSeries`) and fetches every listed series of
+  the programs a security has switched `bond_auto_fetch` on for that is not
+  stored, under a `FetchSyncService` lease, so a new month's series of a
+  followed program exist without anyone asking; then the history backfill for
+  the same programs (`bond-offer-and-history.md` 4).
 
 ### 5.2 Manual entry (administrator)
 
@@ -184,4 +197,4 @@ message in every locale.
 | Write | integration | fetch inserts one instrument and version 1; a repeat writes nothing; a differing repeat is `SERIES_TERMS_CONFLICT`; a refused fetch leaves no row; two concurrent fetches insert once |
 | Manual | integration | non-administrator refused (403); administrator entry stored with `provider: manual`; out-of-bounds values refused |
 | Tools | unit | AI and MCP tool call the service; MCP manual tool requires the administrator role |
-| Cron | unit | lease held; only missing series fetched; one failing series does not stop the others |
+| Cron | unit | lease held; only the programs switched on; only missing series fetched; one failing series does not stop the others |

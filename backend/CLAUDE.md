@@ -104,6 +104,7 @@ Each module holds `{feature}.module.ts`, controller, service, their specs, `enti
 | Ownership, identity, joint accounts, refusals, predicates | `docs/backend/database-access-and-tenancy.md` and `docs/row-level-security-contract.md` |
 | Transaction writes, exports, loans, categories, currency of a value, Money import | `docs/backend/transactions-and-money.md`, then `docs/financial-semantics.md` |
 | Prices, securities, outbound providers and the breaker | `docs/backend/securities-and-providers.md` |
+| Adding a country's bonds, a new bond product or engine primitive | `docs/backend/bond-adapters.md` |
 | AI assistant, tools, payee lookup and enrichment, search | `docs/backend/ai-and-payees.md` |
 | Notifications, push, recipient-locale copy | `docs/backend/notifications-and-push.md` |
 | Backup and restore, automatic backups, off-machine copies | `docs/backend/backup.md` and `docs/backup-restore-contract.md` |
