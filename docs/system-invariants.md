@@ -1090,7 +1090,10 @@ Statement           Every exchange_rates row a provider writes carries that
                     provider is never remembered as an empty window: a window
                     the first provider never answered may hold history the
                     second does not carry, and recording it as empty would stop
-                    the gap fill from ever asking again.
+                    the gap fill from ever asking again. What a fill learned
+                    about a pair's history (exchange_rate_coverage) is scoped to
+                    the chain that learned it: a row recorded under another
+                    ordered set of providers says nothing about this one.
 Source of truth     FX_PROVIDERS (the configured order, parsed against
                     FX_PROVIDER_NAMES) and FxRateProvider.source (the slug each
                     adapter writes).
@@ -1114,6 +1117,13 @@ Enforcement         backend/src/currencies/providers/fx-provider-chain.ts asks
                     exists and answers null only for a non-answer, but nothing
                     asks it until an operator names it in FX_PROVIDERS (the
                     default changes at task R1).
+                    exchange_rate_coverage.providers records the ordered source
+                    slugs of the chain that wrote each row;
+                    ExchangeRateHistoryService reads a row under any other
+                    value (NULL included) as unestablished, and its upsert
+                    replaces the three dates rather than merging them when the
+                    stored value differs (IS DISTINCT FROM in the ON CONFLICT
+                    clause).
 Test                The section 5 truth table of
                     docs/future-plans/exchange-rate-providers.md as named cases
                     in fx-provider-chain.spec.ts (in particular: first provider
@@ -1124,7 +1134,10 @@ Test                The section 5 truth table of
                     remembered); currencies.service.spec.ts with the chain
                     faked (no global fetch reached by the lookup);
                     fx-provider-source.guard.spec.ts;
-                    provider-call.guard.spec.ts over currencies.
+                    provider-call.guard.spec.ts over currencies;
+                    exchange-rate-history.service.spec.ts ("a coverage row is
+                    scoped to the provider chain that wrote it") and
+                    fx-rate-coverage.integration.spec.ts over the real upsert.
 Status              enforced -- the chain, the service on it, the source
                     guard and the currency lookup on the chain are on main
                     (tasks B1, B2 and B5 of
