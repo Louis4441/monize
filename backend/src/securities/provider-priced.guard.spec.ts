@@ -30,8 +30,8 @@ const PRICE_SERVICE = "securities/security-price.service.ts";
 
 /**
  * Files that call a provider's fetch method without pricing a security, each with
- * the reason. The provider implementations call one another's methods; the FX and
- * market-index services fetch a currency pair or an index, which no security link
+ * the reason. The provider implementations call one another's methods; the FX
+ * provider and the market-index service fetch a currency pair or an index, which no security link
  * can name. Shrink-only: a new reader of security quotes is not an exemption.
  */
 const EXEMPT: ReadonlyMap<string, string> = new Map([
@@ -48,8 +48,9 @@ const EXEMPT: ReadonlyMap<string, string> = new Map([
     "a provider implementation, calling its own methods",
   ],
   [
-    "currencies/exchange-rate.service.ts",
-    "fetches a currency pair's rate, not a security",
+    "currencies/providers/yahoo-fx.provider.ts",
+    "fetches a currency pair's rate, not a security (the FX provider chain " +
+      "took these calls over from exchange-rate.service.ts)",
   ],
   [
     "securities/market-index.service.ts",
