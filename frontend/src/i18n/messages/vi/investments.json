@@ -312,6 +312,11 @@
       "noLongerHeld": "{code} (không còn nắm giữ vào ngày này)",
       "noLongerHeldUnknown": "Series đã lưu (không còn nắm giữ vào ngày này)",
       "storedSeries": "Series đã lưu"
+    },
+    "bondRedemption": {
+      "summary": "Lãi {interest}, khoản khấu trừ khi hoàn trả sớm {deduction}, số tiền chi trả {payout}",
+      "outsideSaleWindow": "Một lô của đợt phát hành này được mua ngoài thời gian bán, nên không thể tách khoản hoàn trả.",
+      "failed": "Không thể tính phần tách của khoản hoàn trả."
     }
   },
   "newTransactionButton": {

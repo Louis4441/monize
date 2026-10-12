@@ -312,6 +312,11 @@
       "noLongerHeld": "{code} (ya no se posee en esta fecha)",
       "noLongerHeldUnknown": "Serie guardada (ya no se posee en esta fecha)",
       "storedSeries": "Serie guardada"
+    },
+    "bondRedemption": {
+      "summary": "Intereses {interest}, deducción por amortización anticipada {deduction}, pago {payout}",
+      "outsideSaleWindow": "Un lote de esta serie se compró fuera de su periodo de venta, por lo que no se puede desglosar el reembolso.",
+      "failed": "No se pudo calcular el desglose del reembolso."
     }
   },
   "newTransactionButton": {

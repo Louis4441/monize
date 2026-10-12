@@ -312,6 +312,11 @@
       "noLongerHeld": "{code} (इस तारीख पर अब धारित नहीं)",
       "noLongerHeldUnknown": "सहेजी गई सीरीज़ (इस तारीख पर अब धारित नहीं)",
       "storedSeries": "सहेजी गई सीरीज़"
+    },
+    "bondRedemption": {
+      "summary": "ब्याज {interest}, समय-पूर्व मोचन कटौती {deduction}, भुगतान {payout}",
+      "outsideSaleWindow": "इस सीरीज़ का एक लॉट उसकी बिक्री अवधि के बाहर खरीदा गया था, इसलिए मोचन को विभाजित नहीं किया जा सकता।",
+      "failed": "मोचन का विभाजन परिकलित नहीं किया जा सका।"
     }
   },
   "newTransactionButton": {

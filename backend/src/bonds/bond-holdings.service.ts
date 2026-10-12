@@ -2,7 +2,15 @@ import { Injectable } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { loadBondLedger, loadLinkedSecurity } from "./bond-ledger";
-import { bondLotsAsOf } from "./bond-lots";
+import {
+  BondLot,
+  BondLotTransaction,
+  bondLotsAsOf,
+  bondLotsFromTransactions,
+} from "./bond-lots";
+import { BondValuationService } from "./bond-valuation.service";
+import { ExactDecimal } from "./domain/exact-decimal";
+import { RedemptionSplitRefusal } from "./engine/redemption-split";
 import { inferSeriesForDate, seriesCodeOf } from "./bond-series-resolver";
 import { lotsRefusalException } from "./bond-write-guard";
 
@@ -21,6 +29,60 @@ export interface SeriesHolding {
 }
 
 /**
+ * What a redemption of `quantity` bonds of one series pays on a date, as
+ * returned principal and interest (`docs/specs/bond-redemption-interest.md`
+ * 2.2): the engine's split of each lot portion the removal takes, summed
+ * exactly. A figure is null when any portion's is unknown; `refusal` is the
+ * first portion's refusal.
+ */
+export interface BondRedemptionSplit {
+  readonly date: string;
+  readonly quantity: number;
+  readonly principal: string | null;
+  readonly grossInterest: string | null;
+  readonly deduction: string | null;
+  readonly interest: string | null;
+  readonly principalReturned: string | null;
+  readonly payout: string | null;
+  readonly refusal: RedemptionSplitRefusal | null;
+}
+
+const FIGURES = [
+  "principal",
+  "grossInterest",
+  "deduction",
+  "interest",
+  "principalReturned",
+  "payout",
+] as const;
+
+const lotKey = (lot: BondLot): string =>
+  `${lot.accountId ?? ""}|${lot.instrumentId ?? ""}|${lot.purchaseDate}|${lot.purchaseDateAssumed}`;
+
+/**
+ * What a removal takes: the lots before it less the lots after it, per account,
+ * series and purchase date, oldest first. Both folds are the lot derivation the
+ * write guard runs, so the first-in first-out choice is made in one place.
+ */
+function removedLots(
+  before: readonly BondLot[],
+  after: readonly BondLot[],
+): BondLot[] {
+  const left = new Map<string, number>();
+  for (const lot of after) {
+    left.set(lotKey(lot), (left.get(lotKey(lot)) ?? 0) + lot.quantity);
+  }
+  const removed: BondLot[] = [];
+  for (const lot of before) {
+    const kept = Math.min(left.get(lotKey(lot)) ?? 0, lot.quantity);
+    left.set(lotKey(lot), (left.get(lotKey(lot)) ?? 0) - kept);
+    if (lot.quantity > kept)
+      removed.push({ ...lot, quantity: lot.quantity - kept });
+  }
+  return removed;
+}
+
+/**
  * What the transaction form asks the server before it writes
  * (`docs/specs/bond-program-securities.md` section 3.3): the series a BUY on a
  * date would be given, and the series an account holds, so a removal can name
@@ -31,7 +93,10 @@ export interface SeriesHolding {
  */
 @Injectable()
 export class BondHoldingsService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly valuation: BondValuationService,
+  ) {}
 
   /**
    * The series `resolveTransactionSeries` would store for a BUY or REINVEST on
@@ -96,6 +161,73 @@ export class BondHoldingsService {
         }
       }
       return { holdings };
+    });
+  }
+
+  /**
+   * The split of redeeming `quantity` bonds of series `instrumentId` out of
+   * `accountId` on `date`. The lots taken are the ones the write's own lot
+   * derivation takes: a REDEEM of that series, appended to the account's rows up
+   * to the day (without `excludeTransactionId`, the row being edited), is folded
+   * by `bondLotsFromTransactions` and the lots it removes are the difference.
+   * A quantity above the series held in the account is refused with the removal
+   * refusal (400, `errorCode`), a ledger already underivable with 422. Reads
+   * stored terms and observations only (INV-BOND-008); nothing is written.
+   */
+  async redemptionSplit(
+    userId: string,
+    securityId: string,
+    accountId: string,
+    instrumentId: string,
+    date: string,
+    quantity: number,
+    excludeTransactionId?: string,
+  ): Promise<BondRedemptionSplit> {
+    return withScopedDb(this.dataSource, async (m) => {
+      const ledger = await loadBondLedger(m, userId, securityId);
+      const rows = ledger.transactions.filter(
+        (row) =>
+          (row.id === undefined || row.id !== excludeTransactionId) &&
+          row.transactionDate <= date,
+      );
+      const before = bondLotsFromTransactions(rows);
+      if (before.refusal !== null) {
+        throw lotsRefusalException(before.refusal, "read");
+      }
+      const redeem: BondLotTransaction = {
+        action: "REDEEM",
+        status: "ACTIVE",
+        transactionDate: date,
+        quantity: String(quantity),
+        pairedTransfer: false,
+        accountId,
+        instrumentId,
+      };
+      const after = bondLotsFromTransactions([...rows, redeem]);
+      if (after.refusal !== null) {
+        throw lotsRefusalException(after.refusal, "write");
+      }
+
+      const reference = await this.valuation.loadReference(m, instrumentId);
+      const places = reference.terms.rounding.moneyDecimals;
+      const splits = removedLots(before.lots, after.lots).map((lot) =>
+        this.valuation.redemptionSplitFrom(reference, lot, date),
+      );
+
+      const totals = {} as Record<(typeof FIGURES)[number], string | null>;
+      for (const figure of FIGURES) {
+        let total: ExactDecimal | null = ExactDecimal.ZERO;
+        for (const split of splits) {
+          const value = split[figure];
+          total =
+            total === null || value === null
+              ? null
+              : total.add(ExactDecimal.parse(value));
+        }
+        totals[figure] = total === null ? null : total.toFixed(places);
+      }
+      const refusal = splits.find((s) => s.refusal !== null)?.refusal ?? null;
+      return { date, quantity, ...totals, refusal };
     });
   }
 }

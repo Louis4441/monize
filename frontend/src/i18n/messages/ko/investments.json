@@ -312,6 +312,11 @@
       "noLongerHeld": "{code} (이 날짜에는 더 이상 보유하지 않음)",
       "noLongerHeldUnknown": "저장된 시리즈 (이 날짜에는 더 이상 보유하지 않음)",
       "storedSeries": "저장된 시리즈"
+    },
+    "bondRedemption": {
+      "summary": "이자 {interest}, 조기 상환 공제 {deduction}, 지급액 {payout}",
+      "outsideSaleWindow": "이 시리즈의 로트가 판매 기간 밖에 매수되어 상환을 분할할 수 없습니다.",
+      "failed": "상환 내역을 계산할 수 없습니다."
     }
   },
   "newTransactionButton": {

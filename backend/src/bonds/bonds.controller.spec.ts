@@ -54,7 +54,11 @@ describe("BondsController", () => {
     readRefreshProgress: jest.Mock;
   };
   let offers: { offer: jest.Mock; history: jest.Mock };
-  let holdings: { seriesOnSale: jest.Mock; seriesHoldings: jest.Mock };
+  let holdings: {
+    seriesOnSale: jest.Mock;
+    seriesHoldings: jest.Mock;
+    redemptionSplit: jest.Mock;
+  };
 
   beforeEach(async () => {
     catalog = {
@@ -82,6 +86,7 @@ describe("BondsController", () => {
     holdings = {
       seriesOnSale: jest.fn().mockResolvedValue(null),
       seriesHoldings: jest.fn().mockResolvedValue({ holdings: [] }),
+      redemptionSplit: jest.fn(),
     };
     const moduleRef = await Test.createTestingModule({
       controllers: [BondsController],
@@ -466,6 +471,7 @@ describe("BondsController", () => {
   describe("the series endpoints of the transaction form", () => {
     const ACCOUNT = "33333333-3333-4333-8333-333333333333";
     const EXCLUDED = "44444444-4444-4444-8444-444444444444";
+    const INSTRUMENT = "55555555-5555-4555-8555-555555555555";
     const pipesOf = (method: keyof BondsController) => {
       const args = Reflect.getMetadata(
         "__routeArguments__",
@@ -536,6 +542,60 @@ describe("BondsController", () => {
       await expect(
         controller.seriesHoldings(req, SECURITY, ACCOUNT, "2026-10-15"),
       ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    });
+
+    it("GET redemption-split passes the caller, the series, the account, the date and the quantity through", async () => {
+      const body = { date: "2026-10-15", quantity: 4, payout: "412.00" };
+      holdings.redemptionSplit.mockResolvedValue(body);
+      await expect(
+        controller.redemptionSplit(
+          req,
+          SECURITY,
+          "2026-10-15",
+          4,
+          INSTRUMENT,
+          ACCOUNT,
+          EXCLUDED,
+        ),
+      ).resolves.toEqual(body);
+      expect(holdings.redemptionSplit).toHaveBeenCalledWith(
+        USER,
+        SECURITY,
+        ACCOUNT,
+        INSTRUMENT,
+        "2026-10-15",
+        4,
+        EXCLUDED,
+      );
+    });
+
+    it("GET redemption-split answers 404 for another user's security", async () => {
+      holdings.redemptionSplit.mockRejectedValue(
+        new BondDataNotFoundError("INSTRUMENT_ID_NOT_FOUND", { id: "x" }, "x"),
+      );
+      await expect(
+        controller.redemptionSplit(
+          req,
+          SECURITY,
+          "2026-10-15",
+          4,
+          INSTRUMENT,
+          ACCOUNT,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("GET redemption-split validates every parameter with a pipe", () => {
+      expect(pipesOf("redemptionSplit")).toEqual(
+        expect.arrayContaining([
+          ["securityId", [ParseUUIDPipe.name]],
+          ["date", ["ParseCalendarDatePipe"]],
+          ["quantity", ["ParseBondQuantityPipe"]],
+          ["bondInstrumentId", [ParseUUIDPipe.name]],
+          ["accountId", [ParseUUIDPipe.name]],
+          ["excludeTransactionId", [ParseUUIDPipe.name]],
+        ]),
+      );
     });
 
     it("validates every parameter with a pipe", () => {

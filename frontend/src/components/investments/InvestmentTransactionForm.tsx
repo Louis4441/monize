@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, MutableRefObject } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, MutableRefObject } from 'react';
 import { useTranslations } from 'next-intl';
 import { useForm, Resolver } from 'react-hook-form';
 import '@/lib/zodConfig';
@@ -20,6 +20,12 @@ import {
   bondSeriesKind,
   useBondSeriesOptions,
 } from './BondSeriesSelect';
+import { BondRedemptionInfo } from './BondRedemptionInfo';
+import {
+  redemptionRequestKey,
+  useBondRedemptionSplit,
+  type RedemptionSplitRequest,
+} from './useBondRedemptionSplit';
 import { investmentsApi } from '@/lib/investments';
 import {
   LAST_INVESTMENT_TRANSACTION_DATE_KEY,
@@ -502,6 +508,61 @@ function InvestmentTransactionFormFields({
       { shouldDirty: false },
     );
   }, [watchedSecurityId, bondKindNow, storedBondKind, originalSecurityId, transaction, setValue]);
+  // A redemption of a program-linked bond: once series, date and quantity are
+  // set, the server splits what it pays into returned principal and interest and
+  // the form suggests both. A person's own edit of either field stands.
+  const priceEditedByPerson = useRef(false);
+  const interestEditedByPerson = useRef(false);
+  const lastFilledKey = useRef<string | null>(null);
+  const redemptionRequest: RedemptionSplitRequest | null =
+    (watchedAction as string) === 'REDEEM' &&
+    bondSeries?.kind === 'remove' &&
+    watchedSecurityId &&
+    watchedAccountId &&
+    bondSeriesValue &&
+    /^\d{4}-\d{2}-\d{2}$/.test(watchedTransactionDate) &&
+    Number.isInteger(watchedQuantity) &&
+    watchedQuantity > 0
+      ? {
+          securityId: watchedSecurityId,
+          accountId: watchedAccountId,
+          bondInstrumentId: bondSeriesValue,
+          date: watchedTransactionDate,
+          quantity: watchedQuantity,
+          excludeTransactionId: transaction?.id,
+        }
+      : null;
+  const redemption = useBondRedemptionSplit(redemptionRequest);
+  // An existing redemption opens with the values it stored; only a change of
+  // series, date, account or quantity suggests new ones.
+  const openRedemptionKey =
+    transaction && transaction.action === 'REDEEM' && transaction.bondInstrumentId
+      ? redemptionRequestKey({
+          securityId: originalSecurityId ?? '',
+          accountId: transaction.accountId,
+          bondInstrumentId: transaction.bondInstrumentId,
+          date: transaction.transactionDate,
+          quantity: Number(transaction.quantity),
+          excludeTransactionId: transaction.id,
+        })
+      : null;
+  useEffect(() => {
+    const { key, split } = redemption;
+    if (key === null || split === null) return;
+    if (key === openRedemptionKey || key === lastFilledKey.current) return;
+    lastFilledKey.current = key;
+    if (split.refusal !== null || split.principalReturned === null || split.interest === null) return;
+    const quantity = split.quantity;
+    if (!priceEditedByPerson.current) {
+      setValue('price', roundToDecimals(Number(split.principalReturned) / quantity, 10), {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+    if (!interestEditedByPerson.current) {
+      setValue('accruedInterest', Number(split.interest), { shouldDirty: true, shouldValidate: true });
+    }
+  }, [redemption, openRedemptionKey, setValue]);
   const currencySymbol = getCurrencySymbol(transactionCurrency);
   const cashCurrencySymbol = getCurrencySymbol(cashCurrency);
 
@@ -646,6 +707,7 @@ function InvestmentTransactionFormFields({
         ? proceeds - watchedCommission
         : proceeds + watchedCommission;
     if (!(gross > 0)) return;
+    priceEditedByPerson.current = true;
     setValue('price', roundToDecimals(gross / watchedQuantity, 10), {
       shouldDirty: true,
       shouldValidate: true,
@@ -1350,7 +1412,10 @@ function InvestmentTransactionFormFields({
             label={t('transactionForm.pricePerShare', { currency: transactionCurrency })}
             prefix={currencySymbol}
             value={watchedPrice || undefined}
-            onChange={(value) => setValue('price', value, { shouldValidate: true })}
+            onChange={(value) => {
+              priceEditedByPerson.current = true;
+              setValue('price', value, { shouldValidate: true });
+            }}
             decimalPlaces={6}
             min={0}
             error={errors.price?.message}
@@ -1545,13 +1610,21 @@ function InvestmentTransactionFormFields({
             label={t('transactionForm.accruedInterest', { currency: transactionCurrency })}
             prefix={currencySymbol}
             value={watchedAccruedInterest || undefined}
-            onChange={(value) => setValue('accruedInterest', value, { shouldValidate: true })}
+            onChange={(value) => {
+              interestEditedByPerson.current = true;
+              setValue('accruedInterest', value, { shouldValidate: true });
+            }}
             error={errors.accruedInterest?.message}
             allowNegative={false}
           />
           <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             {t('transactionForm.accruedInterestHelp')}
           </div>
+          {redemptionRequest !== null && (
+            <div className="mt-1">
+              <BondRedemptionInfo result={redemption} currencyCode={transactionCurrency} />
+            </div>
+          )}
         </div>
       )}
 

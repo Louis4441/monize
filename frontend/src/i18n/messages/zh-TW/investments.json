@@ -312,6 +312,11 @@
       "noLongerHeld": "{code}(在此日期已不再持有)",
       "noLongerHeldUnknown": "已儲存的系列(在此日期已不再持有)",
       "storedSeries": "已儲存的系列"
+    },
+    "bondRedemption": {
+      "summary": "利息 {interest}，提前贖回扣減 {deduction}，支付金額 {payout}",
+      "outsideSaleWindow": "此系列的一個批次在其銷售期間之外買入，因此無法拆分贖回。",
+      "failed": "無法計算贖回拆分。"
     }
   },
   "newTransactionButton": {

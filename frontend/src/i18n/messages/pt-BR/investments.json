@@ -312,6 +312,11 @@
       "noLongerHeld": "{code} (não é mais mantida nesta data)",
       "noLongerHeldUnknown": "Série salva (não é mais mantida nesta data)",
       "storedSeries": "Série salva"
+    },
+    "bondRedemption": {
+      "summary": "Juros {interest}, dedução por resgate antecipado {deduction}, pagamento {payout}",
+      "outsideSaleWindow": "Um lote desta série foi comprado fora do período de venda, então o resgate não pode ser dividido.",
+      "failed": "Não foi possível calcular a divisão do resgate."
     }
   },
   "newTransactionButton": {

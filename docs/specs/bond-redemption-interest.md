@@ -89,14 +89,30 @@ what the holder receives.
 - Engine: `redemptionSplit(lotInput, d)` in `backend/src/bonds/engine/`, beside
   `valueBondLot`, through the same schedule, rate and penalty code (a preview is
   the commit's code).
-- API: `GET /bonds/securities/:securityId/redemption-split?date=&quantity=&bondInstrumentId=`
-  for the caller's bond-linked security: the lots redeemed are the ones the
-  removal resolves to (the same FIFO per account the write guard uses), the
-  answer `{ principalReturned, interest, deduction, payout, perBond, refusal }`.
+- API: `GET /bonds/securities/:securityId/redemption-split?date=&quantity=&bondInstrumentId=&accountId=[&excludeTransactionId=]`
+  for the caller's bond-linked security (another user's or an unlinked one is
+  404). `accountId` is required, as for `series-holdings`: lots are held per
+  account. `quantity` is a positive whole number. The lots redeemed are the ones
+  the removal resolves to: the ledger rows up to `date` (without
+  `excludeTransactionId`, the row being edited) are folded by
+  `bondLotsFromTransactions` with and without a REDEEM of that series appended,
+  and the lots the removal takes are the difference, so the first-in first-out
+  choice is the write guard's own (`BondHoldingsService.redemptionSplit`). Each
+  portion goes through `redemptionSplit`, and the figures are summed exactly (a
+  figure is null when any portion's is unknown; `refusal` is the first
+  portion's). The answer is
+  `{ date, quantity, principal, grossInterest, deduction, interest, principalReturned, payout, refusal }`,
+  decimal strings or null. A quantity above what the account holds of the series
+  is 400 with `errorCode` `REMOVAL_EXCEEDS_SERIES` (the write's refusal), a ledger
+  whose lots cannot be derived is 422.
 - Form: on `REDEEM` of a bond-linked security, once series, date and quantity are
-  set, the form fills `price` and `accruedInterest` from the split and shows the
-  deduction as information. The person may still edit both (a bank statement
-  rounding differently wins); the fill is a suggestion, not a server override.
+  set, the form asks the endpoint (debounced, an answer to an earlier request is
+  dropped), fills `price` (`principalReturned / quantity`) and `accruedInterest`
+  (`interest`) and shows the interest, the deduction and the payout as
+  information. A field the person has edited is not overwritten, and an existing
+  redemption keeps its stored values on open (only a change of series, date,
+  account or quantity suggests new ones); the fill is a suggestion, not a server
+  override.
 
 ## 3. Discount instruments in the engine
 

@@ -312,6 +312,11 @@
       "noLongerHeld": "{code} (op deze datum niet meer aangehouden)",
       "noLongerHeldUnknown": "Opgeslagen serie (op deze datum niet meer aangehouden)",
       "storedSeries": "Opgeslagen serie"
+    },
+    "bondRedemption": {
+      "summary": "Rente {interest}, aftrek bij vervroegde aflossing {deduction}, uitbetaling {payout}",
+      "outsideSaleWindow": "Een lot van deze serie is buiten de verkoopperiode gekocht, dus de aflossing kan niet worden opgesplitst.",
+      "failed": "De opsplitsing van de aflossing kon niet worden berekend."
     }
   },
   "newTransactionButton": {

@@ -312,6 +312,11 @@
       "noLongerHeld": "{code} (bu tarihte artık elde değil)",
       "noLongerHeldUnknown": "Kayıtlı seri (bu tarihte artık elde değil)",
       "storedSeries": "Kayıtlı seri"
+    },
+    "bondRedemption": {
+      "summary": "Faiz {interest}, erken itfa kesintisi {deduction}, ödeme {payout}",
+      "outsideSaleWindow": "Bu serinin bir lotu satış döneminin dışında alındığından itfa bölünemiyor.",
+      "failed": "İtfa dökümü hesaplanamadı."
     }
   },
   "newTransactionButton": {

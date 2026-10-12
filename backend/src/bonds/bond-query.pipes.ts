@@ -161,3 +161,28 @@ export class ParseOptionalProgramCodePipe implements PipeTransform<
     );
   }
 }
+
+/** The most bonds one redemption split may ask about (a whole number of bonds). */
+export const MAX_REDEMPTION_QUANTITY = 1_000_000_000;
+
+/**
+ * `quantity` of the redemption-split route: a positive whole number of bonds up
+ * to `MAX_REDEMPTION_QUANTITY`, written as plain digits. The type is checked
+ * before the text, so a repeated key (an array) is refused rather than coerced.
+ */
+@Injectable()
+export class ParseBondQuantityPipe implements PipeTransform<unknown, number> {
+  transform(value: unknown): number {
+    if (typeof value === "string" && /^[1-9]\d{0,9}$/.test(value)) {
+      const quantity = Number(value);
+      if (quantity <= MAX_REDEMPTION_QUANTITY) return quantity;
+    }
+    throw new BadRequestException(
+      tr(
+        "errors.bonds.QUANTITY_INVALID",
+        `The quantity must be a positive whole number of bonds: ${typeof value === "string" ? value : ""}`,
+        { quantity: typeof value === "string" ? value : "" },
+      ),
+    );
+  }
+}

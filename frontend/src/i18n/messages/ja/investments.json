@@ -312,6 +312,11 @@
       "noLongerHeld": "{code}(この日付ではすでに保有していません)",
       "noLongerHeldUnknown": "保存済みのシリーズ(この日付ではすでに保有していません)",
       "storedSeries": "保存済みのシリーズ"
+    },
+    "bondRedemption": {
+      "summary": "利息 {interest}、期限前償還の控除 {deduction}、支払額 {payout}",
+      "outsideSaleWindow": "この銘柄のロットは販売期間外に購入されたため、償還を分割できません。",
+      "failed": "償還の内訳を計算できませんでした。"
     }
   },
   "newTransactionButton": {

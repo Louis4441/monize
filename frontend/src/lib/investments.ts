@@ -41,6 +41,7 @@ import { IntradayBreakdown } from '@/types/net-worth';
 import type {
   BondInstrumentSummary,
   BondProgramSummary,
+  BondRedemptionSplit,
   BondSeriesHoldings,
   BondSeriesOnSale,
   FetchBondSeriesResult,
@@ -1050,6 +1051,28 @@ export const investmentsApi = {
       { params: { date } },
     );
     return response.data ?? null;
+  },
+
+  // What redeeming `quantity` bonds of a series out of an account on `date` pays,
+  // split into returned principal and interest (the lots the removal takes, the
+  // engine's figures). `excludeTransactionId` leaves the row being edited out. A
+  // 400 carries the removal refusal as `errorCode`. Uncached: a trade changes it.
+  getBondRedemptionSplit: async (
+    securityId: string,
+    params: {
+      accountId: string;
+      bondInstrumentId: string;
+      date: string;
+      quantity: number;
+      excludeTransactionId?: string;
+    },
+  ): Promise<BondRedemptionSplit> => {
+    const { excludeTransactionId, ...rest } = params;
+    const response = await apiClient.get<BondRedemptionSplit>(
+      `/bonds/securities/${securityId}/redemption-split`,
+      { params: { ...rest, ...(excludeTransactionId ? { excludeTransactionId } : {}) } },
+    );
+    return response.data;
   },
 
   // The series (and quantities) the account holds of the security on `date`,

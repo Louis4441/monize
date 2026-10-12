@@ -37,7 +37,11 @@ import {
   BondDataNotFoundError,
   BondErrorParams,
 } from "./bond-errors";
-import { BondHoldingsService, SeriesHolding } from "./bond-holdings.service";
+import {
+  BondHoldingsService,
+  BondRedemptionSplit,
+  SeriesHolding,
+} from "./bond-holdings.service";
 import { BondPriceRecompute, BondPriceService } from "./bond-price.service";
 import { seriesHttpException } from "./bond-series-errors";
 import {
@@ -57,6 +61,7 @@ import {
   ParseBondAsOfPipe,
   ParseBondCountryCodePipe,
   ParseBenchmarkIdPipe,
+  ParseBondQuantityPipe,
   ParseOptionalProgramCodePipe,
   ParseScenarioValuesPipe,
 } from "./bond-query.pipes";
@@ -397,6 +402,57 @@ export class BondsController {
         securityId,
         accountId,
         date,
+        excludeTransactionId,
+      ),
+    );
+  }
+
+  @Get("securities/:securityId/redemption-split")
+  @ApiOperation({
+    summary: "What redeeming bonds of a series on a date pays, split",
+    description:
+      "The cash of redeeming `quantity` bonds of `bondInstrumentId` out of " +
+      "`accountId` on `date`, as returned principal and interest: the lots the " +
+      "removal takes are the ones the write's first-in first-out derivation " +
+      "takes (without `excludeTransactionId`, the row being edited), each split by the " +
+      "engine and the figures summed exactly. Figures are decimal strings, " +
+      "null where unknown; `refusal` names why no split is given. Reads stored " +
+      "terms only; nothing is written. A quantity above the series held answers " +
+      "400 with the removal refusal as `errorCode`.",
+  })
+  @ApiQuery({ name: "date", example: "2027-04-15" })
+  @ApiQuery({ name: "quantity", example: "10" })
+  @ApiQuery({ name: "bondInstrumentId" })
+  @ApiQuery({ name: "accountId" })
+  @ApiQuery({ name: "excludeTransactionId", required: false })
+  @ApiResponse({ status: 200, description: "The split" })
+  @ApiResponse({
+    status: 400,
+    description: "A parameter is invalid, or more is redeemed than held",
+  })
+  @ApiResponse({
+    status: 404,
+    description: "Not the caller's security, or not linked to a bond program",
+  })
+  @ApiResponse({ status: 422, description: "The lots cannot be derived" })
+  redemptionSplit(
+    @Request() req,
+    @Param("securityId", ParseUUIDPipe) securityId: string,
+    @Query("date", new ParseCalendarDatePipe()) date: string,
+    @Query("quantity", new ParseBondQuantityPipe()) quantity: number,
+    @Query("bondInstrumentId", new ParseUUIDPipe()) bondInstrumentId: string,
+    @Query("accountId", new ParseUUIDPipe()) accountId: string,
+    @Query("excludeTransactionId", new ParseUUIDPipe({ optional: true }))
+    excludeTransactionId?: string,
+  ): Promise<BondRedemptionSplit> {
+    return this.mapBondErrors(() =>
+      this.holdings.redemptionSplit(
+        req.user.id,
+        securityId,
+        accountId,
+        bondInstrumentId,
+        date,
+        quantity,
         excludeTransactionId,
       ),
     );

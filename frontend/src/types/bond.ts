@@ -331,6 +331,29 @@ export interface BondSeriesHoldings {
   holdings: BondSeriesHolding[];
 }
 
+/** Why no redemption split is given (the engine's early-redemption refusals, and a lot bought outside its series' sale window). */
+export type BondRedemptionSplitRefusal =
+  | Exclude<BondEarlyRedemptionRefusal, 'MATURED'>
+  | 'PURCHASE_OUTSIDE_SALE_WINDOW';
+
+/**
+ * `GET /bonds/securities/:securityId/redemption-split`: what redeeming
+ * `quantity` bonds of a series on `date` pays, as returned principal and
+ * interest, summed over the lots the removal takes. Exact decimal strings in the
+ * terms' money decimals; null where unknown (never zero).
+ */
+export interface BondRedemptionSplit {
+  date: string;
+  quantity: number;
+  principal: string | null;
+  grossInterest: string | null;
+  deduction: string | null;
+  interest: string | null;
+  principalReturned: string | null;
+  payout: string | null;
+  refusal: BondRedemptionSplitRefusal | null;
+}
+
 /** `POST /bonds/securities/:securityId/recompute`. */
 export interface BondPriceRecompute {
   written: number;

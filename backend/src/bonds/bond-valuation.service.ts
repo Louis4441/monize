@@ -19,8 +19,10 @@ import {
 import {
   BondEngineError,
   BondValuation,
+  redemptionSplit,
   valueBondLot,
 } from "./engine/bond-engine";
+import { RedemptionSplit } from "./engine/redemption-split";
 import { BondScenarios, scenarioOf, unknownScenario } from "./bond-scenarios";
 
 export interface ValueLotRequest {
@@ -533,6 +535,37 @@ export class BondValuationService {
       asOf,
       projection,
     });
+  }
+
+  /**
+   * The split of the cash of redeeming one lot portion on `date` into returned
+   * principal and interest, from reference data already loaded (the engine's
+   * `redemptionSplit`, the same code a commit's figures come from). Pure.
+   */
+  redemptionSplitFrom(
+    reference: BondReferenceData,
+    lot: {
+      readonly purchaseDate: string;
+      readonly quantity: number;
+      readonly purchaseDateAssumed?: boolean;
+    },
+    date: string,
+  ): RedemptionSplit {
+    return redemptionSplit(
+      {
+        terms: reference.terms,
+        termsVersion: reference.termsVersion,
+        announcedRates: reference.announcedRates,
+        benchmarks: reference.benchmarks,
+        calendars: BOND_CALENDARS,
+        lot: {
+          purchaseDate: lot.purchaseDate,
+          quantity: lot.quantity,
+          purchaseDateAssumed: lot.purchaseDateAssumed,
+        },
+      },
+      date,
+    );
   }
 
   private async loadReferenceOf(

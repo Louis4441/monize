@@ -5,6 +5,7 @@ import {
   ParseBondAsOfPipe,
   ParseBenchmarkIdPipe,
   ParseBondCountryCodePipe,
+  ParseBondQuantityPipe,
   ParseOptionalProgramCodePipe,
   ParseScenarioValuesPipe,
 } from "./bond-query.pipes";
@@ -157,4 +158,32 @@ describe("ParseOptionalProgramCodePipe", () => {
       expect(() => pipe.transform(value)).toThrow(BadRequestException);
     },
   );
+});
+
+describe("ParseBondQuantityPipe", () => {
+  const pipe = new ParseBondQuantityPipe();
+
+  it("accepts a positive whole number of bonds", () => {
+    expect(pipe.transform("1")).toBe(1);
+    expect(pipe.transform("240")).toBe(240);
+    expect(pipe.transform("1000000000")).toBe(1_000_000_000);
+  });
+
+  it.each([
+    undefined,
+    "",
+    "0",
+    "-1",
+    "1.5",
+    "01",
+    "1e3",
+    " 4",
+    "1000000001",
+    "99999999999",
+    ["1", "2"],
+    4,
+    null,
+  ])("refuses %p with a 400", (value) => {
+    expect(() => pipe.transform(value)).toThrow(BadRequestException);
+  });
 });

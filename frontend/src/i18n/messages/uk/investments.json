@@ -312,6 +312,11 @@
       "noLongerHeld": "{code} (на цю дату вже не числиться)",
       "noLongerHeldUnknown": "Збережена серія (на цю дату вже не числиться)",
       "storedSeries": "Збережена серія"
+    },
+    "bondRedemption": {
+      "summary": "Відсотки {interest}, утримання за дострокове погашення {deduction}, виплата {payout}",
+      "outsideSaleWindow": "Лот цієї серії куплено поза періодом її продажу, тому погашення не можна розділити.",
+      "failed": "Не вдалося розрахувати розбивку погашення."
     }
   },
   "newTransactionButton": {

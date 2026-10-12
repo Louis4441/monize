@@ -1,10 +1,13 @@
 import {
+  BadRequestException,
   NotFoundException,
   UnprocessableEntityException,
 } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import { BondHoldingsService } from "./bond-holdings.service";
+import { BondValuationService } from "./bond-valuation.service";
+import type { RedemptionSplit } from "./engine/redemption-split";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -78,8 +81,47 @@ function setup(
       return [];
     },
   );
-  const service = new BondHoldingsService(dataSource as unknown as DataSource);
-  return { service, manager };
+  // One bond of the series pays 100.00 principal and interest 0.10 per day
+  // held since the purchase date (a stand-in for the engine, which has its own
+  // suite): the portions the service asks about are what these figures show.
+  const valuation = {
+    loadReference: jest.fn(async () => ({
+      terms: { rounding: { moneyDecimals: 2 } },
+    })),
+    redemptionSplitFrom: jest.fn(
+      (
+        _reference: unknown,
+        lot: { purchaseDate: string; quantity: number },
+        date: string,
+      ): RedemptionSplit => {
+        const days = Math.round(
+          (Date.parse(date) - Date.parse(lot.purchaseDate)) / 86_400_000,
+        );
+        const interest = (days * 10 * lot.quantity) / 100;
+        const money = (v: number) => v.toFixed(2);
+        const figures = {
+          principal: money(lot.quantity * 100),
+          grossInterest: money(interest),
+          deduction: "0.00",
+          interest: money(interest),
+          principalReturned: money(lot.quantity * 100),
+          payout: money(lot.quantity * 100 + interest),
+        };
+        return {
+          date,
+          quantity: lot.quantity,
+          ...figures,
+          perBond: figures,
+          refusal: null,
+        };
+      },
+    ),
+  };
+  const service = new BondHoldingsService(
+    dataSource as unknown as DataSource,
+    valuation as unknown as BondValuationService,
+  );
+  return { service, manager, valuation };
 }
 
 describe("BondHoldingsService.seriesOnSale", () => {
@@ -217,6 +259,146 @@ describe("BondHoldingsService.seriesHoldings", () => {
         SEC,
         ACC,
         "2026-12-31",
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe("BondHoldingsService.redemptionSplit", () => {
+  const ledger = [
+    row({ id: "b1", quantity: "3", tx_date: "2026-01-10" }),
+    row({ id: "b2", quantity: "5", tx_date: "2026-01-20" }),
+    row({
+      id: "b3",
+      quantity: "9",
+      tx_date: "2026-01-05",
+      bond_instrument_id: COI,
+    }),
+    row({
+      id: "b4",
+      quantity: "4",
+      tx_date: "2026-01-01",
+      account_id: OTHER_ACC,
+    }),
+  ];
+
+  it("splits the lots the removal takes first in first out, across purchase dates, and sums them exactly", async () => {
+    const { service, valuation } = setup({ ledger });
+    const split = await service.redemptionSplit(
+      USER,
+      SEC,
+      ACC,
+      EDO,
+      "2026-02-09",
+      4,
+    );
+    // 3 bonds of 10 Jan (30 days) and 1 bond of 20 Jan (20 days).
+    expect(
+      valuation.redemptionSplitFrom.mock.calls.map(([, lot]) => lot),
+    ).toEqual([
+      expect.objectContaining({ purchaseDate: "2026-01-10", quantity: 3 }),
+      expect.objectContaining({ purchaseDate: "2026-01-20", quantity: 1 }),
+    ]);
+    expect(split).toEqual({
+      date: "2026-02-09",
+      quantity: 4,
+      principal: "400.00",
+      grossInterest: "11.00",
+      deduction: "0.00",
+      interest: "11.00",
+      principalReturned: "400.00",
+      payout: "411.00",
+      refusal: null,
+    });
+  });
+
+  it("leaves a lot the edited row already took available when it is excluded", async () => {
+    const { service, valuation } = setup({
+      ledger: [
+        ...ledger,
+        row({
+          id: "r1",
+          action: "REDEEM",
+          quantity: "8",
+          tx_date: "2026-02-01",
+        }),
+      ],
+    });
+    await expect(
+      service.redemptionSplit(USER, SEC, ACC, EDO, "2026-02-09", 4),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await service.redemptionSplit(USER, SEC, ACC, EDO, "2026-02-09", 4, "r1");
+    expect(valuation.redemptionSplitFrom).toHaveBeenCalled();
+  });
+
+  it("makes a figure null when any portion's is unknown and returns the refusal", async () => {
+    const { service, valuation } = setup({ ledger });
+    const base = valuation.redemptionSplitFrom.getMockImplementation()!;
+    valuation.redemptionSplitFrom.mockImplementation((r, lot, date) =>
+      lot.purchaseDate === "2026-01-20"
+        ? {
+            ...base(r, lot, date),
+            interest: null,
+            payout: null,
+            principalReturned: null,
+            grossInterest: null,
+            deduction: null,
+            refusal: "RATE_UNKNOWN",
+          }
+        : base(r, lot, date),
+    );
+    await expect(
+      service.redemptionSplit(USER, SEC, ACC, EDO, "2026-02-09", 4),
+    ).resolves.toMatchObject({
+      principal: "400.00",
+      interest: null,
+      payout: null,
+      refusal: "RATE_UNKNOWN",
+    });
+  });
+
+  it("refuses a quantity above what the account holds of the series with the removal refusal", async () => {
+    const { service } = setup({ ledger });
+    const error = await service
+      .redemptionSplit(USER, SEC, ACC, EDO, "2026-02-09", 9)
+      .catch((e) => e);
+    expect(error).toBeInstanceOf(BadRequestException);
+    expect(error.getResponse()).toMatchObject({
+      errorCode: "REMOVAL_EXCEEDS_SERIES",
+    });
+  });
+
+  it("takes only the lots acquired on or before the date", async () => {
+    const { service } = setup({ ledger });
+    await expect(
+      service.redemptionSplit(USER, SEC, ACC, EDO, "2026-01-15", 4),
+    ).rejects.toMatchObject({
+      response: { errorCode: "REMOVAL_EXCEEDS_SERIES" },
+    });
+  });
+
+  it("is a 422 when the ledger's lots cannot be derived, and a 404 for another user's security", async () => {
+    const broken = setup({
+      ledger: [
+        row({
+          id: "s1",
+          action: "SELL",
+          quantity: "4",
+          bond_instrument_id: null,
+        }),
+      ],
+    });
+    await expect(
+      broken.service.redemptionSplit(USER, SEC, ACC, EDO, "2026-02-09", 1),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    await expect(
+      setup({ ledger }).service.redemptionSplit(
+        "someone-else",
+        SEC,
+        ACC,
+        EDO,
+        "2026-02-09",
+        1,
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
   });

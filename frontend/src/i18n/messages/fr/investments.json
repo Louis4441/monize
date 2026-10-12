@@ -312,6 +312,11 @@
       "noLongerHeld": "{code} (n'est plus détenue à cette date)",
       "noLongerHeldUnknown": "Série enregistrée (n'est plus détenue à cette date)",
       "storedSeries": "Série enregistrée"
+    },
+    "bondRedemption": {
+      "summary": "Intérêts {interest}, retenue de remboursement anticipé {deduction}, versement {payout}",
+      "outsideSaleWindow": "Un lot de cette série a été acheté en dehors de sa période de vente ; le remboursement ne peut pas être ventilé.",
+      "failed": "La ventilation du remboursement n'a pas pu être calculée."
     }
   },
   "newTransactionButton": {

@@ -551,6 +551,100 @@ describe("a program-linked security's series on write (integration, INV-BOND-007
     });
   });
 
+  describe("redemption-split reads the lots the removal takes", () => {
+    const DAY = "2026-12-01";
+    const split = (
+      quantity: number,
+      over: { user?: string; account?: string; exclude?: string } = {},
+    ) =>
+      withUserContext(over.user ?? userId, () =>
+        holdings.redemptionSplit(
+          over.user ?? userId,
+          securityId,
+          over.account ?? accountId,
+          OCT,
+          DAY,
+          quantity,
+          over.exclude,
+        ),
+      );
+    const portion = async (purchaseDate: string, quantity: number) =>
+      withUserContext(userId, () =>
+        dataSource.transaction(async (m) =>
+          valuation.redemptionSplitFrom(
+            await valuation.loadReference(m, OCT),
+            { purchaseDate, quantity },
+            DAY,
+          ),
+        ),
+      );
+
+    it("splits two lots of one series bought on two dates first in first out, and sums the portions exactly", async () => {
+      await raw("BUY", "2026-10-05", 3, OCT);
+      await raw("BUY", "2026-10-12", 5, OCT);
+      const first = await portion("2026-10-05", 3);
+      const second = await portion("2026-10-12", 1);
+      expect(first.refusal).toBeNull();
+      expect(second.refusal).toBeNull();
+
+      const four = await split(4);
+      expect(four.refusal).toBeNull();
+      expect(four.principal).toBe("400.00");
+      expect(four.interest).toBe(
+        (Number(first.interest) + Number(second.interest)).toFixed(2),
+      );
+      expect(four.payout).toBe(
+        (Number(first.payout) + Number(second.payout)).toFixed(2),
+      );
+      expect(
+        Number(four.principalReturned) + Number(four.interest),
+      ).toBeCloseTo(Number(four.payout), 2);
+      // Only the first lot: one purchase date, the oldest.
+      expect((await split(3)).interest).toBe(first.interest);
+    });
+
+    it("refuses a quantity above what the account holds of the series, and leaves the other account's lots alone", async () => {
+      await raw("BUY", "2026-10-05", 3, OCT);
+      await raw("BUY", "2026-10-12", 5, OCT, secondAccountId);
+      const error = await split(4).catch((e) => e);
+      expect(error.getResponse()).toMatchObject({
+        errorCode: "REMOVAL_EXCEEDS_SERIES",
+      });
+      await expect(
+        split(5, { account: secondAccountId }),
+      ).resolves.toMatchObject({ principal: "500.00", refusal: null });
+    });
+
+    it("does not count the row being edited, and writes nothing", async () => {
+      await raw("BUY", "2026-10-05", 3, OCT);
+      const redeem = await raw("REDEEM", "2026-11-20", 3, OCT);
+      await expect(split(3)).rejects.toMatchObject({
+        response: { errorCode: "REMOVAL_EXCEEDS_SERIES" },
+      });
+      const rows = await rowCount();
+      await expect(split(3, { exclude: redeem })).resolves.toMatchObject({
+        principal: "300.00",
+      });
+      expect(await rowCount()).toBe(rows);
+    });
+
+    it("is a 404 for another user's security", async () => {
+      await raw("BUY", "2026-10-05", 3, OCT);
+      await expect(
+        asOther(() =>
+          holdings.redemptionSplit(
+            otherUserId,
+            securityId,
+            accountId,
+            OCT,
+            DAY,
+            1,
+          ),
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
   describe("linking a security reads each row as the series it will be read as (G)", () => {
     const link = (id: string) =>
       withUserContext(userId, () =>

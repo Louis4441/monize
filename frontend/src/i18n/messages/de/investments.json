@@ -312,6 +312,11 @@
       "noLongerHeld": "{code} (an diesem Datum nicht mehr gehalten)",
       "noLongerHeldUnknown": "Gespeicherte Serie (an diesem Datum nicht mehr gehalten)",
       "storedSeries": "Gespeicherte Serie"
+    },
+    "bondRedemption": {
+      "summary": "Zinsen {interest}, Abzug für vorzeitige Rückzahlung {deduction}, Auszahlung {payout}",
+      "outsideSaleWindow": "Ein Los dieser Serie wurde außerhalb ihres Verkaufszeitraums gekauft, daher lässt sich die Rückzahlung nicht aufteilen.",
+      "failed": "Die Aufteilung der Rückzahlung konnte nicht berechnet werden."
     }
   },
   "newTransactionButton": {
