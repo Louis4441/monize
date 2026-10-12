@@ -7,6 +7,12 @@ export interface BenchmarkSeriesDefinition {
   readonly kind: "STEP" | "MONTHLY";
   readonly publisher: string;
   readonly sourceUrl: string;
+  /**
+   * The only hosts the fetch may talk to: exact host names, https, default
+   * port. The door refuses any other address, including a redirect target
+   * (`FetchPolicy` in `series-http.ts`); name every host the fetcher requests.
+   */
+  readonly hosts: readonly string[];
   /** Values are stored as fractions: 0.0575 for 5.75 percent. */
   readonly unit: "RATE_FRACTION";
   /** The outbound provider the fetch is gated and reported under. */
@@ -147,6 +153,13 @@ export class SeriesFetchError extends Error {
 export interface BondAdapter {
   readonly countryCode: string;
   /**
+   * The repo-relative path of the country's spec under `docs/specs/`. A country
+   * is not installed without it: `adapter-docs.guard.spec.ts` requires that it
+   * exists and names every program code, every benchmark code, the country code
+   * and an official https source (`docs/backend/bond-adapters.md` section 5).
+   */
+  readonly specDoc: string;
+  /**
    * IANA zone of the market's publishers. The adapter's own calendar day decides
    * whether one of its series is fresh (`BenchmarkRefreshService`).
    */
@@ -186,6 +199,13 @@ export interface BondAdapter {
    * only the programs a person has switched auto-fetch on for.
    */
   programOf?(seriesCode: string): string | null;
+  /**
+   * The code of the series of `programCode` sold on `saleDate` (YYYY-MM-DD, a
+   * valid calendar date), or null when the adapter cannot name one (not its
+   * program, or a code that does not follow from the date). Lets a purchase
+   * form offer "Fetch <code>" without a client knowing the country's grammar.
+   */
+  seriesCodeFor?(programCode: string, saleDate: string): string | null;
   /**
    * The earliest sale month (`YYYY-MM`) the adapter's templates are validated
    * for, the lower bound of its series history.

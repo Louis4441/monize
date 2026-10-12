@@ -7,6 +7,7 @@ import { BondAdapter } from "./bond-adapter";
 import { INSTALLED_BOND_ADAPTERS } from "./bond-adapters";
 import { BondCatalogService } from "./bond-catalog.service";
 import { BondSeriesService } from "./bond-series.service";
+import { SeriesHttp } from "./series-http";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -127,6 +128,7 @@ describe("no bond data without a person's action (INV-BOND-008)", () => {
       health as never,
       fetchSync as never,
       catalog,
+      new SeriesHttp(health as never),
     );
     refresh.onApplicationBootstrap();
     await new Promise((resolve) => setImmediate(resolve));

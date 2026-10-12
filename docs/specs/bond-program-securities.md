@@ -252,6 +252,18 @@ detail in `polish-retail-bonds.md` section 13):
   series was on sale that day: the series the server would infer for a BUY or
   REINVEST on that date (the same `seriesOnSaleSql` as the write). 404 for
   another user's or an unlinked security.
+- `GET /bonds/securities/:securityId/expected-series?date=YYYY-MM-DD` answers
+  `{ seriesCode: string | null, countryCode: string, fetchable: boolean }`: the
+  code of the series a purchase on `date` would carry, by the grammar of the
+  adapter of the security's program's country (`BondAdapter.seriesCodeFor`, e.g.
+  `EDO1036` for an EDO bought in October 2026), and whether that country can
+  fetch a series (the adapter has `fetchSeries` and `seriesProviderId`). The
+  purchase form offers "Fetch <code>" from it and holds no code grammar of its
+  own. `seriesCode` is null when the adapter has no `seriesCodeFor` or does not
+  know the program; a country with no adapter answers `seriesCode` null and
+  `fetchable` false. `countryCode` is the program's issuer country. `date` is a
+  calendar date (`ParseCalendarDatePipe`, 400 otherwise); 404 for another
+  user's, a missing or an unlinked security. Nothing is fetched or stored.
 - `GET /bonds/securities/:securityId/series-holdings?accountId=<uuid>&date=YYYY-MM-DD[&excludeTransactionId=<uuid>]`
   answers `{ holdings: [{ instrumentId, seriesCode, quantity }] }`: the series
   `accountId` holds on that date (the lot derivation over the rows up to and
@@ -285,7 +297,7 @@ detail in `polish-retail-bonds.md` section 13):
 | Migration | schema | `verify-schema.sh` no-op; programs and both columns present; FKs RESTRICT; immutability trigger on programs |
 | Link | unit, integration | program link checks (exists, BOND, currency, price range across series); auto-fetch default false |
 | Series on write | unit, integration | BUY/REINVEST inferred from the date, explicit accepted, foreign program refused, no series refused before writing; ADD_SHARES and unpaired TRANSFER_IN refused without one; removal with and without series, refused when uncovered (rolled back); an edit keeps the stored series; undo restores it exactly; a split parent edit keeps the embedded rows' series; every entry point (UI service, bulk, AI, MCP, import, undo) |
-| Series endpoints | unit, integration | series-on-sale (found, none, foreign security 404); series-holdings (per account, date, excluded row, refused 422) |
+| Series endpoints | unit, integration | series-on-sale (found, none, foreign security 404); expected-series (a code, a program the grammar does not know, no adapter, foreign or unlinked 404); series-holdings (per account, date, excluded row, refused 422) |
 | Lots | unit | two series in one account; removal by series; FIFO across series; paired transfer keeps series; over-removal of a series |
 | Valuation, prices | unit, integration | two series valued by their own terms; blend; scenarios per series; recompute after a write |
 | Auto-fetch | unit | cron fetches only programs switched on; off by default |

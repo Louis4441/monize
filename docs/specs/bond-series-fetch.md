@@ -81,7 +81,7 @@ ROS 72, EDO 120, ROD 144). A code whose month is not 01..12 is refused
 ### 4.2 Sources
 
 Host `www.obligacjeskarbowe.pl`, HTTPS only, the only host the adapter fetches
-from; a redirect to another host is refused. Each fetch has a 30 s timeout and
+from; a redirect to another host is refused. The code of the series a purchase on a date would carry comes from the adapter (`seriesCodeFor`, section 4.1's grammar) through `GET /bonds/securities/:securityId/expected-series` (`bond-program-securities.md` 3.3), so a client never holds the grammar. Each fetch has a 30 s timeout and
 a size cap (HTML 2 MB, PDF 5 MB), and runs through `ProviderHealthService`
 (provider id `obligacjeskarbowe`) and `describeFetchFailure`.
 

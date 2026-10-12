@@ -21,6 +21,18 @@ is listed in section 10.
 | `COI1030` | List emisyjny nr 98/2026 of 21 September 2026 | 4-year, CPI-linked, annual coupons |
 | `EDO1036` | List emisyjny nr 99/2026 of 21 September 2026 | 10-year, CPI-linked, compounded |
 
+## Official sources (country code `PL`)
+
+The sources the Polish adapter reads, which `backend/src/bonds/adapters/pl/`
+fetches only on a person's action (INV-BOND-008) and which
+`adapter-docs.guard.spec.ts` requires this document to name:
+
+| Source | What it is | Address |
+| --- | --- | --- |
+| obligacjeskarbowe.pl | The Ministry of Finance's retail bond site: the product pages, the series pages and the issue letters (*listy emisyjne*) of every program (OTS, ROR, DOR, TOS, COI, ROS, EDO, ROD) | https://www.obligacjeskarbowe.pl/oferta-obligacji/ |
+| NBP | The reference rate (`PL_NBP_REFERENCE`): the archive and the current table of the National Bank of Poland's interest rates | https://static.nbp.pl/dane/stopy/stopy_procentowe_archiwum.xml and https://static.nbp.pl/dane/stopy/stopy_procentowe.xml |
+| GUS | The 12-month CPI (`PL_CPI_GUS_YOY`): the landing page of the monthly price indices and the CSV it links, all on stat.gov.pl | https://stat.gov.pl/obszary-tematyczne/ceny-handel/wskazniki-cen/wskazniki-cen-towarow-i-uslug-konsumpcyjnych-pot-inflacja-/miesieczne-wskazniki-cen-towarow-i-uslug-konsumpcyjnych-od-1982-roku/ |
+
 ## 1. Scope
 
 In scope (phases 1 to 5 of the plan):

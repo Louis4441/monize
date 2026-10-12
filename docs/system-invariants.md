@@ -3535,7 +3535,9 @@ Enforcement         Three mechanisms.
                        url elsewhere, a status other than 200 and an oversized
                        body), SeriesHttp makes the request with
                        redirect: "manual", a 30 s timeout and a 5 MB streaming
-                       cap behind the obligacjeskarbowe circuit breaker, and the
+                       cap behind the obligacjeskarbowe circuit breaker (the
+                       NBP and GUS benchmark fetches use the same door, limited
+                       to the https hosts their adapter declares), and the
                        series page and the issue letter are cross-checked field
                        by field before the template is filled and parsed. A
                        refusal is a SeriesFetchError thrown before

@@ -5,14 +5,24 @@ import {
   BondFetch,
   BondProgramDefinition,
 } from "../../bond-adapter";
+import { isValidYMD } from "../../domain/calendar-date";
 import { registerCalendar } from "../../domain/calendar-registry";
 import type { CalendarRegistry } from "../../domain/calendar-registry";
-import { fetchGusCpi, GUS_CPI_LANDING_URL } from "./pl-gus-cpi";
-import { fetchNbpReference, NBP_ARCHIVE_URL } from "./pl-nbp-reference";
+import { fetchGusCpi, GUS_CPI_LANDING_URL, GUS_HOST } from "./pl-gus-cpi";
+import {
+  fetchNbpReference,
+  NBP_ARCHIVE_URL,
+  NBP_HOST,
+} from "./pl-nbp-reference";
 import { PL_CPI_GUS_YOY, PL_NBP_REFERENCE } from "./pl-benchmarks";
 import { plCalendar } from "./pl-calendar";
 import { backfillCodes, SERIES_VALID_FROM } from "./series/backfill-codes";
-import { parseSeriesCode, PolishProduct } from "./series/series-code";
+import {
+  parseSeriesCode,
+  PolishProduct,
+  PRODUCT_TENOR_MONTHS,
+  seriesCodeFor as polishSeriesCodeFor,
+} from "./series/series-code";
 import { productPageUrl } from "./series/series-source";
 import { fetchCurrentSeries } from "./series/current-offer";
 import { fetchSeries } from "./series/fetch-series";
@@ -44,6 +54,7 @@ const programs: readonly BondProgramDefinition[] = Object.values(
 
 export const POLISH_BOND_ADAPTER: BondAdapter = {
   countryCode: "PL",
+  specDoc: "docs/specs/polish-retail-bonds.md",
   timezone: PL_TIMEZONE,
   registerCalendars: registerPolishCalendars,
   benchmarks: [
@@ -52,6 +63,7 @@ export const POLISH_BOND_ADAPTER: BondAdapter = {
       kind: "STEP",
       publisher: "NBP",
       sourceUrl: NBP_ARCHIVE_URL,
+      hosts: [NBP_HOST],
       unit: "RATE_FRACTION",
       providerId: "nbp",
     },
@@ -60,6 +72,7 @@ export const POLISH_BOND_ADAPTER: BondAdapter = {
       kind: "MONTHLY",
       publisher: "GUS",
       sourceUrl: GUS_CPI_LANDING_URL,
+      hosts: [GUS_HOST],
       unit: "RATE_FRACTION",
       providerId: "gus",
     },
@@ -79,6 +92,11 @@ export const POLISH_BOND_ADAPTER: BondAdapter = {
     }
   },
   seriesValidFrom: SERIES_VALID_FROM,
+  seriesCodeFor: (programCode: string, saleDate: string) =>
+    Object.prototype.hasOwnProperty.call(PRODUCT_TENOR_MONTHS, programCode) &&
+    isValidYMD(saleDate)
+      ? polishSeriesCodeFor(programCode as PolishProduct, saleDate.slice(0, 7))
+      : null,
   async fetchBenchmark(code: string, fetch: BondFetch) {
     switch (code) {
       case PL_NBP_REFERENCE:

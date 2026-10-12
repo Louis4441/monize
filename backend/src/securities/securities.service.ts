@@ -421,8 +421,18 @@ export class SecuritiesService {
           country,
           program,
         );
-        if (run.failed > 0 && run.stored + run.alreadyStored === 0) {
+        // A failure only when nothing of the pass succeeded: a listing that
+        // failed while the history stored series (or the offer stored or
+        // already held some) is a refresh that did work.
+        const failures = run.failed + (run.history?.failed ?? 0);
+        const succeeded =
+          run.stored + run.alreadyStored + (run.history?.stored ?? 0);
+        if (failures > 0 && succeeded === 0) {
           message = `The current ${program} offer could not be fetched`;
+        } else if (failures > 0) {
+          this.logger.warn(
+            `The ${program} refresh was partial: ${failures} series could not be fetched, ${succeeded} stored or already held`,
+          );
         }
       } catch (error) {
         if (

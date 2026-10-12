@@ -7,6 +7,8 @@ import { DataSource } from "typeorm";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import { BondHoldingsService } from "./bond-holdings.service";
 import { BondValuationService } from "./bond-valuation.service";
+import { BondAdapter } from "./bond-adapter";
+import { POLISH_BOND_ADAPTER } from "./adapters/pl";
 import type { RedemptionSplit } from "./engine/redemption-split";
 
 jest.mock("../common/db/scoped-db", () =>
@@ -42,7 +44,13 @@ const row = (over: Partial<Row> & { id: string }): Row => ({
 });
 
 function setup(
-  opts: { linked?: boolean; ledger?: Row[]; onSale?: string[] } = {},
+  opts: {
+    linked?: boolean;
+    ledger?: Row[];
+    onSale?: string[];
+    country?: string;
+    program?: string;
+  } = {},
 ) {
   const { manager, dataSource } = createScopedDbMocks();
   dataSource.transaction.mockImplementation(
@@ -65,6 +73,14 @@ function setup(
               },
             ]
           : [];
+      }
+      if (sql.includes("FROM bond_programs WHERE id")) {
+        return [
+          {
+            issuer_country_code: opts.country ?? "PL",
+            program_code: opts.program ?? "EDO",
+          },
+        ];
       }
       if (sql.includes("counterpart_account_id")) {
         return (opts.ledger ?? []).map((r) => ({
@@ -155,6 +171,89 @@ describe("BondHoldingsService.seriesOnSale", () => {
     ).rejects.toBeInstanceOf(NotFoundException);
     await expect(
       setup({ linked: false }).service.seriesOnSale(USER, SEC, "2026-10-15"),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe("BondHoldingsService.expectedSeries", () => {
+  const adapters = [POLISH_BOND_ADAPTER];
+
+  it("names the Polish series sold on the date, from the adapter's grammar, and says it is fetchable", async () => {
+    await expect(
+      setup().service.expectedSeries(USER, SEC, "2026-10-15", adapters),
+    ).resolves.toEqual({
+      seriesCode: "EDO1036",
+      countryCode: "PL",
+      fetchable: true,
+    });
+    await expect(
+      setup({ program: "OTS" }).service.expectedSeries(
+        USER,
+        SEC,
+        "2026-11-03",
+        adapters,
+      ),
+    ).resolves.toMatchObject({ seriesCode: "OTS0227" });
+  });
+
+  it("answers a null code, still fetchable, for a program the adapter's grammar does not know", async () => {
+    await expect(
+      setup({ program: "XYZ" }).service.expectedSeries(
+        USER,
+        SEC,
+        "2026-10-15",
+        adapters,
+      ),
+    ).resolves.toEqual({
+      seriesCode: null,
+      countryCode: "PL",
+      fetchable: true,
+    });
+  });
+
+  it("answers a null code and not fetchable for a country with no adapter or one without the members", async () => {
+    await expect(
+      setup({ country: "DE" }).service.expectedSeries(
+        USER,
+        SEC,
+        "2026-10-15",
+        adapters,
+      ),
+    ).resolves.toEqual({
+      seriesCode: null,
+      countryCode: "DE",
+      fetchable: false,
+    });
+    const bare = {
+      ...POLISH_BOND_ADAPTER,
+      fetchSeries: undefined,
+      seriesCodeFor: undefined,
+    } as BondAdapter;
+    await expect(
+      setup().service.expectedSeries(USER, SEC, "2026-10-15", [bare]),
+    ).resolves.toEqual({
+      seriesCode: null,
+      countryCode: "PL",
+      fetchable: false,
+    });
+  });
+
+  it("is a 404 for another user's security and for one that is not linked", async () => {
+    await expect(
+      setup().service.expectedSeries(
+        "someone-else",
+        SEC,
+        "2026-10-15",
+        adapters,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      setup({ linked: false }).service.expectedSeries(
+        USER,
+        SEC,
+        "2026-10-15",
+        adapters,
+      ),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

@@ -255,6 +255,56 @@ describe("BondOfferService.offer", () => {
       });
     });
 
+    describe("a discount bill", () => {
+      const bill = (code: string, issue: string, maturity: string) =>
+        series("tos1029", code, OCTOBER, (doc) => {
+          doc.instrument.faceValue = "100";
+          doc.instrument.issuePrice = "99.00";
+          doc.schedule = {
+            anchor: "ISSUE_DATE",
+            issueDate: issue,
+            maturityDate: maturity,
+            periodCount: 1,
+            calendarId: "PL",
+          };
+          doc.rateRule = { type: "ZERO_COUPON_DISCOUNT" };
+          doc.capitalization = { type: "NONE" };
+          doc.redemption = { type: "MATURITY_ONLY" };
+        });
+
+      it("gives a 28-day bill its exact length and annualizes over 28/365 of a year", async () => {
+        const { service } = setup([
+          bill("BIL0001", "2026-10-15", "2026-11-12"),
+        ]);
+        const [b] = (await service.offer("u1", "PL")).series;
+        expect(b.lengthDays).toBe(28);
+        // The month fields stay the whole months, at least one: display only.
+        expect(b.periodMonths).toBe(1);
+        // (100 / 99)^(365 / 28) - 1 = 0.13998: not the 0.1281 of
+        // (100 / 99)^12 - 1 that a length of "1 month" would give.
+        expect(b.projection.totalReturn).toBe("0.0101");
+        expect(b.projection.annualizedReturn).toBe("0.1400");
+      });
+
+      it("gives a 182-day bill its exact length and annualizes over 182/365 of a year", async () => {
+        const { service } = setup([
+          bill("BIL0002", "2026-10-15", "2027-04-15"),
+        ]);
+        const [b] = (await service.offer("u1", "PL")).series;
+        expect(b.lengthDays).toBe(182);
+        expect(b.periodMonths).toBe(6);
+        // (100 / 99)^(365 / 182) - 1 = 0.0204...
+        expect(b.projection.annualizedReturn).toBe("0.0204");
+      });
+    });
+
+    it("has no length in days for a schedule counted in months", async () => {
+      const { service } = setup([series("tos1029", "TOS1029", OCTOBER)]);
+      const [tos] = (await service.offer("u1", "PL")).series;
+      expect(tos.lengthDays).toBeNull();
+      expect(tos.periodMonths * tos.periodCount).toBe(36);
+    });
+
     it("annualizes E1 (TOS at 4.40 percent for 3 years, compounding) to 0.0440", async () => {
       const { service } = setup([series("tos1029", "TOS1029", OCTOBER)]);
       const [tos] = (await service.offer("u1", "PL")).series;

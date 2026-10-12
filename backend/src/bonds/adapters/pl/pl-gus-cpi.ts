@@ -17,7 +17,8 @@ export const GUS_CPI_CSV_URL =
 export const GUS_CPI_LANDING_URL =
   "https://stat.gov.pl/obszary-tematyczne/ceny-handel/wskazniki-cen/wskazniki-cen-towarow-i-uslug-konsumpcyjnych-pot-inflacja-/miesieczne-wskazniki-cen-towarow-i-uslug-konsumpcyjnych-od-1982-roku/";
 
-const GUS_HOST = "stat.gov.pl";
+/** The only host the CPI fetch talks to: the landing page and the file it links. */
+export const GUS_HOST = "stat.gov.pl";
 const NATION = "Polska";
 const YEAR_ON_YEAR = "Analogiczny miesiąc poprzedniego roku = 100";
 

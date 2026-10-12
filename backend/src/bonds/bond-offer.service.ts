@@ -3,13 +3,17 @@ import { DataSource, EntityManager } from "typeorm";
 import { todayInTimezone } from "../common/date-utils";
 import { withScopedDb } from "../common/db/scoped-db";
 import { getEffectiveTimezoneOfUser } from "../common/users-by-timezone.util";
-import { annualizedReturn } from "./domain/annualized-return";
+import {
+  annualizedReturn,
+  annualizedReturnOverDays,
+} from "./domain/annualized-return";
 import { INSTALLED_BOND_ADAPTERS } from "./bond-adapters";
 import {
   benchmarkFieldsOf,
   BondTerms,
   parseBondTerms,
   Redemption,
+  scheduleDaysOf,
   scheduleMonthsOf,
 } from "./domain/bond-terms";
 import { enumerateMonthKeys } from "./domain/calendar-date";
@@ -32,7 +36,7 @@ export interface BondOfferProjection {
    * coupon bond included and not reinvested; null when any amount is unknown.
    */
   readonly maturityValue: string | null;
-  /** (cash received - face value) / face value, 4 places; null with the cash. */
+  /** (cash received - price paid) / price paid, 4 places; the price is the face value, or the issue price of a discount bill; null with the cash. */
   readonly totalReturn: string | null;
   /** The yearly rate r with (1 + r)^years = cash / face, 4 places; a comparison figure. */
   readonly annualizedReturn: string | null;
@@ -56,6 +60,13 @@ export interface BondOfferSeries {
   readonly saleWindow: { readonly from: string; readonly to: string };
   readonly periodMonths: number;
   readonly periodCount: number;
+  /**
+   * The exact length in days of a single issue-to-maturity period (a discount
+   * bill: 28 for four weeks), null for a schedule counted in months. When set it
+   * is the length the projection's `annualizedReturn` uses; `periodMonths` stays
+   * the whole months (at least 1) for display.
+   */
+  readonly lengthDays: number | null;
   readonly rateRule: RateRuleDescription;
   readonly capitalization: BondTerms["capitalization"]["type"];
   /** The terms' redemption policy; null when redeemable at maturity only. */
@@ -268,6 +279,7 @@ export class BondOfferService {
       // The id query admitted the series by this window.
       saleWindow: terms.saleWindow as { from: string; to: string },
       ...scheduleMonthsOf(terms.schedule),
+      lengthDays: scheduleDaysOf(terms.schedule),
       rateRule: valuation.rateRule,
       capitalization: terms.capitalization.type,
       redemption:
@@ -325,15 +337,27 @@ function projectionOf(
       annualizedReturn: null,
     };
   }
-  const face = ExactDecimal.parse(terms.instrument.faceValue);
+  // What one bond costs today: the issue price of a discount bill (it pays the
+  // face value at maturity), the face value of every other product.
+  const face = ExactDecimal.parse(
+    terms.instrument.issuePrice ?? terms.instrument.faceValue,
+  );
   const length = scheduleMonthsOf(terms.schedule);
   const months = length.periodMonths * length.periodCount;
+  const days = scheduleDaysOf(terms.schedule);
   const positiveFace = face.cmp(ExactDecimal.ZERO) > 0;
   return {
     ...base,
     maturityValue: cash.toFixed(terms.rounding.moneyDecimals),
     totalReturn: positiveFace ? cash.sub(face).div(face).toFixed(4) : null,
-    annualizedReturn: annualizedReturn(cash, face, months),
+    // A single issue-to-maturity period is measured in actual days over 365; a
+    // month schedule in months over 12.
+    annualizedReturn:
+      days === null
+        ? annualizedReturn(cash, face, months)
+        : days < 1
+          ? null
+          : annualizedReturnOverDays(cash, face, days),
   };
 }
 

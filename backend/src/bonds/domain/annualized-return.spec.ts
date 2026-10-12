@@ -1,4 +1,7 @@
-import { annualizedReturn } from "./annualized-return";
+import {
+  annualizedReturn,
+  annualizedReturnOverDays,
+} from "./annualized-return";
 import { ExactDecimal } from "./exact-decimal";
 
 const d = ExactDecimal.parse;
@@ -46,5 +49,28 @@ describe("annualizedReturn", () => {
   it("refuses a length that is not a positive whole number of months", () => {
     expect(() => annualizedReturn(d("100"), d("100"), 0)).toThrow(RangeError);
     expect(() => annualizedReturn(d("100"), d("100"), 1.5)).toThrow(RangeError);
+  });
+});
+
+describe("annualizedReturnOverDays", () => {
+  it("annualizes over days / 365: 1 percent in 28 days is (101 / 100)^(365 / 28) - 1", () => {
+    // 1.01^13.0357 - 1 = 0.13850
+    expect(annualizedReturnOverDays(d("101"), d("100"), 28)).toBe("0.1385");
+  });
+
+  it("a full 365 days is the plain return", () => {
+    expect(annualizedReturnOverDays(d("105"), d("100"), 365)).toBe("0.0500");
+  });
+
+  it("is 0.0000 for no gain and null for a non-positive cash or face", () => {
+    expect(annualizedReturnOverDays(d("100"), d("100"), 182)).toBe("0.0000");
+    expect(annualizedReturnOverDays(d("0"), d("100"), 28)).toBeNull();
+    expect(annualizedReturnOverDays(d("100"), d("0"), 28)).toBeNull();
+  });
+
+  it("refuses a length that is not a positive whole number of days", () => {
+    expect(() => annualizedReturnOverDays(d("100"), d("100"), 0)).toThrow(
+      RangeError,
+    );
   });
 });

@@ -7,6 +7,8 @@ import {
 import { isValidYMD } from "../../domain/calendar-date";
 import { ExactDecimal } from "../../domain/exact-decimal";
 
+/** The only host the NBP fetch talks to. */
+export const NBP_HOST = "static.nbp.pl";
 export const NBP_ARCHIVE_URL =
   "https://static.nbp.pl/dane/stopy/stopy_procentowe_archiwum.xml";
 export const NBP_CURRENT_URL =

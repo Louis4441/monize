@@ -29,7 +29,12 @@ instrumentId, issuerCountryCode, issuerCode, programCode, seriesCode, currency
 saleWindow       { from, to }
 periodMonths, periodCount            length = periodMonths x periodCount
                                      (an ISSUE_DATE schedule: the whole months
-                                     from issue to maturity, at least 1, x 1)
+                                     from issue to maturity, at least 1, x 1;
+                                     display only for such a schedule)
+lengthDays       number | null       the exact days from issueDate to
+                                     maturityDate (a 4-week bill is 28) for an
+                                     ISSUE_DATE schedule; null for a schedule
+                                     counted in months (LOT_PURCHASE_DATE)
 rateRule         the description of polish-retail-bonds.md 2.6 (type,
                  benchmarkId, first-period rate or annual rate, addend, floor)
 capitalization   NONE | COMPOUND_AT_PERIOD_END
@@ -38,10 +43,15 @@ termsSource      { provider, url, document }
 projection       the valuation of one bond bought today, held to maturity:
   maturityValue        per bond | null, plus every coupon of a coupon bond
                        (the total cash received, not reinvested)
-  totalReturn          (cash received - face value) / face value | null
-  annualizedReturn     the yearly rate r with (1 + r)^years = cash / face,
-                       years = length in months / 12, to 4 places
-                       | null
+  totalReturn          (cash received - price paid) / price paid | null
+                       (price paid as for annualizedReturn)
+  annualizedReturn     the yearly rate r with (1 + r)^years = cash / price,
+                       to 4 places | null; price is the face value, or the
+                       issue price of a discount bill; years = periodMonths x
+                       periodCount / 12 for a month schedule and
+                       lengthDays / 365 for an ISSUE_DATE schedule (actual
+                       days over a 365-day year, the convention the bill's own
+                       length needs: a 28-day bill is not a 1-month one)
   projected            true when any period's rate is assumed
   assumptions          [{ benchmarkId, value, basis: SUPPLIED | LATEST_OBSERVATION }]
   projectionMissing    as in polish-retail-bonds.md 2.6
@@ -129,7 +139,7 @@ translated in every locale.
 
 | Area | Kind | Cases |
 | --- | --- | --- |
-| On sale | unit | a series inside, before and after its window; newest version used; projection equals the engine's maturity value of a 1-bond lot; coupon bond sums coupons; annualized return of E1 (TOS 4.40% for 3 years compounding) is 0.0440; null figures with projectionMissing when no observation and no assumption |
+| On sale | unit | a 28-day and a 182-day discount bill: `lengthDays` 28 and 182, `annualizedReturn` over days / 365 on the issue price, `lengthDays` null for a month schedule; a series inside, before and after its window; newest version used; projection equals the engine's maturity value of a 1-bond lot; coupon bond sums coupons; annualized return of E1 (TOS 4.40% for 3 years compounding) is 0.0440; null figures with projectionMissing when no observation and no assumption |
 | On sale | integration | owner-agnostic read of reference data; `assume` parsing reuses the scenario pipe |
 | History | unit | ordering by sale window; fee and floor per series; coverage and missing months |
 | Backfill | unit | derives codes per product and month from validFrom; skips stored series; one request per 3 s; stops on SOURCE_UNAVAILABLE |

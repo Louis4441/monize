@@ -14,6 +14,7 @@ import {
 import { ProviderHealthService } from "@/provider-health/provider-health.service";
 import { BenchmarkRefreshService } from "@/bonds/benchmark-refresh.service";
 import { BondCatalogService } from "@/bonds/bond-catalog.service";
+import { SeriesHttp } from "@/bonds/series-http";
 import { POLISH_BOND_ADAPTER } from "@/bonds/adapters/pl/index";
 import { FIXTURE_CATALOG } from "@/bonds/adapters/pl/pl-test-input";
 import {
@@ -78,11 +79,13 @@ describe("bond catalog and benchmark refresh (integration)", () => {
     currencies = new CurrenciesService(dataSource);
     fetchSync = new FetchSyncService(dataSource);
     catalog = new BondCatalogService(dataSource, currencies);
+    const health = new ProviderHealthService(dataSource);
     refresh = new BenchmarkRefreshService(
       dataSource,
-      new ProviderHealthService(dataSource),
+      health,
       fetchSync,
       catalog,
+      new SeriesHttp(health),
     );
   });
 

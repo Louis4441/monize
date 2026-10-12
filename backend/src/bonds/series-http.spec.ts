@@ -1,6 +1,8 @@
 import { ProviderHealthService } from "../provider-health/provider-health.service";
 import { ProviderUnavailableError } from "../provider-health/provider-unavailable.error";
 import {
+  FETCH_MAX_REDIRECTS,
+  FetchRefusedError,
   readCapped,
   SERIES_FETCH_TIMEOUT_MS,
   SERIES_MAX_BODY_BYTES,
@@ -195,5 +197,122 @@ describe("SeriesHttp.gated", () => {
     http.mockRejectedValue(new Error("fetch failed"));
     await expect(gated(URL_)).rejects.toThrow();
     expect(health.releaseProbe).not.toHaveBeenCalled();
+  });
+});
+
+describe("SeriesHttp.gated with a fetch policy (benchmark fetches)", () => {
+  const HOST_URL = "https://static.nbp.pl/dane/a.xml";
+  const policy = { allowedHosts: ["static.nbp.pl"] };
+  const redirect = (location: string, status = 302) =>
+    new Response(null, { status, headers: { location } });
+
+  function policed(admission: "open-gate" | "probe" = "open-gate") {
+    const { health, http } = setup(admission);
+    const gated = new SeriesHttp(
+      health as unknown as ProviderHealthService,
+    ).gated("nbp", http, policy);
+    return { health, http, gated };
+  }
+
+  it("serves an answer from an allowed host, never letting fetch follow a redirect itself", async () => {
+    const { http, gated, health } = policed();
+    http.mockResolvedValue(new Response("<x/>", { status: 200 }));
+    const result = await gated(HOST_URL);
+    expect(result.status).toBe(200);
+    expect(http.mock.calls[0][1].redirect).toBe("manual");
+    expect(http.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+    expect(health.recordSuccess).toHaveBeenCalledWith("nbp");
+  });
+
+  it.each([
+    ["plain http", "http://static.nbp.pl/a.xml", "scheme"],
+    ["another host", "https://evil.example/a.xml", "host"],
+    ["a subdomain", "https://x.static.nbp.pl/a.xml", "host"],
+    ["a port", "https://static.nbp.pl:8443/a.xml", "scheme"],
+    ["credentials", "https://u:p@static.nbp.pl/a.xml", "scheme"],
+  ])(
+    "refuses %s before any socket or breaker admission",
+    async (_n, url, reason) => {
+      const { http, gated, health } = policed();
+      await expect(gated(url)).rejects.toMatchObject({
+        name: "FetchRefusedError",
+        reason,
+      });
+      expect(http).not.toHaveBeenCalled();
+      expect(health.assertAvailable).not.toHaveBeenCalled();
+    },
+  );
+
+  it("follows a redirect that stays on an allowed https host and reports the final url", async () => {
+    const { http, gated } = policed();
+    http
+      .mockResolvedValueOnce(redirect("/dane/b.xml", 301))
+      .mockResolvedValueOnce(new Response("ok", { status: 200 }));
+    const result = await gated(HOST_URL);
+    expect(http.mock.calls.map((c) => c[0])).toEqual([
+      HOST_URL,
+      "https://static.nbp.pl/dane/b.xml",
+    ]);
+    expect(result.url).toBe("https://static.nbp.pl/dane/b.xml");
+    expect(new TextDecoder().decode(result.body)).toBe("ok");
+  });
+
+  it("refuses a redirect to another host without requesting it, and records no failure", async () => {
+    const { http, gated, health } = policed("probe");
+    http.mockResolvedValue(redirect("https://evil.example/a.xml"));
+    await expect(gated(HOST_URL)).rejects.toBeInstanceOf(FetchRefusedError);
+    expect(http).toHaveBeenCalledTimes(1);
+    expect(health.recordFailure).not.toHaveBeenCalled();
+    expect(health.recordSuccess).not.toHaveBeenCalled();
+    expect(health.releaseProbe).toHaveBeenCalledWith("nbp");
+  });
+
+  it("refuses a redirect down to http", async () => {
+    const { http, gated } = policed();
+    http.mockResolvedValue(redirect("http://static.nbp.pl/a.xml"));
+    await expect(gated(HOST_URL)).rejects.toMatchObject({ reason: "scheme" });
+  });
+
+  it("stops a redirect loop after the hop limit", async () => {
+    const { http, gated } = policed();
+    http.mockImplementation(async () => redirect(HOST_URL));
+    await expect(gated(HOST_URL)).rejects.toMatchObject({
+      reason: "redirects",
+    });
+    expect(http).toHaveBeenCalledTimes(FETCH_MAX_REDIRECTS + 1);
+  });
+
+  it("refuses an oversized body and records no success", async () => {
+    const { http, gated, health } = policed();
+    http.mockResolvedValue(
+      new Response(new Uint8Array(SERIES_MAX_BODY_BYTES + 1), { status: 200 }),
+    );
+    await expect(gated(HOST_URL)).rejects.toBeInstanceOf(
+      SeriesBodyTooLargeError,
+    );
+    expect(health.recordSuccess).not.toHaveBeenCalled();
+    expect(health.recordFailure).toHaveBeenCalled();
+  });
+
+  it("aborts a call that outlives the 30 s timeout", async () => {
+    const { http, gated, health } = policed();
+    const controller = new AbortController();
+    const timeout = jest
+      .spyOn(AbortSignal, "timeout")
+      .mockReturnValue(controller.signal);
+    http.mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) =>
+          init.signal?.addEventListener("abort", () =>
+            reject(init.signal?.reason),
+          ),
+        ),
+    );
+    const pending = gated(HOST_URL);
+    controller.abort(new DOMException("timed out", "TimeoutError"));
+    await expect(pending).rejects.toMatchObject({ name: "TimeoutError" });
+    expect(timeout).toHaveBeenCalledWith(30_000);
+    expect(health.recordFailure).toHaveBeenCalled();
+    timeout.mockRestore();
   });
 });

@@ -56,6 +56,7 @@ describe("BondsController", () => {
   let offers: { offer: jest.Mock; history: jest.Mock };
   let holdings: {
     seriesOnSale: jest.Mock;
+    expectedSeries: jest.Mock;
     seriesHoldings: jest.Mock;
     redemptionSplit: jest.Mock;
   };
@@ -85,6 +86,7 @@ describe("BondsController", () => {
     };
     holdings = {
       seriesOnSale: jest.fn().mockResolvedValue(null),
+      expectedSeries: jest.fn(),
       seriesHoldings: jest.fn().mockResolvedValue({ holdings: [] }),
       redemptionSplit: jest.fn(),
     };
@@ -510,6 +512,48 @@ describe("BondsController", () => {
           json: jest.fn(),
         } as never),
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("GET expected-series answers the adapter's code for the JWT's user and the date", async () => {
+      const body = {
+        seriesCode: "EDO1036",
+        countryCode: "PL",
+        fetchable: true,
+      };
+      holdings.expectedSeries.mockResolvedValue(body);
+      await expect(
+        controller.expectedSeries(req, SECURITY, "2026-10-15"),
+      ).resolves.toEqual(body);
+      expect(holdings.expectedSeries).toHaveBeenCalledWith(
+        USER,
+        SECURITY,
+        "2026-10-15",
+      );
+    });
+
+    it("GET expected-series lets another user's or an unlinked security's 404 through", async () => {
+      holdings.expectedSeries.mockRejectedValue(new NotFoundException("no"));
+      await expect(
+        controller.expectedSeries(req, SECURITY, "2026-10-15"),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("GET expected-series validates the date with ParseCalendarDatePipe", () => {
+      const meta = Reflect.getMetadata(
+        "__routeArguments__",
+        BondsController,
+        "expectedSeries",
+      );
+      const pipes = Object.values(meta as Record<string, { pipes: unknown[] }>)
+        .flatMap((arg) => arg.pipes)
+        .map((pipe) =>
+          typeof pipe === "function"
+            ? pipe.name
+            : (pipe as object).constructor.name,
+        );
+      expect(pipes).toEqual(
+        expect.arrayContaining(["ParseUUIDPipe", "ParseCalendarDatePipe"]),
+      );
     });
 
     it("GET series-holdings passes the account, the date and the excluded row, and answers { holdings }", async () => {

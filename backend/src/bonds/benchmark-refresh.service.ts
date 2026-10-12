@@ -14,17 +14,14 @@ import {
 } from "../common/jobs/fetch-sync.service";
 import { ProviderHealthService } from "../provider-health/provider-health.service";
 import { isProviderUnavailable } from "../provider-health/provider-unavailable.error";
-import { TrackedProviderId } from "../provider-health/providers";
 import {
   BenchmarkFetchResult,
   BenchmarkSeriesDefinition,
   BondAdapter,
-  BondFetch,
 } from "./bond-adapter";
 import { INSTALLED_BOND_ADAPTERS } from "./bond-adapters";
 import { BondCatalogService } from "./bond-catalog.service";
-
-export type HttpFetch = typeof globalThis.fetch;
+import { HttpFetch, SeriesHttp } from "./series-http";
 
 export interface RefreshOptions {
   /**
@@ -45,7 +42,6 @@ export interface RefreshOptions {
   readonly only?: ReadonlySet<string>;
 }
 
-const FETCH_TIMEOUT_MS = 30_000;
 /** Days without a successful store after which a failing series is reported as an outage. */
 const PERSISTENT_FAILURE_DAYS = 3;
 
@@ -72,6 +68,7 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
     private readonly health: ProviderHealthService,
     private readonly fetchSync: FetchSyncService,
     private readonly catalog: BondCatalogService,
+    private readonly http: SeriesHttp,
   ) {}
 
   /**
@@ -193,7 +190,7 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
    */
   async refreshAll(options: RefreshOptions = {}): Promise<void> {
     const adapters = options.adapters ?? INSTALLED_BOND_ADAPTERS;
-    const http: HttpFetch | undefined = options.fetch;
+    const fetchImpl: HttpFetch | undefined = options.fetch;
     // Only what a stored series reads: with none, nothing is fetched.
     const read = await this.benchmarksRead();
     const needed = options.only
@@ -214,7 +211,7 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
         const outcome = await this.refreshSeries(
           adapter,
           series,
-          http,
+          fetchImpl,
           today,
           options.onlyStale === true,
         );
@@ -232,7 +229,7 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
   private async refreshSeries(
     adapter: BondAdapter,
     series: BenchmarkSeriesDefinition,
-    http: HttpFetch | undefined,
+    fetchImpl: HttpFetch | undefined,
     today: string,
     onlyStale: boolean,
   ): Promise<"stored" | "skipped" | "failed"> {
@@ -244,7 +241,9 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
         return "skipped";
       const result = await adapter.fetchBenchmark(
         series.code,
-        this.gated(series.providerId, http),
+        this.http.gated(series.providerId, fetchImpl, {
+          allowedHosts: series.hosts,
+        }),
       );
       await this.store(series.code, result);
       this.health.recordDataRecovered(series.providerId);
@@ -340,37 +339,6 @@ export class BenchmarkRefreshService implements OnApplicationBootstrap {
         ),
     );
     return rows[0]?.fetched_on ?? null;
-  }
-
-  /**
-   * The network, behind the provider's circuit breaker: a refusal throws before
-   * any socket is opened, a transport failure is counted, and success is
-   * recorded only once the whole body has arrived.
-   */
-  private gated(
-    providerId: TrackedProviderId,
-    http: HttpFetch | undefined,
-  ): BondFetch {
-    return async (url) => {
-      const admission = this.health.assertAvailable(providerId);
-      let status: number;
-      let body: Uint8Array;
-      try {
-        const init = { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) };
-        // A test injects `http`; production calls the global fetch here, in the
-        // one place provider-call.guard.spec.ts scans for its breaker.
-        const response = http ? await http(url, init) : await fetch(url, init);
-        status = response.status;
-        body = new Uint8Array(await response.arrayBuffer());
-      } catch (error) {
-        const counted = this.health.recordFailure(providerId, error);
-        if (!counted && admission === "probe")
-          this.health.releaseProbe(providerId);
-        throw error;
-      }
-      this.health.recordSuccess(providerId);
-      return { status, body };
-    };
   }
 
   /**

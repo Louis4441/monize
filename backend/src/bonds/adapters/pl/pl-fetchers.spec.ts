@@ -2,6 +2,8 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { BenchmarkFetchError, BondFetch } from "../../bond-adapter";
 import { POLISH_BOND_ADAPTER } from ".";
+import { ProviderHealthService } from "../../../provider-health/provider-health.service";
+import { SeriesHttp } from "../../series-http";
 import {
   findCsvLink,
   fetchGusCpi,
@@ -464,5 +466,83 @@ describe("Polish adapter contract", () => {
       POLISH_BOND_ADAPTER.fetchBenchmark("X", fetch),
     ).rejects.toThrow(/no benchmark X/);
     jest.useRealTimers();
+  });
+});
+
+describe("the Polish benchmark fetchers through the hardened door", () => {
+  const health = {
+    assertAvailable: jest.fn().mockReturnValue("open-gate"),
+    recordSuccess: jest.fn(),
+    recordFailure: jest.fn().mockReturnValue(false),
+    releaseProbe: jest.fn(),
+  };
+  const door = (code: string, http: jest.Mock) => {
+    const series = POLISH_BOND_ADAPTER.benchmarks.find((b) => b.code === code);
+    if (!series) throw new Error(`no benchmark ${code}`);
+    return new SeriesHttp(health as unknown as ProviderHealthService).gated(
+      series.providerId,
+      http as unknown as typeof fetch,
+      { allowedHosts: series.hosts },
+    );
+  };
+  const answer = (table: Record<string, Uint8Array>) =>
+    jest.fn(async (url: string) =>
+      table[url]
+        ? new Response(table[url] as unknown as BodyInit, { status: 200 })
+        : new Response("missing", { status: 404 }),
+    );
+
+  it("declares the one host each publisher serves from", () => {
+    expect(
+      Object.fromEntries(
+        POLISH_BOND_ADAPTER.benchmarks.map((b) => [b.code, b.hosts]),
+      ),
+    ).toEqual({
+      PL_NBP_REFERENCE: ["static.nbp.pl"],
+      PL_CPI_GUS_YOY: ["stat.gov.pl"],
+    });
+  });
+
+  it("reads the NBP archive and current table with every request on the declared host", async () => {
+    const http = answer({
+      [NBP_ARCHIVE_URL]: fixture("nbp-archive.xml"),
+      [NBP_CURRENT_URL]: fixture("nbp-current.xml"),
+    });
+    const result = await fetchNbpReference(
+      door("PL_NBP_REFERENCE", http),
+      "2026-10-10",
+    );
+    expect(result.observations).toHaveLength(5);
+    expect(http.mock.calls.map((c) => c[0])).toEqual([
+      NBP_ARCHIVE_URL,
+      NBP_CURRENT_URL,
+    ]);
+  });
+
+  it("reads the GUS landing page and the CSV it links, both on the declared host", async () => {
+    const linked =
+      "https://stat.gov.pl/download/gfx/a/miesiecznewskaznikicentowarowiuslugkonsumpcyjnychod1982roku_9.csv";
+    const http = answer({
+      [GUS_CPI_LANDING_URL]: new TextEncoder().encode(
+        `<a href="/download/gfx/a/miesiecznewskaznikicentowarowiuslugkonsumpcyjnychod1982roku_9.csv">`,
+      ),
+      [linked]: fixture("gus-cpi.csv"),
+    });
+    const result = await fetchGusCpi(
+      door("PL_CPI_GUS_YOY", http),
+      "2026-10-11",
+    );
+    expect(result.sourceUrl).toBe(linked);
+  });
+
+  it("refuses a GUS link to a subdomain: the door allows the declared host only", async () => {
+    const http = answer({
+      [GUS_CPI_LANDING_URL]: new TextEncoder().encode(
+        `<a href="https://www.stat.gov.pl/d/miesiecznewskaznikicentowarowiuslugkonsumpcyjnychod1982roku_9.csv">`,
+      ),
+    });
+    await expect(
+      fetchGusCpi(door("PL_CPI_GUS_YOY", http), "2026-10-11"),
+    ).rejects.toMatchObject({ name: "FetchRefusedError", reason: "host" });
   });
 });

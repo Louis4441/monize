@@ -7,6 +7,7 @@ import { FetchSyncService } from "../common/jobs/fetch-sync.service";
 import { BondAdapter, BenchmarkFetchResult } from "./bond-adapter";
 import { todayInTimezone } from "../common/date-utils";
 import { BenchmarkRefreshService } from "./benchmark-refresh.service";
+import { SeriesHttp } from "./series-http";
 import { BondCatalogService } from "./bond-catalog.service";
 
 jest.mock("../common/db/scoped-db", () =>
@@ -48,6 +49,7 @@ function build(opts: {
   };
   const adapter: BondAdapter = {
     countryCode: "PL",
+    specDoc: "docs/specs/polish-retail-bonds.md",
     timezone: "Europe/Warsaw",
     registerCalendars: (r) => r,
     programs: [],
@@ -57,6 +59,7 @@ function build(opts: {
         kind: "STEP",
         publisher: "NBP",
         sourceUrl: "u",
+        hosts: ["x"],
         unit: "RATE_FRACTION",
         providerId: "nbp",
       },
@@ -65,6 +68,7 @@ function build(opts: {
         kind: "MONTHLY",
         publisher: "GUS",
         sourceUrl: "u",
+        hosts: ["x"],
         unit: "RATE_FRACTION",
         providerId: "gus",
       },
@@ -113,6 +117,7 @@ function build(opts: {
     health as unknown as ProviderHealthService,
     fetchSync as unknown as FetchSyncService,
     catalog as unknown as BondCatalogService,
+    new SeriesHttp(health as unknown as ProviderHealthService),
   );
   return {
     service,

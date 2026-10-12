@@ -1,4 +1,4 @@
-import { isValidYMD, parseYMD } from "./calendar-date";
+import { daysBetween, isValidYMD, parseYMD } from "./calendar-date";
 import { assertNever } from "./assert-never";
 import { ExactDecimal, RoundingMode } from "./exact-decimal";
 
@@ -150,6 +150,22 @@ export function scheduleMonthsOf(schedule: BondSchedule): {
         (to.day < from.day ? 1 : 0);
       return { periodMonths: whole < 1 ? 1 : whole, periodCount: 1 };
     }
+    default:
+      return assertNever(schedule);
+  }
+}
+
+/**
+ * The exact length in days of a single issue-to-maturity period (`ISSUE_DATE`),
+ * or null for a schedule counted in months (`LOT_PURCHASE_DATE`): a discount
+ * bill of 4 weeks is 28 days, not "1 month".
+ */
+export function scheduleDaysOf(schedule: BondSchedule): number | null {
+  switch (schedule.anchor) {
+    case "LOT_PURCHASE_DATE":
+      return null;
+    case "ISSUE_DATE":
+      return daysBetween(schedule.issueDate, schedule.maturityDate);
     default:
       return assertNever(schedule);
   }

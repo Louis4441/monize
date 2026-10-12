@@ -1,6 +1,9 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
+import { tr } from "../i18n/translate";
+import { BondAdapter } from "./bond-adapter";
+import { INSTALLED_BOND_ADAPTERS } from "./bond-adapters";
 import { loadBondLedger, loadLinkedSecurity } from "./bond-ledger";
 import {
   BondLot,
@@ -18,6 +21,20 @@ import { lotsRefusalException } from "./bond-write-guard";
 export interface SeriesOnSale {
   readonly instrumentId: string;
   readonly seriesCode: string;
+}
+
+/**
+ * The series code the adapter of a security's country would give a purchase on a
+ * date, for the form's "Fetch <code>" action. Computed from the adapter's own
+ * grammar, never stored or fetched.
+ */
+export interface ExpectedSeries {
+  /** Null when the adapter cannot name one (no `seriesCodeFor`, or not its program). */
+  readonly seriesCode: string | null;
+  /** The country of the security's program (an issuer country, upper case). */
+  readonly countryCode: string;
+  /** True when the adapter can fetch a series from the official source. */
+  readonly fetchable: boolean;
 }
 
 /** A series an account holds on a date. */
@@ -118,6 +135,52 @@ export class BondHoldingsService {
       if (instrumentId === null) return null;
       const seriesCode = await seriesCodeOf(m, instrumentId);
       return seriesCode === null ? null : { instrumentId, seriesCode };
+    });
+  }
+
+  /**
+   * The series code a purchase of this security on `date` would carry, by the
+   * grammar of the adapter of the program's country (`BondAdapter.seriesCodeFor`),
+   * and whether that country can fetch a series. Nothing is read from the
+   * catalog's series or from the network. A country with no adapter answers a
+   * null code and `fetchable` false. 404 for a security that is not the
+   * caller's or not linked.
+   */
+  async expectedSeries(
+    userId: string,
+    securityId: string,
+    date: string,
+    adapters: readonly BondAdapter[] = INSTALLED_BOND_ADAPTERS,
+  ): Promise<ExpectedSeries> {
+    return withScopedDb(this.dataSource, async (m) => {
+      const security = await loadLinkedSecurity(m, userId, securityId);
+      const rows: Array<{ issuer_country_code: string; program_code: string }> =
+        await m.query(
+          `SELECT issuer_country_code, program_code
+             FROM bond_programs WHERE id = $1::uuid`,
+          [security.bondProgramId],
+        );
+      const program = rows[0];
+      if (!program) {
+        throw new NotFoundException(
+          tr(
+            "errors.bonds.securityNotLinked",
+            `Security ${securityId} not found or not linked to a bond program`,
+            { securityId },
+          ),
+        );
+      }
+      const adapter = adapters.find(
+        (a) => a.countryCode === program.issuer_country_code,
+      );
+      return {
+        seriesCode:
+          adapter?.seriesCodeFor?.(program.program_code, date) ?? null,
+        countryCode: program.issuer_country_code,
+        fetchable:
+          adapter?.fetchSeries !== undefined &&
+          adapter.seriesProviderId !== undefined,
+      };
     });
   }
 

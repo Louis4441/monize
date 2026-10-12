@@ -2992,6 +2992,76 @@ describe("SecuritiesService", () => {
       });
     });
 
+    describe("recomputeLinkedPrices judges the whole refresh pass", () => {
+      const selection = [{ id: "s1", symbol: "EDO1036" }];
+      const history = (stored: number, failed: number) => ({
+        candidates: 8,
+        alreadyStored: 0,
+        stored,
+        notPublished: 0,
+        failed,
+        stoppedEarly: false,
+        remaining: 0,
+      });
+      const run = async (offer: object) => {
+        queryRunnerManager.query.mockImplementation(
+          queryWith(async () => [
+            { id: "s1", issuer_country_code: "PL", program_code: "EDO" },
+          ]),
+        );
+        mockBondSeriesService.fetchProgramOffer.mockResolvedValue(offer);
+        return service.recomputeLinkedPrices("user-1", selection);
+      };
+
+      it("is a success when the listing failed but the history stored series", async () => {
+        const result = await run({
+          listed: 0,
+          stored: 0,
+          alreadyStored: 0,
+          failed: 1,
+          history: history(3, 0),
+        });
+        expect(result).toMatchObject({ updated: 1, failed: 0 });
+      });
+
+      it("is a success when the offer stored some and another series failed", async () => {
+        const result = await run({
+          listed: 2,
+          stored: 1,
+          alreadyStored: 0,
+          failed: 1,
+          history: history(0, 0),
+        });
+        expect(result).toMatchObject({ updated: 1, failed: 0 });
+      });
+
+      it("is a failure only when nothing of the pass succeeded and something failed", async () => {
+        const result = await run({
+          listed: 0,
+          stored: 0,
+          alreadyStored: 0,
+          failed: 1,
+          history: history(0, 2),
+        });
+        expect(result).toMatchObject({ updated: 0, failed: 1 });
+        expect(result.results[0]).toMatchObject({
+          success: false,
+          error: "The current EDO offer could not be fetched",
+        });
+      });
+
+      it("is a success when nothing failed, even if nothing was stored", async () => {
+        const result = await run({
+          listed: 0,
+          stored: 0,
+          alreadyStored: 0,
+          failed: 0,
+          history: history(0, 0),
+        });
+        expect(result).toMatchObject({ updated: 1, failed: 0 });
+      });
+    });
+
     it("create refuses a link on a security that is not of type BOND", async () => {
       queryRunnerManager.findOne.mockResolvedValue(null);
       queryRunnerManager.query.mockResolvedValue([{ currency_code: "PLN" }]);

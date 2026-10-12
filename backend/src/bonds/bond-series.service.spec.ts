@@ -73,6 +73,7 @@ const NO_BACKFILL: BackfillRun = {
 function adapterOf(over: Partial<BondAdapter> = {}): BondAdapter {
   return {
     countryCode: "PL",
+    specDoc: "docs/specs/polish-retail-bonds.md",
     timezone: "Europe/Warsaw",
     registerCalendars: (r) => r,
     benchmarks: [],

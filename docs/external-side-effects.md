@@ -526,7 +526,9 @@ failure throws rather than fabricating a result.
 `BenchmarkRefreshService` reads the NBP reference rate and the GUS year-on-year
 CPI and writes them to `benchmark_values`; it has no effect at the publisher to
 undo. Each outbound call is gated by the `nbp` or `gus` circuit breaker
-(`ProviderHealthService`), and the whole body is read before the breaker records
+(`ProviderHealthService`) through `SeriesHttp.gated`, limited to the https hosts
+the adapter declares (no other host, no redirect off them), with a 30 s timeout
+and a 5 MB streaming cap, and the whole body is read before the breaker records
 a success. The fetch and parse finish before anything is written, so a failed or
 unparseable document leaves no partial rows, and one series failing does not
 stop the other. The write is one transaction per series: the observations

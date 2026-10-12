@@ -40,6 +40,7 @@ import {
 import {
   BondHoldingsService,
   BondRedemptionSplit,
+  ExpectedSeries,
   SeriesHolding,
 } from "./bond-holdings.service";
 import { BondPriceRecompute, BondPriceService } from "./bond-price.service";
@@ -366,6 +367,34 @@ export class BondsController {
     );
     res.json(series);
     return;
+  }
+
+  @Get("securities/:securityId/expected-series")
+  @ApiOperation({
+    summary:
+      "The series code a purchase of this security on a date would carry",
+    description:
+      "By the grammar of the adapter of the security's program's country: " +
+      "`{ seriesCode, countryCode, fetchable }`. `seriesCode` is null when the " +
+      "adapter cannot name one; `fetchable` is true when the country can fetch " +
+      'a series from its official source (the form then offers "Fetch <code>"). ' +
+      "Nothing is fetched or stored.",
+  })
+  @ApiQuery({ name: "date", example: "2027-04-15" })
+  @ApiResponse({ status: 200, description: "The expected series" })
+  @ApiResponse({ status: 400, description: "date is not a calendar date" })
+  @ApiResponse({
+    status: 404,
+    description: "Not the caller's security, or not linked to a bond program",
+  })
+  expectedSeries(
+    @Request() req,
+    @Param("securityId", ParseUUIDPipe) securityId: string,
+    @Query("date", new ParseCalendarDatePipe()) date: string,
+  ): Promise<ExpectedSeries> {
+    return this.mapBondErrors(() =>
+      this.holdings.expectedSeries(req.user.id, securityId, date),
+    );
   }
 
   @Get("securities/:securityId/series-holdings")
