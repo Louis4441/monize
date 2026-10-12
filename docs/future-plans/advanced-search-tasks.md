@@ -55,7 +55,7 @@ There is no migration. B3 is the only **change**, and it swaps every call site i
 
 - `parseTransactionSearch(raw, formats)` and the types of plan section 6, exactly. The grammar is section 4.1 and the fields and aliases are section 4.2 (aliases are normalised: `desc` becomes `memo`, `category` becomes `cat`).
 - Amount and date values are read through the existing helpers in `transaction-search-parse.util.ts`, exported from there if they are not already. Never write a second number or date parser. A partial ISO date becomes the period of plan section 7, carried as `between`.
-- Caps: cut the input at 200 characters before tokenising. More than 12 terms throws `BadRequestException` with `tr("transactions.search.tooManyTerms", ...)`; the key goes in the backend `en` catalog, then run `npm run i18n:pseudo`.
+- Caps: cut the input at 200 characters before tokenising. More than 12 terms throws `BadRequestException` with `tr("errors.transactions.searchTooManyTerms", ...)`; the key goes in every backend locale's `errors.json` in the same PR, because `locales.parity.spec.ts` requires it, then run `npm run i18n:pseudo`.
 - Malformed and empty values follow decision 6.
 - Acceptance: the parser row of plan section 10, written as one `it.each` table of input, expected terms. Also: `#` alone, `-` alone, `"` alone, and a 200-character run with no whitespace.
 
@@ -85,13 +85,13 @@ There is no migration. B3 is the only **change**, and it swaps every call site i
 - `backend/src/transactions/transactions.controller.ts`
 - `backend/src/transactions/transaction-search.util.ts` (delete `buildTransactionSearchClause`)
 - `backend/src/transactions/transaction-search.guard.spec.ts` (new)
-- `backend/test/integration/transaction-search.integration.spec.ts` (new)
+- `backend/test/integration/transaction-search.integration.spec.ts` (B2 created it with the builder's truth tables; B3 adds the call-site cases)
 - each touched service's spec
 - `docs/system-invariants.md` (a "Search" section with INV-SEARCH-001 to 005, and their index rows)
 
 Work:
 - Each site becomes one helper call with its own prefix and grain. Record the grain decision in a one-line comment at each call. `findAll` and `buildFilteredIdsSubquery` must read the string identically, so the target-page lookup and the running balance agree with the listed rows (INV-REGISTER-001).
-- While swapping `findAll`, record in the PR whether today's `splits` alias filter trims the drawn splits (plan section 4.4). If it does, the integration spec gains a case showing the register now draws every split of a matched transaction.
+- `findAll`, `buildFilteredIdsSubquery`, `createFilteredAnalyticsQuery` and the bulk-update filter run at split grain (plan section 13, question 5), correlated to the split alias each already joins (`splits`, `bfSplits`, `searchSplits` / `filterSplits`), so the register keeps drawing only matching lines with a filtered total and bulk update keeps acting on matching lines. A site with no split join gets one (`leftJoin`), as `buildFilteredIdsSubquery` already does when a search is present. The integration spec gains a register case showing a split-memo search draws only the matching line.
 - The controller: `/summary`, `/grouped-totals`, `/tag-key-breakdown` and `/monthly-totals` get the same `assertStringParam` and 200-character cut that `findAll` already has.
 - Delete `sanitizeLikePattern`. The LLM paths pass the raw string, as the rows path already does (INV-SEARCH-005).
 - The guard: no import of the builder or the parser outside the util and the helper, and no `%${` template next to a search identifier in `backend/src/transactions/`. Its failure message names the helper.
@@ -152,7 +152,7 @@ Work:
 
 ### Q -- Acceptance
 
-**Files:** every locale's `transactions.json` under `frontend/src/i18n/messages/` and the backend locale files holding `transactions.search.tooManyTerms`, `docs/release-notes/` (one entry), `docs/future-plans/advanced-search.md` (status line and section 13), the tracking issue.
+**Files:** every locale's `transactions.json` under `frontend/src/i18n/messages/` `docs/release-notes/` (one entry), `docs/future-plans/advanced-search.md` (status line and section 13), the tracking issue.
 
 - Translate every new key, then run `npm run i18n:pseudo`; both parity specs must pass.
 - The release note gives three examples (`#10`, `payee:costco -cat:gas`, `date:2026-03 amount:>100`) and states the multi-word change in one sentence.

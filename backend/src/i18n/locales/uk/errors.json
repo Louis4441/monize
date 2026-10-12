@@ -639,6 +639,7 @@
     "targetRequiresDateSort": "targetTransactionId можна використовувати, лише коли реєстр відсортовано за датою",
     "invalidTagKeyOp": "Недійсний tagKeyOp: {{ op }}",
     "tagKeyRequired": "Потрібен ключ тегу (1–100 символів)",
+    "searchTooManyTerms": "Пошуковий запит може містити не більше {{ max }} умов",
     "limitMustBePositive": "limit має бути додатним числом",
     "categoryNotFound": "Категорію не знайдено",
     "categoriesNotFound": "Категорії не знайдено: {{ ids }}",

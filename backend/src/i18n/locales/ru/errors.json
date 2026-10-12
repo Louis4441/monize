@@ -639,6 +639,7 @@
     "targetRequiresDateSort": "targetTransactionId можно использовать, только когда реестр отсортирован по дате",
     "invalidTagKeyOp": "Недопустимый tagKeyOp: {{ op }}",
     "tagKeyRequired": "Требуется ключ тега (1–100 символов)",
+    "searchTooManyTerms": "Поисковый запрос может содержать не более {{ max }} условий",
     "limitMustBePositive": "limit должен быть положительным числом",
     "categoryNotFound": "Категория не найдена",
     "categoriesNotFound": "Категории не найдены: {{ ids }}",

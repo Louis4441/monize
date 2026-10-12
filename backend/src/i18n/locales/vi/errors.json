@@ -639,6 +639,7 @@
     "targetRequiresDateSort": "targetTransactionId chỉ có thể dùng khi sổ giao dịch được sắp xếp theo ngày",
     "invalidTagKeyOp": "tagKeyOp không hợp lệ: {{ op }}",
     "tagKeyRequired": "Cần có khóa thẻ (1-100 ký tự)",
+    "searchTooManyTerms": "Một tìm kiếm chỉ có thể chứa tối đa {{ max }} cụm từ",
     "limitMustBePositive": "limit phải là số dương",
     "categoryNotFound": "Không tìm thấy danh mục",
     "categoriesNotFound": "Không tìm thấy danh mục: {{ ids }}",
