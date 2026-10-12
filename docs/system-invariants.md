@@ -74,6 +74,7 @@ implied.
 | INV-FX-002 | A row that carries its own exchange rate is converted at that rate on every surface | enforced |
 | INV-FX-003 | A currency pair is stored in one orientation | partial |
 | INV-FX-004 | A user-supplied rate never replaces a global exchange-rate observation | enforced |
+| INV-FX-005 | A provider-written rate names its provider, every provider question goes through the chain, and an outage is never remembered as an empty answer | unenforced |
 | INV-TRADE-001 | The executed total is the fact; the per-share price is derived from it | enforced |
 | INV-PRICE-001 | A stored price is in the currency the security is recorded in | partial |
 | INV-PORTRESULT-001 | A period change is not a return: value change, external flows and investment result are three figures | enforced |
@@ -1076,6 +1077,46 @@ Status              enforced -- the conflict action is the mechanism, and the
                     CRNC_EXCHG history can predate what Yahoo or any other
                     provider carries, and until a provider supplies the date
                     every user resolves through the Money rate.
+```
+
+### INV-FX-005 -- a stored rate names its provider; an outage is not an empty answer
+
+```text
+Statement           Every exchange_rates row a provider writes carries that
+                    provider's source slug. Every provider question passes
+                    through FxProviderChain in the order FX_PROVIDERS names.
+                    "The provider answered with nothing" and "no provider
+                    answered" are kept apart per provider, so an outage at one
+                    provider is never remembered as an empty window: a window
+                    the first provider never answered may hold history the
+                    second does not carry, and recording it as empty would stop
+                    the gap fill from ever asking again.
+Source of truth     FX_PROVIDERS (the configured order, parsed against
+                    FX_PROVIDER_NAMES) and FxRateProvider.source (the slug each
+                    adapter writes).
+Enforcement         None yet. ExchangeRateService builds Yahoo symbols itself
+                    and hard-codes 'yahoo_finance' in upsertCanonicalRate and
+                    persistRateSeries; fillRateWindow keeps "answered nothing"
+                    apart from "did not answer" across its direct and reverse
+                    symbols, but there is no second provider to keep it apart
+                    from. Planned:
+                    backend/src/currencies/providers/fx-provider-chain.ts asks
+                    the providers in order and gates every call on carries;
+                    ExchangeRateService takes the source from the chain's
+                    answer; fx-provider-source.guard.spec.ts fails on a quoted
+                    source slug under backend/src/currencies/ outside the
+                    providers directory and on an import of
+                    yahoo-finance.service there outside the Yahoo adapter.
+Test                Planned: the section 5 truth table of
+                    docs/future-plans/exchange-rate-providers.md as named cases
+                    in fx-provider-chain.spec.ts (in particular: first provider
+                    did not answer, second answered empty -> answered false),
+                    and fx-provider-source.guard.spec.ts.
+Status              unenforced -- registered ahead of the build; the plan is
+                    docs/future-plans/exchange-rate-providers.md with its task
+                    list docs/future-plans/exchange-rate-providers-tasks.md.
+                    Task Q moves this entry to enforced once the guard and the
+                    chain cases are on main.
 ```
 
 ### INV-TRADE-001 -- the executed total is the fact, the price is derived
