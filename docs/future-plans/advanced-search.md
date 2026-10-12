@@ -122,7 +122,7 @@ field     := payee | memo | desc | cat | category | tag | account | ref
 ```
 
 Limits: the raw string is cut at 200 characters, as today. More than 12
-terms is a 400 with `transactions.search.tooManyTerms`.
+terms is a 400 with `errors.transactions.searchTooManyTerms`.
 
 ### 4.2 Fields and what each one reads
 
@@ -214,10 +214,14 @@ interface SearchTerm {
   field: SearchField | "any";        // "any" is a bare word or phrase
   op: SearchOp;
   value: string;                     // unescaped; amount and date values normalised (section 7)
-  valueTo?: string;                  // "between" only; absent side means open
+  valueTo?: string;                  // "between" only; an open range is gte or lte
   negated: boolean;
   raw: string;                       // the term as typed, for the echo
   ignored?: "malformed" | "empty";
+  interpreted?: {                    // "any" only: the bare term read as an amount
+    amount: number | null;           // and a date (parseSearchTerm); builder-internal,
+    date: string | null;             // never echoed
+  };
 }
 interface ParsedSearch { terms: SearchTerm[] }
 function parseTransactionSearch(raw: string, formats: SearchFormats): ParsedSearch;

@@ -55,7 +55,7 @@ There is no migration. B3 is the only **change**, and it swaps every call site i
 
 - `parseTransactionSearch(raw, formats)` and the types of plan section 6, exactly. The grammar is section 4.1 and the fields and aliases are section 4.2 (aliases are normalised: `desc` becomes `memo`, `category` becomes `cat`).
 - Amount and date values are read through the existing helpers in `transaction-search-parse.util.ts`, exported from there if they are not already. Never write a second number or date parser. A partial ISO date becomes the period of plan section 7, carried as `between`.
-- Caps: cut the input at 200 characters before tokenising. More than 12 terms throws `BadRequestException` with `tr("transactions.search.tooManyTerms", ...)`; the key goes in the backend `en` catalog, then run `npm run i18n:pseudo`.
+- Caps: cut the input at 200 characters before tokenising. More than 12 terms throws `BadRequestException` with `tr("errors.transactions.searchTooManyTerms", ...)`; the key goes in every backend locale's `errors.json` in the same PR, because `locales.parity.spec.ts` requires it, then run `npm run i18n:pseudo`.
 - Malformed and empty values follow decision 6.
 - Acceptance: the parser row of plan section 10, written as one `it.each` table of input, expected terms. Also: `#` alone, `-` alone, `"` alone, and a 200-character run with no whitespace.
 
@@ -152,7 +152,7 @@ Work:
 
 ### Q -- Acceptance
 
-**Files:** every locale's `transactions.json` under `frontend/src/i18n/messages/` and the backend locale files holding `transactions.search.tooManyTerms`, `docs/release-notes/` (one entry), `docs/future-plans/advanced-search.md` (status line and section 13), the tracking issue.
+**Files:** every locale's `transactions.json` under `frontend/src/i18n/messages/` `docs/release-notes/` (one entry), `docs/future-plans/advanced-search.md` (status line and section 13), the tracking issue.
 
 - Translate every new key, then run `npm run i18n:pseudo`; both parity specs must pass.
 - The release note gives three examples (`#10`, `payee:costco -cat:gas`, `date:2026-03 amount:>100`) and states the multi-word change in one sentence.
