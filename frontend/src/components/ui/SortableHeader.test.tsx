@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
 import { SortableHeader } from './SortableHeader';
+import { useLongPress } from '@/hooks/useLongPress';
 
 function renderHeader(props: Partial<Parameters<typeof SortableHeader>[0]> = {}) {
   const onSort = vi.fn();
@@ -134,5 +135,94 @@ describe('SortableHeader controls slot', () => {
     // The header itself still sorts.
     fireEvent.click(screen.getByRole('columnheader'));
     expect(onSort).toHaveBeenCalledWith('date');
+  });
+});
+
+describe('SortableHeader pressHandlers', () => {
+  function PressHeader({ onSort, onLongPress }: { onSort: (f: 'status') => void; onLongPress: () => void }) {
+    const { getRowHandlers } = useLongPress<'status'>({ onLongPress, onClick: onSort });
+    return (
+      <table>
+        <thead>
+          <tr>
+            <SortableHeader
+              field="status"
+              sortField="status"
+              sortDirection="asc"
+              onSort={onSort}
+              pressHandlers={getRowHandlers('status')}
+            >
+              Status
+            </SortableHeader>
+          </tr>
+        </thead>
+      </table>
+    );
+  }
+
+  it('sorts exactly once on a click, through the press handlers', () => {
+    // The header's own onClick is dropped when handlers are given; spreading
+    // both would sort twice per click.
+    const onSort = vi.fn();
+    render(<PressHeader onSort={onSort} onLongPress={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('columnheader', { name: /Status/ }));
+
+    expect(onSort).toHaveBeenCalledOnce();
+    expect(onSort).toHaveBeenCalledWith('status');
+  });
+
+  it('does not sort on a right-click, which is the long-press', () => {
+    const onSort = vi.fn();
+    const onLongPress = vi.fn();
+    render(<PressHeader onSort={onSort} onLongPress={onLongPress} />);
+
+    fireEvent.contextMenu(screen.getByRole('columnheader', { name: /Status/ }));
+
+    expect(onLongPress).toHaveBeenCalledOnce();
+    expect(onSort).not.toHaveBeenCalled();
+  });
+
+  it.each(['Enter', ' '])('still sorts from the keyboard with %j', (key) => {
+    const onSort = vi.fn();
+    render(<PressHeader onSort={onSort} onLongPress={vi.fn()} />);
+
+    fireEvent.keyDown(screen.getByRole('columnheader', { name: /Status/ }), { key });
+
+    expect(onSort).toHaveBeenCalledOnce();
+    expect(onSort).toHaveBeenCalledWith('status');
+  });
+
+  it('keeps a press on a header control from starting a long-press', () => {
+    const onSort = vi.fn();
+    const onLongPress = vi.fn();
+    function WithControl() {
+      const { getRowHandlers } = useLongPress<'date'>({ onLongPress, onClick: onSort });
+      return (
+        <table>
+          <thead>
+            <tr>
+              <SortableHeader
+                field="date"
+                sortField="date"
+                sortDirection="desc"
+                onSort={onSort}
+                pressHandlers={getRowHandlers('date')}
+                controls={<button type="button">Hide the year</button>}
+              >
+                Date
+              </SortableHeader>
+            </tr>
+          </thead>
+        </table>
+      );
+    }
+    render(<WithControl />);
+
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Hide the year' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hide the year' }));
+
+    expect(onLongPress).not.toHaveBeenCalled();
+    expect(onSort).not.toHaveBeenCalled();
   });
 });

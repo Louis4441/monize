@@ -4,6 +4,9 @@ import { Pagination } from '@/components/ui/Pagination';
 import { DensityToggle } from '@/components/ui/DensityToggle';
 import type { DensityView } from '@/store/densityStore';
 
+/** The class of a text button in this bar's `actions`; see `DensityToggle.tsx`. */
+export { LIST_TOOLBAR_BUTTON_CLASS } from '@/components/ui/DensityToggle';
+
 interface ListTopToolbarProps {
   /** Which surface's remembered row density the toggle in this bar reads. */
   densityView: DensityView;

@@ -39,6 +39,12 @@
     "more": "More actions"
   },
   "columns": {
+    "button": "Columns",
+    "buttonWithHidden": "Columns, {count} hidden",
+    "menuLabel": "Show or hide columns",
+    "showAll": "Show all",
+    "hideColumn": "Hide column",
+    "sheetSubtitle": "Bring it back from the Columns menu.",
     "saveFailed": "Couldn't save column settings. Please try again."
   },
   "loading": "Loading...",

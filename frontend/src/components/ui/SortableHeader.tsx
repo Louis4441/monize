@@ -4,6 +4,7 @@ import { ReactNode } from 'react';
 import { SortIcon } from './SortIcon';
 import { INTERACTIVE_ROW_FOCUS_CLASS, activateOnKey } from './interactive-row';
 import type { SortDirection } from '@/hooks/useSortableTable';
+import type { LongPressRowHandlers } from '@/hooks/useLongPress';
 
 interface SortableHeaderProps<F extends string> {
   field: F;
@@ -22,6 +23,15 @@ interface SortableHeaderProps<F extends string> {
    * wrapper makes every press on it sort as well.
    */
   controls?: ReactNode;
+  /**
+   * Press-and-hold handlers for a header that opens a sheet of its own (the
+   * hideable columns' "Hide column", from `useColumnHeaderActions`). When
+   * present the header spreads them and drops its own `onClick`: the sort
+   * arrives through their `onClick`, which `useLongPress` withholds after a
+   * long-press, so one press never both opens the sheet and sorts. The
+   * keyboard sort is unchanged.
+   */
+  pressHandlers?: LongPressRowHandlers;
 }
 
 /**
@@ -37,6 +47,7 @@ export function SortableHeader<F extends string>({
   className = '',
   children,
   controls,
+  pressHandlers,
 }: SortableHeaderProps<F>) {
   const justify =
     align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : '';
@@ -51,7 +62,7 @@ export function SortableHeader<F extends string>({
       role="columnheader"
       tabIndex={0}
       aria-sort={isActive ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
-      onClick={sort}
+      {...(pressHandlers ?? { onClick: sort })}
       onKeyDown={activateOnKey(sort)}
       className={`cursor-pointer transition-colors motion-reduce:transition-none hover:bg-gray-100 dark:hover:bg-gray-700 ${INTERACTIVE_ROW_FOCUS_CLASS} select-none ${className}`}
     >
@@ -64,6 +75,9 @@ export function SortableHeader<F extends string>({
             className="inline-flex items-center"
             onClick={(event) => event.stopPropagation()}
             onKeyDown={(event) => event.stopPropagation()}
+            onMouseDown={(event) => event.stopPropagation()}
+            onTouchStart={(event) => event.stopPropagation()}
+            onContextMenu={(event) => event.stopPropagation()}
           >
             {controls}
           </span>
