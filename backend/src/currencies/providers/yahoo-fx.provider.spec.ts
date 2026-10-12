@@ -4,7 +4,13 @@ import {
   HistoricalPrice,
   QuoteResult,
 } from "../../securities/providers/quote-provider.interface";
-import { FX_FETCH_CONCURRENCY, YahooFxProvider } from "./yahoo-fx.provider";
+import {
+  FX_FETCH_CONCURRENCY,
+  PLACEHOLDER_TOLERANCE,
+  REVERSE_FIRST_MEMORY_LIMIT,
+  YAHOO_FX_PLACEHOLDER_RATE,
+  YahooFxProvider,
+} from "./yahoo-fx.provider";
 
 jest.mock("../../common/date-utils", () => ({
   ...jest.requireActual("../../common/date-utils"),
@@ -39,6 +45,7 @@ describe("YahooFxProvider", () => {
   >;
   let provider: YahooFxProvider;
   let warn: jest.SpyInstance;
+  let log: jest.SpyInstance;
 
   /** Answer each symbol from a table; an absent symbol is Yahoo returning null. */
   const quotes = (table: Record<string, QuoteResult | null>) => {
@@ -62,10 +69,12 @@ describe("YahooFxProvider", () => {
     };
     provider = new YahooFxProvider(yahoo as unknown as YahooFinanceService);
     warn = jest.spyOn(Logger.prototype, "warn").mockImplementation(() => {});
+    log = jest.spyOn(Logger.prototype, "log").mockImplementation(() => {});
   });
 
   afterEach(() => {
     warn.mockRestore();
+    log.mockRestore();
   });
 
   it("is the yahoo provider writing yahoo_finance rows, and carries every code", async () => {
@@ -342,6 +351,192 @@ describe("YahooFxProvider", () => {
       const series = await provider.fetchDailySeries("USD", "CAD", START, END);
 
       expect(series?.map((p) => p.date)).toEqual(["2024-01-02", "2024-01-05"]);
+    });
+  });
+
+  describe("the placeholder cross-check (issue #1677)", () => {
+    const START = "2024-01-01";
+    const END = "2024-01-05";
+
+    it("names the placeholder and its 1 % tolerance", () => {
+      expect(YAHOO_FX_PLACEHOLDER_RATE).toBe(0.01);
+      expect(PLACEHOLDER_TOLERANCE).toBe(0.01);
+    });
+
+    it("plan section 7.3: IDRUSD=X at 0.01 against USDIDR=X at 17871 answers the reverse, in its own orientation", async () => {
+      quotes({
+        "IDRUSD=X": quoteOf("IDRUSD=X", 0.01),
+        "USDIDR=X": quoteOf("USDIDR=X", 17871),
+      });
+
+      const found = await provider.fetchLatest("IDR", ["USD"]);
+
+      expect(askedSymbols()).toEqual(["IDRUSD=X", "USDIDR=X"]);
+      expect(found!.get("USD")).toEqual({
+        from: "USD",
+        to: "IDR",
+        date: TODAY,
+        rate: 17871,
+      });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it("a placeholder whose reverse is itself too coarse is no rate, never the placeholder", async () => {
+      quotes({
+        "IDRUSD=X": quoteOf("IDRUSD=X", 0.01),
+        "USDIDR=X": quoteOf("USDIDR=X", 0.05),
+      });
+
+      const found = await provider.fetchLatest("IDR", ["USD"]);
+
+      expect(found).not.toBeNull();
+      expect(found!.has("USD")).toBe(false);
+    });
+
+    it("a real rate of 0.01 that its reverse agrees with is not a placeholder: the pair is chosen as before and not remembered", async () => {
+      // 1 / 100.5 is 0.995 % from 0.01, inside the tolerance.
+      quotes({
+        "AAABBB=X": quoteOf("AAABBB=X", 0.01),
+        "BBBAAA=X": quoteOf("BBBAAA=X", 100.5),
+      });
+
+      const first = await provider.fetchLatest("AAA", ["BBB"]);
+      const second = await provider.fetchLatest("AAA", ["BBB"]);
+
+      // chooseFxQuote keeps the side with more digits, as for any quote below 1.
+      expect(first!.get("BBB")).toEqual({
+        from: "BBB",
+        to: "AAA",
+        date: TODAY,
+        rate: 100.5,
+      });
+      expect(second).toEqual(first);
+      expect(askedSymbols()).toEqual([
+        "AAABBB=X",
+        "BBBAAA=X",
+        "AAABBB=X",
+        "BBBAAA=X",
+      ]);
+      expect(log).not.toHaveBeenCalled();
+    });
+
+    it("a placeholder whose reverse does not answer is no rate, with one warn naming the pair", async () => {
+      quotes({ "IDRUSD=X": quoteOf("IDRUSD=X", 0.01) });
+
+      const found = await provider.fetchLatest("IDR", ["USD"]);
+
+      expect(found).not.toBeNull();
+      expect(found!.has("USD")).toBe(false);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("IDR/USD"));
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("USDIDR=X"));
+    });
+
+    it("a placeholder the reverse could not check is not remembered: the next call asks the direct symbol first again", async () => {
+      quotes({ "IDRUSD=X": quoteOf("IDRUSD=X", 0.01) });
+      await provider.fetchLatest("IDR", ["USD"]);
+      yahoo.fetchQuote.mockClear();
+
+      await provider.fetchLatest("IDR", ["USD"]);
+
+      expect(askedSymbols()[0]).toBe("IDRUSD=X");
+    });
+
+    it("a remembered pair asks the reverse symbol first on the next fetchLatest and fetchLive, one call each", async () => {
+      quotes({
+        "IDRUSD=X": quoteOf("IDRUSD=X", 0.01),
+        "USDIDR=X": quoteOf("USDIDR=X", 17871),
+      });
+      await provider.fetchLatest("IDR", ["USD"]);
+      yahoo.fetchQuote.mockClear();
+
+      const found = await provider.fetchLatest("IDR", ["USD"]);
+      const live = await provider.fetchLive("IDR", "USD");
+
+      expect(askedSymbols()).toEqual(["USDIDR=X", "USDIDR=X"]);
+      const expected = { from: "USD", to: "IDR", date: TODAY, rate: 17871 };
+      expect(found!.get("USD")).toEqual(expected);
+      expect(live).toEqual(expected);
+    });
+
+    it("a remembered pair whose reverse goes silent still asks the direct symbol, and the choice is the same rule", async () => {
+      quotes({
+        "IDRUSD=X": quoteOf("IDRUSD=X", 0.01),
+        "USDIDR=X": quoteOf("USDIDR=X", 17871),
+      });
+      await provider.fetchLatest("IDR", ["USD"]);
+      quotes({ "IDRUSD=X": quoteOf("IDRUSD=X", 0.01) });
+      yahoo.fetchQuote.mockClear();
+
+      const found = await provider.fetchLatest("IDR", ["USD"]);
+
+      expect(askedSymbols()).toEqual(["USDIDR=X", "IDRUSD=X"]);
+      expect(found!.has("USD")).toBe(false);
+    });
+
+    it("a remembered pair asks the reverse window first on the next fetchDailySeries, and a dense reverse answer is the whole answer", async () => {
+      quotes({
+        "IDRUSD=X": quoteOf("IDRUSD=X", 0.01),
+        "USDIDR=X": quoteOf("USDIDR=X", 17871),
+      });
+      await provider.fetchLatest("IDR", ["USD"]);
+      windows({
+        "USDIDR=X": [
+          bar("2024-01-02", 15500),
+          bar("2024-01-03", 15520),
+          bar("2024-01-04", 15510),
+          bar("2024-01-05", 15530),
+        ],
+      });
+
+      const series = await provider.fetchDailySeries("IDR", "USD", START, END);
+
+      expect(askedWindows()).toEqual(["USDIDR=X"]);
+      expect(series).toEqual([
+        { from: "USD", to: "IDR", date: "2024-01-02", rate: 15500 },
+        { from: "USD", to: "IDR", date: "2024-01-03", rate: 15520 },
+        { from: "USD", to: "IDR", date: "2024-01-04", rate: 15510 },
+        { from: "USD", to: "IDR", date: "2024-01-05", rate: 15530 },
+      ]);
+    });
+
+    it("the memory is per question: the reverse question USD->IDR is not affected", async () => {
+      quotes({
+        "IDRUSD=X": quoteOf("IDRUSD=X", 0.01),
+        "USDIDR=X": quoteOf("USDIDR=X", 17871),
+      });
+      await provider.fetchLatest("IDR", ["USD"]);
+      yahoo.fetchQuote.mockClear();
+
+      await provider.fetchLatest("USD", ["IDR"]);
+
+      expect(askedSymbols()).toEqual(["USDIDR=X"]);
+    });
+
+    it(`the memory is bounded at ${REVERSE_FIRST_MEMORY_LIMIT} pairs, the oldest forgotten first`, async () => {
+      const codes = Array.from(
+        { length: REVERSE_FIRST_MEMORY_LIMIT + 1 },
+        (_, i) => `Q${String(i).padStart(3, "0")}`,
+      );
+      yahoo.fetchQuote.mockImplementation(async (symbol: string) =>
+        symbol.startsWith("IDR")
+          ? quoteOf(symbol, 0.01)
+          : quoteOf(symbol, 17871),
+      );
+      for (const code of codes) {
+        await provider.fetchLatest("IDR", [code]);
+      }
+      yahoo.fetchQuote.mockClear();
+
+      // The first pair remembered was pushed out by the last; the second stays.
+      await provider.fetchLatest("IDR", [codes[0]]);
+      await provider.fetchLatest("IDR", [codes[2]]);
+
+      expect(askedSymbols()).toEqual([
+        `IDR${codes[0]}=X`,
+        `${codes[0]}IDR=X`,
+        `${codes[2]}IDR=X`,
+      ]);
     });
   });
 
