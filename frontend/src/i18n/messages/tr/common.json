@@ -39,6 +39,12 @@
     "more": "Daha Fazla İşlem"
   },
   "columns": {
+    "button": "Sütunlar",
+    "buttonWithHidden": "Sütunlar, {count} gizli",
+    "menuLabel": "Sütunları göster veya gizle",
+    "showAll": "Tümünü göster",
+    "hideColumn": "Sütunu gizle",
+    "sheetSubtitle": "Sütunlar menüsünden geri getirebilirsiniz.",
     "saveFailed": "Sütun ayarları kaydedilemedi. Lütfen tekrar deneyin."
   },
   "loading": "Yükleniyor...",

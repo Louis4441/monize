@@ -39,6 +39,12 @@
     "more": "更多操作"
   },
   "columns": {
+    "button": "列",
+    "buttonWithHidden": "列，已隐藏 {count} 个",
+    "menuLabel": "显示或隐藏列",
+    "showAll": "全部显示",
+    "hideColumn": "隐藏列",
+    "sheetSubtitle": "可在“列”菜单中重新显示。",
     "saveFailed": "无法保存列设置。请重试。"
   },
   "loading": "加载中...",

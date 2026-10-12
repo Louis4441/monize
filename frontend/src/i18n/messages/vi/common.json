@@ -39,6 +39,12 @@
     "more": "Thêm thao tác"
   },
   "columns": {
+    "button": "Cột",
+    "buttonWithHidden": "Cột, {count} đã ẩn",
+    "menuLabel": "Hiện hoặc ẩn cột",
+    "showAll": "Hiện tất cả",
+    "hideColumn": "Ẩn cột",
+    "sheetSubtitle": "Hiện lại cột từ menu Cột.",
     "saveFailed": "Không thể lưu cài đặt cột. Vui lòng thử lại."
   },
   "loading": "Đang tải...",

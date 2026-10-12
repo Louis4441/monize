@@ -39,6 +39,12 @@
     "more": "Altre azioni"
   },
   "columns": {
+    "button": "Colonne",
+    "buttonWithHidden": "Colonne, nascoste: {count}",
+    "menuLabel": "Mostra o nascondi colonne",
+    "showAll": "Mostra tutte",
+    "hideColumn": "Nascondi colonna",
+    "sheetSubtitle": "Puoi ripristinarla dal menu Colonne.",
     "saveFailed": "Impossibile salvare le impostazioni delle colonne. Riprova."
   },
   "loading": "Caricamento...",
