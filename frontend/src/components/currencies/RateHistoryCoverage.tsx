@@ -57,8 +57,11 @@ interface PanelState {
 }
 
 /** The provider slugs `exchange_rates.source` actually holds. */
-function sourceKey(source: string | null): 'yahooFinance' | 'mnyImport' | null {
+function sourceKey(
+  source: string | null,
+): 'yahooFinance' | 'frankfurter' | 'mnyImport' | null {
   if (source === 'yahoo_finance') return 'yahooFinance';
+  if (source === 'frankfurter') return 'frankfurter';
   if (source === 'mny_import') return 'mnyImport';
   return null;
 }
