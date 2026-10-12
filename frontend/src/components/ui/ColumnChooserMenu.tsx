@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { HOVER_ROW_ON_CARD } from '@/components/ui/Card';
 import { INTERACTIVE_ROW_FOCUS_CLASS } from '@/components/ui/interactive-row';
@@ -28,6 +28,16 @@ const ITEM_CLASS =
   `w-full px-3 py-2 flex items-center gap-2 text-left text-sm text-gray-700 dark:text-gray-300 ${HOVER_ROW_ON_CARD} ` +
   `${INTERACTIVE_ROW_FOCUS_CLASS} disabled:opacity-50 disabled:cursor-not-allowed`;
 
+/** The menu's rows that can take focus, in order ("Show all" only while enabled). */
+function enabledItems(menu: HTMLElement | null): HTMLButtonElement[] {
+  return Array.from(menu?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? []);
+}
+
+function focusEdge(menu: HTMLElement | null, edge: 'first' | 'last') {
+  const items = enabledItems(menu);
+  items[edge === 'first' ? 0 : items.length - 1]?.focus();
+}
+
 /**
  * The "Columns" menu in a list's toolbar: one checkbox row per hideable column,
  * then "Show all". It is the one way to bring a hidden column back (a header's
@@ -37,8 +47,9 @@ const ITEM_CLASS =
  * trigger.
  *
  * Opening, Escape and click-outside behave as `ActionMenu` does, focus going
- * back to the trigger on Escape. The arrow keys, Home and End move between the
- * rows, as a menu's keyboard contract expects.
+ * back to the trigger on Escape. ArrowDown or ArrowUp on the trigger opens the
+ * menu (if it is shut) and moves into its first or last row; inside, the arrow
+ * keys, Home and End move between the rows.
  */
 export function ColumnChooserMenu<C extends string>({
   columns,
@@ -53,6 +64,8 @@ export function ColumnChooserMenu<C extends string>({
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  /** The row to focus once the menu has rendered, when an arrow key opened it. */
+  const pendingFocus = useRef<'first' | 'last' | null>(null);
 
   const close = useCallback(() => setIsOpen(false), []);
 
@@ -73,10 +86,26 @@ export function ColumnChooserMenu<C extends string>({
   const hiddenCount = columns.filter((column) => hidden.has(column.id)).length;
   const formattedCount = formatNumber(hiddenCount, 0);
 
+  useEffect(() => {
+    if (!isOpen || pendingFocus.current === null) return;
+    focusEdge(menuRef.current, pendingFocus.current);
+    pendingFocus.current = null;
+  }, [isOpen]);
+
+  const handleTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    event.preventDefault();
+    const edge = event.key === 'ArrowDown' ? 'first' : 'last';
+    if (isOpen) {
+      focusEdge(menuRef.current, edge);
+    } else {
+      pendingFocus.current = edge;
+      setIsOpen(true);
+    }
+  };
+
   const handleMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const items = Array.from(
-      menuRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [],
-    );
+    const items = enabledItems(menuRef.current);
     if (items.length === 0) return;
     const current = items.indexOf(document.activeElement as HTMLButtonElement);
     let next: number | null = null;
@@ -96,6 +125,7 @@ export function ColumnChooserMenu<C extends string>({
         ref={triggerRef}
         type="button"
         onClick={() => setIsOpen((open) => !open)}
+        onKeyDown={handleTriggerKeyDown}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-label={

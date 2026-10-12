@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@/test/render';
+import { act, render, screen, fireEvent } from '@/test/render';
+import { ActionMenu } from './ActionMenu';
 import { SortableHeader } from './SortableHeader';
 import { useLongPress } from '@/hooks/useLongPress';
 
@@ -193,12 +194,19 @@ describe('SortableHeader pressHandlers', () => {
     expect(onSort).toHaveBeenCalledWith('status');
   });
 
-  it('keeps a press on a header control from starting a long-press', () => {
-    const onSort = vi.fn();
-    const onLongPress = vi.fn();
-    function WithControl() {
-      const { getRowHandlers } = useLongPress<'date'>({ onLongPress, onClick: onSort });
-      return (
+  function WithControl({
+    onSort,
+    onLongPress,
+    withPressHandlers = true,
+  }: {
+    onSort: (f: 'date') => void;
+    onLongPress: () => void;
+    withPressHandlers?: boolean;
+  }) {
+    const { getRowHandlers } = useLongPress<'date'>({ onLongPress, onClick: onSort });
+    return (
+      <>
+        <ActionMenu label="Maintenance" items={[{ id: 'merge', label: 'Merge', onSelect: vi.fn() }]} />
         <table>
           <thead>
             <tr>
@@ -207,7 +215,7 @@ describe('SortableHeader pressHandlers', () => {
                 sortField="date"
                 sortDirection="desc"
                 onSort={onSort}
-                pressHandlers={getRowHandlers('date')}
+                pressHandlers={withPressHandlers ? getRowHandlers('date') : undefined}
                 controls={<button type="button">Hide the year</button>}
               >
                 Date
@@ -215,14 +223,49 @@ describe('SortableHeader pressHandlers', () => {
             </tr>
           </thead>
         </table>
-      );
+      </>
+    );
+  }
+
+  it('keeps a press on a header control from starting a long-press', () => {
+    vi.useFakeTimers();
+    try {
+      const onSort = vi.fn();
+      const onLongPress = vi.fn();
+      render(<WithControl onSort={onSort} onLongPress={onLongPress} />);
+      const control = screen.getByRole('button', { name: 'Hide the year' });
+
+      fireEvent.contextMenu(control);
+      fireEvent.mouseDown(control, { button: 0 });
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      fireEvent.mouseUp(control);
+      fireEvent.click(control);
+
+      expect(onLongPress).not.toHaveBeenCalled();
+      expect(onSort).not.toHaveBeenCalled();
+
+      // A press on the header itself still is one.
+      fireEvent.contextMenu(screen.getByRole('columnheader'));
+      expect(onLongPress).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
     }
-    render(<WithControl />);
-
-    fireEvent.contextMenu(screen.getByRole('button', { name: 'Hide the year' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Hide the year' }));
-
-    expect(onLongPress).not.toHaveBeenCalled();
-    expect(onSort).not.toHaveBeenCalled();
   });
+
+  it.each([true, false])(
+    'lets a press on a header control close a popover open elsewhere (pressHandlers: %s)',
+    (withPressHandlers) => {
+      // Click-outside listens for mousedown on the document; a control that
+      // stopped its mousedown would leave every open menu open.
+      render(<WithControl onSort={vi.fn()} onLongPress={vi.fn()} withPressHandlers={withPressHandlers} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Maintenance' }));
+      expect(screen.getByRole('menu')).toBeInTheDocument();
+
+      fireEvent.mouseDown(screen.getByRole('button', { name: 'Hide the year' }), { button: 0 });
+
+      expect(screen.queryByRole('menu')).toBeNull();
+    },
+  );
 });

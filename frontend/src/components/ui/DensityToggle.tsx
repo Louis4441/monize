@@ -37,18 +37,6 @@ const SIZE_CLASSES: Record<DensityToggleSize, string> = {
     'hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors',
 };
 
-/**
- * A text button in the bar above a table (`ListTopToolbar`'s `actions`): the
- * register's export button and the Columns menu trigger. It is the `sm`
- * toggle's own look plus the disabled state an export needs, so the buttons
- * beside the toggle stand at its height and highlight as it does.
- * `ListTopToolbar.tsx` re-exports it; it is declared here because this file
- * already owns the toolbar's hover pair, and the bar imports the toggle, not
- * the other way round.
- */
-export const LIST_TOOLBAR_BUTTON_CLASS =
-  'inline-flex items-center px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded disabled:opacity-50 disabled:cursor-not-allowed';
-
 interface DensityToggleProps {
   /** Which surface's remembered level this button reads and cycles. */
   view: DensityView;

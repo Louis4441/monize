@@ -11,8 +11,12 @@ interface UseColumnHeaderActionsOptions<C extends string> {
   columns: readonly ColumnChooserItem<C>[];
   /** Hide the column (`useHiddenColumns(...).hide`). */
   onHide: (id: C) => void;
-  /** A plain click or tap on the header: the sort it always did. */
-  onHeaderClick?: (id: C) => void;
+  /**
+   * A plain click or tap on the header: the sort it always did. Required, since
+   * a header given these handlers drops its own `onClick`, so without it a
+   * hideable header would sort from the keyboard and never from a click.
+   */
+  onHeaderClick: (id: C) => void;
 }
 
 export interface UseColumnHeaderActionsResult {
@@ -51,7 +55,7 @@ export function useColumnHeaderActions<C extends string>({
 
   const { getRowHandlers } = useLongPress<C>({
     onLongPress: (id) => setTarget(byId.get(id) ?? null),
-    onClick: (id) => onHeaderClick?.(id),
+    onClick: (id) => onHeaderClick(id),
   });
 
   const headerHandlers = useCallback(

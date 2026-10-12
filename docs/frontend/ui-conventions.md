@@ -44,7 +44,7 @@ Tailwind v4 trap: the bare `shadow` utility is a legacy alias with the stock val
 
 ## A focus ring is `focus-visible:`, and a hover animates
 
-`focus:ring-*` paints on a mouse click as well as a Tab; use `focus-visible:` on anything clickable. Text inputs are the one exception (`inputBaseClasses` and the element selectors in `globals.css`). Row hover comes from `HOVER_ROW_ON_CARD` / `HOVER_ROW_ON_PAGE` in `Card.tsx`, not a hand-picked grey, and includes the transition (a hover that snaps reads as a redraw). Pair any new transition with `motion-reduce:transition-none`. Both rules carry shrink-only baselines in `ui-conventions.test.ts`.
+`focus:ring-*` paints on a mouse click as well as a Tab; use `focus-visible:` on anything clickable. Text inputs are the one exception (`inputBaseClasses` and the element selectors in `globals.css`). Row hover comes from `HOVER_ROW_ON_CARD` / `HOVER_ROW_ON_PAGE` in `Card.tsx` (a text button in the bar above a table from `HOVER_TOOLBAR_BUTTON`, through `LIST_TOOLBAR_BUTTON_CLASS` on `ListTopToolbar.tsx`), not a hand-picked grey, and includes the transition (a hover that snaps reads as a redraw). Pair any new transition with `motion-reduce:transition-none`. Both rules carry shrink-only baselines in `ui-conventions.test.ts`.
 
 ## A dialog is titled through `Modal`, never by a hand-rolled heading
 

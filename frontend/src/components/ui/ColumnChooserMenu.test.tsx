@@ -150,16 +150,18 @@ describe('ColumnChooserMenu', () => {
     expect(screen.getByTestId('column-chooser-count')).toHaveTextContent('1');
   });
 
-  it('moves between rows with the arrow keys, Home and End, skipping a disabled row', () => {
+  it('opens from the trigger with ArrowDown into the first row, then moves with the arrows, Home and End', () => {
     const { trigger } = setup();
-    fireEvent.click(trigger());
-    const menu = screen.getByRole('menu');
+    trigger().focus();
+
+    fireEvent.keyDown(trigger(), { key: 'ArrowDown' });
+
+    expect(screen.getByRole('menu')).toBeInTheDocument();
     const ref = screen.getByRole('menuitemcheckbox', { name: 'Ref #' });
     const tags = screen.getByRole('menuitemcheckbox', { name: 'Tags' });
     const status = screen.getByRole('menuitemcheckbox', { name: 'Status' });
-
-    fireEvent.keyDown(menu, { key: 'ArrowDown' });
     expect(ref).toHaveFocus();
+
     fireEvent.keyDown(ref, { key: 'ArrowDown' });
     expect(tags).toHaveFocus();
     fireEvent.keyDown(tags, { key: 'End' });
@@ -171,5 +173,24 @@ describe('ColumnChooserMenu', () => {
     expect(status).toHaveFocus();
     fireEvent.keyDown(status, { key: 'Home' });
     expect(ref).toHaveFocus();
+  });
+
+  it('opens from the trigger with ArrowUp into the last enabled row', () => {
+    const { trigger } = setup(['tags']);
+    trigger().focus();
+
+    fireEvent.keyDown(trigger(), { key: 'ArrowUp' });
+
+    expect(screen.getByRole('menuitem', { name: 'Show all' })).toHaveFocus();
+  });
+
+  it('moves from the trigger into an already open menu', () => {
+    const { trigger } = setup();
+    fireEvent.click(trigger());
+    trigger().focus();
+
+    fireEvent.keyDown(trigger(), { key: 'ArrowDown' });
+
+    expect(screen.getByRole('menuitemcheckbox', { name: 'Ref #' })).toHaveFocus();
   });
 });

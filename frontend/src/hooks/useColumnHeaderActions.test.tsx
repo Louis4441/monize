@@ -109,7 +109,7 @@ describe('useColumnHeaderActions', () => {
 
   it('gives a structural column no handlers, so its header sorts as before', () => {
     const { result } = renderHook(() =>
-      useColumnHeaderActions<Col>({ columns: COLUMNS, onHide: vi.fn() }),
+      useColumnHeaderActions<Col>({ columns: COLUMNS, onHide: vi.fn(), onHeaderClick: vi.fn() }),
     );
     expect(result.current.headerHandlers('date')).toBeUndefined();
     expect(result.current.headerHandlers('payee')).toBeUndefined();
