@@ -639,6 +639,25 @@ describe("FrankfurterFxProvider", () => {
     });
   });
 
+  describe("verifyCurrency", () => {
+    it("answers from the instance's own list, without a call per code", async () => {
+      answer(200, CURRENCIES);
+
+      expect(await provider.verifyCurrency("CAD")).toBe(true);
+      expect(await provider.verifyCurrency("cad")).toBe(true);
+      expect(await provider.verifyCurrency("TWD")).toBe(false);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(askedUrl()).toBe(`${DEFAULT_FRANKFURTER_BASE_URL}/currencies`);
+    });
+
+    it("while the compiled-in list stands in, a code it does not name is no answer, not unknown", async () => {
+      fetchMock.mockRejectedValueOnce(transportFailure());
+
+      expect(await provider.verifyCurrency("CAD")).toBe(true);
+      expect(await provider.verifyCurrency("TWD")).toBeNull();
+    });
+  });
+
   describe("the base URL", () => {
     it.each([
       [undefined, DEFAULT_FRANKFURTER_BASE_URL],

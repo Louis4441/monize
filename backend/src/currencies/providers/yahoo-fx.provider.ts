@@ -48,6 +48,9 @@ export const PLACEHOLDER_TOLERANCE = 0.01;
  */
 export const REVERSE_FIRST_MEMORY_LIMIT = 256;
 
+/** How many quotes a free-text currency search asks Yahoo for. */
+export const CURRENCY_SEARCH_COUNT = 20;
+
 /** Yahoo's symbol for the `from -> to` rate. */
 function fxSymbol(from: string, to: string): string {
   return `${from}${to}=X`;
@@ -72,6 +75,22 @@ function pairKey(from: string, to: string): string {
 function contradictsPlaceholder(reverse: number): boolean {
   const product = YAHOO_FX_PLACEHOLDER_RATE * reverse;
   return Math.abs(1 - product) > PLACEHOLDER_TOLERANCE * product;
+}
+
+/**
+ * The currency code a Yahoo FX symbol names for a free-text query: of a
+ * six-letter pair (`EURUSD=X`), the half the query spells, else the base; of
+ * anything else, the query itself upper-cased, as the lookup always answered.
+ */
+function currencyCodeFromSymbol(symbol: string, query: string): string {
+  const upperQuery = query.toUpperCase();
+  const pair = symbol.replace("=X", "");
+  if (pair.length !== 6) return upperQuery;
+  const base = pair.substring(0, 3);
+  const quote = pair.substring(3, 6);
+  if (base === upperQuery) return base;
+  if (quote === upperQuery) return quote;
+  return base;
 }
 
 function usable(rate: number | null | undefined): rate is number {
@@ -109,6 +128,13 @@ function usable(rate: number | null | undefined): rate is number {
  * is primary on a tie in density. Daily bars are not checked for the
  * placeholder: a pair not yet remembered asks the direct window first, as
  * before this check existed.
+ *
+ * Two lookup aids answer the currency lookup through the same client:
+ * `verifyCurrency` asks the code's chart against USD (Yahoo's `null` cannot
+ * say "unknown", so it answers `true` or `null`, never `false`), and
+ * `searchCurrency` reads the first FX quote of `searchQuotes`. The chain asks
+ * `verifyCurrency` only of a code no provider carries, and `carries` is
+ * always true here, so it is not reached while this adapter is configured.
  *
  * Observations come back in the orientation that answered; the writer orients
  * them. A quote is dated `todayYMD()`, as the refresh dates it today, so no
@@ -198,6 +224,22 @@ export class YahooFxProvider implements FxRateProvider {
   async fetchLive(from: string, to: string): Promise<FxObservation | null> {
     const { observation } = await this.chooseQuote(from, to);
     return observation ? { ...observation, date: todayYMD() } : null;
+  }
+
+  async verifyCurrency(code: string): Promise<boolean | null> {
+    const upper = code.toUpperCase();
+    const counter = upper === "USD" ? "EUR" : "USD";
+    const quote = await this.yahoo.fetchQuote(fxSymbol(upper, counter));
+    return quote === null ? null : true;
+  }
+
+  async searchCurrency(query: string): Promise<string | null> {
+    const quotes = await this.yahoo.searchQuotes(query, CURRENCY_SEARCH_COUNT);
+    if (quotes === null) return null;
+    const fx = quotes.find(
+      (quote) => quote.quoteType === "CURRENCY" || quote.symbol.includes("=X"),
+    );
+    return fx ? currencyCodeFromSymbol(fx.symbol, query) : null;
   }
 
   /**
