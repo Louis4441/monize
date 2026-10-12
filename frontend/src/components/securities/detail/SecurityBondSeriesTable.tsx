@@ -209,14 +209,18 @@ export function SecurityBondSeriesTable({
                 </tr>
                 {isOpen && (
                   <tr id={detailId}>
-                    <Td colSpan={columnCount} className="space-y-4 bg-gray-50 dark:bg-gray-900/30">
-                      {renderTermsSource(s)}
-                      <SecurityBondLotsTable lots={s.lots} currency={currency} />
-                      <SecurityBondRateSection
-                        lots={s.lots}
-                        currency={currency}
-                        redemptionTerms={s.series?.redemptionTerms ?? null}
-                      />
+                    <Td colSpan={columnCount} className="bg-gray-50 dark:bg-gray-900/30">
+                      {/* w-0 min-w-full: the detail fills the row but adds nothing to the
+                          table's own width, so the chart cannot widen the table it measures. */}
+                      <div className="w-0 min-w-full space-y-4">
+                        {renderTermsSource(s)}
+                        <SecurityBondLotsTable lots={s.lots} currency={currency} />
+                        <SecurityBondRateSection
+                          lots={s.lots}
+                          currency={currency}
+                          redemptionTerms={s.series?.redemptionTerms ?? null}
+                        />
+                      </div>
                     </Td>
                   </tr>
                 )}
